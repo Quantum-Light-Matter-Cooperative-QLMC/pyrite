@@ -54,6 +54,10 @@ class AxialDiagnosticConfig:
     spectral_cutoff_eV: float | None = None
     record_coherence: bool = False
     coherence_reference_index: tuple[int, int] | None = None
+    record_current: bool = False
+    record_current_divergence: bool = False
+    # (x_start, y_start, width_pixels, height_pixels), with periodic wrap.
+    current_contour: tuple[int, int, int, int] | None = None
 
 
 def _validate(config: AxialDiagnosticConfig) -> None:
@@ -94,6 +98,15 @@ def _validate(config: AxialDiagnosticConfig) -> None:
         raise ValueError("seed must be a nonnegative integer")
     if set(config.mechanisms) - {"tds", "electronic"}:
         raise ValueError("mechanisms must contain only tds and electronic")
+    from .axial_flux import FluxContour, samples_per_cell
+    samples_per_cell(config.cells, config.shape)
+    if (config.record_current_divergence or config.current_contour is not None) and not config.record_current:
+        raise ValueError("enable record_current to record divergence or contour flux")
+    if config.current_contour is not None:
+        bounds = config.current_contour
+        if not isinstance(bounds, tuple) or len(bounds) != 4:
+            raise ValueError("current_contour needs (start_x, start_y, width, height)")
+        FluxContour(bounds[:2], bounds[2:]).validate(config.shape)
     if not isinstance(config.spectral_states, Integral) or not 0 <= config.spectral_states <= 256:
         raise ValueError("spectral_states must be an integer between 0 and 256")
     if config.spectral_representation not in ("states", "energy_bins"):
@@ -158,6 +171,10 @@ class AxialDiagnosticResult:
     coherence_reference_index: tuple[int, int] | None = None
     coherence_numerator_per_ang2: np.ndarray | None = None
     coherence_second_moment: np.ndarray | None = None
+    # The physical Bloch carrier is included. Units are per depth.
+    transverse_current_per_ang2: np.ndarray | None = None  # (depth, component, x, y)
+    transverse_divergence_per_ang3: np.ndarray | None = None
+    contour_flux_per_ang: np.ndarray | None = None  # outward (-x,+x,-y,+y)
 
     def density(self, *, conditional: bool = False) -> np.ndarray:
         """Return density [Å⁻²], optionally conditioned on survival (zero if empty)."""
@@ -206,6 +223,7 @@ class _DiagnosticRecording:
         record_metrics,
         spectral=None,
         coherence=None,
+        current=None,
     ):
         self.metrics = (
             AxialMetricsObservable(
@@ -216,10 +234,12 @@ class _DiagnosticRecording:
         )
         self.spectral = spectral
         self.coherence = coherence
+        self.current = current
+        self.current_width = 0 if current is None else current.recording_width
         self.spectral_width = 0 if spectral is None else spectral.recording_width
         self.coherence_width = 0 if coherence is None else coherence.recording_width
         self.observers = [
-            f for f in (projection, observable, spectral, coherence, self.metrics) if f is not None
+            f for f in (projection, observable, spectral, coherence, current, self.metrics) if f is not None
         ]
         self.cuda_compatible = all(getattr(f, "cuda_compatible", False) for f in self.observers)
         self.width = 0 if self.metrics is None else self.metrics.width
@@ -228,16 +248,17 @@ class _DiagnosticRecording:
             + (0 if observable is None else getattr(observable, "recording_width", 4096))
             + self.spectral_width
             + self.coherence_width
+            + self.current_width
         )
         self.recording_bytes = (
             len(config.depths_ang) * 16 * (int(np.prod(grid.shape)) + self.width + extras)
         )
-        if (record_metrics or spectral is not None or coherence is not None) and (
+        if (record_metrics or spectral is not None or coherence is not None or current is not None) and (
             self.recording_bytes > RECORDING_BUDGET_BYTES
         ):
             raise ValueError("combined ensemble recording exceeds 128 MiB budget")
         self.scratch_bytes = 16 * int(np.prod(grid.shape)) * 100 + sum(
-            int(getattr(f, "scratch_bytes", 0)) for f in (spectral, coherence) if f is not None
+            int(getattr(f, "scratch_bytes", 0)) for f in (spectral, coherence, current) if f is not None
         )
         self.electrons = config.n_electrons if config.mode == "mcwf" else None
 
@@ -354,8 +375,16 @@ def axial_diagnostic(
             raise ValueError("oam_string must index a profile string")
         origin = profile.strings[config.oam_string].position_ang
         projection = CylindricalProjection(grid, origin, config.oam_radius_ang, 8)
+    from .axial_flux import AxialFluxObservable, FluxContour
+    current = None
+    if config.record_current:
+        bounds = config.current_contour
+        current = AxialFluxObservable(
+            grid, config.kinetic_energy_eV, divergence=config.record_current_divergence,
+            contour=None if bounds is None else FluxContour(bounds[:2], bounds[2:]),
+        )
     observe = _DiagnosticRecording(
-        grid, potential, config, projection, observable, record_metrics, spectral, coherence
+        grid, potential, config, projection, observable, record_metrics, spectral, coherence, current
     )
     numerical_sink = np.zeros(len(config.depths_ang))
     jump_history = None
@@ -394,7 +423,7 @@ def axial_diagnostic(
     density = stacked[:, :count].real.reshape(-1, *grid.shape)
     oam = None if projection is None else stacked[:, count:stop].real
     extra_stop = stacked.shape[1] - (
-        observe.width + observe.spectral_width + observe.coherence_width
+        observe.width + observe.spectral_width + observe.coherence_width + observe.current_width
     )
     extra = None if observable is None else stacked[:, stop:extra_stop]
     spec_values = None
@@ -411,6 +440,14 @@ def axial_diagnostic(
         coh = stacked[:, extra_stop : extra_stop + observe.coherence_width]
         coh_numerator = coh[:, :n].reshape(-1, *grid.shape)
         coh_second = coh[:, n:].real.reshape(-1, *grid.shape)
+        extra_stop += observe.coherence_width
+    current_maps = None
+    current_divergence = None
+    current_sides = None
+    if current is not None:
+        current_maps, current_divergence, current_sides = current.unpack(
+            stacked[:, extra_stop : extra_stop + observe.current_width]
+        )
     if config.mode == "coherent":
         surviving = density.sum(axis=(1, 2)) * grid.cell_area_ang2
     else:
@@ -447,4 +484,7 @@ def axial_diagnostic(
         ),
         coherence_numerator_per_ang2=coh_numerator,
         coherence_second_moment=coh_second,
+        transverse_current_per_ang2=current_maps,
+        transverse_divergence_per_ang3=current_divergence,
+        contour_flux_per_ang=current_sides,
     )

@@ -554,6 +554,9 @@ def _(mo, mode_ui):
             electrons=mo.ui.number(1, 4096, value=16, label="MCWF electrons"),
             samples=mo.ui.dropdown([11, 21, 41, 61, 81], value=41, label="Recorded depths"),
             metrics=mo.ui.checkbox(value=True, label="Record ensemble metrics (128 MiB cap)"),
+            current=mo.ui.checkbox(value=False, label="Record transverse probability current"),
+            divergence=mo.ui.checkbox(value=False, label="Record current divergence"),
+            cell_flux=mo.ui.checkbox(value=True, label="Contour flux around origin cell"),
             seed=mo.ui.number(0, 100000, value=0, label="Seed"),
             preset=mo.ui.dropdown(
                 ["Gaussian", "Vortex +1", "Vortex -1", "Equal ±1 mixture"],
@@ -610,6 +613,14 @@ def _(axial_form, mo):
         mechanisms=("tds", "electronic") if _v["electronic"] else ("tds",),
         spectral_states=int(_v["spectral"]),
         spectral_representation=_v["spectral_repr"],
+        record_current=bool(_v["current"]),
+        record_current_divergence=bool(_v["current"] and _v["divergence"]),
+        current_contour=(
+            (-(_v["grid"] // _v["cells"]) // 2,) * 2
+            + (_v["grid"] // _v["cells"],) * 2
+            if _v["current"] and _v["cell_flux"] and _v["grid"] % _v["cells"] == 0
+            else None
+        ),
         record_coherence=bool(_v["coherence"]),
         coherence_reference_index=(
             None if _v["ref_auto"] else (int(_v["ref_x"]), int(_v["ref_y"]))
@@ -642,7 +653,12 @@ def _(axial_result, mo):
     axial_conditional_ui = mo.ui.checkbox(
         value=False, label="Condition axial density on grid survival"
     )
+    axial_view_ui = mo.ui.dropdown(
+        {"Full periodic supercell": "full", "Origin unit-cell crop": "unit_cell"},
+        value="full", label="Axial map view",
+    )
     return (
+        axial_view_ui,
         axial_conditional_ui,
         axial_frames,
         axial_play_ui,
@@ -677,6 +693,7 @@ def _(
     axial_frames,
     axial_play_ui,
     axial_speed_ui,
+    axial_view_ui,
     axial_tick_ui,
     get_axial_frame,
     mo,
@@ -690,7 +707,7 @@ def _(
         show_value=True,
         on_change=set_axial_frame,
     )
-    _controls = [axial_sample_ui, axial_play_ui, axial_speed_ui, axial_conditional_ui]
+    _controls = [axial_sample_ui, axial_play_ui, axial_speed_ui, axial_conditional_ui, axial_view_ui]
     if axial_tick_ui is not None:
         _controls.append(axial_tick_ui)
     mo.hstack(_controls, wrap=True)
@@ -698,19 +715,31 @@ def _(
 
 
 @app.cell
-def _(axial_conditional_ui, axial_demo_figure, axial_result, axial_sample_ui, mo):
+def _(axial_conditional_ui, axial_demo_figure, axial_result, axial_sample_ui, axial_view_ui, mo):
     _index = axial_sample_ui.value
-    _fig = axial_demo_figure(axial_result, _index, axial_conditional_ui.value)
+    _fig = axial_demo_figure(axial_result, _index, axial_conditional_ui.value, axial_view_ui.value)
     _notes = (
         f"**{axial_result.config.mode} · depth {axial_result.depths_ang[_index] / 1e4:.4g} µm** · "
         f"surviving weight {axial_result.surviving[_index]:.6f}. "
         "Density integrates to incident-electron survival, or one when conditioned "
         "(zero if extinct). Coherent norm is not scattering survival. "
-        "The finite periodic grid can wrap the probe and lose momentum transfers; "
+        f"Supercell {axial_result.config.cells[0]}×{axial_result.config.cells[1]} cells; "
+        f"{axial_result.config.shape[0] // axial_result.config.cells[0]}×"
+        f"{axial_result.config.shape[1] // axial_result.config.cells[1]} samples/cell. "
+        "Cropped views are not open boundaries; the periodic grid can wrap "
+        "a spread probe and lose momentum transfers; "
         "compare grid, supercell and step convergence. MCWF statistics here are illustrative. "
         "Existing axial validation limits remain in the physics ledger. "
     )
     _items = [mo.md(_notes), _fig]
+    if axial_result.transverse_current_per_ang2 is not None:
+        from pyrite.apps.axial_channeling import axial_flux_figure
+        _items.extend(
+            [mo.md("**Periodic transverse current** includes the carrier tilt. "
+                   "Signed contour flux is local redistribution, not physical escape "
+                   "or numerical loss. The solve is cached; these views use recorded reductions."),
+             axial_flux_figure(axial_result, _index, axial_view_ui.value)]
+        )
     if axial_result.coherence_numerator_per_ang2 is not None:
         from pyrite.apps.axial_channeling import axial_coherence_figure
 
@@ -722,7 +751,7 @@ def _(axial_conditional_ui, axial_demo_figure, axial_result, axial_sample_ui, mo
                     "physical carrier included even after electronic kicks. Regions with insufficient "
                     "density, visibility or MC sampling signal are masked; MCWF has no unique phase."
                 ),
-                axial_coherence_figure(axial_result, _index),
+                axial_coherence_figure(axial_result, _index, axial_view_ui.value),
             ]
         )
     if axial_result.spectral_populations is not None:

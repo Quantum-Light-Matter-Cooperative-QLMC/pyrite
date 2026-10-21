@@ -207,7 +207,74 @@ def _centered(values: np.ndarray, grid):
     return np.roll(values, shift, axis=(0, 1)).T, tuple(extent)
 
 
-def axial_demo_figure(result: AxialDiagnosticResult, sample: int, conditional: bool = False):
+def _axial_view(axes, result: AxialDiagnosticResult, view: str):
+    """Crop only the plot axes; the solved periodic state remains unchanged."""
+    if view not in ("full", "unit_cell"):
+        raise ValueError("view must be full or unit_cell")
+    if view == "unit_cell":
+        lx = result.grid.extent_ang[0] / result.config.cells[0]
+        ly = result.grid.extent_ang[1] / result.config.cells[1]
+        for ax in axes:
+            if ax.axison:
+                ax.set(xlim=(-lx / 2, lx / 2), ylim=(-ly / 2, ly / 2))
+
+
+def axial_flux_figure(result: AxialDiagnosticResult, sample: int, view: str = "full"):
+    """Plot stored (cached-solve) probability flow without recomputing MCWF."""
+    import matplotlib.pyplot as plt
+
+    if result.transverse_current_per_ang2 is None:
+        raise ValueError("transverse current was not recorded")
+    grid = result.grid
+    jx, jy = result.transverse_current_per_ang2[sample]
+    magnitude = np.hypot(jx, jy)
+    ncol = 1 + int(result.transverse_divergence_per_ang3 is not None) + int(
+        result.contour_flux_per_ang is not None)
+    fig, axes = plt.subplots(1, ncol, figsize=(6 * ncol, 4), constrained_layout=True)
+    if ncol == 1:
+        axes = [axes]
+    shown, extent = _centered(magnitude, grid)
+    mesh = axes[0].imshow(shown, origin="lower", extent=extent, aspect="equal")
+    fig.colorbar(mesh, ax=axes[0], label="|j| (Å⁻²)")
+    sx = max(1, grid.shape[0] // 16)
+    sy = max(1, grid.shape[1] // 16)
+    dx = grid.extent_ang[0] / grid.shape[0]
+    dy = grid.extent_ang[1] / grid.shape[1]
+    xs = extent[0] + (np.arange(grid.shape[0]) + 0.5) * dx
+    ys = extent[2] + (np.arange(grid.shape[1]) + 0.5) * dy
+    ux, _ = _centered(jx, grid)
+    uy, _ = _centered(jy, grid)
+    axes[0].quiver(xs[::sx], ys[::sy], ux[::sy, ::sx], uy[::sy, ::sx],
+                   color="white", angles="xy", scale_units="xy", scale=None)
+    axes[0].set(title="Carrier-inclusive transverse current", xlabel="x (Å)", ylabel="y (Å)")
+    if result.transverse_divergence_per_ang3 is not None:
+        div, _ = _centered(result.transverse_divergence_per_ang3[sample], grid)
+        max_abs = max(float(np.max(np.abs(div))), 1e-30)
+        mesh = axes[1].imshow(div, origin="lower", extent=extent, aspect="equal",
+                              cmap="coolwarm", vmin=-max_abs, vmax=max_abs)
+        fig.colorbar(mesh, ax=axes[1], label="∇·j (Å⁻³)")
+        axes[1].set(title="Finite-volume current divergence", xlabel="x (Å)", ylabel="y (Å)")
+    if result.contour_flux_per_ang is not None:
+        net = result.contour_flux_per_ang.sum(axis=1)
+        for side, label in enumerate(("-x", "+x", "-y", "+y")):
+            axes[-1].plot(result.depths_ang / 1e4, result.contour_flux_per_ang[:, side],
+                          label=label)
+        axes[-1].plot(result.depths_ang / 1e4, net, color="black", ls="--", label="net")
+        axes[-1].axvline(result.depths_ang[sample] / 1e4, color="gray", ls=":")
+        axes[-1].set(xlabel="Depth (µm)", ylabel="Outward flux (Å⁻¹)",
+                     title="Internal-cell contour (signed)")
+        axes[-1].legend(fontsize="small", ncol=2)
+    if result.contour_flux_per_ang is not None:
+        sides = result.contour_flux_per_ang[sample]
+        fig.suptitle("Contour flux (-x,+x,-y,+y): " + ", ".join(f"{v:+.3g}" for v in sides)
+                     + f" Å⁻¹; net={sides.sum():+.3g} Å⁻¹")
+    _axial_view(axes[:ncol - int(result.contour_flux_per_ang is not None)],
+                result, view)
+    return fig
+
+
+def axial_demo_figure(result: AxialDiagnosticResult, sample: int, conditional: bool = False,
+                      view: str = "full"):
     """Draw recorded arrays; phase is a coherent envelope or ensemble relative phase."""
     import matplotlib.pyplot as plt
 
@@ -267,10 +334,12 @@ def axial_demo_figure(result: AxialDiagnosticResult, sample: int, conditional: b
         ylabel="Incident-electron fraction",
         ylim=(0, 1.05),
     )
+    _axial_view(axes[:3], result, view)
     return fig
 
 
-def axial_coherence_figure(result: AxialDiagnosticResult, sample: int):
+def axial_coherence_figure(result: AxialDiagnosticResult, sample: int,
+                            view: str = "full"):
     """Plot cached normalized spatial coherence; never reconstruct from density."""
     import matplotlib.pyplot as plt
 
@@ -310,6 +379,7 @@ def axial_coherence_figure(result: AxialDiagnosticResult, sample: int):
         f"empirical purity={purity:.3g}; "
         + ("2σ MC sampling mask" if sem is not None else "deterministic ensemble")
     )
+    _axial_view(axes, result, view)
     return fig
 
 
