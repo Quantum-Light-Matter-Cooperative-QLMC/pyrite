@@ -15,6 +15,7 @@ def _response(segments=None, **overrides):
         medium="sample", segments=((np.array([1.0, 2.0]), np.array([1+0j, 3+2j])),) if segments is None else segments,
         source="synthetic passivity fixture", source_sha256="0" * 64,
         license="CC0-1.0", sample_state="synthetic", temperature_K=300.0,
+        dataset_id="synthetic", reference="synthetic fixture", source_units="energy eV; epsilon dimensionless",
     )  # fmt: skip
     values.update(overrides)
     return OpticalResponse(**values)
@@ -51,6 +52,11 @@ def test_gold_pinned_response_matches_rakic_within_tabulation_error():
     assert eps.dtype == np.complex128
     assert response.license == "CC0-1.0"
     assert response.temperature_K is None
+    assert response.orientation == "not applicable (isotropic response)"
+    assert response.uncertainty == "unspecified by source"
+    assert response.dataset_id == "refractiveindex.info/main/Au/nk/Rakic-LD"
+    assert "10.1364/AO.37.005271" in response.reference
+    assert "wavelength um" in response.source_units
     assert "fit" in response.sample_state
     assert (
         response.source_sha256 == "a91fca57ee99efc77354908fa11b9c4822e8852394042069caaac7610c52e602"
@@ -84,6 +90,9 @@ def test_linear_complex_interpolation_shape_passivity_and_vacuum_limit():
     assert response.epsilon(1.5) == 2 + 1j
     vacuum = _response(((np.array([1.0, 2.0]), np.ones(2, complex)),))
     np.testing.assert_array_equal(vacuum.epsilon(query), np.ones(query.shape))
+    # Zero dissipative loss also permits negative real epsilon (evanescence).
+    evanescent = _response(((np.array([1.0, 2.0]), np.full(2, -2 + 0j)),))
+    np.testing.assert_array_equal(evanescent.epsilon(query), np.full(query.shape, -2 + 0j))
 
 
 def test_disjoint_support_never_interpolates_through_a_gap():
@@ -112,6 +121,11 @@ def test_gold_refuses_unsupported_energies(energy):
         ({"temperature_K": -1}, "temperature"),
         ({"temperature_K": np.nan}, "temperature"),
         ({"license": ""}, "license"),
+        ({"dataset_id": ""}, "dataset identifier"),
+        ({"reference": ""}, "reference"),
+        ({"source_units": ""}, "source units"),
+        ({"orientation": ""}, "orientation"),
+        ({"uncertainty": ""}, "uncertainty"),
         ({"source_sha256": "not a hash"}, "SHA-256"),
         ({"segments": ()}, "segment"),
         ({"segments": (([1, 2], [1 - 1j, 2 + 0j]),)}, "passive"),
@@ -135,6 +149,8 @@ def test_response_identity_and_immutable_data():
     assert replace(response, temperature_K=301).digest != response.digest
     assert replace(response, sample_state="different film").digest != response.digest
     assert replace(response, source_sha256="1" * 64).digest != response.digest
+    assert replace(response, uncertainty="1% source estimate").digest != response.digest
+    assert replace(response, dataset_id="another sample").digest != response.digest
     assert (
         replace(response, segments=((np.array([1.0, 2.0]), np.array([1.0, 2.0])),)).digest
         != response.digest

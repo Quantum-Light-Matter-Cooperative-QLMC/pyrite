@@ -26,6 +26,10 @@ class OpticalResponse:
     kelvin or None when the source does not specify it; sample state must say
     whether the ordinates are measured or fitted. ``medium`` is an explicit
     sample label, never a composition-based inference.
+    Dataset identifier, original reference and source units distinguish raw
+    data from the normalized eV/relative-permittivity arrays. Orientation is
+    inapplicable for this isotropic model; unspecified source uncertainty is
+    recorded explicitly and never treated as zero.
 
     Validation: optical-material-response
     """
@@ -36,7 +40,12 @@ class OpticalResponse:
     source_sha256: str
     license: str
     sample_state: str
+    dataset_id: str
+    reference: str
+    source_units: str
     temperature_K: float | None = None
+    orientation: str = "not applicable (isotropic response)"
+    uncertainty: str = "unspecified by source"
     convention: str = "exp(-i omega t)"
     symmetry: str = "scalar-isotropic"
 
@@ -45,8 +54,23 @@ class OpticalResponse:
             raise ValueError("optical response: unsupported tensor/anisotropic response")
         if self.convention != "exp(-i omega t)":
             raise ValueError("optical response requires passive exp(-i omega t) convention")
-        if not all((self.medium, self.source, self.license, self.sample_state)):
-            raise ValueError("optical response requires medium, source, license and sample state")
+        if not all(
+            (
+                self.medium,
+                self.source,
+                self.license,
+                self.sample_state,
+                self.dataset_id,
+                self.reference,
+                self.source_units,
+                self.orientation,
+                self.uncertainty,
+            )
+        ):
+            raise ValueError(
+                "optical response requires medium, source, license, sample state, "
+                "dataset identifier, reference, source units, orientation and uncertainty"
+            )
         if len(self.source_sha256) != 64 or any(
             c not in "0123456789abcdef" for c in self.source_sha256
         ):
@@ -84,7 +108,12 @@ class OpticalResponse:
                 self.source_sha256,
                 self.license,
                 self.sample_state,
+                self.dataset_id,
+                self.reference,
+                self.source_units,
                 self.temperature_K,
+                self.orientation,
+                self.uncertainty,
                 self.convention,
                 self.symmetry,
                 "linear-epsilon-in-eV-v1",
@@ -170,4 +199,7 @@ def gold_rakic_response() -> OpticalResponse:
         source_sha256=_RAKIC_SHA256,
         license="CC0-1.0",
         sample_state="Rakić 1998 Lorentz–Drude fit to multiple experimental sources; temperature unspecified",
+        dataset_id="refractiveindex.info/main/Au/nk/Rakic-LD",
+        reference="Rakić et al., Appl. Opt. 37, 5271–5283 (1998); doi:10.1364/AO.37.005271",
+        source_units="vacuum wavelength um; refractive index n,k dimensionless",
     )

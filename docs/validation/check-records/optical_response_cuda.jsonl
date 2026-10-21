@@ -1,0 +1,1 @@
+{"check": "checks/optical_response_cuda.py", "ledger_id": "optical-material-response", "measured_value": null, "recorded_at": "2026-10-21T02:23:22.371704+00:00", "reference_value": null, "revision": "c20abfc48080d69bb2dffc3563868649eee89c0a", "schema_revision": 1, "tolerance": null, "verdict": "pass"}

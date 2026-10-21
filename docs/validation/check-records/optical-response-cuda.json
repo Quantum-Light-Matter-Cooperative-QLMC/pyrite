@@ -1,0 +1,31 @@
+{
+  "bands_eV": [
+    [
+      0.2000003193960511,
+      4.999967657377909
+    ]
+  ],
+  "compute_capability": "120",
+  "cuda_driver": 13030,
+  "cuda_runtime": 13020,
+  "cupy": "14.2.0",
+  "device": "NVIDIA GeForce RTX 5080",
+  "nodes": 513,
+  "refusals": [
+    "[0.01]",
+    "[6.0]",
+    "[nan]",
+    "declared gap",
+    "tensor",
+    "Au/eaglexo_qe"
+  ],
+  "response_digest": "0aef62db24744ab6a9958913d2052dbc8e367c3e6c09e76cacfdc6d3b317503c",
+  "response_max_abs_difference": 0.0,
+  "revision": "c20abfc48080d69bb2dffc3563868649eee89c0a",
+  "source_sha256": "a91fca57ee99efc77354908fa11b9c4822e8852394042069caaac7610c52e602",
+  "timestamp_utc": "2026-10-21T02:23:21.911084+00:00",
+  "tr_atol_over_peak": 1e-12,
+  "tr_peak_normalized_max_abs_difference": 1.6071485542663386e-15,
+  "tr_rtol": 1e-10,
+  "validation_id": "optical-material-response"
+}

@@ -225,7 +225,10 @@ local, isotropic, scalar relative permittivity. Photon energies are in eV;
 permittivity is dimensionless and uses $\exp(-i\omega t)$, with
 $\operatorname{Im}\epsilon\geq0$ for a passive medium. Each response records
 its medium/sample label, sample state, temperature in kelvin (or explicitly
-unspecified), source URL, source SHA-256 and license. Its `digest` also covers
+unspecified), dataset identifier, original reference, source units, orientation,
+uncertainty, source URL, source SHA-256 and license. Isotropic orientation is
+explicitly inapplicable; unspecified uncertainty is not a zero-error claim.
+Its `digest` also covers
 numeric values, support segmentation and interpolation policy. Unsupported
 tensors, active response, nonfinite values and undeclared extrapolation fail.
 Disjoint segments represent gaps; interpolation never joins across a gap.
