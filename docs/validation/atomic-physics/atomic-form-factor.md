@@ -1,9 +1,10 @@
+(validation-atomic-form-factor)=
 # `atomic-form-factor`
 
 ## Claim and sources
 
-- Claim: `materials/atomic.py::atomic_form_factor` returns `F(g,E) = f0(g) + f'(E) + i f''(E)`.
-- Sources: Waasmaier--Kirfel elastic form factors and Chantler/FFAST anomalous terms, exposed through xraydb; source mapping recorded in `docs/physics/atomic-physics/atomic-data-sources.md`.
+- Claim: {py:func}`pyrite.materials.atomic.atomic_form_factor` returns `F(g,E) = f0(g) + f'(E) + i f''(E)`.
+- Sources: Waasmaier--Kirfel elastic form factors and Chantler/FFAST anomalous terms, exposed through xraydb; source mapping recorded in [Atomic data sources](../../physics/atomic-physics/atomic-data-sources.md).
 - Signature: `atomic_form_factor(element, g, E_eV, on_out_of_range="nan")` with `g` in inverse angstrom and energy in eV.
 
 ## Independent derivation
@@ -30,7 +31,9 @@ The Chantler functions supply `f'` directly, not `Z+f'`, and positive `f''`. Thu
 
 ## Implementation comparison
 
-Production delegates `f0` to `cromer_mann_f0`, which passes exactly `g/(4*pi)` to `xraydb.f0`. `henke_dispersion` returns direct `xraydb.f1_chantler` and `xraydb.f2_chantler` values. The final expression is
+Current source: {source}`src/pyrite/materials/atomic.py::atomic_form_factor`.
+
+Production delegates `f0` to {py:func}`pyrite.materials.atomic.cromer_mann_f0`, which passes exactly `g/(4*pi)` to `xraydb.f0`. {py:func}`pyrite.materials.atomic.henke_dispersion` returns direct `xraydb.f1_chantler` and `xraydb.f2_chantler` values. The final expression is
 
 ```text
 (f0 + fp) + 1j * fpp

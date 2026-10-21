@@ -34,3 +34,6 @@ On the real amplitude $f_0+f'$ in the 1–4.5 keV line band, Chantler and Henke/
 - `f1_chantler` can raise at the exact table endpoint, and the bremsstrahlung grid passes $E = 0$, so `henke_dispersion` masks to the strict interior of the table and returns NaN outside it.
 
 The choice of dataset is recorded in [ADR-0015](../../adr/0015-xraydb-atomic-scattering-data.md).
+
+The [atomic-form-factor validation record](../../validation/atomic-physics/atomic-form-factor.md)
+checks the momentum-transfer conversion and anomalous-term convention.

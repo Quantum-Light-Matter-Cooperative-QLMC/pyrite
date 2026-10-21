@@ -1,3 +1,4 @@
+(validation-structure-factor)=
 # `structure-factor`
 
 **Claim.** Kinematical (geometric) structure factor of a crystal unit cell, together with the isotropic Debye–Waller (thermal) attenuation factor:
@@ -12,6 +13,11 @@ W = B \left(\frac{\sin\theta}{\lambda}\right)^2 = B\left(\frac{g}{4\pi}\right)^2
 with the crystallographic B-factor `B = 8π² <u_x²>` (`<u_x²>` = mean-square displacement along the scattering vector).
 
 **Code.** `src/pyrite/materials/crystal.py::structure_factor`, `src/pyrite/materials/crystal.py::debye_waller` **Source (as handed).** Standard kinematical structure factor $F(\mathbf g) = \sum_j f_j\exp(i\mathbf g\cdot\mathbf r_j) \exp\left(-\dfrac{Bg^2}{16\pi^2}\right)$. The flagged trap is the Debye–Waller exponent convention: $B$ vs $\langle u^2\rangle$, and the factor $16\pi^2$ vs $4$. **Anchor.** none in the ledger row. **Verifier context.** Fresh, independent session. Derivation below was written from the standard kinematical-diffraction result and the module's stated reciprocal-space convention *before* reading the `debye_waller` body; the code was only diffed afterward.
+
+Current source: {source}`src/pyrite/materials/crystal.py::structure_factor` and
+{source}`src/pyrite/materials/crystal.py::debye_waller`. The public
+{py:func}`pyrite.materials.crystal.structure_factor` reference documents its inputs;
+the atomic amplitude convention is checked in {ref}`validation-atomic-form-factor`.
 
 ---
 

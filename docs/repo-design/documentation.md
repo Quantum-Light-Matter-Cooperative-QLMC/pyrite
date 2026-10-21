@@ -28,7 +28,62 @@ Refer to numbered objects semantically:
 
 Do not manually write references such as “Table 3” or “the equation above” when a semantic cross-reference can be used instead.
 
-Link project files with relative Markdown links.
+Link published pages with relative Markdown links, for example
+`[Atomic data sources](../physics/atomic-physics/atomic-data-sources.md)`.
+These follow the documentation version in tags and PR previews. Use `{doc}`
+for a document reference and `{ref}` for a stable explicit claim label, such
+as `validation-atomic-form-factor`.
+
+For documented Python objects, use the matching Python-domain role with its
+fully qualified name: `{py:func}`, `{py:class}`, `{py:meth}` or `{py:mod}`.
+For example:
+
+```markdown
+{py:func}`pyrite.materials.atomic.atomic_form_factor`
+{ref}`validation-atomic-form-factor`
+```
+
+API pages also provide Sphinx's `[source]` links. Do not add private helpers to
+the public API inventory solely to obtain links.
+
+### Current and historical source references
+
+Use the checked `source` role for repository files and private Python owners:
+
+```markdown
+{source}`src/pyrite/materials/atomic.py`
+{source}`src/pyrite/montecarlo/spectrum/cxr/_formation.py::formation_factor`
+{source}`tests/montecarlo/test_coherent_emission.py`
+```
+
+Paths start at the repository root. An optional `::` suffix names a definition
+or dotted class member. The build checks that the file and definition exist,
+using the ledger's AST symbol resolver without importing the owner. It emits
+a GitHub link with the familiar path label and the revision in its tooltip.
+Definition links include a line anchor pinned to that revision.
+
+`docs/conf.py` owns the repository URL and revision. Hosted builds use
+`READTHEDOCS_GIT_COMMIT_HASH`; local checkouts use `git rev-parse HEAD`.
+Source archives without Git fall back to the release tag. Commit local changes
+before publishing so the linked commit contains the reviewed source.
+
+Keep canonical ledger `Code` values as literal `file::symbol` anchors: the
+ledger parser and marker checks consume that format. Add checked source links
+in the detailed write-up alongside those anchors. Generated status/domain
+views contain no implementation fields and need no source-link rewrite.
+
+Label historical excerpts, paths and line numbers as historical. Link them
+with ordinary Markdown URLs pinned to their recorded commit; the current-source
+role deliberately checks today's checkout and cannot validate a historical tree.
+Do not replace a historical reference with an assertion about current ownership.
+
+The warning-as-error build rejects missing explicit document, claim and
+Python-role targets in maintained Markdown, and missing files/definitions in
+`source` roles. It does not enable global nitpicky checking of inferred API
+types. Literal code spans, code excerpts, unlinked identifiers and historical
+external URLs are outside this check; retain them when quoting source or when
+no resolvable target exists. These checks establish navigation and current
+ownership, not physical validity or external GitHub availability.
 
 Cite external scientific sources with a descriptive author/year/title/DOI link in prose or with a MyST footnote. Add a shared BibTeX dependency only when sources are reused often enough to justify repository-wide bibliography ownership.
 

@@ -56,6 +56,7 @@ version = __version__
 
 # -- Extensions --------------------------------------------------------------
 extensions = [
+    "_source_refs",  # checked links to current repository files and definitions
     "_warning_baseline",  # exact boundary around inherited autodoc parse debt
     "_marimo_demo",  # browser-only results demo embedded on the overview page
     "myst_parser",  # render the docs/*.md design notes
@@ -66,6 +67,11 @@ extensions = [
     "sphinx.ext.mathjax",  # the docstrings carry LaTeX
     "sphinxcontrib.bibtex",  # one references.bib for every external source
 ]
+
+from _source_refs import build_revision
+
+source_repository = "https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite"
+source_revision = build_revision(ROOT, f"v{release}")
 
 # -- Bibliography ------------------------------------------------------------
 # Single shared bibliography. Cite with ``{cite:t}`key``` / ``{cite:p}`key```;

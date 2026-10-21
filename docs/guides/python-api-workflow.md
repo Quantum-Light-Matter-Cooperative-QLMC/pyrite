@@ -122,7 +122,7 @@ Three derived views cover most analysis:
 
 - `result.spectral_flux(units="detector")` returns a wide polars table on the union of all native grids: `photon_energy_eV`, `photon_energy_keV`, one column per family, and `total`. Each family is exact at its own nodes, linearly interpolated between them, and zero outside its own grid. `units` selects photons/(s eV) into the accepted solid angle (`"detector"`), photons/(s nA eV) (`"nA"`), photons/(s eV sr) (`"sr"`), or the stored per-electron density (`"electron"`); `pyrite.results.FLUX_UNITS` holds the labels. Beam current is the bunch charge times the repetition rate. The accepted solid angle is `result.accepted_solid_angle_sr()`: the case `domega_sr` for a scalar detector, or the summed pixel solid angle for a planar one. For a scalar detector the density is taken at the central observation direction, so `"detector"` assumes it is uniform over the acceptance.
 - `result.to_dataframe()` returns a long polars frame with one row per native node: `component`, `mode`, `photon_energy_eV`, `density`, and `normalization`. It never interpolates or adds totals.
-- `result.combined_cxr(mode="incoherent")` returns CXR plus characteristic emission as one `SpectralDensity` on the CXR grid.
+- `result.combined_cxr(mode="incoherent")` returns CXR plus characteristic emission as one `SpectralDensity` on the CXR grid. Pass `include_characteristic=False` to keep only the selected CXR mode.
 
 ```python
 cxr_energy_eV = result.cxr.incoherent.photon_energy_eV
@@ -153,6 +153,10 @@ resolved_case = result.case
 | | `line_grid_policy`, `line_grid_resolved` | automatic CXR grids |
 | Environment | `backend`, `device`, `git_sha`, `git_dirty`, `versions` | always; git fields are `None` for an installed wheel |
 
+`provenance.resolved_physics` records in-tree descriptor IDs, model-generation
+markers, parameters and per-case table digests. Capability declarations describe
+the selected model; they do not certify its physical validation domain.
+
 Use `result.scene` for what you asked for. `result.case` is the lower-level resolved transport input: its keys use internal units and historical names (`E0_keV`, `E_grid_line`, `theta_obs_rad`, `domega_sr`) because they feed content identity. Record the digest and software revision with any derived figure or table.
 
 `Physics.emission` accepts a single mode string or a nonempty tuple, list, set,
@@ -168,6 +172,10 @@ and `result.cxr.coherent.density` is its coherent companion. Neither includes
 atomic characteristic emission. Use `result.combined_cxr(mode="coherent")`
 for the coherent CXR-plus-characteristic density and its grid. The coherent
 model remains inside the [documented validation boundary](../physics/radiation-physics/coherent-emission.md).
+
+`Physics(brem_source=None)` disables continuum scoring and normalizes to
+`"none"` for case/checkpoint identity; the string remains accepted. The default
+`"mc"` selects simulated continuum.
 
 The high-level API currently cannot inject an external bremsstrahlung array. `brem_source="external"` and `brem_source="none"` therefore return zeros on the resolved continuum grid; use `brem_source="mc"` for simulated background.
 
@@ -391,6 +399,11 @@ attribute names were removed in 0.13 after the two-minor deprecation window.
 | `Sweep.line_grid_policy` | `Sweep.cxr_grid_policy` |
 | spatial component `line`, `background` | `cxr`, `brem` |
 
+The flat `Result` attributes (`energy_eV`, `spectrum`, `background_energy_eV`,
+`background`, `coherent_spectrum`, `characteristic_spectrum`), flat/positional
+constructor and `line_total()` were removed after 0.11. Use the grouped
+radiation families, keyword-only constructor and `combined_cxr()`.
+
 Through 0.11, `result.to_dataframe()` returned a pandas frame with units,
 normalization, case, and provenance in `DataFrame.attrs`. It now returns a polars
 frame: units are fixed and documented, `normalization` is a column, and case and
@@ -407,3 +420,285 @@ payload keys, format tags, and RNG stream identifiers retain their historical
 spellings. These compatibility contracts keep existing runs reusable and
 preserve seeded observations. Atomic characteristic lines and mathematical
 line shapes retain their domain terminology.
+
+## Compare photon energies
+
+`pyrite.photon_energies` returns a NumPy array of vacuum CXR line-centre energies
+without running transport. The implementation lives in
+`pyrite.materials.emission`. Beam kinetic energy and returned photon energy are
+in **eV**; sample and detector angles are in degrees. Inputs may be scalars,
+lists, or arrays. The default `mode="broadcast"` pairs numerical inputs using
+NumPy broadcasting and retains a leading material axis; all-scalar inputs
+return `(n_materials,)`.
+
+```python
+import numpy as np
+import pyrite as pr
+from pyrite.materials.crystal import HC_EV_ANG
+
+observation_deg = np.linspace(20.0, 160.0, 141)
+energies_eV = pr.photon_energies(
+    ["hopg", "mos2", "wse2"],
+    beam_energy_eV=30_000.0,
+    tilt_deg=30.0,
+    tilt_azim_deg=15.0,
+    theta_obs_deg=observation_deg,
+)
+# Each row is one material's comparison curve, shape (3, 141).
+wavelengths_nm = HC_EV_ANG / (10.0 * energies_eV)
+```
+
+For a heatmap, either shape independent inputs for broadcasting or request a
+Cartesian product with `mode="grid"`:
+
+```python
+tilts_deg = np.linspace(0.0, 80.0, 81)
+energies_eV = pr.photon_energies(
+    ["hopg", "mos2"],
+    beam_energy_eV=[30_000.0, 100_000.0],
+    tilt_deg=tilts_deg,
+    theta_obs_deg=observation_deg,
+    mode="grid",
+)
+# Axis order: material, beam energy, tilt, tilt azimuth,
+#             detector polar angle, detector azimuth.
+hopg_30keV_heatmap = energies_eV[0, 0, :, 0, :, 0]  # (81, 141)
+
+# The same two-angle map with broadcast inputs:
+paired_map = pr.photon_energies(
+    "hopg",
+    30_000.0,
+    tilt_deg=tilts_deg[:, None],
+    theta_obs_deg=observation_deg[None, :],
+)[0]
+```
+
+Grid mode accepts scalar or 1-D numerical axes. Scalar axes retain size one,
+empty axes retain size zero, and material order and duplicates are preserved.
+Both modes accept `phi_obs_deg`; it participates in shape resolution but does
+not change this straight-beam vacuum energy because the beam points along lab
+`+z`. Sample `tilt_azim_deg` can affect oblique reflections; a reflection
+parallel to the surface normal is azimuth-independent.
+
+The default reflection is the lowest catalogue-pinned family parallel to the
+declared surface normal, or the first non-extinct harmonic (orders 1–32) of its
+primitive reciprocal cut. The unpinned search tests each element's fractional
+basis sum with a relative amplitude tolerance of `1e-5` for CIF rounding; it
+does not rank intensities. Examples include HOPG/MoS₂ `(002)`, black phosphorus
+`(020)`, and GeP `(20-2)`. `hkl=(h, k, l)` overrides all materials;
+`hkl={"hopg": (0, 0, 4)}` overrides just that material. Explicit indices give
+kinematics even for extinct planes and do not promise emission intensity.
+An unresolved cut requires explicit indices. The catalogue surface orientation
+is retained when selecting an oblique reflection; the reflection override does
+not change the crystal cut. `catalog=` accepts a loaded `MaterialCatalog` or a
+complete catalogue path; omission uses the current configured catalogue.
+
+Each reflection denotes its Friedel pair, choosing the member with positive
+beam projection. Grazing projections within `1e-12 * |g|` of zero and energies
+above the electron kinetic energy return `NaN`. Invalid inputs and incompatible
+shapes raise `ValueError`. These are straight-electron, vacuum resonance
+energies, not intensity maxima or broadened spectra. Production in-medium
+dispersion can shift line centres; mosaicity, transport energy loss, and
+detector response require the simulation API.
+
+## Choose adaptive sampling
+
+Adaptive sampling replaces both fixed counts with one shared count chosen from a precision policy:
+
+```python
+numerics = pr.Numerics(
+    precision=pr.Precision(
+        target_rse=0.1,
+        min_electrons=400,
+        max_electrons=10_000,
+        block_electrons=100,
+        observables=("cxr", "brem"),
+    ),
+)
+result = pr.simulate(beam, target, detector, numerics=numerics)
+sampling = result.provenance["adaptive_sampling"]
+sampling["realized_electrons"]
+sampling["statistics_limited"]
+```
+
+`min_electrons` defaults to one block (`block_electrons`); the other three budget fields are required. The example is an explicit budget, not a default recommendation. Counts must be multiples of the block size. The policy overrides `Numerics.cxr_trials` and `brem_trials`; omitting `precision` retains fixed sampling. The requested policy stays in `Result.case["adaptive_precision"]` and its identity, while realized counts, achieved errors, guards, and stop reason stay in `adaptive_sampling`. A run reaching its maximum without convergence completes with `statistics_limited=True` and a `CxrYieldStatisticsWarning`.
+
+This mode supports incoherent scalar-detector scenes on the per-electron or CUDA core. It rejects coherent emission, physical detectors and observation directions, trajectory capture, GDF beams, grooves, and particle cascades. The two populations share one target and count in this implementation. The [statistical methods](../computation/statistical-methods.md#adaptive-electron-counts) describe the observables, guards, and limits of the error estimate.
+
+## Reuse bodies as targets and filters
+
+`RectangularBody` describes one homogeneous finite solid: an explicit substance
+reference, full width/height and thickness in **mm**. `Target` and `Filter`
+assign independent scene roles to that description. Target angles and the
+catalog crystal cut describe source orientation; a filter's `PlanarPose`
+describes its box centre and local axes in lab mm relative to the target
+entrance origin. Reusing a body does not place one in-scene object in two roles.
+
+```python
+plate = pr.RectangularBody(
+    substance=pr.SubstanceRef(kind="crystal", key="silicon"),
+    size_mm=(10.0, 10.0),
+    thickness_mm=0.1,
+)
+target = pr.Target(body=plate, tilt_deg=30.0)
+window = pr.Filter(body=plate, pose=pr.PlanarPose((0.0, 0.0, 50.0)), name="window")
+physical_detector = pr.PlanarDetector(pr.PlanarPose((0.0, 0.0, 100.0)), size_mm=(10.0, 10.0))
+scene = pr.Scene(beam, target, physical_detector, filters=(window,))
+
+body_sweep = pr.Sweep(scene, axes={"target.body.thickness_mm": [0.01, 0.1]})
+```
+
+Bodies and wrappers are frozen scalar records; sweep axes expand before case
+lowering. Filter body and pose axes work similarly, for example
+`filters[0].body.thickness_mm` or `filters[0].pose.center_mm`. Existing
+`Slab`/`Stack` constructors and their Å-based thickness fields retain their
+meaning. `Target.to_slab()` converts mm to Å without rounding and preserves
+the established target angle quantization during case construction.
+`Scene.target_spec` and `Scene.filter_plates` expose the legacy values for
+source, observation and trajectory consumers. `ResolvedObservation` continues
+to take fully lowered plates; use `scene.filter_plates` there.
+
+`SubstanceRef` selects the case-sensitive `crystal` or `medium` namespace;
+runnable target recipes are not homogeneous substances. Inline `MediumSpec`
+compositions are also valid bodies for filters. `Target` requires a crystal
+reference and uses the selected target catalog. A key that would redirect
+through a recipe to a different crystal is rejected. `lattice_cut="catalog"`
+keeps the catalog crystal cut; `lattice_cut=pr.CrystalCut(...)` lowers to
+`Slab(cut=...)` (see "Crystal cuts" below). Arbitrary target poses,
+layers, grooves and amorphous entrances are outside this adapter's supported
+set.
+Use the existing target variants for their established specialized behavior.
+
+`Filter` supports only `interaction="primary-attenuation-only"`. Other
+requested interactions fail before computation. `Filter.to_plate(catalog=...)`
+can resolve an explicit loaded catalog without fallback; it uses an inline
+medium when legacy string lookup would select a different namespace or catalog.
+Equivalent legacy and adapted inputs retain source cases, observation identities
+and numerical behavior. Standard catalog references also retain their legacy
+trajectory snapshots; explicit external or disambiguated references snapshot
+their resolved inline composition. Catalog tables, stored schema versions and
+CLI commands are unchanged.
+
+## Tilt the bunch front and crystal cut
+
+`TransverseSpot` is the Gaussian transverse descriptor; `Spot` remains a
+compatibility alias. Compose a front tilt with the existing spot and local
+bunch duration:
+
+```python
+beam = pr.Beam(
+    energy_keV=30.0,
+    transverse=pr.TransverseSpot(fwhm_x_mm=0.001, fwhm_y_mm=0.01),
+    longitudinal=pr.BunchLength(rms_fs=0.001),
+    bunch_front_tilt=pr.BunchFrontTilt(tilt_deg=45.0, azimuth_deg=0.0),
+)
+target = pr.Slab(
+    "hopg", thickness_ang=500.0, tilt_deg=45.0, footprint=pr.Footprint(width_mm=5.0, height_mm=5.0)
+)
+```
+
+The front is tilted from the beam-normal plane, without rotating the beam.
+Matching its tilt and azimuth to the resolved target makes the front **parallel to the
+entrance face**: the imposed incoming time gradient cancels the different
+vacuum flight times to that face. Positive tilt means later arrival along the
+lab transverse direction selected by the azimuth (0 degrees is +x, 90 is +y).
+Angles must be finite and strictly between -90 and 90 degrees.
+
+The RMS duration is conditional on transverse position: it remains the local
+thickness of the tilted front, while the full envelope can be much longer.
+Initially nonzero tilt supports monoenergetic parallel Gaussian/point analytic
+sources with Gaussian timing or `PointBunch()`. GDF, Courant–Snyder, energy
+spread and other longitudinal policies fail explicitly.
+
+Parallel to the target is a geometric convention, not a guarantee of radiation
+phase matching in a chosen direction. The joint position–time Gaussian average
+retains the correlation; the old independent suppression factors cannot simply
+be multiplied unchanged. See the [independent derivation](../validation/beam-transport/linear-bunch-front-tilt.md).
+A wide phase-matched source can have a narrow angular lobe: resolve that lobe
+before interpreting central-direction density as detector-integrated flux.
+This source model does not establish experimental feasibility of attosecond
+local bunch durations.
+
+For the notebook's ideal HOPG (002) geometry (30 keV electrons, target tilt
+84.5 degrees, target azimuth zero, observation polar angle 145 degrees),
+the transverse phase-matching choice is:
+
+```python
+from dataclasses import replace
+
+scene = pr.Scene(
+    beam=beam,
+    target=pr.Slab("hopg", thickness_ang=500.0, tilt_deg=84.5, footprint=pr.Footprint(5.0, 5.0)),
+    detector=pr.Detector(observation_angle_deg=145.0),
+)
+front = scene.phase_matched_bunch_front_tilt((0, 0, 2), photon_energy_eV=91.2)
+matched_beam = replace(scene.beam, bunch_front_tilt=front)
+```
+
+This gives an incoming gradient of 135.785 fs/µm. It cancels the transverse
+phase mismatch in that central direction for the c-axis reflection; the
+parallel-face choice would instead be 84.5 degrees. For a finite Gaussian
+spot, the ideal joint intensity factor becomes the residual timing factor
+alone: about 0.981 at 91.2 eV with 0.001 fs local RMS duration. Reversing the
+front restores strong transverse suppression. This is a form-factor example,
+not a prediction of integrated detector gain or a converged transport spectrum.
+
+`Scene.phase_matched_bunch_front_tilt` leaves the scene unchanged and returns a
+`BunchFrontTilt`. The reflection is explicit because different reflections
+can require different fronts. Omitting `photon_energy_eV` uses the vacuum
+zero-scattering line estimate. The scalar detector's central direction is the
+default; pass `observation_direction_lab=(nx, ny, nz)` for another ray or a
+planar detector. This method currently supports a flat single slab and matches
+its mean crystal orientation -- the catalog cut or the slab's `CrystalCut`,
+resolved exactly as the simulated case resolves it -- rather than every mosaic
+orientation.
+Target tilt and azimuth follow the existing nearest-half-degree case
+resolution. The helper uses those resolved angles; bunch-front angles retain
+full precision. Thus match the resolved entrance-face angles when setting a
+parallel front manually.
+
+### Crystal cuts
+
+A flat single `Slab` (or `Target`) accepts `cut=pr.CrystalCut(...)` to orient
+the lattice relative to the entrance face. The cut face normal defines the zero
+of `tilt_deg`/`tilt_azim_deg`: `tilt_deg=0` is normal incidence on the cut
+face, and tilting moves face and lattice together. The cut fixes how the
+lattice sits under that face:
+
+```python
+cut = pr.CrystalCut(
+    surface_hkl=(1, 0, 1),  # or beam_uvw=(u, v, w); omit both for the catalog axis
+    roll_deg=17.0,  # right-handed roll about the face normal
+    miscut_deg=5.56512,  # continuous tilt off the face normal, 0 <= miscut < 90
+    miscut_azim_deg=200.0,  # sample-frame azimuth the lattice tilts toward
+)
+target = pr.Slab("hopg", 500.0, tilt_deg=84.5, footprint=None, cut=cut)
+```
+
+The lattice rotation is `R_miscut @ R_roll @ R_axis`. `surface_hkl` and
+`beam_uvw` are mutually exclusive integer axes and are unrelated to the
+reflections being scored. `miscut_deg` cuts the face that far off the selected
+plane (toward `miscut_azim_deg`), giving a continuous orientation, since integer
+surface planes alone rarely give an exact energy match. Target tilts are still
+quantized to half a degree; miscut angles are not.
+
+Omitting the cut, or passing `CrystalCut()` or the catalog axis, leaves the
+case payload and identity unchanged. An explicit cut adds `azimuth_rad` and
+`recip_miscut_rad` keys and a name suffix such as
+`cut=(1,0,1) roll=17 miscut=5.56512@200`, so distinct cuts are distinct
+cases. The catalog is never modified. Stored catalog line grids belong to the
+catalog orientation, so a reoriented cut resolves its line grid automatically
+unless you pass an explicit grid. The cut supports only flat single slabs;
+grooves, substrates and stacks are rejected. A miscut also rejects targeted
+longitudinal timing modes, whose resonance assumes `g` parallel to the face
+normal. `Scene.phase_matched_bunch_front_tilt` uses the same orientation as
+transport and spectrum evaluation. Solving for the cut that cancels the front
+tilt is tracked separately (#509).
+
+Named or inline profile beam tables use the same descriptor:
+
+```toml
+[profiles.example.beam.bunch_front_tilt]
+tilt_deg = 45.0
+azimuth_deg = 0.0
+```
