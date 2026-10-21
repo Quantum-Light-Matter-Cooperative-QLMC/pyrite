@@ -1,3 +1,4 @@
+(validation-coherent-formation-absorption)=
 # coherent-formation-absorption
 
 > Ownership refresh (2026-10-20, #599): module paths below point to current
@@ -6,10 +7,14 @@
 
 ## Claim
 
+Current CPU owners: {source}`src/pyrite/montecarlo/spectrum/cxr/_formation.py::formation_factor`
+and {source}`src/pyrite/montecarlo/spectrum/cxr/_formation.py::expand_escape_pieces`.
+The public scorer is {py:func}`pyrite.montecarlo.spectrum.mc_cxr_spectrum`.
+
 - **ID:** `coherent-formation-absorption`
 - **Symbols:** `montecarlo/spectrum/cxr/_formation.py::{formation_coefficients,formation_factor,formation_argument,formation_profile,formation_window_half_width,expand_escape_pieces}`; CUDA twins `montecarlo/spectrum/coherent_jit_kernel.py::{_formation_re,_formation_im,run_coherent_reduction_kernel}`, `montecarlo/spectrum/coherent_stream_jit_kernel.py::{_coherent_prologue_kernel,run_coherent_field_accumulation_kernel}`, `montecarlo/spectrum/coherent_grouped_jit_kernel.py::run_coherent_grouped_intensity_kernel`
 - **Consumers:** the phased-field line reductions of `mc_cxr_spectrum`: the coherent route (`coherent=True`; batched `montecarlo/spectrum/cxr/_batched.py::_batched_coherent_block` and its CUDA stream, per-reflection `montecarlo/spectrum/cxr/_per_hkl.py`) and the flight-grouped incoherent reduction (a coherent sum per physical flight, `montecarlo/spectrum/cxr/_per_hkl.py`). Setup: `montecarlo/spectrum/cxr/_setup.py::_prepare_spectrum` splits their rows into escape pieces.
-- **Source:** Feranchuk--Spence 2000 Eqs. (8), (10), (12)--(14) finite-time field (as derived under `coherent-emission`), with the amplitude damped by Beer--Lambert $e^{-\tau/2}$ (`self-absorption`) and phased by the in-medium escape leg $-\delta\omega L_\text{esc}$ (`xray-in-medium-propagation-phase`) *inside* the integral instead of at the segment midpoint
+- **Source:** Feranchuk--Spence 2000 Eqs. (8), (10), (12)--(14) finite-time field (as derived under [coherent-emission](coherent-emission.md)), with the amplitude damped by Beer--Lambert $e^{-\tau/2}$ (`self-absorption`) and phased by the in-medium escape leg $-\delta\omega L_\text{esc}$ (`xray-in-medium-propagation-phase`) *inside* the integral instead of at the segment midpoint
 - **Intended quantity:** one straight segment's coherent line field under absorption and refraction, exact for any segment length
 
 ## Derivation
@@ -47,7 +52,7 @@ w=iv-q,
 
 $a=e^{-\tau_\text{start}/2}$, $b=e^{-\tau_\text{end}/2}$. The midpoint phase $\Phi_c$ stays where the route has always applied it; $F$ replaces the real $\operatorname{sinc}(x)$ and the amplitude's midpoint $e^{-\tau_c/2}$.
 
-**Split invariance.** The slope inside a piece is the time derivative of the same $\Phi$ that separates pieces, so the pieces of a straight flight sum to its field exactly, absorption and escape-leg phase included. The previous model was exact only for the vacuum phase and moved at first order in $\delta\omega\,\Delta L_\text{esc}$ and in $\mu\,\Delta L_\text{esc}$ (`coherent-segment-midpoint-time`).
+**Split invariance.** The slope inside a piece is the time derivative of the same $\Phi$ that separates pieces, so the pieces of a straight flight sum to its field exactly, absorption and escape-leg phase included. The previous model was exact only for the vacuum phase and moved at first order in $\delta\omega\,\Delta L_\text{esc}$ and in $\mu\,\Delta L_\text{esc}$ ({ref}`validation-coherent-segment-midpoint-time`).
 
 **Parseval.** $\int|F|^2dv=\tfrac14\cdot2\pi\int_{-1}^{1}e^{-\tau(s)}ds=\pi\langle e^{-\tau}\rangle$, against $\int\operatorname{sinc}^2=\pi$. In the constant-index limit, a piece's integrated coherent self-term is therefore exactly the incoherent route's segment-mean escape yield (`segment-escape-average`). With full δ(E), equality in energy also requires the Jacobian below. Absorption only reshapes the line (damped, $q$-broadened); $|F|^2=(a^2+b^2-2ab\cos2v)/[4(v^2+q^2)]$ is even in $v$, so it never moves the centre.
 
