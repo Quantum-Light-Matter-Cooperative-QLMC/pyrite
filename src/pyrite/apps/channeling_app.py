@@ -47,7 +47,7 @@ def _():
 
 @app.cell
 def _(mo):
-    mode_ui = mo.ui.radio(["Planar", "Axial (experimental)"], value="Planar", label="Mode")
+    mode_ui = mo.ui.radio(["Planar", "Axial (experimental)"], value="Axial (experimental)", label="Mode")
     mode_ui
     return (mode_ui,)
 
@@ -524,7 +524,7 @@ def _(mo, mode_ui):
             crystal=mo.ui.dropdown(["silicon", "diamond"], value="silicon", label="Crystal"),
             axis=mo.ui.dropdown(["001", "110"], value="001", label="Axis"),
             energy=mo.ui.slider(1, 10, value=5, label="Energy (MeV)"),
-            mode=mo.ui.dropdown(["coherent", "mcwf"], value="coherent", label="Evolution"),
+            mode=mo.ui.dropdown(["coherent", "mcwf"], value="mcwf", label="Evolution"),
             backend=mo.ui.dropdown(["cpu", "cuda"], value="cpu", label="MCWF backend"),
             grid=mo.ui.dropdown(
                 [16, 32, 48, 64, 96, 128, 192], value=32, label="Grid samples per axis"
@@ -655,7 +655,7 @@ def _(axial_result, mo):
     )
     axial_view_ui = mo.ui.dropdown(
         {"Full periodic supercell": "full", "Origin unit-cell crop": "unit_cell"},
-        value="full", label="Axial map view",
+        value="Full periodic supercell", label="Axial map view",
     )
     return (
         axial_view_ui,
