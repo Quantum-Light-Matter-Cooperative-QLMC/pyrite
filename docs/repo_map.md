@@ -922,3 +922,15 @@ existing shared trajectory projection; `plots/altair/trajectory_summary.py`
 renders the summary tables. `apps/viewer.py::load_saved_capture` is the thin
 trace-app loading owner. `campaign/beam_metrics.py::capture_beam_metrics` reads
 a separately bounded prefix of initial sampled particles.
+
+### Optical/IR diagnostic response
+
+`materials/optical.py` owns explicit scalar local optical permittivity and the
+pinned CC0 Rakić Au record under `data/optical/`. The source-only
+`runner/transition_emission.py::case_layer_eps` keyword `layer_responses`
+associates a provider with every layer without changing persisted cases.
+`energy_grid/component_support.py` validates explicit medium/component bands
+for node or midpoint-bin grids; it leaves the shared X-ray floor unchanged.
+Independent derivation: `validation/radiation-physics/optical-material-response.md`.
+Real-hardware check: `checks/optical_response_cuda.py`, run through remote staging
+and a bounded CUDA allocation.

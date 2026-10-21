@@ -218,3 +218,24 @@ require derived or adapted material to be marked as such.
 - **Documentation**: the manuals `BremsLib_v2.0.pdf` and
   `Interpolate_DCS.pdf` are published alongside the library in the same
   deposit and are the basis for any clean-room reimplementation.
+
+## refractiveindex.info optical response: Rakić Au
+
+- **Database author**: Mikhail Polyanskiy and contributors.
+- **License**: CC0 1.0 Universal Public Domain Dedication,
+  <https://creativecommons.org/publicdomain/zero/1.0/>; the upstream record
+  explicitly states this dedication.
+- **Source**: [Au Rakić Lorentz–Drude record](https://github.com/polyanskiy/refractiveindex.info-database/blob/c5c2f188e848453def5970e347399d653df2ffc2/database/data/main/Au/nk/Rakic-LD.yml),
+  revision `c5c2f188e848453def5970e347399d653df2ffc2`.
+  Unmodified bytes ship in `src/pyrite/data/optical/Au-Rakic-LD.yml`, SHA-256
+  `a91fca57ee99efc77354908fa11b9c4822e8852394042069caaac7610c52e602`.
+- **Reference**: A. D. Rakić, A. B. Djurišic, J. M. Elazar, M. L. Majewski,
+  “Optical properties of metallic films for vertical-cavity optoelectronic
+  devices,” *Applied Optics* **37**, 5271–5283 (1998),
+  <https://doi.org/10.1364/AO.37.005271>.
+- **Use**: fitted scalar gold refractive index, converted from vacuum wavelength
+  in micrometers to photon energy in eV and from `n+ik` to `(n+ik)^2`.
+  Interpolation is linear in complex permittivity versus energy; support is
+  restricted to the record's actual endpoints (about 0.2–5 eV). Sample
+  temperature is unspecified. This is a fit to measurements, not a new
+  measured dataset or a general optical material library.

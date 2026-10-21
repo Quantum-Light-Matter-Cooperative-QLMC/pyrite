@@ -215,3 +215,87 @@ The bremsstrahlung continuum is incoherent in PyRITE and has no phased field to 
 ## Validity boundary
 
 The omission decisions hold for planar slabs and stacks, straight crossings at the stated speeds, the catalog media's independent-atom $\varepsilon$, and bremsstrahlung as the comparison floor. They do not cover grooved or rough entrance faces, laterally finite targets whose side faces the detector sees, coherent (`emission = coherent`) observables with a non-negligible bunch form factor (CTR, above), or a tighter precision target than 0.05 without rerunning the study. Stopping still omits radiative feedback, transported delta rays and density-effect corrections, and the Browning elastic fit ends at 30 keV; these limitations are independent of TR.
+
+## Explicit optical response for bounded diagnostics
+
+`Validation: optical-material-response`
+
+The provisional `pyrite.materials.optical.OpticalResponse` accepts explicit
+local, isotropic, scalar relative permittivity. Photon energies are in eV;
+permittivity is dimensionless and uses $\exp(-i\omega t)$, with
+$\operatorname{Im}\epsilon\geq0$ for a passive medium. Each response records
+its medium/sample label, sample state, temperature in kelvin (or explicitly
+unspecified), source URL, source SHA-256 and license. Its `digest` also covers
+numeric values, support segmentation and interpolation policy. Unsupported
+tensors, active response, nonfinite values and undeclared extrapolation fail.
+Disjoint segments represent gaps; interpolation never joins across a gap.
+
+`gold_rakic_response()` provides the pinned CC0 refractiveindex.info gold
+Lorentz–Drude fit to measurements, referenced to Rakić et al.,
+[Applied Optics 37, 5271 (1998)](https://doi.org/10.1364/AO.37.005271).
+This record covers about **0.2–5 eV**, with actual endpoints determined by the
+rounded wavelength table. It does not cover every range discussed in the
+paper. Source temperature is unspecified. The shipped bytes, revision and hash
+are recorded in `THIRD-PARTY-NOTICES.md`; loading verifies the hash offline.
+For vacuum wavelength $\lambda$ in micrometers,
+
+$$
+E=\frac{hc}{10^4\lambda},\qquad
+\epsilon=(n+ik)^2=n^2-k^2+2ink.
+$$
+
+Real and imaginary permittivity are interpolated linearly **versus energy**.
+This convex interpolation preserves passivity and constant vacuum response;
+it is not a claim of global Kramers–Kronig consistency. Interpolation runs in
+NumPy; `epsilon(energy, xp=cupy)` validates on the host and uploads complex128
+values. It does not silently select a backend or interpolate on the device.
+
+A source-only diagnostic can associate one response with each transport layer
+in order through `case_layer_eps(..., layer_responses=(...))`, or pass the same
+keyword to `case_transition_spectrum`. Every layer must have an explicit
+provider. The mapping is an assertion about the sample by the caller; a
+chemical composition never selects an optical response automatically. Provider
+failures name the TR component and layer and propagate without atomic fallback.
+Without providers, `case_layer_eps` retains the independent-atom X-ray response
+above each layer's existing continuum floor and refuses lower energies.
+Production component dispatch, persisted cases and the shared X-ray grid floor
+are unchanged. This API does not enable general optical source/instrument runs.
+
+Use the provisional `energy_grid.component_support` resolver to validate all
+components requested by a diagnostic:
+
+```python
+import numpy as np
+from pyrite.energy_grid.component_support import ComponentSupport, component_grid
+from pyrite.materials.optical import gold_rakic_response
+from pyrite.montecarlo.spectrum.transition_radiation import planar_transition_radiation
+
+response = gold_rakic_response()
+energy = component_grid(
+    np.geomspace(0.3, 4.0, 257),
+    required=(("Au", "transition_radiation"),),
+    support=(ComponentSupport("Au", "transition_radiation", response.bands_eV),),
+)
+eps = response.epsilon(energy)
+photons_per_eV_sr = planar_transition_radiation(
+    energy,
+    np.array([0.6, 0.0, 0.8]),
+    np.array([0.0, 0.0, 0.8]),
+    [(eps, 1000.0)],  # gold slab thickness in angstroms, vacuum outside
+)
+```
+
+A capability belongs to one named medium/component pair. Adding an attenuation,
+bremsstrahlung or detector component to `required` demands that component's own
+explicit capability; otherwise resolution fails naming the responsible pair.
+An optical TR capability supplies no EPDL, EEDL, Chantler or Eagle-XO/Si-QE
+support. The resolver preserves coordinates and the canonical midpoint edge
+and width conversion. `representation="nodes"` checks evaluation nodes;
+`representation="bins"` additionally requires the entire extent of every
+midpoint bin to lie in one supported interval. It never clips or relocates a
+grid to make coverage pass.
+
+The [independent verification](../../validation/radiation-physics/optical-material-response.md)
+separates optical-record interpolation accuracy from the accuracy of the fitted
+model against experiments. `checks/optical_response_cuda.py` is the bounded
+real-hardware parity/refusal check; it must run on a remote CUDA allocation.

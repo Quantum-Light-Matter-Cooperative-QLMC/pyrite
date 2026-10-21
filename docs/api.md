@@ -258,3 +258,13 @@ electron/eV/sr, supported-direction mask and resolved provenance. `.rate()` uses
 the beam mean current; `.rate(current_na)` rescales stored arrays to ph/s/eV/sr.
 This new surface is provisional; see [directional heatmaps](guides/directional-source-heatmap.md)
 for the bounded example, full-circle convention, supported geometry and limits.
+
+## Provisional optical diagnostic response
+
+`pyrite.materials.optical.OpticalResponse`, `gold_rakic_response`, and
+`pyrite.energy_grid.component_support.{ComponentSupport,component_grid}` are
+provisional source-only diagnostic APIs. They require explicit passive scalar
+response and per-component supported bands; they do not lower the production
+X-ray floor or supply optical detector/transport models. See
+[explicit optical TR response](physics/radiation-physics/transition-radiation.md#explicit-optical-response-for-bounded-diagnostics)
+for units, sample/provenance metadata, interpolation policy and an example.

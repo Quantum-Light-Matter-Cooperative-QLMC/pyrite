@@ -120,3 +120,23 @@ def test_case_record_validation():
         _case(groove_spacing_ang=5e3)
     with pytest.raises(ValueError, match="Chantler dielectric data"):
         case_layer_eps(_case(), np.array([1e-3]))
+
+
+def test_source_only_optical_override_preserves_vacuum_limit_and_refuses_gaps(transported):
+    from pyrite.materials.optical import gold_rakic_response
+
+    case, transport = transported
+    response = gold_rakic_response()
+    # Fixed trajectories exercise only the response/scorer seam, not optical
+    # transport. Matched vacuum must remain dark on precisely the same rows.
+    optical_transport = dict(transport, E_grid=np.geomspace(0.3, 4.0, 21))
+    gold = case_transition_spectrum(case, optical_transport, xp=np, layer_responses=(response,))
+    assert np.all(np.isfinite(gold)) and np.max(gold) > 0
+    energy, eps = response.segments[0]
+    vacuum = replace(response, medium="vacuum fixture", segments=((energy, np.ones_like(eps)),))
+    dark = case_transition_spectrum(case, optical_transport, xp=np, layer_responses=(vacuum,))
+    np.testing.assert_array_equal(dark, np.zeros(21))
+    # Invalid optics must fail even on a geometrically dark direction.
+    invalid = dict(transport, E_grid=np.array([0.01]), n_hat=np.array([1.0, 0.0, 0.0]))
+    with pytest.raises(ValueError, match=r"transition_radiation/layer\[0\].*Au.*unsupported"):
+        case_transition_spectrum(case, invalid, xp=np, layer_responses=(response,))

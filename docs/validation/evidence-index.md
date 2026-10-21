@@ -130,6 +130,7 @@ channeling/cr-dipole-far-field-amplitude
 :caption: Radiation physics
 
 radiation-physics/absorption-length
+radiation-physics/optical-material-response
 radiation-physics/brem-source-comparison
 radiation-physics/brem-spectrum
 radiation-physics/bremslib-angular-model

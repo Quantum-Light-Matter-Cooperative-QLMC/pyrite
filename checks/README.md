@@ -30,6 +30,7 @@ run through the collector.
 
 | Artifact | Purpose |
 |---|---|
+| `optical_response_cuda.py` | Real CUDA complex128 upload and planar optical TR parity for the pinned CC0 Au response; unsupported-band/component refusal. Stage with `pyrite remote sync`, run in a bounded GPU allocation, and collect JSON evidence. No CPU fallback. |
 | `axial_escape_accounting.py` | Bounded deterministic Si TDS plane-wave comparison: a position-diagonal sink cannot identify outgoing Fourier-window escape for different incident momenta (#548). Research only; no physical escape model or validation verdict. |
 | `axial_matching_study.py` | Research study of an energy-defined retained projector and return-flux loss, with Gamma-point and Bloch-grid TDS rates (#548). No dechanneling prediction or physical validation verdict. |
 | `axial_mcwf_return_flux.py` | MCWF study of return-flux deficit under an energy-cut handoff, including TDS and electronic jumps (#548). Research only; no native launch model or physical validation verdict. |
