@@ -156,6 +156,13 @@ remains the validation owner; this diagnostic surface does not promote it.
 
 ## Stored quantum evolution metrics
 
+For **orthonormal full-grid transverse eigenstate populations**, instantaneous
+carrier-sector energy bins, and **MCWF reference-point relative phase / spatial
+coherence** rather than the restricted radiation-selected local levels, see
+[Axial state and coherence diagnostics](axial-state-coherence.md). These new
+optional reductions are stored during propagation, not reconstructed by
+redrawing the density map.
+
 Both app modes show instantaneous state-population bars and depth heatmaps.
 Planar bars include all retained Bloch bands, summed over blocks. Axial bars
 sum each degenerate string-0 local level. These are local squared projection

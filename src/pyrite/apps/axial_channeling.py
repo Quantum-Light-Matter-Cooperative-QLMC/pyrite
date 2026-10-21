@@ -211,6 +211,24 @@ def axial_demo_figure(result: AxialDiagnosticResult, sample: int, conditional: b
         )
         axes[2].set(title="Coherent envelope phase", xlabel="x (Å)", ylabel="y (Å)")
         fig.colorbar(mesh, ax=axes[2], label="rad; carrier tilt factored out")
+    elif result.coherence_numerator_per_ang2 is not None:
+        from pyrite.montecarlo.channeling.axial_state_diagnostics import coherence_maps
+
+        phase, _, _ = coherence_maps(
+            result.coherence_numerator_per_ang2[sample],
+            result.coherence_second_moment[sample],
+            result.density_per_ang2[sample],
+            result.coherence_reference_index,
+            result.config.n_electrons if result.config.mode == "mcwf" else None,
+        )
+        shown, extent = _centered(phase, result.grid)
+        mesh = axes[2].imshow(
+            shown, origin="lower", extent=extent, cmap="twilight", vmin=-np.pi, vmax=np.pi
+        )
+        axes[2].set(
+            title="Ensemble relative phase (physical carrier)", xlabel="x (Å)", ylabel="y (Å)"
+        )
+        fig.colorbar(mesh, ax=axes[2], label="arg g¹(r,r₀) (rad)")
     else:
         axes[2].text(0.5, 0.5, "Ensemble density\nNo unique phase", ha="center", va="center")
         axes[2].set_axis_off()
@@ -223,6 +241,68 @@ def axial_demo_figure(result: AxialDiagnosticResult, sample: int, conditional: b
         ylim=(0, 1.05),
     )
     return fig
+
+
+def axial_coherence_figure(result: AxialDiagnosticResult, sample: int):
+    """Plot cached normalized spatial coherence; never reconstruct from density."""
+    import matplotlib.pyplot as plt
+    from pyrite.montecarlo.channeling.axial_state_diagnostics import coherence_maps
+
+    if result.coherence_numerator_per_ang2 is None:
+        raise ValueError("coherence was not recorded; rerun with record_coherence=True")
+    phase, visibility, sem = coherence_maps(
+        result.coherence_numerator_per_ang2[sample],
+        result.coherence_second_moment[sample],
+        result.density_per_ang2[sample],
+        result.coherence_reference_index,
+        result.config.n_electrons if result.config.mode == "mcwf" else None,
+    )
+    fig, axes = plt.subplots(1, 2, figsize=(10, 4), constrained_layout=True)
+    for ax, values, title, cmap, bounds in (
+        (axes[0], phase, "Relative phase arg g¹", "twilight", (-np.pi, np.pi)),
+        (axes[1], visibility, "Coherence visibility |g¹|", "viridis", (0, 1)),
+    ):
+        shown, extent = _centered(values, result.grid)
+        image = ax.imshow(
+            shown,
+            origin="lower",
+            extent=extent,
+            aspect="equal",
+            cmap=cmap,
+            vmin=bounds[0],
+            vmax=bounds[1],
+        )
+        ax.set(xlabel="x (Å)", ylabel="y (Å)", title=title)
+        fig.colorbar(image, ax=ax)
+    ref = result.coherence_reference_index
+    purity = float(result.metrics.purity[sample]) if result.metrics is not None else float("nan")
+    fig.suptitle(
+        f"r₀ = pixel {ref}; survival={result.surviving[sample]:.3g}; "
+        f"empirical purity={purity:.3g}; "
+        + ("2σ MC sampling mask" if sem is not None else "deterministic ensemble")
+    )
+    return fig
+
+
+def axial_spectral_population_data(result: AxialDiagnosticResult):
+    """Return orthonormal spectral populations, independently of local line weights."""
+    if result.spectral_populations is None:
+        return None
+    mode = result.config.spectral_representation
+    basis = (
+        "trajectory-sector transverse-energy bins"
+        if mode == "energy_bins"
+        else "fixed-carrier orthonormal transverse eigenspace projectors"
+    )
+    return (
+        result.spectral_populations,
+        result.spectral_labels,
+        (
+            f"{basis}; periodic FFT Hamiltonian, reference q={result.config.tilt_rad}; "
+            f"barrier Umax={result.spectral_barrier_eV:.4g} eV; omitted survival may "
+            "include uncomputed bound AND above-barrier states; neither is physical escape"
+        ),
+    )
 
 
 def catalog_rate(catalog: AxialLineCatalog, line, polarization: np.ndarray) -> np.ndarray:

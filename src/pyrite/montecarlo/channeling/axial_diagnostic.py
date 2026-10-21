@@ -46,6 +46,14 @@ class AxialDiagnosticConfig:
     oam_string: int | None = None
     oam_radius_ang: float = 0.5
     backend: Literal["cpu", "cuda"] = "cpu"
+    # Opt-in orthonormal FFT-supercell spectral measurements. Electronic jumps
+    # change the carrier sector, so choose energy bins instead of state indices.
+    spectral_states: int = 0
+    spectral_representation: Literal["states", "energy_bins"] = "energy_bins"
+    spectral_energy_bins: int = 8
+    spectral_cutoff_eV: float | None = None
+    record_coherence: bool = False
+    coherence_reference_index: tuple[int, int] | None = None
 
 
 def _validate(config: AxialDiagnosticConfig) -> None:
@@ -86,6 +94,24 @@ def _validate(config: AxialDiagnosticConfig) -> None:
         raise ValueError("seed must be a nonnegative integer")
     if set(config.mechanisms) - {"tds", "electronic"}:
         raise ValueError("mechanisms must contain only tds and electronic")
+    if not isinstance(config.spectral_states, Integral) or not 0 <= config.spectral_states <= 256:
+        raise ValueError("spectral_states must be an integer between 0 and 256")
+    if config.spectral_representation not in ("states", "energy_bins"):
+        raise ValueError("unknown spectral representation")
+    if (
+        not isinstance(config.spectral_energy_bins, Integral)
+        or not 1 <= config.spectral_energy_bins <= 64
+    ):
+        raise ValueError("spectral_energy_bins must be between 1 and 64")
+    if config.spectral_cutoff_eV is not None and not np.isfinite(config.spectral_cutoff_eV):
+        raise ValueError("spectral cutoff must be finite")
+    if (
+        config.spectral_states
+        and config.spectral_representation == "states"
+        and config.mode == "mcwf"
+        and "electronic" in config.mechanisms
+    ):
+        raise ValueError("electronic jumps change the carrier sector: use energy_bins")
 
 
 @dataclass(frozen=True)
@@ -123,6 +149,15 @@ class AxialDiagnosticResult:
     numerical_sink: np.ndarray | None = None
     jump_history: dict[str, np.ndarray] | None = None
     experimental_model: str = "experimental axial diagnostic; existing #508 solvers"
+    spectral_populations: np.ndarray | None = None
+    spectral_energies_eV: np.ndarray | None = None
+    spectral_labels: tuple[str, ...] | None = None
+    spectral_represented: np.ndarray | None = None
+    spectral_omitted: np.ndarray | None = None
+    spectral_barrier_eV: float | None = None
+    coherence_reference_index: tuple[int, int] | None = None
+    coherence_numerator_per_ang2: np.ndarray | None = None
+    coherence_second_moment: np.ndarray | None = None
 
     def density(self, *, conditional: bool = False) -> np.ndarray:
         """Return density [Å⁻²], optionally conditioned on survival (zero if empty)."""
@@ -161,7 +196,17 @@ def _coherent(config, grid, potential, components, norms, observe):
 class _DiagnosticRecording:
     """Compose bounded recorded observables and declare device resource needs."""
 
-    def __init__(self, grid, potential, config, projection, observable, record_metrics):
+    def __init__(
+        self,
+        grid,
+        potential,
+        config,
+        projection,
+        observable,
+        record_metrics,
+        spectral=None,
+        coherence=None,
+    ):
         self.metrics = (
             AxialMetricsObservable(
                 grid, potential, config.kinetic_energy_eV, len(config.depths_ang)
@@ -169,18 +214,31 @@ class _DiagnosticRecording:
             if record_metrics
             else None
         )
-        self.observers = [f for f in (projection, observable, self.metrics) if f is not None]
+        self.spectral = spectral
+        self.coherence = coherence
+        self.spectral_width = 0 if spectral is None else spectral.recording_width
+        self.coherence_width = 0 if coherence is None else coherence.recording_width
+        self.observers = [
+            f for f in (projection, observable, spectral, coherence, self.metrics) if f is not None
+        ]
         self.cuda_compatible = all(getattr(f, "cuda_compatible", False) for f in self.observers)
         self.width = 0 if self.metrics is None else self.metrics.width
-        extras = (0 if projection is None else len(projection.ells)) + (
-            0 if observable is None else getattr(observable, "recording_width", 4096)
+        extras = (
+            (0 if projection is None else len(projection.ells))
+            + (0 if observable is None else getattr(observable, "recording_width", 4096))
+            + self.spectral_width
+            + self.coherence_width
         )
         self.recording_bytes = (
             len(config.depths_ang) * 16 * (int(np.prod(grid.shape)) + self.width + extras)
         )
-        if record_metrics and self.recording_bytes > RECORDING_BUDGET_BYTES:
+        if (record_metrics or spectral is not None or coherence is not None) and (
+            self.recording_bytes > RECORDING_BUDGET_BYTES
+        ):
             raise ValueError("combined ensemble recording exceeds 128 MiB budget")
-        self.scratch_bytes = 16 * int(np.prod(grid.shape)) * 100
+        self.scratch_bytes = 16 * int(np.prod(grid.shape)) * 100 + sum(
+            int(getattr(f, "scratch_bytes", 0)) for f in (spectral, coherence) if f is not None
+        )
         self.electrons = config.n_electrons if config.mode == "mcwf" else None
 
     def __call__(self, phi, tilt):
@@ -247,6 +305,46 @@ def axial_diagnostic(
     norms = tuple(grid.norm(phi) for _, phi in components)
     if any(not np.isfinite(norm) or norm <= 0 for norm in norms):
         raise ValueError("entry has no finite positive sampled norm on this grid")
+    from .axial_state_diagnostics import (
+        AxialSpectralObservable,
+        ReferenceCoherenceObservable,
+        choose_reference,
+    )
+
+    initial_q = tuple(momentum_inv_ang(config.kinetic_energy_eV) * t for t in config.tilt_rad)
+    spectral = None
+    if config.spectral_states:
+        edges = None
+        if config.spectral_representation == "energy_bins":
+            # Bin definitions are fixed for the entire solve; the actual
+            # eigenvalues used per electron follow its instantaneous H(q).
+            from .axial_state_diagnostics import transverse_spectrum
+
+            sample = transverse_spectrum(
+                grid, potential, config.kinetic_energy_eV, initial_q, config.spectral_states
+            )
+            lo, hi = float(sample.energies_eV[0]), float(sample.energies_eV[-1])
+            pad = max((hi - lo) * 0.05, 1e-5)
+            edges = np.linspace(lo - pad, hi + pad, config.spectral_energy_bins + 1)
+            barrier = float(np.max(potential))
+            if edges[0] < barrier < edges[-1]:
+                edges = np.unique(np.r_[edges, barrier])
+        spectral = AxialSpectralObservable(
+            grid,
+            potential,
+            config.kinetic_energy_eV,
+            initial_q,
+            count=config.spectral_states,
+            cutoff_eV=config.spectral_cutoff_eV,
+            representation=config.spectral_representation,
+            energy_edges_eV=edges,
+        )
+    coherence = None
+    if config.record_coherence:
+        ref = config.coherence_reference_index
+        if ref is None:
+            ref = choose_reference(grid, components)
+        coherence = ReferenceCoherenceObservable(grid, ref)
     projection = None
     origin = None
     if config.oam_string is not None:
@@ -256,7 +354,9 @@ def axial_diagnostic(
             raise ValueError("oam_string must index a profile string")
         origin = profile.strings[config.oam_string].position_ang
         projection = CylindricalProjection(grid, origin, config.oam_radius_ang, 8)
-    observe = _DiagnosticRecording(grid, potential, config, projection, observable, record_metrics)
+    observe = _DiagnosticRecording(
+        grid, potential, config, projection, observable, record_metrics, spectral, coherence
+    )
     numerical_sink = np.zeros(len(config.depths_ang))
     jump_history = None
 
@@ -293,8 +393,25 @@ def axial_diagnostic(
     # A complex caller observable promotes the stack; density and OAM are real.
     density = stacked[:, :count].real.reshape(-1, *grid.shape)
     oam = None if projection is None else stacked[:, count:stop].real
-    extra_stop = -observe.width if observe.width else stacked.shape[1]
+    extra_stop = stacked.shape[1] - (
+        observe.width + observe.spectral_width + observe.coherence_width
+    )
     extra = None if observable is None else stacked[:, stop:extra_stop]
+    spec_values = None
+    spec_represented = None
+    spec_omitted = None
+    coh_numerator = None
+    coh_second = None
+    if spectral is not None:
+        spec = stacked[:, extra_stop : extra_stop + observe.spectral_width].real
+        spec_values = spec[:, :-1]
+        spec_represented = spec[:, -1]
+        extra_stop += observe.spectral_width
+    if coherence is not None:
+        n = count
+        coh = stacked[:, extra_stop : extra_stop + observe.coherence_width]
+        coh_numerator = coh[:, :n].reshape(-1, *grid.shape)
+        coh_second = coh[:, n:].real.reshape(-1, *grid.shape)
     if config.mode == "coherent":
         surviving = density.sum(axis=(1, 2)) * grid.cell_area_ang2
     else:
@@ -318,4 +435,13 @@ def axial_diagnostic(
         observe.finish(stacked, surviving, density),
         numerical_sink,
         jump_history,
+        spectral_populations=spec_values,
+        spectral_energies_eV=None if spectral is None else spectral.energies_eV,
+        spectral_labels=None if spectral is None else tuple(spectral.labels),
+        spectral_represented=spec_represented,
+        spectral_omitted=None if spectral is None else np.maximum(surviving - spec_represented, 0),
+        spectral_barrier_eV=None if spectral is None else spectral.barrier_eV,
+        coherence_reference_index=None if coherence is None else coherence.reference_index,
+        coherence_numerator_per_ang2=coh_numerator,
+        coherence_second_moment=coh_second,
     )

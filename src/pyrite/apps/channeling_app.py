@@ -496,13 +496,18 @@ def _(mo, mode_ui):
     axial_form = (
         mo.md(
             """
-        **Experimental axial diagnostic** — periodic CPU model; no campaign integration.
+        **Experimental axial diagnostic** — periodic supercell (not a visualization crop);
+        enlarging cells at fixed shape lowers samples per crystal cell. For
+        individual degenerate-level populations choose 'states' and disable electronic
+        jumps; with electronic kicks use carrier-sector energy bins. No campaign integration.
 
         {crystal} {axis} {energy} {mode} {grid} {cells}
 
         {depth} {step} {electrons} {seed} {preset}
 
         {waist} {impact_x} {impact_y} {tilt_x} {tilt_y} {oam}
+
+        {spectral} {spectral_repr} {electronic} {coherence} {ref_auto} {ref_x} {ref_y}
 
         Waist w means exp(-r²/w²); impact is relative to the projected cell origin,
         drawn at the center of each map. The equal ±1 mixture adds probabilities,
@@ -553,6 +558,17 @@ def _(mo, mode_ui):
             tilt_x=mo.ui.slider(-1, 1, step=0.1, value=0, label="Tilt x (mrad)"),
             tilt_y=mo.ui.slider(-1, 1, step=0.1, value=0, label="Tilt y (mrad)"),
             oam=mo.ui.checkbox(value=False, label="OAM about string 0, radius 0.5 Å"),
+            spectral=mo.ui.dropdown(
+                [0, 8, 16, 32, 48, 64], value=16, label="Transverse eigenstates (0 disables)"
+            ),
+            spectral_repr=mo.ui.dropdown(
+                ["energy_bins", "states"], value="energy_bins", label="Spectral presentation"
+            ),
+            electronic=mo.ui.checkbox(value=True, label="Include electronic jumps"),
+            coherence=mo.ui.checkbox(value=True, label="Record reference-point spatial coherence"),
+            ref_auto=mo.ui.checkbox(value=True, label="Auto-select nonzero reference density"),
+            ref_x=mo.ui.number(0, 47, value=0, label="Reference x pixel (manual)"),
+            ref_y=mo.ui.number(0, 47, value=0, label="Reference y pixel (manual)"),
         )
         .form(submit_button_label="Run axial diagnostic")
     )
@@ -581,9 +597,16 @@ def _(axial_form, mo):
         step_ang=_v["step"],
         tilt_rad=(_v["tilt_x"] * 1e-3, _v["tilt_y"] * 1e-3),
         mode=_v["mode"],
+        mechanisms=("tds", "electronic") if _v["electronic"] else ("tds",),
         n_electrons=_v["electrons"],
         seed=int(_v["seed"]),
         oam_string=0 if _v["oam"] else None,
+        spectral_states=int(_v["spectral"]),
+        spectral_representation=_v["spectral_repr"],
+        record_coherence=bool(_v["coherence"]),
+        coherence_reference_index=(
+            None if _v["ref_auto"] else (int(_v["ref_x"]), int(_v["ref_y"]))
+        ),
     )
     try:
         axial_result = solve_axial_demo(
@@ -674,6 +697,38 @@ def _(axial_conditional_ui, axial_demo_figure, axial_result, axial_sample_ui, mo
         "Existing axial validation limits remain in the physics ledger. "
     )
     _items = [mo.md(_notes), _fig]
+    if axial_result.coherence_numerator_per_ang2 is not None:
+        from pyrite.apps.axial_channeling import axial_coherence_figure
+
+        _rx, _ry = axial_result.coherence_reference_index
+        _items.extend(
+            [
+                mo.md(
+                    f"**Reference-point ensemble coherence:** reference pixel ({_rx}, {_ry}); "
+                    "physical carrier included even after electronic kicks. Regions with insufficient "
+                    "density, visibility or MC sampling signal are masked; MCWF has no unique phase."
+                ),
+                axial_coherence_figure(axial_result, _index),
+            ]
+        )
+    if axial_result.spectral_populations is not None:
+        from pyrite.apps.axial_channeling import axial_spectral_population_data
+        from pyrite.apps.channeling_metrics import population_figure as _population_figure
+
+        _spectral, _labels, _description = axial_spectral_population_data(axial_result)
+        _items.extend(
+            [
+                mo.md("**Full-grid orthonormal transverse spectral projection.** " + _description),
+                _population_figure(
+                    axial_result.depths_ang,
+                    _spectral,
+                    axial_result.surviving,
+                    _index,
+                    conditional=axial_conditional_ui.value,
+                    labels=_labels,
+                ),
+            ]
+        )
     if axial_result.oam_populations is not None:
         import matplotlib.pyplot as _axial_plt
 
@@ -772,9 +827,10 @@ def _(
 
 @app.cell
 def _(conditional_ui, mo, result, sample_ui):
-    from pyrite.apps.channeling_metrics import metric_figure, population_figure
+    from pyrite.apps.channeling_metrics import metric_figure
+    from pyrite.apps.channeling_metrics import population_figure as _population_figure
 
-    _pop = population_figure(
+    _pop = _population_figure(
         result.z_ang,
         result.retained_band_populations,
         result.trace,
@@ -805,6 +861,7 @@ def _(axial_conditional_ui, axial_result, axial_sample_ui, mo):
     from pyrite.apps.channeling_metrics import population_figure as axial_population_figure
 
     _populations, _labels, _basis = axial_population_data(axial_result)
+    _basis = "Restricted radiation-selected string-local projection: " + _basis
     _pop = axial_population_figure(
         axial_result.depths_ang,
         _populations,
