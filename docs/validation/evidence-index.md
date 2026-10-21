@@ -120,6 +120,8 @@ channeling/cr-axial-2d-eigenproblem
 channeling/cr-axial-zone-handoff-accounting
 channeling/cr-axial-phase-space-instrument
 channeling/cr-quantum-regression-correlation
+channeling/cr-axial-qrt-source-normalization
+channeling/cr-axial-cuda-backend
 channeling/cr-axial-realspace-propagation
 channeling/cr-axial-realspace-dissipator
 channeling/cr-vortex-string-coupling

@@ -813,6 +813,9 @@ There is no standard-run axial integration. Research helpers
 independently anchored finite-grid measurement and two-time correlation algebra,
 with explicit allocation limits; physical escape and a persisted axial photon
 source remain separate unimplemented contracts.
+`channeling/axial_qrt_source.py` adds a bounded global-grid eigensystem/current
+factory and normalized on-axis finite RWA photon reference; it refuses oblique
+directions and does not supply the actual material carrier-bath closure.
 `apps/channeling.py::far_field_maps` draws fixed-basis circular far-field
 intensity/phase of a planar or axial dipole line from `dipole.dipole_far_field`.
 

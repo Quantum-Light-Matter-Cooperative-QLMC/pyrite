@@ -176,9 +176,9 @@ class _DiagnosticRecording:
             0 if observable is None else getattr(observable, "recording_width", 4096)
         )
         self.recording_bytes = (
-            len(config.depths_ang) * 48 * (int(np.prod(grid.shape)) + self.width + extras)
+            len(config.depths_ang) * 16 * (int(np.prod(grid.shape)) + self.width + extras)
         )
-        if record_metrics and self.recording_bytes // 3 > RECORDING_BUDGET_BYTES:
+        if record_metrics and self.recording_bytes > RECORDING_BUDGET_BYTES:
             raise ValueError("combined ensemble recording exceeds 128 MiB budget")
         self.scratch_bytes = 16 * int(np.prod(grid.shape)) * 100
         self.electrons = config.n_electrons if config.mode == "mcwf" else None

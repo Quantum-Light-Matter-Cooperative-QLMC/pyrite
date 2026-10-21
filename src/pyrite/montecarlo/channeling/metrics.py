@@ -90,9 +90,9 @@ class AxialMetricsObservable:
         self.probes = probes
         size = int(np.prod(grid.shape))
         self.width = probes * size + 2
-        # Device sums, transferred per-depth values and final stacked output can
-        # coexist during reduction/transfer; admit all three, not only output.
-        self.recording_bytes = 3 * depths * self.width * np.dtype(complex).itemsize
+        # Declare one output copy; CUDA admission reserves three simultaneous
+        # copies for device sums, transferred per-depth values and final stack.
+        self.recording_bytes = depths * self.width * np.dtype(complex).itemsize
         self.scratch_bytes = (3 * probes + 8) * size * np.dtype(complex).itemsize
         if depths * self.width * np.dtype(complex).itemsize > RECORDING_BUDGET_BYTES:
             raise ValueError("ensemble metric recording exceeds 128 MiB budget")
