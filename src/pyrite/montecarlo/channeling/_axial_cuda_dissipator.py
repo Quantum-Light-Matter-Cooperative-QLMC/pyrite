@@ -6,6 +6,7 @@ Validation: cr-axial-realspace-dissipator
 from __future__ import annotations
 
 import cupy as cp
+import numpy as np
 
 from .axial_dissipator import _pad_index
 from .realspace import RealSpaceGrid
@@ -31,13 +32,17 @@ class DeviceDissipator:
         )
         self._envelopes = {}
         self._spectra = {}
+        self._phases = {}
         self.tds_sources = dissipator.tds_sources
         self.tds_source_rates = cp.asarray(dissipator.tds_source_rates)
         self.phase_spectra = {k: cp.asarray(v) for k, v in dissipator.phase_spectra.items()}
         self.electronic_q_inv_ang = cp.asarray(dissipator.electronic_q_inv_ang)
+        self.electronic_q_host = dissipator.electronic_q_inv_ang
         self.electronic_weights = cp.asarray(dissipator.electronic_weights)
         self.electron_density = cp.asarray(dissipator.electron_density)
         self.electronic_damping = cp.asarray(dissipator.electronic_damping)
+        self._electronic_indices = cp.asarray(np.flatnonzero(dissipator.electron_density))
+        self._electronic_density = self.electron_density.ravel()[self._electronic_indices]
 
     def tds_phase(self, source: int, offset_ang) -> cp.ndarray:
         """``phi_u(r) - <phi>(r)`` of one source displaced by ``offset_ang`` (real).
@@ -49,9 +54,12 @@ class DeviceDissipator:
         kx = self.grid.kx[:, None]
         ky = self.grid.ky[None, :]
         spectrum = self.phase_spectra[src.element]
-        x0, y0 = src.position_ang
-        base = spectrum * cp.exp(-1j * (kx * x0 + ky * y0))
-        mean = cp.exp(-0.5 * src.displacement_ang2 * (kx**2 + ky**2))
+        if source not in self._phases:
+            x0, y0 = src.position_ang
+            base = spectrum * cp.exp(-1j * (kx * x0 + ky * y0))
+            mean = cp.exp(-0.5 * src.displacement_ang2 * (kx**2 + ky**2))
+            self._phases[source] = base, mean
+        base, mean = self._phases[source]
         offsets = cp.asarray(offset_ang, dtype=float)
         single = offsets.ndim == 1
         offsets = cp.atleast_2d(offsets)
@@ -163,6 +171,7 @@ class DeviceDissipator:
     def electronic_expectations(self, density: cp.ndarray) -> cp.ndarray:
         """``<rho_q>`` of a normalized ``|psi|^2`` sample at every transfer node."""
         spectrum = cp.fft.fft2(density) * self.grid.cell_area_ang2
-        live = self.electron_density != 0.0
-        overlap = (self.electron_density[live] * cp.conj(spectrum[live])).real * spectrum.size
+        overlap = (
+            self._electronic_density * cp.conj(spectrum.ravel()[self._electronic_indices])
+        ).real * spectrum.size
         return self.electronic_damping @ overlap

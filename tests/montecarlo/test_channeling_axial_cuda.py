@@ -1,6 +1,7 @@
 """Axial CUDA device parity, trajectory streams and callback contract (#620)."""
 
 from dataclasses import replace
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -53,6 +54,26 @@ def test_cpu_jump_history_preserves_batch_and_recording_contract():
     for kind, counts in first.jump_history.items():
         assert counts[0] == 0 and np.all(np.diff(counts) >= 0)
         assert counts[-1] == first.jumps[kind] == second.jump_history[kind][-1]
+
+
+def test_cuda_admission_reserves_recording_finalization_and_mixtures():
+    from pyrite._backend import BackendResourceError, NumPyBackend
+    from pyrite.montecarlo.channeling._axial_cuda import _admit
+    from pyrite.montecarlo.channeling.axial_mcwf import density_observable
+
+    d, potential = _case()
+    solver = AxialMCWF(d, 1e6, potential)
+    backend = NumPyBackend()
+    backend.xp = SimpleNamespace(
+        cuda=SimpleNamespace(runtime=SimpleNamespace(memGetInfo=lambda: (2**30, 2**30)))
+    )
+    # Three coexisting recording copies alone exceed this explicit16MiB budget;
+    # reserving only one copy would incorrectly admit it.
+    with pytest.raises(BackendResourceError, match="immutable data and scratch"):
+        _admit(solver, backend, 1, 16 * 2**20, 10000, density_observable, 1)
+    # Immutable sampled mixtures must be counted before device upload too.
+    with pytest.raises(BackendResourceError, match="immutable data and scratch"):
+        _admit(solver, backend, 1, 2**20, 1, density_observable, 1000)
 
 
 def test_cuda_jump_equations_match_cpu():
@@ -120,6 +141,42 @@ def test_cuda_philox_published_vector_full_key_and_draw_partition():
         cp.asnumpy(whole.random(64)),
         cp.asnumpy(cp.concatenate([split.random(7), split.random(57)])),
     )
+
+
+def test_cuda_rejection_acceptance_handles_strided_real_weights():
+    cp = _cuda()
+    from pyrite.montecarlo.channeling._axial_cuda_jumps import _accepted
+
+    weights = cp.asarray([0.2 + 7j, 0.8 + 9j, 0.5 + 11j]).real
+    shells = cp.asarray([0, 0, 0], dtype=cp.int64)
+    envelope = cp.asarray([1.0])
+    uniforms = cp.asarray([0.5, 0.5, 0.6])
+    assert _accepted(weights, envelope, shells, uniforms) == 1
+    weights[2] = 1.1
+    with pytest.raises(RuntimeError, match="exceeded"):
+        _accepted(weights, envelope, shells, uniforms)
+
+
+def test_cuda_displacement_proposal_matches_numpy_inverse_cdf():
+    cp = _cuda()
+    from pyrite.montecarlo.channeling._axial_cuda_jumps import _proposals
+    from pyrite.montecarlo.channeling.axial_mcwf import _SHELL_EDGES
+
+    proposal = np.arange(1, len(_SHELL_EDGES), dtype=float)
+    draws = np.random.default_rng(620).random((4, 64))
+    draws[:, 0] = 0
+    draws[:, 1] = np.nextafter(1.0, 0.0)
+    shells = np.searchsorted(np.cumsum(proposal), draws[0] * proposal.sum(), "right")
+    decay = np.exp(-0.5 * _SHELL_EDGES**2)
+    radius = 0.1 * np.sqrt(
+        -2 * np.log(decay[shells + 1] + (decay[shells] - decay[shells + 1]) * draws[1])
+    )
+    offsets = radius[:, None] * np.stack(
+        [np.cos(2 * np.pi * draws[2]), np.sin(2 * np.pi * draws[2])], axis=1
+    )
+    actual_shells, actual_offsets = _proposals(cp.asarray(proposal), cp.asarray(draws), 0.1)
+    np.testing.assert_array_equal(cp.asnumpy(actual_shells), shells)
+    np.testing.assert_allclose(cp.asnumpy(actual_offsets), offsets, rtol=1e-13, atol=1e-14)
 
 
 def test_cuda_deterministic_propagation_and_device_callbacks():

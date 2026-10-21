@@ -62,7 +62,7 @@ def _observe(cp, observable, lagged, half, live, tilts, area, total):
     return total
 
 
-def _admit(solver, backend, batch_size, budget, depths, observable):
+def _admit(solver, backend, batch_size, budget, depths, observable, component_count):
     cp = backend.xp
     policy = resolve_resource_policy(backend)
     available = int(cp.cuda.runtime.memGetInfo()[0])
@@ -78,11 +78,12 @@ def _admit(solver, backend, batch_size, budget, depths, observable):
     # Fixed device spectra/scratch: fine-grid TDS coefficients, rejection GEMMs,
     # source spectra, potential and recorded density. FFT workspace receives a
     # factor of two over the live complex128 arrays. Admission fails before upload.
-    fixed = static + cells * (16 * 48 + 8 * depths) + 131 * 131 * 8 * 4
+    # Sums, divided values and final stack coexist during finalization.
+    fixed = static + cells * (16 * (48 + component_count) + 24 * depths) + 131 * 131 * 8 * 4
     fixed += len(d.tds_sources) * (
         cells * 16 * 12 + 15 * 131**2 + 131 * sum(solver.grid.shape) * 32
     )
-    fixed += int(getattr(observable, "recording_bytes", 0))
+    fixed += 3 * int(getattr(observable, "recording_bytes", 0))
     fixed += int(getattr(observable, "scratch_bytes", 0))
     if limit <= fixed:
         raise BackendResourceError(
@@ -117,14 +118,20 @@ def run_cuda(
     steps = _depth_steps(depths_ang, n_electrons, step_ang)
     backend = select_backend("cuda")
     cp = backend.xp
+    components = _sample_components(solver.grid, entry)
     size_limit = _admit(
-        solver, backend, batch_size or BATCH, memory_budget_bytes, steps.size, observable
+        solver,
+        backend,
+        batch_size or BATCH,
+        memory_budget_bytes,
+        steps.size,
+        observable,
+        len(components),
     )
     from ._axial_cuda_dissipator import DeviceDissipator
     from ._axial_cuda_jumps import DeviceJumps
 
     device = DeviceJumps(solver, DeviceDissipator(solver.dissipator))
-    components = _sample_components(solver.grid, entry)
     weights = cp.asarray([float(w) for w, _ in components])
     sampled = cp.asarray(np.stack([s for _, s in components]))
     phase = cp.exp(-1j * step_ang * cp.asarray(solver._complex_potential) / solver.hbar_v)
@@ -193,7 +200,14 @@ class _Batch:
         self.start, self.step, self.hook = start, 0, hook
         self.jumps = {"tds": 0, "sink": 0, "electronic": 0}
         self.rngs = [electron_rng(seed, e) for e in range(start, start + size)]
-        phi = cp.stack([sampled[_choose(rng, weights)] for rng in self.rngs])
+        if sampled.shape[0] == 1:
+            phi = cp.broadcast_to(sampled[0], (size, *sampled.shape[1:])).copy()
+            # A one-component categorical draw is always index zero; reserve
+            # its scalar address exactly as the general sampler does.
+            for rng in self.rngs:
+                rng.counter = 1
+        else:
+            phi = cp.stack([sampled[_choose(rng, weights)] for rng in self.rngs])
         self.area = device.grid.cell_area_ang2
         phi /= cp.sqrt(cp.sum(cp.abs(phi) ** 2, axis=(1, 2)) * self.area)[:, None, None]
         self.tilts = [tilt] * size
@@ -202,7 +216,8 @@ class _Batch:
             kept = _hook(cp, hook, start + b, phi[b], tilt, self.area)
             self.live[b] = kept is not None
             phi[b] = 0 if kept is None else kept
-        self.absorbed = size - int(self.live.sum())
+        self.live_count = int(self.live.sum())
+        self.absorbed = size - self.live_count
         self.absorbed_after_entry = 0
         self.half = cp.broadcast_to(device._half_kinetic(tilt, step), phi.shape).copy()
         self.full = self.half**2
@@ -211,14 +226,14 @@ class _Batch:
 
     def advance(self, target, step_ang, phase, jumps, sinks):
         cp = self.cp
-        while self.step < target and bool(self.live.any()):
+        while self.step < target and self.live_count:
             self.lagged *= self.full
             self.lagged = cp.fft.fft2(
                 phase * cp.fft.ifft2(self.lagged, axes=(-2, -1)), axes=(-2, -1)
             )
             self.step += 1
             norms = cp.sum(cp.abs(self.lagged) ** 2, axis=(1, 2)) * self.area / self.lagged[0].size
-            for b in cp.asnumpy(cp.flatnonzero(self.live & (norms <= self.thresholds))):
+            for b in np.flatnonzero(cp.asnumpy(self.live & (norms <= self.thresholds))):
                 self.jump(int(b), norms[b], step_ang, jumps, sinks)
 
     def jump(self, b, norm, step_ang, jumps, sinks):
@@ -236,6 +251,7 @@ class _Batch:
         self.absorbed_after_entry += int(kept is None) - int(kind == "sink")
         if kept is None:
             self.live[b] = False
+            self.live_count -= 1
             self.lagged[b] = 0
         else:
             self.lagged[b] = cp.fft.fft2(kept) * self.half[b].conj()

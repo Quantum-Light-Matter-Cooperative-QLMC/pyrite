@@ -22,6 +22,16 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 - **Anchor:** `tests/montecarlo/test_channeling_quantum_regression.py`
 - **Notes:** Bounded CPU reference, with incident normalization and explicit dense/spectral-memory admission. Output is a supplied-current correlation/quadratic form, not photons/eV/sr. It supplies no material-specific current operator, finite-grid completeness, frame mapping, boundary matching or persisted channel. **2026-10-21 fresh-context verdict `rederived`** ([write-up](channeling/cr-quantum-regression-correlation.md)): derived before implementation; column-major GKSL factors, non-Hermitian intermediate, complex component ordering, positive spectral phase and amplitude attenuation match. All 15 independent analytic/budget regressions pass; this scoped reference is `anchored`. The physical axial source remains unverified/unimplemented. Human sign-off remains in #277.
 
+## `cr-axial-persisted-channel`
+
+- **Claim:** proposed standard-run axial source: incident-normalized photons/eV/sr from a complete declared emitting subspace, physical finite-path/scattering correlations, consistent frames and depth attenuation, and exactly-once optional result/checkpoint persistence. All strings, represented capture and unresolved spectral weight require explicit coverage or bounds.
+- **Code:** research proposal only; no production axial source or persistence adapter.
+- **Source:** [standard-run source contract](../research/physics/axial-run-integration.md#expected-value-spectral-source); `cr-axial-helicity-emission` for the existing local-level polarization scope; `cr-quantum-regression-correlation` for the finite Markov reference algebra. None establishes the complete material source.
+- **Status:** unverified
+- **Checks:** planned: complete emitting-subspace/capture convergence, correct photon units and angular frames, finite-path/scattering line shapes, amplitude attenuation, mixed-state linearity, exactly-once combination, cache separation, persisted round-trip and early unsupported-consumer refusal.
+- **Anchor:** no production anchor; finite correlation and diagnostic local-line anchors do not cover this claim.
+- **Notes:** Registered for #620 before production source implementation. Actual axial electronic jumps change carrier/Bloch sectors; a one-sector finite Liouvillian and the one-string flat-level catalog are insufficient. Source/native radiation partition and physical handoff remain open. Target `anchored`; human sign-off remains in #277.
+
 ## `diamond-valence-oscillator`
 
 - **Claim:** the existing PENELOPE effective-oscillator model for undoped diamond assigns four valence electrons per C formula unit to the approximately 34 eV bulk plasmon, retaining two K-core electrons; this is not a free-carrier or boron-doped intervalence oscillator.
