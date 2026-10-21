@@ -35,13 +35,10 @@ global state itself.
 from typing import Any
 
 import altair as alt
-import numpy as np
 import pandas as pd
 
-from ..._spectral_components import cxr_spectrum
 from ...results import records
-from ...results.store import _detected_background_wide
-from .._common import _best_azimuth, _case_title, _comparison_drop_message, _cxr_brem
+from .._common import _case_title, _comparison_drop_message
 from ._typing import _mark_chart
 
 _FRAME_COLUMNS = ["energy_eV", "intensity", "E0_keV", "azimuth_deg", "component"]
@@ -101,12 +98,6 @@ def _style_chart(chart):
         )
         .configure_title(fontSize=_TITLE_FONT_SIZE)
     )
-
-
-
-
-
-
 
 
 def _log_y_scale(df, floor_frac=1e-3):
@@ -175,18 +166,6 @@ def _scale(scale_type, domain=None):
     return alt.Scale(**kwargs) if kwargs else alt.Undefined
 
 
-
-
-
-
-
-
-
-
-
-
-
-
 def _compact_component_frame(df):
     """Store paired total/brem values once per rendered energy coordinate."""
     index_cols = [c for c in df.columns if c not in {"intensity", "component"}]
@@ -204,8 +183,6 @@ def _fold_components(chart, include_brem, include_cxr=False, include_coherent=Fa
     if include_coherent:
         components.append("coherent")
     return chart.transform_fold(components, as_=["component", "intensity"])
-
-
 
 
 def spectrum_chart(
@@ -317,8 +294,6 @@ def _component_layers(base, include_brem, include_cxr=False, include_coherent=Fa
     return layers
 
 
-
-
 def compare_spectrum_chart(
     results,
     settings,
@@ -400,8 +375,6 @@ def compare_spectrum_chart(
         .properties(width=width, height=height, title=_spectrum_title(title))
         .interactive(bind_y=False)
     )
-
-
 
 
 def multi_case_spectrum_chart(
@@ -580,16 +553,10 @@ def material_comparison_chart(
 # #622: renderer-neutral implementations take precedence over legacy local
 # definitions. Public helpers remain available to existing Altair callers.
 from .._spectrum_frames import (  # noqa: E402
-    _characteristic_view,
     _compare_frame,
-    _decimate_frame,
     _multi_case_frame,
     _narrow_line_domain,
-    _peak_preserving_indices,
-    _record_frame,
-    _selected_cxr_record,
     _tilt_records,
-    _validate_band,
     _windowed_frame,
     spectrum_frame,
 )

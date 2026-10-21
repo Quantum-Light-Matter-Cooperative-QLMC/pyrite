@@ -8,20 +8,15 @@ under ``emission = coherent | both``. Import from the submodule:
 """
 
 import altair as alt
-import numpy as np
-import pandas as pd
 
-from ...results import records
 from ._typing import _mark_chart
-from .spectra import _peak_preserving_indices, _spectrum_axis, _spectrum_legend, _style_chart
+from .spectra import _spectrum_axis, _spectrum_legend, _style_chart
 
 _INTENSITY_TITLE = "I(t) (photons/sr/e⁻/fs)"
 _COMPONENTS = (
     ("temporal_intensity", "incoherent"),
     ("temporal_intensity_coherent", "coherent"),
 )
-
-
 
 
 def temporal_chart(

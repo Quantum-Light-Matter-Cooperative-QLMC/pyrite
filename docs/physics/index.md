@@ -73,6 +73,8 @@ beam-transport/positron-transport
 :caption: Radiation physics
 
 radiation-physics/coherent-radiation
+radiation-physics/channeling-energy-ensemble
+radiation-physics/channeling-energy-resolved-mcwf
 radiation-physics/coherent-emission
 radiation-physics/temporal-intensity-profile
 radiation-physics/bremsstrahlung

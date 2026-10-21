@@ -1,6 +1,5 @@
 """Map view: one clickable azimuth × polar-tilt heatmap, metric trends, and rankings."""
 
-from pyrite.apps._design import static_altair_chart
 from pyrite.plots.plotly.spectra import spectrum_chart
 from pyrite.plots.plotly.sweeps import metric_vs_chart, scan_charts
 from pyrite.results import select_results, top_geometries

@@ -37,29 +37,45 @@ from ...detectors import eaglexo_response as eag
 from .._common import SI_K_EDGE_EV, _thr_keV
 from .._detector_frames import (
     _CHARGE_COLUMNS as _CHARGE_COLUMNS,
+)
+from .._detector_frames import (
     _CHART_MAX_ROWS as _CHART_MAX_ROWS,
+)
+from .._detector_frames import (
     _DET_COLUMNS as _DET_COLUMNS,
+)
+from .._detector_frames import (
     _INTENSITY_TITLE,
-    _NA_PER_UA as _NA_PER_UA,
-    _broad_incident as _broad_incident,
     _chart_frame,
-    _collapsed as _collapsed,
-    _peak_preserving_indices as _peak_preserving_indices,
     _title,
-    _tilt_records,
-    _validate_band as _validate_band,
     eaglexo_charge_frame,
     eaglexo_detected_frame,
     timepix_detected_frame,
 )
+from .._detector_frames import (
+    _NA_PER_UA as _NA_PER_UA,
+)
+from .._detector_frames import (
+    _broad_incident as _broad_incident,
+)
+from .._detector_frames import (
+    _collapsed as _collapsed,
+)
+from .._detector_frames import (
+    _peak_preserving_indices as _peak_preserving_indices,
+)
+from .._detector_frames import (
+    _validate_band as _validate_band,
+)
+from .._spectrum_frames import _tilt_records
 from ._typing import _mark_chart
+from .spectra import _scale as _axis_scale
 from .spectra import (
     _spectrum_axis,
     _spectrum_legend,
     _spectrum_title,
     _windowed_frame,
 )
-from .spectra import _scale as _axis_scale
 
 
 def _y_scale(df, y_field, y_type, x_domain=None, y_domain=None, floor_frac=1e-5):

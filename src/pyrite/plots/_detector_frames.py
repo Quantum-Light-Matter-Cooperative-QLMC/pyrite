@@ -19,7 +19,7 @@ from ._common import (
     _eag_wide_charge,
     _tpx_detected,
 )
-from ._spectrum_frames import _peak_preserving_indices, _tilt_records, _validate_band
+from ._spectrum_frames import _peak_preserving_indices, _validate_band
 
 # incident-vs-detected long form (Timepix + Eagle photon density)
 _DET_COLUMNS = ["energy_eV", "intensity", "E0_keV", "azimuth_deg", "kind", "band"]

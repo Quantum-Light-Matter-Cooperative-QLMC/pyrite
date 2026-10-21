@@ -20,12 +20,13 @@ from .._spectral_components import cxr_spectrum
 
 # ---- record selection --------------------------------------------------------
 def records(results, names=None):
-    """Flatten records from a nested checkpoint store.
+    """Flatten a nested checkpoint store or select an existing record list.
 
     Parameters
     ----------
     results
-        ``{configuration_name: {electron_energy: record}}`` mapping.
+        ``{configuration_name: {electron_energy: record}}`` mapping, or an
+        already-flat record list.
     names
         Optional configuration names to include, in requested order.
 
@@ -34,6 +35,10 @@ def records(results, names=None):
     list
         Record mappings in configuration and nested energy insertion order.
     """
+    if isinstance(results, list):
+        if names is None:
+            return results
+        return [record for record in results if record["case"].get("name") in names]
     keys = list(results) if names is None else [n for n in names if n in results]
     return [results[n][E0] for n in keys for E0 in results[n]]
 

@@ -15,6 +15,13 @@ experimental axial tier's periodic split-step backend. CPU only.
 """
 
 from . import realspace, states
+from .axial_energy_mcwf import (
+    AxialEnergyMCWFCheckpoint,
+    AxialEnergyMCWFOptions,
+    AxialEnergyMCWFResult,
+    axial_energy_mcwf,
+    sample_electron_energies,
+)
 from .density import (
     DECHANNELING_MARGIN_EV,
     DECHANNELING_MARGIN_PROVENANCE,
@@ -43,6 +50,20 @@ from .emission import (
     emission_lines,
     line_shape,
 )
+from .energy_ensemble import (
+    AxialEnergyDiagnostic,
+    AxialEnergySpectrum,
+    EnergyQuadrature,
+    IncidentEnergyEnsemble,
+    PlanarEnergyDiagnostic,
+    PlanarEnergySpectrum,
+    axial_energy_diagnostic,
+    axial_energy_spectrum,
+    check_quadrature_convergence,
+    planar_energy_diagnostic,
+    planar_energy_spectrum,
+    planar_solver_factory,
+)
 from .handoff import CHANNELING_MODEL
 from .mcwf import MCWFResult, MCWFSolver, mcwf_stream_key
 from .operators import (
@@ -70,6 +91,11 @@ __all__ = [
     "DECHANNELING_MARGIN_PROVENANCE",
     "KIND_CAPTURE",
     "KIND_LINE",
+    "AxialEnergyMCWFCheckpoint",
+    "AxialEnergyMCWFOptions",
+    "AxialEnergyMCWFResult",
+    "AxialEnergyDiagnostic",
+    "AxialEnergySpectrum",
     "CaptureBound",
     "ChannelingSpectrum",
     "DecoherenceRate",
@@ -77,14 +103,22 @@ __all__ = [
     "DensityMatrixSolver",
     "ElectronicChannels",
     "EmissionLines",
+    "EnergyQuadrature",
+    "IncidentEnergyEnsemble",
     "FirstOrderTransition",
     "LineGroup",
     "MCWFResult",
+    "PlanarEnergyDiagnostic",
+    "PlanarEnergySpectrum",
     "MCWFSolver",
     "ScatteringKernel",
     "TransitionRadiationBound",
+    "axial_energy_mcwf",
+    "axial_energy_diagnostic",
+    "axial_energy_spectrum",
     "boosted_dipole_pattern",
     "capture_bound",
+    "check_quadrature_convergence",
     "channeling_spectrum",
     "decoherence_rate",
     "dipole_rate_per_ang",
@@ -96,7 +130,11 @@ __all__ = [
     "first_order_transition",
     "line_shape",
     "mcwf_stream_key",
+    "planar_energy_diagnostic",
+    "planar_energy_spectrum",
+    "planar_solver_factory",
     "rest_frame_dipole_rate_inv_s",
+    "sample_electron_energies",
     "spatial_density",
     "tds_kernel",
     "transition_operator",
