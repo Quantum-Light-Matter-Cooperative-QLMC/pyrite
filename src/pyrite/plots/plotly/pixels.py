@@ -24,7 +24,7 @@ def _signed_ticks(raw):
     maximum = float(np.max(np.abs(finite)))
     if maximum == 0:
         return [0.0], ["0"]
-    magnitudes = [0.0] + [10.0 ** e for e in range(0, int(np.floor(np.log10(maximum))) + 1)]
+    magnitudes = [0.0] + [10.0**e for e in range(0, int(np.floor(np.log10(maximum))) + 1)]
     levels = sorted(set([-v for v in magnitudes if np.min(finite) < 0] + magnitudes))
     levels = [v for v in levels if np.min(finite) <= v <= np.max(finite)]
     if 0 not in levels:
@@ -72,28 +72,43 @@ def detector_image_chart(
     # boundaries removes overshoot when the last block is truncated.
     nx = int(frame["column1"].max()) + 1
     ny = int(frame["row1"].max()) + 1
-    fig.add_trace(go.Heatmap(
-        z=plotted, x0=block / 2, dx=block, y0=block / 2, dy=block,
-        text=hover, hovertemplate="%{text}<extra></extra>",
-        colorscale=scheme, colorbar=colorbar,
-    ))
+    fig.add_trace(
+        go.Heatmap(
+            z=plotted,
+            x0=block / 2,
+            dx=block,
+            y0=block / 2,
+            dy=block,
+            text=hover,
+            hovertemplate="%{text}<extra></extra>",
+            colorscale=scheme,
+            colorbar=colorbar,
+        )
+    )
     if selected is not None:
         row, column = selected
         hit = frame.loc[
-            (frame["row0"] <= row) & (row <= frame["row1"])
-            & (frame["column0"] <= column) & (column <= frame["column1"])
+            (frame["row0"] <= row)
+            & (row <= frame["row1"])
+            & (frame["column0"] <= column)
+            & (column <= frame["column1"])
         ]
         if not hit.empty:
             cell = hit.iloc[0]
             fig.add_shape(
-                type="rect", x0=float(cell.column0), x1=float(cell.column1 + 1),
-                y0=float(cell.row0), y1=float(cell.row1 + 1),
-                line=dict(color="red", width=2), fillcolor="rgba(0,0,0,0)",
+                type="rect",
+                x0=float(cell.column0),
+                x1=float(cell.column1 + 1),
+                y0=float(cell.row0),
+                y1=float(cell.row1 + 1),
+                line=dict(color="red", width=2),
+                fillcolor="rgba(0,0,0,0)",
             )
     subtitle = "full resolution" if block == 1 else f"display blocks of {block} × {block} pixels"
     fig.update_layout(
         title=f"{title}<br><sup>{subtitle}</sup>",
-        width=size + 150, height=size + 85,
+        width=size + 150,
+        height=size + 85,
         xaxis=dict(title="column", range=[0, nx], constrain="domain"),
         yaxis=dict(title="row", range=[ny, 0], scaleanchor="x", scaleratio=1),
     )
@@ -110,17 +125,24 @@ def pixel_spectrum_chart(
     for i, (component, grp) in enumerate(frame.groupby("component", sort=False)):
         grp = grp.sort_values("energy_eV")
         values = grp["value"].to_numpy(dtype=float)
-        fig.add_trace(go.Scatter(
-            x=grp["energy_eV"].to_numpy(dtype=float),
-            y=np.where(values > 0, values, np.nan) if y_type == "log" else values,
-            mode="lines", name=str(component),
-            line=dict(color=qualitative.Plotly[i % len(qualitative.Plotly)]),
-            hovertemplate=f"{component}<br>Energy: %{{x:.6g}} eV"
-                          "<br>Flux: %{y:.6g} photons/e⁻/eV<extra></extra>",
-        ))
-    fig.update_layout(title=title, width=width, height=height,
-                      xaxis_title="Photon energy (eV)",
-                      yaxis=dict(title="Photons / electron / eV", type=y_type))
+        fig.add_trace(
+            go.Scatter(
+                x=grp["energy_eV"].to_numpy(dtype=float),
+                y=np.where(values > 0, values, np.nan) if y_type == "log" else values,
+                mode="lines",
+                name=str(component),
+                line=dict(color=qualitative.Plotly[i % len(qualitative.Plotly)]),
+                hovertemplate=f"{component}<br>Energy: %{{x:.6g}} eV"
+                "<br>Flux: %{y:.6g} photons/e⁻/eV<extra></extra>",
+            )
+        )
+    fig.update_layout(
+        title=title,
+        width=width,
+        height=height,
+        xaxis_title="Photon energy (eV)",
+        yaxis=dict(title="Photons / electron / eV", type=y_type),
+    )
     return fig
 
 
@@ -141,22 +163,28 @@ def histogram_chart(
     values = frame["counts"].to_numpy(dtype=float)
     plot_values = _signed_log(values) if y_type == "log" else values
     fig = go.Figure()
-    fig.add_trace(go.Bar(
-        x=(left + right) / 2,
-        width=right - left,
-        y=plot_values,
-        customdata=np.column_stack((left, right, values)),
-        hovertemplate="Bin [%{customdata[0]:.6g}, %{customdata[1]:.6g}) eV"
-                      "<br>Counts: %{customdata[2]:.6g}<extra></extra>",
-        marker_line_width=0,
-    ))
+    fig.add_trace(
+        go.Bar(
+            x=(left + right) / 2,
+            width=right - left,
+            y=plot_values,
+            customdata=np.column_stack((left, right, values)),
+            hovertemplate="Bin [%{customdata[0]:.6g}, %{customdata[1]:.6g}) eV"
+            "<br>Counts: %{customdata[2]:.6g}<extra></extra>",
+            marker_line_width=0,
+        )
+    )
     yaxis = dict(title=count_title)
     if y_type == "log":
         vals, labels = _signed_ticks(values)
         yaxis.update(tickmode="array", tickvals=vals, ticktext=labels)
     fig.update_layout(
-        title=title, width=width, height=height,
-        xaxis_title="Measured energy (eV)", yaxis=yaxis, bargap=0,
+        title=title,
+        width=width,
+        height=height,
+        xaxis_title="Measured energy (eV)",
+        yaxis=yaxis,
+        bargap=0,
     )
     return fig
 

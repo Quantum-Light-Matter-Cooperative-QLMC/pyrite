@@ -54,26 +54,38 @@ def metric_vs_chart(
         return None
     eff_x = _effective_x(recs, x, hue)
     frame = metric_vs_frame(
-        results, settings, x=x, metric=metric, hue=hue,
-        select=select, cases=cases, rel_prominence=rel_prominence,
-        cxr_metric=cxr_metric, metrics=metrics,
+        results,
+        settings,
+        x=x,
+        metric=metric,
+        hue=hue,
+        select=select,
+        cases=cases,
+        rel_prominence=rel_prominence,
+        cxr_metric=cxr_metric,
+        metrics=metrics,
     )
     if frame.empty:
         return None
     fig = go.Figure()
     for i, (key, group) in enumerate(frame.groupby("hue", sort=False)):
         points = group.sort_values("x")
-        fig.add_trace(go.Scatter(
-            x=points["x"].to_numpy(dtype=float),
-            y=points["metric"].to_numpy(dtype=float),
-            mode="lines+markers", name=str(key),
-            marker=dict(size=5), line=dict(width=1.8, color=_COLORS[i % len(_COLORS)]),
-            hovertemplate=f"{hue}: {key}<br>x: %{{x:.6g}}<br>value: %{{y:.6g}}<extra></extra>",
-        ))
+        fig.add_trace(
+            go.Scatter(
+                x=points["x"].to_numpy(dtype=float),
+                y=points["metric"].to_numpy(dtype=float),
+                mode="lines+markers",
+                name=str(key),
+                marker=dict(size=5),
+                line=dict(width=1.8, color=_COLORS[i % len(_COLORS)]),
+                hovertemplate=f"{hue}: {key}<br>x: %{{x:.6g}}<br>value: %{{y:.6g}}<extra></extra>",
+            )
+        )
     metric_label = _METRIC_LABELS.get(metric, metric)
     fig.update_layout(
         title=f"{metric_label} vs {_axis_label(eff_x)}  (best per point: {select})",
-        width=width, height=height,
+        width=width,
+        height=height,
         xaxis=dict(title=_axis_label(eff_x), type="log" if logx else "linear"),
         yaxis=dict(title=metric_label, type="log" if logy else "linear"),
         legend=dict(title=_AXIS_SPECS.get(hue, (hue,))[0]),
@@ -103,22 +115,35 @@ def heatmap_chart(
     """Dense sweep grids with NaN gaps, per-cell metadata, and shared color range."""
     key, label, cmap = _resolve_quantity(quantity)
     frame = heatmap_frame(
-        results, settings, quantity=key, x=x, y=y, panel=panel,
-        select=select, cases=cases, rel_prominence=rel_prominence,
-        cxr_metric=cxr_metric, min_flux_frac=min_flux_frac,
-        min_cxr_quality=min_cxr_quality, metrics=metrics,
+        results,
+        settings,
+        quantity=key,
+        x=x,
+        y=y,
+        panel=panel,
+        select=select,
+        cases=cases,
+        rel_prominence=rel_prominence,
+        cxr_metric=cxr_metric,
+        min_flux_frac=min_flux_frac,
+        min_cxr_quality=min_cxr_quality,
+        metrics=metrics,
     )
     if frame.empty:
         return None
     panels = list(dict.fromkeys(frame["panel"].tolist()))
     fig = make_subplots(
-        rows=1, cols=len(panels), subplot_titles=panels,
+        rows=1,
+        cols=len(panels),
+        subplot_titles=panels,
         horizontal_spacing=min(0.08, 0.2 / len(panels)),
     )
     all_values = frame["value"].to_numpy(dtype=float)
     finite = all_values[np.isfinite(all_values)]
-    zmin, zmax = color_domain if color_domain is not None else (
-        (float(finite.min()), float(finite.max())) if finite.size else (0.0, 1.0)
+    zmin, zmax = (
+        color_domain
+        if color_domain is not None
+        else ((float(finite.min()), float(finite.max())) if finite.size else (0.0, 1.0))
     )
     if zmin == zmax:
         zmax = zmin + 1.0
@@ -135,19 +160,29 @@ def heatmap_chart(
         for r in part.itertuples(index=False):
             row, col = yix[r.y], xix[r.x]
             z[row, col] = float(r.value)
-            hover[row, col] = f"{r.name}<br>{_axis_label(x)}: {r.x:.6g}<br>{_axis_label(y)}: {r.y:.6g}"
+            hover[row, col] = (
+                f"{r.name}<br>{_axis_label(x)}: {r.x:.6g}<br>{_axis_label(y)}: {r.y:.6g}"
+            )
         fig.add_trace(
             go.Heatmap(
-                z=z, x=xs, y=ys, text=hover,
+                z=z,
+                x=xs,
+                y=ys,
+                text=hover,
                 hovertemplate="%{text}<br>value: %{z:.6g}<extra></extra>",
-                coloraxis="coloraxis", xgap=1, ygap=1,
+                coloraxis="coloraxis",
+                xgap=1,
+                ygap=1,
             ),
-            row=1, col=i + 1,
+            row=1,
+            col=i + 1,
         )
         fig.update_xaxes(title_text=_axis_label(x), row=1, col=i + 1)
         fig.update_yaxes(title_text=_axis_label(y), row=1, col=i + 1)
     fig.update_layout(
-        title=label, width=max(520, width * len(panels)), height=height + 110,
+        title=label,
+        width=max(520, width * len(panels)),
+        height=height + 110,
         coloraxis=dict(colorscale=str(cmap), cmin=zmin, cmax=zmax, colorbar=dict(title=label)),
         showlegend=False,
     )
@@ -184,10 +219,19 @@ def scan_charts(
     if mode == "heatmap":
         charts = [
             heatmap_chart(
-                results, settings, quantity=(key, label, cmap), x=x, y=y, panel=panel,
-                select=select, cases=cases, rel_prominence=rel_prominence,
-                cxr_metric=cxr_metric, min_flux_frac=min_flux_frac,
-                min_cxr_quality=min_cxr_quality, metrics=metrics,
+                results,
+                settings,
+                quantity=(key, label, cmap),
+                x=x,
+                y=y,
+                panel=panel,
+                select=select,
+                cases=cases,
+                rel_prominence=rel_prominence,
+                cxr_metric=cxr_metric,
+                min_flux_frac=min_flux_frac,
+                min_cxr_quality=min_cxr_quality,
+                metrics=metrics,
             )
             for key, label, cmap in quantities
         ]
@@ -195,9 +239,18 @@ def scan_charts(
         cxr_x, hue = pick_hue(recs, x, y, panel, hue)
         charts = [
             metric_vs_chart(
-                results, settings, x=cxr_x, metric=key, hue=hue,
-                select=select, cases=cases, rel_prominence=rel_prominence,
-                cxr_metric=cxr_metric, logx=logx, logy=logy, metrics=metrics,
+                results,
+                settings,
+                x=cxr_x,
+                metric=key,
+                hue=hue,
+                select=select,
+                cases=cases,
+                rel_prominence=rel_prominence,
+                cxr_metric=cxr_metric,
+                logx=logx,
+                logy=logy,
+                metrics=metrics,
             )
             for key, _, _ in quantities
         ]

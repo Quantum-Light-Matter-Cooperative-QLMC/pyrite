@@ -11,6 +11,7 @@ _COMPONENTS = (
     ("temporal_intensity_coherent", "coherent"),
 )
 
+
 def temporal_frame(results, *, hue="E0_keV", include_coherent=True, max_points=5000):
     """Long frame ``time_fs, intensity, <hue>, component`` over records with a profile.
 

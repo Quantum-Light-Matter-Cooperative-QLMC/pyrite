@@ -135,7 +135,8 @@ def render_spectra(
         parts.extend(
             [
                 mo.md(f"**{heading}**"),
-                chart if chart is not None
+                chart
+                if chart is not None
                 else mo.md(f"*No {heading.lower()} spectra for this slice.*"),
             ]
         )

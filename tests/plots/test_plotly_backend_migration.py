@@ -30,8 +30,12 @@ def test_spectrum_components_preserve_coordinates_and_units():
         frame,
         hue="E0_keV",
         components=("total", "brem"),
-        width=640, height=320, title="test",
-        x_type="linear", y_type="linear", x_domain=None,
+        width=640,
+        height=320,
+        title="test",
+        x_type="linear",
+        y_type="linear",
+        x_domain=None,
     )
     assert len(figure.data) == 2
     assert list(figure.data[0].x) == [10, 11, 12]
@@ -44,9 +48,15 @@ def test_spectrum_components_preserve_coordinates_and_units():
 def test_log_axes_mask_only_display_values():
     frame = _spectrum_frame()
     figure = spectra._trace_series(
-        frame, hue="E0_keV", components=("total",),
-        width=500, height=200, title="test",
-        x_type="log", y_type="log", x_domain=(10, 12),
+        frame,
+        hue="E0_keV",
+        components=("total",),
+        width=500,
+        height=200,
+        title="test",
+        x_type="log",
+        y_type="log",
+        x_domain=(10, 12),
     )
     assert figure.layout.xaxis.type == "log"
     assert figure.layout.xaxis.range[0] == pytest.approx(1.0)
@@ -63,10 +73,12 @@ def test_log_axis_rejects_nonpositive_bounds():
 def test_sweep_heatmap_preserves_missing_cell_vs_zero(monkeypatch):
     frame = pd.DataFrame(
         {
-            "x": [0, 1, 0], "y": [0, 0, 1],
+            "x": [0, 1, 0],
+            "y": [0, 0, 1],
             "panel": ["30 keV"] * 3,
             "value": [0.0, 4.0, 2.0],
-            "name": ["a", "b", "c"], "panel_raw": [30.0] * 3,
+            "name": ["a", "b", "c"],
+            "panel_raw": [30.0] * 3,
         }
     )
     monkeypatch.setattr(sweeps, "records_for_cases", lambda *_: [object()])
@@ -81,14 +93,21 @@ def test_sweep_heatmap_preserves_missing_cell_vs_zero(monkeypatch):
 def test_pixel_map_orientation_selected_cell_and_block_bounds():
     frame = pd.DataFrame(
         {
-            "row": [0, 0, 2, 2], "column": [0, 2, 0, 2],
-            "row0": [0, 0, 2, 2], "row1": [1, 1, 2, 2],
-            "column0": [0, 2, 0, 2], "column1": [1, 2, 1, 2],
-            "block": [2] * 4, "value": [0, 1, 2, 3],
+            "row": [0, 0, 2, 2],
+            "column": [0, 2, 0, 2],
+            "row0": [0, 0, 2, 2],
+            "row1": [1, 1, 2, 2],
+            "column0": [0, 2, 0, 2],
+            "column1": [1, 2, 1, 2],
+            "block": [2] * 4,
+            "value": [0, 1, 2, 3],
         }
     )
     figure = pixels.detector_image_chart(
-        frame, title="detector", value_title="counts", selected=(2, 2),
+        frame,
+        title="detector",
+        value_title="counts",
+        selected=(2, 2),
     )
     assert np.asarray(figure.data[0].z).shape == (2, 2)
     assert figure.layout.xaxis.range == (0, 3)
@@ -98,9 +117,7 @@ def test_pixel_map_orientation_selected_cell_and_block_bounds():
 
 
 def test_pixel_histogram_respects_measured_edges_and_raw_counts():
-    frame = pd.DataFrame({
-        "low_eV": [10.0, 13.0], "high_eV": [13.0, 20.0], "counts": [0.0, 6.0]
-    })
+    frame = pd.DataFrame({"low_eV": [10.0, 13.0], "high_eV": [13.0, 20.0], "counts": [0.0, 6.0]})
     figure = pixels.histogram_chart(
         frame, title="measured", count_title="expected counts", y_type="log"
     )
@@ -110,10 +127,14 @@ def test_pixel_histogram_respects_measured_edges_and_raw_counts():
 
 
 def test_temporal_is_built_from_exact_shared_frame(monkeypatch):
-    frame = pd.DataFrame({
-        "time_fs": [-1.0, 0.0, 1.0], "intensity": [0.0, 4.0, 0.0],
-        "E0_keV": [30.0] * 3, "component": ["incoherent"] * 3,
-    })
+    frame = pd.DataFrame(
+        {
+            "time_fs": [-1.0, 0.0, 1.0],
+            "intensity": [0.0, 4.0, 0.0],
+            "E0_keV": [30.0] * 3,
+            "component": ["incoherent"] * 3,
+        }
+    )
     monkeypatch.setattr(temporal, "temporal_frame", lambda *args, **kwargs: frame)
     figure = temporal.temporal_chart({})
     assert list(figure.data[0].x) == [-1, 0, 1]
@@ -122,8 +143,7 @@ def test_temporal_is_built_from_exact_shared_frame(monkeypatch):
 
 def test_material_comparison_keeps_source_values():
     fig = spectra.material_comparison_chart(
-        [("A", 1234.0, 56.0, 0.85,
-          {"E0_keV": 30.0, "tilt_deg": 5.0, "tilt_azim_deg": 10.0})],
+        [("A", 1234.0, 56.0, 0.85, {"E0_keV": 30.0, "tilt_deg": 5.0, "tilt_azim_deg": 10.0})],
         {},
     )
     assert fig.data[0].x[0] == pytest.approx(1.234)

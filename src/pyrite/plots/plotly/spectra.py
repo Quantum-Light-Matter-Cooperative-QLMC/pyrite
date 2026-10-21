@@ -322,22 +322,35 @@ def material_comparison_chart(
         for label, _, _, _, case in points
     ]
     fig = go.Figure()
-    fig.add_trace(go.Scatter(
-        x=x, y=y, mode="markers+text", text=labels, textposition="top center",
-        customdata=hover,
-        marker=dict(size=11, color=quality, colorscale="Viridis", cmin=0, cmax=1,
-                    colorbar=dict(title="Line quality"), line=dict(color="black", width=0.7)),
-        hovertemplate="%{customdata}<br>Line: %{x:.5g} keV<br>Flux: %{y:.5g} Phs/s<extra></extra>",
-    ))
+    fig.add_trace(
+        go.Scatter(
+            x=x,
+            y=y,
+            mode="markers+text",
+            text=labels,
+            textposition="top center",
+            customdata=hover,
+            marker=dict(
+                size=11,
+                color=quality,
+                colorscale="Viridis",
+                cmin=0,
+                cmax=1,
+                colorbar=dict(title="Line quality"),
+                line=dict(color="black", width=0.7),
+            ),
+            hovertemplate="%{customdata}<br>Line: %{x:.5g} keV<br>Flux: %{y:.5g} Phs/s<extra></extra>",
+        )
+    )
     scope = (
-        "all beam energies"
-        if beam_energy_keV is None
-        else f"{beam_energy_keV:g} keV beam energy"
+        "all beam energies" if beam_energy_keV is None else f"{beam_energy_keV:g} keV beam energy"
     )
     quality_scope = "" if min_cxr_quality is None else f", line quality ≥ {min_cxr_quality:g}"
     fig.update_layout(
         title=f"Cross-material comparison — {select.replace('_', ' ')} ({scope}{quality_scope})",
-        width=width, height=height, showlegend=False,
+        width=width,
+        height=height,
+        showlegend=False,
         xaxis_title="Dominant coherent line energy (keV)",
         yaxis=dict(title="Integrated line flux at best geometry (Phs/s)", type="log"),
     )

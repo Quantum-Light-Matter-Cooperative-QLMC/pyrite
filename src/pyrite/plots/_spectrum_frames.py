@@ -22,6 +22,7 @@ _COMPARE_HUE_FIELDS = {
     "tilt_azim_deg": "azimuth (deg)",
 }
 
+
 def _tilt_records(results, tilt_deg=None):
     """Records for ONE polar tilt: the one nearest ``tilt_deg`` (default: the
     first/lowest tilt present). Returns ``[]`` when ``results`` is empty."""
@@ -33,11 +34,9 @@ def _tilt_records(results, tilt_deg=None):
     return [r for r in recs if r["case"]["tilt_deg"] == t]
 
 
-
 def _validate_band(band):
     if band not in {"narrow", "broad"}:
         raise ValueError(f"band must be 'narrow' or 'broad', got {band!r}")
-
 
 
 def _windowed_frame(df, x_domain):
@@ -61,7 +60,6 @@ def _windowed_frame(df, x_domain):
     return windowed if not windowed.empty else df
 
 
-
 def _narrow_line_domain(records, band, x_domain):
     """Resolve an automatic narrowband domain from the widest line grid."""
     if band != "narrow" or x_domain is not None:
@@ -74,7 +72,6 @@ def _narrow_line_domain(records, band, x_domain):
         if finite.size:
             domains.append((float(finite.min()), float(finite.max())))
     return max(domains, key=lambda domain: domain[1] - domain[0], default=None)
-
 
 
 def _characteristic_view(
@@ -93,7 +90,6 @@ def _characteristic_view(
     if not dropped:
         return record
     return {key: value for key, value in record.items() if key not in dropped}
-
 
 
 def _selected_cxr_record(
@@ -121,7 +117,6 @@ def _selected_cxr_record(
     for key, _ in components:
         scored_record.pop(key, None)
     return scored_record
-
 
 
 def _record_frame(
@@ -260,7 +255,6 @@ def _record_frame(
     return frames
 
 
-
 def _peak_preserving_indices(y, max_points):
     y = np.asarray(y, dtype=float)
     n = y.size
@@ -281,7 +275,6 @@ def _peak_preserving_indices(y, max_points):
         vals = np.nan_to_num(y[bucket], nan=-np.inf)
         keep.add(int(bucket[int(np.argmax(vals))]))
     return np.fromiter(sorted(keep), dtype=int)
-
 
 
 def _decimate_frame(df, max_points):
@@ -344,7 +337,6 @@ def _decimate_frame(df, max_points):
     return pd.concat(frames, ignore_index=True).drop(columns=["_line_intensity", "_line_grid"])
 
 
-
 def spectrum_frame(
     recs,
     settings,
@@ -399,7 +391,6 @@ def spectrum_frame(
     if not frames:
         return pd.DataFrame(columns=_FRAME_COLUMNS)
     return _decimate_frame(pd.concat(frames, ignore_index=True), max_points)
-
 
 
 def _compare_frame(
@@ -464,7 +455,6 @@ def _compare_frame(
     if not frames:
         return pd.DataFrame(columns=_columns)
     return _decimate_frame(pd.concat(frames, ignore_index=True), max_points)
-
 
 
 def _multi_case_frame(

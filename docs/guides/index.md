@@ -15,6 +15,7 @@ working-with-results
 planar-channeling
 transition-radiation-demo
 directional-source-heatmap
+plotting-backends
 axial-diagnostics
 axial-state-coherence
 axial-cuda
