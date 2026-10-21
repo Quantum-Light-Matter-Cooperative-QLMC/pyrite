@@ -100,6 +100,12 @@ def resolve_channeling(cases: list[Case], physics: Physics, numerics: Numerics) 
         For a crystal without channeling data, an energy above 100 MeV, no
         bound state at the beam energy, or an unsupported case combination.
     """
+    if physics.channeling_model == "axial":
+        # Defense in depth for direct/legacy callers that bypass Scene lowering:
+        # never fall through to the planar resolver and its model marker.
+        from .axial_spec import refuse_unverified_axial_run
+
+        refuse_unverified_axial_run()
     from ..materials.channeling import longitudinal_kinematics, planar_profile, transverse_states
     from ..montecarlo.channeling import DECHANNELING_MARGIN_EV
 

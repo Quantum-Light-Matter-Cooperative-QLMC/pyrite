@@ -87,7 +87,7 @@ def test_numerics_fields_enter_the_record_and_key(planar_case):
 @pytest.mark.parametrize(
     "changes, message",
     [
-        ({"channeling_model": "axial"}, "channeling_model must be one of"),
+        ({"channeling_model": "axial"}, "channeling_plane is planar-only"),
         ({"channeling_plane": None}, "requires channeling_plane"),
         ({"channeling_plane": (0, 0, 0)}, "nonzero"),
         ({"channeling_plane": (1, 1)}, "three integer"),

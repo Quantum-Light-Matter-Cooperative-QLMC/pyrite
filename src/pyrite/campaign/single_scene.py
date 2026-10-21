@@ -168,9 +168,10 @@ def resolve_pixel_scene(
                 Literal["penelope-2024"] | None, transport.get("pair_production_model")
             ),
             channeling_model=cast(
-                Literal["off", "planar"], transport.get("channeling_model", "off")
+                Literal["off", "planar", "axial"], transport.get("channeling_model", "off")
             ),
             channeling_plane=cast(tuple[int, int, int] | None, transport.get("channeling_plane")),
+            channeling_axial=cast(Mapping[str, object] | None, transport.get("channeling_axial")),
             transition_radiation=cast(
                 Literal["off", "history", "bunch", "two-beam"],
                 transport.get("transition_radiation", "off"),

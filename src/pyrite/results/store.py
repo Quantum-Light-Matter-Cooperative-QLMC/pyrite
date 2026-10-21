@@ -166,8 +166,9 @@ class Settings:
     pair_production_model: Literal["penelope-2024"] | None = None
     positron_transport: bool = False
     atomic_electron_deflection: Literal["kawrakow", "none"] = "kawrakow"
-    channeling_model: Literal["off", "planar"] = "off"
+    channeling_model: Literal["off", "planar", "axial"] = "off"
     channeling_plane: tuple[int, int, int] | None = None
+    channeling_axial: dict[str, object] | None = None
     channeling_basis_size: int = 16
     channeling_bloch_cells: int = 16
     channeling_dz_ang: float = 250.0
@@ -221,12 +222,19 @@ class Settings:
             self.positron_transport,
         )
         validate_atomic_electron_deflection(self.atomic_electron_deflection)
-        if self.channeling_model != "off" or self.channeling_plane is not None:
+        if (
+            self.channeling_model != "off"
+            or self.channeling_plane is not None
+            or self.channeling_axial is not None
+        ):
             physics = Physics(
                 **{key: getattr(self, key) for key in PHYSICS_FIELDS if key != "emission"},
                 emission=_emission_selection(self.emission),
             )
             self.channeling_plane = physics.channeling_plane
+            self.channeling_axial = (
+                None if physics.channeling_axial is None else dict(physics.channeling_axial)
+            )
             validate_channeling_physics(physics, self.energy_model)
         if self.transition_radiation != "off" or self.transition_lattice_origin_ang is not None:
             validate_transition_physics(

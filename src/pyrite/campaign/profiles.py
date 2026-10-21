@@ -49,6 +49,7 @@ from ..montecarlo.spectrum.transition_radiation_crossings import TRANSITION_MODE
 from ..montecarlo.transport import STOPPING_MODEL
 from ..results import EmissionMode, Settings
 from ..xsgen.bremslib.tables import resolve_bremsstrahlung_model
+from .axial_spec import AXIAL_MODEL_MARKER, resolve_axial_spec
 from .identity_options import (
     pop_identity_options,
     radiative_numerics_payload,
@@ -588,8 +589,15 @@ def _identity_v1(
     # Channeling is opt-in: strip every new inert field before hashing.
     channeling = {key: settings_payload.pop(key, None) for key in CHANNELING_KEYS}
     if channeling["channeling_model"] not in (None, "off"):
+        if channeling["channeling_model"] == "axial":
+            # Expand defaults before hashing; do not alias the planar marker.
+            channeling["channeling_axial"] = resolve_axial_spec(channeling["channeling_axial"])
+            model_marker = AXIAL_MODEL_MARKER
+        else:
+            channeling.pop("channeling_axial", None)  # planar identity remains bit-for-bit
+            model_marker = CHANNELING_MODEL
         resolved["channeling"] = channeling
-        resolved["channeling_model"] = CHANNELING_MODEL
+        resolved["channeling_model"] = model_marker
     # Transition radiation (#103) is opt-in on the same divergence-only rule.
     transition = settings_payload.pop("transition_radiation", "off")
     origin = settings_payload.pop("transition_lattice_origin_ang", None)
@@ -778,7 +786,10 @@ def case_content_key(
     # Planar channeling zone (#506): divergence-only, so channeling-off keys
     # are unchanged. The record itself (plane, margin, numerics) is in "case".
     if case.get("channeling") is not None:
-        payload["channeling_model"] = CHANNELING_MODEL
+        if case["channeling"].get("model") == "axial":
+            payload["channeling_model"] = AXIAL_MODEL_MARKER
+        else:
+            payload["channeling_model"] = CHANNELING_MODEL
     if case.get("transition_radiation") is not None:
         payload["transition_model"] = TRANSITION_MODEL
         if case["transition_radiation"]["model"] == "two-beam":

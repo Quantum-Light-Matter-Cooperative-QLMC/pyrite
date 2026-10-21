@@ -493,10 +493,10 @@ Usage: pyrite profile numerics reset [OPTIONS] NAME [cxr-trials|brem-trials|line
                                      model|bremsstrahlung-model|radiative-
                                      model|radiative-cutoff-ev|pair-production-
                                      model|positron-transport|atomic-electron-
-                                     deflection|channeling-model|transition-
-                                     radiation|channeling-plane|channeling-basis-
-                                     size|channeling-bloch-cells|channeling-dz-
-                                     ang|channeling-zone-max-ang]...
+                                     deflection|channeling-model|channeling-
+                                     axial|transition-radiation|channeling-
+                                     plane|channeling-basis-size|channeling-bloch-
+                                     cells|channeling-dz-ang|channeling-zone-max-ang]...
 
   Reset selected FIELDs, or every explicit numeric when none are named.
 

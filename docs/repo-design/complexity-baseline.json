@@ -42,6 +42,11 @@
       "cc": 36
     },
     {
+      "path": "src/pyrite/campaign/axial_spec.py",
+      "name": "_entry",
+      "cc": 24
+    },
+    {
       "path": "src/pyrite/campaign/beam.py",
       "name": "Beam.from_spec",
       "cc": 29
