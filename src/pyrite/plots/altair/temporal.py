@@ -81,3 +81,7 @@ def temporal_chart(
         .interactive(bind_y=False)
     )
     return _style_chart(chart)
+
+
+# #622: use the same renderer-independent frame builder as Plotly.
+from .._temporal_frames import temporal_frame  # noqa: E402

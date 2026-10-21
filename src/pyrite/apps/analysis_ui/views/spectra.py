@@ -1,8 +1,7 @@
 """Spectra view: one dimension varies across curves, the sidebar slice pins the rest."""
 
-from pyrite.apps._design import static_altair_chart
-from pyrite.plots.altair.spectra import compare_spectrum_chart
-from pyrite.plots.altair.temporal import temporal_chart
+from pyrite.plots.plotly.spectra import compare_spectrum_chart
+from pyrite.plots.plotly.temporal import temporal_chart
 from pyrite.results import records, select_results, sweep_values
 
 from ..controls import axes_panel
@@ -136,8 +135,7 @@ def render_spectra(
         parts.extend(
             [
                 mo.md(f"**{heading}**"),
-                static_altair_chart(mo, chart)
-                if chart is not None
+                chart if chart is not None
                 else mo.md(f"*No {heading.lower()} spectra for this slice.*"),
             ]
         )
@@ -147,7 +145,7 @@ def render_spectra(
         parts.extend(
             [
                 mo.md("**Temporal profile**"),
-                static_altair_chart(mo, context.title_for_face(themed_chart(temporal, theme))),
+                context.title_for_face(themed_chart(temporal, theme)),
             ]
         )
     return mo.vstack(parts)

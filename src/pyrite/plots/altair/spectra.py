@@ -1026,3 +1026,21 @@ def material_comparison_chart(
             f"{_comparison_drop_message(dropped)}"
         )
     return _style_chart(chart.interactive(bind_y=False))
+
+
+# #622: renderer-neutral implementations take precedence over legacy local
+# definitions. Public helpers remain available to existing Altair callers.
+from .._spectrum_frames import (  # noqa: E402
+    _characteristic_view,
+    _compare_frame,
+    _decimate_frame,
+    _multi_case_frame,
+    _narrow_line_domain,
+    _peak_preserving_indices,
+    _record_frame,
+    _selected_cxr_record,
+    _tilt_records,
+    _validate_band,
+    _windowed_frame,
+    spectrum_frame,
+)

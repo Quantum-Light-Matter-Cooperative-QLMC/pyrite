@@ -5,7 +5,7 @@ from pyrite.plots import (
     material_comparison_summary,
     select_material_comparison,
 )
-from pyrite.plots.altair.spectra import material_comparison_chart
+from pyrite.plots.plotly.spectra import material_comparison_chart
 
 from .common import themed_chart
 
