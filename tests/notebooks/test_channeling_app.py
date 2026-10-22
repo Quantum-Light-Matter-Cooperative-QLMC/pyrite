@@ -13,6 +13,74 @@ from pyrite.materials.crystal import M_E_EV
 APP = Path(__file__).parents[2] / "src/pyrite/apps/channeling_app.py"
 
 
+@pytest.mark.parametrize(
+    ("label", "crystal", "hkl"),
+    [
+        ("Silicon (110)", "silicon", (1, 1, 0)),
+        ("Diamond (110)", "diamond", (1, 1, 0)),
+        ("MoS2 (001)", "mos2", (0, 0, 1)),
+    ],
+)
+def test_planar_selection_routes_crystal_and_plane(label, crystal, hkl):
+    from types import SimpleNamespace
+
+    import marimo as mo
+
+    from pyrite.apps.channeling_app import planar_controls, planar_parameters, planar_states
+
+    _, controls = planar_controls.run(mo=mo, mode_ui=SimpleNamespace(value="Planar"))
+    assert controls["crystal_ui"].value == ("silicon", (1, 1, 0))
+    _, parameters = planar_parameters.run(
+        **{**controls, "crystal_ui": mo.ui.dropdown(controls["crystal_ui"].options, value=label)}
+    )
+    assert parameters["crystal"] == crystal
+    assert parameters["hkl"] == hkl
+    _, solved = planar_states.run(
+        crystal=parameters["crystal"],
+        energy_eV=parameters["energy_eV"],
+        hkl=parameters["hkl"],
+        longitudinal_kinematics=longitudinal_kinematics,
+        planar_profile=planar_profile,
+        transverse_states=transverse_states,
+    )
+    profile = solved["profile"]
+    assert profile.crystal == crystal
+    assert profile.hkl == hkl
+    assert solved["states"].n_bound > 0
+    assert np.all(np.isfinite(solved["states"].energies_eV))
+
+
+def test_mos2_planar_scattering_and_diagnostics():
+    from pyrite.materials.channeling import entry_populations
+    from pyrite.montecarlo.channeling import (
+        DensityMatrixSolver,
+        channeling_spectrum,
+        electronic_kernel,
+        tds_kernel,
+    )
+
+    profile = planar_profile("mos2", (0, 0, 1), 293.15)
+    energy = 5e6
+    grid = {"n_cells": 2, "max_order": 4}
+    kernel = tds_kernel(profile, energy, **grid) + electronic_kernel(profile, energy, **grid)
+    solver = DensityMatrixSolver(profile, energy, kernel)
+    x = np.linspace(0, profile.period_ang, 33)
+    result = solver.propagate(200.0, 100.0, spatial_x_ang=x, record_every=1)
+    assert np.all(np.isfinite(result.final_density))
+    assert np.all(np.isfinite(result.trace))
+    populations = entry_populations(profile, energy, np.array([0.0]), n_plane_waves=4)
+    assert np.all(np.isfinite(populations))
+    spectrum = channeling_spectrum(
+        solver,
+        200.0,
+        np.linspace(100.0, 100_000.0, 32),
+        0.0,
+        dz_ang=100.0,
+        sample_ang=100.0,
+    )
+    assert np.all(np.isfinite(spectrum.spectrum))
+
+
 def test_si110_critical_angle_uses_the_well_depth():
     profile = planar_profile("silicon", (1, 1, 0), 293.15)
     gamma, beta = longitudinal_kinematics(5e6)

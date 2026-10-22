@@ -55,10 +55,14 @@ def _(mo):
 
 
 @app.cell
-def _(mo, mode_ui):
+def planar_controls(mo, mode_ui):
     mo.stop(mode_ui.value != "Planar")
     crystal_ui = mo.ui.dropdown(
-        {"Silicon (110)": "silicon", "Diamond (110)": "diamond"},
+        {
+            "Silicon (110)": ("silicon", (1, 1, 0)),
+            "Diamond (110)": ("diamond", (1, 1, 0)),
+            "MoS2 (001)": ("mos2", (0, 0, 1)),
+        },
         value="Silicon (110)",
         label="Crystal",
     )
@@ -71,13 +75,13 @@ def _(mo, mode_ui):
 
 
 @app.cell
-def _(crystal_ui, depth_ui, divergence_ui, energy_ui, incidence_ui):
-    crystal = crystal_ui.value
+def planar_parameters(crystal_ui, depth_ui, divergence_ui, energy_ui, incidence_ui):
+    crystal, hkl = crystal_ui.value
     energy_eV = energy_ui.value * 1e6
     incidence_rad = incidence_ui.value * 1e-3
     divergence_rad = divergence_ui.value * 1e-3
     depth_ang = depth_ui.value * 1e4
-    return crystal, depth_ang, divergence_rad, energy_eV, incidence_rad
+    return crystal, depth_ang, divergence_rad, energy_eV, hkl, incidence_rad
 
 
 @app.cell
@@ -121,9 +125,11 @@ def _():
 
 
 @app.cell
-def _(crystal, energy_eV, longitudinal_kinematics, planar_profile, transverse_states):
+def planar_states(
+    crystal, energy_eV, hkl, longitudinal_kinematics, planar_profile, transverse_states
+):
 
-    profile = planar_profile(crystal, (1, 1, 0), 293.15)
+    profile = planar_profile(crystal, hkl, 293.15)
     gamma, _ = longitudinal_kinematics(energy_eV)
     states = transverse_states(profile, gamma, n_plane_waves=16)
     return gamma, profile, states
@@ -218,6 +224,7 @@ def _(
     energy_eV,
     energy_grid,
     gamma,
+    hkl,
     mo,
     np,
     plt,
@@ -323,7 +330,10 @@ def _(
     axes[1, 2].set(title="Exit fate fractions", ylabel="Share of incident electrons", ylim=(0, 1))
     for axis in axes.flat:
         axis.grid(alpha=0.2)
-    fig.suptitle(f"{crystal.title()} (110), {energy_eV / 1e6:g} MeV · {bound_count} bound states")
+    plane_label = "".join(str(index) for index in hkl)
+    fig.suptitle(
+        f"{crystal.title()} ({plane_label}), {energy_eV / 1e6:g} MeV · {bound_count} bound states"
+    )
     explanation = mo.md(
         f"**Critical angle:** {psi_c * 1e3:.2f} mrad. "
         f"**Plane-wave order:** ±{basis_order} (chosen to cover the 300 eV tracking margin). "
