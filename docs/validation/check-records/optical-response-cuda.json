@@ -33,9 +33,9 @@
     "temperature_K": null,
     "uncertainty": "unspecified by source"
   },
-  "revision": "daff9cf0655d5ed9d48794426ef283d38f0ec782",
+  "revision": "4c65f11645da5c653db0042d75f3ebd9a831fdca",
   "source_sha256": "a91fca57ee99efc77354908fa11b9c4822e8852394042069caaac7610c52e602",
-  "timestamp_utc": "2026-10-21T02:43:59.008687+00:00",
+  "timestamp_utc": "2026-10-22T03:18:09.706649+00:00",
   "tr_atol_over_peak": 1e-12,
   "tr_peak_normalized_max_abs_difference": 1.6071485542663386e-15,
   "tr_rtol": 1e-10,
