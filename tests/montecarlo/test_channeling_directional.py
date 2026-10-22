@@ -242,6 +242,10 @@ def test_mos2_dataset_closes_both_sum_rules(omega_ev):
         tolerance=entry["closure_tolerance"],
     )
     assert np.all(np.abs(valence.closure - 1.0) <= entry["closure_tolerance"])
+    # Digitized Fig. 2 ends at 31.5 eV: the Im-eps-matched tail carries 16-21% of the
+    # f-sum, and the static sum falls ~8% short of 1 - 1/eps1(0) (#541 diagnostics).
+    assert np.all(valence.tail_fraction < 0.25)
+    assert np.all(np.abs(valence.static_sum / valence.static_target - 1.0) < 0.1)
 
 
 def test_mos2_dielectric_matches_the_digitized_loss_function():

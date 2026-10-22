@@ -249,4 +249,34 @@ The directional model reads four digitized curves of Zeppenfeld Fig. 2 and check
 
 **Registering.** Uncomment the `[mos2]` block in `src/pyrite/data/directional_loss.toml`, keep `status = "provisional"`, regenerate `CHANNELING_MODEL` (new suffix) in `montecarlo/channeling/handoff.py`, then run `tests/montecarlo/test_channeling_directional.py` (the MoS₂ tests stop skipping). Items 2–6 of #541 (ε₁∥(0), the 6-versus-8 π electron count, per-direction f-sum, the 30–50 eV extension, the intermediate-angle test) stay open and keep the warning.
 
-**Chosen 30 eV treatment.** Above the last tabulated energy the loss follows the free-electron tail `ELF ∝ ω⁻³`, matched in value; its share of the f-sum is reported per direction (`tail_fraction`) and each direction is renormalized to 18 electrons only when its raw closure is within the entry's `closure_tolerance`.
+**Chosen 30 eV treatment.** Above the last tabulated energy the loss follows the free-electron tail `ELF(ω) = Im ε(ω_max)(ω_max/ω)³`, the `ε → 1` asymptote matched to `Im ε` (maintainer decision, 2026-10-22). Matching `ELF(ω_max)` instead overcounts: at 31.5 eV ε₁ ≈ 0.55, so the ELF is still about 3 Im ε on the 23 eV plasmon shoulder, and that tail gave closure 1.19 (⊥) / 1.34 (∥). The tail share of the f-sum is reported per direction (`tail_fraction`) and each direction is renormalized to 18 electrons only when its raw closure is within the entry's `closure_tolerance`.
+
+## Registered dataset (2026-10-22)
+
+The maintainer digitized Zeppenfeld Fig. 2 (all four curves, main and ×10 branches). `src/pyrite/data/directional_loss/mos2/eps{1,2}_{perp,par}.csv` join each main branch (to 14-15 eV) with its ×10 branch divided by 10 (to 31.5 eV), sorted by energy; each `ε₂` file adds one figure-baseline zero at the first `ε₁` energy (about 0.59 eV). Branch assignment in the 2-3 eV crossing was checked against a 600 dpi rendering. Tool and axis calibration points were not recorded; estimated tolerance ±0.1 eV and ±0.3 (main) / ±0.03 (×10 branch, after division). Fig. 1 (`elf_*.csv`) is not digitized yet.
+
+```{list-table} Diagnostics of the registered MoS2 dataset (catalog Ω for 18 electrons = 21.61 eV).
+:name: tbl-mos2-registered
+:header-rows: 1
+
+* - Quantity
+  - ⊥ (`E ⊥ c`)
+  - ∥ (`E ∥ c`)
+* - ELF peaks (Zeppenfeld: 8.75 and 23 eV ⊥; 23 eV ∥, no π plasmon)
+  - 8.75, 23.27 eV
+  - 23.01 eV; ELF(8.5 eV) at 0.38 of the ⊥ π peak
+* - `n_eff` from `ε₂` at 9 / 20 / 31.5 eV
+  - 7.1 / 14.6 / 16.3
+  - 5.4 / 15.0 / 16.8
+* - `n_eff` from the ELF at 31.5 eV
+  - 13.4
+  - 13.2
+* - Raw closure with tail (tail share)
+  - 0.886 (0.16)
+  - 0.929 (0.21)
+* - Static sum vs `1 − 1/ε₁(0)`
+  - 0.866 vs 0.933
+  - 0.816 vs 0.889
+```
+
+The `ε₂` route gives the per-direction f-sum asked for by #541: both directions reach 16-17 of 18 electrons by 31.5 eV, the ∥ direction slightly more. `n_eff⊥` at the 8.75 eV π plasmon is 6.8-7.1, between the 6 (Zeppenfeld) and 8 (Bell-Liang, Beal-Hughes) of the partition question; the digitization tolerance does not resolve it. The static-sum shortfall (7-8%) is the part of `1 − 1/ε₁(0)` the tail cannot supply; it depends on the assumed `ε₁∥(0) = 9` for ∥.

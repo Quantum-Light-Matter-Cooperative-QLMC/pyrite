@@ -185,8 +185,9 @@ def directional_valence(
 
     ``plasma_energy_eV`` is ``Omega`` of the ``electrons`` valence electrons. The
     loss function beyond the last tabulated energy follows the free-electron
-    tail ``ELF(w) = ELF(w_max)(w_max/w)^3`` (``tail=False`` drops it); this is an
-    assumption, flagged in ``tail_fraction``. A direction whose raw closure
+    tail ``ELF(w) = Im eps(w_max)(w_max/w)^3``, the ``eps -> 1`` asymptote matched
+    to ``Im eps`` rather than to the still-screened ``ELF(w_max)`` (``tail=False``
+    drops it); this is an assumption, flagged in ``tail_fraction``. A direction whose raw closure
     differs from 1 by more than ``tolerance`` raises; otherwise its strengths are
     rescaled to ``electrons`` exactly.
 
@@ -211,10 +212,13 @@ def directional_valence(
     static = np.empty(nodes)
     tail_frac = np.empty(nodes)
     for j, c2 in enumerate(cos2):
+        # Tail ELF -> Im eps once eps -> 1: matched to Im eps(e1), not to ELF(e1),
+        # which is still screened by the plasmon shoulder at the table end.
+        eps2_end = _mix(dielectric.eps_perp[-1], dielectric.eps_par[-1], c2).imag
         elf = np.where(
             fine <= e1,
             dielectric.elf(c2, np.minimum(fine, e1)),
-            dielectric.elf(c2, np.array([e1]))[0] * (e1 / np.maximum(fine, e1)) ** 3,
+            eps2_end * (e1 / np.maximum(fine, e1)) ** 3,
         )
         if not tail:
             elf = np.where(fine <= e1, elf, 0.0)
