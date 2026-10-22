@@ -1535,7 +1535,7 @@ def test_named_detector_unknown_suggests_create(tmp_path, monkeypatch):
 
     assert unknown.exit_code == 1
     assert "Did you mean: eds" in unknown.stderr
-    assert "pyrite detector create ed" in unknown.stderr
+    assert "pyrite detector create scalar ed" in unknown.stderr
 
 
 def test_remove_beam_detaches_named_reference(tmp_path, monkeypatch):

@@ -217,7 +217,7 @@ def emit_show(payload, target, resolution, numerics_names, grid_rows):
         for row in group["fields"]:
             label = numerics_names[row["key"]]
             if group["name"] == "sampling" and payload["precision"]["effective"] is not None:
-                value = "adaptive (profile precision)"
+                value = "adaptive (numerics precision)"
             else:
                 source = "default" if row["source"] == "fidelity" else row["source"]
                 value = f"{_display(row['effective'])} ({source})"
@@ -233,17 +233,17 @@ def emit_show(payload, target, resolution, numerics_names, grid_rows):
             ("mode", f"adaptive ({precision['source']} policy)"),
             *list(_rows(precision["effective"])),
         ]
-    _table("Precision (profile precision)", precision_rows)
+    _table("Precision (numerics precision)", precision_rows)
 
     policy = payload["line_grid_policy"]
     _table(
-        "CXR-grid policy (profile cxr-grid)",
+        "CXR-grid policy (numerics cxr-grid)",
         [("source", "automatic for every case"), *list(_rows(policy))]
         if policy
         else [("policy", "none (explicit, stored or built-in grids)")],
     )
 
-    _table("Energy grids (profile defaults / material energy-grid)", grid_rows)
+    _table("Energy grids (profile defaults / numerics energy-grid)", grid_rows)
     non_grid_overrides = {
         material: [key for key in labels if key not in {"E_grid_line", "E_grid_brem"}]
         for material, labels in payload["overrides"].items()

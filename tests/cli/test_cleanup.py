@@ -33,13 +33,12 @@ def test_detector_creation_help_and_incompatible_types():
         assert "No such option" in result.stderr
 
 
-def test_legacy_detector_create_parses_options_and_warns_only_on_stderr(_isolate_user_catalog):
+def test_legacy_detector_create_is_removed(_isolate_user_catalog):
+    before = snapshot(_isolate_user_catalog)
     result = invoke(command, ["detector", "create", "legacy", "--observation-angle", "91"])
-    assert result.exit_code == 0
-    assert result.stdout == "created detector legacy\n"
-    assert result.stderr.count("is deprecated") == 1
-    assert "0.17.0" in result.stderr
-    assert read_raw(bundled_catalog())["detectors"]["legacy"]["observation_angle_deg"] == 91
+    assert result.exit_code == 2
+    assert "No such command 'legacy'" in result.stderr
+    assert snapshot(_isolate_user_catalog) == before
 
 
 def test_first_use_dry_run_does_not_create_user_catalog(tmp_path, monkeypatch):
@@ -155,19 +154,18 @@ def test_material_inspection_is_intrinsic_and_creation_help_is_typed():
     assert "--mass-fraction" in medium.stdout and "--mass-fraction" not in crystal.stdout
 
 
-def test_remote_job_alias_preserves_json_and_warns_once(monkeypatch):
+def test_remote_job_alias_is_removed(monkeypatch):
     from pyrite.remote import viewer
 
     monkeypatch.setattr(viewer, "jobs_raw", lambda: "j1\t12\tFalse\trun\thopg\tdone\n")
     canonical = invoke(command, ["remote", "job", "list", "-o", "json"])
     legacy = invoke(command, ["job", "list", "-o", "json"])
     assert_clean_result(canonical)
-    assert legacy.exit_code == 0
-    assert legacy.stdout == canonical.stdout
-    assert legacy.stderr.count("is deprecated") == 1
+    assert legacy.exit_code == 2
+    assert "No such command" in legacy.stderr
 
 
-def test_gdf_alias_keeps_machine_schema_and_stdout(tmp_path):
+def test_gdf_alias_is_removed_and_canonical_schema_is_preserved(tmp_path):
     from tests.cli.test_gdf import fields, write_gdf
 
     path = write_gdf(tmp_path / "particles.gdf", fields(), times=(0,))
@@ -176,10 +174,9 @@ def test_gdf_alias_keeps_machine_schema_and_stdout(tmp_path):
     )
     legacy = invoke(command, ["beam", "gdf-inspect", str(path), "--time-s", "0", "-o", "json"])
     assert_clean_result(canonical)
-    assert legacy.exit_code == 0
-    assert legacy.stdout == canonical.stdout
+    assert legacy.exit_code == 2
+    assert "No such command" in legacy.stderr
     assert json.loads(canonical.stdout)["schema"] == "cxr.beam.gdf-inspect"
-    assert legacy.stderr.count("is deprecated") == 1
 
 
 def test_exported_catalog_reproduces_cli_configuration(tmp_path):
@@ -199,3 +196,32 @@ def test_exported_catalog_reproduces_cli_configuration(tmp_path):
         assert_clean_result(original)
         assert_clean_result(restored)
         assert json.loads(original.stdout) == json.loads(restored.stdout)
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "beam gdf-times",
+        "material add",
+        "material energy-grid",
+    ],
+)
+def test_removed_017_command_paths_are_usage_errors(path):
+    result = invoke(command, [*path.split(), "--help"])
+    assert result.exit_code == 2
+    assert "No such command" in result.stderr
+
+
+@pytest.mark.parametrize("name", ["precision", "cxr-grid"])
+def test_removed_017_profile_groups_do_not_resolve(name):
+    import click
+
+    from pyrite.cli.commands.profile import command as profile
+
+    assert profile.get_command(click.Context(profile), name) is None
+
+
+def test_removed_material_profile_option():
+    result = invoke(command, ["material", "show", "hopg", "--profile", "standard"])
+    assert result.exit_code == 2
+    assert "No such option '--profile'" in result.stderr

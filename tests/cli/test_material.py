@@ -85,7 +85,7 @@ def test_unknown_names_report_actionable_errors(tmp_path, monkeypatch):
     _catalog(tmp_path, monkeypatch)
 
     unknown_material = invoke(material.command, ["show", "hpg"])
-    unknown_profile = invoke(material.command, ["show", "hopg", "--profile", "missing"])
+    unknown_profile = invoke(profile.command, ["ranges", "show", "missing", "hopg"])
 
     assert unknown_material.exit_code == 1
     assert "unknown material: hpg. Did you mean: hopg?" in unknown_material.stderr

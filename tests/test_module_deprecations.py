@@ -59,29 +59,8 @@ def test_removed_cxr_module_paths_are_unavailable(module):
     assert importlib.util.find_spec(module) is None
 
 
-def test_profile_edit_import_warns_and_preserves_export_identity():
-    from pyrite.campaign import (
-        _profile_document,
-        profile_cxr_grid,
-        profile_lifecycle,
-        profile_summary,
-    )
-
-    name = "pyrite.campaign.profile_edit"
-    with pytest.warns(
-        DeprecationWarning, match=r"pyrite.campaign.profile_edit.*0\.17\.0.*profile_lifecycle"
-    ) as recorded:
-        legacy = (
-            importlib.reload(sys.modules[name])
-            if name in sys.modules
-            else importlib.import_module(name)
-        )
-    assert len(recorded) == 1
-    assert legacy.create_profile is profile_lifecycle.create_profile
-    assert legacy.profile_payload is profile_summary.profile_payload
-    assert legacy.RANGES is _profile_document.RANGES
-    assert legacy.CxrGridPolicyConflict is profile_cxr_grid.CxrGridPolicyConflict
-    assert legacy._packaged_standard is profile_lifecycle._packaged_standard
+def test_profile_edit_module_is_removed():
+    assert importlib.util.find_spec("pyrite.campaign.profile_edit") is None
 
 
 def test_profile_commands_import_without_the_deprecated_facade():

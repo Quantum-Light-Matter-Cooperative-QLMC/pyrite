@@ -4,6 +4,7 @@ import json
 
 from pyrite._catalog_layout import bundled_catalog, source_files
 from pyrite.cli.commands import profile
+from pyrite.cli.commands._profile_precision import command as precision_command
 from pyrite.devtools import dev_cli
 from tests.helpers.cli import assert_clean_result, invoke
 
@@ -76,13 +77,13 @@ def test_precision_enable_on_a_bundled_demo_writes_nothing_and_a_clone_switches(
 
     before = bundled()
 
-    refused = invoke(profile.command, ["precision", "enable", "trajectory_demo"])
+    refused = invoke(precision_command, ["enable", "trajectory_demo"])
     assert refused.exit_code == 1
     assert "pyrite profile create NAME --from trajectory_demo" in refused.stderr
 
     created = invoke(profile.command, ["create", "mine", "--from", "trajectory_demo"])
     assert created.exit_code == 0
-    enabled = invoke(profile.command, ["precision", "enable", "mine"])
+    enabled = invoke(precision_command, ["enable", "mine"])
     assert enabled.exit_code == 0, enabled.stderr
     assert "removed fixed counts: cxr-trials 100, brem-trials 100" in enabled.stdout
     assert "n_electrons" not in (_isolate_user_catalog / "profiles" / "mine.toml").read_text()

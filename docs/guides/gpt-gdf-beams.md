@@ -248,7 +248,7 @@ without the `gdf_` prefix. The GDF source carries its own phase space, so
 - No time blocks: select a screen with `gdf_screen_position_m`, or export `tout`.
 - Missing arrays, empty block, or unequal lengths: export complete particle
   records. Missing data are never padded with zeros.
-- Unavailable/ambiguous time: inspect `beam gdf-times`, then choose a time and
+- Unavailable/ambiguous time: inspect `beam gdf times`, then choose a time and
   an absolute tolerance smaller than the neighboring time spacing.
 - Invalid beta, gamma mismatch, non-electron mass/charge, or bad weights:
   correct the upstream particle output; the error identifies the field and

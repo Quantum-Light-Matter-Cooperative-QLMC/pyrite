@@ -29,7 +29,7 @@ def test_profile_help_omits_removed_presets():
     result = invoke(root_command, ["profile", "--help"])
     assert_clean_result(result)
     assert "energy-grid" not in result.stdout
-    result = invoke(root_command, ["material", "energy-grid", "--help"])
+    result = invoke(root_command, ["numerics", "energy-grid", "--help"])
     assert_clean_result(result)
     assert "defaults" not in result.stdout
     assert "defaults" not in result.stdout
@@ -555,7 +555,7 @@ def test_click_numeric_domains_fail_at_boundary(argv):
     ("argv", "exit_code", "stderr_text"),
     [
         (
-            ["material", "energy-grid", "show", "not-a-material"],
+            ["numerics", "energy-grid", "show", "not-a-material"],
             1,
             "unknown material: not-a-material",
         )

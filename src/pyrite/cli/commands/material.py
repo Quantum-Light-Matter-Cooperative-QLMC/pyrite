@@ -5,7 +5,6 @@ from tomlkit.exceptions import ParseError
 
 from pyrite.cli import _catalog_io
 from pyrite.cli import _completion as _cli_completion
-from pyrite.cli._deprecations import DeprecatedOption
 from pyrite.cli._groups import LazyGroup
 from pyrite.console import json as cli_json
 from pyrite.console.output import (
@@ -16,20 +15,16 @@ from pyrite.console.output import (
 )
 
 _COMMANDS = {
-    "add": "pyrite.cli.commands.material_add.command",
     "create": "pyrite.cli.commands.material_create.command",
     "list": "pyrite.cli.commands.material_inventory.command",
     "blaze": "pyrite.cli.commands.blaze.command",
-    "energy-grid": "pyrite.cli.commands.energy_grid_surface.material_command",
     "validate": "pyrite.cli.commands.check_config.command",
 }
 
 _COMMAND_HELP = {
-    "add": "Add a validated medium or crystal to your catalog.",
     "create": "Create a crystal or amorphous medium with type-specific options.",
     "list": "List materials and media with their source and composition.",
     "blaze": "Run a grooved-crystal sweep and write a checkpoint.",
-    "energy-grid": "Derive and inspect detector energy-grid inputs.",
     "validate": "Validate a material catalog without starting simulation.",
 }
 
@@ -183,7 +178,6 @@ def _show(material, profile_name, json_output, *, schema="cxr.material.show"):
     cls=LazyGroup,
     lazy_commands=_COMMANDS,
     lazy_help=_COMMAND_HELP,
-    lazy_hidden=("energy-grid", "add"),
     no_args_is_help=True,
     deprecation_prefix="material",
 )
@@ -199,20 +193,9 @@ def command():
 
 @command.command("show")
 @click.argument("material", shell_complete=_cli_completion.complete_material)
-@click.option(
-    "--profile",
-    "profile_name",
-    default=None,
-    cls=DeprecatedOption,
-    hidden=True,
-    shell_complete=_cli_completion.complete_profile,
-    help="Resolve defaults and overrides under profile NAME.",
-)
 @output_option
-def show_command(material, profile_name, json_output):
+def show_command(material, json_output):
     """Show intrinsic MATERIAL properties, independent of campaign geometry."""
-    if profile_name is not None:
-        return _show(material, profile_name, json_output)
     schema = "pyrite.material.show"
     try:
         _, document = _catalog_io.catalog_text()

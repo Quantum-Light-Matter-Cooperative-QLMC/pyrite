@@ -130,7 +130,18 @@ def test_maintainer_command_targets_checkout_bundle(
     monkeypatch.setattr(layout, "bundled_catalog", lambda: bundled)
     monkeypatch.setattr(dev_cli, "ROOT", checkout)
     monkeypatch.setenv("PYRITE_CATALOG", str(tmp_path / "unused-external"))
-    dev_cli.main(["material", "add", "maintainer-carbon", "--formula", "C", "--density-g-cm3", "2"])
+    dev_cli.main(
+        [
+            "material",
+            "create",
+            "amorphous",
+            "maintainer-carbon",
+            "--formula",
+            "C",
+            "--density-g-cm3",
+            "2",
+        ]
+    )
     assert "bundled" in capsys.readouterr().out
     assert (bundled / "media" / "maintainer-carbon.toml").is_file()
     assert not (_isolate_user_catalog / "media" / "maintainer-carbon.toml").exists()
@@ -142,4 +153,6 @@ def test_maintainer_command_rejects_installed_package(tmp_path, monkeypatch):
 
     monkeypatch.setattr(dev_cli, "ROOT", tmp_path)
     with pytest.raises(SystemExit, match="source checkout"):
-        dev_cli.main(["material", "add", "bad", "--formula", "C", "--density-g-cm3", "2"])
+        dev_cli.main(
+            ["material", "create", "amorphous", "bad", "--formula", "C", "--density-g-cm3", "2"]
+        )

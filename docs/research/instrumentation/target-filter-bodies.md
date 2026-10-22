@@ -375,7 +375,7 @@ define the durable migration contract; they are not a second task tracker.
    detector-owned scoring; pass a target footprint explicitly.
 3. **Catalog/CLI adapters and persistence parity.** Owners:
    `materials/_parse.py`, `_beam_detector_parse.py`, `campaign/observation.py`,
-   `campaign/profile_edit.py`, `cli/commands/material.py`, `_profile_filters.py`,
+   `campaign/profile_filters.py`, `cli/commands/material.py`, `_profile_filters.py`,
    `observations/store.py`, `instrument/scene.py` and trajectory consumers.
    Keep schema-version-1 tables/keys, complete external-catalog layouts,
    profile filter order and CLI command/JSON/help contracts. Describe

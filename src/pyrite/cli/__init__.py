@@ -17,7 +17,6 @@ _COMMANDS = {
     "trajectories": "pyrite.cli.commands.trajectories.command",
     "config": "pyrite.cli.commands.config.command",
     "remote": "pyrite.cli.commands.remote.command",
-    "job": "pyrite.cli.commands.job.command",
     "profile": "pyrite.cli.commands.profile.command",
     "physics": "pyrite.cli.commands.calculation.physics_command",
     "numerics": "pyrite.cli.commands.calculation.numerics_command",
@@ -34,7 +33,6 @@ _COMMAND_HELP = {
     "trajectories": "List, describe, export, and score saved trajectory captures.",
     "config": "Set profile, catalog, workspace, and remote defaults.",
     "remote": "Run and manage MC sweeps on a remote GPU host.",
-    "job": "List, inspect, follow, or stop asynchronous remote jobs.",
     "profile": "Manage named catalog campaigns and material membership.",
     "physics": "Inspect and edit a campaign's physical models and cutoffs.",
     "numerics": "Configure sampling, integration, precision and photon grids.",
@@ -70,7 +68,6 @@ def _catalog_option(ctx: click.Context, _param: click.Parameter, catalog: Path |
     cls=LazyGroup,
     lazy_commands=_COMMANDS,
     lazy_help=_COMMAND_HELP,
-    lazy_hidden=("job",),
     no_args_is_help=False,
     context_settings={"help_option_names": ["-h", "--help"]},
 )

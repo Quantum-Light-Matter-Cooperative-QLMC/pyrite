@@ -400,7 +400,7 @@ def test_partial_custom_detector_error_preserves_configured_geometry():
     "path",
     [
         "checkpoint recompute line",
-        "material energy-grid line",
+        "numerics energy-grid line",
     ],
 )
 def test_removed_cxr_command_spellings_are_usage_errors(path):
@@ -427,7 +427,7 @@ def test_removed_profile_line_grid_does_not_resolve_as_a_command():
         ("profile add", "--line-trials"),
         ("profile create", "--line-trials"),
         ("profile numerics set", "--line-trials"),
-        ("profile precision disable", "--line-trials"),
+        ("numerics precision disable", "--line-trials"),
         ("profile set", "--line-trials"),
     ],
 )

@@ -82,6 +82,7 @@ _REMOVED_OPTIONS = {
 } | {
     # `checkpoint archive` became a group; its `--force` moved to `archive store`.
     (("checkpoint", "archive"), "--force"),
+    (("material", "show"), "--profile"),
 }
 
 _REMOVED_OPTIONS.update(
@@ -113,7 +114,7 @@ _REMOVED_OPTIONS.update(
         ("profile set", "--line-trials"),
         ("profile add", "--line-trials"),
         ("profile numerics set", "--line-trials"),
-        ("profile precision disable", "--line-trials"),
+        ("numerics precision disable", "--line-trials"),
     )
 )
 
@@ -190,8 +191,7 @@ def test_click_tree_preserves_frozen_command_and_option_names():
         # launch options it used to advertise now sit on its `launch` child.
         relocated = _run(*path, "launch", "--help").stdout if path[:1] == ("app",) else ""
         if path == ("detector", "create"):
-            # NAME-first compatibility still accepts the frozen options; the
-            # bare group now documents typed scalar/planar/clone children.
+            # Creation options now belong to typed scalar/planar/clone children.
             relocated = "\n".join(
                 _run(*path, kind, "--help").stdout for kind in ("scalar", "planar", "clone")
             )
