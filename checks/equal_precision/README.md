@@ -396,3 +396,68 @@ Those are local CPU plumbing smokes only. Detector scoring costs one estimator
 call per direction, stage and band over every segment, so a 10-history W
 800 keV case takes minutes on CPU. Run anything larger through
 `pyrite remote`. Thick W cases need `--max-steps` above the 20000 default.
+
+## PenRed arm
+
+`penred_adapter.py` runs PenRed (label **PenRed (PENELOPE-2018 physics)**, never
+standalone PENELOPE-2024) on a pilot scene or matrix case and writes a
+`pyrite.equal-precision.comparison.v1` record (`--arm source|transport`). Build
+the pinned source with the custom per-history tally first:
+
+```bash
+git clone https://github.com/PenRed/PenRed.git penred && cd penred
+git checkout 145a8a357f08affa551f592300fa6dfcab98a762
+uv run python /path/to/pyrite/checks/equal_precision/prepare_penred.py .
+cd src && mkdir build && cd build
+cmake -DWITH_DICOM=OFF -DWITH_MPI=OFF -DWITH_LB=OFF -DBUILD_UTILITIES=OFF \
+  -DCMAKE_BUILD_TYPE=Release ..
+cmake --build . --target install -j8   # -> src/compiled/mains/penmain/pen_main
+```
+
+`prepare_penred.py` refuses any source whose two tally-registry files differ
+from the pin, copies `penred/tallyPyritePrimary.{hh,cpp}` (AGPL-3.0-or-later,
+like PenRed) next to the generic tallies and writes `benchmark-patch.json`. No
+physics source changes. PenRed's default `WITH_NATIVE=ON` compiles for the
+build host, so build on the host that times it.
+
+```bash
+uv run python checks/equal_precision/penred_adapter.py silicon-300kev-100um-0deg-anchor \
+  --histories 20000 --seed 11 --executable PATH/pen_main --output /tmp/ep/penred.json
+```
+
+The adapter writes a 10 × 10 mm slab in vacuum (first exit, no re-entry), a
+pencil source just upstream of the entrance face, materials created from
+catalog mass fractions and matrix density, `EABS(e⁻) = 10 keV`, `WCR = 1 keV`,
+`WCC = E0` (no delta rays) and `C1 = C2 = 0.05`. `DSMAX` defaults to a tenth of
+the slab thickness. These are the starting controls of the
+[comparator notes](../../docs/research/beam-transport/equal-precision-comparators.md),
+not converged settings. One thread; `--seed` selects one of PenRed's 1001 seed
+pairs, and the initial seeds are recorded.
+
+The tally streams one line per primary end (`T`, terminal code as in the
+Geant4 arm) and per hard-bremsstrahlung photon of the primary (`G`). Photons
+are exact at creation: the material photon `EABS` (5 keV) is below the score
+threshold, so PENELOPE stacks every scored photon, and a body photon `EABS`
+above E0 absorbs it before any transport. Reading the photon energy as the
+electron's energy drop in the knock hook would fail whenever the electron falls
+below `EABS` in that event, because PENELOPE then reports the residual energy
+as well. PenRed 1.15.2 transports `nhist − 1` primaries for `nhist` requested
+(its history counter reaches the limit before the last sampled particle), so
+the adapter requests one extra and requires exactly the requested count of
+terminal records. Finite beams and explicit-secondary cases get
+`unsupported-physics` records; there is no PenRed cone-detector arm yet.
+
+Timings are a fresh process: `fresh_process` is the full `pen_main` wall time,
+and PenRed's own initialization (material creation) and simulation times have
+one-second resolution apart from user CPU time. Local runs are plumbing
+smokes; measurements go through `pyrite remote`.
+
+On the lab box, `sbatch checks/equal_precision/penred-build.sbatch` clones,
+prepares and builds the pin under `~/.local/opt/penred-510/<pin>` on the GPU
+node and records compiler, flags, CPU and the `pen_main` hash. It refuses to
+overwrite an existing build. `penred-straggling.sbatch penred|pyrite` runs the
+four-scene straggling-on screen for one engine with per-run timeouts, and
+`compare_penred.py PENRED_DIR PYRITE_DIR --output PATH` writes the paired
+z-score summary. `pyrite_adapter.py --straggling on|off` overrides a scene's
+straggling switch, keeps the scene value as `straggling_scene` in the record,
+and never writes the legacy pilot record.

@@ -1,0 +1,600 @@
+{
+  "schema": "pyrite.equal-precision.penred-pyrite-screen.v1",
+  "scenes": {
+    "silicon-300kev-100um-0deg-anchor": {
+      "n_primaries": {
+        "penred": 100000,
+        "pyrite": 10000
+      },
+      "pyrite_straggling": true,
+      "record_sha256": {
+        "penred": "ada79db27e9546c25c1300697b5ff3a9489e8886609e605ef1d4a448d605f4e4",
+        "pyrite": "2b8e4b741c0f0a0e0b4c7f83f81d931b693f2365d25fb3237cade9d187d3d51b"
+      },
+      "timings_s": {
+        "penred": {
+          "fresh_process": 7.3312515809666365,
+          "initialization": 1.0,
+          "simulation_real": 6.0,
+          "simulation_user": 6.3481
+        },
+        "pyrite": {
+          "imports_and_tables": 2.903166415868327,
+          "warmup": 14.18736853892915,
+          "request_with_reductions": 4.459866236895323,
+          "adapter_total": 21.94861600897275,
+          "scoring": 0.04162348387762904,
+          "transport": 4.418136932188645
+        }
+      },
+      "observables": {
+        "backscattered": {
+          "penred": [
+            0.10744,
+            0.0009792732273275612
+          ],
+          "pyrite": [
+            0.1051,
+            0.0030669756493919864
+          ],
+          "difference": 0.002339999999999995,
+          "z": 0.7268161864330107
+        },
+        "photons_10_50kev": {
+          "penred": [
+            0.00462,
+            0.0002153764608080435
+          ],
+          "pyrite": [
+            0.0032,
+            0.0005648078441293809
+          ],
+          "difference": 0.0014199999999999998,
+          "z": 2.34913021780878
+        },
+        "photons_50_100kev": {
+          "penred": [
+            0.00127,
+            0.00011262325621281956
+          ],
+          "pyrite": [
+            0.0013,
+            0.0003603387078825142
+          ],
+          "difference": -2.9999999999999862e-05,
+          "z": -0.0794641397559877
+        },
+        "photons_ge100kev": {
+          "penred": [
+            0.0009,
+            9.482610357859906e-05
+          ],
+          "pyrite": [
+            0.0008,
+            0.0002827436902911185
+          ],
+          "difference": 9.999999999999994e-05,
+          "z": 0.3353213777994628
+        },
+        "photons_ge10kev": {
+          "penred": [
+            0.00679,
+            0.0002608440902079132
+          ],
+          "pyrite": [
+            0.0053,
+            0.0007261155034651425
+          ],
+          "difference": 0.00149,
+          "z": 1.9311872950320885
+        },
+        "side_exited": {
+          "penred": [
+            0.0,
+            0.0
+          ],
+          "pyrite": [
+            0.0,
+            0.0
+          ],
+          "difference": 0.0,
+          "z": null
+        },
+        "stopped": {
+          "penred": [
+            0.05236,
+            0.0007044070314048966
+          ],
+          "pyrite": [
+            0.0493,
+            0.0021650449745846383
+          ],
+          "difference": 0.0030600000000000002,
+          "z": 1.3440186913975838
+        },
+        "transmitted": {
+          "penred": [
+            0.8402,
+            0.001158729056565971
+          ],
+          "pyrite": [
+            0.8456,
+            0.003613498268572118
+          ],
+          "difference": -0.005400000000000071,
+          "z": -1.4230238223189975
+        },
+        "transmitted_energy_keV_per_primary": {
+          "penred": [
+            198.21253445129514,
+            0.29406046304226313
+          ],
+          "pyrite": [
+            199.37789384258707,
+            0.9134853039941695
+          ],
+          "difference": -1.1653593912919291,
+          "z": -1.2143595362971344
+        }
+      }
+    },
+    "silicon-800kev-tr0.3-0deg-straggling": {
+      "n_primaries": {
+        "penred": 100000,
+        "pyrite": 10000
+      },
+      "pyrite_straggling": true,
+      "record_sha256": {
+        "penred": "a219c5ef392dc4cad51dbdffc5f0a2424324ed973e4ae168fedb923dc1c1d554",
+        "pyrite": "eae8af7ce6091db78b7b68ef5c44a66277dd6c4f11f5c9b187111156cda24816"
+      },
+      "timings_s": {
+        "penred": {
+          "fresh_process": 13.194263302953914,
+          "initialization": 1.0,
+          "simulation_real": 12.0,
+          "simulation_user": 12.197
+        },
+        "pyrite": {
+          "imports_and_tables": 0.6179147209040821,
+          "warmup": 19.023018857929856,
+          "request_with_reductions": 16.42878050287254,
+          "adapter_total": 36.18622837704606,
+          "scoring": 0.16508201300166547,
+          "transport": 16.26356977899559
+        }
+      },
+      "observables": {
+        "backscattered": {
+          "penred": [
+            0.1061,
+            0.0009738774996753154
+          ],
+          "pyrite": [
+            0.1111,
+            0.0031427164470671978
+          ],
+          "difference": -0.0050000000000000044,
+          "z": -1.5196863569587764
+        },
+        "photons_10_50kev": {
+          "penred": [
+            0.0218,
+            0.0004684546877745433
+          ],
+          "pyrite": [
+            0.0214,
+            0.001454102967999225
+          ],
+          "difference": 0.00040000000000000105,
+          "z": 0.26183162663701837
+        },
+        "photons_50_100kev": {
+          "penred": [
+            0.00712,
+            0.000267008930445574
+          ],
+          "pyrite": [
+            0.007,
+            0.0008337682633392177
+          ],
+          "difference": 0.00011999999999999945,
+          "z": 0.13706783960727284
+        },
+        "photons_ge100kev": {
+          "penred": [
+            0.00922,
+            0.0003032339616671508
+          ],
+          "pyrite": [
+            0.0097,
+            0.0009801464526828993
+          ],
+          "difference": -0.0004799999999999995,
+          "z": -0.46784472291242707
+        },
+        "photons_ge10kev": {
+          "penred": [
+            0.03814,
+            0.0006185929441662795
+          ],
+          "pyrite": [
+            0.0381,
+            0.0019404163268618815
+          ],
+          "difference": 3.999999999999837e-05,
+          "z": 0.019640262091668154
+        },
+        "side_exited": {
+          "penred": [
+            0.0,
+            0.0
+          ],
+          "pyrite": [
+            0.0,
+            0.0
+          ],
+          "difference": 0.0,
+          "z": null
+        },
+        "stopped": {
+          "penred": [
+            0.14366,
+            0.0011091574939130432
+          ],
+          "pyrite": [
+            0.1384,
+            0.003453365977370103
+          ],
+          "difference": 0.005260000000000015,
+          "z": 1.4501881691063363
+        },
+        "transmitted": {
+          "penred": [
+            0.75024,
+            0.0013688747795841743
+          ],
+          "pyrite": [
+            0.7505,
+            0.004327452794054313
+          ],
+          "difference": -0.00025999999999992696,
+          "z": -0.05728391862403803
+        },
+        "transmitted_energy_keV_per_primary": {
+          "penred": [
+            399.3479189773463,
+            0.7955165891902605
+          ],
+          "pyrite": [
+            400.3967501058849,
+            2.494413177623371
+          ],
+          "difference": -1.048831128538609,
+          "z": -0.40059324421403586
+        }
+      }
+    },
+    "tungsten-300kev-10um-0deg-anchor": {
+      "n_primaries": {
+        "penred": 100000,
+        "pyrite": 10000
+      },
+      "pyrite_straggling": true,
+      "record_sha256": {
+        "penred": "a8b3061fc3774fcd10a1cd90ec666ff2a68a1127f75919b7fecf57584ba07e71",
+        "pyrite": "75cace535cb391ab4a0621caf08d0d83081923240d0677c0e2474f4c48c5a939"
+      },
+      "timings_s": {
+        "penred": {
+          "fresh_process": 21.459974422119558,
+          "initialization": 1.0,
+          "simulation_real": 20.0,
+          "simulation_user": 20.384
+        },
+        "pyrite": {
+          "imports_and_tables": 0.6311891949735582,
+          "warmup": 11.075644493103027,
+          "request_with_reductions": 10.156312175793573,
+          "adapter_total": 21.983153972076252,
+          "scoring": 0.09339318214915693,
+          "transport": 10.062812322983518
+        }
+      },
+      "observables": {
+        "backscattered": {
+          "penred": [
+            0.41826,
+            0.0015598750129739755
+          ],
+          "pyrite": [
+            0.4129,
+            0.00492379765814334
+          ],
+          "difference": 0.005360000000000031,
+          "z": 1.0377586182535676
+        },
+        "photons_10_50kev": {
+          "penred": [
+            0.02359,
+            0.0004892213327064997
+          ],
+          "pyrite": [
+            0.026,
+            0.0016287004839830596
+          ],
+          "difference": -0.002409999999999999,
+          "z": -1.417156097098088
+        },
+        "photons_50_100kev": {
+          "penred": [
+            0.00739,
+            0.00027268044034405085
+          ],
+          "pyrite": [
+            0.0073,
+            0.0008513186679190317
+          ],
+          "difference": 8.99999999999998e-05,
+          "z": 0.1006798271473397
+        },
+        "photons_ge100kev": {
+          "penred": [
+            0.00747,
+            0.0002722916312105906
+          ],
+          "pyrite": [
+            0.007,
+            0.0008337682633392177
+          ],
+          "difference": 0.00046999999999999993,
+          "z": 0.5358540705931629
+        },
+        "photons_ge10kev": {
+          "penred": [
+            0.03845,
+            0.0006263544509293295
+          ],
+          "pyrite": [
+            0.0403,
+            0.0020415699353145064
+          ],
+          "difference": -0.0018500000000000044,
+          "z": -0.8663107480762776
+        },
+        "side_exited": {
+          "penred": [
+            0.0,
+            0.0
+          ],
+          "pyrite": [
+            0.0,
+            0.0
+          ],
+          "difference": 0.0,
+          "z": null
+        },
+        "stopped": {
+          "penred": [
+            0.03629,
+            0.0005913830030856174
+          ],
+          "pyrite": [
+            0.0378,
+            0.001907217802972381
+          ],
+          "difference": -0.0015099999999999975,
+          "z": -0.7562096168616392
+        },
+        "transmitted": {
+          "penred": [
+            0.54545,
+            0.0015746008283618062
+          ],
+          "pyrite": [
+            0.5493,
+            0.004975884538722162
+          ],
+          "difference": -0.00385000000000002,
+          "z": -0.7376779229956498
+        },
+        "transmitted_energy_keV_per_primary": {
+          "penred": [
+            134.221145846866,
+            0.39985354508259324
+          ],
+          "pyrite": [
+            135.38356160575196,
+            1.2599616258540707
+          ],
+          "difference": -1.1624157588859703,
+          "z": -0.8793606824329767
+        }
+      }
+    },
+    "tungsten-800kev-tr0.3-0deg-straggling": {
+      "n_primaries": {
+        "penred": 100000,
+        "pyrite": 10000
+      },
+      "pyrite_straggling": true,
+      "record_sha256": {
+        "penred": "178ff27e888081e1763805a7946117d7c841f722d55bd4064aace29e5111875e",
+        "pyrite": "7b2aa6bcc4b737758942e592701cc6071d9095386a3ac28bb3e51448ef9c5826"
+      },
+      "timings_s": {
+        "penred": {
+          "fresh_process": 120.33214644691907,
+          "initialization": 1.0,
+          "simulation_real": 119.0,
+          "simulation_user": 119.28
+        },
+        "pyrite": {
+          "imports_and_tables": 0.6702878810465336,
+          "warmup": 62.30674728099257,
+          "request_with_reductions": 61.1750838260632,
+          "adapter_total": 124.28502427088097,
+          "scoring": 0.7669349971693009,
+          "transport": 60.40803201892413
+        }
+      },
+      "observables": {
+        "backscattered": {
+          "penred": [
+            0.45433,
+            0.001574537170940409
+          ],
+          "pyrite": [
+            0.4587,
+            0.004983163070923843
+          ],
+          "difference": -0.004369999999999985,
+          "z": -0.8362035132892768
+        },
+        "photons_10_50kev": {
+          "penred": [
+            0.16364,
+            0.0013092886031606872
+          ],
+          "pyrite": [
+            0.1705,
+            0.0042549718540253415
+          ],
+          "difference": -0.006860000000000005,
+          "z": -1.5409303336654754
+        },
+        "photons_50_100kev": {
+          "penred": [
+            0.0582,
+            0.0007679410767337382
+          ],
+          "pyrite": [
+            0.0637,
+            0.002518901642888951
+          ],
+          "difference": -0.005500000000000005,
+          "z": -2.0885843222106715
+        },
+        "photons_ge100kev": {
+          "penred": [
+            0.08292,
+            0.0008961309985195606
+          ],
+          "pyrite": [
+            0.0806,
+            0.002816231012490199
+          ],
+          "difference": 0.0023199999999999887,
+          "z": 0.7850118683026294
+        },
+        "photons_ge10kev": {
+          "penred": [
+            0.30476,
+            0.00177613202506168
+          ],
+          "pyrite": [
+            0.3148,
+            0.005710810567312977
+          ],
+          "difference": -0.010040000000000049,
+          "z": -1.6787513324317218
+        },
+        "side_exited": {
+          "penred": [
+            0.0,
+            0.0
+          ],
+          "pyrite": [
+            0.0,
+            0.0
+          ],
+          "difference": 0.0,
+          "z": null
+        },
+        "stopped": {
+          "penred": [
+            0.42159,
+            0.0015615835246412673
+          ],
+          "pyrite": [
+            0.4234,
+            0.004941223084273453
+          ],
+          "difference": -0.0018099999999999783,
+          "z": -0.34927880579380277
+        },
+        "transmitted": {
+          "penred": [
+            0.12408,
+            0.0010425221362273538
+          ],
+          "pyrite": [
+            0.1179,
+            0.003225057999464504
+          ],
+          "difference": 0.006179999999999991,
+          "z": 1.8233459155905147
+        },
+        "transmitted_energy_keV_per_primary": {
+          "penred": [
+            53.75513783185536,
+            0.47796965335526764
+          ],
+          "pyrite": [
+            49.98813761031464,
+            1.437160732838796
+          ],
+          "difference": 3.7670002215407195,
+          "z": 2.4871944158268136
+        }
+      }
+    }
+  },
+  "unpaired": [],
+  "failures": {
+    "penred": [],
+    "pyrite": []
+  },
+  "interpretation": "plausibility screen; z uses independent 1-sigma SEs; no equivalence, numerical or timing claim",
+  "jobs": {
+    "build": 1667,
+    "pyrite": 1668,
+    "penred": 1670,
+    "host": "DESKTOP-QNIHO3D",
+    "date": "2026-10-22"
+  },
+  "penred_build": {
+    "commit": "145a8a357f08affa551f592300fa6dfcab98a762",
+    "benchmark_patch": {
+      "penred_commit": "145a8a357f08affa551f592300fa6dfcab98a762",
+      "before": {
+        "src/tallies/generic/includes/genericTallies.hh": "0e0fd340586c9ec19acccd4a4d37eb8e34e7fb3a5ba53572cf2eb562867e373c",
+        "src/tallies/generic/source/genericTallies.cpp": "d89b9ead55f116aafdde385a123ea30157029525ee264f2e4331cc463146c433"
+      },
+      "after": {
+        "src/tallies/generic/includes/genericTallies.hh": "17db00a75f714810e8c7db80e064d606ed155645c8c9129f5992f22c4b11e8d8",
+        "src/tallies/generic/source/genericTallies.cpp": "94ff6fec28c44d4e117334eef2363a25f27d300f036dd2d230e20959e9a36af4"
+      },
+      "added": {
+        "src/tallies/generic/includes/tallyPyritePrimary.hh": "ef5037176e443f0c1ee54384491107e8254a2adfe39d5d8a5afff794765cb942",
+        "src/tallies/generic/source/tallyPyritePrimary.cpp": "a2f53a280a007ed84d2c6257ac0b9cfa2b2def9df54838b7eca3daf0b3a5e980"
+      },
+      "physics_sources_modified": false
+    },
+    "pen_main_sha256": "0fe932230120f00f56e5bc87c4c9c7e6a827f371512617accce36230945161f3",
+    "compiler": "g++ 11.4.0 (Ubuntu 22.04)",
+    "cmake": "4.3.3",
+    "flags": "Release -O3 -DNDEBUG, WITH_NATIVE=ON",
+    "cpu": "AMD Ryzen 9 9950X3D"
+  },
+  "runs": {
+    "penred": "--arm source, 100000 histories, seed pair 101, one thread, fresh process",
+    "pyrite": "--arm source --straggling on, CUDA, 10000 histories in 5000-primary blocks, seed 81001, full warmup"
+  },
+  "raw_evidence": {
+    "archive": "penred-straggling-evidence-2026-10-22.tar.gz",
+    "bytes": 10324132,
+    "sha256": "74bf1e56548d51620777fdda989737608e8568e49ca32ebf583809f3b9a7fbb8",
+    "status": "not yet uploaded as a release asset; also retained on the lab host under ~/pyrite-510-penred/evidence/penred-straggling/"
+  }
+}

@@ -268,6 +268,12 @@ def parse_args():
     parser.add_argument("--max-steps", type=int, default=20000)
     parser.add_argument("--cone-rtol", type=float, default=1e-3)
     parser.add_argument("--cone-max-order", type=int, default=32)
+    parser.add_argument(
+        "--straggling",
+        choices=["scene", "on", "off"],
+        default="scene",
+        help="override the scene's straggling switch (recorded); e.g. to pair with PenRed",
+    )
     args = parser.parse_args()
     if args.histories < 2 or args.batch_histories < 0 or args.scratch_mib < 1 or args.max_steps < 1:
         parser.error("invalid history count or scratch budget")
@@ -300,6 +306,9 @@ def write_unsupported(args, spec, raw_path, reason):
 def main():
     args = parse_args()
     raw, spec, raw_path = load_scene(args.scene)
+    if args.straggling != "scene":
+        spec["straggling_scene"] = spec["straggling"]
+        spec["straggling"] = args.straggling == "on"
     if args.arm == "detector" and not spec["detector"]:
         raise SystemExit(f"{args.scene} has no detector cone; the detector arm needs a matrix case")
     if spec["unsupported"]:
@@ -307,7 +316,8 @@ def main():
             args, spec, raw_path, "adapter cannot express: " + ", ".join(spec["unsupported"])
         )
         return
-    legacy = spec["source"] == "manifest" and args.arm == "source"
+    # An override never writes the unchanged pilot record, whose scene omits it.
+    legacy = spec["source"] == "manifest" and args.arm == "source" and args.straggling == "scene"
     cutoff_eV = spec["hard_photon_cutoff_eV"] if args.cutoff_ev is None else args.cutoff_ev
     setup = time.perf_counter()
     import numpy as np

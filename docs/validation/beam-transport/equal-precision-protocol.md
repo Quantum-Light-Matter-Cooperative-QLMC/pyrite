@@ -258,10 +258,56 @@ Local CPU smoke runs of a few histories only checked the plumbing (see
 directions × bands, so precision runs belong on the lab GPU through
 `pyrite remote`.
 
+## PenRed arm
+
+`checks/equal_precision/penred_adapter.py` runs PenRed at the pinned commit,
+labelled **PenRed (PENELOPE-2018 physics)**, with a custom per-history tally.
+It writes `source` and `transport` records in the common schema for 39 of the
+44 cases; finite beams and explicit secondaries get `unsupported-physics`
+records, and there is no PenRed cone-detector arm. Photons are scored at
+creation with their exact energy and never transported. The `transport` record
+keeps PENELOPE's soft and hard radiative loss, matching the PyRITE
+`bremslib-soft-hard` headline. PENELOPE always samples soft-loss straggling, so
+its records pair with the PyRITE straggling variants. Setup, controls and two
+upstream quirks the adapter handles are in
+`checks/equal_precision/README.md` (PenRed arm).
+
+A local 20000-history smoke of `silicon-300kev-100um-0deg-anchor` gave a
+stopped fraction 4σ above the retained straggling-off PyRITE anchor, as
+expected from straggling-on against straggling-off.
+
+### Straggling-on lab screen (2026-10-22)
+
+PenRed was built at the pin with the tally on the lab GPU node (job 1667:
+g++ 11.4.0, `-O3`, `WITH_NATIVE=ON`, AMD Ryzen 9 9950X3D). The PenRed run had
+100000 histories per scene, seed pair 101, one thread (job 1670). The PyRITE
+run used CUDA with `--straggling on`, 10000 histories, seed 81001 and a full
+warmup (job 1668). There were no failures. Two of the four scenes are matrix
+straggling variants; for the two 300 keV anchors the straggling switch is an
+explicit, recorded override.
+
+| Scene | Transmitted (PenRed / PyRITE) | Stopped | Photons ≥ 10 keV per primary | Largest \|z\| |
+| --- | --- | --- | --- | --- |
+| Si 300 keV, 100 µm | 0.8402 / 0.8456 | 0.0524 / 0.0493 | 0.00679 / 0.00530 | 2.3 (10–50 keV band) |
+| W 300 keV, 10 µm | 0.5455 / 0.5493 | 0.0363 / 0.0378 | 0.0385 / 0.0403 | 1.4 |
+| Si 800 keV, t/R = 0.3 | 0.7502 / 0.7505 | 0.1437 / 0.1384 | 0.0381 / 0.0381 | 1.5 |
+| W 800 keV, t/R = 0.3 | 0.1241 / 0.1179 | 0.4216 / 0.4234 | 0.305 / 0.315 | 2.5 (transmitted energy) |
+
+All 36 scene–observable pairs have |z| < 3, using independent 1σ SEs; the
+PyRITE SEs dominate. With straggling on, the Si 300 keV stopped fraction moves
+to z = 1.3. This is a plausibility screen: there is no equivalence margin, no
+multiple-comparison policy and no numerical convergence. The timings
+(PenRed fresh process, PyRITE warmed GPU transport, different populations) are
+not comparable and support no speed ratio. Per-observable values, hashes and
+timings are in
+`docs/validation/check-records/equal-precision/penred-straggling-screen.json`.
+The raw evidence archive (`penred-straggling-evidence-2026-10-22.tar.gz`,
+SHA-256 `74bf1e56…`) is not yet uploaded as a release asset.
+
 ## Remaining gates
 
-This stage leaves the following open: PenRed and EGSnrc adapters with
-creation-level photon tallies, Geant4 transport-only and cone-detector tallies
+This stage leaves the following open: the EGSnrc adapter, a PenRed
+cone-detector tally, Geant4 transport-only and cone-detector tallies
 matching the arms above, adapter support for finite beams and explicit
 secondaries, numerical refinement (including the electron cutoff and the
 estimator's straight-ray escape against full photon transport), equivalence

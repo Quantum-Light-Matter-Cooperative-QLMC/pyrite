@@ -3,8 +3,9 @@
 Resolves the installed ELSEPA, SBETHE and BremsLib tables for each matrix
 material and checks that every case energy and the electron cutoff lie inside
 every table. A missing table or uncovered energy stays an explicit gap entry.
-Each case also lists the PyRITE adapter arms that can run it and any scene
-feature the adapter cannot yet express; those are adapter limits, not table gaps.
+Each case also lists the PyRITE and PenRed adapter arms that can run it and any
+scene feature each adapter cannot yet express; those are adapter limits, not
+table gaps.
 """
 
 import argparse
@@ -114,6 +115,7 @@ def main():
     matrix = json.loads(matrix_bytes)
     domains = {name: table_domains(*spec) for name, spec in compositions().items()}
     adapter = runpy.run_path(str(HERE / "pyrite_adapter.py"))
+    penred = runpy.run_path(str(HERE / "penred_adapter.py"))
     cases = []
     for case in matrix["cases"]:
         gaps = case_gaps(case, domains[case["material"]], case["physics"]["electron_cutoff_keV"])
@@ -124,6 +126,8 @@ def main():
                 "gaps": gaps,
                 "pyrite_arms": adapter["case_arms"](case),
                 "pyrite_unsupported": adapter["case_unsupported"](case),
+                "penred_arms": penred["case_arms"](case),
+                "penred_unsupported": penred["case_unsupported"](case),
             }
         )
     result = {

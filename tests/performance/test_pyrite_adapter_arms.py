@@ -125,7 +125,8 @@ def test_transport_arm_writes_comparison_record_without_emission_work(
     output = tmp_path / "t.json"
     argv = ["pyrite_adapter.py", "silicon-100kev-tr0.03-0deg", "--histories", "6", "--seed", "3",
             "--core", "per-electron", "--arm", "transport", "--batch-histories", "4",
-            "--radiative-loss", "none", "--audit-cxr", "--output", str(output)]  # fmt: skip
+            "--radiative-loss", "none", "--audit-cxr", "--straggling", "on",
+            "--output", str(output)]  # fmt: skip
     monkeypatch.setattr(sys, "argv", argv)
     adapter["main"]()
     record = json.loads(output.read_text())
@@ -135,6 +136,10 @@ def test_transport_arm_writes_comparison_record_without_emission_work(
     assert [c["_electron_start"] for c in seen["calls"]] == [0, 4, 0, 4]
     assert {c["radiative_model"] for c in seen["calls"]} == {"uncoupled"}
     assert {c["bremslib_tables"] for c in seen["calls"]} == {None}
+    # The straggling override reaches transport and is recorded against the scene value.
+    assert {c["straggling"] for c in seen["calls"]} == {True}
+    assert record["provenance"]["scene"]["straggling"] is True
+    assert record["provenance"]["scene"]["straggling_scene"] is False
     assert record["moments"]["transmitted"]["mean"] == pytest.approx(0.5)
     assert record["moments"]["transmitted"]["n"] == 6
     assert record["transmitted_energy"]["mean_keV"] == 90.0
