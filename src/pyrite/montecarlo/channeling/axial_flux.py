@@ -77,7 +77,7 @@ def samples_per_cell(
         raise ValueError(
             "shape must be divisible by cells on both axes; hold samples/cell fixed when changing extent"
         )
-    result = tuple(n // c for n, c in zip(shape, cells, strict=True))
+    result = (shape[0] // cells[0], shape[1] // cells[1])
     if min(result) < 8:
         raise ValueError(
             "at least 8 samples per projected cell/axis are required; >=16 recommended"
@@ -93,7 +93,7 @@ def samples_per_cell(
 
 def fixed_resolution_shape(cells: tuple[int, int], per_cell: tuple[int, int]) -> tuple[int, int]:
     """Total FFT shape for a supercell study at *fixed* per-cell resolution."""
-    shape = tuple(c * p for c, p in zip(cells, per_cell, strict=True))
+    shape = (cells[0] * per_cell[0], cells[1] * per_cell[1])
     samples_per_cell(cells, shape, warn=False)
     return shape
 
