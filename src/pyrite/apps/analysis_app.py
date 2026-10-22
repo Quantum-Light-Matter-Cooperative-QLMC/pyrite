@@ -37,7 +37,12 @@ with app.setup:
         make_vary_control,
         make_varying_control,
     )
-    from pyrite.apps.analysis_ui.interactive import is_heatmap_sweep, make_map_widget
+    from pyrite.apps.analysis_ui.interactive import (
+        is_heatmap_sweep,
+        make_map_widget,
+        make_plotly_map_widget,
+    )
+    from pyrite.apps.analysis_ui.map_selection import map_scope, restore_selection, selection_for_scope
     from pyrite.apps.analysis_ui.navigation import DETECTORS, MAP, SPECTRA, make_view_nav
     from pyrite.apps.analysis_ui.views import (
         SPECTRA_SPECS,
@@ -215,7 +220,19 @@ def _():
     spectrum_components_ui = make_component_controls(mo)
     map_quantity_ui = make_map_quantity_control(mo)
     detector_ui = make_detector_choice(mo)
-    return detector_ui, map_quantity_ui, spectrum_components_ui, vary_ui
+    map_backend_ui = mo.ui.dropdown(
+        {"Altair (stable)": "altair", "Plotly (experimental)": "plotly"},
+        value="altair",
+        label="Map renderer",
+    )
+    return detector_ui, map_backend_ui, map_quantity_ui, spectrum_components_ui, vary_ui
+
+
+@app.cell
+def _():
+    # Independent of plots/slices: a click must not rerun metric scoring.
+    map_selection_get, map_selection_set = mo.state(None)
+    return map_selection_get, map_selection_set
 
 
 @app.cell
@@ -273,25 +290,35 @@ def _(
 
 
 @app.cell
-def _(app_theme, context, energy_ui, map_quantity_ui, thickness_ui, view_nav):
+def _(
+    app_theme,
+    context,
+    energy_ui,
+    map_backend_ui,
+    map_quantity_ui,
+    map_selection_set,
+    thickness_ui,
+    view_nav,
+):
     mo.stop(not context.has_data or view_nav.value != MAP)
     map_results = slice_results(context.results, thickness=thickness_ui.value)
     heatmap_mode = is_heatmap_sweep(map_results)
-    map_widget = (
-        make_map_widget(
-            mo,
-            alt,
-            map_results,
-            context.settings,
-            context.cases,
-            quantity=map_quantity_ui.value,
-            energy=energy_ui.value,
-            theme=app_theme,
-        )
-        if heatmap_mode
-        else None
-    )
-    return heatmap_mode, map_results, map_widget
+    map_frame = None
+    map_widget = None
+    if heatmap_mode:
+        if map_backend_ui.value == "plotly":
+            scope = map_scope(context, energy=energy_ui.value, thickness=thickness_ui.value)
+            map_widget, map_frame = make_plotly_map_widget(
+                mo, map_results, context.settings, context.cases,
+                quantity=map_quantity_ui.value, energy=energy_ui.value,
+                theme=app_theme, scope=scope, on_selection=map_selection_set,
+            )
+        else:
+            map_widget = make_map_widget(
+                mo, alt, map_results, context.settings, context.cases,
+                quantity=map_quantity_ui.value, energy=energy_ui.value, theme=app_theme,
+            )
+    return heatmap_mode, map_frame, map_results, map_widget
 
 
 @app.cell
@@ -307,21 +334,34 @@ def _(
     context,
     energy_ui,
     heatmap_mode,
+    map_backend_ui,
+    map_frame,
     map_quantity_ui,
     map_results,
+    map_selection_get,
     map_trends,
     map_widget,
+    thickness_ui,
     view_nav,
 ):
     mo.stop(view_nav.value != MAP)
+    if map_widget is None:
+        selection = None
+    elif map_backend_ui.value == "plotly":
+        scope = map_scope(context, energy=energy_ui.value, thickness=thickness_ui.value)
+        fresh = selection_for_scope(map_widget.value, map_frame, scope)
+        selection = restore_selection(map_frame, fresh or map_selection_get(), scope)
+    else:
+        selection = map_widget.value
     render_map(
         mo,
         context=context,
         map_results=map_results,
         heatmap_mode=heatmap_mode,
         quantity_ui=map_quantity_ui,
+        map_backend_ui=map_backend_ui,
         map_widget=map_widget,
-        selection=None if map_widget is None else map_widget.value,
+        selection=selection,
         energy=energy_ui.value,
         trends=map_trends,
         theme=app_theme,
