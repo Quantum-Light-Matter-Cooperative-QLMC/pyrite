@@ -205,7 +205,7 @@ def gold_johnson_christy_response() -> OpticalResponse:
 
     Source: P. B. Johnson and R. W. Christy, Phys. Rev. B 6, 4370 (1972);
     pinned CC0 refractiveindex.info record. Assumes local scalar nonmagnetic
-    response. Validation: optical-material-response
+    response. Validation: optical-material-response, optical-planar-tr
     """
     return _refractiveindex_nk(
         "Au-Johnson.yml",

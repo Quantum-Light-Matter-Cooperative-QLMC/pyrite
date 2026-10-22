@@ -958,3 +958,10 @@ for node or midpoint-bin grids; it leaves the shared X-ray floor unchanged.
 Independent derivation: `validation/radiation-physics/optical-material-response.md`.
 Real-hardware check: `checks/optical_response_cuda.py`, run through remote staging
 and a bounded CUDA allocation.
+
+Bounded optical TR/CTR (#615): `montecarlo/spectrum/optical_transition.py`
+(physical-bunch source laws, weighted distinct-pair estimator, npz persistence),
+`montecarlo/spectrum/optical_transition_validity.py` (formation and radiated-
+energy refusals) and `runner/transition_emission.py::case_optical_transition`.
+Physics: `physics/radiation-physics/optical-transition-radiation.md`; CUDA
+parity: `checks/optical_transition_cuda.py`.

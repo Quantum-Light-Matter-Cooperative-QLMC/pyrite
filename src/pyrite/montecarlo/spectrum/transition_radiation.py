@@ -412,7 +412,7 @@ def interface_transition_radiation_amplitude(
         ``(0, 0, z_top)``, ``exp(-i omega t)``, and
         ``d^2N/dE dOmega = E n_z^2 |sum_c a_c|^2 / (16 pi^4)``.
 
-    Validation: tr-crossing-superposition
+    Validation: tr-crossing-superposition, optical-planar-tr
     """
     energy = np.asarray(photon_energy_eV, dtype=float)
     n = np.asarray(direction, dtype=float)

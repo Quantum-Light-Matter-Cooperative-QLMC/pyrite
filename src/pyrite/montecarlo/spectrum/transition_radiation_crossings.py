@@ -467,7 +467,7 @@ def history_field_sums(
     :mod:`~pyrite.montecarlo.spectrum.optical_transition` use this. Arrays
     have shapes ``s`` and ``(*s, 3)`` for the broadcast energy/direction shape.
 
-    Validation: tr-crossing-superposition, tr-coherent-bunch
+    Validation: tr-crossing-superposition, tr-coherent-bunch, optical-ctr-population
     """
     energy = np.asarray(photon_energy_eV, dtype=float)
     n = np.asarray(direction, dtype=float)
