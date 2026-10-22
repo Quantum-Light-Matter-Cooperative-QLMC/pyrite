@@ -2,10 +2,10 @@
   "schema": "pyrite.xsgen.sbethe-release.v1",
   "upstream": "SBETHE, Mendeley Data doi:10.17632/7zw25f428t.2",
   "archive": {
-    "sha256": "071d80f9d4da578d6d5699f0471f8ccb85f03a6e65016cc54cd5d8a40610c67d",
-    "bytes": 2994599,
+    "sha256": "27305a4472df09586b4ec17ea3e525313afd4aff5cec5d9477d4aa103f41e7bb",
+    "bytes": 3053724,
     "urls": [
-      "https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/releases/download/tables-sbethe-positron-2/sbethe-positron-tables.zip"
+      "https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/releases/download/tables-sbethe-positron-3/sbethe-positron-tables.zip"
     ]
   },
   "tables": [
@@ -210,6 +210,11 @@
       "manifest_sha256": "17eff26f4056c3eb7c205b418ca073075862482080b98ef5cf217c739a82f437"
     },
     {
+      "label": "tungsten",
+      "key": "0ece650d8dbb4e3f1f1abea202fd8e9b97da50633553353c7c4fee1bc054772b",
+      "manifest_sha256": "c0a50d8a65da157db22ce175cef567c771d0044835845765cf60c52ea8d575a3"
+    },
+    {
       "label": "v2o5",
       "key": "3a2afa49838ad1efbeeae1bf2e8b5ed3d51c156659c9f88ad1ce7b5ab97d7c13",
       "manifest_sha256": "58ddc59d799748c516fe8b72e9ed3bf97032c516e2c7304e6aeab06c0d772851"
@@ -296,6 +301,7 @@
     "75a9441658534dbd06ea3806da62ca198569d83ddc7516726545326dac26bc25": "47af6abfc736bcb56e1b0d10a8ee36ac121ae6cd70e34accae32a0df06372fef",
     "8e332739be11c846b47d2e9fa747782f527b8df8358b7d51bfb8db141418adb7": "29f0cd2d9d4467d8af811a4331ac23a20e6b6ef3475b02588196ad4a797d49ac",
     "6e89baa5abdb5fab869ae47aaf6666a40ff071e4b9b54d8ce8aec9ae47fdbdef": "25af1eeac7b3086e618386e300722c662b65a95670ae0c01e898d3a64ca29472",
+    "0ece650d8dbb4e3f1f1abea202fd8e9b97da50633553353c7c4fee1bc054772b": "40dbe391299300b31bf180c73eb0ba84bbac0965b1b612076ed694dcd1be440b",
     "3a2afa49838ad1efbeeae1bf2e8b5ed3d51c156659c9f88ad1ce7b5ab97d7c13": "f2c8b4b609c65277661feaafca5b0784c4a128f42c5e7187fcfb52faa44d2dd5",
     "6d33c77640c6af0f78cf8ed99b5fc9baeb1ab91a7096add3c322ea25e8d6f5f3": "7d60ec234001c27b4e01d02605282f02e5ca57334e9cd76abeba631a75e5627a",
     "8556005907ebc02326066d625da4655cf72947e8a90a687b8ef778a49dee490a": "de0c6f5831ea02c6b911664f5d27e27c3190d996119b553d14cf8f5ae00cac77",
