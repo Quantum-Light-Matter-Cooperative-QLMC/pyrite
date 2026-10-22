@@ -95,7 +95,7 @@ each case to the exact table digests.
 | C (diamond) | 0.1–100000 | 1–10⁶ | 0.01–30000 | yes |
 | SiO₂ (medium) | 0.1–100000 | 1–10⁶ | 0.01–30000 | yes |
 
-39 of 44 cases are covered by released tables. Every 5 MeV case lies inside all
+All 44 cases are covered by released tables. Every 5 MeV case lies inside all
 three table domains, so the pilot manifest's 5 MeV deferral no longer has a
 table-coverage reason; the physical validity of each model at 5 MeV is a
 separate question this audit does not answer.
@@ -109,10 +109,14 @@ anchors rerun from this matrix use the catalog density, so a Geant4 arm must set
 its tungsten density to match, as already done for silicon. The 0.2% density
 change alters W thicknesses derived from `t/R` by the same fraction.
 
-The remaining gaps are:
-
-- **5 detector cases:** the uncollided-detector arm needs the production
-  weighted per-segment scorer, which no adapter calls yet.
+No table gap remains. The five detector cases were gaps only while no adapter
+called the production weighted per-segment scorer; the
+[detector arm](#pyrite-detector-arm) now does. Each audit entry also lists
+`pyrite_arms`, the adapter arms that can run the case, and
+`pyrite_unsupported`, the scene features the adapter cannot yet express. These
+are adapter limits, not table gaps: the finite spot, divergence and energy-spread
+beams and the two explicit-secondary arms have no PyRITE arm yet, and the adapter
+writes an explicit `unsupported-physics` record for them.
 
 ## Physics-capability audit
 
@@ -156,9 +160,20 @@ has no terminal state or more than one, transmitted energy is outside
 nonnegative integers, the fixed 10–50/50–100/≥100 keV bands do not partition
 the ≥10 keV total, or a band above the endpoint scores anything.
 
-`comparison_record` adds primary moments (via `pyrite.perf.precision`) and the
-covariance of the band means, so integrated yields keep their within-primary
-correlation. Outcomes other than `ok` (`failed`, `timeout`, `oom`,
+Records have a `kind`. `source` carries the creation-level photon counts above.
+`transport` carries only terminal fractions and transmitted energy, and refuses
+any photon or cone field. `detector` adds weighted cone yields per primary. Each
+10–50/50–100/≥100 keV band, and the ≥10 keV total they sum to, is scored at
+creation (`cone_source_photons_*`) and after uncollided escape
+(`cone_escape_photons_*`). Yields must be nonnegative, bands must sum to the
+total, nothing may score above the endpoint, and escape may never exceed the
+yield at creation.
+
+`comparison_record` adds primary moments (via `pyrite.perf.precision`) and,
+for photon kinds, the covariance of the band means, so integrated yields keep
+their within-primary correlation. Every kind also records the moments of
+transmitted energy over transmitted primaries: their count, mean, second
+moment and variance, with a delta-method SE for the ratio mean. Outcomes other than `ok` (`failed`, `timeout`, `oom`,
 `precision-unmet`, `coverage-gap`, `unsupported-physics`) must carry a reason
 and no scores, so they are retained rather than dropped.
 
@@ -169,11 +184,86 @@ orders until successive results agree to `rtol`, and reports an unconverged or
 repeatedly zero result as unresolved instead of raising, so a narrow emission
 feature missed by a coarse rule cannot pass silently. A point value times solid
 angle never stands in for this convergence evidence.
+`converged_cone_scores` does the same for per-primary arrays. It refines
+until, for every field, both the primary sum and the primary sum of squares
+(the inputs of the mean and its variance) change by at most `rtol`. A band
+that is zero by construction is declared `exact-zero` and must stay zero.
+
+## PyRITE transport-only and detector arms
+
+`checks/equal_precision/pyrite_adapter.py` takes a pilot `manifest.json` id or a
+frozen `matrix.json` case id. Matrix cases use exact catalog compositions,
+including catalog `tungsten`, and the case's footprint, electron and photon
+cutoffs and straggling switch. `--arm source` on a manifest id writes the
+retained `pyrite.equal-precision.sample.v1` pilot record unchanged. Every other
+combination writes a `pyrite.equal-precision.comparison.v1` record of the
+matching kind. Each record keeps the raw per-primary `.npz` with its SHA-256,
+the table digests, the warmup policy and the timings.
+
+### PyRITE transport-only arm
+
+`--arm transport` scores only terminal fractions and transmitted energy. The
+headline arm is `--radiative-loss bremslib-soft-hard` (the default), described
+below; `--radiative-loss none` is a diagnostic variant. With
+`--radiative-loss none`, transport runs with
+`radiative_model="uncoupled"`. It applies SBETHE collision stopping only, with
+no bremsstrahlung energy loss and no hard-photon sampling, and loads no BremsLib
+table. A comparator matches this by removing electron bremsstrahlung from
+transport. With `--radiative-loss bremslib-soft-hard`, transport keeps the
+coupled BremsLib soft loss and sampled hard-photon debits, but discards the photons
+unscored. A comparator then keeps bremsstrahlung at the same production
+threshold and kills photons at creation. The selected treatment is recorded
+verbatim under `provenance.radiative_energy_loss`. The `--audit-cxr` call
+trace, which already refuses PXR/CBS work in every arm, also refuses any
+`pyrite.montecarlo.spectrum` or detector scorer call in this arm. The one
+exception is the BremsLib table module that coupled transport samples hard
+photons from when loss is retained. Blocks carrying radiative rows without
+retained loss are refused.
+
+### PyRITE detector arm
+
+`--arm detector` runs coupled BremsLib transport for a matrix case with a
+`detector` cone. It scores each block with
+`pyrite.perf.detector_scoring.cone_detector_scores`, which calls the production
+expected-value estimator `mc_coupled_brem_spectrum` (BremsLib DDCS by track
+length along the coupled tracks) in its per-electron band mode, one call per
+direction, stage and band. Each primary's segments are summed before any
+moment. Primaries with no emission keep zero scores, and successive blocks keep
+global primary indices. The cone axis is at `center_deg` from the slab normal,
+in the x–z plane of incidence, as frozen in the matrix spec's `detector_frame`
+and recorded with every detector record.
+
+Both stages use one estimator and the same geometry, and differ only in the
+absorber:
+
+- **Source at creation:** the absorbing layer has zero number density, so
+  every segment's escape transmission is exactly one.
+- **Uncollided escape:** straight-ray EPDL2025 narrow-beam attenuation through the
+  slab and its finite footprint, the estimator's production escape model.
+
+Photon energy is integrated per band with composite Gauss–Legendre panels.
+Panels are split at every EPDL2025 photoelectric edge of the slab and are at most
+100 keV wide, with `2 × order` nodes each. The ≥100 keV band ends at the beam
+energy. Energy and angle are refined jointly by `converged_cone_scores`
+(`--cone-rtol`, default 10⁻³; `--cone-max-order`, default 32). The record keeps
+each block's per-field convergence evidence under `provenance.acceptance`, and
+`provenance.acceptance_gate` reads `unconverged` if any block failed to converge.
+Terminal fractions and transmitted energy come from the same coupled transport.
+In this arm, the `--audit-cxr` trace allows only the CXR package's shared
+segment-clipping, observation-direction and groove-validation helpers, which the
+bremsstrahlung estimator imports. Any other PXR/CBS call fails the run.
+
+Local CPU smoke runs of a few histories only checked the plumbing (see
+`checks/equal_precision/README.md`). Estimator cost grows with segment count ×
+directions × bands, so precision runs belong on the lab GPU through
+`pyrite remote`.
 
 ## Remaining gates
 
-This stage leaves the following open: the production weighted scorer for
-detector cases, PenRed and EGSnrc adapters with creation-level photon tallies,
-transport-only scoring, numerical refinement and equivalence margins, equal-
-core resources and held-out time-to- precision runs. No physics default, model
+This stage leaves the following open: PenRed and EGSnrc adapters with
+creation-level photon tallies, Geant4 transport-only and cone-detector tallies
+matching the arms above, adapter support for finite beams and explicit
+secondaries, numerical refinement (including the electron cutoff and the
+estimator's straight-ray escape against full photon transport), equivalence
+margins, equal-core resources and held-out time-to-precision runs. No physics default, model
 marker or version changes here, and no new physics-validation claim is made.

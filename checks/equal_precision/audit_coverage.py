@@ -3,11 +3,14 @@
 Resolves the installed ELSEPA, SBETHE and BremsLib tables for each matrix
 material and checks that every case energy and the electron cutoff lie inside
 every table. A missing table or uncovered energy stays an explicit gap entry.
+Each case also lists the PyRITE adapter arms that can run it and any scene
+feature the adapter cannot yet express; those are adapter limits, not table gaps.
 """
 
 import argparse
 import hashlib
 import json
+import runpy
 import warnings
 from pathlib import Path
 
@@ -92,8 +95,13 @@ def case_gaps(case, domains, cutoff_keV):
 
         if case["material"] not in covered_shell_materials():
             gaps.append(f"no conduction-band shell data for {case['material']}")
-    if case.get("detector"):
-        gaps.append("uncollided detector arm needs the pending weighted per-segment scorer")
+    detector = case.get("detector")
+    if detector and not (
+        0.0 <= detector["center_deg"] <= 180.0 and 0.0 < detector["half_angle_deg"] <= 90.0
+    ):
+        gaps.append(f"invalid detector cone {detector}")
+    # The detector arm scores BremsLib DDCS (covered above) with the weighted
+    # per-segment estimator wired into pyrite_adapter.py --arm detector.
     return gaps
 
 
@@ -105,10 +113,19 @@ def main():
     matrix_bytes = args.matrix.read_bytes()
     matrix = json.loads(matrix_bytes)
     domains = {name: table_domains(*spec) for name, spec in compositions().items()}
+    adapter = runpy.run_path(str(HERE / "pyrite_adapter.py"))
     cases = []
     for case in matrix["cases"]:
         gaps = case_gaps(case, domains[case["material"]], case["physics"]["electron_cutoff_keV"])
-        cases.append({"id": case["id"], "covered": not gaps, "gaps": gaps})
+        cases.append(
+            {
+                "id": case["id"],
+                "covered": not gaps,
+                "gaps": gaps,
+                "pyrite_arms": adapter["case_arms"](case),
+                "pyrite_unsupported": adapter["case_unsupported"](case),
+            }
+        )
     result = {
         "schema": "pyrite.equal-precision.coverage-audit.v1",
         "matrix_sha256": hashlib.sha256(matrix_bytes).hexdigest(),
