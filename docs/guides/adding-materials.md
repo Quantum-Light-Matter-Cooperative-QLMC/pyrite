@@ -150,7 +150,8 @@ checkpoint identity and provenance, rather than depending on a later lookup
 of the original authoring file.
 
 Maintainers in an editable source checkout can deliberately publish a bundled
-definition with `pyrite-dev material add ...`. This route ignores the user
+definition with `pyrite-dev material create crystal ...` or
+`pyrite-dev material create amorphous ...`. This route ignores the user
 layer and external-catalog selection, validates the candidate, and refuses an
 installed package without its source checkout. Ordinary CLI/API authoring never
 uses this maintainer context.

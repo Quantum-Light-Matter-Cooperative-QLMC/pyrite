@@ -307,7 +307,9 @@ def test_profile_and_material_commands_wire_catalog_completion():
     for name in ("show",):
         material_command = material.command.commands[name]
         assert _callback(material_command, "material") is _cli_completion.complete_material
-        assert _callback(material_command, "profile_name") is _cli_completion.complete_profile
+    ranges_show = profile.command.commands["ranges"].commands["show"]
+    assert _callback(ranges_show, "name") is _cli_completion.complete_profile
+    assert _callback(ranges_show, "material") is _cli_completion.complete_material
 
 
 def test_beam_commands_wire_catalog_completion_but_not_create():
