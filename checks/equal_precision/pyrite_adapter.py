@@ -255,7 +255,9 @@ def parse_args():
     parser.add_argument("--seed", type=int, required=True)
     parser.add_argument("--core", choices=["per-electron", "cuda"], required=True)
     parser.add_argument("--arm", choices=ARMS, default="source")
-    parser.add_argument("--radiative-loss", choices=sorted(RADIATIVE_LOSS), default="none")
+    parser.add_argument(
+        "--radiative-loss", choices=sorted(RADIATIVE_LOSS), default="bremslib-soft-hard"
+    )
     parser.add_argument("--max-de-frac", type=float, default=0.05)
     parser.add_argument("--cutoff-ev", type=float, default=None)
     parser.add_argument("--output", type=Path, required=True)

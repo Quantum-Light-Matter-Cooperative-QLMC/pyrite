@@ -148,3 +148,12 @@ def test_matrix_detector_cases_have_a_runnable_detector_arm():
     assert all(adapter["case_arms"](c) == ["source", "transport", "detector"] for c in detector)
     unsupported = {c["variant"] for c in cases if adapter["case_unsupported"](c)}
     assert unsupported == {"spot100um", "div5mrad", "espread1pct", "secondaries"}
+
+
+def test_detector_frame_is_frozen_with_the_scorer_convention():
+    from pyrite.perf.detector_scoring import AZIMUTH_CONVENTION
+
+    spec = json.loads((ROOT / "matrix-spec.json").read_text())
+    matrix = json.loads((ROOT / "matrix.json").read_text())
+    assert spec["detector_frame"]["azimuth_convention"] == AZIMUTH_CONVENTION
+    assert matrix["detector_frame"] == spec["detector_frame"]

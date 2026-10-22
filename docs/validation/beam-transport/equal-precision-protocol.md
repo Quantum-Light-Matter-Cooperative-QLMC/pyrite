@@ -202,8 +202,10 @@ the table digests, the warmup policy and the timings.
 
 ### PyRITE transport-only arm
 
-`--arm transport` scores only terminal fractions and transmitted energy. With
-`--radiative-loss none` (the default), transport runs with
+`--arm transport` scores only terminal fractions and transmitted energy. The
+headline arm is `--radiative-loss bremslib-soft-hard` (the default), described
+below; `--radiative-loss none` is a diagnostic variant. With
+`--radiative-loss none`, transport runs with
 `radiative_model="uncoupled"`. It applies SBETHE collision stopping only, with
 no bremsstrahlung energy loss and no hard-photon sampling, and loads no BremsLib
 table. A comparator matches this by removing electron bremsstrahlung from
@@ -228,8 +230,8 @@ length along the coupled tracks) in its per-electron band mode, one call per
 direction, stage and band. Each primary's segments are summed before any
 moment. Primaries with no emission keep zero scores, and successive blocks keep
 global primary indices. The cone axis is at `center_deg` from the slab normal,
-in the x–z plane of incidence. The matrix fixes only the polar angle, so this
-azimuth is the adapter's recorded convention.
+in the x–z plane of incidence, as frozen in the matrix spec's `detector_frame`
+and recorded with every detector record.
 
 Both stages use one estimator and the same geometry, and differ only in the
 absorber:

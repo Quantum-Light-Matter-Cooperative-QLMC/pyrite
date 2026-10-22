@@ -1,6 +1,6 @@
 {
   "schema": "pyrite.equal-precision.coverage-audit.v1",
-  "matrix_sha256": "2563db8b9f1e1a1a7bb21d4c0624e9d48f58f7da14a13f2b9e5e4562b7962c1b",
+  "matrix_sha256": "5ed265aab24d7169a6ead9d9ee8fbca198abd3b4ad2ac2a3be7e36963e2f726f",
   "tables": {
     "silicon": {
       "elsepa": [

@@ -332,6 +332,10 @@
       }
     }
   ],
+  "detector_frame": {
+    "center_deg": "polar angle of the cone axis from the slab normal",
+    "azimuth_convention": "detector axis in the x-z plane of incidence, +x azimuth"
+  },
   "interaction_checks": {
     "energy_x_thickness": "core product",
     "angle_x_thickness": [

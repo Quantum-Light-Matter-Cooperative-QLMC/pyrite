@@ -1,6 +1,6 @@
 {
   "schema": "pyrite.equal-precision.matrix.v1",
-  "spec_sha256": "5e2c7256213d177b82260de24c4fb376e7ca284ea68e11a195c62ed76e63e1c3",
+  "spec_sha256": "9608d8edfc7c0063f9d5fbce292a4894fdd40eba541e479eec40db0d7010d852",
   "range_sources": {
     "silicon": {
       "path": "checks/reference/estar/silicon.txt",
@@ -22,6 +22,10 @@
       "input_sha256": "258a7a1108759e8b7a31b36d1c4421bd819fe4f988bdb6d53403c6fa67aee2c5",
       "canonical_csv_sha256": "d2f629567f223ea964d5e518d08e25e470ad92015782651b37df243bdc254663"
     }
+  },
+  "detector_frame": {
+    "center_deg": "polar angle of the cone axis from the slab normal",
+    "azimuth_convention": "detector axis in the x-z plane of incidence, +x azimuth"
   },
   "n_cases": 44,
   "status_counts": {

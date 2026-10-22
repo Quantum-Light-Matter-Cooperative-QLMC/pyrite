@@ -381,9 +381,10 @@ uv run python checks/equal_precision/pyrite_adapter.py tungsten-800kev-tr0.03-0d
   --max-steps 200000 --output /tmp/ep/detector.json
 ```
 
-`--radiative-loss none` (default) runs the transport arm uncoupled: no
-bremsstrahlung loss and no BremsLib tables. `bremslib-soft-hard` keeps the
-coupled loss but leaves photons unscored. The record states which, for the
+`--radiative-loss bremslib-soft-hard` (default, the headline arm) keeps the
+coupled radiative loss in transport but leaves photons unscored. The diagnostic
+`none` runs the transport arm uncoupled: no bremsstrahlung loss and no BremsLib
+tables. The record states which, for the
 comparator to match. The detector arm scores source-at-creation and
 uncollided-escape cone yields per primary, with joint energy/angle quadrature
 convergence evidence (`--cone-rtol`, `--cone-max-order`). The

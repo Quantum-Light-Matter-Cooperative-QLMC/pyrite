@@ -88,6 +88,7 @@ def main():
         "schema": "pyrite.equal-precision.matrix.v1",
         "spec_sha256": hashlib.sha256(spec_bytes).hexdigest(),
         "range_sources": sources,
+        "detector_frame": spec["detector_frame"],
         "n_cases": len(cases),
         "status_counts": {
             s: sum(c["status"] == s for c in cases) for s in sorted({c["status"] for c in cases})
