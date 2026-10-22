@@ -17,20 +17,21 @@ is generated from it by `build_matrix.py` and records the spec SHA-256, every
 resolved case, observable applicability and a per-axis coverage table. A test
 fails if the committed `matrix.json` no longer regenerates byte-for-byte.
 
-- **Core:** Si and W × 100 keV, 800 keV, 5 MeV × `t/R` = 0.03, 0.3, 3, giving 18
+- **Core:** Si and W × 100 keV, 800 keV, 5 MeV × `t/R` = 0.03, 0.3, 3, with
+  `t/R` capped at 1 for 5 MeV (`t_over_r_cap_by_energy_keV`), giving 18
   scenes at normal incidence with a 10 × 10 mm prism, pencil monoenergetic beam
   and the pilot's numerical controls (10 keV electron threshold, 1 keV hard
   photon threshold, photons scored at ≥10 keV in 10 keV bins).
 - **Anchors:** the six retained adapter-pilot scenes, with their absolute
   dimensions and an `anchor_of` link to the pilot manifest id. No `t/R` is
   claimed for them.
-- **Sparse extensions (19):** 45° and 75° incidence at Si 800 keV `t/R` 0.3;
+- **Sparse extensions (20):** 45° and 75° incidence at Si 800 keV `t/R` 0.3;
   angle×thickness checks at W 800 keV 75° and `t/R` 0.03 and 3; diamond (low Z)
   and SiO₂ (compound) at 800 keV `t/R` 0.3; one-factor beam phase space at Si
   800 keV `t/R` 0.3 (100 µm RMS spot, 5 mrad RMS divergence, 1% RMS energy
   spread); a 1 × 1 mm footprint at `t/R` 3 for Si and W; five detector cones
   (90°/5° for Si and W, 0°/1°, 0°/15°, 135°/5°); straggling on for Si and W;
-  and one explicit-secondary arm for Si.
+  and explicit-secondary arms for Si and W.
 
 Case ids are built only from material, energy, `t/R` or absolute thickness,
 incidence and variant, for example `tungsten-800kev-tr3-75deg-oblique`.
@@ -42,23 +43,33 @@ path length is reported, not compensated.
 
 `t/R` is converted to an absolute surface-normal thickness exactly once, by
 log-log interpolation of one pinned CSDA-range tabulation per material, and
-every engine then receives that same thickness. The intended source is the NIST
-ESTAR CSDA range (ICRU Report 37 methods). ESTAR was unreachable from the
-environment that froze this matrix, so all 37 range-scaled cases are
-`pending-range-source` with `thickness_um = null`; nothing is estimated from
-PyRITE's or any other engine's stopping model. To freeze them, save the ESTAR
-text output for each material outside the checkout and run:
+every engine then receives that same thickness. The source is the NIST ESTAR
+CSDA range (ICRU Report 37 methods), downloaded on 2026-10-22 with all seven
+columns, space-delimited, on the default 10 keV–1 GeV grid. The text files are
+committed under `checks/reference/estar/` (provenance in its `README.md`)
+and pinned in `matrix-spec.json`, so all 37 range-scaled cases are `frozen`.
+Nothing is estimated from PyRITE's or any other engine's stopping model.
+Rebuilding needs no arguments:
 
 ```bash
-uv run python checks/equal_precision/build_matrix.py --estar \
-  --range silicon=/path/estar-si.txt --range tungsten=/path/estar-w.txt \
-  --range diamond=/path/estar-c.txt --range sio2=/path/estar-sio2.txt
+uv run python checks/equal_precision/build_matrix.py
 ```
 
-`matrix.json` then records the SHA-256 of each input file and of its canonical
-two-column CSV. ESTAR's default densities and density-effect treatment differ
+`matrix.json` records the repository path and SHA-256 of each input file and of
+its canonical two-column CSV. The parser rejects any row without exactly seven
+columns, because a table missing a stopping-power column would shift the CSDA
+range out of column 5. ESTAR's densities and density-effect treatment differ
 slightly from the matrix densities; the range in g/cm² is taken as tabulated
 and that difference is a declared approximation, not a per-engine adjustment.
+ESTAR has no diamond entry, so `diamond` uses amorphous carbon (2.0 g/cm³), the
+densest carbon entry; graphite (1.7 g/cm³) gives ranges 0.5–0.6% shorter
+between 0.1 and 5 MeV.
+
+At 5 MeV, `t/R` = 3 would make the silicon slab 38.5 mm thick, so the
+stopping-dominated point is capped at `t/R` = 1. That keeps essentially no
+transmission, but `silicon-5000kev-tr1-0deg` is still 12.8 mm thick, deeper than
+the 10 mm lateral prism, so side exits remain a large share of its terminal
+fractions. `tungsten-100kev-tr0.03-0deg` is 0.46 µm thick.
 
 ### Observable applicability
 
@@ -80,27 +91,28 @@ each case to the exact table digests.
 | Material | ELSEPA (keV) | SBETHE (keV) | BremsLib (keV) | Released SBETHE table |
 | --- | --- | --- | --- | --- |
 | Si (catalog crystal) | 0.1–100000 | 1–10⁶ | 0.01–30000 | yes |
-| W, 19.3 g/cm³ | 0.1–100000 | — | 0.01–30000 | **no** |
+| W (catalog crystal, 19.261 g/cm³) | 0.1–100000 | 1–10⁶ | 0.01–30000 | yes (`tables-sbethe-3`) |
 | C (diamond) | 0.1–100000 | 1–10⁶ | 0.01–30000 | yes |
 | SiO₂ (medium) | 0.1–100000 | 1–10⁶ | 0.01–30000 | yes |
 
-22 of 43 cases are covered by released tables. Every 5 MeV case lies inside all
+39 of 44 cases are covered by released tables. Every 5 MeV case lies inside all
 three table domains, so the pilot manifest's 5 MeV deferral no longer has a
 table-coverage reason; the physical validity of each model at 5 MeV is a
-separate question this audit does not answer. The remaining gaps are:
+separate question this audit does not answer.
 
-- **19 tungsten cases:** no released SBETHE table exists for any tungsten
-  composition. The pilot's W layer is anonymous (`"W"` at 19.3 g/cm³, matching
-  Geant4's `G4_W`), while the catalog `tungsten` crystal is 19.261 g/cm³; the lab
-  pilot used a locally generated table whose digest is in its evidence. Another
-  developer therefore cannot reproduce any W scene from released inputs alone.
-  Either publish that SBETHE table as a pinned release asset, or move every
-  engine to the catalog density. This is a decision for the issue owner; the
-  matrix keeps 19.3 g/cm³ until then.
+Tungsten moved to the catalog `tungsten` crystal (19.261 g/cm³) on 2026-10-22,
+and its SBETHE table was published in `tables-sbethe-3` and
+`tables-sbethe-positron-3`, so every W case reproduces from released inputs.
+The retained pilot (`manifest.json`) used anonymous W at 19.3 g/cm³, matching
+Geant4's `G4_W`, with a locally generated table; its evidence is unchanged. W
+anchors rerun from this matrix use the catalog density, so a Geant4 arm must set
+its tungsten density to match, as already done for silicon. The 0.2% density
+change alters W thicknesses derived from `t/R` by the same fraction.
+
+The remaining gaps are:
+
 - **5 detector cases:** the uncollided-detector arm needs the production
   weighted per-segment scorer, which no adapter calls yet.
-- The tungsten secondary-transport arm is not declared, because
-  `inelastic_model="shell-soft-hard"` needs a catalog key per layer.
 
 ## Physics-capability audit
 
@@ -160,10 +172,8 @@ angle never stands in for this convergence evidence.
 
 ## Remaining gates
 
-This stage leaves the following open: freezing the range-scaled thicknesses,
-the tungsten SBETHE reproducibility decision, the production weighted scorer
-for detector cases, PenRed and EGSnrc adapters with creation-level photon
-tallies, transport-only scoring, numerical refinement and equivalence margins,
-equal-core resources and held-out time-to-precision runs. No physics default,
-model marker or version changes here, and no new physics-validation claim is
-made.
+This stage leaves the following open: the production weighted scorer for
+detector cases, PenRed and EGSnrc adapters with creation-level photon tallies,
+transport-only scoring, numerical refinement and equivalence margins, equal-
+core resources and held-out time-to- precision runs. No physics default, model
+marker or version changes here, and no new physics-validation claim is made.

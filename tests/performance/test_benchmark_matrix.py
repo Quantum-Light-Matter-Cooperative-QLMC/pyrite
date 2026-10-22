@@ -69,6 +69,9 @@ def test_frozen_spec_expands_to_core_product_with_pending_thickness():
     assert len(core) == 18
     assert {c["status"] for c in core} == {"pending-range-source"}
     assert all(c["thickness_um"] is None for c in core)
+    # 5 MeV is capped at t/R = 1: tr3 would be 38.5 mm of silicon in a 10 mm prism.
+    assert {c["t_over_r"] for c in core if c["energy_keV"] == 5000} == {0.03, 0.3, 1}
+    assert {c["t_over_r"] for c in core if c["energy_keV"] == 800} == {0.03, 0.3, 3}
     anchors = [c for c in cases if c["variant"] == "anchor"]
     assert {c["status"] for c in anchors} == {"frozen-absolute"}
     assert all(not c["physics"]["pxr"] and not c["physics"]["cbs"] for c in cases)
@@ -103,10 +106,16 @@ def test_case_id_is_stable():
 
 def test_estar_text_columns_and_committed_matrix_regenerates(tmp_path, monkeypatch):
     module = runpy.run_path(str(ROOT / "build_matrix.py"))
-    estar = "ESTAR: SILICON\nKinetic Collision\n1.000E-01 3.0 0.1 3.1 1.000E-02 0.1 0.2\n"
+    estar = "ESTAR: SILICON\nKinetic Collision Radiative Total CSDA\n"
+    estar += "1.000E-01 3.0 0.1 3.1 1.000E-02 0.1 0.2\n"
     estar += "1.000E+00 1.5 0.1 1.6 5.000E-01 0.1 0.2\n"
     table = parse_range_table(module["estar_to_csv"](estar))
     assert csda_range_g_cm2(table, 1000.0) == pytest.approx(0.5)
+    # A table missing a stopping-power column would shift CSDA out of column 5.
+    with pytest.raises(ValueError, match="seven columns"):
+        module["estar_to_csv"]("Kinetic CSDA\n1.000E-01 3.0 3.1 1.000E-02 0.1 0.2\n")
+    with pytest.raises(ValueError, match="CSDA"):
+        module["estar_to_csv"]("1.000E-01 3.0 0.1 3.1 1.000E-02 0.1 0.2\n")
     output = tmp_path / "matrix.json"
     monkeypatch.setattr("sys.argv", ["build_matrix", "--output", str(output)])
     module["main"]()

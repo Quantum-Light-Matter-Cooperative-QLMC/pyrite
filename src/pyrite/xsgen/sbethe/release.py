@@ -1,7 +1,7 @@
 """Build, pin, and look up the released SBETHE stopping tables.
 
-Every runnable catalogue material and every amorphous medium used in target
-stacks resolves one SBETHE table by material identity
+Every runnable catalogue material, crystal-only entry and amorphous medium used
+in target stacks resolves one SBETHE table by material identity
 (:func:`pyrite.xsgen.sbethe.catalog.resolve_catalog_table`). Generating them
 needs gfortran and the fetched ``sdbase/``, so the set is released as one
 archive and installed with ``pyrite tables fetch sbethe-tables``, like the
@@ -32,6 +32,7 @@ from pathlib import Path
 from typing import Any, ClassVar, Self
 
 from ...materials import CATALOG
+from ...materials._transport_data import TRANSPORT_ELEMENTS
 from ...paths import data_dir
 from .._errors import TableNotFoundError
 from .._urls import as_urls
@@ -98,8 +99,18 @@ def load_release_index(
 
 
 def catalog_keys() -> tuple[str, ...]:
-    """Return runnable materials plus amorphous media used in target stacks, sorted."""
-    return tuple(sorted(set(CATALOG.materials) | set(CATALOG.media)))
+    """Return runnable materials, supported crystal-only entries and media, sorted.
+
+    Crystal-only entries (e.g. ``tungsten``) have no material file but still
+    resolve a table by identity when used as a layer. One is included only if
+    every element has SBETHE transport inputs; ``lif`` therefore stays out.
+    """
+    crystals = {
+        key
+        for key, crystal in CATALOG.crystals.items()
+        if all(element in TRANSPORT_ELEMENTS for element, _ in crystal.composition)
+    }
+    return tuple(sorted(set(CATALOG.materials) | crystals | set(CATALOG.media)))
 
 
 def release_tables(

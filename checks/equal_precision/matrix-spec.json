@@ -4,8 +4,17 @@
   "stage": "frozen-matrix-definition",
   "range_source": {
     "name": "NIST ESTAR CSDA range (ICRU Report 37 methods)",
-    "status": "pending-download",
-    "note": "One pinned tabulation per material; every engine receives the same absolute thickness."
+    "status": "pinned",
+    "note": "One pinned tabulation per material; every engine receives the same absolute thickness.",
+    "estar_files": {
+      "silicon": "../reference/estar/silicon.txt",
+      "tungsten": "../reference/estar/tungsten.txt",
+      "diamond": "../reference/estar/carbon-amorphous.txt",
+      "sio2": "../reference/estar/silicon-dioxide.txt"
+    },
+    "substitutions": {
+      "diamond": "ESTAR has no diamond; amorphous carbon (2.0 g/cm3) is the densest carbon entry. Graphite (1.7 g/cm3) CSDA ranges differ by 0.5-0.6% at 0.1-5 MeV."
+    }
   },
   "materials": [
     {
@@ -18,8 +27,8 @@
     {
       "key": "tungsten",
       "element_or_formula": "W",
-      "density_g_cm3": 19.3,
-      "catalog": "anonymous W at the pilot/Geant4 density; catalog tungsten crystal is 19.261064912240354",
+      "density_g_cm3": 19.261064912240354,
+      "catalog": "crystal tungsten; the retained pilot manifest used anonymous W at 19.3 g/cm3 (Geant4 G4_W)",
       "role": "core"
     },
     {
@@ -51,7 +60,10 @@
       0.03,
       0.3,
       3
-    ]
+    ],
+    "t_over_r_cap_by_energy_keV": {
+      "5000": 1
+    }
   },
   "defaults": {
     "width_mm": 10.0,
@@ -297,6 +309,18 @@
     },
     {
       "material": "silicon",
+      "energy_keV": 800,
+      "t_over_r": 0.3,
+      "angle_deg": 0,
+      "variant": "secondaries",
+      "physics": {
+        "inelastic_model": "shell-soft-hard",
+        "secondary_threshold_keV": 10,
+        "secondary_transport": true
+      }
+    },
+    {
+      "material": "tungsten",
       "energy_keV": 800,
       "t_over_r": 0.3,
       "angle_deg": 0,

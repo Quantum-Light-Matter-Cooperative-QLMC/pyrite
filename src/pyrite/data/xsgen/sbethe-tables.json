@@ -2,10 +2,10 @@
   "schema": "pyrite.xsgen.sbethe-release.v1",
   "upstream": "SBETHE, Mendeley Data doi:10.17632/7zw25f428t.2",
   "archive": {
-    "sha256": "0b04d157808a8e2fd6452fd9d46ac74682fd02d4b8c197e101dd1c908aeb18c9",
-    "bytes": 2982571,
+    "sha256": "96f4fd1d956a5581bcec1a424f862f566c9508da76dcf77e6d03644233af9ff0",
+    "bytes": 3041273,
     "urls": [
-      "https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/releases/download/tables-sbethe-2/sbethe-tables.zip"
+      "https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/releases/download/tables-sbethe-3/sbethe-tables.zip"
     ]
   },
   "tables": [
@@ -210,6 +210,11 @@
       "manifest_sha256": "8541083f58feffd1b1ecc63c57b9313befe3b9061c3787a93bfb43528f08bc9a"
     },
     {
+      "label": "tungsten",
+      "key": "75d31af32d1aa6457e1948e7124615c1ec7aabb192e06a7ed3b42f1e779ec7e8",
+      "manifest_sha256": "52ea57e2ca3f924195ac9c1b70c40fe04dc40afd170ecd0490e69c1678d2a81d"
+    },
+    {
       "label": "v2o5",
       "key": "6e2495747daec144c35be9334d0e39b74964bf29ee49b519601a2e1c22a1d43b",
       "manifest_sha256": "29754aeeaf7fb2749b83e98b937c40fdca6a9d2e511b148426eea4486a9ac44c"
@@ -296,6 +301,7 @@
     "a9a18df70ddab5459702b69871b857279b26647cf8dfa7e4328a46965be0f0f8": "cf0b93515b0ac3377fe1795b70be24c2d8ec8bf82452090e698a9a262616e61a",
     "3d1e7a14f5a5c36f89445b1f009cf8220b229f1d9712c047fab18539ec078afb": "0b099acfad0c5d58f40e01654390e4a89b53c9345c7b923f2119f07a682c20cf",
     "eda9873652cc877a448304dc5ed42901baeea5c64bc5b48cbb59348ea0fcb0e4": "545f4f13705a917bfea0d8c91200698d5064b262d91d6cfe2e2a6b6185d2d974",
+    "75d31af32d1aa6457e1948e7124615c1ec7aabb192e06a7ed3b42f1e779ec7e8": "3a8a6245a1954325f3825e7f8e13a702d74ff667ba368ce10180c3cb4dd3237c",
     "6e2495747daec144c35be9334d0e39b74964bf29ee49b519601a2e1c22a1d43b": "64685566628b0a7c89954b99c18f424ab514c2f3afb299a2bd0f607dcc73c92b",
     "ce70b82975197969a962f02adffea148ad47bd1304eea7338dbd4911f87cafff": "4af11d205376d4c77ad43d85d75cbe706d6148e2c11b220378a96a6582cbbd3f",
     "8452e6349d6d1022736139bedd4cf1dff3394a8a0f165839701a8657d4c9679a": "a5acdf6d7a6cb5b1288f0b933b8c9638818e17e05212e2789cf5ebc6086afa6e",

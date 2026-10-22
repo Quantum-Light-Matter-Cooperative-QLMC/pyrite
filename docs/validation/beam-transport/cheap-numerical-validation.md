@@ -170,9 +170,10 @@ sbatch checks/equal_precision/activity-ladder.sbatch checks/equal_precision/acti
 sbatch checks/equal_precision/activity-ladder.sbatch checks/equal_precision/activity-midpoint.json
 ```
 
-These CPU jobs require the retained pilot's anonymous-W SBETHE table, which
-is still absent from released assets; the
-[table-coverage gap](equal-precision-protocol.md#table-coverage-audit) remains.
+These CPU jobs require the retained pilot's anonymous-W (19.3 g/cm³) SBETHE
+table, which stays unreleased. The frozen matrix now uses catalog `tungsten`,
+whose table is released; see the
+[table-coverage audit](equal-precision-protocol.md#table-coverage-audit).
 They change no production transport defaults or physics-model markers.
 
 ## Comparator configuration audit

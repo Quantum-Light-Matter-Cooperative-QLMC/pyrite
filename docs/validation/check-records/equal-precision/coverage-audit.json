@@ -1,6 +1,6 @@
 {
   "schema": "pyrite.equal-precision.coverage-audit.v1",
-  "matrix_sha256": "304fda1f0eeaf2504e944417aca15200bef0fa6d143c44273808b0757d3f9b27",
+  "matrix_sha256": "2563db8b9f1e1a1a7bb21d4c0624e9d48f58f7da14a13f2b9e5e4562b7962c1b",
   "tables": {
     "silicon": {
       "elsepa": [
@@ -35,7 +35,9 @@
         }
       ],
       "sbethe": {
-        "error": "TableNotFoundError: no SBETHE table for material 'W'; generate the catalog table with 'pyrite tables generate --code sbethe --material W'"
+        "key": "75d31af32d1aa6457e1948e7124615c1ec7aabb192e06a7ed3b42f1e779ec7e8",
+        "min_keV": 1.0,
+        "max_keV": 1000000.0
       },
       "bremslib": [
         {
@@ -105,8 +107,8 @@
       ]
     }
   },
-  "n_covered": 22,
-  "n_cases": 43,
+  "n_covered": 39,
+  "n_cases": 44,
   "cases": [
     {
       "id": "silicon-100kev-tr0.03-0deg",
@@ -149,72 +151,54 @@
       "gaps": []
     },
     {
-      "id": "silicon-5000kev-tr3-0deg",
+      "id": "silicon-5000kev-tr1-0deg",
       "covered": true,
       "gaps": []
     },
     {
       "id": "tungsten-100kev-tr0.03-0deg",
-      "covered": false,
-      "gaps": [
-        "sbethe unavailable"
-      ]
+      "covered": true,
+      "gaps": []
     },
     {
       "id": "tungsten-100kev-tr0.3-0deg",
-      "covered": false,
-      "gaps": [
-        "sbethe unavailable"
-      ]
+      "covered": true,
+      "gaps": []
     },
     {
       "id": "tungsten-100kev-tr3-0deg",
-      "covered": false,
-      "gaps": [
-        "sbethe unavailable"
-      ]
+      "covered": true,
+      "gaps": []
     },
     {
       "id": "tungsten-800kev-tr0.03-0deg",
-      "covered": false,
-      "gaps": [
-        "sbethe unavailable"
-      ]
+      "covered": true,
+      "gaps": []
     },
     {
       "id": "tungsten-800kev-tr0.3-0deg",
-      "covered": false,
-      "gaps": [
-        "sbethe unavailable"
-      ]
+      "covered": true,
+      "gaps": []
     },
     {
       "id": "tungsten-800kev-tr3-0deg",
-      "covered": false,
-      "gaps": [
-        "sbethe unavailable"
-      ]
+      "covered": true,
+      "gaps": []
     },
     {
       "id": "tungsten-5000kev-tr0.03-0deg",
-      "covered": false,
-      "gaps": [
-        "sbethe unavailable"
-      ]
+      "covered": true,
+      "gaps": []
     },
     {
       "id": "tungsten-5000kev-tr0.3-0deg",
-      "covered": false,
-      "gaps": [
-        "sbethe unavailable"
-      ]
+      "covered": true,
+      "gaps": []
     },
     {
-      "id": "tungsten-5000kev-tr3-0deg",
-      "covered": false,
-      "gaps": [
-        "sbethe unavailable"
-      ]
+      "id": "tungsten-5000kev-tr1-0deg",
+      "covered": true,
+      "gaps": []
     },
     {
       "id": "silicon-300kev-100um-0deg-anchor",
@@ -228,17 +212,13 @@
     },
     {
       "id": "tungsten-300kev-10um-0deg-anchor",
-      "covered": false,
-      "gaps": [
-        "sbethe unavailable"
-      ]
+      "covered": true,
+      "gaps": []
     },
     {
       "id": "tungsten-800kev-10um-0deg-anchor",
-      "covered": false,
-      "gaps": [
-        "sbethe unavailable"
-      ]
+      "covered": true,
+      "gaps": []
     },
     {
       "id": "silicon-100kev-1um-0deg-anchor",
@@ -247,10 +227,8 @@
     },
     {
       "id": "tungsten-100kev-100um-75deg-anchor",
-      "covered": false,
-      "gaps": [
-        "sbethe unavailable"
-      ]
+      "covered": true,
+      "gaps": []
     },
     {
       "id": "silicon-800kev-tr0.3-45deg-oblique",
@@ -264,17 +242,13 @@
     },
     {
       "id": "tungsten-800kev-tr0.03-75deg-oblique",
-      "covered": false,
-      "gaps": [
-        "sbethe unavailable"
-      ]
+      "covered": true,
+      "gaps": []
     },
     {
       "id": "tungsten-800kev-tr3-75deg-oblique",
-      "covered": false,
-      "gaps": [
-        "sbethe unavailable"
-      ]
+      "covered": true,
+      "gaps": []
     },
     {
       "id": "diamond-800kev-tr0.3-0deg-low-z",
@@ -308,10 +282,8 @@
     },
     {
       "id": "tungsten-800kev-tr3-0deg-footprint1mm",
-      "covered": false,
-      "gaps": [
-        "sbethe unavailable"
-      ]
+      "covered": true,
+      "gaps": []
     },
     {
       "id": "silicon-800kev-tr0.3-0deg-det90-5",
@@ -324,7 +296,6 @@
       "id": "tungsten-800kev-tr0.3-0deg-det90-5",
       "covered": false,
       "gaps": [
-        "sbethe unavailable",
         "uncollided detector arm needs the pending weighted per-segment scorer"
       ]
     },
@@ -339,7 +310,6 @@
       "id": "tungsten-800kev-tr0.03-0deg-det0-15",
       "covered": false,
       "gaps": [
-        "sbethe unavailable",
         "uncollided detector arm needs the pending weighted per-segment scorer"
       ]
     },
@@ -347,7 +317,6 @@
       "id": "tungsten-100kev-tr3-0deg-det135-5",
       "covered": false,
       "gaps": [
-        "sbethe unavailable",
         "uncollided detector arm needs the pending weighted per-segment scorer"
       ]
     },
@@ -358,13 +327,16 @@
     },
     {
       "id": "tungsten-800kev-tr0.3-0deg-straggling",
-      "covered": false,
-      "gaps": [
-        "sbethe unavailable"
-      ]
+      "covered": true,
+      "gaps": []
     },
     {
       "id": "silicon-800kev-tr0.3-0deg-secondaries",
+      "covered": true,
+      "gaps": []
+    },
+    {
+      "id": "tungsten-800kev-tr0.3-0deg-secondaries",
       "covered": true,
       "gaps": []
     }

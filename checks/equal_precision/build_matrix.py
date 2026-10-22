@@ -15,22 +15,38 @@ from pyrite.perf.benchmark_matrix import (
 )
 
 HERE = Path(__file__).parent
+REPO = HERE.parents[1]
 
 
 def estar_to_csv(text):
-    """Keep ESTAR text-output columns 1 (MeV) and 5 (CSDA range, g/cm^2)."""
+    """Keep ESTAR text-output columns 1 (MeV) and 5 (CSDA range, g/cm^2).
+
+    Only the full seven-column table is accepted: omitting a stopping-power
+    column would silently shift CSDA range out of column 5.
+    """
+    if "CSDA" not in text:
+        raise ValueError("ESTAR text has no CSDA column header")
     out = io.StringIO()
     writer = csv.writer(out, lineterminator="\n")
     writer.writerow(RANGE_COLUMNS)
     for line in text.splitlines():
-        fields = line.replace("E", "e").split()
+        fields = line.split()
         try:
-            values = [float(v) for v in fields]
+            [float(v) for v in fields]
         except ValueError:
             continue
-        if len(values) >= 5:
-            writer.writerow([fields[0], fields[4]])
+        if not fields:
+            continue
+        if len(fields) != 7:
+            raise ValueError(f"ESTAR row needs all seven columns, space-delimited: {line!r}")
+        writer.writerow([fields[0], fields[4]])
     return out.getvalue()
+
+
+def pinned_estar_ranges(spec, spec_dir):
+    """Return ``MATERIAL=PATH`` items for the spec's committed ESTAR files."""
+    files = spec["range_source"].get("estar_files", {})
+    return [f"{material}={spec_dir / path}" for material, path in files.items()]
 
 
 def main():
@@ -41,22 +57,25 @@ def main():
         action="append",
         default=[],
         metavar="MATERIAL=PATH",
-        help="pinned CSDA-range CSV, or raw ESTAR text with --estar",
+        help="pinned CSDA-range CSV, or raw ESTAR text with --estar; "
+        "default: the spec's committed ESTAR files",
     )
     parser.add_argument("--estar", action="store_true", help="range files are ESTAR text output")
     parser.add_argument("--output", type=Path, default=HERE / "matrix.json")
     args = parser.parse_args()
     spec_bytes = args.spec.read_bytes()
     spec = json.loads(spec_bytes)
+    estar = args.estar or not args.range
+    items = args.range or pinned_estar_ranges(spec, args.spec.parent)
     ranges, sources = {}, {}
-    for item in args.range:
+    for item in items:
         material, _, path = item.partition("=")
         raw = Path(path).read_bytes()
         text = raw.decode("utf-8")
-        table = parse_range_table(estar_to_csv(text) if args.estar else text)
+        table = parse_range_table(estar_to_csv(text) if estar else text)
         ranges[material] = table
         sources[material] = {
-            "path": Path(path).name,
+            "path": Path(path).resolve().relative_to(REPO).as_posix(),
             "input_sha256": hashlib.sha256(raw).hexdigest(),
             "canonical_csv_sha256": table["sha256"],
         }
