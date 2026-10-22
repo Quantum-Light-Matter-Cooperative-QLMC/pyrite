@@ -48,8 +48,8 @@ Usage: pyrite physics reset [OPTIONS] PROFILE [straggling|inelastic-model|inelas
                             cutoff-ev|secondary-threshold-ev|elastic-
                             model|bremsstrahlung-model|radiative-model|radiative-cutoff-
                             ev|pair-production-model|positron-transport|atomic-electron-
-                            deflection|channeling-model|transition-radiation|channeling-
-                            plane|emission]...
+                            deflection|channeling-model|channeling-axial|transition-
+                            radiation|channeling-plane|emission]...
 
   Reset selected fields, or all fields owned by this command.
 

@@ -90,6 +90,7 @@ _NUMERICS_FIELD_NAMES = {
     "positron-transport": "positron_transport",
     "atomic-electron-deflection": "atomic_electron_deflection",
     "channeling-model": "channeling_model",
+    "channeling-axial": "channeling_axial",
     "transition-radiation": "transition_radiation",
     "channeling-plane": "channeling_plane",
     "channeling-basis-size": "channeling_basis_size",

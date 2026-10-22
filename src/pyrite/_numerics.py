@@ -45,6 +45,7 @@ CONVERGENCE_KEYS = ("n_families", "max_reflections", "mosaic_nodes", "mosaic_rou
 CHANNELING_KEYS = (
     "channeling_model",
     "channeling_plane",
+    "channeling_axial",
     "channeling_basis_size",
     "channeling_bloch_cells",
     "channeling_dz_ang",
@@ -100,7 +101,7 @@ DEFAULT_RADIATIVE_CUTOFF_EV = 1000.0
 #: Quantum channeling-zone selectors (ADR-0018, issue #506). ``"off"`` (the
 #: default) leaves every case, identity and RNG stream unchanged; ``"planar"``
 #: runs the planar density-matrix entrance zone with a one-way handoff.
-CHANNELING_MODELS = ("off", "planar")
+CHANNELING_MODELS = ("off", "planar", "axial")
 #: Transition-radiation component selectors (#103). ``"off"`` (the default)
 #: leaves every case and identity unchanged; ``"history"`` sums each primary
 #: history's boundary crossings coherently; ``"bunch"`` also keeps the
@@ -253,8 +254,9 @@ class Physics:
     pair_production_model: Literal["penelope-2024"] | None = None
     positron_transport: bool = False
     atomic_electron_deflection: Literal["kawrakow", "none"] = "kawrakow"
-    channeling_model: Literal["off", "planar"] = "off"
+    channeling_model: Literal["off", "planar", "axial"] = "off"
     channeling_plane: tuple[int, int, int] | None = None
+    channeling_axial: Mapping[str, object] | None = None
     transition_radiation: Literal["off", "history", "bunch", "two-beam"] = "off"
     transition_lattice_origin_ang: tuple[float, float, float] | None = None
 
@@ -270,6 +272,10 @@ class Physics:
             )
         if self.channeling_plane is not None:
             object.__setattr__(self, "channeling_plane", _miller(self.channeling_plane))
+        if self.channeling_axial is not None:
+            from .campaign.axial_spec import resolve_axial_spec
+
+            object.__setattr__(self, "channeling_axial", resolve_axial_spec(self.channeling_axial))
         if self.brem_source is None:
             object.__setattr__(self, "brem_source", "none")
         if self.brem_source not in {"mc", "external", "none"}:
@@ -431,7 +437,25 @@ def validate_channeling_physics(physics: "Physics", energy_model: str) -> None:
     if model == "off":
         if physics.channeling_plane is not None:
             raise ValueError("channeling_plane requires channeling_model='planar'")
+        if physics.channeling_axial is not None:
+            raise ValueError("channeling_axial requires a matching channeling_model='axial'")
         return
+    if model == "axial":
+        if physics.channeling_plane is not None:
+            raise ValueError("channeling_plane is planar-only; use channeling_axial.axis_uvw")
+        if physics.channeling_axial is None:
+            raise ValueError("channeling_model='axial' requires channeling_axial")
+        if energy_model != "midpoint":
+            raise ValueError("channeling_model='axial' requires energy_model='midpoint'")
+        if physics.radiative_model != "uncoupled":
+            raise ValueError("axial channeling requires radiative_model='uncoupled'")
+        if physics.secondary_threshold_eV is not None:
+            raise ValueError("axial channeling cannot transport secondaries")
+        if "coherent" in cast(tuple[str, ...], physics.emission):
+            raise ValueError("axial channeling currently requires incoherent emission")
+        return
+    if physics.channeling_axial is not None:
+        raise ValueError("channeling_axial requires channeling_model='axial'")
     if physics.channeling_plane is None:
         raise ValueError("channeling_model='planar' requires channeling_plane")
     if energy_model != "midpoint":
@@ -472,7 +496,9 @@ def validate_transition_physics(physics: "Physics", energy_model: str) -> None:
     if energy_model != "midpoint":
         raise ValueError("transition_radiation requires energy_model='midpoint'")
     if physics.channeling_model != "off":
-        raise ValueError("transition_radiation does not support channeling_model='planar'")
+        raise ValueError(
+            f"transition_radiation does not support channeling_model={physics.channeling_model!r}"
+        )
 
 
 def validate_channeling_numerics(

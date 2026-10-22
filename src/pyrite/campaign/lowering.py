@@ -20,6 +20,12 @@ def scene_physics(scene: Scene, numerics: Numerics) -> Physics:
     """Resolve the scene's model policy."""
     physics = resolve_physics(scene.physics, numerics)
     physics.validate_transport(numerics.energy_model)
+    if physics.channeling_model == "axial":
+        # Refuse before material lookup, any case construction, or output writes.
+        # Physical source and handoff cannot be inferred from an FFT sink (#623).
+        from .axial_spec import refuse_unverified_axial_run
+
+        refuse_unverified_axial_run()
     return physics
 
 
