@@ -268,11 +268,16 @@ def adopted_stopping_cs(key: str, energy_eV: float, *, projectile: str = "electr
     return float(np.exp(np.interp(np.log(energy_eV), np.log(grid), np.log(stopping))))
 
 
-def catalog_shell_oscillators(key: str) -> MaterialShellOscillators:
+def catalog_shell_oscillators(
+    key: str, *, conduction_resonance_eV: float | None = None
+) -> MaterialShellOscillators:
     """Measured-conduction-band shell oscillators of a catalog material.
 
     Catalog composition and ``I``, all-electron ``Omega_p`` and the packaged
     conduction band, as :func:`~.shell_oscillators.build_shell_oscillators`.
+    ``conduction_resonance_eV`` overrides the band's ``W_cb`` in the Sternheimer
+    closure, for a direction-resolved valence set whose logarithmic mean
+    replaces it (:mod:`.directional_loss`).
 
     Validation: penelope-shell-oscillators
     """
@@ -283,12 +288,15 @@ def catalog_shell_oscillators(key: str) -> MaterialShellOscillators:
             f"{', '.join(sorted(bands))}"
         )
     inputs = catalog_material(key)
+    band = bands[key]
+    if conduction_resonance_eV is not None:
+        band = replace(band, resonance_eV=float(conduction_resonance_eV))
     return build_shell_oscillators(
         inputs.composition,
         inputs.mean_excitation_eV,
         plasma_energy_eV(key),
         load_atomic_shells(),
-        bands[key],
+        band,
     )
 
 

@@ -1,0 +1,17 @@
+# Registered uniaxial dielectric datasets for direction-resolved valence loss (#536).
+# Each entry names a folder under data/ holding eps1_perp.csv, eps2_perp.csv,
+# eps1_par.csv and eps2_par.csv (columns energy_eV,value; '#' lines are provenance).
+# A registered crystal switches `electronic_kernel` to the directional valence model
+# on its basal plane; add an entry only together with a CHANNELING_MODEL bump.
+#
+# [mos2]
+# directory = "directional_loss/mos2"
+# label = "2H-MoS2 uniaxial dielectric, Zeppenfeld, Opt. Commun. 1, 377 (1970), Figs. 1-2 digitized"
+# status = "provisional"          # not "anchored" until #541 closes
+# valence_electrons = 18
+# optic_axis = [0, 0, 1]
+# eps1_static_perp = 14.9         # Landolt-Bornstein, via Zeppenfeld
+# eps1_static_par = 9.0           # ASSUMED by Zeppenfeld ("optimal consistency")
+# eps2_floor = 0.3                # digitization tolerance on eps2 >= 0
+# closure_tolerance = 0.25        # reject a direction whose raw f-sum misses N by more
+# protocol = "docs/research/physics/mos2-directional-loss-sources.md"

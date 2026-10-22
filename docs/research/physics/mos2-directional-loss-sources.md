@@ -230,3 +230,23 @@ Not needed any longer: Beal-Hughes (read; independent only 1-14 eV) and Yue's ma
 ## Next slice
 
 Decide the 30-50 eV treatment (item 1). Then digitize Zeppenfeld Figs. 1-2 and Bell-Liang Figs. 2-3 and 6(a) with stated uncertainty; fit per-direction oscillator sets with each $\epsilon_1(0)$ treated as a free, flagged anchor; check both sum rules and the 6-versus-8 electron partition; and test the uniaxial mixing against hBN (Tarrio-Schnatterly Figs. 2, 8, 9) before any MoS2 row is added. Until then MoS2 stays at its scalar in-plane catalog row and must be reported as not an anisotropic channeling anchor.
+
+
+(sec-mos2-digitization-protocol)=
+## Digitization protocol (#536, #541)
+
+The directional model reads four digitized curves of Zeppenfeld Fig. 2 and checks them against the two loss functions of Fig. 1. Nothing in the code invents a value: with no registered dataset `electronic_kernel` keeps the scalar response and `load_directional_loss("mos2")` raises.
+
+**Files.** Under `src/pyrite/data/directional_loss/mos2/`, one CSV per curve with header `energy_eV,value` and `#` provenance lines (source figure, axis calibration points, digitizer, estimated tolerance in eV and in value):
+
+| File | Curve | Notes |
+|---|---|---|
+| `eps1_perp.csv`, `eps2_perp.csv` | Fig. 2 upper panel, `E ⊥ c` | joined branches below 15 eV and the ×10 branch above, already divided by 10 |
+| `eps1_par.csv`, `eps2_par.csv` | Fig. 2 lower panel, `E ∥ c` | same; the 0–3 eV parts are dashed (uncertain, per the author) |
+| `elf_perp.csv`, `elf_par.csv` (optional) | Fig. 1 `-Im 1/ε`, `q ⊥ c` (left axis) and `q ∥ c` (right axis) | the ×3 branches below 14 eV (⊥) and 17 eV (∥) divided by 3 |
+
+**Reading the figure** (the agent's reading, from zooming on the 300 dpi rendering of the Zotero PDF `VUGI9WE4`; confirm against the plot before digitizing). In both Fig. 2 panels the curve starting at `ε₁(0)` (14.9 for ⊥, 9 for ∥) is **ε₁**, and the steep curve rising from the baseline near 1.6 eV (⊥) or 2 eV (∥) is **ε₂**. They cross near 2.2 eV (⊥, value about 24). The curve labelled ε₂ above 3 eV (shoulder 12.5 at 4 eV, 2.5 at 8.5 eV) is the continuation of that rising ε₂; the one labelled ε₁ continues the descent of ε₁. Sanity checks: `ε₂/(ε₁²+ε₂²)` at 8.8 eV must give the Fig. 1 peak (about 0.46 after the ×3 division) and ε₂ must be non-negative everywhere. Axis ticks, read from the rendering: Fig. 2 energy ticks at 0, 5, 10, 15, 20, 25, 30 eV; left ε ticks every 5 units (⊥ spans −10…30, ∥ −10…20).
+
+**Registering.** Uncomment the `[mos2]` block in `src/pyrite/data/directional_loss.toml`, keep `status = "provisional"`, regenerate `CHANNELING_MODEL` (new suffix) in `montecarlo/channeling/handoff.py`, then run `tests/montecarlo/test_channeling_directional.py` (the MoS₂ tests stop skipping). Items 2–6 of #541 (ε₁∥(0), the 6-versus-8 π electron count, per-direction f-sum, the 30–50 eV extension, the intermediate-angle test) stay open and keep the warning.
+
+**Chosen 30 eV treatment.** Above the last tabulated energy the loss follows the free-electron tail `ELF ∝ ω⁻³`, matched in value; its share of the f-sum is reported per direction (`tail_fraction`) and each direction is renormalized to 18 electrons only when its raw closure is within the entry's `closure_tolerance`.
