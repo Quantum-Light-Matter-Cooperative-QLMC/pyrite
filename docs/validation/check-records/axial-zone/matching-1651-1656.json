@@ -1,0 +1,1014 @@
+{
+ "arms": {
+  "cuts-main": {
+   "analysis": {
+    "deficits": {
+     "hook@179.53": {
+      "1000": [
+       0.00044188714987580813,
+       0.0009310914356062485
+      ],
+      "10000": [
+       0.003439457700087911,
+       0.003359500251816569
+      ],
+      "2000": [
+       0.001128231974453553,
+       0.0015003778425054701
+      ],
+      "20000": [
+       0.009375731516389152,
+       0.005122420005651036
+      ],
+      "5000": [
+       0.0021234965746470547,
+       0.002338280255690908
+      ]
+     },
+     "hook@49.11": {
+      "1000": [
+       -0.000521204587624613,
+       0.0026273999981101933
+      ],
+      "10000": [
+       0.00404764635893573,
+       0.0077380364166227435
+      ],
+      "2000": [
+       -0.0033846072421099826,
+       0.00419712027430252
+      ],
+      "20000": [
+       0.024409588160851037,
+       0.00947404458904031
+      ],
+      "5000": [
+       -0.0037127850864573375,
+       0.006447303121222119
+      ]
+     },
+     "hook@7.95": {
+      "1000": [
+       0.004923387559178316,
+       0.007687003321682206
+      ],
+      "10000": [
+       0.1131782045391696,
+       0.022174116113687244
+      ],
+      "2000": [
+       0.016099204479140927,
+       0.012615985007125479
+      ],
+      "20000": [
+       0.19179554628232076,
+       0.025344466002587707
+      ],
+      "5000": [
+       0.050786212847270695,
+       0.019023836687382348
+      ]
+     },
+     "hook@94.96": {
+      "1000": [
+       0.0006439496668970701,
+       0.00219134325263417
+      ],
+      "10000": [
+       0.0021615081710261164,
+       0.004751837088232405
+      ],
+      "2000": [
+       -0.00037309080417813334,
+       0.0031890738949279405
+      ],
+      "20000": [
+       0.014307563785112998,
+       0.006758697567928942
+      ],
+      "5000": [
+       -0.002971239664981029,
+       0.0038228899423722418
+      ]
+     },
+     "native@179.53": {
+      "1000": [
+       0.0005073094859364691,
+       0.0009237094063697848
+      ],
+      "10000": [
+       0.0032658385527826184,
+       0.0031428341719434206
+      ],
+      "2000": [
+       0.001125381237759293,
+       0.0014041688506424004
+      ],
+      "20000": [
+       0.00934454817682795,
+       0.00471106112116086
+      ],
+      "5000": [
+       0.0018546454212536867,
+       0.0019776250390425385
+      ]
+     },
+     "native@49.11": {
+      "1000": [
+       0.00018172776171676563,
+       0.0026071716371825955
+      ],
+      "10000": [
+       0.002314586205272251,
+       0.00810194692361798
+      ],
+      "2000": [
+       -0.002206033211088476,
+       0.004172393803687702
+      ],
+      "20000": [
+       0.025210710791467417,
+       0.010154951771987173
+      ],
+      "5000": [
+       -0.004241926610517588,
+       0.006271858140882764
+      ]
+     },
+     "native@7.95": {
+      "1000": [
+       0.007052793596660445,
+       0.007705582266747886
+      ],
+      "10000": [
+       0.1149607137120997,
+       0.02191984018945314
+      ],
+      "2000": [
+       0.019352359589990487,
+       0.012877457614118779
+      ],
+      "20000": [
+       0.1922920872952545,
+       0.02474590998525403
+      ],
+      "5000": [
+       0.05272396389849099,
+       0.019357598161156196
+      ]
+     },
+     "native@94.96": {
+      "1000": [
+       0.0009881742224803203,
+       0.0022326973003284735
+      ],
+      "10000": [
+       0.00032620048864995255,
+       0.005084902453104462
+      ],
+      "2000": [
+       0.000250137817792484,
+       0.003283544251430924
+      ],
+      "20000": [
+       0.00987672290338626,
+       0.007670567930477499
+      ],
+      "5000": [
+       -0.0032342993319742774,
+       0.003877812080379847
+      ]
+     },
+     "projected@179.53": {
+      "1000": [
+       0.0004494959616071492,
+       0.0009279115775114344
+      ],
+      "10000": [
+       0.003138194520454274,
+       0.003342776858503836
+      ],
+      "2000": [
+       0.0010143254319673334,
+       0.0015082857708621032
+      ],
+      "20000": [
+       0.00929647658946331,
+       0.005135246126521748
+      ],
+      "5000": [
+       0.0018362108415651557,
+       0.0023396944956186106
+      ]
+     },
+     "projected@49.11": {
+      "1000": [
+       4.6993135988326884e-05,
+       0.0026241806562538475
+      ],
+      "10000": [
+       0.002875608130758378,
+       0.007643637586628547
+      ],
+      "2000": [
+       -0.002652280357350545,
+       0.004149581936736995
+      ],
+      "20000": [
+       0.02225676179320879,
+       0.009372500701427276
+      ],
+      "5000": [
+       -0.004071460989201192,
+       0.006134913513554583
+      ]
+     },
+     "projected@7.95": {
+      "1000": [
+       0.006457319429251984,
+       0.007843021372563836
+      ],
+      "10000": [
+       0.11393965856066834,
+       0.021588320204275674
+      ],
+      "2000": [
+       0.017003150595942262,
+       0.012789198213392375
+      ],
+      "20000": [
+       0.19391529087161596,
+       0.022678643009584814
+      ],
+      "5000": [
+       0.047904674910794975,
+       0.019099667748240106
+      ]
+     },
+     "projected@94.96": {
+      "1000": [
+       0.0010795720762644123,
+       0.0022480899814700983
+      ],
+      "10000": [
+       0.0022334979511431374,
+       0.004818385023731126
+      ],
+      "2000": [
+       0.00017871878823416676,
+       0.00325591245491871
+      ],
+      "20000": [
+       0.014068589308902868,
+       0.006644365435587452
+      ],
+      "5000": [
+       -0.0024801500608240268,
+       0.003881272958283635
+      ]
+     }
+    },
+    "gaps": {
+     "hook@179.53": [
+      0.4634148009261594,
+      1.1523956555408859,
+      228
+     ],
+     "hook@49.11": [
+      0.41102379829851543,
+      0.9845760254612763,
+      555
+     ],
+     "hook@7.95": [
+      0.6430494560617142,
+      1.4391101287624353,
+      715
+     ],
+     "hook@94.96": [
+      0.4443888039859587,
+      1.0181960561620187,
+      430
+     ],
+     "native@179.53": [
+      0.4634148009261594,
+      1.1543687619149523,
+      227
+     ],
+     "native@49.11": [
+      0.41102379829851543,
+      0.9886222712874293,
+      560
+     ],
+     "native@7.95": [
+      0.5743360999006271,
+      1.428795742762254,
+      718
+     ],
+     "native@94.96": [
+      0.4443888039859587,
+      1.0211104221587846,
+      416
+     ],
+     "projected@179.53": [
+      0.4634148009261594,
+      1.1567328767283982,
+      231
+     ],
+     "projected@49.11": [
+      0.36453271560382916,
+      0.9884260631831161,
+      549
+     ],
+     "projected@7.95": [
+      0.5743360999006271,
+      1.43735229526622,
+      723
+     ],
+     "projected@94.96": [
+      0.4443888039859587,
+      1.0181086557219956,
+      428
+     ]
+    },
+    "projected_deficit_lower_cut_minus_higher": {
+     "49.11-minus-94.96": {
+      "10000": [
+       0.0006421101796151783,
+       0.005892831080338841
+      ],
+      "20000": [
+       0.008188172484305914,
+       0.00844097767933214
+      ]
+     },
+     "7.95-minus-49.11": {
+      "10000": [
+       0.11106405042990997,
+       0.018471428261124655
+      ],
+      "20000": [
+       0.17165852907840723,
+       0.02045517691648308
+      ]
+     },
+     "94.96-minus-179.53": {
+      "10000": [
+       -0.0009046965693111081,
+       0.00495748404959632
+      ],
+      "20000": [
+       0.004772112719439543,
+       0.006791260241793457
+      ]
+     }
+    },
+    "projected_minus_hook": {
+     "179.53": [
+      -0.0003012631796335973,
+      0.0002553091561289068
+     ],
+     "49.11": [
+      -0.0011720382281773234,
+      0.0009461449205181353
+     ],
+     "7.95": [
+      0.0007614540214987902,
+      0.00543707876729094
+     ],
+     "94.96": [
+      7.198978011705722e-05,
+      0.0008948461658206764
+     ]
+    },
+    "reference_exposure_ang": {
+     "10000": [
+      3529.832495544923,
+      61.83119688099722
+     ],
+     "20000": [
+      4467.117082227511,
+      94.98283559188822
+     ]
+    },
+    "runtime": "6:39.63",
+    "settings": {
+     "cells": 2,
+     "chunks": 32,
+     "cuts_eV": [
+      8.19,
+      50.0,
+      95.0,
+      178.0
+     ],
+     "depth_max_ang": 20000.0,
+     "electrons_per_chunk": 32,
+     "points_per_cell": 16,
+     "step_ang": 10.0
+    },
+    "u_max_eV": 8.185690784041462
+   },
+   "exit_code": 0,
+   "job": 1654,
+   "provenance": {
+    "args.txt": "cuts main\n",
+    "code-identity.txt": "code_digest: 15d26f60661bf5ba4c7c3ebe3d78035969f2384f93cd94223b91581d5e1c3e56\ncode_revision: 4384e47301e395af52f4f92c08b5ba5d95472bc1\ncode_dirty: False\ncode_synced_at: 2026-10-22T02:56:10+00:00\ncode_source: alex-XPS-15-9530:/home/alex/dev/pyrite/.worktrees/issue-623-axial-entrance-zone-resume\ncode_tables_digest: 45345ae89516134faa35e6218ea2d0cb2c26ccc11d9df28b986151bcc90c5918\n",
+    "environment.txt": "3.14.6 (main, Jun 11 2026, 04:03:53) [Clang 22.1.3 ]\nnumpy 2.5.4\nscipy 1.18.1\n",
+    "resources.txt": "\tCommand being timed: \"/home/aamador/.local/bin/uv run --no-sync --no-default-groups python checks/axial_mcwf_return_flux.py --projected-no-jump --cut-eV 8.19 --cut-eV 50 --cut-eV 95 --cut-eV 178 --cells 2 --points-per-cell 16 --workers 16 --chunks 32 --electrons-per-chunk 32 --depth-max-ang 20000 --depth-step-ang 1000 --step-ang 10 --out pyrite-output/research/issue623/matching-20261021/cuts-main/result.json\"\n\tUser time (seconds): 0.96\n\tSystem time (seconds): 0.18\n\tPercent of CPU this job got: 0%\n\tElapsed (wall clock) time (h:mm:ss or m:ss): 6:39.63\n\tAverage shared text size (kbytes): 0\n\tAverage unshared data size (kbytes): 0\n\tAverage stack size (kbytes): 0\n\tAverage total size (kbytes): 0\n\tMaximum resident set size (kbytes): 344256\n\tAverage resident set size (kbytes): 0\n\tMajor (requiring I/O) page faults: 0\n\tMinor (reclaiming a frame) page faults: 39792\n\tVoluntary context switches: 2168\n\tInvoluntary context switches: 25\n\tSwaps: 0\n\tFile system inputs: 0\n\tFile system outputs: 1496\n\tSocket messages sent: 0\n\tSocket messages received: 0\n\tSignals delivered: 0\n\tPage size (bytes): 4096\n\tExit status: 0\n",
+    "script-sha256.txt": "0342795bb15209d4b85d09cd16969a8b0947dded407e0f7dd793975ffe933458  checks/axial_mcwf_return_flux.py\n4337739d5b6429b5a39de0829e44db39b9af4998bdbbcfd19c8e60c894376002  src/pyrite/montecarlo/channeling/axial_projection.py\n"
+   },
+   "raw_result": "matching-1654-cuts.json.gz",
+   "result_sha256": "449fe9fb1b2295effa61af29002ffd3f84d4e92080fe6476a84645c503b81436",
+   "runtime": "6:39.63",
+   "settings": {
+    "cells": 2,
+    "chunks": 32,
+    "cuts_eV": [
+     8.19,
+     50.0,
+     95.0,
+     178.0
+    ],
+    "depth_max_ang": 20000.0,
+    "depth_step_ang": 1000.0,
+    "electrons_per_chunk": 32,
+    "energy_eV": 5000000.0,
+    "gap_window_eV": 2.0,
+    "loss_coupling": false,
+    "mechanisms": "tds,electronic",
+    "out": "pyrite-output/research/issue623/matching-20261021/cuts-main/result.json",
+    "points_per_cell": 16,
+    "projected_no_jump": true,
+    "smoke": false,
+    "step_ang": 10.0,
+    "u_max_eV": 8.185690784041462,
+    "u_min_eV": -77.21864988368196,
+    "workers": 16
+   }
+  },
+  "cuts-pilot": {
+   "exit_code": 0,
+   "job": 1651,
+   "provenance": {
+    "args.txt": "cuts pilot\n",
+    "code-identity.txt": "code_digest: 15d26f60661bf5ba4c7c3ebe3d78035969f2384f93cd94223b91581d5e1c3e56\ncode_revision: 4384e47301e395af52f4f92c08b5ba5d95472bc1\ncode_dirty: False\ncode_synced_at: 2026-10-22T02:56:10+00:00\ncode_source: alex-XPS-15-9530:/home/alex/dev/pyrite/.worktrees/issue-623-axial-entrance-zone-resume\ncode_tables_digest: 45345ae89516134faa35e6218ea2d0cb2c26ccc11d9df28b986151bcc90c5918\n",
+    "environment.txt": "3.14.6 (main, Jun 11 2026, 04:03:53) [Clang 22.1.3 ]\nnumpy 2.5.4\nscipy 1.18.1\n",
+    "resources.txt": "\tCommand being timed: \"/home/aamador/.local/bin/uv run --no-sync --no-default-groups python checks/axial_mcwf_return_flux.py --projected-no-jump --cut-eV 8.19 --cut-eV 50 --cut-eV 95 --cut-eV 178 --cells 2 --points-per-cell 16 --workers 8 --chunks 2 --electrons-per-chunk 8 --depth-max-ang 20000 --depth-step-ang 1000 --step-ang 10 --out pyrite-output/research/issue623/matching-20261021/cuts-pilot/result.json\"\n\tUser time (seconds): 1.31\n\tSystem time (seconds): 0.13\n\tPercent of CPU this job got: 9%\n\tElapsed (wall clock) time (h:mm:ss or m:ss): 0:15.97\n\tAverage shared text size (kbytes): 0\n\tAverage unshared data size (kbytes): 0\n\tAverage stack size (kbytes): 0\n\tAverage total size (kbytes): 0\n\tMaximum resident set size (kbytes): 339720\n\tAverage resident set size (kbytes): 0\n\tMajor (requiring I/O) page faults: 10\n\tMinor (reclaiming a frame) page faults: 40358\n\tVoluntary context switches: 249\n\tInvoluntary context switches: 26\n\tSwaps: 0\n\tFile system inputs: 0\n\tFile system outputs: 280\n\tSocket messages sent: 0\n\tSocket messages received: 0\n\tSignals delivered: 0\n\tPage size (bytes): 4096\n\tExit status: 0\n",
+    "script-sha256.txt": "0342795bb15209d4b85d09cd16969a8b0947dded407e0f7dd793975ffe933458  checks/axial_mcwf_return_flux.py\n4337739d5b6429b5a39de0829e44db39b9af4998bdbbcfd19c8e60c894376002  src/pyrite/montecarlo/channeling/axial_projection.py\n"
+   },
+   "result_sha256": "c89c4e9f4e1934909ec54f89eac3c17afcaaa2ec37e1e5dde741cf8a96d22094",
+   "runtime": "0:15.97",
+   "settings": {
+    "cells": 2,
+    "chunks": 2,
+    "cuts_eV": [
+     8.19,
+     50.0,
+     95.0,
+     178.0
+    ],
+    "depth_max_ang": 20000.0,
+    "depth_step_ang": 1000.0,
+    "electrons_per_chunk": 8,
+    "energy_eV": 5000000.0,
+    "gap_window_eV": 2.0,
+    "loss_coupling": false,
+    "mechanisms": "tds,electronic",
+    "out": "pyrite-output/research/issue623/matching-20261021/cuts-pilot/result.json",
+    "points_per_cell": 16,
+    "projected_no_jump": true,
+    "smoke": false,
+    "step_ang": 10.0,
+    "u_max_eV": 8.185690784041462,
+    "u_min_eV": -77.21864988368196,
+    "workers": 8
+   }
+  },
+  "grid-main": {
+   "analysis": {
+    "deficits": {
+     "hook@178.04": {
+      "1000": [
+       0.0018783569139295686,
+       0.0024982765211965506
+      ],
+      "10000": [
+       0.006074289501103225,
+       0.007244368224726928
+      ],
+      "2000": [
+       0.0018072018634472942,
+       0.004128528445564567
+      ],
+      "5000": [
+       0.0025209390553074806,
+       0.004798429016885676
+      ]
+     },
+     "hook@94.93": {
+      "1000": [
+       0.00499725861946676,
+       0.005127189177188738
+      ],
+      "10000": [
+       0.012777179574917863,
+       0.015260294640117682
+      ],
+      "2000": [
+       0.004644248390959893,
+       0.008775294481063166
+      ],
+      "5000": [
+       0.004873781257900611,
+       0.011894621523649009
+      ]
+     },
+     "native@178.04": {
+      "1000": [
+       0.0018641212965152532,
+       0.0024986165139013403
+      ],
+      "10000": [
+       0.008941295078118139,
+       0.007178165380662783
+      ],
+      "2000": [
+       0.0017630079349743033,
+       0.004124736381387667
+      ],
+      "5000": [
+       0.003672455381928952,
+       0.004937288811201855
+      ]
+     },
+     "native@94.93": {
+      "1000": [
+       0.005051236632534484,
+       0.005118973354642407
+      ],
+      "10000": [
+       0.01148452645293463,
+       0.013877940286418955
+      ],
+      "2000": [
+       0.004752571235479119,
+       0.00875657053964668
+      ],
+      "5000": [
+       0.006087772418672754,
+       0.01166371028586529
+      ]
+     },
+     "projected@178.04": {
+      "1000": [
+       0.0018781597155462793,
+       0.002497930397564264
+      ],
+      "10000": [
+       0.005630414931313887,
+       0.007671322550293019
+      ],
+      "2000": [
+       0.00180657901977066,
+       0.004128560426113786
+      ],
+      "5000": [
+       0.0025223702227441525,
+       0.004800383281123762
+      ]
+     },
+     "projected@94.93": {
+      "1000": [
+       0.005067609195218092,
+       0.005121411503167232
+      ],
+      "10000": [
+       0.011905234750364091,
+       0.01540889016349959
+      ],
+      "2000": [
+       0.0047283812192986385,
+       0.008751978180957961
+      ],
+      "5000": [
+       0.005721427100098486,
+       0.01175291043931912
+      ]
+     }
+    },
+    "gaps": {
+     "hook@178.04": [
+      0.4178837754927258,
+      1.092820027270136,
+      72
+     ],
+     "hook@94.93": [
+      0.499469422898585,
+      1.1797981091068834,
+      110
+     ],
+     "native@178.04": [
+      0.4178837754927258,
+      1.068990754767725,
+      72
+     ],
+     "native@94.93": [
+      0.499469422898585,
+      1.1580064500832918,
+      107
+     ],
+     "projected@178.04": [
+      0.4178837754927258,
+      1.092820027270136,
+      71
+     ],
+     "projected@94.93": [
+      0.499469422898585,
+      1.2353427498330376,
+      111
+     ]
+    },
+    "projected_178_minus_control_pp": [
+     0.0015374623220383299,
+     0.009980659868962332
+    ],
+    "projected_deficit_lower_cut_minus_higher": {
+     "94.93-minus-178.04": {
+      "10000": [
+       0.006274819819050143,
+       0.010683770264138269
+      ]
+     }
+    },
+    "projected_minus_hook": {
+     "178.04": [
+      -0.00044387456978930685,
+      0.001015923025989476
+     ],
+     "94.93": [
+      -0.0008719448245537836,
+      0.0021213230905874347
+     ]
+    },
+    "reference_exposure_ang": {
+     "10000": [
+      3416.8061628907735,
+      97.84239199295877
+     ]
+    },
+    "runtime": "13:16.69",
+    "settings": {
+     "cells": 2,
+     "chunks": 8,
+     "cuts_eV": [
+      95.0,
+      178.0
+     ],
+     "depth_max_ang": 10000.0,
+     "electrons_per_chunk": 32,
+     "points_per_cell": 24,
+     "step_ang": 10.0
+    },
+    "u_max_eV": 8.185690784041462
+   },
+   "exit_code": 0,
+   "job": 1655,
+   "provenance": {
+    "args.txt": "grid main\n",
+    "code-identity.txt": "code_digest: 15d26f60661bf5ba4c7c3ebe3d78035969f2384f93cd94223b91581d5e1c3e56\ncode_revision: 4384e47301e395af52f4f92c08b5ba5d95472bc1\ncode_dirty: False\ncode_synced_at: 2026-10-22T02:56:10+00:00\ncode_source: alex-XPS-15-9530:/home/alex/dev/pyrite/.worktrees/issue-623-axial-entrance-zone-resume\ncode_tables_digest: 45345ae89516134faa35e6218ea2d0cb2c26ccc11d9df28b986151bcc90c5918\n",
+    "environment.txt": "3.14.6 (main, Jun 11 2026, 04:03:53) [Clang 22.1.3 ]\nnumpy 2.5.4\nscipy 1.18.1\n",
+    "resources.txt": "\tCommand being timed: \"/home/aamador/.local/bin/uv run --no-sync --no-default-groups python checks/axial_mcwf_return_flux.py --projected-no-jump --cut-eV 95 --cut-eV 178 --cells 2 --points-per-cell 24 --workers 8 --chunks 8 --electrons-per-chunk 32 --depth-max-ang 10000 --depth-step-ang 1000 --step-ang 10 --out pyrite-output/research/issue623/matching-20261021/grid-main/result.json\"\n\tUser time (seconds): 1.00\n\tSystem time (seconds): 0.14\n\tPercent of CPU this job got: 0%\n\tElapsed (wall clock) time (h:mm:ss or m:ss): 13:16.69\n\tAverage shared text size (kbytes): 0\n\tAverage unshared data size (kbytes): 0\n\tAverage stack size (kbytes): 0\n\tAverage total size (kbytes): 0\n\tMaximum resident set size (kbytes): 344724\n\tAverage resident set size (kbytes): 0\n\tMajor (requiring I/O) page faults: 0\n\tMinor (reclaiming a frame) page faults: 48828\n\tVoluntary context switches: 411\n\tInvoluntary context switches: 17\n\tSwaps: 0\n\tFile system inputs: 0\n\tFile system outputs: 184\n\tSocket messages sent: 0\n\tSocket messages received: 0\n\tSignals delivered: 0\n\tPage size (bytes): 4096\n\tExit status: 0\n",
+    "script-sha256.txt": "0342795bb15209d4b85d09cd16969a8b0947dded407e0f7dd793975ffe933458  checks/axial_mcwf_return_flux.py\n4337739d5b6429b5a39de0829e44db39b9af4998bdbbcfd19c8e60c894376002  src/pyrite/montecarlo/channeling/axial_projection.py\n"
+   },
+   "raw_result": "matching-1655-grid.json.gz",
+   "result_sha256": "c5296c87f24445d4479c4830fe9efa17cf60157712a7737c812886286b30993c",
+   "runtime": "13:16.69",
+   "settings": {
+    "cells": 2,
+    "chunks": 8,
+    "cuts_eV": [
+     95.0,
+     178.0
+    ],
+    "depth_max_ang": 10000.0,
+    "depth_step_ang": 1000.0,
+    "electrons_per_chunk": 32,
+    "energy_eV": 5000000.0,
+    "gap_window_eV": 2.0,
+    "loss_coupling": false,
+    "mechanisms": "tds,electronic",
+    "out": "pyrite-output/research/issue623/matching-20261021/grid-main/result.json",
+    "points_per_cell": 24,
+    "projected_no_jump": true,
+    "smoke": false,
+    "step_ang": 10.0,
+    "u_max_eV": 8.185690784041462,
+    "u_min_eV": -77.21864988368196,
+    "workers": 8
+   }
+  },
+  "grid-pilot": {
+   "exit_code": 0,
+   "job": 1652,
+   "provenance": {
+    "args.txt": "grid pilot\n",
+    "code-identity.txt": "code_digest: 15d26f60661bf5ba4c7c3ebe3d78035969f2384f93cd94223b91581d5e1c3e56\ncode_revision: 4384e47301e395af52f4f92c08b5ba5d95472bc1\ncode_dirty: False\ncode_synced_at: 2026-10-22T02:56:10+00:00\ncode_source: alex-XPS-15-9530:/home/alex/dev/pyrite/.worktrees/issue-623-axial-entrance-zone-resume\ncode_tables_digest: 45345ae89516134faa35e6218ea2d0cb2c26ccc11d9df28b986151bcc90c5918\n",
+    "environment.txt": "3.14.6 (main, Jun 11 2026, 04:03:53) [Clang 22.1.3 ]\nnumpy 2.5.4\nscipy 1.18.1\n",
+    "resources.txt": "\tCommand being timed: \"/home/aamador/.local/bin/uv run --no-sync --no-default-groups python checks/axial_mcwf_return_flux.py --projected-no-jump --cut-eV 95 --cut-eV 178 --cells 2 --points-per-cell 24 --workers 8 --chunks 2 --electrons-per-chunk 8 --depth-max-ang 10000 --depth-step-ang 1000 --step-ang 10 --out pyrite-output/research/issue623/matching-20261021/grid-pilot/result.json\"\n\tUser time (seconds): 1.06\n\tSystem time (seconds): 0.14\n\tPercent of CPU this job got: 1%\n\tElapsed (wall clock) time (h:mm:ss or m:ss): 1:05.36\n\tAverage shared text size (kbytes): 0\n\tAverage unshared data size (kbytes): 0\n\tAverage stack size (kbytes): 0\n\tAverage total size (kbytes): 0\n\tMaximum resident set size (kbytes): 339680\n\tAverage resident set size (kbytes): 0\n\tMajor (requiring I/O) page faults: 9\n\tMinor (reclaiming a frame) page faults: 50378\n\tVoluntary context switches: 206\n\tInvoluntary context switches: 48\n\tSwaps: 0\n\tFile system inputs: 0\n\tFile system outputs: 104\n\tSocket messages sent: 0\n\tSocket messages received: 0\n\tSignals delivered: 0\n\tPage size (bytes): 4096\n\tExit status: 0\n",
+    "script-sha256.txt": "0342795bb15209d4b85d09cd16969a8b0947dded407e0f7dd793975ffe933458  checks/axial_mcwf_return_flux.py\n4337739d5b6429b5a39de0829e44db39b9af4998bdbbcfd19c8e60c894376002  src/pyrite/montecarlo/channeling/axial_projection.py\n"
+   },
+   "result_sha256": "49c27490fe86ce8f7213e3a3798b8b3c5bee71907393a932d0ce020b5c5f7d37",
+   "runtime": "1:05.36",
+   "settings": {
+    "cells": 2,
+    "chunks": 2,
+    "cuts_eV": [
+     95.0,
+     178.0
+    ],
+    "depth_max_ang": 10000.0,
+    "depth_step_ang": 1000.0,
+    "electrons_per_chunk": 8,
+    "energy_eV": 5000000.0,
+    "gap_window_eV": 2.0,
+    "loss_coupling": false,
+    "mechanisms": "tds,electronic",
+    "out": "pyrite-output/research/issue623/matching-20261021/grid-pilot/result.json",
+    "points_per_cell": 24,
+    "projected_no_jump": true,
+    "smoke": false,
+    "step_ang": 10.0,
+    "u_max_eV": 8.185690784041462,
+    "u_min_eV": -77.21864988368196,
+    "workers": 8
+   }
+  },
+  "supercell-main": {
+   "analysis": {
+    "deficits": {
+     "hook@177.64": {
+      "1000": [
+       0.00011530966106165774,
+       0.0017506528594583878
+      ],
+      "10000": [
+       0.00259765576092974,
+       0.0070653962486094644
+      ],
+      "2000": [
+       0.0009400495585439872,
+       0.003114544640745303
+      ],
+      "5000": [
+       0.002487059289415061,
+       0.004917216608118538
+      ]
+     },
+     "hook@95.5": {
+      "1000": [
+       0.0011703937856319957,
+       0.005295250881174503
+      ],
+      "10000": [
+       0.009891652662588513,
+       0.016526112631239098
+      ],
+      "2000": [
+       9.820343774546991e-05,
+       0.0083615845237432
+      ],
+      "5000": [
+       0.0012434347646264055,
+       0.010788247284684247
+      ]
+     },
+     "native@177.64": {
+      "1000": [
+       9.981962796290489e-05,
+       0.0017615517052954799
+      ],
+      "10000": [
+       0.003054428793691555,
+       0.00977502127806972
+      ],
+      "2000": [
+       0.0011629101608511272,
+       0.0031127319341087197
+      ],
+      "5000": [
+       0.0026341916094958506,
+       0.005948067742098852
+      ]
+     },
+     "native@95.5": {
+      "1000": [
+       0.001149461188167722,
+       0.0052848374118906905
+      ],
+      "10000": [
+       0.011866000758675943,
+       0.01642304321158677
+      ],
+      "2000": [
+       0.000417729728781957,
+       0.008467752452845582
+      ],
+      "5000": [
+       0.0029700187477168516,
+       0.01030292123956417
+      ]
+     },
+     "projected@177.64": {
+      "1000": [
+       0.00011501174356476351,
+       0.0017513382431705474
+      ],
+      "10000": [
+       0.004175558850335159,
+       0.006650713793363032
+      ],
+      "2000": [
+       0.0009398870294995421,
+       0.003115437128593305
+      ],
+      "5000": [
+       0.0035186582808125477,
+       0.004822468587260612
+      ]
+     },
+     "projected@95.5": {
+      "1000": [
+       0.0011816852921964216,
+       0.00529675201012248
+      ],
+      "10000": [
+       0.010273511045707506,
+       0.01638441195627252
+      ],
+      "2000": [
+       0.00010998586513166764,
+       0.008364195859479106
+      ],
+      "5000": [
+       0.0017168038509762784,
+       0.010679314731140126
+      ]
+     }
+    },
+    "gaps": {
+     "hook@177.64": [
+      0.27454793993427984,
+      0.6518162062552051,
+      38
+     ],
+     "hook@95.5": [
+      0.27141474768615126,
+      0.7378820511780759,
+      73
+     ],
+     "native@177.64": [
+      0.27454793993427984,
+      0.6476102286108159,
+      35
+     ],
+     "native@95.5": [
+      0.27141474768615126,
+      0.7396216856833036,
+      71
+     ],
+     "projected@177.64": [
+      0.27454793993427984,
+      0.6524650477689846,
+      37
+     ],
+     "projected@95.5": [
+      0.27141474768615126,
+      0.7378820511780759,
+      74
+     ]
+    },
+    "projected_178_minus_control_pp": [
+     8.260624105960179e-05,
+     0.006875167454519302
+    ],
+    "projected_deficit_lower_cut_minus_higher": {
+     "95.5-minus-177.64": {
+      "10000": [
+       0.006097952195372342,
+       0.013993964779599966
+      ]
+     }
+    },
+    "projected_minus_hook": {
+     "177.64": [
+      0.001577903089405491,
+      0.0014221020903927653
+     ],
+     "95.5": [
+      0.00038185838311898814,
+      0.0004904962377145364
+     ]
+    },
+    "reference_exposure_ang": {
+     "10000": [
+      3370.090838954985,
+      95.23271644348328
+     ]
+    },
+    "runtime": "2:06.10",
+    "settings": {
+     "cells": 3,
+     "chunks": 8,
+     "cuts_eV": [
+      95.0,
+      178.0
+     ],
+     "depth_max_ang": 10000.0,
+     "electrons_per_chunk": 32,
+     "points_per_cell": 16,
+     "step_ang": 10.0
+    },
+    "u_max_eV": 8.185690784041462
+   },
+   "exit_code": 0,
+   "job": 1656,
+   "provenance": {
+    "args.txt": "supercell main\n",
+    "code-identity.txt": "code_digest: 15d26f60661bf5ba4c7c3ebe3d78035969f2384f93cd94223b91581d5e1c3e56\ncode_revision: 4384e47301e395af52f4f92c08b5ba5d95472bc1\ncode_dirty: False\ncode_synced_at: 2026-10-22T02:56:10+00:00\ncode_source: alex-XPS-15-9530:/home/alex/dev/pyrite/.worktrees/issue-623-axial-entrance-zone-resume\ncode_tables_digest: 45345ae89516134faa35e6218ea2d0cb2c26ccc11d9df28b986151bcc90c5918\n",
+    "environment.txt": "3.14.6 (main, Jun 11 2026, 04:03:53) [Clang 22.1.3 ]\nnumpy 2.5.4\nscipy 1.18.1\n",
+    "resources.txt": "\tCommand being timed: \"/home/aamador/.local/bin/uv run --no-sync --no-default-groups python checks/axial_mcwf_return_flux.py --projected-no-jump --cut-eV 95 --cut-eV 178 --cells 3 --points-per-cell 16 --workers 12 --chunks 8 --electrons-per-chunk 32 --depth-max-ang 10000 --depth-step-ang 1000 --step-ang 10 --out pyrite-output/research/issue623/matching-20261021/supercell-main/result.json\"\n\tUser time (seconds): 1.20\n\tSystem time (seconds): 0.12\n\tPercent of CPU this job got: 1%\n\tElapsed (wall clock) time (h:mm:ss or m:ss): 2:06.10\n\tAverage shared text size (kbytes): 0\n\tAverage unshared data size (kbytes): 0\n\tAverage stack size (kbytes): 0\n\tAverage total size (kbytes): 0\n\tMaximum resident set size (kbytes): 339932\n\tAverage resident set size (kbytes): 0\n\tMajor (requiring I/O) page faults: 0\n\tMinor (reclaiming a frame) page faults: 39989\n\tVoluntary context switches: 7862\n\tInvoluntary context switches: 24\n\tSwaps: 0\n\tFile system inputs: 7560\n\tFile system outputs: 176\n\tSocket messages sent: 0\n\tSocket messages received: 0\n\tSignals delivered: 0\n\tPage size (bytes): 4096\n\tExit status: 0\n",
+    "script-sha256.txt": "0342795bb15209d4b85d09cd16969a8b0947dded407e0f7dd793975ffe933458  checks/axial_mcwf_return_flux.py\n4337739d5b6429b5a39de0829e44db39b9af4998bdbbcfd19c8e60c894376002  src/pyrite/montecarlo/channeling/axial_projection.py\n"
+   },
+   "raw_result": "matching-1656-supercell.json.gz",
+   "result_sha256": "ab8b1443794533458f345d92ffe2c97b9a17914889ef1887b8e7340ab6eeda6a",
+   "runtime": "2:06.10",
+   "settings": {
+    "cells": 3,
+    "chunks": 8,
+    "cuts_eV": [
+     95.0,
+     178.0
+    ],
+    "depth_max_ang": 10000.0,
+    "depth_step_ang": 1000.0,
+    "electrons_per_chunk": 32,
+    "energy_eV": 5000000.0,
+    "gap_window_eV": 2.0,
+    "loss_coupling": false,
+    "mechanisms": "tds,electronic",
+    "out": "pyrite-output/research/issue623/matching-20261021/supercell-main/result.json",
+    "points_per_cell": 16,
+    "projected_no_jump": true,
+    "smoke": false,
+    "step_ang": 10.0,
+    "u_max_eV": 8.185690784041462,
+    "u_min_eV": -77.21864988368196,
+    "workers": 12
+   }
+  },
+  "supercell-pilot": {
+   "exit_code": 0,
+   "job": 1653,
+   "provenance": {
+    "args.txt": "supercell pilot\n",
+    "code-identity.txt": "code_digest: 15d26f60661bf5ba4c7c3ebe3d78035969f2384f93cd94223b91581d5e1c3e56\ncode_revision: 4384e47301e395af52f4f92c08b5ba5d95472bc1\ncode_dirty: False\ncode_synced_at: 2026-10-22T02:56:10+00:00\ncode_source: alex-XPS-15-9530:/home/alex/dev/pyrite/.worktrees/issue-623-axial-entrance-zone-resume\ncode_tables_digest: 45345ae89516134faa35e6218ea2d0cb2c26ccc11d9df28b986151bcc90c5918\n",
+    "environment.txt": "3.14.6 (main, Jun 11 2026, 04:03:53) [Clang 22.1.3 ]\nnumpy 2.5.4\nscipy 1.18.1\n",
+    "resources.txt": "\tCommand being timed: \"/home/aamador/.local/bin/uv run --no-sync --no-default-groups python checks/axial_mcwf_return_flux.py --projected-no-jump --cut-eV 95 --cut-eV 178 --cells 3 --points-per-cell 16 --workers 8 --chunks 2 --electrons-per-chunk 8 --depth-max-ang 10000 --depth-step-ang 1000 --step-ang 10 --out pyrite-output/research/issue623/matching-20261021/supercell-pilot/result.json\"\n\tUser time (seconds): 1.15\n\tSystem time (seconds): 0.17\n\tPercent of CPU this job got: 4%\n\tElapsed (wall clock) time (h:mm:ss or m:ss): 0:26.73\n\tAverage shared text size (kbytes): 0\n\tAverage unshared data size (kbytes): 0\n\tAverage stack size (kbytes): 0\n\tAverage total size (kbytes): 0\n\tMaximum resident set size (kbytes): 339472\n\tAverage resident set size (kbytes): 0\n\tMajor (requiring I/O) page faults: 0\n\tMinor (reclaiming a frame) page faults: 40719\n\tVoluntary context switches: 7790\n\tInvoluntary context switches: 22\n\tSwaps: 0\n\tFile system inputs: 7560\n\tFile system outputs: 96\n\tSocket messages sent: 0\n\tSocket messages received: 0\n\tSignals delivered: 0\n\tPage size (bytes): 4096\n\tExit status: 0\n",
+    "script-sha256.txt": "0342795bb15209d4b85d09cd16969a8b0947dded407e0f7dd793975ffe933458  checks/axial_mcwf_return_flux.py\n4337739d5b6429b5a39de0829e44db39b9af4998bdbbcfd19c8e60c894376002  src/pyrite/montecarlo/channeling/axial_projection.py\n"
+   },
+   "result_sha256": "d6598d2b6fda54dc1ae25aa175c388f2d31145066306a35f807e4481695be603",
+   "runtime": "0:26.73",
+   "settings": {
+    "cells": 3,
+    "chunks": 2,
+    "cuts_eV": [
+     95.0,
+     178.0
+    ],
+    "depth_max_ang": 10000.0,
+    "depth_step_ang": 1000.0,
+    "electrons_per_chunk": 8,
+    "energy_eV": 5000000.0,
+    "gap_window_eV": 2.0,
+    "loss_coupling": false,
+    "mechanisms": "tds,electronic",
+    "out": "pyrite-output/research/issue623/matching-20261021/supercell-pilot/result.json",
+    "points_per_cell": 16,
+    "projected_no_jump": true,
+    "smoke": false,
+    "step_ang": 10.0,
+    "u_max_eV": 8.185690784041462,
+    "u_min_eV": -77.21864988368196,
+    "workers": 8
+   }
+  }
+ },
+ "batch_script": "#!/bin/bash\n#SBATCH --job-name=623-matching\n#SBATCH --partition=cpu\n#SBATCH --cpus-per-task=8\n#SBATCH --mem=16G\n#SBATCH --time=00:30:00\n#SBATCH --output=/home/aamador/pyrite-issue623/issue623-matching-%j.log\nset -eu\narm=${1:?arm required}\ntier=${2:?tier required}\ncells=2; ppc=16; depth=10000; cuts=(--cut-eV 95 --cut-eV 178)\ncase \"$arm\" in\n  cuts) depth=20000; cuts=(--cut-eV 8.19 --cut-eV 50 --cut-eV 95 --cut-eV 178) ;;\n  grid) ppc=24 ;;\n  supercell) cells=3 ;;\n  *) exit 2 ;;\nesac\ncase \"$tier\" in\n  pilot) chunks=2; electrons=8 ;;\n  main) chunks=8; electrons=32; [ \"$arm\" = cuts ] && chunks=32 ;;\n  *) exit 2 ;;\nesac\ncd /home/aamador/pyrite-issue623\nexport OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 NUMEXPR_NUM_THREADS=1\nexport PYRITE_MC_BACKEND=cpu\nstudy_dir=pyrite-output/research/issue623/matching-20261021/$arm-$tier\nmkdir -p \"$study_dir\"\ntest ! -e \"$study_dir/result.json\"\nexec 9<.pyrite-sync.lock\nflock -s 9\ncp .pyrite-sync \"$study_dir/code-identity.txt\"\ncp \"$0\" \"$study_dir/run.sh\"\necho \"$arm $tier\" > \"$study_dir/args.txt\"\nsha256sum checks/axial_mcwf_return_flux.py src/pyrite/montecarlo/channeling/axial_projection.py > \"$study_dir/script-sha256.txt\"\n/home/aamador/.local/bin/uv run --no-sync --no-default-groups python -c \\\n  'import sys,numpy,scipy; print(sys.version); print(\"numpy\",numpy.__version__); print(\"scipy\",scipy.__version__)' > \"$study_dir/environment.txt\"\n/usr/bin/time -v -o \"$study_dir/resources.txt\" \\\n  /home/aamador/.local/bin/uv run --no-sync --no-default-groups python checks/axial_mcwf_return_flux.py \\\n  --projected-no-jump \"${cuts[@]}\" --cells \"$cells\" --points-per-cell \"$ppc\" \\\n  --workers \"$SLURM_CPUS_PER_TASK\" --chunks \"$chunks\" --electrons-per-chunk \"$electrons\" \\\n  --depth-max-ang \"$depth\" --depth-step-ang 1000 --step-ang 10 \\\n  --out \"$study_dir/result.json\"\n",
+ "method": "Deficit D=1-sum X/sum X_ref per depth (pooled over seed chunks); delete-one-seed-chunk jackknife SEM. Cut-to-cut and projected-minus-hook differences recompute both ratios with the shared matrix reference per deleted chunk. Grid/supercell vs control (1649, seeds 0-7) delete the same seed from both arms; their streams diverge, so these pairs are weakly correlated. SEMs are not confidence bounds.",
+ "reproduction_check": {
+  "cuts_main_seeds_0_7_vs_1649_projected_178_at_1um_max_abs_diff_ang": 0.0
+ },
+ "resource_caveat": "GNU time MaxRSS covers the parent process, not forkserver workers or allocation peak.",
+ "source_checkpoint": "4384e47301e395af52f4f92c08b5ba5d95472bc1 (content-identical script/kernel at branch 678dfd33)",
+ "status": "research-only; physical handoff unverified",
+ "submission": "pilots: sbatch run-matching.sh ARM pilot (8 CPU, 16G, 30 min); main: cuts 16 CPU/20G, grid 8 CPU/36G pinned DESKTOP-QNIHO3D, supercell 12 CPU/22G; 60 min limits"
+}

@@ -566,7 +566,313 @@ these numbers. Reproduction requires cut/clearance distributions, coherent
 projected evolution, more histories, and independent grid and supercell
 convergence before a physical matching threshold can be selected.
 
+## Observing the cross-cut no-jump loss
+
+`checks/axial_mcwf_return_flux.py --loss-coupling` optionally records the
+absorptive operator at each **entry or post-jump projection event**. This is
+research instrumentation under `cr-axial-zone-handoff-accounting`; its physical
+claim remains `unverified`. The MCWF no-jump convention follows
+[Castin, Dalibard and Mølmer, Eq. (4)](https://arxiv.org/abs/0805.4002):
+
+$$H_{\rm eff}=H-iW,\qquad W=\frac{\hbar v_z}{2}\sum_m C_m^\dagger C_m.$$
+
+Here the jump rates are per propagation length, so $W$ is the production
+`dissipator.absorptive_eV`, in eV. For the selected spectral cut $E_c$ at
+carrier tilt $\mathbf q$, define $P=1_{H(\mathbf q)<E_c}$ and $F=1-P$.
+The diagnostic measures
+
+$$c_W=\|FWP\|_2,\qquad
+\Delta=\min\operatorname{spec}(H|_F)-\max\operatorname{spec}(H|_P),\qquad
+\eta=c_W/\Delta.$$
+
+Both $c_W$ and $\Delta$ have eV units; $\eta$ is dimensionless. $\Delta$ is
+the actual separation between the represented sectors, **not** twice the
+clearance from the selected cut to the nearest level. For a cell-periodic
+$W$, the Fourier matrix is a direct sum of Bloch blocks. The full cross norm
+is the maximum block singular value; the sector separation uses the entire
+represented spectrum, including levels in different blocks. Nonperiodic loss
+arrays are refused rather than silently discarding their inter-block terms.
+Constant $W$ gives zero cross norm up to roundoff. Empty/full sectors have
+zero cross norm and no defined separation or ratio (JSON `null`).
+
+For a state initially in $P$, the exact finite-grid no-jump generator gives
+$F\partial_z\phi=-FWP\phi/(\hbar v_z)$ at that instant because $FHP=0$.
+Thus $c_W/(\hbar v_z)$ measures the largest instantaneous outgoing-amplitude
+derivative per Å for a unit retained vector. Neither this derivative nor
+$\eta$ is a finite-depth probability, return-flux or photon-source error
+bound. Repeated jumps, long-time evolution, discretization error and
+unrepresented transfers still require separate treatment.
+
+The JSON `matching_diagnostics_by_chunk` retains fixed-size histograms and
+extrema for selected cut, nearest-level clearance, $c_W$, $\Delta$ and
+$\eta$. Each hook call contributes once, including deterministic entrance
+projection; the distribution is weighted by observed hook events, not depth,
+incident weight or unique tilt. Bin counts cover values below the first edge,
+half-open interior intervals, and values at/above the last edge; undefined
+quantities increment `missing`. These samples do not bound unvisited tilts or
+tilts of already removed electrons. Eigenvectors and loss diagnostics use
+bounded LRU caches; enabling observation consumes no random draws and changes
+no propagation or acceptance rule. Dense singular-value calculations add
+cost, so use the flag explicitly in lab-box studies.
+
+Independent dense real-space operator regressions, constant-loss/trivial-sector
+limits and exact enabled/disabled RNG and worker-result comparisons are in
+`tests/montecarlo/test_channeling_axial_mcwf_return_flux.py`. They check the
+represented-grid algebra, not physical eligibility; fresh-context review and
+the coherent projected-evolution comparison remain required.
+
+**Bounded lab-box pilot (SLURM 1641, 2026-10-21).** The
+[raw result and code identity](../../validation/check-records/axial-zone/loss-coupling-pilot-1641.json)
+record Si [001], 5 MeV, $2\times2$ cells, $32^2$ points, both TDS and
+electronic jumps, 10,000 Å depth and 10 Å steps, with two seed chunks of eight
+incident electrons. The nominal 178 eV target selects 179.532 eV at entry.
+Across 78 entry/post-jump projection events, nearest-level clearance reached
+0.320 eV, the global sector separation reached 0.640 eV, and $c_W$ ranged
+from 0.797 to 0.883 eV. The largest observed $c_W/\Delta$ was **1.257**.
+The ratio uses the global separation, so it is conservative when the nearest
+levels belong to uncoupled Bloch blocks; it does not demonstrate large actual
+leakage. It also does not certify a uniformly small perturbative scale.
+
+The bound-exposure deficit at 10,000 Å was $0.001224\pm0.001575$
+(pooled ratio, delete-one-chunk jackknife SEM). Two chunks cannot establish an
+admission confidence bound, and a small measured exposure deficit does not
+bound the omitted coherent correction. This pilot supplies no eligible case
+or depth budget. It motivates the coherent projected-evolution comparison
+before increasing histories for a depth calibration. Reproduce on the lab box
+with the script's `--loss-coupling --cut-eV 178 --workers 2 --chunks 2
+--electrons-per-chunk 8 --depth-max-ang 10000 --depth-step-ang 1000
+--step-ang 10` options. Source/table digests and exact script SHA-256 are in
+the linked record; no peak-RSS claim is made because SLURM accounting is
+disabled on this host.
+
+(axial-return-flux-paired-study)=
+### Larger paired study (SLURM 1642–1647)
+
+The [study record](../../validation/check-records/axial-zone/study-1642-1647.json)
+contains settings, paired-error method, resource records, source/table digests
+and identifies the six losslessly compressed raw results linked below. Source checkpoint
+`82e4d1f3` retains each chunk's reference and model exposures so comparisons
+can delete the **same seed chunk** from both arms. For each arm the deficit
+is $D=1-\sum_i X_i/\sum_i X_{\mathrm{ref},i}$. For an arm difference, the
+jackknife recomputes both pooled ratios after deleting seed $i$ and subtracts
+them before estimating its standard error. Independent chunks, not individual
+hook events, are the statistical units.
+
+All cases use Si [001], 5 MeV, TDS plus electronic jumps and a nominal 178 eV
+target, except the additional low-cut baseline. The control is $2\times2$
+cells at 16 points/cell, 10 Å steps and 10,000 Å depth. Each numerical-control
+arm has eight chunks of 32 incident electrons (256 total), with shared seeds
+0–7. Only the named control changes. The precision arm instead uses 16 chunks
+of 128 (2,048 total). It overlaps some control streams and is reported
+separately, never pooled as independent additional data.
+
+| Arm | Change from control | Deficit at 1 µm (%) | Paired change from control (percentage points) |
+| --- | --- | ---: | ---: |
+| [Control](../../validation/check-records/axial-zone/study-1642-baseline.json.gz) | none | 0.677 ± 0.759 | — |
+| [Step](../../validation/check-records/axial-zone/study-1643-step.json.gz) | 5 Å propagation step | 0.099 ± 0.733 | −0.578 ± 0.314 |
+| [Grid](../../validation/check-records/axial-zone/study-1644-grid.json.gz) | 24 points/cell, $48^2$ | 0.894 ± 0.718 | +0.217 ± 0.714 |
+| [Supercell](../../validation/check-records/axial-zone/study-1645-supercell.json.gz) | $3\times3$ cells, 16 points/cell, $48^2$ | 0.305 ± 0.978 | −0.372 ± 0.709 |
+| [Depth](../../validation/check-records/axial-zone/study-1646-depth.json.gz) | propagate to 2 µm, compare at 1 µm | 0.677 ± 0.759 | zero to roundoff |
+| [Precision](../../validation/check-records/axial-zone/study-1647-precision.json.gz) | 2,048 incident electrons | 0.427 ± 0.205 | not a matched comparison |
+
+Errors are **jackknife SEMs**, not admission confidence bounds. At 2 µm the
+depth arm gives $1.992\%\pm1.255\%$. The low-cut control (nominal 95 eV)
+gives $0.873\%\pm1.365\%$ at 1 µm. The actual zero-tilt selected cuts and
+their event distributions are retained in the raw results: the adaptive
+matching rule changes its selected energy when the represented spectrum
+changes, so the grid/supercell comparison includes that discretization effect.
+
+The precision arm reduces sampling uncertainty, but does not certify the
+provisional 1% error criterion. Step refinement shifts the estimate by about
+0.58 percentage points, and the paired grid/supercell errors remain too wide
+to establish the needed convergence. The largest observed conservative
+$c_W/\Delta$ is 2.101 in the precision arm and 2.926 in the supercell arm.
+These remain diagnostic scales, not measured leakage probabilities. No
+physical outgoing instrument, calibrated depth budget or axial run admission
+is established. A coherent projected-evolution comparison is still required
+before interpreting the exposure differences as physical handoff errors.
+
+All six jobs completed with exit code zero within three minutes, each under
+a ten-minute/four-CPU allocation (12 GB memory, 24 GB for the refined grid).
+GNU time's reported MaxRSS is retained, but coverage of forkserver workers
+was not established, so it is not an allocation peak. Some Python 3.14 jobs
+emitted semaphore-cleanup warnings after writing their results; the warnings
+did not change the successful scheduler exit codes. These host timings are
+provenance, not performance comparisons between different numerical cases.
+
+### Coherently projected no-jump reference
+
+`checks/axial_mcwf_return_flux.py --projected-no-jump` adds a CPU research
+comparison using `montecarlo/channeling/axial_projection.py`. This is not a
+physical escape model; `cr-axial-zone-handoff-accounting` stays `unverified`.
+The source is Castin, Dalibard and Mølmer, Eqs. (2), (4), (8), with the
+represented-grid generator compressed before exponentiation:
+
+$$H_P=P H P,\qquad W_P=P W P,\qquad
+U_P(\Delta z)=\exp\!\left[-\frac{i\Delta z}{\hbar v_z}(H_P-iW_P)\right].$$
+
+The exponential acts **within** the retained subspace. It is not
+$P\exp[-i(H-iW)\Delta z/(\hbar v_z)]P$, and it does not add repeated
+finite-step measurement losses. In the spectral basis of $H(\mathbf q)$,
+$H_P$ is diagonal; the supplied cell-periodic $W$ is compressed in each
+Fourier/Bloch block. Dense matrix exponentials remove kinetic/potential
+Strang splitting from this reference, up to floating-point matrix-function
+error. Jump times remain resolved to one propagation step.
+
+The exact no-jump norm obeys
+
+$$-\partial_z\|\phi\|^2=\frac{2}{\hbar v_z}
+\langle\phi|W_P|\phi\rangle.$$
+
+Here $W$ is in eV and $\hbar v_z$ in eV Å, so the hazard is per Å. The full
+native jump selection and jump operators are evaluated on the normalized
+retained state. The same stochastic post-jump $P/F$ measurement supplies
+retained channels $P J_m P$; sink outcomes remain separately recorded as
+numerically unresolved. Electronic jumps update the carrier and therefore
+the selected projector. Entry and post-jump states must already be normalized
+inside that subspace; otherwise the reference refuses instead of silently
+losing unaccounted weight. The pure entry's projected norm is applied externally
+as in the existing study. General mixtures need their own component weights.
+
+The five arms are:
+
+1. Native Strang reference with no handoff.
+2. Native Strang propagation with entry/post-jump handoff measurements.
+3. Full-space matrix-exponential reference with no handoff.
+4. Full-space matrix propagation with the same handoff measurements.
+5. Retained-space matrix propagation with those measurements.
+
+The difference between arms 4 and 5 isolates the compression effect from
+Strang splitting at a fixed jump-depth step. Arms 1–4 expose the independent
+splitting effect. Deficits of arms 4 and 5 share arm 3's pooled reference
+exposure; their difference and paired delete-one-chunk SEM are stored under
+`spectral_comparison`. Per-chunk exposures are retained for all arms. More
+than one jump per step is not resolved by either implementation, so step
+convergence is still required even with matrix-exponential propagation.
+
+For $W=0$ the retained evolution is unitary. Constant scalar $W$ attenuates
+amplitude by $\exp[-W\Delta z/(\hbar v_z)]$. Empty/full cuts recover the
+zero/full subspace. If $[P,W]=0$, no-jump evolution starting in $P$ stays in
+$P$ in the full reference as well. Independent real-space DOP853 integration,
+analytic constant-loss/semigroup checks, seeded native sink waiting times and
+carrier-update regressions are in
+`tests/montecarlo/test_channeling_axial_projection.py`. These are numerical
+implementation checks; fresh-context source-to-code verification remains open.
+
+### Projected comparison results (SLURM 1648–1650)
+
+Source checkpoint `4384e473`; all three jobs completed with exit zero. The
+16-electron pilot (1648) was followed by matched 256-electron runs at 10 Å
+(1649) and 5 Å (1650), each with eight seed chunks of 32 histories. Both use
+2×2 cells, 16 points per cell, TDS plus electronic jumps, 1 µm depth and the
+selected 179.532 eV cut. The pilot overlaps the main streams and is not pooled.
+
+At 1 µm, deficits are percentages of each propagator's no-handoff reference
+bound-state exposure. Errors are paired delete-one-chunk jackknife SEMs:
+
+| Propagation / measurement | 10 Å step | 5 Å step |
+|---|---:|---:|
+| Native Strang with handoff | 0.677 ± 0.759% | 0.099 ± 0.733% |
+| Full matrix with handoff | 0.398 ± 0.862% | 0.301 ± 0.699% |
+| Retained matrix with handoff | 0.409 ± 0.863% | 0.277 ± 0.710% |
+| Retained minus full-matrix handoff deficit | +0.0108 ± 0.0100 pp | −0.0243 ± 0.0271 pp |
+
+The last row uses a common full-matrix reference and correlated chunks; its
+error is not obtained by adding the marginal errors. Halving the step changes
+the retained-matrix deficit by −0.132 ± 0.437 percentage points (paired SEM).
+The native counterpart changes by −0.578 ± 0.314 points. These samples show no
+resolved large compression effect for this case; they neither establish a
+step-converged error bound nor justify a physical handoff. More histories can
+narrow sampling error, but cannot supply the missing physical outgoing
+instrument, source closure, or independent verification. Bound-state exposure
+remains a proxy rather than a photon-source error measurement.
+
+The summary retains per-arm source identities, settings, environment, batch
+scripts and resource records; the raw results retain every chunk exposure.
+Reported GNU time RSS does not establish forkserver-worker/allocation peaks.
+Main/half-step scheduler runtimes were 91/90 s on four allocated CPUs with
+12 GB requested memory. Evidence:
+{download}`summary <../../validation/check-records/axial-zone/projected-1648-1650.json>`,
+{download}`pilot <../../validation/check-records/axial-zone/projected-1648-pilot.json.gz>`,
+{download}`10 Å <../../validation/check-records/axial-zone/projected-1649-main.json.gz>`,
+{download}`5 Å <../../validation/check-records/axial-zone/projected-1650-halfstep.json.gz>`.
+
+### Matching-energy, grid and supercell scan (SLURM 1651–1656)
+
+The same five-arm comparison was repeated at several matching energies and
+two numerical refinements, without source changes (script and spectral
+kernel hashes as for 1648–1650). All six jobs (three 16-electron pilots,
+then 1654–1656) completed with exit zero. Settings: Si [001], 5 MeV, TDS
+plus electronic jumps, 10 Å steps, 1,000 Å recording interval, gap window
+±2 eV.
+
+- **Cut scan (1654):** $2\times2$ cells, 16 points/cell, nominal targets
+  8.19 (≈ $U_{\max}$), 50, 95 and 178 eV, 2 µm depth, 32 chunks × 32
+  electrons (1,024). All cuts share one reference per propagator, so
+  cut-to-cut differences are paired. Its seeds 0–7 reproduce the 1649
+  retained-matrix exposures at 1 µm exactly (zero difference).
+- **Grid (1655):** 24 points/cell ($48^2$), 95 and 178 eV, 1 µm, 256 electrons.
+- **Supercell (1656):** $3\times3$ cells at 16 points/cell, 95 and 178 eV,
+  1 µm, 256 electrons.
+
+Retained-matrix (projected) deficits, jackknife SEM, with zero-tilt selected
+cuts:
+
+| Arm | Selected cut (eV) | 1 µm (%) | 2 µm (%) |
+|---|---:|---:|---:|
+| Cut scan | 7.95 | 11.39 ± 2.16 | 19.39 ± 2.27 |
+| Cut scan | 49.11 | 0.29 ± 0.76 | 2.23 ± 0.94 |
+| Cut scan | 94.96 | 0.22 ± 0.48 | 1.41 ± 0.66 |
+| Cut scan | 179.53 | 0.31 ± 0.33 | 0.93 ± 0.51 |
+| Grid $48^2$ | 94.93 / 178.04 | 1.19 ± 1.54 / 0.56 ± 0.77 | — |
+| Supercell $3\times3$ | 95.50 / 177.64 | 1.03 ± 1.64 / 0.42 ± 0.67 | — |
+
+Paired cut differences (lower minus higher cut, percentage points): 7.95 vs
+49.11 eV is **+11.11 ± 1.85** at 1 µm and +17.17 ± 2.05 at 2 µm. 49.11 vs
+94.96 eV is +0.06 ± 0.59 and +0.82 ± 0.84; 94.96 vs 179.53 eV is −0.09 ± 0.50
+and +0.48 ± 0.68. Retained-minus-full-matrix handoff effects stay below
+0.16 points for every cut and arm, none resolved beyond 1.3 SEM. At 178 eV
+the grid and supercell arms differ from the 1649 control by +0.15 ± 1.00
+and +0.01 ± 0.69 points (same seeds, but streams diverge, so weakly paired).
+Native Strang and full-matrix hook rows agree with the retained-matrix rows
+within their errors; all rows are retained in the raw results.
+
+Electronic kicks put the cut at generic tilts. Across hook events, the
+smallest level-free width around a selected cut was 0.36–0.64 eV on
+$2\times2$ cells, 0.42–0.50 eV on the $48^2$ grid and 0.27 eV on
+$3\times3$ cells. The median per-chunk median width fell from about 1.0–1.4 eV
+to 0.65–0.74 eV on $3\times3$ cells. Larger supercells fold more levels into
+each window, so clearance, not only cut energy, must be tracked when they grow.
+
+**Reading.** A barrier-adjacent cut is excluded: it discards about a tenth
+of the bound exposure within 1 µm, consistent in sign with the TDS-only
+secular table above (3.2% at $10^4$ Å, 7.8 eV) but three to four times
+larger with electronic jumps on this $2\times2$ grid. For cuts from about $U_{\max}+(U_{\max}-U_{\min})/2$ upward, the
+1 µm differences are unresolved at the 0.5–0.6 point level, and grid and
+supercell changes are unresolved at the 0.7–1.0 point level. At 2 µm the
+estimates order as expected (lower cut, larger deficit) but the pairwise
+differences are below 1.3 SEM. These are SEMs from 256–1,024 histories,
+not confidence bounds. They do not establish a depth budget, a physical
+outgoing instrument or a photon-source error. Bound-state exposure remains
+the proxy.
+
+Evidence: {download}`summary <../../validation/check-records/axial-zone/matching-1651-1656.json>`
+(settings, batch script, provenance, paired analysis and pilot digests),
+{download}`cut scan <../../validation/check-records/axial-zone/matching-1654-cuts.json.gz>`,
+{download}`grid <../../validation/check-records/axial-zone/matching-1655-grid.json.gz>`,
+{download}`supercell <../../validation/check-records/axial-zone/matching-1656-supercell.json.gz>`.
+Scheduler runtimes were 6 min 40 s (16 CPUs), 13 min 17 s (8 CPUs) and
+2 min 6 s (12 CPUs).
+
 ## Matching prescription still to establish
+
+**Provisional numerical matching rule (research, from 1651–1656).** At each
+entry and post-jump tilt, cut in the widest level-free interval within
+±2 eV of a nominal target no lower than
+$U_{\max}+(U_{\max}-U_{\min})$ (about 95 eV for Si [001] at 5 MeV), and
+record the selected cut and clearance. Refuse barrier-adjacent cuts. This
+rule fixes only the numerical retained/outgoing split for further study. It
+does not supply the physical outgoing state, a depth budget or admission.
 
 Retain slow free states in the quantum zone. Investigate native matching only
 where the outgoing transverse motion is sufficiently kinetic dominated and

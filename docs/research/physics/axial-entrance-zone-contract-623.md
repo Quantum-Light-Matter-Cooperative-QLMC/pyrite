@@ -97,15 +97,18 @@ This is not proof that a user-defined process partition is physically complete.
    closure, lab polarization/azimuth mapping, line shapes, source normalization
    and the exactly-once split from native sources.
 5. Add full-case early refusal, independent reference tests, fresh-context
-   source-to-code review, and human sign-off before updating the ledger.
+   source-to-code review before advancing the claim to `anchored`. Human
+   sign-off is tracked separately in #277 and does not gate that status.
 
 ## Tests
 
 ```sh
-uv run pytest -q \
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test \
   tests/montecarlo/test_channeling_axial_zone_handoff.py \
   tests/montecarlo/test_channeling_axial_source_assembly.py \
   tests/montecarlo/test_channeling_axial_phase_space.py
 ```
 
-The first two are new; the last is PyRITE's existing finite-Weyl oracle.
+The first two cover the accounting, candidate conversion and supplied-source
+assembly contracts; the last is the finite-Weyl oracle. Passing these checks
+does not validate a physical outgoing instrument or material photon source.

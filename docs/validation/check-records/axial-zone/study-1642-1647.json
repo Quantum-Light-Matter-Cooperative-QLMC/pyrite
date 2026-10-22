@@ -1,0 +1,442 @@
+{
+  "status": "research-only; physical handoff remains unverified; no calibrated depth budget",
+  "study": "paired numerical controls and a separate high-history axial return-flux run",
+  "source_checkpoint": "82e4d1f362ba57a507d765c314497b569ac9ec23",
+  "paired_method": "At the same recorded depth, each deficit is 1 - sum(model chunk exposure)/sum(reference chunk exposure). For differences, delete the same seed chunk from both arms, recompute both pooled ratios and subtract; SEM = sqrt((n-1)/n * sum((leave-one-out differences - their mean)^2)).",
+  "uncertainty": "All reported errors are delete-one-chunk jackknife SEMs, not admission confidence bounds. The precision run overlaps control streams and is not pooled with them.",
+  "resource_metric": "GNU time reported MaxRSS is retained verbatim. Coverage of forkserver worker processes was not established; do not interpret it as a worker or allocation peak. Host timings are provenance, not speed comparisons.",
+  "warnings": "Some completed Python 3.14 jobs emitted semaphore resource_tracker cleanup warnings after writing their result JSON; all scheduler exit codes were zero.",
+  "batch_script": "#!/bin/bash\n#SBATCH --job-name=pyrite623-study\n#SBATCH --partition=cpu\n#SBATCH --cpus-per-task=4\n#SBATCH --mem=12G\n#SBATCH --time=00:10:00\n#SBATCH --output=/home/aamador/pyrite-issue623/issue623-study-%j.log\nset -eu\narm=${1:?study arm required}\ncells=2\npoints=16\nstep=10\ndepth=10000\nchunks=8\nelectrons=32\ncuts=(--cut-eV 178)\ncase \"$arm\" in\n  baseline) cuts=(--cut-eV 95 --cut-eV 178) ;;\n  step) step=5 ;;\n  grid) points=24 ;;\n  supercell) cells=3 ;;\n  depth) depth=20000 ;;\n  precision) chunks=16; electrons=128 ;;\n  *) exit 2 ;;\nesac\ncd /home/aamador/pyrite-issue623\nexport OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 NUMEXPR_NUM_THREADS=1\nexport PYRITE_MC_BACKEND=cpu\nstudy_dir=pyrite-output/research/issue623/study-20261021/$arm\nmkdir -p \"$study_dir\"\ntest ! -e \"$study_dir/result.json\"\nexec 9<.pyrite-sync.lock\nflock -s 9\ncp .pyrite-sync \"$study_dir/code-identity.txt\"\ncp \"$0\" \"$study_dir/run.sh\"\nsha256sum checks/axial_mcwf_return_flux.py > \"$study_dir/script-sha256.txt\"\n/home/aamador/.local/bin/uv run --no-sync --no-default-groups python -c \\\n  'import sys,numpy; print(sys.version); print(\"numpy\",numpy.__version__)' > \"$study_dir/environment.txt\"\n/usr/bin/time -v -o \"$study_dir/resources.txt\" \\\n  /home/aamador/.local/bin/uv run --no-sync --no-default-groups python checks/axial_mcwf_return_flux.py \\\n  --loss-coupling \"${cuts[@]}\" --cells \"$cells\" --points-per-cell \"$points\" \\\n  --workers 4 --chunks \"$chunks\" --electrons-per-chunk \"$electrons\" \\\n  --depth-max-ang \"$depth\" --depth-step-ang 1000 --step-ang \"$step\" \\\n  --out \"$study_dir/result.json\"\n",
+  "arms": {
+    "baseline": {
+      "incident_electrons": 256,
+      "settings": {
+        "cells": 2,
+        "points_per_cell": 16,
+        "gap_window_eV": 2.0,
+        "loss_coupling": true,
+        "cuts_eV": [
+          95.0,
+          178.0
+        ],
+        "mechanisms": "tds,electronic",
+        "energy_eV": 5000000.0,
+        "depth_max_ang": 10000.0,
+        "depth_step_ang": 1000.0,
+        "step_ang": 10.0,
+        "electrons_per_chunk": 32,
+        "chunks": 8,
+        "workers": 4,
+        "smoke": false,
+        "out": "pyrite-output/research/issue623/study-20261021/baseline/result.json",
+        "u_min_eV": -77.21864988368196,
+        "u_max_eV": 8.185690784041462
+      },
+      "rows": [
+        {
+          "matching_energy_eV": 94.95697933099208,
+          "deficit_at_1um": 0.008727755957832484,
+          "sem_at_1um": 0.013646667101180739,
+          "events": 1129,
+          "min_clearance_eV": 0.23379448215074206,
+          "min_sector_separation_eV": 0.4675889643014841,
+          "max_loss_cross_norm_eV": 0.8297592059419863,
+          "max_loss_to_separation_ratio": 1.7693005013809953,
+          "absorbed": 74
+        },
+        {
+          "matching_energy_eV": 179.5323659823144,
+          "deficit_at_1um": 0.006771389613132062,
+          "sem_at_1um": 0.0075932499355867815,
+          "events": 1246,
+          "min_clearance_eV": 0.2491090663418447,
+          "min_sector_separation_eV": 0.49821813268371784,
+          "max_loss_cross_norm_eV": 0.888937730283251,
+          "max_loss_to_separation_ratio": 1.6253586992369866,
+          "absorbed": 36
+        }
+      ],
+      "reference_jumps": {
+        "tds": 229,
+        "sink": 76,
+        "electronic": 841
+      },
+      "paired_high_minus_low_cut_at_1um": {
+        "estimate": -0.001956366344700422,
+        "sem": 0.014440955322360796
+      },
+      "job_id": 1642,
+      "raw_result": "study-1642-baseline.json.gz",
+      "raw_result_sha256": "1b14e6018243518caa451f7101f0731edf23e1e0c7202cc9e6ce6a8625b73353",
+      "source_sha256": "ce9648d440a615fe5c1774ad294138aa88962af79751553ec3728b54da0d1db9",
+      "code_identity": {
+        "code_digest": "ae7961df533619cac27bf0c47a0b364963ed827985d729ca07ce923f0e4cc954",
+        "code_revision": "82e4d1f362ba57a507d765c314497b569ac9ec23",
+        "code_dirty": "False",
+        "code_synced_at": "2026-10-22T02:15:55+00:00",
+        "code_source": "alex-XPS-15-9530:/home/alex/dev/pyrite/.worktrees/issue-623-axial-entrance-zone-resume",
+        "code_tables_digest": "45345ae89516134faa35e6218ea2d0cb2c26ccc11d9df28b986151bcc90c5918"
+      },
+      "scheduler": {
+        "JobState": "COMPLETED",
+        "ExitCode": "0:0",
+        "RunTime": "00:00:33",
+        "TimeLimit": "00:10:00",
+        "NodeList": "DESKTOP-QNIHO3D",
+        "NumCPUs": "4",
+        "MinMemoryNode": "12G"
+      },
+      "environment": "3.14.6 (main, Jun 11 2026, 04:03:53) [Clang 22.1.3 ]\nnumpy 2.5.4\n",
+      "resource_record": "\tCommand being timed: \"/home/aamador/.local/bin/uv run --no-sync --no-default-groups python checks/axial_mcwf_return_flux.py --loss-coupling --cut-eV 95 --cut-eV 178 --cells 2 --points-per-cell 16 --workers 4 --chunks 8 --electrons-per-chunk 32 --depth-max-ang 10000 --depth-step-ang 1000 --step-ang 10 --out pyrite-output/research/issue623/study-20261021/baseline/result.json\"\n\tUser time (seconds): 1.20\n\tSystem time (seconds): 0.19\n\tPercent of CPU this job got: 4%\n\tElapsed (wall clock) time (h:mm:ss or m:ss): 0:32.38\n\tAverage shared text size (kbytes): 0\n\tAverage unshared data size (kbytes): 0\n\tAverage stack size (kbytes): 0\n\tAverage total size (kbytes): 0\n\tMaximum resident set size (kbytes): 340536\n\tAverage resident set size (kbytes): 0\n\tMajor (requiring I/O) page faults: 1302\n\tMinor (reclaiming a frame) page faults: 39301\n\tVoluntary context switches: 5247\n\tInvoluntary context switches: 7\n\tSwaps: 0\n\tFile system inputs: 108528\n\tFile system outputs: 1360\n\tSocket messages sent: 0\n\tSocket messages received: 0\n\tSignals delivered: 0\n\tPage size (bytes): 4096\n\tExit status: 0\n",
+      "gnu_time_reported_max_rss_kbytes": 340536
+    },
+    "step": {
+      "incident_electrons": 256,
+      "settings": {
+        "cells": 2,
+        "points_per_cell": 16,
+        "gap_window_eV": 2.0,
+        "loss_coupling": true,
+        "cuts_eV": [
+          178.0
+        ],
+        "mechanisms": "tds,electronic",
+        "energy_eV": 5000000.0,
+        "depth_max_ang": 10000.0,
+        "depth_step_ang": 1000.0,
+        "step_ang": 5.0,
+        "electrons_per_chunk": 32,
+        "chunks": 8,
+        "workers": 4,
+        "smoke": false,
+        "out": "pyrite-output/research/issue623/study-20261021/step/result.json",
+        "u_min_eV": -77.21864988368196,
+        "u_max_eV": 8.185690784041462
+      },
+      "rows": [
+        {
+          "matching_energy_eV": 179.5323659823144,
+          "deficit_at_1um": 0.000991093346439209,
+          "sem_at_1um": 0.007326809596055467,
+          "events": 1259,
+          "min_clearance_eV": 0.25298406107876303,
+          "min_sector_separation_eV": 0.5059681221575261,
+          "max_loss_cross_norm_eV": 0.888937730283251,
+          "max_loss_to_separation_ratio": 1.578627346563732,
+          "absorbed": 34
+        }
+      ],
+      "reference_jumps": {
+        "tds": 229,
+        "sink": 77,
+        "electronic": 851
+      },
+      "paired_difference_from_baseline_at_1um": {
+        "estimate": -0.005780296266692853,
+        "sem": 0.0031397462779913536
+      },
+      "job_id": 1643,
+      "raw_result": "study-1643-step.json.gz",
+      "raw_result_sha256": "da9a682eec4bbcb2f6ffba923f0d01935911160682b8504d310235f56e35b408",
+      "source_sha256": "ce9648d440a615fe5c1774ad294138aa88962af79751553ec3728b54da0d1db9",
+      "code_identity": {
+        "code_digest": "ae7961df533619cac27bf0c47a0b364963ed827985d729ca07ce923f0e4cc954",
+        "code_revision": "82e4d1f362ba57a507d765c314497b569ac9ec23",
+        "code_dirty": "False",
+        "code_synced_at": "2026-10-22T02:15:55+00:00",
+        "code_source": "alex-XPS-15-9530:/home/alex/dev/pyrite/.worktrees/issue-623-axial-entrance-zone-resume",
+        "code_tables_digest": "45345ae89516134faa35e6218ea2d0cb2c26ccc11d9df28b986151bcc90c5918"
+      },
+      "scheduler": {
+        "JobState": "COMPLETED",
+        "ExitCode": "0:0",
+        "RunTime": "00:00:27",
+        "TimeLimit": "00:10:00",
+        "NodeList": "DESKTOP-QNIHO3D",
+        "NumCPUs": "4",
+        "MinMemoryNode": "12G"
+      },
+      "environment": "3.14.6 (main, Jun 11 2026, 04:03:53) [Clang 22.1.3 ]\nnumpy 2.5.4\n",
+      "resource_record": "\tCommand being timed: \"/home/aamador/.local/bin/uv run --no-sync --no-default-groups python checks/axial_mcwf_return_flux.py --loss-coupling --cut-eV 178 --cells 2 --points-per-cell 16 --workers 4 --chunks 8 --electrons-per-chunk 32 --depth-max-ang 10000 --depth-step-ang 1000 --step-ang 5 --out pyrite-output/research/issue623/study-20261021/step/result.json\"\n\tUser time (seconds): 1.10\n\tSystem time (seconds): 0.22\n\tPercent of CPU this job got: 5%\n\tElapsed (wall clock) time (h:mm:ss or m:ss): 0:26.01\n\tAverage shared text size (kbytes): 0\n\tAverage unshared data size (kbytes): 0\n\tAverage stack size (kbytes): 0\n\tAverage total size (kbytes): 0\n\tMaximum resident set size (kbytes): 340776\n\tAverage resident set size (kbytes): 0\n\tMajor (requiring I/O) page faults: 1302\n\tMinor (reclaiming a frame) page faults: 39794\n\tVoluntary context switches: 5259\n\tInvoluntary context switches: 7\n\tSwaps: 0\n\tFile system inputs: 112120\n\tFile system outputs: 704\n\tSocket messages sent: 0\n\tSocket messages received: 0\n\tSignals delivered: 0\n\tPage size (bytes): 4096\n\tExit status: 0\n",
+      "gnu_time_reported_max_rss_kbytes": 340776
+    },
+    "grid": {
+      "incident_electrons": 256,
+      "settings": {
+        "cells": 2,
+        "points_per_cell": 24,
+        "gap_window_eV": 2.0,
+        "loss_coupling": true,
+        "cuts_eV": [
+          178.0
+        ],
+        "mechanisms": "tds,electronic",
+        "energy_eV": 5000000.0,
+        "depth_max_ang": 10000.0,
+        "depth_step_ang": 1000.0,
+        "step_ang": 10.0,
+        "electrons_per_chunk": 32,
+        "chunks": 8,
+        "workers": 4,
+        "smoke": false,
+        "out": "pyrite-output/research/issue623/study-20261021/grid/result.json",
+        "u_min_eV": -77.21864988368196,
+        "u_max_eV": 8.185690784041462
+      },
+      "rows": [
+        {
+          "matching_energy_eV": 178.03691866942978,
+          "deficit_at_1um": 0.008941295078117917,
+          "sem_at_1um": 0.0071781653806629155,
+          "events": 1327,
+          "min_clearance_eV": 0.2089418877463629,
+          "min_sector_separation_eV": 0.41788377549275424,
+          "max_loss_cross_norm_eV": 0.837427077000319,
+          "max_loss_to_separation_ratio": 1.654483133520142,
+          "absorbed": 72
+        }
+      ],
+      "reference_jumps": {
+        "tds": 307,
+        "sink": 31,
+        "electronic": 959
+      },
+      "paired_difference_from_baseline_at_1um": {
+        "estimate": 0.002169905464985855,
+        "sem": 0.007136836151282081
+      },
+      "job_id": 1644,
+      "raw_result": "study-1644-grid.json.gz",
+      "raw_result_sha256": "345ada4ef50456efe0fd026d99b89bf8cb11cd0b175870a0d59f0a7531354b86",
+      "source_sha256": "ce9648d440a615fe5c1774ad294138aa88962af79751553ec3728b54da0d1db9",
+      "code_identity": {
+        "code_digest": "ae7961df533619cac27bf0c47a0b364963ed827985d729ca07ce923f0e4cc954",
+        "code_revision": "82e4d1f362ba57a507d765c314497b569ac9ec23",
+        "code_dirty": "False",
+        "code_synced_at": "2026-10-22T02:15:55+00:00",
+        "code_source": "alex-XPS-15-9530:/home/alex/dev/pyrite/.worktrees/issue-623-axial-entrance-zone-resume",
+        "code_tables_digest": "45345ae89516134faa35e6218ea2d0cb2c26ccc11d9df28b986151bcc90c5918"
+      },
+      "scheduler": {
+        "JobState": "COMPLETED",
+        "ExitCode": "0:0",
+        "RunTime": "00:02:54",
+        "TimeLimit": "00:10:00",
+        "NodeList": "qlmc-ace",
+        "NumCPUs": "4",
+        "MinMemoryNode": "24G"
+      },
+      "environment": "3.14.6 (main, Jun 11 2026, 04:03:53) [Clang 22.1.3 ]\nnumpy 2.5.4\n",
+      "resource_record": "\tCommand being timed: \"/home/aamador/.local/bin/uv run --no-sync --no-default-groups python checks/axial_mcwf_return_flux.py --loss-coupling --cut-eV 178 --cells 2 --points-per-cell 24 --workers 4 --chunks 8 --electrons-per-chunk 32 --depth-max-ang 10000 --depth-step-ang 1000 --step-ang 10 --out pyrite-output/research/issue623/study-20261021/grid/result.json\"\n\tUser time (seconds): 1.45\n\tSystem time (seconds): 0.18\n\tPercent of CPU this job got: 0%\n\tElapsed (wall clock) time (h:mm:ss or m:ss): 2:53.05\n\tAverage shared text size (kbytes): 0\n\tAverage unshared data size (kbytes): 0\n\tAverage stack size (kbytes): 0\n\tAverage total size (kbytes): 0\n\tMaximum resident set size (kbytes): 335736\n\tAverage resident set size (kbytes): 0\n\tMajor (requiring I/O) page faults: 1388\n\tMinor (reclaiming a frame) page faults: 48486\n\tVoluntary context switches: 10198\n\tInvoluntary context switches: 24\n\tSwaps: 0\n\tFile system inputs: 300936\n\tFile system outputs: 688\n\tSocket messages sent: 0\n\tSocket messages received: 0\n\tSignals delivered: 0\n\tPage size (bytes): 4096\n\tExit status: 0\n",
+      "gnu_time_reported_max_rss_kbytes": 335736
+    },
+    "supercell": {
+      "incident_electrons": 256,
+      "settings": {
+        "cells": 3,
+        "points_per_cell": 16,
+        "gap_window_eV": 2.0,
+        "loss_coupling": true,
+        "cuts_eV": [
+          178.0
+        ],
+        "mechanisms": "tds,electronic",
+        "energy_eV": 5000000.0,
+        "depth_max_ang": 10000.0,
+        "depth_step_ang": 1000.0,
+        "step_ang": 10.0,
+        "electrons_per_chunk": 32,
+        "chunks": 8,
+        "workers": 4,
+        "smoke": false,
+        "out": "pyrite-output/research/issue623/study-20261021/supercell/result.json",
+        "u_min_eV": -77.21864988368196,
+        "u_max_eV": 8.185690784041462
+      },
+      "rows": [
+        {
+          "matching_energy_eV": 177.63638028101315,
+          "deficit_at_1um": 0.003054428793691555,
+          "sem_at_1um": 0.009775021278069517,
+          "events": 1251,
+          "min_clearance_eV": 0.13727396996713992,
+          "min_sector_separation_eV": 0.27454793993430826,
+          "max_loss_cross_norm_eV": 0.8903980564417391,
+          "max_loss_to_separation_ratio": 2.926029156534942,
+          "absorbed": 35
+        }
+      ],
+      "reference_jumps": {
+        "tds": 230,
+        "sink": 73,
+        "electronic": 854
+      },
+      "paired_difference_from_baseline_at_1um": {
+        "estimate": -0.003716960819440507,
+        "sem": 0.007090095237432019
+      },
+      "job_id": 1645,
+      "raw_result": "study-1645-supercell.json.gz",
+      "raw_result_sha256": "e512fd1cfa4645cede52849dc279806cc000db82f2ab8b94d51cb6465c5fa5d8",
+      "source_sha256": "ce9648d440a615fe5c1774ad294138aa88962af79751553ec3728b54da0d1db9",
+      "code_identity": {
+        "code_digest": "ae7961df533619cac27bf0c47a0b364963ed827985d729ca07ce923f0e4cc954",
+        "code_revision": "82e4d1f362ba57a507d765c314497b569ac9ec23",
+        "code_dirty": "False",
+        "code_synced_at": "2026-10-22T02:15:55+00:00",
+        "code_source": "alex-XPS-15-9530:/home/alex/dev/pyrite/.worktrees/issue-623-axial-entrance-zone-resume",
+        "code_tables_digest": "45345ae89516134faa35e6218ea2d0cb2c26ccc11d9df28b986151bcc90c5918"
+      },
+      "scheduler": {
+        "JobState": "COMPLETED",
+        "ExitCode": "0:0",
+        "RunTime": "00:00:47",
+        "TimeLimit": "00:10:00",
+        "NodeList": "DESKTOP-QNIHO3D",
+        "NumCPUs": "4",
+        "MinMemoryNode": "12G"
+      },
+      "environment": "3.14.6 (main, Jun 11 2026, 04:03:53) [Clang 22.1.3 ]\nnumpy 2.5.4\n",
+      "resource_record": "\tCommand being timed: \"/home/aamador/.local/bin/uv run --no-sync --no-default-groups python checks/axial_mcwf_return_flux.py --loss-coupling --cut-eV 178 --cells 3 --points-per-cell 16 --workers 4 --chunks 8 --electrons-per-chunk 32 --depth-max-ang 10000 --depth-step-ang 1000 --step-ang 10 --out pyrite-output/research/issue623/study-20261021/supercell/result.json\"\n\tUser time (seconds): 1.04\n\tSystem time (seconds): 0.21\n\tPercent of CPU this job got: 2%\n\tElapsed (wall clock) time (h:mm:ss or m:ss): 0:46.52\n\tAverage shared text size (kbytes): 0\n\tAverage unshared data size (kbytes): 0\n\tAverage stack size (kbytes): 0\n\tAverage total size (kbytes): 0\n\tMaximum resident set size (kbytes): 339848\n\tAverage resident set size (kbytes): 0\n\tMajor (requiring I/O) page faults: 1308\n\tMinor (reclaiming a frame) page faults: 39281\n\tVoluntary context switches: 5092\n\tInvoluntary context switches: 8\n\tSwaps: 0\n\tFile system inputs: 97872\n\tFile system outputs: 704\n\tSocket messages sent: 0\n\tSocket messages received: 0\n\tSignals delivered: 0\n\tPage size (bytes): 4096\n\tExit status: 0\n",
+      "gnu_time_reported_max_rss_kbytes": 339848
+    },
+    "depth": {
+      "incident_electrons": 256,
+      "settings": {
+        "cells": 2,
+        "points_per_cell": 16,
+        "gap_window_eV": 2.0,
+        "loss_coupling": true,
+        "cuts_eV": [
+          178.0
+        ],
+        "mechanisms": "tds,electronic",
+        "energy_eV": 5000000.0,
+        "depth_max_ang": 20000.0,
+        "depth_step_ang": 1000.0,
+        "step_ang": 10.0,
+        "electrons_per_chunk": 32,
+        "chunks": 8,
+        "workers": 4,
+        "smoke": false,
+        "out": "pyrite-output/research/issue623/study-20261021/depth/result.json",
+        "u_min_eV": -77.21864988368196,
+        "u_max_eV": 8.185690784041462
+      },
+      "rows": [
+        {
+          "matching_energy_eV": 179.5323659823144,
+          "deficit_at_1um": 0.006771389613131951,
+          "sem_at_1um": 0.0075932499355867815,
+          "events": 1832,
+          "min_clearance_eV": 0.23226100505465297,
+          "min_sector_separation_eV": 0.46452201010930594,
+          "max_loss_cross_norm_eV": 0.8915710540425091,
+          "max_loss_to_separation_ratio": 1.7264921280596295,
+          "absorbed": 57,
+          "deficit_at_2um": 0.019921703729569362,
+          "sem_at_2um": 0.012549432651368894
+        }
+      ],
+      "reference_jumps": {
+        "tds": 359,
+        "sink": 102,
+        "electronic": 1529
+      },
+      "paired_difference_from_baseline_at_1um": {
+        "estimate": -1.1102230246251565e-16,
+        "sem": 0.0
+      },
+      "job_id": 1646,
+      "raw_result": "study-1646-depth.json.gz",
+      "raw_result_sha256": "7cb58994452b25bd002f16c23a7744934f1320667e9278f07d4b2f0647b41120",
+      "source_sha256": "ce9648d440a615fe5c1774ad294138aa88962af79751553ec3728b54da0d1db9",
+      "code_identity": {
+        "code_digest": "ae7961df533619cac27bf0c47a0b364963ed827985d729ca07ce923f0e4cc954",
+        "code_revision": "82e4d1f362ba57a507d765c314497b569ac9ec23",
+        "code_dirty": "False",
+        "code_synced_at": "2026-10-22T02:15:55+00:00",
+        "code_source": "alex-XPS-15-9530:/home/alex/dev/pyrite/.worktrees/issue-623-axial-entrance-zone-resume",
+        "code_tables_digest": "45345ae89516134faa35e6218ea2d0cb2c26ccc11d9df28b986151bcc90c5918"
+      },
+      "scheduler": {
+        "JobState": "COMPLETED",
+        "ExitCode": "0:0",
+        "RunTime": "00:00:53",
+        "TimeLimit": "00:10:00",
+        "NodeList": "qlmc-queen",
+        "NumCPUs": "4",
+        "MinMemoryNode": "12G"
+      },
+      "environment": "3.14.6 (main, Jun 11 2026, 04:03:53) [Clang 22.1.3 ]\nnumpy 2.5.4\n",
+      "resource_record": "\tCommand being timed: \"/home/aamador/.local/bin/uv run --no-sync --no-default-groups python checks/axial_mcwf_return_flux.py --loss-coupling --cut-eV 178 --cells 2 --points-per-cell 16 --workers 4 --chunks 8 --electrons-per-chunk 32 --depth-max-ang 20000 --depth-step-ang 1000 --step-ang 10 --out pyrite-output/research/issue623/study-20261021/depth/result.json\"\n\tUser time (seconds): 1.30\n\tSystem time (seconds): 0.13\n\tPercent of CPU this job got: 2%\n\tElapsed (wall clock) time (h:mm:ss or m:ss): 0:52.12\n\tAverage shared text size (kbytes): 0\n\tAverage unshared data size (kbytes): 0\n\tAverage stack size (kbytes): 0\n\tAverage total size (kbytes): 0\n\tMaximum resident set size (kbytes): 342348\n\tAverage resident set size (kbytes): 0\n\tMajor (requiring I/O) page faults: 1094\n\tMinor (reclaiming a frame) page faults: 40733\n\tVoluntary context switches: 10212\n\tInvoluntary context switches: 22\n\tSwaps: 0\n\tFile system inputs: 183864\n\tFile system outputs: 960\n\tSocket messages sent: 0\n\tSocket messages received: 0\n\tSignals delivered: 0\n\tPage size (bytes): 4096\n\tExit status: 0\n",
+      "gnu_time_reported_max_rss_kbytes": 342348
+    },
+    "precision": {
+      "incident_electrons": 2048,
+      "settings": {
+        "cells": 2,
+        "points_per_cell": 16,
+        "gap_window_eV": 2.0,
+        "loss_coupling": true,
+        "cuts_eV": [
+          178.0
+        ],
+        "mechanisms": "tds,electronic",
+        "energy_eV": 5000000.0,
+        "depth_max_ang": 10000.0,
+        "depth_step_ang": 1000.0,
+        "step_ang": 10.0,
+        "electrons_per_chunk": 128,
+        "chunks": 16,
+        "workers": 4,
+        "smoke": false,
+        "out": "pyrite-output/research/issue623/study-20261021/precision/result.json",
+        "u_min_eV": -77.21864988368196,
+        "u_max_eV": 8.185690784041462
+      },
+      "rows": [
+        {
+          "matching_energy_eV": 179.5323659823144,
+          "deficit_at_1um": 0.004269585792550323,
+          "sem_at_1um": 0.00205491421535255,
+          "events": 10480,
+          "min_clearance_eV": 0.20050361469714062,
+          "min_sector_separation_eV": 0.40100722939428124,
+          "max_loss_cross_norm_eV": 0.8925885600622724,
+          "max_loss_to_separation_ratio": 2.1005791919555095,
+          "absorbed": 266
+        }
+      ],
+      "reference_jumps": {
+        "tds": 1877,
+        "sink": 552,
+        "electronic": 7231
+      },
+      "job_id": 1647,
+      "raw_result": "study-1647-precision.json.gz",
+      "raw_result_sha256": "9ea8ba894fb3a45e547d3c2af1f77e934f6e6bdab7f482383213f77872341103",
+      "source_sha256": "ce9648d440a615fe5c1774ad294138aa88962af79751553ec3728b54da0d1db9",
+      "code_identity": {
+        "code_digest": "ae7961df533619cac27bf0c47a0b364963ed827985d729ca07ce923f0e4cc954",
+        "code_revision": "82e4d1f362ba57a507d765c314497b569ac9ec23",
+        "code_dirty": "False",
+        "code_synced_at": "2026-10-22T02:15:55+00:00",
+        "code_source": "alex-XPS-15-9530:/home/alex/dev/pyrite/.worktrees/issue-623-axial-entrance-zone-resume",
+        "code_tables_digest": "45345ae89516134faa35e6218ea2d0cb2c26ccc11d9df28b986151bcc90c5918"
+      },
+      "scheduler": {
+        "JobState": "COMPLETED",
+        "ExitCode": "0:0",
+        "RunTime": "00:02:44",
+        "TimeLimit": "00:10:00",
+        "NodeList": "qlmc-queen",
+        "NumCPUs": "4",
+        "MinMemoryNode": "12G"
+      },
+      "environment": "3.14.6 (main, Jun 11 2026, 04:03:53) [Clang 22.1.3 ]\nnumpy 2.5.4\n",
+      "resource_record": "\tCommand being timed: \"/home/aamador/.local/bin/uv run --no-sync --no-default-groups python checks/axial_mcwf_return_flux.py --loss-coupling --cut-eV 178 --cells 2 --points-per-cell 16 --workers 4 --chunks 16 --electrons-per-chunk 128 --depth-max-ang 10000 --depth-step-ang 1000 --step-ang 10 --out pyrite-output/research/issue623/study-20261021/precision/result.json\"\n\tUser time (seconds): 1.07\n\tSystem time (seconds): 0.14\n\tPercent of CPU this job got: 0%\n\tElapsed (wall clock) time (h:mm:ss or m:ss): 2:42.53\n\tAverage shared text size (kbytes): 0\n\tAverage unshared data size (kbytes): 0\n\tAverage stack size (kbytes): 0\n\tAverage total size (kbytes): 0\n\tMaximum resident set size (kbytes): 341716\n\tAverage resident set size (kbytes): 0\n\tMajor (requiring I/O) page faults: 619\n\tMinor (reclaiming a frame) page faults: 41213\n\tVoluntary context switches: 10411\n\tInvoluntary context switches: 24\n\tSwaps: 0\n\tFile system inputs: 117936\n\tFile system outputs: 1600\n\tSocket messages sent: 0\n\tSocket messages received: 0\n\tSignals delivered: 0\n\tPage size (bytes): 4096\n\tExit status: 0\n",
+      "gnu_time_reported_max_rss_kbytes": 341716
+    }
+  }
+}
