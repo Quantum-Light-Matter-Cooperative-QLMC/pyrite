@@ -18,6 +18,7 @@ directional-source-heatmap
 plotting-backends
 axial-diagnostics
 axial-state-coherence
+axial-supercell-flux
 axial-cuda
 analysis-tutorial
 running-on-a-cluster
