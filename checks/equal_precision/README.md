@@ -356,7 +356,42 @@ thicknesses come from the committed ESTAR CSDA tables in
 `checks/reference/estar/`, pinned in the spec; `--estar --range MATERIAL=PATH`
 overrides them. No engine's own range is used.
 `audit_coverage.py --output PATH` resolves the installed released tables for
-every case without transport and keeps every gap explicit. The comparison
-schema for all adapters is `pyrite.perf.comparison`. See the
+every case without transport and keeps every gap explicit. It also lists, per
+case, the PyRITE adapter arms that can run it and any feature the adapter
+cannot express. The comparison schema for all adapters is
+`pyrite.perf.comparison`. See the
 [protocol page](../../docs/validation/beam-transport/equal-precision-protocol.md)
 and the [comparator notes](../../docs/research/beam-transport/equal-precision-comparators.md).
+
+## Transport-only and detector arms
+
+`pyrite_adapter.py` accepts a matrix case id in place of a pilot scene id and an
+`--arm`. The default `source` arm on a pilot id writes the unchanged pilot
+record, so all wrappers and retained-evidence workflows keep working. Other
+combinations write `pyrite.equal-precision.comparison.v1` records:
+
+```bash
+# Transport only: terminal fractions and transmitted energy, no radiation work.
+uv run python checks/equal_precision/pyrite_adapter.py silicon-800kev-tr0.03-0deg \
+  --arm transport --histories 200 --seed 7 --core per-electron --audit-cxr \
+  --output /tmp/ep/transport.json
+# Uncollided cone detector with the production per-segment estimator.
+uv run python checks/equal_precision/pyrite_adapter.py tungsten-800kev-tr0.03-0deg-det0-15 \
+  --arm detector --histories 10 --seed 7 --core per-electron --audit-cxr \
+  --max-steps 200000 --output /tmp/ep/detector.json
+```
+
+`--radiative-loss none` (default) runs the transport arm uncoupled: no
+bremsstrahlung loss and no BremsLib tables. `bremslib-soft-hard` keeps the
+coupled loss but leaves photons unscored. The record states which, for the
+comparator to match. The detector arm scores source-at-creation and
+uncollided-escape cone yields per primary, with joint energy/angle quadrature
+convergence evidence (`--cone-rtol`, `--cone-max-order`). The
+[protocol page](../../docs/validation/beam-transport/equal-precision-protocol.md#pyrite-transport-only-and-detector-arms)
+has the definitions. Matrix cases with finite beams or explicit secondaries
+get an explicit `unsupported-physics` record.
+
+Those are local CPU plumbing smokes only. Detector scoring costs one estimator
+call per direction, stage and band over every segment, so a 10-history W
+800 keV case takes minutes on CPU. Run anything larger through
+`pyrite remote`. Thick W cases need `--max-steps` above the 20000 default.

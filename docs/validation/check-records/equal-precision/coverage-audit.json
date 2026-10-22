@@ -107,238 +107,450 @@
       ]
     }
   },
-  "n_covered": 39,
+  "n_covered": 44,
   "n_cases": 44,
   "cases": [
     {
       "id": "silicon-100kev-tr0.03-0deg",
       "covered": true,
-      "gaps": []
+      "gaps": [],
+      "pyrite_arms": [
+        "source",
+        "transport"
+      ],
+      "pyrite_unsupported": []
     },
     {
       "id": "silicon-100kev-tr0.3-0deg",
       "covered": true,
-      "gaps": []
+      "gaps": [],
+      "pyrite_arms": [
+        "source",
+        "transport"
+      ],
+      "pyrite_unsupported": []
     },
     {
       "id": "silicon-100kev-tr3-0deg",
       "covered": true,
-      "gaps": []
+      "gaps": [],
+      "pyrite_arms": [
+        "source",
+        "transport"
+      ],
+      "pyrite_unsupported": []
     },
     {
       "id": "silicon-800kev-tr0.03-0deg",
       "covered": true,
-      "gaps": []
+      "gaps": [],
+      "pyrite_arms": [
+        "source",
+        "transport"
+      ],
+      "pyrite_unsupported": []
     },
     {
       "id": "silicon-800kev-tr0.3-0deg",
       "covered": true,
-      "gaps": []
+      "gaps": [],
+      "pyrite_arms": [
+        "source",
+        "transport"
+      ],
+      "pyrite_unsupported": []
     },
     {
       "id": "silicon-800kev-tr3-0deg",
       "covered": true,
-      "gaps": []
+      "gaps": [],
+      "pyrite_arms": [
+        "source",
+        "transport"
+      ],
+      "pyrite_unsupported": []
     },
     {
       "id": "silicon-5000kev-tr0.03-0deg",
       "covered": true,
-      "gaps": []
+      "gaps": [],
+      "pyrite_arms": [
+        "source",
+        "transport"
+      ],
+      "pyrite_unsupported": []
     },
     {
       "id": "silicon-5000kev-tr0.3-0deg",
       "covered": true,
-      "gaps": []
+      "gaps": [],
+      "pyrite_arms": [
+        "source",
+        "transport"
+      ],
+      "pyrite_unsupported": []
     },
     {
       "id": "silicon-5000kev-tr1-0deg",
       "covered": true,
-      "gaps": []
+      "gaps": [],
+      "pyrite_arms": [
+        "source",
+        "transport"
+      ],
+      "pyrite_unsupported": []
     },
     {
       "id": "tungsten-100kev-tr0.03-0deg",
       "covered": true,
-      "gaps": []
+      "gaps": [],
+      "pyrite_arms": [
+        "source",
+        "transport"
+      ],
+      "pyrite_unsupported": []
     },
     {
       "id": "tungsten-100kev-tr0.3-0deg",
       "covered": true,
-      "gaps": []
+      "gaps": [],
+      "pyrite_arms": [
+        "source",
+        "transport"
+      ],
+      "pyrite_unsupported": []
     },
     {
       "id": "tungsten-100kev-tr3-0deg",
       "covered": true,
-      "gaps": []
+      "gaps": [],
+      "pyrite_arms": [
+        "source",
+        "transport"
+      ],
+      "pyrite_unsupported": []
     },
     {
       "id": "tungsten-800kev-tr0.03-0deg",
       "covered": true,
-      "gaps": []
+      "gaps": [],
+      "pyrite_arms": [
+        "source",
+        "transport"
+      ],
+      "pyrite_unsupported": []
     },
     {
       "id": "tungsten-800kev-tr0.3-0deg",
       "covered": true,
-      "gaps": []
+      "gaps": [],
+      "pyrite_arms": [
+        "source",
+        "transport"
+      ],
+      "pyrite_unsupported": []
     },
     {
       "id": "tungsten-800kev-tr3-0deg",
       "covered": true,
-      "gaps": []
+      "gaps": [],
+      "pyrite_arms": [
+        "source",
+        "transport"
+      ],
+      "pyrite_unsupported": []
     },
     {
       "id": "tungsten-5000kev-tr0.03-0deg",
       "covered": true,
-      "gaps": []
+      "gaps": [],
+      "pyrite_arms": [
+        "source",
+        "transport"
+      ],
+      "pyrite_unsupported": []
     },
     {
       "id": "tungsten-5000kev-tr0.3-0deg",
       "covered": true,
-      "gaps": []
+      "gaps": [],
+      "pyrite_arms": [
+        "source",
+        "transport"
+      ],
+      "pyrite_unsupported": []
     },
     {
       "id": "tungsten-5000kev-tr1-0deg",
       "covered": true,
-      "gaps": []
+      "gaps": [],
+      "pyrite_arms": [
+        "source",
+        "transport"
+      ],
+      "pyrite_unsupported": []
     },
     {
       "id": "silicon-300kev-100um-0deg-anchor",
       "covered": true,
-      "gaps": []
+      "gaps": [],
+      "pyrite_arms": [
+        "source",
+        "transport"
+      ],
+      "pyrite_unsupported": []
     },
     {
       "id": "silicon-800kev-100um-0deg-anchor",
       "covered": true,
-      "gaps": []
+      "gaps": [],
+      "pyrite_arms": [
+        "source",
+        "transport"
+      ],
+      "pyrite_unsupported": []
     },
     {
       "id": "tungsten-300kev-10um-0deg-anchor",
       "covered": true,
-      "gaps": []
+      "gaps": [],
+      "pyrite_arms": [
+        "source",
+        "transport"
+      ],
+      "pyrite_unsupported": []
     },
     {
       "id": "tungsten-800kev-10um-0deg-anchor",
       "covered": true,
-      "gaps": []
+      "gaps": [],
+      "pyrite_arms": [
+        "source",
+        "transport"
+      ],
+      "pyrite_unsupported": []
     },
     {
       "id": "silicon-100kev-1um-0deg-anchor",
       "covered": true,
-      "gaps": []
+      "gaps": [],
+      "pyrite_arms": [
+        "source",
+        "transport"
+      ],
+      "pyrite_unsupported": []
     },
     {
       "id": "tungsten-100kev-100um-75deg-anchor",
       "covered": true,
-      "gaps": []
+      "gaps": [],
+      "pyrite_arms": [
+        "source",
+        "transport"
+      ],
+      "pyrite_unsupported": []
     },
     {
       "id": "silicon-800kev-tr0.3-45deg-oblique",
       "covered": true,
-      "gaps": []
+      "gaps": [],
+      "pyrite_arms": [
+        "source",
+        "transport"
+      ],
+      "pyrite_unsupported": []
     },
     {
       "id": "silicon-800kev-tr0.3-75deg-oblique",
       "covered": true,
-      "gaps": []
+      "gaps": [],
+      "pyrite_arms": [
+        "source",
+        "transport"
+      ],
+      "pyrite_unsupported": []
     },
     {
       "id": "tungsten-800kev-tr0.03-75deg-oblique",
       "covered": true,
-      "gaps": []
+      "gaps": [],
+      "pyrite_arms": [
+        "source",
+        "transport"
+      ],
+      "pyrite_unsupported": []
     },
     {
       "id": "tungsten-800kev-tr3-75deg-oblique",
       "covered": true,
-      "gaps": []
+      "gaps": [],
+      "pyrite_arms": [
+        "source",
+        "transport"
+      ],
+      "pyrite_unsupported": []
     },
     {
       "id": "diamond-800kev-tr0.3-0deg-low-z",
       "covered": true,
-      "gaps": []
+      "gaps": [],
+      "pyrite_arms": [
+        "source",
+        "transport"
+      ],
+      "pyrite_unsupported": []
     },
     {
       "id": "sio2-800kev-tr0.3-0deg-compound",
       "covered": true,
-      "gaps": []
+      "gaps": [],
+      "pyrite_arms": [
+        "source",
+        "transport"
+      ],
+      "pyrite_unsupported": []
     },
     {
       "id": "silicon-800kev-tr0.3-0deg-spot100um",
       "covered": true,
-      "gaps": []
+      "gaps": [],
+      "pyrite_arms": [],
+      "pyrite_unsupported": [
+        "beam spot_rms_mm=0.1"
+      ]
     },
     {
       "id": "silicon-800kev-tr0.3-0deg-div5mrad",
       "covered": true,
-      "gaps": []
+      "gaps": [],
+      "pyrite_arms": [],
+      "pyrite_unsupported": [
+        "beam divergence_rms_mrad=5.0"
+      ]
     },
     {
       "id": "silicon-800kev-tr0.3-0deg-espread1pct",
       "covered": true,
-      "gaps": []
+      "gaps": [],
+      "pyrite_arms": [],
+      "pyrite_unsupported": [
+        "beam energy_spread_rms_frac=0.01"
+      ]
     },
     {
       "id": "silicon-800kev-tr3-0deg-footprint1mm",
       "covered": true,
-      "gaps": []
+      "gaps": [],
+      "pyrite_arms": [
+        "source",
+        "transport"
+      ],
+      "pyrite_unsupported": []
     },
     {
       "id": "tungsten-800kev-tr3-0deg-footprint1mm",
       "covered": true,
-      "gaps": []
+      "gaps": [],
+      "pyrite_arms": [
+        "source",
+        "transport"
+      ],
+      "pyrite_unsupported": []
     },
     {
       "id": "silicon-800kev-tr0.3-0deg-det90-5",
-      "covered": false,
-      "gaps": [
-        "uncollided detector arm needs the pending weighted per-segment scorer"
-      ]
+      "covered": true,
+      "gaps": [],
+      "pyrite_arms": [
+        "source",
+        "transport",
+        "detector"
+      ],
+      "pyrite_unsupported": []
     },
     {
       "id": "tungsten-800kev-tr0.3-0deg-det90-5",
-      "covered": false,
-      "gaps": [
-        "uncollided detector arm needs the pending weighted per-segment scorer"
-      ]
+      "covered": true,
+      "gaps": [],
+      "pyrite_arms": [
+        "source",
+        "transport",
+        "detector"
+      ],
+      "pyrite_unsupported": []
     },
     {
       "id": "silicon-5000kev-tr0.03-0deg-det0-1",
-      "covered": false,
-      "gaps": [
-        "uncollided detector arm needs the pending weighted per-segment scorer"
-      ]
+      "covered": true,
+      "gaps": [],
+      "pyrite_arms": [
+        "source",
+        "transport",
+        "detector"
+      ],
+      "pyrite_unsupported": []
     },
     {
       "id": "tungsten-800kev-tr0.03-0deg-det0-15",
-      "covered": false,
-      "gaps": [
-        "uncollided detector arm needs the pending weighted per-segment scorer"
-      ]
+      "covered": true,
+      "gaps": [],
+      "pyrite_arms": [
+        "source",
+        "transport",
+        "detector"
+      ],
+      "pyrite_unsupported": []
     },
     {
       "id": "tungsten-100kev-tr3-0deg-det135-5",
-      "covered": false,
-      "gaps": [
-        "uncollided detector arm needs the pending weighted per-segment scorer"
-      ]
+      "covered": true,
+      "gaps": [],
+      "pyrite_arms": [
+        "source",
+        "transport",
+        "detector"
+      ],
+      "pyrite_unsupported": []
     },
     {
       "id": "silicon-800kev-tr0.3-0deg-straggling",
       "covered": true,
-      "gaps": []
+      "gaps": [],
+      "pyrite_arms": [
+        "source",
+        "transport"
+      ],
+      "pyrite_unsupported": []
     },
     {
       "id": "tungsten-800kev-tr0.3-0deg-straggling",
       "covered": true,
-      "gaps": []
+      "gaps": [],
+      "pyrite_arms": [
+        "source",
+        "transport"
+      ],
+      "pyrite_unsupported": []
     },
     {
       "id": "silicon-800kev-tr0.3-0deg-secondaries",
       "covered": true,
-      "gaps": []
+      "gaps": [],
+      "pyrite_arms": [],
+      "pyrite_unsupported": [
+        "secondary_transport",
+        "inelastic_model=shell-soft-hard"
+      ]
     },
     {
       "id": "tungsten-800kev-tr0.3-0deg-secondaries",
       "covered": true,
-      "gaps": []
+      "gaps": [],
+      "pyrite_arms": [],
+      "pyrite_unsupported": [
+        "secondary_transport",
+        "inelastic_model=shell-soft-hard"
+      ]
     }
   ]
 }
