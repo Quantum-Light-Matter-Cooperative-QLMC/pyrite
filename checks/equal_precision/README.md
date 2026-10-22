@@ -451,3 +451,13 @@ Timings are a fresh process: `fresh_process` is the full `pen_main` wall time,
 and PenRed's own initialization (material creation) and simulation times have
 one-second resolution apart from user CPU time. Local runs are plumbing
 smokes; measurements go through `pyrite remote`.
+
+On the lab box, `sbatch checks/equal_precision/penred-build.sbatch` clones,
+prepares and builds the pin under `~/.local/opt/penred-510/<pin>` on the GPU
+node and records compiler, flags, CPU and the `pen_main` hash. It refuses to
+overwrite an existing build. `penred-straggling.sbatch penred|pyrite` runs the
+four-scene straggling-on screen for one engine with per-run timeouts, and
+`compare_penred.py PENRED_DIR PYRITE_DIR --output PATH` writes the paired
+z-score summary. `pyrite_adapter.py --straggling on|off` overrides a scene's
+straggling switch, keeps the scene value as `straggling_scene` in the record,
+and never writes the legacy pilot record.
