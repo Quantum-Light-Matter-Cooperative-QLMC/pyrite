@@ -407,7 +407,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 - **Status:** unverified
 - **Checks:** rotated-box axis/diagonal chords and midpoints, inside-origin/miss/backward cases, rotation invariance over 500 random rays, bitwise no-box equivalence with the stack navigator, region ordering, overlapping/touching/lateral/tilted region validation, aperture-in-material refusal, tilted-filter Beer–Lambert transmission, filter-to-target re-entry, `FilterPlate` corners and `PlanarDetector` central/edge hits through a tilted sample rotation, non-orthogonal rotation refusal
 - **Anchor:** `tests/montecarlo/test_photon_scene.py`
-- **Notes:** Issue #341 ordinary-hit reference geometry. `montecarlo` may not import `instrument`, so poses enter as `PlanarPose`, sizes and a material; callers pass `FilterPlate`/`PlanarDetector` fields. The existing ballistic filter transmission and production routes are unchanged. Pixel binning of aperture `local_ang` and detector response stay downstream. Requires fresh-context verification before `rederived`.
+- **Notes:** Issue #341 ordinary-hit reference geometry. `montecarlo` may not import `instrument`, so poses enter as `PlanarPose`, sizes and a material; callers pass `FilterPlate`/`PlanarDetector` fields. The existing ballistic filter transmission and production routes are unchanged. Pixel binning of aperture `local_ang` and detector response stay downstream. [Independent report and subsequent repair](beam-transport/photon-scene-navigation.md): the original absolute-coordinate/global-extent overlap tolerance admitted coincident and thin overlapping bodies. The repair uses relative centre displacement and a binary64 contact allowance based on the lengths projected onto each tested axis; infinite-radius axes cannot separate bodies. Public regressions distinguish overlap, contact and gaps across translations and thin-body aspect ratios. Status remains `unverified` pending fresh-context verification of the changed implementation before `rederived`.
 
 ## `photon-charged-coupling`
 
@@ -421,6 +421,45 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 - **Checks:** synthetic stage launch selection, photon return with lineage keys and weights, soft returned photons deposited, positron pending and box-local fates, round cap, reproducibility and per-round stage seeds, option refusals; real silicon cascade per-row closure, radiated-photon sum, unit directions, ordinals and reproducibility (slow); 2 MeV photons in 5 mm Si coupled closure; existing shell/positron/pair cascade tests unchanged
 - **Anchor:** `tests/montecarlo/test_photon_coupling.py`
 - **Notes:** Issue #341 coupled photon/charged queue, electron half. Requires fresh-context verification before `rederived`. Positron handoff (#295 emission rows), impact-ionization fluorescence and the weighted continuous-source adapter remain before MeV full-track comparisons. No production route, default output or identity changes.
+
+## `photon-continuous-source`
+
+- **Claim:** CPU weighted proposals integrate the unattenuated joint BremsLib segment emission measure over position, photon energy and the full sphere without debiting the primary track again
+- **Code:** `montecarlo/transport/photon_sources.py::sample_continuous_photons`, `::sample_bremslib_continuum`
+- **Source:** importance-sampling identity (integration against a proposal density); BremsLib DDCS units and angular convention in `bremslib-angular-model`; ADR-0020 weighted mean-response boundary
+- **Equation:** $A=\sum_i L_i(k_{\max,i}-k_{\min})_+$; $p_i=L_i\Delta k_i/A$; $w=4\pi A j_i(k,\Omega)/M$; $j_i=\sum_a n_a10^{16}d^2\sigma_a/(dk\,d\Omega)$ in photons/Å/eV/sr
+- **Assumptions:** fixed representative electron energy and straight segment; uniform position along each segment, uniform photon energy on its supported interval, isotropic proposal with joint DDCS evaluated at the sampled energy/direction; explicit material labels; CPU NumPy and local Philox; weighted scoring histories, not physical emission events; no source attenuation or extra electron energy debit
+- **Limiting cases:** constant emissivity gives total weight $4\pi A j$ exactly; zero length/energy support gives no source; zero emissivity proposals are omitted without renormalizing surviving weights; primary normalization is deferred to detection
+- **Status:** rederived
+- **Checks:** constant-emissivity normalization, full-sphere and position support, joint energy/angle correlation, seeded replay, empty/invalid inputs, synthetic BremsLib angle-integrated SDCS comparison
+- **Anchor:** `tests/montecarlo/test_photon_sources.py`
+- **Notes:** Issue #341 experimental reference; no production mode or full-track validation implied. Fresh-context verification 2026-10-22 independently derived the joint proposal measure, position density, full-sphere importance factor, cm²→Å² conversion and deferred primary normalization; no discrepancy. [Validation](radiation-physics/photon-continuous-source.md).
+
+## `photon-continuous-source-scoring`
+
+- **Claim:** weighted continuous sources feed ordinary-hit photon tracking once and yield aperture-integrated counts per original primary per eV, with disjoint direct/redistributed categories and explicit out-of-bin hits
+- **Code:** `montecarlo/runner/photon_emission.py::score_bremslib_continuum`, `::_score_exits`
+- **Source:** linear weighted response and histogram bin integration; `photon-continuous-source`, `photon-history-queue`; ADR-0020 ordinary-hit reference
+- **Equation:** $S_b=\sum_{h\in\mathrm{det}}w_h\mathbf{1}(k_h\in b)/(N_e\Delta k_b)$; $S_b=S_{b,\mathrm{direct}}+S_{b,\mathrm{redistributed}}$; outside count $=\sum_{h\in\mathrm{det},\,k_h\notin[k_0,k_B]}w_h/N_e$
+- **Assumptions:** absorbing physical aperture, already transported electron segments, one original primary denominator, no extra ballistic attenuation or physical-hard-event histogram; direct iff photon generation and coupled round are both zero; coupled stage optional and inherits its documented limitations; bin intervals left-closed/right-open except the final upper edge is included
+- **Limiting cases:** vacuum gives only direct hits; no hits gives zero spectra; newly emitted round-positive photons are redistributed even at generation zero; hits outside the reported band retain their weights; doubling primary count at fixed weighted sources halves the score
+- **Status:** rederived
+- **Checks:** analytic weighted bin/primary normalization, edge inclusion, direct/redistributed partition, coupled round classification, source/tracker handoff and unsupported option refusal
+- **Anchor:** `tests/montecarlo/test_photon_continuous_scoring.py`
+- **Notes:** Issue #341 reference only. Fresh-context verification 2026-10-22 independently derived the primary/bin-width normalization, direct/redistributed partition and final-edge convention; exact synthetic checks include out-of-band weights beside much larger in-band weights. The finite-square vacuum regression checks the source-to-aperture scale against its analytic solid angle. Does not establish validity of inherited interaction samplers or a full MeV shower. [Validation](radiation-physics/photon-continuous-source-scoring.md).
+
+## `photon-continuum-scene-handoff`
+
+- **Claim:** an explicit CPU Scene diagnostic lowers physical detector/filter geometry, transports primaries once and scores only the continuum primary population with a separate observation identity and aperture normalization
+- **Code:** `photon_transport.py::simulate_photon_continuum`
+- **Source:** ADR-0020 source/scoring boundary; `photon-continuous-source-scoring`, `photon-scene-navigation`; existing case identity/table provenance contract
+- **Equation:** $S_b=\sum_{h\in\mathrm{det}}w_h\mathbf{1}(k_h\in b)/(N_{e,\mathrm{brem}}\Delta k_b)$; geometry uses $\mathbf r_s=10^7 R^{\mathsf T}\mathbf r_{\rm lab}$ Å for lab millimetres
+- **Assumptions:** CPU NumPy, coupled BremsLib primary radiative loss, ideal unpixelated PlanarDetector, analytic target stack/prism and disjoint filters; photon-only charged handoffs; no acquisition, response, adaptive precision, grooves, channeling, primary characteristic or positron transport; separate diagnostic result and identity, no default Result/checkpoint integration
+- **Limiting cases:** line-only primaries do not enter the continuum source denominator; identical inputs reproduce observation identity; changed detector/filter/bin/source proposal changes observation identity; importing the diagnostic does not enable default photon transport
+- **Status:** rederived
+- **Checks:** continuum population selection, geometry rotation/unit conversion, one primary transport/score pass, identity sensitivity and unsupported-request refusal
+- **Anchor:** `tests/montecarlo/test_photon_scene_handoff.py`
+- **Notes:** Issue #341 experimental boundary. Fresh-context verification 2026-10-22 matched population selection, coordinate/unit conversion, single-pass orchestration and separate observation identity. Focused orchestration tests are not a bitwise production spectrum regression or independent full-track anchor. Complete charged feedback remains pending. [Validation](radiation-physics/photon-continuum-scene-handoff.md).
 
 ## `pair-production-sampling`
 

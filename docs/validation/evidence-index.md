@@ -21,6 +21,7 @@ beam-transport/beam-energy-spread-injection
 beam-transport/beam-phase-space-injection
 beam-transport/beam-phase-space-metrics
 beam-transport/trajectory-depth-loss-profile
+beam-transport/photon-scene-navigation
 beam-transport/linear-bunch-front-tilt
 beam-transport/gpt-gdf-injection
 beam-transport/coherent-line-grid-fringe-spacing
@@ -168,6 +169,9 @@ radiation-physics/eadl-sampled-relaxation
 radiation-physics/photon-compton-scattering
 radiation-physics/photon-rayleigh-scattering
 radiation-physics/photon-photoelectric-sampling
+radiation-physics/photon-continuous-source
+radiation-physics/photon-continuous-source-scoring
+radiation-physics/photon-continuum-scene-handoff
 radiation-physics/coherent-formation-absorption
 radiation-physics/coherent-inter-electron-decoherence
 radiation-physics/quantum-pair-population-normalization

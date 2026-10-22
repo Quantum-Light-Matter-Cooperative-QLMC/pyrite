@@ -129,6 +129,37 @@ def test_disjoint_and_touching_regions_are_valid():
     validate_photon_regions(layers, [tilted, touching])
 
 
+@pytest.mark.parametrize("center", [(0, 0, 0), (0, 0, 3e12), (3e12, -3e12, 3e12)])
+@pytest.mark.parametrize("half", [(1.0, 1.0, 1.0), (1e-15, 1e-15, 1e-15)])
+def test_coincident_boxes_are_rejected_at_every_position_and_scale(center, half):
+    box = _box(center=center, half=half)
+    with pytest.raises(ValueError, match="overlap"):
+        validate_photon_regions([], [box, box])
+
+
+@pytest.mark.parametrize("translation", [0.0, 3e12])
+@pytest.mark.parametrize("lateral_half", [1.0, 1e12])
+@pytest.mark.parametrize("separation", [1.5, 2.0, 2.5])
+def test_box_overlap_contact_and_gap_use_normal_extent(translation, lateral_half, separation):
+    # Exactly representable coordinates: a 0.5 Å penetration, contact, or gap.
+    half = (lateral_half, lateral_half, 1.0)
+    first = _box(center=(0, 0, translation), half=half)
+    second = _box(center=(0, 0, translation + separation), half=half)
+    if separation < 2.0:
+        with pytest.raises(ValueError, match="overlap"):
+            validate_photon_regions([], [first, second])
+    else:
+        validate_photon_regions([], [first, second])
+
+
+@pytest.mark.parametrize("translation", [0.0, 3e12])
+def test_translated_aperture_inside_thin_box_is_rejected(translation):
+    box = _box(center=(0, 0, translation), half=(1e12, 1e12, 0.25))
+    aperture = PhotonAperture((0, 0, translation), (1, 0, 0), (0, 1, 0), 1.0, 1.0)
+    with pytest.raises(ValueError, match="outside all modeled material"):
+        validate_photon_regions([], [box], surfaces=[aperture.region()])
+
+
 def test_aperture_inside_material_raises():
     aperture = PhotonAperture((0, 0, 5.0), (1, 0, 0), (0, 1, 0), 1.0, 1.0)
     with pytest.raises(ValueError, match="outside all modeled material"):

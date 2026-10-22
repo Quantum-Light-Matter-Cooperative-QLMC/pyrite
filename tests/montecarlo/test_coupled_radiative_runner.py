@@ -294,14 +294,14 @@ def test_layered_stack_scores_each_layer_with_its_own_composition(synthetic_si_t
     np.testing.assert_allclose(runner._brem_for_case(case, tp["E_brem"]), brem, rtol=1e-10)
 
 
-def test_pre_adapter_seeded_coupled_baseline(synthetic_si_tables):
+@pytest.mark.slow
+def test_pre_adapter_seeded_coupled_baseline(synthetic_si_tables, monkeypatch):
+    from tests.helpers.photon_mode_off import assert_photon_mode_off_bitwise
     from tests.helpers.physics_baseline import assert_output_baseline, transport_signature
 
     case = _coupled_case()
-    tp = runner._transport_case(case, transport_core="lockstep")
-    continuum = runner._brem_wide_from_segments(
-        tp["segs"], tp["E_brem"], case, tp["n_hat"], case.get("abs_layers"), Ne=case["Ne_brem"]
-    )
+    tp, output = assert_photon_mode_off_bitwise(case, monkeypatch)
+    continuum = output["brem_wide"]
     assert_output_baseline(
         "coupled", {"transport": transport_signature(tp["segs"]), "brem_wide": continuum.tolist()}
     )

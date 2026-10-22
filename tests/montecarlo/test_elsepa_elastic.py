@@ -285,8 +285,10 @@ def test_cuda_elsepa_agrees_statistically_with_the_cpu_core(reference):
 
 def test_pre_adapter_seeded_elsepa_baseline(reference):
     from pyrite.montecarlo.transport import simulate_trajectories
+    from tests.helpers.photon_mode_off import exercise_photon_reference
     from tests.helpers.physics_baseline import assert_output_baseline, transport_signature
 
+    exercise_photon_reference(seed=485)
     table = _sr_table(14.0, np.geomspace(4.0, 40.0, 41), reference.mu)
     segments = simulate_trajectories(
         30.0,
