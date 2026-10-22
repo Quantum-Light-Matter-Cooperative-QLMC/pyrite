@@ -98,7 +98,6 @@ geometry/transport-geometry
 
 detectors/detector-solid-angle
 detectors/detector-response
-channeling/axial-entrance-zone-contract-623
 ```
 
 ```{toctree}
