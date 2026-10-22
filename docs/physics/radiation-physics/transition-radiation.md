@@ -147,7 +147,7 @@ For the catalog beams at 1 pC ($N=6.2\times10^6$):
 | `default`, `gaussian_200fs` | 200 fs | $9.4\times10^3$ | $3.0\times10^5$ | 0 / 0 |
 | `1_atto`, `coherent_demo` | 1 as | 0.047 | 1.5 | $6.2\times10^6$ / $6.2\times10^5$ |
 
-So the omission decisions hold for incoherent emission and for bunches long compared with the photon period. They do **not** hold for `emission = coherent` (or `both`) runs whose form factor is non-negligible in the band: today the attosecond catalog beams across the whole EUV and soft-X-ray range. CTR there is computed from the crossings (next section). CTR at optical and infrared wavelengths, where it is used as a bunch-length diagnostic, is below the modelled band; its requirements are tracked in #533.
+So the omission decisions hold for incoherent emission and for bunches long compared with the photon period. They do **not** hold for `emission = coherent` (or `both`) runs whose form factor is non-negligible in the band: today the attosecond catalog beams across the whole EUV and soft-X-ray range. CTR there is computed from the crossings (next section). CTR at optical and infrared wavelengths, where it is used as a bunch-length diagnostic, is below the modelled X-ray band; the bounded opt-in optical path with explicit measured permittivities and a physical-bunch sampling contract is [optical planar TR and CTR](optical-transition-radiation.md).
 
 ### CTR from transported crossings
 

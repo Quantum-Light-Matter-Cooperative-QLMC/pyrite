@@ -1,0 +1,55 @@
+{
+  "allocation": "srun -p gpu --gres=gpu:1 -t 20",
+  "atol_over_peak": 1e-11,
+  "band_eV": [
+    0.7,
+    4.9
+  ],
+  "compute_capability": "120",
+  "crossings": 1028,
+  "cuda_driver": 13030,
+  "cuda_runtime": 13020,
+  "cupy": "14.2.0",
+  "device": "NVIDIA GeForce RTX 5080",
+  "directions_per_face": 9,
+  "energies": 97,
+  "histories": 257,
+  "peak_normalized_max_abs_difference": {
+    "backward/array/field_im": 1.8031421517105364e-15,
+    "backward/array/field_re": 2.1385201010606596e-15,
+    "backward/array/power": 2.235302327652326e-15,
+    "backward/fused/field_im": 1.8031421517105364e-15,
+    "backward/fused/field_re": 2.1385201010606596e-15,
+    "backward/fused/power": 1.8627519397102717e-15,
+    "backward/gaussian/pair_yield": 4.187260646778238e-15,
+    "backward/gaussian/self_yield": 4.883306891676486e-15,
+    "backward/gaussian/yield_per_electron": 4.157204324895553e-15,
+    "backward/sampled-weighted/pair_yield": 2.237570980940424e-15,
+    "backward/sampled-weighted/self_yield": 2.9620483384148124e-15,
+    "backward/sampled-weighted/yield_per_electron": 2.1301725788438383e-15,
+    "forward/array/field_im": 1.9395156847487387e-15,
+    "forward/array/field_re": 9.91277852181001e-16,
+    "forward/array/power": 1.6924414924435054e-15,
+    "forward/fused/field_im": 1.8317648133738085e-15,
+    "forward/fused/field_re": 9.0116168380091e-16,
+    "forward/fused/power": 1.861685641687856e-15,
+    "forward/gaussian/pair_yield": 2.3049363897192773e-15,
+    "forward/gaussian/self_yield": 1.9960789027024573e-15,
+    "forward/gaussian/yield_per_electron": 2.3299985829063547e-15,
+    "forward/sampled-weighted/pair_yield": 2.8006512285850577e-15,
+    "forward/sampled-weighted/self_yield": 2.7629835465811845e-15,
+    "forward/sampled-weighted/yield_per_electron": 2.878417247842413e-15
+  },
+  "remote_dir": "/home/aamador/pyrite-615 (isolated; clean sync stamp)",
+  "response_digests": {
+    "jc": "03c12af7b17510862e867f80e74d1a4175ce294198c572e1d694615e1a8ed6cd",
+    "rakic": "f242ba3fd156e1089d7e78bb5d55f595d9e195d7033b07eb35421b8c613b3230"
+  },
+  "revision": "816a0b59541ed1754fa807a6edc21826e1522aef",
+  "rtol": 1e-09,
+  "timestamp_utc": "2026-10-22T03:46:35.521512+00:00",
+  "validation_ids": [
+    "optical-planar-tr",
+    "optical-ctr-population"
+  ]
+}

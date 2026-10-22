@@ -239,3 +239,21 @@ require derived or adapted material to be marked as such.
   restricted to the record's actual endpoints (about 0.2–5 eV). Sample
   temperature is unspecified. This is a fit to measurements, not a new
   measured dataset or a general optical material library.
+
+## refractiveindex.info optical response: Johnson–Christy Au
+
+- **Database author**: Mikhail Polyanskiy and contributors.
+- **License**: CC0 1.0 Universal Public Domain Dedication,
+  <https://creativecommons.org/publicdomain/zero/1.0/>; the upstream record
+  explicitly states this dedication.
+- **Source**: [Au Johnson–Christy record](https://github.com/polyanskiy/refractiveindex.info-database/blob/c5c2f188e848453def5970e347399d653df2ffc2/database/data/main/Au/nk/Johnson.yml),
+  revision `c5c2f188e848453def5970e347399d653df2ffc2`.
+  Unmodified bytes ship in `src/pyrite/data/optical/Au-Johnson.yml`, SHA-256
+  `9f4bdab6bd49f7c6a1c48b5fb5482c7448caf4b6de39594a34ecd66dcf592774`.
+- **Reference**: P. B. Johnson and R. W. Christy, “Optical constants of the
+  noble metals,” *Physical Review B* **6**, 4370–4379 (1972),
+  <https://doi.org/10.1103/PhysRevB.6.4370>.
+- **Use**: measured room-temperature scalar gold refractive index (49 nodes,
+  about 0.64–6.6 eV), converted as for the Rakić record; used for the
+  published optical transition-radiation comparison with Coenen et al. (2011),
+  whose calculation used these constants.

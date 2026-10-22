@@ -30,6 +30,7 @@ run through the collector.
 
 | Artifact | Purpose |
 |---|---|
+| `optical_transition_cuda.py` | Real CUDA parity of optical-band TR/CTR: per-history power and complex bunch field before squaring (fused kernel and CuPy array route) and the optical scorer's self/pair/per-electron yields for importance-weighted sampled and Gaussian laws, on a Johnson–Christy/Rakić Au multilayer. Stage a clean tree with `pyrite remote sync`, run in a bounded GPU allocation, collect JSON evidence. No CPU fallback. |
 | `optical_response_cuda.py` | Real CUDA complex128 upload and planar optical TR parity for the pinned CC0 Au response; unsupported-band/component refusal. Stage with `pyrite remote sync`, run in a bounded GPU allocation, and collect JSON evidence. No CPU fallback. |
 | `channeling_overflow.py` | Experimental full-depth planar momentum instrument (#522): nonwrapped differential gain, unresolved probability, in-band gain shift and closure-gated conditional angle samples. Fixed-energy research diagnostic; no production handoff or derived escape boundary. |
 | `axial_escape_accounting.py` | Bounded deterministic Si TDS plane-wave comparison: a position-diagonal sink cannot identify outgoing Fourier-window escape for different incident momenta (#548). Research only; no physical escape model or validation verdict. |

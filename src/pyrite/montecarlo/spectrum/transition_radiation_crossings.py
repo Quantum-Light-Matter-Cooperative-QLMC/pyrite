@@ -48,6 +48,7 @@ __all__ = [
     "boundary_crossings",
     "crossing_amplitudes",
     "crossing_transition_radiation",
+    "history_field_sums",
 ]
 
 #: ``layer_before``/``layer_after`` code of the vacuum outside either face.
@@ -92,6 +93,12 @@ class BoundaryCrossings:
         Layer boundaries between equal compositions, not recorded.
     n_side_exits
         ``EXIT_SIDE`` rows, not recorded.
+    straight_before_ang, straight_after_ang
+        Straight path [Å] of the track on the incoming and outgoing side of the
+        crossing: summed row lengths until the transported direction changes or
+        the track ends; ``inf`` on a vacuum side (no transport scatters there).
+        ``None`` for records not derived from transport rows. They bound the
+        locally straight formation assumption (``optical_transition``).
     """
 
     electron_id: np.ndarray
@@ -108,6 +115,8 @@ class BoundaryCrossings:
     z_interfaces_ang: np.ndarray
     n_matched_dropped: int
     n_side_exits: int
+    straight_before_ang: np.ndarray | None = None
+    straight_after_ang: np.ndarray | None = None
 
     def __len__(self) -> int:
         return int(self.interface.size)
@@ -235,6 +244,19 @@ def boundary_crossings(
     if np.any((beyond < VACUUM) | (beyond >= n_layers)):
         raise ValueError("a layer boundary leads outside the stack")
 
+    run_back, run_forward = _straight_runs(track, v_hat, length)
+    # Entry: vacuum before, the first row's forward run after. A face at a
+    # row end: that row's backward run before; the next row's forward run
+    # after an inner boundary (transport keeps direction across it), vacuum
+    # after an exit.
+    following = np.minimum(index + 1, kind.size - 1)
+    continues = (index + 1 < kind.size) & (track[following] == track[index])
+    inner_after = np.where(continues, run_forward[following], 0.0)
+    straight_before = np.where(is_entry, np.inf, run_back[index])
+    straight_after = np.where(
+        is_entry, run_forward[index], np.where(beyond == VACUUM, np.inf, inner_after)
+    )
+
     ranked = np.lexsort((age, track[index]))
     index, position, interface = index[ranked], position[ranked], interface[ranked]
     count = index.size
@@ -253,7 +275,30 @@ def boundary_crossings(
         z_interfaces_ang=planes,
         n_matched_dropped=int(np.count_nonzero(matched)),
         n_side_exits=int(np.count_nonzero(kind == EVENT_EXIT_SIDE)),
+        straight_before_ang=straight_before[ranked],
+        straight_after_ang=straight_after[ranked],
     )
+
+
+def _straight_runs(track, v_hat, length):
+    """Backward (start of run to row end) and forward (row start to run end) lengths.
+
+    A run is a maximal sequence of consecutive rows of one track with the same
+    direction; ``SUBSTEP`` rows are integration nodes and keep it.
+    """
+    count = track.size
+    new = np.ones(count, dtype=bool)
+    if count > 1:
+        turned = np.any(np.abs(v_hat[1:] - v_hat[:-1]) > 1e-12, axis=-1)
+        new[1:] = (track[1:] != track[:-1]) | turned
+    group = np.cumsum(new) - 1
+    cumulative = np.cumsum(length)
+    start = np.flatnonzero(new)
+    before_start = np.where(start > 0, cumulative[start - 1], 0.0)
+    end = np.r_[start[1:], count] - 1
+    backward = cumulative - before_start[group]
+    forward = cumulative[end][group] - cumulative + length
+    return backward, forward
 
 
 _FLIP = np.array([1.0, -1.0, -1.0])  # rotation by pi about x: the entrance face on top
@@ -393,22 +438,48 @@ def crossing_transition_radiation(
     n = np.asarray(direction, dtype=float)
     shape = np.broadcast_shapes(energy.shape, n.shape[:-1])
     omega_nz2 = xp.asarray(np.broadcast_to(energy * n[..., 2] ** 2, shape))
-    order = np.argsort(crossings.electron_id, kind="stable")
-    history = crossings.electron_id[order]
-    starts = np.flatnonzero(np.r_[True, history[1:] != history[:-1]])[: history.size]
-    if history.size and _fused_kernel(xp):
-        total, field = _device_sums(
-            _take(crossings, order), starts, energy, n, layer_eps, coherence, shape
-        )
-    else:
-        total, field = _chunked_sums(
-            crossings, order, starts, energy, n, layer_eps, coherence, shape, max_elements, xp
-        )
+    total, field = history_field_sums(
+        crossings, energy, n, layer_eps, coherence=coherence, max_elements=max_elements, xp=xp
+    )
     if coherence == "bunch":
         total = _bunch_power(
             total, field, energy, shape, n_electrons, physical_electrons, form_factor, xp
         )
     return omega_nz2 * total / (16.0 * np.pi**4 * int(n_electrons))
+
+
+def history_field_sums(
+    crossings: BoundaryCrossings,
+    photon_energy_eV,
+    direction,
+    layer_eps,
+    *,
+    coherence: str = "history",
+    max_elements: int = 1 << 22,
+    xp=np,
+):
+    """``(sum_e |S_e|^2, sum_e S_e)`` of the crossing records, on ``xp``.
+
+    ``S_e`` sums the charge-weighted crossing amplitudes of history ``e``
+    (``coherence="crossing"``: of one crossing). The charges are multiplied
+    into the amplitudes, so scaling every crossing of a history by ``c_e``
+    yields ``sum c_e^2 |S_e|^2`` and ``sum c_e S_e``: the weighted moments of
+    :mod:`~pyrite.montecarlo.spectrum.optical_transition` use this. Arrays
+    have shapes ``s`` and ``(*s, 3)`` for the broadcast energy/direction shape.
+
+    Validation: tr-crossing-superposition, tr-coherent-bunch, optical-ctr-population
+    """
+    energy = np.asarray(photon_energy_eV, dtype=float)
+    n = np.asarray(direction, dtype=float)
+    shape = np.broadcast_shapes(energy.shape, n.shape[:-1])
+    order = np.argsort(crossings.electron_id, kind="stable")
+    history = crossings.electron_id[order]
+    starts = np.flatnonzero(np.r_[True, history[1:] != history[:-1]])[: history.size]
+    if history.size and _fused_kernel(xp):
+        return _device_sums(_take(crossings, order), starts, energy, n, layer_eps, coherence, shape)
+    return _chunked_sums(
+        crossings, order, starts, energy, n, layer_eps, coherence, shape, max_elements, xp
+    )
 
 
 def _fused_kernel(xp) -> bool:
@@ -511,8 +582,13 @@ def _take(crossings: BoundaryCrossings, index) -> BoundaryCrossings:
             "layer_after",
         )
     }  # fmt: skip
+    runs = {
+        name: None if getattr(crossings, name) is None else getattr(crossings, name)[index]
+        for name in ("straight_before_ang", "straight_after_ang")
+    }
     return BoundaryCrossings(
         **fields,
+        **runs,
         z_interfaces_ang=crossings.z_interfaces_ang,
         n_matched_dropped=crossings.n_matched_dropped,
         n_side_exits=crossings.n_side_exits,

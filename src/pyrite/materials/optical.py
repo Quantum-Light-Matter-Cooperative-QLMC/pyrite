@@ -179,27 +179,79 @@ def gold_rakic_response() -> OpticalResponse:
     Assumes local scalar nonmagnetic response. Vacuum n=1, k=0 gives epsilon=1.
     Validation: optical-material-response
     """
-    path = Path(__file__).parents[1] / "data" / "optical" / "Au-Rakic-LD.yml"
+    return _refractiveindex_nk(
+        "Au-Rakic-LD.yml",
+        _RAKIC_SHA256,
+        medium="Au",
+        record="Au/nk/Rakic-LD",
+        sample_state="Rakić 1998 Lorentz–Drude fit to multiple experimental sources; temperature unspecified",
+        reference="Rakić et al., Appl. Opt. 37, 5271–5283 (1998); doi:10.1364/AO.37.005271",
+        temperature_K=None,
+    )
+
+
+_JOHNSON_SHA256 = "9f4bdab6bd49f7c6a1c48b5fb5482c7448caf4b6de39594a34ecd66dcf592774"
+
+
+def gold_johnson_christy_response() -> OpticalResponse:
+    """Pinned CC0 Au Johnson–Christy measured n, k; tabulated band only (~0.64–6.6 eV).
+
+    Room-temperature thin-film measurement of the optical constants used by
+    Coenen et al. (2011) for their 30 keV gold TR calculation, kept for that
+    published comparison. The source states "room temperature" without a
+    value; ``temperature_K`` is therefore unspecified. Linear interpolation
+    between the 49 measured nodes does not resolve features narrower than the
+    node spacing (about 0.1 eV).
+
+    Source: P. B. Johnson and R. W. Christy, Phys. Rev. B 6, 4370 (1972);
+    pinned CC0 refractiveindex.info record. Assumes local scalar nonmagnetic
+    response. Validation: optical-material-response, optical-planar-tr
+    """
+    return _refractiveindex_nk(
+        "Au-Johnson.yml",
+        _JOHNSON_SHA256,
+        medium="Au",
+        record="Au/nk/Johnson",
+        sample_state="Johnson–Christy 1972 measured thin films; room temperature, value unstated",
+        reference="P. B. Johnson and R. W. Christy, Phys. Rev. B 6, 4370–4379 (1972); "
+        "doi:10.1103/PhysRevB.6.4370",
+        temperature_K=None,
+    )
+
+
+def _refractiveindex_nk(
+    filename: str,
+    digest: str,
+    *,
+    medium: str,
+    record: str,
+    sample_state: str,
+    reference: str,
+    temperature_K: float | None,
+) -> OpticalResponse:
+    """Load one pinned, hash-verified refractiveindex.info tabulated-nk record."""
+    path = Path(__file__).parents[1] / "data" / "optical" / filename
     raw = path.read_bytes()
-    if sha256(raw).hexdigest() != _RAKIC_SHA256:
-        raise ValueError("Au Rakić optical data failed pinned SHA-256 verification")
-    record = yaml.safe_load(raw)["DATA"][0]
-    if record["type"] != "tabulated nk":
-        raise ValueError("Au Rakić optical record must contain scalar tabulated nk")
+    if sha256(raw).hexdigest() != digest:
+        raise ValueError(f"{filename} optical data failed pinned SHA-256 verification")
+    data = yaml.safe_load(raw)["DATA"][0]
+    if data["type"] != "tabulated nk":
+        raise ValueError(f"{filename} optical record must contain scalar tabulated nk")
     rows = np.array(
-        [line.split() for line in record["data"].splitlines() if line.strip()], dtype=float
+        [line.split() for line in data["data"].splitlines() if line.strip()], dtype=float
     )
     energy = HC_EV_ANG / (rows[:, 0] * 1e4)
     order = np.argsort(energy)
     eps = (rows[:, 1] + 1j * rows[:, 2]) ** 2
     return OpticalResponse(
-        medium="Au",
+        medium=medium,
         segments=((energy[order], eps[order]),),
-        source=f"https://github.com/polyanskiy/refractiveindex.info-database/blob/{_RAKIC_REVISION}/database/data/main/Au/nk/Rakic-LD.yml",
-        source_sha256=_RAKIC_SHA256,
+        source=f"https://github.com/polyanskiy/refractiveindex.info-database/blob/{_RAKIC_REVISION}/database/data/main/{record}.yml",
+        source_sha256=digest,
         license="CC0-1.0",
-        sample_state="Rakić 1998 Lorentz–Drude fit to multiple experimental sources; temperature unspecified",
-        dataset_id="refractiveindex.info/main/Au/nk/Rakic-LD",
-        reference="Rakić et al., Appl. Opt. 37, 5271–5283 (1998); doi:10.1364/AO.37.005271",
+        sample_state=sample_state,
+        dataset_id=f"refractiveindex.info/main/{record}",
+        reference=reference,
         source_units="vacuum wavelength um; refractive index n,k dimensionless",
+        temperature_K=temperature_K,
     )

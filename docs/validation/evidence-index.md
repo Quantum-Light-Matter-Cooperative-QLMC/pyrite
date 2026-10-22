@@ -138,6 +138,8 @@ channeling/cr-mcwf-regression-estimator
 
 radiation-physics/absorption-length
 radiation-physics/optical-material-response
+radiation-physics/optical-planar-tr
+radiation-physics/optical-ctr-population
 radiation-physics/brem-source-comparison
 radiation-physics/brem-spectrum
 radiation-physics/bremslib-angular-model

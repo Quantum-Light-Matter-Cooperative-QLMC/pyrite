@@ -54,6 +54,7 @@ CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
     "checks/multilayer_validation_check.py": ("multilayer-stack", "self-absorption"),
     "checks/transition_radiation_omission.py": ("tr-detected-omission-bound",),
     "checks/optical_response_cuda.py": ("optical-material-response",),
+    "checks/optical_transition_cuda.py": ("optical-planar-tr", "optical-ctr-population"),
     # Decision evidence for the pixel angular-reconstruction policy (#23); v1
     # makes no ledgered reconstruction-accuracy claim, so it emits no records.
     "checks/pixel_reconstruction_oracle.py": (),
