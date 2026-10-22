@@ -181,7 +181,7 @@ The Ahmad 2017 (`XNZTLK4M`) and Taft-Philipp 1965 (`RMIJPTUW`) findings of the p
 * - $\epsilon_\parallel(\omega)$, 0-3 eV
   - Partly (a)
   - Ermolaev 2021 (open access, 0.73-3.4 eV); Zeppenfeld dashed region
-  - Ermolaev can test the assumed $\epsilon_1^\parallel(0)=9$. Its SI fit parameters are not yet read.
+  - Ermolaev's SI (c-axis Cauchy fit) gives about 6.1 against the assumed 9; kept at 9 with a bounded systematic, see {ref}`sec-mos2-eps1par-decision`.
 * - $\epsilon_\parallel(\omega)$, 30-50 eV
   - **No (b)**
   - None measured. Yue Fig. 4(c,e) gives a TD-LDA calculation along A (to 50 eV)
@@ -230,3 +230,68 @@ Not needed any longer: Beal-Hughes (read; independent only 1-14 eV) and Yue's ma
 ## Next slice
 
 Decide the 30-50 eV treatment (item 1). Then digitize Zeppenfeld Figs. 1-2 and Bell-Liang Figs. 2-3 and 6(a) with stated uncertainty; fit per-direction oscillator sets with each $\epsilon_1(0)$ treated as a free, flagged anchor; check both sum rules and the 6-versus-8 electron partition; and test the uniaxial mixing against hBN (Tarrio-Schnatterly Figs. 2, 8, 9) before any MoS2 row is added. Until then MoS2 stays at its scalar in-plane catalog row and must be reported as not an anisotropic channeling anchor.
+
+
+(sec-mos2-digitization-protocol)=
+## Digitization protocol (#536, #541)
+
+The directional model reads four digitized curves of Zeppenfeld Fig. 2 and checks them against the two loss functions of Fig. 1. Nothing in the code invents a value: with no registered dataset `electronic_kernel` keeps the scalar response and `load_directional_loss("mos2")` raises.
+
+**Files.** Under `src/pyrite/data/directional_loss/mos2/`, one CSV per curve with header `energy_eV,value` and `#` provenance lines (source figure, axis calibration points, digitizer, estimated tolerance in eV and in value):
+
+| File | Curve | Notes |
+|---|---|---|
+| `eps1_perp.csv`, `eps2_perp.csv` | Fig. 2 upper panel, `E ⊥ c` | joined branches below 15 eV and the ×10 branch above, already divided by 10 |
+| `eps1_par.csv`, `eps2_par.csv` | Fig. 2 lower panel, `E ∥ c` | same; the 0–3 eV parts are dashed (uncertain, per the author) |
+| `elf_perp.csv`, `elf_par.csv` (optional) | Fig. 1 `-Im 1/ε`, `q ⊥ c` (left axis) and `q ∥ c` (right axis) | the ×3 branches below 14 eV (⊥) and 17 eV (∥) divided by 3 |
+
+**Reading the figure** (the agent's reading, from zooming on the 300 dpi rendering of the Zotero PDF `VUGI9WE4`; confirm against the plot before digitizing). In both Fig. 2 panels the curve starting at `ε₁(0)` (14.9 for ⊥, 9 for ∥) is **ε₁**, and the steep curve rising from the baseline near 1.6 eV (⊥) or 2 eV (∥) is **ε₂**. They cross near 2.2 eV (⊥, value about 24). The curve labelled ε₂ above 3 eV (shoulder 12.5 at 4 eV, 2.5 at 8.5 eV) is the continuation of that rising ε₂; the one labelled ε₁ continues the descent of ε₁. Sanity checks: `ε₂/(ε₁²+ε₂²)` at 8.8 eV must give the Fig. 1 peak (about 0.46 after the ×3 division) and ε₂ must be non-negative everywhere. Axis ticks, read from the rendering: Fig. 2 energy ticks at 0, 5, 10, 15, 20, 25, 30 eV; left ε ticks every 5 units (⊥ spans −10…30, ∥ −10…20).
+
+**Registering.** Uncomment the `[mos2]` block in `src/pyrite/data/directional_loss.toml`, keep `status = "provisional"`, regenerate `CHANNELING_MODEL` (new suffix) in `montecarlo/channeling/handoff.py`, then run `tests/montecarlo/test_channeling_directional.py` (the MoS₂ tests stop skipping). Items 2–6 of #541 (ε₁∥(0), the 6-versus-8 π electron count, per-direction f-sum, the 30–50 eV extension, the intermediate-angle test) stay open and keep the warning.
+
+**Chosen 30 eV treatment.** Above the last tabulated energy the loss follows the free-electron tail `ELF(ω) = Im ε(ω_max)(ω_max/ω)³`, the `ε → 1` asymptote matched to `Im ε` (maintainer decision, 2026-10-22). Matching `ELF(ω_max)` instead overcounts: at 31.5 eV ε₁ ≈ 0.55, so the ELF is still about 3 Im ε on the 23 eV plasmon shoulder, and that tail gave closure 1.19 (⊥) / 1.34 (∥). The tail share of the f-sum is reported per direction (`tail_fraction`) and each direction is renormalized to 18 electrons only when its raw closure is within the entry's `closure_tolerance`.
+
+## Registered dataset (2026-10-22)
+
+The maintainer digitized Zeppenfeld Fig. 2 (all four curves, main and ×10 branches). `src/pyrite/data/directional_loss/mos2/eps{1,2}_{perp,par}.csv` join each main branch (to 14-15 eV) with its ×10 branch divided by 10 (to 31.5 eV), sorted by energy; each `ε₂` file adds one figure-baseline zero at the first `ε₁` energy (about 0.59 eV). Branch assignment in the 2-3 eV crossing was checked against a 600 dpi rendering. Tool and axis calibration points were not recorded; estimated tolerance ±0.1 eV and ±0.3 (main) / ±0.03 (×10 branch, after division). Fig. 1 is digitized too (`elf_perp.csv`, `elf_par.csv`: main branches plus the ×3 branches below 14 eV (⊥) and 17 eV (∥) divided by 3; ±0.1 eV, ±0.05 main, ±0.02 ×3). Fig. 1 ⊥ is on the left axis, ∥ on the right.
+
+```{list-table} Diagnostics of the registered MoS2 dataset (catalog Ω for 18 electrons = 21.61 eV).
+:name: tbl-mos2-registered
+:header-rows: 1
+
+* - Quantity
+  - ⊥ (`E ⊥ c`)
+  - ∥ (`E ∥ c`)
+* - ELF peaks (Zeppenfeld: 8.75 and 23 eV ⊥; 23 eV ∥, no π plasmon)
+  - 8.75, 23.27 eV
+  - 23.01 eV; ELF(8.5 eV) at 0.38 of the ⊥ π peak
+* - `n_eff` from `ε₂` at 9 / 20 / 31.5 eV
+  - 7.1 / 14.6 / 16.3
+  - 5.4 / 15.0 / 16.8
+* - `n_eff` from the ELF at 31.5 eV
+  - 13.4
+  - 13.2
+* - Raw closure with tail (tail share)
+  - 0.886 (0.16)
+  - 0.929 (0.21)
+* - Static sum vs `1 − 1/ε₁(0)`
+  - 0.866 vs 0.933
+  - 0.816 vs 0.889
+```
+
+The `ε₂` route gives the per-direction f-sum asked for by #541: both directions reach 16-17 of 18 electrons by 31.5 eV, the ∥ direction slightly more. `n_eff⊥` at the 8.75 eV π plasmon is 6.8-7.1, between the 6 (Zeppenfeld) and 8 (Bell-Liang, Beal-Hughes) of the partition question; the digitization tolerance does not resolve it. The static-sum shortfall (7-8%) is the part of `1 − 1/ε₁(0)` the tail cannot supply; it depends on the assumed `ε₁∥(0) = 9` for ∥.
+
+**Fig. 1 against Fig. 2.** The ELF computed from the digitized Fig. 2 $\epsilon$ reproduces the digitized Fig. 1 over 3-30 eV within 1.2σ (⊥) and 1.4σ (∥), where σ propagates the stated reading errors through $\epsilon_2/|\epsilon|^2$ and adds the Fig. 1 reading error; no point exceeds 2σ (the anchor test). The largest absolute gap is at the 23 eV plasmon (∥: 3.52 in Fig. 1 against 3.19 from Fig. 2), where $\epsilon_1\approx0$ makes the ELF $\approx1/\epsilon_2$ with $\epsilon_2\approx0.28$, so a 0.03 reading error is already 10%. Fig. 1 peaks: ⊥ 8.73 eV (0.46) and 23.2 eV (3.34); ∥ 23.0 eV (3.52) with the π region at 0.17. Fig. 1 to 31.5 eV holds 13.7 (⊥) and 13.9 (∥) electrons on the loss f-sum, against 13.4 and 13.2 from Fig. 2.
+
+(sec-mos2-eps1par-decision)=
+## Decision: $\epsilon_1^\parallel(0)$ (2026-10-22)
+
+**Kept at 9, as the anchor of the dataset, with Ermolaev's measured value recorded as a conflict.** Reasons and the bound:
+
+* $\epsilon_1^\parallel(0)=9$ is not a separate input. It is the normalization from which Zeppenfeld built the Fig. 1 ∥ scale and the Fig. 2 ∥ curves by KK. Replacing it means re-deriving $\epsilon_\parallel$ ourselves from the digitized Fig. 1.
+* That re-derivation was done as a sensitivity test (anisotropic KK of `elf_par.csv`, zero below the 1.84 eV onset, the Im-ε-matched ω⁻³ tail above 31.8 eV, scale fixed by the static sum). With 9 it reproduces the digitized Fig. 2 ∥ to $|\Delta\epsilon_1|\le1.3$ and $|\Delta\epsilon_2|\le1.7$ over 3-30 eV, and gives $\epsilon_1^\parallel(0.6\,\text{eV})=9.2$ against 9.3 digitized. That reconstruction error is larger than the effect of the anchor itself.
+* With Ermolaev's 6.1 the ELF∥ scale changes by 6% (0.974 against 1.035), which the per-direction f-sum renormalization removes. The binned strengths change by at most 1.7% of N (L1 over bins, pure ∥; 0 for pure ⊥) and at most 5.7% in any bin above 1% of N. The static target moves from 0.889 to 0.836.
+* Ermolaev's value is a measurement, but it comes from extrapolating a transparent-range Cauchy fit (800-1700 nm) to $\lambda\to\infty$. Hieu's 8.92 is GGA-PBE, which typically overestimates $\epsilon_\infty$. The two published values bracket the anchor and do not settle it.
+* The discrepancy is real at 0.6 eV: Zeppenfeld's dashed ε₁∥ reads 9.3, while Ermolaev's fit gives 6.2 at the same wavelength. It is confined to the region the author already marks as uncertain (below 3 eV), which carries almost no f-sum weight.
+
+Consequence: the dataset stays `provisional`. The $\epsilon_1^\parallel(0)$ item of #541 is closed as a decision with a quantified ≤2% (L1) systematic, not as support for the value 9.

@@ -60,6 +60,7 @@ Lengths in angstroms, energies in eV; kernels in 1/angstrom.
 
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass
 from functools import cache
 
@@ -319,6 +320,10 @@ class ElectronicChannels:
     def weight(self, q_perp):
         """Total ``dsigma/d^2q_perp`` per electron [angstrom^4]."""
         return self.distant(q_perp) + self.close(q_perp)
+
+    def weight_pq(self, p, q_y):
+        """Total ``dsigma/d^2q_perp`` at ``(q_x, q_y)``; radial here, directional in subclasses."""
+        return self.weight(np.hypot(p, q_y))
 
 
 def electronic_channels(
@@ -837,6 +842,39 @@ def _electronic_diagonal(profile, channels, max_harmonic):
     return rho * _electronic_transform(channels, np.arange(rho.size) * profile.g_inv_ang)
 
 
+def _directional_setup(profile, oscillators, valence, c_axis):
+    """Resolve the directional valence and its optic-axis frame for ``electronic_kernel``.
+
+    Explicit ``valence`` needs a derivable or explicit ``c_axis``. Otherwise a
+    crystal with a registered dataset (and default oscillators) uses it on its
+    basal plane; other planes of that crystal keep the scalar response, with a
+    warning, because the beam azimuth is not known here.
+    """
+    from ..transport.directional_loss import ProvisionalModelWarning, registered_directional_valence
+    from .directional import plane_c_axis
+
+    if valence is not None:
+        c_axis = c_axis or plane_c_axis(profile.normal)
+        if c_axis is None:
+            raise ValueError("c_axis is required: the plane normal is not along the optic axis")
+        return valence, c_axis
+    if oscillators is not None:
+        return None, None
+    registered = registered_directional_valence(profile.crystal)
+    if registered is None:
+        return None, None
+    derived = c_axis or plane_c_axis(profile.normal, registered[1])
+    if derived is None:
+        warnings.warn(
+            f"{profile.crystal}: directional valence loss needs the beam azimuth for a "
+            "non-basal plane; using the scalar response",
+            ProvisionalModelWarning,
+            stacklevel=3,
+        )
+        return None, None
+    return registered[0], derived
+
+
 def electronic_kernel(
     profile: PlanarProfile,
     kinetic_energy_eV: float,
@@ -844,6 +882,8 @@ def electronic_kernel(
     n_cells: int = DEFAULT_CELLS,
     max_order: int = DEFAULT_MAX_ORDER,
     oscillators: MaterialShellOscillators | None = None,
+    valence=None,
+    c_axis: str | None = None,
 ) -> ScatteringKernel:
     """Return the local-density electronic-excitation kernel.
 
@@ -855,7 +895,11 @@ def electronic_kernel(
 
     ``oscillators`` defaults to the catalog shell oscillators of
     ``profile.crystal``; crystals without measured conduction-band data must
-    pass their own.
+    pass their own. ``valence`` (a
+    :class:`~..transport.directional_loss.DirectionalValence`) makes the
+    valence response uniaxial about ``c_axis`` (``x`` plane normal, ``y``
+    in-plane, ``z`` beam; see :mod:`.directional`) and emits a
+    ``ProvisionalModelWarning`` unless its status is ``anchored``.
 
     Assumptions: first Born, the PENELOPE-2024 δ-oscillator GOS of
     :func:`~pyrite.montecarlo.transport.shell_gos.shell_gos_moments`, every
@@ -869,7 +913,18 @@ def electronic_kernel(
     """
     _check_grid(n_cells, max_order)
     hbar_v = _kinematics(kinetic_energy_eV)
-    channels = electronic_channels(_profile_oscillators(profile, oscillators), kinetic_energy_eV)
+    valence, c_axis = _directional_setup(profile, oscillators, valence, c_axis)
+    if valence is None:
+        channels = electronic_channels(
+            _profile_oscillators(profile, oscillators), kinetic_energy_eV
+        )
+    else:
+        from ..transport.directional_loss import catalog_directional_oscillators
+        from .directional import directional_channels
+
+        valence.warn_if_provisional()
+        base = oscillators or catalog_directional_oscillators(profile.crystal, valence)
+        channels = directional_channels(base, valence, kinetic_energy_eV, c_axis)
     g = profile.g_inv_ang
     root = _root_density(profile, 2 * max_order)
     width = g / n_cells
@@ -888,8 +943,10 @@ def electronic_kernel(
     for index, (nodes, node_w) in enumerate(zip(p, p_w, strict=True)):
         if bins[index] == 0:
             nodes, node_w = centre_p, centre_pw
-        q = np.sqrt(nodes[:, None] ** 2 + q_y[None, :] ** 2).ravel()
-        weight = (node_w[:, None] * 2.0 * q_yw[None, :]).ravel() * channels.weight(q)
+        px = np.broadcast_to(nodes[:, None], (nodes.size, q_y.size)).ravel()
+        qy = np.broadcast_to(q_y[None, :], (nodes.size, q_y.size)).ravel()
+        q = np.hypot(px, qy)
+        weight = (node_w[:, None] * 2.0 * q_yw[None, :]).ravel() * channels.weight_pq(px, qy)
         lo, w_lo, hi, w_hi = root.hat_weights(q)
         abel[index] = np.bincount(lo, weight * w_lo, root.log_q.size) + np.bincount(
             hi, weight * w_hi, root.log_q.size
