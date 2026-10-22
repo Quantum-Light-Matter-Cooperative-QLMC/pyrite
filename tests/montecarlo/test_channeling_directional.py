@@ -249,17 +249,27 @@ def test_mos2_dataset_closes_both_sum_rules(omega_ev):
 
 
 def test_mos2_dielectric_matches_the_digitized_loss_function():
-    # Independent Fig. 1 curves (-Im 1/eps, optional files elf_perp.csv / elf_par.csv): the
-    # KK-derived eps of Fig. 2 must reproduce them to the digitization tolerance.
+    # Fig. 1 (-Im 1/eps, elf_perp.csv / elf_par.csv) is the measured loss; Fig. 2 eps is its
+    # KK transform. Each must reproduce the other within 2 sigma of the digitization error
+    # stated in the CSV headers, propagated through ELF = eps2/|eps|^2 (at the 23 eV plasmon
+    # eps1 ~ 0, so a 0.03 error on eps2 ~ 0.3 is already ~10% of the peak).
     from pyrite import DATA_DIR
     from pyrite.montecarlo.transport.directional_loss import _read_curve
 
     dielectric, entry = _mos2_or_skip()
     folder = DATA_DIR / entry["directory"]
-    for name, cos2 in (("elf_perp", 0.0), ("elf_par", 1.0)):
-        if not (folder / f"{name}.csv").is_file():
-            pytest.skip(f"{name}.csv not digitized")
-        energy, elf = _read_curve(folder / f"{name}.csv")
+    # (cos^2 alpha, Fig. 2 x10-branch start, Fig. 1 x3-branch end) in eV.
+    for name, cos2, eps_split, elf_split in (("perp", 0.0, 15.0, 14.0), ("par", 1.0, 14.0, 17.0)):
+        energy, elf = _read_curve(folder / f"elf_{name}.csv")
         keep = (energy > 3.0) & (energy < min(30.0, dielectric.energy_eV[-1]))
-        got = dielectric.elf(cos2, energy[keep])
-        assert np.max(np.abs(got - elf[keep])) < 0.1 * np.max(elf[keep])
+        energy, elf = energy[keep], elf[keep]
+        eps = dielectric.eps_perp if cos2 == 0.0 else dielectric.eps_par
+        e1 = np.interp(energy, dielectric.energy_eV, eps.real)
+        e2 = np.interp(energy, dielectric.energy_eV, eps.imag)
+        mod2 = e1**2 + e2**2
+        d_eps = np.where(energy < eps_split, 0.3, 0.03)
+        sigma = np.hypot(
+            np.hypot(2.0 * e1 * e2, e1**2 - e2**2) / mod2**2 * d_eps,
+            np.where(energy < elf_split, 0.02, 0.05),
+        )
+        assert np.all(np.abs(dielectric.elf(cos2, energy) - elf) < 2.0 * sigma)
