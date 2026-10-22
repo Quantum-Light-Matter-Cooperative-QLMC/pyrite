@@ -1,0 +1,878 @@
+{
+ "allocation": {
+  "OMP_NUM_THREADS": 8,
+  "OPENBLAS_NUM_THREADS": 8,
+  "cpus": 8,
+  "gpus": 1,
+  "memory": "24G",
+  "partition": "gpu",
+  "time_limit_minutes": 90
+ },
+ "batch_script": "#!/bin/bash\n#SBATCH --job-name=623-qcuda\n#SBATCH --partition=gpu\n#SBATCH --gres=gpu:1\n#SBATCH --cpus-per-task=8\n#SBATCH --mem=24G\n#SBATCH --time=01:30:00\n#SBATCH --output=/home/aamador/pyrite-623-quantum-cuda/qcuda-%j.log\n# Stages run sequentially on one GPU; a failing stage is recorded and later stages still run.\nset -u\ncd /home/aamador/pyrite-623-quantum-cuda\nUV=/home/aamador/.local/bin/uv\nexport OMP_NUM_THREADS=8 OPENBLAS_NUM_THREADS=8 MKL_NUM_THREADS=8\nout=pyrite-output/research/issue623/quantum-cuda-20261021\nmkdir -p \"$out\"\ntest ! -e \"$out/status.txt\" || { echo \"refusing to overwrite $out\"; exit 2; }\ncp .pyrite-sync \"$out/code-identity.txt\"\ncp \"$0\" \"$out/run.sh\"\nsha256sum checks/axial_mcwf_cuda.py checks/axial_split_step_precision_cuda.py src/pyrite/montecarlo/channeling/_axial_cuda*.py src/pyrite/montecarlo/channeling/axial_mcwf.py > \"$out/source-sha256.txt\"\nnvidia-smi --query-gpu=name,memory.total,driver_version,compute_cap,clocks.max.sm --format=csv > \"$out/gpu.txt\"\n$UV run --no-sync python -c 'import sys,numpy,scipy,cupy; print(sys.version); print(\"numpy\",numpy.__version__); print(\"scipy\",scipy.__version__); print(\"cupy\",cupy.__version__, cupy.cuda.runtime.runtimeGetVersion())' > \"$out/environment.txt\"\nstage() {\n  name=$1; shift\n  start=$(date +%s)\n  /usr/bin/time -v -o \"$out/$name.resources.txt\" \"$@\" > \"$out/$name.out\" 2> \"$out/$name.err\"\n  code=$?\n  echo \"$name exit=$code seconds=$(( $(date +%s) - start ))\" | tee -a \"$out/status.txt\"\n}\n# 1. Functional: every quantum/channeling CUDA test module, serial, slow included, skips reported.\nPYRITE_TEST_WORKERS=1 stage tests $UV run --no-sync pyrite-dev test --slow \\\n  tests/montecarlo/test_channeling_axial_cuda.py tests/montecarlo/test_channeling_cuda.py \\\n  tests/montecarlo/test_axial_flux.py tests/montecarlo/test_axial_flux_integration.py \\\n  tests/montecarlo/test_channeling_axial_energy_mcwf.py -rs -v\n# 2. Reproduce the recorded 1 MeV hardware-target workloads.\nstage bench-default $UV run --no-sync python checks/axial_mcwf_cuda.py\n# 3. Heavy 5 MeV supercell workloads; CPU capped at 64 electrons, throughput compared per electron-step.\nstage bench-heavy $UV run --no-sync python checks/axial_mcwf_cuda.py --energy-eV 5e6 \\\n  --cpu-max-electrons 64 --repeats 2 \\\n  --workload 1,48,512,10000 --workload 2,32,512,10000 \\\n  --workload 3,32,512,10000 --workload 4,32,1024,10000\n# 4. FP32/FP64 tolerance and throughput of the no-jump split step to 10 um.\nstage precision $UV run --no-sync python checks/axial_split_step_precision_cuda.py \\\n  --out \"$out/precision.json\"\n",
+ "bench_default": {
+  "cpu": "x86_64",
+  "cuda_runtime": 13020,
+  "cupy": "14.2.0",
+  "device": "NVIDIA GeForce RTX 5080",
+  "peak_host_rss_kib": 1331288,
+  "repeats": 3,
+  "target_warm_speedup": 2,
+  "timestamp_utc": "2026-10-22T03:32:53.446987+00:00",
+  "warmup": 1,
+  "workloads": [
+   {
+    "cells": [
+     1,
+     1
+    ],
+    "depth_ang": 100,
+    "electrons": 8,
+    "energy_eV": 1000000.0,
+    "pool_reserved_bytes": 779776,
+    "pool_used_bytes": 5120,
+    "precision": "complex128",
+    "result_download_s": 4.0529994294047356e-05,
+    "result_upload_s": 7.177004590630531e-05,
+    "results": {
+     "cpu": {
+      "jumps": {
+       "electronic": 0,
+       "sink": 0,
+       "tds": 0
+      },
+      "surviving": [
+       1.0,
+       1.0,
+       1.0
+      ]
+     },
+     "cuda": {
+      "jumps": {
+       "electronic": 1,
+       "sink": 0,
+       "tds": 0
+      },
+      "surviving": [
+       1.0,
+       1.0,
+       1.0
+      ]
+     }
+    },
+    "seed": 17,
+    "setup_s": 0.15667578508146107,
+    "shape": [
+     12,
+     12
+    ],
+    "step_ang": 10,
+    "throughput_speedup": 0.09452374807008025,
+    "timings": {
+     "cpu": {
+      "cold_s": 0.0019042231142520905,
+      "electron_steps_per_s": 133422.04271634747,
+      "electrons": 8,
+      "warm_median_s": 0.0005996010731905699,
+      "warm_s": [
+       0.0006762209814041853,
+       0.0005784109234809875,
+       0.0005996010731905699
+      ]
+     },
+     "cuda": {
+      "cold_s": 0.0996289518661797,
+      "electron_steps_per_s": 12611.551552715513,
+      "electrons": 8,
+      "warm_median_s": 0.006343390792608261,
+      "warm_s": [
+       0.006594622042030096,
+       0.006343390792608261,
+       0.005983990849927068
+      ]
+     }
+    },
+    "warm_speedup": 0.09452374807008024
+   },
+   {
+    "cells": [
+     1,
+     1
+    ],
+    "depth_ang": 1000,
+    "electrons": 128,
+    "energy_eV": 1000000.0,
+    "pool_reserved_bytes": 42248704,
+    "pool_used_bytes": 56832,
+    "precision": "complex128",
+    "result_download_s": 4.127994179725647e-05,
+    "result_upload_s": 7.882993668317795e-05,
+    "results": {
+     "cpu": {
+      "jumps": {
+       "electronic": 69,
+       "sink": 2,
+       "tds": 61
+      },
+      "surviving": [
+       1.0,
+       1.0,
+       0.984375
+      ]
+     },
+     "cuda": {
+      "jumps": {
+       "electronic": 71,
+       "sink": 2,
+       "tds": 74
+      },
+      "surviving": [
+       1.0,
+       0.9921875,
+       0.984375
+      ]
+     }
+    },
+    "seed": 17,
+    "setup_s": 0.10960461408831179,
+    "shape": [
+     48,
+     48
+    ],
+    "step_ang": 10,
+    "throughput_speedup": 2.0904812473480043,
+    "timings": {
+     "cpu": {
+      "cold_s": 0.4172374710906297,
+      "electron_steps_per_s": 30989.44023108197,
+      "electrons": 128,
+      "warm_median_s": 0.41304392414167523,
+      "warm_s": [
+       0.4127891540993005,
+       0.41304392414167523,
+       0.41426014015451074
+      ]
+     },
+     "cuda": {
+      "cold_s": 4.016378612956032,
+      "electron_steps_per_s": 64782.843668888665,
+      "electrons": 128,
+      "warm_median_s": 0.19758317596279085,
+      "warm_s": [
+       0.19758317596279085,
+       0.19807254592888057,
+       0.19755968498066068
+      ]
+     }
+    },
+    "warm_speedup": 2.0904812473480043
+   }
+  ]
+ },
+ "bench_heavy": {
+  "cpu": "x86_64",
+  "cuda_runtime": 13020,
+  "cupy": "14.2.0",
+  "device": "NVIDIA GeForce RTX 5080",
+  "peak_host_rss_kib": 1455012,
+  "repeats": 2,
+  "target_warm_speedup": 2,
+  "timestamp_utc": "2026-10-22T03:35:19.031746+00:00",
+  "warmup": 1,
+  "workloads": [
+   {
+    "cells": [
+     1,
+     1
+    ],
+    "depth_ang": 10000.0,
+    "electrons": 512,
+    "energy_eV": 5000000.0,
+    "pool_reserved_bytes": 61336576,
+    "pool_used_bytes": 56832,
+    "precision": "complex128",
+    "result_download_s": 4.344014450907707e-05,
+    "result_upload_s": 0.00010076002217829227,
+    "results": {
+     "cpu": {
+      "jumps": {
+       "electronic": 236,
+       "sink": 7,
+       "tds": 99
+      },
+      "surviving": [
+       1.0,
+       0.953125,
+       0.890625
+      ]
+     },
+     "cuda": {
+      "jumps": {
+       "electronic": 2180,
+       "sink": 22,
+       "tds": 851
+      },
+      "surviving": [
+       1.0,
+       0.974609375,
+       0.95703125
+      ]
+     }
+    },
+    "seed": 17,
+    "setup_s": 0.14274548506364226,
+    "shape": [
+     48,
+     48
+    ],
+    "step_ang": 10,
+    "throughput_speedup": 3.4448007174902635,
+    "timings": {
+     "cpu": {
+      "cold_s": 1.7320645309519023,
+      "electron_steps_per_s": 36672.25574515276,
+      "electrons": 64,
+      "warm_median_s": 1.7451885273912922,
+      "warm_s": [
+       1.739494650857523,
+       1.7508824039250612
+      ]
+     },
+     "cuda": {
+      "cold_s": 4.327154883183539,
+      "electron_steps_per_s": 126328.61290288866,
+      "electrons": 512,
+      "warm_median_s": 4.052921885508113,
+      "warm_s": [
+       4.052144397981465,
+       4.05369937303476
+      ]
+     }
+    },
+    "warm_speedup": null
+   },
+   {
+    "cells": [
+     2,
+     2
+    ],
+    "depth_ang": 10000.0,
+    "electrons": 512,
+    "energy_eV": 5000000.0,
+    "pool_reserved_bytes": 136834048,
+    "pool_used_bytes": 99840,
+    "precision": "complex128",
+    "result_download_s": 4.776008427143097e-05,
+    "result_upload_s": 0.00011232099495828152,
+    "results": {
+     "cpu": {
+      "jumps": {
+       "electronic": 247,
+       "sink": 8,
+       "tds": 86
+      },
+      "surviving": [
+       1.0,
+       0.890625,
+       0.875
+      ]
+     },
+     "cuda": {
+      "jumps": {
+       "electronic": 2180,
+       "sink": 24,
+       "tds": 834
+      },
+      "surviving": [
+       1.0,
+       0.96484375,
+       0.953125
+      ]
+     }
+    },
+    "seed": 17,
+    "setup_s": 0.13787504890933633,
+    "shape": [
+     64,
+     64
+    ],
+    "step_ang": 10,
+    "throughput_speedup": 3.8055660528538304,
+    "timings": {
+     "cpu": {
+      "cold_s": 2.092605736805126,
+      "electron_steps_per_s": 29625.530053637154,
+      "electrons": 64,
+      "warm_median_s": 2.160298900445923,
+      "warm_s": [
+       2.1145472719799727,
+       2.2060505289118737
+      ]
+     },
+     "cuda": {
+      "cold_s": 4.825792657909915,
+      "electron_steps_per_s": 112741.91146992247,
+      "electrons": 512,
+      "warm_median_s": 4.541345745557919,
+      "warm_s": [
+       4.539177725091577,
+       4.543513766024262
+      ]
+     }
+    },
+    "warm_speedup": null
+   },
+   {
+    "cells": [
+     3,
+     3
+    ],
+    "depth_ang": 10000.0,
+    "electrons": 512,
+    "energy_eV": 5000000.0,
+    "pool_reserved_bytes": 325577728,
+    "pool_used_bytes": 222720,
+    "precision": "complex128",
+    "result_download_s": 5.646003410220146e-05,
+    "result_upload_s": 0.00011466001160442829,
+    "results": {
+     "cpu": {
+      "jumps": {
+       "electronic": 249,
+       "sink": 6,
+       "tds": 84
+      },
+      "surviving": [
+       1.0,
+       0.90625,
+       0.90625
+      ]
+     },
+     "cuda": {
+      "jumps": {
+       "electronic": 2155,
+       "sink": 31,
+       "tds": 819
+      },
+      "surviving": [
+       1.0,
+       0.95703125,
+       0.939453125
+      ]
+     }
+    },
+    "seed": 17,
+    "setup_s": 0.137439695186913,
+    "shape": [
+     96,
+     96
+    ],
+    "step_ang": 10,
+    "throughput_speedup": 6.64788255644352,
+    "timings": {
+     "cpu": {
+      "cold_s": 4.858478926122189,
+      "electron_steps_per_s": 13329.77050075616,
+      "electrons": 64,
+      "warm_median_s": 4.8012829625513405,
+      "warm_s": [
+       4.68160379701294,
+       4.920962128089741
+      ]
+     },
+     "cuda": {
+      "cold_s": 6.053803189890459,
+      "electron_steps_per_s": 88614.74879337227,
+      "electrons": 512,
+      "warm_median_s": 5.7778192340629175,
+      "warm_s": [
+       5.778807741124183,
+       5.776830727001652
+      ]
+     }
+    },
+    "warm_speedup": null
+   },
+   {
+    "cells": [
+     4,
+     4
+    ],
+    "depth_ang": 10000.0,
+    "electrons": 1024,
+    "energy_eV": 5000000.0,
+    "pool_reserved_bytes": 627567616,
+    "pool_used_bytes": 394752,
+    "precision": "complex128",
+    "result_download_s": 7.120007649064064e-05,
+    "result_upload_s": 0.00015883101150393486,
+    "results": {
+     "cpu": {
+      "jumps": {
+       "electronic": 246,
+       "sink": 7,
+       "tds": 87
+      },
+      "surviving": [
+       1.0,
+       0.890625,
+       0.890625
+      ]
+     },
+     "cuda": {
+      "jumps": {
+       "electronic": 4282,
+       "sink": 72,
+       "tds": 1633
+      },
+      "surviving": [
+       1.0,
+       0.94921875,
+       0.9296875
+      ]
+     }
+    },
+    "seed": 17,
+    "setup_s": 0.17062821798026562,
+    "shape": [
+     128,
+     128
+    ],
+    "step_ang": 10,
+    "throughput_speedup": 9.236141311830846,
+    "timings": {
+     "cpu": {
+      "cold_s": 8.963432671967894,
+      "electron_steps_per_s": 7121.548559421643,
+      "electrons": 64,
+      "warm_median_s": 8.986809465102851,
+      "warm_s": [
+       8.997997529106215,
+       8.975621401099488
+      ]
+     },
+     "cuda": {
+      "cold_s": 15.793076653033495,
+      "electron_steps_per_s": 65775.62885388368,
+      "electrons": 1024,
+      "warm_median_s": 15.568076168070547,
+      "warm_s": [
+       15.560725579969585,
+       15.57542675617151
+      ]
+     }
+    },
+    "warm_speedup": null
+   }
+  ]
+ },
+ "code_identity": "code_digest: 0b67cddfecffe97ed10cafde61dfc32a4825e4c195a2807995837cf52065b734\ncode_revision: a2274fb037981f064a227d7bcf60b70cf4812a44\ncode_dirty: False\ncode_synced_at: 2026-10-22T03:23:55+00:00\ncode_source: alex-XPS-15-9530:/home/alex/dev/pyrite/.worktrees/issue-623-axial-entrance-zone-resume\ncode_tables_digest: 45345ae89516134faa35e6218ea2d0cb2c26ccc11d9df28b986151bcc90c5918\n",
+ "comparability": "Heavy CPU runs use 64 electrons (CUDA 512/1024); speedup is per electron-step throughput, independent RNG algorithms, so survival/jump counts are not an accuracy comparison. Precision rows compare identical deterministic no-jump split steps; jumps remain float64.",
+ "environment": "3.14.6 (main, Jun 11 2026, 04:03:53) [Clang 22.1.3 ]\nnumpy 2.5.4\nscipy 1.18.1\ncupy 14.2.0 13020\n",
+ "gpu": "name, memory.total [MiB], driver_version, compute_cap, clocks.max.sm [MHz]\nNVIDIA GeForce RTX 5080, 16303 MiB, 610.47, 12.0, 3090 MHz\n",
+ "memory_scope": "CuPy pool reserved bytes exclude CUDA-library allocations; GNU time covers the uv process tree only as reported.",
+ "precision": {
+  "cuda_runtime": 13020,
+  "cupy": "14.2.0",
+  "device": "NVIDIA GeForce RTX 5080",
+  "settings": {
+   "case": null,
+   "depth_ang": 100000.0,
+   "energy_eV": 5000000.0,
+   "out": "pyrite-output/research/issue623/quantum-cuda-20261021/precision.json",
+   "repeats": 3,
+   "seed": 23,
+   "step_ang": 10.0
+  },
+  "status": "research measurement; production axial MCWF remains complex128",
+  "timestamp_utc": "2026-10-22T03:35:20.111342+00:00",
+  "workloads": [
+   {
+    "batch": 64,
+    "cells": [
+     1,
+     1
+    ],
+    "cpu_vs_cuda128_norm_rel_err": 3.016953930957578e-12,
+    "depth_ang": 100000.0,
+    "energy_eV": 5000000.0,
+    "grid": [
+     48,
+     48
+    ],
+    "rows": [
+     {
+      "density_l1_max": 2.783656509626422e-07,
+      "depth_ang": 10.0,
+      "infidelity_max": 7.061018436615996e-14,
+      "norm_min": 0.9918689525531926,
+      "norm_rel_err_max": 3.765675855030965e-07
+     },
+     {
+      "density_l1_max": 4.4624196746546106e-07,
+      "depth_ang": 30.0,
+      "infidelity_max": 2.1582735598713043e-13,
+      "norm_min": 0.9754052078937195,
+      "norm_rel_err_max": 4.779744952729615e-07
+     },
+     {
+      "density_l1_max": 1.008599611854638e-06,
+      "depth_ang": 100.0,
+      "infidelity_max": 1.057376408652999e-12,
+      "norm_min": 0.9072961053499774,
+      "norm_rel_err_max": 1.262908337477907e-06
+     },
+     {
+      "density_l1_max": 3.6931705465875844e-06,
+      "depth_ang": 320.0,
+      "infidelity_max": 8.860689959533374e-12,
+      "norm_min": 0.6890526232197461,
+      "norm_rel_err_max": 4.1209809162569346e-06
+     },
+     {
+      "density_l1_max": 7.919729012151978e-06,
+      "depth_ang": 1000.0,
+      "infidelity_max": 6.057532253578302e-11,
+      "norm_min": 0.36393231972536194,
+      "norm_rel_err_max": 1.2676262791612488e-05
+     },
+     {
+      "density_l1_max": 1.967486494888379e-05,
+      "depth_ang": 3160.0,
+      "infidelity_max": 3.3252667286376436e-10,
+      "norm_min": 0.08128313406402737,
+      "norm_rel_err_max": 4.131126738332997e-05
+     },
+     {
+      "density_l1_max": 5.089902511699422e-05,
+      "depth_ang": 10000.0,
+      "infidelity_max": 3.008384874547687e-09,
+      "norm_min": 0.0011895561381462811,
+      "norm_rel_err_max": 0.00012933018708886763
+     },
+     {
+      "density_l1_max": 0.0001841295465162485,
+      "depth_ang": 31620.0,
+      "infidelity_max": 2.6502812833228973e-08,
+      "norm_min": 2.574118674613889e-09,
+      "norm_rel_err_max": 0.0004245740342446891
+     },
+     {
+      "density_l1_max": 0.0006039143359798653,
+      "depth_ang": 100000.0,
+      "infidelity_max": 5.251969400488221e-07,
+      "norm_min": 1.0983471202526053e-23,
+      "norm_rel_err_max": 0.0021898709704577493
+     }
+    ],
+    "step_ang": 10.0,
+    "timing": {
+     "complex128": {
+      "cold_s": 0.08158191680908203,
+      "electron_steps_per_s": 732577.9512813333,
+      "warm_median_s": 0.08736271667480469
+     },
+     "complex64": {
+      "cold_s": 0.05518252944946289,
+      "electron_steps_per_s": 1245745.7924228266,
+      "warm_median_s": 0.051374847412109376
+     }
+    },
+    "timing_steps": 1000
+   },
+   {
+    "batch": 128,
+    "cells": [
+     2,
+     2
+    ],
+    "cpu_vs_cuda128_norm_rel_err": 6.026091342441577e-13,
+    "depth_ang": 100000.0,
+    "energy_eV": 5000000.0,
+    "grid": [
+     64,
+     64
+    ],
+    "rows": [
+     {
+      "density_l1_max": 2.7040469425141316e-07,
+      "depth_ang": 10.0,
+      "infidelity_max": 1.4277468096679513e-13,
+      "norm_min": 0.9918021273238093,
+      "norm_rel_err_max": 5.841226624823936e-07
+     },
+     {
+      "density_l1_max": 3.933314057114413e-07,
+      "depth_ang": 30.0,
+      "infidelity_max": 3.623767952376511e-13,
+      "norm_min": 0.9751991332860024,
+      "norm_rel_err_max": 1.0749559667895345e-06
+     },
+     {
+      "density_l1_max": 7.907087534300846e-07,
+      "depth_ang": 100.0,
+      "infidelity_max": 1.7783552408445757e-12,
+      "norm_min": 0.9064053849850583,
+      "norm_rel_err_max": 2.968242085336259e-06
+     },
+     {
+      "density_l1_max": 2.0528115975261575e-06,
+      "depth_ang": 320.0,
+      "infidelity_max": 1.2280398919983782e-11,
+      "norm_min": 0.6856203724299105,
+      "norm_rel_err_max": 9.815494354176554e-06
+     },
+     {
+      "density_l1_max": 7.790076527628864e-06,
+      "depth_ang": 1000.0,
+      "infidelity_max": 6.802935992311632e-11,
+      "norm_min": 0.3552403303022139,
+      "norm_rel_err_max": 3.152469711675424e-05
+     },
+     {
+      "density_l1_max": 2.2963529675670495e-05,
+      "depth_ang": 3160.0,
+      "infidelity_max": 4.4570591661852177e-10,
+      "norm_min": 0.07589307186357558,
+      "norm_rel_err_max": 9.601356261549787e-05
+     },
+     {
+      "density_l1_max": 6.556284709131907e-05,
+      "depth_ang": 10000.0,
+      "infidelity_max": 4.011864618291838e-09,
+      "norm_min": 0.0010221781682302818,
+      "norm_rel_err_max": 0.00031592254382144464
+     },
+     {
+      "density_l1_max": 0.00021821758429065594,
+      "depth_ang": 31620.0,
+      "infidelity_max": 3.571737539065367e-08,
+      "norm_min": 3.1234404651662546e-09,
+      "norm_rel_err_max": 0.001105504095516345
+     },
+     {
+      "density_l1_max": 0.0007358942408334415,
+      "depth_ang": 100000.0,
+      "infidelity_max": 5.002663010511554e-07,
+      "norm_min": 1.5929431366035835e-22,
+      "norm_rel_err_max": 0.004163336508587155
+     }
+    ],
+    "step_ang": 10.0,
+    "timing": {
+     "complex128": {
+      "cold_s": 0.21373916625976563,
+      "electron_steps_per_s": 599732.8994140374,
+      "warm_median_s": 0.2134283447265625
+     },
+     "complex64": {
+      "cold_s": 0.06928995513916016,
+      "electron_steps_per_s": 1858147.9519490479,
+      "warm_median_s": 0.06888579559326172
+     }
+    },
+    "timing_steps": 1000
+   },
+   {
+    "batch": 128,
+    "cells": [
+     3,
+     3
+    ],
+    "cpu_vs_cuda128_norm_rel_err": 7.639519555327269e-13,
+    "depth_ang": 100000.0,
+    "energy_eV": 5000000.0,
+    "grid": [
+     96,
+     96
+    ],
+    "rows": [
+     {
+      "density_l1_max": 3.2657850584631427e-07,
+      "depth_ang": 10.0,
+      "infidelity_max": 1.7630341631047486e-13,
+      "norm_min": 0.9917192637794958,
+      "norm_rel_err_max": 5.851814116541973e-07
+     },
+     {
+      "density_l1_max": 4.896794051056414e-07,
+      "depth_ang": 30.0,
+      "infidelity_max": 5.084821452783217e-13,
+      "norm_min": 0.9749469725941804,
+      "norm_rel_err_max": 1.0378373280257307e-06
+     },
+     {
+      "density_l1_max": 9.673187931893878e-07,
+      "depth_ang": 100.0,
+      "infidelity_max": 2.836175738707425e-12,
+      "norm_min": 0.905452831333321,
+      "norm_rel_err_max": 2.99463029570389e-06
+     },
+     {
+      "density_l1_max": 2.826304884114948e-06,
+      "depth_ang": 320.0,
+      "infidelity_max": 1.970779095472608e-11,
+      "norm_min": 0.6835587149580775,
+      "norm_rel_err_max": 9.736606054564266e-06
+     },
+     {
+      "density_l1_max": 1.1151620077208364e-05,
+      "depth_ang": 1000.0,
+      "infidelity_max": 1.1518985765235357e-10,
+      "norm_min": 0.35287256335313955,
+      "norm_rel_err_max": 3.354115435119222e-05
+     },
+     {
+      "density_l1_max": 2.627445654057369e-05,
+      "depth_ang": 3160.0,
+      "infidelity_max": 6.912270755776717e-10,
+      "norm_min": 0.0752059140329346,
+      "norm_rel_err_max": 9.701136272200998e-05
+     },
+     {
+      "density_l1_max": 8.012452659674754e-05,
+      "depth_ang": 10000.0,
+      "infidelity_max": 5.248525392076431e-09,
+      "norm_min": 0.0010413225055670248,
+      "norm_rel_err_max": 0.0003209420245058763
+     },
+     {
+      "density_l1_max": 0.00024246639102893137,
+      "depth_ang": 31620.0,
+      "infidelity_max": 4.757525495779902e-08,
+      "norm_min": 4.626164355363207e-09,
+      "norm_rel_err_max": 0.0011296897197381893
+     },
+     {
+      "density_l1_max": 0.0006700529363695335,
+      "depth_ang": 100000.0,
+      "infidelity_max": 5.299064695929445e-07,
+      "norm_min": 1.9506884461162635e-22,
+      "norm_rel_err_max": 0.004203548035940338
+     }
+    ],
+    "step_ang": 10.0,
+    "timing": {
+     "complex128": {
+      "cold_s": 0.5058251647949219,
+      "electron_steps_per_s": 263757.98456215794,
+      "warm_median_s": 0.48529336547851565
+     },
+     "complex64": {
+      "cold_s": 0.0938786849975586,
+      "electron_steps_per_s": 1360633.1254144213,
+      "warm_median_s": 0.0940738525390625
+     }
+    },
+    "timing_steps": 1000
+   },
+   {
+    "batch": 256,
+    "cells": [
+     4,
+     4
+    ],
+    "cpu_vs_cuda128_norm_rel_err": 2.3641346678051925e-12,
+    "depth_ang": 100000.0,
+    "energy_eV": 5000000.0,
+    "grid": [
+     128,
+     128
+    ],
+    "rows": [
+     {
+      "density_l1_max": 2.6727770262940464e-07,
+      "depth_ang": 10.0,
+      "infidelity_max": 1.7674750552032492e-13,
+      "norm_min": 0.9918586141911787,
+      "norm_rel_err_max": 5.140656028615757e-07
+     },
+     {
+      "density_l1_max": 3.5959620117355276e-07,
+      "depth_ang": 30.0,
+      "infidelity_max": 4.53859172466764e-13,
+      "norm_min": 0.9753862862638242,
+      "norm_rel_err_max": 1.0431147622580734e-06
+     },
+     {
+      "density_l1_max": 6.252772152716688e-07,
+      "depth_ang": 100.0,
+      "infidelity_max": 2.290168055196773e-12,
+      "norm_min": 0.9074134980062883,
+      "norm_rel_err_max": 2.814862077024461e-06
+     },
+     {
+      "density_l1_max": 1.4742826671422883e-06,
+      "depth_ang": 320.0,
+      "infidelity_max": 1.481259559454884e-11,
+      "norm_min": 0.6884872922452641,
+      "norm_rel_err_max": 8.367540914807365e-06
+     },
+     {
+      "density_l1_max": 7.109289829481598e-06,
+      "depth_ang": 1000.0,
+      "infidelity_max": 9.167333558934843e-11,
+      "norm_min": 0.3588833184360355,
+      "norm_rel_err_max": 2.735550034619392e-05
+     },
+     {
+      "density_l1_max": 2.678810167346102e-05,
+      "depth_ang": 3160.0,
+      "infidelity_max": 6.389093698544457e-10,
+      "norm_min": 0.07733703736192041,
+      "norm_rel_err_max": 8.42905723623818e-05
+     },
+     {
+      "density_l1_max": 8.171150690051805e-05,
+      "depth_ang": 10000.0,
+      "infidelity_max": 5.494458221733112e-09,
+      "norm_min": 0.0010640843617538513,
+      "norm_rel_err_max": 0.0002733002130026465
+     },
+     {
+      "density_l1_max": 0.0002441961385479392,
+      "depth_ang": 31620.0,
+      "infidelity_max": 5.786346490843641e-08,
+      "norm_min": 4.431562693179574e-09,
+      "norm_rel_err_max": 0.0009033780148914301
+     },
+     {
+      "density_l1_max": 0.0010487359917596929,
+      "depth_ang": 100000.0,
+      "infidelity_max": 8.352277435230704e-07,
+      "norm_min": 1.3443696692805286e-22,
+      "norm_rel_err_max": 0.0037205962530518512
+     }
+    ],
+    "step_ang": 10.0,
+    "timing": {
+     "complex128": {
+      "cold_s": 2.06501708984375,
+      "electron_steps_per_s": 129587.45422362999,
+      "warm_median_s": 1.9754998779296875
+     },
+     "complex64": {
+      "cold_s": 0.2920907287597656,
+      "electron_steps_per_s": 914378.6964769432,
+      "warm_median_s": 0.2799715270996094
+     }
+    },
+    "timing_steps": 1000
+   }
+  ]
+ },
+ "resources": {
+  "bench-default": "\tCommand being timed: \"/home/aamador/.local/bin/uv run --no-sync python checks/axial_mcwf_cuda.py\"\n\tUser time (seconds): 22.24\n\tSystem time (seconds): 0.92\n\tPercent of CPU this job got: 298%\n\tElapsed (wall clock) time (h:mm:ss or m:ss): 0:07.75\n\tAverage shared text size (kbytes): 0\n\tAverage unshared data size (kbytes): 0\n\tAverage stack size (kbytes): 0\n\tAverage total size (kbytes): 0\n\tMaximum resident set size (kbytes): 1374040\n\tAverage resident set size (kbytes): 0\n\tMajor (requiring I/O) page faults: 191\n\tMinor (reclaiming a frame) page faults: 261927\n\tVoluntary context switches: 14306\n\tInvoluntary context switches: 110\n\tSwaps: 0\n\tFile system inputs: 28936\n\tFile system outputs: 9032\n\tSocket messages sent: 0\n\tSocket messages received: 0\n\tSignals delivered: 0\n\tPage size (bytes): 4096\n\tExit status: 0\n",
+  "bench-heavy": "\tCommand being timed: \"/home/aamador/.local/bin/uv run --no-sync python checks/axial_mcwf_cuda.py --energy-eV 5e6 --cpu-max-electrons 64 --repeats 2 --workload 1,48,512,10000 --workload 2,32,512,10000 --workload 3,32,512,10000 --workload 4,32,1024,10000\"\n\tUser time (seconds): 569.96\n\tSystem time (seconds): 19.91\n\tPercent of CPU this job got: 405%\n\tElapsed (wall clock) time (h:mm:ss or m:ss): 2:25.57\n\tAverage shared text size (kbytes): 0\n\tAverage unshared data size (kbytes): 0\n\tAverage stack size (kbytes): 0\n\tAverage total size (kbytes): 0\n\tMaximum resident set size (kbytes): 1455012\n\tAverage resident set size (kbytes): 0\n\tMajor (requiring I/O) page faults: 727\n\tMinor (reclaiming a frame) page faults: 301603\n\tVoluntary context switches: 424206\n\tInvoluntary context switches: 726\n\tSwaps: 0\n\tFile system inputs: 68032\n\tFile system outputs: 2120\n\tSocket messages sent: 0\n\tSocket messages received: 0\n\tSignals delivered: 0\n\tPage size (bytes): 4096\n\tExit status: 0\n",
+  "precision": "\tCommand being timed: \"/home/aamador/.local/bin/uv run --no-sync python checks/axial_split_step_precision_cuda.py --out pyrite-output/research/issue623/quantum-cuda-20261021/precision.json\"\n\tUser time (seconds): 28.61\n\tSystem time (seconds): 25.19\n\tPercent of CPU this job got: 105%\n\tElapsed (wall clock) time (h:mm:ss or m:ss): 0:50.87\n\tAverage shared text size (kbytes): 0\n\tAverage unshared data size (kbytes): 0\n\tAverage stack size (kbytes): 0\n\tAverage total size (kbytes): 0\n\tMaximum resident set size (kbytes): 2548236\n\tAverage resident set size (kbytes): 0\n\tMajor (requiring I/O) page faults: 779\n\tMinor (reclaiming a frame) page faults: 316958\n\tVoluntary context switches: 3099\n\tInvoluntary context switches: 161\n\tSwaps: 0\n\tFile system inputs: 81256\n\tFile system outputs: 3464\n\tSocket messages sent: 0\n\tSocket messages received: 0\n\tSignals delivered: 0\n\tPage size (bytes): 4096\n\tExit status: 0\n",
+  "tests": "\tCommand being timed: \"/home/aamador/.local/bin/uv run --no-sync pyrite-dev test --slow tests/montecarlo/test_channeling_axial_cuda.py tests/montecarlo/test_channeling_cuda.py tests/montecarlo/test_axial_flux.py tests/montecarlo/test_axial_flux_integration.py tests/montecarlo/test_channeling_axial_energy_mcwf.py -rs -v\"\n\tUser time (seconds): 41.11\n\tSystem time (seconds): 1.44\n\tPercent of CPU this job got: 164%\n\tElapsed (wall clock) time (h:mm:ss or m:ss): 0:25.81\n\tAverage shared text size (kbytes): 0\n\tAverage unshared data size (kbytes): 0\n\tAverage stack size (kbytes): 0\n\tAverage total size (kbytes): 0\n\tMaximum resident set size (kbytes): 1851184\n\tAverage resident set size (kbytes): 0\n\tMajor (requiring I/O) page faults: 2026\n\tMinor (reclaiming a frame) page faults: 459890\n\tVoluntary context switches: 4169\n\tInvoluntary context switches: 267\n\tSwaps: 0\n\tFile system inputs: 344064\n\tFile system outputs: 137136\n\tSocket messages sent: 0\n\tSocket messages received: 0\n\tSignals delivered: 0\n\tPage size (bytes): 4096\n\tExit status: 0\n"
+ },
+ "schema": 1,
+ "slurm_job": 1659,
+ "source_sha256": "a5ae2cde8a91ed054706ed3dec988d6329283862f995182f1cf886e4f0a65427  checks/axial_mcwf_cuda.py\n08214f722218b9c45847bbe1d4804f28efb9c5acfe6b0a7de20678c3a0ba390b  checks/axial_split_step_precision_cuda.py\nfb300c65d55cfb1bf0cf7138f77fa76d6103961b9de7c4c86cceda356f7660d8  src/pyrite/montecarlo/channeling/_axial_cuda.py\nece0849cd18fa3d001699bf8eb7429684df0af1133a36db3b2829c063dfddb9d  src/pyrite/montecarlo/channeling/_axial_cuda_dissipator.py\n37b8f9ffa3eb35720d9ed1e93342382b9fa0dd51dab4e54cf3c3738f02ec5e79  src/pyrite/montecarlo/channeling/_axial_cuda_jumps.py\nc6e85d7a1a014d02f30dd96b283aa5cad91820e84ee58ba09f95d7cdb8f27414  src/pyrite/montecarlo/channeling/_axial_cuda_rng.py\n784fffe202d851039c16d4949219bcbcca3e3a8060cb67d9cf8e8b3f628f80eb  src/pyrite/montecarlo/channeling/axial_mcwf.py\n",
+ "stage_status": "tests exit=0 seconds=26\nbench-default exit=0 seconds=7\nbench-heavy exit=0 seconds=146\nprecision exit=0 seconds=51\n",
+ "status": "measurement; production axial MCWF remains complex128; no physics-validation verdict",
+ "tests": {
+  "output": "============================= test session starts ==============================\nplatform linux -- Python 3.14.6, pytest-9.1.1, pluggy-1.7.0\nrootdir: /home/aamador/pyrite-623-quantum-cuda\nconfigfile: pyproject.toml\nplugins: zarr-3.4.1, xdist-3.8.0, cov-7.1.0, typeguard-4.6.0, platformdirs-4.13.5, timeout-2.4.0, anyio-4.15.1\ncollected 33 items\n\ntests/montecarlo/test_channeling_axial_cuda.py ..........                [ 30%]\ntests/montecarlo/test_channeling_cuda.py .....                           [ 45%]\ntests/montecarlo/test_axial_flux.py ......                               [ 63%]\ntests/montecarlo/test_axial_flux_integration.py .....                    [ 78%]\ntests/montecarlo/test_channeling_axial_energy_mcwf.py .......            [100%]\n\n============================= 33 passed in 23.24s ==============================\n"
+ },
+ "tests_tree_sha256_of_sorted_git_ls_files_hashes": "1c4205e07210a7c727fbc5fba191720c76086b08a6d133a0a22c6b03f5e9c3e2"
+}

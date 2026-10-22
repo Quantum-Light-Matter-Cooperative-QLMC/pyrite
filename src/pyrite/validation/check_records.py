@@ -32,6 +32,8 @@ CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
     # Hardware performance evidence accompanies the CUDA backend validation;
     # it does not add a separate pass/fail ledger claim.
     "checks/axial_mcwf_cuda.py": (),
+    "checks/axial_mcwf_precision_cuda.py": (),
+    "checks/axial_split_step_precision_cuda.py": (),
     "checks/axial_mcwf_return_flux.py": (),
     "checks/quantum_decoherence_budget.py": ("quantum-decoherence-budget",),
     "checks/channeling_material_survey.py": (),

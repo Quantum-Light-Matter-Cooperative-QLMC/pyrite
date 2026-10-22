@@ -132,3 +132,87 @@ was 1.21 GiB including setup and imported libraries. The raw
 all sampled timings, initial target misses, settings, source hashes and the
 ten passing hardware checks. These measurements establish this bounded
 workload only, not a general CUDA crossover size or new physical convergence.
+
+## Heavier workloads and single-precision tolerance
+
+SLURM job 1659 reran the hardware checks on the same RTX 5080 (CuPy 14.2.0,
+CUDA runtime 13.2, eight CPU threads) at branch commit `a2274fb0` (axial sources unchanged in its rebase `a54e5564`). All 33
+tests in the axial CUDA, CPU-zone CUDA continuation, axial flux and
+energy-MCWF refusal modules passed, with none skipped. The default benchmark
+reproduced the recorded target: 413.0 ms CPU and 197.6 ms CUDA warm medians,
+a 2.090 times speedup.
+
+`checks/axial_mcwf_cuda.py --workload` then ran silicon [001] at 5 MeV over
+1 µm (1,000 steps of 10 Å). CPU runs were capped at 64 electrons, so the
+comparison is warm throughput per electron-step, not matched results:
+
+| Cells, grid | CUDA electrons | CPU (electron-steps/s) | CUDA (electron-steps/s) | CUDA/CPU |
+| --- | ---: | ---: | ---: | ---: |
+| 1×1, 48² | 512 | 36,672 | 126,329 | 3.44 |
+| 2×2, 64² | 512 | 29,626 | 112,742 | 3.81 |
+| 3×3, 96² | 512 | 13,330 | 88,615 | 6.65 |
+| 4×4, 128² | 1,024 | 7,122 | 65,776 | 9.24 |
+
+The advantage grows with supercell size. CPU and CUDA use independent random
+algorithms, so these runs make no accuracy comparison. The largest case
+reserved 598 MiB of CuPy pool memory.
+
+Production propagation stays complex128.
+{source}`checks/axial_split_step_precision_cuda.py` measures what
+complex64 would cost. It applies the same deterministic no-jump Strang step,
+with absorptive loss, to the same batch of tilted Gaussian entries in both
+precisions. A CPU complex128 run of one entry agrees with the device
+reference to $6\times10^{-13}$–$3\times10^{-12}$ relative norm after
+$10^4$ steps. The complex64 error grows roughly linearly with step count:
+
+| Steps (10 Å) | Surviving norm | Relative norm error | Infidelity | Density L1 |
+| ---: | ---: | ---: | ---: | ---: |
+| 100 | 0.35–0.36 | $1.3$–$3.4\times10^{-5}$ | $\le1.2\times10^{-10}$ | $\le1.1\times10^{-5}$ |
+| 1,000 | $\approx10^{-3}$ | $1.3$–$3.2\times10^{-4}$ | $\le5.5\times10^{-9}$ | $\le8.2\times10^{-5}$ |
+| 10,000 | $\approx10^{-22}$ | $2.2$–$4.2\times10^{-3}$ | $\le8.4\times10^{-7}$ | $\le1.0\times10^{-3}$ |
+
+Ranges cover all four grids (48² to 128²) and are batch maxima. An MCWF jump
+resets the norm, and a no-jump span ends when the norm falls below a uniform
+threshold, typically within about a hundred steps here. Over such spans the
+complex64 norm error shifts a jump by far less than one step. Complex64 split
+steps ran 1.70, 3.10, 5.16 and 7.06 times faster than complex128 for 48²,
+64², 96² and 128² grids. This measures the no-jump kernel only; jump
+selection and dissipator kernels remain float64.
+Raw outputs: {source}`docs/validation/check-records/axial-cuda-heavy-precision.json`.
+
+### Paired complex64 MCWF ensembles
+
+{source}`checks/axial_mcwf_precision_cuda.py` runs the production CUDA batch
+twice per seed chunk with identical Philox streams. One arm propagates in
+complex128. The other stores the spectrum and phases in complex64, so its
+split step, norm decay and jump clock are single precision; jump states are
+promoted to complex128 for the float64 jump kernels. The predeclared
+tolerance was $|\overline{\Delta}|+2\,\mathrm{SE}(\Delta)\le0.1\,
+\mathrm{SE}_{128}$ for every observable and recorded depth. The observables
+are survival, cumulative TDS, sink and electronic jumps per electron, and the
+mean transverse potential energy per incident electron. SE₁₂₈ is the chunk
+standard error of the complex128 ensemble mean.
+
+SLURM job 1662 (RTX 5080, commit `fe6993fc`, exit 0, 5 min 26 s) ran silicon
+[001] at 5 MeV with 10 Å steps and chunks of 64 electrons:
+
+| Grid, depth | Electrons | Identical jump sequences | Tolerance | Warm time ratio c128/c64 |
+| --- | ---: | ---: | --- | ---: |
+| 2×2 cells, 64², 2 µm | 2,048 | 1,873 (91.5%) | fails from 0.21 µm | 1.06 |
+| 4×4 cells, 128², 2 µm | 2,048 | 1,870 (91.3%) | fails from 0.45 µm | 1.75 |
+| 2×2 cells, 64², 10 µm | 1,024 | 618 (60.4%) | fails from 1 µm | 1.07 |
+
+**Complex64 fails the tolerance.** The failure comes from trajectory
+divergence, not a resolved bias. Single-precision rounding eventually moves a
+jump step or a rejection-sampling outcome. After that, the paired electron
+follows an independent history, so SE(Δ) grows toward the unpaired value.
+The earliest divergence came at 38 steps, the median near 1,100 steps over
+2 µm. Of the 43 depth/observable pairs whose paired differences vary,
+only the 0.1 µm mean potential energy on 64² shows a resolved shift,
+$\approx8\times10^{-6}$ eV against a −8.7 eV mean, consistent with rounding.
+No other $|\overline{\Delta}|/\mathrm{SE}(\Delta)$ exceeds 2. With dispatch and
+float64 jumps still dominating, the whole-solver gain is modest. Production
+axial MCWF therefore remains complex128. A statistically equivalent unpaired
+ensemble comparison could still be designed, but this check gives no reason
+to pursue the 1.06–1.75 times gain.
+Raw outputs: {source}`docs/validation/check-records/axial-mcwf-complex64-1662.json`.

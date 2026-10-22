@@ -23,130 +23,53 @@ behind lazy dispatch, ``__getattr__``, or ``import_module`` are outside this sca
 Components (a + b denotes a static import cycle):
   p0: _entry
   p1: apps
-  p2: campaign
-  p3: checkpoints
-  p4: cli
-  p5: console
-  p6: detectors
-  p7: devtools
-  p8: energy_grid
-  p9: instrument
-  p10: materials
-  p11: montecarlo
-  p12: observations
-  p13: perf
-  p14: plots
-  p15: remote
-  p16: results
-  p17: runs
-  p18: validation
-  p19: xsgen
+  p2: campaign + checkpoints + energy_grid + montecarlo + observations + remote + results + runs + validation
+  p3: cli
+  p4: console
+  p5: detectors
+  p6: devtools
+  p7: instrument
+  p8: materials
+  p9: perf
+  p10: plots
+  p11: xsgen
 Edges (importer -> imported):
-  p0 -> p10
-  p0 -> p18
+  p0 -> p2
+  p0 -> p3
   p0 -> p4
-  p0 -> p5
+  p0 -> p8
   p1 -> p10
-  p1 -> p11
-  p1 -> p12
-  p1 -> p14
-  p1 -> p15
-  p1 -> p16
-  p1 -> p17
-  p1 -> p18
   p1 -> p2
-  p1 -> p3
-  p1 -> p5
-  p11 -> p10
-  p11 -> p19
-  p11 -> p5
-  p12 -> p11
-  p12 -> p16
-  p12 -> p3
-  p12 -> p5
-  p12 -> p6
-  p12 -> p9
-  p13 -> p5
-  p14 -> p10
-  p14 -> p11
-  p14 -> p16
-  p14 -> p5
-  p14 -> p6
-  p15 -> p10
-  p15 -> p11
-  p15 -> p13
-  p15 -> p16
-  p15 -> p17
-  p15 -> p18
-  p15 -> p19
-  p15 -> p2
-  p15 -> p3
-  p15 -> p5
-  p16 -> p10
-  p16 -> p11
-  p16 -> p6
-  p16 -> p9
-  p17 -> p10
-  p17 -> p11
-  p17 -> p12
-  p17 -> p13
-  p17 -> p16
-  p17 -> p19
-  p17 -> p2
-  p17 -> p3
-  p17 -> p5
-  p17 -> p9
-  p18 -> p10
-  p18 -> p11
-  p18 -> p2
-  p18 -> p3
-  p18 -> p5
-  p18 -> p6
-  p19 -> p10
-  p19 -> p5
-  p2 -> p10
+  p1 -> p4
+  p1 -> p8
+  p10 -> p2
+  p10 -> p4
+  p10 -> p5
+  p10 -> p8
+  p11 -> p4
+  p11 -> p8
   p2 -> p11
-  p2 -> p16
-  p2 -> p19
-  p2 -> p6
+  p2 -> p4
+  p2 -> p5
+  p2 -> p7
+  p2 -> p8
   p2 -> p9
-  p3 -> p10
   p3 -> p11
-  p3 -> p16
   p3 -> p2
+  p3 -> p4
   p3 -> p5
-  p4 -> p10
-  p4 -> p11
-  p4 -> p13
-  p4 -> p15
-  p4 -> p17
-  p4 -> p19
-  p4 -> p2
-  p4 -> p3
-  p4 -> p5
-  p4 -> p6
+  p3 -> p7
+  p3 -> p8
+  p3 -> p9
   p4 -> p8
-  p4 -> p9
-  p5 -> p10
+  p5 -> p8
   p6 -> p10
-  p7 -> p14
-  p7 -> p16
-  p7 -> p17
-  p7 -> p18
-  p7 -> p2
-  p7 -> p4
+  p6 -> p2
+  p6 -> p3
+  p6 -> p4
   p7 -> p5
   p7 -> p8
-  p8 -> p10
-  p8 -> p11
-  p8 -> p15
-  p8 -> p16
-  p8 -> p2
-  p8 -> p3
-  p8 -> p5
-  p8 -> p6
-  p9 -> p10
-  p9 -> p6
+  p9 -> p4
 ```
 <!-- END GENERATED PACKAGE DEPENDENCIES -->
 
@@ -825,6 +748,10 @@ There is no standard-run axial integration. Research helpers
 independently anchored finite-grid measurement and two-time correlation algebra,
 with explicit allocation limits; physical escape and a persisted axial photon
 source remain separate unimplemented contracts.
+`channeling/axial_projection.py` provides the CPU research full/retained
+no-jump matrix-exponential reference with native jump draws and step-resolved
+jump times, used only by the opt-in return-flux comparison. It does not admit
+standard axial transport.
 `channeling/axial_qrt_source.py` adds a bounded global-grid eigensystem/current
 factory and normalized on-axis finite RWA photon reference; it refuses oblique
 directions and does not supply the actual material carrier-bath closure.

@@ -21,6 +21,11 @@ weight below the cell maximum U_max. Chunks share seeds across models, so
 their differences are paired. Research diagnostic only; not a dechanneling
 prediction or native launch model.
 
+``--loss-coupling`` additionally records bounded, hook-event-weighted
+histograms of cuts, clearances, ||F W P||_2 and sector separation for the
+production absorptive W [eV]. Their ratio is a diagnostic scale, not a
+finite-depth leakage bound. No propagation or random draws are changed.
+
 Source: Dalibard, Castin & Molmer, PRL 68, 580 (1992) (MCWF unravelling);
 Castin, Dalibard & Molmer, arXiv:0805.4002, Eq. (2); TDS and electronic jumps
 of cr-axial-realspace-dissipator. Lengths in Å, energies in eV.
@@ -50,7 +55,17 @@ class GridProjector:
     Validation: cr-axial-zone-handoff-accounting
     """
 
-    def __init__(self, potential_eV, kx, ky, cells, kinetic_scale_eV_ang2, cache_size=160):
+    def __init__(
+        self,
+        potential_eV,
+        kx,
+        ky,
+        cells,
+        kinetic_scale_eV_ang2,
+        cache_size=160,
+        *,
+        absorptive_eV=None,
+    ):
         self.n = potential_eV.shape
         self.u = np.fft.fft2(potential_eV) / potential_eV.size
         self.kx, self.ky = np.asarray(kx), np.asarray(ky)
@@ -60,6 +75,16 @@ class GridProjector:
         self.scale = float(kinetic_scale_eV_ang2)
         self._cache: OrderedDict = OrderedDict()
         self.cache_size = int(cache_size)
+        self._loss_cache: OrderedDict = OrderedDict()
+        self.loss_blocks = []
+        if absorptive_eV is not None:
+            w = np.asarray(absorptive_eV, dtype=float)
+            if w.shape != self.n or not np.all(np.isfinite(w)) or np.any(w < 0):
+                raise ValueError("absorptive_eV must be a finite nonnegative grid array")
+            for axis, (n, c) in enumerate(zip(self.n, self.cells, strict=True)):
+                if not np.allclose(w, np.roll(w, n // c, axis), rtol=1e-12, atol=1e-12):
+                    raise ValueError("absorptive_eV must be periodic on each crystal cell")
+            loss_fourier = np.fft.fft2(w) / w.size
         mx = np.rint(np.fft.fftfreq(self.n[0]) * self.n[0]).astype(int)
         my = np.rint(np.fft.fftfreq(self.n[1]) * self.n[1]).astype(int)
         self.blocks = []
@@ -71,6 +96,8 @@ class GridProjector:
                 dx = (index[0][:, None] - index[0][None, :]) % self.n[0]
                 dy = (index[1][:, None] - index[1][None, :]) % self.n[1]
                 self.blocks.append((index, self.u[dx, dy]))
+                if absorptive_eV is not None:
+                    self.loss_blocks.append(loss_fourier[dx, dy])
 
     def spectrum(self, tilt):
         key = (round(float(tilt[0]), 9), round(float(tilt[1]), 9))
@@ -123,8 +150,97 @@ class GridProjector:
         weight = float(np.sum(np.abs(below) ** 2)) / total if total > 0 else 0.0
         return weight, np.fft.ifft2(below), np.fft.ifft2(a - below)
 
+    def cross_cut_loss(self, tilt, cut_eV):
+        """Measure ||F W P||_2 [eV] for H_eff = H - i W at this tilt.
 
-def projective_hook(projector: GridProjector, cut_eV: float, seed: int, window_eV=None, gaps=None):
+        The full represented spectrum sets the sector separation. Their ratio
+        is a diagnostic scale, NOT a finite-depth or photon-error bound.
+        Empty/full sectors have zero cross norm and no separation or ratio.
+        Validation: cr-axial-zone-handoff-accounting (unverified).
+        """
+        if not self.loss_blocks or not np.isfinite(cut_eV):
+            raise ValueError("finite cut and absorptive_eV are required")
+        key = (round(float(tilt[0]), 9), round(float(tilt[1]), 9), float(cut_eV))
+        if key in self._loss_cache:
+            self._loss_cache.move_to_end(key)
+            return dict(self._loss_cache[key])
+        norm, retained_max, outgoing_min = 0.0, -np.inf, np.inf
+        for (_, values, vectors), loss in zip(self.spectrum(tilt), self.loss_blocks, strict=True):
+            keep = values < cut_eV
+            if keep.any():
+                retained_max = max(retained_max, float(values[keep].max()))
+            if (~keep).any():
+                outgoing_min = min(outgoing_min, float(values[~keep].min()))
+            if keep.any() and (~keep).any():
+                cross = vectors[:, ~keep].conj().T @ loss @ vectors[:, keep]
+                norm = max(norm, float(np.linalg.svd(cross, compute_uv=False)[0]))
+        separation = outgoing_min - retained_max
+        result = {
+            "loss_cross_norm_eV": norm,
+            "sector_separation_eV": float(separation) if np.isfinite(separation) else None,
+            "loss_to_separation_ratio": norm / separation if np.isfinite(separation) else None,
+        }
+        if len(self._loss_cache) >= self.cache_size:
+            self._loss_cache.popitem(last=False)
+        self._loss_cache[key] = result
+        return dict(result)
+
+
+class MatchingDiagnostics:
+    """Bounded, hook-event-weighted histograms; no additional random draws.
+
+    Counts have len(edges)+1 bins: below first edge, half-open interior bins,
+    and at/above last edge. No histories or wavefunctions are retained.
+    Validation: cr-axial-zone-handoff-accounting (unverified).
+    """
+
+    def __init__(self, target_eV, window_eV):
+        positive_edges = np.r_[0.0, np.logspace(-12, 8, 81)]
+        self.data = {}
+        for name in (
+            "selected_cut_eV",
+            "clearance_eV",
+            "loss_cross_norm_eV",
+            "sector_separation_eV",
+            "loss_to_separation_ratio",
+        ):
+            edges = (
+                np.unique(np.linspace(target_eV - window_eV, target_eV + window_eV, 33))
+                if name == "selected_cut_eV"
+                else positive_edges
+            )
+            self.data[name] = {
+                "edges": edges.tolist(),
+                "counts": [0] * (len(edges) + 1),
+                "min": None,
+                "max": None,
+                "missing": 0,
+            }
+
+    def observe(self, projector, tilt, cut, gap):
+        values = {
+            "selected_cut_eV": cut,
+            "clearance_eV": gap / 2,
+            **projector.cross_cut_loss(tilt, cut),
+        }
+        for name, value in values.items():
+            row = self.data[name]
+            if value is None:
+                row["missing"] += 1
+                continue
+            row["counts"][int(np.searchsorted(row["edges"], value, side="right"))] += 1
+            row["min"] = value if row["min"] is None else min(row["min"], value)
+            row["max"] = value if row["max"] is None else max(row["max"], value)
+
+
+def projective_hook(
+    projector: GridProjector,
+    cut_eV: float,
+    seed: int,
+    window_eV=None,
+    gaps=None,
+    diagnostics=None,
+):
     """Measure P(cut) with per-electron streams; absorb outcome F.
 
     With ``window_eV`` the cut at each tilt is ``projector.gap_cut(tilt,
@@ -145,6 +261,10 @@ def projective_hook(projector: GridProjector, cut_eV: float, seed: int, window_e
             cut, gap = projector.gap_cut(tilt, cut_eV, window_eV)
             if gaps is not None:
                 gaps.append(gap)
+        if diagnostics is not None:
+            if window_eV is None:
+                gap = 2 * float(np.min(np.abs(projector.energies(tilt) - cut)))
+            diagnostics.observe(projector, tilt, cut, gap)
         weight, below, _ = projector.split(phi, tilt, cut)
         rng = streams.get(electron)
         if rng is None:
@@ -157,7 +277,7 @@ def projective_hook(projector: GridProjector, cut_eV: float, seed: int, window_e
     return hook
 
 
-def _setup(cells, shape, mechanisms, energy_eV):
+def _setup(cells, shape, mechanisms, energy_eV, *, loss_coupling=False):
     from pyrite.materials.channeling.axial import axial_profile
     from pyrite.materials.channeling.transverse import HBAR2_2M_EV_ANG2
     from pyrite.montecarlo.channeling.axial_dissipator import axial_dissipator
@@ -168,18 +288,31 @@ def _setup(cells, shape, mechanisms, energy_eV):
     potential = profile.on_grid(cells, shape)
     solver = AxialMCWF(dissipator, energy_eV, potential)
     projector = GridProjector(
-        potential, dissipator.grid.kx, dissipator.grid.ky, cells, HBAR2_2M_EV_ANG2 / solver.gamma
+        potential,
+        dissipator.grid.kx,
+        dissipator.grid.ky,
+        cells,
+        HBAR2_2M_EV_ANG2 / solver.gamma,
+        absorptive_eV=dissipator.absorptive_eV if loss_coupling else None,
     )
     return profile, solver, projector
 
 
 def _job(args):
-    cells, shape, mechanisms, energy, cut, window, u_max, depths, n, seed, step = args
+    cells, shape, mechanisms, energy, cut, window, u_max, depths, n, seed, step, coupling = args[
+        :12
+    ]
+    mode = args[12] if len(args) > 12 else "split"
+    if mode not in ("split", "exact", "projected") or (mode == "projected" and cut is None):
+        raise ValueError("invalid no-jump mode or missing projected cut")
     from pyrite.montecarlo.channeling import states
 
-    _, solver, projector = _setup(cells, shape, mechanisms, energy)
+    _, solver, projector = _setup(
+        cells, shape, mechanisms, energy, loss_coupling=coupling or mode != "split"
+    )
     gaps: list[float] = []
-    hook = None if cut is None else projective_hook(projector, cut, seed, window, gaps)
+    diagnostics = MatchingDiagnostics(cut, window) if coupling and cut is not None else None
+    hook = None if cut is None else projective_hook(projector, cut, seed, window, gaps, diagnostics)
 
     def bound(phi, tilt):
         return np.array([projector.split(phi, tilt, u_max)[0]])
@@ -192,18 +325,32 @@ def _job(args):
         scale = projector.split(sampled, (0.0, 0.0), projector.gap_cut((0.0, 0.0), cut, window)[0])[
             0
         ]
-    result = solver.run(
-        entry,
-        depths,
-        n,
-        seed=seed,
-        step_ang=step,
-        observable=bound,
-        jump_hook=hook,
-    )
+    kwargs = dict(seed=seed, step_ang=step, observable=bound, jump_hook=hook)
+    if mode == "split":
+        result = solver.run(entry, depths, n, **kwargs)
+    else:
+        from pyrite.montecarlo.channeling.axial_projection import run_spectral_mcwf
+
+        result = run_spectral_mcwf(
+            solver,
+            projector,
+            entry,
+            depths,
+            n,
+            cut_eV=cut if mode == "projected" else None,
+            window_eV=window,
+            **kwargs,
+        )
     bound_mean = scale * result.observables[:, 0]
     gap_stats = [min(gaps), float(np.median(gaps))] if gaps else None
-    return cut, seed, bound_mean.tolist(), result.jumps, gap_stats
+    return (
+        cut if mode == "split" else (mode, cut),
+        seed,
+        bound_mean.tolist(),
+        result.jumps,
+        gap_stats,
+        (diagnostics.data if diagnostics is not None else None),
+    )
 
 
 def _pooled_deficit(ref_x, x):
@@ -229,11 +376,45 @@ def _gap(energies, target):
     return 0.5 * (energies[energies <= target].max() + energies[energies > target].min())
 
 
+def _paired_deficit_change(reference, hook, projected):
+    """Projected-minus-hook pooled deficit with paired delete-one-chunk SEM.
+
+    The common reference denominator is retained for every leave-one-out ratio.
+    No confidence bound or physical leakage probability is inferred.
+    """
+
+    def ratio(r, h, p):
+        denominator = r.mean(0)
+        return np.where(
+            denominator > 0,
+            (h.mean(0) - p.mean(0)) / np.where(denominator > 0, denominator, 1.0),
+            0.0,
+        )
+
+    full, n = ratio(reference, hook, projected), len(reference)
+    if n < 2:
+        return full, None
+    keep = ~np.eye(n, dtype=bool)
+    loo = np.array([ratio(reference[k], hook[k], projected[k]) for k in keep])
+    sem = np.sqrt((n - 1) / n * np.sum((loo - loo.mean(0)) ** 2, 0))
+    return full, sem.tolist()
+
+
 def main(argv=None) -> dict:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--cells", type=int, default=2)
     parser.add_argument("--points-per-cell", type=int, default=16)
     parser.add_argument("--gap-window-eV", type=float, default=2.0)
+    parser.add_argument(
+        "--projected-no-jump",
+        action="store_true",
+        help="compare full-space and retained-space matrix-exponential no-jump propagation (CPU research)",
+    )
+    parser.add_argument(
+        "--loss-coupling",
+        action="store_true",
+        help="record cut/clearance and cross-cut absorptive-loss histograms (extra dense algebra)",
+    )
     parser.add_argument(
         "--cut-eV",
         type=float,
@@ -280,15 +461,20 @@ def main(argv=None) -> dict:
             ns.electrons_per_chunk,
             seed,
             ns.step_ang,
+            ns.loss_coupling,
         )
         for seed in range(ns.chunks)
         for cut in [None, *cuts]
     ]
+    if ns.projected_no_jump:
+        base_jobs = list(jobs)
+        jobs.extend((*job, "exact") for job in base_jobs)
+        jobs.extend((*job, "projected") for job in base_jobs if job[4] is not None)
     with ProcessPoolExecutor(max_workers=ns.workers) as pool:
         results = list(pool.map(_job, jobs))
     by = {}
-    for cut, seed, bound, jumps, gap_stats in results:
-        by.setdefault(cut, {})[seed] = (np.array(bound), jumps, gap_stats)
+    for cut, seed, bound, jumps, gap_stats, diagnostics in results:
+        by.setdefault(cut, {})[seed] = (np.array(bound), jumps, gap_stats, diagnostics)
     seeds = sorted(by[None])
     reference = np.array([by[None][s][0] for s in seeds])
 
@@ -302,37 +488,81 @@ def main(argv=None) -> dict:
         )
 
     ref_x = exposure(reference)
-    rows = []
-    for cut in cuts:
-        model = np.array([by[cut][s][0] for s in seeds])
+
+    def summarize(cut, key, reference_exposure):
+        model = np.array([by[key][s][0] for s in seeds])
         x = exposure(model)
-        deficit, sem = _pooled_deficit(ref_x, x)
-        gap_stats = [by[cut][s][2] for s in seeds if by[cut][s][2] is not None]
-        rows.append(
-            {
-                "matching_energy_eV": float(cut),
-                "bound_population": model.mean(0).tolist(),
-                "bound_exposure_ang": x.mean(0).tolist(),
-                "exposure_deficit": deficit.tolist(),
-                "exposure_deficit_sem": sem,
-                "absorbed": int(sum(by[cut][s][1].get("absorbed", 0) for s in seeds)),
-                "min_gap_eV": min(g[0] for g in gap_stats) if gap_stats else None,
-                "median_chunk_median_gap_eV": (
-                    float(np.median([g[1] for g in gap_stats])) if gap_stats else None
-                ),
-            }
-        )
+        deficit, sem = _pooled_deficit(reference_exposure, x)
+        gap_stats = [by[key][s][2] for s in seeds if by[key][s][2] is not None]
+        return {
+            "matching_energy_eV": float(cut),
+            "bound_population": model.mean(0).tolist(),
+            "bound_exposure_ang": x.mean(0).tolist(),
+            "bound_exposure_ang_by_chunk": [
+                {"seed": s, "values": values.tolist()} for s, values in zip(seeds, x, strict=True)
+            ],
+            "exposure_deficit": deficit.tolist(),
+            "exposure_deficit_sem": sem,
+            "absorbed": int(sum(by[key][s][1].get("absorbed", 0) for s in seeds)),
+            "jumps": {k: int(sum(by[key][s][1][k] for s in seeds)) for k in by[key][seeds[0]][1]},
+            "min_gap_eV": min(g[0] for g in gap_stats) if gap_stats else None,
+            "median_chunk_median_gap_eV": (
+                float(np.median([g[1] for g in gap_stats])) if gap_stats else None
+            ),
+            "matching_diagnostics_by_chunk": [
+                {"seed": s, "histograms": by[key][s][3]} for s in seeds
+            ]
+            if ns.loss_coupling
+            else None,
+        }
+
+    rows = [summarize(cut, cut, ref_x) for cut in cuts]
     out = {
         "status": "research-only MCWF return-flux study; not a dechanneling prediction",
         "settings": {**vars(ns), "u_min_eV": u_min, "u_max_eV": u_max},
         "depths_ang": depths.tolist(),
         "reference_bound_population": reference.mean(0).tolist(),
         "reference_bound_exposure_ang": ref_x.mean(0).tolist(),
+        "reference_bound_exposure_ang_by_chunk": [
+            {"seed": s, "values": values.tolist()} for s, values in zip(seeds, ref_x, strict=True)
+        ],
         "reference_jumps": {
             k: int(sum(by[None][s][1][k] for s in seeds)) for k in by[None][seeds[0]][1]
         },
         "rows": rows,
     }
+    if ns.projected_no_jump:
+        exact_reference = np.array([by[("exact", None)][s][0] for s in seeds])
+        exact_x = exposure(exact_reference)
+        changes = []
+        for cut in cuts:
+            hook = exposure(np.array([by[("exact", cut)][s][0] for s in seeds]))
+            projected = exposure(np.array([by[("projected", cut)][s][0] for s in seeds]))
+            change, sem = _paired_deficit_change(exact_x, hook, projected)
+            changes.append(
+                {
+                    "matching_energy_eV": float(cut),
+                    "projected_minus_hook_deficit": change.tolist(),
+                    "sem": sem,
+                }
+            )
+        out["spectral_comparison"] = {
+            "model": "finite-grid-spectral-expm-v1",
+            "jump_time_rule": "first step crossing; at most one jump per step",
+            "reference_bound_population": exact_reference.mean(0).tolist(),
+            "reference_bound_exposure_ang": exact_x.mean(0).tolist(),
+            "reference_bound_exposure_ang_by_chunk": [
+                {"seed": s, "values": values.tolist()}
+                for s, values in zip(seeds, exact_x, strict=True)
+            ],
+            "reference_jumps": {
+                k: int(sum(by[("exact", None)][s][1][k] for s in seeds))
+                for k in by[("exact", None)][seeds[0]][1]
+            },
+            "hook_rows": [summarize(cut, ("exact", cut), exact_x) for cut in cuts],
+            "projected_rows": [summarize(cut, ("projected", cut), exact_x) for cut in cuts],
+            "changes": changes,
+        }
     if ns.out:
         with open(ns.out, "w") as handle:
             json.dump(out, handle, indent=2)
