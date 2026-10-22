@@ -12,17 +12,15 @@ import warnings
 from pathlib import Path
 
 HERE = Path(__file__).parent
-# Frozen pilot tungsten (19.3 g/cm^3); the catalog crystal is 19.261 g/cm^3.
-PILOT_W_NUMBER_DENSITY = 0.06322199557658834
 
 
 def compositions():
-    """Exact number densities: catalog entries, plus the pilot's anonymous W layer."""
+    """Exact number densities of the catalog entries every matrix material uses."""
     from pyrite.xsgen.sbethe.catalog import CATALOG
 
     return {
         "silicon": ("silicon", tuple(CATALOG.crystal("silicon").composition)),
-        "tungsten": ("W", (("W", PILOT_W_NUMBER_DENSITY),)),
+        "tungsten": ("tungsten", tuple(CATALOG.crystal("tungsten").composition)),
         "diamond": ("diamond", tuple(CATALOG.crystal("diamond").composition)),
         "sio2": ("sio2", tuple(CATALOG.media["sio2"].composition)),
     }

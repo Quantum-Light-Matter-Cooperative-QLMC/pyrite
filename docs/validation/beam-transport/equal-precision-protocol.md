@@ -91,27 +91,31 @@ each case to the exact table digests.
 | Material | ELSEPA (keV) | SBETHE (keV) | BremsLib (keV) | Released SBETHE table |
 | --- | --- | --- | --- | --- |
 | Si (catalog crystal) | 0.1–100000 | 1–10⁶ | 0.01–30000 | yes |
-| W, 19.3 g/cm³ | 0.1–100000 | — | 0.01–30000 | **no** |
+| W (catalog crystal, 19.261 g/cm³) | 0.1–100000 | 1–10⁶ | 0.01–30000 | yes (`tables-sbethe-3`) |
 | C (diamond) | 0.1–100000 | 1–10⁶ | 0.01–30000 | yes |
 | SiO₂ (medium) | 0.1–100000 | 1–10⁶ | 0.01–30000 | yes |
 
-22 of 43 cases are covered by released tables. Every 5 MeV case lies inside all
+38 of 43 cases are covered by released tables. Every 5 MeV case lies inside all
 three table domains, so the pilot manifest's 5 MeV deferral no longer has a
 table-coverage reason; the physical validity of each model at 5 MeV is a
-separate question this audit does not answer. The remaining gaps are:
+separate question this audit does not answer.
 
-- **19 tungsten cases:** no released SBETHE table exists for any tungsten
-  composition. The pilot's W layer is anonymous (`"W"` at 19.3 g/cm³, matching
-  Geant4's `G4_W`), while the catalog `tungsten` crystal is 19.261 g/cm³; the lab
-  pilot used a locally generated table whose digest is in its evidence. Another
-  developer therefore cannot reproduce any W scene from released inputs alone.
-  Either publish that SBETHE table as a pinned release asset, or move every
-  engine to the catalog density. This is a decision for the issue owner; the
-  matrix keeps 19.3 g/cm³ until then.
+Tungsten moved to the catalog `tungsten` crystal (19.261 g/cm³) on 2026-10-22,
+and its SBETHE table was published in `tables-sbethe-3` and
+`tables-sbethe-positron-3`, so every W case reproduces from released inputs.
+The retained pilot (`manifest.json`) used anonymous W at 19.3 g/cm³, matching
+Geant4's `G4_W`, with a locally generated table; its evidence is unchanged. W
+anchors rerun from this matrix use the catalog density, so a Geant4 arm must set
+its tungsten density to match, as already done for silicon. The 0.2% density
+change alters W thicknesses derived from `t/R` by the same fraction.
+
+The remaining gaps are:
+
 - **5 detector cases:** the uncollided-detector arm needs the production
   weighted per-segment scorer, which no adapter calls yet.
-- The tungsten secondary-transport arm is not declared, because
-  `inelastic_model="shell-soft-hard"` needs a catalog key per layer.
+- The tungsten secondary-transport arm is not yet declared. Catalog `tungsten`
+  now supplies the per-layer key that `inelastic_model="shell-soft-hard"`
+  needs, so it can be added as an extension.
 
 ## Physics-capability audit
 
@@ -171,9 +175,8 @@ angle never stands in for this convergence evidence.
 
 ## Remaining gates
 
-This stage leaves the following open: the tungsten SBETHE reproducibility
-decision, the production weighted scorer for detector cases, PenRed and EGSnrc
-adapters with creation-level photon tallies, transport-only scoring, numerical
-refinement and equivalence margins, equal-core resources and held-out time-to-
-precision runs. No physics default, model marker or version changes here, and
-no new physics-validation claim is made.
+This stage leaves the following open: the production weighted scorer for
+detector cases, PenRed and EGSnrc adapters with creation-level photon tallies,
+transport-only scoring, numerical refinement and equivalence margins, equal-
+core resources and held-out time-to- precision runs. No physics default, model
+marker or version changes here, and no new physics-validation claim is made.
