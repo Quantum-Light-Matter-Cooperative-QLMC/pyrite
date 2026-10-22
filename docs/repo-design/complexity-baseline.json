@@ -279,17 +279,27 @@
     {
       "path": "src/pyrite/montecarlo/channeling/axial_diagnostic.py",
       "name": "_validate",
-      "cc": 38
+      "cc": 44
     },
     {
       "path": "src/pyrite/montecarlo/channeling/axial_diagnostic.py",
       "name": "axial_diagnostic",
-      "cc": 31
+      "cc": 34
     },
     {
       "path": "src/pyrite/montecarlo/channeling/axial_dissipator.py",
       "name": "axial_dissipator",
       "cc": 22
+    },
+    {
+      "path": "src/pyrite/montecarlo/channeling/axial_energy_mcwf.py",
+      "name": "axial_energy_mcwf",
+      "cc": 101
+    },
+    {
+      "path": "src/pyrite/montecarlo/channeling/axial_source_assembly.py",
+      "name": "integrate_incident_axial_source",
+      "cc": 26
     },
     {
       "path": "src/pyrite/montecarlo/channeling/axial_state_diagnostics.py",
@@ -300,6 +310,16 @@
       "path": "src/pyrite/montecarlo/channeling/emission.py",
       "name": "emission_lines",
       "cc": 45
+    },
+    {
+      "path": "src/pyrite/montecarlo/channeling/energy_ensemble.py",
+      "name": "IncidentEnergyEnsemble.quadrature",
+      "cc": 36
+    },
+    {
+      "path": "src/pyrite/montecarlo/channeling/energy_ensemble.py",
+      "name": "axial_energy_diagnostic",
+      "cc": 32
     },
     {
       "path": "src/pyrite/montecarlo/channeling/mcwf.py",

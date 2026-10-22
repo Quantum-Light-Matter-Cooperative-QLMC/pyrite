@@ -13,7 +13,13 @@ from pyrite.plots.plotly import detectors as plotly_detectors
 def _record(energy=30.0, n=50, *, wide=True):
     E = np.linspace(1000.0, 5000.0, n)
     out = dict(
-        case=dict(E0_keV=energy, tilt_deg=2.0, tilt_azim_deg=0.0),
+        case=dict(
+            name="silicon detector test",
+            E0_keV=energy,
+            thickness_ang=20_000.0,
+            tilt_deg=2.0,
+            tilt_azim_deg=0.0,
+        ),
         E_grid=E,
         spec=np.ones(n),
         brem=np.zeros(n),

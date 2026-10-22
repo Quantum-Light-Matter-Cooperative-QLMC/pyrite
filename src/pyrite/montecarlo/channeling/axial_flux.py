@@ -23,9 +23,9 @@ all ensemble-averaged observables.
 
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass
 from numbers import Integral
-import warnings
 
 import numpy as np
 
