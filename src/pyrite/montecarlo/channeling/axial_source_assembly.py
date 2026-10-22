@@ -32,7 +32,10 @@ class AxialRadiationOwnership:
     def __post_init__(self) -> None:
         if not self.axial_processes:
             raise ValueError("an axial source needs explicit owned radiation processes")
-        if any(not isinstance(tag, str) or not tag.strip() for tag in self.axial_processes | self.native_processes):
+        if any(
+            not isinstance(tag, str) or not tag.strip()
+            for tag in self.axial_processes | self.native_processes
+        ):
             raise ValueError("radiation process tags must be nonempty strings")
         duplicate = self.axial_processes & self.native_processes
         if duplicate:
@@ -65,7 +68,11 @@ def integrate_incident_axial_source(
     """
     if not isinstance(ownership, AxialRadiationOwnership):
         raise ValueError("explicit radiation ownership is required")
-    if isinstance(max_working_bytes, bool) or not isinstance(max_working_bytes, int) or max_working_bytes < 1:
+    if (
+        isinstance(max_working_bytes, bool)
+        or not isinstance(max_working_bytes, int)
+        or max_working_bytes < 1
+    ):
         raise ValueError("max_working_bytes must be positive integer")
     z = np.asarray(depths_ang, dtype=float)
     e = np.asarray(photon_energy_eV, dtype=float)
@@ -73,8 +80,11 @@ def integrate_incident_axial_source(
     mu = np.asarray(absorption_inv_ang, dtype=float)
     path = np.asarray(path_to_exit_ang, dtype=float)
     if (
-        z.ndim != 1 or z.size < 2 or not np.all(np.isfinite(z))
-        or np.any(z < 0) or np.any(np.diff(z) <= 0)
+        z.ndim != 1
+        or z.size < 2
+        or not np.all(np.isfinite(z))
+        or np.any(z < 0)
+        or np.any(np.diff(z) <= 0)
     ):
         raise ValueError("depths_ang must have >=2 finite increasing nonnegative entries")
     if e.ndim != 1 or not e.size or not np.all(np.isfinite(e)) or np.any(e <= 0):

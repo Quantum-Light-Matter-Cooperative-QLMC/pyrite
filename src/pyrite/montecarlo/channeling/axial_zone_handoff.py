@@ -42,7 +42,9 @@ class AxialFluxAccount:
         if any(not np.isfinite(v) or v < 0 for v in values):
             raise ValueError("flux components must be finite and nonnegative")
         if abs(sum(values) - 1.0) > self.tolerance:
-            raise ValueError("retained + physical outgoing + unresolved must equal incident weight 1")
+            raise ValueError(
+                "retained + physical outgoing + unresolved must equal incident weight 1"
+            )
 
 
 @dataclass(frozen=True)
@@ -69,14 +71,20 @@ class AxialDepthEvidence:
             raise ValueError("nonempty evidence_id required")
         if not np.isfinite(self.max_depth_ang) or self.max_depth_ang <= 0:
             raise ValueError("max_depth_ang must be finite and positive")
-        for name in ("upper_return_fraction", "upper_unresolved_fraction", "upper_source_error_fraction"):
+        for name in (
+            "upper_return_fraction",
+            "upper_unresolved_fraction",
+            "upper_source_error_fraction",
+        ):
             v = getattr(self, name)
             if not np.isfinite(v) or not 0 <= v <= 1:
                 raise ValueError(f"{name} must be a finite fraction in [0,1]")
 
 
 def require_axial_depth_budget(
-    *, case_key: str, requested_depth_ang: float,
+    *,
+    case_key: str,
+    requested_depth_ang: float,
     evidence: AxialDepthEvidence | None,
     max_error_fraction: float = 0.01,
 ) -> None:
@@ -217,9 +225,9 @@ def propose_correlated_outgoing(
     if perpendicular2 >= np.sin(max_angle_rad) ** 2:
         raise ValueError("sampled transverse momentum violates on-shell/paraxial angle budget")
     direction_crystal = np.array([px / p, py / p, np.sqrt(1.0 - perpendicular2)])
-    point_crystal = np.array([
-        float(grid.x[ix]) + offset[0], float(grid.y[iy]) + offset[1], depth_ang
-    ])
+    point_crystal = np.array(
+        [float(grid.x[ix]) + offset[0], float(grid.y[iy]) + offset[1], depth_ang]
+    )
     return AxialOutgoingCandidate(
         incident_id=particle,
         depth_ang=float(depth_ang),
