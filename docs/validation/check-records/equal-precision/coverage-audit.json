@@ -1,6 +1,6 @@
 {
   "schema": "pyrite.equal-precision.coverage-audit.v1",
-  "matrix_sha256": "c57169143332f67a2036fbb0d5e1553cf43dd9e83badc19949383ca14ec620e2",
+  "matrix_sha256": "2563db8b9f1e1a1a7bb21d4c0624e9d48f58f7da14a13f2b9e5e4562b7962c1b",
   "tables": {
     "silicon": {
       "elsepa": [
@@ -107,8 +107,8 @@
       ]
     }
   },
-  "n_covered": 38,
-  "n_cases": 43,
+  "n_covered": 39,
+  "n_cases": 44,
   "cases": [
     {
       "id": "silicon-100kev-tr0.03-0deg",
@@ -332,6 +332,11 @@
     },
     {
       "id": "silicon-800kev-tr0.3-0deg-secondaries",
+      "covered": true,
+      "gaps": []
+    },
+    {
+      "id": "tungsten-800kev-tr0.3-0deg-secondaries",
       "covered": true,
       "gaps": []
     }

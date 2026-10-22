@@ -318,6 +318,18 @@
         "secondary_threshold_keV": 10,
         "secondary_transport": true
       }
+    },
+    {
+      "material": "tungsten",
+      "energy_keV": 800,
+      "t_over_r": 0.3,
+      "angle_deg": 0,
+      "variant": "secondaries",
+      "physics": {
+        "inelastic_model": "shell-soft-hard",
+        "secondary_threshold_keV": 10,
+        "secondary_transport": true
+      }
     }
   ],
   "interaction_checks": {

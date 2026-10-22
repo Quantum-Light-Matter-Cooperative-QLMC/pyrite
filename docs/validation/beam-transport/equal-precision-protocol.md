@@ -25,13 +25,13 @@ fails if the committed `matrix.json` no longer regenerates byte-for-byte.
 - **Anchors:** the six retained adapter-pilot scenes, with their absolute
   dimensions and an `anchor_of` link to the pilot manifest id. No `t/R` is
   claimed for them.
-- **Sparse extensions (19):** 45° and 75° incidence at Si 800 keV `t/R` 0.3;
+- **Sparse extensions (20):** 45° and 75° incidence at Si 800 keV `t/R` 0.3;
   angle×thickness checks at W 800 keV 75° and `t/R` 0.03 and 3; diamond (low Z)
   and SiO₂ (compound) at 800 keV `t/R` 0.3; one-factor beam phase space at Si
   800 keV `t/R` 0.3 (100 µm RMS spot, 5 mrad RMS divergence, 1% RMS energy
   spread); a 1 × 1 mm footprint at `t/R` 3 for Si and W; five detector cones
   (90°/5° for Si and W, 0°/1°, 0°/15°, 135°/5°); straggling on for Si and W;
-  and one explicit-secondary arm for Si.
+  and explicit-secondary arms for Si and W.
 
 Case ids are built only from material, energy, `t/R` or absolute thickness,
 incidence and variant, for example `tungsten-800kev-tr3-75deg-oblique`.
@@ -95,7 +95,7 @@ each case to the exact table digests.
 | C (diamond) | 0.1–100000 | 1–10⁶ | 0.01–30000 | yes |
 | SiO₂ (medium) | 0.1–100000 | 1–10⁶ | 0.01–30000 | yes |
 
-38 of 43 cases are covered by released tables. Every 5 MeV case lies inside all
+39 of 44 cases are covered by released tables. Every 5 MeV case lies inside all
 three table domains, so the pilot manifest's 5 MeV deferral no longer has a
 table-coverage reason; the physical validity of each model at 5 MeV is a
 separate question this audit does not answer.
@@ -113,9 +113,6 @@ The remaining gaps are:
 
 - **5 detector cases:** the uncollided-detector arm needs the production
   weighted per-segment scorer, which no adapter calls yet.
-- The tungsten secondary-transport arm is not yet declared. Catalog `tungsten`
-  now supplies the per-layer key that `inelastic_model="shell-soft-hard"`
-  needs, so it can be added as an extension.
 
 ## Physics-capability audit
 

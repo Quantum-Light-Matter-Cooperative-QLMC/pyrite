@@ -87,8 +87,11 @@ def case_gaps(case, domains, cutoff_keV):
             elif not item["min_keV"] <= cutoff_keV < case["energy_keV"] <= item["max_keV"]:
                 gaps.append(f"{label} domain {item['min_keV']:g}-{item['max_keV']:g} keV")
     physics = case["physics"]
-    if physics.get("inelastic_model") == "shell-soft-hard" and case["material"] == "tungsten":
-        gaps.append("shell-soft-hard needs a catalog key; anonymous W has none")
+    if physics.get("inelastic_model") == "shell-soft-hard":
+        from pyrite.campaign.inelastic_cases import covered_shell_materials
+
+        if case["material"] not in covered_shell_materials():
+            gaps.append(f"no conduction-band shell data for {case['material']}")
     if case.get("detector"):
         gaps.append("uncollided detector arm needs the pending weighted per-segment scorer")
     return gaps

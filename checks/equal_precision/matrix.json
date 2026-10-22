@@ -1,6 +1,6 @@
 {
   "schema": "pyrite.equal-precision.matrix.v1",
-  "spec_sha256": "ca75d2863e96a98b812bfa86eef4739a307b9cbbbb49609500d2128910754119",
+  "spec_sha256": "5e2c7256213d177b82260de24c4fb376e7ca284ea68e11a195c62ed76e63e1c3",
   "range_sources": {
     "silicon": {
       "path": "checks/reference/estar/silicon.txt",
@@ -23,9 +23,9 @@
       "canonical_csv_sha256": "d2f629567f223ea964d5e518d08e25e470ad92015782651b37df243bdc254663"
     }
   },
-  "n_cases": 43,
+  "n_cases": 44,
   "status_counts": {
-    "frozen": 37,
+    "frozen": 38,
     "frozen-absolute": 6
   },
   "coverage": {
@@ -73,7 +73,8 @@
         "tungsten-800kev-tr0.3-0deg-det90-5",
         "tungsten-800kev-tr0.03-0deg-det0-15",
         "tungsten-100kev-tr3-0deg-det135-5",
-        "tungsten-800kev-tr0.3-0deg-straggling"
+        "tungsten-800kev-tr0.3-0deg-straggling",
+        "tungsten-800kev-tr0.3-0deg-secondaries"
       ],
       "diamond": [
         "diamond-800kev-tr0.3-0deg-low-z"
@@ -119,7 +120,8 @@
         "tungsten-800kev-tr0.03-0deg-det0-15",
         "silicon-800kev-tr0.3-0deg-straggling",
         "tungsten-800kev-tr0.3-0deg-straggling",
-        "silicon-800kev-tr0.3-0deg-secondaries"
+        "silicon-800kev-tr0.3-0deg-secondaries",
+        "tungsten-800kev-tr0.3-0deg-secondaries"
       ],
       "5000": [
         "silicon-5000kev-tr0.03-0deg",
@@ -165,7 +167,8 @@
         "tungsten-800kev-tr0.3-0deg-det90-5",
         "silicon-800kev-tr0.3-0deg-straggling",
         "tungsten-800kev-tr0.3-0deg-straggling",
-        "silicon-800kev-tr0.3-0deg-secondaries"
+        "silicon-800kev-tr0.3-0deg-secondaries",
+        "tungsten-800kev-tr0.3-0deg-secondaries"
       ],
       "3": [
         "silicon-100kev-tr3-0deg",
@@ -229,7 +232,8 @@
         "tungsten-100kev-tr3-0deg-det135-5",
         "silicon-800kev-tr0.3-0deg-straggling",
         "tungsten-800kev-tr0.3-0deg-straggling",
-        "silicon-800kev-tr0.3-0deg-secondaries"
+        "silicon-800kev-tr0.3-0deg-secondaries",
+        "tungsten-800kev-tr0.3-0deg-secondaries"
       ],
       "75": [
         "tungsten-100kev-100um-75deg-anchor",
@@ -313,7 +317,8 @@
         "tungsten-800kev-tr0.3-0deg-straggling"
       ],
       "secondaries": [
-        "silicon-800kev-tr0.3-0deg-secondaries"
+        "silicon-800kev-tr0.3-0deg-secondaries",
+        "tungsten-800kev-tr0.3-0deg-secondaries"
       ]
     }
   },
@@ -2342,6 +2347,54 @@
       "thickness_um": 526.2856428991165,
       "csda_range_g_cm2": 0.4086,
       "range_source": "8bdec93a4daaa6595de6c7fcec00c7ad08b1d6a75e5ff564cb874193c4818631",
+      "status": "frozen",
+      "observables": {
+        "transmitted": "headline",
+        "backscattered": "headline",
+        "side_exited": "diagnostic",
+        "stopped": "headline",
+        "transmitted_energy_keV_per_primary": "headline",
+        "photons_ge10kev": "headline",
+        "photons_10_50kev": "headline",
+        "photons_50_100kev": "headline",
+        "photons_ge100kev": "headline"
+      }
+    },
+    {
+      "angle_deg": 0,
+      "width_mm": 10.0,
+      "beam": {
+        "particle": "electron",
+        "spot_rms_mm": 0.0,
+        "divergence_rms_mrad": 0.0,
+        "energy_spread_rms_frac": 0.0,
+        "truncation": "none"
+      },
+      "detector": null,
+      "physics": {
+        "electron_cutoff_keV": 10,
+        "hard_photon_cutoff_eV": 1000,
+        "score_threshold_keV": 10,
+        "score_bin_keV": 10,
+        "straggling": false,
+        "inelastic_model": "shell-soft-hard",
+        "secondary_transport": true,
+        "photon_transport": false,
+        "characteristic": false,
+        "pxr": false,
+        "cbs": false,
+        "termination": "first slab exit or electron cutoff",
+        "secondary_threshold_keV": 10
+      },
+      "material": "tungsten",
+      "energy_keV": 800,
+      "t_over_r": 0.3,
+      "variant": "secondaries",
+      "density_g_cm3": 19.261064912240354,
+      "id": "tungsten-800kev-tr0.3-0deg-secondaries",
+      "thickness_um": 92.06656060190487,
+      "csda_range_g_cm2": 0.5911,
+      "range_source": "57d40cc2eb0b85aedf92011b2b3d6466c9c01b014197706bb0321edde595c772",
       "status": "frozen",
       "observables": {
         "transmitted": "headline",
