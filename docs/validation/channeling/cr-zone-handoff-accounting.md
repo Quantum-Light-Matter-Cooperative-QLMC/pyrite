@@ -40,7 +40,12 @@ $$
 \hat{\mathbf v}_h=\cos\psi\,\hat{\mathbf t}+s\sin\psi\,\hat{\mathbf n}.
 $$
 
-Overflow is jump weight beyond the plane-wave band $\lvert h\rvert\leq H$, whose angle the solver does not resolve. It leaves at the band-edge angle $\psi_{\rm edge}=(H+1/2)g\hbar/p$, a lower bound. Continuity across the `DECHANNEL` row:
+Overflow is the full-loss residual after represented jump gain. It includes
+omitted transfer-kernel weight as well as gain outside the plane-wave band
+$\lvert h\rvert\leq H$; the solver does not resolve its angle. The production
+assignment is $\psi_{\rm edge}=(H+1/2)g\hbar/p$, not a proved lower bound
+for this entire residual (see the scope correction below). Continuity across
+the `DECHANNEL` row:
 
 $$
 \mathbf r_h=\mathbf r_0+z\hat{\mathbf v}_0,\quad E_h=E_0-S(E_0)z,\quad t_h=t_0+z/\beta((E_0+E_h)/2).
@@ -52,7 +57,7 @@ which is the clock rule the native cores use for a midpoint row. The launch goes
 
 Maintainer decisions (2026-10-16):
 
-- Overflow is handed off at the band-edge angle (a lower bound); a run warns when overflow exceeds 10% of electrons, telling the user to raise `channeling_basis_size`.
+- Overflow is handed off at the declared band-edge angle; a run warns when overflow exceeds 10% of electrons, telling the user to raise `channeling_basis_size`. The original lower-bound interpretation is withdrawn by the #522 scope correction below.
 - The plane-angle sign is symmetric. This is exact for an aligned, translation-averaged entry; the solver's binned flux carries no momentum sign.
 - Depth and $E_\perp$ are sampled separably (measured below).
 - $S$ is constant at $S(E_0)$, the case's SBETHE collision stopping, in both the solve and the zone row.
@@ -255,3 +260,90 @@ Result: 17 passed in 12.12 s; longest fixture setup 4.23 s, longest test call
   the existing green reference tests; clarify that the clock is a length, fate
   probabilities precede geometrical/cutoff censoring, and angle reconstruction
   uses entrance-energy momentum. Human sign-off remains separate.
+
+## Independent boundary review, 2026-10-20 (#522)
+
+### Derivation recorded before implementation inspection
+
+A fresh verifier began with the ledger, signatures/docstrings, proposal D4(i),
+and ADR-0018. Given nonnegative exclusive flux measures and survivor trace,
+their sum $N=1+\delta$ normalizes a categorical fate distribution. A draw
+from channel $c$ must invert $F_c(z)/F_c(L)$; its energy distribution may be
+sampled independently only under the explicitly declared separability
+approximation. Continuity requires the same terminal and initial position,
+energy, and clock on the two sides of the handoff.
+
+For path length $z$, constant stopping $S$, and clock $ct$,
+
+$$
+E(z)=E_0-Sz,\qquad ct(z)-ct_0=\int_0^z\frac{ds}{\beta(E_0-Ss)}.
+$$
+
+The declared midpoint expression $z/\beta(E_0-Sz/2)$ approximates the integral
+and has the correct zero-loss limit. With unit normal $\mathbf n$ and unit
+in-plane tangent $\mathbf t$, $\mathbf u=\cos\psi\,\mathbf t+s\sin\psi\,\mathbf n$
+has unit norm and signed plane angle $s\psi$ for small $\psi$.
+
+The continuum invariant gives
+
+$$
+\psi(x)=\sqrt{\frac{2[E_\perp-U(x)]}{pv}}.
+$$
+
+The declared launch $\sqrt{2E_\perp/(pv)}$ therefore chooses $U=0$; it does
+not reconstruct the local angle without sampling position and phase. The
+plane-wave band edge gives an angular scale $(H+1/2)g\hbar/p$, not the
+conditional distribution of omitted momentum transfers. Neither a
+categorical partition nor exact row continuity validates that overflow
+angle or the physical escape boundary. At zero flux only entrance and
+survivor categories remain; changing a numerical band must not be mistaken
+for changing a physical escape law.
+
+### Implementation comparison and verdict
+
+`solve_zone` uses free plus reprojection cumulative flux and the separate
+overflow cumulative flux. `sample_handoffs` inverts the matching cumulative
+measure, samples the energy histogram with one inverse-CDF uniform, and
+uses the independent symmetric sign. `handoff_directions` matches the unit
+vector construction. The runner's `_zone_rows` and native launch use the
+same midpoint clock and stopping expression, preserving their declared
+continuity. These agree with the independent accounting derivation.
+
+The #522 $a=4.5$ records do not change this result or validate a new handoff
+law: they are occupation solves without transported outgoing-angle
+measurements. Their overflow remains finite (up to 0.083738 of incident
+weight in the final records). In particular, a scalar omitted jump trace
+cannot determine its angle; assigning all that mass to the band edge is
+still the declared approximation. A future resolved tail must distinguish
+physical outgoing-band mass from missing transfer-kernel contributions
+that can land inside the original band, and retain unresolved mass rather
+than normalize it away. No overflow-tail claim was inferred from these
+occupation records.
+
+**Filters:** units pass; declared limits pass; signs/conventions pass under
+the stated small-angle, mean-energy, potential-zero and symmetric-sign
+assumptions. **Re-derivation:** matches the declared accounting and launch
+approximation. **Verdict:** `rederived` within that scope. This is not a
+validation of physical escape angles. **Suggested ledger edit (owner
+applies):** retain `anchored` for the existing accounting tests and add the
+#522 boundary-review qualification; no changed default, new physical-angle
+anchor, or human sign-off.
+
+### Scope correction: the legacy overflow angle is an assignment
+
+The production phrase “band-edge angle, a lower bound” is not proved for
+the entire legacy overflow channel. That scalar channel is full local loss
+minus retained jump gain. Omitted transfer amplitudes can land inside the
+original particle band, as the independent single-kick counterexample in
+`test_missing_transfer_can_land_inside_and_blocks_sampling` demonstrates.
+Consequently its angular distribution need not lie beyond the particle-band
+edge. The assigned band-edge angle is a declared approximation, not a proven
+lower bound on all electrons sampled from legacy overflow.
+
+The supplied 5 MeV diagnostic ($H=16$, transfer order 64) reports an inband
+gain shift of about 0.01716 against legacy overflow 0.16564, approximately
+10.4% of that channel. This illustrates the scope problem; it does not
+identify each legacy event with a resolved momentum. The accounting verdict
+remains `rederived`: partition and continuity still match their declared
+model. The physical lower-bound interpretation must be withdrawn unless
+separate closure and outgoing-support evidence establish it.

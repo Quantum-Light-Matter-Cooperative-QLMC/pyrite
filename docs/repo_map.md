@@ -500,6 +500,18 @@ Beam phase-space case keys for `build_cases`: `beam_case_keys` validates the bun
 Per-case continuum source resolution for `build_cases`: `resolve_auto_bremsstrahlung` replaces `bremsstrahlung_model="auto"` with the source each case's elements resolve to, and `radiative_case_keys` validates the coupled radiative mode and returns its divergence-only case keys, which join only BremsLib-resolved cases (#172).
 - Deps: `_numerics`, `montecarlo.case`, `xsgen.bremslib.tables` (lazy).
 
+### Experimental planar overflow instrument
+
+`montecarlo/channeling/overflow.py` contracts a supplied plane density with a
+larger differential kernel into a nonwrapped outgoing momentum measure. It
+reports unresolved loss and the changed in-band gain, and refuses sampling
+until both close against the original solver overflow. The optional
+`DensityMatrixSolver.propagate(jump_source_observer=...)` supplies the same
+integrated source quadrature used for flux accounting.
+`checks/channeling_overflow.py` measures full-depth fixed-energy marginals;
+no production handoff selects this instrument. Claim:
+`cr-planar-overflow-spectrum`.
+
 ### `campaign/channeling_cases.py`
 Opt-in planar channeling selection for `lowering.build_case` (ADR-0018, #506): `resolve_channeling` attaches the resolved `Case.channeling` record (plane, temperature, declared dechanneling margin, zone numerics) only when `Physics.channeling_model="planar"` and applies the per-case gates: crystals without channeling thermal data and energies above 100 MeV are refused, energies above 30 MeV warn (#439), `n_b < 1` is refused, and a beam within a few Lindhard axial critical angles of a low-index axis warns. Off returns the cases unchanged.
 - Deps: `montecarlo.case`; lazily `materials.channeling`, `materials.crystal`, `materials.atomic`, `montecarlo.geometry`, `montecarlo.channeling`.

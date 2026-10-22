@@ -307,6 +307,11 @@
       "cc": 33
     },
     {
+      "path": "src/pyrite/montecarlo/channeling/density.py",
+      "name": "DensityMatrixSolver.propagate",
+      "cc": 21
+    },
+    {
       "path": "src/pyrite/montecarlo/channeling/emission.py",
       "name": "emission_lines",
       "cc": 45

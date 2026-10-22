@@ -28,6 +28,7 @@ physics/axial-run-integration
 physics/axial-escape-instrument
 physics/axial-entrance-zone-contract-623
 physics/channeling-materials
+physics/dechanneling-boundary
 physics/mos2-directional-loss-sources
 physics/transition-radiation-recommendations
 physics/photon-transport

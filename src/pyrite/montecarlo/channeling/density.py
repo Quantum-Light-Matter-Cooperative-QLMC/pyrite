@@ -40,6 +40,7 @@ Lengths in angstroms, energies in eV.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -405,6 +406,7 @@ class DensityMatrixSolver:
         initial: tuple[np.ndarray, float] | None = None,
         spatial_x_ang: np.ndarray | None = None,
         record_metrics: bool = False,
+        jump_source_observer: Callable[[np.ndarray], None] | None = None,
     ) -> DensityMatrixResult:
         """Integrate the entry state to ``thickness_ang`` with steps ``dz_ang``.
 
@@ -425,7 +427,15 @@ class DensityMatrixSolver:
 
         Validation: cr-quantum-ensemble-metrics
 
-        Validation: cr-density-matrix-split-operator, cr-dechanneling-collapse
+        ``jump_source_observer`` optionally receives each step's integrated
+        incoming jump density in the plane basis, including the kernel's
+        energy-rescaling factor. Its quadrature is exactly the one used to
+        book free/overflow flux: ``dz rho_half + dz² J_S(rho_half)/2``.
+        Summing these arrays permits a linear differential-kernel diagnostic
+        without retaining a density history. The callback receives a new array.
+
+        Validation: cr-density-matrix-split-operator, cr-dechanneling-collapse,
+        cr-planar-overflow-spectrum
         """
         if thickness_ang <= 0.0 or dz_ang <= 0.0:
             raise ValueError("thickness_ang and dz_ang must be positive")
@@ -497,6 +507,10 @@ class DensityMatrixSolver:
             first, free1, band1 = self.jump(rho)
             second, free2, band2 = self.jump(first)
             loss1, loss2 = self.loss_rate(rho), self.loss_rate(first)
+            if jump_source_observer is not None:
+                jump_source_observer(
+                    _sandwich(self.basis.vectors, dz * rho + 0.5 * dz**2 * first) * self._scale
+                )
             rho = rho + dz * first + 0.5 * dz**2 * second
             free_step = dz * free1 + 0.5 * dz**2 * free2
             totals["free"] += float(free_step.sum())

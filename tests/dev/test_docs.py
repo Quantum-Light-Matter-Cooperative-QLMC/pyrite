@@ -68,6 +68,11 @@ def test_changed_warning_fingerprint_emits_unsuppressed_failure(
         "subtype": "changed",
     }
 
+    # Sphinx emits build-finished again if a later export hook raises.
+    # Preserve that original failure instead of masking it with KeyError.
+    warning_baseline_module._check_filter(app, RuntimeError("demo export failed"))
+    assert len(calls) == 1
+
 
 def test_literal_documentation_path_check_reports_missing_target(tmp_path: Path) -> None:
     (tmp_path / "docs").mkdir()

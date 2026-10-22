@@ -63,7 +63,7 @@ as a validity limit.
 density-matrix solve per case with keyed per-electron streams. Free `E_⊥` is
 sampled separably from depth, the plane-angle sign is symmetric, and
 `ψ = √(2E_⊥/pv)` (from `U₀ = 0`) tilts the electron's own in-plane direction
-toward the plane normal. Overflow leaves at the band-edge angle, a lower bound,
+toward the plane normal. Overflow leaves at the declared band-edge angle,
 with a warning above 10%. Stopping is constant at `S(E₀)` in the solve and the
 zone row, and zone caps shorter than the path are refused. The primaries'
 entrance states come from the same seed-pure draws as amorphous transport and
@@ -71,6 +71,15 @@ relaunch with their own stream keys. Mosaic crystals, coupled radiative
 transport, secondaries, coherent emission, stacks and grooves are refused.
 CUDA native continuation is described under Run surfaces below. The 300 eV margin sets the dechanneled angular distribution (mean
 4.7 `ψ_c` at 5 MeV Si(110)); see `cr-zone-handoff-accounting`.
+
+*Scope correction (#522, 2026-10-20):* the original description of the
+overflow angle as a lower bound is withdrawn. The legacy residual includes
+omitted transfer-kernel weight that can land inside the particle band, so
+the band-edge angle is an assignment, not a bound for that entire channel.
+The independent [handoff review](../validation/channeling/cr-zone-handoff-accounting.md#scope-correction-the-legacy-overflow-angle-is-an-assignment)
+records the counterexample. The [boundary investigation](../research/physics/dechanneling-boundary.md#recommendation-after-boundary-and-tail-prototypes)
+retains the 300 eV model after negative boundary and tail-window tests;
+the assignment and production output are unchanged.
 
 ### Evolution backends
 

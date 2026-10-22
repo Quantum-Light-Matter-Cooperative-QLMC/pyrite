@@ -210,7 +210,94 @@ def bound_rate_weights(solver, kernels, divergence_rad):
     return tuple(out)
 
 
-def run_case_group(keys, margin, orders, cells, dz_ang):
+def boundary_candidates(profile, energy_eV, orders, margins, angle_multiples, gap_fractions):
+    """Resolve exploratory sinks, without changing the production margin (#522).
+
+    Sen & Lynn, FERMILAB-PUB-14-243-APC, Eqs. (1), (5), (22)-(23):
+    the Bloch Hamiltonian determines energies, not irreversible escape.
+    Angle candidates use ``E_cut = U_min + a**2 (U_max - U_min)``;
+    ``a = 1`` gives the barrier. Gap candidates use the first three
+    consecutive above-barrier gaps smaller than a declared fraction of the
+    mean adjacent band width. Both thresholds are hypotheses, not derived
+    dechanneling laws. A vanishing potential has no gaps or angle scale.
+
+    Only bands below half the momentum window are used for gap selection;
+    repeat in H to test this guard. The endpoint spectra at k=0 and g/2
+    give the band edges of the one-dimensional real periodic Hamiltonian.
+    Energies are eV relative to the cell mean, angles radians.
+
+    Validation: cr-dechanneling-collapse
+    """
+    low, barrier = profile.extrema()
+    depth = barrier - low
+    gamma, beta = longitudinal_kinematics(energy_eV)
+    pv = gamma * M_E_EV * beta**2
+    critical = float(np.sqrt(2.0 * depth / pv))
+    candidates = [
+        {"kind": "fixed_margin", "parameter": margin, "margin_eV": margin} for margin in margins
+    ]
+    for multiple in angle_multiples:
+        if not np.isfinite(multiple) or multiple < 1.0:
+            raise ValueError("critical-angle multiples must be finite and >= 1")
+        candidates.append(
+            {
+                "kind": "critical_angle",
+                "parameter": multiple,
+                "margin_eV": (multiple**2 - 1.0) * depth,
+            }
+        )
+    spectrum = None
+    if gap_fractions:
+        endpoints = np.array(
+            [
+                transverse_states(profile, gamma, k, orders).energies_eV
+                for k in (0.0, 0.5 * profile.g_inv_ang)
+            ]
+        )
+        band_min, band_max = endpoints.min(axis=0), endpoints.max(axis=0)
+        widths = band_max - band_min
+        gaps = np.maximum(0.0, band_min[1:] - band_max[:-1])
+        adjacent_width = 0.5 * (widths[:-1] + widths[1:])
+        ratios = np.divide(
+            gaps, adjacent_width, out=np.full_like(gaps, np.inf), where=adjacent_width > 0
+        )
+        guard = low + (HBARC_EV_ANG * orders * profile.g_inv_ang / 2.0) ** 2 / (
+            2.0 * gamma * M_E_EV
+        )
+        valid = (band_max[:-1] > barrier) & (band_max[1:] < guard)
+        spectrum = {
+            "band_min_eV": band_min.tolist(),
+            "band_max_eV": band_max.tolist(),
+            "gap_to_width": [float(r) if np.isfinite(r) else None for r in ratios],
+            "guard_eV": float(guard),
+            "consecutive_gaps": 3,
+        }
+        for fraction in gap_fractions:
+            if not np.isfinite(fraction) or not 0.0 < fraction < 1.0:
+                raise ValueError("gap fractions must be finite and between 0 and 1")
+            small = valid & (ratios <= fraction)
+            found = next((i for i in range(len(small) - 2) if small[i : i + 3].all()), None)
+            if found is None:
+                raise ValueError(f"no gap threshold {fraction:g} resolved at H={orders}; raise H")
+            cutoff = float(band_max[found])
+            candidates.append(
+                {
+                    "kind": "band_gap",
+                    "parameter": fraction,
+                    "margin_eV": cutoff - barrier,
+                    "first_gap_index": found,
+                }
+            )
+    for candidate in candidates:
+        candidate.update(
+            cutoff_eV=barrier + candidate["margin_eV"],
+            well_depth_eV=depth,
+            critical_angle_rad=critical,
+        )
+    return candidates, spectrum
+
+
+def run_case_group(keys, margin, orders, cells, dz_ang, *, boundary=None, spectrum=None):
     """Solve one (plane, energy) configuration and fit every case sharing it."""
     first = CASES[keys[0]]
     profile = planar_profile("silicon", first.hkl, TEMPERATURE_K)
@@ -242,14 +329,20 @@ def run_case_group(keys, margin, orders, cells, dz_ang):
         weights = line_weights(case, orders)
         signal = sum(w * result.band_populations[:, band] for band, w in weights.items())
         length, amplitude, residual = fit_occupation_length(z_um, signal, case.thickness_range_um)
-        detector = {
-            str(scale): fit_occupation_length(z_um, signal * weight, case.thickness_range_um)[0]
+        detector_fits = {
+            str(scale): fit_occupation_length(z_um, signal * weight, case.thickness_range_um)
             for scale, weight in acceptance.items()
         }
+        detector = {name: fit[0] for name, fit in detector_fits.items()}
         rows.append(
             {
                 "detector_occupation_length_um": detector,
                 "detector_ratio": {k: v / case.occupation_length_um for k, v in detector.items()},
+                "detector_within_tolerance": {
+                    k: abs(v / case.occupation_length_um - 1.0) <= TOLERANCE
+                    for k, v in detector.items()
+                },
+                "detector_fit_rms_relative": {k: fit[2] for k, fit in detector_fits.items()},
                 "z_um": z_um.tolist(),
                 "signal": signal.tolist(),
                 "case": key,
@@ -267,6 +360,8 @@ def run_case_group(keys, margin, orders, cells, dz_ang):
         )
     return {
         "cases": rows,
+        "boundary": boundary,
+        "band_structure": spectrum,
         "margin_eV": margin,
         "max_order": orders,
         "n_cells": cells,
@@ -378,7 +473,21 @@ def main(argv=None) -> int:
     parser.add_argument(
         "--cases", nargs="+", default=["si110_17", "si100_17", "si100_54", "si110_54"]
     )
-    parser.add_argument("--margins", nargs="+", default=["30", "100", "300", "inf"])
+    parser.add_argument("--margins", nargs="*", default=["30", "100", "300", "inf"])
+    parser.add_argument(
+        "--critical-angle-multiples",
+        nargs="*",
+        type=float,
+        default=[],
+        help="additional exploratory cutoffs U_min + a^2 well_depth (a >= 1)",
+    )
+    parser.add_argument(
+        "--gap-fractions",
+        nargs="*",
+        type=float,
+        default=[],
+        help="additional exploratory free-band gap / mean-width thresholds (0 < f < 1)",
+    )
     parser.add_argument("--orders", nargs="+", type=int, default=[24])
     parser.add_argument("--cells", nargs="+", type=int, default=[16])
     parser.add_argument("--dz", nargs="+", type=float, default=[250.0])
@@ -411,23 +520,36 @@ def main(argv=None) -> int:
         "tolerance": TOLERANCE,
         "runs": [],
     }
-    for keys, margin, orders, cells, dz in itertools.product(
-        groups, margins, args.orders, args.cells, args.dz
-    ):
-        run = run_case_group(keys, margin, orders, cells, dz)
-        report["runs"].append(run)
-        summary = ", ".join(
-            f"{row['case']} L={row['occupation_length_um']:.1f} um (x{row['ratio']:.2f})"
-            + " det "
-            + "/".join(f"{v:.1f}" for v in row["detector_occupation_length_um"].values())
-            for row in run["cases"]
+    for keys, orders, cells, dz in itertools.product(groups, args.orders, args.cells, args.dz):
+        first = CASES[keys[0]]
+        profile = planar_profile("silicon", first.hkl, TEMPERATURE_K)
+        candidates, spectrum = boundary_candidates(
+            profile,
+            first.kinetic_energy_eV,
+            orders,
+            margins,
+            args.critical_angle_multiples,
+            args.gap_fractions,
         )
-        print(
-            f"margin={margin:g} H={orders} cells={cells} dz={dz:g}: {summary} "
-            f"[defect {run['balance_defect']:.1e}, {run['solve_seconds']:.0f} s]",
-            flush=True,
-        )
-        args.out.write_text(json.dumps(report, indent=1))
+        for boundary in candidates:
+            margin = boundary["margin_eV"]
+            run = run_case_group(
+                keys, margin, orders, cells, dz, boundary=boundary, spectrum=spectrum
+            )
+            report["runs"].append(run)
+            summary = ", ".join(
+                f"{row['case']} L={row['occupation_length_um']:.1f} um (x{row['ratio']:.2f})"
+                + " det "
+                + "/".join(f"{v:.1f}" for v in row["detector_occupation_length_um"].values())
+                for row in run["cases"]
+            )
+            print(
+                f"{boundary['kind']}={boundary['parameter']:g} margin={margin:g} "
+                f"H={orders} cells={cells} dz={dz:g}: {summary} "
+                f"[defect {run['balance_defect']:.1e}, {run['solve_seconds']:.0f} s]",
+                flush=True,
+            )
+            args.out.write_text(json.dumps(report, indent=1))
     return 0
 
 

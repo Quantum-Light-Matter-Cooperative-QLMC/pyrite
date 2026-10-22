@@ -91,6 +91,34 @@ def test_trace_plus_flux_converges_at_second_order(si110, kernel):
     assert coarse.free_flux[-1] > 0.0 and coarse.overflow_flux[-1] > 0.0
 
 
+@pytest.mark.parametrize("stopping", [0.0, 10.0])
+def test_jump_source_observer_reproduces_overflow_without_changing_solve(si110, kernel, stopping):
+    from pyrite.montecarlo.channeling.overflow import overflow_spectrum
+
+    solver = DensityMatrixSolver(si110, ENERGY_EV, kernel, margin_eV=5.0)
+    source = np.zeros_like(kernel.momentum_kernel)
+
+    def collect(plane):
+        source[:] += plane
+        plane[:] = 0  # callback arrays cannot mutate the evolving density
+
+    ordinary = solver.propagate(1000.0, 100.0, divergence_rad=1e-3, stopping_eV_per_ang=stopping)
+    observed = solver.propagate(
+        1000.0,
+        100.0,
+        divergence_rad=1e-3,
+        stopping_eV_per_ang=stopping,
+        jump_source_observer=collect,
+    )
+    np.testing.assert_array_equal(observed.final_density, ordinary.final_density)
+    np.testing.assert_array_equal(observed.overflow_flux, ordinary.overflow_flux)
+    # Average source gives rates; multiplying by thickness recovers flux.
+    spectrum = overflow_spectrum(source / 1000, kernel, reference_kernel=kernel)
+    assert 1000 * spectrum.reference_overflow_rate == pytest.approx(
+        observed.overflow_flux[-1], abs=1e-13
+    )
+
+
 def test_dephasing_dominated_limit_is_the_rate_equation(si110, kernel):
     # Weak scattering: coherences dephase over beat lengths far shorter than
     # the scattering length, so populations follow dP/dz = W P - Gamma P.
