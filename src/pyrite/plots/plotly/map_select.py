@@ -120,29 +120,34 @@ def selectable_map_figure(
     markers_x: list[float] = []
     markers_y: list[float] = []
     names: list[str] = []
-    for row in frame.itertuples(index=False):
-        x, y, value = float(row.x), float(row.y), float(row.value)
+    for x_raw, y_raw, value_raw, name_raw in frame[["x", "y", "value", "name"]].itertuples(
+        index=False, name=None
+    ):
+        x, y, value = float(x_raw), float(y_raw), float(value_raw)
         if not isfinite(value):
             continue
         z[y_index[y], x_index[x]] = value
         markers_x.append(x)
         markers_y.append(y)
-        names.append(str(row.name))
+        names.append(str(name_raw))
 
     finite = z[np.isfinite(z)]
     if finite.size == 0:
         return None
     cmin, cmax = (
-        color_domain
-        if color_domain is not None
-        else (float(finite.min()), float(finite.max()))
+        color_domain if color_domain is not None else (float(finite.min()), float(finite.max()))
     )
     if cmin == cmax:
         cmax = cmin + 1.0
     fig = go.Figure()
     fig.add_trace(
         go.Heatmap(
-            x=xs, y=ys, z=z, coloraxis="coloraxis", xgap=1, ygap=1,
+            x=xs,
+            y=ys,
+            z=z,
+            coloraxis="coloraxis",
+            xgap=1,
+            ygap=1,
             hoverongaps=False,
             hovertemplate="azimuth: %{x:.6g}°<br>tilt: %{y:.6g}°<br>value: %{z:.6g}<extra></extra>",
             name=label,
@@ -155,7 +160,10 @@ def selectable_map_figure(
     px = max(3.0, min(14.0, 0.75 * min((width - 160) / len(xs), (height - 135) / len(ys))))
     fig.add_trace(
         go.Scatter(
-            x=markers_x, y=markers_y, mode="markers", name="Select cell",
+            x=markers_x,
+            y=markers_y,
+            mode="markers",
+            name="Select cell",
             customdata=names,
             marker={"symbol": "square", "size": px, "color": "rgba(0,0,0,0.01)"},
             hovertemplate=(
@@ -167,12 +175,15 @@ def selectable_map_figure(
     )
     fig.update_layout(
         title=f"{label} (experimental: click the center of a cell)",
-        width=width, height=height,
+        width=width,
+        height=height,
         xaxis={"title": _axis_label("tilt_azim_deg"), "type": "linear"},
         yaxis={"title": _axis_label("tilt_deg"), "type": "linear"},
-        coloraxis={"colorscale": cmap, "cmin": cmin, "cmax": cmax,
-                   "colorbar": {"title": label}},
-        clickmode="event+select", dragmode="pan", showlegend=False,
-        uirevision="pyrite-map", margin={"t": 65},
+        coloraxis={"colorscale": cmap, "cmin": cmin, "cmax": cmax, "colorbar": {"title": label}},
+        clickmode="event+select",
+        dragmode="pan",
+        showlegend=False,
+        uirevision="pyrite-map",
+        margin={"t": 65},
     )
     return fig

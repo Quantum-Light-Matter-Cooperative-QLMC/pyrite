@@ -42,7 +42,11 @@ with app.setup:
         make_map_widget,
         make_plotly_map_widget,
     )
-    from pyrite.apps.analysis_ui.map_selection import map_scope, restore_selection, selection_for_scope
+    from pyrite.apps.analysis_ui.map_selection import (
+        map_scope,
+        restore_selection,
+        selection_for_scope,
+    )
     from pyrite.apps.analysis_ui.navigation import DETECTORS, MAP, SPECTRA, make_view_nav
     from pyrite.apps.analysis_ui.views import (
         SPECTRA_SPECS,
@@ -309,14 +313,26 @@ def _(
         if map_backend_ui.value == "plotly":
             scope = map_scope(context, energy=energy_ui.value, thickness=thickness_ui.value)
             map_widget, map_frame = make_plotly_map_widget(
-                mo, map_results, context.settings, context.cases,
-                quantity=map_quantity_ui.value, energy=energy_ui.value,
-                theme=app_theme, scope=scope, on_selection=map_selection_set,
+                mo,
+                map_results,
+                context.settings,
+                context.cases,
+                quantity=map_quantity_ui.value,
+                energy=energy_ui.value,
+                theme=app_theme,
+                scope=scope,
+                on_selection=map_selection_set,
             )
         else:
             map_widget = make_map_widget(
-                mo, alt, map_results, context.settings, context.cases,
-                quantity=map_quantity_ui.value, energy=energy_ui.value, theme=app_theme,
+                mo,
+                alt,
+                map_results,
+                context.settings,
+                context.cases,
+                quantity=map_quantity_ui.value,
+                energy=energy_ui.value,
+                theme=app_theme,
             )
     return heatmap_mode, map_frame, map_results, map_widget
 

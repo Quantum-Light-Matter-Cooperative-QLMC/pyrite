@@ -69,7 +69,10 @@ def test_decoder_only_accepts_single_valid_coordinate():
     frame = single_panel_frame(_frame(), 30.0)
     point = {"curveNumber": 1, "pointIndex": 1, "x": 1.5, "y": 2.0, "customdata": "b"}
     assert cell_from_points([point], frame) == {
-        "x": 1.5, "y": 2.0, "name": "b", "panel_raw": 30.0,
+        "x": 1.5,
+        "y": 2.0,
+        "name": "b",
+        "panel_raw": 30.0,
     }
     assert cell_from_points([point, dict(point)], frame)["name"] == "b"
     assert cell_from_points([point, {"x": 0.0, "y": 2.0}], frame) is None
@@ -89,9 +92,7 @@ def test_decoder_does_not_trust_browser_case_name():
 
 def test_session_scope_and_reactivity_preserve_same_cell_across_theme_or_quantity():
     frame = single_panel_frame(_frame(), 30.0)
-    ctx = SimpleNamespace(
-        selected_material="Si", selected_face="(111)", checkpoint_stem="run-42"
-    )
+    ctx = SimpleNamespace(selected_material="Si", selected_face="(111)", checkpoint_stem="run-42")
     scope = map_scope(ctx, energy=30.0, thickness=1_000_000.0)
     stored = selection_for_scope([{"x": 0.0, "y": 2.0}], frame, scope)
     assert stored["scope"] == scope
@@ -134,7 +135,8 @@ def test_dense_grid_targets_are_bounded_and_serializable():
     xs, ys = np.meshgrid(np.linspace(-4.0, 6.0, 25), np.linspace(1.0, 11.0, 25))
     frame = pd.DataFrame(
         {
-            "x": xs.ravel(), "y": ys.ravel(),
+            "x": xs.ravel(),
+            "y": ys.ravel(),
             "value": np.arange(625, dtype=float),
             "panel": ["30 keV"] * 625,
             "panel_raw": np.full(625, 30.0),

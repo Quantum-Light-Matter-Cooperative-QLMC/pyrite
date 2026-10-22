@@ -55,12 +55,17 @@ def make_plotly_map_widget(
         return None, None
     spec = next((entry for entry in MAP_QUANTITIES if entry[0] == quantity), MAP_QUANTITIES[0])
     frame = heatmap_frame(
-        results, settings, quantity=spec[0], cases=cases,
+        results,
+        settings,
+        quantity=spec[0],
+        cases=cases,
         cxr_metric="prominence",
     )
     frame = single_panel_frame(frame, energy)
     chart = selectable_map_figure(
-        frame, label=spec[1], cmap=spec[2],
+        frame,
+        label=spec[1],
+        cmap=spec[2],
         color_domain=(0.0, 1.0) if spec[0] == "hit_frac" else None,
     )
     if chart is None:

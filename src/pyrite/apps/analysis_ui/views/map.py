@@ -100,8 +100,7 @@ def render_map(
                     "Azimuth × polar tilt at the sidebar beam energy and thickness. "
                     "Click a cell to plot its spectrum."
                     + (
-                        " **Plotly pilot:** click near the cell center; pan and zoom "
-                        "are enabled."
+                        " **Plotly pilot:** click near the cell center; pan and zoom are enabled."
                         if map_backend_ui.value == "plotly"
                         else ""
                     )
