@@ -21,7 +21,16 @@ use outside it:
   the coherent pair term, integrated over the scored band and both
   hemispheres, must be a small fraction of the kinetic energy; and the pair
   term must be negligible at both band edges, otherwise coherent energy
-  outside the band is unbounded by this calculation.
+  just outside the band is unbounded by this calculation. The budget is
+  in-band only: it cannot see coherent emission below a band whose lower edge
+  lies above the coherent window (``gaussian_coherent_band_eV``), where
+  ``|F|^2`` rises again toward one; such sub-band energy needs supported optics
+  there and is reported, not bounded, by the caller.
+
+Both bounds concern the self (single-history) power: the pair term's
+relative error is not bounded by the formation check. The factor 2 assumes
+the true term of a short run is no larger than the straight-run term; it is a
+heuristic sensitivity measure, not a proven bound.
 
 Validation: optical-planar-tr, optical-ctr-population
 """

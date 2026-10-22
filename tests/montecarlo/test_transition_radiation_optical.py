@@ -197,6 +197,22 @@ def test_matched_medium_and_vanishing_film_radiate_nothing():
     assert np.max(thin) < 1e-12 * np.max(_score(_film(), one, 1))
 
 
+def test_finite_gold_permittivity_matches_closed_form_ginzburg_frank():
+    from pyrite.montecarlo.spectrum.transition_radiation import ginzburg_frank_interface
+
+    theta = np.linspace(0.05, 1.5, 15)
+    n = np.stack([np.sin(theta), 0 * theta, -np.cos(theta)], -1)
+    entrance = _take(_film(foil=1e6), np.array([0]))  # charge entering bulk gold
+    one = OpticalBunchSource.sampled(_PC1, "one")
+    for energy in (1.4, 2.5, 3.3):
+        eps = _AU.epsilon(energy)
+        got = optical_transition_radiation(
+            entrance, energy, n, [eps], source=one, n_histories=1
+        ).yield_per_electron
+        closed = ginzburg_frank_interface(eps, -_BETA, theta, energy)
+        np.testing.assert_allclose(got, closed, rtol=1e-9)
+
+
 def test_perfect_conductor_limit_recovers_ginzburg_frank():
     theta = np.linspace(0.05, 1.5, 12)
     n = np.stack([np.sin(theta), 0 * theta, -np.cos(theta)], -1)
@@ -258,7 +274,7 @@ def test_gaussian_law_is_exact_and_matches_sampled_offsets():
         _score(sampled, law, m)
 
 
-def test_importance_weights_are_unbiased_and_never_squared_as_charge():
+def test_importance_weights_are_consistent_and_never_squared_as_charge():
     m, sigma_t, wide = 4000, 700.0, 1000.0  # Å of crossing-time spread
     rng = np.random.default_rng(9)
     t0 = rng.normal(0, wide, m)

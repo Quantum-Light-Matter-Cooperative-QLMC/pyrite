@@ -40,7 +40,10 @@ Limits pinned in `tests/montecarlo/test_transition_radiation_optical.py`: a
 matched medium ($\varepsilon=1$) and a vanishing film radiate nothing; a
 conductor $|\varepsilon|\to\infty$ at normal incidence gives the backward
 Ginzburg–Frank form
-$\alpha\beta^2\sin^2\theta/[\pi^2E(1-\beta^2\cos^2\theta)^2]$.
+$\alpha\beta^2\sin^2\theta/[\pi^2E(1-\beta^2\cos^2\theta)^2]$. A charge entering
+bulk gold reproduces the closed finite-$\varepsilon$ Ginzburg–Frank form
+(`ginzburg_frank_interface`, $\beta\to-\beta$) at 1.4, 2.5 and 3.3 eV to
+$10^{-9}$.
 
 **Published comparison.** Coenen, Vesseur and Polman {cite:p}`coenen2011`
 (arXiv:1107.3632v1, withdrawn from arXiv; APL 99, 143103) computed the
@@ -89,7 +92,7 @@ $$
 $$
 
 $W=\sum w_e$, $W_2=\sum w_e^2$. Both are self-normalized importance-sampling
-ratios: consistent for $w\propto p/q$, exactly the distinct-pair moments
+ratios: consistent for $w\propto p/q$ (bias $O(1/M_\text{eff})$; exactly unbiased only for unit weights), exactly the distinct-pair moments
 $G/M$ and $(P-G)/[M(M-1)]$ for unit weights, invariant to a common weight
 scale. A weight never multiplies the self term squared, so a macro-particle
 weight cannot masquerade as physical self noise. The three moments come from
@@ -103,7 +106,7 @@ $M_\text{eff}=W^2/W_2$, recorded as `pair_weight`.
 | --- | --- | --- | --- |
 | `sampled` | carry their own sampled offsets and all intra-electron correlations (time–energy chirp, position–direction) | 1 | an analytic factor (would count offsets twice) |
 | `gaussian` | offset-free | $\exp(-\boldsymbol\kappa^{\mathsf T}\Sigma\boldsymbol\kappa)$, $\Sigma$ the $(t,x,y)$ covariance at the entrance face | histories with entrance offsets |
-| `empirical` | offset-free | transform of a stated profile: `profile` density $|\sum w e^{i\boldsymbol\kappa\cdot\boldsymbol\xi}|^2/W^2$; iid `samples` $(|\sum w e^{i\phi}|^2-W_2)/(W^2-W_2)$ | $\omega\,\delta t>1$ or $k_\parallel\,\delta r>1$ for the stated resolution; missing resolution |
+| `empirical` | offset-free (resolution = sampling interval, not RMS blur) | transform of a stated profile: `profile` density $|\sum w e^{i\boldsymbol\kappa\cdot\boldsymbol\xi}|^2/W^2$; iid `samples` $(|\sum w e^{i\phi}|^2-W_2)/(W^2-W_2)$ | $\omega\,\delta t>1$ or $k_\parallel\,\delta r>1$ for the stated resolution; missing resolution |
 | `realization` | are the physical electrons ($N=M$, unit weights) | — ($|\sum\mathbf S|^2/M$) | weights; $N\ne M$ |
 
 `inter_electron="correlated"` (sub- or super-Poissonian shot noise) is refused
@@ -132,7 +135,9 @@ E_w=\frac{\hbar}{\sigma_t}\sqrt{\ln\frac{N-1}{\epsilon}}
 $$
 
 For `gaussian_200fs` at 1 pC ($N=6.24\times10^6$): $E_{1/e}=3.29$ meV and
-$E_w=15.6$ meV at $\epsilon=10^{-3}$. The bunch turnover therefore needs
+$E_w=15.6$ meV at $\epsilon=10^{-3}$. This is a time-only, normal-incidence
+window; a tilted front ($t$–$x$ covariance) observed obliquely can make
+$\boldsymbol\kappa^{\mathsf T}\Sigma\boldsymbol\kappa<\omega^2\sigma_t^2$ and widen it. The bunch turnover therefore needs
 optical support well below 0.01 eV (far-IR/THz data, at least down to a few
 meV), which no shipped provider has; across the gold 0.2–5 eV band the CTR
 term of that bunch is $e^{-3700}$ or smaller. The X-ray coherent-window
@@ -160,7 +165,17 @@ predicates are lattice phases and are not reused here.
   $\cos\theta$ × uniform $\varphi$) and the band, must stay below
   `energy_budget` (default $10^{-3}$) of the entrance kinetic energy, and the
   pair-to-self ratio at both band edges must be below $10^{-3}$; otherwise the
-  coherent energy outside the band is unbounded and the case is refused.
+  coherent energy just outside the band is unbounded and the case is refused.
+  The budget is in-band only: it cannot detect coherent energy below a band
+  whose lower edge lies above the coherent window $E_w$, where $|F|^2$ rises
+  back toward one (for 30 keV electrons on gold, a 200 fs bunch radiates
+  roughly $2	imes10^{-4}$ of the kinetic energy there at 1 pC and
+  $2	imes10^{-3}$ at 10 pC). Check $E_w$ against the band before relying on
+  fixed trajectories for a high-charge short bunch.
+
+Both checks bound the self (single-history) power; the pair term's relative
+error is not bounded by the formation check, and the factor 2 is a heuristic
+sensitivity measure, not a proven bound.
 
 Both are recorded in the result's `metadata["validity"]`; passing `None`
 skips a check and records it as not evaluated. Space charge, wakefields and

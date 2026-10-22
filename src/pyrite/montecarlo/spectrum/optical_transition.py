@@ -75,7 +75,10 @@ class OpticalBunchSource:
     travel; use the constructors for fs/µm inputs. ``history_weights`` are
     positive importance weights ``p/q`` of the iid sampled histories (any
     common scale), never macro-particle charges: the self term uses them
-    linearly. ``inter_electron="correlated"`` (sub-/super-Poissonian shot
+    linearly. ``time_resolution_ang``/``transverse_resolution_ang`` of an
+    empirical law are its sampling interval (grid spacing), not an RMS blur;
+    an RMS-blurred measurement must be deconvolved or its blur stated as part
+    of the profile. ``inter_electron="correlated"`` (sub-/super-Poissonian shot
     noise, a fixed realization treated as a law) is refused except by the
     ``realization`` law, which is that explicit realization.
 
