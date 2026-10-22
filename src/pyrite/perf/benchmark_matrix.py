@@ -118,17 +118,21 @@ def expand_matrix(
 ) -> list[dict[str, Any]]:
     """Expand the frozen core product and declared sparse extensions to cases.
 
+    ``core.t_over_r_cap_by_energy_keV`` lowers every core ``t/R`` above the cap
+    at that energy to the cap, so they merge into one case.
+
     ``ranges`` maps a material key to a :func:`parse_range_table` result. A
     material without one keeps ``thickness_um = None`` and status
     ``pending-range-source`` rather than a guessed dimension.
     """
     materials = {m["key"]: m for m in spec["materials"]}
     core = spec["core"]
+    caps = {float(e): cap for e, cap in core.get("t_over_r_cap_by_energy_keV", {}).items()}
     scenes: list[dict[str, Any]] = [
         {"material": key, "energy_keV": e, "t_over_r": tr, "variant": "core"}
         for key in core["materials"]
         for e in core["energies_keV"]
-        for tr in core["t_over_r"]
+        for tr in sorted({min(t, caps.get(float(e), t)) for t in core["t_over_r"]})
     ]
     scenes.extend(dict(extension) for extension in spec.get("extensions", []))
     cases = []

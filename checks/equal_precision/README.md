@@ -352,8 +352,9 @@ grid. The adapter's default history limit stays 20000. See the
 `matrix-spec.json` defines the 18-scene core, the six pilot anchors and the
 sparse extensions; `build_matrix.py` expands it to the committed `matrix.json`
 (stable case ids, observable applicability, coverage table). Range-scaled
-thicknesses stay `pending-range-source` until pinned ESTAR CSDA tables are
-supplied with `--estar --range MATERIAL=PATH`; no engine's own range is used.
+thicknesses come from the committed ESTAR CSDA tables in
+`checks/reference/estar/`, pinned in the spec; `--estar --range MATERIAL=PATH`
+overrides them. No engine's own range is used.
 `audit_coverage.py --output PATH` resolves the installed released tables for
 every case without transport and keeps every gap explicit. The comparison
 schema for all adapters is `pyrite.perf.comparison`. See the
