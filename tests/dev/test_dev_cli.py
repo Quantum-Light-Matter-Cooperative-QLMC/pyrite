@@ -333,6 +333,23 @@ def test_ci_runs_every_primary_suite_once(dev_module) -> None:
     assert quantum["python"] == matrix["python"]
 
 
+def test_formatter_regenerates_and_commits_cli_reference(dev_module) -> None:
+    import yaml
+
+    workflow = yaml.safe_load((dev_module.ROOT / ".github/workflows/ci.yml").read_text())
+    steps = workflow["jobs"]["format"]["steps"]
+    reference = next(step for step in steps if step.get("name") == "Regenerate CLI reference")
+    commit = next(
+        step
+        for step in steps
+        if step.get("name") == "Commit formatting and generated-reference fixes"
+    )
+
+    assert reference["run"] == "uv run --locked pyrite-dev cli-reference --write"
+    assert "'docs/repo-design/cli/cli-reference*.md'" in commit["run"]
+    assert "style: apply Ruff formatting and regenerate CLI reference" in commit["run"]
+
+
 @pytest.mark.parametrize(
     ("path", "owner"),
     [
