@@ -4,7 +4,7 @@ from pyrite.plots._pixel_frames import (
     pixel_metadata_rows,
     pixel_spectrum_frame,
 )
-from pyrite.plots.altair.pixels import (
+from pyrite.plots.plotly.pixels import (
     detector_image_chart,
     histogram_chart,
     pixel_spectrum_chart,

@@ -47,7 +47,15 @@ class AnalysisContext:
         return replace(self, results=results, emission=emission or self.emission)
 
     def title_for_face(self, chart: Any) -> Any:
-        if chart is None or self.selected_face != "blazed" or not hasattr(chart, "title"):
+        if chart is None or self.selected_face != "blazed":
+            return chart
+        # Plotly titles are stored under ``layout.title.text``, unlike Altair.
+        if callable(getattr(chart, "update_layout", None)):
+            title = getattr(getattr(chart.layout, "title", None), "text", None)
+            if title:
+                chart.update_layout(title=f"{title} (blazed)")
+            return chart
+        if not hasattr(chart, "title"):
             return chart
         title = chart.title
         if isinstance(title, str):

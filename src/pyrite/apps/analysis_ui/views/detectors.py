@@ -1,7 +1,6 @@
 """Detectors view: Eagle XO or Timepix3 response at the sidebar slice."""
 
-from pyrite.apps._design import static_altair_chart
-from pyrite.plots.altair.detectors import (
+from pyrite.plots.plotly.detectors import (
     eaglexo_charge_chart,
     eaglexo_detected_chart,
     timepix_detected_chart,
@@ -63,6 +62,6 @@ def render_detectors(
                 band=band,
             )
             if chart is not None:
-                charts.append(static_altair_chart(mo, themed_chart(chart, theme)))
+                charts.append(themed_chart(chart, theme))
     parts.extend(charts or [mo.md("*No detector response for this slice.*")])
     return mo.vstack(parts)

@@ -1,4 +1,4 @@
-from pyrite.plots.altair.spectra import multi_case_spectrum_chart
+from pyrite.plots.plotly.spectra import multi_case_spectrum_chart
 
 from ..controls import axes_panel
 from .common import themed_chart

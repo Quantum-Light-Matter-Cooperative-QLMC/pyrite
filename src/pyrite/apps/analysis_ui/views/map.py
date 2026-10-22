@@ -1,8 +1,8 @@
 """Map view: one clickable azimuth × polar-tilt heatmap, metric trends, and rankings."""
 
 from pyrite.apps._design import static_altair_chart
-from pyrite.plots.altair.spectra import spectrum_chart
-from pyrite.plots.altair.sweeps import metric_vs_chart, scan_charts
+from pyrite.plots.plotly.spectra import spectrum_chart
+from pyrite.plots.plotly.sweeps import metric_vs_chart, scan_charts
 from pyrite.results import select_results, top_geometries
 
 from .common import themed_chart
@@ -52,9 +52,7 @@ def _selected_cell_spectra(mo, *, context, map_results, selection, energy, theme
         for band in ("narrow", "broad")
     ]
     charts = [
-        static_altair_chart(mo, context.title_for_face(themed_chart(chart, theme)))
-        for chart in charts
-        if chart is not None
+        context.title_for_face(themed_chart(chart, theme)) for chart in charts if chart is not None
     ]
     heading = mo.md(f"**Selected cell** — polar tilt {tilt:g} deg, azimuth {float(row['x']):g} deg")
     return mo.vstack([heading, *charts]) if charts else mo.md("*No spectrum for that cell.*")
@@ -70,9 +68,7 @@ def render_map_trends(mo, *, context, map_results, theme):
     return mo.vstack(
         [
             mo.md("**Integrated line and coherent flux versus polar tilt**"),
-            mo.vstack([static_altair_chart(mo, chart) for chart in metric_charts])
-            if metric_charts
-            else mo.md("*No metric results.*"),
+            mo.vstack(metric_charts) if metric_charts else mo.md("*No metric results.*"),
             render_rankings(mo, context=context),
         ]
     )
@@ -132,9 +128,7 @@ def render_map(
                     "*No heatmap — needs an azimuth × polar-tilt sweep. Scan plots at the "
                     "sidebar thickness follow.*"
                 ),
-                mo.vstack([static_altair_chart(mo, chart) for chart in charts])
-                if charts
-                else mo.md("*No scan results.*"),
+                mo.vstack(charts) if charts else mo.md("*No scan results.*"),
             ]
         )
 
