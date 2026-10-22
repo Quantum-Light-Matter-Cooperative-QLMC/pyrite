@@ -2,6 +2,66 @@
 
 Part of the [physics validation ledger](physics-validation-ledger.md). See the [validation methodology](methodology.md) for the status lifecycle and the [domain inventories](domain-inventories.md) for a claim-by-claim index.
 
+## `optical-planar-tr`
+
+- **Claim:** The planar Maxwell TR amplitude with measured optical permittivity is a candidate optical single-electron source; its ideal-conductor normal-incidence limit is the Ginzburg–Frank angular spectrum.
+- **Code:** `docs/research/physics/optical-ir-emission.md` (research proposal; no optical production implementation)
+- **Source:** Ginzburg–Frank interface formula and Maxwell boundary continuity; [source equation, assumptions and limits](../research/physics/optical-ir-emission.md#tr-and-ctr-first-production-target); Coenen, Vesseur and Polman (2011), DOI 10.1063/1.3644985, arXiv:1107.3632.
+- **Status:** unverified
+- **Checks:** Proposed only: matched media, vanishing film, perfect-conductor limit, optical material validity, photon/energy normalization, angular convergence and CPU/CUDA complex-field parity.
+- **Anchor:** None executed. Proposed published measured anchor: 30 keV gold OTR angular pattern of Coenen et al., including collection/polarization response.
+- **Notes:** #533 research only; extends rather than upgrades tr-detected-omission-bound. Optical constants/benchmark data must be pinned and a fresh-context derivation/reproduction performed before support is claimed.
+
+## `optical-ctr-population`
+
+- **Claim:** Independent identical single-electron responses give N plus N(N-1) times the squared crossing-phase characteristic function; a distinct-pair estimator separates physical charge from sampled history count. Correlated/weighted sources require their own sampling contract.
+- **Code:** `docs/research/physics/optical-ir-emission.md` (research proposal; no changed population estimator)
+- **Source:** Squared field-sum expansion; Shkvarunets and Fiorito, arXiv:0712.2848, Eq. (1); [bunch equations and limits](../research/physics/optical-ir-emission.md#bunch-inputs-sampling-and-phase-retention).
+- **Status:** unverified
+- **Checks:** Proposed only: N=1, incoherent and point-bunch limits, Gaussian RMS duration/transverse factors, sample-count invariance at fixed charge, weighted-pair bias and correlated-source phase retention.
+- **Anchor:** None executed for this extension. Proposed instrument-level anchor: Schmidt et al., arXiv:1803.00608, CTR reconstruction versus deflecting-structure profiles, with optical response and missing-band uncertainty.
+- **Notes:** #533 research only. Existing tr-coherent-bunch/coherent-physical-bunch-population statuses remain unchanged; those claims do not validate arbitrary optical weighted/microbunched sources. Gaussian catalog scale calculations are illustrative, not hardware or experimental evidence.
+
+## `optical-finite-boundary-field`
+
+- **Claim:** Vector equivalent surface currents with the finite-distance outgoing Green function are a candidate finite-radiator TR/DR model; DR can be emitted without an electron crossing the material.
+- **Code:** `docs/research/physics/optical-ir-emission.md` (research proposal; no implementation)
+- **Source:** Shkvarunets and Fiorito, arXiv:0712.2848, Eqs. (15), (17), (19)–(25); Schmidt et al., arXiv:1803.00608, Eqs. (11)–(15); [finite-source requirements](../research/physics/optical-ir-emission.md#finite-targets-diffraction-radiation-and-the-pre-wave-zone).
+- **Status:** unverified
+- **Checks:** Proposed only: infinite-screen/far-zone limit, zero screen, circular-disc analytic comparison, vector polarization, finite-distance convergence and CPU/CUDA parity.
+- **Anchor:** None executed. Proposed theoretical anchor: Schmidt et al., Fig. 7; experimental candidate: Phys. Rev. E 63, 056501 (2001), DOI 10.1103/PhysRevE.63.056501, full geometry/data not acquired here.
+- **Notes:** #533 research only. Perfect-conductor equivalents need a stated validity envelope before applying them to real optical films. No fresh-context derivation, implementation or measured-data reproduction.
+
+## `optical-wavefront-propagation`
+
+- **Claim:** Passive vector angular-spectrum propagation between reference planes, combined with explicitly modeled polarization/optical elements, can retain CTR phase in finite-distance collection where a far-field angular detector is insufficient.
+- **Code:** `docs/research/physics/optical-ir-emission.md` (research proposal; no implementation)
+- **Source:** Vacuum Maxwell angular-spectrum identity; Schmidt et al., arXiv:1803.00608, Appendix D; [equation and instrument boundary](../research/physics/optical-ir-emission.md#propagation-detectors-and-observables).
+- **Status:** unverified
+- **Checks:** Proposed only: zero-distance identity, unobstructed propagating flux conservation, passive evanescent decay, padding/mesh convergence, far-field transform, complex polarization and CPU/CUDA parity.
+- **Anchor:** None executed. Proposed published numerical comparisons: Schmidt et al., finite-screen field and Appendix D propagation; each real element additionally needs its measured transfer response.
+- **Notes:** #533 research only. No arbitrary-mirror/chamber validity follows from the vacuum propagator. No fresh-context derivation or independent numerical reproduction has been performed.
+
+## `optical-instrument-observable`
+
+- **Claim:** A calibrated linear response maps optical spectral energy per pulse to detector signal; an ideal balanced two-port field interferometer measures its response-weighted cosine transform, which alone does not uniquely determine bunch shape.
+- **Code:** `docs/research/physics/optical-ir-emission.md` (research proposal; no detector/inference implementation)
+- **Source:** Linear detector integration and two-arm field interference; DIPAC 1999 IT07, Fourier-transform spectroscopy/Martin–Puplett setup; Schmidt et al., arXiv:1803.00608, phase-retrieval ambiguity; [equations and units](../research/physics/optical-ir-emission.md#propagation-detectors-and-observables).
+- **Status:** unverified
+- **Checks:** Proposed only: energy/power/count units, gain/sign/double-pass delay, zero/large-delay behavior, finite-band response, port imbalance, uncertainty-aware synthetic inference and CPU/CUDA reduction parity.
+- **Anchor:** None executed. Proposed setup anchor: DIPAC 1999 IT07; measured bunch-shape comparison: Schmidt et al. CTR/TDS profiles, pending acquisition of numerical response and data.
+- **Notes:** #533 research only. No detector calibration, interferogram reproduction, fresh-context derivation or uniquely inferred bunch profile is claimed.
+
+## `optical-lattice-applicability`
+
+- **Claim:** Atomic elastic diffraction of propagating optical/IR waves has no nonzero Bragg order when wavelength greatly exceeds atomic spacing; this does not exclude off-shell near-field coupling or tuned low-frequency lattice-force motion. Optical grating diffraction requires macroscopic periodic response rather than an extrapolated X-ray susceptibility harmonic.
+- **Code:** `docs/research/physics/optical-ir-emission.md` (research applicability statement; no implementation)
+- **Source:** Elastic wavevector matching, g no greater than twice the propagating wavenumber; own/free-field distinction of Artru and Rullhusen, NIM B 145, 1–7 (1998), DOI 10.1016/S0168-583X(98)00241-9; [assumptions and CBS/DTR exceptions](../research/physics/optical-ir-emission.md#pxr-cbs-and-dtr-at-long-wavelength).
+- **Status:** unverified
+- **Checks:** Proposed only: units, propagating Bragg inequality in a lossless isotropic medium, homogenization limit, evanescent-current and near-transverse CBS exceptions; do not infer a universal zero-emission theorem.
+- **Anchor:** None executed. This scope boundary is research-only; no optical atomic-DTR or grating-DTR implementation is recommended without a selected geometry/source and published anchor.
+- **Notes:** #533 explicitly includes DTR. No fresh-context applicability verification performed. Existing dtr-kinematic-boundary, dtr-two-beam-boundary, dtr-transported-current and line-tr-phase-reconciliation statuses are unchanged.
+
 ## `dtr-two-beam-boundary`
 
 - **Claim:** Projecting Maxwell's curl equations onto two transverse harmonics gives a driven eight-component tangential field system; matching outgoing eigenmodes across a planar stack retains repeated diffraction in one crystal layer and the complex interference of the observed and diffracted charge harmonics
