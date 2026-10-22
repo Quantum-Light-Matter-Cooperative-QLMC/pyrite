@@ -22,10 +22,8 @@ from pyrite.cli import _completion as _cli_completion
 from pyrite.cli._deprecations import canonical_option
 from pyrite.cli._groups import LazyGroup
 from pyrite.cli.commands import (
-    _profile_cxr_grid,
     _profile_detectors,
     _profile_filters,
-    _profile_precision,
     _profile_show,
 )
 from pyrite.cli.commands._profile_members import (
@@ -54,7 +52,6 @@ from pyrite.console.output import (
     emit_json_result,
     emit_result,
     flatten_option_values,
-    hidden_alias,
     output_option,
 )
 
@@ -537,10 +534,6 @@ def numerics_reset_command(name, fields, yes, dry_run):
         raise CLIError(str(exc)) from None
     _confirm_standard(name, "reset calculation numerics on", yes, dry_run)
     return _write(document, original, dry_run, f"reset numerics for profile {name}")
-
-
-hidden_alias(command, _profile_cxr_grid.command, "cxr-grid")
-hidden_alias(command, _profile_precision.command, "precision")
 
 
 @command.group("ranges")

@@ -271,17 +271,17 @@ def test_shape_only_named_beam(catalog, flag, expected):
 
 def test_list_times(tmp_path):
     path = write_gdf(tmp_path / "beam.gdf", times=(0, 1e-9))
-    result = invoke("gdf-times", str(path))
+    result = invoke("gdf", "times", str(path))
     assert result.exit_code == 0, result.output
     assert result.output.count("2 particles") == 2
-    assert invoke("gdf-times", str(tmp_path / "missing")).exit_code == 1
+    assert invoke("gdf", "times", str(tmp_path / "missing")).exit_code == 1
 
 
 def test_screen_inspection(tmp_path):
     arrays = fields()
     arrays["t"] = np.array([1e-9, 2e-9])
     path = write_gdf(tmp_path / "screen.gdf", arrays, times=(0,), kind="position")
-    args = ("gdf-inspect", str(path), "--screen-position-m", "0")
+    args = ("gdf", "inspect", str(path), "--screen-position-m", "0")
     result = invoke(*args)
     assert result.exit_code == 0, result.output
     assert "--gdf-z-origin-m" in result.output

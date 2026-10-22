@@ -69,7 +69,7 @@ def test_unknown_name_suggests_and_points_to_create(tmp_path, monkeypatch):
 
     assert result.exit_code == 1
     assert "Did you mean: standard_90" in result.stderr
-    assert "pyrite detector create standard_9" in result.stderr
+    assert "pyrite detector create scalar standard_9" in result.stderr
 
 
 def test_create_set_and_dry_run(tmp_path, monkeypatch):

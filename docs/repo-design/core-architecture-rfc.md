@@ -108,7 +108,7 @@ The documented entry points are the CLI and the marimo apps. `Sweep`, `build_cas
 
 ### The command surface is large relative to the modelled physics
 
-Thirteen top-level groups and 88 documented commands. A substantial fraction is store maintenance surfaced as user vocabulary — `checkpoint gc|rm|merge|slim| recompute|archive|restore`, `energy-grid add|rm|verify|gc|regen-golden`, `performance rm`, `remote gc|prune-jobs`. A further part is a TOML editor implemented as a command group: {file}`src/pyrite/cli/commands/profile.py` is 1 169 lines over {file}`src/pyrite/campaign/profile_edit.py` at 465 lines.
+Thirteen top-level groups and 88 documented commands. A substantial fraction is store maintenance surfaced as user vocabulary — `checkpoint gc|rm|merge|slim| recompute|archive|restore`, `energy-grid add|rm|verify|gc|regen-golden`, `performance rm`, `remote gc|prune-jobs`. A further part is a TOML editor implemented as a command group: {file}`src/pyrite/cli/commands/profile.py` is 1 169 lines over the former `src/pyrite/campaign/profile_edit.py` facade (removed in 0.17.0) at 465 lines.
 
 The CLI's *contracts* are strong and are not in question here: exit-code discipline, the versioned JSON envelope, destructive-operation previews, the deprecation registry, and the generated reference should all be retained unchanged. The proposal concerns the number of nouns, not their quality.
 
@@ -229,7 +229,7 @@ Checkpoints and campaign locks record `identity_version`. Readers dispatch on th
 
 `Case` is not the campaign layer's output; it is the **transport layer's input schema**. It therefore belongs with its consumer, in `pyrite.montecarlo`, not with its producer.
 
-This matters because the property is currently unenforced. The `physics-core-stays-below-drivers` contract ({file}`pyproject.toml` line 191) forbids `detectors` / `materials` / `montecarlo` from importing eight driver packages, but omits `campaign` and `results`. The physics core imports neither today — the dependency graph is clean — so defining `Case` in `campaign` and importing it from `run_case` would introduce the first upward edge, and import-linter would pass it silently. `campaign` already imports the physics core (for example {file}`src/pyrite/campaign/profile_edit.py` line 14), so that edge would close a package-level cycle.
+This matters because the property is currently unenforced. The `physics-core-stays-below-drivers` contract ({file}`pyproject.toml` line 191) forbids `detectors` / `materials` / `montecarlo` from importing eight driver packages, but omits `campaign` and `results`. The physics core imports neither today — the dependency graph is clean — so defining `Case` in `campaign` and importing it from `run_case` would introduce the first upward edge, and import-linter would pass it silently. `campaign` already imports the physics core (for example the former `src/pyrite/campaign/profile_edit.py` facade (removed in 0.17.0) line 14), so that edge would close a package-level cycle.
 
 The practical cost is concrete: `campaign` owns catalog resolution, so the edge would make `import pyrite.montecarlo` transitively pull in profile lookup and TOML loading, working against Change 1's requirement that a single-shot simulation perform no filesystem access.
 
@@ -428,7 +428,7 @@ Two nouns the first draft proposed to remove are retained on review:
 
 Two narrower proposals:
 
-* Keep `profile show`, `profile list`, `material show`, and `material validate`. Reconsider the interactive `create` / `rename` / `delete` flows: they are the bulk of the 1 634 lines across {file}`src/pyrite/cli/commands/profile.py` and {file}`src/pyrite/campaign/profile_edit.py`, and the catalog is already self-validating, so edit-then-validate is a defensible alternative to prompt-driven mutation.
+* Keep `profile show`, `profile list`, `material show`, and `material validate`. Reconsider the interactive `create` / `rename` / `delete` flows: they are the bulk of the 1 634 lines across {file}`src/pyrite/cli/commands/profile.py` and the former `src/pyrite/campaign/profile_edit.py` facade (removed in 0.17.0), and the catalog is already self-validating, so edit-then-validate is a defensible alternative to prompt-driven mutation.
 * Keep every existing contract. Exit codes, the JSON envelope, `-o/--output` semantics, destructive previews, the deprecation registry, and the generated reference are not in scope for change.
 
 ### Migration

@@ -124,5 +124,5 @@ def unknown_detector(document, name):
     message = f"unknown detector: {name}"
     if suggestions:
         message += f". Did you mean: {', '.join(suggestions)}?"
-    message += f". Create it first with: pyrite detector create {name}"
+    message += f". Create it first with: pyrite detector create scalar {name}"
     raise ValueError(message)

@@ -51,7 +51,7 @@ previous preflight behavior.
   pyrite-output/cache/  # regenerable; safe to delete
 ```
 
-The exact internal files are implementation details; use `pyrite checkpoint` and the `pyrite material energy-grid` / `pyrite-dev energy-grid` commands rather than editing them. A command's `--checkpoint-dir` overrides the workspace checkpoint root for that invocation.
+The exact internal files are implementation details; use `pyrite checkpoint` and the `pyrite numerics energy-grid` / `pyrite-dev energy-grid` commands rather than editing them. A command's `--checkpoint-dir` overrides the workspace checkpoint root for that invocation.
 
 ## Lifecycle and safety
 

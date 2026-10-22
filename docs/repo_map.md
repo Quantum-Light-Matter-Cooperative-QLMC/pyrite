@@ -23,53 +23,49 @@ behind lazy dispatch, ``__getattr__``, or ``import_module`` are outside this sca
 Components (a + b denotes a static import cycle):
   p0: _entry
   p1: apps
-  p2: campaign + checkpoints + energy_grid + montecarlo + observations + remote + results + runs + validation
+  p2: campaign + checkpoints + energy_grid + montecarlo + observations + perf + remote + results + runs + validation
   p3: cli
   p4: console
   p5: detectors
   p6: devtools
   p7: instrument
   p8: materials
-  p9: perf
-  p10: plots
-  p11: xsgen
+  p9: plots
+  p10: xsgen
 Edges (importer -> imported):
   p0 -> p2
   p0 -> p3
   p0 -> p4
   p0 -> p8
-  p1 -> p10
   p1 -> p2
   p1 -> p4
   p1 -> p8
-  p10 -> p2
+  p1 -> p9
   p10 -> p4
-  p10 -> p5
   p10 -> p8
-  p11 -> p4
-  p11 -> p8
-  p2 -> p11
+  p2 -> p10
   p2 -> p4
   p2 -> p5
   p2 -> p7
   p2 -> p8
-  p2 -> p9
-  p3 -> p11
+  p3 -> p10
   p3 -> p2
   p3 -> p4
   p3 -> p5
   p3 -> p7
   p3 -> p8
-  p3 -> p9
   p4 -> p8
   p5 -> p8
-  p6 -> p10
   p6 -> p2
   p6 -> p3
   p6 -> p4
+  p6 -> p9
   p7 -> p5
   p7 -> p8
+  p9 -> p2
   p9 -> p4
+  p9 -> p5
+  p9 -> p8
 ```
 <!-- END GENERATED PACKAGE DEPENDENCIES -->
 
@@ -477,10 +473,8 @@ Immutable resolved numerics with value provenance and stable CLI/JSON grouping; 
 ### Profile authoring (`campaign/profile_*.py`)
 
 Click-free operations over parsed catalog documents. Consumers import their
-operation family directly. `profile_edit.py` is a deprecated compatibility module
-(since 0.15.2, removal in 0.17.0); importing it emits `DeprecationWarning` while
-preserving exported objects, signatures and behavior. Its schedule is registered
-in `_module_deprecations.py` and enforced by the release gate. CLI parsing,
+operation family directly. The `profile_edit.py` compatibility module was removed
+in 0.17.0. CLI parsing,
 prompts and persistence remain at their existing owners; `catalog_edit.CatalogDraft` provides service
 validation, stale-edit checks and atomic saving.
 
@@ -672,7 +666,7 @@ Click command modules. `cli.commands.calculation` exposes API-owned
 store. See [ADR-0019](adr/0019-cli-configuration-ownership.md).
 
 ### `cli/commands/job.py`
-Canonical `pyrite remote job list|status|logs|attach|stop` Click layer. Reuses the remote viewer, JSON envelope, completion, exit, confirmation, and lifecycle owners; normalizes persisted submitter names into the four public job kinds. The former root `job` is a hidden warning alias through 0.17.0.
+Canonical `pyrite remote job list|status|logs|attach|stop` Click layer. Reuses the remote viewer, JSON envelope, completion, exit, confirmation, and lifecycle owners; normalizes persisted submitter names into the four public job kinds. The former root `job` alias was removed in 0.17.0.
 
 ### `cli/commands/checkpoint.py`
 Canonical `pyrite checkpoint` group. Lazily routes `slim`, component `recompute {brem,cxr}`, `archive`, `restore`, `list`, `merge`, obsolete-record `gc`, and reachability-safe `rm` to existing checkpoint handlers.

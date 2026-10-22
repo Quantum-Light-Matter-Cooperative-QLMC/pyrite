@@ -11,7 +11,7 @@ from pyrite._catalog_layout import object_sources
 from pyrite.campaign.profile_detectors import PHYSICAL_SECTIONS
 from pyrite.cli import _catalog_io
 from pyrite.cli import _completion as _cli_completion
-from pyrite.cli._deprecations import DeprecatingGroup, warn_self
+from pyrite.cli._deprecations import DeprecatingGroup
 from pyrite.cli.commands._detector_shared import (
     apply_detector_fields,
     collect_detector_updates,
@@ -42,7 +42,7 @@ def _unknown_detector(document, name):
     message = f"unknown detector: {name}"
     if suggestions:
         message += f". Did you mean: {', '.join(suggestions)}?"
-    message += f". Create it first with: pyrite detector create {name}"
+    message += f". Create it first with: pyrite detector create scalar {name}"
     raise ValueError(message)
 
 
@@ -415,26 +415,7 @@ def reset_command(name, sections, yes, dry_run):
     return _write(document, original, dry_run, f"reset detector {name}")
 
 
-class _TypedCreate(click.Group):
-    """Route legacy NAME-first syntax to the same callback for one support window."""
-
-    def parse_args(self, ctx, args):
-        if args and not args[0].startswith("-") and args[0] not in self.commands:
-            ctx.meta["pyrite.legacy_detector_create"] = True
-            ctx.allow_interspersed_args = True
-            ctx.allow_extra_args = False
-            if not any(arg in ("--help", "-h") for arg in args):
-                warn_self("detector create", "pyrite detector create scalar NAME")
-            return create_command.parse_args(ctx, args)
-        return super().parse_args(ctx, args)
-
-    def invoke(self, ctx):
-        if ctx.meta.get("pyrite.legacy_detector_create"):
-            return create_command.invoke(ctx)
-        return super().invoke(ctx)
-
-
-@command.group("create", cls=_TypedCreate)
+@command.group("create")
 def typed_create():
     """Create a scalar or planar detector, or clone an existing named detector.
 

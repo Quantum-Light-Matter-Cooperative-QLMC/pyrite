@@ -87,7 +87,7 @@ def test_show_reports_explicit_effective_and_grid_source(catalog):
     assert_clean_result(profile_json)
     assert json.loads(profile_json.stdout)["payload"]["line_grid_policy"] == _FULL_POLICY
     profile_text = invoke(root_command, ["profile", "show", "sub_100keV"])
-    assert "CXR-grid policy (profile cxr-grid)" in profile_text.stdout
+    assert "CXR-grid policy (numerics cxr-grid)" in profile_text.stdout
     assert_table_row(profile_text.stdout, "policy", "none (explicit, stored or built-in grids)")
 
 

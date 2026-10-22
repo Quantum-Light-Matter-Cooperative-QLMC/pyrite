@@ -67,13 +67,7 @@ def _public_export_entry(
 #:
 #: CXR vocabulary shims introduced in 0.11.0 were removed in 0.13.0.
 #: The older flat re-export cohort was removed in 0.5.0.
-MODULE_DEPRECATIONS: dict[str, ModuleDeprecation] = {
-    "pyrite.campaign.profile_edit": _entry(
-        "pyrite.campaign.profile_edit",
-        "pyrite.campaign.profile_lifecycle or the relevant operation owner listed in docs/repo_map.md",
-        since="0.15.2",
-    ),
-}
+MODULE_DEPRECATIONS: dict[str, ModuleDeprecation] = {}
 
 
 #: Keyed by the compatibility package and exported attribute.

@@ -27,7 +27,6 @@ from pyrite.console.output import (
     confirm_destructive,
     emit_json_result,
     emit_result,
-    hidden_alias,
     output_option,
 )
 
@@ -523,7 +522,3 @@ def gdf_inspect(path, time_s, time_tolerance_s, screen_position_m, screen_tolera
     )
     emit_result("GPT x/y offsets are preserved; check them against the target footprint.")
     return 0
-
-
-hidden_alias(command, gdf_times, "gdf-times")
-hidden_alias(command, gdf_inspect, "gdf-inspect")

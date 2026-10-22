@@ -20,7 +20,6 @@ from .._groups import LazyGroup
         "cxr": "Inspect PXR/CBS energy grids.",
         "brem": "Inspect bremsstrahlung energy grids.",
     },
-    deprecation_prefix="material energy-grid",
     no_args_is_help=True,
 )
 def material_command() -> None:
