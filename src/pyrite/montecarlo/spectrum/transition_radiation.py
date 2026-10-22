@@ -362,6 +362,7 @@ def interface_transition_radiation_amplitude(
     position_ang,
     interface,
     *,
+    own_field_sides=None,
     xp=np,
 ):
     """Vacuum amplitude of each interface crossing of a planar stack [1/eV].
@@ -397,6 +398,11 @@ def interface_transition_radiation_amplitude(
         ``0 < |v| < 1`` and ``v_z != 0``, time ``(K,)`` and position ``(K, 3)`` in
         Å (``c = 1``; only ``x, y`` enter), interface index ``(K,)`` in
         ``0..len(layers)``.
+    own_field_sides
+        Optional ``(K, 2)`` multipliers of the own-field terms of the medium
+        below (column 0) and above (column 1) each interface. The default
+        ``(1, 1)`` is the physical jump; ``(1, 0)`` isolates the part driven
+        by the medium below, a linear split used by validity bounds.
 
     Returns
     -------
@@ -421,12 +427,18 @@ def interface_transition_radiation_amplitude(
     v_dev = xp.asarray(v)[None]
     q = (omega[:, None] - xp.sum(k_perp[:, None] * v_dev[..., :2], axis=-1)) / v_dev[..., 2]
     face_dev = xp.asarray(face)
+    sides = (
+        np.ones((face.size, 2))
+        if own_field_sides is None
+        else np.broadcast_to(np.asarray(own_field_sides, dtype=float), (face.size, 2))
+    )
     jump = []
     for offset, sign in ((1, -1.0), (0, 1.0)):
         e_vec, h_vec = _particular_field(
             eps[face_dev + offset].T, omega[:, None], k_perp[:, None], q, v_dev, xp
         )
-        jump.append(sign * xp.concatenate([e_vec[..., :2], h_vec[..., :2]], axis=-1))
+        weight = xp.asarray(sign * sides[:, offset])[None, :, None]
+        jump.append(weight * xp.concatenate([e_vec[..., :2], h_vec[..., :2]], axis=-1))
     r_perp = xp.asarray(np.atleast_2d(np.asarray(position_ang, dtype=float))[:, :2])
     phase = xp.exp(
         1j

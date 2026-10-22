@@ -40,6 +40,7 @@ __all__ = [
     "block_transition_spectrum",
     "case_layer_eps",
     "case_layers",
+    "case_optical_transition",
     "case_transition_spectrum",
 ]
 
@@ -155,3 +156,122 @@ def block_transition_spectrum(case, segs, energy_eV, n_hat, ne_brem) -> np.ndarr
         return np.zeros(np.shape(energy_eV))
     transport = dict(segs=segs, E_grid=energy_eV, n_hat=n_hat, Ne_brem=ne_brem)
     return case_transition_spectrum(case, transport)
+
+
+def case_optical_transition(
+    case,
+    transport,
+    *,
+    layer_responses: tuple[OpticalResponse, ...],
+    source,
+    direction=None,
+    formation_tolerance: float | None = 0.05,
+    energy_budget: float | None = 1e-3,
+    xp=None,
+):
+    """Opt-in optical TR/CTR of a case's transported histories (#615).
+
+    Scores the ``Ne_brem`` histories of ``transport`` on ``transport['E_grid']``
+    with one explicit :class:`OpticalResponse` per layer and an
+    :class:`~pyrite.montecarlo.spectrum.optical_transition.OpticalBunchSource`
+    (physical charge and sampling law). ``direction`` defaults to
+    ``transport['n_hat']``. Every node must lie in each response's supported
+    bands; a case ``bunch_charge_pc`` must agree with the source charge. The
+    returned result carries the per-layer material provenance and the source
+    law and is persisted with its ``save``. The X-ray component dispatcher
+    never calls this.
+
+    Unbounded use is refused (``optical_transition_validity``): the
+    formation-zone bound of the self power must not exceed
+    ``formation_tolerance``, and the radiated energy per physical electron
+    over both hemispheres and the band must stay below ``energy_budget`` of
+    the kinetic energy with negligible pair emission at the band edges.
+    ``None`` skips a check and records it as not evaluated.
+
+    Validation: optical-planar-tr, optical-ctr-population, optical-material-response
+    """
+    from ...energy_grid.component_support import ComponentSupport, component_grid
+    from ..spectrum.optical_transition import optical_transition_radiation
+
+    if "bunch_charge_pc" in case and float(case["bunch_charge_pc"]) != float(source.charge_pC):
+        raise ValueError("optical source charge disagrees with the case bunch_charge_pc")
+    energy = np.asarray(transport["E_grid"], dtype=float)
+    support = tuple(
+        ComponentSupport(f"layer-{i}:{r.medium}", "optical_transition", r.bands_eV)
+        for i, r in enumerate(layer_responses)
+    )
+    component_grid(
+        energy, required=tuple((item.medium, item.component) for item in support), support=support
+    )
+    eps = case_layer_eps(case, energy, layer_responses=layer_responses)
+    n_hat = np.asarray(transport["n_hat"] if direction is None else direction, dtype=float)
+    count = int(transport["Ne_brem"])
+    crossings = boundary_crossings(transport["segs"], case_layers(case))
+    crossings = _take(crossings, np.flatnonzero(crossings.electron_id < count))
+    materials = [
+        {
+            "layer": index,
+            "medium": response.medium,
+            "dataset_id": response.dataset_id,
+            "source": response.source,
+            "source_sha256": response.source_sha256,
+            "response_digest": response.digest,
+            "bands_eV": response.bands_eV,
+            "license": response.license,
+            "temperature_K": response.temperature_K,
+            "uncertainty": response.uncertainty,
+        }
+        for index, response in enumerate(layer_responses)
+    ]
+    backend = (np if cp is None else cp) if xp is None else xp
+    validity = _optical_validity(
+        crossings, energy, n_hat, eps, source, count, formation_tolerance, energy_budget, backend
+    )
+    return optical_transition_radiation(
+        crossings,
+        energy,
+        n_hat,
+        eps,
+        source=source,
+        n_histories=count,
+        provenance={
+            "materials": materials,
+            "transition_model": TRANSITION_MODEL,
+            "validity": validity,
+        },
+        xp=backend,
+    )
+
+
+def _optical_validity(crossings, energy, n_hat, eps, source, count, formation, budget, xp):
+    """Formation and energy-budget refusals of :func:`case_optical_transition`."""
+    from ..spectrum.optical_transition import optical_transition_radiation
+    from ..spectrum.optical_transition_validity import (
+        formation_error_bound,
+        kinetic_energy_eV,
+        radiated_energy_fraction,
+    )
+
+    out: dict[str, object] = {"formation_bound": None, "energy_fraction": None}
+    if formation is not None:
+        bound = float(np.max(formation_error_bound(crossings, energy, n_hat, eps)))
+        if not bound <= formation:
+            raise ValueError(
+                f"optical TR formation-zone bound {bound:.3g} exceeds {formation:g}: "
+                "transported paths are not straight over the formation length"
+            )
+        out["formation_bound"] = bound
+    if budget is not None:
+        excess = max(source.physical_electrons - 1.0, 0.0)
+
+        def score(e, d):
+            eps_grid = [np.asarray(x)[:, None] for x in eps]  # (E,) -> (E, 1)
+            r = optical_transition_radiation(
+                crossings, e, d, eps_grid, source=source, n_histories=count, xp=xp
+            )
+            return r.yield_per_electron, r.self_yield, excess * r.form_factor * r.pair_yield
+
+        out["energy_fraction"] = radiated_energy_fraction(
+            score, energy, kinetic_energy_eV(crossings), max_fraction=budget
+        )
+    return out

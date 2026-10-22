@@ -5,7 +5,11 @@ from dataclasses import replace
 import numpy as np
 import pytest
 
-from pyrite.materials.optical import OpticalResponse, gold_rakic_response
+from pyrite.materials.optical import (
+    OpticalResponse,
+    gold_johnson_christy_response,
+    gold_rakic_response,
+)
 from pyrite.montecarlo.runner.transition_emission import case_layer_eps
 from pyrite.montecarlo.spectrum.transition_radiation import composition_dielectric
 
@@ -196,3 +200,18 @@ def test_default_xray_response_is_unchanged_and_optical_needs_explicit_provider(
     )
     with pytest.raises(ValueError, match=r"transition_radiation/layer\[0\].*X-ray floor"):
         case_layer_eps(case, [2.0])
+
+
+def test_johnson_christy_gold_is_pinned_measured_and_bounded():
+    response = gold_johnson_christy_response()
+    ((lower, upper),) = response.bands_eV
+    assert response.segments[0][0].size == 49 and 0.63 < lower < 0.65 and 6.5 < upper < 6.7
+    assert (
+        response.dataset_id.endswith("Au/nk/Johnson")
+        and response.digest != gold_rakic_response().digest
+    )
+    # 2.0 eV row of the source table (lambda 0.6199 um): n = 0.13, k = 3.15... via interpolation.
+    eps = response.epsilon(2.0)
+    assert -11.0 < eps.real < -8.5 and 0.5 < eps.imag < 2.0
+    with pytest.raises(ValueError, match="unsupported energy"):
+        response.epsilon(0.5)
