@@ -1,6 +1,6 @@
 # `cr-dechanneling-collapse`: Kephart occupation lengths and cutoff sensitivity
 
-Evidence for issue #504. It is not a verdict: the ledger row stays `unverified` until the comparison basis is decided (see [Open decisions](#open-decisions)).
+Historical implementation evidence for issue #504, followed by the independent #522 boundary review below. The ledger retains its declared-calibration `anchored` scope; the exploratory replacement receives a separate verdict.
 
 - **Harness:** `checks/kephart_occupation.py` at revisions `ebea431c` (remote sweep on `qlmc`, SLURM CPU) and `42b93283` (local `H ≥ 40` runs). The solver code is the same in both.
 - **Reference:** Kephart et al., Phys. Rev. B 40, 4249 (1989). Table I gives 1/e occupation lengths ±20%; Table II gives the inferred divergences of 2.2 mrad (17 MeV) and 1.0 mrad (54 MeV).
@@ -82,3 +82,109 @@ Five of the six values are within ±20%. The outlier is Si(100) at 54 MeV, at 1.
 
 - **Decided.** On 2026-10-15 the maintainer chose the detector observable as the comparison basis, over a pure dechanneling criterion or a bare calibration factor.
 - **Still open.** The detector observable does not by itself reproduce Kephart without a near-barrier dechanneling cutoff. A 300 eV cutoff matches at 17 MeV. Whether one cutoff can be declared as a calibration across both energies depends on the pending 54 MeV runs. Without the cutoff, 54 MeV at `H = 64` gives 2–3× Kephart, and those runs are converged in neither `dz` nor `H`. A declared cutoff would enter model identity and provenance.
+
+## Independent boundary review, 2026-10-20 (#522)
+
+### Derivation recorded before implementation inspection
+
+Fresh verifier read the ledger, signatures/docstrings, proposal D4(i), and
+ADR-0018 before inspecting implementation bodies. The declared collapse is a
+projected open-system model, not a first-principles derivation of a 300 eV
+escape energy. Let $P$ retain the evolving subspace, $Q$ contain represented
+sink states, $A=\sum_a L_a^\dagger L_a$, and
+$J(\rho)=\sum_a L_a\rho L_a^\dagger$. For $\rho=P\rho P$,
+
+$$
+\frac{d\rho}{dz}=-\frac{i}{\hbar v}[PHP,\rho]
+-\frac12\{PAP,\rho\}+PJ(\rho)P.
+$$
+
+The represented free and omitted-band flux rates must be
+
+$$
+f=\operatorname{tr}[QJ(\rho)Q],\qquad
+ o=\operatorname{tr}(A\rho)-\operatorname{tr}[(P+Q)J(\rho)(P+Q)].
+$$
+
+Thus $d\operatorname{tr}\rho/dz+f+o=0$. Units are inverse length;
+positivity follows from positive jump maps and the interpretation of the
+omitted contribution as a projection complement. With no scattering both
+fluxes vanish; with no sink, represented jump gain cancels loss. An energy
+basis change adds the nonnegative trace discarded by the new projector.
+None of these identities fixes the physical boundary, makes an omitted-band
+flux negligible, or establishes a detector-weighted occupation length.
+
+For a classical continuum potential the transverse invariant is
+$E_\perp=pv\psi^2/2+U(x)$. Barrier crossing and asymptotic angular escape
+are different criteria when above-barrier particles can rechannel. A
+boundary based on accumulated scattering variance, residence time, or a
+near-barrier energy is therefore a model hypothesis requiring independent
+observable and basis-convergence tests.
+
+### Implementation comparison and bounded result
+
+Inspection of `DensityMatrixSolver._propagators`, `jump`, `entry_from_plane`,
+`_reproject`, and `propagate` matches the projected equations: the retained
+loss is projected on both sides; jump gain is split into retained and free
+diagonals; `loss_rate - band_trace` is recorded as overflow. The finite-step
+flux quadrature is approximate, not an exactly conservative discretization.
+The overflow includes missing transfer-kernel weight as well as outgoing
+particle-band weight. It cannot by itself establish a momentum distribution
+outside the particle band.
+
+The exploratory harness uses
+
+$$
+E_{\rm cut}=U_{\min}+a^2(U_{\max}-U_{\min}),\qquad
+m=(a^2-1)(U_{\max}-U_{\min}).
+$$
+
+This is dimensionally consistent, becomes the barrier at $a=1$, and loses
+its energy scale when the potential vanishes. It defines an angle measured
+from the potential minimum; it is not the production handoff angle measured
+from $U_0=0$. The gap candidate's three-gap, width-fraction, and half-window
+guards are declared numerical hypotheses. Neither follows as an irreversible
+escape law from a Bloch Hamiltonian. [Sen and Lynn (2014)](https://arxiv.org/abs/1407.6053)
+explicitly introduce a phenomenological dechanneling model and emphasize
+rechanneling; their spectrum does not supply these threshold constants.
+
+The four `a45-final-1577/run-{0,1,2,3}.json` records (revision `54b29d7c`,
+$H=64$, 32 cells, $\Delta z=15.625$ Å) use $a=4.5$, margins
+405.0213 eV for (110) and 224.4037 eV for (100). Directly recomputing their
+ratios gives:
+
+| Case | Bound-weighted ratio | Mean-weighted ratio | Bound-weighted ±20% |
+|---|---:|---:|---|
+| Si(110), 17 MeV, n=1 | 0.947807 | 1.005768 | pass |
+| Si(110), 17 MeV, n=2 | 1.101662 | 1.168839 | pass |
+| Si(110), 17 MeV, n=3 | 1.092553 | 1.158928 | pass |
+| Si(100), 17 MeV | 0.884007 | 0.926075 | pass |
+| Si(100), 54 MeV | **1.204927** | **1.276443** | **fail** |
+| Si(110), 54 MeV | 1.072245 | 1.169043 | pass |
+
+The first exact numerical failure is $28.9182399613/24=1.2049266651>1.2$;
+rounding to 1.20 would falsely pass it. [Kephart's published abstract](https://journals.aps.org/prb/abstract/10.1103/PhysRevB.40.4249)
+independently confirms the 24 µm reference; fine band-resolved Table I data
+and its tolerance remain the repository transcription because the full
+article was not accessible during this review. The candidate's cumulative
+overflow is 0.030686, 0.009950, 0.024348, and 0.083738 in run order;
+balance defects are −0.001578, −0.000869, −0.002136, and −0.003935.
+Small balance error does not repair the failed observable or certify a
+basis-independent escape law. This four-record set has only one basis and
+step configuration, so it cannot independently establish convergence.
+
+**Filters:** units pass; projected-model limits pass; signs/conventions pass
+only with the potential-zero and missing-kernel qualifications above.
+**Re-derivation:** matches the declared projected accounting; differs from
+any claim that the exploratory threshold is a derived physical escape law.
+**Verdict:** `rederived` for projected accounting, `discrepancy` for promotion
+of the $a=4.5$ candidate as a six-case replacement. The 300 eV declared
+calibration and its previously documented Si(100) 54 MeV outlier remain
+separate retained evidence; this review neither replaces that calibration
+nor establishes its first-principles validity.
+
+**Suggested ledger edit (owner applies):** retain the existing declared
+300 eV anchored scope; add #522 notes giving the rejected candidate, exact
+1.2049266651 failure, finite overflow, and unresolved convergence. Do not
+extend `anchored` to the candidate or describe all six cases as passing.
+No human sign-off is implied.
