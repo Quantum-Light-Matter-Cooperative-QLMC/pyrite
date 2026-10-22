@@ -83,6 +83,17 @@ It writes one record per history, in the schema of `pyrite.perf.comparison`:
 Validate the hook arithmetic on a few histories against the photon energies
 written to a phase-space file before trusting it.
 
+**Implemented (2026-10-22).** The landed tally (`checks/equal_precision/penred/`; see the PenRed arm in
+`checks/equal_precision/README.md`) does not use the
+knock-difference arithmetic above: when a hard bremsstrahlung event leaves the
+electron below `EABS`, PENELOPE adds the residual energy to the event's loss
+and zeroes the electron, so the photon energy is lost. Instead the material
+photon `EABS` sits below the 10 keV score threshold, so every scored photon is
+stacked with its exact creation energy, and a body photon `EABS` above E0
+absorbs it before transport. The tally scores it in `tally_beginPart`. PenRed
+1.15.2 also transports one primary fewer than requested; the adapter requests
+one extra.
+
 ## EGSnrc
 
 - **Pin:** latest release tag `v2026` (`bd49a47aae3938f49f4100b8e018091861408b19`).

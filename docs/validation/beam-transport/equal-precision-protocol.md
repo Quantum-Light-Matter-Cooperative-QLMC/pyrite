@@ -258,10 +258,31 @@ Local CPU smoke runs of a few histories only checked the plumbing (see
 directions × bands, so precision runs belong on the lab GPU through
 `pyrite remote`.
 
+## PenRed arm
+
+`checks/equal_precision/penred_adapter.py` runs PenRed at the pinned commit,
+labelled **PenRed (PENELOPE-2018 physics)**, with a custom per-history tally.
+It writes `source` and `transport` records in the common schema for 39 of the
+44 cases; finite beams and explicit secondaries get `unsupported-physics`
+records, and there is no PenRed cone-detector arm. Photons are scored at
+creation with their exact energy and never transported. The `transport` record
+keeps PENELOPE's soft and hard radiative loss, matching the PyRITE
+`bremslib-soft-hard` headline. PENELOPE always samples soft-loss straggling, so
+its records pair with the PyRITE straggling variants. Setup, controls and two
+upstream quirks the adapter handles are in
+`checks/equal_precision/README.md` (PenRed arm).
+
+A local 20000-history smoke of `silicon-300kev-100um-0deg-anchor` gave
+transmitted 0.839 ± 0.003, backscattered 0.109 ± 0.002, stopped 0.052 ± 0.002
+and 0.0058 ± 0.0005 photons ≥ 10 keV per primary (1σ). The retained
+100000-history PyRITE CUDA anchor gave 0.846, 0.110, 0.045 and 0.0066. The
+stopped fraction differs by about 4σ, as expected from straggling-on against
+straggling-off. This is a plumbing check, not an equivalence or timing result.
+
 ## Remaining gates
 
-This stage leaves the following open: PenRed and EGSnrc adapters with
-creation-level photon tallies, Geant4 transport-only and cone-detector tallies
+This stage leaves the following open: the EGSnrc adapter, a PenRed
+cone-detector tally, Geant4 transport-only and cone-detector tallies
 matching the arms above, adapter support for finite beams and explicit
 secondaries, numerical refinement (including the electron cutoff and the
 estimator's straight-ray escape against full photon transport), equivalence
