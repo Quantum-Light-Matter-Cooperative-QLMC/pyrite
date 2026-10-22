@@ -47,7 +47,9 @@ def _():
 
 @app.cell
 def _(mo):
-    mode_ui = mo.ui.radio(["Planar", "Axial (experimental)"], value="Axial (experimental)", label="Mode")
+    mode_ui = mo.ui.radio(
+        ["Planar", "Axial (experimental)"], value="Axial (experimental)", label="Mode"
+    )
     mode_ui
     return (mode_ui,)
 
@@ -616,8 +618,7 @@ def _(axial_form, mo):
         record_current=bool(_v["current"]),
         record_current_divergence=bool(_v["current"] and _v["divergence"]),
         current_contour=(
-            (-(_v["grid"] // _v["cells"]) // 2,) * 2
-            + (_v["grid"] // _v["cells"],) * 2
+            (-(_v["grid"] // _v["cells"]) // 2,) * 2 + (_v["grid"] // _v["cells"],) * 2
             if _v["current"] and _v["cell_flux"] and _v["grid"] % _v["cells"] == 0
             else None
         ),
@@ -655,7 +656,8 @@ def _(axial_result, mo):
     )
     axial_view_ui = mo.ui.dropdown(
         {"Full periodic supercell": "full", "Origin unit-cell crop": "unit_cell"},
-        value="Full periodic supercell", label="Axial map view",
+        value="Full periodic supercell",
+        label="Axial map view",
     )
     return (
         axial_view_ui,
@@ -707,7 +709,13 @@ def _(
         show_value=True,
         on_change=set_axial_frame,
     )
-    _controls = [axial_sample_ui, axial_play_ui, axial_speed_ui, axial_conditional_ui, axial_view_ui]
+    _controls = [
+        axial_sample_ui,
+        axial_play_ui,
+        axial_speed_ui,
+        axial_conditional_ui,
+        axial_view_ui,
+    ]
     if axial_tick_ui is not None:
         _controls.append(axial_tick_ui)
     mo.hstack(_controls, wrap=True)
@@ -734,11 +742,16 @@ def _(axial_conditional_ui, axial_demo_figure, axial_result, axial_sample_ui, ax
     _items = [mo.md(_notes), _fig]
     if axial_result.transverse_current_per_ang2 is not None:
         from pyrite.apps.axial_channeling import axial_flux_figure
+
         _items.extend(
-            [mo.md("**Periodic transverse current** includes the carrier tilt. "
-                   "Signed contour flux is local redistribution, not physical escape "
-                   "or numerical loss. The solve is cached; these views use recorded reductions."),
-             axial_flux_figure(axial_result, _index, axial_view_ui.value)]
+            [
+                mo.md(
+                    "**Periodic transverse current** includes the carrier tilt. "
+                    "Signed contour flux is local redistribution, not physical escape "
+                    "or numerical loss. The solve is cached; these views use recorded reductions."
+                ),
+                axial_flux_figure(axial_result, _index, axial_view_ui.value),
+            ]
         )
     if axial_result.coherence_numerator_per_ang2 is not None:
         from pyrite.apps.axial_channeling import axial_coherence_figure

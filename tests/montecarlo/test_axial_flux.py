@@ -39,8 +39,12 @@ def test_carrier_included_exact_uniform_flow():
     recorded = flux(phi, tilt)[None]
     current, div, sides = flux.unpack(recorded)
     assert current.shape == (1, 2, 32, 48)
-    np.testing.assert_allclose(current[0, 0], flux.coefficient * tilt[0] / grid.area_ang2, atol=1e-15)
-    np.testing.assert_allclose(current[0, 1], flux.coefficient * tilt[1] / grid.area_ang2, atol=1e-15)
+    np.testing.assert_allclose(
+        current[0, 0], flux.coefficient * tilt[0] / grid.area_ang2, atol=1e-15
+    )
+    np.testing.assert_allclose(
+        current[0, 1], flux.coefficient * tilt[1] / grid.area_ang2, atol=1e-15
+    )
     np.testing.assert_allclose(div, 0, atol=1e-15)
     np.testing.assert_allclose(np.sum(sides, axis=1), 0, atol=1e-14)
     # Without the Bloch carrier, the probability flow of uniform phi is zero.
@@ -79,6 +83,7 @@ def test_local_continuity_and_no_sink_under_unitary_propagation():
     tilt = (0.2, -0.1)
     # Use the direct carrier in the current and a matching tilted solver.
     from pyrite.montecarlo.channeling.states import momentum_inv_ang
+
     prop = SplitStepPropagator(grid, 5e6, tilt_rad=tuple(q / momentum_inv_ang(5e6) for q in tilt))
     before = prop.evolve(phi, 0.0, step_ang=depth)
     after = prop.evolve(phi, depth, step_ang=depth)
@@ -98,8 +103,14 @@ def test_supercell_convergence_with_fixed_samples_per_cell():
     profiles = []
     for cells in (2, 3, 4):
         grid = RealSpaceGrid((cells * cell,) * 2, fixed_resolution_shape((cells, cells), (24, 24)))
-        x = np.remainder(grid.x[:, None] + grid.extent_ang[0] / 2, grid.extent_ang[0]) - grid.extent_ang[0] / 2
-        y = np.remainder(grid.y[None, :] + grid.extent_ang[1] / 2, grid.extent_ang[1]) - grid.extent_ang[1] / 2
+        x = (
+            np.remainder(grid.x[:, None] + grid.extent_ang[0] / 2, grid.extent_ang[0])
+            - grid.extent_ang[0] / 2
+        )
+        y = (
+            np.remainder(grid.y[None, :] + grid.extent_ang[1] / 2, grid.extent_ang[1])
+            - grid.extent_ang[1] / 2
+        )
         phi = _normalized(np.exp(-(x**2 + y**2) / (2 * 0.55**2)).astype(complex), grid)
         propagated = SplitStepPropagator(grid, 5e6).evolve(phi, 100, step_ang=5)
         # Fixed ~3 Å window around the origin at the same 6 samples/Å.

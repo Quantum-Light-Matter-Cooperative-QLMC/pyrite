@@ -45,32 +45,48 @@ class FluxContour:
     size: tuple[int, int]
 
     def validate(self, shape: tuple[int, int]) -> None:
-        if (len(self.start) != 2 or len(self.size) != 2 or
-            any(isinstance(v, bool) or not isinstance(v, Integral) for v in (*self.start, *self.size)) or
-            any(n < 1 or n > max_n for n, max_n in zip(self.size, shape, strict=True))):
+        if (
+            len(self.start) != 2
+            or len(self.size) != 2
+            or any(
+                isinstance(v, bool) or not isinstance(v, Integral)
+                for v in (*self.start, *self.size)
+            )
+            or any(n < 1 or n > max_n for n, max_n in zip(self.size, shape, strict=True))
+        ):
             raise ValueError("flux contour needs two integer starts and widths within the grid")
 
 
-def samples_per_cell(cells: tuple[int, int], shape: tuple[int, int], *, warn: bool = True) -> tuple[int, int]:
+def samples_per_cell(
+    cells: tuple[int, int], shape: tuple[int, int], *, warn: bool = True
+) -> tuple[int, int]:
     """Require integer, useful resolution in each periodic projected cell.
 
     This is a conservative admission rule for the *diagnostic* FFT grid,
     not a validated physical convergence threshold. Compare 16, 24, 32,
     ... points per cell as needed for the specific potential and probe.
     """
-    if (len(cells) != 2 or len(shape) != 2 or
-        any(isinstance(v, bool) or not isinstance(v, Integral) or v < 1 for v in cells) or
-        any(isinstance(v, bool) or not isinstance(v, Integral) or v < 2 for v in shape)):
+    if (
+        len(cells) != 2
+        or len(shape) != 2
+        or any(isinstance(v, bool) or not isinstance(v, Integral) or v < 1 for v in cells)
+        or any(isinstance(v, bool) or not isinstance(v, Integral) or v < 2 for v in shape)
+    ):
         raise ValueError("cells and shape must be positive integer pairs")
     if any(n % c for n, c in zip(shape, cells, strict=True)):
-        raise ValueError("shape must be divisible by cells on both axes; hold samples/cell fixed when changing extent")
+        raise ValueError(
+            "shape must be divisible by cells on both axes; hold samples/cell fixed when changing extent"
+        )
     result = tuple(n // c for n, c in zip(shape, cells, strict=True))
     if min(result) < 8:
-        raise ValueError("at least 8 samples per projected cell/axis are required; >=16 recommended")
+        raise ValueError(
+            "at least 8 samples per projected cell/axis are required; >=16 recommended"
+        )
     if warn and min(result) < 16:
         warnings.warn(
             "fewer than 16 samples per cell/axis: check fixed-resolution convergence ",
-            RuntimeWarning, stacklevel=2,
+            RuntimeWarning,
+            stacklevel=2,
         )
     return result
 
@@ -93,7 +109,11 @@ class AxialFluxObservable:
     cuda_compatible = True
 
     def __init__(
-        self, grid, energy_eV: float, *, divergence: bool = False,
+        self,
+        grid,
+        energy_eV: float,
+        *,
+        divergence: bool = False,
         contour: FluxContour | None = None,
     ) -> None:
         if not np.isfinite(energy_eV) or energy_eV <= 0:
@@ -104,12 +124,15 @@ class AxialFluxObservable:
         self.divergence = bool(divergence)
         self.contour = contour
         self.coefficient = (
-            2.0 * HBAR2_2M_EV_ANG2
+            2.0
+            * HBAR2_2M_EV_ANG2
             / longitudinal_kinematics(energy_eV)[0]
             / (self._hbar_v(energy_eV))
         )
         pixels = int(np.prod(grid.shape))
-        self.recording_width = (2 + int(self.divergence)) * pixels + (4 if contour is not None else 0)
+        self.recording_width = (2 + int(self.divergence)) * pixels + (
+            4 if contour is not None else 0
+        )
         # FFT, two derivatives, currents, faces and optional divergence. CUDA
         # reserving this separately avoids silent oversubscription by callbacks.
         self.scratch_bytes = 12 * pixels * np.dtype(complex).itemsize
@@ -118,6 +141,7 @@ class AxialFluxObservable:
     @staticmethod
     def _hbar_v(energy_eV):
         from pyrite.materials.crystal import HBARC_EV_ANG
+
         return HBARC_EV_ANG * longitudinal_kinematics(energy_eV)[1]
 
     def __call__(self, phi, tilt):
@@ -125,12 +149,20 @@ class AxialFluxObservable:
         if hasattr(phi, "__cuda_array_interface__"):
             import cupy as xp
         if self._device is None or self._device[0] is not xp:
-            self._device = (xp, xp.asarray(self.grid.kx[:, None]), xp.asarray(self.grid.ky[None, :]))
+            self._device = (
+                xp,
+                xp.asarray(self.grid.kx[:, None]),
+                xp.asarray(self.grid.ky[None, :]),
+            )
         _, kx, ky = self._device
         spectrum = xp.fft.fft2(phi)
         density = xp.abs(phi) ** 2
-        jx = self.coefficient * (xp.imag(xp.conj(phi) * xp.fft.ifft2(1j * kx * spectrum)) + tilt[0] * density)
-        jy = self.coefficient * (xp.imag(xp.conj(phi) * xp.fft.ifft2(1j * ky * spectrum)) + tilt[1] * density)
+        jx = self.coefficient * (
+            xp.imag(xp.conj(phi) * xp.fft.ifft2(1j * kx * spectrum)) + tilt[0] * density
+        )
+        jy = self.coefficient * (
+            xp.imag(xp.conj(phi) * xp.fft.ifft2(1j * ky * spectrum)) + tilt[1] * density
+        )
         parts = [jx.ravel(), jy.ravel()]
         if self.divergence or self.contour is not None:
             # Positive faces: between pixel i and i+1. Periodicity at N-1/0.
@@ -148,12 +180,14 @@ class AxialFluxObservable:
                 xx = (x0 + xp.arange(nx)) % self.grid.shape[0]
                 yy = (y0 + xp.arange(ny)) % self.grid.shape[1]
                 # Four outward signed sides: -x, +x, -y, +y.
-                sides = xp.stack((
-                    -xp.sum(face_x[(x0 - 1) % self.grid.shape[0], yy]) * dy,
-                    xp.sum(face_x[(x0 + nx - 1) % self.grid.shape[0], yy]) * dy,
-                    -xp.sum(face_y[xx, (y0 - 1) % self.grid.shape[1]]) * dx,
-                    xp.sum(face_y[xx, (y0 + ny - 1) % self.grid.shape[1]]) * dx,
-                ))
+                sides = xp.stack(
+                    (
+                        -xp.sum(face_x[(x0 - 1) % self.grid.shape[0], yy]) * dy,
+                        xp.sum(face_x[(x0 + nx - 1) % self.grid.shape[0], yy]) * dy,
+                        -xp.sum(face_y[xx, (y0 - 1) % self.grid.shape[1]]) * dx,
+                        xp.sum(face_y[xx, (y0 + ny - 1) % self.grid.shape[1]]) * dx,
+                    )
+                )
                 parts.append(sides)
         return xp.concatenate(parts)
 

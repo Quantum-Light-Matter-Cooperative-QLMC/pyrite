@@ -99,8 +99,11 @@ def _validate(config: AxialDiagnosticConfig) -> None:
     if set(config.mechanisms) - {"tds", "electronic"}:
         raise ValueError("mechanisms must contain only tds and electronic")
     from .axial_flux import FluxContour, samples_per_cell
+
     samples_per_cell(config.cells, config.shape)
-    if (config.record_current_divergence or config.current_contour is not None) and not config.record_current:
+    if (
+        config.record_current_divergence or config.current_contour is not None
+    ) and not config.record_current:
         raise ValueError("enable record_current to record divergence or contour flux")
     if config.current_contour is not None:
         bounds = config.current_contour
@@ -239,7 +242,9 @@ class _DiagnosticRecording:
         self.spectral_width = 0 if spectral is None else spectral.recording_width
         self.coherence_width = 0 if coherence is None else coherence.recording_width
         self.observers = [
-            f for f in (projection, observable, spectral, coherence, current, self.metrics) if f is not None
+            f
+            for f in (projection, observable, spectral, coherence, current, self.metrics)
+            if f is not None
         ]
         self.cuda_compatible = all(getattr(f, "cuda_compatible", False) for f in self.observers)
         self.width = 0 if self.metrics is None else self.metrics.width
@@ -253,12 +258,14 @@ class _DiagnosticRecording:
         self.recording_bytes = (
             len(config.depths_ang) * 16 * (int(np.prod(grid.shape)) + self.width + extras)
         )
-        if (record_metrics or spectral is not None or coherence is not None or current is not None) and (
-            self.recording_bytes > RECORDING_BUDGET_BYTES
-        ):
+        if (
+            record_metrics or spectral is not None or coherence is not None or current is not None
+        ) and (self.recording_bytes > RECORDING_BUDGET_BYTES):
             raise ValueError("combined ensemble recording exceeds 128 MiB budget")
         self.scratch_bytes = 16 * int(np.prod(grid.shape)) * 100 + sum(
-            int(getattr(f, "scratch_bytes", 0)) for f in (spectral, coherence, current) if f is not None
+            int(getattr(f, "scratch_bytes", 0))
+            for f in (spectral, coherence, current)
+            if f is not None
         )
         self.electrons = config.n_electrons if config.mode == "mcwf" else None
 
@@ -376,15 +383,26 @@ def axial_diagnostic(
         origin = profile.strings[config.oam_string].position_ang
         projection = CylindricalProjection(grid, origin, config.oam_radius_ang, 8)
     from .axial_flux import AxialFluxObservable, FluxContour
+
     current = None
     if config.record_current:
         bounds = config.current_contour
         current = AxialFluxObservable(
-            grid, config.kinetic_energy_eV, divergence=config.record_current_divergence,
+            grid,
+            config.kinetic_energy_eV,
+            divergence=config.record_current_divergence,
             contour=None if bounds is None else FluxContour(bounds[:2], bounds[2:]),
         )
     observe = _DiagnosticRecording(
-        grid, potential, config, projection, observable, record_metrics, spectral, coherence, current
+        grid,
+        potential,
+        config,
+        projection,
+        observable,
+        record_metrics,
+        spectral,
+        coherence,
+        current,
     )
     numerical_sink = np.zeros(len(config.depths_ang))
     jump_history = None
