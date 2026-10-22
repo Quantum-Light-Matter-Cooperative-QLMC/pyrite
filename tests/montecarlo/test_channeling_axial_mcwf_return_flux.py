@@ -102,21 +102,27 @@ def test_hook_keeps_with_the_born_rule_weight(module, setup):
     assert abs(kept / trials - weight) < 4 * sigma
 
 
-def test_gap_cut_picks_the_widest_gap_in_the_window(module, setup):
+def test_gap_cut_reports_clearance_at_the_selected_cut(module, setup):
     _, _, _, projector = setup
     tilt = (0.05, -0.3)
     e = projector.energies(tilt)
     target, window = float(e[len(e) // 3]), 5.0
     cut, gap = projector.gap_cut(tilt, target, window)
-    mid, width = 0.5 * (e[1:] + e[:-1]), np.diff(e)
-    inside = np.abs(mid - target) <= window
-    assert gap == pytest.approx(width[inside].max())
+    assert gap > 0
     assert abs(cut - target) <= window
-    assert not np.any((e > cut - 0.5 * gap + 1e-9) & (e < cut + 0.5 * gap - 1e-9))
+    assert min(abs(e - cut)) == pytest.approx(gap / 2)
     gaps = []
     hook = module["projective_hook"](projector, target, seed=0, window_eV=window, gaps=gaps)
     hook(0, np.ones(projector.n, complex), tilt)
     assert gaps == [gap]
+
+
+def test_gap_cut_handles_wide_gap_and_empty_or_full_projector(module, setup, monkeypatch):
+    projector = setup[-1]
+    monkeypatch.setattr(projector, "energies", lambda tilt: np.array([0.0, 20.0, 21.0]))
+    assert projector.gap_cut((0.0, 0.0), 2.0, 1.0) == pytest.approx((3.0, 6.0))
+    assert projector.gap_cut((0.0, 0.0), -2.0, 1.0) == pytest.approx((-2.0, 4.0))
+    assert projector.gap_cut((0.0, 0.0), 25.0, 1.0) == pytest.approx((25.0, 8.0))
 
 
 def test_pooled_deficit_and_jackknife(module):

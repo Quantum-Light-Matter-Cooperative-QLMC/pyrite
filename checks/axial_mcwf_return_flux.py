@@ -91,15 +91,26 @@ class GridProjector:
         return np.sort(np.concatenate([v for _, v, _ in self.spectrum(tilt)]))
 
     def gap_cut(self, tilt, target_eV, window_eV):
-        """Return ``(cut, gap)``: the midpoint and width of the widest level gap
-        whose midpoint lies within ``window_eV`` of ``target_eV`` at ``tilt``."""
+        """Choose the largest level-free interval centred within the cut window.
+
+        The reported width is twice the distance to the nearest level, not
+        necessarily the full enclosing gap. An empty/full retained spectrum
+        uses the nominal cut and its one-sided level clearance.
+        """
+        if not np.isfinite(target_eV) or not np.isfinite(window_eV) or window_eV < 0:
+            raise ValueError("matching energy and nonnegative cut window must be finite")
         e = self.energies(tilt)
-        mid, width = 0.5 * (e[1:] + e[:-1]), np.diff(e)
-        ok = np.abs(mid - target_eV) <= window_eV
-        if not ok.any():
-            raise ValueError(f"no level gap within {window_eV} eV of {target_eV} eV")
-        best = np.flatnonzero(ok)[np.argmax(width[ok])]
-        return float(mid[best]), float(width[best])
+        if target_eV <= e[0]:
+            return float(target_eV), float(2 * (e[0] - target_eV))
+        if target_eV >= e[-1]:
+            return float(target_eV), float(2 * (target_eV - e[-1]))
+        mid = 0.5 * (e[1:] + e[:-1])
+        low = np.maximum(e[:-1], target_eV - window_eV)
+        high = np.minimum(e[1:], target_eV + window_eV)
+        cut = np.clip(mid, low, high)
+        clearance = np.where(high >= low, np.minimum(cut - e[:-1], e[1:] - cut), -1.0)
+        best = int(np.argmax(clearance))
+        return float(cut[best]), float(2 * clearance[best])
 
     def split(self, phi, tilt, cut_eV):
         """Return ``(weight below cut, phi below, phi above)`` of a grid state."""
@@ -213,6 +224,8 @@ def _pooled_deficit(ref_x, x):
 
 
 def _gap(energies, target):
+    if not np.isfinite(target) or target <= energies[0] or target >= energies[-1]:
+        raise ValueError("matching energy must lie inside the represented spectrum")
     return 0.5 * (energies[energies <= target].max() + energies[energies > target].min())
 
 
@@ -221,6 +234,13 @@ def main(argv=None) -> dict:
     parser.add_argument("--cells", type=int, default=2)
     parser.add_argument("--points-per-cell", type=int, default=16)
     parser.add_argument("--gap-window-eV", type=float, default=2.0)
+    parser.add_argument(
+        "--cut-eV",
+        type=float,
+        action="append",
+        dest="cuts_eV",
+        help="nominal matching energy; repeat to study selected cuts (default: barrier and one/two well depths above)",
+    )
     parser.add_argument("--mechanisms", default="tds,electronic")
     parser.add_argument("--energy-eV", type=float, default=5e6)
     parser.add_argument("--depth-max-ang", type=float, default=3e4)
@@ -243,7 +263,8 @@ def main(argv=None) -> dict:
     u_min, u_max = profile.extrema()
     energies = projector.energies()
     well = u_max - u_min
-    cuts = [_gap(energies, t) for t in (u_max, u_max + well, u_max + 2 * well)]
+    targets = ns.cuts_eV if ns.cuts_eV is not None else (u_max, u_max + well, u_max + 2 * well)
+    cuts = [_gap(energies, t) for t in targets]
     window = ns.gap_window_eV
     depths = np.arange(0.0, ns.depth_max_ang + 0.5 * ns.depth_step_ang, ns.depth_step_ang)
     jobs = [
