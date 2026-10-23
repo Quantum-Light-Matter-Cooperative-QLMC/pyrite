@@ -9,6 +9,8 @@ Validation: cr-axial-realspace-dissipator
 
 from __future__ import annotations
 
+from functools import cache
+
 import numpy as np
 
 from ..._backend import BackendResourceError, select_backend
@@ -21,6 +23,35 @@ from .axial_mcwf import (
     _sample_components,
     density_observable,
 )
+
+# Limit speculative storage and wasted FFTs when a threshold crosses mid-block.
+_CHECK_STEPS = 8
+# Replay each speculative block as one CUDA graph (eager fallback if capture fails).
+_GRAPHS = True
+
+
+@cache
+def _step_kernels(cp):
+    """Per-step norm and threshold test as two launches instead of eight.
+
+    ``|z|`` then square, as ``cp.abs(z) ** 2``; only the summation order differs.
+    """
+    norm = cp.ReductionKernel(
+        "complex128 z, float64 area, float64 cells",
+        "float64 norm",
+        "abs(z) * abs(z)",
+        "a + b",
+        "norm = a * area / cells",
+        "0",
+        "pyrite_axial_norm",
+    )
+    crossed = cp.ElementwiseKernel(
+        "float64 norm, bool live, float64 threshold",
+        "bool crossed",
+        "crossed = live && norm <= threshold",
+        "pyrite_axial_crossed",
+    )
+    return norm, crossed
 
 
 def _callback_check(observable, hook):
@@ -54,7 +85,16 @@ def _observe(cp, observable, lagged, half, live, tilts, area, total):
     if observable is density_observable:
         value = cp.sum(cp.abs(states) ** 2, axis=0)
         return value if total is None else total + value
-    for b, state in zip(cp.asnumpy(cp.flatnonzero(live)), states, strict=True):
+    indices = cp.asnumpy(cp.flatnonzero(live))
+    batch_tilts = None
+    if hasattr(observable, "prepare_batch") or hasattr(observable, "sum_batch"):
+        batch_tilts = tilts[live]
+    if hasattr(observable, "prepare_batch"):
+        return observable.prepare_batch(states, batch_tilts, total)
+    if hasattr(observable, "sum_batch"):
+        value = observable.sum_batch(states, batch_tilts)
+        return value if total is None else total + value
+    for b, state in zip(indices, states, strict=True):
         value = observable(state, tilts[b])
         if not isinstance(value, cp.ndarray):
             raise TypeError("CUDA observable must return a CuPy array")
@@ -94,7 +134,7 @@ def _admit(solver, backend, batch_size, budget, depths, observable, component_co
         bins=cells,
         itemsize=16,
         budget_bytes=limit - fixed,
-        intermediates=12,
+        intermediates=12 + _CHECK_STEPS,
         minimum_chunk=1,
     )
 
@@ -135,6 +175,8 @@ def run_cuda(
     weights = cp.asarray([float(w) for w, _ in components])
     sampled = cp.asarray(np.stack([s for _, s in components]))
     phase = cp.exp(-1j * step_ang * cp.asarray(solver._complex_potential) / solver.hbar_v)
+    # The step's inverse FFT is unscaled; apply its 1/n here once, not per step.
+    phase /= phase.size
     base_tilt = (solver.momentum * tilt_rad[0], solver.momentum * tilt_rad[1])
     sums = [None] * len(steps)
     alive = np.zeros(len(steps))
@@ -164,7 +206,7 @@ def run_cuda(
                 batch.lagged,
                 batch.half,
                 batch.live,
-                batch.tilts,
+                batch.device_tilts,
                 solver.grid.cell_area_ang2,
                 sums[index],
             )
@@ -172,6 +214,8 @@ def run_cuda(
         absorbed += batch.absorbed_after_entry
     if jump_hook is not None:
         jumps["absorbed"] = absorbed
+    if hasattr(observable, "flush"):
+        observable.flush()
     template = next((s for s in sums if s is not None), None)
     if template is None:
         template = (
@@ -189,6 +233,57 @@ def run_cuda(
         int(n_electrons),
         history,
     )
+
+
+class _StepGraphs:
+    """Captured speculative step blocks writing fixed buffers.
+
+    The eager block's FFT configuration and kernels, so replay is bitwise
+    identical; one graph launch replaces ~10 kernel launches per step.
+    """
+
+    def __init__(self, cp, batch, phase, checks):
+        get_fft_plan = __import__("cupyx.scipy.fft", fromlist=["get_fft_plan"]).get_fft_plan
+        shape = batch.lagged.shape
+        self.cp, self.batch, self.phase = cp, batch, phase
+        self.states = cp.empty((checks, *shape), dtype=complex)
+        self.norms = cp.empty((checks, shape[0]))
+        self.crossings = cp.empty((checks, shape[0]), dtype=bool)
+        self.work = cp.empty(shape, dtype=complex)
+        self.real = cp.empty(shape, dtype=complex)
+        self.plan = get_fft_plan(self.work, axes=(-2, -1))
+        self.stream = cp.cuda.Stream(non_blocking=True)
+        self.graphs = {}
+        self._steps(1)  # compile kernels and plan outside capture
+
+    def _steps(self, count):
+        cp, batch = self.cp, self.batch
+        from cupy.cuda import cufft
+
+        norm_kernel, crossed_kernel = _step_kernels(cp)
+        cells = float(batch.lagged[0].size)
+        source = batch.lagged
+        for j in range(count):
+            cp.multiply(source, batch.full, out=self.work)
+            self.plan.fft(self.work, self.real, cufft.CUFFT_INVERSE)
+            cp.multiply(self.phase, self.real, out=self.real)
+            self.plan.fft(self.real, self.states[j], cufft.CUFFT_FORWARD)
+            norm_kernel(self.states[j], batch.area, cells, axis=(1, 2), out=self.norms[j])
+            crossed_kernel(self.norms[j], batch.live, batch.thresholds, self.crossings[j])
+            source = self.states[j]
+
+    def run(self, count):
+        """Advance ``count`` speculative steps; return host crossings."""
+        if count not in self.graphs:
+            with self.stream:
+                self.stream.begin_capture()
+                try:
+                    self._steps(count)
+                finally:
+                    graph = self.stream.end_capture()
+            self.graphs[count] = graph
+        self.graphs[count].launch(stream=self.cp.cuda.Stream.null)
+        return self.cp.asnumpy(self.crossings[:count])
 
 
 class _Batch:
@@ -211,11 +306,13 @@ class _Batch:
         self.area = device.grid.cell_area_ang2
         phi /= cp.sqrt(cp.sum(cp.abs(phi) ** 2, axis=(1, 2)) * self.area)[:, None, None]
         self.tilts = [tilt] * size
+        self.device_tilts = cp.broadcast_to(cp.asarray(tilt), (size, 2)).copy()
         self.live = cp.ones(size, dtype=bool)
-        for b in range(size):
-            kept = _hook(cp, hook, start + b, phi[b], tilt, self.area)
-            self.live[b] = kept is not None
-            phi[b] = 0 if kept is None else kept
+        if hook is not None:
+            for b in range(size):
+                kept = _hook(cp, hook, start + b, phi[b], tilt, self.area)
+                self.live[b] = kept is not None
+                phi[b] = 0 if kept is None else kept
         self.live_count = int(self.live.sum())
         self.absorbed = size - self.live_count
         self.absorbed_after_entry = 0
@@ -226,15 +323,57 @@ class _Batch:
 
     def advance(self, target, step_ang, phase, jumps, sinks):
         cp = self.cp
+        # Large ensembles cross thresholds often; avoid replaying many large
+        # FFTs for a rare opportunity to combine host checks.
+        checks = min(_CHECK_STEPS, max(1, BATCH // len(self.live)))
+        graphs = self._graphs(phase, checks)
+        norm_kernel, crossed_kernel = _step_kernels(cp)
+        cells = float(self.lagged[0].size)
         while self.step < target and self.live_count:
-            self.lagged *= self.full
-            self.lagged = cp.fft.fft2(
-                phase * cp.fft.ifft2(self.lagged, axes=(-2, -1)), axes=(-2, -1)
-            )
-            self.step += 1
-            norms = cp.sum(cp.abs(self.lagged) ** 2, axis=(1, 2)) * self.area / self.lagged[0].size
-            for b in np.flatnonzero(cp.asnumpy(self.live & (norms <= self.thresholds))):
-                self.jump(int(b), norms[b], step_ang, jumps, sinks)
+            count = min(checks, target - self.step)
+            if graphs is not None:
+                crossed = graphs.run(count)
+                events = np.flatnonzero(crossed.any(axis=1))
+                index = int(events[0]) if events.size else count - 1
+                cp.copyto(self.lagged, graphs.states[index])  # buffers stay fixed
+                self.step += index + 1
+                for b in np.flatnonzero(crossed[index]):
+                    self.jump(int(b), graphs.norms[index][b], step_ang, jumps, sinks)
+                continue
+            states, norms = [], []
+            crossings = cp.empty((count, len(self.live)), dtype=bool)
+            for j in range(count):
+                # Do not mutate snapshots: a jump rolls the whole batch back
+                # to its first crossing. Speculation consumes no RNG draws.
+                self.lagged = cp.fft.fft2(
+                    phase * cp.fft.ifft2(self.lagged * self.full, axes=(-2, -1), norm="forward"),
+                    axes=(-2, -1),
+                )
+                norm = norm_kernel(self.lagged, self.area, cells, axis=(1, 2))
+                states.append(self.lagged)
+                norms.append(norm)
+                crossed_kernel(norm, self.live, self.thresholds, crossings[j])
+            crossed = cp.asnumpy(crossings)
+            events = np.flatnonzero(crossed.any(axis=1))
+            index = int(events[0]) if events.size else len(states) - 1
+            self.lagged = states[index]
+            self.step += index + 1
+            for b in np.flatnonzero(crossed[index]):
+                self.jump(int(b), norms[index][b], step_ang, jumps, sinks)
+
+    def _graphs(self, phase, checks):
+        """Per-batch step graphs, or ``None`` for the eager block."""
+        # Single-step blocks measured no faster as graphs (one launch saved per sync).
+        if not _GRAPHS or checks < 2 or not hasattr(self.cp, "cuda"):
+            return None
+        key = (id(phase), checks)
+        if getattr(self, "_graph_key", None) != key:
+            self._graph_key = key
+            try:
+                self._step_graphs = _StepGraphs(self.cp, self, phase, checks)
+            except self.cp.cuda.runtime.CUDARuntimeError:
+                self._step_graphs = None
+        return self._step_graphs
 
     def jump(self, b, norm, step_ang, jumps, sinks):
         cp = self.cp
@@ -245,6 +384,7 @@ class _Batch:
         if kind == "sink":
             sinks.append(self.step * step_ang)
         elif kind == "electronic":
+            self.device_tilts[b] = cp.stack([cp.asarray(v) for v in self.tilts[b]])
             self.half[b] = self.device._half_kinetic(self.tilts[b], step_ang)
             self.full[b] = self.half[b] ** 2
         kept = _hook(cp, self.hook, self.start + b, state, self.tilts[b], self.area)

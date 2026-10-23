@@ -284,6 +284,36 @@ class _DiagnosticRecording:
             stacked[:, -self.width :], surviving, density, electrons=self.electrons
         )
 
+    def prepare_batch(self, states, tilts, total=None):
+        """Accumulate live device states; spectral projections may finish later."""
+        import cupy as cp
+
+        parts = [cp.sum(cp.abs(states) ** 2, axis=0).ravel()]
+        spectral_offset = None
+        for observer in self.observers:
+            if observer is self.spectral:
+                spectral_offset = sum(p.size for p in parts)
+                parts.append(cp.zeros(self.spectral_width))
+            elif hasattr(observer, "sum_batch"):
+                parts.append(cp.asarray(observer.sum_batch(states, tilts)))
+            else:
+                parts.append(sum((observer(p, q) for p, q in zip(states, tilts, strict=True))))
+        value = cp.concatenate(parts)
+        if total is None:
+            total = value
+        else:
+            total += value
+        if spectral_offset is not None:
+            assert self.spectral is not None
+            self.spectral.defer_batch(
+                states, tilts, total[spectral_offset : spectral_offset + self.spectral_width]
+            )
+        return total
+
+    def flush(self):
+        if self.spectral is not None:
+            self.spectral.flush()
+
 
 def _validate_backend(config):
     if config.backend not in ("cpu", "cuda") or (

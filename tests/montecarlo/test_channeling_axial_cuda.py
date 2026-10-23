@@ -203,6 +203,24 @@ def test_cuda_deterministic_propagation_and_device_callbacks():
     np.testing.assert_allclose(result.observables, 1, atol=2e-12)
 
 
+def test_cuda_threshold_blocks_preserve_exact_seeded_trajectories(monkeypatch):
+    _cuda()
+    from pyrite.montecarlo.channeling import _axial_cuda
+
+    d, potential = _case(shape=(8, 8))
+    solver = AxialMCWF(d, 1e6, potential, backend="cuda")
+    entry = states.gaussian(waist_ang=0.6)
+    kwargs = dict(n_electrons=8, seed=17, step_ang=10, batch_size=8)
+    monkeypatch.setattr(_axial_cuda, "_CHECK_STEPS", 1)
+    reference = solver.run(entry, [0, 500, 1000], **kwargs)
+    monkeypatch.setattr(_axial_cuda, "_CHECK_STEPS", 8)
+    actual = solver.run(entry, [0, 500, 1000], **kwargs)
+    assert actual.jumps == reference.jumps
+    assert sum(actual.jumps.values()) > 0
+    np.testing.assert_array_equal(actual.sink_depths_ang, reference.sink_depths_ang)
+    np.testing.assert_array_equal(actual.observables, reference.observables)
+
+
 @pytest.mark.slow
 def test_cuda_stream_batch_recording_and_stochastic_parity():
     _cuda()

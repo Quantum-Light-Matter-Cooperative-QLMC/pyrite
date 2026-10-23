@@ -21,12 +21,20 @@ arbitrarily assigned individual populations. Energy-bin mode recomputes the
 local eigenstates for the **exact instantaneous carrier** following a kick;
 energies are grouped into fixed eV intervals, which remain comparable across
 sectors. LRU caches hold at most 64 sectors and are additionally bounded by
-64 MiB host / 32 MiB device eigenvector budgets. Large grids
-use matrix-free `eigsh` on at most 64 low states; full eigensystems require at
+256 MiB host / 32 MiB device eigenvector budgets; one solve may hold at most 64 MiB of eigenvectors. The host solver uses
+matrix-free `eigsh` (with residual-checked warm starts) on at most 64 low states;
+full eigensystems require at
 most 256 grid points. Truncation and energy-cutoff omissions are shown against
 survival. A finite-supercell state with energy above the maximum grid potential
 is **not** a physical escape/dechanneling event. Omitted weight may contain
 both bound and above-barrier states.
+
+Sparse host eigenvectors are QR-orthonormalized and rediagonalized within their
+computed invariant subspace. Complex ARPACK can return individually normalized
+but mutually non-orthogonal vectors inside a degenerate eigenspace; small
+eigenpair residuals alone do not make their squared overlaps valid projector
+probabilities. The refinement preserves the subspace and makes complete
+degenerate-level populations independent of its chosen basis.
 
 With `record_coherence=True`, a reference pixel `r0` is selected from the
 maximum weighted entrance density (or specify `coherence_reference_index`).
@@ -45,9 +53,21 @@ throughout a solve; a vortex center is not chosen if its entry density vanishes.
 
 Recorded arrays scale linearly with grid points and depth count, *not* with
 full density-matrix size. The combined 128 MiB recording guard also includes
-these arrays; CUDA callbacks keep their grid reductions on device, but new
-carrier sectors may require an expensive CPU eigenproblem and basis upload.
-Fixed-sector mode avoids that cost and supports CPU/CUDA projection parity.
+these arrays. CUDA energy-bin recording queues immutable state snapshots under
+a separate 128 MiB cap, then solves missing exact carrier sectors together using
+complex128 Chebyshev-filtered subspace iteration. FFT matvecs run on device;
+small Rayleigh–Ritz eigensystems run on the host. Solver workspace holds up to
+64 sectors per batch, capped at 4 GiB and a quarter of device memory, and is
+included in CUDA admission. Larger queues flush incrementally;
+neither flushing nor cache eviction consumes trajectory RNG draws.
+
+Acceptance requires absolute residuals at most `1e-10` eV and an orthonormality
+error at most `1e-10`. A nondegenerate retained/guard gap tightens the residual
+gate to limit projector error. Sectors that fail these checks or exceed the
+workspace cap use the canonical host solver. The regression targets are
+`1e-9` eV for energies and `1e-8` for nondegenerate projectors. Fixed-sector mode
+keeps its host basis and avoids solving post-kick sectors. These are numerical
+measurement checks, independent of the physical validation of axial transport.
 
 The periodic supercell is physical numerical geometry, **not merely a cropped
 view**. Increase its extent and the sample count together when checking

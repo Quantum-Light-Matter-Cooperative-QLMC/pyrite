@@ -126,6 +126,27 @@ class AxialMetricsObservable:
         second = xp.sum(xp.abs(hphi) ** 2) * self.grid.cell_area_ang2
         return xp.concatenate((actions.ravel(), xp.stack((first, second))))
 
+    def sum_batch(self, states, tilts):
+        """Sum sketches without allocating an electron-by-probe-by-grid tensor."""
+        xp = np
+        if hasattr(states, "__cuda_array_interface__"):
+            import cupy as xp
+        # Initialize the same cached constants as the scalar entry point.
+        self(states[0], tilts[0])
+        assert self._device is not None
+        _, probes, potential, kx, ky, x, y = self._device
+        q = xp.asarray(tilts)[:, :, None, None]
+        physical = states * xp.exp(1j * (q[:, 0] * x + q[:, 1] * y))
+        physical = physical.reshape(len(states), -1) * np.sqrt(self.grid.cell_area_ang2)
+        overlaps = physical.conj() @ probes.reshape(self.probes, -1).T
+        actions = overlaps.T @ physical
+        kinetic = self._factor * ((kx + q[:, 0]) ** 2 + (ky + q[:, 1]) ** 2)
+        hphi = xp.fft.ifft2(kinetic * xp.fft.fft2(states, axes=(-2, -1)), axes=(-2, -1))
+        hphi += potential * states
+        first = xp.sum(states.conj() * hphi).real * self.grid.cell_area_ang2
+        second = xp.sum(xp.abs(hphi) ** 2) * self.grid.cell_area_ang2
+        return xp.concatenate((actions.ravel(), xp.stack((first, second))))
+
     def finish(self, values, survival, density, *, electrons=None) -> EnsembleMetrics:
         """Reduce stored ensemble density actions; raw estimates may exceed bounds."""
         actions = values[:, :-2].reshape(len(values), self.probes, -1)
