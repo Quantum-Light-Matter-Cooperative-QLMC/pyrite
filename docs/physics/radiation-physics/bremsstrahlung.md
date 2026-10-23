@@ -64,7 +64,7 @@ Momenta are carried in units of {math}`m_ec`, built from the exact relativistic 
 
 ## Default BremsLib direction-resolved backend
 
-`cross_section_model="bremslib"` replaces isotropic emission with the BremsLib v2.0 double differential cross section {cite:p}`poskus2025bremslib`, taking the photon-energy spectrum from the same evaluation. BremsLib tabulates, per element, the scaled single differential cross section (SDCS) {math}`\chi(T_1,x)=(k/Z^2)\,d\sigma/dk` in mb and, at every grid node, the scaled double differential cross section (DDCS) {math}`(k/Z^2)\,d^2\sigma/(dk\,d\Omega)` in mb/sr over the photon emission angle {math}`\theta` measured from the incident electron direction, with {math}`x=k/T_1`. The grids are {math}`T_1` from 10 eV to 30 MeV (ratios up to 1.33), 13 values of {math}`x` from 0 to just below 1, and 181--441 angles refined towards the forward peak. The cross sections PyRITE evaluates are
+`cross_section_model="bremslib"` replaces isotropic emission with the BremsLib v2.0 double differential cross section {cite:p}`poskus2025bremslib`, taking the photon-energy spectrum from the same evaluation. BremsLib tabulates, per element, the scaled single differential cross section (SDCS) {math}`\chi(T_1,x)=(k/Z^2)\,d\sigma/dk` in mb and, at every grid node, the scaled double differential cross section (DDCS) {math}`(k/Z^2)\,d^2\sigma/(dk\,d\Omega)` in mb/sr over the photon emission angle {math}`\theta` measured from the incident electron direction, with {math}`x=k/T_1`. The complete grids are {math}`T_1` from 10 eV to 30 MeV (ratios up to 1.33), 13 values of {math}`x` from 0 to just below 1, and 181--441 angles refined towards the forward peak. The cross sections PyRITE evaluates are
 
 ```{math}
 \frac{d^2\sigma_Z}{dk\,d\Omega}(T,k,\theta)=\frac{Z^2}{k}\,\chi(T,x)\,S(T,x,\theta),
@@ -83,6 +83,17 @@ The interpolation is PyRITE's own. It is not a port of the vendor's `Interpolate
 2. **Incident-energy refinement.** Backward emission falls steeply and convexly with {math}`T_1`, so linear interpolation across a library interval overshoots it. At load, each interval is split into four in {math}`\ln T_1`. Each sub-node's shape is the weighted geometric mean of its neighbours' shapes, renormalized to unit integral, and its SDCS is interpolated log-log. Library nodes are kept bit for bit.
 3. **Evaluation.** The scaled DDCS is interpolated linearly in {math}`\theta`, in {math}`x=k/T` and in {math}`\ln T` on the refined grid. Each step is a convex combination of nodes whose angular integrals equal their SDCS, so the {math}`4\pi` integral of the interpolated DDCS is exactly the identically interpolated SDCS. The energy spectrum is recovered by construction, not by a separate renormalization.
 
+**30--100 MeV extension** (#439). Above 30 MeV the library is incomplete: at 50, 60, 80 and 100 MeV it tabulates the SDCS for {math}`x\le 0.95` and the DDCS only at {math}`k=0` (40 MeV has {math}`k=0` alone and is skipped). Locally generated tables keep these *extension rows* (`build_table`, default `t1_max_MeV=100`) with the two tip SDCS columns stored as missing, and staging fills them, anchored on the last complete row {math}`T_c=30` MeV:
+
+```{math}
+\chi(T,x_m)=\chi(T,0.95)\,\frac{\chi(T_c,x_m)}{\chi(T_c,0.95)},\qquad
+S(T,x,\theta)\propto S(T,0,\theta)\,\frac{S_{\rm 2BS}(T,x,\theta)}{S_{\rm 2BS}(T,0,\theta)}\,C(x,\theta),
+\qquad
+C=\frac{S(T_c,x,\theta)\,S_{\rm 2BS}(T_c,0,\theta)}{S(T_c,0,\theta)\,S_{\rm 2BS}(T_c,x,\theta)},
+```
+
+with {math}`x_m\in\{0.975,x_{\rm top}\}` and {math}`S_{\rm 2BS}` the Schiff density (Koch--Motz 2BS). Every library value is kept; {math}`x\to0` gives the library {math}`k=0` shape and {math}`T\to T_c` the complete row. A Bethe--Heitler tip is not used: the Born result turns negative at {math}`x=0.9999` for heavy elements. The tip cells carry about 2 % of the radiative first moment; predicting 30 MeV from 15 MeV this way reproduces the library's half-flux and 90 % angles within 1--3 % (the large-angle tail within 10--55 %). Radiative stopping over ESTAR stays within 2.5 % of its 30 MeV value up to 100 MeV for C, Si and W. The released catalogue tables (`tables-bremslib-2`) carry these rows. Validation: `bremslib-high-energy-extension`.
+
 Between the last node, {math}`x_{\rm top}` (0.99, {math}`1-50\,{\rm eV}/T_1`, or 0.9999 depending on {math}`T_1`, per the library manual), and the kinematic tip, the top node's value is held. Above {math}`k=T` the cross section is zero.
 
 Tables come from `pyrite.xsgen`. The released catalogue tables install with `pyrite tables fetch bremslib`, and other elements are generated from a local BremsLib checkout. Because the physics core does not import `pyrite.xsgen`, a driver resolves them with `pyrite.xsgen.bremslib.tables.load_bremsstrahlung_tables(elements)` and passes them as `bremslib_tables`. Fallback coverage:
@@ -94,7 +105,7 @@ Runs select the continuum through `Numerics.bremsstrahlung_model` (also `Setting
 
 ## Coupled soft/hard radiative transport
 
-The coupled BremsLib mode adds soft radiative stopping and samples hard photon events that debit electron energy. Its partition, event record, straggling treatment, and scoring boundary are documented in [Hard BremsLib photon events](hard-bremsstrahlung-events.md). The default couples when BremsLib tables resolve; EEDL fallback and grooved cases use the uncoupled track-length estimator.
+The coupled BremsLib mode adds soft radiative stopping and samples hard photon events that debit electron energy. Its partition, event record, straggling treatment, and scoring boundary are documented in [Hard BremsLib photon events](hard-bremsstrahlung-events.md). The default couples when BremsLib tables resolve; EEDL fallback and grooved cases use the uncoupled track-length estimator. Uncoupled transport debits only collision stopping, so between 30 and 100 MeV `build_cases` refuses a case that resolves uncoupled (missing tables, explicit `"eedl"`, or a groove) unless the run sets `radiative_model="uncoupled"`; such a case carries no coupled keys, so its identity records the choice (`campaign.bremsstrahlung_cases.require_coupled_radiative`). Above 100 MeV, where the tables end, no coupled mode exists and this screen does not apply.
 
 ## Per-segment yield
 

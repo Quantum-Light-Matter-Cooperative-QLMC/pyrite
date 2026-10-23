@@ -18,7 +18,7 @@ from .._errors import SourceUnavailableError
 from ..sources import resolve_source
 from ..store import ElementTarget, StoredTable, TableRequest, resolve, store
 from .convert import QUANTITY, build_table
-from .read import COMPLETE_T1_MAX_MEV, iter_node_files, library_root, library_version
+from .read import EXTENDED_T1_MAX_MEV, iter_node_files, library_root, library_version
 
 
 @dataclass(frozen=True)
@@ -51,7 +51,7 @@ def element_request(
 def generate_element(
     z: int,
     *,
-    t1_max_MeV: float = COMPLETE_T1_MAX_MEV,
+    t1_max_MeV: float = EXTENDED_T1_MAX_MEV,
     source_path: str | Path | None = None,
     overwrite: bool = False,
 ) -> GenerationResult:
@@ -63,7 +63,7 @@ def generate_element(
         Atomic number, 1 to 100 -- the range the library covers.
     t1_max_MeV
         Highest incident energy to include, bounding the table's size.
-        Defaults to the library's complete range.
+        Defaults to :data:`~pyrite.xsgen.bremslib.read.EXTENDED_T1_MAX_MEV`.
     source_path
         Override for the BremsLib checkout. Neither the GPL-3 sources nor the
         810 MB library is shipped, so a checkout is required for any element

@@ -48,7 +48,7 @@ from ..sources import resolve_source
 from ..store import MODIFICATIONS_NOTE, StoredTable, resolve, store
 from .convert import build_table
 from .generate import element_request
-from .read import COMPLETE_T1_MAX_MEV, library_root
+from .read import EXTENDED_T1_MAX_MEV, library_root
 
 #: Schema of the release index.
 RELEASE_SCHEMA = "pyrite.xsgen.bremslib-release.v1"
@@ -245,7 +245,7 @@ def build_release(
     *,
     source_path: str | Path | None = None,
     elements: Iterable[int] | None = None,
-    t1_max_MeV: float = COMPLETE_T1_MAX_MEV,
+    t1_max_MeV: float = EXTENDED_T1_MAX_MEV,
     urls: Iterable[str] = (),
 ) -> tuple[Path, ReleaseIndex]:
     """Build the release archive and its index from a BremsLib checkout.

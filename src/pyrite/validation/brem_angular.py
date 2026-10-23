@@ -29,30 +29,10 @@ Validation: bremslib-angular-schiff
 
 import numpy as np
 
+from pyrite._bremslib_extension import ELECTRON_REST_ENERGY_MEV, schiff_density
 from pyrite.montecarlo.spectrum.brem_bremslib import BremsLibBremsstrahlungTable
 
-ELECTRON_REST_ENERGY_MEV = 0.51099895
 QUANTILES = (0.5, 0.9)
-
-
-def schiff_density(
-    atomic_number: int, incident_energy_MeV: float, kappa: float, theta_rad: np.ndarray
-) -> np.ndarray:
-    """Unnormalized Schiff photon density per steradian (Koch-Motz 2BS).
-
-    Validation: bremslib-angular-schiff
-    """
-    E0 = 1.0 + incident_energy_MeV / ELECTRON_REST_ENERGY_MEV
-    k = kappa * incident_energy_MeV / ELECTRON_REST_ENERGY_MEV
-    E = E0 - k
-    y2 = (E0 * np.asarray(theta_rad, dtype=float)) ** 2
-    d = y2 + 1.0
-    inv_M = (k / (2.0 * E0 * E)) ** 2 + (atomic_number ** (1.0 / 3.0) / (111.0 * d)) ** 2
-    return (
-        16.0 * y2 * E / (d**4 * E0)
-        - (E0 + E) ** 2 / (d**2 * E0**2)
-        + ((E0**2 + E**2) / (d**2 * E0**2) - 4.0 * y2 * E / (d**4 * E0)) * -np.log(inv_M)
-    )
 
 
 def enclosed_angle(theta_rad: np.ndarray, density: np.ndarray, fraction: float) -> float:

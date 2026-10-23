@@ -58,3 +58,45 @@ def synthetic_bremslib_arrays(t1_MeV=SYNTHETIC_T1_MEV, theta_step_deg=1.0):
         "ddcs_mb_sr": np.concatenate(ddcs).astype(np.float32),
         "ddcs_point_finite": np.ones(n_nodes * theta_deg.size, dtype=np.float32),
     }
+
+
+def extend_synthetic_arrays(arrays, extension_t1_MeV, *, tip_columns=2):
+    """Append extension rows as the library holds them above 30 MeV.
+
+    Each new row keeps the synthetic SDCS for its leading columns, NaN for the
+    last ``tip_columns``, and only its ``k = 0`` DDCS node.
+    """
+    t1_ext = np.asarray(extension_t1_MeV, dtype=float)
+    complete = arrays["t1_MeV"].size
+    theta_deg = arrays["theta_deg"][: int(arrays["node_offset"][1])]
+    sdcs_ext = synthetic_scaled_sdcs(t1_ext[:, None], K_OVER_T1[None, :])
+    sdcs_ext[:, K_OVER_T1.size - tip_columns :] = np.nan
+    ddcs_ext = [
+        (3.7 * synthetic_shape(t1, np.radians(theta_deg))).astype(np.float32) for t1 in t1_ext
+    ]
+    offset_end = int(arrays["node_offset"][-1])
+    return {
+        **arrays,
+        "t1_MeV": np.r_[arrays["t1_MeV"], t1_ext],
+        "complete_rows": np.asarray(complete, dtype=np.int64),
+        "sdcs_mb": np.vstack([arrays["sdcs_mb"], sdcs_ext]),
+        "sdcs_point_finite": np.vstack(
+            [arrays["sdcs_point_finite"], np.ones_like(sdcs_ext, dtype=np.float32)]
+        ),
+        "node_t1_index": np.r_[arrays["node_t1_index"], complete + np.arange(t1_ext.size)].astype(
+            np.int32
+        ),
+        "node_k_index": np.r_[arrays["node_k_index"], np.zeros(t1_ext.size)].astype(np.int32),
+        "node_k_MeV": np.r_[arrays["node_k_MeV"], np.zeros(t1_ext.size)],
+        "node_offset": np.r_[
+            arrays["node_offset"], offset_end + theta_deg.size * np.arange(1, t1_ext.size + 1)
+        ].astype(np.int64),
+        "node_angular_integral_mb": np.r_[arrays["node_angular_integral_mb"], sdcs_ext[:, 0]],
+        "node_vendor_integral_mb": np.r_[arrays["node_vendor_integral_mb"], sdcs_ext[:, 0]],
+        "node_finite_nucleus": np.r_[arrays["node_finite_nucleus"], np.zeros(t1_ext.size, bool)],
+        "theta_deg": np.r_[arrays["theta_deg"], np.tile(theta_deg, t1_ext.size)],
+        "ddcs_mb_sr": np.r_[arrays["ddcs_mb_sr"], *ddcs_ext],
+        "ddcs_point_finite": np.r_[
+            arrays["ddcs_point_finite"], np.ones(theta_deg.size * t1_ext.size, np.float32)
+        ],
+    }

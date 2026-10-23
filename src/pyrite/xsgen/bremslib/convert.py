@@ -26,6 +26,8 @@ from scipy.integrate import simpson
 
 from .read import (
     COMPLETE_T1_MAX_MEV,
+    EXTENDED_T1_MAX_MEV,
+    EXTENSION_RATIO_COUNT,
     RATIO_COUNT,
     DdcsPanel,
     ddcs_integral_path,
@@ -92,7 +94,7 @@ def shape_function(theta_deg: np.ndarray, ddcs: np.ndarray) -> np.ndarray:
 
 
 def build_table(
-    library: Path, z: int, *, t1_max_MeV: float = COMPLETE_T1_MAX_MEV
+    library: Path, z: int, *, t1_max_MeV: float = EXTENDED_T1_MAX_MEV
 ) -> dict[str, np.ndarray]:
     """Read element ``z`` from ``library`` and return the stored arrays.
 
@@ -104,9 +106,8 @@ def build_table(
         Atomic number, 1 to 100.
     t1_max_MeV
         Highest incident energy to include. Defaults to
-        :data:`~pyrite.xsgen.bremslib.read.COMPLETE_T1_MAX_MEV`, above which
-        the library holds only ``k = 0`` and writes zeros for everything else.
-        Lowering it is how a caller bounds the table's size.
+        :data:`~pyrite.xsgen.bremslib.read.EXTENDED_T1_MAX_MEV`. Lowering it
+        is how a caller bounds the table's size.
 
     Returns
     -------
@@ -121,6 +122,16 @@ def build_table(
         for it, so the two are comparable after the fact rather than only at
         generation time.
 
+        Rows above
+        :data:`~pyrite.xsgen.bremslib.read.COMPLETE_T1_MAX_MEV` are
+        *extension rows*: only energies where the library fills the SDCS at
+        ``k/T1 <= 0.95`` and has the ``k = 0`` DDCS node are kept (50, 60, 80
+        and 100 MeV in v2.0.8). Their two tip SDCS columns are stored as NaN
+        -- missing, not zero -- and they carry only the ``k = 0`` node.
+        ``complete_rows`` counts the rows below them. The library data are
+        stored unchanged; filling the holes is a model choice made at staging
+        (:func:`pyrite._bremslib_table.prepare_bremslib_table`).
+
     Raises
     ------
     ValueError
@@ -134,7 +145,15 @@ def build_table(
 
     sdcs = parse_ratio_table(sdcs_path(library, z).read_text(encoding="ascii"))
     vendor = parse_ratio_table(ddcs_integral_path(library, z).read_text(encoding="ascii"))
-    keep = np.flatnonzero(sdcs.t1_MeV <= t1_max_MeV)
+    complete = sdcs.t1_MeV <= min(t1_max_MeV, COMPLETE_T1_MAX_MEV)
+    extension = (
+        (sdcs.t1_MeV > COMPLETE_T1_MAX_MEV)
+        & (sdcs.t1_MeV <= t1_max_MeV)
+        & np.all(sdcs.value[:, :EXTENSION_RATIO_COUNT] > 0.0, axis=1)
+        & np.isin(np.round(sdcs.t1_MeV, 9), [round(n.t1_MeV, 9) for n in nodes if n.k_MeV == 0.0])
+    )
+    keep = np.flatnonzero(complete | extension)
+    complete_rows = int(np.count_nonzero(complete))
     t1_grid = sdcs.t1_MeV[keep]
     # The vendor's angular-integral file carries its own, shorter energy grid,
     # so each retained energy is looked up in it by value rather than reused
@@ -181,14 +200,23 @@ def build_table(
         vendor_integrals.append(float(vendor.value[vendor_row[row], column]))
         finite_nucleus.append(panel.finite_nucleus)
 
-    _check_complete(z, len(t1_grid), seen)
+    _check_complete(z, complete_rows, len(t1_grid), seen)
     order = np.lexsort((np.asarray(k_index), np.asarray(t1_index)))
+    tip = (slice(complete_rows, None), slice(EXTENSION_RATIO_COUNT, None))
+    sdcs_mb, rel_err, point_finite = (
+        sdcs.value[keep].copy(),
+        sdcs.middle[keep].astype(np.float32),
+        sdcs.point_finite[keep].astype(np.float32),
+    )
+    for array in (sdcs_mb, rel_err, point_finite):
+        array[tip] = np.nan
     return {
         "t1_MeV": t1_grid,
         "k_over_t1": sdcs.k_over_t1,
-        "sdcs_mb": sdcs.value[keep],
-        "sdcs_rel_err": sdcs.middle[keep].astype(np.float32),
-        "sdcs_point_finite": sdcs.point_finite[keep].astype(np.float32),
+        "complete_rows": np.asarray(complete_rows, dtype=np.int64),
+        "sdcs_mb": sdcs_mb,
+        "sdcs_rel_err": rel_err,
+        "sdcs_point_finite": point_finite,
         "node_t1_index": np.asarray(t1_index, dtype=np.int32)[order],
         "node_k_index": np.asarray(k_index, dtype=np.int32)[order],
         "node_k_MeV": np.asarray(k_mev, dtype=np.float64)[order],
@@ -215,22 +243,24 @@ def _matching_row(rows_by_energy: Mapping[float, int], t1_MeV: float) -> int | N
     return None
 
 
-def _check_complete(z: int, rows: int, seen: set[tuple[int, int]]) -> None:
+def _check_complete(z: int, complete_rows: int, rows: int, seen: set[tuple[int, int]]) -> None:
     """Fail when a retained energy is missing any of its ``k/T1`` nodes.
 
     A hole would be indistinguishable from a vanishing cross section once
     interpolated, so the table refuses to be built rather than shipping one.
+    An extension row needs only its ``k = 0`` node.
     """
     missing = [
         (row, column)
         for row in range(rows)
-        for column in range(RATIO_COUNT)
+        for column in range(RATIO_COUNT if row < complete_rows else 1)
         if (row, column) not in seen
     ]
     if missing:
         first = ", ".join(f"T1[{row}] k/T1[{column}]" for row, column in missing[:4])
         raise ValueError(
-            f"BremsLib Z={int(z)} is missing {len(missing)} of {rows * RATIO_COUNT} "
+            f"BremsLib Z={int(z)} is missing {len(missing)} of "
+            f"{complete_rows * RATIO_COUNT + rows - complete_rows} "
             f"DDCS nodes: {first}{', ...' if len(missing) > 4 else ''}"
         )
 

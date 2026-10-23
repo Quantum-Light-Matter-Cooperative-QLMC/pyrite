@@ -379,7 +379,7 @@ def show_command(key: str, json_output: bool) -> None:
     metavar="MEV",
     help=(
         "Highest incident electron energy to include, in MeV; bounds the "
-        "table size. Defaults to the library's complete range. BremsLib only."
+        "table size. Defaults to 100 MeV. BremsLib only."
     ),
 )
 @click.option("--overwrite", is_flag=True, help="Regenerate and replace an existing key.")
@@ -498,7 +498,7 @@ def generate_command(
             result = generate_bremslib(
                 _bremslib_args(selected, element),
                 t1_max_MeV=(
-                    bremslib_read.COMPLETE_T1_MAX_MEV if t1_max_MeV is None else t1_max_MeV
+                    bremslib_read.EXTENDED_T1_MAX_MEV if t1_max_MeV is None else t1_max_MeV
                 ),
                 overwrite=overwrite,
             )

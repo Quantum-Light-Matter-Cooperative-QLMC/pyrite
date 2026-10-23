@@ -87,7 +87,11 @@ def test_case_lowering_warns_for_thick_silicon():
     )
     with pytest.warns(KinematicValidityWarning):
         cases = build_cases(
-            sweep, inelastic_model="continuous", elastic_model="mott", bremsstrahlung_model="eedl"
+            sweep,
+            inelastic_model="continuous",
+            elastic_model="mott",
+            bremsstrahlung_model="eedl",
+            radiative_model="uncoupled",
         )
     assert cases
     assert "kinematic_validity" not in cases[0].to_dict()

@@ -137,7 +137,10 @@ Portable array backend shared by every device-dispatching kernel: NumPy, CUDA/RO
 Immutable, content-addressed energy-grid artifact store: canonical `cxr.energy-grid-artifact.v1` identity bytes, SHA-256 naming, sharded storage, atomic dedup publication, and corruption checks. Imports nothing first-party. Read by `materials.catalog` when resolving `[profiles.*.energy_grid_refs]` at catalog-load time and written by `energy_grid.apply` / collected by `energy_grid.gc`, so it sits below both rather than inside `energy_grid/`. Deps: none (leaf; stdlib only).
 
 ### `_bremslib_table.py`
-BremsLib table staging: `BremsLibBremsstrahlungTable`, `prepare_bremslib_table` (exact piecewise-linear solid-angle renormalization, geometric `T1` refinement), `solid_angle_integral`, `top_reduced_energy`, and `BREMSSTRAHLUNG_BREMSLIB_MODEL`. A leaf below `montecarlo` and `xsgen` so `xsgen.bremslib.tables` stages tables without importing Monte Carlo; `montecarlo.spectrum.brem_bremslib` re-exports every public name. Ledger `bremslib-angular-model`. Deps: none (leaf; NumPy only).
+BremsLib table staging: `BremsLibBremsstrahlungTable`, `prepare_bremslib_table` (exact piecewise-linear solid-angle renormalization, geometric `T1` refinement, 30--100 MeV extension rows filled by `_bremslib_extension`), `solid_angle_integral`, `top_reduced_energy`, and `BREMSSTRAHLUNG_BREMSLIB_MODEL`. A leaf below `montecarlo` and `xsgen` so `xsgen.bremslib.tables` stages tables without importing Monte Carlo; `montecarlo.spectrum.brem_bremslib` re-exports every public name. Ledger `bremslib-angular-model`. Deps: `_bremslib_extension`; otherwise NumPy only.
+
+### `_bremslib_extension.py`
+Fills BremsLib's 30--100 MeV extension rows at staging (#439): `extend_above_complete` holds the SDCS tip ratio of the last complete row and builds `x > 0` angular shapes from the library `k = 0` shape times the Schiff (Koch–Motz 2BS) ratio and the complete-row residual; owns `schiff_density`, which `validation.brem_angular` reuses. Ledger `bremslib-high-energy-extension`. Deps: none (leaf; NumPy only).
 
 ### `_planar_geometry.py`
 Planar pose and point-source ray geometry: `PlanarPose`, `PixelGrid`, `PixelRays`, `solid_angle_sr`, and `planar_rays(pose, pixels=, size_mm=)`. A leaf below `montecarlo`, `detectors`, and `instrument`: `montecarlo.geometry` tiles a detector face and `detectors.eaglexo_response` takes its solid angle without importing the instrument model. `instrument` and `instrument.geometry` re-export the public names; `instrument.geometry.planar_detector_rays` delegates to `planar_rays`. Ledger `positioned-filter-attenuation`. Deps: none (leaf; NumPy only).
@@ -247,6 +250,10 @@ Analysis-only external bremsstrahlung comparison, weighted sideband normalizatio
 Atomic scattering factors (Z, f0, f′, f″) from **xraydb** for any element — no hand-maintained table.
 - Public: `cromer_mann_f0`, `henke_dispersion`, `atomic_form_factor`, `load_henke`.
 - Deps: none (leaf; external xraydb).
+
+### `materials/radiation_length.py`
+Tsai radiation length (PDG Eq. 34.26 with the DBM Coulomb correction and Tsai's Z ≤ 4 logarithms) per element and for `(element, atoms/Å³)` compositions by number-density additivity. Screening scale only; no kernel reads it. Ledger `radiation-length-tsai`.
+- Public: `radiation_cross_section_ang2`, `radiation_length_ang`. Deps: `materials.atomic`, `materials.crystal` (constants).
 
 ### `materials/photon_cross_sections.py`
 Per-atom EPDL2025 photon cross sections (photoelectric, coherent, incoherent, nuclear- and electron-field pair) for Z = 1–100, 1 eV – 100 GeV, from the packaged derived table `data/photon_cross_sections/epdl2025_mf23.npz` (SHA-pinned; generator `scripts/release_epdl_table.py`). Source of every narrow-beam escape `μ` since #274; the refractive index and couplings keep Chantler `f₂`.
@@ -414,6 +421,10 @@ Turn `Sweep` definition into Cartesian product of `run_case` dicts.
 ### `campaign/beam_cases.py`
 Beam phase-space case keys for `build_cases`: `beam_case_keys` validates the bunch-front source and refuses declarative transverse/longitudinal policies mixed with legacy fields, then returns the flat beam keys that join a case only where they diverge from defaults (plus the GPT `gdf_source` record); `beam_distribution_keys` resolves the declarative policies at one geometry and beam energy.
 - Deps: `materials` (`CATALOG`), `montecarlo.bunch_front`, `montecarlo.transverse`, `campaign.longitudinal`.
+
+### `campaign/thick_target.py`
+Thick-target screen run by `build_cases` after the kinematic screen: `warn_thick_target` emits `ThickTargetWarning` when a case above the pair threshold traverses more than `THICK_TARGET_X0_FRACTION` (0.05) radiation lengths, since photons are attenuated rather than transported (#341). `traversed_radiation_lengths` sums `t_i/X0_i` over transport layers at the case tilt. Changes no case key or identity (#439).
+- Deps: `materials.radiation_length`.
 
 ### `campaign/bremsstrahlung_cases.py`
 Per-case continuum source resolution for `build_cases`: `resolve_auto_bremsstrahlung` replaces `bremsstrahlung_model="auto"` with the source each case's elements resolve to, and `radiative_case_keys` validates the coupled radiative mode and returns its divergence-only case keys, which join only BremsLib-resolved cases (#172).

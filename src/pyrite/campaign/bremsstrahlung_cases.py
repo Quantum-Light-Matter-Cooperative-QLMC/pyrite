@@ -57,6 +57,36 @@ def radiative_case_keys(
     }
 
 
+#: Above BremsLib v2.0's complete grid, radiative loss rivals collision loss
+#: (equal near 40 MeV in Si, 8 MeV in W); uncoupled transport would drop it.
+UNCOUPLED_RADIATIVE_MAX_E0_KEV = 30.0e3
+#: BremsLib (and so coupled transport) ends at 100 MeV; channeling runs above
+#: it keep their uncoupled transport (out of #439's scope).
+COUPLED_RADIATIVE_MAX_E0_KEV = 100.0e3
+
+
+def require_coupled_radiative(case: Case, radiative_model: str) -> None:
+    """Refuse a 30--100 MeV case that would silently drop radiative loss (#439).
+
+    Uncoupled transport debits only collision stopping; the continuum is scored
+    afterwards. Above ``UNCOUPLED_RADIATIVE_MAX_E0_KEV`` that is allowed only
+    when the run asks for ``radiative_model="uncoupled"``; such a case carries
+    no coupled keys, so its identity records the choice.
+    """
+    if radiative_model == "uncoupled" or case.get("radiative_model") is not None:
+        return
+    if not UNCOUPLED_RADIATIVE_MAX_E0_KEV < float(case["E0_keV"]) <= COUPLED_RADIATIVE_MAX_E0_KEV:
+        return
+    raise ValueError(
+        f"{case['name']} at {case['E0_keV']:g} keV resolved to uncoupled radiative transport "
+        f"(bremsstrahlung_model={case.get('bremsstrahlung_model', 'eedl')!r}"
+        f"{', grooved' if case.get('groove_spacing_ang') is not None else ''}), which drops "
+        "radiative energy loss above 30 MeV. Install the BremsLib tables "
+        "(`pyrite tables fetch bremslib`) for coupled transport, or set "
+        "radiative_model='uncoupled' to accept it."
+    )
+
+
 def _case_elements(case: Case) -> tuple[str, ...]:
     """Every element the case's crystal and absorber layers radiate from."""
     compositions = [case["composition"]]

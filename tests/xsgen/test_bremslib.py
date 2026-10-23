@@ -289,6 +289,51 @@ def test_build_table_bounds_itself_with_a_maximum_energy(library):
     assert arrays["node_t1_index"].size == RATIO_COUNT
 
 
+def _add_extension_energy(library: Path, energy: float, *, leading: int, k0_node: bool) -> None:
+    """Append an energy above 30 MeV holding only ``leading`` SDCS columns."""
+    path = library / "SDCS" / "SDCS_79.txt"
+
+    def value(_energy: float, column: int) -> float:
+        return 4.0 * np.pi * (1.0 + column) if column < leading else 0.0
+
+    row = _ratio_file("CS", (energy,), value).splitlines()[1]
+    path.write_text(path.read_text(encoding="ascii") + row + "\n", encoding="ascii")
+    if k0_node:
+        (library / "DDCS" / ddcs_filename(79, energy, 0.0)).write_text(
+            _ddcs_file(GRID_POINTS[2.0], level=1.0), encoding="ascii"
+        )
+
+
+def test_build_table_keeps_extension_rows_with_their_library_data_only(library):
+    vendor = library / "SDCS" / "DDCS_int" / "DDCS_int_79.txt"
+    vendor.write_text(
+        _ratio_file("DDCS_int", (*ENERGIES, 80.0), lambda e, c: 4.0 * np.pi * (1.0 + c)),
+        encoding="ascii",
+    )
+    _add_extension_energy(library, 60.0, leading=1, k0_node=True)
+    _add_extension_energy(library, 80.0, leading=11, k0_node=True)
+
+    arrays = build_table(library, 79)
+
+    # 50 MeV has no k = 0 node and 60 MeV only k = 0 in its SDCS: both dropped.
+    assert arrays["t1_MeV"].tolist() == [*ENERGIES, 80.0]
+    assert int(arrays["complete_rows"]) == len(ENERGIES)
+    assert np.all(np.isnan(arrays["sdcs_mb"][-1, 11:]))
+    assert np.all(arrays["sdcs_mb"][-1, :11] > 0.0)
+    assert np.all(np.isfinite(arrays["sdcs_mb"][:-1]))
+    assert arrays["node_t1_index"][-2:].tolist() == [len(ENERGIES) - 1, len(ENERGIES)]
+    assert arrays["node_k_index"][-2:].tolist() == [RATIO_COUNT - 1, 0]
+
+
+def test_build_table_at_the_complete_bound_has_no_extension(library):
+    _add_extension_energy(library, 80.0, leading=11, k0_node=True)
+
+    arrays = build_table(library, 79, t1_max_MeV=30.0)
+
+    assert arrays["t1_MeV"].tolist() == list(ENERGIES)
+    assert int(arrays["complete_rows"]) == len(ENERGIES)
+
+
 def test_build_table_refuses_a_hole_in_the_node_grid(library):
     (library / "DDCS" / ddcs_filename(79, 2.0, 0.9 * 2.0)).unlink()
 
