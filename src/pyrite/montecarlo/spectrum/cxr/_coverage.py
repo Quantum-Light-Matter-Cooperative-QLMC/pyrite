@@ -134,7 +134,7 @@ def line_data_coverage(st):
             for start in range(0, st.v_all.shape[0], chunk):
                 block = slice(start, start + chunk)
                 velocity = st.v_all[block]
-                vn = st.v_dot_n_all[block]
+                denom_vac = st.denom_all[block]
                 vg = xp.sum(velocity * row, axis=1)
                 gradient = st.escape_gradient[block]
                 vg_escape = xp.sum(velocity * gradient, axis=1)
@@ -142,18 +142,18 @@ def line_data_coverage(st):
                 eligible = st.cxr_electron[block] & xp.isfinite(st.t_L_all[block])
                 eligible &= st.t_L_all[block] > 0
                 with np.errstate(divide="ignore", invalid="ignore"):
-                    seed = HBARC_EV_ANG * vg / (1.0 - vn)
-                    denom, n_re = _in_medium_kinematics(
-                        vn, vg, st.n_re_tab_g, st.E_tab_g, vg_escape, grad2
+                    seed = HBARC_EV_ANG * vg / denom_vac
+                    denom, delta = _in_medium_kinematics(
+                        denom_vac, vg, st.delta_tab_g, st.E_tab_g, vg_escape, grad2
                     )
                     root = HBARC_EV_ANG * vg / denom
                 positive = eligible & xp.isfinite(seed) & (seed > 0)
                 seed_miss = positive & ((seed <= lower) | (seed >= upper))
                 pending = positive & ~seed_miss
                 optical_miss = pending & (
-                    ~xp.isfinite(n_re) | (xp.isfinite(root) & ((root <= lower) | (root >= upper)))
+                    ~xp.isfinite(delta) | (xp.isfinite(root) & ((root <= lower) | (root >= upper)))
                 )
-                critical = pending & ~optical_miss & (2.0 * xp.abs(1.0 - n_re) * grad2 >= 1)
+                critical = pending & ~optical_miss & (2.0 * xp.abs(delta) * grad2 >= 1)
                 rejected = pending & ~optical_miss & ~critical & ~xp.isfinite(root)
                 solved = pending & ~optical_miss & ~critical & ~rejected
                 finite = solved & (root > MIN_RESONANCE_EV)

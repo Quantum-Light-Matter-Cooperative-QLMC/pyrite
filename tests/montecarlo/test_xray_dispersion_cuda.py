@@ -390,17 +390,17 @@ def _prologue_inputs():
         u_re=np.tile(np.array([2e-5, 1.8e-5, 1.5e-5, 1.2e-5], dtype=np.float32), (n_g, 1)),
         u_im=np.tile(np.array([1e-6, 2e-6, 1e-6, 0.5e-6], dtype=np.float32), (n_g, 1)),
         mu=np.array([2e-4, 1e-4, 4e-5, 1e-5], dtype=np.float32),
-        n_re_tab=(1.0 - np.array([4e-3, 1.6e-3, 6e-4, 2e-4], dtype=np.float32)).astype(np.float32),
+        delta_tab=np.array([4e-3, 1.6e-3, 6e-4, 2e-4], dtype=np.float32),
     )
 
 
-def _run_prologue(d, *, n_re_tab=None):
+def _run_prologue(d, *, delta_tab=None):
     from pyrite.montecarlo.spectrum.coherent_stream_jit_kernel import (
         CoherentStreamKernelConfig,
         run_coherent_prologue_kernel,
     )
 
-    medium = n_re_tab is not None
+    medium = delta_tab is not None
     G, ES, EP = d["G"], d["ES"], d["EP"]
     aw_seg = None
     if not medium:
@@ -439,8 +439,7 @@ def _run_prologue(d, *, n_re_tab=None):
         g_dot_es=cp.asarray(np.sum(G * ES, axis=1).astype(np.float32)),
         g_dot_ep=cp.asarray(np.sum(G * EP, axis=1).astype(np.float32)),
         aw_seg=aw_seg,
-        v_dot_n=cp.asarray(d["v_dot_n"]) if medium else None,
-        n_re_tab=cp.asarray(n_re_tab) if medium else None,
+        delta_tab=cp.asarray(delta_tab) if medium else None,
         escape_gradient=None if d.get("gradient") is None else cp.asarray(d["gradient"]),
         config=CoherentStreamKernelConfig(32, 32, 2, 32),
     )
@@ -448,11 +447,11 @@ def _run_prologue(d, *, n_re_tab=None):
     return [cp.asnumpy(a) for a in out]
 
 
-def _in_medium_root_reference(d, n_re_tab):
+def _in_medium_root_reference(d, delta_tab):
     """``omega = v.g / (1 - Re n(omega) v.n_hat)`` by the kernel's 3-pass fixed
     point, in float64, with the same clamped linear interpolation on E_tab."""
     E_tab = d["E_tab"].astype(float)
-    table = np.asarray(n_re_tab, dtype=float)
+    table = np.asarray(delta_tab, dtype=float)
     v_dot_g = (d["v"].astype(float) @ d["G"].astype(float).T).T  # (n_g, n_seg)
     v_dot_n = d["v_dot_n"].astype(float)[None, :]
     gradient = d.get("gradient", np.broadcast_to(-d["n_hat"], d["v"].shape))
@@ -460,8 +459,8 @@ def _in_medium_root_reference(d, n_re_tab):
     dnm = 1.0 - v_dot_n * np.ones_like(v_dot_g)
     for _ in range(3):
         E_it = d["hbarc"] * (v_dot_g / dnm)
-        n_re = np.interp(E_it, E_tab, table)
-        dnm = 1.0 - v_dot_n - (1.0 - n_re) * v_dot_grad
+        delta = np.interp(E_it, E_tab, table)
+        dnm = 1.0 - v_dot_n - delta * v_dot_grad
     E_r = d["hbarc"] * (v_dot_g / dnm)
     aw = dnm * d["t_L"].astype(float)[None, :] / (2.0 * d["hbarc"])
     return E_r.reshape(-1), aw.reshape(-1)
@@ -472,8 +471,8 @@ def test_prologue_solves_the_in_medium_resonance():
     resonance root and sinc half-width are pinned to the same implicit
     ``omega = v.g / (1 - Re n(omega) v.n_hat)`` the CPU core solves."""
     d = _prologue_inputs()
-    E_r, aw = _run_prologue(d, n_re_tab=d["n_re_tab"])[:2]
-    E_r_ref, aw_ref = _in_medium_root_reference(d, d["n_re_tab"])
+    E_r, aw = _run_prologue(d, delta_tab=d["delta_tab"])[:2]
+    E_r_ref, aw_ref = _in_medium_root_reference(d, d["delta_tab"])
 
     assert aw.size == d["n_g"] * d["n_seg"]  # per-(segment, g) under refraction
     np.testing.assert_allclose(E_r, E_r_ref, rtol=3e-6)
@@ -491,7 +490,7 @@ def test_prologue_unit_index_reproduces_the_vacuum_kinematics():
     pre-existing vacuum kernel exactly."""
     d = _prologue_inputs()
     vac = _run_prologue(d)
-    med = _run_prologue(d, n_re_tab=np.ones_like(d["n_re_tab"]))
+    med = _run_prologue(d, delta_tab=np.zeros_like(d["delta_tab"]))
 
     np.testing.assert_array_equal(med[0], vac[0])  # E_r
     np.testing.assert_array_equal(med[1], np.tile(vac[1], d["n_g"]))  # aw, pair layout
@@ -499,20 +498,13 @@ def test_prologue_unit_index_reproduces_the_vacuum_kinematics():
         np.testing.assert_array_equal(got, want)
 
 
-def test_prologue_rejects_a_half_specified_medium_and_a_hoisted_half_width():
+def test_prologue_rejects_a_hoisted_half_width_under_the_medium():
     d = _prologue_inputs()
-    with pytest.raises(ValueError, match="together"):
-        _run_prologue_raw(d, v_dot_n=cp.asarray(d["v_dot_n"]), n_re_tab=None, aw_seg=None)
     with pytest.raises(ValueError, match="cannot be hoisted"):
-        _run_prologue_raw(
-            d,
-            v_dot_n=cp.asarray(d["v_dot_n"]),
-            n_re_tab=cp.asarray(d["n_re_tab"]),
-            aw_seg=cp.asarray(d["t_L"]),
-        )
+        _run_prologue_raw(d, delta_tab=cp.asarray(d["delta_tab"]), aw_seg=cp.asarray(d["t_L"]))
 
 
-def _run_prologue_raw(d, *, v_dot_n, n_re_tab, aw_seg):
+def _run_prologue_raw(d, *, delta_tab, aw_seg):
     from pyrite.montecarlo.spectrum.coherent_stream_jit_kernel import (
         run_coherent_prologue_kernel,
     )
@@ -545,8 +537,7 @@ def _run_prologue_raw(d, *, v_dot_n, n_re_tab, aw_seg):
         n_hat=d["n_hat"],
         n_g=d["n_g"],
         aw_seg=aw_seg,
-        v_dot_n=v_dot_n,
-        n_re_tab=n_re_tab,
+        delta_tab=delta_tab,
     )
 
 
@@ -955,10 +946,10 @@ def test_prologue_snell_amplitudes_match_full_vector_numpy(axis):
     d["ES"][:] = [0, 1, 0]
     d["EP"][:] = [0.8, 0, -0.6]
     delta = float(np.float32(1) - np.float32(0.999))
-    index = np.full_like(d["n_re_tab"], 1 - delta)
+    index = np.full_like(d["delta_tab"], delta)
     for key in ("chi_re", "chi_im", "u_re", "u_im", "mu"):
         d[key][:] = d[key].flat[0]
-    got = _run_prologue(d, n_re_tab=index)
+    got = _run_prologue(d, delta_tab=index)
     energies, widths, cs, cp_ref = [], [], [], []
     for row, g in enumerate(d["G"].astype(float)):
         for seg, v in enumerate(d["v"].astype(float)):

@@ -11,7 +11,7 @@ import numpy as np
 
 from ...._backend import REAL, _to_cpu, array_namespace, xp
 from ....materials.attenuation import _mu_total_inv_ang
-from ....materials.crystal import HBARC_EV_ANG, emission_coupling_tables
+from ....materials.crystal import HBARC_EV_ANG, M_E_EV, emission_coupling_tables
 from ...geometry import first_prism_exit
 from ...groove import _THETA_TOL
 from ...transport import (
@@ -627,7 +627,29 @@ if hasattr(xp, "fuse"):
 _RESONANCE_ROOT_RTOL = 1e-3
 
 
-def _in_medium_kinematics(v_dot_n, v_dot_g, n_re_tab, E_tab, v_dot_grad=None, grad2=None):
+def _vacuum_doppler(E_keV, beta, v_hat, n_hat, *, xp=xp):
+    """``(gamma, 1 - beta v_hat.n_hat)`` per row, free of cancellation.
+
+    ``gamma = 1 + T/(m c^2)`` straight from the kinetic energy, and
+    ``1 - beta cos theta = (1 - beta) + beta (1 - cos theta)`` with
+    ``1 - beta = 1/(gamma^2 (1 + beta))`` and, for unit ``v_hat``/``n_hat``,
+    ``1 - cos theta = |v_hat - n_hat|^2 / 2``. Both are algebraically exact.
+    Rebuilding ``gamma`` from ``beta`` or subtracting ``beta cos theta`` from 1
+    instead loses ~eps gamma^2 relative accuracy: ~0.1% in float32 at 100 MeV
+    and worse toward a forward detector, where the factor approaches
+    ``1/(2 gamma^2)``.
+
+    Validation: line-kinematics-precision
+    """
+    dtype = beta.dtype
+    gamma = 1.0 + E_keV / dtype.type(M_E_EV / 1e3)
+    one_minus_beta = 1.0 / (gamma * gamma * (1.0 + beta))
+    dv = v_hat - xp.asarray(n_hat, dtype=dtype)[None, :]
+    one_minus_cos = 0.5 * (dv[:, 0] * dv[:, 0] + dv[:, 1] * dv[:, 1] + dv[:, 2] * dv[:, 2])
+    return gamma, one_minus_beta + beta * one_minus_cos
+
+
+def _in_medium_kinematics(denom_vac, v_dot_g, delta_tab, E_tab, v_dot_grad=None, grad2=None):
     """First-order Snell resonance on one linear photon-escape piece.
 
     Tangential continuity at a planar exit gives
@@ -635,38 +657,42 @@ def _in_medium_kinematics(v_dot_n, v_dot_g, n_re_tab, E_tab, v_dot_grad=None, gr
     Energy conservation (Zhai SI Eqs. (7)–(9)) therefore requires
     ``omega (1 - v.n_hat - delta v.grad L) = v.g``. The imaginary index
     is counted only by Beer-Lambert absorption. Couplings sample this root.
-    At normal exit ``grad L = -n_hat`` and the bulk root is recovered.
+    At normal exit ``grad L = -n_hat`` and the bulk root
+    ``1 - Re(n) v.n_hat`` is recovered.
+
+    Takes the vacuum Doppler factor ``denom_vac = 1 - v.n_hat`` and the
+    decrement table ``delta = 1 - Re n`` rather than ``v.n_hat`` and ``Re n``:
+    near the forward direction at tens of MeV ``1 - v.n_hat`` is ~1e-5 and
+    ``delta`` ~1e-6, so forming either difference in float32 would cost
+    percent-level accuracy (``_setup`` builds both cancellation-free).
     Three fixed-point passes retain the float32-aware convergence guard.
     Reject the critical-angle regime ``2 |delta| |grad L|^2 >= 1``;
     first-order ray optics and the existing coherent phase are invalid there.
     With omitted geometry, retain the bulk scalar convention for legacy
     direct callers; production spectrum routes always supply the gradient.
+    Returns ``(denom, delta)`` at the root.
 
-    Validation: xray-in-medium-resonance
+    Validation: xray-in-medium-resonance, line-kinematics-precision
     """
-    _xp = array_namespace(v_dot_n, v_dot_g, n_re_tab, E_tab)
+    _xp = array_namespace(denom_vac, v_dot_g, delta_tab, E_tab)
     if v_dot_grad is None:
-        v_dot_grad = -v_dot_n
-    denom = 1.0 - v_dot_n
-    n_re = None
+        v_dot_grad = denom_vac - 1.0  # bulk: grad L = -n_hat
+    denom = denom_vac
+    delta = None
     previous = denom
     for _ in range(3):
         E_res = HBARC_EV_ANG * (v_dot_g / denom)
         _ix, _fr, _blw, _abv = _interp_index(E_res, E_tab)
-        n_re = _interp_gather1d(_ix, _fr, _blw, _abv, n_re_tab)
+        delta = _interp_gather1d(_ix, _fr, _blw, _abv, delta_tab)
         previous = denom
-        denom = _xp.where(
-            v_dot_grad == -v_dot_n,
-            1.0 - n_re * v_dot_n,
-            1.0 - v_dot_n - (1.0 - n_re) * v_dot_grad,
-        )
+        denom = denom_vac - delta * v_dot_grad
     # NaN denominators compare False here and stay NaN, which is the wanted
     # outcome: an out-of-range root is already a rejected pair.
     settled = _xp.abs(denom - previous) <= _RESONANCE_ROOT_RTOL * _xp.abs(denom)
     if grad2 is not None:
-        settled &= 2.0 * _xp.abs(1.0 - n_re) * grad2 < 1.0
+        settled &= 2.0 * _xp.abs(delta) * grad2 < 1.0
     denom = _xp.where(settled, denom, REAL(_xp.nan))
-    return denom, n_re
+    return denom, delta
 
 
 def _segments_in_layer(segments, L):

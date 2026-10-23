@@ -26,6 +26,15 @@ The coherent-roundoff acceptance test applies representative relative errors
 from the recorded CI sample to the current spectrum, instead of embedding
 absolute v3 intensities.
 
+## Line kinematics v5 generation (#439)
+
+Forming `gamma`, the Doppler factor `1 - v.n_hat` and the refractive
+decrement `delta = 1 - Re n` cancellation-free changed `CXR_ESCAPE_MODEL`
+from v4 to v5. Only the generation-dependent `case_content_key` and
+`parameter_sha256` hashes in `resolved.json` and `channeling.json` were
+re-pinned. On CPU/NumPy fp64 the line spectra move at rounding level only, so
+every recorded output keeps its expectation and tolerance.
+
 ## Fixture inputs
 
 `resolved.json` stores full resolved case mappings, `case_content_key` and

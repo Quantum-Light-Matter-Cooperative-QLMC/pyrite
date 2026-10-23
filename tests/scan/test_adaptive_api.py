@@ -75,16 +75,17 @@ def test_fixed_n_identity_matches_the_pre_precision_baseline():
     sweep = LegacySweep(
         material="hopg", beam=BeamSpec(energy_keV=30), thickness_ang=1e4, tilt_deg=30
     )
-    # Re-pinned for the deliberate CBS v4 identity generation in #513.
+    # Re-pinned for the deliberate CBS v4 (#513) and line-kinematics v5 (#439)
+    # identity generations.
     identity = dataset_identity("hopg", "full", Settings(), sweep, bremsstrahlung_model="eedl")
     assert (
         identity["parameter_sha256"]
-        == "cedfa09fbc06f1cc091a26ac1a7488b9639a141d258887b12f0df9af1c9a5640"
+        == "54fea7ba66afaad41e403fd48e411d43f8b0b57c731295ddd29d7310018f5452"
     )
     case = build_cases(sweep, n_electrons=60, n_electrons_brem=60, bremsstrahlung_model="eedl")[0]
     assert "adaptive_precision" not in case
     assert (
-        case_content_key(case) == "42a633d3da63e5acdb888f78b4b4453af4f237cf4eb4acb78b780284eb1a4a58"
+        case_content_key(case) == "881423359f7d39f9411823dc8692d3199d817929852167ecb8cf132d8ace3c22"
     )
 
 

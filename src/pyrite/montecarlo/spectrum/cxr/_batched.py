@@ -401,10 +401,9 @@ def _batched_block(st, bt, sb):
     """Solve each piece/reflection's Snell root and gather frozen couplings."""
     cxr_electron = st.cxr_electron
     v_all = st.v_all
-    v_dot_n_all = st.v_dot_n_all
     E_tab_g = st.E_tab_g
     log_mu_tab_g = st.log_mu_tab_g
-    n_re_tab_g = st.n_re_tab_g
+    delta_tab_g = st.delta_tab_g
     lo_keep = bt.lo_keep
     hi_keep = bt.hi_keep
     gx = bt.gx
@@ -424,15 +423,14 @@ def _batched_block(st, bt, sb):
     vy = v_all[sb, 1][:, None]
     vz = v_all[sb, 2][:, None]
     # Refraction makes the denominator and k.g piece/reflection dependent.
-    denom, n_re_blk = _in_medium_kinematics(
-        v_dot_n_all[sb][:, None],
+    denom, delta = _in_medium_kinematics(
+        st.denom_all[sb][:, None],
         vx * gx + vy * gy + vz * gz,
-        n_re_tab_g,
+        delta_tab_g,
         E_tab_g,
         (v_all[sb] * st.escape_gradient[sb]).sum(axis=1)[:, None],
         (st.escape_gradient[sb] ** 2).sum(axis=1)[:, None],
     )
-    delta = 1.0 - n_re_blk
     grad = st.escape_gradient[sb]
     grad_dot_g = grad[:, 0, None] * gx + grad[:, 1, None] * gy + grad[:, 2, None] * gz
     n_dot_g_blk = n_dot_g + delta * grad_dot_g
@@ -784,10 +782,9 @@ def _accumulate_batched(st):
     spec = st.spec
     cxr_electron = st.cxr_electron
     v_all = st.v_all
-    v_dot_n_all = st.v_dot_n_all
     E_tab_g = st.E_tab_g
     log_mu_tab_g = st.log_mu_tab_g
-    n_re_tab_g = st.n_re_tab_g
+    delta_tab_g = st.delta_tab_g
     delta_omega_grid = st.delta_omega_grid
     seg_r_geom = st.seg_r_geom
     d_all_geom = st.d_all_geom
@@ -958,8 +955,7 @@ def _accumulate_batched(st):
                 n_dot_g=_coh_n_dot_g,
                 g_dot_es=_coh_g_dot_es,
                 g_dot_ep=_coh_g_dot_ep,
-                v_dot_n=v_dot_n_all[sel],
-                n_re_tab=n_re_tab_g,
+                delta_tab=delta_tab_g,
                 escape_gradient=st.escape_gradient[sel],
                 L_start=_coh_L_start[sel],
                 L_end=_coh_L_end[sel],

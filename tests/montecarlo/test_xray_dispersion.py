@@ -342,10 +342,10 @@ _CYCLE_V_DOT_G = 6.5 * (1.0 - _CYCLE_V_DOT_N) / HBARC_EV_ANG
 def _root(v_dot_n, v_dot_g):
     from pyrite.montecarlo.spectrum.cxr import _in_medium_kinematics
 
-    denom, n_re = _in_medium_kinematics(
-        np.array([v_dot_n]), np.array([v_dot_g]), _CYCLE_N_RE, _CYCLE_E_TAB
+    denom, delta = _in_medium_kinematics(
+        np.array([1.0 - v_dot_n]), np.array([v_dot_g]), 1.0 - _CYCLE_N_RE, _CYCLE_E_TAB
     )
-    return float(np.asarray(denom)[0]), float(np.asarray(n_re)[0])
+    return float(np.asarray(denom)[0]), 1.0 - float(np.asarray(delta)[0])
 
 
 def test_the_two_cycle_root_is_rejected_rather_than_returned():
@@ -385,7 +385,7 @@ def test_a_converged_root_is_untouched_by_the_guard():
     v_dot_g = 3000.0 * (1.0 - _CYCLE_V_DOT_N) / HBARC_EV_ANG
     denom, n_re = _root(_CYCLE_V_DOT_N, v_dot_g)
     assert np.isfinite(denom)
-    assert denom == pytest.approx(1.0 - n_re * _CYCLE_V_DOT_N, rel=0, abs=0)
+    assert denom == pytest.approx(1.0 - n_re * _CYCLE_V_DOT_N, rel=1e-14)
     assert n_re == pytest.approx(1.0 - 1e-5, rel=1e-6)
 
 
@@ -403,7 +403,7 @@ def test_the_guard_is_inert_across_the_xray_regime():
     """
     g = reciprocal_g_vector(HKL, CRYSTALS[CRYSTAL]["lattice"])[0]
     E_tab = np.geomspace(10.0, 30000.0, 512)
-    n_re_tab = np.real(refractive_index(CRYSTAL, E_tab))
+    delta_tab = 1.0 - np.real(refractive_index(CRYSTAL, E_tab))
 
     rng = np.random.default_rng(0)
     v = rng.normal(size=(4096, 3))
@@ -413,7 +413,7 @@ def test_the_guard_is_inert_across_the_xray_regime():
     from pyrite.montecarlo.spectrum.cxr import _in_medium_kinematics
 
     v_dot_g = v @ g
-    denom, _ = _in_medium_kinematics(v @ N_HAT, v_dot_g, n_re_tab, E_tab)
+    denom, _ = _in_medium_kinematics(1.0 - v @ N_HAT, v_dot_g, delta_tab, E_tab)
     E_res = HBARC_EV_ANG * (v_dot_g / np.asarray(denom))
     in_window = np.isfinite(E_res) & (E_res > 10.0) & (E_res < E_tab[-1])
     assert in_window.sum() > 100
@@ -442,21 +442,21 @@ def test_normal_exit_snell_root_is_exactly_the_bulk_root():
     from pyrite.montecarlo.spectrum.cxr import _in_medium_kinematics
 
     table = np.array([1e3, 3e3, 1e4])
-    index = np.array([0.9999, 0.99998, 0.999999])
+    delta = 1.0 - np.array([0.9999, 0.99998, 0.999999])
     vdn = np.array([-BETA])
     vdg = np.array([V_DOT_G])
-    bulk, _ = _in_medium_kinematics(vdn, vdg, index, table)
-    snell, _ = _in_medium_kinematics(vdn, vdg, index, table, -vdn, np.ones(1))
-    np.testing.assert_array_equal(snell, bulk)
+    bulk, _ = _in_medium_kinematics(1.0 - vdn, vdg, delta, table)
+    snell, _ = _in_medium_kinematics(1.0 - vdn, vdg, delta, table, -vdn, np.ones(1))
+    np.testing.assert_allclose(snell, bulk, rtol=1e-15)
 
 
 def test_critical_angle_snell_root_is_rejected():
     from pyrite.montecarlo.spectrum.cxr import _in_medium_kinematics
 
     table = np.array([1e3, 2e3, 3e3])
-    index = np.full(3, 1.0 - 1e-4)
+    delta = np.full(3, 1e-4)
     denom, _ = _in_medium_kinematics(
-        np.zeros(1), np.array([1600 / HBARC_EV_ANG]), index, table, np.zeros(1), np.array([1e4])
+        np.ones(1), np.array([1600 / HBARC_EV_ANG]), delta, table, np.zeros(1), np.array([1e4])
     )
     assert np.isnan(denom[0])
 

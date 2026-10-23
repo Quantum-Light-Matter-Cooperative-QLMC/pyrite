@@ -192,10 +192,11 @@ def test_equal_acceptance_preserves_lowered_case_and_both_identities():
     ]
     assert cases[0] == cases[1]
     assert case_content_key(cases[0]) == case_content_key(cases[1])
-    # Input captured at 86db77f5; case hash re-pinned for #592 automatic photon grids.
+    # Input captured at 86db77f5; case hash re-pinned for #592 automatic photon grids
+    # and the #439 line-kinematics v5 marker.
     assert (
         case_content_key(cases[1])
-        == "2aefdc3d9a8913f97f9cfeecdaa9d71814e048e767f02cfdfa597775aaccea7e"
+        == "ea16913de8f0d97f4461eb2b8f1bd1f31a4fbce4d802ba2b21dda7164cde5afb"
     )
     sweeps = [
         LegacySweep(material="hopg", beam=beam.to_spec(), target=target, detector=d)
@@ -205,7 +206,7 @@ def test_equal_acceptance_preserves_lowered_case_and_both_identities():
     assert identities[0] == identities[1]
     assert (
         identities[1]["parameter_sha256"]
-        == "004e8e0abd0d528d0230e559aa62bd7009e3862e9ec21f21dfd9e009d7631dea"
+        == "3ca2ca38a4d9a35e1b61125c3ee2cfc5eb30576ae1190882735bbbdeaf3d2fcd"
     )
     # Pin to the pre-object payload vocabulary; no acceptance metadata enters identity.
     assert "detector" not in identities[0]["resolved_parameters"]["sweep"]

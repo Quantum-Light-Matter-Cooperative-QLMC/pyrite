@@ -5,6 +5,7 @@
 Compact generated view of the [detailed validation ledger](physics-validation-ledger.md). Regenerate with `pyrite-dev validation-ledger --write` after editing detailed records.
 
 **Publication gate:** 0 / 265 claims signed off.
+**Publication gate:** 0 / 265 claims signed off.
 
 Formal sign-off requires human review of each claim. Independent derivations, automated checks and experimental comparisons provide evidence; none alone confers sign-off.
 
@@ -16,6 +17,7 @@ Formal sign-off requires human review of each claim. Independent derivations, au
 | `fail` | 0 |
 | `skip` | 0 |
 | `missing` | 238 |
+| `missing` | 238 |
 
 Oldest current automated evidence: `2026-09-15T15:45:04.640409+00:00` (UTC timestamp; use it to assess evidence age).
 
@@ -23,10 +25,11 @@ Oldest current automated evidence: `2026-09-15T15:45:04.640409+00:00` (UTC times
 |---|---:|
 | `signed-off` | 0 |
 | `anchored` | 73 |
-| `rederived` | 96 |
-| `filtered` | 12 |
-| `unverified` | 80 |
+| `rederived` | 93 |
+| `filtered` | 13 |
+| `unverified` | 82 |
 | `discrepancy` | 4 |
+| **Total** | **265** |
 | **Total** | **265** |
 
 Status meanings and promotion rules are defined in the [validation methodology](methodology.md).

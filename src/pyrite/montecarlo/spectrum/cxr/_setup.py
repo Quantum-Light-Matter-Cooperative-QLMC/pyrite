@@ -30,6 +30,7 @@ from ._kernels import (
     _elemental_log_mu_table,
     _matvec3,
     _observation_direction,
+    _vacuum_doppler,
     _validate_groove_escape_direction,
 )
 from ._temporal import segment_arrival_times
@@ -41,8 +42,10 @@ from ._temporal import segment_arrival_times
 # formation integral under absorption since its second slice; each move
 # orphans the previous generation's line spectra once. v4 (#513): the CBS
 # potential coupling U_g is the static Z - f0(g), no longer carrying the
-# anomalous f' of edge-prone elements.
-CXR_ESCAPE_MODEL = "segment-mean-v4-snell-resonance"
+# anomalous f' of edge-prone elements. v5 (#439): gamma and the Doppler
+# factor 1 - v.n_hat are formed cancellation-free and the in-medium root reads
+# a float64-formed decrement table, which moves float32 device lines at MeV.
+CXR_ESCAPE_MODEL = "segment-mean-v5-precise-kinematics"
 
 
 #: Size of the most recent line setups' tabulation, for performance telemetry.
@@ -134,7 +137,6 @@ class _SpectrumSetup:
     seg_elec_id: Any
     cxr_electron: Any
     v_all: Any
-    v_dot_n_all: Any
     denom_all: Any
     gamma_all: Any
     t_L_all: Any
@@ -143,7 +145,7 @@ class _SpectrumSetup:
     E_tab: Any
     E_tab_g: Any
     log_mu_tab_g: Any
-    n_re_tab_g: Any
+    delta_tab_g: Any
     mosaic_quad: Any
     finite_footprint: Any
     cdtype: Any
@@ -475,12 +477,15 @@ def _prepare_spectrum(request):
     # Validation: line-absorption-tabulation
     log_mu_tab_g = xp.asarray(_elemental_log_mu_table(abs_comp, E_tab), dtype=REAL)
 
-    # Real part of the crystal's bulk refractive index n(E) = sqrt(1 + chi_0(E)),
-    # tabulated on the SAME edge-resolved grid as chi/U/mu (delta = 1 - Re n has
-    # its own edge structure, from the f1 cusp). The in-medium dispersion is
-    # unconditional, so this table is always built.
-    n_re_tab_g = xp.asarray(
-        np.asarray(refractive_index(crystal, E_tab, use_henke).real), dtype=REAL
+    # Decrement delta = 1 - Re n of the crystal's bulk refractive index
+    # n(E) = sqrt(1 + chi_0(E)), tabulated on the SAME edge-resolved grid as
+    # chi/U/mu (delta has its own edge structure, from the f1 cusp). Formed in
+    # float64 before the cast: Re n itself rounds delta ~1e-6 to ~6% in float32.
+    # The in-medium dispersion is unconditional, so this table is always built.
+    # Validation: line-kinematics-precision
+    delta_tab_g = xp.asarray(
+        1.0 - np.asarray(refractive_index(crystal, E_tab, use_henke).real, dtype=np.float64),
+        dtype=REAL,
     )
 
     n_hat_d = xp.asarray(n_hat, dtype=REAL)  # detector dir is g-independent: hoist
@@ -488,9 +493,8 @@ def _prepare_spectrum(request):
     # Segment-only kinematics shared by every reflection/orientation and by both
     # the batched and compatibility paths. These used to be recomputed inside
     # ``_accumulate`` for every g row.
-    v_dot_n_all = _matvec3(v_all, n_hat_d)
-    denom_all = 1.0 - v_dot_n_all
-    gamma_all = 1.0 / xp.sqrt(1.0 - beta_all * beta_all)
+    # Validation: line-kinematics-precision
+    gamma_all, denom_all = _vacuum_doppler(seg_E, beta_all, seg_v, n_hat_d)
     t_L_all = seg_L / beta_all
     piece_fraction = xp.ones_like(seg_L)
     if not (coherent or grouped):
@@ -725,7 +729,6 @@ def _prepare_spectrum(request):
         seg_elec_id=seg_elec_id,
         cxr_electron=cxr_electron,
         v_all=v_all,
-        v_dot_n_all=v_dot_n_all,
         denom_all=denom_all,
         gamma_all=gamma_all,
         t_L_all=t_L_all,
@@ -734,7 +737,7 @@ def _prepare_spectrum(request):
         E_tab=E_tab,
         E_tab_g=E_tab_g,
         log_mu_tab_g=log_mu_tab_g,
-        n_re_tab_g=n_re_tab_g,
+        delta_tab_g=delta_tab_g,
         mosaic_quad=mosaic_quad,
         finite_footprint=finite_footprint,
         cdtype=cdtype,
