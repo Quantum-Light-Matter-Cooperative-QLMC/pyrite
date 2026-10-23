@@ -16,6 +16,7 @@ from ...materials.channeling.transverse import HBAR2_2M_EV_ANG2, longitudinal_ki
 SOLVER_BUDGET_BYTES = 4 << 30
 MAX_BATCH_SECTORS = 64
 _RESIDUAL_TOL_EV = 1e-10
+_ITERATIONS = 64
 
 
 def _block(n, count):
@@ -78,8 +79,9 @@ def _residual_tolerances(xp, energies):
     return xp.where(gap > 1e-8, xp.minimum(_RESIDUAL_TOL_EV, gap * 1e-9), _RESIDUAL_TOL_EV)
 
 
-def _iterate(xp, potential, kinetic, initial, count, *, degree=20, iterations=40):
+def _iterate(xp, potential, kinetic, initial, count, *, degree=20, iterations=None):
     """Return lowest momentum-space rows, energies, and per-sector residuals."""
+    iterations = _ITERATIONS if iterations is None else iterations
     batch, block, n = initial.shape
     degree = min(degree, max(2, n // block))
     shape = potential.shape
