@@ -177,6 +177,34 @@ IMFP at 1/10/100 keV, raw → closed (Å): Si 18.6→19.6, 128.7→115.5,
 810.7→750.4; SiO₂ 15.4→19.8, 107.0→122.9, 674.8→807.4; MoS₂ 15.0→14.9,
 101.1→88.4, 629.8→510.5.
 
+### MeV extension (#439)
+
+The closure stays exact ($10^{-12}$) with $\mathcal N>0$ up to 100 MeV, and
+the raw GOS stopping stays within 2 % of `stp.dat` (Bethe limit, checked to
+1 GeV in `test_shell_gos.py`). $\mathcal N(E)$:
+
+| material | 1 MeV | 3 MeV | 10 MeV | 30 MeV | 100 MeV |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| silicon | 1.056 | 1.124 | 1.263 | 1.442 | 1.623 |
+| sio2 | 0.791 | 0.816 | 0.851 | 0.916 | 1.000 |
+| mos2 | 1.270 | 1.343 | 1.444 | 1.492 | 1.618 |
+
+The rise is not a closure defect; it moves stopping from the inner to the
+outer shells. The EEDL inner-shell cross sections are flat in energy above
+about 10 MeV (Si L shells) and 40 MeV (Si K): from 1 to 100 MeV they rise by
+5 % (L) and 54 % (K), against 11 % and 20 % for the GOS with $\delta_F$ and
+58 % and 84 % for the GOS without it. The density ratio $\rho_i$, which
+PENELOPE applies to DWBA cross sections that carry no density effect, still
+falls to 0.62–0.68 at 100 MeV. The adopted Si inner shells are then
+0.43–0.85 of their GOS $\sigma^{(0)}$ with $\delta_F$ (0.94–1.09 at 1 MeV),
+and $\mathcal N$ makes up the difference. If the EEDL plateau already
+represents a density-effect saturation, $\rho_i$ counts it twice above
+~10 MeV and inner-shell ionization (characteristic X-ray yields) is low by
+up to ~30 %; the total stopping is unaffected. Which reading holds needs an
+independent high-energy inner-shell reference (Bote–Salvat is #92). The
+values are pinned by
+`test_outer_scale_at_mev_energies_matches_recorded_note`.
+
 ### Independent SiO₂ total-rate gate
 
 [Shinotsuka et al., *Surface and Interface Analysis* 51 (2019),
@@ -363,7 +391,8 @@ with IMFP or straggling measurements.
 `tests/montecarlo/test_shell_rates.py` covers the following:
 
 - exact closure $\sum\sigma^{(1)}=S_{\rm stp}$ ($10^{-12}$, `abs=0`), with
-  finite positive $\mathcal N$ for three materials at eight energies;
+  finite positive $\mathcal N$ for three materials at eleven energies from
+  1 keV to 100 MeV, and the recorded $\mathcal N$ at 1–100 MeV;
 - inner $\sigma^{(1)}/\sigma^{(0)}$ and $\sigma^{(2)}/\sigma^{(0)}$ unchanged
   ($10^{-12}$), and outer shells scaled by one $\mathcal N$;
 - the adopted inner $\sigma^{(0)}$ equals an independent EEDL lin-lin

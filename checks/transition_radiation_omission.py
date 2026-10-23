@@ -77,6 +77,10 @@ SCENES = (
     Scene("si-3MeV-film-offaxis", "MeV thin film", (("silicon", 2e4),), 3e3, 90.0, cone_deg=2.1),
     Scene("si-3MeV-film-forward", "MeV thin film", (("silicon", 2e4),), 3e3, 1.0, cone_deg=2.1),
     Scene("si-10MeV-film-forward", "MeV thin film", (("silicon", 2e4),), 1e4, 1.0, cone_deg=0.7),
+    Scene("si-30MeV-film-forward", "30-100 MeV", (("silicon", 2e4),), 3e4, 1.0, cone_deg=0.21),
+    Scene("si-100MeV-film-offaxis", "30-100 MeV", (("silicon", 2e4),), 1e5, 90.0, cone_deg=0.07),
+    Scene("si-100MeV-film-forward", "30-100 MeV", (("silicon", 2e4),), 1e5, 1.0, cone_deg=0.07),
+    Scene("si-100MeV-bulk-forward", "30-100 MeV", (("silicon", 1e6),), 1e5, 1.0, cone_deg=0.6),
 )
 
 
@@ -98,13 +102,16 @@ def _simulate(scene: Scene, grid: np.ndarray, trials: int):
             tilt_deg=scene.tilt_deg,
             footprint=footprint,
         )
+    # The study reads only the continuum; above 10 MeV the automatic line grid
+    # exceeds its point budget, so give the lines a fixed coarse grid there.
+    cxr = np.linspace(1e3, 20e3, 2000) if scene.kinetic_keV > 1e4 else None
     result = pr.simulate(
         beam,
         target,
         pr.Detector(scene.theta_obs_deg),
         physics=pr.Physics(),
         numerics=pr.Numerics(
-            cxr_trials=trials, brem_trials=trials, energy_bins=pr.EnergyBins(brem=grid)
+            cxr_trials=trials, brem_trials=trials, energy_bins=pr.EnergyBins(cxr=cxr, brem=grid)
         ),
     )
     return result.brem.photon_energy_eV, result.brem.density

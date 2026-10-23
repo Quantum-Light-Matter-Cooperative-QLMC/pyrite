@@ -151,6 +151,9 @@ radiation-physics/cbs-amplitude
 radiation-physics/characteristic-radiation
 radiation-physics/eedl-shell-ionization-comparison
 radiation-physics/bremslib-angular-schiff
+radiation-physics/bremslib-electron-electron
+radiation-physics/bremslib-high-energy-extension
+radiation-physics/dielectric-suppression
 radiation-physics/closed-form-flux
 radiation-physics/coherent-emission
 radiation-physics/pair-production-sampling
