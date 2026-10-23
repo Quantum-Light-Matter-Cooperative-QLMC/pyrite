@@ -4,7 +4,7 @@ The line-spectrum kernel is the core radiation model of PyRITE. It uses vector P
 
 The kernel is kinematic (Born): the crystal supplies static Fourier components of its susceptibility and its electrostatic potential, the electron supplies a straight constant-velocity flight, and the emitted field is first order in both.
 
-There is no fixed 300 keV beam-energy gate. The documented transport checks and scattering data extend to roughly 300 keV; higher-energy predictions, including 3–5 MeV beams, still need transport and radiation validation. See the [relativistic PXR/CBS assessment](../../research/physics/relativistic-pxr-cbs.md) for the remaining model limits.
+There is no fixed beam-energy gate. Electron transport is benchmarked against Geant4 up to 100 MeV (see the [beam-energy validity map](../capabilities.md#beam-energy-validity)); the line kernel's own high-energy limits, including line couplings above ~1 MeV photon energy (#249), are separate. See the [relativistic PXR/CBS assessment](../../research/physics/relativistic-pxr-cbs.md) for the remaining model limits.
 
 ## Emission geometry
 

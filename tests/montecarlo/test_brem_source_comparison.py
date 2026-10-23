@@ -44,6 +44,12 @@ _SELTZER_BERGER_CHI_MB = {
         3.20187, 2.69652, 2.08267, 1.49693, 0.80704, 0.58939, 0.37513, 0.33403, 0.28851,
         0.28268, 0.28464, 0.28033,
     ),
+    (6, 100.0): (
+        20.9188, 16.4776, 15.5509, 14.7338, 14.0012, 13.3376, 12.7398, 12.2033, 11.7249,
+        11.3007, 10.9261, 10.5943, 10.2946, 10.0162, 9.75133, 9.48413, 9.17758, 8.73932,
+        7.99837, 7.41166, 6.53564, 5.37627, 3.0566, 2.02112, 0.84403, 0.62042, 0.3678,
+        0.32001, 0.27596, 0.27175,
+    ),
     (74, 0.1): (
         8.92442, 8.8157, 8.59365, 8.3051, 7.9943, 7.70177, 7.43315, 7.1873, 6.96312,
         6.75963, 6.57379, 6.40247, 6.24333, 6.09543, 5.95839, 5.83166, 5.71472, 5.60641,
@@ -62,6 +68,12 @@ _SELTZER_BERGER_CHI_MB = {
         3.2138, 2.87466, 2.45823, 2.05312, 1.56906, 1.43027, 1.35023, 1.35045, 1.35265,
         1.34892, 1.3365, 1.35163,
     ),
+    (74, 100.0): (
+        11.3685, 10.5113, 9.97962, 9.49579, 9.05602, 8.65768, 8.2994, 7.97962, 7.69711,
+        7.45052, 7.23811, 7.05699, 6.90195, 6.76849, 6.65477, 6.55447, 6.44733, 6.27302,
+        5.92332, 5.62272, 5.14944, 4.46454, 2.93327, 2.23367, 1.45372, 1.33587, 1.25354,
+        1.2442, 1.23617, 1.23749,
+    ),
 }  # fmt: skip
 # ESTAR radiative stopping, MeV cm^2/g (NIST SRD 124), at 0.1, 1 and 10 MeV.
 _ESTAR = {(6, 0.1): 0.003414, (6, 1.0): 0.01053, (6, 10.0): 0.1513,
@@ -71,7 +83,7 @@ _SYMBOL = {6: "C", 74: "W"}
 
 
 def _excerpt_table() -> SeltzerBergerTable:
-    energies = np.array([0.1, 1.0, 10.0])
+    energies = np.array([0.1, 1.0, 10.0, 100.0])
     chi = np.ones((100, len(_KAPPA), energies.size))
     for (Z, energy), row in _SELTZER_BERGER_CHI_MB.items():
         chi[Z - 1, :, list(energies).index(energy)] = row
@@ -164,3 +176,26 @@ def test_released_bremslib_tracks_seltzer_berger(Z):
         ratio = result.chi_ratio[gated]
         assert np.all(np.abs(ratio - 1.0) <= 0.13), (result.incident_energy_MeV, ratio)
         assert abs(result.first_moment_ratio - 1.0) <= 0.06
+
+
+@pytest.mark.parametrize("Z", [6, 74])
+def test_extended_bremslib_first_moment_tracks_seltzer_berger_at_100_mev(Z):
+    """#439 extension rows: the first moment keeps the 30 MeV bound (1 +/- 0.06).
+
+    Pointwise ratios on the library columns are BremsLib data (pinned to the
+    library elsewhere) and the filled tip ``kappa > 0.95`` shifts the moment by
+    at most 0.24 %, so both are reported by ``checks/brem_source_comparison.py``,
+    not gated here.
+    """
+    from pyrite.xsgen._errors import TableNotFoundError
+    from pyrite.xsgen.bremslib import tables as bremslib_tables
+
+    element = _SYMBOL[Z]
+    try:
+        tables = bremslib_tables.load_bremsstrahlung_tables([element])
+    except TableNotFoundError as exc:
+        pytest.skip(f"released BremsLib tables are not installed: {exc}")
+    (result,) = compare_sources(
+        _excerpt_table(), [(element, Z)], (100.0,), models=("bremslib",), bremslib_tables=tables
+    )
+    assert abs(result.first_moment_ratio - 1.0) <= 0.06

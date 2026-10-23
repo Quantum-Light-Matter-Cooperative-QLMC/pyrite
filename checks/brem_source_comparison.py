@@ -21,6 +21,13 @@ electron-electron term was added the lower bounds were ``1/(1 + 1/Z)`` minus
 0.05 and 0.03. ``kappa < 0.05`` and the tip ``kappa > 0.95`` (resolved
 differently by the two grids) are reported, not gated.
 
+The 30--100 MeV extension rows (claim ``bremslib-high-energy-extension``,
+#439) gate only the first moment, within the same ``1 +/- 0.06``. Their
+pointwise ratios on the library columns ``kappa <= 0.95`` are BremsLib data,
+pinned to the library by the extension tests, and are reported; the filled
+tip ``kappa > 0.95`` (PyRITE's held-ratio rule, 2--3.5 % of the moment, moving
+it by at most 0.24 %) is reported separately.
+
 EEDL is reported, not gated: its fixed-photon-energy interpolation between
 decade-spaced incident panels is a known defect (#174). Its values at the
 EEDL panel nodes are listed separately as the data-versus-interpolation split.
@@ -54,6 +61,7 @@ from pyrite.xsgen.bremslib import release
 from pyrite.xsgen.bremslib import tables as bremslib_tables
 
 T_MIN_MEV, T_MAX_MEV, KAPPA_MIN, KAPPA_MAX = 0.01, 30.0, 0.05, 0.95
+EXTENSION_MAX_MEV = 100.0
 POINTWISE_TOLERANCE, MOMENT_TOLERANCE = 0.13, 0.06
 
 
@@ -105,7 +113,9 @@ def main(argv=None) -> int:
     except TableNotFoundError as exc:
         print(f"SKIP: released BremsLib tables are not installed: {exc}")
         return 2
-    energies = [float(t) for t in table.incident_energy_MeV if 0.001 <= t <= T_MAX_MEV * (1 + 1e-9)]
+    energies = [
+        float(t) for t in table.incident_energy_MeV if 0.001 <= t <= EXTENSION_MAX_MEV * (1 + 1e-9)
+    ]
     results = compare_sources(table, elements, energies, bremslib_tables=tables)
 
     failures = []
@@ -122,11 +132,23 @@ def main(argv=None) -> int:
             )
             if model != "bremslib" or r.incident_energy_MeV < T_MIN_MEV * (1 - 1e-9):
                 continue
-            if np.any(np.abs(ratio - 1.0) > POINTWISE_TOLERANCE):
+            extension = r.incident_energy_MeV > T_MAX_MEV * (1 + 1e-9)
+            if not extension and np.any(np.abs(ratio - 1.0) > POINTWISE_TOLERANCE):
                 failures.append((r.element, r.incident_energy_MeV, "chi", ratio.min(), ratio.max()))
             moment = r.first_moment_ratio
             if abs(moment - 1.0) > MOMENT_TOLERANCE:
                 failures.append((r.element, r.incident_energy_MeV, "moment", moment, moment))
+
+    tip = table.kappa > KAPPA_MAX
+    print(
+        f"\n== bremslib extension (> {T_MAX_MEV:g} MeV, reported): tip chi ratio, kappa > {KAPPA_MAX}"
+    )
+    for r in results:
+        if r.model == "bremslib" and r.incident_energy_MeV > T_MAX_MEV * (1 + 1e-9):
+            ratio = r.chi_ratio[tip]
+            print(
+                f"{r.element:>3} {r.incident_energy_MeV:8.3f} {ratio.min():7.3f} {ratio.max():7.3f}"
+            )
 
     panel_rows = _eedl_panel_moments(table, elements)
     panel = np.array([row["moment_ratio"] for row in panel_rows])
@@ -144,6 +166,7 @@ def main(argv=None) -> int:
                 "pointwise_tolerance": POINTWISE_TOLERANCE,
                 "moment_tolerance": MOMENT_TOLERANCE,
             },
+            "moment_gated_extension_T_MeV": [T_MAX_MEV, EXTENSION_MAX_MEV],
             "comparisons": [
                 {
                     "model": r.model,
