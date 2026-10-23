@@ -287,3 +287,42 @@ def test_coupled_total_stopping_matches_estar_to_100_mev(material):
         estar_collision, _, estar_total = estar[energy_MeV]
         np.testing.assert_allclose(collision, estar_collision, rtol=0.02)
         np.testing.assert_allclose(collision + radiative, estar_total, rtol=0.05)
+
+
+@pytest.mark.parametrize("material", ["silicon", "tungsten"])
+def test_coupled_csda_range_matches_estar_to_100_mev(material):
+    # Issue #439: CSDA range from SBETHE collision plus coupled BremsLib
+    # radiative stopping, integrated from 10 keV (ESTAR's own 10 keV range is
+    # added for its zero lower limit). Measured 2026-10-22: Si 0.989-0.996,
+    # W 0.978-0.992 of ESTAR from 1 to 100 MeV, short by the radiative excess.
+    from pyrite.materials._transport_data import TRANSPORT_ELEMENTS
+    from pyrite.materials.attenuation import plasma_energy_eV
+    from pyrite.montecarlo.transport.shell_rates import adopted_stopping_cs
+    from pyrite.xsgen._errors import TableNotFoundError
+
+    element = {"silicon": "Si", "tungsten": "W"}[material]
+    table = _released_table(element)
+    plasma = plasma_energy_eV(material)
+    grams_per_atom = TRANSPORT_ELEMENTS[element]["A"] / 6.02214076e23
+    energy = np.geomspace(1.0e4, 1.0e8, 401)
+    try:
+        collision = np.array([adopted_stopping_cs(material, e) for e in energy])
+    except TableNotFoundError as exc:
+        pytest.skip(f"released SBETHE tables are not installed: {exc}")
+    radiative = np.array(
+        [
+            build_radiative_partition(table, e, e, plasma_energy_eV=plasma).total_stopping_cs_eV_cm2
+            for e in energy
+        ]
+    )
+    inverse = grams_per_atom / (collision + radiative)  # g/cm^2 per eV
+    range_g_cm2 = np.r_[0.0, np.cumsum(0.5 * (inverse[1:] + inverse[:-1]) * np.diff(energy))]
+    rows = np.loadtxt(_ESTAR_DIR / f"{material}.txt", skiprows=8)
+    assert (
+        hashlib.sha256((_ESTAR_DIR / f"{material}.txt").read_bytes()).hexdigest()
+        == (_ESTAR_SHA256[material])
+    )
+    estar_range = dict(zip(np.round(rows[:, 0], 6), rows[:, 4], strict=True))
+    for energy_MeV in (1.0, 3.0, 10.0, 30.0, 50.0, 100.0):
+        ours = np.interp(np.log(energy_MeV * 1e6), np.log(energy), range_g_cm2) + estar_range[0.01]
+        assert ours / estar_range[energy_MeV] == pytest.approx(1.0, abs=0.03), energy_MeV

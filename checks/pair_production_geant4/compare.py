@@ -43,25 +43,51 @@ HERE = Path(__file__).resolve().parent
 REFERENCE = HERE / "reference"
 MC2_EV = 510998.95
 #: case -> (Z, photon energy [eV]); materials as in make_macros.py.
-CASES = {"c_2mev": (6, 2.0e6), "c_5mev": (6, 5.0e6), "pb_2mev": (82, 2.0e6), "pb_5mev": (82, 5.0e6)}
+CASES = {
+    "c_2mev": (6, 2.0e6),
+    "c_5mev": (6, 5.0e6),
+    "pb_2mev": (82, 2.0e6),
+    "pb_5mev": (82, 5.0e6),
+    "c_30mev": (6, 30.0e6),
+    "c_100mev": (6, 100.0e6),
+    "pb_30mev": (82, 30.0e6),
+    "pb_100mev": (82, 100.0e6),
+}
 PHYSICS = ("empenelope", "emstandard_opt0", "emstandard_opt4")
 X_EDGES = np.linspace(0.0, 1.0, 41)
 COS_EDGES = np.linspace(-1.0, 1.0, 81)
+# log10(1 - cos theta): resolves the ~mc^2/E opening angles of MeV pairs, which
+# fall into the last COS_EDGES bin above ~10 MeV (issue #439).
+LOG_EDGES = np.linspace(-10.0, np.log10(2.0), 81)
+OBSERVABLES = ("x", "cos_minus", "cos_plus", "log_minus", "log_plus")
 
 
-def _observables(x, cos_minus, cos_plus):
+def _one_minus_cos(a, b):
+    """``1 - a.b`` for unit vectors without cancellation: ``|a x b|^2 / (1 + a.b)``."""
+    a, b = np.asarray(a, float), np.asarray(b, float)
+    cross = np.cross(a, b)
+    dot = np.sum(a * b, axis=-1)
+    return np.where(dot > 0.0, np.sum(cross * cross, axis=-1) / (1.0 + dot), 1.0 - dot)
+
+
+def _observables(x, w_minus, w_plus):
+    """Histograms from the energy share and both ``1 - cos theta``."""
     return {
         "x": np.histogram(x, X_EDGES)[0],
-        "cos_minus": np.histogram(cos_minus, COS_EDGES)[0],
-        "cos_plus": np.histogram(cos_plus, COS_EDGES)[0],
+        "cos_minus": np.histogram(1.0 - w_minus, COS_EDGES)[0],
+        "cos_plus": np.histogram(1.0 - w_plus, COS_EDGES)[0],
+        "log_minus": np.histogram(np.log10(w_minus), LOG_EDGES)[0],
+        "log_plus": np.histogram(np.log10(w_plus), LOG_EDGES)[0],
     }
 
 
-def _moments(x, cos_minus, cos_plus):
+def _moments(x, w_minus, w_plus):
     return {
         "mean_x": float(np.mean(x)),
-        "mean_cos_minus": float(np.mean(cos_minus)),
-        "mean_cos_plus": float(np.mean(cos_plus)),
+        "mean_cos_minus": float(np.mean(1.0 - w_minus)),
+        "mean_cos_plus": float(np.mean(1.0 - w_plus)),
+        "mean_log_minus": float(np.mean(np.log10(w_minus))),
+        "mean_log_plus": float(np.mean(np.log10(w_plus))),
     }
 
 
@@ -71,7 +97,10 @@ def reduce(raw_dir: Path) -> None:
     for case, (Z, energy) in CASES.items():
         for physics in PHYSICS:
             path = raw_dir / f"{case}_{physics}.txt.gz"
-            xs, cm, cp = [], [], []
+            if not path.exists():
+                print(f"{path.name}: missing, skipped")
+                continue
+            xs, wm, wp, recoil = [], [], [], []
             n_lines = n_full = n_triplet = 0
             with gzip.open(path, "rt") as handle:
                 for line in handle:
@@ -89,14 +118,17 @@ def reduce(raw_dir: Path) -> None:
                     ]
                     if len(secondaries) != 2:
                         n_triplet += 1
+                        electrons = sorted(float(s[1]) for s in secondaries if int(s[0]) == 11)
+                        if len(electrons) == 2:
+                            recoil.append(electrons[0] / k)
                         continue
                     by_pdg = {int(s[0]): s for s in secondaries}
                     electron, positron = by_pdg[11], by_pdg[-11]
                     e_minus = float(electron[1])
                     xs.append(e_minus / (k - 2.0 * MC2_EV))
-                    cm.append(float(np.dot(photon, [float(v) for v in electron[2:5]])))
-                    cp.append(float(np.dot(photon, [float(v) for v in positron[2:5]])))
-            x, cos_minus, cos_plus = map(np.asarray, (xs, cm, cp))
+                    wm.append(_one_minus_cos(photon, [float(v) for v in electron[2:5]]))
+                    wp.append(_one_minus_cos(photon, [float(v) for v in positron[2:5]]))
+            x, w_minus, w_plus = map(np.asarray, (xs, wm, wp))
             record = {
                 "case": case,
                 "physics": physics,
@@ -105,11 +137,15 @@ def reduce(raw_dir: Path) -> None:
                 "conversions": n_lines,
                 "full_energy_conversions": n_full,
                 "triplet_events": n_triplet,
+                # Mean share of k taken by the lower-energy electron of a triplet,
+                # the recoil electron PyRITE does not create.
+                "triplet_recoil_fraction_mean": float(np.mean(recoil)) if recoil else None,
                 "pairs": int(x.size),
-                **_moments(x, cos_minus, cos_plus),
+                **_moments(x, w_minus, w_plus),
                 "x_edges": X_EDGES.tolist(),
                 "cos_edges": COS_EDGES.tolist(),
-                **{k: v.tolist() for k, v in _observables(x, cos_minus, cos_plus).items()},
+                "log_edges": LOG_EDGES.tolist(),
+                **{k: v.tolist() for k, v in _observables(x, w_minus, w_plus).items()},
             }
             out = REFERENCE / f"{case}_{physics}.json"
             out.write_text(json.dumps(record, indent=1) + "\n")
@@ -146,23 +182,27 @@ def _pyrite_samples(Z, energy, n, seed):
 
     rng = np.random.default_rng(seed)
     photon = np.array([1.0, 0.0, 0.0])
-    x, cm, cp = np.empty(n), np.empty(n), np.empty(n)
+    x, wm, wp = np.empty(n), np.empty(n), np.empty(n)
     for i in range(n):
         pair = sample_pair(energy, Z, photon, rng)
         x[i] = pair.electron_eV / (energy - 2.0 * MC2_EV)
-        cm[i] = pair.electron_direction[0]
-        cp[i] = pair.positron_direction[0]
-    return x, cm, cp
+        wm[i] = _one_minus_cos(photon, pair.electron_direction)
+        wp[i] = _one_minus_cos(photon, pair.positron_direction)
+    return x, wm, wp
 
 
 def compare(samples: int, output: str | None) -> int:
     report, failed = [], False
     for index, (case, (Z, energy)) in enumerate(CASES.items()):
-        x, cm, cp = _pyrite_samples(Z, energy, samples, seed=27_500 + index)
-        ours = _observables(x, cm, cp)
-        moments = _moments(x, cm, cp)
+        x, wm, wp = _pyrite_samples(Z, energy, samples, seed=27_500 + index)
+        ours = _observables(x, wm, wp)
+        moments = _moments(x, wm, wp)
         for physics in PHYSICS:
-            ref = json.loads((REFERENCE / f"{case}_{physics}.json").read_text())
+            ref_path = REFERENCE / f"{case}_{physics}.json"
+            if not ref_path.exists():
+                print(f"{case:9s} {physics:16s} no reference, skipped", flush=True)
+                continue
+            ref = json.loads(ref_path.read_text())
             row = {
                 "case": case,
                 "physics": physics,
@@ -170,7 +210,7 @@ def compare(samples: int, output: str | None) -> int:
                 "triplet_fraction_geant4": ref["triplet_events"]
                 / max(ref["full_energy_conversions"], 1),
             }
-            for name in ("x", "cos_minus", "cos_plus"):
+            for name in OBSERVABLES:
                 chi2, dof, p = _two_sample_chi2(ours[name], ref[name])
                 row[name] = {
                     "chi2_per_dof": chi2 / dof,
@@ -181,7 +221,7 @@ def compare(samples: int, output: str | None) -> int:
                 }
             gated = physics == "empenelope"
             row["gated"] = gated
-            row["pass"] = all(row[n]["p"] > 1e-3 for n in ("x", "cos_minus", "cos_plus"))
+            row["pass"] = all(row[n]["p"] > 1e-3 for n in OBSERVABLES)
             failed |= gated and not row["pass"]
             report.append(row)
             print(
@@ -190,7 +230,7 @@ def compare(samples: int, output: str | None) -> int:
                     f"{n}: chi2/dof {row[n]['chi2_per_dof']:.2f} p {row[n]['p']:.3g} "
                     f"D {row[n]['ks_distance']:.3f} <> {row[n]['mean_pyrite']:.4f}/"
                     f"{row[n]['mean_geant4']:.4f}"
-                    for n in ("x", "cos_minus", "cos_plus")
+                    for n in OBSERVABLES
                 )
                 + (
                     f"  triplet {row['triplet_fraction_geant4']:.4f}"

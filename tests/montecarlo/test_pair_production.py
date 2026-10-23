@@ -46,9 +46,20 @@ def test_bethe_heitler_total_tracks_epdl_nuclear_pair(Z):
 
     PENELOPE-2024 states the residual is appreciable near threshold, 4 % at
     3 MeV and 2 % above 6 MeV; EPDL2025 is an independent evaluation of the
-    same Hubbell et al. totals.
+    same Hubbell et al. totals. Issue #439 extends this to 100 MeV, where the
+    measured residual is at most 1.1 % (C, 2026-10-22).
     """
-    for E_MeV, tolerance in ((1.5, 0.13), (2.0, 0.07), (3.0, 0.045), (5.0, 0.04), (10.0, 0.02)):
+    for E_MeV, tolerance in (
+        (1.5, 0.13),
+        (2.0, 0.07),
+        (3.0, 0.045),
+        (5.0, 0.04),
+        (10.0, 0.02),
+        (20.0, 0.02),
+        (30.0, 0.02),
+        (50.0, 0.02),
+        (100.0, 0.02),
+    ):
         E = E_MeV * 1e6
         sigma_barn = RE2_BARN * ALPHA * Z * Z * 1.0093 * (2.0 / 3.0) * _density_integral(E, Z)
         epdl_barn = photon_cross_sections_ang2(SYMBOL[Z], E)["pair_nuclear"] * 1e8
@@ -70,7 +81,9 @@ def test_reduced_energy_density_is_symmetric_and_bounded():
         pair_reduced_energy_density(0.5, E, 100)
 
 
-@pytest.mark.parametrize(("E_MeV", "Z"), [(1.1, 82), (1.5, 6), (3.0, 82), (10.0, 6), (10.0, 82)])
+@pytest.mark.parametrize(
+    ("E_MeV", "Z"), [(1.1, 82), (1.5, 6), (3.0, 82), (10.0, 6), (10.0, 82), (100.0, 6), (100.0, 82)]
+)
 def test_sampled_reduced_energy_matches_eq_2_90(E_MeV, Z):
     """Chi-square of 20 000 composition/rejection draws in 20 equal-mass bins."""
     E = E_MeV * 1e6
@@ -132,7 +145,7 @@ def test_sampled_pair_angles_match_leading_term_per_particle(Z):
     e1 = np.array([1.0, 0.0, 0.0]) - 0.36 * photon
     e1 /= np.linalg.norm(e1)
     e2 = np.cross(photon, e1)
-    for k in (1.5e6, 4.0e6, 10.0e6):
+    for k in (1.5e6, 4.0e6, 10.0e6, 100.0e6):
         pit, azimuth = [], []
         for _ in range(3_000):
             pair = sample_pair(k, Z, photon, rng)
@@ -168,11 +181,17 @@ def _merged_two_sample_chi2(a, b):
     return stats.chi2_contingency(np.array(merged).T, correction=False).pvalue
 
 
-@pytest.mark.parametrize("case", ["c_2mev", "c_5mev", "pb_2mev", "pb_5mev"])
+@pytest.mark.parametrize(
+    "case",
+    ["c_2mev", "c_5mev", "pb_2mev", "pb_5mev", "c_30mev", "c_100mev", "pb_30mev", "pb_100mev"],
+)
 def test_sample_pair_matches_geant4_penelope_reference(case):
-    """Regression anchor: binned ``x = E_-/(k - 2mc^2)`` and both polar cosines
-    against Geant4 11.4.2 ``G4PenelopeGammaConversionModel`` (TestEm5, see
-    ``checks/pair_production_geant4``), the same PENELOPE section 2.4 model."""
+    """Regression anchor: binned ``x = E_-/(k - 2mc^2)``, both polar cosines and
+    both ``log10(1 - cos theta)`` against Geant4 11.4.2
+    ``G4PenelopeGammaConversionModel`` (TestEm5, see
+    ``checks/pair_production_geant4``), the same PENELOPE section 2.4 model.
+    The logarithmic angle resolves the ~mc^2/E opening angles at 30-100 MeV
+    (#439), where every cosine falls in the last bin."""
     import json
 
     ref = json.loads((GEANT4_REFERENCE / f"{case}_empenelope.json").read_text())
@@ -180,16 +199,19 @@ def test_sample_pair_matches_geant4_penelope_reference(case):
     rng = np.random.default_rng(27_500 + Z + int(k // 1e6))
     photon = np.array([1.0, 0.0, 0.0])
     n = 8_000
-    x, cos_minus, cos_plus = np.empty(n), np.empty(n), np.empty(n)
+    x, w_minus, w_plus = np.empty(n), np.empty(n), np.empty(n)
     for i in range(n):
         pair = sample_pair(k, Z, photon, rng)
         x[i] = pair.electron_eV / (k - PAIR_THRESHOLD_EV)
-        cos_minus[i] = pair.electron_direction[0]
-        cos_plus[i] = pair.positron_direction[0]
+        # 1 - cos about +x without cancellation: (u_y^2 + u_z^2) / (1 + u_x).
+        for out, u in ((w_minus, pair.electron_direction), (w_plus, pair.positron_direction)):
+            out[i] = (u[1] ** 2 + u[2] ** 2) / (1.0 + u[0]) if u[0] > 0.0 else 1.0 - u[0]
     for name, values, edges in (
         ("x", x, ref["x_edges"]),
-        ("cos_minus", cos_minus, ref["cos_edges"]),
-        ("cos_plus", cos_plus, ref["cos_edges"]),
+        ("cos_minus", 1.0 - w_minus, ref["cos_edges"]),
+        ("cos_plus", 1.0 - w_plus, ref["cos_edges"]),
+        ("log_minus", np.log10(w_minus), ref["log_edges"]),
+        ("log_plus", np.log10(w_plus), ref["log_edges"]),
     ):
         ours, _ = np.histogram(values, edges)
         assert _merged_two_sample_chi2(ours, ref[name]) > 1e-3, name

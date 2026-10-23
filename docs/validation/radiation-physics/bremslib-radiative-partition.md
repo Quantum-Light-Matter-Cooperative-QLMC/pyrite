@@ -126,7 +126,9 @@ from comparing BremsLib plus SB85 electron–electron against ESTAR's own tables
 which is inside Seltzer and Berger's quoted 3–10 % uncertainty. So the
 maintainer decision (2026-10-22) gates each part separately: collision within
 2 %, radiative within 0.97–1.06, and total within 5 %. The original 2 % total
-target fails for W above 30 MeV and is not claimed. Both tests are in
+target fails for W above 30 MeV and is not claimed. The CSDA range, integrated from 10 keV over SBETHE collision plus coupled
+radiative stopping with ESTAR's 10 keV range added, is 0.989–0.996 of ESTAR
+for Si and 0.978–0.992 for W from 1 to 100 MeV. It is pinned within 3 %. Both tests are in
 `tests/montecarlo/test_hard_radiative.py`. This section is a moment and
 stopping-power anchor only, not a full-track benchmark.
 

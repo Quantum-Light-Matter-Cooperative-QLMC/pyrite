@@ -5,7 +5,7 @@
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=4G
 #SBATCH --time=02:00:00
-#SBATCH --array=1-12
+#SBATCH --array=1-24
 #SBATCH --output=/home/aamador/.local/opt/pyrite-issue-275/results/%x_%a.log
 set -euo pipefail
 ROOT=/home/aamador/.local/opt/pyrite-issue-275

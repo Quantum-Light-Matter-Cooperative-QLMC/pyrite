@@ -1,10 +1,15 @@
-"""TestEm5 macros: mono-energetic photon pencil beams on thick C and Pb (issue #275)."""
+"""TestEm5 macros: mono-energetic photon pencil beams on thick C and Pb (issues #275, #439)."""
 
 CASES = {  # name: (material, thickness, energy MeV, events)
     "c_2mev": ("Graphite", "30 cm", 2.0, 6_000_000),
     "c_5mev": ("Graphite", "30 cm", 5.0, 1_000_000),
     "pb_2mev": ("Lead", "3 cm", 2.0, 1_000_000),
     "pb_5mev": ("Lead", "3 cm", 5.0, 500_000),
+    # Issue #439: 30-100 MeV, where the opening angle is ~mc^2/E.
+    "c_30mev": ("Graphite", "30 cm", 30.0, 500_000),
+    "c_100mev": ("Graphite", "30 cm", 100.0, 500_000),
+    "pb_30mev": ("Lead", "3 cm", 30.0, 250_000),
+    "pb_100mev": ("Lead", "3 cm", 100.0, 250_000),
 }
 PHYSICS = ("empenelope", "emstandard_opt0", "emstandard_opt4")
 for i, (name, (material, thickness, energy, events)) in enumerate(CASES.items()):
