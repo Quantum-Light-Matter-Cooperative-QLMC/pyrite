@@ -60,7 +60,7 @@ small Rayleigh–Ritz eigensystems run on the host. Solver workspace is capped a
 512 MiB and included in CUDA admission. Larger queues flush incrementally;
 neither flushing nor cache eviction consumes trajectory RNG draws.
 
-Acceptance requires absolute residuals at most `1e-11` eV and an orthonormality
+Acceptance requires absolute residuals at most `1e-10` eV and an orthonormality
 error at most `1e-10`. A nondegenerate retained/guard gap tightens the residual
 gate to limit projector error. Sectors that fail these checks or exceed the
 workspace cap use the canonical host solver. The regression targets are

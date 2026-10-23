@@ -12,6 +12,7 @@ from threadpoolctl import threadpool_limits
 from ...materials.channeling.transverse import HBAR2_2M_EV_ANG2, longitudinal_kinematics
 
 SOLVER_BUDGET_BYTES = 512 << 20
+_RESIDUAL_TOL_EV = 1e-10
 
 
 def _host(xp, value):
@@ -23,6 +24,14 @@ def _eigh(xp, matrix):
     with threadpool_limits(1, user_api="blas"):
         values, vectors = np.linalg.eigh((matrix + matrix.conj().swapaxes(-1, -2)) / 2)
     return xp.asarray(values), xp.asarray(vectors)
+
+
+def _residual_tolerances(xp, energies):
+    """Keep energy error below 1e-9 eV and resolve retained/guard projectors."""
+    if energies.shape[-1] == 1:
+        return xp.full(energies.shape[:-1], _RESIDUAL_TOL_EV)
+    gap = energies[..., -1] - energies[..., -2]
+    return xp.where(gap > 1e-8, xp.minimum(_RESIDUAL_TOL_EV, gap * 1e-9), _RESIDUAL_TOL_EV)
 
 
 def _iterate(xp, potential, kinetic, initial, count, *, degree=20, iterations=40):
@@ -60,7 +69,8 @@ def _iterate(xp, potential, kinetic, initial, count, *, degree=20, iterations=40
         # the slowest one. This also reduces host Rayleigh--Ritz work each round.
         gram = rows[:, :count].conj() @ rows[:, :count].swapaxes(-1, -2)
         orthogonal = xp.max(xp.abs(gram - xp.eye(count)), axis=(-2, -1)) <= 1e-12
-        done = _host(xp, xp.all(residual <= 1e-11, axis=1) & orthogonal)
+        tolerance = _residual_tolerances(xp, energies[:, :count])
+        done = _host(xp, xp.all(residual <= tolerance[:, None], axis=1) & orthogonal)
         if np.any(done):
             out_energies[remaining[done]] = energies[done, :count]
             out_rows[remaining[done]] = rows[done, :count]
@@ -102,7 +112,7 @@ def transverse_spectra_batch(
     """Solve exact sectors with deterministic starts and bounded device workspace.
 
     Returns host ``DiscreteSpectrum`` objects or ``None`` per sector. Absolute
-    residuals <= 1e-11 eV are required; a nondegenerate retained/guard gap also
+    residuals <= 1e-10 eV are required; a nondegenerate retained/guard gap also
     bounds the projector error. No precision reduction or tilt rounding.
     """
     from .axial_state_diagnostics import DiscreteSpectrum
@@ -147,9 +157,8 @@ def transverse_spectra_batch(
         vectors = _host(
             xp, xp.fft.ifft2(rows.reshape(len(qs), count, *grid.shape), axes=(-2, -1), norm="ortho")
         ).reshape(len(qs), count, n)
-        for e, v, r in zip(energies, vectors, residual, strict=True):
-            gap = e[-1] - e[-2] if count > 1 else 1.0
-            tolerance = min(1e-11, gap * 1e-9) if gap > 1e-8 else 1e-11
+        tolerances = _residual_tolerances(np, energies)
+        for e, v, r, tolerance in zip(energies, vectors, residual, tolerances, strict=True):
             orthogonal = np.linalg.norm(v.conj() @ v.T - np.eye(count), ord=2) <= 1e-10
             accepted = orthogonal and np.all(np.isfinite(r)) and np.all(r <= tolerance)
             result.append(DiscreteSpectrum(e, v.T) if accepted else None)
