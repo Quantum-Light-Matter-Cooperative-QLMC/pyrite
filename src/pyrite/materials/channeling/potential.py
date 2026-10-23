@@ -120,11 +120,15 @@ class PlanarProfile:
         """Return ``(min U, max U)`` [eV] over one period.
 
         The difference is the planar well depth; the maximum is the barrier
-        that separates bound from free transverse states.
+        that separates bound from free transverse states. Cached per profile
+        and ``n_grid``: eigensolves call this once per Bloch ``k``.
         """
-        x = np.linspace(0.0, self.period_ang, n_grid, endpoint=False)
-        u = self.potential(x)
-        return float(u.min()), float(u.max())
+        cache = self.__dict__.setdefault("_extrema", {})
+        if n_grid not in cache:
+            x = np.linspace(0.0, self.period_ang, n_grid, endpoint=False)
+            u = self.potential(x)
+            cache[n_grid] = (float(u.min()), float(u.max()))
+        return cache[n_grid]
 
 
 def _synthesize(coefficients: np.ndarray, g: float, x_ang):
