@@ -31,7 +31,6 @@ if TYPE_CHECKING:
     from .montecarlo.transport.photon_event_sources import PrimaryRelaxationSources
 
 
-
 MODEL = EVENT_MODEL
 
 

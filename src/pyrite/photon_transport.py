@@ -40,7 +40,6 @@ if TYPE_CHECKING:
     from .montecarlo.runner.photon_emission import PhotonContinuumScore
 
 
-
 @dataclass(frozen=True, slots=True)
 class PhotonContinuumObservation:
     """A reference aperture tally with separate source and observation identity.
