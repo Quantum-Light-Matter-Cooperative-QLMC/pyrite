@@ -145,6 +145,9 @@ Fills BremsLib's 30--100 MeV extension rows at staging (#439): `extend_above_com
 ### `_planar_geometry.py`
 Planar pose and point-source ray geometry: `PlanarPose`, `PixelGrid`, `PixelRays`, `solid_angle_sr`, and `planar_rays(pose, pixels=, size_mm=)`. A leaf below `montecarlo`, `detectors`, and `instrument`: `montecarlo.geometry` tiles a detector face and `detectors.eaglexo_response` takes its solid angle without importing the instrument model. `instrument` and `instrument.geometry` re-export the public names; `instrument.geometry.planar_detector_rays` delegates to `planar_rays`. Ledger `positioned-filter-attenuation`. Deps: none (leaf; NumPy only).
 
+### `_optical_coherency.py`
+`OpticalSpectralCoherency`: Hermitian PSD 2x2 photon-density Jones matrix per energy node, photons/(eV pulse) (#617). A leaf below `montecarlo` and `detectors`: `montecarlo.spectrum.optical_interferometer_handoff` builds it from finite PEC screen fields and `detectors.optical_interferometer` (which re-exports it) consumes it. Ledger `optical-instrument-observable`. Deps: none (leaf; NumPy only).
+
 ### `datasets.py`
 Hash-pinned upstream datasets (ADR-0014 class b): the EPICS2025 EEDL and EADL files and the PyRITE-derived EPDL photon table. Pins (ordered URLs: upstream then PyRITE's release mirror; SHA-256, and EEDL's declared final-CRLF transformation of the published bytes), install path `<data root>/datasets/<name>/<file>` (data root from `console.config.fetched_data_root`, shared with xsgen tables), `require_dataset`/`verify_dataset`, `fetch_dataset`, and the SBETHE `PDATCONF_SHA256` pin read by `montecarlo.shell_configuration` and `xsgen.verify` behind `pyrite tables fetch eedl|eadl|epdl`. Read by `montecarlo.eedl_ionization` and `montecarlo.eadl_relaxation`, verified by `xsgen.verify`, shipped by `remote.transport` sync. Deps: `console.config`, `xsgen` (fetch only, lazy).
 
