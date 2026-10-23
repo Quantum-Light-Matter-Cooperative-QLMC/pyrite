@@ -109,7 +109,7 @@ class DirectionalValence:
         Strengths averaged over the sphere of ``q`` directions (uniform in
         ``cos alpha``), the isotropic part used for close collisions.
     closure
-        Per node, the raw ``(2 / pi Omega^2) int w ELF dw / N`` before renormalization.
+        Per node, the raw ``(2 / pi Omega^2) int w ELF dw = sum f / N`` before renormalization.
     static_sum
         Per node, ``(2/pi) int ELF/w dw`` of the data plus tail, against
         ``static_target`` from ``eps1(0)`` (``nan`` without an anchor).

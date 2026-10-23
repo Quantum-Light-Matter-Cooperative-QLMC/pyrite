@@ -130,6 +130,7 @@ channeling/cr-axial-helicity-emission
 channeling/cr-dipole-far-field-amplitude
 channeling/cr-quantum-ensemble-metrics
 channeling/cr-mcwf-regression-estimator
+channeling/cr-valence-directional-loss
 ```
 
 ```{toctree}
