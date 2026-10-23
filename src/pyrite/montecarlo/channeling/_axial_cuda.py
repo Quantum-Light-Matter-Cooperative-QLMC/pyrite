@@ -9,6 +9,8 @@ Validation: cr-axial-realspace-dissipator
 
 from __future__ import annotations
 
+from functools import cache
+
 import numpy as np
 
 from ..._backend import BackendResourceError, select_backend
@@ -24,6 +26,30 @@ from .axial_mcwf import (
 
 # Limit speculative storage and wasted FFTs when a threshold crosses mid-block.
 _CHECK_STEPS = 8
+
+
+@cache
+def _step_kernels(cp):
+    """Per-step norm and threshold test as two launches instead of eight.
+
+    ``|z|`` then square, as ``cp.abs(z) ** 2``; only the summation order differs.
+    """
+    norm = cp.ReductionKernel(
+        "complex128 z, float64 area, float64 cells",
+        "float64 norm",
+        "abs(z) * abs(z)",
+        "a + b",
+        "norm = a * area / cells",
+        "0",
+        "pyrite_axial_norm",
+    )
+    crossed = cp.ElementwiseKernel(
+        "float64 norm, bool live, float64 threshold",
+        "bool crossed",
+        "crossed = live && norm <= threshold",
+        "pyrite_axial_crossed",
+    )
+    return norm, crossed
 
 
 def _callback_check(observable, hook):
@@ -147,6 +173,8 @@ def run_cuda(
     weights = cp.asarray([float(w) for w, _ in components])
     sampled = cp.asarray(np.stack([s for _, s in components]))
     phase = cp.exp(-1j * step_ang * cp.asarray(solver._complex_potential) / solver.hbar_v)
+    # The step's inverse FFT is unscaled; apply its 1/n here once, not per step.
+    phase /= phase.size
     base_tilt = (solver.momentum * tilt_rad[0], solver.momentum * tilt_rad[1])
     sums = [None] * len(steps)
     alive = np.zeros(len(steps))
@@ -245,22 +273,24 @@ class _Batch:
         # Large ensembles cross thresholds often; avoid replaying many large
         # FFTs for a rare opportunity to combine host checks.
         checks = min(_CHECK_STEPS, max(1, BATCH // len(self.live)))
+        norm_kernel, crossed_kernel = _step_kernels(cp)
+        cells = float(self.lagged[0].size)
         while self.step < target and self.live_count:
-            states, crossings, norms = [], [], []
-            for _ in range(min(checks, target - self.step)):
+            count = min(checks, target - self.step)
+            states, norms = [], []
+            crossings = cp.empty((count, len(self.live)), dtype=bool)
+            for j in range(count):
                 # Do not mutate snapshots: a jump rolls the whole batch back
                 # to its first crossing. Speculation consumes no RNG draws.
                 self.lagged = cp.fft.fft2(
-                    phase * cp.fft.ifft2(self.lagged * self.full, axes=(-2, -1)),
+                    phase * cp.fft.ifft2(self.lagged * self.full, axes=(-2, -1), norm="forward"),
                     axes=(-2, -1),
                 )
-                norm = (
-                    cp.sum(cp.abs(self.lagged) ** 2, axis=(1, 2)) * self.area / self.lagged[0].size
-                )
+                norm = norm_kernel(self.lagged, self.area, cells, axis=(1, 2))
                 states.append(self.lagged)
                 norms.append(norm)
-                crossings.append(self.live & (norm <= self.thresholds))
-            crossed = cp.asnumpy(cp.stack(crossings))
+                crossed_kernel(norm, self.live, self.thresholds, crossings[j])
+            crossed = cp.asnumpy(crossings)
             events = np.flatnonzero(crossed.any(axis=1))
             index = int(events[0]) if events.size else len(states) - 1
             self.lagged = states[index]

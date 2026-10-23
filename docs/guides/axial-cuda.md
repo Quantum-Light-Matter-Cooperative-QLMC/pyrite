@@ -68,6 +68,10 @@ Small CUDA batches check waiting-time thresholds in blocks of up to eight
 steps. If a threshold crosses inside a block, propagation resumes from the
 first crossing before any jump is drawn. Speculative steps consume no random
 numbers. The block shrinks for larger electron batches to limit replayed FFTs.
+Each step uses an unscaled inverse FFT with its `1/n` folded into the
+potential phase, and one fused kernel for the waiting-time norm. These change
+states and norms only at float64 roundoff: on the benchmark workloads jump
+counts are identical to the unfused path and densities agree within `1e-13`.
 
 ## Device callbacks
 

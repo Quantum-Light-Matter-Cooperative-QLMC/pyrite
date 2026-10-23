@@ -175,8 +175,16 @@ def test_zero_norm_ritz_vectors_cannot_pass_by_having_zero_residual(monkeypatch)
 def test_speculative_steps_restore_first_crossing_and_keep_event_order(monkeypatch):
     def run(check_steps):
         monkeypatch.setattr(_axial_cuda, "_CHECK_STEPS", check_steps)
+        monkeypatch.setattr(
+            _axial_cuda,
+            "_step_kernels",
+            lambda cp: (
+                lambda z, area, cells, axis: np.sum(np.abs(z) ** 2, axis=axis) * area / cells,
+                lambda norm, live, threshold, out: np.logical_and(live, norm <= threshold, out=out),
+            ),
+        )
         batch = object.__new__(_axial_cuda._Batch)
-        batch.cp = SimpleNamespace(**{k: getattr(np, k) for k in ("fft", "sum", "abs", "stack")})
+        batch.cp = SimpleNamespace(**{k: getattr(np, k) for k in ("fft", "sum", "abs", "empty")})
         batch.cp.asnumpy = np.asarray
         batch.step, batch.live_count, batch.area = 0, 2, 1.0
         batch.lagged = np.ones((2, 2, 2), complex)
@@ -191,7 +199,8 @@ def test_speculative_steps_restore_first_crossing_and_keep_event_order(monkeypat
             batch.thresholds[b] *= 0.7
 
         batch.jump = jump
-        batch.advance(25, 1, np.full((2, 2), 0.9), {}, [])
+        # run_cuda folds the unscaled inverse FFT's 1/n into the phase.
+        batch.advance(25, 1, np.full((2, 2), 0.9 / 4), {}, [])
         return events, batch.lagged
 
     expected, reference = run(1)
