@@ -21,9 +21,26 @@ def _host(xp, value):
 
 def _eigh(xp, matrix):
     matrix = _host(xp, matrix)
-    with threadpool_limits(1, user_api="blas"):
-        values, vectors = np.linalg.eigh((matrix + matrix.conj().swapaxes(-1, -2)) / 2)
+    values, vectors = np.linalg.eigh((matrix + matrix.conj().swapaxes(-1, -2)) / 2)
     return xp.asarray(values), xp.asarray(vectors)
+
+
+_CHEBYSHEV = None
+
+
+def _chebyshev(xp, vrows, rows, previous, t, center, scale, weight):
+    """Return ``(V rows + (T - center) rows) * scale - weight * previous`` in one pass."""
+    if xp is np:
+        return (vrows + (t - center) * rows) * scale - weight * previous
+    global _CHEBYSHEV
+    if _CHEBYSHEV is None:
+        _CHEBYSHEV = xp.ElementwiseKernel(
+            "complex128 v, complex128 x, complex128 p, float64 t, float64 c, float64 s, float64 w",
+            "complex128 y",
+            "y = (v + (t - c) * x) * s - w * p",
+            "pyrite_axial_chebyshev",
+        )
+    return _CHEBYSHEV(vrows, rows, previous, t, center, scale, weight)
 
 
 def _residual_tolerances(xp, energies):
@@ -42,10 +59,13 @@ def _iterate(xp, potential, kinetic, initial, count, *, degree=20, iterations=40
     t = kinetic.reshape(batch, 1, n)
     upper = (kinetic.reshape(batch, n).max(axis=1) + potential.max())[:, None, None]
 
+    def potential_rows(rows):
+        real = xp.fft.ifft2(rows.reshape(-1, block, *shape), axes=(-2, -1), norm="ortho")
+        real *= potential
+        return xp.fft.fft2(real, axes=(-2, -1), norm="ortho").reshape(-1, block, n)
+
     def apply(rows):
-        real = xp.fft.ifft2(rows.reshape(batch, block, *shape), axes=(-2, -1), norm="ortho")
-        transformed = xp.fft.fft2(real * potential, axes=(-2, -1), norm="ortho")
-        return transformed.reshape(batch, block, n) + t * rows
+        return potential_rows(rows) + t * rows
 
     def ritz(rows):
         s, u = _eigh(xp, rows.conj() @ rows.swapaxes(-1, -2))
@@ -92,9 +112,17 @@ def _iterate(xp, potential, kinetic, initial, count, *, degree=20, iterations=40
         filtered = (hrows - center * rows) * (sigma / radius)
         for _ in range(2, degree + 1):
             next_sigma = 1 / (tau - sigma)
-            next_rows = (apply(filtered) - center * filtered) * (2 * next_sigma / radius) - (
-                sigma * next_sigma
-            ) * previous
+            # Fused recursion: FFTs dominate, so avoid extra full-block passes.
+            next_rows = _chebyshev(
+                xp,
+                potential_rows(filtered),
+                filtered,
+                previous,
+                t,
+                center,
+                2 * next_sigma / radius,
+                sigma * next_sigma,
+            )
             previous, filtered, sigma = filtered, next_rows, next_sigma
         energies, rows, hrows = ritz(filtered)
     residual = xp.linalg.norm(
@@ -147,9 +175,11 @@ def transverse_spectra_batch(
             )
         )
         try:
-            energies, rows, residual = _iterate(
-                xp, potential, kinetic, xp.asarray(np.stack(initial)), count
-            )
+            # Enter the BLAS limit once: per-eigh entry rescans loaded libraries.
+            with threadpool_limits(1, user_api="blas"):
+                energies, rows, residual = _iterate(
+                    xp, potential, kinetic, xp.asarray(np.stack(initial)), count
+                )
         except np.linalg.LinAlgError:
             result.extend([None] * len(qs))
             continue
