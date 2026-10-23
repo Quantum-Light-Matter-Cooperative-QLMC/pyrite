@@ -1,8 +1,8 @@
 # Stopping power and the energy cutoff
 
-Between elastic collisions PyRITE removes energy continuously rather than sampling individual inelastic events. This is the condensed-history (continuous-slowing-down) approximation: discrete excitation and ionization losses are replaced by their mean rate $dE/ds$, evaluated along the flight{cite:p}`nistestar,akkerman1978`.
+PyRITE resolves an SBETHE mean collision-stopping rate $dE/ds${cite:p}`nistestar,akkerman1978`. The default [shell soft/hard mode](shell-soft-hard-transport.md), where every layer is covered, partitions it into continuous soft loss and sampled hard transfers. The continuous fallback instead replaces all excitation and ionization losses by that mean rate along each flight.
 
-The local scale-separation check is the fractional mean loss over an elastic free path, $|dE/ds|\lambda_{\rm el}/E$: when it is small, energy evolves slowly compared with the explicitly sampled directional changes. The inelastic and elastic mean free paths are distinct, material- and energy-dependent scales{cite:p}`akkerman1978,shinotsuka2015`. Optional straggling restores fluctuations around that mean without changing it.
+The local scale-separation check is the fractional mean loss over an elastic free path, $|dE/ds|\lambda_{\rm el}/E$: when it is small, energy evolves slowly compared with the explicitly sampled directional changes. The inelastic and elastic mean free paths are distinct, material- and energy-dependent scales{cite:p}`akkerman1978,shinotsuka2015`. Optional straggling fluctuates the soft share in shell mode, or the full collision loss in continuous mode, preserving the selected law's row-start mean. Finite-step integration and terminal selection can still change observable means.
 
 ## Current production model: SBETHE
 
@@ -77,7 +77,7 @@ where a study needs it.
 ## Assumptions and limits
 
 - Transport removes SBETHE **collision** stopping continuously, or splits it into soft loss and hard collisions in the default shell mode where it applies. When BremsLib tables are unavailable or uncoupled transport is selected, bremsstrahlung and characteristic radiation are scored from the electron histories and do not debit electron energy. The default [BremsLib soft/hard radiative mode](../radiation-physics/hard-bremsstrahlung-events.md) adds its separate soft loss and sampled hard-photon debits.
-- With `straggling=True`, Urban fluctuations are scaled to the SBETHE mean; the default is deterministic. See `Validation: energy-loss-straggling` and the [derivation and observable checks](../../validation/beam-transport/energy-loss-straggling.md).
+- `Physics(straggling=False)` leaves the soft debit deterministic; explicit shell hard transfers remain stochastic. With `straggling=True`, the shell mode samples its restricted soft variance, while the continuous fallback uses unrestricted Urban fluctuations scaled to the SBETHE mean. See [inelastic loss partitions](inelastic-scattering-events.md#role-and-type-of-straggling), `Validation: energy-loss-straggling`, and the [derivation and observable checks](../../validation/beam-transport/energy-loss-straggling.md).
 - The continuous model omits discrete knock-on electrons. The [shell soft/hard mode](shell-soft-hard-transport.md), the production default where shell data covers every layer, samples hard inelastic transfers and can launch secondaries above its threshold; it uses SBETHE to close the mean collision loss.
 - SBETHE includes shell and density-effect corrections above its material-dependent `ECUT`; below that it supplies an empirical extrapolation. PyRITE accepts its table only from 1 keV to 1 GeV and does not extrapolate outside those nodes.
 
