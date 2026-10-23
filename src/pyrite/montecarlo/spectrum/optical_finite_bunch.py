@@ -87,7 +87,10 @@ class FiniteScreenBunchAngular:
         The integral sums FFT angular cells with physical ``dOmega``. The
         all-forward-hemisphere limit (theta_max = pi/2) reproduces positive-z
         spectral radiation energy divided by E*e. Grid/acceptance convergence
-        must be demonstrated independently. No optics, detector efficiency or
+        must be demonstrated independently; near theta = pi/2 the FFT k-grid
+        under-resolves the light-circle 1/kz density and the sum varies by
+        several percent with the window (compare ``hemisphere_energy_per_eV``
+        for one compact source). No optics, detector efficiency or
         polarization acceptance is silently applied.
         """
         if (

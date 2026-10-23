@@ -110,8 +110,9 @@ print(reading.absorbed_joule_per_pulse, reading.expected_voltage_v)
   source and finite-distance Green operator are implemented as an independent
   bounded reference, with oblique straight-charge incidence and transport
   handoff. Real materials, general finite surfaces and exact edge currents
-  are not. Published numerical benchmark, Jones provenance/angle
-  constraints, window/mesh/spectral convergence and remote CPU/CUDA parity
+  are not. Measured passive Jones elements and a pitch/window convergence
+  diagnostic exist (sections below). Published numerical benchmark,
+  measured element data, spectral convergence and remote CPU/CUDA parity
   remain open.
 - **#617:** supply a real measured and provenance-pinned detector calibration,
   temporal/electronic response, collected-field-to-spectrum pipeline, polarized
@@ -885,3 +886,64 @@ unsupported calibration. These are **software and mathematical checks, not
 independent measured-data anchors**. The published experimental comparison,
 real CUDA reduction, broader spectral-band support, correlated uncertainty
 propagation and nonparametric phase retrieval remain open in #617.
+
+## Window-independent hemisphere energy and convergence (#616)
+
+The k-space normal-flux density of an outgoing angular spectrum is
+
+$$
+\frac{dU}{dE\,d^2k}\propto\frac{k_z}{k_0}\Bigl(|\widetilde E_x|^2+|\widetilde E_y|^2
++\frac{|k_x\widetilde E_x+k_y\widetilde E_y|^2}{k_z^2}\Bigr),
+$$
+
+whose longitudinal term diverges as $1/k_z$ on the light circle
+$k_x^2+k_y^2=k_0^2$. The singularity is integrable, but a Riemann sum on the
+periodic FFT grid (`spectral_energy_per_eV`, `collect_cone` near
+$\theta\to\pi/2$, and plane collection through FFT propagation) converges
+slowly and **non-monotonically** with the window: for a 2 µm disc at 1 eV,
+$\beta=0.95$, the FFT hemisphere total varies from 0.84 to 1.13 of the
+converged value between 6.4 µm and 51 µm windows, independent of pitch.
+
+`hemisphere_energy_per_eV` evaluates the same sampled source by a *direct*
+(non-periodic) Fourier sum at Gauss–Legendre nodes in $u=\cos\theta$ and
+uniform $\phi$. Because $d^2k=k_0^2\,u\,du\,d\phi$, the integrand is smooth;
+it is exactly window-independent for a compact source and agrees with the
+infinite-PEC Ginzburg–Frank hemisphere yield to $10^{-5}$ for a 5 µm disc
+(regression in `tests/montecarlo/test_optical_finite_screen.py`).
+
+`finite_screen_collection_convergence` (module `optical_finite_convergence`)
+halves the pitch at fixed window and doubles the window at fixed pitch,
+separately, and reports both relative changes plus `hemisphere_fft_bias`, the
+FFT-vs-quadrature hemisphere ratio of the base source. `converged` requires all
+three below `rtol`. It is a numerical diagnostic for one geometry and energy,
+not physics validation; plane-collection window error itself is not yet
+removed (a non-periodic Green-operator collection is the candidate remedy).
+
+## Measured passive optical elements (#616)
+
+`pyrite.detectors.optical_elements.CalibratedJonesElement` holds a *measured*
+2×2 Jones transfer $T(E)$ on a bounded calibration grid in the source's Jones
+basis, a calibrated maximum ray half-angle and provenance; its SHA-256
+response hash enters the output provenance. `apply_optical_elements` maps
+$J\to TJT^\dagger$ per energy, in beam order. Passivity (largest singular
+value ≤ 1) is enforced at every node and preserved by complex-linear
+interpolation (a convex combination of contractions is a contraction).
+There is no extrapolation, no inferred optical constants, no etalon or
+angle-resolved model, and the caller must state its collection half-angle.
+`from_intensity_transmission` encodes a polarization-independent
+$\sqrt{T(E)}\,\mathbb 1$ assumption. Tests: Malus law, lossless
+retarder composition (QWP+QWP = HWP), interpolation and refusals.
+
+## Shot-to-shot charge jitter in CTR templates (#617)
+
+With per-shot population $N$ of mean $\bar N$ and RMS $r\bar N$, the
+shot-averaged incoherent term keeps $\langle N\rangle=\bar N$ while the pair
+term becomes $\langle N(N-1)\rangle=\bar N^2(1+r^2)-\bar N$, i.e. the
+coherent envelope scales by $1+\bar N r^2/(\bar N-1)\to1+r^2$.
+`GaussianCTRTemplates.with_charge_jitter(mean_electrons=, charge_rms_fraction=)`
+applies exactly this, assuming charge is uncorrelated with bunch shape and the
+scan voltages are linear shot averages. Ignoring it biases the fitted duration
+(regression in `tests/detectors/test_optical_ctr_inference.py`). Common
+arrival-time jitter cancels in the interferogram; per-shot charge
+normalization and the extra voltage variance from jitter are not modeled.
+

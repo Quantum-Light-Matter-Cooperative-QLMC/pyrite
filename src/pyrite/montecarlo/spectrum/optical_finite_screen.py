@@ -36,6 +36,7 @@ __all__ = [
     "propagate_screen_field",
     "observe_screen_green",
     "spectral_energy_per_eV",
+    "hemisphere_energy_per_eV",
     "far_field_photons_per_eV_sr",
     "ginzburg_frank_photons_per_eV_sr",
     "backward_formation_length_ang",
@@ -369,10 +370,66 @@ def spectral_energy_per_eV(field: ScreenSpectralField) -> float:
     dU/domega = int(dA)|Etilde|^2/(pi*Z0), not the time-averaged V/m phasor
     expression. Includes vector longitudinal-field and obliquity factors;
     evanescent components do not transport net normal energy.
+
+    This is a Riemann sum on the periodic FFT k-grid. The k-space flux
+    density carries an integrable 1/kz singularity on the light circle (the
+    |Ez|² term), so the sum converges slowly and non-monotonically with the
+    FFT window (errors of several percent are typical even when pitch is
+    converged). For a compact source use :func:`hemisphere_energy_per_eV`.
     """
     *_, flux = _propagating_spectral_flux(field)
     ny, nx = field.electric_xy_v_s_m.shape[1:]
     return float(np.sum(flux) * field.dx_m * field.dy_m / (nx * ny * np.pi * _Z0_OHM * _HBAR_EV_S))
+
+
+def hemisphere_energy_per_eV(
+    field: ScreenSpectralField, *, n_u: int = 64, n_phi: int = 128, chunk: int = 512
+) -> float:
+    """Outgoing dU/dE [J/eV] by window-independent angular quadrature.
+
+    The sampled surface field is Fourier transformed *directly* (no periodic
+    images) at Gauss--Legendre nodes in ``u = cos(theta)`` and uniform nodes in
+    phi. With ``d²k = k0² u du dphi`` the light-circle 1/kz singularity of the
+    k-space flux density cancels, so the integrand is smooth and the rule
+    converges rapidly. Same normalization as :func:`spectral_energy_per_eV`.
+    The field must be compact inside the window (zero on its border), as the
+    PEC source is when its metal lies inside the grid; propagated fields are
+    refused. Cost scales as nonzero pixels x ``n_u * n_phi``.
+
+    Validation: optical-finite-boundary-field
+    """
+    e = field.electric_xy_v_s_m
+    if min(n_u, n_phi, chunk) < 1:
+        raise ValueError("quadrature sizes must be positive")
+    border = np.concatenate([e[:, 0, :], e[:, -1, :], e[:, :, 0], e[:, :, -1]], axis=1)
+    if np.any(border != 0):
+        raise ValueError("field is not compact inside the window; quadrature needs a source")
+    ny, nx = e.shape[1:]
+    k0 = field.energy_eV / _HBAR_C_EV_M
+    x = (np.arange(nx) - (nx - 1) / 2) * field.dx_m
+    y = (np.arange(ny) - (ny - 1) / 2) * field.dy_m
+    nonzero = np.any(e != 0, axis=0)
+    rows, cols = np.nonzero(nonzero)
+    xs, ys = x[cols], y[rows]
+    ex, ey = e[0][nonzero] * field.dx_m * field.dy_m, e[1][nonzero] * field.dx_m * field.dy_m
+    t, w = np.polynomial.legendre.leggauss(n_u)
+    u, wu = (t + 1) / 2, w / 2
+    phi = np.arange(n_phi) * (2 * np.pi / n_phi)
+    uu, pp = (a.ravel() for a in np.meshgrid(u, phi, indexing="ij"))
+    weights = np.repeat(wu, n_phi) * (2 * np.pi / n_phi)
+    kx = k0 * np.sqrt(1 - uu * uu) * np.cos(pp)
+    ky = k0 * np.sqrt(1 - uu * uu) * np.sin(pp)
+    kz = k0 * uu
+    total = 0.0
+    for lo in range(0, uu.size, chunk):
+        sl = slice(lo, lo + chunk)
+        phase = np.exp(-1j * (np.outer(kx[sl], xs) + np.outer(ky[sl], ys)))
+        fx, fy = phase @ ex, phase @ ey
+        fz = -(kx[sl] * fx + ky[sl] * fy) / kz[sl]
+        norm = np.abs(fx) ** 2 + np.abs(fy) ** 2 + np.abs(fz) ** 2
+        # (kz/k0)|F|²/(4 pi²) per d²k, with d²k = k0² u du dphi.
+        total += float(np.sum(weights[sl] * kz[sl] * k0 * uu[sl] * norm))
+    return total / (4 * np.pi**2 * np.pi * _Z0_OHM * _HBAR_EV_S)
 
 
 def far_field_photons_per_eV_sr(field: ScreenSpectralField):

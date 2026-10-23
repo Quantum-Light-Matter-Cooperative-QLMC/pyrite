@@ -254,3 +254,50 @@ def test_energy_dependent_detector_and_instrument_jitter_reused():
         detectors=(measured_response, detectors[1]),
     )
     np.testing.assert_allclose(calculated, exact.expected_voltage_v_ports, rtol=2e-15)
+
+
+def test_charge_jitter_scales_only_pair_term_by_exact_second_moment():
+    source, *_ = _setup()
+    assert source.with_charge_jitter(mean_electrons=1e9, charge_rms_fraction=0.0).photon_density(
+        150
+    ) == pytest.approx(source.photon_density(150), rel=1e-15)
+    n_mean, r = 5.0, 0.4
+    jittered = source.with_charge_jitter(mean_electrons=n_mean, charge_rms_fraction=r)
+    np.testing.assert_array_equal(
+        jittered.incoherent_photons_per_eV_per_pulse, source.incoherent_photons_per_eV_per_pulse
+    )
+    # Direct moment of a two-point population N in {N - d, N + d}, d = r N.
+    d = r * n_mean
+    pair_mean = np.mean([(n_mean + s * d) * (n_mean + s * d - 1) for s in (-1, 1)])
+    np.testing.assert_allclose(
+        jittered.coherent_envelope_photons_per_eV_per_pulse,
+        source.coherent_envelope_photons_per_eV_per_pulse * pair_mean / (n_mean * (n_mean - 1)),
+        rtol=1e-14,
+    )
+    big = source.with_charge_jitter(mean_electrons=1e12, charge_rms_fraction=0.1)
+    np.testing.assert_allclose(
+        big.coherent_envelope_photons_per_eV_per_pulse,
+        1.01 * source.coherent_envelope_photons_per_eV_per_pulse,
+        rtol=1e-11,
+    )
+    assert "charge jitter" in jittered.provenance
+    with pytest.raises(ValueError):
+        source.with_charge_jitter(mean_electrons=1.0, charge_rms_fraction=0.1)
+    with pytest.raises(ValueError):
+        source.with_charge_jitter(mean_electrons=10.0, charge_rms_fraction=-0.1)
+
+
+def test_ignoring_charge_jitter_biases_fitted_duration():
+    scan_source, instrument, detectors, shifts = _setup()
+    jittered = scan_source.with_charge_jitter(mean_electrons=6.25e8, charge_rms_fraction=0.3)
+    truth = gaussian_ctr_forward_voltage(
+        jittered, shifts, rms_duration_fs=200, instrument=instrument, detectors=detectors
+    )
+    scan = OpticalVoltageScan(
+        shifts, truth, np.full(truth.shape, 1.5e-5), "synthetic jittered shot average"
+    )
+    kw = dict(instrument=instrument, detectors=detectors, fit_scale=False, profile_points=61)
+    matched = fit_gaussian_ctr(scan, jittered, **kw)
+    naive = fit_gaussian_ctr(scan, scan_source, **kw)
+    assert matched.rms_duration_fs == pytest.approx(200, rel=2e-3)
+    assert naive.chi_square > matched.chi_square + 100

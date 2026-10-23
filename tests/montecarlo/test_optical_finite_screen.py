@@ -4,11 +4,13 @@ import numpy as np
 import pytest
 
 from pyrite.montecarlo.spectrum.optical_finite_screen import (
+    _E_CHARGE_C,
     PECCircularScreen,
     ScreenSpectralField,
     circular_pec_transition_field,
     far_field_photons_per_eV_sr,
     ginzburg_frank_photons_per_eV_sr,
+    hemisphere_energy_per_eV,
     observe_screen_green,
     propagate_screen_field,
     spectral_energy_per_eV,
@@ -185,3 +187,27 @@ def test_green_refuses_upstream_or_malformed_points():
         observe_screen_green(f, [0, 0, 1e-6])
     with pytest.raises(ValueError, match="max_interactions"):
         observe_screen_green(f, [[0, 0, 1e-6]], max_interactions=0)
+
+
+def test_hemisphere_quadrature_is_window_independent_and_reaches_ginzburg_frank():
+    small = PECCircularScreen(outer_radius_m=2e-6)
+    grids = [
+        circular_pec_transition_field(1.0, small, nx=n, ny=n, dx_m=0.2e-6, dy_m=0.2e-6)
+        for n in (32, 64, 128)
+    ]
+    quad = [hemisphere_energy_per_eV(f) for f in grids]
+    fft = [spectral_energy_per_eV(f) for f in grids]
+    np.testing.assert_allclose(quad, quad[0], rtol=1e-12)
+    # The k-grid Riemann sum is biased by the light-circle 1/kz singularity.
+    assert max(fft) / min(fft) - 1 > 0.05
+    # Large disc -> infinite-PEC Ginzburg--Frank hemisphere yield (beta=0.95).
+    t, w = np.polynomial.legendre.leggauss(400)
+    u = (t + 1) / 2
+    gf = np.pi * np.sum(w * ginzburg_frank_photons_per_eV_sr(1.0, np.arccos(u), 0.95))
+    big = circular_pec_transition_field(
+        1.0, PECCircularScreen(outer_radius_m=5e-6), nx=108, ny=108, dx_m=0.1e-6, dy_m=0.1e-6
+    )
+    photons = hemisphere_energy_per_eV(big) / (1.0 * _E_CHARGE_C)
+    assert photons == pytest.approx(gf, rel=1e-4)
+    with pytest.raises(ValueError, match="compact"):
+        hemisphere_energy_per_eV(propagate_screen_field(grids[0], 1e-6))

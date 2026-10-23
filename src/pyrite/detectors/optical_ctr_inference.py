@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
 
 import numpy as np
@@ -79,6 +79,8 @@ class GaussianCTRTemplates:
     intensities do not establish it. No optical response below/above the input
     energy band is inferred. This template is incompatible with complex signed
     pair estimates until those estimates are physically resolved.
+
+    Validation: optical-instrument-observable
     """
 
     energy_eV: np.ndarray
@@ -119,6 +121,40 @@ class GaussianCTRTemplates:
         return (
             self.incoherent_photons_per_eV_per_pulse
             + self.coherent_envelope_photons_per_eV_per_pulse * temporal
+        )
+
+    def with_charge_jitter(
+        self, *, mean_electrons: float, charge_rms_fraction: float
+    ) -> GaussianCTRTemplates:
+        """Shot-averaged templates for a fluctuating physical bunch population.
+
+        The templates hold one bunch of ``mean_electrons`` = N̄: incoherent
+        yield proportional to N and pair excess to N(N-1). For independent
+        shot-to-shot population N with mean N̄ and RMS ``r * N̄``,
+        ``<N> = N̄`` and ``<N(N-1)> = N̄^2 (1 + r^2) - N̄``, so only the pair
+        envelope scales, exactly, by ``1 + N̄ r^2 / (N̄ - 1)`` (-> ``1 + r^2``
+        for N̄ >> 1). Assumes the charge fluctuation is uncorrelated with the
+        bunch length and transverse shape and that voltages are linear
+        averages over shots. Common arrival-time jitter cancels in the
+        interferogram and is not modeled here. Not a per-shot charge
+        normalization: use it only for unnormalized, shot-averaged scans.
+        """
+        n_mean = float(mean_electrons)
+        r = float(charge_rms_fraction)
+        if not np.isfinite(n_mean) or n_mean <= 1:
+            raise ValueError("mean_electrons must be finite and > 1")
+        if not np.isfinite(r) or r < 0:
+            raise ValueError("charge_rms_fraction must be finite and nonnegative")
+        factor = 1.0 + n_mean * r * r / (n_mean - 1.0)
+        return replace(
+            self,
+            coherent_envelope_photons_per_eV_per_pulse=(
+                self.coherent_envelope_photons_per_eV_per_pulse * factor
+            ),
+            provenance=(
+                f"{self.provenance}; shot-averaged charge jitter "
+                f"N={n_mean:.6g}, rms={r:.6g}, pair factor={factor:.12g}"
+            ),
         )
 
     def coherent_coverage(self, rms_duration_fs: float):
