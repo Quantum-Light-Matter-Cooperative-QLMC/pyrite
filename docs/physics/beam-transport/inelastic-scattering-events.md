@@ -24,4 +24,4 @@ The separate [hard BremsLib photon mode](../radiation-physics/hard-bremsstrahlun
 
 ## Scope and evidence
 
-The shell mode runs on the exact CPU and CUDA cores and the CPU transport LUT. Its channel distributions use the row-start energy; the PENELOPE energy-dependence correction within a flight is not applied. The [validation ledger](../../validation/physics-validation-ledger.md) retains the status and evidence for the claims above. The `shell-soft-hard-transport` transport-level claim remains `unverified`; this description does not change that status.
+The shell mode runs on the exact CPU and CUDA cores and the CPU transport LUT. Its channel distributions use the row-start energy; the PENELOPE energy-dependence correction within a flight is not applied. The [validation ledger](../../validation/ledger-transport-background.md#shell-soft-hard-transport) records the `shell-soft-hard-transport` transport-level claim as `rederived`, including its assumptions and evidence limits. That status does not establish experimental accuracy or qualify enabling soft fluctuations by default.

@@ -1,0 +1,18 @@
+{
+  "schema": "pyrite.straggling-defaults.protocol.v1",
+  "energy_keV": 30.0,
+  "electron_cutoff_keV": 5.0,
+  "range_fractions": [0.05, 0.8],
+  "materials": {"hopg": "shell-soft-hard", "silicon": "shell-soft-hard", "mos2": "shell-soft-hard", "wse2": "shell-soft-hard", "sapphire": "continuous"},
+  "histories": 512,
+  "seeds": {"off": [642101, 642102, 642103], "on": [642201, 642202, 642203]},
+  "warmup_seed": 1642101,
+  "max_steps": 80000,
+  "scratch_mib": 512,
+  "max_de_frac": 0.0,
+  "inelastic_cutoff_eV": 50.0,
+  "radiative_cutoff_eV": 1000.0,
+  "refinement": {"material": "silicon", "range_fraction": 0.8, "caps": [0.00025, 0.000125], "cutoffs_eV": [100.0, 200.0]},
+  "diagnostic_margins": {"terminal_fraction_absolute": 0.02, "transmitted_energy_mean_relative": 0.02},
+  "deferred": ["5/100/300 keV", "layered and grooved runs", "line and detector-band estimators", "external-code/experimental accuracy", "equal achieved precision and held-out timing", "rare-tail qualification", "global default decision"]
+}
