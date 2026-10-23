@@ -60,6 +60,7 @@ beam-transport/cheap-numerical-validation
 beam-transport/equal-precision-protocol
 beam-transport/energy-controlled-propagation
 beam-transport/energy-loss-straggling
+beam-transport/collision-straggling-default-pilot
 beam-transport/energy-step-convergence
 beam-transport/gos-distant-response
 beam-transport/gos-hard-recoil
