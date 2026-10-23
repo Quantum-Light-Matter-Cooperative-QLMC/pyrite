@@ -40,10 +40,10 @@ def _arrays(energies, scale=1.0):
     }
 
 
-def _store_all(scale=1.0):
+def _store_all(root, scale=1.0):
     for z in sorted(int(row["Z"]) for row in TRANSPORT_ELEMENTS.values()):
         request, _ = element_request(z, PRODUCTION_ENERGIES_EV)
-        store(request, _arrays(PRODUCTION_ENERGIES_EV, scale))
+        store(request, _arrays(PRODUCTION_ENERGIES_EV, scale), root=root)
     for key in elementary_crystals():
         solid = elemental_solid(key)
         request, _ = muffin_tin_request(
@@ -53,13 +53,16 @@ def _store_all(scale=1.0):
             radius_cm=solid.radius_cm,
             density_g_cm3=solid.density_g_cm3,
         )
-        store(request, _arrays(_muffin_tin_energies(), scale))
+        store(request, _arrays(_muffin_tin_energies(), scale), root=root)
 
 
 @pytest.fixture
 def release(tmp_path, isolated_dirs, packaged_dir, monkeypatch):
     """Build a release from maintainer-side tables, then empty the user store."""
-    _store_all()
+    # These use production keys: never let a missed directory patch select a
+    # real workspace. The root is explicitly owned by this test's tmp_path.
+    monkeypatch.setenv("PYRITE_HOME", str(tmp_path / "workspace"))
+    _store_all(tmp_path / "workspace" / "xsgen" / "tables")
     archive, index = build_release(tmp_path / "out")
     shutil.rmtree(user_table_dir())
     index_path = tmp_path / "out" / "elsepa-tables.json"
@@ -105,15 +108,33 @@ def test_fetch_installs_tables_that_the_default_model_then_resolves(release):
     assert fetch_elsepa().installed is False
 
 
-def test_a_locally_generated_table_under_a_released_key_counts_as_installed(release):
+def test_a_locally_generated_table_under_a_released_key_counts_as_installed(release, tmp_path):
     archive, index = release
-    _store_all(scale=2.0)  # same keys, different manifests (a local generation)
+    _store_all(tmp_path / "workspace" / "xsgen" / "tables", scale=2.0)
 
     result = fetch_elsepa(archive)
 
     assert result.installed is False
     kept = resolve(index.tables[0].key)
     assert kept.digest != index.tables[0].manifest_sha256
+
+
+def test_synthetic_production_keys_never_follow_an_ambient_workspace(tmp_path, monkeypatch):
+    # Before 9127c99e, isolated_dirs patched platformdirs but PYRITE_HOME won.
+    # The explicit fixture destination must remain safe even under that setup.
+    workspace = tmp_path / "fake-user-workspace"
+    real_store = workspace / "xsgen" / "tables"
+    real_store.mkdir(parents=True)
+    sentinel = real_store / "production.npz"
+    sentinel.write_bytes(b"verified production payload")
+    monkeypatch.setenv("PYRITE_HOME", str(workspace))
+    isolated = tmp_path / "fixture-store"
+
+    _store_all(isolated)
+
+    assert list(real_store.iterdir()) == [sentinel]
+    assert sentinel.read_bytes() == b"verified production payload"
+    assert any(isolated.glob("*.npz"))
 
 
 def test_an_unpublished_release_names_the_local_archive_route(release):

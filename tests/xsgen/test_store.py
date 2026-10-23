@@ -7,11 +7,14 @@ shipped table and a user-generated one are indistinguishable to a consumer.
 """
 
 import json
+import os
+from dataclasses import replace
+from zipfile import ZipFile
 
 import numpy as np
 import pytest
 
-from pyrite.xsgen._errors import TableNotFoundError
+from pyrite.xsgen._errors import TableCorruptError, TableNotFoundError
 from pyrite.xsgen.store import (
     MODIFICATIONS_NOTE,
     ElementTarget,
@@ -152,6 +155,95 @@ def test_stored_table_round_trips_its_arrays():
     assert set(loaded) == set(expected)
     for name, values in expected.items():
         np.testing.assert_array_equal(loaded[name], values)
+
+
+@pytest.mark.parametrize("damage", ["stub", "same-shape", "truncated", "compressed-data"])
+def test_payload_damage_with_an_intact_manifest_fails_closed(damage, packaged_dir):
+    request = _request()
+    store(request, _arrays(), root=packaged_dir)  # a good lower tier must not mask damage
+    table = store(request, _arrays())
+    manifest_bytes = table.path.with_suffix(".json").read_bytes()
+    if damage == "truncated":
+        table.path.write_bytes(b"PK\x03\x04broken")
+    elif damage == "compressed-data":
+        with ZipFile(table.path) as archive:
+            entry = archive.infolist()[0]
+        payload = bytearray(table.path.read_bytes())
+        # Damage the deflate stream while retaining the ZIP container/header.
+        offset = entry.header_offset + 30 + len(entry.filename.encode())
+        extra_size = int.from_bytes(
+            payload[entry.header_offset + 28 : entry.header_offset + 30], "little"
+        )
+        payload[offset + extra_size] = 0xFF
+        table.path.write_bytes(payload)
+    else:
+        values = {"mu": np.linspace(0.0, 1.0, 5)} if damage == "stub" else _arrays()
+        values[next(iter(values))] *= 0.5
+        np.savez_compressed(table.path, **values)
+
+    with pytest.raises(TableCorruptError) as error:
+        require(request.key).arrays()
+    message = str(error.value)
+    assert request.key in message and str(table.path) in message
+    assert "pyrite tables fetch" in message and "pyrite tables generate" in message
+    assert table.path.with_suffix(".json").read_bytes() == manifest_bytes
+
+
+def test_payload_digest_is_cached_but_arrays_are_fresh(monkeypatch):
+    table = store(_request(), _arrays())
+    calls = []
+
+    def digest(arrays):
+        calls.append(True)
+        return arrays_digest(arrays)
+
+    monkeypatch.setattr("pyrite.xsgen.store.arrays_digest", digest)
+    first = table.arrays()
+    first["theta_deg"][:] = -1.0
+    np.testing.assert_array_equal(require(table.key).arrays()["theta_deg"], _arrays()["theta_deg"])
+    assert len(calls) == 1
+    # A different expected digest must be checked even on a cache hit.
+    impostor = replace(table, manifest={**table.manifest, "arrays_sha256": "0" * 64})
+    with pytest.raises(TableCorruptError, match="arrays_sha256 mismatch"):
+        impostor.arrays()
+
+
+@pytest.mark.parametrize("change", ["mtime", "size", "replace"])
+def test_cached_digest_is_invalidated_by_file_changes(change, monkeypatch):
+    table = store(_request(), _arrays())
+    table.arrays()
+    before = table.path.stat()
+    if change == "mtime":
+        os.utime(table.path, ns=(before.st_atime_ns, before.st_mtime_ns + 1_000_000_000))
+        calls = []
+
+        def digest(arrays):
+            calls.append(True)
+            return arrays_digest(arrays)
+
+        monkeypatch.setattr("pyrite.xsgen.store.arrays_digest", digest)
+        table.arrays()
+        assert len(calls) == 1
+        return
+    replacement = table.path.with_name("replacement.npz")
+    np.savez_compressed(replacement, mu=np.linspace(0.0, 1.0, 5))
+    if change == "replace":
+        # Preserve size and mtime: inode/ctime must invalidate the old digest.
+        with replacement.open("ab") as stream:
+            stream.write(b"\0" * (before.st_size - replacement.stat().st_size))
+        assert replacement.stat().st_size == before.st_size
+        os.utime(replacement, ns=(before.st_atime_ns, before.st_mtime_ns))
+    replacement.replace(table.path)
+    with pytest.raises(TableCorruptError, match="arrays_sha256 mismatch"):
+        require(table.key).arrays()
+
+
+def test_a_missing_payload_digest_fails_closed():
+    table = store(_request(), _arrays())
+    manifest = dict(table.manifest)
+    del manifest["arrays_sha256"]
+    with pytest.raises(TableCorruptError, match="arrays_sha256"):
+        replace(table, manifest=manifest).arrays()
 
 
 def test_the_manifest_records_how_the_table_was_made():

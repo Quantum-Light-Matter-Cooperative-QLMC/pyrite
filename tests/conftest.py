@@ -62,6 +62,17 @@ from tests.helpers.slow_marker import (  # noqa: E402, F401
 )
 
 
+def pytest_configure(config):
+    from tests.helpers.table_store_guard import TableStoreWriteGuard
+
+    # Audit hooks also see direct np.savez/copy/unlink calls that bypass store().
+    # Install before collection, including on each xdist worker.
+    roots = [tempfile.gettempdir()]
+    if config.option.basetemp:
+        roots.append(config.option.basetemp)
+    sys.addaudithook(TableStoreWriteGuard(roots))
+
+
 @pytest.fixture(autouse=True)
 def _isolate_config_store(monkeypatch, tmp_path):
     """Give every test an empty config store.

@@ -171,7 +171,7 @@ def _validate_parallel_materials(parallel_materials):
 def _tables_preflight_block() -> str:
     """Bash that fails the job fast when pinned tables, datasets or sdbase are missing.
 
-    Runs ``pyrite tables verify`` (table manifest digests; the EEDL, EADL and EPDL
+    Runs ``pyrite tables verify`` (table manifest and payload digests; the EEDL, EADL and EPDL
     files hashed in full; SBETHE's ``sdbase/``) once per chain, guarded like
     the dependency sync by ``$JOBDIR/.tables_ok``, before any transport runs. A miss records
     ``FAILED (tables)`` and exits 1; the verify output, which names the fix,

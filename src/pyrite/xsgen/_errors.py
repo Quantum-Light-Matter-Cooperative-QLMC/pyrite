@@ -50,11 +50,16 @@ class TableNotFoundError(XsgenError):
     """No stored table for a request key, in either resolution tier."""
 
 
+class TableCorruptError(XsgenError):
+    """A stored payload is unreadable or disagrees with its manifest."""
+
+
 __all__ = [
     "BuildError",
     "DataFetchError",
     "RunError",
     "SourceUnavailableError",
+    "TableCorruptError",
     "TableNotFoundError",
     "ToolchainUnavailableError",
     "XsgenError",

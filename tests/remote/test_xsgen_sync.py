@@ -168,7 +168,7 @@ def _sync(
             with tarfile.open(argv[1], "r:gz") as bundle:
                 archived.extend(bundle.getnames())
                 for member in bundle.getmembers():
-                    if member.name.startswith(("datasets/", "xsgen/reference-data/")):
+                    if member.name.startswith(("datasets/", "xsgen/")):
                         contents[member.name] = bundle.extractfile(member).read()
 
     monkeypatch.setattr(transport, "_run", fake_run)
@@ -192,6 +192,41 @@ def test_sync_ships_missing_tables_once_and_stamps_the_inventory(tmp_path, monke
     archived, _, captured = _sync(tmp_path, monkeypatch, local, digests)
     assert not [n for n in archived if n.startswith("xsgen/")]
     assert len(captured) == 1
+
+
+def test_sync_replaces_a_stub_payload_with_an_unchanged_manifest(tmp_path, monkeypatch):
+    local = _tables(tmp_path)
+    remote = _digests(local)
+    remote[f"{KEY_A}.npz"] = _sha(b"five-angle stub")
+
+    archived, _, captured = _sync(tmp_path, monkeypatch, local, remote)
+
+    assert sorted(n for n in archived if n.startswith("xsgen/")) == [
+        f"xsgen/tables/{KEY_A}.json",
+        f"xsgen/tables/{KEY_A}.npz",
+    ]
+    assert _sync.contents[f"xsgen/tables/{KEY_A}.npz"] == local[f"{KEY_A}.npz"].read_bytes()
+    assert "/remote/xsgen/tables" in captured[0]
+
+
+def test_remote_runtime_resolves_the_inventoried_tier_over_ambient_workspace(tmp_path, monkeypatch):
+    import shlex
+
+    from pyrite.console import config as console_config
+    from pyrite.xsgen.store import packaged_table_dir, search_dirs, user_table_dir
+
+    ambient = tmp_path / "ambient-workspace"
+    console_config.set_stored("workspace.root", str(ambient))
+    monkeypatch.setenv("PYRITE_HOME", str(ambient))
+    assert user_table_dir() == ambient / "xsgen/tables"
+    synced = tmp_path / "synced checkout"
+    monkeypatch.setattr(config, "REMOTE_DIR", str(synced))
+    for assignment in shlex.split(config.remote_runtime_env()):
+        name, value = assignment.split("=", 1)
+        monkeypatch.setenv(name, value)
+
+    assert search_dirs() == (synced / "xsgen/tables", packaged_table_dir())
+    assert str(synced / "xsgen/tables") in transport._xsgen_inventory_command()
 
 
 def test_sync_refuses_when_a_pinned_table_is_missing_locally(monkeypatch):

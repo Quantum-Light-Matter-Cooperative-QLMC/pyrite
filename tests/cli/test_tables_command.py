@@ -956,6 +956,33 @@ def test_verify_flags_an_edited_manifest_as_corrupt(isolated, monkeypatch):
     assert "corrupt: elsepa Z=29" in result.stderr
 
 
+@pytest.mark.parametrize("json_output", [False, True])
+@pytest.mark.parametrize("truncated", [False, True])
+def test_verify_flags_a_damaged_payload_with_a_real_manifest(
+    isolated, monkeypatch, json_output, truncated
+):
+    stored = _pin(monkeypatch, _store_one())
+    stored.arrays()  # exercise invalidation of a previously verified payload
+    if truncated:
+        stored.path.write_bytes(b"broken zip")
+    else:
+        np.savez_compressed(stored.path, mu=np.linspace(0.0, 1.0, 5))
+    args = ["verify", "--require", "elsepa"] + (["-o", "json"] if json_output else [])
+
+    result = invoke(tables_command.command, args)
+
+    assert result.exit_code == 1
+    if json_output:
+        envelope = json.loads(result.stdout)
+        assert envelope["ok"] is False
+        assert envelope["payload"]["failed"][0]["status"] == "corrupt"
+        assert result.stderr == ""
+    else:
+        assert "corrupt: elsepa Z=29" in result.stderr
+        assert "pyrite tables fetch elsepa --archive PATH" in result.stderr
+    assert "Traceback" not in result.output
+
+
 def test_verify_json_is_one_envelope_and_still_exits_one(isolated, monkeypatch):
     from pyrite.xsgen import verify
 
