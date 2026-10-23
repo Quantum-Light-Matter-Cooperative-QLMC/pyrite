@@ -30,6 +30,7 @@ import numpy as np
 from .optical_finite_bunch import _form_factor, _validate_histories
 from .optical_finite_screen import (
     _E_CHARGE_C,
+    _HBAR_C_EV_M,
     _HBAR_EV_S,
     _Z0_OHM,
     PECCircularScreen,
@@ -47,6 +48,7 @@ __all__ = [
     "FinitePlaneCollection",
     "FinitePlaneBunchBand",
     "collect_screen_field",
+    "collect_screen_green",
     "finite_screen_bunch_plane_band",
 ]
 
@@ -148,7 +150,12 @@ def _checked_jones(jones_sp):
 
 
 def _polarized_spectrum(ft, field, matrix):
-    """Power-orthonormal outgoing propagating s/p transfer (s first)."""
+    """Power-orthonormal outgoing propagating s/p transfer (s first).
+
+    At k_perp = 0 the s/p plane is undefined; the convention there is
+    (cx, cy) = (1, 0), so s = y-hat and p = x-hat and ``jones_sp`` acts on the
+    on-axis mode as a fixed lab-frame polarizer.
+    """
     if matrix is None:
         return ft
     k0, kx, ky, kz = _wavevectors(field)
@@ -278,6 +285,111 @@ def collect_screen_field(
         photons_per_eV=energy / (field.energy_eV * _E_CHARGE_C),
         polarization="total" if jones_sp is None else "propagating s/p Jones",
         configuration=_configuration(field, plane_z_m, aperture, jones_sp),
+    )
+
+
+def _green_fields(field: ScreenSpectralField, points, max_interactions):
+    """Direct (non-periodic) E and H [V*s/m, A*s/m] of the PEC source sheet.
+
+    E = 2 int grad G x A dA' with A = zhat x E_s (as ``observe_screen_green``);
+    curl E = 2 int [(A.grad) grad G + k0^2 G A] dA', and Faraday's law for the
+    exp(-i omega t) convention gives H = curl E / (i k0 Z0).
+    """
+    source = field.electric_xy_v_s_m
+    keep = np.any(source != 0, axis=0)
+    ny, nx = source.shape[1:]
+    x = (np.arange(nx) - (nx - 1) / 2) * field.dx_m
+    y = (np.arange(ny) - (ny - 1) / 2) * field.dy_m
+    xx, yy = np.meshgrid(x, y)
+    xs, ys = xx[keep], yy[keep]
+    a = np.stack([-source[1, keep], source[0, keep], np.zeros(xs.size)], axis=-1)
+    k0 = field.energy_eV / _HBAR_C_EV_M
+    e_out = np.zeros((len(points), 3), complex)
+    curl = np.zeros((len(points), 3), complex)
+    block = max(1, max_interactions // max(xs.size, 1))
+    for lo in range(0, len(points), block):
+        p = points[lo : lo + block]
+        r = np.stack(
+            [
+                p[:, None, 0] - xs,
+                p[:, None, 1] - ys,
+                np.broadcast_to(p[:, None, 2], (len(p), xs.size)),
+            ],
+            axis=-1,
+        )
+        rr = np.linalg.norm(r, axis=-1)
+        rhat = r / rr[..., None]
+        g = np.exp(1j * k0 * rr) / (4 * np.pi * rr)
+        g1 = (1j * k0 - 1 / rr) * g
+        g2 = ((1j * k0 - 1 / rr) ** 2 + 1 / rr**2) * g
+        grad = g1[..., None] * rhat
+        e_out[lo : lo + block] = 2 * np.sum(np.cross(grad, a[None]), axis=1)
+        a_dot = np.sum(a[None] * rhat, axis=-1)
+        hess_a = (g2 - g1 / rr)[..., None] * a_dot[..., None] * rhat + (g1 / rr)[..., None] * a
+        curl[lo : lo + block] = 2 * np.sum(hess_a + (k0 * k0 * g)[..., None] * a, axis=1)
+    area = field.dx_m * field.dy_m
+    return e_out * area, curl * area / (1j * k0 * _Z0_OHM)
+
+
+def collect_screen_green(
+    field: ScreenSpectralField,
+    *,
+    plane_z_m: float,
+    aperture: PlaneAcceptance,
+    pitch_m: float,
+    max_interactions: int = 2_000_000,
+) -> FinitePlaneCollection:
+    """Collected signed normal energy through ``aperture`` without FFT images.
+
+    Unlike :func:`collect_screen_field`, the detector-plane E and H are summed
+    directly from the compact PEC source with the free-space Green function,
+    so there is no periodic window and no light-circle k-sampling error; it
+    is exact to source-pixel and detector-``pitch_m`` quadrature. The aperture
+    is sampled on a ``pitch_m`` grid with the same partial-pixel weights as the
+    FFT path. Both pitches must resolve min(wavelength, plane distance); the
+    source must be compact (zero on the window border). Cost is O(source
+    pixels x aperture points); no Jones analyzer is applied.
+
+    Validation: optical-wavefront-propagation
+    """
+    if not isinstance(field, ScreenSpectralField):
+        raise TypeError("field must be a ScreenSpectralField in V*s/m")
+    if not isinstance(aperture, PlaneAcceptance):
+        raise TypeError("aperture must be a PlaneAcceptance")
+    if not np.isfinite(plane_z_m) or plane_z_m <= field.z_m:
+        raise ValueError("plane_z_m must be downstream of the field reference plane")
+    if not np.isfinite(pitch_m) or pitch_m <= 0:
+        raise ValueError("pitch_m must be positive and finite")
+    e = field.electric_xy_v_s_m
+    if np.any(e[:, [0, -1], :] != 0) or np.any(e[:, :, [0, -1]] != 0):
+        raise ValueError("source is not compact inside its window")
+    half = aperture.radius_m if aperture.shape == "circle" else None
+    if half is None:
+        assert aperture.width_m is not None and aperture.height_m is not None
+        half = max(aperture.width_m, aperture.height_m) / 2
+    extent = max(abs(aperture.center_x_m), abs(aperture.center_y_m)) + half
+    n = 2 * int(np.ceil(extent / pitch_m)) + 2
+    grid = ScreenSpectralField(field.energy_eV, pitch_m, pitch_m, np.zeros((2, n, n), complex))
+    weights = aperture._weights(grid)
+    coords = (np.arange(n) - (n - 1) / 2) * pitch_m
+    rows, cols = np.nonzero(weights)
+    points = np.column_stack(
+        [coords[cols], coords[rows], np.full(rows.size, plane_z_m - field.z_m)]
+    )
+    electric, magnetic = _green_fields(field, points, max_interactions)
+    sz = np.real(electric[:, 0] * magnetic[:, 1].conj() - electric[:, 1] * magnetic[:, 0].conj())
+    energy = float(np.sum(sz * weights[rows, cols]) * pitch_m * pitch_m / (np.pi * _HBAR_EV_S))
+    configuration = _configuration(field, plane_z_m, aperture, None)
+    configuration["model"] = "finite-pec-detector-plane-green-v1"
+    configuration["sampling"]["detector_pitch_m"] = float(pitch_m)
+    configuration["sampling"]["fft_boundary"] = "none; direct free-space Green sum"
+    return FinitePlaneCollection(
+        energy_eV=field.energy_eV,
+        z_m=float(plane_z_m),
+        spectral_energy_j_per_eV=energy,
+        photons_per_eV=energy / (field.energy_eV * _E_CHARGE_C),
+        polarization="total",
+        configuration=configuration,
     )
 
 

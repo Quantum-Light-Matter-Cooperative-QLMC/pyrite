@@ -17,7 +17,9 @@ This is a *bounded* planar, ideal-PEC, prescribed straight-current
 reference, now admitting oblique incidence from the +z half-space. Finite-grid
 truncation and pixel sampling must be converged; finite-thickness edge
 currents, real materials, beam deflection, and coupled transport are not
-modeled. The source is not yet experimentally anchored.
+modeled. The physical-optics source (-E_inc,t on the metal, zero off it) is
+exact only for an unbounded PEC: screen/hole radii and edge distances must be
+>> wavelength. The source is not yet experimentally anchored.
 
 Validation: optical-finite-boundary-field
 """
@@ -367,8 +369,10 @@ def spectral_energy_per_eV(field: ScreenSpectralField) -> float:
     """Positive-z energy density dU/dE [J/eV], per physical electron.
 
     With a *two-sided* Fourier transform, positive frequencies have
-    dU/domega = int(dA)|Etilde|^2/(pi*Z0), not the time-averaged V/m phasor
-    expression. Includes vector longitudinal-field and obliquity factors;
+    dU/domega = (pi*Z0)^-1 times the outgoing normal flux sum over
+    propagating modes of (kz/k0)|Etilde(k)|^2 (paraxially int(dA)|Etilde|^2),
+    not the time-averaged V/m phasor expression. Includes the longitudinal
+    field and obliquity factors;
     evanescent components do not transport net normal energy.
 
     This is a Riemann sum on the periodic FFT k-grid. The k-space flux

@@ -188,7 +188,9 @@ not V/m phasors.
 photon yield $d^2N/(dE\,d\Omega)$ at propagating FFT directions. With the
 stated *two-sided* temporal Fourier convention,
 `spectral_energy_per_eV` computes forward $dU/dE$ (joules per eV) from
-$[\pi Z_0]^{-1}\int|\widetilde{\mathbf E}|^2dA$ and the
+$(\pi Z_0)^{-1}\sum_{k_\perp<k_0}(k_z/k_0)|\widetilde{\mathbf E}(\mathbf k_\perp)|^2$
+(the outgoing normal flux of each propagating mode, including $E_z$; it
+reduces to $(\pi Z_0)^{-1}\int|\widetilde{\mathbf E}|^2dA$ only paraxially) and the
 $1/\hbar$ conversion; it is **not** average continuous-wave optical power.
 Do not multiply these single-charge yields by a macro-charge squared. Use the
 physical $N$ and a resolved coherent electron-field estimator as in #615,
@@ -739,7 +741,7 @@ spectral coherency by integrating $\widetilde E_i\widetilde E_j^*$ over the
 chosen physical aperture. The paraxial normalization is
 
 $$
-J_{ij}(E)=\frac{1}{\pi\hbar Z_0 E\,[\mathrm{J/eV}]}
+J_{ij}(E)=\frac{1}{\pi\hbar_{\mathrm{eV\,s}}Z_0E_{\mathrm{eV}}e}
 \int_A\widetilde E_i(\mathbf r;E)\widetilde E_j^*(\mathbf r;E)\,dA.
 $$
 
@@ -908,16 +910,42 @@ converged value between 6.4 µm and 51 µm windows, independent of pitch.
 (non-periodic) Fourier sum at Gauss–Legendre nodes in $u=\cos\theta$ and
 uniform $\phi$. Because $d^2k=k_0^2\,u\,du\,d\phi$, the integrand is smooth;
 it is exactly window-independent for a compact source and agrees with the
-infinite-PEC Ginzburg–Frank hemisphere yield to $10^{-5}$ for a 5 µm disc
-(regression in `tests/montecarlo/test_optical_finite_screen.py`).
+infinite-PEC Ginzburg–Frank hemisphere yield for a 5 µm disc with the charge
+on a pixel corner at 0.1 µm pitch: $\sim10^{-5}$ observed, pinned at
+$10^{-4}$ in `tests/montecarlo/test_optical_finite_screen.py`. An off-corner
+charge adds a pitch²-convergent sampling error (1.6 % at 0.1 µm for a
+partial-pixel offset in the independent check).
+
+**Validity range.** The source is the physical-optics boundary field
+($-\widetilde{\mathbf E}_{e,\parallel}$ on the metal, zero off it), exact only
+for an unbounded PEC. It requires screen and hole radii, and the electron's
+distance to every edge, to be much larger than the wavelength; edge
+diffraction corrections at the rim are not included.
 
 `finite_screen_collection_convergence` (module `optical_finite_convergence`)
 halves the pitch at fixed window and doubles the window at fixed pitch,
 separately, and reports both relative changes plus `hemisphere_fft_bias`, the
 FFT-vs-quadrature hemisphere ratio of the base source. `converged` requires all
 three below `rtol`. It is a numerical diagnostic for one geometry and energy,
-not physics validation; plane-collection window error itself is not yet
-removed (a non-periodic Green-operator collection is the candidate remedy).
+not physics validation.
+
+`collect_screen_green` removes the window error from finite-aperture
+collection. It sums the detector-plane fields directly from the compact source
+with the free-space Green function: $\mathbf E=2\int\nabla G\times\mathbf A\,dA'$
+with $\mathbf A=\hat{\mathbf z}\times\widetilde{\mathbf E}_s$, and
+
+$$
+\nabla\times\mathbf E=2\int\bigl[(\mathbf A\cdot\nabla)\nabla G+k_0^2G\,\mathbf A\bigr]dA',
+\qquad
+\mathbf H=\frac{\nabla\times\mathbf E}{ik_0Z_0},
+$$
+
+then integrates $\operatorname{Re}(\mathbf E\times\mathbf H^*)_z$ over the
+aperture on a `pitch_m` grid. For the 2 µm disc and 2 µm aperture at 0.5 µm,
+it agrees with the FFT path only once the FFT window reaches ~100 µm
+(2×10⁻⁴); a 6.4 µm window over-reads by 19 %. Its H equals a finite-difference
+curl of the direct E to 10⁻⁸. Passing `green_pitch_m` to the convergence
+diagnostic adds this reference (`green_relative_difference`).
 
 ## Measured passive optical elements (#616)
 

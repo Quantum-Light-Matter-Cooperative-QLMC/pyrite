@@ -141,6 +141,8 @@ channeling/cr-valence-directional-loss
 radiation-physics/absorption-length
 radiation-physics/optical-material-response
 radiation-physics/optical-planar-tr
+radiation-physics/optical-finite-boundary-field
+radiation-physics/optical-wavefront-propagation
 radiation-physics/optical-ctr-population
 radiation-physics/brem-source-comparison
 radiation-physics/brem-spectrum
@@ -248,6 +250,7 @@ detectors/detector-eaglexo
 detectors/detector-line-broadening
 detectors/detector-timepix
 detectors/grazing-reflectivity
+detectors/optical-instrument-observable
 detectors/pixel-angular-interpolation
 detectors/positioned-filter-attenuation
 ```

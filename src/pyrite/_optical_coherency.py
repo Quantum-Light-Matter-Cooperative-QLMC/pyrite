@@ -24,6 +24,8 @@ class OpticalSpectralCoherency:
     ``trace(J[i])`` is already-collected photons/(eV pulse). It is not an
     electric field and contains no frequency-to-frequency mutual coherence.
     The matrix may encode partial polarization and polarization phase.
+
+    Validation: optical-instrument-observable
     """
 
     energy_eV: np.ndarray

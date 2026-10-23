@@ -60,6 +60,13 @@ class IdealMartinPuplett:
     non-ideal wavelength dependence requires a future calibrated transfer.
     The optional Gaussian ``opd_jitter_rms_m`` is an RMS *optical path*
     fluctuation between shots and attenuates only the fringe term.
+    ``phase_offset_rad`` adds a constant, energy-independent fringe phase
+    (e.g. a residual retardance); a nonzero value makes the interferogram
+    asymmetric about zero OPD. It is not a calibrated dispersion model. The
+    interferogram is even in mirror displacement only for zero ``zero_opd_m``
+    and ``phase_offset_rad``.
+
+    Validation: optical-instrument-observable
     """
 
     instrument_id: str
@@ -157,9 +164,9 @@ def _port_spectra(source, instrument, mirror_shift):
     a = instrument.input_grid_angle_rad
     b = instrument.output_grid_angle_rad
     u = np.array([np.cos(a), np.sin(a)])
-    # The input polarizer removes the component orthogonal to u. For a source
-    # with partial polarization this projection retains *intensity* only,
-    # not fictitious mutual coherence between the two incident components.
+    # The input polarizer removes the component orthogonal to u: the passed
+    # density is u^T J u, which keeps 2 cos(a) sin(a) Re J_xy, i.e. the real
+    # part of the incident xy coherence, and nothing orthogonal to u.
     input_density = np.einsum("a,eab,b->e", u, j, u).real
     amplitudes = (
         np.array(

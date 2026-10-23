@@ -13,7 +13,9 @@ The k-space flux density has an integrable 1/kz singularity on the light
 circle, so FFT-grid sums converge slowly and *non-monotonically* in the window
 for any source with near-grazing emission. ``hemisphere_fft_bias`` compares the
 base-grid FFT hemisphere energy with the window-independent angular quadrature
-of the same sampled source, and is an indicator of that sampling error.
+of the same sampled source, and is an indicator of that sampling error. With
+``green_pitch_m`` the base grid is also compared with the non-periodic direct
+Green collection (:func:`collect_screen_green`), which has no window error.
 
 Each step reports the relative change in collected photons/eV at the stated
 detector plane. A step below ``rtol`` is a numerical-convergence diagnostic for
@@ -28,7 +30,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from .optical_finite_collection import PlaneAcceptance, collect_screen_field
+from .optical_finite_collection import PlaneAcceptance, collect_screen_field, collect_screen_green
 from .optical_finite_screen import (
     PECCircularScreen,
     circular_pec_transition_field,
@@ -54,6 +56,14 @@ class CollectionConvergence:
     window_relative_change: float
     hemisphere_fft_bias: float
     rtol: float
+    green_photons_per_eV: float | None = None
+
+    @property
+    def green_relative_difference(self) -> float | None:
+        """Base FFT collection relative to the direct Green reference."""
+        if self.green_photons_per_eV is None:
+            return None
+        return self.base[-1] / self.green_photons_per_eV - 1.0
 
     @property
     def converged(self) -> bool:
@@ -62,6 +72,7 @@ class CollectionConvergence:
                 self.pitch_relative_change,
                 self.window_relative_change,
                 abs(self.hemisphere_fft_bias),
+                abs(self.green_relative_difference or 0.0),
             )
             <= self.rtol
         )
@@ -91,6 +102,7 @@ def finite_screen_collection_convergence(
     aperture: PlaneAcceptance | None = None,
     refinements: int = 1,
     rtol: float = 0.01,
+    green_pitch_m: float | None = None,
 ) -> CollectionConvergence:
     """Refine pitch and window separately ``refinements`` times each.
 
@@ -108,6 +120,13 @@ def finite_screen_collection_convergence(
     args = (plane_z_m, aperture)
     field = circular_pec_transition_field(energy_eV, screen, nx=nx, ny=ny, dx_m=dx_m, dy_m=dy_m)
     bias = spectral_energy_per_eV(field) / hemisphere_energy_per_eV(field) - 1.0
+    green = None
+    if green_pitch_m is not None:
+        if aperture is None:
+            raise ValueError("the direct Green reference needs a finite aperture")
+        green = collect_screen_green(
+            field, plane_z_m=plane_z_m, aperture=aperture, pitch_m=green_pitch_m
+        ).photons_per_eV
     base = _collect(energy_eV, screen, nx, ny, dx_m, dy_m, *args)
     pitch, window = [base], [base]
     for k in range(1, refinements + 1):
@@ -124,4 +143,5 @@ def finite_screen_collection_convergence(
         window_relative_change=_relative_change(window),
         hemisphere_fft_bias=float(bias),
         rtol=float(rtol),
+        green_photons_per_eV=green,
     )
