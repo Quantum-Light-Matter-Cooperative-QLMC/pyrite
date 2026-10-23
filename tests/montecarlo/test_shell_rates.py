@@ -16,7 +16,7 @@ from pyrite.montecarlo.transport.shell_partition import partition_shell_rates
 from pyrite.xsgen.sbethe.catalog import resolve_catalog_table
 
 KEYS = ("silicon", "sio2", "mos2")
-ENERGIES = (1e3, 2e3, 5e3, 1e4, 2e4, 5e4, 1e5, 1e6)
+ENERGIES = (1e3, 2e3, 5e3, 1e4, 2e4, 5e4, 1e5, 1e6, 1e7, 3e7, 1e8)
 
 
 def _shell(z, designator, label, orbital, occupation, energy):
@@ -79,6 +79,24 @@ def test_catalog_closure_reproduces_stp_exactly_with_positive_scale(key, energy)
     assert np.all(closure.moments.per_shell >= 0.0)
 
 
+# Characterization, not a physics gate (#439): EEDL inner-shell cross sections
+# are flat above ~10 MeV (Si L) / ~40 MeV (Si K) while the density ratio keeps
+# falling, so N(E) rises to keep the stopping closed. Pins the recorded values;
+# see docs/validation/beam-transport/penelope-shell-rate-closure.md.
+@pytest.mark.parametrize(
+    ("key", "recorded"),
+    [
+        ("silicon", (1.056, 1.263, 1.442, 1.623)),
+        ("sio2", (0.791, 0.851, 0.916, 1.000)),
+        ("mos2", (1.270, 1.444, 1.492, 1.618)),
+    ],
+)
+def test_outer_scale_at_mev_energies_matches_recorded_note(key, recorded):
+    _require_pdatconf()
+    scales = [sr.catalog_shell_rate_closure(key, e).outer_scale for e in (1e6, 1e7, 3e7, 1e8)]
+    assert scales == pytest.approx(recorded, abs=1e-3)
+
+
 # Documented note, not a gate (owner decision, 2026-09-24): the closed model's
 # total IMFP is 26-35% below independent full Penn calculations. The recorded
 # ratios pin that note so a model change cannot silently move it; see
@@ -133,7 +151,7 @@ def test_imfp_excess_channel_is_condensed_above_conduction_resonance(key, energy
 
 
 @pytest.mark.parametrize("key", KEYS)
-@pytest.mark.parametrize("energy", (2e3, 1e4, 1e5, 1e6))
+@pytest.mark.parametrize("energy", (2e3, 1e4, 1e5, 1e6, 1e8))
 def test_inner_shell_loss_pdf_unchanged_and_outer_shells_share_one_scale(key, energy):
     _require_pdatconf()
     closure = sr.catalog_shell_rate_closure(key, energy)
@@ -146,7 +164,7 @@ def test_inner_shell_loss_pdf_unchanged_and_outer_shells_share_one_scale(key, en
     assert np.allclose(new[outer], closure.outer_scale * raw[outer], rtol=1e-15, atol=0.0)
 
 
-@pytest.mark.parametrize("energy", (5e3, 1e5, 1e6))
+@pytest.mark.parametrize("energy", (5e3, 1e5, 1e6, 1e8))
 def test_inner_cross_section_is_eedl_times_density_ratio(energy):
     _require_pdatconf()
     closure = sr.catalog_shell_rate_closure("sio2", energy)

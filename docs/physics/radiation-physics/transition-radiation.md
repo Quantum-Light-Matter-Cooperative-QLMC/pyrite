@@ -115,10 +115,14 @@ Two statements the bound does **not** rely on, and which are false in general:
 | Si, 3 MeV, 2 µm, detector 90° | exit | **1.6e3** | **1.0** | 8.0e-4 | 625 eV |
 | Si, 3 MeV, 2 µm, detector 1° | exit | **2.6e3** | **67** | **0.18** | 1.8 keV |
 | Si, 10 MeV, 2 µm, detector 1° | exit | **6.5e3** | **1.0e3** | **15** | 7.3 keV |
+| Si, 30 MeV, 2 µm, detector 1° | exit | **1.2e7** | **2.3e5** | **2.0e3** | 25 keV |
+| Si, 100 MeV, 2 µm, detector 90° | exit | **2.9e10** | **2.0e5** | **14** | 3.6 keV |
+| Si, 100 MeV, 2 µm, detector 1° | exit | **7.7e8** | **1.5e7** | **2.6e4** | > 30 keV |
+| Si, 100 MeV, 100 µm, detector 1° | exit | **2.1e9** | **4.1e7** | **1.4e5** | > 30 keV |
 
 The bound is conservative by construction (worst crossing direction and speed, factor 5, continuum-only denominator). The 30 keV Si scene at the actual beam exit direction gives TR/brem ≈ 0.73 at 32 eV, 0.03 at 50 eV and 0.03 at 150 eV, so the EUV failures are physical, not an artefact of the bound. Near the floor TR is a surface source, unattenuated, while the bremsstrahlung escaping at the same energy comes from the last tens of nanometres.
 
-For 30--100 MeV, beyond supported transport (#439, #440), the analytic comparison of $2\,dN_{\rm TR}/dE$ (Jackson Eq. 13.92 per photon, Si) with thin-target complete-screening bremsstrahlung $(4/3)(t/X_0)/E$ puts the 1.67% crossover at 39 keV (100 MeV, 2 µm), 14 keV (100 µm) and 7 keV (1 mm), and at 12/4/2 keV for 30 MeV. This is a screening estimate (angle-integrated, no self-absorption of the bremsstrahlung), not a bound.
+The 30 and 100 MeV scenes (#439) use the production coupled transport, so the bremsstrahlung denominator carries the Ter-Mikaelian factor $k^2/(k^2+(\gamma\hbar\omega_p)^2)$ ([bremsstrahlung](bremsstrahlung.md)); with $\gamma\hbar\omega_p=1.9$ and 6.1 keV in Si it suppresses the continuum by $(k/\gamma\hbar\omega_p)^2$ below those energies, while TR, the boundary term of the same dielectric response, is not suppressed. The EUV and soft-X-ray ratios therefore grow much faster than $\gamma$; at 100 MeV forward the ratio is still 0.12 (2 µm) and 0.09 (100 µm) at 30 keV, the grid cap. The cone is $3\theta_0$ (Highland): 0.21° at 30 MeV and 0.07°/0.6° at 100 MeV for 2/100 µm. The earlier angle-integrated screening estimate (Jackson Eq. 13.92 against thin-target complete-screening bremsstrahlung, no suppression) put the 1.67% crossover at 39 keV for 100 MeV and 2 µm and 12 keV for 30 MeV, consistent with these bounds.
 
 ## Diffracted TR and PXR
 
@@ -208,13 +212,13 @@ The bremsstrahlung continuum is incoherent in PyRITE and has no phased field to 
 | Tens-of-keV, soft X-ray 0.3--1 keV | **Per scene** | Passes for Si up to 30 keV and for the film-on-substrate scene; fails for HOPG, MoS₂, WSe₂ and Si at 60 keV. Use $E^\ast$ from the study, or escalate. |
 | EUV / soft X-ray down to the continuum floor (any beam energy) | **Escalate to #103** | $b$ from 1.4 to 1400 below 300 eV in every scene. PyRITE models photons from $\max(\hbar\omega_p, 12~\text{eV})$, so this band cannot be scoped out. Below the floor (optical) is outside the model; optical TR is measured at 30 keV {cite:p}`coenen2011` and belongs to a future optical model. |
 | MeV thin-film soft X-ray (outside channeling) | **Escalate to #103** below $E^\ast$; omit above | Off-axis 90° at 3 MeV: omit ≥ 625 eV ($b\le8.0\times10^{-4}$ for ≥ 1 keV). Forward detectors: fails to 1.8 keV (3 MeV) and 7.3 keV (10 MeV). The channeling row is decided separately (`cr-transition-radiation-bound`). |
-| General transport approaching 100 MeV | **Escalate to #103**, gated on #439/#440 | No supported transport to compare against; analytic crossover 7--39 keV for Si, thin films worst. Address bulk transport first, then rerun the study. |
+| 30--100 MeV transport, keV X-rays | **Include** (opt-in TR, #103) below $E^\ast$; omit above | With supported coupled transport (#439): forward detectors fail to 25 keV at 30 MeV and beyond the 30 keV grid at 100 MeV, for 2 µm and 100 µm Si; off-axis 90° at 100 MeV omits ≥ 3.6 keV. Above 100 MeV: #440. |
 | Purpose-built multilayer radiator | **Escalate to #103** | Essential source physics; coherent gain exceeds summed-interface estimates (above). |
 | Coherent bunches (CTR) with non-negligible form factor | **Compute** (`coherence="bunch"`) | Enhancement $N\lvert F\rvert^2$ up to $6\times10^6$ for the 1 as catalog beams; incoherent bounds do not apply. TR adds to PXR/CBS for $g_\parallel\sigma_\perp\gg1$; surface-normal $\mathbf g$ (default (00l) rows) and DTR are not covered (#103). Optical/IR CTR: #533. |
 
 ## Validity boundary
 
-The omission decisions hold for planar slabs and stacks, straight crossings at the stated speeds, the catalog media's independent-atom $\varepsilon$, and bremsstrahlung as the comparison floor. They do not cover grooved or rough entrance faces, laterally finite targets whose side faces the detector sees, coherent (`emission = coherent`) observables with a non-negligible bunch form factor (CTR, above), or a tighter precision target than 0.05 without rerunning the study. Stopping still omits radiative feedback, transported delta rays and density-effect corrections, and the Browning elastic fit ends at 30 keV; these limitations are independent of TR.
+The omission decisions hold for planar slabs and stacks, straight crossings at the stated speeds, the catalog media's independent-atom $\varepsilon$, and bremsstrahlung as the comparison floor. They do not cover grooved or rough entrance faces, laterally finite targets whose side faces the detector sees, coherent (`emission = coherent`) observables with a non-negligible bunch form factor (CTR, above), or a tighter precision target than 0.05 without rerunning the study. Transported delta rays are off by default in these scenes; that limitation is independent of TR.
 
 ## Explicit optical response for bounded diagnostics
 

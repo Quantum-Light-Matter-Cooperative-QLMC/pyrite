@@ -16,6 +16,7 @@ atomic-physics/crystals-cif-adapter
 :caption: Beam physics and electron transport
 
 beam-transport/adaptive-sample-size-stopping
+beam-transport/mev-full-track-transport
 beam-transport/beam-energy-spread-injection
 beam-transport/beam-phase-space-injection
 beam-transport/beam-phase-space-metrics
@@ -151,6 +152,9 @@ radiation-physics/cbs-amplitude
 radiation-physics/characteristic-radiation
 radiation-physics/eedl-shell-ionization-comparison
 radiation-physics/bremslib-angular-schiff
+radiation-physics/bremslib-electron-electron
+radiation-physics/bremslib-high-energy-extension
+radiation-physics/dielectric-suppression
 radiation-physics/closed-form-flux
 radiation-physics/coherent-emission
 radiation-physics/pair-production-sampling

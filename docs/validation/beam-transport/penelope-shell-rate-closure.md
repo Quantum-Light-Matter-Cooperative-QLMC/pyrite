@@ -177,6 +177,77 @@ IMFP at 1/10/100 keV, raw → closed (Å): Si 18.6→19.6, 128.7→115.5,
 810.7→750.4; SiO₂ 15.4→19.8, 107.0→122.9, 674.8→807.4; MoS₂ 15.0→14.9,
 101.1→88.4, 629.8→510.5.
 
+### MeV extension (#439)
+
+The closure stays exact ($10^{-12}$) with $\mathcal N>0$ up to 100 MeV, and
+the raw GOS stopping stays within 2 % of `stp.dat` (Bethe limit, checked to
+1 GeV in `test_shell_gos.py`). $\mathcal N(E)$:
+
+| material | 1 MeV | 3 MeV | 10 MeV | 30 MeV | 100 MeV |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| silicon | 1.056 | 1.124 | 1.263 | 1.442 | 1.623 |
+| sio2 | 0.791 | 0.816 | 0.851 | 0.916 | 1.000 |
+| mos2 | 1.270 | 1.343 | 1.444 | 1.492 | 1.618 |
+
+The rise is not a closure defect; it moves stopping from the inner to the
+outer shells. The EEDL inner-shell cross sections are flat in energy above
+about 10 MeV (Si L shells) and 40 MeV (Si K): from 1 to 100 MeV they rise by
+5 % (L) and 54 % (K), against 11 % and 20 % for the GOS with $\delta_F$ and
+58 % and 84 % for the GOS without it. The density ratio $\rho_i$, which
+PENELOPE applies to DWBA cross sections that carry no density effect, still
+falls to 0.62–0.68 at 100 MeV. The adopted Si inner shells are then
+0.43–0.85 of their GOS $\sigma^{(0)}$ with $\delta_F$ (0.94–1.09 at 1 MeV),
+and $\mathcal N$ makes up the difference. The values are pinned by
+`test_outer_scale_at_mev_energies_matches_recorded_note`.
+
+**Against NIST SRD 164** (Bote–Salvat free-atom DWBA/PWBA, the inner-shell
+input PENELOPE's $\rho_i$ is defined for; `checks/srd164_inner_shell_comparison.py`,
+2026-10-23). EEDL agrees within 9 % at 1 MeV and then falls below it.
+EEDL/SRD 164 at 100 MeV (with $\rho_i$ in parentheses):
+
+| shell | 10 MeV | 30 MeV | 100 MeV |
+| --- | ---: | ---: | ---: |
+| Si K | 1.035 (0.81) | 1.019 (0.71) | 0.913 (0.62) |
+| Si L1 | 0.930 (0.84) | 0.819 (0.75) | 0.721 (0.67) |
+| Si L3 | 0.875 (0.84) | 0.759 (0.76) | 0.660 (0.68) |
+| O K | 1.042 (0.77) | 0.959 (0.69) | 0.829 (0.61) |
+| S L3 | 0.892 (0.85) | 0.853 (0.77) | 0.739 (0.69) |
+| Mo L3 | 0.975 (0.81) | 0.960 (0.72) | 0.857 (0.63) |
+| Mo M5 | 0.787 (0.85) | 0.744 (0.76) | 0.646 (0.68) |
+
+With SRD 164 in place of EEDL, $\mathcal N$ is flat: Si 1.107, 1.089,
+1.081, 1.070 and MoS₂ 1.291, 1.306, 1.305, 1.300 at 1, 10, 30, 100 MeV
+(SiO₂ 0.83–0.77). The rise of $\mathcal N$ is therefore EEDL's high-energy
+shortfall, not the closure. For L and M shells that shortfall is close to
+$\rho_i$ itself, so EEDL behaves as if it already carried a density-effect
+saturation and the adopted rate $\rho_i\sigma_{\rm EEDL}$ is near
+$\rho_i^2\sigma_{\rm SRD}$. Relative to the PENELOPE prescription
+$\rho_i\sigma_{\rm SRD}$, adopted inner-shell rates at 100 MeV are low by
+9 % (Si K), 28–34 % (Si L), 17 % (O K), 26–35 % (S L, Mo M) and 14 % (Mo L);
+below 1 MeV they are within 9 %. Total stopping is unaffected. Remedy:
+the SRD 164 backend of #92.
+
+Dropping $\rho_i$ from EEDL does not fix this uniformly. Against
+$\rho_i\sigma_{\rm SRD}$, EEDL with / without $\rho_i$:
+
+| shell | 10 MeV | 30 MeV | 100 MeV |
+| --- | ---: | ---: | ---: |
+| Si L2/L3 | 0.87 / 1.03 | 0.75 / 1.00 | 0.66 / 0.97 |
+| Si L1 | 0.93 / 1.11 | 0.82 / 1.09 | 0.72 / 1.08 |
+| S L | 0.89 / 1.05 | 0.85 / 1.11 | 0.74 / 1.07 |
+| Mo M4/M5 | 0.79 / 0.93 | 0.74 / 0.98 | 0.65 / 0.95 |
+| Si K | 1.03 / 1.28 | 1.02 / 1.44 | 0.91 / 1.47 |
+| O K (SiO₂) | 1.04 / 1.35 | 0.96 / 1.39 | 0.83 / 1.36 |
+| Mo L | 0.97 / 1.20 | 0.96 / 1.33 | 0.86 / 1.37 |
+| Mo K | 1.05 / 1.36 | 1.03 / 1.53 | 1.01 / 1.74 |
+
+Light-atom L and M shells, whose EEDL values plateau early, match within
+~10 % without $\rho_i$; K shells (and Mo L) keep a free-atom-like rise and
+match within 9 % (O K 17 %) only with it. The closure keeps $\rho_i$ on
+every shell (decision 2026-10-23): it is correct for the K shells that
+dominate keV characteristic lines, and a per-shell choice would tune to the
+reference. The reference is itself PENELOPE's model, not measurement.
+
 ### Independent SiO₂ total-rate gate
 
 [Shinotsuka et al., *Surface and Interface Analysis* 51 (2019),
@@ -363,7 +434,8 @@ with IMFP or straggling measurements.
 `tests/montecarlo/test_shell_rates.py` covers the following:
 
 - exact closure $\sum\sigma^{(1)}=S_{\rm stp}$ ($10^{-12}$, `abs=0`), with
-  finite positive $\mathcal N$ for three materials at eight energies;
+  finite positive $\mathcal N$ for three materials at eleven energies from
+  1 keV to 100 MeV, and the recorded $\mathcal N$ at 1–100 MeV;
 - inner $\sigma^{(1)}/\sigma^{(0)}$ and $\sigma^{(2)}/\sigma^{(0)}$ unchanged
   ($10^{-12}$), and outer shells scaled by one $\mathcal N$;
 - the adopted inner $\sigma^{(0)}$ equals an independent EEDL lin-lin

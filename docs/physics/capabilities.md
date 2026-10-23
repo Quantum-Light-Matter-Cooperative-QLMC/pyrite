@@ -20,6 +20,21 @@ link each claim to its authoritative ledger record.
 | Photon escape and detector response | Default source escape; downstream response | Straight-ray attenuation and passive bulk dispersion. Detector acceptance, efficiency and measured-energy redistribution follow source scoring; general photon scattering, interface optics and feedback on electrons are excluded from this escape model. | [Photon escape](radiation-physics/photon-escape-and-dispersion.md), [detector response](detectors/detector-response.md); [detector evidence](../validation/ledger-detector-forward-models.md) |
 | Transition radiation | Opt-in planar-stack TR and CTR; off by default | Flat interfaces, dielectric-band and coherence limits apply; default omission bounds are observable-dependent. | [Model and limits](radiation-physics/transition-radiation.md); [TR/CTR demo](../guides/transition-radiation-demo.md); [detected omission bound](../validation/radiation-physics/tr-detected-omission-bound.md) |
 
+## Beam-energy validity
+
+Electron (and positron) beams outside channeling. "Benchmarked" names the
+external comparison behind the tier; the ledger rows carry the evidence and
+none is human signed-off.
+
+| Beam energy | Physics state | Benchmarked against | Known limits |
+|---|---|---|---|
+| ≤ 1 MeV | ELSEPA elastic, SBETHE stopping, shell soft/hard events, coupled BremsLib radiative loss | Geant4 TestEm5 full track, W/Si at 300 and 800 keV; ESTAR stopping | EUV/soft X-ray transition radiation not omissible ([TR decisions](radiation-physics/transition-radiation.md#decisions)) |
+| 1–30 MeV | As above on BremsLib's complete grid, with the Seltzer–Berger e–e term and Ter-Mikaelian suppression | TestEm5 W 100 µm / Si 1 mm at 3, 10, 30 MeV (`mev-full-track-transport`); ESTAR collision/radiative stopping and CSDA range; Seltzer–Berger spectra (`brem-source-comparison`); EPDL pair totals | Forward soft X-rays need the opt-in TR component; photons are attenuated, not transported (thick-target warning above 0.05 X₀, #341) |
+| 30–100 MeV | BremsLib extension rows (library SDCS to `k/T` = 0.95; tip and `k > 0` angles modelled, `bremslib-high-energy-extension`); uncoupled radiative loss refused unless `radiative_model="uncoupled"` | TestEm5 at 50 and 100 MeV (W θ_rms excepted: Geant4's point-nucleus Mott correction); ESTAR to 100 MeV; Seltzer–Berger reported, not gated | Filled tip `k/T > 0.95` 0.6–1.9× Seltzer–Berger at 100 MeV; inner-shell ionization may double-count the density effect above ~10 MeV ([closure note](../validation/beam-transport/penelope-shell-rate-closure.md)); TR dominates forward keV continua below 25–30 keV |
+| > 100 MeV | No coupled radiative tables; LPM not modelled | — | #440 |
+
+Channeling ([#56](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/56)) and coherent PXR/CBS line couplings above ~1 MeV photon energy (#249) are tracked separately.
+
 Research designs may describe later tiers alongside implemented outcomes. Use
 the linked run-surface restrictions for execution support, and the ledger for
 the evidence behind a numerical claim. No maturity label in this table promotes

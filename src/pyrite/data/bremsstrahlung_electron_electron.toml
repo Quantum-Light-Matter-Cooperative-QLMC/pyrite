@@ -16,8 +16,9 @@
 # chi_total / (1 + eta/Z)); 0 means linear. The fitted 1/kappa_s varies with
 # Z by at most 8 % from 1 MeV up (32 % at 0.5 MeV), and the stored value is the
 # mean over the six elements.
-# Below 0.5 MeV eta(0) <= eta(0.1) and the linear rule reproduces etabar
-# within 0.004; above 200 MeV the scale is held. Rederive with
+# Below 0.5 MeV the linear rule (1/kappa_s = 0 at and below 0.2 MeV, rising
+# linearly in ln T to 0.5 MeV) reproduces etabar within 0.004, although
+# eta(0) > eta(0.1) for some Z at 0.1-0.2 MeV; above 200 MeV the scale is held. Rederive with
 # checks/sb85_eta_small_kappa_fit.py.
 # Validation: bremslib-electron-electron
 

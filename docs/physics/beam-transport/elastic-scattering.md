@@ -65,7 +65,7 @@ The elastic hazard is evaluated at the flight-start energy under **both** propag
 
 with $E$ in keV. This is the Browning empirical fit to tabulated Mott total elastic cross sections.{cite:p}`browning1994,srd64`
 
-**Stated validity is 0.1–30 keV and $Z \le 92$.** PyRITE evaluates it above 30 keV with no guard. The extrapolation is a ledgered limitation; the documented transport checks reach roughly 300 keV.
+**Stated validity is 0.1–30 keV and $Z \le 92$.** PyRITE evaluates it above 30 keV with no guard. The extrapolation is a ledgered limitation of this deprecated model; the default ELSEPA tables are benchmarked in full-track transport to 100 MeV (`mev-full-track-transport`).
 
 ### Relativistic screened-Rutherford total cross section
 

@@ -4783,7 +4783,7 @@ def test_parallel_queue_script_enforces_process_limit(monkeypatch, tmp_path, par
         'if [ "$1" = sync ]; then exit 0; fi\n'
         'case "$*" in *"tables verify"*) exit 0 ;; esac\n'
         f'echo "start $$" >> "{trace.as_posix()}"\n'
-        "sleep 0.05\n"
+        "sleep 0.3\n"
         f'echo "end $$" >> "{trace.as_posix()}"\n'
     )
     fake_uv.chmod(0o755)
