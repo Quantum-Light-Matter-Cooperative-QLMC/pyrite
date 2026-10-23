@@ -64,6 +64,11 @@ at float64 roundoff. Sink-depth array ordering follows batch traversal; compare
 its multiset when batch sizes differ. A new `run` starts electron IDs at zero;
 separate calls are not a resumable trajectory-chunk interface.
 
+Small CUDA batches check waiting-time thresholds in blocks of up to eight
+steps. If a threshold crosses inside a block, propagation resumes from the
+first crossing before any jump is drawn. Speculative steps consume no random
+numbers. The block shrinks for larger electron batches to limit replayed FFTs.
+
 ## Device callbacks
 
 The built-in density observable reduces the ensemble directly on CUDA.
@@ -71,6 +76,14 @@ Custom observables and jump hooks must set `cuda_compatible = True`, accept
 CuPy arrays and return CuPy arrays (`None` may absorb a state in a hook).
 Unmarked callbacks fail before CUDA allocation. There is no implicit host
 wavefunction transfer for callbacks.
+
+An observable may implement `sum_batch(states, tilts)` to return the **sum**
+over normalized live states, with shapes `(electrons, nx, ny)` and
+`(electrons, 2)`. The result has the scalar callback's output shape; incident
+normalization remains the solver's responsibility. The diagnostic recorder
+uses batched reductions for metrics, level density and reference coherence.
+Its internal `prepare_batch`/`flush` protocol also allows deferred spectral
+projections to fill per-depth accumulators before results are finalized.
 
 Custom observables can declare `recording_bytes` (one copy of all recorded outputs) and
 `scratch_bytes` (peak temporary work); CUDA admission reserves these in
@@ -99,6 +112,14 @@ or falls back. The focused tests compare deterministic propagation and jump
 kernels, check device callback types, verify batch/recording independence and
 compare stochastic populations and survival with a predeclared uncertainty
 bound. Extend convergence evidence before interpreting a new physical case.
+
+{source}`checks/axial_recording_performance.py` measures recording off,
+eigenstate-only and combined-recording workloads. It records one cold run,
+individual warm repeats, GPU utilization, memory, configuration and source
+hashes, and saves paired observable arrays for before/after comparisons.
+Run identical arguments in separate baseline and candidate checkouts inside
+bounded GPU allocations. Profile separate invocations with Nsight Systems;
+profiling timings should not be mixed with unprofiled repeats.
 
 ## Measured workload and limitations
 

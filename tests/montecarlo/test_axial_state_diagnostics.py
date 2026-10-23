@@ -38,6 +38,24 @@ def test_full_discrete_eigenbasis_closes_probability_and_is_orthonormal():
     assert np.sum(np.abs(amp) ** 2) == pytest.approx(1, abs=1e-12)
 
 
+def test_sparse_degenerate_eigenvectors_form_orthonormal_projectors():
+    from pyrite.materials.channeling.axial import axial_profile
+
+    profile = axial_profile("silicon", (0, 0, 1))
+    grid = RealSpaceGrid(profile.period_ang, (32, 32))
+    potential = profile.on_grid((1, 1), grid.shape)
+    first = transverse_spectrum(grid, potential, 5e6, (0, 0), 17)
+    second = transverse_spectrum(grid, potential, 5e6, (0, 0), 17)
+    np.testing.assert_allclose(first.vectors.conj().T @ first.vectors, np.eye(17), atol=1e-10)
+    # The first excited pair is degenerate: its complete projector must assign
+    # unit probability to every normalized vector in that subspace.
+    state = first.vectors[:, 1] + 1j * first.vectors[:, 2]
+    state /= np.linalg.norm(state)
+    for spectrum in (first, second):
+        population = np.sum(np.abs(spectrum.vectors[:, 1:3].conj().T @ state) ** 2)
+        assert population == pytest.approx(1, abs=1e-10)
+
+
 def test_partial_orthogonal_population_and_separate_omitted_weight():
     grid = _grid()
     pot = np.zeros(grid.shape)

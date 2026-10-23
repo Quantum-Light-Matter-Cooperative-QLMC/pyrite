@@ -137,6 +137,12 @@ class _RolledLevelDensity:
             import cupy as xp
         return self.levels(xp.roll(phi, self.shift, axis=(0, 1)), tilt_inv_ang)
 
+    def sum_batch(self, states, tilts):
+        xp = np
+        if hasattr(states, "__cuda_array_interface__"):
+            import cupy as xp
+        return self.levels.sum_batch(xp.roll(states, self.shift, axis=(-2, -1)), tilts)
+
 
 def _level_observable(config: AxialDiagnosticConfig) -> _RolledLevelDensity | None:
     catalog = _catalog(config.crystal, config.axis, config.kinetic_energy_eV, config.temperature_K)

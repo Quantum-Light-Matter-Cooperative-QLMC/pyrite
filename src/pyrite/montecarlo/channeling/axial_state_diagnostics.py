@@ -27,6 +27,7 @@ MAX_SPECTRAL_STATES = 64
 MAX_CACHED_SECTORS = 64
 HOST_SPECTRAL_CACHE_BYTES = 64 << 20
 DEVICE_SPECTRAL_CACHE_BYTES = 32 << 20
+PENDING_SPECTRAL_BYTES = 16 << 20
 
 
 def _xp(array):
@@ -88,6 +89,21 @@ def _warm_lobpcg(kinetic, potential, guess, count):
     return energies[order], vectors.reshape(-1, n).T
 
 
+def _orthonormal_eigenpairs(apply, vectors):
+    """Refine a sparse invariant subspace into orthonormal Hermitian eigenpairs.
+
+    Complex ARPACK uses the general eigensolver, whose individually normalized
+    vectors need not be mutually orthogonal inside a degenerate eigenspace.
+    Projector probabilities require an orthonormal basis, even with tiny
+    individual residuals. QR followed by Rayleigh--Ritz preserves the subspace.
+    """
+    basis, _ = np.linalg.qr(vectors)
+    action = np.column_stack([apply(v) for v in basis.T])
+    projected = basis.conj().T @ action
+    energies, rotation = eigh((projected + projected.conj().T) / 2, check_finite=False)
+    return energies, basis @ rotation
+
+
 def transverse_spectrum(grid, potential_eV, kinetic_energy_eV, tilt_inv_ang, count, guess=None):
     """Diagonalize precisely the Hamiltonian used by the split-step FFT.
 
@@ -131,9 +147,7 @@ def transverse_spectrum(grid, potential_eV, kinetic_energy_eV, tilt_inv_ang, cou
             if solved is None:
                 h = LinearOperator((n, n), matvec=apply, dtype=np.complex128)  # type: ignore
                 solved = eigsh(h, k=count, which="SA", tol=1e-10)
-        energies, vectors = solved
-        order = np.argsort(energies)
-        energies, vectors = energies[order], vectors[:, order]
+            energies, vectors = _orthonormal_eigenpairs(apply, solved[1])
     return DiscreteSpectrum(np.asarray(energies, float), np.asarray(vectors, complex))
 
 
@@ -178,8 +192,6 @@ class AxialSpectralObservable:
         self.representation = representation
         self.degeneracy_tol_eV = degeneracy_tol_eV
         n = int(np.prod(grid.shape))
-        if count > n:
-            raise ValueError("requested states exceed grid dimension")
         # Include the guard eigenvector and temporary eigensolver allocations.
         self._sector_bytes = (count + (count < n)) * n * 16
         if self._sector_bytes > HOST_SPECTRAL_CACHE_BYTES:
@@ -265,6 +277,14 @@ class AxialSpectralObservable:
         self.recording_bytes = self.recording_width * 16
         self.scratch_bytes = self._sector_bytes * (2 + self._max_device_sectors)
         self._device_cache = OrderedDict()
+        self._base_spectrum = base
+        self._pending = []
+        self._pending_bytes = 0
+        if representation == "energy_bins":
+            # Pending states and the bounded iterative solver coexist with caches.
+            from ._axial_spectral_batch import SOLVER_BUDGET_BYTES
+
+            self.scratch_bytes += PENDING_SPECTRAL_BYTES + SOLVER_BUDGET_BYTES
 
     def _guess(self, q):
         """Nearest cached sector's eigenvectors, carrier-shifted by a grid ``G``.
@@ -305,9 +325,12 @@ class AxialSpectralObservable:
         return self._cache[q]
 
     def __call__(self, phi, tilt):
-        xp = _xp(phi)
         q = tuple(float(v) for v in tilt)
         spec = self._spectrum(q)
+        return self._project(phi, q, spec)
+
+    def _project(self, phi, q, spec):
+        xp = _xp(phi)
         # Discrete eigenvectors have sum |v_i|²=1, while psi is area normalized.
         if xp is np:
             basis = spec.vectors[:, : self.count]
@@ -318,23 +341,98 @@ class AxialSpectralObservable:
                     self._device_cache.popitem(last=False)
             self._device_cache.move_to_end(q)
             basis = self._device_cache[q]
-        coeff = basis.conj().T @ phi.reshape(-1) * np.sqrt(self.grid.cell_area_ang2)
+        scalar = phi.ndim == 2
+        coeff = phi.reshape(-1, basis.shape[0]) @ basis.conj() * np.sqrt(self.grid.cell_area_ang2)
         pop = xp.abs(coeff) ** 2
         valid = np.ones(self.count, dtype=bool)
         if self.cutoff_eV is not None:
             valid &= spec.energies_eV[: self.count] <= self.cutoff_eV
         if self.representation == "states":
             assert self.groups is not None
-            values = xp.stack([xp.sum(pop[s] * xp.asarray(valid[s])) for s in self.groups])
+            values = xp.stack(
+                [xp.sum(pop[:, s] * xp.asarray(valid[s]), axis=-1) for s in self.groups],
+                axis=-1,
+            )
         else:
             e = spec.energies_eV[: self.count]
             bins = np.searchsorted(self.edges_eV, e, side="right") - 1
             bins[e == self.edges_eV[-1]] = len(self.edges_eV) - 2
             values = xp.stack(
-                [xp.sum(pop * xp.asarray(valid & (bins == i))) for i in range(self.width)]
+                [xp.sum(pop * xp.asarray(valid & (bins == i)), axis=-1) for i in range(self.width)],
+                axis=-1,
             )
-        represented = xp.sum(values)
-        return xp.concatenate([values, represented[None]])
+        represented = xp.sum(values, axis=-1)
+        result = xp.concatenate([values, represented[:, None]], axis=-1)
+        return result[0] if scalar else result
+
+    def defer_batch(self, states, tilts, destination):
+        """Queue immutable states and a live accumulator view under a byte cap."""
+        xp = _xp(states)
+        # One transfer for all scalar carrier components, including device q.
+        qs = xp.asarray(tilts)
+        qs = qs if xp is np else xp.asnumpy(qs)
+        if self.representation == "states":
+            for q in dict.fromkeys(tuple(q) for q in qs):
+                self._spectrum(q)  # retain the fixed-carrier refusal after a kick
+            destination += self._project(states, self.initial_tilt, self._base_spectrum).sum(axis=0)
+            return
+        per_state = states[0].nbytes
+        if per_state > PENDING_SPECTRAL_BYTES:
+            # A single state must not silently exceed the queue's declared cap.
+            self.flush()
+            for state, q in zip(states, qs, strict=True):
+                destination += self(state, q)
+            return
+        capacity = max(1, PENDING_SPECTRAL_BYTES // per_state)
+        for start in range(0, len(states), capacity):
+            chunk = states[start : start + capacity]
+            if self._pending_bytes + chunk.nbytes > PENDING_SPECTRAL_BYTES:
+                self.flush()
+            self._pending.append((chunk.copy(), qs[start : start + capacity].copy(), destination))
+            self._pending_bytes += chunk.nbytes
+
+    def flush(self):
+        """Resolve sectors in deterministic batches and fill queued accumulators."""
+        if not self._pending:
+            return
+        from ._axial_spectral_batch import transverse_spectra_batch
+
+        xp = _xp(self._pending[0][0])
+        keys = list(dict.fromkeys(tuple(q) for _, qs, _ in self._pending for q in qs))
+        for start in range(0, len(keys), self._max_sectors):
+            group = keys[start : start + self._max_sectors]
+            missing = [q for q in group if q not in self._cache]
+            spectra = {}
+            if missing and self.representation == "energy_bins" and xp is not np:
+                solved = transverse_spectra_batch(
+                    self.grid,
+                    self.potential,
+                    self.energy_eV,
+                    missing,
+                    self.count + int(self.count < np.prod(self.grid.shape)),
+                    self._base_spectrum,
+                    base_tilt=self.initial_tilt,
+                    xp=xp,
+                )
+                spectra = dict(zip(missing, solved, strict=True))
+            self._flush_sectors(group, spectra)
+        self._pending.clear()
+        self._pending_bytes = 0
+
+    def _flush_sectors(self, keys, spectra):
+        for q in keys:
+            spec = spectra.pop(q, None)
+            if spec is None:
+                spec = self._spectrum(q)
+            self._device_cache.pop(q, None)
+            for states, qs, destination in self._pending:
+                indices = np.flatnonzero(np.all(qs == q, axis=1))
+                if indices.size:
+                    destination += self._project(states[indices], q, spec).sum(axis=0)
+            self._cache[q] = spec
+            self._cache.move_to_end(q)
+            if len(self._cache) > self._max_sectors:
+                self._cache.popitem(last=False)
 
 
 class ReferenceCoherenceObservable:
@@ -359,6 +457,18 @@ class ReferenceCoherenceObservable:
         self.recording_bytes = self.recording_width * 16
         self.scratch_bytes = 4 * int(np.prod(grid.shape)) * 16
         self._device_coordinates = None
+
+    def sum_batch(self, states, tilts):
+        """Sum physical reference correlations and their second moments."""
+        xp = _xp(states)
+        q = xp.asarray(tilts)[:, :, None, None]
+        dx, dy = xp.asarray(self.delta_x), xp.asarray(self.delta_y)
+        ref = states[:, self.reference_index[0], self.reference_index[1]]
+        cross = states * ref.conj()[:, None, None]
+        cross *= xp.exp(1j * (q[:, 0] * dx + q[:, 1] * dy))
+        return xp.concatenate(
+            [xp.sum(cross, axis=0).ravel(), xp.sum(xp.abs(cross) ** 2, axis=0).ravel()]
+        )
 
     def __call__(self, phi, tilt):
         xp = _xp(phi)

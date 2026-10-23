@@ -22,6 +22,9 @@ from .axial_mcwf import (
     density_observable,
 )
 
+# Limit speculative storage and wasted FFTs when a threshold crosses mid-block.
+_CHECK_STEPS = 8
+
 
 def _callback_check(observable, hook):
     for name, callback in (("observable", observable), ("jump_hook", hook)):
@@ -54,7 +57,16 @@ def _observe(cp, observable, lagged, half, live, tilts, area, total):
     if observable is density_observable:
         value = cp.sum(cp.abs(states) ** 2, axis=0)
         return value if total is None else total + value
-    for b, state in zip(cp.asnumpy(cp.flatnonzero(live)), states, strict=True):
+    indices = cp.asnumpy(cp.flatnonzero(live))
+    batch_tilts = None
+    if hasattr(observable, "prepare_batch") or hasattr(observable, "sum_batch"):
+        batch_tilts = tilts[live]
+    if hasattr(observable, "prepare_batch"):
+        return observable.prepare_batch(states, batch_tilts, total)
+    if hasattr(observable, "sum_batch"):
+        value = observable.sum_batch(states, batch_tilts)
+        return value if total is None else total + value
+    for b, state in zip(indices, states, strict=True):
         value = observable(state, tilts[b])
         if not isinstance(value, cp.ndarray):
             raise TypeError("CUDA observable must return a CuPy array")
@@ -94,7 +106,7 @@ def _admit(solver, backend, batch_size, budget, depths, observable, component_co
         bins=cells,
         itemsize=16,
         budget_bytes=limit - fixed,
-        intermediates=12,
+        intermediates=12 + _CHECK_STEPS,
         minimum_chunk=1,
     )
 
@@ -164,7 +176,7 @@ def run_cuda(
                 batch.lagged,
                 batch.half,
                 batch.live,
-                batch.tilts,
+                batch.device_tilts,
                 solver.grid.cell_area_ang2,
                 sums[index],
             )
@@ -172,6 +184,8 @@ def run_cuda(
         absorbed += batch.absorbed_after_entry
     if jump_hook is not None:
         jumps["absorbed"] = absorbed
+    if hasattr(observable, "flush"):
+        observable.flush()
     template = next((s for s in sums if s is not None), None)
     if template is None:
         template = (
@@ -211,11 +225,13 @@ class _Batch:
         self.area = device.grid.cell_area_ang2
         phi /= cp.sqrt(cp.sum(cp.abs(phi) ** 2, axis=(1, 2)) * self.area)[:, None, None]
         self.tilts = [tilt] * size
+        self.device_tilts = cp.broadcast_to(cp.asarray(tilt), (size, 2)).copy()
         self.live = cp.ones(size, dtype=bool)
-        for b in range(size):
-            kept = _hook(cp, hook, start + b, phi[b], tilt, self.area)
-            self.live[b] = kept is not None
-            phi[b] = 0 if kept is None else kept
+        if hook is not None:
+            for b in range(size):
+                kept = _hook(cp, hook, start + b, phi[b], tilt, self.area)
+                self.live[b] = kept is not None
+                phi[b] = 0 if kept is None else kept
         self.live_count = int(self.live.sum())
         self.absorbed = size - self.live_count
         self.absorbed_after_entry = 0
@@ -226,15 +242,31 @@ class _Batch:
 
     def advance(self, target, step_ang, phase, jumps, sinks):
         cp = self.cp
+        # Large ensembles cross thresholds often; avoid replaying many large
+        # FFTs for a rare opportunity to combine host checks.
+        checks = min(_CHECK_STEPS, max(1, BATCH // len(self.live)))
         while self.step < target and self.live_count:
-            self.lagged *= self.full
-            self.lagged = cp.fft.fft2(
-                phase * cp.fft.ifft2(self.lagged, axes=(-2, -1)), axes=(-2, -1)
-            )
-            self.step += 1
-            norms = cp.sum(cp.abs(self.lagged) ** 2, axis=(1, 2)) * self.area / self.lagged[0].size
-            for b in np.flatnonzero(cp.asnumpy(self.live & (norms <= self.thresholds))):
-                self.jump(int(b), norms[b], step_ang, jumps, sinks)
+            states, crossings, norms = [], [], []
+            for _ in range(min(checks, target - self.step)):
+                # Do not mutate snapshots: a jump rolls the whole batch back
+                # to its first crossing. Speculation consumes no RNG draws.
+                self.lagged = cp.fft.fft2(
+                    phase * cp.fft.ifft2(self.lagged * self.full, axes=(-2, -1)),
+                    axes=(-2, -1),
+                )
+                norm = (
+                    cp.sum(cp.abs(self.lagged) ** 2, axis=(1, 2)) * self.area / self.lagged[0].size
+                )
+                states.append(self.lagged)
+                norms.append(norm)
+                crossings.append(self.live & (norm <= self.thresholds))
+            crossed = cp.asnumpy(cp.stack(crossings))
+            events = np.flatnonzero(crossed.any(axis=1))
+            index = int(events[0]) if events.size else len(states) - 1
+            self.lagged = states[index]
+            self.step += index + 1
+            for b in np.flatnonzero(crossed[index]):
+                self.jump(int(b), norms[index][b], step_ang, jumps, sinks)
 
     def jump(self, b, norm, step_ang, jumps, sinks):
         cp = self.cp
@@ -245,6 +277,7 @@ class _Batch:
         if kind == "sink":
             sinks.append(self.step * step_ang)
         elif kind == "electronic":
+            self.device_tilts[b] = cp.stack([cp.asarray(v) for v in self.tilts[b]])
             self.half[b] = self.device._half_kinetic(self.tilts[b], step_ang)
             self.full[b] = self.half[b] ** 2
         kept = _hook(cp, self.hook, self.start + b, state, self.tilts[b], self.area)

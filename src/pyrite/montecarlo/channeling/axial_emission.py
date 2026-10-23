@@ -381,6 +381,25 @@ class LevelDensity:
             blocks.append(xp.outer(amplitude, amplitude.conj()).ravel())
         return xp.concatenate(blocks)
 
+    def sum_batch(self, states, tilts):
+        """Reduce orbital density matrices across live electrons on device."""
+        xp = np
+        if hasattr(states, "__cuda_array_interface__"):
+            import cupy as xp
+        self(states[0], tilts[0])  # populate immutable device orbitals once
+        if xp is np:
+            x, y, orbitals = self.grid.x[:, None], self.grid.y[None, :], self._orbitals
+        else:
+            assert self._cuda_cache is not None
+            x, y, orbitals = self._cuda_cache
+        q = xp.asarray(tilts)[:, :, None, None]
+        psi = states * xp.exp(1j * (q[:, 0] * x + q[:, 1] * y))
+        blocks = []
+        for basis in orbitals:
+            amplitude = xp.einsum("sij,bij->bs", basis.conj(), psi) * self.grid.cell_area_ang2
+            blocks.append((amplitude.T @ amplitude.conj()).ravel())
+        return xp.concatenate(blocks)
+
     def unpack(self, values: np.ndarray) -> list[np.ndarray]:
         """Split an observable vector into per-level density matrices."""
         out, start = [], 0
