@@ -28,6 +28,7 @@ GATED = (
 #: Gate failures traced to the reference: Geant4's GS Mott correction assumes
 #: a point nucleus, PyRITE's ELSEPA tables a Fermi charge distribution, which
 #: suppresses the large-angle exit tail above ~0.3 rad in W at 50-100 MeV.
+#: The point-nucleus control (``<case>_point.json``) passes them.
 REFERENCE_MODEL_FAILURES = {("w_50mev", "theta_rms_rad"), ("w_100mev", "theta_rms_rad")}
 
 
@@ -36,9 +37,9 @@ def _gate(pyrite, geant4):
     return abs(a - b) <= max(0.05 * abs(b), 3.0 * np.hypot(sa, sb))
 
 
-def _load(case):
+def _load(case, variant=""):
     reference = json.loads((BENCH / "reference" / f"{case}.json").read_text())
-    result = json.loads((BENCH / "results" / f"{case}.json").read_text())
+    result = json.loads((BENCH / "results" / f"{case}{variant}.json").read_text())
     return reference, result
 
 
@@ -52,6 +53,16 @@ def test_committed_reduction_meets_gates(case):
     for name in GATED:
         passed = _gate(result[name], reference[name])
         assert passed != ((case, name) in REFERENCE_MODEL_FAILURES), (case, name)
+
+
+@pytest.mark.parametrize("case", sorted({case for case, _ in REFERENCE_MODEL_FAILURES}))
+def test_point_nucleus_control_meets_gates(case):
+    """With a point-nucleus ELSEPA W table, as Geant4's GS Mott correction
+    assumes, the reference-model failures close and every gate passes."""
+    reference, result = _load(case, "_point")
+    assert result["meta"]["elastic_override"] == "point-nucleus"
+    for name in GATED:
+        assert _gate(result[name], reference[name]), (case, name)
 
 
 def _observables(E0_eV, fate, E_exit_eV, cos_exit, photon_primary, photon_k_eV):

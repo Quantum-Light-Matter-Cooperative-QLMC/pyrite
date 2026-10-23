@@ -62,7 +62,7 @@ Only the primary is transported. Elastic scattering is analog, so a primary
 scattered to grazing can need ~10⁵ steps (W at 3 MeV). The driver therefore
 raises `max_steps` to 300,000 and runs 50-primary batches, because rows are
 preallocated as batch × `max_steps`. `run_pyrite.sbatch` runs ten 10,000-primary
-shards per case.
+shards per case. `run_control.sbatch` runs the point-nucleus control below.
 
 ## Comparison
 
@@ -70,6 +70,8 @@ shards per case.
 uv run python checks/mev_full_track/compare.py reduce-geant4 RAW_DIR
 uv run python checks/mev_full_track/compare.py reduce-pyrite RAW_DIR
 uv run python checks/mev_full_track/compare.py --output report.json
+uv run python checks/mev_full_track/compare.py reduce-pyrite RAW_DIR --variant point
+uv run python checks/mev_full_track/compare.py --variant point
 ```
 
 The gates were fixed before any PyRITE result was inspected. An observable
@@ -88,6 +90,65 @@ Reported, not gated:
 - the implementation check: PyRITE's realized photons against BremsLib
   moments on its own track-length spectrum;
 - Kolmogorov distances of the binned loss, angle and photon spectra.
+
+## Results
+
+Lab-box job 1840 (2026-10-22), 100,000 primaries per case, PyRITE/Geant4:
+
+| Case | Not transmitted | Deposit | Transmitted loss | θ_mean | θ_rms | Photon E ≥ 10 keV | Photon N ≥ 100 keV | Gates |
+|---|---:|---:|---:|---:|---:|---:|---:|---|
+| W 3 MeV | 1.029 | 1.035 | 1.027 | 0.993 | 0.993 | 1.023 | 1.039 | pass |
+| W 10 MeV | 0.917 | 1.013 | 1.001 | 0.996 | 0.993 | 0.988 | 1.010 | pass |
+| W 30 MeV | 0.63 | 1.005 | 1.009 | 0.991 | 0.965 | 1.012 | 1.008 | pass |
+| W 50 MeV | 0.83 | 1.001 | 1.024 | 0.987 | **0.928** | 1.029 | 1.020 | θ_rms fails |
+| W 100 MeV | 0.81 | 0.998 | 1.023 | 0.989 | **0.926** | 1.026 | 1.019 | θ_rms fails |
+| Si 3 MeV | 1.082 | 1.009 | 1.009 | 1.000 | 0.999 | 1.036 | 1.052 | pass |
+| Si 10 MeV | 0.91 | 1.002 | 1.009 | 1.007 | 1.006 | 1.039 | 1.032 | pass |
+| Si 30 MeV | 1.13 | 1.001 | 1.005 | 0.997 | 0.982 | 1.008 | 1.028 | pass |
+| Si 50 MeV | 1.00 | 1.000 | 1.017 | 0.994 | 0.949 | 1.032 | 1.011 | pass |
+| Si 100 MeV | 0.33 | 0.999 | 1.006 | 0.999 | 0.959 | 1.008 | 1.015 | pass |
+
+Non-transmitted fractions above 10 MeV are a few to a few tens of primaries,
+so their ratios carry large errors. All of them pass within 3σ.
+
+- **Exit-angle tail.** For W at 50 and 100 MeV, the rms over θ below
+  0.2–0.5 rad agrees within 0.5 %. The θ_rms deficit comes from the 0.1–1 %
+  of primaries that leave above ~0.3 rad, where PyRITE has 15–45 % fewer.
+  Geant4's GS Mott correction uses the Mott DCS of a point nucleus
+  (`G4GSMottCorrection.hh`). PyRITE's ELSEPA tables use a Fermi charge
+  distribution. In W, ELSEPA's Fermi/point DCS ratio is 0.37 at 1 rad and
+  50 MeV, against an observed tail ratio of 0.32 ± 0.08. At 0.5 rad and
+  100 MeV it is 0.54, against 0.60 ± 0.08.
+- **Point-nucleus control.** Lab-box job 1968 reran W 50 and 100 MeV with a
+  point-nucleus table from `point_nucleus_table.py` (`run_control.sbatch`,
+  `pyrite_bench.py --elastic-npz`). Every gate passes. θ_rms is 0.981 and
+  0.988 and θ_mean 0.998 and 0.999; the other observables are unchanged
+  (`results/<case>_point.json`). The two failures are therefore a difference
+  in the reference's nuclear model, not in transport.
+- **Photons.** PyRITE's realized hard photons match its own BremsLib partition
+  on its own track-length spectrum within 1.5 % in every case (the
+  implementation check). On Geant4's track, BremsLib gives 1–4 % more photon
+  energy than PenBrem (the isolated model check). Photon counts above 1 keV
+  are 15–24 % below Geant4 for W at 30 MeV and above, because PenBrem has no
+  dielectric suppression.
+- **Loss spectrum.** Without fluctuations the transmitted-loss peak is nearly
+  deterministic. For W at 30 and 100 MeV it falls on a log-bin edge, which
+  is why `ks_loss` is about 0.5 there. The mean losses differ by less than
+  0.5 %.
+
+`tests/montecarlo/test_mev_full_track.py` pins these reductions and the
+control. It also reruns Si 30 MeV and W 10 MeV at 300 primaries against the
+Geant4 gates; these runs are marked slow.
+
+### ELSEPA point-nucleus runs
+
+One `elscata` run of the point-nucleus deck over all 61 production energies
+returns a first transport cross section that stops falling above ~1 MeV: 7×
+the Fermi value at 25 MeV and 92× at 100 MeV. Run alone, the same energy
+gives 1.09× and 1.27×. The first control (job 1948) used such a table and is
+discarded. `point_nucleus_table.py` now runs one energy per call. Before
+writing the table, it checks that the Fermi deck run the same way reproduces
+the production table within 1e-6, so the production table is not affected.
 
 ## Lab-box table incident
 

@@ -11,6 +11,12 @@ writes the sampler arrays without touching the table store. Running
 ``pyrite_bench.py`` with ``--elastic-npz`` on the result isolates the nuclear
 model as the cause of the W 50/100 MeV exit-angle tail difference.
 
+ELSEPA runs once per energy. One point-nucleus run over the whole 61-energy
+grid returned a first transport cross section that stops falling above
+~1 MeV (92x the Fermi value at 100 MeV, against 1.27x for a single-energy
+run), so each panel is generated alone and the Fermi deck, run the same way,
+must reproduce the production table before the point table is written.
+
 Validation: mev-full-track-transport
 """
 
@@ -36,15 +42,30 @@ def main(argv):
         raise RuntimeError("production W table is not the default free-atom deck")
     if deck.nuclear_model != 3:
         raise RuntimeError(f"expected a Fermi-nucleus production deck, got {deck.nuclear_model}")
-    point = dataclasses.replace(deck, nuclear_model=1)
     source = resolve_source("elsepa", None)
     binary = build(source, "elscata", toolchain=find_toolchain())
-    run = run_program(
-        binary, data_dirs=source.data_dirs, stdin_text=point.render(), outputs=point.output_names
-    )
-    panels = [parse_dcs(run.outputs[name]) for name in point.output_names]
-    arrays = table_arrays(panels, energies_ev=point.energies_ev)
-    np.savez_compressed(argv[0], production_key=request.key, **arrays)
+
+    def panels(nuclear_model):
+        out = []
+        for energy in deck.energies_ev:
+            single = dataclasses.replace(deck, energies_ev=(energy,), nuclear_model=nuclear_model)
+            run = run_program(
+                binary,
+                data_dirs=source.data_dirs,
+                stdin_text=single.render(),
+                outputs=single.output_names,
+            )
+            out.append(parse_dcs(run.outputs[single.output_names[0]]))
+        return table_arrays(out, energies_ev=deck.energies_ev)
+
+    fermi, point = panels(3), panels(1)
+    reference = production.tables[0].arrays()
+    for name in ("total_elastic_cm2", "transport1_cm2", "dcs_cm2_sr"):
+        np.testing.assert_allclose(fermi[name], reference[name], rtol=1e-6, err_msg=name)
+    ratio = point["transport1_cm2"] / fermi["transport1_cm2"]
+    if not (np.all(ratio > 0.99) and np.all(ratio < 1.5) and np.all(np.diff(ratio) > -1e-3)):
+        raise RuntimeError(f"point/Fermi transport ratio out of range: {ratio}")
+    np.savez_compressed(argv[0], production_key=request.key, **point)
 
 
 if __name__ == "__main__":
