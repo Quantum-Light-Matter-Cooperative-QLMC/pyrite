@@ -32,6 +32,8 @@ def radiation_cross_section_ang2(element: str) -> float:
     ``L'_rad = ln(1194 Z^-2/3)`` for ``Z > 4`` and Tsai's tabulated values
     below. Complete screening, high-energy limit; the ``Z L'_rad`` term is the
     atomic-electron contribution.
+
+    Validation: radiation-length-tsai
     """
     z = Z_TABLE[element]
     l_rad = _L_RAD_LIGHT.get(z, math.log(184.15 * z ** (-1.0 / 3.0)))
@@ -46,6 +48,8 @@ def radiation_length_ang(composition: Iterable[tuple[str, float]]) -> float:
 
     Inverse lengths add by number density (Bragg additivity of the per-atom
     radiative cross section), the number-density form of PDG Eq. 34.28.
+
+    Validation: radiation-length-tsai
     """
     inverse = sum(float(n) * radiation_cross_section_ang2(el) for el, n in composition)
     if not inverse > 0.0:

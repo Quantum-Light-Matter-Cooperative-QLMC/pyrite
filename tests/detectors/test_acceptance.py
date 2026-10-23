@@ -196,7 +196,7 @@ def test_equal_acceptance_preserves_lowered_case_and_both_identities():
     # and the #439 line-kinematics v5 marker.
     assert (
         case_content_key(cases[1])
-        == "ea16913de8f0d97f4461eb2b8f1bd1f31a4fbce4d802ba2b21dda7164cde5afb"
+        == "6468c58e6dae36db65b81eaed1efb32e7ce6b689f446e32711664aad339ddfc7"
     )
     sweeps = [
         LegacySweep(material="hopg", beam=beam.to_spec(), target=target, detector=d)
@@ -206,7 +206,7 @@ def test_equal_acceptance_preserves_lowered_case_and_both_identities():
     assert identities[0] == identities[1]
     assert (
         identities[1]["parameter_sha256"]
-        == "3ca2ca38a4d9a35e1b61125c3ee2cfc5eb30576ae1190882735bbbdeaf3d2fcd"
+        == "28fbc99f7b7562c4ba3973eb830d24466a259bc7a7b326b317d4ebc45276bf2f"
     )
     # Pin to the pre-object payload vocabulary; no acceptance metadata enters identity.
     assert "detector" not in identities[0]["resolved_parameters"]["sweep"]

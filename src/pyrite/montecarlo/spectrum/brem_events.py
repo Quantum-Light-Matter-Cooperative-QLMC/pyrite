@@ -71,6 +71,40 @@ def _uncoupled_view(segments, cutoff_eV, bremslib_tables, kwargs):
     return view
 
 
+def _scoring_plasma_eV(segments, kwargs):
+    """Check that emission uses the *emitting layer's* transport suppression.
+
+    A layer view has one composition; the stack metadata records all layer
+    plasma energies. Missing metadata denotes the historical unsuppressed
+    transport mode. Comparing against all entries also supports identical
+    materials in several layers without needing a separate layer index.
+
+    Validation: dielectric-suppression
+    """
+    radiative = segments.get("radiative") or {}
+    if radiative.get("dielectric_model") is None:
+        return 0.0
+    if radiative["dielectric_model"] != "ter-mikaelian-v1":
+        raise ValueError("unknown dielectric suppression recorded on transport rows")
+    from ...materials import MediumSpec
+    from ...materials.attenuation import plasma_energy_eV
+
+    composition = kwargs.get("composition")
+    if composition is None:
+        # The legacy element + number density form is accepted for direct
+        # single-material callers of the coupled scorers.
+        from ...materials.attenuation import _normalize_composition
+
+        composition = _normalize_composition(
+            kwargs.get("element"), kwargs.get("n_atoms_per_ang3"), None
+        )
+    plasma = plasma_energy_eV(MediumSpec("coupled-scoring-layer", tuple(composition)))
+    expected = tuple(radiative.get("plasma_energy_eV_by_layer", ()))
+    if not expected or not any(np.isclose(plasma, value, rtol=1e-10) for value in expected):
+        raise ValueError("scoring material does not match transport dielectric plasma energy")
+    return plasma
+
+
 def mc_coupled_brem_spectrum(segments, E_grid_eV, *, cutoff_eV, bremslib_tables, **kwargs):
     """Expected-value continuum on coupled tracks, soft and hard photons alike.
 
@@ -85,8 +119,14 @@ def mc_coupled_brem_spectrum(segments, E_grid_eV, *, cutoff_eV, bremslib_tables,
     Validation: bremslib-coupled-expected-spectrum
     """
     view = _uncoupled_view(segments, cutoff_eV, bremslib_tables, kwargs)
+    plasma_eV = _scoring_plasma_eV(segments, kwargs)
     return mc_brem_spectrum(
-        view, E_grid_eV, cross_section_model="bremslib", bremslib_tables=bremslib_tables, **kwargs
+        view,
+        E_grid_eV,
+        cross_section_model="bremslib",
+        bremslib_tables=bremslib_tables,
+        dielectric_plasma_eV=plasma_eV,
+        **kwargs,
     )
 
 
@@ -110,6 +150,7 @@ def mc_soft_brem_spectrum(segments, E_grid_eV, *, cutoff_eV, bremslib_tables, **
         E_grid_eV,
         cross_section_model="bremslib",
         bremslib_tables=bremslib_tables,
+        dielectric_plasma_eV=_scoring_plasma_eV(segments, kwargs),
         **kwargs,
     )
     soft = np.asarray(full).copy()

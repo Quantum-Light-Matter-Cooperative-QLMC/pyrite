@@ -41,6 +41,8 @@ def traversed_radiation_lengths(case: Mapping[str, Any]) -> float:
 
     Straight-line primary path through every transport layer at the case
     tilt; scattering only lengthens it, so this is a lower bound.
+
+    Validation: radiation-length-tsai
     """
     total = sum(
         (float(bottom) - float(top)) / radiation_length_ang(composition)
@@ -51,7 +53,10 @@ def traversed_radiation_lengths(case: Mapping[str, Any]) -> float:
 
 
 def warn_thick_target(case: Mapping[str, Any]) -> None:
-    """Warn once per case above the pair threshold and ``THICK_TARGET_X0_FRACTION``."""
+    """Warn once per case above the pair threshold and ``THICK_TARGET_X0_FRACTION``.
+
+    Validation: radiation-length-tsai
+    """
     if float(case["E0_keV"]) <= THICK_TARGET_MIN_E0_KEV:
         return
     depth = traversed_radiation_lengths(case)

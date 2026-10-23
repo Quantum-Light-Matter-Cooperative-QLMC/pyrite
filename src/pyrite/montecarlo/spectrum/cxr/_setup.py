@@ -203,7 +203,7 @@ def _prepare_spectrum(request):
 
     Returns the :class:`_SpectrumSetup` the accumulation phases consume.
 
-    Validation: coherent-formation-absorption
+    Validation: coherent-formation-absorption, line-kinematics-precision
     Validation: sinc-bin-integration
     Validation: transverse-bunch-form-factor
     """

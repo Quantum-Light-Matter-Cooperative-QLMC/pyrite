@@ -3,6 +3,10 @@
 Validation: bremslib-radiative-partition
 """
 
+import hashlib
+import io
+from pathlib import Path
+
 import numpy as np
 import pytest
 
@@ -156,12 +160,12 @@ _ESTAR_RADIATIVE_MEV_CM2_G = {
 
 
 @pytest.mark.parametrize("element", sorted(_ESTAR_RADIATIVE_MEV_CM2_G))
-def test_released_bremslib_total_moment_matches_seltzer_berger_nuclear_share(element):
-    # Independent benchmark of the integrated first moment. BremsLib is
-    # electron-atom (screened-nucleus) partial-wave bremsstrahlung; ESTAR adds
-    # electron-electron bremsstrahlung, which approaches 1/Z of the nuclear
-    # term at high energy. BremsLib may therefore fall short by at most that
-    # share, plus the 3 % that also bounds the high-Z agreement.
+def test_released_bremslib_total_moment_matches_estar(element):
+    # Independent benchmark of the integrated first moment. The staged
+    # BremsLib electron-nucleus term carries Seltzer-Berger's electron-electron
+    # ratio, as ESTAR does. Without it carbon fell 11 % short at 10-30 MeV;
+    # with it every element is within ESTAR's 2-50 MeV uncertainty (3-10 %,
+    # Seltzer and Berger 1985), and heavy elements within 3 %.
     from pyrite.materials._transport_data import TRANSPORT_ELEMENTS
     from pyrite.xsgen._errors import TableNotFoundError
     from pyrite.xsgen.bremslib import tables as bremslib_tables
@@ -183,7 +187,103 @@ def test_released_bremslib_total_moment_matches_seltzer_berger_nuclear_share(ele
             )
         ]
     )
-    assert np.all(ratio <= 1.03)
-    assert np.all(ratio >= 1.0 / (1.0 + 1.0 / Z) - 0.03)
+    assert np.all((ratio >= 0.97) & (ratio <= 1.06))
     if Z >= 30:
         np.testing.assert_allclose(ratio, 1.0, atol=0.03)
+
+
+# Pinned NIST ESTAR downloads (checks/reference/estar/README.md).
+_ESTAR_DIR = Path(__file__).resolve().parents[2] / "checks" / "reference" / "estar"
+_ESTAR_SHA256 = {
+    "graphite": "427849a47e310ba2ced63988965a1f1a4f5409790c7a100f034b91fbfc5b6dca",
+    "molybdenum": "d44a6fd7e496fc770679f752bf26545a2c9b94f98f6297d625c3f0d31234867f",
+    "silicon": "ac02e55f68576901068169864dc0ff88ad24e4a6c4f26337002afd94f24f0dec",
+    "tungsten": "6b50749e1e5ecdc49b84ada9142b64691299e963b4032c83190f0e581e228a3d",
+}
+_MEV_ENERGIES_MEV = (1.0, 3.0, 10.0, 30.0, 40.0, 50.0, 60.0, 80.0, 100.0)
+
+
+def _estar_rows(name):
+    data = (_ESTAR_DIR / f"{name}.txt").read_bytes()
+    assert hashlib.sha256(data).hexdigest() == _ESTAR_SHA256[name]
+    rows = np.loadtxt(io.StringIO(data.decode("ascii")), skiprows=8)
+    return {round(float(row[0]), 6): row[1:4] for row in rows}
+
+
+def _released_table(element):
+    from pyrite.xsgen._errors import TableNotFoundError
+    from pyrite.xsgen.bremslib import tables as bremslib_tables
+
+    try:
+        return bremslib_tables.load_bremsstrahlung_tables([element])[element]
+    except TableNotFoundError as exc:
+        pytest.skip(f"released BremsLib tables are not installed: {exc}")
+
+
+@pytest.mark.parametrize(
+    ("estar_name", "element", "plasma_key"),
+    [
+        ("graphite", "C", None),
+        ("silicon", "Si", "silicon"),
+        ("molybdenum", "Mo", None),
+        ("tungsten", "W", "tungsten"),
+    ],
+)
+def test_released_partition_closes_and_matches_estar_to_100_mev(estar_name, element, plasma_key):
+    # Issue #439 extension to 100 MeV, with the dielectric suppression of
+    # coupled runs where the material has a catalog plasma energy. Soft + hard
+    # must equal the uncut first moment exactly; the moment itself must stay
+    # inside Seltzer-Berger's 3-10 % (2-50 MeV) uncertainty. Measured
+    # 2026-10-22: 1.009-1.053, highest for C and W at 100 MeV.
+    from pyrite.materials._transport_data import TRANSPORT_ELEMENTS
+    from pyrite.materials.attenuation import plasma_energy_eV
+
+    table = _released_table(element)
+    plasma = 0.0 if plasma_key is None else plasma_energy_eV(plasma_key)
+    grams_per_atom = TRANSPORT_ELEMENTS[element]["A"] / 6.02214076e23
+    estar = _estar_rows(estar_name)
+    for energy_MeV in _MEV_ENERGIES_MEV:
+        energy = energy_MeV * 1e6
+        cut = build_radiative_partition(table, energy, 1.0e3, plasma_energy_eV=plasma)
+        uncut = build_radiative_partition(table, energy, energy, plasma_energy_eV=plasma)
+        np.testing.assert_allclose(
+            cut.soft_stopping_cs_eV_cm2 + cut.hard_stopping_cs_eV_cm2,
+            uncut.soft_stopping_cs_eV_cm2,
+            rtol=1e-12,
+        )
+        ratio = cut.total_stopping_cs_eV_cm2 * 1e-6 / grams_per_atom / estar[energy_MeV][1]
+        assert 0.97 <= ratio <= 1.06, (energy_MeV, ratio)
+
+
+@pytest.mark.parametrize("material", ["silicon", "tungsten"])
+def test_coupled_total_stopping_matches_estar_to_100_mev(material):
+    # Maintainer decision (2026-10-22, #439): split gates. SBETHE collision
+    # stopping within 2 % of ESTAR; total within 5 %, because BremsLib + SB85
+    # e-e radiative stopping sits 2-5 % above ESTAR (SB's own 3-10 %).
+    # Measured: collision 0.998-1.017, total 1.005-1.021 (Si), 1.013-1.044 (W).
+    from pyrite.materials._transport_data import TRANSPORT_ELEMENTS
+    from pyrite.materials.attenuation import plasma_energy_eV
+    from pyrite.montecarlo.transport.shell_rates import adopted_stopping_cs
+    from pyrite.xsgen._errors import TableNotFoundError
+
+    element = {"silicon": "Si", "tungsten": "W"}[material]
+    table = _released_table(element)
+    plasma = plasma_energy_eV(material)
+    grams_per_atom = TRANSPORT_ELEMENTS[element]["A"] / 6.02214076e23
+    estar = _estar_rows(material)
+    for energy_MeV in _MEV_ENERGIES_MEV:
+        energy = energy_MeV * 1e6
+        try:
+            collision = adopted_stopping_cs(material, energy) * 1e-6 / grams_per_atom
+        except TableNotFoundError as exc:
+            pytest.skip(f"released SBETHE tables are not installed: {exc}")
+        radiative = (
+            build_radiative_partition(
+                table, energy, 1.0e3, plasma_energy_eV=plasma
+            ).total_stopping_cs_eV_cm2
+            * 1e-6
+            / grams_per_atom
+        )
+        estar_collision, _, estar_total = estar[energy_MeV]
+        np.testing.assert_allclose(collision, estar_collision, rtol=0.02)
+        np.testing.assert_allclose(collision + radiative, estar_total, rtol=0.05)

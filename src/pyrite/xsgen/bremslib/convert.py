@@ -138,6 +138,8 @@ def build_table(
         If the library's own structure does not hold: a retained energy
         without its full set of ``k/T1`` nodes, a node whose ratio is not a
         grid value, or two nodes claiming the same grid position.
+
+    Validation: bremslib-high-energy-extension
     """
     nodes = [node for node in iter_node_files(library, z) if node.t1_MeV <= t1_max_MeV]
     if not nodes:

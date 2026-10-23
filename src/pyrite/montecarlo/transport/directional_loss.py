@@ -53,6 +53,8 @@ class UniaxialDielectric:
     ``tolerance`` so every mixed loss function is a positive spectral density.
     ``eps1_static_*`` anchor ``eps1(0)`` for the static sum rule (``None`` when
     the table starts too high to extrapolate).
+
+    Validation: cr-valence-directional-loss
     """
 
     energy_eV: np.ndarray
@@ -117,6 +119,8 @@ class DirectionalValence:
         Per node, the share of the closure above the last tabulated energy.
     label
         Provenance string, including the flagged tail assumption.
+
+    Validation: cr-valence-directional-loss
     """
 
     energies_eV: np.ndarray
@@ -304,6 +308,8 @@ def load_directional_loss(
     scaled figure branches already divided). Curves are interpolated onto the
     union of their energies; ``eps2`` is clipped at zero below
     ``eps2_floor`` and rejected below ``-eps2_floor``.
+
+    Validation: cr-valence-directional-loss
     """
     registry = tomllib.loads((Path(path) if path else DIRECTIONAL_LOSS_PATH).read_bytes().decode())
     if key not in registry:
@@ -367,6 +373,8 @@ def load_directional_valence(key: str) -> DirectionalValence:
 
     The plasma energy is that of the conduction-band electrons,
     ``Omega_p sqrt(N_cb / N_total)`` of the catalog oscillators.
+
+    Validation: cr-valence-directional-loss
     """
     from .shell_rates import catalog_shell_oscillators
 
@@ -389,6 +397,8 @@ def registered_directional_valence(crystal: str) -> tuple[DirectionalValence, tu
 
     ``optic_axis`` is the ``c`` direction in the catalog Cartesian frame. A
     registered crystal whose curves are missing raises ``FileNotFoundError``.
+
+    Validation: cr-valence-directional-loss
     """
     registry = tomllib.loads(DIRECTIONAL_LOSS_PATH.read_bytes().decode())
     if crystal not in registry:

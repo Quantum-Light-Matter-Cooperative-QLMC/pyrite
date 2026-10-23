@@ -22,9 +22,14 @@ from ..eedl_ionization import eedl_path
 from ..transport import TRANSPORT_ELEMENTS
 from .brem_bremslib import (
     BremsLibBremsstrahlungTable,
+    _warn_bremslib_element_missing,
+    _warn_bremslib_out_of_range,
     bremslib_segment_state,
+    dielectric_scoring_factor,
+    dielectric_scoring_plasma,
     evaluate_bremslib,
     resolve_auto_model,
+    stage_bremslib_elements,
     stage_bremslib_table,
 )
 from .brem_unit_base import _unit_base_panels
@@ -725,25 +730,6 @@ def _require_bremslib_tables(
     return bremslib_tables
 
 
-def _warn_bremslib_element_missing(element: str, stacklevel: int) -> None:
-    warnings.warn(
-        f"no BremsLib table supplied for {element}; its bremsstrahlung falls back to "
-        "isotropic EEDL emission",
-        RuntimeWarning,
-        stacklevel=stacklevel + 1,
-    )
-
-
-def _warn_bremslib_out_of_range(table: BremsLibBremsstrahlungTable, stacklevel: int) -> None:
-    warnings.warn(
-        f"Z={table.atomic_number} incident energy is outside the BremsLib range "
-        f"[{table.minimum_incident_energy_keV:g}, {table.maximum_incident_energy_keV:g}] keV; "
-        "falling back to isotropic EEDL emission for those segments",
-        RuntimeWarning,
-        stacklevel=stacklevel + 1,
-    )
-
-
 def _bremsstrahlung_dsigma_dk(
     element: str,
     T_keV,
@@ -868,6 +854,7 @@ def mc_brem_spectrum(
     cross_section_model: BremsstrahlungModel | Literal["auto"] = "auto",
     bremslib_tables: Mapping[str, BremsLibBremsstrahlungTable] | None = None,
     electron_band_weights=None,
+    dielectric_plasma_eV: float = 0.0,
 ):
     """Return the incoherent bremsstrahlung density from transport segments.
 
@@ -957,6 +944,7 @@ def mc_brem_spectrum(
     if cross_section_model == "auto":
         cross_section_model, bremslib_tables = resolve_auto_model(segments, comp, bremslib_tables)
     cross_section_model = _validate_bremsstrahlung_model(cross_section_model)
+    plasma_eV = dielectric_scoring_plasma(dielectric_plasma_eV, cross_section_model)
     supplied_bremslib = (
         _require_bremslib_tables(bremslib_tables) if cross_section_model == "bremslib" else {}
     )
@@ -1013,24 +1001,14 @@ def mc_brem_spectrum(
         if cross_section_model in {"eedl", "bremslib"}
         else {}
     )
-    bremslib_staged = {}
+    bremslib_staged: dict = {}
     bremslib_covers: dict[str, bool] = {}
     if cross_section_model == "bremslib":
+        bremslib_staged, bremslib_covers = stage_bremslib_elements(
+            comp, supplied_bremslib, seg_E, strict=bool(plasma_eV)
+        )
         v_hat = xp.asarray(segments["v_hat"], dtype=REAL)[brem_idx][owner]
         seg_cos_theta = v_hat @ xp.asarray(n_hat, dtype=REAL)
-        for el_i, _ in comp:
-            table = supplied_bremslib.get(el_i)
-            if table is None:
-                _warn_bremslib_element_missing(el_i, stacklevel=2)
-                continue
-            covers = not seg_E.size or bool(
-                (float(_to_cpu(seg_E.min())) >= table.minimum_incident_energy_keV)
-                and (float(_to_cpu(seg_E.max())) <= table.maximum_incident_energy_keV)
-            )
-            if not covers:
-                _warn_bremslib_out_of_range(table, stacklevel=2)
-            bremslib_staged[el_i] = stage_bremslib_table(table)
-            bremslib_covers[el_i] = covers
 
     spec = xp.zeros(E_grid.size, dtype=REAL)
 
@@ -1125,6 +1103,7 @@ def mc_brem_spectrum(
                     number_density_ang3=n_i,
                     n_layers=n_abs_layers,
                     out=spec,
+                    plasma_eV=plasma_eV,
                 )
             elif cross_section_model in {"eedl", "bremslib"} and context is not None:
                 state = context.state
@@ -1184,6 +1163,8 @@ def mc_brem_spectrum(
                 # 4 pi d2sigma/(dk dOmega): the common 1/(4 pi) below then
                 # leaves the direction-resolved density per steradian.
                 dsig = REAL(4.0 * np.pi) * evaluate_bremslib(staged, bremslib_state, E_grid)
+                if plasma_eV:
+                    dsig = dsig * dielectric_scoring_factor(seg_E[sl], E_grid, plasma_eV)
                 if bremslib_covers[el_i]:
                     _accumulate(n_i * 1e24 * path_cm, dsig * T_abs, sl)
                     continue

@@ -453,6 +453,7 @@ def _radiative_kernel_args(radiative_args, photon_segments):
             dummy_float64,
             dummy_float64,
             dummy_float64,
+            dummy_float64,  # inert plasma-energy array for uncoupled kernels
             np.int32(1),
             np.int32(1),
             np.int32(1),
@@ -470,6 +471,7 @@ def _radiative_kernel_args(radiative_args, photon_segments):
         nominal,
         top,
         chi,
+        plasma_by_layer,
     ) = radiative_args
     seg_rad_k, seg_rad_Z = photon_segments
     return (
@@ -484,6 +486,7 @@ def _radiative_kernel_args(radiative_args, photon_segments):
         nominal.reshape(-1),
         top.reshape(-1),
         chi.reshape(-1),
+        plasma_by_layer.reshape(-1),
         np.int32(z.shape[1]),
         np.int32(incident.shape[2]),
         np.int32(nominal.shape[2]),

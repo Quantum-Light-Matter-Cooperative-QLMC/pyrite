@@ -586,12 +586,11 @@ def test_extended_table_radiative_stopping_continues_the_complete_grid(z):
 
     The extension holds the library SDCS at ``k/T1 <= 0.95`` and fills only
     the tip, so its first moment must track ESTAR (Seltzer--Berger) the way
-    the complete grid does at 30 MeV: BremsLib omits electron-electron
-    bremsstrahlung, ~1/Z of the nuclear term, so C and Si sit near the
-    nuclear share; W sits 1--3 % above ESTAR across 30--100 MeV. The bounds
-    are that share minus 3 % below and +4 % above, and the ratio may drift
-    from its 30 MeV value by at most 2.5 %, which a lost tip, a misplaced
-    column or an unscaled row would all exceed.
+    the complete grid does at 30 MeV. Both include electron-electron
+    bremsstrahlung; C, Si and W sit 2--5 % above ESTAR across 30--100 MeV.
+    The bounds are -3 % and +6 % (Seltzer--Berger quote 3--10 % at 2--50
+    MeV), and the ratio may drift from its 30 MeV value by at most 2.5 %,
+    which a lost tip, a misplaced column or an unscaled row would all exceed.
 
     Validation: bremslib-high-energy-extension
     """
@@ -615,8 +614,7 @@ def test_extended_table_radiative_stopping_continues_the_complete_grid(z):
             for energy, estar in zip((50.0, 100.0), _ESTAR_RADIATIVE_ABOVE_30_MEV[z], strict=True)
         ]
     )
-    assert np.all(ratio <= 1.04)
-    assert np.all(ratio >= 1.0 / (1.0 + 1.0 / z) - 0.03)
+    assert np.all((ratio >= 0.97) & (ratio <= 1.06))
     np.testing.assert_allclose(ratio, at_30, rtol=0.025)
 
 

@@ -230,6 +230,7 @@ def make_cpu_transport_core(
                 rad_nominal,
                 rad_top,
                 rad_chi,
+                rad_plasma,
             ) = radiative_args
         if per_electron:
             (e_start, e_count, cap, stream_key) = run
@@ -380,6 +381,7 @@ def make_cpu_transport_core(
                     E_j * 1e3,
                     rad_cutoff_eV,
                     rad_element_rates,
+                    rad_plasma,
                 )
                 if tau_rad[e] < 0.0:
                     tau_rad[e] = -np.log(_stream_uniform_scalar(rad_keys[e], rad_draws[e]))
@@ -595,6 +597,7 @@ def make_cpu_transport_core(
                             0.5 * (E_j + E_cut_e) * 1e3,
                             rad_cutoff_eV,
                             rad_scratch_rates,
+                            rad_plasma,
                         )
                         cutoff_rate -= rad_cut_soft * 1e-3
                     cutoff_distance = (E_cut_e - E_j) / cutoff_rate
@@ -650,6 +653,7 @@ def make_cpu_transport_core(
                                 0.5 * (E_j + E_pred) * 1e3,
                                 rad_cutoff_eV,
                                 rad_scratch_rates,
+                                rad_plasma,
                             )
                             mid_rate -= rad_mid_soft * 1e-3
                         E_end_j = E_j + step_j * mid_rate
@@ -765,6 +769,7 @@ def make_cpu_transport_core(
                         E_end_j * 1e3,
                         rad_cutoff_eV,
                         rad_scratch_rates,
+                        rad_plasma,
                     )
                     u_el = _stream_uniform_scalar(rad_keys[e], rad_draws[e])
                     u_k = _stream_uniform_scalar(rad_keys[e], rad_draws[e] + _SM64_ONE)
@@ -787,6 +792,7 @@ def make_cpu_transport_core(
                         E_end_j * 1e3,
                         rad_cutoff_eV,
                         u_k,
+                        rad_plasma[L],
                     )
                     rad_event_Z = rad_Z[L, element_index]
                     if E_end_j - rad_k_eV * 1e-3 <= E_cut_e:

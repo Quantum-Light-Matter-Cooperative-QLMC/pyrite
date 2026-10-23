@@ -35,10 +35,10 @@ from typing import Any
 
 import numpy as np
 
-from ..._backend import REAL, xp
+from ..._backend import REAL, _to_cpu, xp
 from ..._bremslib_table import (
-    _RATIO_COUNT,
     BREMSSTRAHLUNG_BREMSLIB_MODEL,
+    STAGED_RATIO_COUNT,
     BremsLibBremsstrahlungTable,
     prepare_bremslib_table,
     solid_angle_integral,
@@ -84,7 +84,7 @@ def stage_bremslib_table(table: BremsLibBremsstrahlungTable) -> _StagedBremsLib:
 
 @dataclass(frozen=True, slots=True)
 class _BremsLibSegmentState:
-    """Per-segment incident-energy bracket and node values, O(Nsegment * 13)."""
+    """Per-segment incident-energy bracket and node values, O(Nsegment * 18)."""
 
     incident_energy_keV: Any
     available: Any
@@ -108,7 +108,7 @@ def _incident_bracket(staged: _StagedBremsLib, T_keV):
 
 
 def bremslib_segment_state(staged: _StagedBremsLib, T_keV, cos_theta=None):
-    """Bracket each segment in ``ln T`` and gather its 2 x 13 node values.
+    """Bracket each segment in ``ln T`` and gather its 2 x 18 node values.
 
     With ``cos_theta`` the node values are the scaled DDCS at each segment's
     emission angle, interpolated linearly in ``theta``; without it they are
@@ -146,19 +146,19 @@ def bremslib_segment_state(staged: _StagedBremsLib, T_keV, cos_theta=None):
 
 
 def _along_reduced_energy(staged, values, top, reduced):
-    """Interpolate ``(M, 13)`` node values linearly in ``k/T`` at ``(M, NE)``.
+    """Interpolate ``(M, 18)`` node values linearly in ``k/T`` at ``(M, NE)``.
 
     Above the top node (``k/T`` between it and 1) the top value is held: the
     library stops a 50 eV (or 1e-4 T) outgoing electron short of the tip.
     """
     inner = staged.inner_reduced_energy
     nominal = staged.table.nominal_reduced_energy
-    lower = xp.searchsorted(inner, reduced, side="right")  # 0..11
+    lower = xp.searchsorted(inner, reduced, side="right")  # 0..16
     x0 = xp.asarray(nominal, dtype=REAL)[lower]
     x1 = xp.where(
-        lower == _RATIO_COUNT - 2,
+        lower == STAGED_RATIO_COUNT - 2,
         top[:, None],
-        xp.asarray(nominal, dtype=REAL)[xp.minimum(lower + 1, _RATIO_COUNT - 1)],
+        xp.asarray(nominal, dtype=REAL)[xp.minimum(lower + 1, STAGED_RATIO_COUNT - 1)],
     )
     fraction = xp.clip((reduced - x0) / (x1 - x0), REAL(0.0), REAL(1.0))
     rows = xp.arange(values.shape[0])[:, None]
@@ -210,6 +210,81 @@ def evaluate_bremslib_rows(staged: _StagedBremsLib, state: _BremsLibSegmentState
     return _evaluate(staged, state, xp.asarray(photon_energy_eV, dtype=REAL)[:, None])[:, 0]
 
 
+#: Electron rest energy in eV, as in ``transport.dielectric_radiative``.
+_ELECTRON_REST_EV = 510998.95
+
+
+def _warn_bremslib_element_missing(element: str, stacklevel: int) -> None:
+    warnings.warn(
+        f"no BremsLib table supplied for {element}; its bremsstrahlung falls back to "
+        "isotropic EEDL emission",
+        RuntimeWarning,
+        stacklevel=stacklevel + 1,
+    )
+
+
+def _warn_bremslib_out_of_range(table: BremsLibBremsstrahlungTable, stacklevel: int) -> None:
+    warnings.warn(
+        f"Z={table.atomic_number} incident energy is outside the BremsLib range "
+        f"[{table.minimum_incident_energy_keV:g}, {table.maximum_incident_energy_keV:g}] keV; "
+        "falling back to isotropic EEDL emission for those segments",
+        RuntimeWarning,
+        stacklevel=stacklevel + 1,
+    )
+
+
+def stage_bremslib_elements(comp, tables, seg_E_keV, *, strict=False):
+    """Stage each composition element's table and whether it covers ``seg_E_keV``.
+
+    An element without a table, or a table not covering every segment energy,
+    warns and leaves those segments to the isotropic EEDL fallback. ``strict``
+    (dielectric-coupled scoring) refuses that fallback instead: the transport
+    that produced the segments used the suppressed BremsLib DCS throughout.
+    """
+    staged, covers = {}, {}
+    for element, _ in comp:
+        table = tables.get(element)
+        if table is None:
+            if strict:
+                raise ValueError("dielectric-coupled scoring requires all BremsLib tables")
+            _warn_bremslib_element_missing(element, stacklevel=3)
+            continue
+        covered = not seg_E_keV.size or bool(
+            (float(_to_cpu(seg_E_keV.min())) >= table.minimum_incident_energy_keV)
+            and (float(_to_cpu(seg_E_keV.max())) <= table.maximum_incident_energy_keV)
+        )
+        if not covered:
+            if strict:
+                raise ValueError("dielectric-coupled BremsLib scorer cannot fall back to EEDL")
+            _warn_bremslib_out_of_range(table, stacklevel=3)
+        staged[element] = stage_bremslib_table(table)
+        covers[element] = covered
+    return staged, covers
+
+
+def dielectric_scoring_plasma(plasma_eV, cross_section_model) -> float:
+    """Validate the scorer's ``hbar*omega_p`` (eV); zero is the vacuum limit."""
+    plasma = float(plasma_eV)
+    if not np.isfinite(plasma) or plasma < 0.0:
+        raise ValueError("dielectric_plasma_eV must be finite and nonnegative")
+    if plasma and cross_section_model != "bremslib":
+        raise ValueError("dielectric suppression requires BremsLib scoring")
+    return plasma
+
+
+def dielectric_scoring_factor(T_keV, photon_eV, plasma_eV):
+    """Ter--Mikaelian ``k**2/(k**2 + (gamma*Ep)**2)`` on a (segment, photon) grid.
+
+    The factor is isotropic at fixed ``(T, k)``, so it scales the DDCS without
+    changing its conditional angular shape. Backend twin of
+    ``spectrum.dielectric_suppression.ter_mikaelian_factor``.
+
+    Validation: dielectric-suppression
+    """
+    scale = (1.0 + T_keV[:, None] * 1e3 / _ELECTRON_REST_EV) * plasma_eV
+    return xp.square(photon_eV[None, :] / xp.hypot(photon_eV[None, :], scale))
+
+
 def resolve_auto_model(segments, comp, bremslib_tables):
     """Pick ``"bremslib"`` or ``"eedl"`` for ``cross_section_model="auto"``.
 
@@ -240,6 +315,9 @@ def resolve_auto_model(segments, comp, bremslib_tables):
 
 __all__ = [
     "resolve_auto_model",
+    "dielectric_scoring_factor",
+    "dielectric_scoring_plasma",
+    "stage_bremslib_elements",
     "BREMSSTRAHLUNG_BREMSLIB_MODEL",
     "BremsLibBremsstrahlungTable",
     "bremslib_segment_state",

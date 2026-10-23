@@ -65,7 +65,7 @@ def schiff_density(
     in units of ``mc^2``. Born approximation, Thomas--Fermi screening, no
     electron-electron term, small angles; ``Z -> 0`` in ``M`` gives 2BN(a).
 
-    Validation: bremslib-angular-schiff
+    Validation: bremslib-angular-schiff, bremslib-high-energy-extension
     """
     E0 = 1.0 + incident_energy_MeV / ELECTRON_REST_ENERGY_MEV
     k = kappa * incident_energy_MeV / ELECTRON_REST_ENERGY_MEV

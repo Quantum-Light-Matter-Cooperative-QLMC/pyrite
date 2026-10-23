@@ -35,6 +35,36 @@ from v4 to v5. Only the generation-dependent `case_content_key` and
 re-pinned. On CPU/NumPy fp64 the line spectra move at rounding level only, so
 every recorded output keeps its expectation and tolerance.
 
+## Always-on Ter–Mikaelian coupling (#439)
+
+Applying the dielectric factor `k²/(k² + (γħω_p)²)` to every coupled BremsLib
+run (not only runs reaching 30 MeV) changed `BREMSSTRAHLUNG_BREMSLIB_MODEL` to
+`…/tm-coupled-v2`. Re-pinned: the `coupled` and `cascade` identity hashes in
+`resolved.json`, and the `coupled` output in `outputs.json`. With the 1 keV
+photon cutoff and `ħω_p ≈ 31 eV`, Si soft radiative stopping falls about 5 %
+at 10–40 keV and the hard rate about 2e-4; on the 1e4-inflated synthetic
+tables the seeded tracks diverge (rows 1355 → 1613, path +3.4 %, continuum
+sum +1.6 %). Other outputs and tolerances are unchanged.
+
+## Electron–electron bremsstrahlung (#439)
+
+Staging every BremsLib table with five `k/T1` sub-nodes in `(0, 0.1)` and
+the Seltzer–Berger (1985) factor `1 + η/Z` changed
+`BREMSSTRAHLUNG_BREMSLIB_MODEL` to `…/lin-x18-…-v2/tm-coupled-v2/ee-sb85-v1`.
+Re-pinned: the `coupled` and `cascade` identity hashes in `resolved.json`,
+and the `coupled` and `cascade` outputs in `outputs.json`. With the factor
+switched off, the sub-nodes alone reproduce the previous `coupled` transport
+bit for bit and its continuum to 4e-16. At 5–200 keV the factor is
+1.002–1.02, but on the 1e4-inflated synthetic tables the seeded tracks
+diverge (`coupled` rows 1613 → 2272, path +25 %, continuum sum +3.1 %;
+`cascade` rows 596 → 542). Other outputs and tolerances are unchanged.
+
+## Channeling content key after rebase (#439)
+
+After rebasing onto `main` (#536/#541), `channeling.json`'s
+`case_content_key` was re-pinned for the v5 line-kinematics marker on the
+rebased generation. Its resolved case payload is identical to `main`'s.
+
 ## Fixture inputs
 
 `resolved.json` stores full resolved case mappings, `case_content_key` and

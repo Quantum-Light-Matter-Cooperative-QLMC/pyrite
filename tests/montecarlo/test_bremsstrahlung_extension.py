@@ -17,14 +17,18 @@ from tests.helpers.bremslib import (
 COMPLETE_T1_MEV = np.array([10.0, 20.0, 30.0])
 EXTENSION_T1_MEV = np.array([50.0, 100.0])
 
+#: Library ``k/T1`` columns among the staged ones (the rest are sub-nodes).
+LIBRARY_COLUMNS = np.r_[0, 6:18]
+
 
 @pytest.fixture(scope="module")
 def tables():
     complete = synthetic_bremslib_arrays(COMPLETE_T1_MEV)
     extended = extend_synthetic_arrays(complete, EXTENSION_T1_MEV)
+    # Electron-nucleus only: the extension is checked against library data.
     return (
-        prepare_bremslib_table(complete, atomic_number=14),
-        prepare_bremslib_table(extended, atomic_number=14),
+        prepare_bremslib_table(complete, atomic_number=14, electron_electron=False),
+        prepare_bremslib_table(extended, atomic_number=14, electron_electron=False),
     )
 
 
@@ -52,10 +56,12 @@ def test_complete_rows_are_unchanged_by_the_extension(tables):
 
 def test_library_sdcs_is_kept_and_the_tip_ratio_is_held_from_the_last_complete_row(tables):
     _, extended = tables
-    anchor = extended.scaled_sdcs_mb[_row(extended, 30.0)]
+    library = extended.scaled_sdcs_mb[:, LIBRARY_COLUMNS]
+    anchor = library[_row(extended, 30.0)]
+    x = extended.nominal_reduced_energy[LIBRARY_COLUMNS]
     for t1 in EXTENSION_T1_MEV:
-        row = extended.scaled_sdcs_mb[_row(extended, t1)]
-        expected = 10.0 * (1.0 - 0.5 * extended.nominal_reduced_energy[:11]) * t1**-0.1
+        row = library[_row(extended, t1)]
+        expected = 10.0 * (1.0 - 0.5 * x[:11]) * t1**-0.1
         np.testing.assert_allclose(row[:11], expected, rtol=1e-14)
         np.testing.assert_allclose(row[11:] / row[10], anchor[11:] / anchor[10], rtol=1e-14)
 

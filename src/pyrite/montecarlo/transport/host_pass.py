@@ -972,6 +972,7 @@ def _add_optional_fields(t, o, rows, result):
             p.bremslib_tables,
             c.radiative_cutoff_eV,
             p.seed if p._secondary is None else p._secondary.photon_seed,
+            t.radiative_args[-1],
         )
     if p.collect_diagnostics:
         result["transport_diagnostics"] = _flight_diagnostic_summary(

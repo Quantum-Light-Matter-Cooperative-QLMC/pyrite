@@ -70,7 +70,7 @@ def reflection_rows(
     coherent window seeds; see :func:`kinematic_cxr_seeds` for the source
     equation and root solver.
 
-    Validation: line-window-seeding
+    Validation: line-window-seeding, line-kinematics-precision
     """
     from .cxr._kernels import _vacuum_doppler
     from .segment_escape import segment_escape_gradient

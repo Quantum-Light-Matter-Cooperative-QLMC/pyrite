@@ -180,7 +180,7 @@ def _coherent_prologue_kernel(
 ):
     # g-major fixed order: pair_index = reflection*n_segments + segment.  The reduction kernel then
     # reads each g row contiguously while its threads stride over segments.
-    """Validation: xray-in-medium-resonance"""
+    """Validation: xray-in-medium-resonance, line-kinematics-precision"""
     pair_index = jit.blockIdx.x * jit.blockDim.x + jit.threadIdx.x
     if pair_index >= pair_count:
         return

@@ -124,7 +124,7 @@ def test_typed_case_content_key_matches_pre_case_golden():
     # #513: static CBS potential U_g bumps the line-escape marker to v4.
     # #439: cancellation-free line kinematics bump the line-escape marker to v5.
     assert case_content_key(case) == (
-        "fd31f5942e05c5e25b248b071bd1b60088222690b7359b947a575242f6bd370c"
+        "a15fa28f70238a8372cd8da70d88f4febf3b7cf029649d16e791c32221fd92cb"
     )
 
 
@@ -135,7 +135,7 @@ def test_dataset_identity_dispatches_through_recorded_v1():
     assert set(IDENTITY_MIGRATIONS) == {1}
     assert identity["identity_version"] == 1
     assert identity["parameter_sha256"] == (
-        "7d2f9c146a2f201434657aa8c9f65a52dac49e8e40d22f5bb95aa2acd80cdb96"
+        "fc43b33c362e63029ac83073baaa48ebaba8a738f1264c8bcb57f7ef9c8b51be"
     )
     with pytest.raises(ValueError, match="unsupported dataset identity version"):
         dataset_identity("hopg", "full", default_settings(), sweep, identity_version=2)
@@ -551,7 +551,7 @@ def test_standard_detector_keeps_current_payload_and_digest_bit_for_bit():
     sweep_payload = identity["resolved_parameters"]["sweep"]
 
     assert identity["parameter_sha256"] == (
-        "7d2f9c146a2f201434657aa8c9f65a52dac49e8e40d22f5bb95aa2acd80cdb96"
+        "fc43b33c362e63029ac83073baaa48ebaba8a738f1264c8bcb57f7ef9c8b51be"
     )
     assert "detector" not in sweep_payload
     assert sweep_payload["theta_obs_deg"] == 90.0
@@ -565,43 +565,43 @@ def test_standard_detector_keeps_current_payload_and_digest_bit_for_bit():
         (
             "hopg_hbn_gaussian_200fs",
             "hopg",
-            "0be01032d44a975eb7a2e8de77d8e3b64da47e968f9c89ceb73be1961c18ac9e",
+            "73faaebbb545243092908c6fe41dc808c620dc2d884fb04125227b7b71239407",
         ),
         (
             "hopg_hbn_gaussian_200fs",
             "hbn",
-            "1db7d49ed1452f2da7bc5657534a05c9d9f7fdbea536fb66db2767b12d971713",
+            "e04cde4be0e8080869eebe0cf3a02153930b58a4faf5823d28c73d0f43ce74dd",
         ),
         (
             "hopg_hbn_microtrain_200fs",
             "hopg",
-            "b0f300577453ec50be0506943eface2bfc73327dacaa1cfb6ce2aaa71a7fb7c4",
+            "20af34de942b226199d7a8015295b8d53075e22a0506bfd5bd169942734c5bce",
         ),
         (
             "hopg_hbn_microtrain_200fs",
             "hbn",
-            "2173e05cd180dcb184af56292dad2f82055967260b475129d7367413809bdbe3",
+            "0402642e242562ba1c9cda6a137f2c25cc78ba29ee5059ab7cea448c1eb6cf04",
         ),
         (
             "hopg_hbn_compressed_microbunch",
             "hopg",
-            "f90d2d281173773093912229aa0f3dad5c784a99bc096812fb4a7f809392985e",
+            "c2d48070a9ebc3861d30135b6d565b716d762e875e5b4720daabf2295bed4893",
         ),
         (
             "hopg_hbn_compressed_microbunch",
             "hbn",
-            "9ebb2ed71787e68967cb4b8351c55439d4521cec1c7259e745a1043e0f504b2f",
+            "9a27eb240e8770ed98aa099b5dff8e44d7e112fe1c616ed0ffca686a1fa22a28",
         ),
         (
             "hopg_emittance_demo",
             "hopg",
-            "37c7808c0b808ddf4cea2922312ba99c7860a7a8d6c51bdcea5b81aa743a390e",
+            "d15d0445b491e6583d1eaf0c41be24b6f515a037992967644e543f0e4b5822ea",
         ),
         (
             "promising_low_ne",
             "hopg",
             # #465: coherent operator identity advanced to physical-distinct-pairs-v4.
-            "9563af91db58d1a47568241ddbba1fc090eadea932d8af4053c0347fae879abf",
+            "b15439a6ba15d55227425099aef8afc4986c231ea2aea03426687c82810b7c51",
         ),
     ],
 )
@@ -634,6 +634,9 @@ def test_named_beam_migration_keeps_shipped_profile_digests_bit_for_bit(
     became ``physical-distinct-pairs-v2`` (finite-footprint transverse form
     factor and tilted face-arrival delay), then ``physical-distinct-pairs-v3``
     for #365 (flat omission certified by ``F_z F_perp``).
+    Issue #439 re-minted every pin for the ``segment-mean-v5-precise-kinematics``
+    line-escape marker and the BremsLib
+    ``…/lin-x18-geo4-ln-t-lin-theta-v2/tm-coupled-v2/ee-sb85-v1`` marker.
 
     Issue #100's derived photon-continuum floor deliberately did NOT move these:
     it raises a brem grid's ``start`` where the band meets the material, in
@@ -795,7 +798,7 @@ def test_emission_modes_yield_three_distinct_digests_incoherent_unchanged():
     # issue #256's dropped uniform E_grid_brem override, which the sweep-level
     # payload hashes although no case grid changed) must stay bit-for-bit.
     assert incoherent["parameter_sha256"] == (
-        "7d2f9c146a2f201434657aa8c9f65a52dac49e8e40d22f5bb95aa2acd80cdb96"
+        "fc43b33c362e63029ac83073baaa48ebaba8a738f1264c8bcb57f7ef9c8b51be"
     )
     survey_incoherent = dataset_identity(
         "mose2", "survey", default_settings("survey"), material_sweep("mose2", fidelity="survey")
@@ -812,7 +815,7 @@ def test_emission_modes_yield_three_distinct_digests_incoherent_unchanged():
     # issue #218: mose2 gained conduction-band data, so the default "auto"
     # inelastic model now resolves to shell-soft-hard (50 eV cutoff).
     assert survey_incoherent["parameter_sha256"] == (
-        "eec1a99f21256a60bb70623fb7291f6b0dc7dc8c25a3554c3148a597bbe9a61c"
+        "7a6e5866bc5ee97852ed796d9785575f770b1c02a93923f3428eafa91f5446bc"
     )
 
 
@@ -1018,14 +1021,14 @@ def test_atomic_electron_deflection_forks_identity_and_none_restores_it():
     # The pre-#317 pins of test_dataset_identity_dispatches_through_recorded_v1
     # and test_typed_case_content_key_matches_pre_case_golden.
     assert dataset_identity("hopg", "full", off, sweep)["parameter_sha256"] == (
-        "0e932f9e16d378fc5d02cebdebec2ff9fd408b6992231ecf185bb1cfd4230485"
+        "9278c58023cb41f083d243fb0b08873f500b69950cb633dd7874b521e5d51813"
     )
     case = build_cases(
         sweep, n_electrons=300, n_electrons_brem=150, atomic_electron_deflection="none"
     )[0]
     assert "atomic_electron_deflection" not in case
     assert case_content_key(case) == (
-        "5cee8ff027a9bc62d08ccdf723ff1b8fa3b196b6326bc036db0836093543b215"
+        "c47770b640aebc2f2414b2f56eccd2a1db83dd85d0e7ca071decbd130d23ee22"
     )
     with pytest.raises(ValueError, match="atomic_electron_deflection"):
         build_cases(sweep, 4, 4, atomic_electron_deflection="z1")

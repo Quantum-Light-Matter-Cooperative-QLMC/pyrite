@@ -113,6 +113,62 @@ def test_directional_bremslib_kernel_matches_chunked_cuda_fallback(monkeypatch):
     np.testing.assert_allclose(fused, fallback, rtol=5e-4, atol=1e-20)
 
 
+@pytest.mark.skipif(BACKEND.name != "cuda", reason="run with PYRITE_TEST_BACKEND=cuda")
+def test_dielectric_bremslib_kernel_matches_chunked_cuda_scorer(monkeypatch):
+    """#439: the fused reducer applies the same Ter--Mikaelian factor as the portable path."""
+    from pyrite.montecarlo.spectrum import brem
+    from pyrite.montecarlo.spectrum.brem_bremslib import prepare_bremslib_table
+    from tests.helpers.bremslib import synthetic_bremslib_arrays
+
+    segments = {
+        "r_mid": np.array([[0.0, 0.0, 20.0], [0.0, 0.0, 55.0], [0.0, 0.0, 80.0]], np.float32),
+        "v_hat": np.array(
+            [[0.0, 0.0, 1.0], [0.5, 0.0, np.sqrt(0.75)], [1.0, 0.0, 0.0]], dtype=np.float32
+        ),
+        "L_ang": np.array([45.0, 130.0, 300.0], dtype=np.float32),
+        "E_keV": np.array([3.0e4, 6.0e4, 1.0e5], dtype=np.float32),
+        "elec_id": np.arange(3),
+        "Ne": 3,
+        "thickness_ang": 100.0,
+    }
+    # 200 eV-100 keV straddles a = gamma*Ep (about 1.9-6.1 keV in Si).
+    energy_eV = np.geomspace(200.0, 1.0e5, 193).astype(np.float32)
+    table = prepare_bremslib_table(
+        synthetic_bremslib_arrays(t1_MeV=np.array([10.0, 30.0, 60.0, 100.0])),
+        atomic_number=14,
+        key="synthetic",
+        digest="fixture",
+    )
+    monkeypatch.setattr(
+        brem, "_mu_total_inv_ang", lambda _composition, energy: brem.xp.zeros_like(energy)
+    )
+    kwargs = {
+        "composition": [("Si", 0.05)],
+        "cross_section_model": "bremslib",
+        "bremslib_tables": {"Si": table},
+        "n_hat": np.array([0.0, 0.0, 1.0]),
+        "chunk": 2,
+        "dielectric_plasma_eV": 31.05,
+    }
+    spectra = {}
+    for fused in (True, False):
+        monkeypatch.setattr(brem, "_USE_JIT_BREM_REDUCTION", fused)
+        spectra[fused] = cp.asnumpy(
+            cp.asarray(brem.mc_brem_spectrum(segments, energy_eV, **kwargs))
+        )
+    monkeypatch.setattr(brem, "_USE_JIT_BREM_REDUCTION", True)
+    vacuum = cp.asnumpy(
+        cp.asarray(
+            brem.mc_brem_spectrum(segments, energy_eV, **{**kwargs, "dielectric_plasma_eV": 0.0})
+        )
+    )
+
+    np.testing.assert_allclose(spectra[True], spectra[False], rtol=5e-4, atol=1e-20)
+    # Suppressed at low k, unchanged far above a.
+    assert spectra[True][0] < 0.2 * vacuum[0]
+    np.testing.assert_allclose(spectra[True][-1], vacuum[-1], rtol=1e-2)
+
+
 def _segment_ends(paths):
     """Start/end escape paths ``(n_seg, 2, n_layers)``; ends differ so the mean is exercised."""
     return np.stack((paths, 1.7 * paths + 15.0), axis=1).astype(np.float32)
