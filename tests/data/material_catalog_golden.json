@@ -97,6 +97,7 @@
     "tis2",
     "tise2",
     "tite2",
+    "tungsten",
     "v2o5",
     "vse2",
     "vte2",
@@ -5886,16 +5887,16 @@
           ]
         ]
       ],
-      "V_cell": 248.19409350142797,
+      "V_cell": 248.19409350142794,
       "mosaic_fwhm_deg": null,
       "composition": [
         [
           "Re",
-          0.016116418983101167
+          0.01611641898310117
         ],
         [
           "Se",
-          0.032232837966202334
+          0.03223283796620234
         ]
       ],
       "config": {
@@ -7104,7 +7105,7 @@
           0,
           1
         ],
-        "g_mag": 2.1505324798740353,
+        "g_mag": 2.150532479874035,
         "structure_factor": [
           70.37738610851294,
           44.3453111112303
@@ -7791,16 +7792,16 @@
           ]
         ]
       ],
-      "V_cell": 440.5103448264665,
+      "V_cell": 440.51034482646656,
       "mosaic_fwhm_deg": null,
       "composition": [
         [
           "Te",
-          0.027241130976679444
+          0.02724113097667944
         ],
         [
           "V",
-          0.013620565488339722
+          0.01362056548833972
         ]
       ],
       "config": {
@@ -11121,6 +11122,60 @@
       },
       "profile": "standard",
       "crystal_key": "tite2",
+      "substrate": null,
+      "stack": [],
+      "scan": {
+        "thickness_ang": {
+          "shape": [
+            9
+          ],
+          "sha256": "9743fbc4f38942468cb76297f3ebc91be09eb7936644ba6e99998eeeae2cc32a"
+        },
+        "energy_keV": {
+          "shape": [
+            9
+          ],
+          "sha256": "5a70af6978e762f2c142dbbcb626aa6ee7e1180a17705f26625a444982cd7afa"
+        },
+        "tilt_deg": {
+          "shape": [
+            7
+          ],
+          "sha256": "77befd9328e7f800e61cb1d65c7a098f2f03f3533631edc592aefce242a68583"
+        },
+        "tilt_azim_deg": {
+          "shape": [
+            7
+          ],
+          "sha256": "91f02c38f0ba1c266fbbe66b69e2095bc13890bbcf55539d24422ddd12fefb9f"
+        },
+        "E_grid_line": null,
+        "E_grid_line_by_energy": {},
+        "E_grid_brem": {
+          "shape": [
+            1200
+          ],
+          "sha256": "79f8f20c412aa260b3f00a9e0cb7c2e01c140a18067e9f5fe5e8c9aab64638d2"
+        }
+      }
+    },
+    "tungsten": {
+      "label": "Tungsten (110)",
+      "identity": {
+        "formula": "W",
+        "phase": null,
+        "full_name": "Tungsten",
+        "cut": [
+          1,
+          1,
+          0
+        ],
+        "cut_frame": "plane",
+        "display_name": "Tungsten",
+        "hexagonal": false
+      },
+      "profile": "standard",
+      "crystal_key": "tungsten",
       "substrate": null,
       "stack": [],
       "scan": {
