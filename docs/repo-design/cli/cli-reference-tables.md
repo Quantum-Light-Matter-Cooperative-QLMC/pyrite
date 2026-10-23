@@ -49,7 +49,7 @@ Commands:
 
 ```text
 Usage: pyrite tables fetch [OPTIONS] [eedl|eadl|epdl|epdl-differential|sbethe|sbethe-
-                           tables|elsepa|bremslib]
+                           tables|elsepa|bremslib|bote-salvat]
 
   Fetch pinned data into your user data directory; without CODE, all of it.
 
@@ -75,15 +75,18 @@ Usage: pyrite tables fetch [OPTIONS] [eedl|eadl|epdl|epdl-differential|sbethe|sb
   bremslib       BremsLib-derived bremsstrahlung tables for every element a
                  catalogue material may contain, so no BremsLib checkout is
                  needed for them.
+  bote-salvat    NIST's public-domain Bote-Salvat K/L/M shell-ionization
+                 parameters, read only when a run selects the opt-in
+                 Bote-Salvat ionization model.
 
-  Without CODE every one is fetched in the order above, sbethe-tables and elsepa for
-  both electrons and positrons (the positron pins are what `--projectile positron`
-  installs); one that fails is reported and the rest still run, and the command exits 1
-  if any failed. Data lands in the user data directory, or in the selected workspace
-  when PYRITE_HOME or workspace.root is set. Each archive or file is SHA-256 verified
-  before anything is installed, whether it was downloaded or given with --archive.
-  Download locations are tried in order (upstream, then PyRITE's mirror). A complete
-  existing install returns successfully without network access.
+  Without CODE every one except bote-salvat is fetched in the order above, sbethe-tables
+  and elsepa for both electrons and positrons (the positron pins are what `--projectile
+  positron` installs); one that fails is reported and the rest still run, and the
+  command exits 1 if any failed. Data lands in the user data directory, or in the
+  selected workspace when PYRITE_HOME or workspace.root is set. Each archive or file is
+  SHA-256 verified before anything is installed, whether it was downloaded or given with
+  --archive. Download locations are tried in order (upstream, then PyRITE's mirror). A
+  complete existing install returns successfully without network access.
 
   PyRITE's own archives (epdl, epdl-differential, sbethe-tables, elsepa, bremslib, and
   the eedl and eadl mirrors) are on public GitHub Releases; downloading them needs no
@@ -91,9 +94,9 @@ Usage: pyrite tables fetch [OPTIONS] [eedl|eadl|epdl|epdl-differential|sbethe|sb
 
 Options:
   --archive FILE                  Install CODE from a local copy of the pinned archive
-                                  (for eedl, eadl, epdl and epdl-differential, of the
-                                  pinned file itself) instead of downloading it. Needs
-                                  CODE.
+                                  (for eedl, eadl, epdl, epdl-differential and bote-
+                                  salvat, of the pinned file itself) instead of
+                                  downloading it. Needs CODE.
   --projectile [electron|positron]
                                   Table species. Positron requires CODE elsepa or
                                   sbethe-tables; other data are species-independent.

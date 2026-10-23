@@ -1,12 +1,17 @@
 """Electron-impact characteristic x rays from EEDL, EADL, and xraydb data.
 
+Shell ionization is EEDL by default; ``ionization_model="bote-salvat"`` is the
+opt-in Bote--Salvat reference backend for the K, L and M shells.
+
 Validation: eedl-shell-ionization-comparison
+
+Validation: bote-salvat-ionization-backend
 """
 
 import re
 import warnings
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from functools import cache
 from importlib.metadata import version as package_version
 from pathlib import Path
@@ -21,6 +26,11 @@ from ...materials.attenuation import (
     _finite_mu_or_raise,
     _mu_total_inv_ang,
     _normalize_composition,
+)
+from ..bote_salvat_ionization import (
+    BOTE_SALVAT_SHA256,
+    bote_salvat_energy_grid,
+    load_bote_salvat_parameters,
 )
 from ..eadl_relaxation import EADL_FILENAME as CHARACTERISTIC_EADL_FILENAME
 from ..eadl_relaxation import EADL_SHA256 as CHARACTERISTIC_EADL_SHA256
@@ -50,26 +60,39 @@ from .segment_escape import mean_transmission, segment_escape_paths
 
 FluorescenceYieldSource = Literal["eadl", "elam"]
 _FLUORESCENCE_YIELD_SOURCES = ("eadl", "elam")
+IonizationModel = Literal["eedl", "bote-salvat"]
+_IONIZATION_MODELS = ("eedl", "bote-salvat")
 
 CHARACTERISTIC_ENDF_PARSERPY_VERSION = package_version("endf-parserpy")
 CHARACTERISTIC_XRAYDB_VERSION = package_version("xraydb")
 
 
-def characteristic_model_marker(fluorescence_yields: FluorescenceYieldSource = "eadl") -> str:
-    """Identity marker of the characteristic model for one yield choice.
+def characteristic_model_marker(
+    fluorescence_yields: FluorescenceYieldSource = "eadl",
+    ionization_model: IonizationModel = "eedl",
+) -> str:
+    """Identity marker of the characteristic model for one yield and ionization choice.
 
-    The EEDL and EADL checksums, the parser and xraydb versions, and the
-    fluorescence-yield source all change the scored spectrum, so each is part
-    of the checkpoint identity.
+    The EEDL and EADL checksums, the parser and xraydb versions, the
+    fluorescence-yield source, and the ionization model all change the scored
+    spectrum, so each is part of the checkpoint identity. The default EEDL
+    marker is unchanged by the opt-in Bote--Salvat backend, which appends its
+    parameter checksum.
     """
     if fluorescence_yields not in _FLUORESCENCE_YIELD_SOURCES:
         raise ValueError(f"fluorescence_yields must be one of {_FLUORESCENCE_YIELD_SOURCES}")
+    if ionization_model not in _IONIZATION_MODELS:
+        raise ValueError(f"ionization_model must be one of {_IONIZATION_MODELS}")
+    ionization = (
+        "" if ionization_model == "eedl" else f"/bote-salvat-ionization-{BOTE_SALVAT_SHA256[:12]}"
+    )
     return (
         f"eedl-2025-{CHARACTERISTIC_EEDL_SHA256[:12]}/"
         f"eadl-2025-{CHARACTERISTIC_EADL_SHA256[:12]}/"
         f"endf-parserpy-{CHARACTERISTIC_ENDF_PARSERPY_VERSION}/"
         f"xraydb-{CHARACTERISTIC_XRAYDB_VERSION}-eadl-cascade-{fluorescence_yields}-yields-"
         "lorentzian-segment-escape-v7"
+        f"{ionization}"
     )
 
 
@@ -107,6 +130,11 @@ class CharacteristicCrossSectionTable:
     xraydb has no such line and the EADL transition energy is used.
     ``shell_fluorescence_yield`` is the radiative branching ratio used for each
     ionization subshell, EADL or Elam per ``fluorescence_yields``.
+
+    ``ionization_shell_model[i]`` names the cross-section source of row ``i``:
+    ``"eedl"``, or ``"bote-salvat"`` for the K/L/M shells that
+    ``ionization_model="bote-salvat"`` replaces. ``shell_binding_energy_eV``
+    stays EEDL's; a Bote--Salvat row starts at its own fit edge.
     """
 
     element: str
@@ -131,6 +159,8 @@ class CharacteristicCrossSectionTable:
     cxr_fwhm_eV: np.ndarray
     vacancy_transfer: np.ndarray
     line_yield_per_vacancy: np.ndarray
+    ionization_model: IonizationModel = "eedl"
+    ionization_shell_model: tuple[str, ...] = ()
 
 
 def _level_width_eV(core_widths: Mapping[str, object], level: str) -> float | None:
@@ -449,6 +479,45 @@ def _parse_characteristic_file(
         cxr_fwhm_eV=_readonly([record[5] for record in line_records]),
         vacancy_transfer=_readonly(transfer),
         line_yield_per_vacancy=_readonly(line_yields),
+        ionization_shell_model=("eedl",) * len(ionization_shell_labels),
+    )
+
+
+def _with_bote_salvat_ionization(
+    table: CharacteristicCrossSectionTable,
+) -> CharacteristicCrossSectionTable:
+    """Replace the K/L/M rows of ``table`` by tabulated Bote--Salvat cross sections.
+
+    Each replaced row is tabulated on :func:`bote_salvat_energy_grid` from the
+    fit's own edge to the EEDL row's last projectile energy, so the lin-lin
+    interpolation in scoring tracks the analytical fit and the energy coverage
+    of the EEDL row is kept. Shells the fit does not cover (N and above) keep
+    EEDL. The relaxation cascade, line energies and binding-energy cutoffs are
+    unchanged: only the primary-vacancy rate changes.
+
+    Validation: bote-salvat-ionization-backend
+    """
+    parameters = load_bote_salvat_parameters()
+    if table.atomic_number not in parameters:
+        raise ValueError(f"Bote-Salvat parameters do not cover {table.element}")
+    element = parameters[table.atomic_number]
+    grids = list(table.projectile_energy_eV_by_shell)
+    values = list(table.ionization_cross_sections_cm2_by_shell)
+    models = list(table.ionization_shell_model)
+    for row, shell in enumerate(table.ionization_shell_labels):
+        if shell not in element.shells:
+            continue
+        edge = float(element.edge_eV[element.shells.index(shell)])
+        grid = bote_salvat_energy_grid(edge, float(grids[row][-1]))
+        grids[row] = _readonly(grid)
+        values[row] = _readonly(element.cross_sections_cm2(shell, grid))
+        models[row] = "bote-salvat"
+    return replace(
+        table,
+        projectile_energy_eV_by_shell=tuple(grids),
+        ionization_cross_sections_cm2_by_shell=tuple(values),
+        ionization_model="bote-salvat",
+        ionization_shell_model=tuple(models),
     )
 
 
@@ -456,7 +525,12 @@ def _parse_characteristic_file(
 def _load_packaged_characteristic_cross_sections(
     element: str,
     fluorescence_yields: FluorescenceYieldSource,
+    ionization_model: IonizationModel = "eedl",
 ) -> CharacteristicCrossSectionTable:
+    if ionization_model == "bote-salvat":
+        return _with_bote_salvat_ionization(
+            _load_packaged_characteristic_cross_sections(element, fluorescence_yields, "eedl")
+        )
     return _parse_characteristic_file(
         eedl_path(),
         None,
@@ -470,6 +544,7 @@ def load_characteristic_cross_sections(
     *,
     data_dir: str | Path | None = None,
     fluorescence_yields: FluorescenceYieldSource = "eadl",
+    ionization_model: IonizationModel = "eedl",
 ) -> CharacteristicCrossSectionTable:
     """Load one element's EEDL ionization and EADL/xraydb relaxation table.
 
@@ -488,6 +563,12 @@ def load_characteristic_cross_sections(
         rescales each subshell's radiative branch to xraydb's Elam/Krause
         ``omega_i`` and its nonradiative branch to ``1 - omega_i``, keeping
         each branch's EADL shape.
+    ionization_model
+        ``"eedl"`` (default) uses EEDL MF=23 subshell cross sections for every
+        shell. ``"bote-salvat"`` is the opt-in reference backend: K, L1--L3 and
+        M1--M5 use the Bote--Salvat fit (``pyrite tables fetch bote-salvat``),
+        and higher shells keep EEDL. The runner and checkpoint identity use the
+        default; see :func:`characteristic_model_marker`.
 
     Returns
     -------
@@ -507,8 +588,12 @@ def load_characteristic_cross_sections(
         raise ValueError("element must be a chemical symbol such as 'C' or 'Si'")
     if fluorescence_yields not in _FLUORESCENCE_YIELD_SOURCES:
         raise ValueError(f"fluorescence_yields must be one of {_FLUORESCENCE_YIELD_SOURCES}")
+    if ionization_model not in _IONIZATION_MODELS:
+        raise ValueError(f"ionization_model must be one of {_IONIZATION_MODELS}")
     if data_dir is None:
-        return _load_packaged_characteristic_cross_sections(element, fluorescence_yields)
+        return _load_packaged_characteristic_cross_sections(
+            element, fluorescence_yields, ionization_model
+        )
     candidate = Path(data_dir)
     path = candidate if candidate.is_file() else candidate / CHARACTERISTIC_EEDL_FILENAME
     if not path.is_file():
@@ -521,7 +606,8 @@ def load_characteristic_cross_sections(
         if candidate.is_dir() and (candidate / CHARACTERISTIC_EADL_FILENAME).is_file()
         else None
     )
-    return _parse_characteristic_file(path, eadl_path, element, fluorescence_yields)
+    table = _parse_characteristic_file(path, eadl_path, element, fluorescence_yields)
+    return table if ionization_model == "eedl" else _with_bote_salvat_ionization(table)
 
 
 def _energy_bin_edges_and_widths(E_grid_eV: object) -> tuple[np.ndarray, np.ndarray]:
@@ -655,7 +741,7 @@ def _interpolate_shell_cross_sections(
     table: CharacteristicCrossSectionTable,
     segment_energy_keV: object,
 ):
-    """Linearly interpolate EEDL partial electroionization cross sections."""
+    """Linearly interpolate the table's partial electroionization cross sections."""
     query_eV = xp.asarray(segment_energy_keV, dtype=REAL) * 1.0e3
     columns = []
     for energy_cpu, values_cpu in zip(
@@ -687,6 +773,7 @@ def mc_characteristic_spectrum(
     data_dir=None,
     relaxation_cutoff_eV=None,
     fluorescence_yields: FluorescenceYieldSource = "eadl",
+    ionization_model: IonizationModel = "eedl",
 ):
     """Return the characteristic X-ray density from transport segments.
 
@@ -731,6 +818,9 @@ def mc_characteristic_spectrum(
         ``"eadl"`` (default) or ``"elam"``; see
         :func:`load_characteristic_cross_sections`. The runner and checkpoint
         identity use the default; see :func:`characteristic_model_marker`.
+    ionization_model
+        ``"eedl"`` (default) or the opt-in ``"bote-salvat"``; see
+        :func:`load_characteristic_cross_sections`.
 
     Returns
     -------
@@ -748,7 +838,10 @@ def mc_characteristic_spectrum(
     comp = _normalize_composition(element, n_atoms_per_ang3, composition)
     all_tables = {
         el: load_characteristic_cross_sections(
-            el, data_dir=data_dir, fluorescence_yields=fluorescence_yields
+            el,
+            data_dir=data_dir,
+            fluorescence_yields=fluorescence_yields,
+            ionization_model=ionization_model,
         )
         for el, _density in comp
     }
@@ -892,6 +985,7 @@ __all__ = [
     "CHARACTERISTIC_XRAYDB_VERSION",
     "CharacteristicCrossSectionTable",
     "FluorescenceYieldSource",
+    "IonizationModel",
     "characteristic_model_marker",
     "characteristic_line_window_mass",
     "load_characteristic_cross_sections",

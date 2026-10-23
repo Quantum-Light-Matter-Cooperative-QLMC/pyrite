@@ -11,14 +11,18 @@ FETCH_CODES = (
     "sbethe-tables",
     "elsepa",
     "bremslib",
+    "bote-salvat",
 )
-DATASET_FETCH_CODES = ("eedl", "eadl", "epdl", "epdl-differential")
+DATASET_FETCH_CODES = ("eedl", "eadl", "epdl", "epdl-differential", "bote-salvat")
+#: Opt-in codes a bare fetch skips; ``pyrite tables fetch CODE`` installs them.
+OPTIONAL_FETCH_CODES = ("bote-salvat",)
 _POSITRON_FETCH_CODES = ("sbethe-tables", "elsepa")
 #: ``(code, projectile)`` pins a bare fetch installs, in order: each code, with
 #: its positron pin right after the electron one (#385).
 BARE_FETCH_STEPS = tuple(
     (code, projectile)
     for code in FETCH_CODES
+    if code not in OPTIONAL_FETCH_CODES
     for projectile in (("electron", "positron") if code in _POSITRON_FETCH_CODES else ("electron",))
 )
 

@@ -117,6 +117,19 @@ EPDL_DIFFERENTIAL = Dataset(
         "EPDL2025 subshell photoionization and scattering functions, knot-thinned by PyRITE (11 MB)"
     ),
 )
+#: NIST BoteSalvatICX.jl K/L/M shell-ionization parameters (public domain), the
+#: opt-in Bote--Salvat backend of #92. Optional: no default run reads it, so it
+#: is not in :data:`DATASETS` (bare fetch, ``tables verify``, remote sync).
+BOTE_SALVAT = Dataset(
+    name="bote-salvat",
+    filename="xione.jl",
+    urls=(
+        "https://raw.githubusercontent.com/usnistgov/BoteSalvatICX.jl/"
+        "8520cf5d002b11c3cf6669ebd5fedbb3de8d1fdb/src/xione.jl",
+    ),
+    sha256="d0bd0d3ddca915a785a2562dfe29d6158b02d4a0e0330f54b784f8bba0b41599",
+    description="NIST BoteSalvatICX.jl K/L/M shell-ionization parameters (opt-in)",
+)
 #: SHA-256 of SBETHE's ``sdbase/pdatconf.p14``, the atomic-shell file every
 #: default-model run reads. ``sdbase/`` is a multi-file tree fetched by
 #: :mod:`pyrite.xsgen.fetch`, so it is pinned here rather than as a
@@ -128,6 +141,9 @@ PDATCONF_SHA256 = "cd239554bb6e823692ea4611d443df8684b4cace06006fc271a4168cb78c6
 DATASETS: dict[str, Dataset] = {
     dataset.name: dataset for dataset in (EEDL, EADL, EPDL, EPDL_DIFFERENTIAL)
 }
+
+#: Opt-in datasets that only explicitly selected models read; fetched by name.
+OPTIONAL_DATASETS: dict[str, Dataset] = {BOTE_SALVAT.name: BOTE_SALVAT}
 
 #: Outcomes of :func:`verify_dataset`; ``ok`` is the only passing one.
 OK = "ok"
@@ -157,9 +173,9 @@ class DatasetFetchResult:
 def get(name: str) -> Dataset:
     """Return the pinned dataset called ``name``."""
     try:
-        return DATASETS[name]
+        return DATASETS[name] if name in DATASETS else OPTIONAL_DATASETS[name]
     except KeyError:
-        known = ", ".join(DATASETS)
+        known = ", ".join((*DATASETS, *OPTIONAL_DATASETS))
         raise KeyError(f"unknown dataset {name!r}; choose from {known}") from None
 
 
@@ -178,11 +194,13 @@ def dataset_path(name: str) -> Path:
 
 def fetch_hint(name: str) -> str:
     """Return the command that installs ``name``, for error messages."""
-    return (
+    local = (
         f"`pyrite tables fetch {name}` (downloads the pinned file), or "
-        f"`pyrite tables fetch {name} --archive PATH` with a local copy; "
-        "on the remote box, `pyrite remote sync` from a machine that has it"
+        f"`pyrite tables fetch {name} --archive PATH` with a local copy"
     )
+    if name in OPTIONAL_DATASETS:
+        return f"{local}; `pyrite remote sync` does not ship opt-in datasets"
+    return f"{local}; on the remote box, `pyrite remote sync` from a machine that has it"
 
 
 def require_dataset(name: str) -> Path:
@@ -350,6 +368,7 @@ def fetch_dataset(name: str, source: str | Path | None = None) -> DatasetFetchRe
 
 
 __all__ = [
+    "BOTE_SALVAT",
     "DATASETS",
     "EADL",
     "EEDL",
@@ -358,6 +377,7 @@ __all__ = [
     "MISMATCH",
     "MISSING",
     "OK",
+    "OPTIONAL_DATASETS",
     "PDATCONF_SHA256",
     "Dataset",
     "DatasetFetchResult",
