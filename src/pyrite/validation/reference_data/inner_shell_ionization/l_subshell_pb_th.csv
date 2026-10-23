@@ -1,0 +1,70 @@
+# Measured electron-impact L1, L2 and L3 subshell ionization cross sections of
+# Pb (Z = 82) and Th (Z = 90), thin films on aluminium backing, transcribed from
+# Tables (Pb, Th) "Experimental Production and Ionization cross sections" of
+# H. V. Rahangdale, P. K. Das, S. De, J. P. Santos, D. Mitra, M. Guerra and
+# S. Saha, "Absolute L-shell ionization and X-ray production cross sections of
+# Lead and Thorium by 16-45 keV electron impact", arXiv:1508.02877 (2015)
+# (ref Ra15 in references.csv). Ionization cross sections were derived by the
+# authors from measured La, Lb, Lg production with Campbell's relaxation data;
+# dsigma is their stated total uncertainty. Entries the paper leaves blank
+# ("..") are omitted. Units: energies keV, cross sections barn.
+Z,symbol,E_keV,shell,sigma_b,dsigma_b,ref
+82,Pb,16,L3,164.5,20.6,Ra15
+82,Pb,18,L1,3.9,2.2,Ra15
+82,Pb,18,L2,21.9,4,Ra15
+82,Pb,18,L3,204.4,26.3,Ra15
+82,Pb,20,L1,22.8,8.7,Ra15
+82,Pb,20,L2,64.6,11.6,Ra15
+82,Pb,20,L3,423.7,56.1,Ra15
+82,Pb,23,L1,44.6,14.7,Ra15
+82,Pb,23,L2,84,15.4,Ra15
+82,Pb,23,L3,451,62,Ra15
+82,Pb,25,L1,49.7,16.4,Ra15
+82,Pb,25,L2,93.7,17.2,Ra15
+82,Pb,25,L3,477.6,66,Ra15
+82,Pb,28,L1,63.4,20.6,Ra15
+82,Pb,28,L2,113.4,20.7,Ra15
+82,Pb,28,L3,502,70.8,Ra15
+82,Pb,30,L1,72.3,23.1,Ra15
+82,Pb,30,L2,119.9,22.1,Ra15
+82,Pb,30,L3,542.6,76.8,Ra15
+82,Pb,33,L1,76.1,23.9,Ra15
+82,Pb,33,L2,119.8,22.1,Ra15
+82,Pb,33,L3,522.6,74.7,Ra15
+82,Pb,35,L1,70.4,22.6,Ra15
+82,Pb,35,L2,121.7,22.2,Ra15
+82,Pb,35,L3,524.6,74.4,Ra15
+82,Pb,38,L1,74.6,23.4,Ra15
+82,Pb,38,L2,116.4,21.6,Ra15
+82,Pb,38,L3,513.8,73.4,Ra15
+82,Pb,40,L1,80.9,25,Ra15
+82,Pb,40,L2,121.9,22.1,Ra15
+82,Pb,40,L3,493.8,71.8,Ra15
+90,Th,20,L3,64.6,8,Ra15
+90,Th,22.5,L3,147.5,18.4,Ra15
+90,Th,25,L2,19.8,3.2,Ra15
+90,Th,25,L3,213,26.8,Ra15
+90,Th,27.5,L1,29.2,7.3,Ra15
+90,Th,27.5,L2,41.6,7.1,Ra15
+90,Th,27.5,L3,252.2,34.7,Ra15
+90,Th,30,L1,32,8,Ra15
+90,Th,30,L2,46.5,7.9,Ra15
+90,Th,30,L3,301.1,41.1,Ra15
+90,Th,32.5,L1,33.9,8.4,Ra15
+90,Th,32.5,L2,52.3,8.9,Ra15
+90,Th,32.5,L3,329.2,44.8,Ra15
+90,Th,35,L1,36.8,9.3,Ra15
+90,Th,35,L2,58,9.8,Ra15
+90,Th,35,L3,331.7,45.5,Ra15
+90,Th,37.5,L1,36.5,9.1,Ra15
+90,Th,37.5,L2,61.6,10.4,Ra15
+90,Th,37.5,L3,354,48.3,Ra15
+90,Th,40,L1,39.8,10.1,Ra15
+90,Th,40,L2,68.9,11.6,Ra15
+90,Th,40,L3,374.5,51.3,Ra15
+90,Th,42.5,L1,41,10.3,Ra15
+90,Th,42.5,L2,74,12.4,Ra15
+90,Th,42.5,L3,358.5,49.5,Ra15
+90,Th,45,L1,42.1,10.4,Ra15
+90,Th,45,L2,68,11.6,Ra15
+90,Th,45,L3,368,50.6,Ra15

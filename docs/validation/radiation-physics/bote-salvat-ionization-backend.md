@@ -42,6 +42,31 @@ Synthetic-parameter tests run in every environment; pinned-data tests skip when 
 
 "—" is below the edge. These agree with the inverse ratios of `eedl-shell-ionization-comparison` (W L3 family EEDL/BS 0.472 at 30 keV and 0.721 at 100 keV). The two differ only in edge convention.
 
+## Experimental comparison
+
+`validation/inner_shell_experiment.py` evaluates the two tabulated characteristic-scoring backends at each measured incident energy, using lin-lin interpolation and zero outside each shell row. It compares shell-ionization cross sections, not a new simulation of the measured X-ray yields. Both models retain their own binding energies; no edge override is applied. Overvoltage U = E/I uses the compilation's Larkins (1977) K edges and the EEDL L edges only to assign reporting bands.
+
+The packaged `validation/reference_data/inner_shell_ionization/` CSVs contain 362 thin-film K-shell measurements and 59 Pb/Th L1–L3 measurements. Each row links to a primary citation in `references.csv`. The K values and uncertainties were located through Limandri et al., [arXiv:2506.22856](https://arxiv.org/abs/2506.22856), Table 2. Selection retains catalogue transport elements, thin films (T, TS, TtS), X-ray-yield measurements reported as ionization cross sections, and publications from 1996 onward or any year at U ≥ 20; thick-target Zhu et al. (2009) rows are excluded. The L values are from Rahangdale et al., [arXiv:1508.02877](https://arxiv.org/abs/1508.02877), Pb/Th tables, omitting blank entries. CSV headers record the selection and transcription provenance.
+
+Reproduce with `uv run python checks/inner_shell_experiment_comparison.py` after installing the opt-in Bote–Salvat dataset. The script reports results without an agreement gate (exit 2 if the dataset is absent).
+
+| Shell | U band | Points | EEDL/measured | Bote–Salvat/measured |
+|---|---|---:|---:|---:|
+| K | [1, 1.5) | 77 | 0.760 | 1.023 |
+| K | [1.5, 4) | 153 | 0.851 | 1.012 |
+| K | [4, 20) | 84 | 0.981 | 1.062 |
+| K | ≥ 20 | 48 | 1.041 | 1.021 |
+| L3 | [1, 1.5) | 4 | 0.445 | 1.689 |
+| L3 | [1.5, 4) | 18 | 0.376 | 0.966 |
+| L1 | [1, 1.5) | 5 | 0.719 | 2.634 |
+| L1 | [1.5, 4) | 13 | 0.644 | 1.737 |
+| L2 | [1, 1.5) | 4 | 0.671 | 2.201 |
+| L2 | [1.5, 4) | 15 | 0.618 | 1.518 |
+
+Ratios are unweighted geometric means over positive model values. Zero model values remain in the point count and one-sigma agreement fraction, but are excluded from the geometric mean. The one-sigma fraction uses only rows with quoted uncertainties; it is descriptive, with no treatment of shared experimental systematics or unequal sampling among elements.
+
+Bote–Salvat improves pooled K agreement near threshold and Pb/Th L3 agreement at U = 1.5–4. This is not uniform across elements: near-threshold Ti and V give Bote–Salvat/measured = 1.879 and 2.847 (EEDL = 1.471 and 2.150). The Pb/Th L1/L2 ionization values are inferred from measured line production using relaxation and Coster–Kronig corrections; their uncertainties can be around 30% or larger. The substantial L1/L2 disagreement and four near-threshold L3 points remain limitations, not grounds to select a universal correction or change the EEDL default. The comparison assumes thin-target single collisions and the authors' corrections, and compares free-atom models with solid targets.
+
 ## Fresh-context verification (2026-10-23)
 
 An independent verifier derived Eqs. (87)–(88a–c) from the NIST review (J. Phys. Chem. Ref. Data 43, 013102) and the pinned `xione.jl` before reading the code, then compared at commit `6c598f5e`:
@@ -56,6 +81,6 @@ The verifier made two findings, now fixed. The physics page understated the fit-
 
 ## Status and open items
 
-Status `rederived`. Comparison with experimental production data near threshold and at high overvoltage (#92 plan item 3) is not yet done. Only a human may mark this row signed off.
+Status `rederived`. The measured-data comparison completes #92 plan item 3 within the thin-target scope above; it does not validate thick-target transport or remove the stated experimental discrepancies. Only a human may mark this row signed off.
 
-Anchors: `tests/montecarlo/test_bote_salvat_backend.py`, `tests/montecarlo/test_shell_ionization_model_selection.py`.
+Anchors: `tests/montecarlo/test_bote_salvat_backend.py`, `tests/montecarlo/test_shell_ionization_model_selection.py`, `tests/montecarlo/test_inner_shell_experiment.py`; report `checks/inner_shell_experiment_comparison.py`.

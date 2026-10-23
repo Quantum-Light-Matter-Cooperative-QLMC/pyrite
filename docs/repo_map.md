@@ -898,3 +898,12 @@ Bounded optical TR/CTR (#615): `montecarlo/spectrum/optical_transition.py`
 energy refusals) and `runner/transition_emission.py::case_optical_transition`.
 Physics: `physics/radiation-physics/optical-transition-radiation.md`; CUDA
 parity: `checks/optical_transition_cuda.py`.
+
+### `validation/inner_shell_experiment.py`
+
+Loads cited thin-film K and Pb/Th L1–L3 measurements from
+`validation/reference_data/inner_shell_ionization/`, evaluates EEDL and the
+optional Bote–Salvat tabulated scoring backend at measured energies, and
+summarizes model/measured ratios by overvoltage band. Developer report:
+`checks/inner_shell_experiment_comparison.py`; evidence and limitations:
+[backend validation](validation/radiation-physics/bote-salvat-ionization-backend.md).

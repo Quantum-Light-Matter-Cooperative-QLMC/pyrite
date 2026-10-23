@@ -258,3 +258,18 @@ require derived or adapted material to be marked as such.
   about 0.64–6.6 eV), converted as for the Rakić record; used for the
   published optical transition-radiation comparison with Coenen et al. (2011),
   whose calculation used these constants.
+
+## Experimental inner-shell ionization measurements
+
+- **Files**: `src/pyrite/validation/reference_data/inner_shell_ionization/*.csv`.
+- **Sources**: K-shell numerical values and reported uncertainties from the
+  compilation by S. P. Limandri et al., *Experimental cross sections for K-shell
+  ionization by electron impact* (2025), [arXiv:2506.22856](https://arxiv.org/abs/2506.22856),
+  Table 2; Pb/Th L-subshell values from H. V. Rahangdale et al., *Absolute
+  L-shell ionization and X-ray production cross sections of Lead and Thorium
+  by 16–45 keV electron impact* (2015), [arXiv:1508.02877](https://arxiv.org/abs/1508.02877).
+- **Attribution**: each measurement row names its primary publication through
+  `references.csv`, which records authors, journal citation and DOI. CSV headers
+  describe the selection and transcription. These numerical measurements are
+  attributed to their original authors; no license to the source articles or
+  compilation is asserted here.
