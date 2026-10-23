@@ -278,10 +278,19 @@ def _layer_regions(layers, width_ang, height_ang):
 
 
 def _project(region, axis) -> float:
-    """Support radius; zero components skip infinite extents."""
+    """Box support radius [Å], retaining every nonzero axis projection.
+
+    Source: Eberly §§2.1–2.2.1, support sum of half extents times absolute
+    axis dot products. A small angle can project a long side significantly.
+    Exactly zero factors contribute zero even for an infinite slab; any
+    nonzero factor on an infinite extent gives infinite support.
+    Limiting case: an axis-aligned box returns its matching half extent.
+
+    Validation: photon-scene-navigation
+    """
     _, axes, half = region
     weights = np.abs(axes @ axis)
-    used = weights > 1e-12
+    used = weights > 0.0
     return float(np.sum(half[used] * weights[used]))
 
 
@@ -301,8 +310,8 @@ def _overlap(first, second) -> bool:
     candidates += [np.cross(a, b) for a in first[1] for b in second[1]]
     displacement = first[0] - second[0]
     for axis in candidates:
-        norm = float(np.linalg.norm(axis))
-        if norm < 1e-9:
+        norm = float(np.hypot.reduce(axis))
+        if norm == 0.0:
             continue
         axis = axis / norm
         radius = _project(first, axis) + _project(second, axis)

@@ -79,7 +79,7 @@ def _score_exits(histories, edges: np.ndarray, n_primaries: int):
     Assumes an absorbing aperture and positive source weights; no hits gives
     zero in every tally. Validation: photon-continuous-source-scoring.
     """
-    from ..transport.photon_histories import detected_spectrum
+    from ..transport.photon_histories import _weighted_photon_counts, detected_spectrum
 
     exits = histories.exits
     hit = np.asarray(exits["detected"], dtype=bool)
@@ -90,9 +90,9 @@ def _score_exits(histories, edges: np.ndarray, n_primaries: int):
         direct &= np.asarray(exits["round"]) == 0
     norm = n_primaries * np.diff(edges)
     total = detected_spectrum(histories, edges, n_primaries)
-    direct_counts, _ = np.histogram(energy[direct], edges, weights=weight[direct])
+    direct_counts = _weighted_photon_counts(energy[direct], weight[direct], edges)
     other = hit & ~direct
-    other_counts, _ = np.histogram(energy[other], edges, weights=weight[other])
+    other_counts = _weighted_photon_counts(energy[other], weight[other], edges)
     # Use exactly the official scorer for the total; the other categories
     # partition hits, so a failure of this invariant is a scoring bug.
     direct_spec = direct_counts / norm
@@ -146,8 +146,10 @@ def score_bremslib_continuum(
     daughters are *recorded* but not transported, and an electron cutoff must
     be supplied.  With ``charged_stage``, photon-born electron feedback is
     followed by ``track_coupled_histories``; its own threshold sets the charged
-    cutoff. Positrons presently remain pending, so this is not a validated
-    complete MeV shower or a production simulation mode.
+    cutoff. Electron-only stages retain pending positrons; the experimental
+    ``FeedbackChargedStage`` additionally follows positron annihilation and
+    charged-impact relaxation. Neither is a validated complete MeV shower or
+    a production simulation mode.
 
     ``layers`` are the actual contiguous/gapped photon scene and provide one
     composition per electron segment layer.  For multilayers the segment's

@@ -105,3 +105,14 @@ one; the outside tally retained exactly 0.5 photons/primary.
   comparison and link this page.
 - **Human sign-off:** pending. The result remains conditional on the inherited
   history transport and does not expand its physics validation scope.
+
+## Bin-local numerical repair (2026-10-23)
+
+The original weighted histogram reduction could cancel a small positive bin
+against a much larger weight in another bin or below the displayed band.
+The total, direct and redistributed spectra now share
+`photon_histories._weighted_photon_counts`: assign each in-band energy using
+the internal edges and accumulate weights directly in its bin. This preserves
+the final inclusive edge and the single primary/bin-width denominator.
+The independently derived counterexample and fresh repair verification are
+recorded in [photon history queue](../beam-transport/photon-history-queue.md).

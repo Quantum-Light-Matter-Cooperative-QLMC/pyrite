@@ -60,6 +60,14 @@ The workflow covers [results](guides/python-api-workflow.md#interpret-the-result
 [shared target/filter bodies](guides/python-api-workflow.md#reuse-bodies-as-targets-and-filters).
 For correlated imported beams, see [GDF beam import](guides/gpt-gdf-beams.md).
 
+The provisional photon-continuum reference has a separate
+[aperture tally artifact](research/physics/photon-scene-handoff.md#explicit-reduced-observation-persistence):
+`PhotonContinuumObservation.save(path)` and
+`pyrite.photon_observation.load_photon_continuum(path)` preserve reduced
+aperture spectra and provenance. These experimental objects are outside the
+supported API contract above. Their aperture-integrated spectra have units
+photons/(incident electron eV) and must not be added to `Result.brem`.
+
 ```{eval-rst}
 .. autosummary::
    :toctree: _autosummary

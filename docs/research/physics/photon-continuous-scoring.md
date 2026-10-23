@@ -102,9 +102,12 @@ print(score.total_per_primary_eV)
 
 To follow photon-born electron feedback instead, pass `charged_stage=` and
 omit `electron_cutoff_eV`. Construct the stage with the matching material stack,
-cutoffs and electron transport physics; filter-box charged descendants currently
-deposit locally, and positrons remain pending. The charged-stage boundary is
-therefore *not* a fully coupled validated MeV cascade.
+cutoffs and electron transport physics. The electron-only stage deposits
+filter-born electrons locally and keeps positrons pending. The newer
+`cascade_feedback_stage` follows in-stack positrons, annihilation and
+charged-impact relaxation, and refuses filter boxes. See
+[CPU secondary feedback](photon-secondary-feedback.md). Neither reference is
+a fully coupled validated MeV cascade.
 
 ## Validation and outstanding production work
 

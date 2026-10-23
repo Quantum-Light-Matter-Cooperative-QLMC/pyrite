@@ -296,15 +296,30 @@ charged electron/positron handoff rows, an absorbing sample-frame aperture
 for ordinary hits, and a per-history weighted energy ledger. Filter plates
 navigate as oriented `PhotonBox`es (`photon_navigation.scene_first_interactions`);
 lab-frame poses convert through `photon_box_from_pose`/`PhotonAperture.from_pose`.
-Charged rows are not transported; no source adapters or production callers exist.
+This photon-only owner returns charged rows; the coupled owners below transport them.
 
 `transport/photon_coupling.py` alternates that queue with a charged stage:
 `track_coupled_histories` launches photon-born electrons above the stage
 threshold inside the transport stack, `cascade_charged_stage` runs them
 through the shell soft/hard cascade from an explicit `LaunchState`
 (`secondaries.transport_secondary_cascade(launch=...)`), and their hard
-bremsstrahlung photons re-enter the queue with lineage keys. Positrons stay
-pending; per-history coupled ledger closes. No production caller.
+bremsstrahlung photons re-enter the queue with lineage keys. Electron-only
+stages keep positrons pending; per-history coupled ledger closes. No production caller.
+
+`transport/photon_feedback.py` adds the CPU `FeedbackChargedStage`: in-stack
+positron transport/annihilation, sampled charged-impact EADL relaxation and
+Auger re-entry. `transport/photon_event_sources.py` adapts unattenuated primary
+characteristic/annihilation emissions, retaining sub-cutoff source energy.
+`photon_transport.simulate_photon_continuum(charged_feedback=True)` connects
+the stage to the experimental Scene boundary with enabled-only positron table
+provenance. Charged filters/gaps are refused; no production Result/checkpoint
+integration or independent full-track validation is implied. Contract:
+[CPU secondary feedback](research/physics/photon-secondary-feedback.md).
+
+`photon_observation.py` owns explicit atomic save/load of the experimental
+Scene continuum aperture tally, including identities and pinned provenance.
+It stores reduced arrays only, separately from Result/checkpoints and replay;
+`PhotonContinuumObservation.save` is the convenience entry point.
 
 Simulation core: electron transport, segment-sum PXR+CBS and EEDL characteristic line spectra, bremsstrahlung, parallel case runner, and detector-convolution helpers. Split from single module into submodules; **every public and internal name re-exported from package** — `from pyrite.montecarlo import X` unchanged (`tests/montecarlo/test_exports.py` freeze export set).
 - `case` — frozen, validating `Case` input schema. `build_cases` returns it; `to_dict()` reproduces the version-1 legacy mapping and `run_case` temporarily accepts either representation.

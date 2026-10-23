@@ -84,6 +84,24 @@ def test_outside_bin_hits_survive_large_in_bin_weight():
     assert outside == pytest.approx(5.0 / 4)
 
 
+@pytest.mark.parametrize("category", ["direct", "scattered", "charged"])
+def test_small_bin_hit_survives_in_each_score_category(category):
+    histories = SimpleNamespace(
+        exits=dict(
+            energy_eV=np.array([2e4, 4e4]),
+            weight=np.array([1e20, 1.0]),
+            detected=np.ones(2, dtype=bool),
+            generation=np.full(2, int(category == "scattered")),
+            round=np.full(2, int(category == "charged")),
+        )
+    )
+    total, direct, other, *_ = _score_exits(histories, np.array([1e4, 3e4, 5e4]), 2)
+    expected = np.array([2.5e15, 2.5e-5])
+    np.testing.assert_array_equal(total, expected)
+    np.testing.assert_array_equal(direct, expected if category == "direct" else [0.0, 0.0])
+    np.testing.assert_array_equal(other, [0.0, 0.0] if category == "direct" else expected)
+
+
 @pytest.mark.parametrize("bad", [np.array([1.0]), [1.0, 1.0], [1.0, np.inf], [[1.0, 2.0]]])
 def test_bad_energy_edges_are_rejected(bad):
     from pyrite.montecarlo.runner.photon_emission import _edges

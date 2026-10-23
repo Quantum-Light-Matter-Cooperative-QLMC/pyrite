@@ -37,6 +37,7 @@ physics/photon-transport
 physics/photon-continuous-sources
 physics/photon-continuous-scoring
 physics/photon-scene-handoff
+physics/photon-secondary-feedback
 ```
 
 ```{toctree}

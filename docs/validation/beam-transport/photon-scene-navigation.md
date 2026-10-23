@@ -6,8 +6,13 @@ Validation: `photon-scene-navigation`.
 The separating-axis overlap tolerance depended on absolute position and
 could accept coincident material boxes. The original derivation and finding
 are preserved below. The subsequent implementation repair is recorded
-separately; the complete claim remains `unverified` pending fresh-context
-verification of the changed code.
+separately. Fresh-context verification of that repair on 2026-10-23 found a
+different support-projection discrepancy, documented below. A second
+implementation repair now retains every nonzero support contribution. The
+verdict on that pre-repair code is **discrepancy**. A later independent pass
+found a missing cross-axis case; after its repair, the final independent
+verdict is **rederived**, recorded at the end of this page. Historical
+findings below refer to their stated implementation snapshots.
 
 ## Scope and sources
 
@@ -170,11 +175,12 @@ Reproducer (inside the project runner's Python environment):
 
 ```python
 from pyrite.montecarlo.transport.photon_navigation import (
-    PhotonBox, validate_photon_regions,
+    PhotonBox,
+    validate_photon_regions,
 )
 
-axes = ((1., 0., 0.), (0., 1., 0.), (0., 0., 1.))
-box = PhotonBox((0., 0., 3e12), axes, (1., 1., 1.), (("Cu", 0.0849),))
+axes = ((1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0))
+box = PhotonBox((0.0, 0.0, 3e12), axes, (1.0, 1.0, 1.0), (("Cu", 0.0849),))
 validate_photon_regions([], [box, box])  # Returns; it must reject overlap.
 ```
 
@@ -270,3 +276,447 @@ models, flight draws, and production default path are unchanged.
   counterexample. The task owner applies the edit; no human sign-off or
   full-track validation is implied. After the repair above, the owner retained
   `unverified` pending a fresh-context verdict on the changed implementation.
+
+## Fresh-context repair verification (2026-10-23)
+
+This pass did not implement the repair. Before reading its implementation,
+the expected geometry was derived again from the ledger contract and Eberly's
+stationary separating-axis construction. The preceding report supplies the
+historical discrepancy, not evidence that the repair is correct.
+
+### Independent expression before implementation inspection
+
+The support function of a centred box in a direction $\mathbf u$ is
+
+$$
+S(\mathbf u)=\sum_{a=1}^3 h_a|\mathbf e_a\cdot\mathbf u|.
+$$
+
+Subtract centres before projecting. With $\Delta\mathbf c=\mathbf c_2-\mathbf c_1$,
+interior separation on a nonzero candidate axis is
+
+$$
+|\Delta\mathbf c\cdot\mathbf u|\geq S_1(\mathbf u)+S_2(\mathbf u).
+$$
+
+Six face normals and nine nonzero edge cross products suffice. Axis
+normalization is optional because both sides are homogeneous of degree one.
+A contact allowance may depend on the magnitudes of the arithmetic terms
+on this particular axis, but must not depend on the absolute world origin
+or on an extent perpendicular to that axis. In particular, identical boxes
+must overlap at every representable common translation, and a thin box's
+normal overlap must not disappear as its lateral extent grows. A nonzero
+projection of an infinite extent gives infinite support, so that axis cannot
+separate the regions. Exactly zero projection contributes zero.
+
+For ray clipping, solve each local band
+$-h_a\leq (\mathbf o-\mathbf c)\cdot\mathbf e_a+s\hat{\mathbf d}\cdot\mathbf e_a<h_a$
+and intersect the resulting
+intervals with $s\geq0$. A parallel ray is admitted only on the half-open
+band. The accumulated hazard is the sum of each nonnegative material chord
+length times its attenuation coefficient. Vacuum gaps have zero hazard;
+inverting the cumulative hazard gives the collision point without resetting
+the optical-depth draw at interfaces. A common orthogonal transformation
+preserves these dot products. The lab-to-sample transform is the transpose
+of the stated sample-to-lab rotation, with $10^7$ Å/mm applied only to lengths.
+
+Units, signs and exact vacuum, normal-incidence, common-translation and
+common-rotation limits therefore pass at the contract level. Finite precision
+must still be tested against the strict support inequality, especially for
+very thin bodies and near-parallel axes.
+
+### Implementation comparison and new discrepancy
+
+The repaired `_overlap` subtracts centres before projection and bases its
+contact allowance on each axis's projected lengths. Those changes address
+the original defect. However, `_project` still thresholds the support sum:
+
+```python
+weights = np.abs(axes @ axis)
+used = weights > 1e-12
+return float(np.sum(half[used] * weights[used]))
+```
+
+The first divergent term is omission of $h_a|\mathbf e_a\cdot\mathbf u|$
+when the angular factor is small but nonzero. A small angle does not bound
+the omitted length independently of the half extent. `_overlap` also omits
+cross-product axes with norm below `1e-9`; this was not needed to trigger
+the counterexample and is not independently adjudicated here.
+
+Take two boxes with half sizes $(10^{13},1,1)$ Å. The first is axis-aligned
+at the origin. Put the second at $(0,0,3)$ Å with local axes
+
+$$
+\mathbf e_x=(\cos\theta,0,\sin\theta),\quad
+\mathbf e_y=(0,1,0),\quad
+\mathbf e_z=(-\sin\theta,0,\cos\theta),\qquad
+\theta=5\times10^{-13}.
+$$
+
+The point $\mathbf p=(-6\times10^{12},0,0)$ Å lies strictly inside both.
+Its local coordinates in each box are $(-6\times10^{12},0,0)$ to binary64
+precision. The omitted long-axis contribution to the second box's support
+along world $z$ is $10^{13}\sin\theta=5$ Å. The support radius sum is
+seven Å, exceeding the centre separation of three Å. The implementation
+drops the five Å contribution and uses a sum of two Å, falsely reporting
+separation. The axes pass the public orthonormality check.
+
+This deliberately extreme aspect ratio is allowed by the public contract;
+the failure needs neither ambiguous face contact nor loss of displacement
+under translation. It does not establish failure for ordinary millimetre
+filters. This self-contained assertion reproduces the defect at `e1d2b98a`
+using an independent strict-interior witness:
+
+```python
+import numpy as np
+from pyrite.montecarlo.transport.photon_navigation import (
+    PhotonBox,
+    validate_photon_regions,
+)
+
+angle = 5e-13
+c, s = np.cos(angle), np.sin(angle)
+axes = np.array([[c, 0.0, s], [0.0, 1.0, 0.0], [-s, 0.0, c]])
+first = PhotonBox(
+    (0.0, 0.0, 0.0),
+    tuple(map(tuple, np.eye(3))),
+    (1e13, 1.0, 1.0),
+    (),
+)
+second = PhotonBox(
+    (0.0, 0.0, 3.0),
+    tuple(map(tuple, axes)),
+    (1e13, 1.0, 1.0),
+    (),
+)
+point = np.array([-6e12, 0.0, 0.0])
+for box in (first, second):
+    local = np.asarray(box.axes) @ (point - np.asarray(box.center_ang))
+    assert np.all(np.abs(local) < np.asarray(box.half_extent_ang))
+try:
+    validate_photon_regions([], [first, second])
+except ValueError:
+    pass
+else:
+    raise AssertionError("overlapping boxes were accepted")
+```
+
+A temporary test containing this assertion was run through
+`UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test
+/tmp/test_photon_navigation_reverification.py --durations=0`.
+It failed at the final assertion after both strict-interior checks passed
+(one test, 1.04 seconds). No implementation change was made in this verifier
+context. A repair must retain significant finite support contributions and
+treat nonzero infinite-extent projections conservatively; changing the
+contact allowance does not address this term.
+
+The existing scene module still passes all **35 tests** (1.76 seconds), and
+`tests/dev/test_docs.py` passes all **eight tests**. These results distinguish
+the uncovered geometry defect from failures of the existing regression set.
+
+### Fresh verifier verdict
+
+- **Claim:** `photon-scene-navigation` —
+  `montecarlo/transport/photon_navigation.py::_overlap` through `_project`;
+  Eberly §§2.1–2.2.1, equation (1), stationary support projections.
+- **Filters:** units pass; limits fail (near-parallel long-body overlap);
+  signs/conventions pass away from thresholded projections.
+- **Re-derivation:** differs — support contributions with angular factor
+  at most `1e-12` are discarded without regard to their projected length.
+- **Verdict:** `discrepancy`.
+- **Write-up:** `docs/validation/beam-transport/photon-scene-navigation.md`.
+- **Suggested ledger change:** change `photon-scene-navigation` from
+  `unverified` to `discrepancy`, reference this fresh verification and retain
+  the original repair history. The task owner applies the edit; the verifier
+  does not change the ledger or implementation.
+
+## Support-projection repair (implementation context)
+
+After the fresh verifier report, the implementation owner changed `_project`
+to omit only exactly zero dot products. Small nonzero factors retain their
+full finite support contribution; any nonzero factor on an infinite extent
+produces infinite support. Exactly zero factors are excluded before
+multiplication, avoiding undefined zero-times-infinity arithmetic. No clipping,
+flight-draw, contact-allowance or cross-axis selection rule changed.
+
+The public-validator regression `test_small_tilt_preserves_long_box_overlap`
+uses the independently derived strict-interior witness above, both tilt signs,
+and finite-box and infinite-stack counterparts. All four cases failed before
+the repair. The companion contact/gap regression keeps valid geometries
+accepted. After repair the scene, photon history, coupled history and Scene
+handoff modules pass **93 tests**, with one existing slow test skipped; each
+new regression case takes less than five milliseconds.
+
+These are implementation regression checks. They do not independently verify
+the changed code or advance the complete claim to `rederived`. In particular,
+the separate near-parallel cross-axis threshold noted above remains outside
+this repair's scope. Fresh-context verification remains required.
+
+## Fresh independent verification at 3f19d652 (2026-10-23)
+
+### Independence and derivation before implementation inspection
+
+This verifier did not implement the claim. The ledger row, owner signatures and
+AST-extracted docstrings were the only implementation information read before
+writing this section; prior report sections and implementation bodies were withheld.
+The complete claim includes finite boxes, finite or infinite target slabs,
+zero-thickness surfaces, optical-depth continuation and pose conversion.
+
+Source inspected: [Eberly, Dynamic Collision Detection using Oriented Bounding
+Boxes](https://www.geometrictools.com/Documentation/DynamicCollisionDetection.pdf),
+§§2.1–2.2.1, especially equation (1) and Table 1. Its closed-set intersection
+criterion needs equality assigned to contact for this project's disjoint-interior
+contract. Direct access to the cited PENELOPE-2024 PDF failed; the exponential
+survival derivation below is independent, with §1.4.4 equation-number attribution
+remaining unaudited.
+
+For unit direction $\mathbf d$, write $\mathbf x(s)=\mathbf o+s\mathbf d$,
+$s\geq0$. In local coordinates $q_a=\mathbf e_a\cdot(\mathbf o-\mathbf c)$,
+$v_a=\mathbf e_a\cdot\mathbf d$, solve $-h_a\leq q_a+s v_a<h_a$.
+For nonzero $v_a$, the two boundary quotients give the lower and upper crossing
+distances after sorting. Intersect all bands and $s\geq0$; positive material
+length requires exit strictly greater than entry. If $v_a=0$, the whole ray
+satisfies this band iff $-h_a\leq q_a<h_a$. A merely small nonzero $v_a$
+is not parallel: its crossing can be arbitrarily distant. Infinite lateral
+extents impose no crossing constraint. With normalized directions the quotients
+are Å; with nonunit directions they are ray parameters rather than lengths.
+
+Independent support derivation: maximize the linear functional of
+$\mathbf c+\sum_a t_a\mathbf e_a$, $|t_a|\leq h_a$, by choosing each sign.
+Thus
+
+$$
+r(\mathbf u)=\sum_a h_a|\mathbf e_a\cdot\mathbf u|,\qquad
+D(\mathbf u)=|(\mathbf c_2-\mathbf c_1)\cdot\mathbf u|.
+$$
+
+Disjoint interiors require some face normal or nonzero edge-cross-edge axis
+with $D\geq r_1+r_2$. All 15 candidate directions must otherwise be retained.
+Normalization is optional because both sides scale identically. An infinite
+extent contributes infinity for every nonzero projection and zero for an exactly
+zero projection. Small angles cannot be truncated independently of extent.
+For a surface with one zero extent, test whether its relative interior enters
+the material; contact on a material face is allowed, a plane through its interior
+is forbidden. SAT against a full-dimensional body follows the same support rule.
+Roundoff allowances may classify an unresolved boundary as contact, but cannot
+justify finite geometric overlap far above the local arithmetic uncertainty.
+
+For disjoint forward material intervals $[a_r,b_r]$ sorted by entry, the hazard
+is piecewise constant, zero in vacuum. Integrating survival gives
+
+$$
+T(s)=\exp[-H(s)],\qquad
+H(s)=\sum_r\mu_r\max(0,\min(s,b_r)-a_r),\qquad
+\tau=-\ln U.
+$$
+
+Subtract completed interval depths from $\tau$; in the first region with
+remaining depth smaller than $\mu_r(b_r-a_r)$, place the event at
+$a_r+\tau_{\rm remaining}/\mu_r$. All $\mu_r$ have units Å$^{-1}$;
+$H$ and $\tau$ are dimensionless. Zero rate means no event. Conditional channel
+and atomic probabilities are their macroscopic partial rates divided by total
+rate. A straight ray cannot re-enter a convex body, but a changed direction after
+scattering requires recomputing intervals. Infinite depth absorbs with probability
+one when the rate is positive. A finite tilted plate yields thickness divided
+by the absolute direction-normal cosine, unless a lateral face truncates it.
+
+Finally, $R$ maps sample vectors into lab vectors, hence the inverse pose is
+$\mathbf c_s=10^7R^{\mathsf T}\mathbf c_{\rm lab}$ and
+$\mathbf e_{a,s}=R^{\mathsf T}\mathbf e_{a,\rm lab}$, with sizes also multiplied
+by $10^7$ Å/mm. Proper rotation preserves lengths, dot products and handedness;
+no offset is permitted under the stated common-origin convention. Identity,
+common rigid rotation/translation, axial chord $2h_a$, diagonal chord
+$2\|\mathbf h\|$, vacuum survival and zero-width contact are the independent
+filters. Units, signs and these analytic limits pass at the expression level.
+
+### Comparison, new discrepancy, and reproducible evidence
+
+`ray_box_intervals` transforms origins and directions with the row-axis matrix
+and `_clip_axes` implements the independently derived interval intersection,
+including exact-zero parallel tests and half-open parallel-face membership.
+`scene_first_interactions` concatenates region intervals; the inversion helper
+sorts by entry, accumulates positive material depths and uses strict greater-than
+at an exact interface. Its draw convention is $\tau=-\ln(1-U)$, distributionally
+equivalent to the derivation's survival uniform. `_interval_first_interactions`
+selects flattened atom/channel partial rates. This comparison does not independently
+validate the EPDL cross sections themselves. `PhotonBox` checks positive finite
+sizes and orthonormal axes; pose conversion and `PhotonAperture.region` match the
+unit conversion and zero-thickness support construction under proper rotations.
+`_project` at this tip retains every nonzero projection, resolving the preceding
+support-sum finding. Relative displacement and axis-specific contact allowance
+also remove the original coordinate-scale failure.
+
+**The complete claim still differs.** `_overlap` excludes candidate axes when
+`norm < 1e-9`, instead of excluding only an exactly zero cross product. This is
+an independent approximation to the separating-axis theorem: two long boxes may
+have their only separating direction on an arbitrarily small edge cross product.
+It produces false overlap, so `validate_photon_regions` refuses disjoint boxes,
+finite-target counterparts, and disjoint scoring surfaces. It does not demonstrate
+an accepted overlapping body; the observed failure is rejection of valid geometry.
+
+Here is a public-API reproducer, executable with `uv run python` from this checkout:
+
+```python
+import numpy as np
+from pyrite.montecarlo.transport.photon_navigation import (
+    PhotonBox,
+    validate_photon_regions,
+)
+
+angle = 1e-10
+k = np.array([0.0, -1.0, 1.0]) / np.sqrt(2.0)
+K = np.array([[0.0, -k[2], k[1]], [k[2], 0.0, -k[0]], [-k[1], k[0], 0.0]])
+R = np.eye(3) + np.sin(angle) * K + (1 - np.cos(angle)) * (K @ K)
+first = PhotonBox((0.0, 0.0, 0.0), tuple(map(tuple, np.eye(3))), (1e12, 1.0, 1.0), ())
+second = PhotonBox(tuple(10 * k), tuple(map(tuple, R.T)), (1e12, 1.0, 1.0), ())
+validate_photon_regions([], [first, second])
+# Incorrect ValueError: photon boxes must not overlap ...
+```
+
+The first long axis is $\hat{\mathbf x}$; the second is
+$\cos\theta\hat{\mathbf x}+\sin\theta(0,1,1)/\sqrt2$.
+Their cross product has norm $10^{-10}$ and direction $\mathbf k$.
+Along it, independently,
+
+$$
+D=10\ \text{Å},\qquad r_1+r_2=2\sqrt2\ \text{Å},\qquad
+D-r_1-r_2=7.171572875\ \text{Å}>0.
+$$
+
+The measured binary64 values were `9.999999999999998` and
+`2.8284271247461903`. This is a resolved positive gap, vastly larger than
+$32\epsilon\max(D,r_1+r_2)$. The six face-axis tests cannot separate these rods:
+the long-axis tilt projects about $70.71$ Å onto each transverse face direction,
+whereas the centre displacement projects only $7.07$ Å. The missed cross axis
+is therefore essential, despite its small unnormalized length. For a finite
+stack counterpart, use the first body's axis-aligned geometry as a stack layer
+from $-1$ to $1$ Å, with width $2\times10^{12}$ Å and height $2$ Å, and validate
+`second` against it. For the zero-thickness version, replace the second box by
+`surfaces=[(np.array(second.center_ang), np.array(second.axes),
+np.array([1e12, 1., 0.]))]` and retain only `first` as a material box. Its support
+is smaller and the same positive-gap certificate proves disjointness; the
+validator nevertheless raises the scoring-surface error.
+
+A separate input-validation limitation is `_rotation`: it checks orthogonality
+but accepts determinant $-1$. A reflection is outside the stated physical
+sample-to-lab rotation domain, so this is not used as the in-domain discrepancy
+verdict. It is nevertheless accepted by the public constructor. With
+`sample_to_lab=np.diag([-1.,1.,1.])`, identity-oriented lab pose centred at
+`(0,0,1)` mm, the transformed lab normal should remain positive z, but the
+aperture normal becomes negative z because a cross product changes sign under
+an improper orthogonal map. The origin ray along positive z then misses rather
+than hitting at $10^7$ Å. Rejecting reflections would make that domain explicit.
+`PlanarPose` itself describes a target-reference origin, while this adapter's
+ledger explicitly assumes that origin is the sample entrance; validation here
+is conditional on that documented common-origin assumption.
+
+### Checks and limits
+
+Independent small CPU probes used no implementation helpers for the expected
+geometry or optical-depth result. A six-plane boundary enumeration compared
+2,000 seeded rays through a rotated translated box, with absolute and relative
+tolerance $2\times10^{-12}$. Finite and infinite slab controls distinguish an
+interior aperture, face contact, and an exterior aperture; both reject embedded
+boxes and accept face contact. Synthetic partial-rate inversions cover unsorted
+region storage, vacuum gaps, zero rates and an exact optical-depth interface.
+Additional direct probes gave event distances `10.5`, `5.0`, and `inf` for
+finite-gap, infinite-path, and all-vacuum cases. Proper-rotation pose checks and
+a half-open parallel-face probe agree with the derived expressions. Numerical
+claims are for representable finite coordinates; no algorithm can recover a
+separation already lost when coordinates are rounded. Exhaustive extreme-range
+IEEE overflow/underflow certification is not claimed.
+
+The public reproducer is independent of cross sections and uses vacuum box
+compositions solely to isolate region geometry: overlap validation applies to
+all boxes regardless of composition. Replacing the empty compositions with a
+positive material density leaves the SAT result unchanged. No source, tests or
+ledger were edited by this verifier. Prior report sections remain historical.
+
+### Fresh verifier verdict at 3f19d652
+
+- **Claim:** `photon-scene-navigation` — the ledger's navigation, support,
+  region-validation and pose owners — analytic clipping; Eberly equation (1)
+  and §§2.1–2.2.1; exponential integrated-hazard continuation.
+- **Filters:** units pass; limits failure (near-parallel finite boxes and
+  zero-thickness surface disjointness); signs/conventions pass for proper rotations.
+- **Re-derivation:** differs — `_overlap` discards nonzero cross axes below
+  `1e-9`, eliminating a necessary separating direction.
+- **Verdict:** `discrepancy`.
+- **Write-up:** `docs/validation/beam-transport/photon-scene-navigation.md`.
+- **Suggested ledger change:** owner changes `unverified` to `discrepancy`,
+  records the cross-axis false-refusal witness and retains the successful
+  support-projection repair history; never `signed-off`.
+
+## Independent re-check of cross-axis repair (2026-10-23)
+
+This is a re-check by the same independent verifier against the derivation
+written above before implementation inspection. The reviewed tree is
+`3f19d652` plus the task owner's uncommitted cross-axis/proper-rotation repair;
+this verdict supersedes the preceding discrepancy for that repaired tree only.
+No source, test, ledger or other report was edited by this verifier.
+
+### Repair comparison against the independent expression
+
+The source diff changes the candidate-axis norm from `np.linalg.norm(axis)` to
+`np.hypot.reduce(axis)`, and the exclusion condition from `norm < 1e-9` to
+`norm == 0.0`. Thus every represented nonzero face/cross axis is normalized
+and tested, exactly as required by the independent SAT derivation. Repeated
+hypotenuse evaluation avoids the squaring underflow that would otherwise
+reintroduce an effective small-angle cutoff. `_project` still retains every
+nonzero support weight, including infinite support for an unbounded slab.
+The relative displacement, axis-local binary64 contact allowance and strict
+interior/contact distinction remain the previously reviewed conventions.
+
+The same public disjoint-box witness, finite-stack counterpart and zero-thickness
+surface now pass validation. Independent positive-material probes also sweep
+angles $10^{-8}$, $10^{-10}$, $10^{-50}$, $10^{-100}$, $10^{-200}$ and
+$10^{-290}$ radians, with long half extent $100/\theta$ Å. At every angle the
+$10$ Å separation is accepted for box/stack/surface, while coincident centres
+are rejected for the two boxes. The separating-axis support and displacement
+certificate remains independent of the implementation. Separate direct support
+checks at $10^{-10}$, $10^{-100}$ and $10^{-200}$ retain the finite projected
+long-side contribution and infinite slab contribution; an exactly perpendicular
+projection onto the slab normal remains its finite thickness support.
+
+`_rotation` now also requires determinant approximately positive one, in
+addition to orthogonality. It rejects the accepted-reflection limitation
+reported above for both plate and aperture construction. For proper rotations,
+transpose inversion, the Å/mm factor and preservation of aperture handedness
+remain correct. This makes the physical rotation input domain explicit; it
+does not change the shared-origin assumption.
+
+The complete claim comparison remains valid: analytic local-ray clipping with
+exact-zero parallel treatment; forward finite/infinite slab intervals; convex-box
+chords; sorted optical-depth continuation through vacuum gaps; joint partial-rate
+selection; pose inversion; and zero-thickness scoring-surface refusal inside
+material. No further divergent term or convention was found in these owners.
+This is a derivation and bounded numerical verification, with the source-access,
+representable-coordinate and extreme-range limits already recorded above. The
+$32\epsilon$ contact allowance still intentionally treats numerically unresolved
+penetration as contact; the verdict uses that declared finite-precision boundary
+convention rather than asserting exact-real arithmetic at arbitrarily small gaps.
+
+### Re-check evidence and verdict
+
+The independent scratch suite passed **6 tests** through `pyrite-dev test`,
+including the 2,000-ray plane-crossing oracle (241 positive chords), synthetic
+optical-depth/channel inversion, finite/infinite slab and surface controls,
+proper pose inversion, reflection refusal and the new angle/support sweeps.
+The owning scene/navigation modules plus documentation tests passed **81 tests**.
+After this report append, documentation tests were rerun separately. The task
+owner owns the final combined docs build and rendered-math verification; the
+preceding pre-repair build had already rendered this page with 109 math elements
+and no raw dollar delimiters. This appended section uses the same math syntax.
+
+- **Claim:** `photon-scene-navigation` — ledger navigation, region-validation,
+  support and pose owners — analytic clipping; Eberly equation (1) and
+  §§2.1–2.2.1; integrated exponential survival.
+- **Filters:** units pass; limits pass; signs/conventions pass for proper
+  rotations and the stated common-origin convention.
+- **Re-derivation:** matches — every represented nonzero SAT axis and support
+  projection is retained, with the documented binary64 contact allowance.
+- **Verdict:** `rederived` for the repaired working tree.
+- **Write-up:** `docs/validation/beam-transport/photon-scene-navigation.md`.
+- **Suggested ledger change:** task owner changes the claim to `rederived`,
+  links this repair verification and retains all historical discrepancy evidence;
+  never `signed-off`.

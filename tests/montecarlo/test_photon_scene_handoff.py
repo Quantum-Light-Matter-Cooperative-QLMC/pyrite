@@ -85,6 +85,17 @@ def test_identity_is_detector_and_sampler_sensitive():
         photon._identity("source", aperture, [], [1e3, 5e3, 8e3], **options)[0],
         photon._identity("source", aperture, [], [1e3, 5e3], **dict(options, seed=10))[0],
         photon._identity("source", aperture, [], [1e3, 5e3], **dict(options, n_samples=101))[0],
+        photon._identity(
+            "source",
+            aperture,
+            [],
+            [1e3, 5e3],
+            charged_feedback={
+                "model": "cpu-charged-photon-feedback-v1",
+                "positron_tables": {"a": "pin"},
+            },
+            **options,
+        )[0],
     ]
     assert all(changed != digest for changed in changes)
 
@@ -120,7 +131,10 @@ def test_scene_geometry_uses_same_sample_rotation_for_filter_and_detector():
     assert len(layers) == 1
 
 
-def test_explicit_call_is_one_transport_and_one_reference_score(monkeypatch, beam_segments):
+@pytest.mark.parametrize("feedback", [False, True])
+def test_explicit_call_is_one_transport_and_one_reference_score(
+    monkeypatch, beam_segments, feedback
+):
     from pyrite.campaign import lowering, profiles
     from pyrite.montecarlo import runner
     from pyrite.montecarlo.runner import case_tables, photon_emission
@@ -144,6 +158,8 @@ def test_explicit_call_is_one_transport_and_one_reference_score(monkeypatch, bea
     monkeypatch.setattr(profiles, "case_content_key", lambda *a, **kw: "source")
     monkeypatch.setattr(case_tables, "case_table_markers", lambda case: {"tables": "pinned"})
     monkeypatch.setattr(runner, "_case_bremslib_tables", lambda case: {"Cu": "table"})
+    stage = object()
+    monkeypatch.setattr(photon, "_scene_feedback", lambda *a: (stage, {"model": "test-feedback"}))
 
     def track(case_arg, **options):
         recorded.append(("transport", case_arg, options))
@@ -156,7 +172,7 @@ def test_explicit_call_is_one_transport_and_one_reference_score(monkeypatch, bea
     monkeypatch.setattr(runner, "_transport_case", track)
     monkeypatch.setattr(photon_emission, "score_bremslib_continuum", score)
     result = photon.simulate_photon_continuum(
-        fake_scene, [1e3, 4e3], n_samples=30, source_ceiling_eV=8e4
+        fake_scene, [1e3, 4e3], n_samples=30, source_ceiling_eV=8e4, charged_feedback=feedback
     )
     assert [call[0] for call in recorded] == ["transport", "score"]
     assert result.source_identity_digest == "source"
@@ -165,7 +181,12 @@ def test_explicit_call_is_one_transport_and_one_reference_score(monkeypatch, bea
     assert recorded[1][1]["elec_id"].tolist() == [0, 1, 2]
     assert recorded[1][-1]["n_primaries"] == 3
     assert recorded[1][-1]["seed"] == 42
-    assert recorded[1][-1]["electron_cutoff_eV"] == 1000.0
+    if feedback:
+        assert recorded[1][-1]["charged_stage"] is stage
+        assert "electron_cutoff_eV" not in recorded[1][-1]
+        assert result.provenance["proposal"]["charged_feedback"] == {"model": "test-feedback"}
+    else:
+        assert recorded[1][-1]["electron_cutoff_eV"] == 1000.0
     assert recorded[1][-1]["width_ang"] is None
 
 

@@ -20,6 +20,8 @@ import numpy as np
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
+    from os import PathLike
+    from pathlib import Path
 
     from .campaign.model import Scene
     from .montecarlo.case import Case
@@ -49,6 +51,17 @@ class PhotonContinuumObservation:
     source_identity_digest: str
     observation_identity_digest: str
     provenance: Mapping[str, Any]
+
+    def save(self, path: str | PathLike[str]) -> Path:
+        """Save reduced aperture tallies and provenance to an atomic NPZ artifact.
+
+        Reload with ``pyrite.photon_observation.load_photon_continuum``.
+        Source rows, histories and the Case are excluded; this is not a
+        production checkpoint or a transport restart.
+        """
+        from .photon_observation import save_photon_continuum
+
+        return save_photon_continuum(self, path)
 
 
 def _positive(name: str, value: float) -> float:
@@ -141,6 +154,7 @@ def _identity(
     photon_cutoff_eV,
     electron_cutoff_eV,
     source_ceiling_eV,
+    charged_feedback=None,
 ):
     """Observation digest includes all source proposals and physical acceptance.
 
@@ -190,6 +204,8 @@ def _identity(
         ],
         "energy_bin_edges_eV": np.asarray(edges, dtype=float).tolist(),
     }
+    if charged_feedback is not None:
+        payload["charged_feedback"] = charged_feedback
     digest = hashlib.sha256(
         json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
     ).hexdigest()
@@ -243,6 +259,7 @@ def simulate_photon_continuum(
     electron_cutoff_eV: float = 1_000.0,
     source_ceiling_eV: float = 1_000_000.0,
     seed: int | None = None,
+    charged_feedback: bool = False,
 ) -> PhotonContinuumObservation:
     """Run existing primary electron transport once, then score tracked brem hits.
 
@@ -250,10 +267,12 @@ def simulate_photon_continuum(
     Supports CPU BremsLib expected-value sources, a planar **unpixelated**
     detector, finite filter plates, and analytic stack/rectangular geometry.
     Rejects grooves, channeling, non-BremsLib source models and unsupported
-    backends. A photon-born charged particle's kinetic energy is handed off in
-    the score's ledger, but **not transported** in this photon-only reference.
-    Pair/positron feedback and coincidence/pulse-height response therefore
-    remain outside its validity. No conditional/forced detector estimator.
+    backends. The default records charged handoffs. ``charged_feedback=True``
+    follows photon-born electrons/positrons, charged-impact EADL relaxation,
+    Auger descendants and annihilation photons in a contiguous target stack.
+    It requires shell-soft-hard transport and currently refuses filter boxes.
+    Neither mode is a validated complete MeV detector response or a
+    coincidence/pulse-height model. No conditional/forced detector estimator.
 
     The result is *not* a per-steradian source spectrum and is not added to a
     physical hard-photon event histogram or to ``Result.brem``. This means
@@ -261,11 +280,13 @@ def simulate_photon_continuum(
     debit into the already sampled primary electrons. Original primary
     bremsstrahlung energy losses are those of the chosen coupled transport.
 
-    Validation: photon-continuum-scene-handoff.
+    Validation: photon-continuum-scene-handoff, photon-secondary-feedback.
     """
     detector, numerics, low, electron, high = _preflight(
         scene, n_samples, photon_cutoff_eV, electron_cutoff_eV, source_ceiling_eV
     )
+    if type(charged_feedback) is not bool:
+        raise ValueError("charged_feedback must be a bool")
     edges = _energy_edges(edges_eV)
     if seed is not None and (type(seed) is not int or seed < 0):
         raise ValueError("seed must be a nonnegative integer or None")
@@ -298,6 +319,16 @@ def simulate_photon_continuum(
     # Identity is resolved BEFORE tracking: a data or physical geometry change
     # cannot silently reuse a stale detector tally.
     layers, aperture, boxes, (width, height) = _scene_geometry(case, detector, scene.filter_plates)
+    stage = None
+    feedback_identity = None
+    if charged_feedback:
+        if boxes:
+            raise ValueError(
+                "charged feedback does not yet transport charged particles through filter boxes"
+            )
+        stage, feedback_identity = _scene_feedback(
+            case, layers, width, height, numerics, low, electron
+        )
     effective_seed = int(case["seed"]) if seed is None else seed
     source_digest = case_content_key(case, xsgen_tables=case_table_markers(case))
     observation_digest, identity = _identity(
@@ -310,6 +341,7 @@ def simulate_photon_continuum(
         photon_cutoff_eV=low,
         electron_cutoff_eV=electron,
         source_ceiling_eV=high,
+        **({"charged_feedback": feedback_identity} if stage is not None else {}),
     )
     tables = runner._case_bremslib_tables(case)
     if tables is None:
@@ -328,7 +360,7 @@ def simulate_photon_continuum(
         n_samples=n_samples,
         seed=effective_seed,
         photon_cutoff_eV=low,
-        electron_cutoff_eV=electron,
+        **({"electron_cutoff_eV": electron} if stage is None else {"charged_stage": stage}),
         source_ceiling_eV=high,
         boxes=boxes,
         width_ang=width,
@@ -344,16 +376,80 @@ def simulate_photon_continuum(
             "observation_identity_digest": observation_digest,
             "normalization": "photons / (incident electron eV), aperture-integrated",
             "origin": "physical PlanarDetector ordinary hits; no ballistic filter reapplication",
-            "charged_descendants": "handoff-only, not transported",
+            "charged_descendants": "CPU electron/positron, Auger and annihilation feedback"
+            if stage is not None
+            else "handoff-only, not transported",
             "limitations": [
                 "CPU-only experimental reference, not a validated MeV shower",
-                "no charged feedback or positron annihilation",
+                *(
+                    ["contiguous target stack only; no charged filter transport"]
+                    if stage is not None
+                    else ["no charged feedback or positron annihilation"]
+                ),
                 "unpolarized BremsLib sources; no PXR/CBS or primary characteristic",
                 "no pixelation, response, acquisition or uncertainty estimates",
                 "no source/physical-hard-photon histogram summation",
             ],
         },
     )
+
+
+def _scene_feedback(case, layers, width, height, numerics, photon_cutoff, electron_cutoff):
+    """Prepare enabled-only feedback and its additional positron table provenance.
+
+    Validation: photon-secondary-feedback
+    """
+    from .montecarlo.runner.case_tables import (
+        _case_elastic_kwargs,
+        _case_inelastic_kwargs,
+        _case_radiative_kwargs,
+        _case_stopping_tables,
+    )
+    from .montecarlo.transport.photon_feedback import cascade_feedback_stage
+
+    if case.get("inelastic_model") != "shell-soft-hard":
+        raise ValueError("charged feedback requires inelastic_model='shell-soft-hard'")
+    options = {
+        **_case_inelastic_kwargs(case),
+        **_case_elastic_kwargs(case),
+        **_case_radiative_kwargs(case),
+        "stopping_tables": _case_stopping_tables(case),
+        "secondary_threshold_eV": electron_cutoff,
+        "E_cut_keV": electron_cutoff * 1e-3,
+        "transport_core": numerics.transport_core,
+        "energy_model": case.get("energy_model", "frozen"),
+        "straggling": bool(case.get("straggling", False)),
+        "max_dE_frac": case.get("max_dE_frac", 0.0),
+    }
+    stage = cascade_feedback_stage(
+        layers, width_ang=width, height_ang=height, photon_cutoff_eV=photon_cutoff, **options
+    )
+    return stage, {
+        "model": "cpu-charged-photon-feedback-v1",
+        "positron_tables": _feedback_table_markers(stage),
+        "max_relaxation_rounds": stage.max_relaxation_rounds,
+    }
+
+
+def _feedback_table_markers(stage):
+    """Resolve enabled-only positron provenance at the Scene orchestration boundary."""
+    from .xsgen.elsepa.catalog import resolve_layer_tables
+    from .xsgen.sbethe.catalog import resolve_catalog_table
+    from .xsgen.store import identity_markers
+
+    transport = stage.base.transport
+    materials = transport["inelastic_materials"]
+    if isinstance(materials, str):
+        materials = [materials]
+    records = [resolve_catalog_table(key, projectile="positron") for key in materials]
+    if transport.get("elastic_model") == "elsepa":
+        records.extend(
+            table
+            for layer in transport["layers"]
+            for entry in resolve_layer_tables(layer[2], projectile="positron")
+            for table in entry.tables
+        )
+    return identity_markers(records)
 
 
 __all__ = ["MODEL", "PhotonContinuumObservation", "simulate_photon_continuum"]

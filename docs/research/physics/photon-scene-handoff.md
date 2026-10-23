@@ -79,11 +79,14 @@ in the source range. Unbinned detector hits are reported separately.
   positron transport, adaptive precision, pixelation, detector response,
   acquisition and unsupported material/radiation modes.
 - Photon interactions include existing EPDL collision sampling and sampled
-  EADL relaxation. Photon-born charged daughters are **booked as handoffs**;
-  this entry point does *not* yet transport those daughters or positrons.
-  It therefore is **not** a validated complete MeV thick-target response.
-  See the separate `track_coupled_histories` diagnostic for current CPU
-  charged-feedback limitations.
+  EADL relaxation. By default photon-born charged daughters are booked as
+  handoffs. Explicit `charged_feedback=True` follows electrons, positrons,
+  charged-impact relaxation, Auger descendants and annihilation photons in a
+  contiguous target stack, and requires shell-soft-hard inelastic transport.
+  That mode refuses filter boxes. Its enabled-only observation identity adds
+  the feedback model and positron table pins; the photon-only payload is
+  unchanged. See [CPU secondary feedback](photon-secondary-feedback.md).
+  Neither mode is a validated complete MeV thick-target response.
 
 ## Source and observation identities
 
@@ -103,11 +106,41 @@ or directional artifacts. Its return type explicitly reports the aperture
 normalization and the distinction between weighted scoring histories and the
 physical electron energy ledger.
 
+### Explicit reduced-observation persistence
+
+```python
+from pyrite.photon_observation import load_photon_continuum
+
+observation.save("photon-aperture.npz")
+tally = load_photon_continuum("photon-aperture.npz")
+print(tally.total_per_primary_eV)  # photons / electron / eV, aperture-integrated
+```
+
+The provisional `pyrite.photon-continuum-tally.v1` artifact stores bin edges,
+total/direct/redistributed spectra, detected and out-of-band counts, primary
+and proposal populations, charged-feedback selection, both identities and
+the complete observation provenance. Arrays retain their floating-point dtype
+and values. JSON metadata and NumPy arrays require no pickle. The loader checks
+the content checksum, observation identity, bin/category/count consistency and
+aperture normalization. Original data pins are retained without consulting the
+current table installation. The checksum detects accidental corruption; it is
+not an authenticity signature.
+
+Saving uses the exact supplied filename and atomically replaces it only after
+validation and successful writing; the parent directory must already exist.
+Loading returns `PhotonContinuumTally`, a reduced observation without source
+rows, histories or `Case`. It performs no transport or table fetch. This is an
+experimental analysis artifact, not a production checkpoint, source replay or
+transport restart. The production Result/checkpoint/replay work below remains
+open.
+
 ## Remaining steps before exposing `Physics.photon_transport_model`
 
-1. Integrate the photon-born electron feedback and positron/annihilation path
-   under one coupled queue with reliable energy and lineage accounting;
-   support shower-dependent source correlations where needed.
+1. Independently verify the CPU secondary-feedback reference, generalize
+   charged target/filter re-entry, and support shower-dependent source
+   correlations where needed. Physical primary characteristic/annihilation
+   source adapters exist separately; the Scene continuum call remains a
+   weighted BremsLib source.
 2. Add a separate physical-aperture/pixel observable to the public result and
    checkpoint schema; never overload the directional `Result.brem` array.
 3. Make source versus detector identity and data-pin provenance part of the
