@@ -26,6 +26,8 @@ from .axial_mcwf import (
 
 # Limit speculative storage and wasted FFTs when a threshold crosses mid-block.
 _CHECK_STEPS = 8
+# Replay each speculative block as one CUDA graph (eager fallback if capture fails).
+_GRAPHS = True
 
 
 @cache
@@ -233,6 +235,57 @@ def run_cuda(
     )
 
 
+class _StepGraphs:
+    """Captured speculative step blocks writing fixed buffers.
+
+    The eager block's FFT configuration and kernels, so replay is bitwise
+    identical; one graph launch replaces ~10 kernel launches per step.
+    """
+
+    def __init__(self, cp, batch, phase, checks):
+        get_fft_plan = __import__("cupyx.scipy.fft", fromlist=["get_fft_plan"]).get_fft_plan
+        shape = batch.lagged.shape
+        self.cp, self.batch, self.phase = cp, batch, phase
+        self.states = cp.empty((checks, *shape), dtype=complex)
+        self.norms = cp.empty((checks, shape[0]))
+        self.crossings = cp.empty((checks, shape[0]), dtype=bool)
+        self.work = cp.empty(shape, dtype=complex)
+        self.real = cp.empty(shape, dtype=complex)
+        self.plan = get_fft_plan(self.work, axes=(-2, -1))
+        self.stream = cp.cuda.Stream(non_blocking=True)
+        self.graphs = {}
+        self._steps(1)  # compile kernels and plan outside capture
+
+    def _steps(self, count):
+        cp, batch = self.cp, self.batch
+        from cupy.cuda import cufft
+
+        norm_kernel, crossed_kernel = _step_kernels(cp)
+        cells = float(batch.lagged[0].size)
+        source = batch.lagged
+        for j in range(count):
+            cp.multiply(source, batch.full, out=self.work)
+            self.plan.fft(self.work, self.real, cufft.CUFFT_INVERSE)
+            cp.multiply(self.phase, self.real, out=self.real)
+            self.plan.fft(self.real, self.states[j], cufft.CUFFT_FORWARD)
+            norm_kernel(self.states[j], batch.area, cells, axis=(1, 2), out=self.norms[j])
+            crossed_kernel(self.norms[j], batch.live, batch.thresholds, self.crossings[j])
+            source = self.states[j]
+
+    def run(self, count):
+        """Advance ``count`` speculative steps; return host crossings."""
+        if count not in self.graphs:
+            with self.stream:
+                self.stream.begin_capture()
+                try:
+                    self._steps(count)
+                finally:
+                    graph = self.stream.end_capture()
+            self.graphs[count] = graph
+        self.graphs[count].launch(stream=self.cp.cuda.Stream.null)
+        return self.cp.asnumpy(self.crossings[:count])
+
+
 class _Batch:
     def __init__(self, device, sampled, weights, start, size, seed, step, tilt, hook):
         from ._axial_cuda_jumps import _choose, electron_rng
@@ -273,10 +326,20 @@ class _Batch:
         # Large ensembles cross thresholds often; avoid replaying many large
         # FFTs for a rare opportunity to combine host checks.
         checks = min(_CHECK_STEPS, max(1, BATCH // len(self.live)))
+        graphs = self._graphs(phase, checks)
         norm_kernel, crossed_kernel = _step_kernels(cp)
         cells = float(self.lagged[0].size)
         while self.step < target and self.live_count:
             count = min(checks, target - self.step)
+            if graphs is not None:
+                crossed = graphs.run(count)
+                events = np.flatnonzero(crossed.any(axis=1))
+                index = int(events[0]) if events.size else count - 1
+                cp.copyto(self.lagged, graphs.states[index])  # buffers stay fixed
+                self.step += index + 1
+                for b in np.flatnonzero(crossed[index]):
+                    self.jump(int(b), graphs.norms[index][b], step_ang, jumps, sinks)
+                continue
             states, norms = [], []
             crossings = cp.empty((count, len(self.live)), dtype=bool)
             for j in range(count):
@@ -297,6 +360,20 @@ class _Batch:
             self.step += index + 1
             for b in np.flatnonzero(crossed[index]):
                 self.jump(int(b), norms[index][b], step_ang, jumps, sinks)
+
+    def _graphs(self, phase, checks):
+        """Per-batch step graphs, or ``None`` for the eager block."""
+        # Single-step blocks measured no faster as graphs (one launch saved per sync).
+        if not _GRAPHS or checks < 2 or not hasattr(self.cp, "cuda"):
+            return None
+        key = (id(phase), checks)
+        if getattr(self, "_graph_key", None) != key:
+            self._graph_key = key
+            try:
+                self._step_graphs = _StepGraphs(self.cp, self, phase, checks)
+            except self.cp.cuda.runtime.CUDARuntimeError:
+                self._step_graphs = None
+        return self._step_graphs
 
     def jump(self, b, norm, step_ang, jumps, sinks):
         cp = self.cp
