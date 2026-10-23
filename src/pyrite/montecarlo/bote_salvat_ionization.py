@@ -149,6 +149,8 @@ def load_bote_salvat_parameters() -> dict[int, BoteSalvatElement]:
         If it is not installed; the message names ``pyrite tables fetch bote-salvat``.
     pyrite.datasets.DatasetMismatchError
         If the installed bytes differ from the pinned file.
+
+    Validation: bote-salvat-ionization-backend
     """
     path = require_dataset(BOTE_SALVAT.name)
     actual = file_sha256(path)

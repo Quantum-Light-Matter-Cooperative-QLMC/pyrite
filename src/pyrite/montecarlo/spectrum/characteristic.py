@@ -78,6 +78,8 @@ def characteristic_model_marker(
     spectrum, so each is part of the checkpoint identity. The default EEDL
     marker is unchanged by the opt-in Bote--Salvat backend, which appends its
     parameter checksum.
+
+    Validation: bote-salvat-ionization-backend
     """
     if fluorescence_yields not in _FLUORESCENCE_YIELD_SOURCES:
         raise ValueError(f"fluorescence_yields must be one of {_FLUORESCENCE_YIELD_SOURCES}")
@@ -583,6 +585,8 @@ def load_characteristic_cross_sections(
     ``docs/physics/radiation-physics/characteristic-radiation.md``.
 
     Validation: characteristic-radiation
+
+    Validation: bote-salvat-ionization-backend
     """
     if not isinstance(element, str) or re.fullmatch(r"[A-Z][a-z]?", element) is None:
         raise ValueError("element must be a chemical symbol such as 'C' or 'Si'")
@@ -830,6 +834,8 @@ def mc_characteristic_spectrum(
     Validation: characteristic-radiation
 
     Validation: segment-escape-average
+
+    Validation: bote-salvat-ionization-backend
     """
     if isinstance(chunk, bool) or int(chunk) <= 0:
         raise ValueError("chunk must be a positive integer")

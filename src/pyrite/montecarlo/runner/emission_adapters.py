@@ -330,6 +330,10 @@ def select_continuum(
 def select_emission(
     case: Mapping[str, Any], catalog: EmissionCatalog = BUILTIN_EMISSION
 ) -> EmissionSelection:
+    """Select case emission descriptors, including the shell-ionization model.
+
+    Validation: bote-salvat-ionization-backend
+    """
     return EmissionSelection(
         catalog.get("emission.cxr/cxr"),
         catalog.get(

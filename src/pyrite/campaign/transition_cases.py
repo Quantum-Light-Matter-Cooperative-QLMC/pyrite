@@ -15,7 +15,10 @@ from ..montecarlo.case import Case, transition_case_record
 
 
 def resolve_shell_ionization(cases: list[Case], physics: Physics) -> list[Case]:
-    """Record the opt-in Bote--Salvat ionization model (#92); EEDL leaves cases unchanged."""
+    """Record the opt-in Bote--Salvat ionization model (#92); EEDL leaves cases unchanged.
+
+    Validation: bote-salvat-ionization-backend
+    """
     if physics.shell_ionization_model == "eedl":
         return cases
     return [replace(case, shell_ionization_model=physics.shell_ionization_model) for case in cases]

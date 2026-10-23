@@ -248,6 +248,8 @@ class Physics:
         ``"eedl"`` (default) characteristic primary-vacancy cross sections, or
         the opt-in ``"bote-salvat"`` K/L/M fit (#92; ``pyrite tables fetch
         bote-salvat``), which keeps EEDL for higher shells and the EADL cascade.
+
+    Validation: bote-salvat-ionization-backend
     """
 
     emission: EmissionSelection = "incoherent"

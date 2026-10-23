@@ -12,6 +12,8 @@ how the remote box (``PYRITE_HOME=<remote dir>``) finds its synced copy.
 A missing dataset is an error naming the fetch command. Nothing here falls back
 to other data, and nothing downloads implicitly at run time: a compute node may
 have no network, so installation stays an explicit step.
+
+Validation: bote-salvat-ionization-backend
 """
 
 import hashlib

@@ -399,6 +399,8 @@ def case_characteristic_marker(case: Case | Mapping[str, Any]) -> str:
     """Characteristic-model marker of the shell-ionization model a case selects (#92).
 
     Absent is EEDL and returns :data:`CHARACTERISTIC_MODEL` unchanged.
+
+    Validation: bote-salvat-ionization-backend
     """
     model = case.get("shell_ionization_model")
     if model is None:
@@ -584,7 +586,10 @@ def _identity_v1(
     xsgen_tables: Mapping[str, str] | None = None,
     bremsstrahlung_model: Literal["auto", "eedl", "bremslib"] | None = None,
 ) -> dict[str, Any]:
-    """Return profile plus exact resolved parameters and stable SHA-256 digest."""
+    """Return profile plus exact resolved parameters and stable SHA-256 digest.
+
+    Validation: bote-salvat-ionization-backend
+    """
     assert sweep.target is not None
     crystallography = crystal_params(sweep.target.material, sweep.n_families)
     resolved = {
@@ -795,6 +800,8 @@ def case_content_key(
     otherwise still be served a blob computed from the superseded table. Unlike
     the three constants it is conditional, so a run reading no xsgen table
     keeps its existing content key and every stored blob stays reachable.
+
+    Validation: bote-salvat-ionization-backend
     """
     payload = {
         "schema": CASE_CONTENT_KEY_SCHEMA,

@@ -2,6 +2,8 @@
 
 Callers supply ``case_table_markers(case)`` or its run-scoped cached equivalent,
 never a dataset union. No table loading or alternative auto algorithm occurs.
+
+Validation: bote-salvat-ionization-backend
 """
 
 import json
