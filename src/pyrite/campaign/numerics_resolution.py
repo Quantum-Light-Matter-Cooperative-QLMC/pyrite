@@ -39,6 +39,7 @@ NUMERICS_GROUPS = (
             ("positron_transport", "positron transport"),
             ("atomic_electron_deflection", "atomic-electron deflection"),
             ("transition_radiation", "transition radiation"),
+            ("shell_ionization_model", "shell-ionization model"),
             *((key, key.replace("_", " ")) for key in CHANNELING_KEYS),
         ),
     ),

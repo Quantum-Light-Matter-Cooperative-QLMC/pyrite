@@ -66,6 +66,7 @@ _BREMSSTRAHLUNG_MODEL_VALUES = ("auto", "eedl", "bremslib")
 _RADIATIVE_MODEL_VALUES = ("auto", "uncoupled", "bremslib-soft-hard")
 _PAIR_PRODUCTION_MODEL_VALUES = ("penelope-2024",)
 _ATOMIC_ELECTRON_DEFLECTION_VALUES = ("kawrakow", "none")
+_SHELL_IONIZATION_MODEL_VALUES = ("eedl", "bote-salvat")
 _MOSAIC_ROUTE_VALUES = ("analytic", "mc")
 _NUMERICS_FIELD_NAMES = {
     "cxr-trials": "n_electrons",
@@ -92,6 +93,7 @@ _NUMERICS_FIELD_NAMES = {
     "channeling-model": "channeling_model",
     "channeling-axial": "channeling_axial",
     "transition-radiation": "transition_radiation",
+    "shell-ionization-model": "shell_ionization_model",
     "channeling-plane": "channeling_plane",
     "channeling-basis-size": "channeling_basis_size",
     "channeling-bloch-cells": "channeling_bloch_cells",
@@ -465,6 +467,15 @@ def numerics_show_command(name, json_output):
         "elastic rate by 1 + xi/Z (xi = 1 under continuous stopping; the Moller share "
         "above W_c is removed under shell-soft-hard, which needs elsepa); none keeps "
         "elastic-only deflection."
+    ),
+)
+@click.option(
+    "--shell-ionization-model",
+    type=click.Choice(_SHELL_IONIZATION_MODEL_VALUES),
+    help=(
+        "Characteristic-line primary vacancies: eedl (default) subshell cross sections, or "
+        "the opt-in bote-salvat K/L/M fit (needs 'pyrite tables fetch bote-salvat'; EEDL "
+        "for higher shells)."
     ),
 )
 @click.option(

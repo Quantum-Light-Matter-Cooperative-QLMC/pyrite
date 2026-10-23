@@ -1,4 +1,4 @@
-"""Per-case transition-radiation record (#103).
+"""Per-case transition-radiation record (#103) and shell-ionization model (#92).
 
 ``Physics(transition_radiation="history" | "bunch")`` adds one
 ``transition_radiation`` record to every lowered case; ``Case`` validation then
@@ -12,6 +12,16 @@ from dataclasses import replace
 
 from .._numerics import Physics
 from ..montecarlo.case import Case, transition_case_record
+
+
+def resolve_shell_ionization(cases: list[Case], physics: Physics) -> list[Case]:
+    """Record the opt-in Bote--Salvat ionization model (#92); EEDL leaves cases unchanged.
+
+    Validation: bote-salvat-ionization-backend
+    """
+    if physics.shell_ionization_model == "eedl":
+        return cases
+    return [replace(case, shell_ionization_model=physics.shell_ionization_model) for case in cases]
 
 
 def resolve_transition_radiation(cases: list[Case], physics: Physics) -> list[Case]:

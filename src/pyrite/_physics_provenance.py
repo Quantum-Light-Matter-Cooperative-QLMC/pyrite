@@ -2,6 +2,8 @@
 
 Callers supply ``case_table_markers(case)`` or its run-scoped cached equivalent,
 never a dataset union. No table loading or alternative auto algorithm occurs.
+
+Validation: bote-salvat-ionization-backend
 """
 
 import json
@@ -47,6 +49,7 @@ def resolved_physics_view(
         CXR_ESCAPE_MODEL,
     )
     from .montecarlo.spectrum.brem_bremslib import BREMSSTRAHLUNG_BREMSLIB_MODEL
+    from .montecarlo.spectrum.characteristic import characteristic_model_marker
     from .montecarlo.spectrum.coherent_population import COHERENT_POPULATION_MODEL
     from .montecarlo.trajectories import _jsonable
     from .montecarlo.transport import STOPPING_MODEL
@@ -63,7 +66,9 @@ def resolved_physics_view(
         "transport.atomic-electron": resolved.get("atomic_electron_deflection", "none"),
         "emission.continuum": resolved.get("bremsstrahlung_model", "eedl"),
         "emission.cxr": "cxr",
-        "emission.characteristic": "characteristic",
+        "emission.characteristic": (
+            "bote-salvat" if resolved.get("shell_ionization_model") else "characteristic"
+        ),
     }
     if resolved.get("pair_production_model"):
         selections["transport.pair"] = resolved["pair_production_model"]
@@ -95,7 +100,11 @@ def resolved_physics_view(
     )
     markers = {
         "stopping_model": STOPPING_MODEL,
-        "characteristic_model": CHARACTERISTIC_MODEL,
+        "characteristic_model": (
+            characteristic_model_marker(ionization_model="bote-salvat")
+            if resolved.get("shell_ionization_model")
+            else CHARACTERISTIC_MODEL
+        ),
         "line_escape_model": CXR_ESCAPE_MODEL,
         "attenuation_model": ATTENUATION_MODEL,
         "bremsstrahlung_model": (

@@ -611,7 +611,7 @@ def _fetch_cxr(payload: dict) -> str:
     default=None,
     help=(
         "Install CODE from a local copy of the pinned archive (for eedl, eadl, "
-        "epdl and epdl-differential, of the pinned file itself) instead of "
+        "epdl, epdl-differential and bote-salvat, of the pinned file itself) instead of "
         "downloading it. Needs CODE."
     ),
 )
@@ -651,8 +651,11 @@ def fetch_command(
     bremslib       BremsLib-derived bremsstrahlung tables for every element a
                    catalogue material may contain, so no BremsLib checkout is
                    needed for them.
+    bote-salvat    NIST's public-domain Bote-Salvat K/L/M shell-ionization
+                   parameters, read only when a run selects the opt-in
+                   Bote-Salvat ionization model.
 
-    Without CODE every one is fetched in the order above, sbethe-tables and
+    Without CODE every one except bote-salvat is fetched in the order above, sbethe-tables and
     elsepa for both electrons and positrons (the positron pins are what
     `--projectile positron` installs); one that fails is reported and the rest
     still run, and the command exits 1 if any failed.

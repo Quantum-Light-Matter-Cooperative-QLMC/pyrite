@@ -68,6 +68,7 @@ TRANSPORT_KEYS = (
     "atomic_electron_deflection",
     "transition_radiation",
     "transition_lattice_origin_ang",
+    "shell_ionization_model",
 )
 #: Collision-loss schemes a run may select: ``"auto"`` (the default) plus the
 #: ``simulate_trajectories`` schemes of
@@ -95,6 +96,10 @@ PAIR_PRODUCTION_MODELS = ("penelope-2024",)
 #: ``montecarlo.transport.atomic_electrons.ATOMIC_ELECTRON_DEFLECTION_MODELS``
 #: plus the ``"none"`` opt-out (a test keeps them in step).
 ATOMIC_ELECTRON_DEFLECTION_MODELS = ("kawrakow", "none")
+#: Characteristic primary-vacancy cross sections: EEDL (default) or the opt-in
+#: Bote--Salvat K/L/M fit (#92). Kept in step with
+#: ``montecarlo.spectrum.characteristic._IONIZATION_MODELS`` by a test.
+SHELL_IONIZATION_MODELS = ("eedl", "bote-salvat")
 #: The default resolves coupling when BremsLib tables are available.
 RADIATIVE_MODELS = ("auto", "uncoupled", "bremslib-soft-hard")
 DEFAULT_RADIATIVE_CUTOFF_EV = 1000.0
@@ -239,6 +244,12 @@ class Physics:
     transition_lattice_origin_ang
         Lattice origin relative to the entrance face, in Å, for ``"two-beam"``;
         omitted means (0, 0, 0). It changes the surface-termination phase.
+    shell_ionization_model
+        ``"eedl"`` (default) characteristic primary-vacancy cross sections, or
+        the opt-in ``"bote-salvat"`` K/L/M fit (#92; ``pyrite tables fetch
+        bote-salvat``), which keeps EEDL for higher shells and the EADL cascade.
+
+    Validation: bote-salvat-ionization-backend
     """
 
     emission: EmissionSelection = "incoherent"
@@ -259,6 +270,7 @@ class Physics:
     channeling_axial: Mapping[str, object] | None = None
     transition_radiation: Literal["off", "history", "bunch", "two-beam"] = "off"
     transition_lattice_origin_ang: tuple[float, float, float] | None = None
+    shell_ionization_model: Literal["eedl", "bote-salvat"] = "eedl"
 
     def __post_init__(self) -> None:
         if self.emission == "both":
@@ -320,6 +332,7 @@ class Physics:
             self.positron_transport,
         )
         validate_atomic_electron_deflection(self.atomic_electron_deflection)
+        validate_shell_ionization_model(self.shell_ionization_model)
         validate_channeling_physics(self, energy_model)
         validate_transition_physics(self, energy_model)
 
@@ -529,6 +542,14 @@ def validate_atomic_electron_deflection(model: object) -> None:
         raise ValueError(
             "atomic_electron_deflection must be one of "
             + ", ".join(ATOMIC_ELECTRON_DEFLECTION_MODELS)
+        )
+
+
+def validate_shell_ionization_model(model: object) -> None:
+    """Validate a run-level characteristic shell-ionization model name."""
+    if model not in SHELL_IONIZATION_MODELS:
+        raise ValueError(
+            "shell_ionization_model must be one of " + ", ".join(SHELL_IONIZATION_MODELS)
         )
 
 

@@ -259,6 +259,18 @@ BUILTIN_DESCRIPTORS = DescriptorCatalog(
             output_slots=("spec_characteristic",),
             streaming_requirements=("whole-electron blocks",),
         ),
+        ModelDescriptor(
+            "emission.characteristic",
+            "bote-salvat",
+            "montecarlo.runner.emission",
+            (
+                "layer compositions and absorption stack",
+                "Bote-Salvat K/L/M primary vacancies; EEDL for higher shells",
+            ),
+            output_slots=("spec_characteristic",),
+            required_datasets=("bote-salvat",),
+            streaming_requirements=("whole-electron blocks",),
+        ),
     )
 )
 

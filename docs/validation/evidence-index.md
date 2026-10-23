@@ -151,6 +151,7 @@ radiation-physics/bremslib-radiative-partition
 radiation-physics/cbs-amplitude
 radiation-physics/characteristic-radiation
 radiation-physics/eedl-shell-ionization-comparison
+radiation-physics/bote-salvat-ionization-backend
 radiation-physics/bremslib-angular-schiff
 radiation-physics/bremslib-electron-electron
 radiation-physics/bremslib-high-energy-extension

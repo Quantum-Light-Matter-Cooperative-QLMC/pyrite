@@ -119,6 +119,7 @@ def physics_from_legacy(settings: Any) -> Physics:
         channeling_plane=getattr(settings, "channeling_plane", None),
         transition_radiation=getattr(settings, "transition_radiation", "off"),
         transition_lattice_origin_ang=getattr(settings, "transition_lattice_origin_ang", None),
+        shell_ionization_model=getattr(settings, "shell_ionization_model", "eedl"),
     )
 
 

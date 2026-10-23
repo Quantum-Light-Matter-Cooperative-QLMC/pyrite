@@ -1,0 +1,29 @@
+# Primary measurements cited by the CSV files in this directory.
+ref,authors,citation,doi
+An00,An et al.,"J. Phys. B 33, 3677 (2000)",10.1088/0953-4075/33/18/315
+An03,An et al.,"Nucl. Instrum. Methods B 207, 268 (2003)",10.1016/S0168-583X(03)00961-3
+Be78,Berenyi et al.,"J. Phys. B 11, 709 (1978)",10.1088/0022-3700/11/4/018
+Fe14,Fernández-Varea et al.,"J. Phys. B 47, 155201 (2014)",10.1088/0953-4075/47/15/155201
+Ha64,Hansen et al.,"Nucl. Phys. 58, 241 (1964)",10.1016/0029-5582(64)90534-6
+He96a,He et al.,"Acta Phys. Sin. (Overseas Ed.) 5, 499 (1996)",10.1088/1004-423X/5/7/003
+He96b,He et al.,"Nucl. Instrum. Methods B 114, 213 (1996)",10.1016/0168-583X(96)00193-0
+He97,He et al.,"Nucl. Instrum. Methods B 129, 445 (1997)",10.1016/S0168-583X(97)00163-8
+Ho79,Hoffmann et al.,"Z. Phys. A 293, 187 (1979)",10.1007/BF01435588
+Is77,Ishii et al.,"Phys. Rev. A 15, 906 (1977)",10.1103/PhysRevA.15.906
+Ka80,Kamiya et al.,"Phys. Rev. A 22, 413 (1980)",10.1103/PhysRevA.22.413
+Ki81,Kiss et al.,"Acta Phys. Acad. Sci. Hung. 50, 97 (1981)",10.1007/BF03157961
+Li12,Limandri et al.,"Phys. Rev. A 86, 042701 (2012)",10.1103/PhysRevA.86.042701
+Li20,Li et al.,"Acta Phys. Sin. 69, 133401 (2020)",10.7498/aps.69.20200264
+Ll02,Llovet et al.,"J. Phys. B 35, 973 (2002)",10.1088/0953-4075/35/4/320
+Lu01,Luo et al.,"Phys. Rev. A 63, 034702 (2001)",10.1103/PhysRevA.63.034702
+Lu97,Luo et al.,"J. Phys. B 30, 2681 (1997)",10.1088/0953-4075/30/11/018
+Mc88,McDonald and Spicer,"Phys. Rev. A 37, 985 (1988)",10.1103/PhysRevA.37.985
+Me04,Merlet et al.,"Phys. Rev. A 69, 032708 (2004)",10.1103/PhysRevA.69.032708
+Me16,Mei et al.,"J. Phys. B 49, 245204 (2016)",10.1088/0953-4075/49/24/245204
+Pe98,Peng et al.,"Phys. Rev. A 58, 2034 (1998)",10.1103/PhysRevA.58.2034
+Ri77,Ricz et al.,"Acta Phys. Acad. Sci. Hung. 42, 269 (1977)",10.1007/BF03157496
+Sa19,Santos et al.,"Phys. Rev. A 100, 022703 (2019)",10.1103/PhysRevA.100.022703
+Ta02,Tang et al.,"J. Appl. Phys. 91, 6739 (2002)",10.1063/1.1470248
+Ti20,Tian et al.,"Can. J. Phys. 98, 970 (2020)",10.1139/cjp-2019-0652
+Wu10,Wu et al.,"Nucl. Instrum. Methods B 268, 2820 (2010)",10.1016/j.nimb.2010.06.010
+Ra15,Rahangdale et al.,"arXiv:1508.02877 (2015)",10.48550/arXiv.1508.02877

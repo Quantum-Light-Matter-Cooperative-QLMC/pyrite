@@ -494,9 +494,10 @@ Usage: pyrite profile numerics reset [OPTIONS] NAME [cxr-trials|brem-trials|line
                                      model|radiative-cutoff-ev|pair-production-
                                      model|positron-transport|atomic-electron-
                                      deflection|channeling-model|channeling-
-                                     axial|transition-radiation|channeling-
-                                     plane|channeling-basis-size|channeling-bloch-
-                                     cells|channeling-dz-ang|channeling-zone-max-ang]...
+                                     axial|transition-radiation|shell-ionization-
+                                     model|channeling-plane|channeling-basis-
+                                     size|channeling-bloch-cells|channeling-dz-
+                                     ang|channeling-zone-max-ang]...
 
   Reset selected FIELDs, or every explicit numeric when none are named.
 
@@ -583,6 +584,11 @@ Options:
                                   share above W_c is removed under shell-soft-hard,
                                   which needs elsepa); none keeps elastic-only
                                   deflection.
+  --shell-ionization-model [eedl|bote-salvat]
+                                  Characteristic-line primary vacancies: eedl (default)
+                                  subshell cross sections, or the opt-in bote-salvat
+                                  K/L/M fit (needs 'pyrite tables fetch bote-salvat';
+                                  EEDL for higher shells).
   --channeling-model [off|planar]
                                   Planar quantum entrance zone (default off); requires
                                   plane, midpoint, uncoupled radiation and incoherent

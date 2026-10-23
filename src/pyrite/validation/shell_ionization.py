@@ -33,27 +33,27 @@ Validation: eedl-shell-ionization-comparison
 """
 
 import os
-import re
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
 
+from pyrite.datasets import BOTE_SALVAT, dataset_path
+from pyrite.montecarlo.bote_salvat_ionization import (
+    BOTE_SALVAT_SHA256,
+    BOTE_SALVAT_SHELLS,
+    BoteSalvatElement,
+    parse_bote_salvat,
+)
 from pyrite.montecarlo.eedl_ionization import EEDL_SUBSHELL_LABELS, load_eedl_shell_ionization
 from pyrite.montecarlo.spectrum.characteristic import load_characteristic_cross_sections
 from pyrite.paths import user_data_dir
 
 from ._pinned import read_pinned
 
-BOTE_SALVAT_URL = (
-    "https://raw.githubusercontent.com/usnistgov/BoteSalvatICX.jl/"
-    "8520cf5d002b11c3cf6669ebd5fedbb3de8d1fdb/src/xione.jl"
-)
-BOTE_SALVAT_SHA256 = "d0bd0d3ddca915a785a2562dfe29d6158b02d4a0e0330f54b784f8bba0b41599"
+BOTE_SALVAT_URL = BOTE_SALVAT.url
 BOTE_SALVAT_ENV = "PYRITE_BOTE_SALVAT_TABLE"
-BOTE_SALVAT_SHELLS = ("K", "L1", "L2", "L3", "M1", "M2", "M3", "M4", "M5")
-_BOHR_RADIUS_CM = 5.291772108e-9
 _ELECTRON_REST_ENERGY_EV = 5.10998918e5  # the value xion.f uses
 _SHELL_FAMILY = {"K": "K", "L1": "L1", "L2": "L2", "L3": "L3"}
 LINE_FAMILIES = ("K", "L1", "L2", "L3", "M")
@@ -63,100 +63,18 @@ class BoteSalvatUnavailableError(FileNotFoundError):
     """Raised when the pinned Bote--Salvat parameter file is not installed."""
 
 
-@dataclass(frozen=True, slots=True)
-class BoteSalvatElement:
-    """Bote--Salvat parameters for the shells ``K, L1, ...`` of one element."""
-
-    atomic_number: int
-    b_e: np.ndarray
-    a_nlj: np.ndarray
-    g: np.ndarray
-    edge_eV: np.ndarray
-    a: np.ndarray
-
-    def cross_section_cm2(self, shell: str, energy_eV: float, edge_eV: float | None = None):
-        """Ionization cross section of ``shell`` at ``energy_eV`` [cm²].
-
-        Validation: eedl-shell-ionization-comparison
-        """
-        index = BOTE_SALVAT_SHELLS.index(shell)
-        edge = float(self.edge_eV[index]) if edge_eV is None else edge_eV
-        overvoltage = energy_eV / edge
-        if overvoltage <= 1.0:
-            return 0.0
-        if overvoltage <= 16.0:
-            a = self.a[index]
-            inverse = 1.0 / (1.0 + overvoltage)
-            fit = (
-                a[0]
-                + a[1] * overvoltage
-                + inverse * (a[2] + inverse**2 * (a[3] + inverse**2 * a[4]))
-            )
-            reduced = (overvoltage - 1.0) * (fit / overvoltage) ** 2
-        else:
-            mc2 = _ELECTRON_REST_ENERGY_EV
-            beta2 = energy_eV * (energy_eV + 2.0 * mc2) / (energy_eV + mc2) ** 2
-            x = np.sqrt(energy_eV * (energy_eV + 2.0 * mc2)) / mc2
-            g = self.g[index]
-            fit = (
-                (2.0 * np.log(x) - beta2) * (1.0 + g[0] / x)
-                + g[1]
-                + g[2] * np.sqrt(mc2 / (energy_eV + mc2))
-                + g[3] / x
-            )
-            reduced = (
-                self.a_nlj[index] / beta2 * overvoltage / (overvoltage + self.b_e[index]) * fit
-            )
-        return 4.0 * np.pi * _BOHR_RADIUS_CM**2 * float(reduced)
-
-    @property
-    def shells(self) -> tuple[str, ...]:
-        return BOTE_SALVAT_SHELLS[: self.edge_eV.size]
-
-
-def parse_bote_salvat(text: str) -> dict[int, BoteSalvatElement]:
-    """Parse the ``BoteSalvatElectron`` tuple of BoteSalvatICX.jl ``xione.jl``.
-
-    Each ``BoteSalvatElementDatum(z, Be, Anlj, G, edge, A)`` holds comma
-    vectors ``Be``, ``Anlj`` and ``edge`` (one value per shell) and
-    semicolon-separated matrices ``G`` (four columns) and ``A`` (five).
-
-    Validation: eedl-shell-ionization-comparison
-    """
-    start = text.index("const BoteSalvatElectron")
-    body = text[start : text.index('"""', start)]
-    elements = {}
-    for match in re.finditer(r"BoteSalvatElementDatum\((\d+),(.*?)\)\s*[,\n]", body, re.S):
-        groups = re.findall(r"\[([^\]]*)\]", match.group(2))
-        if len(groups) != 5:
-            raise ValueError(f"Bote-Salvat datum {match.group(1)} has {len(groups)} fields")
-        rows = [
-            np.array(
-                [
-                    [float(v) for v in re.split(r"[,\s]+", row.strip()) if v]
-                    for row in group.split(";")
-                ]
-            )
-            for group in groups
-        ]
-        b_e, a_nlj, g, edge, a = rows[0][0], rows[1][0], rows[2], rows[3][0], rows[4]
-        n_shell = edge.size
-        if b_e.size != n_shell or a_nlj.size != n_shell or g.shape != (n_shell, 4):
-            raise ValueError(f"Bote-Salvat datum {match.group(1)} has inconsistent shapes")
-        if a.shape != (n_shell, 5) or n_shell > len(BOTE_SALVAT_SHELLS):
-            raise ValueError(f"Bote-Salvat datum {match.group(1)} has inconsistent shapes")
-        z = int(match.group(1))
-        elements[z] = BoteSalvatElement(z, b_e, a_nlj, g, edge, a)
-    if sorted(elements) != list(range(1, len(elements) + 1)):
-        raise ValueError("Bote-Salvat elements must run 1..N without gaps")
-    return elements
-
-
 def default_parameter_path() -> Path:
-    """Where the fetched file lives unless ``PYRITE_BOTE_SALVAT_TABLE`` overrides it."""
+    """Where the fetched file lives unless ``PYRITE_BOTE_SALVAT_TABLE`` overrides it.
+
+    An installed ``pyrite tables fetch bote-salvat`` dataset is preferred over
+    this check's own fetch location.
+    """
     override = os.environ.get(BOTE_SALVAT_ENV)
     if override:
         return Path(override)
+    installed = dataset_path(BOTE_SALVAT.name)
+    if installed.is_file():
+        return installed
     return user_data_dir() / "validation" / "bote-salvat" / "xione.jl"
 
 
@@ -342,7 +260,7 @@ def compare_production(
         bote_lines = bote_values @ table.line_yield_per_vacancy
         out_eedl, out_bote = {}, {}
         for family in LINE_FAMILIES:
-            chosen = np.array([f == family for f in families])
+            chosen = np.array([f == family for f in families], dtype=bool)
             out_eedl[family] = float(eedl_lines[chosen].sum())
             out_bote[family] = float(bote_lines[chosen].sum())
         return out_eedl, out_bote

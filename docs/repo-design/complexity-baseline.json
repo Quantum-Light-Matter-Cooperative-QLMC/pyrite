@@ -279,7 +279,7 @@
     {
       "path": "src/pyrite/montecarlo/case.py",
       "name": "Case.__post_init__",
-      "cc": 58
+      "cc": 59
     },
     {
       "path": "src/pyrite/montecarlo/channeling/axial_diagnostic.py",
@@ -394,7 +394,7 @@
     {
       "path": "src/pyrite/montecarlo/spectrum/brem.py",
       "name": "mc_brem_spectrum",
-      "cc": 46
+      "cc": 45
     },
     {
       "path": "src/pyrite/montecarlo/spectrum/brem_events.py",
@@ -469,7 +469,7 @@
     {
       "path": "src/pyrite/montecarlo/spectrum/coherent_stream_jit_kernel.py",
       "name": "_coherent_prologue_kernel",
-      "cc": 24
+      "cc": 23
     },
     {
       "path": "src/pyrite/montecarlo/spectrum/coherent_stream_jit_kernel.py",
@@ -479,7 +479,7 @@
     {
       "path": "src/pyrite/montecarlo/spectrum/coherent_stream_jit_kernel.py",
       "name": "run_coherent_prologue_kernel",
-      "cc": 36
+      "cc": 34
     },
     {
       "path": "src/pyrite/montecarlo/spectrum/coherent_windows.py",

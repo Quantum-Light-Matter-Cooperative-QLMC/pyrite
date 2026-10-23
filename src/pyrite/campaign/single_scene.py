@@ -184,6 +184,10 @@ def resolve_pixel_scene(
                 Literal["kawrakow", "none"],
                 transport.get("atomic_electron_deflection", "kawrakow"),
             ),
+            shell_ionization_model=cast(
+                Literal["eedl", "bote-salvat"],
+                transport.get("shell_ionization_model", "eedl"),
+            ),
         ),
         detector_id,
     )
