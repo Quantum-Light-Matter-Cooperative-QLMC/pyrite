@@ -8,11 +8,8 @@ import pytest
 
 def exercise_photon_reference(seed=341):
     """Run real weighted source/queue/tally code in vacuum; no external tables."""
-    from pyrite.montecarlo.runner.photon_emission import _score_exits
-    from pyrite.montecarlo.transport.photon_histories import (
-        PhotonAperture,
-        track_photon_histories,
-    )
+    from pyrite.montecarlo.runner.photon_emission import score_photon_sources
+    from pyrite.montecarlo.transport.photon_histories import PhotonAperture
     from pyrite.montecarlo.transport.photon_sources import sample_continuous_photons
 
     segments = dict(
@@ -31,19 +28,20 @@ def exercise_photon_reference(seed=341):
         cutoff_eV=1000,
         ceiling_eV=10_000,
     )
-    histories = track_photon_histories(
-        *source.track_args,
+    score = score_photon_sources(
+        source,
         [],
+        PhotonAperture((0, 0, 1e6), (1, 0, 0), (0, 1, 0), 1e6, 1e6),
+        [1000, 10_000],
+        n_primaries=1,
+        n_proposals=128,
         seed=seed,
         photon_cutoff_eV=1000,
         electron_cutoff_eV=1000,
-        source_kind=source.source_kind,
-        aperture=PhotonAperture((0, 0, 1e6), (1, 0, 0), (0, 1, 0), 1e6, 1e6),
     )
-    total, direct, redistributed, _, _ = _score_exits(histories, [1000, 10_000], 1)
-    assert total.sum() > 0
-    np.testing.assert_array_equal(total, direct)
-    np.testing.assert_array_equal(redistributed, [0])
+    assert score.total_per_primary_eV.sum() > 0
+    np.testing.assert_array_equal(score.total_per_primary_eV, score.direct_per_primary_eV)
+    np.testing.assert_array_equal(score.redistributed_per_primary_eV, [0])
 
 
 def _production_run(case, monkeypatch):
@@ -70,7 +68,7 @@ def _production_run(case, monkeypatch):
         guard.setattr(runner, "_TIMING", False)
         for module, names in (
             (scene, ["simulate_photon_continuum"]),
-            (photon_emission, ["score_bremslib_continuum"]),
+            (photon_emission, ["score_bremslib_continuum", "score_photon_sources"]),
             (photon_sources, ["sample_continuous_photons", "sample_bremslib_continuum"]),
             (photon_histories, ["track_photon_histories"]),
             (photon_coupling, ["track_coupled_histories"]),

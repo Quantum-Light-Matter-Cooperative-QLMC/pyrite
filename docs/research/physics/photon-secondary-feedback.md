@@ -116,6 +116,49 @@ select the intended original electron population and must not combine two
 representations of the same bremsstrahlung-driven shower. In particular, the
 Scene continuous-source path still refuses primary physical pair conversion.
 
+## Explicit event-source aperture scoring
+
+`montecarlo/runner/photon_emission.py::score_photon_sources` accepts these
+physical source batches directly. It follows the same photon-only or coupled
+queue and ordinary-hit reducer used by `score_bremslib_continuum`, without
+running primary transport or drawing a continuous source again:
+
+```python
+from pyrite.montecarlo.runner.photon_emission import score_photon_sources
+from pyrite.montecarlo.transport.photon_event_sources import primary_annihilation_sources
+
+sources = primary_annihilation_sources(primary_result, photon_cutoff_eV=1000)
+score = score_photon_sources(
+    sources,
+    layers,
+    aperture,
+    [1000, 100_000, 600_000],
+    n_primaries=original_incident_population,
+    seed=17,
+    photon_cutoff_eV=1000,
+    electron_cutoff_eV=1000,
+)
+```
+
+`layers` and `aperture` use the existing sample-frame ångström geometry.
+The denominator includes incident electrons with no emitted photons. The
+returned historical `PhotonContinuumScore` type also represents this explicit
+event tally: `n_proposals` defaults to the number of tracked input photon
+rows, including zero for an empty batch, and never supplies a normalization.
+Continuous callers instead retain their original proposal count, including
+zero-yield trials. Source history IDs, including local-only histories, must
+fall within the declared primary population. Event and tracker cutoffs must
+match so omitted emissions cannot silently disappear from a lower-cutoff run.
+
+Sub-cutoff energy remains in `score.sources.local_energy_eV`; it is outside
+`score.histories.ledger`, which covers tracked photons only. Primary energy
+reservations remain owned by the adapters and original charged transport.
+Pass a `charged_stage` instead of `electron_cutoff_eV` for coupled tracking.
+The caller still owns disjoint contributions and event-ID ranges. This API
+does not combine primary physical sources with a weighted continuum or add
+Scene source selection, enabled-only production identity, or persistence for
+physical event tallies. Secondary-feedback claims remain **unverified**.
+
 ## Evidence and remaining validation
 
 `tests/montecarlo/test_photon_feedback.py` checks annihilation energy and

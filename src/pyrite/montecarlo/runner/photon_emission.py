@@ -2,9 +2,9 @@
 
 This is a diagnostic runner, not a ``Physics`` mode.  It does not alter
 ``run_case`` or the existing attenuated directional bremsstrahlung scorer.
-The only source in this runner is the continuous BremsLib *expected-value*
-estimator; physical hard-radiative events must not also be tallied for the
-same radiation.  PXR/CBS and primary characteristic radiation are excluded.
+The continuous BremsLib *expected-value* estimator and explicit physical
+event adapters share an ordinary-hit scoring boundary. Callers must not tally
+two representations of the same radiation. No PXR/CBS conversion is made.
 
 All geometry and flight coordinates are sample-frame Angstroms.  Cross
 sections have their existing BremsLib convention.  Counts are integrated
@@ -37,6 +37,10 @@ class PhotonContinuumScore:
     scattered photons and fluorescence, not just scattered source photons.
     ``unbinned_detected_per_primary`` counts hits outside the supplied bins;
     the energy grid may intentionally be a restricted region of interest.
+
+    ``n_proposals`` records source trials for continuous sampling, or input
+    photon rows for an explicit event batch; it is never the denominator.
+    Event sources retain their separate sub-cutoff energy on ``sources``.
 
     ``histories.ledger`` is the energy account of weighted *scoring* photons,
     not the physical energy loss of the original transport electrons.
@@ -159,8 +163,6 @@ def score_bremslib_continuum(
 
     Validation: photon-continuous-source-scoring.
     """
-    from ..transport.photon_coupling import track_coupled_histories
-    from ..transport.photon_histories import track_photon_histories
     from ..transport.photon_sources import sample_bremslib_continuum
 
     edges = _edges(edges_eV)
@@ -195,8 +197,93 @@ def score_bremslib_continuum(
         segment_layer=segment_layer,
         source_kind=source_kind,
     )
+    return score_photon_sources(
+        sources,
+        layers,
+        aperture,
+        edges,
+        n_primaries=n_primaries,
+        n_proposals=n_samples,
+        seed=seed,
+        photon_cutoff_eV=photon_cutoff_eV,
+        electron_cutoff_eV=electron_cutoff_eV,
+        charged_stage=charged_stage,
+        boxes=boxes,
+        width_ang=width_ang,
+        height_ang=height_ang,
+        max_generations=max_generations,
+        max_rounds=max_rounds,
+    )
+
+
+def score_photon_sources(
+    sources: "WeightedPhotonSources",
+    layers: "Sequence",
+    aperture: "PhotonAperture",
+    edges_eV,
+    *,
+    n_primaries: int,
+    seed: int,
+    photon_cutoff_eV: float,
+    electron_cutoff_eV: float | None = None,
+    charged_stage: "ChargedStage | None" = None,
+    boxes: "Sequence[PhotonBox]" = (),
+    width_ang: float | None = None,
+    height_ang: float | None = None,
+    max_generations: int = 1000,
+    max_rounds: int = 64,
+    n_proposals: int | None = None,
+) -> PhotonContinuumScore:
+    """Track an explicit source batch and score ordinary physical-aperture hits.
+
+    Accepts weighted continuous sources or physical ``emission_sources``
+    batches, including primary characteristic and annihilation adapters.
+    ``n_primaries`` is the original incident-electron population, including
+    electrons emitting no photons. Histories must belong to that population.
+    No source sampling, primary transport, attenuation pass or primary energy
+    debit occurs here. Sources must represent disjoint emission contributions.
+
+    ``n_proposals`` defaults to the input photon-row count for event batches;
+    continuous callers pass their original trial count, including zero-yield
+    trials. It affects bookkeeping only. The source batch and its sub-cutoff
+    energy are retained in the result; the history ledger covers tracked rows
+    only. Event batches must use the same cutoff as the queue.
+
+    Photon-only and charged-feedback boundaries match
+    ``score_bremslib_continuum``. This experimental scoring API does not add
+    Scene source selection, production persistence or a validated shower model.
+    Validation: photon-continuous-source-scoring, photon-secondary-feedback.
+    """
+    from ..transport.photon_coupling import track_coupled_histories
+    from ..transport.photon_histories import track_photon_histories
+
+    edges = _edges(edges_eV)
+    if aperture is None:
+        raise ValueError("an explicit physical aperture is required for ordinary-hit scoring")
+    if type(n_primaries) is not int or n_primaries <= 0:
+        raise ValueError("n_primaries must be a positive integer")
+    owners = np.asarray(sources.history_id)
+    local_owners = np.asarray(getattr(sources, "local_history_id", owners))
+    for ids in (owners, local_owners):
+        if ids.ndim != 1 or not np.issubdtype(ids.dtype, np.integer):
+            raise ValueError("source history ids must be an integer vector")
+        if np.any((ids < 0) | (ids >= n_primaries)):
+            raise ValueError("source history ids must belong to the original primary population")
+    if n_proposals is None:
+        n_proposals = owners.size
+    if type(n_proposals) is not int or n_proposals < owners.size:
+        raise ValueError("n_proposals must be an integer at least the source row count")
+    if getattr(sources, "photon_cutoff_eV", photon_cutoff_eV) != photon_cutoff_eV:
+        raise ValueError("event source and tracker photon cutoffs must match")
     if charged_stage is None:
-        assert electron_cutoff_eV is not None  # checked before sampling
+        if electron_cutoff_eV is None:
+            raise ValueError("photon-only scoring requires electron_cutoff_eV")
+        if max_rounds != 64:
+            raise ValueError("max_rounds requires a charged_stage")
+    elif electron_cutoff_eV is not None:
+        raise ValueError("charged_stage owns its electron threshold; omit electron_cutoff_eV")
+    if charged_stage is None:
+        assert electron_cutoff_eV is not None  # checked above
         histories = track_photon_histories(
             *sources.track_args,
             layers,
@@ -236,6 +323,6 @@ def score_bremslib_continuum(
         hits,
         outside,
         n_primaries,
-        n_samples,
+        n_proposals,
         charged_stage is not None,
     )

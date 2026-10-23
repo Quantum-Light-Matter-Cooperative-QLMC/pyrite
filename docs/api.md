@@ -67,6 +67,10 @@ The provisional photon-continuum reference has a separate
 aperture spectra and provenance. These experimental objects are outside the
 supported API contract above. Their aperture-integrated spectra have units
 photons/(incident electron eV) and must not be added to `Result.brem`.
+The experimental low-level
+[`score_photon_sources`](research/physics/photon-secondary-feedback.md#explicit-event-source-aperture-scoring)
+boundary also scores explicit characteristic/annihilation source batches using
+the original incident-electron denominator; it does not select Scene sources.
 
 ```{eval-rst}
 .. autosummary::
