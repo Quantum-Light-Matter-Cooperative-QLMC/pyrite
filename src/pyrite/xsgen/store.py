@@ -33,12 +33,23 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+from zipfile import BadZipFile
+from zlib import error as ZlibError
 
 import numpy as np
 
 from .. import __version__
 from ..paths import data_dir, user_data_dir
-from ._errors import TableNotFoundError
+from ._errors import TableCorruptError, TableNotFoundError
+
+# Cache digests, never mutable arrays. File identity/ctime also invalidate an
+# atomic replacement or a same-size rewrite with its original mtime restored.
+_PAYLOAD_DIGESTS: dict[Path, tuple[tuple[int, ...], str]] = {}
+
+
+def _payload_stamp(stat: os.stat_result) -> tuple[int, ...]:
+    return (stat.st_mtime_ns, stat.st_size, stat.st_ctime_ns, stat.st_ino, stat.st_dev)
+
 
 #: Schema of the request record hashed into a table key. Bumping this
 #: re-keys every table, so it changes only when the record's *meaning*
@@ -416,9 +427,36 @@ class StoredTable:
         return str(self.manifest["manifest_sha256"])
 
     def arrays(self) -> dict[str, np.ndarray]:
-        """Load the stored arrays."""
-        with np.load(self.path) as loaded:
-            return {name: loaded[name] for name in loaded.files}
+        """Load arrays and fail closed on an unreadable or mismatched payload.
+
+        Hash once per unchanged file per process; every call still returns
+        fresh arrays. Replacements and metadata changes invalidate the cache.
+        """
+        remedy = (
+            f"corrupt cross-section table {self.key} at {self.path}; "
+            "restore the payload and manifest from a verified copy, or remove "
+            "the pair and re-fetch with `pyrite tables fetch` / regenerate "
+            "with `pyrite tables generate`"
+        )
+        try:
+            path = self.path.resolve()
+            with path.open("rb") as stream:
+                stamp = _payload_stamp(os.fstat(stream.fileno()))
+                with np.load(stream, allow_pickle=False) as loaded:
+                    arrays = {name: loaded[name] for name in loaded.files}
+                after = _payload_stamp(os.fstat(stream.fileno()))
+            if stamp != after:
+                raise TableCorruptError(f"{remedy} (file changed while reading)")
+            cached = _PAYLOAD_DIGESTS.get(path)
+            digest = (
+                cached[1] if cached is not None and cached[0] == stamp else arrays_digest(arrays)
+            )
+            if digest != self.manifest["arrays_sha256"]:
+                raise TableCorruptError(f"{remedy} (arrays_sha256 mismatch)")
+        except (OSError, ValueError, KeyError, TypeError, EOFError, BadZipFile, ZlibError) as exc:
+            raise TableCorruptError(f"{remedy} ({exc})") from exc
+        _PAYLOAD_DIGESTS[path] = (stamp, digest)
+        return arrays
 
 
 def _paths_for(root: Path, key: str) -> tuple[Path, Path]:

@@ -3,9 +3,8 @@
 The release indexes shipped in the wheel (``bremslib-tables.json``,
 ``elsepa-tables.json``, and ``sbethe-tables.json``) record each table's key and manifest digest. This
 module resolves each key through the store and compares the stored manifest
-against the pin. It reads table manifests only, never payloads, so it is cheap
-enough to run as a job preflight; table payload integrity is the remote sync's
-content-addressed inventory.
+against the pin, then checks the payload against its manifest. Unchanged
+payload digests are cached by the store for the lifetime of the process.
 
 The fetched datasets (:mod:`pyrite.datasets`: EEDL, EADL, EPDL) are single files
 pinned by SHA-256; they are hashed in full, about 0.1 s together. SBETHE's
@@ -18,6 +17,7 @@ import json
 from collections.abc import Iterable
 from dataclasses import dataclass
 
+from ._errors import TableCorruptError
 from .store import manifest_digest, resolve
 
 #: Codes whose release indexes pin tables, in report order.
@@ -82,10 +82,10 @@ def pinned_tables(codes: Iterable[str] = TABLE_CODES) -> list[tuple[str, str, st
 
 
 def verify_pinned(codes: Iterable[str] = CODES) -> list[TableCheck]:
-    """Resolve each pinned table and compare its manifest digest to the pin.
+    """Check pinned manifests and the payloads the runtime would load.
 
     ``corrupt`` means the stored manifest does not hash to its own recorded
-    digest (edited or truncated), or a dataset could not be read;
+    digest, its payload is unreadable or differs, or a dataset could not be read;
     ``mismatch`` means it is internally consistent but is not the pinned
     table, or a dataset's bytes differ from its pinned SHA-256. Dataset rows
     carry the file name as ``label`` and the pinned SHA-256 as ``key``. The
@@ -106,7 +106,8 @@ def verify_pinned(codes: Iterable[str] = CODES) -> list[TableCheck]:
         try:
             recorded = found.digest
             consistent = manifest_digest(found.manifest) == recorded
-        except (KeyError, TypeError, ValueError, json.JSONDecodeError):
+            found.arrays()
+        except (KeyError, TypeError, ValueError, json.JSONDecodeError, TableCorruptError):
             checks.append(TableCheck(code, label, key, CORRUPT, found.tier))
             continue
         if not consistent:

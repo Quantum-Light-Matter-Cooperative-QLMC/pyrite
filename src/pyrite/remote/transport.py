@@ -268,6 +268,11 @@ def _local_xsgen_tables() -> dict[str, Path]:
 def _xsgen_inventory_command() -> str:
     """Shell that migrates legacy-tier tables, then digests the synced tier.
 
+    Jobs and direct remote commands pin PYRITE_HOME via remote_runtime_env
+    (also exported by the batch header). Thus this is the runtime's user
+    tier, even if the login shell/config selects ~/.pyrite/workspace. The
+    packaged fallback travels with src/pyrite, under the code inventory.
+
     Migration is non-clobbering (``cp -n``) and payload-before-manifest, so an
     interrupted copy leaves a payload without a manifest, which the store
     ignores. Migrated files are then judged by the same digest inventory as any
