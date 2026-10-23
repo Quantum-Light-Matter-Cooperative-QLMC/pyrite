@@ -11,8 +11,35 @@ from threadpoolctl import threadpool_limits
 
 from ...materials.channeling.transverse import HBAR2_2M_EV_ANG2, longitudinal_kinematics
 
-SOLVER_BUDGET_BYTES = 512 << 20
+# Batching sectors amortizes per-round host Rayleigh--Ritz and launch costs on
+# large grids; beyond ~64 sectors small grids slow down again.
+SOLVER_BUDGET_BYTES = 4 << 30
+MAX_BATCH_SECTORS = 64
 _RESIDUAL_TOL_EV = 1e-10
+
+
+def _block(n, count):
+    return min(n, max(2 * count, count + 8))
+
+
+def _sector_bytes(n, count):
+    return 12 * _block(n, count) * n * 16
+
+
+def solver_workspace_bytes(n, count):
+    """Device workspace for up to ``MAX_BATCH_SECTORS`` sectors per batch.
+
+    Capped by ``SOLVER_BUDGET_BYTES`` and a quarter of device memory, so smaller
+    GPUs keep admission headroom for propagation.
+    """
+    cap = SOLVER_BUDGET_BYTES
+    try:
+        import cupy
+
+        cap = min(cap, cupy.cuda.Device().mem_info[1] // 4)
+    except Exception:  # no usable CUDA device: only CUDA admission reads this
+        pass
+    return min(cap, MAX_BATCH_SECTORS * _sector_bytes(n, count))
 
 
 def _host(xp, value):
@@ -148,10 +175,11 @@ def transverse_spectra_batch(
     if xp is None:
         import cupy as xp
     n = int(np.prod(grid.shape))
-    block = min(n, max(2 * count, count + 8))
-    if 12 * block * n * 16 > SOLVER_BUDGET_BYTES:
+    block = _block(n, count)
+    budget = solver_workspace_bytes(n, count)
+    if _sector_bytes(n, count) > budget:
         return [None] * len(tilts)
-    size = max(1, SOLVER_BUDGET_BYTES // (12 * block * n * 16))
+    size = budget // _sector_bytes(n, count)
     gamma, _ = longitudinal_kinematics(energy_eV)
     dk = 2 * np.pi / np.asarray(grid.extent_ang)
     basek = np.fft.fft2(base.vectors.T.reshape(-1, *grid.shape), axes=(-2, -1), norm="ortho")

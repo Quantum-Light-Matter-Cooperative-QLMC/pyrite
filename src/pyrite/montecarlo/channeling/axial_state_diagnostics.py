@@ -25,9 +25,11 @@ from pyrite.materials.channeling.transverse import (
 MAX_DENSE_DIMENSION = 256
 MAX_SPECTRAL_STATES = 64
 MAX_CACHED_SECTORS = 64
-HOST_SPECTRAL_CACHE_BYTES = 64 << 20
+MAX_SOLVE_BYTES = 64 << 20
+# Large enough to hold a full batched flush group of 96^2 x 2-cell sectors.
+HOST_SPECTRAL_CACHE_BYTES = 256 << 20
 DEVICE_SPECTRAL_CACHE_BYTES = 32 << 20
-PENDING_SPECTRAL_BYTES = 16 << 20
+PENDING_SPECTRAL_BYTES = 128 << 20
 
 
 def _xp(array):
@@ -194,8 +196,8 @@ class AxialSpectralObservable:
         n = int(np.prod(grid.shape))
         # Include the guard eigenvector and temporary eigensolver allocations.
         self._sector_bytes = (count + (count < n)) * n * 16
-        if self._sector_bytes > HOST_SPECTRAL_CACHE_BYTES:
-            raise ValueError("spectral eigenvectors exceed the 64 MiB per-solve cache budget")
+        if self._sector_bytes > MAX_SOLVE_BYTES:
+            raise ValueError("spectral eigenvectors exceed the 64 MiB per-solve budget")
         self._max_sectors = max(
             1, min(MAX_CACHED_SECTORS, HOST_SPECTRAL_CACHE_BYTES // self._sector_bytes)
         )
@@ -282,9 +284,11 @@ class AxialSpectralObservable:
         self._pending_bytes = 0
         if representation == "energy_bins":
             # Pending states and the bounded iterative solver coexist with caches.
-            from ._axial_spectral_batch import SOLVER_BUDGET_BYTES
+            from ._axial_spectral_batch import solver_workspace_bytes
 
-            self.scratch_bytes += PENDING_SPECTRAL_BYTES + SOLVER_BUDGET_BYTES
+            self.scratch_bytes += PENDING_SPECTRAL_BYTES + solver_workspace_bytes(
+                n, self.count + int(self.count < n)
+            )
 
     def _guess(self, q):
         """Nearest cached sector's eigenvectors, carrier-shifted by a grid ``G``.

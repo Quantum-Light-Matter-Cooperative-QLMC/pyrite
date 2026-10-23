@@ -21,7 +21,7 @@ arbitrarily assigned individual populations. Energy-bin mode recomputes the
 local eigenstates for the **exact instantaneous carrier** following a kick;
 energies are grouped into fixed eV intervals, which remain comparable across
 sectors. LRU caches hold at most 64 sectors and are additionally bounded by
-64 MiB host / 32 MiB device eigenvector budgets. The host solver uses
+256 MiB host / 32 MiB device eigenvector budgets; one solve may hold at most 64 MiB of eigenvectors. The host solver uses
 matrix-free `eigsh` (with residual-checked warm starts) on at most 64 low states;
 full eigensystems require at
 most 256 grid points. Truncation and energy-cutoff omissions are shown against
@@ -54,10 +54,11 @@ throughout a solve; a vortex center is not chosen if its entry density vanishes.
 Recorded arrays scale linearly with grid points and depth count, *not* with
 full density-matrix size. The combined 128 MiB recording guard also includes
 these arrays. CUDA energy-bin recording queues immutable state snapshots under
-a separate 16 MiB cap, then solves missing exact carrier sectors together using
+a separate 128 MiB cap, then solves missing exact carrier sectors together using
 complex128 Chebyshev-filtered subspace iteration. FFT matvecs run on device;
-small Rayleigh–Ritz eigensystems run on the host. Solver workspace is capped at
-512 MiB and included in CUDA admission. Larger queues flush incrementally;
+small Rayleigh–Ritz eigensystems run on the host. Solver workspace holds up to
+64 sectors per batch, capped at 4 GiB and a quarter of device memory, and is
+included in CUDA admission. Larger queues flush incrementally;
 neither flushing nor cache eviction consumes trajectory RNG draws.
 
 Acceptance requires absolute residuals at most `1e-10` eV and an orthonormality
