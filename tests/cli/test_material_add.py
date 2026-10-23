@@ -96,14 +96,9 @@ def test_existing_crystal_and_cif_cli():
             "1",
             "--b-ang2",
             ".46",
-            "--photon-grid",
-            "100",
-            "400",
-            "100",
         ],
     )
     assert result.exit_code == 0
-    assert "--photon-grid" in result.stderr and "ignored" in result.stderr
     assert not hasattr(load_material_catalog().crystals["my-cif"], "E_grid")
 
 
@@ -113,7 +108,7 @@ def test_help_explains_units_ownership_and_limits():
     assert "g/cm³" in result.stdout
     assert "user catalog" in result.stdout
     assert "Partial" in result.stdout
-    assert "--photon-grid" in result.stdout
+    assert "--photon-grid" not in result.stdout
 
 
 def test_maintainer_command_targets_checkout_bundle(
@@ -156,3 +151,11 @@ def test_maintainer_command_rejects_installed_package(tmp_path, monkeypatch):
         dev_cli.main(
             ["material", "create", "amorphous", "bad", "--formula", "C", "--density-g-cm3", "2"]
         )
+
+
+def test_removed_photon_grid_is_usage_error():
+    result = invoke(
+        cli.command, ["material", "create", "crystal", "old", "--photon-grid", "100", "400", "100"]
+    )
+    assert result.exit_code == 2
+    assert "No such option '--photon-grid'" in result.output

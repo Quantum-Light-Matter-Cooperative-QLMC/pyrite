@@ -139,7 +139,6 @@ def test_user_materials_cifs_round_trip_with_same_identity(
         phase="diamond",
         surface_hkl=(1, 1, 1),
         B_ang2=0.46,
-        photon_energies_eV=[100, 200],
     )
     local = save_material(definition)
     save_material(build_medium("remote-silica", formula="SiO2", density_g_cm3=2.2))

@@ -11,7 +11,6 @@ from typing import Any, Literal, cast
 import numpy as np
 
 from .. import DATA_DIR
-from .._api_deprecations import warn_api
 from .._catalog_layout import ARTIFACT_DIR, catalog_root
 from .._cxr_grid_policy import PROFILE_CXR_GRID_SELECTORS
 from .._energy_grid_artifacts import ArtifactError, load_artifact
@@ -155,14 +154,11 @@ def _parse_crystals(raw: object, errors: _Errors, *, source: Path) -> dict[str, 
         "beam_uvw",
         "surface_hkl",
         "mosaic_fwhm_deg",
-        "E_grid",
         "hkl_families",
         "hkl_reason",
         "layers_per_cell",
     }
     required = {"cif", "validation_id", "formula", "B_ang2"}
-    if any(isinstance(row, dict) and "E_grid" in row for row in table.values()):
-        warn_api("crystal.E_grid")
     for key, value in table.items():
         path = f"crystals.{key}"
         row = _table(value, path, errors)

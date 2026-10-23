@@ -107,8 +107,6 @@ Options:
                                   excludes --surface-hkl.
   --b-ang2 FLOAT                  Required new-CIF isotropic Debye–Waller factor in
                                   angstrom²; nonnegative.
-  --photon-grid START STOP STEP   Deprecated and ignored; set photon grids through
-                                  numerics instead.
   --mosaic-fwhm-deg FLOAT         Optional positive new-CIF mosaic FWHM in degrees;
                                   omitted means perfect crystal.
   -o, --output [table|json]       Output format; only json is a stable automation

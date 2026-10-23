@@ -53,7 +53,7 @@ Installing one material's immutable artifact repoints only that material in the 
 
 ## Crystals and media
 
-Photon grids belong to numerics, not crystals. Legacy crystal `E_grid` fields are deprecated, ignored on load, and scheduled for removal in 0.18.0. Use profile grids or `Sweep.energy_bins` instead.
+Photon grids belong to numerics, not crystals. Crystal `E_grid` fields are rejected as of 0.18.0. Use profile grids or `Sweep.energy_bins` instead.
 
 A crystal names a packaged CIF and a validation record. Optional metadata includes phase/source identifiers, Debye--Waller `B_ang2`, beam or surface orientation, pinned reflection families, layer count, and mosaic FWHM. CIF paths must resolve below packaged `data/cifs`; arbitrary filesystem paths are rejected. Lattice, expanded basis, unit-cell volume, and number-density composition are derived from the CIF rather than duplicated in TOML.
 
