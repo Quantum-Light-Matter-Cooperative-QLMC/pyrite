@@ -121,3 +121,39 @@ def test_build_cases_records_the_resolved_continuum(monkeypatch):
 
     assert resolved["bremsstrahlung_model"] == "bremslib"
     assert "bremsstrahlung_model" not in fallback
+
+
+def _mev_cases(monkeypatch, energy_keV, resolved, **kwargs):
+    from pyrite.campaign.config import material_sweep
+    from pyrite.campaign.sweep import BeamSpec, build_cases
+
+    monkeypatch.setattr(
+        "pyrite.xsgen.bremslib.tables.resolve_bremsstrahlung_model",
+        lambda model, elements: resolved,
+    )
+    sweep = replace(material_sweep("silicon"), beam=BeamSpec(energy_keV=energy_keV))
+    return build_cases(sweep, 4, 4, **kwargs)
+
+
+def test_mev_cases_refuse_to_drop_radiative_loss_silently(monkeypatch):
+    """#439: above 30 MeV an EEDL fallback may not run uncoupled unless asked."""
+    with pytest.raises(ValueError, match="radiative_model='uncoupled'"):
+        _mev_cases(monkeypatch, 5.0e4, "eedl")
+    with pytest.raises(ValueError, match="drops radiative energy loss"):
+        _mev_cases(monkeypatch, 1.0e5, "bremslib", bremsstrahlung_model="eedl")
+    # Coupled cases, and the historical uncoupled fallback up to 30 MeV, pass.
+    assert _mev_cases(monkeypatch, 5.0e4, "bremslib")[0]["radiative_model"] == (
+        "bremslib-soft-hard"
+    )
+    assert "radiative_model" not in _mev_cases(monkeypatch, 3.0e4, "eedl")[0]
+    # Above the tables' 100 MeV no coupled mode exists (channeling is out of scope).
+    assert "radiative_model" not in _mev_cases(monkeypatch, 8.55e5, "eedl")[0]
+
+
+def test_explicit_uncoupled_mev_case_records_the_opt_in(monkeypatch):
+    opted = _mev_cases(monkeypatch, 5.0e4, "bremslib", radiative_model="uncoupled")[0]
+    coupled = _mev_cases(monkeypatch, 5.0e4, "bremslib")[0]
+
+    assert "radiative_model" not in opted
+    assert opted["bremsstrahlung_model"] == "bremslib"
+    assert case_content_key(opted) != case_content_key(coupled)

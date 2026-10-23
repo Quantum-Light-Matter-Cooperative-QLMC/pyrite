@@ -10,6 +10,7 @@ Validation: bremslib-radiative-partition
 import numpy as np
 from numba import njit
 
+from .dielectric_radiative import dielectric_cell_moments, dielectric_scale_eV
 from .kinematics import stream_keys
 
 _MB_CM2 = 1.0e-27
@@ -101,52 +102,83 @@ def _linear_cell(left, right, chi_left, chi_right):
 
 @njit(cache=True)
 def radiative_moments_scalar(
-    incident_keV, nominal, top, scaled_sdcs, atomic_number, energy_eV, cutoff_eV
+    incident_keV,
+    nominal,
+    top,
+    scaled_sdcs,
+    atomic_number,
+    energy_eV,
+    cutoff_eV,
+    plasma_energy_eV=0.0,
 ):
     """Return (soft first, hard zeroth, hard first) cross sections per atom.
 
     The caller validates ``0 < cutoff_eV <= energy_eV`` and table coverage.
     All first moments have units eV cm²; the zeroth has units cm².
+    ``plasma_energy_eV=0`` keeps the historical unsuppressed partition.
 
-    Validation: bremslib-radiative-partition
+    Validation: bremslib-radiative-partition, dielectric-suppression
     """
     row, fraction = _incident_row(incident_keV, energy_eV)
     nodes = _photon_nodes(energy_eV, cutoff_eV, row, nominal, top)
     scale = _MB_CM2 * atomic_number * atomic_number
+    suppression_scale = dielectric_scale_eV(energy_eV, plasma_energy_eV)
     soft, hard_rate, hard_first = 0.0, 0.0, 0.0
     chi_left = _scaled_sdcs_at(nodes[0] / energy_eV, row, fraction, nominal, top, scaled_sdcs)
     for interval_index in range(nodes.size - 1):
         left, right = nodes[interval_index], nodes[interval_index + 1]
         chi_right = _scaled_sdcs_at(right / energy_eV, row, fraction, nominal, top, scaled_sdcs)
-        if left == 0.0:
-            soft += scale * 0.5 * (chi_left + chi_right) * right
-        else:
+        if suppression_scale == 0.0:
+            if left == 0.0:
+                soft += scale * 0.5 * (chi_left + chi_right) * right
+                chi_left = chi_right
+                continue
             rate, first = _linear_cell(left, right, chi_left, chi_right)
-            if right <= cutoff_eV:
-                soft += scale * first
-            else:
-                hard_rate += scale * rate
-                hard_first += scale * first
+        else:
+            rate, first = dielectric_cell_moments(
+                left, right, chi_left, chi_right, suppression_scale
+            )
+        if right <= cutoff_eV:
+            soft += scale * first
+        else:
+            hard_rate += scale * rate
+            hard_first += scale * first
         chi_left = chi_right
     return soft, hard_rate, hard_first
 
 
 @njit(cache=True)
 def sample_hard_photon_energy_scalar(
-    incident_keV, nominal, top, scaled_sdcs, atomic_number, energy_eV, cutoff_eV, uniform
+    incident_keV,
+    nominal,
+    top,
+    scaled_sdcs,
+    atomic_number,
+    energy_eV,
+    cutoff_eV,
+    uniform,
+    plasma_energy_eV=0.0,
 ):
-    """Invert the same hard zeroth-moment CDF used by the host sampler.
+    """Invert the same (optionally suppressed) zeroth-moment CDF as the host.
 
-    Validation: bremslib-radiative-partition
+    Validation: bremslib-radiative-partition, dielectric-suppression
     """
     _, hard_rate, _ = radiative_moments_scalar(
-        incident_keV, nominal, top, scaled_sdcs, atomic_number, energy_eV, cutoff_eV
+        incident_keV,
+        nominal,
+        top,
+        scaled_sdcs,
+        atomic_number,
+        energy_eV,
+        cutoff_eV,
+        plasma_energy_eV,
     )
     if hard_rate <= 0.0:
         raise ValueError("partition has no hard photons")
     row, fraction = _incident_row(incident_keV, energy_eV)
     nodes = _photon_nodes(energy_eV, cutoff_eV, row, nominal, top)
     scale = _MB_CM2 * atomic_number * atomic_number
+    suppression_scale = dielectric_scale_eV(energy_eV, plasma_energy_eV)
     target = uniform * hard_rate
     cumulative = 0.0
     chi_left = _scaled_sdcs_at(nodes[0] / energy_eV, row, fraction, nominal, top, scaled_sdcs)
@@ -154,7 +186,12 @@ def sample_hard_photon_energy_scalar(
         left, right = nodes[interval_index], nodes[interval_index + 1]
         chi_right = _scaled_sdcs_at(right / energy_eV, row, fraction, nominal, top, scaled_sdcs)
         if right > cutoff_eV:
-            mass, _ = _linear_cell(left, right, chi_left, chi_right)
+            if suppression_scale == 0.0:
+                mass, _ = _linear_cell(left, right, chi_left, chi_right)
+            else:
+                mass, _ = dielectric_cell_moments(
+                    left, right, chi_left, chi_right, suppression_scale
+                )
             cell_mass = scale * mass
             if cumulative + cell_mass >= target or interval_index == nodes.size - 2:
                 local = target - cumulative
@@ -164,7 +201,12 @@ def sample_hard_photon_energy_scalar(
                     chi_mid = chi_left + (chi_right - chi_left) * (midpoint_eV - left) / (
                         right - left
                     )
-                    partial, _ = _linear_cell(left, midpoint_eV, chi_left, chi_mid)
+                    if suppression_scale == 0.0:
+                        partial, _ = _linear_cell(left, midpoint_eV, chi_left, chi_mid)
+                    else:
+                        partial, _ = dielectric_cell_moments(
+                            left, midpoint_eV, chi_left, chi_mid, suppression_scale
+                        )
                     if scale * partial < local:
                         low = midpoint_eV
                     else:
@@ -189,9 +231,11 @@ def radiative_layer_moments_scalar(
     energy_eV,
     cutoff_eV,
     element_rates,
+    plasma_energy_eV_by_layer=None,
 ):
     """Return (soft eV/Angstrom, hard 1/Angstrom) and fill element rates."""
     soft, hard = 0.0, 0.0
+    plasma_eV = 0.0 if plasma_energy_eV_by_layer is None else plasma_energy_eV_by_layer[layer]
     for element_index in range(n_elements[layer]):
         incident_energy_count = n_incident[layer, element_index]
         soft_moment, rate, _ = radiative_moments_scalar(
@@ -202,6 +246,7 @@ def radiative_layer_moments_scalar(
             atomic_number[layer, element_index],
             energy_eV,
             cutoff_eV,
+            plasma_eV,
         )
         number_per_ang = density_cm3[layer, element_index] * 1e-8
         soft += number_per_ang * soft_moment

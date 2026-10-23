@@ -102,11 +102,41 @@ electron–electron bremsstrahlung, photon transport or detected yield (#171),
 Mott elastic transport (#183), or energies and materials outside the four
 cases.
 
+## Extension to 100 MeV against ESTAR (issue #439)
+
+With `tables-bremslib-2` (BremsLib to 100 MeV, SB85 electron–electron term,
+dielectric suppression at the catalog plasma energy), the released-table
+partition at `kc` = 1 keV closes exactly. Soft + hard equals the uncut first
+moment to within 3e-16 at 1, 3, 10, 30, 40, 50, 60, 80 and 100 MeV, for C,
+Si, Mo and W. Against the pinned NIST ESTAR downloads
+(`checks/reference/estar/`):
+
+| Ratio to ESTAR | 30 MeV | 50 MeV | 100 MeV |
+| --- | --- | --- | --- |
+| Si radiative | 1.025 | 1.023 | 1.031 |
+| Si collision (SBETHE) | 1.002 | 1.000 | 0.999 |
+| Si total | 1.011 | 1.012 | 1.021 |
+| W radiative | 1.026 | 1.042 | 1.048 |
+| W collision (SBETHE) | 1.006 | 1.003 | 0.998 |
+| W total | 1.021 | 1.035 | 1.044 |
+
+Graphite radiative is 1.034–1.053 and Mo is 1.014–1.027 from 1 to 100 MeV.
+Collision stopping is within 1.7 % everywhere. The radiative excess comes
+from comparing BremsLib plus SB85 electron–electron against ESTAR's own tables,
+which is inside Seltzer and Berger's quoted 3–10 % uncertainty. So the
+maintainer decision (2026-10-22) gates each part separately: collision within
+2 %, radiative within 0.97–1.06, and total within 5 %. The original 2 % total
+target fails for W above 30 MeV and is not claimed. The CSDA range, integrated from 10 keV over SBETHE collision plus coupled
+radiative stopping with ESTAR's 10 keV range added, is 0.989–0.996 of ESTAR
+for Si and 0.978–0.992 for W from 1 to 100 MeV. It is pinned within 3 %. Both tests are in
+`tests/montecarlo/test_hard_radiative.py`. This section is a moment and
+stopping-power anchor only, not a full-track benchmark.
+
 ## Verdict
 
 - **Claim:** `bremslib-radiative-partition` — `montecarlo/transport/hard_radiative.py::build_radiative_partition` and related sampling functions; `montecarlo/transport/_jit_radiative.py::radiative_moments_scalar` and `::sample_hard_photon_energy_scalar` — BremsLib v2.0.8 scaled SDCS/DDCS definitions.
 - **Filters:** units pass; limits pass; signs and conventions pass.
 - **Re-derivation:** matches — no divergent factor, moment, angular measure, or momentum sign found.
-- **Verdict:** `rederived`.
+- **Verdict:** `rederived`; anchored to ESTAR to 100 MeV by the section above.
 - **Write-up:** `docs/validation/radiation-physics/bremslib-radiative-partition.md`.
 - **Ledger change:** status `rederived`, linked from the ledger; human sign-off remains pending.

@@ -19,7 +19,7 @@ energies and tips start at ``s * max_t``, nominal reduced energies at
 Like its siblings, this module imports ``cupy`` at module scope, so it must
 stay out of the package ``__init__``.
 
-Validation: bremslib-radiative-partition
+Validation: bremslib-radiative-partition, dielectric-suppression
 """
 
 import cupy as xp
@@ -151,9 +151,80 @@ def _rad_cell_rate(left, right, chi_left, chi_right):
     return intercept * xp.log(right / left) + slope * (right - left)
 
 
+# The BremsLib chi(k) is linear in each cell, but chi(k)*F(k) is not.
+# Integrate analytically instead of rescaling the widely spaced tabulated nodes.
+# The Taylor branch reproduces the host/Numba evaluation near k/(gamma*Ep)=0.
+F64_ELECTRON_REST_EV = np.float64(510998.95)
+I32_TAYLOR_TERMS = np.int32(6)
+
+
+@jit.rawkernel(device=True)
+def _rad_dielectric_cell(which, left, right, chi_left, chi_right, scale_eV):
+    """Suppressed cell first (soft) or zeroth (hard) moment, before Z^2 mb scaling.
+
+    Scalar CUDA equivalent of ``dielectric_cell_moments``. With ``scale_eV=0``
+    the caller uses the original unsuppressed device primitives instead.
+    """
+    if right <= left:
+        return F64_ZERO
+    slope = (chi_right - chi_left) / (right - left)
+    intercept = chi_left - slope * left
+    u = left / scale_eV
+    v = right / scale_eV
+    if v < np.float64(0.1):
+        result = F64_ZERO
+        sign = F64_ONE
+        n = I32_ZERO
+        while n < I32_TAYLOR_TERMS:
+            power = I32_TWO * n + I32_TWO
+            if which == RAD_SOFT:
+                result += (
+                    sign
+                    * scale_eV
+                    * (
+                        intercept
+                        * (v ** (power + I32_ONE) - u ** (power + I32_ONE))
+                        / np.float64(power + I32_ONE)
+                        + slope
+                        * scale_eV
+                        * (v ** (power + I32_TWO) - u ** (power + I32_TWO))
+                        / np.float64(power + I32_TWO)
+                    )
+                )
+            else:
+                result += sign * (
+                    intercept * (v**power - u**power) / np.float64(power)
+                    + slope
+                    * scale_eV
+                    * (v ** (power + I32_ONE) - u ** (power + I32_ONE))
+                    / np.float64(power + I32_ONE)
+                )
+            sign = -sign
+            n += I32_ONE
+        return result
+    delta_c = F64_HALF * (xp.log1p(v * v) - xp.log1p(u * u))
+    delta_a = (v - u) - (xp.arctan(v) - xp.arctan(u))
+    if which == RAD_HARD_RATE:
+        return intercept * delta_c + slope * scale_eV * delta_a
+    delta_b = F64_HALF * (v * v - u * u) - delta_c
+    return scale_eV * (intercept * delta_a + slope * scale_eV * delta_b)
+
+
 @jit.rawkernel(device=True)
 def _rad_moment(
-    which, incident, nominal, top, chi, slot, max_t, n_red, n_t, z, energy_eV, cutoff_eV
+    which,
+    incident,
+    nominal,
+    top,
+    chi,
+    slot,
+    max_t,
+    n_red,
+    n_t,
+    z,
+    energy_eV,
+    cutoff_eV,
+    plasma_energy_eV,
 ):
     """Soft first moment or hard rate per atom; host ``radiative_moments_scalar``.
 
@@ -168,6 +239,7 @@ def _rad_moment(
     top_b = top[incident_offset + row + I32_ONE]
     reduced_cutoff = cutoff_eV / energy_eV
     scale = F64_MB_CM2 * z * z
+    suppression_scale = (F64_ONE + energy_eV / F64_ELECTRON_REST_EV) * plasma_energy_eV
     soft = F64_ZERO
     hard_rate = F64_ZERO
     # Each selector retains the original cell arithmetic and summation order,
@@ -211,13 +283,23 @@ def _rad_moment(
             chi,
             sdcs_offset,
         )
-        if left == F64_ZERO:
-            soft += scale * F64_HALF * (chi_left + chi_right) * right
+        if suppression_scale == F64_ZERO:
+            # The historical CUDA operations stay bit-for-bit unchanged.
+            if left == F64_ZERO:
+                soft += scale * F64_HALF * (chi_left + chi_right) * right
+            elif right <= cutoff_eV:
+                if right > left:
+                    soft += scale * (F64_HALF * (chi_left + chi_right) * (right - left))
+            else:
+                hard_rate += scale * _rad_cell_rate(left, right, chi_left, chi_right)
         elif right <= cutoff_eV:
-            if right > left:
-                soft += scale * (F64_HALF * (chi_left + chi_right) * (right - left))
+            soft += scale * _rad_dielectric_cell(
+                RAD_SOFT, left, right, chi_left, chi_right, suppression_scale
+            )
         else:
-            hard_rate += scale * _rad_cell_rate(left, right, chi_left, chi_right)
+            hard_rate += scale * _rad_dielectric_cell(
+                RAD_HARD_RATE, left, right, chi_left, chi_right, suppression_scale
+            )
         left = right
         chi_left = chi_right
         left_reduced_energy = right_reduced_energy
@@ -246,6 +328,7 @@ def _rad_layer_moment(
     n_red,
     energy_eV,
     cutoff_eV,
+    plasma_by_layer,
 ):
     """Layer soft loss (eV/Angstrom) or hard rate (1/Angstrom); host layer moments."""
     total = F64_ZERO
@@ -265,6 +348,7 @@ def _rad_layer_moment(
             np.float64(z_arr[slot]),
             energy_eV,
             cutoff_eV,
+            plasma_by_layer[layer],
         )
         total += ncm3[slot] * F64_CM_PER_ANG * per_atom
         element_index += I32_ONE
@@ -273,14 +357,38 @@ def _rad_layer_moment(
 
 @jit.rawkernel(device=True)
 def _rad_sample_photon_eV(
-    incident, nominal, top, chi, slot, max_t, n_red, n_t, z, energy_eV, cutoff_eV, uniform
+    incident,
+    nominal,
+    top,
+    chi,
+    slot,
+    max_t,
+    n_red,
+    n_t,
+    z,
+    energy_eV,
+    cutoff_eV,
+    uniform,
+    plasma_energy_eV,
 ):
     """Invert the hard zeroth-moment CDF; host ``sample_hard_photon_energy_scalar``.
 
     Validation: bremslib-radiative-partition
     """
     hard_rate = _rad_moment(
-        RAD_HARD_RATE, incident, nominal, top, chi, slot, max_t, n_red, n_t, z, energy_eV, cutoff_eV
+        RAD_HARD_RATE,
+        incident,
+        nominal,
+        top,
+        chi,
+        slot,
+        max_t,
+        n_red,
+        n_t,
+        z,
+        energy_eV,
+        cutoff_eV,
+        plasma_energy_eV,
     )
     if hard_rate <= F64_ZERO:
         return energy_eV
@@ -293,6 +401,7 @@ def _rad_sample_photon_eV(
     top_b = top[incident_offset + row + I32_ONE]
     reduced_cutoff = cutoff_eV / energy_eV
     scale = F64_MB_CM2 * z * z
+    suppression_scale = (F64_ONE + energy_eV / F64_ELECTRON_REST_EV) * plasma_energy_eV
     target = uniform * hard_rate
     cumulative = F64_ZERO
     left_reduced_energy = _rad_next_node(
@@ -332,7 +441,12 @@ def _rad_sample_photon_eV(
             right_reduced_energy, nominal, nominal_offset, n_red, top_a, top_b, reduced_cutoff
         )
         if right > cutoff_eV:
-            cell_mass = scale * _rad_cell_rate(left, right, chi_left, chi_right)
+            if suppression_scale == F64_ZERO:
+                cell_mass = scale * _rad_cell_rate(left, right, chi_left, chi_right)
+            else:
+                cell_mass = scale * _rad_dielectric_cell(
+                    RAD_HARD_RATE, left, right, chi_left, chi_right, suppression_scale
+                )
             if cumulative + cell_mass >= target or next_reduced_energy == F64_INF:
                 local = target - cumulative
                 low = left
@@ -343,7 +457,18 @@ def _rad_sample_photon_eV(
                     chi_mid = chi_left + (chi_right - chi_left) * (midpoint_eV - left) / (
                         right - left
                     )
-                    if scale * _rad_cell_rate(left, midpoint_eV, chi_left, chi_mid) < local:
+                    if suppression_scale == F64_ZERO:
+                        partial = _rad_cell_rate(left, midpoint_eV, chi_left, chi_mid)
+                    else:
+                        partial = _rad_dielectric_cell(
+                            RAD_HARD_RATE,
+                            left,
+                            midpoint_eV,
+                            chi_left,
+                            chi_mid,
+                            suppression_scale,
+                        )
+                    if scale * partial < local:
                         low = midpoint_eV
                     else:
                         high = midpoint_eV

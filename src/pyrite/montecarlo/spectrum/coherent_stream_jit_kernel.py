@@ -131,7 +131,6 @@ def _bracket_index(grid, energy_eV, n_samples):
 def _coherent_prologue_kernel(
     v_flat,
     denom,
-    v_dot_n,
     grad_flat,
     gamma,
     t_L,
@@ -154,7 +153,7 @@ def _coherent_prologue_kernel(
     u_im_tab,
     log_mu_tab,
     table_row,
-    n_re_tab,
+    delta_tab,
     E_r_out,
     aw_out,
     g_phase_out,
@@ -181,7 +180,7 @@ def _coherent_prologue_kernel(
 ):
     # g-major fixed order: pair_index = reflection*n_segments + segment.  The reduction kernel then
     # reads each g row contiguously while its threads stride over segments.
-    """Validation: xray-in-medium-resonance"""
+    """Validation: xray-in-medium-resonance, line-kinematics-precision"""
     pair_index = jit.blockIdx.x * jit.blockDim.x + jit.threadIdx.x
     if pair_index >= pair_count:
         return
@@ -213,19 +212,18 @@ def _coherent_prologue_kernel(
     vacuum_denom = resonance_denom
     v_dot_g = vx * gx + vy * gy + vz * gz
 
-    # First-order Snell fixed point: D = 1-v.n-delta v.grad L.
+    # First-order Snell fixed point: D = (1-v.n) - delta v.grad L on the
+    # cancellation-free vacuum factor and decrement table (see the CPU twin).
     # Retain the CPU twin's three passes and float32 convergence guard;
     # reject critical-angle gradients before producing any amplitude.
-    # Validation: xray-in-medium-resonance
-    n_re = F32_ONE
+    # Validation: xray-in-medium-resonance, line-kinematics-precision
+    delta = F32_ZERO
     grad_x = grad_flat[velocity_offset]
     grad_y = grad_flat[velocity_offset + U32_ONE]
     grad_z = grad_flat[velocity_offset + U32_TWO]
     gradient_norm_sq = grad_x * grad_x + grad_y * grad_y + grad_z * grad_z
     velocity_dot_grad = vx * grad_x + vy * grad_y + vz * grad_z
     if use_medium:
-        velocity_dot_n = v_dot_n[segment]
-        resonance_denom = F32_ONE - velocity_dot_n
         previous_denominator = resonance_denom
         for _it in range(3):
             trial_energy_eV = hbarc * (v_dot_g / resonance_denom)
@@ -236,20 +234,17 @@ def _coherent_prologue_kernel(
             trial_fraction = (trial_energy_eV - trial_lower_eV) / (
                 E_tab[trial_upper] - trial_lower_eV
             )
-            n_re = _interp_shared(
-                n_re_tab, trial_upper, trial_fraction, trial_below, trial_above, n_samples
+            delta = _interp_shared(
+                delta_tab, trial_upper, trial_fraction, trial_below, trial_above, n_samples
             )
             previous_denominator = resonance_denom
-            if velocity_dot_grad == -velocity_dot_n:
-                resonance_denom = F32_ONE - n_re * velocity_dot_n
-            else:
-                resonance_denom = F32_ONE - velocity_dot_n - (F32_ONE - n_re) * velocity_dot_grad
+            resonance_denom = vacuum_denom - delta * velocity_dot_grad
         # `abs` is not a cupyx.jit builtin; `xp.abs` is. Written as `>` rather
         # than `not (<=)` so a NaN root falls through to the existing NaN
         # handling below instead of taking a new exit.
         if (
             xp.abs(resonance_denom - previous_denominator) > root_rtol * xp.abs(resonance_denom)
-            or F32_TWO * xp.abs(F32_ONE - n_re) * gradient_norm_sq >= F32_ONE
+            or F32_TWO * xp.abs(delta) * gradient_norm_sq >= F32_ONE
         ):
             return
 
@@ -280,13 +275,10 @@ def _coherent_prologue_kernel(
     # Scalar products of k_eff = omega(n_hat + delta grad L).
     k_mag = omega
     if use_medium:
-        delta = F32_ONE - n_re
         if gradient_norm_sq != F32_ZERO:
             k_mag = omega * xp.sqrt(F32_ONE - F32_TWO * delta + delta * delta * gradient_norm_sq)
     k_dot_v = omega * (F32_ONE - resonance_denom)
-    k_dot_g = omega * (
-        n_dot_g[reflection] + (F32_ONE - n_re) * (grad_x * gx + grad_y * gy + grad_z * gz)
-    )
+    k_dot_g = omega * (n_dot_g[reflection] + delta * (grad_x * gx + grad_y * gy + grad_z * gz))
     v_dot_kg = v_dot_g + k_dot_v
     detuning = g2[reflection] + F32_TWO * k_dot_g
 
@@ -341,7 +333,7 @@ def _coherent_prologue_kernel(
     # coherent complex expression, preserving its phase information.
     g_dot_e = g_dot_es[reflection]
     v_dot_e = vx * esx + vy * esy + vz * esz
-    k_dot_e = omega * (F32_ONE - n_re) * (grad_x * esx + grad_y * esy + grad_z * esz)
+    k_dot_e = omega * delta * (grad_x * esx + grad_y * esy + grad_z * esz)
     numerator = v_dot_kg * (g_dot_e + k_dot_e) - k_mag * k_mag * v_dot_e
     braced_ge = g_dot_e - v_dot_g * v_dot_e
     braced_kg = k_dot_g - k_dot_v * v_dot_g
@@ -357,7 +349,7 @@ def _coherent_prologue_kernel(
     # pi polarization.
     g_dot_e = g_dot_ep[reflection]
     v_dot_e = vx * epx + vy * epy + vz * epz
-    k_dot_e = omega * (F32_ONE - n_re) * (grad_x * epx + grad_y * epy + grad_z * epz)
+    k_dot_e = omega * delta * (grad_x * epx + grad_y * epy + grad_z * epz)
     numerator = v_dot_kg * (g_dot_e + k_dot_e) - k_mag * k_mag * v_dot_e
     braced_ge = g_dot_e - v_dot_g * v_dot_e
     braced_kg = k_dot_g - k_dot_v * v_dot_g
@@ -880,8 +872,7 @@ def run_coherent_prologue_kernel(
     g_dot_es=None,
     g_dot_ep=None,
     aw_seg=None,
-    v_dot_n=None,
-    n_re_tab=None,
+    delta_tab=None,
     escape_gradient=None,
     L_start=None,
     L_end=None,
@@ -900,13 +891,13 @@ def run_coherent_prologue_kernel(
     hoists. When omitted they are constructed once here, preserving older direct
     callers while the main line path avoids rebuilding them per segment block.
 
-    Under the in-medium dispersion the caller supplies the per-segment
-    ``v_dot_n = v.n_hat`` together with ``n_re_tab``, the real refractive index
-    on the ``E_tab`` grid. The kernel then solves the implicit in-medium
-    resonance per (segment, g) instead of reading the hoisted vacuum ``denom``,
-    and returns ``aw`` in the pair layout because the sinc half-width follows
-    that denominator. Both must be given together or both omitted; when omitted
-    the kernel evaluates the vacuum kinematics unchanged.
+    Under the in-medium dispersion the caller supplies ``delta_tab``, the
+    decrement ``1 - Re n`` on the ``E_tab`` grid. The kernel then solves the
+    implicit in-medium resonance per (segment, g) from the hoisted vacuum
+    ``denom = 1 - v.n_hat`` instead of using that denominator directly, and
+    returns ``aw`` in the pair layout because the sinc half-width follows the
+    in-medium root. Omitted, the kernel evaluates the vacuum kinematics
+    unchanged.
 
     ``root_rtol`` is the CPU twin's ``_in_medium_kinematics._RESONANCE_ROOT_RTOL``,
     passed in for the same reason ``hbarc`` is: this module cannot import the
@@ -945,14 +936,10 @@ def run_coherent_prologue_kernel(
         if int(table_row.size) != n_g:
             raise ValueError("table_row must have one entry per g row")
 
-    if (v_dot_n is None) != (n_re_tab is None):
-        raise ValueError("v_dot_n and n_re_tab must be given together")
-    use_medium = n_re_tab is not None
+    use_medium = delta_tab is not None
     if use_medium:
-        if int(v_dot_n.size) != n_segments:
-            raise ValueError("v_dot_n must have one entry per segment")
-        if int(n_re_tab.size) != n_tab:
-            raise ValueError("n_re_tab must use the E_tab grid")
+        if int(delta_tab.size) != n_tab:
+            raise ValueError("delta_tab must use the E_tab grid")
         if aw_seg is not None:
             raise ValueError("aw_seg cannot be hoisted per segment under the refractive model")
     if (L_start is None) != (L_end is None):
@@ -960,7 +947,7 @@ def run_coherent_prologue_kernel(
     use_formation = L_start is not None
     if use_formation:
         if not use_medium:
-            raise ValueError("the formation factor needs the refractive model (v_dot_n, n_re_tab)")
+            raise ValueError("the formation factor needs the refractive model (delta_tab)")
         if int(L_start.size) != n_segments or int(L_end.size) != n_segments:
             raise ValueError("L_start and L_end must have one entry per segment")
 
@@ -1019,7 +1006,7 @@ def run_coherent_prologue_kernel(
         return line_data
 
     if not use_medium:
-        v_dot_n = n_re_tab = _dummy()
+        delta_tab = _dummy()
     if use_formation:
         apb_out, bma_out, q_out = formation
     else:
@@ -1038,7 +1025,6 @@ def run_coherent_prologue_kernel(
         (
             v_flat,
             denom,
-            v_dot_n,
             grad_flat,
             gamma,
             t_L,
@@ -1061,7 +1047,7 @@ def run_coherent_prologue_kernel(
             u_im_kernel,
             log_mu_kernel,
             table_row,
-            n_re_tab,
+            delta_tab,
             resonances_eV,
             aw_seg,
             g_phase,

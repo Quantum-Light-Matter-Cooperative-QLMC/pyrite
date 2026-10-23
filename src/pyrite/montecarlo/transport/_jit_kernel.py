@@ -223,6 +223,7 @@ def _transport_kernel(
     rad_nominal,
     rad_top,
     rad_chi,
+    rad_plasma,
     rad_max_el,
     rad_max_t,
     rad_n_red,
@@ -398,6 +399,7 @@ def _transport_kernel(
                 rad_n_red,
                 energy_keV * F64_EV_PER_KEV,
                 rad_cutoff_eV,
+                rad_plasma,
             )
             mu_rad = _rad_layer_moment(
                 RAD_HARD_RATE,
@@ -415,6 +417,7 @@ def _transport_kernel(
                 rad_n_red,
                 energy_keV * F64_EV_PER_KEV,
                 rad_cutoff_eV,
+                rad_plasma,
             )
             if radiative_optical_depth < F64_ZERO:
                 radiative_optical_depth = -xp.log(_stream_uniform(rad_key, radiative_draw_counter))
@@ -684,6 +687,7 @@ def _transport_kernel(
                             rad_n_red,
                             cutoff_energy * F64_EV_PER_KEV,
                             rad_cutoff_eV,
+                            rad_plasma,
                         )
                         * F64_KEV_PER_EV
                     )
@@ -755,6 +759,7 @@ def _transport_kernel(
                                 rad_n_red,
                                 midpoint_energy * F64_EV_PER_KEV,
                                 rad_cutoff_eV,
+                                rad_plasma,
                             )
                             * F64_KEV_PER_EV
                         )
@@ -865,6 +870,7 @@ def _transport_kernel(
                 rad_n_red,
                 E_end_eV,
                 rad_cutoff_eV,
+                rad_plasma,
             )
             u_el = _stream_uniform(rad_key, radiative_draw_counter)
             u_k = _stream_uniform(rad_key, radiative_draw_counter + U64_ONE)
@@ -893,6 +899,7 @@ def _transport_kernel(
                         np.float64(rad_z[rad_slot]),
                         E_end_eV,
                         rad_cutoff_eV,
+                        rad_plasma[layer_index],
                     )
                 )
                 if cumulative > target:
@@ -913,6 +920,7 @@ def _transport_kernel(
                 E_end_eV,
                 rad_cutoff_eV,
                 u_k,
+                rad_plasma[layer_index],
             )
             rad_event_Z = np.int16(rad_z[rad_slot])
             if end_energy_keV - rad_k_eV * F64_KEV_PER_EV <= cutoff_energy_keV:

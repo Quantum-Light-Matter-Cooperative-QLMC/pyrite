@@ -119,6 +119,14 @@ def assert_output_baseline(kind, actual):
     import json
     from pathlib import Path
 
+    import pytest
+
+    from pyrite._backend import BACKEND
+
+    if BACKEND.name != "cpu":
+        # Device scoring runs in REAL (float32 by default); the pins are CPU fp64.
+        pytest.skip(f"CPU fp64 output baseline; backend is {BACKEND.name}")
+
     expected = json.loads(
         (Path(__file__).parents[1] / "data/physics-baseline/outputs.json").read_text()
     )[kind]

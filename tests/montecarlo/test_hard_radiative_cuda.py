@@ -124,6 +124,7 @@ def test_device_radiative_moments_cover_cutoff_and_table_boundaries(constant_sdc
                 np.float64(6),
                 energy[i],
                 cutoff[i],
+                np.float64(0.0),
             )
             output[i, 1] = dev._rad_moment(
                 dev.RAD_HARD_RATE,
@@ -138,6 +139,7 @@ def test_device_radiative_moments_cover_cutoff_and_table_boundaries(constant_sdc
                 np.float64(6),
                 energy[i],
                 cutoff[i],
+                np.float64(0.0),
             )
 
     output = cupy.empty((energies.size, 2), dtype=cupy.float64)

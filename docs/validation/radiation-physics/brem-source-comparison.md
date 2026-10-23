@@ -124,3 +124,15 @@ Evidence: this page (Seltzer–Berger, spectrum and moments), `bremslib-angular-
 - **EEDL fallback remains for:** elements outside the catalogue without a local checkout; incident energies above 30 MeV; missing or unfetched tables. `"eedl"` stays selectable. After #174 EEDL is 0.96–1.34 pointwise and 0.99–1.07 in first moment at 10 keV–1 MeV (panel sparsity), so it is a usable fallback but not the more accurate source.
 - **Unvalidated.** The BremsLib angular shape below 5 MeV and against any tabulated or measured double-differential data; magnitudes above 30 MeV; full-track observables (#172); low-Z first moment at MeV energies beyond the stated shortfall.
 - **Preconditions for the default flip (not this issue).** Coordinated goldens and cache keys with #172. Public archive hosting (Zenodo) is deferred and does not gate the flip; archives are distributed internally until then. Characteristic production keeps the EEDL baseline (`eedl-shell-ionization-comparison`).
+
+## Update: electron–electron term added (#439, 2026-10-22)
+
+The staged BremsLib tables now carry Seltzer and Berger's (1985) factor `1 + η/Z` (`bremslib-electron-electron`), so both sides of this comparison include electron–electron bremsstrahlung. The earlier sections describe the electron–nucleus library alone and are kept as history. `checks/brem_source_comparison.py` gates pointwise `χ` within `1 ± 0.13` for `0.05 ≤ k/T ≤ 0.95` and the first moment within `1 ± 0.06`. These bounds follow Seltzer–Berger's quoted uncertainty: ~10 % for the nuclear term below 2 MeV, 3–10 % at 2–50 MeV, and 5–10 % theory in the total.
+
+Measured over the 24 catalogue elements, 10 keV–30 MeV:
+
+- First moment: 0.974–1.057 (previously 0.86–1.03).
+- Pointwise: 0.94–1.12.
+- At `k/T → 0`: low Z is 0.97–1.11 (previously 0.70 for boron).
+
+The largest values are B and C at `k/T ≤ 0.05` and 0.4–1 MeV. They persist at `k/T = 0`, where `η` is tabulated, so they are a BremsLib versus Seltzer–Berger electron–nucleus difference, not the fitted small-`k/T` shape. The electron–electron gap described above is closed; the remaining limitation is that residual.

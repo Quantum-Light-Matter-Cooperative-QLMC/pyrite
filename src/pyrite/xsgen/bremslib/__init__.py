@@ -4,6 +4,7 @@ from .convert import QUANTITY, angular_integral, build_table, panel_of, shape_fu
 from .generate import GenerationResult, element_request, generate_element
 from .read import (
     COMPLETE_T1_MAX_MEV,
+    EXTENDED_T1_MAX_MEV,
     DdcsPanel,
     NodeFile,
     RatioTable,
@@ -18,6 +19,7 @@ from .release import catalogue_elements, catalogue_table, load_release_index
 
 __all__ = [
     "COMPLETE_T1_MAX_MEV",
+    "EXTENDED_T1_MAX_MEV",
     "QUANTITY",
     "DdcsPanel",
     "GenerationResult",

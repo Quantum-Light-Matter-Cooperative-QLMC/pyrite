@@ -564,10 +564,10 @@ def test_generate_reports_a_new_bremslib_table(isolated, monkeypatch, tmp_path):
     assert seen["t1_max_MeV"] == 2.5
 
 
-def test_generate_defaults_bremslib_to_the_complete_library_range(isolated, monkeypatch):
+def test_generate_defaults_bremslib_to_the_extended_library_range(isolated, monkeypatch):
     from types import SimpleNamespace
 
-    from pyrite.xsgen.bremslib.read import COMPLETE_T1_MAX_MEV
+    from pyrite.xsgen.bremslib.read import EXTENDED_T1_MAX_MEV
 
     seen: dict[str, object] = {}
 
@@ -581,7 +581,7 @@ def test_generate_defaults_bremslib_to_the_complete_library_range(isolated, monk
     monkeypatch.setattr("pyrite.xsgen.bremslib.generate_element", fake)
     invoke(tables_command.command, ["generate", "--code", "bremslib", "--element", "79"])
 
-    assert seen["t1_max_MeV"] == COMPLETE_T1_MAX_MEV
+    assert seen["t1_max_MeV"] == EXTENDED_T1_MAX_MEV
 
 
 def test_generate_requires_an_element_for_bremslib(isolated):

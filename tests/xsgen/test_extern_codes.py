@@ -473,7 +473,7 @@ def test_the_pinned_release_matches_the_library_it_claims(tmp_path, monkeypatch)
     without a new ``VARIANT``.
 
     Bounded to Z=6, the lightest released element, which still reads its full
-    30 MeV table: that is what the release holds.
+    100 MeV table: that is what the release holds.
     """
     library = _bremslib()
     index = load_release_index()
@@ -573,6 +573,49 @@ def test_direction_resolved_ddcs_reproduces_the_vendor_interpolation(
     relative = np.abs(ours / vendor_cm2_sr_MeV - 1.0)
     assert relative.max() < max_rel
     assert np.median(relative) < median_rel
+
+
+# ESTAR radiative stopping powers, MeV cm^2/g (NIST SRD 124, retrieved
+# 2026-10-22) at 50 and 100 MeV.
+_ESTAR_RADIATIVE_ABOVE_30_MEV = {6: (0.9617, 2.046), 14: (1.944, 4.099), 74: (6.477, 13.55)}
+
+
+@pytest.mark.parametrize("z", sorted(_ESTAR_RADIATIVE_ABOVE_30_MEV))
+def test_extended_table_radiative_stopping_continues_the_complete_grid(z):
+    """Benchmark for the staged 30--100 MeV BremsLib extension.
+
+    The extension holds the library SDCS at ``k/T1 <= 0.95`` and fills only
+    the tip, so its first moment must track ESTAR (Seltzer--Berger) the way
+    the complete grid does at 30 MeV. Both include electron-electron
+    bremsstrahlung; C, Si and W sit 2--5 % above ESTAR across 30--100 MeV.
+    The bounds are -3 % and +6 % (Seltzer--Berger quote 3--10 % at 2--50
+    MeV), and the ratio may drift from its 30 MeV value by at most 2.5 %,
+    which a lost tip, a misplaced column or an unscaled row would all exceed.
+
+    Validation: bremslib-high-energy-extension
+    """
+    from pyrite._bremslib_table import prepare_bremslib_table
+    from pyrite.materials._transport_data import TRANSPORT_ELEMENTS
+    from pyrite.montecarlo.transport.hard_radiative import build_radiative_partition
+
+    library = _bremslib()
+    element = next(name for name, row in TRANSPORT_ELEMENTS.items() if int(row["Z"]) == z)
+    grams_per_atom = TRANSPORT_ELEMENTS[element]["A"] / 6.02214076e23
+    table = prepare_bremslib_table(build_table(library, z), atomic_number=z)
+
+    def per_gram(energy_MeV: float) -> float:
+        partition = build_radiative_partition(table, energy_MeV * 1e6, 1.0)
+        return partition.total_stopping_cs_eV_cm2 * 1e-6 / grams_per_atom
+
+    at_30 = per_gram(30.0) / {6: 0.5435, 14: 1.108, 74: 3.735}[z]
+    ratio = np.array(
+        [
+            per_gram(energy) / estar
+            for energy, estar in zip((50.0, 100.0), _ESTAR_RADIATIVE_ABOVE_30_MEV[z], strict=True)
+        ]
+    )
+    assert np.all((ratio >= 0.97) & (ratio <= 1.06))
+    np.testing.assert_allclose(ratio, at_30, rtol=0.025)
 
 
 def test_elsepa_muffin_tin_silicon_keeps_transport_and_cuts_the_total(monkeypatch, tmp_path):

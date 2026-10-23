@@ -250,16 +250,24 @@ def test_soft_and_hard_radiative_loss_reproduce_the_full_moment(cutoff_eV, core)
     E_start, E_end, L = result["E_start_keV"], result["E_end_keV"], result["L_ang"]
     k_keV = result["hard_radiative_k_eV"] * 1e-3
     per_ang = 0.1e24 * 1e-8  # atoms/cm^3 x cm/Angstrom
+    # Coupled transport always applies dielectric suppression at the layer's
+    # recorded plasma energy; rebuild every partition with the same value.
+    (plasma,) = result["radiative"]["plasma_energy_eV_by_layer"]
+
+    def partition(energy_keV):
+        return build_radiative_partition(
+            table, energy_keV * 1e3, cutoff_eV, plasma_energy_eV=plasma
+        )
 
     midpoint = 0.5 * (E_start + E_end)
     collision = -np.asarray(spliced_stopping_keV_per_ang(composition, midpoint))
-    mid_parts = [build_radiative_partition(table, e * 1e3, cutoff_eV) for e in midpoint]
+    mid_parts = [partition(e) for e in midpoint]
     soft = np.array([p.soft_stopping_cs_eV_cm2 for p in mid_parts]) * per_ang * 1e-3
     total = np.array([p.total_stopping_cs_eV_cm2 for p in mid_parts]) * per_ang * 1e-3
     np.testing.assert_allclose((E_start - E_end).sum(), (L * (collision + soft)).sum(), rtol=1e-4)
 
     # The flight hazard is frozen at row-start energy.
-    start_parts = [build_radiative_partition(table, e * 1e3, cutoff_eV) for e in E_start]
+    start_parts = [partition(e) for e in E_start]
     rate = np.array([p.hard_rate_cs_cm2 for p in start_parts]) * per_ang
     expected_count = (L * rate).sum()
     count = np.count_nonzero(k_keV)

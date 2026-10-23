@@ -15,6 +15,7 @@ from dataclasses import dataclass
 import cupy as xp
 import numpy as np
 
+from ..._bremslib_table import STAGED_RATIO_COUNT
 from .._cupy_jit import jit
 
 F32_ZERO = np.float32(0.0)
@@ -28,6 +29,7 @@ F32_TWO = np.float32(2.0)
 F32_ONE_SIXTH = np.float32(1.0 / 6.0)
 F32_16_OVER_3 = np.float32(16.0 / 3.0)
 F32_MC2_KEV = np.float32(510.99895)
+F32_MC2_EV = np.float32(510998.95)
 F32_ALPHA = np.float32(7.2973525693e-3)
 F32_R_E_CM2 = np.float32(7.9407877e-26)
 F32_TWO_PI_ALPHA = np.float32(2.0 * np.pi * 7.2973525693e-3)
@@ -37,8 +39,8 @@ U32_ONE = np.uint32(1)
 U32_TWO = np.uint32(2)
 U32_THREE = np.uint32(3)
 U32_FOUR = np.uint32(4)
-U32_ELEVEN = np.uint32(11)
-U32_THIRTEEN = np.uint32(13)
+U32_LAST_INNER_NODE = np.uint32(STAGED_RATIO_COUNT - 2)
+U32_RATIO_COUNT = np.uint32(STAGED_RATIO_COUNT)
 
 
 @dataclass(frozen=True)
@@ -166,15 +168,15 @@ def _eedl_or_bh_weighted_scalar(
 
 @jit.rawkernel(device=True)
 def _bremslib_scaled_scalar(reduced, top, line_id, values, nominal_ratio):
-    """Interpolate one staged 13-node BremsLib row in ``k/T``.
+    """Interpolate one staged BremsLib row (``STAGED_RATIO_COUNT`` nodes) in ``k/T``.
 
     Validation: bremslib-angular-model
     """
     lower = U32_ZERO
-    while lower < U32_ELEVEN and reduced >= nominal_ratio[lower + U32_ONE]:
+    while lower < U32_LAST_INNER_NODE and reduced >= nominal_ratio[lower + U32_ONE]:
         lower += U32_ONE
     lower_reduced_energy = nominal_ratio[lower]
-    if lower == U32_ELEVEN:
+    if lower == U32_LAST_INNER_NODE:
         upper_reduced_energy = top
     else:
         upper_reduced_energy = nominal_ratio[lower + U32_ONE]
@@ -183,7 +185,7 @@ def _bremslib_scaled_scalar(reduced, top, line_id, values, nominal_ratio):
         fraction = F32_ZERO
     elif fraction > F32_ONE:
         fraction = F32_ONE
-    offset = line_id * U32_THIRTEEN + lower
+    offset = line_id * U32_RATIO_COUNT + lower
     lower_scaled_sdcs = values[offset]
     upper_scaled_sdcs = values[offset + U32_ONE]
     return lower_scaled_sdcs + fraction * (upper_scaled_sdcs - lower_scaled_sdcs)
@@ -212,10 +214,15 @@ def _bremslib_or_fallback_weighted_scalar(
     nominal_ratio,
     n_energies,
     atomic_number,
+    plasma_eV,
 ):
     """Weighted directional BremsLib cell, with the normal EEDL/BH fallback.
 
-    Validation: bremslib-angular-model
+    ``plasma_eV > 0`` applies the Ter--Mikaelian ``k**2/(k**2 + (gamma*Ep)**2)``
+    to the BremsLib branch, as the portable scorer does; the fallback is never
+    reached then (the strict scorer refuses it).
+
+    Validation: bremslib-angular-model, dielectric-suppression
     """
     if bremslib_available > F32_ZERO:
         if photon_energy_eV <= F32_ZERO or photon_energy_eV > incident_energy_keV * F32_1E3:
@@ -228,6 +235,10 @@ def _bremslib_or_fallback_weighted_scalar(
             reduced, bremslib_upper_top, line_id, bremslib_upper_values, nominal_ratio
         )
         scaled = lower + bremslib_energy_fraction * (upper - lower)
+        if plasma_eV > F32_ZERO:
+            scale = (F32_ONE + incident_energy_keV * F32_1E3 / F32_MC2_EV) * plasma_eV
+            k2 = photon_energy_eV * photon_energy_eV
+            scaled = scaled * (k2 / (k2 + scale * scale))
         return bremslib_weight * scaled / photon_energy_eV
     return _eedl_or_bh_weighted_scalar(
         incident_energy_keV,
@@ -329,6 +340,7 @@ def _bremslib_kernel_1e(
     nominal_ratio,
     spectrum,
     atomic_number,
+    plasma_eV,
     n_segments,
     n_energies,
     n_layers,
@@ -367,6 +379,7 @@ def _bremslib_kernel_1e(
             nominal_ratio,
             n_energies,
             atomic_number,
+            plasma_eV,
         )
         transmission = _transmission_scalar(
             path_flat, mu_flat, line_id, energy_index, n_layers, n_energies
@@ -921,6 +934,7 @@ def run_bremslib_brem_reduction_kernel(
     *,
     Z,
     n_layers,
+    plasma_eV=0.0,
     out=None,
     config=DEFAULT_BREM_KERNEL_CONFIG,
 ):
@@ -970,6 +984,7 @@ def run_bremslib_brem_reduction_kernel(
             nominal_ratio,
             out,
             np.float32(Z),
+            np.float32(plasma_eV),
             np.uint32(T_keV.size),
             np.uint32(n_energies),
             np.uint32(n_layers),
@@ -995,6 +1010,7 @@ def run_bremslib_element_reduction(
     number_density_ang3,
     n_layers,
     out,
+    plasma_eV=0.0,
 ):
     """Stage one element's segment state and launch the BremsLib reducer.
 
@@ -1049,5 +1065,6 @@ def run_bremslib_element_reduction(
         xp.asarray(staged.table.nominal_reduced_energy, dtype=xp.float32),
         Z=Z,
         n_layers=n_layers,
+        plasma_eV=plasma_eV,
         out=out,
     )

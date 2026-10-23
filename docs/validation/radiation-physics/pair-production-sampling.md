@@ -258,3 +258,32 @@ The ledger row moved from `rederived` to `anchored` after the verdict above.
 - The binned energy share and both polar cosines, compared with the committed
   Geant4 `empenelope` references in `checks/pair_production_geant4/reference/`
   (C and Pb, 2 and 5 MeV, two-sample chi-square).
+
+## Extension to 100 MeV (2026-10-22, issue #439)
+
+`tests/montecarlo/test_pair_production.py` now also pins:
+
+- The Eq. 2.85 total (η = 0, $C_r$ = 1.0093) against EPDL2025
+  $\sigma_{\rm pair,nuc}$ at 20, 30, 50 and 100 MeV, within 2 % for Z = 6, 14,
+  42 and 82. Measured: 0.990–1.011 from 10 to 100 MeV, including W. The
+  largest deviation is +1.1 %, for C at 100 MeV.
+- Composition/rejection ε against Eq. 2.90 at 100 MeV (Z = 6, 82), and
+  per-particle Eq. 2.99 cosines and uniform azimuth at 100 MeV.
+- The Geant4 `empenelope` references at 30 and 100 MeV for C and Pb, including
+  the new `log10(1 - cos θ)` observable, which resolves the ~mc²/E opening
+  angles.
+
+Against the independent Geant4 models, the energy share agrees to
+$D\le0.010$ at 30 and 100 MeV. Opening angles are up to about 7 % narrower than
+`G4BetheHeitlerModel` and the 5D model. This is the documented leading-term
+cost, and multiple scattering of the daughters dominates it in any target thick
+enough to convert.
+
+Triplet production stays folded into the pair channel. EPDL2025's
+$\sigma_{\rm pair,el}/(\sigma_{\rm pair,nuc}+\sigma_{\rm pair,el})$ reaches
+13.6 % for C, 6.4 % for Si and 1.3 % for Pb at 100 MeV. The 5D model's recoil
+electron takes on average 0.5 % (30 MeV) and 0.1 % (100 MeV) of `k`, so the
+omitted recoil electron moves at most 0.07 % of the converted energy. The total
+is unaffected, because it comes from EPDL. The numbers are in
+`checks/pair_production_geant4/README.md`.
+

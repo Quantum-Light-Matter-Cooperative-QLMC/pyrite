@@ -14,6 +14,7 @@ Verdict = Literal["pass", "fail", "skip"]
 
 CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
     "checks/brem_source_comparison.py": ("brem-source-comparison",),
+    "checks/sb85_eta_small_kappa_fit.py": ("bremslib-electron-electron",),
     "checks/coherent_flat_omission.py": ("coherent-flat-term-omission",),
     "checks/coherent_physical_population_remote.py": ("coherent-physical-bunch-population",),
     "checks/coherent_window_excluded_dispersion.py": ("coherent-line-grid-windowed-resolution",),

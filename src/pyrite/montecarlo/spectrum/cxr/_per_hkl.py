@@ -849,14 +849,13 @@ def _accumulate_reflection(
     seg_r = st.seg_r
     cxr_electron = st.cxr_electron
     v_all = st.v_all
-    v_dot_n_all = st.v_dot_n_all
     gamma_all = st.gamma_all
     t_L_all = st.t_L_all
     gid_all = st.gid_all
     grouped = st.grouped
     E_tab_g = st.E_tab_g
     log_mu_tab_g = st.log_mu_tab_g
-    n_re_tab_g = st.n_re_tab_g
+    delta_tab_g = st.delta_tab_g
     omega_grid = st.omega_grid
     delta_omega_grid = st.delta_omega_grid
     d_all = st.d_all
@@ -865,10 +864,10 @@ def _accumulate_reflection(
     #   omega_res = v.g / (1 - v.n - delta v.grad L)   [1/Ang]   (>0 radiates)
     v_dot_g = _matvec3(v_all, g_vec_d)
     grad = st.escape_gradient
-    denom, n_re_seg = _in_medium_kinematics(
-        v_dot_n_all,
+    denom, delta_seg = _in_medium_kinematics(
+        st.denom_all,
         v_dot_g,
-        n_re_tab_g,
+        delta_tab_g,
         E_tab_g,
         (v_all * grad).sum(axis=1),
         (grad**2).sum(axis=1),
@@ -913,7 +912,7 @@ def _accumulate_reflection(
     # k_eff = om * (n_hat + delta grad L); every scalar is a dot of this
     # same vector. External polarization is transverse to n_hat, so k_eff.e
     # is retained in the PXR numerator. Validation: xray-in-medium-resonance
-    delta = 1.0 - n_re_seg[idx]
+    delta = delta_seg[idx]
     grad2 = (grad[idx] ** 2).sum(axis=1)
     k_mag = om * xp.sqrt(xp.where(grad2 == 0.0, 1.0, 1.0 - 2.0 * delta + delta**2 * grad2))
     k_dot_v = om * (1.0 - dnm)

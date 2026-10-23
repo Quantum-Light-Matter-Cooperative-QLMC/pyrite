@@ -67,7 +67,11 @@ from ..montecarlo.bunch_front import BunchFrontTilt, resolve_front_tilt
 from ..montecarlo.case import Case
 from ..montecarlo.transverse import TransverseDistribution, resolve_transverse_distribution
 from .beam_cases import beam_case_keys, beam_distribution_keys
-from .bremsstrahlung_cases import radiative_case_keys, resolve_auto_bremsstrahlung
+from .bremsstrahlung_cases import (
+    radiative_case_keys,
+    require_coupled_radiative,
+    resolve_auto_bremsstrahlung,
+)
 from .cost import (  # noqa: F401  (re-exported: pyrite.campaign.sweep is the stable import path)
     _COST_E_CUT_KEV,
     _csda_profile,
@@ -952,8 +956,9 @@ def _resolve_case_models(
     atomic_electron_deflection: str,
     bremsstrahlung_model: str,
     radiative: dict[str, Any],
+    radiative_model: str,
 ) -> list[Case]:
-    """Resolve "auto" models on the assembled cases, then warn on kinematic validity."""
+    """Resolve "auto" models on the assembled cases, then screen their validity."""
     if inelastic_model == "auto":
         cases = resolve_auto_inelastic(
             cases,
@@ -966,9 +971,12 @@ def _resolve_case_models(
     if bremsstrahlung_model == "auto":
         cases = resolve_auto_bremsstrahlung(cases, radiative)
     from .kinematic_validity import warn_kinematic_validity
+    from .thick_target import warn_thick_target
 
     for case in cases:
+        require_coupled_radiative(case, radiative_model)
         warn_kinematic_validity(case)
+        warn_thick_target(case)
     return cases
 
 
@@ -1149,4 +1157,5 @@ def build_cases(
         atomic_electron_deflection=atomic_electron_deflection,
         bremsstrahlung_model=bremsstrahlung_model,
         radiative=radiative,
+        radiative_model=radiative_model,
     )

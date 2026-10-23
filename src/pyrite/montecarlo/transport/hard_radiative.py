@@ -17,6 +17,7 @@ from ..spectrum.brem_bremslib import (
     evaluate_bremslib,
     stage_bremslib_table,
 )
+from .dielectric_radiative import dielectric_cell_moments, dielectric_scale_eV
 
 _MB_CM2 = 1.0e-27
 _ELECTRON_REST_EV = 510998.95
@@ -54,6 +55,7 @@ class RadiativePartition:
     hard_rate_cs_cm2: float
     hard_stopping_cs_eV_cm2: float
     total_stopping_cs_eV_cm2: float
+    plasma_energy_eV: float = 0.0
 
     def sample_photon_energy(self, uniform: float) -> float:
         """Sample a hard photon from the exact piecewise-linear SDCS CDF.
@@ -72,11 +74,17 @@ class RadiativePartition:
         left, right = self.photon_grid_eV[cell : cell + 2]
         chi_left, chi_right = self.scaled_sdcs_mb[cell : cell + 2]
         scale = _MB_CM2 * self.table.atomic_number**2
+        suppression_scale = dielectric_scale_eV(self.incident_energy_eV, self.plasma_energy_eV)
         low, high = float(left), float(right)
         for _ in range(52):
             mid = 0.5 * (low + high)
             chi_mid = chi_left + (chi_right - chi_left) * (mid - left) / (right - left)
-            partial, _ = _cell_moments(float(left), mid, float(chi_left), float(chi_mid))
+            if suppression_scale == 0.0:
+                partial, _ = _cell_moments(float(left), mid, float(chi_left), float(chi_mid))
+            else:
+                partial, _ = dielectric_cell_moments(
+                    float(left), mid, float(chi_left), float(chi_mid), suppression_scale
+                )
             if scale * partial < target:
                 low = mid
             else:
@@ -94,21 +102,29 @@ class HardRadiativePhoton:
 
 
 def build_radiative_partition(
-    table: BremsLibBremsstrahlungTable, incident_energy_eV: float, cutoff_eV: float
+    table: BremsLibBremsstrahlungTable,
+    incident_energy_eV: float,
+    cutoff_eV: float,
+    *,
+    plasma_energy_eV: float = 0.0,
 ) -> RadiativePartition:
-    """Split one BremsLib SDCS at positive ``kc`` without altering its shape.
+    """Split one BremsLib SDCS at positive ``kc`` with optional dielectric suppression.
 
-    The BremsLib scaled SDCS is linearly interpolated in reduced photon energy.
-    Integrating each resulting linear cell analytically avoids a quadrature
-    dependence on ``kc``. The zero-energy zeroth moment is divergent, so only
-    the soft *first* moment is formed below ``kc``.
+    The parent scaled SDCS is linearly interpolated in reduced photon energy.
+    Its dielectric-corrected moments are integrated analytically, *not* by
+    linearly resampling the suppression factor on BremsLib's coarse photon
+    nodes. The vacuum limit preserves the existing unsuppressed calculation.
 
-    Validation: bremslib-radiative-partition
+    Validation: bremslib-radiative-partition, dielectric-suppression
     """
     energy = float(incident_energy_eV)
     cutoff = float(cutoff_eV)
+    plasma = float(plasma_energy_eV)
     if not np.isfinite(energy) or not np.isfinite(cutoff) or energy <= 0.0 or cutoff <= 0.0:
         raise ValueError("incident energy and radiative cutoff must be positive and finite")
+    if not np.isfinite(plasma) or plasma < 0.0:
+        raise ValueError("plasma_energy_eV must be finite and nonnegative")
+    suppression_scale = dielectric_scale_eV(energy, plasma)
     T_keV = energy / 1.0e3
     if (
         T_keV < table.minimum_incident_energy_keV
@@ -146,11 +162,16 @@ def build_radiative_partition(
     soft = hard_first = 0.0
     hard_cells = np.zeros(photon_grid.size - 1, dtype=float)
     for i, (left, right) in enumerate(zip(photon_grid[:-1], photon_grid[1:], strict=True)):
-        if left == 0.0:
-            first = 0.5 * (chi[i] + chi[i + 1]) * right
-            soft += scale * first
-            continue
-        rate, first = _cell_moments(float(left), float(right), float(chi[i]), float(chi[i + 1]))
+        if suppression_scale == 0.0:
+            if left == 0.0:
+                first = 0.5 * (chi[i] + chi[i + 1]) * right
+                soft += scale * first
+                continue
+            rate, first = _cell_moments(float(left), float(right), float(chi[i]), float(chi[i + 1]))
+        else:
+            rate, first = dielectric_cell_moments(
+                float(left), float(right), float(chi[i]), float(chi[i + 1]), suppression_scale
+            )
         if right <= cutoff:
             soft += scale * first
         else:
@@ -168,6 +189,7 @@ def build_radiative_partition(
         hard_rate,
         hard_first,
         soft + hard_first,
+        plasma,
     )
 
 
@@ -372,11 +394,15 @@ def pack_radiative_layer_tables(
     tables: Mapping[str, BremsLibBremsstrahlungTable],
     min_energy_eV: float,
     max_energy_eV: float,
+    *,
+    dielectric: bool = False,
 ) -> tuple:
     """Pad the BremsLib SDCS and number densities for the exact scalar kernels.
 
     Every requested element must have a table covering the complete electron
     range. There is no EEDL fallback inside a coupled transport mode.
+
+    Validation: dielectric-suppression
     """
     if not compositions or any(not comp for comp in compositions):
         raise ValueError("radiative transport needs a nonempty composition in every layer")
@@ -401,6 +427,22 @@ def pack_radiative_layer_tables(
                 )
             layer.append((table, float(density) * 1e24))
         selected.append(layer)
+    # The medium's plasma frequency is set by ALL constituent electrons,
+    # not each element's isolated density. It is therefore shared by every
+    # element in a layer, including the absorbing substrate of a stack.
+    if dielectric:
+        from ...materials import MediumSpec
+        from ...materials.attenuation import plasma_energy_eV
+
+        plasma_by_layer = np.array(
+            [
+                plasma_energy_eV(MediumSpec(f"radiative-layer-{i}", tuple(composition)))
+                for i, composition in enumerate(compositions)
+            ],
+            dtype=float,
+        )
+    else:
+        plasma_by_layer = np.zeros(n_layers, dtype=float)
     max_incident = max(table.incident_energy_keV.size for layer in selected for table, _ in layer)
     n_reduced = selected[0][0][0].nominal_reduced_energy.size
     n_elements = np.array([len(layer) for layer in selected], dtype=np.int32)
@@ -432,6 +474,7 @@ def pack_radiative_layer_tables(
         nominal,
         top,
         scaled_sdcs,
+        plasma_by_layer,
     )
 
 
@@ -480,26 +523,45 @@ def validate_radiative_args(
 def radiative_core_args(
     compositions, tables, cutoff_eV, electron_cutoffs_keV, energies_keV, seed, n_electrons, start=0
 ) -> tuple:
-    """The exact cores' ``radiative_args``: stream keys, cutoff, packed tables."""
+    """The exact cores' ``radiative_args``: stream keys, cutoff, packed tables.
+
+    Validation: dielectric-suppression
+    """
     from ._jit_radiative import radiative_stream_keys
 
     min_cutoff_eV = float(np.min(electron_cutoffs_keV)) * 1e3
     if cutoff_eV > min_cutoff_eV:
         raise ValueError("radiative_cutoff_eV must not exceed the electron cutoff")
+    maximum_eV = float(np.max(energies_keV)) * 1e3
+    # Ter--Mikaelian suppression is on for every coupled run so the model has
+    # no step in beam energy; at low gamma it reaches only k ~ hbar*omega_p.
     packed = pack_radiative_layer_tables(
-        compositions, tables, min_cutoff_eV, float(np.max(energies_keV)) * 1e3
+        compositions, tables, min_cutoff_eV, maximum_eV, dielectric=True
     )
     keys = radiative_stream_keys(seed, n_electrons, start=start)
     return (keys, float(cutoff_eV)) + packed
 
 
-def add_radiative_result_fields(result, photon_k_eV, photon_Z, tables, cutoff_eV, seed) -> None:
+def add_radiative_result_fields(
+    result, photon_k_eV, photon_Z, tables, cutoff_eV, seed, plasma_energy_eV_by_layer=None
+) -> None:
     """Attach photon rows, their completed kinematics, and the mode's identity."""
     result["hard_radiative_k_eV"] = photon_k_eV
     result["hard_radiative_Z"] = photon_Z
     complete_hard_radiative_events(result, tables, seed)
+    plasma = np.asarray(
+        [] if plasma_energy_eV_by_layer is None else plasma_energy_eV_by_layer, dtype=float
+    )
     result["radiative"] = {
         "model": "bremslib-soft-hard",
+        **(
+            {
+                "dielectric_model": "ter-mikaelian-v1",
+                "plasma_energy_eV_by_layer": tuple(float(x) for x in plasma),
+            }
+            if plasma.size and np.any(plasma > 0.0)
+            else {}
+        ),
         "cutoff_eV": float(cutoff_eV),
         "bremslib_tables": tuple(
             sorted(

@@ -322,7 +322,10 @@ class ElectronicChannels:
         return self.distant(q_perp) + self.close(q_perp)
 
     def weight_pq(self, p, q_y):
-        """Total ``dsigma/d^2q_perp`` at ``(q_x, q_y)``; radial here, directional in subclasses."""
+        """Total ``dsigma/d^2q_perp`` at ``(q_x, q_y)``; radial here, directional in subclasses.
+
+        Validation: cr-valence-directional-loss
+        """
         return self.weight(np.hypot(p, q_y))
 
 
@@ -909,7 +912,7 @@ def electronic_kernel(
     diffusion ``int w(q) (1 - cos q_x Delta)``; ``q -> 0`` jumps do not
     decohere.
 
-    Validation: cr-lindblad-jump-operators
+    Validation: cr-lindblad-jump-operators, cr-valence-directional-loss
     """
     _check_grid(n_cells, max_order)
     hbar_v = _kinematics(kinetic_energy_eV)

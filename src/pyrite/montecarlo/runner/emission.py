@@ -153,6 +153,10 @@ def _coupled_brem_from_segments(
     for segments, composition in layer_views:
         if segments["L_ang"].size == 0:
             continue
+        # A layer view can omit scalar transport metadata; restore the
+        # original coupled partition record for its scorer consistency check.
+        if "radiative" not in segments and "radiative" in segs_b:
+            segments = {**segments, "radiative": segs_b["radiative"]}
         brem_wide = brem_wide + mc_coupled_brem_spectrum(
             segments,
             E_brem,

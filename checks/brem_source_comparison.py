@@ -9,13 +9,17 @@ cross section above ``kappa = 0.05``, and the radiative first moment. See
 Gate (claim ``brem-source-comparison``, BremsLib only) on the validated domain
 ``10 keV <= T <= 30 MeV``, ``0.05 <= kappa <= 0.95``:
 
-* pointwise ``chi`` ratio within ``[1/(1 + 1/Z) - 0.05, 1.05]``. The lower
-  bound allows the electron-electron share that Seltzer--Berger includes and
-  BremsLib, an electron-atom library, does not. Below ``kappa = 0.05``
-  screening raises that share towards ``xi/Z`` with ``xi > 1`` (B at 30 MeV
-  reaches 0.70 at ``kappa -> 0``), and the tip ``kappa > 0.95`` is resolved
-  differently by the two grids, so both edges are reported, not gated;
-* first-moment ratio within ``[1/(1 + 1/Z) - 0.03, 1.03]``.
+* pointwise ``chi`` ratio within ``1 +/- 0.13``;
+* first-moment ratio within ``1 +/- 0.06``.
+
+Both sides include electron-electron bremsstrahlung: Seltzer--Berger's own,
+and the staged BremsLib tables through Seltzer and Berger's (1985) ``eta``
+(``pyrite._bremslib_electron``). The bounds follow that paper's quoted
+uncertainty: ~10 % for the electron-nucleus term below 2 MeV and 3--10 %
+from 2 to 50 MeV, and 5--10 % theory uncertainty in the total. Before the
+electron-electron term was added the lower bounds were ``1/(1 + 1/Z)`` minus
+0.05 and 0.03. ``kappa < 0.05`` and the tip ``kappa > 0.95`` (resolved
+differently by the two grids) are reported, not gated.
 
 EEDL is reported, not gated: its fixed-photon-energy interpolation between
 decade-spaced incident panels is a known defect (#174). Its values at the
@@ -50,11 +54,7 @@ from pyrite.xsgen.bremslib import release
 from pyrite.xsgen.bremslib import tables as bremslib_tables
 
 T_MIN_MEV, T_MAX_MEV, KAPPA_MIN, KAPPA_MAX = 0.01, 30.0, 0.05, 0.95
-POINTWISE_TOLERANCE, MOMENT_TOLERANCE = 0.05, 0.03
-
-
-def _electron_electron_floor(atomic_number: int) -> float:
-    return 1.0 / (1.0 + 1.0 / atomic_number)
+POINTWISE_TOLERANCE, MOMENT_TOLERANCE = 0.13, 0.06
 
 
 def _eedl_panel_moments(table, elements):
@@ -122,11 +122,10 @@ def main(argv=None) -> int:
             )
             if model != "bremslib" or r.incident_energy_MeV < T_MIN_MEV * (1 - 1e-9):
                 continue
-            floor = _electron_electron_floor(r.atomic_number)
-            if ratio.min() < floor - POINTWISE_TOLERANCE or ratio.max() > 1 + POINTWISE_TOLERANCE:
+            if np.any(np.abs(ratio - 1.0) > POINTWISE_TOLERANCE):
                 failures.append((r.element, r.incident_energy_MeV, "chi", ratio.min(), ratio.max()))
             moment = r.first_moment_ratio
-            if moment < floor - MOMENT_TOLERANCE or moment > 1 + MOMENT_TOLERANCE:
+            if abs(moment - 1.0) > MOMENT_TOLERANCE:
                 failures.append((r.element, r.incident_energy_MeV, "moment", moment, moment))
 
     panel_rows = _eedl_panel_moments(table, elements)

@@ -70,8 +70,9 @@ def reflection_rows(
     coherent window seeds; see :func:`kinematic_cxr_seeds` for the source
     equation and root solver.
 
-    Validation: line-window-seeding
+    Validation: line-window-seeding, line-kinematics-precision
     """
+    from .cxr._kernels import _vacuum_doppler
     from .segment_escape import segment_escape_gradient
 
     # Seeding is host work even when transport returned device arrays.
@@ -94,7 +95,7 @@ def reflection_rows(
         gradient, index = gradient[line], index[line]
     beta = beta_from_keV(energy)
     velocity = beta[:, None] * direction
-    v_dot_n = velocity @ np.asarray(n_hat, dtype=float)
+    _, vacuum = _vacuum_doppler(energy, beta, direction, n_hat, xp=np)
     parent_length = np.asarray(segments.get("line_parent_L_ang", segments["L_ang"]), dtype=float)
     fraction = np.asarray(
         segments.get("line_piece_fraction", np.ones_like(parent_length)), dtype=float
@@ -102,8 +103,8 @@ def reflection_rows(
     if electron_limit is not None:
         parent_length, fraction = parent_length[line], fraction[line]
     weight = (parent_length / beta) ** 2 * fraction
-    usable = np.isfinite(weight) & (weight > 0.0) & np.isfinite(v_dot_n) & (v_dot_n < 1.0)
-    velocity, v_dot_n, weight = velocity[usable], v_dot_n[usable], weight[usable]
+    usable = np.isfinite(weight) & (weight > 0.0) & np.isfinite(vacuum) & (vacuum > 0.0)
+    velocity, vacuum, weight = velocity[usable], vacuum[usable], weight[usable]
     gradient, index = gradient[usable], index[usable]
     v_dot_grad = np.sum(velocity * gradient, axis=1)
     grad2 = np.sum(gradient**2, axis=1)
@@ -120,7 +121,7 @@ def reflection_rows(
             CRYSTALS[crystal], list(composition or ()), max(start - pad, 1.0), stop + pad
         )
         refractive = (
-            np.asarray(refractive_index(crystal, table_energy).real, dtype=float),
+            1.0 - np.asarray(refractive_index(crystal, table_energy).real, dtype=float),
             table_energy,
         )
     if refractive is not None:
@@ -143,10 +144,10 @@ def reflection_rows(
             v_dot_g = velocity @ g_row
             with np.errstate(divide="ignore", invalid="ignore"):
                 if refractive is None:
-                    denominator = 1.0 - v_dot_n
+                    denominator = vacuum
                 else:
                     denominator, _ = _in_medium_kinematics(
-                        v_dot_n, v_dot_g, *refractive, v_dot_grad, grad2
+                        vacuum, v_dot_g, *refractive, v_dot_grad, grad2
                     )
                 resonance = HBARC_EV_ANG * v_dot_g / denominator
             radiating = np.isfinite(resonance) & (resonance > MIN_RESONANCE_EV)

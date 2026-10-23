@@ -39,6 +39,8 @@ class DirectionalChannels(ElectronicChannels):
     ``distant`` (radial, used by the full-loss diagonal) is the azimuthal mean
     of :meth:`distant_pq` over the transverse plane; :meth:`weight_pq` is the
     full direction-resolved ``dsigma/d^2q_perp``.
+
+    Validation: cr-valence-directional-loss
     """
 
     valence: DirectionalValence
@@ -117,6 +119,8 @@ def plane_c_axis(normal, optic_axis=(0.0, 0.0, 1.0)) -> str | None:
     ``c`` along the plane normal (basal plane) is ``x`` for every beam. Any other
     orientation needs the beam azimuth (``y``: beam normal to ``c``, ``z``: beam
     along ``c``), which a plane alone does not fix.
+
+    Validation: cr-valence-directional-loss
     """
     n = np.asarray(normal, dtype=float)
     c = np.asarray(optic_axis, dtype=float)

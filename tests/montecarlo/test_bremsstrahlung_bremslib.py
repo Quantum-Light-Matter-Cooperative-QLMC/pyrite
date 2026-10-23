@@ -31,9 +31,16 @@ def _zero_mu(_composition, energy):
     return xp.zeros_like(xp.asarray(energy, dtype=REAL))
 
 
+#: Library ``k/T1`` columns among the staged ones (the rest are sub-nodes).
+LIBRARY_COLUMNS = np.r_[0, 6:18]
+
+
 @pytest.fixture
 def carbon_table():
-    return prepare_bremslib_table(synthetic_bremslib_arrays(), atomic_number=6, key="k", digest="d")
+    # Electron-nucleus only: these tests check fidelity to the library nodes.
+    return prepare_bremslib_table(
+        synthetic_bremslib_arrays(), atomic_number=6, key="k", digest="d", electron_electron=False
+    )
 
 
 def _evaluate(table, T_keV, photon_eV, cos_theta=None):
@@ -76,18 +83,45 @@ def test_refinement_keeps_library_nodes_and_inserts_geometric_sub_nodes(carbon_t
     raw = arrays["ddcs_mb_sr"].astype(float).reshape(SYNTHETIC_T1_MEV.size, 13, theta.size)
     shape = raw / solid_angle_integral(theta, raw)[..., None]
 
+    library = carbon_table.scaled_ddcs_mb_sr[:, LIBRARY_COLUMNS]
     np.testing.assert_allclose(carbon_table.incident_energy_keV[::4], SYNTHETIC_T1_MEV * 1.0e3)
-    np.testing.assert_allclose(
-        carbon_table.scaled_ddcs_mb_sr[::4], shape * arrays["sdcs_mb"][..., None], rtol=1e-12
-    )
+    np.testing.assert_allclose(library[::4], shape * arrays["sdcs_mb"][..., None], rtol=1e-12)
     # The midpoint sub-node of the first interval: geometric mean, renormalized.
     midpoint = np.sqrt(shape[0] * shape[1])
     midpoint /= solid_angle_integral(theta, midpoint)[..., None]
     chi = np.sqrt(arrays["sdcs_mb"][0] * arrays["sdcs_mb"][1])
     np.testing.assert_allclose(carbon_table.incident_energy_keV[2], np.sqrt(10.0 * 20.0))
+    np.testing.assert_allclose(library[2], midpoint * chi[:, None], rtol=1e-12)
+
+
+def test_reduced_energy_sub_nodes_are_the_library_interpolant(carbon_table):
+    # Sub-nodes in (0, 0.1) take the values runtime interpolation already
+    # served there, so the electron-nucleus model is unchanged by them.
+    x = carbon_table.nominal_reduced_energy
+    np.testing.assert_array_equal(x[LIBRARY_COLUMNS], [0, *np.arange(1, 10) / 10, 0.95, 0.975, 1])
+    w = x[1:6] / 0.1
+    sdcs = carbon_table.scaled_sdcs_mb
+    np.testing.assert_allclose(sdcs[:, 1:6], (1.0 - w) * sdcs[:, :1] + w * sdcs[:, 6:7], rtol=1e-13)
+    ddcs = carbon_table.scaled_ddcs_mb_sr
+    w = w[:, None]
+    np.testing.assert_allclose(ddcs[:, 1:6], (1.0 - w) * ddcs[:, :1] + w * ddcs[:, 6:7], rtol=1e-13)
+
+
+def test_electron_electron_multiplies_every_node_by_one_plus_eta_over_z(carbon_table):
+    from pyrite._bremslib_electron import electron_electron_factor
+
+    full = prepare_bremslib_table(synthetic_bremslib_arrays(), atomic_number=6)
+    reduced = np.broadcast_to(full.nominal_reduced_energy, full.scaled_sdcs_mb.shape).copy()
+    reduced[:, -1] = full.top_reduced_energy
+    factor = electron_electron_factor(6, full.incident_energy_keV / 1e3, reduced)
     np.testing.assert_allclose(
-        carbon_table.scaled_ddcs_mb_sr[2], midpoint * chi[:, None], rtol=1e-12
+        full.scaled_sdcs_mb, carbon_table.scaled_sdcs_mb * factor, rtol=1e-14
     )
+    np.testing.assert_allclose(
+        full.scaled_ddcs_mb_sr, carbon_table.scaled_ddcs_mb_sr * factor[..., None], rtol=1e-14
+    )
+    integral = solid_angle_integral(full.theta_rad, full.scaled_ddcs_mb_sr)
+    np.testing.assert_allclose(integral, full.scaled_sdcs_mb, rtol=1.0e-12)
 
 
 def test_evaluation_reproduces_a_library_node(carbon_table):

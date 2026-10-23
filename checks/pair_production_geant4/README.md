@@ -23,7 +23,7 @@ finds the bundled CLHEP.
 a mono-energetic photon pencil beam at a thick slab with a 1 m lateral size,
 fluorescence off, and secondaries killed at creation
 (`/testem/stack/killSecondaries 2`). It runs single-threaded with fixed seeds.
-`run_pairs.sbatch` runs the twelve macros as a SLURM array on the lab box's
+`run_pairs.sbatch` runs the 24 macros as a SLURM array on the lab box's
 CPU partition; the full set takes a few minutes.
 
 | Case | Material | Thickness | Photon energy | Events |
@@ -32,6 +32,8 @@ CPU partition; the full set takes a few minutes.
 | `c_5mev` | Graphite | 30 cm | 5 MeV | 1,000,000 |
 | `pb_2mev` | Lead (Z = 82) | 3 cm | 2 MeV | 1,000,000 |
 | `pb_5mev` | Lead | 3 cm | 5 MeV | 500,000 |
+| `c_30mev`, `c_100mev` | Graphite | 30 cm | 30, 100 MeV | 500,000 |
+| `pb_30mev`, `pb_100mev` | Lead | 3 cm | 30, 100 MeV | 250,000 |
 
 Physics lists:
 
@@ -47,8 +49,12 @@ Physics lists:
 `compare.py reduce RAW_DIR` keeps only conversions at the full beam energy,
 so the photon has lost no energy before converting. It takes angles about
 the photon's own pre-step direction, counts three-secondary (triplet) events,
-and bins the electron energy share `x = E_- / (k - 2 m c^2)` and both polar
-cosines into `reference/*.json`. The raw records are not committed; the
+and bins the electron energy share `x = E_- / (k - 2 m c^2)`, both polar
+cosines and both `log10(1 - cos θ)` into `reference/*.json`. The logarithmic
+angle, formed as `|a × b|² / (1 + a·b)` without cancellation, resolves the
+~mc²/E opening angles above 10 MeV, where every cosine lands in the last bin.
+For 5D triplets it also records the mean share of `k` taken by the
+lower-energy electron, which is the recoil electron PyRITE does not create. The raw records are not committed; the
 binned references are.
 
 `compare.py` samples `sample_pair` at the same photon energy and Z (200,000
@@ -82,3 +88,23 @@ Pairs at the full beam energy per case: 37k–39k for C at 2 MeV, 51k–60k for 
 - **Energy sharing, independent models:** at 5 MeV it agrees with both to $D\le0.005$. At 2 MeV the 5D model differs by $D\approx0.016$. `opt0` at 2 MeV differs strongly ($D\approx0.1$): its energy share is narrower and has no support near the endpoints, whereas PENELOPE's $F_0$-corrected DCS stays finite there. The two near-threshold Bethe–Heitler forms disagree, and this check does not decide which is closer to exact theory.
 - **Angles, independent models:** the mean polar cosine differs from them by about 0.01 ($D$ = 0.014–0.052). This is the expected cost of the leading-term angular law (PENELOPE-2024 §2.4.1.1), which multiple scattering of the daughters washes out.
 - **Triplets:** the 5D model gives a triplet share of 14 % (C) and 1.2 % (Pb) at 5 MeV, about three times the EPDL2025 $\sigma_{\rm pair,el}/\sigma_{\rm pair}$ (4.7 %, 0.4 %) that PyRITE folds into the pair channel. The 5D model has none at 2 MeV, below its 4 m c² threshold.
+
+## Results to 100 MeV (2026-10-22, issue #439, SLURM job 1685)
+
+The original 12 runs were re-reduced unchanged (same histograms; means move
+by ≤ 3e-15) to add the logarithmic angle. Pairs at the full beam energy:
+124k–145k for C at 30 MeV, 185k–217k for C at 100 MeV, and 206k–234k for Pb.
+Full output: `compare.py --output`.
+
+- **`empenelope`:** agrees within statistics for all five observables at 30
+  and 100 MeV (p = 0.054–0.99, $D\le0.004$), and still at 2 and 5 MeV.
+- **Energy sharing, independent models:** $D\le0.010$ at 30 and 100 MeV for
+  both `opt0` and the 5D model; the near-threshold disagreement is gone.
+- **Angles, independent models:** `log10(1 - cos θ)` differs by $D$ =
+  0.017–0.040. `opt0`'s mean is 0.06–0.07 decades higher (opening angle about
+  7 % wider). The 5D model's is 0.002 (30 MeV, C) to 0.07 decades higher.
+  This is the same leading-term cost as at 5 MeV.
+- **Triplets:** the 5D share is 14.4 % (C) and 1.2 % (Pb) at both energies.
+  The recoil electron carries on average 0.5 % of `k` at 30 MeV and 0.1–0.13 %
+  at 100 MeV, so folding triplets into the pair channel misplaces at most 0.07 %
+  of the converted energy (C, 30 MeV).

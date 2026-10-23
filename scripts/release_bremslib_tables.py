@@ -22,7 +22,7 @@ import shutil
 import sys
 from pathlib import Path
 
-from pyrite.xsgen.bremslib.read import COMPLETE_T1_MAX_MEV
+from pyrite.xsgen.bremslib.read import EXTENDED_T1_MAX_MEV
 from pyrite.xsgen.bremslib.release import build_release, release_index_path
 
 _REPO = Path(__file__).resolve().parents[1]
@@ -41,7 +41,7 @@ def main(argv: list[str] | None = None) -> int:
         help="where the archive will be published (repeatable, in fetch order)",
     )
     parser.add_argument(
-        "--t1-max", type=float, default=COMPLETE_T1_MAX_MEV, help="energy bound in MeV"
+        "--t1-max", type=float, default=EXTENDED_T1_MAX_MEV, help="energy bound in MeV"
     )
     parser.add_argument(
         "--element", type=int, action="append", default=None, help="restrict to Z (repeatable)"

@@ -69,13 +69,14 @@ def test_boundary_constant_sdcs_moments_and_inverse_near_endpoint():
         energy,
         cutoff,
     )
-    hard = ns["_rad_moment"](ns["RAD_HARD_RATE"], *args)
+    vacuum = np.float64(0.0)  # no dielectric suppression
+    hard = ns["_rad_moment"](ns["RAD_HARD_RATE"], *args, vacuum)
     assert hard.dtype == np.dtype("float32")
     assert hard == pytest.approx(1e-27 * 14**2 * 1.25 * np.log(energy / cutoff), rel=4e-7)
-    soft = ns["_rad_moment"](ns["RAD_SOFT"], *args)
+    soft = ns["_rad_moment"](ns["RAD_SOFT"], *args, vacuum)
     assert soft.dtype == np.dtype("float32")
     assert soft == pytest.approx(1e-27 * 14**2 * 1.25 * cutoff, rel=4e-7)
-    photon = ns["_rad_sample_photon_eV"](*args, np.float64(0.5))
+    photon = ns["_rad_sample_photon_eV"](*args, np.float64(0.5), vacuum)
     assert cutoff <= photon <= energy
     assert photon == pytest.approx(np.sqrt(cutoff * energy), abs=energy * 1e-10)
     assert ns["F64_KEV_PER_EV"].dtype == np.dtype("float64")

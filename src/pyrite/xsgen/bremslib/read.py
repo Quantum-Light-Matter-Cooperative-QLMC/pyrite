@@ -61,6 +61,16 @@ LIBRARY_DIR_PREFIX = "BremsLib_v2.0"
 #: consumer could not distinguish from a vanishing cross section.
 COMPLETE_T1_MAX_MEV = 30.0
 
+#: Highest incident energy a converted table reaches. Between
+#: :data:`COMPLETE_T1_MAX_MEV` and here the library fills the SDCS for the
+#: first :data:`EXTENSION_RATIO_COUNT` ``k/T1`` columns at some energies, and
+#: the DDCS only at ``k = 0``; 100 MeV is also the ELSEPA transport ceiling.
+EXTENDED_T1_MAX_MEV = 100.0
+
+#: Leading ``k/T1`` columns (``k/T1 <= 0.95``) the library fills at an
+#: extension energy. The two tip columns, 0.975 and the nominal 1, are zero.
+EXTENSION_RATIO_COUNT = 11
+
 #: Number of ``k/T1`` grid values in every SDCS and DDCS_int line.
 RATIO_COUNT = 13
 
@@ -416,6 +426,8 @@ __all__ = [
     "COMPLETE_T1_MAX_MEV",
     "DDCS_DIR",
     "DDCS_INT_DIR",
+    "EXTENDED_T1_MAX_MEV",
+    "EXTENSION_RATIO_COUNT",
     "LIBRARY_DIR_PREFIX",
     "RATIO_COUNT",
     "SDCS_DIR",

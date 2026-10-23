@@ -9,8 +9,10 @@ public names stay importable from
 At load, each ``T1`` interval is refined with geometric sub-nodes (see
 :func:`_refine_incident_grid`) and every node's DDCS is renormalized so that
 the solid-angle integral of its linear-in-``theta`` interpolant equals that
-node's SDCS exactly. Source equations, assumptions, and limiting cases are
-documented in ``docs/physics/radiation-physics/bremsstrahlung.md``.
+node's SDCS exactly. A table reaching past BremsLib's complete grid (30 MeV)
+has its holes filled first by :mod:`pyrite._bremslib_extension`. Source
+equations, assumptions, and limiting cases are documented in
+``docs/physics/radiation-physics/bremsstrahlung.md``.
 """
 
 from collections.abc import Mapping
@@ -18,12 +20,25 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from ._bremslib_electron import electron_electron_factor
+from ._bremslib_extension import extend_above_complete
+
 #: Identity of the BremsLib model and of this module's interpolation scheme.
 #: Bump the suffix whenever the interpolation changes the numbers it serves.
-BREMSSTRAHLUNG_BREMSLIB_MODEL = "bremslib-v2.0-sdcs-ddcs/lin-x-geo4-ln-t-lin-theta-v1"
+BREMSSTRAHLUNG_BREMSLIB_MODEL = (
+    "bremslib-v2.0-sdcs-ddcs/lin-x18-geo4-ln-t-lin-theta-v2/tm-coupled-v2/ee-sb85-v1"
+)
 
-#: Number of ``k/T1`` grid values per incident energy.
+#: Number of library ``k/T1`` grid values per incident energy.
 _RATIO_COUNT = 13
+
+#: ``k/T1`` sub-nodes inserted at load between the library's 0 and 0.1 nodes,
+#: where the electron-electron ratio falls steeply (see
+#: :mod:`pyrite._bremslib_electron`).
+_SMALL_REDUCED_ENERGY_NODES = (0.004, 0.01, 0.02, 0.035, 0.06)
+
+#: Number of staged ``k/T1`` grid values per incident energy.
+STAGED_RATIO_COUNT = _RATIO_COUNT + len(_SMALL_REDUCED_ENERGY_NODES)
 
 #: Sub-intervals per library ``T1`` interval in the staged grid.
 _INCIDENT_REFINEMENT = 4
@@ -42,15 +57,17 @@ class BremsLibBremsstrahlungTable:
     incident_energy_keV
         Incident electron kinetic-energy grid ``T1``, ascending.
     nominal_reduced_energy
-        The 13 nominal ``k/T1`` grid values; the last is spelled 1.
+        The 18 staged ``k/T1`` grid values: the library's 13 plus the
+        sub-nodes in ``(0, 0.1)``; the last is spelled 1.
     top_reduced_energy
         The actual last ``k/T1`` value at each ``T1``, slightly below 1.
     scaled_sdcs_mb
-        ``chi(T1, k/T1)`` in mb, shape ``(n_T1, 13)``.
+        ``chi(T1, k/T1)`` in mb, shape ``(n_T1, 18)``, electron-atom
+        (electron-nucleus times ``1 + eta/Z``) unless staged without it.
     theta_rad
         Common photon emission-angle grid, a superset of every node's grid.
     scaled_ddcs_mb_sr
-        Scaled DDCS in mb/sr, shape ``(n_T1, 13, n_theta)``, renormalized so
+        Scaled DDCS in mb/sr, shape ``(n_T1, 18, n_theta)``, renormalized so
         that its linear-in-``theta`` solid-angle integral is ``scaled_sdcs_mb``.
 
     Validation: bremslib-angular-schiff
@@ -116,10 +133,20 @@ def prepare_bremslib_table(
     atomic_number: int,
     key: str = "",
     digest: str = "",
+    electron_electron: bool = True,
 ) -> BremsLibBremsstrahlungTable:
     """Stage one stored BremsLib table (``pyrite.xsgen.bremslib`` layout).
 
-    Validation: bremslib-angular-model
+    Rows past ``arrays["complete_rows"]`` (absent: none) are extension rows
+    holding library data for ``k/T1 <= 0.95`` and the ``k = 0`` DDCS only;
+    :func:`pyrite._bremslib_extension.extend_above_complete` fills the rest.
+    After ``T1`` refinement the ``k/T1`` grid gains the sub-nodes
+    :data:`_SMALL_REDUCED_ENERGY_NODES` (linear in ``k/T1``, so the
+    electron-nucleus values served are unchanged), and with
+    ``electron_electron`` every node's SDCS and DDCS is multiplied by
+    :func:`pyrite._bremslib_electron.electron_electron_factor`.
+
+    Validation: bremslib-angular-model, bremslib-high-energy-extension, bremslib-electron-electron
 
     Raises
     ------
@@ -131,19 +158,24 @@ def prepare_bremslib_table(
     nominal = np.asarray(arrays["k_over_t1"], dtype=np.float64)
     sdcs = np.asarray(arrays["sdcs_mb"], dtype=np.float64)
     n_t1 = t1_MeV.size
+    complete_rows = int(arrays.get("complete_rows", n_t1))
     if nominal.shape != (_RATIO_COUNT,) or sdcs.shape != (n_t1, _RATIO_COUNT) or n_t1 < 2:
         raise ValueError("BremsLib table does not hold a (T1, 13 k/T1) SDCS grid")
+    if not 1 <= complete_rows <= n_t1:
+        raise ValueError("BremsLib table needs at least one complete T1 row")
     if np.any(np.diff(t1_MeV) <= 0.0) or t1_MeV[0] <= 0.0:
         raise ValueError("BremsLib T1 grid must be positive and ascending")
     if nominal[0] != 0.0 or np.any(np.diff(nominal) <= 0.0):
         raise ValueError("BremsLib k/T1 grid must ascend from zero")
-    if np.any(sdcs < 0.0) or not np.all(np.isfinite(sdcs)):
+    complete_sdcs = sdcs[:complete_rows]
+    if np.any(complete_sdcs < 0.0) or not np.all(np.isfinite(complete_sdcs)):
         raise ValueError("BremsLib SDCS must be finite and non-negative")
 
     t1_index = np.asarray(arrays["node_t1_index"], dtype=np.int64)
     k_index = np.asarray(arrays["node_k_index"], dtype=np.int64)
-    expected_t1 = np.repeat(np.arange(n_t1), _RATIO_COUNT)
-    expected_k = np.tile(np.arange(_RATIO_COUNT), n_t1)
+    extension_rows = np.arange(complete_rows, n_t1)
+    expected_t1 = np.r_[np.repeat(np.arange(complete_rows), _RATIO_COUNT), extension_rows]
+    expected_k = np.r_[np.tile(np.arange(_RATIO_COUNT), complete_rows), 0 * extension_rows]
     if not (np.array_equal(t1_index, expected_t1) and np.array_equal(k_index, expected_k)):
         raise ValueError("BremsLib table does not hold every (T1, k/T1) DDCS node in order")
 
@@ -157,16 +189,34 @@ def prepare_bremslib_table(
         raise ValueError("BremsLib DDCS theta grids must span 0 to 180 degrees")
     theta_common = np.radians(theta_common_deg)
 
-    resampled = np.empty((n_t1 * _RATIO_COUNT, theta_common.size), dtype=np.float64)
-    for node in range(n_t1 * _RATIO_COUNT):
+    resampled = np.empty((t1_index.size, theta_common.size), dtype=np.float64)
+    for node in range(t1_index.size):
         start, stop = offsets[node], offsets[node + 1]
         resampled[node] = np.interp(theta_common_deg, theta_deg[start:stop], ddcs[start:stop])
-    integral = solid_angle_integral(theta_common, resampled)
-    if np.any(~np.isfinite(integral)) or np.any(integral <= 0.0):
-        raise ValueError("a BremsLib DDCS node has no positive finite angular integral")
-    shape = (resampled / integral[:, None]).reshape(n_t1, _RATIO_COUNT, theta_common.size)
+    shape = np.zeros((n_t1, _RATIO_COUNT, theta_common.size), dtype=np.float64)
+    shape[t1_index, k_index] = resampled
+    if complete_rows < n_t1:
+        reduced = np.broadcast_to(nominal, (n_t1, _RATIO_COUNT)).copy()
+        reduced[:, -1] = top_reduced_energy(t1_MeV)
+        shape[:complete_rows] /= _positive_integral(theta_common, shape[:complete_rows])[..., None]
+        shape[complete_rows:, 0] /= _positive_integral(theta_common, shape[complete_rows:, 0])[
+            ..., None
+        ]
+        sdcs, shape = extend_above_complete(
+            t1_MeV, reduced, sdcs, shape, theta_common, complete_rows, int(atomic_number)
+        )
+    shape /= _positive_integral(theta_common, shape)[..., None]
 
     t1_fine, sdcs_fine, shape_fine = _refine_incident_grid(t1_MeV, sdcs, shape, theta_common)
+    nominal, sdcs_fine, ddcs_fine = _refine_reduced_energy(
+        nominal, sdcs_fine, shape_fine * sdcs_fine[..., None]
+    )
+    if electron_electron:
+        reduced = np.broadcast_to(nominal, sdcs_fine.shape).copy()
+        reduced[:, -1] = top_reduced_energy(t1_fine)
+        factor = electron_electron_factor(int(atomic_number), t1_fine, reduced)
+        sdcs_fine = sdcs_fine * factor
+        ddcs_fine = ddcs_fine * factor[..., None]
     return BremsLibBremsstrahlungTable(
         atomic_number=int(atomic_number),
         key=str(key),
@@ -176,8 +226,38 @@ def prepare_bremslib_table(
         top_reduced_energy=top_reduced_energy(t1_fine),
         scaled_sdcs_mb=sdcs_fine,
         theta_rad=theta_common,
-        scaled_ddcs_mb_sr=shape_fine * sdcs_fine[..., None],
+        scaled_ddcs_mb_sr=ddcs_fine,
     )
+
+
+def _refine_reduced_energy(nominal, sdcs, ddcs):
+    """Insert :data:`_SMALL_REDUCED_ENERGY_NODES` between ``k/T1 = 0`` and 0.1.
+
+    Each sub-node takes the linear interpolant of its neighbours' SDCS and
+    DDCS, the values runtime interpolation already serves there, so the
+    electron-nucleus cross section is unchanged and every DDCS node still
+    integrates to its SDCS.
+
+    Validation: bremslib-electron-electron
+    """
+    inserted = np.asarray(_SMALL_REDUCED_ENERGY_NODES, dtype=np.float64)
+    if not (0.0 < inserted[0] and inserted[-1] < nominal[1]):
+        raise ValueError("k/T1 sub-nodes must lie between the first two library nodes")
+    w = inserted / nominal[1]
+    sdcs_sub = (1.0 - w) * sdcs[:, :1] + w * sdcs[:, 1:2]
+    ddcs_sub = (1.0 - w)[:, None] * ddcs[:, :1] + w[:, None] * ddcs[:, 1:2]
+    return (
+        np.concatenate([nominal[:1], inserted, nominal[1:]]),
+        np.concatenate([sdcs[:, :1], sdcs_sub, sdcs[:, 1:]], axis=1),
+        np.concatenate([ddcs[:, :1], ddcs_sub, ddcs[:, 1:]], axis=1),
+    )
+
+
+def _positive_integral(theta: np.ndarray, values: np.ndarray) -> np.ndarray:
+    integral = solid_angle_integral(theta, values)
+    if np.any(~np.isfinite(integral)) or np.any(integral <= 0.0):
+        raise ValueError("a BremsLib DDCS node has no positive finite angular integral")
+    return integral
 
 
 def _refine_incident_grid(t1_MeV, sdcs, shape, theta):

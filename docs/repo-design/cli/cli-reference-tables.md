@@ -147,8 +147,8 @@ Options:
                                   SBETHE: any listed species. BremsLib: electron only.
                                   [default: electron]
   --t1-max MEV                    Highest incident electron energy to include, in MeV;
-                                  bounds the table size. Defaults to the library's
-                                  complete range. BremsLib only.  [x>0.0]
+                                  bounds the table size. Defaults to 100 MeV. BremsLib
+                                  only.  [x>0.0]
   --overwrite                     Regenerate and replace an existing key.
   --keep-on-failure               Keep the scratch directory after an external-code
                                   failure.
