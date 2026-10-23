@@ -30,6 +30,7 @@ from .._numerics import (
     validate_inelastic_numerics,
     validate_pair_production_numerics,
     validate_radiative_numerics,
+    validate_shell_ionization_model,
     validate_transition_physics,
 )
 from .._precision import Precision
@@ -134,6 +135,9 @@ class Settings:
     transition_radiation
         Opt-in ``"history"`` or ``"bunch"`` transition-radiation component
         (#103); defaults to ``"off"``.
+    shell_ionization_model
+        ``"eedl"`` (default) or the opt-in ``"bote-salvat"`` characteristic
+        primary-vacancy cross sections (#92).
     channeling_basis_size, channeling_bloch_cells, channeling_dz_ang, channeling_zone_max_ang
         Zone basis, Bloch grid, depth step and optional length cap, as in Numerics.
     emission
@@ -175,6 +179,7 @@ class Settings:
     channeling_zone_max_ang: float | None = None
     transition_radiation: Literal["off", "history", "bunch", "two-beam"] = "off"
     transition_lattice_origin_ang: tuple[float, float, float] | None = None
+    shell_ionization_model: Literal["eedl", "bote-salvat"] = "eedl"
     # Emission policy (tri-state). "incoherent" (default) is the incoherent line
     # spectrum, bit-for-bit; "coherent" is the phased segment sum in mc_cxr_spectrum;
     # "both" runs one transport and stores both spectra. Run-affecting, so
@@ -222,6 +227,7 @@ class Settings:
             self.positron_transport,
         )
         validate_atomic_electron_deflection(self.atomic_electron_deflection)
+        validate_shell_ionization_model(self.shell_ionization_model)
         if (
             self.channeling_model != "off"
             or self.channeling_plane is not None

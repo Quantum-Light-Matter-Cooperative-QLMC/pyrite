@@ -166,7 +166,8 @@ def bote_salvat_energy_grid(edge_eV: float, max_energy_eV: float, per_decade: in
 
     Nodes are geometric in ``U - 1`` from ``1e-4`` to 1 and geometric in ``E``
     above, so the threshold onset and the Bethe rise are both resolved. The
-    grid starts at the edge (cross section zero) and carries the branch switch
+    grid starts at the edge (cross section zero), ends exactly at
+    ``max_energy_eV``, and carries the branch switch
     ``U = 16`` as the pair ``16`` and ``16 (1 + 1e-12)``, so interpolation never
     blends the two branches.
 
@@ -183,8 +184,11 @@ def bote_salvat_energy_grid(edge_eV: float, max_energy_eV: float, per_decade: in
     overvoltage = np.unique(
         np.concatenate(([1.0], onset, rise, [branch, branch * (1.0 + 1.0e-12)]))
     )
-    overvoltage = overvoltage[overvoltage <= max_energy_eV / edge_eV]
-    return edge_eV * overvoltage
+    energy = edge_eV * overvoltage
+    # The last node is exactly ``max_energy_eV``: a rounded rebuild could fall
+    # one ulp short and score zero at the end of the EEDL row it replaces.
+    energy = energy[energy < max_energy_eV * (1.0 - 1.0e-9)]
+    return np.append(energy, max_energy_eV)
 
 
 __all__ = [

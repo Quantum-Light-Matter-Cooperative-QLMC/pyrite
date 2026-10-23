@@ -105,6 +105,7 @@ _CASE_KEY_ORDER = (
     "pair_production_model",
     "positron_transport",
     "atomic_electron_deflection",
+    "shell_ionization_model",
     "channeling",
     "transition_radiation",
     "beam_uvw",
@@ -227,6 +228,9 @@ class Case(Mapping[str, Any]):
         elastic-rate correction, which :class:`~pyrite.Numerics` lowers to by
         default; absent is elastic-only deflection, so earlier case keys stay
         valid. Shell soft/hard transport needs ``elastic_model``.
+    shell_ionization_model
+        Opt-in ``"bote-salvat"`` characteristic primary-vacancy cross sections
+        (#92); absent is EEDL, so existing case keys stay valid.
     channeling
         Opt-in planar quantum channeling zone (ADR-0018, #506): the resolved
         record ``{"model": "planar", "plane_hkl", "temperature_K",
@@ -330,6 +334,7 @@ class Case(Mapping[str, Any]):
     coherent_flat_omission_limit: float | _Absent = _ABSENT
     channeling: dict[str, object] | _Absent = _ABSENT
     transition_radiation: dict[str, object] | _Absent = _ABSENT
+    shell_ionization_model: Literal["bote-salvat"] | _Absent = _ABSENT
 
     def __setstate__(self, state: list[Any]) -> None:
         """Restore frozen-slot pickles, filling newly appended optional fields."""
@@ -425,6 +430,8 @@ class Case(Mapping[str, Any]):
                 raise ValueError("positron_transport must be absent or True")
             if self.pair_production_model is _ABSENT:
                 raise ValueError("positron_transport requires pair_production_model")
+        if self.shell_ionization_model not in (_ABSENT, "bote-salvat"):
+            raise ValueError("shell_ionization_model must be absent or 'bote-salvat'")
         if self.atomic_electron_deflection is not _ABSENT:
             if self.atomic_electron_deflection != "kawrakow":
                 raise ValueError("atomic_electron_deflection must be absent or 'kawrakow'")

@@ -279,7 +279,7 @@
     {
       "path": "src/pyrite/montecarlo/case.py",
       "name": "Case.__post_init__",
-      "cc": 58
+      "cc": 59
     },
     {
       "path": "src/pyrite/montecarlo/channeling/axial_diagnostic.py",

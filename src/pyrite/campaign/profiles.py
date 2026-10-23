@@ -41,6 +41,7 @@ from ..montecarlo.case import Case
 from ..montecarlo.channeling.handoff import CHANNELING_MODEL
 from ..montecarlo.spectrum import BREMSSTRAHLUNG_MODEL, CHARACTERISTIC_MODEL, CXR_ESCAPE_MODEL
 from ..montecarlo.spectrum.brem_bremslib import BREMSSTRAHLUNG_BREMSLIB_MODEL
+from ..montecarlo.spectrum.characteristic import IonizationModel, characteristic_model_marker
 from ..montecarlo.spectrum.coherent_population import (
     COHERENT_POPULATION_MODEL,
     physical_bunch_electrons,
@@ -294,6 +295,7 @@ def resolve_numerics(
         "atomic_electron_deflection": physics.atomic_electron_deflection,
         "transition_radiation": physics.transition_radiation,
         "transition_lattice_origin_ang": physics.transition_lattice_origin_ang,
+        "shell_ionization_model": physics.shell_ionization_model,
     }
     effective.update(
         {
@@ -391,6 +393,31 @@ def case_bremsstrahlung_marker(case: Case | Mapping[str, Any]) -> str:
     return _bremsstrahlung_identity_marker(
         "bremslib" if case.get("bremsstrahlung_model") == "bremslib" else "eedl"
     )
+
+
+def case_characteristic_marker(case: Case | Mapping[str, Any]) -> str:
+    """Characteristic-model marker of the shell-ionization model a case selects (#92).
+
+    Absent is EEDL and returns :data:`CHARACTERISTIC_MODEL` unchanged.
+    """
+    model = case.get("shell_ionization_model")
+    if model is None:
+        return CHARACTERISTIC_MODEL
+    return characteristic_model_marker(ionization_model=model)
+
+
+def _shell_ionization_identity(model: IonizationModel) -> dict[str, str]:
+    """Opt-in Bote--Salvat characteristic ionization (#92), divergence-only.
+
+    EEDL adds nothing, so its digest is unchanged. Bote--Salvat records the
+    selection and replaces the characteristic-model marker.
+    """
+    if model == "eedl":
+        return {}
+    return {
+        "shell_ionization_model": model,
+        "characteristic_model": characteristic_model_marker(ionization_model=model),
+    }
 
 
 def _crystallography_payload(sweep: Sweep, crystallography: Mapping[str, Any]) -> dict[str, Any]:
@@ -609,6 +636,9 @@ def _identity_v1(
 
             resolved["transition_model"] = DTR_MODEL
             resolved["transition_lattice_origin_ang"] = origin or (0.0, 0.0, 0.0)
+    shell_ionization = _shell_ionization_identity(
+        settings_payload.pop("shell_ionization_model", "eedl")
+    )
     # Fixed-N payloads retain their exact historical bytes. In adaptive mode
     # the requested policy owns the budget; the unused fixed defaults and the
     # realized count do not participate in dataset identity.
@@ -636,6 +666,7 @@ def _identity_v1(
     if transport_numerics:
         resolved["transport_numerics"] = transport_numerics
     resolved.update(_model_generation_markers(options.emission))
+    resolved.update(shell_ionization)
     # The continuum now defaults to evaluated EEDL MF=23/527 + MF=26/527
     # instead of the historical analytic Bethe--Heitler approximation.
     requested = (
@@ -768,7 +799,7 @@ def case_content_key(
     payload = {
         "schema": CASE_CONTENT_KEY_SCHEMA,
         "stopping_model": STOPPING_MODEL,
-        "characteristic_model": CHARACTERISTIC_MODEL,
+        "characteristic_model": case_characteristic_marker(case),
         "line_escape_model": CXR_ESCAPE_MODEL,
         "attenuation_model": ATTENUATION_MODEL,
         "bremsstrahlung_model": (

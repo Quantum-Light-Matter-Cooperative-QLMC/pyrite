@@ -66,7 +66,7 @@ def test_bote_salvat_dataset_is_opt_in():
     assert datasets.get("bote-salvat") is datasets.BOTE_SALVAT
     assert "bote-salvat" in FETCH_CODES
     assert all(code != "bote-salvat" for code, _projectile in BARE_FETCH_STEPS)
-    assert "does not ship" in datasets.fetch_hint("bote-salvat")
+    assert "ships it once" in datasets.fetch_hint("bote-salvat")
 
 
 def test_default_table_stays_eedl_and_cache_separates_models(synthetic):
@@ -194,6 +194,7 @@ def test_tabulation_interpolates_the_fit_within_half_a_permille(pinned, z):
     for shell in element.shells:
         edge = float(element.edge_eV[element.shells.index(shell)])
         grid = bs.bote_salvat_energy_grid(edge, 1.0e11)
+        assert grid[0] == edge and grid[-1] == 1.0e11 and np.all(np.diff(grid) > 0.0)
         wide = grid[1:] / grid[:-1] > 1.0 + 1.0e-9  # skip the U = 16 branch pair
         middle = np.sqrt(grid[1:] * grid[:-1])[wide]
         middle = middle[middle > 1.001 * edge]

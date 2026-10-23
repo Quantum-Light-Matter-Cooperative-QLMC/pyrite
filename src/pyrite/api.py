@@ -21,7 +21,11 @@ from .campaign.model import (
     Numerics,
     Scene,
 )
-from .campaign.profiles import case_bremsstrahlung_marker, case_content_key
+from .campaign.profiles import (
+    case_bremsstrahlung_marker,
+    case_characteristic_marker,
+    case_content_key,
+)
 from .detectors import Detector
 from .instrument import (
     Acquisition,
@@ -39,7 +43,6 @@ from .montecarlo import Case, run_case
 from .montecarlo.runner import cached_case_table_markers, case_table_markers, run_case_directions
 from .montecarlo.spectrum import (
     BREM_ENDF_PARSERPY_VERSION,
-    CHARACTERISTIC_MODEL,
 )
 from .montecarlo.transport import STOPPING_MODEL
 from .observations.plan import ObservationPlan, PixelSampling
@@ -182,7 +185,7 @@ def run_provenance(case: Case | Mapping[str, Any], xsgen_tables: Mapping[str, st
         "kinematic_validity": case_kinematic_validity(case),
         "xsgen_tables": xsgen_tables,
         "stopping_model": STOPPING_MODEL,
-        "characteristic_model": CHARACTERISTIC_MODEL,
+        "characteristic_model": case_characteristic_marker(case),
         "attenuation_model": ATTENUATION_MODEL,
         "bremsstrahlung_model": case_bremsstrahlung_marker(case),
         "backend": BACKEND.name,

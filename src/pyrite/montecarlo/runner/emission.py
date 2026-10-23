@@ -183,8 +183,8 @@ def _characteristic_from_segments(
 ):
     """Characteristic lines on the requested fine line-energy grid.
 
-    Every material layer emits from its own EEDL subshell cross sections and
-    xraydb relaxation data; photons self-absorb through the complete stack.
+    Every material layer emits from its own EEDL subshell cross sections (or
+    the case's opt-in Bote--Salvat K/L/M model, #92) and its relaxation data; photons self-absorb through the complete stack.
     The estimator uses the bremsstrahlung electron population because those
     tracks continue to the lower, background cutoff and therefore retain the
     low-energy ionization path that a line-only 5 keV cutoff would discard.
@@ -192,6 +192,8 @@ def _characteristic_from_segments(
     validity floor even if a case requests a lower background cutoff.
 
     Validation: characteristic-radiation
+
+    Validation: bote-salvat-ionization-backend
     """
     from .. import runner
 
@@ -201,6 +203,7 @@ def _characteristic_from_segments(
         or runner._adaptive_chunk(E_grid.size),
         E_grid.size,
     )
+    ionization_model = case.get("shell_ionization_model", "eedl")
     n_lay = int(segs.get("n_layers", 1))
     if n_lay == 1:
         return runner.mc_characteristic_spectrum(
@@ -213,6 +216,7 @@ def _characteristic_from_segments(
             groove=groove,
             electron_limit=Ne,
             E_cut_keV=case.get("E_cut_brem_keV", 1.0),
+            ionization_model=ionization_model,
         )
     characteristic = np.zeros(E_grid.shape, dtype=float)
     for layer_index in range(n_lay):
@@ -229,6 +233,7 @@ def _characteristic_from_segments(
             groove=groove,
             electron_limit=Ne,
             E_cut_keV=case.get("E_cut_brem_keV", 1.0),
+            ionization_model=ionization_model,
         )
     return characteristic
 

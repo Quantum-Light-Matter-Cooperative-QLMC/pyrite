@@ -8,7 +8,7 @@ from .._numerics import Numerics, Physics, resolve_physics
 from ..instrument import PlanarDetector
 from ..montecarlo import Case
 from .channeling_cases import resolve_channeling
-from .transition_cases import resolve_transition_radiation
+from .transition_cases import resolve_shell_ionization, resolve_transition_radiation
 
 if TYPE_CHECKING:
     from .model import Scene, Sweep
@@ -78,7 +78,7 @@ def build_case(scene: Scene, numerics: Numerics | None = None) -> Case:
     if len(cases) != 1:  # Scene rejects every implicit multi-value field.
         raise RuntimeError(f"one Scene lowered to {len(cases)} cases")
     # Opt-in channeling zone (#506) and TR component (#103): "off" is unchanged.
-    cases = resolve_transition_radiation(cases, physics)
+    cases = resolve_shell_ionization(resolve_transition_radiation(cases, physics), physics)
     return resolve_channeling(cases, physics, numerics)[0]
 
 
@@ -110,7 +110,7 @@ def build_sweep_cases(sweep: Sweep, numerics: Numerics | None = None) -> list[Ca
         from .legacy import numerics_from_legacy, physics_from_legacy
 
         physics = physics_from_legacy(settings)
-        cases = resolve_transition_radiation(cases, physics)
+        cases = resolve_shell_ionization(resolve_transition_radiation(cases, physics), physics)
         return resolve_channeling(cases, physics, numerics_from_legacy(old_sweep, settings))
     if numerics is not None:
         sweep = replace(sweep, base=replace(sweep.base, numerics=numerics))

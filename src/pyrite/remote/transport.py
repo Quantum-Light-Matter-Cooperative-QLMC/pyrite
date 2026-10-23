@@ -368,29 +368,39 @@ _LEGACY_DATASET_DIR = "src/pyrite/data/characteristic_cross_sections"
 
 
 def _dataset_arcnames() -> dict[str, str]:
-    """Return ``{dataset name: arcname below REMOTE_DIR}``."""
-    from ..datasets import DATASETS
+    """Return ``{dataset name: arcname below REMOTE_DIR}``, opt-in datasets included."""
+    from ..datasets import DATASETS, OPTIONAL_DATASETS
 
-    return {name: f"datasets/{name}/{d.filename}" for name, d in DATASETS.items()}
+    return {
+        name: f"datasets/{name}/{d.filename}"
+        for name, d in (*DATASETS.items(), *OPTIONAL_DATASETS.items())
+    }
 
 
 def _local_datasets() -> dict[str, Path]:
     """Return ``{arcname: local path}`` for every pinned dataset a sync ships.
 
-    Refuses when one is missing or differs locally: a run on the box needs
-    every one of them, and a box without internet cannot fetch them itself.
+    Refuses when a required one is missing or differs locally: a run on the
+    box needs every one of them, and a box without internet cannot fetch them
+    itself. An opt-in dataset (#92) ships when it is intact locally and is
+    otherwise skipped.
     """
-    from ..datasets import OK, dataset_path, verify_dataset
+    from ..datasets import OK, OPTIONAL_DATASETS, dataset_path, verify_dataset
 
     arcnames = _dataset_arcnames()
-    failed = [(name, status) for name in arcnames if (status := verify_dataset(name)) != OK]
+    status = {name: verify_dataset(name) for name in arcnames}
+    failed = [
+        (name, outcome)
+        for name, outcome in status.items()
+        if outcome != OK and name not in OPTIONAL_DATASETS
+    ]
     if failed:
-        detail = ", ".join(f"{name} ({status})" for name, status in failed)
+        detail = ", ".join(f"{name} ({outcome})" for name, outcome in failed)
         raise SystemExit(
             f"refusing to sync: pinned dataset(s) are not intact locally: {detail}.\n"
             + "\n".join(f"  fix: pyrite tables fetch {name}" for name, _ in failed)
         )
-    return {arc: dataset_path(name) for name, arc in arcnames.items()}
+    return {arc: dataset_path(name) for name, arc in arcnames.items() if status[name] == OK}
 
 
 def _dataset_inventory_command() -> str:

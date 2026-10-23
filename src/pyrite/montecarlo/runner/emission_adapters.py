@@ -294,6 +294,9 @@ BUILTIN_EMISSION = EmissionCatalog(
             BUILTIN_DESCRIPTORS.get("emission.characteristic", "characteristic"), _characteristic
         ),
         EmissionAdapter(
+            BUILTIN_DESCRIPTORS.get("emission.characteristic", "bote-salvat"), _characteristic
+        ),
+        EmissionAdapter(
             BUILTIN_DESCRIPTORS.get("emission.continuum", "eedl"), _continuum, "uncoupled", _eedl
         ),
         EmissionAdapter(
@@ -329,6 +332,9 @@ def select_emission(
 ) -> EmissionSelection:
     return EmissionSelection(
         catalog.get("emission.cxr/cxr"),
-        catalog.get("emission.characteristic/characteristic"),
+        catalog.get(
+            "emission.characteristic/"
+            + ("bote-salvat" if case.get("shell_ionization_model") else "characteristic")
+        ),
         select_continuum(case, catalog),
     )

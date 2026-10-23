@@ -119,7 +119,8 @@ EPDL_DIFFERENTIAL = Dataset(
 )
 #: NIST BoteSalvatICX.jl K/L/M shell-ionization parameters (public domain), the
 #: opt-in Bote--Salvat backend of #92. Optional: no default run reads it, so it
-#: is not in :data:`DATASETS` (bare fetch, ``tables verify``, remote sync).
+#: is not in :data:`DATASETS`; bare fetch and ``tables verify`` skip it, and
+#: ``pyrite remote sync`` ships it only when it is installed locally.
 BOTE_SALVAT = Dataset(
     name="bote-salvat",
     filename="xione.jl",
@@ -199,7 +200,7 @@ def fetch_hint(name: str) -> str:
         f"`pyrite tables fetch {name} --archive PATH` with a local copy"
     )
     if name in OPTIONAL_DATASETS:
-        return f"{local}; `pyrite remote sync` does not ship opt-in datasets"
+        return f"{local}; `pyrite remote sync` ships it once it is installed locally"
     return f"{local}; on the remote box, `pyrite remote sync` from a machine that has it"
 
 

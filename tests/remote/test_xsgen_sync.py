@@ -358,7 +358,24 @@ def test_local_datasets_map_arcnames_to_verified_files(monkeypatch, tmp_path):
         "datasets/epdl-differential/epdl2025_differential.npz": (
             tmp_path / "epdl-differential" / "epdl2025_differential.npz"
         ),
+        "datasets/bote-salvat/xione.jl": tmp_path / "bote-salvat" / "xione.jl",
     }
+
+
+def test_local_datasets_skip_an_opt_in_dataset_that_is_not_installed(monkeypatch, tmp_path):
+    from pyrite import datasets
+
+    monkeypatch.setattr(datasets, "datasets_dir", lambda: tmp_path)
+    monkeypatch.setattr(
+        datasets,
+        "verify_dataset",
+        lambda name: datasets.MISSING if name == "bote-salvat" else datasets.OK,
+    )
+
+    found = transport._real_local_datasets()
+
+    assert "datasets/bote-salvat/xione.jl" not in found
+    assert EEDL_ARC in found
 
 
 # --- SBETHE sdbase/ --------------------------------------------------------------
