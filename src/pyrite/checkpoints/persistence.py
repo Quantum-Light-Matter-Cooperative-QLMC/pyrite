@@ -101,6 +101,7 @@ _CAS_OPTIONAL_PAYLOAD_KEYS = frozenset(
         "spec_characteristic",
         "spec_channeling",
         "spec_transition",
+        "photon_aperture",
         "temporal_t_fs",
         "temporal_intensity",
         "temporal_intensity_coherent",

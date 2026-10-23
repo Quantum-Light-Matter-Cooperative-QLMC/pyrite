@@ -136,11 +136,12 @@ open.
 
 ## Remaining steps before exposing `Physics.photon_transport_model`
 
-1. Independently verify the CPU secondary-feedback reference, generalize
+1. Extend the bounded CPU secondary-feedback rederivation to generalized
    charged target/filter re-entry, and support shower-dependent source
    correlations where needed. Physical primary characteristic/annihilation
-   source adapters exist separately; the Scene continuum call remains a
-   weighted BremsLib source.
+   source adapters now have a separate
+   [Scene physical-event boundary](photon-secondary-feedback.md#scene-physical-event-source-boundary);
+   the Scene continuum call remains a weighted BremsLib source.
 2. Add a separate physical-aperture/pixel observable to the public result and
    checkpoint schema; never overload the directional `Result.brem` array.
 3. Make source versus detector identity and data-pin provenance part of the

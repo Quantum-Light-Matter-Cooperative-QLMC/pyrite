@@ -46,6 +46,7 @@ def exercise_photon_reference(seed=341):
 
 def _production_run(case, monkeypatch):
     """Spy on real transport; fail if mode-off dispatch reaches photon MC."""
+    import pyrite.photon_events as scene_events
     import pyrite.photon_transport as scene
     from pyrite.campaign.profiles import case_content_key
     from pyrite.montecarlo import runner
@@ -68,6 +69,7 @@ def _production_run(case, monkeypatch):
         guard.setattr(runner, "_TIMING", False)
         for module, names in (
             (scene, ["simulate_photon_continuum"]),
+            (scene_events, ["simulate_photon_events"]),
             (photon_emission, ["score_bremslib_continuum", "score_photon_sources"]),
             (photon_sources, ["sample_continuous_photons", "sample_bremslib_continuum"]),
             (photon_histories, ["track_photon_histories"]),

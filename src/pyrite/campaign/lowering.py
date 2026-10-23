@@ -79,7 +79,11 @@ def build_case(scene: Scene, numerics: Numerics | None = None) -> Case:
         raise RuntimeError(f"one Scene lowered to {len(cases)} cases")
     # Opt-in channeling zone (#506) and TR component (#103): "off" is unchanged.
     cases = resolve_shell_ionization(resolve_transition_radiation(cases, physics), physics)
-    return resolve_channeling(cases, physics, numerics)[0]
+    from .photon_cases import resolve_photon_transport
+
+    return resolve_photon_transport(
+        scene, resolve_channeling(cases, physics, numerics)[0], numerics
+    )
 
 
 def build_sweep_cases(sweep: Sweep, numerics: Numerics | None = None) -> list[Case]:
@@ -116,6 +120,10 @@ def build_sweep_cases(sweep: Sweep, numerics: Numerics | None = None) -> list[Ca
         sweep = replace(sweep, base=replace(sweep.base, numerics=numerics))
     cases = []
     for index, (label, scene) in enumerate(sweep.expand()):
+        if scene.physics.photon_transport is not None:
+            raise ValueError(
+                "photon transport currently requires a scalar Scene; sweeps are unsupported"
+            )
         case = build_case(scene)
         if label:
             case = replace(case, name=f"{case.name} {label}")

@@ -331,7 +331,13 @@ def _transport_case(
     # worker reconstructs adapters locally; no callable or device state travels
     # in the case payload.
     select_emission(case)
-    _check_opt_in_transport(case, trajectory_capture, block_electrons)
+    _check_opt_in_transport(
+        case,
+        trajectory_capture,
+        block_electrons,
+        transport_core=transport_core,
+        block_monitor=block_monitor,
+    )
     if case.get("adaptive_precision") is not None:
         return _adaptive.transport_requested_precision(
             case,
@@ -959,6 +965,10 @@ def _spectrum_case(case, tp, record_timing=False):
     if timed:
         out.update(_stage_counters(tp))
     _adaptive.attach_sampling(case, tp, out)
+    if case.get("photon_transport") is not None:
+        from .photon_aperture import cached_photon_aperture
+
+        out["photon_aperture"] = cached_photon_aperture(case, tp)
     return out
 
 

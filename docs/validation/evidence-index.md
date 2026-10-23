@@ -23,6 +23,8 @@ beam-transport/beam-phase-space-metrics
 beam-transport/trajectory-depth-loss-profile
 beam-transport/photon-scene-navigation
 beam-transport/photon-history-queue
+beam-transport/photon-charged-coupling
+beam-transport/photon-secondary-feedback
 beam-transport/linear-bunch-front-tilt
 beam-transport/gpt-gdf-injection
 beam-transport/coherent-line-grid-fringe-spacing

@@ -108,6 +108,7 @@ _CASE_KEY_ORDER = (
     "shell_ionization_model",
     "channeling",
     "transition_radiation",
+    "photon_transport",
     "beam_uvw",
     "surface_hkl",
     "mosaic_fwhm_rad",
@@ -336,6 +337,8 @@ class Case(Mapping[str, Any]):
     transition_radiation: dict[str, object] | _Absent = _ABSENT
     shell_ionization_model: Literal["bote-salvat"] | _Absent = _ABSENT
 
+    photon_transport: dict[str, object] | _Absent = _ABSENT
+
     def __setstate__(self, state: list[Any]) -> None:
         """Restore frozen-slot pickles, filling newly appended optional fields."""
         declared = fields(self)
@@ -451,6 +454,7 @@ class Case(Mapping[str, Any]):
         if self.channeling is not _ABSENT:
             self._validate_channeling()
         self._validate_transition_radiation()
+        self._validate_photon_transport()
         if self.coherent_flat_omission_limit is not _ABSENT:
             _positive(
                 "coherent_flat_omission_limit", self.coherent_flat_omission_limit, allow_zero=True
@@ -469,6 +473,13 @@ class Case(Mapping[str, Any]):
                     "line_quadrature='bin-mean' is incompatible with max_dE_frac: "
                     "numerical substeps add amplitudes before squaring"
                 )
+
+    def _validate_photon_transport(self) -> None:
+        """Validate only enabled photon records, preserving legacy omissions."""
+        if self.photon_transport is not _ABSENT:
+            from .._photon_config import validate_photon_record
+
+            validate_photon_record(self.photon_transport)
 
     def _validate_channeling(self) -> None:
         record = self.channeling

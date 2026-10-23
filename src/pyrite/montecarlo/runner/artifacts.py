@@ -32,7 +32,7 @@ from ..trajectories import (
 STREAM_MAX_SEGMENTS = 1 << 20
 
 #: Case keys whose spectra need every segment at once, so they never stream.
-STREAM_REFUSED_KEYS = ("coherent_emission", "temporal_profile")
+STREAM_REFUSED_KEYS = ("coherent_emission", "temporal_profile", "photon_transport")
 
 
 def _case_geometry(case):

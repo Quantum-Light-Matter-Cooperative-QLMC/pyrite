@@ -44,6 +44,7 @@ if TYPE_CHECKING:
     from pyrite._config_presets import load_physics as load_physics
     from pyrite._numerics import CxrReflections as CxrReflections
     from pyrite._numerics import Physics as Physics
+    from pyrite._photon_config import PhotonTransport as PhotonTransport
     from pyrite._precision import Precision as Precision
     from pyrite.api import simulate as simulate
     from pyrite.bodies import RectangularBody as RectangularBody
@@ -187,6 +188,7 @@ _PUBLIC_OBJECTS = {
     "BlazedGrooves": ("pyrite.campaign.geometry", "BlazedGrooves"),
     "CrystalCut": ("pyrite.campaign.geometry", "CrystalCut"),
     "Physics": ("pyrite._numerics", "Physics"),
+    "PhotonTransport": ("pyrite._photon_config", "PhotonTransport"),
     "CxrReflections": ("pyrite._numerics", "CxrReflections"),
     "CxrSpectra": ("pyrite.results.model", "CxrSpectra"),
     "AngularAcceptance": ("pyrite.detectors", "AngularAcceptance"),

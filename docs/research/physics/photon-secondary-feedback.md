@@ -1,7 +1,9 @@
 # CPU photon/charged feedback reference
 
 Status: experimental implementation for #341, validation claim
-`photon-secondary-feedback` **unverified**. This is not a production
+`photon-secondary-feedback` **rederived** for bounded CPU energy substitution
+and physical source adapter accounting. See the
+[independent derivation](../../validation/beam-transport/photon-secondary-feedback.md). This is not a production
 `Physics` selector or independently validated MeV detector model.
 
 ## Queue boundary
@@ -157,7 +159,116 @@ Pass a `charged_stage` instead of `electron_cutoff_eV` for coupled tracking.
 The caller still owns disjoint contributions and event-ID ranges. This API
 does not combine primary physical sources with a weighted continuum or add
 Scene source selection, enabled-only production identity, or persistence for
-physical event tallies. Secondary-feedback claims remain **unverified**.
+physical event tallies. Bounded secondary-feedback accounting is **rederived**; independent full-track
+comparisons remain open.
+
+## Scene physical-event source boundary
+
+`pyrite.photon_events.simulate_photon_events(scene, edges_eV, source=...)`
+selects exactly one primary physical emission component, runs primary charged
+transport once, then uses the shared aperture scorer above. It returns a
+`PhotonEventObservation`, separate from the weighted continuum observation
+and the production `Result`. Its spectrum is photons/(original incident
+electron eV), integrated over the physical aperture.
+
+```python
+from pyrite.photon_events import simulate_photon_events
+
+observation = simulate_photon_events(
+    scene,
+    [1000, 10_000, 600_000],
+    source="characteristic",  # or "annihilation" with primary pairs/positrons
+    photon_cutoff_eV=1000,
+    electron_cutoff_eV=1000,
+    seed=341,
+    charged_feedback=False,
+)
+print(observation.score.total_per_primary_eV)
+```
+
+The Scene must satisfy the existing CPU/ideal unpixelated physical-detector
+boundary, select coupled BremsLib and shell-soft-hard transport, and set
+`Physics.secondary_threshold_eV` equal to `electron_cutoff_eV`. Both trial
+counts must be equal and positive (`Numerics.cxr_trials == brem_trials`), so
+all retained cascade rows have one unambiguous original-primary denominator.
+The input Scene and resolved Case are not modified. Original primary tracks
+retain the Scene seed; the separate event seed controls vacancy relaxation
+and photon tracking. Vacancy keys use the existing `secondary_stream_keys`
+construction with salt `0x341EADE1`, one key per original primary; event IDs
+are local to the selected emission component.
+
+- `source="characteristic"` samples the recorded primary-cascade vacancies,
+  follows their additional Auger descendants, and scores the emitted photons
+  and radiation from those additional descendants. The returned `relaxation`
+  retains the reserved-binding/escaped/deposited/remainder budget. This source
+  currently refuses primary pair conversion. It always prepares the existing
+  charged feedback stage for Auger transport, even when photon-born charged
+  feedback is disabled, and therefore refuses filter boxes.
+- `source="annihilation"` requires explicit primary pair conversion and
+  positron transport. It reuses both original photon rows regardless of their
+  old absorbed flags. With photon-born feedback disabled it supports photon
+  filter boxes. It still inherits the original primary cascade's approximate
+  pair/annihilation source model; this is not a complete new photon shower.
+
+`charged_feedback=True` follows photon-born charged descendants with the
+existing CPU stage. The primary pair/positron selectors are omitted only from
+that newly prepared stage: its pair conversion belongs to the photon queue.
+The original primary Case retains those selectors. Charged stages remain
+limited to contiguous target stacks without filter/gap/re-entry transport.
+Sub-cutoff source energy remains on `score.sources`; the photon ledger covers
+tracked sources only. Empty sources produce zero spectra with the original
+nonzero primary denominator.
+
+The source digest is the existing Case/table content identity. A separate
+`pyrite.photon-event-observation.v1` observation identity records the selected
+component, original population, event seed, cutoffs, photon data pins, physical
+geometry, tally bins, and enabled photon/relaxation feedback table pins.
+There is no continuum proposal count or solid-angle density in this identity.
+`PhotonEventObservation.save(path)` stores a reduced event analysis artifact
+(described below). The continuum tally schema and production
+Result/checkpoint/replay schemas remain separate. The two source components are not summed with
+weighted continuum or physical hard-brem histograms. Full-track comparisons
+remain open; the bounded secondary-feedback accounting claim is **rederived**.
+
+## Reduced event observation persistence
+
+```python
+from pyrite.photon_event_observation import load_photon_events
+
+observation.save("photon-events.npz")
+tally = load_photon_events("photon-events.npz")
+print(tally.source_component)
+print(tally.total_per_primary_eV)  # photons / (incident electron eV), aperture-integrated
+print(tally.local_source_energy_eV)  # eV per original primary, below source cutoff
+```
+
+The provisional `pyrite.photon-event-tally.v1` schema stores source component,
+aperture bin/category/count tallies, both identities, original provenance,
+primary population, tracked input source count, and per-primary tracked and
+sub-cutoff source energy. A source count of zero is valid, including when all
+emission energy is below the cutoff. These energy arrays describe the source,
+not energy deposited by the photon tracker or energy measured by the detector.
+For characteristic observations the artifact also stores per-primary reserved,
+escaped, deposited, signed remaining binding and emitted relaxation energies.
+The emitted term includes both tracked and sub-cutoff source photons. It does
+not debit the original charged tracks again.
+
+The loader requires the original identity/provenance, aperture normalization,
+source-energy split and characteristic budget closure to agree. Budget closure
+uses relative tolerance $10^{-12}$ plus $10^{-9}$ eV absolute roundoff allowance;
+signed EADL/transport binding defects remain signed. Every stored spectrum and
+budget array retains its floating dtype and values; derived per-primary source
+energy aggregates use float64. All arrays and metadata, including budgets,
+enter the content checksum. The checksum detects accidental corruption, not
+malicious replacement. Original data pins load without consulting the current
+installation or fetching tables.
+
+Saving validates first and atomically replaces the exact destination path after
+a complete NPZ/JSON write. Parent directories must exist. Loading returns a
+`PhotonEventTally` with an optional `PhotonRelaxationBudget`; neither includes
+source photon rows, histories or Case. No transport runs during saving/loading.
+The continuum and event loaders reject each other's artifacts. This is an
+experimental analysis artifact, not a production checkpoint or source replay.
 
 ## Evidence and remaining validation
 
@@ -168,6 +279,7 @@ and cutoff bookkeeping, and removal of pending pair rest energy in the
 coupled photon queue. Scene tests cover enabled-only orchestration/identity.
 A real one-primary, eight-proposal silicon Scene probe also prepares the
 positron tables and closes its photon ledger to roundoff. These are bounded
-implementation checks. Fresh-context rederivation, external thick-target and
-511 keV comparisons, filter charged transport and production persistence
-remain separate work.
+implementation checks. Fresh-context rederivation of the bounded coupling/feedback accounting matches
+[the implementation](../../validation/beam-transport/photon-secondary-feedback.md).
+External thick-target and 511 keV comparisons, filter charged transport and
+production persistence remain separate work.

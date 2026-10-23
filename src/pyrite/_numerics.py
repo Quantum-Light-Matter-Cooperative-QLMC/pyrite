@@ -7,6 +7,7 @@ from typing import Any, Literal, cast
 import numpy as np
 
 from ._energy_bins import EnergyBins
+from ._photon_config import PhotonTransport
 from ._precision import Precision
 
 MosaicRoute = Literal["analytic", "mc"]
@@ -249,6 +250,14 @@ class Physics:
         the opt-in ``"bote-salvat"`` K/L/M fit (#92; ``pyrite tables fetch
         bote-salvat``), which keeps EEDL for higher shells and the EADL cascade.
 
+    photon_transport
+        ``None`` (default) leaves straight-ray spectra and identities unchanged.
+        A :class:`~pyrite.PhotonTransport` adds a separate ordinary-hit aperture
+        tally to ``Result.aperture``. This experimental CPU reference requires
+        an ideal unpixelated physical detector and supports one selected source.
+        Directional spectra remain per steradian; aperture counts are not added
+        to them. Full-track validation and pixel response remain open.
+
     Validation: bote-salvat-ionization-backend
     """
 
@@ -271,6 +280,7 @@ class Physics:
     transition_radiation: Literal["off", "history", "bunch", "two-beam"] = "off"
     transition_lattice_origin_ang: tuple[float, float, float] | None = None
     shell_ionization_model: Literal["eedl", "bote-salvat"] = "eedl"
+    photon_transport: PhotonTransport | None = None
 
     def __post_init__(self) -> None:
         if self.emission == "both":
@@ -335,6 +345,11 @@ class Physics:
         validate_shell_ionization_model(self.shell_ionization_model)
         validate_channeling_physics(self, energy_model)
         validate_transition_physics(self, energy_model)
+        if self.photon_transport is not None:
+            if not isinstance(self.photon_transport, PhotonTransport):
+                raise TypeError("photon_transport must be a PhotonTransport or None")
+            if energy_model != "midpoint":
+                raise ValueError("photon transport requires midpoint integration")
 
 
 PHYSICS_FIELDS = tuple(f.name for f in fields(Physics))

@@ -4,8 +4,8 @@ Chains the standalone first-flight navigator and interaction samplers into a
 lineage-keyed photon queue. Charged daughters are returned as handoff rows for
 the charged launch boundary; they are not transported here. Filter plates and
 detectors enter as sample-frame boxes and apertures converted from lab poses.
-No production caller: source adapters, identity and device execution are
-later slices. Coordinates are sample-frame Å, energies eV.
+The opt-in CPU aperture runner supplies source adapters and observation identity;
+device execution remains unsupported. Coordinates are sample-frame Å, energies eV.
 """
 
 from collections.abc import Callable, Iterator, Mapping, Sequence

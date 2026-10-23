@@ -153,7 +153,7 @@ def score_bremslib_continuum(
     cutoff. Electron-only stages retain pending positrons; the experimental
     ``FeedbackChargedStage`` additionally follows positron annihilation and
     charged-impact relaxation. Neither is a validated complete MeV shower or
-    a production simulation mode.
+    a complete detector-response model.
 
     ``layers`` are the actual contiguous/gapped photon scene and provide one
     composition per electron segment layer.  For multilayers the segment's

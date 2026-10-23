@@ -11,12 +11,24 @@ Validation: photon-continuum-scene-handoff (experimental reference boundary).
 
 from __future__ import annotations
 
-import hashlib
-import json
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
+
+from ._photon_support import MODEL as MODEL
+from ._photon_support import (
+    _feedback_table_markers as _feedback_table_markers,
+)
+from ._photon_support import (
+    _identity as _identity,
+)
+from ._photon_support import (
+    _sample_segments as _sample_segments,
+)
+from ._photon_support import (
+    _scene_feedback as _scene_feedback,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -27,12 +39,6 @@ if TYPE_CHECKING:
     from .montecarlo.case import Case
     from .montecarlo.runner.photon_emission import PhotonContinuumScore
 
-
-MODEL = "bremslib-continuum-photon-only-cpu.v1"
-# Only these arrays describe each individual electron segment in this adapter.
-# Other arrays in the transport dictionary include per-layer/per-electron tables
-# and must NEVER be filtered using a heuristic based on a matching first axis.
-_SEGMENT_KEYS = ("L_ang", "r_mid", "v_hat", "elec_id", "E_repr_keV", "E_keV", "layer")
 
 
 @dataclass(frozen=True, slots=True)
@@ -85,32 +91,6 @@ def _energy_edges(edges_eV) -> np.ndarray:
     return edges.copy()
 
 
-def _sample_segments(segments, n_primaries: int) -> dict:
-    """Keep only continuum primary electron rows, preserving their global IDs.
-
-    Transport may share one population between the line and brem scorers:
-    ``max(Ne, Ne_brem)`` can exceed ``Ne_brem``. Unselected line-only
-    electrons must neither enter the weighted estimator nor its denominator.
-    """
-    owners = np.asarray(segments["elec_id"])
-    if owners.ndim != 1 or not np.issubdtype(owners.dtype, np.integer):
-        raise ValueError("transport electron ids must be a one-dimensional integer array")
-    if owners.size and owners.min() < 0:
-        raise ValueError("transport electron ids must be nonnegative")
-    mask = owners < n_primaries
-    result = {}
-    for key in _SEGMENT_KEYS:
-        value = segments.get(key)
-        if value is not None:
-            array = np.asarray(value)
-            if array.ndim == 0 or array.shape[0] != owners.size:
-                raise ValueError(
-                    f"transport segment field {key!r} does not align with electron ids"
-                )
-            result[key] = array[mask]
-    return result
-
-
 def _scene_geometry(case, detector, plates):
     """One sample-frame conversion for detector, filters and target footprint."""
     from .montecarlo.geometry import sample_to_lab_R
@@ -143,103 +123,41 @@ def _scene_geometry(case, detector, plates):
     )
 
 
-def _identity(
-    case_digest,
-    aperture,
-    boxes,
-    edges,
-    *,
-    n_samples,
-    seed,
-    photon_cutoff_eV,
-    electron_cutoff_eV,
-    source_ceiling_eV,
-    charged_feedback=None,
-):
-    """Observation digest includes all source proposals and physical acceptance.
-
-    The source digest is the existing case-content key, including its BremsLib
-    table markers. The observation digest additionally includes the scattering
-    data pins, physical geometry, scoring grid, and random proposal policy.
-    """
-    from .datasets import EADL, EPDL, EPDL_DIFFERENTIAL
-
-    def vec(value):
-        return np.asarray(value, dtype=float).tolist()
-
-    payload = {
-        "schema": "pyrite.photon-continuum-observation.v1",
-        "model": MODEL,
-        "source_identity_digest": case_digest,
-        "data_sha256": {
-            "epdl_integrated": EPDL.sha256,
-            "epdl_differential": EPDL_DIFFERENTIAL.sha256,
-            "eadl": EADL.sha256,
-        },
-        "proposal": {
-            "n_samples": n_samples,
-            "seed": seed,
-            "photon_cutoff_eV": photon_cutoff_eV,
-            "electron_cutoff_eV": electron_cutoff_eV,
-            "source_ceiling_eV": source_ceiling_eV,
-            "angular_proposal": "isotropic-4pi",
-            "energy_proposal": "uniform-on-segment-support",
-            "source_role": "weighted-expected-value-not-physical-event",
-        },
-        "aperture": {
-            "center_ang": vec(aperture.center_ang),
-            "x_axis": vec(aperture.x_axis),
-            "y_axis": vec(aperture.y_axis),
-            "half_width_ang": float(aperture.half_width_ang),
-            "half_height_ang": float(aperture.half_height_ang),
-        },
-        "boxes": [
-            {
-                "center_ang": vec(box.center_ang),
-                "axes": vec(box.axes),
-                "half_extent_ang": vec(box.half_extent_ang),
-                "composition": [[str(el), float(density)] for el, density in box.composition],
-            }
-            for box in boxes
-        ],
-        "energy_bin_edges_eV": np.asarray(edges, dtype=float).tolist(),
-    }
-    if charged_feedback is not None:
-        payload["charged_feedback"] = charged_feedback
-    digest = hashlib.sha256(
-        json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
-    ).hexdigest()
-    return digest, payload
-
-
-def _preflight(scene, n_samples, photon_cutoff_eV, electron_cutoff_eV, source_ceiling_eV):
+def _preflight_scene(scene):
     """Reject unsupported *physical* and execution requests before transport."""
     from ._backend import xp
     from ._numerics import Numerics
     from .campaign.model import Scene
     from .instrument import PlanarDetector
-    from .materials.photon_cross_sections import EPDL_E_MAX_EV, EPDL_E_MIN_EV
 
     if not isinstance(scene, Scene):
-        raise TypeError("simulate_photon_continuum requires a Scene")
+        raise TypeError("photon reference requires a Scene")
     detector = scene.detector
     if not isinstance(detector, PlanarDetector):
-        raise ValueError("photon-continuum ordinary hits require a physical PlanarDetector")
+        raise ValueError("photon ordinary hits require a physical PlanarDetector")
     if detector.pixels is not None or detector.response is not None or detector.scorer is not None:
-        raise ValueError("photon-continuum reference supports an unpixelated, ideal detector only")
+        raise ValueError("photon reference supports an unpixelated, ideal detector only")
     if scene.acquisition is not None:
-        raise ValueError("photon-continuum reference does not support acquisition response")
+        raise ValueError("photon reference does not support acquisition response")
     if scene.physics is None or scene.physics.brem_source != "mc":
-        raise ValueError("photon-continuum reference requires Physics(brem_source='mc')")
+        raise ValueError("photon reference requires Physics(brem_source='mc')")
     if xp is not np:
-        raise ValueError("photon-continuum reference is CPU-only (PYRITE_MC_BACKEND=cpu)")
+        raise ValueError("photon reference is CPU-only (PYRITE_MC_BACKEND=cpu)")
     numerics = scene.numerics
     if not isinstance(numerics, Numerics):
         raise TypeError("scene.numerics must be Numerics")
     if numerics.precision is not None:
-        raise ValueError("photon-continuum reference does not support adaptive precision")
+        raise ValueError("photon reference does not support adaptive precision")
     if numerics.transport_core not in ("auto", "lockstep", "per-electron"):
-        raise ValueError("photon-continuum reference needs a CPU transport core")
+        raise ValueError("photon reference needs a CPU transport core")
+    return detector, numerics
+
+
+def _preflight(scene, n_samples, photon_cutoff_eV, electron_cutoff_eV, source_ceiling_eV):
+    """Validate the common Scene boundary and continuous-source proposal."""
+    from .materials.photon_cross_sections import EPDL_E_MAX_EV, EPDL_E_MIN_EV
+
+    detector, numerics = _preflight_scene(scene)
     if type(n_samples) is not int or n_samples <= 0:
         raise ValueError("n_samples must be a positive integer")
     low = _positive("photon_cutoff_eV", photon_cutoff_eV)
@@ -392,64 +310,6 @@ def simulate_photon_continuum(
             ],
         },
     )
-
-
-def _scene_feedback(case, layers, width, height, numerics, photon_cutoff, electron_cutoff):
-    """Prepare enabled-only feedback and its additional positron table provenance.
-
-    Validation: photon-secondary-feedback
-    """
-    from .montecarlo.runner.case_tables import (
-        _case_elastic_kwargs,
-        _case_inelastic_kwargs,
-        _case_radiative_kwargs,
-        _case_stopping_tables,
-    )
-    from .montecarlo.transport.photon_feedback import cascade_feedback_stage
-
-    if case.get("inelastic_model") != "shell-soft-hard":
-        raise ValueError("charged feedback requires inelastic_model='shell-soft-hard'")
-    options = {
-        **_case_inelastic_kwargs(case),
-        **_case_elastic_kwargs(case),
-        **_case_radiative_kwargs(case),
-        "stopping_tables": _case_stopping_tables(case),
-        "secondary_threshold_eV": electron_cutoff,
-        "E_cut_keV": electron_cutoff * 1e-3,
-        "transport_core": numerics.transport_core,
-        "energy_model": case.get("energy_model", "frozen"),
-        "straggling": bool(case.get("straggling", False)),
-        "max_dE_frac": case.get("max_dE_frac", 0.0),
-    }
-    stage = cascade_feedback_stage(
-        layers, width_ang=width, height_ang=height, photon_cutoff_eV=photon_cutoff, **options
-    )
-    return stage, {
-        "model": "cpu-charged-photon-feedback-v1",
-        "positron_tables": _feedback_table_markers(stage),
-        "max_relaxation_rounds": stage.max_relaxation_rounds,
-    }
-
-
-def _feedback_table_markers(stage):
-    """Resolve enabled-only positron provenance at the Scene orchestration boundary."""
-    from .xsgen.elsepa.catalog import resolve_layer_tables
-    from .xsgen.sbethe.catalog import resolve_catalog_table
-    from .xsgen.store import identity_markers
-
-    transport = stage.base.transport
-    materials = transport["inelastic_materials"]
-    if isinstance(materials, str):
-        materials = [materials]
-    records = [resolve_catalog_table(key, projectile="positron") for key in materials]
-    if transport.get("elastic_model") == "elsepa":
-        records.extend(
-            table
-            for layer in transport["layers"]
-            for entry in resolve_layer_tables(layer[2], projectile="positron")
-            for table in entry.tables
-        )
-    return identity_markers(records)
 
 
 __all__ = ["MODEL", "PhotonContinuumObservation", "simulate_photon_continuum"]

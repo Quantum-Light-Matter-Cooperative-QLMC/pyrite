@@ -81,6 +81,8 @@ def resolved_physics_view(
     transition = resolved.get("transition_radiation")
     if transition is not None:
         selections["emission.transition"] = transition["model"]
+    if resolved.get("photon_transport") is not None:
+        selections["observation.photon"] = "cpu-reference"
     # Reuse facade policy with legacy defaults, without mutating Case omissions.
     Physics(
         elastic_model=selections["transport.elastic"],
@@ -113,6 +115,8 @@ def resolved_physics_view(
             else BREMSSTRAHLUNG_MODEL
         ),
     }
+    if resolved.get("photon_transport") is not None:
+        markers["photon_transport_model"] = resolved["photon_transport"]["model"]
     if resolved.get("coherent_emission", False):
         markers["coherent_population_model"] = COHERENT_POPULATION_MODEL
     if channeling is not None:

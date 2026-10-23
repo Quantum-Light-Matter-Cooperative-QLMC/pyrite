@@ -266,7 +266,7 @@ def track_coupled_histories(
     Per history: incident = photon terminal terms + charged escaped,
     deposited, binding, local, radiated-local, positron-pending and
     unresolved, to roundoff (:func:`coupled_ledger_residual_eV`).
-    Source: PENELOPE-2024 §1.4 secondary stack (scheduling order does not
+    Source: PENELOPE-2024 Chapter 7 §7.1 p.283 secondary stack (scheduling order does not
     change physical means); the stage's own transport claims.
     Validation: photon-charged-coupling
     """

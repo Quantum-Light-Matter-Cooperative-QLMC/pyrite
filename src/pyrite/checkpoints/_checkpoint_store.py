@@ -3,7 +3,8 @@
 Active checkpoints live at ``<root>/<stem>/{line,brem,characteristic}.h5``,
 plus ``channeling.h5`` once any record carries ``spec_channeling`` (ADR-0018 P5)
 and ``transition.h5`` once any carries ``spec_transition`` (#103); stores
-without them keep the historical three-file layout. Callers keep
+also write ``photon.h5`` for selected ordinary-hit aperture observations.
+Stores without optional components keep the historical three-file layout. Callers keep
 using the historical merged ``{name: {E0: record}}`` in-memory shape; this
 module splits records on write and merges them on read.  A legacy
 ``<root>/<stem>.pkl`` remains readable, so migration happens on the next save.
@@ -21,18 +22,19 @@ import numpy as np
 
 from . import _checkpoint_io
 
-COMPONENTS = ("line", "brem", "characteristic", "channeling", "transition")
+COMPONENTS = ("line", "brem", "characteristic", "channeling", "transition", "photon")
 #: Components whose artifact is written only when non-empty or already present.
-OPTIONAL_COMPONENTS = frozenset({"channeling", "transition"})
+OPTIONAL_COMPONENTS = frozenset({"channeling", "transition", "photon"})
 _HDF5_SUFFIX = ".h5"
 _LEGACY_SUFFIX = ".pkl"
 _BREM_KEYS = frozenset({"brem", "E_grid_brem", "brem_wide"})
 _BREM_CASE_KEYS = frozenset({"Ne_brem", "E_grid_brem", "brem_chunk", "brem_file"})
-#: Line-grid component key carried by each separately stored component.
+#: Companion payload keys; the photon aperture retains its own histogram grid.
 _LINE_COMPONENT_KEY = {
     "characteristic": "spec_characteristic",
     "channeling": "spec_channeling",
     "transition": "spec_transition",
+    "photon": "photon_aperture",
 }
 _SHARED_KEYS = frozenset({"case", "E_grid", "scale", "adaptive_sampling"})
 
@@ -161,6 +163,7 @@ def save_part(
     Records never change once a config completes, so each shard is written
     exactly once -- the whole per-sweep write cost is O(N), not O(N^2).
     """
+    _validate_photon_components({name: record_map})
     _atomic_dump(_part_path(stem, root, name), {name: record_map})
 
 
@@ -172,6 +175,7 @@ def load_parts(stem: str, root: str | os.PathLike[str]) -> dict:
     merged: dict = {}
     for shard in _part_paths(directory):
         merged.update(_checkpoint_io.load(str(shard)))
+    _validate_photon_components(merged)
     return merged
 
 
@@ -204,6 +208,19 @@ def _atomic_dump(path: Path, value: object) -> None:
     os.replace(tmp, path)
 
 
+def _validate_photon_components(results: dict) -> None:
+    """Check selected companions before replacing any checkpoint component."""
+    from ..results.aperture import aperture_from_record
+
+    for by_energy in results.values():
+        for record in by_energy.values():
+            if (
+                record.get("photon_aperture") is not None
+                or record.get("case", {}).get("photon_transport") is not None
+            ):
+                aperture_from_record(record)
+
+
 def save(
     stem: str,
     root: str | os.PathLike[str],
@@ -219,6 +236,7 @@ def save(
     optional component (:data:`OPTIONAL_COMPONENTS`) is skipped while it is
     empty and absent on disk.
     """
+    _validate_photon_components(results)
     unknown = set(components) - set(COMPONENTS)
     if unknown:
         raise ValueError(f"unknown checkpoint component(s): {sorted(unknown)}")
@@ -234,7 +252,7 @@ def save(
                 _dump_component(stem, root, component, _component_store(legacy, component))
     order = tuple(
         component
-        for component in ("brem", "characteristic", "channeling", "transition", "line")
+        for component in ("brem", "characteristic", "channeling", "transition", "photon", "line")
         if component in components
     )
     for component in order:
@@ -251,7 +269,7 @@ def _dump_component(stem: str, root: str | os.PathLike[str], component: str, sto
 def _attach_line_component(
     record: dict, component: str, stored: dict | None, *, name: str, energy: object
 ) -> None:
-    """Attach one separately stored line-grid component to its line record.
+    """Attach one separately stored companion to its authoritative line record.
 
     Line artifacts omit these components; each is attached as its own array.
     A legacy line artifact that still carries a co-located component was
@@ -259,6 +277,19 @@ def _attach_line_component(
     """
     key = _LINE_COMPONENT_KEY[component]
     if record.get(key) is not None or stored is None:
+        return
+    if component == "photon":
+        from ..montecarlo.trajectories import case_digest
+        from ..results.aperture import aperture_from_payload
+
+        if record["case"].get("photon_transport") is None:
+            return
+        if case_digest(stored.get("case", {})) != case_digest(record["case"]):
+            raise ValueError("photon checkpoint source Case does not match line record")
+        value = stored.get(key)
+        aperture_from_payload(value)
+        if value is not None:
+            record[key] = value
         return
     grid = stored.get("E_grid")
     if grid is not None and not np.array_equal(np.asarray(record.get("E_grid")), np.asarray(grid)):
@@ -298,6 +329,7 @@ def _merge(cxr: dict, brem: dict, companions: dict[str, dict]) -> dict:
                     record, component, store.get(name, {}).get(energy), name=name, energy=energy
                 )
             merged[name][energy] = record
+    _validate_photon_components(merged)
     return merged
 
 
@@ -315,7 +347,7 @@ def load(stem: str, root: str | os.PathLike[str]) -> dict:
         else:
             brem = {}
         companions = {}
-        for component in ("characteristic", "channeling", "transition"):
+        for component in ("characteristic", "channeling", "transition", "photon"):
             path = component_read_path(stem, component, root)
             if path.is_file():
                 companions[component] = _checkpoint_io.load(str(path))

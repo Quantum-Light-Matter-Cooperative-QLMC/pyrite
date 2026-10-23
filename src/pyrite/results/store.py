@@ -296,6 +296,10 @@ TEMPORAL_RECORD_KEYS = (
 
 def store_result(results, case, out):
     """Post-process one finished case into ``results[name][E0]`` (in place)."""
+    if case.get("photon_transport") is not None or out.get("photon_aperture") is not None:
+        from .aperture import aperture_from_record
+
+        aperture_from_record({"case": case, "photon_aperture": out.get("photon_aperture")})
     name, E0 = case["name"], case["E0_keV"]
     E_grid = out["E_grid"]
     E_pk = E_grid[np.argmax(cxr_spectrum(out))]
@@ -334,6 +338,8 @@ def store_result(results, case, out):
         if out.get(key) is not None:
             results[name][E0][key] = out[key]
     # Opt-in line temporal intensity profile (#292); absent unless requested.
+    if out.get("photon_aperture") is not None:
+        results[name][E0]["photon_aperture"] = out["photon_aperture"]
     for key in TEMPORAL_RECORD_KEYS:
         if out.get(key) is not None:
             results[name][E0][key] = out[key]

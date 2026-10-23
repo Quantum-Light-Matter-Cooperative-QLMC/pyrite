@@ -513,10 +513,26 @@ def _simulate_planar(
             "observation_identity_digest": observation_digest,
             "observation": observation,
             **identity_provenance,
+            **(
+                {
+                    "photon_aperture_identity_digest": output["photon_aperture"]["metadata"][
+                        "observation_identity_digest"
+                    ]
+                }
+                if "photon_aperture" in output
+                else {}
+            ),
             **run_provenance(case, xsgen_tables),
         },
         spatial=(spatial if detector.pixels is not None or scene.acquisition is not None else None),
+        aperture=_aperture_result(output),
     )
+
+
+def _aperture_result(output):
+    from .results.aperture import aperture_from_payload
+
+    return aperture_from_payload(output.get("photon_aperture"))
 
 
 __all__ = ["build_case", "build_configured_cases", "build_sweep_cases", "simulate"]
