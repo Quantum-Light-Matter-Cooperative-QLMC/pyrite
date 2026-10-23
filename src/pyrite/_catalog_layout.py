@@ -42,6 +42,7 @@ OBJECT_TABLES = (
     "materials",
     "beams",
     "energy_grids",
+    "physics",
 )
 LAYERED_TABLES = OBJECT_TABLES
 _STEM_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
@@ -358,6 +359,11 @@ def _bundled_object_message(table: str, name: str) -> str:
         return (
             f"{kind} {name!r} is {description} and is read-only; copy it with "
             f"'pyrite {kind} create NAME --from {name}' (maintainers: 'pyrite-dev {kind}')"
+        )
+    if table == "physics":
+        return (
+            f"physics preset {name!r} is a bundled reference and is read-only; copy it with "
+            f"'pyrite physics preset create NAME --from {name}'"
         )
     relative = MANIFEST if table == MANIFEST else f"{table}/{name}.toml"
     return (

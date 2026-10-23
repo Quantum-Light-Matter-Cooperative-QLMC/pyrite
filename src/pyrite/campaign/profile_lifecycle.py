@@ -20,6 +20,7 @@ from ._profile_document import (
     unknown_detector,
     values_item,
 )
+from .physics_presets import attach_preset
 from .profile_cxr_grid import _check_cxr_grid_policy, profile_cxr_grid_values
 from .profile_detectors import attach_detector_shortcut
 from .profile_membership import csv_materials, validate_materials
@@ -215,6 +216,7 @@ def set_profile(
     all_materials,
     emission,
     temporal_profile=None,
+    physics_name=None,
 ):
     """Replace supplied profile fields and return overwritten field labels.
 
@@ -251,6 +253,8 @@ def set_profile(
         target["temporal_profile"] = True
     elif temporal_profile is False:
         target.pop("temporal_profile", None)
+    if physics_name is not None:
+        attach_preset(document, name, physics_name)
     _check_cxr_grid_policy(target, profile_cxr_grid_values(target))
     return overwriting
 

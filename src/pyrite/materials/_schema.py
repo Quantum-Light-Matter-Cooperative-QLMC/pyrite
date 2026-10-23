@@ -435,6 +435,8 @@ class MaterialCatalog:
         Named beam definitions and their source declaration order.
     detectors, detector_labels, detector_keys
         Named scalar detectors, display labels, and source declaration order.
+    physics_presets, profile_physics_refs
+        Named physics presets and each profile's preset reference.
 
     Notes
     -----
@@ -508,6 +510,12 @@ class MaterialCatalog:
     detector_labels: Mapping[str, str] = MappingProxyType({})
     #: Every ``[detectors.*]`` name defined by the source TOML.
     detector_keys: tuple[str, ...] = ()
+    #: Named ``[physics.*]`` presets (ADR-0021), keyed by name. Profiles never
+    #: read these directly: each reference is already folded into the profile's
+    #: emission and transport numerics, so the name cannot reach an identity.
+    physics_presets: Mapping[str, Mapping[str, object]] = MappingProxyType({})
+    #: ``profiles.NAME.physics`` preset references, as display provenance only.
+    profile_physics_refs: Mapping[str, str] = MappingProxyType({})
 
     def profile_beam(self, name: str) -> Mapping[str, object] | None:
         """Decoded ``[profiles.NAME.beam]`` distribution overrides, or ``None``

@@ -13,19 +13,21 @@ Usage: pyrite physics [OPTIONS] COMMAND [ARGS]...
 
   Inspect and edit PROFILE's physical models and cutoffs (API Physics).
 
-  Settings stay in the selected profile; this is not a separate preset store. Use
-  profile create NAME --from SOURCE to clone a campaign. brem_source is currently an
-  API-only setting; CLI campaigns keep their existing sources.
+  show/set/reset/validate edit the selected profile's own fields, which override any
+  attached named preset; manage reusable presets with 'pyrite physics preset'.
+  brem_source is currently an API-only setting; CLI campaigns keep their existing
+  sources.
 
 Options:
   -h, --help  Show this message and exit.
 
 Commands:
-  list      List the campaigns whose configuration can be inspected or edited.
-  reset     Reset selected fields, or all fields owned by this command.
-  set       Set PROFILE fields; validate and atomically save, or preview with...
-  show      Show explicit/effective settings and their source for PROFILE.
-  validate  Validate the selected campaign without running simulation or writing...
+  list      List the campaigns whose configuration can...
+  reset     Reset selected fields, or all fields owned...
+  set       Set PROFILE fields; validate and...
+  show      Show explicit/effective settings and their...
+  validate  Validate the selected campaign without...
+  preset    Manage named physics presets that profiles attach by name.
 ```
 
 ## `pyrite physics list`
@@ -162,6 +164,299 @@ Options:
 Usage: pyrite physics validate [OPTIONS] PROFILE
 
   Validate the selected campaign without running simulation or writing files.
+
+Options:
+  -h, --help  Show this message and exit.
+```
+
+## `pyrite physics preset`
+
+```text
+Usage: pyrite physics preset [OPTIONS] COMMAND [ARGS]...
+
+  Manage named physics presets that profiles attach by name.
+
+  Bundled reference presets are read-only; clone one with create NAME --from SOURCE.
+  Attach with 'pyrite profile set PROFILE --physics NAME'. Profile physics fields
+  override the preset; presets never change a result's identity unless their effective
+  values change.
+
+Options:
+  -h, --help  Show this message and exit.
+
+Commands:
+  adopt     Move PROFILE's physics fields into new preset NAME and attach it.
+  create    Create user preset NAME, empty (built-in defaults) or cloned with...
+  delete    Delete an unreferenced user preset; irreversible.
+  list      List physics presets, their origin, and referencing profiles.
+  rename    Rename user preset NAME and update every referencing profile atomically.
+  reset     Return selected fields, or all fields, of NAME to built-in defaults.
+  set       Set fields of user preset NAME; affects every referencing profile.
+  show      Show NAME's stored and effective fields with their source.
+  validate  Validate NAME and every profile that references it; write nothing.
+```
+
+## `pyrite physics preset adopt`
+
+```text
+Usage: pyrite physics preset adopt [OPTIONS] PROFILE NAME
+
+  Move PROFILE's physics fields into new preset NAME and attach it.
+
+  Effective values are unchanged: the preset takes PROFILE's current preset values (if
+  any) overlaid with its inline physics fields, which are then removed from PROFILE.
+
+Options:
+  --description TEXT  Display description for the new preset.
+  -y, --yes           Skip the standard-profile confirmation.
+  --dry-run           Print proposed TOML diff; write nothing.
+  -h, --help          Show this message and exit.
+```
+
+## `pyrite physics preset create`
+
+```text
+Usage: pyrite physics preset create [OPTIONS] NAME
+
+  Create user preset NAME, empty (built-in defaults) or cloned with --from; validate and
+  atomically save, or preview with --dry-run.
+
+Options:
+  --from SOURCE                   Clone SOURCE's fields; options then override them.
+  --straggling / --no-straggling  Enable or disable Urban energy-loss straggling.
+  --inelastic-model [auto|continuous|shell-soft-hard]
+                                  Collision energy-loss scheme: auto (default; shell-
+                                  soft-hard hard inelastic collisions where every layer
+                                  has shell data, otherwise continuous with a warning),
+                                  continuous stopping, or shell-soft-hard (requires
+                                  midpoint and --inelastic-cutoff-ev).
+  --inelastic-cutoff-ev EV        Soft/hard energy-loss cutoff W_c in eV (default 50
+                                  under auto); must exceed each material's conduction-
+                                  band resonance (Si 16.7, SiO2 22, MoS2 23 eV).
+                                  [x>0.0]
+  --secondary-threshold-ev EV     Transport hard-collision secondaries above this energy
+                                  in eV (production cut and tracking cutoff; requires
+                                  shell-soft-hard and SBETHE coverage, >= 1000 eV).
+                                  [x>0.0]
+  --elastic-model [mott|elsepa]   Elastic scattering: elsepa (default) full differential
+                                  cross sections (needs 'pyrite tables fetch elsepa';
+                                  bypasses the transport LUT), or the historical mott
+                                  screened-Rutherford angles.
+  --bremsstrahlung-model [auto|eedl|bremslib]
+                                  Continuum bremsstrahlung: auto (default) uses the
+                                  released BremsLib tables with their angular model when
+                                  installed ('pyrite tables fetch bremslib') and warns
+                                  and falls back to EEDL otherwise; bremslib requires
+                                  them; eedl is the fetched EEDL continuum with an
+                                  isotropic photon angle.
+  --radiative-model [auto|uncoupled|bremslib-soft-hard]
+                                  Radiative energy loss: auto (default) couples when
+                                  BremsLib resolves; uncoupled scores after transport;
+                                  bremslib-soft-hard uses soft loss plus sampled hard
+                                  photons. Coupling requires midpoint energy and
+                                  BremsLib. Missing tables and grooved targets fall back
+                                  to uncoupled scoring.
+  --radiative-cutoff-ev EV        Hard-photon cutoff k_c in eV for coupled transport
+                                  (default 1000); must not exceed the continuum electron
+                                  cutoff (1000 eV by default).  [x>0.0]
+  --pair-production-model [penelope-2024]
+                                  Convert coupled hard photons above 1.022 MeV to e-/e+
+                                  pairs (opt-in). Requires --secondary-threshold-ev and
+                                  coupled BremsLib transport; pair electrons are
+                                  transported as secondaries, positrons are recorded
+                                  unless --positron-transport.
+  --positron-transport / --no-positron-transport
+                                  Transport pair positrons above the secondary threshold
+                                  (opt-in; requires --pair-production-model). Positrons
+                                  annihilate in flight and at rest; each annihilation
+                                  photon escapes or is absorbed at its first
+                                  interaction.
+  --atomic-electron-deflection [kawrakow|none]
+                                  Angular deflection by atomic electrons: kawrakow
+                                  (default) scales each element's elastic rate by 1 +
+                                  xi/Z (xi = 1 under continuous stopping; the Moller
+                                  share above W_c is removed under shell-soft-hard,
+                                  which needs elsepa); none keeps elastic-only
+                                  deflection.
+  --shell-ionization-model [eedl|bote-salvat]
+                                  Characteristic-line primary vacancies: eedl (default)
+                                  subshell cross sections, or the opt-in bote-salvat
+                                  K/L/M fit (needs 'pyrite tables fetch bote-salvat';
+                                  EEDL for higher shells).
+  --channeling-model [off|planar]
+                                  Planar quantum entrance zone (default off); requires
+                                  plane, midpoint, uncoupled radiation and incoherent
+                                  emission. Disable with numerics reset PROFILE
+                                  channeling-model channeling-plane.
+  --channeling-plane H K L        Nonzero Miller indices of the planar channeling
+                                  family; requires planar.
+  --emission [incoherent|coherent|both]
+                                  CXR modes; cross-model constraints are validated
+                                  before saving.
+  --description TEXT              Replace the display description.
+  --dry-run                       Print proposed TOML diff; write nothing.
+  -h, --help                      Show this message and exit.
+```
+
+## `pyrite physics preset delete`
+
+```text
+Usage: pyrite physics preset delete [OPTIONS] NAME
+
+  Delete an unreferenced user preset; irreversible.
+
+Options:
+  -y, --yes   Delete the exact previewed preset.
+  --dry-run   Print proposed TOML diff; delete nothing.
+  -h, --help  Show this message and exit.
+```
+
+## `pyrite physics preset list`
+
+```text
+Usage: pyrite physics preset list [OPTIONS]
+
+  List physics presets, their origin, and referencing profiles.
+
+Options:
+  -o, --output [table|json]  Output format; only json is a stable automation contract.
+                             [default: table]
+  -h, --help                 Show this message and exit.
+```
+
+## `pyrite physics preset rename`
+
+```text
+Usage: pyrite physics preset rename [OPTIONS] NAME NEW_NAME
+
+  Rename user preset NAME and update every referencing profile atomically.
+
+Options:
+  --dry-run   Print proposed TOML diff; write nothing.
+  -h, --help  Show this message and exit.
+```
+
+## `pyrite physics preset reset`
+
+```text
+Usage: pyrite physics preset reset [OPTIONS] NAME [straggling|inelastic-model|inelastic-
+                                   cutoff-ev|secondary-threshold-ev|elastic-
+                                   model|bremsstrahlung-model|radiative-model|radiative-
+                                   cutoff-ev|pair-production-model|positron-
+                                   transport|atomic-electron-deflection|channeling-
+                                   model|channeling-axial|transition-radiation|shell-
+                                   ionization-model|channeling-plane|emission]...
+
+  Return selected fields, or all fields, of NAME to built-in defaults.
+
+Options:
+  --dry-run   Print proposed TOML diff; write nothing.
+  -h, --help  Show this message and exit.
+```
+
+## `pyrite physics preset set`
+
+```text
+Usage: pyrite physics preset set [OPTIONS] NAME
+
+  Set fields of user preset NAME; affects every referencing profile. Validates all
+  referencing profiles before saving.
+
+Options:
+  --straggling / --no-straggling  Enable or disable Urban energy-loss straggling.
+  --inelastic-model [auto|continuous|shell-soft-hard]
+                                  Collision energy-loss scheme: auto (default; shell-
+                                  soft-hard hard inelastic collisions where every layer
+                                  has shell data, otherwise continuous with a warning),
+                                  continuous stopping, or shell-soft-hard (requires
+                                  midpoint and --inelastic-cutoff-ev).
+  --inelastic-cutoff-ev EV        Soft/hard energy-loss cutoff W_c in eV (default 50
+                                  under auto); must exceed each material's conduction-
+                                  band resonance (Si 16.7, SiO2 22, MoS2 23 eV).
+                                  [x>0.0]
+  --secondary-threshold-ev EV     Transport hard-collision secondaries above this energy
+                                  in eV (production cut and tracking cutoff; requires
+                                  shell-soft-hard and SBETHE coverage, >= 1000 eV).
+                                  [x>0.0]
+  --elastic-model [mott|elsepa]   Elastic scattering: elsepa (default) full differential
+                                  cross sections (needs 'pyrite tables fetch elsepa';
+                                  bypasses the transport LUT), or the historical mott
+                                  screened-Rutherford angles.
+  --bremsstrahlung-model [auto|eedl|bremslib]
+                                  Continuum bremsstrahlung: auto (default) uses the
+                                  released BremsLib tables with their angular model when
+                                  installed ('pyrite tables fetch bremslib') and warns
+                                  and falls back to EEDL otherwise; bremslib requires
+                                  them; eedl is the fetched EEDL continuum with an
+                                  isotropic photon angle.
+  --radiative-model [auto|uncoupled|bremslib-soft-hard]
+                                  Radiative energy loss: auto (default) couples when
+                                  BremsLib resolves; uncoupled scores after transport;
+                                  bremslib-soft-hard uses soft loss plus sampled hard
+                                  photons. Coupling requires midpoint energy and
+                                  BremsLib. Missing tables and grooved targets fall back
+                                  to uncoupled scoring.
+  --radiative-cutoff-ev EV        Hard-photon cutoff k_c in eV for coupled transport
+                                  (default 1000); must not exceed the continuum electron
+                                  cutoff (1000 eV by default).  [x>0.0]
+  --pair-production-model [penelope-2024]
+                                  Convert coupled hard photons above 1.022 MeV to e-/e+
+                                  pairs (opt-in). Requires --secondary-threshold-ev and
+                                  coupled BremsLib transport; pair electrons are
+                                  transported as secondaries, positrons are recorded
+                                  unless --positron-transport.
+  --positron-transport / --no-positron-transport
+                                  Transport pair positrons above the secondary threshold
+                                  (opt-in; requires --pair-production-model). Positrons
+                                  annihilate in flight and at rest; each annihilation
+                                  photon escapes or is absorbed at its first
+                                  interaction.
+  --atomic-electron-deflection [kawrakow|none]
+                                  Angular deflection by atomic electrons: kawrakow
+                                  (default) scales each element's elastic rate by 1 +
+                                  xi/Z (xi = 1 under continuous stopping; the Moller
+                                  share above W_c is removed under shell-soft-hard,
+                                  which needs elsepa); none keeps elastic-only
+                                  deflection.
+  --shell-ionization-model [eedl|bote-salvat]
+                                  Characteristic-line primary vacancies: eedl (default)
+                                  subshell cross sections, or the opt-in bote-salvat
+                                  K/L/M fit (needs 'pyrite tables fetch bote-salvat';
+                                  EEDL for higher shells).
+  --channeling-model [off|planar]
+                                  Planar quantum entrance zone (default off); requires
+                                  plane, midpoint, uncoupled radiation and incoherent
+                                  emission. Disable with numerics reset PROFILE
+                                  channeling-model channeling-plane.
+  --channeling-plane H K L        Nonzero Miller indices of the planar channeling
+                                  family; requires planar.
+  --emission [incoherent|coherent|both]
+                                  CXR modes; cross-model constraints are validated
+                                  before saving.
+  --description TEXT              Replace the display description.
+  --dry-run                       Print proposed TOML diff; write nothing.
+  -h, --help                      Show this message and exit.
+```
+
+## `pyrite physics preset show`
+
+```text
+Usage: pyrite physics preset show [OPTIONS] NAME
+
+  Show NAME's stored and effective fields with their source.
+
+Options:
+  -o, --output [table|json]  Output format; only json is a stable automation contract.
+                             [default: table]
+  -h, --help                 Show this message and exit.
+```
+
+## `pyrite physics preset validate`
+
+```text
+Usage: pyrite physics preset validate [OPTIONS] NAME
+
+  Validate NAME and every profile that references it; write nothing.
 
 Options:
   -h, --help  Show this message and exit.

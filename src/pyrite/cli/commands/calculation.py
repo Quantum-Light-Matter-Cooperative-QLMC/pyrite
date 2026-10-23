@@ -6,10 +6,9 @@ from typing import Any, cast
 import click
 from tomlkit.exceptions import ParseError
 
-from pyrite.campaign import _profile_document, profile_numerics
+from pyrite.campaign import _profile_document, physics_presets, profile_numerics
 
 from ..._numerics import PHYSICS_FIELDS
-from ...campaign.profiles import resolve_numerics
 from ...console import json as cli_json
 from ...console.output import CLIError, emit_json_result, emit_result, output_option
 from .. import _catalog_io, _completion
@@ -32,7 +31,7 @@ def _show(name, json_output, *, physics):
     try:
         _, document = _catalog_io.catalog_text()
         target = _profile_document.existing_profile(document, name)
-        resolution = resolve_numerics(profile_numerics.profile_numerics_values(target))
+        resolution = profile_numerics.profile_resolution(document, target)
         fields = [
             row
             for group in resolution.groups()
@@ -40,17 +39,29 @@ def _show(name, json_output, *, physics):
             if (row["key"] in PHYSICS_FIELDS) == physics
         ]
         if physics:
+            preset, preset_fields = physics_presets.profile_preset(document, target)
+            emission_source = (
+                "profile"
+                if "emission" in target
+                else f"preset {preset}"
+                if "emission" in preset_fields
+                else "built-in"
+            )
             fields.insert(
                 0,
                 {
                     "key": "emission",
                     "label": "emission",
                     "explicit": target.get("emission"),
-                    "effective": target.get("emission", "incoherent"),
-                    "source": "profile" if "emission" in target else "built-in",
+                    "effective": target.get(
+                        "emission", preset_fields.get("emission", "incoherent")
+                    ),
+                    "source": emission_source,
                 },
             )
         payload = {"profile": name, "fields": fields}
+        if physics:
+            payload["preset"] = preset
     except (OSError, ValueError, ParseError) as exc:
         if json_output:
             emit_json_result(cli_json.failure(schema, {}, str(exc)))
@@ -173,13 +184,20 @@ def _register(group, *, physics):
         emit_result(f"valid profile {name}")
 
 
-@click.group("physics", context_settings={"help_option_names": ["-h", "--help"]})
+@click.group(
+    "physics",
+    cls=LazyGroup,
+    lazy_commands={"preset": "pyrite.cli.commands.physics_preset.command"},
+    lazy_help={"preset": "Manage named physics presets that profiles attach by name."},
+    context_settings={"help_option_names": ["-h", "--help"]},
+)
 def physics_command():
     """Inspect and edit PROFILE's physical models and cutoffs (API Physics).
 
-    Settings stay in the selected profile; this is not a separate preset store.
-    Use profile create NAME --from SOURCE to clone a campaign. brem_source is
-    currently an API-only setting; CLI campaigns keep their existing sources.
+    show/set/reset/validate edit the selected profile's own fields, which
+    override any attached named preset; manage reusable presets with
+    'pyrite physics preset'. brem_source is currently an API-only setting;
+    CLI campaigns keep their existing sources.
     """
 
 

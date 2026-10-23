@@ -70,6 +70,7 @@ def test_root_exports_stay_frozen() -> None:
         "SubstanceRef",
         "Target",
         "fetch_tables",
+        "load_physics",
         "photon_energies",
         "simulate",
         "directional_source",

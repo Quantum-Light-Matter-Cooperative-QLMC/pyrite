@@ -60,3 +60,17 @@ def _apply_transport_updates(target, updates):
     validate_profile_numerics({**profile_numerics_values(target), **updates})
     for key, value in updates.items():
         target[key] = value
+
+
+def profile_resolution(document, profile, **options):
+    """Resolve ``profile``'s numerics over its referenced physics preset, if any."""
+    from .physics_presets import profile_preset
+    from .profiles import resolve_numerics
+
+    name, preset = profile_preset(document, profile)
+    return resolve_numerics(
+        profile_numerics_values(profile),
+        named={key: value for key, value in preset.items() if key != "emission"},
+        named_source=f"preset {name}",
+        **options,
+    )

@@ -11,12 +11,12 @@ from pyrite import _catalog_layout
 from pyrite._numerics import TRANSPORT_KEYS
 from pyrite.campaign import (
     _profile_document,
+    physics_presets,
     profile_detectors,
     profile_lifecycle,
     profile_numerics,
     profile_summary,
 )
-from pyrite.campaign.profiles import resolve_numerics
 from pyrite.cli import _catalog_io
 from pyrite.cli import _completion as _cli_completion
 from pyrite.cli._deprecations import canonical_option
@@ -284,9 +284,7 @@ def numerics_show_command(name, json_output):
     try:
         _text, document = _catalog_io.catalog_text()
         target = _profile_document.existing_profile(document, name)
-        resolution = resolve_numerics(
-            profile_numerics.profile_numerics_values(target), fidelity=fidelity
-        )
+        resolution = profile_numerics.profile_resolution(document, target, fidelity=fidelity)
         groups = resolution.groups()
         payload = {"profile": name, "fidelity": fidelity, "groups": groups}
     except (OSError, ValueError, ParseError) as exc:
@@ -638,7 +636,7 @@ def show_command(name, json_output):
         payload = _profile_payload(document, name)
         if not json_output:
             target = _existing_profile(document, name)
-            resolution = resolve_numerics(profile_numerics.profile_numerics_values(target))
+            resolution = profile_numerics.profile_resolution(document, target)
             grid_rows = _profile_show.energy_grid_rows(document, target)
     except (OSError, ValueError, ParseError) as exc:
         if json_output:
@@ -802,6 +800,13 @@ def create_command(
         "and raw spectra. Create others with 'pyrite detector create'."
     ),
 )
+@click.option(
+    "--physics",
+    "physics_name",
+    metavar="NAME",
+    shell_complete=_cli_completion.complete_physics_preset,
+    help="Attach a named physics preset; inline physics fields stay as overrides.",
+)
 @canonical_option(
     "--material",
     "materials",
@@ -845,13 +850,14 @@ def set_command(
     materials,
     beam_name,
     detector_name,
+    physics_name,
     all_materials,
     emission,
     temporal_profile,
     yes,
     dry_run,
 ):
-    """Replace range grids, the beam reference, the detector reference, or emission.
+    """Replace range grids, beam/detector/physics references, or emission.
 
     NAME must already exist (create it with ``pyrite profile create``); unknown
     names error with suggestions. Editing 'standard' prompts for confirmation
@@ -878,6 +884,7 @@ def set_command(
         not updates
         and beam_name is None
         and detector_name is None
+        and physics_name is None
         and not transport_updates
         and materials is None
         and not all_materials
@@ -885,7 +892,7 @@ def set_command(
         and temporal_profile is None
     ):
         raise click.UsageError(
-            "provide a range, beam, detector, transport, membership, emission, "
+            "provide a range, beam, detector, physics, transport, membership, emission, "
             "or temporal-profile option"
         )
     try:
@@ -901,6 +908,7 @@ def set_command(
             all_materials=all_materials,
             emission=emission,
             temporal_profile=temporal_profile,
+            physics_name=physics_name,
         )
     except (OSError, ValueError, ParseError) as exc:
         raise CLIError(str(exc)) from None
@@ -908,6 +916,7 @@ def set_command(
         overwriting
         or beam_name is not None
         or detector_name is not None
+        or physics_name is not None
         or transport_updates
         or materials is not None
         or all_materials
@@ -919,6 +928,8 @@ def set_command(
             action_fields.append("beam")
         if detector_name is not None:
             action_fields.append("detector")
+        if physics_name is not None:
+            action_fields.append("physics")
         if emission is not None:
             action_fields.append("emission")
         if temporal_profile is not None:
@@ -1057,6 +1068,12 @@ def add_command(
     is_flag=True,
     help="Detach the profile's beam (named reference or inline block).",
 )
+@click.option(
+    "--physics",
+    "detach_physics",
+    is_flag=True,
+    help="Detach the physics preset; the profile's own physics fields remain.",
+)
 @click.option("-y", "--yes", "yes", is_flag=True, help="Skip the 'standard' confirmation prompt.")
 @click.option("--dry-run", is_flag=True, help="Print proposed TOML diff; write nothing.")
 def remove_command(
@@ -1069,6 +1086,7 @@ def remove_command(
     coherent,
     incoherent,
     detach_beam,
+    detach_physics,
     yes,
     dry_run,
 ):
@@ -1084,8 +1102,10 @@ def remove_command(
     leaves 'coherent'.
     """
     updates = _collect_updates(thickness, energy, polar, azimuth)
-    if not updates and materials is None and not coherent and not incoherent and not detach_beam:
-        raise click.UsageError("provide a range, membership, beam, or emission option")
+    if not (updates or materials is not None or coherent or incoherent) and not (
+        detach_beam or detach_physics
+    ):
+        raise click.UsageError("provide a range, membership, beam, physics, or emission option")
     try:
         if updates:
             original, document = _merge_values(name, updates, add=False)
@@ -1108,6 +1128,7 @@ def remove_command(
                 raise ValueError(f"profile {name} has no beam to remove")
             removed_beam = str(existing_beam) if isinstance(existing_beam, str) else "(inline)"
             del target["beam"]
+        removed_physics = physics_presets.detach_preset(document, name) if detach_physics else None
     except (OSError, ValueError, ParseError) as exc:
         raise CLIError(str(exc)) from None
     action_bits = []
@@ -1119,6 +1140,8 @@ def remove_command(
         action_bits.append("emission")
     if detach_beam:
         action_bits.append("beam")
+    if detach_physics:
+        action_bits.append("physics")
     action = f"remove {'/'.join(action_bits) or 'materials'} from"
     _confirm_standard(name, action, yes, dry_run)
     message = f"updated profile {name}"
@@ -1132,6 +1155,8 @@ def remove_command(
         message += f" (now '{label}')" if label is not None else " (no explicit emission left)"
     if removed_beam is not None:
         message += f"; beam: detached {removed_beam}"
+    if removed_physics is not None:
+        message += f"; physics: detached preset {removed_physics}"
     return _write(document, original, dry_run, message)
 
 

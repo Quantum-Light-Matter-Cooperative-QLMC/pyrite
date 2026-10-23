@@ -134,12 +134,12 @@
     {
       "path": "src/pyrite/cli/commands/profile.py",
       "name": "remove_command",
-      "cc": 26
+      "cc": 30
     },
     {
       "path": "src/pyrite/cli/commands/profile.py",
       "name": "set_command",
-      "cc": 30
+      "cc": 33
     },
     {
       "path": "src/pyrite/cli/commands/remote.py",

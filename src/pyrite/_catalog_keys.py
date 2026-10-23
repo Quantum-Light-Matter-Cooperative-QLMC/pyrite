@@ -58,3 +58,9 @@ def beam_keys() -> tuple[str, ...]:
 def detector_keys() -> tuple[str, ...]:
     """Return catalog ``[detectors.*]`` keys."""
     return _section_keys("detectors")
+
+
+@lru_cache(maxsize=1)
+def physics_preset_keys() -> tuple[str, ...]:
+    """Return catalog ``[physics.*]`` preset keys."""
+    return _section_keys("physics")

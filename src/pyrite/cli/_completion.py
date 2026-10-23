@@ -18,6 +18,7 @@ from .._catalog_keys import SAFE_TOKEN_RE as _SAFE_TOKEN_RE
 from .._catalog_keys import beam_keys as _beam_keys
 from .._catalog_keys import detector_keys as _detector_keys
 from .._catalog_keys import material_keys as _material_keys
+from .._catalog_keys import physics_preset_keys as _physics_preset_keys
 from .._catalog_keys import profile_keys as _profile_keys
 from ..console.outputs import output_dir
 
@@ -74,6 +75,12 @@ def complete_detector(ctx: object, param: object, incomplete: str) -> list[Compl
     """Complete one catalog ``[detectors.*]`` name."""
     del ctx, param
     return _items(_detector_keys(), incomplete)
+
+
+def complete_physics_preset(ctx: object, param: object, incomplete: str) -> list[CompletionItem]:
+    """Complete one catalog ``[physics.*]`` preset name."""
+    del ctx, param
+    return _items(_physics_preset_keys(), incomplete)
 
 
 def complete_profile(ctx: object, param: object, incomplete: str) -> list[CompletionItem]:

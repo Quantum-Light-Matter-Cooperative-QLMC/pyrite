@@ -42,6 +42,7 @@ if TYPE_CHECKING:
     # Static view of the lazy exports below, so editors resolve hover docs and types.
     from pyrite._numerics import CxrReflections as CxrReflections
     from pyrite._numerics import Physics as Physics
+    from pyrite._physics_presets import load_physics as load_physics
     from pyrite._precision import Precision as Precision
     from pyrite.api import simulate as simulate
     from pyrite.bodies import RectangularBody as RectangularBody
@@ -218,6 +219,7 @@ _PUBLIC_OBJECTS = {
     "SubstanceRef": ("pyrite.bodies", "SubstanceRef"),
     "Target": ("pyrite.campaign.target", "Target"),
     "fetch_tables": ("pyrite.xsgen.install", "fetch_tables"),
+    "load_physics": ("pyrite._physics_presets", "load_physics"),
     "photon_energies": ("pyrite.materials.emission", "photon_energies"),
     "simulate": ("pyrite.api", "simulate"),
     "directional_source": ("pyrite.directional", "directional_source"),

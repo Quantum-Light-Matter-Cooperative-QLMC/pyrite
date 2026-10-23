@@ -14,7 +14,7 @@ The bundled `trajectory_demo` profile is a single fixed-count case with a micron
 
 ## Calculation numerics
 
-Use the API-aligned views to inspect a campaign’s numerical controls and physical models. These commands edit the existing profile; they do not create independent preset stores:
+Use the API-aligned views to inspect a campaign’s numerical controls and physical models. These commands edit the profile's own fields; reusable physics configurations are [named presets](#named-physics-presets):
 
 ```bash
 pyrite numerics show standard
@@ -22,10 +22,10 @@ pyrite numerics show standard -o json
 pyrite physics show standard -o json
 ```
 
-Numerics reports sampling counts, reflection/mosaic sampling, and transport integration controls. Physics reports interaction models and cutoffs. Each field reports its explicit profile value, effective value, and source (`profile`, `fidelity`, or `built-in`). Resolution follows:
+Numerics reports sampling counts, reflection/mosaic sampling, and transport integration controls. Physics reports interaction models and cutoffs. Each field reports its explicit profile value, effective value, and source (`profile`, `preset NAME`, `fidelity`, or `built-in`). Resolution follows:
 
 ```text
-per-run override > explicit profile value > fidelity preset > built-in
+per-run override > explicit profile value > named physics preset > fidelity preset > built-in
 ```
 
 Set controls without editing TOML directly:
@@ -47,6 +47,26 @@ pyrite physics set standard --straggling --yes
 pyrite numerics reset standard reflection-families mosaic-route --yes
 pyrite numerics reset standard --yes
 ```
+
+### Named physics presets
+
+A physics preset is a named catalog object holding emission, model selectors and physical cutoffs, so several campaigns can share one configuration ([ADR-0021](../adr/0021-named-physics-numerics-presets.md)). Bundled presets are read-only references; `electron-standard` restates the built-in defaults. Clone and edit a user copy, then attach it:
+
+```bash
+pyrite physics preset list
+pyrite physics preset create low-angle --from electron-standard
+pyrite physics preset set low-angle --elastic-model mott --straggling
+pyrite profile set my_scan --physics low-angle
+pyrite physics show my_scan          # fields report 'preset low-angle' or 'profile'
+```
+
+Fields set on the profile itself (`pyrite physics set PROFILE`) override the preset. To move an existing profile's physics into a reusable preset without changing any effective value or result identity, adopt it; `--dry-run` previews the TOML diff:
+
+```bash
+pyrite physics preset adopt my_scan my-physics --dry-run
+```
+
+Editing a preset changes every referencing profile's future runs; finished checkpoints keep the values they were computed with. A preset's name never enters a result identity, so renaming one or adding unused presets leaves existing results reusable. `delete` refuses while a profile references the preset, `rename` updates references, and `pyrite profile remove PROFILE --physics` detaches it. In Python, `pyrite.load_physics("low-angle")` returns the same configuration as a frozen `Physics`.
 
 `profile create|set|add` accepts `-l/--cxr-trials` and `-b/--brem-trials`, including comma-separated trial-count grids. A trial is one Monte Carlo electron history used to estimate the corresponding spectrum, rather than one electron in the physical beam. These counts select histories from shared transport, so they are not added together to determine the transport count.
 
