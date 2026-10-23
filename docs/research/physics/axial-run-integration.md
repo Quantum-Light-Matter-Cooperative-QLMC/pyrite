@@ -271,12 +271,13 @@ contracts, not permission to enable those consumers for axial.
 
 ## Claim boundaries and validation requirements
 
-Reserve `cr-axial-zone-handoff-accounting` for the new physical escape map,
+Reserve `cr-axial-zone-handoff-physical` for the new physical escape map,
 joint launch distribution, flux balance and continuity. Reserve
 `cr-axial-persisted-channel` for the new source estimator, line shape,
 normalization, frame/absorption mapping and exactly-once persistence.
-The handoff claim now has an `unverified` research ledger row and a diagnostic
-counterexample; it has no production implementation or physical verdict.
+The handoff accounting row `cr-axial-zone-handoff-accounting` is `rederived`
+with a diagnostic counterexample; the physical row is `unverified`, with no
+production implementation or physical verdict.
 Register the source claim when its model is selected; attach source derivations
 and in-code markers before physics code lands. Both must
 reach `anchored` through fresh-context review and independent regression

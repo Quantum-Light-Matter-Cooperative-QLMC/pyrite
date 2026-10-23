@@ -1014,3 +1014,680 @@ cover the solver's kinetic scale, the Born-rule keep frequency, the gap
 choice, and the pooled estimator. `AxialMCWFResult` docstrings now name
 `absorbed`. The hook combined with electronic jumps is still untested here
 because SBETHE data is not installed.
+
+# Coherently projected no-jump reference: scoped verification (2026-10-22)
+
+Scope: the opt-in `--projected-no-jump` research reference only.
+`src/pyrite/montecarlo/channeling/axial_projection.py::{SpectralNoJump,run_spectral_mcwf}`
+and the five-arm comparison in `checks/axial_mcwf_return_flux.py`. The
+verifier began from Castin, Dalibard and Mølmer (arXiv:0805.4002), Eqs. (2),
+(4) and (8), the docstrings and signatures, and the statement in
+[the research note](../../research/physics/axial-escape-instrument.md#coherently-projected-no-jump-reference).
+The derivation and filters below were written before any implementation body
+or earlier section of this file was read. The overall
+`cr-axial-zone-handoff-accounting` claim stays `unverified`. A projected
+reference is not a physical escape model.
+
+## Independent derivation
+
+**Source equations.** The Lindblad master equation (Eq. 2) is
+
+$$
+\dot\rho=-\frac{i}{\hbar}[H,\rho]
++\sum_m\Big(C_m\rho C_m^\dagger-\tfrac12\{C_m^\dagger C_m,\rho\}\Big).
+$$
+
+Eq. (4) gives the no-jump Hamiltonian
+$H_{\rm eff}=H-\tfrac{i\hbar}{2}\sum_m C_m^\dagger C_m\equiv H-iW$.
+So $W=\tfrac{\hbar}{2}\sum_m C_m^\dagger C_m$ is Hermitian, positive
+semidefinite, and has energy units (eV). Eq. (8) gives, for a normalized
+$\phi$, the jump probability $\delta p_m=\delta t\,\langle\phi|C_m^\dagger
+C_m|\phi\rangle$ and total $\delta p=(2/\hbar)\langle\phi|W|\phi\rangle\,\delta t$.
+For axial channeling at fixed longitudinal speed, $z=v_z t$ maps time to
+depth:
+
+$$
+i\hbar v_z\,\partial_z\phi=(H-iW)\phi,\qquad
+\phi(z+\Delta z)=\exp\!\Big[-\frac{i\Delta z}{\hbar v_z}(H-iW)\Big]\phi(z).
+$$
+
+**No-jump norm.** Since $H$ and $W$ are Hermitian, the $H$ terms cancel:
+
+$$
+\partial_z\langle\phi|\phi\rangle
+=\frac{i}{\hbar v_z}\langle\phi|(H+iW)-(H-iW)|\phi\rangle
+=-\frac{2}{\hbar v_z}\langle\phi|W|\phi\rangle .
+$$
+
+Here $\langle W\rangle$ is in eV and $\hbar v_z$ in eV Å, so the hazard has
+units Å$^{-1}$. In the waiting-time form of Eq. (8), $\|\phi(z)\|^2$ is the
+survival probability against any jump since the last renormalization.
+
+**Compression.** Let $P$ be an orthogonal projector with $F=1-P$. Define
+$H_P=PHP$, $W_P=PWP$ and $G_P=H_P-iW_P$ on $\operatorname{ran}P$. Then
+$W_P$ is PSD whenever $W$ is. The compressed equation
+$i\hbar v_z\partial_z\phi=G_P\phi$ keeps $\phi\in\operatorname{ran}P$ and,
+by the same two-line calculation,
+
+$$
+-\partial_z\|\phi\|^2=\frac{2}{\hbar v_z}\langle\phi|W_P|\phi\rangle
+=\frac{2}{\hbar v_z}\langle\phi|W|\phi\rangle\quad(\phi\in\operatorname{ran}P).
+$$
+
+So the compressed no-jump norm decays **only** at the native jump hazard. No
+amplitude crosses into $F$ and no extra norm leaks. Its propagator
+$U_P(\Delta z)=e^{-i\Delta z G_P/(\hbar v_z)}$ is a contractive semigroup:
+$U_P(a)U_P(b)=U_P(a+b)$, $\|U_P\|\le 1$. This is the Zeno limit of
+continuous $P$ measurement:
+$\lim_{N\to\infty}\big(Pe^{-iG z/(N\hbar v_z)}P\big)^N=U_P(z)$ on
+$\operatorname{ran}P$.
+
+**Difference from projecting a full step.** Write
+$A=-iG/(\hbar v_z)$. When $P$ is a spectral projector of $H$, $PHF=0$, so
+$PAF=-PWF/(\hbar v_z)$ and $FAP=-FWP/(\hbar v_z)$. Expanding to second order,
+
+$$
+Pe^{A\Delta z}P-U_P(\Delta z)
+=\frac{\Delta z^2}{2}PAFAP+O(\Delta z^3)
+=\frac{\Delta z^2}{2\hbar^2v_z^2}\,PWFWP+O(\Delta z^3).
+$$
+
+So, for normalized $\phi\in\operatorname{ran}P$, the retained norms differ by
+$\Delta z^2\|FW\phi\|^2/(\hbar v_z)^2$ per step. The per-step projected
+full exponential is therefore step-dependent: its product over $N$ steps
+differs from $U_P$ by $O(\Delta z)$. $U_P$ has no step dependence. The two
+agree to first order. They also agree exactly when $[P,W]=0$, i.e.
+$FWP=0$.
+
+**Spectral and Bloch blocks.** On a periodic $c\times c$ supercell grid, a
+primitive-cell-periodic potential and a cell-periodic $W$ couple only plane
+waves $\mathbf k$ and $\mathbf k+\mathbf G$ with $\mathbf G$ in the primitive
+reciprocal lattice. The grid therefore splits into $c^2$ Fourier/Bloch
+blocks $b$. Both $H(\mathbf q)$ and $W$ are block diagonal in them. Within a
+block, $H_b=V_bE_bV_b^\dagger$. The spectral projector keeps the columns
+$V_{b,P}$ with retained energies. Then
+
+$$
+H_{P,b}=\operatorname{diag}(E_{b,P}),\qquad
+W_{P,b}=V_{b,P}^\dagger W_bV_{b,P},\qquad
+U_{P,b}=\exp\!\Big[-\frac{i\Delta z}{\hbar v_z}\big(\operatorname{diag}(E_{b,P})-iW_{P,b}\big)\Big].
+$$
+
+The coefficients are $c_b=V_{b,P}^\dagger\hat\phi_b$, where the transform is
+normalized so that Parseval gives
+$\sum_b\|c_b\|^2=\int_A|P\phi|^2\,dA$. Decoding uses
+$\hat\phi_b=V_{b,P}c_b$. If no cut is supplied ($P=1$), $V_b$ is unitary and
+the result is the full-grid exponential $e^{A\Delta z}$, written in the
+eigenbasis.
+
+**Limits.** (i) $W=0$: $G_P$ is Hermitian and $U_P$ is unitary on
+$\operatorname{ran}P$. (ii) $W=w\mathbb 1$: $W_P=wP$ commutes with $H_P$, so
+amplitude scales by $e^{-w\Delta z/(\hbar v_z)}$ and norm by
+$e^{-2w\Delta z/(\hbar v_z)}$, consistent with hazard $2w/(\hbar v_z)$.
+(iii) $P=1$ gives the full non-Hermitian evolution. $P=0$ gives the zero
+space.
+
+**Jumps and the $P/F$ measurement.** Take one waiting-time cycle. Draw $r$,
+propagate $\phi\in\operatorname{ran}P$ with $U_P$ until $\|\phi\|^2\le r$
+(at step resolution), and normalize $\tilde\phi=\phi/\|\phi\|$. Select
+channel $m$ with probability
+$\langle\tilde\phi|C_m^\dagger C_m|\tilde\phi\rangle/\sum_n\langle\tilde\phi|C_n^\dagger C_n|\tilde\phi\rangle$.
+Note that $\sum_n\langle C_n^\dagger C_n\rangle=(2/\hbar)\langle W_P\rangle$
+for $\tilde\phi\in\operatorname{ran}P$. Then set
+$\phi'=C_m\tilde\phi/\|C_m\tilde\phi\|$. Measuring $\{P',F'\}$, where $P'$ is
+the projector for the post-jump carrier, retains
+$P'\phi'/\|P'\phi'\|=P'C_mP\tilde\phi/\|P'C_mP\tilde\phi\|$ with probability
+$\|P'\phi'\|^2$. Otherwise it records a sink outcome with probability
+$\|F'\phi'\|^2$. Completeness:
+$\|P'\phi'\|^2+\|F'\phi'\|^2=\|\phi'\|^2=1$, because $P'F'=0$ and $P'+F'=1$.
+For a TDS jump, $P'=P$, which gives the retained channel $PC_mP$. An
+electronic jump changes the carrier (tilt $\mathbf q$). This changes $H(\mathbf q)$,
+its spectrum and hence $P'$. The new $P'$ must be built before the
+measurement and used for the subsequent $U_{P'}$.
+
+**Normalization contract.** Each cycle starts from a unit-norm state in
+$\operatorname{ran}P$. If an entry or post-jump state has
+$\|P\phi\|^2\ne 1$, either it is unnormalized or it has weight in $F$.
+Projecting it silently would drop weight that was never recorded as a sink
+outcome, so refusal is the correct behaviour. For a pure entry $\phi_0$, the
+incident weight $\|P\phi_0\|^2$ multiplies the retained branch's observables
+externally, and $\|F\phi_0\|^2$ is the entry sink weight. A mixture needs
+one such weight per component.
+
+## Cheap filters before implementation inspection
+
+| Filter | Expectation | Result |
+|---|---|---|
+| Exponent units | $\Delta z\,[\text{Å}]\cdot G\,[\text{eV}]/(\hbar v_z\,[\text{eV Å}])$ is dimensionless | pass |
+| Hazard units | $2\langle W_P\rangle/(\hbar v_z)$ in Å$^{-1}$ | pass |
+| Sign of $-iW$ | $-i(-iW)=-W$, so $e^{-W\Delta z/(\hbar v_z)}$ decays for $W\succeq0$ | pass |
+| $W=0$ | $G_P$ Hermitian, $U_P$ unitary | pass |
+| $P=1$ / $P=0$ | full non-Hermitian semigroup / zero space | pass |
+| Semigroup | one fixed generator, so $U_P(a)U_P(b)=U_P(a+b)$ | pass |
+| Norm identity | $-\partial_z\|\phi\|^2=2\langle W_P\rangle/(\hbar v_z)$ equals the Eq. (8) total jump rate on $\operatorname{ran}P$ | pass |
+| $P/F$ completeness | retained + sink $=1$ for each post-jump measurement | pass |
+| Compressed vs projected step | they differ at $O(\Delta z^2)$ by $PWFWP/(2\hbar^2v_z^2)$ and are equal when $[P,W]=0$ | pass (claim consistent) |
+
+## Implementation comparison
+
+Read after the sections above were written. Source checkpoint `c621a04e`.
+
+| Derived element | Implementation | Agreement |
+|---|---|---|
+| $G_{P,b}=\operatorname{diag}(E_{b,P})-iV_{b,P}^\dagger W_bV_{b,P}$ | `SpectralNoJump._blocks`: `keep = energies < cut`, `h_eff = np.diag(energies[keep]) - 1j * (v.conj().T @ loss @ v)` | exact |
+| $U_{P,b}=\exp[-i\Delta z\,G_{P,b}/(\hbar v_z)]$ | `expm(-1j * self.step_ang / self.hbar_v * h_eff)`. The expm is taken after compression, and no full-space exponential is projected. | exact, sign and units |
+| Parseval coefficients $c_b=V_{b,P}^\dagger\hat\phi_b$ | `encode`: `fft2(phi) * sqrt(cell_area_ang2 / N)`, then `V_P^dagger` per block. `cell_area_ang2` is the area per sample (`RealSpaceGrid`), so $\|c\|^2=\sum\lvert\phi\rvert^2\,dA$. | exact |
+| $P=1$ | `cut_eV=None` sets the cut to $+\infty$, so all eigenvectors are kept and $V_b$ is unitary | exact |
+| $P=0$ | empty `keep` gives a $0\times0$ block | exact |
+| Carrier-dependent $P'$ | `_blocks(tilt)` calls `projector.spectrum(tilt)` and `gap_cut(tilt, …)` for each carrier tilt. `_prepare` runs after each jump at the returned tilt. | exact |
+| Waiting-time law | `_trajectory`: draw `threshold`, then advance. A jump fires when `norm2 <= threshold`, at most once per step. | exact (step-resolved, as declared) |
+| Selection on the normalized retained state | `decode(c)/sqrt(norm)` is passed to the native `solver._jump`, whose shares are $\int\lvert\phi\rvert^2 C_m(\mathbf r,\mathbf r)\,dA$. The supplied $W$ is `dissipator.absorptive_eV` $=(\hbar v/2)$`total_rate`, where `total_rate` $=$ `tds_grid_rate + tds_sink_rate + electronic_rate`, matching the Eq. (4) relation to the jump channels. | exact |
+| $P'/F'$ measurement | `projective_hook`: `split` at `gap_cut(tilt, cut, window)`, retained with probability $\|P'\phi'\|^2$ and otherwise `None` (counted as `absorbed`). Native sink jumps return `None` before the hook and are counted only as `sink`, with depths in `sink_depths_ang`. | exact, outcomes disjoint |
+| Refusal | `_prepare` raises unless `norm2(encode(state))` is within `1e-9` of 1. `_apply_hook` normalizes the hook output, so a refusal means weight outside $P'$. Without a hook, a finite cut refuses any post-jump state outside $P$. | exact |
+| External entry weight | `_job`: the first hook call projects deterministically, and `scale = split(sampled, (0,0), gap_cut((0,0), cut, window)[0])[0]` multiplies the bound observable. The entry is the pure `states.gaussian`, and `tilt_rad` is the default $(0,0)$. | exact for a pure entry at zero tilt |
+| Same $P$ in hook and stepper | Both use the same `GridProjector` object, the same `gap_cut(tilt, cut, window)` and the same strict `<` | exact |
+
+The five arms in `main` are: `None` split (1), cut split (2), `None` exact (3),
+cut exact (4) and cut projected (5). Arms 4 and 5 differ only in
+`cut_eV=None` versus `cut` for `SpectralNoJump`. The hook, seeds and
+per-incident Philox draws are shared. This matches the stated isolation of
+the compression effect.
+
+The `GridProjector` blocks
+$H_b[\mathbf m,\mathbf m']=\tilde U(\mathbf m-\mathbf m')+s\lvert\mathbf k_{\mathbf m}+\mathbf q\rvert^2\delta_{\mathbf m\mathbf m'}$
+use $\tilde U=\mathrm{fft2}(U)/N$, with orders grouped by residue modulo the
+cell count. The loss blocks use $\tilde W$ in the same way. This is the plane-wave
+matrix of pointwise multiplication plus the native split-step kinetic term
+`HBAR2_2M_EV_ANG2 / gamma * (k + tilt)^2`. Block diagonality holds because
+$\tilde U$ and $\tilde W$ vanish off multiples of the cell count. The
+constructor enforces this for $W$ by its periodicity check.
+
+## Independent numeric evidence (2026-10-22)
+
+The oracle is `/tmp/claude-1000/-home-alex-dev-pyrite/a6d7b22a-bb10-4e37-9fdd-dd3bf02926b0/scratchpad/oracle.py`,
+a scratch file that is not committed. It uses an $8\times8$ grid with
+$2\times2$ cells, a random cell-periodic potential (standard deviation 8 eV), a
+random cell-periodic $W\in[0,0.5]$ eV, $\hbar v_z=1973$ eV Å and tilt
+$(0.13,-0.07)$ Å$^{-1}$. The cut sits at the midpoint of a 0.057 eV gap, so 21 of
+64 states are retained. The reference is a dense $64\times64$ real-space
+$H(\mathbf q)=\mathcal F^\dagger T\mathcal F+\operatorname{diag}U$, built
+from an explicit unitary Kronecker DFT matrix and diagonalized with
+`scipy.linalg.eigh`. The oracle uses its own block provider and none of the
+implementation's spectral helpers.
+
+| Check | Result |
+|---|---|
+| Encode Parseval $\lvert\|c\|^2-1\rvert$ | $0$ |
+| 40 steps of $\Delta z=7$ Å vs dense $V_P e^{-i\Delta z V_P^\dagger(H-iW)V_P/(\hbar v_z)}V_P^\dagger$ | $3.2\times10^{-13}$ |
+| Decoded state outside $P$ | $1.3\times10^{-14}$ |
+| vs DOP853 ODE $i\hbar v_z\phi'=P(H-iW)P\phi$ (`rtol` $10^{-12}$), 280 Å | $6.4\times10^{-14}$ |
+| Central-difference $-\partial_z\|\phi\|^2$ vs $2\langle W\rangle/(\hbar v_z)=2.08\times10^{-4}$ Å$^{-1}$ | relative $9.3\times10^{-9}$ |
+| Semigroup $U_P(3)U_P(4.5)-U_P(7.5)$ | $1.8\times10^{-16}$ |
+| $W=0$: norm after 20 steps of 50 Å | $\lvert\|c\|^2-1\rvert=2.2\times10^{-16}$ |
+| $W=0.37\,\mathbb 1$ eV: ratio to the $W=0$ step vs $e^{-w\Delta z/(\hbar v_z)}$ | $7.5\times10^{-17}$ |
+| No cut vs dense full $e^{-i\Delta z(H-iW)/(\hbar v_z)}$ | $1.1\times10^{-15}$ |
+| The check's `GridProjector` as provider, 40 steps vs dense | $3.3\times10^{-13}$ |
+| `GridProjector.split`: retained + outgoing norm $-1$; weight vs dense $\|P\psi\|^2$ | $2.2\times10^{-16}$; $2.0\times10^{-15}$ |
+
+**Compressed vs projected full step.** These numbers confirm the derived
+second-order difference:
+
+| $\Delta z$ [Å] | $\|PU\psi\|^2-\|U_P\psi\|^2$ | $\Delta z^2\|FW\psi\|^2/(\hbar v_z)^2$ |
+|---:|---:|---:|
+| 40 | $2.6245\times10^{-6}$ | $2.6382\times10^{-6}$ |
+| 20 | $6.5820\times10^{-7}$ | $6.5954\times10^{-7}$ |
+| 10 | $1.6474\times10^{-7}$ | $1.6489\times10^{-7}$ |
+| 5 | $4.1205\times10^{-8}$ | $4.1221\times10^{-8}$ |
+
+At a fixed depth $Z=400$ Å, $\|(PUP)^n\psi-U_P(Z)\psi\|$ equals
+$1.62,\ 0.81,\ 0.41,\ 0.20\times10^{-5}$ for $n=10,20,40,80$. The error is
+first order in $\Delta z$, and its Zeno limit is $U_P$. Repeated $P\,e^{\cdot}\,P$
+is therefore step-dependent, while the implementation's $U_P$ is not.
+
+**Waiting-time law.** The oracle calls the real `run_spectral_mcwf` with a
+stand-in solver whose `_jump` always returns a sink, $W=0.37\,\mathbb 1$ eV
+and 4000 electrons. The step-resolved survival should be exactly
+$e^{-2wz/(\hbar v_z)}$. The observed deviations at $z=700/2100/4900$ Å were
+$-2.08/+0.23/-0.76\,\sigma$ for seed 3, $-0.50/+0.17/-0.07\,\sigma$ for seed
+11 and $-1.06/+0.01/-0.85\,\sigma$ for seed 12. These are binomial σ, and
+points within one seed are correlated. All three seeds are consistent with
+the law.
+
+**Carrier update and refusal.** A stand-in electronic jump sends the
+carrier to tilt $(0.41,0.22)$ Å$^{-1}$ and returns a ground state of
+$H(\mathbf q')$. That state has $\|P(\mathbf q)\cdot\|^2=0.99865$, so the
+old projector would refuse it at tolerance $10^{-9}$. The run accepts it
+(four electronic jumps), which shows that $P'$ is rebuilt at $\mathbf q'$.
+A post-jump state in $F(\mathbf q')$ is refused. An unprojected, normalized
+entry state with a finite cut is refused.
+
+The eight tests in `tests/montecarlo/test_channeling_axial_projection.py`
+pass in 0.82 s. `checks/axial_mcwf_return_flux.py --smoke --projected-no-jump`
+completes in 6 s and emits `spectral_comparison`
+(`finite-grid-spectral-expm-v1`).
+
+## Verdict and limitations
+
+Scoped verdict for the coherently projected no-jump reference: **`rederived`**.
+The compressed generator, the sign of $-iW$, the
+$\Delta z/(\hbar v_z)$ units, Parseval normalization, the hazard
+$2\langle W_P\rangle/(\hbar v_z)$ [Å$^{-1}$], semigroup and limit
+behaviour, jump selection on the normalized retained state, the
+$P'/F'$ measurement with separate sink and absorbed outcomes, the carrier-dependent
+projector, refusal and the external pure-entry weight all agree with the
+independent derivation. No divergent factor, sign or convention was found.
+
+Limitations, none of which is a discrepancy in the scoped algebra:
+
+1. $U_P$ is the continuous-measurement (Zeno) limit of $P$-conditioning
+   between jumps. Its norm decays only at the jump hazard. The amplitude that
+   the full no-jump generator would move through $FWP$ is neither retained nor
+   recorded as an outcome. The $O(\Delta z^2)$ per-step and $O(\|FWP\|^2)$
+   differences from arm 4 measure this modelling choice. They are not a
+   numerical error of either arm, and neither arm is a physical handoff.
+2. Jump depths remain resolved to one step, with at most one jump per step.
+   Step convergence of arms 3–5 is still required (as stated).
+3. The external entry weight in `_job` is evaluated at tilt $(0,0)$, which
+   matches the default `tilt_rad`. A tilted entry or a mixed entry would need
+   per-component weights at the base tilt. The research note states the
+   mixture caveat.
+4. Agreement of the hook and stepper projectors relies on the same provider
+   object and the same `gap_cut`. Exact level degeneracy at the selected cut
+   is excluded by the level-free cut choice, but it is not separately guarded
+   in `SpectralNoJump`.
+5. The overall `cr-axial-zone-handoff-accounting` claim stays `unverified`.
+   This review does not address the matching prescription, outgoing
+   instrument, depth budget or stopping/frame mapping. Human sign-off remains
+   in #277.
+
+# Full-claim verification (2026-10-22)
+
+Fresh-context review of the whole `cr-axial-zone-handoff-accounting` Claim.
+Inputs read before this section was written: the ledger row, the research
+note's two statement sections ("Three subspaces, not two loss labels" and "A
+total loss effect does not determine an outgoing instrument"), and the cited
+Lindblad structure of {cite:t}`castin2008`, Eqs. (2), (4), (8). No earlier
+section of this write-up and no implementation body was read before the
+derivation below was written.
+
+## Independent derivation
+
+### Setting and units
+
+Transverse Hilbert space $\mathcal H$, axial depth $z$ (Å). A Lindblad
+generator per unit depth has jump operators $J_m$ with units
+Å$^{-1/2}$, so $J_m^\dagger J_m$ and $J_m\rho J_m^\dagger$ (with
+$\operatorname{tr}\rho$ dimensionless) are rates per Å. The total jump rate of a
+state $\rho$ is
+
+$$
+w(\rho)=\operatorname{tr}\sum_m J_m\rho J_m^\dagger
+=\operatorname{tr}(\rho\,\Gamma),
+\qquad
+\Gamma=\sum_m J_m^\dagger J_m ,
+$$
+
+by cyclicity of the trace. $\Gamma$ is the loss effect: the operator that
+appears in the anticommutator $-\tfrac12\{\Gamma,\rho\}$ of the no-jump
+evolution (Castin–Dalibard–Mølmer Eq. (4)) and whose expectation is the jump
+probability per depth (Eq. (8)).
+
+Let $P$, $F$, $O$ be mutually orthogonal projectors with $P+F+O=I$: retained,
+represented outgoing, and numerically unresolved. ($R=P+F$ is the represented
+space.)
+
+### Positivity
+
+For any operator $X$ and projector $Q=Q^\dagger=Q^2$,
+
+$$
+\langle\psi|X^\dagger QX|\psi\rangle=\|QX\psi\|^2\ge0 ,
+$$
+
+so each of
+
+$$
+\Gamma_P=\sum_m PJ_m^\dagger PJ_mP,\qquad
+\Gamma_F=\sum_m PJ_m^\dagger FJ_mP,\qquad
+\Gamma_O=\sum_m PJ_m^\dagger OJ_mP
+$$
+
+is positive semidefinite, with units Å$^{-1}$. They are separately defined
+operators; "distinct" means distinct definitions, not that they cannot vanish
+or coincide.
+
+### Closure
+
+Insert $I=P+F+O$ between $J_m^\dagger$ and $J_m$. The insertion is linear, so
+no cross terms arise:
+
+$$
+P\Gamma P=\sum_m PJ_m^\dagger(P+F+O)J_mP
+=\Gamma_P+\Gamma_F+\Gamma_O .
+$$
+
+For $\rho=P\rho P$, $w(\rho)=\operatorname{tr}(\rho\Gamma_P)
++\operatorname{tr}(\rho\Gamma_F)+\operatorname{tr}(\rho\Gamma_O)$. Equivalently,
+with the post-jump gain operator $\sigma=\sum_mJ_m\rho J_m^\dagger$,
+
+$$
+\operatorname{tr}\sigma=\operatorname{tr}(P\sigma)+\operatorname{tr}(F\sigma)
++\operatorname{tr}(O\sigma),
+$$
+
+because the off-diagonal blocks $P\sigma F$, $F\sigma O$, … are traceless in
+the trace. Two consequences matter for the Claim's wording:
+
+1. "Full jump loss" here is the full jump **rate** $w(\rho)$; the
+   $\Gamma_P$ part is recapture into $P$, not loss of retained weight. The
+   net decrease of $\operatorname{tr}P\rho$ equals
+   $\operatorname{tr}\rho(\Gamma_F+\Gamma_O)$ only if the no-jump evolution
+   does not move weight out of $P$, i.e. $[PH_\perp P,\cdot\,]$ with
+   $[H_\perp,P]=0$ and a depth-independent $P$.
+2. The closure is a statement about traces (weights). The post-jump state
+   $\sigma$ generally has coherences $P\sigma F$ between retained and
+   outgoing blocks; dropping them is a modelling choice (a projective
+   measurement at the boundary), not a consequence of the identity.
+
+### TDS realization and the production diagonal
+
+For a multiplicative (displacement-type) jump family whose second moment is a
+covariance kernel $C(\mathbf r,\mathbf r')$ — the TDS form of
+`cr-axial-realspace-dissipator` — the gain operator is the Hadamard product
+$\sigma(\mathbf r,\mathbf r')=C(\mathbf r,\mathbf r')\rho(\mathbf r,\mathbf r')$
+and $\Gamma$ is multiplication by $C(\mathbf r,\mathbf r)$. Then
+$w(\rho)=\int C(\mathbf r,\mathbf r)\rho(\mathbf r,\mathbf r)\,d^2r$; in two
+transverse dimensions $\rho(\mathbf r,\mathbf r)$ is Å$^{-2}$ and
+$C(\mathbf r,\mathbf r)$ is Å$^{-1}$, so $w$ is Å$^{-1}$. Because $C$ is a
+positive-semidefinite kernel and $\rho\ge0$, the Schur product theorem gives
+$\sigma\ge0$, hence every window weight $\operatorname{tr}(Q\sigma)\ge0$. The
+unresolved weight must be computed as $\operatorname{tr}(O\sigma)
+=w(\rho)-\operatorname{tr}(R\sigma)$ **with the same kernel** on both sides.
+If the represented part used a truncated kernel $C_{\rm cut}$ while the total
+used the full diagonal, the difference need not be nonnegative; positivity of
+$\Gamma_O$ is guaranteed only as a projected operator product of one $\sigma$.
+
+### Cheap-filter limits
+
+| Limit | Result |
+|---|---|
+| Zero scattering, $J_m=0$ | $\Gamma=\Gamma_P=\Gamma_F=\Gamma_O=0$; closure trivially $0=0$. |
+| Enclosing window, $R=I$ ($O=0$) | $\Gamma_O=0$; $\Gamma_P+\Gamma_F=P\Gamma P$. |
+| No represented outgoing space, $F=0$ | $\Gamma_F=0$; all non-recaptured jump weight is unresolved. |
+| Jumps diagonal in a $P$-commuting basis | $\Gamma_F=\Gamma_O=0$; pure recapture (dephasing). |
+| Units | $J$: Å$^{-1/2}$; all effects and $w$: Å$^{-1}$. |
+
+### A loss effect does not identify an outgoing direction law
+
+General statement: $\Gamma$ is unchanged by (i) unitary mixing
+$J_m'=\sum_nU_{mn}J_n$, which also leaves the whole Lindbladian unchanged, and
+(ii) a left isometry $J_m'=VJ_m$ with $V^\dagger V$ the identity on
+the span of all $\operatorname{ran}J_m$, since $J_m'^\dagger J_m'=J_m^\dagger J_m$.
+Case (ii) changes the outgoing state to $\sigma'=V\sigma V^\dagger$. The loss
+effect therefore fixes the jumps only up to such an isometry, and the
+outgoing law depends on it.
+
+Counterexample with momentum content: let $P=|b\rangle\langle b|$ and let
+$|{\pm}\mathbf q_0\rangle$ be orthonormal plane waves on the represented
+Fourier grid, both inside $F$. Model 1: $J=\sqrt\gamma\,|{+}\mathbf q_0\rangle
+\langle b|$. Model 2: $J'=\sqrt\gamma\,|{-}\mathbf q_0\rangle\langle b|$.
+Then
+
+$$
+J^\dagger J=J'^\dagger J'=\gamma|b\rangle\langle b|,\qquad
+\Gamma_F=\Gamma_F'=\gamma|b\rangle\langle b|,\qquad \Gamma_O=\Gamma_O'=0,
+$$
+
+but the outgoing momentum distributions are $\delta_{\mathbf k,+\mathbf q_0}$
+and $\delta_{\mathbf k,-\mathbf q_0}$. Even the *split* $(\Gamma_P,\Gamma_F,
+\Gamma_O)$ is identical, so no diagonal-loss accessor separates them.
+
+A TDS-like family makes the same point: $J_{\mathbf q}=\sqrt{\gamma(\mathbf q)}
+\,e^{i\mathbf q\cdot\mathbf r}$ gives $\sum_{\mathbf q}J_{\mathbf q}^\dagger
+J_{\mathbf q}=\big(\sum_{\mathbf q}\gamma(\mathbf q)\big)I$, independent of the
+shape of $\gamma$, while the outgoing momentum is the incident momentum
+shifted by a draw from $\gamma$. Two transfer kernels with the same integral
+have the same total loss effect and different direction laws (their
+$\Gamma_F$/$\Gamma_O$ split differs in general).
+
+Hence an outgoing law requires the gain operator $\sigma_F=F\sigma F$ and a
+declared instrument (POVM $M(d\xi)$ on $F$), giving
+$d\Phi=\operatorname{tr}[M(d\xi)\sigma_F]\,dz\ge0$ with total
+$\operatorname{tr}\sigma_F=\operatorname{tr}\rho\Gamma_F$. This agrees with the
+research note's statement and counterexample.
+
+### What a Fourier-window plane-wave diagnostic can and cannot test
+
+Take $F_W=\sum_{\mathbf k\in W}|\mathbf k\rangle\langle\mathbf k|$, a
+momentum-diagonal window projector, and window weights
+$\operatorname{tr}(F_W\sigma)$ for a known incident (plane-wave or
+superposition) state.
+
+It **can** test:
+
+- positivity of every window weight and closure of a window partition
+  against $w(\rho)$, including the enclosing-window and zero-jump limits;
+- that the outgoing momentum marginal is not a function of $\Gamma$: two
+  models with equal $\Gamma$ give different window weights (the
+  counterexample above);
+- coherent interference: for a non-translation-invariant multiplicative jump,
+  $\operatorname{tr}(F_W\,C\circ\rho)$ depends on momentum-space coherences
+  of $\rho$, so incident states with equal momentum density but different
+  phases yield different window weights, which a classical convolution of a
+  transfer kernel with the incident momentum density cannot reproduce.
+
+It **cannot** test:
+
+- whether $P$ is the physical retained subspace or $F$ weight is irreversible
+  escape (return flux / rechanneling, $[H_\perp,P]\ne0$, energy-dependent $P$);
+- a joint position–direction law: a momentum projector yields only a momentum
+  marginal;
+- stopping, frame, energy-shell or native-stream mapping, or any physical
+  dechanneling rate;
+- convergence of the matching surface, transfer grid or depth.
+
+These are exactly the exclusions in the Claim's last sentence. The
+"planned physical checks" in the row's Checks field (flux balance against
+return flux, joint continuity, matching-surface convergence, omitted
+return-flux bound) belong to the physical handoff, not to this accounting
+identity.
+
+## Open item (a): the `--loss-coupling` diagnostic
+
+Read after the derivation above: `GridProjector.cross_cut_loss`,
+`MatchingDiagnostics`, `projective_hook` and `_setup`/`_job` in
+`checks/axial_mcwf_return_flux.py`, and the matching tests in
+`tests/montecarlo/test_channeling_axial_mcwf_return_flux.py`.
+
+### What should be computed
+
+The production no-jump generator is $H_{\rm eff}=H-iW$ with
+$W=\tfrac12\hbar v\,\Gamma$ in eV. Here $\Gamma$ is multiplication by the
+production diagonal $C(\mathbf r,\mathbf r)$ in Å$^{-1}$, so $\hbar v$
+[eV Å] $\times$ Å$^{-1}$ gives eV. Let $P$ project onto eigenvectors of $H$
+(at the carrier tilt) below the cut, and $F=R-P$. The coupling of the
+retained and outgoing sectors through the loss is the off-diagonal block
+$FH_{\rm eff}P=-iFWP$, because $FHP=0$. Its scale is the spectral norm
+$\|FWP\|_2$. The relevant energy denominator is the sector separation
+$\Delta=\min\operatorname{spec}(FHF)-\max\operatorname{spec}(PHP)$. The ratio
+$\|FWP\|_2/\Delta$ is the first-order (Davis–Kahan-type) rotation of the
+retained subspace under $-iW$. It is not a bound on the weight leaked over a
+finite depth, because the loss also acts through its anti-Hermitian part and
+accumulates with depth.
+
+For a cell-periodic $W$, its Fourier components lie only at reciprocal
+vectors that are multiples of the supercell count. $W$ is then block
+diagonal in the same order-residue blocks as $H$, so
+$\|FWP\|_2=\max_{\rm blocks}\|F_bW_bP_b\|_2$. The separation, by contrast, is
+global across all blocks.
+
+### Implementation comparison
+
+| Item | Derivation | `cross_cut_loss` |
+|---|---|---|
+| $W$ | $\tfrac12\hbar v\,C(\mathbf r,\mathbf r)$, eV | `dissipator.absorptive_eV` $=0.5\,\hbar v\,$`total_rate` (grid + sink + electronic) |
+| Plane-wave matrix | $W_{\mathbf k\mathbf k'}=\tilde w_{\mathbf k-\mathbf k'}$, $\tilde w=\mathrm{FFT}(W)/N$ | `loss_fourier[dx, dy]`, `dx` $=k-k'$; same convention as `u` |
+| Block reduction | valid for cell-periodic $W$ | enforced: refuses non-periodic `absorptive_eV` |
+| Norm | largest singular value, max over blocks | `svd(...)[0]`, `max` over blocks |
+| Separation | global $\min E_F-\max E_P$ | `outgoing_min - retained_max` across blocks |
+| Empty sector | norm 0, no separation | `0.0`, `None`, `None` |
+
+No factor, sign or convention differs. The histograms are filled before the
+projective draw and use no random numbers. They are weighted by hook events
+(entry plus each post-jump call), not by depth or by electron.
+
+### Independent dense oracle
+
+The oracle script
+(`/tmp/claude-1000/-home-alex-dev-pyrite/a6d7b22a-bb10-4e37-9fdd-dd3bf02926b0/scratchpad/oracle_losscoupling.py`)
+works in the plane-wave basis with an explicit unitary Kronecker DFT and does
+not use the Bloch blocks. It builds dense $H$ and $W$ from random
+cell-periodic $U$ and $W>0$ on supercells $(2,3)$, $(3,2)$ and $(1,1)$ with
+non-square cells, at three tilts and three cuts each. The largest deviation
+of norm and separation from the implementation is $2.7\times10^{-14}$ eV. The
+norm also equals the off-diagonal block of $H-iW$ in the $H$ eigenbasis to
+$10^{-10}$. Scaling $W\to\epsilon W$ on a $6\times6$, $2\times2$-cell case
+gives a largest principal-angle sine between the retained subspace and the
+right-eigenvector subspace of $H-i\epsilon W$ of
+$1.006\times10^{-4},10^{-3},10^{-2}$ for $\epsilon=10^{-3},10^{-2},10^{-1}$,
+against $\epsilon\|FWP\|/\Delta=3.36\times10^{-4},\dots$. The ratio is
+therefore the correct first-order scale and, in this case, an upper scale
+for the eigen-subspace rotation. The existing test
+`test_cross_cut_loss_matches_full_realspace_operator` provides a second
+independent route (a real-space dense matrix from FFT kinetic plus pointwise
+terms). All 50 tests in the four relevant modules pass.
+
+### Finding: the production $W$ is not the full TDS diagonal
+
+`absorptive_eV` uses `total_rate` $=C_{\rm grid}+\max(C-C_{\rm grid},0)+C_{\rm el}
+=\max(C,C_{\rm grid})+C_{\rm el}$, as recorded in
+`cr-axial-realspace-dissipator`. On the default MCWF grid of this study (Si
+[001], 5 MeV, $2\times2$ cells, TDS only), the clamp is active on 55%, 67% and
+36% of points at $16^2$, $32^2$ and $64^2$. It raises the cell-mean TDS loss
+above the full diagonal $C$ by 15.8%, 1.33% and 0.15%, with a pointwise
+excess of up to 327%, 98% and 12%. (The research note's "14.8% of 16² points,
+inactive at 32²" refers to the $1\times1$-cell continuum example, not this
+grid.) The diagnostic therefore measures $\|FWP\|$ for the production
+generator, which is internally consistent with its own jumps, and not for the
+exact full-jump loss of the derivation. The production sink is a clamped
+pointwise difference of two kernels, not the projected product $\Gamma_O$. The
+research note already states this. It is not a discrepancy in
+`cross_cut_loss`, but it does mean the MCWF arms' "unresolved" outcome is a
+proxy for the claim's $O$ weight, not the claim's $O$ weight.
+
+**Sub-verdict (a): `rederived`** for `GridProjector.cross_cut_loss` and
+`MatchingDiagnostics` as instrumentation: the norm, separation, units, block
+reduction and RNG neutrality all agree. As the code docstring states, the
+ratio is neither a leakage bound nor a photon-error bound.
+
+## Implementation agreement with the accounting
+
+Read after the derivation: the verdict sections of the six earlier scoped
+reviews above; `plane_wave_escape_rates` and `report` in
+`checks/axial_escape_accounting.py`; and the production sink construction.
+
+- **Positive effects and closure.** `continuum_tds_window_split` splits one
+  gain operator $\sigma$ (independent-atom Hadamard form) by a momentum box
+  and closes on the expectation of the production *full* diagonal $C$. This is
+  the derivation's same-kernel condition (scoped review: `rederived`).
+  `coherent_tds_gain` is the PSD finite-transfer gain (`rederived`).
+  `plane_wave_escape_rates` is the $R$/$O$ two-way partition of a single
+  incident order. Its classes are disjoint index sets of nonnegative rates,
+  so positivity and closure are exact, with zero-input and enclosing-window
+  limits (spot check: total $61.705$ for incident orders $(0,0)$, $(3,-2)$,
+  $(-4,3)$; window escape $28.6$, $38.8$, $42.5$; zero input gives zeros; a
+  $32^2$ window gives escape $0$).
+- **Three-way $P/F/O$.** In the MCWF arms, $P$ continues, $F=R-P$ is
+  absorbed by the projective hook, and the sink jump plays the role of $O$.
+  The partition is exhaustive in each history (hook and projector algebra:
+  `rederived`; projected no-jump reference: `rederived`). The matching study
+  and Bloch-block rates realize the $P/F$ split for energy projectors with
+  exact secular flux balance (`rederived`).
+- **Loss effect versus direction law.** `report()` gives, for unit-density
+  plane waves of incident orders $(0,0)$, $(7,0)$, $(0,7)$ and $(7,7)$ on a
+  $16^2$ window, an identical total $6.078\times10^{-5}$ Å$^{-1}$ and an
+  identical diagonal-sink rate $9.81\times10^{-6}$ Å$^{-1}$. The window escape
+  is $5.13\times10^{-6}$, $2.79\times10^{-5}$, $2.79\times10^{-5}$ and
+  $4.15\times10^{-5}$ Å$^{-1}$. This is the TDS-like counterexample derived
+  above, realized numerically. The coherent-gain tests cover the
+  equal-density, different-phase case.
+
+There is one limitation of the implementation relative to the derivation.
+The exact same-kernel three-way split is realized only in the research
+checks. The MCWF arms use the clamped production sink as the $O$ proxy (see
+the finding above). Coherences $P\sigma F$ are dropped by projective
+measurement, which is a declared modelling choice. No sign, factor or
+convention diverges.
+
+## Adjudication
+
+The Claim contains three sentences:
+
+1. "retained, represented outgoing and numerically unresolved weights have
+   distinct positive effects; their sum closes the full jump loss" —
+   independently derived (PSD of $X^\dagger QX$, linear insertion of
+   $P+F+O=I$). The research checks implement it, and the scoped reviews
+   verified it. One wording caveat applies: "full jump loss" means the full
+   jump **rate** $\operatorname{tr}\rho\Gamma$, including recapture into $P$.
+   It equals the loss of retained weight only for $[H_\perp,P]=0$ and a fixed
+   $P$.
+2. "A loss effect alone does not identify an outgoing direction law" —
+   derived with a general isometry argument and two counterexamples, and
+   reproduced by `report()`.
+3. "A Fourier-window plane-wave diagnostic tests this distinction, not
+   physical dechanneling or a native launch model" — derived (see "can and
+   cannot test" above), and matched by `plane_wave_escape_rates`, `report`
+   and the coherent-gain checks.
+
+The Claim as worded is an accounting contract plus a diagnostic distinction.
+It explicitly disclaims physical dechanneling and native launch. It is fully
+rederived.
+
+The row conflates this with the physical handoff in three places:
+
+- **Checks:** "planned physical checks: units, flux balance, zero
+  scattering, joint depth/direction/energy continuity, differential-transfer
+  and matching-surface convergence, omitted return-flux bound". Of these,
+  units, flux balance (as trace closure) and zero scattering belong to the
+  accounting and pass. Joint continuity, matching-surface convergence and
+  the omitted return-flux bound are obligations of a physical handoff the
+  Claim does not make.
+- **Notes:** "this scoped algebra result does not advance the
+  physical-handoff claim", together with "The matching prescription, outgoing
+  phase-space instrument, stopping/frame/native stream mapping … remain
+  open", treat this row as the physical-handoff claim.
+- **Claim lead-in:** "proposed research contract for axial entrance-zone
+  handoff" can be read as the handoff itself.
+
+If the row is meant to carry the physical handoff, the Claim text does not
+say so and cannot rise. As written, it can.
+
+**Verdict: `rederived`**, conditional on the wording split below being
+applied with the status change. Without the split, the Checks and Notes
+contradict the status, and the row should stay `unverified`.
+
+Suggested ledger change (the task owner applies it; never `signed-off`):
+
+- Claim: "research accounting contract for an axial entrance-zone handoff:
+  for complementary retained ($P$), represented-outgoing ($F$) and
+  numerically unresolved ($O$) projectors, the effects
+  $\sum PJ^\dagger QJP$ are positive and sum to the full jump rate
+  $\operatorname{tr}\rho\sum J^\dagger J$ (including recapture into $P$). A
+  loss effect alone does not identify an outgoing direction law. A
+  Fourier-window plane-wave diagnostic tests this distinction, not physical
+  dechanneling, a matching surface or a native launch model."
+- Status: `rederived`.
+- Checks: "units, positivity, trace closure, zero-scattering and
+  enclosing-window limits; equal-loss / different-direction counterexample;
+  equal-density / different-phase window interference. The production MCWF
+  sink is a clamped proxy for $O$, not the projected $\Gamma_O$."
+- Move to a new row (for example `cr-axial-zone-handoff-physical`, status
+  `unverified`): the matching prescription and surface convergence; joint
+  depth/direction/energy continuity; the omitted return-flux bound and depth
+  budget; the physical choice and resolution of the outgoing instrument
+  (whose algebra is `cr-axial-phase-space-instrument`); and the
+  stopping/frame/native stream mapping. `cr-axial-persisted-channel` is a
+  source-normalization claim and is not the right home.
+- Notes: record sub-verdict (a) `rederived` for the loss-coupling
+  instrumentation, and the clamp magnitude on the $2\times2$-cell $32^2$ grid
+  (1.33% mean, up to 98% pointwise). Human sign-off remains in #277.

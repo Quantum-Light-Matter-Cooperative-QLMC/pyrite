@@ -6,7 +6,7 @@ on 2026-10-17. This note derives the accounting that an escape model must
 satisfy and gives a numerical counterexample to identifying the current grid
 sink with outgoing population. It does **not** select or validate a physical
 matching threshold, rechanneling approximation, or native launch distribution.
-The claim `cr-axial-zone-handoff-accounting` remains `unverified`.
+The accounting claim `cr-axial-zone-handoff-accounting` is `rederived`; the physical handoff, `cr-axial-zone-handoff-physical`, remains `unverified`.
 
 ## Three subspaces, not two loss labels
 
@@ -244,7 +244,7 @@ example, the plane-wave reduction, and zero-rate limits. The
 [fresh-context verification](../../validation/channeling/cr-axial-zone-handoff-accounting.md)
 rederives this finite-transfer algebra and compares an independent Gaussian
 quadrature with the implementation. It does not certify physical matching:
-`cr-axial-zone-handoff-accounting` remains `unverified`.
+`cr-axial-zone-handoff-physical` remains `unverified`.
 
 ## Cutoff-free continuum window split
 
@@ -335,8 +335,8 @@ mixture, in-phase and antiphase totals are 6.429e-5, 1.204e-4 and
 the string. The production grid samples of $C(\mathbf r,\mathbf r)$ give
 6.465e-5, 1.210e-4 and 8.297e-6 Å$^{-1}$: 0.6%, 0.5% and 1.7% higher. The
 excess comes from the zero clamp on the production sink, active on 14.8% of
-the 16² grid points, not from the closure; at 32², where the clamp is
-inactive, the mixture's grid mean matches the total to 5e-10. Supercell lattice sums over
+the 16² grid points of this 1×1-cell example, not from the closure; at 32², where the clamp is
+inactive for this example (it stays active on the 2×2-cell MCWF grid), the mixture's grid mean matches the total to 5e-10. Supercell lattice sums over
 orders $|n_{x,y}|\le15c$ approach the matching continuum box integral as
 6.078e-5 versus 6.225e-5, 6.2288e-5 versus 6.2309e-5, and 6.22787e-5 versus
 6.22785e-5 Å$^{-1}$ for $c=1,2,4$. The $c=1$ lattice sum reproduces the
@@ -347,7 +347,7 @@ ties the outgoing gain to the production TDS loss effect. It does not choose
 the physical retained projector $P$, bound return flux, supply an outgoing
 phase-space instrument, or treat electronic jumps; the box remains numerical
 accounting. A [fresh-context review](../../validation/channeling/cr-axial-zone-handoff-accounting.md)
-rederives this split; `cr-axial-zone-handoff-accounting` remains `unverified`.
+rederives this split; `cr-axial-zone-handoff-physical` remains `unverified`.
 
 ## Energy-defined retained projector and return flux
 
@@ -570,8 +570,8 @@ convergence before a physical matching threshold can be selected.
 
 `checks/axial_mcwf_return_flux.py --loss-coupling` optionally records the
 absorptive operator at each **entry or post-jump projection event**. This is
-research instrumentation under `cr-axial-zone-handoff-accounting`; its physical
-claim remains `unverified`. The MCWF no-jump convention follows
+research instrumentation under `cr-axial-zone-handoff-accounting`; the physical
+claim `cr-axial-zone-handoff-physical` remains `unverified`. The MCWF no-jump convention follows
 [Castin, Dalibard and Mølmer, Eq. (4)](https://arxiv.org/abs/0805.4002):
 
 $$H_{\rm eff}=H-iW,\qquad W=\frac{\hbar v_z}{2}\sum_m C_m^\dagger C_m.$$
@@ -704,7 +704,7 @@ provenance, not performance comparisons between different numerical cases.
 
 `checks/axial_mcwf_return_flux.py --projected-no-jump` adds a CPU research
 comparison using `montecarlo/channeling/axial_projection.py`. This is not a
-physical escape model; `cr-axial-zone-handoff-accounting` stays `unverified`.
+physical escape model; `cr-axial-zone-handoff-physical` stays `unverified`.
 The source is Castin, Dalibard and Mølmer, Eqs. (2), (4), (8), with the
 represented-grid generator compressed before exponentiation:
 

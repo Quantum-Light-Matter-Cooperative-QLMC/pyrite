@@ -1,6 +1,6 @@
 # Issue #623 — axial entrance-zone contract scaffolding
 
-**Status: research-only; `cr-axial-zone-handoff-accounting` remains unverified.**
+**Status: research-only; `cr-axial-zone-handoff-physical` remains unverified.**
 The associated code does not enable axial channeling in standard PyRITE runs.
 It adds fail-closed, testable numerical contracts for physical outgoing-flux
 accounting, candidate lab-frame launch conversion and positive expected-value
