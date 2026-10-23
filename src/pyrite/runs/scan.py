@@ -625,6 +625,7 @@ def _resolved_run(args, material):
     # stands. settings.emission drives the dataset_identity divergence key and
     # the canonical_full collision guard below, so a coherent/both run never
     # shares the plain incoherent <material> stem.
+    from .._config_presets import identity_labels
     from ..materials import CATALOG
 
     detector_id = getattr(args, "detector_id", None)
@@ -752,6 +753,8 @@ def _resolved_run(args, material):
     )
     if named_variant:
         identity["detector_id"] = detector_id
+    # Unhashed label: names and definition digests of the resolved presets.
+    identity.update(identity_labels(CATALOG, catalog_profile))
     canonical_full = (
         fidelity == "full"
         and not overrides

@@ -39,10 +39,11 @@ Build a beam, target and detector, then call {py:func}`pyrite.simulate` with
 those three components. `Scene` collects them for sweeps; `Physics` selects
 models and `Numerics` controls sampling and integration. Beam transverse and
 longitudinal descriptions and target footprints are explicit inputs.
-{py:func}`pyrite.load_physics` returns a named catalog physics preset (for
-example the bundled `electron-standard`, or one made with
-`pyrite physics preset create`) as a frozen `Physics`; adjust it with
-`dataclasses.replace` instead of restating every model.
+{py:func}`pyrite.load_physics` and {py:func}`pyrite.load_numerics` return
+named catalog presets (for example the bundled `electron-standard` and
+`default`, or ones made with `pyrite physics|numerics preset create`) as
+frozen `Physics` and `Numerics`; adjust them with `dataclasses.replace`
+instead of restating every setting.
 
 `simulate` returns an in-memory `Result` without reading or writing checkpoints.
 Radiation families remain separate: `cxr.incoherent`, optional `cxr.coherent`,
@@ -99,6 +100,7 @@ For correlated imported beams, see [GDF beam import](guides/gpt-gdf-beams.md).
    pyrite.Sweep
    pyrite.Physics
    pyrite.load_physics
+   pyrite.load_numerics
    pyrite.CxrReflections
    pyrite.Numerics
    pyrite.Precision

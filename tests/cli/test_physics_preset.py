@@ -20,6 +20,11 @@ def snapshot(path):
     }
 
 
+def member(profile):
+    catalog = load_material_catalog(profile=profile)
+    return (catalog.profile_materials(profile) or catalog.material_keys)[0]
+
+
 def ok(*args):
     result = invoke(command, list(args))
     assert_clean_result(result)
@@ -30,7 +35,7 @@ def identity(profile):
     # Identity predictors read the process-wide default catalog; reload it so
     # each call sees the edits made through the CLI.
     _refresh_default_catalog(load_material_catalog())
-    material = load_material_catalog(profile=profile).material_keys[0]
+    material = member(profile)
     return named_profile_identity(material, catalog_profile=profile)
 
 

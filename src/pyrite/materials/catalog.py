@@ -11,7 +11,7 @@ from threading import Lock
 from types import MappingProxyType
 from typing import cast
 
-from .. import _physics_presets
+from .. import _config_presets
 from .._catalog_layout import CatalogLayoutError, Sources, catalog_root, selected_catalog
 from .._catalog_layout import load_raw as _load_raw
 from .._catalog_layout import read_sources as _read_sources
@@ -24,6 +24,7 @@ from ._parse import (
     _parse_energy_grids,
     _parse_materials,
     _parse_media,
+    _parse_profile_cxr_grid_policy,
     _parse_profiles,
 )
 from ._schema import (
@@ -127,7 +128,7 @@ def _load_material_catalog_cached(
             "energy_grids",
             "beams",
             "detectors",
-            _physics_presets.TABLE,
+            *_config_presets.TABLES,
         },
     )
     version = raw.get("schema_version")
@@ -136,7 +137,7 @@ def _load_material_catalog_cached(
     for key in ("profiles", "crystals", "media", "materials"):
         if key not in raw:
             errors.add(key, "missing required table")
-    physics_presets, profile_rows, profile_physics_refs = _resolve_physics_presets(raw, errors)
+    preset_tables, profile_rows, profile_preset_refs = _resolve_presets(raw, errors)
     profiles = _parse_profiles(profile_rows, errors)
     beams = _parse_beams(raw.get("beams", {}), errors)
     detectors, detector_labels = _parse_detectors(raw.get("detectors", {}), errors)
@@ -298,35 +299,50 @@ def _load_material_catalog_cached(
         detectors=MappingProxyType(detectors),
         detector_labels=MappingProxyType(detector_labels),
         detector_keys=tuple(detectors),
-        physics_presets=physics_presets,
-        profile_physics_refs=MappingProxyType(profile_physics_refs),
+        preset_tables=preset_tables,
+        profile_preset_refs=profile_preset_refs,
     )
 
 
-def _resolve_physics_presets(
+def _resolve_presets(
     raw: Mapping[str, object], errors: _Errors
-) -> tuple[Mapping[str, Mapping[str, object]], object, dict[str, str]]:
-    """Validate ``[physics.NAME]`` presets and fold them into referencing profiles.
+) -> tuple[
+    Mapping[str, Mapping[str, Mapping[str, object]]], object, Mapping[str, Mapping[str, str]]
+]:
+    """Validate physics/numerics presets and fold them into referencing profiles.
 
-    Returns the frozen valid presets, the profile rows to parse, and each
-    profile's preset reference (ADR-0021).
+    Returns the frozen valid presets and each profile's references, both keyed
+    by table, and the profile rows to parse (ADR-0021).
     """
-    table = raw.get(_physics_presets.TABLE, {})
-    if not isinstance(table, Mapping):
-        errors.add(_physics_presets.TABLE, "must be a table")
-        table = {}
-    presets = {}
-    for name, row in table.items():
-        problems = _physics_presets.preset_errors(name, row)
-        for path, message in problems:
-            errors.add(path, message)
-        if not problems:
-            presets[name] = cast("Mapping[str, object]", row)
-    rows, references, problems = _physics_presets.resolve_profile_rows(raw.get("profiles"), presets)
+    presets: dict[_config_presets.PresetKind, dict[str, Mapping[str, object]]] = {}
+    for kind in _config_presets.KINDS:
+        table = raw.get(kind.table, {})
+        if not isinstance(table, Mapping):
+            errors.add(kind.table, "must be a table")
+            table = {}
+        valid = presets[kind] = {}
+        for name, row in table.items():
+            problems = _config_presets.preset_errors(kind, name, row)
+            for path, message in problems:
+                errors.add(path, message)
+            if problems:
+                continue
+            if "line_grid_policy" in row:
+                _parse_profile_cxr_grid_policy(
+                    row["line_grid_policy"], f"{kind.table}.{name}.line_grid_policy", errors
+                )
+            valid[name] = cast("Mapping[str, object]", row)
+    rows, references, problems = _config_presets.resolve_profile_rows(raw.get("profiles"), presets)
     for path, message in problems:
         errors.add(path, message)
-    frozen = {name: _physics_presets.frozen_preset(row) for name, row in presets.items()}
-    return MappingProxyType(frozen), rows, references
+    frozen = {
+        kind.table: MappingProxyType(
+            {name: _config_presets.frozen_preset(row) for name, row in rows_by_name.items()}
+        )
+        for kind, rows_by_name in presets.items()
+    }
+    refs = {table: MappingProxyType(mapping) for table, mapping in references.items()}
+    return MappingProxyType(frozen), rows, MappingProxyType(refs)
 
 
 _DEFAULT_CATALOG: MaterialCatalog | None = None

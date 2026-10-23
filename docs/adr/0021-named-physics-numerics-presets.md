@@ -24,14 +24,17 @@ a model registry and add no runtime dispatch.
 | Object | Catalog table | Profile reference | Owned keys |
 | --- | --- | --- | --- |
 | Physics preset | `[physics.NAME]` (`physics/NAME.toml`) | `physics = "NAME"` | `emission` plus every profile key that is a `Physics` field |
-| Numerics preset | `[numerics.NAME]` (`numerics/NAME.toml`) | `numerics = "NAME"` | Profile numerics keys that are not `Physics` fields (phase 2) |
+| Numerics preset | `[numerics.NAME]` (`numerics/NAME.toml`) | `numerics = "NAME"` | Scalar trial counts and the profile numerics keys that are not `Physics` fields, plus `precision` and `line_grid_policy` tables |
 
 Both tables follow the existing object rules: one file per object, file stem
 is the name (`[A-Za-z0-9][A-Za-z0-9._-]*`), names are reserved
 case-insensitively across the bundled and user layers, and bundled objects are
 read-only. A preset may be partial; an omitted key keeps its built-in default.
-`description` is display metadata only. A preset is never a sweep: grids,
-material membership and beam/detector references stay in the profile.
+`description` is display metadata only. A preset is never a sweep: trial
+counts are single values, and grids, material membership and beam/detector
+references stay in the profile. Trial counts and `precision` form one sampling
+policy: a profile that sets any of them takes none of them from its numerics
+preset, so fixed counts and adaptive precision never mix.
 
 **Resolution.** One path, lowest to highest precedence:
 
@@ -63,13 +66,17 @@ or moving inline fields into an equivalent preset leaves identities unchanged;
 a scientifically meaningful preset edit changes the effective values of every
 referencing profile and therefore their identities.
 
-**Immutability.** Bundled presets are immutable from the ordinary CLI and are
-cloned with `create NAME --from SOURCE`. User presets are editable; editing
-affects future resolutions only. A resolved configuration is the frozen
-`Physics`/`Numerics` values recorded with the run; later catalog edits cannot
-reach it. Recording the preset name and definition digest beside those values,
-strict refusal of `auto` fallbacks, and remote catalog parity are follow-on
-work in #663 phase 3; they do not alter the identity rule above.
+**Immutability and provenance.** Bundled presets are immutable from the
+ordinary CLI and are cloned with `create NAME --from SOURCE`. User presets are
+editable; editing affects future resolutions only. A resolved configuration is
+the frozen `Physics`/`Numerics` values recorded with the run; later catalog
+edits cannot reach it. Profile runs record each referenced preset's name and
+SHA-256 definition digest as an unhashed `presets` label beside the dataset
+identity and in the case manifest. Remote jobs ship user preset files with the
+rest of the user catalog layer, and the existing submitter/host dataset-digest
+comparison covers their resolution. Strict refusal of `auto` model fallbacks
+remains open in #663: fallbacks are reported by warnings of mixed categories
+across campaign, transport and table code and need one audited category first.
 
 **Commands.** `pyrite physics preset {list,show,create,set,reset,validate,
 rename,delete,adopt}` (and the numerics equivalent) manage the objects; the

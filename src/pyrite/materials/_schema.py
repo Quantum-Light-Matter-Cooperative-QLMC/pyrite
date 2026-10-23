@@ -435,8 +435,8 @@ class MaterialCatalog:
         Named beam definitions and their source declaration order.
     detectors, detector_labels, detector_keys
         Named scalar detectors, display labels, and source declaration order.
-    physics_presets, profile_physics_refs
-        Named physics presets and each profile's preset reference.
+    preset_tables, profile_preset_refs
+        Named physics/numerics presets and each profile's references, by table.
 
     Notes
     -----
@@ -510,18 +510,27 @@ class MaterialCatalog:
     detector_labels: Mapping[str, str] = MappingProxyType({})
     #: Every ``[detectors.*]`` name defined by the source TOML.
     detector_keys: tuple[str, ...] = ()
-    #: Named ``[physics.*]`` presets (ADR-0021), keyed by name. Profiles never
-    #: read these directly: each reference is already folded into the profile's
-    #: emission and transport numerics, so the name cannot reach an identity.
-    physics_presets: Mapping[str, Mapping[str, object]] = MappingProxyType({})
-    #: ``profiles.NAME.physics`` preset references, as display provenance only.
-    profile_physics_refs: Mapping[str, str] = MappingProxyType({})
+    #: Named ``[physics.*]`` and ``[numerics.*]`` presets (ADR-0021), keyed by
+    #: table then name. Profiles never read these directly: each reference is
+    #: already folded into the profile's values, so a name cannot reach an identity.
+    preset_tables: Mapping[str, Mapping[str, Mapping[str, object]]] = MappingProxyType({})
+    #: ``profiles.NAME.physics``/``numerics`` references keyed by table then
+    #: profile, as display provenance only.
+    profile_preset_refs: Mapping[str, Mapping[str, str]] = MappingProxyType({})
 
     def profile_beam(self, name: str) -> Mapping[str, object] | None:
         """Decoded ``[profiles.NAME.beam]`` distribution overrides, or ``None``
         when the profile carries no beam block (the ``standard`` beam default
         applies). Consumed by :func:`config.material_sweep` via ``beam_replace``."""
         return self.profile_beams.get(name)
+
+    def presets(self, table: str) -> Mapping[str, Mapping[str, object]]:
+        """Named ``physics`` or ``numerics`` presets, keyed by name."""
+        return self.preset_tables.get(table, MappingProxyType({}))
+
+    def profile_preset(self, table: str, name: str) -> str | None:
+        """Profile ``name``'s ``physics``/``numerics`` preset reference, if any."""
+        return self.profile_preset_refs.get(table, {}).get(name)
 
     def profile_emission(self, name: str) -> str | None:
         """Explicit ``profiles.NAME.emission`` override, or ``None`` when the

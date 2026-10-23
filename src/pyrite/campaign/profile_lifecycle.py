@@ -20,7 +20,7 @@ from ._profile_document import (
     unknown_detector,
     values_item,
 )
-from .physics_presets import attach_preset
+from .config_presets import attach_preset
 from .profile_cxr_grid import _check_cxr_grid_policy, profile_cxr_grid_values
 from .profile_detectors import attach_detector_shortcut
 from .profile_membership import csv_materials, validate_materials
@@ -216,9 +216,12 @@ def set_profile(
     all_materials,
     emission,
     temporal_profile=None,
-    physics_name=None,
+    presets=None,
 ):
     """Replace supplied profile fields and return overwritten field labels.
+
+    ``presets`` maps a :class:`~pyrite._config_presets.PresetKind` to the
+    named preset to attach (ADR-0021).
 
     ``temporal_profile`` True writes the opt-in key; False removes it (off is
     the absent default).
@@ -253,8 +256,8 @@ def set_profile(
         target["temporal_profile"] = True
     elif temporal_profile is False:
         target.pop("temporal_profile", None)
-    if physics_name is not None:
-        attach_preset(document, name, physics_name)
+    for kind, preset in (presets or {}).items():
+        attach_preset(document, kind, name, preset)
     _check_cxr_grid_policy(target, profile_cxr_grid_values(target))
     return overwriting
 

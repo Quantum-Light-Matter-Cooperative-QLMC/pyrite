@@ -6,8 +6,9 @@ from typing import Any, cast
 import click
 from tomlkit.exceptions import ParseError
 
-from pyrite.campaign import _profile_document, physics_presets, profile_numerics
+from pyrite.campaign import _profile_document, config_presets, profile_numerics
 
+from ..._config_presets import NUMERICS, PHYSICS
 from ..._numerics import PHYSICS_FIELDS
 from ...console import json as cli_json
 from ...console.output import CLIError, emit_json_result, emit_result, output_option
@@ -39,7 +40,7 @@ def _show(name, json_output, *, physics):
             if (row["key"] in PHYSICS_FIELDS) == physics
         ]
         if physics:
-            preset, preset_fields = physics_presets.profile_preset(document, target)
+            preset, preset_fields = config_presets.profile_preset(document, PHYSICS, target)
             emission_source = (
                 "profile"
                 if "emission" in target
@@ -59,9 +60,12 @@ def _show(name, json_output, *, physics):
                     "source": emission_source,
                 },
             )
-        payload = {"profile": name, "fields": fields}
-        if physics:
-            payload["preset"] = preset
+        kind = PHYSICS if physics else NUMERICS
+        payload = {
+            "profile": name,
+            "preset": config_presets.profile_preset(document, kind, target)[0],
+            "fields": fields,
+        }
     except (OSError, ValueError, ParseError) as exc:
         if json_output:
             emit_json_result(cli_json.failure(schema, {}, str(exc)))
@@ -187,7 +191,7 @@ def _register(group, *, physics):
 @click.group(
     "physics",
     cls=LazyGroup,
-    lazy_commands={"preset": "pyrite.cli.commands.physics_preset.command"},
+    lazy_commands={"preset": "pyrite.cli.commands.config_preset.physics_command"},
     lazy_help={"preset": "Manage named physics presets that profiles attach by name."},
     context_settings={"help_option_names": ["-h", "--help"]},
 )
@@ -205,11 +209,13 @@ def physics_command():
     "numerics",
     cls=LazyGroup,
     lazy_commands={
+        "preset": "pyrite.cli.commands.config_preset.numerics_command",
         "precision": "pyrite.cli.commands._profile_precision.command",
         "cxr-grid": "pyrite.cli.commands._profile_cxr_grid.command",
         "energy-grid": "pyrite.cli.commands.energy_grid_surface.material_command",
     },
     lazy_help={
+        "preset": "Manage named numerics presets that profiles attach by name.",
         "precision": "Configure adaptive precision or fixed trials on PROFILE.",
         "cxr-grid": "Configure PROFILE's automatic CXR photon-grid policy.",
         "energy-grid": "Derive and inspect specialist photon-grid artifacts.",
@@ -219,8 +225,10 @@ def physics_command():
 def numerics_command():
     """Inspect and edit PROFILE's sampling, integration and photon grids.
 
-    Settings stay in the selected profile; no independent preset is created.
-    Physical interaction models and cutoffs live under pyrite physics.
+    show/set/reset/validate edit the selected profile's own fields, which
+    override any attached named preset; manage reusable presets with
+    'pyrite numerics preset'. Physical models and cutoffs live under pyrite
+    physics.
     """
 
 
