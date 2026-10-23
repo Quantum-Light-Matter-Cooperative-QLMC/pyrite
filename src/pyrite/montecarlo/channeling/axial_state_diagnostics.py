@@ -8,12 +8,14 @@ Bloch carrier sectors have distinct Hamiltonians, H_q=T(k+q)+U.
 
 from __future__ import annotations
 
+import warnings
 from collections import OrderedDict
 from dataclasses import dataclass
 
 import numpy as np
 from scipy.linalg import eigh
-from scipy.sparse.linalg import LinearOperator, eigsh
+from scipy.sparse.linalg import LinearOperator, eigsh, lobpcg
+from threadpoolctl import threadpool_limits
 
 from pyrite.materials.channeling.transverse import (
     HBAR2_2M_EV_ANG2,
@@ -43,7 +45,50 @@ class DiscreteSpectrum:
     vectors: np.ndarray
 
 
-def transverse_spectrum(grid, potential_eV, kinetic_energy_eV, tilt_inv_ang, count):
+def _warm_lobpcg(kinetic, potential, guess, count):
+    """Lowest ``count`` eigenpairs by LOBPCG in the plane-wave basis, or ``None``.
+
+    ``guess`` holds real-space columns already shifted to this sector. Only an
+    explicit residual check accepts the result; otherwise ARPACK is used.
+    """
+    shape, n = potential.shape, potential.size
+    t = kinetic.reshape(n)
+
+    def apply(x):
+        r = np.fft.ifft2(x.T.reshape(-1, *shape), norm="ortho") * potential
+        return np.fft.fft2(r, norm="ortho").reshape(-1, n).T + t[:, None] * x
+
+    x0 = np.fft.fft2(guess.T.reshape(-1, *shape), norm="ortho").reshape(-1, n).T[:, :count]
+    if x0.shape[1] < count:
+        fill = np.random.default_rng(0).standard_normal((n, 2 * (count - x0.shape[1])))
+        x0 = np.hstack([x0, fill.view(complex)])
+    precondition = (1.0 / (t + abs(potential.mean()) + 1.0))[:, None]
+
+    def block(f):
+        return lambda x: f(x.reshape(n, -1))
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        try:
+            energies, vectors = lobpcg(
+                block(apply),
+                x0,
+                M=block(lambda x: precondition * x),
+                largest=False,
+                tol=1e-9,
+                maxiter=200,
+            )
+        except (Warning, np.linalg.LinAlgError, ValueError):
+            return None
+    residual = np.linalg.norm(apply(vectors) - vectors * energies, axis=0)
+    if not np.all(residual <= 1e-9 * np.maximum(np.abs(energies), 1.0)):
+        return None
+    order = np.argsort(energies)
+    vectors = np.fft.ifft2(vectors[:, order].T.reshape(-1, *shape), norm="ortho")
+    return energies[order], vectors.reshape(-1, n).T
+
+
+def transverse_spectrum(grid, potential_eV, kinetic_energy_eV, tilt_inv_ang, count, guess=None):
     """Diagonalize precisely the Hamiltonian used by the split-step FFT.
 
     Both the supercell boundary conditions and the trajectory's actual carrier
@@ -51,6 +96,11 @@ def transverse_spectrum(grid, potential_eV, kinetic_energy_eV, tilt_inv_ang, cou
     larger grids use the lowest eigenpairs of a matrix-free Hermitian operator.
     The solver does *not* pretend these finite-supercell states are continuum
     scattering states or infinite-crystal Bloch bands.
+
+    ``guess`` (real-space columns, shape ``(n, m)``) only warm-starts the
+    matrix-free solve: LOBPCG pairs are kept only if every residual
+    ``|H v - E v| <= 1e-9 max(|E|, 1)`` eV; otherwise ARPACK runs unseeded.
+    BLAS runs single-threaded here: these small blocks oversubscribe cores.
     """
     n = int(np.prod(grid.shape))
     if not 1 <= count <= n or (n > MAX_DENSE_DIMENSION and count > MAX_SPECTRAL_STATES + 1):
@@ -76,8 +126,12 @@ def transverse_spectrum(grid, potential_eV, kinetic_energy_eV, tilt_inv_ang, cou
         h = (h + h.conj().T) / 2
         energies, vectors = eigh(h, subset_by_index=(0, count - 1), check_finite=False)
     else:
-        h = LinearOperator((n, n), matvec=apply, dtype=np.complex128)  # type: ignore
-        energies, vectors = eigsh(h, k=count, which="SA", tol=1e-10)
+        with threadpool_limits(1, user_api="blas"):
+            solved = None if guess is None else _warm_lobpcg(kinetic, potential, guess, count)
+            if solved is None:
+                h = LinearOperator((n, n), matvec=apply, dtype=np.complex128)  # type: ignore
+                solved = eigsh(h, k=count, which="SA", tol=1e-10)
+        energies, vectors = solved
         order = np.argsort(energies)
         energies, vectors = energies[order], vectors[:, order]
     return DiscreteSpectrum(np.asarray(energies, float), np.asarray(vectors, complex))
@@ -212,6 +266,27 @@ class AxialSpectralObservable:
         self.scratch_bytes = self._sector_bytes * (2 + self._max_device_sectors)
         self._device_cache = OrderedDict()
 
+    def _guess(self, q):
+        """Nearest cached sector's eigenvectors, carrier-shifted by a grid ``G``.
+
+        ``H(q + G)`` is ``H(q)`` conjugated by ``exp(-i G r)`` up to FFT-grid
+        wrap-around, so the shifted vectors are a close LOBPCG start.
+        """
+        dk = [2.0 * np.pi / e for e in self.grid.extent_ang]
+        best = None
+        for s, spec in self._cache.items():
+            m = [round((a - b) / d) for a, b, d in zip(q, s, dk, strict=True)]
+            miss = np.hypot(*(a - b - i * d for a, b, i, d in zip(q, s, m, dk, strict=True)))
+            if best is None or miss < best[0]:
+                best = (miss, spec.vectors, m)
+        if best is None:
+            return None
+        _, vectors, (mx, my) = best
+        phase = np.exp(
+            -1j * (mx * dk[0] * self.grid.x[:, None] + my * dk[1] * self.grid.y[None, :])
+        )
+        return vectors * phase.reshape(-1, 1)
+
     def _spectrum(self, q):
         if q not in self._cache:
             if self.representation != "energy_bins":
@@ -222,7 +297,7 @@ class AxialSpectralObservable:
             n = int(np.prod(self.grid.shape))
             extra = 1 if self.count < n else 0
             self._cache[q] = transverse_spectrum(
-                self.grid, self.potential, self.energy_eV, q, self.count + extra
+                self.grid, self.potential, self.energy_eV, q, self.count + extra, self._guess(q)
             )
             if len(self._cache) > self._max_sectors:
                 self._cache.popitem(last=False)
