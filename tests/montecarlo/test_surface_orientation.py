@@ -268,7 +268,6 @@ validation_id = "mos2-cif-migration"
 formula = "MoS2"
 B_ang2 = 0.6
 surface_hkl = [1, 0, 0]
-E_grid = { arange = { start = 800.0, stop = 3500.0, step = 5.0 } }
 hkl_families = [[1, 0, 0]]
 hkl_reason = "test surface-parallel reflection"
 [media.sio2]

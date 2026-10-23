@@ -239,7 +239,7 @@
     {
       "path": "src/pyrite/materials/_parse.py",
       "name": "_parse_crystals",
-      "cc": 57
+      "cc": 54
     },
     {
       "path": "src/pyrite/materials/_parse.py",
@@ -264,7 +264,7 @@
     {
       "path": "src/pyrite/materials/authoring.py",
       "name": "build_crystal",
-      "cc": 26
+      "cc": 25
     },
     {
       "path": "src/pyrite/materials/catalog.py",
