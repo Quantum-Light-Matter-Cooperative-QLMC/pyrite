@@ -124,7 +124,7 @@
     {
       "path": "src/pyrite/cli/commands/_profile_show.py",
       "name": "emit_show",
-      "cc": 34
+      "cc": 33
     },
     {
       "path": "src/pyrite/cli/commands/_remote_actions.py",
@@ -134,12 +134,12 @@
     {
       "path": "src/pyrite/cli/commands/profile.py",
       "name": "remove_command",
-      "cc": 26
+      "cc": 27
     },
     {
       "path": "src/pyrite/cli/commands/profile.py",
       "name": "set_command",
-      "cc": 30
+      "cc": 32
     },
     {
       "path": "src/pyrite/cli/commands/remote.py",

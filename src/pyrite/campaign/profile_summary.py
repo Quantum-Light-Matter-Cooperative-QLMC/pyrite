@@ -1,5 +1,6 @@
 """Read-only profile summary assembly for catalog consumers."""
 
+from pyrite._config_presets import KINDS
 from pyrite._numerics import TRANSPORT_KEYS
 
 from ._profile_document import (
@@ -12,6 +13,7 @@ from ._profile_document import (
     range_values,
     unknown_detector,
 )
+from .config_presets import effective_profile
 from .profile_cxr_grid import profile_cxr_grid_values
 from .profile_detectors import (
     ACTIVE_DETECTOR_FIELDS,
@@ -101,6 +103,17 @@ def profile_payload(document, name):
         dict(row.unwrap() if hasattr(row, "unwrap") else row) for row in filter_rows(profile)
     ]
     physical = physical_detector_row(profile)
+    presets = {kind.table: profile.get(kind.reference_key) for kind in KINDS}
+    effective = effective_profile(document, profile)
+    precision = dict(
+        zip(
+            ("explicit", "effective", "source", "fixed_reason"),
+            precision_resolution(effective),
+            strict=True,
+        )
+    )
+    if precision["source"] == "profile" and "precision" not in profile:
+        precision["source"] = f"preset {presets['numerics']}"
     return {
         "name": name,
         "ranges": [
@@ -120,15 +133,11 @@ def profile_payload(document, name):
             else dict(physical.unwrap() if hasattr(physical, "unwrap") else physical)
         ),
         "emission": profile.get("emission"),
+        "effective_emission": effective.get("emission", "incoherent"),
+        "presets": presets,
         "temporal_profile": profile.get("temporal_profile") is True,
         "line_grid_policy": profile_cxr_grid_values(profile),
-        "precision": dict(
-            zip(
-                ("explicit", "effective", "source", "fixed_reason"),
-                precision_resolution(profile),
-                strict=True,
-            )
-        ),
+        "precision": precision,
         "transport_numerics": {key: profile[key] for key in TRANSPORT_KEYS if key in profile},
         "overrides": {
             material: sorted(row)

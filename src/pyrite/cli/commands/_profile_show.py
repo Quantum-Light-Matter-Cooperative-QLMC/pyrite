@@ -136,6 +136,20 @@ def energy_grid_rows(document, target):
     return rows
 
 
+def _emission_label(payload):
+    """Explicit emission, else the physics preset's, else the built-in default."""
+    if payload["emission"]:
+        return payload["emission"]
+    preset = payload["presets"]["physics"]
+    if preset:
+        return f"{payload['effective_emission']} (preset {preset})"
+    return "incoherent (default)"
+
+
+def _preset_rows(payload):
+    return [(table, name or "none") for table, name in payload["presets"].items()]
+
+
 def emit_show(payload, target, resolution, numerics_names, grid_rows):
     emit_result(f"[{payload['name']}]")
     ranges = [
@@ -164,9 +178,14 @@ def emit_show(payload, target, resolution, numerics_names, grid_rows):
                 if materials is None
                 else ", ".join(materials) or "(none)",
             ),
-            ("emission", payload["emission"] or "incoherent (default)"),
+            ("emission", _emission_label(payload)),
             ("temporal-profile", "on" if payload["temporal_profile"] else "off (default)"),
         ],
+    )
+
+    _table(
+        "Named presets (profile set --physics/--numerics; pyrite physics|numerics preset)",
+        _preset_rows(payload),
     )
 
     if payload["beam_ref"] is not None:

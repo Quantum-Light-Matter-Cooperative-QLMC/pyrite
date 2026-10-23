@@ -3,6 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-10-17
 - **Amends:** ADR-0010 command organization
+- **Amended by:** [ADR-0021](0021-named-physics-numerics-presets.md) (named Physics/Numerics presets)
 - **Context:** [CLI cleanup, #551](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/551)
 
 ## Decision

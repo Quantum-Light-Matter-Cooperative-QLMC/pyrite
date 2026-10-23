@@ -60,3 +60,21 @@ def _apply_transport_updates(target, updates):
     validate_profile_numerics({**profile_numerics_values(target), **updates})
     for key, value in updates.items():
         target[key] = value
+
+
+def profile_resolution(document, profile, **options):
+    """Resolve ``profile``'s numerics over its referenced named presets, if any."""
+    from .._config_presets import KINDS
+    from .config_presets import profile_preset
+    from .profiles import resolve_numerics
+
+    named, sources = {}, {}
+    for kind in KINDS:
+        name, values = profile_preset(document, kind, profile)
+        for key, value in values.items():
+            if key in PROFILE_NUMERICS_KEYS:
+                named[key] = value
+                sources[key] = f"preset {name}"
+    return resolve_numerics(
+        profile_numerics_values(profile), named=named, named_sources=sources, **options
+    )

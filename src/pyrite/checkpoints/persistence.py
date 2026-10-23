@@ -59,7 +59,7 @@ def _write_case_manifest(checkpoint_path, cases, content_key_fn, dataset_identit
     """Atomically write the thin per-profile pointer table mapping each case's
     ``(name, E0_keV)`` to its shared-store ``content_key`` (see
     :func:`pyrite.campaign.profiles.case_content_key`), plus label provenance
-    (``catalog_profile``/``variant``/``parameter_sha256``). This is the reference
+    (``catalog_profile``/``variant``/``parameter_sha256``/``presets``). This is the reference
     list a future GC / ``pyrite clear`` walks to decide which shared blobs a profile
     still needs. Atomic temp-file + ``os.replace`` mirrors :func:`_manifest_save`."""
     entries = []
@@ -78,7 +78,7 @@ def _write_case_manifest(checkpoint_path, cases, content_key_fn, dataset_identit
 
         dataset_identity = normalize_dataset_identity(dataset_identity)
         manifest["identity_version"] = dataset_identity["identity_version"]
-        for field in ("catalog_profile", "variant", "parameter_sha256"):
+        for field in ("catalog_profile", "variant", "parameter_sha256", "presets"):
             value = dataset_identity.get(field)
             if value is not None:
                 manifest[field] = value

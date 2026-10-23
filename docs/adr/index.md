@@ -53,6 +53,7 @@ In other words:
 0018-quantum-channeling-zone
 0019-cli-configuration-ownership
 0020-photon-transport-source-and-scoring
+0021-named-physics-numerics-presets
 ```
 
 | ADR                                                 | Title                               | Status                                 |
@@ -76,3 +77,4 @@ In other words:
 | [0018](0018-quantum-channeling-zone.md)            | Model electron channeling as a quantum entrance zone | Proposed |
 | [0019](0019-cli-configuration-ownership.md) | CLI configuration ownership | Accepted |
 | [0020](0020-photon-transport-source-and-scoring.md) | Photon transport source and scoring | Accepted |
+| [0021](0021-named-physics-numerics-presets.md) | Named Physics and Numerics presets | Accepted |

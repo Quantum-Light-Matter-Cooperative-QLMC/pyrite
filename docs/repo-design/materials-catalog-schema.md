@@ -1,6 +1,6 @@
 # Materials catalog schema
 
-The bundled `pyrite/data/catalog/` directory is the canonical schema-version-1 catalog for crystals, media, runnable materials, beams, detectors, and campaign profiles. `load_material_catalog()` validates the entire document and returns deeply immutable typed records. Invalid or unknown fields fail closed with grouped, location-qualified errors.
+The bundled `pyrite/data/catalog/` directory is the canonical schema-version-1 catalog for crystals, media, runnable materials, beams, detectors, physics and numerics presets, and campaign profiles. `load_material_catalog()` validates the entire document and returns deeply immutable typed records. Invalid or unknown fields fail closed with grouped, location-qualified errors.
 
 CIF structures are parsed with Gemmi under its MPL-2.0 license option. Explicit
 CIF symmetry operations take precedence over the named space group; affine
@@ -24,6 +24,8 @@ catalog/
   materials/<name>.toml
   beams/<name>.toml
   detectors/<name>.toml
+  physics/<name>.toml     # named physics presets (ADR-0021)
+  numerics/<name>.toml    # named numerics presets (ADR-0021)
   profiles/<name>.toml    # profile fields plus its [overrides.MATERIAL] tables
   energy-grid-artifacts/  # immutable line-grid artifacts, not catalog source
 ```
@@ -40,12 +42,14 @@ schema_version = 1
 [profiles.NAME]      # campaign defaults and membership
 [beams.NAME]         # reusable beam distribution
 [detectors.NAME]     # reusable detector geometry
+[physics.NAME]       # reusable physics models and cutoffs
+[numerics.NAME]      # reusable sampling, integration and grid policy
 [crystals.NAME]      # CIF-backed crystalline phase
 [media.NAME]         # amorphous composition
 [materials.NAME]     # runnable film or stack
 ```
 
-`profiles`, `crystals`, `media`, and `materials` are required. `beams` and `detectors` are optional. `energy_grids` is accepted only as a legacy compatibility input; new grids are immutable artifacts referenced from profiles.
+`profiles`, `crystals`, `media`, and `materials` are required. `beams`, `detectors`, `physics`, and `numerics` are optional. `energy_grids` is accepted only as a legacy compatibility input; new grids are immutable artifacts referenced from profiles.
 
 Bundled profiles contain neither artifact references nor legacy line rows, so every bundled material uses automatic case-local line grids. For an opt-in fixed grid, line rows resolve from the selected profile's artifact reference for that material, then its own `[energy_grids.MATERIAL]` legacy table. There is no cross-material fallback: profile-named tables, including `[energy_grids.standard]`, do not supply or seed another material's rows. Explicit fixed line grids remain supported. Without a fixed grid, all energies use the existing automatic `sinc-nyquist` resolution and `kinematic-ceiling` bandwidth policy from the case's own material and trajectories. Derivation is not a prerequisite.
 
@@ -105,6 +109,14 @@ Electron-count grids, line grids, bremsstrahlung grids, thickness-in-layers, and
 A named beam contains display metadata plus transverse and longitudinal source parameters. Profiles attach it with `beam = "NAME"`; the name and label are removed during resolution so identity follows values. The full field and unit reference is [Beam phase space](../physics/beam-transport/beam-phase-space.md).
 
 `[profiles.NAME.detectors.ID]` declares one detector with scalar acceptance or pixel geometry; `[profiles.NAME.detectors]` may instead map an ID to a named `[detectors.REFERENCE]` object. Named objects support both geometries. Pixel rows may contain detector-specific `scorer`, `response`, and `acquisition` tables; their scalar acceptance is derived from pose and grid. IDs identify result/checkpoint ownership and therefore enter new collection identities, while the referenced object's name and display label do not. Legacy `detector` and `physical_detector` rows remain readable and migrate to IDs `default` and `physical`; they cannot be combined with a `detectors` collection. A profile without any detector declaration resolves one implicit scalar `default`, deprecated in 0.9.0 and refused from 0.11.0. Partial scalar acceptance follows the same window. The bundled `reference` object explicitly declares the existing Timepix3 aperture with ideal response and raw spectra; selecting it through the legacy single-detector field preserves checkpoint identity. See [Sweep profiles](../guides/sweep-profiles.md) for the complete form and identity behavior.
+
+## Physics and numerics presets
+
+`[physics.NAME]` holds `emission` and any profile key that is a `Physics` field (elastic, inelastic, bremsstrahlung, radiative, pair, positron, atomic-electron, shell-ionization, channeling-model and transition-radiation selectors and their cutoffs), plus an optional display `description`. Omitted keys keep built-in defaults; sampling, integration and grid numerics are rejected. A profile attaches one with `physics = "NAME"`. Before validation the catalog folds the preset under the profile's own physics keys, which stay explicit overrides, and validates the merged values for every referencing profile. Consumers, run identities and checkpoints therefore see only effective values: renaming a preset, adding an unused one, or moving equal inline values into a preset does not change identity. The bundled `electron-standard` preset restates the built-in defaults.
+
+`[numerics.NAME]` holds scalar trial counts (`cxr_trials`, `brem_trials`; one positive integer each — sweep grids stay in profiles), reflection/mosaic quadrature, integration and channeling-zone numerics, and optional `[precision]` and `[line_grid_policy]` tables; a profile attaches it with `numerics = "NAME"`. Trial counts and `precision` form one sampling policy: a profile that sets any of them takes none of them from its preset, so fixed counts and adaptive precision never mix. Physical models and cutoffs are rejected. The bundled `default` preset restates the built-in integration and mosaic numerics and leaves trial counts, reflection truncation and precision to the fidelity and default adaptive policy.
+
+Profile runs record each referenced preset's name and definition digest (`presets` beside `parameter_sha256` in the dataset identity and case manifest) as an unhashed label. See [ADR-0021](../adr/0021-named-physics-numerics-presets.md).
 
 ## Validation and editing
 

@@ -1,0 +1,13 @@
+# Reference configuration: the built-in PyRITE electron transport defaults,
+# stated explicitly. Attaching it to a profile changes no effective value,
+# identity, or result. Clone it to start a custom preset:
+#   pyrite physics preset create my-physics --from electron-standard
+description = "Built-in defaults: ELSEPA elastic, auto shell soft/hard inelastic, auto BremsLib coupling, Kawrakow atomic-electron deflection, incoherent CXR"
+emission = "incoherent"
+straggling = false
+elastic_model = "elsepa"
+inelastic_model = "auto"
+bremsstrahlung_model = "auto"
+radiative_model = "auto"
+atomic_electron_deflection = "kawrakow"
+shell_ionization_model = "eedl"

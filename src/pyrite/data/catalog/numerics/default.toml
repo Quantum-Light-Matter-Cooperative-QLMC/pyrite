@@ -1,0 +1,11 @@
+# Reference configuration: the built-in PyRITE integration and mosaic
+# quadrature numerics, stated explicitly. Attaching it to a profile changes no
+# effective value, identity, or result. Trial counts, reflection truncation and
+# adaptive precision are deliberately absent so the selected fidelity and the
+# default adaptive policy keep applying. Clone it to start a custom preset:
+#   pyrite numerics preset create my-numerics --from default
+description = "Built-in defaults: midpoint integration without substeps, analytic 5-node mosaic quadrature; fidelity owns trial counts"
+energy_model = "midpoint"
+max_dE_frac = 0.0
+mosaic_nodes = 5
+mosaic_route = "analytic"

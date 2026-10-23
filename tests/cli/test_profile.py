@@ -769,7 +769,7 @@ def test_remove_material_and_no_op_requires_option(tmp_path, monkeypatch):
 
     bare = invoke(profile.command, ["remove", "sub_100keV"])
     assert bare.exit_code == 2
-    assert "provide a range, membership, beam, or emission option" in bare.stderr
+    assert "provide a range, membership, beam, preset, or emission option" in bare.stderr
 
 
 def test_show_emission_defaults_to_incoherent(tmp_path, monkeypatch):
@@ -1184,11 +1184,11 @@ def test_empty_updates_are_usage_errors(tmp_path, monkeypatch):
 
     expected_by_verb = {
         "set": (
-            "provide a range, beam, detector, transport, membership, emission, "
+            "provide a range, beam, detector, preset, transport, membership, emission, "
             "or temporal-profile option"
         ),
         "add": "provide a range, membership, or emission option",
-        "remove": "provide a range, membership, beam, or emission option",
+        "remove": "provide a range, membership, beam, preset, or emission option",
     }
     for verb, expected in expected_by_verb.items():
         result = invoke(profile.command, [verb, "sub_100keV"])
@@ -1569,7 +1569,7 @@ def test_remove_bare_no_op_error_mentions_beam(tmp_path, monkeypatch):
     result = invoke(profile.command, ["remove", "sub_100keV"])
 
     assert result.exit_code == 2
-    assert "provide a range, membership, beam, or emission option" in result.stderr
+    assert "provide a range, membership, beam, preset, or emission option" in result.stderr
 
 
 def test_numerics_set_shell_inelastic_mode_validates_and_resets(tmp_path, monkeypatch):

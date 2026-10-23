@@ -267,8 +267,15 @@ def resolve_numerics(
     *,
     fidelity: str = "full",
     overrides: Mapping[str, object] | None = None,
+    named: Mapping[str, object] | None = None,
+    named_sources: Mapping[str, str] | None = None,
 ) -> NumericsResolution:
-    """Resolve run overrides over profile, fidelity, then built-in numerics."""
+    """Resolve run overrides over profile, presets, fidelity, then built-in numerics.
+
+    ``named`` holds referenced named presets' numerics-key values (ADR-0021)
+    and ``named_sources`` each field's source label, kept unless the profile
+    or run overrides the field.
+    """
     preset = get_fidelity_preset(fidelity)
     convergence = CxrReflections()
     numerics = Numerics(cxr_reflections=convergence)
@@ -313,6 +320,8 @@ def resolve_numerics(
         )
         for key in PROFILE_NUMERICS_KEYS
     }
+    effective.update(named or {})
+    sources.update(named_sources or {})
     normalized: dict[str, object] = {}
     for key, value in dict(explicit or {}).items():
         if key not in PROFILE_NUMERICS_KEYS:
