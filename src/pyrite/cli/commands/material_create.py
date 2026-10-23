@@ -29,7 +29,6 @@ def _register(kind):
             "surface_hkl",
             "beam_uvw",
             "b_ang2",
-            "photon_grid",
             "mosaic_fwhm_deg",
         }
     )

@@ -223,15 +223,7 @@ def _flag(
 #: `--fidelity` cohort (deprecated in 0.4.0, issue #215) at 0.6.0 (issue #387).
 #: `RetiredOption` and `canonical_option` (renamed spellings) and
 #: `DeprecatedOption` (whole options) stay as the substrate ADR-0002 requires.
-DEPRECATED_FLAGS: dict[tuple[str, str], DeprecatedFlag] = {
-    (command, "--photon-grid"): _flag(
-        command,
-        "--photon-grid",
-        "set grids through numerics; crystal grids are ignored",
-        since="0.16.3",
-    )
-    for command in ("material create crystal",)
-}
+DEPRECATED_FLAGS: dict[tuple[str, str], DeprecatedFlag] = {}
 
 
 def flag_message(command: str, flag: str, replacement: str) -> str:

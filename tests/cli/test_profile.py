@@ -1774,7 +1774,7 @@ def test_show_wraps_values_and_wide_keeps_them_on_one_line(tmp_path, monkeypatch
     )
     _catalog(tmp_path, monkeypatch, text)
     monkeypatch.setattr(
-        _profile_show.shutil, "get_terminal_size", lambda: os.terminal_size((80, 24))
+        _profile_show.shutil, "get_terminal_size", lambda *_a, **_k: os.terminal_size((80, 24))
     )
     monkeypatch.setenv("NO_COLOR", "1")
     shown = invoke(profile.command, ["show", "sub_100keV"])

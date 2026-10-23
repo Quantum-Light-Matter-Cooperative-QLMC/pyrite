@@ -434,7 +434,6 @@ formula = "MoS2"
 B_ang2 = 0.6
 beam_uvw = [0, 0, 2]
 layers_per_cell = 2
-E_grid = { values = [100.0, 200.0] }
 
 [media.sio2]
 composition = { Si = 0.02205, O = 0.04410 }

@@ -9,7 +9,7 @@ import math
 import os
 import re
 import tempfile
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
@@ -218,7 +218,6 @@ def build_crystal(
     surface_hkl: tuple[int, int, int] | None = None,
     beam_uvw: tuple[int, int, int] | None = None,
     B_ang2: float | None = None,
-    photon_energies_eV: Sequence[float] | None = None,
     mosaic_fwhm_deg: float | None = None,
     density_g_cm3: float | None = None,
     catalog: Path | None = None,
@@ -227,16 +226,11 @@ def build_crystal(
 
     Existing crystals reuse their catalog configuration; overrides are rejected.
     A new CIF requires formula, phase, exactly one orientation, nonnegative
-    ``B_ang2``. Photon grids belong to numerics; the deprecated
-    ``photon_energies_eV`` argument is ignored. Reflections use the existing
+    ``B_ang2``. Photon grids belong to numerics. Reflections use the existing
     automatic selection policy. Density is derived from the lattice; an optional
     supplied density must agree within 1e-6 relative tolerance. Partial occupancy
     and unsupported transport elements are rejected by existing validators.
     """
-    if photon_energies_eV is not None:
-        from .._api_deprecations import warn_api
-
-        warn_api("build_crystal(photon_energies_eV=...)")
     _name(name)
     if (crystal is None) == (cif is None):
         raise ValueError("supply exactly one of crystal or cif")

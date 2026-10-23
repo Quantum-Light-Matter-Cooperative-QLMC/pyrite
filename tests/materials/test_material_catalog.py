@@ -56,7 +56,6 @@ formula = "MoS2"
 B_ang2 = 0.6
 beam_uvw = [0, 0, 2]
 layers_per_cell = 2
-E_grid = {{ values = [100.0, 200.0] }}
 [media.sio2]
 composition = {{ Si = 0.02205, O = 0.04410 }}
 {material_rows}
@@ -2493,19 +2492,15 @@ E_grid_brem = { values = [100.0, 300.0, 1000.0] }
     np.testing.assert_array_equal(custom.material("other").scan.E_grid_brem, expected)
 
 
-def test_legacy_crystal_grid_warns_once_and_is_ignored(tmp_path):
+def test_removed_crystal_grid_is_rejected(tmp_path):
     from pyrite.materials import load_material_catalog
 
     legacy = _minimal_catalog(material_rows='[materials.sample]\ncrystal = "mos2"\n')
-    with pytest.warns(DeprecationWarning, match=r"crystal.E_grid") as caught:
-        loaded = load_material_catalog(_write_catalog(tmp_path, legacy))
-    assert len(caught) == 1
-    clean = load_material_catalog(
-        _write_catalog(tmp_path, legacy.replace("E_grid = { values = [100.0, 200.0] }\n", ""))
+    legacy = legacy.replace(
+        "[crystals.mos2]", "[crystals.mos2]\nE_grid = { values = [100.0, 200.0] }"
     )
-    assert not hasattr(loaded.crystal("mos2"), "E_grid")
-    assert loaded.crystal("mos2").composition == clean.crystal("mos2").composition
-    np.testing.assert_array_equal(loaded.material_keys, clean.material_keys)
+    with pytest.raises(ValueError, match="E_grid"):
+        load_material_catalog(_write_catalog(tmp_path, legacy))
 
 
 @pytest.mark.slow

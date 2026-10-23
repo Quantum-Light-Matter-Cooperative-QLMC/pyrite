@@ -6,7 +6,6 @@ import click
 
 from ...console import json as cli_json
 from ...console.output import CLIError, emit_json_result, emit_result, output_option
-from .._deprecations import DeprecatedOption
 
 
 def _fractions(values: tuple[str, ...], option: str) -> dict[str, float] | None:
@@ -77,13 +76,6 @@ def _fractions(values: tuple[str, ...], option: str) -> dict[str, float] | None:
     help="Required new-CIF isotropic Debye–Waller factor in angstrom²; nonnegative.",
 )
 @click.option(
-    "--photon-grid",
-    cls=DeprecatedOption,
-    type=(float, float, float),
-    metavar="START STOP STEP",
-    help="Deprecated and ignored; set photon grids through numerics instead.",
-)
-@click.option(
     "--mosaic-fwhm-deg",
     type=float,
     help="Optional positive new-CIF mosaic FWHM in degrees; omitted means perfect crystal.",
@@ -102,7 +94,6 @@ def command(
     surface_hkl,
     beam_uvw,
     b_ang2,
-    photon_grid,
     mosaic_fwhm_deg,
     json_output,
 ):
@@ -142,10 +133,7 @@ def command(
                 catalog=path,
             )
         else:
-            if any(
-                v is not None
-                for v in (phase, surface_hkl, beam_uvw, b_ang2, photon_grid, mosaic_fwhm_deg)
-            ):
+            if any(v is not None for v in (phase, surface_hkl, beam_uvw, b_ang2, mosaic_fwhm_deg)):
                 raise ValueError("crystal options require --cif or --crystal")
             if density_g_cm3 is None:
                 raise ValueError("--density-g-cm3 is required for a medium")
