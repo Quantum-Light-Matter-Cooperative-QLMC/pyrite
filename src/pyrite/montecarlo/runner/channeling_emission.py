@@ -67,6 +67,10 @@ def case_channeling_spectrum(case, transport) -> np.ndarray:
         int(record["bloch_cells"]),
         float(record["margin_eV"]),
     )
+    if case.get("channeling_source") is not None:
+        from ..channeling.planar_injection import fresh_source_solver
+
+        solver = fresh_source_solver(case)
     frame = source_frame(transport["channeling_beam_dir"], case_plane_incidence(case).plane_normal)
     direction = np.asarray(transport["n_hat"]) @ frame
     theta = float(np.arctan2(np.hypot(direction[0], direction[1]), direction[2]))
@@ -87,14 +91,20 @@ def case_channeling_spectrum(case, transport) -> np.ndarray:
     # In-plane divergence changes the observed Doppler angle; the normal
     # divergence already participates in the density-matrix entry state.
     in_plane = np.arctan2(v @ frame[:, 1], v @ frame[:, 2])
+    initial = None
+    if case.get("channeling_source") is not None:
+        from ..channeling.planar_injection import source_entry_initial
+
+        initial = source_entry_initial(case, solver, float(info["incidence_rad"]))
     result = channeling_spectrum(
         solver,
         float(info["path_ang"]),
         np.asarray(transport["E_grid"]),
         theta,
         phi,
-        incidence_rad=float(info["incidence_rad"]),
-        divergence_rad=float(info["divergence_rad"]),
+        incidence_rad=0.0 if initial is not None else float(info["incidence_rad"]),
+        divergence_rad=0.0 if initial is not None else float(info["divergence_rad"]),
+        entry_initial=initial,
         divergence_y_rad=float(np.std(in_plane)),
         energy_spread_eV=float(case.get("energy_spread_frac", 0.0) or 0.0)
         * float(case["E0_keV"])
@@ -134,6 +144,10 @@ def rescore_channeling_spectrum(case, energy_eV, n_hat=None) -> np.ndarray:
         tilt_azim_rad=np.deg2rad(case.get("tilt_azim_deg", 0.0)),
         **_beam_kwargs(case),
     )
+    if case.get("channeling_source") is not None:
+        from ..channeling.planar_injection import source_momentum_bins
+
+        v, _bins = source_momentum_bins(case, v, int(case["seed"]))
     log_energy, log_stopping = prepare_sbethe_stopping_table(_case_stopping_tables(case)[0])
     stopping = -float(sbethe_stopping_keV_per_ang(log_energy, log_stopping, float(case["E0_keV"])))
     ensemble = solve_zone(case, np.asarray(beam, dtype=float), v, stopping)

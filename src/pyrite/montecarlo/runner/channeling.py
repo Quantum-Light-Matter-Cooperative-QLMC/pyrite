@@ -164,6 +164,13 @@ def transport_channeling_case(
         **{key: beam_kw.get(key) for key in _LAUNCH_BEAM_ARGS},
         long_shape=beam_kw.get("long_shape", "gaussian"),
     )
+    source_bins = None
+    if case.get("channeling_source") is not None:
+        from ..channeling.planar_injection import source_momentum_bins
+
+        v0, source_bins = source_momentum_bins(case, v0, seed)
+        if record is not None:
+            record = {**record, "quantum_source": case["channeling_source"]["model"]}
     log_energy, log_stopping = prepare_sbethe_stopping_table(stopping_tables[0])
     S = -float(sbethe_stopping_keV_per_ang(log_energy, log_stopping, E0))
     ensemble = solve_zone(case, np.asarray(beam_dir, dtype=float), v0, S)
@@ -173,7 +180,12 @@ def transport_channeling_case(
     width_ang = None if width is None else float(width) * 1e7
     height_ang = None if height is None else float(height) * 1e7
     ids = np.arange(Ne)
-    sample = sample_handoffs(ensemble, seed, ids)
+    if source_bins is None:
+        sample = sample_handoffs(ensemble, seed, ids)
+    else:
+        from ..channeling.planar_injection import conditional_handoffs
+
+        sample = conditional_handoffs(case, ensemble, seed, ids, source_bins)
     fate = sample.fate.copy()
     if width_ang is not None and height_ang is not None:  # a missed electron never enters
         missed = (np.abs(r0[:, 0]) > width_ang / 2.0) | (np.abs(r0[:, 1]) > height_ang / 2.0)

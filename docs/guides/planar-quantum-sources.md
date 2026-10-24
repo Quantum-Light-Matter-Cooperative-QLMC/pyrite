@@ -86,13 +86,16 @@ Absorption assumptions and photon escape remain those of the diagnostic CR
 scorer. This does **not** validate electron handoffs, physical source-frame
 matching, or replay identities for an end-to-end Monte Carlo run.
 
-**Production remains gated.** `Beam(state=...)` still refuses on `to_spec`.
-This diagnostic does not define the per-electron position/momentum launch
-law for initially free or off-band source weight, a physically consistent
-handoff for dechanneling electrons, or the unified entrance law used in
-transport, live CR scoring, checkpoint replay and recompute. Those changes
-must be completed and validated before a state specification can enter a
-production `Case`. Nonchanneling/axial propagation is also not enabled here.
+**Restricted production envelope (experimental):** A centered 1D Gaussian
+with uniform lattice-impact averaging is supported through `Scene` and
+`Beam(state=...)`. Direct `Beam.to_spec()` remains intentionally unable to
+lower a quantum source without a compatible planar scene. The production
+handoff is conditioned on sampled Bloch momentum, and CR live/replay scoring
+shares the same projected source (see [conditional source validation](../validation/channeling/cr-planar-conditional-source.md)).
+All other source types (including fixed-impact coherent states, 2D OAM
+wavefunctions and custom sampled arrays) remain diagnostic-only. The outgoing
+handoff still uses #506's approximate depth/angle/sign sampling and requires
+independent convergence/physics validation. Axial production is still refused.
 
 ## Interaction with axial integration (#624)
 

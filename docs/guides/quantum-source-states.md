@@ -55,13 +55,15 @@ includes the array digest and grid conventions. Relative paths need `base_dir`
 when materialized; missing/changed files refuse. No sample bytes are embedded
 in the configuration and no arbitrary file formats are deserialized.
 
-`Beam(state=...)` accepts a typed `TransverseStateSpec`, so a source can be
-attached to a conceptual scene. **Production `Beam.to_spec()` and
-`Scene`/`Sweep` lowering still refuse this field**: MC handoff, coherent source
-normalization, channeling radiation rescoring and checkpoint identity require
-an end-to-end source adapter. The [planar source projection guide](planar-quantum-sources.md)
-now shows how to project these specifications onto the Bloch basis and
-propagate them *diagnostically* without constructing a production Case.
+`Beam(state=...)` stores the typed `TransverseStateSpec`. A restricted,
+experimental production adapter now supports centered 1D Gaussian states
+with lattice-averaged impact, when the Scene selects planar channeling.
+Standalone `Beam.to_spec()` still refuses: it lacks the required crystal
+configuration. Every admitted source has a distinct versioned case identity,
+momentum-conditioned handoffs, and deterministic CR live/replay reconstruction.
+See [conditional source validation](../validation/channeling/cr-planar-conditional-source.md).
+Other source recipes remain diagnostic-only; the physical handoff still needs
+independent validation and convergence tests.
 
 #624's axial candidate resolver remains separate from the planar diagnostics.
 Its continuation branch hardens physical-admission refusals; describing an
