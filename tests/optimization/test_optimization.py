@@ -4,7 +4,7 @@ from dataclasses import FrozenInstanceError
 
 import pytest
 
-from pyrite.campaign.geometry import Slab
+from pyrite.campaign.geometry import Footprint, Slab
 from pyrite.campaign.model import Scene
 from pyrite.campaign.sweep import BeamSpec
 from pyrite.optimization import (
@@ -21,7 +21,7 @@ from pyrite.optimization import (
 
 
 def scene():
-    return Scene(beam=BeamSpec(energy_keV=40), target=Slab("hopg", thickness_ang=2_000))
+    return Scene(beam=BeamSpec(energy_keV=40), target=Slab("hopg", thickness_ang=2_000, footprint=Footprint(5.0, 5.0)))
 
 
 def study():

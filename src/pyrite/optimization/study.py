@@ -192,6 +192,7 @@ class OptimizationStudy:
         *,
         max_trials: int,
         on_trial: Callable[[OptimizationTrial], None] | None = None,
+        evaluation_id: str | None = None,
     ) -> OptimizationResult:
         if isinstance(max_trials, bool) or not isinstance(max_trials, int) or max_trials < 1:
             raise ValueError("max_trials must be a positive integer")
@@ -201,8 +202,27 @@ class OptimizationStudy:
             configured = getattr(optimizer, attr, None)
             if configured is not None and configured != getattr(self, attr):
                 raise ValueError(f"optimizer {attr} do not match the study")
-        history: list[OptimizationTrial] = []
-        for number in range(max_trials):
+        # A persisted optimizer is the authoritative trial-history store. Check
+        # the *whole study definition* before proposing or executing any work.
+        # The scorer itself is arbitrary Python; callers must explicitly version
+        # its semantics and settings with evaluation_id.
+        digest = None
+        if getattr(optimizer, "persistent", False):
+            from .identity import study_definition_digest
+
+            digest = study_definition_digest(
+                self.base, self.parameters, self.objectives, self.constraints,
+                evaluation_id=evaluation_id,  # type: ignore[arg-type]
+                base_seed=(evaluator.base_seed if isinstance(evaluator, PyriteEvaluator)
+                           else None),
+            )
+        prepare_resume = getattr(optimizer, "prepare_resume", None)
+        history: list[OptimizationTrial] = (
+            list(prepare_resume(digest)) if prepare_resume is not None else []
+        )
+        if max_trials < len(history):
+            raise ValueError("max_trials is a total study budget, smaller than existing history")
+        for number in range(len(history), max_trials):
             proposal = optimizer.ask()
             try:
                 scene = self.scene(proposal.parameters)
@@ -220,19 +240,25 @@ class OptimizationStudy:
             except Exception as exc:
                 # Only candidate/physics/scoring failures are recoverable. A
                 # failed backend tell is an optimizer-state error and propagates.
-                optimizer.tell(proposal, None, failed=True)
                 trial = OptimizationTrial(number, dict(proposal.parameters), TrialState.FAILED,
                                           error=f"{type(exc).__name__}: {exc}")
+                record_trial = getattr(optimizer, "record_trial", None)
+                if record_trial is not None:
+                    record_trial(proposal, trial)
+                optimizer.tell(proposal, None, failed=True)
             else:
-                optimizer.tell(
-                    proposal, tuple(objective_values.values()), constraint_violations=violations
-                )
                 state = (
                     TrialState.INFEASIBLE if any(v > 0 for v in violations)
                     else TrialState.COMPLETED
                 )
                 trial = OptimizationTrial(number, dict(proposal.parameters), state,
                                           objective_values, constraint_values)
+                record_trial = getattr(optimizer, "record_trial", None)
+                if record_trial is not None:
+                    record_trial(proposal, trial)
+                optimizer.tell(
+                    proposal, tuple(objective_values.values()), constraint_violations=violations
+                )
             history.append(trial)
             if on_trial is not None:
                 on_trial(trial)
