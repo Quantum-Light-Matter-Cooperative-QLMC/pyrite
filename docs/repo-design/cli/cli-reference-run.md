@@ -35,6 +35,12 @@ Options:
                                   new compressed .npz file; never overwrite.
   --workers NUMBER                run_cases max_workers (default auto; 0 = serial, no
                                   transport pool).
+  --execution NAME                Select a named execution profile (built-in: local,
+                                  slurm-cpu).
+  --execution-config TOML         TOML file containing [execution.NAME] scheduler
+                                  settings.
+  --execution-plan                Inspect requested execution resources and task counts
+                                  without running cases.
   --quick                         Use a tiny smoke-test grid and write the
                                   <material>_quick/ component directory.
   --n-families NUMBER             Override positive dominant reflection-family count.

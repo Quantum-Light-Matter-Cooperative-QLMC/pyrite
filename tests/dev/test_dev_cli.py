@@ -333,6 +333,22 @@ def test_ci_runs_every_primary_suite_once(dev_module) -> None:
     assert quantum["python"] == matrix["python"]
 
 
+@pytest.mark.parametrize(
+    ("base", "expected"),
+    [("main", True), ("issue-680", True), ("issue-681-execution", True), ("release", False)],
+)
+def test_ci_accepts_stacked_issue_pr_bases(dev_module, base, expected) -> None:
+    from fnmatch import fnmatchcase
+
+    import yaml
+
+    workflow = yaml.load(
+        (dev_module.ROOT / ".github/workflows/ci.yml").read_text(), Loader=yaml.BaseLoader
+    )
+    patterns = workflow["on"]["pull_request"]["branches"]
+    assert any(fnmatchcase(base, pattern) for pattern in patterns) is expected
+
+
 def test_formatter_regenerates_and_commits_cli_reference(dev_module) -> None:
     import yaml
 

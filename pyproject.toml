@@ -36,6 +36,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+dask = [
+    "distributed>=2025.1",
+    "dask-jobqueue>=0.9",
+]
 external-db = [
     "mp-api>=0.46",
 ]
@@ -231,6 +235,9 @@ include = [
 
 [tool.ty.analysis]
 allowed-unresolved-imports = [
+    # Distributed schedulers are optional; default contributor checks need no cluster extra.
+    "distributed",
+    "dask_jobqueue",
     # The Python 3.13 zstd backport is intentionally absent on Python 3.14+.
     "backports",
     "backports.zstd",

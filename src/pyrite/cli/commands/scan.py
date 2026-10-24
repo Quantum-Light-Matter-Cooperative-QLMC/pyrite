@@ -125,6 +125,24 @@ def _reproduce_zhai(ne, ne_brem, ne_supp, tmd_azimuth, refresh):
     help="run_cases max_workers (default auto; 0 = serial, no transport pool).",
 )
 @click.option(
+    "--execution",
+    default=None,
+    metavar="NAME",
+    help="Select a named execution profile (built-in: local, slurm-cpu).",
+)
+@click.option(
+    "--execution-config",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    default=None,
+    metavar="TOML",
+    help="TOML file containing [execution.NAME] scheduler settings.",
+)
+@click.option(
+    "--execution-plan",
+    is_flag=True,
+    help="Inspect requested execution resources and task counts without running cases.",
+)
+@click.option(
     "--quick",
     is_flag=True,
     help="Use a tiny smoke-test grid and write the <material>_quick/ component directory.",
@@ -350,6 +368,21 @@ def _command(ctx, **options):
         options["detector_id"] is not None or options["output_file"] is not None
     ):
         raise click.UsageError("--detector/--output-file require --ephemeral")
+    if options["execution_config"] is not None and options["execution"] is None:
+        raise click.UsageError("--execution-config requires --execution NAME")
+    if options["execution_plan"] and options["execution"] is None:
+        raise click.UsageError("--execution-plan requires --execution NAME")
+    if options["execution_plan"] and options["json_output"]:
+        raise click.UsageError("--execution-plan has its own JSON output; omit --json")
+    if options["execution"] is not None and (
+        options["ephemeral"]
+        or options["remote_target"] is not None
+        or options["preset"] is not None
+    ):
+        raise click.UsageError(
+            "--execution is for ordinary sweeps; it cannot be combined with "
+            "--ephemeral, -R/--remote, or --preset"
+        )
     if options["ephemeral"]:
         return _run_ephemeral(ctx, options)
     raw_catalog_profile = options["catalog_profile"]
@@ -695,6 +728,8 @@ def _run_local(options):
         if options["py_spy"]
         else None
     )
+    if reexec is not None and options["execution"] is not None:
+        raise click.UsageError("--execution cannot be combined with profiling re-execution")
     if reexec is not None:
         reexec(
             performance_profile=performance_profile,
@@ -713,6 +748,11 @@ def _run_local(options):
             "overwrite_trajectories": options["overwrite_trajectories"],
         }
     )
+    execution = (
+        {}
+        if options["execution"] is None
+        else {name: options[name] for name in ("execution", "execution_config", "execution_plan")}
+    )
     resolved_profile = _scan._resolve_catalog_profile(
         options["catalog_profile"], performance_profile
     )
@@ -728,6 +768,7 @@ def _run_local(options):
         "cache_write": cache_write,
         **({"progress_phase": progress_phase} if progress_phase is not None else {}),
         **capture,
+        **execution,
     }
     if options["json_output"]:
         return _cli_core.invoke_legacy(_scan._run_json, **run_kwargs)

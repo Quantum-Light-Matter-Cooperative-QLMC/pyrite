@@ -14,6 +14,8 @@ configuration-cookbook
 numerics-and-execution
 quantum-source-states
 sampling-policy
+execution-profiles
+dask-and-distributed-execution
 working-with-results
 planar-channeling
 transition-radiation-demo

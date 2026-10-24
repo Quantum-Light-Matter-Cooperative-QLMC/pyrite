@@ -823,6 +823,15 @@ def _run_material(args, material, max_seconds=None):
     if summary is not None:
         print(summary)
     _print_sweep_header(args, material, cases, settings, identity)
+    if getattr(args, "execution_plan", False):
+        from ..execution.inspection import inspect_execution
+        from ..execution.profiles import resolve_execution_profile
+
+        selected = resolve_execution_profile(
+            args.execution, config_path=getattr(args, "execution_config", None)
+        )
+        print(json.dumps(inspect_execution(selected, len(cases)), indent=2, sort_keys=True))
+        return True  # No checkpoint, manifest, CAS, or worker job is created.
 
     # Always pass an explicit path named for the catalog material key: run_sweep's
     # default derives the name from the film crystal, which would make a named
@@ -862,6 +871,32 @@ def _run_material(args, material, max_seconds=None):
     try:
         if progress.timer is not None:
             progress.timer.start()
+        observation = _sweep_observation(args, identity, settings, stem, content_key_fn)
+        execution_kwargs = {}
+        selected_execution = getattr(args, "execution", None)
+        if selected_execution is not None:
+            from ..execution.profiles import build_executor, resolve_execution_profile
+
+            selected = resolve_execution_profile(
+                selected_execution, config_path=getattr(args, "execution_config", None)
+            )
+            if selected.backend in ("slurm", "dask"):
+                if deadline is not None:
+                    raise ValueError("distributed execution does not support --max-minutes yet")
+                if capture_kw:
+                    raise ValueError("distributed execution does not support --trajectories yet")
+                if performance_logger is not None:
+                    raise ValueError(
+                        "distributed execution does not support performance profiling yet"
+                    )
+            executor, artifact_store = build_executor(
+                selected,
+                case_key=content_key_fn,
+                artifact_root=Path(args.checkpoint_dir).resolve(),
+            )
+            execution_kwargs["executor"] = executor
+            if artifact_store is not None:
+                execution_kwargs["artifact_store"] = artifact_store
         result = run_sweep(
             cases,
             results,
@@ -881,7 +916,8 @@ def _run_material(args, material, max_seconds=None):
             dataset_identity=identity,
             metadata_only_complete=True,
             **capture_kw,
-            observation=_sweep_observation(args, identity, settings, stem, content_key_fn),
+            **execution_kwargs,
+            observation=observation,
         )
         # run_sweep returns a bool (complete?). Only a bare None -- test doubles
         # that predate the budget feature and don't bother returning anything --

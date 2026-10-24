@@ -162,7 +162,7 @@ def test_rejects_unsafe_incompatible_modes_before_submitting(tmp_path, monkeypat
     ex = SlurmArrayExecutor(store, key)
     with pytest.raises(ValueError, match="bounded sweeps"):
         ex.execute([case(1)], should_stop=lambda: False)
-    with pytest.raises(ValueError, match="observation_directions"):
+    with pytest.raises(ValueError, match=r"shape \(N, 3\)"):
         ex.execute([case(1)], observation_directions=[[1, 0, 0]])
     with pytest.raises(ValueError, match="does not support"):
         ex.execute([case(1)], invented_option=True)

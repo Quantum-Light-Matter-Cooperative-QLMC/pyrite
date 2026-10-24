@@ -66,7 +66,11 @@ from ..checkpoints.recompute import (  # noqa: F401 -- compatibility exports
     repair_checkpoint,
     repair_cxr_spec,
 )
-from ..execution.artifacts import CaseArtifactRef
+from ..execution.artifacts import (
+    CaseArtifactRef,
+    DirectionalArtifactRef,
+    load_directional_result,
+)
 from ..montecarlo import run_cases, runner
 from ..results import store_result
 from ._sweep_execution import SweepCompletion
@@ -370,6 +374,22 @@ def run_sweep(
     completion.prepare_groups(todo, work.observation_only)
 
     def _cb(i, case, out):
+        if isinstance(out, DirectionalArtifactRef):
+            if artifact_store is None:
+                raise ValueError("executor returned a directional artifact without artifact_store")
+            key = preparation.content_key(case)
+            if key is None:
+                raise ValueError("cannot resolve key for worker-published observation")
+            plan = work.observation_plans.get((case["name"], case["E0_keV"]))
+            if plan is None:
+                raise ValueError("executor returned unexpected directional artifact")
+            out = load_directional_result(
+                artifact_store,
+                out,
+                material=material,
+                case_key=key,
+                directions=plan.directions_sample,
+            )
         if isinstance(out, CaseArtifactRef):
             if artifact_store is None:
                 raise ValueError("executor returned a case artifact without artifact_store")
