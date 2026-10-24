@@ -144,6 +144,7 @@ radiation-physics/optical-planar-tr
 radiation-physics/optical-finite-boundary-field
 radiation-physics/optical-wavefront-propagation
 radiation-physics/optical-ctr-population
+radiation-physics/frank-tamm-homogeneous-dielectric
 radiation-physics/brem-source-comparison
 radiation-physics/brem-spectrum
 radiation-physics/bremslib-angular-model

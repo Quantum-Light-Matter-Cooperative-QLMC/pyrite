@@ -22,10 +22,10 @@ Oldest current automated evidence: `2026-09-15T15:45:04.640409+00:00` (UTC times
 | Status | Claims |
 |---|---:|
 | `signed-off` | 0 |
-| `anchored` | 76 |
+| `anchored` | 77 |
 | `rederived` | 101 |
 | `filtered` | 14 |
-| `unverified` | 78 |
+| `unverified` | 77 |
 | `discrepancy` | 4 |
 | **Total** | **273** |
 
