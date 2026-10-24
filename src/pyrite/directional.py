@@ -1,4 +1,4 @@
-"""Detector-free escaped directional PXR/CBS source maps."""
+"""Detector-free escaped directional source maps (PXR/CBS, characteristic, continuum)."""
 
 from dataclasses import replace
 
@@ -19,8 +19,11 @@ from .campaign.target import Target
 from .materials import CATALOG
 from .materials.crystal import reciprocal_g_vector
 from .montecarlo.runner import case_table_markers
-from .montecarlo.runner.directional_source import source_outputs
-from .results.directional import DirectionalSpectrum
+from .montecarlo.runner.directional_source import SOURCE_COMPONENTS, source_outputs
+from .results.directional import COMPONENT_IDS, DirectionalSpectrum
+
+#: Public component names accepted by :func:`directional_sources`.
+DIRECTIONAL_COMPONENTS = tuple(SOURCE_COMPONENTS)
 
 
 def observation_directions(angle_deg: ArrayLike, plane_azimuth_deg: float = 0.0) -> np.ndarray:
@@ -111,6 +114,44 @@ def directional_source(
 ) -> DirectionalSpectrum:
     """Calculate a detector-free incoherent PXR/CBS angular slice.
 
+    Equivalent to ``directional_sources(..., components=("pxr-cbs",))["pxr-cbs"]``;
+    see :func:`directional_sources` for the parameters.
+    """
+    return directional_sources(
+        beam,
+        target,
+        energy_eV=energy_eV,
+        angle_deg=angle_deg,
+        plane_azimuth_deg=plane_azimuth_deg,
+        numerics=numerics,
+        seed=seed,
+        direction_batch=direction_batch,
+    )["pxr-cbs"]
+
+
+def directional_sources(
+    beam: Beam,
+    target: Slab | Stack | Target,
+    *,
+    energy_eV: ArrayLike,
+    angle_deg: ArrayLike | None = None,
+    plane_azimuth_deg: float = 0.0,
+    numerics: Numerics | None = None,
+    seed: int = 1,
+    direction_batch: int = 16,
+    components: tuple[str, ...] = ("pxr-cbs",),
+) -> dict[str, DirectionalSpectrum]:
+    """Calculate detector-free escaped angular slices for selected components.
+
+    One transport serves every component and direction. Components are kept
+    separate (never summed): ``"pxr-cbs"`` (incoherent PXR/CBS with their
+    interference), ``"characteristic"`` (isotropic atomic relaxation lines)
+    and ``"bremsstrahlung"`` (continuum; BremsLib angular model when the
+    tables resolve under the default ``Physics``, otherwise isotropic EEDL).
+    Characteristic and continuum use the live runner's lower-cutoff
+    population, which equals the line population here because
+    ``brem_trials`` is replaced by ``cxr_trials``.
+
     Parameters
     ----------
     beam, target
@@ -132,11 +173,14 @@ def directional_source(
         replaced by cxr_trials; no extra population or excluded channel is scored.
     seed, direction_batch
         Nonnegative integer RNG seed and positive bounded scoring batch size.
+    components
+        Subset of :data:`DIRECTIONAL_COMPONENTS`, scored in this order.
 
     Returns
     -------
-    DirectionalSpectrum
-        Escaped density per incident electron/eV/sr and current-scaled rate.
+    dict[str, DirectionalSpectrum]
+        One result per requested component, sharing angles, grid, case and
+        provenance. Each holds escaped density per incident electron/eV/sr and current-scaled rate.
         A finite footprint evaluates every direction, tracing escape to the
         first prism face (side exits included). Only the laterally infinite
         slab marks face-parallel directions (|n_sample,z| <= 1e-10)
@@ -169,24 +213,36 @@ def directional_source(
     if grid[-1] > case["E0_keV"] * 1000:
         raise ValueError("energy_eV must not exceed the incident electron energy")
     sample = lab @ case_rotation(case)
-    density, supported = source_outputs(
-        case, sample, direction_batch=direction_batch, transport_core=controls.transport_core
+    components = tuple(dict.fromkeys(components))
+    if not components or not set(components) <= set(DIRECTIONAL_COMPONENTS):
+        raise ValueError(f"components must be a nonempty subset of {DIRECTIONAL_COMPONENTS}")
+    densities, supported = source_outputs(
+        case,
+        sample,
+        components=components,
+        direction_batch=direction_batch,
+        transport_core=controls.transport_core,
     )
     tables = case_table_markers(case)
-    return DirectionalSpectrum(
-        angles,
-        grid.copy(),
-        lab,
-        sample,
-        density,
-        supported,
-        case,
-        {
-            "plane_azimuth_deg": float(plane_azimuth_deg),
-            "numerics": controls,
-            "identity_digest": case_content_key(case, xsgen_tables=tables),
-            "energy_grid": "explicit point samples; no automatic window",
-            "line_window_ceiling_eV": line_window_ceiling_eV(case),
-            **run_provenance(case, tables),
-        },
-    )
+    provenance = {
+        "plane_azimuth_deg": float(plane_azimuth_deg),
+        "numerics": controls,
+        "identity_digest": case_content_key(case, xsgen_tables=tables),
+        "energy_grid": "explicit point samples; no automatic window",
+        "line_window_ceiling_eV": line_window_ceiling_eV(case),
+        **run_provenance(case, tables),
+    }
+    return {
+        name: DirectionalSpectrum(
+            angles,
+            grid.copy(),
+            lab,
+            sample,
+            densities[name],
+            supported,
+            case,
+            provenance,
+            component=COMPONENT_IDS[name],
+        )
+        for name in components
+    }

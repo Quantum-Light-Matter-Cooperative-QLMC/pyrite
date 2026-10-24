@@ -727,16 +727,22 @@ Notebook support for `src/pyrite/apps/validation_app.py`: the persisted suppleme
 
 `directional.py::directional_source` lowers beam/target through a source-only
 `SourceDirection` context, then `montecarlo/runner/directional_source.py` reuses
-one transport for CXR-only directional scoring. `results/directional.py` owns
-the typed component and mean-current scaling. The thin standalone
-`apps/angular_heatmap_app.py` uses bounded cache/plot helpers in
-`apps/angular_heatmap.py`; `pyrite app angular-heatmap launch|export` uses
-the shared launcher on tunnel port 2724. No detector or checkpoint required.
+one transport for directional scoring of the selected components (PXR/CBS,
+characteristic, bremsstrahlung; `directional_sources`). `results/directional.py`
+owns the typed component and mean-current scaling. The thin standalone
+`apps/angular_heatmap_app.py` uses bounded cache/panel helpers in
+`apps/angular_heatmap.py`; `apps/angular_maps.py` owns the shared Plotly
+angle × energy heatmap/profile figures, catalog material options, backend-aware
+transport cores and form layout used by the heatmap, TR and optical apps.
+`pyrite app angular-heatmap launch|export` uses the shared launcher on tunnel
+port 2724; every shared-launcher app accepts `launch --backend`. No detector or
+checkpoint required.
 
 ### `apps/transition_radiation.py` and `apps/transition_radiation_app.py`
 
 The standalone TR/CTR demo lives in `apps/transition_radiation_app.py`, with
-bounded cached planar-solver/production adapters in `apps/transition_radiation.py`.
+cached planar-solver/production adapters in `apps/transition_radiation.py`
+(forward and backward straight-track maps, configurable medium/tilt/band).
 `pyrite app transition-radiation launch|export` uses the shared `app_views`
 launcher on tunnel port 2723; `tr_demo`/`ctr_demo` are its catalog references.
 
@@ -744,7 +750,8 @@ launcher on tunnel port 2723; `tr_demo`/`ctr_demo` are its catalog references.
 
 `apps/optical_diagnostics_app.py` is the bounded Plotly optical source,
 collection/convergence, synthetic instrument/inference and saved-artifact app.
-`apps/optical_diagnostics.py` caches existing solver adapters;
+`apps/optical_diagnostics.py` caches existing solver adapters (`ScreenConfig`,
+the constant-index Cherenkov cone map);
 `apps/radiation_figures.py` renders stored arrays. The shared app launcher uses
 `pyrite app optical-diagnostics launch|export` on tunnel port 2725.
 `apps/transition_radiation.py::cached_dtr_reference` feeds an explicitly triggered
@@ -917,7 +924,8 @@ parity: `checks/optical_transition_cuda.py`.
 Bulk Cherenkov source (#587): `montecarlo/spectrum/cherenkov.py`
 (`frank_tamm_yield`: Frank–Tamm yield and cone for an explicit weak-loss
 permittivity; `BulkEmissionMechanism` extension point for interface-free
-sources). Standalone, not wired into transport or scoring. Physics:
+sources; `ConstantIndex` lossless nondispersive input). Standalone, not wired
+into transport or scoring; the optical diagnostics app maps its cone. Physics:
 `physics/radiation-physics/cherenkov-radiation.md`; Geant4 reference:
 `checks/cherenkov_geant4`.
 

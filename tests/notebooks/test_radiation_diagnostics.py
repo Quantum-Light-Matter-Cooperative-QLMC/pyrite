@@ -164,6 +164,7 @@ def test_evidence_missing_malformed_and_provenance(tmp_path):
     [
         pytest.param("Source and collection", marks=pytest.mark.slow),
         "Instrument and inference",
+        "Cherenkov cone",
         "Saved outputs",
     ],
 )
@@ -172,19 +173,32 @@ def test_live_optical_app_views_execute_without_implicit_transport(view_name, tm
 
     overrides = {"view": SimpleNamespace(value=view_name)}
     if view_name == "Source and collection":
-        overrides.update(
-            source_run=SimpleNamespace(value=True),
-            hole=SimpleNamespace(value=0.0),
-            distance=SimpleNamespace(value=100.0),
-            duration=SimpleNamespace(value=1.0),
-            charge=SimpleNamespace(value=0.001),
+        from pyrite.apps.optical_diagnostics import ScreenConfig
+
+        d = ScreenConfig()
+        overrides["screen_form"] = SimpleNamespace(
+            value=dict(
+                outer=d.outer_um,
+                hole=d.hole_um,
+                beta=d.beta,
+                duration=d.duration_fs,
+                charge=d.charge_pc,
+                distance=d.distance_um,
+                aperture=d.aperture_um,
+                low=d.low_eV,
+                high=d.high_eV,
+                points=d.energy_points,
+                grid=d.grid,
+                pitch=d.pitch_um,
+                device="cpu",
+            )
         )
     elif view_name == "Instrument and inference":
-        overrides.update(
-            infer_run=SimpleNamespace(value=True),
-            sigma=SimpleNamespace(value=200.0),
-            band=SimpleNamespace(value=0.0005),
+        overrides["infer_form"] = SimpleNamespace(
+            value=dict(sigma=200.0, low=0.0005, high=0.025, mirror=1.2, nodes=61, noise=15.0)
         )
+    elif view_name == "Cherenkov cone":
+        pass
     else:
         path = inference_demo()[1].save(tmp_path / "fit.npz")
         overrides.update(
@@ -212,7 +226,7 @@ def test_initial_optical_app_defers_numerical_work(monkeypatch):
     ):
         monkeypatch.setattr(optical_diagnostics, name, forbidden)
     _, definitions = app.run()
-    assert not definitions["source_run"].value
+    assert definitions["screen_form"].value is None
 
 
 def test_radiation_panel_keeps_single_energy_checkpoints_usable():
@@ -224,3 +238,35 @@ def test_radiation_panel_keeps_single_energy_checkpoints_usable():
     for name in ("E_grid", "spec", "spec_transition", "brem"):
         r[name] = r[name][:1]
     assert radiation_panel(mo, [r]) is not None
+
+
+def test_cherenkov_cone_map_threshold_and_cone():
+    """Validation: frank-tamm-homogeneous-dielectric (constant-n app view)."""
+    from pyrite.apps.optical_diagnostics import cherenkov_cone_map
+
+    panel, threshold, cone = cherenkov_cone_map(1.46, 2.5, (100.0, 1e5), 64, 90)
+    assert threshold == pytest.approx(510.99895 * (1 / np.sqrt(1 - 1 / 1.46**2) - 1), rel=1e-6)
+    assert cone == pytest.approx(np.rad2deg(np.arccos(1 / 1.46)))
+    below = panel.energy_eV < threshold
+    assert below.any() and not panel.values[:, below].any()
+    # Above threshold each kinetic energy fills exactly one bin, at theta_C.
+    hit = panel.values[:, ~below] > 0
+    assert np.all(hit.sum(axis=0) == 1)
+    assert panel.angle_deg[hit[:, -1]][0] == pytest.approx(cone, abs=1.0)
+    _, none, _ = cherenkov_cone_map(1.0, 2.5, (100.0, 1e5), 8, 10)
+    assert none == np.inf
+
+
+def test_screen_config_validation_and_defaults():
+    from pyrite.apps.optical_diagnostics import ScreenConfig
+
+    assert ScreenConfig().window_um == 64.0
+    for bad in (
+        {"hole_um": 30.0},
+        {"beta": 1.0},
+        {"low_eV": 2.0},
+        {"grid": 8},
+        {"device": "tpu"},
+    ):
+        with pytest.raises(ValueError):
+            ScreenConfig(**bad)

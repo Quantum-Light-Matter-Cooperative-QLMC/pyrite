@@ -126,13 +126,17 @@ Usage: pyrite app pixels launch [OPTIONS] [MATERIAL]
   default.
 
 Options:
-  --watch     Reload app when source files change.
-  --smoke     Execute app once headlessly and exit.
-  --edit      Use `marimo edit` instead of `marimo run`.
-  --acp       Start local Claude and Codex ACP bridges.
-  --tunnel    Bind fixed port for SSH tunneling.
-  --no-token  Disable marimo auth token.
-  -h, --help  Show this message and exit.
+  --watch                         Reload app when source files change.
+  --smoke                         Execute app once headlessly and exit.
+  --edit                          Use `marimo edit` instead of `marimo run`.
+  --acp                           Start local Claude and Codex ACP bridges.
+  --tunnel                        Bind fixed port for SSH tunneling.
+  --no-token                      Disable marimo auth token.
+  --backend [auto|cpu|cuda|rocm|sycl]
+                                  Array backend for the app process (sets
+                                  PYRITE_MC_BACKEND). Default: inherit the environment.
+                                  An explicit accelerator fails if unavailable.
+  -h, --help                      Show this message and exit.
 ```
 
 ## `pyrite app compare`
@@ -182,13 +186,17 @@ Usage: pyrite app compare launch [OPTIONS] [MATERIAL]
   default.
 
 Options:
-  --watch     Reload app when source files change.
-  --smoke     Execute app once headlessly and exit.
-  --edit      Use `marimo edit` instead of `marimo run`.
-  --acp       Start local Claude and Codex ACP bridges.
-  --tunnel    Bind fixed port for SSH tunneling.
-  --no-token  Disable marimo auth token.
-  -h, --help  Show this message and exit.
+  --watch                         Reload app when source files change.
+  --smoke                         Execute app once headlessly and exit.
+  --edit                          Use `marimo edit` instead of `marimo run`.
+  --acp                           Start local Claude and Codex ACP bridges.
+  --tunnel                        Bind fixed port for SSH tunneling.
+  --no-token                      Disable marimo auth token.
+  --backend [auto|cpu|cuda|rocm|sycl]
+                                  Array backend for the app process (sets
+                                  PYRITE_MC_BACKEND). Default: inherit the environment.
+                                  An explicit accelerator fails if unavailable.
+  -h, --help                      Show this message and exit.
 ```
 
 ## `pyrite app channeling`
@@ -232,13 +240,17 @@ Usage: pyrite app channeling launch [OPTIONS]
   Choose the crystal and beam settings inside the app; no checkpoint is needed.
 
 Options:
-  --watch     Reload app when source files change.
-  --smoke     Execute app once headlessly and exit.
-  --edit      Use `marimo edit` instead of `marimo run`.
-  --acp       Start local Claude and Codex ACP bridges.
-  --tunnel    Bind fixed port for SSH tunneling.
-  --no-token  Disable marimo auth token.
-  -h, --help  Show this message and exit.
+  --watch                         Reload app when source files change.
+  --smoke                         Execute app once headlessly and exit.
+  --edit                          Use `marimo edit` instead of `marimo run`.
+  --acp                           Start local Claude and Codex ACP bridges.
+  --tunnel                        Bind fixed port for SSH tunneling.
+  --no-token                      Disable marimo auth token.
+  --backend [auto|cpu|cuda|rocm|sycl]
+                                  Array backend for the app process (sets
+                                  PYRITE_MC_BACKEND). Default: inherit the environment.
+                                  An explicit accelerator fails if unavailable.
+  -h, --help                      Show this message and exit.
 ```
 
 ## `pyrite app angular-heatmap`
@@ -282,13 +294,17 @@ Usage: pyrite app angular-heatmap launch [OPTIONS]
   Choose the crystal and beam settings inside the app; no checkpoint is needed.
 
 Options:
-  --watch     Reload app when source files change.
-  --smoke     Execute app once headlessly and exit.
-  --edit      Use `marimo edit` instead of `marimo run`.
-  --acp       Start local Claude and Codex ACP bridges.
-  --tunnel    Bind fixed port for SSH tunneling.
-  --no-token  Disable marimo auth token.
-  -h, --help  Show this message and exit.
+  --watch                         Reload app when source files change.
+  --smoke                         Execute app once headlessly and exit.
+  --edit                          Use `marimo edit` instead of `marimo run`.
+  --acp                           Start local Claude and Codex ACP bridges.
+  --tunnel                        Bind fixed port for SSH tunneling.
+  --no-token                      Disable marimo auth token.
+  --backend [auto|cpu|cuda|rocm|sycl]
+                                  Array backend for the app process (sets
+                                  PYRITE_MC_BACKEND). Default: inherit the environment.
+                                  An explicit accelerator fails if unavailable.
+  -h, --help                      Show this message and exit.
 ```
 
 ## `pyrite app transition-radiation`
@@ -333,13 +349,17 @@ Usage: pyrite app transition-radiation launch [OPTIONS]
   Choose the crystal and beam settings inside the app; no checkpoint is needed.
 
 Options:
-  --watch     Reload app when source files change.
-  --smoke     Execute app once headlessly and exit.
-  --edit      Use `marimo edit` instead of `marimo run`.
-  --acp       Start local Claude and Codex ACP bridges.
-  --tunnel    Bind fixed port for SSH tunneling.
-  --no-token  Disable marimo auth token.
-  -h, --help  Show this message and exit.
+  --watch                         Reload app when source files change.
+  --smoke                         Execute app once headlessly and exit.
+  --edit                          Use `marimo edit` instead of `marimo run`.
+  --acp                           Start local Claude and Codex ACP bridges.
+  --tunnel                        Bind fixed port for SSH tunneling.
+  --no-token                      Disable marimo auth token.
+  --backend [auto|cpu|cuda|rocm|sycl]
+                                  Array backend for the app process (sets
+                                  PYRITE_MC_BACKEND). Default: inherit the environment.
+                                  An explicit accelerator fails if unavailable.
+  -h, --help                      Show this message and exit.
 ```
 
 ## `pyrite app optical-diagnostics`
@@ -384,13 +404,17 @@ Usage: pyrite app optical-diagnostics launch [OPTIONS]
   Choose the crystal and beam settings inside the app; no checkpoint is needed.
 
 Options:
-  --watch     Reload app when source files change.
-  --smoke     Execute app once headlessly and exit.
-  --edit      Use `marimo edit` instead of `marimo run`.
-  --acp       Start local Claude and Codex ACP bridges.
-  --tunnel    Bind fixed port for SSH tunneling.
-  --no-token  Disable marimo auth token.
-  -h, --help  Show this message and exit.
+  --watch                         Reload app when source files change.
+  --smoke                         Execute app once headlessly and exit.
+  --edit                          Use `marimo edit` instead of `marimo run`.
+  --acp                           Start local Claude and Codex ACP bridges.
+  --tunnel                        Bind fixed port for SSH tunneling.
+  --no-token                      Disable marimo auth token.
+  --backend [auto|cpu|cuda|rocm|sycl]
+                                  Array backend for the app process (sets
+                                  PYRITE_MC_BACKEND). Default: inherit the environment.
+                                  An explicit accelerator fails if unavailable.
+  -h, --help                      Show this message and exit.
 ```
 
 ## `pyrite app viewer`

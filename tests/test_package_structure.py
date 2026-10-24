@@ -75,6 +75,7 @@ def test_root_exports_stay_frozen() -> None:
         "photon_energies",
         "simulate",
         "directional_source",
+        "directional_sources",
         "DirectionalSpectrum",
     ]
 

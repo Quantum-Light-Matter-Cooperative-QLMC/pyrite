@@ -30,23 +30,36 @@ than the idealized **1 nm FWHM Gaussian spot**. The bunch has **1 as RMS**
 duration and **0.0001 pC**, about 624 physical electrons. These settings expose
 soft-X-ray coherence; they are an illustrative source, not a facility model.
 
-Submit **Update comparison** after editing energy, film thickness, observation
-angle, duration, spot size or charge. The first plots show the exact
-straight-track film spectrum, a semi-infinite interface comparison, an angular
-cut, and the Gaussian intensity form factor. Thickness changes include
-interference between the entry and exit fields and absorption. The angular cut
-and per-bunch checkbox redraw cached arrays.
+Submit **Update comparison** after editing the beam and bunch (energy, RMS
+duration, spot, charge), the film (catalog medium, thickness, tilt, spectrum
+observation angle), the photon band (start, stop, points, log spacing) or the
+map angles. Limits are physical, not demonstrative: beams up to 100 GeV,
+forward (< 90°) and backward observation anywhere off the film plane, and any
+band inside the medium's dielectric table and below the beam energy. Forward
+rays are solved at the exit face and backward rays at the entrance face.
 
-**Run transported comparison** explicitly runs two small CPU simulations:
-history-coherent TR and bunch-coherent CTR. Each uses 32 line histories and 64
-continuum histories; the latter population scores TR. Both use midpoint
+The first plots are interactive TR and CTR-expectation heatmaps over signed
+angle × photon energy (gray marks directions parallel to the film), then the
+exact straight-track film spectrum, a semi-infinite interface comparison, an
+angular cut, and the Gaussian intensity form factor. Thickness changes include
+interference between the entry and exit fields and absorption. The angular cut,
+log color and per-bunch checkbox redraw cached arrays. TR vanishes exactly along
+a normal-incidence track, so 0° and ±180° are dark at zero tilt.
+
+**Run transported comparison** explicitly runs two fixed-count simulations:
+history-coherent TR and bunch-coherent CTR. *Line histories* sets the line count
+(continuum histories are twice it; the latter population scores TR);
+*Transport core* offers the CPU cores, plus CUDA on a
+`pyrite app transition-radiation launch --backend cuda` session, where TR
+crossings use the fused CUDA kernel. Both use midpoint
 integration, continuous inelastic loss, incoherent PXR/CBS, uncoupled radiative transport, and EEDL
 bremsstrahlung. These counts illustrate behavior and provide no precision
 certificate. The notebook reports measured runtime and captured warnings.
-On the development CPU, both runs together took about 5 s with the pinned
-tables installed and warm compiled code; initial compilation took longer
-(about 33 s in a cold fallback-data run). Startup and data installation are
-additional. Individual CLI profile runs reported about 1 s of case execution.
+On the development CPU, the default 32/64-history runs together took about 5 s
+with the pinned tables installed and warm compiled code; initial compilation
+took longer (about 33 s in a cold fallback-data run). Startup and data
+installation are additional. Individual CLI profile runs reported about 1 s of
+case execution.
 
 The analytic expectation assumes identical straight tracks with independent
 Gaussian time/position offsets. It uses the existing face-projection transverse

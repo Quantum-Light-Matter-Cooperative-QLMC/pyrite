@@ -5,6 +5,11 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 
+def _host(values):
+    """NumPy copy of a NumPy or CuPy array (CUDA field-device results)."""
+    return np.asarray(values.get() if hasattr(values, "get") else values)
+
+
 def optical_source_figure(band, field):
     fig = make_subplots(
         rows=1,
@@ -13,12 +18,14 @@ def optical_source_figure(band, field):
     )
     fig.add_trace(
         go.Scatter(
-            x=band.energy_eV, y=band.collected_photons_per_eV_per_pulse, name="photons/(eV pulse)"
+            x=_host(band.energy_eV),
+            y=_host(band.collected_photons_per_eV_per_pulse),
+            name="photons/(eV pulse)",
         ),
         row=1,
         col=1,
     )
-    electric = np.asarray(field.electric_xy_v_s_m)[0]
+    electric = _host(field.electric_xy_v_s_m)[0]
     axis = (np.arange(electric.shape[0]) - electric.shape[0] / 2 + 0.5) * field.dx_m * 1e6
     fig.add_trace(go.Heatmap(x=axis, y=axis, z=abs(electric) ** 2, showscale=False), row=1, col=2)
     fig.add_trace(

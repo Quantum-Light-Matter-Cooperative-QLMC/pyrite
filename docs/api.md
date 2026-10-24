@@ -264,6 +264,8 @@ returns `pyrite.DirectionalSpectrum` without a detector or checkpoint. The resul
 contains explicit coordinates, escaped incoherent PXR/CBS density per incident
 electron/eV/sr, supported-direction mask and resolved provenance. `.rate()` uses
 the beam mean current; `.rate(current_na)` rescales stored arrays to ph/s/eV/sr.
+`pyrite.directional_sources(..., components=...)` returns one such result per
+component (`"pxr-cbs"`, `"characteristic"`, `"bremsstrahlung"`) from one transport.
 This new surface is provisional; see [directional heatmaps](guides/directional-source-heatmap.md)
 for the bounded example, full-circle convention, supported geometry and limits.
 

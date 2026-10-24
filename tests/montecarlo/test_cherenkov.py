@@ -7,6 +7,7 @@ from pyrite.montecarlo.spectrum.cherenkov import (
     CHERENKOV_MODEL,
     FRANK_TAMM_PER_EV_M,
     ChargedPassage,
+    ConstantIndex,
     cherenkov_threshold_beta,
     frank_tamm_yield,
 )
@@ -113,6 +114,19 @@ def test_accepts_explicit_dielectric_response():
     via_object = frank_tamm_yield(ChargedPassage(0.9), energy, _Response())
     via_array = frank_tamm_yield(ChargedPassage(0.9), energy, _Response().epsilon(energy))
     np.testing.assert_array_equal(via_object.yield_per_m_per_eV, via_array.yield_per_m_per_eV)
+
+
+def test_constant_index_is_the_nondispersive_limit():
+    """Validation: frank-tamm-homogeneous-dielectric (constant-n input)."""
+    energy = np.linspace(1.5, 4.0, 5)
+    medium = ConstantIndex(1.46)
+    via_object = frank_tamm_yield(ChargedPassage(0.95), energy, medium)
+    via_scalar = frank_tamm_yield(ChargedPassage(0.95), energy, 1.46**2)
+    np.testing.assert_array_equal(via_object.yield_per_m_per_eV, via_scalar.yield_per_m_per_eV)
+    np.testing.assert_allclose(via_object.cos_theta, 1 / (0.95 * 1.46), rtol=1e-15)
+    for bad in (0.0, -1.0, np.nan):
+        with pytest.raises(ValueError, match="positive"):
+            ConstantIndex(bad)
 
 
 @pytest.mark.parametrize(

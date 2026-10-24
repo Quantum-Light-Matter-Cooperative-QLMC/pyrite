@@ -9,10 +9,20 @@ from scipy.constants import elementary_charge
 
 from .store import beam_current_na
 
+#: Result component identity for each public directional component name.
+COMPONENT_IDS = {
+    "pxr-cbs": "incoherent-pxr-cbs",
+    "characteristic": "characteristic",
+    "bremsstrahlung": "bremsstrahlung",
+}
+
 
 @dataclass(frozen=True)
 class DirectionalSpectrum:
-    """Escaped incoherent PXR/CBS density, including PXR–CBS interference.
+    """Escaped density of one directional source component.
+
+    ``component`` names it: ``incoherent-pxr-cbs`` (with PXR–CBS
+    interference), ``characteristic`` or ``bremsstrahlung``.
 
     ``density`` has shape (angle, energy), in ph/incident-electron/eV/sr.
     ``supported`` flags sample-face grazing directions; their density is NaN.

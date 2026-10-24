@@ -91,19 +91,51 @@ def test_straight_track_comparison_cache_and_bunch_scaling():
 
 
 @pytest.mark.parametrize(
-    "updates",
+    "updates,match",
     [
-        {"thickness_nm": 0},
-        {"energy_keV": 1000},
-        {"duration_as": float("nan")},
-        {"charge_pc": 1},
-        {"spot_nm": -1},
-        {"angle_deg": 90},
+        ({"thickness_nm": 0}, "demo limit"),
+        ({"energy_keV": 1e9}, "demo limit"),
+        ({"duration_as": float("nan")}, "demo limit"),
+        ({"spot_nm": -1}, "demo limit"),
+        ({"angle_deg": 95}, "parallel"),  # 5° tilt: film plane
+        ({"stop_eV": 40_000}, "kinetic"),
+        ({"angle_min_deg": 10, "angle_max_deg": 0}, "min < max"),
+        ({"energy_points": 4000, "angle_points": 4000}, "bound"),
     ],
 )
-def test_demo_rejects_unbounded_requests(updates):
-    with pytest.raises(ValueError, match="demo limit"):
+def test_demo_rejects_unphysical_requests(updates, match):
+    with pytest.raises(ValueError, match=match):
         replace(DemoConfig(), **updates)
+
+
+def test_forward_relativistic_map_and_grazing_mask():
+    from pyrite.apps.transition_radiation import map_panels
+
+    config = DemoConfig(
+        energy_keV=5000.0,
+        angle_deg=3.0,
+        tilt_deg=0.0,
+        start_eV=500.0,
+        stop_eV=5000.0,
+        energy_points=8,
+        angle_min_deg=-180.0,
+        angle_max_deg=180.0,
+        angle_points=9,
+    )
+    data = straight_track_demo(config)
+    grazing = np.isclose(abs(data["angles"]), 90.0)
+    assert np.isnan(data["film"][:, grazing]).all()
+    # TR vanishes exactly along a normal-incidence track (0°, ±180°).
+    off_axis = ~grazing & ~np.isclose(abs(data["angles"]) % 180, 0)
+    assert np.all(data["film"][:, off_axis] > 0) and np.all(data["spectrum"] > 0)
+    assert np.all(data["film"][:, np.isclose(data["angles"], 0)] < 1e-30)
+    # Forward TR of a relativistic beam dominates the backward lobe.
+    forward, backward = (
+        np.nanmean(data["film"][:, np.isclose(data["angles"], a)]) for a in (45, 135)
+    )
+    assert forward > backward
+    panels = map_panels(data, config, per_bunch=True)
+    np.testing.assert_allclose(panels[0].values, data["film"].T * config.population)
 
 
 def test_app_initial_export_has_analytic_plots_and_waits_for_transport():
@@ -143,9 +175,15 @@ def test_live_app_runs_production_and_preserves_signed_components():
 
     from pyrite.apps.transition_radiation_app import app
 
-    _, definitions = app.run(defs={"transport_button": SimpleNamespace(value=True)})
+    _, definitions = app.run(
+        defs={
+            "transport_button": SimpleNamespace(value=True),
+            "trials_ui": SimpleNamespace(value=32),
+            "core_ui": SimpleNamespace(value="per-electron"),
+        }
+    )
     results = definitions["production"]
-    assert transported_demo(DemoConfig())[0] is results
+    assert transported_demo(DemoConfig(), trials=32, transport_core="per-electron")[0] is results
     for result in results.values():
         assert result.transition is not None
         assert np.all(np.isfinite(result.transition.density))
