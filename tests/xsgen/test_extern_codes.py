@@ -594,8 +594,12 @@ def test_direction_resolved_ddcs_reproduces_the_vendor_interpolation(
     about 1 %. The tolerances sit just above those, so a unit error, a
     mis-scaled angle, or a lost normalization fails by orders of magnitude.
 
+    The vendor samples are electron-nucleus only, so the staged
+    electron-electron factor ``1 + eta/Z`` is divided out before comparing.
+
     Validation: bremslib-angular-model
     """
+    from pyrite._bremslib_electron import electron_electron_factor
     from pyrite.montecarlo.spectrum.brem_bremslib import (
         bremslib_segment_state,
         evaluate_bremslib,
@@ -619,6 +623,7 @@ def test_direction_resolved_ddcs_reproduces_the_vendor_interpolation(
         staged, np.array([t1_MeV * 1.0e3]), np.array([np.cos(np.radians(theta_deg))])
     )
     ours = to_host(evaluate_bremslib(staged, state, photon_MeV * 1.0e6))[0] * 1.0e6
+    ours = ours / electron_electron_factor(79, np.array([t1_MeV]), photon_MeV / t1_MeV)[0]
 
     relative = np.abs(ours / vendor_cm2_sr_MeV - 1.0)
     assert relative.max() < max_rel
