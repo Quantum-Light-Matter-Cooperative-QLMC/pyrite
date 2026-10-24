@@ -72,20 +72,21 @@ def _effective_brem_chunk(case, tp):
 
 def _halve_case_spec_chunk(case, tp):
     """Halve this case's effective line chunk in place; preserve brem tuning."""
-    spec_cur = (
-        case.get("spec_chunk") or _RESOURCE_POLICY.spec_chunk or _adaptive_chunk(tp["E_grid"].size)
-    )
-    case["spec_chunk"] = max(1, spec_cur // 2)
+    case["spec_chunk"] = max(1, _effective_spec_chunk(case, tp) // 2)
 
 
 def _halve_case_brem_chunk(case, tp):
-    """Halve this case's effective brem chunk in place; preserve line tuning."""
-    brem_cur = (
-        case.get("brem_chunk")
-        or _RESOURCE_POLICY.brem_chunk
-        or _adaptive_chunk(tp["E_brem"].size, intermediates=_EEDL_BREM_DENSE_INTERMEDIATES)
+    """Halve the admitted brem chunk; preserve line tuning."""
+    case["brem_chunk"] = max(1, _effective_brem_chunk(case, tp) // 2)
+
+
+def _halve_case_characteristic_chunk(case, tp):
+    """Characteristic uses the line grid and the shared brem chunk selector."""
+    current = _admit_chunk(
+        case.get("brem_chunk") or _RESOURCE_POLICY.brem_chunk or _adaptive_chunk(tp["E_grid"].size),
+        tp["E_grid"].size,
     )
-    case["brem_chunk"] = max(1, brem_cur // 2)
+    case["brem_chunk"] = max(1, current // 2)
 
 
 def _halve_case_chunks(case, tp):

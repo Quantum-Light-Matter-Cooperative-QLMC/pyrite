@@ -26,16 +26,15 @@ from . import (
     _ensure_pool_limit,
     _gpu_pipeline_prefetch,
     _gpu_pipeline_workers,
-    _is_gpu_oom,
     _process_pool_kwargs,
-    _spectrum_case,
-    _spectrum_case_retry,
+    _spectrum_with_recovery,
     _TimingAgg,
     _transport_case,
     _worker_init,
     run_case,
 )
 from .adaptive import _run_adaptive_case_worker, _transport_adaptive_case_worker
+from .recovery import RECOVERY_KEYS, recovery_engine
 
 
 def case_runtime_plan(case):
@@ -440,6 +439,7 @@ def run_cases(
     def _collect_timing(i, out, wait_seconds=None):
         if timing is None:
             for key in (
+                *RECOVERY_KEYS,
                 "_gpu_oom_retries",
                 "_line_gpu_oom_retries",
                 "_brem_gpu_oom_retries",
@@ -496,7 +496,7 @@ def run_cases(
 
     def _serial(keep_segments_on_device=False):
         force_cpu = not use_gpu and _RESOURCE_POLICY.gpu
-        with _cpu_spectrum_backend() if force_cpu else nullcontext():
+        with recovery_engine(engine), _cpu_spectrum_backend() if force_cpu else nullcontext():
             for i in _maybe_bar(range(n)):
                 if should_stop is not None and should_stop():
                     break
@@ -659,57 +659,25 @@ def run_cases(
                     in_flight_case_count=len(inflight),
                     transport_prefetch_count=prefetch,
                 )
-                try:
-                    out = (
-                        _spectrum_case_retry(
-                            cases[i],
-                            tp,
-                            record_timing=True,
-                            spec_chunk_cap=learned_spec_chunk,
-                        )
-                        if on_timing is not None
-                        else _spectrum_case_retry(cases[i], tp, spec_chunk_cap=learned_spec_chunk)
-                    )  # accelerator, THIS process only
-                except Exception as error:
-                    resource_error = isinstance(error, BackendResourceError)
-                    if not (resource_error or _is_gpu_oom(error)):
-                        raise
-                    if engine != "auto" or env_value("PYRITE_MC_BACKEND", "auto").lower() != "auto":
-                        raise
-                    _admit_cpu_fallback()
-                    reason = (
-                        f"device_budget_infeasible: {error}"
-                        if resource_error
-                        else f"accelerator_oom_retries_exhausted: {error}"
-                    )
-                    warnings.warn(
-                        f"{reason}; rerunning spectrum phase on CPU NumPy",
-                        RuntimeWarning,
-                        stacklevel=2,
-                    )
-                    with _cpu_spectrum_backend():
-                        out = _spectrum_case(cases[i], tp, on_timing is not None)
-                    out["_backend_fallback_reason"] = reason
+                spectrum = partial(
+                    _spectrum_with_recovery, spec_chunk_cap=learned_spec_chunk, engine=engine
+                )
+                out = spectrum(cases[i], tp, record_timing=on_timing is not None)
                 directions = _directions(i)
                 if directions is not None:
-                    if "_backend_fallback_reason" in out:
-                        with _cpu_spectrum_backend():
-                            out["directional"] = _directional_outputs(cases[i], tp, directions)
-                    else:
-                        out["directional"] = _directional_outputs(
-                            cases[i],
-                            tp,
-                            directions,
-                            spectrum=partial(
-                                _spectrum_case_retry, spec_chunk_cap=learned_spec_chunk
-                            ),
-                        )
+                    out["directional"] = _directional_outputs(
+                        cases[i], tp, directions, spectrum=spectrum
+                    )
                 # The payload is dead here; holding it until the next iteration
                 # rebinds tp would put prefetch + 1 of them in the driver.
                 del tp
                 line_retries = out.get("_line_gpu_oom_retries", 0)
                 effective_spec_chunk = out.get("_effective_spec_chunk")
-                if line_retries and effective_spec_chunk is not None:
+                if (
+                    line_retries
+                    and effective_spec_chunk is not None
+                    and out.get("_recovery_path") != "cpu_spectrum"
+                ):
                     learned_spec_chunk = (
                         effective_spec_chunk
                         if learned_spec_chunk is None

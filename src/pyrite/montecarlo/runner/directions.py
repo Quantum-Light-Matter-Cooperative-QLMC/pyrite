@@ -31,7 +31,7 @@ def directional_outputs(case, transport, n_hats, spectrum) -> dict[str, Any]:
     (:func:`~.line_grid.resolve_observation_cxr_grid`); it is independent of
     the scalar case grid, so adding directions never changes scalar output.
     ``spectrum(case, transport)`` is the runner's spectrum phase (the GPU
-    pipeline passes its OOM-retrying variant).
+    pipeline passes its recovery policy).
     """
     directions = validated_directions(n_hats)
     E_grid, grid_record = resolve_observation_cxr_grid(
@@ -63,7 +63,8 @@ def directional_outputs(case, transport, n_hats, spectrum) -> dict[str, Any]:
     result = {
         key: value
         for key, value in first.items()
-        if key
+        if not key.startswith("_")
+        and key
         not in {
             "spec",
             "spec_coherent",
@@ -91,18 +92,11 @@ def directional_outputs(case, transport, n_hats, spectrum) -> dict[str, Any]:
     result["brem_wide_by_direction"] = np.stack(
         [np.asarray(output["brem_wide"]) for output in outputs]
     )
-    if first.get("spec_channeling") is not None:
-        result["spec_channeling_by_direction"] = np.stack(
-            [np.asarray(output["spec_channeling"]) for output in outputs]
-        )
-    if first.get("spec_transition") is not None:
-        result["spec_transition_by_direction"] = np.stack(
-            [np.asarray(output["spec_transition"]) for output in outputs]
-        )
-    if "spec_coherent" in first:
-        result["spec_coherent_by_direction"] = np.stack(
-            [np.asarray(output["spec_coherent"]) for output in outputs]
-        )
+    for key in ("spec_channeling", "spec_transition", "spec_coherent"):
+        if first.get(key) is not None:
+            result[f"{key}_by_direction"] = np.stack(
+                [np.asarray(output[key]) for output in outputs]
+            )
     for key in ("temporal_intensity", "temporal_intensity_coherent"):
         if key in first:
             result[f"{key}_by_direction"] = np.stack(

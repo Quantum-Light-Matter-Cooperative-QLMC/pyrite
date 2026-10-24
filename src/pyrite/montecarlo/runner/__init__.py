@@ -195,6 +195,11 @@ def _is_gpu_oom(error):
     return isinstance(error, _RESOURCE_POLICY.gpu_oom) or BACKEND.is_oom_error(error)
 
 
+from .recovery import _spectrum_case_retry as _spectrum_case_retry
+from .recovery import _spectrum_with_recovery as _spectrum_with_recovery
+from .recovery import transport_with_recovery
+
+
 def run_case(
     case: Case | Mapping[str, Any],
     record_timing: bool = False,
@@ -213,7 +218,10 @@ def run_case(
     ``transport_core="auto"`` lets the electron count and backend select the
     core. ``keep_segments_on_device`` avoids a host round trip only when CUDA
     transport and spectrum execute in one process; an allocation failure falls
-    back to downloaded segments without changing the result.
+    back to downloaded segments after host-memory admission. Spectrum allocation
+    failures retry smaller chunks on these same trajectories. With automatic
+    backend selection, exhausted retries may run the spectra on admitted host
+    memory; explicit backend choices remain binding.
 
     Parameters
     ----------
@@ -248,7 +256,7 @@ def run_case(
         keep_segments_on_device=keep_segments_on_device,
         trajectory_capture=trajectory_capture,
     )
-    out = _spectrum_case(case, transport, record_timing)
+    out = _spectrum_with_recovery(case, transport, record_timing)
     if case.get("channeling") is not None:  # zone diagnostics (#506), not persisted
         out["channeling"] = transport["segs"]["channeling"]
     if observation_directions is not None:
@@ -259,7 +267,7 @@ def run_case(
 def _directional_outputs(case, transport, n_hats, spectrum=None) -> dict[str, Any]:
     """Evaluate observation directions on one transport; see :mod:`.directions`."""
     return directional_outputs(
-        case, transport, n_hats, _spectrum_case if spectrum is None else spectrum
+        case, transport, n_hats, _spectrum_with_recovery if spectrum is None else spectrum
     )
 
 
@@ -478,18 +486,7 @@ def _transport_case(
             progress=transport_progress,
             monitor=block_monitor,
         )
-    if resident:
-        try:
-            segs_all = transport(True)
-        except _RESOURCE_POLICY.gpu_oom:
-            # Residency holds the whole payload plus the join's second copy. The
-            # streams are counter-addressed, so replaying the same seed with the
-            # segments downloaded reproduces this run exactly -- the retry costs
-            # the bus, not the result.
-            BACKEND.release_memory()
-            segs_all = transport(False)
-    else:
-        segs_all = transport(False)
+    segs_all, transport_recovery = transport_with_recovery(transport, resident)
     if block_monitor is not None:
         # From here on this is the fixed-count case at the realized pair.
         Ne = Ne_transport = int(segs_all["Ne"])
@@ -538,7 +535,7 @@ def _transport_case(
             spectrum_inputs=spectrum_inputs,
         )
 
-    tp: dict[str, Any] = dict(spectrum_inputs, segs=segs_all)
+    tp: dict[str, Any] = dict(spectrum_inputs, segs=segs_all, **transport_recovery)
     if channeling:
         tp["channeling_beam_dir"] = beam
     if timed:
@@ -872,78 +869,26 @@ def _cxr_pair_for_case(
 
 
 from .stage_chunks import (
-    _effective_brem_chunk,
-    _effective_spec_chunk,
-    _halve_case_brem_chunk,
-    _halve_case_chunks,
-    _halve_case_spec_chunk,
-    _stage_counters,
+    _effective_brem_chunk as _effective_brem_chunk,
+)
+from .stage_chunks import (
+    _effective_spec_chunk as _effective_spec_chunk,
+)
+from .stage_chunks import (
+    _halve_case_brem_chunk as _halve_case_brem_chunk,
+)
+from .stage_chunks import (
+    _halve_case_chunks as _halve_case_chunks,
+)
+from .stage_chunks import (
+    _halve_case_spec_chunk as _halve_case_spec_chunk,
 )
 from .stage_chunks import (
     _host_rss_mib as _host_rss_mib,
 )
-
-
-def _spectrum_case_retry(
-    case,
-    tp,
-    max_retries=_RESOURCE_POLICY.gpu_oom_retries,
-    record_timing=False,
-    spec_chunk_cap=None,
-):
-    """Run the GPU phase, retrying line OOMs with progressively halved chunks.
-
-    ``spec_chunk_cap`` carries a successful fallback forward within one
-    :func:`run_cases` call. It only lowers the resolved line chunk. The original
-    case and its brem chunk stay pristine for checkpoint/recompute compatibility.
-    OOMs outside the coherent-line phase propagate without teaching a false cap.
-    """
-    timed = _TIMING or record_timing
-    t0 = perf_counter() if timed else 0.0
-    work = case
-    initial_spec_chunk = _effective_spec_chunk(work, tp)
-    initial_brem_chunk = _effective_brem_chunk(work, tp)
-    if spec_chunk_cap is not None and initial_spec_chunk > spec_chunk_cap:
-        work = dict(work)
-        work["spec_chunk"] = spec_chunk_cap
-        initial_spec_chunk = spec_chunk_cap
-    line_retries = 0
-    brem_retries = 0
-    generic_retries = 0
-    for attempt in range(max_retries + 1):
-        try:
-            out = _spectrum_case(work, tp, record_timing)
-            if timed:
-                out["_t_spectrum"] = perf_counter() - t0
-            out["_gpu_oom_retries"] = attempt
-            out["_line_gpu_oom_retries"] = line_retries
-            out["_brem_gpu_oom_retries"] = brem_retries
-            out["_generic_gpu_oom_retries"] = generic_retries
-            out["_attempted_spec_chunk"] = initial_spec_chunk
-            out["_effective_spec_chunk"] = _effective_spec_chunk(work, tp)
-            out["_attempted_brem_chunk"] = initial_brem_chunk
-            out["_effective_brem_chunk"] = _effective_brem_chunk(work, tp)
-            return out
-        except _SpectrumPhaseOOM as tagged:
-            if attempt == max_retries:
-                raise tagged.error from tagged
-            BACKEND.release_memory()
-            work = dict(work)
-            if tagged.phase == "line":
-                line_retries += 1
-                _halve_case_spec_chunk(work, tp)
-            else:
-                brem_retries += 1
-                _halve_case_brem_chunk(work, tp)
-        except Exception as error:
-            if not _is_gpu_oom(error):
-                raise
-            if attempt == max_retries:
-                raise
-            BACKEND.release_memory()
-            work = dict(work)
-            generic_retries += 1
-            _halve_case_chunks(work, tp)
+from .stage_chunks import (
+    _stage_counters,
+)
 
 
 def _spectrum_case(case, tp, record_timing=False):
@@ -959,6 +904,9 @@ def _spectrum_case(case, tp, record_timing=False):
     if timed:
         out.update(_stage_counters(tp))
     _adaptive.attach_sampling(case, tp, out)
+    from .recovery import RECOVERY_KEYS
+
+    out.update({key: tp[key] for key in RECOVERY_KEYS if key in tp})
     return out
 
 
@@ -1066,7 +1014,7 @@ def _spectrum_case_impl(case, tp, record_timing=False):
         except Exception as error:
             if not _is_gpu_oom(error):
                 raise
-            raise _SpectrumPhaseOOM("brem", error) from error
+            raise _SpectrumPhaseOOM("characteristic", error) from error
 
     # BREM: EVERY layer radiates with its OWN composition (each Z^2 cross
     # section); each layer's brem self-absorbs through the whole stack, summed

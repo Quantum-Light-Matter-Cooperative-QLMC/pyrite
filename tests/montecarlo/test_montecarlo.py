@@ -793,7 +793,7 @@ def test_run_cases_pipeline_holds_no_more_than_the_budgeted_prefetch(monkeypatch
     monkeypatch.setattr(scheduling, "_transport_case", lambda case: {"name": case["name"]})
     monkeypatch.setattr(
         scheduling,
-        "_spectrum_case_retry",
+        "_spectrum_with_recovery",
         lambda case, tp, **_kw: {"name": tp["name"]},
     )
     monkeypatch.setattr("concurrent.futures.ProcessPoolExecutor", _SyncProcessPoolExecutor)
@@ -829,7 +829,7 @@ def test_gpu_pipeline_deadline_completes_at_most_one_case_after_expiry(monkeypat
         return payload
 
     monkeypatch.setattr(scheduling, "_transport_case", transport)
-    monkeypatch.setattr(scheduling, "_spectrum_case_retry", spectrum)
+    monkeypatch.setattr(scheduling, "_spectrum_with_recovery", spectrum)
     cases = [{"name": f"c{i}", "Ne": 10} for i in range(6)]
     activity = []
     results = runner.run_cases(
