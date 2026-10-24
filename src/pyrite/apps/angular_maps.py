@@ -67,6 +67,7 @@ def heatmap_figure(
     *,
     value_label: str,
     angle_label: str = "Signed observation angle (deg)",
+    energy_label: str = "Photon energy (eV)",
     logarithmic: bool = True,
     dynamic_range: float = 1e8,
     periodic: bool = False,
@@ -104,7 +105,7 @@ def heatmap_figure(
                 customdata=values.T,
                 coloraxis="coloraxis",
                 hovertemplate=(
-                    "angle %{x:.4g}°<br>E %{y:.5g} eV<br>%{customdata:.4g}<extra>"
+                    "angle %{x:.4g}°<br>%{y:.5g}<br>%{customdata:.4g}<extra>"
                     + panel.title
                     + "</extra>"
                 ),
@@ -115,7 +116,7 @@ def heatmap_figure(
         fig.update_xaxes(range=[angle[0], angle[-1]], row=1, col=col)
     log_y = geometric(panels[0].energy_eV) if log_energy is None else log_energy
     fig.update_yaxes(type="log" if log_y else "linear")
-    fig.update_yaxes(title_text="Photon energy (eV)", row=1, col=1)
+    fig.update_yaxes(title_text=energy_label, row=1, col=1)
     colorbar: dict[str, object] = {"title": {"text": value_label, "side": "right"}}
     if logarithmic:
         tick = np.arange(np.ceil(lo), np.floor(hi) + 1)

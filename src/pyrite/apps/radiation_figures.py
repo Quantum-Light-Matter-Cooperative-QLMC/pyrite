@@ -18,7 +18,8 @@ def optical_source_figure(band, field):
         row=1,
         col=1,
     )
-    electric = np.asarray(field.electric_xy_v_s_m)[0]
+    electric = field.electric_xy_v_s_m
+    electric = np.asarray(electric.get() if hasattr(electric, "get") else electric)[0]  # CuPy
     axis = (np.arange(electric.shape[0]) - electric.shape[0] / 2 + 0.5) * field.dx_m * 1e6
     fig.add_trace(go.Heatmap(x=axis, y=axis, z=abs(electric) ** 2, showscale=False), row=1, col=2)
     fig.add_trace(

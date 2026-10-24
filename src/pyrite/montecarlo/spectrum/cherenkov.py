@@ -41,6 +41,7 @@ __all__ = [
     "BulkEmissionMechanism",
     "BulkEmissionYield",
     "ChargedPassage",
+    "ConstantIndex",
     "DielectricResponse",
     "cherenkov_threshold_beta",
     "frank_tamm_yield",
@@ -61,6 +62,25 @@ class DielectricResponse(Protocol):
     def epsilon(self, energy_eV: Any) -> Any:
         """Relative permittivity at photon energies [eV]."""
         ...
+
+
+@dataclass(frozen=True)
+class ConstantIndex:
+    """Lossless nondispersive medium, ``epsilon = n**2`` at every photon energy.
+
+    A user-declared limiting case of the explicit-permittivity input (no
+    material data): valid only inside a transparent band where the index is
+    nearly constant, e.g. n = 1.46 for fused silica in the visible.
+    """
+
+    n: float
+
+    def __post_init__(self) -> None:
+        if not (np.isfinite(self.n) and self.n > 0.0):
+            raise ValueError("refractive index n must be finite and positive")
+
+    def epsilon(self, energy_eV: Any) -> np.ndarray:
+        return np.full(np.shape(energy_eV), complex(self.n**2))
 
 
 @dataclass(frozen=True)
