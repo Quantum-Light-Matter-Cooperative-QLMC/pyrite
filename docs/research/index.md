@@ -24,6 +24,7 @@ physics/superradiant-pxr
 physics/quantum-coherent-emission
 physics/phase-retention
 physics/channeling-radiation-physics
+physics/channeling-submev-envelope
 physics/axial-run-integration
 physics/axial-escape-instrument
 physics/axial-entrance-zone-contract-623
