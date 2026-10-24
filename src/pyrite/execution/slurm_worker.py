@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import traceback
 from time import perf_counter
 from pathlib import Path
@@ -35,26 +36,44 @@ def execute_unit(run_dir: Path, unit_index: int) -> None:
         raise ValueError("GPU worker is not permitted a nested pool")
     references = []
     status_path = run_dir / "status" / f"{unit_index}.json"
+    attempt = int(os.environ.get("PYRITE_SLURM_ATTEMPT", "1"))
+    if attempt < 1:
+        raise ValueError("invalid SLURM attempt")
     state = "succeeded"
     error = None
     started = perf_counter()
     try:
+        pending = []
+        for row in records:
+            # Idempotent retry: never re-run an already committed, verified
+            # case, even if its previous task died before writing status JSON.
+            # A corrupt committed artifact raises; never silently replace it.
+            existing = store.reference(row["case"]["crystal"], row["content_key"])
+            if existing is not None:
+                store.load(existing, expected_material=existing.material,
+                           expected_content_key=row["content_key"])
+                references.append({"index": row["index"], "key": existing.content_key})
+            else:
+                pending.append(row)
+
         def publish(i, case, output):
             if output is None:
                 raise RuntimeError("worker returned an empty scalar result")
-            record = records[i]
-            reference = store.publish(case["crystal"], record["content_key"], output)
-            references.append({"index": record["index"], "key": reference.content_key})
+            row = pending[i]
+            reference = store.publish(case["crystal"], row["content_key"], output)
+            references.append({"index": row["index"], "key": reference.content_key})
 
-        run_cases([row["case"] for row in records], max_workers=local_workers,
-                  engine=engine, progress=False, keep_results=False, callback=publish)
+        if pending:
+            run_cases([row["case"] for row in pending], max_workers=local_workers,
+                      engine=engine, progress=False, keep_results=False, callback=publish)
         if len(references) != len(records):
             raise RuntimeError("worker did not finish publishing every case")
     except BaseException:
         state = "failed"
         error = traceback.format_exc(limit=12)
     _atomic_json(status_path, {"format": "pyrite.slurm-task.v1", "unit_index": unit_index,
-                               "state": state, "case_refs": references, "error": error,
+                               "state": state, "attempt": attempt,
+                               "case_refs": references, "error": error,
                                "worker_seconds": perf_counter() - started})
     if state != "succeeded":
         raise RuntimeError(f"SLURM array unit {unit_index} failed; see {status_path}")

@@ -13,7 +13,7 @@ version and Python path on compute nodes):
 ```python
 from pyrite.execution.artifacts import CaseArtifactStore
 from pyrite.execution.slurm import SlurmArrayConfig, SlurmArrayExecutor
-from pyrite.execution import ResourceRequest
+from pyrite.execution import ResourceRequest, RetryPolicy
 from pyrite.runs.run import run_sweep
 
 # Supply `cases` from the existing campaign builder, and a content-key
@@ -25,6 +25,7 @@ executor = SlurmArrayExecutor(
     key_fn,
     resources=ResourceRequest(cpu_cores=8, memory_bytes=32 * 1024**3),
     config=SlurmArrayConfig(partition="cpu", cases_per_task=4, max_concurrent=16),
+    retry_policy=RetryPolicy(max_attempts=3),  # 1 (no automatic retries) by default
 )
 run_sweep(cases, results, executor=executor, artifact_store=store,
           content_key_fn=key_fn, checkpoint_dir="/shared/pyrite-output/checkpoints")
@@ -48,10 +49,41 @@ artifacts even when it never writes its task-status marker; the coordinator
 will deliver those successful references before surfacing the task failure.
 The next `run_sweep(..., resume=True)` recovers already-published work.
 
-Current limits: synchronous coordinator, homogeneous resource requests per
-array, one GPU per array task, no job submission from a non-SLURM workstation,
-no observation-direction/trajectory-capture jobs, no bounded sweep slices,
-no automatic cancellation, no SLURM retry/resubmission, and no named CLI
-execution profiles. Use existing `pyrite remote` for SSH-based workflows.
-Neither this implementation nor the current tests demonstrate multi-node
-scaling efficiency; benchmark on a real cluster before enabling by default.
+## Retry, cancellation and resumption
+
+`RetryPolicy(max_attempts=N)` bounds the **total** number of SLURM array
+submissions. The default is `N=1` (no automatic retries); opt in with e.g.
+`max_attempts=3` for preemption-prone allocations. A failed or abruptly
+terminated job submits only incomplete array indices with a new `sbatch
+--array=...` override. Each attempt tags its status JSON so a stale failure
+report cannot masquerade as a retry result. Before running numerical work,
+each worker validates committed artifacts and skips already-completed cases;
+coordinator callbacks run **at most once per case** within one `execute` call.
+A corrupt committed artifact raises rather than being overwritten.
+
+While `execute` is active, `executor.cancel()` can be called from another
+thread or an event callback. It requests `scancel` for this executor's current
+SLURM allocation, recovers any published case artifacts, and raises
+`ExecutionCancelledError` from the coordinating `execute` call. Cancellation
+does not delete the artifact inbox; resume the sweep to reuse completed work.
+It requires permission to cancel the submitted SLURM job and a running
+coordinator; it is **not** a background job-management service after the
+coordinator itself exits. The `submitted_job_ids` and `last_run_dir` attributes
+provide basic debugging/provenance for a live or finished invocation.
+
+If all retry attempts fail, `execute` raises with the remaining failed task
+indices. Successfully published case results stay in the artifact store and
+are recovered by a subsequent `run_sweep(..., resume=True)`, including after
+the coordinator or login session was interrupted. No recomputation is done for
+committed and valid cases. Standard checkpoint metadata is always consolidated
+by the coordinator rather than compute-node workers.
+
+Current limits: synchronous coordinator (keep the Python process alive until
+completion), homogeneous resource requests per array, one GPU per array task,
+no job submission from a non-SLURM workstation, no observation-direction or
+trajectory-capture jobs, no bounded sweep slices, and no named CLI execution
+profiles. Use existing `pyrite remote` for SSH-based workflows. This is a
+compute-node worker model, **not** support for reattaching to an existing
+in-flight SLURM allocation after coordinator termination. Neither this
+implementation nor the current tests demonstrate multi-node scaling
+efficiency; benchmark on a real cluster before enabling by default.
