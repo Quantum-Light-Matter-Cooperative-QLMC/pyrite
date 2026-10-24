@@ -9,6 +9,7 @@ import sys
 import numpy as np
 
 from .chunking import _RESOURCE_POLICY
+from .recovery import RECOVERY_KEYS
 
 
 class _TimingAgg:
@@ -45,6 +46,7 @@ class _TimingAgg:
         chunk_metrics = {
             key[1:]: out.pop(key)
             for key in (
+                *RECOVERY_KEYS,
                 "_line_gpu_oom_retries",
                 "_brem_gpu_oom_retries",
                 "_generic_gpu_oom_retries",
@@ -87,7 +89,7 @@ class _TimingAgg:
             "transport_seconds_total": self.transport_total,
             "spectrum_seconds_total": self.spectrum_total,
             "driver_wait_seconds_total": self.wait_total,
-            "gpu_oom_retry_count": retries,
+            "gpu_oom_retry_count": retries + chunk_metrics.get("transport_gpu_oom_retries", 0),
             **({"backend_fallback_reason": fallback_reason} if fallback_reason is not None else {}),
             **chunk_metrics,
             **pool,

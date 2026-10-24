@@ -27,6 +27,16 @@ def _mem_worker_cap(per_worker_mb=None):
 
 
 def _admit_cpu_fallback():
+    """Require one full host worker for CPU spectrum fallback."""
+    _admit_host_memory(_RESOURCE_POLICY.worker_mem_mb, "CPU fallback")
+
+
+def _admit_host_segments():
+    """Require a host segment slot before replaying resident CUDA transport."""
+    _admit_host_memory(_RESOURCE_POLICY.pipeline_worker_mem_mb, "host segments")
+
+
+def _admit_host_memory(required_mb, purpose):
     """Require one policy-budgeted host worker before accelerator fallback."""
 
     budget = min(
@@ -37,10 +47,10 @@ def _admit_cpu_fallback():
             - _RESOURCE_POLICY.host_reserve_bytes // 1_000_000,
         ),
     )
-    if budget < _RESOURCE_POLICY.worker_mem_mb:
+    if budget < required_mb:
         raise BackendResourceError(
-            f"{_RESOURCE_POLICY.name} policy cannot admit CPU fallback: "
-            f"{budget} MiB budgeted, {_RESOURCE_POLICY.worker_mem_mb} MiB required"
+            f"{_RESOURCE_POLICY.name} policy cannot admit {purpose}: "
+            f"{budget} MiB budgeted, {required_mb} MiB required"
         )
 
 

@@ -117,7 +117,8 @@ def test_brem_oom_halves_only_brem_and_preserves_original_case(monkeypatch):
     assert out["_line_gpu_oom_retries"] == 0
 
 
-def test_delayed_runtime_oom_inside_brem_is_phase_tagged(monkeypatch):
+@pytest.mark.parametrize("phase", ["brem", "characteristic"])
+def test_delayed_runtime_oom_inside_component_is_phase_tagged(monkeypatch, phase):
     from tests.helpers.segments import runner_transport_payload
 
     class CUDARuntimeError(Exception):
@@ -141,7 +142,7 @@ def test_delayed_runtime_oom_inside_brem_is_phase_tagged(monkeypatch):
     )
     monkeypatch.setattr(
         runner,
-        "_brem_wide_from_segments",
+        "_brem_wide_from_segments" if phase == "brem" else "_characteristic_from_segments",
         lambda *_args, **_kwargs: (_ for _ in ()).throw(
             CUDARuntimeError("cudaErrorMemoryAllocation: out of memory")
         ),
@@ -166,7 +167,7 @@ def test_delayed_runtime_oom_inside_brem_is_phase_tagged(monkeypatch):
             tp,
         )
 
-    assert caught.value.phase == "brem"
+    assert caught.value.phase == phase
     assert isinstance(caught.value.error, CUDARuntimeError)
 
 
@@ -272,19 +273,20 @@ def test_gpu_pipeline_auto_fallback_recognizes_delayed_runtime_oom(monkeypatch):
     )
     monkeypatch.setattr(scheduling, "_gpu_pipeline_workers", lambda *_args: 2)
     monkeypatch.setattr(scheduling, "_ensure_pool_limit", lambda: None)
+    monkeypatch.setattr(runner, "_admit_cpu_fallback", lambda: None)
     monkeypatch.setattr(scheduling, "_admit_cpu_fallback", lambda: None)
     monkeypatch.setattr(scheduling, "_process_pool_kwargs", lambda: {})
     monkeypatch.setattr(scheduling, "_transport_case", fake_transport)
     monkeypatch.setattr(
-        scheduling,
+        runner,
         "_spectrum_case_retry",
         lambda *_args, **_kwargs: (_ for _ in ()).throw(
             CUDARuntimeError("cudaErrorMemoryAllocation: out of memory")
         ),
     )
-    monkeypatch.setattr(scheduling, "_cpu_spectrum_backend", cpu_spectrum_backend)
+    monkeypatch.setattr(runner, "_cpu_spectrum_backend", cpu_spectrum_backend)
     monkeypatch.setattr(
-        scheduling,
+        runner,
         "_spectrum_case",
         lambda case, *_args, **_kwargs: {"name": case["name"]},
     )
@@ -367,7 +369,7 @@ def test_gpu_pipeline_evaluates_directions_on_the_pipelined_transport(monkeypatc
 
     def fake_directional(case, tp, directions, spectrum=None):
         assert tp["name"] == case["name"]
-        assert spectrum.func is scheduling._spectrum_case_retry
+        assert spectrum.func is scheduling._spectrum_with_recovery
         directional_calls.append((case["name"], len(directions)))
         return {"spec_by_direction": np.zeros((len(directions), 2))}
 
@@ -377,7 +379,7 @@ def test_gpu_pipeline_evaluates_directions_on_the_pipelined_transport(monkeypatc
     monkeypatch.setattr(scheduling, "_process_pool_kwargs", lambda: {})
     monkeypatch.setattr(scheduling, "_transport_case", fake_transport)
     monkeypatch.setattr(
-        scheduling, "_spectrum_case_retry", lambda case, tp, **_kwargs: {"name": case["name"]}
+        runner, "_spectrum_case_retry", lambda case, tp, **_kwargs: {"name": case["name"]}
     )
     monkeypatch.setattr(scheduling, "_directional_outputs", fake_directional)
     monkeypatch.setattr("concurrent.futures.ProcessPoolExecutor", _SyncProcessPoolExecutor)
@@ -442,13 +444,14 @@ def test_gpu_pipeline_falls_back_per_case_when_a_later_case_is_infeasible(monkey
     monkeypatch.setattr(scheduling, "case_runtime_plan", lambda case: {})
     monkeypatch.setattr(scheduling, "_gpu_pipeline_workers", lambda *_args: 2)
     monkeypatch.setattr(scheduling, "_ensure_pool_limit", lambda: None)
+    monkeypatch.setattr(runner, "_admit_cpu_fallback", lambda: None)
     monkeypatch.setattr(scheduling, "_admit_cpu_fallback", lambda: None)
     monkeypatch.setattr(scheduling, "_process_pool_kwargs", lambda: {})
     monkeypatch.setattr(scheduling, "_transport_case", fake_transport)
-    monkeypatch.setattr(scheduling, "_spectrum_case_retry", fake_retry)
-    monkeypatch.setattr(scheduling, "_cpu_spectrum_backend", cpu_spectrum_backend)
+    monkeypatch.setattr(runner, "_spectrum_case_retry", fake_retry)
+    monkeypatch.setattr(runner, "_cpu_spectrum_backend", cpu_spectrum_backend)
     monkeypatch.setattr(
-        scheduling,
+        runner,
         "_spectrum_case",
         lambda case, *_args, **_kwargs: {"name": case["name"], "backend": "cpu"},
     )
@@ -490,7 +493,7 @@ def test_gpu_pipeline_reraises_infeasible_case_when_engine_is_forced(monkeypatch
     monkeypatch.setattr(scheduling, "_ensure_pool_limit", lambda: None)
     monkeypatch.setattr(scheduling, "_process_pool_kwargs", lambda: {})
     monkeypatch.setattr(scheduling, "_transport_case", fake_transport)
-    monkeypatch.setattr(scheduling, "_spectrum_case_retry", fake_retry)
+    monkeypatch.setattr(runner, "_spectrum_case_retry", fake_retry)
     monkeypatch.setattr("concurrent.futures.ProcessPoolExecutor", _SyncProcessPoolExecutor)
 
     with pytest.raises(BackendResourceError, match="cannot admit"):
@@ -514,6 +517,7 @@ def test_startup_check_sends_run_to_cpu_when_a_later_case_is_infeasible(monkeypa
 
     monkeypatch.setattr(runner._RESOURCE_POLICY, "gpu", True)
     monkeypatch.setattr(scheduling, "case_runtime_plan", fake_plan)
+    monkeypatch.setattr(runner, "_admit_cpu_fallback", lambda: None)
     monkeypatch.setattr(scheduling, "_admit_cpu_fallback", lambda: None)
     monkeypatch.setattr(
         scheduling,

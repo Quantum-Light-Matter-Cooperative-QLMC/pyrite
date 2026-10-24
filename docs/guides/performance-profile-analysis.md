@@ -23,6 +23,51 @@ Do not modify raw `.ndjson` files.
 
 Runtime records include `backend`, `backend_vendor`, `backend_device`, requested/resolved resource policy, device budget/reserve, backend-neutral `allocator_*_mib`, OOM attempts, effective chunks, and any `backend_fallback_reason`. Legacy `cupy_pool_*_mib` fields remain emitted and readable for existing `cxr.performance.v1` artifacts. NVIDIA device utilization comes from `nvidia-smi`; unavailable vendor counters remain null rather than being mislabeled as NVIDIA data.
 
+## Allocation recovery
+
+Direct `run_case()`, serial CUDA cases, and GPU-pipeline spectra share the same
+recovery policy. Pool allocation errors and delayed CUDA/HIP allocation errors
+retry on the already transported trajectories, up to the resolved resource
+policy's retry limit (`PYRITE_MC_GPU_OOM_RETRIES` overrides it). Each retry
+releases failed scratch and halves the admitted execution chunk: line failures
+shrink `spec_chunk`; characteristic and bremsstrahlung failures shrink the
+shared `brem_chunk`. Characteristic admission uses the line energy grid.
+Unattributed allocation failures shrink both chunks. A successful pipeline line
+chunk is reused for later cases; a failed GPU chunk followed by CPU fallback is
+never learned as a successful device setting.
+
+A `BackendResourceError` is an admission rejection, not an allocator OOM, and
+skips chunk retries. With both `engine="auto"` and `PYRITE_MC_BACKEND=auto`,
+admission rejection or exhausted spectrum retries may rerun the spectrum on
+CPU NumPy after host-memory admission. Resident device segments are downloaded
+before CPU scoring. Explicit accelerator selection forbids this backend switch.
+CPU allocation failures and unrelated runtime errors propagate without device
+retries; an exhausted allocator error retains its type and a note naming the
+failed phase and retry count.
+
+Resident CUDA transport has one separate recovery: replay the same seed on the
+same CUDA core with host-resident segments. Host admission charges one transport
+payload using `PYRITE_MC_PIPELINE_WORKER_MEM_MB`; CPU spectrum fallback charges
+one full worker using `PYRITE_MC_WORKER_MEM_MB`. These are policy estimates, not
+measurements of an arbitrary case's peak memory. Rejected host admission stops
+before replay or download. Failure of the downloaded transport attempt propagates;
+transport recovery never selects a CPU core. Recovery preserves physics inputs,
+electron counts, cutoffs, grids and seeds. Changing spectrum reduction grouping
+or device arithmetic can introduce floating-point roundoff.
+
+Per-case timing records expose `line_gpu_oom_retries`,
+`characteristic_gpu_oom_retries`, `brem_gpu_oom_retries`,
+`generic_gpu_oom_retries`, and `transport_gpu_oom_retries` when applicable.
+`gpu_oom_retry_count` includes transport and spectrum retries.
+`recovery_events` lists failed phases and mitigations (`halve_chunks`,
+`host_segments`, `exhausted`, `cpu_spectrum`); `recovery_path` records
+`device_spectrum`, `host_segments`, or `cpu_spectrum`.
+`backend_fallback_reason` distinguishes `device_budget_infeasible` from
+`accelerator_oom_retries_exhausted`. Admission rejection consumes no OOM retry.
+These private runner metrics reach performance logs through `on_timing`; the
+batch runner removes them from stored result payloads. Failed runs retain the
+underlying exception, with recovery context in exception notes/chaining.
+
 ## Collect comparable runs
 
 Use one named catalog profile, one slow material, and one faster comparison material. Run at least three repetitions per configuration. Keep these fixed:
