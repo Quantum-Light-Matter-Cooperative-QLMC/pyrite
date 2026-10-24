@@ -225,6 +225,7 @@ _PUBLIC_OBJECTS = {
     "photon_energies": ("pyrite.materials.emission", "photon_energies"),
     "simulate": ("pyrite.api", "simulate"),
     "directional_source": ("pyrite.directional", "directional_source"),
+    "directional_sources": ("pyrite.directional", "directional_sources"),
     "DirectionalSpectrum": ("pyrite.results.directional", "DirectionalSpectrum"),
 }
 

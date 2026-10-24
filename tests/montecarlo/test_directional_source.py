@@ -79,7 +79,9 @@ def test_source_lowering_rotation_and_no_detector(inputs, monkeypatch):
 
         np.testing.assert_array_equal(decode_energy_grid(case["E_grid"]), [100.0, 200.0])
         assert case["Ne"] == case["Ne_brem"] == 3
-        return np.ones((len(directions), 2)), np.ones(len(directions), dtype=bool)
+        assert kwargs["components"] == ("pxr-cbs",)
+        values = {"pxr-cbs": np.ones((len(directions), 2))}
+        return values, np.ones(len(directions), dtype=bool)
 
     monkeypatch.setattr(detectors.Detector, "__post_init__", forbidden)
     monkeypatch.setattr(owner, "source_outputs", score)
@@ -170,6 +172,49 @@ def test_shared_transport_matches_fixed_direction_cxr_only(inputs, monkeypatch):
     np.testing.assert_array_equal(results[0].density, results[1].density)
 
 
+@pytest.mark.slow
+def test_shared_transport_components_match_fixed_direction_scorers(inputs, monkeypatch):
+    import pyrite.directional as owner
+    from pyrite import EnergyBins, Scene
+    from pyrite.api import build_case
+    from pyrite.directional import directional_sources
+    from pyrite.montecarlo import runner
+
+    controls = Numerics(
+        cxr_trials=2, brem_trials=2, energy_bins=EnergyBins(cxr=np.linspace(500, 3000, 26))
+    )
+    case = build_case(Scene(*inputs, detector=None, numerics=controls))
+    transport = runner._transport_case(case)
+    monkeypatch.setattr(runner, "_transport_case", lambda *args, **kwargs: transport)
+    monkeypatch.setattr(owner, "case_table_markers", lambda case: {})
+    monkeypatch.setattr(owner, "run_provenance", lambda *args: {})
+    results = directional_sources(
+        *inputs,
+        energy_eV=transport["E_grid"],
+        angle_deg=[-120.0, 0.0, 60.0],
+        numerics=controls,
+        components=("pxr-cbs", "characteristic", "bremsstrahlung"),
+    )
+    assert [r.component for r in results.values()] == [
+        "incoherent-pxr-cbs",
+        "characteristic",
+        "bremsstrahlung",
+    ]
+    for i, direction in enumerate(results["pxr-cbs"].direction_sample):
+        args = (transport["segs"], transport["E_grid"], results["pxr-cbs"].case, direction)
+        layers = results["pxr-cbs"].case.get("abs_layers")
+        np.testing.assert_allclose(
+            results["characteristic"].density[i],
+            runner._characteristic_from_segments(*args, layers, Ne=transport["Ne_brem"]),
+            rtol=1e-13,
+        )
+        np.testing.assert_allclose(
+            results["bremsstrahlung"].density[i],
+            runner._brem_wide_from_segments(*args, layers, Ne=transport["Ne_brem"]),
+            rtol=1e-13,
+        )
+
+
 def test_grazing_explicitly_masked_without_scoring(monkeypatch):
     from types import SimpleNamespace
 
@@ -196,7 +241,7 @@ def test_grazing_explicitly_masked_without_scoring(monkeypatch):
         {"E_grid": np.array([100.0, 200.0])}, [[0.0, 0.0, 1.0], [1.0, 0.0, 0.0], [0.0, 0.0, -1.0]]
     )
     np.testing.assert_array_equal(supported, [True, False, True])
-    assert np.isnan(values[1]).all()
+    assert np.isnan(values["pxr-cbs"][1]).all()
     assert len(seen) == 2
 
 
@@ -231,7 +276,59 @@ def test_finite_footprint_scores_face_parallel_directions(monkeypatch):
         {"E_grid": np.array([100.0, 200.0]), "crystal_width_mm": 5.0, "crystal_height_mm": 5.0},
         [[0.0, 0.0, 1.0], [1.0, 0.0, 0.0]],
     )
-    assert supported.all() and np.isfinite(values).all()
+    assert supported.all() and np.isfinite(values["pxr-cbs"]).all()
+
+
+def test_components_use_their_live_populations_and_slots(monkeypatch):
+    """Characteristic/continuum use the brem population; unrequested never run."""
+    from types import SimpleNamespace
+
+    from pyrite.montecarlo import runner
+    from pyrite.montecarlo.runner import directional_source as owner
+
+    monkeypatch.setattr(
+        runner,
+        "_transport_case",
+        lambda *args, **kw: {
+            "segs": {},
+            "Ne_lines": 3,
+            "Ne_brem": 5,
+            "E_grid": np.array([100.0, 200.0]),
+        },
+    )
+    monkeypatch.setattr(runner, "_segments_on_device", lambda segs: segs)
+    seen = []
+
+    def adapter(slot, scale):
+        def evaluate(batch, requested):
+            assert requested == slot
+            seen.append((slot, batch.electron_limit))
+            return SimpleNamespace(values=scale * np.ones(2))
+
+        return SimpleNamespace(evaluate=evaluate)
+
+    def forbidden(batch, slot):
+        raise AssertionError("unrequested component scored")
+
+    monkeypatch.setattr(
+        owner,
+        "select_emission",
+        lambda case: SimpleNamespace(
+            cxr=SimpleNamespace(evaluate=forbidden),
+            characteristic=adapter("spec_characteristic", 2.0),
+            continuum=adapter("brem_wide", 3.0),
+        ),
+    )
+    values, _ = owner.source_outputs(
+        {"E_grid": np.array([100.0, 200.0]), "crystal_width_mm": 5.0},
+        [[0.0, 0.0, 1.0]],
+        components=("characteristic", "bremsstrahlung"),
+    )
+    assert set(values) == {"characteristic", "bremsstrahlung"}
+    np.testing.assert_array_equal(values["bremsstrahlung"], 3.0)
+    assert seen == [("spec_characteristic", 5), ("brem_wide", 5)]
+    with pytest.raises(ValueError, match="subset"):
+        owner.source_outputs({"E_grid": np.array([1.0])}, [[0, 0, 1.0]], components=("tr",))
 
 
 def test_line_window_ceiling_bound_and_kinetic_cap():
