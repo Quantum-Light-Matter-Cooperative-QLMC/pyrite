@@ -1,0 +1,7 @@
+cif = "cifs/al.cif"
+validation_id = "al-cif-structure"
+full_name = "Aluminium"
+formula = "Al"
+cod_id = 9012002
+B_ang2 = 0.78
+surface_hkl = [1, 0, 0]

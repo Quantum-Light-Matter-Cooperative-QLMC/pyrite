@@ -1,0 +1,7 @@
+cif = "cifs/pb.cif"
+validation_id = "pb-cif-structure"
+full_name = "Lead"
+formula = "Pb"
+cod_id = 9012004
+B_ang2 = 2.13
+surface_hkl = [1, 0, 0]

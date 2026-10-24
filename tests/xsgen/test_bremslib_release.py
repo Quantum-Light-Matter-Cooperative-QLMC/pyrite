@@ -272,5 +272,5 @@ def test_a_missing_checkout_does_not_offer_a_fetch_for_other_elements(isolated_d
     from pyrite.xsgen import SourceUnavailableError
 
     with pytest.raises(SourceUnavailableError) as raised:
-        generate_element(79, source_path=tmp_path / "no-checkout")
+        generate_element(92, source_path=tmp_path / "no-checkout")
     assert "fetch" not in str(raised.value)

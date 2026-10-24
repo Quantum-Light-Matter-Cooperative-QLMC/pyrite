@@ -1,0 +1,7 @@
+cif = "cifs/caf2.cif"
+validation_id = "caf2-cif-structure"
+full_name = "Calcium Fluoride"
+formula = "CaF2"
+cod_id = 2300449
+B_ang2 = 0.58
+surface_hkl = [1, 1, 1]

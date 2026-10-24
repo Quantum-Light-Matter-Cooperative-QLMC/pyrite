@@ -1,0 +1,7 @@
+cif = "cifs/cu.cif"
+validation_id = "cu-cif-structure"
+full_name = "Copper"
+formula = "Cu"
+cod_id = 9008468
+B_ang2 = 0.55
+surface_hkl = [1, 0, 0]

@@ -1,0 +1,7 @@
+cif = "cifs/nai.cif"
+validation_id = "nai-cif-structure"
+full_name = "Sodium Iodide"
+formula = "NaI"
+cod_id = 9008681
+B_ang2 = 1.7
+surface_hkl = [1, 0, 0]

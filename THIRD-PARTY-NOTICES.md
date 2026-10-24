@@ -167,7 +167,12 @@ require derived or adapted material to be marked as such.
   user's own data directory. Tables derived or
   resampled from SBETHE output are **adaptations** under the license and are
   marked as such in the provenance manifest stored beside each generated
-  table. PyRITE **redistributes** the stopping tables for its catalogue
+  table. **Modification:** the vendored `sbethe.f` differs from the deposit
+  in one statement pair, marked `PyRITE modification` in the source: the
+  compound shell correction weights each element by its electron fraction
+  `STF*Z/ZT` instead of `STF`, which makes compound stopping independent of
+  how the stoichiometric indices are normalized. Single-element results are
+  unchanged. The `mirror-sbethe2-1` archive remains the unmodified deposit. PyRITE **redistributes** the stopping tables for its catalogue
   materials as one SHA-256-pinned archive on its release `tables-sbethe-1`,
   installed with `pyrite tables fetch sbethe-tables`; the release notes carry
   this attribution and the modifications statement.
@@ -205,7 +210,7 @@ require derived or adapted material to be marked as such.
   - PyRITE **does** redistribute cross-section tables **derived** from that
     library, for every element its built-in catalogue materials may contain.
     They are not in the PyRITE package: they are published as one
-    SHA-256-pinned archive (PyRITE release `tables-bremslib-2`) that
+    SHA-256-pinned archive (PyRITE release `tables-bremslib-3`) that
     `pyrite tables fetch bremslib` installs into
     the user's own data directory. These are **adaptations** of a CC BY 4.0
     work and are not the upstream data: they are parsed and restructured on

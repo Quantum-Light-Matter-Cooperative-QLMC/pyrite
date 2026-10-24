@@ -1,0 +1,7 @@
+cif = "cifs/ni.cif"
+validation_id = "ni-cif-structure"
+full_name = "Nickel"
+formula = "Ni"
+cod_id = 9008476
+B_ang2 = 0.36
+surface_hkl = [1, 0, 0]

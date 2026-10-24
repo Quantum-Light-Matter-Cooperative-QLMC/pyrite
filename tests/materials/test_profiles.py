@@ -124,7 +124,7 @@ def test_typed_case_content_key_matches_pre_case_golden():
     # #513: static CBS potential U_g bumps the line-escape marker to v4.
     # #439: cancellation-free line kinematics bump the line-escape marker to v5.
     assert case_content_key(case) == (
-        "a15fa28f70238a8372cd8da70d88f4febf3b7cf029649d16e791c32221fd92cb"
+        "b8c1e10262ad785ab66024bc996cdd3395e33a9909c6639d0d5872d2d109f045"
     )
 
 
@@ -135,7 +135,7 @@ def test_dataset_identity_dispatches_through_recorded_v1():
     assert set(IDENTITY_MIGRATIONS) == {1}
     assert identity["identity_version"] == 1
     assert identity["parameter_sha256"] == (
-        "fc43b33c362e63029ac83073baaa48ebaba8a738f1264c8bcb57f7ef9c8b51be"
+        "dfe4f577199451fb775d4d7f190fec0ef27c28e070a46c2bf38e7af44aa67ad0"
     )
     with pytest.raises(ValueError, match="unsupported dataset identity version"):
         dataset_identity("hopg", "full", default_settings(), sweep, identity_version=2)
@@ -482,7 +482,7 @@ def test_stopping_model_marker_is_a_constant_that_orphans_splice_era_digests():
     identity = dataset_identity("hopg", "full", default_settings(), material_sweep("hopg"))
 
     assert identity["resolved_parameters"]["stopping_model"] == STOPPING_MODEL
-    assert STOPPING_MODEL == "sbethe-corrected-v1"
+    assert STOPPING_MODEL == "sbethe-corrected-v2"
 
 
 def test_case_content_key_separates_stopping_models():
@@ -551,7 +551,7 @@ def test_standard_detector_keeps_current_payload_and_digest_bit_for_bit():
     sweep_payload = identity["resolved_parameters"]["sweep"]
 
     assert identity["parameter_sha256"] == (
-        "fc43b33c362e63029ac83073baaa48ebaba8a738f1264c8bcb57f7ef9c8b51be"
+        "dfe4f577199451fb775d4d7f190fec0ef27c28e070a46c2bf38e7af44aa67ad0"
     )
     assert "detector" not in sweep_payload
     assert sweep_payload["theta_obs_deg"] == 90.0
@@ -565,43 +565,43 @@ def test_standard_detector_keeps_current_payload_and_digest_bit_for_bit():
         (
             "hopg_hbn_gaussian_200fs",
             "hopg",
-            "73faaebbb545243092908c6fe41dc808c620dc2d884fb04125227b7b71239407",
+            "b63fa593d222e18e07d98798ded0507bbe73fca9d8f2036140a6f69f24703883",
         ),
         (
             "hopg_hbn_gaussian_200fs",
             "hbn",
-            "e04cde4be0e8080869eebe0cf3a02153930b58a4faf5823d28c73d0f43ce74dd",
+            "1f1dca7c87ad0a828801d02a65e58914792ad17c179aa512f9530abcbd3a8e4e",
         ),
         (
             "hopg_hbn_microtrain_200fs",
             "hopg",
-            "20af34de942b226199d7a8015295b8d53075e22a0506bfd5bd169942734c5bce",
+            "d049d44c8a28a33d7431be9f06a1fdcd3fd8c0a286d66008e9fa7d0c2951e461",
         ),
         (
             "hopg_hbn_microtrain_200fs",
             "hbn",
-            "0402642e242562ba1c9cda6a137f2c25cc78ba29ee5059ab7cea448c1eb6cf04",
+            "75089379a8c5031541193baf634af52781c5a8cd684235aa20686e6f78f8f8b7",
         ),
         (
             "hopg_hbn_compressed_microbunch",
             "hopg",
-            "c2d48070a9ebc3861d30135b6d565b716d762e875e5b4720daabf2295bed4893",
+            "7cddfc946b25d95c972c9392ddf63943fb19fb9ed16705abbf35380ae0c29632",
         ),
         (
             "hopg_hbn_compressed_microbunch",
             "hbn",
-            "9a27eb240e8770ed98aa099b5dff8e44d7e112fe1c616ed0ffca686a1fa22a28",
+            "9b73688a325d8f5530a11bc79561a92ff1679a97b1bc0a4746ba23d0896f2420",
         ),
         (
             "hopg_emittance_demo",
             "hopg",
-            "d15d0445b491e6583d1eaf0c41be24b6f515a037992967644e543f0e4b5822ea",
+            "7d9f2942e37043284c4026fa62f53a0a472ac7513d2577cf5dffe91e6a2e38fb",
         ),
         (
             "promising_low_ne",
             "hopg",
             # #465: coherent operator identity advanced to physical-distinct-pairs-v4.
-            "b15439a6ba15d55227425099aef8afc4986c231ea2aea03426687c82810b7c51",
+            "edee160662531536d3437de44686dca18a7a67942ff5e428fe9fabe810609beb",
         ),
     ],
 )
@@ -798,7 +798,7 @@ def test_emission_modes_yield_three_distinct_digests_incoherent_unchanged():
     # issue #256's dropped uniform E_grid_brem override, which the sweep-level
     # payload hashes although no case grid changed) must stay bit-for-bit.
     assert incoherent["parameter_sha256"] == (
-        "fc43b33c362e63029ac83073baaa48ebaba8a738f1264c8bcb57f7ef9c8b51be"
+        "dfe4f577199451fb775d4d7f190fec0ef27c28e070a46c2bf38e7af44aa67ad0"
     )
     survey_incoherent = dataset_identity(
         "mose2", "survey", default_settings("survey"), material_sweep("mose2", fidelity="survey")
@@ -815,7 +815,7 @@ def test_emission_modes_yield_three_distinct_digests_incoherent_unchanged():
     # issue #218: mose2 gained conduction-band data, so the default "auto"
     # inelastic model now resolves to shell-soft-hard (50 eV cutoff).
     assert survey_incoherent["parameter_sha256"] == (
-        "7a6e5866bc5ee97852ed796d9785575f770b1c02a93923f3428eafa91f5446bc"
+        "bb6c892364413f7301dec7f1da24684f3120d28bef90650d9e8f8e72e97c09fb"
     )
 
 
@@ -1021,14 +1021,14 @@ def test_atomic_electron_deflection_forks_identity_and_none_restores_it():
     # The pre-#317 pins of test_dataset_identity_dispatches_through_recorded_v1
     # and test_typed_case_content_key_matches_pre_case_golden.
     assert dataset_identity("hopg", "full", off, sweep)["parameter_sha256"] == (
-        "9278c58023cb41f083d243fb0b08873f500b69950cb633dd7874b521e5d51813"
+        "6bb8c81f24654715d537538815fe054d92be0aced97220afccaebc64c8cb313d"
     )
     case = build_cases(
         sweep, n_electrons=300, n_electrons_brem=150, atomic_electron_deflection="none"
     )[0]
     assert "atomic_electron_deflection" not in case
     assert case_content_key(case) == (
-        "c47770b640aebc2f2414b2f56eccd2a1db83dd85d0e7ca071decbd130d23ee22"
+        "dfc41833cff718a3e0410ff33ac24145e2186a74c81d76efacf88a783811e1ee"
     )
     with pytest.raises(ValueError, match="atomic_electron_deflection"):
         build_cases(sweep, 4, 4, atomic_electron_deflection="z1")

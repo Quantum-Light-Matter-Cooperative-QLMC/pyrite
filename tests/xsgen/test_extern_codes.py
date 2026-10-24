@@ -269,25 +269,75 @@ def test_the_rendered_deck_drives_a_complete_real_sbethe_run():
 
 
 def test_the_real_collision_stopping_power_of_water_reproduces_estar():
-    """Anchor the parsed column against published values PyRITE did not produce.
+    """Anchor the parsed columns against published values PyRITE did not produce.
 
-    ICRU 37 / NIST ESTAR collision stopping power for liquid water at I=75 eV:
-    113.0 MeV cm^2/g at 1 keV and 2.398 MeV cm^2/g at 1 GeV. A 2% tolerance
-    covers SBETHE's shell and density-effect corrections differing in detail
-    from ESTAR's, which is a physics comparison #90 owns; what is anchored
-    here is that the right column, in the right units, reached the caller.
+    NIST ESTAR collision stopping power for liquid water at I = 75 eV (queried
+    2026-10-24): 119.8, 75.21, 38.41 and 22.56 MeV cm^2/g at 1, 2, 5 and
+    10 keV, and 2.398 at 1 GeV. ESTAR applies no shell correction, so it is
+    SBETHE's "without shell correction" column, to the table's four figures.
+    The corrected column sits below it by SBETHE's DHFS shell correction,
+    about 3% at 1 keV. (The 113.0 MeV cm^2/g this test once quoted at 1 keV
+    was upstream SBETHE's own output, with the compound shell correction
+    over-weighted by the index sum; see the normalization test below.)
     """
     stopping, _, _ = _run_sbethe_water()
 
+    for energy_ev, estar in ((1.0e3, 119.8), (2.0e3, 75.21), (5.0e3, 38.41), (1.0e4, 22.56)):
+        raw = float(
+            np.interp(energy_ev, stopping.energy_ev, stopping.stopping_no_shell_mev_cm2_per_g)
+        )
+        assert raw == pytest.approx(estar, rel=1.5e-3), energy_ev
     at_1kev = float(np.interp(1.0e3, stopping.energy_ev, stopping.stopping_mev_cm2_per_g))
     at_1gev = float(np.interp(1.0e9, stopping.energy_ev, stopping.stopping_mev_cm2_per_g))
 
-    assert at_1kev == pytest.approx(113.0, rel=0.02)
+    assert at_1kev / 119.8 == pytest.approx(0.970, abs=0.01)
     assert at_1gev == pytest.approx(2.398, rel=0.02)
 
     # The collision stopping power has a minimum near 1 MeV; it is not monotone.
     minimum_ev = float(stopping.energy_ev[np.argmin(stopping.stopping_mev_cm2_per_g)])
     assert 3.0e5 < minimum_ev < 3.0e6
+
+
+def _real_sbethe_stopping(composition, density, excitation):
+    source = _sbethe()
+    binary = build(source, "sbethe", toolchain=find_toolchain())
+    deck = SbetheDeck(
+        name="probe",
+        composition=composition,
+        density_g_cm3=density,
+        mean_excitation_eV=excitation,
+    )
+    run = run_program(
+        binary, data_dirs=source.data_dirs, stdin_text=deck.render(), outputs=("stp.dat",)
+    )
+    return parse_stopping(run.outputs["stp.dat"])
+
+
+def test_the_compound_shell_correction_does_not_depend_on_index_normalization():
+    """A formula unit is a bookkeeping choice; stopping per unit mass is not.
+
+    Upstream SBETHE weighted each element's per-electron shell correction by
+    its stoichiometric index alone, so the correction grew linearly with the
+    index scale: ZrTe5 written as 1:5 stopped 11% below 1/6:5/6 at 10 keV, and
+    air written as integer counts came out with a zero corrected column. The
+    vendored source weights by electron fraction instead (PyRITE modification,
+    THIRD-PARTY-NOTICES.md). Validation: sbethe-corrected-stopping
+    """
+    reference = _real_sbethe_stopping({40: 1.0 / 6.0, 52: 5.0 / 6.0}, 6.1, 460.0)
+    for scale in (1.0, 100.0):
+        scaled = _real_sbethe_stopping({40: scale, 52: 5.0 * scale}, 6.1, 460.0)
+        np.testing.assert_allclose(
+            scaled.stopping_mev_cm2_per_g, reference.stopping_mev_cm2_per_g, rtol=1e-4
+        )
+    # A pure element is its own electron fraction, so it is untouched: the
+    # corrected/uncorrected ratio for Te at 10 keV stays at its element value.
+    tellurium = _real_sbethe_stopping({52: 1.0}, 6.24, 485.0)
+    at_10kev = np.searchsorted(tellurium.energy_ev, 1.0e4)
+    ratio = (
+        tellurium.stopping_mev_cm2_per_g[at_10kev]
+        / tellurium.stopping_no_shell_mev_cm2_per_g[at_10kev]
+    )
+    assert ratio == pytest.approx(10.1952 / 10.4196, rel=1e-4)
 
 
 def test_two_materials_do_not_share_a_scratch_directory():
@@ -544,8 +594,12 @@ def test_direction_resolved_ddcs_reproduces_the_vendor_interpolation(
     about 1 %. The tolerances sit just above those, so a unit error, a
     mis-scaled angle, or a lost normalization fails by orders of magnitude.
 
+    The vendor samples are electron-nucleus only, so the staged
+    electron-electron factor ``1 + eta/Z`` is divided out before comparing.
+
     Validation: bremslib-angular-model
     """
+    from pyrite._bremslib_electron import electron_electron_factor
     from pyrite.montecarlo.spectrum.brem_bremslib import (
         bremslib_segment_state,
         evaluate_bremslib,
@@ -569,6 +623,7 @@ def test_direction_resolved_ddcs_reproduces_the_vendor_interpolation(
         staged, np.array([t1_MeV * 1.0e3]), np.array([np.cos(np.radians(theta_deg))])
     )
     ours = to_host(evaluate_bremslib(staged, state, photon_MeV * 1.0e6))[0] * 1.0e6
+    ours = ours / electron_electron_factor(79, np.array([t1_MeV]), photon_MeV / t1_MeV)[0]
 
     relative = np.abs(ours / vendor_cm2_sr_MeV - 1.0)
     assert relative.max() < max_rel

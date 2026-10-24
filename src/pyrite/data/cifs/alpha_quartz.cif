@@ -1,0 +1,30 @@
+data_alpha_quartz
+# Phase identity: PyRITE crystal catalog entry [alpha_quartz].
+# Bundled full-basis P1 CIF used by the declarative material catalog.
+# Source: COD 9013321; Antao et al., The Canadian Mineralogist 46, 1501 (2008),
+# doi:10.3749/canmin.46.5.1501 (P 32 2 1, a = 4.91344 A, c = 5.40512 A).
+# Symmetry-equivalent sites expanded to P1 with gemmi.
+_symmetry_space_group_name_H-M 'P 1'
+_symmetry_Int_Tables_number 1
+_cell_length_a 4.91344
+_cell_length_b 4.91344
+_cell_length_c 5.40512
+_cell_angle_alpha 90
+_cell_angle_beta 90
+_cell_angle_gamma 120
+loop_
+_atom_site_label
+_atom_site_type_symbol
+_atom_site_fract_x
+_atom_site_fract_y
+_atom_site_fract_z
+_atom_site_occupancy
+O1 O 0.5854 0.8532 0.881237 1.0
+O2 O 0.7322 0.1468 0.452097 1.0
+O3 O 0.8532 0.5854 0.118763 1.0
+O4 O 0.1468 0.7322 0.547903 1.0
+O5 O 0.2678 0.4146 0.21457 1.0
+O6 O 0.4146 0.2678 0.78543 1.0
+Si1 Si 0.53 0.53 3e-06 1.0
+Si2 Si 0 0.47 0.333337 1.0
+Si3 Si 0.47 0 0.66667 1.0

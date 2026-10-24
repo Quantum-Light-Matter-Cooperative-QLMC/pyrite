@@ -31,7 +31,7 @@ def test_composition_representations_are_equivalent(recipe):
 @pytest.mark.parametrize(
     "kwargs,match",
     [
-        ({"formula": "H2O"}, "unsupported.*H"),
+        ({"formula": "Fr"}, "unsupported.*Fr"),
         ({"formula": "Si(OH)2"}, "invalid formula"),
         ({"formula": "Si0"}, "positive"),
         ({"formula": "Si", "density_g_cm3": -1}, "positive"),

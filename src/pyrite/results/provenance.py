@@ -72,7 +72,7 @@ class Provenance(Mapping[str, Any]):
     Descriptive metadata; source and observation digests remain authoritative.
     """
     stopping_model: str | None = None
-    """Collision-stopping model marker, e.g. ``"sbethe-corrected-v1"``."""
+    """Collision-stopping model marker, e.g. ``"sbethe-corrected-v2"``."""
     characteristic_model: str | None = None
     """Atomic characteristic-emission model and data-version marker."""
     attenuation_model: str | None = None

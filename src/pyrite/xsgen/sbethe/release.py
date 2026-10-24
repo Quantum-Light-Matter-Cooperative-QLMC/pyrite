@@ -103,7 +103,7 @@ def catalog_keys() -> tuple[str, ...]:
 
     Crystal-only entries (e.g. ``tungsten``) have no material file but still
     resolve a table by identity when used as a layer. One is included only if
-    every element has SBETHE transport inputs; ``lif`` therefore stays out.
+    every element has SBETHE transport inputs.
     """
     crystals = {
         key

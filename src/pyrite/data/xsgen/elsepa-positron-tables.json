@@ -2,13 +2,23 @@
   "schema": "pyrite.xsgen.elsepa-release.v1",
   "upstream": "ELSEPA 2020, Mendeley Data doi:10.17632/w4hm5vymym.1",
   "archive": {
-    "sha256": "ef77a26fdc3e12b5d862c8749f8d5347d3e4041a06c5f39e9059d162530f73c1",
-    "bytes": 26574964,
+    "sha256": "cc0046c83660c8a6b4526725d9e875418f33a0ec52676d4ef27ce6b1eb261779",
+    "bytes": 49517253,
     "urls": [
-      "https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/releases/download/tables-elsepa-positron-3/elsepa-positron-tables.zip"
+      "https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/releases/download/tables-elsepa-positron-4/elsepa-positron-tables.zip"
     ]
   },
   "tables": [
+    {
+      "label": "Z=1",
+      "key": "b9b88de8199844dcb8230f99c36ffdbeb848e3d37c003e2a4738e14707eacc0d",
+      "manifest_sha256": "f2e560eb375edd703adad734635558f13b1e7173386666f43faed0d274b4f725"
+    },
+    {
+      "label": "Z=3",
+      "key": "023bba8c3ab5402bcaf1e299b8304571f5b638c4c5feb09500251655f3e31763",
+      "manifest_sha256": "8bbf30404f99ccbc63aab2c5691fe3ac8a5331ad76d280d0ffbffe3b9331dffd"
+    },
     {
       "label": "Z=5",
       "key": "f320edfc2364fca87e3d07f2fc10002061fd5a4018e622bcde6f80f6a68b89e0",
@@ -28,6 +38,16 @@
       "label": "Z=8",
       "key": "6792485b8d7d308029a8a24a6421c3d4a7cffcde8b8c8b06c0e9bc5655e981b3",
       "manifest_sha256": "72085c117460e87f92c84b8e3c04eb2beeb5740950c29f92e42fde80d94f1890"
+    },
+    {
+      "label": "Z=9",
+      "key": "4b0210824d172bf4df38a5d3b18935f78584eb4e5dbab1126ff58cc7b91d6141",
+      "manifest_sha256": "d48beb6bbb15d81675b05852d5c40fc06115a5b97d26ced44ef04891d2208c66"
+    },
+    {
+      "label": "Z=11",
+      "key": "842f52aa6e1b46635120bb992ca01f6c064d6e38febf6324219572da6b32a086",
+      "manifest_sha256": "2368af3986efa4ad3ac1923b3cdb3282bf8d4b8d0a64e00a63d684eb36523b2c"
     },
     {
       "label": "Z=13",
@@ -50,6 +70,16 @@
       "manifest_sha256": "aa192303b788241f259ad51cd55fc34fdf59f4baa79c84213a87b8185ec91429"
     },
     {
+      "label": "Z=18",
+      "key": "32108916ab1317f96dbd2d43c646e03433151dd3c6c66f08f6b12e0f43a336cc",
+      "manifest_sha256": "c1f806fb068cb1d947660d962dda7e86ba4fd41a38bdeea55d8798323e96518e"
+    },
+    {
+      "label": "Z=20",
+      "key": "e94b7ab81742cab51d67370a6016ec5d71a4fae44b4706bd543842abe7118dd1",
+      "manifest_sha256": "f5af280d984ccd770ce1a13e9b76acfafc1e42d064c118a6eecc5aeb5a5084dd"
+    },
+    {
       "label": "Z=22",
       "key": "8bbfa8a238d2b417e060d71ce618a8ca16d39fbb3a062e51d38dc08caa0c4042",
       "manifest_sha256": "be46543bb7ac8fd0629b4570bb5f009e15f97fe58fd6374907cf0824c57dd40c"
@@ -60,14 +90,44 @@
       "manifest_sha256": "d823f798e0dcc5c813a8dc3ab1867743124ba601e02692de3342a7370924a221"
     },
     {
+      "label": "Z=24",
+      "key": "bd2f666bb272beabd2a57d3ad62925c934279a995c0460db27169d7b2c5d4efd",
+      "manifest_sha256": "7a27e6aa21d3049f8913863b9785af3f4e15a4465db0c656b1e2d8d795a521da"
+    },
+    {
+      "label": "Z=25",
+      "key": "b56980cee8db1527633081a0b06c5476a7706384007015f43d012916e27eb4d7",
+      "manifest_sha256": "23e9936e0217b4ee542044a686310af70fa5885c7583d7793846ca93accc436e"
+    },
+    {
       "label": "Z=26",
       "key": "1e736dd897ccc33a2f68f174c73bc87b12adbff85a781c42f12f15c0a990b759",
       "manifest_sha256": "18a72c88b326179debc29a1a0dbccd59e66a87c2bcd9abf16310c54fb6f0f6c4"
     },
     {
+      "label": "Z=28",
+      "key": "39c7843efa252b3b609d5bfdcab250aa05973c765ff02d1188849844e564166f",
+      "manifest_sha256": "b16d7f95a3628ab38786dc449573cf089b21db86128689257f1583a72c5ab3b5"
+    },
+    {
+      "label": "Z=29",
+      "key": "8f344073570ea8930607181cb66bd94ec0687f398f2351a128d8adc5c0007f3e",
+      "manifest_sha256": "f1dd748e4d97ddc69d55e8f6c6d8f87aca9b6f7b9c1780134b9f37c0824569c0"
+    },
+    {
+      "label": "Z=31",
+      "key": "faa81dc267f305dd3e6b2816d46bd3441bcf9c56963c9c99942382b9b6cb1742",
+      "manifest_sha256": "b65432e1bff29cb3f77256ac9cf49c6436486b841d5296d72e9229f3febe16f7"
+    },
+    {
       "label": "Z=32",
       "key": "fa7fe0e37d03086cc67244ff86a4566643a5c0e01b9b4b724d5fc035764fc80c",
       "manifest_sha256": "c28e284a865cc28341c33b90c06b6209dff1eb3e08e5aa0dc24f08e7221df218"
+    },
+    {
+      "label": "Z=33",
+      "key": "8692104afea765da3a4676d698ab8065ff5c72138609b64b375e8bf50c45f8b5",
+      "manifest_sha256": "e2284dda151be6435f19bd35b41b46d5f642d5d93fb1d39018ea78ed4885561d"
     },
     {
       "label": "Z=34",
@@ -95,9 +155,29 @@
       "manifest_sha256": "d029b0f7f7848e00eaa4900a275d7efbf219adee053dc9b42c7765616c75f867"
     },
     {
+      "label": "Z=48",
+      "key": "e9b8b9b11043884fdef7c330b57697bd6aa1f1810d239c77d61d113b802b3775",
+      "manifest_sha256": "2de4e112bd962ea44ebbdc881435696b6998ff0e34465ccbf8e246d9d47d4b5e"
+    },
+    {
       "label": "Z=52",
       "key": "56919b361789dffcc10679123ead7d1039b073353eb39ee77ef5f3c9f5d9713e",
       "manifest_sha256": "937f43fcd3d3ecf3a55dff2939af1ee700f731165274b233f9f5075f30247454"
+    },
+    {
+      "label": "Z=53",
+      "key": "8d56ff0abe1bb4b7957df8195430bcb4d20fadbea0202e901d93a29baf54af54",
+      "manifest_sha256": "817de49e26879a141187269057614120ff152334b4fb001d2b5a64e3bd1e6c29"
+    },
+    {
+      "label": "Z=55",
+      "key": "15450ab864499228fe36d47cb8d094b490642203ef4594cadf8a6339d71dd8e7",
+      "manifest_sha256": "0b93500a11299c06fa4a31ec7d62fe843376eb400ad52aaed39f44f2ca6b20dc"
+    },
+    {
+      "label": "Z=56",
+      "key": "dd77c274765b08d7a047ca20ccbca4825c674bbd798ae14e1956831cd3bb56be",
+      "manifest_sha256": "7c28dd6be0d3bd4941c34e5629b025da1ce2c5c78a688044d029c3384b674cf8"
     },
     {
       "label": "Z=72",
@@ -125,9 +205,39 @@
       "manifest_sha256": "f9423a609803bd2c32ba3cfe61a796bb429d9fe3aa89b33228927fb0ef22d096"
     },
     {
+      "label": "Z=79",
+      "key": "72149d00799070349c9d25c8b9de3a5d7b4869d0aede7d6530cdb5c244efcd41",
+      "manifest_sha256": "037e90648a5394349b682bac11bc12bced67c21644908b12e6151223733348e9"
+    },
+    {
+      "label": "Z=82",
+      "key": "20fa0b70be835d9408128fdca9bd8c8b357de6d0533753601fb9e2a59f1c66c2",
+      "manifest_sha256": "89e9868eccfe4e6158b18cb2d42929f31d3f873ed42628c1dd1b862efe734ad2"
+    },
+    {
       "label": "Z=83",
       "key": "8ae9d573624a1bfabc007b4e24c26cffb0a997124462f406bc5e1ac3a0dfd8af",
       "manifest_sha256": "344ccdb12c19e036d2244e4d376d4d65e5bd88c8831c9e939f8176f208874dcf"
+    },
+    {
+      "label": "al",
+      "key": "e7bf102542577dec1a6e89de7ef23d14bcdf6e7fbe50ec8da65d3e4f6aa25fbb",
+      "manifest_sha256": "51cecdd45ef8ad7fef73dd18faf3f5fba919f5ed7a3c5bd2c3313111da9ecdd6"
+    },
+    {
+      "label": "alpha_fe",
+      "key": "48f07001741e704fbbda136d321fa7e03fb73444599f17c02e2f2197b2af35dc",
+      "manifest_sha256": "968ca07c740b972c3dc2486809adfcad26cc0bc71dbc7b39da5d3c113e37b527"
+    },
+    {
+      "label": "alpha_ti",
+      "key": "adbe6da742289b53132494d6210edc351dac2ec96117f70bc0ad9b6febc57e30",
+      "manifest_sha256": "1aa3fbc25a94076666cbb690eeb7bb6e73ec030ba79242fa0946e1b610522a95"
+    },
+    {
+      "label": "au",
+      "key": "e52b24df917a7387abe2ebb3c654d3775f13db3ab6cb5c28666d39b26d337c77",
+      "manifest_sha256": "7020d77199caf8ef8e5a5ef22fed9f60ebd40642265d5497ebf8f1235912e99c"
     },
     {
       "label": "black_phosphorus",
@@ -135,14 +245,34 @@
       "manifest_sha256": "e82407f4ce6a90a917ccc5e12945267cc50a8ac7b0705b136484547e15dd27bc"
     },
     {
+      "label": "cu",
+      "key": "a984b6f2a8466aab1790acd59ded1ad79f3c4d73fe5515d6ed4c2826eb2d755c",
+      "manifest_sha256": "2f92f21f3d58b3ec917b3de728a19b455b8d6e81d7953f5ffc382045454e9b39"
+    },
+    {
       "label": "diamond",
       "key": "72e113300207cfae5c879446b5f6faad2343ab07531d8a9bea4dab7d355326f6",
       "manifest_sha256": "cc0971d40d3234be8d56c47f57a4e41b88e1e84a0b3f32d9a3a672c1aea3799b"
     },
     {
+      "label": "ge",
+      "key": "5bc72cdbf2e13af22d89004b87f6004c61f934b993e8a6b0e038cb4d35f5fbcf",
+      "manifest_sha256": "56797b19439d1e78348736c109fc3bff773af4fc57cb077eb33b2448d8efffda"
+    },
+    {
       "label": "hopg",
       "key": "0d7958f1379150a166cf7a4bc6b374eff8cef77468df07175bbbec42248e8007",
       "manifest_sha256": "5bba15d4cc81fbb9f08c1de96b99d7dfcc678f0190862460868bdf187444500e"
+    },
+    {
+      "label": "ni",
+      "key": "0772edfdfd9bc566807687dfa17f2463a85b961b055e44c04bb9b4c1841fa5e8",
+      "manifest_sha256": "b6eedc8579775630907fc4201b0c2cc8e4b12958e891bcd46ffe9248daa3a6e6"
+    },
+    {
+      "label": "pb",
+      "key": "e6a35212e3f14c2068356a09c1575ba308019c2843b0fb3a16f7b981f98c3472",
+      "manifest_sha256": "d7658ce41f52e8e9f7430feb32e04a4791553b9b6f0bbfab3efeab19717298a2"
     },
     {
       "label": "silicon",
