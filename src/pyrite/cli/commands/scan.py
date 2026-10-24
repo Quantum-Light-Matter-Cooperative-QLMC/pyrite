@@ -695,9 +695,6 @@ _PROFILER_REEXEC_PARAMETER_NAMES = (
 _LOCAL_RUN_PARAMETER_NAMES = (
     "material",
     "workers",
-    "execution",
-    "execution_config",
-    "execution_plan",
     "catalog_profile",
     "quick",
     "n_families",
@@ -751,6 +748,11 @@ def _run_local(options):
             "overwrite_trajectories": options["overwrite_trajectories"],
         }
     )
+    execution = (
+        {}
+        if options["execution"] is None
+        else {name: options[name] for name in ("execution", "execution_config", "execution_plan")}
+    )
     resolved_profile = _scan._resolve_catalog_profile(
         options["catalog_profile"], performance_profile
     )
@@ -766,6 +768,7 @@ def _run_local(options):
         "cache_write": cache_write,
         **({"progress_phase": progress_phase} if progress_phase is not None else {}),
         **capture,
+        **execution,
     }
     if options["json_output"]:
         return _cli_core.invoke_legacy(_scan._run_json, **run_kwargs)

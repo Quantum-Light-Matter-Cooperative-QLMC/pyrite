@@ -82,6 +82,30 @@ def test_run_click_dispatches_profile_material_and_zero_workers(monkeypatch, tmp
     }
 
 
+@pytest.mark.parametrize("plan", [False, True])
+def test_run_forwards_explicit_execution_selection(monkeypatch, tmp_path, plan):
+    seen = _capture(monkeypatch, scan, "run")
+    config = tmp_path / "execution.toml"
+    config.write_text('[execution.cluster]\nbackend = "slurm"\n')
+    result = invoke(
+        scan_cli.command,
+        [
+            "standard",
+            "-m",
+            "hopg",
+            "--execution",
+            "cluster",
+            "--execution-config",
+            str(config),
+            *(["--execution-plan"] if plan else []),
+        ],
+    )
+    assert_clean_result(result)
+    assert seen["execution"] == "cluster"
+    assert seen["execution_config"] == config
+    assert seen["execution_plan"] is plan
+
+
 def test_run_trajectory_capture_is_opt_in(monkeypatch, tmp_path):
     seen = _capture(monkeypatch, scan, "run")
     plain = invoke(scan_cli.command, ["standard", "-m", "hopg"])
