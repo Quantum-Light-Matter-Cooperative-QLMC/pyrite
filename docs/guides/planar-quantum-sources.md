@@ -49,6 +49,43 @@ Neither is a dechanneling event. Propagation uses the solver's existing
 `DensityMatrixResult`. An energy-calibrated source (aperture probe or sampled
 state with `kinetic_energy_eV`) refuses inconsistent beam energies.
 
+## Incident-normalized channeling-radiation diagnostics
+
+The CR estimator can now reuse the **same projected initial density** as the
+propagator, avoiding a second wavefunction projection or an inconsistent
+incidence/divergence setting. This is useful for studying how controlled source
+coherence and impact influence planar channeling lines.
+
+```python
+import numpy as np
+from pyrite.planar_source import score_planar_source
+
+energies = np.linspace(1_000.0, 50_000.0, 500)  # eV
+spectrum = score_planar_source(
+    entry, depth_ang=500.0, photon_energy_eV=energies,
+    theta_rad=0.0, absorption=False,
+)
+print(spectrum.spectrum, spectrum.bound_population)
+```
+
+The result is the existing `ChannelingSpectrum`, in photons/eV/sr/incident
+electron; it is not a persisted detector response. `theta_rad` and `phi_rad`
+are in the beam/plane frame, not slab-lab coordinates. The projected state
+already contains the normal momentum spread; specifying that spread again
+as a classical divergence would double-count it. Only in-plane broadening
+(`divergence_y_rad`) and independently specified energy spread remain optional
+for 1-D sources. For **2-D sources**, supply `divergence_y_rad` explicitly:
+tracing out the in-plane momentum removes its actual distribution, and a
+single Gaussian width is a modelling approximation rather than a predicted
+spread. Planar CR remains insensitive to the full photon OAM structure.
+
+`sample_ang` controls line-rate sampling independently of the density solver
+step (`setup.numerics.step_ang`). The optional `path_limits_ang` represents
+geometric/cutoff path censoring only; never pass dechanneling survival there.
+Absorption assumptions and photon escape remain those of the diagnostic CR
+scorer. This does **not** validate electron handoffs, physical source-frame
+matching, or replay identities for an end-to-end Monte Carlo run.
+
 **Production remains gated.** `Beam(state=...)` still refuses on `to_spec`.
 This diagnostic does not define the per-electron position/momentum launch
 law for initially free or off-band source weight, a physically consistent

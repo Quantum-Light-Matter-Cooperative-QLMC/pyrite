@@ -128,3 +128,90 @@ def test_refusal_before_case_creation_or_propagation():
                    longitudinal=pr.PointBunch(), state=spec)
     with pytest.raises(ValueError, match="not yet.*transport"):
         beam.to_spec()
+
+
+def test_scoring_matches_existing_emitter_from_the_same_projected_state():
+    from pyrite.montecarlo.channeling import channeling_spectrum
+    from pyrite.planar_source import score_planar_source, _solver_for
+
+    low = pr.TransverseStateSpec.recipe("hermite_gauss", m=0, waist_ang=1.0)
+    high = pr.TransverseStateSpec.recipe("hermite_gauss", m=1, waist_ang=1.0)
+    for state, impact in (
+        (low, "averaged"),
+        (pr.TransverseStateSpec.superpose([(1.0, low), (1.0j, high)]), "fixed"),
+        (pr.TransverseStateSpec.mixture([(1.0, low), (2.0, high)]), "fixed"),
+    ):
+        proj = _project(state, impact=impact)
+        grid = np.linspace(5e3, 60e3, 25)
+        new = score_planar_source(
+            proj, depth_ang=80.0, photon_energy_eV=grid,
+            theta_rad=0.0, absorption=False, sample_ang=40.0,
+        )
+        legacy = channeling_spectrum(
+            _solver_for(proj), 80.0, grid, 0.0,
+            incidence_rad=proj.incidence_rad, entry_state=state.to_runtime(),
+            entry_impact=impact, dz_ang=proj.setup.numerics.step_ang,
+            sample_ang=40.0, absorption=False,
+        )
+        np.testing.assert_allclose(new.spectrum, legacy.spectrum, rtol=1e-11, atol=1e-13)
+        np.testing.assert_allclose(new.line_rates, legacy.line_rates, rtol=1e-11, atol=1e-13)
+        np.testing.assert_allclose(new.bound_population, legacy.bound_population,
+                                   rtol=1e-11, atol=1e-13)
+        assert new.spectrum.shape == grid.shape
+        assert np.all(np.isfinite(new.spectrum))
+
+
+def test_preprojected_cr_input_validates_population_and_exclusivity():
+    from pyrite.montecarlo.channeling import channeling_spectrum
+    from pyrite.planar_source import score_planar_source, _solver_for
+
+    source = pr.TransverseStateSpec.recipe("gaussian", waist_ang=1.0, dimension=1)
+    proj = _project(source)
+    solver = _solver_for(proj)
+    grid = np.linspace(5e3, 60e3, 15)
+    kwargs = dict(dz_ang=20.0, sample_ang=20.0, absorption=False)
+    with pytest.raises(ValueError, match="entry_initial conflicts"):
+        channeling_spectrum(
+            solver, 20.0, grid, 0.0, entry_initial=proj.initial,
+            entry_state=source.to_runtime(), **kwargs
+        )
+    with pytest.raises(ValueError, match="entry_initial conflicts"):
+        channeling_spectrum(
+            solver, 20.0, grid, 0.0, entry_initial=proj.initial,
+            incidence_rad=0.001, **kwargs
+        )
+    with pytest.raises(ValueError, match="normalized"):
+        channeling_spectrum(solver, 20.0, grid, 0.0,
+                            entry_initial=(proj.initial[0], -1.0), **kwargs)
+    with pytest.raises(ValueError, match="shape"):
+        channeling_spectrum(solver, 20.0, grid, 0.0,
+                            entry_initial=(np.ones((2, 2)), 0.0), **kwargs)
+    with pytest.raises(ValueError, match="Hermitian"):
+        rho = proj.initial[0]
+        rho[0, 0, 1] += 0.25j
+        channeling_spectrum(solver, 20.0, grid, 0.0,
+                            entry_initial=(rho, proj.entry_population), **kwargs)
+    with pytest.raises(ValueError, match="positive"):
+        score_planar_source(proj, depth_ang=20.0,
+                            photon_energy_eV=[5e3, 5e3], theta_rad=0.0)
+    with pytest.raises(ValueError, match="nonnegative"):
+        score_planar_source(proj, depth_ang=20.0,
+                            photon_energy_eV=grid, theta_rad=0.0, aperture_rad=-0.1)
+    with pytest.raises(ValueError, match="zone_max_ang"):
+        capped = replace(proj, setup=replace(proj.setup, region=pr.QuantumRegion(
+            kind="planar", plane_hkl=(1, 1, 0), zone_max_ang=10.0)))
+        score_planar_source(capped, depth_ang=20.0,
+                            photon_energy_eV=grid, theta_rad=0.0)
+
+
+def test_two_dimensional_source_requires_explicit_in_plane_angular_model():
+    from pyrite.planar_source import score_planar_source
+
+    state = pr.TransverseStateSpec.recipe("laguerre_gauss", ell=1, waist_ang=2.0)
+    proj = _project(state)
+    assert proj.source_dimension == 2
+    with pytest.raises(ValueError, match="2-D state requires explicit"):
+        score_planar_source(
+            proj, depth_ang=20.0, photon_energy_eV=np.linspace(5e3, 60e3, 12),
+            theta_rad=0.0, absorption=False,
+        )

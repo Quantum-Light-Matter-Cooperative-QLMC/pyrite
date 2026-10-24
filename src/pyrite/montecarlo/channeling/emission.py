@@ -572,6 +572,39 @@ class _History:
         return _History(z, rates, np.interp(z, self.z_ang, self.bound), weight)
 
 
+def _validated_entry_initial(solver: DensityMatrixSolver, initial) -> tuple[np.ndarray, float]:
+    """Validate a preprojected entrance density before CR depth integration.
+
+    This is the exact density/eigenbasis cutoff partition returned by the
+    established planar projector. Initially free/outside populations belong
+    to the entry sink, not an independent dechanneling weight.
+    """
+    if not isinstance(initial, tuple) or len(initial) != 2:
+        raise TypeError("entry_initial must be (subspace_density, entry_population)")
+    rho = np.array(initial[0], dtype=complex, copy=True)
+    n_cells, states = solver.basis.energies.shape
+    if rho.shape != (n_cells, states, states):
+        raise ValueError("entry_initial density shape does not match solver's Bloch basis")
+    if not np.all(np.isfinite(rho)):
+        raise ValueError("entry_initial density must be finite")
+    if not np.allclose(rho, np.swapaxes(rho.conj(), 1, 2), atol=1e-10, rtol=0.0):
+        raise ValueError("entry_initial density must be Hermitian")
+    if np.linalg.eigvalsh(rho).min() < -2e-8:
+        raise ValueError("entry_initial density must be positive semidefinite")
+    kept = solver.basis.subspace
+    if np.any(np.abs(rho * ~(kept[:, :, None] & kept[:, None, :])) > 1e-8):
+        raise ValueError("entry_initial has weight outside the retained subspace")
+    entry = float(initial[1])
+    trace = float(np.einsum("rii->", rho).real)
+    if (
+        not np.isfinite(entry)
+        or entry < -1e-12
+        or not np.isclose(trace + entry, 1.0, atol=2e-3, rtol=0.0)
+    ):
+        raise ValueError("entry_initial population must be normalized and nonnegative")
+    return rho, max(entry, 0.0)
+
+
 def _depth_history(
     solver: DensityMatrixSolver,
     lines: EmissionLines,
@@ -582,6 +615,7 @@ def _depth_history(
     divergence_rad: float,
     entry_state=None,
     impact: str = "averaged",
+    entry_initial=None,
 ) -> _History:
     if thickness_ang <= 0.0 or dz_ang <= 0.0 or sample_ang <= 0.0:
         raise ValueError("thickness_ang, dz_ang and sample_ang must be positive")
@@ -589,8 +623,11 @@ def _depth_history(
     segments = max(1, int(np.ceil(thickness_ang / (inner * dz_ang))))
     seg = thickness_ang / segments
     step = seg / inner
-    if entry_state is None:
+    if entry_initial is not None:
+        rho, entry = _validated_entry_initial(solver, entry_initial)
+    elif entry_state is None:
         rho, free, outside = solver.entry_state(incidence_rad, divergence_rad)
+        entry = float(free.sum()) + outside
     else:
         from .states import planar_entry_density
 
@@ -599,7 +636,7 @@ def _depth_history(
         rho, free, outside = solver.entry_from_plane(
             *planar_entry_density(solver, entry_state, incidence_rad=incidence_rad, impact=impact)
         )
-    entry = float(free.sum()) + outside
+        entry = float(free.sum()) + outside
     z, rates, bound = [0.0], [lines.rates(rho)], [solver.bound_population(rho)]
     for index in range(1, segments + 1):
         result = solver.propagate(seg, step, initial=(rho, entry))
@@ -706,6 +743,7 @@ def channeling_spectrum(
     path_limits_ang: np.ndarray | Sequence[float] | None = None,
     entry_state=None,
     entry_impact: str = "averaged",
+    entry_initial: tuple[np.ndarray, float] | None = None,
 ) -> ChannelingSpectrum:
     """Return the channeling-radiation spectrum per electron.
 
@@ -782,6 +820,12 @@ def channeling_spectrum(
     entry_impact
         ``"averaged"`` (uniform entry point) or ``"fixed"`` (the state's own
         position relative to the planes); see :func:`~.states.planar_entry_density`.
+    entry_initial
+        Preprojected ``(rho_S, initially_unretained_population)`` from the
+        planar source projector. Reuses the same initial density as diagnostic
+        propagation without projecting twice. Mutually exclusive with
+        ``entry_state``, nonzero ``incidence_rad``/``divergence_rad`` and
+        nondefault ``entry_impact``; these are already encoded in ``rho_S``.
 
     Returns
     -------
@@ -799,6 +843,13 @@ def channeling_spectrum(
 
     Validation: cr-yield-assembly, cr-line-shape, cr-capture-yield, cr-persisted-channel
     """
+    if entry_initial is not None and (
+        entry_state is not None
+        or incidence_rad != 0.0
+        or divergence_rad != 0.0
+        or entry_impact != "averaged"
+    ):
+        raise ValueError("entry_initial conflicts with entry_state or incidence/divergence/impact")
     energies = np.asarray(photon_energy_eV, dtype=float)
     theta, phi = np.broadcast_arrays(
         np.asarray(theta_rad, dtype=float), np.asarray(phi_rad, dtype=float)
@@ -821,6 +872,7 @@ def channeling_spectrum(
         divergence_rad,
         entry_state,
         entry_impact,
+        entry_initial,
     )
     if path_limits_ang is not None:
         history = history.censored(path_limits_ang)

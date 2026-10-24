@@ -107,6 +107,7 @@ class PlanarStateProjection:
     subspace_density: np.ndarray
     free_population: np.ndarray
     outside_population: float
+    source_dimension: int = 1
 
     @property
     def retained_population(self) -> float:
@@ -196,6 +197,7 @@ def project_planar_source(
         margin_eV=margin, incidence_rad=float(incidence_rad), impact=impact,
         setup=setup, plane_density=np.empty((0,)), subspace_density=np.empty((0,)),
         free_population=np.empty((0,)), outside_population=0.0,
+        source_dimension=state.dimension,
     )
     solver = _solver_for(metadata)
     runtime = state.to_runtime(base_dir=base_dir)
@@ -209,7 +211,7 @@ def project_planar_source(
         margin_eV=margin, incidence_rad=float(incidence_rad), impact=impact,
         setup=setup, plane_density=_readonly(wave_density),
         subspace_density=_readonly(rho), free_population=_readonly(free),
-        outside_population=float(outside),
+        outside_population=float(outside), source_dimension=state.dimension,
     )
     if (
         not np.all(np.isfinite(rho))
@@ -253,4 +255,93 @@ def propagate_planar_source(
         stopping_eV_per_ang=stopping,
         record_every=record_every,
         record_metrics=record_metrics,
+    )
+
+
+def score_planar_source(
+    projection: PlanarStateProjection,
+    *,
+    depth_ang: float,
+    photon_energy_eV,
+    theta_rad,
+    phi_rad=0.0,
+    sample_ang: float = 500.0,
+    divergence_y_rad: float | None = None,
+    energy_spread_eV: float = 0.0,
+    aperture_rad: float = 0.0,
+    absorption: bool = True,
+    layers=None,
+    include_capture: bool = True,
+    surface_normal=None,
+    path_limits_ang=None,
+):
+    """Score diagnostic planar channeling radiation from a *projected* source.
+
+    Reuse the same immutable Bloch entry density as
+    :func:`propagate_planar_source`, without reprojecting the original
+    wavefunction. This is an incident-normalized **diagnostic** spectrum, not
+    a production electron transport or persisted CR implementation.
+
+    ``theta_rad`` / ``phi_rad`` are expressed in the beam/plane frame (x toward
+    the plane normal). The projected state's normal momentum spread is already
+    present in its density; ``divergence_y_rad`` only broadens directions *in*
+    the plane. ``path_limits_ang`` may account for independently specified
+    entrance misses and face/cutoff geometry, not dechanneling (already in rho).
+    Do not count an external classical normal divergence again. For a 2-D
+    source, an explicit in-plane broadening estimate is mandatory: tracing over
+    ky removes its distribution, so the Gaussian-width approximation must be
+    supplied by the caller rather than silently set to zero. It is not an OAM
+    emission model.
+    """
+    if not isinstance(projection, PlanarStateProjection):
+        raise TypeError("projection must be a PlanarStateProjection")
+    depth = _positive("depth_ang", depth_ang)
+    cap = projection.setup.region.zone_max_ang
+    if cap is not None and depth > cap:
+        raise ValueError("depth_ang exceeds the quantum region's physical zone_max_ang")
+    sample = _positive("sample_ang", sample_ang)
+    if divergence_y_rad is None:
+        if projection.source_dimension == 2:
+            raise ValueError(
+                "a 2-D state requires explicit divergence_y_rad; the planar trace "
+                "loses its in-plane momentum distribution"
+            )
+        divergence_y_rad = 0.0
+    for name, value in (
+        ("divergence_y_rad", divergence_y_rad),
+        ("energy_spread_eV", energy_spread_eV),
+        ("aperture_rad", aperture_rad),
+    ):
+        _positive(name, value, zero=True)
+    if not isinstance(absorption, bool) or not isinstance(include_capture, bool):
+        raise TypeError("absorption and include_capture must be bool")
+    energy = np.asarray(photon_energy_eV, dtype=float)
+    if (
+        energy.ndim != 1
+        or energy.size < 2
+        or not np.all(np.isfinite(energy))
+        or np.any(energy <= 0.0)
+        or np.any(np.diff(energy) <= 0.0)
+    ):
+        raise ValueError("photon_energy_eV must be a finite increasing positive 1-D grid")
+    from .montecarlo.channeling.emission import channeling_spectrum
+
+    solver = _solver_for(projection)
+    return channeling_spectrum(
+        solver,
+        depth,
+        energy,
+        theta_rad,
+        phi_rad,
+        entry_initial=projection.initial,
+        dz_ang=projection.setup.numerics.step_ang,
+        sample_ang=sample,
+        divergence_y_rad=float(divergence_y_rad),
+        energy_spread_eV=float(energy_spread_eV),
+        aperture_rad=float(aperture_rad),
+        absorption=absorption,
+        layers=layers,
+        include_capture=include_capture,
+        surface_normal=surface_normal,
+        path_limits_ang=path_limits_ang,
     )
