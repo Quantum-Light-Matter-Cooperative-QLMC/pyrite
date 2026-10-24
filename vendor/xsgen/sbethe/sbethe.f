@@ -330,6 +330,12 @@ C
 C  ****  Read the DHFS shell-correction tables, and include the
 C        relativistic correction.
 C
+C  ****  PyRITE modification: weight each element's per-electron shell
+C        correction by its electron fraction STF*Z/ZT, so CSHC is the
+C        compound's per-electron correction that SFACT=2*CONS*ZT expects.
+C        Upstream weighted by STF alone, which scales with the arbitrary
+C        normalization of the stoichiometric indices. Elements unchanged.
+C
       DO JZ=1,NELEM
         IZE=IZ(JZ)
         WRITE(BUFFER,'(1P,I3)') IZE
@@ -358,7 +364,7 @@ C
             RC=DLOG(GAM1*(GAM1+2.0D0))-GAM1*(GAM1+2.0D0)/(GAM1+1.0D0)**2
             SHELL=SHELL+((DBLE(IZE)-S0T(IZE))/(2.0D0*DBLE(IZE)))*RC
             ESHC(NSHC)=GAM1*PMASS*REV
-            SHC(NSHC)=STF(JZ)*SHELL
+            SHC(NSHC)=STF(JZ)*DBLE(IZE)*SHELL/ZT
           ENDDO
  102      CONTINUE
           CLOSE(15)
@@ -371,7 +377,7 @@ C
             RC=DLOG(GAM1*(GAM1+2.0D0))-GAM1*(GAM1+2.0D0)/(GAM1+1.0D0)**2
             SHELL=SHELL+((DBLE(IZE)-S0T(IZE))/(2.0D0*DBLE(IZE)))*RC
             X1(N1)=GAM1*PMASS*REV
-            X2(N1)=STF(JZ)*SHELL
+            X2(N1)=STF(JZ)*DBLE(IZE)*SHELL/ZT
           ENDDO
  104      CONTINUE
           CLOSE(15)

@@ -519,4 +519,4 @@ def sternheimer_delta(element, E_keV):
 # than letting them resume into -- or be served from the CAS for -- a run that
 # computes different numbers. Bump it whenever the evaluated model changes:
 # adding the density-effect term delta, or moving a crossover, is such a change.
-STOPPING_MODEL = "sbethe-corrected-v1"
+STOPPING_MODEL = "sbethe-corrected-v2"

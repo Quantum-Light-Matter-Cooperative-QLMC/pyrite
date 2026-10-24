@@ -167,7 +167,12 @@ require derived or adapted material to be marked as such.
   user's own data directory. Tables derived or
   resampled from SBETHE output are **adaptations** under the license and are
   marked as such in the provenance manifest stored beside each generated
-  table. PyRITE **redistributes** the stopping tables for its catalogue
+  table. **Modification:** the vendored `sbethe.f` differs from the deposit
+  in one statement pair, marked `PyRITE modification` in the source: the
+  compound shell correction weights each element by its electron fraction
+  `STF*Z/ZT` instead of `STF`, which makes compound stopping independent of
+  how the stoichiometric indices are normalized. Single-element results are
+  unchanged. The `mirror-sbethe2-1` archive remains the unmodified deposit. PyRITE **redistributes** the stopping tables for its catalogue
   materials as one SHA-256-pinned archive on its release `tables-sbethe-1`,
   installed with `pyrite tables fetch sbethe-tables`; the release notes carry
   this attribution and the modifications statement.
