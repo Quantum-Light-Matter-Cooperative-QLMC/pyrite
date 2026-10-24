@@ -12,14 +12,16 @@ the task record); worker skills own implementation;
 ## Start an approved issue
 
 1. Read the issue with `gh issue view <n> --json number,title,body,labels,state,url`
-   and confirm it is open, reviewed, and actionable: `status:backlog` (new
-   start) or `status:active` (resume). Stop on `status:gated`,
-   `status:paused`, or no `status:*` label (route to `triage`). Inspect `gh issue develop --list <n>` and current
+   and confirm it is open, reviewed, and actionable: `backlog` (new
+   start) or `active` (resume); legacy `status:backlog`/`status:active` are
+   equivalent. Stop on `gated`, `paused`, `needs-triage`, or no status label
+   (route to `triage`). Inspect `gh issue develop --list <n>` and current
    worktrees/status.
 2. Reuse an existing clean linked branch/worktree when unambiguous. Otherwise
    create one linked development branch from `main` with `gh issue develop`;
    prefer `issue-<n>-<short-slug>` naming. Fetch it and attach a dedicated
-   worktree under `.worktrees/`. Set the issue to `status:active`.
+   worktree under `.worktrees/`. Set the issue to `active`
+   (`gh issue edit <n> --add-label active --remove-label backlog,status:backlog`).
 3. Stop on overlapping dirty state in the target worktree, an already-active
    conflicting branch, or a material decision missing from the issue. Unrelated
    dirt in another worktree is not a blocker.

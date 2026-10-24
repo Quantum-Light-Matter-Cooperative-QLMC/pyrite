@@ -1,3 +1,9 @@
+# `uv run pre-commit install` installs both stages below. Commit-stage hooks
+# fix staged files; pre-push hooks run the cheap CI contracts that `lint`
+# alone misses (import-linter layers, the skill mirror, the repo map).
+default_install_hook_types: [pre-commit, pre-push]
+default_stages: [pre-commit]
+
 repos:
   # Ruff (lint + format)
   - repo: https://github.com/astral-sh/ruff-pre-commit
@@ -31,3 +37,26 @@ repos:
         language: system
         files: ^\.(agents|claude)/skills/
         pass_filenames: false
+
+  # Cheap CI gates, run once per push instead of per commit. The full static
+  # gate (`pyrite-dev verify`, which adds ty and the docs build) stays manual.
+  - repo: local
+    hooks:
+      - id: import-linter
+        name: import-linter layer contracts
+        entry: uv run --quiet lint-imports
+        language: system
+        pass_filenames: false
+        stages: [pre-push]
+      - id: check-skills
+        name: skill mirror is synchronized
+        entry: uv run --quiet pyrite-dev check-skills
+        language: system
+        pass_filenames: false
+        stages: [pre-push]
+      - id: repo-map
+        name: generated repository map is current
+        entry: uv run --quiet pyrite-dev repo-map --check
+        language: system
+        pass_filenames: false
+        stages: [pre-push]

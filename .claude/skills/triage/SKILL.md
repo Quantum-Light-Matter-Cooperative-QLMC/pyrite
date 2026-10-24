@@ -13,7 +13,8 @@ task docs, commit, or push. `dispatch-task` owns routing to a worker.
 
 - `/triage <text>`: triage only the supplied task text.
 - `/triage #<n>` or an issue URL: refine that issue.
-- `/triage` with no target: choose an open issue carrying no `status:*` label
+- `/triage` with no target: choose an open issue carrying no status label
+  (`needs-triage` or none)
   (or new `>user<` prose) only when selection is unambiguous; otherwise report
   the best candidates.
 
@@ -49,9 +50,12 @@ task docs, commit, or push. `dispatch-task` owns routing to a worker.
    `anchored` (also pinned by a regression test). Never add a `signed-off`
    item; human sign-off lives only in the standing ledger-review issue #277 (see
    `docs/validation/methodology.md` "Agent done criteria").
-4. Use existing `area:*`/type labels when clearly applicable, and apply
-   `status:backlog` (accepted, not yet scheduled; `dispatch-task` sets
-   `status:active`). Use native issue relations (`--blocked-by`, `--blocking`,
+4. Apply existing area labels (`physics`, `cli`, `api`, `notebooks`, `tests`,
+   `performance`, `remote`, `geometry`, `validation`, `materials`,
+   `infrastructure`, `refactor`) and a built-in type label when clearly
+   applicable; check `gh label list` rather than inventing labels. Replace
+   `needs-triage` (and legacy `status:*`) with `backlog` (accepted, not yet
+   scheduled; `dispatch-task` sets `active`). Use native issue relations (`--blocked-by`, `--blocking`,
    parent/sub-issue) when they express real dependencies; do not duplicate
    dependency state in prose.
 5. Create/update the issue with `gh issue create` or `gh issue edit`. The issue
