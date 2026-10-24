@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING, Any
 from ._env import env_value
 from .paths import data_dir
 
-__version__ = "0.18.0"
+__version__ = "0.19.0"
 
 # Packaged data (catalog/, cifs/,
 # eaglexo_qe.csv, and the other entries ADR-0014 classifies as in-wheel).
