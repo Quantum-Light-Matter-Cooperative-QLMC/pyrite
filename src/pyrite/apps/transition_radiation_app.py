@@ -196,5 +196,32 @@ def _(mo):
     return
 
 
+@app.cell
+def _(mo):
+    dtr_run = mo.ui.run_button(label="Compute experimental DTR reference")
+    dtr_two_beam = mo.ui.checkbox(label="Include repeated-diffraction two-beam comparison")
+    mo.vstack(
+        [
+            mo.md(
+                "Experimental DTR: Born and two-beam solvers remain unverified. Born PXR-only is its DTR-off reference; two-beam rows contain coupled PXR/DTR with no separate DTR-off interpretation. Retain signed cross terms."
+            ),
+            dtr_two_beam,
+            dtr_run,
+        ]
+    )
+    return dtr_run, dtr_two_beam
+
+
+@app.cell
+def _(dtr_run, dtr_two_beam, mo):
+    mo.stop(not dtr_run.value)
+    from pyrite.apps.radiation_figures import dtr_reference_figure
+    from pyrite.apps.transition_radiation import cached_dtr_reference
+
+    _columns, _metadata = cached_dtr_reference(dtr_two_beam.value)
+    mo.vstack([dtr_reference_figure(_columns), mo.md(f"Reference provenance: `{_metadata}`")])
+    return
+
+
 if __name__ == "__main__":
     app.run()

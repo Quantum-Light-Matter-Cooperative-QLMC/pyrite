@@ -15,6 +15,7 @@ _LEAVES = {
     "channeling": "pyrite.cli.commands.app.channeling_command",
     "angular-heatmap": "pyrite.cli.commands.app.angular_heatmap_command",
     "transition-radiation": "pyrite.cli.commands.app.transition_radiation_command",
+    "optical-diagnostics": "pyrite.cli.commands.app.optical_diagnostics_command",
     "viewer": "pyrite.cli.commands.app.viewer_command",
     "validation": "pyrite.cli.commands.app.validation_command",
 }
@@ -25,6 +26,7 @@ _HELP = {
     "channeling": "Launch or export the planar quantum channeling demo.",
     "angular-heatmap": "Launch or export the detector-free directional source heatmap.",
     "transition-radiation": "Launch or export the TR/CTR demo.",
+    "optical-diagnostics": "Launch or export optical source and instrument diagnostics.",
     "viewer": "Launch or export the 3D trajectory viewer.",
     "validation": "Launch or export cached validation figures.",
 }
@@ -201,4 +203,12 @@ def angular_heatmap_command() -> click.Group:
         "angular-heatmap",
         "pyrite.cli.commands.app_views.angular_heatmap_command",
         "pyrite.cli.commands.app_views.angular_heatmap_export_command",
+    )
+
+
+def optical_diagnostics_command() -> click.Group:
+    return _launch_leaf(
+        "optical-diagnostics",
+        "pyrite.cli.commands.app_views.optical_diagnostics_command",
+        "pyrite.cli.commands.app_views.optical_diagnostics_export_command",
     )

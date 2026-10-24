@@ -949,5 +949,29 @@ def _(
     return
 
 
+@app.cell
+def _(mo, repo_dir):
+    from pyrite.apps.radiation_evidence import radiation_evidence
+
+    evidence_root = mo.ui.text(
+        value=str(repo_dir), label="Radiation evidence checkout/export directory"
+    )
+    mo.vstack(
+        [
+            mo.md(
+                "Saved radiation evidence: cache-only reports. Missing records are not passed checks. CUDA parity is not a physical anchor; consult the ledger for claim status. For DTR exports choose the directory containing reference.json."
+            ),
+            evidence_root,
+        ]
+    )
+    return evidence_root, radiation_evidence
+
+
+@app.cell
+def _(evidence_root, mo, radiation_evidence):
+    mo.ui.table(radiation_evidence(evidence_root.value), selection=None)
+    return
+
+
 if __name__ == "__main__":
     app.run()

@@ -740,6 +740,18 @@ bounded cached planar-solver/production adapters in `apps/transition_radiation.p
 `pyrite app transition-radiation launch|export` uses the shared `app_views`
 launcher on tunnel port 2723; `tr_demo`/`ctr_demo` are its catalog references.
 
+### Radiation diagnostic views
+
+`apps/optical_diagnostics_app.py` is the bounded Plotly optical source,
+collection/convergence, synthetic instrument/inference and saved-artifact app.
+`apps/optical_diagnostics.py` caches existing solver adapters;
+`apps/radiation_figures.py` renders stored arrays. The shared app launcher uses
+`pyrite app optical-diagnostics launch|export` on tunnel port 2725.
+`apps/transition_radiation.py::cached_dtr_reference` feeds an explicitly triggered
+experimental DTR view. `apps/radiation_evidence.py` reads saved evidence for the
+validation app without launching checks. `results/radiation.py` owns read-time
+band yields and component semantics used by `apps/analysis_ui/radiation.py`.
+
 ### `apps/channeling.py` and `apps/channeling_app.py`
 
 The channeling app also offers a bounded experimental axial mode through

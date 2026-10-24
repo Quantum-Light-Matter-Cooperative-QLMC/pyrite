@@ -92,7 +92,11 @@ def render_map(
     ``trends`` comes from :func:`render_map_trends` in its own cell, so clicking
     a heatmap cell does not recompute the metric charts or rankings.
     """
-    parts = []
+    parts = [
+        mo.md(
+            "Metric basis: PXR/CBS plus all stored characteristic, channeling and TR components. Historical coherent_flux includes those additions. Two-beam line + TR baseline forms the joint total; spectrum component controls do not filter map metrics."
+        )
+    ]
     if heatmap_mode:
         parts.extend(
             [

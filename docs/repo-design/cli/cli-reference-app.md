@@ -23,6 +23,7 @@ Commands:
   channeling            Launch or export the planar quantum channeling demo.
   angular-heatmap       Launch or export the detector-free directional source heatmap.
   transition-radiation  Launch or export the TR/CTR demo.
+  optical-diagnostics   Launch or export optical source and instrument diagnostics.
   viewer                Launch or export the 3D trajectory viewer.
   validation            Launch or export cached validation figures.
 ```
@@ -328,6 +329,57 @@ Options:
 Usage: pyrite app transition-radiation launch [OPTIONS]
 
   Launch the interactive TR/CTR app with marimo run or edit.
+
+  Choose the crystal and beam settings inside the app; no checkpoint is needed.
+
+Options:
+  --watch     Reload app when source files change.
+  --smoke     Execute app once headlessly and exit.
+  --edit      Use `marimo edit` instead of `marimo run`.
+  --acp       Start local Claude and Codex ACP bridges.
+  --tunnel    Bind fixed port for SSH tunneling.
+  --no-token  Disable marimo auth token.
+  -h, --help  Show this message and exit.
+```
+
+## `pyrite app optical-diagnostics`
+
+```text
+Usage: pyrite app optical-diagnostics [OPTIONS] COMMAND [ARGS]...
+
+  Launch the interactive optical radiation diagnostics app with marimo run or edit.
+
+  Choose the crystal and beam settings inside the app; no checkpoint is needed.
+
+Options:
+  -h, --help  Show this message and exit.
+
+Commands:
+  export  Render the optical radiation diagnostics app as static HTML without...
+  launch  Launch the interactive optical radiation diagnostics app with marimo run...
+```
+
+## `pyrite app optical-diagnostics export`
+
+```text
+Usage: pyrite app optical-diagnostics export [OPTIONS]
+
+  Render the optical radiation diagnostics app as static HTML without starting marimo.
+
+  Writes pyrite-output/results/<stem>.html; the stem defaults to pyrite_optical-
+  diagnostics.
+
+Options:
+  --stem TEXT  Output stem under pyrite-output/results/ (without .html).
+  -h, --help   Show this message and exit.
+```
+
+## `pyrite app optical-diagnostics launch`
+
+```text
+Usage: pyrite app optical-diagnostics launch [OPTIONS]
+
+  Launch the interactive optical radiation diagnostics app with marimo run or edit.
 
   Choose the crystal and beam settings inside the app; no checkpoint is needed.
 

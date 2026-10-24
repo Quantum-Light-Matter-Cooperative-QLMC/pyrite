@@ -91,10 +91,13 @@ def render_spectra(
     """The Spectra view: vary radio, curve picker, components, two bands."""
     results = context.results
     component_values = set(components.value)
+    from ..radiation import radiation_panel
+
     parts = [
         mo.hstack([vary_ui, varying_ui], align="end", widths=[1, 1]),
         mo.md(spec.description),
         components,
+        radiation_panel(mo, list(records(results))),
         axes_panel(mo, axes_controls),
     ]
 
@@ -124,6 +127,7 @@ def render_spectra(
             include_cxr="Line" in component_values,
             include_characteristic="Characteristic" in component_values,
             include_channeling="Channeling" in component_values,
+            include_transition="TR/CTR" in component_values,
             include_coherent=context.show_both_emissions,
             sum_components=True,
             max_points=2500 if context.show_both_emissions else 5000,

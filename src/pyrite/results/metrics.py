@@ -208,8 +208,10 @@ def cxr_metrics(r, settings, rel_prominence=0.03, n_fwhm=3.0, metric="sharpness"
     * ``line_brem_ratio`` compares the dominant peak to its local background.
     * ``cxr_quality`` is the dominant-line definition score in ``[0, 1]``.
 
-    The coherent-line quantities (peak_flux, coherent_flux, line_eV, fwhm_eV,
-    and line_flux) are calculated from the LINE spectrum r['spec']. Brem enters
+    Compatibility names such as coherent_flux refer to cxr_spectrum(r):
+    PXR/CBS plus stored characteristic, channeling and TR components. In
+    two-beam cases the line slot is a signed joint-field correction and the
+    TR baseline completes that joint spectrum. Brem enters
     total_flux, the line_frac denominator, coherent_brem_ratio (over the full
     line grid), and line_brem_ratio (over the dominant line's local window).
     peak_flux / coherent_flux / total_flux need no peak and stay valid

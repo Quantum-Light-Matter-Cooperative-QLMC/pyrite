@@ -234,3 +234,14 @@ transition_radiation_export_command = _export_command(TRANSITION_RADIATION)
 
 angular_heatmap_command = _launch_command(ANGULAR_HEATMAP)
 angular_heatmap_export_command = _export_command(ANGULAR_HEATMAP)
+
+
+OPTICAL_DIAGNOSTICS = MarimoApp(
+    "optical-diagnostics",
+    "optical_diagnostics_app.py",
+    2725,
+    "optical radiation diagnostics",
+    False,
+)
+optical_diagnostics_command = _launch_command(OPTICAL_DIAGNOSTICS)
+optical_diagnostics_export_command = _export_command(OPTICAL_DIAGNOSTICS)
