@@ -4,7 +4,7 @@ import math
 from collections.abc import Iterator, Mapping
 from dataclasses import MISSING, dataclass, fields
 from os import PathLike
-from typing import Any, Literal, cast
+from typing import Any, Literal, NoReturn, cast
 
 import numpy as np
 
@@ -650,12 +650,33 @@ def refuse_transition_radiation(case: Mapping[str, Any], consumer: str) -> None:
         raise ValueError(f"{consumer} does not support transition_radiation cases yet (#103)")
 
 
+def refuse_unverified_axial_run() -> NoReturn:
+    """Fail before production work until the physical axial contract exists."""
+    raise ValueError(
+        "channeling_model='axial' cannot run yet: physical matching surface, "
+        "incident-normalized photon source and case-specific depth budget "
+        "are unvalidated (#623); #624 only provides preliminary configuration"
+    )
+
+
+def refuse_axial_channeling(case: Mapping[str, Any]) -> None:
+    """Apply axial admission to raw compatibility mappings as well as cases."""
+    record = case.get("channeling")
+    if (
+        (isinstance(record, Mapping) and record.get("model") == "axial")
+        or case.get("channeling_model") == "axial"
+        or case.get("channeling_axial") is not None
+    ):
+        refuse_unverified_axial_run()
+
+
 def refuse_channeling(case: Mapping[str, Any], consumer: str) -> None:
     """Raise before any work when ``consumer`` cannot run a channeling case.
 
     ADR-0017 tier-3 rule: every consumer path either supports the planar
     channeling zone (#506) or refuses it before transport or output writes.
     """
+    refuse_axial_channeling(case)
     if case.get("channeling") is not None:
         raise ValueError(f"{consumer} does not support channeling cases (#506)")
 

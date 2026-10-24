@@ -1,6 +1,6 @@
 """Transport option forwarding and opt-in capability checks."""
 
-from ..case import refuse_channeling, refuse_transition_radiation
+from ..case import refuse_axial_channeling, refuse_channeling, refuse_transition_radiation
 
 
 def _beam_kwargs(case):
@@ -36,6 +36,8 @@ def _check_opt_in_transport(
         if block_electrons is not None or block_monitor is not None:
             raise ValueError("photon transport does not support block/adaptive transport")
         prepare_photon_case(case, transport_core)
+
+    refuse_axial_channeling(case)
     if trajectory_capture is not None:
         refuse_channeling(case, "trajectory capture")
     if block_electrons is not None:

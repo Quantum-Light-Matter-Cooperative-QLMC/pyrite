@@ -16,7 +16,9 @@ import math
 from collections.abc import Mapping
 from math import gcd
 from numbers import Integral, Real
-from typing import Any, NoReturn
+from typing import Any
+
+from ..montecarlo.case import refuse_unverified_axial_run as refuse_unverified_axial_run
 
 AXIAL_MODEL_MARKER = "axial-entrance-experimental-config-v1"
 AXIAL_SCHEMA_VERSION = 1
@@ -288,12 +290,3 @@ def axial_spec_identity(spec: Mapping[str, object]) -> str:
         allow_nan=False,
     )
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
-
-
-def refuse_unverified_axial_run() -> NoReturn:
-    """Fail before material, solver, checkpoint, remote or output work (#623)."""
-    raise ValueError(
-        "channeling_model='axial' cannot run yet: physical matching surface, "
-        "incident-normalized photon source and case-specific depth budget "
-        "are unvalidated (#623); #624 only provides preliminary configuration"
-    )

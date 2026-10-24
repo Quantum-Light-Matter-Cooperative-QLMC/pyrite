@@ -26,7 +26,7 @@ from ..._backend import BACKEND
 from ..._energy_grid_encoding import decode_energy_grid as decode_energy_grid
 from ..._env import env_value, set_canonical_env
 from .. import spectrum as _spectrum_mod
-from ..case import Case
+from ..case import Case, refuse_axial_channeling
 from ..geometry import tilted_geometry as tilted_geometry
 from ..groove import blazed_groove_spec as blazed_groove_spec
 from ..spectrum import (
@@ -338,7 +338,6 @@ def _transport_case(
     # Resolve data-only selectors in this process before transport/capture. A
     # worker reconstructs adapters locally; no callable or device state travels
     # in the case payload.
-    select_emission(case)
     _check_opt_in_transport(
         case,
         trajectory_capture,
@@ -346,6 +345,7 @@ def _transport_case(
         transport_core=transport_core,
         block_monitor=block_monitor,
     )
+    select_emission(case)
     if case.get("adaptive_precision") is not None:
         return _adaptive.transport_requested_precision(
             case,
@@ -901,6 +901,7 @@ def _spectrum_case(case, tp, record_timing=False):
     """GPU phase of run_case: CXR spectrum + brem from the already-transported
     segments ``tp`` (from _transport_case). Runs in the main process, so only one
     CUDA context ever touches the device."""
+    refuse_axial_channeling(case)
     case = _adaptive.realized_case(case, tp)
     timed = _TIMING or record_timing
     if timed:

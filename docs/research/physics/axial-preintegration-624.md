@@ -52,8 +52,18 @@ The Scene lowering entry point calls the central axial refusal before case
 construction; the raw per-case resolver refuses before planar profile/zone
 work. An axial call should never reach the planar density-matrix solver or
 reuse its cache. CLI/profile/remote codepaths must converge on the same
-`Physics` and `scene_physics` admission gate; future runner/persistence work
-will require its own independent guard against raw `Case` callers.
+`Physics` and `scene_physics` admission gate.
+
+Raw compatibility mappings have an independent production guard in
+`montecarlo.case.refuse_axial_channeling`. It recognizes an axial
+`channeling.model` record as well as unlowered `channeling_model` /
+`channeling_axial` selectors. Batch scheduling, transport (including capture,
+blocks and adaptive precision), spectrum scoring, full/streamed artifact
+replay, planar source reconstruction and result insertion refuse before their
+setup or output mutation. Artifact replay reports a `TrajectoryArtifactError`;
+the other paths report `ValueError`, all identifying the missing #623 contract.
+The low-level artifact/checkpoint serializers remain storage primitives;
+these guards do not establish a supported axial persistence format.
 
 Next changes needed after #623 is independently anchored: material/axis frame
 resolution and eligibility evidence, `Case.channeling` discriminated variant,
