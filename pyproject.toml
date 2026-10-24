@@ -40,6 +40,9 @@ dask = [
     "distributed>=2025.1",
     "dask-jobqueue>=0.9",
 ]
+optimization = [
+    "optuna>=4.5,<5",
+]
 external-db = [
     "mp-api>=0.46",
 ]
@@ -238,6 +241,8 @@ allowed-unresolved-imports = [
     # Distributed schedulers are optional; default contributor checks need no cluster extra.
     "distributed",
     "dask_jobqueue",
+    # Optuna is an optional optimization backend.
+    "optuna",
     # The Python 3.13 zstd backport is intentionally absent on Python 3.14+.
     "backports",
     "backports.zstd",

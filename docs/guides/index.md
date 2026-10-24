@@ -16,6 +16,7 @@ quantum-source-states
 sampling-policy
 execution-profiles
 dask-and-distributed-execution
+optimization-studies
 working-with-results
 planar-channeling
 transition-radiation-demo

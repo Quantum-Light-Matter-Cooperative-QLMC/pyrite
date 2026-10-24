@@ -30,26 +30,31 @@ Components (a + b denotes a static import cycle):
   p6: devtools
   p7: instrument
   p8: materials
-  p9: plots
-  p10: xsgen
+  p9: optimization
+  p10: plots
+  p11: xsgen
 Edges (importer -> imported):
   p0 -> p2
   p0 -> p3
   p0 -> p4
   p0 -> p8
+  p1 -> p10
   p1 -> p2
   p1 -> p4
   p1 -> p5
   p1 -> p8
-  p1 -> p9
+  p10 -> p2
   p10 -> p4
+  p10 -> p5
   p10 -> p8
-  p2 -> p10
+  p11 -> p4
+  p11 -> p8
+  p2 -> p11
   p2 -> p4
   p2 -> p5
   p2 -> p7
   p2 -> p8
-  p3 -> p10
+  p3 -> p11
   p3 -> p2
   p3 -> p4
   p3 -> p5
@@ -57,16 +62,13 @@ Edges (importer -> imported):
   p3 -> p8
   p4 -> p8
   p5 -> p8
+  p6 -> p10
   p6 -> p2
   p6 -> p3
   p6 -> p4
-  p6 -> p9
   p7 -> p5
   p7 -> p8
   p9 -> p2
-  p9 -> p4
-  p9 -> p5
-  p9 -> p8
 ```
 <!-- END GENERATED PACKAGE DEPENDENCIES -->
 

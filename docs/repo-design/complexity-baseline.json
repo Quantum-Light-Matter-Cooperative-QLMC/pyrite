@@ -645,6 +645,11 @@
       "cc": 26
     },
     {
+      "path": "src/pyrite/optimization/study.py",
+      "name": "OptimizationStudy.run",
+      "cc": 29
+    },
+    {
       "path": "src/pyrite/perf/performance_analysis.py",
       "name": "_interval_rows",
       "cc": 21
