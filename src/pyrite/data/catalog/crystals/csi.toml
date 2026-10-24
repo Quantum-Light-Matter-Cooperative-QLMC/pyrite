@@ -1,0 +1,7 @@
+cif = "cifs/csi.cif"
+validation_id = "csi-cif-structure"
+full_name = "Caesium Iodide"
+formula = "CsI"
+cod_id = 9008790
+B_ang2 = 2.8
+surface_hkl = [1, 1, 0]

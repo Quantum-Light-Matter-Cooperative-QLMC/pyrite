@@ -33,6 +33,24 @@ TRANSPORT_ELEMENTS = {
     "Bi": {"Z": 83, "A": 208.98040, "J_keV": 0.823},
     "O": {"Z": 8, "A": 15.999, "J_keV": 0.095},
     "Al": {"Z": 13, "A": 26.982, "J_keV": 0.166},
+    "Li": {"Z": 3, "A": 6.94, "J_keV": 0.040},
+    "F": {"Z": 9, "A": 18.998403163, "J_keV": 0.115},
+    "H": {"Z": 1, "A": 1.008, "J_keV": 0.0218},
+    "Ar": {"Z": 18, "A": 39.948, "J_keV": 0.188},
+    "Cr": {"Z": 24, "A": 51.9961, "J_keV": 0.257},
+    "Mn": {"Z": 25, "A": 54.938044, "J_keV": 0.272},
+    "Ni": {"Z": 28, "A": 58.6934, "J_keV": 0.311},
+    "Cu": {"Z": 29, "A": 63.546, "J_keV": 0.322},
+    "Au": {"Z": 79, "A": 196.966569, "J_keV": 0.79},
+    "Pb": {"Z": 82, "A": 207.2, "J_keV": 0.823},
+    "Na": {"Z": 11, "A": 22.98976928, "J_keV": 0.149},
+    "Ca": {"Z": 20, "A": 40.078, "J_keV": 0.191},
+    "Ga": {"Z": 31, "A": 69.723, "J_keV": 0.334},
+    "As": {"Z": 33, "A": 74.921595, "J_keV": 0.347},
+    "Cd": {"Z": 48, "A": 112.414, "J_keV": 0.469},
+    "I": {"Z": 53, "A": 126.90447, "J_keV": 0.491},
+    "Cs": {"Z": 55, "A": 132.90545196, "J_keV": 0.488},
+    "Ba": {"Z": 56, "A": 137.327, "J_keV": 0.491},
 }
 
 # Sternheimer density-effect coefficients, read from the header of each
@@ -49,8 +67,8 @@ TRANSPORT_ELEMENTS = {
 #
 # They are per ELEMENT in its own elemental solid. delta is a bulk property of
 # the medium, so it does not Bragg-add and these values are not a compound's
-# delta; N and O, which appear in the catalog only inside solids, are listed at
-# their liquid-phase parameters because no elemental-solid phase exists.
+# delta; N, O, H, F and Ar, which appear in the catalog only inside solids or
+# fluids, are listed at their liquid-phase parameters because no elemental-solid phase exists.
 STERNHEIMER_DENSITY_EFFECT = {
     "B": {
         "a": 0.5622,
@@ -244,6 +262,150 @@ STERNHEIMER_DENSITY_EFFECT = {
         "C_bar": 4.2395,
         "delta0": 0.12,
     },  # aluminum_Al
+    "H": {
+        "a": 0.1348,
+        "k": 5.6249,
+        "x0": 0.44,
+        "x1": 1.8856,
+        "C_bar": 3.0977,
+        "delta0": 0.0,
+    },  # hydrogen_liquid
+    "Li": {
+        "a": 0.9514,
+        "k": 2.4993,
+        "x0": 0.1304,
+        "x1": 1.6397,
+        "C_bar": 3.1221,
+        "delta0": 0.14,
+    },  # lithium_Li
+    "F": {
+        "a": 0.145,
+        "k": 3.0,
+        "x0": 0.2,
+        "x1": 3.0,
+        "C_bar": 4.105,
+        "delta0": 0.0,
+    },  # fluorine_liquid
+    "Ar": {
+        "a": 0.1956,
+        "k": 3.0,
+        "x0": 0.2,
+        "x1": 3.0,
+        "C_bar": 5.2146,
+        "delta0": 0.0,
+    },  # argon_liquid
+    "Cr": {
+        "a": 0.1542,
+        "k": 2.9896,
+        "x0": 0.034,
+        "x1": 3.0451,
+        "C_bar": 4.1781,
+        "delta0": 0.14,
+    },  # chromium_Cr
+    "Mn": {
+        "a": 0.1497,
+        "k": 2.9796,
+        "x0": 0.0447,
+        "x1": 3.1074,
+        "C_bar": 4.2702,
+        "delta0": 0.14,
+    },  # manganese_Mn
+    "Ni": {
+        "a": 0.165,
+        "k": 2.843,
+        "x0": -0.0566,
+        "x1": 3.1851,
+        "C_bar": 4.3115,
+        "delta0": 0.1,
+    },  # nickel_Ni
+    "Cu": {
+        "a": 0.1434,
+        "k": 2.9044,
+        "x0": -0.0254,
+        "x1": 3.2792,
+        "C_bar": 4.419,
+        "delta0": 0.08,
+    },  # copper_Cu
+    "Au": {
+        "a": 0.0976,
+        "k": 3.1101,
+        "x0": 0.2021,
+        "x1": 3.6979,
+        "C_bar": 5.5747,
+        "delta0": 0.14,
+    },  # gold_Au
+    "Pb": {
+        "a": 0.0936,
+        "k": 3.1608,
+        "x0": 0.3776,
+        "x1": 3.8073,
+        "C_bar": 6.2018,
+        "delta0": 0.14,
+    },  # lead_Pb
+    "Na": {
+        "a": 0.0777,
+        "k": 3.6452,
+        "x0": 0.288,
+        "x1": 3.1962,
+        "C_bar": 5.0526,
+        "delta0": 0.08,
+    },  # sodium_Na
+    "Ca": {
+        "a": 0.1564,
+        "k": 3.0745,
+        "x0": 0.3228,
+        "x1": 3.1191,
+        "C_bar": 5.0396,
+        "delta0": 0.14,
+    },  # calcium_Ca
+    "Ga": {
+        "a": 0.0944,
+        "k": 3.1314,
+        "x0": 0.2267,
+        "x1": 3.5434,
+        "C_bar": 4.9353,
+        "delta0": 0.14,
+    },  # gallium_Ga
+    "As": {
+        "a": 0.0663,
+        "k": 3.4176,
+        "x0": 0.1767,
+        "x1": 3.5702,
+        "C_bar": 5.051,
+        "delta0": 0.08,
+    },  # arsenic_As
+    "Cd": {
+        "a": 0.2461,
+        "k": 2.6772,
+        "x0": 0.1281,
+        "x1": 3.1667,
+        "C_bar": 5.2727,
+        "delta0": 0.14,
+    },  # cadmium_Cd
+    "I": {
+        "a": 0.2377,
+        "k": 2.7276,
+        "x0": 0.0549,
+        "x1": 3.2596,
+        "C_bar": 5.9488,
+        "delta0": 0.0,
+    },  # iodine_I
+    "Cs": {
+        "a": 0.1823,
+        "k": 2.8866,
+        "x0": 0.5473,
+        "x1": 3.5914,
+        "C_bar": 6.9135,
+        "delta0": 0.14,
+    },  # caesium_Cs
+    "Ba": {
+        "a": 0.1827,
+        "k": 2.8906,
+        "x0": 0.419,
+        "x1": 3.4547,
+        "C_bar": 6.3153,
+        "delta0": 0.14,
+    },  # barium_Ba
 }
 
 __all__ = ["STERNHEIMER_DENSITY_EFFECT", "TRANSPORT_ELEMENTS"]

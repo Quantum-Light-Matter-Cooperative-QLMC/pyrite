@@ -154,6 +154,22 @@ Generated browsing views of every claim in the [detailed validation ledger](phys
 | [`v2o5-010-structure`](ledger-crystal-structure-provenance.md#v2o5-010-structure) | alpha-V2O5 standard-Pmmn lattice + explicit two-formula-unit basis for the layered cut conventionally indexed as (010) | `unverified` |
 | [`tis2-003-structure`](ledger-crystal-structure-provenance.md#tis2-003-structure) | 1T-TiS2 P-3m1 lattice + explicit one-formula-unit basis for a symmetric (003) cut | `unverified` |
 | [`tungsten-cif-structure`](ledger-crystal-structure-provenance.md#tungsten-cif-structure) | bundled bcc tungsten lattice (Im-3m, a = 3.1648 Å at 298 K) and P1-expanded two-atom basis | `unverified` |
+| [`al-cif-structure`](ledger-crystal-structure-provenance.md#al-cif-structure) | bundled fcc aluminium lattice (Fm-3m, a = 4.04961 Å at 298 K) and P1-expanded four-atom basis | `unverified` |
+| [`cu-cif-structure`](ledger-crystal-structure-provenance.md#cu-cif-structure) | bundled fcc copper lattice (Fm-3m, a = 3.61496 Å) and P1-expanded four-atom basis | `unverified` |
+| [`ge-cif-structure`](ledger-crystal-structure-provenance.md#ge-cif-structure) | bundled diamond-structure germanium lattice (Fd-3m, a = 5.65754 Å at 297.75 K) and P1-expanded eight-atom basis | `unverified` |
+| [`au-cif-structure`](ledger-crystal-structure-provenance.md#au-cif-structure) | bundled fcc gold lattice (Fm-3m, a = 4.07825 Å) and P1-expanded four-atom basis | `unverified` |
+| [`alpha-fe-cif-structure`](ledger-crystal-structure-provenance.md#alpha-fe-cif-structure) | bundled bcc alpha-iron lattice (Im-3m, a = 2.8654 Å at 298 K) and P1-expanded two-atom basis | `unverified` |
+| [`ni-cif-structure`](ledger-crystal-structure-provenance.md#ni-cif-structure) | bundled fcc nickel lattice (Fm-3m, a = 3.52387 Å) and P1-expanded four-atom basis | `unverified` |
+| [`pb-cif-structure`](ledger-crystal-structure-provenance.md#pb-cif-structure) | bundled fcc lead lattice (Fm-3m, a = 4.95004 Å at 298 K) and P1-expanded four-atom basis | `unverified` |
+| [`alpha-ti-cif-structure`](ledger-crystal-structure-provenance.md#alpha-ti-cif-structure) | bundled hcp alpha-titanium lattice (P6_3/mmc, a = 2.95 Å, c = 4.686 Å) and P1-expanded two-atom basis | `unverified` |
+| [`alpha-quartz-cif-structure`](ledger-crystal-structure-provenance.md#alpha-quartz-cif-structure) | bundled alpha-quartz lattice (P3_221, a = 4.91344 Å, c = 5.40512 Å) and P1-expanded nine-atom basis | `unverified` |
+| [`caf2-cif-structure`](ledger-crystal-structure-provenance.md#caf2-cif-structure) | bundled fluorite CaF2 lattice (Fm-3m, a = 5.463209 Å at 298 K) and P1-expanded twelve-atom basis | `unverified` |
+| [`cdwo4-cif-structure`](ledger-crystal-structure-provenance.md#cdwo4-cif-structure) | bundled wolframite CdWO4 lattice (P2/c, a = 5.028 Å, b = 5.862 Å, c = 5.067 Å, beta = 91.5°) and P1-expanded twelve-atom basis | `unverified` |
+| [`baf2-cif-structure`](ledger-crystal-structure-provenance.md#baf2-cif-structure) | bundled fluorite BaF2 lattice (Fm-3m, a = 6.2001 Å) and P1-expanded twelve-atom basis | `unverified` |
+| [`nai-cif-structure`](ledger-crystal-structure-provenance.md#nai-cif-structure) | bundled rock-salt NaI lattice (Fm-3m, a = 6.4728 Å) and P1-expanded eight-atom basis | `unverified` |
+| [`csi-cif-structure`](ledger-crystal-structure-provenance.md#csi-cif-structure) | bundled CsCl-type CsI lattice (Pm-3m, a = 4.5667 Å) and P1-expanded two-atom basis | `unverified` |
+| [`gaas-cif-structure`](ledger-crystal-structure-provenance.md#gaas-cif-structure) | bundled zinc-blende GaAs lattice (F-43m, a = 5.6537 Å) and P1-expanded eight-atom basis | `unverified` |
+| [`pbwo4-cif-structure`](ledger-crystal-structure-provenance.md#pbwo4-cif-structure) | bundled scheelite PbWO4 lattice (I4_1/a, a = 5.456 Å, c = 12.02 Å) and P1-expanded 24-atom basis | `unverified` |
 
 ## Transport & background
 

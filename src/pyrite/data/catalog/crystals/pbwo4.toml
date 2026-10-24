@@ -1,0 +1,7 @@
+cif = "cifs/pbwo4.cif"
+validation_id = "pbwo4-cif-structure"
+full_name = "Lead Tungstate"
+formula = "PbWO4"
+cod_id = 9015950
+B_ang2 = 1.49
+surface_hkl = [0, 0, 1]

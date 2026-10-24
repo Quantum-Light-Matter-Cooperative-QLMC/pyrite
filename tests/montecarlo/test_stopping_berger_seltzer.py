@@ -204,6 +204,7 @@ def test_crossover_spans_a_wide_z_range_so_no_global_splice_is_continuous():
         el: _bs_joy_luo_crossover_keV(p["Z"], p["A"], p["J_keV"])
         for el, p in TRANSPORT_ELEMENTS.items()
     }
+    assert crossovers["H"] == pytest.approx(1.36, abs=0.05)
     assert crossovers["B"] == pytest.approx(2.66, abs=0.05)
     assert crossovers["Bi"] == pytest.approx(10.46, abs=0.05)
 
@@ -219,7 +220,7 @@ def test_crossover_spans_a_wide_z_range_so_no_global_splice_is_continuous():
             worst = max(worst, abs(ratio - 1.0))
         return worst
 
-    assert worst_mismatch(8.0) == pytest.approx(0.0184, abs=0.002)
+    assert worst_mismatch(8.0) == pytest.approx(0.0201, abs=0.002)
     assert min(worst_mismatch(E) for E in np.arange(2.0, 12.0, 0.25)) > 0.015
 
 

@@ -52,8 +52,8 @@ the same representation. This is the inverse of the existing catalog-to-mass
 conversion ([validated mass-density convention](../validation/beam-transport/sbethe-material-inputs.md));
 it introduces no new stopping-power or mixture model.
 
-Only existing transport elements are accepted. For example, `--formula H2O`
-fails with an unsupported-hydrogen error and the supported-element list;
+Only existing transport elements are accepted. For example, `--formula Fr`
+fails with an unsupported-element error and the supported-element list;
 `--density-g-cm3 0` fails before registration. Adding an element's interaction
 constants or isotopic enrichment is outside this workflow.
 

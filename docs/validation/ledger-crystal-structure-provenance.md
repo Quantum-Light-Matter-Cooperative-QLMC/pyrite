@@ -531,3 +531,163 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 - **Checks:** lattice against the cached COD record; volume, composition, structure factor, and dominant-reflection golden
 - **Anchor:** `tests/materials/test_crystal_external_db.py::test_local_lattice_matches_cached_cod`; `tests/materials/test_material_catalog.py::test_packaged_catalog_matches_independent_serialized_golden`
 - **Notes:** Added for the #508 axial vortex anchor (heavy pure strings along ⟨001⟩ that bind an on-column 2p pair at TEM energies). Catalog `B_ang2 = 0.16` is the channeling `B(293 K) = 0.159 Å²` from Peng et al. (1996) Table 1 (`cr-debye-b-of-t`); no experimental PXR/CBS agreement claimed.
+
+## `al-cif-structure`
+
+- **Claim:** bundled fcc aluminium lattice (Fm-3m, a = 4.04961 Å at 298 K) and P1-expanded four-atom basis
+- **Code:** `data/cifs/al.cif`; `data/catalog/crystals/al.toml`
+- **Source:** Straumanis, *J. Appl. Phys.* **20**, 726 (1949), doi:10.1063/1.1698520 (COD 9012002)
+- **Status:** unverified
+- **Checks:** lattice against the cached COD record; volume, composition, structure factor, and dominant-reflection golden
+- **Anchor:** `tests/materials/test_crystal_external_db.py::test_local_lattice_matches_cached_cod`; `tests/materials/test_material_catalog.py::test_packaged_catalog_matches_independent_serialized_golden`
+- **Notes:** Crystal counterpart of the amorphous Geant4/PDG-style medium set. `B_ang2 = 0.78` is `B(293 K) = 0.7806 Å²` from Peng, Ren, Dudarev & Whelan, *Acta Cryst.* **A52**, 456 (1996), doi:10.1107/S010876739600089X, Table 9. No experimental PXR/CBS agreement claimed.
+
+## `cu-cif-structure`
+
+- **Claim:** bundled fcc copper lattice (Fm-3m, a = 3.61496 Å) and P1-expanded four-atom basis
+- **Code:** `data/cifs/cu.cif`; `data/catalog/crystals/cu.toml`
+- **Source:** Wyckoff, *Crystal Structures* **1** (1963) (COD 9008468)
+- **Status:** unverified
+- **Checks:** lattice against the cached COD record; volume, composition, structure factor, and dominant-reflection golden
+- **Anchor:** `tests/materials/test_crystal_external_db.py::test_local_lattice_matches_cached_cod`; `tests/materials/test_material_catalog.py::test_packaged_catalog_matches_independent_serialized_golden`
+- **Notes:** Crystal counterpart of the amorphous Geant4/PDG-style medium set. `B_ang2 = 0.55` is `B(293 K) = 0.5505 Å²` from Peng, Ren, Dudarev & Whelan, *Acta Cryst.* **A52**, 456 (1996), doi:10.1107/S010876739600089X, Table 22. No experimental PXR/CBS agreement claimed.
+
+## `ge-cif-structure`
+
+- **Claim:** bundled diamond-structure germanium lattice (Fd-3m, a = 5.65754 Å at 297.75 K) and P1-expanded eight-atom basis
+- **Code:** `data/cifs/ge.cif`; `data/catalog/crystals/ge.toml`
+- **Source:** Cooper, *Acta Cryst.* **15**, 578 (1962), doi:10.1107/S0365110X62001474 (COD 9011050)
+- **Status:** unverified
+- **Checks:** lattice against the cached COD record; volume, composition, structure factor, and dominant-reflection golden
+- **Anchor:** `tests/materials/test_crystal_external_db.py::test_local_lattice_matches_cached_cod`; `tests/materials/test_material_catalog.py::test_packaged_catalog_matches_independent_serialized_golden`
+- **Notes:** Crystal counterpart of the amorphous Geant4/PDG-style medium set. `B_ang2 = 0.60` is `B(293 K) = 0.6000 Å²` from Peng, Ren, Dudarev & Whelan, *Acta Cryst.* **A52**, 456 (1996), doi:10.1107/S010876739600089X, Table 24. No experimental PXR/CBS agreement claimed.
+
+## `au-cif-structure`
+
+- **Claim:** bundled fcc gold lattice (Fm-3m, a = 4.07825 Å) and P1-expanded four-atom basis
+- **Code:** `data/cifs/au.cif`; `data/catalog/crystals/au.toml`
+- **Source:** Wyckoff, *Crystal Structures* **1** (1963) (COD 9008463)
+- **Status:** unverified
+- **Checks:** lattice against the cached COD record; volume, composition, structure factor, and dominant-reflection golden
+- **Anchor:** `tests/materials/test_crystal_external_db.py::test_local_lattice_matches_cached_cod`; `tests/materials/test_material_catalog.py::test_packaged_catalog_matches_independent_serialized_golden`
+- **Notes:** Crystal counterpart of the amorphous Geant4/PDG-style medium set. `B_ang2 = 0.62` is `B(293 K) = 0.6198 Å²` from Peng, Ren, Dudarev & Whelan, *Acta Cryst.* **A52**, 456 (1996), doi:10.1107/S010876739600089X, Table 44. No experimental PXR/CBS agreement claimed.
+
+## `alpha-fe-cif-structure`
+
+- **Claim:** bundled bcc alpha-iron lattice (Im-3m, a = 2.8654 Å at 298 K) and P1-expanded two-atom basis
+- **Code:** `data/cifs/alpha_fe.cif`; `data/catalog/crystals/alpha_fe.toml`
+- **Source:** Zhang & Guyot, *Phys. Chem. Minerals* **26**, 206 (1999), doi:10.1007/s002690050178 (COD 9006587)
+- **Status:** unverified
+- **Checks:** lattice against the cached COD record; volume, composition, structure factor, and dominant-reflection golden
+- **Anchor:** `tests/materials/test_crystal_external_db.py::test_local_lattice_matches_cached_cod`; `tests/materials/test_material_catalog.py::test_packaged_catalog_matches_independent_serialized_golden`
+- **Notes:** Crystal counterpart of the amorphous Geant4/PDG-style medium set. `B_ang2 = 0.33` is the b.c.c. `B(293 K) = 0.3250 Å²` from Peng, Ren, Dudarev & Whelan, *Acta Cryst.* **A52**, 456 (1996), doi:10.1107/S010876739600089X, Table 19. No experimental PXR/CBS agreement claimed.
+
+## `ni-cif-structure`
+
+- **Claim:** bundled fcc nickel lattice (Fm-3m, a = 3.52387 Å) and P1-expanded four-atom basis
+- **Code:** `data/cifs/ni.cif`; `data/catalog/crystals/ni.toml`
+- **Source:** Wyckoff, *Crystal Structures* **1** (1963) (COD 9008476)
+- **Status:** unverified
+- **Checks:** lattice against the cached COD record; volume, composition, structure factor, and dominant-reflection golden
+- **Anchor:** `tests/materials/test_crystal_external_db.py::test_local_lattice_matches_cached_cod`; `tests/materials/test_material_catalog.py::test_packaged_catalog_matches_independent_serialized_golden`
+- **Notes:** Crystal counterpart of the amorphous Geant4/PDG-style medium set. `B_ang2 = 0.36` is `B(293 K) = 0.3559 Å²` from Peng, Ren, Dudarev & Whelan, *Acta Cryst.* **A52**, 456 (1996), doi:10.1107/S010876739600089X, Table 21. No experimental PXR/CBS agreement claimed.
+
+## `pb-cif-structure`
+
+- **Claim:** bundled fcc lead lattice (Fm-3m, a = 4.95004 Å at 298 K) and P1-expanded four-atom basis
+- **Code:** `data/cifs/pb.cif`; `data/catalog/crystals/pb.toml`
+- **Source:** Straumanis, *J. Appl. Phys.* **20**, 726 (1949), doi:10.1063/1.1698520 (COD 9012004)
+- **Status:** unverified
+- **Checks:** lattice against the cached COD record; volume, composition, structure factor, and dominant-reflection golden
+- **Anchor:** `tests/materials/test_crystal_external_db.py::test_local_lattice_matches_cached_cod`; `tests/materials/test_material_catalog.py::test_packaged_catalog_matches_independent_serialized_golden`
+- **Notes:** Crystal counterpart of the amorphous Geant4/PDG-style medium set. `B_ang2 = 2.13` is `B(293 K) = 2.1266 Å²` from Peng, Ren, Dudarev & Whelan, *Acta Cryst.* **A52**, 456 (1996), doi:10.1107/S010876739600089X, Table 45. No experimental PXR/CBS agreement claimed.
+
+## `alpha-ti-cif-structure`
+
+- **Claim:** bundled hcp alpha-titanium lattice (P6_3/mmc, a = 2.95 Å, c = 4.686 Å) and P1-expanded two-atom basis
+- **Code:** `data/cifs/alpha_ti.cif`; `data/catalog/crystals/alpha_ti.toml`
+- **Source:** Wyckoff, *Crystal Structures* **1** (1963) (COD 9008517)
+- **Status:** unverified
+- **Checks:** lattice against the cached COD record; volume, composition, structure factor, and dominant-reflection golden
+- **Anchor:** `tests/materials/test_crystal_external_db.py::test_local_lattice_matches_cached_cod`; `tests/materials/test_material_catalog.py::test_packaged_catalog_matches_independent_serialized_golden`
+- **Notes:** Crystal counterpart of the amorphous Geant4/PDG-style medium set. `B_ang2 = 0.51` is `B(293 K) = 0.5138 Å²` from Peng, Ren, Dudarev & Whelan, *Acta Cryst.* **A52**, 456 (1996), doi:10.1107/S010876739600089X, Table 16. Lattice-derived density 4.50 g/cm³ is the X-ray density; PDG lists bulk 4.54 g/cm³. No experimental PXR/CBS agreement claimed.
+
+## `alpha-quartz-cif-structure`
+
+- **Claim:** bundled alpha-quartz lattice (P3_221, a = 4.91344 Å, c = 5.40512 Å) and P1-expanded nine-atom basis
+- **Code:** `data/cifs/alpha_quartz.cif`; `data/catalog/crystals/alpha_quartz.toml`
+- **Source:** Antao et al., *Can. Mineral.* **46**, 1501 (2008), doi:10.3749/canmin.46.5.1501 (COD 9013321)
+- **Status:** unverified
+- **Checks:** lattice against the cached COD record; volume, composition, structure factor, and dominant-reflection golden
+- **Anchor:** `tests/materials/test_crystal_external_db.py::test_local_lattice_matches_cached_cod`; `tests/materials/test_material_catalog.py::test_packaged_catalog_matches_independent_serialized_golden`
+- **Notes:** Crystal counterpart of the amorphous Geant4/PDG-style medium set. `B_ang2 = 0.75` is the atom-count-weighted mean of `8 pi^2 U_eq` from the same record's anisotropic displacement parameters (Si 0.502, O 0.872 Å²). One handedness of the enantiomorphic pair; no chirality-dependent observable is claimed. No experimental PXR/CBS agreement claimed.
+
+## `caf2-cif-structure`
+
+- **Claim:** bundled fluorite CaF2 lattice (Fm-3m, a = 5.463209 Å at 298 K) and P1-expanded twelve-atom basis
+- **Code:** `data/cifs/caf2.cif`; `data/catalog/crystals/caf2.toml`
+- **Source:** Schreyer et al., *J. Appl. Cryst.* **47**, 659 (2014), doi:10.1107/S1600576714003379 (COD 2300449)
+- **Status:** unverified
+- **Checks:** lattice against the cached COD record; volume, composition, structure factor, and dominant-reflection golden
+- **Anchor:** `tests/materials/test_crystal_external_db.py::test_local_lattice_matches_cached_cod`; `tests/materials/test_material_catalog.py::test_packaged_catalog_matches_independent_serialized_golden`
+- **Notes:** Crystal counterpart of the amorphous Geant4/PDG-style medium set. `B_ang2 = 0.58` is the atom-count-weighted mean of the same record's isotropic `8 pi^2 U_iso` (Ca 0.497, F 0.618 Å²). No experimental PXR/CBS agreement claimed.
+
+## `cdwo4-cif-structure`
+
+- **Claim:** bundled wolframite CdWO4 lattice (P2/c, a = 5.028 Å, b = 5.862 Å, c = 5.067 Å, beta = 91.5°) and P1-expanded twelve-atom basis
+- **Code:** `data/cifs/cdwo4.cif`; `data/catalog/crystals/cdwo4.toml`
+- **Source:** Macavei & Schulz, *Z. Kristallogr.* **207**, 193 (1993) (COD 9013912)
+- **Status:** unverified
+- **Checks:** lattice against the cached COD record; volume, composition, structure factor, and dominant-reflection golden
+- **Anchor:** `tests/materials/test_crystal_external_db.py::test_local_lattice_matches_cached_cod`; `tests/materials/test_material_catalog.py::test_packaged_catalog_matches_independent_serialized_golden`
+- **Notes:** Crystal counterpart of the amorphous Geant4/PDG-style medium set. `B_ang2 = 0.90` is the atom-count-weighted mean of the same record's isotropic `8 pi^2 U_iso` (Cd 0.987, W 0.671, O1 0.947, O2 0.908 Å²). Lattice-derived density 8.01 g/cm³ against the handbook 7.9 g/cm³. No experimental PXR/CBS agreement claimed.
+
+## `baf2-cif-structure`
+
+- **Claim:** bundled fluorite BaF2 lattice (Fm-3m, a = 6.2001 Å) and P1-expanded twelve-atom basis
+- **Code:** `data/cifs/baf2.cif`; `data/catalog/crystals/baf2.toml`
+- **Source:** Wyckoff, *Crystal Structures* **1** (1963) (COD 9009004)
+- **Status:** unverified
+- **Checks:** lattice against the cached COD record; volume, composition, structure factor, and dominant-reflection golden
+- **Anchor:** `tests/materials/test_crystal_external_db.py::test_local_lattice_matches_cached_cod`; `tests/materials/test_material_catalog.py::test_packaged_catalog_matches_independent_serialized_golden`
+- **Notes:** Crystal counterpart of the amorphous Geant4/PDG-style medium set. `B_ang2 = 0.83` is the atom-count-weighted mean of the TDS-corrected 298 K X-ray values B(Ba) = 0.60 Å² and B(F) = 0.94 Å² from Srinivasan & Girirajan, *Pramana* **19**, 203 (1982), doi:10.1007/BF02875462, Table I row 8. No experimental PXR/CBS agreement claimed.
+
+## `nai-cif-structure`
+
+- **Claim:** bundled rock-salt NaI lattice (Fm-3m, a = 6.4728 Å) and P1-expanded eight-atom basis
+- **Code:** `data/cifs/nai.cif`; `data/catalog/crystals/nai.toml`
+- **Source:** Wyckoff, *Crystal Structures* **1** (1963) (COD 9008681)
+- **Status:** unverified
+- **Checks:** lattice against the cached COD record; volume, composition, structure factor, and dominant-reflection golden
+- **Anchor:** `tests/materials/test_crystal_external_db.py::test_local_lattice_matches_cached_cod`; `tests/materials/test_material_catalog.py::test_packaged_catalog_matches_independent_serialized_golden`
+- **Notes:** Crystal counterpart of the amorphous Geant4/PDG-style medium set. **Estimated.** `B_ang2 = 1.7` is the Debye-model `B(293 K)` (`debye_b_factor`, Peng et al. 1996 Eq. 8) at the mean ionic mass 74.9 u with the elastic-constant Debye temperature 164 K quoted by Boyle & Perlow, *Phys. Rev.* **151**, 211 (1966). An elastic-constant Debye temperature overstates the one governing <u²> in a dispersive lattice, so this is likely a lower bound; no room-temperature diffraction B is anchored. No experimental PXR/CBS agreement claimed.
+
+## `csi-cif-structure`
+
+- **Claim:** bundled CsCl-type CsI lattice (Pm-3m, a = 4.5667 Å) and P1-expanded two-atom basis
+- **Code:** `data/cifs/csi.cif`; `data/catalog/crystals/csi.toml`
+- **Source:** Wyckoff, *Crystal Structures* **1** (1963) (COD 9008790)
+- **Status:** unverified
+- **Checks:** lattice against the cached COD record; volume, composition, structure factor, and dominant-reflection golden
+- **Anchor:** `tests/materials/test_crystal_external_db.py::test_local_lattice_matches_cached_cod`; `tests/materials/test_material_catalog.py::test_packaged_catalog_matches_independent_serialized_golden`
+- **Notes:** Crystal counterpart of the amorphous Geant4/PDG-style medium set. **Estimated.** `B_ang2 = 2.8` is the Debye-model `B(293 K)` (`debye_b_factor`, Peng et al. 1996 Eq. 8) for CsI treated as monatomic (mean mass 129.9 u, as Boyle & Perlow argue) with the Mössbauer characteristic temperature 96 K from Boyle & Perlow, *Phys. Rev.* **151**, 211 (1966), Table I. Their elastic-constant Debye temperature 125 K gives 1.67 Å² instead; the range 1.7-2.8 Å² is the stated uncertainty. No experimental PXR/CBS agreement claimed.
+
+## `gaas-cif-structure`
+
+- **Claim:** bundled zinc-blende GaAs lattice (F-43m, a = 5.6537 Å) and P1-expanded eight-atom basis
+- **Code:** `data/cifs/gaas.cif`; `data/catalog/crystals/gaas.toml`
+- **Source:** Wyckoff, *Crystal Structures* **1** (1963) (COD 9008845)
+- **Status:** unverified
+- **Checks:** lattice against the cached COD record; volume, composition, structure factor, and dominant-reflection golden
+- **Anchor:** `tests/materials/test_crystal_external_db.py::test_local_lattice_matches_cached_cod`; `tests/materials/test_material_catalog.py::test_packaged_catalog_matches_independent_serialized_golden`
+- **Notes:** Crystal counterpart of the amorphous Geant4/PDG-style medium set. `B_ang2 = 0.62` is `8 pi^2` times the mean of the LDA mean-square displacements at 287 K, <u²>(Ga) = 0.00845 Å² and <u²>(As) = 0.00726 Å² (B = 0.667, 0.573 Å²), from Schowalter et al., *Acta Cryst.* **A65**, 5 (2009), doi:10.1107/S0108767308031437, which agree with the Stahn et al. (1998) measurement they quote (0.00844, 0.00716 Å²). No experimental PXR/CBS agreement claimed.
+
+## `pbwo4-cif-structure`
+
+- **Claim:** bundled scheelite PbWO4 lattice (I4_1/a, a = 5.456 Å, c = 12.02 Å) and P1-expanded 24-atom basis
+- **Code:** `data/cifs/pbwo4.cif`; `data/catalog/crystals/pbwo4.toml`
+- **Source:** Moreau et al., *J. Alloys Compd.* **238**, 46 (1996), doi:10.1016/0925-8388(95)02175-2 (COD 9015950)
+- **Status:** unverified
+- **Checks:** lattice against the cached COD record; volume, composition, structure factor, and dominant-reflection golden
+- **Anchor:** `tests/materials/test_crystal_external_db.py::test_local_lattice_matches_cached_cod`; `tests/materials/test_material_catalog.py::test_packaged_catalog_matches_independent_serialized_golden`
+- **Notes:** Crystal counterpart of the amorphous Geant4/PDG-style medium set. `B_ang2 = 1.49` is the multiplicity-weighted mean over the √2-supercell P4 room-temperature single-crystal X-ray refinement in LeBeau et al., *Phys. Rev. B* **79**, 214110 (2009), Table I (Pb 1.50, W 1.27, O 1.54 Å²; O constrained to one value; R = 0.113). Lattice-derived density 8.45 g/cm³ against the bulk 8.28 g/cm³; the cell is 0.1-0.2% below a = 5.4619, c = 12.049 Å. No experimental PXR/CBS agreement claimed.

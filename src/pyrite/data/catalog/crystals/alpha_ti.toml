@@ -1,0 +1,7 @@
+cif = "cifs/alpha_ti.cif"
+validation_id = "alpha-ti-cif-structure"
+full_name = "Titanium (alpha)"
+formula = "Ti"
+cod_id = 9008517
+B_ang2 = 0.51
+surface_hkl = [0, 0, 1]

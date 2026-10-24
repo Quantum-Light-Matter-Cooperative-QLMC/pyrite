@@ -1,0 +1,7 @@
+cif = "cifs/au.cif"
+validation_id = "au-cif-structure"
+full_name = "Gold"
+formula = "Au"
+cod_id = 9008463
+B_ang2 = 0.62
+surface_hkl = [1, 0, 0]

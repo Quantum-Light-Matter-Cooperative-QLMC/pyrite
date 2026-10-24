@@ -1,0 +1,7 @@
+cif = "cifs/cdwo4.cif"
+validation_id = "cdwo4-cif-structure"
+full_name = "Cadmium Tungstate"
+formula = "CdWO4"
+cod_id = 9013912
+B_ang2 = 0.9
+surface_hkl = [0, 1, 0]

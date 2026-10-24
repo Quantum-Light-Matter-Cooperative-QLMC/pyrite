@@ -1,0 +1,45 @@
+data_pbwo4
+# Phase identity: PyRITE crystal catalog entry [pbwo4].
+# Bundled full-basis P1 CIF used by the declarative material catalog.
+# Source: COD 9015950; Moreau et al., Journal of Alloys and Compounds 238, 46 (1996),
+# doi:10.1016/0925-8388(95)02175-2 (I 41/a :2, a = 5.456 A, c = 12.02 A).
+# Symmetry-equivalent sites expanded to P1 with gemmi.
+_symmetry_space_group_name_H-M 'P 1'
+_symmetry_Int_Tables_number 1
+_cell_length_a 5.456
+_cell_length_b 5.456
+_cell_length_c 12.02
+_cell_angle_alpha 90
+_cell_angle_beta 90
+_cell_angle_gamma 90
+loop_
+_atom_site_label
+_atom_site_type_symbol
+_atom_site_fract_x
+_atom_site_fract_y
+_atom_site_fract_z
+_atom_site_occupancy
+O1 O 0.7612 0.8859 0.9571 1.0
+O2 O 0.7612 0.3859 0.0429 1.0
+O3 O 0.1359 0.4888 0.2071 1.0
+O4 O 0.1359 0.9888 0.7929 1.0
+O5 O 0.2388 0.1141 0.0429 1.0
+O6 O 0.2388 0.6141 0.9571 1.0
+O7 O 0.2612 0.8859 0.5429 1.0
+O8 O 0.2612 0.3859 0.4571 1.0
+O9 O 0.3641 0.0112 0.2929 1.0
+O10 O 0.3641 0.5112 0.7071 1.0
+O11 O 0.6359 0.4888 0.2929 1.0
+O12 O 0.6359 0.9888 0.7071 1.0
+O13 O 0.7388 0.1141 0.4571 1.0
+O14 O 0.7388 0.6141 0.5429 1.0
+O15 O 0.8641 0.0112 0.2071 1.0
+O16 O 0.8641 0.5112 0.7929 1.0
+W1 W 0 0.25 0.125 1.0
+W2 W 0.5 0.75 0.625 1.0
+W3 W 0.5 0.25 0.375 1.0
+W4 W 0 0.75 0.875 1.0
+Pb1 Pb 0 0.25 0.625 1.0
+Pb2 Pb 0.5 0.75 0.125 1.0
+Pb3 Pb 0.5 0.25 0.875 1.0
+Pb4 Pb 0 0.75 0.375 1.0

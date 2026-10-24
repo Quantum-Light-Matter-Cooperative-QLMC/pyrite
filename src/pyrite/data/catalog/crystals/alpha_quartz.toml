@@ -1,0 +1,7 @@
+cif = "cifs/alpha_quartz.cif"
+validation_id = "alpha-quartz-cif-structure"
+full_name = "Quartz (alpha)"
+formula = "SiO2"
+cod_id = 9013321
+B_ang2 = 0.75
+surface_hkl = [0, 0, 1]

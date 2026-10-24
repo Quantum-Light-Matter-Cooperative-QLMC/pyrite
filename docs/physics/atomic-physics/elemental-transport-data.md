@@ -26,7 +26,7 @@ The X-ray side of PyRITE resolves atomic data from external databases. The elect
 
 $Z$ and $A$ use the CIAAW 2024 standard atomic weights.{cite:p}`ciaaw2024` $J$ uses the PDG *Atomic and Nuclear Properties* elemental tables,{cite:p}`pdg2025` which follow the ICRU stopping-power compilation.
 
-The table currently covers 24 elements: B, C, N, O, Al, Si, P, S, Ti, V, Fe, Ge, Se, Zr, Nb, Mo, Pd, Te, Hf, Ta, W, Re, Pt, Bi.
+The table currently covers 42 elements: H, Li, B, C, N, O, F, Na, Al, Si, P, S, Ar, Ca, Ti, V, Cr, Mn, Fe, Ni, Cu, Ga, Ge, As, Se, Zr, Nb, Mo, Pd, Cd, Te, I, Cs, Ba, Hf, Ta, W, Re, Pt, Au, Pb, Bi.
 
 ## Where $A$ actually enters
 

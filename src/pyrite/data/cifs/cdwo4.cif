@@ -1,0 +1,32 @@
+data_cdwo4
+# Phase identity: PyRITE crystal catalog entry [cdwo4].
+# Bundled full-basis P1 CIF used by the declarative material catalog.
+# Source: COD 9013912; Macavei & Schulz, Zeitschrift fur Kristallographie 207, 193 (1993) (P 1 2/c 1, a = 5.028 A, b = 5.862 A, c = 5.067 A, beta = 91.5 deg).
+# Symmetry-equivalent sites expanded to P1 with gemmi.
+_symmetry_space_group_name_H-M 'P 1'
+_symmetry_Int_Tables_number 1
+_cell_length_a 5.028
+_cell_length_b 5.862
+_cell_length_c 5.067
+_cell_angle_alpha 90
+_cell_angle_beta 91.5
+_cell_angle_gamma 90
+loop_
+_atom_site_label
+_atom_site_type_symbol
+_atom_site_fract_x
+_atom_site_fract_y
+_atom_site_fract_z
+_atom_site_occupancy
+O1 O 0.758 0.628 0.617 1.0
+O2 O 0.758 0.372 0.117 1.0
+O3 O 0.797 0.902 0.051 1.0
+O4 O 0.797 0.098 0.551 1.0
+O5 O 0.203 0.902 0.449 1.0
+O6 O 0.203 0.098 0.949 1.0
+O7 O 0.242 0.628 0.883 1.0
+O8 O 0.242 0.372 0.383 1.0
+Cd1 Cd 0.5 0.3023 0.75 1.0
+Cd2 Cd 0.5 0.6977 0.25 1.0
+W1 W 0 0.8215 0.75 1.0
+W2 W 0 0.1785 0.25 1.0

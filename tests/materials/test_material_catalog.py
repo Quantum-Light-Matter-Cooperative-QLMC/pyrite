@@ -1756,7 +1756,7 @@ def test_packaged_catalog_exposes_frozen_ordered_public_api():
     from pyrite.materials import CATALOG, MaterialCatalog
 
     assert isinstance(CATALOG, MaterialCatalog)
-    assert len(CATALOG.crystals) == 50
+    assert len(CATALOG.crystals) == 66
     assert len(CATALOG.materials) == 51
     assert CATALOG.material_keys == tuple(CATALOG.materials)
     assert CATALOG.crystal("hbn") is CATALOG.crystals["hbn"]
@@ -2105,13 +2105,17 @@ def test_runnable_crystal_must_use_supported_transport_elements(tmp_path):
     from pyrite.materials import MaterialConfigError, load_material_catalog
 
     text = _minimal_catalog(
-        crystal="lif",
+        crystal="frf",
         material_rows="""
-[materials.lif]
-display_name = "LiF"
+[materials.frf]
+display_name = "FrF"
 """,
     )
-    with pytest.raises(MaterialConfigError, match="unsupported transport elements.*F.*Li"):
+    # Hypothetical FrF fixture: Fr lies outside TRANSPORT_ELEMENTS by design.
+    (tmp_path / "cifs").mkdir()
+    fixture = Path(__file__).parents[1] / "data" / "materials" / "frf.cif"
+    (tmp_path / "cifs" / "frf.cif").write_bytes(fixture.read_bytes())
+    with pytest.raises(MaterialConfigError, match="unsupported transport elements.*Fr"):
         load_material_catalog(_write_catalog(tmp_path, text))
 
 

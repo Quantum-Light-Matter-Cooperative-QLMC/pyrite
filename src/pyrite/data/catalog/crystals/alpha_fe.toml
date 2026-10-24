@@ -1,0 +1,7 @@
+cif = "cifs/alpha_fe.cif"
+validation_id = "alpha-fe-cif-structure"
+full_name = "Iron (alpha)"
+formula = "Fe"
+cod_id = 9006587
+B_ang2 = 0.33
+surface_hkl = [1, 1, 0]

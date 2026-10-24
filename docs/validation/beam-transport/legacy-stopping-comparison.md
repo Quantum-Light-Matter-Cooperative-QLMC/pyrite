@@ -130,7 +130,7 @@ Onset is at $x_0$. Graphite's $x_0 = -0.009$, so the swept range
 material, and the omission is justified by its measured size rather than by
 sitting below threshold.
 
-Measured over all 24 catalog elements, the fractional error in $|dE/ds|$ from
+Measured over all 42 transport elements, the fractional error in $|dE/ds|$ from
 dropping $\delta$, that is $\delta$ divided by the bracket of
 {eq}`eq-stopping-bs`, is
 
@@ -142,18 +142,18 @@ dropping $\delta$, that is $\delta$ divided by the bracket of
   - Worst fractional error
   - Element
 * - 25 keV
-  - 0.13%
-  - Pd
+  - 0.14%
+  - Ni
 * - 100 keV
-  - 0.44%
-  - C
+  - 0.48%
+  - Ni
 * - 300 keV
   - 1.50%
   - C
 ```
 
 $\delta$ rises monotonically with $\beta\gamma$, so the 300 keV row bounds the
-measured range through 300 keV. At 25 keV the omission is about 45 times smaller than the 6%
+measured range through 300 keV. At 25 keV the omission is about 40 times smaller than the 6%
 Joy–Luo error {eq}`eq-stopping-bs` was introduced to remove, and below the
 unmodeled shell corrections and omitted delta-ray transport listed under
 *Assumptions and limits*. At the 300 keV measured endpoint it is 1.5%, stated and
@@ -177,11 +177,11 @@ Joy–Luo compound rule.
 
 The crossover between {eq}`eq-stopping-joy-luo` and {eq}`eq-stopping-bs` is
 strongly $Z$-dependent, so there is no single splice energy that works well
-everywhere: measured across the 24 catalog elements the two laws cross at
-2.66 keV (B) through 10.46 keV (Bi), monotone in $I$. At 10 keV the ratio of the
-two laws runs from 0.976 (B) to 1.003 (Bi), so forcing one global crossover
-leaves a step in every other element; the best available global choice, 8.0 keV,
-still steps by 1.84% in the worst element.
+everywhere: measured across the 42 transport elements the two laws cross at
+1.36 keV (H) through 10.46 keV (Bi), monotone in $I$. At 10 keV the ratio of the
+two laws runs from 0.975 (H) to 1.003 (Bi), so forcing one global crossover
+leaves a step in every other element; the best available global choice, 7.75 keV,
+still steps by 1.94% in the worst element.
 
 Because stopping is additive over elements ({eq}`eq-stopping-compound`), the
 splice does not have to be global. Each element's term switches at *its own*

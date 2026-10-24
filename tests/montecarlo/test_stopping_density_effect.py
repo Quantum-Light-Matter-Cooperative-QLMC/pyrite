@@ -71,13 +71,13 @@ def test_omitting_delta_costs_under_two_percent_of_stopping_power():
     """The measurement slice B owed.
 
     The fractional error in |dE/ds| from dropping delta is delta/[...]. Measured
-    over all 24 catalog elements: worst 0.14% at 25 keV, 0.44% at 100 keV, and
-    1.51% at 300 keV, all in low-Z solids (graphite worst at 300 keV, which is
-    the repository's primary material and exactly the case the task doc said to
-    measure rather than assume).
+    over all 42 transport elements: worst 0.14% at 25 keV and 0.48% at 100 keV
+    (nickel), and 1.50% at 300 keV (graphite, which is the repository's primary
+    material and exactly the case the task doc said to measure rather than
+    assume).
 
     Against the ~6% Joy-Luo error at 25 keV that this branch exists to remove,
-    the omission is ~45x smaller at that operating point. It is retained, and
+    the omission is ~40x smaller at that operating point. It is retained, and
     stated, rather than corrected.
     """
     worst = {E: (0.0, "") for E in SWEPT_keV}
@@ -88,8 +88,8 @@ def test_omitting_delta_costs_under_two_percent_of_stopping_power():
             if fraction > worst[E][0]:
                 worst[E] = (fraction, element)
 
-    assert worst[25.0][0] == pytest.approx(0.00133, abs=5.0e-5)
-    assert worst[100.0][0] == pytest.approx(0.00438, abs=5.0e-5)
+    assert worst[25.0][0] == pytest.approx(0.00144, abs=5.0e-5)
+    assert worst[100.0][0] == pytest.approx(0.00478, abs=5.0e-5)
     assert worst[300.0][0] == pytest.approx(0.01504, abs=5.0e-5)
     assert worst[300.0][1] == "C"
     # The headline claim in stopping-power.md's assumptions list.

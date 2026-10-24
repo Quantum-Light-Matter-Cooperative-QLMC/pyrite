@@ -1,0 +1,7 @@
+cif = "cifs/ge.cif"
+validation_id = "ge-cif-structure"
+full_name = "Germanium"
+formula = "Ge"
+cod_id = 9011050
+B_ang2 = 0.6
+surface_hkl = [4, 4, 0]

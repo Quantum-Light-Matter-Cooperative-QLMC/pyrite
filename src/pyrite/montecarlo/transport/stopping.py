@@ -288,9 +288,9 @@ def _dEds_bs_compound(J_arr, coeff_arr, delta, E_keV):
 # default E_cut_keV is 5 keV, so the low-energy branch is load-bearing.
 #
 # The crossover is strongly Z-dependent, so there is no good *global* splice
-# energy. Measured over the 24 catalog elements the two laws cross at 2.66 keV
-# (B) through 10.46 keV (Bi), monotone in I. Forcing one global energy leaves a
-# step: the best available choice is 8.0 keV, which still mismatches by 1.84% in
+# energy. Measured over the 42 transport elements the two laws cross at 1.36 keV
+# (H) through 10.46 keV (Bi), monotone in I. Forcing one global energy leaves a
+# step: the best available choice is 7.75 keV, which still mismatches by 1.94% in
 # the worst element. The 2% agreement at 10 keV quoted in stopping-power.md is a
 # carbon number and does not generalize.
 #
@@ -483,6 +483,11 @@ def sternheimer_delta(element, E_keV):
 
     delta_0 is zero for non-conductors, so the first branch vanishes for them.
 
+    delta is clamped at zero. It is non-negative by definition, but the
+    published fit need not be: PDG's iodine coefficients (delta_0 = 0) dip to
+    -0.011 over 0.06 < x < 0.24, inside the swept range, and oxygen's dip by
+    less than 1e-4 at its x_0 join. No other element changes.
+
     NO TRANSPORT PATH CALLS THIS. eq-stopping-bs carries delta as a parameter
     and every call site passes 0.0; this function exists to measure how much
     that omission costs, and is the instrument behind the bound quoted in
@@ -498,11 +503,12 @@ def sternheimer_delta(element, E_keV):
     gamma = 1.0 + tau
     x = np.log10(np.sqrt(1.0 - 1.0 / (gamma * gamma)) * gamma)
     asymptote = 2.0 * np.log(10.0) * x - p["C_bar"]
-    return np.where(
+    delta = np.where(
         x < p["x0"],
         p["delta0"] * 10.0 ** (2.0 * (x - p["x0"])),
         asymptote + np.where(x < p["x1"], p["a"] * np.abs(p["x1"] - x) ** p["k"], 0.0),
     )
+    return np.maximum(delta, 0.0)
 
 
 # Generation marker for the collision-stopping model every core evaluates. The
