@@ -124,6 +124,7 @@ def run_sweep(
     trajectory_capture=None,
     observation=None,
     retain_results=True,
+    executor=None,
 ):
     """Run ``cases`` into ``results`` (mutated in place).
 
@@ -135,6 +136,10 @@ def run_sweep(
         successful persistence. Use checkpoint loading for spectra, including
         in on_chunk callbacks. Resume and consolidation keep only case metadata
         plus one config's arrays resident (legacy input files may fully decode).
+    executor : optional object implementing ``execute(cases, callback=..., **options)``.
+        When omitted, use ``montecarlo.run_cases`` exactly as before. When
+        supplied, callbacks must execute in this coordinator process so the
+        existing sweep remains sole owner of manifests and consolidation.
     checkpoint_dir : directory for the per-material checkpoints (default
         ``pyrite-output/checkpoints`` in the workspace). A sweep is
         single-material, so each writes ``<checkpoint_dir>/<material>/``
@@ -367,16 +372,20 @@ def run_sweep(
         run_cases_options["on_activity"] = on_activity
 
     t0 = time.perf_counter()
-    run_cases(
-        todo,
-        max_workers=max_workers,
-        progress=progress,
-        callback=_cb,
-        should_stop=should_stop,
-        keep_results=False,  # _cb owns storage; don't pin every spectrum in RAM
-        transport_only=transport_only,
-        **run_cases_options,
-    )
+    # A fully cached sweep has no work for an external executor. Preserve the
+    # historical run_cases([]) call when no executor was explicitly supplied.
+    if todo or executor is None:
+        dispatch = run_cases if executor is None else executor.execute
+        dispatch(
+            todo,
+            max_workers=max_workers,
+            progress=progress,
+            callback=_cb,
+            should_stop=should_stop,
+            keep_results=False,  # _cb owns storage; don't pin every spectrum in RAM
+            transport_only=transport_only,
+            **run_cases_options,
+        )
     print(f"{len(todo)} cases in {time.perf_counter() - t0:.0f} s")
     complete = all(has_record(results, c) for c in cases) and not work.observation_plans
     checkpoint.finish(complete)
