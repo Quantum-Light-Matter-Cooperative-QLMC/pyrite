@@ -47,6 +47,9 @@ _MAX_NAME = 15
 _MAX_ELEMENTS = 30
 _MAX_Z = 99
 _MIN_EXCITATION_EV = 1.0
+# SBETHE treats RHO < 0.1 g/cm^3 as a gas: every subshell is inner (ECUT = 0),
+# so FOUT = 0 and the program skips the insulator/gap prompt entirely.
+_GAS_DENSITY_G_CM3 = 0.1
 _UNSAFE = re.compile(r"[^A-Za-z0-9_-]+")
 
 
@@ -89,7 +92,8 @@ class SbetheDeck:
         PyRITE controls.
     band_gap_eV
         Gap energy for an insulator or semiconductor. ``None`` answers the
-        conductor branch, which is what the program assumes for a metal.
+        conductor branch, which is what the program assumes for a metal. A gas
+        (density below 0.1 g/cm^3) is never asked, so it must be ``None``.
     projectile
         Key of :data:`PROJECTILES`.
     """
@@ -118,13 +122,16 @@ class SbetheDeck:
             raise ValueError("SBETHE mean excitation energy must exceed 1 eV")
         if self.band_gap_eV is not None:
             _positive(self.band_gap_eV, "band gap")
+        density = _positive(self.density_g_cm3, "density")
+        if density < _GAS_DENSITY_G_CM3 and self.band_gap_eV is not None:
+            raise ValueError("SBETHE never asks a gas (density < 0.1 g/cm^3) for a band gap")
         object.__setattr__(self, "name", material_token(self.name))
         object.__setattr__(
             self,
             "composition",
             {int(z): float(n) for z, n in sorted(self.composition.items())},
         )
-        object.__setattr__(self, "density_g_cm3", _positive(self.density_g_cm3, "density"))
+        object.__setattr__(self, "density_g_cm3", density)
         object.__setattr__(self, "mean_excitation_eV", excitation)
 
     @property
@@ -171,7 +178,9 @@ class SbetheDeck:
         answers.append(f"{self.density_g_cm3:.8E}")
         answers.append("Y")  # change the proposed mean excitation energy
         answers.append(f"{self.mean_excitation_eV:.8E}")
-        if self.band_gap_eV is None:
+        if self.density_g_cm3 < _GAS_DENSITY_G_CM3:
+            pass  # gas branch: no insulator/gap prompt
+        elif self.band_gap_eV is None:
             answers.append("N")  # conductor
         else:
             answers.append("Y")

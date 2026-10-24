@@ -184,6 +184,31 @@ def test_an_insulator_answers_the_gap_prompt():
     assert float(gap_lines[-2]) == pytest.approx(8.9)
 
 
+def test_a_gas_skips_the_insulator_prompt():
+    """Below 0.1 g/cm^3 SBETHE takes its gas branch and never asks for a gap, so
+    an answer there would be read as the projectile (regression: dry air)."""
+    air = SbetheDeck(
+        name="air",
+        composition={6: 0.0001, 7: 0.78, 8: 0.21, 18: 0.0047},
+        density_g_cm3=1.20479e-3,
+        mean_excitation_eV=85.7,
+    )
+
+    lines = air.render().splitlines()
+    assert float(lines[-4]) == pytest.approx(1.20479e-3)
+    assert lines[-3] == "Y"  # change the proposed mean excitation energy
+    assert float(lines[-2]) == pytest.approx(85.7)
+    assert lines[-1] == "1"  # projectile follows I directly
+    with pytest.raises(ValueError, match="never asks a gas"):
+        SbetheDeck(
+            name="air",
+            composition={7: 1},
+            density_g_cm3=1.2e-3,
+            mean_excitation_eV=82.0,
+            band_gap_eV=5.0,
+        )
+
+
 def test_the_gap_is_part_of_the_model_record():
     """A band gap changes the numbers, so it cannot be invisible to the key."""
     without = SbetheDeck(
