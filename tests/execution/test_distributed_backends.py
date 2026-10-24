@@ -26,7 +26,6 @@ from pyrite.execution import (
 from pyrite.execution.profiles import execution_profile_from_dict
 from pyrite.execution.slurm_worker import execute_unit
 
-
 KEY = "1" * 64
 
 
@@ -125,7 +124,7 @@ def test_direction_keys_unique_and_independent_of_scalar_key(tmp_path):
     )
     assert "directional" not in store.load(scalar)
     np.testing.assert_array_equal(combined["directional"]["spec_by_direction"], a)
-    with pytest.raises(Exception):
+    with pytest.raises(ValueError, match="content key"):
         load_directional_result(
             store,
             DirectionalArtifactRef(scalar, direction),
@@ -136,8 +135,7 @@ def test_direction_keys_unique_and_independent_of_scalar_key(tmp_path):
 
 
 def test_slurm_worker_publishes_separate_directions_and_reuses(monkeypatch, tmp_path, fake_runner):
-    from pyrite.execution.slurm import _save_input
-    from pyrite.execution.slurm import _atomic_json
+    from pyrite.execution.slurm import _atomic_json, _save_input
 
     sample = np.array([[1.0, 0.0, 0.0]])
     _save_input(

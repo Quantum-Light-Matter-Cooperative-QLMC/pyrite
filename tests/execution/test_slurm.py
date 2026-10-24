@@ -5,6 +5,7 @@ from hashlib import sha256
 from types import ModuleType
 
 import pytest
+
 from pyrite.execution import ResourceRequest
 from pyrite.execution.artifacts import CaseArtifactRef, CaseArtifactStore
 from pyrite.execution.slurm import SlurmArrayConfig, SlurmArrayExecutor, _script

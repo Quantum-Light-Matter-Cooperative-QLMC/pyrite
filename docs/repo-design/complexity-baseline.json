@@ -167,6 +167,11 @@
       "cc": 27
     },
     {
+      "path": "src/pyrite/cli/commands/scan.py",
+      "name": "_command",
+      "cc": 22
+    },
+    {
       "path": "src/pyrite/cli/commands/tables.py",
       "name": "verify_command",
       "cc": 21
@@ -217,6 +222,21 @@
       "cc": 30
     },
     {
+      "path": "src/pyrite/execution/dask.py",
+      "name": "DaskExecutor.execute",
+      "cc": 47
+    },
+    {
+      "path": "src/pyrite/execution/dask.py",
+      "name": "_worker_run_unit",
+      "cc": 27
+    },
+    {
+      "path": "src/pyrite/execution/profiles.py",
+      "name": "ExecutionProfile.__post_init__",
+      "cc": 27
+    },
+    {
       "path": "src/pyrite/execution/slurm.py",
       "name": "SlurmArrayExecutor._execute_staged",
       "cc": 37
@@ -224,7 +244,12 @@
     {
       "path": "src/pyrite/execution/slurm.py",
       "name": "SlurmArrayExecutor.execute",
-      "cc": 27
+      "cc": 31
+    },
+    {
+      "path": "src/pyrite/execution/slurm_worker.py",
+      "name": "execute_unit",
+      "cc": 25
     },
     {
       "path": "src/pyrite/instrument/acquisition.py",
@@ -743,6 +768,11 @@
       "path": "src/pyrite/runs/scan.py",
       "name": "_resolved_run",
       "cc": 32
+    },
+    {
+      "path": "src/pyrite/runs/scan.py",
+      "name": "_run_material",
+      "cc": 25
     },
     {
       "path": "src/pyrite/xsgen/elsepa/deck.py",

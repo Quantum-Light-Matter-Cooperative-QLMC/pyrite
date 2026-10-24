@@ -24,16 +24,15 @@ from threading import Event, Lock
 from typing import Any
 
 from .artifacts import (
-    CaseArtifactRef,
     CaseArtifactStore,
     DirectionalArtifactRef,
     directional_content_key,
     directional_store,
     load_directional_result,
 )
+from .inspection import run_provenance
 from .model import ResourceRequest, RetryPolicy
 from .planning import iter_work_units
-from .inspection import run_provenance
 
 _SAFE_TOKEN = re.compile(r"[A-Za-z0-9_.-]+\Z")
 _WALLTIME = re.compile(r"(?:\d+-)?\d{1,3}:\d\d:\d\d\Z")

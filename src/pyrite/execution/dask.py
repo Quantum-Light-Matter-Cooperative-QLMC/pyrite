@@ -23,10 +23,10 @@ from .artifacts import (
     directional_store,
     load_directional_result,
 )
+from .inspection import run_provenance
 from .model import ResourceRequest, RetryPolicy
 from .planning import iter_work_units
 from .slurm import _atomic_json, _save_input
-from .inspection import run_provenance
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,7 +49,7 @@ class DaskConfig:
     poll_seconds: float = 0.1
 
     def __post_init__(self) -> None:
-        from .slurm import _token, _WALLTIME
+        from .slurm import _WALLTIME, _token
 
         if self.cluster not in ("existing", "local", "slurm"):
             raise ValueError("cluster must be existing, local, or slurm")

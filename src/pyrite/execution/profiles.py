@@ -11,9 +11,10 @@ from __future__ import annotations
 
 import re
 import tomllib
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Literal
+from typing import Any, Literal
 
 from .artifacts import CaseArtifactStore
 from .dask import DaskConfig, DaskExecutor

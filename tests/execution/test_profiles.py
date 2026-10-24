@@ -4,6 +4,7 @@ from dataclasses import FrozenInstanceError
 from pathlib import Path
 
 import pytest
+
 from pyrite.execution import (
     CaseArtifactStore,
     ExecutionProfile,
