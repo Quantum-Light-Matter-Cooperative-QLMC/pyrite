@@ -55,8 +55,8 @@ $$
 This result is in W and **cannot** be converted to J/pulse or photons/eV
 without a specified temporal/spectral-field Fourier convention. Do not confuse
 it with #615's outgoing `photons/eV/sr` intensities. Vacuum propagation and
-FFT kernels accept an `xp` array backend; NumPy is covered here, and
-**device-resident CuPy and remote CUDA parity have not yet been verified**.
+FFT kernels accept an `xp` array backend; NumPy and CuPy are covered by
+[remote parity evidence](#device-resident-field-operators-and-cuda-parity).
 
 ## Calibrated optical single-pulse energy channel (#617)
 
@@ -112,12 +112,12 @@ print(reading.absorbed_joule_per_pulse, reading.expected_voltage_v)
   handoff. Real materials, general finite surfaces and exact edge currents
   are not. Measured passive Jones elements and a pitch/window convergence
   diagnostic exist (sections below). Published numerical benchmark,
-  measured element data, spectral convergence and remote CPU/CUDA parity
-  remain open.
+  measured element data, spectral convergence and production source kernels
+  remain open; bounded field-operator CUDA parity is recorded below.
 - **#617:** supply a real measured and provenance-pinned detector calibration,
-  temporal/electronic response, collected-field-to-spectrum pipeline, polarized
-  Martin–Puplett interferogram, uncertainties and finite-band bunch-length
-  inference. Published data reproduction and remote CUDA tests remain open.
+  temporal/electronic response and broader uncertainty propagation. The bounded
+  field handoff, ideal polarized interferogram and conditional Gaussian fit
+  are implemented below. Published data reproduction remains open.
 - **DTR:** the existing atomic Bragg DTR solver (#581) is a separate X-ray
   coherent-boundary model, **not** optical diffraction from a wavelength-scale
   grating or optical aperture DR.
@@ -126,8 +126,8 @@ Tests exercise analytically known plane waves, power and phase limits, evanescen
 decay, linear pulse-energy integration, saturation, calibration hashing and
 strict refusal of unsupported inputs. They are **not** experimental anchors:
 `optical-wavefront-propagation` and `optical-instrument-observable` remain
-unanchored until independent re-derivation, published regressions and device
-parity have been completed.
+`rederived`, with published observable regressions still required for
+`anchored`. Device parity alone does not establish a physical anchor.
 
 ## Circular PEC source (#616, bounded reference)
 
@@ -211,8 +211,8 @@ field; the point source cannot fall exactly on a metallic sample node;
 transverse wraparound and insufficient mesh resolution can bias the result.
 Oblique beams are supported only under the straight-current ideal-PEC
 approximation detailed below. No imperfect metals, finite-conductivity edge
-currents, X-ray DTR, optical gratings, realistic apparatus or CUDA parity are
-claimed.
+currents, X-ray DTR, optical gratings or realistic apparatus are claimed.
+Bounded field-operator CUDA parity is documented below.
 The following section adds a bounded coherent-bunch reference estimator,
 not yet a production optical transport/instrument integration. Validation claim `optical-finite-boundary-field` remains
 **unanchored**, pending published finite-disc/DR benchmarks and hardware tests.
@@ -634,8 +634,7 @@ Fourier normalization; no optical response is inferred or re-applied.
 
 **Remaining evidence gates:** wavelength-dependent detector measurements and
 noise, source/grid/FFT-padding/acceptance convergence studies, comparison with
-a published finite-screen near-field observable, and device-resident
-CPU/CUDA parity. This slice is **not** an anchored
+a published finite-screen near-field observable, and production integration. This slice is **not** an anchored
 `optical-instrument-observable` or `optical-finite-boundary-field` validation.
 
 ## Polarized two-port Martin–Puplett forward model (#617, new slice)
@@ -759,8 +758,9 @@ realizations**, not a sampled $N\gg M$ bunch's intensity-only self/pair
 expectation. Neither the interferometer nor the adapter constructs the missing
 complex ensemble coherence. Full optical instrument geometry, background
 subtraction, shot-charge variation, uncertainty inference, finite-band
-retrieval ambiguities, measured MPI comparisons, and CPU/CUDA parity are
-outstanding. Synthetic forward/port-conservation tests do **not** anchor
+retrieval ambiguities and measured MPI comparisons are outstanding.
+The field-to-coherency reduction has bounded CPU/CUDA parity below; the
+ideal interferometer then evaluates that small collected matrix on the CPU. Synthetic forward/port-conservation tests do **not** anchor
 `optical-instrument-observable`.
 
 ### Conditional Gaussian CTR bunch-duration inference (#617)
@@ -886,7 +886,7 @@ synthetic parameter recovery, detector-response/Jones-forward consistency,
 unconstrained high-frequency bands and strict rejection of saturation or
 unsupported calibration. These are **software and mathematical checks, not
 independent measured-data anchors**. The published experimental comparison,
-real CUDA reduction, broader spectral-band support, correlated uncertainty
+production device integration, broader spectral-band support, correlated uncertainty
 propagation and nonparametric phase retrieval remain open in #617.
 
 ## Window-independent hemisphere energy and convergence (#616)
@@ -975,3 +975,44 @@ scan voltages are linear shot averages. Ignoring it biases the fitted duration
 arrival-time jitter cancels in the interferogram; per-shot charge
 normalization and the extra voltage variance from jitter are not modeled.
 
+
+## Device-resident field operators and CUDA parity
+
+With `PYRITE_MC_BACKEND=cuda` selected before import, `ScreenSpectralField`
+accepts NumPy or CuPy complex arrays. Propagation, direct Green electric
+fields, far-field distributions, hemisphere quadrature and FFT/direct-Green
+plane flux reductions use the namespace owning the field. Host arrays stay
+on the CPU even with CUDA selected. Constructors copy the input storage;
+NumPy copies are read-only, while CuPy copies remain writable.
+
+The PEC source builder and bunch/transport orchestration remain CPU reference
+paths. Upload a realized source field explicitly; this is not a GPU source
+kernel or a production dispatcher. Plane aperture masks and quadrature nodes
+are built on the host and uploaded. Large complex field arrays stay on the
+device during propagation and collection; validation checks and final scalar
+fluxes synchronize with the host. The interferometer handoff transfers only
+the reduced 2×2 coherency matrix per energy. Detector response, calibrated
+Jones elements, interferograms and inference still run on the CPU.
+
+`tests/montecarlo/test_optical_cuda_parity.py` checks normal-disc and oblique
+annulus propagation, complex direct Green fields, FFT angular yields,
+hemisphere energy, polarized finite-plane flux, monochromatic power, and
+collected two-port voltages from paraxial device fields. Float64/complex128
+comparisons use relative tolerances of $10^{-12}$–$10^{-11}$ for reductions
+and $10^{-11}$ plus a peak-scaled $10^{-12}$ absolute floor for complex fields.
+These bound backend arithmetic differences; spatial/spectral convergence
+and finite-screen model validity require separate checks.
+
+[Recorded remote run](../../validation/check-records/optical-finite-cuda.json):
+five tests passed in a bounded SLURM GPU allocation. The record pins the synced
+source digest and test hash. Reproduce after syncing the intended tree and
+staging the test (tests are not included in `pyrite remote sync`):
+
+```bash
+PYRITE_TEST_BACKEND=cuda uv run --extra nvidia pyrite-dev test \
+  tests/montecarlo/test_optical_cuda_parity.py --durations=0
+```
+
+This is hardware parity evidence for the bounded reference operators.
+Published finite-source/instrument benchmarks, measured calibration and
+full production source/transport integration remain required by #616/#617.

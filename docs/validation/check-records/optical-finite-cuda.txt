@@ -1,0 +1,17 @@
+============================= test session starts ==============================
+platform linux -- Python 3.14.6, pytest-9.1.1, pluggy-1.7.0
+rootdir: /tmp
+plugins: zarr-3.4.1, xdist-3.8.0, cov-7.1.0, typeguard-4.6.0, platformdirs-4.13.5, timeout-2.4.0, anyio-4.15.1
+collected 5 items
+
+../../../tmp/test_optical_cuda_parity_616_617.py .....                   [100%]
+
+============================== slowest durations ===============================
+0.75s call     test_optical_cuda_parity_616_617.py::test_direct_sums_match_on_device
+0.41s call     test_optical_cuda_parity_616_617.py::test_propagated_field_and_fft_collection_match_on_device[screen0]
+0.08s call     test_optical_cuda_parity_616_617.py::test_end_to_end_interferogram_matches_from_device_fields
+0.01s call     test_optical_cuda_parity_616_617.py::test_propagated_field_and_fft_collection_match_on_device[screen1]
+0.01s call     test_optical_cuda_parity_616_617.py::test_monochromatic_wavefront_matches_on_device
+
+(10 durations < 0.005s hidden.  Use -vv to show these durations.)
+============================== 5 passed in 2.65s ===============================

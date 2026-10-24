@@ -27,6 +27,7 @@ from typing import TYPE_CHECKING, Literal
 
 import numpy as np
 
+from ..._backend import array_namespace
 from .optical_finite_bunch import _form_factor, _validate_histories
 from .optical_finite_screen import (
     _E_CHARGE_C,
@@ -158,23 +159,25 @@ def _polarized_spectrum(ft, field, matrix):
     """
     if matrix is None:
         return ft
+    xp = array_namespace(ft)
     k0, kx, ky, kz = _wavevectors(field)
-    kt = np.sqrt(kx * kx + ky * ky)
+    kt = xp.sqrt(kx * kx + ky * ky)
     good = kt < k0 * (1 - 1e-12)
     nonaxial = good & (kt > 0)
-    cx = np.divide(kx, kt, out=np.ones(np.broadcast_shapes(kx.shape, ky.shape)), where=nonaxial)
-    cy = np.divide(ky, kt, out=np.zeros_like(cx), where=nonaxial)
-    cos = np.where(good, kz.real / k0, 1.0)
-    cos_safe = np.where(good, cos, 1.0)
+    kt_safe = xp.where(nonaxial, kt, 1.0)
+    cx = xp.where(nonaxial, kx / kt_safe, 1.0)
+    cy = xp.where(nonaxial, ky / kt_safe, 0.0)
+    cos = xp.where(good, kz.real / k0, 1.0)
+    cos_safe = xp.where(good, cos, 1.0)
     # E = Es*(-cy,cx,0) + Ep*(cos*cx,cos*cy,-sin(theta)).
     es = -cy * ft[0] + cx * ft[1]
     ep = (cx * ft[0] + cy * ft[1]) / cos_safe
     output_s = matrix[0, 0] * es + matrix[0, 1] * ep
     output_p = matrix[1, 0] * es + matrix[1, 1] * ep
-    return np.stack(
+    return xp.stack(
         [
-            np.where(good, -cy * output_s + cos * cx * output_p, 0.0),
-            np.where(good, cx * output_s + cos * cy * output_p, 0.0),
+            xp.where(good, -cy * output_s + cos * cx * output_p, 0.0),
+            xp.where(good, cx * output_s + cos * cy * output_p, 0.0),
         ]
     )
 
@@ -182,24 +185,26 @@ def _polarized_spectrum(ft, field, matrix):
 def _plane_electric_magnetic(field: ScreenSpectralField, jones_sp=None):
     """Reconstruct E_t and H_t on a common plane, including evanescence."""
     matrix = _checked_jones(jones_sp)
+    xp = array_namespace(field.electric_xy_v_s_m)
     k0, kx, ky, kz = _wavevectors(field)
-    ft = np.fft.fft2(field.electric_xy_v_s_m, axes=(-2, -1))
+    ft = xp.fft.fft2(field.electric_xy_v_s_m, axes=(-2, -1))
     ft = _polarized_spectrum(ft, field, matrix)
     # kz=0 at the light circle is a singular angular-spectrum coordinate.
     # Refuse it rather than silently substituting a very large Ez/H field.
-    if np.any((np.abs(kz) <= 1e-12 * k0) & (np.abs(ft[0]) + np.abs(ft[1]) > 0)):
+    if bool(xp.any((xp.abs(kz) <= 1e-12 * k0) & (xp.abs(ft[0]) + xp.abs(ft[1]) > 0))):
         raise ValueError("grazing spectral mode is singular; change the FFT mesh")
-    safe = np.where(np.abs(kz) > 1e-12 * k0, kz, 1.0)
+    safe = xp.where(xp.abs(kz) > 1e-12 * k0, kz, 1.0)
     ez = -(kx * ft[0] + ky * ft[1]) / safe
     hx = (ky * ez - kz * ft[1]) / (_Z0_OHM * k0)
     hy = (kz * ft[0] - kx * ez) / (_Z0_OHM * k0)
-    electric = np.fft.ifft2(ft, axes=(-2, -1))
-    magnetic = np.fft.ifft2(np.stack([hx, hy]), axes=(-2, -1))
+    electric = xp.fft.ifft2(ft, axes=(-2, -1))
+    magnetic = xp.fft.ifft2(xp.stack([hx, hy]), axes=(-2, -1))
     return electric, magnetic
 
 
 def _collected_energy(field, electric, magnetic, aperture):
-    pz = np.real(electric[0] * magnetic[1].conj() - electric[1] * magnetic[0].conj())
+    xp = array_namespace(electric)
+    pz = xp.real(electric[0] * magnetic[1].conj() - electric[1] * magnetic[0].conj())
     weights = (
         aperture._weights(field)
         if isinstance(aperture, PlaneAcceptance)
@@ -207,7 +212,9 @@ def _collected_energy(field, electric, magnetic, aperture):
         if aperture is None
         else aperture
     )
-    return float(np.sum(pz * weights) * field.dx_m * field.dy_m / (np.pi * _HBAR_EV_S))
+    if not np.isscalar(weights):
+        weights = xp.asarray(weights)
+    return float(xp.sum(pz * weights) * field.dx_m * field.dy_m / (np.pi * _HBAR_EV_S))
 
 
 @dataclass(frozen=True)
@@ -296,37 +303,39 @@ def _green_fields(field: ScreenSpectralField, points, max_interactions):
     exp(-i omega t) convention gives H = curl E / (i k0 Z0).
     """
     source = field.electric_xy_v_s_m
-    keep = np.any(source != 0, axis=0)
+    xp = array_namespace(source)
+    points = xp.asarray(points)
+    keep = xp.any(source != 0, axis=0)
     ny, nx = source.shape[1:]
-    x = (np.arange(nx) - (nx - 1) / 2) * field.dx_m
-    y = (np.arange(ny) - (ny - 1) / 2) * field.dy_m
-    xx, yy = np.meshgrid(x, y)
+    x = (xp.arange(nx) - (nx - 1) / 2) * field.dx_m
+    y = (xp.arange(ny) - (ny - 1) / 2) * field.dy_m
+    xx, yy = xp.meshgrid(x, y)
     xs, ys = xx[keep], yy[keep]
-    a = np.stack([-source[1, keep], source[0, keep], np.zeros(xs.size)], axis=-1)
+    a = xp.stack([-source[1, keep], source[0, keep], xp.zeros(xs.size, complex)], axis=-1)
     k0 = field.energy_eV / _HBAR_C_EV_M
-    e_out = np.zeros((len(points), 3), complex)
-    curl = np.zeros((len(points), 3), complex)
+    e_out = xp.zeros((len(points), 3), complex)
+    curl = xp.zeros((len(points), 3), complex)
     block = max(1, max_interactions // max(xs.size, 1))
     for lo in range(0, len(points), block):
         p = points[lo : lo + block]
-        r = np.stack(
+        r = xp.stack(
             [
                 p[:, None, 0] - xs,
                 p[:, None, 1] - ys,
-                np.broadcast_to(p[:, None, 2], (len(p), xs.size)),
+                xp.broadcast_to(p[:, None, 2], (len(p), xs.size)),
             ],
             axis=-1,
         )
-        rr = np.linalg.norm(r, axis=-1)
+        rr = xp.sqrt(xp.sum(r * r, axis=-1))
         rhat = r / rr[..., None]
-        g = np.exp(1j * k0 * rr) / (4 * np.pi * rr)
+        g = xp.exp(1j * k0 * rr) / (4 * np.pi * rr)
         g1 = (1j * k0 - 1 / rr) * g
         g2 = ((1j * k0 - 1 / rr) ** 2 + 1 / rr**2) * g
         grad = g1[..., None] * rhat
-        e_out[lo : lo + block] = 2 * np.sum(np.cross(grad, a[None]), axis=1)
-        a_dot = np.sum(a[None] * rhat, axis=-1)
+        e_out[lo : lo + block] = 2 * xp.sum(xp.cross(grad, a[None]), axis=1)
+        a_dot = xp.sum(a[None] * rhat, axis=-1)
         hess_a = (g2 - g1 / rr)[..., None] * a_dot[..., None] * rhat + (g1 / rr)[..., None] * a
-        curl[lo : lo + block] = 2 * np.sum(hess_a + (k0 * k0 * g)[..., None] * a, axis=1)
+        curl[lo : lo + block] = 2 * xp.sum(hess_a + (k0 * k0 * g)[..., None] * a, axis=1)
     area = field.dx_m * field.dy_m
     return e_out * area, curl * area / (1j * k0 * _Z0_OHM)
 
@@ -361,7 +370,8 @@ def collect_screen_green(
     if not np.isfinite(pitch_m) or pitch_m <= 0:
         raise ValueError("pitch_m must be positive and finite")
     e = field.electric_xy_v_s_m
-    if np.any(e[:, [0, -1], :] != 0) or np.any(e[:, :, [0, -1]] != 0):
+    xp = array_namespace(e)
+    if bool(xp.any(e[:, [0, -1], :] != 0)) or bool(xp.any(e[:, :, [0, -1]] != 0)):
         raise ValueError("source is not compact inside its window")
     half = aperture.radius_m if aperture.shape == "circle" else None
     if half is None:
@@ -377,8 +387,10 @@ def collect_screen_green(
         [coords[cols], coords[rows], np.full(rows.size, plane_z_m - field.z_m)]
     )
     electric, magnetic = _green_fields(field, points, max_interactions)
-    sz = np.real(electric[:, 0] * magnetic[:, 1].conj() - electric[:, 1] * magnetic[:, 0].conj())
-    energy = float(np.sum(sz * weights[rows, cols]) * pitch_m * pitch_m / (np.pi * _HBAR_EV_S))
+    sz = xp.real(electric[:, 0] * magnetic[:, 1].conj() - electric[:, 1] * magnetic[:, 0].conj())
+    energy = float(
+        xp.sum(sz * xp.asarray(weights[rows, cols])) * pitch_m * pitch_m / (np.pi * _HBAR_EV_S)
+    )
     configuration = _configuration(field, plane_z_m, aperture, None)
     configuration["model"] = "finite-pec-detector-plane-green-v1"
     configuration["sampling"]["detector_pitch_m"] = float(pitch_m)

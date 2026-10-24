@@ -15,6 +15,7 @@ from collections.abc import Sequence
 
 import numpy as np
 
+from ..._backend import _to_cpu, array_namespace
 from ..._optical_coherency import OpticalSpectralCoherency
 from .optical_finite_collection import PlaneAcceptance, collect_screen_field
 from .optical_finite_screen import (
@@ -100,22 +101,24 @@ def _field_coherency(
     if plane_z_m <= f.z_m:
         raise ValueError("detector plane must be downstream of every field reference plane")
     plane = propagate_screen_field(f, plane_z_m - f.z_m)
-    ft = np.fft.fft2(plane.electric_xy_v_s_m, axes=(-2, -1))
+    xp = array_namespace(plane.electric_xy_v_s_m)
+    ft = xp.fft.fft2(plane.electric_xy_v_s_m, axes=(-2, -1))
     k0, kx, ky, _ = _wavevectors(plane)
     outside = (kx * kx + ky * ky) > (k0 * np.sin(max_angle_rad)) ** 2
-    power_spectrum = np.sum(np.abs(ft) ** 2, axis=0)
-    total = float(np.sum(power_spectrum))
+    power_spectrum = xp.sum(xp.abs(ft) ** 2, axis=0)
+    total = float(xp.sum(power_spectrum))
     if not np.isfinite(total) or total <= 0:
         raise ValueError("screen field must have finite positive spectral power")
-    leakage = float(np.sum(power_spectrum[outside]) / total)
+    leakage = float(xp.sum(power_spectrum[outside]) / total)
     if leakage > max_angular_leakage:
         raise ValueError(
             f"nonparaxial/evanescent field leakage {leakage:.3g} exceeds "
             f"{max_angular_leakage:g}; a fixed-xy Jones model is unsupported"
         )
-    weight = 1.0 if aperture is None else aperture._weights(plane)
     e = plane.electric_xy_v_s_m
-    matrix = np.einsum("ayx,byx,yx->ab", e, e.conj(), np.broadcast_to(weight, e.shape[1:]))
+    weight = xp.ones(e.shape[1:]) if aperture is None else xp.asarray(aperture._weights(plane))
+    # Device-resident reduction to the 2x2 matrix; only it returns to the host.
+    matrix = _to_cpu(xp.einsum("ayx,byx,yx->ab", e, e.conj(), weight))
     matrix *= plane.dx_m * plane.dy_m / (np.pi * _HBAR_EV_S * _Z0_OHM * f.energy_eV * _E_CHARGE_C)
     # The paraxial scalar-flux approximation is an explicit controlled
     # reduction of the vector Maxwell source, not a silent replacement.

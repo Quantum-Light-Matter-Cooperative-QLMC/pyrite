@@ -31,6 +31,8 @@ from dataclasses import dataclass, replace
 import numpy as np
 from scipy.special import k0, k1
 
+from ..._backend import array_namespace
+
 __all__ = [
     "PECCircularScreen",
     "ScreenSpectralField",
@@ -139,23 +141,27 @@ class ScreenSpectralField:
             raise ValueError("pixel pitches must be finite and positive")
         if not np.isfinite(self.z_m) or self.z_m < 0:
             raise ValueError("z_m must be finite and nonnegative")
-        f = np.asarray(self.electric_xy_v_s_m)
+        # Host NumPy or device (CuPy) arrays; operators keep the field where it is.
+        xp = array_namespace(self.electric_xy_v_s_m)
+        f = xp.asarray(self.electric_xy_v_s_m)
         if f.ndim != 3 or f.shape[0] != 2 or min(f.shape[1:]) < 16:
             raise ValueError("electric_xy_v_s_m must have shape (2,ny>=16,nx>=16)")
-        if f.dtype.kind != "c" or not np.all(np.isfinite(f)):
+        if f.dtype.kind != "c" or not bool(xp.all(xp.isfinite(f))):
             raise ValueError("electric_xy_v_s_m must be finite complex Fourier fields")
-        # Prevent mutations after construction (inputs are copied).
+        # Isolate caller-owned storage. NumPy additionally supports a read-only view.
         f = f.copy()
-        f.setflags(write=False)
+        if xp is np:
+            f.setflags(write=False)
         object.__setattr__(self, "electric_xy_v_s_m", f)
 
 
 def _wavevectors(field: ScreenSpectralField):
+    xp = array_namespace(field.electric_xy_v_s_m)
     ny, nx = field.electric_xy_v_s_m.shape[1:]
     k0 = field.energy_eV / _HBAR_C_EV_M
-    kx = (2 * np.pi * np.fft.fftfreq(nx, field.dx_m))[None, :]
-    ky = (2 * np.pi * np.fft.fftfreq(ny, field.dy_m))[:, None]
-    kz = np.sqrt((k0 * k0 - kx * kx - ky * ky).astype(complex))
+    kx = (2 * np.pi * xp.fft.fftfreq(nx, field.dx_m))[None, :]
+    ky = (2 * np.pi * xp.fft.fftfreq(ny, field.dy_m))[:, None]
+    kz = xp.sqrt((k0 * k0 - kx * kx - ky * ky).astype(complex))
     return k0, kx, ky, kz
 
 
@@ -290,9 +296,10 @@ def propagate_screen_field(field: ScreenSpectralField, distance_m: float) -> Scr
         raise ValueError("distance_m must be finite and nonnegative")
     if distance_m == 0:
         return replace(field, electric_xy_v_s_m=field.electric_xy_v_s_m.copy())
+    xp = array_namespace(field.electric_xy_v_s_m)
     _, _, _, kz = _wavevectors(field)
-    spectrum = np.fft.fft2(field.electric_xy_v_s_m, axes=(-2, -1))
-    electric = np.fft.ifft2(spectrum * np.exp(1j * kz * distance_m), axes=(-2, -1))
+    spectrum = xp.fft.fft2(field.electric_xy_v_s_m, axes=(-2, -1))
+    electric = xp.fft.ifft2(spectrum * xp.exp(1j * kz * distance_m), axes=(-2, -1))
     return replace(field, electric_xy_v_s_m=electric, z_m=field.z_m + distance_m)
 
 
@@ -314,26 +321,27 @@ def observe_screen_green(
     periodically repeats the source, whereas this quadrature does not. At
     very small distances, the pixel-centre quadrature requires refinement;
     the caller must converge both source sampling and observation distances.
-    O(number of metal pixels x observation points), CPU reference only.
+    O(number of metal pixels x observation points); arrays stay on the source backend.
 
     Validation: optical-finite-boundary-field
     """
-    points = np.asarray(observation_xyz_m, dtype=float)
-    if points.ndim != 2 or points.shape[1] != 3 or not np.all(np.isfinite(points)):
+    xp = array_namespace(field.electric_xy_v_s_m)
+    points = xp.asarray(observation_xyz_m, dtype=float)
+    if points.ndim != 2 or points.shape[1] != 3 or not xp.all(xp.isfinite(points)):
         raise ValueError("observation_xyz_m must be a finite (n,3) array")
-    if np.any(points[:, 2] <= field.z_m):
+    if xp.any(points[:, 2] <= field.z_m):
         raise ValueError("all observation z positions must lie downstream of the source plane")
     if not isinstance(max_interactions, int) or max_interactions < 1:
         raise ValueError("max_interactions must be a positive integer")
     source = field.electric_xy_v_s_m
-    keep = np.any(source != 0, axis=0)
-    result = np.zeros((points.shape[0], 3), complex)
-    if not np.any(keep) or points.shape[0] == 0:
+    keep = xp.any(source != 0, axis=0)
+    result = xp.zeros((points.shape[0], 3), complex)
+    if not xp.any(keep) or points.shape[0] == 0:
         return result
     ny, nx = source.shape[1:]
-    x = (np.arange(nx) - (nx - 1) / 2) * field.dx_m
-    y = (np.arange(ny) - (ny - 1) / 2) * field.dy_m
-    xx, yy = np.meshgrid(x, y)
+    x = (xp.arange(nx) - (nx - 1) / 2) * field.dx_m
+    y = (xp.arange(ny) - (ny - 1) / 2) * field.dy_m
+    xx, yy = xp.meshgrid(x, y)
     xs, ys = xx[keep], yy[keep]
     ex, ey = source[0, keep], source[1, keep]
     k0 = field.energy_eV / _HBAR_C_EV_M
@@ -344,24 +352,25 @@ def observe_screen_green(
             rx = point[0] - xs[start:stop]
             ry = point[1] - ys[start:stop]
             rz = point[2] - field.z_m
-            rr = np.sqrt(rx * rx + ry * ry + rz * rz)
-            kernel = np.exp(1j * k0 * rr) * (1j * k0 * rr - 1) / (4 * np.pi * rr**3)
+            rr = xp.sqrt(rx * rx + ry * ry + rz * rz)
+            kernel = xp.exp(1j * k0 * rr) * (1j * k0 * rr - 1) / (4 * np.pi * rr**3)
             # curl( G * 2(z cross E_s) ) evaluated with the exact dG/dR.
-            result[i, 0] += np.sum(-2 * rz * kernel * ex[start:stop])
-            result[i, 1] += np.sum(-2 * rz * kernel * ey[start:stop])
-            result[i, 2] += np.sum(2 * kernel * (rx * ex[start:stop] + ry * ey[start:stop]))
+            result[i, 0] += xp.sum(-2 * rz * kernel * ex[start:stop])
+            result[i, 1] += xp.sum(-2 * rz * kernel * ey[start:stop])
+            result[i, 2] += xp.sum(2 * kernel * (rx * ex[start:stop] + ry * ey[start:stop]))
     result *= field.dx_m * field.dy_m
     return result
 
 
 def _propagating_spectral_flux(field: ScreenSpectralField):
+    xp = array_namespace(field.electric_xy_v_s_m)
     k0, kx, ky, kz = _wavevectors(field)
     propagated = (kx * kx + ky * ky) < k0 * k0 * (1 - 1e-12)
-    fft = np.fft.fft2(field.electric_xy_v_s_m, axes=(-2, -1))
-    kz_safe = np.where(propagated, kz, 1.0)
+    fft = xp.fft.fft2(field.electric_xy_v_s_m, axes=(-2, -1))
+    kz_safe = xp.where(propagated, kz, 1.0)
     ez = -(kx * fft[0] + ky * fft[1]) / kz_safe
     norm = abs(fft[0]) ** 2 + abs(fft[1]) ** 2 + abs(ez) ** 2
-    flux = np.where(propagated, (kz.real / k0) * norm, 0.0)
+    flux = xp.where(propagated, (kz.real / k0) * norm, 0.0)
     return k0, kx, ky, kz, propagated, fft, ez, flux
 
 
@@ -383,7 +392,7 @@ def spectral_energy_per_eV(field: ScreenSpectralField) -> float:
     """
     *_, flux = _propagating_spectral_flux(field)
     ny, nx = field.electric_xy_v_s_m.shape[1:]
-    return float(np.sum(flux) * field.dx_m * field.dy_m / (nx * ny * np.pi * _Z0_OHM * _HBAR_EV_S))
+    return float(flux.sum() * field.dx_m * field.dy_m / (nx * ny * np.pi * _Z0_OHM * _HBAR_EV_S))
 
 
 def hemisphere_energy_per_eV(
@@ -403,36 +412,37 @@ def hemisphere_energy_per_eV(
     Validation: optical-finite-boundary-field
     """
     e = field.electric_xy_v_s_m
+    xp = array_namespace(e)
     if min(n_u, n_phi, chunk) < 1:
         raise ValueError("quadrature sizes must be positive")
-    border = np.concatenate([e[:, 0, :], e[:, -1, :], e[:, :, 0], e[:, :, -1]], axis=1)
-    if np.any(border != 0):
+    border = xp.concatenate([e[:, 0, :], e[:, -1, :], e[:, :, 0], e[:, :, -1]], axis=1)
+    if bool(xp.any(border != 0)):
         raise ValueError("field is not compact inside the window; quadrature needs a source")
     ny, nx = e.shape[1:]
     k0 = field.energy_eV / _HBAR_C_EV_M
-    x = (np.arange(nx) - (nx - 1) / 2) * field.dx_m
-    y = (np.arange(ny) - (ny - 1) / 2) * field.dy_m
-    nonzero = np.any(e != 0, axis=0)
-    rows, cols = np.nonzero(nonzero)
+    x = (xp.arange(nx) - (nx - 1) / 2) * field.dx_m
+    y = (xp.arange(ny) - (ny - 1) / 2) * field.dy_m
+    nonzero = xp.any(e != 0, axis=0)
+    rows, cols = xp.nonzero(nonzero)
     xs, ys = x[cols], y[rows]
     ex, ey = e[0][nonzero] * field.dx_m * field.dy_m, e[1][nonzero] * field.dx_m * field.dy_m
     t, w = np.polynomial.legendre.leggauss(n_u)
     u, wu = (t + 1) / 2, w / 2
     phi = np.arange(n_phi) * (2 * np.pi / n_phi)
-    uu, pp = (a.ravel() for a in np.meshgrid(u, phi, indexing="ij"))
-    weights = np.repeat(wu, n_phi) * (2 * np.pi / n_phi)
-    kx = k0 * np.sqrt(1 - uu * uu) * np.cos(pp)
-    ky = k0 * np.sqrt(1 - uu * uu) * np.sin(pp)
+    uu, pp = (xp.asarray(a.ravel()) for a in np.meshgrid(u, phi, indexing="ij"))
+    weights = xp.asarray(np.repeat(wu, n_phi)) * (2 * np.pi / n_phi)
+    kx = k0 * xp.sqrt(1 - uu * uu) * xp.cos(pp)
+    ky = k0 * xp.sqrt(1 - uu * uu) * xp.sin(pp)
     kz = k0 * uu
     total = 0.0
     for lo in range(0, uu.size, chunk):
         sl = slice(lo, lo + chunk)
-        phase = np.exp(-1j * (np.outer(kx[sl], xs) + np.outer(ky[sl], ys)))
+        phase = xp.exp(-1j * (xp.outer(kx[sl], xs) + xp.outer(ky[sl], ys)))
         fx, fy = phase @ ex, phase @ ey
         fz = -(kx[sl] * fx + ky[sl] * fy) / kz[sl]
-        norm = np.abs(fx) ** 2 + np.abs(fy) ** 2 + np.abs(fz) ** 2
+        norm = xp.abs(fx) ** 2 + xp.abs(fy) ** 2 + xp.abs(fz) ** 2
         # (kz/k0)|F|²/(4 pi²) per d²k, with d²k = k0² u du dphi.
-        total += float(np.sum(weights[sl] * kz[sl] * k0 * uu[sl] * norm))
+        total += float(xp.sum(weights[sl] * kz[sl] * k0 * uu[sl] * norm))
     return total / (4 * np.pi**2 * np.pi * _Z0_OHM * _HBAR_EV_S)
 
 
@@ -445,15 +455,16 @@ def far_field_photons_per_eV_sr(field: ScreenSpectralField):
     already finite-screen source; it is not a detector map or solid-angle
     integral, and the discrete angular mesh must be converged independently.
     """
+    xp = array_namespace(field.electric_xy_v_s_m)
     k0, kx, ky, kz, good, fft, ez, _ = _propagating_spectral_flux(field)
     ft_power = (abs(fft[0]) ** 2 + abs(fft[1]) ** 2 + abs(ez) ** 2) * (field.dx_m * field.dy_m) ** 2
-    cosine = np.where(good, kz.real / k0, 0.0)
+    cosine = xp.where(good, kz.real / k0, 0.0)
     # Jacobian d(kx ky) = k0² cos(theta) dOmega. Field amplitude at infinity
     # carries a second cos(theta), giving k0² cos²(theta) |FT|².
     du_domega_sr = k0**2 * cosine**2 * ft_power / (4 * np.pi**3 * _Z0_OHM)
-    density = np.where(good, du_domega_sr / (_HBAR_EV_S * field.energy_eV * _E_CHARGE_C), 0.0)
-    theta = np.where(good, np.arccos(np.clip(cosine, -1, 1)), np.nan)
-    phi = np.broadcast_to(np.arctan2(ky, kx), cosine.shape).copy()
+    density = xp.where(good, du_domega_sr / (_HBAR_EV_S * field.energy_eV * _E_CHARGE_C), 0.0)
+    theta = xp.where(good, xp.arccos(xp.clip(cosine, -1, 1)), np.nan)
+    phi = xp.broadcast_to(xp.arctan2(ky, kx), cosine.shape).copy()
     return theta, phi, density
 
 
