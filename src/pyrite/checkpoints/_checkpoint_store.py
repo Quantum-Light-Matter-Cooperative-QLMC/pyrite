@@ -408,3 +408,57 @@ def cas_save(
     same-material writers touch distinct blobs and never clobber a monolith.
     """
     _atomic_dump(cas_blob_path(material, content_key, root), payload)
+
+
+def load_selected(
+    stem: str,
+    root: str | os.PathLike[str],
+    cases: set[tuple[str, float]],
+    *,
+    components: tuple[str, ...] = COMPONENTS,
+) -> dict:
+    """Load selected cases and emission components, with shard precedence.
+
+    ``line`` is always the authoritative record index. Requested companions
+    attach to those records using the same grid validation as :func:`load`.
+    Unselected companions are absent, including in crash-recovery shards.
+    """
+    unknown = set(components) - set(COMPONENTS)
+    if unknown:
+        raise ValueError(f"unknown checkpoint component(s): {sorted(unknown)}")
+    if not cases:
+        return {}
+    if not checkpoint_exists(stem, root):
+        raise FileNotFoundError(component_read_path(stem, "line", root))
+    old = legacy_path(stem, root)
+
+    def component_records(component):
+        path = component_read_path(stem, component, root)
+        if path.is_file():
+            return _component_store(_checkpoint_io.load_selected(str(path), cases), component)
+        if old.is_file():
+            return _component_store(_checkpoint_io.load_selected(str(old), cases), component)
+        return {}
+
+    line = component_records("line")
+    brem = component_records("brem") if "brem" in components else {}
+    companions = {
+        component: component_records(component)
+        for component in _LINE_COMPONENT_KEY
+        if component in components
+    }
+    merged = _merge(line, brem, companions)
+    # Shard filenames identify a whole config; select its energies before decoding.
+    for name in sorted({name for name, _ in cases}):
+        path = _part_path(stem, root, name)
+        if not path.is_file():
+            path = path.with_suffix(_LEGACY_SUFFIX)
+        if path.is_file():
+            shard = _checkpoint_io.load_selected(str(path), cases)
+            selected_line = _component_store(shard, "line")
+            selected_brem = _component_store(shard, "brem") if "brem" in components else {}
+            selected_companions = {
+                component: _component_store(shard, component) for component in companions
+            }
+            merged = _overlay(merged, _merge(selected_line, selected_brem, selected_companions))
+    return merged

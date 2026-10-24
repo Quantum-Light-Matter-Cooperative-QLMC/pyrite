@@ -37,6 +37,27 @@ A compatible existing profile checkpoint seeds missing CAS blobs during normal r
 
 Profile labels stay in dataset identity and provenance but not per-case content identity. Two profiles reuse a case only when resolved inputs, including seed, hash identically.
 
+## Selective reads
+
+Internal checkpoint consumers can call `_checkpoint_store.load_selected(stem,
+root, cases, components=...)`, where `cases` is a set of `(config_name,
+energy_keV)` pairs. The line component always supplies the authoritative
+record index; `components` selects which companions attach. Completed-config
+shards override component files per case, with the same component-grid checks
+as full loading. Missing cases produce no entries; a missing checkpoint raises
+`FileNotFoundError` for a nonempty request.
+
+Bare schema-v2 HDF5 reads traverse only requested record payloads, including
+columnar tables. Key columns and layout metadata still scale with the file's
+record count. Legacy containers and compressed transfer frames use the existing
+full-decode compatibility path before filtering. This does not change the
+in-memory sweep API or make sweep execution disk-backed.
+
+The synthetic storage benchmark `checks/checkpoint_selective_memory.py` compares
+one-case and full-store reads using identical warm file caches and fresh reader
+processes, reporting wall time and peak RSS. It measures storage reads, not
+campaign execution or consolidation.
+
 ## Version control
 
 Nothing under `checkpoints/` is tracked except the `.gitkeep` files that hold `checkpoints/` and `checkpoints/archive/` open. Payloads (`*.pkl`), CAS blobs, `*meta.json`, `cases.json`, and `cxr.lock.json` are all local run output, reproducible from a profile plus seed, and are ignored.

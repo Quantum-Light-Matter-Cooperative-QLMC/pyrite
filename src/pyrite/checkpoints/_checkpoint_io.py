@@ -192,3 +192,27 @@ def _load_raw(path: str) -> tuple[Any, bool]:
             return pickle.load(stream), False
     with open(path, "rb") as stream:
         return pickle.load(stream), False
+
+
+def load_selected(path: str, cases: set[tuple[str, float]]) -> dict:
+    """Read selected ``(config name, energy_keV)`` records.
+
+    Bare v2 HDF5 reads only matching payloads. Older containers and transfer
+    frames retain their full-decode compatibility path before filtering.
+    """
+    if not cases:
+        return {}
+    with open(path, "rb") as stream:
+        bare = stream.read(8) == _HDF5_MAGIC
+    if bare:
+        with h5py.File(path, "r") as h5:
+            if h5.attrs.get("schema") == SCHEMA and h5.attrs.get("schema_version") == 2:
+                selected = _result_v2.read_selected(h5, cases)
+                separate = h5.attrs.get(COMPONENTS_ATTR) == SEPARATE_CONTRACT
+                return selected if separate else separate_legacy(selected)
+    loaded = load(path)
+    return {
+        name: {energy: record for energy, record in by_energy.items() if (name, energy) in cases}
+        for name, by_energy in loaded.items()
+        if any((name, energy) in cases for energy in by_energy)
+    }
