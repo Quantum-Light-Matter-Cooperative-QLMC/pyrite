@@ -87,8 +87,8 @@ def test_catalog_closure_reproduces_stp_exactly_with_positive_scale(key, energy)
     ("key", "recorded"),
     [
         ("silicon", (1.056, 1.263, 1.442, 1.623)),
-        ("sio2", (0.791, 0.851, 0.916, 1.000)),
-        ("mos2", (1.270, 1.444, 1.492, 1.618)),
+        ("sio2", (0.792, 0.853, 0.918, 1.002)),
+        ("mos2", (1.272, 1.449, 1.499, 1.626)),
     ],
 )
 def test_outer_scale_at_mev_energies_matches_recorded_note(key, recorded):
@@ -98,7 +98,7 @@ def test_outer_scale_at_mev_energies_matches_recorded_note(key, recorded):
 
 
 # Documented note, not a gate (owner decision, 2026-09-24): the closed model's
-# total IMFP is 26-35% below independent full Penn calculations. The recorded
+# total IMFP is 26-39% below independent full Penn calculations with SBETHE v2. The recorded
 # ratios pin that note so a model change cannot silently move it; see
 # docs/validation/beam-transport/penelope-shell-rate-closure.md.
 @pytest.mark.parametrize(
@@ -107,9 +107,9 @@ def test_outer_scale_at_mev_energies_matches_recorded_note(key, recorded):
         ("silicon", 1998.2, 4.25, 0.0, 0.745),
         ("silicon", 9897.1, 16.04, 0.0, 0.714),
         ("silicon", 19930.4, 28.77, 0.0, 0.734),
-        ("sio2", 1998.2, 5.09, 10.0, 0.674),
-        ("sio2", 9897.1, 19.0, 10.0, 0.645),
-        ("sio2", 19930.4, 33.9, 10.0, 0.660),
+        ("sio2", 1998.2, 5.09, 10.0, 0.613),
+        ("sio2", 9897.1, 19.0, 10.0, 0.627),
+        ("sio2", 19930.4, 33.9, 10.0, 0.651),
     ],
 )
 def test_closed_imfp_to_full_penn_ratio_matches_recorded_note(
