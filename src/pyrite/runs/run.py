@@ -66,6 +66,7 @@ from ..checkpoints.recompute import (  # noqa: F401 -- compatibility exports
     repair_checkpoint,
     repair_cxr_spec,
 )
+from ..execution.artifacts import CaseArtifactRef
 from ..montecarlo import run_cases, runner
 from ..results import store_result
 from ._sweep_execution import SweepCompletion
@@ -125,6 +126,7 @@ def run_sweep(
     observation=None,
     retain_results=True,
     executor=None,
+    artifact_store=None,
 ):
     """Run ``cases`` into ``results`` (mutated in place).
 
@@ -140,6 +142,12 @@ def run_sweep(
         When omitted, use ``montecarlo.run_cases`` exactly as before. When
         supplied, callbacks must execute in this coordinator process so the
         existing sweep remains sole owner of manifests and consolidation.
+    artifact_store : optional pyrite.execution.CaseArtifactStore.
+        A shared-filesystem inbox for independently published worker results.
+        A worker may return a CaseArtifactRef instead of bulk result arrays;
+        the coordinator verifies its physics key and digest, then performs the
+        established checkpoint writes. With resume and cache_read enabled,
+        completed but uncommitted worker artifacts are recovered on restart.
     checkpoint_dir : directory for the per-material checkpoints (default
         ``pyrite-output/checkpoints`` in the workspace). A sweep is
         single-material, so each writes ``<checkpoint_dir>/<material>/``
@@ -237,6 +245,8 @@ def run_sweep(
     completed-config shards for resume. Legacy ``.pkl`` paths receive a final
     whole-store save on an incomplete return, including partial configs.
     """
+    if artifact_store is not None and content_key_fn is None:
+        raise ValueError("artifact_store requires content_key_fn for physics identity validation")
     if time_fn is None:
         time_fn = time.monotonic
     if deadline is None and max_seconds is not None:
@@ -287,6 +297,37 @@ def run_sweep(
         preparation.seed_cache()
     preparation.replay_cache()
 
+    # A worker may finish publishing its immutable artifact immediately before
+    # the coordinator crashes. Recover those outputs before planning new work,
+    # so successful transports are not recomputed. Resume / --no-cache semantics
+    # still control whether existing artifacts may be replayed. Do not use a
+    # scalar-only artifact in place of a missing directional observation.
+    if (
+        resume
+        and cache_read
+        and artifact_store is not None
+        and not transport_only
+        and observation is None
+    ):
+        recovered = 0
+        for case in cases:
+            if has_record(results, case):
+                continue
+            key = preparation.content_key(case)
+            if key is None:
+                continue
+            found = artifact_store.recover(material, key)
+            if found is None:
+                continue
+            _, output = found
+            store_result(results, case, output)
+            preparation.store_transport(case, output)
+            checkpoint.record_finished(case)
+            recovered += 1
+        if recovered:
+            checkpoint.cache_replayed()
+            print(f"recovered {recovered} {material} case artifacts from distributed inbox")
+
     work = SweepWork(cases, results, observation, transport_only)
     todo = work.todo
     print(f"{len(todo)} of {len(cases)} cases to run ({len(cases) - len(todo)} cached)")
@@ -329,6 +370,17 @@ def run_sweep(
     completion.prepare_groups(todo, work.observation_only)
 
     def _cb(i, case, out):
+        if isinstance(out, CaseArtifactRef):
+            if artifact_store is None:
+                raise ValueError("executor returned a case artifact without artifact_store")
+            key = preparation.content_key(case)
+            if key is None:
+                raise ValueError("cannot resolve content key for worker-published case")
+            out = artifact_store.load(
+                out,
+                expected_material=material,
+                expected_content_key=key,
+            )
         if capture_size_report is not None:
             capture_size_report.completed(case)
 
