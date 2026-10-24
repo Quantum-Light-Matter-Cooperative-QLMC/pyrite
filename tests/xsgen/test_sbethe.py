@@ -323,6 +323,21 @@ def test_outputs_that_disagree_on_the_material_are_rejected():
         )
 
 
+def test_outputs_agree_to_the_oscillator_file_print_precision():
+    """OOS.dat rounds the count to five figures; air's catalog indices give
+    48352.4 electrons/molecule in stp.dat and 4.8352E+04 in OOS.dat."""
+    stopping = STOPPING.replace("1.00000E+01", "4.83524E+04", 1)
+    oscillator = OSCILLATOR.replace(
+        "#  Electrons/molecule .........  1.0000E+01",
+        "#  Electrons/molecule .........  4.8352E+04",
+    )
+    arrays = table_arrays(
+        parse_stopping(stopping), parse_integrated(INTEGRATED), parse_oscillator(oscillator)
+    )
+
+    assert float(arrays["electrons_per_molecule"]) == pytest.approx(48352.4)
+
+
 def _sbethe_tree(root):
     """Build a minimal SBETHE source tree with its fetched data directory."""
     root.mkdir(parents=True, exist_ok=True)

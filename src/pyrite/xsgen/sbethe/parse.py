@@ -170,7 +170,9 @@ def table_arrays(
     the corrected-Bethe floor, ``asymptotic.dat`` extends below it, and
     ``OOS.dat`` is in transferred energy, not projectile energy.
     """
-    if abs(stopping.electrons_per_molecule - oscillator.electrons_per_molecule) > 1e-6 * max(
+    # OOS.dat prints the count to five significant figures (stp.dat to six), so
+    # agreement is only defined to that rounding: 5e-5 relative at worst.
+    if abs(stopping.electrons_per_molecule - oscillator.electrons_per_molecule) > 1e-4 * max(
         stopping.electrons_per_molecule, 1.0
     ):
         raise ValueError("SBETHE outputs disagree on electrons per molecule")
