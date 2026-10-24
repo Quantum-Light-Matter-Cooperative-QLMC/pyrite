@@ -286,3 +286,13 @@ and bounded; these provisional operators supply no measured response by default.
 `OpticalSpectralCoherency`, calibrated Jones transfers and
 `polarized_interferogram` preserve that backend through the forward reductions.
 See [device operators and transfer boundaries](physics/radiation-physics/optical-wavefront-and-detectors.md#device-resident-field-operators-and-cuda-parity).
+
+Finite PEC source entry points in `pyrite.montecarlo.spectrum.optical_finite_screen`
+and `optical_finite_bunch`, `optical_finite_collection.finite_screen_bunch_plane_band`,
+and the three `runner.finite_screen_emission.case_finite_screen_*` adapters
+accept an explicit `xp=np` (default) or active CuPy namespace. Meshes, Bessel
+evaluation, complex fields and streamed self/pair moments stay on that backend;
+screen objects, energy-node iteration, source-law metadata and formation guards
+remain host control. `FiniteScreenBunchAngular.collect_cone(to_host=False)`
+retains its scalar on device; the default returns a host float. Device band
+arrays can feed `CalibratedPulseEnergyDetector.predict_batch` directly.

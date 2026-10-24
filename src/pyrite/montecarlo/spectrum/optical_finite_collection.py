@@ -23,7 +23,7 @@ from __future__ import annotations
 import warnings
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass, field
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 import numpy as np
 
@@ -214,7 +214,7 @@ def _collected_energy(field, electric, magnetic, aperture):
     )
     if not np.isscalar(weights):
         weights = xp.asarray(weights)
-    return float(xp.sum(pz * weights) * field.dx_m * field.dy_m / (np.pi * _HBAR_EV_S))
+    return xp.sum(pz * weights) * field.dx_m * field.dy_m / (np.pi * _HBAR_EV_S)
 
 
 @dataclass(frozen=True)
@@ -284,7 +284,7 @@ def collect_screen_field(
         raise TypeError("aperture must be a PlaneAcceptance")
     propagated = propagate_screen_field(field, plane_z_m - field.z_m)
     electric, magnetic = _plane_electric_magnetic(propagated, jones_sp)
-    energy = _collected_energy(propagated, electric, magnetic, aperture)
+    energy = float(_collected_energy(propagated, electric, magnetic, aperture))
     return FinitePlaneCollection(
         energy_eV=field.energy_eV,
         z_m=float(plane_z_m),
@@ -409,11 +409,11 @@ def collect_screen_green(
 class FinitePlaneBunchBand:
     """Finite-distance bunch spectrum; signed estimates remain signed."""
 
-    energy_eV: np.ndarray
-    collected_photons_per_eV_per_pulse: np.ndarray
-    self_photons_per_eV_per_electron: np.ndarray
-    pair_photons_per_eV_per_electron_pair: np.ndarray
-    form_factor_squared: np.ndarray
+    energy_eV: Any
+    collected_photons_per_eV_per_pulse: Any
+    self_photons_per_eV_per_electron: Any
+    pair_photons_per_eV_per_electron_pair: Any
+    form_factor_squared: Any
     plane_z_m: float
     source_record: dict
     polarization: str
@@ -421,7 +421,8 @@ class FinitePlaneBunchBand:
 
     def detect(self, detector, *, repetition_hz=None):
         """Apply an explicitly supplied calibrated pulse detector (#617)."""
-        if np.any(self.collected_photons_per_eV_per_pulse < 0):
+        xp = array_namespace(self.collected_photons_per_eV_per_pulse)
+        if xp.any(self.collected_photons_per_eV_per_pulse < 0):
             raise ValueError(
                 "signed near-field flux or unresolved pair estimate cannot be detected as counts"
             )
@@ -433,7 +434,20 @@ class FinitePlaneBunchBand:
 
 
 def _bunch_plane_one(
-    energy, screens, source, weights, population, *, nx, ny, dx, dy, plane_z_m, aperture, jones_sp
+    energy,
+    screens,
+    source,
+    weights,
+    population,
+    *,
+    nx,
+    ny,
+    dx,
+    dy,
+    plane_z_m,
+    aperture,
+    jones_sp,
+    xp,
 ):
     total_e = None
     total_h = None
@@ -443,11 +457,11 @@ def _bunch_plane_one(
     w2sum = float(np.sum(weights**2))
     region_weights = None
     for weight, screen in zip(weights, screens, strict=True):
-        field = circular_pec_transition_field(energy, screen, nx=nx, ny=ny, dx_m=dx, dy_m=dy)
+        field = circular_pec_transition_field(energy, screen, nx=nx, ny=ny, dx_m=dx, dy_m=dy, xp=xp)
         field = propagate_screen_field(field, plane_z_m)
         e, h = _plane_electric_magnetic(field, jones_sp)
         if region_weights is None:
-            region_weights = aperture._weights(field) if aperture is not None else 1.0
+            region_weights = xp.asarray(aperture._weights(field)) if aperture is not None else 1.0
         self_flux = _collected_energy(field, e, h, region_weights)
         self_w += weight * self_flux
         self_w2 += weight * weight * self_flux
@@ -469,7 +483,17 @@ def _bunch_plane_one(
         else (population * (selfflux + max(population - 1, 0) * factor * pair))
     )
     photon_joule = energy * _E_CHARGE_C
-    return bunchflux / photon_joule, selfflux / photon_joule, pair / photon_joule, factor
+    return xp.stack(
+        [
+            xp.asarray(x)
+            for x in (
+                bunchflux / photon_joule,
+                selfflux / photon_joule,
+                pair / photon_joule,
+                factor,
+            )
+        ]
+    )
 
 
 def finite_screen_bunch_plane_band(
@@ -484,6 +508,7 @@ def finite_screen_bunch_plane_band(
     plane_z_m: float,
     aperture: PlaneAcceptance | None,
     jones_sp=None,
+    xp: Any = np,
 ) -> FinitePlaneBunchBand:
     """Collect finite-screen CTR/CDR from a physical bunch at a finite plane.
 
@@ -491,7 +516,9 @@ def finite_screen_bunch_plane_band(
     Signed distinct-pair expectations use the established #615 source law.
     An actual realization is summed coherently BEFORE the local Poynting
     integration. Only the resulting photons/eV/pulse may enter the detector
-    after an explicit positive-flux check. CPU NumPy reference only.
+    after an explicit positive-flux check. The explicit NumPy/CuPy backend
+    builds sources and retains field/flux moments on device, one history at
+    a time with O(nx*ny) workspace. Energy/source-law control remains on host.
     """
     energies = np.asarray(energy_eV, dtype=float)
     if (
@@ -509,11 +536,11 @@ def finite_screen_bunch_plane_band(
     _checked_jones(jones_sp)
     histories, population, weights = _validate_histories(screens, source, float(energies[-1]))
     reference = circular_pec_transition_field(
-        float(energies[0]), histories[0], nx=nx, ny=ny, dx_m=dx_m, dy_m=dy_m
+        float(energies[0]), histories[0], nx=nx, ny=ny, dx_m=dx_m, dy_m=dy_m, xp=xp
     )
     if aperture is not None:
         aperture._weights(reference)  # refuse clipped/empty pupils before expensive moments
-    values = np.array(
+    values = xp.stack(
         [
             _bunch_plane_one(
                 e,
@@ -528,12 +555,13 @@ def finite_screen_bunch_plane_band(
                 plane_z_m=plane_z_m,
                 aperture=aperture,
                 jones_sp=jones_sp,
+                xp=xp,
             )
             for e in energies
         ]
     )
     result = FinitePlaneBunchBand(
-        energy_eV=energies.copy(),
+        energy_eV=xp.asarray(energies).copy(),
         collected_photons_per_eV_per_pulse=values[:, 0],
         self_photons_per_eV_per_electron=values[:, 1],
         pair_photons_per_eV_per_electron_pair=values[:, 2],
@@ -543,7 +571,7 @@ def finite_screen_bunch_plane_band(
         polarization="total" if jones_sp is None else "propagating s/p Jones",
         configuration=_configuration(reference, plane_z_m, aperture, jones_sp),
     )
-    if np.any(result.collected_photons_per_eV_per_pulse < 0):
+    if xp.any(result.collected_photons_per_eV_per_pulse < 0):
         warnings.warn(
             "finite-distance spectral collection has signed negative bins; detector conversion will refuse them",
             RuntimeWarning,

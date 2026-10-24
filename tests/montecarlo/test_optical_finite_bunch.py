@@ -57,6 +57,14 @@ def _run(screens, source, energy=1.0):
     return finite_screen_bunch_angular(energy, screens, source=source, **_GRID)
 
 
+def test_explicit_numpy_source_backend_and_unsupported_namespace():
+    expected = circular_pec_transition_field(1.0, _screen(), **_GRID)
+    actual = circular_pec_transition_field(1.0, _screen(), xp=np, **_GRID)
+    np.testing.assert_array_equal(actual.electric_xy_v_s_m, expected.electric_xy_v_s_m)
+    with pytest.raises(ValueError, match="backend"):
+        circular_pec_transition_field(1.0, _screen(), xp=object(), **_GRID)
+
+
 def test_n1_has_single_electron_energy_and_angular_yield():
     one, u = _single()
     result = _run([_screen()], _Source("sampled", 1))

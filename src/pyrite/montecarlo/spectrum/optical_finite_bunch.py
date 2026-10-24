@@ -1,6 +1,6 @@
 """Finite PEC-screen optical TR/DR and CTR/CDR from physical bunch histories (#616).
 
-CPU reference path connecting the finite, phase-bearing spectral surface fields
+NumPy/CuPy source path connecting the finite, phase-bearing spectral surface fields
 of :mod:`optical_finite_screen` with the physical-population/importance-sampling
 contract of :class:`optical_transition.OpticalBunchSource` (#615).
 
@@ -28,10 +28,11 @@ from __future__ import annotations
 import warnings
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
+from ..._backend import array_namespace
 from .optical_finite_screen import (
     _E_CHARGE_C,
     _HBAR_C_EV_M,
@@ -67,13 +68,13 @@ class FiniteScreenBunchAngular:
     """
 
     energy_eV: float
-    theta_rad: np.ndarray
-    phi_rad: np.ndarray
-    self_yield: np.ndarray
-    pair_yield: np.ndarray
+    theta_rad: Any
+    phi_rad: Any
+    self_yield: Any
+    pair_yield: Any
     form_factor_squared: float
-    yield_per_electron: np.ndarray
-    bunch_yield: np.ndarray
+    yield_per_electron: Any
+    bunch_yield: Any
     physical_electrons: float
     n_histories: int
     effective_histories: float
@@ -81,7 +82,9 @@ class FiniteScreenBunchAngular:
     dy_m: float
     source_record: dict
 
-    def collect_cone(self, *, theta_max_rad: float, theta_min_rad: float = 0.0) -> float:
+    def collect_cone(
+        self, *, theta_max_rad: float, theta_min_rad: float = 0.0, to_host: bool = True
+    ) -> Any:
         """Integrate bunch photons/eV in a forward circular angular annulus.
 
         The integral sums FFT angular cells with physical ``dOmega``. The
@@ -92,6 +95,9 @@ class FiniteScreenBunchAngular:
         several percent with the window (compare ``hemisphere_energy_per_eV``
         for one compact source). No optics, detector efficiency or
         polarization acceptance is silently applied.
+
+        ``to_host=False`` retains the scalar on the array backend for band
+        scoring; the default returns a host float for compatibility.
         """
         if (
             not np.isfinite(theta_min_rad)
@@ -99,16 +105,18 @@ class FiniteScreenBunchAngular:
             or not 0 <= theta_min_rad < theta_max_rad <= np.pi / 2
         ):
             raise ValueError("cone bounds require 0 <= theta_min < theta_max <= pi/2")
-        keep = np.isfinite(self.theta_rad) & (self.theta_rad >= theta_min_rad)
+        xp = array_namespace(self.bunch_yield)
+        keep = xp.isfinite(self.theta_rad) & (self.theta_rad >= theta_min_rad)
         keep &= self.theta_rad <= theta_max_rad
-        if not np.any(keep):
-            return 0.0
+        if not xp.any(keep):
+            return 0.0 if to_host else xp.asarray(0.0)
         ny, nx = self.theta_rad.shape
         k0 = self.energy_eV / _HBAR_C_EV_M
         dkx = 2 * np.pi / (nx * self.dx_m)
         dky = 2 * np.pi / (ny * self.dy_m)
-        d_omega = dkx * dky / (k0**2 * np.cos(self.theta_rad[keep]))
-        return float(np.sum(self.bunch_yield[keep] * d_omega))
+        d_omega = dkx * dky / (k0**2 * xp.cos(self.theta_rad[keep]))
+        value = xp.sum(self.bunch_yield[keep] * d_omega)
+        return float(value) if to_host else value
 
 
 @dataclass(frozen=True, eq=False)
@@ -120,8 +128,8 @@ class FiniteScreenBunchBand:
     explicitly accounted for; ``collected`` does not imply measured response.
     """
 
-    energy_eV: np.ndarray
-    collected_photons_per_eV_per_pulse: np.ndarray
+    energy_eV: Any
+    collected_photons_per_eV_per_pulse: Any
     theta_min_rad: float
     theta_max_rad: float
     source_record: dict
@@ -199,9 +207,11 @@ def _check_temporal_only_law(source: OpticalBunchSource, law: str, histories) ->
             raise ValueError("finite-screen empirical law supports temporal offsets only")
 
 
-def _screen_fields(energy_eV, histories, *, nx, ny, dx_m, dy_m):
+def _screen_fields(energy_eV, histories, *, nx, ny, dx_m, dy_m, xp=np):
     for screen in histories:
-        yield circular_pec_transition_field(energy_eV, screen, nx=nx, ny=ny, dx_m=dx_m, dy_m=dy_m)
+        yield circular_pec_transition_field(
+            energy_eV, screen, nx=nx, ny=ny, dx_m=dx_m, dy_m=dy_m, xp=xp
+        )
 
 
 def _form_factor(source, energy_eV):
@@ -216,21 +226,21 @@ def _form_factor(source, energy_eV):
     return factor
 
 
-def _moments(energy_eV, histories, weights, kx, ky, kz_safe, *, nx, ny, dx_m, dy_m):
+def _moments(energy_eV, histories, weights, kx, ky, kz_safe, *, nx, ny, dx_m, dy_m, xp=np):
     """One pass through sampled histories; no N-history field tensor."""
-    sum_fft = np.zeros((2, ny, nx), complex)
-    sum_one = np.zeros((ny, nx), float)
-    sum_two = np.zeros((ny, nx), float)
+    sum_fft = xp.zeros((2, ny, nx), complex)
+    sum_one = xp.zeros((ny, nx), float)
+    sum_two = xp.zeros((ny, nx), float)
     for weight, field in zip(
         weights,
-        _screen_fields(energy_eV, histories, nx=nx, ny=ny, dx_m=dx_m, dy_m=dy_m),
+        _screen_fields(energy_eV, histories, nx=nx, ny=ny, dx_m=dx_m, dy_m=dy_m, xp=xp),
         strict=True,
     ):
-        ft = np.fft.fft2(field.electric_xy_v_s_m, axes=(-2, -1))
+        ft = xp.fft.fft2(field.electric_xy_v_s_m, axes=(-2, -1))
         norm = (
-            np.abs(ft[0]) ** 2
-            + np.abs(ft[1]) ** 2
-            + np.abs((kx * ft[0] + ky * ft[1]) / kz_safe) ** 2
+            xp.abs(ft[0]) ** 2
+            + xp.abs(ft[1]) ** 2
+            + xp.abs((kx * ft[0] + ky * ft[1]) / kz_safe) ** 2
         )
         sum_fft += weight * ft
         sum_one += weight * norm
@@ -247,6 +257,7 @@ def finite_screen_bunch_angular(
     ny: int,
     dx_m: float,
     dy_m: float,
+    xp: Any = np,
 ) -> FiniteScreenBunchAngular:
     """Estimate finite PEC-screen TR/DR self/pair far-zone angular photons.
 
@@ -255,26 +266,27 @@ def finite_screen_bunch_angular(
     physical charge, independent-electron offset law and positive importance
     weights. A ``realization`` is instead an actual field-level bunch sum.
 
-    This CPU-only reference computes FFTs one history at a time (O(nx*ny)
-    moment workspace). No transport-to-screen handoff, emission beyond the
-    bounded ideal PEC geometry, GPU parity or experimental anchor is implied.
+    The explicit NumPy/CuPy backend builds fields and computes FFTs one history
+    at a time with O(nx*ny) moment workspace. Geometry, weights and source-law
+    control remain on the host. No emission beyond the bounded ideal PEC
+    geometry or experimental anchor is implied.
     """
     histories, n_physical, weights = _validate_histories(screens, source, energy_eV)
     # Generate one source first to validate the grid before allocating moments.
     reference = circular_pec_transition_field(
-        energy_eV, histories[0], nx=nx, ny=ny, dx_m=dx_m, dy_m=dy_m
+        energy_eV, histories[0], nx=nx, ny=ny, dx_m=dx_m, dy_m=dy_m, xp=xp
     )
     k0, kx, ky, kz = _wavevectors(reference)
     good = (kx * kx + ky * ky) < k0 * k0 * (1 - 1e-12)
-    kz_safe = np.where(good, kz, 1.0)
+    kz_safe = xp.where(good, kz, 1.0)
     sum_fft, one, two = _moments(
-        energy_eV, histories, weights, kx, ky, kz_safe, nx=nx, ny=ny, dx_m=dx_m, dy_m=dy_m
+        energy_eV, histories, weights, kx, ky, kz_safe, nx=nx, ny=ny, dx_m=dx_m, dy_m=dy_m, xp=xp
     )
     # Proper vector metric, including Ez for each transverse Fourier mode.
     full = (
-        np.abs(sum_fft[0]) ** 2
-        + np.abs(sum_fft[1]) ** 2
-        + np.abs((kx * sum_fft[0] + ky * sum_fft[1]) / kz_safe) ** 2
+        xp.abs(sum_fft[0]) ** 2
+        + xp.abs(sum_fft[1]) ** 2
+        + xp.abs((kx * sum_fft[0] + ky * sum_fft[1]) / kz_safe) ** 2
     )
     w_sum = float(np.sum(weights))
     w2_sum = float(np.sum(weights**2))
@@ -284,7 +296,7 @@ def finite_screen_bunch_angular(
     if denominator > 0:
         pair = (full - h) / denominator
     else:
-        pair = np.zeros_like(g)
+        pair = xp.zeros_like(g)
     factor = _form_factor(source, energy_eV)
     total = (
         full / w_sum
@@ -293,25 +305,25 @@ def finite_screen_bunch_angular(
     )
     # Angle -> spectral photons uses the exact two-sided Fourier norm from
     # optical_finite_screen.far_field_photons_per_eV_sr.
-    cosine = np.where(good, kz.real / k0, 0.0)
+    cosine = xp.where(good, kz.real / k0, 0.0)
     prefactor = (
         k0**2
         * cosine**2
         * (dx_m * dy_m) ** 2
         / (4 * np.pi**3 * _Z0_OHM * _HBAR_EV_S * energy_eV * _E_CHARGE_C)
     )
-    yself = np.where(good, prefactor * g, 0.0)
-    ypair = np.where(good, prefactor * pair, 0.0)
-    ytotal = np.where(good, prefactor * total, 0.0)
-    if np.any(ytotal < -1e-12 * max(float(np.max(yself)), 1e-300)):
+    yself = xp.where(good, prefactor * g, 0.0)
+    ypair = xp.where(good, prefactor * pair, 0.0)
+    ytotal = xp.where(good, prefactor * total, 0.0)
+    if xp.any(ytotal < -1e-12 * max(float(xp.max(yself)), 1e-300)):
         warnings.warn(
             "finite-screen CTR signed pair estimator is unresolved; "
             "returned unclipped negative spectral bins",
             RuntimeWarning,
             stacklevel=2,
         )
-    theta = np.where(good, np.arccos(np.clip(cosine, -1, 1)), np.nan)
-    phi = np.broadcast_to(np.arctan2(ky, kx), (ny, nx)).copy()
+    theta = xp.where(good, xp.arccos(xp.clip(cosine, -1, 1)), np.nan)
+    phi = xp.broadcast_to(xp.arctan2(ky, kx), (ny, nx)).copy()
     return FiniteScreenBunchAngular(
         energy_eV=float(energy_eV),
         theta_rad=theta,
@@ -339,6 +351,7 @@ def finite_screen_realization_field(
     ny: int,
     dx_m: float,
     dy_m: float,
+    xp: Any = np,
 ) -> ScreenSpectralField:
     """Exactly sum physical-electron complex surface fields, for realisations.
 
@@ -346,15 +359,16 @@ def finite_screen_realization_field(
     ``propagate_screen_field`` or ``observe_screen_green`` and later summed
     coherently across *linear* optical operators. A sampled ensemble that
     represents N >> M physical electrons does NOT have a unique realizable
-    summed field, so this function explicitly rejects it.
+    summed field, so this function explicitly rejects it. ``xp`` chooses
+    NumPy (default) or the active CuPy backend for generation and summation.
     """
     histories, _, _ = _validate_histories(screens, source, energy_eV)
     if source.law != "realization":
         raise ValueError("only law='realization' has a physical complex bunch field")
     total = None
-    for field in _screen_fields(energy_eV, histories, nx=nx, ny=ny, dx_m=dx_m, dy_m=dy_m):
+    for field in _screen_fields(energy_eV, histories, nx=nx, ny=ny, dx_m=dx_m, dy_m=dy_m, xp=xp):
         if total is None:
-            total = np.array(field.electric_xy_v_s_m, copy=True)
+            total = xp.array(field.electric_xy_v_s_m, copy=True)
         else:
             total += field.electric_xy_v_s_m
     assert total is not None  # _validate_histories rejects empty histories
@@ -370,6 +384,7 @@ def finite_screen_bunch_band(
     ny: int,
     dx_m: float,
     dy_m: float,
+    xp: Any = np,
     theta_max_rad: float,
     theta_min_rad: float = 0.0,
 ) -> FiniteScreenBunchBand:
@@ -389,16 +404,16 @@ def finite_screen_bunch_band(
     ):
         raise ValueError("energy_eV must be a finite positive increasing 1-D grid")
     s = tuple(screens)
-    spectrum = np.array(
+    spectrum = xp.stack(
         [
             finite_screen_bunch_angular(
-                energy, s, source=source, nx=nx, ny=ny, dx_m=dx_m, dy_m=dy_m
-            ).collect_cone(theta_max_rad=theta_max_rad, theta_min_rad=theta_min_rad)
+                energy, s, source=source, nx=nx, ny=ny, dx_m=dx_m, dy_m=dy_m, xp=xp
+            ).collect_cone(theta_max_rad=theta_max_rad, theta_min_rad=theta_min_rad, to_host=False)
             for energy in e
         ]
     )
     return FiniteScreenBunchBand(
-        energy_eV=e.copy(),
+        energy_eV=xp.asarray(e).copy(),
         collected_photons_per_eV_per_pulse=spectrum,
         theta_min_rad=theta_min_rad,
         theta_max_rad=theta_max_rad,

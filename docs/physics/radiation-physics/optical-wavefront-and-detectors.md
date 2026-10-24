@@ -112,8 +112,8 @@ print(reading.absorbed_joule_per_pulse, reading.expected_voltage_v)
   handoff. Real materials, general finite surfaces and exact edge currents
   are not. Measured passive Jones elements and a pitch/window convergence
   diagnostic exist (sections below). Published numerical benchmark,
-  measured element data, spectral convergence and production source kernels
-  remain open; bounded field-operator CUDA parity is recorded below.
+  measured element data, spectral convergence and automatic production
+  integration remain open; bounded source/field CUDA parity is recorded below.
 - **#617:** supply a real measured and provenance-pinned detector calibration,
   temporal/electronic response and broader uncertainty propagation. The bounded
   field handoff, ideal polarized interferogram and conditional Gaussian fit
@@ -394,7 +394,9 @@ window response, or measured detector calibration: add these explicitly before
 claiming a *detected* bunch spectrum. The response operator in #617 then
 converts such a collected spectrum to joules and an isolated-pulse signal.
 
-This is a CPU reference, not yet production transport/geometry integration.
+NumPy is the default; an explicit active CuPy backend retains source fields
+and moments on device. Automatic production transport/geometry integration
+remains separate.
 For realistic bunches, memory is kept to a few FFT planes per energy, but
 computational cost scales with sampled histories × photon energies × FFT mesh.
 Numerical convergence must be established separately for the source/edge
@@ -1004,9 +1006,28 @@ plane flux reductions use the namespace owning the field. Host arrays stay
 on the CPU even with CUDA selected. Constructors copy the input storage;
 NumPy copies are read-only, while CuPy copies remain writable.
 
-The PEC source builder and bunch/transport orchestration remain CPU reference
-paths. Upload a realized source field explicitly; this is not a GPU source
-kernel or a production dispatcher. Plane aperture masks and quadrature nodes
+The PEC source builder and bunch scorers accept an explicit `xp=np` (default)
+or the active CuPy namespace. Select `PYRITE_MC_BACKEND=cuda` before import,
+then pass `xp=cupy` to generate the mesh, metal mask, modified Bessel $K_0/K_1$
+values and complex source field directly on the GPU. The CPU uses SciPy's
+Bessel functions; the device uses `cupyx.scipy.special`, with no CPU fallback.
+Unsupported source namespaces fail explicitly. Oblique velocity, impact point
+and arrival-time phase use the same source equation on either backend.
+
+Realized bunches sum complex fields on device. Sampled bunches stream weighted
+self, squared-weight self subtraction and distinct-pair moments one history at
+a time with O(nx×ny) field workspace, never a history-by-pixel tensor. Angular
+and finite-plane band arrays retain the selected backend; finite-plane moments
+use the bilinear flux of both coherently summed E and H. The three existing
+`case_finite_screen_*` adapters pass `xp` through after the host entrance and
+formation checks. Screen parameters, energy-node iteration, physical-population
+laws, weights and crossing extraction remain host control. `collect_cone`
+returns a host float by default; `to_host=False` retains its scalar on device.
+Band arrays can feed `predict_batch` without downloading the spectrum.
+
+These source kernels extend the bounded ideal-PEC operator; they do not wire
+it into the automatic production dispatcher or add self-consistent screen
+scattering/material response. Plane aperture masks and quadrature nodes
 are built on the host and uploaded. Large complex field arrays stay on the
 device during propagation and collection; validation checks and final scalar
 fluxes synchronize with the host. The interferometer handoff now keeps its
@@ -1031,7 +1052,7 @@ voltage arrays. `OpticalInterferogram.save` explicitly downloads the result
 arrays for the existing NPZ format. Calibration/configuration data remain
 on the host and are staged at operator entry. CPU optimization/inference
 control is unchanged; these forward reductions do not add a production source
-dispatcher or GPU PEC source builder.
+dispatcher.
 
 `tests/montecarlo/test_optical_cuda_parity.py` checks normal-disc and oblique
 annulus propagation, complex direct Green fields, FFT angular yields,
@@ -1058,6 +1079,29 @@ staging the test (tests are not included in `pyrite remote sync`):
 PYRITE_TEST_BACKEND=cuda uv run --extra nvidia pyrite-dev test \
   tests/montecarlo/test_optical_cuda_parity.py --durations=0
 ```
+
+[Native-source hardware evidence](../../validation/check-records/optical-source-cuda.json)
+records 15 passing tests (SLURM 2279): eight source checks and the seven retained
+device-operator checks. `tests/montecarlo/test_optical_source_cuda.py` generates
+normal-disc, oblique-annulus and displaced/arrival-phased fields directly on
+device with CPU Bessel calls disabled. It compares weighted sampled, temporal
+Gaussian and realized bunch moments, finite-plane flux and device pulse output;
+coincident sources give N² and opposite phases cancel. A real seeded 30 keV
+`Case` transports four primaries, selects two optical histories and invokes
+the device source/plane adapters. That transport check is marked `slow`.
+Run it explicitly with the retained forward checks:
+
+```bash
+PYRITE_TEST_BACKEND=cuda uv run --extra nvidia pyrite-dev test --slow \
+  tests/montecarlo/test_optical_source_cuda.py \
+  tests/montecarlo/test_optical_cuda_parity.py --durations=0
+```
+
+Source comparisons allow relative $10^{-10}$ and a peak-scaled $10^{-12}$
+absolute floor for complex fields/maps; collected flux uses relative
+$10^{-10}$. These account for float64/complex128 Bessel and reduction ordering,
+not physical mesh or aperture convergence. The record pins the synced source
+and staged test hashes and includes the exact remote command.
 
 This is hardware parity evidence for the bounded reference operators.
 Published finite-source/instrument benchmarks, measured calibration and

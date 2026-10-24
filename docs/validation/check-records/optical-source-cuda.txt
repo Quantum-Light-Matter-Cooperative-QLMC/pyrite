@@ -1,0 +1,18 @@
+NVIDIA GeForce RTX 5080, 610.47
+...............                                                          [100%]
+============================== slowest durations ===============================
+1.44s call     ::test_real_case_transport_to_native_device_source
+0.64s call     ::test_direct_sums_match_on_device
+0.15s call     ::test_native_source_and_propagated_flux_match_cpu[1.0-screen0]
+0.12s call     ::test_end_to_end_interferogram_matches_from_device_fields
+0.08s call     ::test_device_angular_and_plane_source_moments[sampled]
+0.07s call     ::test_device_angular_and_plane_source_moments[gaussian]
+0.07s call     ::test_device_angular_and_plane_source_moments[realization]
+0.04s call     ::test_device_jones_and_interferogram_reductions_and_save
+0.01s call     ::test_propagated_field_and_fft_collection_match_on_device[screen0]
+0.01s call     ::test_native_realization_n_squared_and_phase_cancellation
+0.01s call     ::test_propagated_field_and_fft_collection_match_on_device[screen1]
+0.01s call     ::test_native_source_and_propagated_flux_match_cpu[0.2-screen1]
+
+(33 durations < 0.005s hidden.  Use -vv to show these durations.)
+15 passed in 3.33s

@@ -27,11 +27,13 @@ Validation: optical-finite-boundary-field
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
+from importlib import import_module
+from typing import Any
 
 import numpy as np
 from scipy.special import k0, k1
 
-from ..._backend import array_namespace
+from ..._backend import BACKEND, array_namespace
 
 __all__ = [
     "PECCircularScreen",
@@ -165,6 +167,16 @@ def _wavevectors(field: ScreenSpectralField):
     return k0, kx, ky, kz
 
 
+def _source_bessel_functions(xp: Any) -> tuple[Any, Any]:
+    """Bessel kernels for the explicit supported source namespace; no fallback."""
+    if xp is np:
+        return k0, k1
+    if xp is not BACKEND.xp or BACKEND.name not in ("cuda", "rocm"):
+        raise ValueError("source backend must be NumPy or the active CuPy backend")
+    special = import_module("cupyx.scipy.special")
+    return special.k0, special.k1
+
+
 def circular_pec_transition_field(
     energy_eV: float,
     screen: PECCircularScreen,
@@ -173,6 +185,7 @@ def circular_pec_transition_field(
     ny: int = 256,
     dx_m: float,
     dy_m: float,
+    xp: Any = np,
 ) -> ScreenSpectralField:
     """Outgoing PEC tangential field driven by an oblique straight electron.
 
@@ -196,6 +209,10 @@ def circular_pec_transition_field(
     Even-sized centred FFT grids are required, and pixel sampling must resolve
     both the screen edge and the contracted virtual-photon transverse scale.
 
+    ``xp`` explicitly selects NumPy (default) or the active CuPy backend.
+    Bessel evaluation, masks and complex field arrays stay on that backend;
+    scalar validity checks synchronize. No CPU source field is uploaded.
+
     Validation: optical-finite-boundary-field
     """
     if not isinstance(screen, PECCircularScreen):
@@ -215,18 +232,19 @@ def circular_pec_transition_field(
         raise ValueError("dx_m and dy_m must be finite and positive")
     if 2 * screen.outer_radius_m >= min(nx * dx_m, ny * dy_m):
         raise ValueError("screen must fit strictly inside the transverse FFT window")
-    x = (np.arange(nx) - (nx - 1) / 2) * dx_m
-    y = (np.arange(ny) - (ny - 1) / 2) * dy_m
-    xx, yy = np.meshgrid(x, y)
+    bessel_zero, bessel_one = _source_bessel_functions(xp)
+    x = (xp.arange(nx) - (nx - 1) / 2) * dx_m
+    y = (xp.arange(ny) - (ny - 1) / 2) * dy_m
+    xx, yy = xp.meshgrid(x, y)
     # The screen mask uses origin, but the *charge field* uses its intercept.
-    metal_r = np.hypot(xx, yy)
+    metal_r = xp.hypot(xx, yy)
     metal = (metal_r >= screen.inner_radius_m) & (metal_r <= screen.outer_radius_m)
     rx, ry = xx - screen.electron_x_m, yy - screen.electron_y_m
-    r = np.hypot(rx, ry)
-    if np.any(metal & (r == 0)):
+    r = xp.hypot(rx, ry)
+    if xp.any(metal & (r == 0)):
         raise ValueError("electron intercept exactly at a metal grid node: shift/refine mesh")
-    result = np.zeros((2, ny, nx), complex)
-    if np.any(metal):
+    result = xp.zeros((2, ny, nx), complex)
+    if xp.any(metal):
         beta = screen.beta_xyz
         beta_abs = float(np.linalg.norm(beta))
         unit = beta / beta_abs
@@ -240,19 +258,19 @@ def circular_pec_transition_field(
         perp_x = rx[metal] - unit[0] * projection
         perp_y = ry[metal] - unit[1] * projection
         perp_z = -unit[2] * projection
-        a = np.sqrt(perp_x**2 + perp_y**2 + perp_z**2) / gamma
-        if np.any(a <= 0):
+        a = xp.sqrt(perp_x**2 + perp_y**2 + perp_z**2) / gamma
+        if xp.any(a <= 0):
             raise ValueError("electron trajectory intersects the sampled PEC node")
         argument = omega * a / speed
-        phase = np.exp(1j * omega * (screen.arrival_time_s + projection / speed))
+        phase = xp.exp(1j * omega * (screen.arrival_time_s + projection / speed))
         coefficient = (
             -screen.charge_c * omega / (2.0 * np.pi * _EPS0_F_M * gamma**2 * speed**2)
         ) * phase
-        k_one = k1(argument)
-        k_zero = k0(argument)
+        k_one = bessel_one(argument)
+        k_zero = bessel_zero(argument)
         result[0, metal] = coefficient * (perp_x / a * k_one - 1j * unit[0] * k_zero)
         result[1, metal] = coefficient * (perp_y / a * k_one - 1j * unit[1] * k_zero)
-        if not np.all(np.isfinite(result)):
+        if not xp.all(xp.isfinite(result)):
             raise ValueError("PEC source exceeded finite spectral-field range; refine input")
     return ScreenSpectralField(energy_eV, dx_m, dy_m, result)
 

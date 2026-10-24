@@ -7,9 +7,15 @@ and it does not inherit the case X-ray photon-energy grid or detector model.
 The output has forward-vacuum-cone integrated photons/(eV pulse), not a
 finite-distance detector signal. Incoherent addition to planar TR on the same
 physical interface would double-count the source.
+
+Each adapter accepts an explicit NumPy/CuPy ``xp`` for source generation and
+bunch scoring. Crossing extraction, geometry, source laws and formation guards
+remain host control; no electron transport or material model is changed.
 """
 
 from __future__ import annotations
+
+from typing import Any
 
 import numpy as np
 
@@ -82,6 +88,7 @@ def case_finite_screen_band(
     ny: int,
     dx_m: float,
     dy_m: float,
+    xp: Any = np,
     theta_max_rad: float,
     theta_min_rad: float = 0.0,
     centre_xy_ang=(0.0, 0.0),
@@ -94,7 +101,7 @@ def case_finite_screen_band(
 
     Optical energies are explicit (no lowered X-ray continuum floor), and
     neither target optical permittivity nor a detector QE is inferred. This
-    CPU reference does not account for screen scattering, other radiation,
+    diagnostic does not account for screen scattering, other radiation,
     finite-distance optical collection, or a radiative energy budget.
     Source weights are indexed by the same ``Ne_brem`` primary histories.
     The bunch normalization is delegated to ``finite_screen_bunch_band``.
@@ -125,6 +132,7 @@ def case_finite_screen_band(
         ny=ny,
         dx_m=dx_m,
         dy_m=dy_m,
+        xp=xp,
         theta_max_rad=theta_max_rad,
         theta_min_rad=theta_min_rad,
     )
@@ -142,6 +150,7 @@ def case_finite_screen_realization_field(
     ny: int,
     dx_m: float,
     dy_m: float,
+    xp: Any = np,
     centre_xy_ang=(0.0, 0.0),
     time_origin_ang: float = 0.0,
     max_angle_rad: float = 1e-3,
@@ -177,6 +186,7 @@ def case_finite_screen_realization_field(
         ny=ny,
         dx_m=dx_m,
         dy_m=dy_m,
+        xp=xp,
     )
 
 
@@ -192,6 +202,7 @@ def case_finite_screen_plane_band(
     ny: int,
     dx_m: float,
     dy_m: float,
+    xp: Any = np,
     plane_z_m: float,
     aperture,
     jones_sp=None,
@@ -255,6 +266,7 @@ def case_finite_screen_plane_band(
         ny=ny,
         dx_m=dx_m,
         dy_m=dy_m,
+        xp=xp,
         plane_z_m=plane_z_m,
         aperture=aperture,
         jones_sp=jones_sp,

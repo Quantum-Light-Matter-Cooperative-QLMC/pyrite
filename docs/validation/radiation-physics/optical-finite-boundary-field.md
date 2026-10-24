@@ -157,3 +157,179 @@ What this does and does not establish:
 
 - The incident field is that of an infinite straight trajectory, the standard PEC-image construction; no finite-track, deflection or thickness effects.
 - All checks are synthetic and numerical; no measured data.
+
+
+## Independent backend-scope re-derivation (2026-10-23)
+
+This fresh verifier read the ledger row, public signatures/docstrings and research
+requirements, and resolved the primary sources before inspecting implementation
+bodies, tests, diffs, or the earlier sections of this document. This section was
+appended before implementation inspection. Scope: oblique moving-charge PEC
+source, actual-electron realization sums, weighted distinct-electron angular
+moments and finite-plane bilinear flux under explicit NumPy/CuPy selection.
+
+Sources: [Shkvarunets and Fiorito](https://arxiv.org/pdf/0712.2848), Eq. (8)
+including the longitudinal field, Eq. (15) for the tangential boundary and
+Eqs. (17), (19)–(25) for outgoing vector propagation;
+[Schmidt et al.](https://arxiv.org/html/1803.00608), Eq. (4) for the uniformly
+moving charge, Eq. (6) for the Ginzburg–Frank limit and Eqs. (11)–(15)
+for finite-radius propagation. These establish the physical-optics model;
+a finite mask is not an exact finite-body Maxwell solution.
+
+### Derivation recorded before code inspection
+
+Use the temporal transform $\widetilde{\mathbf E}(\omega)= \int\mathbf E(t)e^{i\omega t}\,dt$, with inverse time dependence
+$e^{-i\omega t}$, and the spatial transform
+$\widehat{\mathbf E}(\mathbf k_t)=\int\widetilde{\mathbf E} e^{-i\mathbf k_t\cdot\mathbf r_t}\,d^2r_t$.
+Let $\mathbf d=\boldsymbol\beta/\beta$, $v=c\beta$,
+$\gamma=(1-\beta^2)^{-1/2}$, $\mathbf u=(x-x_0,y-y_0,0)$,
+$\ell=\mathbf d\cdot\mathbf u$, $\mathbf p=\mathbf u-\mathbf d\ell$,
+$a=|\mathbf p|/\gamma$ and $\tau=t-t_0-\ell/v$.
+The Lorentz-transformed Coulomb field becomes
+
+$$
+\mathbf E(t)=\frac{q}{4\pi\epsilon_0\gamma^2}
+\frac{\mathbf p-\mathbf d v\tau}{(a^2+v^2\tau^2)^{3/2}}.
+$$
+
+Fourier integration of the even transverse term and odd longitudinal term gives
+
+$$
+\widetilde{\mathbf E}_{\rm inc}=
+\frac{q\omega}{2\pi\epsilon_0\gamma^2v^2}
+ e^{i\omega(t_0+\ell/v)}
+\left[\frac{\mathbf p}{a}K_1\!\left(\frac{\omega a}{v}\right)
+-i\mathbf d K_0\!\left(\frac{\omega a}{v}\right)\right].
+$$
+
+The odd term has the negative imaginary sign because $\int\tau (a^2+v^2\tau^2)^{-3/2}e^{i\omega\tau}d\tau$ is positive imaginary.
+Both the incidence phase and Bessel arguments use the full speed, not its
+normal component. The source is $\widetilde{\mathbf E}_t= -\chi_{\rm metal}\widetilde{\mathbf E}_{{\rm inc},t}$;
+$\chi_{\rm metal}$ selects the disc or annulus about the screen centre.
+The virtual incident field over a hole is not an outgoing source.
+
+The prefactor has units $\mathrm{V\,s/m}$; the bracket is dimensionless.
+At normal incidence the tangential longitudinal term vanishes, leaving
+$q\omega K_1(\omega\rho/(\gamma v))/(2\pi\epsilon_0\gamma v^2)$
+radially. Removing the metal gives zero. Charge reversal reverses the field;
+arrival delay multiplies it by $e^{i\omega\Delta t}$.
+The infinite-plane, resolved-grid limit must recover the absolute
+Ginzburg–Frank angular yield, including its full $\beta$ dependence.
+The trajectory singularity needs a stated grid regularization and convergence;
+it does not alter the continuum formula away from the trajectory.
+
+For outgoing vacuum modes, $k=\omega/c$, $k_z=\sqrt{k^2-k_t^2}$,
+$\widehat E_z=-\mathbf k_t\cdot\widehat{\mathbf E}_t/k_z$.
+Stationary phase of the inverse spatial transform gives the far-field
+amplitude $r\mathbf E=-ik_z\widehat{\mathbf E}/(2\pi)$ up to a common
+outgoing phase. Real-field Parseval gives positive-frequency energy
+$\epsilon_0c|r\mathbf E|^2/\pi$ per angular frequency and solid angle.
+Thus the photon density per eV and solid angle is
+
+$$
+\frac{d^2n}{dE_{\rm eV}\,d\Omega}
+=\frac{\epsilon_0c\,k_z^2}{4\pi^3\hbar E_{\rm eV}}
+ \left|\widehat{\mathbf E}\right|^2.
+$$
+
+For independent weighted samples define $p_j=w_j/\sum_lw_l$ and
+$D=1-\sum_jp_j^2$. For vector responses $\mathbf A_j$,
+
+$$
+S=\sum_jp_j|\mathbf A_j|^2,\qquad
+P=\frac{|\sum_jp_j\mathbf A_j|^2-
+\sum_jp_j^2|\mathbf A_j|^2}{D}.
+$$
+
+The total bunch is $NS+N(N-1)P$, and the per-electron result is
+$S+(N-1)P$. The denominator normalizes the distinct ordered sample pairs;
+the squared weights in the subtraction are essential. This is the stated
+self-normalized weighted independent-sample prescription, not a proof of
+unbiasedness for arbitrary importance-sampling schemes. For equal weights it
+reduces to the ordered-pair U-statistic. A zero denominator cannot estimate a
+nonzero population pair term. An actual realization instead sums each physical
+electron field once and takes its squared norm, with no Monte Carlo pair
+subtraction; coincident responses give $N^2$, and $N=1$ gives the self term.
+
+At finite distance replace the norm by the real bilinear normal flux. With
+$\mathbf H=(\mathbf k\times\mathbf E)/(\mu_0\omega)$ for each vacuum mode,
+
+$$
+S_z=\sum_jp_j\operatorname{Re}(\mathbf E_j\times\mathbf H_j^*)_z,
+\quad
+P_z=\frac{\operatorname{Re}[(\sum_jp_j\mathbf E_j)
+\times(\sum_jp_j\mathbf H_j)^*]_z-
+\sum_jp_j^2\operatorname{Re}(\mathbf E_j\times\mathbf H_j^*)_z}{D}.
+$$
+
+The photon flux is $[NS_z+N(N-1)P_z]/(\pi\hbar E_{\rm eV})$;
+area integration uses the physical pixel area. Aperture and Jones operations
+must act linearly on each field before these moments. The same weighted
+subtraction must apply to the full electric–magnetic bilinear, not an
+intensity surrogate. No monochromatic $1/2$ belongs in this temporal-transform
+positive-frequency normalization. Individual interference estimates may be
+negative and must retain their sign. Backend selection may change array
+execution but must preserve all these phases, normalizations and bilinears.
+
+
+### Scoped comparison after implementation inspection
+
+The bodies were inspected only after the preceding derivation was appended.
+`circular_pec_transition_field` matches the derived full-speed coefficient,
+three-dimensional perpendicular distance, positive incidence/arrival phase,
+negative imaginary longitudinal term, PEC minus sign and disc/annulus mask.
+The singular sampled trajectory is rejected rather than regularized silently.
+`_source_bessel_functions` selects SciPy on NumPy and `cupyx.scipy.special`
+on the active CuPy backend. The backend change does not replace the physical
+speed by its normal component or remove the longitudinal contribution.
+
+`_moments` retains both transverse components and the Maxwell longitudinal
+component in each norm. Its `sum_one` uses the first power of weight and
+`sum_two` uses the second power. `finite_screen_bunch_angular` subtracts
+`sum_two` from the norm of the weighted field sum and divides by
+$W^2-W_2$, where $W=\sum_jw_j$ and $W_2=\sum_jw_j^2$.
+Its prefactor contains $k_z^2(\Delta x\Delta y)^2$ divided by
+$4\pi^3 Z_0\hbar E_{\rm eV}$ with $\hbar$ expressed in joule seconds
+through `_HBAR_EV_S * _E_CHARGE_C`. Since $1/Z_0=\epsilon_0c$, this
+matches the independently derived angular normalization. The pixel area
+squared converts the unnormalized discrete FFT to the spatial integral.
+The realization branch divides the unweighted field-sum norm by the history
+count for the per-electron result, then restores the physical population for
+the bunch result. `finite_screen_realization_field` sums the complex source
+fields directly, rejecting sampled laws. `_validate_histories` refuses
+macro-particle weights for a realization and insufficient histories for a
+sampled population with pairs.
+
+For analytic temporal laws, `_form_factor` multiplies the pair contribution
+only; sampled and realization laws use unity because their field phases
+already carry the timing. This preserves the distinction between a resolved
+sampled arrival distribution and a separately specified independent temporal
+law. It does not apply an extra temporal form factor to the self radiation.
+
+`_bunch_plane_one` constructs each field using the selected backend and
+propagates it before reducing the fields. `_plane_electric_magnetic` uses
+$\widehat E_z=-(k_x\widehat E_x+k_y\widehat E_y)/k_z$ and
+$\mathbf H=\mathbf k\times\mathbf E/(Z_0k)$, including complex $k_z$.
+`_collected_energy` computes exactly
+$\operatorname{Re}(E_xH_y^*-E_yH_x^*)$, integrates the same aperture weights
+with $\Delta x\Delta y$, and divides by $\pi\hbar_{\rm eV\,s}$.
+Its return is energy per eV; subsequent division by photon energy in joules
+therefore reproduces the derived photon normalization. The finite-plane pair
+subtraction uses squared-weight individual bilinear fluxes, the same
+$W^2-W_2$ denominator, and the coherent sum of both electric and magnetic
+fields. It does not substitute an electric-field norm for flux. The
+realization branch returns the actual summed-field flux without pair
+estimation. Jones filtering occurs before both electric and magnetic fields
+are reconstructed, and the aperture weighting is common to all moments.
+
+**Scoped verdict: rederived.** Units, continuum limits and phase/sign conventions
+pass symbolically; no divergent factor, sign, exponent, unit, weight power,
+pair denominator or flux convention was found in the requested backend scope.
+This comparison does not execute accelerator parity, certify an arbitrary
+importance-sampling law, or upgrade the physical-optics finite-screen model
+to an exact finite-body solution. Existing broader physical limitations and
+published-anchor requirements remain outside this backend audit.
+
+Suggested ledger change: retain `rederived`; optionally record this fresh
+source-first backend-scope verification in Checks, without claiming an anchor
+or human sign-off.
