@@ -24,7 +24,7 @@ import os
 import re
 import tempfile
 import tomllib
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import contextmanager
 from contextvars import ContextVar
 from pathlib import Path
@@ -84,7 +84,7 @@ _BUNDLED_PROFILE_WRITES: ContextVar[bool] = ContextVar("bundled_profile_writes",
 
 
 @contextmanager
-def bundled_profile_writes() -> Iterator[None]:
+def bundled_profile_writes() -> Generator[None]:
     """Maintainer context: edit bundled objects without the user layer."""
     token = _BUNDLED_PROFILE_WRITES.set(True)
     try:

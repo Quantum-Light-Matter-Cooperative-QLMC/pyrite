@@ -107,6 +107,7 @@ _CASE_KEY_ORDER = (
     "atomic_electron_deflection",
     "shell_ionization_model",
     "channeling",
+    "channeling_source",
     "transition_radiation",
     "beam_uvw",
     "surface_hkl",
@@ -335,6 +336,8 @@ class Case(Mapping[str, Any]):
     channeling: dict[str, object] | _Absent = _ABSENT
     transition_radiation: dict[str, object] | _Absent = _ABSENT
     shell_ionization_model: Literal["bote-salvat"] | _Absent = _ABSENT
+    # Appended to retain existing frozen-slot pickle state offsets.
+    channeling_source: dict[str, object] | _Absent = _ABSENT
 
     def __setstate__(self, state: list[Any]) -> None:
         """Restore frozen-slot pickles, filling newly appended optional fields."""
@@ -450,6 +453,10 @@ class Case(Mapping[str, Any]):
                 )
         if self.channeling is not _ABSENT:
             self._validate_channeling()
+        if self.channeling_source is not _ABSENT:
+            from .channeling.planar_injection import validate_source_case
+
+            validate_source_case(self)
         self._validate_transition_radiation()
         if self.coherent_flat_omission_limit is not _ABSENT:
             _positive(

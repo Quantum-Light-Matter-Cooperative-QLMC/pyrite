@@ -8,9 +8,14 @@ never interpreted as physical dechanneling.
 from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
-from typing import Literal
+from pathlib import Path
+from typing import TYPE_CHECKING, Literal
 
 from ._numerics import Numerics, Physics, _miller, validate_channeling_numerics
+
+if TYPE_CHECKING:
+    from .planar_source import PlanarStateProjection
+    from .quantum_state import TransverseStateSpec
 
 
 @dataclass(frozen=True)
@@ -127,4 +132,36 @@ class QuantumSetup:
         return (
             replace(physics, channeling_model="planar", channeling_plane=self.region.plane_hkl),
             replace(numerics, **values),
+        )
+
+    def project_state(
+        self,
+        state: TransverseStateSpec,
+        *,
+        crystal: str,
+        kinetic_energy_eV: float,
+        incidence_rad: float = 0.0,
+        impact: str = "averaged",
+        temperature_K: float = 293.15,
+        margin_eV: float | None = None,
+        base_dir: str | Path | None = None,
+    ) -> PlanarStateProjection:
+        """Project a portable state for diagnostic planar density evolution.
+
+        This does not admit production transport or persisted CR emission.
+        The incidence is the *effective refracted* angle to the planes.
+        Axial configurations use #624's shared physical-admission refusal.
+        """
+        from .planar_source import project_planar_source
+
+        return project_planar_source(
+            state,
+            setup=self,
+            crystal=crystal,
+            kinetic_energy_eV=kinetic_energy_eV,
+            incidence_rad=incidence_rad,
+            impact=impact,
+            temperature_K=temperature_K,
+            margin_eV=margin_eV,
+            base_dir=base_dir,
         )

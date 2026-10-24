@@ -139,6 +139,11 @@ tests or changes formatting.
 - Never mask a gate's exit code: no `| tail`/`| grep` on lint, test or verify
   without `set -o pipefail`; prefer `cmd > scratch/x.log 2>&1; echo rc=$?`.
 - Local tests: `pyrite-dev test` sizes workers by memory; never raise `-n`.
+  That budget is a heuristic, not a memory limit. Full `--slow` audits and
+  isolated multi-GiB tests belong on the remote box; see the measured
+  [slow-test audit](docs/repo-design/compute/slow-test-audit.md). For parallel
+  CPU audits, start with `OPENBLAS_NUM_THREADS=1` to avoid multiplying BLAS
+  threads by xdist workers; benchmark larger thread counts explicitly.
   Cap heavy local probes with
   `systemd-run --user --scope -p MemoryMax=8G -p MemorySwapMax=0 ...`.
   After a squash/rebase with no content change, rerun only focused tests;

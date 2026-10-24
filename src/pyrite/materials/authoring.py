@@ -9,7 +9,7 @@ import math
 import os
 import re
 import tempfile
-from collections.abc import Iterator, Mapping
+from collections.abc import Generator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
@@ -349,7 +349,7 @@ def save_material(
 
 
 @contextmanager
-def _authoring_lock(root: Path) -> Iterator[None]:
+def _authoring_lock(root: Path) -> Generator[None]:
     lock = root / ".material-authoring.lock"
     try:
         lock.mkdir()

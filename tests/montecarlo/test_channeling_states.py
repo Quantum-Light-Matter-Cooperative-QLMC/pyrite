@@ -22,10 +22,16 @@ def solver():
 
 def _norm(state):
     nodes, weights = zip(*(st._uniform_nodes(e, r) for e, r in state._hints()), strict=True)
-    density = np.abs(state.amplitude(*nodes)) ** 2
-    for w in weights:
-        density = np.tensordot(w / (2 * np.pi), density, axes=([0], [0]))
-    return float(density)
+    if len(nodes) == 1:
+        return float(np.dot(weights[0] / (2 * np.pi), np.abs(state.amplitude(*nodes)) ** 2))
+    # Keep every quadrature node and weight, but bound the 2D amplitude scratch.
+    # Airy's fine phase resolution otherwise materializes a multi-GiB tensor.
+    marginal = np.empty(nodes[1].size)
+    for start in range(0, nodes[1].size, 64):
+        block = slice(start, start + 64)
+        density = np.abs(state.amplitude(nodes[0], nodes[1][block])) ** 2
+        marginal[block] = np.dot(weights[0] / (2 * np.pi), density)
+    return float(np.dot(weights[1] / (2 * np.pi), marginal))
 
 
 PRESETS = {

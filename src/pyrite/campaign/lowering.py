@@ -22,6 +22,17 @@ def scene_physics(scene: Scene, numerics: Numerics) -> Physics:
     if scene.quantum is not None:
         physics, numerics = scene.quantum.lower(physics, numerics)
     physics.validate_transport(numerics.energy_model)
+    if scene.beam.state is not None:
+        from ..montecarlo.channeling.planar_injection import source_record
+        from ..montecarlo.transverse import TransverseDistribution
+
+        if physics.channeling_model != "planar":
+            raise ValueError("Beam.state production requires planar channeling")
+        if isinstance(scene.beam.transverse, TransverseDistribution):
+            raise ValueError("Beam.state cannot combine with classical Twiss slopes")
+        if scene.beam.energy_spread_frac not in (None, 0.0):
+            raise ValueError("Beam.state requires a monoenergetic source")
+        source_record(scene.beam.state)  # fail before materials and case construction
     if physics.channeling_model == "axial":
         # Refuse before material lookup, any case construction, or output writes.
         # Physical source and handoff cannot be inferred from an FFT sink (#623).
@@ -48,7 +59,11 @@ def build_case(scene: Scene, numerics: Numerics | None = None) -> Case:
     target = scene.target_spec
     legacy = LegacySweep(
         material=target.material,
-        beam=scene.beam.to_spec(),
+        beam=(
+            replace(scene.beam, state=None).to_spec()
+            if scene.beam.state is not None
+            else scene.beam.to_spec()
+        ),
         target=target,
         detector=scalar_detector,
         energy_bins=numerics.energy_bins or EnergyBins(),
@@ -83,7 +98,12 @@ def build_case(scene: Scene, numerics: Numerics | None = None) -> Case:
         raise RuntimeError(f"one Scene lowered to {len(cases)} cases")
     # Opt-in channeling zone (#506) and TR component (#103): "off" is unchanged.
     cases = resolve_shell_ionization(resolve_transition_radiation(cases, physics), physics)
-    return resolve_channeling(cases, physics, numerics)[0]
+    case = resolve_channeling(cases, physics, numerics)[0]
+    if scene.beam.state is not None:
+        from ..montecarlo.channeling.planar_injection import source_record
+
+        case = replace(case, channeling_source=source_record(scene.beam.state))
+    return case
 
 
 def build_sweep_cases(sweep: Sweep, numerics: Numerics | None = None) -> list[Case]:

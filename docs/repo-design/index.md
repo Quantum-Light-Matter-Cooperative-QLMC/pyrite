@@ -28,6 +28,7 @@ issue-680-configuration-rfc
 compute/coherent-streaming-rawkernel.md
 compute/compute-performance-optimization.md
 compute/startup-latency.md
+compute/slow-test-audit.md
 compute/phase-retention.md
 compute/phase-retention-benchmarks.md
 compute/gpu-transport-rawkernel.md

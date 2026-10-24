@@ -55,12 +55,17 @@ includes the array digest and grid conventions. Relative paths need `base_dir`
 when materialized; missing/changed files refuse. No sample bytes are embedded
 in the configuration and no arbitrary file formats are deserialized.
 
-`Beam(state=...)` accepts a typed `TransverseStateSpec`, so a source can be
-attached to a conceptual scene. **Current production `Beam.to_spec()` and
-`Scene`/`Sweep` lowering refuse this field** because the validated planar
-entry-state projection has not been plumbed into the Case contract yet. This
-avoids emitting a classical Case under a misleading quantum-source request.
-The existing planar quantum setup continues to use its legacy source path.
-Axial physical transport remains gated by #623; merely describing an axial
-state does not enable it. The next slice must define and validate the actual
-source projection and identity lowering before enabling production runs.
+`Beam(state=...)` stores the typed `TransverseStateSpec`. A restricted,
+experimental production adapter now supports centered 1D Gaussian states
+with lattice-averaged impact, when the Scene selects planar channeling.
+Standalone `Beam.to_spec()` still refuses: it lacks the required crystal
+configuration. Every admitted source has a distinct versioned case identity,
+momentum-conditioned handoffs, and deterministic CR live/replay reconstruction.
+See [conditional source validation](../validation/channeling/cr-planar-conditional-source.md).
+Other source recipes remain diagnostic-only; the physical handoff still needs
+independent validation and convergence tests.
+
+#624's axial candidate resolver remains separate from the planar diagnostics.
+Its continuation branch hardens physical-admission refusals; describing an
+axial region still never admits a production run without #623's matching,
+source and depth-budget contracts.

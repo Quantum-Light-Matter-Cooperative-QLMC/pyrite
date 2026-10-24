@@ -257,20 +257,37 @@ def solve_zone(case, beam_dir: np.ndarray, v_hat: np.ndarray, stopping_keV_per_a
     normal = incidence.plane_normal
     psi = np.arcsin(np.clip(np.asarray(v_hat) @ normal, -1.0, 1.0))
     divergence = float(np.std(psi)) if psi.size > 1 else 0.0
-    result, solver, profile, divergence, depth_eV = _solve(
-        case["crystal"],
-        plane,
-        float(record["temperature_K"]),
-        kinetic_eV,
-        int(record["basis_size"]),
-        int(record["bloch_cells"]),
-        float(record["margin_eV"]),
-        path,
-        float(record["dz_ang"]),
-        float(incidence.effective_rad),
-        divergence,
-        float(stopping_keV_per_ang) * 1e3,
-    )
+    if case.get("channeling_source") is None:
+        result, solver, profile, divergence, depth_eV = _solve(
+            case["crystal"],
+            plane,
+            float(record["temperature_K"]),
+            kinetic_eV,
+            int(record["basis_size"]),
+            int(record["bloch_cells"]),
+            float(record["margin_eV"]),
+            path,
+            float(record["dz_ang"]),
+            float(incidence.effective_rad),
+            divergence,
+            float(stopping_keV_per_ang) * 1e3,
+        )
+    else:
+        from .planar_injection import fresh_source_solver, source_entry_initial
+
+        solver = fresh_source_solver(case)
+        profile = solver.profile
+        initial = source_entry_initial(case, solver, float(incidence.effective_rad))
+        result = solver.propagate(
+            path,
+            float(record["dz_ang"]),
+            initial=initial,
+            stopping_eV_per_ang=float(stopping_keV_per_ang) * 1e3,
+        )
+        minimum, _ = profile.extrema()
+        depth_eV = float(solver.barrier_eV - minimum)
+        divergence = 0.0  # source momentum is already contained in initial
+
     gamma, beta = solver.gamma0, solver.beta0
     pc_eV = gamma * beta * 510998.95
     pv_eV = pc_eV * beta

@@ -119,6 +119,9 @@ def resolved_physics_view(
         from .montecarlo.channeling.handoff import CHANNELING_MODEL
 
         markers["channeling_model"] = CHANNELING_MODEL
+        source = resolved.get("channeling_source")
+        if source is not None:
+            markers["channeling_source_model"] = source["model"]
     if transition is not None:
         from .montecarlo.spectrum.transition_radiation_crossings import TRANSITION_MODEL
 
