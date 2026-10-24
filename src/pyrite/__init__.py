@@ -44,6 +44,9 @@ if TYPE_CHECKING:
     from pyrite._config_presets import load_physics as load_physics
     from pyrite._numerics import CxrReflections as CxrReflections
     from pyrite._numerics import Physics as Physics
+    from pyrite._numerics_groups import TransportNumerics as TransportNumerics
+    from pyrite._numerics_groups import RadiationNumerics as RadiationNumerics
+    from pyrite._numerics_groups import ExecutionConfig as ExecutionConfig
     from pyrite._precision import Precision as Precision
     from pyrite._sampling import AdaptiveSampling as AdaptiveSampling
     from pyrite._sampling import FixedSampling as FixedSampling
@@ -193,6 +196,9 @@ _PUBLIC_OBJECTS = {
     "BlazedGrooves": ("pyrite.campaign.geometry", "BlazedGrooves"),
     "CrystalCut": ("pyrite.campaign.geometry", "CrystalCut"),
     "Physics": ("pyrite._numerics", "Physics"),
+    "TransportNumerics": ("pyrite._numerics_groups", "TransportNumerics"),
+    "RadiationNumerics": ("pyrite._numerics_groups", "RadiationNumerics"),
+    "ExecutionConfig": ("pyrite._numerics_groups", "ExecutionConfig"),
     "QuantumRegion": ("pyrite.quantum", "QuantumRegion"),
     "QuantumDynamics": ("pyrite.quantum", "QuantumDynamics"),
     "QuantumNumerics": ("pyrite.quantum", "QuantumNumerics"),
