@@ -654,22 +654,31 @@ class _Reader:
                 values.append(_from_tag(tag, group.attrs[f"v:{name}"]))
         return values
 
-    def _read_table(self, group: h5py.Group) -> dict:
+    def _read_table(self, group: h5py.Group, cases=None, prefix=(), fields=None) -> dict:
         levels = int(group.attrs["levels"])
         n_rows = int(group.attrs["n_rows"])
         key_columns = [
             self._read_column(group["keys"][f"{level:02d}"], n_rows) for level in range(levels)
         ]
-        records = self._read_column_set(group["records"])
+        paths = [tuple(column[row] for column in key_columns) for row in range(n_rows)]
+        selected = (
+            None
+            if cases is None
+            else [row for row, path in enumerate(paths) if prefix + path in cases]
+        )
+        records = self._read_column_set(group["records"], selected, fields)
+        rows = range(n_rows) if selected is None else selected
         root: dict = {}
-        for row in range(n_rows):
+        for row, record in zip(rows, records, strict=True):
             node = root
             for level in range(levels - 1):
                 node = node.setdefault(key_columns[level][row], {})
-            node[key_columns[levels - 1][row]] = records[row]
+            node[key_columns[levels - 1][row]] = record
         return root
 
-    def _read_column_set(self, group: h5py.Group, selected: list[int] | None = None) -> list[dict]:
+    def _read_column_set(
+        self, group: h5py.Group, selected: list[int] | None = None, fields: set[str] | None = None
+    ) -> list[dict]:
         n_rows = int(group.attrs["n_rows"])
         if group.attrs["keys_inline"]:
             keys: list[Any] = _read_strs(group.attrs["keys"])
@@ -683,12 +692,17 @@ class _Reader:
             layout_values[layout_offsets[i] : layout_offsets[i + 1]]
             for i in range(len(layout_offsets) - 1)
         ]
-        columns = [self._read_column(group["cols"][name], n_rows, selected) for name in names]
+        columns = {
+            index: self._read_column(group["cols"][name], n_rows, selected)
+            for index, name in enumerate(names)
+            if fields is None or keys[index] in fields
+        }
         records: list[dict] = []
         for slot, row in enumerate(range(n_rows) if selected is None else selected):
             record: dict = {}
             for column in layouts[layout_index[row]]:
-                record[keys[column]] = columns[column][slot]
+                if column in columns:
+                    record[keys[column]] = columns[column][slot]
             records.append(record)
         return records
 
@@ -790,27 +804,15 @@ def read(h5: h5py.File) -> Any:
     return _Reader(h5).read_node(h5["value"])
 
 
-def read_selected(h5: h5py.File, cases: set[tuple[str, float]]) -> dict:
+def read_selected(
+    h5: h5py.File, cases: set[tuple[str, float]] | None, *, metadata_only: bool = False
+) -> dict:
     """Decode requested record paths without visiting other spectral payloads."""
     reader = _Reader(h5)
 
     def visit(node, prefix):
         if node.attrs["kind"] == "record-table":
-            levels = int(node.attrs["levels"])
-            count = int(node.attrs["n_rows"])
-            columns = [
-                reader._read_column(node["keys"][f"{level:02d}"], count) for level in range(levels)
-            ]
-            paths = [tuple(column[row] for column in columns) for row in range(count)]
-            selected = [row for row, path in enumerate(paths) if prefix + path in cases]
-            records = reader._read_column_set(node["records"], selected)
-            result = {}
-            for row, record in zip(selected, records, strict=True):
-                target = result
-                for key in paths[row][:-1]:
-                    target = target.setdefault(key, {})
-                target[paths[row][-1]] = record
-            return result
+            return reader._read_table(node, cases, prefix, {"case"} if metadata_only else None)
         if node.attrs["kind"] != "mapping":
             raise ValueError("selective loading requires a case-record mapping")
         keys = (
@@ -822,12 +824,44 @@ def read_selected(h5: h5py.File, cases: set[tuple[str, float]]) -> dict:
         for key, name in zip(keys, _read_strs(node.attrs["names"]), strict=True):
             path = prefix + (key,)
             if len(path) == 2:
-                if path in cases:
-                    result[key] = reader.read_node(node[name])
-            elif any(case[0] == key for case in cases):
+                if cases is None or path in cases:
+                    result[key] = (
+                        {"case": reader.read_node(node[name]["case"])}
+                        if metadata_only
+                        else reader.read_node(node[name])
+                    )
+            elif cases is None or any(case[0] == key for case in cases):
                 selected = visit(node[name], path)
                 if selected:
                     result[key] = selected
         return result
 
     return visit(h5["value"], ())
+
+
+class ConfigWriter:
+    """Append bounded config tables to one ordinary v2 component container."""
+
+    def __init__(self, h5: h5py.File, names: list[str]):
+        self.writer = _Writer(h5, shuffle=False)
+        self.root = h5.create_group("value", track_order=True)
+        self.root.attrs["kind"] = "mapping"
+        self.root.attrs["keys_inline"] = True
+        self.storage = dict(zip(names, _storage_names(names), strict=True))
+        self.keys = []
+
+    def add(self, name: str, config: dict) -> None:
+        if not config:
+            return
+        group = self.root.create_group(self.storage[name])
+        rows = [((energy,), record) for energy, record in config.items()]
+        # Small configs also share the component's deduplicated array pool.
+        self.writer._write_table(group, 1, rows)
+        self.keys.append(name)
+
+    def finish(self) -> None:
+        self.root.attrs["keys"] = _str_array(self.keys)
+        self.root.attrs["names"] = _str_array([self.storage[key] for key in self.keys])
+        self.root.create_dataset(
+            "kinds", data=_str_array(["node"] * len(self.keys)), track_times=False
+        )

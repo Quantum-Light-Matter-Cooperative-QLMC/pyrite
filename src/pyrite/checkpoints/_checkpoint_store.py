@@ -15,6 +15,7 @@ import copy
 import hashlib
 import os
 import shutil
+from contextlib import ExitStack
 from pathlib import Path
 
 import numpy as np
@@ -462,3 +463,54 @@ def load_selected(
             }
             merged = _overlay(merged, _merge(selected_line, selected_brem, selected_companions))
     return merged
+
+
+def load_metadata(stem: str, root: str | os.PathLike[str]) -> dict:
+    """Recover the authoritative case index and overlay crash-safety shards."""
+    path = component_read_path(stem, "line", root)
+    if not path.is_file():
+        path = legacy_path(stem, root)
+    records = _checkpoint_io.load_metadata(str(path)) if path.is_file() else {}
+    for shard in _part_paths(parts_dir(stem, root)):
+        records = _overlay(records, _checkpoint_io.load_metadata(str(shard)))
+    return records
+
+
+def save_streaming(stem: str, root: str | os.PathLike[str], metadata: dict) -> None:
+    """Stage every component before publication, loading at most one config.
+
+    Shards remain recovery authority until the caller publishes its manifest.
+    No source component is replaced while a staged component is still reading it.
+    """
+    order = ("brem", "characteristic", "channeling", "transition", "line")
+    staged = []
+    directory = checkpoint_dir(stem, root)
+    directory.mkdir(parents=True, exist_ok=True)
+    try:
+        with ExitStack() as stack:
+            writers = {}
+            for component in order:
+                target = component_path(stem, component, root)
+                temporary = target.with_name(f"{target.name}.{os.getpid()}.tmp")
+                staged.append((temporary, target, component))
+                writers[component] = stack.enter_context(
+                    _checkpoint_io.config_writer(list(metadata), str(temporary))
+                )
+            for name, energies in metadata.items():
+                keys = {(name, energy) for energy in energies}
+                records = load_selected(stem, root, keys)
+                for component, writer in writers.items():
+                    writer.add(name, _component_store(records, component).get(name, {}))
+                del records
+        for temporary, target, component in staged:
+            if (
+                component in OPTIONAL_COMPONENTS
+                and not writers[component].keys
+                and not target.is_file()
+            ):
+                temporary.unlink()
+            else:
+                os.replace(temporary, target)
+    finally:
+        for temporary, _, _ in staged:
+            temporary.unlink(missing_ok=True)

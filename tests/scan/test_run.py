@@ -847,7 +847,7 @@ def test_run_sweep_exact_metadata_hit_skips_decode_launch_and_writes(tmp_path, m
     def forbidden(*_args, **_kwargs):
         raise AssertionError("exact metadata hit must not decode, launch, or write")
 
-    monkeypatch.setattr("pyrite.runs._sweep_plan._checkpoint_load", forbidden)
+    monkeypatch.setattr("pyrite.checkpoints.persistence._checkpoint_load", forbidden)
     monkeypatch.setattr("pyrite.runs.run.run_cases", forbidden)
     monkeypatch.setattr("pyrite.checkpoints.persistence._checkpoint_components_save", forbidden)
     progress = []

@@ -165,3 +165,20 @@ def test_selected_store_matches_full_loader_with_legacy_shard(tmp_path, legacy):
                     np.testing.assert_array_equal(value, expected[key])
                 else:
                     assert value == expected[key]
+
+
+@pytest.mark.parametrize("count", [1, 20])
+def test_metadata_reads_skip_spectral_columns(tmp_path, monkeypatch, count):
+    path = tmp_path / "records.h5"
+    ckio.dump(_records(count), str(path))
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("metadata reader decoded spectral arrays")
+
+    monkeypatch.setattr(_result_v2._Reader, "blob", forbidden)
+    monkeypatch.setattr(ckio, "load", forbidden)
+    metadata = ckio.load_metadata(str(path))
+    assert sum(map(len, metadata.values())) == count * 2
+    assert all(
+        set(record) == {"case"} for values in metadata.values() for record in values.values()
+    )

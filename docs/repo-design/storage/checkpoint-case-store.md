@@ -50,13 +50,71 @@ as full loading. Missing cases produce no entries; a missing checkpoint raises
 Bare schema-v2 HDF5 reads traverse only requested record payloads, including
 columnar tables. Key columns and layout metadata still scale with the file's
 record count. Legacy containers and compressed transfer frames use the existing
-full-decode compatibility path before filtering. This does not change the
-in-memory sweep API or make sweep execution disk-backed.
+full-decode compatibility path before filtering. The default in-memory sweep API remains unchanged.
 
 The synthetic storage benchmark `checks/checkpoint_selective_memory.py` compares
 one-case and full-store reads using identical warm file caches and fresh reader
 processes, reporting wall time and peak RSS. It measures storage reads, not
 campaign execution or consolidation.
+
+## Low-retention sweeps
+
+`pyrite.runs.run.run_sweep(..., retain_results=False)` opts into disk-backed
+result retention. The default remains `True`. The low-retention mode requires
+an empty `results` mapping and a component checkpoint path; explicit legacy
+`.pkl` output paths are rejected.
+
+After successful shard and manifest writes, each completed record in `results`
+contains only `case` and `checkpoint_path`. Callers obtain spectra through
+checkpoint loading. Group callbacks still receive config names, but must load
+their spectra explicitly instead of reading arrays from `results`. Progress,
+budgets, observation production, dataset identity checks, and CAS reuse retain
+their normal semantics.
+
+Each completed energy is written immediately, preserving other already stored
+energies for that config. A failed write leaves the live record's arrays in
+`results`. This also makes partially completed configs recoverable after an
+interruption. Rewriting the config shard for each energy trades additional I/O
+for bounded retention; the transient payload bound is one config, not one case.
+Case dictionaries, record keys, manifest audits, and HDF5 indexing metadata
+remain resident or scale with the campaign size.
+
+Resume reads case metadata without spectra from bare v2 HDF5. Missing CAS blobs
+are seeded from selective case reads; cache hits are persisted and released
+one case at a time. Legacy input containers retain the full-decode fallback
+described above.
+
+Final consolidation loads one config at a time and writes all component
+staging files from that payload. Each staged component uses the existing v2
+columnar record encoding and shared array pool. All staging files finish before
+any authoritative component is replaced; companions publish before the line
+index. Shards are removed only after the final manifest succeeds. A staging,
+publication, or manifest failure therefore leaves recovery shards available.
+
+`checks/checkpoint_sweep_memory.py` measures retained and disk-backed sweeps at
+16, 64, and 256 configs, two energies per config, and 16,384 spectral bins. It
+builds real HOPG campaign cases but substitutes deterministic synthetic spectra
+to isolate host retention and storage overhead from transport. It reports peak
+RSS at the case frontier and after consolidation, wall time, checkpoint phase
+timing, process read/write bytes, and final artifact size. Each arm has a fresh
+process and checkpoint directory, matched scalar warmup, and an 8 GiB virtual
+memory cap. These are orchestration measurements, not transport predictions.
+
+A three-repeat Linux/Python 3.14.4 run of that workload measured:
+
+| Records | Peak RSS, retained / disk (MiB) | Wall time, retained / disk (s) |
+|---|---|---|
+| 32 | 476.06–476.20 / 475.77–476.32 | 0.33–0.35 / 1.34–1.44 |
+| 128 | 495.77–496.29 / 495.39–495.88 | 1.35–1.40 / 5.80–6.23 |
+| 512 | 838.09–838.32 / 548.25–548.46 | 7.06–7.49 / 28.36–29.41 |
+
+At 512 records, case-frontier peak RSS was 703.09–703.43 MiB retained versus
+536.91–537.36 MiB disk-backed. Process write volume was 863.21 versus
+1,312.01–1,312.02 MiB, read volume 0.62 versus 956.89 MiB, and final artifacts
+194.96 versus 268.36 MiB. Per-config column tables add metadata relative to one
+campaign-wide table; early persistence rewrites config shards. Interpreter
+startup and HDF5 indexing overhead dominate smaller workloads. Peak RSS includes
+those costs; the mode bounds spectral retention, not total metadata growth.
 
 ## Version control
 
