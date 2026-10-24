@@ -56,11 +56,14 @@ when materialized; missing/changed files refuse. No sample bytes are embedded
 in the configuration and no arbitrary file formats are deserialized.
 
 `Beam(state=...)` accepts a typed `TransverseStateSpec`, so a source can be
-attached to a conceptual scene. **Current production `Beam.to_spec()` and
-`Scene`/`Sweep` lowering refuse this field** because the validated planar
-entry-state projection has not been plumbed into the Case contract yet. This
-avoids emitting a classical Case under a misleading quantum-source request.
-The existing planar quantum setup continues to use its legacy source path.
-Axial physical transport remains gated by #623; merely describing an axial
-state does not enable it. The next slice must define and validate the actual
-source projection and identity lowering before enabling production runs.
+attached to a conceptual scene. **Production `Beam.to_spec()` and
+`Scene`/`Sweep` lowering still refuse this field**: MC handoff, coherent source
+normalization, channeling radiation rescoring and checkpoint identity require
+an end-to-end source adapter. The [planar source projection guide](planar-quantum-sources.md)
+now shows how to project these specifications onto the Bloch basis and
+propagate them *diagnostically* without constructing a production Case.
+
+#624's axial candidate resolver remains separate from the planar diagnostics.
+Its continuation branch hardens physical-admission refusals; describing an
+axial region still never admits a production run without #623's matching,
+source and depth-budget contracts.

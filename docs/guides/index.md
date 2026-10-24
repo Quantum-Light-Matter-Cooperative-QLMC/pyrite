@@ -13,6 +13,7 @@ shell-completion
 configuration-cookbook
 numerics-and-execution
 quantum-source-states
+planar-quantum-sources
 sampling-policy
 execution-profiles
 dask-and-distributed-execution
