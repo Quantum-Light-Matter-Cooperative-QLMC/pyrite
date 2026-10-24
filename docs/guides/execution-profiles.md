@@ -80,8 +80,12 @@ executor, artifact_store = build_executor(
     artifact_root="/shared/checkpoints",  # absolute path shared by every node
 )
 run_sweep(
-    cases, results, executor=executor, artifact_store=artifact_store,
-    content_key_fn=content_key_fn, checkpoint_path=checkpoint_path,
+    cases,
+    results,
+    executor=executor,
+    artifact_store=artifact_store,
+    content_key_fn=content_key_fn,
+    checkpoint_path=checkpoint_path,
 )
 ```
 

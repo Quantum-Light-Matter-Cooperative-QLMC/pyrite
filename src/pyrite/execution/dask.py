@@ -17,8 +17,11 @@ from threading import Event, Lock
 from typing import Any, Literal
 
 from .artifacts import (
-    CaseArtifactStore, DirectionalArtifactRef,
-    directional_content_key, directional_store, load_directional_result,
+    CaseArtifactStore,
+    DirectionalArtifactRef,
+    directional_content_key,
+    directional_store,
+    load_directional_result,
 )
 from .model import ResourceRequest, RetryPolicy
 from .planning import iter_work_units
@@ -47,6 +50,7 @@ class DaskConfig:
 
     def __post_init__(self) -> None:
         from .slurm import _token, _WALLTIME
+
         if self.cluster not in ("existing", "local", "slurm"):
             raise ValueError("cluster must be existing, local, or slurm")
         if self.cluster == "existing" and not self.scheduler_address:
@@ -99,7 +103,8 @@ def _worker_run_unit(run_dir: str, unit_index: int) -> list[dict[str, Any]]:
         # CUDA contexts on an unpinned GPU by accident.
         vendor = resources["accelerator"]
         visibility = (
-            os.environ.get("CUDA_VISIBLE_DEVICES") if vendor == "cuda"
+            os.environ.get("CUDA_VISIBLE_DEVICES")
+            if vendor == "cuda"
             else os.environ.get("ROCR_VISIBLE_DEVICES") or os.environ.get("HIP_VISIBLE_DEVICES")
         )
         if not visibility or visibility in ("-1", "NoDevFiles"):
@@ -111,14 +116,19 @@ def _worker_run_unit(run_dir: str, unit_index: int) -> list[dict[str, Any]]:
     for r in records:
         prior = store.reference(r["case"]["crystal"], r["content_key"])
         d_key = r.get("direction_key")
-        d_ref = (directional_store(store).reference(r["case"]["crystal"], d_key)
-                 if d_key is not None else None)
+        d_ref = (
+            directional_store(store).reference(r["case"]["crystal"], d_key)
+            if d_key is not None
+            else None
+        )
         if prior is not None:
-            store.load(prior, expected_material=prior.material,
-                       expected_content_key=r["content_key"])
+            store.load(
+                prior, expected_material=prior.material, expected_content_key=r["content_key"]
+            )
         if d_ref is not None:
-            directional_store(store).load(d_ref, expected_material=d_ref.material,
-                                          expected_content_key=d_key)
+            directional_store(store).load(
+                d_ref, expected_material=d_ref.material, expected_content_key=d_key
+            )
         if prior is not None and (d_key is None or d_ref is not None):
             refs.append({"index": r["index"], "reference": asdict(prior)})
         else:
@@ -128,13 +138,17 @@ def _worker_run_unit(run_dir: str, unit_index: int) -> list[dict[str, Any]]:
         if out is None:
             raise RuntimeError("Dask worker returned no scalar output")
         record = pending[i]
-        ref = store.publish(case["crystal"], record["content_key"],
-                            {k: v for k, v in out.items() if k != "directional"})
+        ref = store.publish(
+            case["crystal"],
+            record["content_key"],
+            {k: v for k, v in out.items() if k != "directional"},
+        )
         if record.get("direction_key") is not None:
             if "directional" not in out:
                 raise RuntimeError("Dask worker omitted requested directional output")
-            directional_store(store).publish(case["crystal"], record["direction_key"],
-                                             {"directional": out["directional"]})
+            directional_store(store).publish(
+                case["crystal"], record["direction_key"], {"directional": out["directional"]}
+            )
         refs.append({"index": record["index"], "reference": asdict(ref)})
 
     if pending:
@@ -148,8 +162,10 @@ def _worker_run_unit(run_dir: str, unit_index: int) -> list[dict[str, Any]]:
 
         with threadpool_limits(limits=1):
             run_cases(
-                [r["case"] for r in pending], callback=publish,
-                progress=False, keep_results=False,
+                [r["case"] for r in pending],
+                callback=publish,
+                progress=False,
+                keep_results=False,
                 max_workers=0 if resources["gpu_count"] else plan["local_workers"],
                 engine="gpu" if resources["gpu_count"] else "cpu",
                 **kwargs,
@@ -168,7 +184,10 @@ class DaskExecutor:
     """
 
     def __init__(
-        self, artifact_store: CaseArtifactStore, case_key: Callable[[Any], str], *,
+        self,
+        artifact_store: CaseArtifactStore,
+        case_key: Callable[[Any], str],
+        *,
         resources: ResourceRequest | None = None,
         config: DaskConfig | None = None,
         retry_policy: RetryPolicy | None = None,
@@ -222,7 +241,8 @@ class DaskExecutor:
             "cores": self.resources.cpu_cores,
             "processes": 1,
             "memory": f"{max(1, self.resources.memory_bytes // 1024**2)}MiB"
-            if self.resources.memory_bytes else "4GiB",
+            if self.resources.memory_bytes
+            else "4GiB",
             "walltime": cfg.walltime,
         }
         if cfg.partition:
@@ -235,11 +255,20 @@ class DaskExecutor:
         return Client(cluster), cluster
 
     def execute(self, cases: Sequence[Any], *, callback=None, **options: Any) -> list[Any]:
-        supported = {"max_workers", "progress", "keep_results", "on_timing", "on_activity",
-                     "should_stop", "engine", "transport_only", "observation_directions",
-                     "trajectory_capture"}
+        supported = {
+            "max_workers",
+            "progress",
+            "keep_results",
+            "on_timing",
+            "on_activity",
+            "should_stop",
+            "engine",
+            "transport_only",
+            "observation_directions",
+            "trajectory_capture",
+        }
         if set(options) - supported:
-            raise ValueError(f"Dask unsupported run options: {sorted(set(options)-supported)}")
+            raise ValueError(f"Dask unsupported run options: {sorted(set(options) - supported)}")
         if options.get("should_stop") is not None:
             raise ValueError("Dask executor does not yet support bounded execution")
         if options.get("transport_only") or options.get("trajectory_capture") is not None:
@@ -266,8 +295,14 @@ class DaskExecutor:
         if self.resources.gpu_count and self.config.cluster == "local":
             raise ValueError("local Dask cluster has no GPU isolation; use existing scheduler")
         cfg = self.config
-        units = list(iter_work_units(cases, cases_per_unit=cfg.cases_per_task,
-                                    resources=self.resources, case_key=self.case_key))
+        units = list(
+            iter_work_units(
+                cases,
+                cases_per_unit=cfg.cases_per_task,
+                resources=self.resources,
+                case_key=self.case_key,
+            )
+        )
         unit_count = len(units)
         run_dir = self.store.root / ".execution-jobs" / f"dask-{uuid.uuid4().hex}"
         self.last_run_dir = run_dir
@@ -286,13 +321,20 @@ class DaskExecutor:
                     expected_directions[index] = directions[index]
                 batch.append(row)
             _save_input(run_dir / "inputs" / f"{ui}.h5", batch)
-        _atomic_json(run_dir / "plan.json", {
-            "format": "pyrite.dask.v1", "cases_per_task": cfg.cases_per_task,
-            "tasks": unit_count, "artifact_root": str(self.store.root),
-            "resources": asdict(self.resources), "local_workers": 0,
-        })
-        _atomic_json(run_dir / "execution.json", run_provenance(
-            "dask", resources=self.resources, config=cfg))
+        _atomic_json(
+            run_dir / "plan.json",
+            {
+                "format": "pyrite.dask.v1",
+                "cases_per_task": cfg.cases_per_task,
+                "tasks": unit_count,
+                "artifact_root": str(self.store.root),
+                "resources": asdict(self.resources),
+                "local_workers": 0,
+            },
+        )
+        _atomic_json(
+            run_dir / "execution.json", run_provenance("dask", resources=self.resources, config=cfg)
+        )
         self._cancelled.clear()
         self._running.set()
         managed_client = self._client is None
@@ -319,8 +361,9 @@ class DaskExecutor:
                     ref = self.store.reference(case["crystal"], keys[index])
                     if ref is None:
                         continue
-                    self.store.load(ref, expected_material=case["crystal"],
-                                    expected_content_key=keys[index])
+                    self.store.load(
+                        ref, expected_material=case["crystal"], expected_content_key=keys[index]
+                    )
                     resolved_ref = ref
                     if expected_directions[index] is not None:
                         dkey = directional_content_key(keys[index], expected_directions[index])
@@ -328,9 +371,13 @@ class DaskExecutor:
                         if dref is None:
                             continue
                         resolved_ref = DirectionalArtifactRef(ref, dref)
-                        load_directional_result(self.store, resolved_ref,
-                                                material=case["crystal"], case_key=keys[index],
-                                                directions=expected_directions[index])
+                        load_directional_result(
+                            self.store,
+                            resolved_ref,
+                            material=case["crystal"],
+                            case_key=keys[index],
+                            directions=expected_directions[index],
+                        )
                     if callback is not None:
                         callback(index, case, resolved_ref)
                     if options.get("keep_results", True):
@@ -346,14 +393,19 @@ class DaskExecutor:
                     break
                 futures = {
                     self._client.submit(
-                        _worker_run_unit, str(run_dir), unit, pure=False,
+                        _worker_run_unit,
+                        str(run_dir),
+                        unit,
+                        pure=False,
                         resources=dask_resources,
-                    ): unit for unit in pending
+                    ): unit
+                    for unit in pending
                 }
                 with self._lock:
                     self._futures = list(futures)
                 # Use Futures rather than constructing delayed arrays/graphs.
                 from distributed import as_completed
+
                 for fut in as_completed(futures):
                     unit = futures[fut]
                     if self._cancelled.is_set():
@@ -366,11 +418,16 @@ class DaskExecutor:
                     # first case artifact but before Dask marked task complete).
                     deliver(unit)
                     if on_activity is not None:
-                        on_activity({"phase": "dask_progress", "case": None,
-                                     "completed_work_units": len(succeeded),
-                                     "total_work_units": unit_count,
-                                     "in_flight_case_count": n - len(delivered),
-                                     "attempt": attempt})
+                        on_activity(
+                            {
+                                "phase": "dask_progress",
+                                "case": None,
+                                "completed_work_units": len(succeeded),
+                                "total_work_units": unit_count,
+                                "in_flight_case_count": n - len(delivered),
+                                "attempt": attempt,
+                            }
+                        )
                 for unit in pending:
                     deliver(unit)
                 if self._cancelled.is_set():
@@ -379,11 +436,18 @@ class DaskExecutor:
                 if len(succeeded) == unit_count:
                     break
                 if on_activity is not None and attempt < self.retry_policy.max_attempts:
-                    on_activity({"phase": "dask_retry", "case": None,
-                                 "attempt": attempt + 1,
-                                 "pending_work_units": sorted(set(range(unit_count)) - succeeded)})
+                    on_activity(
+                        {
+                            "phase": "dask_retry",
+                            "case": None,
+                            "attempt": attempt + 1,
+                            "pending_work_units": sorted(set(range(unit_count)) - succeeded),
+                        }
+                    )
             if self._cancelled.is_set():
-                raise RuntimeError(f"Dask execution cancelled; {len(delivered)}/{n} cases committed")
+                raise RuntimeError(
+                    f"Dask execution cancelled; {len(delivered)}/{n} cases committed"
+                )
             if len(succeeded) != unit_count:
                 missing = sorted(set(range(unit_count)) - succeeded)
                 raise RuntimeError(f"Dask exhausted retries: {missing}; errors={errors}")
@@ -395,9 +459,15 @@ class DaskExecutor:
             with self._lock:
                 self._futures.clear()
             self._running.clear()
-            _atomic_json(run_dir / "execution.json", run_provenance(
-                "dask", resources=self.resources, config=cfg,
-                state="cancelled" if self._cancelled.is_set() else state))
+            _atomic_json(
+                run_dir / "execution.json",
+                run_provenance(
+                    "dask",
+                    resources=self.resources,
+                    config=cfg,
+                    state="cancelled" if self._cancelled.is_set() else state,
+                ),
+            )
             if managed_client and self._client is not None:
                 self._client.close()
                 self._client = None

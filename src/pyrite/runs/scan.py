@@ -886,7 +886,9 @@ def _run_material(args, material, max_seconds=None):
                 if capture_kw:
                     raise ValueError("distributed execution does not support --trajectories yet")
                 if performance_logger is not None:
-                    raise ValueError("distributed execution does not support performance profiling yet")
+                    raise ValueError(
+                        "distributed execution does not support performance profiling yet"
+                    )
             executor, artifact_store = build_executor(
                 selected,
                 case_key=content_key_fn,

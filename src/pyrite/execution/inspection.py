@@ -51,22 +51,38 @@ def inspect_execution(profile: ExecutionProfile, case_count: int) -> dict[str, A
         "cases_per_unit": batch,
         "max_simultaneous_units_requested": concurrency,
         "resources_per_unit": resource,
-        "max_cpus_requested": concurrency * profile.resources.cpu_cores if concurrency is not None else None,
-        "max_gpus_requested": concurrency * profile.resources.gpu_count if concurrency is not None else None,
-        "max_memory_bytes_requested": concurrency * profile.resources.memory_bytes if concurrency is not None else None,
+        "max_cpus_requested": concurrency * profile.resources.cpu_cores
+        if concurrency is not None
+        else None,
+        "max_gpus_requested": concurrency * profile.resources.gpu_count
+        if concurrency is not None
+        else None,
+        "max_memory_bytes_requested": concurrency * profile.resources.memory_bytes
+        if concurrency is not None
+        else None,
         "retry_max_attempts": profile.retry_policy.max_attempts,
         "scheduler": asdict(cfg) if cfg is not None else None,
         "physics_identity_unchanged": True,
     }
 
 
-def run_provenance(backend: str, *, resources: Any, config: Any,
-                   submitted_job_ids: list[str] | None = None, state: str = "staged") -> dict[str, Any]:
+def run_provenance(
+    backend: str,
+    *,
+    resources: Any,
+    config: Any,
+    submitted_job_ids: list[str] | None = None,
+    state: str = "staged",
+) -> dict[str, Any]:
     """Operational sidecar only. Never write into the checkpoint/CAS tree."""
     return {
-        "format": "pyrite.execution.provenance.v1", "backend": backend,
-        "state": state, "resources_requested": asdict(resources),
-        "configuration": asdict(config), "submitted_job_ids": list(submitted_job_ids or []),
-        "python": sys.version.split()[0], "host": platform.node(),
+        "format": "pyrite.execution.provenance.v1",
+        "backend": backend,
+        "state": state,
+        "resources_requested": asdict(resources),
+        "configuration": asdict(config),
+        "submitted_job_ids": list(submitted_job_ids or []),
+        "python": sys.version.split()[0],
+        "host": platform.node(),
         "note": "Requested resources; actual scheduler allocations not verified here",
     }

@@ -6,8 +6,12 @@ Distributed backends can implement :class:`Executor` in later milestones.
 """
 
 from .artifacts import (
-    ArtifactIntegrityError, CaseArtifactRef, CaseArtifactStore, DirectionalArtifactRef,
-    directional_content_key, load_directional_result,
+    ArtifactIntegrityError,
+    CaseArtifactRef,
+    CaseArtifactStore,
+    DirectionalArtifactRef,
+    directional_content_key,
+    load_directional_result,
 )
 from .dask import DaskConfig, DaskExecutor
 from .inspection import inspect_execution

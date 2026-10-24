@@ -308,8 +308,12 @@ def directional_store(store: CaseArtifactStore) -> CaseArtifactStore:
 
 
 def load_directional_result(
-    store: CaseArtifactStore, ref: DirectionalArtifactRef, *,
-    material: str, case_key: str, directions: Any,
+    store: CaseArtifactStore,
+    ref: DirectionalArtifactRef,
+    *,
+    material: str,
+    case_key: str,
+    directions: Any,
 ) -> dict[str, Any]:
     """Return a fresh ordinary runner output for the coordinator callback."""
     scalar = store.load(ref.scalar, expected_material=material, expected_content_key=case_key)

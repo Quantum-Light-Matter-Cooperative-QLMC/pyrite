@@ -24,8 +24,12 @@ from threading import Event, Lock
 from typing import Any
 
 from .artifacts import (
-    CaseArtifactRef, CaseArtifactStore, DirectionalArtifactRef,
-    directional_content_key, directional_store, load_directional_result,
+    CaseArtifactRef,
+    CaseArtifactStore,
+    DirectionalArtifactRef,
+    directional_content_key,
+    directional_store,
+    load_directional_result,
 )
 from .model import ResourceRequest, RetryPolicy
 from .planning import iter_work_units
@@ -359,8 +363,12 @@ class SlurmArrayExecutor:
         (work_dir / "logs").mkdir(parents=True)
         expected_keys: list[str] = [""] * n
         expected_directions: list[Any] = [None] * n
-        for unit in iter_work_units(cases, cases_per_unit=cfg.cases_per_task,
-                                    resources=self.resources, case_key=self.case_key):
+        for unit in iter_work_units(
+            cases,
+            cases_per_unit=cfg.cases_per_task,
+            resources=self.resources,
+            case_key=self.case_key,
+        ):
             records = []
             assert unit.case_keys is not None
             for index, key in zip(range(unit.start, unit.stop), unit.case_keys, strict=True):
@@ -396,8 +404,10 @@ class SlurmArrayExecutor:
         )
         script = work_dir / "submit.sbatch"
         script.write_text(script_text, encoding="utf-8")
-        _atomic_json(work_dir / "execution.json", run_provenance(
-            "slurm", resources=self.resources, config=cfg))
+        _atomic_json(
+            work_dir / "execution.json",
+            run_provenance("slurm", resources=self.resources, config=cfg),
+        )
         if self._executing.is_set():
             raise RuntimeError("the SLURM executor is already running")
         self._cancel_requested.clear()
@@ -409,25 +419,45 @@ class SlurmArrayExecutor:
             self._cancelled_jobs.clear()
         state = "failed"
         try:
-            value = self._execute_staged(cases, expected_keys, script, unit_count,
-                                         callback=callback, expected_directions=expected_directions,
-                                         **options)
+            value = self._execute_staged(
+                cases,
+                expected_keys,
+                script,
+                unit_count,
+                callback=callback,
+                expected_directions=expected_directions,
+                **options,
+            )
             state = "completed"
             return value
         finally:
             with self._job_lock:
                 self._active_job_id = None
             try:
-                _atomic_json(work_dir / "execution.json", run_provenance(
-                    "slurm", resources=self.resources, config=cfg,
-                    submitted_job_ids=self.submitted_job_ids,
-                    state="cancelled" if self._cancel_requested.is_set() else state))
+                _atomic_json(
+                    work_dir / "execution.json",
+                    run_provenance(
+                        "slurm",
+                        resources=self.resources,
+                        config=cfg,
+                        submitted_job_ids=self.submitted_job_ids,
+                        state="cancelled" if self._cancel_requested.is_set() else state,
+                    ),
+                )
             finally:
                 self._executing.clear()
 
-    def _execute_staged(self, cases: Sequence[Any], expected_keys: list[str],
-                        script: Path, unit_count: int, *, callback=None,
-                        expected_directions=None, **options: Any) -> list[Any]:
+    def _execute_staged(
+        self,
+        cases: Sequence[Any],
+        expected_keys: list[str],
+        script: Path,
+        unit_count: int,
+        *,
+        callback=None,
+        expected_directions=None,
+        **options: Any,
+    ) -> list[Any]:
         """Coordinator lifecycle; each attempt submits only incomplete units."""
         cfg = self.config
         n = len(cases)
@@ -462,9 +492,13 @@ class SlurmArrayExecutor:
                     if d_ref is None:
                         continue
                     resolved_ref = DirectionalArtifactRef(ref, d_ref)
-                    load_directional_result(self.store, resolved_ref,
-                                            material=material, case_key=key,
-                                            directions=expected_directions[index])
+                    load_directional_result(
+                        self.store,
+                        resolved_ref,
+                        material=material,
+                        case_key=key,
+                        directions=expected_directions[index],
+                    )
                 if callback is not None:
                     callback(index, case, resolved_ref)
                 if keep_results:

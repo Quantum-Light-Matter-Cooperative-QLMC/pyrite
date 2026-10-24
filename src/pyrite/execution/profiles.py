@@ -94,8 +94,10 @@ class ExecutionProfile:
                 raise ValueError("distributed GPU profiles must select 'cuda' or 'rocm'")
             if not self.resources.gpu_count and self.resources.accelerator not in ("any", "cpu"):
                 raise ValueError("distributed CPU profiles cannot require an accelerator")
-            if self.backend == "dask" and self.resources.gpu_count and (
-                self.dask is None or self.dask.cluster != "existing"
+            if (
+                self.backend == "dask"
+                and self.resources.gpu_count
+                and (self.dask is None or self.dask.cluster != "existing")
             ):
                 raise ValueError("Dask GPU requires a configured external scheduler")
 
@@ -132,7 +134,9 @@ def execution_profile_from_dict(name: str, document: dict[str, Any]) -> Executio
     )
 
 
-def resolve_execution_profile(name: str, *, config_path: str | Path | None = None) -> ExecutionProfile:
+def resolve_execution_profile(
+    name: str, *, config_path: str | Path | None = None
+) -> ExecutionProfile:
     """Resolve built-ins or a named ``[execution.NAME]`` TOML section.
 
     ``local`` and ``slurm-cpu`` are safe built-in examples. User profiles must
@@ -175,9 +179,14 @@ def build_executor(
     store = CaseArtifactStore(root)
     if profile.backend == "dask":
         return (
-            DaskExecutor(store, case_key, resources=profile.resources,
-                         config=profile.dask or DaskConfig(cluster="local"),
-                         retry_policy=profile.retry_policy), store,
+            DaskExecutor(
+                store,
+                case_key,
+                resources=profile.resources,
+                config=profile.dask or DaskConfig(cluster="local"),
+                retry_policy=profile.retry_policy,
+            ),
+            store,
         )
     return (
         SlurmArrayExecutor(

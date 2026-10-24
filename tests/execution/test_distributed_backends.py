@@ -11,9 +11,16 @@ import numpy as np
 import pytest
 
 from pyrite.execution import (
-    CaseArtifactStore, DaskConfig, DaskExecutor, DirectionalArtifactRef,
-    ExecutionProfile, ResourceRequest, SlurmArrayConfig,
-    build_executor, directional_content_key, inspect_execution,
+    CaseArtifactStore,
+    DaskConfig,
+    DaskExecutor,
+    DirectionalArtifactRef,
+    ExecutionProfile,
+    ResourceRequest,
+    SlurmArrayConfig,
+    build_executor,
+    directional_content_key,
+    inspect_execution,
     load_directional_result,
 )
 from pyrite.execution.profiles import execution_profile_from_dict
@@ -44,8 +51,11 @@ def fake_runner(monkeypatch):
 
 def test_inspect_pure_and_distinct_from_scientific_identity(tmp_path):
     profile = ExecutionProfile(
-        "alloc", backend="slurm", resources=ResourceRequest(cpu_cores=8, gpu_count=1,
-        accelerator="cuda", memory_bytes=32 * 1024**3),
+        "alloc",
+        backend="slurm",
+        resources=ResourceRequest(
+            cpu_cores=8, gpu_count=1, accelerator="cuda", memory_bytes=32 * 1024**3
+        ),
         slurm=SlurmArrayConfig(cases_per_task=3, max_concurrent=2),
     )
     plan = inspect_execution(profile, 11)
@@ -61,10 +71,14 @@ def test_inspect_pure_and_distinct_from_scientific_identity(tmp_path):
 
 
 def test_dask_profile_factory_and_optional_dependency(tmp_path):
-    profile = execution_profile_from_dict("dask-workstation", {
-        "backend": "dask", "max_attempts": 2,
-        "dask": {"cluster": "local", "workers": 4, "cases_per_task": 2},
-    })
+    profile = execution_profile_from_dict(
+        "dask-workstation",
+        {
+            "backend": "dask",
+            "max_attempts": 2,
+            "dask": {"cluster": "local", "workers": 4, "cases_per_task": 2},
+        },
+    )
     exe, store = build_executor(profile, case_key=lambda x: KEY, artifact_root=tmp_path)
     assert isinstance(exe, DaskExecutor)
     assert exe.config.workers == 4
@@ -74,20 +88,23 @@ def test_dask_profile_factory_and_optional_dependency(tmp_path):
     assert list(tmp_path.iterdir()) == []
 
 
-@pytest.mark.parametrize("bad", [
-    {"cluster": "existing"},
-    {"cluster": "local", "adaptive": True},
-    {"cluster": "slurm", "workers": -1},
-    {"cluster": "slurm", "partition": "gpu\n#SBATCH --foo"},
-])
+@pytest.mark.parametrize(
+    "bad",
+    [
+        {"cluster": "existing"},
+        {"cluster": "local", "adaptive": True},
+        {"cluster": "slurm", "workers": -1},
+        {"cluster": "slurm", "partition": "gpu\n#SBATCH --foo"},
+    ],
+)
 def test_dask_config_validation(bad):
     with pytest.raises(ValueError):
         DaskConfig(**bad)
 
 
 def test_direction_keys_unique_and_independent_of_scalar_key(tmp_path):
-    a = np.array([[1., 0., 0.]])
-    b = np.array([[0., 1., 0.]])
+    a = np.array([[1.0, 0.0, 0.0]])
+    b = np.array([[0.0, 1.0, 0.0]])
     assert directional_content_key(KEY, a) != directional_content_key(KEY, b)
     assert directional_content_key(KEY, a) == directional_content_key(KEY, a.copy())
     with pytest.raises(ValueError):
@@ -95,40 +112,63 @@ def test_direction_keys_unique_and_independent_of_scalar_key(tmp_path):
     store = CaseArtifactStore(tmp_path)
     scalar = store.publish("hopg", KEY, {"spec": np.array([2.0])})
     from pyrite.execution.artifacts import directional_store
+
     direction = directional_store(store).publish(
         "hopg", directional_content_key(KEY, a), {"directional": {"spec_by_direction": a}}
     )
     combined = load_directional_result(
-        store, DirectionalArtifactRef(scalar, direction),
-        material="hopg", case_key=KEY, directions=a,
+        store,
+        DirectionalArtifactRef(scalar, direction),
+        material="hopg",
+        case_key=KEY,
+        directions=a,
     )
     assert "directional" not in store.load(scalar)
     np.testing.assert_array_equal(combined["directional"]["spec_by_direction"], a)
     with pytest.raises(Exception):
-        load_directional_result(store, DirectionalArtifactRef(scalar, direction),
-                                material="hopg", case_key=KEY, directions=b)
+        load_directional_result(
+            store,
+            DirectionalArtifactRef(scalar, direction),
+            material="hopg",
+            case_key=KEY,
+            directions=b,
+        )
 
 
-def test_slurm_worker_publishes_separate_directions_and_reuses(monkeypatch, tmp_path,
-                                                                 fake_runner):
+def test_slurm_worker_publishes_separate_directions_and_reuses(monkeypatch, tmp_path, fake_runner):
     from pyrite.execution.slurm import _save_input
     from pyrite.execution.slurm import _atomic_json
-    sample = np.array([[1., 0., 0.]])
-    _save_input(tmp_path / "inputs" / "0.h5", [
-        {"index": 0, "case": {"crystal": "hopg", "x": 4},
-         "content_key": KEY, "directions": sample,
-         "direction_key": directional_content_key(KEY, sample)},
-    ])
-    _atomic_json(tmp_path / "plan.json", {
-        "format": "pyrite.slurm-array.v1", "tasks": 1,
-        "cases_per_task": 1, "artifact_root": str(tmp_path),
-        "resources": {"gpu_count": 0}, "local_workers": 0,
-    })
+
+    sample = np.array([[1.0, 0.0, 0.0]])
+    _save_input(
+        tmp_path / "inputs" / "0.h5",
+        [
+            {
+                "index": 0,
+                "case": {"crystal": "hopg", "x": 4},
+                "content_key": KEY,
+                "directions": sample,
+                "direction_key": directional_content_key(KEY, sample),
+            },
+        ],
+    )
+    _atomic_json(
+        tmp_path / "plan.json",
+        {
+            "format": "pyrite.slurm-array.v1",
+            "tasks": 1,
+            "cases_per_task": 1,
+            "artifact_root": str(tmp_path),
+            "resources": {"gpu_count": 0},
+            "local_workers": 0,
+        },
+    )
     execute_unit(tmp_path, 0)
     execute_unit(tmp_path, 0)  # retry, neither scalar nor directional recomputed
     store = CaseArtifactStore(tmp_path)
     assert store.reference("hopg", KEY) is not None
     from pyrite.execution.artifacts import directional_store
+
     assert directional_store(store).reference("hopg", directional_content_key(KEY, sample))
 
 
@@ -156,16 +196,25 @@ def test_dask_futures_callback_refs_and_resume(tmp_path, monkeypatch, fake_runne
     monkeypatch.setitem(sys.modules, "distributed", module)
     store = CaseArtifactStore(tmp_path)
     client = SynchronousClient()
-    executor = DaskExecutor(store, lambda case: case["key"],
-                            config=DaskConfig(cluster="local", cases_per_task=2),
-                            client=client)
+    executor = DaskExecutor(
+        store,
+        lambda case: case["key"],
+        config=DaskConfig(cluster="local", cases_per_task=2),
+        client=client,
+    )
     inputs = [{"crystal": "hopg", "key": str(i) * 64, "x": i} for i in range(1, 4)]
     collected = []
-    returned = executor.execute(inputs, progress=False, keep_results=False,
-                                callback=lambda i, c, ref: collected.append((i, ref)))
+    returned = executor.execute(
+        inputs,
+        progress=False,
+        keep_results=False,
+        callback=lambda i, c, ref: collected.append((i, ref)),
+    )
     assert len(collected) == 3
-    assert all(isinstance(ref, type(store.reference("hopg", c["key"])))
-               for (_, ref), c in zip(sorted(collected), inputs, strict=True))
+    assert all(
+        isinstance(ref, type(store.reference("hopg", c["key"])))
+        for (_, ref), c in zip(sorted(collected), inputs, strict=True)
+    )
     assert returned == [None] * 3
     assert len(client.submitted) == 2
     assert client.submitted[0][1]["resources"] == {}
@@ -180,14 +229,18 @@ def test_dask_directional_refs(tmp_path, monkeypatch, fake_runner):
     module.as_completed = lambda items: iter(items)
     monkeypatch.setitem(sys.modules, "distributed", module)
     store = CaseArtifactStore(tmp_path)
-    ex = DaskExecutor(store, lambda c: c["key"],
-                      config=DaskConfig(cluster="local"), client=SynchronousClient())
+    ex = DaskExecutor(
+        store, lambda c: c["key"], config=DaskConfig(cluster="local"), client=SynchronousClient()
+    )
     dirs = np.array([[1.0, 0.0, 0.0]])
     observed = []
-    ex.execute([{"crystal": "hopg", "key": KEY, "x": 1}],
-               observation_directions=[dirs],
-               callback=lambda i, c, ref: observed.append(ref))
+    ex.execute(
+        [{"crystal": "hopg", "key": KEY, "x": 1}],
+        observation_directions=[dirs],
+        callback=lambda i, c, ref: observed.append(ref),
+    )
     assert isinstance(observed[0], DirectionalArtifactRef)
-    out = load_directional_result(store, observed[0], material="hopg", case_key=KEY,
-                                  directions=dirs)
+    out = load_directional_result(
+        store, observed[0], material="hopg", case_key=KEY, directions=dirs
+    )
     assert "directional" in out and "spec" in out

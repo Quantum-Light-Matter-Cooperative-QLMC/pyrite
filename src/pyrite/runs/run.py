@@ -384,8 +384,11 @@ def run_sweep(
             if plan is None:
                 raise ValueError("executor returned unexpected directional artifact")
             out = load_directional_result(
-                artifact_store, out, material=material,
-                case_key=key, directions=plan.directions_sample,
+                artifact_store,
+                out,
+                material=material,
+                case_key=key,
+                directions=plan.directions_sample,
             )
         if isinstance(out, CaseArtifactRef):
             if artifact_store is None:

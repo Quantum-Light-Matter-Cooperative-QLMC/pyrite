@@ -50,14 +50,21 @@ def execute_unit(run_dir: Path, unit_index: int) -> None:
             # A corrupt committed artifact raises; never silently replace it.
             existing = store.reference(row["case"]["crystal"], row["content_key"])
             d_key = row.get("direction_key")
-            d_ref = (directional_store(store).reference(row["case"]["crystal"], d_key)
-                     if d_key is not None else None)
+            d_ref = (
+                directional_store(store).reference(row["case"]["crystal"], d_key)
+                if d_key is not None
+                else None
+            )
             if existing is not None:
-                store.load(existing, expected_material=existing.material,
-                           expected_content_key=row["content_key"])
+                store.load(
+                    existing,
+                    expected_material=existing.material,
+                    expected_content_key=row["content_key"],
+                )
             if d_ref is not None:
-                directional_store(store).load(d_ref, expected_material=d_ref.material,
-                                              expected_content_key=d_key)
+                directional_store(store).load(
+                    d_ref, expected_material=d_ref.material, expected_content_key=d_key
+                )
             if existing is not None and (d_key is None or d_ref is not None):
                 references.append({"index": row["index"], "key": existing.content_key})
             else:
@@ -72,17 +79,24 @@ def execute_unit(run_dir: Path, unit_index: int) -> None:
             if row.get("direction_key") is not None:
                 if "directional" not in output:
                     raise RuntimeError("worker returned no requested directional spectra")
-                directional_store(store).publish(case["crystal"], row["direction_key"],
-                                                 {"directional": output["directional"]})
+                directional_store(store).publish(
+                    case["crystal"], row["direction_key"], {"directional": output["directional"]}
+                )
             references.append({"index": row["index"], "key": reference.content_key})
 
         if pending:
             run_kwargs = {}
             if any(row.get("direction_key") is not None for row in pending):
                 run_kwargs["observation_directions"] = [row.get("directions") for row in pending]
-            run_cases([row["case"] for row in pending], max_workers=local_workers,
-                      engine=engine, progress=False, keep_results=False,
-                      callback=publish, **run_kwargs)
+            run_cases(
+                [row["case"] for row in pending],
+                max_workers=local_workers,
+                engine=engine,
+                progress=False,
+                keep_results=False,
+                callback=publish,
+                **run_kwargs,
+            )
         if len(references) != len(records):
             raise RuntimeError("worker did not finish publishing every case")
     except BaseException:

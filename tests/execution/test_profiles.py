@@ -4,7 +4,6 @@ from dataclasses import FrozenInstanceError
 from pathlib import Path
 
 import pytest
-
 from pyrite.execution import (
     CaseArtifactStore,
     ExecutionProfile,
@@ -36,7 +35,7 @@ def test_builtins_and_differentiation(tmp_path):
 
 def test_named_slurm_gpu_resource_roundtrip(tmp_path):
     file = tmp_path / "profiles.toml"
-    file.write_text('''
+    file.write_text("""
 [execution.cluster-amd]
 backend = "slurm"
 max_attempts = 3
@@ -52,14 +51,16 @@ gres = "gpu:radeon8060s:1"
 walltime = "00:50:00"
 max_concurrent = 6
 cases_per_task = 2
-''')
+""")
     profile = resolve_execution_profile("cluster-amd", config_path=file)
     assert profile.resources.cpu_cores == 8
     assert profile.resources.memory_bytes == 32 * 1024**3
     assert profile.resources.gpu_memory_bytes == 16 * 1024**3
     assert profile.retry_policy.max_attempts == 3
     assert profile.slurm.gres == "gpu:radeon8060s:1"
-    executor, store = build_executor(profile, case_key=lambda case: case["key"], artifact_root=tmp_path)
+    executor, store = build_executor(
+        profile, case_key=lambda case: case["key"], artifact_root=tmp_path
+    )
     assert executor.resources is profile.resources
     assert executor.config is profile.slurm
     assert executor.retry_policy is profile.retry_policy
@@ -67,19 +68,25 @@ cases_per_task = 2
     assert executor.case_key({"key": "sha"}) == "sha"
 
 
-@pytest.mark.parametrize("definition, error", [
-    ({"backend": "dask", "dask": {"cluster": "existing"}}, "scheduler_address"),
-    ({"backend": "slurm", "extra": 1}, "unknown"),
-    ({"backend": "slurm", "resources": {"mem_bytes": 40}}, "unknown"),
-    ({"backend": "slurm", "resources": {"cpu_cores": True}}, "cpu_cores"),
-    ({"backend": "slurm", "resources": {"memory_bytes": "3GB"}}, "memory_bytes"),
-    ({"backend": "slurm", "resources": {"gpu_count": 1}}, "GPU profiles"),
-    ({"backend": "slurm", "resources": {"accelerator": "cuda"}}, "device-specific"),
-    ({"backend": "local", "slurm": {"partition": "gpu"}}, "local profiles"),
-    ({"backend": "local", "max_attempts": 2}, "local profiles"),
-    ({"backend": "local", "resources": {"cpu_cores": 4}}, "local profiles"),
-    ({"backend": "slurm", "slurm": {"partition": "partition\n#SBATCH --account=oops"}}, "unsafe"),
-])
+@pytest.mark.parametrize(
+    "definition, error",
+    [
+        ({"backend": "dask", "dask": {"cluster": "existing"}}, "scheduler_address"),
+        ({"backend": "slurm", "extra": 1}, "unknown"),
+        ({"backend": "slurm", "resources": {"mem_bytes": 40}}, "unknown"),
+        ({"backend": "slurm", "resources": {"cpu_cores": True}}, "cpu_cores"),
+        ({"backend": "slurm", "resources": {"memory_bytes": "3GB"}}, "memory_bytes"),
+        ({"backend": "slurm", "resources": {"gpu_count": 1}}, "GPU profiles"),
+        ({"backend": "slurm", "resources": {"accelerator": "cuda"}}, "device-specific"),
+        ({"backend": "local", "slurm": {"partition": "gpu"}}, "local profiles"),
+        ({"backend": "local", "max_attempts": 2}, "local profiles"),
+        ({"backend": "local", "resources": {"cpu_cores": 4}}, "local profiles"),
+        (
+            {"backend": "slurm", "slurm": {"partition": "partition\n#SBATCH --account=oops"}},
+            "unsafe",
+        ),
+    ],
+)
 def test_bad_profiles_rejected_before_dispatch(definition, error):
     with pytest.raises((ValueError, TypeError), match=error):
         execution_profile_from_dict("test", definition)
@@ -100,8 +107,9 @@ def test_missing_and_bad_file(tmp_path):
 
 def test_no_implicit_physics_changes_and_invalid_key(tmp_path):
     # Scheduler configs stay separate from scientific Numerics (issue #680).
-    profile = ExecutionProfile("gpu", backend="slurm",
-                               resources=ResourceRequest(gpu_count=1, accelerator="cuda"))
+    profile = ExecutionProfile(
+        "gpu", backend="slurm", resources=ResourceRequest(gpu_count=1, accelerator="cuda")
+    )
     with pytest.raises(TypeError, match="callable"):
         build_executor(profile, case_key=None, artifact_root=tmp_path)
     assert not list(Path(tmp_path).rglob("*"))

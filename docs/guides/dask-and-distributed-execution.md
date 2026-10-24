@@ -26,6 +26,7 @@ At the Python level:
 
 ```python
 from pyrite.execution import inspect_execution, resolve_execution_profile
+
 p = resolve_execution_profile("slurm-cpu")
 print(inspect_execution(p, case_count=320))
 ```
