@@ -43,6 +43,11 @@ def _gaussian(waist=10.0):
 def _numerics():
     return pr.Numerics(
         cxr_trials=8, brem_trials=12,
+        # Replay equality needs only a few photon nodes; the automatic grid
+        # would score >300,000 nodes at every detector quadrature direction.
+        energy_bins=pr.EnergyBins(
+            cxr=np.linspace(1e3, 2e3, 9), brem=np.linspace(1e3, 2e3, 9),
+        ),
         channeling_basis_size=8, channeling_bloch_cells=4, channeling_dz_ang=250.0,
     )
 
@@ -137,5 +142,7 @@ def test_live_and_replayed_channeling_cr_agree_with_quantum_source():
     result = runner._transport_case(case)
     live = runner._spectrum_case(case, result)["spec_channeling"]
     replay = rescore_channeling_spectrum(case, result["E_grid"])
+    assert live.shape == (9,)
     np.testing.assert_array_equal(live, replay)
     assert np.all(np.isfinite(live))
+    assert np.any(live > 0.0)
