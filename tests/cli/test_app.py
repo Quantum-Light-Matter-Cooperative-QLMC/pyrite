@@ -264,6 +264,24 @@ def test_channeling_launch_and_export_have_no_material_argument(monkeypatch, tmp
     assert runner.invoke(cli.command, ["app", name, "launch", "silicon"]).exit_code == 2
 
 
+@pytest.mark.parametrize("name", ["transition-radiation", "angular-heatmap", "pixels"])
+def test_launch_backend_sets_app_process_environment(monkeypatch, name):
+    from pyrite._backend import _VALID_BACKENDS
+
+    assert views.BACKEND_CHOICES == _VALID_BACKENDS
+    calls = []
+    monkeypatch.setattr(views.subprocess, "run", lambda *a, **k: calls.append(k["env"]))
+    monkeypatch.setenv("PYRITE_MC_BACKEND", "cpu")
+    runner = CliRunner()
+    result = runner.invoke(cli.command, ["app", name, "launch", "--backend", "cuda"])
+    assert result.exit_code == 0, result.output
+    assert "array backend: cuda" in result.output
+    assert calls[-1]["PYRITE_MC_BACKEND"] == "cuda"
+    assert runner.invoke(cli.command, ["app", name, "launch"]).exit_code == 0
+    assert calls[-1]["PYRITE_MC_BACKEND"] == "cpu"  # inherited, never overridden
+    assert runner.invoke(cli.command, ["app", name, "launch", "--backend", "gpu"]).exit_code == 2
+
+
 @pytest.mark.parametrize(
     "name", ["channeling", "transition-radiation", "angular-heatmap", "optical-diagnostics"]
 )

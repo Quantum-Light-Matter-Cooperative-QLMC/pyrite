@@ -68,6 +68,10 @@ TRANSITION_RADIATION = MarimoApp(
 )
 
 
+#: ``PYRITE_MC_BACKEND`` values (mirrors ``pyrite._backend``, which probes devices on import).
+BACKEND_CHOICES = ("auto", "cpu", "cuda", "rocm", "sycl")
+
+
 def resolve_material(material: str | None) -> str:
     """Explicit MATERIAL, else the analysis app's persisted default, else hopg."""
     return material or get_analysis_default() or "hopg"
@@ -114,6 +118,7 @@ def _launch(
     acp=False,
     tunnel=False,
     no_token=False,
+    backend=None,
 ):
     require_cli_extra("apps", feature=f"pyrite app {app.name} launch")
     cmd = _command(app, material, edit=edit, watch=watch, tunnel=tunnel, no_token=no_token)
@@ -123,6 +128,10 @@ def _launch(
         click.echo(f"ssh -L {app.tunnel_port}:127.0.0.1:{app.tunnel_port} <your-pi-ssh-host>")
         click.echo(f"http://127.0.0.1:{app.tunnel_port}")
     env = {**os.environ, **({"PYRITE_ANALYZE_INITIAL": material} if material is not None else {})}
+    if backend is not None:
+        # The array backend is chosen once at import; the app process inherits it.
+        env["PYRITE_MC_BACKEND"] = backend
+        click.echo(f"array backend: {backend}")
     if smoke:
         with tempfile.TemporaryDirectory(prefix=f"pyrite-{app.name}-") as tmpdir:
             output = Path(tmpdir) / f"{app.name}.html"
@@ -189,7 +198,16 @@ def _launch_command(app: MarimoApp) -> click.Command:
     @click.option("--acp", is_flag=True, help="Start local Claude and Codex ACP bridges.")
     @click.option("--tunnel", is_flag=True, help="Bind fixed port for SSH tunneling.")
     @click.option("--no-token", is_flag=True, help="Disable marimo auth token.")
-    def command(watch, smoke, edit, acp, tunnel, no_token, material=None):
+    @click.option(
+        "--backend",
+        type=click.Choice(BACKEND_CHOICES),
+        default=None,
+        help=(
+            "Array backend for the app process (sets PYRITE_MC_BACKEND). "
+            "Default: inherit the environment. An explicit accelerator fails if unavailable."
+        ),
+    )
+    def command(watch, smoke, edit, acp, tunnel, no_token, backend, material=None):
         _launch(
             app,
             resolve_material(material) if app.material_picker else None,
@@ -199,6 +217,7 @@ def _launch_command(app: MarimoApp) -> click.Command:
             acp=acp,
             tunnel=tunnel,
             no_token=no_token,
+            backend=backend,
         )
 
     return command

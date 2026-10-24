@@ -15,17 +15,27 @@ bounded crystal (`campaign.geometry.DEFAULT_FOOTPRINT`); set the width and
 height to your sample.
 
 Controls are grouped by role: **Beam**, **Target**, **Footprint**,
-**Observation**, **Photon energy** and **Execution**. Submit **Run source maps**
-to calculate a scene. The **Display** row (mean current, log color, tilts shown)
-only redraws cached source arrays. A status rail reports the backend, elapsed
-time, footprint, resolved photon grid, line ceiling and history count. Export
+**Radiation**, **Photon energy** and **Execution**. The material list is the
+full catalog. *Tilts* takes a comma list and/or inclusive `start:stop:step`
+ranges (`0:80:5, 45`); each tilt is one transport. Submit **Run source maps**
+to calculate a scene. The **Display** controls (component, mean current, log
+color and range, tilts compared side by side or stepped through with a slider,
+cut energy/angle) only redraw cached source arrays. Maps are interactive Plotly
+heatmaps whose hover shows the true rate; below them, an angular cut at the
+chosen energy and a spectrum at the chosen angle overlay every shown tilt. A
+status rail reports the backend, transport core, elapsed time (or `cached`),
+footprint, resolved photon grid, line ceiling and history count. Export
 writes the default example into static HTML; static HTML cannot run new
 transports. The four-entry in-memory calculation cache is local to the running
 app process.
 
-Only the existing **incoherent PXR/CBS total** is scored, including its PXR–CBS
-interference. Bremsstrahlung, characteristic, cross-electron coherent,
-channeling and transition radiation are excluded from the map. Electron
+Selected **components** are scored from the same transport and kept as
+separate maps, never summed: the **incoherent PXR/CBS total** (including its
+PXR–CBS interference), **characteristic** atomic lines (isotropic emission, so
+the map shows escape geometry) and the **bremsstrahlung continuum** (BremsLib
+angular model when its tables are installed, otherwise isotropic EEDL).
+Cross-electron coherent, channeling and transition radiation are excluded; the
+TR app maps transition radiation. Electron
 transport retains the existing interaction policy. Photons retain target
 escape/self-absorption; there is no downstream filter, aperture, response,
 acquisition, or angular acceptance integration.
@@ -125,11 +135,16 @@ Grooves, direction-targeted longitudinal policies and adaptive precision are
 unsupported and rejected. Existing target geometry restrictions still apply. It
 transports once per scalar target/tilt, then evaluates bounded direction batches
 on the same segments. `brem_trials` is replaced by `cxr_trials` to avoid an
-unnecessary second population; only the CXR adapter is evaluated. Result
+unnecessary second population; only the requested adapters are evaluated.
+`pyrite.directional_sources(..., components=("pxr-cbs", "characteristic",
+"bremsstrahlung"))` returns one `DirectionalSpectrum` per component from one
+transport; characteristic and continuum use the live runner's lower-cutoff
+population, as in production. Pick a manual photon stop for the continuum,
+which extends to the beam energy rather than the PXR/CBS line ceiling. Result
 metadata records the case, seed, resolved numerics, plane azimuth, energy-grid
 choice, line ceiling, package/model/table provenance and source identity.
-Component identity and independent energy coordinates leave room for other
-future source components without assuming additive semantics.
+Each result's `component` names its identity; components are not additive
+by assumption.
 
 ## Resolution, statistics and limits
 
@@ -181,17 +196,18 @@ contains `directional_source`), Linux CuPy for CUDA 13, marimo and Matplotlib.
 
 molab keeps no generated files, and sessions stop after 90 idle minutes or
 12 hours. Use **Download results (.npz)** for maps worth keeping: it contains
-per-tilt `density` (per incident electron), `rate` (at the displayed current),
-`supported`, lab/sample directions, the shared angle/energy/tilt coordinates,
+per-tilt, per-component `t<i>_<component>_density` (per incident electron) and
+`t<i>_<component>_rate` (at the displayed current), per-tilt `supported`, lab/sample directions, the shared angle/energy/tilt coordinates,
 and JSON `metadata` (submitted config, current, units, line ceilings,
 identity digests). Static molab previews show no outputs; use a live session.
 
 ## Execution backends
 
 The array backend is fixed when PyRITE is imported, so choose it at launch:
-`PYRITE_MC_BACKEND=cuda pyrite app angular-heatmap launch` runs transport and
-scoring on a local GPU, and the app's status rail shows the resolved backend.
-*Transport core* selects the CPU lockstep/per-electron or CUDA transport core;
+`pyrite app angular-heatmap launch --backend cuda` (equivalently
+`PYRITE_MC_BACKEND=cuda`) runs transport and scoring on a local GPU, and the
+app's status rail shows the resolved backend. *Transport core* offers the CPU
+lockstep/per-electron cores, plus the CUDA core only on a CUDA launch;
 *Direction batch* bounds scoring scratch per batch without changing
 normalization. For sweeps beyond an interactive session, script the
 `directional_source` API and run it on the GPU host through `pyrite remote`.
