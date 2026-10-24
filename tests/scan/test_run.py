@@ -109,7 +109,7 @@ def test_run_case_directions_transports_once_and_stacks_direction_outputs(monkey
             "E_grid": np.array([1.0, 2.0]),
         }
 
-    def fake_spectrum(payload, transport):
+    def fake_spectrum(payload, transport, record_timing=False):
         assert payload is case
         calls["spectrum"] += 1
         value = transport["n_hat"][0]
