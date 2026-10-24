@@ -45,6 +45,10 @@ if TYPE_CHECKING:
     from pyrite._numerics import CxrReflections as CxrReflections
     from pyrite._numerics import Physics as Physics
     from pyrite._precision import Precision as Precision
+    from pyrite.quantum import QuantumRegion as QuantumRegion
+    from pyrite.quantum import QuantumDynamics as QuantumDynamics
+    from pyrite.quantum import QuantumNumerics as QuantumNumerics
+    from pyrite.quantum import QuantumSetup as QuantumSetup
     from pyrite.api import simulate as simulate
     from pyrite.bodies import RectangularBody as RectangularBody
     from pyrite.bodies import SubstanceRef as SubstanceRef
@@ -187,6 +191,10 @@ _PUBLIC_OBJECTS = {
     "BlazedGrooves": ("pyrite.campaign.geometry", "BlazedGrooves"),
     "CrystalCut": ("pyrite.campaign.geometry", "CrystalCut"),
     "Physics": ("pyrite._numerics", "Physics"),
+    "QuantumRegion": ("pyrite.quantum", "QuantumRegion"),
+    "QuantumDynamics": ("pyrite.quantum", "QuantumDynamics"),
+    "QuantumNumerics": ("pyrite.quantum", "QuantumNumerics"),
+    "QuantumSetup": ("pyrite.quantum", "QuantumSetup"),
     "CxrReflections": ("pyrite._numerics", "CxrReflections"),
     "CxrSpectra": ("pyrite.results.model", "CxrSpectra"),
     "AngularAcceptance": ("pyrite.detectors", "AngularAcceptance"),

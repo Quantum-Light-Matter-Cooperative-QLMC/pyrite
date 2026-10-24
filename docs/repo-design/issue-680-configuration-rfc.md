@@ -2,7 +2,7 @@
 
 **Status:** Proposal for maintainer review; no runtime changes in this slice
 **Target:** PyRITE `main`, inspected 2026-10-24
-**Issue:** https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/680
+**Issue:** [Issue 680](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/680)
 **Related:** ADR-0018 (quantum channeling zone), ADR-0019 (CLI ownership), ADR-0021 (#663, named physics/numerics presets), #623/#624 (experimental axial configuration), #361 (adaptive sampling), #508 (transverse source states).
 
 ## Decision requested
@@ -49,7 +49,7 @@ Adopt the *separation of responsibilities*, abTEM adapters, inspectable resolved
 
 | Type (tentative public name) | Contents | Identity/provenance classification |
 | --- | --- | --- |
-| `Beam.state: TransverseStateSpec | None` | Entrance pure state, coherent superposition, or statistical mixed state; units and beam-frame coordinate conventions explicit. Uses #508 factories. | Scientific, serialized spec and content hash of sampled data |
+| `Beam.state: TransverseStateSpec <or> None` | Entrance pure state, coherent superposition, or statistical mixed state; units and beam-frame coordinate conventions explicit. Uses #508 factories. | Scientific, serialized spec and  content hash of sampled data |
 | `QuantumRegion` | Planar/axial crystal alignment, potential source, physical zone bounds, handoff/escape definition. Plane/axis selectors use target-crystal orientation. | Scientific |
 | `QuantumDynamics` | Hamiltonian/potential recipe and physical dissipation/scattering mechanisms (e.g., validated Lindblad operator families), plus model compatibility. | Scientific |
 | `QuantumNumerics` | Representation (`BlochBasis`, `RealSpaceGrid`, etc.), solver (`density-matrix`, `MCWF`, coherent-only), propagation step, tolerance, quadrature, numerical/FFT boundary. | Scientific when affecting numerical approximation |
