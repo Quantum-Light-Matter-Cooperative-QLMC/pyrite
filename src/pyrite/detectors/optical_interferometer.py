@@ -27,6 +27,7 @@ from typing import Any
 
 import numpy as np
 
+from .._backend import _to_cpu, array_namespace
 from .._optical_coherency import OpticalSpectralCoherency
 from .optical_energy import CalibratedPulseEnergyDetector
 
@@ -105,22 +106,23 @@ class IdealMartinPuplett:
 class OpticalInterferogram:
     """Two-port calibrated energy/voltage against mirror travel.
 
-    Arrays have shape (Ndelay, 2), except the optional spectrum (Ndelay,2,NE).
+    NumPy/CuPy arrays have shape (Ndelay, 2), except the spectrum (Ndelay,2,NE).
     A pulse is one physical electron bunch. Detector outputs are *isolated*
     peak voltages, not lock-in/interferometer AC responses or long-time DC V/W.
+    :meth:`save` explicitly downloads device arrays for NPZ persistence.
     """
 
-    mirror_displacement_m: np.ndarray
-    optical_path_difference_m: np.ndarray
-    optical_delay_fs: np.ndarray
-    spectral_port_photons_per_eV_per_pulse: np.ndarray
-    incident_joule_per_pulse_ports: np.ndarray
-    absorbed_joule_per_pulse_ports: np.ndarray
-    expected_voltage_v_ports: np.ndarray
-    reported_voltage_v_ports: np.ndarray
-    saturated_ports: np.ndarray
-    noise_rms_voltage_v_ports: np.ndarray
-    average_absorbed_power_w_ports: np.ndarray | None
+    mirror_displacement_m: Any
+    optical_path_difference_m: Any
+    optical_delay_fs: Any
+    spectral_port_photons_per_eV_per_pulse: Any
+    incident_joule_per_pulse_ports: Any
+    absorbed_joule_per_pulse_ports: Any
+    expected_voltage_v_ports: Any
+    reported_voltage_v_ports: Any
+    saturated_ports: Any
+    noise_rms_voltage_v_ports: Any
+    average_absorbed_power_w_ports: Any
     metadata: dict = field(default_factory=dict)
 
     def save(self, path) -> Path:
@@ -140,9 +142,9 @@ class OpticalInterferogram:
             "saturated_ports",
             "noise_rms_voltage_v_ports",
         )
-        arrays = {k: getattr(self, k) for k in names}
+        arrays: dict[str, Any] = {k: _to_cpu(getattr(self, k)) for k in names}
         if self.average_absorbed_power_w_ports is not None:
-            arrays["average_absorbed_power_w_ports"] = self.average_absorbed_power_w_ports
+            arrays["average_absorbed_power_w_ports"] = _to_cpu(self.average_absorbed_power_w_ports)
         np.savez(dest, metadata=np.array(json.dumps(self.metadata, sort_keys=True)), **arrays)
         return dest
 
@@ -159,44 +161,45 @@ def load_optical_interferogram(path) -> OpticalInterferogram:
 
 def _port_spectra(source, instrument, mirror_shift):
     """Two complementary analyzing axes following an ideal retarder."""
-    e = source.energy_eV
-    j = source.photons_per_eV_per_pulse
+    xp = array_namespace(source.photons_per_eV_per_pulse, mirror_shift)
+    e = xp.asarray(source.energy_eV)
+    j = xp.asarray(source.photons_per_eV_per_pulse)
     a = instrument.input_grid_angle_rad
     b = instrument.output_grid_angle_rad
-    u = np.array([np.cos(a), np.sin(a)])
+    u = xp.asarray([np.cos(a), np.sin(a)])
     # The input polarizer removes the component orthogonal to u: the passed
     # density is u^T J u, which keeps 2 cos(a) sin(a) Re J_xy, i.e. the real
     # part of the incident xy coherence, and nothing orthogonal to u.
-    input_density = np.einsum("a,eab,b->e", u, j, u).real
+    input_density = xp.einsum("a,eab,b->e", u, j, u).real
     amplitudes = (
-        np.array(
+        xp.asarray(
             [
                 [np.cos(b) * np.cos(a), np.sin(b) * np.sin(a)],
                 [-np.sin(b) * np.cos(a), np.cos(b) * np.sin(a)],
             ]
         )
-        * np.sqrt(np.asarray(instrument.arm_intensity_transmissions))[None, :]
+        * xp.sqrt(xp.asarray(instrument.arm_intensity_transmissions))[None, :]
     )
-    dc = np.sum(amplitudes**2, axis=1)
-    fringes = 2 * np.prod(amplitudes, axis=1)
+    dc = xp.sum(amplitudes**2, axis=1)
+    fringes = 2 * xp.prod(amplitudes, axis=1)
     opd = instrument.zero_opd_m + 2.0 * mirror_shift
     k = 2 * np.pi * e / _HC_EV_M
-    fringe_reduction = np.exp(-0.5 * (k * instrument.opd_jitter_rms_m) ** 2)
+    fringe_reduction = xp.exp(-0.5 * (k * instrument.opd_jitter_rms_m) ** 2)
     phases = opd[:, None] * k[None, :] + instrument.phase_offset_rad
-    cos = np.cos(phases) * fringe_reduction[None, :]
+    cos = xp.cos(phases) * fringe_reduction[None, :]
     spectra = (dc[None, :, None] + fringes[None, :, None] * cos[:, None, :]) * input_density[
         None, None, :
     ]
-    spectra *= np.asarray(instrument.port_efficiencies)[None, :, None]
+    spectra *= xp.asarray(instrument.port_efficiencies)[None, :, None]
     # Roundoff cannot create a physical negative spectral density.
-    if np.any(spectra < -1e-12 * np.maximum(1.0, np.max(np.abs(spectra)))):
+    if bool(xp.any(spectra < -1e-12 * xp.maximum(1.0, xp.max(xp.abs(spectra))))):
         raise ValueError("non-passive interferometer output")
-    return np.maximum(spectra, 0.0), opd
+    return xp.maximum(spectra, 0.0), opd
 
 
 def _check_scan_arguments(
     source, mirror_displacement_m, instrument, detectors, repetition_hz, max_spectral_elements
-) -> np.ndarray:
+) -> Any:
     if not isinstance(source, OpticalSpectralCoherency):
         raise TypeError("source must be an OpticalSpectralCoherency, not intensity alone")
     if not isinstance(instrument, IdealMartinPuplett):
@@ -205,8 +208,9 @@ def _check_scan_arguments(
         isinstance(d, CalibratedPulseEnergyDetector) for d in detectors
     ):
         raise TypeError("supply two calibrated pulse energy detectors")
-    shifts = np.asarray(mirror_displacement_m, dtype=float)
-    if shifts.ndim != 1 or shifts.size == 0 or not np.all(np.isfinite(shifts)):
+    xp = array_namespace(source.photons_per_eV_per_pulse, mirror_displacement_m)
+    shifts = xp.asarray(mirror_displacement_m, dtype=float)
+    if shifts.ndim != 1 or shifts.size == 0 or not bool(xp.all(xp.isfinite(shifts))):
         raise ValueError("mirror_displacement_m must be a finite nonempty 1-D scan")
     if repetition_hz is not None and (not np.isfinite(repetition_hz) or repetition_hz < 0):
         raise ValueError("repetition_hz must be finite and nonnegative")
@@ -238,29 +242,40 @@ def polarized_interferogram(
     into per-pulse energy again. Multiple pulses/exposure, detector recovery,
     beam-charge fluctuations and broadband instrument calibration are deferred.
 
+    The source/scan arrays select NumPy or CuPy. Forward spectra and batched
+    response reductions stay on that backend. Validation synchronizes scalar
+    checks; provenance hashing downloads the small input (energy,2,2) once per
+    scan. No delay spectra or output voltages are downloaded until persistence
+    or an explicit caller transfer. Calibration data are staged from the host.
+
     Validation: optical-instrument-observable
     """
     shifts = _check_scan_arguments(
         source, mirror_displacement_m, instrument, detectors, repetition_hz, max_spectral_elements
     )
     spectra, opd = _port_spectra(source, instrument, shifts)
-    shape = spectra.shape[:2]
-    incident, absorbed, expected, reported, noise = (np.empty(shape) for _ in range(5))
-    saturated = np.empty(shape, bool)
-    avg_power = None if repetition_hz is None else np.empty(shape)
-    for p, detector in enumerate(detectors):
-        # Reuse detector's explicit spectral calibration, absorption, gain and
-        # saturation; do not invent a second energy-response implementation.
-        for t in range(shifts.size):
-            reading = detector.predict(source.energy_eV, spectra[t, p], repetition_hz=repetition_hz)
-            incident[t, p] = reading.incident_joule_per_pulse
-            absorbed[t, p] = reading.absorbed_joule_per_pulse
-            expected[t, p] = reading.expected_voltage_v
-            reported[t, p] = reading.reported_voltage_v
-            noise[t, p] = reading.noise_rms_voltage_v
-            saturated[t, p] = reading.saturated
-            if avg_power is not None:
-                avg_power[t, p] = reading.average_absorbed_power_w
+    xp = array_namespace(spectra)
+    # Two batched calls, independent of scan length. No per-delay host readings.
+    readings = [
+        detector.predict_batch(source.energy_eV, spectra[:, p], repetition_hz=repetition_hz)
+        for p, detector in enumerate(detectors)
+    ]
+    incident, absorbed, expected, reported, noise, saturated = (
+        xp.stack([getattr(r, name) for r in readings], axis=1)
+        for name in (
+            "incident_joule_per_pulse",
+            "absorbed_joule_per_pulse",
+            "expected_voltage_v",
+            "reported_voltage_v",
+            "noise_rms_voltage_v",
+            "saturated",
+        )
+    )
+    avg_power = (
+        None
+        if repetition_hz is None
+        else xp.stack([r.average_absorbed_power_w for r in readings], axis=1)
+    )
     config = json.loads(json.dumps(asdict(instrument)))
     meta = {
         "model": "ideal-martin-puplett-v1",
@@ -275,8 +290,9 @@ def polarized_interferogram(
         "repetition_hz": repetition_hz,
         "validation": "optical-instrument-observable: unanchored; synthetic reference only",
     }
-    source_digest = hashlib.sha256(source.energy_eV.tobytes())
-    source_digest.update(source.photons_per_eV_per_pulse.tobytes())
+    # Provenance boundary: hash only the small input (E,2,2), never delay spectra.
+    source_digest = hashlib.sha256(_to_cpu(source.energy_eV).tobytes())
+    source_digest.update(_to_cpu(source.photons_per_eV_per_pulse).tobytes())
     meta["source_spectrum_sha256"] = source_digest.hexdigest()
     digest = hashlib.sha256(json.dumps(meta, sort_keys=True).encode()).hexdigest()
     meta["model_configuration_sha256"] = digest

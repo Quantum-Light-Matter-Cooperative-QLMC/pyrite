@@ -97,3 +97,25 @@ def test_invalid_calibrations_refused():
         _calibrated(saturation_v=0)
     with pytest.raises(ValueError, match="repetition_hz"):
         _calibrated().predict([1, 3], [1, 1], repetition_hz=-1)
+
+
+def test_batched_pulse_reduction_has_exact_nonuniform_grid_units():
+    det = _calibrated(saturation_v=0.003)
+    energy = np.array([1.0, 1.3, 2.2, 3.0])
+    levels = np.array([[0.0, 1e7], [2e7, 3e7]])
+    photons = np.broadcast_to(levels[..., None], (2, 2, energy.size))
+    out = det.predict_batch(energy, photons, repetition_hz=1e6)
+    # Constant spectral density: integral E dE from 1 to 3 = 4 eV^2.
+    joules = 4 * levels * 1.602176634e-19
+    np.testing.assert_allclose(out.incident_joule_per_pulse, joules, rtol=1e-14)
+    np.testing.assert_allclose(out.expected_voltage_v, joules * 0.5e12, rtol=1e-14)
+    np.testing.assert_allclose(out.reported_voltage_v, np.minimum(joules * 0.5e12, 0.003))
+    np.testing.assert_array_equal(out.saturated, joules * 0.5e12 > 0.003)
+    np.testing.assert_allclose(out.average_absorbed_power_w, joules * 0.5e6)
+
+
+def test_batched_pulse_reduction_checks_every_spectrum():
+    det = _calibrated()
+    for photons in (np.ones((2, 4)), [[1, 1, 1], [1, -1, 1]], [[1, 1, 1], [1, np.nan, 1]]):
+        with pytest.raises(ValueError):
+            det.predict_batch([1, 2, 3], photons)

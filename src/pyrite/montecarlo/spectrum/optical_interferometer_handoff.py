@@ -15,7 +15,7 @@ from collections.abc import Sequence
 
 import numpy as np
 
-from ..._backend import _to_cpu, array_namespace
+from ..._backend import array_namespace
 from ..._optical_coherency import OpticalSpectralCoherency
 from .optical_finite_collection import PlaneAcceptance, collect_screen_field
 from .optical_finite_screen import (
@@ -74,6 +74,9 @@ def coherency_from_screen_fields(
     energies = np.array([float(f.energy_eV) for f in fields])
     if energies.size < 2 or not np.all(np.diff(energies) > 0):
         raise ValueError("fields must be sorted on a strictly increasing energy grid of >=2 nodes")
+    xp = array_namespace(fields[0].electric_xy_v_s_m)
+    if any(array_namespace(f.electric_xy_v_s_m) is not xp for f in fields):
+        raise ValueError("screen fields must share one array backend")
     matrices = [
         _field_coherency(
             f,
@@ -85,7 +88,7 @@ def coherency_from_screen_fields(
         )
         for f in fields
     ]
-    return OpticalSpectralCoherency(energies, np.asarray(matrices), provenance)
+    return OpticalSpectralCoherency(xp.asarray(energies), xp.stack(matrices), provenance)
 
 
 def _field_coherency(
@@ -96,7 +99,7 @@ def _field_coherency(
     max_angle_rad,
     max_angular_leakage,
     max_flux_relative_error,
-) -> np.ndarray:
+):
     """2x2 Jones coherency [photons/eV/pulse] of one energy node at the plane."""
     if plane_z_m <= f.z_m:
         raise ValueError("detector plane must be downstream of every field reference plane")
@@ -117,13 +120,13 @@ def _field_coherency(
         )
     e = plane.electric_xy_v_s_m
     weight = xp.ones(e.shape[1:]) if aperture is None else xp.asarray(aperture._weights(plane))
-    # Device-resident reduction to the 2x2 matrix; only it returns to the host.
-    matrix = _to_cpu(xp.einsum("ayx,byx,yx->ab", e, e.conj(), weight))
+    # Keep the reduced Jones matrices on the field's device for the instrument.
+    matrix = xp.einsum("ayx,byx,yx->ab", e, e.conj(), weight)
     matrix *= plane.dx_m * plane.dy_m / (np.pi * _HBAR_EV_S * _Z0_OHM * f.energy_eV * _E_CHARGE_C)
     # The paraxial scalar-flux approximation is an explicit controlled
     # reduction of the vector Maxwell source, not a silent replacement.
     exact = collect_screen_field(f, plane_z_m=plane_z_m, aperture=aperture).photons_per_eV
-    estimate = float(np.trace(matrix).real)
+    estimate = float(xp.trace(matrix).real)
     if exact <= 0 or abs(estimate - exact) > max_flux_relative_error * exact:
         raise ValueError(
             "paraxial polarization density disagrees with full-vector collected flux; "

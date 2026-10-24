@@ -19,10 +19,13 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass, field
+from typing import Any
 
 import numpy as np
 
-__all__ = ["CalibratedPulseEnergyDetector", "OpticalPulseReading"]
+from .._backend import array_namespace
+
+__all__ = ["CalibratedPulseEnergyDetector", "OpticalPulseReading", "OpticalPulseBatchReading"]
 
 _ELECTRON_VOLT_J = 1.602176634e-19
 
@@ -40,6 +43,26 @@ class OpticalPulseReading:
     response_sha256: str
     average_incident_power_w: float | None
     average_absorbed_power_w: float | None
+
+
+@dataclass(frozen=True, eq=False)
+class OpticalPulseBatchReading:
+    """Pulse predictions with NumPy/CuPy arrays over the input's batch axes.
+
+    Every numerical member has shape ``photon_density.shape[:-1]``. Scalars
+    and metadata validation may synchronize; spectral arrays and reductions
+    remain on their owning device. No stochastic noise is sampled.
+    """
+
+    incident_joule_per_pulse: Any
+    absorbed_joule_per_pulse: Any
+    expected_voltage_v: Any
+    reported_voltage_v: Any
+    noise_rms_voltage_v: Any
+    saturated: Any
+    response_sha256: str
+    average_incident_power_w: Any
+    average_absorbed_power_w: Any
 
 
 @dataclass(frozen=True, eq=False)
@@ -123,45 +146,95 @@ class CalibratedPulseEnergyDetector:
         *,
         repetition_hz: float | None = None,
     ) -> OpticalPulseReading:
-        """Integrate a collected photon *density* in energy (not bin counts).
+        """Integrate one photon density on a nonuniform energy grid.
 
-        Samples use trapezoidal quadrature on the physical nonuniform energy
-        grid; resolution/convergence is the caller's responsibility. Repetition
-        rate only reports optical average W, not an arbitrary conversion to
-        pulse voltage. AC coupling, pulse pile-up and response times are not
-        modeled. No uncertainty is inferred for the input spectrum or
-        calibration; ``noise_rms_v`` is the declared electronics noise alone.
+        Returns host scalars for compatibility. Use :meth:`predict_batch`
+        for device-resident reductions or multiple spectra. Repetition rate
+        reports optical average W only, never an arbitrary pulse-voltage
+        conversion. AC coupling, pile-up and recovery are not modeled.
         """
-        energy = np.asarray(energy_eV, dtype=float)
-        photons = np.asarray(collected_photons_per_eV_per_pulse, dtype=float)
+        xp = array_namespace(energy_eV, collected_photons_per_eV_per_pulse)
+        photons = xp.asarray(collected_photons_per_eV_per_pulse)
+        if photons.ndim != 1:
+            raise ValueError("input must be a 1-D photon density; use predict_batch for batches")
+        out = self.predict_batch(energy_eV, photons, repetition_hz=repetition_hz)
+        return OpticalPulseReading(
+            incident_joule_per_pulse=float(out.incident_joule_per_pulse),
+            absorbed_joule_per_pulse=float(out.absorbed_joule_per_pulse),
+            expected_voltage_v=float(out.expected_voltage_v),
+            reported_voltage_v=float(out.reported_voltage_v),
+            noise_rms_voltage_v=self.noise_rms_v,
+            saturated=bool(out.saturated),
+            response_sha256=out.response_sha256,
+            average_incident_power_w=None
+            if repetition_hz is None
+            else float(out.average_incident_power_w),
+            average_absorbed_power_w=None
+            if repetition_hz is None
+            else float(out.average_absorbed_power_w),
+        )
+
+    def predict_batch(
+        self,
+        energy_eV: Any,
+        collected_photons_per_eV_per_pulse: Any,
+        *,
+        repetition_hz: float | None = None,
+    ) -> OpticalPulseBatchReading:
+        """Reduce photon densities shaped (..., energy) on their NumPy/CuPy backend.
+
+        The common energy grid is one-dimensional and wholly inside the measured
+        calibration band. Trapezoidal quadrature integrates the final axis.
+        Calibration knots are uploaded once per call; no spectrum is downloaded.
+        Validation synchronizes scalar predicates, not individual batch readings.
+
+        Validation: optical-instrument-observable
+        """
+        xp = array_namespace(energy_eV, collected_photons_per_eV_per_pulse)
+        energy = xp.asarray(energy_eV, dtype=float)
+        photons = xp.asarray(collected_photons_per_eV_per_pulse, dtype=float)
         if (
             energy.ndim != 1
             or energy.size < 2
-            or photons.shape != energy.shape
-            or not np.all(np.isfinite(energy))
-            or not np.all(np.diff(energy) > 0)
-            or not np.all(np.isfinite(photons))
-            or np.any(photons < 0)
+            or photons.ndim < 1
+            or photons.shape[-1] != energy.size
+            or not bool(xp.all(xp.isfinite(energy)))
+            or not bool(xp.all(xp.diff(energy) > 0))
+            or not bool(xp.all(xp.isfinite(photons)))
+            or bool(xp.any(photons < 0))
         ):
             raise ValueError("input must be finite, nonnegative photons/eV on an increasing grid")
-        if energy[0] < self.energy_eV[0] or energy[-1] > self.energy_eV[-1]:
+        if bool(energy[0] < self.energy_eV[0]) or bool(energy[-1] > self.energy_eV[-1]):
             raise ValueError("optical detector spectrum is outside its calibrated energy band")
         if repetition_hz is not None and (not np.isfinite(repetition_hz) or repetition_hz < 0):
             raise ValueError("repetition_hz must be finite and nonnegative")
-        absorption = np.interp(energy, self.energy_eV, self.efficiency)
-        incident = float(np.trapezoid(photons * energy, energy) * _ELECTRON_VOLT_J)
-        absorbed = float(np.trapezoid(photons * energy * absorption, energy) * _ELECTRON_VOLT_J)
+        absorption = xp.interp(energy, xp.asarray(self.energy_eV), xp.asarray(self.efficiency))
+        density = photons * energy * _ELECTRON_VOLT_J
+        widths = xp.diff(energy) / 2
+        incident = xp.sum((density[..., 1:] + density[..., :-1]) * widths, axis=-1)
+        absorbed_density = density * absorption
+        absorbed = xp.sum(
+            (absorbed_density[..., 1:] + absorbed_density[..., :-1]) * widths, axis=-1
+        )
         expected = absorbed * self.pulse_gain_v_per_j
-        if not (np.isfinite(incident) and np.isfinite(absorbed) and np.isfinite(expected)):
+        if not bool(xp.all(xp.isfinite(incident) & xp.isfinite(absorbed) & xp.isfinite(expected))):
             raise ValueError("calculated detector energy or voltage overflowed")
-        saturated = self.saturation_v is not None and expected > self.saturation_v
-        readout = min(expected, self.saturation_v) if self.saturation_v is not None else expected
-        return OpticalPulseReading(
+        saturated = (
+            xp.zeros(expected.shape, dtype=bool)
+            if self.saturation_v is None
+            else expected > self.saturation_v
+        )
+        reported = (
+            expected.copy()
+            if self.saturation_v is None
+            else xp.minimum(expected, self.saturation_v)
+        )
+        return OpticalPulseBatchReading(
             incident_joule_per_pulse=incident,
             absorbed_joule_per_pulse=absorbed,
             expected_voltage_v=expected,
-            reported_voltage_v=readout,
-            noise_rms_voltage_v=self.noise_rms_v,
+            reported_voltage_v=reported,
+            noise_rms_voltage_v=xp.full(expected.shape, self.noise_rms_v),
             saturated=saturated,
             response_sha256=self.response_sha256,
             average_incident_power_w=None if repetition_hz is None else incident * repetition_hz,

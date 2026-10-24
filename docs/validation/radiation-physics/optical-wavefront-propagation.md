@@ -170,3 +170,46 @@ What this does and does not establish:
 
 - Schmidt et al., arXiv:1803.00608, Appendix D was not available in this context. The rederivation rests on the first-principles Maxwell angular-spectrum identity, which is the primary cited source.
 - FFT periodicity: all identities hold exactly for the periodic cell. Physical aperture collection additionally requires the window/pitch convergence that `finite_screen_collection_convergence` diagnoses but does not guarantee.
+
+## Device coherency-transfer re-derivation (2026-10-23, issues #616–617)
+
+Fresh verifier; scope is `apply_optical_elements` downstream of collection,
+with signatures/docstrings and ledger read before implementation. No upstream
+vacuum or finite-screen solver, published comparison or hardware calibration
+is re-certified by this scoped check.
+
+From linear Jones transfer of a random transverse amplitude $a$, define
+$J=\langle aa^\dagger\rangle$. An element $T$ sends $a$ to $Ta$, hence
+
+$$
+J'=TJT^\dagger,\qquad
+J_{\rm out}=T_n\cdots T_1J_{\rm in}T_1^\dagger\cdots T_n^\dagger.
+$$
+
+Thus the first element acts first, with no transpose substituted for the
+conjugate transpose. Photon-density units are unchanged; energy-resolved
+Jones matrices carry dimensionless amplitudes. For a positive-semidefinite
+input and passive $T^\dagger T\preceq I$, positivity is preserved and
+$\operatorname{tr}J'\le\operatorname{tr}J$. Identity preserves $J$; a unitary
+retarder preserves its trace; an ideal polarizer gives Malus' law. Changing
+array backend cannot change these index contractions. The operator remains
+restricted to the calibrated spectral and angular domain stated by each
+element. This derivation and the unit/limit/sign filters precede inspection
+of the implementation body.
+
+### Scoped comparison and verdict
+
+Inspection after derivation found `t @ j @ t.conj().transpose(0, 2, 1)`
+in beam order. `CalibratedJonesElement.transfer` stages calibration knots on
+the energy backend, interpolates real and imaginary amplitude components and
+refuses extrapolation; it introduces no intensity or photon-energy factor.
+An independent NumPy example with a complex positive-semidefinite coherency
+and two noncommuting complex passive matrices matched the single combined
+operator expression within relative tolerance $10^{-14}$ and absolute
+tolerance $10^{-10}$ photons/(eV pulse).
+
+- **Filters**: units pass; limits pass; signs/conventions pass.
+- **Re-derivation**: `matches`; no transpose, ordering or normalization discrepancy.
+- **Verdict**: `rederived` for this scoped coherency-transfer refactor.
+- **Suggested ledger change**: retain `rederived`; append this scoped check to
+  Checks. No real CUDA execution, published anchor or human sign-off is claimed.

@@ -290,3 +290,76 @@ Independent scripts (scratch only; not committed) using
   $e^{-k^2\sigma_L^2/2}$).
 - **Re-derivation**: `matches`.
 - **Verdict**: `rederived`.
+
+## Device-reduction re-derivation (2026-10-23, issues #616–617)
+
+Fresh verifier; signatures/docstrings and ledger read before implementation.
+Scope: already-collected photon densities, calibrated batch reduction and ideal
+two-port readout. Source is linear detector integration and two-arm field
+interference, as specified in the linked research equations; the DIPAC IT07
+PDF could not be fetched in this review. No published numerical reproduction
+or hardware calibration is claimed.
+
+For each independent leading-axis index $b$, let $\Phi_b(E)$ have units
+photons/(eV pulse), with $E$ measured in eV and $e$ the J/eV conversion.
+Absorptance $\eta(E)$ is dimensionless. Conservation of photon energy gives
+
+$$
+U_b=e\int E\Phi_b(E)\,dE,\qquad
+U_{a,b}=e\int E\eta(E)\Phi_b(E)\,dE,\qquad
+V_b=gU_{a,b},\qquad P_b=fU_b,\quad P_{a,b}=fU_{a,b}.
+$$
+
+Here $g$ is isolated-pulse V/J and $f$ is repetition Hz. Trapezoidal
+quadrature on common increasing nonuniform nodes applies only to the last
+axis; batching changes neither weights nor normalization. Zero absorptance
+annuls absorbed energy and voltage; unit absorptance gives identical incident
+and absorbed energies. Neither bunch population nor repetition rate belongs
+in per-pulse energy again.
+
+Independently, an ideal input grid along
+$u=(\cos\alpha,\sin\alpha)^T$ gives scalar photon density
+$S=u^\dagger Ju$. Arms with power transmissions $t_x,t_y$ give diagonal
+intensities $S t_x\cos^2\alpha$ and $S t_y\sin^2\alpha$.
+Analyzing at $v=(\cos\beta,\sin\beta)^T$ and its orthogonal complement gives
+
+$$
+\begin{aligned}
+\Phi_A&=p_A S[t_x\cos^2\alpha\cos^2\beta+
+ t_y\sin^2\alpha\sin^2\beta+
+ 2\sqrt{t_xt_y}\cos\alpha\sin\alpha\cos\beta\sin\beta\,q\cos\phi],\\
+\Phi_B&=p_B S[t_x\cos^2\alpha\sin^2\beta+
+ t_y\sin^2\alpha\cos^2\beta-
+ 2\sqrt{t_xt_y}\cos\alpha\sin\alpha\cos\beta\sin\beta\,q\cos\phi],\\
+\phi&=\frac{E(L_0+2d)}{\hbar c}+\phi_0,\qquad
+q=\exp[-\tfrac12(E\sigma_L/(\hbar c))^2].
+\end{aligned}
+$$
+
+The Gaussian factor follows from averaging the phase over RMS OPD jitter.
+For unit port efficiencies their sum is the post-grid transmitted density;
+fringes cancel exactly. Balanced 45-degree grids give complementary cosine
+ports. The same linear detector integral applies to each delay independently.
+These expressions and unit/limit/sign filters were recorded before reading
+the implementation bodies.
+
+### Scoped comparison and verdict
+
+After recording the derivation, inspection of `predict_batch`, `predict`,
+`_port_spectra` and `polarized_interferogram` found the same factors and port
+signs. The scalar wrapper delegates the identical energy integral; two batched
+port calls preserve the per-delay normalization and attach repetition rate
+only to average power. An independent NumPy calculation used four nonuniform
+nodes, two spectra, nonconstant absorptance and 13 Hz: energy, isolated-pulse
+voltage and W agreed within relative tolerance $2\times10^{-15}$. A separate
+explicit complex field/Jones oracle used non-45-degree grids, unequal lossy
+arms/ports, phase offset, OPD offset and Gaussian jitter at three displacements;
+all port spectra agreed within relative tolerance $10^{-13}$ (maximum absolute
+photon-density difference $4.66\times10^{-10}$).
+
+- **Filters**: units pass; limits pass; signs/conventions pass.
+- **Re-derivation**: `matches`; no divergent factor, sign or normalization found.
+- **Verdict**: `rederived` for this scoped device-reduction refactor.
+- **Suggested ledger change**: retain `rederived`; append this scoped comparison
+  to Checks. Actual CUDA execution, published anchors and measured calibration
+  are not established by this review.

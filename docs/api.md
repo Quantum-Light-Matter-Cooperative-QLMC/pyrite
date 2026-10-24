@@ -275,3 +275,14 @@ response and per-component supported bands; they do not lower the production
 X-ray floor or supply optical detector/transport models. See
 [explicit optical TR response](physics/radiation-physics/transition-radiation.md#explicit-optical-response-for-bounded-diagnostics)
 for units, sample/provenance metadata, interpolation policy and an example.
+
+`pyrite.detectors.optical_energy.CalibratedPulseEnergyDetector.predict_batch`
+integrates collected photon densities shaped `(..., energy)` on a shared
+nonuniform energy grid. Its `OpticalPulseBatchReading` carries per-pulse
+joules, isolated-pulse volts, noise/saturation and optional average watts over
+the batch axes. NumPy/CuPy inputs select the backend; `predict` retains the
+single-spectrum interface returning host scalars. Calibration remains explicit
+and bounded; these provisional operators supply no measured response by default.
+`OpticalSpectralCoherency`, calibrated Jones transfers and
+`polarized_interferogram` preserve that backend through the forward reductions.
+See [device operators and transfer boundaries](physics/radiation-physics/optical-wavefront-and-detectors.md#device-resident-field-operators-and-cuda-parity).

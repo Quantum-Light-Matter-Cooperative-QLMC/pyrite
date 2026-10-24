@@ -516,8 +516,8 @@ CUDA parity is recorded below. `optical-finite-boundary-field` remains
 
 ## Finite-distance, polarization-resolved collection (#616 next slice)
 
-`pyrite.montecarlo.spectrum.optical_finite_collection` provides an **opt-in CPU
-reference** for the finite circular PEC screen source implemented in
+`pyrite.montecarlo.spectrum.optical_finite_collection` provides an **opt-in
+reference with NumPy/CuPy field reductions** for the finite circular PEC screen source implemented in
 `optical_finite_screen.py` and the physical-bunch estimates implemented in
 `optical_finite_bunch.py`. Unlike the earlier angular-cone scorer, this operator
 integrates **a physical area on a plane at a stated finite distance**. It does
@@ -778,8 +778,8 @@ expectation. Neither the interferometer nor the adapter constructs the missing
 complex ensemble coherence. Full optical instrument geometry, background
 subtraction, shot-charge variation, uncertainty inference, finite-band
 retrieval ambiguities and measured MPI comparisons are outstanding.
-The field-to-coherency reduction has bounded CPU/CUDA parity below; the
-ideal interferometer then evaluates that small collected matrix on the CPU. Synthetic forward/port-conservation tests do **not** anchor
+The field-to-coherency and instrument reductions retain their array backend,
+with bounded CPU/CUDA parity recorded below. Synthetic forward/port-conservation tests do **not** anchor
 `optical-instrument-observable`.
 
 ### Conditional Gaussian CTR bunch-duration inference (#617)
@@ -1009,22 +1009,49 @@ paths. Upload a realized source field explicitly; this is not a GPU source
 kernel or a production dispatcher. Plane aperture masks and quadrature nodes
 are built on the host and uploaded. Large complex field arrays stay on the
 device during propagation and collection; validation checks and final scalar
-fluxes synchronize with the host. The interferometer handoff transfers only
-the reduced 2×2 coherency matrix per energy. Detector response, calibrated
-Jones elements, interferograms and inference still run on the CPU.
+fluxes synchronize with the host. The interferometer handoff now keeps its
+reduced 2×2 coherency matrices on the field's device. Fields in a handoff must
+share one backend. `OpticalSpectralCoherency` copies its inputs on that backend;
+NumPy storage is read-only, while CuPy storage remains writable.
+
+`CalibratedJonesElement.transfer` interpolates host calibration knots onto the
+energy grid's backend; `apply_optical_elements` performs the complex
+$TJT^\dagger$ map there. `CalibratedPulseEnergyDetector.predict_batch` accepts
+`(..., energy)` photon densities and reduces the last axis using nonuniform
+trapezoidal quadrature. Joules/pulse, saturation-clipped volts, declared RMS
+noise and optional average watts retain the batch shape and backend. The
+single-spectrum `predict` method retains its host-scalar return contract.
+
+`polarized_interferogram` forms the two-port spectra and makes two batched
+response calls, independent of delay count. Spectra, voltages and the other
+scan arrays remain on the device. Validation checks synchronize scalar
+predicates. SHA-256 provenance explicitly downloads the small input energy
+grid and `(energy,2,2)` coherency once per scan, never the delay spectra or
+voltage arrays. `OpticalInterferogram.save` explicitly downloads the result
+arrays for the existing NPZ format. Calibration/configuration data remain
+on the host and are staged at operator entry. CPU optimization/inference
+control is unchanged; these forward reductions do not add a production source
+dispatcher or GPU PEC source builder.
 
 `tests/montecarlo/test_optical_cuda_parity.py` checks normal-disc and oblique
 annulus propagation, complex direct Green fields, FFT angular yields,
 hemisphere energy, polarized finite-plane flux, monochromatic power, and
-collected two-port voltages from paraxial device fields. Float64/complex128
+collected two-port voltages from paraxial device fields. Additional checks
+exercise device-resident Jones interpolation, nonuniform batched detector
+integration, unequal calibrated ports, OPD jitter, saturation and persistence;
+they assert device array ownership and the explicit provenance-transfer
+boundary. Float64/complex128
 comparisons use relative tolerances of $10^{-12}$–$10^{-11}$ for reductions
 and $10^{-11}$ plus a peak-scaled $10^{-12}$ absolute floor for complex fields.
 These bound backend arithmetic differences; spatial/spectral convergence
 and finite-screen model validity require separate checks.
 
 [Recorded remote run](../../validation/check-records/optical-finite-cuda.json):
-five tests passed in a bounded SLURM GPU allocation. The record pins the synced
-source digest and test hash. Reproduce after syncing the intended tree and
+five field-operator tests passed in a bounded SLURM GPU allocation. The
+[instrument-reduction follow-up](../../validation/check-records/optical-device-reductions-cuda.json)
+records seven passing tests (SLURM job 2277, RTX 5080), including the retained
+device arrays and provenance boundary. Each record pins the synced source
+digest and test hash. Reproduce after syncing the intended tree and
 staging the test (tests are not included in `pyrite remote sync`):
 
 ```bash

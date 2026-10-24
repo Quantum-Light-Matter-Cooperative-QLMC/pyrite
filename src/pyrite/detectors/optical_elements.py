@@ -26,9 +26,11 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 
+from .._backend import array_namespace
 from .._optical_coherency import OpticalSpectralCoherency
 
 __all__ = ["CalibratedJonesElement", "apply_optical_elements"]
@@ -113,16 +115,23 @@ class CalibratedJonesElement:
         )
         return digest.hexdigest()
 
-    def transfer(self, energy_eV) -> np.ndarray:
-        """Interpolated passive T at ``energy_eV``; refuses extrapolation."""
-        e = np.asarray(energy_eV, dtype=float)
-        if e.ndim != 1 or np.any(e < self.energy_eV[0]) or np.any(e > self.energy_eV[-1]):
+    def transfer(self, energy_eV) -> Any:
+        """Passive T on the energy grid's NumPy/CuPy backend; no extrapolation."""
+        xp = array_namespace(energy_eV)
+        e = xp.asarray(energy_eV, dtype=float)
+        if (
+            e.ndim != 1
+            or not bool(xp.all(xp.isfinite(e)))
+            or bool(xp.any(e < self.energy_eV[0]))
+            or bool(xp.any(e > self.energy_eV[-1]))
+        ):
             raise ValueError(f"{self.element_id}: energies outside the calibrated band")
-        out = np.empty((e.size, 2, 2), complex)
+        knots, jones = xp.asarray(self.energy_eV), xp.asarray(self.jones)
+        out = xp.empty((e.size, 2, 2), complex)
         for a in range(2):
             for b in range(2):
-                out[:, a, b] = np.interp(e, self.energy_eV, self.jones[:, a, b].real) + (
-                    1j * np.interp(e, self.energy_eV, self.jones[:, a, b].imag)
+                out[:, a, b] = xp.interp(e, knots, jones[:, a, b].real) + (
+                    1j * xp.interp(e, knots, jones[:, a, b].imag)
                 )
         return out
 
@@ -147,7 +156,8 @@ def apply_optical_elements(
         raise TypeError("supply at least one CalibratedJonesElement")
     if not np.isfinite(collection_half_angle_rad) or collection_half_angle_rad < 0:
         raise ValueError("collection_half_angle_rad must be finite and nonnegative")
-    j = np.array(source.photons_per_eV_per_pulse)
+    xp = array_namespace(source.photons_per_eV_per_pulse)
+    j = xp.array(source.photons_per_eV_per_pulse)
     for element in elements:
         if collection_half_angle_rad > element.max_half_angle_rad:
             raise ValueError(

@@ -1,0 +1,50 @@
+{
+  "evidence_kind": "device-resident optical instrument forward reductions; CPU/CUDA arithmetic parity, not a published physics anchor",
+  "validation_ids": [
+    "optical-wavefront-propagation",
+    "optical-instrument-observable"
+  ],
+  "device": "NVIDIA GeForce RTX 5080",
+  "driver_version": "610.47",
+  "python": "3.14.6",
+  "pytest": "9.1.1",
+  "slurm": {
+    "job_id": 2277,
+    "state": "COMPLETED",
+    "exit_code": "0:0",
+    "partition": "gpu",
+    "gpus": 1,
+    "cpus": 2,
+    "memory": "4G",
+    "time_limit": "00:05:00",
+    "runtime": "00:00:06"
+  },
+  "sync_stamp": {
+    "code_digest": "f8857db282ca1b21bb25879e32aab43008f849f0d0ff89e190282734b9e08641",
+    "code_revision": "36fb688a11d52179c793a2358e779168494473bc",
+    "code_dirty": "True",
+    "code_synced_at": "2026-10-24T00:53:26+00:00",
+    "code_source": "alex-XPS-15-9530:/home/alex/dev/pyrite/.worktrees/issues-616-617",
+    "code_tables_digest": "f9a89dc83cb97f36fc94a2fef58a4ad710d5848d9f5c8f513b896de47f6106e2"
+  },
+  "source_and_test_sha256": {
+    "src/pyrite/_optical_coherency.py": "cb3489fa3d33d7b144b145e02205c55e6fbd6151dc653bb81c81915b4cb6dde4",
+    "src/pyrite/detectors/optical_energy.py": "de4303252df5c4fd8ac32f8bd01c03f9b04802b2b2b9ec535321435e995ab30c",
+    "src/pyrite/detectors/optical_elements.py": "932b16040b0b9d38b30f0d41283cd049c4f5bd3f60c15380e64fae9dbedf1760",
+    "src/pyrite/detectors/optical_interferometer.py": "2882ce7a691498120b7243ed07ad64b9facf74e8920e9fee5625d7cc391fd6ca",
+    "src/pyrite/montecarlo/spectrum/optical_interferometer_handoff.py": "4f8e16bbfc50ddb5a59e43537079537915c39db2b4f90c68e4dcae95ebd0e3f5",
+    "tests/montecarlo/test_optical_cuda_parity.py": "15982e8eb74ecc2c2dfb27082668d8e9f92b1066a55a7863a845b90227317027"
+  },
+  "test_command": "PYRITE_MC_BACKEND=cuda PYRITE_TEST_BACKEND=cuda PYRITE_CATALOG=/home/aamador/pyrite/src/pyrite/data/catalog PYRITE_HOME=/home/aamador/pyrite /home/aamador/.local/bin/uv run --extra nvidia pyrite-dev test /tmp/test_optical_device_reductions_616_617.py --durations=0",
+  "test_staging": "Tracked test copied unchanged to /tmp/test_optical_device_reductions_616_617.py; pyrite remote sync excludes tests.",
+  "result": {
+    "passed": 7,
+    "skipped": 0,
+    "elapsed_seconds": 2.85
+  },
+  "log": "optical-device-reductions-cuda.txt",
+  "tolerance_basis": "float64/complex128 reductions, interpolation and FFT ordering: relative 1e-12 for analytic batch units and Jones values, 1e-11 plus peak-scaled 1e-12 absolute floor for full scans/complex fields; no physical convergence claim",
+  "residency": "Coherency, Jones transfer, delay/port spectra and detector reductions return CuPy arrays. Scan test records exactly two explicit downloads: energy shape (5,) and source coherency shape (5,2,2), for SHA-256 provenance. NPZ save explicitly downloads output arrays. Validation predicates synchronize scalars; host calibration/configuration is staged at entry.",
+  "scope": "Host-generated PEC sources; device field/coherency/instrument forward reductions. CPU inference control, source kernels, production dispatcher, convergence studies, measured calibrations and published anchors remain outside this parity claim.",
+  "scheduler_evidence": "scontrol show job 2277 reported COMPLETED and ExitCode=0:0; sacct accounting is disabled."
+}
