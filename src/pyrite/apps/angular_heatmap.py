@@ -4,14 +4,21 @@ import io
 import json
 from dataclasses import asdict, dataclass
 from functools import lru_cache
-from html import escape
 
 import numpy as np
 
 from .._numerics import CxrReflections, Numerics
 from ..campaign.beam import Beam, PointBunch, PointSpot
 from ..campaign.geometry import Footprint, Slab
-from ..directional import directional_source, source_line_ceiling_eV
+from ..directional import DIRECTIONAL_COMPONENTS, directional_sources, source_line_ceiling_eV
+from .angular_maps import AngularPanel
+
+#: App labels and units of each directional component.
+COMPONENT_LABELS = {
+    "pxr-cbs": "PXR/CBS (incoherent)",
+    "characteristic": "Characteristic lines",
+    "bremsstrahlung": "Bremsstrahlung continuum",
+}
 
 #: Largest retained (tilt, angle, energy) density array, in float64 elements
 #: (about 1.6 GB). A memory guard only; scoring work itself is uncapped.
@@ -46,8 +53,11 @@ class MapConfig:
     max_reflections: int = 4
     transport_core: str = "auto"
     direction_batch: int = 16
+    components: tuple[str, ...] = ("pxr-cbs",)
 
     def __post_init__(self):
+        if not self.components or not set(self.components) <= set(DIRECTIONAL_COMPONENTS):
+            raise ValueError(f"select components from {', '.join(DIRECTIONAL_COMPONENTS)}")
         tilts = np.asarray(self.tilts_deg, dtype=float)
         if not len(tilts) or not np.all(np.isfinite(tilts)):
             raise ValueError("supply at least one finite target tilt")
@@ -68,16 +78,16 @@ class MapConfig:
         if self.result_elements > MAX_RESULT_ELEMENTS:
             raise ValueError(
                 f"result arrays need {8 * self.result_elements / 1e9:.1f} GB; "
-                "reduce tilts, angles or energy points"
+                "reduce tilts, components, angles or energy points"
             )
 
     @property
     def result_elements(self) -> int:
-        return len(self.tilts_deg) * self.angle_points * self.energy_points
+        return len(self.tilts_deg) * len(self.components) * self.angle_points * self.energy_points
 
     @property
     def scoring_work(self) -> int:
-        """Electron x direction x energy evaluations per run (resource feedback)."""
+        """Electron x component x direction x energy evaluations (resource feedback)."""
         return self.electrons * self.result_elements
 
     def beam(self) -> Beam:
@@ -120,10 +130,13 @@ class MapConfig:
 
 @lru_cache(maxsize=4)
 def calculate_maps(config: MapConfig):
-    """One transport per tilt; cache source arrays separately from plots/current."""
+    """One transport per tilt; cache source arrays separately from plots/current.
+
+    Returns one ``{component: DirectionalSpectrum}`` per tilt, in tilt order.
+    """
     energy = config.energy_grid()
     return tuple(
-        directional_source(
+        directional_sources(
             config.beam(),
             config.target(tilt),
             energy_eV=energy,
@@ -132,114 +145,91 @@ def calculate_maps(config: MapConfig):
             numerics=config.numerics(),
             seed=config.seed,
             direction_batch=config.direction_batch,
+            components=config.components,
         )
         for tilt in config.tilts_deg
     )
 
 
-def maps_npz(config: MapConfig, maps, *, current_na: float) -> bytes:
-    """Compressed ``.npz`` of every computed tilt, for download.
+def calculate_maps_reporting_cache(config: MapConfig):
+    """:func:`calculate_maps` plus whether the result came from the cache."""
+    hits = calculate_maps.cache_info().hits
+    maps = calculate_maps(config)
+    return maps, calculate_maps.cache_info().hits > hits
 
-    Per tilt ``t<i>_*``: ``density`` (ph/incident-electron/eV/sr), ``rate``
-    (ph/s/eV/sr at ``current_na``), ``supported``, ``direction_lab`` and
-    ``direction_sample``; shared ``angle_deg``, ``energy_eV`` and ``tilt_deg``.
-    ``metadata`` is JSON: the submitted config, current, units, line ceilings
-    and each tilt's provenance identity digest.
+
+def tilt_panels(maps, component: str, *, current_na: float):
+    """Rate panels (ph/s/eV/sr) of one component for the given tilt maps."""
+    return [
+        AngularPanel(
+            f"{COMPONENT_LABELS[component]} · tilt {by_component[component].case['tilt_deg']:g}°",
+            by_component[component].angle_deg,
+            by_component[component].energy_eV,
+            by_component[component].rate(current_na),
+        )
+        for by_component in maps
+    ]
+
+
+def maps_npz(config: MapConfig, maps, *, current_na: float) -> bytes:
+    """Compressed ``.npz`` of every computed tilt and component, for download.
+
+    Per tilt and component ``t<i>_<component>_*``: ``density``
+    (ph/incident-electron/eV/sr), ``rate`` (ph/s/eV/sr at ``current_na``);
+    per tilt ``t<i>_supported``, ``t<i>_direction_lab`` and
+    ``t<i>_direction_sample``; shared ``angle_deg``, ``energy_eV`` and
+    ``tilt_deg``. ``metadata`` is JSON: the submitted config, current,
+    units, line ceilings and each tilt's provenance identity digest.
     """
+    first = next(iter(maps[0].values()))
     arrays = {
-        "angle_deg": maps[0].angle_deg,
-        "energy_eV": maps[0].energy_eV,
-        "tilt_deg": np.array([result.case["tilt_deg"] for result in maps]),
+        "angle_deg": first.angle_deg,
+        "energy_eV": first.energy_eV,
+        "tilt_deg": np.array([next(iter(m.values())).case["tilt_deg"] for m in maps]),
     }
-    for index, result in enumerate(maps):
+    for index, by_component in enumerate(maps):
+        result = next(iter(by_component.values()))
         arrays |= {
-            f"t{index}_density": result.density,
-            f"t{index}_rate": result.rate(current_na),
             f"t{index}_supported": result.supported,
             f"t{index}_direction_lab": result.direction_lab,
             f"t{index}_direction_sample": result.direction_sample,
         }
+        for name, spectrum in by_component.items():
+            key = name.replace("-", "_")
+            arrays |= {
+                f"t{index}_{key}_density": spectrum.density,
+                f"t{index}_{key}_rate": spectrum.rate(current_na),
+            }
     metadata = {
         "config": asdict(config),
         "current_na": current_na,
-        "units": {"density": maps[0].units, "rate": "ph/s/eV/sr"},
-        "component": maps[0].component,
-        "line_window_ceiling_eV": [r.provenance.get("line_window_ceiling_eV") for r in maps],
-        "identity_digest": [r.provenance.get("identity_digest") for r in maps],
+        "units": {"density": first.units, "rate": "ph/s/eV/sr"},
+        "components": {name: s.component for name, s in maps[0].items()},
+        "line_window_ceiling_eV": [
+            next(iter(m.values())).provenance.get("line_window_ceiling_eV") for m in maps
+        ],
+        "identity_digest": [next(iter(m.values())).provenance.get("identity_digest") for m in maps],
     }
     buffer = io.BytesIO()
     np.savez_compressed(buffer, metadata=np.array(json.dumps(metadata, default=str)), **arrays)
     return buffer.getvalue()
 
 
-def form_template(groups: dict[str, tuple[str, ...]]) -> str:
-    """HTML batch template: one labeled column per control group.
-
-    Values name the batch keys rendered, in order, inside each group; the grid
-    wraps to fewer columns on narrow screens.
-    """
-    columns = "".join(
-        '<div class="pyrite-group" style="display:flex;flex-direction:column;gap:.55rem">'
-        f'<div class="pyrite-shell pyrite-group__label">{escape(label)}</div>'
-        + "".join(f"<div>{{{key}}}</div>" for key in keys)
-        + "</div>"
-        for label, keys in groups.items()
-    )
-    return (
-        '<div style="display:grid;gap:1.25rem 1.5rem;'
-        'grid-template-columns:repeat(auto-fit,minmax(19rem,1fr))">'
-        f"{columns}</div>"
-    )
-
-
-def heatmap_figure(maps, *, current_na=5.0, logarithmic=True):
-    """Draw one panel per selected tilt; no transport or scoring is performed.
-
-    Panels share both axes and one color scale, so only the leftmost axis and
-    the single right-hand colorbar carry labels. Gray marks unsupported
-    (infinite-slab face-parallel) directions; zeros take the lowest color.
-    """
-    from matplotlib.colors import LogNorm, Normalize
-    from matplotlib.figure import Figure
-
-    rates = [result.rate(current_na) for result in maps]
-    positive = np.concatenate([rate[np.isfinite(rate) & (rate > 0)] for rate in rates])
-    norm = (
-        LogNorm(
-            vmin=max(float(positive.min()), float(positive.max()) * 1e-8),
-            vmax=float(positive.max()) * (1 + 1e-12),
-        )
-        if logarithmic and len(positive)
-        else Normalize(vmin=0, vmax=max(1.0, max(float(np.nanmax(rate)) for rate in rates)))
-    )
-    figure = Figure(figsize=(1.0 + 5.2 * len(maps), 4.8), layout="constrained")
-    axes = figure.subplots(1, len(maps), squeeze=False, sharex=True, sharey=True)[0]
-    log_energy = _geometric(maps[0].energy_eV)
-    for axis, result, rate in zip(axes, maps, rates, strict=True):
-        # Duplicate the first periodic sample only for drawing circle closure.
-        angle = np.append(result.angle_deg, result.angle_deg[0] + 360)
-        value = np.concatenate((rate, rate[:1]), axis=0)
-        # Gray (masked) means unsupported only: zero and underflowed escape
-        # share the log floor color with anything below it.
-        if isinstance(norm, LogNorm):
-            value = np.clip(value, norm.vmin, None)
-        colors = np.ma.masked_invalid(value.T)
-        image = axis.pcolormesh(
-            angle, result.energy_eV, colors, shading="auto", norm=norm, cmap="inferno"
-        )
-        axis.set_title(f"Target tilt {result.case['tilt_deg']:g}°")
-        axis.set_xticks(np.arange(-180, 181, 90))
-        axis.set_facecolor("#d8d8d8")
-        if log_energy:
-            axis.set_yscale("log")
-    axes[0].set(xlim=(-180, 180), ylabel="Emitted photon energy (eV)")
-    figure.supxlabel("Signed observation angle (deg)")
-    figure.colorbar(
-        image, ax=list(axes), label=f"Photon intensity at {current_na:g} nA (ph/s/eV/sr)"
-    )
-    return figure
-
-
-def _geometric(grid: np.ndarray) -> bool:
-    ratio = grid[1:] / grid[:-1]
-    return len(grid) > 2 and bool(np.allclose(ratio, ratio[0])) and ratio[0] > 1.01
+def parse_tilts(text: str) -> tuple[float, ...]:
+    """Tilts from a comma list and/or inclusive ``start:stop:step`` ranges [deg]."""
+    tilts = []
+    for item in (part.strip() for part in text.split(",")):
+        if not item:
+            continue
+        try:
+            fields = [float(field) for field in item.split(":")]
+        except ValueError:
+            raise ValueError(f"cannot read tilt {item!r}; use numbers or start:stop:step") from None
+        if len(fields) == 1:
+            tilts.append(fields[0])
+        elif len(fields) == 3 and fields[2] > 0 and fields[1] >= fields[0]:
+            count = int(np.floor((fields[1] - fields[0]) / fields[2] + 1e-9)) + 1
+            tilts.extend(fields[0] + fields[2] * np.arange(count))
+        else:
+            raise ValueError(f"tilt range {item!r} must be start:stop:step with step > 0")
+    return tuple(float(t) for t in tilts)
