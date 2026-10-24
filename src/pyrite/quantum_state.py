@@ -14,14 +14,18 @@ from __future__ import annotations
 import hashlib
 import json
 import math
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Self
 
 SCHEMA = "pyrite.quantum.transverse-state.v1"
 _ANALYTIC = {
-    "gaussian", "hermite_gauss", "laguerre_gauss", "bessel_gauss", "airy",
+    "gaussian",
+    "hermite_gauss",
+    "laguerre_gauss",
+    "bessel_gauss",
+    "airy",
     "aperture_probe",
 }
 _SUPPORTED = _ANALYTIC | {"sampled", "superposition", "mixture", "translated"}
@@ -32,11 +36,20 @@ _FIELDS = {
     "bessel_gauss": {"ell", "k_radial_inv_ang", "waist_ang", "center_ang"},
     "airy": {"scale_ang", "truncation", "dimension", "center_ang"},
     "aperture_probe": {
-        "kinetic_energy_eV", "semiangle_rad", "inner_semiangle_rad",
-        "aberrations", "ell", "center_ang",
+        "kinetic_energy_eV",
+        "semiangle_rad",
+        "inner_semiangle_rad",
+        "aberrations",
+        "ell",
+        "center_ang",
     },
     "sampled": {
-        "path", "sha256", "shape", "dtype", "spacing_ang", "origin_ang",
+        "path",
+        "sha256",
+        "shape",
+        "dtype",
+        "spacing_ang",
+        "origin_ang",
         "kinetic_energy_eV",
     },
     "translated": {"offset_ang"},
@@ -82,10 +95,9 @@ def _coords(
     if isinstance(value, (int, float)) and not isinstance(value, bool):
         values = (value,) * dimension
     else:
-        try:
-            values = tuple(value)  # type: ignore[arg-type]
-        except TypeError as exc:
-            raise TypeError(f"{name} must be a coordinate sequence") from exc
+        if not isinstance(value, Iterable):
+            raise TypeError(f"{name} must be a coordinate sequence")
+        values = tuple(value)
         if len(values) != dimension:
             raise ValueError(f"{name} must have {dimension} coordinates")
     return tuple(_finite(name, item, positive=positive) for item in values)
@@ -122,8 +134,11 @@ def _params(kind: str, raw: Mapping[str, Any]) -> tuple[tuple[str, Any], ...]:
         if not isinstance(values["path"], str) or not values["path"].strip():
             raise ValueError("sample path must be a nonempty string")
         digest = values["sha256"]
-        if (not isinstance(digest, str) or len(digest) != 64
-                or any(c not in "0123456789abcdef" for c in digest)):
+        if (
+            not isinstance(digest, str)
+            or len(digest) != 64
+            or any(c not in "0123456789abcdef" for c in digest)
+        ):
             raise ValueError("sha256 must be a 64-digit lowercase hexadecimal digest")
         # Use NumPy only when constructing sampled specs. Other recipe types
         # remain import-light and can be parsed without a numerical backend.
@@ -147,8 +162,14 @@ def _params(kind: str, raw: Mapping[str, Any]) -> tuple[tuple[str, Any], ...]:
     else:
         dim = 0
 
-    for name in ("waist_ang", "scale_ang", "truncation", "k_radial_inv_ang",
-                 "kinetic_energy_eV", "semiangle_rad"):
+    for name in (
+        "waist_ang",
+        "scale_ang",
+        "truncation",
+        "k_radial_inv_ang",
+        "kinetic_energy_eV",
+        "semiangle_rad",
+    ):
         if name in values and kind != "sampled":
             values[name] = _finite(name, values[name], positive=True)
     if kind == "aperture_probe":
@@ -161,22 +182,37 @@ def _params(kind: str, raw: Mapping[str, Any]) -> tuple[tuple[str, Any], ...]:
             raise TypeError("aberrations must be a mapping")
         # Keep in lockstep with the existing abTEM convention; arbitrary phase
         # callbacks are intentionally not part of a serializable source.
-        allowed = {f"C{n}{m}" for n, ms in ((1,(0,2)),(2,(1,3)),(3,(0,2,4)),
-                                            (4,(1,3,5)),(5,(0,2,4,6))) for m in ms}
-        allowed |= {"phi"+key[1:] for key in allowed}
+        allowed = {
+            f"C{n}{m}"
+            for n, ms in (
+                (1, (0, 2)),
+                (2, (1, 3)),
+                (3, (0, 2, 4)),
+                (4, (1, 3, 5)),
+                (5, (0, 2, 4, 6)),
+            )
+            for m in ms
+        }
+        allowed |= {"phi" + key[1:] for key in allowed}
         if set(aberrations) - allowed:
             raise ValueError(f"unknown aberration keys: {sorted(set(aberrations) - allowed)}")
-        values["aberrations"] = tuple(sorted(
-            (str(key), _finite(str(key), v)) for key, v in aberrations.items()
-        ))
+        values["aberrations"] = tuple(
+            sorted((str(key), _finite(str(key), v)) for key, v in aberrations.items())
+        )
     if kind not in ("sampled", "translated", "superposition", "mixture"):
         values["center_ang"] = _coords("center_ang", values.get("center_ang", 0.0), dim)
     return tuple(sorted(values.items()))
 
 
 def _json_parameters(params: tuple[tuple[str, Any], ...]) -> dict[str, Any]:
-    return {key: dict(value) if key == "aberrations" else list(value) if isinstance(value, tuple)
-            else value for key, value in params}
+    return {
+        key: dict(value)
+        if key == "aberrations"
+        else list(value)
+        if isinstance(value, tuple)
+        else value
+        for key, value in params
+    }
 
 
 @dataclass(frozen=True)
@@ -195,7 +231,7 @@ class TransverseStateSpec:
 
     kind: str
     parameters: tuple[tuple[str, Any], ...] = ()
-    terms: tuple[tuple[complex | float, "TransverseStateSpec"], ...] = ()
+    terms: tuple[tuple[complex | float, TransverseStateSpec], ...] = ()
 
     def __post_init__(self) -> None:
         if self.kind not in _SUPPORTED:
@@ -231,13 +267,15 @@ class TransverseStateSpec:
                 if any(w < 0 for w in weights) or not math.isfinite(total) or total <= 0:
                     raise ValueError("mixture weights must be nonnegative with positive finite sum")
                 object.__setattr__(
-                    self, "terms",
+                    self,
+                    "terms",
                     tuple((w / total, spec) for w, (_, spec) in zip(weights, pairs, strict=True)),
                 )
             else:
                 weights = tuple(complex(w) for w, _ in pairs)
-                if (any(not math.isfinite(w.real) or not math.isfinite(w.imag)
-                        for w in weights) or not any(weights)):
+                if any(
+                    not math.isfinite(w.real) or not math.isfinite(w.imag) for w in weights
+                ) or not any(weights):
                     raise ValueError("superposition needs finite, nonzero coefficients")
                 object.__setattr__(
                     self, "terms", tuple((w, s) for w, (_, s) in zip(weights, pairs, strict=True))
@@ -262,11 +300,11 @@ class TransverseStateSpec:
         return cls(kind, tuple(parameters.items()))
 
     @classmethod
-    def superpose(cls, terms: Sequence[tuple[complex, "TransverseStateSpec"]]) -> Self:
+    def superpose(cls, terms: Sequence[tuple[complex, TransverseStateSpec]]) -> Self:
         return cls("superposition", terms=tuple(terms))
 
     @classmethod
-    def mixture(cls, components: Sequence[tuple[float, "TransverseStateSpec"]]) -> Self:
+    def mixture(cls, components: Sequence[tuple[float, TransverseStateSpec]]) -> Self:
         return cls("mixture", terms=tuple(components))
 
     def translated(self, offset_ang: object) -> Self:
@@ -274,7 +312,11 @@ class TransverseStateSpec:
 
     @classmethod
     def from_npy(
-        cls, path: str | Path, *, spacing_ang: object, origin_ang: object = 0.0,
+        cls,
+        path: str | Path,
+        *,
+        spacing_ang: object,
+        origin_ang: object = 0.0,
         kinetic_energy_eV: float | None = None,
     ) -> Self:
         """Reference a saved .npy array by its exact contents (no embedding).
@@ -292,22 +334,33 @@ class TransverseStateSpec:
         array = np.load(file, allow_pickle=False)
         _validate_samples(array)
         return cls.recipe(
-            "sampled", path=str(file), sha256=_array_digest(array),
-            shape=array.shape, dtype=array.dtype.str, spacing_ang=spacing_ang,
-            origin_ang=origin_ang, kinetic_energy_eV=kinetic_energy_eV,
+            "sampled",
+            path=str(file),
+            sha256=_array_digest(array),
+            shape=array.shape,
+            dtype=array.dtype.str,
+            spacing_ang=spacing_ang,
+            origin_ang=origin_ang,
+            kinetic_energy_eV=kinetic_energy_eV,
         )
 
     def to_dict(self) -> dict[str, Any]:
         """Return a fresh JSON-safe, versioned description."""
         payload: dict[str, Any] = {
-            "schema": SCHEMA, "kind": self.kind,
+            "schema": SCHEMA,
+            "kind": self.kind,
             "parameters": _json_parameters(self.parameters),
         }
         if self.kind in ("superposition", "mixture", "translated"):
             payload["terms"] = [
-                {"weight": ([complex(weight).real, complex(weight).imag]
-                            if self.kind == "superposition" else float(weight)),
-                 "state": spec.to_dict()}
+                {
+                    "weight": (
+                        [complex(weight).real, complex(weight).imag]
+                        if self.kind == "superposition"
+                        else complex(weight).real
+                    ),
+                    "state": spec.to_dict(),
+                }
                 for weight, spec in self.terms
             ]
         return payload
@@ -357,6 +410,7 @@ class TransverseStateSpec:
         parameters. The sample digest, shape, dtype and grid metadata remain
         part of the scientific identity, including in nested mixed states.
         """
+
         def identity(spec: TransverseStateSpec) -> dict[str, Any]:
             payload = spec.to_dict()
             if spec.kind == "sampled":
@@ -397,18 +451,23 @@ class TransverseStateSpec:
                 path = Path(base_dir) / path
             array = np.load(path, allow_pickle=False)
             _validate_samples(array)
-            if (array.dtype.str != params["dtype"] or tuple(array.shape) != params["shape"]
-                    or _array_digest(array) != params["sha256"]):
+            if (
+                array.dtype.str != params["dtype"]
+                or tuple(array.shape) != params["shape"]
+                or _array_digest(array) != params["sha256"]
+            ):
                 raise ValueError(f"sample asset content differs from pinned metadata: {path}")
             return states.from_array(
-                array, spacing_ang=params["spacing_ang"], origin_ang=params["origin_ang"],
+                array,
+                spacing_ang=params["spacing_ang"],
+                origin_ang=params["origin_ang"],
                 kinetic_energy_eV=params["kinetic_energy_eV"],
             )
         children = [(w, s.to_runtime(base_dir=base_dir)) for w, s in self.terms]
         if self.kind == "translated":
             return states.translate(children[0][1], params["offset_ang"])
         if self.kind == "mixture":
-            return states.mixture(children)
+            return states.mixture([(complex(w).real, state) for w, state in children])
         return states.superpose(children)
 
 

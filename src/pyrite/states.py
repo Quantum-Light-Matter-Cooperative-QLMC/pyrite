@@ -12,12 +12,28 @@ from typing import Any
 
 from .quantum_state import TransverseStateSpec
 
-_RUNTIME = frozenset({
-    "TransverseState", "SampledState", "Superposition", "MixedState", "Translated",
-    "EntryState", "gaussian", "hermite_gauss", "laguerre_gauss", "donut",
-    "bessel_gauss", "airy", "aperture_probe", "from_array", "from_abtem",
-    "superpose", "mixture", "translate",
-})
+_RUNTIME = frozenset(
+    {
+        "TransverseState",
+        "SampledState",
+        "Superposition",
+        "MixedState",
+        "Translated",
+        "EntryState",
+        "gaussian",
+        "hermite_gauss",
+        "laguerre_gauss",
+        "donut",
+        "bessel_gauss",
+        "airy",
+        "aperture_probe",
+        "from_array",
+        "from_abtem",
+        "superpose",
+        "mixture",
+        "translate",
+    }
+)
 
 
 def __getattr__(name: str) -> Any:

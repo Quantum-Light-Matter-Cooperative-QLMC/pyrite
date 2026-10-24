@@ -12,8 +12,7 @@ from pyrite.campaign.profiles import case_content_key
 def _scene():
     return pr.Scene(
         pr.Beam(energy_keV=30.0, transverse=pr.Spot(), longitudinal=pr.PointBunch()),
-        pr.Slab("hopg", thickness_ang=10_000.0, tilt_deg=30.0,
-                footprint=pr.Footprint(5.0, 5.0)),
+        pr.Slab("hopg", thickness_ang=10_000.0, tilt_deg=30.0, footprint=pr.Footprint(5.0, 5.0)),
         pr.Detector(),
         physics=pr.Physics(bremsstrahlung_model="eedl"),
     )
@@ -21,18 +20,27 @@ def _scene():
 
 def _policy():
     return pr.AdaptiveSampling(
-        0.1, 40, 80, 20, observables=("cxr", "brem"),
-        brem_target_rse=0.2, brem_max_electrons=60,
+        0.1,
+        40,
+        80,
+        20,
+        observables=("cxr", "brem"),
+        brem_target_rse=0.2,
+        brem_max_electrons=60,
     )
 
 
 def test_fixed_policy_matches_legacy_case_payload_and_key():
     scene = _scene()
     from pyrite.campaign.lowering import build_case
+
     old = build_case(replace(scene, numerics=pr.Numerics(cxr_trials=31, brem_trials=17)))
-    new = build_case(replace(scene, numerics=pr.Numerics(
-        sampling=pr.FixedSampling(cxr_electrons=31, brem_electrons=17)
-    )))
+    new = build_case(
+        replace(
+            scene,
+            numerics=pr.Numerics(sampling=pr.FixedSampling(cxr_electrons=31, brem_electrons=17)),
+        )
+    )
     assert pickle.dumps(old.to_dict(), protocol=5) == pickle.dumps(new.to_dict(), protocol=5)
     assert case_content_key(old) == case_content_key(new)
     assert "adaptive_precision" not in new
@@ -41,6 +49,7 @@ def test_fixed_policy_matches_legacy_case_payload_and_key():
 
 def test_adaptive_policy_matches_legacy_identity_and_brem_prefix():
     from pyrite.campaign.lowering import build_case
+
     scene = _scene()
     policy = _policy()
     legacy = pr.Precision.from_dict(policy.to_dict())
@@ -55,7 +64,8 @@ def test_adaptive_policy_matches_legacy_identity_and_brem_prefix():
     assert pickle.loads(pickle.dumps(new_numerics)).sampling == policy
     assert new_numerics.describe_sampling()["mode"] == "adaptive"
     assert new_numerics.describe_sampling()["inactive_legacy_fields"] == {
-        "cxr_trials": 450, "brem_trials": 100
+        "cxr_trials": 450,
+        "brem_trials": 100,
     }
 
 

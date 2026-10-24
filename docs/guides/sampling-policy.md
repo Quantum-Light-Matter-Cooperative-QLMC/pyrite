@@ -10,13 +10,15 @@ policies and schema migration are **not** implemented yet.
 import pyrite as pr
 
 fixed = pr.Numerics(sampling=pr.FixedSampling(cxr_electrons=450, brem_electrons=100))
-adaptive = pr.Numerics(sampling=pr.AdaptiveSampling(
-    target_rse=0.05,
-    min_electrons=200,
-    max_electrons=20_000,
-    block_electrons=100,
-    observables=("cxr", "brem"),
-))
+adaptive = pr.Numerics(
+    sampling=pr.AdaptiveSampling(
+        target_rse=0.05,
+        min_electrons=200,
+        max_electrons=20_000,
+        block_electrons=100,
+        observables=("cxr", "brem"),
+    )
+)
 
 assert fixed.resolved_sampling == pr.FixedSampling()
 print(adaptive.describe_sampling())
@@ -40,6 +42,7 @@ old legacy compatibility field as appropriate, e.g.:
 
 ```python
 from dataclasses import replace
+
 updated = replace(adaptive, sampling=pr.FixedSampling(100, 100), precision=None)
 ```
 

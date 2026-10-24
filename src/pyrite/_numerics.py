@@ -441,12 +441,17 @@ class Numerics:
         from ._numerics_groups import ExecutionConfig, RadiationNumerics, TransportNumerics
 
         groups = (
-            ("transport", TransportNumerics, (
-                ("energy_model", "midpoint"), ("max_dE_frac", 0.0))),
-            ("radiation", RadiationNumerics, (
-                ("cxr_reflections", CxrReflections()), ("energy_bins", None))),
-            ("execution", ExecutionConfig, (
-                ("transport_core", "auto"), ("cxr_chunk", None), ("brem_chunk", None))),
+            ("transport", TransportNumerics, (("energy_model", "midpoint"), ("max_dE_frac", 0.0))),
+            (
+                "radiation",
+                RadiationNumerics,
+                (("cxr_reflections", CxrReflections()), ("energy_bins", None)),
+            ),
+            (
+                "execution",
+                ExecutionConfig,
+                (("transport_core", "auto"), ("cxr_chunk", None), ("brem_chunk", None)),
+            ),
         )
         for group_name, expected_type, mirrors in groups:
             group = getattr(self, group_name)
@@ -477,55 +482,79 @@ class Numerics:
     def resolved_transport(self) -> "TransportNumerics":
         """Return the effective transport integration policy for either API."""
         from ._numerics_groups import TransportNumerics
-        return self.transport if self.transport is not None else TransportNumerics(
-            self.energy_model, self.max_dE_frac)
+
+        return (
+            self.transport
+            if self.transport is not None
+            else TransportNumerics(self.energy_model, self.max_dE_frac)
+        )
 
     @property
     def resolved_radiation(self) -> "RadiationNumerics":
         """Return the effective CXR/reflection and energy-grid policy."""
         from ._numerics_groups import RadiationNumerics
-        return self.radiation if self.radiation is not None else RadiationNumerics(
-            self.cxr_reflections, self.energy_bins)
+
+        return (
+            self.radiation
+            if self.radiation is not None
+            else RadiationNumerics(self.cxr_reflections, self.energy_bins)
+        )
 
     @property
     def resolved_execution(self) -> "ExecutionConfig":
         """Return local kernel settings, not a scheduler/Executor."""
         from ._numerics_groups import ExecutionConfig
-        return self.execution if self.execution is not None else ExecutionConfig(
-            self.transport_core, self.cxr_chunk, self.brem_chunk)
+
+        return (
+            self.execution
+            if self.execution is not None
+            else ExecutionConfig(self.transport_core, self.cxr_chunk, self.brem_chunk)
+        )
 
     def with_transport(self, value: "TransportNumerics") -> "Numerics":
         """Change transport policy, clearing mirrored legacy values."""
         from dataclasses import replace
+
         return replace(self, transport=value, energy_model="midpoint", max_dE_frac=0.0)
 
     def with_radiation(self, value: "RadiationNumerics") -> "Numerics":
         """Change radiation policy, clearing mirrored legacy values."""
         from dataclasses import replace
+
         return replace(self, radiation=value, cxr_reflections=CxrReflections(), energy_bins=None)
 
     def with_execution(self, value: "ExecutionConfig") -> "Numerics":
         """Change local kernel policy, clearing mirrored legacy values."""
         from dataclasses import replace
-        return replace(self, execution=value, transport_core="auto",
-                       cxr_chunk=None, brem_chunk=None)
+
+        return replace(
+            self, execution=value, transport_core="auto", cxr_chunk=None, brem_chunk=None
+        )
 
     def describe_numerics(self) -> dict[str, dict[str, object]]:
         """Explain grouped settings without material loading or execution."""
         from dataclasses import asdict
+
         return {
-            "transport": {"classification": "scientific",
-                          "source": "typed" if self.transport is not None else "legacy",
-                          "effective": asdict(self.resolved_transport)},
-            "radiation": {"classification": "scientific",
-                          "source": "typed" if self.radiation is not None else "legacy",
-                          # Grid arrays may be large: do not expand them for inspection.
-                          "effective": {"cxr_reflections": asdict(self.cxr_reflections),
-                                        "energy_bins": "custom" if self.energy_bins is not None
-                                                       else "catalog-default"}},
-            "execution": {"classification": "execution",
-                          "source": "typed" if self.execution is not None else "legacy",
-                          "effective": asdict(self.resolved_execution)},
+            "transport": {
+                "classification": "scientific",
+                "source": "typed" if self.transport is not None else "legacy",
+                "effective": asdict(self.resolved_transport),
+            },
+            "radiation": {
+                "classification": "scientific",
+                "source": "typed" if self.radiation is not None else "legacy",
+                # Grid arrays may be large: do not expand them for inspection.
+                "effective": {
+                    "cxr_reflections": asdict(self.cxr_reflections),
+                    "energy_bins": "custom" if self.energy_bins is not None else "catalog-default",
+                },
+            },
+            "execution": {
+                "classification": "execution",
+                "source": "typed" if self.execution is not None else "legacy",
+                "effective": asdict(self.resolved_execution),
+            },
         }
 
     def _resolve_typed_sampling(self) -> None:
@@ -551,9 +580,7 @@ class Numerics:
                 current = getattr(self, field_name)
                 default = 450 if field_name == "cxr_trials" else 100
                 if current not in (default, count):
-                    raise ValueError(
-                        f"cannot combine FixedSampling with conflicting {field_name}"
-                    )
+                    raise ValueError(f"cannot combine FixedSampling with conflicting {field_name}")
                 object.__setattr__(self, field_name, count)
             return
         if self.cxr_trials != 450 or self.brem_trials != 100:
@@ -571,7 +598,9 @@ class Numerics:
         if self.sampling is not None:
             return self.sampling
         if self.precision is not None:
-            return AdaptiveSampling.from_dict(self.precision.to_dict())
+            return AdaptiveSampling(
+                **{f.name: getattr(self.precision, f.name) for f in fields(Precision)}
+            )
         return FixedSampling(self.cxr_trials, self.brem_trials)
 
     def describe_sampling(self) -> dict[str, object]:
@@ -584,7 +613,8 @@ class Numerics:
         source = "typed" if self.sampling is not None else "legacy"
         if isinstance(policy, FixedSampling):
             return {
-                "mode": "fixed", "source": source,
+                "mode": "fixed",
+                "source": source,
                 "requested": {
                     "cxr_electrons": policy.cxr_electrons,
                     "brem_electrons": policy.brem_electrons,
@@ -596,17 +626,20 @@ class Numerics:
                 "inactive_legacy_fields": {},
             }
         return {
-            "mode": "adaptive", "source": source,
+            "mode": "adaptive",
+            "source": source,
             "requested": policy.to_dict(),
             "effective": {
                 "maximum_cxr_electrons": policy.max_electrons,
                 "maximum_brem_electrons": (
-                    policy.max_electrons if policy.brem_target_rse is None
+                    policy.max_electrons
+                    if policy.brem_target_rse is None
                     else policy.brem_policy().max_electrons
                 ),
             },
             "inactive_legacy_fields": {
-                "cxr_trials": self.cxr_trials, "brem_trials": self.brem_trials,
+                "cxr_trials": self.cxr_trials,
+                "brem_trials": self.brem_trials,
             },
         }
 

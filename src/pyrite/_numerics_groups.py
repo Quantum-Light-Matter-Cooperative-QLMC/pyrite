@@ -31,8 +31,12 @@ class TransportNumerics:
         if self.energy_model not in ("frozen", "midpoint"):
             raise ValueError("energy_model must be 'frozen' or 'midpoint'")
         value = self.max_dE_frac
-        if (isinstance(value, bool) or not isinstance(value, (int, float))
-                or not math.isfinite(value) or value < 0):
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, (int, float))
+            or not math.isfinite(value)
+            or value < 0
+        ):
             raise ValueError("max_dE_frac must be finite and non-negative")
         if value and self.energy_model != "midpoint":
             raise ValueError("max_dE_frac > 0 requires energy_model='midpoint'")

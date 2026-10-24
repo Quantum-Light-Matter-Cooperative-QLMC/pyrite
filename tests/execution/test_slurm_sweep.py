@@ -43,12 +43,19 @@ def test_job_array_publishes_through_standard_sweep_checkpoint(monkeypatch, tmp_
 
     monkeypatch.setattr(slurm, "_job_active", active)
     executor = SlurmArrayExecutor(
-        store, _key, resources=ResourceRequest(cpu_cores=1),
+        store,
+        _key,
+        resources=ResourceRequest(cpu_cores=1),
         config=SlurmArrayConfig(cases_per_task=1, poll_seconds=0.001),
     )
     assert run_sweep(
-        cases, results, checkpoint_path=str(checkpoint), progress=False,
-        content_key_fn=_key, artifact_store=store, executor=executor,
+        cases,
+        results,
+        checkpoint_path=str(checkpoint),
+        progress=False,
+        content_key_fn=_key,
+        artifact_store=store,
+        executor=executor,
     )
     assert called == ["slurm-a", "slurm-b"]
     assert (checkpoint / "line.h5").exists()
@@ -56,9 +63,17 @@ def test_job_array_publishes_through_standard_sweep_checkpoint(monkeypatch, tmp_
 
     # Normal checkpoint resume remains the only owner of completion. Fully
     # completed cases never need a second SLURM allocation.
-    monkeypatch.setattr(slurm, "_submit", lambda *_: (_ for _ in ()).throw(
-        AssertionError("a fully cached campaign was submitted")))
+    monkeypatch.setattr(
+        slurm,
+        "_submit",
+        lambda *_: (_ for _ in ()).throw(AssertionError("a fully cached campaign was submitted")),
+    )
     assert run_sweep(
-        cases, {}, checkpoint_path=str(checkpoint), progress=False,
-        content_key_fn=_key, artifact_store=store, executor=executor,
+        cases,
+        {},
+        checkpoint_path=str(checkpoint),
+        progress=False,
+        content_key_fn=_key,
+        artifact_store=store,
+        executor=executor,
     )

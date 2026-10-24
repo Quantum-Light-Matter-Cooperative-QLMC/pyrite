@@ -128,9 +128,7 @@ class CaseArtifactStore:
             raise ArtifactIntegrityError(f"artifact receipt identity mismatch: {receipt}")
         return ref
 
-    def publish(
-        self, material: str, content_key: str, output: dict[str, Any]
-    ) -> CaseArtifactRef:
+    def publish(self, material: str, content_key: str, output: dict[str, Any]) -> CaseArtifactRef:
         """Atomically publish a complete case output without modifying checkpoints.
 
         ``output`` is the raw ``run_case`` result, prior to ``store_result``.
@@ -188,15 +186,18 @@ class CaseArtifactStore:
             raise ArtifactIntegrityError(f"uncommitted artifact identity mismatch: {target}")
         digest, size = _digest(target)
         receipt_path = target.with_suffix(".json")
-        descriptor, tmp_name = tempfile.mkstemp(
-            prefix=f".{key}.", suffix=".tmp", dir=target.parent
-        )
+        descriptor, tmp_name = tempfile.mkstemp(prefix=f".{key}.", suffix=".tmp", dir=target.parent)
         tmp = Path(tmp_name)
         try:
             with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
                 json.dump(
-                    {"format": _FORMAT, "material": name, "content_key": key,
-                     "sha256": digest, "size_bytes": size},
+                    {
+                        "format": _FORMAT,
+                        "material": name,
+                        "content_key": key,
+                        "sha256": digest,
+                        "size_bytes": size,
+                    },
                     stream,
                     sort_keys=True,
                 )

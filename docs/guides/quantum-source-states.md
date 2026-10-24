@@ -38,9 +38,12 @@ nonzero floating/complex NumPy array saved as `.npy` (not object arrays):
 
 ```python
 import numpy as np
+
 np.save("probe.npy", np.ones((16, 16), dtype=np.complex128))
 spec = pr.TransverseStateSpec.from_npy(
-    "probe.npy", spacing_ang=(0.1, 0.1), origin_ang=(-0.8, -0.8),
+    "probe.npy",
+    spacing_ang=(0.1, 0.1),
+    origin_ang=(-0.8, -0.8),
 )
 metadata = spec.to_dict()  # path, data digest, shape, dtype and sampling grid
 wave = spec.to_runtime(base_dir=".")

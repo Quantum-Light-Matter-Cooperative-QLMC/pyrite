@@ -6,8 +6,8 @@ import argparse
 import json
 import os
 import traceback
-from time import perf_counter
 from pathlib import Path
+from time import perf_counter
 
 from .artifacts import CaseArtifactStore
 from .slurm import _atomic_json
@@ -50,8 +50,11 @@ def execute_unit(run_dir: Path, unit_index: int) -> None:
             # A corrupt committed artifact raises; never silently replace it.
             existing = store.reference(row["case"]["crystal"], row["content_key"])
             if existing is not None:
-                store.load(existing, expected_material=existing.material,
-                           expected_content_key=row["content_key"])
+                store.load(
+                    existing,
+                    expected_material=existing.material,
+                    expected_content_key=row["content_key"],
+                )
                 references.append({"index": row["index"], "key": existing.content_key})
             else:
                 pending.append(row)
@@ -64,17 +67,31 @@ def execute_unit(run_dir: Path, unit_index: int) -> None:
             references.append({"index": row["index"], "key": reference.content_key})
 
         if pending:
-            run_cases([row["case"] for row in pending], max_workers=local_workers,
-                      engine=engine, progress=False, keep_results=False, callback=publish)
+            run_cases(
+                [row["case"] for row in pending],
+                max_workers=local_workers,
+                engine=engine,
+                progress=False,
+                keep_results=False,
+                callback=publish,
+            )
         if len(references) != len(records):
             raise RuntimeError("worker did not finish publishing every case")
     except BaseException:
         state = "failed"
         error = traceback.format_exc(limit=12)
-    _atomic_json(status_path, {"format": "pyrite.slurm-task.v1", "unit_index": unit_index,
-                               "state": state, "attempt": attempt,
-                               "case_refs": references, "error": error,
-                               "worker_seconds": perf_counter() - started})
+    _atomic_json(
+        status_path,
+        {
+            "format": "pyrite.slurm-task.v1",
+            "unit_index": unit_index,
+            "state": state,
+            "attempt": attempt,
+            "case_refs": references,
+            "error": error,
+            "worker_seconds": perf_counter() - started,
+        },
+    )
     if state != "succeeded":
         raise RuntimeError(f"SLURM array unit {unit_index} failed; see {status_path}")
 

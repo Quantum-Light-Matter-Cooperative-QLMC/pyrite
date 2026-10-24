@@ -12,10 +12,8 @@ import pyrite as pr
 numerics = pr.Numerics(
     sampling=pr.FixedSampling(400, 200),
     transport=pr.TransportNumerics(energy_model="midpoint", max_dE_frac=0.01),
-    radiation=pr.RadiationNumerics(
-        cxr_reflections=pr.CxrReflections(n_families=6)),
-    execution=pr.ExecutionConfig(
-        transport_core="per-electron", cxr_chunk=256, brem_chunk=256),
+    radiation=pr.RadiationNumerics(cxr_reflections=pr.CxrReflections(n_families=6)),
+    execution=pr.ExecutionConfig(transport_core="per-electron", cxr_chunk=256, brem_chunk=256),
 )
 print(numerics.describe_numerics())
 ```
@@ -44,8 +42,8 @@ also reset the corresponding compatibility mirrors before calling
 
 ```python
 from dataclasses import replace
-updated = numerics.with_transport(
-    replace(numerics.resolved_transport, max_dE_frac=0.005))
+
+updated = numerics.with_transport(replace(numerics.resolved_transport, max_dE_frac=0.005))
 assert updated.max_dE_frac == 0.005
 ```
 

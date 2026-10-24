@@ -25,18 +25,25 @@ def test_work_planner_yields_contiguous_bounded_units():
         )
     )
     assert [(unit.start, unit.stop, unit.size) for unit in units] == [
-        (0, 2, 2), (2, 4, 2), (4, 5, 1)
+        (0, 2, 2),
+        (2, 4, 2),
+        (4, 5, 1),
     ]
     assert [unit.unit_id for unit in units] == [
-        "work-00000000-00000002", "work-00000002-00000004", "work-00000004-00000005"
+        "work-00000000-00000002",
+        "work-00000002-00000004",
+        "work-00000004-00000005",
     ]
     assert units[1].case_keys == ("content-key-2", "content-key-3")
     assert [unit.estimated_cost for unit in units] == [3.0, 7.0, 5.0]
-    assert units == list(iter_work_units(
-        cases, cases_per_unit=2,
-        case_key=lambda case: f"content-key-{case['id']}",
-        estimate_cost=lambda case: case["id"] + 1.0,
-    ))
+    assert units == list(
+        iter_work_units(
+            cases,
+            cases_per_unit=2,
+            case_key=lambda case: f"content-key-{case['id']}",
+            estimate_cost=lambda case: case["id"] + 1.0,
+        )
+    )
     with pytest.raises(FrozenInstanceError):
         units[0].start = 99
 
@@ -60,12 +67,19 @@ def test_invalid_chunk_size(bad):
         list(iter_work_units([{}], cases_per_unit=bad))
 
 
-@pytest.mark.parametrize("kwargs", [
-    {"cpu_cores": 0}, {"cpu_cores": "3"}, {"memory_bytes": -2},
-    {"gpu_count": -1}, {"accelerator": "cuda2"},
-    {"accelerator": "cpu", "gpu_count": 1},
-    {"gpu_memory_bytes": 100}, {"accelerator": "cuda"},
-])
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"cpu_cores": 0},
+        {"cpu_cores": "3"},
+        {"memory_bytes": -2},
+        {"gpu_count": -1},
+        {"accelerator": "cuda2"},
+        {"accelerator": "cpu", "gpu_count": 1},
+        {"gpu_memory_bytes": 100},
+        {"accelerator": "cuda"},
+    ],
+)
 def test_invalid_resources(kwargs):
     with pytest.raises(ValueError):
         ResourceRequest(**kwargs)
@@ -112,6 +126,8 @@ def test_local_executor_delegates_options_and_does_not_add_parallelism():
     assert result == [None, None]
     assert received == [(i, case, {"value": i}) for i, case in enumerate(cases)]
     assert observed == {
-        "keep_results": False, "max_workers": 3,
-        "progress": False, "transport_only": False,
+        "keep_results": False,
+        "max_workers": 3,
+        "progress": False,
+        "transport_only": False,
     }

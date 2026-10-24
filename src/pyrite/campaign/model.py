@@ -12,10 +12,10 @@ from .._numerics import CxrReflections, Numerics, Physics
 from .._numerics import EmissionMode as EmissionMode
 from .._numerics import MosaicRoute as MosaicRoute
 from .._precision import Precision
-from ..quantum import QuantumSetup
 from ..detectors import Detector, EnergyBins
 from ..instrument import Acquisition, Filter, FilterPlate, NativeAcquisition, PlanarDetector
 from ..instrument.model import validate_downstream_scene
+from ..quantum import QuantumSetup
 from .beam import Beam, BunchFrontTilt
 from .geometry import Slab, Stack
 from .geometry import Target as LegacyTarget

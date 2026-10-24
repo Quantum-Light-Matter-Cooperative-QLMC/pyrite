@@ -15,6 +15,8 @@ Physical models are documented in [Physics and simulation models](../physics/ind
 
 execution-and-acceleration
 memory-and-scheduling
+distributed-artifacts
+native-slurm-execution
 precision-and-tolerances
 ../physics/radiation-physics/energy-grid-semantics
 statistical-methods

@@ -48,6 +48,11 @@
     },
     {
       "path": "src/pyrite/campaign/beam.py",
+      "name": "Beam.__post_init__",
+      "cc": 22
+    },
+    {
+      "path": "src/pyrite/campaign/beam.py",
       "name": "Beam.from_spec",
       "cc": 29
     },
@@ -65,6 +70,11 @@
       "path": "src/pyrite/campaign/longitudinal.py",
       "name": "LongitudinalDistribution.__post_init__",
       "cc": 23
+    },
+    {
+      "path": "src/pyrite/campaign/model.py",
+      "name": "Scene.__post_init__",
+      "cc": 22
     },
     {
       "path": "src/pyrite/campaign/single_scene.py",
@@ -205,6 +215,16 @@
       "path": "src/pyrite/energy_grid/derive.py",
       "name": "derive_bounds",
       "cc": 30
+    },
+    {
+      "path": "src/pyrite/execution/slurm.py",
+      "name": "SlurmArrayExecutor._execute_staged",
+      "cc": 37
+    },
+    {
+      "path": "src/pyrite/execution/slurm.py",
+      "name": "SlurmArrayExecutor.execute",
+      "cc": 27
     },
     {
       "path": "src/pyrite/instrument/acquisition.py",
@@ -359,7 +379,7 @@
     {
       "path": "src/pyrite/montecarlo/runner/__init__.py",
       "name": "_transport_case",
-      "cc": 28
+      "cc": 26
     },
     {
       "path": "src/pyrite/montecarlo/runner/channeling.py",
@@ -372,14 +392,9 @@
       "cc": 27
     },
     {
-      "path": "src/pyrite/montecarlo/runner/directions.py",
-      "name": "directional_outputs",
-      "cc": 22
-    },
-    {
       "path": "src/pyrite/montecarlo/runner/scheduling.py",
       "name": "run_cases",
-      "cc": 79
+      "cc": 72
     },
     {
       "path": "src/pyrite/montecarlo/shell_configuration.py",
@@ -645,6 +660,16 @@
       "cc": 27
     },
     {
+      "path": "src/pyrite/quantum_state.py",
+      "name": "TransverseStateSpec.__post_init__",
+      "cc": 30
+    },
+    {
+      "path": "src/pyrite/quantum_state.py",
+      "name": "_params",
+      "cc": 38
+    },
+    {
       "path": "src/pyrite/remote/_queue_scripts.py",
       "name": "_material_stems",
       "cc": 21
@@ -712,7 +737,7 @@
     {
       "path": "src/pyrite/runs/run.py",
       "name": "run_sweep",
-      "cc": 40
+      "cc": 55
     },
     {
       "path": "src/pyrite/runs/scan.py",

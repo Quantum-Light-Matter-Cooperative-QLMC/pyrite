@@ -7,9 +7,9 @@ The remote worker executes the existing PyRITE numerical code and publishes its
 **raw** `run_case` output to a shared filesystem:
 
 ```python
-ref = artifact_store.publish(material=case["crystal"],
-                             content_key=content_key_fn(case),
-                             output=run_case(case))
+ref = artifact_store.publish(
+    material=case["crystal"], content_key=content_key_fn(case), output=run_case(case)
+)
 # Send only `ref` (a small dataclass) back to the coordinator.
 ```
 
@@ -17,8 +17,12 @@ The coordinator supplies that same store and content-key function to `run_sweep`
 
 ```python
 run_sweep(
-    cases, results, executor=my_executor, artifact_store=artifact_store,
-    content_key_fn=content_key_fn, checkpoint_path=checkpoint_path,
+    cases,
+    results,
+    executor=my_executor,
+    artifact_store=artifact_store,
+    content_key_fn=content_key_fn,
+    checkpoint_path=checkpoint_path,
 )
 ```
 

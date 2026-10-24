@@ -29,7 +29,8 @@ def _key(case):
 
 def _executor(tmp_path, *, tasks=2, attempts=2):
     return SlurmArrayExecutor(
-        CaseArtifactStore(tmp_path / "shared"), _key,
+        CaseArtifactStore(tmp_path / "shared"),
+        _key,
         resources=ResourceRequest(cpu_cores=1),
         config=SlurmArrayConfig(cases_per_task=tasks, poll_seconds=0.001),
         retry_policy=RetryPolicy(max_attempts=attempts),
@@ -55,10 +56,15 @@ def test_sbatch_retry_overrides_array_and_tags_attempt(monkeypatch, tmp_path):
 
     monkeypatch.setattr(slurm.subprocess, "run", run)
     assert _submit(tmp_path / "script.sbatch", array_spec="0,3-5%2", attempt=2) == "456"
-    assert commands == [[
-        "sbatch", "--parsable", "--array=0,3-5%2",
-        "--export=ALL,PYRITE_SLURM_ATTEMPT=2", str(tmp_path / "script.sbatch")
-    ]]
+    assert commands == [
+        [
+            "sbatch",
+            "--parsable",
+            "--array=0,3-5%2",
+            "--export=ALL,PYRITE_SLURM_ATTEMPT=2",
+            str(tmp_path / "script.sbatch"),
+        ]
+    ]
     _cancel_job("456")
     assert commands[-1] == ["scancel", "456"]
     with pytest.raises(ValueError):
@@ -111,8 +117,9 @@ def test_partial_failure_retries_only_missing_units_no_recomputed_cases(monkeypa
 
     monkeypatch.setattr(slurm, "_job_active", active)
     delivered = []
-    out = ex.execute(cases, callback=lambda i, _c, ref: delivered.append((i, ref)),
-                     keep_results=True)
+    out = ex.execute(
+        cases, callback=lambda i, _c, ref: delivered.append((i, ref)), keep_results=True
+    )
     assert submissions == [{}, {"array_spec": "0%8", "attempt": 2}]
     assert sorted(i for i, _ in delivered) == [0, 1, 2, 3]
     assert sorted(run_names) == ["c-0", "c-1", "c-2", "c-3"]
@@ -136,10 +143,17 @@ def test_stale_status_must_not_complete_new_attempt(monkeypatch, tmp_path):
         if calls == 1:
             status = ex.last_run_dir / "status" / "0.json"
             status.parent.mkdir(exist_ok=True, parents=True)
-            status.write_text(json.dumps({
-                "format": "pyrite.slurm-task.v1", "unit_index": 0,
-                "attempt": 1, "state": "failed", "error": "preempted",
-            }))
+            status.write_text(
+                json.dumps(
+                    {
+                        "format": "pyrite.slurm-task.v1",
+                        "unit_index": 0,
+                        "attempt": 1,
+                        "state": "failed",
+                        "error": "preempted",
+                    }
+                )
+            )
         return str(calls)
 
     monkeypatch.setattr(slurm, "_submit", submit)

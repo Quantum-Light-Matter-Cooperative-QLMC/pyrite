@@ -27,8 +27,14 @@ executor = SlurmArrayExecutor(
     config=SlurmArrayConfig(partition="cpu", cases_per_task=4, max_concurrent=16),
     retry_policy=RetryPolicy(max_attempts=3),  # 1 (no automatic retries) by default
 )
-run_sweep(cases, results, executor=executor, artifact_store=store,
-          content_key_fn=key_fn, checkpoint_dir="/shared/pyrite-output/checkpoints")
+run_sweep(
+    cases,
+    results,
+    executor=executor,
+    artifact_store=store,
+    content_key_fn=key_fn,
+    checkpoint_dir="/shared/pyrite-output/checkpoints",
+)
 ```
 
 For one GPU per SLURM array task, request

@@ -17,13 +17,13 @@ import subprocess
 import sys
 import time
 import uuid
-from threading import Event, Lock
 from collections.abc import Callable, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
+from threading import Event, Lock
 from typing import Any
 
-from .artifacts import CaseArtifactRef, CaseArtifactStore
+from .artifacts import CaseArtifactStore
 from .model import ResourceRequest, RetryPolicy
 from .planning import iter_work_units
 
@@ -112,8 +112,7 @@ class SlurmArrayConfig:
             raise ValueError("gres must have form gpu:COUNT or gpu:TYPE:COUNT")
 
 
-def _script(run_dir: Path, n_tasks: int, resources: ResourceRequest,
-            cfg: SlurmArrayConfig) -> str:
+def _script(run_dir: Path, n_tasks: int, resources: ResourceRequest, cfg: SlurmArrayConfig) -> str:
     """Render directives as literals: SLURM does not expand shell variables."""
     if n_tasks < 1:
         raise ValueError("SLURM array requires at least one task")
@@ -130,9 +129,11 @@ def _script(run_dir: Path, n_tasks: int, resources: ResourceRequest,
     elif cfg.gres is not None:
         raise ValueError("CPU-only execution must not request SLURM gres")
     directive = [
-        "#!/usr/bin/env bash", "#SBATCH --job-name=pyrite-cases",
-        f"#SBATCH --array=0-{n_tasks-1}%{cfg.max_concurrent}",
-        "#SBATCH --nodes=1", "#SBATCH --ntasks=1",
+        "#!/usr/bin/env bash",
+        "#SBATCH --job-name=pyrite-cases",
+        f"#SBATCH --array=0-{n_tasks - 1}%{cfg.max_concurrent}",
+        "#SBATCH --nodes=1",
+        "#SBATCH --ntasks=1",
         f"#SBATCH --cpus-per-task={resources.cpu_cores}",
         f"#SBATCH --time={cfg.walltime}",
         f"#SBATCH --output={run_dir}/logs/%A_%a.out",
@@ -150,16 +151,29 @@ def _script(run_dir: Path, n_tasks: int, resources: ResourceRequest,
         directive.append(f"#SBATCH --gres={gres}")
     # One task per allocated GPU: the worker never starts an outer GPU pool.
     backend = resources.accelerator if resources.gpu_count else "cpu"
-    command = " ".join((
-        shlex.quote(cfg.python_executable), "-m", "pyrite.execution.slurm_worker",
-        "--run-dir", shlex.quote(str(run_dir)),
-        "--unit-index", '"${SLURM_ARRAY_TASK_ID:?missing SLURM_ARRAY_TASK_ID}"',
-    ))
-    return "\n".join([*directive, "", "set -euo pipefail",
-                       f"export PYRITE_MC_BACKEND={backend}",
-                       # No Python thread oversubscription across array tasks.
-                       'export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1',
-                       command, ""])
+    command = " ".join(
+        (
+            shlex.quote(cfg.python_executable),
+            "-m",
+            "pyrite.execution.slurm_worker",
+            "--run-dir",
+            shlex.quote(str(run_dir)),
+            "--unit-index",
+            '"${SLURM_ARRAY_TASK_ID:?missing SLURM_ARRAY_TASK_ID}"',
+        )
+    )
+    return "\n".join(
+        [
+            *directive,
+            "",
+            "set -euo pipefail",
+            f"export PYRITE_MC_BACKEND={backend}",
+            # No Python thread oversubscription across array tasks.
+            "export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1",
+            command,
+            "",
+        ]
+    )
 
 
 def _save_input(path: Path, records: list[dict[str, Any]]) -> None:
@@ -192,8 +206,7 @@ def _submit(script: Path, *, array_spec: str | None = None, attempt: int = 1) ->
         argv.append(f"--array={array_spec}")
     if attempt != 1:
         argv.append(f"--export=ALL,PYRITE_SLURM_ATTEMPT={attempt}")
-    result = subprocess.run([*argv, str(script)],
-                            capture_output=True, text=True, check=True)
+    result = subprocess.run([*argv, str(script)], capture_output=True, text=True, check=True)
     job = result.stdout.strip()
     if not _JOB_ID.fullmatch(job):
         raise RuntimeError(f"unexpected sbatch job id: {job!r}")
@@ -208,8 +221,12 @@ def _cancel_job(job_id: str) -> None:
 
 
 def _job_active(job_id: str) -> bool:
-    result = subprocess.run(["squeue", "--noheader", "--jobs", job_id,
-                             "--format=%i"], capture_output=True, text=True, check=True)
+    result = subprocess.run(
+        ["squeue", "--noheader", "--jobs", job_id, "--format=%i"],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
     return bool(result.stdout.strip())
 
 
@@ -230,11 +247,15 @@ class SlurmArrayExecutor:
     are validated and never recomputed by a retried worker.
     """
 
-    def __init__(self, artifact_store: CaseArtifactStore,
-                 case_key: Callable[[Any], str], *,
-                 resources: ResourceRequest | None = None,
-                 config: SlurmArrayConfig | None = None,
-                 retry_policy: RetryPolicy | None = None) -> None:
+    def __init__(
+        self,
+        artifact_store: CaseArtifactStore,
+        case_key: Callable[[Any], str],
+        *,
+        resources: ResourceRequest | None = None,
+        config: SlurmArrayConfig | None = None,
+        retry_policy: RetryPolicy | None = None,
+    ) -> None:
         self.store = artifact_store
         self.case_key = case_key
         self.resources = ResourceRequest() if resources is None else resources
@@ -272,9 +293,18 @@ class SlurmArrayExecutor:
         return True
 
     def execute(self, cases: Sequence[Any], *, callback=None, **options: Any) -> list[Any]:
-        allowed = {"max_workers", "progress", "keep_results", "on_timing", "on_activity",
-                   "should_stop", "engine", "transport_only", "observation_directions",
-                   "trajectory_capture"}
+        allowed = {
+            "max_workers",
+            "progress",
+            "keep_results",
+            "on_timing",
+            "on_activity",
+            "should_stop",
+            "engine",
+            "transport_only",
+            "observation_directions",
+            "trajectory_capture",
+        }
         unexpected = set(options) - allowed
         if unexpected:
             raise ValueError(f"SLURM executor does not support: {sorted(unexpected)}")
@@ -322,9 +352,14 @@ class SlurmArrayExecutor:
         self.last_run_dir = work_dir
         (work_dir / "logs").mkdir(parents=True)
         expected_keys: list[str] = [""] * n
-        for unit in iter_work_units(cases, cases_per_unit=cfg.cases_per_task,
-                                    resources=self.resources, case_key=self.case_key):
+        for unit in iter_work_units(
+            cases,
+            cases_per_unit=cfg.cases_per_task,
+            resources=self.resources,
+            case_key=self.case_key,
+        ):
             records = []
+            assert unit.case_keys is not None
             for index, key in zip(range(unit.start, unit.stop), unit.case_keys, strict=True):
                 expected_keys[index] = key
                 # Freeze resolved inputs; Case is a Mapping but not an HDF5 node.
@@ -332,17 +367,24 @@ class SlurmArrayExecutor:
                 self.store.path_for(case["crystal"], key)  # fail before sbatch on invalid identity
                 records.append({"index": index, "case": dict(case), "content_key": key})
             _save_input(work_dir / "inputs" / f"{unit.start // cfg.cases_per_task}.h5", records)
-        _atomic_json(work_dir / "plan.json", {
-            "format": "pyrite.slurm-array.v1", "tasks": unit_count,
-            "cases": n, "cases_per_task": cfg.cases_per_task,
-            "artifact_root": str(self.store.root),
-            "resources": asdict(self.resources),
-            "local_workers": 0 if self.resources.gpu_count else (
-                requested_workers
-                if requested_workers is not None
-                else max(0, self.resources.cpu_cores - 1)
-            ),
-        })
+        _atomic_json(
+            work_dir / "plan.json",
+            {
+                "format": "pyrite.slurm-array.v1",
+                "tasks": unit_count,
+                "cases": n,
+                "cases_per_task": cfg.cases_per_task,
+                "artifact_root": str(self.store.root),
+                "resources": asdict(self.resources),
+                "local_workers": 0
+                if self.resources.gpu_count
+                else (
+                    requested_workers
+                    if requested_workers is not None
+                    else max(0, self.resources.cpu_cores - 1)
+                ),
+            },
+        )
         script = work_dir / "submit.sbatch"
         script.write_text(script_text, encoding="utf-8")
         if self._executing.is_set():
@@ -355,16 +397,24 @@ class SlurmArrayExecutor:
             self._active_job_id = None
             self._cancelled_jobs.clear()
         try:
-            return self._execute_staged(cases, expected_keys, script, unit_count,
-                                        callback=callback, **options)
+            return self._execute_staged(
+                cases, expected_keys, script, unit_count, callback=callback, **options
+            )
         finally:
             with self._job_lock:
                 self._active_job_id = None
             self._executing.clear()
 
-    def _execute_staged(self, cases: Sequence[Any], expected_keys: list[str],
-                        script: Path, unit_count: int, *, callback=None,
-                        **options: Any) -> list[Any]:
+    def _execute_staged(
+        self,
+        cases: Sequence[Any],
+        expected_keys: list[str],
+        script: Path,
+        unit_count: int,
+        *,
+        callback=None,
+        **options: Any,
+    ) -> list[Any]:
         """Coordinator lifecycle; each attempt submits only incomplete units."""
         cfg = self.config
         n = len(cases)
@@ -416,8 +466,9 @@ class SlurmArrayExecutor:
             if attempt == 1:
                 job_id = _submit(script)
             else:
-                job_id = _submit(script, array_spec=_array_spec(pending, cfg.max_concurrent),
-                                 attempt=attempt)
+                job_id = _submit(
+                    script, array_spec=_array_spec(pending, cfg.max_concurrent), attempt=attempt
+                )
             with self._job_lock:
                 self.last_job_id = job_id
                 self._active_job_id = job_id
@@ -427,9 +478,16 @@ class SlurmArrayExecutor:
             if self._cancel_requested.is_set():
                 self._cancel_current_job()
             if on_activity is not None:
-                on_activity({"phase": "slurm_submitted", "job_id": job_id,
-                             "attempt": attempt, "max_attempts": self.retry_policy.max_attempts,
-                             "in_flight_case_count": n - len(delivered), "case": None})
+                on_activity(
+                    {
+                        "phase": "slurm_submitted",
+                        "job_id": job_id,
+                        "attempt": attempt,
+                        "max_attempts": self.retry_policy.max_attempts,
+                        "in_flight_case_count": n - len(delivered),
+                        "case": None,
+                    }
+                )
             accounted: set[int] = set()
             while len(accounted) < len(pending):
                 if self._cancel_requested.is_set():
@@ -437,12 +495,14 @@ class SlurmArrayExecutor:
                 for unit_index in pending:
                     if unit_index in accounted:
                         continue
-                    status_path = self.last_run_dir / "status" / f"{unit_index}.json"
+                    status_path = script.parent / "status" / f"{unit_index}.json"
                     if not status_path.exists():
                         continue
                     status = json.loads(status_path.read_text(encoding="utf-8"))
-                    if (status.get("format") != "pyrite.slurm-task.v1"
-                        or status.get("unit_index") != unit_index):
+                    if (
+                        status.get("format") != "pyrite.slurm-task.v1"
+                        or status.get("unit_index") != unit_index
+                    ):
                         raise RuntimeError(f"invalid SLURM task status: {status_path}")
                     # The previous attempt's status may remain on disk. Never
                     # treat it as this attempt's completion report.
@@ -461,14 +521,23 @@ class SlurmArrayExecutor:
                             f"task {unit_index} finished without all case artifacts"
                         )
                     if on_timing is not None:
-                        on_timing({"slurm_task_index": unit_index,
-                                   "slurm_attempt": attempt,
-                                   "slurm_worker_seconds": status.get("worker_seconds")})
+                        on_timing(
+                            {
+                                "slurm_task_index": unit_index,
+                                "slurm_attempt": attempt,
+                                "slurm_worker_seconds": status.get("worker_seconds"),
+                            }
+                        )
                     if on_activity is not None:
-                        on_activity({"phase": "slurm_progress", "case": None,
-                                     "in_flight_case_count": n - len(delivered),
-                                     "completed_work_units": len(succeeded),
-                                     "total_work_units": unit_count})
+                        on_activity(
+                            {
+                                "phase": "slurm_progress",
+                                "case": None,
+                                "in_flight_case_count": n - len(delivered),
+                                "completed_work_units": len(succeeded),
+                                "total_work_units": unit_count,
+                            }
+                        )
                 if len(accounted) == len(pending):
                     break
                 if not _job_active(job_id):
@@ -491,21 +560,28 @@ class SlurmArrayExecutor:
             if len(succeeded) == unit_count:
                 break
             if attempt < self.retry_policy.max_attempts and on_activity is not None:
-                on_activity({"phase": "slurm_retry", "case": None,
-                             "attempt": attempt + 1,
-                             "pending_work_units": sorted(set(range(unit_count)) - succeeded),
-                             "in_flight_case_count": n - len(delivered)})
+                on_activity(
+                    {
+                        "phase": "slurm_retry",
+                        "case": None,
+                        "attempt": attempt + 1,
+                        "pending_work_units": sorted(set(range(unit_count)) - succeeded),
+                        "in_flight_case_count": n - len(delivered),
+                    }
+                )
 
         if self._cancel_requested.is_set():
             if on_activity is not None:
-                on_activity({"phase": "slurm_cancelled", "case": None,
-                             "in_flight_case_count": 0})
+                on_activity({"phase": "slurm_cancelled", "case": None, "in_flight_case_count": 0})
             raise ExecutionCancelledError(
                 f"SLURM execution cancelled; {len(delivered)}/{n} case artifacts committed"
             )
         if len(succeeded) != unit_count:
-            problems = "; ".join(failures.get(i, f"incomplete tasks [{i}]")
-                                 for i in range(unit_count) if i not in succeeded)
+            problems = "; ".join(
+                failures.get(i, f"incomplete tasks [{i}]")
+                for i in range(unit_count)
+                if i not in succeeded
+            )
             raise RuntimeError(
                 f"SLURM execution exhausted {self.retry_policy.max_attempts} attempt(s): "
                 + problems

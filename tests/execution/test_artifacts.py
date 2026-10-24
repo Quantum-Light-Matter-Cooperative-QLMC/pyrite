@@ -16,7 +16,7 @@ OTHER_KEY = "b" * 64
 
 
 def _output(value=1.0):
-    return {"spec": np.array([value, value + 1]), "E_grid": np.array([100., 200.])}
+    return {"spec": np.array([value, value + 1]), "E_grid": np.array([100.0, 200.0])}
 
 
 def test_worker_publication_is_immutable_and_returns_lightweight_reference(tmp_path):
@@ -33,7 +33,7 @@ def test_worker_publication_is_immutable_and_returns_lightweight_reference(tmp_p
     # Same physics key: first complete result wins, not last writer.
     second = store.publish("hopg", KEY, _output(9.0))
     assert second == first
-    np.testing.assert_array_equal(store.load(first)["spec"], [1., 2.])
+    np.testing.assert_array_equal(store.load(first)["spec"], [1.0, 2.0])
 
 
 def test_concurrent_workers_do_not_clobber_same_content_key(tmp_path):
@@ -71,7 +71,7 @@ def test_missing_unfinished_and_corrupt_are_distinct(tmp_path):
     ref = store.publish("hopg", KEY, _output())
     recovered_ref, recovered = store.recover("hopg", KEY)
     assert recovered_ref == ref
-    np.testing.assert_array_equal(recovered["spec"], [1., 2.])
+    np.testing.assert_array_equal(recovered["spec"], [1.0, 2.0])
     with path.open("ab") as stream:
         stream.write(b"corrupted")
     with pytest.raises(ArtifactIntegrityError, match="digest or length"):
@@ -118,4 +118,4 @@ def test_crash_between_data_link_and_receipt_is_resumable(tmp_path, monkeypatch)
     assert store.path_for("hopg", KEY).is_file()
     assert store.recover("hopg", KEY) is None
     ref = store.publish("hopg", KEY, _output(999.0))
-    np.testing.assert_array_equal(store.load(ref)["spec"], [1., 2.])
+    np.testing.assert_array_equal(store.load(ref)["spec"], [1.0, 2.0])

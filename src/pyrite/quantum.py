@@ -85,8 +85,11 @@ class QuantumSetup:
     numerics: QuantumNumerics = field(default_factory=QuantumNumerics)
 
     def __post_init__(self) -> None:
-        for name, cls in (("region", QuantumRegion), ("dynamics", QuantumDynamics),
-                          ("numerics", QuantumNumerics)):
+        for name, cls in (
+            ("region", QuantumRegion),
+            ("dynamics", QuantumDynamics),
+            ("numerics", QuantumNumerics),
+        ):
             if not isinstance(getattr(self, name), cls):
                 raise TypeError(f"QuantumSetup.{name} must be {cls.__name__}")
 
@@ -94,25 +97,34 @@ class QuantumSetup:
         """Adapt supported planar configuration to unchanged versioned case fields."""
         if self.region.kind == "axial":
             from .campaign.axial_spec import refuse_unverified_axial_run
+
             refuse_unverified_axial_run()
-        if (self.region.kind != "planar" or self.dynamics.kind != "channeling"
-                or self.numerics.representation != "bloch"
-                or self.numerics.method != "density-matrix"):
-            raise ValueError("quantum production supports only planar Bloch density-matrix "
-                             "channeling; other configurations are diagnostic-only")
+        if (
+            self.region.kind != "planar"
+            or self.dynamics.kind != "channeling"
+            or self.numerics.representation != "bloch"
+            or self.numerics.method != "density-matrix"
+        ):
+            raise ValueError(
+                "quantum production supports only planar Bloch density-matrix "
+                "channeling; other configurations are diagnostic-only"
+            )
         if physics.channeling_model != "off" or physics.channeling_axial is not None:
             raise ValueError("Scene.quantum conflicts with legacy Physics.channeling_model")
         if numerics.precision is not None:
             raise ValueError("adaptive precision is unsupported by planar quantum channeling")
-        values = dict(channeling_basis_size=self.numerics.basis_size,
-                      channeling_bloch_cells=self.numerics.bloch_cells,
-                      channeling_dz_ang=self.numerics.step_ang,
-                      channeling_zone_max_ang=self.region.zone_max_ang)
+        values = dict(
+            channeling_basis_size=self.numerics.basis_size,
+            channeling_bloch_cells=self.numerics.bloch_cells,
+            channeling_dz_ang=self.numerics.step_ang,
+            channeling_zone_max_ang=self.region.zone_max_ang,
+        )
         defaults = Numerics()
         for name, value in values.items():
             current = getattr(numerics, name)
             if current != getattr(defaults, name) and current != value:
                 raise ValueError(f"Scene.quantum conflicts with legacy Numerics.{name}")
-        return (replace(physics, channeling_model="planar",
-                        channeling_plane=self.region.plane_hkl),
-                replace(numerics, **values))
+        return (
+            replace(physics, channeling_model="planar", channeling_plane=self.region.plane_hkl),
+            replace(numerics, **values),
+        )

@@ -11,6 +11,9 @@ how-pyrite-works
 python-api-workflow
 shell-completion
 configuration-cookbook
+numerics-and-execution
+quantum-source-states
+sampling-policy
 working-with-results
 planar-channeling
 transition-radiation-demo

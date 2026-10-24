@@ -113,11 +113,15 @@ Make `sampling` a **tagged union** rather than a bag of nullable fields:
 ```python
 pr.Numerics(sampling=pr.FixedSampling(cxr_electrons=450, brem_electrons=100))
 # OR
-pr.Numerics(sampling=pr.AdaptiveSampling(
-    target_rse=0.05, min_electrons=200,
-    max_electrons=20_000, block_electrons=100,
-    observables=("cxr", "brem"),
-))
+pr.Numerics(
+    sampling=pr.AdaptiveSampling(
+        target_rse=0.05,
+        min_electrons=200,
+        max_electrons=20_000,
+        block_electrons=100,
+        observables=("cxr", "brem"),
+    )
+)
 ```
 
 **Invariants:**

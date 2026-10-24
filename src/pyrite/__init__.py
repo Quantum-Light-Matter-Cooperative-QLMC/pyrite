@@ -44,17 +44,12 @@ if TYPE_CHECKING:
     from pyrite._config_presets import load_physics as load_physics
     from pyrite._numerics import CxrReflections as CxrReflections
     from pyrite._numerics import Physics as Physics
-    from pyrite._numerics_groups import TransportNumerics as TransportNumerics
-    from pyrite._numerics_groups import RadiationNumerics as RadiationNumerics
     from pyrite._numerics_groups import ExecutionConfig as ExecutionConfig
+    from pyrite._numerics_groups import RadiationNumerics as RadiationNumerics
+    from pyrite._numerics_groups import TransportNumerics as TransportNumerics
     from pyrite._precision import Precision as Precision
-    from pyrite.quantum_state import TransverseStateSpec as TransverseStateSpec
     from pyrite._sampling import AdaptiveSampling as AdaptiveSampling
     from pyrite._sampling import FixedSampling as FixedSampling
-    from pyrite.quantum import QuantumRegion as QuantumRegion
-    from pyrite.quantum import QuantumDynamics as QuantumDynamics
-    from pyrite.quantum import QuantumNumerics as QuantumNumerics
-    from pyrite.quantum import QuantumSetup as QuantumSetup
     from pyrite.api import simulate as simulate
     from pyrite.bodies import RectangularBody as RectangularBody
     from pyrite.bodies import SubstanceRef as SubstanceRef
@@ -154,6 +149,11 @@ if TYPE_CHECKING:
     )
     from pyrite.instrument.filter import Filter as Filter
     from pyrite.materials.emission import photon_energies as photon_energies
+    from pyrite.quantum import QuantumDynamics as QuantumDynamics
+    from pyrite.quantum import QuantumNumerics as QuantumNumerics
+    from pyrite.quantum import QuantumRegion as QuantumRegion
+    from pyrite.quantum import QuantumSetup as QuantumSetup
+    from pyrite.quantum_state import TransverseStateSpec as TransverseStateSpec
     from pyrite.results.model import (
         CxrSpectra as CxrSpectra,
     )

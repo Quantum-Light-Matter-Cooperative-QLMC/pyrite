@@ -23,8 +23,8 @@ from typing import Any
 import numpy as np
 
 from ..montecarlo.bunch_front import BunchFrontTilt, validate_front_source
-from ..quantum_state import TransverseStateSpec
 from ..montecarlo.transverse import TransverseDistribution
+from ..quantum_state import TransverseStateSpec
 from .longitudinal import LongitudinalDistribution
 from .sweep import BeamSpec
 

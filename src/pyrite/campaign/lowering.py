@@ -19,7 +19,7 @@ from .sweep import Sweep as LegacySweep
 def scene_physics(scene: Scene, numerics: Numerics) -> Physics:
     """Resolve the scene's model policy."""
     physics = resolve_physics(scene.physics, numerics)
-    if getattr(scene, "quantum", None) is not None:
+    if scene.quantum is not None:
         physics, numerics = scene.quantum.lower(physics, numerics)
     physics.validate_transport(numerics.energy_model)
     if physics.channeling_model == "axial":
