@@ -46,7 +46,7 @@ def test_api_and_profile_normalize_using_the_same_resolver():
 def test_scene_refuses_before_any_case_material_work():
     physics = _physics()
     with pytest.raises(ValueError, match="#623"):
-        scene_physics(SimpleNamespace(physics=physics), Numerics())
+        scene_physics(SimpleNamespace(physics=physics, quantum=None), Numerics())
 
 
 def test_direct_channeling_resolver_cannot_fall_through_to_planar_solver():
