@@ -210,7 +210,7 @@ require derived or adapted material to be marked as such.
   - PyRITE **does** redistribute cross-section tables **derived** from that
     library, for every element its built-in catalogue materials may contain.
     They are not in the PyRITE package: they are published as one
-    SHA-256-pinned archive (PyRITE release `tables-bremslib-2`) that
+    SHA-256-pinned archive (PyRITE release `tables-bremslib-3`) that
     `pyrite tables fetch bremslib` installs into
     the user's own data directory. These are **adaptations** of a CC BY 4.0
     work and are not the upstream data: they are parsed and restructured on

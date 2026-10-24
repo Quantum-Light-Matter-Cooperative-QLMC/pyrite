@@ -105,15 +105,21 @@ and release assets are public, so downloads need no GitHub token.
 * - Release
   - Asset
   - Pinned by
-* - `tables-elsepa-3`
-  - `elsepa-tables.zip` (25,881,348 B, 29 tables)
+* - `tables-elsepa-4`
+  - `elsepa-tables.zip` (48,282,047 B, 55 tables)
   - `src/pyrite/data/xsgen/elsepa-tables.json`
-* - `tables-bremslib-2`
-  - `bremslib-tables.zip` (23,679,749 B, 24 tables, to 100 MeV)
+* - `tables-elsepa-positron-4`
+  - `elsepa-positron-tables.zip` (49,517,253 B, 55 tables)
+  - `src/pyrite/data/xsgen/elsepa-positron-tables.json`
+* - `tables-bremslib-3`
+  - `bremslib-tables.zip` (41,369,196 B, 42 tables)
   - `src/pyrite/data/xsgen/bremslib-tables.json`
-* - `tables-sbethe-1`
-  - `sbethe-tables.zip` (49 catalogue stopping tables)
+* - `tables-sbethe-4`
+  - `sbethe-tables.zip` (5,127,793 B, 84 tables)
   - `src/pyrite/data/xsgen/sbethe-tables.json`
+* - `tables-sbethe-positron-4`
+  - `sbethe-positron-tables.zip` (5,147,485 B, 84 tables)
+  - `src/pyrite/data/xsgen/sbethe-positron-tables.json`
 * - `tables-epdl-1`
   - `epdl2025_mf23.npz` (derived EPDL2025 photon table)
   - `pyrite.datasets.EPDL`

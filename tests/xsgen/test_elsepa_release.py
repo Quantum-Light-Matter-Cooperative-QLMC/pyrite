@@ -79,7 +79,21 @@ def test_release_covers_every_transport_element_and_elementary_crystal(release):
     zs = sorted(int(row["Z"]) for row in TRANSPORT_ELEMENTS.values())
     assert labels[: len(zs)] == [f"Z={z}" for z in zs]
     assert labels[len(zs) :] == sorted(
-        {"silicon", "diamond", "hopg", "black_phosphorus", "tungsten"}
+        {
+            "silicon",
+            "diamond",
+            "hopg",
+            "black_phosphorus",
+            "tungsten",
+            "al",
+            "cu",
+            "ge",
+            "au",
+            "alpha_fe",
+            "ni",
+            "pb",
+            "alpha_ti",
+        }
     )
     assert all(len(CATALOG.crystal(key).info.composition) == 1 for key in labels[len(zs) :])
 
@@ -147,7 +161,7 @@ def test_an_index_disagreeing_with_its_archive_installs_nothing(release):
     first = index.tables[0]
     tampered = replace(index, tables=(replace(first, manifest_sha256="0" * 64), *index.tables[1:]))
 
-    with pytest.raises(DataFetchError, match="ELSEPA table manifest for Z=5"):
+    with pytest.raises(DataFetchError, match=f"ELSEPA table manifest for {first.label}"):
         fetch_elsepa(archive, index=tampered)
     assert not any(user_table_dir().glob("*.npz"))
 
