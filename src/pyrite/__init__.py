@@ -48,6 +48,7 @@ if TYPE_CHECKING:
     from pyrite._numerics_groups import RadiationNumerics as RadiationNumerics
     from pyrite._numerics_groups import ExecutionConfig as ExecutionConfig
     from pyrite._precision import Precision as Precision
+    from pyrite.quantum_state import TransverseStateSpec as TransverseStateSpec
     from pyrite._sampling import AdaptiveSampling as AdaptiveSampling
     from pyrite._sampling import FixedSampling as FixedSampling
     from pyrite.quantum import QuantumRegion as QuantumRegion
@@ -203,6 +204,7 @@ _PUBLIC_OBJECTS = {
     "QuantumDynamics": ("pyrite.quantum", "QuantumDynamics"),
     "QuantumNumerics": ("pyrite.quantum", "QuantumNumerics"),
     "QuantumSetup": ("pyrite.quantum", "QuantumSetup"),
+    "TransverseStateSpec": ("pyrite.quantum_state", "TransverseStateSpec"),
     "CxrReflections": ("pyrite._numerics", "CxrReflections"),
     "CxrSpectra": ("pyrite.results.model", "CxrSpectra"),
     "AngularAcceptance": ("pyrite.detectors", "AngularAcceptance"),
@@ -255,6 +257,11 @@ def __getattr__(name: str) -> Any:
     # import-linter layer contracts.
     from importlib import import_module
 
+    if name == "states":
+        module = import_module("pyrite.states")
+        globals()[name] = module
+        return module
+
     try:
         module_name, attribute = _PUBLIC_OBJECTS[name]
     except KeyError as exc:
@@ -265,4 +272,4 @@ def __getattr__(name: str) -> Any:
     return value
 
 
-__all__ = ["DATA_DIR", "__version__", *_PUBLIC_OBJECTS]
+__all__ = ["DATA_DIR", "__version__", "states", *_PUBLIC_OBJECTS]

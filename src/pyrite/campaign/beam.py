@@ -23,6 +23,7 @@ from typing import Any
 import numpy as np
 
 from ..montecarlo.bunch_front import BunchFrontTilt, validate_front_source
+from ..quantum_state import TransverseStateSpec
 from ..montecarlo.transverse import TransverseDistribution
 from .longitudinal import LongitudinalDistribution
 from .sweep import BeamSpec
@@ -218,8 +219,13 @@ class Beam:
     bunch_charge_pc: float = 1.0
     gdf: GdfSource | None = None
     bunch_front_tilt: BunchFrontTilt | None = None
+    state: TransverseStateSpec | None = field(default=None, kw_only=True)
 
     def __post_init__(self) -> None:
+        if self.state is not None and not isinstance(self.state, TransverseStateSpec):
+            raise TypeError("Beam.state must be a TransverseStateSpec or None")
+        if self.state is not None and self.gdf is not None:
+            raise ValueError("Beam.state conflicts with a GDF source carrying its own phase space")
         if not isinstance(self.transverse, (TransverseSpot, PointSpot, TransverseDistribution)):
             raise TypeError(
                 "Beam.transverse must be a TransverseSpot, PointSpot, or TransverseDistribution"
@@ -309,6 +315,11 @@ class Beam:
 
     def to_spec(self) -> BeamSpec:
         """Lower to the flat :class:`BeamSpec` the transport layers consume."""
+        if self.state is not None:
+            raise ValueError(
+                "Beam.state cannot yet be lowered to transport: custom quantum "
+                "entry-state projection is not yet integrated in production (#680)"
+            )
         fields: dict[str, Any] = {
             "energy_keV": self.energy_keV,
             "energy_spread_frac": self.energy_spread_frac,
