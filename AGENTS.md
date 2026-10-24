@@ -12,12 +12,20 @@ prose keep required format.
   call sites across the CLI/domain boundary. Use `rg` or direct reads for exact
   text, non-code, generated files, and targeted searches. `src/` is ~128k LOC;
   prefer Serena for cross-file symbol relationships and avoid broad source dumps.
+  Serena starts with `--project-from-cwd`, so every worktree is pre-activated:
+  skip `activate_project`, onboarding, and the instructions manual unless
+  troubleshooting Serena. No hook forces Serena use (`serena-hooks remind`
+  denied ordinary Read-before-Edit loops); choosing the right tool is on you.
 - `README.md`: science/install/primary workflow. Classify maintained pages under
   `docs/guides/`, `docs/physics/`, `docs/validation/`, `docs/research/`,
   `docs/repo-design/`, or `docs/adr/`; see
   `docs/repo-design/documentation.md`. Backlog: GitHub Issues
-  (`gh issue list`), labelled `status:active`/`gated`/`paused`/`backlog`
-  and `area:*`.
+  (`gh issue list`). Status labels (one per open issue): `needs-triage`,
+  `backlog`, `active`, `gated`, `paused`. Area labels: `physics`, `cli`,
+  `api`, `notebooks`, `tests`, `performance`, `remote`, `geometry`,
+  `validation`, `materials`, `infrastructure`, `refactor`. Type: built-in
+  `bug`/`enhancement`/`documentation`/`question`. Legacy `status:backlog`/`status:active` equal
+  their bare forms; replace them with the bare label when editing an issue.
 - Use Context7 only for current external-library docs. Headroom shapes agent and
   tool output; it is not a shell wrapper or code index. Do not use Tokensave or
   RTK.
@@ -113,21 +121,61 @@ tests or changes formatting.
   `docs/repo-design/complexity.md`.
 - New tests >5 s wall or with large peak RSS get `@pytest.mark.slow`
   (default runs skip them; CI runs them). Check with `--durations=0`.
+- When a `*_MODEL` marker or `tables-*-N` tag changes, `rg` every identity
+  digest/pin derived from it and re-pin all in one pass before committing.
+
+## Shell, runs, and shipping
+
+- Claude Code's tool shell is pinned to bash (`CLAUDE_CODE_SHELL` in
+  `.claude/settings.json`), but other agents and humans may run zsh, which
+  does not word-split unquoted `$var`:
+  `for f in $files` loops once over the whole string. Write commands that
+  behave the same in bash and zsh: arrays (`files=(a b)`; `"${files[@]}"`),
+  newline loops (`cmd | while IFS= read -r f; do ...; done`), or
+  `xargs -0`/`git ... -z`; never rely on splitting a string variable.
+  Wrap bash-only scripts in `bash -c '...'`; zsh also aborts on unmatched
+  globs, so quote patterns passed to `rg`, `git` and `find`. Run `gh` from
+  inside the worktree.
+- Never mask a gate's exit code: no `| tail`/`| grep` on lint, test or verify
+  without `set -o pipefail`; prefer `cmd > scratch/x.log 2>&1; echo rc=$?`.
+- Local tests: `pyrite-dev test` sizes workers by memory; never raise `-n`.
+  Cap heavy local probes with
+  `systemd-run --user --scope -p MemoryMax=8G -p MemorySwapMax=0 ...`.
+  After a squash/rebase with no content change, rerun only focused tests;
+  leave domain suites to CI.
+- Format only changed paths (`uv run ruff format <paths>`); CI formats PRs.
+  Repo-wide `pyrite-dev format` only when asked.
+- Kill processes by PID (`pgrep -a`, then `kill <pid>`); never `pkill`/`killall`
+  patterns, which can match the agent's own shell. Never `git add .`/`-A`.
+  `.agents/hooks/guard_bash.sh` blocks these and non-lease force pushes.
+- Ship in checkpoints: with push authority, commit, push and open a draft PR
+  before any remote/GPU job or long check, so a session limit strands only
+  evidence. `ship` owns the verify → rebase → push → PR → issue sequence.
+- Remote runs start with the `remote-gpu-jobs` pre-flight (synced SHA, node
+  state, `uv` on PATH, explicit catalog env). Record job IDs in the issue's
+  `## Progress` section instead of blocking on them.
+- Zotero: an empty search or children listing is not proof of absence. Retry,
+  search attachments by parent title/DOI, then ask the user before concluding a
+  source or SI is missing.
 
 ## Task dispatch
 
-- Use `triage` for new `>user<` prose, GitHub issues carrying no `status:*`
+- Use `triage` for new `>user<` prose, GitHub issues carrying no status
   label, or `/triage <text>` direct input. It turns the task into a canonical
-  GitHub issue (executable body, `area:*`/type labels, `status:backlog`,
+  GitHub issue (executable body, area/type labels, `backlog`,
   native dependency relations), then stops for review. It never implements and
   creates no branches, worktrees, task docs, commits, or pushes.
 - Use `dispatch-task` to route reviewed backlog work. It creates or reuses the
   linked `issue-<n>-<slug>` branch/worktree (`.worktrees/`), moves the issue to
-  `status:active`, writes explicit authority/acceptance handoff, then selects:
+  `active`, writes explicit authority/acceptance handoff, then selects:
   `implement-task-lite` for small mechanical slices, `implement-task` for
   normal checklist slices, or `lead-task` for complex/integrating ownership.
   It also owns landed teardown: close the issue, promote durable content, hand
   worktree/ref removal to `repo-cleanup`.
+- Use `ship` (`/ship [checkpoint|final]`) to publish a task branch: verify,
+  rebase onto `main`, check remote/PR state, push, open or update the PR, and
+  record progress in the issue. Direct invocation grants push/PR/issue-writer
+  for the current issue branch only.
 - Example model tiers: Haiku/Luna → lite; Sonnet/Terra → normal;
   Opus/Sol/Fable/K3 → lead. Risk and scope override model label.
 - Use `repo-cleanup` for git hygiene. It fans cheap subagents out per item to
@@ -146,8 +194,9 @@ tests or changes formatting.
 ## Backlog and physics
 
 Backlog is tracked in GitHub Issues (`gh issue list`/`gh issue view`), not a
-repo file. One issue per item, labelled `status:*`/`area:*`; the issue body is
-the sole task record (goal, scope, plan checklist, acceptance, decisions).
+repo file. One issue per item, with one status label plus area/type labels;
+the issue body is the sole task record (goal, scope, plan checklist,
+acceptance, decisions).
 `dispatch-task` closes an issue when its task lands. Cross-task agent plans
 live only in `agentdocs/plans/`, outside the public documentation tree; see
 `agentdocs/README.md`. `issue-audit` audits backlog/branch consistency

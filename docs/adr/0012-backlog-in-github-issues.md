@@ -4,6 +4,11 @@
 - **Date:** 2026-08-20
 - **Supersedes:** ADR-0004's "`TODO.md` is the single backlog authority on `main`" clause
 
+> **Amended 2026-10-23:** the label taxonomy below is historical. `priority:*`
+> labels were dropped; status and area labels are now bare names (`backlog`,
+> `active`, `gated`, `paused`, `needs-triage`; `physics`, `cli`, `infrastructure`,
+> ...). `AGENTS.md` "Start here" lists the current set.
+
 ## Context
 
 `TODO.md` held the entire backlog as hand-maintained Markdown: priority sections (Active/P1/P2/P3), an untriaged Inbox, and Long-term plans, each item a summary line plus an optional branch and `agentdocs/tasks/<branch-name>/` pointer. A `.gitattributes` `TODO.md merge=ours` driver (installed via `pyrite-dev bootstrap`) resolved conflicting hunks to the current branch so merge/rebase never prompted for manual TODO.md resolution.

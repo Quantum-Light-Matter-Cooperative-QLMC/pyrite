@@ -19,7 +19,7 @@ are correct.
 ## Invariant
 
 - Open GitHub Issues are the single source of truth: one issue per item,
-  labelled `status:*`/`area:*`, body holding goal, scope, plan, acceptance, and
+  labelled with one status label (`backlog`, `active`, ...) plus area/type labels, body holding goal, scope, plan, acceptance, and
   decisions. Branch detail does not enter durable `docs/`.
 - `dispatch-task` closes a completed task's issue when retiring landed work
   (`gh issue close`, with a comment pointing at the landing commit/PR).
@@ -27,9 +27,9 @@ are correct.
 ## Workflow
 
 1. `triage` turns `>user<` prose or unlabelled issues into a canonical issue
-   (`status:backlog`) and stops for review.
+   (`backlog`) and stops for review.
 2. `dispatch-task` creates/reuses the `issue-<n>-<slug>` branch/worktree, sets
-   `status:active`, and assigns `implement-task-lite`, `implement-task`, or
+   `active`, and assigns `implement-task-lite`, `implement-task`, or
    `lead-task` by scope/risk with explicit authority and acceptance checks.
 3. Workers commit independently valid checkpoints when authorized: focused
    checks pass, scoped diff reviewed, explicit paths staged. They report

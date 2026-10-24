@@ -89,6 +89,20 @@ pyrite-dev test --slow
 pyrite-dev package-smoke
 ```
 
+Agent and git hooks:
+
+- `uv run pre-commit install` installs both configured stages: commit-time Ruff,
+  notebook stripping and skill-mirror sync, and pre-push import-linter,
+  `check-skills` and `repo-map --check`. `pyrite-dev verify` stays the full
+  static gate.
+- `.agents/hooks/guard_bash.sh` (Claude Code and Codex `PreToolUse`) blocks
+  pattern kills, bulk `git add`, non-lease force pushes, and pushes to `main`.
+- `.agents/hooks/ruff_after_edit.sh` (Claude Code `PostToolUse`) formats each
+  edited Python file and applies safe Ruff fixes, leaving unused-import
+  findings for the agent.
+- `.claude/settings.json` pins Claude Code's tool shell to bash
+  (`CLAUDE_CODE_SHELL`); zsh does not word-split unquoted variables.
+
 Use the project runner rather than bare `pytest` or an environment-specific Python path. If the project environment is not writable, add `UV_PROJECT_ENVIRONMENT=/tmp/pyrite-venv` instead of switching interpreters.
 
 See [CPU startup latency](compute/startup-latency.md) for benchmark cache policies,

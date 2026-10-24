@@ -16,6 +16,30 @@ contract and report format. That document is the canonical specification.
 - Treat the equation, identified by its validation id, as the unit of trust.
 - Only a human may mark a ledger claim `signed-off`.
 
+## Checklist beyond the derivation
+
+Report each item as a filter result; past misses were caught only by a second
+pass.
+
+- Notation and normalization agree across the ledger row, derivation doc,
+  code docstring, and any inventory/table (factors such as 1/N, per-atom vs
+  per-volume, per-sr vs per-rad, energy vs momentum transfer).
+- Units at every boundary: source table, loader, kernel, output.
+- Reference data: each transcribed value, unit, and page/figure/table number
+  matches the cited source.
+- Tolerances are justified by source uncertainty or a stated model
+  difference, not tuned to pass.
+- Cited evidence (external-code comparisons, CPU/GPU or FP32/FP64 parity)
+  points at commits and artifacts that still exist.
+
+## Fan-out
+
+For a multi-claim change, a supervisor may dispatch one fresh verifier per
+concern (derivation, reference data, notation/units, external comparison,
+parity evidence), none seeing the others' output, each returning
+`pass | fail | concern` with evidence and a suggested fix. Merge verdicts into
+one table, fix every `fail`, and re-run only the failed verifiers.
+
 ## Write-up math must render
 
 - Format the write-up per `docs/validation/formatting-style.md`: math is
