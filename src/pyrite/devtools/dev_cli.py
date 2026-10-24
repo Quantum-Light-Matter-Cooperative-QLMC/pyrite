@@ -144,6 +144,7 @@ TEST_SUITE_PATTERNS = {
     "spectrum": (
         "montecarlo/test_beam_energy_spread_grid.py",
         "montecarlo/test_characteristic.py",
+        "montecarlo/test_cherenkov*.py",
         "montecarlo/test_chunk_invariance.py",
         "montecarlo/test_electron_blocks.py",
         "montecarlo/test_emission_adapters.py",

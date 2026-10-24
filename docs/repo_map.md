@@ -914,6 +914,13 @@ energy refusals) and `runner/transition_emission.py::case_optical_transition`.
 Physics: `physics/radiation-physics/optical-transition-radiation.md`; CUDA
 parity: `checks/optical_transition_cuda.py`.
 
+Bulk Cherenkov source (#587): `montecarlo/spectrum/cherenkov.py`
+(`frank_tamm_yield`: Frank–Tamm yield and cone for an explicit weak-loss
+permittivity; `BulkEmissionMechanism` extension point for interface-free
+sources). Standalone, not wired into transport or scoring. Physics:
+`physics/radiation-physics/cherenkov-radiation.md`; Geant4 reference:
+`checks/cherenkov_geant4`.
+
 ### `validation/inner_shell_experiment.py`
 
 Loads cited thin-film K and Pb/Th L1–L3 measurements from
