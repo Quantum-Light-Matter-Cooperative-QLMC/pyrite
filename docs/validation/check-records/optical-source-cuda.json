@@ -1,0 +1,58 @@
+{
+  "evidence_kind": "native device PEC source generation and streamed bunch moments; CPU/CUDA arithmetic parity, not a published physics anchor",
+  "validation_ids": [
+    "optical-finite-boundary-field",
+    "optical-instrument-observable"
+  ],
+  "device": "NVIDIA GeForce RTX 5080",
+  "driver_version": "610.47",
+  "slurm": {
+    "job_id": 2279,
+    "state": "COMPLETED",
+    "exit_code": "0:0",
+    "partition": "gpu",
+    "gpus": 1,
+    "cpus": 2,
+    "memory": "4G",
+    "time_limit": "00:05:00",
+    "runtime": "00:00:05"
+  },
+  "sync_stamp": {
+    "code_digest": "659800d83ef869d4a5e0adbf581557641d20ec0a23a3fd8a171465443b1e854f",
+    "code_revision": "5f9a17883e4652c3901db0c715d975b412a62c9c",
+    "code_dirty": "True",
+    "code_synced_at": "2026-10-24T01:02:10+00:00",
+    "code_source": "alex-XPS-15-9530:/home/alex/dev/pyrite/.worktrees/issues-616-617",
+    "code_tables_digest": "f9a89dc83cb97f36fc94a2fef58a4ad710d5848d9f5c8f513b896de47f6106e2"
+  },
+  "source_and_test_sha256": {
+    "src/pyrite/montecarlo/spectrum/optical_finite_screen.py": "21d2b6ddd592a080bb91bce0951a0ab96a92214b039968df3661a24e746ee396",
+    "src/pyrite/montecarlo/spectrum/optical_finite_bunch.py": "1a4b0672a12c4364a382db89d54a8067b9b0b072482f32c8f08930957c87c5c4",
+    "src/pyrite/montecarlo/spectrum/optical_finite_collection.py": "e748e7e5b141c726741b40f325268450777189884cc220747e3deff92e7eb778",
+    "src/pyrite/montecarlo/runner/finite_screen_emission.py": "f684d1bf9002e2eaf14cadc3566ec37ccf7fd3d5b9558dd1f8c75674c9f50aa0",
+    "tests/montecarlo/test_optical_source_cuda.py": "c933eb4b27e4dec2cddfccbbaa6999662ff4a240f1995fcf7449918f3ca7018c",
+    "tests/montecarlo/test_optical_cuda_parity.py": "15982e8eb74ecc2c2dfb27082668d8e9f92b1066a55a7863a845b90227317027"
+  },
+  "test_command": "PYRITE_MC_BACKEND=cuda PYRITE_TEST_BACKEND=cuda PYRITE_CATALOG=/home/aamador/pyrite/src/pyrite/data/catalog PYRITE_HOME=/home/aamador/pyrite /home/aamador/.local/bin/uv run --extra nvidia pyrite-dev test --slow /tmp/test_optical_source_cuda_616_617.py /tmp/test_optical_device_reductions_616_617.py --durations=0 -c /home/aamador/pyrite/pyproject.toml",
+  "test_staging": "Both tracked test files copied unchanged to /tmp because pyrite remote sync excludes tests; explicit repository pytest configuration registers the slow marker.",
+  "result": {
+    "passed": 15,
+    "native_source_tests": 8,
+    "retained_device_operator_tests": 7,
+    "skipped": 0,
+    "warnings": 0,
+    "elapsed_seconds": 3.33
+  },
+  "log": "optical-source-cuda.txt",
+  "tolerance_basis": "float64/complex128 Bessel evaluation, FFT ordering and streaming reductions: relative 1e-10 and peak-scaled 1e-12 absolute floor for complex fields/maps and relative 1e-10 for collected flux; coincident-source N^2 scaling at 1e-12, opposite-phase residual field <1e-14 of the single field. No mesh/acceptance convergence claim.",
+  "coverage": [
+    "normal-disc, oblique-annulus and displaced/arrival-phased sources with CPU Bessel calls disabled during native generation",
+    "weighted sampled, temporal Gaussian and actual-realization angular self/pair moments",
+    "finite-distance E/H flux band and device pulse response",
+    "coincident N^2 scaling and opposite-phase cancellation",
+    "real seeded 30 keV Case transport with four total primaries, two scored histories and device source/plane adapters",
+    "retained propagation, Green sums, Jones transfer, interferogram, saturation and persistence checks"
+  ],
+  "residency": "Mesh, Bessel evaluation, masks, complex fields, angular moments and final band arrays stay on selected CuPy backend. Streaming workspace O(nx*ny), no history-by-pixel tensor. Geometry, weights, energy-node loop, source law and crossing/formation checks remain host control. Validity predicates and legacy host-scalar collection/detection interfaces synchronize explicitly.",
+  "scope": "Bounded ideal-PEC source kernels and explicit Case adapters. Automatic production dispatcher, self-consistent screen transport/material response, convergence-justified tolerances, measured data and published anchors remain open."
+}

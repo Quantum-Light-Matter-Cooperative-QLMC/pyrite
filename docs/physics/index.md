@@ -84,6 +84,7 @@ radiation-physics/photon-escape-and-dispersion
 radiation-physics/spectral-observables
 radiation-physics/transition-radiation
 radiation-physics/optical-transition-radiation
+radiation-physics/optical-wavefront-and-detectors
 radiation-physics/diffracted-transition-radiation
 ```
 
