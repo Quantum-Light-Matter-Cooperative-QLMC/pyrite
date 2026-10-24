@@ -40,6 +40,9 @@ dask = [
     "distributed>=2025.1",
     "dask-jobqueue>=0.9",
 ]
+optimization = [
+    "optuna>=4.5,<5",
+]
 external-db = [
     "mp-api>=0.46",
 ]
