@@ -10,7 +10,7 @@ imports, so ``apps`` stays outside the driver import cycle.
 import json
 import os
 import subprocess
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import contextmanager
 
 from .console.config import workspace_root
@@ -95,7 +95,7 @@ def stop_acp_servers() -> None:
 
 
 @contextmanager
-def running_acp() -> Iterator[None]:
+def running_acp() -> Generator[None]:
     """Keep ACP bridges alive for the duration of a Marimo launch."""
     start_acp_servers()
     try:

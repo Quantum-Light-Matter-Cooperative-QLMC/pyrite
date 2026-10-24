@@ -20,17 +20,24 @@ from pyrite.montecarlo.channeling.planar_injection import (
 def _scene(state=None, *, physics=None, energy_spread_frac=None):
     return pr.Scene(
         pr.Beam(
-            energy_keV=5000.0, transverse=pr.Spot(),
-            longitudinal=pr.PointBunch(), state=state,
+            energy_keV=5000.0,
+            transverse=pr.Spot(),
+            longitudinal=pr.PointBunch(),
+            state=state,
             energy_spread_frac=energy_spread_frac,
         ),
         pr.Slab(
-            "silicon", thickness_ang=5000.0, tilt_deg=3.0, tilt_azim_deg=45.0,
+            "silicon",
+            thickness_ang=5000.0,
+            tilt_deg=3.0,
+            tilt_azim_deg=45.0,
             footprint=pr.Footprint(5.0, 5.0),
         ),
         pr.Detector(),
-        physics=physics or pr.Physics(
-            channeling_model="planar", channeling_plane=(1, -1, 0),
+        physics=physics
+        or pr.Physics(
+            channeling_model="planar",
+            channeling_plane=(1, -1, 0),
             radiative_model="uncoupled",
         ),
     )
@@ -42,13 +49,17 @@ def _gaussian(waist=10.0):
 
 def _numerics():
     return pr.Numerics(
-        cxr_trials=8, brem_trials=12,
+        cxr_trials=8,
+        brem_trials=12,
         # Replay equality needs only a few photon nodes; the automatic grid
         # would score >300,000 nodes at every detector quadrature direction.
         energy_bins=pr.EnergyBins(
-            cxr=np.linspace(1e3, 2e3, 9), brem=np.linspace(1e3, 2e3, 9),
+            cxr=np.linspace(1e3, 2e3, 9),
+            brem=np.linspace(1e3, 2e3, 9),
         ),
-        channeling_basis_size=8, channeling_bloch_cells=4, channeling_dz_ang=250.0,
+        channeling_basis_size=8,
+        channeling_bloch_cells=4,
+        channeling_dz_ang=250.0,
     )
 
 
@@ -69,12 +80,17 @@ def test_source_record_is_canonical_and_distinct_from_legacy_case():
     assert replace(quantum, name=plain.name)["channeling_source"] == record
 
 
-@pytest.mark.parametrize("spec, pattern", [
-    (pr.TransverseStateSpec.recipe("gaussian", dimension=2, waist_ang=10), "one-dimensional"),
-    (pr.TransverseStateSpec.recipe("hermite_gauss", m=0, waist_ang=10), "Gaussian"),
-    (pr.TransverseStateSpec.recipe("gaussian", dimension=1, waist_ang=10,
-                                  center_ang=(1.0,)), "centered"),
-])
+@pytest.mark.parametrize(
+    "spec, pattern",
+    [
+        (pr.TransverseStateSpec.recipe("gaussian", dimension=2, waist_ang=10), "one-dimensional"),
+        (pr.TransverseStateSpec.recipe("hermite_gauss", m=0, waist_ang=10), "Gaussian"),
+        (
+            pr.TransverseStateSpec.recipe("gaussian", dimension=1, waist_ang=10, center_ang=(1.0,)),
+            "centered",
+        ),
+    ],
+)
 def test_unsupported_quantum_sources_refuse_before_case_creation(spec, pattern):
     with pytest.raises(ValueError, match=pattern):
         source_record(spec)
@@ -89,8 +105,10 @@ def test_source_requires_planar_and_monoenergetic_beam():
         api.build_case(_scene(_gaussian(), energy_spread_frac=0.01), _numerics())
     case = api.build_case(_scene(), _numerics())
     with pytest.raises(ValueError, match="requires a planar"):
-        replace(api.build_case(_scene(physics=pr.Physics()), _numerics()),
-                channeling_source=source_record(_gaussian()))
+        replace(
+            api.build_case(_scene(physics=pr.Physics()), _numerics()),
+            channeling_source=source_record(_gaussian()),
+        )
     with pytest.raises(ValueError, match="channeling_source"):
         replace(case, channeling_source={"model": SOURCE_MODEL})
 

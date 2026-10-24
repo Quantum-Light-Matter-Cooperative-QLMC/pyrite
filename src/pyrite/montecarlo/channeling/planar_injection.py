@@ -70,12 +70,18 @@ def fresh_source_solver(case):
 
     record = case["channeling"]
     profile, cached = zone_solver(
-        case["crystal"], tuple(record["plane_hkl"]), float(record["temperature_K"]),
-        float(case["E0_keV"]) * 1e3, int(record["basis_size"]),
-        int(record["bloch_cells"]), float(record["margin_eV"]),
+        case["crystal"],
+        tuple(record["plane_hkl"]),
+        float(record["temperature_K"]),
+        float(case["E0_keV"]) * 1e3,
+        int(record["basis_size"]),
+        int(record["bloch_cells"]),
+        float(record["margin_eV"]),
     )
     return DensityMatrixSolver(
-        profile, float(case["E0_keV"]) * 1e3, cached.kernel,
+        profile,
+        float(case["E0_keV"]) * 1e3,
+        cached.kernel,
         margin_eV=float(record["margin_eV"]),
     )
 
@@ -109,9 +115,13 @@ def source_momentum_bins(case, v_hat: np.ndarray, seed: int):
     incidence = case_plane_incidence(case)
     normal = np.asarray(incidence.plane_normal, dtype=float)
     _, solver = zone_solver(
-        case["crystal"], tuple(record["plane_hkl"]), float(record["temperature_K"]),
-        float(case["E0_keV"]) * 1e3, int(record["basis_size"]),
-        int(record["bloch_cells"]), float(record["margin_eV"]),
+        case["crystal"],
+        tuple(record["plane_hkl"]),
+        float(record["temperature_K"]),
+        float(case["E0_keV"]) * 1e3,
+        int(record["basis_size"]),
+        int(record["bloch_cells"]),
+        float(record["margin_eV"]),
     )
     step = solver.profile.g_inv_ang / solver.n_cells
     # Prevent an unexpectedly broad source from multiplying full zone solves.
@@ -147,15 +157,18 @@ def _bin_ensemble(case, overall, bin_index: int):
     plane[residue, order + solver.max_order, order + solver.max_order] = 1.0
     rho, free, outside = solver.entry_from_plane(plane)
     result = solver.propagate(
-        overall.path_ang, float(record["dz_ang"]),
+        overall.path_ang,
+        float(record["dz_ang"]),
         initial=(rho, float(np.sum(free) + outside)),
         stopping_eV_per_ang=overall.stopping_keV_per_ang * 1e3,
     )
     return replace(
-        overall, z_ang=np.asarray(result.z_ang),
+        overall,
+        z_ang=np.asarray(result.z_ang),
         free_cumulative=np.asarray(result.free_flux + result.reprojection_flux),
         overflow_cumulative=np.asarray(result.overflow_flux),
-        entry=float(result.entry_flux), bound=float(result.trace[-1]),
+        entry=float(result.entry_flux),
+        bound=float(result.trace[-1]),
         balance_defect=float(result.balance_defect[-1]),
         energy_edges_eV=np.asarray(result.energy_edges_eV),
         free_by_energy=np.asarray(result.free_flux_by_energy),
@@ -188,8 +201,12 @@ def conditional_handoffs(case, overall, seed: int, electron_ids, bins):
         if zone is None:
             continue
         sampled = sample_handoffs(zone, seed, ids[group])
-        for out, values in ((fate, sampled.fate), (depth, sampled.z_ang),
-                            (energy, sampled.transverse_eV), (psi, sampled.psi_rad),
-                            (sign, sampled.sign)):
+        for out, values in (
+            (fate, sampled.fate),
+            (depth, sampled.z_ang),
+            (energy, sampled.transverse_eV),
+            (psi, sampled.psi_rad),
+            (sign, sampled.sign),
+        ):
             out[group] = values
     return HandoffSample(fate=fate, z_ang=depth, transverse_eV=energy, psi_rad=psi, sign=sign)

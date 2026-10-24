@@ -259,10 +259,17 @@ def solve_zone(case, beam_dir: np.ndarray, v_hat: np.ndarray, stopping_keV_per_a
     divergence = float(np.std(psi)) if psi.size > 1 else 0.0
     if case.get("channeling_source") is None:
         result, solver, profile, divergence, depth_eV = _solve(
-            case["crystal"], plane, float(record["temperature_K"]), kinetic_eV,
-            int(record["basis_size"]), int(record["bloch_cells"]),
-            float(record["margin_eV"]), path, float(record["dz_ang"]),
-            float(incidence.effective_rad), divergence,
+            case["crystal"],
+            plane,
+            float(record["temperature_K"]),
+            kinetic_eV,
+            int(record["basis_size"]),
+            int(record["bloch_cells"]),
+            float(record["margin_eV"]),
+            path,
+            float(record["dz_ang"]),
+            float(incidence.effective_rad),
+            divergence,
             float(stopping_keV_per_ang) * 1e3,
         )
     else:
@@ -272,7 +279,9 @@ def solve_zone(case, beam_dir: np.ndarray, v_hat: np.ndarray, stopping_keV_per_a
         profile = solver.profile
         initial = source_entry_initial(case, solver, float(incidence.effective_rad))
         result = solver.propagate(
-            path, float(record["dz_ang"]), initial=initial,
+            path,
+            float(record["dz_ang"]),
+            initial=initial,
             stopping_eV_per_ang=float(stopping_keV_per_ang) * 1e3,
         )
         minimum, _ = profile.extrema()

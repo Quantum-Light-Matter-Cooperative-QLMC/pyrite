@@ -59,8 +59,11 @@ def build_case(scene: Scene, numerics: Numerics | None = None) -> Case:
     target = scene.target_spec
     legacy = LegacySweep(
         material=target.material,
-        beam=(replace(scene.beam, state=None).to_spec()
-              if scene.beam.state is not None else scene.beam.to_spec()),
+        beam=(
+            replace(scene.beam, state=None).to_spec()
+            if scene.beam.state is not None
+            else scene.beam.to_spec()
+        ),
         target=target,
         detector=scalar_detector,
         energy_bins=numerics.energy_bins or EnergyBins(),

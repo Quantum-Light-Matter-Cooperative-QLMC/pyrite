@@ -23,7 +23,7 @@ which the codes cannot distinguish since they only ever open paths beneath it.
 import shutil
 import subprocess
 import tempfile
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Generator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -120,7 +120,7 @@ def scratch_dir(
     keep: bool = False,
     keep_on_failure: bool = False,
     prefix: str = "run-",
-) -> Iterator[Path]:
+) -> Generator[Path]:
     """Yield a fresh working directory with ``data_dirs`` linked into it.
 
     Parameters

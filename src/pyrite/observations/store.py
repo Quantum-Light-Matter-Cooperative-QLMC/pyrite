@@ -29,7 +29,7 @@ import json
 import os
 import re
 import uuid
-from collections.abc import Iterator, Mapping
+from collections.abc import Generator, Mapping
 from dataclasses import dataclass, fields, is_dataclass, replace
 from pathlib import Path
 from types import MappingProxyType
@@ -379,7 +379,7 @@ class ObservationStore:
         return path.with_name(f".{path.name}.{os.getpid()}.{uuid.uuid4().hex}.tmp")
 
     @contextlib.contextmanager
-    def _index_lock(self) -> Iterator[None]:
+    def _index_lock(self) -> Generator[None]:
         self.path.mkdir(parents=True, exist_ok=True)
         with open(self.path / "index.lock", "a") as handle:
             fcntl.flock(handle, fcntl.LOCK_EX)

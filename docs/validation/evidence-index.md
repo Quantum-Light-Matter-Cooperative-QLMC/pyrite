@@ -113,6 +113,7 @@ channeling/cr-capture-bound
 channeling/cr-capture-yield
 channeling/cr-transition-radiation-bound
 channeling/cr-zone-handoff-accounting
+channeling/cr-planar-conditional-source
 channeling/cr-planar-overflow-spectrum
 channeling/cr-persisted-channel
 channeling/quantum-decoherence-budget

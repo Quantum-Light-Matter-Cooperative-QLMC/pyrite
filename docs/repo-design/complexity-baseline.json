@@ -324,7 +324,8 @@
     {
       "path": "src/pyrite/montecarlo/case.py",
       "name": "Case.__post_init__",
-      "cc": 59
+      "cc": 60,
+      "exception": "#680: accept 59 -> 60 for the optional channeling_source admission guard. Source-specific checks already live in validate_source_case; the dispatcher must also reject source records without planar channeling. Moving this single guard would only hide a constructor invariant."
     },
     {
       "path": "src/pyrite/montecarlo/channeling/axial_diagnostic.py",
@@ -360,6 +361,12 @@
       "path": "src/pyrite/montecarlo/channeling/density.py",
       "name": "DensityMatrixSolver.propagate",
       "cc": 21
+    },
+    {
+      "path": "src/pyrite/montecarlo/channeling/emission.py",
+      "name": "channeling_spectrum",
+      "cc": 24,
+      "exception": "#680: accept 19 -> 24 for the preprojected-entry exclusivity guard (entry_initial presence plus conflicts with entry_state, incidence, divergence and impact). These are public argument-contract checks before the existing depth integration and angular/attenuation quadrature; density validation already lives in _validated_entry_initial. Keep the guard visible at the API boundary rather than splitting the numerical estimator to lower CC."
     },
     {
       "path": "src/pyrite/montecarlo/channeling/emission.py",
@@ -409,7 +416,8 @@
     {
       "path": "src/pyrite/montecarlo/runner/channeling.py",
       "name": "transport_channeling_case",
-      "cc": 26
+      "cc": 29,
+      "exception": "#680: accept 26 -> 29 for optional source momentum sampling, optional beam-entry provenance and conditional-versus-legacy handoff selection. Source sampling and bin propagation already have separate owners in planar_injection. The remaining branches belong to the ordered entrance -> zone -> handoff -> native continuation orchestration, preserving electron IDs and RNG streams; extracting them solely for CC would obscure that data flow."
     },
     {
       "path": "src/pyrite/montecarlo/runner/cxr_grid.py",

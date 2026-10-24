@@ -9,9 +9,7 @@ production electron trajectories and channeling-radiation scoring.
 import pyrite as pr
 from pyrite.planar_source import propagate_planar_source
 
-state = pr.TransverseStateSpec.recipe(
-    "gaussian", waist_ang=1.0, dimension=1
-)
+state = pr.TransverseStateSpec.recipe("gaussian", waist_ang=1.0, dimension=1)
 setup = pr.QuantumSetup(
     region=pr.QuantumRegion(kind="planar", plane_hkl=(1, 1, 0)),
     dynamics=pr.QuantumDynamics(kind="channeling"),
@@ -19,8 +17,7 @@ setup = pr.QuantumSetup(
 )
 
 entry = setup.project_state(
-    state, crystal="silicon", kinetic_energy_eV=17e6,
-    incidence_rad=0.0, impact="fixed"
+    state, crystal="silicon", kinetic_energy_eV=17e6, incidence_rad=0.0, impact="fixed"
 )
 assert abs(entry.total_population - 1) < 2e-3
 result = propagate_planar_source(entry, depth_ang=500.0)
@@ -62,8 +59,11 @@ from pyrite.planar_source import score_planar_source
 
 energies = np.linspace(1_000.0, 50_000.0, 500)  # eV
 spectrum = score_planar_source(
-    entry, depth_ang=500.0, photon_energy_eV=energies,
-    theta_rad=0.0, absorption=False,
+    entry,
+    depth_ang=500.0,
+    photon_energy_eV=energies,
+    theta_rad=0.0,
+    absorption=False,
 )
 print(spectrum.spectrum, spectrum.bound_population)
 ```

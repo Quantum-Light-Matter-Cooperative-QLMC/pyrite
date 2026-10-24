@@ -73,8 +73,7 @@ def _check_source_energy(spec: TransverseStateSpec, kinetic_energy_eV: float) ->
             float(energy), kinetic_energy_eV, rel_tol=1e-9, abs_tol=1e-6
         ):
             raise ValueError(
-                f"{spec.kind} state is calibrated for {energy:g} eV, "
-                f"not {kinetic_energy_eV:g} eV"
+                f"{spec.kind} state is calibrated for {energy:g} eV, not {kinetic_energy_eV:g} eV"
             )
     for _, child in spec.terms:
         _check_source_energy(child, kinetic_energy_eV)
@@ -133,12 +132,18 @@ def _solver_for(projection: PlanarStateProjection):
     from .montecarlo.channeling.handoff import zone_solver
 
     profile, cached = zone_solver(
-        projection.crystal, projection.plane_hkl, projection.temperature_K,
-        projection.kinetic_energy_eV, projection.setup.numerics.basis_size,
-        projection.setup.numerics.bloch_cells, projection.margin_eV,
+        projection.crystal,
+        projection.plane_hkl,
+        projection.temperature_K,
+        projection.kinetic_energy_eV,
+        projection.setup.numerics.basis_size,
+        projection.setup.numerics.bloch_cells,
+        projection.margin_eV,
     )
     return DensityMatrixSolver(
-        profile, projection.kinetic_energy_eV, cached.kernel,
+        profile,
+        projection.kinetic_energy_eV,
+        cached.kernel,
         margin_eV=projection.margin_eV,
     )
 
@@ -175,8 +180,11 @@ def project_planar_source(
     temperature = _positive("temperature_K", temperature_K)
     from .montecarlo.channeling.density import DECHANNELING_MARGIN_EV
 
-    margin = (_positive("margin_eV", margin_eV)
-              if margin_eV is not None else float(DECHANNELING_MARGIN_EV))
+    margin = (
+        _positive("margin_eV", margin_eV)
+        if margin_eV is not None
+        else float(DECHANNELING_MARGIN_EV)
+    )
     if (
         isinstance(incidence_rad, bool)
         or not isinstance(incidence_rad, (int, float))
@@ -192,11 +200,19 @@ def project_planar_source(
     plane = setup.region.plane_hkl
     assert plane is not None
     metadata = PlanarStateProjection(
-        state_digest=state.digest, crystal=crystal, plane_hkl=plane,
-        kinetic_energy_eV=energy, temperature_K=temperature,
-        margin_eV=margin, incidence_rad=float(incidence_rad), impact=impact,
-        setup=setup, plane_density=np.empty((0,)), subspace_density=np.empty((0,)),
-        free_population=np.empty((0,)), outside_population=0.0,
+        state_digest=state.digest,
+        crystal=crystal,
+        plane_hkl=plane,
+        kinetic_energy_eV=energy,
+        temperature_K=temperature,
+        margin_eV=margin,
+        incidence_rad=float(incidence_rad),
+        impact=impact,
+        setup=setup,
+        plane_density=np.empty((0,)),
+        subspace_density=np.empty((0,)),
+        free_population=np.empty((0,)),
+        outside_population=0.0,
         source_dimension=state.dimension,
     )
     solver = _solver_for(metadata)
@@ -206,12 +222,20 @@ def project_planar_source(
     )
     rho, free, outside = solver.entry_from_plane(wave_density, outside)
     projected = PlanarStateProjection(
-        state_digest=metadata.state_digest, crystal=crystal, plane_hkl=plane,
-        kinetic_energy_eV=energy, temperature_K=temperature,
-        margin_eV=margin, incidence_rad=float(incidence_rad), impact=impact,
-        setup=setup, plane_density=_readonly(wave_density),
-        subspace_density=_readonly(rho), free_population=_readonly(free),
-        outside_population=float(outside), source_dimension=state.dimension,
+        state_digest=metadata.state_digest,
+        crystal=crystal,
+        plane_hkl=plane,
+        kinetic_energy_eV=energy,
+        temperature_K=temperature,
+        margin_eV=margin,
+        incidence_rad=float(incidence_rad),
+        impact=impact,
+        setup=setup,
+        plane_density=_readonly(wave_density),
+        subspace_density=_readonly(rho),
+        free_population=_readonly(free),
+        outside_population=float(outside),
+        source_dimension=state.dimension,
     )
     if (
         not np.all(np.isfinite(rho))
@@ -250,7 +274,8 @@ def propagate_planar_source(
         raise TypeError("record_metrics must be a bool")
     solver = _solver_for(projection)
     return solver.propagate(
-        depth, projection.setup.numerics.step_ang,
+        depth,
+        projection.setup.numerics.step_ang,
         initial=projection.initial,
         stopping_eV_per_ang=stopping,
         record_every=record_every,
