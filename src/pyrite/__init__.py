@@ -45,6 +45,8 @@ if TYPE_CHECKING:
     from pyrite._numerics import CxrReflections as CxrReflections
     from pyrite._numerics import Physics as Physics
     from pyrite._precision import Precision as Precision
+    from pyrite._sampling import AdaptiveSampling as AdaptiveSampling
+    from pyrite._sampling import FixedSampling as FixedSampling
     from pyrite.quantum import QuantumRegion as QuantumRegion
     from pyrite.quantum import QuantumDynamics as QuantumDynamics
     from pyrite.quantum import QuantumNumerics as QuantumNumerics
@@ -208,6 +210,8 @@ _PUBLIC_OBJECTS = {
     "Layer": ("pyrite.campaign.geometry", "Layer"),
     "Numerics": ("pyrite.campaign.model", "Numerics"),
     "Precision": ("pyrite._precision", "Precision"),
+    "FixedSampling": ("pyrite._sampling", "FixedSampling"),
+    "AdaptiveSampling": ("pyrite._sampling", "AdaptiveSampling"),
     "PixelGrid": ("pyrite.instrument", "PixelGrid"),
     "PixelScorer": ("pyrite.instrument", "PixelScorer"),
     "PlanarDetector": ("pyrite.instrument", "PlanarDetector"),

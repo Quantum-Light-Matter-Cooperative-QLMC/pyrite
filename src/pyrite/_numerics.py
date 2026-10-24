@@ -8,6 +8,7 @@ import numpy as np
 
 from ._energy_bins import EnergyBins
 from ._precision import Precision
+from ._sampling import AdaptiveSampling, FixedSampling, SamplingPolicy
 
 MosaicRoute = Literal["analytic", "mc"]
 EmissionMode = Literal["incoherent", "coherent"]
@@ -353,6 +354,9 @@ class Numerics:
     defaults.
     ``cxr_reflections`` controls reflection truncation and mosaic quadrature.
     ``precision`` requests adaptive sampling instead of the two fixed counts.
+    Alternatively, ``sampling`` selects a typed :class:`FixedSampling` or
+    :class:`AdaptiveSampling` policy. This opt-in interface lowers to the same
+    legacy case fields without changing historical checkpoint identities.
     The ``channeling_*`` fields are the planar channeling zone's numerics, used
     only with ``Physics(channeling_model="planar")``: ``channeling_basis_size``
     is the plane-wave band ``|h| <= H`` of the transverse basis,
@@ -373,6 +377,7 @@ class Numerics:
     max_dE_frac: float = field(default=0.0, kw_only=True)
     cxr_reflections: CxrReflections = field(default_factory=CxrReflections, kw_only=True)
     precision: Precision | None = field(default=None, kw_only=True)
+    sampling: SamplingPolicy | None = field(default=None, kw_only=True)
     energy_bins: EnergyBins | None = field(default=None, kw_only=True)
     channeling_basis_size: int = field(default=16, kw_only=True)
     channeling_bloch_cells: int = field(default=16, kw_only=True)
@@ -380,6 +385,7 @@ class Numerics:
     channeling_zone_max_ang: float | None = field(default=None, kw_only=True)
 
     def __post_init__(self) -> None:
+        self._resolve_typed_sampling()
         validate_channeling_numerics(
             self.channeling_basis_size,
             self.channeling_bloch_cells,
@@ -414,6 +420,88 @@ class Numerics:
             raise ValueError("max_dE_frac must be finite and non-negative")
         if self.max_dE_frac > 0.0 and self.energy_model != "midpoint":
             raise ValueError("max_dE_frac > 0 requires energy_model='midpoint'")
+
+    def _resolve_typed_sampling(self) -> None:
+        """Adapt an opt-in policy to legacy fields, never altering legacy inputs.
+
+        Explicit contradictory legacy values are rejected. The historical
+        numeric defaults are unavoidable in the legacy dataclass signature;
+        adaptive mode documents those defaults as inactive rather than
+        interpreting them as requested work.
+        """
+        policy = self.sampling
+        if policy is None:
+            return
+        if not isinstance(policy, (FixedSampling, AdaptiveSampling)):
+            raise TypeError("sampling must be a FixedSampling, AdaptiveSampling, or None")
+        if isinstance(policy, FixedSampling):
+            if self.precision is not None:
+                raise ValueError("cannot combine fixed sampling with legacy precision")
+            for field_name, count in (
+                ("cxr_trials", policy.cxr_electrons),
+                ("brem_trials", policy.brem_electrons),
+            ):
+                current = getattr(self, field_name)
+                default = 450 if field_name == "cxr_trials" else 100
+                if current not in (default, count):
+                    raise ValueError(
+                        f"cannot combine FixedSampling with conflicting {field_name}"
+                    )
+                object.__setattr__(self, field_name, count)
+            return
+        if self.cxr_trials != 450 or self.brem_trials != 100:
+            raise ValueError(
+                "cannot combine AdaptiveSampling with legacy cxr_trials/brem_trials; "
+                "remove the fixed counts"
+            )
+        if self.precision is not None and self.precision.to_dict() != policy.to_dict():
+            raise ValueError("AdaptiveSampling conflicts with legacy precision")
+        object.__setattr__(self, "precision", policy)
+
+    @property
+    def resolved_sampling(self) -> SamplingPolicy:
+        """The effective fixed/adaptive policy, including legacy construction."""
+        if self.sampling is not None:
+            return self.sampling
+        if self.precision is not None:
+            return AdaptiveSampling.from_dict(self.precision.to_dict())
+        return FixedSampling(self.cxr_trials, self.brem_trials)
+
+    def describe_sampling(self) -> dict[str, object]:
+        """Explain the chosen mode and any inactive legacy trial defaults.
+
+        No material lookup, estimation, or execution is performed. This is a
+        Python API diagnostic, not the profile CLI's resolution provenance.
+        """
+        policy = self.resolved_sampling
+        source = "typed" if self.sampling is not None else "legacy"
+        if isinstance(policy, FixedSampling):
+            return {
+                "mode": "fixed", "source": source,
+                "requested": {
+                    "cxr_electrons": policy.cxr_electrons,
+                    "brem_electrons": policy.brem_electrons,
+                },
+                "effective": {
+                    "cxr_electrons": policy.cxr_electrons,
+                    "brem_electrons": policy.brem_electrons,
+                },
+                "inactive_legacy_fields": {},
+            }
+        return {
+            "mode": "adaptive", "source": source,
+            "requested": policy.to_dict(),
+            "effective": {
+                "maximum_cxr_electrons": policy.max_electrons,
+                "maximum_brem_electrons": (
+                    policy.max_electrons if policy.brem_target_rse is None
+                    else policy.brem_policy().max_electrons
+                ),
+            },
+            "inactive_legacy_fields": {
+                "cxr_trials": self.cxr_trials, "brem_trials": self.brem_trials,
+            },
+        }
 
 
 def resolve_physics(physics: Physics | None, numerics: Numerics) -> Physics:
