@@ -140,8 +140,8 @@ def make_vary_control(mo):
 def make_component_controls(mo):
     """Spectrum components selected across views."""
     return mo.ui.multiselect(
-        options=["Line", "Bremsstrahlung", "Characteristic", "Channeling"],
-        value=["Line", "Bremsstrahlung"],
+        options=["Line", "Bremsstrahlung", "Characteristic", "Channeling", "TR/CTR"],
+        value=["Line", "Bremsstrahlung", "TR/CTR"],
         label="Components",
     )
 

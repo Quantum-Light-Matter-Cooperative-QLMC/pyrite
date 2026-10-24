@@ -251,3 +251,11 @@ def transport_figure(results, config: DemoConfig, *, per_bunch=False):
         )
         ax.legend(fontsize=8)
     return fig
+
+
+@lru_cache(maxsize=2)
+def cached_dtr_reference(two_beam=False):
+    """Reuse the maintained unverified field reference; no transport."""
+    from ..validation.dtr_reference import reference_spectrum
+
+    return reference_spectrum(two_beam=two_beam)

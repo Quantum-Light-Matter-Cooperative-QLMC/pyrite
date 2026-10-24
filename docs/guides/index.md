@@ -14,6 +14,7 @@ configuration-cookbook
 working-with-results
 planar-channeling
 transition-radiation-demo
+radiation-diagnostics
 directional-source-heatmap
 plotting-backends
 axial-diagnostics

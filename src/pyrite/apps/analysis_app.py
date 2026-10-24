@@ -311,7 +311,7 @@ def _(
     map_widget = None
     if heatmap_mode:
         if map_backend_ui.value == "plotly":
-            scope = map_scope(context, energy=energy_ui.value, thickness=thickness_ui.value)
+            _scope = map_scope(context, energy=energy_ui.value, thickness=thickness_ui.value)
             map_widget, map_frame = make_plotly_map_widget(
                 mo,
                 map_results,
@@ -320,7 +320,7 @@ def _(
                 quantity=map_quantity_ui.value,
                 energy=energy_ui.value,
                 theme=app_theme,
-                scope=scope,
+                scope=_scope,
                 on_selection=map_selection_set,
             )
         else:
@@ -364,9 +364,9 @@ def _(
     if map_widget is None:
         selection = None
     elif map_backend_ui.value == "plotly":
-        scope = map_scope(context, energy=energy_ui.value, thickness=thickness_ui.value)
-        fresh = selection_for_scope(map_widget.value, map_frame, scope)
-        selection = restore_selection(map_frame, fresh or map_selection_get(), scope)
+        _scope = map_scope(context, energy=energy_ui.value, thickness=thickness_ui.value)
+        fresh = selection_for_scope(map_widget.value, map_frame, _scope)
+        selection = restore_selection(map_frame, fresh or map_selection_get(), _scope)
     else:
         selection = map_widget.value
     render_map(

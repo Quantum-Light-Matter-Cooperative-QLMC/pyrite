@@ -127,6 +127,7 @@ def _record_frame(
     include_cxr=False,
     include_characteristic=True,
     include_channeling=True,
+    include_transition=True,
     include_coherent=False,
     sum_components=False,
     meta,
@@ -138,12 +139,14 @@ def _record_frame(
             include_cxr=include_cxr,
             include_characteristic=include_characteristic,
             include_channeling=include_channeling,
+            include_transition=include_transition,
         )
     else:
         scored_record = _characteristic_view(
             r,
             include_characteristic=include_characteristic,
             include_channeling=include_channeling,
+            include_transition=include_transition,
         )
     E = np.asarray(r["E_grid"], dtype=float)
     scale = r["scale"] * _NA_PER_UA
@@ -223,6 +226,7 @@ def _record_frame(
                 include_cxr=include_cxr,
                 include_characteristic=include_characteristic,
                 include_channeling=include_channeling,
+                include_transition=include_transition,
             )
         else:
             coherent_record = {**scored_record, "spec": r["spec_coherent"]}
@@ -345,6 +349,7 @@ def spectrum_frame(
     include_cxr=False,
     include_characteristic=True,
     include_channeling=True,
+    include_transition=True,
     include_coherent=False,
     collapse_azimuth=True,
     band="narrow",
@@ -384,6 +389,7 @@ def spectrum_frame(
                     include_cxr=include_cxr,
                     include_characteristic=include_characteristic,
                     include_channeling=include_channeling,
+                    include_transition=include_transition,
                     include_coherent=include_coherent,
                     meta=meta,
                 )
@@ -402,6 +408,7 @@ def _compare_frame(
     include_cxr=False,
     include_characteristic=True,
     include_channeling=True,
+    include_transition=True,
     include_coherent=False,
     sum_components=False,
     band="narrow",
@@ -446,6 +453,7 @@ def _compare_frame(
                 include_cxr=include_cxr,
                 include_characteristic=include_characteristic,
                 include_channeling=include_channeling,
+                include_transition=include_transition,
                 include_coherent=include_coherent,
                 sum_components=sum_components,
                 meta=row_meta,
@@ -465,6 +473,7 @@ def _multi_case_frame(
     include_cxr=False,
     include_characteristic=True,
     include_channeling=True,
+    include_transition=True,
     include_coherent=False,
     sum_components=False,
     band="narrow",
@@ -487,6 +496,7 @@ def _multi_case_frame(
                 include_cxr=include_cxr,
                 include_characteristic=include_characteristic,
                 include_channeling=include_channeling,
+                include_transition=include_transition,
                 include_coherent=include_coherent,
                 sum_components=sum_components,
                 meta={"label": str(label)},

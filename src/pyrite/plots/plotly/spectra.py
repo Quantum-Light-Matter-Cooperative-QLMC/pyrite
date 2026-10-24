@@ -65,7 +65,8 @@ def _y_range(frame, *, y_type, x_domain=None, automatic_x_domain=True):
         top = float(positive.max()) * 1.05
         return _axis_range((floor, max(top, floor * 1.05)), "log")
     if not automatic_x_domain and positive.size:
-        return [0, float(positive.max()) * 1.05]
+        finite = values[np.isfinite(values)]
+        return [min(0, float(finite.min()) * 1.05), float(positive.max()) * 1.05]
     return None
 
 
@@ -75,6 +76,10 @@ def _trace_series(df, *, hue, components, width, height, title, x_type, y_type, 
         return None
     _axis_type(x_type)
     _axis_type(y_type)
+    signed = bool((df["intensity"] < 0).any())
+    if signed and y_type == "log":
+        y_type = "linear"
+        title += " · signed values: linear y"
     fig = go.Figure()
     labels = list(dict.fromkeys(df[hue].tolist()))
     # Numeric cases get stable, human-meaningful sorting, not lexical sorting.
@@ -143,6 +148,7 @@ def spectrum_chart(
     include_cxr=False,
     include_characteristic=True,
     include_channeling=True,
+    include_transition=True,
     include_coherent=False,
     collapse_azimuth=True,
     x_domain=None,
@@ -165,6 +171,7 @@ def spectrum_chart(
         include_cxr=include_cxr,
         include_characteristic=include_characteristic,
         include_channeling=include_channeling,
+        include_transition=include_transition,
         include_coherent=include_coherent,
         collapse_azimuth=collapse_azimuth,
         band=band,
@@ -195,6 +202,7 @@ def compare_spectrum_chart(
     include_cxr=False,
     include_characteristic=True,
     include_channeling=True,
+    include_transition=True,
     include_coherent=False,
     sum_components=False,
     x_domain=None,
@@ -220,6 +228,7 @@ def compare_spectrum_chart(
         include_cxr=include_cxr,
         include_characteristic=include_characteristic,
         include_channeling=include_channeling,
+        include_transition=include_transition,
         include_coherent=include_coherent,
         sum_components=sum_components,
         band=band,
@@ -249,6 +258,7 @@ def multi_case_spectrum_chart(
     include_cxr=False,
     include_characteristic=True,
     include_channeling=True,
+    include_transition=True,
     include_coherent=False,
     sum_components=False,
     x_domain=None,
@@ -278,6 +288,7 @@ def multi_case_spectrum_chart(
         include_cxr=include_cxr,
         include_characteristic=include_characteristic,
         include_channeling=include_channeling,
+        include_transition=include_transition,
         include_coherent=include_coherent,
         sum_components=sum_components,
         band=band,

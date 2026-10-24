@@ -104,7 +104,8 @@ CXR with TR added once. Combined CXR does not include the separately gridded
 bremsstrahlung continuum. This example uses incoherent line emission. Combining
 TR with **coherent** PXR/CBS requires the documented transverse cross-term
 suppression condition; diffracted TR and unsuppressed TR–line interference
-are not implemented.
+are outside the demo comparison. The separately triggered experimental DTR view
+uses the maintained Born/two-beam reference and remains unverified.
 
 ## Export and limits
 
@@ -122,7 +123,9 @@ The solver assumes flat, sharp, laterally infinite interfaces with local
 isotropic dielectric response. Side exits produce no TR. The independent-atom
 Chantler dielectric response is crude near the plasma energy and absorption
 edges. The production continuum floor is max(plasma energy, 12 eV); optical/IR
-CTR is outside this demo and the current model. No diffracted TR is included.
+CTR is outside the main demo comparison. The main comparison excludes diffracted
+TR; a separate experimental DTR view is available. See
+[radiation diagnostics](radiation-diagnostics.md) for the DTR view and optical app.
 
 Scalar spectra sample the observation direction. Acceptance metadata
 (1° polar span, 0.0001 sr) does not resolve detector-integrated fringes.

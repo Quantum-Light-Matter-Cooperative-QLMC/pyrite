@@ -42,7 +42,9 @@ def render_case_comparison(
     rows = [
         {"label": entry["case"]["label"], "material": entry["case"]["material"]} for entry in basket
     ]
-    parts = [picker_block]
+    from ..radiation import radiation_panel
+
+    parts = [picker_block, radiation_panel(mo, list(basket))]
     if len(basket) >= CASE_BASKET_CAP:
         parts.append(
             mo.md(f"*Basket capped at {CASE_BASKET_CAP} entries — oldest drop as you add more.*")
@@ -66,6 +68,7 @@ def render_case_comparison(
         include_cxr="Line" in components,
         include_characteristic="Characteristic" in components,
         include_channeling="Channeling" in components,
+        include_transition="TR/CTR" in components,
         sum_components=True,
         x_type=axes.narrow.x_type,
         y_type=axes.narrow.y_type,
@@ -78,6 +81,7 @@ def render_case_comparison(
         include_cxr="Line" in components,
         include_characteristic="Characteristic" in components,
         include_channeling="Channeling" in components,
+        include_transition="TR/CTR" in components,
         sum_components=True,
         x_type=axes.broad.x_type,
         y_type=axes.broad.y_type,

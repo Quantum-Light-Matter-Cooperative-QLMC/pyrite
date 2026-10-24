@@ -253,6 +253,7 @@ consume it.
    pyrite.results.select_results
    pyrite.results.best_azimuth
    pyrite.results.cxr_metrics
+   pyrite.results.radiation.radiation_band_metrics
    pyrite.results.summary_table
 ```
 
