@@ -480,9 +480,10 @@ def run(args):
                 try:
                     complete = _run_material(args, material, max_seconds=remaining)
                 except Exception as error:
+                    from ..montecarlo.case import AxialAdmissionError
                     from ..montecarlo.trajectories import TrajectoryArtifactError
 
-                    if not isinstance(error, TrajectoryArtifactError):
+                    if not isinstance(error, (AxialAdmissionError, TrajectoryArtifactError)):
                         raise
                     raise SystemExit(str(error)) from None
                 if not complete:
@@ -631,8 +632,10 @@ def _resolved_run(args, material):
     detector_id = getattr(args, "detector_id", None)
 
     from ..campaign.profiles import profile_run_settings
+    from ..montecarlo.case import refuse_axial_channeling
 
     settings = profile_run_settings(settings, catalog_profile, fidelity, CATALOG)
+    refuse_axial_channeling(vars(settings))
     overrides = {}
     if getattr(args, "quick", False):
         # Resolve quick beam energies from the effective profile/material line

@@ -57,6 +57,38 @@ def _clear_checkpoint_cache():
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.parametrize("selectors", [False, True], ids=["record", "selectors"])
+@pytest.mark.parametrize("cached", [False, True], ids=["new", "resumed"])
+def test_axial_sweep_refuses_before_checkpoint_or_cache_effects(
+    tmp_path, monkeypatch, selectors, cached
+):
+    from pyrite.runs import run
+
+    cases = [_fake_case("first", 30.0), _fake_case("axial", 30.0)]
+    if selectors:
+        cases[1].update(channeling_model="axial", channeling_axial={"axis_uvw": [0, 0, 1]})
+    else:
+        cases[1]["channeling"] = {"model": "axial", "axis_uvw": [0, 0, 1]}
+    results = {case["name"]: {case["E0_keV"]: {"case": case}} for case in cases} if cached else {}
+    before = pickle.dumps(results)
+    checkpoint = tmp_path / "checkpoints" / "hopg"
+
+    def forbidden(*_args, **_kwargs):
+        pytest.fail("execution or cache work started")
+
+    monkeypatch.setattr(run, "run_cases", forbidden)
+    with pytest.raises(ValueError, match="#623"):
+        run_sweep(
+            cases,
+            results,
+            checkpoint_path=str(checkpoint),
+            content_key_fn=forbidden,
+            on_progress=forbidden,
+        )
+    assert not checkpoint.parent.exists()
+    assert pickle.dumps(results) == before
+
+
 def _fake_case(
     name: str, E0_keV: float, tilt_deg: float = 0.0, crystal: str = "hopg"
 ) -> dict[str, Any]:
@@ -111,6 +143,7 @@ def test_run_case_directions_transports_once_and_stacks_direction_outputs(monkey
 
     def fake_spectrum(payload, transport, record_timing=False):
         assert payload is case
+        assert record_timing is False
         calls["spectrum"] += 1
         value = transport["n_hat"][0]
         return {

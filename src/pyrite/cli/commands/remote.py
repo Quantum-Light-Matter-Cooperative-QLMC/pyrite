@@ -45,10 +45,15 @@ from ._remote_actions import (
 
 def _invoke_action(handler, **values):
     """Invoke one explicitly-typed remote action under the Click exit contract."""
+    from ...montecarlo.case import AxialAdmissionError
+
     _ensure_utf8_stdio()
     ssh_verbose = values.pop("ssh_verbose", False)
     with transport.verbose_ssh(ssh_verbose):
-        status = handler(**values)
+        try:
+            status = handler(**values)
+        except AxialAdmissionError as error:
+            raise CLIError(str(error)) from error
     if isinstance(status, int) and not isinstance(status, bool) and status:
         raise click.exceptions.Exit(status)
     return status

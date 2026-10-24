@@ -72,6 +72,7 @@ from ..execution.artifacts import (
     load_directional_result,
 )
 from ..montecarlo import run_cases, runner
+from ..montecarlo.case import refuse_axial_channeling_cases
 from ..results import store_result
 from ._sweep_execution import SweepCompletion
 from ._sweep_plan import SweepResume, SweepWork, has_record
@@ -249,6 +250,7 @@ def run_sweep(
     completed-config shards for resume. Legacy ``.pkl`` paths receive a final
     whole-store save on an incomplete return, including partial configs.
     """
+    refuse_axial_channeling_cases(cases)
     if artifact_store is not None and content_key_fn is None:
         raise ValueError("artifact_store requires content_key_fn for physics identity validation")
     if time_fn is None:

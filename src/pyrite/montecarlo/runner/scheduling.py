@@ -10,7 +10,7 @@ from typing import Any
 from ..._backend import BACKEND, BackendResourceError, BackendUnavailableError
 from ..._energy_grid_encoding import decode_energy_grid
 from ..._env import env_value
-from ..case import refuse_axial_channeling
+from ..case import refuse_axial_channeling_cases
 from . import (
     _EEDL_BREM_DENSE_INTERMEDIATES,
     _RESOURCE_POLICY,
@@ -372,6 +372,7 @@ def run_cases(
     """
     if engine not in ("auto", "gpu", "cpu"):
         raise ValueError(f"engine must be one of 'auto', 'gpu', 'cpu'; got {engine!r}")
+    refuse_axial_channeling_cases(cases)
     use_gpu = _RESOURCE_POLICY.gpu if engine == "auto" else engine == "gpu"
     if engine == "gpu" and not _RESOURCE_POLICY.gpu:
         raise BackendUnavailableError(
@@ -398,7 +399,6 @@ def run_cases(
     if observation_directions is not None and len(observation_directions) != n:
         raise ValueError("observation_directions must align with cases")
     for index, case in enumerate(cases):
-        refuse_axial_channeling(case)
         if case.get("adaptive_precision") is None:
             continue
         if trajectory_capture is not None or transport_only:

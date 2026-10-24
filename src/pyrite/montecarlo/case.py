@@ -4,10 +4,13 @@ import math
 from collections.abc import Iterator, Mapping
 from dataclasses import MISSING, dataclass, fields
 from os import PathLike
-from typing import Any, Literal, NoReturn, cast
+from typing import Any, Literal, cast
 
 import numpy as np
 
+from .._channeling_admission import AxialAdmissionError as AxialAdmissionError
+from .._channeling_admission import refuse_axial_channeling as refuse_axial_channeling
+from .._channeling_admission import refuse_axial_channeling_cases as refuse_axial_channeling_cases
 from .._cxr_grid_policy import LOCAL_RESOLUTION_POLICY
 
 type Composition = list[tuple[str, float]]
@@ -648,26 +651,6 @@ def refuse_transition_radiation(case: Mapping[str, Any], consumer: str) -> None:
     """
     if case.get("transition_radiation") is not None:
         raise ValueError(f"{consumer} does not support transition_radiation cases yet (#103)")
-
-
-def refuse_unverified_axial_run() -> NoReturn:
-    """Fail before production work until the physical axial contract exists."""
-    raise ValueError(
-        "channeling_model='axial' cannot run yet: physical matching surface, "
-        "incident-normalized photon source and case-specific depth budget "
-        "are unvalidated (#623); #624 only provides preliminary configuration"
-    )
-
-
-def refuse_axial_channeling(case: Mapping[str, Any]) -> None:
-    """Apply axial admission to raw compatibility mappings as well as cases."""
-    record = case.get("channeling")
-    if (
-        (isinstance(record, Mapping) and record.get("model") == "axial")
-        or case.get("channeling_model") == "axial"
-        or case.get("channeling_axial") is not None
-    ):
-        refuse_unverified_axial_run()
 
 
 def refuse_channeling(case: Mapping[str, Any], consumer: str) -> None:

@@ -17,6 +17,7 @@ from pyrite.console.json import job_kind
 from pyrite.montecarlo.trajectories import (
     TrajectoryArtifactError,
     TrajectoryCapture,
+    read_trajectory_artifact,
     write_trajectory_artifact,
 )
 from pyrite.remote import _queue_scripts, config, jobs, trajectories, viewer
@@ -68,6 +69,42 @@ def test_header_inventory_filters_without_reading_segments(captures, monkeypatch
     assert trajectories.inventory(root, energies=[40.0]) == []
     capture.path_for(cases[0]).with_suffix(".h5.partial").write_text("interrupted")
     assert len(trajectories.inventory(root)) == 2
+
+
+@pytest.mark.parametrize("axial", [False, True], ids=["supported", "axial"])
+def test_scoring_inventory_checks_metadata_before_job_staging(tmp_path, monkeypatch, axial):
+    from tests.helpers.trajectory_schema import SCHEMA2_FIXTURE
+
+    root = tmp_path / "remote" / "captures"
+    legacy = read_trajectory_artifact(SCHEMA2_FIXTURE)
+    case = dict(legacy.case)
+    if axial:
+        case["channeling"] = {"model": "axial", "axis_uvw": [0, 0, 1]}
+    write_trajectory_artifact(
+        root / "saved" / "capture.h5",
+        legacy.transport,
+        case=case,
+        spectrum_inputs=legacy.spectrum_inputs,
+        provenance={
+            "checkpoint_stem": "saved",
+            "dataset_identity": {"parameter_sha256": "a" * 64},
+        },
+    )
+    # General inventory remains usable for inspection of unsupported captures.
+    assert len(trajectories.inventory(root, "saved")) == 1
+    if not axial:
+        assert len(trajectories.inventory(root, "saved", for_scoring=True)) == 1
+        return
+
+    def remote_inventory(selected_root, stem, cases, energies, *, for_scoring=False):
+        assert for_scoring
+        return trajectories.inventory(selected_root, stem, cases, energies, for_scoring=for_scoring)
+
+    monkeypatch.setattr(trajectories, "remote_inventory", remote_inventory)
+    monkeypatch.setattr(jobs, "_stage_job_script", lambda *_a: pytest.fail("job staged"))
+    monkeypatch.setattr(jobs, "_submit_staged_job", lambda *_a: pytest.fail("job submitted"))
+    with pytest.raises(TrajectoryArtifactError, match="#623"):
+        trajectories.submit_score({"root": str(root), "stem": "saved"})
 
 
 def test_inventory_refuses_incomplete_or_escaping_artifacts(captures, tmp_path):

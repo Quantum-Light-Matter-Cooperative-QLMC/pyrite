@@ -24,6 +24,16 @@ from .._deprecations import canonical_option
 from .._options import remote_option
 
 
+def _invoke_recompute(handler, **options):
+    """Render an unsupported axial repair as a runtime diagnostic."""
+    from ...montecarlo.case import AxialAdmissionError
+
+    try:
+        return handler(**options)
+    except AxialAdmissionError as error:
+        raise _cli_core.CLIError(str(error)) from error
+
+
 def _brem_cli(args):
     """CLI handler -- returns None so the dict never reaches sys.exit."""
     if bool(args.material) == bool(args.all):
@@ -31,7 +41,8 @@ def _brem_cli(args):
             "pyrite rebrem: give one or more materials, or -a/--all for every checkpoint "
             "(exactly one of the two)"
         )
-    return _recompute.rebrem_checkpoints(
+    return _invoke_recompute(
+        _recompute.rebrem_checkpoints,
         materials=args.material or None,
         checkpoint_dir=args.checkpoint_dir,
         ne_brem=args.ne_brem,
@@ -333,7 +344,8 @@ def _cxr_cli(args):
             "pyrite reline: give one or more materials, or -a/--all for every checkpoint "
             "(exactly one of the two)"
         )
-    return _recompute.recxr_checkpoints(
+    return _invoke_recompute(
+        _recompute.recxr_checkpoints,
         materials=args.material or None,
         checkpoint_dir=args.checkpoint_dir,
         cxr_ne=args.cxr_ne,

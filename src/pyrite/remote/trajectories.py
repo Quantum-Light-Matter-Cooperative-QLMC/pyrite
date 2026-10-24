@@ -52,11 +52,12 @@ def _host_paths(root, stem=None):
         yield path
 
 
-def inventory(root, stem=None, cases=(), energies=(), *, hashes=False):
-    """Read headers only; filter exact case names and incident energies in keV."""
+def inventory(root, stem=None, cases=(), energies=(), *, hashes=False, for_scoring=False):
+    """Read selected headers; optionally check scoring metadata without segments."""
     from ..montecarlo.trajectories import read_trajectory_header
 
     records = []
+    selected_paths = []
     for path in _host_paths(root, stem):
         header = read_trajectory_header(path)
         if cases and header["case_name"] not in cases:
@@ -79,6 +80,11 @@ def inventory(root, stem=None, cases=(), energies=(), *, hashes=False):
             if path.stat() != stat:
                 raise ValueError(f"trajectory artifact changed during hashing: {path}")
         records.append(record)
+        selected_paths.append(path)
+    if for_scoring:
+        from ..checkpoints.trajectory_scoring import plan_stems
+
+        plan_stems(selected_paths)
     return records
 
 
@@ -91,11 +97,15 @@ def _host_command(action, request):
     )
 
 
-def remote_inventory(root=None, stem=None, cases=(), energies=(), *, hashes=False):
+def remote_inventory(
+    root=None, stem=None, cases=(), energies=(), *, hashes=False, for_scoring=False
+):
     """Fetch the exact selected remote inventory in one SSH round trip."""
     request = dict(
         root=capture_root(root), stem=stem, cases=cases, energies=energies, hashes=hashes
     )
+    if for_scoring:
+        request["for_scoring"] = True
     return json.loads(transport._ssh_capture(_host_command("inventory", request)))
 
 
@@ -183,7 +193,11 @@ def submit_score(request):
 
     request = dict(request, root=capture_root(request.get("root")))
     records = remote_inventory(
-        request["root"], request["stem"], request.get("cases", ()), request.get("energies", ())
+        request["root"],
+        request["stem"],
+        request.get("cases", ()),
+        request.get("energies", ()),
+        for_scoring=True,
     )
     if not records:
         raise ValueError("no matching complete trajectory artifacts")

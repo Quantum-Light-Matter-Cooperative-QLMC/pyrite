@@ -18,7 +18,7 @@ from math import gcd
 from numbers import Integral, Real
 from typing import Any
 
-from ..montecarlo.case import refuse_unverified_axial_run as refuse_unverified_axial_run
+from .._channeling_admission import refuse_unverified_axial_run as refuse_unverified_axial_run
 
 AXIAL_MODEL_MARKER = "axial-entrance-experimental-config-v1"
 AXIAL_SCHEMA_VERSION = 1

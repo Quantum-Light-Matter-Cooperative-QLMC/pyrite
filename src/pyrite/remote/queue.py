@@ -259,6 +259,14 @@ def start_queue(
     )
     chunked = chunk_minutes > 0
     modes.validate(chunked=chunked, parallel_materials=parallel_materials, materials=materials)
+    from .physics_identity import expected_inventory
+
+    # Resolve local run admission before any SSH probe, sync, or reservation.
+    physics_options = {
+        "expected_physics": expected_inventory(
+            materials, quick, fidelity, catalog_profile, high_energy_min_kev
+        )
+    }
     if not dry_run and not cpu_only:
         _refuse_if_busy(materials, quick)
     jobid = _queue_jobid(catalog_profile, dry_run)
@@ -268,13 +276,6 @@ def start_queue(
         if cpu_only
         else scripts._stems(materials, quick, fidelity, high_energy_min_kev, catalog_profile)
     )
-    from .physics_identity import expected_inventory
-
-    physics_options = {
-        "expected_physics": expected_inventory(
-            materials, quick, fidelity, catalog_profile, high_energy_min_kev
-        )
-    }
     if chunked:
         parallel_materials = None
         payload = scripts._chunked_queue_script(

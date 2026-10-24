@@ -485,6 +485,7 @@ no production handoff selects this instrument. Claim:
 
 ### `campaign/channeling_cases.py`
 Opt-in planar channeling selection for `lowering.build_case` (ADR-0018, #506): `resolve_channeling` attaches the resolved `Case.channeling` record (plane, temperature, declared dechanneling margin, zone numerics) only when `Physics.channeling_model="planar"` and applies the per-case gates: crystals without channeling thermal data and energies above 100 MeV are refused, energies above 30 MeV warn (#439), `n_b < 1` is refused, and a beam within a few Lindhard axial critical angles of a low-index axis warns. Off returns the cases unchanged.
+Axial selection remains configuration-only (#624). The data-only `_channeling_admission` module implements production admission for raw records/selectors, re-exported through `montecarlo.case`; scan settings resolution, runner consumers, checkpoint repair planning and trajectory checkpoint planning apply it before work or mutation. Remote profile submissions use scan resolution before host probes; remote trajectory scoring preflights metadata before staging. Research details: [axial pre-integration](research/physics/axial-preintegration-624.md).
 - Deps: `montecarlo.case`; lazily `materials.channeling`, `materials.crystal`, `materials.atomic`, `montecarlo.geometry`, `montecarlo.channeling`.
 
 ### `campaign/geometry.py`
