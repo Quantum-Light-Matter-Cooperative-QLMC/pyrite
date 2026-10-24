@@ -58,6 +58,7 @@ from ..checkpoints.persistence import (  # noqa: F401 -- compatibility exports
     checkpoint_path_for,
     default_checkpoint_dir,
     load_checkpoint,
+    sweep_checkpoint,
 )
 from ..checkpoints.recompute import (  # noqa: F401 -- compatibility exports
     recxr_checkpoint,
@@ -122,11 +123,18 @@ def run_sweep(
     metadata_only_complete=False,
     trajectory_capture=None,
     observation=None,
+    retain_results=True,
 ):
     """Run ``cases`` into ``results`` (mutated in place).
 
     cases : list of typed cases from sweep.build_cases.
     results : the dict to fill ({name: {E0: record}}).
+    retain_results : defaults to True, preserving in-memory spectra. False
+        requires an empty results mapping and a component checkpoint path;
+        completed records become {"case": case, "checkpoint_path": path} after
+        successful persistence. Use checkpoint loading for spectra, including
+        in on_chunk callbacks. Resume and consolidation keep only case metadata
+        plus one config's arrays resident (legacy input files may fully decode).
     checkpoint_dir : directory for the per-material checkpoints (default
         ``pyrite-output/checkpoints`` in the workspace). A sweep is
         single-material, so each writes ``<checkpoint_dir>/<material>/``
@@ -241,8 +249,14 @@ def run_sweep(
     if checkpoint_path is None:
         checkpoint_path = checkpoint_path_for(material, checkpoint_dir)
     os.makedirs(os.path.dirname(checkpoint_path) or ".", exist_ok=True)
-    checkpoint = _SweepCheckpoint(
-        checkpoint_path, results, material, dataset_identity, on_timing, on_activity
+    checkpoint = sweep_checkpoint(
+        checkpoint_path,
+        results,
+        material,
+        dataset_identity,
+        on_timing,
+        on_activity,
+        retain_results=retain_results,
     )
     preparation = SweepResume(cases, results, checkpoint, content_key_fn, cache_read, cache_write)
     metadata_eligible = (
@@ -324,6 +338,7 @@ def run_sweep(
         store_result(results, case, out)
 
         preparation.store_transport(case, out)
+        checkpoint.record_finished(case)
         if on_case is not None:
             on_case(case)
         completion.scalar_finished(case, checkpoint)

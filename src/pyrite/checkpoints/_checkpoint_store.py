@@ -15,6 +15,7 @@ import copy
 import hashlib
 import os
 import shutil
+from contextlib import ExitStack
 from pathlib import Path
 
 import numpy as np
@@ -408,3 +409,108 @@ def cas_save(
     same-material writers touch distinct blobs and never clobber a monolith.
     """
     _atomic_dump(cas_blob_path(material, content_key, root), payload)
+
+
+def load_selected(
+    stem: str,
+    root: str | os.PathLike[str],
+    cases: set[tuple[str, float]],
+    *,
+    components: tuple[str, ...] = COMPONENTS,
+) -> dict:
+    """Load selected cases and emission components, with shard precedence.
+
+    ``line`` is always the authoritative record index. Requested companions
+    attach to those records using the same grid validation as :func:`load`.
+    Unselected companions are absent, including in crash-recovery shards.
+    """
+    unknown = set(components) - set(COMPONENTS)
+    if unknown:
+        raise ValueError(f"unknown checkpoint component(s): {sorted(unknown)}")
+    if not cases:
+        return {}
+    if not checkpoint_exists(stem, root):
+        raise FileNotFoundError(component_read_path(stem, "line", root))
+    old = legacy_path(stem, root)
+
+    def component_records(component):
+        path = component_read_path(stem, component, root)
+        if path.is_file():
+            return _component_store(_checkpoint_io.load_selected(str(path), cases), component)
+        if old.is_file():
+            return _component_store(_checkpoint_io.load_selected(str(old), cases), component)
+        return {}
+
+    line = component_records("line")
+    brem = component_records("brem") if "brem" in components else {}
+    companions = {
+        component: component_records(component)
+        for component in _LINE_COMPONENT_KEY
+        if component in components
+    }
+    merged = _merge(line, brem, companions)
+    # Shard filenames identify a whole config; select its energies before decoding.
+    for name in sorted({name for name, _ in cases}):
+        path = _part_path(stem, root, name)
+        if not path.is_file():
+            path = path.with_suffix(_LEGACY_SUFFIX)
+        if path.is_file():
+            shard = _checkpoint_io.load_selected(str(path), cases)
+            selected_line = _component_store(shard, "line")
+            selected_brem = _component_store(shard, "brem") if "brem" in components else {}
+            selected_companions = {
+                component: _component_store(shard, component) for component in companions
+            }
+            merged = _overlay(merged, _merge(selected_line, selected_brem, selected_companions))
+    return merged
+
+
+def load_metadata(stem: str, root: str | os.PathLike[str]) -> dict:
+    """Recover the authoritative case index and overlay crash-safety shards."""
+    path = component_read_path(stem, "line", root)
+    if not path.is_file():
+        path = legacy_path(stem, root)
+    records = _checkpoint_io.load_metadata(str(path)) if path.is_file() else {}
+    for shard in _part_paths(parts_dir(stem, root)):
+        records = _overlay(records, _checkpoint_io.load_metadata(str(shard)))
+    return records
+
+
+def save_streaming(stem: str, root: str | os.PathLike[str], metadata: dict) -> None:
+    """Stage every component before publication, loading at most one config.
+
+    Shards remain recovery authority until the caller publishes its manifest.
+    No source component is replaced while a staged component is still reading it.
+    """
+    order = ("brem", "characteristic", "channeling", "transition", "line")
+    staged = []
+    directory = checkpoint_dir(stem, root)
+    directory.mkdir(parents=True, exist_ok=True)
+    try:
+        with ExitStack() as stack:
+            writers = {}
+            for component in order:
+                target = component_path(stem, component, root)
+                temporary = target.with_name(f"{target.name}.{os.getpid()}.tmp")
+                staged.append((temporary, target, component))
+                writers[component] = stack.enter_context(
+                    _checkpoint_io.config_writer(list(metadata), str(temporary))
+                )
+            for name, energies in metadata.items():
+                keys = {(name, energy) for energy in energies}
+                records = load_selected(stem, root, keys)
+                for component, writer in writers.items():
+                    writer.add(name, _component_store(records, component).get(name, {}))
+                del records
+        for temporary, target, component in staged:
+            if (
+                component in OPTIONAL_COMPONENTS
+                and not writers[component].keys
+                and not target.is_file()
+            ):
+                temporary.unlink()
+            else:
+                os.replace(temporary, target)
+    finally:
+        for temporary, _, _ in staged:
+            temporary.unlink(missing_ok=True)

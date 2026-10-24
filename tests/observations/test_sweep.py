@@ -79,7 +79,7 @@ def _sweep_observation(tmp_path, **acquisition) -> SweepObservation:
     )
 
 
-def _run(tmp_path, observation, results=None):
+def _run(tmp_path, observation, results=None, *, retain_results=True):
     results = {} if results is None else results
     complete = run_sweep(
         [dict(case) for case in CASES],
@@ -89,6 +89,7 @@ def _run(tmp_path, observation, results=None):
         progress=False,
         max_workers=0,
         observation=observation,
+        retain_results=retain_results,
     )
     return complete, results
 
@@ -136,9 +137,12 @@ def _no_transport(monkeypatch) -> None:
     monkeypatch.setattr(runner, "_transport_case", refuse)
 
 
-def test_sweep_produces_each_observation_on_its_scalar_transport(tmp_path, transports) -> None:
+@pytest.mark.parametrize("retain_results", [True, False])
+def test_sweep_produces_each_observation_on_its_scalar_transport(
+    tmp_path, transports, retain_results
+) -> None:
     observation = _sweep_observation(tmp_path)
-    complete, results = _run(tmp_path, observation)
+    complete, results = _run(tmp_path, observation, retain_results=retain_results)
 
     assert complete
     assert transports == ["tilt30", "tilt45"]
@@ -159,12 +163,15 @@ def test_sweep_produces_each_observation_on_its_scalar_transport(tmp_path, trans
     assert observation.store.verify() == ()
 
 
-def test_rerun_reuses_records_and_observations_without_transport(tmp_path, monkeypatch) -> None:
+@pytest.mark.parametrize("retain_results", [True, False])
+def test_rerun_reuses_records_and_observations_without_transport(
+    tmp_path, monkeypatch, retain_results
+) -> None:
     observation = _sweep_observation(tmp_path)
-    _run(tmp_path, observation)
+    _run(tmp_path, observation, retain_results=retain_results)
     _no_transport(monkeypatch)
 
-    complete, _ = _run(tmp_path, observation)
+    complete, _ = _run(tmp_path, observation, retain_results=retain_results)
 
     assert complete
 

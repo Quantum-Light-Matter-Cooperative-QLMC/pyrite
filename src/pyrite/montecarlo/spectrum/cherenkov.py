@@ -92,6 +92,8 @@ class ChargedPassage:
     used by :meth:`BulkEmissionYield.photons_per_eV`, or None for per-metre
     yields only. Slowing down within the path is the caller's responsibility
     (split the path into segments of nearly constant ``beta``).
+
+    Validation: frank-tamm-homogeneous-dielectric
     """
 
     beta: float
@@ -116,6 +118,8 @@ class BulkEmissionYield:
     ``yield_per_m_per_eV`` is ``d^2N/(dx dE)`` [photons m^-1 eV^-1].
     ``cos_theta`` is the emission-cone cosine about the velocity, NaN where
     no photon is emitted (``above_threshold`` False).
+
+    Validation: frank-tamm-homogeneous-dielectric
     """
 
     mechanism: str

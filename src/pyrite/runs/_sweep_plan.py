@@ -11,7 +11,6 @@ from ..checkpoints.persistence import (
     _cas_payload_from_record,
     _case_set_proof_from_cases,
     _checkpoint_exists,
-    _checkpoint_load,
     _checkpoint_signature,
     _manifest_path_for,
     _valid_cas_payload,
@@ -60,13 +59,15 @@ class SweepResume:
             manifest_path = _manifest_path_for(self.checkpoint_path)
             path = Path(self.checkpoint_path)
             existing_identity = self.validate_identity(manifest_path)
-            if metadata_only_complete and self.metadata_complete(
-                manifest_path, path, existing_identity
+            if (
+                metadata_only_complete
+                and self.checkpoint.metadata_completion_supported
+                and self.metadata_complete(manifest_path, path, existing_identity)
             ):
                 if self.on_timing is not None:
                     self.on_timing({"resume_seconds": time.perf_counter() - resume_started})
                 return True
-            loaded = _checkpoint_load(self.checkpoint_path)
+            loaded = self.checkpoint.load()
             print(f"checkpoint: loaded in {time.perf_counter() - resume_started:.3f} s")
             if self.on_timing is not None:
                 self.on_timing({"resume_seconds": time.perf_counter() - resume_started})
@@ -135,10 +136,12 @@ class SweepResume:
         # poison the shared store with a mismatched record.
         if self.cache_write:
             for case in self.cases:
-                record = self.results.get(case["name"], {}).get(case["E0_keV"])
+                key = self.content_key(case)
+                if key is None or _checkpoint_store.cas_contains(self.material, key, self.cas_root):
+                    continue
+                record = self.checkpoint.record_for(case)
                 if record is None:
                     continue
-                key = self.content_key(case)
                 stored_key = self.content_key(record.get("case", {}))
                 payload = _cas_payload_from_record(record)
                 if (
@@ -174,10 +177,11 @@ class SweepResume:
                 if not _valid_cas_payload(out):
                     continue
                 store_result(self.results, c, out)
+                self.checkpoint.record_finished(c)
                 reused += 1
             if reused:
                 print(f"reused {reused} {self.material} cases from shared content cache")
-                self.checkpoint.save()  # persist reused cases into this profile's checkpoint + manifest
+                self.checkpoint.cache_replayed()  # publish reused cases for this profile
 
         # Thin per-profile pointer table: (name, E0_keV) -> content_key, plus label
         # provenance. Enables a future GC / `pyrite clear` to know which shared blobs a

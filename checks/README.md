@@ -30,6 +30,8 @@ run through the collector.
 
 | Artifact | Purpose |
 |---|---|
+| `checkpoint_sweep_memory.py` | Campaign-shaped retained versus disk-backed sweep storage benchmark (#612), using synthetic spectra, fresh processes/directories, phase timing, peak RSS, and I/O counters. Run `uv run python checks/checkpoint_sweep_memory.py`; no physics-validation claim. |
+| `checkpoint_selective_memory.py` | Synthetic full versus selected HDF5 record reads (#612), with matched warm file caches, fresh reader processes, wall time, and peak host RSS. Run `uv run python checks/checkpoint_selective_memory.py`; no simulation or physics-validation claim. |
 | `optical_transition_cuda.py` | Real CUDA parity of optical-band TR/CTR: per-history power and complex bunch field before squaring (fused kernel and CuPy array route) and the optical scorer's self/pair/per-electron yields for importance-weighted sampled and Gaussian laws, on a Johnson–Christy/Rakić Au multilayer. Stage a clean tree with `pyrite remote sync`, run in a bounded GPU allocation, collect JSON evidence. No CPU fallback. |
 | `optical_response_cuda.py` | Real CUDA complex128 upload and planar optical TR parity for the pinned CC0 Au response; unsupported-band/component refusal. Stage with `pyrite remote sync`, run in a bounded GPU allocation, and collect JSON evidence. No CPU fallback. |
 | `channeling_overflow.py` | Experimental full-depth planar momentum instrument (#522): nonwrapped differential gain, unresolved probability, in-band gain shift and closure-gated conditional angle samples. Fixed-energy research diagnostic; no production handoff or derived escape boundary. |

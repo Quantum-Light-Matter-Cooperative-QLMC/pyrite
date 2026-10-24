@@ -539,6 +539,8 @@ def cases_from_results(results):
 class _SweepCheckpoint:
     """One material's publication lifecycle; incomplete sweeps retain shards."""
 
+    metadata_completion_supported = True
+
     def __init__(
         self, checkpoint_path, results, material, dataset_identity, on_timing=None, on_activity=None
     ):
@@ -550,6 +552,18 @@ class _SweepCheckpoint:
         self.on_activity = on_activity
         self.incremental_manifest = None
         self.sharded = Path(checkpoint_path).suffix != ".pkl"
+
+    def load(self):
+        return _checkpoint_load(self.checkpoint_path)
+
+    def record_for(self, case):
+        return self.results.get(case["name"], {}).get(case["E0_keV"])
+
+    def cache_replayed(self):
+        self.save()
+
+    def record_finished(self, case):
+        """Default mode retains the record until config-level publication."""
 
     def config_finished(self, name):
         if self.sharded:
@@ -618,3 +632,13 @@ class _SweepCheckpoint:
         print("checkpoint: saving completed material")
         self.timed_save()
         _checkpoint_store.clear_parts(path.name, path.parent)
+
+
+def sweep_checkpoint(*args, retain_results=True):
+    """Choose the publication lifecycle without changing the default backend."""
+    checkpoint_type = _SweepCheckpoint
+    if not retain_results:
+        from ._disk_sweep import DiskSweepCheckpoint
+
+        checkpoint_type = DiskSweepCheckpoint
+    return checkpoint_type(*args)
