@@ -241,7 +241,7 @@ def test_fetched_raw_stopping_reaches_bethe_and_sbethe_at_high_energy(key):
 
 @pytest.mark.xfail(
     strict=True,
-    reason="raw δ-oscillator GOS exceeds shell-corrected stp.dat at 1 keV: Si 13%, SiO2 21%, MoS2 15%",
+    reason="raw δ-oscillator GOS exceeds v2 shell-corrected stp.dat at 1 keV: Si 13%, SiO2 12%, MoS2 17%",
 )
 @pytest.mark.parametrize("key", KEYS)
 def test_fetched_raw_stopping_matches_sbethe_below_10_kev(key):
@@ -255,8 +255,8 @@ def test_fetched_raw_stopping_matches_sbethe_below_10_kev(key):
     "key, ratios",
     [
         ("silicon", (1.1333, 1.0309, 1.0139, 1.0003)),
-        ("sio2", (1.2142, 1.0635, 1.0320, 0.9996)),
-        ("mos2", (1.1525, 1.1150, 1.0675, 1.0052)),
+        ("sio2", (1.1192, 1.0231, 1.0121, 0.9987)),
+        ("mos2", (1.1675, 1.0525, 1.0283, 1.0022)),
     ],
 )
 def test_fetched_raw_to_sbethe_stopping_ratios_are_recorded(key, ratios):

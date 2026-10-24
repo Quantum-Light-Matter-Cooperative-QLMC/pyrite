@@ -86,11 +86,20 @@ required before this model becomes a transport option.
 As an independent low-energy total-rate anchor, the [NIST SRD 71 User Guide](https://www.nist.gov/system/files/documents/srd/SRD71UsersGuideV1-2.pdf)
 Appendix A gives the TPP-2M predictive IMFP formula for 50–2000 eV. At
 1 and 2 keV, the calibrated model gives 25.0 and 42.1 Å for Si versus
-TPP-2M's 23.9 and 41.5 Å. For SiO2 it gives 23.6 and 40.0 Å versus 30.2 and
-52.3 Å. NIST estimates 20.5% absolute standard uncertainty for TPP-2M;
-the SiO2 discrepancy is about 22–23%, so this is a bounded comparison, not
-precision validation. This source covers neither 100 keV nor the differential
-transfer spectrum.
+TPP-2M's 23.9 and 41.5 Å. With the corrected compound shell term
+(`sbethe-corrected-v2`, `tables-sbethe-4`, 2026-10-24), SiO2 gives 21.7363 and
+37.1929 Å versus TPP-2M's 30.2147 and 52.2882 Å. The earlier 23.6 and 40.0 Å
+values used the superseded stopping tables. The current deficit is about
+28–29%. NIST estimates 20.5% absolute standard uncertainty for TPP-2M; the
+current SiO2 comparison exceeds the test's existing 25% allowance.
+
+`test_total_imfp_against_independent_nist_tpp2m` retains that allowance and
+marks only the two SiO2 cases as strict expected failures. An unexpected pass
+requires review. `test_sio2_optical_imfp_discrepancy_is_recorded` separately
+pins the two current predictions to ±5×10⁻⁴ Å so their drift also requires
+review. This records an unresolved physical discrepancy; it does not validate
+the IMFP, widen the uncertainty, or tune the OOS to the comparison. This source
+covers neither 100 keV nor the differential transfer spectrum.
 
 ## Differential loss-shape checks
 

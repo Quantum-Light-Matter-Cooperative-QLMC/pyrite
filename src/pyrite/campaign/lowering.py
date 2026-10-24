@@ -19,6 +19,8 @@ from .sweep import Sweep as LegacySweep
 def scene_physics(scene: Scene, numerics: Numerics) -> Physics:
     """Resolve the scene's model policy."""
     physics = resolve_physics(scene.physics, numerics)
+    if scene.quantum is not None:
+        physics, numerics = scene.quantum.lower(physics, numerics)
     physics.validate_transport(numerics.energy_model)
     if physics.channeling_model == "axial":
         # Refuse before material lookup, any case construction, or output writes.
@@ -33,6 +35,8 @@ def build_case(scene: Scene, numerics: Numerics | None = None) -> Case:
     """Lower one resolved scene to the existing typed transport input."""
     numerics = scene.numerics if numerics is None else numerics
     physics = scene_physics(scene, numerics)
+    if scene.quantum is not None:
+        _, numerics = scene.quantum.lower(scene.physics, numerics)
     convergence = numerics.cxr_reflections
     if numerics.precision is not None and isinstance(scene.detector, PlanarDetector):
         raise ValueError("adaptive precision does not support physical detectors; use fixed counts")

@@ -47,7 +47,7 @@ def test_add_medium_matches_python_and_reports_source():
     "args, message",
     [
         (["--formula", "Si"], "density-g-cm3 is required"),
-        (["--formula", "H2O", "--density-g-cm3", "1"], "unsupported"),
+        (["--formula", "Xx2O", "--density-g-cm3", "1"], "unsupported"),
         (["--mass-fraction", "Si=1", "--mass-fraction", "Si=.1", "--density-g-cm3", "2"], "unique"),
         (["--crystal", "silicon", "--formula", "Si"], "cannot be overridden"),
     ],

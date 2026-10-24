@@ -15,6 +15,7 @@ from .._precision import Precision
 from ..detectors import Detector, EnergyBins
 from ..instrument import Acquisition, Filter, FilterPlate, NativeAcquisition, PlanarDetector
 from ..instrument.model import validate_downstream_scene
+from ..quantum import QuantumSetup
 from .beam import Beam, BunchFrontTilt
 from .geometry import Slab, Stack
 from .geometry import Target as LegacyTarget
@@ -120,10 +121,13 @@ class Scene:
     acquisition: Acquisition | NativeAcquisition | None = None
     physics: Physics = field(default_factory=Physics, kw_only=True)
     numerics: Numerics = field(default_factory=Numerics, kw_only=True)
+    quantum: QuantumSetup | None = field(default=None, kw_only=True)
 
     def __post_init__(self) -> None:
         if not isinstance(self.numerics, Numerics):
             raise TypeError("Scene.numerics must be a Numerics")
+        if self.quantum is not None and not isinstance(self.quantum, QuantumSetup):
+            raise TypeError("Scene.quantum must be a QuantumSetup or None")
         if self.physics is not None and not isinstance(self.physics, Physics):
             raise TypeError("Scene.physics must be a Physics")
         physics = Physics() if self.physics is None else self.physics

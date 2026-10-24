@@ -198,7 +198,25 @@ $$
   Moving $W_{cb}$ from 14 to 20 eV changes $\sigma^{(1)}$ by less than 1% but
   $\sigma^{(0)}$ by more than 5% (manual, Fig. 3.11 discussion).
 
-## Comparison with corrected SBETHE `stp.dat`
+## Corrected SBETHE v2 characterization (2026-10-24)
+
+The electron-fraction compound shell correction in `1f22f89c` changes the
+SBETHE reference, not the raw GOS calculation. With `tables-sbethe-4`, the
+current raw GOS/corrected-stopping ratios at 1, 5, 10 and 100 keV are:
+
+| material | 1 keV | 5 keV | 10 keV | 100 keV |
+| --- | ---: | ---: | ---: | ---: |
+| silicon | 1.1333 | 1.0309 | 1.0139 | 1.0003 |
+| sio2 | 1.1192 | 1.0231 | 1.0121 | 0.9987 |
+| mos2 | 1.1675 | 1.0525 | 1.0283 | 1.0022 |
+
+These are characterization pins in `test_fetched_raw_to_sbethe_stopping_ratios_are_recorded`,
+with the existing absolute tolerance of 2×10⁻⁴. They do not establish agreement
+with independent stopping data. The following detailed comparison predates v2;
+its compound `stp.dat` columns and ratios are historical and are superseded by
+this table for the listed energies. Elemental silicon is unchanged.
+
+## Historical comparison with corrected SBETHE `stp.dat`
 
 The corrected SBETHE stopping (`stopping_cs_eV_cm2`, catalog tables) compared
 with raw GOS $\sigma^{(1)}$ (eV cm² per formula unit). Nothing was tuned.

@@ -65,6 +65,25 @@ After rebasing onto `main` (#536/#541), `channeling.json`'s
 `case_content_key` was re-pinned for the v5 line-kinematics marker on the
 rebased generation. Its resolved case payload is identical to `main`'s.
 
+## Corrected SBETHE v2 generation (2026-10-24)
+
+Commit `1f22f89c` weights compound shell corrections by electron fraction and
+advances `STOPPING_MODEL` to `sbethe-corrected-v2`. Restoring only the v1
+marker reproduces every prior hash in `resolved.json` and `channeling.json`.
+All resolved case payloads remain identical. The dependent acceptance and
+fixed-count identity pins advance with the same marker; installed BremsLib
+selection is kept fixed for the acceptance fixture.
+
+Only `outputs.json["multilayer"]` changes numerically: substituting the prior
+SiO₂ stopping columns (cross section and eV/angstrom) reproduces the complete
+old transport and spectra at the existing fp64 tolerance. With v2, the four
+seeded electrons still produce 501 rows, one backscatter and three transmissions;
+total path changes from 156417.592494 to 156372.061811 angstrom (−0.0291%).
+The downstream line, characteristic and continuum spectra change with those
+tracks. Other output families and all tolerances remain unchanged. This
+isolates the inherited corrected-stopping change; it is not independent
+physics validation.
+
 ## Fixture inputs
 
 `resolved.json` stores full resolved case mappings, `case_content_key` and

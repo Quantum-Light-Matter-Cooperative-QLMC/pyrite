@@ -2,12 +2,16 @@
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, fields
-from typing import Any, Literal, cast
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 import numpy as np
 
 from ._energy_bins import EnergyBins
 from ._precision import Precision
+from ._sampling import AdaptiveSampling, FixedSampling, SamplingPolicy
+
+if TYPE_CHECKING:
+    from ._numerics_groups import ExecutionConfig, RadiationNumerics, TransportNumerics
 
 MosaicRoute = Literal["analytic", "mc"]
 EmissionMode = Literal["incoherent", "coherent"]
@@ -353,6 +357,9 @@ class Numerics:
     defaults.
     ``cxr_reflections`` controls reflection truncation and mosaic quadrature.
     ``precision`` requests adaptive sampling instead of the two fixed counts.
+    Alternatively, ``sampling`` selects a typed :class:`FixedSampling` or
+    :class:`AdaptiveSampling` policy. This opt-in interface lowers to the same
+    legacy case fields without changing historical checkpoint identities.
     The ``channeling_*`` fields are the planar channeling zone's numerics, used
     only with ``Physics(channeling_model="planar")``: ``channeling_basis_size``
     is the plane-wave band ``|h| <= H`` of the transverse basis,
@@ -373,13 +380,19 @@ class Numerics:
     max_dE_frac: float = field(default=0.0, kw_only=True)
     cxr_reflections: CxrReflections = field(default_factory=CxrReflections, kw_only=True)
     precision: Precision | None = field(default=None, kw_only=True)
+    sampling: SamplingPolicy | None = field(default=None, kw_only=True)
     energy_bins: EnergyBins | None = field(default=None, kw_only=True)
+    transport: "TransportNumerics | None" = field(default=None, kw_only=True)
+    radiation: "RadiationNumerics | None" = field(default=None, kw_only=True)
+    execution: "ExecutionConfig | None" = field(default=None, kw_only=True)
     channeling_basis_size: int = field(default=16, kw_only=True)
     channeling_bloch_cells: int = field(default=16, kw_only=True)
     channeling_dz_ang: float = field(default=250.0, kw_only=True)
     channeling_zone_max_ang: float | None = field(default=None, kw_only=True)
 
     def __post_init__(self) -> None:
+        self._resolve_typed_groups()
+        self._resolve_typed_sampling()
         validate_channeling_numerics(
             self.channeling_basis_size,
             self.channeling_bloch_cells,
@@ -414,6 +427,221 @@ class Numerics:
             raise ValueError("max_dE_frac must be finite and non-negative")
         if self.max_dE_frac > 0.0 and self.energy_model != "midpoint":
             raise ValueError("max_dE_frac > 0 requires energy_model='midpoint'")
+
+    def _resolve_typed_groups(self) -> None:
+        """Lower opt-in grouped sections through the existing flat API.
+
+        Explicit non-default legacy settings must agree. As in the sampling
+        migration, a flat argument equal to its historical default cannot be
+        distinguished from an implicit dataclass default; the typed setting
+        wins in that case. Legacy-only construction is never modified.
+        """
+        if self.transport is None and self.radiation is None and self.execution is None:
+            return  # legacy construction stays import-light and behaviorally untouched
+        from ._numerics_groups import ExecutionConfig, RadiationNumerics, TransportNumerics
+
+        groups = (
+            ("transport", TransportNumerics, (("energy_model", "midpoint"), ("max_dE_frac", 0.0))),
+            (
+                "radiation",
+                RadiationNumerics,
+                (("cxr_reflections", CxrReflections()), ("energy_bins", None)),
+            ),
+            (
+                "execution",
+                ExecutionConfig,
+                (("transport_core", "auto"), ("cxr_chunk", None), ("brem_chunk", None)),
+            ),
+        )
+        for group_name, expected_type, mirrors in groups:
+            group = getattr(self, group_name)
+            if group is None:
+                continue
+            if not isinstance(group, expected_type):
+                raise TypeError(f"{group_name} must be a {expected_type.__name__} or None")
+            for field_name, default in mirrors:
+                original = getattr(self, field_name)
+                value = getattr(group, field_name)
+                # EnergyBins may contain arrays whose equality is not scalar.
+                # Treat a shared object as equal; two separate grid instances
+                # should be specified through only one configuration route.
+                if field_name == "energy_bins":
+                    agrees = original is value
+                    is_default = original is None
+                else:
+                    agrees = original == value
+                    is_default = original == default
+                if not (agrees or is_default):
+                    raise ValueError(
+                        f"{group_name}.{field_name} conflicts with legacy Numerics."
+                        f"{field_name}; specify the value in only one place"
+                    )
+                object.__setattr__(self, field_name, value)
+
+    @property
+    def resolved_transport(self) -> "TransportNumerics":
+        """Return the effective transport integration policy for either API."""
+        from ._numerics_groups import TransportNumerics
+
+        return (
+            self.transport
+            if self.transport is not None
+            else TransportNumerics(self.energy_model, self.max_dE_frac)
+        )
+
+    @property
+    def resolved_radiation(self) -> "RadiationNumerics":
+        """Return the effective CXR/reflection and energy-grid policy."""
+        from ._numerics_groups import RadiationNumerics
+
+        return (
+            self.radiation
+            if self.radiation is not None
+            else RadiationNumerics(self.cxr_reflections, self.energy_bins)
+        )
+
+    @property
+    def resolved_execution(self) -> "ExecutionConfig":
+        """Return local kernel settings, not a scheduler/Executor."""
+        from ._numerics_groups import ExecutionConfig
+
+        return (
+            self.execution
+            if self.execution is not None
+            else ExecutionConfig(self.transport_core, self.cxr_chunk, self.brem_chunk)
+        )
+
+    def with_transport(self, value: "TransportNumerics") -> "Numerics":
+        """Change transport policy, clearing mirrored legacy values."""
+        from dataclasses import replace
+
+        return replace(self, transport=value, energy_model="midpoint", max_dE_frac=0.0)
+
+    def with_radiation(self, value: "RadiationNumerics") -> "Numerics":
+        """Change radiation policy, clearing mirrored legacy values."""
+        from dataclasses import replace
+
+        return replace(self, radiation=value, cxr_reflections=CxrReflections(), energy_bins=None)
+
+    def with_execution(self, value: "ExecutionConfig") -> "Numerics":
+        """Change local kernel policy, clearing mirrored legacy values."""
+        from dataclasses import replace
+
+        return replace(
+            self, execution=value, transport_core="auto", cxr_chunk=None, brem_chunk=None
+        )
+
+    def describe_numerics(self) -> dict[str, dict[str, object]]:
+        """Explain grouped settings without material loading or execution."""
+        from dataclasses import asdict
+
+        return {
+            "transport": {
+                "classification": "scientific",
+                "source": "typed" if self.transport is not None else "legacy",
+                "effective": asdict(self.resolved_transport),
+            },
+            "radiation": {
+                "classification": "scientific",
+                "source": "typed" if self.radiation is not None else "legacy",
+                # Grid arrays may be large: do not expand them for inspection.
+                "effective": {
+                    "cxr_reflections": asdict(self.cxr_reflections),
+                    "energy_bins": "custom" if self.energy_bins is not None else "catalog-default",
+                },
+            },
+            "execution": {
+                "classification": "execution",
+                "source": "typed" if self.execution is not None else "legacy",
+                "effective": asdict(self.resolved_execution),
+            },
+        }
+
+    def _resolve_typed_sampling(self) -> None:
+        """Adapt an opt-in policy to legacy fields, never altering legacy inputs.
+
+        Explicit contradictory legacy values are rejected. The historical
+        numeric defaults are unavoidable in the legacy dataclass signature;
+        adaptive mode documents those defaults as inactive rather than
+        interpreting them as requested work.
+        """
+        policy = self.sampling
+        if policy is None:
+            return
+        if not isinstance(policy, (FixedSampling, AdaptiveSampling)):
+            raise TypeError("sampling must be a FixedSampling, AdaptiveSampling, or None")
+        if isinstance(policy, FixedSampling):
+            if self.precision is not None:
+                raise ValueError("cannot combine fixed sampling with legacy precision")
+            for field_name, count in (
+                ("cxr_trials", policy.cxr_electrons),
+                ("brem_trials", policy.brem_electrons),
+            ):
+                current = getattr(self, field_name)
+                default = 450 if field_name == "cxr_trials" else 100
+                if current not in (default, count):
+                    raise ValueError(f"cannot combine FixedSampling with conflicting {field_name}")
+                object.__setattr__(self, field_name, count)
+            return
+        if self.cxr_trials != 450 or self.brem_trials != 100:
+            raise ValueError(
+                "cannot combine AdaptiveSampling with legacy cxr_trials/brem_trials; "
+                "remove the fixed counts"
+            )
+        if self.precision is not None and self.precision.to_dict() != policy.to_dict():
+            raise ValueError("AdaptiveSampling conflicts with legacy precision")
+        object.__setattr__(self, "precision", policy)
+
+    @property
+    def resolved_sampling(self) -> SamplingPolicy:
+        """The effective fixed/adaptive policy, including legacy construction."""
+        if self.sampling is not None:
+            return self.sampling
+        if self.precision is not None:
+            return AdaptiveSampling(
+                **{f.name: getattr(self.precision, f.name) for f in fields(Precision)}
+            )
+        return FixedSampling(self.cxr_trials, self.brem_trials)
+
+    def describe_sampling(self) -> dict[str, object]:
+        """Explain the chosen mode and any inactive legacy trial defaults.
+
+        No material lookup, estimation, or execution is performed. This is a
+        Python API diagnostic, not the profile CLI's resolution provenance.
+        """
+        policy = self.resolved_sampling
+        source = "typed" if self.sampling is not None else "legacy"
+        if isinstance(policy, FixedSampling):
+            return {
+                "mode": "fixed",
+                "source": source,
+                "requested": {
+                    "cxr_electrons": policy.cxr_electrons,
+                    "brem_electrons": policy.brem_electrons,
+                },
+                "effective": {
+                    "cxr_electrons": policy.cxr_electrons,
+                    "brem_electrons": policy.brem_electrons,
+                },
+                "inactive_legacy_fields": {},
+            }
+        return {
+            "mode": "adaptive",
+            "source": source,
+            "requested": policy.to_dict(),
+            "effective": {
+                "maximum_cxr_electrons": policy.max_electrons,
+                "maximum_brem_electrons": (
+                    policy.max_electrons
+                    if policy.brem_target_rse is None
+                    else policy.brem_policy().max_electrons
+                ),
+            },
+            "inactive_legacy_fields": {
+                "cxr_trials": self.cxr_trials,
+                "brem_trials": self.brem_trials,
+            },
+        }
 
 
 def resolve_physics(physics: Physics | None, numerics: Numerics) -> Physics:

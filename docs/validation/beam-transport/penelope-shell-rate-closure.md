@@ -151,7 +151,37 @@ stopping here exceeds `stp.dat` by up to 26% at 1 keV
   the raw GOS moments are returned unchanged.
 - $E\le U_i$: the shell is closed in both GOS and EEDL and contributes nothing.
 
-## Diagnostics (recorded, not tuned)
+## Corrected SBETHE v2 characterization (2026-10-24)
+
+The electron-fraction compound correction in `1f22f89c` changes the adopted
+stopping input to this closure. With `tables-sbethe-4`, the current outer-shell
+scale pins are:
+
+| material | 1 MeV | 10 MeV | 30 MeV | 100 MeV |
+| --- | ---: | ---: | ---: | ---: |
+| silicon | 1.056 | 1.263 | 1.442 | 1.623 |
+| sio2 | 0.792 | 0.853 | 0.918 | 1.002 |
+| mos2 | 1.272 | 1.449 | 1.499 | 1.626 |
+
+The SiO₂ closed/full-Penn comparison, retaining the same reference IMFPs and
+10 eV energy offset, becomes:
+
+| Energy (eV) | Full Penn (nm) | Closed GOS (nm) | Closed/reference |
+| ---: | ---: | ---: | ---: |
+| 1998.2 | 5.09 | 3.122 | 0.613 |
+| 9897.1 | 19.0 | 11.908 | 0.627 |
+| 19930.4 | 33.9 | 22.085 | 0.651 |
+
+The SiO₂ deficit is now 35–39%. These values replace the compound pins in
+`test_outer_scale_at_mev_energies_matches_recorded_note` and
+`test_closed_imfp_to_full_penn_ratio_matches_recorded_note`, keeping their
+existing absolute tolerances of 10⁻³ and 5×10⁻⁴. This refresh characterizes the
+corrected input; it does not independently validate the closure or resolve the
+total-rate discrepancy. The detailed diagnostic tables and sensitivities below
+were captured before v2 and remain historical; their compound values are
+superseded by the current pins above where provided. Silicon is unchanged.
+
+## Historical diagnostics (recorded, not tuned)
 
 The following values are for the measured-conduction-band oscillators of
 [`penelope-shell-oscillators`](penelope-shell-oscillators.md), with

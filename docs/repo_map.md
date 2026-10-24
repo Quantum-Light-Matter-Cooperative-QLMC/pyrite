@@ -23,7 +23,7 @@ behind lazy dispatch, ``__getattr__``, or ``import_module`` are outside this sca
 Components (a + b denotes a static import cycle):
   p0: _entry
   p1: apps
-  p2: campaign + checkpoints + energy_grid + montecarlo + observations + perf + remote + results + runs + validation
+  p2: campaign + checkpoints + energy_grid + execution + montecarlo + observations + perf + remote + results + runs + validation
   p3: cli
   p4: console
   p5: detectors

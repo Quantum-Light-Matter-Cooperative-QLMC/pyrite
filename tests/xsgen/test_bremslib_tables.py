@@ -59,6 +59,8 @@ def test_released_but_unfetched_table_is_an_error_not_a_fallback(monkeypatch):
 
 
 def test_unreleased_element_generates_from_a_checkout(monkeypatch, stored):
+    monkeypatch.setattr(bremslib_tables, "load_release_index", lambda: None)
+
     class Result:
         table = stored
 
@@ -75,6 +77,8 @@ def test_unreleased_element_generates_from_a_checkout(monkeypatch, stored):
 
 
 def test_unreleased_element_without_checkout_warns_and_is_left_out(monkeypatch):
+    monkeypatch.setattr(bremslib_tables, "load_release_index", lambda: None)
+
     def unavailable(z, *, source_path=None):
         raise SourceUnavailableError("no BremsLib checkout")
 

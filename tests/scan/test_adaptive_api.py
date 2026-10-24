@@ -76,16 +76,16 @@ def test_fixed_n_identity_matches_the_pre_precision_baseline():
         material="hopg", beam=BeamSpec(energy_keV=30), thickness_ang=1e4, tilt_deg=30
     )
     # Re-pinned for the deliberate CBS v4 (#513) and line-kinematics v5 (#439)
-    # identity generations.
+    # identity generations, then the corrected-stopping v2 marker (1f22f89c).
     identity = dataset_identity("hopg", "full", Settings(), sweep, bremsstrahlung_model="eedl")
     assert (
         identity["parameter_sha256"]
-        == "54fea7ba66afaad41e403fd48e411d43f8b0b57c731295ddd29d7310018f5452"
+        == "d434d77934c301d9ffffa7e1de760e325e7ecc45c1b3bad667097059295d5d9e"
     )
     case = build_cases(sweep, n_electrons=60, n_electrons_brem=60, bremsstrahlung_model="eedl")[0]
     assert "adaptive_precision" not in case
     assert (
-        case_content_key(case) == "881423359f7d39f9411823dc8692d3199d817929852167ecb8cf132d8ace3c22"
+        case_content_key(case) == "f91509b7387f3ab0a1ae6e25a253ac3a07f2df2846befdecacf8731add1bad05"
     )
 
 
