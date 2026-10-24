@@ -490,10 +490,29 @@ propagator and transfer/acceptance model.
 
 The transported handoff is covered by synthetic field/phase/kinematics,
 history-index, wrong-face, incidence-acceptance, aperture and source-law tests.
-**Unresolved gates:** a full-repository transported `Case` acceptance run,
-independent finite-boundary publication benchmark, formation-zone energy
-budget, GPU/device implementation and experiment remain required before
-promoting `optical-finite-boundary-field` beyond *unanchored*.
+`tests/montecarlo/test_optical_finite_case.py` additionally lowers a public
+`Scene` to a real `Case` and transports 12 primaries at 30 keV (seed 11),
+selecting the first eight for optical scoring. The normally incident
+`PointSpot`/`PointBunch` launch gives identical entrance states: the realized
+field is eight times the single-charge field and the collected spectrum is
+64 times the single-charge intensity. The test follows finite-plane collection
+through a synthetic 25 % absorptance and pulse gain to joules/pulse, volts and
+average watts; it also checks refusal of an excessive formation-length bound
+using the real post-entry straight runs. No crossings or transport are mocked.
+Run this transport acceptance check explicitly:
+
+```bash
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test --slow \
+  tests/montecarlo/test_optical_finite_case.py --durations=0
+```
+
+This verifies the opt-in diagnostic handoff and population/unit contracts.
+The synthetic channel is not a measured calibration, and the common numerical
+mesh does not establish source or acceptance convergence. **Unresolved gates:**
+independent finite-boundary publication benchmark, formation-zone energy budget,
+production source/transport integration and experiment. Bounded field-operator
+CUDA parity is recorded below. `optical-finite-boundary-field` remains
+`rederived`; published evidence is still required for `anchored`.
 
 ## Finite-distance, polarization-resolved collection (#616 next slice)
 
