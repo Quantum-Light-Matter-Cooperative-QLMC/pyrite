@@ -10,6 +10,7 @@ from .local import LocalExecutor
 from .model import ExecutionState, ResourceRequest, RetryPolicy, WorkUnit
 from .planning import iter_work_units
 from .protocol import Executor
+from .slurm import SlurmArrayConfig, SlurmArrayExecutor
 
 __all__ = [
     "ArtifactIntegrityError",
@@ -20,6 +21,8 @@ __all__ = [
     "LocalExecutor",
     "ResourceRequest",
     "RetryPolicy",
+    "SlurmArrayConfig",
+    "SlurmArrayExecutor",
     "WorkUnit",
     "iter_work_units",
 ]
