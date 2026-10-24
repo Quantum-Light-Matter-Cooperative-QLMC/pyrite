@@ -4,10 +4,10 @@ Execution *profiles* select where independent cases are scheduled. They are
 separate from `pr.ExecutionConfig` (#680), which controls the local numerical
 kernels and chunk sizes, and are **not** part of a case's physics identity.
 
-This initial slice supports the `local` and native `slurm` backends. It uses a
-small TOML file as an explicit profile source; migration into the unified named
-object catalog described in #680/ADR-0021 is future work. No Dask dependency is
-installed and selecting a profile does not change material presets.
+Available backends are `local`, native `slurm`, and optional Futures-based
+`dask` (installed through `pyrite-mc[dask]`). Profiles use a small explicit TOML
+file; migration into the unified named object catalog in #680/ADR-0021 is
+future work. Selecting a profile does not change material presets.
 
 ## Built-in profiles
 
@@ -29,13 +29,13 @@ For a **CPU-only** SLURM array with default one-core tasks:
 pyrite run standard -m hopg --execution slurm-cpu
 ```
 
-The selected catalog profile must not request a directional detector observation
-yet; the SLURM executor will refuse such a profile rather than silently omit
-detector results. This requires a shared filesystem visible at the **same absolute path** to
-both the coordinator and compute nodes, a working `sbatch`/`squeue`/`scancel`,
-and a compatible Python installation on every worker. Workers must be able to
-import `pyrite` and access physics datasets. The `slurm-cpu` built-in is a
-smoke-test configuration, not a site-portable resource recommendation.
+For local Dask testing, use `pyrite run standard -m hopg --execution dask-local`.
+Both distributed backends require a shared filesystem visible at the **same
+absolute path** from the coordinator and compute nodes. SLURM needs
+`sbatch`/`squeue`/`scancel` and a compatible Python installation. Workers must
+be able to import PyRITE and access its physics datasets. The built-in profiles
+are smoke-test configurations, not site-portable resource recommendations.
+See [Dask and distributed execution](dask-and-distributed-execution.md).
 
 ## Named resources and retry controls
 
@@ -92,15 +92,16 @@ profile name or substitutes allocation metadata for physics identity.
 ## Current limitations
 
 - One homogeneous resource request per array, with at most one GPU per task.
-- No detector-direction observations, trajectory capture, time-budgeted sweeps,
-  or performance profiling when the SLURM profile is selected. These combinations
-  fail explicitly before submitting an allocation.
+- Both distributed backends support independently keyed detector-direction
+  artifacts. Trajectory capture, time-budgeted sweeps and performance-profile
+  wrappers remain unsupported and are rejected before submission.
 - A GPU selector requires `accelerator = "cuda"` or `"rocm"`; device isolation
   and affinity remain SLURM/site responsibilities, not promises from a profile.
 - The CLI's existing `-R/--remote` submission mode is a **different** workflow
   and cannot be combined with `--execution`.
 - The TOML file is explicit per invocation; it is not yet a persistent catalog
   of execution presets. The `pyrite run` default remains unchanged.
-- Execution environment/provenance sidecars and cluster-end-to-end validation
-  are separate follow-up slices. The local executor still owns existing
-  multiprocessing, GPU fallback, and kernel scheduling policies.
+- Execution provenance now lives beside each distributed staging directory,
+  not inside scientific case identities. Cluster-end-to-end validation and
+  scaling benchmarks remain outstanding. The local executor still owns its
+  existing multiprocessing, GPU fallback and kernel scheduling policies.

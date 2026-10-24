@@ -68,7 +68,7 @@ cases_per_task = 2
 
 
 @pytest.mark.parametrize("definition, error", [
-    ({"backend": "dask"}, "backend"),
+    ({"backend": "dask", "dask": {"cluster": "existing"}}, "scheduler_address"),
     ({"backend": "slurm", "extra": 1}, "unknown"),
     ({"backend": "slurm", "resources": {"mem_bytes": 40}}, "unknown"),
     ({"backend": "slurm", "resources": {"cpu_cores": True}}, "cpu_cores"),

@@ -36,6 +36,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+dask = [
+    "distributed>=2025.1",
+    "dask-jobqueue>=0.9",
+]
 external-db = [
     "mp-api>=0.46",
 ]

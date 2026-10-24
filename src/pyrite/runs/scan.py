@@ -823,6 +823,15 @@ def _run_material(args, material, max_seconds=None):
     if summary is not None:
         print(summary)
     _print_sweep_header(args, material, cases, settings, identity)
+    if getattr(args, "execution_plan", False):
+        from ..execution.inspection import inspect_execution
+        from ..execution.profiles import resolve_execution_profile
+
+        selected = resolve_execution_profile(
+            args.execution, config_path=getattr(args, "execution_config", None)
+        )
+        print(json.dumps(inspect_execution(selected, len(cases)), indent=2, sort_keys=True))
+        return True  # No checkpoint, manifest, CAS, or worker job is created.
 
     # Always pass an explicit path named for the catalog material key: run_sweep's
     # default derives the name from the film crystal, which would make a named
@@ -871,15 +880,13 @@ def _run_material(args, material, max_seconds=None):
             selected = resolve_execution_profile(
                 selected_execution, config_path=getattr(args, "execution_config", None)
             )
-            if selected.backend == "slurm":
+            if selected.backend in ("slurm", "dask"):
                 if deadline is not None:
-                    raise ValueError("SLURM arrays do not support --max-minutes yet")
+                    raise ValueError("distributed execution does not support --max-minutes yet")
                 if capture_kw:
-                    raise ValueError("SLURM arrays do not support --trajectories yet")
-                if observation is not None:
-                    raise ValueError("SLURM arrays do not support detector observations yet")
+                    raise ValueError("distributed execution does not support --trajectories yet")
                 if performance_logger is not None:
-                    raise ValueError("SLURM arrays do not support performance profiling yet")
+                    raise ValueError("distributed execution does not support performance profiling yet")
             executor, artifact_store = build_executor(
                 selected,
                 case_key=content_key_fn,

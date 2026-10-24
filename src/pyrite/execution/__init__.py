@@ -5,7 +5,12 @@ kernels, local process pools, and GPU context ownership are unchanged.
 Distributed backends can implement :class:`Executor` in later milestones.
 """
 
-from .artifacts import ArtifactIntegrityError, CaseArtifactRef, CaseArtifactStore
+from .artifacts import (
+    ArtifactIntegrityError, CaseArtifactRef, CaseArtifactStore, DirectionalArtifactRef,
+    directional_content_key, load_directional_result,
+)
+from .dask import DaskConfig, DaskExecutor
+from .inspection import inspect_execution
 from .local import LocalExecutor
 from .model import ExecutionState, ResourceRequest, RetryPolicy, WorkUnit
 from .planning import iter_work_units
@@ -17,6 +22,11 @@ __all__ = [
     "ArtifactIntegrityError",
     "CaseArtifactRef",
     "CaseArtifactStore",
+    "DaskConfig",
+    "DaskExecutor",
+    "DirectionalArtifactRef",
+    "directional_content_key",
+    "load_directional_result",
     "ExecutionState",
     "ExecutionProfile",
     "ExecutionCancelledError",
@@ -28,6 +38,7 @@ __all__ = [
     "SlurmArrayExecutor",
     "WorkUnit",
     "iter_work_units",
+    "inspect_execution",
     "build_executor",
     "resolve_execution_profile",
 ]

@@ -138,6 +138,11 @@ def _reproduce_zhai(ne, ne_brem, ne_supp, tmd_azimuth, refresh):
     help="TOML file containing [execution.NAME] scheduler settings.",
 )
 @click.option(
+    "--execution-plan",
+    is_flag=True,
+    help="Inspect requested execution resources and task counts without running cases.",
+)
+@click.option(
     "--quick",
     is_flag=True,
     help="Use a tiny smoke-test grid and write the <material>_quick/ component directory.",
@@ -365,6 +370,10 @@ def _command(ctx, **options):
         raise click.UsageError("--detector/--output-file require --ephemeral")
     if options["execution_config"] is not None and options["execution"] is None:
         raise click.UsageError("--execution-config requires --execution NAME")
+    if options["execution_plan"] and options["execution"] is None:
+        raise click.UsageError("--execution-plan requires --execution NAME")
+    if options["execution_plan"] and options["json_output"]:
+        raise click.UsageError("--execution-plan has its own JSON output; omit --json")
     if options["execution"] is not None and (
         options["ephemeral"]
         or options["remote_target"] is not None
@@ -688,6 +697,7 @@ _LOCAL_RUN_PARAMETER_NAMES = (
     "workers",
     "execution",
     "execution_config",
+    "execution_plan",
     "catalog_profile",
     "quick",
     "n_families",

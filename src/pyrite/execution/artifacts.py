@@ -267,3 +267,56 @@ class CaseArtifactStore:
         if ref is None:
             return None
         return ref, self.load(ref, expected_material=material, expected_content_key=content_key)
+
+
+@dataclass(frozen=True, slots=True)
+class DirectionalArtifactRef:
+    """Two independently verified blobs for one scalar + directional solve.
+
+    The scalar blob uses the established physics content key, while the
+    directional blob is keyed by that physics and the sampled unit vectors.
+    Different detectors must never overwrite one another or poison scalar CAS.
+    """
+
+    scalar: CaseArtifactRef
+    directional: CaseArtifactRef
+
+
+def directional_content_key(scalar_key: str, directions: Any) -> str:
+    """Stable key for direction-dependent *raw* spectra, excluding detector gain.
+
+    The float64 normalization and shape are part of the hash, even for a
+    single direction. This is intentionally NOT a PyRITE scientific case key.
+    """
+    import numpy as np
+
+    data = np.asarray(directions, dtype=np.float64)
+    if data.ndim != 2 or data.shape[1] != 3 or not data.shape[0]:
+        raise ValueError("observation directions must have shape (N, 3)")
+    if not np.all(np.isfinite(data)):
+        raise ValueError("observation directions must be finite")
+    digest = hashlib.sha256(b"pyrite.directional.v1\x00")
+    digest.update(bytes.fromhex(_key(scalar_key)))
+    digest.update(data.shape[0].to_bytes(8, "big"))
+    digest.update(data.astype("<f8", copy=False).tobytes(order="C"))
+    return digest.hexdigest()
+
+
+def directional_store(store: CaseArtifactStore) -> CaseArtifactStore:
+    """Separate namespace: never write directional arrays into scalar CAS."""
+    return CaseArtifactStore(store.root / ".directional")
+
+
+def load_directional_result(
+    store: CaseArtifactStore, ref: DirectionalArtifactRef, *,
+    material: str, case_key: str, directions: Any,
+) -> dict[str, Any]:
+    """Return a fresh ordinary runner output for the coordinator callback."""
+    scalar = store.load(ref.scalar, expected_material=material, expected_content_key=case_key)
+    direction_key = directional_content_key(case_key, directions)
+    directional = directional_store(store).load(
+        ref.directional, expected_material=material, expected_content_key=direction_key
+    )
+    if set(directional) != {"directional"} or not isinstance(directional["directional"], dict):
+        raise ArtifactIntegrityError("invalid directional artifact payload")
+    return {**scalar, **directional}
