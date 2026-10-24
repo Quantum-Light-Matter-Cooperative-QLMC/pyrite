@@ -125,6 +125,19 @@ def _reproduce_zhai(ne, ne_brem, ne_supp, tmd_azimuth, refresh):
     help="run_cases max_workers (default auto; 0 = serial, no transport pool).",
 )
 @click.option(
+    "--execution",
+    default=None,
+    metavar="NAME",
+    help="Select a named execution profile (built-in: local, slurm-cpu).",
+)
+@click.option(
+    "--execution-config",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    default=None,
+    metavar="TOML",
+    help="TOML file containing [execution.NAME] scheduler settings.",
+)
+@click.option(
     "--quick",
     is_flag=True,
     help="Use a tiny smoke-test grid and write the <material>_quick/ component directory.",
@@ -350,6 +363,17 @@ def _command(ctx, **options):
         options["detector_id"] is not None or options["output_file"] is not None
     ):
         raise click.UsageError("--detector/--output-file require --ephemeral")
+    if options["execution_config"] is not None and options["execution"] is None:
+        raise click.UsageError("--execution-config requires --execution NAME")
+    if options["execution"] is not None and (
+        options["ephemeral"]
+        or options["remote_target"] is not None
+        or options["preset"] is not None
+    ):
+        raise click.UsageError(
+            "--execution is for ordinary sweeps; it cannot be combined with "
+            "--ephemeral, -R/--remote, or --preset"
+        )
     if options["ephemeral"]:
         return _run_ephemeral(ctx, options)
     raw_catalog_profile = options["catalog_profile"]
@@ -662,6 +686,8 @@ _PROFILER_REEXEC_PARAMETER_NAMES = (
 _LOCAL_RUN_PARAMETER_NAMES = (
     "material",
     "workers",
+    "execution",
+    "execution_config",
     "catalog_profile",
     "quick",
     "n_families",
@@ -695,6 +721,8 @@ def _run_local(options):
         if options["py_spy"]
         else None
     )
+    if reexec is not None and options["execution"] is not None:
+        raise click.UsageError("--execution cannot be combined with profiling re-execution")
     if reexec is not None:
         reexec(
             performance_profile=performance_profile,

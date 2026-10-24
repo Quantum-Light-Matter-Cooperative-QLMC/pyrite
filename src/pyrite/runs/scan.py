@@ -862,6 +862,32 @@ def _run_material(args, material, max_seconds=None):
     try:
         if progress.timer is not None:
             progress.timer.start()
+        observation = _sweep_observation(args, identity, settings, stem, content_key_fn)
+        execution_kwargs = {}
+        selected_execution = getattr(args, "execution", None)
+        if selected_execution is not None:
+            from ..execution.profiles import build_executor, resolve_execution_profile
+
+            selected = resolve_execution_profile(
+                selected_execution, config_path=getattr(args, "execution_config", None)
+            )
+            if selected.backend == "slurm":
+                if deadline is not None:
+                    raise ValueError("SLURM arrays do not support --max-minutes yet")
+                if capture_kw:
+                    raise ValueError("SLURM arrays do not support --trajectories yet")
+                if observation is not None:
+                    raise ValueError("SLURM arrays do not support detector observations yet")
+                if performance_logger is not None:
+                    raise ValueError("SLURM arrays do not support performance profiling yet")
+            executor, artifact_store = build_executor(
+                selected,
+                case_key=content_key_fn,
+                artifact_root=Path(args.checkpoint_dir).resolve(),
+            )
+            execution_kwargs["executor"] = executor
+            if artifact_store is not None:
+                execution_kwargs["artifact_store"] = artifact_store
         result = run_sweep(
             cases,
             results,
@@ -881,7 +907,8 @@ def _run_material(args, material, max_seconds=None):
             dataset_identity=identity,
             metadata_only_complete=True,
             **capture_kw,
-            observation=_sweep_observation(args, identity, settings, stem, content_key_fn),
+            **execution_kwargs,
+            observation=observation,
         )
         # run_sweep returns a bool (complete?). Only a bare None -- test doubles
         # that predate the budget feature and don't bother returning anything --

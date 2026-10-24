@@ -9,6 +9,7 @@ from .artifacts import ArtifactIntegrityError, CaseArtifactRef, CaseArtifactStor
 from .local import LocalExecutor
 from .model import ExecutionState, ResourceRequest, RetryPolicy, WorkUnit
 from .planning import iter_work_units
+from .profiles import ExecutionProfile, build_executor, resolve_execution_profile
 from .protocol import Executor
 from .slurm import ExecutionCancelledError, SlurmArrayConfig, SlurmArrayExecutor
 
@@ -17,6 +18,7 @@ __all__ = [
     "CaseArtifactRef",
     "CaseArtifactStore",
     "ExecutionState",
+    "ExecutionProfile",
     "ExecutionCancelledError",
     "Executor",
     "LocalExecutor",
@@ -26,4 +28,6 @@ __all__ = [
     "SlurmArrayExecutor",
     "WorkUnit",
     "iter_work_units",
+    "build_executor",
+    "resolve_execution_profile",
 ]
