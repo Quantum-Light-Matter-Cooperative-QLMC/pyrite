@@ -19,7 +19,19 @@ from .study import (
 )
 
 __all__ = [
-    "Categorical", "Continuous", "Integer", "ParameterSpace", "apply_scene_parameters",
-    "Constraint", "Objective", "OptimizationResult", "OptimizationStudy", "OptimizationTrial",
-    "Optimizer", "OptunaOptimizer", "Proposal", "PyriteEvaluator", "TrialState",
+    "Categorical",
+    "Continuous",
+    "Integer",
+    "ParameterSpace",
+    "apply_scene_parameters",
+    "Constraint",
+    "Objective",
+    "OptimizationResult",
+    "OptimizationStudy",
+    "OptimizationTrial",
+    "Optimizer",
+    "OptunaOptimizer",
+    "Proposal",
+    "PyriteEvaluator",
+    "TrialState",
 ]

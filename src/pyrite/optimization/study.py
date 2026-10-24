@@ -114,8 +114,8 @@ class OptimizationResult:
         def dominates(a: OptimizationTrial, b: OptimizationTrial) -> bool:
             comparisons = [
                 (a.objectives[o.name] >= b.objectives[o.name])
-                if o.direction == "maximize" else
-                (a.objectives[o.name] <= b.objectives[o.name])
+                if o.direction == "maximize"
+                else (a.objectives[o.name] <= b.objectives[o.name])
                 for o in self.objectives
             ]
             strict = any(a.objectives[o.name] != b.objectives[o.name] for o in self.objectives)
@@ -173,7 +173,13 @@ class OptimizationStudy:
             raise TypeError("base must be a PyRITE Scene")
         for path in self.parameters.parameters:
             if path.split(".", 1)[0].split("[", 1)[0] not in (
-                "beam", "target", "detector", "filters", "acquisition", "physics", "quantum"
+                "beam",
+                "target",
+                "detector",
+                "filters",
+                "acquisition",
+                "physics",
+                "quantum",
             ):
                 raise ValueError(f"{path!r} is not a physical Scene parameter path")
             parsed = _parts(path)
@@ -210,11 +216,15 @@ class OptimizationStudy:
         if getattr(optimizer, "persistent", False):
             from .identity import study_definition_digest
 
+            if not isinstance(evaluation_id, str) or not evaluation_id.strip():
+                raise ValueError("durable studies require a nonempty evaluation_id")
             digest = study_definition_digest(
-                self.base, self.parameters, self.objectives, self.constraints,
-                evaluation_id=evaluation_id,  # type: ignore[arg-type]
-                base_seed=(evaluator.base_seed if isinstance(evaluator, PyriteEvaluator)
-                           else None),
+                self.base,
+                self.parameters,
+                self.objectives,
+                self.constraints,
+                evaluation_id=evaluation_id,
+                base_seed=(evaluator.base_seed if isinstance(evaluator, PyriteEvaluator) else None),
             )
         prepare_resume = getattr(optimizer, "prepare_resume", None)
         history: list[OptimizationTrial] = (
@@ -240,19 +250,25 @@ class OptimizationStudy:
             except Exception as exc:
                 # Only candidate/physics/scoring failures are recoverable. A
                 # failed backend tell is an optimizer-state error and propagates.
-                trial = OptimizationTrial(number, dict(proposal.parameters), TrialState.FAILED,
-                                          error=f"{type(exc).__name__}: {exc}")
+                trial = OptimizationTrial(
+                    number,
+                    dict(proposal.parameters),
+                    TrialState.FAILED,
+                    error=f"{type(exc).__name__}: {exc}",
+                )
                 record_trial = getattr(optimizer, "record_trial", None)
                 if record_trial is not None:
                     record_trial(proposal, trial)
                 optimizer.tell(proposal, None, failed=True)
             else:
                 state = (
-                    TrialState.INFEASIBLE if any(v > 0 for v in violations)
+                    TrialState.INFEASIBLE
+                    if any(v > 0 for v in violations)
                     else TrialState.COMPLETED
                 )
-                trial = OptimizationTrial(number, dict(proposal.parameters), state,
-                                          objective_values, constraint_values)
+                trial = OptimizationTrial(
+                    number, dict(proposal.parameters), state, objective_values, constraint_values
+                )
                 record_trial = getattr(optimizer, "record_trial", None)
                 if record_trial is not None:
                     record_trial(proposal, trial)
@@ -301,11 +317,12 @@ class PyriteEvaluator:
         from ..campaign.model import Sweep
         from ..runs.run import run_sweep
 
-        case, = Sweep(base=scene).cases()
+        (case,) = Sweep(base=scene).cases()
         # The name is the checkpoint-record key, whereas content keys exclude
         # the name and include the seed. Keep replicate records distinct too.
         case = replace(
-            case, seed=self.base_seed + trial_number,
+            case,
+            seed=self.base_seed + trial_number,
             name=f"{case.name} [optimization-trial-{trial_number:08d}]",
         )
         results: dict = {}

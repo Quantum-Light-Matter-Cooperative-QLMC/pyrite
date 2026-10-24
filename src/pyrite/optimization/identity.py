@@ -31,8 +31,10 @@ def _canonical(value: Any) -> Any:
     An unsupported scene field fails closed rather than permitting unsafe resume.
     """
     if isinstance(value, Enum):
-        return {"enum": f"{type(value).__module__}.{type(value).__qualname__}",
-                "value": _canonical(value.value)}
+        return {
+            "enum": f"{type(value).__module__}.{type(value).__qualname__}",
+            "value": _canonical(value.value),
+        }
     if value is None or isinstance(value, (str, bool, int)):
         return value
     if isinstance(value, float):
@@ -54,8 +56,9 @@ def _canonical(value: Any) -> Any:
     if dataclasses.is_dataclass(value) and not isinstance(value, type):
         return {
             "class": f"{type(value).__module__}.{type(value).__qualname__}",
-            "fields": {f.name: _canonical(getattr(value, f.name))
-                       for f in dataclasses.fields(value)},
+            "fields": {
+                f.name: _canonical(getattr(value, f.name)) for f in dataclasses.fields(value)
+            },
         }
     if isinstance(value, Mapping):
         if not all(isinstance(key, str) for key in value):
@@ -97,6 +100,7 @@ def study_definition_digest(
         "evaluation_id": evaluation_id,
         "base_seed": base_seed,
     }
-    encoded = json.dumps(body, sort_keys=True, ensure_ascii=True,
-                         separators=(",", ":"), allow_nan=False).encode("utf-8")
+    encoded = json.dumps(
+        body, sort_keys=True, ensure_ascii=True, separators=(",", ":"), allow_nan=False
+    ).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()

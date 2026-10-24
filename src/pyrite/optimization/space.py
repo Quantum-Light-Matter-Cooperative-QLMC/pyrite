@@ -154,7 +154,13 @@ def apply_scene_parameters(base: Any, space: ParameterSpace, values: Mapping[str
         raise TypeError("base must be a PyRITE Scene")
     for path in space.parameters:
         if path.split(".", 1)[0].split("[", 1)[0] not in (
-            "beam", "target", "detector", "filters", "acquisition", "physics", "quantum"
+            "beam",
+            "target",
+            "detector",
+            "filters",
+            "acquisition",
+            "physics",
+            "quantum",
         ):
             raise ValueError(f"{path!r} is not a physical Scene parameter path")
     validated = space.validate(values)

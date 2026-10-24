@@ -9,25 +9,33 @@ Optuna is optional: install `pyrite-mc[optimization]` or use
 
 ```python
 from pyrite.optimization import (
-    Constraint, Continuous, Objective, OptimizationStudy,
-    OptunaOptimizer, ParameterSpace, PyriteEvaluator,
+    Constraint,
+    Continuous,
+    Objective,
+    OptimizationStudy,
+    OptunaOptimizer,
+    ParameterSpace,
+    PyriteEvaluator,
 )
 
 # `scene` is an existing, fully resolved pyrite.campaign.model.Scene.
 study = OptimizationStudy(
     base=scene,
-    parameters=ParameterSpace({
-        "beam.energy_keV": Continuous(30, 100),
-        "target.tilt_deg": Continuous(0, 60),
-    }),
+    parameters=ParameterSpace(
+        {
+            "beam.energy_keV": Continuous(30, 100),
+            "target.tilt_deg": Continuous(0, 60),
+        }
+    ),
     objectives=(Objective("window_flux", "maximize", "photons/electron"),),
     constraints=(Constraint("line_fwhm_eV", "<=", 1.0, "eV"),),
 )
 
+
 # Compute these observables from normal run_sweep result records. Keep the
 # energy integration window, normalizations and analysis settings fixed.
-def score_results(records):
-    ...  # return {"window_flux": ..., "line_fwhm_eV": ...}
+def score_results(records): ...  # return {"window_flux": ..., "line_fwhm_eV": ...}
+
 
 evaluator = PyriteEvaluator(
     score_results,
@@ -42,7 +50,9 @@ optimizer = OptunaOptimizer(
     study_name="pxr-500ev-design",
 )
 result = study.run(
-    evaluator, optimizer, max_trials=50,
+    evaluator,
+    optimizer,
+    max_trials=50,
     evaluation_id="window-490-510ev-per-electron-v1",
 )
 print(result.best_trial)

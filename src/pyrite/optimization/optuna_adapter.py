@@ -43,8 +43,7 @@ class OptunaOptimizer:
             import optuna
         except ImportError as exc:
             raise ImportError(
-                "Optuna optimizer requires the optional dependency: "
-                "uv sync --extra optimization"
+                "Optuna optimizer requires the optional dependency: uv sync --extra optimization"
             ) from exc
         if not objectives:
             raise ValueError("optimizer requires at least one objective")
@@ -116,7 +115,9 @@ class OptunaOptimizer:
                 raise ValueError(f"trial {frozen.number} lacks durable PyRITE metadata")
             # Abrupt termination before completion metadata was persisted.
             return OptimizationTrial(
-                frozen.number, dict(frozen.params), TrialState.FAILED,
+                frozen.number,
+                dict(frozen.params),
+                TrialState.FAILED,
                 error="Interrupted before trial observables were committed",
             )
         if frozen.params != saved["parameters"]:
@@ -128,8 +129,12 @@ class OptunaOptimizer:
         elif frozen.state != self._optuna.trial.TrialState.COMPLETE:
             raise ValueError("stored trial state disagrees with Optuna completion")
         return OptimizationTrial(
-            frozen.number, dict(saved["parameters"]), state,
-            dict(saved["objectives"]), dict(saved["constraints"]), saved["error"],
+            frozen.number,
+            dict(saved["parameters"]),
+            state,
+            dict(saved["objectives"]),
+            dict(saved["constraints"]),
+            saved["error"],
         )
 
     def ask(self) -> Proposal:
@@ -164,13 +169,16 @@ class OptunaOptimizer:
                 for constraint in self.constraints
             )
             proposal.token.set_user_attr(_CONSTRAINT_KEY, violations)
-        proposal.token.set_user_attr(_TRIAL_KEY, {
-            "parameters": dict(result.parameters),
-            "state": result.state.value,
-            "objectives": dict(result.objectives),
-            "constraints": dict(result.constraints),
-            "error": result.error,
-        })
+        proposal.token.set_user_attr(
+            _TRIAL_KEY,
+            {
+                "parameters": dict(result.parameters),
+                "state": result.state.value,
+                "objectives": dict(result.objectives),
+                "constraints": dict(result.constraints),
+                "error": result.error,
+            },
+        )
 
     def tell(
         self,
