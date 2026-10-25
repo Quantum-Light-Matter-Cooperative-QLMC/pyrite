@@ -9,6 +9,7 @@ Commands:
     acp-up     start the Claude and Codex ACP WebSocket bridges
     acp-down   stop bridges started by acp-up
     repo-map   print a compact repo tree and the canonical commands
+    api        check governed Python API root exports (and optional alias identity)
     docs       clean, strict Sphinx build (optional external link check)
     lint       run Ruff over the repository
     format     run Ruff formatter
@@ -699,6 +700,18 @@ def cmd_complexity(args: argparse.Namespace) -> None:
         raise SystemExit(status)
 
 
+def cmd_api(args: argparse.Namespace) -> None:
+    """Check the governed Python API inventory without changing exports."""
+    from pyrite.devtools.api_surface import check
+
+    errors = check(ROOT, imports=getattr(args, "imports", False))
+    if errors:
+        for error in errors:
+            print(f"api: {error}", file=sys.stderr)
+        raise SystemExit(1)
+    print("API root namespace inventory OK")
+
+
 def cmd_verify(args: argparse.Namespace) -> None:
     """Run static repository gates; test selection is always explicit."""
     cmd_typecheck(args)
@@ -706,6 +719,7 @@ def cmd_verify(args: argparse.Namespace) -> None:
     run("-m", "ruff", "format", "--check", ".")
     cmd_check_lines(args)
     cmd_complexity(argparse.Namespace(check=True))
+    cmd_api(argparse.Namespace(imports=False))
     cmd_docs(argparse.Namespace(linkcheck=False))
     cmd_imports(args)
 
@@ -1037,6 +1051,15 @@ def build_parser(prog_name: str = "pyrite-dev") -> argparse.ArgumentParser:
         "--churn", type=_positive_int, metavar="N", help="add git churn over N commits"
     )
     complexity.set_defaults(func=cmd_complexity)
+    api = sub.add_parser("api", help="check the governed Python API namespace")
+    api_sub = api.add_subparsers(dest="api_command", required=True)
+    api_check = api_sub.add_parser("check", help="check the root export inventory")
+    api_check.add_argument(
+        "--imports",
+        action="store_true",
+        help="also import aliases and check object identity (may initialize engines)",
+    )
+    api_check.set_defaults(func=cmd_api)
     verify = sub.add_parser(
         "verify",
         help="run static repository checks (no tests)",

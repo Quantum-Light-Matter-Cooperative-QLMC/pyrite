@@ -10,6 +10,41 @@ Start with the [Python API workflow](guides/python-api-workflow.md) for runnable
 examples, units and result interpretation. The [CLI reference](repo-design/cli/cli-reference.md)
 covers command-line contracts.
 
+## Canonical domain imports
+
+New code can import the supported beam, geometry, and configuration objects
+from their owning domains. The package-root aliases remain supported and are
+**identical objects**; no physics defaults, serialization, or caching behavior
+changes when choosing these imports.
+
+```python
+from pyrite.beams import Beam, TransverseSpot, BunchLength
+from pyrite.geometry import Target, Slab, CrystalCut, RectangularBody
+from pyrite.config import Physics, Numerics, FixedSampling, load_physics
+from pyrite.detectors import Detector, PlanarDetector, PixelGrid, PlanarPose
+from pyrite.observations import Acquisition, PixelSampling, ObservationPlan
+```
+
+The **detector** namespace owns scalar and physical/pixel detector models,
+acceptance, geometry and sensor responses. The **observations** namespace owns
+acquisition requests, pixel scoring, observation plans and observation stores;
+scientific spectra and spatial outputs still live under `pyrite.results`.
+`FilterPlate` is a supported detector-adjacent geometry compatibility type;
+new passive filter roles remain under `pyrite.geometry.Filter`. All these
+new imports resolve to the same objects as the existing root and
+`pyrite.instrument` paths where applicable.
+A detector with a response and an `Acquisition` can request expected or
+realized counts; intrinsic spectra remain photons/(incident electron eV sr),
+whereas pixel-integrated and acquired results have different acceptances and
+normalizations (see the [API workflow](guides/python-api-workflow.md)).
+
+Other namespaces retain their existing documented import paths. In particular,
+`pyrite.config.ExecutionConfig` still selects *local kernel controls* and is
+not a scheduler profile (`pyrite.execution.ExecutionProfile`); the name is
+retained for compatibility while configuration design work proceeds.
+`pyrite.config.PhotonTransport` is experimental. See the
+[API namespace policy](development/api-policy.md) for ownership and stability.
+
 ## Material authoring
 
 Use `pyrite.materials.MaterialDefinition`, `build_medium`, `build_crystal` and
@@ -331,3 +366,14 @@ screen objects, energy-node iteration, source-law metadata and formation guards
 remain host control. `FiniteScreenBunchAngular.collect_cone(to_host=False)`
 retains its scalar on device; the default returns a host float. Device band
 arrays can feed `CalibratedPulseEnergyDetector.predict_batch` directly.
+
+## Selected package contracts
+
+The root inventory is supplemented by reviewed package and leaf-module names in
+`api-surface.toml` under `package_exports`. In addition to material authoring,
+the inventory retains the material, transport, detector-response, and analysis
+contracts listed above as advanced-stable, with the axial diagnostic explicitly
+experimental. It also includes `pyrite.observations.ObservationPlan`,
+`pyrite.observations.PixelSampling`, `pyrite.results.Result`, and
+`pyrite.results.Provenance`. A declaration in `__all__` alone is **not** an
+API-support promise; consult the policy for status and compatibility rules.

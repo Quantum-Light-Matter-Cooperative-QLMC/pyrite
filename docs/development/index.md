@@ -7,6 +7,7 @@ implementation; research pages describe proposals; ADRs record durable decisions
 ```{toctree}
 :maxdepth: 1
 
+api-policy
 ../repo-design/index
 ../research/index
 ../adr/index
