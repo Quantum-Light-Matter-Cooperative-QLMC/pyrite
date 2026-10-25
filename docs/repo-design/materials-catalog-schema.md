@@ -104,6 +104,14 @@ tilt_azim_deg = { arange = [0.0, 360.0, 30.0] }
 
 Electron-count grids, line grids, bremsstrahlung grids, thickness-in-layers, and per-energy line grids use the same validated descriptor model where applicable. Units belong in field names: electron energy is keV, photon energy is eV, thickness is Å, and angles are degrees.
 
+With the optional `pyrite-mc[units]` extra installed, physical grid values and
+profile beam, detector, filter, response, and acquisition fields also accept
+explicit quantity strings. For example, `energy_keV = "60 keV"`,
+`distance_mm = "10 cm"`, `polar_deg = "0.5 rad"`, and
+`exposure_s = "500 ms"` resolve through the same Pint adapter as Python
+configuration objects. Existing numeric TOML values retain their field units.
+See the [physical-units boundary and supported fields](physical-units.md).
+
 ## Beams and detectors
 
 A named beam contains display metadata plus transverse and longitudinal source parameters. Profiles attach it with `beam = "NAME"`; the name and label are removed during resolution so identity follows values. The full field and unit reference is [Beam phase space](../physics/beam-transport/beam-phase-space.md).

@@ -13,6 +13,7 @@ from typing import Any, Literal
 
 import numpy as np
 
+from .._units import normalize_unit
 from ..detectors import IdealPhotonCounter, Timepix3
 from ..materials import CATALOG, MediumSpec
 from ..materials._composition import resolve_composition
@@ -75,6 +76,31 @@ class Acquisition:
         object.__setattr__(
             self,
             "exposure_s",
+            normalize_unit(self.exposure_s, "s", field="Acquisition.exposure_s", expected="time"),
+        )
+        object.__setattr__(
+            self,
+            "measured_edges_eV",
+            normalize_unit(
+                self.measured_edges_eV,
+                "eV",
+                field="Acquisition.measured_edges_eV",
+                expected="energy",
+            ),
+        )
+        object.__setattr__(
+            self,
+            "hit_threshold_eV",
+            normalize_unit(
+                self.hit_threshold_eV,
+                "eV",
+                field="Acquisition.hit_threshold_eV",
+                expected="energy",
+            ),
+        )
+        object.__setattr__(
+            self,
+            "exposure_s",
             _finite_real("Acquisition.exposure_s", self.exposure_s, minimum=0.0, open_minimum=True),
         )
         try:
@@ -131,6 +157,15 @@ class Acquisition:
         seed: int | None = None,
     ) -> Acquisition:
         """Construct explicit uniform reporting edges from bounds and width."""
+        exposure_s = normalize_unit(
+            exposure_s, "s", field="Acquisition.exposure_s", expected="time"
+        )
+        minimum_eV = normalize_unit(minimum_eV, "eV", field="minimum_eV", expected="energy")
+        maximum_eV = normalize_unit(maximum_eV, "eV", field="maximum_eV", expected="energy")
+        bin_width_eV = normalize_unit(bin_width_eV, "eV", field="bin_width_eV", expected="energy")
+        hit_threshold_eV = normalize_unit(
+            hit_threshold_eV, "eV", field="Acquisition.hit_threshold_eV", expected="energy"
+        )
         minimum = _finite_real("minimum_eV", minimum_eV, minimum=0.0, open_minimum=False)
         maximum = _finite_real("maximum_eV", maximum_eV, minimum=0.0, open_minimum=True)
         width = _finite_real("bin_width_eV", bin_width_eV, minimum=0.0, open_minimum=True)

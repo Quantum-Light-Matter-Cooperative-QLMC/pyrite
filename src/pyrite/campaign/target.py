@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from numbers import Real
 from typing import Literal
 
+from .._units import normalize_unit
 from ..bodies import RectangularBody, SubstanceRef
 from . import geometry
 from .geometry import CrystalCut, Footprint, Slab
@@ -43,7 +44,14 @@ class Target:
         if not isinstance(self.lattice_cut, CrystalCut) and self.lattice_cut != "catalog":
             raise ValueError("Target.lattice_cut must be 'catalog' or a CrystalCut")
         for name in ("tilt_deg", "tilt_azim_deg"):
-            value = getattr(self, name)
+            value = normalize_unit(
+                getattr(self, name),
+                "degree",
+                field=f"Target.{name}",
+                expected="angle",
+                kind="angle",
+            )
+            object.__setattr__(self, name, value)
             if isinstance(value, bool) or not isinstance(value, Real):
                 raise TypeError(f"Target.{name} must be a scalar real angle")
             if not math.isfinite(float(value)):

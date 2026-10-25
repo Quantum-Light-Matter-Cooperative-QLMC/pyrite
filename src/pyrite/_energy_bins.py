@@ -5,6 +5,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from ._units import _is_pint_quantity, normalize_unit
+
 
 @dataclass(frozen=True, eq=False)
 class EnergyBins:
@@ -29,6 +31,42 @@ class EnergyBins:
     cxr: np.ndarray | None = None
     cxr_by_energy: Mapping[float, np.ndarray] | None = None
     brem: np.ndarray | None = None
+
+    def __post_init__(self) -> None:
+        for name in ("cxr", "brem"):
+            value = getattr(self, name)
+            if value is not None:
+                numeric = normalize_unit(
+                    value,
+                    "eV",
+                    field=f"EnergyBins.{name}",
+                    expected="energy",
+                )
+                object.__setattr__(self, name, np.asarray(numeric, dtype=float))
+        if self.cxr_by_energy is not None and any(
+            _is_pint_quantity(energy) or _is_pint_quantity(grid)
+            for energy, grid in self.cxr_by_energy.items()
+        ):
+            normalized = {
+                float(
+                    normalize_unit(
+                        energy,
+                        "keV",
+                        field="EnergyBins.cxr_by_energy key",
+                        expected="energy",
+                    )
+                ): np.asarray(
+                    normalize_unit(
+                        grid,
+                        "eV",
+                        field="EnergyBins.cxr_by_energy value",
+                        expected="energy",
+                    ),
+                    dtype=float,
+                )
+                for energy, grid in self.cxr_by_energy.items()
+            }
+            object.__setattr__(self, "cxr_by_energy", normalized)
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, EnergyBins):

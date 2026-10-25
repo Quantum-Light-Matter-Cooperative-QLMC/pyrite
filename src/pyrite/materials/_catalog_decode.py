@@ -7,6 +7,8 @@ from typing import cast
 
 import numpy as np
 
+from .._units import normalize_unit_input
+
 GridValue = int | float | Mapping[str, object]
 CxrGridByEnergy = Mapping[float, np.ndarray]
 _GRID_KINDS = frozenset({"values", "arange", "linspace", "logspace"})
@@ -18,6 +20,10 @@ class _Errors:
 
     def add(self, path: str, message: str) -> None:
         self.items.append(f"{path}: {message}")
+
+    def has(self, path: str) -> bool:
+        """Return whether an error has already been recorded for this path."""
+        return any(item.startswith(f"{path}: ") for item in self.items)
 
     def keys(self, raw: Mapping[str, object], path: str, allowed: set[str]) -> None:
         for key in raw:
@@ -39,9 +45,41 @@ def _number(value: object) -> float | None:
     return out if math.isfinite(out) else None
 
 
-def _descriptor_number(payload: Mapping[str, object], key: str) -> float:
-    value = _number(payload.get(key))
+def _grid_number(
+    value: object,
+    path: str,
+    errors: _Errors,
+    *,
+    unit: str | None,
+    expected: str,
+    kind: str | None,
+) -> float | None:
+    if unit is None:
+        return _number(value)
+    try:
+        normalized = normalize_unit_input(value, unit, field=path, expected=expected, kind=kind)
+    except (ImportError, TypeError, ValueError) as exc:
+        errors.add(path, str(exc))
+        return None
+    return _number(normalized)
+
+
+def _descriptor_number(
+    payload: Mapping[str, object],
+    key: str,
+    path: str,
+    errors: _Errors,
+    *,
+    unit: str | None,
+    expected: str,
+    kind: str | None,
+) -> float:
+    value = _grid_number(
+        payload.get(key), f"{path}.{key}", errors, unit=unit, expected=expected, kind=kind
+    )
     if value is None:
+        if not errors.has(f"{path}.{key}"):
+            errors.add(f"{path}.{key}", "must be a finite number (not bool)")
         raise ValueError(f"{key} must be a finite number (not bool)")
     return value
 
@@ -75,8 +113,16 @@ def _direction(value: object, path: str, errors: _Errors) -> tuple[int, int, int
     return out
 
 
-def _grid(value: object, path: str, errors: _Errors) -> np.ndarray | None:
-    scalar = _number(value)
+def _grid(
+    value: object,
+    path: str,
+    errors: _Errors,
+    *,
+    unit: str | None = None,
+    expected: str = "energy",
+    kind: str | None = None,
+) -> np.ndarray | None:
+    scalar = _grid_number(value, path, errors, unit=unit, expected=expected, kind=kind)
     if scalar is not None:
         out = _readonly([scalar])
     elif isinstance(value, Mapping):
@@ -94,7 +140,17 @@ def _grid(value: object, path: str, errors: _Errors) -> np.ndarray | None:
             if kind == "values":
                 if not isinstance(payload, list):
                     raise ValueError("values must be an array")
-                numeric = [_number(item) for item in payload]
+                numeric = [
+                    _grid_number(
+                        item,
+                        f"{path}.values[{index}]",
+                        errors,
+                        unit=unit,
+                        expected=expected,
+                        kind=kind,
+                    )
+                    for index, item in enumerate(payload)
+                ]
                 if any(item is None for item in numeric):
                     raise ValueError("values entries must be finite numbers (not bool)")
                 out = _readonly(numeric)
@@ -113,9 +169,33 @@ def _grid(value: object, path: str, errors: _Errors) -> np.ndarray | None:
                 if kind == "arange":
                     if set(payload) != {"start", "stop", "step"}:
                         raise ValueError("arange requires start, stop, and step")
-                    start = _descriptor_number(payload, "start")
-                    stop = _descriptor_number(payload, "stop")
-                    step = _descriptor_number(payload, "step")
+                    start = _descriptor_number(
+                        payload,
+                        "start",
+                        f"{path}.arange",
+                        errors,
+                        unit=unit,
+                        expected=expected,
+                        kind=kind,
+                    )
+                    stop = _descriptor_number(
+                        payload,
+                        "stop",
+                        f"{path}.arange",
+                        errors,
+                        unit=unit,
+                        expected=expected,
+                        kind=kind,
+                    )
+                    step = _descriptor_number(
+                        payload,
+                        "step",
+                        f"{path}.arange",
+                        errors,
+                        unit=unit,
+                        expected=expected,
+                        kind=kind,
+                    )
                     if step == 0:
                         raise ValueError("step must be nonzero")
                     out = _readonly(np.arange(start, stop, step))
@@ -123,12 +203,40 @@ def _grid(value: object, path: str, errors: _Errors) -> np.ndarray | None:
                     required = {"start", "stop", "num"}
                     if not required <= set(payload):
                         raise ValueError(f"{kind} requires start, stop, and num")
-                    start = _descriptor_number(payload, "start")
-                    stop = _descriptor_number(payload, "stop")
+                    start = _descriptor_number(
+                        payload,
+                        "start",
+                        f"{path}.{kind}",
+                        errors,
+                        unit=unit,
+                        expected=expected,
+                        kind=kind,
+                    )
+                    stop = _descriptor_number(
+                        payload,
+                        "stop",
+                        f"{path}.{kind}",
+                        errors,
+                        unit=unit,
+                        expected=expected,
+                        kind=kind,
+                    )
                     num = _descriptor_num(payload)
                     endpoint = _descriptor_endpoint(payload)
                     if kind == "logspace":
-                        base = _descriptor_number(payload, "base") if "base" in payload else 10.0
+                        base = (
+                            _descriptor_number(
+                                payload,
+                                "base",
+                                f"{path}.logspace",
+                                errors,
+                                unit=None,
+                                expected=expected,
+                                kind=None,
+                            )
+                            if "base" in payload
+                            else 10.0
+                        )
                         generated = np.logspace(start, stop, num, endpoint=endpoint, base=base)
                     else:
                         generated = np.linspace(start, stop, num, endpoint=endpoint)
@@ -171,7 +279,14 @@ def _energy_grid_rows(value: object, path: str, errors: _Errors) -> CxrGridByEne
         if row is None:
             continue
         errors.keys(row, item_path, {"energy_keV", "grid", "source"})
-        energy = _number(row.get("energy_keV"))
+        energy = _grid_number(
+            row.get("energy_keV"),
+            f"{item_path}.energy_keV",
+            errors,
+            unit="keV",
+            expected="energy",
+            kind=None,
+        )
         if energy is None or energy <= 0:
             errors.add(f"{item_path}.energy_keV", "must be finite and positive")
             continue
@@ -182,7 +297,7 @@ def _energy_grid_rows(value: object, path: str, errors: _Errors) -> CxrGridByEne
         source = row.get("source")
         if source not in _SOURCE_KINDS:
             errors.add(f"{item_path}.source", "must be 'derived' or 'manual'")
-        grid = _grid(row.get("grid"), f"{item_path}.grid", errors)
+        grid = _grid(row.get("grid"), f"{item_path}.grid", errors, unit="eV", expected="energy")
         if grid is None or np.any(grid <= 0):
             if grid is not None:
                 errors.add(f"{item_path}.grid", "values must be positive")

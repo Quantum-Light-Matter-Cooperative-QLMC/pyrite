@@ -34,6 +34,7 @@ import numpy as np
 
 from .._energy_grid_encoding import decode_energy_grid
 from .._formatting import fmt_thickness
+from .._units import normalize_unit
 from ..materials import CATALOG, LayerSpec
 from ..materials._composition import resolve_composition
 from ..materials.crystal import dominant_reflections
@@ -251,6 +252,16 @@ class Footprint:
     height_mm: ScalarOrSeq
 
     def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "width_mm",
+            normalize_unit(self.width_mm, "mm", field="Footprint.width_mm", expected="length"),
+        )
+        object.__setattr__(
+            self,
+            "height_mm",
+            normalize_unit(self.height_mm, "mm", field="Footprint.height_mm", expected="length"),
+        )
         _positive_values("Footprint.width_mm", self.width_mm)
         _positive_values("Footprint.height_mm", self.height_mm)
 
@@ -290,6 +301,16 @@ class BlazedGrooves:
     spacing_ang: float
 
     def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "spacing_ang",
+            normalize_unit(
+                self.spacing_ang,
+                "angstrom",
+                field="BlazedGrooves.spacing_ang",
+                expected="length",
+            ),
+        )
         if isinstance(self.spacing_ang, bool) or not isinstance(self.spacing_ang, (int, float)):
             raise TypeError("BlazedGrooves.spacing_ang must be a single number")
         spacing = float(self.spacing_ang)
@@ -478,6 +499,27 @@ class Layer:
     def __post_init__(self) -> None:
         if not isinstance(self.material, str) or not self.material.strip():
             raise ValueError("Layer.material must be a non-empty material key")
+        object.__setattr__(
+            self,
+            "thickness_ang",
+            normalize_unit(
+                self.thickness_ang,
+                "angstrom",
+                field=f"Layer.thickness_ang ({self.material!r})",
+                expected="length",
+            ),
+        )
+        object.__setattr__(
+            self,
+            "azimuth_deg",
+            normalize_unit(
+                self.azimuth_deg,
+                "degree",
+                field=f"Layer.azimuth_deg ({self.material!r})",
+                expected="angle",
+                kind="angle",
+            ),
+        )
         _positive_values(f"Layer.thickness_ang ({self.material!r})", self.thickness_ang)
         if self.beam_uvw is not None and len(tuple(self.beam_uvw)) != 3:
             raise ValueError(
@@ -730,6 +772,22 @@ class Slab(_TargetGeometry):
     def __post_init__(self) -> None:
         if not isinstance(self.material, str) or not self.material.strip():
             raise ValueError("Slab.material must be a non-empty material key")
+        for name, unit, expected, kind in (
+            ("thickness_ang", "angstrom", "length", None),
+            ("tilt_deg", "degree", "angle", "angle"),
+            ("tilt_azim_deg", "degree", "angle", "angle"),
+        ):
+            object.__setattr__(
+                self,
+                name,
+                normalize_unit(
+                    getattr(self, name),
+                    unit,
+                    field=f"Slab.{name}",
+                    expected=expected,
+                    kind=kind,
+                ),
+            )
         if self.cut is not None:
             if not isinstance(self.cut, CrystalCut):
                 raise TypeError("Slab.cut must be a CrystalCut or None")
@@ -794,6 +852,18 @@ class Stack(_TargetGeometry):
             raise ValueError(
                 "Stack.layers needs the film plus at least one layer beneath it; "
                 "use Slab for a free-standing film"
+            )
+        for name in ("tilt_deg", "tilt_azim_deg"):
+            object.__setattr__(
+                self,
+                name,
+                normalize_unit(
+                    getattr(self, name),
+                    "degree",
+                    field=f"Stack.{name}",
+                    expected="angle",
+                    kind="angle",
+                ),
             )
         for layer in layers[1:]:
             if _seq(layer.thickness_ang).size != 1:

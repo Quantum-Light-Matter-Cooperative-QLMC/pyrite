@@ -45,6 +45,41 @@ retained for compatibility while configuration design work proceeds.
 `pyrite.config.PhotonTransport` is experimental. See the
 [API namespace policy](development/api-policy.md) for ownership and stability.
 
+## Physical quantity inputs
+
+Install the optional units extra to construct Pint quantities through PyRITE's
+single shared registry. Existing numeric inputs keep the units encoded by their
+field names. Supported configuration boundaries convert compatible quantities
+to those same numeric values before case lowering or persistence.
+
+```python
+from pyrite.beams import Beam, PointBunch, Spot
+from pyrite.observations import Acquisition
+from pyrite.detectors import PixelGrid, PlanarPose
+from pyrite.units import ureg
+
+beam = Beam(
+    energy_keV=0.06 * ureg.MeV,
+    transverse=Spot(),
+    longitudinal=PointBunch(),
+)
+pose = PlanarPose(center_mm=(0, 0, 10 * ureg.cm))
+pixels = PixelGrid(shape=(256, 256), pitch_mm=(55 * ureg.um, 55 * ureg.um))
+acquisition = Acquisition(
+    exposure_s=500 * ureg.ms,
+    measured_edges_eV=(0.1 * ureg.keV, 0.2 * ureg.keV, 0.3 * ureg.keV),
+)
+```
+
+`from pyrite.units import ureg, Q_` requires `pip install 'pyrite-mc[units]'`.
+The normal `import pyrite` path does not load Pint. Incompatible dimensions,
+non-real magnitudes, and dimensionless values supplied to angular fields fail
+at configuration construction. Stored values remain ordinary Python numbers
+and NumPy arrays; quantities do not enter transport kernels or checkpoints.
+See the [unit boundary and field inventory](repo-design/physical-units.md)
+for supported fields, profile string syntax, serialization policy, and measured
+overhead.
+
 ## Root import compatibility
 
 The forward-looking root API is `Beam`, `Target`, `Detector`, `Scene`,

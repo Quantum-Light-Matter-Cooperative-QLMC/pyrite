@@ -326,9 +326,11 @@ def _scan(
             errors.add(f"{path}.{key}", "missing required key")
             grids[key] = None
         else:
-            grids[key] = _grid(values[key], f"{path}.{key}", errors)
+            grids[key] = _field_grid(values[key], key, f"{path}.{key}", errors)
     if has_cxr:
-        grids["E_grid_line"] = _grid(values["E_grid_line"], f"{path}.E_grid_line", errors)
+        grids["E_grid_line"] = _field_grid(
+            values["E_grid_line"], "E_grid_line", f"{path}.E_grid_line", errors
+        )
     else:
         grids["E_grid_line"] = None
     # An empty mapping opts missing catalog rows into automatic case-local
@@ -357,7 +359,9 @@ def _scan(
     thickness = None
     layer_grid = None
     if has_ang:
-        thickness = _grid(values["thickness_ang"], f"{path}.thickness_ang", errors)
+        thickness = _field_grid(
+            values["thickness_ang"], "thickness_ang", f"{path}.thickness_ang", errors
+        )
     elif has_layers:
         layer_grid = _grid(values["thickness_layers"], f"{path}.thickness_layers", errors)
         if layer_grid is not None:
@@ -426,6 +430,24 @@ def _scan(
 
 _OVERRIDABLE_KEYS = frozenset(_SCAN_KEYS)
 
+_GRID_UNITS = {
+    "energy_keV": ("keV", "energy", None),
+    "tilt_deg": ("degree", "angle", "angle"),
+    "tilt_azim_deg": ("degree", "angle", "angle"),
+    "E_grid_brem": ("eV", "energy", None),
+    "E_grid_line": ("eV", "energy", None),
+    "thickness_ang": ("angstrom", "length", None),
+}
+
+
+def _field_grid(value: object, name: str, path: str, errors: _Errors):
+    """Decode a numeric grid and parse explicit units for physical fields."""
+    unit_spec = _GRID_UNITS.get(name)
+    if unit_spec is None:
+        return _grid(value, path, errors)
+    unit, expected, kind = unit_spec
+    return _grid(value, path, errors, unit=unit, expected=expected, kind=kind)
+
 
 def _parse_profile_precision(row, path, errors) -> None:
     """Validate ``profiles.NAME.precision`` and its incompatible profile keys."""
@@ -477,7 +499,7 @@ def _parse_profile_overrides(raw: object, path: str, errors: _Errors) -> None:
         for name in _OVERRIDABLE_KEYS:
             if name not in row:
                 continue
-            grid = _grid(row[name], f"{material_path}.{name}", errors)
+            grid = _field_grid(row[name], name, f"{material_path}.{name}", errors)
             if grid is not None:
                 _validate_angle_grid(name, grid, f"{material_path}.{name}", errors)
 
@@ -552,7 +574,7 @@ def _parse_profiles(raw: object, errors: _Errors) -> dict[str, Mapping[str, obje
                 errors.add(f"{path}.{name}", "missing required key")
         for name in _SCAN_KEYS:
             if name in row:
-                grid = _grid(row[name], f"{path}.{name}", errors)
+                grid = _field_grid(row[name], name, f"{path}.{name}", errors)
                 if grid is not None:
                     _validate_angle_grid(name, grid, f"{path}.{name}", errors)
         materials_list = row.get("materials")

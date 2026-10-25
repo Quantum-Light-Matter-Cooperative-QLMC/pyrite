@@ -24,7 +24,8 @@
     {
       "path": "src/pyrite/_numerics.py",
       "name": "Numerics.__post_init__",
-      "cc": 21
+      "cc": 22,
+      "exception": "#709: normalize the existing Physics/Numerics fields at construction while preserving their established units and validation order. Keep all config invariants at the boundary; unit conversion itself is delegated to _units.normalize_unit."
     },
     {
       "path": "src/pyrite/_precision.py",
@@ -264,7 +265,8 @@
     {
       "path": "src/pyrite/materials/_beam_detector_parse.py",
       "name": "_parse_filter_rows",
-      "cc": 23
+      "cc": 25,
+      "exception": "#709: the parser accepts both legacy numeric fields and explicit unit strings while retaining filter-specific bounds and path-level diagnostics. Unit conversion is delegated to _unit_number; preserving both error contracts in this catalog boundary adds branches."
     },
     {
       "path": "src/pyrite/materials/_beam_detector_parse.py",
@@ -273,8 +275,15 @@
     },
     {
       "path": "src/pyrite/materials/_beam_detector_parse.py",
+      "name": "_parse_physical_detector",
+      "cc": 22,
+      "exception": "#709: physical detector geometry supports legacy numerics and explicit units with field-path errors, angle-specific validation, and existing geometric bounds. The shared conversion lives in _unit_number; checks remain visible at the input boundary."
+    },
+    {
+      "path": "src/pyrite/materials/_beam_detector_parse.py",
       "name": "_parse_profile_beam",
-      "cc": 47
+      "cc": 55,
+      "exception": "#709: preserve profile beam field validation and specific error paths while accepting compatible units for beam, GDF, and bunch fields. Conversion is shared through _unit_number and canonical numeric output remains unchanged."
     },
     {
       "path": "src/pyrite/materials/_catalog_decode.py",

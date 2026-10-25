@@ -36,6 +36,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+units = [
+    "pint>=0.26,<0.27",
+]
 dask = [
     "distributed>=2025.1",
     "dask-jobqueue>=0.9",
@@ -110,6 +113,7 @@ test = [
     "pytest-xdist>=3.8.0",
     "pytest-timeout>=2.4.0",
     "pytest-cov>=7.1.0",
+    "pint>=0.26,<0.27",
 ]
 
 lint = [

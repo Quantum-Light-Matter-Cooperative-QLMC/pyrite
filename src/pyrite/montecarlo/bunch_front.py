@@ -8,6 +8,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from .._units import normalize_unit
 from ..materials.crystal import beta_from_Ee
 
 
@@ -36,6 +37,28 @@ class BunchFrontTilt:
     azimuth_deg: float = 0.0
 
     def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "tilt_deg",
+            normalize_unit(
+                self.tilt_deg,
+                "degree",
+                field="BunchFrontTilt.tilt_deg",
+                expected="angle",
+                kind="angle",
+            ),
+        )
+        object.__setattr__(
+            self,
+            "azimuth_deg",
+            normalize_unit(
+                self.azimuth_deg,
+                "degree",
+                field="BunchFrontTilt.azimuth_deg",
+                expected="angle",
+                kind="angle",
+            ),
+        )
         if not np.isfinite(self.tilt_deg) or not -90.0 < self.tilt_deg < 90.0:
             raise ValueError("bunch-front tilt_deg must be finite and strictly between -90 and 90")
         if not np.isfinite(self.azimuth_deg):

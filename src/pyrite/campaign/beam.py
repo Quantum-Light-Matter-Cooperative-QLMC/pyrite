@@ -22,6 +22,7 @@ from typing import Any
 
 import numpy as np
 
+from .._units import normalize_unit
 from ..montecarlo.bunch_front import BunchFrontTilt, validate_front_source
 from ..montecarlo.transverse import TransverseDistribution
 from ..quantum_state import TransverseStateSpec
@@ -52,6 +53,24 @@ class TransverseSpot:
     fwhm_y_mm: float | None = None
 
     def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "fwhm_x_mm",
+            normalize_unit(
+                self.fwhm_x_mm, "mm", field="TransverseSpot.fwhm_x_mm", expected="length"
+            ),
+        )
+        if self.fwhm_y_mm is not None:
+            object.__setattr__(
+                self,
+                "fwhm_y_mm",
+                normalize_unit(
+                    self.fwhm_y_mm,
+                    "mm",
+                    field="TransverseSpot.fwhm_y_mm",
+                    expected="length",
+                ),
+            )
         _positive("fwhm_x_mm", self.fwhm_x_mm)
         if self.fwhm_y_mm is not None:
             _positive("fwhm_y_mm", self.fwhm_y_mm)
@@ -92,6 +111,11 @@ class BunchLength:
     shape: str = "gaussian"
 
     def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "rms_fs",
+            normalize_unit(self.rms_fs, "fs", field="BunchLength.rms_fs", expected="time"),
+        )
         _positive("rms_fs", self.rms_fs)
         if not isinstance(self.shape, str) or not self.shape:
             raise ValueError("shape must be a non-empty string")
@@ -105,7 +129,8 @@ class Offsets:
     shape: str = "gaussian"
 
     def __post_init__(self) -> None:
-        values = tuple(float(x) for x in self.offsets_fs)
+        offsets = normalize_unit(self.offsets_fs, "fs", field="Offsets.offsets_fs", expected="time")
+        values = tuple(float(x) for x in offsets)
         if not values:
             raise ValueError("offsets_fs must not be empty")
         if not all(np.isfinite(values)):
@@ -150,6 +175,20 @@ class GdfSource:
     shape_only: bool = False
 
     def __post_init__(self) -> None:
+        for name, unit, expected in (
+            ("z_origin_m", "m", "length"),
+            ("time_s", "s", "time"),
+            ("time_tolerance_s", "s", "time"),
+            ("screen_position_m", "m", "length"),
+            ("screen_tolerance_m", "m", "length"),
+        ):
+            value = getattr(self, name)
+            if value is not None:
+                object.__setattr__(
+                    self,
+                    name,
+                    normalize_unit(value, unit, field=f"GdfSource.{name}", expected=expected),
+                )
         if not self.path:
             raise ValueError("GdfSource requires a path")
         if not np.isfinite(self.z_origin_m):
@@ -222,6 +261,36 @@ class Beam:
     state: TransverseStateSpec | None = field(default=None, kw_only=True)
 
     def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "energy_keV",
+            normalize_unit(
+                self.energy_keV,
+                "keV",
+                field="Beam.energy_keV",
+                expected="energy",
+            ),
+        )
+        object.__setattr__(
+            self,
+            "rep_rate_hz",
+            normalize_unit(
+                self.rep_rate_hz,
+                "Hz",
+                field="Beam.rep_rate_hz",
+                expected="frequency",
+            ),
+        )
+        object.__setattr__(
+            self,
+            "bunch_charge_pc",
+            normalize_unit(
+                self.bunch_charge_pc,
+                "pC",
+                field="Beam.bunch_charge_pc",
+                expected="charge",
+            ),
+        )
         if self.state is not None and not isinstance(self.state, TransverseStateSpec):
             raise TypeError("Beam.state must be a TransverseStateSpec or None")
         if self.state is not None and self.gdf is not None:
