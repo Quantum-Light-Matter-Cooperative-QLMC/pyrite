@@ -13,13 +13,12 @@ how-pyrite-works
 python-api-workflow
 shell-completion
 configuration-cookbook
-numerics-and-execution
 running-on-a-cluster
 experimental-planar-channeling
 experimental-axial-channeling
-sampling-policy
 optimization-studies
 working-with-results
+performance-profile-analysis
 transition-radiation-demo
 radiation-diagnostics
 directional-source-heatmap

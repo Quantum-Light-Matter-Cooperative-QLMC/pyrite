@@ -1,353 +1,146 @@
-# Performance-profile analysis playbook
+# Analyze performance profiles
 
-Use this guide after collecting `pyrite-dev perf PROFILE --remote` logs. Goal: identify throughput constraint from measured phase and resource behavior, then test one change at a time. High CPU or GPU utilization is supporting evidence, not optimization target; compute-weighted throughput is target.
+Use performance profiles to diagnose slow runs and compare changes to PyRITE's
+execution settings. Optimize **uncached, compute-weighted throughput**
+(`done_cost / elapsed_seconds`), not CPU or GPU utilization alone. Keep the
+scientific workload fixed when comparing execution configurations.
 
-For cross-engine equal-precision work, see the bounded [comparator adapter pilot](../validation/beam-transport/equal-precision-pilot.md). Its unresolved accuracy and timing gates preclude a speed ranking.
+## Collect and analyze a run
 
-## Outputs
-
-Write analysis artifacts under:
-
-```text
-pyrite-output/performance/<profile>/analysis/
-├── sessions.csv
-├── intervals.csv
-├── summary.md
-└── timelines/
-    └── <job>-<material>-<session>.png
-```
-
-`sessions.csv` holds one row per `session_id`. `intervals.csv` holds adjacent sample pairs after validation and counter differencing. `summary.md` reports evidence, bottleneck classification, uncertainty, and next controlled experiment.
-
-Do not modify raw `.ndjson` files.
-
-Runtime records include `backend`, `backend_vendor`, `backend_device`, requested/resolved resource policy, device budget/reserve, backend-neutral `allocator_*_mib`, OOM attempts, effective chunks, and any `backend_fallback_reason`. Legacy `cupy_pool_*_mib` fields remain emitted and readable for existing `cxr.performance.v1` artifacts. NVIDIA device utilization comes from `nvidia-smi`; unavailable vendor counters remain null rather than being mislabeled as NVIDIA data.
-
-## Allocation recovery
-
-Direct `run_case()`, serial CUDA cases, and GPU-pipeline spectra share the same
-recovery policy. Pool allocation errors and delayed CUDA/HIP allocation errors
-retry on the already transported trajectories, up to the resolved resource
-policy's retry limit (`PYRITE_MC_GPU_OOM_RETRIES` overrides it). Each retry
-releases failed scratch and halves the admitted execution chunk: line failures
-shrink `spec_chunk`; characteristic and bremsstrahlung failures shrink the
-shared `brem_chunk`. Characteristic admission uses the line energy grid.
-Unattributed allocation failures shrink both chunks. A successful pipeline line
-chunk is reused for later cases; a failed GPU chunk followed by CPU fallback is
-never learned as a successful device setting.
-
-A `BackendResourceError` is an admission rejection, not an allocator OOM, and
-skips chunk retries. With both `engine="auto"` and `PYRITE_MC_BACKEND=auto`,
-admission rejection or exhausted spectrum retries may rerun the spectrum on
-CPU NumPy after host-memory admission. Resident device segments are downloaded
-before CPU scoring. Explicit accelerator selection forbids this backend switch.
-CPU allocation failures and unrelated runtime errors propagate without device
-retries; an exhausted allocator error retains its type and a note naming the
-failed phase and retry count.
-
-Resident CUDA transport has one separate recovery: replay the same seed on the
-same CUDA core with host-resident segments. Host admission charges one transport
-payload using `PYRITE_MC_PIPELINE_WORKER_MEM_MB`; CPU spectrum fallback charges
-one full worker using `PYRITE_MC_WORKER_MEM_MB`. These are policy estimates, not
-measurements of an arbitrary case's peak memory. Rejected host admission stops
-before replay or download. Failure of the downloaded transport attempt propagates;
-transport recovery never selects a CPU core. Recovery preserves physics inputs,
-electron counts, cutoffs, grids and seeds. Changing spectrum reduction grouping
-or device arithmetic can introduce floating-point roundoff.
-
-Per-case timing records expose `line_gpu_oom_retries`,
-`characteristic_gpu_oom_retries`, `brem_gpu_oom_retries`,
-`generic_gpu_oom_retries`, and `transport_gpu_oom_retries` when applicable.
-`gpu_oom_retry_count` includes transport and spectrum retries.
-`recovery_events` lists failed phases and mitigations (`halve_chunks`,
-`host_segments`, `exhausted`, `cpu_spectrum`); `recovery_path` records
-`device_spectrum`, `host_segments`, or `cpu_spectrum`.
-`backend_fallback_reason` distinguishes `device_budget_infeasible` from
-`accelerator_oom_retries_exhausted`. Admission rejection consumes no OOM retry.
-These private runner metrics reach performance logs through `on_timing`; the
-batch runner removes them from stored result payloads. Failed runs retain the
-underlying exception, with recovery context in exception notes/chaining.
-
-## Collect comparable runs
-
-Use one named catalog profile, one slow material, and one faster comparison material. Run at least three repetitions per configuration. Keep these fixed:
-
-- `parameter_sha256`, fidelity, beam parameters, grids, electron counts, and seeds;
-- host, SLURM CPU/GPU allocation, worker request, and parallel-material count;
-- software commit and environment;
-- warm-up treatment and checkpoint state.
-
-The performance-profile name selects an existing catalog profile; it is not an arbitrary experiment label. Pulled remote logs retain job separation:
+`PROFILE` must be an existing catalog profile (`pyrite profile list`), not an
+arbitrary label. For example, to profile one material on a remote worker:
 
 ```bash
-pyrite-dev perf sub_100keV --remote --detach
-pyrite remote performance pull sub_100keV
-```
-
-Cached cases contain no new compute and must not be compared with uncached runs. Prefer a separate dataset identity or archive/restore workflow over deleting checkpoints solely for profiling.
-
-Start with one material process per GPU. Test `--parallel-materials` only after single-process pipeline behavior is understood.
-
-Generate analysis artifacts after local collection or remote pull:
-
-```bash
-pyrite-dev performance analyze sub_100keV
-```
-
-Use `--performance-dir PATH` for a non-default log root and `--sample-period SECONDS` when collection did not use the default five-second interval.
-
-### Repeat one uncached remote workload
-
-Run three comparable MoS2 sessions with one-second telemetry and a fixed six-worker allocation. Submissions go through `pyrite-dev perf PROFILE -R/--remote`; `pyrite remote run` still resolves but is deprecated and hidden (removal in 0.3.0, see the [CLI deprecation reference](../repo-design/cli/cli-deprecations.md)). The supported form has no repetition flag — submit once per repetition, waiting for each to finish, since one live job per named profile is allowed. `--perf-reps`, `--chunk-minutes`, and `--parallel-materials` exist only on the deprecated command:
-
-```bash
-pyrite-dev perf mos2_heavy -m mos2 --remote \
-  -i 1 \
-  --workers 6 \
-  --detach
-
+pyrite-dev perf mos2_heavy -m mos2 --remote --workers 6 -i 1 --detach
+# After the job finishes:
 pyrite remote performance pull mos2_heavy
 pyrite-dev performance analyze mos2_heavy --sample-period 1
 ```
 
-`pyrite-dev perf` runs without shared-cache reads or writes, so every repetition is uncached and existing production checkpoints stay untouched; profiling checkpoints are not automatically pulled. `PROFILE` must name a catalog profile (`pyrite profile list`) — it is not a free-form experiment label.
+`pyrite-dev perf` runs without shared-cache reads or writes, so production
+checkpoints are unaffected. Remote profiling supports one live job per named
+profile; finish the previous job before submitting another. Repeat each
+configuration at least three times. Use `--performance-dir PATH` with the
+analysis command if the logs are outside the default performance directory.
 
-After the baseline completes, test a smaller line-spectrum chunk while keeping every other option fixed:
+The analyzer writes to `pyrite-output/performance/<profile>/analysis/`:
+
+| File | Purpose |
+| --- | --- |
+| `sessions.csv` | One row per session: throughput, wall time, timings, and resource peaks. |
+| `intervals.csv` | Rates calculated from adjacent valid telemetry samples. |
+| `summary.md` | Session comparison and interpretation template. |
+| `timelines/*.png` | Time-aligned phase, utilization, memory, and progress plots. |
+
+Keep the source `.ndjson` logs unchanged. A `paused` or `failed` session is not a
+completed benchmark; inspect its status before comparing it with successful
+runs. Missing GPU counters are **unknown**, not zero.
+
+## Make comparisons reproducible
+
+Use the same profile, material, beam, grids, electron counts, seeds, software
+commit, host/GPU allocation, and warm-up treatment. Check that
+`parameter_sha256` matches. Record the actual worker and chunk settings; a
+resource policy may admit fewer workers or smaller chunks than requested.
+Change **one execution setting at a time**, then compare median and spread
+across repetitions.
+
+Distinguish complete-session rates from steady-state rates: transport startup,
+JIT compilation, memory allocation, and pipeline fill can dominate short
+runs. For GPU pipelines, allow at least one batch of completed work per
+worker before evaluating steady state when the run is long enough.
+
+The principal measurements are:
+
+| Measurement | Interpretation |
+| --- | --- |
+| `done_cost / elapsed_seconds` | Primary compute-weighted throughput; higher is better for comparable workloads. |
+| `completed_new_cases / elapsed_seconds` | Case throughput; meaningful only if case costs are comparable. |
+| `transport_seconds_total`, `spectrum_seconds_total` | Which calculation phase dominates. |
+| `driver_wait_seconds_total`, `gpu_feed_wait_fraction` | Time the spectrum driver waits for prefetched transport work. |
+| `checkpoint_seconds_total` | Time spent writing results. |
+| Worker RSS, available RAM, swap | Whether more CPU workers are safe. |
+| VRAM, allocator pool peaks, `gpu_oom_retry_count` | GPU memory headroom and retry pressure. |
+
+For pipeline runs, an additional check is
+`(transport_seconds_total / timed_case_count) / effective_workers` versus
+`spectrum_seconds_total / timed_case_count`: if transport supply is slower,
+the GPU can run out of work. The feed-wait counter does **not** capture host
+launch, transfer, or synchronization delays *inside* spectrum processing.
+
+## Diagnose the bottleneck
+
+| Observed evidence | Likely limitation | Controlled test |
+| --- | --- | --- |
+| `gpu_feed_wait_fraction` near or above 0.25, repeated `transport_wait` | CPU transport cannot feed the GPU | Increase workers if RAM and swap permit. |
+| Worker cap reached, measured RSS well below the admission budget | Conservative worker admission | Test adjacent worker counts or a measured per-worker memory estimate. |
+| Spectrum dominates; GPU stays busy | GPU spectrum compute | Tune line/bremsstrahlung chunks or inspect kernels. |
+| Spectrum dominates; GPU appears idle but feed-wait is low | Launch, synchronization, transfer, or short GPU bursts | Capture an Nsight timeline before changing algorithms. |
+| Checkpoint time, disk writes, and iowait rise together | Storage | Compare storage or output settings. |
+| RAM runs low, swap grows, or GPU OOM retries appear | Memory pressure | Reduce workers/chunks or concurrency. |
+| Both CPU and GPU appear idle while unfinished work remains | Scheduling or control flow | Inspect phases, in-flight cases, and job logs. |
+
+These are hypotheses, not diagnoses from utilization alone. Sampled GPU
+utilization can miss brief kernels, and `gpu_feed_wait_fraction` describes
+only transport-to-spectrum waiting. Inspect a timeline before interpreting a
+low-utilization interval as a stall.
+
+A useful tuning order is **workers → spectrum chunks → material
+concurrency**. Start with one material process per GPU. For each candidate,
+require repeatable throughput improvement without swap, OOM retries, or
+unbounded memory growth. More concurrent processes also duplicate GPU
+contexts and allocator pools; they are not automatically faster.
+
+## Profile a suspicious phase
+
+Use Nsight Systems when telemetry suggests launch gaps or GPU-side
+bottlenecks. Collect one uncached, single-material, single-process remote run
+with a monolithic allocation:
 
 ```bash
-pyrite-dev perf mos2_heavy -m mos2 --remote \
-  -i 1 \
-  --workers 6 \
-  --cxr-chunk 20000 \
-  --detach
-```
-
-Wait for the baseline job to finish before submitting the candidate: one live job per named profile is allowed. Pull and analyze again; job directories keep the baseline and candidate sessions separate. Change `--brem-chunk` only in a later experiment if line-spectrum chunking does not explain the measured gap.
-
-### Capture one Nsight Systems timeline
-
-When one-second telemetry shows a spectrum-dominated run with bursty GPU use, capture CUDA API calls, kernels, NVTX phases, OS runtime activity, and native CPU samples for one full uncached session:
-
-```bash
-pyrite-dev perf mos2_heavy -m mos2 --remote \
-  -i 1 \
-  --workers 6 \
-  --cxr-chunk 20000 \
-  --nsys \
-  --detach
-
+pyrite-dev perf mos2_heavy -m mos2 --remote --nsys --detach
+# After completion:
 pyrite remote performance pull mos2_heavy
 ```
 
-The spectrum-side ranges are `pyrite.spectrum_case:*`, `pyrite.lines*`, `pyrite.brem`, and `pyrite.interpolate`. `transport.py` pushes its own: `pyrite.transport.tables` (scattering/stopping table build), `.sample` (beam phase-space sampling), `.alloc` (output-buffer reservation), `.core` (the transport core itself), and `.output` (assembly of the returned arrays). Inside the CUDA per-electron driver `.core` nests further — `.upload`, `.scratch`, `.launch` (host-side dispatch only), `.capsync` (the `seg_count.max()` read, which is where the batch's device time actually lands), `.compact`, `.exitcodes`, and `.join`. Everything `transport.py` pushes is host-side wall clock, so a range that dwarfs `.launch` is host cost, not kernel cost. Per-tick phase identity still comes from the `cxr.performance.v1` activity labels (`transport_wait` vs `spectrum`).
+Pulled artifacts include `<material>.nsys-rep`, `<material>.sqlite`, and
+`<material>.nsys-stats.txt`. Inspect CUDA kernels and the `pyrite.transport.*`
+and `pyrite.spectrum_case:*` NVTX ranges. A host-side launch range is not the
+same as GPU kernel execution time. Nsight adds overhead, so do **not** use its
+wall time for throughput comparisons.
 
-`--nsys` requires exactly one material, one material process, one performance repetition, and a monolithic allocation. It uses an isolated job-local checkpoint so the trace is uncached and never changes or pulls a production checkpoint. The lab worker must provide `nsys`; no local CUDA toolkit is required to collect the trace. Nsight sessions launch the synchronized virtual environment's Python directly and use the `spawn` multiprocessing context; ordinary scans retain the platform-default context. This avoids Nsight's known fork-without-exec deadlock mode.
-
-Python-level stack sampling and CUDA backtraces stay opt-in: nsys 2025.6.x stack-walkers SIGSEGV while unwinding CPython 3.14's frame layout, so the session omits `--python-sampling`/`--python-backtrace`/`--cudabacktrace` by default. Set `PYRITE_MC_NSYS_PYSTACK=1` in the submit environment to add them back only on a supported Python/nsys pair. Without them the trace still carries the CUDA kernel timeline, NVTX phases, OS runtime, and process-tree CPU samples -- enough to diagnose bursty-GPU/low-CPU behavior; only Python-frame attribution is lost.
-
-If an older submitted script remains at 0% with both CPU and GPU idle and its log ends with `Waiting for termination of re-parented processes`, cancel that job, sync the updated code, and submit again. It cannot recover useful work.
-
-The existing profile pull fetches these files beside the NDJSON:
-
-```text
-<material>.nsys-rep
-<material>.sqlite
-<material>.nsys-stats.txt
-```
-
-The text report summarizes CUDA APIs, kernels, launch-to-execution delay, and NVTX ranges. Open `.nsys-rep` in an equal-or-newer Nsight Systems GUI for the timeline. The runner emits one `pyrite.spectrum_case:<configuration>` range per case with nested `pyrite.lines`, `pyrite.brem`, and `pyrite.interpolate` ranges.
-
-Nsight instrumentation adds overhead. Use it to explain gaps, not as a throughput measurement or a replacement for the three-repetition comparison.
-
-### Capture a serial CPU cProfile pass
-
-Nsight attributes device work; it will not tell you which Python function owns a host-side range. For that, add a bounded single-process `cProfile` pass:
+For Python-level CPU attribution, run a separate serial pass:
 
 ```bash
-pyrite-dev perf mos2_heavy -m mos2 --remote -c --detach  # primary run, then CPU pass
-pyrite-dev perf mos2_heavy -m mos2 --remote --cpu-only --detach  # CPU pass only
+pyrite-dev perf mos2_heavy -m mos2 --remote --cpu-only --detach
+pyrite remote performance pull mos2_heavy
 ```
 
-Both flags require `-R/--remote` (heavy profiling stays off the workstation) and force an unchunked session. `--cpu` runs the primary phase first and the CPU pass after it; `--cpu-only` starts no GPU or Nsight phase at all. `--cpu` and `--cpu-only` are mutually exclusive, and `--cpu-only` rejects `--nsys` and the GPU chunk pins, which have nothing to act on. The pass writes `<material>.cpu.prof` and `<material>.cpu.txt` beside the NDJSON, pulled by the same `pyrite remote performance pull`. A CPU-phase failure fails the job; with `--cpu` the primary artifacts are still retained.
+This produces `<material>.cpu.prof` and `<material>.cpu.txt`. The `--cpu`
+option also exists to run the primary profiling pass followed by a CPU pass.
+Both options require remote execution; `--cpu-only` cannot be combined with
+`--nsys` or GPU chunk pins.
 
-## Validate and normalize
+## Understand memory recovery
 
-For every input line:
+Accelerator allocation failures can retry spectrum scoring against already
+transported electrons with reduced `spec_chunk` or `brem_chunk`; they do not
+require resampling the physics. Under automatic engine **and** backend
+selection, exhausted spectrum retries or device admission rejection may fall
+back to CPU scoring if host-memory admission succeeds. Explicit accelerator
+selection does not silently switch to CPU. CUDA resident-transport allocation
+failure has a separate same-core replay using host-resident segments.
 
-1. Require `schema == "cxr.performance.v1"`.
-2. Group by `profile`, job directory, `material`, and `session_id`.
-3. Sort by `elapsed_seconds`; verify timestamps and elapsed time are monotonic.
-4. Require one `start` record and one terminal `done`, `paused`, or `failed` record. Mark incomplete sessions instead of silently dropping them.
-5. Confirm one `parameter_sha256` and one execution topology per comparison.
-6. Mark intervals longer than twice expected sampling period as sampling gaps.
-7. Preserve `null` GPU fields as missing data, never zero.
+Inspect `gpu_oom_retry_count`, `recovery_events`, `recovery_path`,
+`backend_fallback_reason`, and the **effective** chunks before interpreting
+slowdowns. A resource-admission rejection is not an allocator OOM. Recovery
+preserves seeds and scientific settings, although different reduction
+chunking or device arithmetic may change floating-point roundoff.
 
-`start` precedes runtime-plan resolution, so topology and phase fields may first appear on a later sample.
+## Record the conclusion
 
-For adjacent valid samples, compute:
-
-```text
-dt = elapsed_seconds[i] - elapsed_seconds[i-1]
-case_rate = Δcompleted_new_cases / dt
-cost_rate = Δdone_cost / dt
-read_rate = Δio_read_bytes / dt
-write_rate = Δio_write_bytes / dt
-swap_in_rate = Δswap_in_bytes / dt
-swap_out_rate = Δswap_out_bytes / dt
-```
-
-Treat negative deltas from process-tree CPU or I/O counters as process-turnover discontinuities. Exclude those intervals from rate calculations; do not clamp them to zero.
-
-Useful normalized CPU metrics:
-
-```text
-host_core_occupancy =
-    process_cpu_percent / (100 * cpu_affinity_count)
-
-worker_cpu_efficiency =
-    Δ(process_cpu_user_seconds + process_cpu_system_seconds)
-    / (dt * effective_workers)
-```
-
-`worker_cpu_efficiency` includes driver CPU time, so values slightly above one are possible. Use it for comparisons, not accounting.
-
-## Session summary metrics
-
-Take rolling totals from last valid terminal sample:
-
-- wall time: `elapsed_seconds`;
-- throughput: `done_cost / elapsed_seconds`;
-- case throughput: `completed_new_cases / elapsed_seconds`;
-- transport time: `transport_seconds_total`;
-- spectrum time: `spectrum_seconds_total`;
-- driver feed-wait: `driver_wait_seconds_total`;
-- checkpoint share: `checkpoint_seconds_total / elapsed_seconds`;
-- transport feed-wait fraction: `gpu_feed_wait_fraction` (legacy field name);
-- peak worker RSS: maximum `child_process_rss_max_bytes`;
-- peak process RSS and system memory percentage;
-- peak VRAM and CuPy reserved/peak memory;
-- total GPU OOM retries;
-- median and 90th-percentile CPU/GPU utilization, clocks, power, and iowait.
-
-For GPU-pipeline sessions:
-
-```text
-mean_transport_per_case =
-    transport_seconds_total / timed_case_count
-
-mean_spectrum_per_case =
-    spectrum_seconds_total / timed_case_count
-
-transport_supply_time =
-    mean_transport_per_case / effective_workers
-```
-
-Compare `transport_supply_time` with `mean_spectrum_per_case`. `gpu_feed_wait_fraction` records only driver time blocked on prefetched CPU transport results. It does not include host launch, synchronization, allocation, or transfer gaps inside the spectrum phase; use an Nsight trace to separate those.
-
-Warm-up inflates initial transport waits and CUDA allocation/JIT work. Report both full-session and steady-state results. Derive steady-state totals by differencing rolling counters after pipeline fill; use at least `effective_workers` completed cases as initial warm-up when session length permits.
-
-## Timeline
-
-Produce one synchronized timeline per session with:
-
-1. `phase`, `active_case`, and `in_flight_case_count`;
-2. host and process-tree CPU;
-3. GPU compute and memory utilization;
-4. GPU SM clock, P-state, power, and temperature;
-5. process RSS, max worker RSS, system RAM, swap, VRAM, and CuPy pool;
-6. read/write rates and CPU iowait;
-7. cumulative completed cost and interval `cost_rate`;
-8. cumulative transport, spectrum, feed-wait, and checkpoint time.
-
-Shade intervals where CPU and GPU are both below 20%. Classify each shaded interval by active phase and resource evidence; do not label it a stall merely because no case completed during one sample interval.
-
-## Bottleneck decision table
-
-| Evidence | Likely constraint | Next experiment |
-|---|---|---|
-| `gpu_feed_wait_fraction >= 0.25`, frequent `transport_wait`, falling in-flight count | CPU transport cannot feed GPU | Increase workers within measured RAM headroom |
-| Effective workers equal memory cap; max worker RSS far below `worker_memory_budget_mib` | Conservative worker admission | Test lower `PYRITE_MC_WORKER_MEM_MB` (`PYRITE_MC_PIPELINE_WORKER_MEM_MB` on the `gpu-pipeline` engine) or explicit `--workers` |
-| Low feed-wait, spectrum dominates, GPU busy | GPU spectrum compute | Test spectrum algorithm or safe chunk increase |
-| Low feed-wait, spectrum dominates, GPU below 20%, clocks active | Launch/synchronization or host work inside spectrum phase | Sweep `spec_chunk`/`brem_chunk`; profile spectrum internals if unchanged |
-| Low GPU utilization plus low clocks, low power, idle P-state during `spectrum` | Power-state, scheduling, or burst sampling | Compare longer cases; inspect GPU clock/throttle policy |
-| Checkpoint share material; write rate and iowait align with low utilization | Checkpoint/storage path | Reduce save cost or test faster storage |
-| Swap counters rise or available RAM collapses | Memory pressure | Reduce workers/chunks; do not increase concurrency |
-| CuPy reserved peak approaches pool limit or OOM retries rise | GPU memory limit | Reduce chunks or concurrency |
-| CPU pool phase, low worker CPU efficiency, low iowait | Scheduling, affinity, process priority, or serial Python | Inspect allocation/affinity and worker activity |
-| Both devices low during `idle` while work remains | Dispatch/control-flow fault | Reproduce with logs and inspect stop/deadline state |
-
-The 20–25% feed-wait boundary matches runner's existing pipeline decision rule. Treat every other threshold as an experiment trigger, not proof.
-
-## Controlled experiment order
-
-### 1. Worker admission
-
-Hold chunks and workload fixed. Compare current auto worker count against adjacent safe counts. Before relaxing memory policy, require:
-
-- sampled worker RSS comfortably below configured per-worker budget;
-- no swap activity;
-- adequate system available memory across repetitions.
-
-Win condition: higher `cost_rate`, lower feed-wait, stable memory, and no regression in spectrum time.
-
-### 2. Spectrum and bremsstrahlung chunks
-
-Hold workers fixed. Test smaller, current, and larger chunks within VRAM headroom. Record effective `spec_chunk` and `brem_chunk` from each active case.
-
-Win condition: lower spectrum time and higher end-to-end throughput without OOM retries or unsafe CuPy/VRAM growth.
-
-### 3. CuPy pool-release cadence
-
-Only test after chunk behavior is understood. Compare pool-release cadence while watching CuPy reserved peak and spectrum time.
-
-Win condition: less allocation/synchronization time with bounded reserved memory.
-
-### 4. Material concurrency
-
-Only if one scan cannot keep GPU busy after worker/chunk tuning. Compare one and two material processes, accounting for duplicated CUDA contexts, CuPy pools, and transport workers.
-
-Win condition: higher aggregate `done_cost / elapsed_seconds`, not merely higher GPU utilization.
-
-## Report template
-
-```markdown
-# Performance analysis: <profile>, <commit>, <date>
-
-## Workload
-- Materials:
-- Parameter SHA:
-- Host/GPU:
-- Allocation:
-- Repetitions:
-- Warm-up rule:
-
-## Baseline
-| Metric | Median | Spread |
-|---|---:|---:|
-| Wall time | | |
-| Cost rate | | |
-| GPU feed-wait fraction | | |
-| Mean transport/case | | |
-| Mean spectrum/case | | |
-| Checkpoint share | | |
-| Peak worker RSS | | |
-| Peak VRAM/CuPy pool | | |
-
-## Evidence
-- Observed:
-- Ruled out:
-- Remaining uncertainty:
-
-## Classification
-- Primary bottleneck:
-- Secondary bottleneck:
-- Confidence:
-
-## Next controlled experiment
-- One changed variable:
-- Expected signature:
-- Safety limit:
-- Acceptance criterion:
-```
-
-Optimization recommendation requires repeatable throughput improvement on identical inputs. Report run-to-run spread and retain raw logs with analysis artifacts.
+In `summary.md`, record the profile and commit, fixed scientific inputs,
+resource allocation, repetitions, median/spread of throughput, phase timing,
+peak memory, suspected bottleneck, and the **single next experiment**. Keep
+the raw logs so a claimed improvement can be reproduced. Do not infer a
+cross-engine speed ranking without separately validating numerical agreement.
