@@ -11,7 +11,6 @@ use their dedicated guides to understand the supported workflows and limitations
 
 how-pyrite-works
 python-api-workflow
-shell-completion
 configuration-cookbook
 running-on-a-cluster
 experimental-planar-channeling
@@ -22,7 +21,6 @@ performance-profile-analysis
 transition-radiation-demo
 radiation-diagnostics
 directional-source-heatmap
-plotting-backends
 analysis-tutorial
 sweep-profiles
 external-catalog

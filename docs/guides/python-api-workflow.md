@@ -19,13 +19,17 @@ beam = pr.Beam(
     longitudinal=pr.PointBunch(),
 )
 target = pr.Slab(
-    "hopg", thickness_ang=10_000.0, tilt_deg=30.0,
+    "hopg",
+    thickness_ang=10_000.0,
+    tilt_deg=30.0,
     footprint=pr.Footprint(5.0, 5.0),
 )
 detector = pr.Detector()
 
 result = pr.simulate(
-    beam, target, detector,
+    beam,
+    target,
+    detector,
     physics=pr.Physics(),
     numerics=pr.Numerics(
         sampling=pr.FixedSampling(cxr_electrons=450, brem_electrons=100),
@@ -55,8 +59,8 @@ without detector response or acceptance weighting.
 cxr = result.cxr.incoherent
 continuum = result.brem
 flux = result.spectral_flux(units="detector")  # photons/(s eV), accepted solid angle
-native = result.to_dataframe()               # Polars, one row per native energy node
-combined = result.combined_cxr()             # CXR + applicable line components; no brem
+native = result.to_dataframe()  # Polars, one row per native energy node
+combined = result.combined_cxr()  # CXR + applicable line components; no brem
 
 digest = result.provenance.identity_digest
 backend = result.provenance.backend
@@ -105,7 +109,7 @@ sweep = pr.Sweep(
     },
 )
 expanded = sweep.expand()  # nine (label, Scene) pairs
-cases = sweep.cases()      # nine resolved Monte Carlo cases
+cases = sweep.cases()  # nine resolved Monte Carlo cases
 ```
 
 These methods *construct* cases; they do not run or persist a sweep. For large
@@ -122,8 +126,10 @@ import numpy as np
 
 angles = np.linspace(20.0, 160.0, 141)
 energies_eV = pr.photon_energies(
-    ["hopg", "mos2"], beam_energy_eV=30_000.0,
-    tilt_deg=30.0, theta_obs_deg=angles,
+    ["hopg", "mos2"],
+    beam_energy_eV=30_000.0,
+    tilt_deg=30.0,
+    theta_obs_deg=angles,
 )
 ```
 
@@ -164,8 +170,10 @@ adaptive stopping on supported incoherent scalar-detector cases:
 ```python
 adaptive = pr.Numerics(
     sampling=pr.AdaptiveSampling(
-        target_rse=0.05, min_electrons=200,
-        max_electrons=20_000, block_electrons=100,
+        target_rse=0.05,
+        min_electrons=200,
+        max_electrons=20_000,
+        block_electrons=100,
         observables=("cxr", "brem"),
     ),
 )
@@ -207,14 +215,20 @@ attenuation across a pixel grid:
 ```python
 pose = pr.PlanarPose.from_observation(distance_mm=400.0, polar_deg=90.0)
 pixels = pr.PlanarDetector.timepix3_chip(
-    pose, scorer=pr.PixelScorer(angular_shape=(2, 2)),
+    pose,
+    scorer=pr.PixelScorer(angular_shape=(2, 2)),
 )
 plate = pr.FilterPlate(
-    "silicon", thickness_mm=0.1, size_mm=(7.04, 14.08),
+    "silicon",
+    thickness_mm=0.1,
+    size_mm=(7.04, 14.08),
     pose=pr.PlanarPose.from_observation(distance_mm=200.0, polar_deg=90.0),
 )
 pixel_result = pr.simulate(
-    beam, target, pixels, filters=(plate,),
+    beam,
+    target,
+    pixels,
+    filters=(plate,),
     numerics=pr.Numerics(sampling=pr.FixedSampling(100, 50)),
 )
 image = pixel_result.spatial.image((1_000.0, 10_000.0), component="cxr")
@@ -238,7 +252,8 @@ registered photon counts, configure `PlanarDetector.response` and an
 ```python
 body = pr.RectangularBody(
     substance=pr.SubstanceRef(kind="crystal", key="silicon"),
-    size_mm=(10.0, 10.0), thickness_mm=0.1,
+    size_mm=(10.0, 10.0),
+    thickness_mm=0.1,
 )
 source_target = pr.Target(body=body, tilt_deg=30.0)
 window = pr.Filter(body=body, pose=pr.PlanarPose((0.0, 0.0, 50.0)), name="window")
@@ -276,8 +291,11 @@ Specify a flat crystal's lattice orientation relative to its surface with
 ```python
 cut = pr.CrystalCut(surface_hkl=(1, 0, 1), roll_deg=17.0)
 cut_target = pr.Slab(
-    "hopg", thickness_ang=500.0, tilt_deg=30.0,
-    footprint=pr.Footprint(5.0, 5.0), cut=cut,
+    "hopg",
+    thickness_ang=500.0,
+    tilt_deg=30.0,
+    footprint=pr.Footprint(5.0, 5.0),
+    cut=cut,
 )
 ```
 

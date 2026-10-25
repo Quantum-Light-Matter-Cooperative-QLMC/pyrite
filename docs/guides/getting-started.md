@@ -1,30 +1,54 @@
 # Getting started
 
 Install the released package, run one small CPU simulation, and locate its output.
-No source checkout is required. PyRITE needs Python 3.13 or newer and
-[uv](https://docs.astral.sh/uv/); the [README installation matrix](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite#install)
-covers library installs and accelerator extras.
+PyRITE needs Python 3.13 or newer and [uv](https://docs.astral.sh/uv/); the [README installation matrix](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite#install)
+covers library installs and GPU acceleration configuration.
 
 ## Install and fetch reference data
 
 ```bash
 uv tool install pyrite-mc
+uv tool update-shell
 pyrite --version
-pyrite --help
+```
+
+PyRITE requires a set of cross-section tables for particle transport and radiation
+calculations. We must therefore install the pinned EEDL, EADL, EPDL, SBETHE, ELSEPA,
+and BremsLib datasets (about 100 MB) from our public GitHub Releases via
+
+```bash
 pyrite tables fetch
 ```
 
-If `pyrite` is not on your `PATH`, run `uv tool update-shell` and restart the
-shell. The base package is CPU-only. `tables fetch` installs pinned EEDL, EADL,
-EPDL, SBETHE, ELSEPA, and BremsLib datasets (about 100 MB) from public GitHub
-Releases; no GitHub token is required. Data go to the selected workspace;
-see [output-home configuration](configuration-cookbook.md#choose-an-output-home).
+Data go to the selected workspace; see [output-home configuration](configuration-cookbook.md#choose-an-output-home).
 For an offline archive or individual dataset, inspect `pyrite tables fetch --help`.
 
-`pyrite config setup` is optional: it detects hardware and saves a backend choice.
-Use the [development setup](../repo-design/development-workspace.md#install-from-source)
-only when contributing or running from a checkout. For persistent tab completion,
-see [shell completion](shell-completion.md).
+### Install completion [optional]
+
+After `command -v pyrite` succeeds in a new shell, install completion:
+
+```bash
+pyrite config completion install
+exec "$SHELL"
+```
+
+Pass the shell explicitly if `$SHELL` does not identify the intended shell:
+
+```bash
+pyrite config completion install --shell zsh
+```
+
+
+### Backend Setup [optional]
+
+If GPU acceleration is desired, PyRITE will autodetect the backend and save the selection:
+
+```bash
+pyrite config setup
+```
+
+If no GPU is detected, PyRITE will default to a `cpu` backend. Intel and ROCm functionality
+is currently untested; NVIDIA CUDA is natively supported.
 
 ## Run the quickstart profile
 
