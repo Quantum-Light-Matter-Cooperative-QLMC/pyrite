@@ -205,7 +205,14 @@ are kinematic energies, with no prediction of intensity or broadening. See
 Build a beam, target and detector, then call {py:func}`pyrite.simulate` with
 those three components, or pass a complete `Scene` as `simulate(scene)`.
 Scene calls use its physics and numerics unless explicitly overridden with
-`physics=` or `numerics=`; omit component arguments in that form. Target tilt
+`physics=` or `numerics=`; omit component arguments in that form.
+Pass an independent {py:class}`pyrite.quantum.QuantumSetup` with `quantum=`
+on either call form. Omission inherits the legacy `Scene.quantum` value;
+explicit `quantum=None` disables that setup. `pyrite.api.build_case` uses the
+same override rules, and unsupported or contradictory quantum settings fail
+before case preparation or transport. Effective quantum solver controls are
+recorded in result numerics; the compatibility scene retains requested inputs.
+Target tilt
 and azimuth retain full floating-point precision in scenes and profile sweeps.
 `Physics` selects models and `Numerics` controls sampling and integration.
 Beam transverse and
@@ -303,6 +310,10 @@ catalog/CLI selectors and full-track external validation remain open.
    pyrite.config.CxrReflections
    pyrite.Numerics
    pyrite.config.Precision
+   pyrite.quantum.QuantumSetup
+   pyrite.quantum.QuantumRegion
+   pyrite.quantum.QuantumDynamics
+   pyrite.quantum.QuantumNumerics
    pyrite.Analysis
    pyrite.Result
    pyrite.Provenance

@@ -4,7 +4,7 @@ import hashlib
 import json
 import subprocess
 from collections.abc import Mapping
-from dataclasses import fields, is_dataclass, replace
+from dataclasses import fields, is_dataclass
 from functools import cache
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
@@ -14,9 +14,10 @@ import numpy as np
 
 from . import __version__
 from ._backend import BACKEND
-from ._numerics import Physics, resolve_physics
+from ._numerics import Physics
 from .campaign.kinematic_validity import case_kinematic_validity
-from .campaign.lowering import build_case, build_sweep_cases, scene_physics
+from .campaign.lowering import build_case, build_sweep_cases, lower_simulation
+from .campaign.lowering import scene_physics as scene_physics
 from .campaign.model import (
     Numerics,
     Scene,
@@ -26,6 +27,7 @@ from .campaign.profiles import (
     case_characteristic_marker,
     case_content_key,
 )
+from .campaign.resolution import UNSET, ResolvedSimulation, _Unset, resolve_simulation
 from .detectors import Detector
 from .instrument import (
     Acquisition,
@@ -46,6 +48,7 @@ from .montecarlo.spectrum import (
 )
 from .montecarlo.transport import STOPPING_MODEL
 from .observations.plan import ObservationPlan, PixelSampling
+from .quantum import QuantumSetup
 from .results.model import CxrSpectra, Result, SpectralDensity
 
 
@@ -224,6 +227,7 @@ def simulate(
     numerics: Numerics | None = None,
     filters: tuple[FilterPlate | Filter, ...] | None = None,
     acquisition: Acquisition | NativeAcquisition | None = None,
+    quantum: QuantumSetup | None | _Unset = UNSET,
 ) -> Result:
     """Simulate one scene without reading or writing a checkpoint.
 
@@ -239,7 +243,7 @@ def simulate(
     beam
         Scalar :class:`~pyrite.Beam` description, or a complete
         :class:`~pyrite.Scene`. With a scene, omit target, detector, filters
-        and acquisition; physics and numerics may override its settings.
+        and acquisition; physics, numerics and quantum may override its settings.
     target
         Scalar :class:`~pyrite.Target`, :class:`~pyrite.Slab` or :class:`~pyrite.Stack`.
     detector
@@ -255,6 +259,11 @@ def simulate(
     acquisition
         Concrete reporting edges or an ``Acquisition.native(...)`` request;
         requires a physical pixel detector with native response scoring.
+    quantum
+        Independent :class:`~pyrite.quantum.QuantumSetup`. Omit to inherit
+        ``Scene.quantum``; explicit ``None`` disables the scene's setup.
+        Unsupported setups and conflicting legacy channeling fields refuse
+        before transport. Component calls default to no quantum setup.
 
     Returns
     -------
@@ -272,9 +281,19 @@ def simulate(
     -----
     This function performs no checkpoint I/O.
     """
-    scene = _simulation_scene(beam, target, detector, physics, numerics, filters, acquisition)
-    resolved_numerics = scene.numerics
-    case, xsgen_tables = _source_case(scene, resolved_numerics)
+    request = resolve_simulation(
+        beam,
+        target,
+        detector,
+        physics=physics,
+        numerics=numerics,
+        filters=filters,
+        acquisition=acquisition,
+        quantum=quantum,
+        require_detector=True,
+    )
+    scene, resolved_numerics = request.scene, request.numerics
+    case, xsgen_tables = _source_case(request)
     if isinstance(scene.detector, PlanarDetector):
         return _simulate_planar(scene, resolved_numerics, case, xsgen_tables)
     output = run_case(case, transport_core=resolved_numerics.transport_core)
@@ -318,55 +337,9 @@ def simulate(
     )
 
 
-def _simulation_scene(
-    beam: Any,
-    target: Any,
-    detector: Detector | PlanarDetector | None,
-    physics: Physics | None,
-    numerics: Numerics | None,
-    filters: tuple[FilterPlate | Filter, ...] | None,
-    acquisition: Acquisition | NativeAcquisition | None,
-) -> Scene:
-    """Resolve component calls and immutable scene overrides before lowering."""
-    if isinstance(beam, Scene):
-        if (
-            target is not None
-            or detector is not None
-            or filters is not None
-            or acquisition is not None
-        ):
-            raise TypeError("with a Scene, omit target, detector, filters and acquisition")
-        scene = beam
-        resolved_numerics = scene.numerics if numerics is None else numerics
-        physics = scene.physics if physics is None else physics
-    else:
-        if target is None:
-            raise TypeError("simulate requires a target")
-        resolved_numerics = Numerics() if numerics is None else numerics
-        scene = None
-    if not isinstance(resolved_numerics, Numerics):
-        raise TypeError("numerics must be a Numerics")
-    resolved_physics = resolve_physics(physics, resolved_numerics)
-    if scene is None:
-        scene = Scene(
-            beam=beam,
-            target=target,
-            detector=detector,
-            filters=() if filters is None else filters,
-            acquisition=acquisition,
-            physics=resolved_physics,
-            numerics=resolved_numerics,
-        )
-    else:
-        scene = replace(scene, physics=resolved_physics, numerics=resolved_numerics)
-    if scene.detector is None:
-        raise TypeError("simulate requires a detector; use directional_source for source maps")
-    return scene
-
-
-def _source_case(scene: Scene, numerics: Numerics) -> tuple[Case, dict[str, str]]:
-    """Lower ``scene`` to its transport case and cross-section table markers."""
-    case = build_case(scene, numerics)
+def _source_case(request: ResolvedSimulation) -> tuple[Case, dict[str, str]]:
+    """Lower a resolved request and prepare its cross-section table markers."""
+    case = lower_simulation(request)
     return case, case_table_markers(case)
 
 
@@ -386,7 +359,13 @@ def source_content_key_fn():
     return content_key
 
 
-def observation_plan(scene: Scene, numerics: Numerics) -> ObservationPlan:
+def observation_plan(
+    scene: Scene,
+    numerics: Numerics,
+    *,
+    physics: Physics | None = None,
+    quantum: QuantumSetup | None | _Unset = UNSET,
+) -> ObservationPlan:
     """Plan ``scene``'s counting observation without running transport.
 
     The plan carries the same source content key, sample-frame directions,
@@ -398,11 +377,12 @@ def observation_plan(scene: Scene, numerics: Numerics) -> ObservationPlan:
     ValueError
         If ``scene`` lacks a pixelated detector or an acquisition.
     """
-    scene = replace(scene, physics=scene_physics(scene, numerics))
+    request = resolve_simulation(scene, numerics=numerics, physics=physics, quantum=quantum)
+    scene = request.scene
     detector = scene.detector
     if not isinstance(detector, PlanarDetector) or scene.acquisition is None:
         raise ValueError("observation production requires a pixelated detector and acquisition")
-    case, xsgen_tables = _source_case(scene, numerics)
+    case, xsgen_tables = _source_case(request)
     return ObservationPlan(
         ResolvedObservation(
             detector=detector,
@@ -415,8 +395,8 @@ def observation_plan(scene: Scene, numerics: Numerics) -> ObservationPlan:
         tilt_azim_deg=float(case.get("tilt_azim_deg", 0.0)),
         rep_rate_hz=scene.beam.rep_rate_hz,
         bunch_charge_pc=scene.beam.bunch_charge_pc,
-        emission=scene.physics.emission_policy,
-        brem_source=cast(str, scene.physics.brem_source),
+        emission=request.physics.emission_policy,
+        brem_source=cast(str, request.physics.brem_source),
     )
 
 

@@ -1,241 +1,323 @@
-# Issue #680 — Coherent simulation configuration: quantum API plus sampling/numerics cleanup
+# Simulation composition RFC: physical scenes and independent run configuration
 
-**Status:** Proposal for maintainer review; no runtime changes in this slice
-**Target:** PyRITE `main`, inspected 2026-10-24
-**Issue:** [Issue 680](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/680)
-**Related:** ADR-0018 (quantum channeling zone), ADR-0019 (CLI ownership), ADR-0021 (#663, named physics/numerics presets), #623/#624 (experimental axial configuration), #361 (adaptive sampling), #508 (transverse source states).
+**Status:** Target contract; shared resolution and independent quantum arguments
+are implemented, with physical Scene/observation separation still proposed.
+**Audit base:** `main` at `2ce1f174`, 2026-10-25.
+**Scope:** [#680](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/680),
+[#695](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/695),
+and the composition boundary with
+[#703](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/703).
 
-## Decision requested
+This revision supersedes the earlier proposal to make `Scene` the simulation
+composition root. It specifies the intended contract; examples marked proposed
+are not executable API documentation. Current usage remains in
+[the API reference](../api.md#scene-simulation). Implementation progress belongs
+in the issues.
 
-Adopt a **typed, composed configuration** with orthogonal ownership and explicit sampling modes. Make quantum source, quantum dynamics, and quantum propagation **separate reusable objects**. Preserve the existing classical `Scene` as the composition root, adding an opt-in `QuantumSetup`. Do not create another mutable, loosely typed super-object or expose arbitrary Python callables through the catalog.
+## Implemented resolution boundary
 
-Most importantly: `Numerics` describes *algorithms and discretization*, `Physics` describes *physical approximations and interactions*, `Sampling` describes *statistical estimator budgets/stopping*, `Execution` describes *hardware/scheduling/resource settings*, and quantum entry states describe *the source*. Named catalog objects are immutable **resolved values** and can be referenced from profiles, per ADR-0021.
+`campaign/resolution.py` now owns shared Scene/component composition and
+model validation. `simulate` and `build_case` accept independent physics,
+numerics and quantum settings. Omitted quantum inherits the legacy scene value;
+explicit `None` disables it. The internal resolved request retains requested
+inputs and effective quantum-adapted physics/numerics separately, so case
+lowering does not repeat quantum adaptation. Observation planning and production
+use the same resolution; configured sweeps share its model validation while
+retaining their historical expansion and defaults.
 
-## 1. Current implementation audit
+This foundation retains existing Scene fields and detector constructors. The
+independent `Observation` and execution arguments in the proposed example below
+remain future work; current execution controls use `Numerics.execution`.
+No new public request type, units package, case schema or numerical model is
+introduced by the resolver migration.
 
-The public API currently has the following issues (code locations are for the current `main`, not proposed new files):
+## Current implementation
 
-| Current element | Observed behavior | Proposed owner |
+The previous RFC predated work already present on the audit base:
+
+- `Numerics.sampling` accepts `FixedSampling` and `AdaptiveSampling`, while
+  retaining the historical count/`Precision` interface and serialization.
+- `TransportNumerics`, `RadiationNumerics` and `ExecutionConfig` provide typed
+  sections; `Numerics` still lowers them through legacy fields.
+- `QuantumSetup` and `Beam.state` already have supported planar adapters and
+  compatibility tests. General quantum production support remains bounded.
+- `Scene` still stores physics, numerics, quantum setup and acquisition.
+  `PlanarDetector` still embeds response and scorer. `api._simulation_scene`,
+  case lowering, profile adapters and observation planning consume these
+  settings at different boundaries.
+
+Reuse these implementations. `ExecutionConfig` describes local kernel/core
+and chunk choices; it is distinct from `pyrite.execution.Executor` and resource
+requests. A common composition boundary must retain that distinction rather
+than introduce another scheduler or configuration store.
+
+## Physical Scene contract
+
+`Scene` describes an immutable physical system. Running it under a different
+model, solver, observation, or backend must not require replacing its physical
+fields. Its canonical fields contain sources, target geometry and material,
+physical downstream bodies and positioned detector geometry.
+
+| Concern | Intended owner | Boundary |
 | --- | --- | --- |
-| `Numerics.cxr_trials=450`, `.brem_trials=100` | Positive fixed counts exist even with an adaptive `Precision`; adaptive lowering intentionally ignores them (`tests/scan/test_adaptive_api.py::test_lowering_uses_policy_maximum_and_ignores_fixed_defaults`). | Mutually exclusive `FixedSampling` / `AdaptiveSampling` |
-| `Numerics.precision` | Hidden alternative to two fixed-count fields; rejects `lockstep` while the fields remain visible. | `Sampling(mode='adaptive')` selection; retain `Precision` as deprecated compatibility alias for stopping rule |
-| `Precision.observables=('cxr', 'brem')`, `.brem_target_rse`, `.brem_min_electrons`, `.brem_max_electrons` | A CXR/brem-specific adaptive controller masquerades as general precision. Brem may use a separately stopped **prefix** under the independent mode; only two estimators are implemented. | `AdaptiveSampling` with explicit CXR and optional brem stopping components; generalized observables later **only after** per-observable variance estimators exist |
-| `Numerics.cxr_chunk`, `.brem_chunk`, `.transport_core` | Backend and memory/batch choices intermixed with scientific discretization. | `Execution`; never hashed when genuinely result-invariant, but recorded in execution provenance |
-| `Numerics.energy_model`, `.max_dE_frac` | Transport integration algorithms. | `TransportNumerics` |
-| `Numerics.cxr_reflections`, `.energy_bins` | CXR-specific reflection and photon-grid quadrature. | `RadiationNumerics` (`cxr`, `brem` child options) |
-| Four `Numerics.channeling_*` settings | Planar basis/grid/depth integration with no typed quantum sub-object, validated even when channeling is off. | `QuantumNumerics` in a reusable `QuantumSetup` |
-| `Physics.channeling_model`, `.channeling_plane`, `.channeling_axial` | Physical selection and plane geometry plus an experimental JSON mapping carrying source/solver/limits. | Typed `QuantumDynamics` / `QuantumRegion`, source state, solver and execution controls |
-| `Physics.emission` | CXR emission estimator selection, **not** a declaration of electron wavefunction coherence. | Continue as radiation physics/observable selection; distinguish explicitly from `Beam.state` |
-| Profile `precision` | CLI refuses explicit fixed counts alongside adaptive, and defaults an eligible profile without counts to adaptive. | Same tagged `sampling` policy as API; no implicit cross-route semantic drift |
-| Bare `Numerics()` | Uses fixed `450/100`, unlike the eligible CLI default adaptive stopping policy. | One documented default for **new** v2 configurations; migrate legacy configurations without changing their results |
+| Energy, charge, source distributions, physical entrance state | `Beam` in `Scene` | State coordinates, units, normalization and sampled-state content are scientific inputs. |
+| Material, layers, cut, orientation, shape, physical region | Target/bodies in `Scene` | Resolve material references before lowering; avoid a second copy of the geometry. |
+| Passive downstream filters | Geometry in `Scene` | Preserve physical order; attenuation model selection belongs to physics. |
+| Detector pose, active area and physical pixel layout | Detector geometry in `Scene` | Physical pixels are independent of angular scoring tiles. |
+| Interactions, emission models, quantum dynamics | Physics/run configuration | Model enablement is independent of the existence of physical components. |
+| Trial counts, stopping rules, grids, integration, quantum solver | Numerical/run configuration | Numerical approximations participate in affected scientific identities. |
+| Virtual angular direction/acceptance, response, acquisition | `Observation` | A mathematical angular observation needs no positioned physical detector. |
+| Angular sampling/reconstruction and response construction budgets | Observation numerical configuration | Owned by `pyrite.config`, composed by the observation. |
+| Backend, chunks, workers, memory, scheduler | Execution configuration | Record provenance; preserve existing identity exclusions. |
 
-Additional constraints:
+A canonical scene contains no `physics`, `numerics`, `quantum` setup,
+`acquisition`, response model, scorer or execution settings. Its physical
+components must also satisfy this separation: merely removing fields from
+`Scene` while leaving response/scoring on `PlanarDetector` is insufficient.
+Compatibility constructors may still accept those values during migration.
 
-- `campaign/lowering.py` ultimately constructs `Case` through `build_cases`; the `Case` and dataset digests are sensitive to scientific inputs. Keep this as a centralized lowering boundary.
-- `campaign/channeling_cases.py` uses four planar parameters to construct a versioned channeling case record. Existing channeling-off outputs deliberately have no extra marker. **Keep off identical.**
-- `campaign/axial_spec.py` is a versioned *candidate* axial specification with `entry`, mesh, limits, pending physical boundary/source; current `refuse_unverified_axial_run()` intentionally prevents production axial runs. New configuration must not bypass that gate or equate FFT boundary loss with physical dechanneling.
-- `montecarlo/channeling/states.py` already defines `TransverseState`, `SampledState`, `Superposition`, mixtures, Gaussian/HG/LG/Bessel/Airy/aperture sources, `from_array`, and `from_abtem`. This is a **foundation to reuse**, not code to reimplement.
-- `docs/adr/0021-named-physics-numerics-presets.md` already establishes catalog identities, user/bundled layering, preset references and fixed-vs-adaptive exclusivity. Extend it; do not create a competing registry.
+A physical quantum entrance state remains on `Beam.state`. Crystal alignment
+and actual physical region bounds belong to target/region geometry. Interaction
+recipes, solver choice, FFT boundaries and requests for quantum observables
+belong to run configuration. The current `QuantumRegion.zone_max_ang` needs an
+explicit classification during migration: a computational handoff cap is not
+made a physical boundary by moving it to geometry. Preserve its present lowered
+meaning until that distinction is resolved. An absorbing FFT boundary never
+becomes evidence of physical dechanneling.
 
-## 2. abTEM lessons worth copying (and not copying)
+## Composition through simulate
 
-abTEM distinguishes `PlaneWave`/`Probe` input builders, `Waves` arrays, `Potential` construction, multislice propagation, detectors and measurements. Its `Probe.multislice(potential, detectors=..., max_batch='auto', lazy=...)` makes source and propagation explicit, while Dask-backed lazy arrays separate construction from execution. Device/FFT-cache/chunking settings belong to configuration or execution, not the physical initial state. Reference: [abTEM Waves/PlaneWave](https://abtem.github.io/doc/reference/api/_autosummary/abtem.waves.PlaneWave.html), [Potential](https://abtem.github.io/doc/reference/api/_autosummary/abtem.potentials.iam.Potential.html), [Parallelization](https://abtem.github.io/doc/user_guide/walkthrough/parallelization.html).
+Keep `simulate` as the straightforward entry point. Compose a physical scene
+with independent physics, numerics, observations, quantum setup and execution
+arguments. Reuse typed values and named catalog objects under ADR-0021.
 
-Adopt the *separation of responsibilities*, abTEM adapters, inspectable resolved computation graphs/budgets and lazy asset loading. **Do not** make PyRITE `Scene`/`Numerics` into a `Waves` array; PyRITE's electron transport, mixed-state jumps, radiation and physical handoff are not simply a multislice problem. Do not make Dask a hard dependency of state definitions or solver semantics; if adopted, it belongs to `Execution`.
-
-## 3. Proposed object model
-
-**Composition root:** retain `Scene(beam, target, detector, physics, numerics, ...)`, and add `quantum: QuantumSetup | None = None` plus `execution: Execution = Execution()` after feature-gating. `QuantumSetup` owns a **reference** to the dynamics, propagation numerics and requested quantum observables; initial state belongs to `Beam` and the crystal potential is resolved from `Target` (no duplicated physical energy/geometry). Both quantum and classical solvers can consume the same `Scene`, but `quantum=None` is strictly legacy-equivalent.
-
-| Type (tentative public name) | Contents | Identity/provenance classification |
-| --- | --- | --- |
-| `Beam.state: TransverseStateSpec <or> None` | Entrance pure state, coherent superposition, or statistical mixed state; units and beam-frame coordinate conventions explicit. Uses #508 factories. | Scientific, serialized spec and  content hash of sampled data |
-| `QuantumRegion` | Planar/axial crystal alignment, potential source, physical zone bounds, handoff/escape definition. Plane/axis selectors use target-crystal orientation. | Scientific |
-| `QuantumDynamics` | Hamiltonian/potential recipe and physical dissipation/scattering mechanisms (e.g., validated Lindblad operator families), plus model compatibility. | Scientific |
-| `QuantumNumerics` | Representation (`BlochBasis`, `RealSpaceGrid`, etc.), solver (`density-matrix`, `MCWF`, coherent-only), propagation step, tolerance, quadrature, numerical/FFT boundary. | Scientific when affecting numerical approximation |
-| `QuantumObservables` | Population/coherence/flux/CR requests, saved snapshots, supported estimator contracts. Distinguish physical observables from presentation toggles. | Scientific if changes computed/stored arrays; display-only fields elsewhere |
-| `QuantumSetup` | `region`, `dynamics`, `numerics`, `observables`; optional when no quantum stage. | A typed, inspectable composition of the preceding values |
-| `TransportNumerics` | Classical electron integration and bounded-step options. | Scientific |
-| `RadiationNumerics` | CXR reflection/mosaic quadrature, photon grids, component-specific integration settings. | Scientific |
-| `FixedSampling` | Explicit counts for line and continuum estimators, along with a defined count/correlation model. Preserve current fixed-path behavior. | Scientific |
-| `AdaptiveSampling` | Existing error targets, block estimator, stabilization and heavy-tail guards, supported CXR/brem stopping choices. | Scientific |
-| `Execution` | Core/backend/device, CPU workers, scheduler, chunk/batch sizes, memory ceilings, streaming/spill policy and cluster profile. | Execution provenance; identity only for settings proven result-affecting |
-
-`Precision` describes **statistical accuracy**, not float32/float64 arithmetic; give it a nonambiguous new name. GPU dtype/FP64 requirements are separate `Execution`/numerical representation constraints. Do not promise FP32 parity.
-
-**Important separation within quantum settings:** physical loss/handoff is in `QuantumRegion`/`QuantumDynamics`; periodic grids, FFT buffers, absorbing numerical layers and discretization are in `QuantumNumerics`. An FFT-box exit is **not** physical dechanneling without a validated flux model. A planar plane index is region geometry, not integration numerics. A solver limit like `max_working_bytes` is execution, not material physics.
-
-Avoid a general-purpose `Hamiltonian` *plugin code registry* in phase 1. Provide typed supported recipes, a `to_spec()`/`from_spec()` interface and a backend protocol that can later admit additional validated operators. Arbitrary state samples are allowed via a **content-addressed array artifact** with units, grid/FFT convention and digest, not embedded Python functions in portable profile TOML.
-
-## 4. Illustrative target Python API (NOT yet implemented)
+Proposed shape, with constructor spellings subject to their owning issues:
 
 ```python
-import pyrite as pr
+scene = Scene(beam=beam, target=target, detector=panel, filters=filters)
 
-state = pr.states.laguerre_gauss(p=0, ell=1, waist_ang=80.0)
-beam = pr.Beam(
-    energy_keV=5_000.0,
-    transverse=pr.Spot(),
-    longitudinal=pr.PointBunch(),
-    state=pr.TransverseStateSpec.from_runtime(state),
+observation = Observation(
+    name="counts",
+    detector="detector",
+    response=response,
+    acquisition=acquisition,
+    sampling=angular_sampling,
 )
-scene = pr.Scene(
-    beam=beam,
-    target=pr.Slab("si", thickness_ang=100_000.0, tilt_deg=0.0),
-    physics=pr.Physics(radiative_model="uncoupled"),
-    numerics=pr.Numerics(
-        sampling=pr.FixedSampling(cxr_electrons=500, brem_electrons=200),
-        transport=pr.TransportNumerics(energy_model="midpoint", max_dE_frac=0.01),
-        radiation=pr.RadiationNumerics(cxr=pr.CxrNumerics(reflections=pr.CxrReflections())),
-    ),
-    quantum=pr.QuantumSetup(
-        region=pr.PlanarChannelingRegion(plane_hkl=(1, 1, 0)),
-        dynamics=pr.ChannelingDynamics(scattering=("tds", "electronic")),
-        numerics=pr.QuantumNumerics(
-            basis=pr.BlochBasis(half_width=16, cells=16),
-            method="density-matrix",
-            step_ang=250.0,
-        ),
-        observables=(pr.StatePopulations(), pr.ChannelingRadiation()),
-    ),
-    execution=pr.Execution(transport_core="auto", cxr_chunk=None, brem_chunk=None),
+result = simulate(
+    scene,
+    physics=physics,
+    numerics=numerics,
+    observation=observation,
+    quantum=quantum_setup,
+    execution=execution,
 )
 ```
 
-This is a **shape proposal**: source factories and `Scene` exist, but several names/constructors above do not. It intentionally cannot be run as-is. `ChannelingDynamics` and `QuantumSetup` should express a generic quantum problem with a *specialized* channeling recipe, not assume every quantum calculation is channeling. Later recipes can include `FreePropagation`, crystal-scattering potentials and custom validated operators without new top-level numerical kwargs.
+Calling this again with different run arguments reuses `scene` unchanged.
+`simulate(beam, target, detector, ...)` remains a supported convenience adapter.
+New geometry-only scenes without a detector can be lowered for source workflows;
+`simulate` still requires a supported observation. Preserve historical defaults
+for legacy construction rather than silently making a default angular detector
+part of the new physical scene.
 
-Optional convenience `pr.Sampling.fixed(...)` / `pr.Sampling.adaptive(...)` factories can return the two discriminated frozen dataclasses; a separate polymorphic base class is not necessary.
+**Decision: defer a public `SimulationSpec`/`RunSpec`.** Current typed
+configuration values and catalog references already provide reusable settings.
+A new public wrapper would duplicate `simulate` arguments without demonstrated
+campaign or serialization value. Use an internal immutable resolved request to
+share validation and lowering. It must carry physical inputs, effective
+scientific settings, observation requests, execution settings, schema origin and
+per-field resolution provenance. Public promotion requires a concrete consumer
+that benefits from a portable reusable request, plus API-governance review.
 
-## 5. Sampling resolution contract (priority 1)
+## Observation references and names
 
-Make `sampling` a **tagged union** rather than a bag of nullable fields:
+Use the proposed `pyrite.observations.Observation` from #703. It composes a
+reference to physical detector geometry **or** a virtual angular specification,
+response, acquisition, and numerical scoring configuration. Its resolved rays,
+tiles and internal plan remain derived representations.
 
-```python
-pr.Numerics(sampling=pr.FixedSampling(cxr_electrons=450, brem_electrons=100))
-# OR
-pr.Numerics(
-    sampling=pr.AdaptiveSampling(
-        target_rse=0.05,
-        min_electrons=200,
-        max_electrons=20_000,
-        block_electrons=100,
-        observables=("cxr", "brem"),
-    )
-)
-```
+For the existing single-detector scene, reserve the reference `"detector"` for
+`scene.detector`. The singular `observation=` form needs no user name; a supplied
+name is a display/routing label. A future multiple-observation form must require
+unique nonempty names and explicit detector references where ambiguous. Multiple
+observations can reference the same physical detector with independent response,
+acquisition and scoring settings. This contract does not promise a new plural
+return type or multi-detector execution in the initial implementation.
 
-**Invariants:**
+A convenience `Observation(detector=panel, ...)` may be normalized to the scene
+reference only when its canonical physical geometry matches the scene's
+registered detector. Validate values, not Python object identity. A mismatched
+pose, size or pixel layout raises an error naming the conflicting reference;
+never allow an observation to override scene geometry. Portable requests store
+the reference, avoiding independently mutable copies of physical geometry.
 
-1. Exactly one sampling mode is active in a resolved v2 `Scene`/profile. `FixedSampling` never has adaptive tolerances; `AdaptiveSampling` never has fixed requested counts. `cxr_trials`/`brem_trials` cannot silently override or be ignored alongside adaptive mode. Legacy API kwargs get a deprecation warning or a clear error **when explicitly conflicting**, but unmodified old default construction continues through the compatibility resolver.
-2. Adaptive sampling retains its present scope: only the validated CXR/brem incoherent estimators. Unsupported modes (coherent scoring, channeling CR, cascades, GDF, physical detector) refuse as today **until corresponding per-primary variance estimators and stopping contracts are implemented**. Never expose a generic `observables=('cr', 'dose')` API ahead of support.
-3. Existing independent-brem adaptive stopping has brem-prefix behavior; do not assume fixed-count continuum sampling shares identical correlation semantics. Keep the two reducers' identity behavior and RNG streams unchanged until a dedicated statistical audit.
-4. One shared `resolve_sampling(scene, profile, overrides) -> ResolvedSampling` returns requested policy, effective per-estimator work budgets, reason/source, and gate decisions; it is the sole lowering path for CLI and API. For adaptive, `max_electrons` is a cap, not a promised realized count. Expose `.explain()`/CLI `--explain` without running.
-5. **Default migration:** old API's implicit 450/100 and eligible CLI profile's implicit adaptive 5% / 200–20,000 / 100 remain under legacy schema handling, to protect reproducibility. New v2 profile creation writes an explicit sampling reference/value; choose one well-documented default preset (rather than route-dependent hidden defaults). Do not silently change existing profile or case hashes.
-6. Preserve `Precision.to_dict()`'s historical `line` observable serialization within legacy case/checkpoint identity until an explicit schema-version migration. An alias or adapter may be needed; changing the observable spelling in serialized historical objects is not cosmetic.
+Use `AngularObservation` as the proposed name for the virtual direction and
+acceptance specification, pending #703's export review. Retain root `Detector`
+and its defaults through the compatibility adapter. No angular geometry is
+inferred from an unrelated physical detector. Keep scalar source densities,
+solid-angle-weighted averages, spatial accepted flux and acquired counts in
+their existing units; composition does not change their meanings.
 
-## 6. CLI and reusable catalog proposals
+## One resolution path
 
-**Extend ADR-0021's named-object mechanism; do not create a second configuration store.** Implement one unified `pr.catalog` resolution service with typed references, clone/adopt/validate/diff, user/bundled layers, immutability rules and provenance. Add catalog `sampling`, `execution`, `quantum_state`, `quantum_dynamics`, `quantum_solver` objects. A `quantum_setup` named preset is optional composition, not a new model registry. Keep physical regions explicit in the setup/profile when they depend on target orientation; reusable region templates may be added later.
+The internal resolver is the authoritative boundary for `simulate`,
+`build_case`, sweeps, profiles, observation producers, directional APIs and
+photon APIs. It performs no transport, response-matrix generation, table fetch
+or output writes. It may resolve local configuration/catalog metadata;
+execution preparation performs expensive asset loading afterwards.
 
-Illustrative commands (names provisional):
+1. Adapt the input schema and record explicitly supplied values. Normalize
+   physical inputs and approved quantities to existing unit-suffixed numeric
+   values; resolve references and content-addressed state descriptors.
+2. Resolve physics and quantum model selection, preserving supported capability
+   gates and validating source/model compatibility.
+3. Resolve numerical and sampling settings into one effective policy per
+   estimator. Preserve schema-specific defaults and RNG/seed rules.
+4. Resolve observation references, response capabilities, acquisition requests
+   and scoring policies against the physical scene.
+5. Resolve execution policy and validate backend compatibility before work.
+6. Produce the immutable resolved request; existing case and observation
+   lowerers consume its values without reapplying defaults.
 
-```sh
-pyrite sampling preset create adaptive-5pct --mode adaptive --target-rse 0.05 --min-electrons 200 --max-electrons 20000 --block-electrons 100 --observables cxr,brem
-pyrite quantum state create vortex1 --kind laguerre-gauss --ell 1 --p 0 --waist-ang 80
-pyrite quantum dynamics create planar-tds --kind channeling --region planar --plane 1,1,0 --mechanisms tds,electronic
-pyrite quantum solver create planar-dm16 --method density-matrix --basis bloch --half-width 16 --cells 16 --step-ang 250
-pyrite execution preset create gpu-worker --core cuda --cxr-chunk auto --memory-limit 4GiB
-pyrite profile set my-run --sampling adaptive-5pct --execution gpu-worker
-pyrite profile quantum set my-run --state vortex1 --dynamics planar-tds --solver planar-dm16
-pyrite profile validate my-run --explain
-pyrite profile show my-run --resolved --output json
-```
+Native acquisition edges remain an unresolved request until the supported
+response/source information is available. Resolve the complete edge union
+before acquisition identity, persistence or Poisson realization; the shared
+resolver must not generate a response matrix merely to construct a request.
 
-Example conceptual TOML (exact syntax subject to parser implementation):
+All entry points must use the same applicability and conflict validation.
+Equivalent explicit API and CLI inputs resolve identically. Historical implicit
+API fixed `450/100` and eligible CLI adaptive defaults remain tagged legacy
+policies until an explicit profile/schema migration; they are not equivalent
+inputs. New-schema profiles must write an explicit sampling policy so the
+interface cannot silently choose the mode.
 
-```toml
-[sampling.adaptive-5pct]
-mode = "adaptive"
-target_rse = 0.05
-min_electrons = 200
-max_electrons = 20000
-block_electrons = 100
-observables = ["cxr", "brem"]
+### Compatibility and precedence
 
-[quantum_state.vortex1]
-kind = "laguerre_gauss"
-version = 1
-ell = 1
-p = 0
-waist_ang = 80.0
+Retain supported imports, positional construction, old scene fields, serialized
+cases and checkpoints throughout the established compatibility window. The
+migration adapter extracts legacy run fields into a private compatibility
+record; they are not canonical physical fields. Deprecated accessors may expose
+that record for old consumers. Dataclass replacement, sweep expansion and
+provenance reconstruction must preserve it until those consumers migrate.
+Implementation must demonstrate this behavior before replacing the constructor.
 
-[quantum_solver.planar-dm16]
-method = "density-matrix"
-representation = "bloch"
-half_width = 16
-cells = 16
-step_ang = 250.0
+Omission must be distinguishable from explicit values, including explicit
+`None` where it disables an optional request. Do not infer explicitness by
+comparing to a default instance. Apply precedence to complete typed settings,
+not an undocumented recursive merge:
 
-[profiles.my-run]
-beam = "beam5mev"
-numerics = "electron-standard"
-sampling = "adaptive-5pct"
+| Input combination | Resolution |
+| --- | --- |
+| Explicit `physics`/`numerics` on a scene call | Override corresponding legacy scene settings, preserving today's behavior. |
+| Omitted run argument with legacy scene settings | Use legacy values; retain historical defaults and serialized output. |
+| Omitted run argument with canonical scene | Use the documented schema default. |
+| Canonical `observation` plus embedded legacy response/acquisition/scorer | Accept if their effective values agree; reject differing explicit values with both paths in the diagnostic. |
+| Explicit execution plus legacy numerical execution fields | Accept agreeing values; reject differing explicitly supplied fields. Omitted legacy defaults do not conflict. |
+| Scene plus component `target`, `detector` or `filters` | Keep the existing mixed-input error; physical changes require a new scene. |
+| Conflicting quantum setup and legacy channeling fields | Preserve refusal of contradictory explicit settings; never silently choose one. |
+| Invalid detector reference or unsupported response/acquisition capability | Refuse before transport or writes. |
 
-[profiles.my-run.quantum]
-state = "vortex1"
-dynamics = "planar-tds"
-solver = "planar-dm16"
-```
+Continue rejecting `simulate(scene, acquisition=...)` under the existing API;
+introduce independent acquisition via the new observation argument. The new
+observation route must not weaken mixed-component diagnostics.
 
-A profile with `quantum` absent follows classical transport without allocating a quantum mesh. `quantum` present **does not** mean an experimental axial run is ready. `--explain` reports each field's origin, e.g., `preset adaptive-5pct`, `profile override`, `built-in`, alongside resolved unsupported-science gates. The CLI must not falsely advertise compatibility: validation should refuse adaptive sampling with the current deterministic channeling-CR path and respect #623's axial refusal.
+Warn when explicitly using migrated configuration fields in Scene or detector
+constructors; implicit historical defaults must remain usable. Define field
+warnings and removal dates in the implementation using the project's
+[API compatibility policy](../development/api-policy.md); this RFC neither
+starts a removal clock nor changes existing import-deprecation schedules.
+Historical stored artifacts load through schema adapters without warnings for
+each field. Never rewrite stored identities merely to normalize the Python API.
 
-Keep old `pyrite numerics precision enable|disable` and old `pyrite physics/numerics preset` commands as migration aliases with warnings; do not redirect them to an incompatible policy silently. Do not overload the words `precision` (numerical floating type, statistical stopping, grid accuracy).
+## Sampling and quantum requirements retained from #680
 
-## 7. Identity, serialization, and safety
+`FixedSampling` and `AdaptiveSampling` remain mutually exclusive effective
+policies. `Precision` keeps its legacy serialization, including the historical
+`line` observable spelling. Adaptive maxima are caps, not realized counts.
+Independent brem stopping retains its prefix semantics; do not assume fixed and
+adaptive populations have identical correlations.
 
-Separate three representations:
+Only supported CXR/brem estimators can use adaptive stopping. Preserve refusals
+for unsupported coherent, channeling, cascade, GDF and physical-detector modes
+until their variance/stopping contracts are implemented. New API names cannot
+imply additional solver or estimator support.
 
-1. **User specification:** named references/partial overrides, explicit units and schema version.
-2. **Resolved scientific specification:** full typed, immutable, JSON-safe values with validated model support and content-addressed input arrays. This alone determines scientific case identity and checkpoints (subject to existing compatibility marker/version rules).
-3. **Execution plan/provenance:** normalized backend, worker scheduler, chunks, cache/spill budget and hardware availability. Execution choices recorded per run; they influence content key only where a documented numerical result dependency exists.
+Reuse current `QuantumSetup`, `QuantumDynamics`, `QuantumNumerics` and source
+state implementations; do not recreate the already implemented #680 foundation.
+Move the setup composition off Scene through the adapter. Initial state belongs
+to the physical beam; sampled state arrays retain shape, dtype, units, coordinate
+conventions and content digest. Keep optional source adapters lazy.
 
-Compile once: `profile/Scene -> resolve references/defaults -> validate applicability -> lower Case -> execute`. Use the **same** validator and lowering contracts in Python API, CLI, remote serialization and sweeps. Never hash preset *names*; do record name/digest as non-hashed provenance per ADR-0021.
+Production quantum support remains the supported planar Bloch density-matrix
+path. Unsupported free/axial/MCWF configurations continue refusing where they do
+today. Preserve axial production gates, channeling-off payloads and RNG use.
+Separating configuration does not validate another propagation model.
 
-For old scenes/configurations, canonical lowering and case serialization should be **byte-for-byte equivalent**. New quantum cases get an explicit schema/model/version marker. Do not reuse a classical cached result for an enabled quantum simulation. `off` must add no extra scientific keys or RNG use. Arrays must carry shape, dtype, grid convention, physical units and SHA-256 digest; require known portability and optional abTEM import at the edge. Reject unsupported backend/observable combinations *before* transport or output writes.
+## Scientific identity and serialization
 
-## 8. Incremental implementation plan (separately reviewable PRs)
+Do not hash a dataclass dump of the new composition. Lower equivalent requests
+to the established case and observation payloads, retaining schema versions,
+conditional model markers, omission rules and response type identifiers.
 
-**Slice A — Contract and diagnostic tests (safe foundation).** Approve this RFC, enumerate all current profile/preset/numerics/physics keys and values, add an exhaustive effective-settings matrix for API vs CLI, fixed vs adaptive, coherent vs incoherent, and channeling off/planar/axial. Record pinned legacy case/dataset keys and representative hashes. Add a `describe/explain` resolver with explicit inactive/ignored fields, scientific/execution classification and source. No run semantics change.
+| Layer | Inputs that must matter | Reuse constraint |
+| --- | --- | --- |
+| Physical/source inputs | Source distributions/state, material, geometry | There is no new all-purpose physical-scene cache key in this proposal. |
+| Source computation | Existing resolved case, numerical policy, seed and model/table markers | Preserve `case_content_key` and dataset identity independently; they gate different storage. |
+| True-spatial observation | Source digest, detector geometry, filters, numerical scorer, representative rays and attenuation arrays | Response/acquisition changes preserve compatible factors. |
+| Response | Canonical response config, implementation identity and event semantics | Preserve historical qualified type strings through namespace migration. |
+| Acquisition | Resolved bins, exposure, threshold, normalization and realization policy | Native edges resolve first; retain coordinate-stable Poisson RNG semantics. |
+| Full observation | Existing links between true-spatial, response and acquisition digests | Names/references route values; labels alone cannot change scientific digests. |
+| Execution | Backend and resource provenance | Preserve established chunk/resource exclusions; add identity inputs only for documented numerical/reproducibility effects. |
 
-**Slice B — Sampling-policy union.** Add frozen `FixedSampling`/`AdaptiveSampling` with `Precision` adapter/alias, choose a single tagged mode at API construction and after catalog resolution, move lowerers to `ResolvedSampling`. On old API calls preserve positional/keyword compatibility and emitted identities; new constructions with conflicting explicit sampling values should raise. CLI new `sampling` commands and presets; migrate only when user explicitly requests `profile migrate`. Test independent brem, peak/band RSE, pilot/stability guards, and all unsupported modes.
+Current scalar source cases include observation direction; source reuse across
+arbitrary angular observations is not promised. Likewise, changed numerical
+angular sampling can require new directional source evaluations. Preserve the
+existing factorization boundaries rather than assuming every observation can
+reuse the same computed arrays.
 
-**Slice C — Separate execution and classical numerics.** Add `Execution`, `TransportNumerics`, `RadiationNumerics` and compatibility accessors/constructors to `Numerics`. Move chunk/core from scientific spec without changing backend policy or current cache exclusion. Add `validate` and resolved/config inspection. Tests across CPU, GPU options (GPU skipped without hardware), sweeps, remote jobs, and resuming checkpoints.
+Existing identity owners are
+{source}`src/pyrite/campaign/profiles.py::case_content_key`,
+{source}`src/pyrite/campaign/profiles.py::dataset_identity`, and
+{source}`src/pyrite/instrument/observation.py::observation_identity`.
+Response identity currently embeds the qualified Python type, and acquisition
+identity includes beam rate/charge normalization. These dependencies require
+explicit compatibility adapters if types move or configuration splits.
 
-**Slice D — Shared quantum types and import adapters.** Lift/alias the current `montecarlo.channeling.states` abstractions into stable public `pr.states` / `pr.quantum` entrypoints; add typed/JSON-safe `TransverseStateSpec`, file-backed sampled-state identity, schema and units, pure/mixed source handling. Do not rewrite amplitude evaluators. Add `QuantumRegion`, `QuantumDynamics`, `QuantumNumerics`, `QuantumSetup` with explicit supported types and no-op/off behavior. Separate source/state, physical boundary and numerical boundary.
+Preserve old checkpoint/case readers and resolved values. A new portable
+request schema, if needed internally, must distinguish specification version
+from historical case/observation schemas. Normalize approved unit-bearing
+quantities at the boundary under the dedicated units contract; this RFC selects
+no units package. No quantity objects enter kernels, CUDA arrays or existing
+checkpoint payloads. Equivalent numeric and quantity inputs must yield the same
+canonical numerical values and identities.
 
-**Slice E — Planar production adapter.** Rewrite only the planar case resolver to take `QuantumSetup`, lowering to the **unchanged** versioned channeling record and respecting ADR-0018 gates. Keep legacy `Physics(channeling_model='planar')` and `Numerics(channeling_*)` through deprecating adapters. Add roundtrip CLI spec/preset tests and equivalence golden tests for density evolution, dechanneling flux, spectra, RNG and identity.
+## Consumer boundaries and verification
 
-**Slice F — Axial diagnostic adapter and capabilities.** Map #624's versioned entry/mesh to the new quantum objects; retain #623's refusal on unverified physical runs and pending sources. Expose diagnostics as explicitly nonproduction. Before enabling quantum transmission/radiation, validate source, depth budget, boundary flux and physical matching. Add solver/device capability matrices and explain reasons for unsupported combinations.
+The current implementation audit identifies these migration seams. This table
+describes the required integration contract; issue checklists own scheduling.
 
-**Slice G — Replace legacy storage at a version boundary.** Add `pyrite profile migrate --configuration-v2 --dry-run` and a deterministic migration report. Support old profile/preset schema through the agreed deprecation window; annotate release notes and Sphinx API docs. Keep old checkpoint readers, data provenance and reproducibility available.
+| Current seam | Required migration and focused evidence |
+| --- | --- |
+| `campaign/model.py::Scene`, `api.py::_simulation_scene` | Extract compatibility settings, retain constructor/access behavior and override semantics; `tests/scan/test_public_api.py`. |
+| `campaign/lowering.py::build_case` and `build_sweep_cases` | Consume resolved inputs once; preserve case payloads, seed order and legacy sweep handling. |
+| `Sweep` and optimization parameter paths | Keep physical axes on scene; route run axes to run settings. Preserve legacy `physics.*`/`numerics.*` paths, label order, Cartesian expansion and override-before-axis precedence through adapters. |
+| `campaign/legacy.py` and profile/settings adapters | Map existing profiles into the same resolver; preserve their schema defaults and named-preset layering under ADR-0021. |
+| `api.py::observation_plan`, `observations/plan.py`, `runs/observe.py` | Build plans from independent observation specs; preserve native bins and reuse checks; `tests/observations/test_produce.py`, `test_sweep.py`. |
+| `quantum.py` and channeling lowering | Move composition without changing versioned records; `tests/scan/test_quantum_configuration.py`, `test_quantum_state_spec.py`. |
+| Directional, photon-event and photon-continuum entry points | Use shared source/model validation while retaining each pathway's capability refusals and distinct tally identities. |
+| Result provenance and reconstruction | Record physical scene and resolved run settings separately; retain legacy `Result.scene` access and historical artifact reconstruction. |
+| Apps, notebooks, CLI examples | Teach the independent composition after runtime support exists; regenerate CLI references only if CLI contracts change. |
+| Public imports/dependencies | Register implemented contracts in `api-surface.toml`, preserve alias object identity and lightweight imports, run API checks and import-linter. |
 
-## 9. Acceptance gates
+Before migrating a seam, capture representative legacy case mappings and both
+case/dataset digests. Cover scalar and pixel cases, fixed/adaptive defaults,
+explicit overrides, conflicts, quantum off/on and converted sweeps. Compare
+resolved values and serialized identities first; use focused execution tests
+where the consumer changes. Existing identity-layer and rescoring tests in
+{source}`tests/instrument/test_observation.py` and
+{source}`tests/observations/test_produce.py` protect response/acquisition reuse.
 
-- `pr.Numerics()` and an equivalent **new** CLI profile resolve the same documented sampling mode. Legacy stored profiles preserve historical default rules and hashes.
-- A resolved configuration cannot contain both adaptive stopping and effective fixed requested counts. Conflicts either raise before work or are explicitly marked as legacy-only in `.explain()`.
-- Every active setting can be traced through public API, named catalog object, CLI setter, validation, lowered Case, and scientific/execution provenance.
-- All new configuration types are immutable with defensive copies or frozen normalized data where necessary; no hidden mutable `Mapping` breaks immutability.
-- Planar legacy fixed runs are numerically and identity equivalent; channeling-off has identical payload and RNG use; unsupported axial and adaptive channeling paths still refuse.
-- `QuantumStateSpec` supports source factories, mixtures/superpositions, sampled inputs and optional abTEM import without requiring abTEM in core runtime or storing arbitrary callbacks.
-- Tests cover invalid combinations, source-frame units, mixed-state normalization, reflection settings, plane/axis orientation, solver boundary interpretation, checkpoint/remote serialization, and old-version migration.
-- `pyrite profile show --resolved` and `validate --explain` expose which settings are active, sources, fallback reasons, capability limitations and resource estimates before run.
-
-## Unresolved decisions for the maintainers
-
-1. Prefer an explicit fixed default for **new v2** scenes/profiles, or a named default adaptive preset? Both can be user-friendly if *identical across interfaces*, resolved visibly and pinned. Current differences should not propagate.
-2. Preserve current public name `Precision` as a long-lived alias for `AdaptiveSampling`, or deprecate after the next major API version?
-3. Do named quantum state recipes belong to beam-object references or the profile's optional quantum composition? This RFC keeps `Beam.state` as the runtime physical owner and uses `profiles.*.quantum.state` as a reference resolved into that beam state, but the parser must enforce that the two sources never conflict.
-4. Should `Execution` have user presets in the material catalog (convenient) or in a separate machine-local catalog? Prefer machine-local *defaults*, transferable requested execution policies, and explicit hardware capability negotiation, with execution excluded from scientific identities unless demonstrated necessary.
-5. Which first generic nonchanneling quantum propagation target is useful and readily validated (free-space evolution with plane-wave/Gaussian input is a low-risk candidate)? Include it in the acceptance gate so these classes are genuinely general purpose.
-
-**Bottom line:** Do not migrate all legacy fields in one PR. Start with sampling semantics and a canonical resolution/explanation layer, then add the quantum object model by reusing #508, and only afterwards attach planar and axial execution paths. This avoids a large facade-only reorganization or an accidental scientific-regression surface.
+The contract is implemented only when one immutable physical scene can be used
+with independent run and observation settings, all consumers share resolution,
+legacy calls retain their behavior, and the configured API/dependency checks
+pass. Publishing this proposal alone does not satisfy those runtime gates.

@@ -4,10 +4,12 @@ from dataclasses import replace
 from typing import TYPE_CHECKING
 
 from .._energy_bins import EnergyBins
-from .._numerics import Numerics, Physics, resolve_physics
+from .._numerics import Numerics, Physics
 from ..instrument import PlanarDetector
 from ..montecarlo import Case
+from ..quantum import QuantumSetup
 from .channeling_cases import resolve_channeling
+from .resolution import UNSET, ResolvedSimulation, _Unset, resolve_models, resolve_simulation
 from .transition_cases import resolve_shell_ionization, resolve_transition_radiation
 
 if TYPE_CHECKING:
@@ -17,40 +19,31 @@ from .sweep import Sweep as LegacySweep
 
 
 def scene_physics(scene: Scene, numerics: Numerics) -> Physics:
-    """Resolve the scene's model policy."""
-    physics = resolve_physics(scene.physics, numerics)
-    if scene.quantum is not None:
-        physics, numerics = scene.quantum.lower(physics, numerics)
-    physics.validate_transport(numerics.energy_model)
-    if scene.beam.state is not None:
-        from ..montecarlo.channeling.planar_injection import source_record
-        from ..montecarlo.transverse import TransverseDistribution
-
-        if physics.channeling_model != "planar":
-            raise ValueError("Beam.state production requires planar channeling")
-        if isinstance(scene.beam.transverse, TransverseDistribution):
-            raise ValueError("Beam.state cannot combine with classical Twiss slopes")
-        if scene.beam.energy_spread_frac not in (None, 0.0):
-            raise ValueError("Beam.state requires a monoenergetic source")
-        source_record(scene.beam.state)  # fail before materials and case construction
-    if physics.channeling_model == "axial":
-        # Refuse before material lookup, any case construction, or output writes.
-        # Physical source and handoff cannot be inferred from an FFT sink (#623).
-        from .axial_spec import refuse_unverified_axial_run
-
-        refuse_unverified_axial_run()
-    return physics
+    """Compatibility accessor for the shared model-resolution boundary."""
+    return resolve_models(scene, numerics)[0]
 
 
-def build_case(scene: Scene, numerics: Numerics | None = None) -> Case:
-    """Lower one resolved scene to the existing typed transport input."""
-    numerics = scene.numerics if numerics is None else numerics
-    physics = scene_physics(scene, numerics)
-    if scene.quantum is not None:
-        _, numerics = scene.quantum.lower(scene.physics, numerics)
+def build_case(
+    scene: Scene,
+    numerics: Numerics | None = None,
+    *,
+    physics: Physics | None = None,
+    quantum: QuantumSetup | None | _Unset = UNSET,
+) -> Case:
+    """Resolve and lower one scene to the existing typed transport input.
+
+    Explicit physics/numerics override legacy scene settings. Omitted quantum
+    inherits ``Scene.quantum``; explicit ``None`` disables the quantum setup.
+    """
+    return lower_simulation(
+        resolve_simulation(scene, numerics=numerics, physics=physics, quantum=quantum)
+    )
+
+
+def lower_simulation(request: ResolvedSimulation) -> Case:
+    """Lower effective settings without repeating defaults or quantum adaptation."""
+    scene, physics, numerics = request.scene, request.physics, request.numerics
     convergence = numerics.cxr_reflections
-    if numerics.precision is not None and isinstance(scene.detector, PlanarDetector):
-        raise ValueError("adaptive precision does not support physical detectors; use fixed counts")
     scalar_detector = (
         scene.detector.scalar_detector()
         if isinstance(scene.detector, PlanarDetector)
@@ -112,6 +105,7 @@ def build_sweep_cases(sweep: Sweep, numerics: Numerics | None = None) -> list[Ca
     """Lower a public sweep; preserve exact D7 expansion for converted sweeps."""
     if sweep._legacy_source is not None:
         old_sweep, settings = sweep._legacy_source
+        physics, resolved_numerics = resolve_models(sweep.base, sweep.base.numerics)
         cases = build_cases(
             old_sweep,
             n_electrons=settings.n_electrons,
@@ -133,11 +127,8 @@ def build_sweep_cases(sweep: Sweep, numerics: Numerics | None = None) -> list[Ca
             atomic_electron_deflection=getattr(settings, "atomic_electron_deflection", "kawrakow"),
             precision=getattr(settings, "precision", None),
         )
-        from .legacy import numerics_from_legacy, physics_from_legacy
-
-        physics = physics_from_legacy(settings)
         cases = resolve_shell_ionization(resolve_transition_radiation(cases, physics), physics)
-        return resolve_channeling(cases, physics, numerics_from_legacy(old_sweep, settings))
+        return resolve_channeling(cases, physics, resolved_numerics)
     if numerics is not None:
         sweep = replace(sweep, base=replace(sweep.base, numerics=numerics))
     cases = []

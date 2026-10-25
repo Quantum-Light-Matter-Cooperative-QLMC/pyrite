@@ -13,8 +13,11 @@ re-angled.
 from dataclasses import dataclass
 
 from .. import api
+from .._numerics import Physics
 from ..campaign.model import Numerics, Scene
+from ..campaign.resolution import UNSET, _Unset
 from ..observations import ObservationStore, StoredObservation, observation_from_result
+from ..quantum import QuantumSetup
 
 
 @dataclass(frozen=True)
@@ -38,6 +41,9 @@ def produce_observation(
     scene: Scene,
     numerics: Numerics,
     store: ObservationStore,
+    *,
+    physics: Physics | None = None,
+    quantum: QuantumSetup | None | _Unset = UNSET,
 ) -> ObservationRun:
     """Return the stored observation for ``scene``, transporting only if needed.
 
@@ -50,24 +56,28 @@ def produce_observation(
         Transport numerics; part of the source identity.
     store
         Destination store. The result is indexed under its source content key.
+    physics
+        Optional override of the scene's legacy model selection.
+    quantum
+        Independent quantum setup. Omission inherits ``Scene.quantum``;
+        explicit ``None`` disables it, as in :func:`pyrite.simulate`.
 
     Returns
     -------
     ObservationRun
         The persisted observation and whether transport ran.
     """
-    reused = api.observation_plan(scene, numerics).find_reusable(store)
+    reused = api.observation_plan(scene, numerics, physics=physics, quantum=quantum).find_reusable(
+        store
+    )
     if reused is not None:
         store.put(reused)
         return ObservationRun(reused, transported=False)
     result = api.simulate(
-        scene.beam,
-        scene.target,
-        scene.detector,
+        scene,
         numerics=numerics,
-        physics=api.scene_physics(scene, numerics),
-        filters=scene.filters,
-        acquisition=scene.acquisition,
+        physics=physics,
+        quantum=quantum,
     )
     produced = observation_from_result(result)
     store.put(produced)

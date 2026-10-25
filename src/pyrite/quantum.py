@@ -101,10 +101,11 @@ class QuantumNumerics:
 
 @dataclass(frozen=True)
 class QuantumSetup:
-    """Optional reusable quantum stage owned by a Scene.
+    """Reusable quantum stage for simulation or legacy Scene construction.
 
-    The initial state and nonchanneling solvers are intentionally not wired to
-    production transport yet. Unsupported configurations explicitly refuse.
+    Pass independently as ``simulate(..., quantum=setup)``. Only planar Bloch
+    density-matrix channeling is supported in production; other configurations
+    explicitly refuse.
     """
 
     region: QuantumRegion = field(default_factory=QuantumRegion)

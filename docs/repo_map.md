@@ -384,7 +384,12 @@ Supported scalar scene API: `Scene`, path-addressed `Sweep`, `Physics`, `Numeric
 `_numerics.py` owns frozen `Physics`, `Numerics`, and `CxrReflections`, plus
 unchanged profile-schema validation. `_energy_bins.py` is the shared leaf for
 sampled true-photon grids; `detectors.spec.EnergyBins` remains its public and
-pickle-compatible re-export. `campaign/lowering.py` validates model/integration constraints and projects
+pickle-compatible re-export. `campaign/resolution.py` owns Scene/component
+composition, run overrides, quantum adaptation and model/integration validation.
+Its internal `ResolvedSimulation` separates requested legacy scene settings
+from effective physics/numerics; `api.simulate`, observation planning and case
+lowering consume it. Configured sweeps share its model validation while retaining
+their historical expansion. `campaign/lowering.py` projects
 `Numerics.energy_bins` onto the legacy campaign adapter, whose `energy_bins`
 field feeds the existing case builder. Detectors own acceptance and response.
 

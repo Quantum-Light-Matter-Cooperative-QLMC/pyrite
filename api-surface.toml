@@ -72,6 +72,7 @@ fetch_tables = { target = "pyrite.xsgen.install:fetch_tables", status = "advance
 load_numerics = { target = "pyrite._config_presets:load_numerics", status = "advanced-stable", domain = "config", root_role = "specialized" }
 load_physics = { target = "pyrite._config_presets:load_physics", status = "advanced-stable", domain = "config", root_role = "specialized" }
 photon_energies = { target = "pyrite.materials.emission:photon_energies", status = "advanced-stable", domain = "radiation", root_role = "specialized" }
+# simulate accepts independent quantum= configuration; no public request-wrapper export.
 simulate = { target = "pyrite.api:simulate", status = "stable", domain = "simulation", root_role = "core" }
 
 # Supported subpackage spellings are opt-in. Unlisted legacy package imports
