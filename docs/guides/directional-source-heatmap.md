@@ -17,9 +17,11 @@ height to your sample.
 Controls are grouped by role: **Beam**, **Target**, **Footprint**,
 **Radiation**, **Photon energy** and **Execution**. The material list is the
 full catalog. *Tilts* takes a comma list and/or inclusive `start:stop:step`
-ranges (`0:80:5, 45`); each tilt is one transport. Submit **Run source maps**
+ranges (`5:80:5, 45`); target azimuth accepts the same syntax. Each polar/azimuth
+pair is one transport. Submit **Run source maps**
 to calculate a scene. The **Display** controls (component, mean current, log
-color and range, tilts compared side by side or stepped through with a slider,
+color and range, orientations compared side by side or browsed with polar and
+azimuth sliders,
 cut energy/angle) only redraw cached source arrays. Maps are interactive Plotly
 heatmaps whose hover shows the true rate; below them, an angular cut at the
 chosen energy and a spectrum at the chosen angle overlay every shown tilt. A
@@ -34,11 +36,35 @@ separate maps, never summed: the **incoherent PXR/CBS total** (including its
 PXR–CBS interference), **characteristic** atomic lines (isotropic emission, so
 the map shows escape geometry) and the **bremsstrahlung continuum** (BremsLib
 angular model when its tables are installed, otherwise isotropic EEDL).
-Cross-electron coherent, channeling and transition radiation are excluded; the
-TR app maps transition radiation. Electron
+**TR** adds the production history-coherent planar-crossing source. Select
+**Infinite slab** explicitly before requesting it: the app refuses finite
+footprints rather than substituting a planar geometry. TR also requires the
+existing per-layer X-ray dielectric band and uses the same transported continuum
+population. Its automatic photon stop is the beam energy, rather than the
+PXR/CBS line ceiling; refine a suitable explicit band for the intended study.
+Cross-electron coherent and channeling radiation are excluded. Electron
 transport retains the existing interaction policy. Photons retain target
 escape/self-absorption; there is no downstream filter, aperture, response,
 acquisition, or angular acceptance integration.
+
+Choose **Cherenkov (internal bulk)** in the radiation-view selector for a separate
+angle × photon-energy map from the existing homogeneous Frank–Tamm source.
+Declare a constant refractive index, beam kinetic energy, straight path length
+and photon band. The band must be transparent with nearly constant index, and
+photon energy must remain far below the electron kinetic energy. The app bins
+the cone over full-azimuth polar bins about the velocity; values are
+**photons/electron/eV/angular bin**, integrated over the declared path, rather
+than pointwise per-steradian densities. Below threshold the yield is zero.
+Target pose, material selection and footprint from the transported view do not
+affect this homogeneous source. No interfaces, refraction, TIR, absorption or
+finite-target escape are included. It is never added to the TR map.
+
+Cherenkov download includes photon energies, polar-bin centres and edges,
+per-bin/path yields, per-metre yields, threshold mask, declared dielectric and
+source settings. Transported downloads include the resolved polar and azimuth
+angles for every orientation, selected components and provenance. Changing a
+cached display selection performs no transport; computing new target
+orientations requires submitting the source form.
 
 ## Coordinates and units
 

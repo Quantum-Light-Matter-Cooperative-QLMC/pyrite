@@ -5,7 +5,7 @@ from dataclasses import replace
 import numpy as np
 import pytest
 
-from pyrite import Beam, Numerics, PointBunch, PointSpot, Slab
+from pyrite import Beam, Footprint, Numerics, PointBunch, PointSpot, Slab
 from pyrite.directional import directional_source, observation_directions
 from pyrite.results.directional import DirectionalSpectrum
 
@@ -103,6 +103,35 @@ def test_source_lowering_rotation_and_no_detector(inputs, monkeypatch):
     assert result.case["seed"] == 42
     with pytest.raises(ValueError, match="domega_sr"):
         replace(result.case, domega_sr=-1.0)
+
+
+def test_tr_lowering_sets_history_model_and_preserves_oriented_frame(inputs, monkeypatch):
+    import pyrite.directional as owner
+
+    def score(case, directions, **kwargs):
+        assert case["transition_radiation"] == {"model": "planar-stack", "coherence": "history"}
+        assert case["Ne"] == case["Ne_brem"] == 3
+        return {"transition": np.ones((len(directions), 2))}, np.ones(len(directions), dtype=bool)
+
+    monkeypatch.setattr(owner, "source_outputs", score)
+    monkeypatch.setattr(owner, "case_table_markers", lambda case: {})
+    monkeypatch.setattr(owner, "run_provenance", lambda *args: {})
+    result = owner.directional_sources(
+        *inputs,
+        energy_eV=[100, 200],
+        angle_deg=[-120, 60],
+        numerics=Numerics(cxr_trials=3),
+        components=("transition",),
+    )["transition"]
+    assert result.component == "transition-radiation-history"
+    assert result.case["tilt_deg"] == 30 and result.case["tilt_azim_deg"] == 45
+    with pytest.raises(ValueError, match="footprint"):
+        owner.directional_sources(
+            inputs[0],
+            replace(inputs[1], footprint=Footprint(5, 5)),
+            energy_eV=[100, 200],
+            components=("transition",),
+        )
 
 
 @pytest.mark.parametrize(

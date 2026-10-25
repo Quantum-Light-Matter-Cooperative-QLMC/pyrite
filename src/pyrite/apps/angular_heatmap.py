@@ -9,7 +9,7 @@ import numpy as np
 
 from .._numerics import CxrReflections, Numerics
 from ..campaign.beam import Beam, PointBunch, PointSpot
-from ..campaign.geometry import Footprint, Slab
+from ..campaign.geometry import Footprint, Slab, _quantized_angles
 from ..directional import DIRECTIONAL_COMPONENTS, directional_sources, source_line_ceiling_eV
 from .angular_maps import AngularPanel
 
@@ -18,9 +18,10 @@ COMPONENT_LABELS = {
     "pxr-cbs": "PXR/CBS (incoherent)",
     "characteristic": "Characteristic lines",
     "bremsstrahlung": "Bremsstrahlung continuum",
+    "transition": "TR (transported planar crossings)",
 }
 
-#: Largest retained (tilt, angle, energy) density array, in float64 elements
+#: Largest retained (orientation, component, angle, energy) result, in float64 elements
 #: (about 1.6 GB). A memory guard only; scoring work itself is uncapped.
 MAX_RESULT_ELEMENTS = 200_000_000
 
@@ -30,7 +31,7 @@ class MapConfig:
     """Submitted transport/scoring controls; display current is deliberately absent.
 
     ``stop_eV=None`` resolves the photon stop to the scene's kinematic PXR/CBS
-    line ceiling, so relativistic forward lines are not truncated by the grid.
+    line ceiling, or to the beam energy when TR is selected.
     ``width_mm=None`` selects the laterally infinite slab (limiting case only).
     The default 5 x 5 mm footprint is the project's historical bounded crystal.
     """
@@ -42,6 +43,7 @@ class MapConfig:
     height_mm: float | None = 5.0
     tilts_deg: tuple[float, ...] = (30.0, 45.0)
     tilt_azimuth_deg: float = 0.0
+    tilt_azimuths_deg: tuple[float, ...] | None = None
     plane_azimuth_deg: float = 0.0
     start_eV: float = 100.0
     stop_eV: float | None = None
@@ -58,16 +60,14 @@ class MapConfig:
     def __post_init__(self):
         if not self.components or not set(self.components) <= set(DIRECTIONAL_COMPONENTS):
             raise ValueError(f"select components from {', '.join(DIRECTIONAL_COMPONENTS)}")
-        tilts = np.asarray(self.tilts_deg, dtype=float)
-        if not len(tilts) or not np.all(np.isfinite(tilts)):
-            raise ValueError("supply at least one finite target tilt")
-        if len(set(tilts)) != len(tilts):
-            raise ValueError("target tilts must be distinct")
+        self._validate_orientations()
         if not self.thickness_ang > 0:
             raise ValueError("target thickness must be positive")
         dimensions = (self.width_mm, self.height_mm)
         if dimensions != (None, None) and not all(d is not None and d > 0 for d in dimensions):
             raise ValueError("footprint needs positive width and height, or neither (infinite)")
+        if "transition" in self.components and dimensions != (None, None):
+            raise ValueError("TR needs infinite planar interfaces; select Infinite slab explicitly")
         stop = self.beam_keV * 1000 if self.stop_eV is None else self.stop_eV
         if not (10 <= self.start_eV < stop <= self.beam_keV * 1000):
             raise ValueError("photon bounds must satisfy 10 <= start < stop <= beam energy [eV]")
@@ -78,12 +78,37 @@ class MapConfig:
         if self.result_elements > MAX_RESULT_ELEMENTS:
             raise ValueError(
                 f"result arrays need {8 * self.result_elements / 1e9:.1f} GB; "
-                "reduce tilts, components, angles or energy points"
+                "reduce tilts, azimuths, components, angles or energy points"
             )
+
+    def _validate_orientations(self):
+        """Validate before allocating the Cartesian orientation grid."""
+        tilts = np.asarray(self.tilts_deg, dtype=float)
+        if not len(tilts) or not np.all(np.isfinite(tilts)):
+            raise ValueError("supply at least one finite target tilt")
+        if len(set(tilts)) != len(tilts):
+            raise ValueError("target tilts must be distinct")
+        if not self.azimuths or not np.all(np.isfinite(self.azimuths)):
+            raise ValueError("supply at least one finite target azimuth")
+        resolved = _quantized_angles(self.azimuths) % 360
+        if len(set(resolved)) != len(self.azimuths):
+            raise ValueError("target azimuths must be distinct after half-degree resolution")
 
     @property
     def result_elements(self) -> int:
-        return len(self.tilts_deg) * len(self.components) * self.angle_points * self.energy_points
+        return (
+            len(self.tilts_deg)
+            * len(self.azimuths)
+            * len(self.components)
+            * self.angle_points
+            * self.energy_points
+        )
+
+    @property
+    def azimuths(self) -> tuple[float, ...]:
+        return (
+            (self.tilt_azimuth_deg,) if self.tilt_azimuths_deg is None else self.tilt_azimuths_deg
+        )
 
     @property
     def scoring_work(self) -> int:
@@ -93,14 +118,14 @@ class MapConfig:
     def beam(self) -> Beam:
         return Beam(self.beam_keV, transverse=PointSpot(), longitudinal=PointBunch())
 
-    def target(self, tilt_deg: float) -> Slab:
+    def target(self, tilt_deg: float, azimuth_deg: float | None = None) -> Slab:
         width, height = self.width_mm, self.height_mm
         footprint = None if width is None or height is None else Footprint(width, height)
         return Slab(
             self.material,
             thickness_ang=self.thickness_ang,
             tilt_deg=tilt_deg,
-            tilt_azim_deg=self.tilt_azimuth_deg,
+            tilt_azim_deg=self.tilt_azimuth_deg if azimuth_deg is None else azimuth_deg,
             footprint=footprint,
         )
 
@@ -115,12 +140,14 @@ class MapConfig:
     def line_ceiling_eV(self) -> float:
         """Kinematic line ceiling over every tilt (no transport)."""
         return max(
-            source_line_ceiling_eV(self.beam(), self.target(tilt), numerics=self.numerics())
+            source_line_ceiling_eV(self.beam(), self.target(tilt, azim), numerics=self.numerics())
             for tilt in self.tilts_deg
+            for azim in self.azimuths
         )
 
     def energy_grid(self) -> np.ndarray:
-        stop = self.line_ceiling_eV() if self.stop_eV is None else self.stop_eV
+        auto_stop = self.beam_keV * 1000 if "transition" in self.components else None
+        stop = (auto_stop or self.line_ceiling_eV()) if self.stop_eV is None else self.stop_eV
         stop = min(stop, self.beam_keV * 1000)
         if not stop > self.start_eV:
             raise ValueError(f"photon start must lie below the resolved stop {stop:g} eV")
@@ -130,15 +157,16 @@ class MapConfig:
 
 @lru_cache(maxsize=4)
 def calculate_maps(config: MapConfig):
-    """One transport per tilt; cache source arrays separately from plots/current.
+    """One transport per orientation; cache source arrays separately from display.
 
-    Returns one ``{component: DirectionalSpectrum}`` per tilt, in tilt order.
+    Returns one ``{component: DirectionalSpectrum}`` per polar/azimuth pair,
+    with azimuth varying fastest.
     """
     energy = config.energy_grid()
     return tuple(
         directional_sources(
             config.beam(),
-            config.target(tilt),
+            config.target(tilt, azim),
             energy_eV=energy,
             angle_deg=np.linspace(-180, 180, config.angle_points, endpoint=False),
             plane_azimuth_deg=config.plane_azimuth_deg,
@@ -148,6 +176,7 @@ def calculate_maps(config: MapConfig):
             components=config.components,
         )
         for tilt in config.tilts_deg
+        for azim in config.azimuths
     )
 
 
@@ -162,7 +191,8 @@ def tilt_panels(maps, component: str, *, current_na: float):
     """Rate panels (ph/s/eV/sr) of one component for the given tilt maps."""
     return [
         AngularPanel(
-            f"{COMPONENT_LABELS[component]} · tilt {by_component[component].case['tilt_deg']:g}°",
+            f"{COMPONENT_LABELS[component]} · tilt {by_component[component].case['tilt_deg']:g}°"
+            f" · azim {by_component[component].case.get('tilt_azim_deg', 0):g}°",
             by_component[component].angle_deg,
             by_component[component].energy_eV,
             by_component[component].rate(current_na),
@@ -178,7 +208,7 @@ def maps_npz(config: MapConfig, maps, *, current_na: float) -> bytes:
     (ph/incident-electron/eV/sr), ``rate`` (ph/s/eV/sr at ``current_na``);
     per tilt ``t<i>_supported``, ``t<i>_direction_lab`` and
     ``t<i>_direction_sample``; shared ``angle_deg``, ``energy_eV`` and
-    ``tilt_deg``. ``metadata`` is JSON: the submitted config, current,
+    ``tilt_deg`` and ``tilt_azim_deg``. ``metadata`` is JSON: submitted config, current,
     units, line ceilings and each tilt's provenance identity digest.
     """
     first = next(iter(maps[0].values()))
@@ -186,6 +216,9 @@ def maps_npz(config: MapConfig, maps, *, current_na: float) -> bytes:
         "angle_deg": first.angle_deg,
         "energy_eV": first.energy_eV,
         "tilt_deg": np.array([next(iter(m.values())).case["tilt_deg"] for m in maps]),
+        "tilt_azim_deg": np.array(
+            [next(iter(m.values())).case.get("tilt_azim_deg", 0.0) for m in maps]
+        ),
     }
     for index, by_component in enumerate(maps):
         result = next(iter(by_component.values()))
