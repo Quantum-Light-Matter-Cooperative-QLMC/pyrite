@@ -143,6 +143,7 @@ channeling/cr-valence-directional-loss
 :maxdepth: 1
 :caption: Radiation physics
 
+radiation-physics/optimization-fixed-window-yield
 radiation-physics/absorption-length
 radiation-physics/optical-material-response
 radiation-physics/optical-planar-tr

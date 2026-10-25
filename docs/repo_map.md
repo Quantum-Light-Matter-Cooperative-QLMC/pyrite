@@ -84,6 +84,17 @@ Edges (importer -> imported):
 
 `detectors.timepix_response` / `detectors.eaglexo_response` depend only on `materials.crystal` plus shared `_si_sensor` plumbing (Si constants, response caching, Poisson core). Packaged data resolve via `pyrite.DATA_DIR` — imports work from any cwd.
 
+## Optimization studies
+
+`optimization/` owns physical parameter spaces, immutable Scene replacement,
+study/trial identity and optional Optuna ask/tell persistence. `study.py` routes
+each trial through Sweep/run_sweep with distinct seeds and the standard case
+content key. `scoring.py::FixedWindowYield` selects one node-sampled incoherent
+PXR/CBS record and delegates exact fixed-band integration to `results.radiation`;
+it refuses bin means and joint-field corrections. `checks/pxr_optimization.py`
+is the bounded TPE/random/grid demonstration and independent-finalist protocol.
+Tests: `tests/optimization/`. Guide: `docs/guides/optimization-studies.md`.
+
 ## Entry points
 
 - **`pyrite.quantum`** remains a module and owns quantum configuration plus a curated lazy facade for portable `TransverseStateSpec`, nonportable runtime factories, planar projection, and selected experimental planar/axial solvers and diagnostics. Definitions remain in `quantum_state`, `planar_source`, and `montecarlo.channeling` leaves; aliases preserve object/pickle identity and production admission. `api-surface.toml` governs this module through `package_exports`; the [quantum API map](guides/quantum-api.md) lists status, units, and bounded examples.

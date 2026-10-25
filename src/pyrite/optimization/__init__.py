@@ -5,6 +5,7 @@ explicitly requested. No change to existing sweeping or execution defaults.
 """
 
 from .optuna_adapter import OptunaOptimizer
+from .scoring import FixedWindowYield
 from .space import Categorical, Continuous, Integer, ParameterSpace, apply_scene_parameters
 from .study import (
     Constraint,
@@ -23,6 +24,7 @@ __all__ = [
     "Continuous",
     "Integer",
     "ParameterSpace",
+    "FixedWindowYield",
     "apply_scene_parameters",
     "Constraint",
     "Objective",
