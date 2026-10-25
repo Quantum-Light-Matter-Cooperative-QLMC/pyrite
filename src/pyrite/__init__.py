@@ -2,9 +2,10 @@
 table-top electron beams in crystals.
 
 The package is intentionally light at import time: ``import pyrite`` pulls in
-no heavy dependencies (matplotlib / cupy / the MC pipeline). Import submodules
-explicitly, e.g. ``from pyrite import crystallography`` or
-``from pyrite.montecarlo import run_cases``.
+no heavy dependencies (matplotlib / cupy / the MC pipeline). Use the curated root for primary simulation objects and canonical domain
+imports for specialized types, e.g. ``from pyrite.beams import TransverseSpot``
+and ``from pyrite.geometry import Slab``. Historical root aliases remain
+available through their documented compatibility windows.
 
 See the README for the scientific overview, ``docs/api.md`` for the supported
 surface, and ``AGENTS.md`` for repository working conventions.
@@ -39,62 +40,36 @@ if env_value("PYRITE_MC_DEBUG"):
     logger.setLevel(logging.DEBUG)
 
 if TYPE_CHECKING:
-    # Static view of the lazy exports below, so editors resolve hover docs and types.
-    from pyrite._config_presets import load_numerics as load_numerics
-    from pyrite._config_presets import load_physics as load_physics
-    from pyrite._numerics import CxrReflections as CxrReflections
+    # Static declarations retain compatibility while recommending canonical owners.
     from pyrite._numerics import Physics as Physics
     from pyrite._numerics_groups import ExecutionConfig as ExecutionConfig
-    from pyrite._numerics_groups import RadiationNumerics as RadiationNumerics
-    from pyrite._numerics_groups import TransportNumerics as TransportNumerics
     from pyrite._photon_config import PhotonTransport as PhotonTransport
-    from pyrite._precision import Precision as Precision
-    from pyrite._sampling import AdaptiveSampling as AdaptiveSampling
-    from pyrite._sampling import FixedSampling as FixedSampling
     from pyrite.api import simulate as simulate
-    from pyrite.bodies import RectangularBody as RectangularBody
-    from pyrite.bodies import SubstanceRef as SubstanceRef
-    from pyrite.campaign.beam import (
-        Beam as Beam,
+    from pyrite.beams import (
+        BunchFrontTilt as BunchFrontTilt,
     )
-    from pyrite.campaign.beam import BunchFrontTilt as BunchFrontTilt
-    from pyrite.campaign.beam import (
+    from pyrite.beams import (
         BunchLength as BunchLength,
     )
-    from pyrite.campaign.beam import (
+    from pyrite.beams import (
         GdfSource as GdfSource,
     )
-    from pyrite.campaign.beam import (
+    from pyrite.beams import (
         Offsets as Offsets,
     )
-    from pyrite.campaign.beam import (
+    from pyrite.beams import (
         PointBunch as PointBunch,
     )
-    from pyrite.campaign.beam import (
+    from pyrite.beams import (
         PointSpot as PointSpot,
     )
-    from pyrite.campaign.beam import (
+    from pyrite.beams import (
         Spot as Spot,
     )
-    from pyrite.campaign.beam import TransverseSpot as TransverseSpot
-    from pyrite.campaign.geometry import (
-        BlazedGrooves as BlazedGrooves,
+    from pyrite.beams import (
+        TransverseSpot as TransverseSpot,
     )
-    from pyrite.campaign.geometry import (
-        CrystalCut as CrystalCut,
-    )
-    from pyrite.campaign.geometry import (
-        Footprint as Footprint,
-    )
-    from pyrite.campaign.geometry import (
-        Layer as Layer,
-    )
-    from pyrite.campaign.geometry import (
-        Slab as Slab,
-    )
-    from pyrite.campaign.geometry import (
-        Stack as Stack,
-    )
+    from pyrite.campaign.beam import Beam as Beam
     from pyrite.campaign.model import (
         Analysis as Analysis,
     )
@@ -108,6 +83,30 @@ if TYPE_CHECKING:
         Sweep as Sweep,
     )
     from pyrite.campaign.target import Target as Target
+    from pyrite.config import (
+        AdaptiveSampling as AdaptiveSampling,
+    )
+    from pyrite.config import (
+        CxrReflections as CxrReflections,
+    )
+    from pyrite.config import (
+        FixedSampling as FixedSampling,
+    )
+    from pyrite.config import (
+        Precision as Precision,
+    )
+    from pyrite.config import (
+        RadiationNumerics as RadiationNumerics,
+    )
+    from pyrite.config import (
+        TransportNumerics as TransportNumerics,
+    )
+    from pyrite.config import (
+        load_numerics as load_numerics,
+    )
+    from pyrite.config import (
+        load_physics as load_physics,
+    )
     from pyrite.detectors import (
         AngularAcceptance as AngularAcceptance,
     )
@@ -118,44 +117,84 @@ if TYPE_CHECKING:
         EnergyBins as EnergyBins,
     )
     from pyrite.detectors import (
+        FilterPlate as FilterPlate,
+    )
+    from pyrite.detectors import (
         IdealPhotonCounter as IdealPhotonCounter,
+    )
+    from pyrite.detectors import (
+        PixelGrid as PixelGrid,
+    )
+    from pyrite.detectors import (
+        PlanarDetector as PlanarDetector,
+    )
+    from pyrite.detectors import (
+        PlanarPose as PlanarPose,
     )
     from pyrite.detectors import (
         SensorAcceptance as SensorAcceptance,
     )
-    from pyrite.directional import directional_source as directional_source
-    from pyrite.directional import directional_sources as directional_sources
-    from pyrite.instrument import (
+    from pyrite.directional import (
+        directional_source as directional_source,
+    )
+    from pyrite.directional import (
+        directional_sources as directional_sources,
+    )
+    from pyrite.geometry import (
+        BlazedGrooves as BlazedGrooves,
+    )
+    from pyrite.geometry import (
+        CrystalCut as CrystalCut,
+    )
+    from pyrite.geometry import (
+        Filter as Filter,
+    )
+    from pyrite.geometry import (
+        Footprint as Footprint,
+    )
+    from pyrite.geometry import (
+        Layer as Layer,
+    )
+    from pyrite.geometry import (
+        RectangularBody as RectangularBody,
+    )
+    from pyrite.geometry import (
+        Slab as Slab,
+    )
+    from pyrite.geometry import (
+        Stack as Stack,
+    )
+    from pyrite.geometry import (
+        SubstanceRef as SubstanceRef,
+    )
+    from pyrite.materials.emission import photon_energies as photon_energies
+    from pyrite.observations import (
         Acquisition as Acquisition,
     )
-    from pyrite.instrument import (
+    from pyrite.observations import (
         AcquisitionBatch as AcquisitionBatch,
     )
-    from pyrite.instrument import (
-        FilterPlate as FilterPlate,
+    from pyrite.observations import (
+        NativeAcquisition as NativeAcquisition,
     )
-    from pyrite.instrument import NativeAcquisition as NativeAcquisition
-    from pyrite.instrument import (
-        PixelGrid as PixelGrid,
-    )
-    from pyrite.instrument import (
+    from pyrite.observations import (
         PixelScorer as PixelScorer,
     )
-    from pyrite.instrument import (
-        PlanarDetector as PlanarDetector,
-    )
-    from pyrite.instrument import (
-        PlanarPose as PlanarPose,
-    )
-    from pyrite.instrument import (
+    from pyrite.observations import (
         ResolvedObservation as ResolvedObservation,
     )
-    from pyrite.instrument.filter import Filter as Filter
-    from pyrite.materials.emission import photon_energies as photon_energies
-    from pyrite.quantum import QuantumDynamics as QuantumDynamics
-    from pyrite.quantum import QuantumNumerics as QuantumNumerics
-    from pyrite.quantum import QuantumRegion as QuantumRegion
-    from pyrite.quantum import QuantumSetup as QuantumSetup
+    from pyrite.quantum import (
+        QuantumDynamics as QuantumDynamics,
+    )
+    from pyrite.quantum import (
+        QuantumNumerics as QuantumNumerics,
+    )
+    from pyrite.quantum import (
+        QuantumRegion as QuantumRegion,
+    )
+    from pyrite.quantum import (
+        QuantumSetup as QuantumSetup,
+    )
     from pyrite.quantum_state import TransverseStateSpec as TransverseStateSpec
     from pyrite.results.directional import DirectionalSpectrum as DirectionalSpectrum
     from pyrite.results.model import (
@@ -179,9 +218,7 @@ if TYPE_CHECKING:
     from pyrite.results.model import (
         SpectralFactors as SpectralFactors,
     )
-    from pyrite.results.provenance import (
-        Provenance as Provenance,
-    )
+    from pyrite.results.provenance import Provenance as Provenance
     from pyrite.xsgen.install import fetch_tables as fetch_tables
 
 _PUBLIC_OBJECTS = {
@@ -272,9 +309,39 @@ def __getattr__(name: str) -> Any:
     except KeyError as exc:
         raise AttributeError(name) from exc
 
+    from ._api_deprecations import ROOT_API_REPLACEMENTS, warn_api
+
+    spelling = f"pyrite.{name}"
+    if spelling in ROOT_API_REPLACEMENTS:
+        # Do not cache compatibility aliases: every access must reach the warning
+        # hook, including after callers change their warning filters.
+        warn_api(spelling)
+        return getattr(import_module(module_name), attribute)
+
     value = getattr(import_module(module_name), attribute)
     globals()[name] = value
     return value
 
 
 __all__ = ["DATA_DIR", "__version__", "states", *_PUBLIC_OBJECTS]
+
+
+# Forward-looking domain contract. __all__ also preserves historical star imports
+# throughout the support window; dir() lists both without resolving any object.
+_ROOT_API = (
+    "Beam",
+    "Target",
+    "Detector",
+    "Scene",
+    "Sweep",
+    "Physics",
+    "Numerics",
+    "simulate",
+    "Result",
+    "photon_energies",
+)
+
+
+def __dir__() -> list[str]:
+    """Discover retained and compatibility exports without importing their owners."""
+    return sorted(set(globals()) | set(__all__))

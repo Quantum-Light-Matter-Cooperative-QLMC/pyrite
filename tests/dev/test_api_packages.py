@@ -127,7 +127,7 @@ def test_checkout_documented_packages_and_private_exceptions() -> None:
 
 def test_documented_autosummary_exports_have_inventory_entries() -> None:
     """Every generated reference entry has an explicit support classification."""
-    from pyrite.devtools.api_surface import read_manifest
+    from pyrite.devtools.api_surface import read_facade_domains, read_manifest
 
     root = Path(__file__).resolve().parents[2]
     roots, errors = read_manifest(root / "api-surface.toml")
@@ -135,6 +135,13 @@ def test_documented_autosummary_exports_have_inventory_entries() -> None:
     packages, _, errors = api_packages.read_package_inventory(root / "api-surface.toml")
     assert not errors
     registered = {f"pyrite.{name}" for name in roots}
+    facades, errors = read_facade_domains(root / "api-surface.toml")
+    assert not errors
+    registered.update(
+        f"pyrite.{export.domain}.{export.name}"
+        for export in roots.values()
+        if export.domain in facades
+    )
     registered.update(f"{module}.{name}" for module, rows in packages.items() for name in rows)
     documented = set(re.findall(r"^   (pyrite\.[\w.]+)$", (root / "docs/api.md").read_text(), re.M))
     assert documented

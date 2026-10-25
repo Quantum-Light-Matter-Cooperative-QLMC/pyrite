@@ -12,17 +12,20 @@ these components or a configured `Scene`.
 
 ```python
 import pyrite as pr
+from pyrite.beams import PointBunch, TransverseSpot
+from pyrite.config import CxrReflections, FixedSampling
+from pyrite.geometry import Footprint, Slab
 
 beam = pr.Beam(
     energy_keV=30.0,
-    transverse=pr.TransverseSpot(fwhm_x_mm=1.0),
-    longitudinal=pr.PointBunch(),
+    transverse=TransverseSpot(fwhm_x_mm=1.0),
+    longitudinal=PointBunch(),
 )
-target = pr.Slab(
+target = Slab(
     "hopg",
     thickness_ang=10_000.0,
     tilt_deg=30.0,
-    footprint=pr.Footprint(5.0, 5.0),
+    footprint=Footprint(5.0, 5.0),
 )
 detector = pr.Detector()
 
@@ -32,8 +35,8 @@ result = pr.simulate(
     detector,
     physics=pr.Physics(),
     numerics=pr.Numerics(
-        sampling=pr.FixedSampling(cxr_electrons=450, brem_electrons=100),
-        cxr_reflections=pr.CxrReflections(n_families=4),
+        sampling=FixedSampling(cxr_electrons=450, brem_electrons=100),
+        cxr_reflections=CxrReflections(n_families=4),
     ),
 )
 ```
@@ -44,7 +47,8 @@ longitudinal descriptors; `Slab` needs an explicit footprint (`None` means
 laterally infinite). `simulate` returns a `Result` without creating checkpoints.
 
 For reusable numerical/physics settings, load a named preset with
-`pr.load_numerics("default")` or `pr.load_physics("electron-standard")`.
+`pyrite.config.load_numerics("default")` or
+`pyrite.config.load_physics("electron-standard")`.
 
 ## Interpret the result
 
@@ -145,11 +149,19 @@ discretization, reflection truncation, and local computation. Typed groups
 make the distinction explicit:
 
 ```python
+from pyrite.config import (
+    CxrReflections,
+    ExecutionConfig,
+    FixedSampling,
+    RadiationNumerics,
+    TransportNumerics,
+)
+
 numerics = pr.Numerics(
-    sampling=pr.FixedSampling(cxr_electrons=400, brem_electrons=200),
-    transport=pr.TransportNumerics(energy_model="midpoint", max_dE_frac=0.01),
-    radiation=pr.RadiationNumerics(cxr_reflections=pr.CxrReflections(n_families=6)),
-    execution=pr.ExecutionConfig(transport_core="per-electron", cxr_chunk=256, brem_chunk=256),
+    sampling=FixedSampling(cxr_electrons=400, brem_electrons=200),
+    transport=TransportNumerics(energy_model="midpoint", max_dE_frac=0.01),
+    radiation=RadiationNumerics(cxr_reflections=CxrReflections(n_families=6)),
+    execution=ExecutionConfig(transport_core="per-electron", cxr_chunk=256, brem_chunk=256),
 )
 print(numerics.describe_numerics())
 ```
@@ -168,8 +180,10 @@ Use fixed electron budgets for reproducible fixed-count runs, or request
 adaptive stopping on supported incoherent scalar-detector cases:
 
 ```python
+from pyrite.config import AdaptiveSampling
+
 adaptive = pr.Numerics(
-    sampling=pr.AdaptiveSampling(
+    sampling=AdaptiveSampling(
         target_rse=0.05,
         min_electrons=200,
         max_electrons=20_000,
@@ -183,7 +197,7 @@ adaptive = pr.Numerics(
 Adaptive limits are budgets, not promised sample counts; check
 `statistics_limited` and the realized counts in provenance. Coherent emission,
 pixel detectors, and several advanced transport modes are not eligible.
-`pr.Precision(...)` remains an equivalent adaptive policy. See
+`pyrite.config.Precision(...)` remains an equivalent adaptive policy. See
 [Adaptive electron counts](../computation/statistical-methods.md#adaptive-electron-counts)
 for estimator limitations.
 
@@ -193,13 +207,15 @@ Use angular spans for a central-direction detector, or physical size and
 distance for a flat sensor:
 
 ```python
+from pyrite.detectors import AngularAcceptance, SensorAcceptance
+
 angular = pr.Detector(
     observation_angle_deg=135.0,
-    acceptance=pr.AngularAcceptance(polar_deg=2.0, azimuthal_deg=4.0),
+    acceptance=AngularAcceptance(polar_deg=2.0, azimuthal_deg=4.0),
 )
 finite = pr.Detector(
     observation_angle_deg=135.0,
-    acceptance=pr.SensorAcceptance(distance_mm=400.0, width_mm=14.08, height_mm=14.08),
+    acceptance=SensorAcceptance(distance_mm=400.0, width_mm=14.08, height_mm=14.08),
 )
 ```
 
@@ -213,23 +229,27 @@ A `PlanarDetector` scores angular tiles and can project downstream
 attenuation across a pixel grid:
 
 ```python
-pose = pr.PlanarPose.from_observation(distance_mm=400.0, polar_deg=90.0)
-pixels = pr.PlanarDetector.timepix3_chip(
+from pyrite.config import FixedSampling
+from pyrite.detectors import FilterPlate, PlanarDetector, PlanarPose
+from pyrite.observations import PixelScorer
+
+pose = PlanarPose.from_observation(distance_mm=400.0, polar_deg=90.0)
+pixels = PlanarDetector.timepix3_chip(
     pose,
-    scorer=pr.PixelScorer(angular_shape=(2, 2)),
+    scorer=PixelScorer(angular_shape=(2, 2)),
 )
-plate = pr.FilterPlate(
+plate = FilterPlate(
     "silicon",
     thickness_mm=0.1,
     size_mm=(7.04, 14.08),
-    pose=pr.PlanarPose.from_observation(distance_mm=200.0, polar_deg=90.0),
+    pose=PlanarPose.from_observation(distance_mm=200.0, polar_deg=90.0),
 )
 pixel_result = pr.simulate(
     beam,
     target,
     pixels,
     filters=(plate,),
-    numerics=pr.Numerics(sampling=pr.FixedSampling(100, 50)),
+    numerics=pr.Numerics(sampling=FixedSampling(100, 50)),
 )
 image = pixel_result.spatial.image((1_000.0, 10_000.0), component="cxr")
 ```
@@ -250,13 +270,16 @@ registered photon counts, configure `PlanarDetector.response` and an
 `Target` and `Filter` give it different roles and geometry:
 
 ```python
-body = pr.RectangularBody(
-    substance=pr.SubstanceRef(kind="crystal", key="silicon"),
+from pyrite.detectors import PlanarPose
+from pyrite.geometry import Filter, RectangularBody, SubstanceRef
+
+body = RectangularBody(
+    substance=SubstanceRef(kind="crystal", key="silicon"),
     size_mm=(10.0, 10.0),
     thickness_mm=0.1,
 )
 source_target = pr.Target(body=body, tilt_deg=30.0)
-window = pr.Filter(body=body, pose=pr.PlanarPose((0.0, 0.0, 50.0)), name="window")
+window = Filter(body=body, pose=PlanarPose((0.0, 0.0, 50.0)), name="window")
 ```
 
 For existing flat slabs or stacks, use `Slab`/`Stack` directly. Filters are
@@ -274,9 +297,11 @@ or establish detector-integrated gain.
 ```python
 from dataclasses import replace
 
+from pyrite.beams import BunchFrontTilt
+
 source = replace(
     beam,
-    bunch_front_tilt=pr.BunchFrontTilt(tilt_deg=45.0, azimuth_deg=0.0),
+    bunch_front_tilt=BunchFrontTilt(tilt_deg=45.0, azimuth_deg=0.0),
 )
 ```
 
@@ -289,12 +314,14 @@ Specify a flat crystal's lattice orientation relative to its surface with
 `CrystalCut`, separately from the incident beam angle:
 
 ```python
-cut = pr.CrystalCut(surface_hkl=(1, 0, 1), roll_deg=17.0)
-cut_target = pr.Slab(
+from pyrite.geometry import CrystalCut, Footprint, Slab
+
+cut = CrystalCut(surface_hkl=(1, 0, 1), roll_deg=17.0)
+cut_target = Slab(
     "hopg",
     thickness_ang=500.0,
     tilt_deg=30.0,
-    footprint=pr.Footprint(5.0, 5.0),
+    footprint=Footprint(5.0, 5.0),
     cut=cut,
 )
 ```
