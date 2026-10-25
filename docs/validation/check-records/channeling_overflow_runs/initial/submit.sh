@@ -5,9 +5,9 @@
 #SBATCH --mem=4G
 #SBATCH --time=04:00:00
 #SBATCH --array=0-3%2
-#SBATCH --output=/home/aamador/pyrite-522-overflow/scratch/overflow/%A_%a.log
+#SBATCH --output=/home/user/pyrite-522-overflow/scratch/overflow/%A_%a.log
 set -euo pipefail
-cd /home/aamador/pyrite-522-overflow
+cd /home/user/pyrite-522-overflow
 export PYRITE_MC_BACKEND=cpu OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1
 export PYRITE_SOURCE_REVISION=bcc966aaab7d4d2ae319b5f9fd7a47b6d8ead0dc+dirty
 sha256sum --check <<'HASHES'

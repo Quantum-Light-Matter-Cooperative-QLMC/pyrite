@@ -10698,7 +10698,7 @@
     "cpu_wall_seconds": 53,
     "archive": "scratch/cheap-validation-results/evidence.tar.gz",
     "archive_sha256": "77c8527d73a1f50939145570ce2d6c73e77e1dd4c17f7dc90219239163004f1e",
-    "remote_archive": "/home/aamador/pyrite-510-precision-20261015/scratch/cheap-validation-evidence.tar.gz",
+    "remote_archive": "/home/user/pyrite-510-precision-20261015/scratch/cheap-validation-evidence.tar.gz",
     "checksums": "Both raw GPU/CPU manifests verified before analysis; downloaded archive SHA256 verified.",
     "geant4_patched_source_hashes": "All three retained source files match benchmark-patch.json after hashes.",
     "linux_focused_tests": 40,

@@ -167,7 +167,7 @@ same case order. The completed refinements below test depth step, $H$ and
 Bloch cells separately.
 
 The screening outputs are `scratch/boundary-screen/run-{0..31}.json` in
-the isolated remote checkout `/home/aamador/pyrite-522`; the four timed-out
+the isolated remote checkout `/home/user/pyrite-522`; the four timed-out
 screening tasks were rerun by array 1454. Each task uses case index
 `id % 4` in `(si110_17, si100_17, si100_54, si110_54)` and candidate
 index `id // 4` in `(300 eV, inf, a=1, a=2, a=3, a=4, f=0.1, f=0.01)`.
@@ -369,7 +369,7 @@ The same independent review confirms the negative a=4.5 comparison above and
 the declared handoff accounting within its approximations.
 
 Initial remote array 1614 uses an isolated checkout
-`/home/aamador/pyrite-522-overflow`, with task mapping and source hashes in
+`/home/user/pyrite-522-overflow`, with task mapping and source hashes in
 `docs/validation/check-records/channeling_overflow_runs/initial/submit.sh`.
 The first two retrieved results (Si(110), 5 MeV, H16, 16 cells, 20 µm,
 300 eV margin) give:

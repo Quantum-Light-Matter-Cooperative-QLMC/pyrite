@@ -1,5 +1,10 @@
 # Physics Validation
 
+Published evidence uses generic placeholders for operator-specific paths and
+machine names. Numerical results, scientific configuration, source revisions
+and content digests retain their recorded values.
+Recorded digests identify the original inputs, not the redacted report bytes.
+
 Start with the generated [status summary](status-summary.md): it separates
 formal human sign-off from the latest recorded automated evidence. A passing
 comparison or independent derivation supports a claim without certifying every

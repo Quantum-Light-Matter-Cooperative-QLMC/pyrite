@@ -22,7 +22,7 @@
     "code_revision": "5f9a17883e4652c3901db0c715d975b412a62c9c",
     "code_dirty": "True",
     "code_synced_at": "2026-10-24T01:02:10+00:00",
-    "code_source": "alex-XPS-15-9530:/home/alex/dev/pyrite/.worktrees/issues-616-617",
+    "code_source": "developer-node:/home/user/dev/pyrite/.worktrees/issues-616-617",
     "code_tables_digest": "f9a89dc83cb97f36fc94a2fef58a4ad710d5848d9f5c8f513b896de47f6106e2"
   },
   "source_and_test_sha256": {
@@ -33,7 +33,7 @@
     "tests/montecarlo/test_optical_source_cuda.py": "c933eb4b27e4dec2cddfccbbaa6999662ff4a240f1995fcf7449918f3ca7018c",
     "tests/montecarlo/test_optical_cuda_parity.py": "15982e8eb74ecc2c2dfb27082668d8e9f92b1066a55a7863a845b90227317027"
   },
-  "test_command": "PYRITE_MC_BACKEND=cuda PYRITE_TEST_BACKEND=cuda PYRITE_CATALOG=/home/aamador/pyrite/src/pyrite/data/catalog PYRITE_HOME=/home/aamador/pyrite /home/aamador/.local/bin/uv run --extra nvidia pyrite-dev test --slow /tmp/test_optical_source_cuda_616_617.py /tmp/test_optical_device_reductions_616_617.py --durations=0 -c /home/aamador/pyrite/pyproject.toml",
+  "test_command": "PYRITE_MC_BACKEND=cuda PYRITE_TEST_BACKEND=cuda PYRITE_CATALOG=/home/user/pyrite/src/pyrite/data/catalog PYRITE_HOME=/home/user/pyrite /home/user/.local/bin/uv run --extra nvidia pyrite-dev test --slow /tmp/test_optical_source_cuda_616_617.py /tmp/test_optical_device_reductions_616_617.py --durations=0 -c /home/user/pyrite/pyproject.toml",
   "test_staging": "Both tracked test files copied unchanged to /tmp because pyrite remote sync excludes tests; explicit repository pytest configuration registers the slow marker.",
   "result": {
     "passed": 15,

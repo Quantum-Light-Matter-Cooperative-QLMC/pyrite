@@ -3344,7 +3344,7 @@ fresh-context check of moment composition, the numerical-centroid convention,
 outward rounding and runner gating. General window-envelope validity,
 upstream/sample arithmetic uncertainty, outside-axis power, FWHM and corrected
 remote ladders remain outside its scope. A fresh remote job inventory probe
-still fails to resolve the configured `qlmc` home with SSH exit 255; no heavy
+still fails to resolve the configured `cluster-head` home with SSH exit 255; no heavy
 local ladder or remote job was started.
 
 ## Independent centroid-enclosure verification (2026-10-07)

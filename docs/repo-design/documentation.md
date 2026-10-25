@@ -8,6 +8,12 @@ Use MyST roles and directives when an object needs a stable label, caption, numb
 
 Agent-operational plans and handoffs do not belong under `docs/`; they belong under `agentdocs/` and are not published as project documentation.
 
+Published documentation and attached evidence use generic usernames, hostnames,
+home paths and example network addresses. Redact operator-identifying metadata
+before adding logs or reports. Preserve numerical measurements, scientific
+configuration, source revisions and content digests; indicate when published
+metadata contains placeholders rather than original operator paths.
+
 ## Structure, labels, and references
 
 Use one `#` document title, then descend through headings without skipping a level.

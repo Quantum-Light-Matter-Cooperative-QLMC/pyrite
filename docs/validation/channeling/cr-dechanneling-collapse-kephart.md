@@ -2,7 +2,7 @@
 
 Historical implementation evidence for issue #504, followed by the independent #522 boundary review below. The ledger retains its declared-calibration `anchored` scope; the exploratory replacement receives a separate verdict.
 
-- **Harness:** `checks/kephart_occupation.py` at revisions `ebea431c` (remote sweep on `qlmc`, SLURM CPU) and `42b93283` (local `H ≥ 40` runs). The solver code is the same in both.
+- **Harness:** `checks/kephart_occupation.py` at revisions `ebea431c` (remote sweep on `cluster-head`, SLURM CPU) and `42b93283` (local `H ≥ 40` runs). The solver code is the same in both.
 - **Reference:** Kephart et al., Phys. Rev. B 40, 4249 (1989). Table I gives 1/e occupation lengths ±20%; Table II gives the inferred divergences of 2.2 mrad (17 MeV) and 1.0 mrad (54 MeV).
 - **Assumed temperature:** 293.15 K, which the paper does not state.
 

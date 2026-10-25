@@ -24,7 +24,7 @@
     "code_revision": "36fb688a11d52179c793a2358e779168494473bc",
     "code_dirty": "True",
     "code_synced_at": "2026-10-24T00:53:26+00:00",
-    "code_source": "alex-XPS-15-9530:/home/alex/dev/pyrite/.worktrees/issues-616-617",
+    "code_source": "developer-node:/home/user/dev/pyrite/.worktrees/issues-616-617",
     "code_tables_digest": "f9a89dc83cb97f36fc94a2fef58a4ad710d5848d9f5c8f513b896de47f6106e2"
   },
   "source_and_test_sha256": {
@@ -35,7 +35,7 @@
     "src/pyrite/montecarlo/spectrum/optical_interferometer_handoff.py": "4f8e16bbfc50ddb5a59e43537079537915c39db2b4f90c68e4dcae95ebd0e3f5",
     "tests/montecarlo/test_optical_cuda_parity.py": "15982e8eb74ecc2c2dfb27082668d8e9f92b1066a55a7863a845b90227317027"
   },
-  "test_command": "PYRITE_MC_BACKEND=cuda PYRITE_TEST_BACKEND=cuda PYRITE_CATALOG=/home/aamador/pyrite/src/pyrite/data/catalog PYRITE_HOME=/home/aamador/pyrite /home/aamador/.local/bin/uv run --extra nvidia pyrite-dev test /tmp/test_optical_device_reductions_616_617.py --durations=0",
+  "test_command": "PYRITE_MC_BACKEND=cuda PYRITE_TEST_BACKEND=cuda PYRITE_CATALOG=/home/user/pyrite/src/pyrite/data/catalog PYRITE_HOME=/home/user/pyrite /home/user/.local/bin/uv run --extra nvidia pyrite-dev test /tmp/test_optical_device_reductions_616_617.py --durations=0",
   "test_staging": "Tracked test copied unchanged to /tmp/test_optical_device_reductions_616_617.py; pyrite remote sync excludes tests.",
   "result": {
     "passed": 7,

@@ -348,7 +348,7 @@ uses the saved transport directly and does not regenerate its trajectories.
 
 The [preflight record](../check-records/coherent-physical-population/replay-preflight.json)
 uses clean checkpoint `ef39e5a7` exported to the isolated remote checkout
-`/home/aamador/pyrite-issue350-replay-20261008`. It refuses the historical
+`/home/user/pyrite-issue350-replay-20261008`. It refuses the historical
 short-bunch replay before spectrum evaluation: the original record guarantees
 reference-data guaranteed-set digest
 `f77edf9549ccb9c1c3866118970db0f7f29e17c204da7ce806fee09aef2ac3da`,
@@ -360,7 +360,7 @@ difference in scattering-table contents, sampled paths or line spectrum. The
 attempted table-only reconstruction did not address that combined marker. No GPU
 replay was submitted, no new spectrum was measured, and sampling/window acceptance
 remains unresolved. Subsequent issue work uses its dedicated remote directory
-`/home/aamador/pyrite/issues/issue-350` with the current synced data.
+`/home/user/pyrite/issues/issue-350` with the current synced data.
 
 
 ### Short-bunch diagnostics rerun (2026-10-08)

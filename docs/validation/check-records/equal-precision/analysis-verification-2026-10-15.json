@@ -12,7 +12,7 @@
   },
   "job": {
     "id": 1335,
-    "host": "DESKTOP-QNIHO3D",
+    "host": "gpu-node",
     "partition": "cpu",
     "state": "COMPLETED",
     "exit_code": "0:0",
@@ -99,7 +99,7 @@
     }
   },
   "evidence": {
-    "remote_directory": "/home/aamador/pyrite-510-verify-a3876d6f/evidence/verification/1335",
+    "remote_directory": "/home/user/pyrite-510-verify-a3876d6f/evidence/verification/1335",
     "local_archive": "scratch/remote-verification/verification-1335.tar.gz",
     "archive_sha256": "c4fe49c4f856d8d1a271d0dd320edc2451b8110c56f21e53310c80a22f85b2a1",
     "verified_manifest_files": 22,

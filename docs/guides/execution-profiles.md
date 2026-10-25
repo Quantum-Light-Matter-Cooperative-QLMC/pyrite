@@ -42,18 +42,18 @@ See [Dask and distributed execution](dask-and-distributed-execution.md).
 Example `execution.toml`:
 
 ```toml
-[execution.qlmc-nvidia]
+[execution.cluster-nvidia]
 backend = "slurm"
 max_attempts = 3
 
-[execution.qlmc-nvidia.resources]
+[execution.cluster-nvidia.resources]
 cpu_cores = 8
 memory_bytes = "32GiB"
 gpu_count = 1
 accelerator = "cuda"
 gpu_memory_bytes = "16GiB"
 
-[execution.qlmc-nvidia.slurm]
+[execution.cluster-nvidia.slurm]
 partition = "gpu"
 walltime = "02:00:00"
 max_concurrent = 4
@@ -65,7 +65,7 @@ gres = "gpu:1"
 Run:
 
 ```shell
-pyrite run standard -m hopg --execution qlmc-nvidia --execution-config execution.toml
+pyrite run standard -m hopg --execution cluster-nvidia --execution-config execution.toml
 ```
 
 The same selection works from Python:
@@ -73,7 +73,7 @@ The same selection works from Python:
 ```python
 from pyrite.execution import build_executor, resolve_execution_profile
 
-profile = resolve_execution_profile("qlmc-nvidia", config_path="execution.toml")
+profile = resolve_execution_profile("cluster-nvidia", config_path="execution.toml")
 executor, artifact_store = build_executor(
     profile,
     case_key=content_key_fn,  # use pyrite.api.source_content_key_fn()

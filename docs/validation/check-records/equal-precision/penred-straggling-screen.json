@@ -560,7 +560,7 @@
     "build": 1667,
     "pyrite": 1668,
     "penred": 1670,
-    "host": "DESKTOP-QNIHO3D",
+    "host": "gpu-node",
     "date": "2026-10-22"
   },
   "penred_build": {

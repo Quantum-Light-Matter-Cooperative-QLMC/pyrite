@@ -1204,7 +1204,7 @@ constructor enforces this for $W$ by its periodicity check.
 
 ## Independent numeric evidence (2026-10-22)
 
-The oracle is `/tmp/claude-1000/-home-alex-dev-pyrite/a6d7b22a-bb10-4e37-9fdd-dd3bf02926b0/scratchpad/oracle.py`,
+The oracle is `/tmp/validation-oracle/oracle.py`,
 a scratch file that is not committed. It uses an $8\times8$ grid with
 $2\times2$ cells, a random cell-periodic potential (standard deviation 8 eV), a
 random cell-periodic $W\in[0,0.5]$ eV, $\hbar v_z=1973$ eV Å and tilt
@@ -1539,7 +1539,7 @@ projective draw and use no random numbers. They are weighted by hook events
 ### Independent dense oracle
 
 The oracle script
-(`/tmp/claude-1000/-home-alex-dev-pyrite/a6d7b22a-bb10-4e37-9fdd-dd3bf02926b0/scratchpad/oracle_losscoupling.py`)
+(`/tmp/validation-oracle/oracle_losscoupling.py`)
 works in the plane-wave basis with an explicit unitary Kronecker DFT and does
 not use the Bloch blocks. It builds dense $H$ and $W$ from random
 cell-periodic $U$ and $W>0$ on supercells $(2,3)$, $(3,2)$ and $(1,1)$ with

@@ -18,7 +18,7 @@ thermal/potential claims to `anchored`.
 - **Beam:** `[1 10 0]`, checked against `[1 13 0]`; the cell retains the
   actual in-plane crystal correlations. `[1 7 0]` is insufficiently converged.
 - **Oracle:** abTEM 1.0.10, ASE 3.29.0, NumPy 2.5.4; Lobato potential,
-  GPU multislice on qlmc, eight configurations (indices 0–7, seed 504).
+  GPU multislice on cluster-head, eight configurations (indices 0–7, seed 504).
   The interaction constant agrees with `e/(ħv)` to 8.06e-9 relative.
 - **Solver:** TDS only, no electronic excitation, `n_cells = 8`, no sink
   (`margin_eV = 1e9`), harmonic order H = 48, dz = 12.5 Å.
@@ -71,7 +71,7 @@ general inequivalent-site tensors and temperature series remain outstanding.
 ## Reproduction and artifacts
 
 Harness: `checks/abtem_channeling_oracle.py`. Recovered raw datasets remain
-on qlmc at `~/pyrite-535/results/oracle/` (`n7.npz`, `n10.npz`,
+on cluster-head at `~/pyrite-535/results/oracle/` (`n7.npz`, `n10.npz`,
 `n10half.npz`, `n10fineA.npz`, `n13.npz`).
 [Machine-readable evidence](../check-records/abtem_mos2_535.json) retains
 their SHA-256 hashes, configurations, revisions, grouped means/SEMs and the
@@ -79,7 +79,7 @@ three solver convergence arrays. Most GPU data were generated at
 `eb7fc5e37c194fe84e60a118b0a23eed2e7e821c`; n13 and the comparison use
 `57c2b4d453a2e7d055ffc52c2ff645620b91f2f6`.
 
-Run heavy work remotely. From the staged checkout on qlmc, the fine case is:
+Run heavy work remotely. From the staged checkout on cluster-head, the fine case is:
 
 ```bash
 uv run --group oracle python checks/abtem_channeling_oracle.py run \
@@ -94,7 +94,7 @@ OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 \
 ```
 
 The original local dz/H checks left no saved results. Recovery job 1511
-on qlmc's CPU partition recomputed H = 48 at dz = 25 and 12.5 Å and
+on cluster-head's CPU partition recomputed H = 48 at dz = 25 and 12.5 Å and
 H = 64 at dz = 12.5 Å, recording every 500 Å. BLAS/OpenMP used one thread;
 each result was saved independently. Regression tests in
 `tests/materials/test_channeling_oracle.py` pin the n13 orthogonal cell and

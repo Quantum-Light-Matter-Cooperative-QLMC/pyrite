@@ -6,8 +6,8 @@ not an independent physics derivation or a DTR device-validation claim.
 On 2026-10-18, SLURM job **1592** ran
 `tests/montecarlo/test_transition_radiation_cuda.py` on an NVIDIA GeForce
 RTX 5080 (16303 MiB), driver 610.47, CuPy 14.2.0, Python 3.14.6.
-The isolated checkout was `/home/aamador/pyrite-issue-103` on the configured
-`qlmc` host. Source was clean revision
+The isolated checkout was `/home/user/pyrite-issue-103` on the configured
+`cluster-head` host. Source was clean revision
 `fc547a9e1dc96cc350b2c262b6e7c40ff99aa7b4`, with the test-fixture correction
 in this change applied afterward. The tested CUDA module SHA-256 is
 `067f7d94ad5e051ba56b061dc0a7549e5c9083952b07b8208d1cae3da7e5aed2`.

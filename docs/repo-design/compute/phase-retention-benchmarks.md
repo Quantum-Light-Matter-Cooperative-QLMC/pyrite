@@ -11,7 +11,7 @@ collapsed with their occurrence counts.
 ## Protocol and scope
 
 SLURM jobs 1171 (paired matrix) and 1174 (calibration/validation and separate
-host profile), isolated `~/pyrite-365-phase-retention` on `qlmc`. Each allocation
+host profile), isolated `~/pyrite-365-phase-retention` on `cluster-head`. Each allocation
 requested one GPU, four CPU threads, 12 GB RAM and a ten-minute limit. No other
 GPU process was present at the initial hardware query. The live default was
 1500 MB per CPU; memory was requested explicitly. Accounting storage is disabled,

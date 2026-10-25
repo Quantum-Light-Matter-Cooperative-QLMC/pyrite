@@ -1,6 +1,6 @@
 # Initial differential overflow evidence (#522)
 
-Array 1614; remote checkout `/home/aamador/pyrite-522-overflow`, outputs
+Array 1614; remote checkout `/home/user/pyrite-522-overflow`, outputs
 `scratch/overflow/`. Source hashes and exact parameters are in `submit.sh`
 and each JSON. All four tasks completed by 2026-10-20 12:10 UTC. Tasks 2–3
 were retrieved after completion; do not sync over the isolated checkout until

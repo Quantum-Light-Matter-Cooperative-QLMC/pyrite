@@ -16529,7 +16529,7 @@
     "direction_norm_max_error": 2.220446049250313e-16
   },
   "evidence": {
-    "remote_checkout": "/home/aamador/pyrite-510-precision-20261015",
+    "remote_checkout": "/home/user/pyrite-510-precision-20261015",
     "gpu_jobs": [
       1343,
       1344,
