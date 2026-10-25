@@ -67,6 +67,20 @@ UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev precommit
 If `uv run` cannot write project environment, add
 `UV_PROJECT_ENVIRONMENT=/tmp/pyrite-venv`; do not switch interpreters.
 
+Before the first sandboxed docs build, set writable uv tool directories:
+
+```bash
+export UV_TOOL_DIR=/tmp/pyrite-uv-tools
+export UV_TOOL_BIN_DIR=/tmp/pyrite-uv-tool-bin
+```
+
+Apply these to `pyrite-dev docs`, `verify`, `precommit`, and direct Sphinx
+invocations. The marimo HTML-WASM demo export invokes Ruff through uv's tool
+runner. `UV_CACHE_DIR` alone does not redirect its default
+`~/.local/share/uv/tools` writes; a read-only home causes
+`LocalWheelError: Failed to analyze local imports with Ruff` / `Could not create
+temporary file`. Set the tool directories up front and keep demo export enabled.
+
 ## Choose tests by impact
 
 Start with the changed behavior's test node or owning module. Trace callers and
