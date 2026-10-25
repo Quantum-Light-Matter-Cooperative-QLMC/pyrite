@@ -29,15 +29,20 @@ from ._photon_support import (
 from ._photon_support import (
     _scene_feedback as _scene_feedback,
 )
+from ._spec_defaults import UNSET, _Unset
+from .campaign.resolution import resolve_simulation
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
     from os import PathLike
     from pathlib import Path
 
+    from ._numerics import Numerics, Physics
     from .campaign.model import Scene
     from .montecarlo.case import Case
     from .montecarlo.runner.photon_emission import PhotonContinuumScore
+    from .observations.spec import Observation
+    from .quantum import QuantumSetup
 
 
 @dataclass(frozen=True, slots=True)
@@ -177,6 +182,10 @@ def simulate_photon_continuum(
     source_ceiling_eV: float = 1_000_000.0,
     seed: int | None = None,
     charged_feedback: bool = False,
+    physics: Physics | None = None,
+    numerics: Numerics | None = None,
+    quantum: QuantumSetup | None | _Unset = UNSET,
+    observation: Observation | None = None,
 ) -> PhotonContinuumObservation:
     """Run existing primary electron transport once, then score tracked brem hits.
 
@@ -197,8 +206,17 @@ def simulate_photon_continuum(
     debit into the already sampled primary electrons. Original primary
     bremsstrahlung energy losses are those of the chosen coupled transport.
 
+    Independent ``physics`` and ``numerics`` override legacy Scene settings.
+    Omitted ``quantum`` inherits ``Scene.quantum``; explicit ``None`` disables that setup.
+    ``observation`` binds through the shared resolver, subject to this API's
+    ideal, unpixelated aperture restrictions. The input Scene is unchanged.
+
     Validation: photon-continuum-scene-handoff, photon-secondary-feedback.
     """
+    request = resolve_simulation(
+        scene, physics=physics, numerics=numerics, quantum=quantum, observation=observation
+    )
+    scene = request.scene
     detector, numerics, low, electron, high = _preflight(
         scene, n_samples, photon_cutoff_eV, electron_cutoff_eV, source_ceiling_eV
     )
@@ -208,13 +226,13 @@ def simulate_photon_continuum(
     if seed is not None and (type(seed) is not int or seed < 0):
         raise ValueError("seed must be a nonnegative integer or None")
 
-    from .campaign.lowering import build_case
+    from .campaign.lowering import lower_simulation
     from .campaign.profiles import case_content_key
     from .montecarlo import runner
     from .montecarlo.runner.case_tables import case_table_markers
     from .montecarlo.runner.photon_emission import score_bremslib_continuum
 
-    case = build_case(scene, numerics)
+    case = lower_simulation(request)
     if case.get("bremsstrahlung_model") != "bremslib":
         raise ValueError("photon-continuum reference requires resolved BremsLib cross sections")
     if case.get("radiative_model") != "bremslib-soft-hard":

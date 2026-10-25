@@ -42,6 +42,7 @@ if TYPE_CHECKING:
     from .plan import (
         SweepObservation as SweepObservation,
     )
+    from .spec import Observation as Observation
     from .store import (
         ObservationStore as ObservationStore,
     )
@@ -69,6 +70,7 @@ _EXPORTS = {
 
 # Preexisting observations package exports retain their import paths and identity.
 _EXISTING_EXPORTS = {
+    "Observation": ("pyrite.observations.spec", "Observation"),
     "ObservationEntry": ("pyrite.observations.inventory", "ObservationEntry"),
     "ObservationInventory": ("pyrite.observations.inventory", "ObservationInventory"),
     "ObservationPlan": ("pyrite.observations.plan", "ObservationPlan"),
@@ -86,6 +88,7 @@ __all__ = [
     "Acquisition",
     "AcquisitionBatch",
     "NativeAcquisition",
+    "Observation",
     "ObservationEntry",
     "ObservationInventory",
     "ObservationPlan",

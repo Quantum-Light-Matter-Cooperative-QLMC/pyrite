@@ -7,7 +7,8 @@ target geometry and never enter the electron-transport navigator.
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+import weakref
+from dataclasses import InitVar, dataclass, field
 from numbers import Integral
 from typing import Literal
 
@@ -18,6 +19,31 @@ from .._units import normalize_unit
 from ..detectors.spec import Detector, DetectorResponse
 from ..materials import CATALOG, MediumSpec
 from ..materials._composition import has_positive_number_densities, resolve_composition
+
+_PLANAR_COMPATIBILITY: dict[int, tuple[weakref.ReferenceType, tuple[object, ...]]] = {}
+
+
+def _remember_planar_compatibility(detector, values) -> None:
+    identity = id(detector)
+
+    def discard(reference) -> None:
+        stored = _PLANAR_COMPATIBILITY.get(identity)
+        if stored is not None and stored[0] is reference:
+            _PLANAR_COMPATIBILITY.pop(identity, None)
+
+    reference = weakref.ref(detector, discard)
+    _PLANAR_COMPATIBILITY[identity] = (reference, values)
+
+
+def _restore_planar_detector(pose, size_mm, pixels, response, scorer, origin):
+    return PlanarDetector(
+        pose,
+        size_mm=size_mm,
+        pixels=pixels,
+        response=response,
+        scorer=scorer,
+        _scorer_origin=origin,
+    )
 
 
 @dataclass(frozen=True)
@@ -109,9 +135,33 @@ class FilterPlate:
         )
 
 
+def _legacy_pixel_scorer(pixels, scorer, origin):
+    """Resolve embedded scoring while retaining omission through dataclass replacement.
+
+    The origin is an InitVar/private attribute, never a dataclass identity field.
+    A replacement that changes the effective scorer is an explicit new selection.
+    """
+    if scorer is not None and not isinstance(scorer, PixelScorer):
+        raise TypeError("PlanarDetector.scorer must be a PixelScorer or None")
+    explicit = scorer is not None
+    if origin is not None and scorer is origin[1]:
+        explicit = origin[0]
+    if pixels is None:
+        if scorer is not None:
+            raise ValueError("PlanarDetector.scorer requires pixels")
+        return None, (False, None)
+    resolved = PixelScorer() if scorer is None else scorer
+    if any(
+        requested > available
+        for requested, available in zip(resolved.angular_shape, pixels.shape, strict=True)
+    ):
+        raise ValueError("pixel scorer angular shape cannot exceed detector pixel shape")
+    return resolved, (explicit, resolved)
+
+
 @dataclass(frozen=True)
 class PlanarDetector:
-    """Describe physical planar detector geometry and optional response.
+    """Describe physical planar detector geometry.
 
     Parameters
     ----------
@@ -123,25 +173,28 @@ class PlanarDetector:
     pixels
         Optional physical pixel grid used for spatial scoring.
     response
-        Optional read-time detector response implementing ``score``.
+        Legacy response accepted for compatibility. Prefer ``Observation``.
     scorer
-        Factorized spatial scoring on the pixel grid. Defaults to
-        :class:`PixelScorer` ``()`` when ``pixels`` is set; requires ``pixels``.
+        Legacy factorized sampling request. Prefer ``Observation.sampling``.
 
     Notes
     -----
-    Geometry changes source observation and accepted solid angle. ``response``
-    changes only read-time scoring. A pixelated detector always returns
-    spatial output from :func:`pyrite.simulate`.
+    Geometry changes source observation and accepted solid angle. Response and
+    scoring constructor arguments remain accessible for compatibility but are
+    excluded from the canonical physical dataclass value. A pixelated detector
+    always returns spatial output from :func:`pyrite.simulate`.
     """
 
     pose: PlanarPose
     size_mm: tuple[float, float] | None = None
     pixels: PixelGrid | None = None
-    response: DetectorResponse | None = None
-    scorer: PixelScorer | None = None
+    response: InitVar[DetectorResponse | None] = None
+    scorer: InitVar[PixelScorer | None] = None
+    _scorer_origin: InitVar[tuple[bool, PixelScorer | None] | None] = field(
+        default=None, kw_only=True
+    )
 
-    def __post_init__(self) -> None:
+    def __post_init__(self, response, scorer, _scorer_origin=None) -> None:
         if not isinstance(self.pose, PlanarPose):
             raise TypeError("PlanarDetector.pose must be a PlanarPose")
         size = (
@@ -168,24 +221,10 @@ class PlanarDetector:
             size = pixel_size
         assert size is not None
         object.__setattr__(self, "size_mm", size)
-        if self.response is not None and not hasattr(self.response, "score"):
+        if response is not None and not hasattr(response, "score"):
             raise TypeError("PlanarDetector.response must implement score()")
-        if self.scorer is not None and not isinstance(self.scorer, PixelScorer):
-            raise TypeError("PlanarDetector.scorer must be a PixelScorer or None")
-        if self.pixels is None:
-            if self.scorer is not None:
-                raise ValueError("PlanarDetector.scorer requires pixels")
-        else:
-            if self.scorer is None:
-                object.__setattr__(self, "scorer", PixelScorer())
-            assert self.scorer is not None
-            if any(
-                requested > available
-                for requested, available in zip(
-                    self.scorer.angular_shape, self.pixels.shape, strict=True
-                )
-            ):
-                raise ValueError("pixel scorer angular shape cannot exceed detector pixel shape")
+        scorer, origin = _legacy_pixel_scorer(self.pixels, scorer, _scorer_origin)
+        _remember_planar_compatibility(self, (response, scorer, origin))
         center = np.asarray(self.pose.center_mm)
         normal = np.asarray(self.pose.normal)
         if float(center @ normal) <= 0.0:
@@ -227,6 +266,21 @@ class PlanarDetector:
             scale=scale,
         )
 
+    def __getattr__(self, name: str):
+        names = ("response", "scorer", "_scorer_origin")
+        if name not in names:
+            raise AttributeError(name)
+        stored = _PLANAR_COMPATIBILITY.get(id(self))
+        if stored is None or stored[0]() is not self:
+            return (None, None, (False, None))[names.index(name)]
+        return stored[1][names.index(name)]
+
+    def __reduce__(self):
+        return (
+            _restore_planar_detector,
+            (self.pose, self.size_mm, self.pixels, self.response, self.scorer, self._scorer_origin),
+        )
+
     def scalar_detector(self) -> Detector:
         """Project physical geometry onto unchanged legacy source-case fields."""
         center = np.asarray(self.pose.center_mm)
@@ -255,6 +309,10 @@ class PlanarDetector:
             _legacy_acceptance=(max(polar_span_deg, np.finfo(float).eps), solid_angle),
             response=self.response,
         )
+
+
+for _compatibility_name in ("response", "scorer", "_scorer_origin"):
+    delattr(PlanarDetector, _compatibility_name)
 
 
 #: Pixel reconstruction modes accepted by :class:`PixelScorer`.

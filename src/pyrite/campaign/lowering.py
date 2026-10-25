@@ -7,6 +7,7 @@ from .._energy_bins import EnergyBins
 from .._numerics import Numerics, Physics
 from ..instrument import PlanarDetector
 from ..montecarlo import Case
+from ..observations.spec import Observation
 from ..quantum import QuantumSetup
 from .channeling_cases import resolve_channeling
 from .resolution import UNSET, ResolvedSimulation, _Unset, resolve_models, resolve_simulation
@@ -29,6 +30,7 @@ def build_case(
     *,
     physics: Physics | None = None,
     quantum: QuantumSetup | None | _Unset = UNSET,
+    observation: Observation | None = None,
 ) -> Case:
     """Resolve and lower one scene to the existing typed transport input.
 
@@ -36,7 +38,9 @@ def build_case(
     inherits ``Scene.quantum``; explicit ``None`` disables the quantum setup.
     """
     return lower_simulation(
-        resolve_simulation(scene, numerics=numerics, physics=physics, quantum=quantum)
+        resolve_simulation(
+            scene, numerics=numerics, physics=physics, quantum=quantum, observation=observation
+        )
     )
 
 
@@ -101,43 +105,97 @@ def lower_simulation(request: ResolvedSimulation) -> Case:
     return resolve_photon_transport(scene, case, numerics)
 
 
-def build_sweep_cases(sweep: Sweep, numerics: Numerics | None = None) -> list[Case]:
+def build_sweep_cases(
+    sweep: Sweep,
+    numerics: Numerics | None = None,
+    *,
+    physics: Physics | None = None,
+    quantum: QuantumSetup | None | _Unset = UNSET,
+    observation: Observation | None = None,
+) -> list[Case]:
     """Lower a public sweep; preserve exact D7 expansion for converted sweeps."""
     if sweep._legacy_source is not None:
         old_sweep, settings = sweep._legacy_source
-        physics, resolved_numerics = resolve_models(sweep.base, sweep.base.numerics)
+        request = resolve_simulation(
+            sweep.base,
+            numerics=numerics,
+            physics=physics,
+            quantum=quantum,
+            observation=observation,
+        )
+        physics, resolved_numerics = request.physics, request.numerics
+        if physics.photon_transport is not None:
+            raise ValueError(
+                "photon transport currently requires a scalar Scene; sweeps are unsupported"
+            )
+        if observation is not None:
+            for _, point in sweep.expand():
+                resolve_simulation(
+                    point,
+                    numerics=request.scene.numerics,
+                    physics=request.scene.physics,
+                    quantum=request.scene.quantum,
+                    observation=observation,
+                )
+        if observation is not None:
+            detector = request.scene.detector
+            old_sweep = replace(
+                old_sweep,
+                detector=(
+                    detector.scalar_detector() if isinstance(detector, PlanarDetector) else detector
+                ),
+            )
+        if numerics is not None:
+            convergence = resolved_numerics.cxr_reflections
+            old_sweep = replace(
+                old_sweep,
+                energy_bins=resolved_numerics.energy_bins or EnergyBins(),
+                n_families=convergence.n_families,
+                max_reflections=convergence.max_reflections,
+                mosaic_nodes=convergence.mosaic_nodes,
+                mosaic_route=convergence.mosaic_route,
+                spec_chunk=resolved_numerics.cxr_chunk,
+                brem_chunk=resolved_numerics.brem_chunk,
+            )
         cases = build_cases(
             old_sweep,
-            n_electrons=settings.n_electrons,
-            n_electrons_brem=settings.n_electrons_brem,
-            coherent_emission=settings.coherent_emission,
-            straggling=getattr(settings, "straggling", False),
-            energy_model=getattr(settings, "energy_model", "frozen"),
-            max_dE_frac=getattr(settings, "max_dE_frac", 0.0),
-            inelastic_model=getattr(settings, "inelastic_model", "auto"),
-            inelastic_cutoff_eV=getattr(settings, "inelastic_cutoff_eV", None),
-            secondary_threshold_eV=getattr(settings, "secondary_threshold_eV", None),
-            elastic_model=getattr(settings, "elastic_model", "elsepa"),
-            bremsstrahlung_model=getattr(settings, "bremsstrahlung_model", "auto"),
-            radiative_model=getattr(settings, "radiative_model", "uncoupled"),
-            radiative_cutoff_eV=getattr(settings, "radiative_cutoff_eV", None),
+            n_electrons=resolved_numerics.cxr_trials,
+            n_electrons_brem=resolved_numerics.brem_trials,
+            coherent_emission=physics.coherent_emission,
+            straggling=physics.straggling,
+            energy_model=resolved_numerics.energy_model,
+            max_dE_frac=resolved_numerics.max_dE_frac,
+            inelastic_model=physics.inelastic_model,
+            inelastic_cutoff_eV=physics.inelastic_cutoff_eV,
+            secondary_threshold_eV=physics.secondary_threshold_eV,
+            elastic_model=physics.elastic_model,
+            bremsstrahlung_model=physics.bremsstrahlung_model,
+            radiative_model=physics.radiative_model,
+            radiative_cutoff_eV=physics.radiative_cutoff_eV,
             temporal_profile=getattr(settings, "temporal_profile", False),
-            pair_production_model=getattr(settings, "pair_production_model", None),
-            positron_transport=getattr(settings, "positron_transport", False),
-            atomic_electron_deflection=getattr(settings, "atomic_electron_deflection", "kawrakow"),
-            precision=getattr(settings, "precision", None),
+            pair_production_model=physics.pair_production_model,
+            positron_transport=physics.positron_transport,
+            atomic_electron_deflection=physics.atomic_electron_deflection,
+            precision=resolved_numerics.precision,
         )
         cases = resolve_shell_ionization(resolve_transition_radiation(cases, physics), physics)
         return resolve_channeling(cases, physics, resolved_numerics)
+    overrides = {}
     if numerics is not None:
-        sweep = replace(sweep, base=replace(sweep.base, numerics=numerics))
+        overrides["numerics"] = numerics
+    if physics is not None:
+        overrides["physics"] = physics
+    if quantum is not UNSET:
+        overrides["quantum"] = quantum
+    if overrides:
+        sweep = replace(sweep, base=replace(sweep.base, **overrides))
     cases = []
     for index, (label, scene) in enumerate(sweep.expand()):
         if scene.physics.photon_transport is not None:
             raise ValueError(
                 "photon transport currently requires a scalar Scene; sweeps are unsupported"
             )
-        case = build_case(scene)
+        case = build_case(scene, observation=observation)
         if label:
             case = replace(case, name=f"{case.name} {label}")
         cases.append(replace(case, seed=index + 1))

@@ -393,6 +393,11 @@ their historical expansion. `campaign/lowering.py` projects
 `Numerics.energy_bins` onto the legacy campaign adapter, whose `energy_bins`
 field feeds the existing case builder. Detectors own acceptance and response.
 
+`observations/spec.py::Observation` owns independent detector references,
+response, acquisition and pixel sampling requests. Its binder validates physical
+geometry and legacy conflicts before case preparation, normalizing into the
+existing execution/identity representations without mutating the input scene.
+
 ### `_physics_contract.py`, `_physics_provenance.py`, and `campaign/physics_view.py`
 
 Private in-tree extension metadata ([ADR-0017](adr/0017-in-tree-physics-extension-contract.md)).

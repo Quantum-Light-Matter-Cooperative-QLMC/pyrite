@@ -48,6 +48,7 @@ from .montecarlo.spectrum import (
 )
 from .montecarlo.transport import STOPPING_MODEL
 from .observations.plan import ObservationPlan, PixelSampling
+from .observations.spec import Observation
 from .quantum import QuantumSetup
 from .results.model import CxrSpectra, Result, SpectralDensity
 
@@ -228,6 +229,7 @@ def simulate(
     filters: tuple[FilterPlate | Filter, ...] | None = None,
     acquisition: Acquisition | NativeAcquisition | None = None,
     quantum: QuantumSetup | None | _Unset = UNSET,
+    observation: Observation | None = None,
 ) -> Result:
     """Simulate one scene without reading or writing a checkpoint.
 
@@ -264,6 +266,10 @@ def simulate(
         ``Scene.quantum``; explicit ``None`` disables the scene's setup.
         Unsupported setups and conflicting legacy channeling fields refuse
         before transport. Component calls default to no quantum setup.
+    observation
+        Independent response, acquisition and numerical sampling request.
+        References the scene's detector or supplies a virtual angular detector.
+        Conflicting embedded legacy settings raise before transport.
 
     Returns
     -------
@@ -290,12 +296,13 @@ def simulate(
         filters=filters,
         acquisition=acquisition,
         quantum=quantum,
+        observation=observation,
         require_detector=True,
     )
     scene, resolved_numerics = request.scene, request.numerics
     case, xsgen_tables = _source_case(request)
     if isinstance(scene.detector, PlanarDetector):
-        return _simulate_planar(scene, resolved_numerics, case, xsgen_tables)
+        return _simulate_planar(request, case, xsgen_tables)
     output = run_case(case, transport_core=resolved_numerics.transport_core)
     background_energy = output.get("E_grid_brem", output["E_grid"])
     background = output.get("brem_wide", output["brem"])
@@ -318,6 +325,7 @@ def simulate(
         transition=(None if transition is None else SpectralDensity(output["E_grid"], transition)),
         case=case,
         provenance={
+            **request.composition_provenance,
             "scene": scene,
             "numerics": resolved_numerics,
             "identity_digest": case_content_key(case, xsgen_tables=xsgen_tables),
@@ -365,6 +373,7 @@ def observation_plan(
     *,
     physics: Physics | None = None,
     quantum: QuantumSetup | None | _Unset = UNSET,
+    observation: Observation | None = None,
 ) -> ObservationPlan:
     """Plan ``scene``'s counting observation without running transport.
 
@@ -377,7 +386,9 @@ def observation_plan(
     ValueError
         If ``scene`` lacks a pixelated detector or an acquisition.
     """
-    request = resolve_simulation(scene, numerics=numerics, physics=physics, quantum=quantum)
+    request = resolve_simulation(
+        scene, numerics=numerics, physics=physics, quantum=quantum, observation=observation
+    )
     scene = request.scene
     detector = scene.detector
     if not isinstance(detector, PlanarDetector) or scene.acquisition is None:
@@ -428,11 +439,11 @@ def _cxr_grid_provenance(case, output) -> dict[str, object]:
 
 
 def _simulate_planar(
-    scene: Scene,
-    numerics: Numerics,
+    request: ResolvedSimulation,
     case: Case,
     xsgen_tables: Mapping[str, str],
 ) -> Result:
+    scene, numerics = request.scene, request.numerics
     detector = scene.detector
     assert isinstance(detector, PlanarDetector)
     scorer = _detector_scorer(detector)
@@ -523,6 +534,7 @@ def _simulate_planar(
         ),
         case=case,
         provenance={
+            **request.composition_provenance,
             "scene": scene,
             "numerics": numerics,
             "identity_digest": source_digest,

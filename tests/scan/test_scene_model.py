@@ -1,4 +1,5 @@
 import pickle
+from dataclasses import asdict, fields
 
 import numpy as np
 import pytest
@@ -11,11 +12,18 @@ from pyrite.campaign.legacy import (
     analysis_from_legacy,
     numerics_from_legacy,
 )
-from pyrite.campaign.model import Analysis, CxrReflections, Numerics, Scene, Sweep
+from pyrite.campaign.model import Analysis, CxrReflections, Numerics, Physics, Scene, Sweep
 from pyrite.campaign.sweep import BeamSpec
 from pyrite.campaign.sweep import build_cases as build_legacy_cases
-from pyrite.detectors import Detector
+from pyrite.detectors import (
+    Detector,
+    IdealPhotonCounter,
+    PixelGrid,
+    PlanarDetector,
+    PlanarPose,
+)
 from pyrite.materials import CATALOG
+from pyrite.observations import Acquisition, Observation, PixelScorer
 from pyrite.results import Settings
 
 
@@ -41,6 +49,59 @@ def test_scene_rejects_implicit_sweep_values() -> None:
             beam=BeamSpec(energy_keV=[30.0, 60.0]),
             target=Slab("hopg", footprint=Footprint(5.0, 5.0)),
         )
+
+
+def test_scene_keeps_legacy_run_settings_outside_physical_value_and_round_trips_them():
+    scene = Scene(
+        beam=BeamSpec(energy_keV=30.0),
+        target=Slab("hopg", footprint=Footprint(5.0, 5.0)),
+        detector=Detector(),
+        physics=Physics(brem_source="none"),
+        numerics=Numerics(cxr_trials=7),
+    )
+
+    assert {item.name for item in fields(scene)} == {"beam", "target", "detector", "filters"}
+    assert set(scene.__dict__) == {"beam", "target", "detector", "filters"}
+    assert set(asdict(scene)) == {"beam", "target", "detector", "filters"}
+    assert scene.physics.brem_source == "none"
+    assert scene.numerics.cxr_trials == 7
+
+    restored = pickle.loads(pickle.dumps(scene))
+    assert restored.physics == scene.physics
+    assert restored.numerics == scene.numerics
+    assert set(restored.__dict__) == {"beam", "target", "detector", "filters"}
+    first = Scene(beam=scene.beam, target=scene.target)
+    second = Scene(beam=scene.beam, target=scene.target)
+    assert first.numerics is not second.numerics
+
+
+def test_scene_and_planar_detector_dataclass_values_contain_only_physical_inputs():
+    detector = PlanarDetector(
+        PlanarPose((0.0, 0.0, 100.0)),
+        pixels=PixelGrid((4, 4), (0.5, 0.5)),
+        response=IdealPhotonCounter(),
+        scorer=PixelScorer((2, 2)),
+    )
+    scene = Scene(
+        beam=BeamSpec(energy_keV=30.0),
+        target=Slab("hopg", footprint=Footprint(5.0, 5.0)),
+        detector=detector,
+        acquisition=Acquisition(1.0, (0.0, 1000.0)),
+        physics=Physics(brem_source="none"),
+        numerics=Numerics(cxr_trials=7),
+    )
+
+    assert set(asdict(detector)) == {"pose", "size_mm", "pixels"}
+    assert detector.response == IdealPhotonCounter()
+    assert detector.scorer == PixelScorer((2, 2))
+    assert set(asdict(scene)) == {"beam", "target", "detector", "filters"}
+    assert set(asdict(scene)["detector"]) == {"pose", "size_mm", "pixels"}
+    assert "acquisition" not in scene.__dict__
+
+    restored = pickle.loads(pickle.dumps(scene))
+    assert restored.acquisition == scene.acquisition
+    assert restored.detector.response == detector.response
+    assert restored.detector.scorer == detector.scorer
 
 
 def test_path_axes_expand_nested_and_indexed_fields_mechanically() -> None:
@@ -126,6 +187,31 @@ def test_configured_adapter_preserves_expanded_cases_exactly() -> None:
         coherent_emission=settings.coherent_emission,
     )
     assert _case_bytes(build_sweep_cases(converted)) == _case_bytes(expected)
+
+
+def test_configured_sweep_accepts_independent_run_and_observation_overrides():
+    from pyrite.campaign.sweep import Sweep as LegacySweep
+
+    old = LegacySweep(
+        material="hopg",
+        beam=BeamSpec(energy_keV=30.0),
+        thickness_ang=1_000.0,
+        tilt_deg=30.0,
+    )
+    converted = adapt_configured_sweep(old, Settings(n_electrons=12, n_electrons_brem=6))
+    numerics = Numerics(cxr_trials=9, brem_trials=4)
+    observation = Observation(detector=Detector())
+
+    cases = build_sweep_cases(
+        converted,
+        numerics,
+        physics=Physics(brem_source="none"),
+        observation=observation,
+    )
+
+    assert len(cases) == 1
+    assert cases[0]["Ne"] == 9
+    assert cases[0]["Ne_brem"] == 4
 
 
 def test_every_catalog_profile_round_trips_a_resolved_case_list() -> None:

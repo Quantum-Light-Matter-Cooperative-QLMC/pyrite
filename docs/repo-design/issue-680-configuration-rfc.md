@@ -1,7 +1,12 @@
 # Simulation composition RFC: physical scenes and independent run configuration
 
-**Status:** Target contract; shared resolution and independent quantum arguments
-are implemented, with physical Scene/observation separation still proposed.
+**Status:** Target contract; shared resolution and independent quantum and
+observation composition are implemented. Scene's run/acquisition settings are
+compatibility-only `InitVar`s excluded from its canonical dataclass fields;
+angular and planar detector responses and planar scoring do as well.
+Configured profile adapters accept independent run and observation arguments;
+downstream consumer migration remains. Unit-bearing physical inputs use the
+normalization introduced by #709.
 **Audit base:** `main` at `2ce1f174`, 2026-10-25.
 **Scope:** [#680](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/680),
 [#695](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/695),
@@ -25,9 +30,30 @@ lowering does not repeat quantum adaptation. Observation planning and production
 use the same resolution; configured sweeps share its model validation while
 retaining their historical expansion and defaults.
 
-This foundation retains existing Scene fields and detector constructors. The
-independent `Observation` and execution arguments in the proposed example below
-remain future work; current execution controls use `Numerics.execution`.
+`Observation` now independently composes detector references, response,
+acquisition and pixel scoring through `simulate`, case lowering, observation
+planning, production and Scene-based sweeps. Geometry references and matching planar values resolve
+to the registered physical detector. The current virtual angular adapter uses
+`Detector`, and sampling uses `PixelScorer`; renaming those concepts stays with
+their owning issues. Legacy scoring omission is tracked through constructor
+provenance, including dataclass replacement, outside scientific dataclass fields.
+Scene-based sweeps apply independent physics/numerics/quantum overrides before
+axes and bind the observation after expansion. Converted configured sweeps retain
+their historical expansion, count grids, defaults and case names while accepting
+independent physics, numerics, quantum and observation arguments. The resolved
+observation supplies the detector direction before case expansion. Per-point
+validation uses requested controls, so quantum adaptation is never applied to
+already adapted settings.
+
+This foundation retains the existing Scene and detector constructors and
+compatibility attribute access while `physics`, `numerics`, `quantum` and
+`acquisition` are excluded from `dataclasses.fields(Scene)` and
+`dataclasses.asdict(scene)`. `Detector.response` and `PlanarDetector.response`
+and `.scorer` are likewise excluded from their dataclass values. Compatibility
+values survive `replace()` and pickle round-trips but do not enter physical
+dataclass representations. The
+independent execution argument in the proposed example below remains future
+work; current execution controls use `Numerics.execution`.
 No new public request type, units package, case schema or numerical model is
 introduced by the resolver migration.
 
@@ -41,10 +67,12 @@ The previous RFC predated work already present on the audit base:
   sections; `Numerics` still lowers them through legacy fields.
 - `QuantumSetup` and `Beam.state` already have supported planar adapters and
   compatibility tests. General quantum production support remains bounded.
-- `Scene` still stores physics, numerics, quantum setup and acquisition.
-  `PlanarDetector` still embeds response and scorer. `api._simulation_scene`,
-  case lowering, profile adapters and observation planning consume these
-  settings at different boundaries.
+- `Scene` keeps physics, numerics, quantum setup and acquisition as
+  constructor/access compatibility values outside its physical dataclass
+  representation. Detector specifications do the same for read-time response
+  and pixel scoring.
+  `api._simulation_scene`, case lowering, profile adapters and observation
+  planning still consume these compatibility values at different boundaries.
 
 Reuse these implementations. `ExecutionConfig` describes local kernel/core
 and chunk choices; it is distinct from `pyrite.execution.Executor` and resource

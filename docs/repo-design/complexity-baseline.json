@@ -73,11 +73,6 @@
       "cc": 23
     },
     {
-      "path": "src/pyrite/campaign/model.py",
-      "name": "Scene.__post_init__",
-      "cc": 22
-    },
-    {
       "path": "src/pyrite/campaign/single_scene.py",
       "name": "resolve_pixel_scene",
       "cc": 31
@@ -256,11 +251,6 @@
       "path": "src/pyrite/instrument/acquisition.py",
       "name": "AcquisitionBatch.__post_init__",
       "cc": 27
-    },
-    {
-      "path": "src/pyrite/instrument/model.py",
-      "name": "PlanarDetector.__post_init__",
-      "cc": 22
     },
     {
       "path": "src/pyrite/materials/_beam_detector_parse.py",

@@ -170,12 +170,12 @@ a helper merely because an implementation package exports it.
 ## Scene composition coordination
 
 Root curation changes import recommendations only. `Scene` retains its current
-constructor, stored fields, lowering, precedence, and serialized identity.
-Physical-only scene composition is tracked in
+constructor, lowering, precedence, and scientific identity. Physical-only
+scene field extraction is tracked in
 [#695](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/695)
-and must reconcile the existing #680 composition RFC before changing those
-contracts. That design is coordinated with observation ownership (#703) and
-quantum setup (#704), without blocking established domain-import migrations.
+and follows the #680 composition RFC, in coordination with observation
+ownership (#703) and quantum setup (#704), without blocking established
+domain-import migrations.
 `ExecutionConfig` and `QuantumSetup` remain supported at root pending these
 decisions; curation does not introduce a simulation request type or endorse a
 future composition model.

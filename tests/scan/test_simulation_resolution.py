@@ -149,10 +149,54 @@ def test_quantum_errors_precede_material_preparation(scene, numerics, quantum, m
 
 
 def test_sweep_keeps_quantum_controls_and_seed_order(scene, numerics, quantum):
-    sweep = Sweep(
-        replace(scene, numerics=numerics, quantum=quantum), {"beam.energy_keV": (5000, 6000)}
-    )
-    cases = sweep.cases()
+    sweep = Sweep(replace(scene, numerics=numerics), {"beam.energy_keV": (5000, 6000)})
+    cases = sweep.cases(quantum=quantum)
     assert [case["seed"] for case in cases] == [1, 2]
     assert [case["E0_keV"] for case in cases] == [5000, 6000]
     assert all(case["channeling"]["dz_ang"] == 100.0 for case in cases)
+    assert sweep.base.quantum is None
+
+
+def test_configured_quantum_observation_matches_scene_lowering(scene, numerics, quantum):
+    from pyrite.campaign.legacy import adapt_configured_sweep
+    from pyrite.campaign.sweep import Sweep as ConfiguredSweep
+    from pyrite.campaign.sweep import build_cases
+    from pyrite.observations import Observation
+    from pyrite.results import Settings
+
+    old = ConfiguredSweep(
+        material="silicon",
+        beam=scene.beam.to_spec(),
+        target=scene.target,
+        detector=scene.detector,
+    )
+    sweep = adapt_configured_sweep(old, Settings(n_electrons=1, n_electrons_brem=1))
+    observation = Observation(detector=Detector(45.0))
+    actual = sweep.cases(numerics, physics=scene.physics, quantum=quantum, observation=observation)[
+        0
+    ]
+    expected = api.build_case(scene, numerics, quantum=quantum, observation=observation)
+    assert actual.to_dict() == expected.to_dict()
+    # Resolving another request leaves the adapter's original physics untouched.
+    np.testing.assert_equal(sweep.cases()[0].to_dict(), build_cases(old, 1, 1)[0].to_dict())
+
+
+def test_configured_observation_changes_direction_and_source_identity():
+    from pyrite.campaign.legacy import adapt_configured_sweep
+    from pyrite.campaign.profiles import case_content_key
+    from pyrite.campaign.sweep import Sweep as ConfiguredSweep
+    from pyrite.observations import Observation
+    from pyrite.results import Settings
+
+    old = ConfiguredSweep(
+        material="hopg",
+        beam=Beam(30.0, transverse=Spot(), longitudinal=PointBunch()).to_spec(),
+        thickness_ang=1000.0,
+        tilt_deg=30.0,
+    )
+    sweep = adapt_configured_sweep(old, Settings(n_electrons=1, n_electrons_brem=1))
+    original = sweep.cases()[0]
+    changed = sweep.cases(observation=Observation(detector=Detector(45.0)))[0]
+    assert changed["theta_obs_rad"] == pytest.approx(np.pi / 4)
+    assert case_content_key(changed) != case_content_key(original)
+    assert sweep.cases()[0].to_dict() == original.to_dict()
