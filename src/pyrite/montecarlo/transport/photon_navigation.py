@@ -277,34 +277,49 @@ def _layer_regions(layers, width_ang, height_ang):
     ]
 
 
-def _project(region, axis) -> tuple[float, float]:
-    """Center projection and support radius; zero components skip infinite extents."""
-    center, axes, half = region
+def _project(region, axis) -> float:
+    """Box support radius [Å], retaining every nonzero axis projection.
+
+    Source: Eberly §§2.1–2.2.1, support sum of half extents times absolute
+    axis dot products. A small angle can project a long side significantly.
+    Exactly zero factors contribute zero even for an infinite slab; any
+    nonzero factor on an infinite extent gives infinite support.
+    Limiting case: an axis-aligned box returns its matching half extent.
+
+    Validation: photon-scene-navigation
+    """
+    _, axes, half = region
     weights = np.abs(axes @ axis)
-    used = weights > 1e-12
-    return float(center @ axis), float(np.sum(half[used] * weights[used]))
+    used = weights > 0.0
+    return float(np.sum(half[used] * weights[used]))
 
 
 def _overlap(first, second) -> bool:
     """Separating-axis test for convex boxes; face contact is not overlap.
 
-    Tolerance is relative to the finite extents and center distances, so
-    exact face contact far from the origin is not mistaken for overlap.
+    Source: separating-axis theorem, Eberly §§2.1–2.2.1. Compare projected
+    relative centres with the sum of support radii [Å]. A common translation
+    leaves this comparison unchanged when the displacement remains representable.
+    Contact tolerance is 32 binary64 epsilons of the lengths on this axis;
+    absolute coordinates and unrelated lateral extents cannot erase thin bodies.
+    Infinite projected slabs do not supply a separating axis.
 
     Validation: photon-scene-navigation
     """
     candidates = [*first[1], *second[1]]
     candidates += [np.cross(a, b) for a in first[1] for b in second[1]]
-    finite = [h for region in (first, second) for h in region[2] if np.isfinite(h)]
-    centers = [float(np.max(np.abs(region[0]))) for region in (first, second)]
-    tolerance = 1e-12 * max([1.0, *finite, *centers])
+    displacement = first[0] - second[0]
     for axis in candidates:
-        norm = float(np.linalg.norm(axis))
-        if norm < 1e-9:
+        norm = float(np.hypot.reduce(axis))
+        if norm == 0.0:
             continue
         axis = axis / norm
-        (c1, r1), (c2, r2) = _project(first, axis), _project(second, axis)
-        if abs(c1 - c2) >= r1 + r2 - tolerance:
+        radius = _project(first, axis) + _project(second, axis)
+        if np.isinf(radius):
+            continue
+        distance = abs(float(displacement @ axis))
+        tolerance = 32 * np.finfo(float).eps * max(distance, radius)
+        if distance >= radius - tolerance:
             return False
     return True
 

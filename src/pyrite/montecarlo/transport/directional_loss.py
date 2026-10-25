@@ -98,6 +98,8 @@ def _mix(eps_perp, eps_par, cos2_alpha):
 class DirectionalValence:
     """Valence oscillators on a shared energy grid, strengths per ``cos^2 alpha`` node.
 
+    Validation: cr-valence-directional-loss
+
     Attributes
     ----------
     energies_eV

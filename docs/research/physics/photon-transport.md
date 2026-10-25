@@ -2,7 +2,8 @@
 
 Status: architecture agreed for [issue #341](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/341);
 recorded in [ADR-0020](../../adr/0020-photon-transport-source-and-scoring.md).
-The photon tracker described here is not implemented or validated. Current
+CPU reference components are implemented; complete production photon transport
+is not implemented or validated. Current
 production behavior remains [straight-ray escape](../../physics/radiation-physics/photon-escape-and-dispersion.md).
 
 ## Existing interfaces and missing data
@@ -22,6 +23,7 @@ photon transport model:
 | `montecarlo/transport/photoelectric.py` | Standalone EPDL subshell absorption, Sauter–Gavrila photoelectrons and sampled EADL cascades (`photon-photoelectric-sampling`) | None for the host queue; production integration remains |
 | `montecarlo/transport/photon_histories.py` | Standalone CPU photon queue over all five channels with lineage-keyed streams, isotropic relaxation emission, charged handoff rows, an absorbing sample-frame aperture and per-history energy closure (`photon-history-queue`) | Source adapters and normalization; positron handoff |
 | `montecarlo/transport/photon_coupling.py` | Host photon/electron round loop: photon-born electrons through the shell cascade from an explicit launch, hard bremsstrahlung returned to the queue, coupled per-history ledger (`photon-charged-coupling`) | Positron transport/annihilation handoff; vacancies from charged impact ionization; soft radiative emission; batch-invariant charged generations ≥1 |
+| `montecarlo/transport/photon_feedback.py`, `photon_event_sources.py` | CPU in-stack electron/positron feedback, unattenuated annihilation return, charged-impact fluorescence/Auger descendants and physical source adapters (`photon-secondary-feedback`) | Independent verification; charged filter/gap transport and target re-entry; Scene source-component selection beyond weighted BremsLib; full-track comparisons |
 | `montecarlo/transport/secondaries.py` | Charged-particle generation queue, pair launches, energy balance | One owner of photon interactions and charged daughter handoff |
 | `montecarlo/transport/annihilation.py` | At-rest/in-flight two-photon emission and first-interaction sink from #295 | Hand off emission rows before sink scoring, preserving event lineage and rest-energy accounting |
 | `montecarlo/runner/emission.py` | Directional continuum and characteristic estimators with escape attenuation | An unattenuated source adapter with energy, position, direction, and statistical weight |

@@ -4,8 +4,8 @@ Chains the standalone first-flight navigator and interaction samplers into a
 lineage-keyed photon queue. Charged daughters are returned as handoff rows for
 the charged launch boundary; they are not transported here. Filter plates and
 detectors enter as sample-frame boxes and apertures converted from lab poses.
-No production caller: source adapters, identity and device execution are
-later slices. Coordinates are sample-frame Å, energies eV.
+The opt-in CPU aperture runner supplies source adapters and observation identity;
+device execution remains unsupported. Coordinates are sample-frame Å, energies eV.
 """
 
 from collections.abc import Callable, Iterator, Mapping, Sequence
@@ -133,9 +133,16 @@ class PhotonAperture:
 
 
 def _rotation(sample_to_lab) -> np.ndarray:
+    """Require a proper orthogonal sample-to-lab map, preserving handedness.
+
+    A reflection reverses cross-product aperture normals and is not a rotation.
+    Validation: photon-scene-navigation
+    """
     rotation = np.asarray(sample_to_lab, dtype=float)
-    if rotation.shape != (3, 3) or not np.allclose(
-        rotation.T @ rotation, np.eye(3), rtol=0.0, atol=1e-12
+    if (
+        rotation.shape != (3, 3)
+        or not np.allclose(rotation.T @ rotation, np.eye(3), rtol=0.0, atol=1e-12)
+        or not np.isclose(np.linalg.det(rotation), 1.0, rtol=0.0, atol=1e-12)
     ):
         raise ValueError("sample_to_lab must be a 3x3 rotation matrix")
     return rotation
@@ -350,13 +357,17 @@ def _validate_batch(position_ang, direction, energy_eV, weight, history_id, even
 
 
 def _validate_ids(history: np.ndarray, event: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    """Non-negative integer ids; uniqueness is checked on the stream keys."""
+    """Non-negative ids representable as int64; stream keys own uniqueness."""
     if history.size and not (
         np.issubdtype(history.dtype, np.integer) and np.issubdtype(event.dtype, np.integer)
     ):
         raise ValueError("history and event ids must be integers")
     if history.size and (history.min() < 0 or event.min() < 0):
         raise ValueError("history and event ids must be non-negative")
+    if history.size and (
+        int(history.max()) > np.iinfo(np.int64).max or int(event.max()) > np.iinfo(np.int64).max
+    ):
+        raise ValueError("history and event ids must fit in int64")
     return history.astype(np.int64), event.astype(np.int64)
 
 
@@ -474,6 +485,7 @@ def track_photon_histories(
     daughter ordinals). ``stream_key`` (uint64, unique) instead supplies the
     source keys of photons returned by a charged stage; ids then only label
     histories. Source photons need ``photon_cutoff_eV < E <= 100 GeV``.
+    History and event labels must be nonnegative integers fitting int64.
     Source: PENELOPE-2024 §1.4 and §2.4 (photon histories, pair kinematics),
     ENDF-102 File 28; component samplers' own ledger claims.
     Validation: photon-history-queue, photon-scene-navigation
@@ -570,6 +582,22 @@ def ledger_residual_eV(ledger: Mapping[str, np.ndarray]) -> np.ndarray:
     return ledger["incident_eV"] - sum(ledger[name] for name in _LEDGER_TERMS)
 
 
+def _weighted_photon_counts(
+    energy: np.ndarray, weight: np.ndarray, edges: np.ndarray
+) -> np.ndarray:
+    """Bin-local weighted hit counts for validated increasing energy edges.
+
+    Source: ordinary weighted bin integration, ADR-0020. Bins are left-closed,
+    right-open except for the included final edge. Direct bin accumulation
+    avoids cancellation against larger weights in other bins or outside the
+    band. No in-band hits gives zero counts; normalization is left to callers.
+    Validation: photon-history-queue, photon-continuous-source-scoring
+    """
+    inside = (energy >= edges[0]) & (energy <= edges[-1])
+    bins = np.searchsorted(edges[1:-1], energy[inside], side="right")
+    return np.bincount(bins, weights=weight[inside], minlength=edges.size - 1)
+
+
 def detected_spectrum(histories: PhotonHistories, edges_eV, n_primaries: int) -> np.ndarray:
     """Weighted aperture hits per primary per eV in each energy bin.
 
@@ -585,5 +613,5 @@ def detected_spectrum(histories: PhotonHistories, edges_eV, n_primaries: int) ->
         raise ValueError("n_primaries must be positive")
     exits = histories.exits
     hit = exits["detected"].astype(bool)
-    counts, _ = np.histogram(exits["energy_eV"][hit], edges, weights=exits["weight"][hit])
+    counts = _weighted_photon_counts(exits["energy_eV"][hit], exits["weight"][hit], edges)
     return counts / (n_primaries * np.diff(edges))

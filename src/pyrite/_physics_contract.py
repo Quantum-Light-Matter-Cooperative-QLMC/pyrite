@@ -81,6 +81,20 @@ _EXACT = ("cpu.lockstep", "cpu.per-electron", "cuda.exact")
 BUILTIN_DESCRIPTORS = DescriptorCatalog(
     (
         ModelDescriptor(
+            "observation.photon",
+            "cpu-reference",
+            "montecarlo.runner.photon_aperture",
+            (
+                "coupled BremsLib",
+                "ideal unpixelated physical aperture",
+                "fixed population",
+                "whole source segments",
+            ),
+            ("cpu.lockstep", "cpu.per-electron"),
+            output_slots=("photon_aperture",),
+            required_datasets=("epdl", "epdl-differential", "eadl"),
+        ),
+        ModelDescriptor(
             "transport.stopping",
             "sbethe",
             "montecarlo.transport.stopping",

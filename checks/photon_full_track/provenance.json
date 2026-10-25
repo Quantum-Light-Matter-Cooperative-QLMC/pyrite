@@ -1,0 +1,75 @@
+{
+  "schema": "photon-full-track-evidence.v1",
+  "run_date": "2026-10-24",
+  "tested_commit_before_rebase": "c2cb361a",
+  "jobs": {
+    "geant4": 2022,
+    "pyrite": 2324,
+    "angles": 2293
+  },
+  "staging_root": "~/.local/opt/pyrite-issue-341",
+  "proposal": {
+    "model": "bremslib-continuum-photon-only-cpu.v2",
+    "energy_log_share": 0.75,
+    "direction_forward_share": 0.75
+  },
+  "source_sha256_verified_against_remote": {
+    "src/pyrite/montecarlo/transport/photon_sources.py": "a7b286e259050d8fcb2e91d6d00a6be017a900752b58b20242e5c765a24f3457",
+    "src/pyrite/montecarlo/runner/photon_emission.py": "4150e74679a62c49f1f9d4108c02cf6f8a05060eff289d643a23b92f982b106b",
+    "checks/photon_full_track/pyrite_bench.py": "281fbeadf1b84701d933501750b714094e775d776048a647979327e2890b4557"
+  },
+  "raw_reduction_sha256": {
+    "reference/si_0p3mev.json": "837c78c1117c4bfc18b2d184d98fe2ed3b1e05e372d01c757a6092b8bff6b2ee",
+    "reference/si_10mev.json": "04b3f8934555b16452e52b53cfbf1d9c0438af1b22737aa7b81abf2c4fccd2f9",
+    "reference/si_1mev.json": "0f698aadbd2a537beda3eca1caeec129cdef9d209da7f2a4cf58d4a329cd0b93",
+    "reference/si_3mev.json": "ce848e69fbd918674cb5ce8c9353a4bac76f9597241f331d408edcbfaf5db613",
+    "reference/w_0p3mev.json": "4fa062b1260ca2c8a1d784009fbe012b232bd87f59dd74692a6ab8baf82fe7b9",
+    "reference/w_10mev.json": "fc2a884b27198ebd431dd08dfa8a360385e9ba1d5189c0f990194928a67792e7",
+    "reference/w_1mev.json": "18c4fa4ae286ee2ef2e2015a5b0c4bdf6219ec877842fe1320aab635084595ca",
+    "reference/w_3mev.json": "bb3a34451e62d0b5c41883604f55bb1e4c172fe28ac96b96eb2b82c88de29cc0",
+    "results/si_0p3mev.json": "dd7371f20d974e0cea0a64b3c0d105a9f200111e2ba6c68bf19494225f8747c1",
+    "results/si_10mev.json": "1d66d4bfeee62f4ac17d859b26b3f5e2947d73a63a2c0ab78dd313679196b6a9",
+    "results/si_1mev.json": "8d304a963516eea8346629593c44adf8bc765704b30a310154b13df84d0af165",
+    "results/si_3mev.json": "8d1897e29d4d93d8fb17c3d69964750a588905be670c680c7eeec01968e4bf13",
+    "results/w_0p3mev.json": "2d88311926126b1fb6b074288e52b04837ba617905919d4c8d65f5f367e181b2",
+    "results/w_10mev.json": "35c25708c1d40274ec4ce8af21bbcda011cd31ab4e723510efee44ec818420ca",
+    "results/w_1mev.json": "fe56939c4962f42630728a7e11a4de7a042409e7817be5b20f18dbd0a9240c17",
+    "results/w_3mev.json": "6ca08bddac1f887610b7441d8962987798b0fba8bf62b6c014daf33ff36e45db"
+  },
+  "committed_reduction_sha256": {
+    "reference/si_0p3mev.json.gz": "15afc28ea25244567e35824aa6231d008668679b9c86328ebff676611d147944",
+    "reference/si_10mev.json.gz": "426ec1ca841dd3046ee05fde3a7cb888695a1102e67b17000b0aed135152c371",
+    "reference/si_1mev.json.gz": "5f7236562dc92e627d7f56b838b448900428e4bae4b4764d6c71750751147d69",
+    "reference/si_3mev.json.gz": "743d6e1b7ae1f2417f076de2e037dff93db36e887166008af8fddf7355b266a1",
+    "reference/w_0p3mev.json.gz": "77653858e80fb66421c4e629cebf11ff00f0f40d825f07a7f73a016b9b56cc82",
+    "reference/w_10mev.json.gz": "d9df96eba091899f00bf308429882e8c0ceca8f01b8fd7020bede981d21ee7ba",
+    "reference/w_1mev.json.gz": "7188ff333f96b02934c41b189b8ef242d882476a3e5523c844b71d7547b618ea",
+    "reference/w_3mev.json.gz": "05f049d43eddfef0dd3a7a267c9b35d0f94c0bbeea00a88d4b8bb5c6cfd35cfd",
+    "results/si_0p3mev.json.gz": "80bd323c69a074c897bc7f7a2bdb2d974d2470f745435153da55d3804d691b20",
+    "results/si_10mev.json.gz": "535089bf9feeb4d12b7a6877245d646b33b94b0648d73cab877427381c9bf3ce",
+    "results/si_1mev.json.gz": "6dd3aaa0e474c940ae3b4f871d06889547c164a1390b53729d114b89f910e11b",
+    "results/si_3mev.json.gz": "69c85d12ee552f5a6e5b0aeb05c4a654ff87e28d6e36f02967ad758d9444dc6a",
+    "results/w_0p3mev.json.gz": "aff05a7519bfaf75c299cda89afb2052039b929a68fe035e260606cf98352a91",
+    "results/w_10mev.json.gz": "6e510cc687aa60deccc981fe3158693805c77b7bf8c62dc03963a68370fbcf3c",
+    "results/w_1mev.json.gz": "78e8322dd3d22223210b788a60b7b4203bd57fbdcd1d51c2796ccad3116f433a",
+    "results/w_3mev.json.gz": "932a377d21e93bf6e5a1cf3382eb9766da80ee04ac3ec3f7d4489a591b8cede3"
+  },
+  "gate_counts": {
+    "gated": 100,
+    "failed": 2
+  },
+  "failures": [
+    [
+      "w_0p3mev",
+      "R",
+      "1-10keV",
+      "redistributed"
+    ],
+    [
+      "w_0p3mev",
+      "R",
+      "1-10keV",
+      "redistributed_fraction"
+    ]
+  ]
+}

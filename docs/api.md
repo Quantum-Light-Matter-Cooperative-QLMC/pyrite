@@ -60,6 +60,34 @@ The workflow covers [results](guides/python-api-workflow.md#interpret-the-result
 [shared target/filter bodies](guides/python-api-workflow.md#reuse-bodies-as-targets-and-filters).
 For correlated imported beams, see [GDF beam import](guides/gpt-gdf-beams.md).
 
+The provisional photon-continuum reference has a separate
+[aperture tally artifact](research/physics/photon-scene-handoff.md#explicit-reduced-observation-persistence):
+`PhotonContinuumObservation.save(path)` and
+`pyrite.photon_observation.load_photon_continuum(path)` preserve reduced
+aperture spectra and provenance. These experimental objects are outside the
+supported API contract above. Their aperture-integrated spectra have units
+photons/(incident electron eV) and must not be added to `Result.brem`.
+The experimental low-level
+[`score_photon_sources`](research/physics/photon-secondary-feedback.md#explicit-event-source-aperture-scoring)
+boundary also scores explicit characteristic/annihilation source batches using
+the original incident-electron denominator.
+[`pyrite.photon_events.simulate_photon_events`](research/physics/photon-secondary-feedback.md#scene-physical-event-source-boundary)
+selects one physical event component from a Scene with retained charged cascades.
+Both remain outside the supported API contract. Physical event observations
+have a separate [reduced event tally artifact](research/physics/photon-secondary-feedback.md#reduced-event-observation-persistence),
+loaded with `pyrite.photon_event_observation.load_photon_events(path)`.
+These analysis artifacts are not production checkpoints or replay inputs.
+
+The experimental `Physics(photon_transport=PhotonTransport(...))` selector now
+adds a separate `Result.aperture` observation through the ordinary scalar
+simulation path, using one primary transport. `aperture_dataframe()` exposes
+histogram densities and bin counts; `current_nA=` scales to photons/s without
+reapplying acceptance. Enabled Case/checkpoint/CAS records preserve the aperture
+and its original pins; full artifact replay is supported and bounded replay is
+refused. See the [selection, units and persistence contract](repo-design/compute/photon-aperture.md).
+`PhotonTransport` and the aperture APIs remain provisional; pixel response,
+catalog/CLI selectors and full-track external validation remain open.
+
 ```{eval-rst}
 .. autosummary::
    :toctree: _autosummary

@@ -206,6 +206,47 @@ def test_detected_spectrum_normalization():
         detected_spectrum(histories, [1.0, 1.0], 1)
 
 
+@pytest.mark.parametrize("large_energy", [5e3, 2e4, 6e4])
+@pytest.mark.parametrize("reverse", [False, True])
+def test_detected_spectrum_keeps_small_hit_in_an_independent_bin(large_energy, reverse):
+    batch = list(_beam(2, large_energy))
+    batch[2][1] = 4e4
+    batch[3][0] = 1e20
+    if reverse:
+        batch = [array[::-1] for array in batch]
+    histories = _track(batch, [], aperture=FAR)
+    assert histories.exits["detected"].all()
+    expected = [2.5e15 if large_energy == 2e4 else 0.0, 2.5e-5]
+    np.testing.assert_array_equal(detected_spectrum(histories, [1e4, 3e4, 5e4], 2), expected)
+
+
+def test_detected_spectrum_preserves_bin_edges_and_discards_outside_hits():
+    batch = list(_beam(5, 2e4))
+    batch[2] = np.array([1e4, 3e4, 5e4, 8e3, 6e4])
+    batch[3] = np.array([1.0, 2.0, 4.0, 8.0, 16.0])
+    histories = _track(batch, [], aperture=FAR)
+    np.testing.assert_array_equal(
+        detected_spectrum(histories, [1e4, 3e4, 5e4], 2), np.array([1.0, 6.0]) / 4e4
+    )
+
+
+@pytest.mark.parametrize("column", [4, 5])
+@pytest.mark.parametrize("value", [2**63, 2**64 - 1])
+def test_source_ids_refuse_unsigned_values_outside_int64(column, value):
+    batch = list(_beam(1, 2e4))
+    batch[column] = np.array([value], dtype=np.uint64)
+    with pytest.raises(ValueError, match="fit in int64"):
+        _track(batch, [], aperture=FAR)
+
+
+def test_source_ids_preserve_the_largest_supported_label():
+    batch = list(_beam(1, 2e4))
+    batch[4] = batch[5] = np.array([2**63 - 1], dtype=np.uint64)
+    histories = _track(batch, [], aperture=FAR)
+    np.testing.assert_array_equal(histories.exits["history_id"], [2**63 - 1])
+    np.testing.assert_array_equal(histories.ledger["history_id"], [2**63 - 1])
+
+
 @pytest.mark.parametrize(
     "change,match",
     [

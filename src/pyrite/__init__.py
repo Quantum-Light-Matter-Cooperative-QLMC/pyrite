@@ -47,6 +47,7 @@ if TYPE_CHECKING:
     from pyrite._numerics_groups import ExecutionConfig as ExecutionConfig
     from pyrite._numerics_groups import RadiationNumerics as RadiationNumerics
     from pyrite._numerics_groups import TransportNumerics as TransportNumerics
+    from pyrite._photon_config import PhotonTransport as PhotonTransport
     from pyrite._precision import Precision as Precision
     from pyrite._sampling import AdaptiveSampling as AdaptiveSampling
     from pyrite._sampling import FixedSampling as FixedSampling
@@ -197,6 +198,7 @@ _PUBLIC_OBJECTS = {
     "BlazedGrooves": ("pyrite.campaign.geometry", "BlazedGrooves"),
     "CrystalCut": ("pyrite.campaign.geometry", "CrystalCut"),
     "Physics": ("pyrite._numerics", "Physics"),
+    "PhotonTransport": ("pyrite._photon_config", "PhotonTransport"),
     "TransportNumerics": ("pyrite._numerics_groups", "TransportNumerics"),
     "RadiationNumerics": ("pyrite._numerics_groups", "RadiationNumerics"),
     "ExecutionConfig": ("pyrite._numerics_groups", "ExecutionConfig"),

@@ -576,8 +576,10 @@ def test_photon_outside_epdl_domain_is_refused():
 @pytest.mark.slow
 def test_pre_adapter_seeded_cascade_baseline(monkeypatch):
     """Synthetic boosted photons exercise pair-electron generation, seed 11."""
+    from tests.helpers.photon_mode_off import exercise_photon_reference
     from tests.helpers.physics_baseline import assert_output_baseline, transport_signature
 
+    exercise_photon_reference(seed=11)
     with pytest.warns(UserWarning, match="not transported"):
         segments = _cascade(monkeypatch, pair_scale=1e9)
     events = segments["pair_production"]["events"]

@@ -11,6 +11,7 @@ import numpy as np
 
 from ..instrument import PlanarDetector
 from ..montecarlo import Case
+from .aperture import ApertureResult, aperture_dataframe
 from .provenance import Provenance
 from .spatial import (
     COMPONENTS,
@@ -118,7 +119,8 @@ class Result:
         ├── scene, numerics     what you asked for (shortcuts into provenance)
         ├── case                low-level resolved transport input (Case)
         ├── provenance          Provenance: identity, models, diagnostics, env
-        └── spatial             SpatialResult | None  per-pixel factors
+        ├── spatial             SpatialResult | None  per-pixel factors
+        └── aperture            photon tally | None  ordinary hits, integrated over aperture
 
     Every :class:`SpectralDensity` holds photons / incident electron / eV / sr
     on its own grid; no family includes another. Derived views:
@@ -145,6 +147,9 @@ class Result:
     spatial: SpatialResult | None
     """Factorized per-pixel data for pixelated planar detectors, else ``None``."""
 
+    aperture: ApertureResult | None
+    """Opt-in ordinary-hit tally, photons/(electron eV) integrated over the aperture."""
+
     def __init__(
         self,
         *,
@@ -156,6 +161,7 @@ class Result:
         case: Case,
         provenance: Mapping[str, Any],
         spatial: SpatialResult | None = None,
+        aperture: ApertureResult | None = None,
     ) -> None:
         if not isinstance(cxr, CxrSpectra) or not isinstance(brem, SpectralDensity):
             raise TypeError("Result requires cxr=CxrSpectra and brem=SpectralDensity")
@@ -175,6 +181,12 @@ class Result:
                 raise ValueError(f"{label} and CXR normalization must match")
         if spatial is not None and not isinstance(spatial, SpatialResult):
             raise TypeError("spatial must be a SpatialResult or None")
+        if aperture is not None:
+            from ..photon_event_observation import PhotonEventTally
+            from ..photon_observation import PhotonContinuumTally
+
+            if not isinstance(aperture, (PhotonContinuumTally, PhotonEventTally)):
+                raise TypeError("aperture must be a photon aperture tally or None")
         if case is None or provenance is None:
             raise TypeError("Result requires case and provenance")
         for name, value in (
@@ -189,8 +201,19 @@ class Result:
                 provenance if isinstance(provenance, Provenance) else Provenance(provenance),
             ),
             ("spatial", spatial),
+            ("aperture", aperture),
         ):
             object.__setattr__(self, name, value)
+
+    def aperture_dataframe(self, *, current_nA: float | None = None) -> pl.DataFrame:
+        """Aperture histogram; per electron by default, or per second at ``current_nA``.
+
+        Densities/counts and their units remain separate from :meth:`spectral_flux`.
+        Uses exact histogram edges and widths; no acceptance factor is reapplied.
+        """
+        if self.aperture is None:
+            raise ValueError("this Result has no photon aperture observation")
+        return aperture_dataframe(self.aperture, current_nA=current_nA)
 
     def combined_cxr(
         self,

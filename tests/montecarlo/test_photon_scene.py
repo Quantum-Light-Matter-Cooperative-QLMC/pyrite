@@ -129,6 +129,88 @@ def test_disjoint_and_touching_regions_are_valid():
     validate_photon_regions(layers, [tilted, touching])
 
 
+@pytest.mark.parametrize("center", [(0, 0, 0), (0, 0, 3e12), (3e12, -3e12, 3e12)])
+@pytest.mark.parametrize("half", [(1.0, 1.0, 1.0), (1e-15, 1e-15, 1e-15)])
+def test_coincident_boxes_are_rejected_at_every_position_and_scale(center, half):
+    box = _box(center=center, half=half)
+    with pytest.raises(ValueError, match="overlap"):
+        validate_photon_regions([], [box, box])
+
+
+@pytest.mark.parametrize("translation", [0.0, 3e12])
+@pytest.mark.parametrize("lateral_half", [1.0, 1e12])
+@pytest.mark.parametrize("separation", [1.5, 2.0, 2.5])
+def test_box_overlap_contact_and_gap_use_normal_extent(translation, lateral_half, separation):
+    # Exactly representable coordinates: a 0.5 Å penetration, contact, or gap.
+    half = (lateral_half, lateral_half, 1.0)
+    first = _box(center=(0, 0, translation), half=half)
+    second = _box(center=(0, 0, translation + separation), half=half)
+    if separation < 2.0:
+        with pytest.raises(ValueError, match="overlap"):
+            validate_photon_regions([], [first, second])
+    else:
+        validate_photon_regions([], [first, second])
+
+
+@pytest.mark.parametrize("translation", [0.0, 3e12])
+def test_translated_aperture_inside_thin_box_is_rejected(translation):
+    box = _box(center=(0, 0, translation), half=(1e12, 1e12, 0.25))
+    aperture = PhotonAperture((0, 0, translation), (1, 0, 0), (0, 1, 0), 1.0, 1.0)
+    with pytest.raises(ValueError, match="outside all modeled material"):
+        validate_photon_regions([], [box], surfaces=[aperture.region()])
+
+
+@pytest.mark.parametrize("angle", [5e-13, -5e-13])
+@pytest.mark.parametrize("infinite_stack", [False, True])
+def test_small_tilt_preserves_long_box_overlap(angle, infinite_stack):
+    # Independent strict-interior witness from photon-scene-navigation verification.
+    c, s = np.cos(angle), np.sin(angle)
+    axes = np.array([[c, 0.0, s], [0.0, 1.0, 0.0], [-s, 0.0, c]])
+    box = _box(center=(0.0, 0.0, 3.0), axes=axes, half=(1e13, 1.0, 1.0))
+    point = np.array([-3.0 / s, 0.0, 0.0])
+    local = axes @ (point - np.asarray(box.center_ang))
+    assert np.all(np.abs(local) < np.asarray(box.half_extent_ang))
+    if infinite_stack:
+        layers, boxes = [(-1.0, 1.0, list(CU))], [box]
+        assert -1.0 < point[2] < 1.0
+    else:
+        first = _box(half=(1e13, 1.0, 1.0))
+        assert np.all(np.abs(point) < np.asarray(first.half_extent_ang))
+        layers, boxes = [], [first, box]
+    with pytest.raises(ValueError, match="overlap"):
+        validate_photon_regions(layers, boxes)
+
+
+@pytest.mark.parametrize("separation", [7.0, 8.0])
+def test_small_tilt_long_box_contact_and_gap_are_allowed(separation):
+    angle = 5e-13
+    c, s = np.cos(angle), np.sin(angle)
+    axes = np.array([[c, 0.0, s], [0.0, 1.0, 0.0], [-s, 0.0, c]])
+    box = _box(center=(0.0, 0.0, separation), axes=axes, half=(1e13, 1.0, 1.0))
+    # Along world z, the box radius is 5 + 1 Å; the stack radius is 1 Å.
+    validate_photon_regions([(-1.0, 1.0, list(CU))], [box])
+
+
+@pytest.mark.parametrize("region", ["box", "stack", "surface"])
+def test_nearly_parallel_rods_keep_their_separating_cross_axis(region):
+    angle = 1e-10
+    axis = np.array([0.0, -1.0, 1.0]) / np.sqrt(2.0)
+    cross = np.array([[0.0, -axis[2], axis[1]], [axis[2], 0.0, 0.0], [-axis[1], 0.0, 0.0]])
+    rotation = np.eye(3) + np.sin(angle) * cross + (1 - np.cos(angle)) * (cross @ cross)
+    half = (1e12, 1.0, 1.0)
+    first = _box(half=half)
+    second = _box(center=10 * axis, axes=rotation.T, half=half)
+    # Independent certificate: axis dot long directions = 0; each radius = sqrt(2).
+    assert 10.0 > 2 * np.sqrt(2.0)
+    if region == "stack":
+        validate_photon_regions([(-1.0, 1.0, list(CU))], [second], width_ang=2e12, height_ang=2.0)
+    elif region == "surface":
+        surface = (np.asarray(second.center_ang), rotation.T, np.array([1e12, 1.0, 0.0]))
+        validate_photon_regions([], [first], surfaces=[surface])
+    else:
+        validate_photon_regions([], [first, second])
+
+
 def test_aperture_inside_material_raises():
     aperture = PhotonAperture((0, 0, 5.0), (1, 0, 0), (0, 1, 0), 1.0, 1.0)
     with pytest.raises(ValueError, match="outside all modeled material"):
@@ -203,7 +285,10 @@ def test_planar_detector_pose_maps_to_aperture_hit():
     assert np.isinf(aperture.intersect(np.zeros((1, 3)), edge[None, :])[0][0])
 
 
-def test_rotation_must_be_orthogonal():
+@pytest.mark.parametrize("rotation", [2 * np.eye(3), np.diag([-1.0, 1.0, 1.0])])
+def test_rotation_must_be_proper_orthogonal(rotation):
     pose = PlanarPose.from_observation(10.0, 0.0)
     with pytest.raises(ValueError, match="rotation"):
-        PhotonAperture.from_pose(pose, (1.0, 1.0), 2 * np.eye(3))
+        PhotonAperture.from_pose(pose, (1.0, 1.0), rotation)
+    with pytest.raises(ValueError, match="rotation"):
+        photon_box_from_pose(pose, (1.0, 1.0), 0.1, "Cu", rotation)

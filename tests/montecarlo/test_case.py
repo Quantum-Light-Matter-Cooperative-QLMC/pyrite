@@ -142,12 +142,14 @@ def test_pre_adapter_case_and_identity_baseline(monkeypatch, kind):
     from pathlib import Path
 
     from pyrite.xsgen._errors import TableNotFoundError
+    from tests.helpers.photon_mode_off import exercise_photon_reference
     from tests.helpers.physics_baseline import resolved_baseline
 
     def missing(_elements, **_kwargs):
         raise TableNotFoundError("baseline deliberately has no BremsLib installation")
 
     monkeypatch.setattr("pyrite.xsgen.bremslib.tables.load_bremsstrahlung_tables", missing)
+    exercise_photon_reference()
     if kind == "eedl-fallback":
         with pytest.warns(RuntimeWarning, match="bremslib"):
             actual = resolved_baseline(kind)

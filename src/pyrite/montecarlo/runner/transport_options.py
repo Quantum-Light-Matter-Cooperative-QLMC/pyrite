@@ -26,8 +26,16 @@ def _beam_kwargs(case):
     )
 
 
-def _check_opt_in_transport(case, trajectory_capture, block_electrons):
+def _check_opt_in_transport(
+    case, trajectory_capture, block_electrons, *, transport_core="auto", block_monitor=None
+):
     """Refuse transport options an opt-in component lacks, before any work (ADR-0017 tier 3)."""
+    if case.get("photon_transport") is not None:
+        from .photon_aperture import prepare_photon_case
+
+        if block_electrons is not None or block_monitor is not None:
+            raise ValueError("photon transport does not support block/adaptive transport")
+        prepare_photon_case(case, transport_core)
     if trajectory_capture is not None:
         refuse_channeling(case, "trajectory capture")
     if block_electrons is not None:

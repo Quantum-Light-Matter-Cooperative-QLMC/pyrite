@@ -163,6 +163,31 @@ limiting-case, trajectory replay and pair/positron energy-accounting tests.
 Hardware/backend parity, staged remote identity and dispatch overhead are later
 integration gates; these fixtures do not claim to have measured them.
 
+## Photon-transport mode-off compatibility (#341)
+
+The fixtures above retain their values and tolerances. Before checking the
+seven resolved-case/content-key/dataset-identity families, the tests execute
+the experimental weighted photon source, vacuum queue and aperture tally.
+The ELSEPA and pair-cascade output goldens also run after that diagnostic.
+
+For the legacy/EEDL-fallback, multilayer, coherent and coupled BremsLib output
+families, `tests/helpers/photon_mode_off.py` additionally runs real production
+`run_case` transport and scoring on both sides of the diagnostic, with the
+same fixed electron seed. Photon-MC entry points are replaced with failure
+guards only during the production runs; electron transport and emission are
+not stubbed. Every output array must keep its shape, dtype and bytes; output
+metadata, transport signatures and case-content identity must match exactly.
+Expected output arrays are copied before the diagnostic to expose aliasing
+or mutation. The historical golden comparison still uses its original
+cross-platform roundoff tolerances; it is not regenerated or tightened to a
+platform-specific byte snapshot.
+
+The coupled full-run check is explicitly slow because the first invocation
+can spend more than five seconds loading/compiling transport inputs. Use the
+focused `--slow ... -k pre_adapter` command above to include it. This is CPU
+compatibility evidence for the existing default path, not validation of
+photon interactions, charged feedback, GPU photon transport or full showers.
+
 ## Planar channeling family (#506)
 
 `channeling.json` adds one family captured after #506's selection plumbing,

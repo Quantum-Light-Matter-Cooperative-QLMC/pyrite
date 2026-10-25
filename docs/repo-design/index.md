@@ -39,6 +39,7 @@ compute/transport-precision-experiment.md
 compute/physics-preparation-adapters.md
 compute/emission-batch-adapters.md
 compute/extending-physics.md
+compute/photon-aperture.md
 compute/physics-adapter-overhead.md
 ```
 
