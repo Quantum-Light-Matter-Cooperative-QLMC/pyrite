@@ -34,6 +34,10 @@ physics/mos2-directional-loss-sources
 physics/transition-radiation-recommendations
 physics/optical-ir-emission
 physics/photon-transport
+physics/photon-continuous-sources
+physics/photon-continuous-scoring
+physics/photon-scene-handoff
+physics/photon-secondary-feedback
 ```
 
 ```{toctree}

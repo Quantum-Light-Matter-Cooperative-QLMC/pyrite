@@ -38,6 +38,7 @@ def test_root_exports_stay_frozen() -> None:
         "BlazedGrooves",
         "CrystalCut",
         "Physics",
+        "PhotonTransport",
         "TransportNumerics",
         "RadiationNumerics",
         "ExecutionConfig",

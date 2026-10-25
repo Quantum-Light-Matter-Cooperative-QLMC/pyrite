@@ -3,8 +3,9 @@
 Alternates the photon queue (``photon_histories``) with a charged stage that
 transports photon-born electrons and returns their hard bremsstrahlung
 photons, until no launch remains. :func:`cascade_charged_stage` runs the
-existing shell soft/hard cascade from an explicit launch. Positrons stay
-pending for the annihilation handoff. No production caller, source adapter,
+existing shell soft/hard cascade from an explicit launch. Electron-only
+stages retain pending positrons; ``photon_feedback`` supplies the optional
+electron/positron, vacancy and annihilation stage. No production caller,
 identity or device path. Coordinates are sample-frame Å, energies eV.
 """
 
@@ -19,6 +20,7 @@ import numpy as np
 from .pair_production import _mix
 from .photon_histories import (
     ELECTRON,
+    POSITRON,
     PhotonHistories,
     daughter_stream_key,
     track_photon_histories,
@@ -56,7 +58,10 @@ class ChargedStageResult:
     """Per launched row energy split [eV] and the photons the rows emitted.
 
     ``escaped + deposited + binding + radiated`` equals each row's launch
-    kinetic energy. ``photons`` holds ``position_ang (M, 3)``, ``direction``,
+    kinetic energy plus ``rest_energy_eV`` when a positron-capable stage
+    releases the pair reservoir. Escaped energy then includes escaped rest
+    energy. Binding retains terminal holes and signed table-energy defects.
+    ``photons`` holds ``position_ang (M, 3)``, ``direction``,
     ``energy_eV``, ``parent`` (launched-row index) and ``ordinal`` (that
     row's emission order, independent of batch composition); their energies
     sum to ``radiated_eV`` per parent.
@@ -67,10 +72,15 @@ class ChargedStageResult:
     binding_eV: np.ndarray
     radiated_eV: np.ndarray
     photons: Mapping[str, np.ndarray]
+    rest_energy_eV: np.ndarray | None = None
 
 
 class ChargedStage(Protocol):
-    """Transport launched electron rows; ``threshold_eV`` is the launch boundary."""
+    """Transport charged rows; ``threshold_eV`` is the electron launch boundary.
+
+    Optional ``transports_positrons=True`` also accepts in-stack positrons at
+    every kinetic energy and owns the returned ``rest_energy_eV`` reservoir.
+    """
 
     threshold_eV: float
 
@@ -153,7 +163,7 @@ def coupled_ledger_residual_eV(ledger: Mapping[str, np.ndarray]) -> np.ndarray:
     return ledger["incident_eV"] - sum(ledger[name] for name in LEDGER_TERMS)
 
 
-def _split_charged(charged, threshold_eV, layers, footprint):
+def _split_charged(charged, threshold_eV, layers, footprint, *, positrons=False):
     """Fates of one round's charged rows: launch, local, positron.
 
     Validation: photon-charged-coupling
@@ -163,15 +173,26 @@ def _split_charged(charged, threshold_eV, layers, footprint):
     above = charged["kinetic_eV"] > threshold_eV
     inside = _in_stack(position, layers, footprint["width_ang"], footprint["height_ang"])
     fate = np.where(electron, np.where(inside & above, "launched", "local"), "positron")
+    if positrons:
+        fate[~electron & inside] = "launched"
     return fate.astype("<U10")
 
 
 def _book_stage(ledger, rows, result: ChargedStageResult, cutoff_eV):
     """Book a stage's per-row split; return the returned photon batch.
 
-    Validation: photon-charged-coupling
+    Validation: photon-charged-coupling, photon-secondary-feedback
     """
     weight, history = rows["weight"], rows["history_id"]
+    if result.rest_energy_eV is not None:
+        from .pair_production import PAIR_THRESHOLD_EV
+
+        expected = np.where(rows["species"] == POSITRON, PAIR_THRESHOLD_EV, 0.0)
+        if not np.array_equal(result.rest_energy_eV, expected):
+            raise ValueError(
+                "charged stage must account for exactly one rest reservoir per positron"
+            )
+        ledger.add("positron_rest_eV", history, -weight * result.rest_energy_eV)
     ledger.add("charged_escaped_eV", history, weight * result.escaped_eV)
     ledger.add("charged_deposited_eV", history, weight * result.deposited_eV)
     ledger.add("charged_binding_eV", history, weight * result.binding_eV)
@@ -232,9 +253,11 @@ def track_coupled_histories(
     stage's ``threshold_eV``, so electrons at or below it deposit in the
     photon queue. Each later round hands the previous round's electrons above
     the threshold and inside a non-empty stack layer to ``charged_stage``;
-    electrons born outside it (filter boxes) deposit locally, and positrons
-    keep their kinetic energy pending (rest energy is already booked by the
-    photon queue) until the annihilation handoff. Returned photons above
+    electrons born outside it (filter boxes) deposit locally. Electron-only
+    stages keep positrons pending. A stage with ``transports_positrons=True``
+    accepts in-stack positrons even below threshold and replaces their
+    reserved rest energy by returned annihilation photons or escaped rest
+    energy. Returned photons above
     ``photon_cutoff_eV`` restart in the photon queue with key
     ``daughter_stream_key(charged key, ordinal)``, their parent's weight,
     history and root ``source_kind``; softer ones deposit at their vertex.
@@ -243,7 +266,7 @@ def track_coupled_histories(
     Per history: incident = photon terminal terms + charged escaped,
     deposited, binding, local, radiated-local, positron-pending and
     unresolved, to roundoff (:func:`coupled_ledger_residual_eV`).
-    Source: PENELOPE-2024 §1.4 secondary stack (scheduling order does not
+    Source: PENELOPE-2024 Chapter 7 §7.1 p.283 secondary stack (scheduling order does not
     change physical means); the stage's own transport claims.
     Validation: photon-charged-coupling
     """
@@ -251,6 +274,8 @@ def track_coupled_histories(
         raise ValueError("max_rounds must be a non-negative integer")
     if "electron_cutoff_eV" in photon_options:
         raise ValueError("electron_cutoff_eV is the charged stage's threshold_eV")
+    if getattr(charged_stage, "requires_stack_only", False) and photon_options.get("boxes"):
+        raise ValueError("this charged feedback stage does not support filter boxes")
     threshold = float(charged_stage.threshold_eV)
     footprint = {"width_ang": width_ang, "height_ang": height_ang}
     options: dict[str, Any] = dict(
@@ -266,7 +291,13 @@ def track_coupled_histories(
     while True:
         ledger.photon_round(batch)
         charged = dict(batch.charged)
-        fate = _split_charged(charged, threshold, layers, footprint)
+        fate = _split_charged(
+            charged,
+            threshold,
+            layers,
+            footprint,
+            positrons=getattr(charged_stage, "transports_positrons", False),
+        )
         launch = fate == "launched"
         if launch.any() and round_index >= max_rounds:
             fate[launch] = "unresolved"

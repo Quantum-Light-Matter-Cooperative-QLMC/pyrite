@@ -103,7 +103,9 @@ def build_case(scene: Scene, numerics: Numerics | None = None) -> Case:
         from ..montecarlo.channeling.planar_injection import source_record
 
         case = replace(case, channeling_source=source_record(scene.beam.state))
-    return case
+    from .photon_cases import resolve_photon_transport
+
+    return resolve_photon_transport(scene, case, numerics)
 
 
 def build_sweep_cases(sweep: Sweep, numerics: Numerics | None = None) -> list[Case]:
@@ -140,6 +142,10 @@ def build_sweep_cases(sweep: Sweep, numerics: Numerics | None = None) -> list[Ca
         sweep = replace(sweep, base=replace(sweep.base, numerics=numerics))
     cases = []
     for index, (label, scene) in enumerate(sweep.expand()):
+        if scene.physics.photon_transport is not None:
+            raise ValueError(
+                "photon transport currently requires a scalar Scene; sweeps are unsupported"
+            )
         case = build_case(scene)
         if label:
             case = replace(case, name=f"{case.name} {label}")

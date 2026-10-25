@@ -370,6 +370,7 @@ def slim_results(
     if case_names is not None:
         results = {name: by_E for name, by_E in results.items() if name in case_names}
     base = select_results(results, **constraints) if constraints else results
+    _refuse_photon_projection(base, fields)
     drop = set(_WIDE_BREM_FIELDS) if (fields is None and drop_wide_brem) else set()
     keep_keys = (set(fields) | {"case"}) if fields is not None else None
     out = {}
@@ -393,6 +394,16 @@ def slim_results(
         if new_by_E:
             out[name] = new_by_E
     return out
+
+
+def _refuse_photon_projection(results, fields) -> None:
+    """A selected aperture cannot survive a directional-only partial transfer."""
+    if fields is None or "photon_aperture" in fields:
+        return
+    for by_energy in results.values():
+        for record in by_energy.values():
+            if record.get("case", {}).get("photon_transport") is not None:
+                raise ValueError("partial photon checkpoints must retain photon_aperture")
 
 
 def _peak(r):

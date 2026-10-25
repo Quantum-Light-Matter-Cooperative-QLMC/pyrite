@@ -33,6 +33,9 @@ def directional_outputs(case, transport, n_hats, spectrum) -> dict[str, Any]:
     ``spectrum(case, transport)`` is the runner's spectrum phase (the GPU
     pipeline passes its recovery policy).
     """
+    from .photon_aperture import cached_photon_aperture
+
+    cached_photon_aperture(case, transport)
     directions = validated_directions(n_hats)
     E_grid, grid_record = resolve_observation_cxr_grid(
         case,
