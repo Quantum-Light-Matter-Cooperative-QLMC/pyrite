@@ -107,9 +107,8 @@ incidence; it is not a small-angle statement. The mean beam direction
 remains fixed. This geometrical alignment does not automatically cancel
 the photon/crystal phase: its remaining transverse coefficient is
 $-A^{\mathsf T}\mathbf q$.
-For a public scene this contract uses the resolved physical target angles:
-the existing scene-to-case conversion rounds target tilt and azimuth to
-the nearest half degree. The bunch-front descriptor retains full precision.
+For a public scene this contract uses the physical target angles. Target tilt,
+azimuth and the bunch-front descriptor retain full precision during lowering.
 
 For the specified phase convention, define
 $\mathbf q=\omega\hat{\mathbf n}+\mathbf g$, where
@@ -462,12 +461,13 @@ and actual scene-to-case checks for off-grid target angles.
 The owner corrected an initial raw-versus-resolved target-angle mismatch
 by reusing `target._angles()`, exactly as scene lowering does. Both the
 default line and inverse gradient now use the same resolved geometry as
-simulation. Independent direct ray checks used raw angle pairs
+simulation. At the time of that review, independent direct ray checks used raw angle pairs
 $(30.24^\circ,75.24^\circ)$ and $(30.25^\circ,-75.25^\circ)$, which lower
 to $(30^\circ,75^\circ)$ and $(30.5^\circ,-75.5^\circ)$ respectively.
 For HOPG $(102)$ at $1800\,\mathrm{eV}$ and the off-axis ray above,
 both corrected fronts leave phase-gradient residuals below
 $9\times10^{-16}\,\mathrm{\AA}^{-1}$ in the actual lowered geometry.
-The second case also verifies half-degree ties away from zero for a
-negative azimuth. **Final inverse verdict:** `rederived`; signs, frame
+Those measurements preceded removal of target-angle rounding. Current
+regressions preserve both raw angle pairs through lowering and exercise the
+independent ray-phase check at fractional target angles. **Final inverse verdict:** `rederived`; signs, frame
 rotations, transpose, line formula, and source-to-case geometry agree.

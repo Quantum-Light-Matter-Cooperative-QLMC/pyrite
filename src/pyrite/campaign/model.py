@@ -188,8 +188,7 @@ class Scene:
 
         Uses the beam energy, resolved target angles and the target crystal cut
         (catalog orientation unless the slab sets ``cut``).
-        Target angles follow the existing nearest-half-degree case resolution;
-        the returned bunch-front angles retain full precision.
+        Target and returned bunch-front angles retain full precision.
         ``hkl`` selects the reflection explicitly. By default the scalar
         detector's central direction is used; a planar detector requires an
         explicit lab-frame direction. A supplied direction is normalized.

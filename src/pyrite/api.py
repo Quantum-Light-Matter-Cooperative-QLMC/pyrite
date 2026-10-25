@@ -217,12 +217,12 @@ def build_configured_cases(old_sweep: Any, settings: Any) -> list[Case]:
 
 def simulate(
     beam: Any,
-    target: Any,
-    detector: Detector | PlanarDetector,
+    target: Any = None,
+    detector: Detector | PlanarDetector | None = None,
     *,
     physics: Physics | None = None,
     numerics: Numerics | None = None,
-    filters: tuple[FilterPlate | Filter, ...] = (),
+    filters: tuple[FilterPlate | Filter, ...] | None = None,
     acquisition: Acquisition | NativeAcquisition | None = None,
 ) -> Result:
     """Simulate one scene without reading or writing a checkpoint.
@@ -237,15 +237,19 @@ def simulate(
     Parameters
     ----------
     beam
-        Scalar :class:`~pyrite.Beam` description.
+        Scalar :class:`~pyrite.Beam` description, or a complete
+        :class:`~pyrite.Scene`. With a scene, omit target, detector, filters
+        and acquisition; physics and numerics may override its settings.
     target
         Scalar :class:`~pyrite.Target`, :class:`~pyrite.Slab` or :class:`~pyrite.Stack`.
     detector
         Scalar detector model or physical :class:`~pyrite.PlanarDetector`.
     physics
-        Emission and interaction models. ``None`` uses :class:`~pyrite.Physics`.
+        Emission and interaction models. ``None`` uses the scene's settings,
+        or :class:`~pyrite.Physics` for a component call.
     numerics
-        Sampling and execution controls. ``None`` uses :class:`~pyrite.Numerics`.
+        Sampling and execution controls. ``None`` uses the scene's settings,
+        or :class:`~pyrite.Numerics` for a component call.
     filters
         Ordered ``Filter`` or ``FilterPlate`` values; require a physical planar detector.
     acquisition
@@ -268,21 +272,8 @@ def simulate(
     -----
     This function performs no checkpoint I/O.
     """
-    if detector is None:
-        raise TypeError("simulate requires a detector; use directional_source for source maps")
-    resolved_numerics = Numerics() if numerics is None else numerics
-    if not isinstance(resolved_numerics, Numerics):
-        raise TypeError("numerics must be a Numerics")
-    resolved_physics = resolve_physics(physics, resolved_numerics)
-    scene = Scene(
-        beam=beam,
-        target=target,
-        detector=detector,
-        filters=filters,
-        acquisition=acquisition,
-        physics=resolved_physics,
-        numerics=resolved_numerics,
-    )
+    scene = _simulation_scene(beam, target, detector, physics, numerics, filters, acquisition)
+    resolved_numerics = scene.numerics
     case, xsgen_tables = _source_case(scene, resolved_numerics)
     if isinstance(scene.detector, PlanarDetector):
         return _simulate_planar(scene, resolved_numerics, case, xsgen_tables)
@@ -325,6 +316,52 @@ def simulate(
             **run_provenance(case, xsgen_tables),
         },
     )
+
+
+def _simulation_scene(
+    beam: Any,
+    target: Any,
+    detector: Detector | PlanarDetector | None,
+    physics: Physics | None,
+    numerics: Numerics | None,
+    filters: tuple[FilterPlate | Filter, ...] | None,
+    acquisition: Acquisition | NativeAcquisition | None,
+) -> Scene:
+    """Resolve component calls and immutable scene overrides before lowering."""
+    if isinstance(beam, Scene):
+        if (
+            target is not None
+            or detector is not None
+            or filters is not None
+            or acquisition is not None
+        ):
+            raise TypeError("with a Scene, omit target, detector, filters and acquisition")
+        scene = beam
+        resolved_numerics = scene.numerics if numerics is None else numerics
+        physics = scene.physics if physics is None else physics
+    else:
+        if target is None:
+            raise TypeError("simulate requires a target")
+        resolved_numerics = Numerics() if numerics is None else numerics
+        scene = None
+    if not isinstance(resolved_numerics, Numerics):
+        raise TypeError("numerics must be a Numerics")
+    resolved_physics = resolve_physics(physics, resolved_numerics)
+    if scene is None:
+        scene = Scene(
+            beam=beam,
+            target=target,
+            detector=detector,
+            filters=() if filters is None else filters,
+            acquisition=acquisition,
+            physics=resolved_physics,
+            numerics=resolved_numerics,
+        )
+    else:
+        scene = replace(scene, physics=resolved_physics, numerics=resolved_numerics)
+    if scene.detector is None:
+        raise TypeError("simulate requires a detector; use directional_source for source maps")
+    return scene
 
 
 def _source_case(scene: Scene, numerics: Numerics) -> tuple[Case, dict[str, str]]:

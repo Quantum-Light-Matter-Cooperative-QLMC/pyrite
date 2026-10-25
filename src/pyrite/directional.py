@@ -155,8 +155,7 @@ def directional_sources(
     Parameters
     ----------
     beam, target
-        Scalar public Beam and flat Slab, Stack or Target. Tilts use the shared
-        nearest-half-degree lowering convention. Grooves are unsupported.
+        Scalar public Beam and flat Slab, Stack or Target. Tilts retain full precision during lowering. Grooves are unsupported.
     energy_eV
         Explicit strictly increasing point grid starting at or above 10 eV, shared at every angle;
         at least two points and no photon energy above the incident electron.

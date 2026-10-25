@@ -54,7 +54,7 @@ unchanged `pyrite.trajectory-scene.v1` downstream geometry snapshot.
 | Runnable recipe | `MaterialSpec`, `MaterialCatalog.material`, `_parse.py` | Crystal reference, profile-resolved scan grids, optional substrate/stack, display identity and validation state |
 | Target description | `campaign/geometry.py::Slab`, `Stack`, `Layer` | Thickness, target tilt, footprint, crystal orientation and specialized layer/groove lowering; legacy campaign inputs can contain sequences |
 | Scalar scene | `campaign/model.py::Scene` | One scalar target; one observation model; ordered filters; rejects implicit multiple target thicknesses/angles |
-| Campaign variation | `Sweep`, `campaign/lowering.py` | Explicit path axes expand scenes; legacy adapters retain product ordering, quantized angles, names and seeds |
+| Campaign variation | `Sweep`, `campaign/lowering.py` | Explicit path axes expand scenes; legacy adapters retain product ordering, full-precision angles, names and seeds |
 | Downstream body | `instrument/model.py::FilterPlate` | Homogeneous composition, finite box dimensions, lab-frame centre/axes, optional display name |
 | Placement | `_planar_geometry.py::PlanarPose`, target lowering | Filter pose is independent of substance; target has sample-relative specialized orientation, not arbitrary lab translation |
 | Interaction capability | Target lowering versus `instrument/attenuation.py` | Source electron transport/radiation versus removal of primary photons; a shared shape supplies neither solver |
@@ -109,7 +109,7 @@ duplication; extraction must preserve each legacy boundary's accepted inputs,
 error behavior and ordered composition output before tightening any rules.
 
 Positive dimensions, finite values, and homogeneous material validation can
-share primitive checks. Target tilt quantization, groove-angle constraints,
+share primitive checks. Target angle validation, groove-angle constraints,
 layer ordering, filter overlap and downstream-volume checks remain specific.
 Serialization can consume the same resolved description while retaining
 separate case, observation and trajectory encoders. Equal-looking field names
@@ -277,8 +277,7 @@ Keep substance densities in atoms per cubic Å. Keep current target thickness
 and groove spacing in Å, footprints in mm, public angles in degrees, and
 downstream dimensions/positions in mm. A rectangular adapter uses mm and
 converts thickness explicitly: `1 mm = 10_000_000 Å`. It must not round or
-quantize dimensions during conversion. Existing target angle quantization
-remains in target lowering.
+quantize dimensions during conversion. Target angles retain full precision in target lowering.
 
 The lab origin is the target reference entrance origin, not the slab centre.
 Filter `pose.center_mm` is the box centre; the normal points downstream with

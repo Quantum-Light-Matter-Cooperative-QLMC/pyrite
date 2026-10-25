@@ -184,10 +184,12 @@ def test_simulate_returns_partial_filter_spatial_result_and_observation_identity
         numerics=pr.Numerics(cxr_trials=1, brem_trials=1),
     )
     result = pr.simulate(
-        pr.Beam(30.0, transverse=pr.Spot(), longitudinal=pr.PointBunch()),
-        pr.Slab("hopg", 1_000.0, tilt_deg=30.0, footprint=pr.Footprint(5.0, 5.0)),
-        _detector(),
-        **kwargs,
+        pr.Scene(
+            pr.Beam(30.0, transverse=pr.Spot(), longitudinal=pr.PointBunch()),
+            pr.Slab("hopg", 1_000.0, tilt_deg=30.0, footprint=pr.Footprint(5.0, 5.0)),
+            _detector(),
+            **kwargs,
+        )
     )
 
     assert result.spatial is not None
@@ -271,11 +273,13 @@ def test_acquisition_enabled_simulation_exposes_layered_identity(monkeypatch) ->
         numerics=pr.Numerics(cxr_trials=1, brem_trials=1),
     )
     first = pr.simulate(
-        pr.Beam(30.0, transverse=pr.Spot(), longitudinal=pr.PointBunch()),
-        pr.Slab("hopg", 1_000.0, tilt_deg=30.0, footprint=pr.Footprint(5.0, 5.0)),
-        detector,
-        acquisition=acquisition,
-        **kwargs,
+        pr.Scene(
+            pr.Beam(30.0, transverse=pr.Spot(), longitudinal=pr.PointBunch()),
+            pr.Slab("hopg", 1_000.0, tilt_deg=30.0, footprint=pr.Footprint(5.0, 5.0)),
+            detector,
+            acquisition=acquisition,
+            **kwargs,
+        )
     )
     rescored = pr.simulate(
         pr.Beam(30.0, transverse=pr.Spot(), longitudinal=pr.PointBunch()),

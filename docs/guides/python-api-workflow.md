@@ -555,8 +555,8 @@ Bodies and wrappers are frozen scalar records; sweep axes expand before case
 lowering. Filter body and pose axes work similarly, for example
 `filters[0].body.thickness_mm` or `filters[0].pose.center_mm`. Existing
 `Slab`/`Stack` constructors and their Å-based thickness fields retain their
-meaning. `Target.to_slab()` converts mm to Å without rounding and preserves
-the established target angle quantization during case construction.
+meaning. `Target.to_slab()` converts mm to Å without rounding; target tilt and azimuth
+retain full precision during case construction.
 `Scene.target_spec` and `Scene.filter_plates` expose the legacy values for
 source, observation and trajectory consumers. `ResolvedObservation` continues
 to take fully lowered plates; use `scene.filter_plates` there.
@@ -655,10 +655,8 @@ planar detector. This method currently supports a flat single slab and matches
 its mean crystal orientation -- the catalog cut or the slab's `CrystalCut`,
 resolved exactly as the simulated case resolves it -- rather than every mosaic
 orientation.
-Target tilt and azimuth follow the existing nearest-half-degree case
-resolution. The helper uses those resolved angles; bunch-front angles retain
-full precision. Thus match the resolved entrance-face angles when setting a
-parallel front manually.
+Target tilt, azimuth and bunch-front angles retain full precision. The helper
+uses the same entrance-face angles as the simulated case.
 
 ### Crystal cuts
 
@@ -682,8 +680,7 @@ The lattice rotation is `R_miscut @ R_roll @ R_axis`. `surface_hkl` and
 `beam_uvw` are mutually exclusive integer axes and are unrelated to the
 reflections being scored. `miscut_deg` cuts the face that far off the selected
 plane (toward `miscut_azim_deg`), giving a continuous orientation, since integer
-surface planes alone rarely give an exact energy match. Target tilts are still
-quantized to half a degree; miscut angles are not.
+surface planes alone rarely give an exact energy match. Target tilts and miscut angles both retain full precision.
 
 Omitting the cut, or passing `CrystalCut()` or the catalog axis, leaves the
 case payload and identity unchanged. An explicit cut adds `azimuth_rad` and

@@ -53,12 +53,9 @@ def _seq(x):
     return np.atleast_1d(np.asarray(x, dtype=float))
 
 
-def _quantized_angles(values: ScalarOrSeq) -> np.ndarray:
-    """Round degrees to nearest half away from zero at ties, then stable-unique."""
-    source = _seq(values)
-    scaled = source * 2.0
-    quantized = np.copysign(np.floor(np.abs(scaled) + 0.5), scaled) / 2.0
-    return np.asarray(list(dict.fromkeys(float(value) for value in quantized)), dtype=float)
+def _unique_angles(values: ScalarOrSeq) -> np.ndarray:
+    """Preserve degree values and order, removing only exact duplicates."""
+    return np.asarray(list(dict.fromkeys(float(value) for value in _seq(values))), dtype=float)
 
 
 def substrate_composition(substrate):
@@ -581,8 +578,8 @@ class _TargetGeometry:
     # -- validity -------------------------------------------------------------
 
     def _angles(self) -> tuple[np.ndarray, np.ndarray]:
-        """Quantize before validating: the checks must see the angles cases use."""
-        return _quantized_angles(self.tilt_deg), _quantized_angles(self.tilt_azim_deg)
+        """Validate the exact angles used by cases."""
+        return _unique_angles(self.tilt_deg), _unique_angles(self.tilt_azim_deg)
 
     def _validate_geometry(self) -> None:
         if self.footprint is not None and not isinstance(self.footprint, Footprint):
