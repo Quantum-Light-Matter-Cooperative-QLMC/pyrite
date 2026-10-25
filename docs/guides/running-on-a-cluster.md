@@ -1,234 +1,236 @@
-# Running on a cluster (SLURM)
+# Running on a cluster (SLURM and Dask)
 
-`pyrite run [PROFILE] -m MATERIAL` is the headless entry point for one profile member. Canonical full runs write `pyrite-output/checkpoints/<material>/{line,brem,characteristic}.h5`; overridden runs (and existing `--survey` datasets) use identity-qualified directories. This makes the command a clean fit for any batch scheduler without the optional lab-box helper below. Install once, submit one job per material, then pull checkpoints back for local analysis or static-HTML export. See [Sweep fidelity and dataset identity](sweep-profiles.md) for the complete naming contract.
+PyRITE can schedule independent simulation cases locally, as native SLURM job
+arrays, or through Dask. **Execution profiles** select *where* cases run;
+`Numerics` and `ExecutionConfig` select numerical methods and local kernel
+settings. Changing the executor does not change the physics case identity or
+random seeds.
 
-> The scripts below are **templates** — partition names, the CUDA module, account
-> strings, and resource limits are site-specific. Adapt them to your cluster.
+Distributed execution is **experimental**: validate a small workload on your
+cluster before relying on multi-node results or scaling estimates.
 
-## 1. Install on the cluster
+## Choose an execution mode
 
-The project is uv-managed with a committed lockfile. On the login node:
+| Mode | Select with `--execution` | When to use it |
+| --- | --- | --- |
+| Normal local run | omit the flag, or `local` | One workstation/node; retains PyRITE's usual CPU/GPU scheduling |
+| Native SLURM | `slurm-cpu` or a custom SLURM profile | Independent cases as job-array tasks; no Dask required |
+| Local Dask | `dask-local` | Test Dask dispatch on one machine |
+| Dask on SLURM | custom Dask profile with `cluster = "slurm"` | Provision CPU Dask workers using `dask-jobqueue` |
+| Existing Dask scheduler | custom Dask profile with `cluster = "existing"` | Join an available CPU or properly isolated GPU cluster |
+
+The separately configured `pyrite run --remote` workflow synchronizes to an
+SSH host and submits jobs through that host's SLURM setup. **Do not combine
+`--remote` with `--execution`.**
+
+## Prepare the environment
+
+On the coordinator and every worker, use compatible Python/PyRITE versions,
+physics tables and material data. From a source checkout, install the locked
+environment with `uv sync`; add Dask only when using its backend:
 
 ```bash
-uv tool install "pyrite-mc[nvidia]"  # ROCm and Intel support are unmaintained
-pyrite --help  # sanity check
+uv sync --extra dask       # includes distributed and dask-jobqueue
+uv run pyrite tables verify
 ```
 
-Set `PYRITE_MC_BACKEND` explicitly in production jobs when silently changing hardware would be wrong. Automatic selection may fall back to CPU; explicit `cuda`, `rocm`, or `sycl` errors if unavailable or over budget.
+For an installed tool rather than a checkout, the Dask extra is
+`uv tool install 'pyrite-mc[dask]'`. Add the appropriate accelerator extra
+only where needed. Set `PYRITE_MC_BACKEND=cpu` for CPU-only experiments, or
+select an explicitly supported GPU backend on an allocated GPU node.
 
-## 2. One material per job
+Distributed runs require:
 
-Submit with `sbatch run_pyrite.sh mose2`:
+- A **shared POSIX filesystem at the same absolute path** for the coordinator
+  and workers, with compatible locking and atomic-rename behavior. Case input,
+  work-unit status and immutable output artifacts are staged there.
+- SLURM CLI tools (`sbatch`, `squeue`, `scancel`) for native arrays; working
+  scheduler-to-worker TCP connectivity for Dask.
+- A Python executable importable on workers, available physics data and enough
+  allocated RAM/VRAM for each work unit. The coordinating process must remain
+  running until work finishes; run it in an appropriate allocation when site
+  policy requires one.
+
+## Run and inspect a profile
+
+Built-in smoke-oriented profiles need no TOML file:
 
 ```bash
-#!/usr/bin/env bash
-#SBATCH --job-name=pyrite-scan
-#SBATCH --partition=gpu          # <-- your GPU partition
-#SBATCH --gres=gpu:1
-#SBATCH --cpus-per-task=8
-#SBATCH --mem=16G
-#SBATCH --time=04:00:00
-#SBATCH --output=pyrite-%x-%j.out
-
-set -euo pipefail
-module load cuda/13.x            # <-- match the cupy-cuda13x wheel (omit for CPU)
-cd "$SLURM_SUBMIT_DIR"
-source .venv/bin/activate        # or install once with `uv tool install .`
-
-MATERIAL="${1:?usage: sbatch run_pyrite.sh <material>}"
-pyrite run standard -m "$MATERIAL"
+pyrite run standard -m hopg                          # unchanged default
+pyrite run standard -m hopg --execution dask-local
+pyrite run standard -m hopg --execution slurm-cpu --execution-plan
+pyrite run standard -m hopg --execution slurm-cpu
 ```
 
-On an accelerator node one main-process device context handles spectrum/bremsstrahlung while a process pool prepares CPU electron transport, so `--cpus-per-task` supplies those transport workers. For a **CPU-only** partition, drop `--gres` and the CUDA module; `run_cases` uses a full-case worker pool capped by both core count and available memory. Pass `--workers $SLURM_CPUS_PER_TASK` to request the allocation's CPU count; the memory cap still applies. The two pools carry different per-worker RAM budgets: `PYRITE_MC_WORKER_MEM_MB` (default 6144) for full-case CPU workers, `PYRITE_MC_PIPELINE_WORKER_MEM_MB` (default 1536) for the transport-only workers behind a GPU. A pinned `--workers` clamped by either budget now warns.
+`--execution-plan` resolves the cases and prints *requested* CPU, GPU, memory,
+work-unit and retry counts. It does not submit, reserve resources or predict
+runtime. `slurm-cpu` requests only one CPU per array task by default; use a
+site-specific profile for substantial runs.
 
-## 3. Several materials as a job array
+Create `execution.toml` for a named cluster configuration, then select its
+name with `--execution NAME --execution-config execution.toml`.
 
-One array task per material — they run independently and write their own component checkpoints:
+### Native SLURM array (CPU)
 
-```bash
-#!/usr/bin/env bash
-#SBATCH --job-name=pyrite-sweep
-#SBATCH --partition=gpu
-#SBATCH --gres=gpu:1
-#SBATCH --cpus-per-task=8
-#SBATCH --mem=16G
-#SBATCH --time=04:00:00
-#SBATCH --array=0-3              # <-- 0..N-1 for the N materials below
-#SBATCH --output=pyrite-%x-%A_%a.out
+```toml
+[execution.cpu-array]
+backend = "slurm"
+max_attempts = 3
 
-set -euo pipefail
-module load cuda/13.x
-cd "$SLURM_SUBMIT_DIR"
-source .venv/bin/activate        # or install once with `uv tool install .`
+[execution.cpu-array.resources]
+cpu_cores = 8
+memory_bytes = "32GiB"
+accelerator = "cpu"
 
-MATERIALS=(mose2 wse2 mos2 hopg)            # indexed by $SLURM_ARRAY_TASK_ID
-pyrite run standard -m "${MATERIALS[$SLURM_ARRAY_TASK_ID]}"
+[execution.cpu-array.slurm]
+partition = "cpu"                  # adapt to your site
+walltime = "02:00:00"
+max_concurrent = 8
+cases_per_task = 2
+# python_executable = "/shared/venv/bin/python"
 ```
 
-## 4. Retrieve and visualize locally
-
-The checkpoints are the only output you need off the cluster:
-
-<!-- verify: skip (rsync to a login node, not a pyrite/pyrite-dev command) -->
 ```bash
-rsync -avz login-node:~/pyrite/pyrite-output/checkpoints/ ./pyrite-output/checkpoints/
+pyrite run standard -m hopg --execution cpu-array \
+  --execution-config execution.toml --execution-plan
+pyrite run standard -m hopg --execution cpu-array \
+  --execution-config execution.toml
 ```
 
-Then run `pyrite app analysis launch <material>` (the `src/pyrite/apps/analysis_app.py` marimo app) or run `pyrite app analysis export` locally — all interactive visualization and static-HTML export stay on your workstation.
+For a native **GPU** array, use a separate profile with `gpu_count = 1`,
+`accelerator = "cuda"` (or `"rocm"`), a GPU partition, and an appropriate
+`gres`, such as `gpu:1`. One GPU is supported per work unit. SLURM and the
+site's device settings must enforce real hardware isolation.
 
-## Notes
+### Dask with SLURM-provisioned CPU workers
 
-- **`__main__` guard:** `pyrite run` (and the `python -m pyrite._entry.scan` shim) are properly guarded, so the `spawn` / `forkserver` transport workers are safe. Don't wrap the sweep in an unguarded `python -c "…"`.
-- **`--quick`** runs a tiny smoke grid into the `<material>_quick/` component directory — use it to validate your sbatch script cheaply before submitting the full sweep.
-- **fp64:** set `PYRITE_FP64=1` for double-precision reference runs (the GPU path defaults to fp32). Devices without native fp64 (e.g. Intel Arc/integrated GPUs) are refused regardless of `PYRITE_FP64`: explicit selection errors and automatic selection runs on CPU.
-- **small devices:** `PYRITE_MC_RESOURCE_POLICY=auto` selects `conservative` below 8 GiB and admits chunks before allocation. Use `balanced` or `throughput` only after measuring headroom on the target node.
-- **runtime pins on remote runs:** `pyrite run --remote` copies `PYRITE_MC_TRANSPORT_CORE`, `PYRITE_MC_RESOURCE_POLICY`, and `PYRITE_MC_MIN_CHUNK` from the submitting shell into the job script; other variables do not reach the job. For example, `PYRITE_MC_TRANSPORT_CORE=cuda pyrite run PROFILE --remote` forces device transport below the automatic electron-count threshold.
+Dask can request CPU worker allocations through `dask-jobqueue`:
 
-## Lab-box remote helper
+```toml
+[execution.cpu-dask]
+backend = "dask"
+max_attempts = 2
 
-`pyrite remote` syncs the current working tree to the configured lab host and submits every CXR compute run through SLURM. Each allocation requests one node, one task, and the configured SLURM target profile: `remote.partition` (default `gpu`), optional `remote.nodelist` (default `any`, no `--nodelist`), and `remote.gres` (default `gpu:1`). Default `--chunk-minutes 10` runs one material at a time in bounded, self-resubmitting slices. `--chunk-minutes 0` selects a monolithic `UNLIMITED` allocation; only that mode accepts `--parallel-materials`, defaults to one material, and caps concurrency at four. It uses the synced project's configured `uv` environment, not the WarpX-specific `warpx-user` Conda environment. `remote.gpu_vendor` (`PYRITE_REMOTE_GPU_VENDOR`, default `nvidia`) selects the job prelude. NVIDIA jobs start with `module purge`, then load `cuda`, `openmpi`, and `hdf5`. AMD jobs load no modules. They sync into their own `.venv-amd` with `CUPY_INSTALL_USE_HIP=1 uv sync --extra amd`, which builds CuPy against the node's ROCm toolchain (`ROCM_HOME`, default `/opt/rocm`). They also pin `PYRITE_MC_BACKEND=rocm`, so a missing HIP stack fails the job instead of falling back to CPU, and they log `rocminfo` gfx and `rocm-smi` output in the job-log header. `--nsys` needs an NVIDIA target. `intel` still fails before batch-script generation. Every compute node must see the head node's `PYRITE_REMOTE_DIR` at the same path on a shared filesystem: the batch script, job bookkeeping (`jobs/<id>/`), reservations, progress, and checkpoints all live there, and `job status`, `job logs`, and `remote pull` read them from the head node. `job status` ranks each job within the partition its own `run.sh` requested.
+[execution.cpu-dask.resources]
+cpu_cores = 8
+memory_bytes = "32GiB"
+accelerator = "cpu"
 
-For example, to target the AMD node `amd-node` behind the `cluster-head` head node:
-
-```bash
-pyrite config set remote.target cluster-head
-pyrite config set remote.gpu_vendor amd
-pyrite config set remote.partition gpu-amd
-pyrite config set remote.nodelist amd-node
-pyrite config set remote.gres gpu:radeon8060s:1
-pyrite run --quick -m hopg --remote --dry-run
+[execution.cpu-dask.dask]
+cluster = "slurm"
+partition = "cpu"                  # adapt to your site
+walltime = "01:00:00"
+workers = 2
+max_workers = 6
+adaptive = true
+cases_per_task = 2
+max_in_flight = 12
 ```
 
-Switch back with `remote.gpu_vendor nvidia`, `remote.partition gpu`, `remote.nodelist any`, and `remote.gres gpu:1`, or override one command with the matching `PYRITE_REMOTE_*` variables.
-
-Remote configuration. There is no built-in host: set the SSH-config alias with `pyrite config set remote.target HOST` (or `PYRITE_REMOTE_HOST`, or `-R HOST` per command). The checkout directory and `uv` executable on that host default to `~/pyrite` and `~/.local/bin/uv`; `sync` creates the checkout directory if it is missing. A leading `~` is resolved to the remote login home with one cached, non-interactive `ssh` call per process, so everything downstream (scripts, `scp` paths) sees an absolute path; if that call fails the command stops and asks for absolute paths. Override with `PYRITE_REMOTE_DIR` and `PYRITE_REMOTE_UV` (absolute POSIX paths, `~/...` paths, or for `uv` a bare executable name on the remote non-interactive `PATH`). The precedence table is in [configuration resolution](../repo-design/configuration-resolution.md).
-
-Cross-section tables. `sync` also guarantees the box holds every xsgen table it needs under `<REMOTE_DIR>/xsgen/tables`: the pinned BremsLib and ELSEPA releases plus any tables generated locally. It inventories the box with `sha256sum` in the same ssh round trip as the energy-grid artifacts and ships only missing or differing `.npz`/`.json` pairs, so a second sync sends no table bytes and a truncated or edited table is replaced. Remote jobs and direct remote commands explicitly set `PYRITE_HOME=<REMOTE_DIR>`: this synced user tier takes precedence over the box's ambient workspace/configuration, including `~/.pyrite/workspace`. The only fallback is the packaged tier shipped with `src/pyrite`; arbitrary workspaces are not inventoried or repaired. For a manual shell invocation, set the same `PYRITE_HOME` to use the synced store. Tables found in the box's legacy `~/.local/share/pyrite/xsgen/tables` are copied into the synced tier first, without overwriting. (Locally, `pyrite tables migrate` does the same for an explicit workspace; the legacy tier stops being searched in 0.5.0.) A sync refuses, naming `pyrite tables fetch CODE --archive PATH`, when a pinned table is missing or corrupt locally.
-
-Table loads verify the array payload against the manifest's `arrays_sha256`, once per unchanged file per process (path, mtime, size and file identity). A mismatch raises `TableCorruptError` with the key, path and repair instructions; runs never silently fetch replacements. `pyrite tables verify` also reports these payload failures as `corrupt`.
-
-Historical lab-box data: runs from **2026-09-28 through 2026-10-22** that read ELSEPA tables from `~/.pyrite/workspace/xsgen/tables` are suspect. That store contained five-angle synthetic stubs retaining production manifests; verified tables were restored on 2026-10-22. CPU/CUDA parity checks compared like with like and are unaffected as parity evidence; they did not establish the physical validity of those tables.
-
-Fetched datasets. The EPICS2025 EEDL and EADL files and PyRITE's derived EPDL photon table (`pyrite tables fetch eedl`, `eadl`, `epdl`, or a bare `pyrite tables fetch` for everything) no longer ride in the code payload. The box needs no GitHub token: PyRITE's private release archives reach it only through `sync`, never by a fetch on the box. `sync` ships them once, byte for byte, to `<REMOTE_DIR>/datasets/<name>/`, in the same inventory round trip and by the same content-digest rule, so a box without internet access gets them from the laptop. A box synced before #263 still holds copies under `src/pyrite/data/characteristic_cross_sections/`; the inventory copies those into place first, without overwriting, and the digest check replaces a bad copy. A sync refuses, naming `pyrite tables fetch NAME`, when a dataset is missing or differs locally. The table-set digest, stamped as `code_tables_digest`, covers the datasets too.
-
-SBETHE reference data. Every run of the default shell model reads SBETHE's `sdbase/` (`pdatconf.p14`), installed locally by `pyrite tables fetch sbethe`. It is a separately licensed download (fetched from PyRITE's release mirror of the upstream archive, else Mendeley Data), so `sync` copies your own fetched copy, all ~600 files (18 MB), to `<REMOTE_DIR>/xsgen/reference-data/sbethe/sdbase/` by the same content-digest rule, in the same round trip; a second sync sends nothing. A box fetched by hand earlier holds it in `~/.local/share/pyrite/xsgen/reference-data/sbethe/sdbase/`; when the synced location is absent, the inventory copies that whole directory into place first, so only differing files ship. A sync refuses, naming `pyrite tables fetch sbethe`, when the local copy is missing or its `pdatconf.p14` differs from the pin. The table-set digest covers these files too.
-
-Every job runs `pyrite tables verify --require bremslib,elsepa,sbethe-tables,eedl,eadl,epdl,sbethe` before its sweep and ends in `FAILED (tables)` when a pinned table, dataset, or `sdbase/` is absent or differs.
-
-One shared checkout, one code identity. `sync` unpacks into a single directory on the box, so a second working tree syncing mid-run would otherwise rewrite `src/pyrite` and `checks/` underneath a job that is already running — silently mixing two revisions into one set of results. Each sync therefore identifies its payload by content (every synced file's arcname plus its content hash, after the CRLF→LF normalization, so a Windows and a Linux checkout of the same code agree) and records that identity in `<REMOTE_DIR>/.pyrite-sync` as the last step of a successful extraction, together with the local `git` revision, a dirty flag, a timestamp, and the source host and worktree. Submission copies those `code_` fields into each job's `jobs/<id>/meta`, so a job's code identity is fixed when it is queued, and evidence collected on the box can name a revision even though the remote checkout is an exported tree rather than a repository.
-
-Syncs are serialized. `sync` holds an exclusive `flock` on `<REMOTE_DIR>/.pyrite-sync.lock` (through one long-lived ssh session, so it works for any transfer transport and is released if the client dies) from the live-job check through the stamp; a second sync waits up to five minutes, then fails with a clear message. Each upload goes to its own `/tmp/pyrite_code.<digest>.<id>.tgz`, which only that sync extracts and removes. The tarball is unpacked into a staging directory first, so a truncated or corrupt upload fails before the live tree or `.pyrite-sync` is touched; only then are stale `.py` files removed and the staged tree copied over. A job's batch script takes the same lock shared, briefly, before its payload, so it never starts importing mid-sync.
-
-Code transfer uses rsync when this machine and the box both have it, so a sync after a one-file edit sends about that file instead of the whole tree. Each sync path (`src/`, `checks/`, `vendor/`, and the top-level files) is mirrored on its own with `--checksum --delete --delay-updates`, so a file deleted locally is deleted on the box too, and updated files are renamed into place only at the end of each transfer. `--delete` only ever targets one sync path, or `external-catalog/`, so `pyrite-output/checkpoints/`, `jobs/`, `.venv`, `.pyrite-sync` and the xsgen tables are never in its reach. The box's own `__pycache__` survives inside live directories. Energy-grid artifacts and the legacy pre-#263 dataset copies stay on the content-delta path above. The tar+scp path described above is the fallback, used on native Windows, when either end lacks rsync, and when a synced text file has CRLF line endings (rsync cannot normalize them). `PYRITE_SYNC_TRANSPORT=tar` forces it; `PYRITE_SYNC_TRANSPORT=rsync` fails instead of falling back. The payload digest and stamp are the same for both transports. `pyrite remote sync -v` prints the chosen transport (and, for tar, why), plus rsync `--stats` for each transfer.
-
-
-A sync then refuses, before transferring anything, when a live job recorded a different payload identity — naming the job, its recorded digest and revision, and the incoming one. Syncing the *same* payload is silent, so starting a second material during a long run keeps working. Jobs queued before code stamping record no identity; they are reported as unverifiable rather than treated as a conflict. Override with `pyrite remote sync --force`, which proceeds and warns, naming every live job whose remaining steps may now import a different revision than they started with:
-
 ```bash
-pyrite remote sync --force
+pyrite run standard -m hopg --execution cpu-dask \
+  --execution-config execution.toml
 ```
 
-Review the exact batch script and `sbatch --parsable` submission command without contacting the lab box:
+This mode creates a Dask scheduler in the **coordinator process**, then
+launches SLURM CPU workers. The workers must be able to connect back to that
+scheduler; cluster network policies may require the coordinator to run on a
+compute node instead of a login node. Automatic GPU worker provisioning is
+**not supported** here.
+
+### Dask with an existing scheduler (CPU or GPU)
+
+```toml
+[execution.existing-dask]
+backend = "dask"
+max_attempts = 3
+
+[execution.existing-dask.resources]
+cpu_cores = 4
+memory_bytes = "8GiB"
+accelerator = "cpu"
+
+[execution.existing-dask.dask]
+cluster = "existing"
+scheduler_address = "tcp://scheduler.internal:8786"  # site-specific
+workers = 2
+cases_per_task = 2
+max_in_flight = 4
+```
+
+Use the same CLI pattern with `--execution existing-dask`.
+
+GPU Dask requires a **preconfigured existing scheduler**. Change the resource
+request to `gpu_count = 1` and `accelerator = "cuda"` or `"rocm"`, configure
+workers with `GPU=1` Dask resources, and ensure each worker actually receives
+an isolated device (`CUDA_VISIBLE_DEVICES`, `ROCR_VISIBLE_DEVICES`, or
+`HIP_VISIBLE_DEVICES`). A Dask resource label alone does **not** isolate a GPU.
+PyRITE runs the existing single-GPU numerical path in each GPU task, without
+adding an outer multiprocessing pool.
+
+## Checkpoints, retries and outputs
+
+Distributed execution partitions the case list into coarse work units; Dask
+sends Futures, **not** electron tracks or spectrum arrays, over the scheduler
+network. Workers read staged HDF5 inputs and publish immutable per-case
+artifacts. Only the **coordinator** updates the normal checkpoint and detector
+observation store. Both native SLURM and Dask support directional detector
+work units.
+
+Completed case artifacts can be reused after a failed/preempted task;
+`max_attempts` bounds scheduler-level retries. Each distributed run also writes
+operational `execution.json` under
+`<checkpoint-root>/.execution-jobs/<run-id>/`. Allocation information is
+*not* included in the scientific case hash. See
+[Working with results](working-with-results.md) for checkpoints and analysis.
+
+Dask's `max_in_flight` caps queued **plus** running Futures, limiting staging
+pressure. For an existing scheduler, set it in line with the workers actually
+available to the campaign; `workers` is a planning value, not a remote cluster
+reservation.
+
+## SSH remote helper and manual SLURM
+
+For a cluster reached through PyRITE's SSH/SLURM helper:
 
 ```bash
+pyrite config set remote.target MY_SSH_ALIAS
+pyrite remote sync
 pyrite run standard -m hopg --remote --dry-run
+pyrite run standard -m hopg --remote --detach
+pyrite remote job status
+pyrite remote job logs --follow
+pyrite remote pull hopg          # after the job completes
 ```
 
-`pyrite run standard -m hopg --remote` syncs, submits, follows the SLURM job, and pulls the checkpoint. Add `--detach` to return after submission. The hidden compatibility command retains advanced `--chunk-minutes` / `--parallel-materials` controls during migration; use concurrent materials only for workloads measured to fit. Use `pyrite remote job status`, `pyrite remote job logs --follow`, or `pyrite remote job attach` to monitor the allocation. Attached status shows an independent case-progress bar for each material; `logs --follow` shows the raw shared job log. While pending, status ranks the target among all pending jobs in the configured SLURM partition by scheduler priority (descending, then numeric job ID) and shows the current queue leader and reason. This is a consideration-order snapshot, not a start-time promise: priority can change and backfill can run a lower-ranked job first.
+This workflow handles code/data synchronization and remote job bookkeeping;
+it is separate from execution profiles. Consult `pyrite remote --help` for
+site-specific target, partition and GPU configuration. For a scheduler not
+integrated with these tools, a standard `sbatch` script can invoke
+`pyrite run standard -m MATERIAL` directly within an allocated job; separate
+materials can run as ordinary SLURM job-array elements. Remote trajectory
+captures are not included in checkpoint pulls: inspect or transfer them with
+`pyrite remote trajectories ls`, `info`, and `pull` (see the
+[remote CLI reference](../repo-design/cli/cli-reference-remote.md)).
 
-### Remote trajectory captures
+## Validation and limitations
 
-Capture transport on the compute node while leaving the large HDF5 files there:
+Before scaling up, run a small Dask connectivity and correctness smoke test:
 
 ```bash
-pyrite run trajectory_demo --remote --trajectories --detach
-pyrite remote job status trajectory_demo
-pyrite remote trajectories ls
+uv run python checks/dask_execution_smoke.py --mode local \
+  --output "$PWD/pyrite-output/dask-smoke-local"
 ```
 
-Bare `--trajectories` uses `<REMOTE_DIR>/pyrite-output/trajectories/<stem>/`.
-An explicit `--trajectories=DIR` names a directory on the **remote** host,
-relative to its checkout; absolute paths must also stay inside that checkout.
-Use `pyrite remote trajectories --root DIR ...` for later operations on a
-custom root. The job runs the same capture preflight as a local run, retaining
-matching captures on resume and requiring `--overwrite-trajectories` before
-replacing cases that will transport again. Cached cases without artifacts are
-not re-transported; use `--recompute` to capture those cases.
+On SLURM, the same check supports `--mode slurm` with site-provided scheduler
+and worker addresses; use `--help` for its arguments. Results compare numerical
+outputs and checkpoint reuse, **not** cluster scaling or physical accuracy.
+Run GPU smoke tests only in appropriately isolated allocations.
 
-`pyrite remote job status` reports capture-directory bytes per stem, including partial
-writes. After the first transported case, the job log reports its measured
-bytes per segment and an approximate total scaled by the requested electron
-counts. A projection over 10 GiB warns. Energy, geometry, secondary production,
-and adaptive stopping can change the actual size. Captures are never included
-in automatic checkpoint pulls.
-
-Inspect the exact on-disk stem with `ls`, then preview a case subset before
-transferring it. Case names and energies are exact matches; repeat either
-filter to select several values. Combining filters takes their intersection.
-
-```bash
-pyrite remote trajectories info STEM
-pyrite remote trajectories pull STEM --energy 30
-pyrite remote trajectories pull STEM --energy 30 --yes
-```
-
-Without `--yes`, `pull` lists complete files and their byte total. With `--yes`,
-it records remote SHA-256 hashes, uses rsync to resume into local staging
-files, and verifies each file's bytes, hash, and HDF5 `complete` header before
-renaming it into `pyrite-output/trajectories/`. Both hosts need rsync. Rerun the
-same command after an interrupted transfer; matching verified local files are
-skipped. Differing local files require `--overwrite`; a failed transfer leaves
-those files intact. `--out-dir DIR` selects a different local capture root.
-This copies whole case artifacts byte for byte, preserving their scoring
-inputs. History subsets are VTK exports, not reduced HDF5 artifacts.
-
-Work directly with the remote captures and retrieve only a small ParaView view:
-
-```bash
-pyrite remote trajectories export STEM --energy 30 --history 0 --history 1
-pyrite remote trajectories export STEM --first 20 --out-dir vtk-subset
-pyrite remote trajectories score STEM --energy 30
-```
-
-`export` requires `--history`, `--track`, `--first`, or `--sample` and applies the
-same whole-history/track selection as local `trajectories export`.
-`--seed` controls `--sample`; track filters intersect history selection. Only
-verified `.vtp` outputs come back, under `pyrite-output/trajectories-exports/`
-by default. The remote exports remain under that directory in a separate
-request directory. `--overwrite` permits replacing differing local VTK files.
-See [working with results](working-with-results.md) for the ParaView preset.
-
-`score` submits bounded spectrum replay through SLURM using the already synced
-code, writing the remote checkpoint stem recorded in the artifacts. Monitor
-its printed job ID with `pyrite remote job attach JOBID`, then pull checkpoints with
-`pyrite remote pull STEM`. Existing records are kept unless `--overwrite`.
-Captures exclude CPU-only profiling and repeated performance sessions.
-
-Progress timing uses additive active worker-process seconds persisted in each atomic progress record. Cached cases reduce remaining work but do not inflate measured throughput; chunk queue time and pauses do not count as compute time. Elapsed compute is always shown when valid. ETA and estimated total remain `—` until at least one new unit of work supplies a finite rate. Cost-weighted work is preferred when available; parallel-material process seconds are folded back to approximate wall time using the submitted parallelism.
-
-Use the developer performance command to enable resource sampling for the selected profile:
-
-```bash
-pyrite-dev perf sub_100keV --remote
-```
-
-Each five-second NDJSON sample records host and process-tree CPU/RAM, CPU affinity/frequency/iowait, swap activity, GPU utilization, clocks, performance state, and VRAM (`null` when no NVIDIA GPU is available), power, temperature, resolved beam parameters, active driver phase/case, most recently completed case, in-flight work, progress, worker topology, electron counts, grid widths, adaptive spectrum/brem chunk sizes, and child-process max/mean RSS. Rolling counters include CPU transport, spectrum, GPU feed-wait, checkpoint time, GPU OOM retries, and CuPy pool used/reserved/peak memory. These phase counters are enabled by `pyrite-dev perf`; `PYRITE_MC_TIMING` is not required. Logs go to `pyrite-output/performance/NAME/<material>.ndjson`; remote logs appear beside case progress in attached status. Fetch every remote job matching the catalog profile name with:
-
-```bash
-pyrite remote performance pull sub_100keV
-```
-
-Pulled files land under `pyrite-output/performance/NAME/<job>/<material>.ndjson`. Use the [performance-profile analysis playbook](performance-profile-analysis.md) to validate sessions, derive phase/resource metrics, classify bottlenecks, and design controlled tuning runs.
-
-For a bursty, spectrum-dominated GPU run, add `--nsys` to a single-material, single-repetition performance submit. This runs an uncached job-local session under Nsight Systems and writes CUDA/NVTX/Python-stack trace artifacts beside the NDJSON. `pyrite remote performance pull NAME` fetches the `.nsys-rep`, `.sqlite`, and `.nsys-stats.txt` files too; see the playbook's Nsight section for the exact command and interpretation limits.
-
-`pyrite remote job stop ...` cancels an active allocation with `scancel`. `pyrite run --preset zhai --remote` follows the same submit-and-wait workflow for the Zhai reproduction; add `--detach` to return after submission. Retrieve an existing cache with `pyrite remote pull --preset zhai`.
-
-With no job id, `pyrite remote job attach`, `pyrite remote job logs`, and `pyrite remote job status` resolve to the most recently active job. Profile submissions name their job after the profile (`sub_100keV`, then `sub_100keV-2` once the bare name is taken), so resubmitting a profile leaves the earlier, now-terminal jobs on the box. `pyrite remote job attach` warns on stderr when it defaults to a job that is no longer running, so a stale default never masks the live resubmission.
-
-`pyrite remote prune-jobs` deletes terminal (done/failed/cancelled) job directories, previewing exact targets unless `--yes`. Scope it to one profile family with `--profile NAME` or sweep every profile with `--all`. A live chain is never removed, so it is safe to prune old runs of a profile while a fresh submission of the same profile is still going:
-
-```bash
-pyrite remote prune-jobs --profile sub_100keV        # preview
-pyrite remote prune-jobs --profile sub_100keV --yes  # delete
-```
+Current distributed limitations: trajectory capture, transport-only dispatch,
+explicit wall-clock-bounded sweeps and performance-profile wrappers are not
+supported. CPU and GPU resources are homogeneous within a work-unit group.
+Check network reachability, shared-directory permissions, worker imports and
+scheduler logs when tasks cannot start; use native SLURM arrays to isolate a
+Dask-specific failure. Real multi-node throughput and reliability remain
+site-dependent and require verification.

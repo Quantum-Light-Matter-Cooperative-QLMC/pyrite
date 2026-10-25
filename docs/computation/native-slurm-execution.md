@@ -88,8 +88,7 @@ Current limits: synchronous coordinator (keep the Python process alive until
 completion), homogeneous resource requests per array, one GPU per array task,
 no job submission from a non-SLURM workstation, no trajectory-capture jobs, and
 no bounded sweep slices. Directional observations and named CLI execution
-profiles are supported; see [distributed execution](../guides/dask-and-distributed-execution.md)
-and [execution profiles](../guides/execution-profiles.md).
+profiles are supported; see [Running on a cluster](../guides/running-on-a-cluster.md).
 Use existing `pyrite remote` for SSH-based workflows. This is a
 compute-node worker model, **not** support for reattaching to an existing
 in-flight SLURM allocation after coordinator termination. Neither this

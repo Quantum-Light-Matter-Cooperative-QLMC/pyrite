@@ -14,11 +14,10 @@ python-api-workflow
 shell-completion
 configuration-cookbook
 numerics-and-execution
+running-on-a-cluster
 experimental-planar-channeling
 experimental-axial-channeling
 sampling-policy
-execution-profiles
-dask-and-distributed-execution
 optimization-studies
 working-with-results
 transition-radiation-demo
@@ -26,7 +25,6 @@ radiation-diagnostics
 directional-source-heatmap
 plotting-backends
 analysis-tutorial
-running-on-a-cluster
 sweep-profiles
 external-catalog
 adding-materials

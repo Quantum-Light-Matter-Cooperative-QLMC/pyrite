@@ -161,7 +161,7 @@ Things to know before enabling it:
 - **Cached cases are not captured.** Only cases this run transports get a file. Cases resumed from a checkpoint or replayed from the shared cache are never re-transported just to write one; the run reports how many and `--recompute` transports them again.
 - **Existing files.** Before any transport the run checks the directory. A case that already has a file stops the run unless `--overwrite-trajectories` is given. A cached case whose file records different physics also stops the run: remove the file or pick another directory.
 - **Interrupted runs.** Files are written as `<name>.partial` and renamed only once complete, so a crash or budget stop cannot leave a truncated file under the final name. A resumed run discards stale `.partial` files of the cases it transports.
-- **Remote captures stay remote.** `pyrite run ... --remote --trajectories` writes on the compute host; transfer selected cases or export selected histories with `pyrite remote trajectories`. See [remote trajectory captures](running-on-a-cluster.md#remote-trajectory-captures).
+- **Remote captures stay remote.** `pyrite run ... --remote --trajectories` writes on the compute host; transfer selected cases or export selected histories with `pyrite remote trajectories`. See See [remote trajectory captures](running-on-a-cluster.md#ssh-remote-helper-and-manual-slurm).
 
 ### Find and describe captures
 
