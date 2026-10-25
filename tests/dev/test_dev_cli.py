@@ -487,6 +487,7 @@ def test_verify_runs_static_checks_without_tests(dev_module, monkeypatch, argv) 
         "cmd_typecheck",
         "cmd_check_lines",
         "cmd_complexity",
+        "cmd_api",
     ):
         monkeypatch.setattr(dev_module, name, lambda _args, name=name: calls.append(name))
     monkeypatch.setattr(dev_module, "run", lambda *args: calls.append(args))
@@ -500,9 +501,36 @@ def test_verify_runs_static_checks_without_tests(dev_module, monkeypatch, argv) 
         ("-m", "ruff", "format", "--check", "."),
         "cmd_check_lines",
         "cmd_complexity",
+        "cmd_api",
         "cmd_docs",
         "cmd_imports",
     ]
+
+
+@pytest.mark.parametrize("imports", [False, True])
+def test_api_check_dispatches_import_mode(dev_module, monkeypatch, capsys, imports) -> None:
+    from pyrite.devtools import api_surface
+
+    calls = []
+    monkeypatch.setattr(
+        api_surface, "check", lambda root, **kwargs: calls.append((root, kwargs)) or []
+    )
+    dev_module.main(["api", "check", *(["--imports"] if imports else [])])
+    assert calls == [(dev_module.ROOT, {"imports": imports})]
+    captured = capsys.readouterr()
+    assert captured.out == "API root namespace inventory OK\n"
+    assert captured.err == ""
+
+
+def test_api_check_reports_violations_on_stderr(dev_module, monkeypatch, capsys) -> None:
+    from pyrite.devtools import api_surface
+
+    monkeypatch.setattr(api_surface, "check", lambda *args, **kwargs: ["Beam: missing target"])
+    with pytest.raises(SystemExit, match="1"):
+        dev_module.main(["api", "check"])
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err == "api: Beam: missing target\n"
 
 
 @pytest.mark.parametrize("args", [["-k", "example"], ["--slow"], ["--numba"], ["tests"]])

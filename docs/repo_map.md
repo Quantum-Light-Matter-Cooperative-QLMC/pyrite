@@ -23,52 +23,55 @@ behind lazy dispatch, ``__getattr__``, or ``import_module`` are outside this sca
 Components (a + b denotes a static import cycle):
   p0: _entry
   p1: apps
-  p2: campaign + checkpoints + energy_grid + execution + montecarlo + observations + perf + remote + results + runs + validation
-  p3: cli
-  p4: console
-  p5: detectors
-  p6: devtools
-  p7: instrument
-  p8: materials
-  p9: optimization
-  p10: plots
-  p11: xsgen
+  p2: beams
+  p3: campaign + checkpoints + energy_grid + execution + montecarlo + observations + perf + remote + results + runs + validation
+  p4: cli
+  p5: config
+  p6: console
+  p7: detectors
+  p8: devtools
+  p9: geometry
+  p10: instrument
+  p11: materials
+  p12: optimization
+  p13: plots
+  p14: xsgen
 Edges (importer -> imported):
-  p0 -> p2
+  p0 -> p11
   p0 -> p3
   p0 -> p4
-  p0 -> p8
-  p1 -> p10
-  p1 -> p2
-  p1 -> p4
-  p1 -> p5
-  p1 -> p8
-  p10 -> p2
-  p10 -> p4
-  p10 -> p5
-  p10 -> p8
-  p11 -> p4
-  p11 -> p8
-  p2 -> p11
-  p2 -> p4
-  p2 -> p5
-  p2 -> p7
-  p2 -> p8
+  p0 -> p6
+  p1 -> p11
+  p1 -> p13
+  p1 -> p3
+  p1 -> p6
+  p1 -> p7
+  p10 -> p11
+  p10 -> p7
+  p12 -> p3
+  p13 -> p11
+  p13 -> p3
+  p13 -> p6
+  p13 -> p7
+  p14 -> p11
+  p14 -> p6
+  p3 -> p10
   p3 -> p11
-  p3 -> p2
-  p3 -> p4
-  p3 -> p5
+  p3 -> p14
+  p3 -> p6
   p3 -> p7
-  p3 -> p8
-  p4 -> p8
-  p5 -> p8
-  p6 -> p10
-  p6 -> p2
-  p6 -> p3
-  p6 -> p4
-  p7 -> p5
-  p7 -> p8
-  p9 -> p2
+  p4 -> p10
+  p4 -> p11
+  p4 -> p14
+  p4 -> p3
+  p4 -> p6
+  p4 -> p7
+  p6 -> p11
+  p7 -> p11
+  p8 -> p13
+  p8 -> p3
+  p8 -> p4
+  p8 -> p6
 ```
 <!-- END GENERATED PACKAGE DEPENDENCIES -->
 

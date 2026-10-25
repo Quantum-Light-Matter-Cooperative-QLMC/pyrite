@@ -52,7 +52,10 @@ backward compatibility. The submodules are:
 """
 
 from importlib import import_module
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from .case import Case as Case
 
 # Resolve legacy bindings on demand; schema imports must not initialize kernels.
 _EXPORT_MODULES = {

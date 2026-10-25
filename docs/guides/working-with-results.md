@@ -121,7 +121,7 @@ Here `x` is the plane normal. With the default `entry_impact="averaged"`, only t
 
 ## Pixel-detector observations
 
-A profile detector with an acquisition also stores one counting observation per case in `pyrite-output/observations/<stem>/`, the sibling of that detector's `pyrite-output/checkpoints/<stem>/`. A profile with several detectors has a separate ID-qualified stem for each. Observations hold factorized per-tile spectra, pixel solid angles, and filter paths rather than a pixel-by-energy cube, so reopening one never reruns transport.
+A profile detector with an acquisition also stores one counting observation per case in `pyrite-output/observations/<stem>/`, the sibling of that detector's `pyrite-output/checkpoints/<stem>/`. A profile with several detectors has a separate ID-qualified stem for each. Observations hold factorized per-tile spectra, pixel solid angles, and filter paths rather than a pixel-by-energy cube, so reopening one never reruns transport. The [Python workflow](python-api-workflow.md#place-a-finite-filter-over-detector-pixels) covers physical detector construction; `pyrite.observations.observation_inventory(stem)` lists a stem's stored observations by case without opening their factors.
 
 The pixel app reads one dataset's observations without loading its checkpoint. Pick the material and checkpoint that name the dataset:
 

@@ -4,6 +4,8 @@ The package-level surface contains registry conveniences and explicit authoring
 operations. Import atomic, crystal, or attenuation details from their owners.
 """
 
+from typing import TYPE_CHECKING
+
 from ._identity import MaterialIdentity
 from .catalog import (
     CrystalInfo,
@@ -17,6 +19,20 @@ from .catalog import (
     ScanSpec,
     load_material_catalog,
 )
+
+if TYPE_CHECKING:
+    from .authoring import (
+        MaterialDefinition as MaterialDefinition,
+    )
+    from .authoring import (
+        build_crystal as build_crystal,
+    )
+    from .authoring import (
+        build_medium as build_medium,
+    )
+    from .authoring import (
+        save_material as save_material,
+    )
 
 CATALOG: MaterialCatalog
 CRYSTALS: dict[str, dict[str, object]]

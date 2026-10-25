@@ -123,6 +123,8 @@ if TYPE_CHECKING:
     from pyrite.detectors import (
         SensorAcceptance as SensorAcceptance,
     )
+    from pyrite.directional import directional_source as directional_source
+    from pyrite.directional import directional_sources as directional_sources
     from pyrite.instrument import (
         Acquisition as Acquisition,
     )
@@ -155,6 +157,7 @@ if TYPE_CHECKING:
     from pyrite.quantum import QuantumRegion as QuantumRegion
     from pyrite.quantum import QuantumSetup as QuantumSetup
     from pyrite.quantum_state import TransverseStateSpec as TransverseStateSpec
+    from pyrite.results.directional import DirectionalSpectrum as DirectionalSpectrum
     from pyrite.results.model import (
         CxrSpectra as CxrSpectra,
     )

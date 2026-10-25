@@ -10,6 +10,7 @@ import hashlib
 import json
 import os
 import shutil
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -74,7 +75,7 @@ def _targets(all_profiles: bool, catalog_profile: str | None) -> list[_Target]:
     return list(targets.values())
 
 
-def _case_key(case: dict[str, Any]) -> str:
+def _case_key(case: Mapping[str, Any]) -> str:
     """Stable exact comparison covering grids, geometry, statistics, and seeds."""
     return json.dumps(
         _jsonable(case),
