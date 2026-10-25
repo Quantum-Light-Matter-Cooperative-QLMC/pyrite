@@ -159,6 +159,7 @@ The node names and documentation-only IP addresses below are placeholders.
 Replace them with your site's allocation and network settings after a clean
 `pyrite remote sync`:
 
+<!-- verify: skip (SLURM job template runs a Python smoke script and requires site resources) -->
 ```bash
 #!/usr/bin/env bash
 #SBATCH --job-name=pyrite-dask-smoke
@@ -197,6 +198,7 @@ On a single-GPU node, place the CPU coordinator and GPU worker on the same
 host. Adapt the example above to select that node for the coordinator, then
 replace the final command with:
 
+<!-- verify: skip (Python CUDA smoke runner requires an allocated SLURM GPU) -->
 ```bash
 export PYRITE_FP64=1
 uv run --no-sync python checks/dask_execution_smoke.py --mode slurm \
