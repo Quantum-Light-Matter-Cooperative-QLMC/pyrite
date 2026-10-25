@@ -43,6 +43,24 @@ def profile_row(name):
     return read_raw(bundled_catalog())["profiles"][name]
 
 
+def test_unit_bearing_physics_preset_resolves_before_profile_identity(_isolate_user_catalog):
+    ok("profile", "create", "campaign", "--from", "quickstart")
+    preset_dir = _isolate_user_catalog / "physics"
+    preset_dir.mkdir(exist_ok=True)
+    (preset_dir / "physical.toml").write_text(
+        'inelastic_model = "shell-soft-hard"\ninelastic_cutoff_eV = "2 keV"\n'
+    )
+    ok("profile", "set", "campaign", "--physics", "physical")
+    profile_path = _isolate_user_catalog / "profiles" / "campaign.toml"
+    profile_path.write_text(profile_path.read_text() + 'inelastic_cutoff_eV = "3 keV"\n')
+
+    catalog = load_material_catalog(profile="campaign")
+    physics = pyrite.load_physics("physical", catalog=load_material_catalog())
+    effective = catalog.profile_numerics("campaign")
+    assert physics.inelastic_cutoff_eV == 2000.0
+    assert effective["inelastic_cutoff_eV"] == 3000.0
+
+
 def test_bundled_reference_preset_restates_built_in_physics():
     assert pyrite.load_physics("electron-standard") == pyrite.Physics()
     refused = invoke(command, ["physics", "preset", "set", "electron-standard", "--straggling"])

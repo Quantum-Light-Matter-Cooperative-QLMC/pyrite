@@ -9,11 +9,41 @@ import pytest
 
 import pyrite as pr
 from pyrite import states
+from pyrite.units import ureg
 
 
 def test_public_lazy_state_entrypoint():
     assert pr.TransverseStateSpec is states.TransverseStateSpec
     assert callable(states.laguerre_gauss)  # runtime #508 API remains available
+
+
+def test_state_spec_unit_inputs_canonicalize_before_serialization_and_identity():
+    numeric = pr.TransverseStateSpec.recipe("gaussian", waist_ang=10.0, center_ang=(0.25, 0.0))
+    quantity = pr.TransverseStateSpec.recipe(
+        "gaussian",
+        waist_ang=1 * ureg.nm,
+        center_ang=(25 * ureg.pm, 0 * ureg.nm),
+    )
+    assert quantity == numeric
+    assert quantity.digest == numeric.digest
+    probe = pr.TransverseStateSpec.recipe(
+        "aperture_probe", kinetic_energy_eV=30 * ureg.keV, semiangle_rad=1 * ureg.mrad
+    )
+    assert dict(probe.parameters)["kinetic_energy_eV"] == 30_000.0
+    assert dict(probe.parameters)["semiangle_rad"] == 0.001
+    bessel = pr.TransverseStateSpec.recipe(
+        "bessel_gauss", ell=1, k_radial_inv_ang=1 / ureg.nm, waist_ang=1 * ureg.nm
+    )
+    assert dict(bessel.parameters)["k_radial_inv_ang"] == pytest.approx(0.1)
+
+
+def test_state_spec_unit_inputs_reject_wrong_dimensions():
+    with pytest.raises(ValueError, match="TransverseStateSpec.waist_ang.*length.*angstrom"):
+        pr.TransverseStateSpec.recipe("gaussian", waist_ang=2 * ureg.fs)
+    with pytest.raises(ValueError, match="TransverseStateSpec.semiangle_rad.*angle"):
+        pr.TransverseStateSpec.recipe(
+            "aperture_probe", kinetic_energy_eV=30_000, semiangle_rad=1 * ureg.dimensionless
+        )
 
 
 @pytest.mark.parametrize(

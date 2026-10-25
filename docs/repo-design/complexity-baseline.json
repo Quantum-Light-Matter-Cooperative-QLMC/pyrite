@@ -303,7 +303,7 @@
     {
       "path": "src/pyrite/materials/_parse.py",
       "name": "_parse_profiles",
-      "cc": 56
+      "cc": 53
     },
     {
       "path": "src/pyrite/materials/_parse.py",

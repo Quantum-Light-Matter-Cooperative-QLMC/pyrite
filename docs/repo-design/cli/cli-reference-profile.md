@@ -19,6 +19,12 @@ Usage: pyrite profile [OPTIONS] COMMAND [ARGS]...
   --material``; ``set --all-materials`` restores implicit membership. Per-material
   effective material ranges are inspected with ``profile ranges show``.
 
+  Catalog TOML accepts quoted physical quantity strings for the supported unit-bearing
+  grid, beam, detector, filter, response, acquisition, Physics, and Numerics preset
+  fields; they resolve to the same canonical values as numeric TOML. CLI numeric options
+  continue to use the field units shown in their help. See docs/repo-design/physical-
+  units.md for supported fields and examples.
+
   Where settings live: ranges, membership, beam/detector references and emission use
   ``set|add|remove``; sampling/integration use ``pyrite numerics``; physical
   models/cutoffs use ``pyrite physics``; line-grid and precision policies live under

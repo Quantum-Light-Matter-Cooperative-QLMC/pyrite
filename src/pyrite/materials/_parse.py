@@ -10,7 +10,7 @@ from typing import Any, Literal, cast
 
 import numpy as np
 
-from .. import DATA_DIR
+from .. import DATA_DIR, _config_presets
 from .._catalog_layout import ARTIFACT_DIR, catalog_root
 from .._cxr_grid_policy import PROFILE_CXR_GRID_SELECTORS
 from .._energy_grid_artifacts import ArtifactError, load_artifact
@@ -528,6 +528,23 @@ def _parse_profile_cxr_grid_policy(raw: object, path: str, errors: _Errors) -> N
         errors.add(f"{path}.max_points", "must be an integer >= 2")
 
 
+def _parse_profile_scalar_numerics(
+    row: Mapping[str, object], path: str, errors: _Errors
+) -> dict[str, object]:
+    """Normalize physical scalar settings before validating profile controls."""
+    raw_values = {name: row[name] for name in _PROFILE_SCALAR_NUMERICS_KEYS if name in row}
+    try:
+        values = _config_presets.normalize_field_units(raw_values, field_prefix=path)
+        validate_profile_numerics(values)
+    except (ImportError, TypeError, ValueError) as exc:
+        message = str(exc)
+        field = message.split(maxsplit=1)[0]
+        detail = message.removeprefix(field).strip()
+        errors.add(field if field.startswith(f"{path}.") else f"{path}.{field}", detail)
+        return {}
+    return values
+
+
 def _parse_profiles(raw: object, errors: _Errors) -> dict[str, Mapping[str, object]]:
     """Parse ``[profiles.*]`` campaign rows.
 
@@ -590,14 +607,7 @@ def _parse_profiles(raw: object, errors: _Errors) -> dict[str, Mapping[str, obje
             errors.add(f"{path}.emission", f"must be one of {_EMISSION_VALUES}")
         if "temporal_profile" in row and type(row["temporal_profile"]) is not bool:
             errors.add(f"{path}.temporal_profile", "must be a boolean")
-        scalar_numerics = {name: row[name] for name in _PROFILE_SCALAR_NUMERICS_KEYS if name in row}
-        try:
-            validate_profile_numerics(scalar_numerics)
-        except ValueError as exc:
-            message = str(exc)
-            field = message.split(maxsplit=1)[0]
-            detail = message.removeprefix(field).strip()
-            errors.add(f"{path}.{field}", detail)
+        scalar_numerics = _parse_profile_scalar_numerics(row, path, errors)
         if "precision" in row:
             _parse_profile_precision(row, path, errors)
         if "overrides" in row:
@@ -621,6 +631,7 @@ def _parse_profiles(raw: object, errors: _Errors) -> dict[str, Mapping[str, obje
                             "must be a 64-character lowercase SHA-256 digest",
                         )
         row_out = dict(row)
+        row_out.update(scalar_numerics)
         if "beam" in row_out:
             beam_raw = row_out["beam"]
             if isinstance(beam_raw, str):

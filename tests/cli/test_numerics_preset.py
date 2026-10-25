@@ -5,11 +5,13 @@ import pickle
 from argparse import Namespace
 from dataclasses import replace
 
+import pytest
+
 import pyrite
 from pyrite._catalog_layout import bundled_catalog, read_raw
 from pyrite._precision import DEFAULT_PRECISION
 from pyrite.cli import command
-from pyrite.materials import load_material_catalog
+from pyrite.materials import MaterialConfigError, load_material_catalog
 from pyrite.materials.catalog import _refresh_default_catalog
 from tests.helpers.cli import assert_clean_result, invoke
 
@@ -58,6 +60,31 @@ def test_bundled_numerics_reference_restates_built_ins():
     refused = invoke(command, ["numerics", "preset", "set", "default", "--mosaic-nodes", "7"])
     assert refused.exit_code == 1
     assert "pyrite numerics preset create NAME --from default" in refused.stderr
+
+
+def test_unit_bearing_numerics_preset_resolves_to_canonical_values(_isolate_user_catalog):
+    write_preset(
+        _isolate_user_catalog,
+        "numerics",
+        "unit-inputs",
+        'channeling_dz_ang = "0.1 nm"\nchanneling_zone_max_ang = "10 nm"\n',
+    )
+
+    numerics = pyrite.load_numerics("unit-inputs", catalog=load_material_catalog())
+    assert numerics.channeling_dz_ang == 1.0
+    assert numerics.channeling_zone_max_ang == 100.0
+
+
+def test_unit_bearing_numerics_preset_rejects_wrong_dimensions(_isolate_user_catalog):
+    write_preset(
+        _isolate_user_catalog,
+        "numerics",
+        "bad-units",
+        'channeling_dz_ang = "2 keV"\n',
+    )
+
+    with pytest.raises(MaterialConfigError, match="numerics.channeling_dz_ang.*length"):
+        load_material_catalog()
 
 
 def test_numerics_preset_resolves_into_profiles_with_provenance(_isolate_user_catalog):

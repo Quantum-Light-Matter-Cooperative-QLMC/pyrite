@@ -13,6 +13,16 @@ def _bundled_snapshot():
     return {relative: file.read_bytes() for relative, file in source_files(bundled_catalog())}
 
 
+def test_profile_help_documents_unit_bearing_catalog_values():
+    result = invoke(profile.command, ["--help"])
+
+    assert result.exit_code == 0
+    assert "Catalog TOML accepts quoted physical quantity strings" in result.stdout
+    assert "Numerics preset fields" in result.stdout
+    assert "CLI numeric options" in result.stdout
+    assert "field units" in result.stdout
+
+
 def test_user_profile_edits_never_touch_the_installed_catalog(_isolate_user_catalog):
     before = {
         path.relative_to(bundled_catalog()): path.read_bytes()

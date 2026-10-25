@@ -15,6 +15,7 @@ from pyrite.detectors import EnergyBins
 from pyrite.montecarlo import runner
 from pyrite.montecarlo.case import _ABSENT
 from pyrite.montecarlo.transport import check_segment_event_contract
+from pyrite.units import ureg
 
 try:
     import cupy
@@ -27,9 +28,10 @@ pytestmark = pytest.mark.slow
 cuda = pytest.mark.skipif(not HAS_CUDA, reason="no CUDA device")
 
 
-def _case(*, elastic="elsepa", plane=(1, -1, 0)):
+def _case(*, elastic="elsepa", plane=(1, -1, 0), unit_bearing=False):
+    energy_keV = 5.0 * ureg.MeV if unit_bearing else 5000.0
     scene = pr.Scene(
-        pr.Beam(5000.0, transverse=pr.Spot(), longitudinal=pr.PointBunch()),
+        pr.Beam(energy_keV, transverse=pr.Spot(), longitudinal=pr.PointBunch()),
         pr.Slab(
             "silicon", 10000.0, tilt_deg=3.0, tilt_azim_deg=45.0, footprint=pr.Footprint(5.0, 5.0)
         ),
@@ -131,6 +133,27 @@ def test_cuda_zone_handoff_matches_cpu_and_preserves_seeded_rows(monkeypatch, el
     np.testing.assert_array_equal(
         case_channeling_spectrum(case, gpu), case_channeling_spectrum(case, cpu)
     )
+
+
+@cuda
+@pytest.mark.hardware
+def test_quantity_beam_input_matches_legacy_cpu_transport_on_cuda():
+    numeric_case = _case()
+    quantity_case = _case(unit_bearing=True)
+    cpu = runner._transport_case(numeric_case, transport_core="per-electron")
+    gpu = runner._transport_case(quantity_case, transport_core="cuda", keep_segments_on_device=True)
+    c, g = cpu["segs"], gpu["segs"]
+    check_segment_event_contract(g)
+    assert g["channeling"] == c["channeling"]
+    for key in ("electron_id", "flight_id", "event_kind", "L_ang", "E_end_keV", "r_mid", "v_hat"):
+        np.testing.assert_array_equal(g[key][g["channeling_zone"]], c[key][c["channeling_zone"]])
+    first_c, first_g = _first_native(c), _first_native(g)
+    assert first_g.size > 0
+    np.testing.assert_array_equal(g["electron_id"][first_g], c["electron_id"][first_c])
+    for key in ("r_mid", "v_hat", "L_ang", "E_start_keV", "E_end_keV", "t_end_ang"):
+        np.testing.assert_allclose(
+            g[key][first_g], c[key][first_c], rtol=2e-11, atol=1e-8, err_msg=key
+        )
 
 
 @cuda

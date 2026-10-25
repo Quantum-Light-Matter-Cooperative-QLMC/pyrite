@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from ._units import normalize_unit
 from .quantum import QuantumSetup
 from .quantum_state import TransverseStateSpec
 
@@ -176,12 +177,39 @@ def project_planar_source(
         raise TypeError("state must be a TransverseStateSpec")
     if not isinstance(crystal, str) or not crystal.strip():
         raise ValueError("crystal must be a nonempty catalog crystal identifier")
+    kinetic_energy_eV = normalize_unit(
+        kinetic_energy_eV,
+        "eV",
+        field="project_planar_source.kinetic_energy_eV",
+        expected="energy",
+    )
+    temperature_K = normalize_unit(
+        temperature_K,
+        "kelvin",
+        field="project_planar_source.temperature_K",
+        expected="temperature",
+    )
+    incidence_rad = normalize_unit(
+        incidence_rad,
+        "radian",
+        field="project_planar_source.incidence_rad",
+        expected="angle",
+        kind="angle",
+    )
     energy = _positive("kinetic_energy_eV", kinetic_energy_eV)
     temperature = _positive("temperature_K", temperature_K)
     from .montecarlo.channeling.density import DECHANNELING_MARGIN_EV
 
     margin = (
-        _positive("margin_eV", margin_eV)
+        _positive(
+            "margin_eV",
+            normalize_unit(
+                margin_eV,
+                "eV",
+                field="project_planar_source.margin_eV",
+                expected="energy",
+            ),
+        )
         if margin_eV is not None
         else float(DECHANNELING_MARGIN_EV)
     )

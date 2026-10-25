@@ -64,9 +64,7 @@ def test_beam_profile_and_physical_detector_parse_unit_strings() -> None:
 
 def test_invalid_profile_dimensions_report_field_and_expected_unit() -> None:
     errors = _Errors()
-    _parse_physical_detector(
-        {"distance_mm": "5 keV"}, "profiles.demo.physical_detector", errors
-    )
+    _parse_physical_detector({"distance_mm": "5 keV"}, "profiles.demo.physical_detector", errors)
     assert any(
         "profiles.demo.physical_detector.distance_mm" in item
         and "electron_volt" in item

@@ -62,6 +62,7 @@ other physical equivalencies are enabled.
 | `RectangularBody`, `Footprint`, planar detector poses/pixels, filters | Existing mm |
 | Detector acceptance | Existing degrees and sr |
 | `Physics` energy cutoffs, `Numerics` channeling depths, `EnergyBins` | Existing eV and Å |
+| `QuantumRegion.zone_max_ang`, `QuantumNumerics.step_ang`, portable transverse-state lengths/energies/angles, planar source diagnostic inputs | Existing Å, eV, rad, K |
 | `Acquisition` exposure, measured edges, threshold | Existing seconds and eV |
 | Material scan grids and profile beam/detector/filter/response/acquisition fields | Existing field-specific units, resolved from numeric TOML values or explicit strings |
 
@@ -70,6 +71,12 @@ Quantity conversion happens once during construction or catalog parsing and
 before case lowering. Same-field-equivalent values consequently feed the same
 canonical numeric fields used by current scientific identity code. No rounded
 identity canonicalization is applied.
+
+The existing #680 quantum value objects and portable state specification accept
+quantities at their current API owners; serialized transverse-state fields stay
+ordinary JSON numbers and schema v1 is unchanged. This does not settle #704's
+pending canonical import-map decision. No quantum recipes, solver admission, or
+physical model changed.
 
 The catalog parser accepts unit strings in physical grid descriptors and
 profile fields. For example:
@@ -91,12 +98,21 @@ pitch_mm = ["55 um", "55 um"]
 [profiles.demo.detectors.camera.acquisition]
 exposure_s = "500 ms"
 measured_edges_eV = ["0 eV", "0.1 keV", "200 eV"]
+
+[physics.demo]
+inelastic_model = "shell-soft-hard"
+inelastic_cutoff_eV = "2 keV"
+
+[numerics.demo]
+channeling_dz_ang = "0.1 nm"
 ```
 
 The TOML keys remain the catalog's existing unit-suffixed names; explicit
-strings only choose a compatible input unit. Malformed strings and dimension
-mismatches are reported at the offending catalog path. Numeric catalog files do
-not import Pint.
+strings only choose a compatible input unit. Physics preset energy cutoffs and
+lattice origins, plus Numerics channeling lengths, use the same parser and
+canonical values as their Python configuration fields. Malformed strings and
+dimension mismatches are reported at the offending catalog path. Numeric catalog
+files do not import Pint.
 
 ## Serialization, results, and kernels
 
@@ -112,7 +128,12 @@ incident electron, eV, and sr; pixel/acquisition counts represent integrated
 accepted events; rate and flux helpers apply their stated beam and geometry
 normalizations. Angles and solid angles remain available through the existing
 public degree/sr fields. No optional Pint wrapper is added to result arrays in
-this slice.
+this slice. `Result.spectral_flux(units=...)` already provides named flux
+normalizations (`detector`, `nA`, `sr`, and `electron`); the underlying source
+components use distinct grids and spectral-density semantics, while pixel and
+aperture results are integrated quantities. A generic quantity wrapper would
+need a result-wide unit metadata map and could misrepresent those distinctions,
+so this remains a separate result-contract design decision.
 
 ## Measured overhead
 
@@ -130,3 +151,21 @@ timing. Process startup is included in import wall time:
 These values describe this Python/container build, not a cross-platform
 performance guarantee. The unit module is opt-in, and ordinary numeric
 constructors retain the lazy fast path without importing Pint.
+
+Scalar and array normalization were measured separately with
+`uv run --extra units python checks/unit_conversion_overhead.py` on Python
+3.14.4 and NumPy 2.5.4. Inputs and registry were constructed before timing;
+each case used a 100-call warmup and seven repeats. Array cases converted 1,024
+float64 energies from MeV to keV per call:
+
+| Boundary operation | Median | Repeat range |
+| --- | ---: | ---: |
+| Numeric scalar pass-through | 0.254 µs/call | 0.253–0.257 µs/call |
+| Pint scalar conversion | 15.352 µs/call | 15.326–15.371 µs/call |
+| Numeric array pass-through (1,024 values) | 0.303 µs/call | 0.301–0.307 µs/call |
+| Pint array conversion (1,024 values) | 18.146 µs/call | 18.082–18.295 µs/call |
+
+The measured Pint array conversion rate was 56.4 million values/s. These
+microbenchmarks isolate boundary normalization; they do not represent full
+simulation throughput. Numeric inputs retain a pass-through fast path, and
+conversion cost is paid once before numerical kernels.

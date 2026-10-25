@@ -27,6 +27,7 @@ from ._numerics import (
     _emission_selection,
     validate_profile_numerics,
 )
+from ._units import normalize_unit_input
 
 EMISSION_VALUES = ("incoherent", "coherent", "both")
 METADATA_KEYS = ("description",)
@@ -64,6 +65,25 @@ NUMERICS = PresetKind(
 )
 KINDS = (PHYSICS, NUMERICS)
 TABLES = tuple(kind.table for kind in KINDS)
+_UNIT_FIELDS = {
+    "inelastic_cutoff_eV": ("eV", "energy"),
+    "secondary_threshold_eV": ("eV", "energy"),
+    "radiative_cutoff_eV": ("eV", "energy"),
+    "transition_lattice_origin_ang": ("angstrom", "length"),
+    "channeling_dz_ang": ("angstrom", "length"),
+    "channeling_zone_max_ang": ("angstrom", "length"),
+}
+
+
+def normalize_field_units(values: Mapping[str, Any], *, field_prefix: str) -> dict[str, Any]:
+    """Normalize supported Physics/Numerics values from Python or catalog input."""
+    result = dict(values)
+    for key, (unit, expected) in _UNIT_FIELDS.items():
+        if key in result:
+            result[key] = normalize_unit_input(
+                result[key], unit, field=f"{field_prefix}.{key}", expected=expected
+            )
+    return result
 
 
 def preset_errors(kind: PresetKind, name: str, row: object) -> list[tuple[str, str]]:
@@ -120,7 +140,8 @@ def validate_values(kind: PresetKind, values: Mapping[str, Any]) -> None:
 
 def preset_values(kind: PresetKind, row: Mapping[str, Any]) -> dict[str, Any]:
     """Return a preset row's configuration values without display metadata."""
-    return {key: _plain(row[key]) for key in kind.keys if key in row}
+    result = {key: _plain(row[key]) for key in kind.keys if key in row}
+    return normalize_field_units(result, field_prefix=kind.table)
 
 
 def _profile_value(key: str, value: Any) -> Any:
@@ -206,7 +227,7 @@ def _load(kind: PresetKind, name: str, catalog: Any) -> Mapping[str, Any]:
     presets = catalog.presets(kind.table)
     if name not in presets:
         raise KeyError(f"unknown {kind.table} preset {name!r}; have {sorted(presets)}")
-    return presets[name]
+    return preset_values(kind, presets[name])
 
 
 def load_physics(name: str, *, catalog: Any = None) -> Physics:
