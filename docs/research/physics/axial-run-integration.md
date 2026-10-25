@@ -2,7 +2,7 @@
 
 This is the design gate for [#548](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/548),
 not a description of supported runs. `Physics(channeling_model="axial")`
-remains refused. The [diagnostic API](../../guides/axial-diagnostics.md)
+remains refused. The [diagnostic API](../../guides/experimental-axial-channeling.md)
 supports periodic-grid evolution and line diagnostics; it supplies neither a
 physical escape distribution nor a persisted source spectrum.
 

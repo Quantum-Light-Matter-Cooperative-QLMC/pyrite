@@ -98,7 +98,7 @@ above selects the Si(110) family, rather than configuring the sample pose.
 CR is forward-peaked: a 90° detector sees lines below about 10 eV, so attach an
 on-axis detector such as the packaged `forward`. The packaged
 `channeling_demo` profile is a complete example; see
-[planar channeling runs](planar-channeling.md) for its prerequisites, the
+[experimental planar channeling](experimental-planar-channeling.md) for its prerequisites, the
 Python equivalent and the model limits.
 Explicit fixed counts are required because adaptive precision has no
 per-electron channeling variance observable. The zone solve runs on the CPU;

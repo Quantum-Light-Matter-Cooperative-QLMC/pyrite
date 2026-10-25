@@ -236,7 +236,7 @@ into one period in the instantaneous basis after energy reprojection. Without
 position sampling, both the grid and density are `None`. See the
 [spatial-density derivation](validation/channeling/cr-planar-spatial-density-reconstruction.md)
 and [channeling demo](guides/working-with-results.md#planar-channeling-demo).
-The [experimental axial diagnostic](guides/axial-diagnostics.md) runs independently
+The [experimental axial diagnostic](guides/experimental-axial-channeling.md) runs independently
 of `simulate`.
 
 ## Detector response
