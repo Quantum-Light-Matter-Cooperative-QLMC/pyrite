@@ -205,6 +205,14 @@ Use `pyrite.materials.MaterialDefinition`, `build_medium`, `build_crystal` and
 g/cm³, composition in atoms/Å³ and photon grids in eV. See
 [Adding materials](guides/adding-materials.md) for inputs and storage rules.
 
+The provisional `pyrite.materials.optical.OpticalResponse.to_record()` and
+`OpticalResponse.from_record(record)` preserve explicit optical response
+arrays, disjoint supported bands and provenance through JSON round trips.
+They validate the existing content digest without reloading source data.
+These response records remain outside the supported API contract and do not
+enable optical production transport; see the
+[proposed Cherenkov integration boundary](research/physics/production-cherenkov.md#identity-and-portable-response-records).
+
 ## Photon-energy comparisons
 
 {py:func}`pyrite.photon_energies` computes vacuum CXR line-centre energies

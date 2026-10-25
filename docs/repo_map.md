@@ -950,6 +950,10 @@ for node or midpoint-bin grids; it leaves the shared X-ray floor unchanged.
 Independent derivation: `validation/radiation-physics/optical-material-response.md`.
 Real-hardware check: `checks/optical_response_cuda.py`, run through remote staging
 and a bounded CUDA allocation.
+`OpticalResponse.to_record/from_record` preserve the data, supported segments,
+provenance and response digest in a self-contained versioned JSON record;
+restoration never fetches source data. Production Cherenkov remains proposed:
+[integration contract](research/physics/production-cherenkov.md).
 
 Bounded optical TR/CTR (#615): `montecarlo/spectrum/optical_transition.py`
 (physical-bunch source laws, weighted distinct-pair estimator, npz persistence),
