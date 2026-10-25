@@ -14,6 +14,7 @@ from typing import Literal
 import numpy as np
 
 from .._planar_geometry import PixelGrid, PlanarPose, _positive_pair, _positive_real
+from .._units import normalize_unit
 from ..detectors.spec import Detector, DetectorResponse
 from ..materials import CATALOG, MediumSpec
 from ..materials._composition import has_positive_number_densities, resolve_composition
@@ -57,9 +58,26 @@ class FilterPlate:
         else:
             raise TypeError("FilterPlate.material must be a catalog key or MediumSpec")
         object.__setattr__(
-            self, "thickness_mm", _positive_real("FilterPlate.thickness_mm", self.thickness_mm)
+            self,
+            "thickness_mm",
+            _positive_real(
+                "FilterPlate.thickness_mm",
+                normalize_unit(
+                    self.thickness_mm,
+                    "mm",
+                    field="FilterPlate.thickness_mm",
+                    expected="length",
+                ),
+            ),
         )
-        object.__setattr__(self, "size_mm", _positive_pair("FilterPlate.size_mm", self.size_mm))
+        object.__setattr__(
+            self,
+            "size_mm",
+            _positive_pair(
+                "FilterPlate.size_mm",
+                normalize_unit(self.size_mm, "mm", field="FilterPlate.size_mm", expected="length"),
+            ),
+        )
         if not isinstance(self.pose, PlanarPose):
             raise TypeError("FilterPlate.pose must be a PlanarPose")
         if self.name is not None and (not isinstance(self.name, str) or not self.name.strip()):
@@ -127,7 +145,17 @@ class PlanarDetector:
         if not isinstance(self.pose, PlanarPose):
             raise TypeError("PlanarDetector.pose must be a PlanarPose")
         size = (
-            None if self.size_mm is None else _positive_pair("PlanarDetector.size_mm", self.size_mm)
+            None
+            if self.size_mm is None
+            else _positive_pair(
+                "PlanarDetector.size_mm",
+                normalize_unit(
+                    self.size_mm,
+                    "mm",
+                    field="PlanarDetector.size_mm",
+                    expected="length",
+                ),
+            )
         )
         if self.pixels is not None and not isinstance(self.pixels, PixelGrid):
             raise TypeError("PlanarDetector.pixels must be a PixelGrid or None")

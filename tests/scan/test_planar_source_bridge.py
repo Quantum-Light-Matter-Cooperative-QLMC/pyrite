@@ -11,6 +11,7 @@ from pyrite.montecarlo.channeling import states
 from pyrite.montecarlo.channeling.density import DensityMatrixSolver
 from pyrite.montecarlo.channeling.handoff import zone_solver
 from pyrite.planar_source import project_planar_source, propagate_planar_source
+from pyrite.units import ureg
 
 ENERGY_EV = 17e6
 
@@ -77,6 +78,27 @@ def test_diagnostic_propagation_uses_exact_projected_initial():
     np.testing.assert_array_equal(actual.final_density, expected.final_density)
     np.testing.assert_array_equal(actual.trace, expected.trace)
     assert projection.total_population == pytest.approx(1.0, abs=2e-3)
+
+
+def test_projection_configuration_accepts_quantities_at_the_diagnostic_boundary():
+    spec = pr.TransverseStateSpec.recipe("gaussian", waist_ang=0.8, dimension=1)
+    projected = _project(
+        spec,
+        kinetic_energy_eV=17 * ureg.MeV,
+        incidence_rad=0.1 * ureg.degree,
+        temperature_K=ureg.Quantity(20, "degC"),
+        margin_eV=0.1 * ureg.keV,
+    )
+    assert projected.kinetic_energy_eV == ENERGY_EV
+    assert projected.temperature_K == pytest.approx(293.15)
+    assert projected.incidence_rad == pytest.approx(np.deg2rad(0.1))
+    assert projected.margin_eV == 100.0
+
+
+def test_projection_rejects_wrong_dimension_before_solver_work():
+    spec = pr.TransverseStateSpec.recipe("gaussian", waist_ang=0.8, dimension=1)
+    with pytest.raises(ValueError, match="project_planar_source.kinetic_energy_eV.*energy.*eV"):
+        _project(spec, kinetic_energy_eV=1 * ureg.mm)
 
 
 def test_coherent_vs_mixed_specs_keep_distinct_phase_identity():

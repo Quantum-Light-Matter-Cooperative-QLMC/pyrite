@@ -15,6 +15,8 @@ from numbers import Integral, Real
 
 import numpy as np
 
+from ._units import normalize_unit
+
 _AXIS_ATOL = 1.0e-10
 
 
@@ -72,7 +74,11 @@ class PlanarPose:
     x_axis: tuple[float, float, float] = (1.0, 0.0, 0.0)
 
     def __post_init__(self) -> None:
-        center = _finite_vector("PlanarPose.center_mm", self.center_mm, 3)
+        center = _finite_vector(
+            "PlanarPose.center_mm",
+            normalize_unit(self.center_mm, "mm", field="PlanarPose.center_mm", expected="length"),
+            3,
+        )
         normal = _finite_vector("PlanarPose.normal", self.normal, 3)
         x_axis = _finite_vector("PlanarPose.x_axis", self.x_axis, 3)
         normal_norm = float(np.linalg.norm(normal))
@@ -128,7 +134,20 @@ class PlanarPose:
         PlanarPose
             Normalized pose in the target-centred lab frame.
         """
-        distance = _positive_real("distance_mm", distance_mm)
+        distance = _positive_real(
+            "distance_mm",
+            normalize_unit(distance_mm, "mm", field="distance_mm", expected="length"),
+        )
+        polar_deg = normalize_unit(
+            polar_deg, "degree", field="polar_deg", expected="angle", kind="angle"
+        )
+        azimuth_deg = normalize_unit(
+            azimuth_deg, "degree", field="azimuth_deg", expected="angle", kind="angle"
+        )
+        roll_deg = normalize_unit(
+            roll_deg, "degree", field="roll_deg", expected="angle", kind="angle"
+        )
+        offset_mm = normalize_unit(offset_mm, "mm", field="offset_mm", expected="length")
         for name, value in (
             ("polar_deg", polar_deg),
             ("azimuth_deg", azimuth_deg),
@@ -196,7 +215,14 @@ class PixelGrid:
         if any(int(x) <= 0 for x in shape):
             raise ValueError("PixelGrid.shape values must be positive")
         object.__setattr__(self, "shape", (int(shape[0]), int(shape[1])))
-        object.__setattr__(self, "pitch_mm", _positive_pair("PixelGrid.pitch_mm", self.pitch_mm))
+        object.__setattr__(
+            self,
+            "pitch_mm",
+            _positive_pair(
+                "PixelGrid.pitch_mm",
+                normalize_unit(self.pitch_mm, "mm", field="PixelGrid.pitch_mm", expected="length"),
+            ),
+        )
 
     @property
     def active_size_mm(self) -> tuple[float, float]:

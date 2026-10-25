@@ -10,7 +10,7 @@ from typing import Any, Literal, cast
 
 import numpy as np
 
-from .. import DATA_DIR
+from .. import DATA_DIR, _config_presets
 from .._catalog_layout import ARTIFACT_DIR, catalog_root
 from .._cxr_grid_policy import PROFILE_CXR_GRID_SELECTORS
 from .._energy_grid_artifacts import ArtifactError, load_artifact
@@ -326,9 +326,11 @@ def _scan(
             errors.add(f"{path}.{key}", "missing required key")
             grids[key] = None
         else:
-            grids[key] = _grid(values[key], f"{path}.{key}", errors)
+            grids[key] = _field_grid(values[key], key, f"{path}.{key}", errors)
     if has_cxr:
-        grids["E_grid_line"] = _grid(values["E_grid_line"], f"{path}.E_grid_line", errors)
+        grids["E_grid_line"] = _field_grid(
+            values["E_grid_line"], "E_grid_line", f"{path}.E_grid_line", errors
+        )
     else:
         grids["E_grid_line"] = None
     # An empty mapping opts missing catalog rows into automatic case-local
@@ -357,7 +359,9 @@ def _scan(
     thickness = None
     layer_grid = None
     if has_ang:
-        thickness = _grid(values["thickness_ang"], f"{path}.thickness_ang", errors)
+        thickness = _field_grid(
+            values["thickness_ang"], "thickness_ang", f"{path}.thickness_ang", errors
+        )
     elif has_layers:
         layer_grid = _grid(values["thickness_layers"], f"{path}.thickness_layers", errors)
         if layer_grid is not None:
@@ -426,6 +430,24 @@ def _scan(
 
 _OVERRIDABLE_KEYS = frozenset(_SCAN_KEYS)
 
+_GRID_UNITS = {
+    "energy_keV": ("keV", "energy", None),
+    "tilt_deg": ("degree", "angle", "angle"),
+    "tilt_azim_deg": ("degree", "angle", "angle"),
+    "E_grid_brem": ("eV", "energy", None),
+    "E_grid_line": ("eV", "energy", None),
+    "thickness_ang": ("angstrom", "length", None),
+}
+
+
+def _field_grid(value: object, name: str, path: str, errors: _Errors):
+    """Decode a numeric grid and parse explicit units for physical fields."""
+    unit_spec = _GRID_UNITS.get(name)
+    if unit_spec is None:
+        return _grid(value, path, errors)
+    unit, expected, kind = unit_spec
+    return _grid(value, path, errors, unit=unit, expected=expected, kind=kind)
+
 
 def _parse_profile_precision(row, path, errors) -> None:
     """Validate ``profiles.NAME.precision`` and its incompatible profile keys."""
@@ -477,7 +499,7 @@ def _parse_profile_overrides(raw: object, path: str, errors: _Errors) -> None:
         for name in _OVERRIDABLE_KEYS:
             if name not in row:
                 continue
-            grid = _grid(row[name], f"{material_path}.{name}", errors)
+            grid = _field_grid(row[name], name, f"{material_path}.{name}", errors)
             if grid is not None:
                 _validate_angle_grid(name, grid, f"{material_path}.{name}", errors)
 
@@ -504,6 +526,23 @@ def _parse_profile_cxr_grid_policy(raw: object, path: str, errors: _Errors) -> N
         errors.add(f"{path}.windows", "must be a boolean")
     if "max_points" in table and (type(table["max_points"]) is not int or table["max_points"] < 2):
         errors.add(f"{path}.max_points", "must be an integer >= 2")
+
+
+def _parse_profile_scalar_numerics(
+    row: Mapping[str, object], path: str, errors: _Errors
+) -> dict[str, object]:
+    """Normalize physical scalar settings before validating profile controls."""
+    raw_values = {name: row[name] for name in _PROFILE_SCALAR_NUMERICS_KEYS if name in row}
+    try:
+        values = _config_presets.normalize_field_units(raw_values, field_prefix=path)
+        validate_profile_numerics(values)
+    except (ImportError, TypeError, ValueError) as exc:
+        message = str(exc)
+        field = message.split(maxsplit=1)[0]
+        detail = message.removeprefix(field).strip()
+        errors.add(field if field.startswith(f"{path}.") else f"{path}.{field}", detail)
+        return {}
+    return values
 
 
 def _parse_profiles(raw: object, errors: _Errors) -> dict[str, Mapping[str, object]]:
@@ -552,7 +591,7 @@ def _parse_profiles(raw: object, errors: _Errors) -> dict[str, Mapping[str, obje
                 errors.add(f"{path}.{name}", "missing required key")
         for name in _SCAN_KEYS:
             if name in row:
-                grid = _grid(row[name], f"{path}.{name}", errors)
+                grid = _field_grid(row[name], name, f"{path}.{name}", errors)
                 if grid is not None:
                     _validate_angle_grid(name, grid, f"{path}.{name}", errors)
         materials_list = row.get("materials")
@@ -568,14 +607,7 @@ def _parse_profiles(raw: object, errors: _Errors) -> dict[str, Mapping[str, obje
             errors.add(f"{path}.emission", f"must be one of {_EMISSION_VALUES}")
         if "temporal_profile" in row and type(row["temporal_profile"]) is not bool:
             errors.add(f"{path}.temporal_profile", "must be a boolean")
-        scalar_numerics = {name: row[name] for name in _PROFILE_SCALAR_NUMERICS_KEYS if name in row}
-        try:
-            validate_profile_numerics(scalar_numerics)
-        except ValueError as exc:
-            message = str(exc)
-            field = message.split(maxsplit=1)[0]
-            detail = message.removeprefix(field).strip()
-            errors.add(f"{path}.{field}", detail)
+        scalar_numerics = _parse_profile_scalar_numerics(row, path, errors)
         if "precision" in row:
             _parse_profile_precision(row, path, errors)
         if "overrides" in row:
@@ -599,6 +631,7 @@ def _parse_profiles(raw: object, errors: _Errors) -> dict[str, Mapping[str, obje
                             "must be a 64-character lowercase SHA-256 digest",
                         )
         row_out = dict(row)
+        row_out.update(scalar_numerics)
         if "beam" in row_out:
             beam_raw = row_out["beam"]
             if isinstance(beam_raw, str):

@@ -6,6 +6,7 @@ from collections.abc import Mapping
 from types import MappingProxyType
 from typing import cast
 
+from .._units import normalize_unit_input
 from ._catalog_decode import _Errors, _number, _table
 
 # Beam *distribution* fields settable in a ``[profiles.NAME.beam]`` block. These
@@ -26,6 +27,15 @@ _BEAM_POSITIVE_KEYS = frozenset(
         "energy_spread_frac",
     }
 )
+_BEAM_UNITS = {
+    "transverse_fwhm_x_mm": ("mm", "length"),
+    "transverse_fwhm_y_mm": ("mm", "length"),
+    "transverse_fwhm_mm": ("mm", "length"),
+    "beam_fwhm_mm": ("mm", "length"),
+    "bunch_length_fs": ("fs", "time"),
+    "rep_rate_hz": ("Hz", "frequency"),
+    "bunch_charge_pc": ("pC", "charge"),
+}
 _BEAM_LONG_SHAPES = frozenset({"gaussian", "uniform"})
 # Mirrors ``instrument.model.RECONSTRUCTIONS``; local for the same import-cycle reason.
 _RECONSTRUCTIONS = ("nearest_tile", "bilinear_tile")
@@ -39,6 +49,13 @@ _GDF_KEYS = {
     "gdf_screen_tolerance_m",
     "gdf_normalization",
     "gdf_z_origin_m",
+}
+_GDF_UNITS = {
+    "gdf_time_s": ("s", "time"),
+    "gdf_time_tolerance_s": ("s", "time"),
+    "gdf_screen_position_m": ("m", "length"),
+    "gdf_screen_tolerance_m": ("m", "length"),
+    "gdf_z_origin_m": ("m", "length"),
 }
 _BEAM_KEYS = (
     _BEAM_POSITIVE_KEYS
@@ -312,27 +329,56 @@ def _parse_profile_beam(raw: object, path: str, errors: _Errors) -> dict[str, ob
             else:
                 out[key] = value
         elif key in _GDF_KEYS:
-            number = _number(value)
+            unit_info = _GDF_UNITS.get(key)
+            number = (
+                _unit_number(
+                    value,
+                    f"{path}.{key}",
+                    errors,
+                    unit_info[0],
+                    expected=unit_info[1],
+                )
+                if unit_info is not None
+                else _number(value)
+            )
             if number is None or (
                 key not in {"gdf_z_origin_m", "gdf_screen_position_m"} and number < 0
             ):
-                errors.add(
-                    f"{path}.{key}",
-                    "must be finite and non-negative (origin/screen coordinates may be signed)",
-                )
+                if not errors.has(f"{path}.{key}"):
+                    errors.add(
+                        f"{path}.{key}",
+                        "must be finite and non-negative (origin/screen coordinates may be signed)",
+                    )
             else:
                 out[key] = number
         elif key == "bunch_front_tilt":
             front = _table(value, f"{path}.{key}", errors)
             if front is not None:
                 errors.keys(front, f"{path}.{key}", {"tilt_deg", "azimuth_deg"})
-                tilt = _number(front.get("tilt_deg"))
-                azimuth = _number(front.get("azimuth_deg", 0.0))
+                tilt = _unit_number(
+                    front.get("tilt_deg"),
+                    f"{path}.{key}.tilt_deg",
+                    errors,
+                    "degree",
+                    expected="angle",
+                    kind="angle",
+                )
+                azimuth = _unit_number(
+                    front.get("azimuth_deg", 0.0),
+                    f"{path}.{key}.azimuth_deg",
+                    errors,
+                    "degree",
+                    expected="angle",
+                    kind="angle",
+                )
                 if tilt is None or not -90 < tilt < 90 or azimuth is None:
-                    errors.add(
-                        f"{path}.{key}",
-                        "requires finite -90 < tilt_deg < 90 and finite azimuth_deg",
-                    )
+                    if not errors.has(f"{path}.{key}.tilt_deg") and not errors.has(
+                        f"{path}.{key}.azimuth_deg"
+                    ):
+                        errors.add(
+                            f"{path}.{key}",
+                            "requires finite -90 < tilt_deg < 90 and finite azimuth_deg",
+                        )
                 else:
                     out[key] = MappingProxyType({"tilt_deg": tilt, "azimuth_deg": azimuth})
         elif key == "long_shape":
@@ -341,9 +387,25 @@ def _parse_profile_beam(raw: object, path: str, errors: _Errors) -> dict[str, ob
             else:
                 out[key] = value
         elif key == "long_offsets_fs":
-            offsets = [_number(item) for item in value] if isinstance(value, list) else None
+            offsets = (
+                [
+                    _unit_number(
+                        item,
+                        f"{path}.long_offsets_fs[{index}]",
+                        errors,
+                        "fs",
+                        expected="time",
+                    )
+                    for index, item in enumerate(value)
+                ]
+                if isinstance(value, list)
+                else None
+            )
             if not offsets or any(item is None for item in offsets):
-                errors.add(f"{path}.long_offsets_fs", "must be a non-empty array of finite numbers")
+                if not errors.has(f"{path}.long_offsets_fs"):
+                    errors.add(
+                        f"{path}.long_offsets_fs", "must be a non-empty array of finite times in fs"
+                    )
             else:
                 out[key] = tuple(offsets)
         elif key == "longitudinal":
@@ -355,9 +417,22 @@ def _parse_profile_beam(raw: object, path: str, errors: _Errors) -> dict[str, ob
             if transverse is not None:
                 out[key] = MappingProxyType(transverse)
         elif key in _BEAM_POSITIVE_KEYS:
-            number = _number(value)
+            unit_info = _BEAM_UNITS.get(key)
+            number = (
+                _unit_number(
+                    value,
+                    f"{path}.{key}",
+                    errors,
+                    unit_info[0],
+                    expected=unit_info[1],
+                )
+                if unit_info is not None
+                else _number(value)
+            )
             if number is None or number <= 0:
-                errors.add(f"{path}.{key}", "must be a finite positive number")
+                if not errors.has(f"{path}.{key}"):
+                    unit = unit_info[0] if unit_info is not None else ""
+                    errors.add(f"{path}.{key}", f"must be a finite positive number {unit}".strip())
             else:
                 out[key] = number
     return out or None
@@ -426,10 +501,28 @@ def _parse_profile_detector(raw: object, path: str, errors: _Errors) -> Mapping[
         if key not in table:
             continue
         raw_value = table[key]
-        if isinstance(raw_value, bool) or not isinstance(raw_value, (int, float)):
-            errors.add(path, f"{key} must be a real number")
+        if key == "solid_angle_sr":
+            value = _unit_number(
+                raw_value,
+                f"{path}.{key}",
+                errors,
+                "steradian",
+                expected="solid angle",
+                kind="solid_angle",
+            )
+        else:
+            value = _unit_number(
+                raw_value,
+                f"{path}.{key}",
+                errors,
+                "degree",
+                expected="angle",
+                kind="angle",
+            )
+        if value is None:
+            if not errors.has(f"{path}.{key}"):
+                errors.add(path, f"{key} must be a real number")
             return None
-        value = float(raw_value)
         if not math.isfinite(value):
             errors.add(path, f"{key} must be finite")
             return None
@@ -452,7 +545,13 @@ def _parse_profile_detector(raw: object, path: str, errors: _Errors) -> Mapping[
 
 
 def _pair(
-    raw: object, path: str, errors: _Errors, *, integer: bool = False
+    raw: object,
+    path: str,
+    errors: _Errors,
+    *,
+    integer: bool = False,
+    unit: str | None = None,
+    expected: str = "length",
 ) -> tuple[int | float, int | float] | None:
     if not isinstance(raw, list) or len(raw) != 2:
         errors.add(path, "must be a two-item array")
@@ -462,12 +561,35 @@ def _pair(
             errors.add(path, "must contain two positive integers")
             return None
         return cast(tuple[int, int], (raw[0], raw[1]))
-    first = _number(raw[0])
-    second = _number(raw[1])
+    if unit is None:
+        first = _number(raw[0])
+        second = _number(raw[1])
+    else:
+        first = _unit_number(raw[0], f"{path}[0]", errors, unit, expected=expected)
+        second = _unit_number(raw[1], f"{path}[1]", errors, unit, expected=expected)
     if first is None or second is None:
-        errors.add(path, "must contain two finite numbers")
+        if not errors.has(path):
+            errors.add(path, "must contain two finite numbers")
         return None
     return first, second
+
+
+def _unit_number(
+    value: object,
+    path: str,
+    errors: _Errors,
+    unit: str,
+    *,
+    expected: str,
+    kind: str | None = None,
+) -> float | None:
+    """Resolve one TOML numeric or explicitly unit-bearing value."""
+    try:
+        normalized = normalize_unit_input(value, unit, field=path, expected=expected, kind=kind)
+    except (ImportError, TypeError, ValueError) as exc:
+        errors.add(path, str(exc))
+        return None
+    return _number(normalized)
 
 
 def _parse_filter_rows(
@@ -491,27 +613,54 @@ def _parse_filter_rows(
             errors.add(f"{row_path}.name", "must be a nonempty string")
         cleaned: dict[str, object] = {key: row[key] for key in ("name", "material") if key in row}
         for key in ("thickness_mm", "distance_mm"):
-            value = _number(row.get(key))
+            value = _unit_number(
+                row.get(key),
+                f"{row_path}.{key}",
+                errors,
+                "mm",
+                expected="length",
+            )
             if value is None or value <= 0:
-                errors.add(f"{row_path}.{key}", "must be a finite positive number")
+                if not errors.has(f"{row_path}.{key}"):
+                    errors.add(f"{row_path}.{key}", "must be a finite positive number in mm")
             else:
                 cleaned[key] = value
-        size = _pair(row.get("size_mm"), f"{row_path}.size_mm", errors)
+        size = _pair(
+            row.get("size_mm"),
+            f"{row_path}.size_mm",
+            errors,
+            unit="mm",
+            expected="length",
+        )
         if size is not None:
             if any(float(item) <= 0 for item in size):
                 errors.add(f"{row_path}.size_mm", "must contain positive numbers")
             else:
                 cleaned["size_mm"] = size
         for key, default in (("polar_deg", 90.0), ("azimuth_deg", 0.0), ("roll_deg", 0.0)):
-            value = _number(row.get(key, default))
+            value = _unit_number(
+                row.get(key, default),
+                f"{row_path}.{key}",
+                errors,
+                "degree",
+                expected="angle",
+                kind="angle",
+            )
             if value is None or key == "polar_deg" and not 0 <= value <= 180:
-                errors.add(
-                    f"{row_path}.{key}",
-                    "must be finite" if key != "polar_deg" else "must be between 0 and 180",
-                )
+                if not errors.has(f"{row_path}.{key}"):
+                    errors.add(
+                        f"{row_path}.{key}",
+                        "must be finite" if key != "polar_deg" else "must be between 0 and 180",
+                    )
             else:
                 cleaned[key] = value
-        offset = _pair(row.get("offset_mm", [0.0, 0.0]), f"{row_path}.offset_mm", errors)
+        offset = _pair(
+            row.get("offset_mm", [0.0, 0.0]),
+            f"{row_path}.offset_mm",
+            errors,
+            unit="mm",
+            expected="length",
+        )
         if offset is not None:
             cleaned["offset_mm"] = offset
         rows.append(MappingProxyType(cleaned))
@@ -577,12 +726,19 @@ def _parse_observation_response(
         errors.add(path, "ideal response accepts only kind")
         return None
     cleaned: dict[str, object] = {"kind": kind}
-    for key in ("thickness_um", "bias_v", "dE_mc", "dE_out"):
+    response_units = {
+        "thickness_um": ("um", "length"),
+        "bias_v": ("V", "voltage"),
+        "dE_mc": ("eV", "energy"),
+        "dE_out": ("eV", "energy"),
+    }
+    for key, (unit, expected) in response_units.items():
         if key not in row:
             continue
-        value = _number(row[key])
+        value = _unit_number(row[key], f"{path}.{key}", errors, unit, expected=expected)
         if value is None or value <= 0.0:
-            errors.add(f"{path}.{key}", "must be a finite positive number")
+            if not errors.has(f"{path}.{key}"):
+                errors.add(f"{path}.{key}", f"must be a finite positive number in {unit}")
         else:
             cleaned[key] = value
     for key in ("n_mc", "seed"):
@@ -605,7 +761,20 @@ def _parse_explicit_acquisition_edges(
     raw_edges: object, path: str, errors: _Errors
 ) -> tuple[float, ...] | None:
     """Decode finite, nonnegative, strictly increasing measured edges."""
-    values = [_number(item) for item in raw_edges] if isinstance(raw_edges, list) else []
+    values = (
+        [
+            _unit_number(
+                item,
+                f"{path}.measured_edges_eV[{index}]",
+                errors,
+                "eV",
+                expected="energy",
+            )
+            for index, item in enumerate(raw_edges)
+        ]
+        if isinstance(raw_edges, list)
+        else []
+    )
     if len(values) < 2 or any(value is None or value < 0.0 for value in values):
         errors.add(f"{path}.measured_edges_eV", "must contain at least two nonnegative numbers")
     elif any(
@@ -622,7 +791,10 @@ def _parse_uniform_acquisition_edges(
     row: Mapping[str, object], path: str, errors: _Errors
 ) -> tuple[float, ...] | None:
     """Validate a complete uniform range and retain its exact upper endpoint."""
-    minimum, maximum, width = (_number(row[key]) for key in _ACQUISITION_UNIFORM_KEYS)
+    minimum, maximum, width = (
+        _unit_number(row[key], f"{path}.{key}", errors, "eV", expected="energy")
+        for key in _ACQUISITION_UNIFORM_KEYS
+    )
     if (
         minimum is None
         or maximum is None
@@ -694,16 +866,26 @@ def _parse_acquisition(
     if row is None:
         return None
     errors.keys(row, path, set(_ACQUISITION_KEYS))
-    exposure = _number(row.get("exposure_s"))
+    exposure = _unit_number(
+        row.get("exposure_s"), f"{path}.exposure_s", errors, "s", expected="time"
+    )
     if exposure is None or exposure <= 0.0:
-        errors.add(f"{path}.exposure_s", "must be a finite positive number")
+        if not errors.has(f"{path}.exposure_s"):
+            errors.add(f"{path}.exposure_s", "must be a finite positive number")
 
     native = row.get("reporting_bins") == "native"
     edges = _parse_acquisition_bins(row, path, errors, native=native)
 
-    threshold = _number(row.get("hit_threshold_eV", 0.0))
+    threshold = _unit_number(
+        row.get("hit_threshold_eV", 0.0),
+        f"{path}.hit_threshold_eV",
+        errors,
+        "eV",
+        expected="energy",
+    )
     if threshold is None or threshold < 0.0:
-        errors.add(f"{path}.hit_threshold_eV", "must be a finite nonnegative number")
+        if not errors.has(f"{path}.hit_threshold_eV"):
+            errors.add(f"{path}.hit_threshold_eV", "must be a finite nonnegative number")
     mode = row.get("mode", "expected")
     seed = row.get("seed")
     _validate_acquisition_mode(mode, seed, path, errors)
@@ -736,27 +918,50 @@ def _parse_physical_detector(
         return None
     errors.keys(row, path, set(_PHYSICAL_DETECTOR_KEYS))
     cleaned: dict[str, object] = {}
-    distance = _number(row.get("distance_mm"))
+    distance = _unit_number(
+        row.get("distance_mm"), f"{path}.distance_mm", errors, "mm", expected="length"
+    )
     if distance is None or distance <= 0:
-        errors.add(f"{path}.distance_mm", "must be a finite positive number")
+        if not errors.has(f"{path}.distance_mm"):
+            errors.add(f"{path}.distance_mm", "must be a finite positive length in mm")
     else:
         cleaned["distance_mm"] = distance
     for key, default in (("polar_deg", 90.0), ("azimuth_deg", 0.0), ("roll_deg", 0.0)):
-        value = _number(row.get(key, default))
+        value = _unit_number(
+            row.get(key, default),
+            f"{path}.{key}",
+            errors,
+            "degree",
+            expected="angle",
+            kind="angle",
+        )
         if value is None or key == "polar_deg" and not 0 <= value <= 180:
-            errors.add(
-                f"{path}.{key}",
-                "must be finite" if key != "polar_deg" else "must be between 0 and 180",
-            )
+            if not errors.has(f"{path}.{key}"):
+                errors.add(
+                    f"{path}.{key}",
+                    "must be finite" if key != "polar_deg" else "must be between 0 and 180",
+                )
         else:
             cleaned[key] = value
-    offset = _pair(row.get("offset_mm", [0.0, 0.0]), f"{path}.offset_mm", errors)
+    offset = _pair(
+        row.get("offset_mm", [0.0, 0.0]),
+        f"{path}.offset_mm",
+        errors,
+        unit="mm",
+        expected="length",
+    )
     if offset is not None:
         cleaned["offset_mm"] = offset
     shape = _pair(row.get("shape", [256, 256]), f"{path}.shape", errors, integer=True)
     if shape is not None:
         cleaned["shape"] = shape
-    pitch = _pair(row.get("pitch_mm", [0.055, 0.055]), f"{path}.pitch_mm", errors)
+    pitch = _pair(
+        row.get("pitch_mm", [0.055, 0.055]),
+        f"{path}.pitch_mm",
+        errors,
+        unit="mm",
+        expected="length",
+    )
     if pitch is not None:
         if any(float(item) <= 0 for item in pitch):
             errors.add(f"{path}.pitch_mm", "must contain positive numbers")

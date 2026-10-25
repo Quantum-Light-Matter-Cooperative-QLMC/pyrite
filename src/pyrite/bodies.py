@@ -5,6 +5,7 @@ from numbers import Real
 from typing import Literal
 
 from ._planar_geometry import _positive_pair, _positive_real
+from ._units import normalize_unit
 from .materials._composition import has_positive_number_densities, resolve_composition
 from .materials._schema import MaterialCatalog, MediumSpec
 
@@ -83,9 +84,31 @@ class RectangularBody:
                     tuple((element, density) for element, density in self.substance.composition),
                 ),
             )
-        object.__setattr__(self, "size_mm", _positive_pair("RectangularBody.size_mm", self.size_mm))
         object.__setattr__(
-            self, "thickness_mm", _positive_real("RectangularBody.thickness_mm", self.thickness_mm)
+            self,
+            "size_mm",
+            _positive_pair(
+                "RectangularBody.size_mm",
+                normalize_unit(
+                    self.size_mm,
+                    "mm",
+                    field="RectangularBody.size_mm",
+                    expected="length",
+                ),
+            ),
+        )
+        object.__setattr__(
+            self,
+            "thickness_mm",
+            _positive_real(
+                "RectangularBody.thickness_mm",
+                normalize_unit(
+                    self.thickness_mm,
+                    "mm",
+                    field="RectangularBody.thickness_mm",
+                    expected="length",
+                ),
+            ),
         )
 
 

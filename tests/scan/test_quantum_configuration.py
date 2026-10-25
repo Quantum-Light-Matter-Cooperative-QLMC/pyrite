@@ -6,6 +6,7 @@ import pytest
 
 from pyrite import Numerics, Physics
 from pyrite.quantum import QuantumDynamics, QuantumNumerics, QuantumRegion, QuantumSetup
+from pyrite.units import ureg
 
 
 def _planar():
@@ -33,6 +34,27 @@ def test_custom_planar_grid_lowering():
         numerics.channeling_bloch_cells,
         numerics.channeling_dz_ang,
     ) == (12, 8, 100.0)
+
+
+def test_quantum_region_and_numerics_normalize_length_quantities():
+    region = QuantumRegion(kind="planar", plane_hkl=(1, 1, 0), zone_max_ang=ureg.Quantity(2, "nm"))
+    numerics = QuantumNumerics(step_ang=ureg.Quantity(0.01, "nm"))
+    assert region.zone_max_ang == 20.0
+    assert numerics.step_ang == 0.1
+    setup = QuantumSetup(
+        region=region,
+        dynamics=QuantumDynamics(kind="channeling"),
+        numerics=QuantumNumerics(step_ang=ureg.Quantity(1, "nm")),
+    )
+    _, lowered = setup.lower(Physics(radiative_model="uncoupled"), Numerics())
+    assert lowered.channeling_dz_ang == 10.0
+    assert lowered.channeling_zone_max_ang == 20.0
+    assert type(lowered.channeling_dz_ang) is float
+
+
+def test_quantum_length_fields_reject_wrong_dimensions():
+    with pytest.raises(ValueError, match="QuantumNumerics.step_ang.*length.*angstrom"):
+        QuantumNumerics(step_ang=1 * ureg.keV)
 
 
 def test_immutable_and_defensive_tuple_conversion():

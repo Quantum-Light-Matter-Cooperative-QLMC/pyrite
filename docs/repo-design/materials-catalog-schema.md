@@ -104,6 +104,14 @@ tilt_azim_deg = { arange = [0.0, 360.0, 30.0] }
 
 Electron-count grids, line grids, bremsstrahlung grids, thickness-in-layers, and per-energy line grids use the same validated descriptor model where applicable. Units belong in field names: electron energy is keV, photon energy is eV, thickness is Å, and angles are degrees.
 
+With the optional `pyrite-mc[units]` extra installed, physical grid values and
+profile beam, detector, filter, response, and acquisition fields also accept
+explicit quantity strings. For example, `energy_keV = "60 keV"`,
+`distance_mm = "10 cm"`, `polar_deg = "0.5 rad"`, and
+`exposure_s = "500 ms"` resolve through the same Pint adapter as Python
+configuration objects. Existing numeric TOML values retain their field units.
+See the [physical-units boundary and supported fields](physical-units.md).
+
 ## Beams and detectors
 
 A named beam contains display metadata plus transverse and longitudinal source parameters. Profiles attach it with `beam = "NAME"`; the name and label are removed during resolution so identity follows values. The full field and unit reference is [Beam phase space](../physics/beam-transport/beam-phase-space.md).
@@ -112,9 +120,9 @@ A named beam contains display metadata plus transverse and longitudinal source p
 
 ## Physics and numerics presets
 
-`[physics.NAME]` holds `emission` and any profile key that is a `Physics` field (elastic, inelastic, bremsstrahlung, radiative, pair, positron, atomic-electron, shell-ionization, channeling-model and transition-radiation selectors and their cutoffs), plus an optional display `description`. Omitted keys keep built-in defaults; sampling, integration and grid numerics are rejected. A profile attaches one with `physics = "NAME"`. Before validation the catalog folds the preset under the profile's own physics keys, which stay explicit overrides, and validates the merged values for every referencing profile. Consumers, run identities and checkpoints therefore see only effective values: renaming a preset, adding an unused one, or moving equal inline values into a preset does not change identity. The bundled `electron-standard` preset restates the built-in defaults.
+`[physics.NAME]` holds `emission` and any profile key that is a `Physics` field (elastic, inelastic, bremsstrahlung, radiative, pair, positron, atomic-electron, shell-ionization, channeling-model and transition-radiation selectors and their cutoffs), plus an optional display `description`. Physical energy cutoffs and the transition lattice origin also accept explicit compatible quantity strings. Omitted keys keep built-in defaults; sampling, integration and grid numerics are rejected. A profile attaches one with `physics = "NAME"`. Before validation the catalog folds the preset under the profile's own physics keys, which stay explicit overrides, and validates the merged values for every referencing profile. Consumers, run identities and checkpoints therefore see only effective values: renaming a preset, adding an unused one, or moving equal inline values into a preset does not change identity. The bundled `electron-standard` preset restates the built-in defaults.
 
-`[numerics.NAME]` holds scalar trial counts (`cxr_trials`, `brem_trials`; one positive integer each — sweep grids stay in profiles), reflection/mosaic quadrature, integration and channeling-zone numerics, and optional `[precision]` and `[line_grid_policy]` tables; a profile attaches it with `numerics = "NAME"`. Trial counts and `precision` form one sampling policy: a profile that sets any of them takes none of them from its preset, so fixed counts and adaptive precision never mix. Physical models and cutoffs are rejected. The bundled `default` preset restates the built-in integration and mosaic numerics and leaves trial counts, reflection truncation and precision to the fidelity and default adaptive policy.
+`[numerics.NAME]` holds scalar trial counts (`cxr_trials`, `brem_trials`; one positive integer each — sweep grids stay in profiles), reflection/mosaic quadrature, integration and channeling-zone numerics, and optional `[precision]` and `[line_grid_policy]` tables; a profile attaches it with `numerics = "NAME"`. Channeling depth and zone lengths accept explicit compatible quantity strings. Trial counts and `precision` form one sampling policy: a profile that sets any of them takes none of them from its preset, so fixed counts and adaptive precision never mix. Physical models and cutoffs are rejected. The bundled `default` preset restates the built-in integration and mosaic numerics and leaves trial counts, reflection truncation and precision to the fidelity and default adaptive policy.
 
 Profile runs record each referenced preset's name and definition digest (`presets` beside `parameter_sha256` in the dataset identity and case manifest) as an unhashed label. See [ADR-0021](../adr/0021-named-physics-numerics-presets.md).
 

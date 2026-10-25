@@ -10,6 +10,7 @@ from ._energy_bins import EnergyBins
 from ._photon_config import PhotonTransport
 from ._precision import Precision
 from ._sampling import AdaptiveSampling, FixedSampling, SamplingPolicy
+from ._units import normalize_unit
 
 if TYPE_CHECKING:
     from ._numerics_groups import ExecutionConfig, RadiationNumerics, TransportNumerics
@@ -287,6 +288,19 @@ class Physics:
     photon_transport: PhotonTransport | None = None
 
     def __post_init__(self) -> None:
+        for name in ("inelastic_cutoff_eV", "secondary_threshold_eV", "radiative_cutoff_eV"):
+            value = getattr(self, name)
+            if value is not None:
+                object.__setattr__(
+                    self,
+                    name,
+                    normalize_unit(
+                        value,
+                        "eV",
+                        field=f"Physics.{name}",
+                        expected="energy",
+                    ),
+                )
         if self.emission == "both":
             raise ValueError(
                 'emission="both" was removed in 0.15.0; use emission=("incoherent", "coherent")'
@@ -294,7 +308,16 @@ class Physics:
         object.__setattr__(self, "emission", _emission_selection(self.emission))
         if self.transition_lattice_origin_ang is not None:
             object.__setattr__(
-                self, "transition_lattice_origin_ang", tuple(self.transition_lattice_origin_ang)
+                self,
+                "transition_lattice_origin_ang",
+                tuple(
+                    normalize_unit(
+                        self.transition_lattice_origin_ang,
+                        "angstrom",
+                        field="Physics.transition_lattice_origin_ang",
+                        expected="length",
+                    )
+                ),
             )
         if self.channeling_plane is not None:
             object.__setattr__(self, "channeling_plane", _miller(self.channeling_plane))
@@ -406,6 +429,27 @@ class Numerics:
     channeling_zone_max_ang: float | None = field(default=None, kw_only=True)
 
     def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "channeling_dz_ang",
+            normalize_unit(
+                self.channeling_dz_ang,
+                "angstrom",
+                field="Numerics.channeling_dz_ang",
+                expected="length",
+            ),
+        )
+        if self.channeling_zone_max_ang is not None:
+            object.__setattr__(
+                self,
+                "channeling_zone_max_ang",
+                normalize_unit(
+                    self.channeling_zone_max_ang,
+                    "angstrom",
+                    field="Numerics.channeling_zone_max_ang",
+                    expected="length",
+                ),
+            )
         self._resolve_typed_groups()
         self._resolve_typed_sampling()
         validate_channeling_numerics(

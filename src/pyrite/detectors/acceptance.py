@@ -4,6 +4,8 @@ import math
 from dataclasses import dataclass
 from numbers import Real
 
+from .._units import normalize_unit
+
 
 def _positive(name: str, value: object) -> float:
     if isinstance(value, bool) or not isinstance(value, Real):
@@ -46,6 +48,15 @@ class AngularAcceptance:
         ):
             value = getattr(self, name)
             if value is not None:
+                target = "steradian" if name == "solid_angle_sr" else "degree"
+                kind = "solid_angle" if name == "solid_angle_sr" else "angle"
+                value = normalize_unit(
+                    value,
+                    target,
+                    field=f"AngularAcceptance.{name}",
+                    expected=kind.replace("_", " "),
+                    kind=kind,
+                )
                 value = _positive(name, value)
                 if value > maximum:
                     raise ValueError(f"{name} must be <= {maximum:g}")
@@ -106,7 +117,13 @@ class SensorAcceptance:
 
     def __post_init__(self) -> None:
         for name in ("distance_mm", "width_mm", "height_mm"):
-            object.__setattr__(self, name, _positive(name, getattr(self, name)))
+            value = normalize_unit(
+                getattr(self, name),
+                "mm",
+                field=f"SensorAcceptance.{name}",
+                expected="length",
+            )
+            object.__setattr__(self, name, _positive(name, value))
 
     def resolve(self) -> tuple[float, float, float]:
         """Return local full polar/azimuthal spans (deg) and exact Ω (sr).

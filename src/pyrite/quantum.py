@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
 from ._numerics import Numerics, Physics, _miller, validate_channeling_numerics
+from ._units import normalize_unit
 
 if TYPE_CHECKING:
     from .planar_source import PlanarStateProjection
@@ -28,6 +29,17 @@ class QuantumRegion:
     zone_max_ang: float | None = None
 
     def __post_init__(self) -> None:
+        if self.zone_max_ang is not None:
+            object.__setattr__(
+                self,
+                "zone_max_ang",
+                normalize_unit(
+                    self.zone_max_ang,
+                    "angstrom",
+                    field="QuantumRegion.zone_max_ang",
+                    expected="length",
+                ),
+            )
         if self.kind not in ("free", "planar", "axial"):
             raise ValueError("unknown quantum region kind")
         if self.kind == "planar":
@@ -70,6 +82,16 @@ class QuantumNumerics:
     step_ang: float = 250.0
 
     def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "step_ang",
+            normalize_unit(
+                self.step_ang,
+                "angstrom",
+                field="QuantumNumerics.step_ang",
+                expected="length",
+            ),
+        )
         if self.representation not in ("bloch", "real-space"):
             raise ValueError("unknown quantum representation")
         if self.method not in ("coherent", "density-matrix", "mcwf"):

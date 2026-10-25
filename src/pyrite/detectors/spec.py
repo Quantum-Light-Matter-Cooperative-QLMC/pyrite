@@ -9,6 +9,7 @@ from typing import Protocol
 import numpy as np
 
 from .._energy_bins import EnergyBins as EnergyBins
+from .._units import normalize_unit
 from .acceptance import AngularAcceptance, SensorAcceptance
 
 
@@ -305,21 +306,42 @@ class Detector:
         object.__setattr__(self, "solid_angle_sr", omega)
 
     def __post_init__(self) -> None:
+        observation_angle = normalize_unit(
+            self.observation_angle_deg,
+            "degree",
+            field="Detector.observation_angle_deg",
+            expected="angle",
+            kind="angle",
+        )
         object.__setattr__(
             self,
             "observation_angle_deg",
             _number(
                 "observation_angle_deg",
-                self.observation_angle_deg,
+                observation_angle,
                 minimum=0.0,
                 maximum=180.0,
             ),
         )
-        acceptance = _positive_optional("polar_acceptance_deg", self.polar_acceptance_deg)
+        polar = normalize_unit(
+            self.polar_acceptance_deg,
+            "degree",
+            field="Detector.polar_acceptance_deg",
+            expected="angle",
+            kind="angle",
+        )
+        acceptance = _positive_optional("polar_acceptance_deg", polar)
         if acceptance is not None and acceptance > 180.0:
             raise ValueError("polar_acceptance_deg is a full polar span and must be <= 180 degrees")
         object.__setattr__(self, "polar_acceptance_deg", acceptance)
-        solid_angle = _positive_optional("solid_angle_sr", self.solid_angle_sr)
+        solid_angle_value = normalize_unit(
+            self.solid_angle_sr,
+            "steradian",
+            field="Detector.solid_angle_sr",
+            expected="solid angle",
+            kind="solid_angle",
+        )
+        solid_angle = _positive_optional("solid_angle_sr", solid_angle_value)
         if solid_angle is not None and solid_angle > 4.0 * math.pi:
             raise ValueError("solid_angle_sr must be <= 4*pi sr")
         object.__setattr__(self, "solid_angle_sr", solid_angle)

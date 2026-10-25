@@ -19,6 +19,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Self
 
+from ._units import normalize_unit
+
 SCHEMA = "pyrite.quantum.transverse-state.v1"
 _ANALYTIC = {
     "gaussian",
@@ -103,12 +105,48 @@ def _coords(
     return tuple(_finite(name, item, positive=positive) for item in values)
 
 
+def _normalize_parameter_units(values: dict[str, Any]) -> None:
+    """Normalize dimensional state fields before JSON-safe validation."""
+    for name in ("waist_ang", "scale_ang", "center_ang", "spacing_ang", "origin_ang", "offset_ang"):
+        if name in values:
+            values[name] = normalize_unit(
+                values[name],
+                "angstrom",
+                field=f"TransverseStateSpec.{name}",
+                expected="length",
+            )
+    if "k_radial_inv_ang" in values:
+        values["k_radial_inv_ang"] = normalize_unit(
+            values["k_radial_inv_ang"],
+            "1 / angstrom",
+            field="TransverseStateSpec.k_radial_inv_ang",
+            expected="inverse length",
+        )
+    if values.get("kinetic_energy_eV") is not None:
+        values["kinetic_energy_eV"] = normalize_unit(
+            values["kinetic_energy_eV"],
+            "eV",
+            field="TransverseStateSpec.kinetic_energy_eV",
+            expected="energy",
+        )
+    for name in ("semiangle_rad", "inner_semiangle_rad"):
+        if name in values:
+            values[name] = normalize_unit(
+                values[name],
+                "radian",
+                field=f"TransverseStateSpec.{name}",
+                expected="angle",
+                kind="angle",
+            )
+
+
 def _params(kind: str, raw: Mapping[str, Any]) -> tuple[tuple[str, Any], ...]:
     extra = set(raw) - _FIELDS[kind]
     missing = _REQUIRED[kind] - set(raw)
     if extra or missing:
         raise ValueError(f"{kind}: unknown parameters {sorted(extra)}, missing {sorted(missing)}")
     values = dict(raw)
+    _normalize_parameter_units(values)
     if kind in ("gaussian", "airy"):
         dim = _integer("dimension", values.get("dimension", 2 if kind == "gaussian" else 1))
         if dim not in (1, 2):

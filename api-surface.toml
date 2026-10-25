@@ -98,6 +98,10 @@ save_material = { target = "pyrite.materials.authoring:save_material", status = 
 ObservationPlan = { target = "pyrite.observations.plan:ObservationPlan", status = "advanced-stable" }
 PixelSampling = { target = "pyrite.observations.plan:PixelSampling", status = "advanced-stable" }
 
+[package_exports."pyrite.units"]
+Q_ = { target = "pyrite.units:Q_", status = "advanced-stable" }
+ureg = { target = "pyrite.units:ureg", status = "advanced-stable" }
+
 [package_exports."pyrite.results"]
 Settings = { target = "pyrite.results.store:Settings", status = "advanced-stable" }
 records = { target = "pyrite.results.selection:records", status = "advanced-stable" }
