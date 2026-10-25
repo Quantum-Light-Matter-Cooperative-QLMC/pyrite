@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib
+import pickle
 import subprocess
 import sys
 from pathlib import Path
@@ -10,6 +11,119 @@ from pathlib import Path
 import pytest
 
 from pyrite.devtools import api_surface
+
+_BEAM_NAMES = (
+    "Beam",
+    "BunchFrontTilt",
+    "BunchLength",
+    "GdfSource",
+    "Offsets",
+    "PointBunch",
+    "PointSpot",
+    "Spot",
+    "TransverseSpot",
+)
+_GEOMETRY_OWNERS = {
+    "BlazedGrooves": "pyrite.campaign.geometry",
+    "CrystalCut": "pyrite.campaign.geometry",
+    "Filter": "pyrite.instrument",
+    "Footprint": "pyrite.campaign.geometry",
+    "Layer": "pyrite.campaign.geometry",
+    "RectangularBody": "pyrite.bodies",
+    "Slab": "pyrite.campaign.geometry",
+    "Stack": "pyrite.campaign.geometry",
+    "SubstanceRef": "pyrite.bodies",
+    "Target": "pyrite.campaign.target",
+}
+
+
+@pytest.mark.parametrize(
+    ("domain", "name", "owner"),
+    [("beams", name, "pyrite.campaign.beam") for name in _BEAM_NAMES]
+    + [("geometry", name, owner) for name, owner in _GEOMETRY_OWNERS.items()],
+)
+def test_physical_facades_preserve_implementation_and_pickle_identity(domain, name, owner):
+    """All physical exports preserve class metadata and legacy pickle bindings."""
+    import pyrite
+
+    canonical = getattr(importlib.import_module(f"pyrite.{domain}"), name)
+    original = getattr(importlib.import_module(owner), name)
+    assert canonical is original is getattr(pyrite, name)
+    # Class identity also preserves constructor signatures and dataclass Fields.
+    assert pickle.dumps(canonical) == pickle.dumps(original)
+    assert pickle.loads(pickle.dumps(original)) is canonical
+
+
+@pytest.mark.parametrize(
+    ("domain", "names"),
+    [("beams", _BEAM_NAMES), ("geometry", tuple(_GEOMETRY_OWNERS))],
+)
+def test_physical_facade_inventories_are_deliberate(domain, names):
+    facade = importlib.import_module(f"pyrite.{domain}")
+    assert sorted(facade.__all__) == sorted(names)
+    assert len(facade.__all__) == len(set(facade.__all__))
+    assert set(names) <= set(dir(facade))
+
+
+@pytest.mark.parametrize("gdf", [False, True], ids=["analytic", "gdf"])
+def test_canonical_physical_inputs_compose_layered_scenes_and_sweeps(gdf):
+    """Composition/serialization require neither GDF file I/O nor transport."""
+    from dataclasses import asdict
+
+    from pyrite import Scene, Sweep
+    from pyrite.beams import Beam, BunchLength, GdfSource, PointBunch, PointSpot
+    from pyrite.geometry import Footprint, Layer, Stack
+
+    beam = (
+        Beam.from_gdf("source.gdf", z_origin_m=0.0, time_s=1e-9, energy_keV=30.0)
+        if gdf
+        else Beam(energy_keV=30.0, transverse=PointSpot(), longitudinal=BunchLength(100.0))
+    )
+    target = Stack(
+        layers=(Layer("hopg", 1e4), Layer("sio2", 2850.0), Layer("silicon", 5e6)),
+        footprint=Footprint(5.0, 5.0),
+    )
+    scene = Scene(beam=beam, target=target)
+    expanded = [value for _, value in Sweep(scene, {"beam.energy_keV": [30.0, 50.0]}).expand()]
+    assert [value.beam.energy_keV for value in expanded] == [30.0, 50.0]
+    assert all(value.target == target for value in expanded)
+    assert Beam.from_spec(beam.to_spec()) == beam
+    assert asdict(pickle.loads(pickle.dumps(scene))) == asdict(scene)
+    if gdf:
+        assert beam.gdf == GdfSource("source.gdf", 0.0, time_s=1e-9)
+        assert all(value.beam.gdf == beam.gdf for value in expanded)
+        assert isinstance(beam.longitudinal, PointBunch)
+    else:
+        from pyrite import api
+        from pyrite.campaign.beam import Beam as OriginalBeam
+        from pyrite.campaign.geometry import Footprint as OriginalFootprint
+        from pyrite.campaign.geometry import Layer as OriginalLayer
+        from pyrite.campaign.geometry import Stack as OriginalStack
+
+        legacy_scene = Scene(
+            beam=OriginalBeam.from_spec(beam.to_spec()),
+            target=OriginalStack(
+                layers=tuple(
+                    OriginalLayer(layer.material, layer.thickness_ang) for layer in target.layers
+                ),
+                footprint=OriginalFootprint(5.0, 5.0),
+            ),
+        )
+        assert api.build_case(scene) == api.build_case(legacy_scene)
+
+
+def test_canonical_body_has_independent_target_and_filter_roles():
+    from pyrite.detectors import PlanarPose
+    from pyrite.geometry import Filter, RectangularBody, SubstanceRef, Target
+
+    body = RectangularBody(SubstanceRef("crystal", "silicon"), (5.0, 5.0), 0.1)
+    target = Target(body, tilt_deg=30.0)
+    window = Filter(body, PlanarPose((0.0, 0.0, 50.0)), name="window")
+    assert target.body is window.body is body
+    assert target.to_slab().thickness_ang == 1_000_000.0
+    assert window.to_plate().thickness_mm == 0.1
+    for value in (body, target, window):
+        assert pickle.loads(pickle.dumps(value)) == value
 
 
 @pytest.mark.parametrize(
@@ -74,6 +188,12 @@ assert 'pyrite.montecarlo' not in sys.modules
 assert 'pyrite.campaign.model' not in sys.modules
 import pyrite.beams
 import pyrite.geometry
+assert 'pyrite.campaign.beam' not in sys.modules
+assert 'pyrite.campaign.geometry' not in sys.modules
+assert 'pyrite.bodies' not in sys.modules
+for facade in (pyrite.beams, pyrite.geometry):
+    for name in facade.__all__:
+        getattr(facade, name)
 import pyrite.config
 import pyrite.detectors
 import pyrite.observations

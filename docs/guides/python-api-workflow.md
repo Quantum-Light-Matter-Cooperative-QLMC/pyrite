@@ -5,6 +5,21 @@ spectra. For named profiles, resumable checkpoints, or distributed runs, use
 [`pyrite run`](running-on-a-cluster.md) instead. The complete object and field
 reference is in the [supported Python API](../api.md).
 
+## Choose physical-input imports
+
+| What you are describing | Import from |
+| --- | --- |
+| Beam energy and analytic or GDF source distributions | `pyrite.beams` |
+| Slabs, layered stacks, crystal cuts, footprints, bodies, and target/filter roles | `pyrite.geometry` |
+| Catalog materials and their properties | `pyrite.materials` |
+| Detector geometry and response | `pyrite.detectors` |
+| Scene composition and sweep axes | `pyrite` (`Scene`, `Sweep`) |
+
+The [namespace policy](../development/api-policy.md#canonical-domain-facades-first-migration-slice)
+lists every beam and geometry export. `Spot` remains the supported alias of
+`TransverseSpot`. Domain imports resolve to the same objects as their historical
+root and implementation imports, with the same units and defaults.
+
 ## Run one scene in memory
 
 Build a beam, target, and detector with explicit units. `simulate` accepts
@@ -12,11 +27,11 @@ these components or a configured `Scene`.
 
 ```python
 import pyrite as pr
-from pyrite.beams import PointBunch, TransverseSpot
+from pyrite.beams import Beam, PointBunch, TransverseSpot
 from pyrite.config import CxrReflections, FixedSampling
 from pyrite.geometry import Footprint, Slab
 
-beam = pr.Beam(
+beam = Beam(
     energy_keV=30.0,
     transverse=TransverseSpot(fwhm_x_mm=1.0),
     longitudinal=PointBunch(),
@@ -271,20 +286,26 @@ registered photon counts, configure `PlanarDetector.response` and an
 
 ```python
 from pyrite.detectors import PlanarPose
-from pyrite.geometry import Filter, RectangularBody, SubstanceRef
+from pyrite.geometry import Filter, RectangularBody, SubstanceRef, Target
 
 body = RectangularBody(
     substance=SubstanceRef(kind="crystal", key="silicon"),
     size_mm=(10.0, 10.0),
     thickness_mm=0.1,
 )
-source_target = pr.Target(body=body, tilt_deg=30.0)
+source_target = Target(body=body, tilt_deg=30.0)
 window = Filter(body=body, pose=PlanarPose((0.0, 0.0, 50.0)), name="window")
 ```
 
 For existing flat slabs or stacks, use `Slab`/`Stack` directly. Filters are
 primary-attenuation-only; the body does not itself determine the object's
 role or placement.
+
+`SubstanceRef(kind="crystal", key="silicon")` selects a catalog crystal;
+`kind="medium"` selects a catalog medium. The body describes substance and
+dimensions independently of placement. `Target` gives a crystalline body its
+source-target orientation; `Filter` places a body downstream with a `PlanarPose`.
+Reusing the body shares its material description without coupling these roles.
 
 ## Tilt the bunch front and crystal cut
 
