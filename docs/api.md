@@ -36,8 +36,12 @@ are kinematic energies, with no prediction of intensity or broadening. See
 ## Scene simulation
 
 Build a beam, target and detector, then call {py:func}`pyrite.simulate` with
-those three components. `Scene` collects them for sweeps; `Physics` selects
-models and `Numerics` controls sampling and integration. Beam transverse and
+those three components, or pass a complete `Scene` as `simulate(scene)`.
+Scene calls use its physics and numerics unless explicitly overridden with
+`physics=` or `numerics=`; omit component arguments in that form. Target tilt
+and azimuth retain full floating-point precision in scenes and profile sweeps.
+`Physics` selects models and `Numerics` controls sampling and integration.
+Beam transverse and
 longitudinal descriptions and target footprints are explicit inputs.
 {py:func}`pyrite.load_physics` and {py:func}`pyrite.load_numerics` return
 named catalog presets (for example the bundled `electron-standard` and

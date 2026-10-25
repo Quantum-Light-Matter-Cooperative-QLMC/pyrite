@@ -96,7 +96,7 @@ def test_adapted_scene_retains_wrappers_and_lowers_to_identical_case_and_snapsho
 
     assert scene.target is target and scene.filters == (window,)
     assert api.build_case(scene) == api.build_case(legacy)
-    assert api.build_case(scene)["tilt_deg"] == 30.0  # existing angle quantization
+    assert api.build_case(scene)["tilt_deg"] == 30.2
     assert _identity(scene) == _identity(legacy)
     assert scene_payload(scene.filter_plates, scene.detector) == scene_payload(
         legacy.filter_plates, legacy.detector

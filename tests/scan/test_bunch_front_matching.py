@@ -47,24 +47,18 @@ def test_default_off_axis_line_matches_independently_derived_reference():
     np.testing.assert_allclose(front.gradient(30.0), explicit.gradient(30.0), atol=1e-13)
 
 
-@pytest.mark.parametrize(
-    "raw,resolved", [((30.24, 75.24), (30.0, 75.0)), ((30.25, -75.25), (30.5, -75.5))]
-)
-def test_off_grid_angles_match_the_actual_case_geometry(raw, resolved):
+@pytest.mark.parametrize("raw", [(30.24, 75.24), (30.25, -75.25)])
+def test_off_grid_angles_match_the_actual_case_geometry(raw):
     direction = (0.6, -0.4, 0.7)
     front = _scene(*raw).phase_matched_bunch_front_tilt(
         (1, 0, 2), photon_energy_eV=1800.0, observation_direction_lab=direction
     )
-    expected = _scene(*resolved).phase_matched_bunch_front_tilt(
-        (1, 0, 2), photon_energy_eV=1800.0, observation_direction_lab=direction
-    )
-    assert front == expected
     scene = _scene(*raw)
     case = build_case(replace(scene, beam=replace(scene.beam, bunch_front_tilt=front)))
-    assert (case["tilt_deg"], case["tilt_azim_deg"]) == resolved
+    assert (case["tilt_deg"], case["tilt_azim_deg"]) == raw
 
 
-@pytest.mark.parametrize("tilt,azimuth", [(30.0, 0.0), (-30.0, 75.0), (84.5, 145.0)])
+@pytest.mark.parametrize("tilt,azimuth", [(30.24, 0.0), (-30.25, 75.24), (84.5, 145.0)])
 @pytest.mark.parametrize("energy", [100.0, 600.0])
 def test_off_axis_reflection_cancels_independent_ray_phases(tilt, azimuth, energy):
     scene = _scene(tilt, azimuth)

@@ -34,7 +34,7 @@ import numpy as np
 
 from pyrite._cxr_grid_policy import AUTOMATIC_RESOLUTION_POLICY, COVERAGE_BANDWIDTH_POLICY
 from pyrite.campaign.config import material_sweep
-from pyrite.campaign.sweep import _quantized_angles, build_cases
+from pyrite.campaign.sweep import _unique_angles, build_cases
 from pyrite.energy_grid.bounds import coverage_energy, cxr_start_eV, margined_stop
 from pyrite.energy_grid.floor import floored_lattice_start_eV
 from pyrite.energy_grid.semantics import resolution_num
@@ -315,7 +315,7 @@ def _resume_phase(
 
 def _geometry_plan(materials, reference_scan, tilts=None, azimuths=None, thicknesses=None):
     """Return coarse geometry specs for the 95%-coverage search: the full
-    quantized tilt x azimuth x thickness product per material, as 4-tuples
+    tilt x azimuth x thickness product per material, as 4-tuples
     ``(material, tilt_deg, tilt_azim_deg, thickness_ang)``.
 
     With no overrides the tilt/azimuth axes default to the reference material's
@@ -331,17 +331,16 @@ def _geometry_plan(materials, reference_scan, tilts=None, azimuths=None, thickne
     maximizes resonant line energy (the widest line-grid driver); the coarse scan
     ranks the product and the refine phase re-measures the top few at higher Ne.
 
-    Both angle axes pass through ``_quantized_angles`` -- the same nearest-0.5deg
-    rounding ``build_cases`` applies -- so each ``Candidate``'s recorded geometry
-    (reported as the driver) is the geometry actually simulated, not the raw
-    catalog value. The second return value (a legacy large-tilt spot-check set)
+    Both angle axes preserve their full precision and remove only exact
+    duplicates, matching ``build_cases``. Each ``Candidate`` records the
+    geometry actually simulated. The second return value (a legacy large-tilt spot-check set)
     is empty: the full product already spans the largest tilt.
     """
     raw_tilts = tilts if tilts else reference_scan.tilt_deg
     raw_azims = azimuths if azimuths else reference_scan.tilt_azim_deg
     thicks = thicknesses if thicknesses else [DIAGNOSTIC_THICKNESS_ANG]
-    tilt_vals = [float(value) for value in _quantized_angles(raw_tilts)]
-    azim_vals = [float(value) for value in _quantized_angles(raw_azims)]
+    tilt_vals = [float(value) for value in _unique_angles(raw_tilts)]
+    azim_vals = [float(value) for value in _unique_angles(raw_azims)]
     coarse = [
         (material, tilt, azim, float(thick))
         for material in materials

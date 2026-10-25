@@ -47,7 +47,7 @@ its transverse basis is `(cos φ, sin φ, 0)` and the direction at signed angle 
 is `(sin θ cos φ, sin θ sin φ, cos θ)`. Default φ = 0 gives the x–z plane:
 0° is forward, +90° is +x, −90° is −x and ±180° is backward. The target pose
 rotates these lab vectors into the sample frame using the existing target
-convention; target angles resolve to the nearest half degree. A map is a
+convention; target angles retain full precision. A map is a
 **plane slice**, not an azimuth-integrated distribution.
 
 Angles are periodic point samples on [−180°, +180°), without a repeated endpoint.
@@ -164,9 +164,8 @@ histories, about 8% at 128 and 2% at 512; per-pixel spread falls as 1/√N
 The finite plotted window is not a total yield.
 
 The app has no demonstration caps on tilts, thickness, histories or grid size.
-It validates physical inputs, keeps tilts distinct after half-degree pose
-resolution, and refuses only result arrays larger than about 1.6 GB; the
-spinner reports the electron × direction × energy work before it starts.
+It validates physical inputs, requires distinct target tilts, and refuses only
+result arrays larger than about 1.6 GB; the spinner reports the electron × direction × energy work before it starts.
 *Max reflections* (default 4) truncates the reflection set; raise it for a
 reflection-convergence study. The existing kinematic PXR/CBS and escape model
 validity limits apply unchanged.

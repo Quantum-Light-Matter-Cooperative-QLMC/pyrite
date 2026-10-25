@@ -19,7 +19,7 @@ def test_geometry_plan_is_full_curated_tilt_azimuth_product():
 
     coarse, spot_check = analyze._geometry_plan(["a", "b"], scan)
 
-    # The full quantized tilt x azimuth product, every geometry sampled; the
+    # The full tilt x azimuth product, every geometry sampled; the
     # legacy large-tilt spot-check set is empty (the product already spans it).
     # Specs are now 4-tuples carrying the (default) diagnostic thickness.
     assert spot_check == []
@@ -581,3 +581,12 @@ def test_brem_grid_for_rows_uses_requested_output_step():
     grid = analyze._brem_grid_for_rows(rows, step_eV=12.5)
 
     assert grid == {"stop_eV": 12000.0, "raw_eV": 11500.0, "step_eV": 12.5}
+
+
+def test_geometry_plan_preserves_fractional_profile_angles():
+    scan = SimpleNamespace(tilt_deg=[5.123456789, 5.2, 5.123456789], tilt_azim_deg=[100.123456789])
+    coarse, _ = analyze._geometry_plan(["hopg"], scan)
+    assert [(row[1], row[2]) for row in coarse] == [
+        (5.123456789, 100.123456789),
+        (5.2, 100.123456789),
+    ]

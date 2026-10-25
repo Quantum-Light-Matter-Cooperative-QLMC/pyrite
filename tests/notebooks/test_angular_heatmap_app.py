@@ -114,7 +114,7 @@ def test_display_cells_do_not_feed_calculation():
         {"start_eV": 1},
         {"stop_eV": 40_000.0},
         {"tilts_deg": ()},
-        {"tilts_deg": (30.0, 30.1)},
+        {"tilts_deg": (30.0, 30.0)},
         {"energy_points": 1_000_000, "angle_points": 3600},
         {"components": ()},
         {"components": ("coherent",)},
@@ -183,3 +183,8 @@ def test_download_archive_round_trip():
     assert metadata["config"]["thickness_ang"] == MapConfig().thickness_ang
     assert metadata["units"]["rate"] == "ph/s/eV/sr"
     assert metadata["components"] == {"pxr-cbs": "incoherent-pxr-cbs"}
+
+
+def test_close_target_tilts_remain_distinct():
+    config = replace(MapConfig(), tilts_deg=(30.123456789, 30.2))
+    assert config.tilts_deg == (30.123456789, 30.2)

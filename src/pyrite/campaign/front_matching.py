@@ -57,7 +57,7 @@ def phase_matched_front_for_scene(
     )
     if orientation is not None:
         g = orientation @ g
-    # Use the same resolved half-degree target angles as case lowering.
+    # Use the same full-precision target angles as case lowering.
     tilts, azimuths = target._angles()
     tilt, azimuth = np.deg2rad([tilts.item(), azimuths.item()])
     rotation = sample_to_lab_R(tilt, azimuth)

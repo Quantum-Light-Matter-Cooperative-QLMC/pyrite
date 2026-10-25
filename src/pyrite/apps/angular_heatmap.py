@@ -61,8 +61,8 @@ class MapConfig:
         tilts = np.asarray(self.tilts_deg, dtype=float)
         if not len(tilts) or not np.all(np.isfinite(tilts)):
             raise ValueError("supply at least one finite target tilt")
-        if len(set(np.round(tilts * 2) / 2)) != len(tilts):
-            raise ValueError("target tilts must be distinct after half-degree resolution")
+        if len(set(tilts)) != len(tilts):
+            raise ValueError("target tilts must be distinct")
         if not self.thickness_ang > 0:
             raise ValueError("target thickness must be positive")
         dimensions = (self.width_mm, self.height_mm)

@@ -50,7 +50,10 @@ def test_build_case_is_the_existing_case_builder_boundary() -> None:
     assert canonical == legacy
 
 
-def test_simulate_returns_intrinsic_result_and_provenance_without_store(monkeypatch) -> None:
+@pytest.mark.parametrize("use_scene", [False, True])
+def test_simulate_returns_intrinsic_result_and_provenance_without_store(
+    monkeypatch, use_scene
+) -> None:
     beam, target, detector, numerics = _inputs()
     seen = {}
 
@@ -69,9 +72,11 @@ def test_simulate_returns_intrinsic_result_and_provenance_without_store(monkeypa
 
     monkeypatch.setattr(api, "run_case", fake_run_case)
 
-    result = pr.simulate(
-        beam, target, detector, numerics=numerics, physics=pr.Physics(bremsstrahlung_model="eedl")
-    )
+    physics = pr.Physics(bremsstrahlung_model="eedl")
+    if use_scene:
+        result = pr.simulate(pr.Scene(beam, target, detector, numerics=numerics, physics=physics))
+    else:
+        result = pr.simulate(beam, target, detector, numerics=numerics, physics=physics)
 
     np.testing.assert_array_equal(result.cxr.incoherent.density, [3.0, 4.0])
     np.testing.assert_array_equal(result.characteristic.density, [0.25, 0.5])
@@ -188,3 +193,44 @@ def test_run_provenance_records_git_state_in_repo_and_null_outside(monkeypatch, 
     finally:
         monkeypatch.undo()
         api.source_git_state.cache_clear()
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [{"target": object()}, {"detector": pr.Detector()}, {"filters": ()}, {"acquisition": object()}],
+)
+def test_simulate_rejects_mixed_scene_and_component_arguments(overrides):
+    beam, target, detector, numerics = _inputs()
+    with pytest.raises(TypeError, match="with a Scene, omit"):
+        pr.simulate(pr.Scene(beam, target, detector, numerics=numerics), **overrides)
+
+
+def test_simulate_scene_overrides_preserve_original_and_geometry(monkeypatch):
+    from dataclasses import replace
+
+    beam, target, detector, numerics = _inputs()
+    scene = pr.Scene(
+        beam, replace(target, tilt_deg=30.123456789, tilt_azim_deg=-75.23456789), detector
+    )
+    physics = pr.Physics(brem_source="none", bremsstrahlung_model="eedl")
+    seen = {}
+
+    def run(case, *, transport_core):
+        seen["case"] = case
+        return {"E_grid": np.array([1.0, 2.0]), "spec": np.ones(2), "brem": np.ones(2)}
+
+    monkeypatch.setattr(api, "run_case", run)
+    result = pr.simulate(scene, physics=physics, numerics=numerics)
+    assert result.case["tilt_deg"] == 30.123456789
+    assert result.case["tilt_azim_deg"] == -75.23456789
+    assert result.case["Ne"] == numerics.cxr_trials
+    assert result.provenance["scene"].physics == physics
+    assert result.provenance["scene"].numerics is numerics
+    assert scene.physics != physics and scene.numerics is not numerics
+    np.testing.assert_array_equal(result.brem.density, [0.0, 0.0])
+
+
+def test_simulate_scene_requires_detector():
+    beam, target, _, _ = _inputs()
+    with pytest.raises(TypeError, match="requires a detector"):
+        pr.simulate(pr.Scene(beam, target, detector=None))

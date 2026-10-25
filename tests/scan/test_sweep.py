@@ -351,7 +351,7 @@ def test_implicit_brem_grid_starts_at_lowest_per_beam_line_grid_start():
     }
 
 
-def test_build_cases_quantizes_angles_symmetrically_and_removes_duplicates():
+def test_build_cases_preserves_continuous_angles_and_removes_exact_duplicates():
     cases = build_cases(
         Sweep(
             material="mose2",
@@ -365,18 +365,11 @@ def test_build_cases_quantizes_angles_symmetrically_and_removes_duplicates():
         )
     )
 
-    assert [(case["tilt_deg"], case["tilt_azim_deg"]) for case in cases] == [
-        (1.0, -1.0),
-        (1.0, -1.5),
-        (1.5, -1.0),
-        (1.5, -1.5),
-    ]
-    assert [case["seed"] for case in cases] == [1, 1001, 2001, 3001]
+    angles = [(tilt, azimuth) for tilt in [1.24, 1.26, 1.25] for azimuth in [-1.24, -1.26, -1.25]]
+    assert [(case["tilt_deg"], case["tilt_azim_deg"]) for case in cases] == angles
+    assert [case["seed"] for case in cases] == [1 + 1000 * index for index in range(9)]
     assert [case["name"] for case in cases] == [
-        "mose2 10nm pol=1 az=-1",
-        "mose2 10nm pol=1 az=-1.5",
-        "mose2 10nm pol=1.5 az=-1",
-        "mose2 10nm pol=1.5 az=-1.5",
+        f"mose2 10nm pol={tilt:g} az={azimuth:g}" for tilt, azimuth in angles
     ]
     for case in cases:
         assert np.deg2rad(case["tilt_deg"]) == pytest.approx(

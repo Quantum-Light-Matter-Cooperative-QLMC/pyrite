@@ -142,3 +142,26 @@ def test_every_catalog_profile_round_trips_a_resolved_case_list() -> None:
             coherent_emission=settings.coherent_emission,
         )
         assert _case_bytes(build_sweep_cases(converted)) == _case_bytes(expected), profile
+
+
+def test_configured_profile_path_preserves_fractional_angles_and_case_identity():
+    from pyrite.campaign.profiles import case_content_key
+    from pyrite.campaign.sweep import Sweep as LegacySweep
+
+    old = LegacySweep(
+        material="hopg",
+        beam=BeamSpec(energy_keV=30.0),
+        thickness_ang=1000.0,
+        tilt_deg=[30.123456789, 30.2],
+        tilt_azim_deg=-75.123456789,
+    )
+    settings = Settings(n_electrons=1, n_electrons_brem=1)
+    cases = build_sweep_cases(adapt_configured_sweep(old, settings))
+    assert [(case.tilt_deg, case.tilt_azim_deg) for case in cases] == [
+        (30.123456789, -75.123456789),
+        (30.2, -75.123456789),
+    ]
+    from dataclasses import replace
+
+    same_seed = replace(cases[1], seed=cases[0].seed, name=cases[0].name)
+    assert case_content_key(cases[0]) != case_content_key(same_seed)

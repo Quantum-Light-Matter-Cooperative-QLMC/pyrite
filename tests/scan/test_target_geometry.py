@@ -104,10 +104,10 @@ def test_slab_allows_normal_incidence_for_transport_only_studies():
         )
 
 
-def test_angles_are_quantized_before_they_are_validated():
-    """0.2 deg quantizes to 0.0, so the tilt ban must fire on the quantized value."""
-    with pytest.raises(ValueError, match="polar tilt_deg == 0 is disallowed"):
-        Slab(MATERIAL, tilt_deg=0.2, footprint=Footprint(5.0, 5.0))
+def test_small_nonzero_angles_are_preserved_before_validation():
+    target = Slab(MATERIAL, tilt_deg=0.2, tilt_azim_deg=90.2, footprint=Footprint(5.0, 5.0))
+    geometry = _lower(target)[0]
+    assert (geometry.tilt_deg, geometry.tilt_azim_deg) == (0.2, 90.2)
 
 
 @pytest.mark.parametrize(
@@ -317,12 +317,14 @@ def test_lower_preserves_the_build_cases_product_order():
     assert axes[8] == (2e4, 15.0, 0.0, 4.0)
 
 
-def test_lower_deduplicates_quantized_angles_like_build_cases():
-    """0.1 and 0.2 both quantize to 0.0; stable-unique collapses them to one case."""
+def test_lower_preserves_distinct_angles_and_removes_exact_duplicates():
     target = Slab(
-        MATERIAL, tilt_deg=[29.9, 30.1], allow_normal_incidence=False, footprint=Footprint(5.0, 5.0)
+        MATERIAL,
+        tilt_deg=[29.9, 30.1, 29.9],
+        allow_normal_incidence=False,
+        footprint=Footprint(5.0, 5.0),
     )
-    assert [g.tilt_deg for g in _lower(target)] == [30.0]
+    assert [g.tilt_deg for g in _lower(target)] == [29.9, 30.1]
 
 
 def test_stack_radiators_align_with_the_absorber_stack():
