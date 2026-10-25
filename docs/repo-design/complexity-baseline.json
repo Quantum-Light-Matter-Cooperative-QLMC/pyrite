@@ -224,7 +224,7 @@
     {
       "path": "src/pyrite/execution/dask.py",
       "name": "DaskExecutor.execute",
-      "cc": 47
+      "cc": 45
     },
     {
       "path": "src/pyrite/execution/dask.py",

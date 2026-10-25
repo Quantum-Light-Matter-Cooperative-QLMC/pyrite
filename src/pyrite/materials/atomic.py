@@ -24,7 +24,7 @@ Conventions:
 
 import hashlib
 from collections import OrderedDict
-from functools import cache
+from functools import cache, lru_cache
 
 import numpy as np
 import xraydb
@@ -61,6 +61,13 @@ Z_TABLE = _ElementZTable()
 
 
 # ---- f0(g): non-resonant, energy-independent --------------------------------
+@lru_cache(maxsize=4096)
+def _scalar_f0(element, g):
+    """A bounded cache of immutable energy-independent reflection factors."""
+    s = np.array([g / (4.0 * np.pi)])
+    return float(np.asarray(xraydb.f0(element, s), dtype=float)[0])
+
+
 def cromer_mann_f0(element, g):
     """Return the energy-independent atomic form factor ``f0(g)``.
 
@@ -82,6 +89,9 @@ def cromer_mann_f0(element, g):
 
     """
     g_arr = np.asarray(g, dtype=float)
+    if g_arr.ndim == 0:
+        # Return a fresh array: callers may mutate their scalar-shaped result.
+        return np.asarray(_scalar_f0(element, float(g_arr)))
     s = (g_arr / (4.0 * np.pi)).ravel()
     f0 = np.asarray(xraydb.f0(element, s), dtype=float)
     return f0.reshape(g_arr.shape)
