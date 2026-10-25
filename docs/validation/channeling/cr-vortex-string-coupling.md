@@ -242,7 +242,7 @@ change. These are seeded model regressions, not measured lifetimes.
 
 ### Corrected grid comparison
 
-SLURM array 1569 on `qlmc-ace` reran both mechanisms on three-cell 72²
+SLURM array 1569 on `amd-node` reran both mechanisms on three-cell 72²
 and 96² grids (24 and 32 samples per cell), with 1024 electrons per case,
 seed 11 and 1 Å steps. Entry, normalized cut 2p orbitals (`max_order=12`)
 and the corrected observable match the regression. The entry population
@@ -271,7 +271,7 @@ digest is `ff10c6d36f9bb59e3159b4622e988b5fe26fc2bdb7e44713efe0a6f2785e2dd5`
 (base `634c3c13`, dirty test edits). The uploaded regression module's
 SHA-256 is `0c61dcac08c751a3fdd75d00d665efc1a8ee918cfc40c04827bec7a82f469a16`.
 Raw outputs are `scratch/decay-{0,1,2,3}.json` under
-`/home/aamador/pyrite-508-carrier` on `qlmc`. The jobs explicitly selected
+`/home/user/pyrite-508-carrier` on `cluster-head`. The jobs explicitly selected
 that snapshot's bundled catalog rather than the remote user's default.
 These results supersede the envelope-only electronic references; they
 still require fresh-context physics validation before the vortex claim
@@ -398,7 +398,7 @@ the 2p pair is degenerate and lies below the stated zero-energy reference.
 This verifies the fixture assumptions and qualitative selectivity, not
 quantitative reproduction of the source's Co/Dy examples.
 
-Read-only inspection of `qlmc` confirmed every population, surviving
+Read-only inspection of `cluster-head` confirmed every population, surviving
 fraction and jump count in all four `scratch/decay-*.json` files in Section
 9. The uploaded module is actually at
 `scratch/test_channeling_axial_dissipator.py`; its SHA-256 matches the

@@ -44,14 +44,14 @@
         "internal_api": "openblas",
         "num_threads": 1,
         "prefix": "libscipy_openblas",
-        "filepath": "/home/aamador/pyrite-646/repo/.venv/lib/python3.14/site-packages/numpy.libs/libscipy_openblas64_-f48b354e.so",
+        "filepath": "/home/user/pyrite-646/repo/.venv/lib/python3.14/site-packages/numpy.libs/libscipy_openblas64_-f48b354e.so",
         "version": "0.3.34.106.0",
         "threading_layer": "pthreads",
         "architecture": "SkylakeX"
       }
     ]
   },
-  "sync_stamp": "code_digest: 13175119bc031cf26ded237834761a9884f81c85b5179ef6bfe93a4de39ec297\ncode_revision: 72087d7784c64d4855ba11f170724495b0c522b0\ncode_dirty: False\ncode_synced_at: 2026-10-24T20:12:08+00:00\ncode_source: alex-XPS-15-9530:/home/alex/dev/pyrite/.worktrees/issue-646-slow-test-audit\ncode_tables_digest: bafd74d27ac4dee76ed2b16d2c605f2d1bd8a09caf388ee74e37ec15e3edaae1\n",
+  "sync_stamp": "code_digest: 13175119bc031cf26ded237834761a9884f81c85b5179ef6bfe93a4de39ec297\ncode_revision: 72087d7784c64d4855ba11f170724495b0c522b0\ncode_dirty: False\ncode_synced_at: 2026-10-24T20:12:08+00:00\ncode_source: developer-node:/home/user/dev/pyrite/.worktrees/issue-646-slow-test-audit\ncode_tables_digest: bafd74d27ac4dee76ed2b16d2c605f2d1bd8a09caf388ee74e37ec15e3edaae1\n",
   "tables": {
     "errors": [],
     "ok": true,

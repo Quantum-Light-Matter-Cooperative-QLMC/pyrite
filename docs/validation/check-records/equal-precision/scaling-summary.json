@@ -535,18 +535,18 @@
       "path": "213e27d8c1f7/w-300-10um-0deg-100000-53001-cuda.failed.json",
       "status": "failed",
       "command": [
-        "/home/aamador/.local/bin/uv",
+        "/home/user/.local/bin/uv",
         "run",
         "--no-sync",
         "python",
-        "/home/aamador/pyrite-510-scaling/checks/equal_precision/pyrite_adapter.py",
+        "/home/user/pyrite-510-scaling/checks/equal_precision/pyrite_adapter.py",
         "w-300-10um-0deg",
         "--histories",
         "100000",
         "--seed",
         "53001",
         "--output",
-        "/home/aamador/pyrite-510-scaling/evidence/scaling/213e27d8c1f7/w-300-10um-0deg-100000-53001-cuda.json",
+        "/home/user/pyrite-510-scaling/evidence/scaling/213e27d8c1f7/w-300-10um-0deg-100000-53001-cuda.json",
         "--core",
         "cuda",
         "--batch-histories",
@@ -556,7 +556,7 @@
         "--probe-electrons",
         "0"
       ],
-      "reason": "Command '['/home/aamador/.local/bin/uv', 'run', '--no-sync', 'python', '/home/aamador/pyrite-510-scaling/checks/equal_precision/pyrite_adapter.py', 'w-300-10um-0deg', '--histories', '100000', '--seed', '53001', '--output', '/home/aamador/pyrite-510-scaling/evidence/scaling/213e27d8c1f7/w-300-10um-0deg-100000-53001-cuda.json', '--core', 'cuda', '--batch-histories', '5000', '--scratch-mib', '4096', '--probe-electrons', '0']' timed out after 399.0781559260795 seconds",
+      "reason": "Command '['/home/user/.local/bin/uv', 'run', '--no-sync', 'python', '/home/user/pyrite-510-scaling/checks/equal_precision/pyrite_adapter.py', 'w-300-10um-0deg', '--histories', '100000', '--seed', '53001', '--output', '/home/user/pyrite-510-scaling/evidence/scaling/213e27d8c1f7/w-300-10um-0deg-100000-53001-cuda.json', '--core', 'cuda', '--batch-histories', '5000', '--scratch-mib', '4096', '--probe-electrons', '0']' timed out after 399.0781559260795 seconds",
       "wall_s": 399.0802527189953
     }
   ],

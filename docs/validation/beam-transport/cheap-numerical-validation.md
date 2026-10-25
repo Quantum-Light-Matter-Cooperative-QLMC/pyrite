@@ -161,7 +161,7 @@ The [activity record](../check-records/equal-precision/active-controls-summary.j
 retains every grid outcome, each captured protocol, archive SHA-256, warmup
 and measured counts, and the capacity score comparisons. Raw archives remain
 under ignored `scratch/activity-ladder-results/` locally and in the isolated
-lab checkout `/home/aamador/pyrite-510-active-controls-20261018/scratch/`.
+lab checkout `/home/user/pyrite-510-active-controls-20261018/scratch/`.
 Reproduce after maintained remote sync and table staging:
 
 ```bash
@@ -215,7 +215,7 @@ SLURM jobs from that checkout:
 ```bash
 cpu=$(sbatch --parsable --partition=cpu --mem=8G --time=00:05:00 \
   checks/equal_precision/cheap-validation.sbatch cpu)
-sbatch --dependency=afterok:$cpu --partition=gpu --nodelist=DESKTOP-QNIHO3D \
+sbatch --dependency=afterok:$cpu --partition=gpu --nodelist=gpu-node \
   --gres=gpu:1 --mem=24G --time=00:10:00 \
   checks/equal_precision/cheap-validation.sbatch gpu
 

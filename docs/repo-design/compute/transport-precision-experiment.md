@@ -9,7 +9,7 @@ Production transport precision and defaults remain FP64.
 ## Workload and precision boundary
 
 Jobs 1343 (preflight), 1344 (Si) and 1345 (W) ran on
-`DESKTOP-QNIHO3D`, partition `gpu`, one RTX 5080, one requested CPU and
+`gpu-node`, partition `gpu`, one RTX 5080, one requested CPU and
 24 GiB RAM. SMT allocated two logical CPUs; worker thread counts were one.
 Preflight requested five minutes; each pilot requested ten minutes.
 All 80 requested samples completed: six scenes × five arms × 64 primaries,
@@ -112,7 +112,7 @@ The [machine summary](../../validation/check-records/equal-precision/precision-e
 contains timing, observable moments, intervals, component errors and archive SHA.
 Raw samples, scores, generated Python/CUDA, source hashes, launch/resources,
 allocation-start snapshots and checksums remain in
-`/home/aamador/pyrite-510-precision-20261015/evidence/precision/{1343,1344,1345}`.
+`/home/user/pyrite-510-precision-20261015/evidence/precision/{1343,1344,1345}`.
 The local `scratch/precision-results/precision-final.tar.gz` archive preserves them.
 It has not been published. End-of-script checksum manifests verify successfully;
 Slurm job records expired before final retrieval and accounting is disabled,

@@ -10,7 +10,9 @@ from __future__ import annotations
 
 import os
 import uuid
-from collections.abc import Callable, Sequence
+from collections import deque
+from collections.abc import Callable, Generator, Sequence
+from contextlib import closing
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from threading import Event, Lock
@@ -36,6 +38,10 @@ class DaskConfig:
     `scheduler_address` applies only to `cluster='existing'`. The jobqueue
     adapter is deliberately conservative: it requests one worker per SLURM
     allocation and does not auto-configure GPU device isolation.
+
+    `max_in_flight` bounds outstanding Futures independently of worker count.
+    When omitted, use twice the configured worker count (the maximum for
+    adaptive clusters). Set it explicitly for borrowed/external clusters.
     """
 
     cluster: Literal["existing", "local", "slurm"] = "local"
@@ -47,6 +53,7 @@ class DaskConfig:
     partition: str | None = None
     walltime: str = "01:00:00"
     poll_seconds: float = 0.1
+    max_in_flight: int | None = None
 
     def __post_init__(self) -> None:
         from .slurm import _WALLTIME, _token
@@ -61,14 +68,18 @@ class DaskConfig:
             raise ValueError("local Dask cluster does not support adaptive SLURM scaling")
         if self.cluster != "slurm" and self.adaptive:
             raise ValueError("adaptive scaling requires cluster='slurm'")
-        for field in ("workers", "cases_per_task"):
-            value = getattr(self, field)
-            if type(value) is not int or value < 1:
-                raise ValueError(f"{field} must be a positive integer")
-        if self.max_workers is not None and (
-            type(self.max_workers) is not int or self.max_workers < self.workers
-        ):
-            raise ValueError("max_workers must be >= workers")
+        limits = {
+            "workers": (self.workers, 1),
+            "cases_per_task": (self.cases_per_task, 1),
+            "max_workers": (
+                self.workers if self.max_workers is None else self.max_workers,
+                self.workers,
+            ),
+            "max_in_flight": (1 if self.max_in_flight is None else self.max_in_flight, 1),
+        }
+        for field, (value, minimum) in limits.items():
+            if type(value) is not int or value < minimum:
+                raise ValueError(f"{field} must be an integer >= {minimum}")
         _token("partition", self.partition)
         if not _WALLTIME.fullmatch(self.walltime):
             raise ValueError("invalid Dask SLURM walltime")
@@ -254,6 +265,54 @@ class DaskExecutor:
             cluster.scale(cfg.workers)
         return Client(cluster), cluster
 
+    def _completed_units(
+        self, run_dir: Path, pending: Sequence[int], resources: dict[str, int]
+    ) -> Generator[tuple[int, Any]]:
+        """Refill a bounded Future window as results are consumed.
+
+        Retire completed Futures immediately. Closing the iterator cancels
+        outstanding submissions, including after a coordinator callback fails.
+        """
+        from distributed import as_completed
+
+        cfg = self.config
+        workers = (cfg.max_workers or cfg.workers) if cfg.adaptive else cfg.workers
+        limit = cfg.max_in_flight or 2 * workers
+        remaining = deque(pending)
+        active: dict[Any, int] = {}
+        completed = as_completed()
+        assert self._client is not None
+        try:
+            while remaining or active:
+                while remaining and len(active) < limit and not self._cancelled.is_set():
+                    unit = remaining.popleft()
+                    with self._lock:
+                        if self._cancelled.is_set():
+                            break
+                        future = self._client.submit(
+                            _worker_run_unit, str(run_dir), unit, pure=False, resources=resources
+                        )
+                        active[future] = unit
+                        self._futures.append(future)
+                    completed.add(future)
+                if self._cancelled.is_set():
+                    break
+                future = next(completed)
+                unit = active.pop(future)
+                with self._lock:
+                    self._futures.remove(future)
+                try:
+                    yield unit, future
+                finally:
+                    future.release()
+        finally:
+            if active:
+                self._client.cancel(list(active))
+                for future in active:
+                    future.release()
+            with self._lock:
+                self._futures.clear()
+
     def execute(self, cases: Sequence[Any], *, callback=None, **options: Any) -> list[Any]:
         supported = {
             "max_workers",
@@ -295,15 +354,13 @@ class DaskExecutor:
         if self.resources.gpu_count and self.config.cluster == "local":
             raise ValueError("local Dask cluster has no GPU isolation; use existing scheduler")
         cfg = self.config
-        units = list(
-            iter_work_units(
-                cases,
-                cases_per_unit=cfg.cases_per_task,
-                resources=self.resources,
-                case_key=self.case_key,
-            )
+        units = iter_work_units(
+            cases,
+            cases_per_unit=cfg.cases_per_task,
+            resources=self.resources,
+            case_key=self.case_key,
         )
-        unit_count = len(units)
+        unit_count = (n + cfg.cases_per_task - 1) // cfg.cases_per_task
         run_dir = self.store.root / ".execution-jobs" / f"dask-{uuid.uuid4().hex}"
         self.last_run_dir = run_dir
         keys: list[str] = [""] * n
@@ -353,7 +410,8 @@ class DaskExecutor:
             dask_resources = {"GPU": self.resources.gpu_count} if self.resources.gpu_count else {}
 
             def deliver(unit: int) -> None:
-                start, stop = units[unit].start, units[unit].stop
+                start = unit * cfg.cases_per_task
+                stop = min(start + cfg.cases_per_task, n)
                 for index in range(start, stop):
                     if index in delivered:
                         continue
@@ -391,47 +449,29 @@ class DaskExecutor:
                 pending = [i for i in range(unit_count) if i not in succeeded]
                 if not pending or self._cancelled.is_set():
                     break
-                futures = {
-                    self._client.submit(
-                        _worker_run_unit,
-                        str(run_dir),
-                        unit,
-                        pure=False,
-                        resources=dask_resources,
-                    ): unit
-                    for unit in pending
-                }
-                with self._lock:
-                    self._futures = list(futures)
-                # Use Futures rather than constructing delayed arrays/graphs.
-                from distributed import as_completed
-
-                for fut in as_completed(futures):
-                    unit = futures[fut]
-                    if self._cancelled.is_set():
-                        break
-                    try:
-                        fut.result()
-                    except Exception as exc:
-                        errors[unit] = f"work unit {unit}: {type(exc).__name__}: {exc}"
-                    # Recover even a partially successful worker (crashed after
-                    # first case artifact but before Dask marked task complete).
-                    deliver(unit)
-                    if on_activity is not None:
-                        on_activity(
-                            {
-                                "phase": "dask_progress",
-                                "case": None,
-                                "completed_work_units": len(succeeded),
-                                "total_work_units": unit_count,
-                                "in_flight_case_count": n - len(delivered),
-                                "attempt": attempt,
-                            }
-                        )
+                with closing(self._completed_units(run_dir, pending, dask_resources)) as completed:
+                    for unit, fut in completed:
+                        try:
+                            fut.result()
+                        except Exception as exc:
+                            errors[unit] = f"work unit {unit}: {type(exc).__name__}: {exc}"
+                        # Even a worker that failed before returning may have
+                        # published valid case artifacts on shared disk.
+                        deliver(unit)
+                        if on_activity is not None:
+                            on_activity(
+                                {
+                                    "phase": "dask_progress",
+                                    "case": None,
+                                    "completed_work_units": len(succeeded),
+                                    "total_work_units": unit_count,
+                                    "in_flight_case_count": n - len(delivered),
+                                    "attempt": attempt,
+                                }
+                            )
                 for unit in pending:
                     deliver(unit)
                 if self._cancelled.is_set():
-                    self._client.cancel(list(futures))
                     break
                 if len(succeeded) == unit_count:
                     break

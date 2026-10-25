@@ -40,7 +40,7 @@
     "forward/sampled-weighted/self_yield": 2.7629835465811845e-15,
     "forward/sampled-weighted/yield_per_electron": 2.878417247842413e-15
   },
-  "remote_dir": "/home/aamador/pyrite-615 (isolated; clean sync stamp)",
+  "remote_dir": "/home/user/pyrite-615 (isolated; clean sync stamp)",
   "response_digests": {
     "jc": "03c12af7b17510862e867f80e74d1a4175ce294198c572e1d694615e1a8ed6cd",
     "rakic": "f242ba3fd156e1089d7e78bb5d55f595d9e195d7033b07eb35421b8c613b3230"

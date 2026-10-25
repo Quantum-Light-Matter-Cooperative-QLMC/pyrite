@@ -8947,7 +8947,7 @@
   "evidence": {
     "archive": "scratch/endpoint-results/endpoint-gpu-evidence.tar.gz",
     "sha256": "9404b09f51f4e91691eb215da8316fbf38dfc080fb3e0e25a1cc553a3ee035c3",
-    "remote_checkout": "/home/aamador/pyrite-510-precision-20261015",
+    "remote_checkout": "/home/user/pyrite-510-precision-20261015",
     "jobs": [
       1371,
       1372,

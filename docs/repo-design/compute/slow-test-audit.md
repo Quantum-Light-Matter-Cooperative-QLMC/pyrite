@@ -7,7 +7,7 @@ requires weaker scientific assertions or a physics-model change.
 ## Baseline and data identity
 
 The current baseline is `72087d7784c64d4855ba11f170724495b0c522b0`
-(0.20.0), on `qlmc` / `DESKTOP-QNIHO3D`: AMD Ryzen 9 9950X3D,
+(0.20.0), on `cluster-head` / `gpu-node`: AMD Ryzen 9 9950X3D,
 32 logical CPUs, Python 3.14.6, NumPy 2.5.4 and pthreads OpenBLAS
 0.3.34.106.0. Job 2493 requests 16 CPUs and 30 GiB, uses six xdist
 workers with work stealing, and pins OpenBLAS to one thread per process.
@@ -172,7 +172,7 @@ controlled BLAS/xdist comparisons and the axial decomposition/profile commands.
 Run them in remote SLURM allocations, sequentially, with the same inputs and
 cache policy. Preserve failed runs rather than presenting them as clean timings.
 
-Raw evidence lives at `qlmc:~/pyrite-646/out/<job-id>/`: 2493 is the corrected
+Raw evidence lives at `cluster-head:~/pyrite-646/out/<job-id>/`: 2493 is the corrected
 full baseline, and 2494 holds memory-change validation, current axial repeats
 and profiles. Job 2492 was cancelled while pending to correct the data preflight.
 The [checked-in summary](data/slow-test-audit-2026-10-24.json) includes the environment, distribution, phase timings, memory ranking and worker totals. RSS sampling includes retained

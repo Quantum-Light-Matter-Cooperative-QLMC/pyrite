@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import sys
 import types
-from concurrent.futures import Future
 
 import numpy as np
 import pytest
@@ -25,6 +24,7 @@ from pyrite.execution import (
 )
 from pyrite.execution.profiles import execution_profile_from_dict
 from pyrite.execution.slurm_worker import execute_unit
+from tests.execution.test_dask_lifecycle import ReadyQueue, TrackedFuture
 
 KEY = "1" * 64
 
@@ -176,7 +176,7 @@ class SynchronousClient:
         self.cancelled = []
 
     def submit(self, fn, *args, **kwargs):
-        fut = Future()
+        fut = TrackedFuture()
         self.submitted.append((args, kwargs))
         try:
             fut.set_result(fn(*args))
@@ -190,7 +190,7 @@ class SynchronousClient:
 
 def test_dask_futures_callback_refs_and_resume(tmp_path, monkeypatch, fake_runner):
     module = types.ModuleType("distributed")
-    module.as_completed = lambda items: iter(items)
+    module.as_completed = ReadyQueue
     monkeypatch.setitem(sys.modules, "distributed", module)
     store = CaseArtifactStore(tmp_path)
     client = SynchronousClient()
@@ -224,7 +224,7 @@ def test_dask_futures_callback_refs_and_resume(tmp_path, monkeypatch, fake_runne
 
 def test_dask_directional_refs(tmp_path, monkeypatch, fake_runner):
     module = types.ModuleType("distributed")
-    module.as_completed = lambda items: iter(items)
+    module.as_completed = ReadyQueue
     monkeypatch.setitem(sys.modules, "distributed", module)
     store = CaseArtifactStore(tmp_path)
     ex = DaskExecutor(

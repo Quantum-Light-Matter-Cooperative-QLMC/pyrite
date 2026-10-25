@@ -1189,7 +1189,7 @@
   "evidence": {
     "archive": "scratch/quotient-results/quotient-evidence.tar.gz",
     "archive_sha256": "3814b9ec2609d0fb1711db4c4087cd153ccc50cc128d2d234e82b2215774e6d2",
-    "remote_archive": "/home/aamador/pyrite-510-precision-20261015/scratch/quotient-evidence.tar.gz",
+    "remote_archive": "/home/user/pyrite-510-precision-20261015/scratch/quotient-evidence.tar.gz",
     "gpu_jobs": [
       {
         "job": 1378,

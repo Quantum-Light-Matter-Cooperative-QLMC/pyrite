@@ -1,7 +1,7 @@
 {
  "check": "kephart_occupation",
  "revision": "54b29d7c",
- "host": "DESKTOP-QNIHO3D",
+ "host": "gpu-node",
  "temperature_K": 293.15,
  "tolerance": 0.2,
  "runs": [

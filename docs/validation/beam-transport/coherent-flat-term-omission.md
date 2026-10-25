@@ -252,7 +252,7 @@ not remote performance evidence or a grid-convergence certificate.
 ## Historical task-owner paired GPU measurements (sampled population)
 
 The task owner subsequently ran `checks/coherent_flat_omission.py` under
-SLURM job 1136 on `qlmc`, in the isolated `~/pyrite-issue362` checkout.
+SLURM job 1136 on `cluster-head`, in the isolated `~/pyrite-issue362` checkout.
 Each full/masked comparison reused the same in-memory trajectories. The
 three route processes also produced the same segment fingerprint:
 `847faf003b1fbd9a04cf6d2aa79eee2cdf414020f48572c0e812bdec9cf8d71a`.

@@ -283,7 +283,7 @@ The bodies were read after the section above was written. Symbol by symbol:
 ## Independent numerical checks
 
 Scripts:
-`/tmp/claude-1000/-home-alex-dev-pyrite/a6d7b22a-bb10-4e37-9fdd-dd3bf02926b0/scratchpad/check.py`
+`/tmp/validation-oracle/check.py`
 and `check2.py`. The references use `scipy.integrate.quad` on the closed-form
 Lorentz tensor. No implementation helper serves as a reference.
 

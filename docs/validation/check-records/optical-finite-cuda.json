@@ -26,7 +26,7 @@
     "code_revision": "10f85914a7fcb852007ec520db5d58b2cfd935b5",
     "code_dirty": "True",
     "code_synced_at": "2026-10-24T00:21:13+00:00",
-    "code_source": "alex-XPS-15-9530:/home/alex/dev/pyrite/.worktrees/issues-616-617",
+    "code_source": "developer-node:/home/user/dev/pyrite/.worktrees/issues-616-617",
     "code_tables_digest": "f9a89dc83cb97f36fc94a2fef58a4ad710d5848d9f5c8f513b896de47f6106e2"
   },
   "source_and_test_sha256": {
@@ -36,7 +36,7 @@
     "src/pyrite/montecarlo/spectrum/optical_wavefront.py": "c13121fce8c65f17675a0ae7569bf8f9335daa8b5ba1035b30b6f0fa5301649e",
     "tests/montecarlo/test_optical_cuda_parity.py": "389ceaf104178f7c9bd87c73928c5ee5adebfdb3028c4be77b3b6fa01fc73edf"
   },
-  "test_command": "PYRITE_MC_BACKEND=cuda PYRITE_TEST_BACKEND=cuda PYRITE_CATALOG=/home/aamador/pyrite/src/pyrite/data/catalog PYRITE_HOME=/home/aamador/pyrite /home/aamador/.local/bin/uv run --extra nvidia pyrite-dev test /tmp/test_optical_cuda_parity_616_617.py --durations=0",
+  "test_command": "PYRITE_MC_BACKEND=cuda PYRITE_TEST_BACKEND=cuda PYRITE_CATALOG=/home/user/pyrite/src/pyrite/data/catalog PYRITE_HOME=/home/user/pyrite /home/user/.local/bin/uv run --extra nvidia pyrite-dev test /tmp/test_optical_cuda_parity_616_617.py --durations=0",
   "test_staging": "Copied the tracked test unchanged to /tmp/test_optical_cuda_parity_616_617.py; pyrite remote sync excludes tests.",
   "result": {
     "passed": 5,

@@ -3,7 +3,7 @@
   "schema_revision": 1,
   "revision": "bcc966aaab7d4d2ae319b5f9fd7a47b6d8ead0dc+dirty",
   "source_sha256": {
-    "/home/aamador/pyrite-522-overflow/checks/channeling_overflow.py": "3b391ec5b0ee62d1060947858123f12c5239e8ec2f123568335e36aa7e6ad29e",
+    "/home/user/pyrite-522-overflow/checks/channeling_overflow.py": "3b391ec5b0ee62d1060947858123f12c5239e8ec2f123568335e36aa7e6ad29e",
     "src/pyrite/montecarlo/channeling/overflow.py": "80545cadd49473b0f72a556b831e082cf4482385bb0a000aa245cbffd120eb7f",
     "src/pyrite/montecarlo/channeling/density.py": "9f7aecd724f8a75ece3efe007ad71a5590932103cfc16cab13798a659b06d23d",
     "src/pyrite/montecarlo/channeling/operators.py": "812fa48f1c3193b1cbc4ccabac7ebfcd91464b8df86eb89bf7cdebde95fc6345"
