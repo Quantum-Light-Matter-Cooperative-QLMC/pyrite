@@ -115,6 +115,20 @@ from pyrite.config import Physics, Numerics, FixedSampling, load_physics
 ```
 
 Canonical facade imports and historical implementation paths continue to work.
+The physical-input facades have these complete `__all__` inventories:
+
+| Namespace | Public names |
+| --- | --- |
+| `pyrite.beams` | `Beam`, `BunchFrontTilt`, `BunchLength`, `GdfSource`, `Offsets`, `PointBunch`, `PointSpot`, `Spot`, `TransverseSpot` |
+| `pyrite.geometry` | `BlazedGrooves`, `CrystalCut`, `Filter`, `Footprint`, `Layer`, `RectangularBody`, `Slab`, `Stack`, `SubstanceRef`, `Target` |
+
+`Spot` remains an alias of `TransverseSpot`. These facades lazily re-export
+the existing classes; they preserve constructor signatures, dataclass fields,
+pickle module paths, and scientific serialization. Importing either namespace
+does not load transport engines. `Scene` and `Sweep` remain high-level root
+imports. See the [physical-input ownership guide](../guides/python-api-workflow.md#choose-physical-input-imports)
+for body, material-reference, and scene-role conventions.
+
 Specialized root aliases classified as deprecated warn through the existing
 versioned machinery. Announcement is scheduled for 0.20.5, with removal targeted
 for 0.22.0. The release PR must confirm the actual announcement version and
