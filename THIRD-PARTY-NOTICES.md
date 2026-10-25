@@ -264,6 +264,23 @@ require derived or adapted material to be marked as such.
   published optical transition-radiation comparison with Coenen et al. (2011),
   whose calculation used these constants.
 
+## refractiveindex.info optical response: Franta fused silica
+
+- **Database author**: Mikhail Polyanskiy and contributors.
+- **License**: CC0 1.0 Universal Public Domain Dedication,
+  <https://creativecommons.org/publicdomain/zero/1.0/>; stated in the upstream file.
+- **Source**: [SiO2 Franta record](https://github.com/polyanskiy/refractiveindex.info-database/blob/c5c2f188e848453def5970e347399d653df2ffc2/database/data/main/SiO2/nk/Franta.yml),
+  revision `c5c2f188e848453def5970e347399d653df2ffc2`.
+  Unmodified bytes ship in `src/pyrite/data/optical/SiO2-Franta.yml`, SHA-256
+  `89e3065c48040e9347fb8707371d5528ab45ff4e05be5fd6644658b588ce458e`.
+- **Reference**: D. Franta, D. Nečas, I. Ohlídal, A. Giglia,
+  “Optical characterization of SiO2 thin films using universal dispersion
+  model over wide spectral range,” *Proc. SPIE* **9890**, 989014 (2016),
+  <https://doi.org/10.1117/12.2227580>.
+- **Use**: fitted scalar complex-index reference, converted and interpolated
+  by the existing optical-response loader. Absorption ordinates are retained;
+  the broad table is not a validated production Cherenkov band.
+
 ## Experimental inner-shell ionization measurements
 
 - **Files**: `src/pyrite/validation/reference_data/inner_shell_ionization/*.csv`.

@@ -566,6 +566,13 @@ X-ray floor or supply optical detector/transport models. See
 [explicit optical TR response](physics/radiation-physics/transition-radiation.md#explicit-optical-response-for-bounded-diagnostics)
 for units, sample/provenance metadata, interpolation policy and an example.
 
+`pyrite.materials.optical.fused_silica_franta_response()` provides pinned
+fitted fused-silica complex-index data with absorption retained.
+`OpticalResponse.require_band(lower_eV, upper_eV)` requires whole-interval
+coverage within one segment, preventing integration across unsupported gaps.
+These provisional inputs do not establish production Cherenkov validity or
+detector calibration; see the [reference-input contract](research/physics/production-cherenkov.md#fused-silica-reference-input).
+
 `pyrite.detectors.optical_energy.CalibratedPulseEnergyDetector.predict_batch`
 integrates collected photon densities shaped `(..., energy)` on a shared
 nonuniform energy grid. Its `OpticalPulseBatchReading` carries per-pulse

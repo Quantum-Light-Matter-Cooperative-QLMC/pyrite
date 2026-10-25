@@ -154,10 +154,39 @@ files. The digest detects stale/corrupt content, not malicious replacement
 of both data and digest. This is a response record, not a production Case or
 checkpoint schema.
 
-A pinned transparent dielectric is still required. Any lossless reference
-must explicitly identify zero absorption as an assumption rather than a
-measurement. Index-only data do not supply measured attenuation. Its
-transport material, optical state and supported band must agree.
+### Fused-silica reference input
+
+{source}`src/pyrite/materials/optical.py::fused_silica_franta_response` supplies
+the pinned CC0 [Franta complex-index record](https://github.com/polyanskiy/refractiveindex.info-database/blob/c5c2f188e848453def5970e347399d653df2ffc2/database/data/main/SiO2/nk/Franta.yml)
+(SHA-256 `89e3065c48040e9347fb8707371d5528ab45ff4e05be5fd6644658b588ce458e`).
+The source describes a fitted fused-silica plate, 0.405 mm thick, at room
+temperature without a numeric temperature. It combines measurements and
+published optical data; the reference is
+[Franta et al., Proc. SPIE 9890, 989014 (2016)](https://doi.org/10.1117/12.2227580).
+Its tabulated extinction is retained, including tiny and zero fitted values;
+these are not measured absorption bounds. The broad table also includes
+absorbing regimes and is not wholly a valid weak-loss Cherenkov band.
+
+The existing scalar index conversion and linear-epsilon interpolation apply.
+`OpticalResponse.require_band(lower_eV, upper_eV)` checks an entire closed
+interval inside one supported segment, including its endpoints. Checking only
+grid nodes would permit integration across a gap. Coverage alone establishes
+neither weak loss nor source/escape/detector validity. For example:
+
+```python
+from pyrite.materials.optical import fused_silica_franta_response
+
+response = fused_silica_franta_response()
+response.require_band(1.5, 3.0)  # response coverage only, energies in eV
+portable_response = response.to_record()
+```
+
+This is a portable reference input, not a production configuration. Binding it
+to a matching amorphous transport material, explicit per-medium bands and
+calibrated full-band detector support remains required. Crystalline quartz
+cannot substitute for fused silica. Any index-only lossless reference must
+explicitly identify zero absorption as an assumption rather than a measurement.
+No new production physics claim is validated by the reference-data adapter.
 
 ## Integration owners and evidence boundary
 

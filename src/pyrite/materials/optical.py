@@ -174,6 +174,21 @@ class OpticalResponse:
             )
         return xp.asarray(result, dtype=xp.complex128)
 
+    def require_band(self, lower_eV: float, upper_eV: float) -> None:
+        """Require a positive, finite, nonzero-width closed photon interval.
+
+        The entire interval must lie within one supported segment. Checking
+        only grid nodes would miss gaps crossed by integration intervals.
+        This checks response coverage, not weak-loss or production validity.
+        """
+        if not np.isfinite(lower_eV) or not np.isfinite(upper_eV) or not 0 < lower_eV < upper_eV:
+            raise ValueError(f"{self.medium}: optical band requires 0 < lower < upper, finite eV")
+        if not any(lo <= lower_eV < upper_eV <= hi for lo, hi in self.bands_eV):
+            raise ValueError(
+                f"{self.medium}: optical band crosses unsupported energy or gap; "
+                f"bands {self.bands_eV} eV"
+            )
+
     def to_record(self) -> dict[str, Any]:
         """Return a self-contained JSON record of data, support and provenance.
 
@@ -332,6 +347,36 @@ def gold_johnson_christy_response() -> OpticalResponse:
         sample_state="Johnson–Christy 1972 measured thin films; room temperature, value unstated",
         reference="P. B. Johnson and R. W. Christy, Phys. Rev. B 6, 4370–4379 (1972); "
         "doi:10.1103/PhysRevB.6.4370",
+        temperature_K=None,
+    )
+
+
+_FRANTA_SILICA_SHA256 = "89e3065c48040e9347fb8707371d5528ab45ff4e05be5fd6644658b588ce458e"
+
+
+def fused_silica_franta_response() -> OpticalResponse:
+    """Pinned CC0 fitted fused-silica n,k, including the source's absorption.
+
+    The source describes a 0.405 mm plate and combines optical measurements
+    with published data. Room temperature has no numeric value. The broad
+    table includes absorbing regimes; coverage is not a weak-loss validity
+    claim. In particular, tiny/zero fitted k values are not measured bounds
+    on absorption. No quartz transport material or detector is inferred.
+
+    Source: Franta et al., Proc. SPIE 9890, 989014 (2016),
+    doi:10.1117/12.2227580; pinned refractiveindex.info SiO2/nk/Franta.
+    Uses the existing scalar nonmagnetic n,k conversion/interpolation contract.
+    Validation: optical-material-response (conversion only).
+    """
+    return _refractiveindex_nk(
+        "SiO2-Franta.yml",
+        _FRANTA_SILICA_SHA256,
+        medium="fused silica",
+        record="SiO2/nk/Franta",
+        sample_state="Franta 2016 fitted fused-silica plate, thickness 0.405 mm; "
+        "combined measurements and published data; room temperature, value unstated; "
+        "tiny/zero fitted extinction is not a measured absorption bound",
+        reference="D. Franta et al., Proc. SPIE 9890, 989014 (2016); doi:10.1117/12.2227580",
         temperature_K=None,
     )
 
