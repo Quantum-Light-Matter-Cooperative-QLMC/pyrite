@@ -273,3 +273,17 @@ def test_mos2_dielectric_matches_the_digitized_loss_function():
             np.where(energy < elf_split, 0.02, 0.05),
         )
         assert np.all(np.abs(dielectric.elf(cos2, energy) - elf) < 2.0 * sigma)
+
+
+@pytest.mark.parametrize("axis", ["x", "y", "z"])
+def test_directional_weight_broadcasting_preserves_scalar_samples(valence, axis):
+    base = catalog_directional_oscillators("mos2", valence)
+    channels = directional_channels(base, valence, ENERGY_EV, axis)
+    px = np.array([0.0, 0.1, 1.0])[:, None]
+    qy = np.geomspace(1e-6, 10.0, 8193)[None, :]
+    actual = channels.distant_pq(px, qy)
+    assert actual.shape == (3, 8193)
+    for i in range(3):
+        for j in (0, 1023, 1024, 4095, 4096, 8192):
+            assert actual[i, j] == channels.distant_pq(px[i, 0], qy[0, j])
+    assert channels.distant_pq(np.array([]), 0.0).shape == (0,)

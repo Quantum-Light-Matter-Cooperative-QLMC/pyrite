@@ -47,20 +47,28 @@ import pyrite as pr
 result = pr.simulate(
     pr.Beam(energy_keV=17_000, transverse=pr.Spot(), longitudinal=pr.PointBunch()),
     pr.Slab(
-        "silicon", thickness_ang=20_000, tilt_deg=3, tilt_azim_deg=45,
+        "silicon",
+        thickness_ang=20_000,
+        tilt_deg=3,
+        tilt_azim_deg=45,
         footprint=pr.Footprint(5, 5),
     ),
     pr.Detector(
-        0, acceptance=pr.SensorAcceptance(
-            distance_mm=1_000, width_mm=3, height_mm=3,
+        0,
+        acceptance=pr.SensorAcceptance(
+            distance_mm=1_000,
+            width_mm=3,
+            height_mm=3,
         ),
     ),
     physics=pr.Physics(
-        channeling_model="planar", channeling_plane=(1, -1, 0),
+        channeling_model="planar",
+        channeling_plane=(1, -1, 0),
         radiative_model="uncoupled",
     ),
     numerics=pr.Numerics(
-        cxr_trials=200, brem_trials=200,
+        cxr_trials=200,
+        brem_trials=200,
         energy_bins=pr.EnergyBins(
             cxr=np.arange(1_000, 24_000, 50),
             brem=np.arange(1_000, 17_000_000, 500),
@@ -114,14 +122,19 @@ setup = pr.QuantumSetup(
     numerics=pr.QuantumNumerics(basis_size=8, bloch_cells=4, step_ang=50),
 )
 entry = setup.project_state(
-    source, crystal="silicon", kinetic_energy_eV=17e6,
-    incidence_rad=0, impact="fixed",
+    source,
+    crystal="silicon",
+    kinetic_energy_eV=17e6,
+    incidence_rad=0,
+    impact="fixed",
 )
 evolution = propagate_planar_source(entry, depth_ang=500)
 spectrum = score_planar_source(
-    entry, depth_ang=500,
+    entry,
+    depth_ang=500,
     photon_energy_eV=np.linspace(1_000, 50_000, 500),
-    theta_rad=0, absorption=False,
+    theta_rad=0,
+    absorption=False,
 )
 print(entry.retained_population, evolution.trace[-1], spectrum.spectrum.shape)
 ```

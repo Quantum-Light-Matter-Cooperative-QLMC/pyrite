@@ -16,17 +16,27 @@ directly for controlled studies. The API does not require the plotting extras.
 
 ```python
 from pyrite.montecarlo.channeling.axial_diagnostic import (
-    AxialDiagnosticConfig, axial_diagnostic,
+    AxialDiagnosticConfig,
+    axial_diagnostic,
 )
 
 config = AxialDiagnosticConfig(
-    crystal="silicon", axis=(0, 0, 1), kinetic_energy_eV=5e6,
-    cells=(2, 2), shape=(48, 48),
-    depths_ang=(0, 250, 500), step_ang=5,
-    mode="mcwf", n_electrons=16, seed=17,
-    spectral_states=16, spectral_representation="energy_bins",
-    record_coherence=True, record_current=True,
-    record_current_divergence=True, current_contour=(0, 0, 12, 12),
+    crystal="silicon",
+    axis=(0, 0, 1),
+    kinetic_energy_eV=5e6,
+    cells=(2, 2),
+    shape=(48, 48),
+    depths_ang=(0, 250, 500),
+    step_ang=5,
+    mode="mcwf",
+    n_electrons=16,
+    seed=17,
+    spectral_states=16,
+    spectral_representation="energy_bins",
+    record_coherence=True,
+    record_current=True,
+    record_current_divergence=True,
+    current_contour=(0, 0, 12, 12),
 )
 result = axial_diagnostic(config, record_metrics=True)
 print(result.surviving, result.density_per_ang2.shape)
@@ -46,10 +56,12 @@ Custom Gaussian, vortex or incoherent-mixture entry states can be supplied via
 ```python
 from pyrite.montecarlo.channeling.states import laguerre_gauss, mixture
 
-entry = mixture([
-    (0.5, laguerre_gauss(1, waist_ang=0.5)),
-    (0.5, laguerre_gauss(-1, waist_ang=0.5)),
-])
+entry = mixture(
+    [
+        (0.5, laguerre_gauss(1, waist_ang=0.5)),
+        (0.5, laguerre_gauss(-1, waist_ang=0.5)),
+    ]
+)
 result = axial_diagnostic(config, entry=entry, record_metrics=True)
 ```
 

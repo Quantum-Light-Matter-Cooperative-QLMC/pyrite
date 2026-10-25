@@ -236,3 +236,36 @@ def test_sampled_power_bounds_refuse_nonfinite_certificate_inputs(invalid):
             stop_eV=1.0,
             form_factor_bounds=factors,
         )
+
+
+@pytest.mark.parametrize("remove_global_phase", [False, True])
+def test_large_energy_batch_preserves_the_shared_electron_sinc_field(remove_global_phase):
+    """Batching keeps both polarizations' interference and every sample energy."""
+    row = replace(
+        _row(),
+        electron=np.array([7, 7]),
+        amplitude=np.array([[1.0, 0.4j], [-0.2j, 0.7]]),
+    )
+    energies = np.linspace(900.0, 1100.0, 65539)
+    delta = 1e-7 * energies + 2e-4
+    centre, phase, escape = row.centre_ang, row.phase_rad, row.escape_mid_ang
+    if remove_global_phase:
+        centre, phase, escape = centre - centre[0], phase - phase[0], escape - escape[0]
+    # With no absorption the exact piece transform is its phased sinc;
+    # combine pieces of the same electron before taking any squared norm.
+    argument = (
+        row.duration_ang[:, None] * (energies - row.energy_eV[:, None]) / (2 * HBARC_EV_ANG)
+        - 0.5 * row.escape_change_ang[:, None] * delta
+    )
+    clock = centre[:, None] * energies / HBARC_EV_ANG - phase[:, None] - escape[:, None] * delta
+    expected = np.sum(
+        row.amplitude[:, :, None]
+        * row.duration_ang[None, :, None]
+        * np.sinc(argument / np.pi)
+        * np.exp(1j * clock),
+        axis=1,
+    )[:, None, :]
+    actual = _sample_row_fields(
+        row, lambda E: 1e-7 * E + 2e-4, energies, remove_global_phase=remove_global_phase
+    )
+    np.testing.assert_allclose(actual, expected, rtol=2e-13, atol=2e-13)

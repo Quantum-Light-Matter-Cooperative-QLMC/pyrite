@@ -102,13 +102,18 @@ def _exact_tail(field, edge_eV, *, reach=4000.0):
         if field.electron[j] == field.electron[j - 1] and np.isclose(lo[j], hi[j - 1]):
             psi[j] = psi[j - 1] + (carrier[j] - carrier[j - 1]) * lo[j]
     amplitude = field.amplitude[0]
-    total = np.zeros((field.electron.max() + 1, omega.size), dtype=complex)
-    for j in range(lo.size):
-        x = omega - carrier[j]
-        piece = (np.exp(1j * x * hi[j]) - np.exp(1j * x * lo[j])) / (1j * x)
-        total[field.electron[j]] += amplitude[j] * np.exp(1j * psi[j]) * piece
-    power = np.sum(np.abs(total) ** 2, axis=0)
-    integral = np.trapezoid(power, omega)
+    integral = 0.0
+    # Retain every reference node; overlap block endpoints so each trapezoid
+    # is integrated once without a full electron x energy complex tensor.
+    for start in range(0, omega.size - 1, 16384):
+        block = omega[start : start + 16385]
+        total = np.zeros((field.electron.max() + 1, block.size), dtype=complex)
+        for j in range(lo.size):
+            x = block - carrier[j]
+            piece = (np.exp(1j * x * hi[j]) - np.exp(1j * x * lo[j])) / (1j * x)
+            total[field.electron[j]] += amplitude[j] * np.exp(1j * psi[j]) * piece
+        power = np.sum(np.abs(total) ** 2, axis=0)
+        integral += np.trapezoid(power, block)
     remainder = (2.0 * np.abs(amplitude).sum()) ** 2 / (omega[-1] - carrier.max())
     return (integral + remainder) / (2.0 * np.pi * field.power)
 

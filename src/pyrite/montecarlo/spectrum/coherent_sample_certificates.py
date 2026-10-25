@@ -13,6 +13,7 @@ from typing import Any
 import numpy as np
 
 from ...materials.crystal import HBARC_EV_ANG
+from ._interval_context import interval_context
 from .coherent_dispersion import CoherentDispersionLaw
 from .coherent_windows import CoherentRowField
 
@@ -85,7 +86,6 @@ def sample_row_norm_certificate(
 
     Validation: coherent-line-grid-windowed-resolution
     """
-    from mpmath.ctx_iv import MPIntervalContext
     from mpmath.libmp import round_ceiling, to_float
 
     energies = np.asarray(energies_eV, dtype=float)
@@ -151,8 +151,7 @@ def sample_row_norm_certificate(
     if pieces == 0 or energies.size == 0:
         return norms, errors
     # mpmath installs interval types and arithmetic operators dynamically.
-    ctx: Any = MPIntervalContext()
-    ctx.dps = precision_digits
+    ctx = interval_context(precision_digits)
     H = ctx.mpf(HBARC_EV_ANG)
     d0, phi0, L0 = (
         ctx.mpf(float(a[0])) for a in (field.centre_ang, field.phase_rad, field.escape_mid_ang)
@@ -214,7 +213,6 @@ def sample_dispersion_bounds(
 
     Validation: coherent-line-grid-windowed-resolution
     """
-    from mpmath.ctx_iv import MPIntervalContext
     from mpmath.libmp import round_ceiling, round_floor, to_float
 
     energies = np.asarray(energies_eV, dtype=float)
@@ -230,8 +228,7 @@ def sample_dispersion_bounds(
         or precision_digits < 20
     ):
         raise ValueError("sample interval precision must be an integer of at least 20 digits")
-    ctx: Any = MPIntervalContext()
-    ctx.dps = precision_digits
+    ctx = interval_context(precision_digits)
     result = np.empty((energies.size, 2))
     for k, energy in enumerate(energies):
         E = ctx.mpf(float(energy))
@@ -289,7 +286,6 @@ def dispersion_derivative_bound(
 
     Validation: coherent-line-grid-windowed-resolution
     """
-    from mpmath.ctx_iv import MPIntervalContext
     from mpmath.libmp import round_ceiling, to_float
 
     lo, hi = float(start_eV), float(stop_eV)
@@ -297,8 +293,7 @@ def dispersion_derivative_bound(
         raise ValueError("phase derivative order must be one or two")
     if not law.start <= lo < hi <= law.stop or np.any((law.breaks > lo) & (law.breaks < hi)):
         raise ValueError("a derivative enclosure needs one knot-free band inside the full axis")
-    ctx: Any = MPIntervalContext()
-    ctx.dps = 50
+    ctx = interval_context()
     E = ctx.mpf([lo, hi])
     # A rounded midpoint may land on the upper knot. The open band instead
     # selects the interpolation piece immediately to the right of lo.
@@ -397,7 +392,6 @@ def row_derivative_bounds(
 
     Validation: coherent-line-grid-windowed-resolution
     """
-    from mpmath.ctx_iv import MPIntervalContext
     from mpmath.libmp import round_ceiling, to_float
 
     if order == 2 and phase_second_derivative_upper is None:
@@ -438,8 +432,7 @@ def row_derivative_bounds(
         )
     if field.electron.size == 0:
         return 0.0, 0.0
-    ctx: Any = MPIntervalContext()
-    ctx.dps = 50
+    ctx = interval_context()
     electrons, inverse = np.unique(field.electron, return_inverse=True)
     if phase_gauges is not None:
         phase_gauges = np.asarray(phase_gauges, dtype=float)
@@ -572,11 +565,9 @@ def _directed_power_bounds(energies, norms, errors, derivative, edges, factors):
 
     Validation: coherent-line-grid-windowed-resolution
     """
-    from mpmath.ctx_iv import MPIntervalContext
     from mpmath.libmp import round_ceiling, round_floor, to_float
 
-    ctx: Any = MPIntervalContext()
-    ctx.dps = 50
+    ctx = interval_context()
     lower_total, upper_total = ctx.mpf(0), ctx.mpf(0)
 
     def lower_side(A, K, t):

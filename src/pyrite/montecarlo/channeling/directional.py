@@ -60,6 +60,20 @@ class DirectionalChannels(ElectronicChannels):
 
         Validation: cr-valence-directional-loss
         """
+        px, qy = np.broadcast_arrays(np.asarray(p, dtype=float), np.asarray(q_y, dtype=float))
+        shape = px.shape
+        px, qy = px.ravel(), qy.ravel()
+        result = np.empty(px.size)
+        # Momentum points are independent; retain the full shell sum at each
+        # point while bounding the point x oscillator interpolation scratch.
+        block_size = max(1, 65536 // self.distant_qmin_inv_ang.size)
+        for start in range(0, result.size, block_size):
+            block = slice(start, start + block_size)
+            result[block] = self._distant_pq_block(px[block], qy[block])
+        return result.reshape(shape)[()]
+
+    def _distant_pq_block(self, p, q_y):
+        """Direction-resolved distant weight on one bounded momentum block."""
         p = np.asarray(p, dtype=float)[..., None]
         q_y = np.asarray(q_y, dtype=float)[..., None]
         q2 = p**2 + q_y**2 + self.distant_qmin_inv_ang**2

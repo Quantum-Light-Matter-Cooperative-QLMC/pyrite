@@ -12,17 +12,10 @@ from typing import Any
 
 import numpy as np
 
+from ._interval_context import interval_context as _context
 from .coherent_dispersion import CoherentDispersionLaw
 from .coherent_normalization import _certified_interpolated_row_power_bounds
 from .coherent_windows import CoherentRowField
-
-
-def _context() -> Any:
-    from mpmath.ctx_iv import MPIntervalContext
-
-    ctx = MPIntervalContext()
-    ctx.dps = 50
-    return ctx
 
 
 def _upper_float(value: Any, *, signed: bool = False) -> float:

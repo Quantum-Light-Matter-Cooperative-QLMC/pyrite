@@ -102,3 +102,15 @@ def test_out_of_range_energy_is_nan():
     fp, fpp = henke_dispersion("Te", np.array([0.0, 5000.0]))
     assert np.isnan(fp[0]) and np.isnan(fpp[0])
     assert np.isfinite(fp[1]) and np.isfinite(fpp[1])
+
+
+@pytest.mark.parametrize("element", ["C", "Mo", "W"])
+def test_scalar_form_factor_matches_vector_values_without_sharing_mutable_results(element):
+    g = np.array([0.0, 1.25, 3.0, 12.0])
+    expected = cromer_mann_f0(element, g)
+    actual = np.array([cromer_mann_f0(element, value) for value in g])
+    np.testing.assert_array_equal(actual, expected)
+    scalar = cromer_mann_f0(element, 1.25)
+    assert scalar.shape == ()
+    scalar[...] = -999.0
+    assert cromer_mann_f0(element, 1.25) == expected[1]

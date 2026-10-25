@@ -15,6 +15,7 @@ from typing import Any
 import numpy as np
 
 from ...materials.crystal import HBARC_EV_ANG
+from ._interval_context import interval_context
 from .coherent_dispersion import CoherentDispersionLaw, DispersionCertificate
 from .coherent_windows import CoherentRowField, _electron_l1_power, _piece_l1_amplitudes
 
@@ -62,16 +63,30 @@ def _sample_row_fields(
     apb = field.start_transmission + field.end_transmission
     # b-a = -(a+b)tanh(q) is stable at nearly equal endpoint transmission.
     bma = -apb * np.tanh(q)
-    for k, energy in enumerate(energies):
+    # Each energy is independent. Bound the piece x energy scratch while
+    # keeping the original piece order in every electron's accumulation.
+    block_size = max(1, 65536 // field.duration_ang.size)
+    for start in range(0, energies.size, block_size):
+        block = slice(start, start + block_size)
+        energy = energies[None, block]
+        delta = omega_delta[None, block]
         v = (
-            field.duration_ang * (energy - field.energy_eV) / (2 * HBARC_EV_ANG)
-            - 0.5 * field.escape_change_ang * omega_delta[k]
+            field.duration_ang[:, None] * (energy - field.energy_eV[:, None]) / (2 * HBARC_EV_ANG)
+            - 0.5 * field.escape_change_ang[:, None] * delta
         )
-        formation = formation_factor(v, apb, bma, q)
-        phase = energy * centre / HBARC_EV_ANG - phase_constant - escape_mid * omega_delta[k]
-        common = field.duration_ang * formation * np.exp(1j * phase)
+        formation = formation_factor(v, apb[:, None], bma[:, None], q[:, None])
+        phase = (
+            energy * centre[:, None] / HBARC_EV_ANG
+            - phase_constant[:, None]
+            - escape_mid[:, None] * delta
+        )
+        common = field.duration_ang[:, None] * formation * np.exp(1j * phase)
         for polarization in range(output.shape[0]):
-            np.add.at(output[polarization, :, k], inverse, field.amplitude[polarization] * common)
+            np.add.at(
+                output[polarization, :, block],
+                inverse,
+                field.amplitude[polarization, :, None] * common,
+            )
     return output
 
 
@@ -373,7 +388,6 @@ def _curvature_power_bounds(
 
     Validation: coherent-line-grid-windowed-resolution
     """
-    from mpmath.ctx_iv import MPIntervalContext
     from mpmath.libmp import round_ceiling, round_floor, to_float
 
     energies = np.asarray(energies_eV, dtype=float)
@@ -401,8 +415,7 @@ def _curvature_power_bounds(
         directed=True,
     )
     norms, errors = np.asarray(sample_norms), np.asarray(sample_norm_errors)
-    ctx: Any = MPIntervalContext()
-    ctx.dps = 50
+    ctx = interval_context()
     lower_total, upper_total = ctx.mpf(0), ctx.mpf(0)
     for index, a, b in ((0, start_eV, energies[0]), (-1, energies[-1], stop_eV)):
         if a < b:
