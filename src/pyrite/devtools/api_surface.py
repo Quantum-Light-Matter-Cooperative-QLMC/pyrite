@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from pyrite.devtools.api_packages import check_package_contracts, check_runtime_package_contracts
+from pyrite.devtools.api_root import check_root_policy
 from pyrite.devtools.api_typing import check_typing_exports
 
 ALLOWED_STATUSES = frozenset({"stable", "advanced-stable", "experimental", "internal"})
@@ -367,6 +368,7 @@ def check_static(root: Path) -> tuple[dict[str, Export], list[str]]:
         errors.extend(check_facades(root, exports, facade_domains))
         errors.extend(check_typing_exports(root, exports, facade_domains))
     errors.extend(check_package_contracts(root, exports))
+    errors.extend(check_root_policy(root, set(exports), CORE_ROOT))
     return exports, errors
 
 

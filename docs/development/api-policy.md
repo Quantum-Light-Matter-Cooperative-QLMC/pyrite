@@ -16,8 +16,11 @@ canonical-facade inventory in `api-surface.toml`. This page is the review policy
 The inventory's `root_role` is independent of stability: `core` identifies the
 nine foundational names; `specialized` records preexisting root exports, **not**
 a deprecation; `experimental` identifies clearly provisional root entries.
-Existing exports keep working. Relocation, promotion, or deprecation is a
-separate reviewed change.
+`root_policy` now separately classifies every root name as retained,
+deprecated, or deferred; see the complete [migration table](../api.md#root-import-compatibility).
+The forward root allowlist contains the nine foundational names and the approved
+`photon_energies` convenience exception. Stability does not change when a root
+alias is deprecated. All existing imports keep working during the support window.
 
 ## Canonical ownership
 
@@ -111,8 +114,13 @@ from pyrite.geometry import Slab, CrystalCut, Target
 from pyrite.config import Physics, Numerics, FixedSampling, load_physics
 ```
 
-This slice is *additive*: all root spellings and historical implementation
-module paths continue to work, without warnings. No scientific configuration,
+Canonical facade imports and historical implementation paths continue to work.
+Specialized root aliases classified as deprecated warn through the existing
+versioned machinery. Announcement is scheduled for 0.20.5, with removal targeted
+for 0.22.0. The release PR must confirm the actual announcement version and
+recalculate the two-minor window if first shipped in a later minor. `__all__`
+continues to include all historical names for compatibility; `_ROOT_API` records
+the forward contract. `dir(pyrite)` discovers both sets without resolving them. No scientific configuration,
 serialization, or content identity is migrated. `ExecutionConfig` retains its
 existing spelling and semantics pending the separate numerics/config issue;
 `PhotonTransport` remains experimental even when accessed through
@@ -143,3 +151,17 @@ For a new supported namespace name, document its scope, add its status and
 concrete target to `package_exports`, expose it in `__all__` if used, ensure a typing
 declaration exists, then run the static and runtime API checks. Don't register
 a helper merely because an implementation package exports it.
+
+
+## Scene composition coordination
+
+Root curation changes import recommendations only. `Scene` retains its current
+constructor, stored fields, lowering, precedence, and serialized identity.
+Physical-only scene composition is tracked in
+[#695](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/695)
+and must reconcile the existing #680 composition RFC before changing those
+contracts. That design is coordinated with observation ownership (#703) and
+quantum setup (#704), without blocking established domain-import migrations.
+`ExecutionConfig` and `QuantumSetup` remain supported at root pending these
+decisions; curation does not introduce a simulation request type or endorse a
+future composition model.

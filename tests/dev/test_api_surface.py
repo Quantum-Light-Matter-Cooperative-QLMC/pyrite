@@ -4,6 +4,8 @@ import sys
 from pathlib import Path
 from types import ModuleType
 
+import pytest
+
 from pyrite.devtools import api_surface
 
 
@@ -14,6 +16,7 @@ def _project(tmp_path: Path) -> Path:
     mapping = {name: ("pyrite.beam", name) for name in api_surface.CORE_ROOT}
     (source / "__init__.py").write_text(
         f"_PUBLIC_OBJECTS = {mapping!r}\n"
+        f"_ROOT_API = {tuple(sorted(mapping))!r}\n"
         "__all__ = ['DATA_DIR', '__version__', 'states', *_PUBLIC_OBJECTS]\n"
     )
     (source / "beam.py").write_text("# fixture leaf\n")
@@ -22,6 +25,12 @@ def _project(tmp_path: Path) -> Path:
         exports.append(
             f'{name} = {{target="pyrite.beam:{name}", status="stable", '
             'domain="beams", root_role="core"}'
+        )
+    (source / "_api_deprecations.py").write_text("ROOT_API_REPLACEMENTS = {}\n")
+    exports.append("[root_policy]")
+    for name in sorted(mapping):
+        exports.append(
+            f'{name} = {{classification="retained", canonical="pyrite:{name}", reason="Core"}}'
         )
     (root / "api-surface.toml").write_text("\n".join(exports) + "\n")
     return root
@@ -66,10 +75,12 @@ def test_invalid_status_and_duplicate_owner_fail(tmp_path: Path) -> None:
     _, errors = api_surface.read_manifest(manifest)
     assert any("invalid API status" in error for error in errors)
     manifest.write_text(
-        manifest.read_text().replace('status="undefined"', 'status="stable"')
-        + (
-            'Alias = {target="pyrite.beam:Beam", status="advanced-stable", '
-            'domain="beams", root_role="specialized"}\n'
+        manifest.read_text()
+        .replace('status="undefined"', 'status="stable"')
+        .replace(
+            "[root_exports]\n",
+            '[root_exports]\nAlias = {target="pyrite.beam:Beam", status="advanced-stable", '
+            'domain="beams", root_role="specialized"}\n',
         )
     )
     _, errors = api_surface.read_manifest(manifest)
@@ -159,3 +170,36 @@ def test_facade_checker_rejects_duplicate_facade_domain(tmp_path: Path) -> None:
     )
     _, errors = api_surface.check_static(root)
     assert any("canonical_facades must be distinct" in error for error in errors)
+
+
+@pytest.mark.parametrize(
+    "before,after,expected",
+    [
+        ('classification="retained"', 'classification="unknown"', "invalid classification"),
+        ('classification="retained"', 'classification="deferred"', "must be retained"),
+        ('canonical="pyrite:Beam"', 'canonical="pyrite:Else"', "invalid canonical import"),
+        ('reason="Core"', 'reason=""', "missing rationale"),
+        ("[root_policy]", "[unclassified]", "root policy coverage"),
+    ],
+)
+def test_root_classification_drift_fails(tmp_path, before, after, expected):
+    from pyrite.devtools.api_root import check_root_policy
+
+    root = _project(tmp_path)
+    path = root / "api-surface.toml"
+    path.write_text(path.read_text().replace(before, after))
+    errors = check_root_policy(root, set(api_surface.CORE_ROOT), api_surface.CORE_ROOT)
+    assert any(expected in error for error in errors), errors
+
+
+def test_runtime_allowlist_and_warning_replacements_are_governed(tmp_path):
+    from pyrite.devtools.api_root import check_root_policy
+
+    root = _project(tmp_path)
+    path = root / "src/pyrite/__init__.py"
+    path.write_text(path.read_text().replace("_ROOT_API = (", "_ROOT_API = ('Surprise', "))
+    registry = root / "src/pyrite/_api_deprecations.py"
+    registry.write_text("ROOT_API_REPLACEMENTS = {'pyrite.Beam': 'pyrite.beams.Beam'}\n")
+    errors = check_root_policy(root, set(api_surface.CORE_ROOT), api_surface.CORE_ROOT)
+    assert any("_ROOT_API differs" in error for error in errors)
+    assert any("deprecation replacements differ" in error for error in errors)

@@ -31,8 +31,9 @@ detector. Clone it to change the beam, target, detector or numerical settings:
 
 ```bash
 pyrite profile create my_channeling --from channeling_demo
+miller_negative=-1
 pyrite physics set my_channeling \
-  --channeling-model planar --channeling-plane 1 -1 0 \
+  --channeling-model planar --channeling-plane 1 "$miller_negative" 0 \
   --radiative-model uncoupled --emission incoherent
 pyrite run my_channeling
 ```

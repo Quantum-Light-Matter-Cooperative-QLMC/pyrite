@@ -1,6 +1,6 @@
 # Inventory of supported imports, preserving the contract at main ec61aac9.
 # target is the *current* concrete binding; domain is the intended public owner.
-# root_role=specialized means existing root compatibility, NOT deprecated.
+# root_role records ownership/stability; root_policy separately classifies root compatibility.
 # canonical_facades lists active domain imports; other domains retain existing paths.
 schema_version = 1
 canonical_facades = ["beams", "geometry", "config", "detectors", "observations"]
@@ -221,3 +221,73 @@ detected_image = { target = "pyrite.detectors.grating:detected_image", status = 
 
 [package_exports."pyrite.results.radiation"]
 radiation_band_metrics = { target = "pyrite.results.radiation:radiation_band_metrics", status = "advanced-stable" }
+
+# Complete root migration classification; schedules live only in _api_deprecations.py.
+[root_policy]
+Acquisition = { classification = "deprecated", canonical = "pyrite.observations:Acquisition", reason = "Use the established canonical domain import." }
+AcquisitionBatch = { classification = "deprecated", canonical = "pyrite.observations:AcquisitionBatch", reason = "Use the established canonical domain import." }
+AdaptiveSampling = { classification = "deprecated", canonical = "pyrite.config:AdaptiveSampling", reason = "Use the established canonical domain import." }
+Analysis = { classification = "deferred", canonical = "pyrite.campaign.model:Analysis", reason = "Keep the existing import pending canonical ownership review in #707." }
+AngularAcceptance = { classification = "deprecated", canonical = "pyrite.detectors:AngularAcceptance", reason = "Use the established canonical domain import." }
+Beam = { classification = "retained", canonical = "pyrite:Beam", reason = "Foundational simulation entry point." }
+BlazedGrooves = { classification = "deprecated", canonical = "pyrite.geometry:BlazedGrooves", reason = "Use the established canonical domain import." }
+BunchFrontTilt = { classification = "deprecated", canonical = "pyrite.beams:BunchFrontTilt", reason = "Use the established canonical domain import." }
+BunchLength = { classification = "deprecated", canonical = "pyrite.beams:BunchLength", reason = "Use the established canonical domain import." }
+CrystalCut = { classification = "deprecated", canonical = "pyrite.geometry:CrystalCut", reason = "Use the established canonical domain import." }
+CxrReflections = { classification = "deprecated", canonical = "pyrite.config:CxrReflections", reason = "Use the established canonical domain import." }
+CxrSpectra = { classification = "deferred", canonical = "pyrite.results.model:CxrSpectra", reason = "Keep the existing import pending canonical ownership review in #707." }
+Detector = { classification = "retained", canonical = "pyrite:Detector", reason = "Foundational simulation entry point." }
+DirectionalSpectrum = { classification = "deferred", canonical = "pyrite.results.directional:DirectionalSpectrum", reason = "Keep the existing import pending canonical ownership review in #707." }
+EnergyBins = { classification = "deprecated", canonical = "pyrite.detectors:EnergyBins", reason = "Use the established canonical domain import." }
+ExecutionConfig = { classification = "deferred", canonical = "pyrite.config:ExecutionConfig", reason = "Keep the existing kernel-control name pending composition and naming decisions in #695 and #702." }
+Filter = { classification = "deprecated", canonical = "pyrite.geometry:Filter", reason = "Use the established canonical domain import." }
+FilterPlate = { classification = "deprecated", canonical = "pyrite.detectors:FilterPlate", reason = "Use the established canonical domain import." }
+FixedSampling = { classification = "deprecated", canonical = "pyrite.config:FixedSampling", reason = "Use the established canonical domain import." }
+Footprint = { classification = "deprecated", canonical = "pyrite.geometry:Footprint", reason = "Use the established canonical domain import." }
+GdfSource = { classification = "deprecated", canonical = "pyrite.beams:GdfSource", reason = "Use the established canonical domain import." }
+IdealPhotonCounter = { classification = "deprecated", canonical = "pyrite.detectors:IdealPhotonCounter", reason = "Use the established canonical domain import." }
+Layer = { classification = "deprecated", canonical = "pyrite.geometry:Layer", reason = "Use the established canonical domain import." }
+NativeAcquisition = { classification = "deprecated", canonical = "pyrite.observations:NativeAcquisition", reason = "Use the established canonical domain import." }
+Numerics = { classification = "retained", canonical = "pyrite:Numerics", reason = "Foundational simulation entry point." }
+Offsets = { classification = "deprecated", canonical = "pyrite.beams:Offsets", reason = "Use the established canonical domain import." }
+PhotonTransport = { classification = "deferred", canonical = "pyrite.config:PhotonTransport", reason = "Keep the experimental root path pending lifecycle review in #706." }
+Physics = { classification = "retained", canonical = "pyrite:Physics", reason = "Foundational simulation entry point." }
+PixelGrid = { classification = "deprecated", canonical = "pyrite.detectors:PixelGrid", reason = "Use the established canonical domain import." }
+PixelMetadata = { classification = "deferred", canonical = "pyrite.results.model:PixelMetadata", reason = "Keep the existing import pending canonical ownership review in #707." }
+PixelRayMap = { classification = "deferred", canonical = "pyrite.results.model:PixelRayMap", reason = "Keep the existing import pending canonical ownership review in #707." }
+PixelScorer = { classification = "deprecated", canonical = "pyrite.observations:PixelScorer", reason = "Use the established canonical domain import." }
+PlanarDetector = { classification = "deprecated", canonical = "pyrite.detectors:PlanarDetector", reason = "Use the established canonical domain import." }
+PlanarPose = { classification = "deprecated", canonical = "pyrite.detectors:PlanarPose", reason = "Use the established canonical domain import." }
+PointBunch = { classification = "deprecated", canonical = "pyrite.beams:PointBunch", reason = "Use the established canonical domain import." }
+PointSpot = { classification = "deprecated", canonical = "pyrite.beams:PointSpot", reason = "Use the established canonical domain import." }
+Precision = { classification = "deprecated", canonical = "pyrite.config:Precision", reason = "Use the established canonical domain import." }
+Provenance = { classification = "deferred", canonical = "pyrite.results.provenance:Provenance", reason = "Keep the existing import pending canonical ownership review in #707." }
+QuantumDynamics = { classification = "deferred", canonical = "pyrite.quantum:QuantumDynamics", reason = "Keep the existing import pending canonical ownership review in #704." }
+QuantumNumerics = { classification = "deferred", canonical = "pyrite.quantum:QuantumNumerics", reason = "Keep the existing import pending canonical ownership review in #704." }
+QuantumRegion = { classification = "deferred", canonical = "pyrite.quantum:QuantumRegion", reason = "Keep the existing import pending canonical ownership review in #704." }
+QuantumSetup = { classification = "deferred", canonical = "pyrite.quantum:QuantumSetup", reason = "Keep the existing quantum composition boundary pending #695 and #704." }
+RadiationNumerics = { classification = "deprecated", canonical = "pyrite.config:RadiationNumerics", reason = "Use the established canonical domain import." }
+RectangularBody = { classification = "deprecated", canonical = "pyrite.geometry:RectangularBody", reason = "Use the established canonical domain import." }
+ResolvedObservation = { classification = "deprecated", canonical = "pyrite.observations:ResolvedObservation", reason = "Use the established canonical domain import." }
+Result = { classification = "retained", canonical = "pyrite:Result", reason = "Foundational simulation entry point." }
+Scene = { classification = "retained", canonical = "pyrite:Scene", reason = "Foundational simulation entry point." }
+SensorAcceptance = { classification = "deprecated", canonical = "pyrite.detectors:SensorAcceptance", reason = "Use the established canonical domain import." }
+Slab = { classification = "deprecated", canonical = "pyrite.geometry:Slab", reason = "Use the established canonical domain import." }
+SpatialResult = { classification = "deferred", canonical = "pyrite.results.model:SpatialResult", reason = "Keep the existing import pending canonical ownership review in #707." }
+SpectralDensity = { classification = "deferred", canonical = "pyrite.results.model:SpectralDensity", reason = "Keep the existing import pending canonical ownership review in #707." }
+SpectralFactors = { classification = "deferred", canonical = "pyrite.results.model:SpectralFactors", reason = "Keep the existing import pending canonical ownership review in #707." }
+Spot = { classification = "deprecated", canonical = "pyrite.beams:Spot", reason = "Use the established canonical domain import." }
+Stack = { classification = "deprecated", canonical = "pyrite.geometry:Stack", reason = "Use the established canonical domain import." }
+SubstanceRef = { classification = "deprecated", canonical = "pyrite.geometry:SubstanceRef", reason = "Use the established canonical domain import." }
+Sweep = { classification = "retained", canonical = "pyrite:Sweep", reason = "Foundational simulation entry point." }
+Target = { classification = "retained", canonical = "pyrite:Target", reason = "Foundational simulation entry point." }
+TransportNumerics = { classification = "deprecated", canonical = "pyrite.config:TransportNumerics", reason = "Use the established canonical domain import." }
+TransverseSpot = { classification = "deprecated", canonical = "pyrite.beams:TransverseSpot", reason = "Use the established canonical domain import." }
+TransverseStateSpec = { classification = "deferred", canonical = "pyrite.quantum_state:TransverseStateSpec", reason = "Keep the existing import pending canonical ownership review in #704." }
+directional_source = { classification = "deferred", canonical = "pyrite.directional:directional_source", reason = "Keep the existing import pending canonical ownership review in #705." }
+directional_sources = { classification = "deferred", canonical = "pyrite.directional:directional_sources", reason = "Keep the existing import pending canonical ownership review in #705." }
+fetch_tables = { classification = "deferred", canonical = "pyrite.xsgen.install:fetch_tables", reason = "Keep the existing import pending canonical ownership review in #707." }
+load_numerics = { classification = "deprecated", canonical = "pyrite.config:load_numerics", reason = "Use the established canonical domain import." }
+load_physics = { classification = "deprecated", canonical = "pyrite.config:load_physics", reason = "Use the established canonical domain import." }
+photon_energies = { classification = "retained", canonical = "pyrite:photon_energies", reason = "Approved deterministic line-energy convenience exception." }
+simulate = { classification = "retained", canonical = "pyrite:simulate", reason = "Foundational simulation entry point." }

@@ -45,6 +45,103 @@ retained for compatibility while configuration design work proceeds.
 `pyrite.config.PhotonTransport` is experimental. See the
 [API namespace policy](development/api-policy.md) for ownership and stability.
 
+## Root import compatibility
+
+The forward-looking root API is `Beam`, `Target`, `Detector`, `Scene`,
+`Sweep`, `Physics`, `Numerics`, `simulate`, and `Result`, plus the approved
+`photon_energies` convenience exception. Use domain imports for specialized types.
+
+All existing names remain importable and available through `dir(pyrite)`, static
+editor declarations, and legacy star imports. Deprecated root accesses emit
+`DeprecationWarning` on each lookup (subject to Python warning filters); these
+aliases are deliberately not cached. Canonical imports emit no root warning.
+`__all__` preserves compatibility rather than defining the forward API.
+
+**Deprecated** rows are scheduled for announcement in 0.20.5, with removal
+targeted for 0.22.0. The release PR confirms the actual announcement version
+and shifts the removal target if first shipped in a later minor.
+Removal is separate release work. **Deferred** rows remain supported at root
+without a warning or removal date until their ownership decisions are resolved.
+`canonical` gives the recommended import today; deferred paths may be refined
+by the linked follow-up. The governed classification is in `api-surface.toml`;
+removal dates are owned by the existing deprecation registry.
+
+`__version__` and `DATA_DIR` remain package metadata. The lazy `states` module
+remains a supported compatibility exposure pending quantum consolidation in
+[#704](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/704);
+it is outside the domain-object allowlist. Logger and import plumbing are not
+public API.
+
+| Root name | Classification | Recommended import | Reason |
+| --- | --- | --- | --- |
+| `Acquisition` | Deprecated | `pyrite.observations.Acquisition` | Use the established canonical domain import. |
+| `AcquisitionBatch` | Deprecated | `pyrite.observations.AcquisitionBatch` | Use the established canonical domain import. |
+| `AdaptiveSampling` | Deprecated | `pyrite.config.AdaptiveSampling` | Use the established canonical domain import. |
+| `Analysis` | Deferred | `pyrite.campaign.model.Analysis` | Keep the existing import pending canonical ownership review in #707. |
+| `AngularAcceptance` | Deprecated | `pyrite.detectors.AngularAcceptance` | Use the established canonical domain import. |
+| `Beam` | Retained | `pyrite.Beam` | Foundational simulation entry point. |
+| `BlazedGrooves` | Deprecated | `pyrite.geometry.BlazedGrooves` | Use the established canonical domain import. |
+| `BunchFrontTilt` | Deprecated | `pyrite.beams.BunchFrontTilt` | Use the established canonical domain import. |
+| `BunchLength` | Deprecated | `pyrite.beams.BunchLength` | Use the established canonical domain import. |
+| `CrystalCut` | Deprecated | `pyrite.geometry.CrystalCut` | Use the established canonical domain import. |
+| `CxrReflections` | Deprecated | `pyrite.config.CxrReflections` | Use the established canonical domain import. |
+| `CxrSpectra` | Deferred | `pyrite.results.model.CxrSpectra` | Keep the existing import pending canonical ownership review in #707. |
+| `Detector` | Retained | `pyrite.Detector` | Foundational simulation entry point. |
+| `DirectionalSpectrum` | Deferred | `pyrite.results.directional.DirectionalSpectrum` | Keep the existing import pending canonical ownership review in #707. |
+| `EnergyBins` | Deprecated | `pyrite.detectors.EnergyBins` | Use the established canonical domain import. |
+| `ExecutionConfig` | Deferred | `pyrite.config.ExecutionConfig` | Keep the existing kernel-control name pending composition and naming decisions in #695 and #702. |
+| `Filter` | Deprecated | `pyrite.geometry.Filter` | Use the established canonical domain import. |
+| `FilterPlate` | Deprecated | `pyrite.detectors.FilterPlate` | Use the established canonical domain import. |
+| `FixedSampling` | Deprecated | `pyrite.config.FixedSampling` | Use the established canonical domain import. |
+| `Footprint` | Deprecated | `pyrite.geometry.Footprint` | Use the established canonical domain import. |
+| `GdfSource` | Deprecated | `pyrite.beams.GdfSource` | Use the established canonical domain import. |
+| `IdealPhotonCounter` | Deprecated | `pyrite.detectors.IdealPhotonCounter` | Use the established canonical domain import. |
+| `Layer` | Deprecated | `pyrite.geometry.Layer` | Use the established canonical domain import. |
+| `NativeAcquisition` | Deprecated | `pyrite.observations.NativeAcquisition` | Use the established canonical domain import. |
+| `Numerics` | Retained | `pyrite.Numerics` | Foundational simulation entry point. |
+| `Offsets` | Deprecated | `pyrite.beams.Offsets` | Use the established canonical domain import. |
+| `PhotonTransport` | Deferred | `pyrite.config.PhotonTransport` | Keep the experimental root path pending lifecycle review in #706. |
+| `Physics` | Retained | `pyrite.Physics` | Foundational simulation entry point. |
+| `PixelGrid` | Deprecated | `pyrite.detectors.PixelGrid` | Use the established canonical domain import. |
+| `PixelMetadata` | Deferred | `pyrite.results.model.PixelMetadata` | Keep the existing import pending canonical ownership review in #707. |
+| `PixelRayMap` | Deferred | `pyrite.results.model.PixelRayMap` | Keep the existing import pending canonical ownership review in #707. |
+| `PixelScorer` | Deprecated | `pyrite.observations.PixelScorer` | Use the established canonical domain import. |
+| `PlanarDetector` | Deprecated | `pyrite.detectors.PlanarDetector` | Use the established canonical domain import. |
+| `PlanarPose` | Deprecated | `pyrite.detectors.PlanarPose` | Use the established canonical domain import. |
+| `PointBunch` | Deprecated | `pyrite.beams.PointBunch` | Use the established canonical domain import. |
+| `PointSpot` | Deprecated | `pyrite.beams.PointSpot` | Use the established canonical domain import. |
+| `Precision` | Deprecated | `pyrite.config.Precision` | Use the established canonical domain import. |
+| `Provenance` | Deferred | `pyrite.results.provenance.Provenance` | Keep the existing import pending canonical ownership review in #707. |
+| `QuantumDynamics` | Deferred | `pyrite.quantum.QuantumDynamics` | Keep the existing import pending canonical ownership review in #704. |
+| `QuantumNumerics` | Deferred | `pyrite.quantum.QuantumNumerics` | Keep the existing import pending canonical ownership review in #704. |
+| `QuantumRegion` | Deferred | `pyrite.quantum.QuantumRegion` | Keep the existing import pending canonical ownership review in #704. |
+| `QuantumSetup` | Deferred | `pyrite.quantum.QuantumSetup` | Keep the existing quantum composition boundary pending #695 and #704. |
+| `RadiationNumerics` | Deprecated | `pyrite.config.RadiationNumerics` | Use the established canonical domain import. |
+| `RectangularBody` | Deprecated | `pyrite.geometry.RectangularBody` | Use the established canonical domain import. |
+| `ResolvedObservation` | Deprecated | `pyrite.observations.ResolvedObservation` | Use the established canonical domain import. |
+| `Result` | Retained | `pyrite.Result` | Foundational simulation entry point. |
+| `Scene` | Retained | `pyrite.Scene` | Foundational simulation entry point. |
+| `SensorAcceptance` | Deprecated | `pyrite.detectors.SensorAcceptance` | Use the established canonical domain import. |
+| `Slab` | Deprecated | `pyrite.geometry.Slab` | Use the established canonical domain import. |
+| `SpatialResult` | Deferred | `pyrite.results.model.SpatialResult` | Keep the existing import pending canonical ownership review in #707. |
+| `SpectralDensity` | Deferred | `pyrite.results.model.SpectralDensity` | Keep the existing import pending canonical ownership review in #707. |
+| `SpectralFactors` | Deferred | `pyrite.results.model.SpectralFactors` | Keep the existing import pending canonical ownership review in #707. |
+| `Spot` | Deprecated | `pyrite.beams.Spot` | Use the established canonical domain import. |
+| `Stack` | Deprecated | `pyrite.geometry.Stack` | Use the established canonical domain import. |
+| `SubstanceRef` | Deprecated | `pyrite.geometry.SubstanceRef` | Use the established canonical domain import. |
+| `Sweep` | Retained | `pyrite.Sweep` | Foundational simulation entry point. |
+| `Target` | Retained | `pyrite.Target` | Foundational simulation entry point. |
+| `TransportNumerics` | Deprecated | `pyrite.config.TransportNumerics` | Use the established canonical domain import. |
+| `TransverseSpot` | Deprecated | `pyrite.beams.TransverseSpot` | Use the established canonical domain import. |
+| `TransverseStateSpec` | Deferred | `pyrite.quantum_state.TransverseStateSpec` | Keep the existing import pending canonical ownership review in #704. |
+| `directional_source` | Deferred | `pyrite.directional.directional_source` | Keep the existing import pending canonical ownership review in #705. |
+| `directional_sources` | Deferred | `pyrite.directional.directional_sources` | Keep the existing import pending canonical ownership review in #705. |
+| `fetch_tables` | Deferred | `pyrite.xsgen.install.fetch_tables` | Keep the existing import pending canonical ownership review in #707. |
+| `load_numerics` | Deprecated | `pyrite.config.load_numerics` | Use the established canonical domain import. |
+| `load_physics` | Deprecated | `pyrite.config.load_physics` | Use the established canonical domain import. |
+| `photon_energies` | Retained | `pyrite.photon_energies` | Approved deterministic line-energy convenience exception. |
+| `simulate` | Retained | `pyrite.simulate` | Foundational simulation entry point. |
+
 ## Material authoring
 
 Use `pyrite.materials.MaterialDefinition`, `build_medium`, `build_crystal` and
@@ -78,7 +175,7 @@ and azimuth retain full floating-point precision in scenes and profile sweeps.
 `Physics` selects models and `Numerics` controls sampling and integration.
 Beam transverse and
 longitudinal descriptions and target footprints are explicit inputs.
-{py:func}`pyrite.load_physics` and {py:func}`pyrite.load_numerics` return
+{py:func}`pyrite.config.load_physics` and {py:func}`pyrite.config.load_numerics` return
 named catalog presets (for example the bundled `electron-standard` and
 `default`, or ones made with `pyrite physics|numerics preset create`) as
 frozen `Physics` and `Numerics`; adjust them with `dataclasses.replace`
@@ -132,33 +229,33 @@ catalog/CLI selectors and full-track external validation remain open.
    :toctree: _autosummary
 
    pyrite.Beam
-   pyrite.TransverseSpot
-   pyrite.BunchFrontTilt
-   pyrite.PointSpot
-   pyrite.PointBunch
-   pyrite.BunchLength
-   pyrite.Offsets
-   pyrite.GdfSource
-   pyrite.Slab
-   pyrite.Stack
-   pyrite.SubstanceRef
-   pyrite.RectangularBody
+   pyrite.beams.TransverseSpot
+   pyrite.beams.BunchFrontTilt
+   pyrite.beams.PointSpot
+   pyrite.beams.PointBunch
+   pyrite.beams.BunchLength
+   pyrite.beams.Offsets
+   pyrite.beams.GdfSource
+   pyrite.geometry.Slab
+   pyrite.geometry.Stack
+   pyrite.geometry.SubstanceRef
+   pyrite.geometry.RectangularBody
    pyrite.Target
-   pyrite.Filter
-   pyrite.Layer
-   pyrite.Footprint
-   pyrite.BlazedGrooves
-   pyrite.CrystalCut
-   pyrite.PlanarPose
-   pyrite.PixelGrid
-   pyrite.FilterPlate
-   pyrite.Acquisition
-   pyrite.NativeAcquisition
-   pyrite.AcquisitionBatch
-   pyrite.IdealPhotonCounter
-   pyrite.PlanarDetector
-   pyrite.PixelScorer
-   pyrite.ResolvedObservation
+   pyrite.geometry.Filter
+   pyrite.geometry.Layer
+   pyrite.geometry.Footprint
+   pyrite.geometry.BlazedGrooves
+   pyrite.geometry.CrystalCut
+   pyrite.detectors.PlanarPose
+   pyrite.detectors.PixelGrid
+   pyrite.detectors.FilterPlate
+   pyrite.observations.Acquisition
+   pyrite.observations.NativeAcquisition
+   pyrite.observations.AcquisitionBatch
+   pyrite.detectors.IdealPhotonCounter
+   pyrite.detectors.PlanarDetector
+   pyrite.observations.PixelScorer
+   pyrite.observations.ResolvedObservation
    pyrite.PixelMetadata
    pyrite.PixelRayMap
    pyrite.SpectralFactors
@@ -166,11 +263,11 @@ catalog/CLI selectors and full-track external validation remain open.
    pyrite.Scene
    pyrite.Sweep
    pyrite.Physics
-   pyrite.load_physics
-   pyrite.load_numerics
-   pyrite.CxrReflections
+   pyrite.config.load_physics
+   pyrite.config.load_numerics
+   pyrite.config.CxrReflections
    pyrite.Numerics
-   pyrite.Precision
+   pyrite.config.Precision
    pyrite.Analysis
    pyrite.Result
    pyrite.Provenance
@@ -285,8 +382,8 @@ images. Physical pixel scoring and acquisition are illustrated in the
    :toctree: _autosummary
 
    pyrite.detectors.Detector
-   pyrite.AngularAcceptance
-   pyrite.SensorAcceptance
+   pyrite.detectors.AngularAcceptance
+   pyrite.detectors.SensorAcceptance
    pyrite.detectors.EnergyBins
    pyrite.detectors.NativeSpectrum
    pyrite.detectors.Timepix3
