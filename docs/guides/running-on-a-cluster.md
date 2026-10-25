@@ -217,6 +217,7 @@ captures are not included in checkpoint pulls: inspect or transfer them with
 
 Before scaling up, run a small Dask connectivity and correctness smoke test:
 
+<!-- verify: skip (standalone developer smoke script, not a pyrite CLI invocation) -->
 ```bash
 uv run python checks/dask_execution_smoke.py --mode local \
   --output "$PWD/pyrite-output/dask-smoke-local"
