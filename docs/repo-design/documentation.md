@@ -274,7 +274,9 @@ Conventions:
   hand-edited screenshots. Plot native component grids separately; label units,
   normalization and sample/convergence limitations in the tutorial.
 - Inputs requiring external fixtures belong in `docs/examples/data/` with
-  source/license/provenance metadata. Do not silently fetch them. Large or
+  source/license/provenance metadata. Record their filenames and SHA-256 hashes
+  in the output's `input_sha256` mapping; freshness checks reject changed inputs.
+  Do not silently fetch them. Large or
   GPU-dependent runs require explicit regeneration outside the normal build;
   publish only bounded reduced outputs. Optional interactive entry points use
   maintained marimo sources and lightweight/precomputed inputs.

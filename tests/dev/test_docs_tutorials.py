@@ -292,3 +292,69 @@ def test_detector_counts_render_without_transport(tutorials, monkeypatch, tmp_pa
         assert (tmp_path / "detector-counts.svg").stat().st_size > 1_000
     finally:
         plt.close("all")
+
+
+def test_imported_beam_fixture_and_cached_figure(tutorials, monkeypatch, tmp_path):
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    from pyrite.montecarlo.gdf import load_gdf_beam
+
+    example = tutorials.load_example("gpt_gdf_beams")
+    data = tutorials.checked_output("gpt_gdf_beams")
+    beam = load_gdf_beam(example.fixture_path(), time_s=1e-9, normalization="gdf_charge")
+    assert len(beam.energy_keV) == 96
+    assert beam.absolute_charge_c == pytest.approx(1e-12)
+    np.testing.assert_allclose(beam.energy_keV, data["energy_keV"])
+    np.testing.assert_allclose(beam.probabilities, data["probabilities"])
+    np.testing.assert_allclose(beam.position_m[:, 0] * 1e6, data["x_um"])
+    np.testing.assert_allclose(beam.beta[:, 0] / beam.beta[:, 2] * 1000, data["slope_mrad"])
+    assert data["case"]["gdf_source"]["sha256"] == beam.sha256
+    assert data["case"]["gdf_source"]["normalization"] == "gdf_charge"
+    assert data["case"]["bunch_charge_pc"] == pytest.approx(1.0)
+    assert data["case"]["rep_rate_hz"] == 1_000_000.0
+    assert data["case"]["E0_keV"] == pytest.approx(max(data["energy_keV"]))
+    assert data["case"]["Ne"] == data["case"]["Ne_brem"] == 64
+    assert data["seed"] == data["case"]["seed"] == 1
+    assert data["provenance"]["backend"] == "cpu"
+    assert data["input_kind"].startswith("SYNTHETIC DEMONSTRATION")
+
+    def forbid_compute(*args, **kwargs):
+        pytest.fail("documentation rendering must never import or simulate the beam")
+
+    monkeypatch.setattr(example, "compute", forbid_compute)
+    monkeypatch.setattr(example, "calculate", forbid_compute)
+    monkeypatch.setattr(example, "simulate", forbid_compute)
+    monkeypatch.setattr(example.easygdf, "load", forbid_compute)
+    monkeypatch.setattr(tutorials, "load_example", lambda _: example)
+    try:
+        tutorials.gpt_gdf_beams()
+        figure = plt.gcf()
+        np.testing.assert_allclose(figure.axes[0].collections[0].get_offsets()[:, 0], data["x_um"])
+        assert sum(p.get_height() for p in figure.axes[1].patches) == pytest.approx(1.0)
+        for line, spectrum in zip(figure.axes[2].lines, data["spectra"].values(), strict=True):
+            assert np.all(np.asarray(spectrum["density"]) >= 0)
+            np.testing.assert_array_equal(line.get_xdata(), spectrum["energy_eV"])
+            np.testing.assert_array_equal(line.get_ydata(), spectrum["density"])
+        figure.savefig(tmp_path / "imported-beam.svg")
+        assert (tmp_path / "imported-beam.svg").stat().st_size > 1_000
+    finally:
+        plt.close("all")
+
+
+def test_tutorial_build_rejects_changed_input_fixture(tutorials, monkeypatch, tmp_path):
+    data = tutorials.checked_output("gpt_gdf_beams")
+    monkeypatch.setattr(tutorials, "EXAMPLES", tmp_path)
+    (tmp_path / "data").mkdir()
+    (tmp_path / "gpt_gdf_beams.py").write_text("source")
+    (tmp_path / "data" / "gpt_gdf_beams.json").write_text(
+        json.dumps({"source_sha256": tutorials.source_digest("gpt_gdf_beams"), "output": data})
+    )
+    fixture = tmp_path / "data" / "synthetic_beam.gdf"
+    with pytest.raises(FileNotFoundError):
+        tutorials.checked_output("gpt_gdf_beams")
+    fixture.write_bytes(b"changed input")
+    with pytest.raises(ValueError, match="stale tutorial input"):
+        tutorials.checked_output("gpt_gdf_beams")

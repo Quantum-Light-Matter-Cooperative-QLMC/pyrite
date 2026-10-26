@@ -172,7 +172,7 @@ include `--emittance`, `--twiss-beta`, `--twiss-alpha`, `--energy-spread` and
 explicitly declaring both is an error. `emittance_demo` supplies a normalized
 0.1 mm·mrad waist at beta 0.05 m with 0.1% energy spread;
 `hopg_emittance_demo` uses that same physical beam at 30 and 100 keV.
-For imported particles and charge normalization, see [GDF beams](../guides/gpt-gdf-beams.md).
+For imported particles and charge normalization, see the [GDF input contract](gdf-beams.md).
 
 Complete-catalog profiles must name a beam; profiles read over the bundled
 catalog retain the example-beam fallback. Runs require explicit scalar

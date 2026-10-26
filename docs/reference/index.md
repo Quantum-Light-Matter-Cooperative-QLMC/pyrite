@@ -12,6 +12,7 @@ python-scene-recipes
 results-and-apps
 trajectory-workflows
 directional-sources
+gdf-beams
 campaign-configuration
 catalogs-and-workspaces
 ../repo-design/profile-settings

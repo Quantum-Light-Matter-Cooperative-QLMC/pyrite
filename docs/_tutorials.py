@@ -21,6 +21,7 @@ NAMES = (
     "configuration_cookbook",
     "directional_source_heatmap",
     "detector_observations",
+    "gpt_gdf_beams",
 )
 
 
@@ -44,6 +45,9 @@ def checked_output(name):
             f"uv run python docs/_tutorials.py --regenerate {name}"
         )
     output = payload["output"]
+    for filename, digest in output.get("input_sha256", {}).items():
+        if hashlib.sha256((EXAMPLES / "data" / filename).read_bytes()).hexdigest() != digest:
+            raise ValueError(f"stale tutorial input: {name}/{filename}; regenerate its output")
     if "script_sha256" in output:
         script = EXAMPLES / f"{name}.sh"
         if hashlib.sha256(script.read_bytes()).hexdigest() != output["script_sha256"]:
@@ -74,6 +78,10 @@ def directional_source_heatmap():
 
 def detector_observations():
     load_example("detector_observations").plot(checked_output("detector_observations"))
+
+
+def gpt_gdf_beams():
+    load_example("gpt_gdf_beams").plot(checked_output("gpt_gdf_beams"))
 
 
 def _json_default(value):
