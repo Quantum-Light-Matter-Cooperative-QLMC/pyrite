@@ -829,7 +829,7 @@ def _lockstep_outcome(t, counts, vacuum=_NO_VACUUM):
     # Lockstep and grooved cores have no batches: report the finished call once.
     if t.inputs.transport_progress is not None:
         t.inputs.transport_progress(t.inputs.Ne, t.inputs.Ne)
-    return _CoreOutcome(*counts, None, t.stragg_dE, np, vacuum)
+    return _CoreOutcome(*counts, dev_segs=None, stragg_dE=t.stragg_dE, seg_xp=np, vacuum=vacuum)
 
 
 def _run_lockstep_lut(t):
