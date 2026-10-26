@@ -76,6 +76,7 @@ __all__ = [
     "AngularSampling",
     "CxrReflections",
     "ExecutionConfig",
+    "KernelTuning",
     "FixedSampling",
     "Numerics",
     "PhotonTransport",

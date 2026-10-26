@@ -27,6 +27,8 @@ FROZEN_EXPORTS = frozenset(
         "Result",
         "Provenance",
         "FLUX_UNITS",
+        "AcquisitionBatch",
+        "PixelCountResult",
         # selection
         "records",
         "records_for_cases",

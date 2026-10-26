@@ -143,7 +143,7 @@ public API.
 | `Detector` | Retained | `pyrite.Detector` | Foundational simulation entry point. |
 | `DirectionalSpectrum` | Deferred | `pyrite.results.directional.DirectionalSpectrum` | Keep the existing import pending canonical ownership review in #707. |
 | `EnergyBins` | Deprecated | `pyrite.detectors.EnergyBins` | Use the established canonical domain import. |
-| `ExecutionConfig` | Deferred | `pyrite.config.KernelTuning` | Historical name for the same class. |
+| `ExecutionConfig` | Deferred | `pyrite.config.ExecutionConfig` | Historical name for the same class. |
 | `Filter` | Deprecated | `pyrite.geometry.Filter` | Use the established canonical domain import. |
 | `FilterPlate` | Deprecated | `pyrite.geometry.FilterPlate` | Passive downstream geometry. |
 | `FixedSampling` | Deprecated | `pyrite.config.FixedSampling` | Use the established canonical domain import. |

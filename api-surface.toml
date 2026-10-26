@@ -103,6 +103,8 @@ FilterPlate = { target = "pyrite.instrument:FilterPlate", status = "advanced-sta
 Observation = { target = "pyrite.observations.spec:Observation", status = "advanced-stable" }
 ObservationPlan = { target = "pyrite.observations.plan:ObservationPlan", status = "advanced-stable" }
 PixelSampling = { target = "pyrite.observations.plan:PixelSampling", status = "advanced-stable" }
+AcquisitionBatch = { target = "pyrite.instrument:AcquisitionBatch", status = "advanced-stable" }
+PixelScorer = { target = "pyrite.instrument:PixelScorer", status = "advanced-stable" }
 
 [package_exports."pyrite.units"]
 Q_ = { target = "pyrite.units:Q_", status = "advanced-stable" }
@@ -217,9 +219,11 @@ axial_diagnostic = { target = "pyrite.montecarlo.channeling.axial_diagnostic:axi
 
 [package_exports."pyrite.config"]
 AngularSampling = { target = "pyrite.config:AngularSampling", status = "advanced-stable" }
+KernelTuning = { target = "pyrite._numerics_groups:KernelTuning", status = "advanced-stable" }
 Timepix3ResponseNumerics = { target = "pyrite.config:Timepix3ResponseNumerics", status = "advanced-stable" }
 
 [package_exports."pyrite.detectors"]
+FilterPlate = { target = "pyrite.instrument:FilterPlate", status = "advanced-stable" }
 AngularDetector = { target = "pyrite.detectors:AngularDetector", status = "advanced-stable" }
 NativeBinnedResponse = { target = "pyrite.detectors.spec:NativeBinnedResponse", status = "advanced-stable" }
 Timepix3Response = { target = "pyrite.detectors:Timepix3Response", status = "advanced-stable" }
