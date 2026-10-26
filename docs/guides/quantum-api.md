@@ -114,9 +114,7 @@ existing stream semantics. This direct MCWF run does not make
 ```python
 from pyrite.quantum import MCWFSolver
 
-mcwf_result = MCWFSolver(solver).run(
-    16, 10.0, 5.0, seed=7, record_every=1
-)
+mcwf_result = MCWFSolver(solver).run(16, 10.0, 5.0, seed=7, record_every=1)
 ```
 
 For axial MCWF and its diagnostics, use the [axial guide](experimental-axial-channeling.md).
