@@ -898,6 +898,9 @@ def test_run_sweep_exact_metadata_hit_skips_decode_launch_and_writes(tmp_path, m
 
 
 def test_budget_pause_keeps_shards_until_completion(tmp_path, monkeypatch):
+    from pyrite.storage import checkpoint_manifest as public_manifest
+    from pyrite.storage import load_checkpoint as public_load
+
     cases = [_fake_case("cfg_a", 30.0), _fake_case("cfg_b", 45.0)]
 
     def first_only(cases, callback=None, **_kwargs):
@@ -907,14 +910,24 @@ def test_budget_pause_keeps_shards_until_completion(tmp_path, monkeypatch):
     assert not run_sweep(cases, {}, checkpoint_dir=str(tmp_path), progress=False)
     assert _checkpoint_store.has_parts("hopg", tmp_path)
     assert not (tmp_path / "hopg" / "line.h5").exists()
-    assert sum(len(items) for items in _checkpoint_store.load("hopg", tmp_path).values()) == 1
+    partial = public_load("hopg", checkpoint_dir=tmp_path)
+    assert set(partial) == {"cfg_a"}
+    saved_spec = partial["cfg_a"][30.0]["spec"].copy()
+    assert public_manifest("hopg", checkpoint_dir=tmp_path)["n_records"] == 1
 
-    monkeypatch.setattr("pyrite.runs.run.run_cases", stub_run_cases)
+    ran = []
+    monkeypatch.setattr("pyrite.runs.run.run_cases", tracking_run_cases_factory(ran))
     results = {}
     assert run_sweep(cases, results, checkpoint_dir=str(tmp_path), progress=False)
+    assert ran == ["cfg_b"]
     assert sum(len(items) for items in results.values()) == 2
     assert (tmp_path / "hopg" / "line.h5").is_file()
     assert not _checkpoint_store.has_parts("hopg", tmp_path)
+    completed = public_load("hopg", checkpoint_dir=tmp_path)
+    assert set(completed) == {"cfg_a", "cfg_b"}
+    np.testing.assert_array_equal(completed["cfg_a"][30.0]["spec"], saved_spec)
+    np.testing.assert_array_equal(completed["cfg_b"][45.0]["spec"], results["cfg_b"][45.0]["spec"])
+    assert public_manifest("hopg", checkpoint_dir=tmp_path)["n_records"] == 2
 
 
 @pytest.mark.parametrize("failure", ["components", "manifest"])
