@@ -116,6 +116,43 @@ QuantumSetup = { target = "pyrite.quantum:QuantumSetup", status = "advanced-stab
 QuantumRegion = { target = "pyrite.quantum:QuantumRegion", status = "advanced-stable" }
 QuantumDynamics = { target = "pyrite.quantum:QuantumDynamics", status = "advanced-stable" }
 QuantumNumerics = { target = "pyrite.quantum:QuantumNumerics", status = "advanced-stable" }
+AxialDiagnosticConfig = { target = "pyrite.montecarlo.channeling.axial_diagnostic:AxialDiagnosticConfig", status = "experimental" }
+AxialDiagnosticResult = { target = "pyrite.montecarlo.channeling.axial_diagnostic:AxialDiagnosticResult", status = "experimental" }
+AxialMCWF = { target = "pyrite.montecarlo.channeling.axial_mcwf:AxialMCWF", status = "experimental" }
+AxialMCWFResult = { target = "pyrite.montecarlo.channeling.axial_mcwf:AxialMCWFResult", status = "experimental" }
+DensityMatrixResult = { target = "pyrite.montecarlo.channeling.density:DensityMatrixResult", status = "experimental" }
+DensityMatrixSolver = { target = "pyrite.montecarlo.channeling.density:DensityMatrixSolver", status = "experimental" }
+EntryState = { target = "pyrite.montecarlo.channeling.states:EntryState", status = "advanced-stable" }
+MCWFResult = { target = "pyrite.montecarlo.channeling.mcwf:MCWFResult", status = "experimental" }
+MCWFSolver = { target = "pyrite.montecarlo.channeling.mcwf:MCWFSolver", status = "experimental" }
+MixedState = { target = "pyrite.montecarlo.channeling.states:MixedState", status = "advanced-stable" }
+PlanarStateProjection = { target = "pyrite.planar_source:PlanarStateProjection", status = "experimental" }
+RealSpaceGrid = { target = "pyrite.montecarlo.channeling.realspace:RealSpaceGrid", status = "experimental" }
+SampledState = { target = "pyrite.montecarlo.channeling.states:SampledState", status = "advanced-stable" }
+ScatteringKernel = { target = "pyrite.montecarlo.channeling.operators:ScatteringKernel", status = "experimental" }
+SplitStepPropagator = { target = "pyrite.montecarlo.channeling.realspace:SplitStepPropagator", status = "experimental" }
+Superposition = { target = "pyrite.montecarlo.channeling.states:Superposition", status = "advanced-stable" }
+Translated = { target = "pyrite.montecarlo.channeling.states:Translated", status = "advanced-stable" }
+TransverseState = { target = "pyrite.montecarlo.channeling.states:TransverseState", status = "advanced-stable" }
+TransverseStateSpec = { target = "pyrite.quantum_state:TransverseStateSpec", status = "advanced-stable" }
+airy = { target = "pyrite.montecarlo.channeling.states:airy", status = "advanced-stable" }
+aperture_probe = { target = "pyrite.montecarlo.channeling.states:aperture_probe", status = "advanced-stable" }
+axial_diagnostic = { target = "pyrite.montecarlo.channeling.axial_diagnostic:axial_diagnostic", status = "experimental" }
+bessel_gauss = { target = "pyrite.montecarlo.channeling.states:bessel_gauss", status = "advanced-stable" }
+donut = { target = "pyrite.montecarlo.channeling.states:donut", status = "advanced-stable" }
+electronic_kernel = { target = "pyrite.montecarlo.channeling.operators:electronic_kernel", status = "experimental" }
+from_abtem = { target = "pyrite.montecarlo.channeling.states:from_abtem", status = "advanced-stable" }
+from_array = { target = "pyrite.montecarlo.channeling.states:from_array", status = "advanced-stable" }
+gaussian = { target = "pyrite.montecarlo.channeling.states:gaussian", status = "advanced-stable" }
+hermite_gauss = { target = "pyrite.montecarlo.channeling.states:hermite_gauss", status = "advanced-stable" }
+laguerre_gauss = { target = "pyrite.montecarlo.channeling.states:laguerre_gauss", status = "advanced-stable" }
+mixture = { target = "pyrite.montecarlo.channeling.states:mixture", status = "advanced-stable" }
+project_planar_source = { target = "pyrite.planar_source:project_planar_source", status = "experimental" }
+propagate_planar_source = { target = "pyrite.planar_source:propagate_planar_source", status = "experimental" }
+score_planar_source = { target = "pyrite.planar_source:score_planar_source", status = "experimental" }
+superpose = { target = "pyrite.montecarlo.channeling.states:superpose", status = "advanced-stable" }
+tds_kernel = { target = "pyrite.montecarlo.channeling.operators:tds_kernel", status = "experimental" }
+translate = { target = "pyrite.montecarlo.channeling.states:translate", status = "advanced-stable" }
 
 [package_exports."pyrite.results"]
 AcquisitionBatch = { target = "pyrite.instrument:AcquisitionBatch", status = "advanced-stable" }
@@ -294,10 +331,10 @@ PointBunch = { classification = "deprecated", canonical = "pyrite.beams:PointBun
 PointSpot = { classification = "deprecated", canonical = "pyrite.beams:PointSpot", reason = "Use the established canonical domain import." }
 Precision = { classification = "deprecated", canonical = "pyrite.config:Precision", reason = "Use the established canonical domain import." }
 Provenance = { classification = "deferred", canonical = "pyrite.results.provenance:Provenance", reason = "Keep the existing import pending canonical ownership review in #707." }
-QuantumDynamics = { classification = "deferred", canonical = "pyrite.quantum:QuantumDynamics", reason = "Keep the existing import pending canonical ownership review in #704." }
-QuantumNumerics = { classification = "deferred", canonical = "pyrite.quantum:QuantumNumerics", reason = "Keep the existing import pending canonical ownership review in #704." }
-QuantumRegion = { classification = "deferred", canonical = "pyrite.quantum:QuantumRegion", reason = "Keep the existing import pending canonical ownership review in #704." }
-QuantumSetup = { classification = "deferred", canonical = "pyrite.quantum:QuantumSetup", reason = "Keep the existing quantum composition boundary pending #695 and #704." }
+QuantumDynamics = { classification = "deferred", canonical = "pyrite.quantum:QuantumDynamics", reason = "Canonical quantum ownership is resolved in #704; retain the root alias without warnings pending a separate migration decision." }
+QuantumNumerics = { classification = "deferred", canonical = "pyrite.quantum:QuantumNumerics", reason = "Canonical quantum ownership is resolved in #704; retain the root alias without warnings pending a separate migration decision." }
+QuantumRegion = { classification = "deferred", canonical = "pyrite.quantum:QuantumRegion", reason = "Canonical quantum ownership is resolved in #704; retain the root alias without warnings pending a separate migration decision." }
+QuantumSetup = { classification = "deferred", canonical = "pyrite.quantum:QuantumSetup", reason = "Canonical quantum ownership is resolved in #704; retain the root alias without warnings pending a separate migration decision." }
 RadiationNumerics = { classification = "deprecated", canonical = "pyrite.config:RadiationNumerics", reason = "Use the established canonical domain import." }
 RectangularBody = { classification = "deprecated", canonical = "pyrite.geometry:RectangularBody", reason = "Use the established canonical domain import." }
 ResolvedObservation = { classification = "deprecated", canonical = "pyrite.observations:ResolvedObservation", reason = "Use the established canonical domain import." }
@@ -315,7 +352,7 @@ Sweep = { classification = "retained", canonical = "pyrite:Sweep", reason = "Fou
 Target = { classification = "retained", canonical = "pyrite:Target", reason = "Foundational simulation entry point." }
 TransportNumerics = { classification = "deprecated", canonical = "pyrite.config:TransportNumerics", reason = "Use the established canonical domain import." }
 TransverseSpot = { classification = "deprecated", canonical = "pyrite.beams:TransverseSpot", reason = "Use the established canonical domain import." }
-TransverseStateSpec = { classification = "deferred", canonical = "pyrite.quantum_state:TransverseStateSpec", reason = "Keep the existing import pending canonical ownership review in #704." }
+TransverseStateSpec = { classification = "deferred", canonical = "pyrite.quantum:TransverseStateSpec", reason = "Canonical quantum ownership is resolved in #704; retain the root alias without warnings pending a separate migration decision." }
 directional_source = { classification = "deferred", canonical = "pyrite.directional:directional_source", reason = "Keep the existing import pending canonical ownership review in #705." }
 directional_sources = { classification = "deferred", canonical = "pyrite.directional:directional_sources", reason = "Keep the existing import pending canonical ownership review in #705." }
 fetch_tables = { classification = "deferred", canonical = "pyrite.xsgen.install:fetch_tables", reason = "Keep the existing import pending canonical ownership review in #707." }

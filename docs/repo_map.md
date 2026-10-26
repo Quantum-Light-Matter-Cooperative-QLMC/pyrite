@@ -84,6 +84,8 @@ Edges (importer -> imported):
 
 ## Entry points
 
+- **`pyrite.quantum`** remains a module and owns quantum configuration plus a curated lazy facade for portable `TransverseStateSpec`, nonportable runtime factories, planar projection, and selected experimental planar/axial solvers and diagnostics. Definitions remain in `quantum_state`, `planar_source`, and `montecarlo.channeling` leaves; aliases preserve object/pickle identity and production admission. `api-surface.toml` governs this module through `package_exports`; the [quantum API map](guides/quantum-api.md) lists status, units, and bounded examples.
+
 - **`pyrite` console script** → `cli:main` (`pyproject.toml [project.scripts]`), lazy Click dispatch for user workflows including `physics` and `numerics`; remote lifecycle is canonical at `remote job`, with the former root `job` hidden through 0.17.0. Retired top-level setup, completion, performance, energy-grid, scan, analyze/export, and flat checkpoint spellings remain hidden compatibility aliases where the D7 registry documents a replacement. Checked user-facing inventory: [CLI reference](repo-design/cli/cli-reference.md).
 - **`import pyrite`** → `__init__`: lightweight lazy exports for `Beam`, target variants, shared `SubstanceRef`/`RectangularBody` descriptions and `Target`/`Filter` roles, `Detector`, `Scene`, path-addressed `Sweep`, `Physics`, `Numerics`, `CxrReflections`, `Precision`, `Analysis`, `Result`, and `simulate`.
 - **`pyrite.simulate(scene)` / `pyrite.simulate(beam, target, detector, ...)`** → `api:simulate`: lower one scalar scene to the typed `Case`, run it without checkpoint I/O, and return response-free source arrays plus resolved provenance in `Result`.
