@@ -2,10 +2,28 @@
 
 import importlib.util
 import json
+import re
 from pathlib import Path
 
 import numpy as np
 import pytest
+
+
+def test_multiple_inline_guide_plots_have_distinct_image_names():
+    guides = Path(__file__).parents[2] / "docs" / "guides"
+    for page in guides.glob("*.md"):
+        blocks = re.findall(
+            r"^\.\. plot::[^\S\n]*\n((?:[ \t]+[^\n]*\n|\n)*)", page.read_text(), re.MULTILINE
+        )
+        if len(blocks) < 2:
+            continue
+        prefixes = [
+            re.search(r"^[ \t]+:filename-prefix:[ \t]+(\S+)[ \t]*$", block, re.MULTILINE)
+            for block in blocks
+        ]
+        assert all(prefixes), f"{page.name}: each inline plot needs a filename-prefix"
+        names = [prefix.group(1) for prefix in prefixes]
+        assert len(set(names)) == len(names), f"{page.name}: duplicate plot filename-prefix"
 
 
 @pytest.fixture
@@ -362,3 +380,64 @@ def test_tutorial_build_rejects_changed_input_fixture(tutorials, monkeypatch, tm
     fixture.write_bytes(b"changed input")
     with pytest.raises(ValueError, match="stale tutorial input"):
         tutorials.checked_output("gpt_gdf_beams")
+
+
+def test_tr_ctr_app_output_renders_signed_native_arrays_without_transport(
+    tutorials, monkeypatch, tmp_path
+):
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    example = tutorials.load_example("transition_radiation_demo")
+
+    def forbid_compute():
+        pytest.fail("documentation rendering must never execute the app calculations")
+
+    monkeypatch.setattr(example, "compute", forbid_compute)
+    monkeypatch.setattr(tutorials, "load_example", lambda _: example)
+    tutorials._check_outputs(None)
+    data = tutorials.checked_output("transition_radiation_demo")
+    assert data["units"] == "ph/incident-electron/eV/sr"
+    assert data["physical_electrons"] == pytest.approx(624.1509074460763)
+    analytic = data["analytic"]
+    np.testing.assert_array_equal(analytic["energy_eV"], np.arange(200, 1010, 10))
+    np.testing.assert_array_equal(analytic["angle_deg"], np.arange(100, 176))
+    np.testing.assert_allclose(
+        analytic["ctr"],
+        np.asarray(analytic["film"])
+        * (1 + (data["physical_electrons"] - 1) * np.asarray(analytic["form_factor"])),
+    )
+    for record in data["transport"].values():
+        assert record["case"]["Ne"] == 32 and record["case"]["Ne_brem"] == 64
+        assert record["seed"] == record["case"]["seed"] == 1
+        assert record["provenance"]["backend"] == "cpu"
+        np.testing.assert_array_equal(record["energy_eV"], analytic["energy_eV"])
+        np.testing.assert_allclose(
+            record["combined_cxr"],
+            np.asarray(record["transition"]) + np.asarray(record["other_cxr"]),
+        )
+    negative = np.count_nonzero(np.asarray(data["transport"]["bunch"]["transition"]) < 0)
+    assert negative > 0
+    assert any(f"negative in {negative} of 81 bins" in warning for warning in data["warnings"])
+    try:
+        for view in ("analytic", "transport"):
+            tutorials.transition_radiation_demo(view)
+            figure = plt.gcf()
+            assert len(figure.axes) == 2
+            if view == "analytic":
+                np.testing.assert_array_equal(figure.axes[0].lines[0].get_ydata(), analytic["film"])
+                np.testing.assert_array_equal(
+                    figure.axes[1].lines[1].get_ydata(), analytic["ctr_cut"]
+                )
+            else:
+                for ax, mode in zip(figure.axes, ("history", "bunch"), strict=True):
+                    assert ax.get_yscale() == "symlog"
+                    np.testing.assert_array_equal(
+                        ax.lines[0].get_ydata(), data["transport"][mode]["transition"]
+                    )
+            figure.savefig(tmp_path / f"tr-ctr-{view}.svg")
+            assert (tmp_path / f"tr-ctr-{view}.svg").stat().st_size > 1_000
+    finally:
+        plt.close("all")

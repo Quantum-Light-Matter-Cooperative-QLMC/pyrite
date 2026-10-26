@@ -1,9 +1,8 @@
 # TR and CTR demo
 
-Explore transition radiation (TR), film interference, and coherent transition
-radiation (CTR) with the packaged marimo notebook and two reference profiles.
-The demo reuses the [planar-stack and crossing solvers](../physics/radiation-physics/transition-radiation.md).
-It introduces no new radiation model.
+Compare film transition radiation (TR) with coherent transition radiation (CTR),
+then see what changes when electrons scatter and lose energy. The figures below
+are actual outputs of the packaged marimo app, not measurements.
 
 ## Launch the notebook
 
@@ -15,135 +14,103 @@ uv run pyrite app transition-radiation launch
 ```
 
 For an installed distribution, install `pyrite-mc[apps]`, then use the same
-`pyrite app` commands without `uv run`. No checkpoints or private catalog are
-needed. The initial analytic plots need only packaged material data and the
-installed dependencies. The CLI profiles require SBETHE stopping and ELSEPA elastic tables;
-`pyrite tables fetch` installs these and the atomic data. The notebook can
-use the runtime fallbacks when tables are absent, so quantitative comparisons
-with a profile require the same installed tables. EEDL is selected
-explicitly for bremsstrahlung; BremsLib and a GPU are not required.
+commands without `uv run`. The initial analytic calculation needs no checkpoints,
+transport tables or GPU.
 
-The reference scene is a free-standing **20 nm silicon film**, tilted **5°**
-toward a scalar detector at **150° from the 30 keV beam**. The plotted band is
-**200–1000 eV**, in 10 eV steps. The 5 × 5 mm transport footprint is much larger
-than the idealized **1 nm FWHM Gaussian spot**. The bunch has **1 as RMS**
-duration and **0.0001 pC**, about 624 physical electrons. These settings expose
-soft-X-ray coherence; they are an illustrative source, not a facility model.
+The default source is a **30 keV beam** crossing a free-standing **20 nm silicon
+film** tilted **5°**. The spectrum looks **150° from the beam**, over **200–1000 eV**.
+An illustrative Gaussian bunch has **1 as RMS duration**, **1 nm FWHM spot** and
+**0.0001 pC charge**, about **624 physical electrons**.
 
-Submit **Update comparison** after editing the beam and bunch (energy, RMS
-duration, spot, charge), the film (catalog medium, thickness, tilt, spectrum
-observation angle), the photon band (start, stop, points, log spacing) or the
-map angles. Limits are physical, not demonstrative: beams up to 100 GeV,
-forward (< 90°) and backward observation anywhere off the film plane, and any
-band inside the medium's dielectric table and below the beam energy. Forward
-rays are solved at the exit face and backward rays at the entrance face.
+```{eval-rst}
+.. plot::
+   :filename-prefix: tr-ctr-analytic
+   :alt: Analytic film TR and Gaussian CTR spectra at 150 degrees, followed by their 500 eV angular cuts from 100 to 175 degrees.
+   :caption: Default straight-track calculation: film/interface spectra and a 500 eV angular cut.
 
-The first plots are interactive TR and CTR-expectation heatmaps over signed
-angle × photon energy (gray marks directions parallel to the film), then the
-exact straight-track film spectrum, a semi-infinite interface comparison, an
-angular cut, and the Gaussian intensity form factor. Thickness changes include
-interference between the entry and exit fields and absorption. The angular cut,
-log color and per-bunch checkbox redraw cached arrays. TR vanishes exactly along
-a normal-incidence track, so 0° and ±180° are dark at zero tilt.
+   from _tutorials import transition_radiation_demo
+   transition_radiation_demo()
+```
 
-**Run transported comparison** explicitly runs two fixed-count simulations:
-history-coherent TR and bunch-coherent CTR. *Line histories* sets the line count
-(continuum histories are twice it; the latter population scores TR);
-*Transport core* offers the CPU cores, plus CUDA on a
-`pyrite app transition-radiation launch --backend cuda` session, where TR
-crossings use the fused CUDA kernel. Both use midpoint
-integration, continuous inelastic loss, incoherent PXR/CBS, uncoupled radiative transport, and EEDL
-bremsstrahlung. These counts illustrate behavior and provide no precision
-certificate. The notebook reports measured runtime and captured warnings.
-On the development CPU, the default 32/64-history runs together took about 5 s
-with the pinned tables installed and warm compiled code; initial compilation
-took longer (about 33 s in a cold fallback-data run). Startup and data
-installation are additional. Individual CLI profile runs reported about 1 s of
-case execution.
-
-The analytic expectation assumes identical straight tracks with independent
-Gaussian time/position offsets. It uses the existing face-projection transverse
-form factor, including arrival delays on the tilted film. The production path
-samples those offsets and includes scattering and energy loss. It does not
-apply an analytic form factor on top of sampled phases.
+The finite film includes interference between entry and exit fields and
+absorption; it differs from a single semi-infinite interface. The CTR expectation
+also includes the Gaussian time/position form factor. In the live app, change
+**RMS duration** to **100 as** and submit **Update comparison**: the bunch excess
+vanishes over this band. Angle–energy maps and the form-factor plot let you
+explore the same calculation interactively.
+The default 10 eV energy spacing and 1° angular spacing are visualization
+samples; refine them before interpreting fringe minima or integrating a yield.
 
 ## Run the reference profiles
 
+[Fetch the reference tables](getting-started.md#install-and-fetch-reference-data),
+then click **Run transported comparison** in the notebook. It runs history TR
+and bunch CTR with the same default scene, using **32 line histories and 64
+continuum histories per run**. TR is scored from the continuum population.
+The sampled trajectories include scattering and energy loss; bunch CTR samples
+the time/position offsets rather than multiplying by an analytic form factor.
+
+```{eval-rst}
+.. plot::
+   :filename-prefix: tr-ctr-transport
+   :alt: Seeded transported history TR and signed bunch CTR spectra, with other CXR, combined CXR and dotted straight-track references on symmetric log axes.
+   :caption: Actual CPU transport at seed 1: 32 line and 64 continuum histories per run. Dotted curves reproduce the analytic comparison above.
+
+   from _tutorials import transition_radiation_demo
+   transition_radiation_demo(view="transport")
+```
+
+The two runs estimate different coherence laws. Their departure from the
+straight-track references includes transport effects and finite-sample noise;
+these small samples do not establish convergence. Increase **Line histories**
+for a sampling study. This run warned of **31 negative CTR bins out of 81**;
+the symmetric log scale preserves them.
+
+To save the same default cases as campaign checkpoints instead:
+
 ```bash
-uv run pyrite profile show tr_demo
-uv run pyrite profile show ctr_demo
-uv run pyrite tables fetch
 uv run pyrite run tr_demo
 uv run pyrite run ctr_demo
 uv run pyrite app analysis launch silicon
 ```
 
-Both profiles select only silicon and the same film, beam, detector, grid and
-fixed counts as the notebook defaults. `tr_demo` uses
-`transition_radiation = "history"`; `ctr_demo` uses `"bunch"`. Each dataset gets
-its own identity-qualified checkpoint stem and a separate `transition.h5`
-component. Select the corresponding checkpoint in the analysis app. The
-physical population is controlled by charge, independently of trial counts.
-`emission = "incoherent"` selects PXR/CBS coherence; it does not disable CTR.
-
-To change a profile, clone it first:
-
-```bash
-uv run pyrite profile create my_ctr --from ctr_demo
-uv run pyrite run my_ctr
-```
-
-For larger sampling studies use the supported remote workflow, for example
-`pyrite run my_ctr --remote`, after configuring the host. Keep the default
-notebook demonstration small.
+Select the corresponding identity-qualified checkpoint in the analysis app.
+`tr_demo` uses history coherence; `ctr_demo` uses bunch coherence. Clone a profile
+before editing it. See [controls, table requirements and profile storage](../reference/tr-ctr-app.md).
 
 ## Units, coherence and sampling
 
-Spectra are photons per incident electron per eV per sr. Selecting per bunch
-multiplies by the physical population N. For identical trajectories the
-ensemble multiplier is `1 + (N - 1)|F|²` per electron, giving N² per bunch for
-an in-phase point bunch and N for a long bunch on average. See
-[CTR from transported crossings](../physics/radiation-physics/transition-radiation.md#ctr-from-transported-crossings)
-for the estimator, assumptions, and validated limits.
+Every curve is **photons/(incident electron · eV · sr)** at one observation
+direction. The app's **per bunch** option multiplies by physical population N,
+independent of Monte Carlo history count. For identical tracks the per-electron
+ensemble multiplier is `1 + (N - 1)|F|²`; an in-phase point bunch gives N² per
+bunch. The transported CTR estimator is signed and can have negative bins when
+the sample does not resolve the bunch excess. See the
+[CTR estimator and validated limits](../physics/radiation-physics/transition-radiation.md#ctr-from-transported-crossings).
 
-The transported CTR estimate is signed and can have negative bins when the
-sample does not resolve the bunch excess. The notebook preserves those bins
-on a symmetric log scale and displays the warning. A long bunch with a small
-sample shows noise or speckle; it need not match the incoherent spectrum bin
-by bin. A lack of warnings is not a convergence certificate.
-
-Production plots show the TR component, other CXR components, and combined
-CXR with TR added once. Combined CXR does not include the separately gridded
-bremsstrahlung continuum. This example uses incoherent line emission. Combining
-TR with **coherent** PXR/CBS requires the documented transverse cross-term
-suppression condition; diffracted TR and unsuppressed TR–line interference
-are outside the demo comparison. The separately triggered experimental DTR view
-uses the maintained Born/two-beam reference and remains unverified.
+**Combined CXR** adds TR once to the other line-grid components. It excludes the
+separately gridded bremsstrahlung continuum. This comparison uses incoherent
+PXR/CBS; coherent TR–line interference and diffracted TR are outside it.
 
 ## Export and limits
 
 ```bash
-uv run pyrite app transition-radiation launch --smoke
 uv run pyrite app transition-radiation export --stem tr_ctr_demo
 ```
 
-The export writes `pyrite-output/results/tr_ctr_demo.html`, containing the
-initial analytic plots. Static HTML does not execute controls or transport;
-use the live notebook for those. `launch --edit` opens the notebook editor;
-`launch --tunnel` binds port 2723 for SSH forwarding.
+Open `pyrite-output/results/tr_ctr_demo.html` for the initial analytic plots;
+static HTML does not execute controls or transport. The
+{download}`cached guide output <../examples/data/transition_radiation_demo.json>`
+records arrays, settings, warnings and transport provenance. Documentation builds
+only render those arrays. The maintained notebook source is
+{download}`transition_radiation_app.py <../../src/pyrite/apps/transition_radiation_app.py>`.
 
-The solver assumes flat, sharp, laterally infinite interfaces with local
-isotropic dielectric response. Side exits produce no TR. The independent-atom
-Chantler dielectric response is crude near the plasma energy and absorption
-edges. The production continuum floor is max(plasma energy, 12 eV); optical/IR
-CTR is outside the main demo comparison. The main comparison excludes diffracted
-TR; a separate experimental DTR view is available. See
-[radiation diagnostics](radiation-diagnostics.md) for the DTR view and optical app.
-
-Scalar spectra sample the observation direction. Acceptance metadata
-(1° polar span, 0.0001 sr) does not resolve detector-integrated fringes.
-The dedicated `detected_transition_radiation` planar-detector integrator is
-the appropriate tool for pixel/channel counts. The demo grid and angular cut
-are visualization samples, not certified integrals. Production TR refuses
-adaptive precision, electron-block transport, grooved faces, channeling and
-temporal profiles. See the physics page for the full validity boundary.
+The planar model assumes flat, sharp, laterally infinite interfaces and local
+isotropic dielectric response; the independent-atom response is crude near plasma
+energies and absorption edges. These are directional source densities, not
+pixel counts or detector-integrated fringes. See the
+[model assumptions](../physics/radiation-physics/transition-radiation.md#exact-planar-stack-tr),
+[production restrictions](../physics/radiation-physics/transition-radiation.md#run-case-component)
+and [detector integration](../physics/radiation-physics/transition-radiation.md#detector-channels-and-acceptance).
+Optical/IR diagnostics and the separately triggered **experimental, unverified**
+DTR view are covered in [Radiation diagnostics](radiation-diagnostics.md).
