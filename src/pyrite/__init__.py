@@ -43,6 +43,7 @@ if TYPE_CHECKING:
     # Static declarations retain compatibility while recommending canonical owners.
     from pyrite._numerics import Physics as Physics
     from pyrite._numerics_groups import ExecutionConfig as ExecutionConfig
+    from pyrite._numerics_groups import KernelTuning as KernelTuning
     from pyrite._photon_config import PhotonTransport as PhotonTransport
     from pyrite.api import simulate as simulate
     from pyrite.beams import (
@@ -242,6 +243,7 @@ _PUBLIC_OBJECTS = {
     "TransportNumerics": ("pyrite._numerics_groups", "TransportNumerics"),
     "RadiationNumerics": ("pyrite._numerics_groups", "RadiationNumerics"),
     "ExecutionConfig": ("pyrite._numerics_groups", "ExecutionConfig"),
+    "KernelTuning": ("pyrite._numerics_groups", "KernelTuning"),
     "QuantumRegion": ("pyrite.quantum", "QuantumRegion"),
     "QuantumDynamics": ("pyrite.quantum", "QuantumDynamics"),
     "QuantumNumerics": ("pyrite.quantum", "QuantumNumerics"),

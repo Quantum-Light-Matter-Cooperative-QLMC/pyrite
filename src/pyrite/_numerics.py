@@ -384,7 +384,7 @@ PHYSICS_FIELDS = tuple(f.name for f in fields(Physics))
 
 @dataclass(frozen=True)
 class Numerics:
-    """Control sampling, integration, CXR truncation, and execution.
+    """Control sampling, integration, CXR truncation, and local kernel tuning.
 
     ``cxr_trials`` and ``brem_trials`` count macro-electron trials. Optional
     ``cxr_chunk`` and ``brem_chunk`` bound spectrum-kernel batches.
@@ -582,6 +582,19 @@ class Numerics:
 
         return replace(self, radiation=value, cxr_reflections=CxrReflections(), energy_bins=None)
 
+    @property
+    def kernel_tuning(self) -> "ExecutionConfig":
+        """Preferred read view for local kernel controls, not a scheduler.
+
+        This mirrors resolved_execution without adding a dataclass field or
+        altering serialized case payloads.
+        """
+        return self.resolved_execution
+
+    def with_kernel_tuning(self, value: "ExecutionConfig") -> "Numerics":
+        """Update local kernel controls through the existing grouped path."""
+        return self.with_execution(value)
+
     def with_execution(self, value: "ExecutionConfig") -> "Numerics":
         """Change local kernel policy, clearing mirrored legacy values."""
         from dataclasses import replace
@@ -610,7 +623,7 @@ class Numerics:
                 },
             },
             "execution": {
-                "classification": "execution",
+                "classification": "kernel-tuning",
                 "source": "typed" if self.execution is not None else "legacy",
                 "effective": asdict(self.resolved_execution),
             },

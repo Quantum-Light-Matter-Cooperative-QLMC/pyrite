@@ -22,6 +22,7 @@ Detector = { target = "pyrite.detectors:Detector", status = "stable", domain = "
 DirectionalSpectrum = { target = "pyrite.results.directional:DirectionalSpectrum", status = "experimental", domain = "results", root_role = "experimental" }
 EnergyBins = { target = "pyrite.detectors:EnergyBins", status = "advanced-stable", domain = "detectors", root_role = "specialized" }
 ExecutionConfig = { target = "pyrite._numerics_groups:ExecutionConfig", status = "advanced-stable", domain = "config", root_role = "specialized" }
+KernelTuning = { target = "pyrite._numerics_groups:KernelTuning", status = "advanced-stable", domain = "config", root_role = "specialized" }
 Filter = { target = "pyrite.instrument:Filter", status = "advanced-stable", domain = "geometry", root_role = "specialized" }
 FilterPlate = { target = "pyrite.instrument:FilterPlate", status = "advanced-stable", domain = "geometry", root_role = "specialized" }
 FixedSampling = { target = "pyrite._sampling:FixedSampling", status = "advanced-stable", domain = "config", root_role = "specialized" }
@@ -264,7 +265,8 @@ CxrSpectra = { classification = "deferred", canonical = "pyrite.results.model:Cx
 Detector = { classification = "retained", canonical = "pyrite:Detector", reason = "Foundational simulation entry point." }
 DirectionalSpectrum = { classification = "deferred", canonical = "pyrite.results.directional:DirectionalSpectrum", reason = "Keep the existing import pending canonical ownership review in #707." }
 EnergyBins = { classification = "deprecated", canonical = "pyrite.detectors:EnergyBins", reason = "Use the established canonical domain import." }
-ExecutionConfig = { classification = "deferred", canonical = "pyrite.config:ExecutionConfig", reason = "Keep the existing kernel-control name pending composition and naming decisions in #695 and #702." }
+ExecutionConfig = { classification = "deferred", canonical = "pyrite.config:KernelTuning", reason = "Legacy identity-preserving kernel-control name; use KernelTuning rather than confusing this with scheduling." }
+KernelTuning = { classification = "deferred", canonical = "pyrite.config:KernelTuning", reason = "Prefer the canonical namespace for local kernel controls, not scheduling." }
 Filter = { classification = "deprecated", canonical = "pyrite.geometry:Filter", reason = "Use the established canonical domain import." }
 FilterPlate = { classification = "deprecated", canonical = "pyrite.geometry:FilterPlate", reason = "Passive attenuating bodies belong to physical geometry." }
 FixedSampling = { classification = "deprecated", canonical = "pyrite.config:FixedSampling", reason = "Use the established canonical domain import." }

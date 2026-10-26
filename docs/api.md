@@ -55,9 +55,12 @@ whereas pixel-integrated and acquired results have different acceptances and
 normalizations (see the [API workflow](guides/python-api-workflow.md)).
 
 Other namespaces retain their existing documented import paths. In particular,
-`pyrite.config.ExecutionConfig` still selects *local kernel controls* and is
-not a scheduler profile (`pyrite.execution.ExecutionProfile`); the name is
-retained for compatibility while configuration design work proceeds.
+`pyrite.config.KernelTuning` selects *local kernel controls* and is the **same
+class** as `pyrite.config.ExecutionConfig` (retained for compatibility).
+`Numerics(execution=KernelTuning(...))` and `with_kernel_tuning(...)` preserve
+the historical lowering. This is not a scheduler profile
+(`pyrite.execution.ExecutionProfile`). See the
+[configuration ownership policy](repo-design/configuration-resolution.md#physics-numerics-and-kernel-tuning-702).
 `pyrite.config.PhotonTransport` is experimental. See the
 [API namespace policy](development/api-policy.md) for ownership and stability.
 
@@ -140,13 +143,14 @@ public API.
 | `Detector` | Retained | `pyrite.Detector` | Foundational simulation entry point. |
 | `DirectionalSpectrum` | Deferred | `pyrite.results.directional.DirectionalSpectrum` | Keep the existing import pending canonical ownership review in #707. |
 | `EnergyBins` | Deprecated | `pyrite.detectors.EnergyBins` | Use the established canonical domain import. |
-| `ExecutionConfig` | Deferred | `pyrite.config.ExecutionConfig` | Keep the existing kernel-control name pending composition and naming decisions in #695 and #702. |
+| `ExecutionConfig` | Deferred | `pyrite.config.KernelTuning` | Historical name for the same class. |
 | `Filter` | Deprecated | `pyrite.geometry.Filter` | Use the established canonical domain import. |
 | `FilterPlate` | Deprecated | `pyrite.geometry.FilterPlate` | Passive downstream geometry. |
 | `FixedSampling` | Deprecated | `pyrite.config.FixedSampling` | Use the established canonical domain import. |
 | `Footprint` | Deprecated | `pyrite.geometry.Footprint` | Use the established canonical domain import. |
 | `GdfSource` | Deprecated | `pyrite.beams.GdfSource` | Use the established canonical domain import. |
 | `IdealPhotonCounter` | Deprecated | `pyrite.detectors.IdealPhotonCounter` | Use the established canonical domain import. |
+| `KernelTuning` | Deferred | `pyrite.config.KernelTuning` | Local kernel settings, not scheduling. |
 | `Layer` | Deprecated | `pyrite.geometry.Layer` | Use the established canonical domain import. |
 | `NativeAcquisition` | Deprecated | `pyrite.observations.NativeAcquisition` | Use the established canonical domain import. |
 | `Numerics` | Retained | `pyrite.Numerics` | Foundational simulation entry point. |

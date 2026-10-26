@@ -147,7 +147,7 @@ def test_explicit_group_replace_helpers():
     assert n.cxr_chunk == 3
     assert changed.describe_numerics()["execution"]["source"] == "typed"
     assert changed.describe_numerics()["transport"]["classification"] == "scientific"
-    assert changed.describe_numerics()["execution"]["classification"] == "execution"
+    assert changed.describe_numerics()["execution"]["classification"] == "kernel-tuning"
     assert replace(n, brem_trials=99).brem_trials == 99
 
 
