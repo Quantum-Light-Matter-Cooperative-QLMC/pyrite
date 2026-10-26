@@ -2,6 +2,7 @@
 
 from collections.abc import Iterable
 from pathlib import Path
+from typing import Any
 
 import grimp
 
@@ -26,8 +27,13 @@ def _owner(module: str, packages: set[str]) -> str | None:
     return None
 
 
-def package_dependencies(source_root: Path) -> tuple[set[str], set[tuple[str, str]]]:
-    """Return canonical top-level packages and their direct static dependencies."""
+def direct_module_dependencies(source_root: Path) -> tuple[set[str], set[tuple[str, str]]]:
+    """Return exact cross-package static module imports (importer, imported).
+
+    Package facade imports and TYPE_CHECKING imports are intentionally excluded,
+    exactly as in the generated repository map. Lazy imports are not excluded:
+    grimp sees ordinary import statements even when they are inside functions.
+    """
     packages = _top_level_packages(source_root)
     graph = grimp.build_graph(
         PACKAGE,
@@ -46,8 +52,57 @@ def package_dependencies(source_root: Path) -> tuple[set[str], set[tuple[str, st
         for imported in graph.find_modules_directly_imported_by(importer):
             imported_owner = _owner(imported, packages)
             if imported_owner is not None and imported_owner != importer_owner:
-                edges.add((importer_owner, imported_owner))
+                edges.add((importer, imported))
     return packages, edges
+
+
+def _package_edges(module_edges: set[tuple[str, str]]) -> set[tuple[str, str]]:
+    return {(importer.split(".")[1], imported.split(".")[1]) for importer, imported in module_edges}
+
+
+def package_dependencies(source_root: Path) -> tuple[set[str], set[tuple[str, str]]]:
+    """Return canonical top-level packages and their direct static dependencies."""
+    packages, module_edges = direct_module_dependencies(source_root)
+    return packages, _package_edges(module_edges)
+
+
+def _report_from_edges(packages: set[str], module_edges: set[tuple[str, str]]) -> dict[str, Any]:
+    """Produce a stable, machine-readable graph and SCC edge inventory."""
+    package_edges = _package_edges(module_edges)
+    components = _strongly_connected_components(packages, package_edges)
+    component_for = {name: component for component in components for name in component}
+    cycles = [component for component in components if len(component) > 1]
+    internal_edges = sorted(
+        (source, target)
+        for source, target in package_edges
+        if component_for[source] == component_for[target] and len(component_for[source]) > 1
+    )
+    return {
+        "schema": "pyrite.package-dependencies.v1",
+        "summary": {
+            "package_count": len(packages),
+            "package_edge_count": len(package_edges),
+            "module_edge_count": len(module_edges),
+            "component_count": len(components),
+            "cyclic_component_count": len(cycles),
+            "largest_component_size": max((len(component) for component in components), default=0),
+        },
+        "packages": sorted(packages),
+        "package_edges": [list(edge) for edge in sorted(package_edges)],
+        "module_edges": [
+            {"importer": importer, "imported": imported}
+            for importer, imported in sorted(module_edges)
+        ],
+        "components": [list(component) for component in components],
+        "cyclic_components": [list(component) for component in cycles],
+        "cycle_edges": [list(edge) for edge in internal_edges],
+    }
+
+
+def dependency_report(source_root: Path) -> dict[str, Any]:
+    """Report exact import edges and SCCs for offline baseline comparisons."""
+    packages, module_edges = direct_module_dependencies(source_root)
+    return _report_from_edges(packages, module_edges)
 
 
 def _strongly_connected_components(

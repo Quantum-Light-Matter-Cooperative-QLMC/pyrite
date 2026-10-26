@@ -1,0 +1,4391 @@
+{
+  "baseline_commit": "a61e37b5",
+  "importlinter": {
+    "contracts": [
+      {
+        "allow_indirect_imports": true,
+        "forbidden_modules": [
+          "pyrite.apps",
+          "pyrite.campaign",
+          "pyrite.checkpoints",
+          "pyrite.cli",
+          "pyrite.perf",
+          "pyrite.plots",
+          "pyrite.remote",
+          "pyrite.results",
+          "pyrite.runs",
+          "pyrite.validation",
+          "pyrite.xsgen"
+        ],
+        "id": "physics-core-stays-below-drivers",
+        "ignore_imports": [
+          "pyrite.montecarlo.runner.case_tables -> pyrite.xsgen.sbethe",
+          "pyrite.montecarlo.runner.case_tables -> pyrite.xsgen.elsepa.catalog",
+          "pyrite.montecarlo.runner.case_tables -> pyrite.xsgen.bremslib.tables",
+          "pyrite.montecarlo.runner.case_tables -> pyrite.xsgen.store",
+          "pyrite.montecarlo.spectrum.brem_bremslib -> pyrite.xsgen.bremslib.tables",
+          "pyrite.montecarlo.shell_configuration -> pyrite.xsgen.sources",
+          "pyrite.montecarlo.shell_configuration -> pyrite.xsgen._errors",
+          "pyrite.montecarlo.transport.arguments -> pyrite.xsgen.elsepa.catalog",
+          "pyrite.montecarlo.transport.shell_rates -> pyrite.xsgen.sbethe.catalog",
+          "pyrite.montecarlo.transport.shell_transport -> pyrite.xsgen.sbethe.catalog",
+          "pyrite.montecarlo.transport.secondaries -> pyrite.xsgen.sbethe.catalog",
+          "pyrite.montecarlo.transport.secondaries -> pyrite.xsgen.elsepa.catalog"
+        ],
+        "name": "Physics core stays below driver and rendering packages",
+        "source_modules": [
+          "pyrite.detectors",
+          "pyrite.materials",
+          "pyrite.montecarlo"
+        ],
+        "type": "forbidden"
+      },
+      {
+        "allow_indirect_imports": true,
+        "forbidden_modules": [
+          "pyrite.detectors",
+          "pyrite.energy_grid",
+          "pyrite.instrument",
+          "pyrite.montecarlo",
+          "pyrite.xsgen"
+        ],
+        "id": "materials-imports-no-peer-domain",
+        "name": "Materials imports no peer domain package",
+        "source_modules": [
+          "pyrite.materials"
+        ],
+        "type": "forbidden"
+      },
+      {
+        "allow_indirect_imports": false,
+        "forbidden_modules": [
+          "pyrite.detectors",
+          "pyrite.instrument"
+        ],
+        "id": "montecarlo-imports-no-detectors",
+        "name": "Monte Carlo imports no detector package",
+        "source_modules": [
+          "pyrite.montecarlo"
+        ],
+        "type": "forbidden"
+      },
+      {
+        "allow_indirect_imports": false,
+        "forbidden_modules": [
+          "pyrite.montecarlo"
+        ],
+        "id": "xsgen-imports-no-montecarlo",
+        "name": "Table generation imports no Monte Carlo package",
+        "source_modules": [
+          "pyrite.xsgen"
+        ],
+        "type": "forbidden"
+      },
+      {
+        "allow_indirect_imports": true,
+        "forbidden_modules": [
+          "pyrite.materials.attenuation",
+          "pyrite.materials.catalog",
+          "pyrite.materials.crystal"
+        ],
+        "id": "material-leaves-stay-independent",
+        "name": "Material leaves do not import higher material modules",
+        "source_modules": [
+          "pyrite.materials._cif",
+          "pyrite.materials._transport_data",
+          "pyrite.materials.atomic"
+        ],
+        "type": "forbidden"
+      },
+      {
+        "allow_indirect_imports": true,
+        "forbidden_modules": [
+          "pyrite.apps"
+        ],
+        "id": "nothing-imports-the-marimo-apps",
+        "name": "No package imports the marimo app package",
+        "source_modules": [
+          "pyrite.checkpoints",
+          "pyrite.cli",
+          "pyrite.remote",
+          "pyrite.runs",
+          "pyrite.validation"
+        ],
+        "type": "forbidden"
+      },
+      {
+        "allow_indirect_imports": true,
+        "forbidden_modules": [
+          "pyrite.cli"
+        ],
+        "id": "domain-packages-stay-below-cli",
+        "name": "Domain packages do not import the CLI",
+        "source_modules": [
+          "pyrite.checkpoints",
+          "pyrite.console",
+          "pyrite.energy_grid",
+          "pyrite.paths",
+          "pyrite.remote",
+          "pyrite.results",
+          "pyrite.runs",
+          "pyrite.validation"
+        ],
+        "type": "forbidden"
+      },
+      {
+        "allow_indirect_imports": true,
+        "forbidden_modules": [
+          "pyrite.apps",
+          "pyrite.campaign",
+          "pyrite.checkpoints",
+          "pyrite.detectors",
+          "pyrite.energy_grid",
+          "pyrite.montecarlo",
+          "pyrite.perf",
+          "pyrite.plots",
+          "pyrite.remote",
+          "pyrite.results",
+          "pyrite.runs",
+          "pyrite.validation"
+        ],
+        "id": "console-stays-below-every-driver",
+        "name": "Console imports no driver or domain package",
+        "source_modules": [
+          "pyrite.console"
+        ],
+        "type": "forbidden"
+      },
+      {
+        "id": "plots-backends-stay-independent",
+        "modules": [
+          "pyrite.plots.mpl",
+          "pyrite.plots.altair",
+          "pyrite.plots.plotly"
+        ],
+        "name": "Plot backends (mpl, altair, plotly) do not import each other",
+        "type": "independence"
+      },
+      {
+        "allow_indirect_imports": true,
+        "forbidden_modules": [
+          "pyrite.api"
+        ],
+        "id": "campaign-stays-below-api",
+        "name": "Campaign does not import api",
+        "source_modules": [
+          "pyrite.campaign"
+        ],
+        "type": "forbidden"
+      },
+      {
+        "allow_indirect_imports": true,
+        "forbidden_modules": [
+          "pyrite.campaign"
+        ],
+        "id": "results-stays-below-campaign",
+        "name": "Results does not import campaign",
+        "source_modules": [
+          "pyrite.results"
+        ],
+        "type": "forbidden"
+      },
+      {
+        "allow_indirect_imports": true,
+        "forbidden_modules": [
+          "pyrite._dev"
+        ],
+        "id": "devtools-stays-below-_dev",
+        "name": "devtools does not import the dev entry point",
+        "source_modules": [
+          "pyrite.devtools"
+        ],
+        "type": "forbidden"
+      }
+    ],
+    "exclude_type_checking_imports": true,
+    "root_packages": [
+      "pyrite"
+    ]
+  },
+  "reconstruction": "Current static graph plus the sole import edge removed by the initial slice; verified against git diff a61e37b5..b2cc9fda.",
+  "report": {
+    "components": [
+      [
+        "_entry"
+      ],
+      [
+        "apps"
+      ],
+      [
+        "beams"
+      ],
+      [
+        "campaign",
+        "checkpoints",
+        "energy_grid",
+        "execution",
+        "montecarlo",
+        "observations",
+        "perf",
+        "remote",
+        "results",
+        "runs",
+        "validation"
+      ],
+      [
+        "cli"
+      ],
+      [
+        "config"
+      ],
+      [
+        "console"
+      ],
+      [
+        "detectors"
+      ],
+      [
+        "devtools"
+      ],
+      [
+        "experimental"
+      ],
+      [
+        "geometry"
+      ],
+      [
+        "instrument"
+      ],
+      [
+        "materials"
+      ],
+      [
+        "optimization"
+      ],
+      [
+        "plots"
+      ],
+      [
+        "radiation"
+      ],
+      [
+        "transport"
+      ],
+      [
+        "xsgen"
+      ]
+    ],
+    "cycle_edges": [
+      [
+        "campaign",
+        "execution"
+      ],
+      [
+        "campaign",
+        "montecarlo"
+      ],
+      [
+        "campaign",
+        "observations"
+      ],
+      [
+        "campaign",
+        "results"
+      ],
+      [
+        "checkpoints",
+        "campaign"
+      ],
+      [
+        "checkpoints",
+        "montecarlo"
+      ],
+      [
+        "checkpoints",
+        "results"
+      ],
+      [
+        "energy_grid",
+        "campaign"
+      ],
+      [
+        "energy_grid",
+        "checkpoints"
+      ],
+      [
+        "energy_grid",
+        "montecarlo"
+      ],
+      [
+        "energy_grid",
+        "remote"
+      ],
+      [
+        "energy_grid",
+        "results"
+      ],
+      [
+        "execution",
+        "campaign"
+      ],
+      [
+        "execution",
+        "checkpoints"
+      ],
+      [
+        "execution",
+        "montecarlo"
+      ],
+      [
+        "montecarlo",
+        "energy_grid"
+      ],
+      [
+        "observations",
+        "checkpoints"
+      ],
+      [
+        "observations",
+        "montecarlo"
+      ],
+      [
+        "observations",
+        "results"
+      ],
+      [
+        "perf",
+        "campaign"
+      ],
+      [
+        "perf",
+        "montecarlo"
+      ],
+      [
+        "remote",
+        "campaign"
+      ],
+      [
+        "remote",
+        "checkpoints"
+      ],
+      [
+        "remote",
+        "montecarlo"
+      ],
+      [
+        "remote",
+        "perf"
+      ],
+      [
+        "remote",
+        "results"
+      ],
+      [
+        "remote",
+        "runs"
+      ],
+      [
+        "remote",
+        "validation"
+      ],
+      [
+        "results",
+        "montecarlo"
+      ],
+      [
+        "runs",
+        "campaign"
+      ],
+      [
+        "runs",
+        "checkpoints"
+      ],
+      [
+        "runs",
+        "execution"
+      ],
+      [
+        "runs",
+        "montecarlo"
+      ],
+      [
+        "runs",
+        "observations"
+      ],
+      [
+        "runs",
+        "perf"
+      ],
+      [
+        "runs",
+        "results"
+      ],
+      [
+        "validation",
+        "campaign"
+      ],
+      [
+        "validation",
+        "checkpoints"
+      ],
+      [
+        "validation",
+        "montecarlo"
+      ]
+    ],
+    "cyclic_components": [
+      [
+        "campaign",
+        "checkpoints",
+        "energy_grid",
+        "execution",
+        "montecarlo",
+        "observations",
+        "perf",
+        "remote",
+        "results",
+        "runs",
+        "validation"
+      ]
+    ],
+    "module_edges": [
+      {
+        "imported": "pyrite.validation.anchor_figures",
+        "importer": "pyrite._entry.reproduce_zhai"
+      },
+      {
+        "imported": "pyrite.cli.commands.scan",
+        "importer": "pyrite._entry.scan"
+      },
+      {
+        "imported": "pyrite.console.output",
+        "importer": "pyrite._entry.scan"
+      },
+      {
+        "imported": "pyrite.materials",
+        "importer": "pyrite._entry.scan"
+      },
+      {
+        "imported": "pyrite.runs.run",
+        "importer": "pyrite.apps.analysis_app"
+      },
+      {
+        "imported": "pyrite.plots._frames",
+        "importer": "pyrite.apps.analysis_ui.controls"
+      },
+      {
+        "imported": "pyrite.results",
+        "importer": "pyrite.apps.analysis_ui.controls"
+      },
+      {
+        "imported": "pyrite.campaign.config",
+        "importer": "pyrite.apps.analysis_ui.data"
+      },
+      {
+        "imported": "pyrite.results",
+        "importer": "pyrite.apps.analysis_ui.data"
+      },
+      {
+        "imported": "pyrite.runs.run",
+        "importer": "pyrite.apps.analysis_ui.data"
+      },
+      {
+        "imported": "pyrite.plots._frames",
+        "importer": "pyrite.apps.analysis_ui.interactive"
+      },
+      {
+        "imported": "pyrite.plots.altair.sweeps",
+        "importer": "pyrite.apps.analysis_ui.interactive"
+      },
+      {
+        "imported": "pyrite.plots.plotly.map_select",
+        "importer": "pyrite.apps.analysis_ui.interactive"
+      },
+      {
+        "imported": "pyrite.results",
+        "importer": "pyrite.apps.analysis_ui.interactive"
+      },
+      {
+        "imported": "pyrite.plots.plotly.map_select",
+        "importer": "pyrite.apps.analysis_ui.map_selection"
+      },
+      {
+        "imported": "pyrite.observations",
+        "importer": "pyrite.apps.analysis_ui.pixels"
+      },
+      {
+        "imported": "pyrite.plots._pixel_frames",
+        "importer": "pyrite.apps.analysis_ui.pixels"
+      },
+      {
+        "imported": "pyrite.results.radiation",
+        "importer": "pyrite.apps.analysis_ui.radiation"
+      },
+      {
+        "imported": "pyrite.plots.plotly.spectra",
+        "importer": "pyrite.apps.analysis_ui.views.cases"
+      },
+      {
+        "imported": "pyrite.plots.plotly.detectors",
+        "importer": "pyrite.apps.analysis_ui.views.detectors"
+      },
+      {
+        "imported": "pyrite.plots.plotly.spectra",
+        "importer": "pyrite.apps.analysis_ui.views.map"
+      },
+      {
+        "imported": "pyrite.plots.plotly.sweeps",
+        "importer": "pyrite.apps.analysis_ui.views.map"
+      },
+      {
+        "imported": "pyrite.results",
+        "importer": "pyrite.apps.analysis_ui.views.map"
+      },
+      {
+        "imported": "pyrite.materials",
+        "importer": "pyrite.apps.analysis_ui.views.materials"
+      },
+      {
+        "imported": "pyrite.plots",
+        "importer": "pyrite.apps.analysis_ui.views.materials"
+      },
+      {
+        "imported": "pyrite.plots.plotly.spectra",
+        "importer": "pyrite.apps.analysis_ui.views.materials"
+      },
+      {
+        "imported": "pyrite.plots._pixel_frames",
+        "importer": "pyrite.apps.analysis_ui.views.pixels"
+      },
+      {
+        "imported": "pyrite.plots.plotly.pixels",
+        "importer": "pyrite.apps.analysis_ui.views.pixels"
+      },
+      {
+        "imported": "pyrite.results",
+        "importer": "pyrite.apps.analysis_ui.views.sidebar"
+      },
+      {
+        "imported": "pyrite.plots.plotly.spectra",
+        "importer": "pyrite.apps.analysis_ui.views.spectra"
+      },
+      {
+        "imported": "pyrite.plots.plotly.temporal",
+        "importer": "pyrite.apps.analysis_ui.views.spectra"
+      },
+      {
+        "imported": "pyrite.results",
+        "importer": "pyrite.apps.analysis_ui.views.spectra"
+      },
+      {
+        "imported": "pyrite.checkpoints._checkpoint_store",
+        "importer": "pyrite.apps.analyze"
+      },
+      {
+        "imported": "pyrite.materials",
+        "importer": "pyrite.apps.analyze"
+      },
+      {
+        "imported": "pyrite.runs.run",
+        "importer": "pyrite.apps.analyze"
+      },
+      {
+        "imported": "pyrite.montecarlo.spectrum.cherenkov",
+        "importer": "pyrite.apps.angular_cherenkov"
+      },
+      {
+        "imported": "pyrite.montecarlo.spectrum.transition_radiation",
+        "importer": "pyrite.apps.angular_cherenkov"
+      },
+      {
+        "imported": "pyrite.campaign.beam",
+        "importer": "pyrite.apps.angular_heatmap"
+      },
+      {
+        "imported": "pyrite.campaign.geometry",
+        "importer": "pyrite.apps.angular_heatmap"
+      },
+      {
+        "imported": "pyrite.materials",
+        "importer": "pyrite.apps.angular_maps"
+      },
+      {
+        "imported": "pyrite.materials.channeling.axial",
+        "importer": "pyrite.apps.axial_channeling"
+      },
+      {
+        "imported": "pyrite.montecarlo.channeling.axial_diagnostic",
+        "importer": "pyrite.apps.axial_channeling"
+      },
+      {
+        "imported": "pyrite.montecarlo.channeling.axial_emission",
+        "importer": "pyrite.apps.axial_channeling"
+      },
+      {
+        "imported": "pyrite.montecarlo.channeling.axial_state_diagnostics",
+        "importer": "pyrite.apps.axial_channeling"
+      },
+      {
+        "imported": "pyrite.montecarlo.channeling.dipole",
+        "importer": "pyrite.apps.axial_channeling"
+      },
+      {
+        "imported": "pyrite.montecarlo.channeling.realspace",
+        "importer": "pyrite.apps.axial_channeling"
+      },
+      {
+        "imported": "pyrite.montecarlo.channeling.states",
+        "importer": "pyrite.apps.axial_channeling"
+      },
+      {
+        "imported": "pyrite.materials.channeling",
+        "importer": "pyrite.apps.channeling"
+      },
+      {
+        "imported": "pyrite.materials.crystal",
+        "importer": "pyrite.apps.channeling"
+      },
+      {
+        "imported": "pyrite.montecarlo.channeling.dipole",
+        "importer": "pyrite.apps.channeling"
+      },
+      {
+        "imported": "pyrite.materials.channeling",
+        "importer": "pyrite.apps.channeling_app"
+      },
+      {
+        "imported": "pyrite.materials.channeling.transverse",
+        "importer": "pyrite.apps.channeling_app"
+      },
+      {
+        "imported": "pyrite.materials.crystal",
+        "importer": "pyrite.apps.channeling_app"
+      },
+      {
+        "imported": "pyrite.montecarlo.channeling",
+        "importer": "pyrite.apps.channeling_app"
+      },
+      {
+        "imported": "pyrite.montecarlo.channeling.axial_diagnostic",
+        "importer": "pyrite.apps.channeling_app"
+      },
+      {
+        "imported": "pyrite.remote.config",
+        "importer": "pyrite.apps.check"
+      },
+      {
+        "imported": "pyrite.campaign.config",
+        "importer": "pyrite.apps.compare_app"
+      },
+      {
+        "imported": "pyrite.materials",
+        "importer": "pyrite.apps.compare_app"
+      },
+      {
+        "imported": "pyrite.results",
+        "importer": "pyrite.apps.compare_app"
+      },
+      {
+        "imported": "pyrite.runs.run",
+        "importer": "pyrite.apps.compare_app"
+      },
+      {
+        "imported": "pyrite.detectors.optical_ctr_inference",
+        "importer": "pyrite.apps.optical_diagnostics"
+      },
+      {
+        "imported": "pyrite.detectors.optical_energy",
+        "importer": "pyrite.apps.optical_diagnostics"
+      },
+      {
+        "imported": "pyrite.detectors.optical_interferometer",
+        "importer": "pyrite.apps.optical_diagnostics"
+      },
+      {
+        "imported": "pyrite.materials.crystal",
+        "importer": "pyrite.apps.optical_diagnostics"
+      },
+      {
+        "imported": "pyrite.montecarlo.spectrum.cherenkov",
+        "importer": "pyrite.apps.optical_diagnostics"
+      },
+      {
+        "imported": "pyrite.montecarlo.spectrum.optical_finite_collection",
+        "importer": "pyrite.apps.optical_diagnostics"
+      },
+      {
+        "imported": "pyrite.montecarlo.spectrum.optical_finite_convergence",
+        "importer": "pyrite.apps.optical_diagnostics"
+      },
+      {
+        "imported": "pyrite.montecarlo.spectrum.optical_finite_screen",
+        "importer": "pyrite.apps.optical_diagnostics"
+      },
+      {
+        "imported": "pyrite.montecarlo.spectrum.optical_transition",
+        "importer": "pyrite.apps.optical_diagnostics"
+      },
+      {
+        "imported": "pyrite.montecarlo.spectrum.transition_radiation",
+        "importer": "pyrite.apps.optical_diagnostics"
+      },
+      {
+        "imported": "pyrite.runs.run",
+        "importer": "pyrite.apps.pixel_app"
+      },
+      {
+        "imported": "pyrite.campaign.config",
+        "importer": "pyrite.apps.scan_app"
+      },
+      {
+        "imported": "pyrite.campaign.sweep",
+        "importer": "pyrite.apps.scan_app"
+      },
+      {
+        "imported": "pyrite.materials",
+        "importer": "pyrite.apps.scan_app"
+      },
+      {
+        "imported": "pyrite.plots",
+        "importer": "pyrite.apps.scan_app"
+      },
+      {
+        "imported": "pyrite.runs.run",
+        "importer": "pyrite.apps.scan_app"
+      },
+      {
+        "imported": "pyrite.campaign.beam_metrics",
+        "importer": "pyrite.apps.trace_app"
+      },
+      {
+        "imported": "pyrite.campaign.config",
+        "importer": "pyrite.apps.trace_app"
+      },
+      {
+        "imported": "pyrite.materials",
+        "importer": "pyrite.apps.trace_app"
+      },
+      {
+        "imported": "pyrite.montecarlo.transport.shell_oscillators",
+        "importer": "pyrite.apps.trace_app"
+      },
+      {
+        "imported": "pyrite.plots.altair.trajectories",
+        "importer": "pyrite.apps.trace_app"
+      },
+      {
+        "imported": "pyrite.plots.plotly.camera",
+        "importer": "pyrite.apps.trace_app"
+      },
+      {
+        "imported": "pyrite.plots.plotly.crystal_lattice",
+        "importer": "pyrite.apps.trace_app"
+      },
+      {
+        "imported": "pyrite.plots.plotly.render",
+        "importer": "pyrite.apps.trace_app"
+      },
+      {
+        "imported": "pyrite.plots.plotly.trajectories",
+        "importer": "pyrite.apps.trace_app"
+      },
+      {
+        "imported": "pyrite.beams",
+        "importer": "pyrite.apps.transition_radiation"
+      },
+      {
+        "imported": "pyrite.campaign.longitudinal",
+        "importer": "pyrite.apps.transition_radiation"
+      },
+      {
+        "imported": "pyrite.detectors",
+        "importer": "pyrite.apps.transition_radiation"
+      },
+      {
+        "imported": "pyrite.geometry",
+        "importer": "pyrite.apps.transition_radiation"
+      },
+      {
+        "imported": "pyrite.materials.crystal",
+        "importer": "pyrite.apps.transition_radiation"
+      },
+      {
+        "imported": "pyrite.montecarlo.geometry",
+        "importer": "pyrite.apps.transition_radiation"
+      },
+      {
+        "imported": "pyrite.montecarlo.spectrum.coherent_transverse",
+        "importer": "pyrite.apps.transition_radiation"
+      },
+      {
+        "imported": "pyrite.montecarlo.spectrum.transition_radiation",
+        "importer": "pyrite.apps.transition_radiation"
+      },
+      {
+        "imported": "pyrite.validation.dtr_reference",
+        "importer": "pyrite.apps.transition_radiation"
+      },
+      {
+        "imported": "pyrite.console.config",
+        "importer": "pyrite.apps.validation_app"
+      },
+      {
+        "imported": "pyrite.validation.anchor_figures",
+        "importer": "pyrite.apps.validation_app"
+      },
+      {
+        "imported": "pyrite.montecarlo.trajectory_selection",
+        "importer": "pyrite.apps.viewer"
+      },
+      {
+        "imported": "pyrite.plots.altair.trajectories",
+        "importer": "pyrite.apps.viewer"
+      },
+      {
+        "imported": "pyrite.plots.plotly.trajectories",
+        "importer": "pyrite.apps.viewer"
+      },
+      {
+        "imported": "pyrite.plots.trajectory_capture",
+        "importer": "pyrite.apps.viewer"
+      },
+      {
+        "imported": "pyrite.montecarlo.bunch_front",
+        "importer": "pyrite.campaign.beam"
+      },
+      {
+        "imported": "pyrite.montecarlo.transverse",
+        "importer": "pyrite.campaign.beam"
+      },
+      {
+        "imported": "pyrite.materials",
+        "importer": "pyrite.campaign.beam_cases"
+      },
+      {
+        "imported": "pyrite.montecarlo.bunch_front",
+        "importer": "pyrite.campaign.beam_cases"
+      },
+      {
+        "imported": "pyrite.montecarlo.transverse",
+        "importer": "pyrite.campaign.beam_cases"
+      },
+      {
+        "imported": "pyrite.montecarlo.trajectories",
+        "importer": "pyrite.campaign.beam_metrics"
+      },
+      {
+        "imported": "pyrite.montecarlo.case",
+        "importer": "pyrite.campaign.bremsstrahlung_cases"
+      },
+      {
+        "imported": "pyrite.xsgen.bremslib.tables",
+        "importer": "pyrite.campaign.bremsstrahlung_cases"
+      },
+      {
+        "imported": "pyrite.materials.atomic",
+        "importer": "pyrite.campaign.channeling_cases"
+      },
+      {
+        "imported": "pyrite.materials.channeling",
+        "importer": "pyrite.campaign.channeling_cases"
+      },
+      {
+        "imported": "pyrite.materials.crystal",
+        "importer": "pyrite.campaign.channeling_cases"
+      },
+      {
+        "imported": "pyrite.montecarlo.case",
+        "importer": "pyrite.campaign.channeling_cases"
+      },
+      {
+        "imported": "pyrite.montecarlo.channeling",
+        "importer": "pyrite.campaign.channeling_cases"
+      },
+      {
+        "imported": "pyrite.montecarlo.geometry",
+        "importer": "pyrite.campaign.channeling_cases"
+      },
+      {
+        "imported": "pyrite.detectors",
+        "importer": "pyrite.campaign.config"
+      },
+      {
+        "imported": "pyrite.materials",
+        "importer": "pyrite.campaign.config"
+      },
+      {
+        "imported": "pyrite.montecarlo",
+        "importer": "pyrite.campaign.config"
+      },
+      {
+        "imported": "pyrite.montecarlo.runner.case_tables",
+        "importer": "pyrite.campaign.config"
+      },
+      {
+        "imported": "pyrite.montecarlo.runner.step_budget",
+        "importer": "pyrite.campaign.config"
+      },
+      {
+        "imported": "pyrite.montecarlo.transverse",
+        "importer": "pyrite.campaign.config"
+      },
+      {
+        "imported": "pyrite.results",
+        "importer": "pyrite.campaign.config"
+      },
+      {
+        "imported": "pyrite.montecarlo.transport",
+        "importer": "pyrite.campaign.cost"
+      },
+      {
+        "imported": "pyrite.detectors",
+        "importer": "pyrite.campaign.front_matching"
+      },
+      {
+        "imported": "pyrite.materials",
+        "importer": "pyrite.campaign.front_matching"
+      },
+      {
+        "imported": "pyrite.materials.crystal",
+        "importer": "pyrite.campaign.front_matching"
+      },
+      {
+        "imported": "pyrite.montecarlo.bunch_front",
+        "importer": "pyrite.campaign.front_matching"
+      },
+      {
+        "imported": "pyrite.montecarlo.geometry",
+        "importer": "pyrite.campaign.front_matching"
+      },
+      {
+        "imported": "pyrite.materials",
+        "importer": "pyrite.campaign.geometry"
+      },
+      {
+        "imported": "pyrite.materials._composition",
+        "importer": "pyrite.campaign.geometry"
+      },
+      {
+        "imported": "pyrite.materials.crystal",
+        "importer": "pyrite.campaign.geometry"
+      },
+      {
+        "imported": "pyrite.materials",
+        "importer": "pyrite.campaign.inelastic_cases"
+      },
+      {
+        "imported": "pyrite.montecarlo.case",
+        "importer": "pyrite.campaign.inelastic_cases"
+      },
+      {
+        "imported": "pyrite.montecarlo.runner.case_tables",
+        "importer": "pyrite.campaign.inelastic_cases"
+      },
+      {
+        "imported": "pyrite.montecarlo.transport.shell_oscillators",
+        "importer": "pyrite.campaign.inelastic_cases"
+      },
+      {
+        "imported": "pyrite.montecarlo.transport.shell_transport",
+        "importer": "pyrite.campaign.inelastic_cases"
+      },
+      {
+        "imported": "pyrite.materials.crystal",
+        "importer": "pyrite.campaign.kinematic_validity"
+      },
+      {
+        "imported": "pyrite.montecarlo.geometry",
+        "importer": "pyrite.campaign.kinematic_validity"
+      },
+      {
+        "imported": "pyrite.materials.crystal",
+        "importer": "pyrite.campaign.longitudinal"
+      },
+      {
+        "imported": "pyrite.instrument",
+        "importer": "pyrite.campaign.lowering"
+      },
+      {
+        "imported": "pyrite.montecarlo",
+        "importer": "pyrite.campaign.lowering"
+      },
+      {
+        "imported": "pyrite.montecarlo.channeling.planar_injection",
+        "importer": "pyrite.campaign.lowering"
+      },
+      {
+        "imported": "pyrite.observations.spec",
+        "importer": "pyrite.campaign.lowering"
+      },
+      {
+        "imported": "pyrite.detectors",
+        "importer": "pyrite.campaign.model"
+      },
+      {
+        "imported": "pyrite.instrument",
+        "importer": "pyrite.campaign.model"
+      },
+      {
+        "imported": "pyrite.instrument.model",
+        "importer": "pyrite.campaign.model"
+      },
+      {
+        "imported": "pyrite.observations.spec",
+        "importer": "pyrite.campaign.model"
+      },
+      {
+        "imported": "pyrite.config",
+        "importer": "pyrite.campaign.observation"
+      },
+      {
+        "imported": "pyrite.detectors",
+        "importer": "pyrite.campaign.observation"
+      },
+      {
+        "imported": "pyrite.geometry",
+        "importer": "pyrite.campaign.observation"
+      },
+      {
+        "imported": "pyrite.instrument",
+        "importer": "pyrite.campaign.observation"
+      },
+      {
+        "imported": "pyrite.instrument.scene",
+        "importer": "pyrite.campaign.observation"
+      },
+      {
+        "imported": "pyrite.materials",
+        "importer": "pyrite.campaign.observation"
+      },
+      {
+        "imported": "pyrite.montecarlo.runner.case_tables",
+        "importer": "pyrite.campaign.photon_cases"
+      },
+      {
+        "imported": "pyrite.montecarlo.runner.photon_aperture",
+        "importer": "pyrite.campaign.photon_cases"
+      },
+      {
+        "imported": "pyrite.detectors.editing",
+        "importer": "pyrite.campaign.profile_detectors"
+      },
+      {
+        "imported": "pyrite.detectors.spec",
+        "importer": "pyrite.campaign.profile_detectors"
+      },
+      {
+        "imported": "pyrite.detectors.editing",
+        "importer": "pyrite.campaign.profile_precision"
+      },
+      {
+        "imported": "pyrite.detectors",
+        "importer": "pyrite.campaign.profiles"
+      },
+      {
+        "imported": "pyrite.materials",
+        "importer": "pyrite.campaign.profiles"
+      },
+      {
+        "imported": "pyrite.materials.photon_cross_sections",
+        "importer": "pyrite.campaign.profiles"
+      },
+      {
+        "imported": "pyrite.montecarlo.case",
+        "importer": "pyrite.campaign.profiles"
+      },
+      {
+        "imported": "pyrite.montecarlo.channeling.handoff",
+        "importer": "pyrite.campaign.profiles"
+      },
+      {
+        "imported": "pyrite.montecarlo.gdf",
+        "importer": "pyrite.campaign.profiles"
+      },
+      {
+        "imported": "pyrite.montecarlo.spectrum",
+        "importer": "pyrite.campaign.profiles"
+      },
+      {
+        "imported": "pyrite.montecarlo.spectrum.brem_bremslib",
+        "importer": "pyrite.campaign.profiles"
+      },
+      {
+        "imported": "pyrite.montecarlo.spectrum.characteristic",
+        "importer": "pyrite.campaign.profiles"
+      },
+      {
+        "imported": "pyrite.montecarlo.spectrum.coherent_population",
+        "importer": "pyrite.campaign.profiles"
+      },
+      {
+        "imported": "pyrite.montecarlo.spectrum.dtr_history",
+        "importer": "pyrite.campaign.profiles"
+      },
+      {
+        "imported": "pyrite.montecarlo.spectrum.transition_radiation_crossings",
+        "importer": "pyrite.campaign.profiles"
+      },
+      {
+        "imported": "pyrite.montecarlo.transport",
+        "importer": "pyrite.campaign.profiles"
+      },
+      {
+        "imported": "pyrite.results",
+        "importer": "pyrite.campaign.profiles"
+      },
+      {
+        "imported": "pyrite.xsgen.bremslib.tables",
+        "importer": "pyrite.campaign.profiles"
+      },
+      {
+        "imported": "pyrite.xsgen.elsepa.catalog",
+        "importer": "pyrite.campaign.profiles"
+      },
+      {
+        "imported": "pyrite.execution._simulation",
+        "importer": "pyrite.campaign.resolution"
+      },
+      {
+        "imported": "pyrite.instrument",
+        "importer": "pyrite.campaign.resolution"
+      },
+      {
+        "imported": "pyrite.montecarlo.channeling.planar_injection",
+        "importer": "pyrite.campaign.resolution"
+      },
+      {
+        "imported": "pyrite.montecarlo.transverse",
+        "importer": "pyrite.campaign.resolution"
+      },
+      {
+        "imported": "pyrite.observations.spec",
+        "importer": "pyrite.campaign.resolution"
+      },
+      {
+        "imported": "pyrite.config",
+        "importer": "pyrite.campaign.single_scene"
+      },
+      {
+        "imported": "pyrite.detectors",
+        "importer": "pyrite.campaign.single_scene"
+      },
+      {
+        "imported": "pyrite.instrument",
+        "importer": "pyrite.campaign.single_scene"
+      },
+      {
+        "imported": "pyrite.montecarlo.transverse",
+        "importer": "pyrite.campaign.single_scene"
+      },
+      {
+        "imported": "pyrite.observations",
+        "importer": "pyrite.campaign.single_scene"
+      },
+      {
+        "imported": "pyrite.detectors",
+        "importer": "pyrite.campaign.sweep"
+      },
+      {
+        "imported": "pyrite.materials",
+        "importer": "pyrite.campaign.sweep"
+      },
+      {
+        "imported": "pyrite.materials.crystal",
+        "importer": "pyrite.campaign.sweep"
+      },
+      {
+        "imported": "pyrite.montecarlo.bunch_front",
+        "importer": "pyrite.campaign.sweep"
+      },
+      {
+        "imported": "pyrite.montecarlo.case",
+        "importer": "pyrite.campaign.sweep"
+      },
+      {
+        "imported": "pyrite.montecarlo.gdf",
+        "importer": "pyrite.campaign.sweep"
+      },
+      {
+        "imported": "pyrite.montecarlo.spectrum.cxr",
+        "importer": "pyrite.campaign.sweep"
+      },
+      {
+        "imported": "pyrite.montecarlo.transverse",
+        "importer": "pyrite.campaign.sweep"
+      },
+      {
+        "imported": "pyrite.materials.radiation_length",
+        "importer": "pyrite.campaign.thick_target"
+      },
+      {
+        "imported": "pyrite.montecarlo.case",
+        "importer": "pyrite.campaign.transition_cases"
+      },
+      {
+        "imported": "pyrite.montecarlo.trajectories",
+        "importer": "pyrite.checkpoints._checkpoint_store"
+      },
+      {
+        "imported": "pyrite.results.aperture",
+        "importer": "pyrite.checkpoints._checkpoint_store"
+      },
+      {
+        "imported": "pyrite.campaign.sweep",
+        "importer": "pyrite.checkpoints._repair_planning"
+      },
+      {
+        "imported": "pyrite.montecarlo.case",
+        "importer": "pyrite.checkpoints._repair_planning"
+      },
+      {
+        "imported": "pyrite.console.outputs",
+        "importer": "pyrite.checkpoints.archive"
+      },
+      {
+        "imported": "pyrite.campaign.profiles",
+        "importer": "pyrite.checkpoints.campaign_lock"
+      },
+      {
+        "imported": "pyrite.campaign.config",
+        "importer": "pyrite.checkpoints.checkpoint_cleanup"
+      },
+      {
+        "imported": "pyrite.campaign.profiles",
+        "importer": "pyrite.checkpoints.checkpoint_cleanup"
+      },
+      {
+        "imported": "pyrite.console.output",
+        "importer": "pyrite.checkpoints.checkpoint_cleanup"
+      },
+      {
+        "imported": "pyrite.console.outputs",
+        "importer": "pyrite.checkpoints.checkpoint_cleanup"
+      },
+      {
+        "imported": "pyrite.materials",
+        "importer": "pyrite.checkpoints.checkpoint_cleanup"
+      },
+      {
+        "imported": "pyrite.campaign.kinematic_validity",
+        "importer": "pyrite.checkpoints.persistence"
+      },
+      {
+        "imported": "pyrite.campaign.profiles",
+        "importer": "pyrite.checkpoints.persistence"
+      },
+      {
+        "imported": "pyrite.console.outputs",
+        "importer": "pyrite.checkpoints.persistence"
+      },
+      {
+        "imported": "pyrite.results",
+        "importer": "pyrite.checkpoints.persistence"
+      },
+      {
+        "imported": "pyrite.campaign.config",
+        "importer": "pyrite.checkpoints.recompute"
+      },
+      {
+        "imported": "pyrite.console.outputs",
+        "importer": "pyrite.checkpoints.recompute"
+      },
+      {
+        "imported": "pyrite.montecarlo",
+        "importer": "pyrite.checkpoints.recompute"
+      },
+      {
+        "imported": "pyrite.montecarlo.runner",
+        "importer": "pyrite.checkpoints.recompute"
+      },
+      {
+        "imported": "pyrite.montecarlo.runner.channeling_emission",
+        "importer": "pyrite.checkpoints.recompute"
+      },
+      {
+        "imported": "pyrite.campaign.config",
+        "importer": "pyrite.checkpoints.recompute_defaults"
+      },
+      {
+        "imported": "pyrite.campaign.profiles",
+        "importer": "pyrite.checkpoints.recompute_defaults"
+      },
+      {
+        "imported": "pyrite.campaign.config",
+        "importer": "pyrite.checkpoints.slim"
+      },
+      {
+        "imported": "pyrite.campaign.grid",
+        "importer": "pyrite.checkpoints.slim"
+      },
+      {
+        "imported": "pyrite.campaign.profiles",
+        "importer": "pyrite.checkpoints.slim"
+      },
+      {
+        "imported": "pyrite.results",
+        "importer": "pyrite.checkpoints.slim"
+      },
+      {
+        "imported": "pyrite.montecarlo.case",
+        "importer": "pyrite.checkpoints.trajectory_scoring"
+      },
+      {
+        "imported": "pyrite.montecarlo.runner",
+        "importer": "pyrite.checkpoints.trajectory_scoring"
+      },
+      {
+        "imported": "pyrite.montecarlo.runner.artifacts",
+        "importer": "pyrite.checkpoints.trajectory_scoring"
+      },
+      {
+        "imported": "pyrite.montecarlo.trajectories",
+        "importer": "pyrite.checkpoints.trajectory_scoring"
+      },
+      {
+        "imported": "pyrite.results",
+        "importer": "pyrite.checkpoints.trajectory_scoring"
+      },
+      {
+        "imported": "pyrite.console.config",
+        "importer": "pyrite.cli._catalog_io"
+      },
+      {
+        "imported": "pyrite.console.output",
+        "importer": "pyrite.cli._catalog_io"
+      },
+      {
+        "imported": "pyrite.energy_grid.apply",
+        "importer": "pyrite.cli._catalog_io"
+      },
+      {
+        "imported": "pyrite.console.outputs",
+        "importer": "pyrite.cli._completion"
+      },
+      {
+        "imported": "pyrite.remote.config",
+        "importer": "pyrite.cli._completion"
+      },
+      {
+        "imported": "pyrite.console.output",
+        "importer": "pyrite.cli._groups"
+      },
+      {
+        "imported": "pyrite.campaign.sweep",
+        "importer": "pyrite.cli._implicit_defaults"
+      },
+      {
+        "imported": "pyrite.console.config",
+        "importer": "pyrite.cli._implicit_defaults"
+      },
+      {
+        "imported": "pyrite.materials",
+        "importer": "pyrite.cli._implicit_defaults"
+      },
+      {
+        "imported": "pyrite.remote.config",
+        "importer": "pyrite.cli._options"
+      },
+      {
+        "imported": "pyrite.campaign.sweep",
+        "importer": "pyrite.cli.commands._beam_shared"
+      },
+      {
+        "imported": "pyrite.console.output",
+        "importer": "pyrite.cli.commands._beam_shared"
+      },
+      {
+        "imported": "pyrite.detectors.editing",
+        "importer": "pyrite.cli.commands._detector_shared"
+      },
+      {
+        "imported": "pyrite.campaign.observation",
+        "importer": "pyrite.cli.commands._filter_shared"
+      },
+      {
+        "imported": "pyrite.instrument",
+        "importer": "pyrite.cli.commands._filter_shared"
+      },
+      {
+        "imported": "pyrite.console.output",
+        "importer": "pyrite.cli.commands._pixel_detector_shared"
+      },
+      {
+        "imported": "pyrite.campaign._profile_document",
+        "importer": "pyrite.cli.commands._profile_cxr_grid"
+      },
+      {
+        "imported": "pyrite.campaign.profile_cxr_grid",
+        "importer": "pyrite.cli.commands._profile_cxr_grid"
+      },
+      {
+        "imported": "pyrite.console.json",
+        "importer": "pyrite.cli.commands._profile_cxr_grid"
+      },
+      {
+        "imported": "pyrite.console.output",
+        "importer": "pyrite.cli.commands._profile_cxr_grid"
+      },
+      {
+        "imported": "pyrite.campaign._profile_document",
+        "importer": "pyrite.cli.commands._profile_detectors"
+      },
+      {
+        "imported": "pyrite.campaign.profile_detectors",
+        "importer": "pyrite.cli.commands._profile_detectors"
+      },
+      {
+        "imported": "pyrite.campaign.profile_summary",
+        "importer": "pyrite.cli.commands._profile_detectors"
+      },
+      {
+        "imported": "pyrite.console.json",
+        "importer": "pyrite.cli.commands._profile_detectors"
+      },
+      {
+        "imported": "pyrite.console.output",
+        "importer": "pyrite.cli.commands._profile_detectors"
+      },
+      {
+        "imported": "pyrite.campaign._profile_document",
+        "importer": "pyrite.cli.commands._profile_filters"
+      },
+      {
+        "imported": "pyrite.campaign.profile_filters",
+        "importer": "pyrite.cli.commands._profile_filters"
+      },
+      {
+        "imported": "pyrite.console.json",
+        "importer": "pyrite.cli.commands._profile_filters"
+      },
+      {
+        "imported": "pyrite.console.output",
+        "importer": "pyrite.cli.commands._profile_filters"
+      },
+      {
+        "imported": "pyrite.campaign.profile_membership",
+        "importer": "pyrite.cli.commands._profile_members"
+      },
+      {
+        "imported": "pyrite.campaign._profile_document",
+        "importer": "pyrite.cli.commands._profile_precision"
+      },
+      {
+        "imported": "pyrite.campaign.profile_cxr_grid",
+        "importer": "pyrite.cli.commands._profile_precision"
+      },
+      {
+        "imported": "pyrite.campaign.profile_precision",
+        "importer": "pyrite.cli.commands._profile_precision"
+      },
+      {
+        "imported": "pyrite.campaign.profiles",
+        "importer": "pyrite.cli.commands._profile_precision"
+      },
+      {
+        "imported": "pyrite.console.json",
+        "importer": "pyrite.cli.commands._profile_precision"
+      },
+      {
+        "imported": "pyrite.console.output",
+        "importer": "pyrite.cli.commands._profile_precision"
+      },
+      {
+        "imported": "pyrite.campaign.config_presets",
+        "importer": "pyrite.cli.commands._profile_presets"
+      },
+      {
+        "imported": "pyrite.campaign._profile_document",
+        "importer": "pyrite.cli.commands._profile_shared"
+      },
+      {
+        "imported": "pyrite.console.output",
+        "importer": "pyrite.cli.commands._profile_shared"
+      },
+      {
+        "imported": "pyrite.campaign._profile_document",
+        "importer": "pyrite.cli.commands._profile_show"
+      },
+      {
+        "imported": "pyrite.campaign.profile_cxr_grid",
+        "importer": "pyrite.cli.commands._profile_show"
+      },
+      {
+        "imported": "pyrite.campaign.profile_detectors",
+        "importer": "pyrite.cli.commands._profile_show"
+      },
+      {
+        "imported": "pyrite.console.output",
+        "importer": "pyrite.cli.commands._profile_show"
+      },
+      {
+        "imported": "pyrite.materials._catalog_decode",
+        "importer": "pyrite.cli.commands._profile_show"
+      },
+      {
+        "imported": "pyrite.materials._schema",
+        "importer": "pyrite.cli.commands._profile_show"
+      },
+      {
+        "imported": "pyrite.checkpoints._checkpoint_store",
+        "importer": "pyrite.cli.commands._remote_actions"
+      },
+      {
+        "imported": "pyrite.console.dashboard",
+        "importer": "pyrite.cli.commands._remote_actions"
+      },
+      {
+        "imported": "pyrite.console.json",
+        "importer": "pyrite.cli.commands._remote_actions"
+      },
+      {
+        "imported": "pyrite.console.output",
+        "importer": "pyrite.cli.commands._remote_actions"
+      },
+      {
+        "imported": "pyrite.console.outputs",
+        "importer": "pyrite.cli.commands._remote_actions"
+      },
+      {
+        "imported": "pyrite.materials",
+        "importer": "pyrite.cli.commands._remote_actions"
+      },
+      {
+        "imported": "pyrite.remote.lifecycle",
+        "importer": "pyrite.cli.commands._remote_actions"
+      },
+      {
+        "imported": "pyrite.remote.scripts",
+        "importer": "pyrite.cli.commands._remote_actions"
+      },
+      {
+        "imported": "pyrite.remote.state",
+        "importer": "pyrite.cli.commands._remote_actions"
+      },
+      {
+        "imported": "pyrite.remote.transport",
+        "importer": "pyrite.cli.commands._remote_actions"
+      },
+      {
+        "imported": "pyrite.remote.viewer",
+        "importer": "pyrite.cli.commands._remote_actions"
+      },
+      {
+        "imported": "pyrite.runs.scan",
+        "importer": "pyrite.cli.commands._remote_actions"
+      },
+      {
+        "imported": "pyrite.campaign.single_scene",
+        "importer": "pyrite.cli.commands._simulation"
+      },
+      {
+        "imported": "pyrite.console.json",
+        "importer": "pyrite.cli.commands._simulation"
+      },
+      {
+        "imported": "pyrite.console.output",
+        "importer": "pyrite.cli.commands._simulation"
+      },
+      {
+        "imported": "pyrite.materials",
+        "importer": "pyrite.cli.commands._simulation"
+      },
+      {
+        "imported": "pyrite.console.output",
+        "importer": "pyrite.cli.commands.app_analysis"
+      },
+      {
+        "imported": "pyrite.console.output",
+        "importer": "pyrite.cli.commands.app_validation"
+      },
+      {
+        "imported": "pyrite.console.output",
+        "importer": "pyrite.cli.commands.app_viewer"
+      },
+      {
+        "imported": "pyrite.console.outputs",
+        "importer": "pyrite.cli.commands.app_viewer"
+      },
+      {
+        "imported": "pyrite.console.outputs",
+        "importer": "pyrite.cli.commands.app_views"
+      },
+      {
+        "imported": "pyrite.checkpoints._checkpoint_io",
+        "importer": "pyrite.cli.commands.archive"
+      },
+      {
+        "imported": "pyrite.checkpoints._checkpoint_store",
+        "importer": "pyrite.cli.commands.archive"
+      },
+      {
+        "imported": "pyrite.checkpoints.archive",
+        "importer": "pyrite.cli.commands.archive"
+      },
+      {
+        "imported": "pyrite.console.json",
+        "importer": "pyrite.cli.commands.archive"
+      },
+      {
+        "imported": "pyrite.console.output",
+        "importer": "pyrite.cli.commands.archive"
+      },
+      {
+        "imported": "pyrite.console.output",
+        "importer": "pyrite.cli.commands.backend_setup"
+      },
+      {
+        "imported": "pyrite.console.json",
+        "importer": "pyrite.cli.commands.beam"
+      },
+      {
+        "imported": "pyrite.console.output",
+        "importer": "pyrite.cli.commands.beam"
+      },
+      {
+        "imported": "pyrite.montecarlo.gdf",
+        "importer": "pyrite.cli.commands.beam"
+      },
+      {
+        "imported": "pyrite.console.output",
+        "importer": "pyrite.cli.commands.blaze"
+      },
+      {
+        "imported": "pyrite.console.outputs",
+        "importer": "pyrite.cli.commands.blaze"
+      },
+      {
+        "imported": "pyrite.runs.blaze",
+        "importer": "pyrite.cli.commands.blaze"
+      },
+      {
+        "imported": "pyrite.campaign._profile_document",
+        "importer": "pyrite.cli.commands.calculation"
+      },
+      {
+        "imported": "pyrite.campaign.config_presets",
+        "importer": "pyrite.cli.commands.calculation"
+      },
+      {
+        "imported": "pyrite.campaign.profile_numerics",
+        "importer": "pyrite.cli.commands.calculation"
+      },
+      {
+        "imported": "pyrite.console.json",
+        "importer": "pyrite.cli.commands.calculation"
+      },
+      {
+        "imported": "pyrite.console.output",
+        "importer": "pyrite.cli.commands.calculation"
+      },
+      {
+        "imported": "pyrite.console.output",
+        "importer": "pyrite.cli.commands.check_config"
+      },
+      {
+        "imported": "pyrite.materials",
+        "importer": "pyrite.cli.commands.check_config"
+      },
+      {
+        "imported": "pyrite.console.output",
+        "importer": "pyrite.cli.commands.checkpoint"
+      },
+      {
+        "imported": "pyrite.checkpoints.checkpoint_cleanup",
+        "importer": "pyrite.cli.commands.cleanup"
+      },
+      {
+        "imported": "pyrite.console.outputs",
+        "importer": "pyrite.cli.commands.cleanup"
+      },
+      {
+        "imported": "pyrite.console.output",
+        "importer": "pyrite.cli.commands.completion"
+      },
+      {
+        "imported": "pyrite.console.config",
+        "importer": "pyrite.cli.commands.config"
+      },
+      {
+        "imported": "pyrite.console.output",
+        "importer": "pyrite.cli.commands.config"
+      },
+      {
+        "imported": "pyrite.materials",
+        "importer": "pyrite.cli.commands.config"
+      },
+      {
+        "imported": "pyrite.materials.catalog",
+        "importer": "pyrite.cli.commands.config"
+      },
+      {
+        "imported": "pyrite.remote.config",
+        "importer": "pyrite.cli.commands.config"
+      },
+      {
+        "imported": "pyrite.xsgen.sources",
+        "importer": "pyrite.cli.commands.config"
+      },
+      {
+        "imported": "pyrite.campaign.config_presets",
+        "importer": "pyrite.cli.commands.config_preset"
+      },
+      {
+        "imported": "pyrite.campaign.profiles",
+        "importer": "pyrite.cli.commands.config_preset"
+      },
+      {
+        "imported": "pyrite.console.json",
+        "importer": "pyrite.cli.commands.config_preset"
+      },
+      {
+        "imported": "pyrite.console.output",
+        "importer": "pyrite.cli.commands.config_preset"
+      },
+      {
+        "imported": "pyrite.campaign.profile_detectors",
+        "importer": "pyrite.cli.commands.detector"
+      },
+      {
+        "imported": "pyrite.console.json",
+        "importer": "pyrite.cli.commands.detector"
+      },
+      {
+        "imported": "pyrite.console.output",
+        "importer": "pyrite.cli.commands.detector"
+      },
+      {
+        "imported": "pyrite.detectors.editing",
+        "importer": "pyrite.cli.commands.detector"
+      },
+      {
+        "imported": "pyrite.console.config",
+        "importer": "pyrite.cli.commands.energy_grid"
+      },
+      {
+        "imported": "pyrite.console.json",
+        "importer": "pyrite.cli.commands.energy_grid"
+      },
+      {
+        "imported": "pyrite.console.output",
+        "importer": "pyrite.cli.commands.energy_grid"
+      },
+      {
+        "imported": "pyrite.console.outputs",
+        "importer": "pyrite.cli.commands.energy_grid"
+      },
+      {
+        "imported": "pyrite.energy_grid.apply",
+        "importer": "pyrite.cli.commands.energy_grid"
+      },
+      {
+        "imported": "pyrite.energy_grid.derive",
+        "importer": "pyrite.cli.commands.energy_grid"
+      },
+      {
+        "imported": "pyrite.energy_grid.gc",
+        "importer": "pyrite.cli.commands.energy_grid"
+      },
+      {
+        "imported": "pyrite.energy_grid.golden",
+        "importer": "pyrite.cli.commands.energy_grid"
+      },
+      {
+        "imported": "pyrite.energy_grid.job",
+        "importer": "pyrite.cli.commands.energy_grid"
+      },
+      {
+        "imported": "pyrite.remote",
+        "importer": "pyrite.cli.commands.energy_grid"
+      },
+      {
+        "imported": "pyrite.remote.config",
+        "importer": "pyrite.cli.commands.energy_grid"
+      },
+      {
+        "imported": "pyrite.console.output",
+        "importer": "pyrite.cli.commands.export"
+      },
+      {
+        "imported": "pyrite.console.outputs",
+        "importer": "pyrite.cli.commands.export"
+      },
+      {
+        "imported": "pyrite.console.output",
+        "importer": "pyrite.cli.commands.job"
+      },
+      {
+        "imported": "pyrite.remote.lifecycle",
+        "importer": "pyrite.cli.commands.job"
+      },
+      {
+        "imported": "pyrite.remote.viewer",
+        "importer": "pyrite.cli.commands.job"
+      },
+      {
+        "imported": "pyrite.console.json",
+        "importer": "pyrite.cli.commands.material"
+      },
+      {
+        "imported": "pyrite.console.output",
+        "importer": "pyrite.cli.commands.material"
+      },
+      {
+        "imported": "pyrite.materials",
+        "importer": "pyrite.cli.commands.material"
+      },
+      {
+        "imported": "pyrite.materials._identity",
+        "importer": "pyrite.cli.commands.material"
+      },
+      {
+        "imported": "pyrite.materials.authoring",
+        "importer": "pyrite.cli.commands.material"
+      },
+      {
+        "imported": "pyrite.materials.catalog",
+        "importer": "pyrite.cli.commands.material"
+      },
+      {
+        "imported": "pyrite.console.json",
+        "importer": "pyrite.cli.commands.material_add"
+      },
+      {
+        "imported": "pyrite.console.output",
+        "importer": "pyrite.cli.commands.material_add"
+      },
+      {
+        "imported": "pyrite.materials.authoring",
+        "importer": "pyrite.cli.commands.material_add"
+      },
+      {
+        "imported": "pyrite.console.json",
+        "importer": "pyrite.cli.commands.material_inventory"
+      },
+      {
+        "imported": "pyrite.console.output",
+        "importer": "pyrite.cli.commands.material_inventory"
+      },
+      {
+        "imported": "pyrite.materials.authoring",
+        "importer": "pyrite.cli.commands.material_inventory"
+      },
+      {
+        "imported": "pyrite.materials.catalog",
+        "importer": "pyrite.cli.commands.material_inventory"
+      },
+      {
+        "imported": "pyrite.console.output",
+        "importer": "pyrite.cli.commands.performance"
+      },
+      {
+        "imported": "pyrite.console.outputs",
+        "importer": "pyrite.cli.commands.performance"
+      },
+      {
+        "imported": "pyrite.perf.performance_analysis",
+        "importer": "pyrite.cli.commands.performance"
+      },
+      {
+        "imported": "pyrite.campaign._profile_document",
+        "importer": "pyrite.cli.commands.profile"
+      },
+      {
+        "imported": "pyrite.campaign.profile_detectors",
+        "importer": "pyrite.cli.commands.profile"
+      },
+      {
+        "imported": "pyrite.campaign.profile_lifecycle",
+        "importer": "pyrite.cli.commands.profile"
+      },
+      {
+        "imported": "pyrite.campaign.profile_numerics",
+        "importer": "pyrite.cli.commands.profile"
+      },
+      {
+        "imported": "pyrite.campaign.profile_summary",
+        "importer": "pyrite.cli.commands.profile"
+      },
+      {
+        "imported": "pyrite.console.json",
+        "importer": "pyrite.cli.commands.profile"
+      },
+      {
+        "imported": "pyrite.console.output",
+        "importer": "pyrite.cli.commands.profile"
+      },
+      {
+        "imported": "pyrite.checkpoints._checkpoint_store",
+        "importer": "pyrite.cli.commands.recompute"
+      },
+      {
+        "imported": "pyrite.checkpoints.recompute",
+        "importer": "pyrite.cli.commands.recompute"
+      },
+      {
+        "imported": "pyrite.console.json",
+        "importer": "pyrite.cli.commands.recompute"
+      },
+      {
+        "imported": "pyrite.console.output",
+        "importer": "pyrite.cli.commands.recompute"
+      },
+      {
+        "imported": "pyrite.console.outputs",
+        "importer": "pyrite.cli.commands.recompute"
+      },
+      {
+        "imported": "pyrite.montecarlo.case",
+        "importer": "pyrite.cli.commands.recompute"
+      },
+      {
+        "imported": "pyrite.remote.config",
+        "importer": "pyrite.cli.commands.recompute"
+      },
+      {
+        "imported": "pyrite.console.config",
+        "importer": "pyrite.cli.commands.remote"
+      },
+      {
+        "imported": "pyrite.console.output",
+        "importer": "pyrite.cli.commands.remote"
+      },
+      {
+        "imported": "pyrite.materials",
+        "importer": "pyrite.cli.commands.remote"
+      },
+      {
+        "imported": "pyrite.montecarlo.case",
+        "importer": "pyrite.cli.commands.remote"
+      },
+      {
+        "imported": "pyrite.remote.config",
+        "importer": "pyrite.cli.commands.remote"
+      },
+      {
+        "imported": "pyrite.remote.lifecycle",
+        "importer": "pyrite.cli.commands.remote"
+      },
+      {
+        "imported": "pyrite.remote.transport",
+        "importer": "pyrite.cli.commands.remote"
+      },
+      {
+        "imported": "pyrite.runs.scan",
+        "importer": "pyrite.cli.commands.remote"
+      },
+      {
+        "imported": "pyrite.console.output",
+        "importer": "pyrite.cli.commands.remote_trajectories"
+      },
+      {
+        "imported": "pyrite.console.outputs",
+        "importer": "pyrite.cli.commands.remote_trajectories"
+      },
+      {
+        "imported": "pyrite.montecarlo.trajectories",
+        "importer": "pyrite.cli.commands.remote_trajectories"
+      },
+      {
+        "imported": "pyrite.remote.trajectories",
+        "importer": "pyrite.cli.commands.remote_trajectories"
+      },
+      {
+        "imported": "pyrite.campaign.config",
+        "importer": "pyrite.cli.commands.scan"
+      },
+      {
+        "imported": "pyrite.console.config",
+        "importer": "pyrite.cli.commands.scan"
+      },
+      {
+        "imported": "pyrite.console.output",
+        "importer": "pyrite.cli.commands.scan"
+      },
+      {
+        "imported": "pyrite.console.outputs",
+        "importer": "pyrite.cli.commands.scan"
+      },
+      {
+        "imported": "pyrite.remote.config",
+        "importer": "pyrite.cli.commands.scan"
+      },
+      {
+        "imported": "pyrite.runs.scan",
+        "importer": "pyrite.cli.commands.scan"
+      },
+      {
+        "imported": "pyrite.checkpoints._checkpoint_io",
+        "importer": "pyrite.cli.commands.slim"
+      },
+      {
+        "imported": "pyrite.checkpoints.slim",
+        "importer": "pyrite.cli.commands.slim"
+      },
+      {
+        "imported": "pyrite.console.output",
+        "importer": "pyrite.cli.commands.slim"
+      },
+      {
+        "imported": "pyrite.console.config",
+        "importer": "pyrite.cli.commands.tables"
+      },
+      {
+        "imported": "pyrite.console.output",
+        "importer": "pyrite.cli.commands.tables"
+      },
+      {
+        "imported": "pyrite.xsgen",
+        "importer": "pyrite.cli.commands.tables"
+      },
+      {
+        "imported": "pyrite.xsgen.bremslib",
+        "importer": "pyrite.cli.commands.tables"
+      },
+      {
+        "imported": "pyrite.xsgen.bremslib.read",
+        "importer": "pyrite.cli.commands.tables"
+      },
+      {
+        "imported": "pyrite.xsgen.elsepa",
+        "importer": "pyrite.cli.commands.tables"
+      },
+      {
+        "imported": "pyrite.xsgen.elsepa.catalog",
+        "importer": "pyrite.cli.commands.tables"
+      },
+      {
+        "imported": "pyrite.xsgen.install",
+        "importer": "pyrite.cli.commands.tables"
+      },
+      {
+        "imported": "pyrite.xsgen.sbethe",
+        "importer": "pyrite.cli.commands.tables"
+      },
+      {
+        "imported": "pyrite.xsgen.sources",
+        "importer": "pyrite.cli.commands.tables"
+      },
+      {
+        "imported": "pyrite.xsgen.store",
+        "importer": "pyrite.cli.commands.tables"
+      },
+      {
+        "imported": "pyrite.xsgen.verify",
+        "importer": "pyrite.cli.commands.tables"
+      },
+      {
+        "imported": "pyrite.checkpoints.trajectory_scoring",
+        "importer": "pyrite.cli.commands.trajectories"
+      },
+      {
+        "imported": "pyrite.console.output",
+        "importer": "pyrite.cli.commands.trajectories"
+      },
+      {
+        "imported": "pyrite.console.outputs",
+        "importer": "pyrite.cli.commands.trajectories"
+      },
+      {
+        "imported": "pyrite.montecarlo.runner.artifacts",
+        "importer": "pyrite.cli.commands.trajectories"
+      },
+      {
+        "imported": "pyrite.montecarlo.trajectories",
+        "importer": "pyrite.cli.commands.trajectories"
+      },
+      {
+        "imported": "pyrite.montecarlo.trajectory_export",
+        "importer": "pyrite.cli.commands.trajectories"
+      },
+      {
+        "imported": "pyrite.montecarlo.trajectory_inventory",
+        "importer": "pyrite.cli.commands.trajectories"
+      },
+      {
+        "imported": "pyrite.montecarlo.trajectory_scene",
+        "importer": "pyrite.cli.commands.trajectories"
+      },
+      {
+        "imported": "pyrite.montecarlo.trajectory_selection",
+        "importer": "pyrite.cli.commands.trajectories"
+      },
+      {
+        "imported": "pyrite.materials",
+        "importer": "pyrite.console.dashboard.render"
+      },
+      {
+        "imported": "pyrite.materials._catalog_decode",
+        "importer": "pyrite.console.json"
+      },
+      {
+        "imported": "pyrite.materials.crystal",
+        "importer": "pyrite.detectors.eaglexo_response"
+      },
+      {
+        "imported": "pyrite.materials.crystal",
+        "importer": "pyrite.detectors.grating"
+      },
+      {
+        "imported": "pyrite.materials.attenuation",
+        "importer": "pyrite.detectors.response"
+      },
+      {
+        "imported": "pyrite.config.response_numerics",
+        "importer": "pyrite.detectors.spec"
+      },
+      {
+        "imported": "pyrite.materials.crystal",
+        "importer": "pyrite.detectors.timepix_response"
+      },
+      {
+        "imported": "pyrite.cli._groups",
+        "importer": "pyrite.devtools.cli_commands"
+      },
+      {
+        "imported": "pyrite.cli._deprecations",
+        "importer": "pyrite.devtools.cli_deprecations"
+      },
+      {
+        "imported": "pyrite.cli",
+        "importer": "pyrite.devtools.cli_reference"
+      },
+      {
+        "imported": "pyrite.cli.commands.material",
+        "importer": "pyrite.devtools.dev_cli"
+      },
+      {
+        "imported": "pyrite.cli.commands.scan",
+        "importer": "pyrite.devtools.dev_cli"
+      },
+      {
+        "imported": "pyrite.console.output",
+        "importer": "pyrite.devtools.dev_cli"
+      },
+      {
+        "imported": "pyrite.console.outputs",
+        "importer": "pyrite.devtools.dev_cli"
+      },
+      {
+        "imported": "pyrite.energy_grid.golden",
+        "importer": "pyrite.devtools.dev_cli"
+      },
+      {
+        "imported": "pyrite.validation.check_records",
+        "importer": "pyrite.devtools.dev_cli"
+      },
+      {
+        "imported": "pyrite.cli",
+        "importer": "pyrite.devtools.doc_cli_check"
+      },
+      {
+        "imported": "pyrite.cli.commands.profile",
+        "importer": "pyrite.devtools.doc_cli_check"
+      },
+      {
+        "imported": "pyrite.cli.commands.scan",
+        "importer": "pyrite.devtools.doc_cli_check"
+      },
+      {
+        "imported": "pyrite.cli._deprecations",
+        "importer": "pyrite.devtools.release"
+      },
+      {
+        "imported": "pyrite.campaign.config",
+        "importer": "pyrite.devtools.smoke"
+      },
+      {
+        "imported": "pyrite.plots",
+        "importer": "pyrite.devtools.smoke"
+      },
+      {
+        "imported": "pyrite.plots.altair.spectra",
+        "importer": "pyrite.devtools.smoke"
+      },
+      {
+        "imported": "pyrite.results",
+        "importer": "pyrite.devtools.smoke"
+      },
+      {
+        "imported": "pyrite.runs.run",
+        "importer": "pyrite.devtools.smoke"
+      },
+      {
+        "imported": "pyrite.validation.check_records",
+        "importer": "pyrite.devtools.validation_ledger"
+      },
+      {
+        "imported": "pyrite.console.config",
+        "importer": "pyrite.energy_grid.apply"
+      },
+      {
+        "imported": "pyrite.materials",
+        "importer": "pyrite.energy_grid.apply"
+      },
+      {
+        "imported": "pyrite.materials._catalog_decode",
+        "importer": "pyrite.energy_grid.apply"
+      },
+      {
+        "imported": "pyrite.materials._schema",
+        "importer": "pyrite.energy_grid.apply"
+      },
+      {
+        "imported": "pyrite.campaign.config",
+        "importer": "pyrite.energy_grid.bandwidth_check"
+      },
+      {
+        "imported": "pyrite.campaign.sweep",
+        "importer": "pyrite.energy_grid.bandwidth_check"
+      },
+      {
+        "imported": "pyrite.detectors.spec",
+        "importer": "pyrite.energy_grid.bandwidth_check"
+      },
+      {
+        "imported": "pyrite.detectors.timepix_response",
+        "importer": "pyrite.energy_grid.bandwidth_check"
+      },
+      {
+        "imported": "pyrite.montecarlo.runner",
+        "importer": "pyrite.energy_grid.bandwidth_check"
+      },
+      {
+        "imported": "pyrite.montecarlo.runner.cxr_grid",
+        "importer": "pyrite.energy_grid.bandwidth_check"
+      },
+      {
+        "imported": "pyrite.montecarlo.runner.oom",
+        "importer": "pyrite.energy_grid.bandwidth_check"
+      },
+      {
+        "imported": "pyrite.montecarlo.spectrum.cxr._attribution",
+        "importer": "pyrite.energy_grid.bandwidth_check"
+      },
+      {
+        "imported": "pyrite.montecarlo.spectrum.cxr._bin_quadrature",
+        "importer": "pyrite.energy_grid.bandwidth_check"
+      },
+      {
+        "imported": "pyrite.detectors.spec",
+        "importer": "pyrite.energy_grid.convergence"
+      },
+      {
+        "imported": "pyrite.results.metrics",
+        "importer": "pyrite.energy_grid.convergence"
+      },
+      {
+        "imported": "pyrite.campaign.config",
+        "importer": "pyrite.energy_grid.convergence_case"
+      },
+      {
+        "imported": "pyrite.campaign.sweep",
+        "importer": "pyrite.energy_grid.convergence_case"
+      },
+      {
+        "imported": "pyrite.materials",
+        "importer": "pyrite.energy_grid.convergence_case"
+      },
+      {
+        "imported": "pyrite.montecarlo.runner",
+        "importer": "pyrite.energy_grid.convergence_case"
+      },
+      {
+        "imported": "pyrite.montecarlo.spectrum.cxr_seeds",
+        "importer": "pyrite.energy_grid.convergence_case"
+      },
+      {
+        "imported": "pyrite.montecarlo.spectrum.diagnostics",
+        "importer": "pyrite.energy_grid.convergence_case"
+      },
+      {
+        "imported": "pyrite.remote",
+        "importer": "pyrite.energy_grid.convergence_job"
+      },
+      {
+        "imported": "pyrite.remote.scripts",
+        "importer": "pyrite.energy_grid.convergence_job"
+      },
+      {
+        "imported": "pyrite.campaign.config",
+        "importer": "pyrite.energy_grid.derive"
+      },
+      {
+        "imported": "pyrite.campaign.sweep",
+        "importer": "pyrite.energy_grid.derive"
+      },
+      {
+        "imported": "pyrite.materials",
+        "importer": "pyrite.energy_grid.derive"
+      },
+      {
+        "imported": "pyrite.montecarlo.runner",
+        "importer": "pyrite.energy_grid.derive"
+      },
+      {
+        "imported": "pyrite.materials",
+        "importer": "pyrite.energy_grid.floor"
+      },
+      {
+        "imported": "pyrite.checkpoints.campaign_lock",
+        "importer": "pyrite.energy_grid.gc"
+      },
+      {
+        "imported": "pyrite.materials.catalog",
+        "importer": "pyrite.energy_grid.golden"
+      },
+      {
+        "imported": "pyrite.materials.crystal",
+        "importer": "pyrite.energy_grid.golden"
+      },
+      {
+        "imported": "pyrite.remote",
+        "importer": "pyrite.energy_grid.job"
+      },
+      {
+        "imported": "pyrite.materials",
+        "importer": "pyrite.energy_grid.refine"
+      },
+      {
+        "imported": "pyrite.materials.attenuation",
+        "importer": "pyrite.energy_grid.refine"
+      },
+      {
+        "imported": "pyrite.montecarlo.spectrum.cxr_seeds",
+        "importer": "pyrite.energy_grid.refine"
+      },
+      {
+        "imported": "pyrite.campaign.profiles",
+        "importer": "pyrite.execution._simulation"
+      },
+      {
+        "imported": "pyrite.checkpoints._checkpoint_io",
+        "importer": "pyrite.execution.artifacts"
+      },
+      {
+        "imported": "pyrite.checkpoints._checkpoint_io",
+        "importer": "pyrite.execution.dask"
+      },
+      {
+        "imported": "pyrite.montecarlo",
+        "importer": "pyrite.execution.dask"
+      },
+      {
+        "imported": "pyrite.montecarlo",
+        "importer": "pyrite.execution.local"
+      },
+      {
+        "imported": "pyrite.checkpoints._checkpoint_io",
+        "importer": "pyrite.execution.slurm"
+      },
+      {
+        "imported": "pyrite.checkpoints._checkpoint_io",
+        "importer": "pyrite.execution.slurm_worker"
+      },
+      {
+        "imported": "pyrite.montecarlo",
+        "importer": "pyrite.execution.slurm_worker"
+      },
+      {
+        "imported": "pyrite.detectors",
+        "importer": "pyrite.instrument.acquisition"
+      },
+      {
+        "imported": "pyrite.materials.attenuation",
+        "importer": "pyrite.instrument.attenuation"
+      },
+      {
+        "imported": "pyrite.materials._composition",
+        "importer": "pyrite.instrument.filter"
+      },
+      {
+        "imported": "pyrite.materials._schema",
+        "importer": "pyrite.instrument.filter"
+      },
+      {
+        "imported": "pyrite.detectors.spec",
+        "importer": "pyrite.instrument.model"
+      },
+      {
+        "imported": "pyrite.materials",
+        "importer": "pyrite.instrument.model"
+      },
+      {
+        "imported": "pyrite.materials._composition",
+        "importer": "pyrite.instrument.model"
+      },
+      {
+        "imported": "pyrite.detectors",
+        "importer": "pyrite.instrument.observation"
+      },
+      {
+        "imported": "pyrite.materials",
+        "importer": "pyrite.instrument.observation"
+      },
+      {
+        "imported": "pyrite.materials._composition",
+        "importer": "pyrite.instrument.observation"
+      },
+      {
+        "imported": "pyrite.materials.crystal",
+        "importer": "pyrite.montecarlo.bunch_front"
+      },
+      {
+        "imported": "pyrite.materials.channeling.transverse",
+        "importer": "pyrite.montecarlo.channeling._axial_cuda_jumps"
+      },
+      {
+        "imported": "pyrite.materials.channeling.transverse",
+        "importer": "pyrite.montecarlo.channeling._axial_spectral_batch"
+      },
+      {
+        "imported": "pyrite.materials.channeling.axial",
+        "importer": "pyrite.montecarlo.channeling.axial_diagnostic"
+      },
+      {
+        "imported": "pyrite.materials.channeling.axial",
+        "importer": "pyrite.montecarlo.channeling.axial_dissipator"
+      },
+      {
+        "imported": "pyrite.materials.crystal",
+        "importer": "pyrite.montecarlo.channeling.axial_dissipator"
+      },
+      {
+        "imported": "pyrite.materials.channeling.axial",
+        "importer": "pyrite.montecarlo.channeling.axial_emission"
+      },
+      {
+        "imported": "pyrite.materials.channeling.transverse",
+        "importer": "pyrite.montecarlo.channeling.axial_emission"
+      },
+      {
+        "imported": "pyrite.materials.crystal",
+        "importer": "pyrite.montecarlo.channeling.axial_emission"
+      },
+      {
+        "imported": "pyrite.materials.channeling.axial",
+        "importer": "pyrite.montecarlo.channeling.axial_energy_mcwf"
+      },
+      {
+        "imported": "pyrite.materials.channeling.transverse",
+        "importer": "pyrite.montecarlo.channeling.axial_flux"
+      },
+      {
+        "imported": "pyrite.materials.crystal",
+        "importer": "pyrite.montecarlo.channeling.axial_flux"
+      },
+      {
+        "imported": "pyrite.materials.channeling.transverse",
+        "importer": "pyrite.montecarlo.channeling.axial_mcwf"
+      },
+      {
+        "imported": "pyrite.materials.channeling.transverse",
+        "importer": "pyrite.montecarlo.channeling.axial_qrt_source"
+      },
+      {
+        "imported": "pyrite.materials.crystal",
+        "importer": "pyrite.montecarlo.channeling.axial_qrt_source"
+      },
+      {
+        "imported": "pyrite.materials.channeling.transverse",
+        "importer": "pyrite.montecarlo.channeling.axial_state_diagnostics"
+      },
+      {
+        "imported": "pyrite.materials.channeling.potential",
+        "importer": "pyrite.montecarlo.channeling.density"
+      },
+      {
+        "imported": "pyrite.materials.channeling.transverse",
+        "importer": "pyrite.montecarlo.channeling.density"
+      },
+      {
+        "imported": "pyrite.materials.crystal",
+        "importer": "pyrite.montecarlo.channeling.density"
+      },
+      {
+        "imported": "pyrite.materials.channeling.potential",
+        "importer": "pyrite.montecarlo.channeling.dipole"
+      },
+      {
+        "imported": "pyrite.materials.channeling.transverse",
+        "importer": "pyrite.montecarlo.channeling.dipole"
+      },
+      {
+        "imported": "pyrite.materials.crystal",
+        "importer": "pyrite.montecarlo.channeling.dipole"
+      },
+      {
+        "imported": "pyrite.materials.crystal",
+        "importer": "pyrite.montecarlo.channeling.directional"
+      },
+      {
+        "imported": "pyrite.materials.attenuation",
+        "importer": "pyrite.montecarlo.channeling.emission"
+      },
+      {
+        "imported": "pyrite.materials.channeling.transverse",
+        "importer": "pyrite.montecarlo.channeling.emission"
+      },
+      {
+        "imported": "pyrite.materials.crystal",
+        "importer": "pyrite.montecarlo.channeling.emission"
+      },
+      {
+        "imported": "pyrite.materials.channeling.axial",
+        "importer": "pyrite.montecarlo.channeling.energy_ensemble"
+      },
+      {
+        "imported": "pyrite.materials.channeling.entry",
+        "importer": "pyrite.montecarlo.channeling.handoff"
+      },
+      {
+        "imported": "pyrite.materials.channeling.potential",
+        "importer": "pyrite.montecarlo.channeling.handoff"
+      },
+      {
+        "imported": "pyrite.materials.crystal",
+        "importer": "pyrite.montecarlo.channeling.handoff"
+      },
+      {
+        "imported": "pyrite.materials.channeling.transverse",
+        "importer": "pyrite.montecarlo.channeling.mcwf"
+      },
+      {
+        "imported": "pyrite.materials.crystal",
+        "importer": "pyrite.montecarlo.channeling.mcwf"
+      },
+      {
+        "imported": "pyrite.materials.channeling.transverse",
+        "importer": "pyrite.montecarlo.channeling.metrics"
+      },
+      {
+        "imported": "pyrite.materials.atomic",
+        "importer": "pyrite.montecarlo.channeling.operators"
+      },
+      {
+        "imported": "pyrite.materials.channeling.potential",
+        "importer": "pyrite.montecarlo.channeling.operators"
+      },
+      {
+        "imported": "pyrite.materials.channeling.thermal",
+        "importer": "pyrite.montecarlo.channeling.operators"
+      },
+      {
+        "imported": "pyrite.materials.channeling.transverse",
+        "importer": "pyrite.montecarlo.channeling.operators"
+      },
+      {
+        "imported": "pyrite.materials.crystal",
+        "importer": "pyrite.montecarlo.channeling.operators"
+      },
+      {
+        "imported": "pyrite.materials.crystal",
+        "importer": "pyrite.montecarlo.channeling.overflow"
+      },
+      {
+        "imported": "pyrite.materials.channeling.transverse",
+        "importer": "pyrite.montecarlo.channeling.realspace"
+      },
+      {
+        "imported": "pyrite.materials.crystal",
+        "importer": "pyrite.montecarlo.channeling.realspace"
+      },
+      {
+        "imported": "pyrite.materials.channeling.transverse",
+        "importer": "pyrite.montecarlo.channeling.states"
+      },
+      {
+        "imported": "pyrite.materials.crystal",
+        "importer": "pyrite.montecarlo.channeling.states"
+      },
+      {
+        "imported": "pyrite.materials.attenuation",
+        "importer": "pyrite.montecarlo.channeling.transition_radiation"
+      },
+      {
+        "imported": "pyrite.materials.crystal",
+        "importer": "pyrite.montecarlo.channeling.transition_radiation"
+      },
+      {
+        "imported": "pyrite.materials.crystal",
+        "importer": "pyrite.montecarlo.detector"
+      },
+      {
+        "imported": "pyrite.materials.atomic",
+        "importer": "pyrite.montecarlo.eadl_relaxation"
+      },
+      {
+        "imported": "pyrite.materials.atomic",
+        "importer": "pyrite.montecarlo.eedl_ionization"
+      },
+      {
+        "imported": "pyrite.materials._schema",
+        "importer": "pyrite.montecarlo.gdf"
+      },
+      {
+        "imported": "pyrite.materials.crystal",
+        "importer": "pyrite.montecarlo.geometry"
+      },
+      {
+        "imported": "pyrite.xsgen.bremslib.tables",
+        "importer": "pyrite.montecarlo.runner.case_tables"
+      },
+      {
+        "imported": "pyrite.xsgen.elsepa.catalog",
+        "importer": "pyrite.montecarlo.runner.case_tables"
+      },
+      {
+        "imported": "pyrite.xsgen.sbethe",
+        "importer": "pyrite.montecarlo.runner.case_tables"
+      },
+      {
+        "imported": "pyrite.xsgen.store",
+        "importer": "pyrite.montecarlo.runner.case_tables"
+      },
+      {
+        "imported": "pyrite.materials.crystal",
+        "importer": "pyrite.montecarlo.runner.dtr_emission"
+      },
+      {
+        "imported": "pyrite.materials.photon_cross_sections",
+        "importer": "pyrite.montecarlo.runner.photon_aperture"
+      },
+      {
+        "imported": "pyrite.energy_grid.component_support",
+        "importer": "pyrite.montecarlo.runner.transition_emission"
+      },
+      {
+        "imported": "pyrite.materials",
+        "importer": "pyrite.montecarlo.runner.transition_emission"
+      },
+      {
+        "imported": "pyrite.materials.optical",
+        "importer": "pyrite.montecarlo.runner.transition_emission"
+      },
+      {
+        "imported": "pyrite.materials.atomic",
+        "importer": "pyrite.montecarlo.shell_configuration"
+      },
+      {
+        "imported": "pyrite.xsgen._errors",
+        "importer": "pyrite.montecarlo.shell_configuration"
+      },
+      {
+        "imported": "pyrite.xsgen.sources",
+        "importer": "pyrite.montecarlo.shell_configuration"
+      },
+      {
+        "imported": "pyrite.materials.atomic",
+        "importer": "pyrite.montecarlo.spectrum.brem"
+      },
+      {
+        "imported": "pyrite.materials.attenuation",
+        "importer": "pyrite.montecarlo.spectrum.brem"
+      },
+      {
+        "imported": "pyrite.materials.crystal",
+        "importer": "pyrite.montecarlo.spectrum.brem"
+      },
+      {
+        "imported": "pyrite.xsgen.bremslib.tables",
+        "importer": "pyrite.montecarlo.spectrum.brem_bremslib"
+      },
+      {
+        "imported": "pyrite.materials",
+        "importer": "pyrite.montecarlo.spectrum.brem_events"
+      },
+      {
+        "imported": "pyrite.materials.attenuation",
+        "importer": "pyrite.montecarlo.spectrum.brem_events"
+      },
+      {
+        "imported": "pyrite.materials.atomic",
+        "importer": "pyrite.montecarlo.spectrum.characteristic"
+      },
+      {
+        "imported": "pyrite.materials.attenuation",
+        "importer": "pyrite.montecarlo.spectrum.characteristic"
+      },
+      {
+        "imported": "pyrite.materials.crystal",
+        "importer": "pyrite.montecarlo.spectrum.cherenkov"
+      },
+      {
+        "imported": "pyrite.materials.atomic",
+        "importer": "pyrite.montecarlo.spectrum.coherent_dispersion"
+      },
+      {
+        "imported": "pyrite.materials.crystal",
+        "importer": "pyrite.montecarlo.spectrum.coherent_dispersion"
+      },
+      {
+        "imported": "pyrite.materials.crystal",
+        "importer": "pyrite.montecarlo.spectrum.coherent_form_factor"
+      },
+      {
+        "imported": "pyrite.materials.crystal",
+        "importer": "pyrite.montecarlo.spectrum.coherent_normalization"
+      },
+      {
+        "imported": "pyrite.materials.crystal",
+        "importer": "pyrite.montecarlo.spectrum.coherent_sample_certificates"
+      },
+      {
+        "imported": "pyrite.materials.crystal",
+        "importer": "pyrite.montecarlo.spectrum.coherent_transverse"
+      },
+      {
+        "imported": "pyrite.materials.crystal",
+        "importer": "pyrite.montecarlo.spectrum.coherent_windows"
+      },
+      {
+        "imported": "pyrite.materials.crystal",
+        "importer": "pyrite.montecarlo.spectrum.cxr"
+      },
+      {
+        "imported": "pyrite.materials.crystal",
+        "importer": "pyrite.montecarlo.spectrum.cxr._batched"
+      },
+      {
+        "imported": "pyrite.materials.crystal",
+        "importer": "pyrite.montecarlo.spectrum.cxr._batched_finalize"
+      },
+      {
+        "imported": "pyrite.materials.atomic",
+        "importer": "pyrite.montecarlo.spectrum.cxr._coverage"
+      },
+      {
+        "imported": "pyrite.materials.crystal",
+        "importer": "pyrite.montecarlo.spectrum.cxr._coverage"
+      },
+      {
+        "imported": "pyrite.materials.photon_cross_sections",
+        "importer": "pyrite.montecarlo.spectrum.cxr._coverage"
+      },
+      {
+        "imported": "pyrite.materials.recoil",
+        "importer": "pyrite.montecarlo.spectrum.cxr._coverage"
+      },
+      {
+        "imported": "pyrite.materials.atomic",
+        "importer": "pyrite.montecarlo.spectrum.cxr._kernels"
+      },
+      {
+        "imported": "pyrite.materials.attenuation",
+        "importer": "pyrite.montecarlo.spectrum.cxr._kernels"
+      },
+      {
+        "imported": "pyrite.materials.crystal",
+        "importer": "pyrite.montecarlo.spectrum.cxr._kernels"
+      },
+      {
+        "imported": "pyrite.materials.photon_cross_sections",
+        "importer": "pyrite.montecarlo.spectrum.cxr._kernels"
+      },
+      {
+        "imported": "pyrite.materials.attenuation",
+        "importer": "pyrite.montecarlo.spectrum.cxr._per_hkl"
+      },
+      {
+        "imported": "pyrite.materials.crystal",
+        "importer": "pyrite.montecarlo.spectrum.cxr._per_hkl"
+      },
+      {
+        "imported": "pyrite.materials.attenuation",
+        "importer": "pyrite.montecarlo.spectrum.cxr._setup"
+      },
+      {
+        "imported": "pyrite.materials.crystal",
+        "importer": "pyrite.montecarlo.spectrum.cxr._setup"
+      },
+      {
+        "imported": "pyrite.materials.crystal",
+        "importer": "pyrite.montecarlo.spectrum.cxr._temporal"
+      },
+      {
+        "imported": "pyrite.materials.atomic",
+        "importer": "pyrite.montecarlo.spectrum.cxr_seeds"
+      },
+      {
+        "imported": "pyrite.materials.crystal",
+        "importer": "pyrite.montecarlo.spectrum.cxr_seeds"
+      },
+      {
+        "imported": "pyrite.materials.photon_cross_sections",
+        "importer": "pyrite.montecarlo.spectrum.cxr_seeds"
+      },
+      {
+        "imported": "pyrite.materials.attenuation",
+        "importer": "pyrite.montecarlo.spectrum.diagnostics"
+      },
+      {
+        "imported": "pyrite.materials.crystal",
+        "importer": "pyrite.montecarlo.spectrum.diagnostics"
+      },
+      {
+        "imported": "pyrite.materials",
+        "importer": "pyrite.montecarlo.spectrum.dielectric_suppression"
+      },
+      {
+        "imported": "pyrite.materials.attenuation",
+        "importer": "pyrite.montecarlo.spectrum.dielectric_suppression"
+      },
+      {
+        "imported": "pyrite.materials.crystal",
+        "importer": "pyrite.montecarlo.spectrum.dtr"
+      },
+      {
+        "imported": "pyrite.materials.crystal",
+        "importer": "pyrite.montecarlo.spectrum.dtr_history"
+      },
+      {
+        "imported": "pyrite.materials.crystal",
+        "importer": "pyrite.montecarlo.spectrum.dtr_two_beam"
+      },
+      {
+        "imported": "pyrite.materials.crystal",
+        "importer": "pyrite.montecarlo.spectrum.optical_transition"
+      },
+      {
+        "imported": "pyrite.materials.crystal",
+        "importer": "pyrite.montecarlo.spectrum.optical_transition_validity"
+      },
+      {
+        "imported": "pyrite.materials.crystal",
+        "importer": "pyrite.montecarlo.spectrum.reflection_rows"
+      },
+      {
+        "imported": "pyrite.materials.attenuation",
+        "importer": "pyrite.montecarlo.spectrum.segment_escape"
+      },
+      {
+        "imported": "pyrite.materials.atomic",
+        "importer": "pyrite.montecarlo.spectrum.transition_radiation"
+      },
+      {
+        "imported": "pyrite.materials.attenuation",
+        "importer": "pyrite.montecarlo.spectrum.transition_radiation"
+      },
+      {
+        "imported": "pyrite.materials.crystal",
+        "importer": "pyrite.montecarlo.spectrum.transition_radiation"
+      },
+      {
+        "imported": "pyrite.materials.crystal",
+        "importer": "pyrite.montecarlo.spectrum.transition_radiation_crossings"
+      },
+      {
+        "imported": "pyrite.materials.crystal",
+        "importer": "pyrite.montecarlo.spectrum.transition_radiation_jit_kernel"
+      },
+      {
+        "imported": "pyrite.materials.atomic",
+        "importer": "pyrite.montecarlo.transport.annihilation"
+      },
+      {
+        "imported": "pyrite.materials.attenuation",
+        "importer": "pyrite.montecarlo.transport.annihilation"
+      },
+      {
+        "imported": "pyrite.materials.attenuation",
+        "importer": "pyrite.montecarlo.transport.arguments"
+      },
+      {
+        "imported": "pyrite.xsgen.elsepa.catalog",
+        "importer": "pyrite.montecarlo.transport.arguments"
+      },
+      {
+        "imported": "pyrite.materials._transport_data",
+        "importer": "pyrite.montecarlo.transport.atomic_electrons"
+      },
+      {
+        "imported": "pyrite.materials.crystal",
+        "importer": "pyrite.montecarlo.transport.directional_loss"
+      },
+      {
+        "imported": "pyrite.materials",
+        "importer": "pyrite.montecarlo.transport.hard_radiative"
+      },
+      {
+        "imported": "pyrite.materials._transport_data",
+        "importer": "pyrite.montecarlo.transport.hard_radiative"
+      },
+      {
+        "imported": "pyrite.materials.attenuation",
+        "importer": "pyrite.montecarlo.transport.hard_radiative"
+      },
+      {
+        "imported": "pyrite.materials._transport_data",
+        "importer": "pyrite.montecarlo.transport.layer_tables"
+      },
+      {
+        "imported": "pyrite.materials.atomic",
+        "importer": "pyrite.montecarlo.transport.pair_production"
+      },
+      {
+        "imported": "pyrite.materials.attenuation",
+        "importer": "pyrite.montecarlo.transport.pair_production"
+      },
+      {
+        "imported": "pyrite.materials.photon_cross_sections",
+        "importer": "pyrite.montecarlo.transport.pair_production"
+      },
+      {
+        "imported": "pyrite.materials.crystal",
+        "importer": "pyrite.montecarlo.transport.photoelectric"
+      },
+      {
+        "imported": "pyrite.materials.photon_cross_sections",
+        "importer": "pyrite.montecarlo.transport.photoelectric"
+      },
+      {
+        "imported": "pyrite.materials.photon_differential",
+        "importer": "pyrite.montecarlo.transport.photoelectric"
+      },
+      {
+        "imported": "pyrite.materials",
+        "importer": "pyrite.montecarlo.transport.photon_histories"
+      },
+      {
+        "imported": "pyrite.materials._composition",
+        "importer": "pyrite.montecarlo.transport.photon_histories"
+      },
+      {
+        "imported": "pyrite.materials.photon_cross_sections",
+        "importer": "pyrite.montecarlo.transport.photon_histories"
+      },
+      {
+        "imported": "pyrite.materials.photon_cross_sections",
+        "importer": "pyrite.montecarlo.transport.photon_navigation"
+      },
+      {
+        "imported": "pyrite.materials.photon_cross_sections",
+        "importer": "pyrite.montecarlo.transport.photon_sampling"
+      },
+      {
+        "imported": "pyrite.materials.crystal",
+        "importer": "pyrite.montecarlo.transport.photon_scattering"
+      },
+      {
+        "imported": "pyrite.materials.photon_differential",
+        "importer": "pyrite.montecarlo.transport.photon_scattering"
+      },
+      {
+        "imported": "pyrite.console.config",
+        "importer": "pyrite.montecarlo.transport.scattering"
+      },
+      {
+        "imported": "pyrite.materials.attenuation",
+        "importer": "pyrite.montecarlo.transport.secondaries"
+      },
+      {
+        "imported": "pyrite.xsgen.elsepa.catalog",
+        "importer": "pyrite.montecarlo.transport.secondaries"
+      },
+      {
+        "imported": "pyrite.xsgen.sbethe.catalog",
+        "importer": "pyrite.montecarlo.transport.secondaries"
+      },
+      {
+        "imported": "pyrite.materials.attenuation",
+        "importer": "pyrite.montecarlo.transport.shell_rates"
+      },
+      {
+        "imported": "pyrite.xsgen.sbethe.catalog",
+        "importer": "pyrite.montecarlo.transport.shell_rates"
+      },
+      {
+        "imported": "pyrite.xsgen.sbethe.catalog",
+        "importer": "pyrite.montecarlo.transport.shell_transport"
+      },
+      {
+        "imported": "pyrite.materials._transport_data",
+        "importer": "pyrite.montecarlo.transport.stopping"
+      },
+      {
+        "imported": "pyrite.materials._transport_data",
+        "importer": "pyrite.montecarlo.transport.straggling"
+      },
+      {
+        "imported": "pyrite.checkpoints.persistence",
+        "importer": "pyrite.observations.inventory"
+      },
+      {
+        "imported": "pyrite.console.outputs",
+        "importer": "pyrite.observations.inventory"
+      },
+      {
+        "imported": "pyrite.instrument",
+        "importer": "pyrite.observations.plan"
+      },
+      {
+        "imported": "pyrite.instrument.acquisition",
+        "importer": "pyrite.observations.plan"
+      },
+      {
+        "imported": "pyrite.instrument.attenuation",
+        "importer": "pyrite.observations.plan"
+      },
+      {
+        "imported": "pyrite.instrument.geometry",
+        "importer": "pyrite.observations.plan"
+      },
+      {
+        "imported": "pyrite.instrument.observation",
+        "importer": "pyrite.observations.plan"
+      },
+      {
+        "imported": "pyrite.montecarlo.geometry",
+        "importer": "pyrite.observations.plan"
+      },
+      {
+        "imported": "pyrite.results.model",
+        "importer": "pyrite.observations.plan"
+      },
+      {
+        "imported": "pyrite.results.store",
+        "importer": "pyrite.observations.plan"
+      },
+      {
+        "imported": "pyrite.detectors.spec",
+        "importer": "pyrite.observations.spec"
+      },
+      {
+        "imported": "pyrite.instrument.model",
+        "importer": "pyrite.observations.spec"
+      },
+      {
+        "imported": "pyrite.instrument.observation",
+        "importer": "pyrite.observations.spec"
+      },
+      {
+        "imported": "pyrite.console.outputs",
+        "importer": "pyrite.observations.store"
+      },
+      {
+        "imported": "pyrite.detectors",
+        "importer": "pyrite.observations.store"
+      },
+      {
+        "imported": "pyrite.detectors.spec",
+        "importer": "pyrite.observations.store"
+      },
+      {
+        "imported": "pyrite.instrument",
+        "importer": "pyrite.observations.store"
+      },
+      {
+        "imported": "pyrite.instrument.acquisition",
+        "importer": "pyrite.observations.store"
+      },
+      {
+        "imported": "pyrite.instrument.observation",
+        "importer": "pyrite.observations.store"
+      },
+      {
+        "imported": "pyrite.results.model",
+        "importer": "pyrite.observations.store"
+      },
+      {
+        "imported": "pyrite.results.radiation",
+        "importer": "pyrite.optimization.scoring"
+      },
+      {
+        "imported": "pyrite.results.selection",
+        "importer": "pyrite.optimization.scoring"
+      },
+      {
+        "imported": "pyrite.campaign.model",
+        "importer": "pyrite.optimization.space"
+      },
+      {
+        "imported": "pyrite.campaign.model",
+        "importer": "pyrite.optimization.study"
+      },
+      {
+        "imported": "pyrite.campaign.profiles",
+        "importer": "pyrite.optimization.study"
+      },
+      {
+        "imported": "pyrite.runs.run",
+        "importer": "pyrite.optimization.study"
+      },
+      {
+        "imported": "pyrite.campaign.model",
+        "importer": "pyrite.perf.batch_chunk_tuner"
+      },
+      {
+        "imported": "pyrite.montecarlo.runner",
+        "importer": "pyrite.perf.batch_chunk_tuner"
+      },
+      {
+        "imported": "pyrite.montecarlo.runner.scheduling",
+        "importer": "pyrite.perf.batch_chunk_tuner"
+      },
+      {
+        "imported": "pyrite.materials.photon_cross_sections",
+        "importer": "pyrite.perf.detector_scoring"
+      },
+      {
+        "imported": "pyrite.montecarlo.spectrum.brem_events",
+        "importer": "pyrite.perf.detector_scoring"
+      },
+      {
+        "imported": "pyrite.materials._transport_data",
+        "importer": "pyrite.perf.penred"
+      },
+      {
+        "imported": "pyrite.console.outputs",
+        "importer": "pyrite.perf.performance_analysis"
+      },
+      {
+        "imported": "pyrite.detectors",
+        "importer": "pyrite.plots._common"
+      },
+      {
+        "imported": "pyrite.detectors.eaglexo_response",
+        "importer": "pyrite.plots._common"
+      },
+      {
+        "imported": "pyrite.detectors.timepix_response",
+        "importer": "pyrite.plots._common"
+      },
+      {
+        "imported": "pyrite.montecarlo.groove",
+        "importer": "pyrite.plots._common"
+      },
+      {
+        "imported": "pyrite.results",
+        "importer": "pyrite.plots._common"
+      },
+      {
+        "imported": "pyrite.results.metrics",
+        "importer": "pyrite.plots._common"
+      },
+      {
+        "imported": "pyrite.detectors",
+        "importer": "pyrite.plots._detector_frames"
+      },
+      {
+        "imported": "pyrite.detectors.eaglexo_response",
+        "importer": "pyrite.plots._detector_frames"
+      },
+      {
+        "imported": "pyrite.results",
+        "importer": "pyrite.plots._detector_frames"
+      },
+      {
+        "imported": "pyrite.montecarlo",
+        "importer": "pyrite.plots._frames"
+      },
+      {
+        "imported": "pyrite.montecarlo.runner.case_tables",
+        "importer": "pyrite.plots._frames"
+      },
+      {
+        "imported": "pyrite.results",
+        "importer": "pyrite.plots._frames"
+      },
+      {
+        "imported": "pyrite.results",
+        "importer": "pyrite.plots._spectrum_frames"
+      },
+      {
+        "imported": "pyrite.results.store",
+        "importer": "pyrite.plots._spectrum_frames"
+      },
+      {
+        "imported": "pyrite.results",
+        "importer": "pyrite.plots._temporal_frames"
+      },
+      {
+        "imported": "pyrite.detectors.eaglexo_response",
+        "importer": "pyrite.plots.altair.detectors"
+      },
+      {
+        "imported": "pyrite.results",
+        "importer": "pyrite.plots.altair.spectra"
+      },
+      {
+        "imported": "pyrite.results",
+        "importer": "pyrite.plots.altair.sweeps"
+      },
+      {
+        "imported": "pyrite.montecarlo.trajectory_selection",
+        "importer": "pyrite.plots.altair.trajectories"
+      },
+      {
+        "imported": "pyrite.detectors.eaglexo_response",
+        "importer": "pyrite.plots.mpl.detectors"
+      },
+      {
+        "imported": "pyrite.detectors.timepix_response",
+        "importer": "pyrite.plots.mpl.detectors"
+      },
+      {
+        "imported": "pyrite.results",
+        "importer": "pyrite.plots.mpl.detectors"
+      },
+      {
+        "imported": "pyrite.detectors",
+        "importer": "pyrite.plots.mpl.interactive"
+      },
+      {
+        "imported": "pyrite.results",
+        "importer": "pyrite.plots.mpl.interactive"
+      },
+      {
+        "imported": "pyrite.detectors",
+        "importer": "pyrite.plots.mpl.spectra"
+      },
+      {
+        "imported": "pyrite.montecarlo",
+        "importer": "pyrite.plots.mpl.spectra"
+      },
+      {
+        "imported": "pyrite.results",
+        "importer": "pyrite.plots.mpl.spectra"
+      },
+      {
+        "imported": "pyrite.results",
+        "importer": "pyrite.plots.mpl.sweeps"
+      },
+      {
+        "imported": "pyrite.materials.crystal",
+        "importer": "pyrite.plots.plotly.crystal_lattice"
+      },
+      {
+        "imported": "pyrite.detectors.eaglexo_response",
+        "importer": "pyrite.plots.plotly.detectors"
+      },
+      {
+        "imported": "pyrite.console.outputs",
+        "importer": "pyrite.plots.plotly.render"
+      },
+      {
+        "imported": "pyrite.results",
+        "importer": "pyrite.plots.plotly.spectra"
+      },
+      {
+        "imported": "pyrite.results",
+        "importer": "pyrite.plots.plotly.sweeps"
+      },
+      {
+        "imported": "pyrite.montecarlo.trajectory_selection",
+        "importer": "pyrite.plots.plotly.trajectories"
+      },
+      {
+        "imported": "pyrite.montecarlo.geometry",
+        "importer": "pyrite.plots.trajectory_capture"
+      },
+      {
+        "imported": "pyrite.montecarlo.trajectories",
+        "importer": "pyrite.plots.trajectory_capture"
+      },
+      {
+        "imported": "pyrite.montecarlo.trajectory_selection",
+        "importer": "pyrite.plots.trajectory_capture"
+      },
+      {
+        "imported": "pyrite.montecarlo.trajectory_summary",
+        "importer": "pyrite.plots.trajectory_capture"
+      },
+      {
+        "imported": "pyrite.campaign.profiles",
+        "importer": "pyrite.remote._queue_scripts"
+      },
+      {
+        "imported": "pyrite.materials",
+        "importer": "pyrite.remote._queue_scripts"
+      },
+      {
+        "imported": "pyrite.montecarlo._resources",
+        "importer": "pyrite.remote._queue_scripts"
+      },
+      {
+        "imported": "pyrite.montecarlo.transport.batching",
+        "importer": "pyrite.remote._queue_scripts"
+      },
+      {
+        "imported": "pyrite.perf.py_spy",
+        "importer": "pyrite.remote._queue_scripts"
+      },
+      {
+        "imported": "pyrite.validation._zhai",
+        "importer": "pyrite.remote._queue_scripts"
+      },
+      {
+        "imported": "pyrite.campaign.profiles",
+        "importer": "pyrite.remote.cleanup"
+      },
+      {
+        "imported": "pyrite.checkpoints.checkpoint_cleanup",
+        "importer": "pyrite.remote.cleanup"
+      },
+      {
+        "imported": "pyrite.console.output",
+        "importer": "pyrite.remote.cleanup"
+      },
+      {
+        "imported": "pyrite.console.config",
+        "importer": "pyrite.remote.config"
+      },
+      {
+        "imported": "pyrite.console.outputs",
+        "importer": "pyrite.remote.config"
+      },
+      {
+        "imported": "pyrite.console.output",
+        "importer": "pyrite.remote.jobs"
+      },
+      {
+        "imported": "pyrite.console.dashboard",
+        "importer": "pyrite.remote.performance"
+      },
+      {
+        "imported": "pyrite.console.output",
+        "importer": "pyrite.remote.performance"
+      },
+      {
+        "imported": "pyrite.console.outputs",
+        "importer": "pyrite.remote.performance"
+      },
+      {
+        "imported": "pyrite.materials",
+        "importer": "pyrite.remote.physics_identity"
+      },
+      {
+        "imported": "pyrite.runs.scan",
+        "importer": "pyrite.remote.physics_identity"
+      },
+      {
+        "imported": "pyrite.campaign.profiles",
+        "importer": "pyrite.remote.pull"
+      },
+      {
+        "imported": "pyrite.checkpoints._checkpoint_io",
+        "importer": "pyrite.remote.pull"
+      },
+      {
+        "imported": "pyrite.checkpoints._checkpoint_store",
+        "importer": "pyrite.remote.pull"
+      },
+      {
+        "imported": "pyrite.checkpoints.archive",
+        "importer": "pyrite.remote.pull"
+      },
+      {
+        "imported": "pyrite.console.outputs",
+        "importer": "pyrite.remote.pull"
+      },
+      {
+        "imported": "pyrite.materials",
+        "importer": "pyrite.remote.pull"
+      },
+      {
+        "imported": "pyrite.results",
+        "importer": "pyrite.remote.pull"
+      },
+      {
+        "imported": "pyrite.runs.run",
+        "importer": "pyrite.remote.pull"
+      },
+      {
+        "imported": "pyrite.console.dashboard",
+        "importer": "pyrite.remote.queue"
+      },
+      {
+        "imported": "pyrite.console.dashboard",
+        "importer": "pyrite.remote.recompute"
+      },
+      {
+        "imported": "pyrite.checkpoints.trajectory_scoring",
+        "importer": "pyrite.remote.trajectories"
+      },
+      {
+        "imported": "pyrite.montecarlo.runner.artifacts",
+        "importer": "pyrite.remote.trajectories"
+      },
+      {
+        "imported": "pyrite.montecarlo.trajectories",
+        "importer": "pyrite.remote.trajectories"
+      },
+      {
+        "imported": "pyrite.montecarlo.trajectory_export",
+        "importer": "pyrite.remote.trajectories"
+      },
+      {
+        "imported": "pyrite.montecarlo.trajectory_selection",
+        "importer": "pyrite.remote.trajectories"
+      },
+      {
+        "imported": "pyrite.console.dashboard",
+        "importer": "pyrite.remote.transport"
+      },
+      {
+        "imported": "pyrite.materials",
+        "importer": "pyrite.remote.transport"
+      },
+      {
+        "imported": "pyrite.xsgen.sources",
+        "importer": "pyrite.remote.transport"
+      },
+      {
+        "imported": "pyrite.xsgen.store",
+        "importer": "pyrite.remote.transport"
+      },
+      {
+        "imported": "pyrite.xsgen.verify",
+        "importer": "pyrite.remote.transport"
+      },
+      {
+        "imported": "pyrite.console.dashboard",
+        "importer": "pyrite.remote.viewer"
+      },
+      {
+        "imported": "pyrite.console.json",
+        "importer": "pyrite.remote.viewer"
+      },
+      {
+        "imported": "pyrite.instrument",
+        "importer": "pyrite.results.model"
+      },
+      {
+        "imported": "pyrite.instrument.geometry",
+        "importer": "pyrite.results.model"
+      },
+      {
+        "imported": "pyrite.montecarlo",
+        "importer": "pyrite.results.model"
+      },
+      {
+        "imported": "pyrite.instrument",
+        "importer": "pyrite.results.spatial"
+      },
+      {
+        "imported": "pyrite.instrument.geometry",
+        "importer": "pyrite.results.spatial"
+      },
+      {
+        "imported": "pyrite.instrument.model",
+        "importer": "pyrite.results.spatial"
+      },
+      {
+        "imported": "pyrite.detectors",
+        "importer": "pyrite.results.store"
+      },
+      {
+        "imported": "pyrite.montecarlo",
+        "importer": "pyrite.results.store"
+      },
+      {
+        "imported": "pyrite.montecarlo.case",
+        "importer": "pyrite.results.store"
+      },
+      {
+        "imported": "pyrite.detectors",
+        "importer": "pyrite.results.tables"
+      },
+      {
+        "imported": "pyrite.materials",
+        "importer": "pyrite.results.tables"
+      },
+      {
+        "imported": "pyrite.campaign.profiles",
+        "importer": "pyrite.runs._material_progress"
+      },
+      {
+        "imported": "pyrite.console.outputs",
+        "importer": "pyrite.runs._material_progress"
+      },
+      {
+        "imported": "pyrite.montecarlo.runner",
+        "importer": "pyrite.runs._material_progress"
+      },
+      {
+        "imported": "pyrite.perf.performance_profile",
+        "importer": "pyrite.runs._material_progress"
+      },
+      {
+        "imported": "pyrite.campaign.profiles",
+        "importer": "pyrite.runs._sweep_plan"
+      },
+      {
+        "imported": "pyrite.checkpoints._checkpoint_store",
+        "importer": "pyrite.runs._sweep_plan"
+      },
+      {
+        "imported": "pyrite.checkpoints.persistence",
+        "importer": "pyrite.runs._sweep_plan"
+      },
+      {
+        "imported": "pyrite.results",
+        "importer": "pyrite.runs._sweep_plan"
+      },
+      {
+        "imported": "pyrite.campaign.observation",
+        "importer": "pyrite.runs._trajectory_capture"
+      },
+      {
+        "imported": "pyrite.console.output",
+        "importer": "pyrite.runs._trajectory_capture"
+      },
+      {
+        "imported": "pyrite.montecarlo.trajectories",
+        "importer": "pyrite.runs._trajectory_capture"
+      },
+      {
+        "imported": "pyrite.campaign.config",
+        "importer": "pyrite.runs.blaze"
+      },
+      {
+        "imported": "pyrite.console.json",
+        "importer": "pyrite.runs.blaze"
+      },
+      {
+        "imported": "pyrite.console.output",
+        "importer": "pyrite.runs.blaze"
+      },
+      {
+        "imported": "pyrite.campaign.model",
+        "importer": "pyrite.runs.observe"
+      },
+      {
+        "imported": "pyrite.campaign.resolution",
+        "importer": "pyrite.runs.observe"
+      },
+      {
+        "imported": "pyrite.observations",
+        "importer": "pyrite.runs.observe"
+      },
+      {
+        "imported": "pyrite.observations.spec",
+        "importer": "pyrite.runs.observe"
+      },
+      {
+        "imported": "pyrite.campaign.profiles",
+        "importer": "pyrite.runs.run"
+      },
+      {
+        "imported": "pyrite.checkpoints.persistence",
+        "importer": "pyrite.runs.run"
+      },
+      {
+        "imported": "pyrite.checkpoints.recompute",
+        "importer": "pyrite.runs.run"
+      },
+      {
+        "imported": "pyrite.execution.artifacts",
+        "importer": "pyrite.runs.run"
+      },
+      {
+        "imported": "pyrite.instrument.scene",
+        "importer": "pyrite.runs.run"
+      },
+      {
+        "imported": "pyrite.montecarlo",
+        "importer": "pyrite.runs.run"
+      },
+      {
+        "imported": "pyrite.montecarlo.case",
+        "importer": "pyrite.runs.run"
+      },
+      {
+        "imported": "pyrite.montecarlo.runner",
+        "importer": "pyrite.runs.run"
+      },
+      {
+        "imported": "pyrite.montecarlo.trajectories",
+        "importer": "pyrite.runs.run"
+      },
+      {
+        "imported": "pyrite.results",
+        "importer": "pyrite.runs.run"
+      },
+      {
+        "imported": "pyrite.campaign.config",
+        "importer": "pyrite.runs.scan"
+      },
+      {
+        "imported": "pyrite.campaign.geometry",
+        "importer": "pyrite.runs.scan"
+      },
+      {
+        "imported": "pyrite.campaign.observation",
+        "importer": "pyrite.runs.scan"
+      },
+      {
+        "imported": "pyrite.campaign.profiles",
+        "importer": "pyrite.runs.scan"
+      },
+      {
+        "imported": "pyrite.campaign.sweep",
+        "importer": "pyrite.runs.scan"
+      },
+      {
+        "imported": "pyrite.checkpoints.campaign_lock",
+        "importer": "pyrite.runs.scan"
+      },
+      {
+        "imported": "pyrite.console.dashboard",
+        "importer": "pyrite.runs.scan"
+      },
+      {
+        "imported": "pyrite.console.json",
+        "importer": "pyrite.runs.scan"
+      },
+      {
+        "imported": "pyrite.console.output",
+        "importer": "pyrite.runs.scan"
+      },
+      {
+        "imported": "pyrite.console.outputs",
+        "importer": "pyrite.runs.scan"
+      },
+      {
+        "imported": "pyrite.execution.inspection",
+        "importer": "pyrite.runs.scan"
+      },
+      {
+        "imported": "pyrite.execution.profiles",
+        "importer": "pyrite.runs.scan"
+      },
+      {
+        "imported": "pyrite.materials",
+        "importer": "pyrite.runs.scan"
+      },
+      {
+        "imported": "pyrite.montecarlo.case",
+        "importer": "pyrite.runs.scan"
+      },
+      {
+        "imported": "pyrite.montecarlo.runner",
+        "importer": "pyrite.runs.scan"
+      },
+      {
+        "imported": "pyrite.montecarlo.trajectories",
+        "importer": "pyrite.runs.scan"
+      },
+      {
+        "imported": "pyrite.observations",
+        "importer": "pyrite.runs.scan"
+      },
+      {
+        "imported": "pyrite.perf.py_spy",
+        "importer": "pyrite.runs.scan"
+      },
+      {
+        "imported": "pyrite.xsgen.bremslib.tables",
+        "importer": "pyrite.runs.scan"
+      },
+      {
+        "imported": "pyrite.xsgen.elsepa.catalog",
+        "importer": "pyrite.runs.scan"
+      },
+      {
+        "imported": "pyrite.xsgen.sbethe",
+        "importer": "pyrite.runs.scan"
+      },
+      {
+        "imported": "pyrite.xsgen.store",
+        "importer": "pyrite.runs.scan"
+      },
+      {
+        "imported": "pyrite.campaign.sweep",
+        "importer": "pyrite.validation._anchor_conditions"
+      },
+      {
+        "imported": "pyrite.detectors",
+        "importer": "pyrite.validation._anchor_conditions"
+      },
+      {
+        "imported": "pyrite.materials.crystal",
+        "importer": "pyrite.validation._anchor_conditions"
+      },
+      {
+        "imported": "pyrite.montecarlo",
+        "importer": "pyrite.validation._anchor_conditions"
+      },
+      {
+        "imported": "pyrite.detectors",
+        "importer": "pyrite.validation._zhai"
+      },
+      {
+        "imported": "pyrite.checkpoints._checkpoint_io",
+        "importer": "pyrite.validation.anchor_figures"
+      },
+      {
+        "imported": "pyrite.console.outputs",
+        "importer": "pyrite.validation.anchor_figures"
+      },
+      {
+        "imported": "pyrite.detectors",
+        "importer": "pyrite.validation.anchor_figures"
+      },
+      {
+        "imported": "pyrite.materials.crystal",
+        "importer": "pyrite.validation.anchor_figures"
+      },
+      {
+        "imported": "pyrite.montecarlo",
+        "importer": "pyrite.validation.anchor_figures"
+      },
+      {
+        "imported": "pyrite.montecarlo.geometry",
+        "importer": "pyrite.validation.anchor_figures"
+      },
+      {
+        "imported": "pyrite.montecarlo.spectrum.brem_bremslib",
+        "importer": "pyrite.validation.brem_angular"
+      },
+      {
+        "imported": "pyrite.montecarlo.spectrum.brem",
+        "importer": "pyrite.validation.brem_sources"
+      },
+      {
+        "imported": "pyrite.montecarlo.spectrum.brem_bremslib",
+        "importer": "pyrite.validation.brem_sources"
+      },
+      {
+        "imported": "pyrite.materials",
+        "importer": "pyrite.validation.dtr_reference"
+      },
+      {
+        "imported": "pyrite.materials.crystal",
+        "importer": "pyrite.validation.dtr_reference"
+      },
+      {
+        "imported": "pyrite.montecarlo.spectrum.dtr",
+        "importer": "pyrite.validation.dtr_reference"
+      },
+      {
+        "imported": "pyrite.montecarlo.spectrum.dtr_two_beam",
+        "importer": "pyrite.validation.dtr_reference"
+      },
+      {
+        "imported": "pyrite.montecarlo.spectrum.transition_radiation",
+        "importer": "pyrite.validation.dtr_reference"
+      },
+      {
+        "imported": "pyrite.materials.atomic",
+        "importer": "pyrite.validation.feranchuk_spence"
+      },
+      {
+        "imported": "pyrite.materials.crystal",
+        "importer": "pyrite.validation.feranchuk_spence"
+      },
+      {
+        "imported": "pyrite.montecarlo.spectrum.characteristic",
+        "importer": "pyrite.validation.inner_shell_experiment"
+      },
+      {
+        "imported": "pyrite.montecarlo.bote_salvat_ionization",
+        "importer": "pyrite.validation.shell_ionization"
+      },
+      {
+        "imported": "pyrite.montecarlo.eedl_ionization",
+        "importer": "pyrite.validation.shell_ionization"
+      },
+      {
+        "imported": "pyrite.montecarlo.spectrum.characteristic",
+        "importer": "pyrite.validation.shell_ionization"
+      },
+      {
+        "imported": "pyrite.montecarlo",
+        "importer": "pyrite.validation.validation_background"
+      },
+      {
+        "imported": "pyrite.materials.crystal",
+        "importer": "pyrite.validation.validation_oracles"
+      },
+      {
+        "imported": "pyrite.materials._transport_data",
+        "importer": "pyrite.xsgen.bremslib.release"
+      },
+      {
+        "imported": "pyrite.materials.atomic",
+        "importer": "pyrite.xsgen.bremslib.tables"
+      },
+      {
+        "imported": "pyrite.materials",
+        "importer": "pyrite.xsgen.elsepa.catalog"
+      },
+      {
+        "imported": "pyrite.materials._transport_data",
+        "importer": "pyrite.xsgen.elsepa.catalog"
+      },
+      {
+        "imported": "pyrite.materials.crystal",
+        "importer": "pyrite.xsgen.elsepa.catalog"
+      },
+      {
+        "imported": "pyrite.materials",
+        "importer": "pyrite.xsgen.elsepa.release"
+      },
+      {
+        "imported": "pyrite.materials._transport_data",
+        "importer": "pyrite.xsgen.elsepa.release"
+      },
+      {
+        "imported": "pyrite.materials",
+        "importer": "pyrite.xsgen.sbethe.catalog"
+      },
+      {
+        "imported": "pyrite.materials._transport_data",
+        "importer": "pyrite.xsgen.sbethe.catalog"
+      },
+      {
+        "imported": "pyrite.materials",
+        "importer": "pyrite.xsgen.sbethe.release"
+      },
+      {
+        "imported": "pyrite.materials._transport_data",
+        "importer": "pyrite.xsgen.sbethe.release"
+      },
+      {
+        "imported": "pyrite.console.config",
+        "importer": "pyrite.xsgen.sources"
+      },
+      {
+        "imported": "pyrite.console.config",
+        "importer": "pyrite.xsgen.store"
+      }
+    ],
+    "package_edges": [
+      [
+        "_entry",
+        "cli"
+      ],
+      [
+        "_entry",
+        "console"
+      ],
+      [
+        "_entry",
+        "materials"
+      ],
+      [
+        "_entry",
+        "validation"
+      ],
+      [
+        "apps",
+        "beams"
+      ],
+      [
+        "apps",
+        "campaign"
+      ],
+      [
+        "apps",
+        "checkpoints"
+      ],
+      [
+        "apps",
+        "console"
+      ],
+      [
+        "apps",
+        "detectors"
+      ],
+      [
+        "apps",
+        "geometry"
+      ],
+      [
+        "apps",
+        "materials"
+      ],
+      [
+        "apps",
+        "montecarlo"
+      ],
+      [
+        "apps",
+        "observations"
+      ],
+      [
+        "apps",
+        "plots"
+      ],
+      [
+        "apps",
+        "remote"
+      ],
+      [
+        "apps",
+        "results"
+      ],
+      [
+        "apps",
+        "runs"
+      ],
+      [
+        "apps",
+        "validation"
+      ],
+      [
+        "campaign",
+        "config"
+      ],
+      [
+        "campaign",
+        "detectors"
+      ],
+      [
+        "campaign",
+        "execution"
+      ],
+      [
+        "campaign",
+        "geometry"
+      ],
+      [
+        "campaign",
+        "instrument"
+      ],
+      [
+        "campaign",
+        "materials"
+      ],
+      [
+        "campaign",
+        "montecarlo"
+      ],
+      [
+        "campaign",
+        "observations"
+      ],
+      [
+        "campaign",
+        "results"
+      ],
+      [
+        "campaign",
+        "xsgen"
+      ],
+      [
+        "checkpoints",
+        "campaign"
+      ],
+      [
+        "checkpoints",
+        "console"
+      ],
+      [
+        "checkpoints",
+        "materials"
+      ],
+      [
+        "checkpoints",
+        "montecarlo"
+      ],
+      [
+        "checkpoints",
+        "results"
+      ],
+      [
+        "cli",
+        "campaign"
+      ],
+      [
+        "cli",
+        "checkpoints"
+      ],
+      [
+        "cli",
+        "console"
+      ],
+      [
+        "cli",
+        "detectors"
+      ],
+      [
+        "cli",
+        "energy_grid"
+      ],
+      [
+        "cli",
+        "instrument"
+      ],
+      [
+        "cli",
+        "materials"
+      ],
+      [
+        "cli",
+        "montecarlo"
+      ],
+      [
+        "cli",
+        "perf"
+      ],
+      [
+        "cli",
+        "remote"
+      ],
+      [
+        "cli",
+        "runs"
+      ],
+      [
+        "cli",
+        "xsgen"
+      ],
+      [
+        "console",
+        "materials"
+      ],
+      [
+        "detectors",
+        "config"
+      ],
+      [
+        "detectors",
+        "materials"
+      ],
+      [
+        "devtools",
+        "campaign"
+      ],
+      [
+        "devtools",
+        "cli"
+      ],
+      [
+        "devtools",
+        "console"
+      ],
+      [
+        "devtools",
+        "energy_grid"
+      ],
+      [
+        "devtools",
+        "plots"
+      ],
+      [
+        "devtools",
+        "results"
+      ],
+      [
+        "devtools",
+        "runs"
+      ],
+      [
+        "devtools",
+        "validation"
+      ],
+      [
+        "energy_grid",
+        "campaign"
+      ],
+      [
+        "energy_grid",
+        "checkpoints"
+      ],
+      [
+        "energy_grid",
+        "console"
+      ],
+      [
+        "energy_grid",
+        "detectors"
+      ],
+      [
+        "energy_grid",
+        "materials"
+      ],
+      [
+        "energy_grid",
+        "montecarlo"
+      ],
+      [
+        "energy_grid",
+        "remote"
+      ],
+      [
+        "energy_grid",
+        "results"
+      ],
+      [
+        "execution",
+        "campaign"
+      ],
+      [
+        "execution",
+        "checkpoints"
+      ],
+      [
+        "execution",
+        "montecarlo"
+      ],
+      [
+        "instrument",
+        "detectors"
+      ],
+      [
+        "instrument",
+        "materials"
+      ],
+      [
+        "montecarlo",
+        "console"
+      ],
+      [
+        "montecarlo",
+        "energy_grid"
+      ],
+      [
+        "montecarlo",
+        "materials"
+      ],
+      [
+        "montecarlo",
+        "xsgen"
+      ],
+      [
+        "observations",
+        "checkpoints"
+      ],
+      [
+        "observations",
+        "console"
+      ],
+      [
+        "observations",
+        "detectors"
+      ],
+      [
+        "observations",
+        "instrument"
+      ],
+      [
+        "observations",
+        "montecarlo"
+      ],
+      [
+        "observations",
+        "results"
+      ],
+      [
+        "optimization",
+        "campaign"
+      ],
+      [
+        "optimization",
+        "results"
+      ],
+      [
+        "optimization",
+        "runs"
+      ],
+      [
+        "perf",
+        "campaign"
+      ],
+      [
+        "perf",
+        "console"
+      ],
+      [
+        "perf",
+        "materials"
+      ],
+      [
+        "perf",
+        "montecarlo"
+      ],
+      [
+        "plots",
+        "console"
+      ],
+      [
+        "plots",
+        "detectors"
+      ],
+      [
+        "plots",
+        "materials"
+      ],
+      [
+        "plots",
+        "montecarlo"
+      ],
+      [
+        "plots",
+        "results"
+      ],
+      [
+        "remote",
+        "campaign"
+      ],
+      [
+        "remote",
+        "checkpoints"
+      ],
+      [
+        "remote",
+        "console"
+      ],
+      [
+        "remote",
+        "materials"
+      ],
+      [
+        "remote",
+        "montecarlo"
+      ],
+      [
+        "remote",
+        "perf"
+      ],
+      [
+        "remote",
+        "results"
+      ],
+      [
+        "remote",
+        "runs"
+      ],
+      [
+        "remote",
+        "validation"
+      ],
+      [
+        "remote",
+        "xsgen"
+      ],
+      [
+        "results",
+        "detectors"
+      ],
+      [
+        "results",
+        "instrument"
+      ],
+      [
+        "results",
+        "materials"
+      ],
+      [
+        "results",
+        "montecarlo"
+      ],
+      [
+        "runs",
+        "campaign"
+      ],
+      [
+        "runs",
+        "checkpoints"
+      ],
+      [
+        "runs",
+        "console"
+      ],
+      [
+        "runs",
+        "execution"
+      ],
+      [
+        "runs",
+        "instrument"
+      ],
+      [
+        "runs",
+        "materials"
+      ],
+      [
+        "runs",
+        "montecarlo"
+      ],
+      [
+        "runs",
+        "observations"
+      ],
+      [
+        "runs",
+        "perf"
+      ],
+      [
+        "runs",
+        "results"
+      ],
+      [
+        "runs",
+        "xsgen"
+      ],
+      [
+        "validation",
+        "campaign"
+      ],
+      [
+        "validation",
+        "checkpoints"
+      ],
+      [
+        "validation",
+        "console"
+      ],
+      [
+        "validation",
+        "detectors"
+      ],
+      [
+        "validation",
+        "materials"
+      ],
+      [
+        "validation",
+        "montecarlo"
+      ],
+      [
+        "xsgen",
+        "console"
+      ],
+      [
+        "xsgen",
+        "materials"
+      ]
+    ],
+    "packages": [
+      "_entry",
+      "apps",
+      "beams",
+      "campaign",
+      "checkpoints",
+      "cli",
+      "config",
+      "console",
+      "detectors",
+      "devtools",
+      "energy_grid",
+      "execution",
+      "experimental",
+      "geometry",
+      "instrument",
+      "materials",
+      "montecarlo",
+      "observations",
+      "optimization",
+      "perf",
+      "plots",
+      "radiation",
+      "remote",
+      "results",
+      "runs",
+      "transport",
+      "validation",
+      "xsgen"
+    ],
+    "schema": "pyrite.package-dependencies.v1",
+    "summary": {
+      "component_count": 18,
+      "cyclic_component_count": 1,
+      "largest_component_size": 11,
+      "module_edge_count": 850,
+      "package_count": 28,
+      "package_edge_count": 124
+    }
+  }
+}

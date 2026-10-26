@@ -16,6 +16,16 @@ from pyrite.observations import Acquisition, Observation, PixelScorer
 ENERGY = np.array([1000.0, 1500.0])
 
 
+def test_executor_helpers_retain_compatibility_imports():
+    from pyrite import _executor_contract
+    from pyrite.execution import _simulation
+
+    for name in ("validate_executor", "execution_provenance"):
+        helper = getattr(_executor_contract, name)
+        assert helper is getattr(_simulation, name)
+        assert helper.__module__ == "pyrite.execution._simulation"
+
+
 @pytest.fixture
 def scene():
     return Scene(

@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import asdict, is_dataclass
 from typing import TYPE_CHECKING, Any
 
+from .._executor_contract import execution_provenance as execution_provenance
+from .._executor_contract import validate_executor as validate_executor
 from .artifacts import (
     CaseArtifactRef,
     CaseArtifactStore,
@@ -15,34 +16,7 @@ from .artifacts import (
 from .protocol import Executor
 
 if TYPE_CHECKING:
-    from .._numerics import Numerics
     from ..montecarlo.case import Case
-
-
-def validate_executor(executor: Executor, numerics: Numerics) -> None:
-    """Reject unsupported scheduling/kernel composition before case preparation."""
-    if not callable(getattr(executor, "execute", None)):
-        raise TypeError("executor must implement execute(cases, **run_options)")
-    if numerics.transport_core != "auto":
-        raise ValueError(
-            "executor requires numerics.transport_core='auto'; "
-            "batch executors cannot preserve an explicit transport-core override"
-        )
-
-
-def execution_provenance(executor: Executor) -> dict[str, Any]:
-    """Describe the scheduler and requested policies without serializing clients."""
-    cls = type(executor)
-    record: dict[str, Any] = {"executor": f"{cls.__module__}.{cls.__qualname__}"}
-    for attribute, key in (
-        ("resources", "resources_requested"),
-        ("config", "configuration"),
-        ("retry_policy", "retry_policy"),
-    ):
-        value = getattr(executor, attribute, None)
-        if is_dataclass(value) and not isinstance(value, type):
-            record[key] = asdict(value)
-    return record
 
 
 def execute_simulation(

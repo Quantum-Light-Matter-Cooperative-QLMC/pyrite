@@ -43,7 +43,7 @@ class ResolvedSimulation:
             "acquisition": self.scene.acquisition,
         }
         if self.executor is not None:
-            from ..execution._simulation import execution_provenance
+            from .._executor_contract import execution_provenance
 
             provenance["execution"] = execution_provenance(self.executor)
         if self.observation is None:
@@ -131,7 +131,7 @@ def resolve_simulation(
     if not isinstance(numerics, Numerics):
         raise TypeError("numerics must be a Numerics")
     if executor is not None:
-        from ..execution._simulation import validate_executor
+        from .._executor_contract import validate_executor
 
         validate_executor(executor, numerics)
     physics = resolve_physics(physics, numerics)

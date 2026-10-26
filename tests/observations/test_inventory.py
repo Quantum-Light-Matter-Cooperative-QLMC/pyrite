@@ -1,10 +1,51 @@
 import json
+import subprocess
+import sys
+import textwrap
 from dataclasses import replace
 
 import numpy as np
 
 from pyrite.observations import ObservationStore, observation_from_result, observation_inventory
 from tests.observations.test_store import _acquisition, _simulate, fake_directional  # noqa: F401
+
+
+def test_inventory_imports_in_spawn_worker_without_checkpoint_driver(tmp_path) -> None:
+    script = tmp_path / "inventory_worker.py"
+    script.write_text(
+        textwrap.dedent(
+            """
+            import multiprocessing
+            import os
+            import sys
+
+            def worker():
+                import pyrite.observations as observations
+                assert "pyrite.observations.inventory" not in sys.modules
+                inventory = observations.observation_inventory
+                assert inventory is observations.observation_inventory
+                assert inventory("unwritten").entries == ()
+                assert not any(
+                    name == "pyrite.checkpoints" or name.startswith("pyrite.checkpoints.")
+                    for name in sys.modules
+                )
+
+            if __name__ == "__main__":
+                os.environ["PYRITE_HOME"] = sys.argv[1]
+                process = multiprocessing.get_context("spawn").Process(target=worker)
+                process.start()
+                process.join(30)
+                if process.is_alive():
+                    process.terminate()
+                    process.join()
+                assert process.exitcode == 0, process.exitcode
+            """
+        )
+    )
+    result = subprocess.run(
+        [sys.executable, str(script), str(tmp_path)], capture_output=True, text=True, timeout=40
+    )
+    assert result.returncode == 0, result.stderr
 
 
 def _checkpoint(root, stem, cases) -> None:
@@ -52,6 +93,18 @@ def test_inventory_names_observations_by_checkpoint_case(tmp_path) -> None:
     assert entry.label.startswith("hopg_t1000 @ 30 keV -- IdealPhotonCounter, 1 s, expected")
     loaded = inventory.load(digest)
     assert loaded.digest == digest
+
+
+def test_inventory_default_checkpoint_root_matches_persistence(tmp_path, monkeypatch) -> None:
+    from pyrite.checkpoints.persistence import default_checkpoint_dir
+    from pyrite.console.outputs import output_dir
+
+    monkeypatch.setenv("PYRITE_HOME", str(tmp_path))
+    inventory = observation_inventory("unwritten")
+
+    assert default_checkpoint_dir() == str(output_dir("checkpoints"))
+    assert inventory.entries == ()
+    assert inventory.store.index_path == output_dir("observations") / "unwritten" / "index.json"
 
 
 def test_inventory_without_a_store_is_empty(tmp_path) -> None:
