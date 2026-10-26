@@ -28,6 +28,8 @@ PYRITE_MC_BACKEND=cpu python python_api_workflow.py
 ```
 
 The narrow PXR/CBS structure sits above a broad bremsstrahlung background.
+The total adds those two components after interpolating bremsstrahlung onto
+the line grid; it excludes characteristic emission.
 The vertical axis is **photons/(incident electron · eV · sr)**: no beam-current,
 solid-angle, exposure or detector-response scaling has been applied. Target
 thickness is in **Å**, beam dimensions in **mm**, and angles in **degrees**.

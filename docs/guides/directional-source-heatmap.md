@@ -14,7 +14,7 @@ PYRITE_MC_BACKEND=cpu python directional_source_heatmap.py
 ```
 
 The example uses 4,096 incident electrons, 48 angles and 513 photon energies on
-CPU; first use also compiles kernels. Both sampling counts are set to 64 because
+CPU; first use also compiles kernels. Both sampling counts are set to 4,096 because
 the directional scorer uses the same transported population for its components.
 The target is 1000 Å (100 nm) thick with a finite 5 × 5 mm footprint.
 
@@ -65,7 +65,7 @@ and [finite-crystal validation](../validation/geometry/finite-transverse-crystal
 
 ## Resolution, statistics and limits
 
-The 100–2000 eV window, 7.5° angular spacing, one reflection family and low
+The 100–2000 eV window, 7.5° angular spacing, one reflection family and chosen
 history count illustrate the workflow; they do **not** establish convergence or
 uncertainty. Increase histories and repeat independent seeds, refine both grids
 and check reflection convergence before interpreting fine structure or peak
