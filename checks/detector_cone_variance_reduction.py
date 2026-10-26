@@ -77,7 +77,10 @@ def baseline(args):
     from pyrite.montecarlo.runner.adaptive import case_measure
 
     report = {"args": vars(args), "real": np.dtype(REAL).name, "device": BACKEND.device.name}
-    for label, core, ne in (("cuda", "auto", args.ne), ("cpu_per_electron", "per-electron", args.ne_cpu)):
+    for label, core, ne in (
+        ("cuda", "auto", args.ne),
+        ("cpu_per_electron", "per-electron", args.ne_cpu),
+    ):
         if ne <= 0:
             continue
         case = build(args.energy, args.thickness, args.tilt, args.azimuth, ne, args.seed)
@@ -100,7 +103,10 @@ def baseline(args):
             row["line_grid_stop_eV"] = float(np.asarray(out["E_grid"])[-1])
             row["line_grid_resolved"] = out.get("line_grid_resolved")
         report[label] = {k: v for k, v in row.items()}
-        print(json.dumps({k: v for k, v in row.items() if k != "line_values"}, default=str), flush=True)
+        print(
+            json.dumps({k: v for k, v in row.items() if k != "line_values"}, default=str),
+            flush=True,
+        )
         del tp
         BACKEND.release_memory()
     Path(args.out).write_text(json.dumps(report, indent=2, default=str))
@@ -134,7 +140,7 @@ def submit(args):
         raise SystemExit("script contains the heredoc terminator")
     payload = _precision_payload(jobdir, [command], remote, _uv_sync_block(), label=JOB_KIND)
     embed = f"cat > \"$JOBDIR/check.py\" <<'PYRITE_CHECK_EOF'\n{source}PYRITE_CHECK_EOF\n"
-    marker = "\n[ -f \"$JOBDIR/STOP\" ]"
+    marker = '\n[ -f "$JOBDIR/STOP" ]'
     payload = payload.replace(marker, "\n" + embed.rstrip("\n") + marker, 1)
     script = remote._slurm_batch_script(
         jobid,

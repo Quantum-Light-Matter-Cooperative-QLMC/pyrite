@@ -46,9 +46,7 @@ def _tallies(result, n):
 
 
 def _split(seed, ne, target=0.05):
-    return simulate_trajectories(
-        **_kw(seed, ne), _cone_split=ConeSplit(N_HAT, THETA_C, target)
-    )
+    return simulate_trajectories(**_kw(seed, ne), _cone_split=ConeSplit(N_HAT, THETA_C, target))
 
 
 def test_primaries_follow_the_analog_streams_until_cone_entry():
