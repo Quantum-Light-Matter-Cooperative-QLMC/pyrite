@@ -19,9 +19,10 @@ import statistics
 import subprocess
 import sys
 import tempfile
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from time import perf_counter
-from typing import Any, Mapping, Sequence
+from typing import Any
 
 import numpy as np
 
@@ -137,7 +138,9 @@ def _benchmark_worker(
         if index >= warmups:
             samples.append(elapsed)
     assert output is not None
-    arrays = {key: np.asarray(_to_cpu(output[key])) for key in _OUTPUTS if output.get(key) is not None}
+    arrays = {
+        key: np.asarray(_to_cpu(output[key])) for key in _OUTPUTS if output.get(key) is not None
+    }
     np.savez_compressed(
         output_path,
         allow_pickle=False,
@@ -146,22 +149,30 @@ def _benchmark_worker(
         eta=np.array(output["eta"], dtype=np.float64),
         hit_frac=np.array(output["hit_frac"], dtype=np.float64),
     )
-    result_path.write_text(json.dumps(dict(
-        samples_s=samples,
-        median_s=statistics.median(samples),
-        requested_batch=int(os.environ[_BATCH_ENV]),
-        requested_cxr_chunk=int(os.environ[_CHUNK_ENV]),
-        admitted_cxr_chunk=plan["spec_chunk"],
-        backend=BACKEND.name,
-        device=BACKEND.device.name,
-        precision=os.environ.get("PYRITE_FP64", "0"),
-        pyrite_version=__version__,
-    ), indent=2))
+    result_path.write_text(
+        json.dumps(
+            dict(
+                samples_s=samples,
+                median_s=statistics.median(samples),
+                requested_batch=int(os.environ[_BATCH_ENV]),
+                requested_cxr_chunk=int(os.environ[_CHUNK_ENV]),
+                admitted_cxr_chunk=plan["spec_chunk"],
+                backend=BACKEND.name,
+                device=BACKEND.device.name,
+                precision=os.environ.get("PYRITE_FP64", "0"),
+                pyrite_version=__version__,
+            ),
+            indent=2,
+        )
+    )
 
 
 def _equivalent(candidate: Path, reference: Path, *, rtol: float, atol: float) -> bool:
     """Require same trajectories plus spectra within declared numeric tolerance."""
-    with np.load(reference, allow_pickle=False) as ref, np.load(candidate, allow_pickle=False) as cur:
+    with (
+        np.load(reference, allow_pickle=False) as ref,
+        np.load(candidate, allow_pickle=False) as cur,
+    ):
         if set(ref.files) != set(cur.files):
             return False
         for key in ref.files:
@@ -194,10 +205,22 @@ def _run_subprocess(
     env["PYRITE_MC_BACKEND"] = "cuda"  # no CPU fallback hidden in timings
     env["PYRITE_MC_TRANSPORT_CORE"] = "cuda"  # ignore inherited CPU pins
     command = [
-        sys.executable, "-m", "pyrite.perf.batch_chunk_tuner", "--worker",
-        "--scene", str(scene), "--warmups", str(warmups), "--repeats", str(repeats),
-        "--transport-core", transport_core,
-        "--output", str(output_path), "--result", str(result_path),
+        sys.executable,
+        "-m",
+        "pyrite.perf.batch_chunk_tuner",
+        "--worker",
+        "--scene",
+        str(scene),
+        "--warmups",
+        str(warmups),
+        "--repeats",
+        str(repeats),
+        "--transport-core",
+        transport_core,
+        "--output",
+        str(output_path),
+        "--result",
+        str(result_path),
     ]
     completed = subprocess.run(
         command, env=env, capture_output=True, text=True, timeout=timeout, check=False
@@ -231,13 +254,13 @@ def tune(
     Runtime is the median uncached run_case wall-clock time after JIT warmup,
     excluding subprocess startup, scene lowering and checkpoint I/O.
     """
-    if trials < 1 or warmups < 1 or repeats < 1 or timeout <= 0:
+    if min(trials, warmups, repeats) < 1 or timeout <= 0:
         raise ValueError("trials, warmups, repeats and timeout must be positive")
     if rtol < 0 or atol < 0 or not np.isfinite([rtol, atol]).all():
         raise ValueError("comparison tolerances must be finite and nonnegative")
     if transport_core != "cuda":
         raise ValueError("initial tuner requires CUDA transport_core='cuda'")
-    if not batches or not chunks or any(x < 1 for x in (*batches, *chunks, *baseline)):
+    if not all((batches, chunks)) or min((*batches, *chunks, *baseline)) < 1:
         raise ValueError("all candidate and baseline sizes must be positive")
     try:
         import optuna
@@ -252,20 +275,37 @@ def tune(
         tmp_path = Path(tmp)
         ref_path, ref_json = tmp_path / "ref.npz", tmp_path / "ref.json"
         reference = _run_subprocess(
-            scene, batch=baseline[0], chunk=baseline[1], warmups=warmups,
-            repeats=repeats, transport_core=transport_core, timeout=timeout,
-            output_path=ref_path, result_path=ref_json,
+            scene,
+            batch=baseline[0],
+            chunk=baseline[1],
+            warmups=warmups,
+            repeats=repeats,
+            transport_core=transport_core,
+            timeout=timeout,
+            output_path=ref_path,
+            result_path=ref_json,
         )
         digest = _study_identity(
-            scene.read_bytes(), batch_choices=batches, chunk_choices=chunks,
-            warmups=warmups, repeats=repeats, rtol=rtol, atol=atol,
-            baseline=baseline, transport_core=transport_core,
-            backend=reference["backend"], precision=reference["precision"],
-            device=reference["device"], version=reference["pyrite_version"],
+            scene.read_bytes(),
+            batch_choices=batches,
+            chunk_choices=chunks,
+            warmups=warmups,
+            repeats=repeats,
+            rtol=rtol,
+            atol=atol,
+            baseline=baseline,
+            transport_core=transport_core,
+            backend=reference["backend"],
+            precision=reference["precision"],
+            device=reference["device"],
+            version=reference["pyrite_version"],
         )
         study = optuna.create_study(
-            direction="minimize", sampler=optuna.samplers.TPESampler(seed=seed),
-            storage=storage, study_name=study_name, load_if_exists=True,
+            direction="minimize",
+            sampler=optuna.samplers.TPESampler(seed=seed),
+            storage=storage,
+            study_name=study_name,
+            load_if_exists=True,
         )
         if study.user_attrs.get(_SCHEMA) not in (None, digest):
             raise ValueError("stored tuner study differs in workload, hardware or tuning settings")
@@ -275,7 +315,8 @@ def tune(
             study.set_user_attr(_SCHEMA, digest)
         print(
             f"Reference batch={baseline[0]} chunk={baseline[1]} "
-            f"median={reference['median_s']:.4f}s on {reference['device']}", flush=True
+            f"median={reference['median_s']:.4f}s on {reference['device']}",
+            flush=True,
         )
 
         def objective(trial: Any) -> float:
@@ -285,9 +326,15 @@ def tune(
             json_path = tmp_path / f"trial-{trial.number}.json"
             try:
                 measurement = _run_subprocess(
-                    scene, batch=batch, chunk=chunk, warmups=warmups,
-                    repeats=repeats, transport_core=transport_core, timeout=timeout,
-                    output_path=out_path, result_path=json_path,
+                    scene,
+                    batch=batch,
+                    chunk=chunk,
+                    warmups=warmups,
+                    repeats=repeats,
+                    transport_core=transport_core,
+                    timeout=timeout,
+                    output_path=out_path,
+                    result_path=json_path,
                 )
                 if measurement["device"] != reference["device"]:
                     raise ValueError("worker device changed during tuning")
@@ -301,7 +348,8 @@ def tune(
                 print(
                     f"trial {trial.number}: batch={batch} chunk={chunk} "
                     f"admitted_chunk={measurement['admitted_cxr_chunk']} "
-                    f"median={measurement['median_s']:.4f}s", flush=True
+                    f"median={measurement['median_s']:.4f}s",
+                    flush=True,
                 )
                 return float(measurement["median_s"])
             except (RuntimeError, ValueError, subprocess.TimeoutExpired) as exc:
@@ -321,15 +369,14 @@ def tune(
             f"Best batch={best.params['electron_batch']} "
             f"chunk={best.params['cxr_chunk']} "
             f"median={best.value:.4f}s "
-            f"(reference {reference['median_s']:.4f}s)", flush=True
+            f"(reference {reference['median_s']:.4f}s)",
+            flush=True,
         )
         if best.value >= reference["median_s"]:
             print("No candidate beat the measured reference; retaining the baseline settings.")
             chosen_batch, chosen_chunk = baseline
         else:
-            chosen_batch, chosen_chunk = (
-                best.params["electron_batch"], best.params["cxr_chunk"]
-            )
+            chosen_batch, chosen_chunk = (best.params["electron_batch"], best.params["cxr_chunk"])
         print("Apply to an existing workload with:")
         print(f"  export {_BATCH_ENV}={chosen_batch}")
         print(f"  export {_CHUNK_ENV}={chosen_chunk}")
@@ -338,13 +385,17 @@ def tune(
 
 def main(argv: Sequence[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--scene", type=Path, required=True, help="Python file defining make_scene()")
+    parser.add_argument(
+        "--scene", type=Path, required=True, help="Python file defining make_scene()"
+    )
     parser.add_argument("--worker", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--output", type=Path, help=argparse.SUPPRESS)
     parser.add_argument("--result", type=Path, help=argparse.SUPPRESS)
     parser.add_argument("--batches", type=_choices, default=(1024, 2048, 4096, 8192))
     parser.add_argument("--chunks", type=_choices, default=(256, 512, 1024, 2048, 4096))
-    parser.add_argument("--trials", type=int, default=16, help="Total Optuna budget including prior trials")
+    parser.add_argument(
+        "--trials", type=int, default=16, help="Total Optuna budget including prior trials"
+    )
     parser.add_argument("--warmups", type=int, default=1)
     parser.add_argument("--repeats", type=int, default=3)
     parser.add_argument("--storage", default="sqlite:///pyrite-batch-chunk.sqlite3")
@@ -360,18 +411,28 @@ def main(argv: Sequence[str] | None = None) -> None:
         if options.output is None or options.result is None:
             parser.error("internal worker requires --output and --result")
         _benchmark_worker(
-            options.scene, warmups=options.warmups, repeats=options.repeats,
+            options.scene,
+            warmups=options.warmups,
+            repeats=options.repeats,
             transport_core=options.transport_core,
-            output_path=options.output, result_path=options.result,
+            output_path=options.output,
+            result_path=options.result,
         )
         return
     tune(
-        options.scene, batches=options.batches, chunks=options.chunks,
-        trials=options.trials, warmups=options.warmups, repeats=options.repeats,
-        storage=options.storage, study_name=options.study_name,
+        options.scene,
+        batches=options.batches,
+        chunks=options.chunks,
+        trials=options.trials,
+        warmups=options.warmups,
+        repeats=options.repeats,
+        storage=options.storage,
+        study_name=options.study_name,
         baseline=(options.baseline_batch, options.baseline_chunk),
-        transport_core=options.transport_core, timeout=options.timeout,
-        rtol=options.rtol, atol=options.atol,
+        transport_core=options.transport_core,
+        timeout=options.timeout,
+        rtol=options.rtol,
+        atol=options.atol,
     )
 
 

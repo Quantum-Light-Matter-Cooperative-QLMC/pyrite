@@ -7,8 +7,18 @@ Electron and spectrum batch sizes are configured separately via environment.
 import numpy as np
 
 from pyrite import (
-    Beam, CxrReflections, Detector, EnergyBins, Footprint, Numerics,
-    Physics, PointBunch, PointSpot, Scene, SensorAcceptance, Slab,
+    Beam,
+    CxrReflections,
+    Detector,
+    EnergyBins,
+    Footprint,
+    Numerics,
+    Physics,
+    PointBunch,
+    PointSpot,
+    Scene,
+    SensorAcceptance,
+    Slab,
 )
 
 
@@ -20,7 +30,9 @@ def make_scene() -> Scene:
             longitudinal=PointBunch(),
         ),
         target=Slab(
-            "hopg", thickness_ang=2000.0, tilt_deg=30.0,
+            "hopg",
+            thickness_ang=2000.0,
+            tilt_deg=30.0,
             footprint=Footprint(5.0, 5.0),
         ),
         detector=Detector(
