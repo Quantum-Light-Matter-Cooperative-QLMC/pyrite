@@ -31,6 +31,8 @@ if TYPE_CHECKING:
     from pyrite._numerics_groups import (
         TransportNumerics as TransportNumerics,
     )
+    from pyrite.instrument.model import PixelScorer as AngularSampling
+    from pyrite.instrument.model import PixelScorer as PixelScorer
     from pyrite._photon_config import PhotonTransport as PhotonTransport
     from pyrite._precision import Precision as Precision
     from pyrite._sampling import (
@@ -48,6 +50,7 @@ _EXPORTS = {
     "FixedSampling": ("pyrite._sampling", "FixedSampling"),
     "Numerics": ("pyrite.campaign.model", "Numerics"),
     "PhotonTransport": ("pyrite._photon_config", "PhotonTransport"),
+    "PixelScorer": ("pyrite.instrument", "PixelScorer"),
     "Physics": ("pyrite._numerics", "Physics"),
     "Precision": ("pyrite._precision", "Precision"),
     "RadiationNumerics": ("pyrite._numerics_groups", "RadiationNumerics"),
@@ -56,11 +59,31 @@ _EXPORTS = {
     "load_physics": ("pyrite._config_presets", "load_physics"),
 }
 
-__all__ = list(_EXPORTS)
+# AngularSampling is package-only: avoid expanding the governed root API.
+__all__ = [
+    "AdaptiveSampling",
+    "AngularSampling",
+    "CxrReflections",
+    "ExecutionConfig",
+    "FixedSampling",
+    "Numerics",
+    "PhotonTransport",
+    "Physics",
+    "PixelScorer",
+    "Precision",
+    "RadiationNumerics",
+    "TransportNumerics",
+    "load_numerics",
+    "load_physics",
+]
 
 
 def __getattr__(name: str) -> Any:
     """Resolve a canonical API name without eagerly loading numerical engines."""
+    if name == "AngularSampling":
+        value = getattr(import_module("pyrite.instrument"), "PixelScorer")
+        globals()[name] = value
+        return value
     try:
         module, attribute = _EXPORTS[name]
     except KeyError as exc:

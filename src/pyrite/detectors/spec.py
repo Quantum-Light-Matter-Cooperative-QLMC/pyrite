@@ -71,6 +71,27 @@ class DetectorResponse(Protocol):
     ) -> np.ndarray: ...
 
 
+class NativeBinnedResponse(DetectorResponse, Protocol):
+    """Optional measured-energy-bin capability for photon-counting responses.
+
+    ``native_score`` consumes an intrinsic differential photon density on an
+    ascending incident-energy axis in eV. The last input dimension equals the
+    energy-axis length. The output is event *mass*, not density: its last
+    dimension matches the returned half-open measured-energy bin edges in eV.
+    Its leading batch dimensions and ``scale`` normalization are preserved.
+    Implementations may redistribute or lose incident events physically.
+    This contract does not imply an event-level digitizer.
+    """
+
+    def native_score(
+        self,
+        energy_eV: np.ndarray,
+        intrinsic_density: np.ndarray,
+        *,
+        scale: float = 1.0,
+    ) -> "NativeSpectrum": ...
+
+
 @dataclass(frozen=True)
 class NativeSpectrum:
     """Measured event mass on explicit native half-open energy bins.

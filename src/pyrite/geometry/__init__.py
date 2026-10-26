@@ -36,11 +36,13 @@ if TYPE_CHECKING:
     )
     from pyrite.campaign.target import Target as Target
     from pyrite.instrument import Filter as Filter
+    from pyrite.instrument.model import FilterPlate as FilterPlate
 
 _EXPORTS = {
     "BlazedGrooves": ("pyrite.campaign.geometry", "BlazedGrooves"),
     "CrystalCut": ("pyrite.campaign.geometry", "CrystalCut"),
     "Filter": ("pyrite.instrument", "Filter"),
+    "FilterPlate": ("pyrite.instrument", "FilterPlate"),
     "Footprint": ("pyrite.campaign.geometry", "Footprint"),
     "Layer": ("pyrite.campaign.geometry", "Layer"),
     "RectangularBody": ("pyrite.bodies", "RectangularBody"),

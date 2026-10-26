@@ -11,6 +11,7 @@ from .acceptance import AngularAcceptance, SensorAcceptance
 from .spec import (
     Detector,
     DetectorResponse,
+    NativeBinnedResponse,
     DetectorSpec,
     EagleXO,
     EnergyBins,
@@ -37,11 +38,14 @@ if TYPE_CHECKING:
 
 __all__ = [
     "AngularAcceptance",
+    "AngularDetector",
     "SensorAcceptance",
     "Detector",
     "DetectorResponse",
+    "NativeBinnedResponse",
     "DetectorSpec",
     "EagleXO",
+    "EagleXOResponse",
     "EnergyBins",
     "FilterPlate",
     "IdealPhotonCounter",
@@ -51,6 +55,7 @@ __all__ = [
     "PlanarDetector",
     "PlanarPose",
     "Timepix3",
+    "Timepix3Response",
     "convolve_detector",
     "detector_efficiency",
     "eaglexo_response",
@@ -64,7 +69,6 @@ _EXPORTS = {
     "AngularAcceptance": ("pyrite.detectors", "AngularAcceptance"),
     "Detector": ("pyrite.detectors", "Detector"),
     "EnergyBins": ("pyrite.detectors", "EnergyBins"),
-    "FilterPlate": ("pyrite.instrument", "FilterPlate"),
     "IdealPhotonCounter": ("pyrite.detectors", "IdealPhotonCounter"),
     "PixelGrid": ("pyrite.instrument", "PixelGrid"),
     "PlanarDetector": ("pyrite.instrument", "PlanarDetector"),
@@ -72,13 +76,20 @@ _EXPORTS = {
     "SensorAcceptance": ("pyrite.detectors", "SensorAcceptance"),
 }
 
+# Semantic spellings preserve existing classes, pickle paths and identities.
+AngularDetector = Detector
+Timepix3Response = Timepix3
+EagleXOResponse = EagleXO
+
+# Supported historical detector-adjacent import, now owned by geometry.
+_LEGACY_EXPORTS = {"FilterPlate": ("pyrite.instrument", "FilterPlate")}
 _MODULE_EXPORTS = frozenset({"eaglexo_response", "grating", "timepix_response"})
 
 
 def __getattr__(name: str) -> Any:
     """Resolve physical detector geometry and response functions lazily."""
-    if name in _EXPORTS:
-        module, attribute = _EXPORTS[name]
+    if name in _EXPORTS or name in _LEGACY_EXPORTS:
+        module, attribute = (_EXPORTS.get(name) or _LEGACY_EXPORTS[name])
         value = getattr(import_module(module), attribute)
         globals()[name] = value
         return value
