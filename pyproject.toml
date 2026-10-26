@@ -516,6 +516,34 @@ source_modules = ["pyrite.observations"]
 forbidden_modules = ["pyrite.checkpoints"]
 allow_indirect_imports = true
 
+# Shared value/admission contracts must stay below both scientific engines and
+# orchestration. No indirect-import exemptions: these leaves import no driver.
+[[tool.importlinter.contracts]]
+id = "shared-contracts-stay-import-light"
+name = "Shared component and executor contracts import no domain drivers"
+type = "forbidden"
+source_modules = ["pyrite._component_support", "pyrite._executor_contract"]
+forbidden_modules = [
+    "pyrite.campaign", "pyrite.checkpoints", "pyrite.energy_grid",
+    "pyrite.execution", "pyrite.montecarlo", "pyrite.observations",
+    "pyrite.perf", "pyrite.remote", "pyrite.results", "pyrite.runs",
+    "pyrite.validation",
+]
+
+[[tool.importlinter.contracts]]
+id = "engines-import-no-grid-drivers"
+name = "Monte Carlo imports no energy-grid orchestration"
+type = "forbidden"
+source_modules = ["pyrite.montecarlo"]
+forbidden_modules = ["pyrite.energy_grid"]
+
+[[tool.importlinter.contracts]]
+id = "campaign-imports-no-executors"
+name = "Campaign composition imports no execution drivers"
+type = "forbidden"
+source_modules = ["pyrite.campaign"]
+forbidden_modules = ["pyrite.execution"]
+
 [[tool.importlinter.contracts]]
 id = "devtools-stays-below-_dev"
 name = "devtools does not import the dev entry point"

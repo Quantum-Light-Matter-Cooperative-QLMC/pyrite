@@ -190,7 +190,7 @@ def case_optical_transition(
 
     Validation: optical-planar-tr, optical-ctr-population, optical-material-response
     """
-    from ...energy_grid.component_support import ComponentSupport, component_grid
+    from ..._component_support import ComponentSupport, component_grid
     from ..spectrum.optical_transition import optical_transition_radiation
 
     if "bunch_charge_pc" in case and float(case["bunch_charge_pc"]) != float(source.charge_pC):

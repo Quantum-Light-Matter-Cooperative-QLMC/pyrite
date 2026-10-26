@@ -37,13 +37,13 @@ the source diff identifies that edge explicitly. The largest static SCC containe
 The generated condensation graph had 18 component nodes. These are static
 counts from the checked-in map, not an assertion about the runtime call graph.
 
-| Metric | Baseline | Initial slice |
-| --- | ---: | ---: |
-| Cross-package module edges | 850 | 849 |
-| Package edges | 124 | 123 |
-| Components | 18 | 18 |
-| Cyclic components | 1 | 1 |
-| Largest component | 11 | 11 |
+| Metric | Baseline | Initial slice | SCC removal |
+| --- | ---: | ---: | ---: |
+| Cross-package module edges | 850 | 849 | 847 |
+| Package edges | 124 | 123 | 121 |
+| Components | 18 | 18 | 28 |
+| Cyclic components | 1 | 1 | 0 |
+| Largest component | 11 | 11 | 1 |
 
 ## Dependency direction
 
@@ -89,9 +89,39 @@ inventory export and calls the default-path inventory without loading any
 checkpoint module. This covers the deferred import as well as worker startup;
 it does not claim that all other dynamic import paths are acyclic.
 
-The *cycle edge* disappears even if the broad 11-package SCC remains: other
-paths may still connect these three packages. Compare `module_edges` and
+The initial *cycle edge* disappeared while the broad 11-package SCC remained:
+other paths still connected these three packages. Compare `module_edges` and
 `cycle_edges`, not only the largest-SCC size.
+
+## Remaining SCC removal
+
+Two upward dependencies kept the entire remaining component connected:
+
+- `montecarlo.runner.transition_emission -> energy_grid.component_support`
+  reached grid derivation, remote execution and validation through a package
+  that also owned a small supported-band value contract.
+- `campaign.resolution -> execution._simulation` reached execution artifacts
+  and checkpoint drivers just to validate an executor and describe its policy.
+
+The supported-band values and validation now live in `_component_support`,
+beside the existing `_grid_semantics` leaf. Executor admission and provenance
+live in `_executor_contract`; its type-only `Executor` reference does not load
+execution drivers. The original modules re-export the same objects, with their
+original `__module__` values retained for pickle/global lookup compatibility.
+No algorithms, signatures, error messages or numerical defaults change.
+
+These are real lower-level implementations, rather than deferred imports back
+into the drivers. Fresh-process tests import and exercise both contracts without
+loading any of the former SCC packages. Compatibility tests cover alias and
+pickle identity; existing executor simulation/artifact and optical scorer tests
+cover their consumers.
+
+Three import-linter contracts prevent either upward edge from returning and
+prevent the new leaves from importing any former SCC package, including through
+indirect paths. A graph regression test requires every top-level package to
+remain a singleton component. The generated graph has no static package cycles.
+This remains a package-level result: the scanner excludes facade re-exports,
+type-only imports and root-level leaves, and does not resolve dynamic imports.
 
 ## Follow-up priorities
 
@@ -100,7 +130,7 @@ paths may still connect these three packages. Compare `module_edges` and
   pickle identities.
 - Separate engine-facing observation data from orchestration and persistence;
   examine `campaign -> observations -> results -> campaign` paths.
-- Audit `energy_grid`/`checkpoints` and `remote`/`runs` host-side drivers, then
-  add narrow *direct* import contracts after individual edges are removed.
+- Keep the now-directional `energy_grid`/`checkpoints` and `remote`/`runs`
+  dependencies below their callers; the acyclic graph test guards regressions.
 - Audit deferred/dynamic imports, subprocess worker startup, and package
   `__getattr__` facades separately from static SCC metrics.

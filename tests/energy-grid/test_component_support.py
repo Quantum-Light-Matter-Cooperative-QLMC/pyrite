@@ -1,5 +1,7 @@
 """Optical source-only grids never relax another component's data support."""
 
+import pickle
+
 import numpy as np
 import pytest
 
@@ -11,6 +13,18 @@ from pyrite.materials.optical import gold_rakic_response
 
 def _optical():
     return ComponentSupport("Au", "transition_radiation", gold_rakic_response().bands_eV)
+
+
+def test_component_contract_retains_import_and_pickle_identity():
+    from pyrite import _component_support
+
+    assert ComponentSupport is _component_support.ComponentSupport
+    assert component_grid is _component_support.component_grid
+    assert ComponentSupport.__module__ == "pyrite.energy_grid.component_support"
+    assert component_grid.__module__ == "pyrite.energy_grid.component_support"
+    support = _optical()
+    assert pickle.loads(pickle.dumps(support)) == support
+    assert pickle.loads(pickle.dumps(component_grid)) is component_grid
 
 
 def test_optical_grid_is_explicit_and_retains_nodes_and_midpoint_bins():

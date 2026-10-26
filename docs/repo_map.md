@@ -416,6 +416,9 @@ their historical expansion. `campaign/lowering.py` projects
 `Numerics.energy_bins` onto the legacy campaign adapter, whose `energy_bins`
 field feeds the existing case builder. Detectors own acceptance and response.
 
+`_executor_contract.py` owns import-light executor admission/provenance shared by
+composition and dispatch; `execution._simulation` preserves the legacy aliases.
+
 `observations/spec.py::Observation` owns independent detector references,
 response, acquisition and pixel sampling requests. Its binder validates physical
 geometry and legacy conflicts before case preparation, normalizing into the
@@ -967,7 +970,8 @@ a separately bounded prefix of initial sampled particles.
 pinned CC0 Rakić Au record under `data/optical/`. The source-only
 `runner/transition_emission.py::case_layer_eps` keyword `layer_responses`
 associates a provider with every layer without changing persisted cases.
-`energy_grid/component_support.py` validates explicit medium/component bands
+`_component_support.py` (re-exported by `energy_grid/component_support.py`)
+validates explicit medium/component bands
 for node or midpoint-bin grids; it leaves the shared X-ray floor unchanged.
 Independent derivation: `validation/radiation-physics/optical-material-response.md`.
 Real-hardware check: `checks/optical_response_cuda.py`, run through remote staging

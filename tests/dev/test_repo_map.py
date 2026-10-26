@@ -1,5 +1,7 @@
 """Tests for the generated repository dependency map."""
 
+import subprocess
+import sys
 from pathlib import Path
 
 from pyrite.devtools import repo_map
@@ -48,6 +50,38 @@ def test_observations_do_not_import_checkpoint_drivers() -> None:
     _, dependencies = repo_map.package_dependencies(root / "src")
 
     assert ("observations", "checkpoints") not in dependencies
+
+
+def test_domain_package_graph_has_no_cycles() -> None:
+    root = Path(__file__).resolve().parents[2]
+    report = repo_map.dependency_report(root / "src")
+
+    assert report["cyclic_components"] == []
+    assert report["summary"]["largest_component_size"] == 1
+
+
+def test_shared_contract_imports_do_not_initialize_domain_packages() -> None:
+    script = """
+import sys
+from types import SimpleNamespace
+from pyrite._component_support import ComponentSupport, component_grid
+from pyrite._executor_contract import validate_executor, execution_provenance
+
+support = ComponentSupport("test", "source", ((1.0, 3.0),))
+assert list(component_grid([1.0, 2.0], required=(("test", "source"),), support=(support,))) == [1.0, 2.0]
+executor = SimpleNamespace(execute=lambda *args, **kwargs: [])
+validate_executor(executor, SimpleNamespace(transport_core="auto"))
+assert execution_provenance(executor) == {"executor": "types.SimpleNamespace"}
+drivers = {
+    "campaign", "checkpoints", "energy_grid", "execution", "montecarlo",
+    "observations", "perf", "remote", "results", "runs", "validation",
+}
+assert not {name.split(".")[1] for name in sys.modules if name.startswith("pyrite.")} & drivers
+"""
+    result = subprocess.run(
+        [sys.executable, "-c", script], capture_output=True, text=True, timeout=15
+    )
+    assert result.returncode == 0, result.stderr
 
 
 def test_json_report_exposes_exact_edges_and_cycles() -> None:
