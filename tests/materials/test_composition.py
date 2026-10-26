@@ -59,13 +59,13 @@ def test_legacy_callers_pass_their_selected_catalog_and_keep_case_rules(
     assert api._resolved_composition("external-foil") == expected
     assert observation._resolved_composition("external-foil") == expected
     assert attenuation._resolve_composition("external-foil") == expected
-    assert pr.FilterPlate("external-foil", 0.1, (1, 1), pr.PlanarPose((0, 0, 10))).material == (
-        "external-foil"
-    )
+    assert pr.geometry.FilterPlate(
+        "external-foil", 0.1, (1, 1), pr.detectors.PlanarPose((0, 0, 10))
+    ).material == ("external-foil")
     with pytest.raises(ValueError, match="unknown substrate"):
         geometry.substrate_composition("HOPG")
     with pytest.raises(ValueError, match="unknown FilterPlate material"):
-        pr.FilterPlate("EXTERNAL-FOIL", 0.1, (1, 1), pr.PlanarPose((0, 0, 10)))
+        pr.geometry.FilterPlate("EXTERNAL-FOIL", 0.1, (1, 1), pr.detectors.PlanarPose((0, 0, 10)))
     with pytest.raises(ValueError, match="unknown filter material"):
         attenuation._resolve_composition("EXTERNAL-FOIL")
 
@@ -85,7 +85,7 @@ def test_recipe_only_keys_keep_contextual_rejections(selected_catalog, monkeypat
     with pytest.raises(ValueError, match="unknown substrate"):
         geometry.substrate_composition("recipe-only")
     with pytest.raises(ValueError, match="unknown FilterPlate material"):
-        pr.FilterPlate("recipe-only", 0.1, (1, 1), pr.PlanarPose((0, 0, 10)))
+        pr.geometry.FilterPlate("recipe-only", 0.1, (1, 1), pr.detectors.PlanarPose((0, 0, 10)))
     with pytest.raises(ValueError, match="expected a catalog crystal or medium key"):
         attenuation._resolve_composition("recipe-only")
 
@@ -94,6 +94,6 @@ def test_recipe_only_keys_keep_contextual_rejections(selected_catalog, monkeypat
 def test_inline_validation_remains_at_filter_and_attenuation_boundaries(composition):
     medium = MediumSpec("invalid", composition)
     with pytest.raises(ValueError, match="FilterPlate MediumSpec composition"):
-        pr.FilterPlate(medium, 0.1, (1, 1), pr.PlanarPose((0, 0, 10)))
+        pr.geometry.FilterPlate(medium, 0.1, (1, 1), pr.detectors.PlanarPose((0, 0, 10)))
     with pytest.raises(ValueError, match="positive element number densities"):
         attenuation._resolve_composition(medium)

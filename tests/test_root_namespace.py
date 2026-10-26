@@ -11,36 +11,54 @@ from pathlib import Path
 import pytest
 
 import pyrite
-from pyrite._api_deprecations import API_DEPRECATIONS, ROOT_API_REPLACEMENTS
+
+REMOVED_ROOT_NAMES = (
+    "Acquisition",
+    "AdaptiveSampling",
+    "AngularAcceptance",
+    "BlazedGrooves",
+    "BunchFrontTilt",
+    "BunchLength",
+    "CrystalCut",
+    "CxrReflections",
+    "EnergyBins",
+    "Filter",
+    "FilterPlate",
+    "FixedSampling",
+    "Footprint",
+    "GdfSource",
+    "IdealPhotonCounter",
+    "Layer",
+    "NativeAcquisition",
+    "Offsets",
+    "PixelGrid",
+    "PixelScorer",
+    "PlanarDetector",
+    "PlanarPose",
+    "PointBunch",
+    "PointSpot",
+    "Precision",
+    "RadiationNumerics",
+    "RectangularBody",
+    "ResolvedObservation",
+    "SensorAcceptance",
+    "Slab",
+    "Spot",
+    "Stack",
+    "SubstanceRef",
+    "TransportNumerics",
+    "TransverseSpot",
+    "directional_source",
+    "directional_sources",
+    "load_numerics",
+    "load_physics",
+)
 
 
-@pytest.mark.parametrize("spelling,replacement", ROOT_API_REPLACEMENTS.items())
-def test_deprecated_alias_warns_on_repeated_access_and_keeps_identity(spelling, replacement):
-    name = spelling.removeprefix("pyrite.")
-    module, attribute = replacement.rsplit(".", 1)
-    canonical = getattr(importlib.import_module(module), attribute)
-    entry = API_DEPRECATIONS[spelling]
-    assert entry.deprecated_in == "0.20.5"
-    assert entry.remove_in == "0.22.0"
-    for _ in range(2):
-        with pytest.warns(DeprecationWarning, match=entry.remove_in) as records:
-            assert getattr(pyrite, name) is canonical
-        assert replacement in str(records[0].message)
-        assert records[0].filename == __file__
-        assert name not in vars(pyrite)
-
-
-def test_warning_filter_changes_are_respected_after_first_access():
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", DeprecationWarning)
-        first = pyrite.FixedSampling
-    with warnings.catch_warnings():
-        warnings.simplefilter("error", DeprecationWarning)
-        with pytest.raises(DeprecationWarning, match="pyrite.config.FixedSampling"):
-            _ = pyrite.FixedSampling
-    from pyrite.config import FixedSampling
-
-    assert first is FixedSampling
+@pytest.mark.parametrize("name", REMOVED_ROOT_NAMES)
+def test_due_root_alias_is_no_longer_exported(name):
+    with pytest.raises(AttributeError):
+        getattr(pyrite, name)
 
 
 def test_root_discovery_and_metadata_do_not_resolve_domain_exports():
@@ -84,8 +102,7 @@ def test_retained_and_deferred_root_exports_do_not_warn():
     with warnings.catch_warnings():
         warnings.simplefilter("error", DeprecationWarning)
         for name in pyrite._PUBLIC_OBJECTS:
-            if f"pyrite.{name}" not in ROOT_API_REPLACEMENTS:
-                assert getattr(pyrite, name) is not None
+            assert getattr(pyrite, name) is not None
 
 
 def test_documented_root_classification_matches_governed_inventory():

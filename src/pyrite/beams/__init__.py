@@ -50,7 +50,17 @@ _EXPORTS = {
     "TransverseSpot": ("pyrite.campaign.beam", "TransverseSpot"),
 }
 
-__all__ = list(_EXPORTS)
+__all__ = [
+    "Beam",
+    "BunchFrontTilt",
+    "BunchLength",
+    "GdfSource",
+    "Offsets",
+    "PointBunch",
+    "PointSpot",
+    "Spot",
+    "TransverseSpot",
+]
 
 
 def __getattr__(name: str) -> Any:

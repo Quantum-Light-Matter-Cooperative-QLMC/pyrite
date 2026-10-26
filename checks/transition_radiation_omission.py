@@ -87,18 +87,18 @@ SCENES = (
 def _simulate(scene: Scene, grid: np.ndarray, trials: int):
     beam = pr.Beam(
         energy_keV=scene.kinetic_keV,
-        transverse=pr.TransverseSpot(fwhm_x_mm=1.0),
-        longitudinal=pr.PointBunch(),
+        transverse=pr.beams.TransverseSpot(fwhm_x_mm=1.0),
+        longitudinal=pr.beams.PointBunch(),
     )
-    footprint = pr.Footprint(5.0, 5.0)
+    footprint = pr.geometry.Footprint(5.0, 5.0)
     if len(scene.layers) == 1:
         material, thickness = scene.layers[0]
-        target = pr.Slab(
+        target = pr.geometry.Slab(
             material, thickness_ang=thickness, tilt_deg=scene.tilt_deg, footprint=footprint
         )
     else:
-        target = pr.Stack(
-            tuple(pr.Layer(m, thickness_ang=t) for m, t in scene.layers),
+        target = pr.geometry.Stack(
+            tuple(pr.geometry.Layer(m, thickness_ang=t) for m, t in scene.layers),
             tilt_deg=scene.tilt_deg,
             footprint=footprint,
         )
@@ -111,7 +111,9 @@ def _simulate(scene: Scene, grid: np.ndarray, trials: int):
         pr.Detector(scene.theta_obs_deg),
         physics=pr.Physics(),
         numerics=pr.Numerics(
-            cxr_trials=trials, brem_trials=trials, energy_bins=pr.EnergyBins(cxr=cxr, brem=grid)
+            cxr_trials=trials,
+            brem_trials=trials,
+            energy_bins=pr.detectors.EnergyBins(cxr=cxr, brem=grid),
         ),
     )
     return result.brem.photon_energy_eV, result.brem.density

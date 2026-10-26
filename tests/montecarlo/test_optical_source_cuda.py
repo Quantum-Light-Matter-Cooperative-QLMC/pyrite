@@ -166,9 +166,15 @@ def test_real_case_transport_to_native_device_source():
     )
 
     scene = pr.Scene(
-        pr.Beam(energy_keV=30.0, transverse=pr.PointSpot(), longitudinal=pr.PointBunch()),
-        pr.Slab(
-            "hopg", 1e4, tilt_deg=0.0, footprint=pr.Footprint(5.0, 5.0), allow_normal_incidence=True
+        pr.Beam(
+            energy_keV=30.0, transverse=pr.beams.PointSpot(), longitudinal=pr.beams.PointBunch()
+        ),
+        pr.geometry.Slab(
+            "hopg",
+            1e4,
+            tilt_deg=0.0,
+            footprint=pr.geometry.Footprint(5.0, 5.0),
+            allow_normal_incidence=True,
         ),
         pr.Detector(),
         physics=pr.Physics(

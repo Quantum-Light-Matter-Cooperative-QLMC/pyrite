@@ -34,7 +34,7 @@ class FixedSampling:
 class AdaptiveSampling(Precision):
     """Adaptive CXR/brem stopping with the existing validated estimator.
 
-    This is a typed name for the existing :class:`~pyrite.Precision` contract.
+    This is a typed name for the existing :class:`~pyrite.config.Precision` contract.
     Historical ``Precision.to_dict()`` uses ``'line'`` in stored policy
     identities; this subclass deliberately inherits that serialization and
     the independent brem-prefix stopping behavior without modification.

@@ -34,8 +34,8 @@ _NUMERICS = pr.Numerics(
 
 def _scene(mode="history"):
     return pr.Scene(
-        pr.Beam(energy_keV=30.0, transverse=pr.Spot(), longitudinal=pr.PointBunch()),
-        pr.Slab("hopg", thickness_ang=1e4, footprint=pr.Footprint(5.0, 5.0)),
+        pr.Beam(energy_keV=30.0, transverse=pr.beams.Spot(), longitudinal=pr.beams.PointBunch()),
+        pr.geometry.Slab("hopg", thickness_ang=1e4, footprint=pr.geometry.Footprint(5.0, 5.0)),
         pr.Detector(),
         physics=pr.Physics(
             transition_radiation=mode, radiative_model="uncoupled", bremsstrahlung_model="eedl"

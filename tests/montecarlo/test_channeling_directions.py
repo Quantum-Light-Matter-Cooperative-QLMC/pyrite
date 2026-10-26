@@ -12,9 +12,13 @@ from pyrite.montecarlo import runner
 @pytest.fixture(scope="module")
 def case():
     scene = pr.Scene(
-        pr.Beam(5000.0, transverse=pr.Spot(), longitudinal=pr.PointBunch()),
-        pr.Slab(
-            "silicon", 5000.0, tilt_deg=3.0, tilt_azim_deg=45.0, footprint=pr.Footprint(5.0, 5.0)
+        pr.Beam(5000.0, transverse=pr.beams.Spot(), longitudinal=pr.beams.PointBunch()),
+        pr.geometry.Slab(
+            "silicon",
+            5000.0,
+            tilt_deg=3.0,
+            tilt_azim_deg=45.0,
+            footprint=pr.geometry.Footprint(5.0, 5.0),
         ),
         pr.Detector(),
         physics=pr.Physics(
@@ -66,21 +70,21 @@ def test_directions_rescore_channeling_from_one_transport(case, monkeypatch):
 @pytest.mark.slow
 @pytest.mark.parametrize("acquisition", [False, True])
 def test_planar_observation_carries_channeling_once(case, monkeypatch, acquisition):
-    detector = pr.PlanarDetector(
-        pr.PlanarPose((0.0, 0.0, 50.0)),
-        pixels=pr.PixelGrid((1, 1), (0.1, 0.1)),
-        response=pr.IdealPhotonCounter(),
-        scorer=pr.PixelScorer((1, 1)),
+    detector = pr.detectors.PlanarDetector(
+        pr.detectors.PlanarPose((0.0, 0.0, 50.0)),
+        pixels=pr.detectors.PixelGrid((1, 1), (0.1, 0.1)),
+        response=pr.detectors.IdealPhotonCounter(),
+        scorer=pr.config.PixelScorer((1, 1)),
     )
     scene = pr.Scene(
-        pr.Beam(5000.0, transverse=pr.Spot(), longitudinal=pr.PointBunch()),
-        pr.Slab("silicon", 5000.0, footprint=pr.Footprint(5.0, 5.0)),
+        pr.Beam(5000.0, transverse=pr.beams.Spot(), longitudinal=pr.beams.PointBunch()),
+        pr.geometry.Slab("silicon", 5000.0, footprint=pr.geometry.Footprint(5.0, 5.0)),
         detector,
         physics=pr.Physics(
             channeling_model="planar", channeling_plane=(1, -1, 0), radiative_model="uncoupled"
         ),
         acquisition=(
-            pr.Acquisition(exposure_s=1.0, measured_edges_eV=(0, 1500, 3000))
+            pr.observations.Acquisition(exposure_s=1.0, measured_edges_eV=(0, 1500, 3000))
             if acquisition
             else None
         ),

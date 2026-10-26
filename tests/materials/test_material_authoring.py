@@ -290,13 +290,13 @@ def test_registered_medium_lowers_into_real_layered_case():
     built = build_medium("layer-silica", formula="SiO2", density_g_cm3=2.2)
     save_material(built)
     save_material(build_crystal("layer-film", crystal="silicon"))
-    target = pr.Stack(
-        layers=(pr.Layer("layer-film", 100), pr.Layer(built.name, 100)),
+    target = pr.geometry.Stack(
+        layers=(pr.geometry.Layer("layer-film", 100), pr.geometry.Layer(built.name, 100)),
         tilt_deg=30,
         footprint=None,
     )
     scene = pr.Scene(
-        beam=pr.Beam(energy_keV=30, transverse=pr.Spot(), longitudinal=pr.PointBunch()),
+        beam=pr.Beam(energy_keV=30, transverse=pr.beams.Spot(), longitudinal=pr.beams.PointBunch()),
         target=target,
         detector=pr.Detector(),
         physics=pr.Physics(inelastic_model="continuous", brem_source="none"),
@@ -306,7 +306,7 @@ def test_registered_medium_lowers_into_real_layered_case():
         pr.Numerics(
             cxr_trials=1,
             brem_trials=1,
-            energy_bins=pr.EnergyBins(cxr=[1000, 1050], brem=[1000, 1050]),
+            energy_bins=pr.detectors.EnergyBins(cxr=[1000, 1050], brem=[1000, 1050]),
         ),
     )
     assert tuple(case["abs_layers"][1][2]) == built.composition

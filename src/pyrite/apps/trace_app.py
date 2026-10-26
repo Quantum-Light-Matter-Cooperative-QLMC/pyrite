@@ -25,11 +25,10 @@ def _():
         theme_switch,
     )
     from pyrite.apps._widgets import MaterialSelect
-    from pyrite.apps.viewer import saved_capture_panel
+    from pyrite.apps.viewer import render_trace_animation, saved_capture_panel
 
-    # penetration_survival_chart / trajectory_chart can exceed Vega-Lite's
-    # default 5000-row cap; vegafusion (shipped with marimo[recommended])
-    # lifts it, falling back to disabling the cap outright.
+    # penetration_survival_chart / trajectory_chart can exceed Vega-Lite's default 5000-row cap; vegafusion
+    # (shipped with marimo[recommended]) lifts it, falling back to disabling the cap outright.
     try:
         alt.data_transformers.enable("vegafusion")
     except Exception:
@@ -53,9 +52,7 @@ def _():
     from pyrite.plots.plotly.crystal_lattice import crystal_lattice_figure
     from pyrite.plots.plotly.render import (
         cached_render_path,
-        prune_render_cache,
         render_cache_key,
-        render_reveal_animation,
     )
     from pyrite.plots.plotly.trajectories import (
         VOLUME_CAMERA_ANGLES,
@@ -66,6 +63,7 @@ def _():
 
     return (
         saved_capture_panel,
+        render_trace_animation,
         CAMERA_PRESETS,
         CATALOG,
         DEFAULT_ANGLES,
@@ -85,11 +83,9 @@ def _():
         np,
         page_title,
         penetration_survival_chart,
-        prune_render_cache,
         resolve_scene_camera,
         resolved_theme,
         render_cache_key,
-        render_reveal_animation,
         style_sheet,
         theme_switch,
         trajectory_chart,
@@ -135,8 +131,8 @@ def _(CAMERA_PRESETS, mo):
         _azimuth, _elevation, _distance = default_angles
         return (
             mo.ui.dropdown(_VIEW_OPTIONS, value="default", label="view"),
-            # Azimuth orbits ABOUT this axis, so z alone can never bring the
-            # camera over the z pole; x or y re-poles the sphere to sweep there.
+            # Azimuth orbits ABOUT this axis, so z alone can never bring the camera over the z pole; x or y
+            # re-poles the sphere to sweep there.
             mo.ui.dropdown(["z", "x", "y"], value="z", label="orbit axis"),
             mo.ui.slider(-180, 180, value=round(_azimuth), step=1, label="azimuth"),
             mo.ui.slider(-89, 89, value=round(_elevation), step=1, label="elevation"),
@@ -154,10 +150,9 @@ def _(CAMERA_PRESETS, mo):
 
 @app.cell
 def _(CATALOG, MaterialSelect, mo):
-    # Unlike analysis_app, every view here runs transport (or draws the lattice)
-    # straight from the catalog's configured scan grids, so no checkpoint is
-    # needed and no material is ever disabled. Same persisted/CLI default
-    # resolution as analysis_app for a consistent landing selection.
+    # Unlike analysis_app, every view here runs transport (or draws the lattice) straight from the catalog's
+    # configured scan grids, so no checkpoint is needed and no material is ever disabled. Same persisted/CLI
+    # default resolution as analysis_app for a consistent landing selection.
     from pyrite.apps.analyze import get_default_material, initial_material
 
     _options = sorted(
@@ -219,10 +214,9 @@ def _(default_settings, material_ui):
 
 @app.cell
 def _(CATALOG, MATERIAL, fmt_thickness, mo):
-    # The penetration figures run transport directly, so use the selected
-    # material's configured scan grids instead of requiring a checkpoint.
-    # MATERIAL is only None with an empty catalog; keep this control cell valid
-    # with inert values so the app still loads.
+    # The penetration figures run transport directly, so use the selected material's configured scan grids
+    # instead of requiring a checkpoint. MATERIAL is only None with an empty catalog; keep this control cell
+    # valid with inert values so the app still loads.
     if MATERIAL is None:
         _energy_values = (1.0,)
         _thickness_values = (10.0,)
@@ -241,7 +235,21 @@ def _(CATALOG, MATERIAL, fmt_thickness, mo):
         value=f"{_energy_values[0]:g} keV",
         label="",
     )
-    _log_energy_values = (10, 20, 50, 100, 200, 500, 1_000, 2_000, 5_000, 10_000, 20_000, 50_000, 100_000)
+    _log_energy_values = (
+        10,
+        20,
+        50,
+        100,
+        200,
+        500,
+        1_000,
+        2_000,
+        5_000,
+        10_000,
+        20_000,
+        50_000,
+        100_000,
+    )
     _log_energy_options = {
         f"{value / 1000:g} MeV" if value >= 1000 else f"{value:g} keV": value
         for value in _log_energy_values
@@ -284,9 +292,9 @@ def _(CATALOG, MATERIAL, fmt_thickness, mo):
         start=0.0, stop=89.9, step=0.1, value=_tilt_values[0], label="(deg)"
     )
 
-    # Azimuth is not part of the material's scan grid (trajectory_sweep pins it
-    # to normal incidence by default) -- offer a fixed preset list instead of a
-    # Presets/Custom toggle like the other penetration knobs.
+    # Azimuth is not part of the material's scan grid (trajectory_sweep pins it to normal incidence by
+    # default) -- offer a fixed preset list instead of a Presets/Custom toggle like the other penetration
+    # knobs.
     _azim_values = (100.0, 125.0, 140.0, 165.0, 180.0)
     penetration_azim_ui = mo.ui.dropdown(
         {f"{value:g} deg": value for value in _azim_values},
@@ -348,11 +356,10 @@ def _(
 
 @app.cell
 def _(mo):
-    # Off by default: the fitted-window 3D view exaggerates lateral scale so the
-    # cascade is legible. Checking this redraws the box at the true 5x5 mm crystal
-    # footprint and overlays the beam entry footprint, which outgrows the crystal
-    # at grazing tilt (1/cos stretch). The ~micron cascade then collapses toward
-    # the origin -- expected at true scale.
+    # Off by default: the fitted-window 3D view exaggerates lateral scale so the cascade is legible.
+    # Checking this redraws the box at the true 5x5 mm crystal footprint and overlays the beam entry
+    # footprint, which outgrows the crystal at grazing tilt (1/cos stretch). The ~micron cascade then
+    # collapses toward the origin -- expected at true scale.
     penetration_realistic_ui = mo.ui.checkbox(value=False, label="")
     return (penetration_realistic_ui,)
 
@@ -380,9 +387,8 @@ def _(mo):
 
 @app.cell
 def _(mo):
-    # Regenerate's click COUNT feeds the trajectory `seed`: every click draws a
-    # fresh transport, and everything else re-renders with the SAME seed until
-    # Regenerate is clicked again.
+    # Regenerate's click COUNT feeds the trajectory `seed`: every click draws a fresh transport, and
+    # everything else re-renders with the SAME seed until Regenerate is clicked again.
     penetration_regen_ui = mo.ui.button(
         value=0, on_click=lambda value: value + 1, label="🎲 Regenerate"
     )
@@ -393,9 +399,8 @@ def _(mo):
         value=1.0, start=0.001, step=0.1, label="Beam FWHM (mm)"
     )
     # Blazed sawtooth entrance-face grooves (Task 6 / docs/superpowers/plans/
-    # 2026-07-23-blazed-groove-geometry.md). 0 = off (flat face). Grooves are only
-    # valid at azimuth = 180 deg with 0 < polar tilt < 90 deg; the tab applies
-    # them only then and shows a note otherwise.
+    # 2026-07-23-blazed-groove-geometry.md). 0 = off (flat face). Grooves are only valid at azimuth = 180
+    # deg with 0 < polar tilt < 90 deg; the tab applies them only then and shows a note otherwise.
     penetration_groove_ui = mo.ui.number(
         value=0.0, start=0.0, step=1000.0, label="Groove spacing (Å, 0 = off)"
     )
@@ -435,9 +440,9 @@ def _(mo):
 
 @app.cell
 def _(VOLUME_CAMERA_ANGLES, camera_controls):
-    # Seeded from the volume figure's own hand-tuned eye, so "default" is the
-    # long-standing view, exactly. Named `_camera_` throughout to keep these
-    # apart from the crystal TILT azimuth the transport sweep reads.
+    # Seeded from the volume figure's own hand-tuned eye, so "default" is the long-standing view, exactly.
+    # Named `_camera_` throughout to keep these apart from the crystal TILT azimuth the transport sweep
+    # reads.
     (
         penetration_camera_view_ui,
         penetration_camera_orbit_ui,
@@ -464,9 +469,9 @@ def _(
     penetration_camera_zoom_ui,
     resolve_scene_camera,
 ):
-    # ONE camera dict for both consumers: the lazy tab body (live figure +
-    # cache-key lookup) and the eager render cell (the render itself). If they
-    # disagreed, the tab would look for a cache entry the render never wrote.
+    # ONE camera dict for both consumers: the lazy tab body (live figure + cache-key lookup) and the eager
+    # render cell (the render itself). If they disagreed, the tab would look for a cache entry the render
+    # never wrote.
     penetration_camera = resolve_scene_camera(
         penetration_camera_view_ui.value,
         penetration_camera_azim_ui.value,
@@ -475,8 +480,8 @@ def _(
         default_angles=VOLUME_CAMERA_ANGLES,
         orbit_axis=penetration_camera_orbit_ui.value,
     )
-    # This scene stays perspective, so the eye distance the zoom rides on is
-    # read as written -- no aspect-ratio workaround needed here.
+    # This scene stays perspective, so the eye distance the zoom rides on is read as written -- no
+    # aspect-ratio workaround needed here.
     return (penetration_camera,)
 
 
@@ -555,10 +560,9 @@ def _(
             "and layer interfaces retain true scale. Enable secondaries to generate shell collision tracks; "
             "track hover shows each parent and generation. The generation and energy controls filter both views. "
         )
-        # Blazed grooves: valid only at azimuth 180 deg with 0 < polar tilt < 90.
-        # Only feed the knob to trajectory_sweep when the selected azimuth admits
-        # it; otherwise show a note and draw the ungrooved slab. build_cases /
-        # Sweep still validate (tilt, substrate/stack, footprint) and raise -- a
+        # Blazed grooves: valid only at azimuth 180 deg with 0 < polar tilt < 90. Only feed the knob to
+        # trajectory_sweep when the selected azimuth admits it; otherwise show a note and draw the ungrooved
+        # slab. build_cases / Sweep still validate (tilt, substrate/stack, footprint) and raise -- a
         # substrate material or tilt=0 falls back to ungrooved with the reason.
         _groove_req = float(penetration_groove_ui.value or 0.0)
         if penetration_secondaries_ui.value and _groove_req > 0:
@@ -589,16 +593,16 @@ def _(
             _sweep = _make_sweep(_groove_spacing)
             _traj = build_configured_cases(_sweep, settings, check_kinematic_validity=False)
         except ValueError as _exc:
-            # geometry/material rejects grooves (tilt=0, substrate/stack, ...):
-            # fall back to the flat face and surface the reason.
+            # geometry/material rejects grooves (tilt=0, substrate/stack, ...): fall back to the flat face
+            # and surface the reason.
             _groove_spacing = None
             _groove_note = mo.md(f"*Grooves not applied: {_exc}*")
             _sweep = _make_sweep(None)
             _traj = build_configured_cases(_sweep, settings, check_kinematic_validity=False)
         if not _traj:
             return mo.vstack([_md, mo.md("*No trajectory cases.*")])
-        # The sweep has one selected energy and tilt; keep the nearest-case guard
-        # in case a future sweep adds a surrounding grid.
+        # The sweep has one selected energy and tilt; keep the nearest-case guard in case a future sweep
+        # adds a surrounding grid.
         _nc = min(_traj, key=lambda c: (abs(c["tilt_deg"] - _angle), c["E0_keV"]))
         _secondary_note = None
         if penetration_secondaries_ui.value:
@@ -662,9 +666,8 @@ def _(
             _data = trajectory_volume_data(
                 _nc, Ne=_Ne, seed=_seed, realistic=_realistic, beam_fwhm_mm=_beam_fwhm
             )
-            # _nc rides along so the eager render cell (below the tabs) can
-            # feed the SAME case + data to render_reveal_animation without
-            # redoing transport.
+            # _nc rides along so the eager render cell (below the tabs) can feed the SAME case + data to
+            # render_reveal_animation without redoing transport.
             set_penetration_data((_data_key, _data, _nc))
 
         # Filter the cached full-reveal data before building display traces.
@@ -681,14 +684,13 @@ def _(
             reveal_until_fs=None,
             logarithmic_color=penetration_log_color_ui.value,
         )
-        # Full-row plot now that the 2D cross-section moved down beside the
-        # survival chart; widened past Plotly's 700 default now the colorbar
-        # (restored below) has room without cramping the scene.
+        # Full-row plot now that the 2D cross-section moved down beside the survival chart; widened past
+        # Plotly's 700 default now the colorbar (restored below) has room without cramping the scene.
         if _volume is not None:
             apply_plotly_theme(_volume, _theme)
             _volume.update_layout(width=900)
-            # Explicit camera, so the modebar PNG and the offscreen render
-            # below both frame the scene the way this tab shows it.
+            # Explicit camera, so the modebar PNG and the offscreen render below both frame the scene the
+            # way this tab shows it.
             _volume.update_scenes(camera=penetration_camera)
 
         _beam_metrics = initial_state_metrics(
@@ -756,12 +758,11 @@ def _(
             penetration_camera,
         )
         _render_path = cached_render_path(_render_key, ".mp4")
-        # This lazy tab body CANNOT run the render itself: marimo resets
-        # run_button.value to False when the click-triggered update completes,
-        # and lazy tab content is evaluated afterwards in a separate request,
-        # so the value is always False here. The render happens in the eager
-        # cell below the tabs; this body only DISPLAYS -- video gated on the
-        # cached file existing, errors relayed via penetration_render_status.
+        # This lazy tab body CANNOT run the render itself: marimo resets run_button.value to False when the
+        # click-triggered update completes, and lazy tab content is evaluated afterwards in a separate
+        # request, so the value is always False here. The render happens in the eager cell below the tabs;
+        # this body only DISPLAYS -- video gated on the cached file existing, errors relayed via
+        # penetration_render_status.
         _render_status = get_penetration_render_status()
         _render_error = None
         if (
@@ -773,8 +774,8 @@ def _(
         if _render_error is not None:
             _render_block = _render_error
         elif _render_path.exists():
-            # File handle (not str path) so marimo serves the bytes itself
-            # instead of pointing the browser at a local filesystem path.
+            # File handle (not str path) so marimo serves the bytes itself instead of pointing the browser
+            # at a local filesystem path.
             _render_block = mo.video(
                 src=_render_path.open("rb"),
                 controls=True,
@@ -790,9 +791,8 @@ def _(
                 f"cached per parameter set afterwards).*"
             )
 
-        # Cache lives under ~/.cache/pyrite/viewer-renders, easy to forget
-        # about; a download button lets the user pull a render straight to
-        # their own filesystem without knowing that path.
+        # Cache lives under ~/.cache/pyrite/viewer-renders, easy to forget about; a download button lets the
+        # user pull a render straight to their own filesystem without knowing that path.
         _save_row = mo.hstack(
             [
                 mo.download(
@@ -810,17 +810,16 @@ def _(
         def _row_label(text):
             return mo.md(text).style({"min-width": "9rem", "display": "inline-block"})
 
-        # Beam FWHM only matters in true-beamsize mode; gray it out (dim +
-        # non-interactive) rather than hide it, so its value stays visible.
+        # Beam FWHM only matters in true-beamsize mode; gray it out (dim + non-interactive) rather than hide
+        # it, so its value stays visible.
         _beam_fwhm_display = (
             penetration_beam_fwhm_ui
             if _realistic
             else penetration_beam_fwhm_ui.style({"opacity": "0.4", "pointer-events": "none"})
         )
 
-        # Built eagerly (cheap at Ne=40); no longer behind a lazy accordion.
-        # Sits beside the survival chart now, not the 3D plot, so back to its
-        # own 480 default width.
+        # Built eagerly (cheap at Ne=40); no longer behind a lazy accordion. Sits beside the survival chart
+        # now, not the 3D plot, so back to its own 480 default width.
         _cross_section_chart = trajectory_chart(_nc, data=_view_data, width=420)
         _cross_section_block = (
             apply_altair_theme(_cross_section_chart, _theme)
@@ -985,28 +984,26 @@ def _(
 
 @app.cell
 def _(DEFAULT_ANGLES, camera_controls, mo):
-    # A few unit cells in each direction (a x b x c) gives enough of the stack
-    # to read layering without the scene turning to soup.
+    # A few unit cells in each direction (a x b x c) gives enough of the stack to read layering without the
+    # scene turning to soup.
     crystal_na_ui = mo.ui.slider(1, 4, value=3, step=1, label="cells a")
     crystal_nb_ui = mo.ui.slider(1, 4, value=3, step=1, label="cells b")
     crystal_nc_ui = mo.ui.slider(1, 3, value=2, step=1, label="cells c")
     crystal_bonds_ui = mo.ui.switch(value=True, label="show bonds")
     crystal_layers_ui = mo.ui.switch(value=False, label="color by layer")
-    # Arrows are off by default: they dominate the scene and only matter when
-    # reading diffraction families, so the structure view starts uncluttered.
+    # Arrows are off by default: they dominate the scene and only matter when reading diffraction families,
+    # so the structure view starts uncluttered.
     crystal_reciprocal_show_ui = mo.ui.switch(value=False, label="show reciprocal vectors")
     crystal_reciprocal_ui = mo.ui.slider(1, 8, value=1, step=1, label="reciprocal vectors")
-    # Two independent scene toggles: the gridlines are the tiled unit-cell
-    # edges running THROUGH the structure (the depth cue), the axes are the
-    # whole surrounding frame.
+    # Two independent scene toggles: the gridlines are the tiled unit-cell edges running THROUGH the
+    # structure (the depth cue), the axes are the whole surrounding frame.
     crystal_grid_ui = mo.ui.switch(value=True, label="show gridlines")
     crystal_axes_ui = mo.ui.switch(value=True, label="show axes")
-    # Orthographic by default: perspective foreshortening bends parallel cell
-    # edges toward a vanishing point, so columns of atoms only line up on a
-    # zone axis without it.
+    # Orthographic by default: perspective foreshortening bends parallel cell edges toward a vanishing
+    # point, so columns of atoms only line up on a zone axis without it.
     crystal_ortho_ui = mo.ui.switch(value=True, label="orthographic camera")
-    # crystal_lattice_figure ships no camera of its own, so the controls seed
-    # from Plotly's default eye -- "default" reproduces the untouched view.
+    # crystal_lattice_figure ships no camera of its own, so the controls seed from Plotly's default eye --
+    # "default" reproduces the untouched view.
     (
         crystal_view_ui,
         crystal_orbit_ui,
@@ -1090,23 +1087,21 @@ def _(
         )
         apply_plotly_theme(_fig, _theme)
         _fig.update_layout(height=680)
-        # Both applied after the theme, which owns axis colors but not
-        # visibility. One switch takes the entire axis frame down -- walls,
-        # wall rules, ticks, labels, and titles -- via axis-level ``visible``.
+        # Both applied after the theme, which owns axis colors but not visibility. One switch takes the
+        # entire axis frame down -- walls, wall rules, ticks, labels, and titles -- via axis-level
+        # ``visible``.
         _fig.update_scenes(
             xaxis={"visible": crystal_axes_ui.value},
             yaxis={"visible": crystal_axes_ui.value},
             zaxis={"visible": crystal_axes_ui.value},
         )
-        # The gridlines that read as depth are the per-cell edges drawn through
-        # the structure, not anything on the axis walls: that is the ``cell``
-        # trace crystal_lattice_figure adds first.
+        # The gridlines that read as depth are the per-cell edges drawn through the structure, not anything
+        # on the axis walls: that is the ``cell`` trace crystal_lattice_figure adds first.
         _fig.update_traces(visible=crystal_grid_ui.value, selector={"name": "cell"})
-        # One explicit camera carries both the viewpoint and the projection.
-        # Orthographic drops the perspective parallax so parallel lattice
-        # directions stay parallel at every depth; because the camera lives in
-        # the figure spec, the modebar's "Download plot as png" gets this exact
-        # view instead of falling back to the default one.
+        # One explicit camera carries both the viewpoint and the projection. Orthographic drops the
+        # perspective parallax so parallel lattice directions stay parallel at every depth; because the
+        # camera lives in the figure spec, the modebar's "Download plot as png" gets this exact view instead
+        # of falling back to the default one.
         _camera = resolve_scene_camera(
             crystal_view_ui.value,
             crystal_azim_ui.value,
@@ -1118,17 +1113,16 @@ def _(
         )
         _fig.update_scenes(camera=_camera)
         if crystal_ortho_ui.value:
-            # An orthographic projection box is fixed, so the camera distance
-            # the zoom rides on does nothing here. Plotly zooms an ortho scene
-            # by scaling the aspect ratio instead (that is what its own scroll
-            # handler does), and any aspectmode but "manual" would recompute
-            # the ratio and throw this away.
+            # An orthographic projection box is fixed, so the camera distance the zoom rides on does nothing
+            # here. Plotly zooms an ortho scene by scaling the aspect ratio instead (that is what its own
+            # scroll handler does), and any aspectmode but "manual" would recompute the ratio and throw this
+            # away.
             _fig.update_scenes(
                 aspectmode="manual",
                 aspectratio=data_aspect_ratio(_fig, crystal_zoom_ui.value),
             )
-        # Angles only bite under the "custom" view; the arrow count only while
-        # the arrows are drawn. Dim rather than hide, so values stay visible.
+        # Angles only bite under the "custom" view; the arrow count only while the arrows are drawn. Dim
+        # rather than hide, so values stay visible.
         _custom_view = crystal_view_ui.value == "custom"
         _reciprocal_count = dim_unless(crystal_reciprocal_ui, crystal_reciprocal_show_ui.value)
         _controls = mo.hstack(
@@ -1167,8 +1161,8 @@ def _(
 
 @app.cell
 def _(MATERIAL, crystal_tab, mo, selected_penetration_tab):
-    # Two views, one 3D scene each; lazy so the un-viewed tab never runs
-    # transport or builds a lattice figure.
+    # Two views, one 3D scene each; lazy so the un-viewed tab never runs transport or builds a lattice
+    # figure.
     if MATERIAL is None:
         view = mo.callout(
             mo.md("**No materials configured.** Check `data/catalog/`."),
@@ -1197,21 +1191,12 @@ def _(
     penetration_max_generation_ui,
     penetration_min_energy_ui,
     penetration_log_color_ui,
-    prune_render_cache,
     render_cache_key,
-    render_reveal_animation,
+    render_trace_animation,
     set_penetration_render_status,
-    visible_trajectory_data,
 ):
-    # EAGER render cell -- must live outside the lazy tab body. marimo resets
-    # run_button.value to False as soon as the click-triggered update
-    # completes, and lazy tab content re-evaluates afterwards in a separate
-    # request, so a render gated on the button INSIDE the tab never fires.
-    # This cell reruns synchronously on click (it references the button), does
-    # the blocking kaleido/ffmpeg render with a visible progress bar (shown
-    # here, just below the tabs -- close to the button that triggered it, in
-    # the "Trace" tab above), then flips penetration_render_status so the tab
-    # body reruns and picks up the cached video file.
+    # Render eagerly: the button resets before lazy tab reevaluation. Publish status
+    # afterwards so the tab can discover the completed cached movie.
     mo.stop(not penetration_render_button_ui.value)
     _cached = get_penetration_data()
     mo.stop(
@@ -1220,8 +1205,8 @@ def _(
     )
     _data_key, _data, _nc = _cached
     _n_frames = int(penetration_render_frames_ui.value)
-    # Same key recipe as the tab body: _data_key is (name, E0, tilt, azim,
-    # groove, Ne, seed, realistic, beam_fwhm, secondary mode, threshold).
+    # Same key recipe as the tab body: _data_key is (name, E0, tilt, azim, groove, Ne, seed, realistic,
+    # beam_fwhm, secondary mode, threshold).
     _max_generation = int(penetration_max_generation_ui.value)
     _min_energy = float(penetration_min_energy_ui.value)
     _render_key = render_cache_key(
@@ -1242,40 +1227,22 @@ def _(
         penetration_camera,
     )
     _render_path = cached_render_path(_render_key, ".mp4")
-    if not _render_path.exists():
-        try:
-            # ~3 s/frame through kaleido at this figure size, measured on the
-            # Ne=50 hopg case -- surface the wait up front so a multi-minute
-            # blocking render doesn't read as a dead button.
-            with mo.status.progress_bar(
-                total=_n_frames,
-                title="Rendering animation",
-                subtitle=f"{_n_frames} frames, ~3 s each offscreen",
-            ) as _bar:
-
-                def _render_progress_cb(_k, _n, _bar=_bar):
-                    _bar.update()
-
-                render_reveal_animation(
-                    _nc,
-                    visible_trajectory_data(
-                        _data, max_generation=_max_generation, min_energy_keV=_min_energy
-                    ),
-                    _render_path,
-                    realistic=_data_key[7],
-                    beam_fwhm_mm=_data_key[8],
-                    n_frames=_n_frames,
-                    fps=12,
-                    camera=penetration_camera,
-                    logarithmic_color=penetration_log_color_ui.value,
-                    progress_cb=_render_progress_cb,
-                )
-            prune_render_cache()
-            set_penetration_render_status((_render_key, None))
-        except (ImportError, RuntimeError) as _exc:
-            set_penetration_render_status((_render_key, str(_exc)))
-    else:
-        set_penetration_render_status((_render_key, None))
+    set_penetration_render_status(
+        render_trace_animation(
+            mo,
+            _render_key,
+            _render_path,
+            _nc,
+            _data,
+            max_generation=_max_generation,
+            min_energy_keV=_min_energy,
+            realistic=_data_key[7],
+            beam_fwhm_mm=_data_key[8],
+            n_frames=_n_frames,
+            camera=penetration_camera,
+            logarithmic_color=penetration_log_color_ui.value,
+        )
+    )
     return
 
 

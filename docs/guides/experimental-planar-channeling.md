@@ -49,17 +49,17 @@ import numpy as np
 import pyrite as pr
 
 result = pr.simulate(
-    pr.Beam(energy_keV=17_000, transverse=pr.Spot(), longitudinal=pr.PointBunch()),
-    pr.Slab(
+    pr.Beam(energy_keV=17_000, transverse=pr.beams.Spot(), longitudinal=pr.beams.PointBunch()),
+    pr.geometry.Slab(
         "silicon",
         thickness_ang=20_000,
         tilt_deg=3,
         tilt_azim_deg=45,
-        footprint=pr.Footprint(5, 5),
+        footprint=pr.geometry.Footprint(5, 5),
     ),
     pr.Detector(
         0,
-        acceptance=pr.SensorAcceptance(
+        acceptance=pr.detectors.SensorAcceptance(
             distance_mm=1_000,
             width_mm=3,
             height_mm=3,
@@ -73,7 +73,7 @@ result = pr.simulate(
     numerics=pr.Numerics(
         cxr_trials=200,
         brem_trials=200,
-        energy_bins=pr.EnergyBins(
+        energy_bins=pr.detectors.EnergyBins(
             cxr=np.arange(1_000, 24_000, 50),
             brem=np.arange(1_000, 17_000_000, 500),
         ),

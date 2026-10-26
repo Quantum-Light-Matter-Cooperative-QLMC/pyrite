@@ -440,8 +440,13 @@ def test_case_threshold_reaches_runner_transport():
         elastic_model="mott",
     )
     scene = pr.Scene(
-        pr.Beam(energy_keV=20.0, transverse=pr.Spot(), longitudinal=pr.PointBunch()),
-        pr.Slab("silicon", thickness_ang=50000.0, tilt_deg=30.0, footprint=pr.Footprint(5.0, 5.0)),
+        pr.Beam(energy_keV=20.0, transverse=pr.beams.Spot(), longitudinal=pr.beams.PointBunch()),
+        pr.geometry.Slab(
+            "silicon",
+            thickness_ang=50000.0,
+            tilt_deg=30.0,
+            footprint=pr.geometry.Footprint(5.0, 5.0),
+        ),
         detector,
         physics=physics,
     )

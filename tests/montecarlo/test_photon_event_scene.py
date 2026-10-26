@@ -275,8 +275,8 @@ def test_real_scene_boundary_refuses_directional_detector_before_lowering(monkey
     from pyrite.montecarlo import runner
 
     scene = pr.Scene(
-        pr.Beam(energy_keV=300.0, transverse=pr.Spot(), longitudinal=pr.PointBunch()),
-        pr.Slab("silicon", thickness_ang=1e5, footprint=pr.Footprint(5.0, 5.0)),
+        pr.Beam(energy_keV=300.0, transverse=pr.beams.Spot(), longitudinal=pr.beams.PointBunch()),
+        pr.geometry.Slab("silicon", thickness_ang=1e5, footprint=pr.geometry.Footprint(5.0, 5.0)),
     )
 
     def forbidden(*args, **kwargs):

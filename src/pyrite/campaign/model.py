@@ -186,12 +186,12 @@ class Scene:
         Scalar electron-beam description. Express varying energies with
         :class:`Sweep`.
     target
-        Scalar :class:`~pyrite.Target`, :class:`~pyrite.Slab` or :class:`~pyrite.Stack`.
+        Scalar :class:`~pyrite.Target`, :class:`~pyrite.geometry.Slab` or :class:`~pyrite.geometry.Stack`.
     detector
         Scalar observation model or physical planar detector. ``None`` requests
         detector-free source lowering (use ``directional_source`` to score it).
     filters
-        Ordered :class:`~pyrite.Filter` or :class:`~pyrite.FilterPlate` instances
+        Ordered :class:`~pyrite.geometry.Filter` or :class:`~pyrite.geometry.FilterPlate` instances
         between the source and a planar detector.
     physics, numerics, quantum, acquisition
         Legacy composition inputs accepted for compatibility. They are not

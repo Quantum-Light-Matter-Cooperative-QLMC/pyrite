@@ -31,9 +31,13 @@ cuda = pytest.mark.skipif(not HAS_CUDA, reason="no CUDA device")
 def _case(*, elastic="elsepa", plane=(1, -1, 0), unit_bearing=False):
     energy_keV = 5.0 * ureg.MeV if unit_bearing else 5000.0
     scene = pr.Scene(
-        pr.Beam(energy_keV, transverse=pr.Spot(), longitudinal=pr.PointBunch()),
-        pr.Slab(
-            "silicon", 10000.0, tilt_deg=3.0, tilt_azim_deg=45.0, footprint=pr.Footprint(5.0, 5.0)
+        pr.Beam(energy_keV, transverse=pr.beams.Spot(), longitudinal=pr.beams.PointBunch()),
+        pr.geometry.Slab(
+            "silicon",
+            10000.0,
+            tilt_deg=3.0,
+            tilt_azim_deg=45.0,
+            footprint=pr.geometry.Footprint(5.0, 5.0),
         ),
         pr.Detector(),
         physics=pr.Physics(

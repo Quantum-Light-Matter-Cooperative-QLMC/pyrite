@@ -94,13 +94,15 @@ def test_producer_censors_misses_sides_and_cutoffs_using_only_the_line_populatio
 
 @pytest.fixture(scope="module")
 def produced():
-    beam = pr.Beam(energy_keV=5000.0, transverse=pr.Spot(), longitudinal=pr.PointBunch())
-    target = pr.Slab(
+    beam = pr.Beam(
+        energy_keV=5000.0, transverse=pr.beams.Spot(), longitudinal=pr.beams.PointBunch()
+    )
+    target = pr.geometry.Slab(
         "silicon",
         thickness_ang=5000.0,
         tilt_deg=3.0,
         tilt_azim_deg=45.0,
-        footprint=pr.Footprint(5.0, 5.0),
+        footprint=pr.geometry.Footprint(5.0, 5.0),
     )
     numerics = pr.Numerics(
         cxr_trials=4,

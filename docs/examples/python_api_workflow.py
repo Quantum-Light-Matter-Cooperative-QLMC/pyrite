@@ -37,7 +37,12 @@ def compute():
     brem_spectrum = result.brem
 
     # Interpolate the coarse Brem grid onto the fine CXR grid
-    total_spectral_density = np.interp(cxr_spectrum.photon_energy_eV, brem_spectrum.photon_energy_eV, brem_spectrum.density) + cxr_spectrum.density
+    total_spectral_density = (
+        np.interp(
+            cxr_spectrum.photon_energy_eV, brem_spectrum.photon_energy_eV, brem_spectrum.density
+        )
+        + cxr_spectrum.density
+    )
 
     # Construct the output dictionary
     data = {
@@ -54,8 +59,8 @@ def compute():
             },
             "Total Spectrum": {
                 "energy_eV": cxr_spectrum.photon_energy_eV,
-                "density": total_spectral_density
-            }
+                "density": total_spectral_density,
+            },
         },
     }
 

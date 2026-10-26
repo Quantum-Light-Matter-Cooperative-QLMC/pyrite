@@ -13,8 +13,8 @@ from pyrite.campaign.profiles import case_content_key
 
 def scene(**kwargs):
     return pr.Scene(
-        pr.Beam(30.0, transverse=pr.PointSpot(), longitudinal=pr.PointBunch()),
-        pr.Slab("hopg", thickness_ang=1000.0, tilt_deg=30.0, footprint=None),
+        pr.Beam(30.0, transverse=pr.beams.PointSpot(), longitudinal=pr.beams.PointBunch()),
+        pr.geometry.Slab("hopg", thickness_ang=1000.0, tilt_deg=30.0, footprint=None),
         **kwargs,
     )
 
@@ -72,7 +72,7 @@ def test_model_keywords_are_removed_from_numerics(name):
 def test_removed_policy_aliases_and_paths_are_rejected():
     assert not hasattr(pr, "Convergence")
     with pytest.raises(TypeError, match="convergence"):
-        pr.Numerics(convergence=pr.CxrReflections())
+        pr.Numerics(convergence=pr.config.CxrReflections())
     for name in ("emission", "brem_source"):
         with pytest.raises(TypeError, match=name):
             scene(**{name: "none"})
@@ -95,17 +95,19 @@ def test_removed_policy_aliases_and_paths_are_rejected():
     assert [c.get("straggling", False) for c in cases] == [False, False, True, True]
     for factory in (
         pr.Detector,
-        lambda **kw: pr.PlanarDetector(pr.PlanarPose((0, 0, 100)), size_mm=(1, 1), **kw),
+        lambda **kw: pr.detectors.PlanarDetector(
+            pr.detectors.PlanarPose((0, 0, 100)), size_mm=(1, 1), **kw
+        ),
     ):
         with pytest.raises(TypeError, match="energy_bins"):
-            factory(energy_bins=pr.EnergyBins())
-    bins = pr.EnergyBins(cxr=np.array([1000.0, 1050.0]), brem=np.array([1000.0, 2000.0]))
+            factory(energy_bins=pr.detectors.EnergyBins())
+    bins = pr.detectors.EnergyBins(cxr=np.array([1000.0, 1050.0]), brem=np.array([1000.0, 2000.0]))
     case = api.build_case(scene(numerics=pr.Numerics(energy_bins=bins)))
     from pyrite._energy_grid_encoding import decode_energy_grid
 
     np.testing.assert_array_equal(decode_energy_grid(case.E_grid_line), bins.cxr)
     assert pickle.loads(pickle.dumps(bins)) == bins
-    assert pr.EnergyBins.__module__ == "pyrite.detectors.spec"
+    assert pr.detectors.EnergyBins.__module__ == "pyrite.detectors.spec"
 
 
 @pytest.mark.parametrize(

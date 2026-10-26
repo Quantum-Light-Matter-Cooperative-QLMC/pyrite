@@ -28,14 +28,21 @@ def benchmark(repeats: int, electrons: int) -> dict:
         raise ValueError("this bounded benchmark requires PYRITE_MC_BACKEND=cpu")
     case = build_case(
         pr.Scene(
-            pr.Beam(energy_keV=30.0, transverse=pr.Spot(), longitudinal=pr.PointBunch()),
-            pr.Slab("hopg", thickness_ang=1000.0, tilt_deg=30.0, footprint=pr.Footprint(5.0, 5.0)),
+            pr.Beam(
+                energy_keV=30.0, transverse=pr.beams.Spot(), longitudinal=pr.beams.PointBunch()
+            ),
+            pr.geometry.Slab(
+                "hopg",
+                thickness_ang=1000.0,
+                tilt_deg=30.0,
+                footprint=pr.geometry.Footprint(5.0, 5.0),
+            ),
             pr.Detector(),
         ),
         pr.Numerics(
             cxr_trials=electrons,
             brem_trials=electrons,
-            energy_bins=pr.EnergyBins(
+            energy_bins=pr.detectors.EnergyBins(
                 cxr=np.linspace(1500.0, 4500.0, 31), brem=np.linspace(1000.0, 10000.0, 31)
             ),
         ),

@@ -61,6 +61,11 @@ if TYPE_CHECKING:
 
 # Existing root aliases now also have a canonical observations import.
 _EXPORTS = {
+    "PixelScorer": ("pyrite.instrument", "PixelScorer"),
+    "AcquisitionBatch": ("pyrite.instrument", "AcquisitionBatch"),
+    "PixelSampling": ("pyrite.observations.plan", "PixelSampling"),
+    "ObservationPlan": ("pyrite.observations.plan", "ObservationPlan"),
+    "Observation": ("pyrite.observations.spec", "Observation"),
     "Acquisition": ("pyrite.instrument", "Acquisition"),
     "NativeAcquisition": ("pyrite.instrument", "NativeAcquisition"),
     "ResolvedObservation": ("pyrite.instrument", "ResolvedObservation"),
@@ -69,17 +74,12 @@ _EXPORTS = {
 # Preexisting observations package exports retain their import paths and identity.
 _EXISTING_EXPORTS = {
     # Advanced-stable historical imports remain aliases, not withdrawn APIs.
-    "AcquisitionBatch": ("pyrite.instrument", "AcquisitionBatch"),
-    "PixelScorer": ("pyrite.instrument", "PixelScorer"),
-    "Observation": ("pyrite.observations.spec", "Observation"),
     "ObservationEntry": ("pyrite.observations.inventory", "ObservationEntry"),
     "ObservationInventory": ("pyrite.observations.inventory", "ObservationInventory"),
-    "ObservationPlan": ("pyrite.observations.plan", "ObservationPlan"),
     "ObservationStore": ("pyrite.observations.store", "ObservationStore"),
     "ObservationStoreError": ("pyrite.observations.store", "ObservationStoreError"),
     "StoredObservation": ("pyrite.observations.store", "StoredObservation"),
     "default_observation_root": ("pyrite.observations.store", "default_observation_root"),
-    "PixelSampling": ("pyrite.observations.plan", "PixelSampling"),
     "SweepObservation": ("pyrite.observations.plan", "SweepObservation"),
     "observation_from_result": ("pyrite.observations.store", "observation_from_result"),
     "observation_inventory": ("pyrite.observations.inventory", "observation_inventory"),

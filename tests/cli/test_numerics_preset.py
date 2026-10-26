@@ -56,7 +56,7 @@ def write_preset(layer, table, name, text):
 
 
 def test_bundled_numerics_reference_restates_built_ins():
-    assert pyrite.load_numerics("default") == pyrite.Numerics()
+    assert pyrite.config.load_numerics("default") == pyrite.Numerics()
     refused = invoke(command, ["numerics", "preset", "set", "default", "--mosaic-nodes", "7"])
     assert refused.exit_code == 1
     assert "pyrite numerics preset create NAME --from default" in refused.stderr
@@ -70,7 +70,7 @@ def test_unit_bearing_numerics_preset_resolves_to_canonical_values(_isolate_user
         'channeling_dz_ang = "0.1 nm"\nchanneling_zone_max_ang = "10 nm"\n',
     )
 
-    numerics = pyrite.load_numerics("unit-inputs", catalog=load_material_catalog())
+    numerics = pyrite.config.load_numerics("unit-inputs", catalog=load_material_catalog())
     assert numerics.channeling_dz_ang == 1.0
     assert numerics.channeling_zone_max_ang == 100.0
 
@@ -104,11 +104,11 @@ def test_numerics_preset_resolves_into_profiles_with_provenance(_isolate_user_ca
     summary = payload("profile", "show", "campaign")
     assert summary["presets"] == {"physics": None, "numerics": "fast"}
 
-    numerics = pyrite.load_numerics("fast", catalog=load_material_catalog())
+    numerics = pyrite.config.load_numerics("fast", catalog=load_material_catalog())
     expected = replace(
         pyrite.Numerics(),
         cxr_trials=200,
-        cxr_reflections=pyrite.CxrReflections(mosaic_nodes=7),
+        cxr_reflections=pyrite.config.CxrReflections(mosaic_nodes=7),
     )
     assert numerics == expected
     assert pickle.loads(pickle.dumps(numerics)) == numerics
@@ -210,5 +210,5 @@ def test_user_presets_ship_to_remote_jobs(_isolate_user_catalog):
 
 
 def test_loaded_physics_survives_worker_serialization():
-    physics = pyrite.load_physics("electron-standard")
+    physics = pyrite.config.load_physics("electron-standard")
     assert pickle.loads(pickle.dumps(physics)) == physics
