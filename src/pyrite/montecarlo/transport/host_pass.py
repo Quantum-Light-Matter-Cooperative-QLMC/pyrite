@@ -774,7 +774,7 @@ def _ragged_n_el(s):
 
 
 def _lockstep_outcome(t, counts, vacuum=_NO_VACUUM):
-    return _CoreOutcome(*counts, None, t.stragg_dE, np, vacuum)
+    return _CoreOutcome(*counts, dev_segs=None, stragg_dE=t.stragg_dE, seg_xp=np, vacuum=vacuum)
 
 
 def _run_lockstep_lut(t):

@@ -14,11 +14,12 @@ direction at ``C``:
   ``p/q = P_band * dphi(theta)/pi``. Russian roulette against a target weight
   keeps the copy count bounded.
 
-Per event the expected score of any functional of the future is unchanged, so
-the summed per-history tally is unbiased; with splitting off the transport is
-the historical core, bit for bit. Copies are transported as one launched
-generation without further splitting, from counter-addressed streams keyed by
-(seed, electron, flight). Derivation, assumptions and limiting cases:
+The proposed likelihood-ratio estimator is intended to preserve the expected
+per-history score; independent verification and radiation-yield/FOM evidence
+remain pending. With splitting off the transport uses the historical core.
+Copies are transported as one launched generation without further splitting,
+from counter-addressed streams keyed by (seed, electron, flight). Proposed
+equations, assumptions, limiting cases and outstanding validation:
 ``docs/validation/beam-transport/detector-cone-variance-reduction.md``.
 
 Validation: detector-cone-variance-reduction
@@ -427,7 +428,5 @@ def transport_cone_split(simulate, kw):
         transport_core="per-electron",
         _energy_range_keV=table_range,
     )
-    record["copies"] = simulate(
-        **step, _secondary=SecondaryPass(launch, table_range, photon_seed)
-    )
+    record["copies"] = simulate(**step, _secondary=SecondaryPass(launch, table_range, photon_seed))
     return primaries
