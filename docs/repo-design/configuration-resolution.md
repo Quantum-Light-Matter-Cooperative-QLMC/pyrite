@@ -223,9 +223,7 @@ preferred read view; `Numerics.with_kernel_tuning(...)` is a spelling for
 from pyrite.config import KernelTuning, Numerics
 
 numerics = Numerics(execution=KernelTuning(cxr_chunk=256))
-numerics = numerics.with_kernel_tuning(
-    KernelTuning(transport_core="per-electron", cxr_chunk=512)
-)
+numerics = numerics.with_kernel_tuning(KernelTuning(transport_core="per-electron", cxr_chunk=512))
 assert numerics.kernel_tuning.cxr_chunk == 512
 ```
 

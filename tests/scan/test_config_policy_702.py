@@ -25,9 +25,7 @@ from pyrite.campaign.profiles import case_content_key
 def _scene(numerics):
     return pr.Scene(
         pr.Beam(energy_keV=30.0, transverse=pr.Spot(), longitudinal=pr.PointBunch()),
-        pr.Slab(
-            "hopg", thickness_ang=1000.0, tilt_deg=30.0, footprint=pr.Footprint(5.0, 5.0)
-        ),
+        pr.Slab("hopg", thickness_ang=1000.0, tilt_deg=30.0, footprint=pr.Footprint(5.0, 5.0)),
         pr.Detector(),
         physics=cfg.Physics(bremsstrahlung_model="eedl"),
         numerics=numerics,
@@ -39,7 +37,9 @@ def test_exhaustive_field_ownership_does_not_drift():
     assert set(NUMERICS_FIELD_OWNERS) == {f.name for f in fields(cfg.Numerics)}
     assert set(PHYSICS_FIELD_OWNERS.values()) == {PHYSICAL_MODEL}
     assert set(NUMERICS_FIELD_OWNERS.values()) == {
-        KERNEL_TUNING, NUMERICAL_APPROXIMATION, SAMPLING_CONVERGENCE
+        KERNEL_TUNING,
+        NUMERICAL_APPROXIMATION,
+        SAMPLING_CONVERGENCE,
     }
 
 
@@ -83,17 +83,13 @@ def test_defaults_and_grouped_forms_lower_identically():
 
 def test_mixed_group_conflicts_fail_instead_of_overriding():
     with pytest.raises(ValueError, match="transport_core"):
-        cfg.Numerics(
-            transport_core="lockstep", execution=cfg.KernelTuning(transport_core="cuda")
-        )
+        cfg.Numerics(transport_core="lockstep", execution=cfg.KernelTuning(transport_core="cuda"))
     with pytest.raises(ValueError, match="max_dE_frac"):
         cfg.Numerics(max_dE_frac=0.1, transport=cfg.TransportNumerics(max_dE_frac=0.2))
     with pytest.raises(ValueError, match="cxr_trials"):
         cfg.Numerics(cxr_trials=45, sampling=cfg.FixedSampling(46, 20))
     with pytest.raises(ValueError, match="legacy precision"):
-        cfg.Numerics(
-            precision=cfg.Precision(0.1, 40, 80, 20), sampling=cfg.FixedSampling()
-        )
+        cfg.Numerics(precision=cfg.Precision(0.1, 40, 80, 20), sampling=cfg.FixedSampling())
 
 
 def test_canonical_module_does_not_initialize_schedulers_or_backends():
