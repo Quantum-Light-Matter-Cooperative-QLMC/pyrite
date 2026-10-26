@@ -19,6 +19,7 @@ core-architecture-rfc
 issue-680-configuration-rfc
 issue-703-observations
 physical-units
+import-architecture
 ../repo_map
 ```
 

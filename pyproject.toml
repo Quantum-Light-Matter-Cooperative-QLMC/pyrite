@@ -504,6 +504,18 @@ source_modules = ["pyrite.results"]
 forbidden_modules = ["pyrite.campaign"]
 allow_indirect_imports = true
 
+# Observation inventory reads the checkpoint manifest but must not import the
+# checkpoint driver to locate its directory. Indirect paths remain temporarily
+# possible through results/campaign while the larger SCC is split (issue #708).
+# This contract forbids new *direct* imports, rather than ignoring those edges.
+[[tool.importlinter.contracts]]
+id = "observations-import-no-checkpoint-driver"
+name = "Observations do not import checkpoint drivers"
+type = "forbidden"
+source_modules = ["pyrite.observations"]
+forbidden_modules = ["pyrite.checkpoints"]
+allow_indirect_imports = true
+
 [[tool.importlinter.contracts]]
 id = "devtools-stays-below-_dev"
 name = "devtools does not import the dev entry point"

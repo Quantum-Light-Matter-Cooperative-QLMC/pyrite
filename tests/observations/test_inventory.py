@@ -54,6 +54,18 @@ def test_inventory_names_observations_by_checkpoint_case(tmp_path) -> None:
     assert loaded.digest == digest
 
 
+def test_inventory_default_checkpoint_root_matches_persistence(tmp_path, monkeypatch) -> None:
+    from pyrite.checkpoints.persistence import default_checkpoint_dir
+    from pyrite.console.outputs import output_dir
+
+    monkeypatch.setenv("PYRITE_HOME", str(tmp_path))
+    inventory = observation_inventory("unwritten")
+
+    assert default_checkpoint_dir() == str(output_dir("checkpoints"))
+    assert inventory.entries == ()
+    assert inventory.store.index_path == output_dir("observations") / "unwritten" / "index.json"
+
+
 def test_inventory_without_a_store_is_empty(tmp_path) -> None:
     assert observation_inventory("hopg", checkpoint_dir=tmp_path / "checkpoints").entries == ()
     _checkpoint(tmp_path, "hopg", [{"name": "c", "E0_keV": 1.0, "content_key": "a" * 64}])

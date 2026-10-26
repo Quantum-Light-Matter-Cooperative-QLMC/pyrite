@@ -260,6 +260,12 @@ def iter_notebooks() -> list[Path]:
 def cmd_repo_map(args: argparse.Namespace) -> None:
     from pyrite.devtools import repo_map
 
+    if getattr(args, "json", False):
+        import json
+
+        print(json.dumps(repo_map.dependency_report(ROOT / "src"), indent=2, sort_keys=True))
+        return
+
     write = getattr(args, "write", False)
     check = getattr(args, "check", False)
     if write or check:
@@ -985,6 +991,11 @@ def build_parser(prog_name: str = "pyrite-dev") -> argparse.ArgumentParser:
         "--check",
         action="store_true",
         help="fail if the generated dependency region is stale",
+    )
+    repo_map_mode.add_argument(
+        "--json",
+        action="store_true",
+        help="print deterministic module/package edges and SCCs as JSON",
     )
     repo_map.set_defaults(func=cmd_repo_map)
     docs = sub.add_parser(

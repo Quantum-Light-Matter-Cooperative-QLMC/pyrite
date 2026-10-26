@@ -118,9 +118,11 @@ def observation_inventory(
         manifests, indices, or records become ``problems``.
     """
     if checkpoint_dir is None:
-        from ..checkpoints.persistence import default_checkpoint_dir
+        # Both stores are siblings under the same workspace output root. Do not
+        # reach into the checkpoint driver just to resolve a directory path.
+        from ..console.outputs import output_dir
 
-        checkpoint_dir = default_checkpoint_dir()
+        checkpoint_dir = output_dir("checkpoints")
     root = Path(checkpoint_dir).resolve()
     store = ObservationStore(
         stem, root.parent / "observations" if observation_root is None else observation_root
