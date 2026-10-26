@@ -39,6 +39,7 @@ CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
     "checks/axial_mcwf_return_flux.py": (),
     "checks/quantum_decoherence_budget.py": ("quantum-decoherence-budget",),
     "checks/channeling_material_survey.py": (),
+    "checks/channeling_submev_screen.py": (),
     "checks/srd164_inner_shell_comparison.py": (),
     "checks/channeling_modulated_emission.py": ("channeling-modulated-incoherent-emission",),
     "checks/xraylib_cascade_oracle.py": ("characteristic-radiation",),

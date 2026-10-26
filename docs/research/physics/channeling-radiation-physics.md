@@ -31,7 +31,7 @@ using Si(110): $d_p = 1.92$ Å, $U_0 \approx 21$ eV at 293 K, and the critical a
 
 Three consequences frame the whole implementation:
 
-1. **A handful of levels.** Spectra are discrete lines from transitions between a few bound states — exactly what Watson observed at 1–3 MeV. The states must come from an explicit eigensolve; there is no continuum approximation to fall back on.
+1. **A handful of levels.** Spectra are discrete lines from transitions between a few bound states. The states must come from an explicit eigensolve; there is no continuum approximation to fall back on. Watson & Koehler's 1–3 MeV silicon lines are *axial*; they report no planar lines above their ≈1 keV detector cutoff ([PRB 25, 3079 (1982)](https://doi.org/10.1103/PhysRevB.25.3079), p. 3082), so they are not a planar anchor. One bound band, as in Si(110) at 1 MeV, allows no bound→bound line at all; see the [sub-MeV screen](channeling-submev-envelope.md).
 2. **The photon energies land in or near the PyRITE detector band.** The Doppler upshift $2\gamma^2$ maps eV-scale transverse spacings to 0.1–20 keV photons, overlapping PXR/CBS lines. Channeling radiation is a physical foreground/background for the coherent spectra, not a separate curiosity.
 3. **Electrons dechannel fast.** Because the bound states peak on the atomic planes, channeled electrons sit in the region of maximum nuclear and electronic density. Occupation lengths are of order a micron at these energies (Kephart), so the channeling module governs only the first $\lesssim$ few µm of path. The rest is ordinary native transport, entered through the handoff of §5.4.
 
@@ -352,8 +352,8 @@ One row per load-bearing equation. `file::symbol` anchors are filled at implemen
 | `cr-doppler-line-energy` | $\hbar\omega = \Delta E_\perp / (1-\beta\cos\theta)$ + recoil bound | kinematics | consistency test vs `line-energy-dispersion` denominator |
 | `cr-dipole-rate` | $A' = e^2\omega'^3|x_{if}|^2 / 3\pi\epsilon_0\hbar c^3$, $\omega' = \gamma\Delta E_\perp/\hbar$ | standard QED dipole | emergent parity selection rule |
 | `cr-boosted-dipole-angular` | aberration-mapped $\sin^2\Theta'$ pattern + polarization | relativistic aberration | solid-angle integral returns $A'/\gamma$; $\gamma\to1$ limit |
-| `cr-line-shape` | occupation Lorentzian ⊗ geometric ⊗ $2\delta\gamma/\gamma$ | §6.3 derivation | width ordering vs Watson linewidths |
-| `cr-yield-assembly` | depth-integrated exit yield, photons/eV/sr/e⁻ | §6.4 | Watson 1–3 MeV Si peak energies |
+| `cr-line-shape` | occupation Lorentzian ⊗ geometric ⊗ $2\delta\gamma/\gamma$ | §6.3 derivation | measured planar widths (Gouanère 1988; Azadegan 2006); not Watson's axial lines |
+| `cr-yield-assembly` | depth-integrated exit yield, photons/eV/sr/e⁻ | §6.4 | Gouanère 1988 diamond(110) peak energies; Watson's lines are axial |
 | `cr-axial-2d-eigenproblem` | 2D sparse eigensolve, approximate $(n,\ell)$ labels | ABP 1983; Watson axial data | peak ordering only (experimental tier) |
 | `cr-transition-radiation-bound` | TR yield bound at boundaries vs CR yield | Ginzburg–Frank | decision record: include or bounded-exclude |
 
