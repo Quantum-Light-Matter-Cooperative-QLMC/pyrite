@@ -56,7 +56,7 @@ def test_secondary_view_uses_track_identity_and_filters_all_overlays():
     from pyrite.apps._design import apply_plotly_theme
 
     selected_case = dict(case, E0_keV=100.0)
-    for threshold, expected in ((0.0, (2.0, 10.0)), (9.0, (0.0, 10.0)), (20.0, None)):
+    for threshold, expected in ((0.0, (0.0, 10.0)), (9.0, (0.0, 10.0)), (20.0, None)):
         selected = trajectory_volume_figure_from_data(selected_case, data, min_energy_keV=threshold)
         colored = [
             trace
@@ -84,6 +84,28 @@ def test_secondary_view_uses_track_identity_and_filters_all_overlays():
                 assert trace.line.cmin == before["cmin"]
                 assert trace.line.cmax == before["cmax"]
         selected.to_json()
+    logarithmic = trajectory_volume_figure_from_data(case, data, logarithmic_color=True)
+    log_colored = [
+        trace
+        for trace in logarithmic.data
+        if getattr(trace, "line", None) is not None and trace.line.colorscale is not None
+    ]
+    assert log_colored
+    assert {(trace.line.cmin, trace.line.cmax) for trace in log_colored} == {(np.log10(0.2), 1.0)}
+    assert all(
+        trace.line.colorbar.title.text == "electron energy (keV, log)" for trace in log_colored
+    )
+    assert all(trace.line.colorbar.ticktext for trace in log_colored)
+    assert np.isfinite(np.asarray(log_colored[0].line.color, dtype=float)[::3]).all()
+
+    zero_data = dict(data, E=np.array([0.0, 8.0, 2.0]))
+    zero_log = trajectory_volume_figure_from_data(case, zero_data, logarithmic_color=True)
+    zero_colors = next(
+        trace.line.color
+        for trace in zero_log.data
+        if getattr(trace, "line", None) is not None and trace.line.colorscale is not None
+    )
+    assert np.isfinite(np.asarray(zero_colors, dtype=float)[::3]).all()
     exit_path = _exit_paths_3d(data, 0.2, cmax=10.0)
     assert len(exit_path.x) == 6  # both tracks own terminal exit segments
     only_primary = visible_trajectory_data(data, max_generation=0)

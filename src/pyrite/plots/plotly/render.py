@@ -24,7 +24,7 @@ from pyrite.plots.plotly.trajectories import (
 from ..._extras import require_extra
 from ...console.outputs import output_dir
 
-_RENDER_SALT = "v2"  # bump on any change to the cache-key inputs or render format
+_RENDER_SALT = "v3"  # bump on any change to the cache-key inputs or render format
 
 
 def render_reveal_animation(
@@ -41,6 +41,7 @@ def render_reveal_animation(
     scale=2,
     camera=None,
     progress_cb=None,
+    logarithmic_color=False,
 ):
     """Render the reveal animation for ``data`` to a fixed-camera video file.
 
@@ -78,6 +79,7 @@ def render_reveal_animation(
             realistic=realistic,
             beam_fwhm_mm=beam_fwhm_mm,
             reveal_until_fs=cutoff,
+            logarithmic_color=logarithmic_color,
         )
         fig.update_layout(showlegend=False, paper_bgcolor="black", plot_bgcolor="black")
         fig.update_scenes(

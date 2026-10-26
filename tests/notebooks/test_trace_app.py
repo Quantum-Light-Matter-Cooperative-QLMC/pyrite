@@ -132,6 +132,7 @@ def test_penetration_view_offers_prerendered_render_button() -> None:
     assert 'penetration_render_button_ui = mo.ui.run_button(label="Render animation")' in source
     assert "penetration_speed_ui" not in source
     assert "render_reveal_animation(" in source
+    assert "logarithmic_color=penetration_log_color_ui.value" in source
     assert "mo.status.progress_bar(" in source
     # Video is served as bytes (file handle, not a local path string) and its
     # display is gated on the cached file existing, not on the transient
@@ -174,6 +175,13 @@ def test_penetration_controls_offer_material_presets_and_uncapped_energy() -> No
     for bound in ("start=1.0", "start=0.001", "stop=10000.0", "stop=89.9"):
         assert bound in source
     assert 'start=1.0, step=1.0, value=_energy_values[0], label="(keV)"' in source
+    assert '"Log presets": "log"' in source
+    assert (
+        "_log_energy_values = (1, 3, 10, 30, 100, 300, 1_000, 3_000, 10_000, 30_000, 100_000)"
+        in source
+    )
+    assert 'value="1 MeV"' in source
+    assert '"log": penetration_energy_log_grid_ui.value' in source
     # The compact control-row layout supplies the "Crystal thickness" label once
     # via the shared row label; the manual widget's own label is just the unit.
     assert 'label="(µm)"' in source

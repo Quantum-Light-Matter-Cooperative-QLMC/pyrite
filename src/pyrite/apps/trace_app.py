@@ -234,12 +234,19 @@ def _(CATALOG, MATERIAL, fmt_thickness, mo):
         _tilt_values = tuple(float(value) for value in _scan.tilt_deg)
 
     _source_options = {"Presets": "grid", "Custom": "manual"}
-    penetration_energy_source_ui = mo.ui.dropdown(_source_options, value="Presets", label="")
+    _energy_source_options = {**_source_options, "Log presets": "log"}
+    penetration_energy_source_ui = mo.ui.dropdown(_energy_source_options, value="Presets", label="")
     penetration_energy_grid_ui = mo.ui.dropdown(
         {f"{value:g} keV": value for value in _energy_values},
         value=f"{_energy_values[0]:g} keV",
         label="",
     )
+    _log_energy_values = (1, 3, 10, 30, 100, 300, 1_000, 3_000, 10_000, 30_000, 100_000)
+    _log_energy_options = {
+        f"{value / 1000:g} MeV" if value >= 1000 else f"{value:g} keV": value
+        for value in _log_energy_values
+    }
+    penetration_energy_log_grid_ui = mo.ui.dropdown(_log_energy_options, value="1 MeV", label="")
     penetration_energy_manual_ui = mo.ui.number(
         start=1.0, step=1.0, value=_energy_values[0], label="(keV)"
     )
@@ -289,6 +296,7 @@ def _(CATALOG, MATERIAL, fmt_thickness, mo):
     return (
         penetration_azim_ui,
         penetration_energy_grid_ui,
+        penetration_energy_log_grid_ui,
         penetration_energy_manual_ui,
         penetration_energy_source_ui,
         penetration_thickness_grid_ui,
@@ -304,6 +312,7 @@ def _(CATALOG, MATERIAL, fmt_thickness, mo):
 def _(
     penetration_azim_ui,
     penetration_energy_grid_ui,
+    penetration_energy_log_grid_ui,
     penetration_energy_manual_ui,
     penetration_energy_source_ui,
     penetration_thickness_grid_ui,
@@ -313,11 +322,11 @@ def _(
     penetration_tilt_manual_ui,
     penetration_tilt_source_ui,
 ):
-    penetration_energy_keV = (
-        penetration_energy_grid_ui.value
-        if penetration_energy_source_ui.value == "grid"
-        else penetration_energy_manual_ui.value
-    )
+    penetration_energy_keV = {
+        "grid": penetration_energy_grid_ui.value,
+        "log": penetration_energy_log_grid_ui.value,
+        "manual": penetration_energy_manual_ui.value,
+    }[penetration_energy_source_ui.value]
     penetration_thickness_ang = (
         penetration_thickness_grid_ui.value
         if penetration_thickness_source_ui.value == "grid"
@@ -400,6 +409,7 @@ def _(mo):
     penetration_min_energy_ui = mo.ui.number(
         value=0.0, start=0.0, step=0.5, label="minimum shown energy (keV)"
     )
+    penetration_log_color_ui = mo.ui.switch(value=False, label="log energy color")
     return (
         penetration_beam_fwhm_ui,
         penetration_groove_ui,
@@ -407,6 +417,7 @@ def _(mo):
         penetration_secondary_threshold_ui,
         penetration_max_generation_ui,
         penetration_min_energy_ui,
+        penetration_log_color_ui,
         penetration_ne_ui,
         penetration_regen_ui,
     )
@@ -498,6 +509,7 @@ def _(
     penetration_camera_view_ui,
     penetration_camera_zoom_ui,
     penetration_energy_grid_ui,
+    penetration_energy_log_grid_ui,
     penetration_energy_keV,
     penetration_energy_manual_ui,
     penetration_energy_source_ui,
@@ -507,6 +519,7 @@ def _(
     penetration_secondary_threshold_ui,
     penetration_max_generation_ui,
     penetration_min_energy_ui,
+    penetration_log_color_ui,
     penetration_realistic_ui,
     penetration_regen_ui,
     penetration_render_button_ui,
@@ -661,7 +674,12 @@ def _(
             _data, max_generation=_max_generation, min_energy_keV=_min_energy
         )
         _volume = trajectory_volume_figure_from_data(
-            _nc, _view_data, realistic=_realistic, beam_fwhm_mm=_beam_fwhm, reveal_until_fs=None
+            _nc,
+            _view_data,
+            realistic=_realistic,
+            beam_fwhm_mm=_beam_fwhm,
+            reveal_until_fs=None,
+            logarithmic_color=penetration_log_color_ui.value,
         )
         # Full-row plot now that the 2D cross-section moved down beside the
         # survival chart; widened past Plotly's 700 default now the colorbar
@@ -722,7 +740,13 @@ def _(
         _n_frames = int(penetration_render_frames_ui.value)
         _render_key = render_cache_key(
             _nc["name"],
-            (*_data_key[1:5], *_data_key[9:], _max_generation, _min_energy),
+            (
+                *_data_key[1:5],
+                *_data_key[9:],
+                _max_generation,
+                _min_energy,
+                bool(penetration_log_color_ui.value),
+            ),
             _Ne,
             _seed,
             _realistic,
@@ -822,11 +846,11 @@ def _(
                                 [
                                     _row_label("**Beam energy**"),
                                     penetration_energy_source_ui,
-                                    (
-                                        penetration_energy_grid_ui
-                                        if penetration_energy_source_ui.value == "grid"
-                                        else penetration_energy_manual_ui
-                                    ),
+                                    {
+                                        "grid": penetration_energy_grid_ui,
+                                        "log": penetration_energy_log_grid_ui,
+                                        "manual": penetration_energy_manual_ui,
+                                    }[penetration_energy_source_ui.value],
                                 ],
                                 justify="start",
                                 align="center",
@@ -924,6 +948,7 @@ def _(
                             ),
                             penetration_max_generation_ui,
                             penetration_min_energy_ui,
+                            penetration_log_color_ui,
                         ],
                         justify="start",
                         align="center",
@@ -1171,6 +1196,7 @@ def _(
     penetration_render_frames_ui,
     penetration_max_generation_ui,
     penetration_min_energy_ui,
+    penetration_log_color_ui,
     prune_render_cache,
     render_cache_key,
     render_reveal_animation,
@@ -1200,7 +1226,13 @@ def _(
     _min_energy = float(penetration_min_energy_ui.value)
     _render_key = render_cache_key(
         _data_key[0],
-        (*_data_key[1:5], *_data_key[9:], _max_generation, _min_energy),
+        (
+            *_data_key[1:5],
+            *_data_key[9:],
+            _max_generation,
+            _min_energy,
+            bool(penetration_log_color_ui.value),
+        ),
         _data_key[5],
         _data_key[6],
         _data_key[7],
@@ -1235,6 +1267,7 @@ def _(
                     n_frames=_n_frames,
                     fps=12,
                     camera=penetration_camera,
+                    logarithmic_color=penetration_log_color_ui.value,
                     progress_cb=_render_progress_cb,
                 )
             prune_render_cache()

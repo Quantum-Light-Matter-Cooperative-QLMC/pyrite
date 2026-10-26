@@ -665,20 +665,40 @@ def trajectory_volume_figure(
     )
 
 
-def _apply_energy_domain(fig, data):
-    """Share the selected dataset's energy domain, independent of playback time."""
+def _apply_energy_domain(fig, data, *, logarithmic=False):
+    """Share a zero-based linear or positive-log energy domain across traces."""
     energies = np.concatenate(
         [np.asarray(data.get(key, ()), dtype=float) for key in ("E", "vacuum_E")]
     )
     energies = energies[np.isfinite(energies)]
-    low, high = (float(energies.min()), float(energies.max())) if energies.size else (0.0, 1.0)
-    if low == high:
-        low, high = (0.0, high) if high > 0 else (0.0, 1.0)
+    high = float(energies.max()) if energies.size else 1.0
+    if not logarithmic:
+        low, high = 0.0, high if high > 0 else 1.0
+    else:
+        positive = energies[energies > 0]
+        floor = float(positive.min()) if positive.size else 1e-12
+        high = max(high, floor)
+        low = floor / 10.0
+        log_low, log_high = np.log10(low), np.log10(high)
+        if log_low == log_high:
+            log_low -= 1.0
+        ticks = np.linspace(log_low, log_high, 5)
+        tick_energies = np.power(10.0, ticks)
     owners = [trace for trace in fig.data if getattr(trace, "line", None) is not None]
     energy_traces = [trace for trace in owners if trace.line.colorscale is not None]
     for index, trace in enumerate(energy_traces):
-        trace.line.update(cmin=low, cmax=high, cauto=False, showscale=index == 0)
-        trace.line.colorbar.title.text = "electron energy (keV)"
+        if logarithmic:
+            values = np.asarray(trace.line.color, dtype=float)
+            trace.line.color = np.log10(np.maximum(values, low))
+            trace.line.update(cmin=log_low, cmax=log_high, cauto=False, showscale=index == 0)
+            trace.line.colorbar.update(
+                title="electron energy (keV, log)",
+                tickvals=ticks,
+                ticktext=[f"{value:.3g}" for value in tick_energies],
+            )
+        else:
+            trace.line.update(cmin=low, cmax=high, cauto=False, showscale=index == 0)
+            trace.line.colorbar.update(title="electron energy (keV)", tickvals=None, ticktext=None)
 
 
 def trajectory_volume_figure_from_data(
@@ -690,6 +710,7 @@ def trajectory_volume_figure_from_data(
     reveal_until_fs=None,
     max_generation=None,
     min_energy_keV=0.0,
+    logarithmic_color=False,
 ):
     """Assemble the 3D cutaway figure from an ALREADY-transported ``data`` dict
     (see :func:`trajectory_volume_data`) plus a playback reveal cutoff.
@@ -778,7 +799,7 @@ def trajectory_volume_figure_from_data(
     ):
         fig.add_trace(trace)
 
-    _apply_energy_domain(fig, data)
+    _apply_energy_domain(fig, data, logarithmic=logarithmic_color)
 
     material = case["name"].split()[0]
     fig.update_layout(

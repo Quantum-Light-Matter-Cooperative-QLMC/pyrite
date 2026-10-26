@@ -50,6 +50,12 @@ def test_render_cache_key_changes_with_case_params():
     assert _key() != _key(case_params={"E0_keV": 50.0, "tilt_deg": 0.0})
 
 
+def test_render_cache_key_changes_with_color_scale():
+    assert _key(case_params={"E0_keV": 30.0, "logarithmic_color": False}) != _key(
+        case_params={"E0_keV": 30.0, "logarithmic_color": True}
+    )
+
+
 def test_render_cache_dir_honors_workspace(tmp_path, monkeypatch):
     monkeypatch.setenv("PYRITE_HOME", str(tmp_path))
     out = render_cache_dir()
@@ -94,3 +100,40 @@ def test_render_reveal_animation_raises_clear_error_when_deps_missing(monkeypatc
 
     with pytest.raises(extras.MissingExtraError, match=r"pyrite-mc\[plots\]"):
         render_reveal_animation(None, {"start_xyz": [], "end_xyz": []}, "out.mp4")
+
+
+def test_render_reveal_animation_passes_log_color_scale_to_each_frame(tmp_path, monkeypatch):
+    import imageio.v3 as iio
+
+    import pyrite.plots.plotly.render as render_module
+
+    calls = []
+
+    class Figure:
+        def update_layout(self, **kwargs):
+            pass
+
+        def update_scenes(self, **kwargs):
+            pass
+
+        def to_image(self, **kwargs):
+            return b"frame"
+
+    monkeypatch.setattr(render_module, "require_extra", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        render_module,
+        "trajectory_volume_figure_from_data",
+        lambda *args, **kwargs: calls.append(kwargs["logarithmic_color"]) or Figure(),
+    )
+    monkeypatch.setattr(iio, "imread", lambda *args, **kwargs: object())
+    monkeypatch.setattr(iio, "imwrite", lambda *args, **kwargs: None)
+
+    render_reveal_animation(
+        {"name": "test", "E0_keV": 10.0},
+        {"t_fs": [0.0]},
+        tmp_path / "out.gif",
+        n_frames=2,
+        logarithmic_color=True,
+    )
+
+    assert calls == [True, True]
