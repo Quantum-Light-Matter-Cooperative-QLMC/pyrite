@@ -284,6 +284,9 @@ def observation_from_result(result: Result) -> StoredObservation:
     if spatial is None or spatial.tile_directions_lab is None:
         raise ValueError("result has no persistable spatial factors")
     scene = result.provenance["scene"]
+    physics = result.provenance.get("physics")
+    if physics is None:
+        physics = scene.physics
     identity = link_identity(
         observation["true_spatial"], observation["response"], observation["acquisition"]
     )
@@ -295,7 +298,7 @@ def observation_from_result(result: Result) -> StoredObservation:
         acquisition=_decode_acquisition(observation["acquisition"])[0],
         rep_rate_hz=float(scene.beam.rep_rate_hz),
         bunch_charge_pc=float(scene.beam.bunch_charge_pc),
-        emission=scene.physics.emission_policy,
+        emission=physics.emission_policy,
         provenance=_jsonable(
             {key: result.provenance[key] for key in _PROVENANCE_KEYS if key in result.provenance}
         ),

@@ -385,3 +385,30 @@ def test_quantity_scene_and_observation_preserve_values_and_identity(
     ):
         assert actual.provenance[key] == expected.provenance[key]
     np.testing.assert_array_equal(actual.acquisition_image(), expected.acquisition_image())
+
+
+def test_result_consumers_use_configuration_outside_physical_scene(
+    scene, observation, transports, tmp_path
+):
+    from types import SimpleNamespace
+
+    from pyrite.observations.store import observation_from_result
+
+    original = api.simulate(scene, numerics=CONTROLS, observation=observation)
+    physical = SimpleNamespace(
+        beam=scene.beam, target=scene.target, detector=scene.detector, filters=scene.filters
+    )
+    result = replace(original, provenance={**original.provenance, "scene": physical})
+    np.testing.assert_array_equal(result.acquisition_image(), original.acquisition_image())
+    np.testing.assert_array_equal(
+        result.acquire(pixels=[(0, 0)]).expected,
+        original.acquire(pixels=[(0, 0)]).expected,
+    )
+    assert "PlanarDetector" in repr(result)
+    stored = observation_from_result(result)
+    assert stored.digest == original.provenance.observation_identity_digest
+    np.testing.assert_array_equal(stored.acquisition_image(), original.acquisition_image())
+    store = ObservationStore("hopg", root=tmp_path)
+    store.put(stored)
+    restored = store.load(stored.digest)
+    np.testing.assert_array_equal(restored.acquisition_image(), original.acquisition_image())
