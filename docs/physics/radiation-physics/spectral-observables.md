@@ -89,5 +89,5 @@ Validation: `directional-source-rate-normalization`.
 `DirectionalSpectrum.rate` applies this conversion to the incoherent PXR/CBS
 total, retaining intra-electron PXR–CBS interference. It is not a detector
 counting observable or a prescription for cross-electron coherent intensity.
-See [directional heatmaps](../../guides/directional-source-heatmap.md) for
+See [directional sources](../../reference/directional-sources.md#coordinates-and-escape) for
 coordinates, unsupported grazing directions and explicit grid requirements.

@@ -1,0 +1,12 @@
+{
+  "schema": "pyrite.tutorial.v1",
+  "source_sha256": "89528cbe32ca59f6e8e0837a5a7b157838ede052575486afcd14ab541458b4d2",
+  "pyrite_version": "0.21.0",
+  "python_version": "3.14.4",
+  "git_revision": "7a0bd36b7ceb571972d76286e0c41e886a1442a0",
+  "output": {
+    "script_sha256": "575488589156e148b6133416068f498fc62c9033cc6027681a4358fb098d426d",
+    "exit_code": 0,
+    "display_text": "created beam lab-beam\ncreated profile lab-scan from quickstart (inherited: beam, detector)\nprofile.current = lab-scan\nKEY              VALUE     SOURCE\nprofile.current  lab-scan  config store\nhopg: profile lab-scan\n  label: HOPG (0001)\n  formula: C\n  phase: 2H\n  name: Highly Oriented Pyrolytic Graphite\n  cut: (0001)\n  source: bundled\n  density: 2.26646 g/cm\u00b3\n  composition (atoms/angstrom\u00b3): {'C': 0.11363677327755675}\n  thickness: [50000] (inherited)\n  energy: [30, 60] (inherited)\n  polar: [45] (inherited)\n  azimuth: [180] (inherited)\n"
+  }
+}

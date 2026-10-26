@@ -7,7 +7,7 @@ Trajectory HDF5 is the authoritative transport snapshot. `trajectories export` p
 | `<case>.vtm` | lab axes, angstrom | captured tracks, crystal crop, layer boundaries, bounded groove relief, incident reference axis |
 | `<case>.instrument.vtm` | lab axes, mm | recorded target footprint, supported beam outline, ordered filters, detector face/pixel metadata, incident reference axis |
 
-The user workflow belongs in [Working with results](../../guides/working-with-results.md#export-scene-geometry).
+The user workflow belongs in [Saved trajectory workflows](../../reference/trajectory-workflows.md#export-scene-geometry).
 
 ## Geometry and capture ownership
 

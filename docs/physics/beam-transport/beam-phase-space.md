@@ -2,9 +2,9 @@
 
 How PyRITE specifies the electron beam **as an input**, and how that specification becomes the per-electron initial conditions the Monte Carlo transports.
 
-Companion to the [sweep profiles guide](../../guides/sweep-profiles.md), which documents the beam TOML block, and to the `beam-phase-space-metrics` ledger row, which covers the *output* side, `beam_metrics.sampled_beam_metrics`.
+Companion to the [campaign configuration reference](../../reference/campaign-configuration.md#named-beams-and-explicit-instruments), which documents the beam TOML block, and to the `beam-phase-space-metrics` ledger row, which covers the *output* side, `beam_metrics.sampled_beam_metrics`.
 
-A beam is a named catalog object: a top-level `[beams.NAME]` table attached by `beam = "NAME"` on a profile and managed with `pyrite beam create` / `pyrite beam set`. The inline `[profiles.NAME.beam]` sub-table decodes to the same keys with the same meaning. A beam reference resolves to values before hashing, so converting an inline block to a named beam leaves `parameter_sha256` bit-for-bit. See the [sweep profiles guide](../../guides/sweep-profiles.md) under "Named beams".
+A beam is a named catalog object: a top-level `[beams.NAME]` table attached by `beam = "NAME"` on a profile and managed with `pyrite beam create` / `pyrite beam set`. The inline `[profiles.NAME.beam]` sub-table decodes to the same keys with the same meaning. A beam reference resolves to values before hashing, so converting an inline block to a named beam leaves `parameter_sha256` bit-for-bit. See the [campaign configuration reference](../../reference/campaign-configuration.md#named-beams-and-explicit-instruments) under "Named beams and explicit instruments".
 
 ## Reference plane
 

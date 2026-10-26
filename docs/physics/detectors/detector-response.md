@@ -150,4 +150,4 @@ response-free line and continuum arrays on source grids resolved for its
 acceptance. Counting observations persist factorized true spectra separately
 from intrinsic checkpoints and resolve reporting edges over the complete
 observation. Response and acquisition edits reuse true-spatial factors without
-another transport pass. See [profile detectors](../../guides/sweep-profiles.md).
+another transport pass. See [profile detectors](../../reference/campaign-configuration.md#detector-collections-filters-and-counting-observations).

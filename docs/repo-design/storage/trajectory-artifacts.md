@@ -1,6 +1,6 @@
 # Trajectory artifact storage
 
-`pyrite.montecarlo.trajectories` writes one HDF5 file per captured case. The user workflow is in [Working with results](../../guides/working-with-results.md#save-electron-trajectories); the authoritative layout is the module docstring. This page records why schema 3 stores row fields the way it does and what that was measured to cost.
+`pyrite.montecarlo.trajectories` writes one HDF5 file per captured case. The user workflow is in [Saved trajectory workflows](../../reference/trajectory-workflows.md#save-electron-trajectories); the authoritative layout is the module docstring. This page records why schema 3 stores row fields the way it does and what that was measured to cost.
 
 ## Schema 3 layout decisions
 

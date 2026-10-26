@@ -253,7 +253,7 @@ enable optical production transport; see the
 without transport. Beam and photon energies are in eV; angles are in degrees.
 Broadcast mode pairs inputs; grid mode forms their Cartesian product. These
 are kinematic energies, with no prediction of intensity or broadening. See
-[comparison examples and reflection rules](guides/python-api-workflow.md#compare-photon-energies).
+[comparison examples and reflection rules](reference/python-scene-recipes.md#compare-photon-energies).
 
 ```{eval-rst}
 .. autosummary::
@@ -304,7 +304,7 @@ and independently composed calls. The `"physics"`, `"quantum"` and
 `"numerics"` retains the effective numerical controls. These values do not
 change case or observation identity. Meanwhile,
 `result.scene` remains the resolved compatibility view used by read-time methods.
-The [observation example](guides/python-api-workflow.md#compose-independent-observations)
+The [observation example](reference/python-scene-recipes.md#compose-independent-observations)
 shows how to reuse the same geometry.
 
 Use `simulate(scene, executor=executor)` to select an existing
@@ -337,11 +337,11 @@ incident electron per eV per sr; planar-detector densities are filtered,
 solid-angle-weighted observation averages, still per sr. Use `spectral_flux()`
 for current and acceptance scaling, or `acquire()` for registered pixel counts.
 
-The workflow covers [results](guides/python-api-workflow.md#interpret-the-result),
-[detector response](guides/python-api-workflow.md#apply-detector-response-explicitly),
-[sweeps](guides/python-api-workflow.md#expand-a-path-addressed-sweep),
-[adaptive sampling](guides/python-api-workflow.md#choose-adaptive-sampling) and
-[shared target/filter bodies](guides/python-api-workflow.md#reuse-bodies-as-targets-and-filters).
+The workflow covers [results](reference/python-scene-recipes.md#interpret-the-result),
+[detector response](reference/python-scene-recipes.md#apply-detector-response-explicitly),
+[sweeps](reference/python-scene-recipes.md#expand-a-path-addressed-sweep),
+[adaptive sampling](reference/python-scene-recipes.md#choose-adaptive-sampling) and
+[shared target/filter bodies](reference/python-scene-recipes.md#reuse-bodies-as-targets-and-filters).
 For correlated imported beams, see [GDF beam import](guides/gpt-gdf-beams.md).
 
 The provisional photon-continuum reference has a separate
@@ -438,7 +438,7 @@ catalog/CLI selectors and full-track external validation remain open.
 ### Shared bodies and explicit roles
 
 `RectangularBody` describes a solid in millimetres; `Target` and `Filter` assign
-its scene role. See [body construction and limits](guides/python-api-workflow.md#reuse-bodies-as-targets-and-filters).
+its scene role. See [body construction and limits](reference/python-scene-recipes.md#reuse-bodies-as-targets-and-filters).
 
 ## Electron bunch-front tilt
 
@@ -446,13 +446,13 @@ its scene role. See [body construction and limits](guides/python-api-workflow.md
 beam. A front parallel to the target entrance face need not phase-match
 radiation in the observation direction. `Scene.phase_matched_bunch_front_tilt`
 returns a front for one explicit reflection and direction on a flat single slab.
-See [front timing, supported sources and examples](guides/python-api-workflow.md#tilt-the-bunch-front-and-crystal-cut).
+See [front timing, supported sources and examples](reference/python-scene-recipes.md#tilt-the-bunch-front-and-crystal-cut).
 
 ### Crystal cuts
 
 `CrystalCut` sets the lattice orientation relative to a flat slab's entrance
 face. Target tilt moves face and lattice together. See the
-[cut convention and limits](guides/python-api-workflow.md#crystal-cuts).
+[cut convention and limits](reference/python-scene-recipes.md#crystal-cuts).
 
 ## Materials and crystallography
 
@@ -604,7 +604,7 @@ integral equals the surviving solver trace. The recorded array has shape
 into one period in the instantaneous basis after energy reprojection. Without
 position sampling, both the grid and density are `None`. See the
 [spatial-density derivation](validation/channeling/cr-planar-spatial-density-reconstruction.md)
-and [channeling demo](guides/working-with-results.md#planar-channeling-demo).
+and [channeling demo](reference/results-and-apps.md#planar-channeling-demo).
 The [experimental axial diagnostic](guides/experimental-axial-channeling.md) runs independently
 of `simulate`.
 
@@ -612,7 +612,7 @@ of `simulate`.
 
 Use these objects for detector efficiency, energy redistribution and grating
 images. Physical pixel scoring and acquisition are illustrated in the
-[workflow guide](guides/python-api-workflow.md#place-a-finite-filter-over-detector-pixels).
+[workflow guide](reference/python-scene-recipes.md#place-a-finite-filter-over-detector-pixels).
 
 ```{eval-rst}
 .. autosummary::
@@ -671,8 +671,9 @@ from one transport. The opt-in `"transition"` component uses the production
 history-coherent planar-crossing model; it requires `footprint=None` and the
 supported X-ray dielectric band. Cherenkov remains an internal bulk diagnostic
 in the app, outside this escaped-source API.
-This new surface is provisional; see [directional heatmaps](guides/directional-source-heatmap.md)
-for the bounded example, full-circle convention, supported geometry and limits.
+This surface is provisional; see [directional heatmaps](guides/directional-source-heatmap.md)
+for a runnable visual example and the [directional source reference](reference/directional-sources.md)
+for the full-circle convention, supported geometry and limits.
 
 ```{eval-rst}
 .. autosummary::

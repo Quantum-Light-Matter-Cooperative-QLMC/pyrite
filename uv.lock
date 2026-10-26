@@ -4292,6 +4292,7 @@ dev = [
 ]
 docs = [
     { name = "marimo" },
+    { name = "matplotlib" },
     { name = "myst-parser", extra = ["linkify"] },
     { name = "pydata-sphinx-theme" },
     { name = "sphinx" },
@@ -4390,6 +4391,7 @@ dev = [
 ]
 docs = [
     { name = "marimo", specifier = ">=0.25.1" },
+    { name = "matplotlib", specifier = ">=3.11.0" },
     { name = "myst-parser", extras = ["linkify"], specifier = ">=4.0" },
     { name = "pydata-sphinx-theme", specifier = ">=0.20.0" },
     { name = "sphinx", specifier = ">=8.2" },

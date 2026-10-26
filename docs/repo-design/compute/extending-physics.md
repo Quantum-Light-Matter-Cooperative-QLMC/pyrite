@@ -10,7 +10,7 @@ registry, or per-collision Python callback.
 ## Select existing implementations
 
 Use `Physics` through the [Python API](../../api.md), or the existing physics
-fields in [sweep profiles](../../guides/sweep-profiles.md). `Numerics` owns grids,
+fields in [profile settings](../profile-settings.md). `Numerics` owns grids,
 trial counts, precision and execution controls. Deprecated physics inputs on
 `Numerics` still lower through the existing compatibility path.
 

@@ -1,344 +1,106 @@
 # Working with results
 
-PyRITE stores simulation output as component checkpoints, then lets analysis and export commands consume those checkpoints without rerunning transport.
+Reopen the saved [quickstart run](getting-started.md), separate its radiation
+components, and integrate a fixed photon-energy band. Loading and plotting a
+checkpoint does not rerun electron transport.
 
-The apps below need the `apps` extra and `pyrite.plots` needs `plots` (`pip install "pyrite-mc[apps]"`); a checkout's `uv sync` includes both.
+## Plot one saved case
 
-## Checkpoint layout and identity
-
-Canonical full runs use `pyrite-output/checkpoints/<material>/`. Survey runs and modified profiles use identity-qualified directories so incompatible parameter sets do not silently resume into one another. Each dataset records its resolved input payload and hash in component metadata.
-
-Active datasets are directories beneath the effective `pyrite-output/checkpoints/` root and are offered by the analysis app's dataset selector. `pyrite checkpoint list` lists them; `pyrite checkpoint archive list` lists labels in the long-term archive shelf:
+Install `pyrite-mc[plots]`. If you have not run the quickstart, first
+[fetch its reference tables](getting-started.md#install-and-fetch-reference-data)
+and create the checkpoint:
 
 ```bash
+pyrite run quickstart
 pyrite checkpoint list
-pyrite checkpoint archive list
 ```
 
-The [sweep-profile guide](sweep-profiles.md) explains how fidelity and profile resolution affect dataset identity. The [checkpoint store design](../repo-design/storage/checkpoint-case-store.md) documents the internal persistence model.
-
-## Analyze or export
-
-Launch the checkpoint-driven analysis app for a material:
+Download {download}`working_with_results.py <../examples/working_with_results.py>`
+and pass the checkpoint directory printed by the run. For the bundled inputs:
 
 ```bash
-pyrite app analysis launch hopg
+python working_with_results.py pyrite-output/checkpoints/hopg@quickstart-cdf8eed9af74
 ```
 
-The sidebar holds the **Material** and **Checkpoint** pickers, the **Emission** choice, and one shared slice: beam energy, polar tilt, azimuth, and crystal thickness. The Checkpoint menu lists every dataset for the material with its face, for example `standard · flat`, `standard · blazed`, or `high_energy (a7b2ce) · flat`. It opens on the standard flat run; when a material has none, it opens on **choose a checkpoint** and loads nothing until you pick one.
+A changed profile or catalog can produce a different stem: use your listed
+quickstart directory. The script expects its single saved case: 30 keV electrons,
+a 2 µm HOPG target, 45° polar tilt and 90° observation angle. These are campaign
+checkpoint records, distinct from the in-memory `Result` returned by `simulate`.
+The loading and reduction functions below are supported **advanced-stable** APIs.
 
-The app has three views, and each reads the sidebar slice:
-
-- **Spectra** overlays narrowband and broadband spectra. **Vary** picks the dimension that changes across curves (beam energy, polar tilt, or azimuth); the other slice values stay pinned.
-- **Map** draws one azimuth × polar-tilt heatmap at the slice's beam energy and thickness. Pick the plotted **quantity**, click a cell to plot its spectrum, and read the line/coherent-flux trends and the top-20 geometry ranking below it. A checkpoint without a 2-D angular sweep shows 1-D scan plots instead.
-- **Detectors** shows the Eagle XO or Timepix3 response at the slice's polar tilt, azimuth, and thickness, with beam energy varying across curves.
-
-A pinned thickness the beam never reached at a low beam energy falls back to that energy's thickest computed slab, and the view says so. The matplotlib efficiency, charge-map, and best-spectra figures are no longer in the app; call them from `pyrite.plots`.
-
-To compare hand-picked cases across datasets (the case basket) or the best lines of every material with a checkpoint, launch the compare app:
-
-```bash
-pyrite app compare launch hopg
+```{literalinclude} ../examples/working_with_results.py
+:language: python
+:start-after: tutorial-start
+:end-before: tutorial-end
 ```
 
-Its Material and Checkpoint pickers select the dataset cases are added from; the basket persists while you switch either. The cross-material view ignores that picker and reads every catalog material's checkpoint.
+```{eval-rst}
+.. plot::
+   :alt: Three saved HOPG source components and a comparison of their PXR/CBS and characteristic yields in the 100 to 1000 eV band.
+   :caption: Actual quickstart checkpoint output. Grey shading marks the integrated band. The bar chart excludes bremsstrahlung; all curves retain their native saved grids.
 
-For non-interactive use, inspect `pyrite app analysis export --help`; `pyrite app pixels export` and `pyrite app compare export` render the other two apps the same way. The generated [CLI reference](../repo-design/cli/cli-reference.md) is authoritative for accepted arguments and output formats.
-
-## Planar channeling demo
-
-Explore the planar model independently of campaign checkpoints:
-
-```bash
-pyrite app channeling launch
-pyrite app channeling launch --smoke
-pyrite app channeling export --stem channeling
+   from _tutorials import working_with_results
+   working_with_results()
 ```
 
-Choose silicon or diamond (110), beam energy, incidence, divergence and zone
-depth inside the app. No material argument is accepted. `--tunnel` uses fixed
-port 2722; launch also supports `--edit`, `--watch`, `--acp` and `--no-token`.
-Export executes the default case headlessly and writes
-`pyrite-output/results/channeling.html`, without starting a browser or server.
-The exported HTML is a static snapshot; live selectors require `launch`.
-
-The eigenstate selector plots a single eigenfunction at Bloch momentum zero,
-normalized to unit probability per period. Its display phase makes the largest
-plane-wave coefficient real and positive. The spatial heatmap and depth slider
-show an **ensemble probability density**, retaining coherences within all Bloch
-blocks. They do not identify a unique ensemble wavefunction. Changing these
-display controls reuses the stored solver and spectrum results.
-
-The supercell density is folded into one period: its integral equals the
-surviving incident-electron weight. The optional conditional view divides by
-that weight (and displays zero when no weight survives); the survival fraction
-is shown separately. Depth samples use the basis current at that depth.
-See the [reconstruction derivation](../validation/channeling/cr-planar-spatial-density-reconstruction.md).
-
-The same app offers an [experimental axial mode](experimental-axial-channeling.md) with a
-Run action, two-dimensional potential/density maps, coherent phase, and optional
-string-centered OAM. Its bounded diagnostics use the existing axial solvers.
-
-## Stored components
-
-Current full checkpoints contain three versioned HDF5 components, plus a
-fourth when planar channeling was selected:
-
-- `line.h5` stores PXR/CBS line results without characteristic or channeling radiation;
-- `brem.h5` stores the bremsstrahlung continuum;
-- `characteristic.h5` stores `spec_characteristic` on the fine line grid;
-- `channeling.h5` stores `spec_channeling` on the fine line grid. It is written
-  only when some record carries channeling radiation, so channeling-off datasets
-  keep the three-file layout.
-
-The analysis app merges all available components and shows characteristic radiation by default. Clear **show characteristic radiation** to inspect the smaller PXR/CBS peaks without changing the checkpoint. Omitting `characteristic.h5` is supported: the dataset loads as line-only, which also makes intentional exclusion and transfer straightforward.
-
-In memory, every record keeps `spec`, `spec_coherent`, `spec_characteristic`, the optional `spec_channeling`, and `brem` as separate arrays; none includes another. Code that needs a sum calls `pyrite._spectral_components.cxr_spectrum` or `incident_spectrum`, and `Result.combined_cxr()` gives the same sum for API results. Each additive component enters a total exactly once; the analysis app's **Components** selector adds **Characteristic** and **Channeling** terms independently.
-
-For the opt-in planar model, `simulate(..., physics=Physics(channeling_model="planar", channeling_plane=(1, -1, 0), radiative_model="uncoupled"))` produces `Result.channeling` on the CXR photon grid, and planar profile runs write `channeling.h5`; see [planar channeling runs](experimental-planar-channeling.md) for the workflow and the packaged `channeling_demo` profile. Select an explicit photon grid spanning the expected CR lines when resolving narrow peaks. The source includes bound lines and tracked free-to-bound capture; `Result.combined_cxr(include_channeling=False)` excludes both without altering the individual arrays.
-
-The persisted source keeps the diagnostic model's constant mean electron energy and laterally infinite slab for photon attenuation. Finite face and cutoff limits censor electron emission paths, but finite side-face photon escape, accumulated in-plane angular diffusion and detector response convolution remain outside that source model. Literature peak positions are anchored; measured linewidth reproduction remains incomplete. See [source geometry and normalization](../validation/channeling/cr-persisted-channel.md) and the [linewidth source audit](../validation/channeling/cr-line-shape.md). Replay and line recompute rescore the stored channel, and physical-detector observations score it; adaptive precision, trajectory capture and electron-block transport refuse planar channeling ([supported and refused paths](experimental-planar-channeling.md#supported-and-refused-paths)).
-
-Legacy `.pkl` component paths and plain, gzip, and zstd monoliths remain readable and migrate to HDF5 on the next normal save. Artifacts written before the separate-component contract stored `spec`/`spec_coherent` as totals including `spec_characteristic`; they are separated once on load. Use the [result schema](../repo-design/storage/result-schema.md) for independent inspection.
-
-### Shaped entry wavefunctions (experimental)
-
-The channeling solvers also accept a user-defined transverse entry state in place of a plane wave with divergence. `pyrite.montecarlo.channeling.states` builds them:
-
-- Gaussian, Hermite–Gauss, Laguerre–Gauss (vortex; `donut`), Bessel–Gauss and finite-energy Airy beams;
-- aperture-limited probes with polar aberrations (abTEM convention), an annular aperture, a vortex charge and an arbitrary phase-plate function;
-- any sampled array (`from_array`) or abTEM `Waves` (`from_abtem`);
-- combinations: `superpose` (coherent), `mixture` (incoherent) and `translate`.
-
-```python
-from pyrite.montecarlo.channeling import channeling_spectrum, states
-
-probe = states.aperture_probe(5e6, semiangle_rad=1e-4, aberrations={"C10": -1e3}, ell=1)
-spectrum = channeling_spectrum(solver, 2e5, energies_eV, 0.0, entry_state=probe)
-```
-
-Here `x` is the plane normal. With the default `entry_impact="averaged"`, only the momentum distribution `|ψ̃(k)|²` matters. `entry_impact="fixed"` keeps the probe's position relative to the planes. Planar channeling carries no orbital angular momentum, because the state's in-plane part is traced out; the axial tier (#508) is where vortex states keep their OAM. `simulate`, `Scene` and profiles cannot select an entry state; runs always enter from the beam's plane-wave incidence and divergence.
-
-## Pixel-detector observations
-
-A profile detector with an acquisition also stores one counting observation per case in `pyrite-output/observations/<stem>/`, the sibling of that detector's `pyrite-output/checkpoints/<stem>/`. A profile with several detectors has a separate ID-qualified stem for each. Observations hold factorized per-tile spectra, pixel solid angles, and filter paths rather than a pixel-by-energy cube, so reopening one never reruns transport. The [Python workflow](python-api-workflow.md#place-a-finite-filter-over-detector-pixels) covers physical detector construction; `pyrite.observations.observation_inventory(stem)` lists a stem's stored observations by case without opening their factors.
-
-The pixel app reads one dataset's observations without loading its checkpoint. Pick the material and checkpoint that name the dataset:
-
-```bash
-pyrite app pixels launch hopg
-```
-
-In the app:
-
-- choose an observation, then an image: registered **total counts**, counts in an **energy window** bounded by configured reporting edges, primary **filter transmission** at a stored continuum-grid energy, or **filter coverage** (plates crossed by each pixel's centre ray);
-- **Counts** shows deterministic expectations by default. A Poisson acquisition also offers its seeded realization, labelled as such; neither is ever substituted for the other;
-- the image is drawn at full resolution up to 128 by 128 pixels, and larger grids draw summed (counts), averaged (transmission), or maximum (coverage) display cells whose tooltips give their pixel ranges;
-- **row** and **column** select one pixel for its geometry (local and lab position, direction, polar/azimuth, solid angle, angular tile, filter paths), its true accepted spectra before response, and its measured reporting-bin histogram with underflow, overflow, and below-cut accounting.
-
-Timepix3 counts are clustered photon events attributed to the incident-ray pixel; raw neighbouring-pixel triggers are not modelled. The first Timepix3 image in a session builds the response matrix and can take tens of seconds. Static HTML export renders the default centre-pixel selection only; interactive pixel selection needs a running app. Observations produced with `pyrite run --remote` stay on the remote host until remote transfer is implemented.
-
-## Save electron trajectories
-
-Checkpoints keep spectra, not the electron histories behind them. To keep the complete transport result of a run for later analysis, opt in per run:
-
-```bash
-pyrite run trajectory_demo --trajectories
-```
-
-The bundled `trajectory_demo` profile runs one case: 100 fixed histories of 30 keV electrons in a 2 µm HOPG slab, tilted 45° at azimuth 180°, with a round 1 µm FWHM incident beam. Its compact beam spot keeps multiple histories visible at the same scale as their scattering paths. These counts are for visualization, not converged spectra. The profile needs neither `--quick` nor edits to `standard`.
-
-Each case the run transports writes one HDF5 file, `pyrite-output/trajectories/<stem>/<config>-<digest>/E0_<energy>keV.h5`, where `<stem>` is the checkpoint stem and the digest keeps configuration names that sanitize alike apart. The file holds the exact mapping the case's spectrum phase consumed: every per-segment array, grooved runs' vacuum legs, the sampled incident phase space, the exit tallies, and whichever optional midpoint, shell, secondary, radiative, straggling, or diagnostic fields the run produced, with dtype, shape, and row order preserved. It also records the resolved case, the seed, the run identity, the resolved transport settings (core, per-electron cutoffs, `n_hat`), and each field's unit. Field meanings are in [transport outputs](../physics/beam-transport/transport-outputs.md).
-
-A bare `--trajectories` writes under `pyrite-output/trajectories/`; `--trajectories DIR` selects an explicit directory. Put the profile before a bare flag.
-
-Capture never changes a result. The file is written after transport and before the spectrum phase, from the arrays that phase then reads, so spectra and checkpoints are identical to the same seeded run without `--trajectories`. Without the option no trajectory file is written.
-
-Things to know before enabling it:
-
-- **Fixed counts required.** The default `standard` profile uses adaptive counts, which cannot capture trajectories. `trajectory_demo` already sets fixed counts. For another profile, set them with `pyrite numerics set NAME --cxr-trials N --brem-trials N`; reset any explicit precision policy first (see [adaptive electron counts](sweep-profiles.md#adaptive-electron-counts)).
-- **Size.** A file holds every segment of every electron. Row fields are stored compressed: a 30 keV silicon capture with the default midpoint and radiative fields measured about 90 bytes per segment, against 208 before compression (schema 2). Files are usually still far larger than the spectra; start with `-m` and `--quick` to gauge it. See [trajectory artifact storage](../repo-design/storage/trajectory-artifacts.md) for measurements.
-- **Cached cases are not captured.** Only cases this run transports get a file. Cases resumed from a checkpoint or replayed from the shared cache are never re-transported just to write one; the run reports how many and `--recompute` transports them again.
-- **Existing files.** Before any transport the run checks the directory. A case that already has a file stops the run unless `--overwrite-trajectories` is given. A cached case whose file records different physics also stops the run: remove the file or pick another directory.
-- **Interrupted runs.** Files are written as `<name>.partial` and renamed only once complete, so a crash or budget stop cannot leave a truncated file under the final name. A resumed run discards stale `.partial` files of the cases it transports.
-- **Remote captures stay remote.** `pyrite run ... --remote --trajectories` writes on the compute host; transfer selected cases or export selected histories with `pyrite remote trajectories`. See See [remote trajectory captures](running-on-a-cluster.md#ssh-remote-helper-and-manual-slurm).
-
-### Find and describe captures
-
-```bash
-pyrite trajectories ls
-pyrite trajectories info pyrite-output/trajectories/<stem>/<config>-<digest>/E0_30keV.h5
-```
-
-`ls` lists every file under the capture root (or each `DIR` given): checkpoint stem, case, E0, schema, status, segment rows, histories with segments, highest secondary generation, and size, then totals per stem. Stray `.partial` files, incomplete artifacts, and HDF5 files that are not trajectory artifacts appear with their status rather than failing the listing. `info` prints one artifact's case, seed, provenance, whether a scene was recorded, history ID range, track count, segments per generation, and every `/transport` field with its role (per-segment, per-electron, nested, scalar), dtype, shape, and units; the per-segment names are the cell arrays an export carries. Both read headers, node metadata, and integer ID columns in bounded blocks only, never segment arrays. `-o json` emits one stable JSON envelope. `export` and `score` likewise skip non-artifact files in a directory with a warning.
-
-Use `pyrite trajectories export` and `score` for captures; the former checkpoint aliases were removed in 0.13.0.
-
-Reopen a file from Python:
-
-```python
-from pyrite.montecarlo.trajectories import read_trajectory_artifact
-
-artifact = read_trajectory_artifact("pyrite-output/trajectories/<stem>/.../E0_30keV.h5")
-segs = artifact.transport  # same keys and arrays as simulate_trajectories
-artifact.units["r_mid"]  # "angstrom"
-artifact.case["seed"], artifact.settings["transport_core"]
-```
-
-The HDF5 layout is self-describing: `/transport` holds one node per field (aliases such as `E_keV` are hard links to their canonical field), and `/case`, `/settings`, and `/provenance` hold JSON attributes; `/case/payload` also stores the exact typed case. Per-segment fields (marked `pyrite_row`) are stored grouped by electron; when that differs from the transported order, `/transport_order` maps each stored row to its transported index, and `/electron_index` gives each history's row range. Since schema 3, per-segment fields are LZF-compressed, ID columns are stored in narrower integers (`pyrite_dtype` names the original), and `t0_ang` is stored once per history. PyRITE's reader undoes all of this and returns the transported arrays in transported order. h5py reads LZF natively; other HDF5 tools need an LZF filter plugin such as the one in `hdf5plugin`. Readers accept schemas 1 to 3 and reject files whose `complete` flag is unset or whose `schema_version` is newer than they support.
-
-### Export segments for visualization
-
-```bash
-pyrite trajectories export pyrite-output/trajectories/
-```
-
-Every artifact becomes a VTK XML PolyData (`.vtp`) file beside it, readable by ParaView, VisIt, and PyVista/VTK. Each segment is a two-point line cell from `r_mid - L_ang v_hat / 2` to `r_mid + L_ang v_hat / 2` in the slab frame, in angstrom. All per-segment fields ride along as cell data, so thresholding on `electron_id` (or `track_id` with secondaries) isolates one history. Grooved vacuum legs are extra cells with `is_vacuum = 1`, where only `electron_id`, `E_start_keV`, `t_start_ang`, `t0_ang`, `L_ang`, and `v_hat` are defined and other fields are NaN or -1; `--no-vacuum` drops them.
-
-VTK PolyData was chosen because it represents disconnected straight segments with arbitrary per-segment attributes and opens in the common scientific viewers without a plugin. It cannot carry the rest of the artifact, so the export omits the compatibility aliases, per-electron arrays (`initial_*`, `straggle_dE_keV`), tallies, nested metadata (`inelastic`, `radiative`, `secondaries`, `secondary_tracks`, `stopping_tables`, `transport_diagnostics`), the case, settings, provenance, and units. The HDF5 artifact stays the authoritative record.
-
-### Score spectra from saved trajectories
-
-```bash
-pyrite trajectories score pyrite-output/trajectories/
-```
-
-This replays only the spectrum phase (line, characteristic, and bremsstrahlung spectra) of every captured case and stores each result as an ordinary record of the checkpoint stem and run identity the capturing run recorded, under `--checkpoint-dir` (default `pyrite-output/checkpoints/<stem>`). It never transports. Each new record carries `source_trajectory` with the artifact's path and SHA-256. Records that already exist are kept unless `--overwrite`, and records of cases without an artifact are never touched, so re-scoring a run's own checkpoint after a spectrum-phase change replaces exactly the captured cases. The shared per-case cache is neither read nor written.
-
-Every artifact is checked before anything is written. The command refuses artifacts from before this schema (re-run the case with `--trajectories`), incomplete or foreign files named explicitly (a directory scan skips them with a warning), artifacts written outside a run, two runs' artifacts for one stem, and a target checkpoint written by a different run. Spectrum inputs that the case alone determines are recomputed and must match what the artifact stored.
-
-Segments are read in whole-electron blocks of at most `--max-segments` rows (default 1,048,576), so host memory does not grow with the artifact. On a 7.1-million-segment CPU artifact, the peak above the process baseline was about 1.1 GiB at the default, 0.7 GiB at 262,144 rows, and 0.4 GiB at 65,536 rows. Reading the whole artifact at once peaked at 4.9 GiB. At a fixed block size the peak does not grow with the artifact: 65,536-row blocks peaked at 0.4 GiB for both 2.4 and 7.1 million segments, while whole-artifact reads grew from 1.7 to 4.9 GiB. Smaller blocks were not slower on the CPU. Scored spectra equal the live run's to floating-point summation order (relative 1e-12). Cases with coherent emission or a temporal profile need every segment at once and are refused; score those in Python with `pyrite.montecarlo.runner.spectrum_from_artifact`, which matches the live run bit for bit but holds the whole artifact in memory.
-
-Prefer artifact reuse when you redo only the spectrum phase of the same transported electrons, for example after a change to line, characteristic, or bremsstrahlung scoring. Prefer a seeded re-transport (`pyrite checkpoint recompute cxr|brem`) when no artifact exists or the change affects transport. Measured on the default 40 keV `standard` sweeps (CPU transport feeding CUDA spectra), transport took 6 to 14 times as long as the spectrum phase per case, and the GPU waited on transport 55 to 89 percent of the time. On the CPU a schema-3 artifact holds about 90 bytes per segment and streams in under 1 microsecond per segment with a warm file cache, against about 6 to 10 microseconds per segment for lockstep transport. Artifacts cost disk, though: a 30,000-electron, 20 µm hopg case writes 0.57 GiB at schema 3 (1.28 GiB uncompressed). With CUDA transport, compressing that capture took several times as long as the transport itself (see [trajectory artifact storage](../repo-design/storage/trajectory-artifacts.md)). CUDA-core transport and cold remote reads are not yet measured.
-
-### Export scene geometry
-
-```bash
-pyrite trajectories export pyrite-output/trajectories/ --scene
-```
-
-In addition to each original slab-frame `.vtp`, `--scene` writes two independently viewable scenes:
-
-- `<case>.vtm`: lab-frame tracks, a capture-fitted crystal crop, layer boundaries, grooves (up to 200 periods), and an entry-beam axis, in **angstrom**.
-- `<case>.instrument.vtm`: the finite target footprint and round beam FWHM outline when their dimensions were recorded, ordered filter volumes, the physical detector face with pixel-grid metadata, and the incident beam axis, in **mm**.
-
-Open these in separate views. Their coordinate scales differ by $10^7$; combining their raw coordinates in one view misrepresents physical distances. The sample entrance origin is the target reference point. Scene tracks and vectors use the recorded sample-to-lab rotation; the original `.vtp` retains its slab frame. Each scene block carries units, frame, material, case digest and transform in VTK FieldData. Grooved vacuum legs retain unknown `track_id`, `parent_id` and `generation` (`-1`); `electron_id` alone cannot recover their ancestry.
-
-New capture-enabled profile runs snapshot downstream geometry in the HDF5 artifact, independently of whether counting acquisition is requested. Old captures remain readable and exportable. When downstream geometry was not captured, the scene omits filters and detector and marks them unavailable; it does not reconstruct them from today's catalog. The beam axis is a reference direction, not a reconstruction of individual incoming particles.
-
-`--out-dir DIR` mirrors the input directory layout for tracks and manifests. `--overwrite` permits replacing their existing outputs. Each scene export owns an immutable `<case>.scene-<id>/` directory; all blocks are completed before publishing a manifest. Keep that directory with its manifests when copying or sharing a scene. Overwrite leaves older sidecar directories intact so previous manifests remain usable; delete an older directory only after verifying no retained manifest references it.
-
-### Inspect trajectories in ParaView
-
-1. **File → Open** the `.vtp` or one `.vtm`, then **Apply**. For a scene, use the block selector or **Extract Block** to select `tracks`. Use a separate render view for the instrument scene.
-2. In the colouring menu choose the **cell** array `E_start_keV`; rescale to the data range. Each two-point cell represents a captured segment, so colour is constant on that segment.
-3. To isolate transported secondaries, apply **Threshold** to cell `generation` with a lower bound of `1` and an upper bound at the recorded maximum. Primaries have generation `0`; unknown groove-vacuum ancestry is `-1`. A capture without secondary transport has no generation array.
-4. To inspect groove-gap flights, threshold cell `is_vacuum` to `1`; threshold to `0` for material segments. The array is present when vacuum diagnostics are included; `--no-vacuum` omits those cells.
-5. Threshold `electron_id` to select a complete primary history/shower, or `track_id` to select one electron trajectory. Use **Spreadsheet View** to inspect track, parent, energy and event attributes. Use **Clip** to inspect a depth range without changing the original artifact.
-
-ParaView reads a whole `.vtp` into memory, so export only the histories you need from a large capture:
-
-```bash
-pyrite trajectories export trajectories/ --first 20
-pyrite trajectories export case.h5 --sample 200 --seed 1 --scene
-pyrite trajectories export case.h5 --history 7 --history 12
-pyrite trajectories export case.h5 --track 4031
-```
-
-Selections take complete histories (a primary `electron_id` with every secondary of its shower) or complete tracks; `--track` intersects a history selection. `--first N` takes the first N histories that have segments, `--sample N` draws N at random (reproducibly from `--seed`, default 0). Only the selected rows are read, so export memory and the output size follow the selection, not the capture. A subset `.vtp` adds the cell array `segment_id`, each cell's row index in the full transported result, and a `selection` FieldData record of the request and the resolved history IDs. Grooved vacuum legs follow selected histories and are left out of track selections, whose ancestry they cannot express. An empty selection exports nothing and reports which history IDs have segments.
-
-The same selection is available from Python:
-
-```python
-from pyrite.montecarlo.trajectory_selection import read_selection, select_trajectories
-
-selection = select_trajectories("trajectories/<stem>/.../E0_30keV.h5", sample=50, seed=1)
-segs = read_selection(selection, ["r_mid", "E_start_keV", "electron_id"])
-segs.transport["segment_id"], segs.units["E_start_keV"]
-```
-
-#### ParaView preset
-
-A ParaView script ships with PyRITE. It colours tracks by a cell array (`E_start_keV` by default), adds ready-to-enable Threshold filters for secondaries, material segments and one history, shows scene geometry as faint grey wireframe, and opens the instrument manifest in its own view. The close-up camera fits the visible tracks rather than the full crystal and reference axis. It needs ParaView's Python, not PyRITE's:
-
-<!-- verify: skip (needs ParaView pvbatch, not a pyrite/pyrite-dev command) -->
-```bash
-SCRIPT=$(pyrite trajectories export --paraview-script)
-pvbatch "$SCRIPT" case.vtp --screenshot case.png
-pvbatch "$SCRIPT" case.vtm --color generation --threshold electron_id 0 9 --screenshot closeup.png
-```
-
-For a first GUI check with the bundled demo, export twenty whole histories:
-
-```bash
-pyrite trajectories export trajectories/ --first 20 --scene --out-dir traj-vtk/
-```
-
-Open the resulting close-up `.vtm` (without `.instrument` in its name), click **Apply**, select the reader in the Pipeline Browser, then run the imported macro. Other profiles can have millimetre-wide beam spots while each shower travels only micrometres: fitting twenty such histories can still make each shower tiny. Use `--first 1` or `--history ID` for a local shower from those captures, and the instrument view for the full footprint. The close-up crystal is a lateral crop around the selected tracks, retains the recorded thickness, and appears as wireframe so its faces do not hide them. Coordinates and track lengths are never stretched or recentered.
-
-`--color` takes any cell array (`generation`, `layer`, `event_kind`, `t_start_ang`, ...); an unknown name lists the available ones. `--threshold FIELD LOW HIGH` repeats. Headless hosts need `pvbatch --force-offscreen-rendering` or an OSMesa/EGL ParaView build. In the GUI, use **Macros > Import new macro...** with the same file, select an opened export in the Pipeline Browser, and run the macro. For a remote capture, export a subset there and copy the `.vtp`, or connect the ParaView client to a `pvserver` on that host.
-
-## Preserve or reduce data
-
-Use checkpoint commands instead of manually editing checkpoint directories:
-
-```bash
-pyrite checkpoint --help
-pyrite checkpoint archive --help  # store, list, restore, merge
-pyrite checkpoint slim --help
-```
-
-`gc` removes cases that no longer match current profile resolution; `rm` targets selected datasets. Both provide previews and confirmation controls. Review their help before destructive use.
-
-Remote runs can be pulled into the same local checkpoint layout. See [Running on a cluster](running-on-a-cluster.md) for submission and transfer.
-
-## Analyze saved trajectory captures
-
-Schema-2/3 trajectory artifacts can be reduced without running transport:
-
-```python
-import numpy as np
-from pyrite.montecarlo.trajectory_summary import summarize_trajectories
-from pyrite.plots.altair.trajectory_summary import summary_charts
-
-tables = summarize_trajectories(
-    "capture.h5",
-    depth_edges_ang=np.linspace(-1, 40001, 81),
-    energy_edges_keV=np.linspace(0, 30, 61),
-    max_rows=65536,
-)
-charts = summary_charts(tables)
-```
-
-Choose depth edges covering the entire capture, including surface nudges, and
-include layer interfaces. Tables contain units in their column names. The
-[observable definitions](../physics/beam-transport/transport-outputs.md#saved-capture-observables)
-explain the primary-only fates/ranges and all-generation continuous-loss profile.
-Histograms retain underflow/overflow counts; charts show finite bins only.
-`iter_primary_summaries(path, max_rows=...)` yields bounded per-history tables
-when individual values are needed. Consume those tables incrementally to keep
-memory bounded. One whole primary shower may exceed `max_rows`; it is never
-split. Reduction memory otherwise depends on the block and fixed histogram
-sizes, rather than the capture's segment or history count.
-
-For secondary-transport captures, compare the continuous-loss profile sum with
-`capture_secondary_energy_balance(path)` from
-`pyrite.montecarlo.trajectory_balance`. Its `term, energy_keV` table reuses the
-transport energy ledger and includes cutoff, binding, pair and annihilation
-terms. Pair metadata is filtered in bounded scans; this can require repeated
-passes. `campaign.beam_metrics.capture_beam_metrics(path, beam,
-max_particles=65536)` reuses sampled-beam diagnostics over a deterministic prefix
-of `initial_*`, including missed entries, returning metrics plus sampled and
-available counts. Increase the limit to the available count for full-bunch
-metrics; its memory limit is separate from the segment-block limit.
-
-Launch the trace viewer with `pyrite app viewer launch`. Choose **Saved capture**,
-enter the artifact path and number of first histories, then **Open saved capture**.
-The existing 3D, cross-section and survival views use those stored rows without
-transport. Reads are capped at 100,000 material plus vacuum segments; reduce the
-history count if the cap is exceeded. Saved-view fractions describe the selected
-material-entering histories. The API also accepts `select_trajectories(...)`
-whole-history selections directly in `trajectory_chart`,
-`penetration_survival_chart`, `trajectory_volume_data` and
-`trajectory_volume_figure`. Track-only selections are rejected because they
-cannot describe complete primary survival.
+The characteristic peak near 277 eV dominates the **100–1,000 eV** integral;
+PXR/CBS produces separate narrow structure. The curves show density in
+**photons/(incident electron · eV · sr)**. Integrating over energy removes
+`/eV`, giving **photons/(incident electron · sr)**. `radiation_band_metrics`
+interpolates band endpoints within the saved line grid and integrates its
+additive line components; it excludes the continuum. The plotted `brem_wide`
+uses its own wider grid, while the checkpoint's `brem` is already interpolated
+onto the line grid. Do not add native arrays with different energy axes.
+
+No current, acceptance, exposure, filter or detector-response factor has been
+applied. These are simulated source components, not measured counts. The
+checkpoint's `scale` and `source_current_na` support explicit flux conversion;
+[detector-response recipes](../reference/python-scene-recipes.md#apply-detector-response-explicitly)
+cover response folding.
+
+The saved quickstart used seed 1 and stopped after 600 sampled histories under
+its adaptive policy. That stopping decision does not establish convergence of
+every spectral bin or the carbon-line integral. Check sampling, grid and
+reflection convergence before quantitative use; consult the
+[model capability matrix](../physics/capabilities.md) and
+[validation status](../validation/status-summary.md). The
+{download}`stored arrays and provenance <../examples/data/working_with_results.json>`
+retain resolved inputs, adaptive diagnostics, dataset identity and input-file
+hashes. Normal documentation builds plot those arrays without simulation or
+table downloads.
+
+(checkpoint-layout-and-identity)=
+(analyze-or-export)=
+(stored-components)=
+(pixel-detector-observations)=
+(preserve-or-reduce-data)=
+
+## Other checkpoint workflows
+
+Use the [checkpoint and app reference](../reference/results-and-apps.md) for
+component files, dataset identity, interactive analysis, pixel observations,
+comparison, export and archiving. For example, `pyrite app analysis launch hopg`
+opens the saved-dataset picker with the `apps` extra installed.
+
+(save-electron-trajectories)=
+(find-and-describe-captures)=
+(export-segments-for-visualization)=
+(score-spectra-from-saved-trajectories)=
+(export-scene-geometry)=
+(inspect-trajectories-in-paraview)=
+(paraview-preset)=
+(analyze-saved-trajectory-captures)=
+
+## Saved electron histories
+
+Checkpoints retain spectra. [Saved trajectory workflows](../reference/trajectory-workflows.md)
+cover separate capture artifacts, reductions, replay, VTK scenes and ParaView.
+
+(planar-channeling-demo)=
+(shaped-entry-wavefunctions-experimental)=
+
+## Experimental quantum views
+
+The [channeling app reference](../reference/results-and-apps.md#planar-channeling-demo)
+and [planar channeling guide](experimental-planar-channeling.md) cover solver
+visualization and the restrictions on entrance-state selection.

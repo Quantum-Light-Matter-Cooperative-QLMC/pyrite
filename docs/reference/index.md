@@ -8,6 +8,12 @@ complete signatures, option defaults, configuration fields, and scientific sourc
 
 ../repo-design/cli/cli-reference
 ../api
+python-scene-recipes
+results-and-apps
+trajectory-workflows
+directional-sources
+campaign-configuration
+catalogs-and-workspaces
 ../repo-design/profile-settings
 ../repo-design/configuration-resolution
 ../repo-design/cli/cli-deprecations

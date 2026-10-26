@@ -1,0 +1,1748 @@
+{
+  "schema": "pyrite.tutorial.v1",
+  "source_sha256": "1916b1396ae10e66896d7264b9104e1d963d6289b61171ca8853ee96480cec75",
+  "pyrite_version": "0.21.0",
+  "python_version": "3.14.4",
+  "git_revision": "59f6d5964ca25b9f224c809456bc905dd8941c94",
+  "output": {
+    "expected": [
+      [
+        3.5151775137340024,
+        3.5224899172025297,
+        3.5287778935167182,
+        3.5340321781081205,
+        3.594815514374688,
+        3.598031232338243,
+        3.600177708802418,
+        3.6012517474939365,
+        3.6403245098252786,
+        3.6392388180582538,
+        3.6370690528126737,
+        3.63381844504065,
+        3.656073827625888,
+        3.65063809546235,
+        3.6441329748317433,
+        3.636568050238262
+      ],
+      [
+        3.5224899172025306,
+        3.5298277084351213,
+        3.536137544013928,
+        3.5414101143623165,
+        3.60232632032047,
+        3.6055532473314145,
+        3.6077072095086096,
+        3.6087849949680613,
+        3.64793949132101,
+        3.6468500121344736,
+        3.6446726799575875,
+        3.6414107415225585,
+        3.663706548065716,
+        3.658251898678406,
+        3.651724163911529,
+        3.6441329748317433
+      ],
+      [
+        3.5287778935167182,
+        3.5361375440139273,
+        3.542466200873185,
+        3.547754515715427,
+        3.608784994968064,
+        3.612021573318413,
+        3.6141819809425044,
+        3.615262992497631,
+        3.654487773650312,
+        3.653395033365694,
+        3.6512111858102823,
+        3.64793949132101,
+        3.6702700422757433,
+        3.664799104685889,
+        3.6582518986784054,
+        3.65063809546235
+      ],
+      [
+        3.5340321781081223,
+        3.5414101143623165,
+        3.547754515715427,
+        3.5530560012940633,
+        3.6141819809425044,
+        3.6174266329739586,
+        3.619592432448863,
+        3.6206761427534824,
+        3.659959655355181,
+        3.658864187040254,
+        3.6566748891336704,
+        3.653395033365694,
+        3.675754605430448,
+        3.6702700422757433,
+        3.663706548065716,
+        3.65607382762589
+      ],
+      [
+        3.538115199385673,
+        3.545507538872953,
+        3.551864342121176,
+        3.5571762025019633,
+        3.6182859576040554,
+        3.621536888262133,
+        3.623706880868962,
+        3.6247926899577987,
+        3.6640477806853378,
+        3.662950212707666,
+        3.6607567199274618,
+        3.6574705829586094,
+        3.67977523933021,
+        3.67428030424933,
+        3.667704412063375,
+        3.6600572936027014
+      ],
+      [
+        3.541280196465021,
+        3.5486835682016027,
+        3.55504987056056,
+        3.5603696772778712,
+        3.6215368882621326,
+        3.624792689957799,
+        3.6269659356013584,
+        3.6280533729151236,
+        3.6673437755670317,
+        3.666244561731391,
+        3.6640477806853378,
+        3.6607567199274604,
+        3.683078778075226,
+        3.6775756227851906,
+        3.670989904099088,
+        3.663331373159667
+      ],
+      [
+        3.54339281697994,
+        3.5508035563588702,
+        3.5571762025019633,
+        3.5625013160254917,
+        3.6237068808689616,
+        3.6269659356013584,
+        3.6291413537301387,
+        3.6302298784267863,
+        3.6695438517842875,
+        3.668443538789833,
+        3.666244561731391,
+        3.662950212707666,
+        3.685283884326969,
+        3.679775239330211,
+        3.673182958219742,
+        3.6655168057101926
+      ],
+      [
+        3.5444499150713438,
+        3.551864342121176,
+        3.558240163475374,
+        3.563567933181552,
+        3.624792689957799,
+        3.628053372915123,
+        3.6302298784267863,
+        3.6313189473857768,
+        3.670644714935237,
+        3.6695438517842875,
+        3.6673437755670304,
+        3.6640477806853378,
+        3.6863872627308725,
+        3.6808758700054125,
+        3.6742803042493315,
+        3.6666103369723073
+      ],
+      [
+        3.5444201736568406,
+        3.5518345384923506,
+        3.558210306347149,
+        3.563538031348109,
+        3.624762424490574,
+        3.62802308022259,
+        3.630199567561365,
+        3.6312886274270957,
+        3.6706150198815677,
+        3.6695141656364636,
+        3.6673141072175457,
+        3.6640181390000377,
+        3.6863608743776313,
+        3.6808495211045034,
+        3.6742540025616184,
+        3.6665840901887026
+      ],
+      [
+        3.5433630844355286,
+        3.55077376163108,
+        3.5571463543014143,
+        3.562471423142012,
+        3.6236766244677785,
+        3.6269356519884624,
+        3.6291110519534326,
+        3.630199567561365,
+        3.669514165636464,
+        3.668413861543403,
+        3.666214902274408,
+        3.662920579901552,
+        3.6852575038720676,
+        3.679748898307974,
+        3.673156664387187,
+        3.6654905667544386
+      ],
+      [
+        3.5412504816475687,
+        3.5486537912625944,
+        3.5550200402020233,
+        3.5603398022809345,
+        3.6215066499794575,
+        3.624762424490574,
+        3.6269356519884624,
+        3.62802308022259,
+        3.667314107217547,
+        3.666214902274408,
+        3.6640181390000377,
+        3.660727104866427,
+        3.683052413405189,
+        3.67754929750852,
+        3.6709636259651233,
+        3.6633051498479463
+      ],
+      [
+        3.538085511125653,
+        3.5454777885839484,
+        3.5518345384923506,
+        3.5571463543014143,
+        3.6182557464652594,
+        3.6215066499794575,
+        3.6236766244677785,
+        3.624762424490573,
+        3.6640181390000377,
+        3.662920579901552,
+        3.6607271048664276,
+        3.6574409944820108,
+        3.679748898307973,
+        3.6742540025616166,
+        3.6676781574480257,
+        3.6600310937279015
+      ],
+      [
+        3.53394309395971,
+        3.541320844234509,
+        3.547665085661065,
+        3.552966437602455,
+        3.6140918610808583,
+        3.6173364322067023,
+        3.6195021776772576,
+        3.620585860959491,
+        3.659872227173059,
+        3.6587767850264,
+        3.6565875394172074,
+        3.653307761997587,
+        3.675672785080623,
+        3.6701883440093885,
+        3.663624995899265,
+        3.655992445359751
+      ],
+      [
+        3.5286889418157332,
+        3.536048406794486,
+        3.5423769041240676,
+        3.547665085661065,
+        3.6086950096806114,
+        3.6119315073266707,
+        3.6140918610808583,
+        3.6151728456808927,
+        3.6544004761791036,
+        3.653307761997587,
+        3.651123966609367,
+        3.647852350273498,
+        3.6701883440093885,
+        3.6647175281997066,
+        3.658170467929559,
+        3.650556834192729
+      ],
+      [
+        3.5224011240057664,
+        3.529738730270918,
+        3.5360484067944866,
+        3.541320844234509,
+        3.602236496080487,
+        3.6054633426277993,
+        3.607617251095808,
+        3.6086950096806096,
+        3.647852350273498,
+        3.6467628971121635,
+        3.6445856169468325,
+        3.6413237564321568,
+        3.663624995899265,
+        3.6581704679295597,
+        3.6516428784666,
+        3.644051858362661
+      ],
+      [
+        3.5150889048647147,
+        3.5224011240057655,
+        3.5286889418157332,
+        3.533943093959708,
+        3.5947258774171384,
+        3.5979415151965584,
+        3.6000879381382047,
+        3.601161950048497,
+        3.6402375506825027,
+        3.6391518848502047,
+        3.636982171435424,
+        3.633731641313088,
+        3.6559924453597494,
+        3.650556834192729,
+        3.644051858362661,
+        3.6364871021603924
+      ]
+    ],
+    "realized": [
+      [
+        2,
+        5,
+        2,
+        4,
+        3,
+        2,
+        4,
+        8,
+        2,
+        7,
+        4,
+        6,
+        4,
+        4,
+        1,
+        1
+      ],
+      [
+        4,
+        3,
+        2,
+        6,
+        5,
+        8,
+        4,
+        3,
+        3,
+        3,
+        8,
+        3,
+        4,
+        7,
+        8,
+        0
+      ],
+      [
+        7,
+        8,
+        1,
+        3,
+        6,
+        1,
+        4,
+        3,
+        5,
+        2,
+        5,
+        1,
+        9,
+        7,
+        6,
+        1
+      ],
+      [
+        5,
+        2,
+        3,
+        5,
+        3,
+        4,
+        2,
+        7,
+        2,
+        4,
+        5,
+        5,
+        3,
+        4,
+        2,
+        3
+      ],
+      [
+        4,
+        4,
+        3,
+        4,
+        3,
+        5,
+        5,
+        4,
+        2,
+        7,
+        4,
+        4,
+        2,
+        2,
+        1,
+        3
+      ],
+      [
+        3,
+        1,
+        4,
+        2,
+        3,
+        6,
+        2,
+        3,
+        1,
+        4,
+        7,
+        6,
+        6,
+        3,
+        2,
+        3
+      ],
+      [
+        2,
+        6,
+        2,
+        2,
+        2,
+        3,
+        3,
+        4,
+        4,
+        4,
+        2,
+        5,
+        5,
+        0,
+        2,
+        1
+      ],
+      [
+        7,
+        2,
+        4,
+        5,
+        4,
+        3,
+        2,
+        1,
+        2,
+        1,
+        4,
+        2,
+        4,
+        1,
+        7,
+        2
+      ],
+      [
+        2,
+        4,
+        1,
+        5,
+        1,
+        5,
+        4,
+        3,
+        2,
+        8,
+        6,
+        4,
+        3,
+        2,
+        2,
+        5
+      ],
+      [
+        5,
+        4,
+        6,
+        9,
+        4,
+        4,
+        8,
+        4,
+        2,
+        4,
+        2,
+        2,
+        2,
+        3,
+        2,
+        2
+      ],
+      [
+        2,
+        4,
+        3,
+        5,
+        6,
+        2,
+        5,
+        4,
+        4,
+        3,
+        5,
+        7,
+        5,
+        2,
+        2,
+        5
+      ],
+      [
+        0,
+        4,
+        5,
+        1,
+        3,
+        7,
+        2,
+        5,
+        6,
+        5,
+        9,
+        2,
+        3,
+        1,
+        3,
+        5
+      ],
+      [
+        1,
+        3,
+        0,
+        4,
+        4,
+        5,
+        2,
+        0,
+        2,
+        4,
+        6,
+        2,
+        4,
+        3,
+        3,
+        3
+      ],
+      [
+        3,
+        4,
+        4,
+        4,
+        3,
+        6,
+        3,
+        0,
+        3,
+        4,
+        3,
+        2,
+        1,
+        4,
+        2,
+        7
+      ],
+      [
+        3,
+        2,
+        4,
+        3,
+        3,
+        1,
+        3,
+        6,
+        5,
+        3,
+        5,
+        3,
+        3,
+        3,
+        4,
+        7
+      ],
+      [
+        4,
+        2,
+        5,
+        3,
+        4,
+        5,
+        3,
+        7,
+        3,
+        3,
+        6,
+        2,
+        1,
+        2,
+        4,
+        2
+      ]
+    ],
+    "measured_edges_eV": [
+      500.0,
+      4000.0
+    ],
+    "components": [
+      "brem",
+      "characteristic",
+      "cxr"
+    ],
+    "outside_window_expected": {
+      "underflow": 13921.993747819293,
+      "overflow": 381.63757009519315,
+      "below_cut": 0.0
+    },
+    "seed": 1,
+    "case": {
+      "name": "hopg 100nm pol=30 az=0 footprint=5x5mm",
+      "crystal": "hopg",
+      "composition": [
+        [
+          "C",
+          0.11363677327755675
+        ]
+      ],
+      "hkl_list": [
+        [
+          0,
+          0,
+          2
+        ],
+        [
+          0,
+          0,
+          -2
+        ],
+        [
+          0,
+          0,
+          4
+        ],
+        [
+          0,
+          0,
+          -4
+        ]
+      ],
+      "B_ang2": 1.3,
+      "E0_keV": 30.0,
+      "thickness_ang": 1000.0,
+      "crystal_width_mm": 5.0,
+      "crystal_height_mm": 5.0,
+      "beam_fwhm_mm": null,
+      "bunch_charge_pc": 0.01,
+      "rep_rate_hz": 1000000.0,
+      "E_grid": [
+        10.0,
+        3703.0,
+        3.0
+      ],
+      "E_grid_line": [
+        10.0,
+        3703.0,
+        3.0
+      ],
+      "E_grid_brem": [
+        50.0,
+        30050.0,
+        50.0
+      ],
+      "line_grid_policy": {
+        "schema": 1,
+        "bandwidth": {
+          "policy": "kinematic-ceiling",
+          "start_eV": 10.0,
+          "stop_eV": 3700.0
+        },
+        "resolution": {
+          "policy": "sinc-nyquist",
+          "max_spacing_eV": 3.0,
+          "aliased_weight_limit": 0.001,
+          "backend_safety_ulps": 8.0,
+          "max_points": 600000
+        },
+        "rtol": {
+          "detected_counts": 0.01,
+          "intrinsic_source": 0.001
+        },
+        "sources": {
+          "aliased_weight_limit": "derived from rtol",
+          "backend_safety_ulps": "built-in default",
+          "max_points": "built-in default",
+          "max_spacing_eV": "built-in default",
+          "rtol.detected_counts": "built-in default",
+          "rtol.intrinsic_source": "built-in default"
+        },
+        "grid_model": "automatic-v1"
+      },
+      "theta_obs_rad": 2.356194490192345,
+      "tilt_deg": 30.0,
+      "tilt_azim_deg": 0.0,
+      "energy_model": "midpoint",
+      "inelastic_model": "shell-soft-hard",
+      "inelastic_cutoff_eV": 50.0,
+      "elastic_model": "elsepa",
+      "bremsstrahlung_model": "bremslib",
+      "radiative_model": "bremslib-soft-hard",
+      "radiative_cutoff_eV": 1000.0,
+      "atomic_electron_deflection": "kawrakow",
+      "beam_uvw": null,
+      "surface_hkl": [
+        0,
+        0,
+        1
+      ],
+      "mosaic_fwhm_rad": null,
+      "mosaic_mc_fwhm_rad": null,
+      "mosaic_mc_nodes": 5,
+      "abs_layers": null,
+      "layer_radiators": null,
+      "brem_file": null,
+      "Ne": 64,
+      "Ne_brem": 64,
+      "seed": 1,
+      "spec_chunk": null,
+      "brem_chunk": null,
+      "dtheta_obs_rad": 0.1586457597990472,
+      "domega_sr": 0.025600000000000008
+    },
+    "provenance": {
+      "input_scene": {
+        "beam": {
+          "energy_keV": 30.0,
+          "transverse": {},
+          "longitudinal": {},
+          "energy_spread_frac": null,
+          "rep_rate_hz": 1000000.0,
+          "bunch_charge_pc": 0.01,
+          "gdf": null,
+          "bunch_front_tilt": null,
+          "state": null
+        },
+        "target": {
+          "material": "hopg",
+          "thickness_ang": 1000.0,
+          "tilt_deg": 30.0,
+          "tilt_azim_deg": 0.0,
+          "footprint": {
+            "width_mm": 5.0,
+            "height_mm": 5.0
+          },
+          "entrance_face": null,
+          "allow_normal_incidence": false,
+          "mosaic": false,
+          "cut": null
+        },
+        "detector": {
+          "pose": {
+            "center_mm": [
+              70.71067811865476,
+              0.0,
+              -70.71067811865474
+            ],
+            "normal": [
+              0.7071067811865476,
+              0.0,
+              -0.7071067811865475
+            ],
+            "x_axis": [
+              -0.7071067811865475,
+              0.0,
+              -0.7071067811865476
+            ]
+          },
+          "size_mm": [
+            16.0,
+            16.0
+          ],
+          "pixels": {
+            "shape": [
+              16,
+              16
+            ],
+            "pitch_mm": [
+              1.0,
+              1.0
+            ]
+          }
+        },
+        "filters": []
+      },
+      "physics": {
+        "emission": [
+          "incoherent"
+        ],
+        "brem_source": "mc",
+        "straggling": false,
+        "inelastic_model": "auto",
+        "inelastic_cutoff_eV": null,
+        "secondary_threshold_eV": null,
+        "elastic_model": "elsepa",
+        "bremsstrahlung_model": "auto",
+        "radiative_model": "auto",
+        "radiative_cutoff_eV": null,
+        "pair_production_model": null,
+        "positron_transport": false,
+        "atomic_electron_deflection": "kawrakow",
+        "channeling_model": "off",
+        "channeling_plane": null,
+        "channeling_axial": null,
+        "transition_radiation": "off",
+        "transition_lattice_origin_ang": null,
+        "shell_ionization_model": "eedl",
+        "photon_transport": null
+      },
+      "quantum": null,
+      "acquisition": {
+        "exposure_s": 1.0,
+        "measured_edges_eV": [
+          500.0,
+          4000.0
+        ],
+        "hit_threshold_eV": 0.0,
+        "mode": "poisson",
+        "seed": 23
+      },
+      "observation_spec": {
+        "detector": "detector",
+        "response": {},
+        "acquisition": {
+          "exposure_s": 1.0,
+          "measured_edges_eV": [
+            500.0,
+            4000.0
+          ],
+          "hit_threshold_eV": 0.0,
+          "mode": "poisson",
+          "seed": 23
+        },
+        "sampling": {
+          "angular_shape": [
+            4,
+            4
+          ],
+          "reconstruction": "nearest_tile"
+        },
+        "name": null
+      },
+      "scene": {
+        "beam": {
+          "energy_keV": 30.0,
+          "transverse": {},
+          "longitudinal": {},
+          "energy_spread_frac": null,
+          "rep_rate_hz": 1000000.0,
+          "bunch_charge_pc": 0.01,
+          "gdf": null,
+          "bunch_front_tilt": null,
+          "state": null
+        },
+        "target": {
+          "material": "hopg",
+          "thickness_ang": 1000.0,
+          "tilt_deg": 30.0,
+          "tilt_azim_deg": 0.0,
+          "footprint": {
+            "width_mm": 5.0,
+            "height_mm": 5.0
+          },
+          "entrance_face": null,
+          "allow_normal_incidence": false,
+          "mosaic": false,
+          "cut": null
+        },
+        "detector": {
+          "pose": {
+            "center_mm": [
+              70.71067811865476,
+              0.0,
+              -70.71067811865474
+            ],
+            "normal": [
+              0.7071067811865476,
+              0.0,
+              -0.7071067811865475
+            ],
+            "x_axis": [
+              -0.7071067811865475,
+              0.0,
+              -0.7071067811865476
+            ]
+          },
+          "size_mm": [
+            16.0,
+            16.0
+          ],
+          "pixels": {
+            "shape": [
+              16,
+              16
+            ],
+            "pitch_mm": [
+              1.0,
+              1.0
+            ]
+          }
+        },
+        "filters": []
+      },
+      "numerics": {
+        "cxr_trials": 64,
+        "brem_trials": 64,
+        "cxr_chunk": null,
+        "brem_chunk": null,
+        "transport_core": "auto",
+        "energy_model": "midpoint",
+        "max_dE_frac": 0.0,
+        "cxr_reflections": {
+          "n_families": 2,
+          "max_reflections": null,
+          "mosaic_nodes": 5,
+          "mosaic_route": "analytic"
+        },
+        "precision": null,
+        "sampling": {
+          "cxr_electrons": 64,
+          "brem_electrons": 64
+        },
+        "energy_bins": null,
+        "transport": null,
+        "radiation": null,
+        "execution": null,
+        "channeling_basis_size": 16,
+        "channeling_bloch_cells": 16,
+        "channeling_dz_ang": 250.0,
+        "channeling_zone_max_ang": null
+      },
+      "identity_digest": "1051ac7eeb6df613eeb48fba48aa84e2e63a2097e1fe1e902a285eda5c43748a",
+      "line_data_coverage": [
+        {
+          "schema": "line-data-coverage.v2",
+          "population": "unweighted-eligible-escape-piece/reflection/mosaic-pairs",
+          "crystal": "hopg",
+          "coherent": false,
+          "direction": [
+            0.977936486954876,
+            -0.059755706714723696,
+            -0.20017363212316389
+          ],
+          "optical_domain_eV": [
+            1.01,
+            966266.74
+          ],
+          "recoil_shift_limit": 0.01,
+          "counts": {
+            "pairs": 712,
+            "invalid_vacuum_seed": 0,
+            "no_positive_vacuum_seed": 356,
+            "vacuum_seed_outside_optical_data": 0,
+            "root_missing_optical_data": 0,
+            "critical_angle_rejected": 0,
+            "root_nonconverged": 0,
+            "below_line_floor": 0,
+            "finite_root": 356,
+            "finite_root_outside_grid": 0,
+            "vacuum_seed_outside_tabulation": 0,
+            "recoil_shift_exceeds_limit": 346
+          }
+        },
+        {
+          "schema": "line-data-coverage.v2",
+          "population": "unweighted-eligible-escape-piece/reflection/mosaic-pairs",
+          "crystal": "hopg",
+          "coherent": false,
+          "direction": [
+            0.9691651600428753,
+            -0.059850671084874636,
+            -0.23903303062497053
+          ],
+          "optical_domain_eV": [
+            1.01,
+            966266.74
+          ],
+          "recoil_shift_limit": 0.01,
+          "counts": {
+            "pairs": 712,
+            "invalid_vacuum_seed": 0,
+            "no_positive_vacuum_seed": 356,
+            "vacuum_seed_outside_optical_data": 0,
+            "root_missing_optical_data": 0,
+            "critical_angle_rejected": 0,
+            "root_nonconverged": 0,
+            "below_line_floor": 0,
+            "finite_root": 356,
+            "finite_root_outside_grid": 0,
+            "vacuum_seed_outside_tabulation": 0,
+            "recoil_shift_exceeds_limit": 343
+          }
+        },
+        {
+          "schema": "line-data-coverage.v2",
+          "population": "unweighted-eligible-escape-piece/reflection/mosaic-pairs",
+          "crystal": "hopg",
+          "coherent": false,
+          "direction": [
+            0.9588381643724264,
+            -0.059850671084874636,
+            -0.2775739031566296
+          ],
+          "optical_domain_eV": [
+            1.01,
+            966266.74
+          ],
+          "recoil_shift_limit": 0.01,
+          "counts": {
+            "pairs": 712,
+            "invalid_vacuum_seed": 0,
+            "no_positive_vacuum_seed": 356,
+            "vacuum_seed_outside_optical_data": 0,
+            "root_missing_optical_data": 0,
+            "critical_angle_rejected": 0,
+            "root_nonconverged": 0,
+            "below_line_floor": 0,
+            "finite_root": 356,
+            "finite_root_outside_grid": 0,
+            "vacuum_seed_outside_tabulation": 0,
+            "recoil_shift_exceeds_limit": 342
+          }
+        },
+        {
+          "schema": "line-data-coverage.v2",
+          "population": "unweighted-eligible-escape-piece/reflection/mosaic-pairs",
+          "crystal": "hopg",
+          "coherent": false,
+          "direction": [
+            0.9470046570522139,
+            -0.0597557067147237,
+            -0.3156127928909771
+          ],
+          "optical_domain_eV": [
+            1.01,
+            966266.74
+          ],
+          "recoil_shift_limit": 0.01,
+          "counts": {
+            "pairs": 712,
+            "invalid_vacuum_seed": 0,
+            "no_positive_vacuum_seed": 356,
+            "vacuum_seed_outside_optical_data": 0,
+            "root_missing_optical_data": 0,
+            "critical_angle_rejected": 0,
+            "root_nonconverged": 0,
+            "below_line_floor": 0,
+            "finite_root": 356,
+            "finite_root_outside_grid": 0,
+            "vacuum_seed_outside_tabulation": 0,
+            "recoil_shift_exceeds_limit": 330
+          }
+        },
+        {
+          "schema": "line-data-coverage.v2",
+          "population": "unweighted-eligible-escape-piece/reflection/mosaic-pairs",
+          "crystal": "hopg",
+          "coherent": false,
+          "direction": [
+            0.9794921557465832,
+            -0.019950223652123983,
+            -0.20049215796918735
+          ],
+          "optical_domain_eV": [
+            1.01,
+            966266.74
+          ],
+          "recoil_shift_limit": 0.01,
+          "counts": {
+            "pairs": 712,
+            "invalid_vacuum_seed": 0,
+            "no_positive_vacuum_seed": 356,
+            "vacuum_seed_outside_optical_data": 0,
+            "root_missing_optical_data": 0,
+            "critical_angle_rejected": 0,
+            "root_nonconverged": 0,
+            "below_line_floor": 0,
+            "finite_root": 356,
+            "finite_root_outside_grid": 0,
+            "vacuum_seed_outside_tabulation": 0,
+            "recoil_shift_exceeds_limit": 346
+          }
+        },
+        {
+          "schema": "line-data-coverage.v2",
+          "population": "unweighted-eligible-escape-piece/reflection/mosaic-pairs",
+          "crystal": "hopg",
+          "coherent": false,
+          "direction": [
+            0.9707118027712309,
+            -0.019982029640228285,
+            -0.23941452431313398
+          ],
+          "optical_domain_eV": [
+            1.01,
+            966266.74
+          ],
+          "recoil_shift_limit": 0.01,
+          "counts": {
+            "pairs": 712,
+            "invalid_vacuum_seed": 0,
+            "no_positive_vacuum_seed": 356,
+            "vacuum_seed_outside_optical_data": 0,
+            "root_missing_optical_data": 0,
+            "critical_angle_rejected": 0,
+            "root_nonconverged": 0,
+            "below_line_floor": 0,
+            "finite_root": 356,
+            "finite_root_outside_grid": 0,
+            "vacuum_seed_outside_tabulation": 0,
+            "recoil_shift_exceeds_limit": 343
+          }
+        },
+        {
+          "schema": "line-data-coverage.v2",
+          "population": "unweighted-eligible-escape-piece/reflection/mosaic-pairs",
+          "crystal": "hopg",
+          "coherent": false,
+          "direction": [
+            0.9603683431098425,
+            -0.019982029640228282,
+            -0.27801684129547427
+          ],
+          "optical_domain_eV": [
+            1.01,
+            966266.74
+          ],
+          "recoil_shift_limit": 0.01,
+          "counts": {
+            "pairs": 712,
+            "invalid_vacuum_seed": 0,
+            "no_positive_vacuum_seed": 356,
+            "vacuum_seed_outside_optical_data": 0,
+            "root_missing_optical_data": 0,
+            "critical_angle_rejected": 0,
+            "root_nonconverged": 0,
+            "below_line_floor": 0,
+            "finite_root": 356,
+            "finite_root_outside_grid": 0,
+            "vacuum_seed_outside_tabulation": 0,
+            "recoil_shift_exceeds_limit": 342
+          }
+        },
+        {
+          "schema": "line-data-coverage.v2",
+          "population": "unweighted-eligible-escape-piece/reflection/mosaic-pairs",
+          "crystal": "hopg",
+          "coherent": false,
+          "direction": [
+            0.9485111686687185,
+            -0.019950223652123972,
+            -0.3161147758124129
+          ],
+          "optical_domain_eV": [
+            1.01,
+            966266.74
+          ],
+          "recoil_shift_limit": 0.01,
+          "counts": {
+            "pairs": 712,
+            "invalid_vacuum_seed": 0,
+            "no_positive_vacuum_seed": 356,
+            "vacuum_seed_outside_optical_data": 0,
+            "root_missing_optical_data": 0,
+            "critical_angle_rejected": 0,
+            "root_nonconverged": 0,
+            "below_line_floor": 0,
+            "finite_root": 356,
+            "finite_root_outside_grid": 0,
+            "vacuum_seed_outside_tabulation": 0,
+            "recoil_shift_exceeds_limit": 330
+          }
+        },
+        {
+          "schema": "line-data-coverage.v2",
+          "population": "unweighted-eligible-escape-piece/reflection/mosaic-pairs",
+          "crystal": "hopg",
+          "coherent": false,
+          "direction": [
+            0.9794921557465832,
+            0.019950223652123983,
+            -0.20049215796918735
+          ],
+          "optical_domain_eV": [
+            1.01,
+            966266.74
+          ],
+          "recoil_shift_limit": 0.01,
+          "counts": {
+            "pairs": 712,
+            "invalid_vacuum_seed": 0,
+            "no_positive_vacuum_seed": 356,
+            "vacuum_seed_outside_optical_data": 0,
+            "root_missing_optical_data": 0,
+            "critical_angle_rejected": 0,
+            "root_nonconverged": 0,
+            "below_line_floor": 0,
+            "finite_root": 356,
+            "finite_root_outside_grid": 0,
+            "vacuum_seed_outside_tabulation": 0,
+            "recoil_shift_exceeds_limit": 346
+          }
+        },
+        {
+          "schema": "line-data-coverage.v2",
+          "population": "unweighted-eligible-escape-piece/reflection/mosaic-pairs",
+          "crystal": "hopg",
+          "coherent": false,
+          "direction": [
+            0.9707118027712308,
+            0.01998202964022828,
+            -0.23941452431313395
+          ],
+          "optical_domain_eV": [
+            1.01,
+            966266.74
+          ],
+          "recoil_shift_limit": 0.01,
+          "counts": {
+            "pairs": 712,
+            "invalid_vacuum_seed": 0,
+            "no_positive_vacuum_seed": 356,
+            "vacuum_seed_outside_optical_data": 0,
+            "root_missing_optical_data": 0,
+            "critical_angle_rejected": 0,
+            "root_nonconverged": 0,
+            "below_line_floor": 0,
+            "finite_root": 356,
+            "finite_root_outside_grid": 0,
+            "vacuum_seed_outside_tabulation": 0,
+            "recoil_shift_exceeds_limit": 343
+          }
+        },
+        {
+          "schema": "line-data-coverage.v2",
+          "population": "unweighted-eligible-escape-piece/reflection/mosaic-pairs",
+          "crystal": "hopg",
+          "coherent": false,
+          "direction": [
+            0.9603683431098425,
+            0.019982029640228282,
+            -0.27801684129547427
+          ],
+          "optical_domain_eV": [
+            1.01,
+            966266.74
+          ],
+          "recoil_shift_limit": 0.01,
+          "counts": {
+            "pairs": 712,
+            "invalid_vacuum_seed": 0,
+            "no_positive_vacuum_seed": 356,
+            "vacuum_seed_outside_optical_data": 0,
+            "root_missing_optical_data": 0,
+            "critical_angle_rejected": 0,
+            "root_nonconverged": 0,
+            "below_line_floor": 0,
+            "finite_root": 356,
+            "finite_root_outside_grid": 0,
+            "vacuum_seed_outside_tabulation": 0,
+            "recoil_shift_exceeds_limit": 341
+          }
+        },
+        {
+          "schema": "line-data-coverage.v2",
+          "population": "unweighted-eligible-escape-piece/reflection/mosaic-pairs",
+          "crystal": "hopg",
+          "coherent": false,
+          "direction": [
+            0.9485111686687187,
+            0.019950223652123976,
+            -0.3161147758124127
+          ],
+          "optical_domain_eV": [
+            1.01,
+            966266.74
+          ],
+          "recoil_shift_limit": 0.01,
+          "counts": {
+            "pairs": 712,
+            "invalid_vacuum_seed": 0,
+            "no_positive_vacuum_seed": 356,
+            "vacuum_seed_outside_optical_data": 0,
+            "root_missing_optical_data": 0,
+            "critical_angle_rejected": 0,
+            "root_nonconverged": 0,
+            "below_line_floor": 0,
+            "finite_root": 356,
+            "finite_root_outside_grid": 0,
+            "vacuum_seed_outside_tabulation": 0,
+            "recoil_shift_exceeds_limit": 330
+          }
+        },
+        {
+          "schema": "line-data-coverage.v2",
+          "population": "unweighted-eligible-escape-piece/reflection/mosaic-pairs",
+          "crystal": "hopg",
+          "coherent": false,
+          "direction": [
+            0.9779364869548759,
+            0.05975570671472369,
+            -0.20017363212316389
+          ],
+          "optical_domain_eV": [
+            1.01,
+            966266.74
+          ],
+          "recoil_shift_limit": 0.01,
+          "counts": {
+            "pairs": 712,
+            "invalid_vacuum_seed": 0,
+            "no_positive_vacuum_seed": 356,
+            "vacuum_seed_outside_optical_data": 0,
+            "root_missing_optical_data": 0,
+            "critical_angle_rejected": 0,
+            "root_nonconverged": 0,
+            "below_line_floor": 0,
+            "finite_root": 356,
+            "finite_root_outside_grid": 0,
+            "vacuum_seed_outside_tabulation": 0,
+            "recoil_shift_exceeds_limit": 346
+          }
+        },
+        {
+          "schema": "line-data-coverage.v2",
+          "population": "unweighted-eligible-escape-piece/reflection/mosaic-pairs",
+          "crystal": "hopg",
+          "coherent": false,
+          "direction": [
+            0.9691651600428753,
+            0.05985067108487465,
+            -0.2390330306249706
+          ],
+          "optical_domain_eV": [
+            1.01,
+            966266.74
+          ],
+          "recoil_shift_limit": 0.01,
+          "counts": {
+            "pairs": 712,
+            "invalid_vacuum_seed": 0,
+            "no_positive_vacuum_seed": 356,
+            "vacuum_seed_outside_optical_data": 0,
+            "root_missing_optical_data": 0,
+            "critical_angle_rejected": 0,
+            "root_nonconverged": 0,
+            "below_line_floor": 0,
+            "finite_root": 356,
+            "finite_root_outside_grid": 0,
+            "vacuum_seed_outside_tabulation": 0,
+            "recoil_shift_exceeds_limit": 343
+          }
+        },
+        {
+          "schema": "line-data-coverage.v2",
+          "population": "unweighted-eligible-escape-piece/reflection/mosaic-pairs",
+          "crystal": "hopg",
+          "coherent": false,
+          "direction": [
+            0.9588381643724265,
+            0.05985067108487464,
+            -0.27757390315662955
+          ],
+          "optical_domain_eV": [
+            1.01,
+            966266.74
+          ],
+          "recoil_shift_limit": 0.01,
+          "counts": {
+            "pairs": 712,
+            "invalid_vacuum_seed": 0,
+            "no_positive_vacuum_seed": 356,
+            "vacuum_seed_outside_optical_data": 0,
+            "root_missing_optical_data": 0,
+            "critical_angle_rejected": 0,
+            "root_nonconverged": 0,
+            "below_line_floor": 0,
+            "finite_root": 356,
+            "finite_root_outside_grid": 0,
+            "vacuum_seed_outside_tabulation": 0,
+            "recoil_shift_exceeds_limit": 341
+          }
+        },
+        {
+          "schema": "line-data-coverage.v2",
+          "population": "unweighted-eligible-escape-piece/reflection/mosaic-pairs",
+          "crystal": "hopg",
+          "coherent": false,
+          "direction": [
+            0.9470046570522138,
+            0.05975570671472371,
+            -0.31561279289097727
+          ],
+          "optical_domain_eV": [
+            1.01,
+            966266.74
+          ],
+          "recoil_shift_limit": 0.01,
+          "counts": {
+            "pairs": 712,
+            "invalid_vacuum_seed": 0,
+            "no_positive_vacuum_seed": 356,
+            "vacuum_seed_outside_optical_data": 0,
+            "root_missing_optical_data": 0,
+            "critical_angle_rejected": 0,
+            "root_nonconverged": 0,
+            "below_line_floor": 0,
+            "finite_root": 356,
+            "finite_root_outside_grid": 0,
+            "vacuum_seed_outside_tabulation": 0,
+            "recoil_shift_exceeds_limit": 330
+          }
+        }
+      ],
+      "line_grid_policy": {
+        "schema": 1,
+        "bandwidth": {
+          "policy": "kinematic-ceiling",
+          "start_eV": 10.0,
+          "stop_eV": 3700.0
+        },
+        "resolution": {
+          "policy": "sinc-nyquist",
+          "max_spacing_eV": 3.0,
+          "aliased_weight_limit": 0.001,
+          "backend_safety_ulps": 8.0,
+          "max_points": 600000
+        },
+        "rtol": {
+          "detected_counts": 0.01,
+          "intrinsic_source": 0.001
+        },
+        "sources": {
+          "aliased_weight_limit": "derived from rtol",
+          "backend_safety_ulps": "built-in default",
+          "max_points": "built-in default",
+          "max_spacing_eV": "built-in default",
+          "rtol.detected_counts": "built-in default",
+          "rtol.intrinsic_source": "built-in default"
+        },
+        "grid_model": "automatic-v1"
+      },
+      "line_grid_resolved": {
+        "actual_spacing_eV": 2.8275862068965516,
+        "aliased_weight_fraction": 0.0,
+        "aliased_weight_limit": 0.001,
+        "backend_dtype": "float64",
+        "backend_safety_ulps": 8.0,
+        "bandwidth_policy": "kinematic-ceiling",
+        "governing_observable": "intrinsic_source",
+        "n_spacing_segments": 178,
+        "num": 1306,
+        "observable_class": "intrinsic_source",
+        "observation_direction_count": 16,
+        "resolution_policy": "sinc-nyquist",
+        "rtol": {
+          "detected_counts": 0.01,
+          "intrinsic_source": 0.001
+        },
+        "schema": 1,
+        "sources": {
+          "aliased_weight_limit": "derived from rtol",
+          "backend_safety_ulps": "built-in default",
+          "max_points": "built-in default",
+          "max_spacing_eV": "built-in default",
+          "rtol.detected_counts": "built-in default",
+          "rtol.intrinsic_source": "built-in default"
+        },
+        "start_eV": 10.0,
+        "stop_eV": 3700.0,
+        "target_spacing_eV": 2.8287342700617306,
+        "cache": "hit",
+        "cache_key": "8b3b60bcdbcefb25464350a8074e72c6"
+      },
+      "observation_identity_digest": "a3701e640859ed141c564909286da85588c1006943a4b12d7e354227a6cb1f26",
+      "observation": {
+        "schema": "pyrite.observation.v2",
+        "true_spatial_digest": "f26575245c725a490fcc354a94f839677f4f1791a450a3def40970e07d1ba808",
+        "response_digest": "9c733f339ace37b0698bd1b444d78b654738c5064d3cd22ee1c14d45a2d0f3e8",
+        "acquisition_digest": "2ff4adbd9f719352ec3c4e4d24b0fb1ae526966183822123d1d3885baa2d3436",
+        "observation_identity_digest": "a3701e640859ed141c564909286da85588c1006943a4b12d7e354227a6cb1f26",
+        "true_spatial": {
+          "schema": "pyrite.true-spatial.v1",
+          "source_identity_digest": "1051ac7eeb6df613eeb48fba48aa84e2e63a2097e1fe1e902a285eda5c43748a",
+          "detector_geometry": {
+            "pose": {
+              "center_mm": [
+                70.71067811865476,
+                0.0,
+                -70.71067811865474
+              ],
+              "normal": [
+                0.7071067811865476,
+                0.0,
+                -0.7071067811865475
+              ],
+              "x_axis": [
+                -0.7071067811865475,
+                0.0,
+                -0.7071067811865476
+              ]
+            },
+            "size_mm": [
+              16.0,
+              16.0
+            ],
+            "pixels": {
+              "shape": [
+                16,
+                16
+              ],
+              "pitch_mm": [
+                1.0,
+                1.0
+              ]
+            }
+          },
+          "filters": [],
+          "scorer": {
+            "angular_shape": [
+              4,
+              4
+            ],
+            "reconstruction": "nearest_tile"
+          },
+          "representative_directions_lab": {
+            "shape": [
+              16,
+              3
+            ],
+            "dtype": "<f8",
+            "sha256": "e7f538f7bc99051d8387aeb001905b940907a1cb67867070b20662d05b37debe"
+          },
+          "attenuation_arrays": [
+            {
+              "shape": [
+                0,
+                1306
+              ],
+              "dtype": "<f8",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            {
+              "shape": [
+                0,
+                600
+              ],
+              "dtype": "<f8",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          ],
+          "approximations": {
+            "emission_source": "point-source-target-reference",
+            "pixel_sampling": "centre-ray",
+            "filter_interactions": "primary-attenuation-only"
+          }
+        },
+        "response": {
+          "schema": "pyrite.response.v1",
+          "type": "pyrite.detectors.spec.IdealPhotonCounter",
+          "config": {},
+          "event_semantics": "ideal-energy-preserving-photon-event",
+          "spatial_calibration": "uniform-ideal"
+        },
+        "acquisition": {
+          "schema": "pyrite.acquisition.v1",
+          "config": {
+            "exposure_s": 1.0,
+            "measured_edges_eV": [
+              500.0,
+              4000.0
+            ],
+            "hit_threshold_eV": 0.0,
+            "mode": "poisson",
+            "seed": 23
+          },
+          "bin_semantics": "half-open",
+          "event_accounting": [
+            "underflow",
+            "overflow",
+            "below-cut",
+            "registered"
+          ],
+          "normalization": {
+            "rep_rate_hz": 1000000.0,
+            "bunch_charge_pc": 0.01
+          },
+          "realization_rng": "pyrite.coordinate-philox.v1"
+        }
+      },
+      "true_spatial_digest": "f26575245c725a490fcc354a94f839677f4f1791a450a3def40970e07d1ba808",
+      "response_digest": "9c733f339ace37b0698bd1b444d78b654738c5064d3cd22ee1c14d45a2d0f3e8",
+      "acquisition_digest": "2ff4adbd9f719352ec3c4e4d24b0fb1ae526966183822123d1d3885baa2d3436",
+      "resolved_physics": {
+        "applicability": {
+          "checks": [
+            "resolved mapping preserved",
+            "Physics transport compatibility"
+          ],
+          "pending": [
+            "table/material/energy coverage",
+            "native route preparation",
+            "ledger-validated physical domain"
+          ]
+        },
+        "backend_availability": [],
+        "descriptor_ids": [
+          "emission.characteristic/characteristic",
+          "emission.continuum/bremslib",
+          "emission.cxr/cxr",
+          "transport.atomic-electron/kawrakow",
+          "transport.elastic/elsepa",
+          "transport.inelastic/shell-soft-hard",
+          "transport.radiative/bremslib-soft-hard",
+          "transport.stopping/sbethe"
+        ],
+        "model_markers": [
+          [
+            "attenuation_model",
+            "epdl2025-mf23-fcc2f00c5bb9"
+          ],
+          [
+            "bremsstrahlung_model",
+            "bremslib-v2.0-sdcs-ddcs/lin-x18-geo4-ln-t-lin-theta-v2/tm-coupled-v2/ee-sb85-v1"
+          ],
+          [
+            "characteristic_model",
+            "eedl-2025-f3ef54f66efa/eadl-2025-78ccf8a4e07c/endf-parserpy-0.17.0/xraydb-4.5.8-eadl-cascade-eadl-yields-lorentzian-segment-escape-v7"
+          ],
+          [
+            "line_escape_model",
+            "segment-mean-v5-precise-kinematics"
+          ],
+          [
+            "stopping_model",
+            "sbethe-corrected-v2"
+          ]
+        ],
+        "parameters_json": "{\"B_ang2\":1.3,\"E0_keV\":30.0,\"E_grid\":[10.0,3703.0,3.0],\"E_grid_brem\":[50.0,30050.0,50.0],\"E_grid_line\":[10.0,3703.0,3.0],\"Ne\":64,\"Ne_brem\":64,\"abs_layers\":null,\"atomic_electron_deflection\":\"kawrakow\",\"beam_fwhm_mm\":null,\"beam_uvw\":null,\"brem_chunk\":null,\"brem_file\":null,\"bremsstrahlung_model\":\"bremslib\",\"bunch_charge_pc\":0.01,\"composition\":[[\"C\",0.11363677327755675]],\"crystal\":\"hopg\",\"crystal_height_mm\":5.0,\"crystal_width_mm\":5.0,\"domega_sr\":0.025600000000000008,\"dtheta_obs_rad\":0.1586457597990472,\"elastic_model\":\"elsepa\",\"energy_model\":\"midpoint\",\"hkl_list\":[[0,0,2],[0,0,-2],[0,0,4],[0,0,-4]],\"inelastic_cutoff_eV\":50.0,\"inelastic_model\":\"shell-soft-hard\",\"layer_radiators\":null,\"line_grid_policy\":{\"bandwidth\":{\"policy\":\"kinematic-ceiling\",\"start_eV\":10.0,\"stop_eV\":3700.0},\"grid_model\":\"automatic-v1\",\"resolution\":{\"aliased_weight_limit\":0.001,\"backend_safety_ulps\":8.0,\"max_points\":600000,\"max_spacing_eV\":3.0,\"policy\":\"sinc-nyquist\"},\"rtol\":{\"detected_counts\":0.01,\"intrinsic_source\":0.001},\"schema\":1,\"sources\":{\"aliased_weight_limit\":\"derived from rtol\",\"backend_safety_ulps\":\"built-in default\",\"max_points\":\"built-in default\",\"max_spacing_eV\":\"built-in default\",\"rtol.detected_counts\":\"built-in default\",\"rtol.intrinsic_source\":\"built-in default\"}},\"mosaic_fwhm_rad\":null,\"mosaic_mc_fwhm_rad\":null,\"mosaic_mc_nodes\":5,\"name\":\"hopg 100nm pol=30 az=0 footprint=5x5mm\",\"radiative_cutoff_eV\":1000.0,\"radiative_model\":\"bremslib-soft-hard\",\"rep_rate_hz\":1000000.0,\"seed\":1,\"spec_chunk\":null,\"surface_hkl\":[0,0,1],\"theta_obs_rad\":2.356194490192345,\"thickness_ang\":1000.0,\"tilt_azim_deg\":0.0,\"tilt_deg\":30.0}",
+        "schema": "pyrite.resolved-physics.v1",
+        "table_markers": [
+          [
+            "44461d55c05a7fea30a0f52bceb2aa384d6b71c1e12765da576b5cbc2592dbe3",
+            "3f32446ff553a97b14755b475c4d88287ff44eff2ffce0cdd790dbd9b40a83f2"
+          ],
+          [
+            "918b1a9013e4c19c584e2cf4eb8b605f0063a7237b8b0d67749867a4c6804832",
+            "c3f8eab1f03c1c66cfe0355b68f312e0ca450cbacaabe4f72eebecefe8d1e08d"
+          ],
+          [
+            "dfea6d21d4f6196cb74ef19486b6d86f6f5af40e89d7241efe09507a3b982e85",
+            "61fb7f4cf6dceab2a4d10c5fc641357d80b0ba6bbe037b64dd000e08f024acd9"
+          ],
+          [
+            "ea7657ec94db1acf9f16cb260a5b107c3d2a4ecc71e43facee0e6a845487cbeb",
+            "beed169ba64a48fd11dc8c5a7bb81471abaa21806bde7943dba6da43e5b01b6f"
+          ]
+        ]
+      },
+      "kinematic_validity": {
+        "model": "central-ray-vacuum-born-screen-v1",
+        "dyn_limit": 0.01,
+        "extinction_ratio_limit": 1.0,
+        "reflections": [
+          {
+            "layer": null,
+            "crystal": "hopg",
+            "hkl": [
+              0,
+              0,
+              2
+            ],
+            "status": "evaluated",
+            "photon_energy_eV": 852.7686263015862,
+            "chi_abs": 0.0009910513384381694,
+            "detuning_inv_ang2": 3.0873853190956435,
+            "absorption_length_ang": 13723.476889247539,
+            "thickness_ang": 1000.0,
+            "dyn": 5.995077554073276e-05,
+            "extinction_length_ang": 4669.701275616967,
+            "extinction_ratio": 4.669701275616967,
+            "photon_mixing": false,
+            "extinction_reachable": false
+          },
+          {
+            "layer": null,
+            "crystal": "hopg",
+            "hkl": [
+              0,
+              0,
+              -2
+            ],
+            "status": "no_positive_resonance"
+          },
+          {
+            "layer": null,
+            "crystal": "hopg",
+            "hkl": [
+              0,
+              0,
+              4
+            ],
+            "status": "evaluated",
+            "photon_energy_eV": 1705.5372526031724,
+            "chi_abs": 0.00013022378386221182,
+            "detuning_inv_ang2": 12.349541276382574,
+            "absorption_length_ang": 99972.87097575485,
+            "thickness_ang": 1000.0,
+            "dyn": 7.877510007394465e-06,
+            "extinction_length_ang": 17769.08012519188,
+            "extinction_ratio": 17.769080125191877,
+            "photon_mixing": false,
+            "extinction_reachable": false
+          },
+          {
+            "layer": null,
+            "crystal": "hopg",
+            "hkl": [
+              0,
+              0,
+              -4
+            ],
+            "status": "no_positive_resonance"
+          }
+        ]
+      },
+      "xsgen_tables": {
+        "918b1a9013e4c19c584e2cf4eb8b605f0063a7237b8b0d67749867a4c6804832": "c3f8eab1f03c1c66cfe0355b68f312e0ca450cbacaabe4f72eebecefe8d1e08d",
+        "ea7657ec94db1acf9f16cb260a5b107c3d2a4ecc71e43facee0e6a845487cbeb": "beed169ba64a48fd11dc8c5a7bb81471abaa21806bde7943dba6da43e5b01b6f",
+        "44461d55c05a7fea30a0f52bceb2aa384d6b71c1e12765da576b5cbc2592dbe3": "3f32446ff553a97b14755b475c4d88287ff44eff2ffce0cdd790dbd9b40a83f2",
+        "dfea6d21d4f6196cb74ef19486b6d86f6f5af40e89d7241efe09507a3b982e85": "61fb7f4cf6dceab2a4d10c5fc641357d80b0ba6bbe037b64dd000e08f024acd9"
+      },
+      "stopping_model": "sbethe-corrected-v2",
+      "characteristic_model": "eedl-2025-f3ef54f66efa/eadl-2025-78ccf8a4e07c/endf-parserpy-0.17.0/xraydb-4.5.8-eadl-cascade-eadl-yields-lorentzian-segment-escape-v7",
+      "attenuation_model": "epdl2025-mf23-fcc2f00c5bb9",
+      "bremsstrahlung_model": "bremslib-v2.0-sdcs-ddcs/lin-x18-geo4-ln-t-lin-theta-v2/tm-coupled-v2/ee-sb85-v1",
+      "backend": "cpu",
+      "device": {
+        "backend": "cpu",
+        "vendor": "numpy",
+        "name": "host CPU",
+        "total_memory_bytes": null,
+        "supports_fp64": true
+      },
+      "git_sha": "59f6d5964ca25b9f224c809456bc905dd8941c94",
+      "git_dirty": true,
+      "versions": {
+        "pyrite": "0.21.0",
+        "numpy": "2.5.4",
+        "xraydb": "4.5.8",
+        "endf-parserpy": "0.17.0"
+      }
+    },
+    "warnings": []
+  }
+}
