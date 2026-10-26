@@ -33,10 +33,16 @@ class ResolvedSimulation:
 
     @property
     def composition_provenance(self) -> dict[str, Any]:
-        """Keep the original physical input and normalized observation available."""
+        """Keep physical inputs and independent effective configuration available."""
+        provenance = {
+            "input_scene": self.input_scene,
+            "physics": self.physics,
+            "quantum": self.scene.quantum,
+            "acquisition": self.scene.acquisition,
+        }
         if self.observation is None:
-            return {}
-        return {"input_scene": self.input_scene, "observation_spec": self.observation}
+            return provenance
+        return {**provenance, "observation_spec": self.observation}
 
 
 def resolve_models(scene: Scene, numerics: Numerics) -> tuple[Physics, Numerics]:

@@ -43,9 +43,12 @@ def simulation_usage_error(message, output_format):
 
 def _selected_cxr_density(result):
     scene = result.provenance.get("scene")
+    physics = result.provenance.get("physics")
+    if physics is None and scene is not None:
+        physics = scene.physics
     component = (
         result.cxr.coherent
-        if scene is not None and scene.physics.emission_policy == "coherent"
+        if physics is not None and physics.emission_policy == "coherent"
         else result.cxr.incoherent
     )
     if component is None:
@@ -78,8 +81,10 @@ def _simulation_payload(material, profile_name, result):
 
 def _acquisition_summary(result):
     """Total registered counts of a counting observation, or ``None``."""
-    scene = result.provenance["scene"]
-    acquisition = scene.acquisition
+    if "acquisition" in result.provenance:
+        acquisition = result.provenance["acquisition"]
+    else:
+        acquisition = result.provenance["scene"].acquisition
     if acquisition is None:
         return None
     edges = getattr(acquisition, "measured_edges_eV", None)

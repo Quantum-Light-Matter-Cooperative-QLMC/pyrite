@@ -142,3 +142,36 @@ def test_pixel_composition_normalizes_unit_values_before_case_lowering(profile_p
             observation=original.observation,
         ).to_dict()
     )
+
+
+def test_result_formatting_uses_independent_configuration():
+    from types import SimpleNamespace
+
+    import numpy as np
+
+    from pyrite.config import Physics
+    from pyrite.observations import Acquisition
+
+    acquisition = Acquisition(exposure_s=2.0, measured_edges_eV=(100.0, 200.0))
+    result = SimpleNamespace(
+        cxr=SimpleNamespace(
+            coherent=SimpleNamespace(density=np.array([3.0, 4.0])),
+            incoherent=SimpleNamespace(density=np.array([1.0, 2.0])),
+        ),
+        provenance={
+            # A physical scene has no run or acquisition attributes.
+            "scene": object(),
+            "physics": Physics(emission="coherent"),
+            "acquisition": acquisition,
+        },
+        acquisition_image=lambda: np.array([[5.0, 6.0]]),
+    )
+    np.testing.assert_array_equal(_simulation._selected_cxr_density(result), [3.0, 4.0])
+    assert _simulation._acquisition_summary(result) == {
+        "mode": acquisition.mode,
+        "exposure_s": 2.0,
+        "measured_edges_eV": [100.0, 200.0],
+        "total_counts": 11.0,
+    }
+    result.provenance["acquisition"] = None
+    assert _simulation._acquisition_summary(result) is None

@@ -200,3 +200,13 @@ def test_configured_observation_changes_direction_and_source_identity():
     assert changed["theta_obs_rad"] == pytest.approx(np.pi / 4)
     assert case_content_key(changed) != case_content_key(original)
     assert sweep.cases()[0].to_dict() == original.to_dict()
+
+
+def test_result_records_independent_effective_configuration(scene, numerics, transport):
+    physics = replace(scene.physics, brem_source="none")
+    result = api.simulate(scene, physics=physics, numerics=numerics)
+    assert result.provenance["input_scene"] is scene
+    assert result.provenance["physics"] == physics
+    assert result.provenance["quantum"] is None
+    assert result.provenance["acquisition"] is None
+    assert scene.physics.brem_source != "none"

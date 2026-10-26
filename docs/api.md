@@ -255,8 +255,12 @@ virtual angular observation, including on a detector-free source scene.
 Omitted observation fields inherit legacy embedded settings. Differing explicit
 settings raise; start from a detector without embedded response/scorer and a
 scene without acquisition to reuse one physical definition across observations.
-Names are labels and do not change scientific identity. For the new call form,
-`result.provenance["input_scene"]` retains the original scene, while
+Names are labels and do not change scientific identity.
+`result.provenance["input_scene"]` retains the original scene for both legacy
+and independently composed calls. The `"physics"`, `"quantum"` and
+`"acquisition"` provenance keys expose the effective independent configuration;
+`"numerics"` retains the effective numerical controls. These values do not
+change case or observation identity. Meanwhile,
 `result.scene` remains the resolved compatibility view used by read-time methods.
 The [observation example](guides/python-api-workflow.md#compose-independent-observations)
 shows how to reuse the same geometry.
