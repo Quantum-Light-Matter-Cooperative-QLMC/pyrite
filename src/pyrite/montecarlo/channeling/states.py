@@ -51,11 +51,25 @@ import numpy as np
 from scipy.special import airy as _airy
 from scipy.special import eval_genlaguerre, eval_hermite, ive, jv
 
+from ..._units import normalize_unit
 from ...materials.channeling.transverse import longitudinal_kinematics
 from ...materials.crystal import HBARC_EV_ANG, M_E_EV
 
 #: Envelope level treated as negligible when sizing momentum quadratures.
 _TAIL = 1e-8
+
+
+def _physical(value, unit: str, name: str, expected: str, *, kind: str | None = None):
+    """Normalize physical inputs before constructing runtime state objects."""
+    return normalize_unit(value, unit, field=f"pyrite.states.{name}", expected=expected, kind=kind)
+
+
+def _length(value, name: str):
+    return _physical(value, "angstrom", name, "length")
+
+
+def _angle(value, name: str):
+    return _physical(value, "radian", name, "angle", kind="angle")
 
 
 def momentum_inv_ang(kinetic_energy_eV: float) -> float:
@@ -393,6 +407,8 @@ def hermite_gauss(m: int, n: int | None = None, *, waist_ang: float, center_ang=
 
     Validation: cr-entry-state-projection
     """
+    waist_ang = _length(waist_ang, "waist_ang")
+    center_ang = _length(center_ang, "center_ang")
     if waist_ang <= 0 or m < 0 or (n is not None and n < 0):
         raise ValueError("waist_ang must be positive and mode orders non-negative")
     center = np.atleast_1d(np.asarray(center_ang, dtype=float))
@@ -420,6 +436,8 @@ def laguerre_gauss(ell: int, p: int = 0, *, waist_ang: float, center_ang=(0.0, 0
 
     Validation: cr-entry-state-projection
     """
+    waist_ang = _length(waist_ang, "waist_ang")
+    center_ang = _length(center_ang, "center_ang")
     if waist_ang <= 0 or p < 0:
         raise ValueError("waist_ang must be positive and p non-negative")
     a, w = abs(int(ell)), float(waist_ang)
@@ -457,6 +475,11 @@ def bessel_gauss(ell: int, *, k_radial_inv_ang: float, waist_ang: float, center_
 
     Validation: cr-entry-state-projection
     """
+    waist_ang = _length(waist_ang, "waist_ang")
+    center_ang = _length(center_ang, "center_ang")
+    k_radial_inv_ang = _physical(
+        k_radial_inv_ang, "1 / angstrom", "k_radial_inv_ang", "inverse length"
+    )
     if waist_ang <= 0 or k_radial_inv_ang <= 0:
         raise ValueError("waist_ang and k_radial_inv_ang must be positive")
     a, kr, w = abs(int(ell)), float(k_radial_inv_ang), float(waist_ang)
@@ -496,6 +519,8 @@ def airy(*, scale_ang: float, truncation: float, dimension: int = 1, center_ang=
 
     Validation: cr-entry-state-projection
     """
+    scale_ang = _length(scale_ang, "scale_ang")
+    center_ang = _length(center_ang, "center_ang")
     if scale_ang <= 0 or truncation <= 0:
         raise ValueError("scale_ang and truncation must be positive")
     if dimension not in (1, 2):
@@ -623,6 +648,18 @@ def aperture_probe(
 
     Validation: cr-entry-state-projection
     """
+    kinetic_energy_eV = _physical(kinetic_energy_eV, "eV", "kinetic_energy_eV", "energy")
+    semiangle_rad = _angle(semiangle_rad, "semiangle_rad")
+    inner_semiangle_rad = _angle(inner_semiangle_rad, "inner_semiangle_rad")
+    center_ang = _length(center_ang, "center_ang")
+    aberrations = {
+        key: (
+            _angle(value, f"aberrations.{key}")
+            if key.startswith("phi")
+            else _length(value, f"aberrations.{key}")
+        )
+        for key, value in (aberrations or {}).items()
+    }
     p = momentum_inv_ang(kinetic_energy_eV)
     if not 0.0 <= inner_semiangle_rad < semiangle_rad:
         raise ValueError("need 0 <= inner_semiangle_rad < semiangle_rad")
@@ -650,6 +687,10 @@ def from_array(values, *, spacing_ang, origin_ang=0.0, kinetic_energy_eV=None) -
 
     Validation: cr-entry-state-projection
     """
+    spacing_ang = _length(spacing_ang, "spacing_ang")
+    origin_ang = _length(origin_ang, "origin_ang")
+    if kinetic_energy_eV is not None:
+        kinetic_energy_eV = _physical(kinetic_energy_eV, "eV", "kinetic_energy_eV", "energy")
     values = np.asarray(values, dtype=complex)
     dims = values.ndim
     spacing = np.broadcast_to(np.asarray(spacing_ang, dtype=float), (dims,))
@@ -721,6 +762,7 @@ def translate(state: TransverseState, offset_ang) -> Translated:
 
     Validation: cr-entry-state-projection
     """
+    offset_ang = _length(offset_ang, "offset_ang")
     return Translated(state, tuple(np.atleast_1d(np.asarray(offset_ang, dtype=float))))
 
 

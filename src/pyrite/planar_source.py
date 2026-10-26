@@ -291,8 +291,22 @@ def propagate_planar_source(
     """
     if not isinstance(projection, PlanarStateProjection):
         raise TypeError("projection must be a PlanarStateProjection")
-    depth = _positive("depth_ang", depth_ang)
-    stopping = _positive("stopping_eV_per_ang", stopping_eV_per_ang, zero=True)
+    depth = _positive(
+        "depth_ang",
+        normalize_unit(
+            depth_ang, "angstrom", field="propagate_planar_source.depth_ang", expected="length"
+        ),
+    )
+    stopping = _positive(
+        "stopping_eV_per_ang",
+        normalize_unit(
+            stopping_eV_per_ang,
+            "eV / angstrom",
+            field="propagate_planar_source.stopping_eV_per_ang",
+            expected="stopping power",
+        ),
+        zero=True,
+    )
     cap = projection.setup.region.zone_max_ang
     if cap is not None and depth > cap:
         raise ValueError("depth_ang exceeds the quantum region's physical zone_max_ang")
@@ -308,6 +322,85 @@ def propagate_planar_source(
         stopping_eV_per_ang=stopping,
         record_every=record_every,
         record_metrics=record_metrics,
+    )
+
+
+def _score_unit_inputs(
+    divergence_y_rad,
+    energy_spread_eV,
+    aperture_rad,
+    theta_rad,
+    phi_rad,
+    path_limits_ang,
+    surface_normal,
+    layers,
+):
+    """Convert diagnostic fields before entering the channeling scorer."""
+    divergence_y_rad = normalize_unit(
+        divergence_y_rad,
+        "radian",
+        field="score_planar_source.divergence_y_rad",
+        expected="angle",
+        kind="angle",
+    )
+    energy_spread_eV = normalize_unit(
+        energy_spread_eV, "eV", field="score_planar_source.energy_spread_eV", expected="energy"
+    )
+    aperture_rad = normalize_unit(
+        aperture_rad,
+        "radian",
+        field="score_planar_source.aperture_rad",
+        expected="angle",
+        kind="angle",
+    )
+    theta_rad = normalize_unit(
+        theta_rad, "radian", field="score_planar_source.theta_rad", expected="angle", kind="angle"
+    )
+    phi_rad = normalize_unit(
+        phi_rad, "radian", field="score_planar_source.phi_rad", expected="angle", kind="angle"
+    )
+    if path_limits_ang is not None:
+        path_limits_ang = normalize_unit(
+            path_limits_ang,
+            "angstrom",
+            field="score_planar_source.path_limits_ang",
+            expected="length",
+        )
+    if surface_normal is not None:
+        surface_normal = normalize_unit(
+            surface_normal,
+            "dimensionless",
+            field="score_planar_source.surface_normal",
+            expected="direction",
+        )
+    if layers is not None:
+        layers = tuple(
+            (
+                normalize_unit(
+                    top,
+                    "angstrom",
+                    field=f"score_planar_source.layers[{i}].top",
+                    expected="length",
+                ),
+                normalize_unit(
+                    bottom,
+                    "angstrom",
+                    field=f"score_planar_source.layers[{i}].bottom",
+                    expected="length",
+                ),
+                composition,
+            )
+            for i, (top, bottom, composition) in enumerate(layers)
+        )
+    return (
+        divergence_y_rad,
+        energy_spread_eV,
+        aperture_rad,
+        theta_rad,
+        phi_rad,
+        path_limits_ang,
+        surface_normal,
+        layers,
     )
 
 
@@ -348,11 +441,21 @@ def score_planar_source(
     """
     if not isinstance(projection, PlanarStateProjection):
         raise TypeError("projection must be a PlanarStateProjection")
-    depth = _positive("depth_ang", depth_ang)
+    depth = _positive(
+        "depth_ang",
+        normalize_unit(
+            depth_ang, "angstrom", field="score_planar_source.depth_ang", expected="length"
+        ),
+    )
     cap = projection.setup.region.zone_max_ang
     if cap is not None and depth > cap:
         raise ValueError("depth_ang exceeds the quantum region's physical zone_max_ang")
-    sample = _positive("sample_ang", sample_ang)
+    sample = _positive(
+        "sample_ang",
+        normalize_unit(
+            sample_ang, "angstrom", field="score_planar_source.sample_ang", expected="length"
+        ),
+    )
     if divergence_y_rad is None:
         if projection.source_dimension == 2:
             raise ValueError(
@@ -360,6 +463,25 @@ def score_planar_source(
                 "loses its in-plane momentum distribution"
             )
         divergence_y_rad = 0.0
+    (
+        divergence_y_rad,
+        energy_spread_eV,
+        aperture_rad,
+        theta_rad,
+        phi_rad,
+        path_limits_ang,
+        surface_normal,
+        layers,
+    ) = _score_unit_inputs(
+        divergence_y_rad,
+        energy_spread_eV,
+        aperture_rad,
+        theta_rad,
+        phi_rad,
+        path_limits_ang,
+        surface_normal,
+        layers,
+    )
     for name, value in (
         ("divergence_y_rad", divergence_y_rad),
         ("energy_spread_eV", energy_spread_eV),
@@ -368,7 +490,15 @@ def score_planar_source(
         _positive(name, value, zero=True)
     if not isinstance(absorption, bool) or not isinstance(include_capture, bool):
         raise TypeError("absorption and include_capture must be bool")
-    energy = np.asarray(photon_energy_eV, dtype=float)
+    energy = np.asarray(
+        normalize_unit(
+            photon_energy_eV,
+            "eV",
+            field="score_planar_source.photon_energy_eV",
+            expected="energy",
+        ),
+        dtype=float,
+    )
     if (
         energy.ndim != 1
         or energy.size < 2
