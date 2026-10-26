@@ -379,3 +379,38 @@ mc_brem_spectrum = { target = "pyrite.montecarlo.spectrum:mc_brem_spectrum", sta
 
 [package_exports."pyrite.results.directional"]
 DirectionalSpectrum = { target = "pyrite.results.directional:DirectionalSpectrum", status = "experimental" }
+
+[package_exports."pyrite.experimental.radiation"]
+directional_source = { target = "pyrite.directional:directional_source", status = "experimental" }
+directional_sources = { target = "pyrite.directional:directional_sources", status = "experimental" }
+DirectionalSpectrum = { target = "pyrite.results.directional:DirectionalSpectrum", status = "experimental" }
+
+[package_exports."pyrite.experimental.observations"]
+PhotonContinuumObservation = { target = "pyrite.photon_transport:PhotonContinuumObservation", status = "experimental" }
+simulate_photon_continuum = { target = "pyrite.photon_transport:simulate_photon_continuum", status = "experimental" }
+PhotonContinuumTally = { target = "pyrite.photon_observation:PhotonContinuumTally", status = "experimental" }
+save_photon_continuum = { target = "pyrite.photon_observation:save_photon_continuum", status = "experimental" }
+load_photon_continuum = { target = "pyrite.photon_observation:load_photon_continuum", status = "experimental" }
+PhotonEventObservation = { target = "pyrite.photon_events:PhotonEventObservation", status = "experimental" }
+simulate_photon_events = { target = "pyrite.photon_events:simulate_photon_events", status = "experimental" }
+PhotonEventTally = { target = "pyrite.photon_event_observation:PhotonEventTally", status = "experimental" }
+PhotonRelaxationBudget = { target = "pyrite.photon_event_observation:PhotonRelaxationBudget", status = "experimental" }
+save_photon_events = { target = "pyrite.photon_event_observation:save_photon_events", status = "experimental" }
+load_photon_events = { target = "pyrite.photon_event_observation:load_photon_events", status = "experimental" }
+
+[package_exports."pyrite.experimental.quantum"]
+DensityMatrixSolver = { target = "pyrite.montecarlo.channeling.density:DensityMatrixSolver", status = "experimental" }
+DensityMatrixResult = { target = "pyrite.montecarlo.channeling.density:DensityMatrixResult", status = "experimental" }
+MCWFSolver = { target = "pyrite.montecarlo.channeling.mcwf:MCWFSolver", status = "experimental" }
+MCWFResult = { target = "pyrite.montecarlo.channeling.mcwf:MCWFResult", status = "experimental" }
+AxialMCWF = { target = "pyrite.montecarlo.channeling.axial_mcwf:AxialMCWF", status = "experimental" }
+AxialMCWFResult = { target = "pyrite.montecarlo.channeling.axial_mcwf:AxialMCWFResult", status = "experimental" }
+AxialDiagnosticConfig = { target = "pyrite.montecarlo.channeling.axial_diagnostic:AxialDiagnosticConfig", status = "experimental" }
+AxialDiagnosticResult = { target = "pyrite.montecarlo.channeling.axial_diagnostic:AxialDiagnosticResult", status = "experimental" }
+axial_diagnostic = { target = "pyrite.montecarlo.channeling.axial_diagnostic:axial_diagnostic", status = "experimental" }
+PlanarStateProjection = { target = "pyrite.planar_source:PlanarStateProjection", status = "experimental" }
+project_planar_source = { target = "pyrite.planar_source:project_planar_source", status = "experimental" }
+propagate_planar_source = { target = "pyrite.planar_source:propagate_planar_source", status = "experimental" }
+score_planar_source = { target = "pyrite.planar_source:score_planar_source", status = "experimental" }
+RealSpaceGrid = { target = "pyrite.montecarlo.channeling.realspace:RealSpaceGrid", status = "experimental" }
+SplitStepPropagator = { target = "pyrite.montecarlo.channeling.realspace:SplitStepPropagator", status = "experimental" }

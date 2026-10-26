@@ -114,6 +114,13 @@ def read_package_inventory(
                 entry, row_errors = _parse_package_export(package, name, row)
                 errors.extend(row_errors)
                 if entry is not None:
+                    if (
+                        package.startswith("pyrite.experimental.")
+                        and entry.status != "experimental"
+                    ):
+                        errors.append(
+                            f"{package}.{name}: experimental facade requires experimental status"
+                        )
                     supported[package][name] = entry
 
     legacy: dict[str, set[str]] = {}
@@ -140,9 +147,34 @@ def _namespace_source(root: Path, module: str) -> Path:
     return path.with_suffix(".py") if path.with_suffix(".py").is_file() else path / "__init__.py"
 
 
+def _check_experimental_admission(
+    root: Path, supported: dict[str, dict[str, PackageExport]]
+) -> list[str]:
+    """Require explicit admission and exhaustive inventories for research facades."""
+    errors: list[str] = []
+    experimental_dir = root / "src" / "pyrite" / "experimental"
+    if experimental_dir.is_dir():
+        for facade in experimental_dir.glob("*.py"):
+            if facade.name == "__init__.py" or facade.stem.startswith("_"):
+                continue
+            package = f"pyrite.experimental.{facade.stem}"
+            if package not in supported:
+                errors.append(f"{package}: experimental facade missing API inventory")
+    for package, expected in supported.items():
+        if not package.startswith("pyrite.experimental."):
+            continue
+        names, all_errors = _read_all(_namespace_source(root, package))
+        errors.extend(all_errors)
+        unreviewed = sorted(names - expected.keys())
+        if unreviewed:
+            errors.append(f"{package}: unreviewed experimental exports: {unreviewed}")
+    return errors
+
+
 def check_package_contracts(root: Path, root_exports: dict[str, Export]) -> list[str]:
     """Check explicitly supported package names and frozen private exceptions."""
     supported, legacy, errors = read_package_inventory(root / "api-surface.toml")
+    errors.extend(_check_experimental_admission(root, supported))
     for package in sorted(set(supported) | set(legacy)):
         source = _namespace_source(root, package)
         declared, typing_errors = read_typing_names(source)

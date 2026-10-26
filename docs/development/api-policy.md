@@ -5,6 +5,12 @@ from an internal module does **not** make it supported. The supported contract
 is described by [the API reference](../api.md) and its package-root and
 canonical-facade inventory in `api-surface.toml`. This page is the review policy for new APIs.
 
+The [experimental API lifecycle](../guides/experimental-api.md) defines the
+shorter compatibility promise, per-domain triage, scientific validation gates,
+exact import inventory and promotion procedure for research interfaces.
+`pyrite.experimental` is a discoverability boundary, not a second owner or a
+mass re-export of unreviewed implementation code.
+
 ## Classification
 
 - **Stable:** supported and subject to documented compatibility/deprecation rules.
