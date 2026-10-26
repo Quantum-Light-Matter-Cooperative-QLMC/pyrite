@@ -193,6 +193,57 @@ def test_invalid_later_grid_fails_before_any_record_mutation(component, monkeypa
     assert pickle.dumps(records) == before
 
 
+@pytest.mark.parametrize("component", ["brem", "line"])
+@pytest.mark.parametrize("selectors", [False, True], ids=["record", "selectors"])
+@pytest.mark.parametrize("at_target", [False, True], ids=["retune", "cached"])
+def test_axial_repair_refuses_before_any_record_or_callback_mutation(
+    component, selectors, at_target, monkeypatch
+):
+    records = {name: {30.0: _finite_record(_fake_case(name, 30.0))} for name in ("first", "axial")}
+    case = records["axial"][30.0]["case"]
+    if selectors:
+        case.update(channeling_model="axial", channeling_axial={"axis_uvw": [0, 0, 1]})
+    else:
+        case["channeling"] = {"model": "axial", "axis_uvw": [0, 0, 1]}
+    if at_target:
+        case["Ne_brem" if component == "brem" else "Ne"] = 999
+    before = pickle.dumps(records)
+    monkeypatch.setattr("pyrite.montecarlo._brem_for_case", lambda *_a: pytest.fail("scored"))
+    monkeypatch.setattr(runner, "_cxr_pair_for_case", lambda *_a, **_kw: pytest.fail("scored"))
+    with pytest.raises(ValueError, match="#623"):
+        _repair_component(
+            component,
+            records,
+            save_cb=lambda _r: pytest.fail("saved"),
+            on_progress=lambda *_a: pytest.fail("reported progress"),
+        )
+    assert pickle.dumps(records) == before
+
+
+@pytest.mark.parametrize("component", ["brem", "line"])
+@pytest.mark.parametrize("json_output", [False, True], ids=["human", "json"])
+def test_axial_recompute_cli_refusal_preserves_output_contract(component, json_output, monkeypatch):
+    from pyrite.cli.commands import recompute as cli
+    from pyrite.montecarlo.case import refuse_axial_channeling
+
+    def unsupported(**_kwargs):
+        refuse_axial_channeling({"channeling": {"model": "axial"}})
+
+    function = "rebrem_checkpoints" if component == "brem" else "recxr_checkpoints"
+    monkeypatch.setattr(recompute, function, unsupported)
+    command = cli.brem_command if component == "brem" else cli.cxr_command
+    options = ["hopg", *(["--output", "json"] if json_output else [])]
+    result = CliRunner().invoke(command, options, catch_exceptions=False)
+    assert result.exit_code == 1
+    assert "Traceback" not in result.output
+    if json_output:
+        assert "#623" in json.dumps(json.loads(result.stdout))
+        assert result.stderr == ""
+    else:
+        assert result.stdout == ""
+        assert "#623" in result.stderr
+
+
 @pytest.mark.parametrize(
     "nodes",
     [

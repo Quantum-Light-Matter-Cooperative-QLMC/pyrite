@@ -5,6 +5,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from .._energy_grid_encoding import decode_energy_grid, encode_energy_grid
+from ..montecarlo.case import refuse_axial_channeling
 
 
 def _validate_grid(grid, name, minimum=1):
@@ -150,6 +151,7 @@ def _plan_brem(results, request, only_nonfinite):
         _validate_grid(request.target_nodes, "brem_nodes", minimum=2)
     for records in results.values():
         for record in records.values():
+            refuse_axial_channeling(record["case"])
             if only_nonfinite and _brem_at_target(record, request):
                 skipped += 1
                 continue
@@ -234,6 +236,7 @@ def _plan_cxr(
     skipped = 0
     for records in results.values():
         for record in records.values():
+            refuse_axial_channeling(record["case"])
             target = _validate_grid(
                 _target_cxr_grid(
                     sweep,

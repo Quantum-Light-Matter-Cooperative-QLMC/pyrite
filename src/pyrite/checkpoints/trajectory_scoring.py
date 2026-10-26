@@ -20,6 +20,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from ..montecarlo.case import refuse_axial_channeling
 from ..montecarlo.trajectories import (
     TrajectoryArtifact,
     TrajectoryArtifactError,
@@ -52,6 +53,15 @@ class StemPlan:
     artifacts: list[TrajectoryArtifact] = field(default_factory=list)
 
 
+def _check_axial_admission(artifacts: Iterable[TrajectoryArtifact]) -> None:
+    """Refuse unsupported inputs before hashing, cache reads, or checkpoint writes."""
+    try:
+        for artifact in artifacts:
+            refuse_axial_channeling(artifact.case)
+    except ValueError as error:
+        raise TrajectoryArtifactError(str(error)) from error
+
+
 def plan_stems(paths: Iterable[Path]) -> dict[str, StemPlan]:
     """Group artifacts by the checkpoint stem their capturing run recorded.
 
@@ -67,6 +77,7 @@ def plan_stems(paths: Iterable[Path]) -> dict[str, StemPlan]:
     seen: dict[tuple[str, str, float], Path] = {}
     for path in paths:
         artifact = read_trajectory_artifact(path, load_transport=False)
+        _check_axial_admission((artifact,))
         artifact_spectrum_inputs(artifact)
         _check_physics_provenance(artifact)
         for key in STREAM_REFUSED_KEYS:
@@ -159,6 +170,7 @@ def score_stem(
         _manifest_save,
     )
 
+    _check_axial_admission(plan.artifacts)
     checkpoint_path = Path(checkpoint_dir) / plan.stem
     _check_target(plan, checkpoint_path)
     results: dict = _checkpoint_load(checkpoint_path) if _checkpoint_exists(checkpoint_path) else {}

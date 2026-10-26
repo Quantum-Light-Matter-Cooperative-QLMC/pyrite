@@ -8,6 +8,7 @@ anything when an input or target belongs to something else.
 
 import json
 import shutil
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -18,6 +19,7 @@ from pyrite.cli.commands.trajectories import score_command
 from pyrite.montecarlo import runner
 from pyrite.montecarlo.trajectories import (
     SCHEMA_VERSION,
+    TrajectoryArtifactError,
     TrajectoryCapture,
     read_trajectory_artifact,
     write_trajectory_artifact,
@@ -29,6 +31,42 @@ from tests.montecarlo.test_trajectory_capture import _case
 
 _IDENTITY = {"catalog_profile": "test", "parameter_sha256": "p" * 64}
 _KEYS = ("spec", "spec_characteristic", "brem", "brem_wide")
+
+
+@pytest.mark.parametrize("selectors", [False, True], ids=["record", "selectors"])
+def test_axial_capture_refuses_during_planning_before_scoring(tmp_path, monkeypatch, selectors):
+    from tests.helpers.trajectory_schema import SCHEMA2_FIXTURE
+
+    legacy = read_trajectory_artifact(SCHEMA2_FIXTURE)
+    case = dict(legacy.case)
+    if selectors:
+        case.update(channeling_model="axial", channeling_axial={"axis_uvw": [0, 0, 1]})
+    else:
+        case["channeling"] = {"model": "axial", "axis_uvw": [0, 0, 1]}
+    path = write_trajectory_artifact(
+        tmp_path / "axial.h5",
+        legacy.transport,
+        case=case,
+        spectrum_inputs=legacy.spectrum_inputs,
+        provenance={"checkpoint_stem": "axial", "dataset_identity": _IDENTITY},
+    )
+    monkeypatch.setattr(
+        trajectory_scoring, "file_sha256", lambda *_a: pytest.fail("capture hashed")
+    )
+    with pytest.raises(TrajectoryArtifactError, match="#623"):
+        trajectory_scoring.plan_stems([path])
+
+
+def test_direct_axial_scoring_plan_refuses_before_target_reads(tmp_path, monkeypatch):
+    plan = trajectory_scoring.StemPlan(
+        "axial",
+        _IDENTITY,
+        artifacts=[SimpleNamespace(case={"channeling": {"model": "axial"}})],
+    )
+    monkeypatch.setattr(trajectory_scoring, "_check_target", lambda *_a: pytest.fail("target read"))
+    with pytest.raises(TrajectoryArtifactError, match="#623"):
+        trajectory_scoring.score_stem(plan, tmp_path, max_segments=10)
+    assert not list(tmp_path.iterdir())
 
 
 def _captured_run(tmp_path, cases=None, identity=_IDENTITY):

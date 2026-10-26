@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import numpy as np
 
+from ..case import refuse_axial_channeling
 from ..channeling.emission import channeling_spectrum
 from ..channeling.handoff import case_plane_incidence, zone_solver
 from ..geometry import beam_frame_basis
@@ -49,6 +50,7 @@ def case_channeling_spectrum(case, transport) -> np.ndarray:
 
     Validation: cr-persisted-channel
     """
+    refuse_axial_channeling(case)
     if "channeling" not in transport["segs"] or "channeling_beam_dir" not in transport:
         return rescore_channeling_spectrum(case, transport["E_grid"], transport["n_hat"])
     record = case["channeling"]
@@ -133,6 +135,7 @@ def rescore_channeling_spectrum(case, energy_eV, n_hat=None) -> np.ndarray:
     from . import _beam_kwargs, _case_stopping_tables
     from .artifacts import _case_geometry
 
+    refuse_axial_channeling(case)
     _grid, _brem, beam, default_direction, _groove = _case_geometry(case)
     count = max(int(case["Ne"]), int(case["Ne_brem"]))
     r, v, energy, _clock, _t0, _record = sample_primary_entry(

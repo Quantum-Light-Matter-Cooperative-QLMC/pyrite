@@ -12,7 +12,7 @@ from typing import Any
 import numpy as np
 
 from ..._energy_grid_encoding import decode_energy_grid
-from ..case import Case
+from ..case import Case, refuse_axial_channeling
 from ..geometry import tilted_geometry
 from ..groove import blazed_groove_spec
 from ..trajectories import (
@@ -242,6 +242,12 @@ def stream_spectrum_from_artifact(
 
 def _checked_case_and_inputs(artifact, case):
     """The artifact's own case and its spectrum inputs, after every identity check."""
+    try:
+        refuse_axial_channeling(artifact.case)
+        if case is not None:
+            refuse_axial_channeling(case)
+    except ValueError as error:
+        raise TrajectoryArtifactError(str(error)) from error
     inputs = artifact_spectrum_inputs(artifact)
     stored = artifact.case
     if case_digest(stored) != artifact.attrs.get("case_sha256"):

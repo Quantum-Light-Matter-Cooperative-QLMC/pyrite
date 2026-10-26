@@ -8,6 +8,9 @@ from typing import Any, Literal, cast
 
 import numpy as np
 
+from .._channeling_admission import AxialAdmissionError as AxialAdmissionError
+from .._channeling_admission import refuse_axial_channeling as refuse_axial_channeling
+from .._channeling_admission import refuse_axial_channeling_cases as refuse_axial_channeling_cases
 from .._cxr_grid_policy import LOCAL_RESOLUTION_POLICY
 
 type Composition = list[tuple[str, float]]
@@ -656,6 +659,7 @@ def refuse_channeling(case: Mapping[str, Any], consumer: str) -> None:
     ADR-0017 tier-3 rule: every consumer path either supports the planar
     channeling zone (#506) or refuses it before transport or output writes.
     """
+    refuse_axial_channeling(case)
     if case.get("channeling") is not None:
         raise ValueError(f"{consumer} does not support channeling cases (#506)")
 
