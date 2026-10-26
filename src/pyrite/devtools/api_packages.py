@@ -114,6 +114,13 @@ def read_package_inventory(
                 entry, row_errors = _parse_package_export(package, name, row)
                 errors.extend(row_errors)
                 if entry is not None:
+                    if (
+                        package.startswith("pyrite.experimental.")
+                        and entry.status != "experimental"
+                    ):
+                        errors.append(
+                            f"{package}.{name}: experimental facade requires experimental status"
+                        )
                     supported[package][name] = entry
 
     legacy: dict[str, set[str]] = {}
@@ -143,6 +150,14 @@ def _namespace_source(root: Path, module: str) -> Path:
 def check_package_contracts(root: Path, root_exports: dict[str, Export]) -> list[str]:
     """Check explicitly supported package names and frozen private exceptions."""
     supported, legacy, errors = read_package_inventory(root / "api-surface.toml")
+    experimental_dir = root / "src" / "pyrite" / "experimental"
+    if experimental_dir.is_dir():
+        for facade in experimental_dir.glob("*.py"):
+            if facade.name == "__init__.py" or facade.stem.startswith("_"):
+                continue
+            package = f"pyrite.experimental.{facade.stem}"
+            if package not in supported:
+                errors.append(f"{package}: experimental facade missing API inventory")
     for package in sorted(set(supported) | set(legacy)):
         source = _namespace_source(root, package)
         declared, typing_errors = read_typing_names(source)
@@ -152,6 +167,10 @@ def check_package_contracts(root: Path, root_exports: dict[str, Export]) -> list
         )
         errors.extend(all_errors)
         expected = supported.get(package, {})
+        if package.startswith("pyrite.experimental.") and not all_errors:
+            unreviewed = sorted(names - expected.keys())
+            if unreviewed:
+                errors.append(f"{package}: unreviewed experimental exports: {unreviewed}")
         for name in sorted(expected):
             entry = expected[name]
             if not all_errors and name not in names:

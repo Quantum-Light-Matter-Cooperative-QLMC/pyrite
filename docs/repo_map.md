@@ -30,52 +30,53 @@ Components (a + b denotes a static import cycle):
   p6: console
   p7: detectors
   p8: devtools
-  p9: geometry
-  p10: instrument
-  p11: materials
-  p12: optimization
-  p13: plots
-  p14: radiation
-  p15: transport
-  p16: xsgen
+  p9: experimental
+  p10: geometry
+  p11: instrument
+  p12: materials
+  p13: optimization
+  p14: plots
+  p15: radiation
+  p16: transport
+  p17: xsgen
 Edges (importer -> imported):
-  p0 -> p11
+  p0 -> p12
   p0 -> p3
   p0 -> p4
   p0 -> p6
-  p1 -> p11
-  p1 -> p13
+  p1 -> p12
+  p1 -> p14
   p1 -> p2
   p1 -> p3
   p1 -> p6
   p1 -> p7
-  p1 -> p9
-  p10 -> p11
-  p10 -> p7
-  p12 -> p3
-  p13 -> p11
+  p1 -> p10
+  p11 -> p12
+  p11 -> p7
   p13 -> p3
-  p13 -> p6
-  p13 -> p7
-  p16 -> p11
-  p16 -> p6
-  p3 -> p10
+  p14 -> p12
+  p14 -> p3
+  p14 -> p6
+  p14 -> p7
+  p17 -> p12
+  p17 -> p6
   p3 -> p11
-  p3 -> p16
+  p3 -> p12
+  p3 -> p17
   p3 -> p5
   p3 -> p6
   p3 -> p7
-  p3 -> p9
-  p4 -> p10
+  p3 -> p10
   p4 -> p11
-  p4 -> p16
+  p4 -> p12
+  p4 -> p17
   p4 -> p3
   p4 -> p6
   p4 -> p7
-  p6 -> p11
-  p7 -> p11
+  p6 -> p12
+  p7 -> p12
   p7 -> p5
-  p8 -> p13
+  p8 -> p14
   p8 -> p3
   p8 -> p4
   p8 -> p6
