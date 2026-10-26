@@ -37,20 +37,21 @@ Components (a + b denotes a static import cycle):
   p13: optimization
   p14: plots
   p15: radiation
-  p16: transport
-  p17: xsgen
+  p16: storage
+  p17: transport
+  p18: xsgen
 Edges (importer -> imported):
   p0 -> p12
   p0 -> p3
   p0 -> p4
   p0 -> p6
+  p1 -> p10
   p1 -> p12
   p1 -> p14
   p1 -> p2
   p1 -> p3
   p1 -> p6
   p1 -> p7
-  p1 -> p10
   p11 -> p12
   p11 -> p7
   p13 -> p3
@@ -58,18 +59,18 @@ Edges (importer -> imported):
   p14 -> p3
   p14 -> p6
   p14 -> p7
-  p17 -> p12
-  p17 -> p6
+  p18 -> p12
+  p18 -> p6
+  p3 -> p10
   p3 -> p11
   p3 -> p12
-  p3 -> p17
+  p3 -> p18
   p3 -> p5
   p3 -> p6
   p3 -> p7
-  p3 -> p10
   p4 -> p11
   p4 -> p12
-  p4 -> p17
+  p4 -> p18
   p4 -> p3
   p4 -> p6
   p4 -> p7

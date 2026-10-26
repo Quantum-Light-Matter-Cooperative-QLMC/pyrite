@@ -30,8 +30,14 @@ def test_storage_aliases_preserve_implementations_and_missing_checkpoint(tmp_pat
     assert checkpoint_manifest("missing", checkpoint_dir=tmp_path) is None
     assert ObservationStore("missing", root=tmp_path).sources() == ()
     assert results.Result.__module__ == "pyrite.results.model"
-    from pyrite.results.model import CxrSpectra, PixelMetadata, PixelRayMap, SpatialResult
-    from pyrite.results.model import SpectralDensity, SpectralFactors
+    from pyrite.results.model import (
+        CxrSpectra,
+        PixelMetadata,
+        PixelRayMap,
+        SpatialResult,
+        SpectralDensity,
+        SpectralFactors,
+    )
 
     assert results.SpectralDensity is SpectralDensity
     assert results.CxrSpectra is CxrSpectra
@@ -85,8 +91,21 @@ def test_worker_artifact_round_trip_uses_existing_identity(tmp_path):
         store.load(ref, expected_content_key="b" * 64)
 
 
-def test_facade_import_does_not_initialize_scheduler_modules():
-    script = """
+@pytest.mark.parametrize(
+    "imports",
+    [
+        "import pyrite.storage",
+        "from pyrite.storage import CaseArtifactStore",
+        "from pyrite.storage import ObservationStore, observation_from_result",
+        "from pyrite.storage import load_checkpoint, checkpoint_manifest",
+        "from pyrite.results import Result, SpatialResult, AcquisitionBatch",
+    ],
+)
+def test_facade_import_does_not_initialize_scheduler_modules(imports):
+    script = (
+        imports
+        + "\n"
+        + """
 import sys
 import pyrite.storage as storage
 from pyrite.storage import CaseArtifactStore
@@ -99,6 +118,7 @@ assert 'pyrite.execution.profiles' not in sys.modules
 assert 'pyrite.cli' not in sys.modules
 assert not hasattr(storage, 'NotAnExport')
 """
+    )
     env = os.environ.copy()
     result = subprocess.run(
         [sys.executable, "-c", script],

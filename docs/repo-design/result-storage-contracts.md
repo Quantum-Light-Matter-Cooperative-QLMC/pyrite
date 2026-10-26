@@ -46,11 +46,13 @@ from pyrite.storage import (
 records = load_checkpoint("hopg", checkpoint_dir="./pyrite-output/checkpoints")
 manifest = checkpoint_manifest("hopg", checkpoint_dir="./pyrite-output/checkpoints")
 
+
 # Write and reopen a factorized observation from an acquisition-enabled Result.
 # This is independent of the campaign checkpoint lifecycle.
 def save_observation(result: Result, root: str) -> str:
     store = ObservationStore("hopg", root=root)
     return store.put(observation_from_result(result))
+
 
 # Distributed executors publish independent raw case outputs, not checkpoints.
 artifacts = CaseArtifactStore("./pyrite-output/checkpoints")
@@ -68,10 +70,21 @@ The existing `pyrite.checkpoints.persistence`, `pyrite.observations.store`, and
 objects. Their serialized class module names, artifact schemas, checkpoint
 manifests, cache keys and normalization conventions do not change.
 
-## Future separation
+## Analysis and compatibility
 
-This first slice establishes the public storage boundary. Follow-up work can
-review the legacy `results.__all__` star-import footprint and migrate the
-historical `Analysis` display controls to explicit transforms. Such changes
-must preserve the published deprecation schedule; they must not silently
-alter scientific factors, normalization, checkpoint data or cache identities.
+Keep `Analysis` as the existing presentation-time compatibility value. It is
+not consumed by `simulate()` and must not acquire persistence or physics
+responsibilities. For scalar results, use `Result.spectral_flux(units="electron")`
+for intrinsic density, `units="sr"` for rates per steradian at the beam's mean
+current, or `units="detector"` for the scalar acceptance approximation. These
+return derived tables without changing the stored spectra or source identity.
+For physical pixel detectors, use an explicit response and acquisition request
+with `Result.acquire()` or `Result.acquisition_image()`; a stored observation
+can be rescored with `StoredObservation.rescore()` while retaining its source
+identity and assigning the appropriate observation identity.
+
+The supported result exports are listed in `api-surface.toml`. Historical
+`results.__all__` entries remain available for compatibility, including legacy
+dictionary/table operations and underscored helpers. Narrowing that star-import
+set requires a separate scheduled compatibility change; this facade slice does
+not remove existing imports or change their normalization.

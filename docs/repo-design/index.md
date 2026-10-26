@@ -49,6 +49,7 @@ compute/physics-adapter-overhead.md
 :maxdepth: 1
 :caption: Storage and artifacts
 
+result-storage-contracts
 storage/checkpoint-case-store
 storage/dataset-identity-and-storage
 storage/result-schema

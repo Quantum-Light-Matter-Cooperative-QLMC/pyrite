@@ -2,8 +2,12 @@
 results (package)
 ==================
 
-Turn finished Monte-Carlo cases into the ``results`` store, reduce an azimuth
-sweep to its best geometry, and build the photon-counting statistics table.
+Scientific outputs, provenance, physical-unit views, and reductions.
+
+``Result`` and its spectral/spatial values describe in-memory computed outputs.
+Use ``pyrite.storage`` for supported checkpoint, observation, and worker-artifact
+persistence. Historical dictionary reductions remain available here for
+compatibility.
 
 ``results`` is a plain dict ``{config_name: {E0_keV: record}}``; each record is
 the dict produced by :func:`store_result` (spectrum, brem, detector FWHM, unit
