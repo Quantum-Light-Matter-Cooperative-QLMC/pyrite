@@ -31,8 +31,6 @@ if TYPE_CHECKING:
     from pyrite._numerics_groups import (
         TransportNumerics as TransportNumerics,
     )
-    from pyrite.instrument.model import PixelScorer as AngularSampling
-    from pyrite.instrument.model import PixelScorer as PixelScorer
     from pyrite._photon_config import PhotonTransport as PhotonTransport
     from pyrite._precision import Precision as Precision
     from pyrite._sampling import (
@@ -42,6 +40,15 @@ if TYPE_CHECKING:
         FixedSampling as FixedSampling,
     )
     from pyrite.campaign.model import Numerics as Numerics
+    from pyrite.config.response_numerics import (
+        Timepix3ResponseNumerics as Timepix3ResponseNumerics,
+    )
+    from pyrite.instrument.model import (
+        PixelScorer as AngularSampling,
+    )
+    from pyrite.instrument.model import (
+        PixelScorer as PixelScorer,
+    )
 
 _EXPORTS = {
     "AdaptiveSampling": ("pyrite._sampling", "AdaptiveSampling"),
@@ -73,6 +80,7 @@ __all__ = [
     "Precision",
     "RadiationNumerics",
     "TransportNumerics",
+    "Timepix3ResponseNumerics",
     "load_numerics",
     "load_physics",
 ]
@@ -80,8 +88,12 @@ __all__ = [
 
 def __getattr__(name: str) -> Any:
     """Resolve a canonical API name without eagerly loading numerical engines."""
+    if name == "Timepix3ResponseNumerics":
+        value = getattr(import_module("pyrite.config.response_numerics"), name)
+        globals()[name] = value
+        return value
     if name == "AngularSampling":
-        value = getattr(import_module("pyrite.instrument"), "PixelScorer")
+        value = import_module("pyrite.instrument").PixelScorer
         globals()[name] = value
         return value
     try:

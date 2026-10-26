@@ -29,9 +29,9 @@ from pyrite.results import AcquisitionBatch
 
 
 def test_semantic_names_are_original_classes_not_new_models() -> None:
+    from pyrite.detectors import FilterPlate as LegacyFilterPlate
     from pyrite.instrument import PixelScorer as OriginalPixelScorer
     from pyrite.observations import PixelScorer as LegacyPixelScorer
-    from pyrite.detectors import FilterPlate as LegacyFilterPlate
 
     assert AngularDetector is Detector
     assert AngularSampling is PixelScorer is OriginalPixelScorer is LegacyPixelScorer

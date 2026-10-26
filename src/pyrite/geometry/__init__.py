@@ -52,7 +52,19 @@ _EXPORTS = {
     "Target": ("pyrite.campaign.target", "Target"),
 }
 
-__all__ = list(_EXPORTS)
+__all__ = [
+    "BlazedGrooves",
+    "CrystalCut",
+    "Filter",
+    "FilterPlate",
+    "Footprint",
+    "Layer",
+    "RectangularBody",
+    "Slab",
+    "Stack",
+    "SubstanceRef",
+    "Target",
+]
 
 
 def __getattr__(name: str) -> Any:

@@ -11,12 +11,12 @@ from .acceptance import AngularAcceptance, SensorAcceptance
 from .spec import (
     Detector,
     DetectorResponse,
-    NativeBinnedResponse,
     DetectorSpec,
     EagleXO,
     EnergyBins,
     IdealPhotonCounter,
     LegacyEDS,
+    NativeBinnedResponse,
     NativeSpectrum,
     Timepix3,
 )
@@ -89,7 +89,7 @@ _MODULE_EXPORTS = frozenset({"eaglexo_response", "grating", "timepix_response"})
 def __getattr__(name: str) -> Any:
     """Resolve physical detector geometry and response functions lazily."""
     if name in _EXPORTS or name in _LEGACY_EXPORTS:
-        module, attribute = (_EXPORTS.get(name) or _LEGACY_EXPORTS[name])
+        module, attribute = _EXPORTS.get(name) or _LEGACY_EXPORTS[name]
         value = getattr(import_module(module), attribute)
         globals()[name] = value
         return value

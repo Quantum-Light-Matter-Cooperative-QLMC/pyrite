@@ -11,6 +11,7 @@ import numpy as np
 
 from .._energy_bins import EnergyBins as EnergyBins
 from .._units import normalize_unit
+from ..config.response_numerics import Timepix3ResponseNumerics
 from .acceptance import AngularAcceptance, SensorAcceptance
 
 _DETECTOR_RESPONSES: dict[int, tuple[weakref.ReferenceType, object | None]] = {}
@@ -176,6 +177,9 @@ class Timepix3:
         Active silicon thickness in micrometres; ``None`` uses hardware default.
     bias_v
         Sensor bias in volts; ``None`` uses hardware default.
+    numerics
+        Optional ``Timepix3ResponseNumerics`` grouped numerical policy. The
+        original flat fields remain accepted for compatibility.
     dE_mc, dE_out
         Numerical response-input and measured-output histogram widths in eV.
         They approximate continuous recorded energies, not ADC/ToT quantization
@@ -192,6 +196,41 @@ class Timepix3:
     dE_out: float = 25.0
     n_mc: int = 60000
     seed: int = 0
+    # Configuration-only InitVar: the original four numerical dataclass fields
+    # stay unchanged for pickle, asdict, response digests and checkpoint replay.
+    numerics: InitVar[Timepix3ResponseNumerics | None] = None
+
+    def __post_init__(self, numerics: Timepix3ResponseNumerics | None) -> None:
+        # Unit-bearing sensor conditions normalize before constructing response
+        # or identity. Ordinary historical numeric values stay bit-identical.
+        for name, unit, expected in (("thickness_um", "um", "length"), ("bias_v", "V", "voltage")):
+            value = getattr(self, name)
+            if value is not None:
+                object.__setattr__(
+                    self,
+                    name,
+                    normalize_unit(
+                        value,
+                        unit,
+                        field=f"Timepix3.{name}",
+                        expected=expected,
+                    ),
+                )
+        if numerics is None:
+            return
+        if not isinstance(numerics, Timepix3ResponseNumerics):
+            raise TypeError("Timepix3.numerics must be a Timepix3ResponseNumerics")
+        for name, default in (("dE_mc", 50.0), ("dE_out", 25.0), ("n_mc", 60000), ("seed", 0)):
+            previous = getattr(self, name)
+            requested = getattr(numerics, name)
+            if previous != default and previous != requested:
+                raise ValueError(f"Timepix3.{name} conflicts with numerics.{name}")
+            object.__setattr__(self, name, requested)
+
+    @property
+    def response_numerics(self) -> Timepix3ResponseNumerics:
+        """Read the normalized policy, without adding it to response identity."""
+        return Timepix3ResponseNumerics(self.dE_mc, self.dE_out, self.n_mc, self.seed)
 
     def score(self, energy_eV, intrinsic_density, *, fwhm_eV, scale):
         from .timepix_response import get_response

@@ -17,6 +17,7 @@ materials-catalog-schema
 data-distribution-and-repository-size
 core-architecture-rfc
 issue-680-configuration-rfc
+issue-703-observations
 physical-units
 ../repo_map
 ```

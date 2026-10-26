@@ -115,6 +115,24 @@ bin/component draws and never make an independent total draw. Exact replay
 across a future RNG algorithm change requires retaining the algorithm version
 or realized arrays.
 
+## Numerical response configuration (issue 703)
+
+New Python code may construct `Timepix3Response(numerics=Timepix3ResponseNumerics(...))`
+where `Timepix3ResponseNumerics` is exported from `pyrite.config`. Thickness
+and bias describe sensor operating conditions; the four numerical policy
+fields determine response-matrix discretization, number of simulated response
+photons per incident energy, and seeded matrix realization. The historical
+flat `Timepix3` constructor and CLI `--timepix-*` controls are compatible;
+conflicting flat/grouped values are rejected. Grouping does not create new
+response identity fields: both paths lower to the same established `Timepix3`
+config, response digest, and native-bin behavior.
+
+An optional `NativeBinnedResponse` protocol specifies the event-mass shape and
+units; it does not require every continuous-spectrum response to support
+native measured bins. This factorized readout remains distinct from full
+photon interaction and event-level digitization, which need separate physics
+and interfaces.
+
 ## Assumptions and interpretation
 
 - response parameters describe an idealized configured instrument, not an automatic calibration of a particular physical detector;

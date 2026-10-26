@@ -83,8 +83,12 @@ from .tables import (
     summary_table,
 )
 
+# Compatibility identity: public result spelling without changing pickle module paths.
+PixelCountResult = AcquisitionBatch
+
 __all__ = [
     "AcquisitionBatch",
+    "PixelCountResult",
     "PER_NA",
     "DEFAULT_BEAM_CURRENT_NA",
     "EmissionMode",
@@ -129,3 +133,14 @@ __all__ = [
     "cxr_quality",
     "cxr_metrics",
 ]
+
+
+def __getattr__(name: str):
+    """Lazy scientific acquisition result aliases; preserve old pickle paths."""
+    if name not in {"AcquisitionBatch", "PixelCountResult"}:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    from pyrite.instrument.acquisition import AcquisitionBatch
+
+    globals()["AcquisitionBatch"] = AcquisitionBatch
+    globals()["PixelCountResult"] = AcquisitionBatch
+    return AcquisitionBatch
