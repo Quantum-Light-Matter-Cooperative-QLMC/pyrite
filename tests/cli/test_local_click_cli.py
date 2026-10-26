@@ -510,3 +510,52 @@ def test_standalone_click_usage_error_preserves_exit_and_streams():
     assert completed.stdout == ""
     assert "Invalid value for '--workers'" in completed.stderr
     assert "Traceback" not in completed.stderr
+
+
+def test_trajectory_storage_policy_is_opt_in_and_validated(monkeypatch, tmp_path):
+    seen = _capture(monkeypatch, scan, "run")
+    bare = invoke(scan_cli.command, ["standard", "-m", "hopg"])
+    assert_clean_result(bare)
+    assert "trajectory_storage" not in seen
+
+    captured = invoke(
+        scan_cli.command,
+        [
+            "standard",
+            "-m",
+            "hopg",
+            "--trajectories",
+            str(tmp_path),
+            "--trajectory-storage",
+            "throughput",
+        ],
+    )
+    assert_clean_result(captured)
+    assert seen["trajectory_storage"] == "throughput"
+
+    seen.clear()
+    default_capture = invoke(
+        scan_cli.command, ["standard", "-m", "hopg", "--trajectories", str(tmp_path)]
+    )
+    assert_clean_result(default_capture)
+    assert "trajectory_storage" not in seen  # uses TrajectoryCapture default
+
+    invalid = invoke(
+        scan_cli.command, ["standard", "-m", "hopg", "--trajectory-storage", "throughput"]
+    )
+    assert invalid.exit_code == 2
+    assert "--trajectory-storage requires --trajectories" in invalid.stderr
+
+    bad_choice = invoke(
+        scan_cli.command,
+        [
+            "standard",
+            "-m",
+            "hopg",
+            "--trajectories",
+            str(tmp_path),
+            "--trajectory-storage",
+            "lossy",
+        ],
+    )
+    assert bad_choice.exit_code == 2

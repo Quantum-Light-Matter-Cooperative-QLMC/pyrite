@@ -26,9 +26,11 @@ argument; the selected policy is stored in the HDF5 root attribute
 Use `throughput` when GPU transport outpaces LZF compression and disk space is
 less important than capture latency. The schema-2-like uncompressed reference
 below is **not** identical to the new schema-3 throughput policy: the latter
-retains compact indexing and ID storage. Its actual write/read times, peak
-host RAM and VRAM, and transfer volume must be measured on the target host
-before changing the default. No new measurements are claimed here.
+retains compact indexing and ID storage. RTX 5080 write/read timings and transfer volume for the new policy are
+recorded below. Policy-specific RAM/VRAM peaks, cold-storage durability,
+and full end-to-end runtime have not yet been measured.
+
+For CLI captures use `pyrite run PROFILE --trajectories --trajectory-storage throughput` (also available via `pyrite remote run` and `pyrite run --remote`). The policy affects storage only; it is not part of simulation physics or checkpoint identity.
 
 ## Benchmarks
 
@@ -96,3 +98,28 @@ of current model or table availability. The snapshot does not change the case
 digest or the HDF5 schema version.
 
 Readers accept schemas 1 to 3. Schema-2 files keep their plain row datasets and have no `/electron_index`. Selection and streaming then fall back to bisection and boundary scans, and give the same selections and blocks. `tests/data/trajectory_artifacts/schema2_hopg_lockstep.h5` is a genuine schema-2 capture. The tests check that it replays bit for bit, both directly and after being rewritten as schema 3. `tests/helpers/trajectory_schema.py` rewrites any new artifact into the schema-1 or schema-2 layout for compatibility tests.
+
+## Issue #610: RTX 5080 measurements (2026-10-26)
+
+30,000 electrons, 8,410,118 segments, 30 keV carbon target, 200,000 Å,
+45° tilt. Same seeded CUDA transport was reused for both policies; five
+alternating captures per policy on `qlmc` (RTX 5080, CuPy 14.2.0). The
+benchmark used an isolated bundled catalog, without the user's catalog layer.
+
+| Residency | Compact median write | Throughput median write | Speedup |
+|---|---:|---:|---:|
+| Device | 3.934 s | 0.863 s | 4.56× |
+| Host | 3.555 s | 0.441 s | 8.05× |
+
+Artifact size: 667.1 MiB compact versus 878.0 MiB throughput (+32%).
+Streaming read: approximately 1.09 s versus 0.17 s. Device-to-host transfer
+volume was approximately 1,115 MiB per capture in both modes. CUDA transport
+itself took 0.165 s (after warm-up); host staging took 0.456 s and was
+excluded from host writer times. Peak sampled RSS (884 MiB) and CuPy pool
+(2,086 MiB) are transport measurements, not policy-specific write peaks.
+
+**Decision:** keep `compact` the backward-compatible default, make
+`throughput` selectable on the CLI, and measure realistic overlap of writing
+with spectrum scoring before introducing a background writer. These write/read
+timings are warm-cache benchmark observations, not cold-storage durability
+or end-to-end application speedups.

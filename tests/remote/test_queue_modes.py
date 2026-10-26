@@ -68,6 +68,11 @@ def remote_effects(monkeypatch):
         ({"cpu": True, **_PERF}, "CPU profiling requires a monolithic allocation"),
         ({"parallel_materials": 2}, "--parallel-materials only applies to a monolithic"),
         ({"overwrite_trajectories": True}, "overwrite-trajectories requires trajectories"),
+        ({"trajectory_storage": "throughput"}, "trajectory-storage requires trajectories"),
+        (
+            {"trajectories": "pyrite-output/trajectories", "trajectory_storage": "bad"},
+            "trajectory-storage must be compact or throughput",
+        ),
         (
             {"trajectories": "pyrite-output/trajectories", "cpu_only": True, **_PERF},
             "trajectory capture excludes CPU-only and repeated profiling",
@@ -123,3 +128,18 @@ def test_submission_summary_names_the_follow_up_commands(
     assert f"{pull_row} " in output
     assert ("Performance " in output) == ("performance_profile" in options)
     assert "Mode " in output
+
+
+@pytest.mark.parametrize("chunk_minutes", [0, 10.0])
+def test_trajectory_storage_flows_into_both_remote_scripts(remote_effects, capsys, chunk_minutes):
+    queue.start_queue(
+        ["hopg"],
+        dry_run=True,
+        chunk_minutes=chunk_minutes,
+        trajectories="pyrite-output/trajectories",
+        trajectory_storage="throughput",
+    )
+    out = capsys.readouterr().out
+    assert "--trajectory-storage throughput" in out
+    assert "trajectory_storage: throughput" in out
+    assert remote_effects == []

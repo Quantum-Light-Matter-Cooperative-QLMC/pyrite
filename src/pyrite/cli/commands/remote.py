@@ -278,6 +278,7 @@ class _StartFlags:
     level9: bool
     trajectories: str | None = None
     overwrite_trajectories: bool = False
+    trajectory_storage: str | None = None
 
 
 @dataclass(frozen=True)
@@ -292,6 +293,8 @@ def _reject_exclusive_start_flags(flags):
     """Reject ``remote run`` flag pairs that cannot describe one session."""
     if flags.overwrite_trajectories and flags.trajectories is None:
         raise click.UsageError("--overwrite-trajectories requires --trajectories")
+    if flags.trajectory_storage is not None and flags.trajectories is None:
+        raise click.UsageError("--trajectory-storage requires --trajectories")
     if flags.trajectories is not None and (flags.cpu_only or flags.performance_repetitions > 1):
         raise click.UsageError("--trajectories excludes --cpu-only and --perf-reps greater than 1")
     if flags.cpu and flags.cpu_only:
@@ -606,6 +609,12 @@ _start_transfer_options = _option_group(
     is_flag=True,
     help="Replace captured cases; requires --trajectories.",
 )
+@click.option(
+    "--trajectory-storage",
+    type=click.Choice(("compact", "throughput")),
+    default=None,
+    help="Capture storage: compact (default, LZF) or throughput (uncompressed); requires --trajectories.",
+)
 def start_command(**params):
     from ...console import config as cli_config
     from ...runs.scan import resolve_profile_materials
@@ -651,6 +660,7 @@ def start_command(**params):
         level9=flags.level9,
         trajectories=flags.trajectories,
         overwrite_trajectories=flags.overwrite_trajectories,
+        trajectory_storage=flags.trajectory_storage,
     )
 
 

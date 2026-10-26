@@ -296,6 +296,7 @@ def _queue_script(
     py_spy=False,
     trajectories=None,
     overwrite_trajectories=False,
+    trajectory_storage=None,
     expected_physics=None,
 ):
     """CXR payload for one bounded-concurrency queue in a SLURM allocation."""
@@ -317,6 +318,8 @@ def _queue_script(
         flags += f" --trajectories {config.shell_word(trajectories)}"
         if overwrite_trajectories:
             flags += " --overwrite-trajectories"
+        if trajectory_storage is not None:
+            flags += f" --trajectory-storage {config.shell_arg(trajectory_storage)}"
     if quick:
         flags += " --quick"
     if workers is not None:
@@ -668,6 +671,7 @@ def _chunked_queue_script(
     recompute=False,
     trajectories=None,
     overwrite_trajectories=False,
+    trajectory_storage=None,
     expected_physics=None,
 ):
     """One SLURM slice of a self-resubmitting chain (spec: chunked remote jobs).
@@ -684,6 +688,8 @@ def _chunked_queue_script(
         flags += f" --trajectories {config.shell_word(trajectories)}"
         if overwrite_trajectories:
             flags += " --overwrite-trajectories"
+        if trajectory_storage is not None:
+            flags += f" --trajectory-storage {config.shell_arg(trajectory_storage)}"
     if quick:
         flags += " --quick"
     if workers is not None:
@@ -1170,6 +1176,7 @@ def _queue_metadata(
     py_spy: bool = False,
     trajectories=None,
     overwrite_trajectories=False,
+    trajectory_storage=None,
 ):
     """Static metadata persisted before a queue becomes visible to SLURM."""
     return "\n".join(
@@ -1198,6 +1205,7 @@ def _queue_metadata(
                 [
                     f"trajectories: {trajectories}",
                     f"overwrite_trajectories: {bool(overwrite_trajectories)}",
+                    f"trajectory_storage: {trajectory_storage or 'compact'}",
                 ]
                 if trajectories is not None
                 else []

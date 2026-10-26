@@ -24,6 +24,7 @@ def scan_trajectory_capture(args, identity, stem, material, fidelity):
     return TrajectoryCapture(
         root=os.path.join(os.fspath(args.trajectories), stem),
         overwrite=bool(getattr(args, "overwrite_trajectories", False)),
+        storage_policy=getattr(args, "trajectory_storage", None) or "compact",
         scene=profile_trajectory_scene(str(profile), getattr(args, "detector_id", None)),
         provenance={
             "material": material,
