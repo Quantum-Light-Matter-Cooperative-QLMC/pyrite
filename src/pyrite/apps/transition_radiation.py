@@ -209,13 +209,16 @@ def map_panels(data, config: DemoConfig, *, per_bunch=False):
 def reference_scene(config: DemoConfig, mode: str):
     """Build the production counterpart of the demo's planar reference scene."""
     import pyrite as pr
+    from pyrite.beams import Spot
+    from pyrite.detectors import AngularAcceptance
+    from pyrite.geometry import Footprint, Slab
 
     if mode not in {"history", "bunch"}:
         raise ValueError("mode must be history or bunch")
     return pr.Scene(
         pr.Beam(
             energy_keV=config.energy_keV,
-            transverse=pr.Spot(fwhm_x_mm=config.spot_nm * 1e-6),
+            transverse=Spot(fwhm_x_mm=config.spot_nm * 1e-6),
             longitudinal=LongitudinalDistribution(
                 kind="gaussian",
                 envelope_rms_fs=config.duration_as * 0.001,
@@ -223,22 +226,30 @@ def reference_scene(config: DemoConfig, mode: str):
             bunch_charge_pc=config.charge_pc,
             rep_rate_hz=5000.0,
         ),
-        pr.Slab(
+        Slab(
             config.material,
             thickness_ang=config.thickness_nm * 10,
             tilt_deg=config.tilt_deg,
-            footprint=pr.Footprint(5.0, 5.0),
+            footprint=Footprint(5.0, 5.0),
         ),
         pr.Detector(
-            config.angle_deg, acceptance=pr.AngularAcceptance(polar_deg=1.0, solid_angle_sr=0.0001)
+            config.angle_deg, acceptance=AngularAcceptance(polar_deg=1.0, solid_angle_sr=0.0001)
         ),
-        physics=pr.Physics(
-            transition_radiation=mode,
-            emission="incoherent",
-            radiative_model="uncoupled",
-            bremsstrahlung_model="eedl",
-            inelastic_model="continuous",
-        ),
+    )
+
+
+def reference_physics(mode: str):
+    """Independent model selection for the same physical reference scene."""
+    import pyrite as pr
+
+    if mode not in {"history", "bunch"}:
+        raise ValueError("mode must be history or bunch")
+    return pr.Physics(
+        transition_radiation=mode,
+        emission="incoherent",
+        radiative_model="uncoupled",
+        bremsstrahlung_model="eedl",
+        inelastic_model="continuous",
     )
 
 
@@ -251,6 +262,7 @@ def transported_demo(config: DemoConfig, *, trials=32, transport_core="per-elect
     the fused CUDA kernel.
     """
     import pyrite as pr
+    from pyrite.detectors import EnergyBins
 
     stop = config.energy_keV * 1e3
     numerics = pr.Numerics(
@@ -258,7 +270,7 @@ def transported_demo(config: DemoConfig, *, trials=32, transport_core="per-elect
         brem_trials=2 * trials,
         energy_model="midpoint",
         transport_core=transport_core,
-        energy_bins=pr.EnergyBins(
+        energy_bins=EnergyBins(
             cxr=photon_grid(config),
             brem=np.arange(200.0, stop, 100.0)
             if config == DemoConfig()
@@ -269,9 +281,7 @@ def transported_demo(config: DemoConfig, *, trials=32, transport_core="per-elect
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         results = {
-            mode: pr.simulate(
-                scene.beam, scene.target, scene.detector, physics=scene.physics, numerics=numerics
-            )
+            mode: pr.simulate(scene, physics=reference_physics(mode), numerics=numerics)
             for mode in ("history", "bunch")
             for scene in (reference_scene(config, mode),)
         }

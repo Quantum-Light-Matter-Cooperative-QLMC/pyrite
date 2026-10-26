@@ -12,6 +12,19 @@ import pytest
 import pyrite.photon_transport as photon
 
 
+def _physical_scene():
+    from pyrite import Beam, Scene
+    from pyrite.beams import PointBunch, Spot
+    from pyrite.geometry import Footprint, Slab
+    from pyrite.instrument import PlanarDetector, PlanarPose
+
+    return Scene(
+        Beam(100.0, transverse=Spot(), longitudinal=PointBunch()),
+        Slab("silicon", 1000.0, footprint=Footprint(5.0, 5.0)),
+        PlanarDetector(PlanarPose.from_observation(90.0, 0.0, 100.0), size_mm=(4.0, 3.0)),
+    )
+
+
 @pytest.fixture
 def beam_segments():
     # Electron 4 is line-only; it must not bias the BremsLib population (Ne_brem=3).
@@ -143,7 +156,7 @@ def test_explicit_call_is_one_transport_and_one_reference_score(
     case = dict(
         Ne_brem=3, seed=42, bremsstrahlung_model="bremslib", radiative_model="bremslib-soft-hard"
     )
-    fake_scene = SimpleNamespace(filter_plates=())
+    fake_scene = _physical_scene()
     aperture = SimpleNamespace()
     monkeypatch.setattr(
         photon,
@@ -154,7 +167,7 @@ def test_explicit_call_is_one_transport_and_one_reference_score(
         photon, "_scene_geometry", lambda *a: (["layer"], aperture, (), (None, None))
     )
     monkeypatch.setattr(photon, "_identity", lambda *a, **kw: ("observation", {"proposal": kw}))
-    monkeypatch.setattr(lowering, "build_case", lambda scene, numerics: case)
+    monkeypatch.setattr(lowering, "lower_simulation", lambda request: case)
     monkeypatch.setattr(profiles, "case_content_key", lambda *a, **kw: "source")
     monkeypatch.setattr(case_tables, "case_table_markers", lambda case: {"tables": "pinned"})
     monkeypatch.setattr(runner, "_case_bremslib_tables", lambda case: {"Cu": "table"})
@@ -214,14 +227,14 @@ def test_unsupported_physics_rejected_before_transport(monkeypatch, key, value, 
         "_preflight",
         lambda *a: (None, SimpleNamespace(transport_core="per-electron"), 1e3, 1e3, 8e4),
     )
-    monkeypatch.setattr(lowering, "build_case", lambda *a: case)
+    monkeypatch.setattr(lowering, "lower_simulation", lambda request: case)
     monkeypatch.setattr(
         runner,
         "_transport_case",
         lambda *a, **kw: pytest.fail("unsupported request reached transport"),
     )
     with pytest.raises(ValueError, match=match):
-        photon.simulate_photon_continuum(None, [1e3, 4e3], n_samples=1)
+        photon.simulate_photon_continuum(_physical_scene(), [1e3, 4e3], n_samples=1)
 
 
 def test_case_default_spectrum_run_is_not_modified():
@@ -233,3 +246,76 @@ def test_case_default_spectrum_run_is_not_modified():
     import inspect
 
     assert "photon_continuum" not in inspect.signature(runner.run_case).parameters
+
+
+@pytest.mark.parametrize("entry", ["continuum", "events"])
+def test_independent_photon_configuration_matches_legacy_case(monkeypatch, entry):
+    from dataclasses import asdict, replace
+
+    from pyrite.campaign import lowering
+    from pyrite.campaign.profiles import case_content_key
+    from pyrite.config import Numerics, Physics
+    from pyrite.observations import Observation
+    from pyrite.photon_events import simulate_photon_events
+
+    scene = _physical_scene()
+    original = asdict(scene)
+    physics = Physics(bremsstrahlung_model="eedl", radiative_model="uncoupled")
+    controls = Numerics(cxr_trials=7, brem_trials=7)
+    expected = lowering.build_case(replace(scene, physics=physics, numerics=controls))
+    lower = lowering.lower_simulation
+    captured = []
+
+    class Resolved(Exception):
+        pass
+
+    def capture(request):
+        captured.append(lower(request))
+        assert request.input_scene is scene
+        assert request.scene.physics == physics
+        assert request.numerics == controls
+        raise Resolved
+
+    monkeypatch.setattr(lowering, "lower_simulation", capture)
+    function = photon.simulate_photon_continuum if entry == "continuum" else simulate_photon_events
+    options = {"n_samples": 3} if entry == "continuum" else {"source": "characteristic"}
+    for name in ("first", "second"):
+        with pytest.raises(Resolved):
+            function(
+                scene,
+                [1000.0, 2000.0],
+                physics=physics,
+                numerics=controls,
+                observation=Observation(name=name),
+                quantum=None,
+                **options,
+            )
+    for case in captured:
+        assert case == expected
+        assert case_content_key(case, xsgen_tables={}) == case_content_key(
+            expected, xsgen_tables={}
+        )
+    assert asdict(scene) == original
+    assert scene.numerics != controls
+
+
+@pytest.mark.parametrize("entry", ["continuum", "events"])
+def test_photon_observation_readout_refused_before_lowering(monkeypatch, entry):
+    from pyrite.campaign import lowering
+    from pyrite.observations import Acquisition, Observation
+    from pyrite.photon_events import simulate_photon_events
+
+    monkeypatch.setattr(
+        lowering, "lower_simulation", lambda *a: pytest.fail("readout reached case preparation")
+    )
+    function = photon.simulate_photon_continuum if entry == "continuum" else simulate_photon_events
+    options = {"n_samples": 3} if entry == "continuum" else {"source": "characteristic"}
+    with pytest.raises(ValueError, match="requires a physical pixel detector"):
+        function(
+            _physical_scene(),
+            [1000.0, 2000.0],
+            observation=Observation(
+                acquisition=Acquisition(exposure_s=2.0, measured_edges_eV=(1000.0, 2000.0))
+            ),
+            **options,
+        )

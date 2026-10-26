@@ -1,13 +1,18 @@
 """Resolve a singleton catalog pixel scene without checkpoint or cache I/O."""
 
 from collections.abc import Mapping
-from dataclasses import replace
-from typing import Any, Literal, cast
+from dataclasses import dataclass, replace
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 import numpy as np
 
 from .._numerics import _emission_selection
 from .observation import filter_from_config, physical_detector_from_config
+
+if TYPE_CHECKING:
+    from .._numerics import Numerics, Physics
+    from ..observations.spec import Observation
+    from .model import Scene
 
 
 def _one(values, label, command_name):
@@ -190,4 +195,50 @@ def resolve_pixel_scene(
             ),
         ),
         detector_id,
+    )
+
+
+@dataclass(frozen=True)
+class ProfileSimulation:
+    """Internal named pixel-run adapter with independent physical/observation inputs.
+
+    Catalog tables and legacy tuple consumers remain unchanged; execution
+    still passes through the shared simulation resolver.
+    """
+
+    scene: "Scene"
+    physics: "Physics"
+    numerics: "Numerics"
+    observation: "Observation"
+    detector_id: str
+
+
+def compose_pixel_scene(components: tuple[Any, ...]) -> ProfileSimulation:
+    """Split a resolved singleton profile into Scene, models, and Observation.
+
+    Detector response, acquisition, and numerical scoring belong to Observation,
+    not to the physical scene. This is value-preserving for historical profiles.
+    """
+    from ..instrument import PlanarDetector
+    from ..observations import Observation
+    from .model import Scene
+
+    beam, target, detector, filters, scorer, acquisition, numerics, physics, detector_id = (
+        components
+    )
+    if not isinstance(detector, PlanarDetector):
+        raise TypeError("pixel profile composition requires a PlanarDetector")
+    physical = replace(detector, response=None, scorer=None)
+    return ProfileSimulation(
+        scene=Scene(beam, target, physical, filters=filters),
+        physics=physics,
+        numerics=numerics,
+        observation=Observation(
+            detector="detector",
+            response=detector.response,
+            acquisition=acquisition,
+            sampling=scorer,
+            name=detector_id,
+        ),
+        detector_id=detector_id,
     )

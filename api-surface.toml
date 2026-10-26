@@ -72,6 +72,7 @@ fetch_tables = { target = "pyrite.xsgen.install:fetch_tables", status = "advance
 load_numerics = { target = "pyrite._config_presets:load_numerics", status = "advanced-stable", domain = "config", root_role = "specialized" }
 load_physics = { target = "pyrite._config_presets:load_physics", status = "advanced-stable", domain = "config", root_role = "specialized" }
 photon_energies = { target = "pyrite.materials.emission:photon_energies", status = "advanced-stable", domain = "radiation", root_role = "specialized" }
+# simulate accepts independent quantum= configuration; no public request-wrapper export.
 simulate = { target = "pyrite.api:simulate", status = "stable", domain = "simulation", root_role = "core" }
 
 # Supported subpackage spellings are opt-in. Unlisted legacy package imports
@@ -95,12 +96,19 @@ build_crystal = { target = "pyrite.materials.authoring:build_crystal", status = 
 save_material = { target = "pyrite.materials.authoring:save_material", status = "advanced-stable" }
 
 [package_exports."pyrite.observations"]
+Observation = { target = "pyrite.observations.spec:Observation", status = "advanced-stable" }
 ObservationPlan = { target = "pyrite.observations.plan:ObservationPlan", status = "advanced-stable" }
 PixelSampling = { target = "pyrite.observations.plan:PixelSampling", status = "advanced-stable" }
 
 [package_exports."pyrite.units"]
 Q_ = { target = "pyrite.units:Q_", status = "advanced-stable" }
 ureg = { target = "pyrite.units:ureg", status = "advanced-stable" }
+
+[package_exports."pyrite.quantum"]
+QuantumSetup = { target = "pyrite.quantum:QuantumSetup", status = "advanced-stable" }
+QuantumRegion = { target = "pyrite.quantum:QuantumRegion", status = "advanced-stable" }
+QuantumDynamics = { target = "pyrite.quantum:QuantumDynamics", status = "advanced-stable" }
+QuantumNumerics = { target = "pyrite.quantum:QuantumNumerics", status = "advanced-stable" }
 
 [package_exports."pyrite.results"]
 Settings = { target = "pyrite.results.store:Settings", status = "advanced-stable" }

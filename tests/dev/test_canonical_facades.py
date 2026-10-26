@@ -200,11 +200,14 @@ import pyrite.observations
 from pyrite.beams import Beam
 from pyrite.config import Physics, FixedSampling
 from pyrite.detectors import Detector
+from pyrite.observations import Observation
 from pyrite import Scene, Result, Target
 assert Beam.__name__ == 'Beam'
 assert Physics.__name__ == 'Physics'
 assert Detector.__name__ == 'Detector'
 assert FixedSampling.__name__ == 'FixedSampling'
+assert Observation.__name__ == 'Observation'
+assert Observation().detector == 'detector'
 assert Scene.__name__ == 'Scene'
 assert Result.__name__ == 'Result'
 assert Target.__name__ == 'Target'

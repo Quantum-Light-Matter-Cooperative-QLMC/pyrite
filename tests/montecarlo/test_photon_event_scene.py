@@ -8,6 +8,19 @@ import pytest
 import pyrite.photon_events as events
 
 
+def _physical_scene():
+    from pyrite import Beam, Scene
+    from pyrite.beams import PointBunch, Spot
+    from pyrite.geometry import Footprint, Slab
+    from pyrite.instrument import PlanarDetector, PlanarPose
+
+    return Scene(
+        Beam(100.0, transverse=Spot(), longitudinal=PointBunch()),
+        Slab("silicon", 1000.0, footprint=Footprint(5.0, 5.0)),
+        PlanarDetector(PlanarPose.from_observation(90.0, 0.0, 100.0), size_mm=(4.0, 3.0)),
+    )
+
+
 @pytest.fixture
 def boundary(monkeypatch):
     from pyrite.campaign import lowering, profiles
@@ -31,7 +44,7 @@ def boundary(monkeypatch):
         boxes=(),
         aperture=PhotonAperture((0, 0, 100), (1, 0, 0), (0, 1, 0), 10, 10),
     )
-    state.scene = SimpleNamespace(filter_plates=())
+    state.scene = _physical_scene()
     state.numerics = SimpleNamespace(transport_core="per-electron")
     state.relaxation = SimpleNamespace(
         photons=dict(
@@ -55,7 +68,7 @@ def boundary(monkeypatch):
         )
     )
     monkeypatch.setattr(events, "_preflight_scene", lambda scene: (object(), state.numerics))
-    monkeypatch.setattr(lowering, "build_case", lambda *args: state.case)
+    monkeypatch.setattr(lowering, "lower_simulation", lambda request: state.case)
     monkeypatch.setattr(profiles, "case_content_key", lambda case, **kw: "original-case")
     monkeypatch.setattr(case_tables, "case_table_markers", lambda case: {})
     monkeypatch.setattr(

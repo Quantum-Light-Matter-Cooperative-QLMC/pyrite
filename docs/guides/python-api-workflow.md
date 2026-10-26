@@ -246,12 +246,11 @@ attenuation across a pixel grid:
 ```python
 from pyrite.config import FixedSampling
 from pyrite.detectors import FilterPlate, PlanarDetector, PlanarPose
-from pyrite.observations import PixelScorer
+from pyrite.observations import Observation, PixelScorer
 
 pose = PlanarPose.from_observation(distance_mm=400.0, polar_deg=90.0)
 pixels = PlanarDetector.timepix3_chip(
     pose,
-    scorer=PixelScorer(angular_shape=(2, 2)),
 )
 plate = FilterPlate(
     "silicon",
@@ -265,6 +264,7 @@ pixel_result = pr.simulate(
     pixels,
     filters=(plate,),
     numerics=pr.Numerics(sampling=FixedSampling(100, 50)),
+    observation=Observation(detector="detector", sampling=PixelScorer((2, 2))),
 )
 image = pixel_result.spatial.image((1_000.0, 10_000.0), component="cxr")
 ```
@@ -273,11 +273,74 @@ image = pixel_result.spatial.image((1_000.0, 10_000.0), component="cxr")
 the full pixel × energy cube. Filters use primary Beer–Lambert attenuation;
 they do not model scattered or fluorescent secondary photons. Pixel-centre
 rays and finite angular tiles limit spatial/angular accuracy. To model
-registered photon counts, configure `PlanarDetector.response` and an
-`Acquisition`, then use `result.acquire(...)` or
+registered photon counts, configure `Observation.response` and an
+`Observation.acquisition`, then use `result.acquire(...)` or
 `result.acquisition_image(...)`. See the
 [detector model](../physics/detectors/detector-response.md) and
 [Working with results](working-with-results.md) for stored observations.
+
+## Compose independent observations
+
+Keep the detector's geometry in a scene and put its readout and numerical
+scoring choices in an `Observation`:
+
+```python
+from dataclasses import replace
+
+from pyrite.detectors import IdealPhotonCounter, PixelGrid, PlanarDetector, PlanarPose
+from pyrite.observations import Acquisition, Observation, PixelScorer
+
+panel = PlanarDetector(
+    PlanarPose.from_observation(100.0, 60.0),
+    pixels=PixelGrid((16, 16), (0.055, 0.055)),
+)
+scene = pr.Scene(beam, target, panel)
+observation = Observation(
+    detector="detector",
+    response=IdealPhotonCounter(),
+    acquisition=Acquisition.native(exposure_s=1.0),
+    sampling=PixelScorer((4, 4)),
+    name="counts",
+)
+controls = pr.Numerics(sampling=FixedSampling(100, 50))
+counts = pr.simulate(scene, numerics=controls, observation=observation)
+
+longer_exposure = replace(observation, acquisition=Acquisition.native(exposure_s=2.0))
+more_counts = pr.simulate(scene, numerics=controls, observation=longer_exposure)
+```
+
+Both calls use the same unchanged scene. `detector="detector"` resolves the
+registered geometry; a planar value is also accepted when its geometry matches.
+For a virtual angular measurement, use `Observation(detector=Detector(...))`.
+Observation names do not affect digests. Response or acquisition changes retain
+compatible source and true-spatial identities, while changed angular sampling
+invalidates affected spatial factors. `simulate` performs transport on each
+call; persisted observation production can reuse compatible true-spatial factors.
+`Sweep.cases(numerics=controls, physics=models, observation=observation)` binds
+the same request to every expanded scene without executing transport. Common
+run overrides apply before sweep axes; detector references follow each point's
+physical geometry. `quantum=` uses the same inherit/override/disable rules.
+
+Legacy Scene run settings and detector response/scorer constructor arguments
+remain supported through compatibility adapters. Observation omission inherits
+those values; differing explicit settings raise before transport. Starting with
+geometry-only detector construction, as above, allows independent requests
+without those conflicts.
+
+### Named CLI pixel profiles use the same composition
+
+For a singleton pixel profile, `pyrite run PROFILE --ephemeral --material MATERIAL`
+resolves the physical beam, target, detector geometry, and ordered filters into
+a physical `Scene`. The named detector's response, acquisition, and angular
+sampling become an independent `Observation`; the profile's physics and
+numerics are supplied separately to `simulate`. The profile's detector ID
+is an observation label, not a source or observation identity field.
+
+This normalization preserves the existing TOML schema, CLI JSON and artifact
+contracts, and equivalent per-case numerical values. Batch CLI runs and the
+scan app continue to use `build_configured_cases`, which resolves the
+configured sweep through the same simulation-composition boundary while
+retaining historical sweep ordering and checkpoint identities.
 
 ## Reuse bodies as targets and filters
 

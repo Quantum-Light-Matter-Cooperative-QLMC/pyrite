@@ -12,6 +12,8 @@ from typing import TYPE_CHECKING, Any, Literal
 from ._photon_support import EVENT_MODEL
 from ._photon_support import _event_identity as _event_identity
 from ._photon_support import _event_sources as _event_sources
+from ._spec_defaults import UNSET, _Unset
+from .campaign.resolution import resolve_simulation
 from .photon_transport import (
     _energy_edges,
     _positive,
@@ -25,10 +27,13 @@ if TYPE_CHECKING:
     from os import PathLike
     from pathlib import Path
 
+    from ._numerics import Numerics, Physics
     from .campaign.model import Scene
     from .montecarlo.case import Case
     from .montecarlo.runner.photon_emission import PhotonContinuumScore
     from .montecarlo.transport.photon_event_sources import PrimaryRelaxationSources
+    from .observations.spec import Observation
+    from .quantum import QuantumSetup
 
 
 MODEL = EVENT_MODEL
@@ -100,6 +105,10 @@ def simulate_photon_events(
     electron_cutoff_eV: float = 1000.0,
     seed: int | None = None,
     charged_feedback: bool = False,
+    physics: Physics | None = None,
+    numerics: Numerics | None = None,
+    quantum: QuantumSetup | None | _Unset = UNSET,
+    observation: Observation | None = None,
 ) -> PhotonEventObservation:
     """Transport one Scene once and score one physical photon emission component.
 
@@ -125,9 +134,14 @@ def simulate_photon_events(
     retain the Scene seed. The output preserves source and observation digests
     separately; source selection, seed, cutoffs, geometry and feedback enter
     only the explicit observation identity.
+    Independent ``physics`` and ``numerics`` override legacy Scene settings.
+    Omitted ``quantum`` inherits ``Scene.quantum``; explicit ``None`` disables that setup.
+    ``observation`` binds through the shared resolver, subject to this API's
+    ideal, unpixelated aperture restrictions. The input Scene is unchanged.
+
     Validation: photon-secondary-feedback.
     """
-    from .campaign.lowering import build_case
+    from .campaign.lowering import lower_simulation
     from .campaign.profiles import case_content_key
     from .materials.photon_cross_sections import EPDL_E_MAX_EV, EPDL_E_MIN_EV
     from .montecarlo import runner
@@ -140,13 +154,17 @@ def simulate_photon_events(
         raise ValueError("charged_feedback must be a bool")
     if seed is not None and (type(seed) is not int or not 0 <= seed < 2**64):
         raise ValueError("seed must be an unsigned 64-bit integer or None")
+    request = resolve_simulation(
+        scene, physics=physics, numerics=numerics, quantum=quantum, observation=observation
+    )
+    scene = request.scene
     detector, numerics = _preflight_scene(scene)
     low = _positive("photon_cutoff_eV", photon_cutoff_eV)
     electron = _positive("electron_cutoff_eV", electron_cutoff_eV)
     if not EPDL_E_MIN_EV <= low < EPDL_E_MAX_EV:
         raise ValueError("photon cutoff must lie inside the EPDL domain")
     edges = _energy_edges(edges_eV)
-    case = build_case(scene, numerics)
+    case = lower_simulation(request)
     n = _event_case(case, source, electron)
     layers, aperture, boxes, (width, height) = _scene_geometry(case, detector, scene.filter_plates)
     effective_seed = int(case["seed"]) if seed is None else seed

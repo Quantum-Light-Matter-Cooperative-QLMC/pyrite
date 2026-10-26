@@ -1,10 +1,11 @@
 """Public scene, numerics, analysis, and path-addressed sweep objects."""
 
 import re
+import weakref
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field, replace
+from dataclasses import InitVar, dataclass, field, replace
 from itertools import product
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 import numpy as np
 
@@ -12,9 +13,11 @@ from .._numerics import CxrReflections, Numerics, Physics
 from .._numerics import EmissionMode as EmissionMode
 from .._numerics import MosaicRoute as MosaicRoute
 from .._precision import Precision
+from .._spec_defaults import UNSET, _Unset
 from ..detectors import Detector, EnergyBins
 from ..instrument import Acquisition, Filter, FilterPlate, NativeAcquisition, PlanarDetector
 from ..instrument.model import validate_downstream_scene
+from ..observations.spec import Observation
 from ..quantum import QuantumSetup
 from .beam import Beam, BunchFrontTilt
 from .geometry import Slab, Stack
@@ -26,6 +29,53 @@ BremSource = Literal["mc", "external", "none"]
 
 _SEGMENT = re.compile(r"(?P<name>[A-Za-z_]\w*)(?P<indexes>(?:\[\d+\])*)\Z")
 _INDEX = re.compile(r"\[(\d+)\]")
+_SCENE_COMPATIBILITY: dict[int, tuple[weakref.ReferenceType, tuple[Any, ...]]] = {}
+
+
+class _CompatibilityDefault:
+    def __init__(self, display: str) -> None:
+        self.display = display
+
+    def __repr__(self) -> str:
+        return self.display
+
+
+_SCENE_DEFAULT_PHYSICS = cast(Physics, _CompatibilityDefault("Physics()"))
+_SCENE_DEFAULT_NUMERICS = cast(Numerics, _CompatibilityDefault("Numerics()"))
+
+
+def _remember_scene_compatibility(scene: "Scene", values: tuple[Any, ...]) -> None:
+    identity = id(scene)
+
+    def discard(reference) -> None:
+        stored = _SCENE_COMPATIBILITY.get(identity)
+        if stored is not None and stored[0] is reference:
+            _SCENE_COMPATIBILITY.pop(identity, None)
+
+    reference = weakref.ref(scene, discard)
+    _SCENE_COMPATIBILITY[identity] = (reference, values)
+
+
+def _restore_scene(
+    beam: Beam,
+    target: LegacyTarget | Target,
+    detector: Detector | PlanarDetector | None,
+    filters: tuple[FilterPlate | Filter, ...],
+    acquisition: Acquisition | NativeAcquisition | None,
+    physics: Physics,
+    numerics: Numerics,
+    quantum: QuantumSetup | None,
+) -> "Scene":
+    return Scene(
+        beam,
+        target,
+        detector,
+        filters,
+        acquisition=acquisition,
+        physics=physics,
+        numerics=numerics,
+        quantum=quantum,
+    )
 
 
 def _one_float(name: str, value: Any) -> float:
@@ -64,6 +114,49 @@ def _scalar_target(target: LegacyTarget | Target) -> LegacyTarget | Target:
     raise TypeError("Scene.target must be a Slab or Stack or Target")
 
 
+def _scene_controls(physics, numerics, quantum):
+    if physics is _SCENE_DEFAULT_PHYSICS or physics is None:
+        physics = Physics()
+    if numerics is _SCENE_DEFAULT_NUMERICS:
+        numerics = Numerics()
+    if not isinstance(numerics, Numerics):
+        raise TypeError("Scene.numerics must be a Numerics")
+    if quantum is not None and not isinstance(quantum, QuantumSetup):
+        raise TypeError("Scene.quantum must be a QuantumSetup or None")
+    if not isinstance(physics, Physics):
+        raise TypeError("Scene.physics must be a Physics")
+    return physics, numerics
+
+
+def _scene_filters(filters):
+    try:
+        values = tuple(filters)
+    except TypeError as exc:
+        raise TypeError("Scene.filters must be an iterable of FilterPlate") from exc
+    if any(not isinstance(plate, (FilterPlate, Filter)) for plate in values):
+        raise TypeError("Scene.filters must contain only FilterPlate or Filter objects")
+    return values
+
+
+def _validate_scene_detector(detector, filters, acquisition):
+    if not isinstance(detector, (Detector, PlanarDetector, type(None))):
+        raise TypeError("Scene.detector must be a Detector or PlanarDetector")
+    if filters and not isinstance(detector, PlanarDetector):
+        raise TypeError("Scene.filters require a physical PlanarDetector")
+    if acquisition is not None:
+        if not isinstance(acquisition, (Acquisition, NativeAcquisition)):
+            raise TypeError("Scene.acquisition must be an Acquisition, native request, or None")
+        if not isinstance(detector, PlanarDetector) or detector.pixels is None:
+            raise TypeError("Scene.acquisition requires a physical pixel detector")
+        if detector.response is None:
+            raise ValueError("Scene.acquisition requires an explicit detector response")
+    if isinstance(detector, PlanarDetector):
+        validate_downstream_scene(
+            tuple(plate.to_plate() if isinstance(plate, Filter) else plate for plate in filters),
+            detector,
+        )
+
+
 @dataclass(frozen=True)
 class Analysis:
     """Control presentation-time scaling of stored spectra.
@@ -85,7 +178,7 @@ class Analysis:
 
 @dataclass(frozen=True)
 class Scene:
-    """Collect one fully resolved physical simulation configuration.
+    """Describe physical inputs for one simulation.
 
     Parameters
     ----------
@@ -100,11 +193,11 @@ class Scene:
     filters
         Ordered :class:`~pyrite.Filter` or :class:`~pyrite.FilterPlate` instances
         between the source and a planar detector.
-    physics
-        Emission and particle-interaction models. Defaults to :class:`Physics`.
-    numerics
-        Sampling, true-energy grids, and execution controls. Used by sweeps
-        unless their ``cases(numerics=...)`` call supplies an override.
+    physics, numerics, quantum, acquisition
+        Legacy composition inputs accepted for compatibility. They are not
+        stored on the physical Scene and are excluded from dataclass fields
+        and serialization. Pass them to :func:`pyrite.simulate` or an
+        :class:`Observation`.
 
     Raises
     ------
@@ -118,52 +211,60 @@ class Scene:
     target: LegacyTarget | Target
     detector: Detector | PlanarDetector | None = field(default_factory=Detector)
     filters: tuple[FilterPlate | Filter, ...] = ()
-    acquisition: Acquisition | NativeAcquisition | None = None
-    physics: Physics = field(default_factory=Physics, kw_only=True)
-    numerics: Numerics = field(default_factory=Numerics, kw_only=True)
-    quantum: QuantumSetup | None = field(default=None, kw_only=True)
+    acquisition: InitVar[Acquisition | NativeAcquisition | None] = None
+    physics: InitVar[Physics] = field(default=_SCENE_DEFAULT_PHYSICS, kw_only=True)
+    numerics: InitVar[Numerics] = field(default=_SCENE_DEFAULT_NUMERICS, kw_only=True)
+    quantum: InitVar[QuantumSetup | None] = field(default=None, kw_only=True)
 
-    def __post_init__(self) -> None:
-        if not isinstance(self.numerics, Numerics):
-            raise TypeError("Scene.numerics must be a Numerics")
-        if self.quantum is not None and not isinstance(self.quantum, QuantumSetup):
-            raise TypeError("Scene.quantum must be a QuantumSetup or None")
-        if self.physics is not None and not isinstance(self.physics, Physics):
-            raise TypeError("Scene.physics must be a Physics")
-        physics = Physics() if self.physics is None else self.physics
-        object.__setattr__(self, "physics", physics)
+    def __post_init__(
+        self,
+        acquisition: Acquisition | NativeAcquisition | None,
+        physics: Physics,
+        numerics: Numerics,
+        quantum: QuantumSetup | None,
+    ) -> None:
+        physics, numerics = _scene_controls(physics, numerics, quantum)
         if isinstance(self.beam, BeamSpec):
             object.__setattr__(self, "beam", Beam.from_spec(self.beam))
         if not isinstance(self.beam, Beam):
             raise TypeError("Scene.beam must be a Beam")
-        if not isinstance(self.detector, (Detector, PlanarDetector, type(None))):
-            raise TypeError("Scene.detector must be a Detector or PlanarDetector")
-        try:
-            filters = tuple(self.filters)
-        except TypeError as exc:
-            raise TypeError("Scene.filters must be an iterable of FilterPlate") from exc
-        if any(not isinstance(plate, (FilterPlate, Filter)) for plate in filters):
-            raise TypeError("Scene.filters must contain only FilterPlate or Filter objects")
+        filters = _scene_filters(self.filters)
         object.__setattr__(self, "filters", filters)
-        if self.acquisition is not None and not isinstance(
-            self.acquisition, (Acquisition, NativeAcquisition)
-        ):
-            raise TypeError("Scene.acquisition must be an Acquisition, native request, or None")
-        if filters and not isinstance(self.detector, PlanarDetector):
-            raise TypeError("Scene.filters require a physical PlanarDetector")
-        if self.acquisition is not None:
-            if not isinstance(self.detector, PlanarDetector) or self.detector.pixels is None:
-                raise TypeError("Scene.acquisition requires a physical pixel detector")
-            if self.detector.response is None:
-                raise ValueError("Scene.acquisition requires an explicit detector response")
-        if isinstance(self.detector, PlanarDetector):
-            validate_downstream_scene(self.filter_plates, self.detector)
+        _validate_scene_detector(self.detector, filters, acquisition)
         object.__setattr__(
             self,
             "beam",
             replace(self.beam, energy_keV=_one_float("beam.energy_keV", self.beam.energy_keV)),
         )
         object.__setattr__(self, "target", _scalar_target(self.target))
+        _remember_scene_compatibility(self, (acquisition, physics, numerics, quantum))
+
+    def __getattr__(self, name: str) -> Any:
+        """Expose constructor-era run settings without storing them on Scene."""
+        names = ("acquisition", "physics", "numerics", "quantum")
+        if name not in names:
+            raise AttributeError(name)
+        stored = _SCENE_COMPATIBILITY.get(id(self))
+        if stored is None or stored[0]() is not self:
+            defaults = (None, Physics(), Numerics(), None)
+            return defaults[names.index(name)]
+        return stored[1][names.index(name)]
+
+    def __reduce__(self):
+        """Retain legacy composition values in serialized compatibility scenes."""
+        return (
+            _restore_scene,
+            (
+                self.beam,
+                self.target,
+                self.detector,
+                self.filters,
+                self.acquisition,
+                self.physics,
+                self.numerics,
+                self.quantum,
+            ),
+        )
 
     @property
     def target_spec(self) -> LegacyTarget:
@@ -208,6 +309,13 @@ class Scene:
         from .front_matching import phase_matched_front_for_scene
 
         return phase_matched_front_for_scene(self, hkl, photon_energy_eV, observation_direction_lab)
+
+
+# InitVar defaults are captured by the generated constructor. Remove the
+# class-level defaults so compatibility reads come from the per-instance
+# sidecar instead of appearing as ordinary class attributes.
+for _compatibility_name in ("acquisition", "physics", "numerics", "quantum"):
+    delattr(Scene, _compatibility_name)
 
 
 def _parts(path: str) -> tuple[tuple[str, tuple[int, ...]], ...]:
@@ -364,13 +472,28 @@ class Sweep:
             )
         return tuple(expanded)
 
-    def cases(self, numerics: Numerics | None = None) -> list[Any]:
+    def cases(
+        self,
+        numerics: Numerics | None = None,
+        *,
+        physics: Physics | None = None,
+        quantum: QuantumSetup | None | _Unset = UNSET,
+        observation: Observation | None = None,
+    ) -> list[Any]:
         """Lower every expanded scene without executing or persisting it.
 
         Parameters
         ----------
         numerics
             Sampling and execution controls; overrides the base scene before axes apply.
+        physics
+            Independent model selection; overrides the base before axes apply.
+        quantum
+            Independent quantum setup. Omit to inherit the base setting;
+            explicit ``None`` disables it before axes apply.
+        observation
+            Observation request bound separately to every expanded scene.
+            Use a detector reference when sweeping physical detector geometry.
 
         Returns
         -------
@@ -379,7 +502,9 @@ class Sweep:
         """
         from .lowering import build_sweep_cases
 
-        return build_sweep_cases(self, numerics)
+        return build_sweep_cases(
+            self, numerics, physics=physics, quantum=quantum, observation=observation
+        )
 
 
 __all__ = [

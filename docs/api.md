@@ -22,7 +22,7 @@ from pyrite.beams import Beam, TransverseSpot, BunchLength
 from pyrite.geometry import Target, Slab, CrystalCut, RectangularBody
 from pyrite.config import Physics, Numerics, FixedSampling, load_physics
 from pyrite.detectors import Detector, PlanarDetector, PixelGrid, PlanarPose
-from pyrite.observations import Acquisition, PixelSampling, ObservationPlan
+from pyrite.observations import Acquisition, Observation, PixelSampling, ObservationPlan
 ```
 
 The **detector** namespace owns scalar and physical/pixel detector models,
@@ -204,8 +204,18 @@ are kinematic energies, with no prediction of intensity or broadening. See
 
 Build a beam, target and detector, then call {py:func}`pyrite.simulate` with
 those three components, or pass a complete `Scene` as `simulate(scene)`.
-Scene calls use its physics and numerics unless explicitly overridden with
-`physics=` or `numerics=`; omit component arguments in that form. Target tilt
+The canonical `Scene` dataclass fields are the physical `beam`, `target`,
+`detector` geometry and ordered `filters`. Legacy constructor inputs for
+`physics`, `numerics`, `quantum` and `acquisition` remain accepted through a
+compatibility adapter, but are excluded from the physical dataclass value and
+its `asdict()` representation. Prefer passing `physics=` and `numerics=` to
+`simulate()` and acquisition through `Observation`. Pass an independent
+{py:class}`pyrite.quantum.QuantumSetup` with `quantum=`; omission inherits a
+legacy Scene setup and explicit `quantum=None` disables it.
+`pyrite.api.build_case` uses the same precedence and validation rules, and
+unsupported or contradictory quantum settings fail before case preparation or
+transport. Effective quantum solver controls are recorded in result numerics.
+Target tilt
 and azimuth retain full floating-point precision in scenes and profile sweeps.
 `Physics` selects models and `Numerics` controls sampling and integration.
 Beam transverse and
@@ -215,6 +225,21 @@ named catalog presets (for example the bundled `electron-standard` and
 `default`, or ones made with `pyrite physics|numerics preset create`) as
 frozen `Physics` and `Numerics`; adjust them with `dataclasses.replace`
 instead of restating every setting.
+
+Pass {py:class}`pyrite.observations.Observation` with `observation=` to select
+response, acquisition and pixel sampling independently of the scene. Its
+`detector="detector"` reference selects `Scene.detector`; a supplied planar
+value must match that physical geometry. A scalar `Detector` value requests a
+virtual angular observation, including on a detector-free source scene.
+`sampling=` currently uses the supported `pyrite.observations.PixelScorer`.
+Omitted observation fields inherit legacy embedded settings. Differing explicit
+settings raise; start from a detector without embedded response/scorer and a
+scene without acquisition to reuse one physical definition across observations.
+Names are labels and do not change scientific identity. For the new call form,
+`result.provenance["input_scene"]` retains the original scene, while
+`result.scene` remains the resolved compatibility view used by read-time methods.
+The [observation example](guides/python-api-workflow.md#compose-independent-observations)
+shows how to reuse the same geometry.
 
 `simulate` returns an in-memory `Result` without reading or writing checkpoints.
 Radiation families remain separate: `cxr.incoherent`, optional `cxr.coherent`,
@@ -244,6 +269,10 @@ boundary also scores explicit characteristic/annihilation source batches using
 the original incident-electron denominator.
 [`pyrite.photon_events.simulate_photon_events`](research/physics/photon-secondary-feedback.md#scene-physical-event-source-boundary)
 selects one physical event component from a Scene with retained charged cascades.
+Both photon Scene entry points accept independent `physics=`, `numerics=`,
+`quantum=` and `observation=` through the shared simulation resolver. Omitted
+quantum inherits legacy Scene settings; `quantum=None` disables that setup.
+Their ideal, unpixelated aperture restrictions still apply to observations.
 Both remain outside the supported API contract. Physical event observations
 have a separate [reduced event tally artifact](research/physics/photon-secondary-feedback.md#reduced-event-observation-persistence),
 loaded with `pyrite.photon_event_observation.load_photon_events(path)`.
@@ -285,6 +314,7 @@ catalog/CLI selectors and full-track external validation remain open.
    pyrite.detectors.PixelGrid
    pyrite.detectors.FilterPlate
    pyrite.observations.Acquisition
+   pyrite.observations.Observation
    pyrite.observations.NativeAcquisition
    pyrite.observations.AcquisitionBatch
    pyrite.detectors.IdealPhotonCounter
@@ -303,6 +333,10 @@ catalog/CLI selectors and full-track external validation remain open.
    pyrite.config.CxrReflections
    pyrite.Numerics
    pyrite.config.Precision
+   pyrite.quantum.QuantumSetup
+   pyrite.quantum.QuantumRegion
+   pyrite.quantum.QuantumDynamics
+   pyrite.quantum.QuantumNumerics
    pyrite.Analysis
    pyrite.Result
    pyrite.Provenance

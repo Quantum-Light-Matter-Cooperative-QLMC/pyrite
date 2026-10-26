@@ -1,5 +1,6 @@
 """Detector validation, binning, scoring, and compatibility contracts."""
 
+import pickle
 from dataclasses import FrozenInstanceError, asdict
 
 import numpy as np
@@ -15,7 +16,7 @@ from pyrite.detectors import (
 )
 
 
-def test_detector_is_frozen_and_owns_acceptance_and_response():
+def test_detector_keeps_response_compatible_without_serializing_it_as_geometry():
     from pyrite.detectors import AngularAcceptance
 
     detector = Detector(
@@ -25,7 +26,10 @@ def test_detector_is_frozen_and_owns_acceptance_and_response():
     )
     payload = asdict(detector)
     assert payload["observation_angle_deg"] == 119.0
-    assert payload["response"]["thickness_um"] == 500.0
+    assert "response" not in payload
+    assert detector.response.thickness_um == 500.0
+    restored = pickle.loads(pickle.dumps(detector))
+    assert restored.response == detector.response
     assert "energy_bins" not in payload
     with pytest.raises(FrozenInstanceError):
         detector.solid_angle_sr = 1.0

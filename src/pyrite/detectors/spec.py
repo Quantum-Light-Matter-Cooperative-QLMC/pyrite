@@ -2,7 +2,8 @@
 
 import math
 import warnings
-from dataclasses import dataclass, field
+import weakref
+from dataclasses import InitVar, dataclass, field
 from numbers import Real
 from typing import Protocol
 
@@ -11,6 +12,29 @@ import numpy as np
 from .._energy_bins import EnergyBins as EnergyBins
 from .._units import normalize_unit
 from .acceptance import AngularAcceptance, SensorAcceptance
+
+_DETECTOR_RESPONSES: dict[int, tuple[weakref.ReferenceType, object | None]] = {}
+
+
+def _remember_response(detector, response) -> None:
+    identity = id(detector)
+
+    def discard(reference) -> None:
+        stored = _DETECTOR_RESPONSES.get(identity)
+        if stored is not None and stored[0] is reference:
+            _DETECTOR_RESPONSES.pop(identity, None)
+
+    reference = weakref.ref(detector, discard)
+    _DETECTOR_RESPONSES[identity] = (reference, response)
+
+
+def _restore_detector(observation_angle_deg, acceptance, response, legacy_acceptance):
+    return Detector(
+        observation_angle_deg,
+        acceptance=acceptance,
+        response=response,
+        _legacy_acceptance=legacy_acceptance,
+    )
 
 
 def _number(name: str, value: object, *, minimum: float, maximum: float | None = None) -> float:
@@ -269,7 +293,7 @@ class Detector:
     _legacy_acceptance: tuple[float | None, float | None] = field(
         default=(None, None), repr=False, compare=False, kw_only=True
     )
-    response: DetectorResponse | None = None
+    response: InitVar[DetectorResponse | None] = None
 
     def __init__(
         self,
@@ -292,8 +316,8 @@ class Detector:
         object.__setattr__(
             self, "_legacy_acceptance", _legacy_acceptance if acceptance is None else (None, None)
         )
-        object.__setattr__(self, "response", response)
-        self.__post_init__()
+        _remember_response(self, response)
+        self.__post_init__(response)
 
     def _resolve_acceptance(self, acceptance: AngularAcceptance | SensorAcceptance) -> None:
         polar, azimuthal, omega = (
@@ -305,7 +329,7 @@ class Detector:
         object.__setattr__(self, "azimuthal_acceptance_deg", azimuthal)
         object.__setattr__(self, "solid_angle_sr", omega)
 
-    def __post_init__(self) -> None:
+    def __post_init__(self, response: DetectorResponse | None) -> None:
         observation_angle = normalize_unit(
             self.observation_angle_deg,
             "degree",
@@ -347,7 +371,7 @@ class Detector:
         object.__setattr__(self, "solid_angle_sr", solid_angle)
         if self.acceptance is not None:
             self._resolve_acceptance(self.acceptance)
-        if self.response is not None and not hasattr(self.response, "score"):
+        if response is not None and not hasattr(response, "score"):
             raise TypeError("response must implement score()")
 
     def score(
@@ -408,6 +432,26 @@ class Detector:
         if not isinstance(result, NativeSpectrum):
             raise TypeError("response native_score() must return NativeSpectrum")
         return result
+
+    def __getattr__(self, name: str):
+        if name != "response":
+            raise AttributeError(name)
+        stored = _DETECTOR_RESPONSES.get(id(self))
+        return None if stored is None or stored[0]() is not self else stored[1]
+
+    def __reduce__(self):
+        return (
+            _restore_detector,
+            (
+                self.observation_angle_deg,
+                self.acceptance,
+                self.response,
+                self._legacy_acceptance,
+            ),
+        )
+
+
+delattr(Detector, "response")
 
 
 class DetectorSpec(Detector):
