@@ -1,10 +1,51 @@
 import json
+import subprocess
+import sys
+import textwrap
 from dataclasses import replace
 
 import numpy as np
 
 from pyrite.observations import ObservationStore, observation_from_result, observation_inventory
 from tests.observations.test_store import _acquisition, _simulate, fake_directional  # noqa: F401
+
+
+def test_inventory_imports_in_spawn_worker_without_checkpoint_driver(tmp_path) -> None:
+    script = tmp_path / "inventory_worker.py"
+    script.write_text(
+        textwrap.dedent(
+            """
+            import multiprocessing
+            import os
+            import sys
+
+            def worker():
+                import pyrite.observations as observations
+                assert "pyrite.observations.inventory" not in sys.modules
+                inventory = observations.observation_inventory
+                assert inventory is observations.observation_inventory
+                assert inventory("unwritten").entries == ()
+                assert not any(
+                    name == "pyrite.checkpoints" or name.startswith("pyrite.checkpoints.")
+                    for name in sys.modules
+                )
+
+            if __name__ == "__main__":
+                os.environ["PYRITE_HOME"] = sys.argv[1]
+                process = multiprocessing.get_context("spawn").Process(target=worker)
+                process.start()
+                process.join(30)
+                if process.is_alive():
+                    process.terminate()
+                    process.join()
+                assert process.exitcode == 0, process.exitcode
+            """
+        )
+    )
+    result = subprocess.run(
+        [sys.executable, str(script), str(tmp_path)], capture_output=True, text=True, timeout=40
+    )
+    assert result.returncode == 0, result.stderr
 
 
 def _checkpoint(root, stem, cases) -> None:

@@ -621,6 +621,21 @@ def test_repo_map_write_and_check_delegate_to_importable_generator(dev_module, m
     assert calls == [(dev_module.ROOT, False), (dev_module.ROOT, True)]
 
 
+def test_repo_map_json_is_machine_readable(dev_module, monkeypatch, capsys) -> None:
+    import json
+
+    from pyrite.devtools import repo_map
+
+    report = {"schema": "pyrite.package-dependencies.v1", "summary": {"package_count": 2}}
+    monkeypatch.setattr(repo_map, "dependency_report", lambda _: report)
+    args = dev_module.build_parser().parse_args(["repo-map", "--json"])
+    args.func(args)
+
+    assert json.loads(capsys.readouterr().out) == report
+    with pytest.raises(SystemExit):
+        dev_module.build_parser().parse_args(["repo-map", "--json", "--check"])
+
+
 def test_repo_map_check_reports_stale_document(dev_module, monkeypatch, capsys) -> None:
     from pyrite.devtools import repo_map
 

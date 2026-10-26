@@ -27,11 +27,23 @@ copy of the baseline from the parent commit and compare to the new branch;
 edges to every module in a package. `pyrite-dev verify` also runs the configured
 import-linter checks.
 
-Baseline on main at `8816d484` (v0.21.0): the largest static SCC contained
+The checked-in [machine-readable baseline](import-architecture-baseline.json)
+records main at `a61e37b5`, including exact edges and all configured import-linter
+contracts, ignored imports and indirect-import exceptions. It is reconstructed
+from this slice's graph by restoring its sole removed cross-package edge;
+the source diff identifies that edge explicitly. The largest static SCC contained
 11 packages: `campaign`, `checkpoints`, `energy_grid`, `execution`,
 `montecarlo`, `observations`, `perf`, `remote`, `results`, `runs`, `validation`.
-The generated condensation graph had 17 component nodes. These are static
+The generated condensation graph had 18 component nodes. These are static
 counts from the checked-in map, not an assertion about the runtime call graph.
+
+| Metric | Baseline | Initial slice |
+| --- | ---: | ---: |
+| Cross-package module edges | 850 | 849 |
+| Package edges | 124 | 123 |
+| Components | 18 | 18 |
+| Cyclic components | 1 | 1 |
+| Largest component | 11 | 11 |
 
 ## Dependency direction
 
@@ -71,6 +83,11 @@ remain; otherwise this targeted contract would fail for unrelated existing
 paths. The focused `repo_map` and inventory tests guard both source dependency
 and path equivalence. No stored format, case identity, worker import, or
 numerical operation changes in this slice.
+
+A fresh spawned-process test imports the observation facade, resolves its lazy
+inventory export and calls the default-path inventory without loading any
+checkpoint module. This covers the deferred import as well as worker startup;
+it does not claim that all other dynamic import paths are acyclic.
 
 The *cycle edge* disappears even if the broad 11-package SCC remains: other
 paths may still connect these three packages. Compare `module_edges` and
