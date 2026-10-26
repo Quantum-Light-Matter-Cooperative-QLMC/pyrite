@@ -151,7 +151,10 @@ def _validate_scene_detector(detector, filters, acquisition):
         if detector.response is None:
             raise ValueError("Scene.acquisition requires an explicit detector response")
     if isinstance(detector, PlanarDetector):
-        validate_downstream_scene(filters, detector)
+        validate_downstream_scene(
+            tuple(plate.to_plate() if isinstance(plate, Filter) else plate for plate in filters),
+            detector,
+        )
 
 
 @dataclass(frozen=True)

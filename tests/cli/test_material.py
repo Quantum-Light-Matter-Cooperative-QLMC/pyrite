@@ -181,9 +181,14 @@ def test_simulation_scene_resolves_real_profile_objects(tmp_path, monkeypatch):
     from pyrite.instrument import FilterPlate, PlanarDetector
 
     document = _single_scene_catalog(tmp_path, monkeypatch)
-    beam, target, detector, filters, scorer, acquisition, numerics, physics, detector_id = (
-        _simulation.resolve_scene(document, "hopg", "single")
+    configured = _simulation.resolve_scene(document, "hopg", "single")
+    beam, target, detector, filters = (
+        configured.scene.beam,
+        configured.scene.target,
+        configured.scene.detector,
+        configured.scene.filters,
     )
+    numerics, physics = configured.numerics, configured.physics
 
     assert isinstance(beam, Beam)
     assert beam.energy_keV == 30.0
@@ -198,9 +203,10 @@ def test_simulation_scene_resolves_real_profile_objects(tmp_path, monkeypatch):
     assert physics.straggling is True
     assert numerics.energy_model == "midpoint"
     assert physics.emission == ("incoherent",)
-    assert detector_id == "physical"
-    assert scorer.angular_shape == (1, 1)
-    assert acquisition is None
+    assert configured.detector_id == "physical"
+    assert configured.observation.sampling.angular_shape == (1, 1)
+    assert configured.observation.acquisition is None
+    assert detector.response is None
 
 
 def test_simulation_scene_uses_the_profile_counting_observation(tmp_path, monkeypatch):
@@ -218,15 +224,16 @@ exposure_s = 2.0
 measured_edges_eV = [0.0, 100.0, 200.0]
 """,
     )
-    _beam, _target, detector, _filters, scorer, acquisition, _numerics, _emission, _id = (
-        _simulation.resolve_scene(document, "hopg", "single")
-    )
+    configured = _simulation.resolve_scene(document, "hopg", "single")
+    observation = configured.observation
+    acquisition = observation.acquisition
 
-    assert scorer.angular_shape == (2, 3)
+    assert observation.sampling.angular_shape == (2, 3)
     assert acquisition.exposure_s == 2.0
     assert acquisition.measured_edges_eV == (0.0, 100.0, 200.0)
-    assert isinstance(detector.response, IdealPhotonCounter)
-    assert _numerics.energy_bins.cxr is not None
+    assert isinstance(observation.response, IdealPhotonCounter)
+    assert configured.scene.detector.response is None
+    assert configured.numerics.energy_bins.cxr is not None
 
 
 def test_simulation_scene_rejects_non_singleton_profile_grid(tmp_path, monkeypatch):
@@ -299,7 +306,9 @@ def _spatial_result(acquisition=None):
         ),
         provenance={
             "observation_identity_digest": "abc",
-            "scene": SimpleNamespace(acquisition=acquisition),
+            "scene": SimpleNamespace(
+                acquisition=acquisition, physics=SimpleNamespace(emission_policy="incoherent")
+            ),
         },
         acquisition_image=lambda: np.ones((2, 3)),
     )
@@ -329,7 +338,7 @@ measured_edges_eV = [0.0, 100.0, 200.0]
     def simulate(*args, **kwargs):
         calls.append((args, kwargs))
         print("transport diagnostic")
-        return _spatial_result(kwargs["acquisition"])
+        return _spatial_result(kwargs["observation"].acquisition)
 
     def forbidden(*args, **kwargs):
         pytest.fail("ephemeral simulation entered checkpoint sweep machinery")
@@ -354,7 +363,9 @@ measured_edges_eV = [0.0, 100.0, 200.0]
     assert ephemeral.stderr == "transport diagnostic\n"
     assert set(tmp_path.iterdir()) == before
     assert len(calls) == 1
-    assert calls[0][1]["filters"][0].name == "half"
+    assert len(calls[0][0]) == 1
+    assert calls[0][0][0].filters[0].name == "half"
+    assert calls[0][1]["observation"].detector == "detector"
     if output_format == "json":
         envelope = json.loads(ephemeral.stdout)
         assert envelope["schema"] == "cxr.material.simulate"
@@ -579,7 +590,6 @@ def test_single_scene_and_checkpoint_lowering_share_seed_counts_and_explicit_gri
 
     from pyrite import api
     from pyrite.campaign import config
-    from pyrite.campaign.model import Scene
     from pyrite.materials import load_material_catalog
 
     document = _single_scene_catalog(tmp_path, monkeypatch)
@@ -591,12 +601,14 @@ def test_single_scene_and_checkpoint_lowering_share_seed_counts_and_explicit_gri
     )
     catalog = load_material_catalog(path, profile="single")
     monkeypatch.setattr(config, "_catalog", lambda *_: catalog)
-    beam, target, detector, filters, scorer, acquisition, numerics, physics, _id = (
-        _simulation.resolve_scene(document, "hopg", "single")
+    configured = _simulation.resolve_scene(document, "hopg", "single")
+    numerics, physics = configured.numerics, configured.physics
+    single = api.build_case(
+        configured.scene,
+        numerics=numerics,
+        physics=physics,
+        observation=configured.observation,
     )
-    assert detector.scorer == scorer
-    scene = Scene(beam, target, detector, filters=filters, physics=physics)
-    single = api.build_case(scene, numerics)
     settings = replace(
         config.default_settings(),
         straggling=physics.straggling,
@@ -679,7 +691,7 @@ def test_single_scene_named_gdf_clears_default_spot(tmp_path, monkeypatch):
     }
     document["profiles"]["single"]["beam"] = "gpt_import"
     _catalog_io.atomic_write(_catalog_io.active_catalog_path(), tomlkit.dumps(document))
-    beam, *_ = _simulation.resolve_scene(document, "hopg", "single")
+    beam = _simulation.resolve_scene(document, "hopg", "single").scene.beam
     assert beam.gdf is not None and beam.gdf.normalization == "gdf_charge"
     assert isinstance(beam.transverse, PointSpot)
     assert beam.rep_rate_hz == 3000

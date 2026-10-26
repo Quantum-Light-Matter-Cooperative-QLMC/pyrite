@@ -70,6 +70,8 @@ CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
     "checks/positron_table_inventory.py": (),
     # Dispatch/runtime evidence (#485), not a transport-physics anchor.
     "checks/physics_adapter_overhead.py": (),
+    # Unit-boundary conversion timing, without a physics-validation claim.
+    "checks/unit_conversion_overhead.py": (),
     # Distributed orchestration evidence (#681), not a physics-validation claim.
     "checks/dask_execution_smoke.py": (),
     # Checkpoint storage performance (#612), without a physics-validation claim.

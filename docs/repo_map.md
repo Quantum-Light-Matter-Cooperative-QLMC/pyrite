@@ -43,9 +43,11 @@ Edges (importer -> imported):
   p0 -> p6
   p1 -> p11
   p1 -> p13
+  p1 -> p2
   p1 -> p3
   p1 -> p6
   p1 -> p7
+  p1 -> p9
   p10 -> p11
   p10 -> p7
   p12 -> p3

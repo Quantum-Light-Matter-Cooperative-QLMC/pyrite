@@ -16,7 +16,7 @@ from pyrite.console.output import CLIError, emit_json_result, emit_result
 def resolve_scene(
     document, material, profile_name, detector_id=None, *, command_name="run --ephemeral"
 ):
-    from pyrite.campaign.single_scene import resolve_pixel_scene
+    from pyrite.campaign.single_scene import compose_pixel_scene, resolve_pixel_scene
     from pyrite.materials import load_material_catalog
 
     _catalog_io.existing_profile(document, profile_name)
@@ -28,8 +28,8 @@ def resolve_scene(
             message += f". Did you mean: {', '.join(suggestions)}?"
         raise ValueError(message)
     catalog = load_material_catalog(_catalog_io.active_catalog_path(), profile=profile_name)
-    return resolve_pixel_scene(
-        catalog, material, profile_name, detector_id, command_name=command_name
+    return compose_pixel_scene(
+        resolve_pixel_scene(catalog, material, profile_name, detector_id, command_name=command_name)
     )
 
 
@@ -45,7 +45,7 @@ def _selected_cxr_density(result):
     scene = result.provenance.get("scene")
     component = (
         result.cxr.coherent
-        if getattr(scene, "emission", None) == "coherent"
+        if scene is not None and scene.physics.emission_policy == "coherent"
         else result.cxr.incoherent
     )
     if component is None:
@@ -135,9 +135,13 @@ def execute_simulation(
         _text, document = _catalog_io.catalog_text()
         if resolver is None:
             resolver = resolve_scene
-        beam, target, detector, filters, _scorer, acquisition, numerics, physics, selected_id = (
-            resolver(document, material, profile_name, detector_id)
-        )
+        from pyrite.campaign.single_scene import ProfileSimulation, compose_pixel_scene
+
+        configured = resolver(document, material, profile_name, detector_id)
+        if not isinstance(configured, ProfileSimulation):
+            # Preserve external injected resolvers returning the older tuple.
+            configured = compose_pixel_scene(configured)
+        selected_id = configured.detector_id
     except (OSError, ValueError, RuntimeError, ParseError) as exc:
         if usage_errors and isinstance(exc, ValueError):
             simulation_usage_error(str(exc), output_format)
@@ -151,13 +155,10 @@ def execute_simulation(
 
         with redirect_stdout(sys.stderr):
             result = simulate(
-                beam,
-                target,
-                detector,
-                numerics=numerics,
-                physics=physics,
-                filters=filters,
-                acquisition=acquisition,
+                configured.scene,
+                numerics=configured.numerics,
+                physics=configured.physics,
+                observation=configured.observation,
             )
         if output_file is not None:
             _write_simulation_artifact(output_file, result)

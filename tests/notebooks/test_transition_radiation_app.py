@@ -12,6 +12,7 @@ from pyrite.apps.transition_radiation import (
     DemoConfig,
     comparison_figure,
     photon_grid,
+    reference_physics,
     reference_scene,
     straight_track_demo,
     transport_figure,
@@ -25,6 +26,7 @@ def test_reference_profiles_match_notebook_scene(profile, mode):
     from pyrite.api import build_case, build_configured_cases
     from pyrite.campaign.config import default_settings, material_sweep
     from pyrite.campaign.profiles import profile_run_settings
+    from pyrite.detectors import EnergyBins
     from pyrite.materials import CATALOG
 
     settings = profile_run_settings(default_settings(), profile, "full", CATALOG)
@@ -37,8 +39,9 @@ def test_reference_profiles_match_notebook_scene(profile, mode):
         pr.Numerics(
             cxr_trials=32,
             brem_trials=64,
-            energy_bins=pr.EnergyBins(cxr=photon_grid(), brem=np.arange(200.0, 30000.0, 100.0)),
+            energy_bins=EnergyBins(cxr=photon_grid(), brem=np.arange(200.0, 30000.0, 100.0)),
         ),
+        physics=reference_physics(mode),
     ).to_dict()
     for key in (
         "crystal",
@@ -197,3 +200,12 @@ def test_live_app_runs_production_and_preserves_signed_components():
         fig.axes[1].lines[0].get_ydata(), results["bunch"].transition.density
     )
     plt.close("all")
+
+
+def test_reference_scene_is_independent_of_transition_model():
+    scene = reference_scene(DemoConfig(), "history")
+    assert scene == reference_scene(DemoConfig(), "bunch")
+    assert set(scene.__dict__) == {"beam", "target", "detector", "filters"}
+    assert scene.physics.transition_radiation == "off"
+    assert reference_physics("history").transition_radiation == "history"
+    assert reference_physics("bunch").transition_radiation == "bunch"

@@ -327,6 +327,21 @@ those values; differing explicit settings raise before transport. Starting with
 geometry-only detector construction, as above, allows independent requests
 without those conflicts.
 
+### Named CLI pixel profiles use the same composition
+
+For a singleton pixel profile, `pyrite run PROFILE --ephemeral --material MATERIAL`
+resolves the physical beam, target, detector geometry, and ordered filters into
+a physical `Scene`. The named detector's response, acquisition, and angular
+sampling become an independent `Observation`; the profile's physics and
+numerics are supplied separately to `simulate`. The profile's detector ID
+is an observation label, not a source or observation identity field.
+
+This normalization preserves the existing TOML schema, CLI JSON and artifact
+contracts, and equivalent per-case numerical values. Batch CLI runs and the
+scan app continue to use `build_configured_cases`, which resolves the
+configured sweep through the same simulation-composition boundary while
+retaining historical sweep ordering and checkpoint identities.
+
 ## Reuse bodies as targets and filters
 
 `RectangularBody` defines reusable material and dimensions in **mm**;
