@@ -26,6 +26,9 @@ if TYPE_CHECKING:
         ExecutionConfig as ExecutionConfig,
     )
     from pyrite._numerics_groups import (
+        KernelTuning as KernelTuning,
+    )
+    from pyrite._numerics_groups import (
         RadiationNumerics as RadiationNumerics,
     )
     from pyrite._numerics_groups import (
@@ -54,6 +57,7 @@ _EXPORTS = {
     "AdaptiveSampling": ("pyrite._sampling", "AdaptiveSampling"),
     "CxrReflections": ("pyrite._numerics", "CxrReflections"),
     "ExecutionConfig": ("pyrite._numerics_groups", "ExecutionConfig"),
+    "KernelTuning": ("pyrite._numerics_groups", "KernelTuning"),
     "FixedSampling": ("pyrite._sampling", "FixedSampling"),
     "Numerics": ("pyrite.campaign.model", "Numerics"),
     "PhotonTransport": ("pyrite._photon_config", "PhotonTransport"),
@@ -72,6 +76,7 @@ __all__ = [
     "AngularSampling",
     "CxrReflections",
     "ExecutionConfig",
+    "KernelTuning",
     "FixedSampling",
     "Numerics",
     "PhotonTransport",

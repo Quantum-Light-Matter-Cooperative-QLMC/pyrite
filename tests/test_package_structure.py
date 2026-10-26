@@ -42,6 +42,7 @@ def test_root_exports_stay_frozen() -> None:
         "TransportNumerics",
         "RadiationNumerics",
         "ExecutionConfig",
+        "KernelTuning",
         "QuantumRegion",
         "QuantumDynamics",
         "QuantumNumerics",

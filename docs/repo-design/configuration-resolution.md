@@ -187,3 +187,77 @@ pyrite material show hopg --profile standard
 ```
 
 Use [Configuration cookbook](../guides/configuration-cookbook.md) for common edits and the generated [CLI reference](cli/cli-reference.md) for exact option contracts.
+
+## Physics, numerics, and kernel tuning (#702)
+
+The canonical Python import home is `pyrite.config`. It is a lazy, identity-
+preserving facade over the existing dataclasses and validators, not a second
+configuration schema. `Physics`, `Numerics`, `CxrReflections`,
+`TransportNumerics`, `RadiationNumerics`, `Precision`, `FixedSampling`,
+`AdaptiveSampling`, and the experimental `PhotonTransport` retain their
+original storage and validation. Preset names resolve to immutable typed values
+via `load_physics` / `load_numerics`.
+
+### Field ownership
+
+Every `Physics`/`Numerics` field has exactly one owner in the import-light
+`pyrite._config_policy` inventory, guarded against dataclass drift by tests.
+
+| Owner | Fields |
+| --- | --- |
+| Physical model (`Physics`) | `emission`, `brem_source`, `straggling`, `inelastic_model`, `inelastic_cutoff_eV`, `secondary_threshold_eV`, `elastic_model`, `bremsstrahlung_model`, `radiative_model`, `radiative_cutoff_eV`, `pair_production_model`, `positron_transport`, `atomic_electron_deflection`, `channeling_model`, `channeling_plane`, `channeling_axial`, `transition_radiation`, `transition_lattice_origin_ang`, `shell_ionization_model`, `photon_transport` |
+| Sampling and convergence (`Numerics`) | `cxr_trials`, `brem_trials`, `cxr_reflections`, `precision`, `sampling` |
+| Numerical approximation (`Numerics`) | `energy_model`, `max_dE_frac`, `energy_bins`, `transport`, `radiation`, `channeling_basis_size`, `channeling_bloch_cells`, `channeling_dz_ang`, `channeling_zone_max_ang` |
+| Kernel tuning (`Numerics`) | `transport_core`, `cxr_chunk`, `brem_chunk`, `execution` |
+| Scheduling and resources (`pyrite.execution`) | No `Physics` or `Numerics` fields. `ExecutionProfile`, `Executor`, `ResourceRequest`, Dask and SLURM backends. |
+
+### KernelTuning is a compatibility alias
+
+`pyrite.config.KernelTuning is pyrite.config.ExecutionConfig`: it is not a
+second class. The historical `Numerics.execution` dataclass field remains
+the **only** grouped storage path. `Numerics.kernel_tuning` provides a
+preferred read view; `Numerics.with_kernel_tuning(...)` is a spelling for
+`with_execution(...)`. These do not introduce a case field or pickle migration.
+
+```python
+from pyrite.config import KernelTuning, Numerics
+
+numerics = Numerics(execution=KernelTuning(cxr_chunk=256))
+numerics = numerics.with_kernel_tuning(KernelTuning(transport_core="per-electron", cxr_chunk=512))
+assert numerics.kernel_tuning.cxr_chunk == 512
+```
+
+The similarly named `ExecutionProfile` under `pyrite.execution` controls
+job scheduling and resources; it is **not** the local kernel selector.
+
+### Single resolution and conflict policy
+
+`Numerics._resolve_typed_groups` and `_resolve_typed_sampling` remain the
+single Python validation/lowering boundary. A non-default flat value that
+contradicts a grouped value raises with the conflicting field name. When a
+flat value equals its dataclass default, the grouped value wins: a standard
+dataclass constructor cannot distinguish an explicit default from omission.
+Use one spelling per knob in new code. `with_transport`, `with_radiation`
+and `with_kernel_tuning` clear mirrored fields on grouped replacement.
+
+`FixedSampling` conflicts with a non-default flat electron budget; an
+`AdaptiveSampling` policy rejects explicit non-default counts or differing
+legacy `precision`. For the CLI, named presets are merged below explicit
+profile keys before the existing profile and case validation. Any explicit
+profile sampling value supersedes the entire preset sampling policy, rather
+than mixing fixed counts with adaptive stopping. The profile-only
+`line_grid_policy` is intentionally resolved at the catalog energy-grid
+boundary and has no `Numerics` dataclass counterpart.
+
+### Scientific identity is not bitwise reproducibility
+
+The existing `case_content_key` denylist excludes `spec_chunk` and
+`brem_chunk`. That cache decision does **not** establish chunk-invariant
+floating-point reductions or exact replay on different hardware. Chunking
+may affect summation order; transport cores, backends and FP modes may
+change numerical paths or RNG consumption. Preserve kernel choice, chunk
+sizes, precision mode, seeds and backend in execution provenance when
+comparing deterministic runs. Do not infer that a shared case hash
+guarantees bitwise equality. Changing content-key semantics or schema
+defaults requires a separate versioned identity decision and numerical
+parity evidence.

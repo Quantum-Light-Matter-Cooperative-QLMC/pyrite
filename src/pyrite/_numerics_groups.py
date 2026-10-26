@@ -83,3 +83,7 @@ class ExecutionConfig:
             value = getattr(self, name)
             if value is not None and (type(value) is not int or value <= 0):
                 raise ValueError(f"{name} must be a positive integer or None")
+
+
+# Preferred public spelling (#702). No second dataclass or pickle schema.
+KernelTuning = ExecutionConfig
