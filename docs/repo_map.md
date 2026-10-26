@@ -24,63 +24,154 @@ Components (a + b denotes a static import cycle):
   p0: _entry
   p1: apps
   p2: beams
-  p3: campaign + checkpoints + energy_grid + execution + montecarlo + observations + perf + remote + results + runs + validation
-  p4: cli
-  p5: config
-  p6: console
-  p7: detectors
-  p8: devtools
-  p9: experimental
-  p10: geometry
-  p11: instrument
-  p12: materials
-  p13: optimization
-  p14: plots
-  p15: radiation
-  p16: storage
-  p17: transport
-  p18: xsgen
+  p3: campaign
+  p4: checkpoints
+  p5: cli
+  p6: config
+  p7: console
+  p8: detectors
+  p9: devtools
+  p10: energy_grid
+  p11: execution
+  p12: experimental
+  p13: geometry
+  p14: instrument
+  p15: materials
+  p16: montecarlo
+  p17: observations
+  p18: optimization
+  p19: perf
+  p20: plots
+  p21: radiation
+  p22: remote
+  p23: results
+  p24: runs
+  p25: storage
+  p26: transport
+  p27: validation
+  p28: xsgen
 Edges (importer -> imported):
-  p0 -> p12
-  p0 -> p3
-  p0 -> p4
-  p0 -> p6
-  p1 -> p10
-  p1 -> p12
-  p1 -> p14
+  p0 -> p15
+  p0 -> p27
+  p0 -> p5
+  p0 -> p7
+  p1 -> p13
+  p1 -> p15
+  p1 -> p16
+  p1 -> p17
   p1 -> p2
+  p1 -> p20
+  p1 -> p22
+  p1 -> p23
+  p1 -> p24
+  p1 -> p27
   p1 -> p3
-  p1 -> p6
+  p1 -> p4
   p1 -> p7
-  p11 -> p12
-  p11 -> p7
-  p13 -> p3
-  p14 -> p12
-  p14 -> p3
-  p14 -> p6
-  p14 -> p7
-  p18 -> p12
-  p18 -> p6
-  p3 -> p10
-  p3 -> p11
-  p3 -> p12
-  p3 -> p18
-  p3 -> p5
+  p1 -> p8
+  p10 -> p15
+  p10 -> p16
+  p10 -> p22
+  p10 -> p23
+  p10 -> p3
+  p10 -> p4
+  p10 -> p7
+  p10 -> p8
+  p11 -> p16
+  p11 -> p3
+  p11 -> p4
+  p14 -> p15
+  p14 -> p8
+  p16 -> p15
+  p16 -> p28
+  p16 -> p7
+  p17 -> p14
+  p17 -> p16
+  p17 -> p23
+  p17 -> p7
+  p17 -> p8
+  p18 -> p23
+  p18 -> p24
+  p18 -> p3
+  p19 -> p15
+  p19 -> p16
+  p19 -> p3
+  p19 -> p7
+  p20 -> p15
+  p20 -> p16
+  p20 -> p23
+  p20 -> p7
+  p20 -> p8
+  p22 -> p15
+  p22 -> p16
+  p22 -> p19
+  p22 -> p23
+  p22 -> p24
+  p22 -> p27
+  p22 -> p28
+  p22 -> p3
+  p22 -> p4
+  p22 -> p7
+  p23 -> p14
+  p23 -> p15
+  p23 -> p16
+  p23 -> p8
+  p24 -> p11
+  p24 -> p14
+  p24 -> p15
+  p24 -> p16
+  p24 -> p17
+  p24 -> p19
+  p24 -> p23
+  p24 -> p28
+  p24 -> p3
+  p24 -> p4
+  p24 -> p7
+  p27 -> p15
+  p27 -> p16
+  p27 -> p3
+  p27 -> p4
+  p27 -> p7
+  p27 -> p8
+  p28 -> p15
+  p28 -> p7
+  p3 -> p13
+  p3 -> p14
+  p3 -> p15
+  p3 -> p16
+  p3 -> p17
+  p3 -> p23
+  p3 -> p28
   p3 -> p6
-  p3 -> p7
-  p4 -> p11
-  p4 -> p12
-  p4 -> p18
+  p3 -> p8
+  p4 -> p15
+  p4 -> p16
+  p4 -> p23
   p4 -> p3
-  p4 -> p6
   p4 -> p7
-  p6 -> p12
-  p7 -> p12
-  p7 -> p5
-  p8 -> p14
-  p8 -> p3
-  p8 -> p4
+  p5 -> p10
+  p5 -> p14
+  p5 -> p15
+  p5 -> p16
+  p5 -> p19
+  p5 -> p22
+  p5 -> p24
+  p5 -> p28
+  p5 -> p3
+  p5 -> p4
+  p5 -> p7
+  p5 -> p8
+  p7 -> p15
+  p8 -> p15
   p8 -> p6
+  p9 -> p10
+  p9 -> p20
+  p9 -> p23
+  p9 -> p24
+  p9 -> p27
+  p9 -> p3
+  p9 -> p5
+  p9 -> p7
 ```
 <!-- END GENERATED PACKAGE DEPENDENCIES -->
 
