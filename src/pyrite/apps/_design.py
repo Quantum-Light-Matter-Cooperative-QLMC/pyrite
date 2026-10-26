@@ -235,19 +235,6 @@ def static_altair_chart(mo, chart):
     )
 
 
-# A white canvas makes the yellow end of many scientific sequential maps hard
-# to distinguish.  This clipped, high-contrast sequential map keeps the full
-# energy trajectory visible without changing the underlying scalar values.
-_LIGHT_ENERGY_COLORSCALE = [
-    [0.00, "#352A86"],
-    [0.20, "#245DA8"],
-    [0.40, "#1687A7"],
-    [0.60, "#169878"],
-    [0.80, "#9A7412"],
-    [1.00, "#B23A32"],
-]
-
-
 def _colorbar_title_text(colorbar) -> str:
     title = getattr(colorbar, "title", None)
     text = getattr(title, "text", None) if title is not None else None
@@ -338,37 +325,17 @@ def apply_plotly_theme(fig, theme: str):
         ),
     )
 
-    # Some PyRITE traces own their own colorbars; layout.font does not always
-    # override those nested fonts. Set them explicitly and, for the energy
-    # trajectories, use a light-canvas-safe scale and a slightly stronger line.
+    # Theme labels only; scalar palettes belong to the figure builder so tracks
+    # with and without a visible colorbar retain the same energy mapping.
     for trace in fig.data:
-        energy_owner = None
         for owner_name in ("marker", "line"):
             owner = getattr(trace, owner_name, None)
             colorbar = getattr(owner, "colorbar", None) if owner is not None else None
-            if colorbar is not None:
-                if _theme_plotly_colorbar(
-                    colorbar, text=text, surface=surface, rule=rule, mode=mode
-                ):
-                    energy_owner = owner
-
+            if colorbar is not None and colorbar.to_plotly_json():
+                _theme_plotly_colorbar(colorbar, text=text, surface=surface, rule=rule, mode=mode)
         colorbar = getattr(trace, "colorbar", None)
-        if colorbar is not None:
+        if colorbar is not None and colorbar.to_plotly_json():
             _theme_plotly_colorbar(colorbar, text=text, surface=surface, rule=rule, mode=mode)
-
-        if energy_owner is not None and mode == "light":
-            # Scatter3d energy trajectories carry the scalar mapping on
-            # ``line``; marker-based plots are handled equivalently.
-            try:
-                energy_owner.colorscale = _LIGHT_ENERGY_COLORSCALE
-            except (AttributeError, ValueError):
-                pass
-            if hasattr(energy_owner, "width"):
-                try:
-                    width = energy_owner.width
-                    energy_owner.width = max(4, float(width or 0))
-                except (TypeError, ValueError):
-                    pass
 
     if getattr(fig.layout, "annotations", None):
         for annotation in fig.layout.annotations:

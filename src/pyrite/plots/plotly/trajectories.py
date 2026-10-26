@@ -665,6 +665,22 @@ def trajectory_volume_figure(
     )
 
 
+def _apply_energy_domain(fig, data):
+    """Share the selected dataset's energy domain, independent of playback time."""
+    energies = np.concatenate(
+        [np.asarray(data.get(key, ()), dtype=float) for key in ("E", "vacuum_E")]
+    )
+    energies = energies[np.isfinite(energies)]
+    low, high = (float(energies.min()), float(energies.max())) if energies.size else (0.0, 1.0)
+    if low == high:
+        low, high = (0.0, high) if high > 0 else (0.0, 1.0)
+    owners = [trace for trace in fig.data if getattr(trace, "line", None) is not None]
+    energy_traces = [trace for trace in owners if trace.line.colorscale is not None]
+    for index, trace in enumerate(energy_traces):
+        trace.line.update(cmin=low, cmax=high, cauto=False, showscale=index == 0)
+        trace.line.colorbar.title.text = "electron energy (keV)"
+
+
 def trajectory_volume_figure_from_data(
     rec_or_case,
     data,
@@ -761,6 +777,8 @@ def trajectory_volume_figure_from_data(
         name="detector direction",
     ):
         fig.add_trace(trace)
+
+    _apply_energy_domain(fig, data)
 
     material = case["name"].split()[0]
     fig.update_layout(

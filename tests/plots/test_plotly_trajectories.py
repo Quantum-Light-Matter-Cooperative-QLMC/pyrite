@@ -52,6 +52,38 @@ def test_secondary_view_uses_track_identity_and_filters_all_overlays():
     assert {trace.name for trace in figure.data} >= {"electron tracks", "generation 1 tracks"}
     secondary = next(trace for trace in figure.data if trace.name == "generation 1 tracks")
     assert secondary.customdata[0][3:5].tolist() == [1.0, 0.0]
+    # A nominal case energy must not override the selected captured energies.
+    from pyrite.apps._design import apply_plotly_theme
+
+    selected_case = dict(case, E0_keV=100.0)
+    for threshold, expected in ((0.0, (2.0, 10.0)), (9.0, (0.0, 10.0)), (20.0, None)):
+        selected = trajectory_volume_figure_from_data(selected_case, data, min_energy_keV=threshold)
+        colored = [
+            trace
+            for trace in selected.data
+            if getattr(trace, "line", None) is not None and trace.line.colorscale is not None
+        ]
+        if expected is not None:
+            assert colored
+            assert {(trace.line.cmin, trace.line.cmax) for trace in colored} == {expected}
+            assert sum(bool(trace.line.showscale) for trace in colored) == 1
+        original = [trace.line.to_plotly_json() for trace in colored]
+        # Styling an empty marker/mesh colorbar creates an unrelated default
+        # scale in Plotly, even though this is a line-only energy plot.
+        empty_bars = [
+            owner.colorbar
+            for trace in selected.data
+            for owner in (trace, getattr(trace, "marker", None))
+            if getattr(owner, "colorbar", None) is not None and not owner.colorbar.to_plotly_json()
+        ]
+        for theme in ("light", "dark", "light"):
+            apply_plotly_theme(selected, theme)
+            assert all(not bar.to_plotly_json() for bar in empty_bars)
+            for trace, before in zip(colored, original, strict=True):
+                assert trace.line.colorscale == tuple(tuple(item) for item in before["colorscale"])
+                assert trace.line.cmin == before["cmin"]
+                assert trace.line.cmax == before["cmax"]
+        selected.to_json()
     exit_path = _exit_paths_3d(data, 0.2, cmax=10.0)
     assert len(exit_path.x) == 6  # both tracks own terminal exit segments
     only_primary = visible_trajectory_data(data, max_generation=0)
