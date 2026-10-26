@@ -57,7 +57,7 @@ class DirectionalSpectrum:
     def rate(self, current_na: float | None = None) -> np.ndarray:
         """Return ph/s/eV/sr at the resolved or explicit mean current [nA].
 
-        Equation: R(E,theta) = Y(E,theta) I[nA] 1e-9 / |e|, where
+        Equation: ``R(E,theta) = Y(E,theta) I[nA] 1e-9 / |e|``, where
         Y is already normalized per incident electron, eV and sr. Assumes
         independent incident electrons and an incoherent source; intra-electron
         PXR–CBS interference remains in Y. No angular-bin/solid-angle factor.

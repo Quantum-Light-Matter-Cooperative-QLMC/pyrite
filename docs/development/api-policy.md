@@ -57,13 +57,15 @@ serialization, result units, scientific identity, and reproducibility behavior.
 
 ## Inventory and static check
 
-`api-surface.toml` records **all existing root lazy exports**, the five active
+`api-surface.toml` records **all existing root lazy exports**, the seven active
 canonical facades, and the supported package and leaf-module contracts documented
 in the API reference. Its `target` is the *current concrete binding*, while
 `domain` identifies the owning public domain; some domains have no facade yet.
-Other importable package names remain provisional or internal. Register future
-supported contracts explicitly rather than promoting whole implementation
-packages.
+Canonical facades may be governed by package-only entries without adding root
+exports (for example transport). Facade checks combine root ownership with the
+facade's package inventory. Other importable package names remain provisional
+or internal. Register future supported contracts explicitly rather than promoting
+whole implementation packages.
 
 Run:
 

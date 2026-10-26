@@ -9,13 +9,13 @@ import pytest
 
 from pyrite.campaign.beam_metrics import capture_beam_metrics, initial_state_metrics
 from pyrite.montecarlo.trajectories import TransportView, write_trajectory_artifact
-from pyrite.montecarlo.trajectory_balance import capture_secondary_energy_balance
-from pyrite.montecarlo.trajectory_summary import (
+from pyrite.montecarlo.transport.secondaries import secondary_energy_balance
+from pyrite.transport import (
+    capture_secondary_energy_balance,
     depth_loss_profile,
     iter_primary_summaries,
     summarize_trajectories,
 )
-from pyrite.montecarlo.transport.secondaries import secondary_energy_balance
 
 CASE = dict(
     name="saved Si",

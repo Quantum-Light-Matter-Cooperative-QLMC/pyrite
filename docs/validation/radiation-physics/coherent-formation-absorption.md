@@ -9,7 +9,7 @@
 
 Current CPU owners: {source}`src/pyrite/montecarlo/spectrum/cxr/_formation.py::formation_factor`
 and {source}`src/pyrite/montecarlo/spectrum/cxr/_formation.py::expand_escape_pieces`.
-The public scorer is {py:func}`pyrite.montecarlo.spectrum.mc_cxr_spectrum`.
+The public scorer is {py:func}`pyrite.radiation.mc_cxr_spectrum`.
 
 - **ID:** `coherent-formation-absorption`
 - **Symbols:** `montecarlo/spectrum/cxr/_formation.py::{formation_coefficients,formation_factor,formation_argument,formation_profile,formation_window_half_width,expand_escape_pieces}`; CUDA twins `montecarlo/spectrum/coherent_jit_kernel.py::{_formation_re,_formation_im,run_coherent_reduction_kernel}`, `montecarlo/spectrum/coherent_stream_jit_kernel.py::{_coherent_prologue_kernel,run_coherent_field_accumulation_kernel}`, `montecarlo/spectrum/coherent_grouped_jit_kernel.py::run_coherent_grouped_intensity_kernel`

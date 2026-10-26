@@ -61,6 +61,8 @@ ROOT_API_REPLACEMENTS = {
     "pyrite.SubstanceRef": "pyrite.geometry.SubstanceRef",
     "pyrite.TransportNumerics": "pyrite.config.TransportNumerics",
     "pyrite.TransverseSpot": "pyrite.beams.TransverseSpot",
+    "pyrite.directional_source": "pyrite.radiation.directional_source",
+    "pyrite.directional_sources": "pyrite.radiation.directional_sources",
     "pyrite.load_numerics": "pyrite.config.load_numerics",
     "pyrite.load_physics": "pyrite.config.load_physics",
 }

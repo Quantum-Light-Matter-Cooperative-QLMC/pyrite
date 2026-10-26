@@ -3,7 +3,7 @@
 # root_role records ownership/stability; root_policy separately classifies root compatibility.
 # canonical_facades lists active domain imports; other domains retain existing paths.
 schema_version = 1
-canonical_facades = ["beams", "geometry", "config", "detectors", "observations"]
+canonical_facades = ["beams", "geometry", "config", "detectors", "observations", "transport", "radiation"]
 
 [root_exports]
 Acquisition = { target = "pyrite.instrument:Acquisition", status = "advanced-stable", domain = "observations", root_role = "specialized" }
@@ -353,10 +353,29 @@ Target = { classification = "retained", canonical = "pyrite:Target", reason = "F
 TransportNumerics = { classification = "deprecated", canonical = "pyrite.config:TransportNumerics", reason = "Use the established canonical domain import." }
 TransverseSpot = { classification = "deprecated", canonical = "pyrite.beams:TransverseSpot", reason = "Use the established canonical domain import." }
 TransverseStateSpec = { classification = "deferred", canonical = "pyrite.quantum:TransverseStateSpec", reason = "Canonical quantum ownership is resolved in #704; retain the root alias without warnings pending a separate migration decision." }
-directional_source = { classification = "deferred", canonical = "pyrite.directional:directional_source", reason = "Keep the existing import pending canonical ownership review in #705." }
-directional_sources = { classification = "deferred", canonical = "pyrite.directional:directional_sources", reason = "Keep the existing import pending canonical ownership review in #705." }
+directional_source = { classification = "deprecated", canonical = "pyrite.radiation:directional_source", reason = "Use the canonical radiation import; API remains experimental." }
+directional_sources = { classification = "deprecated", canonical = "pyrite.radiation:directional_sources", reason = "Use the canonical radiation import; API remains experimental." }
 fetch_tables = { classification = "deferred", canonical = "pyrite.xsgen.install:fetch_tables", reason = "Keep the existing import pending canonical ownership review in #707." }
 load_numerics = { classification = "deprecated", canonical = "pyrite.config:load_numerics", reason = "Use the established canonical domain import." }
 load_physics = { classification = "deprecated", canonical = "pyrite.config:load_physics", reason = "Use the established canonical domain import." }
 photon_energies = { classification = "retained", canonical = "pyrite:photon_energies", reason = "Approved deterministic line-energy convenience exception." }
 simulate = { classification = "retained", canonical = "pyrite:simulate", reason = "Foundational simulation entry point." }
+
+[package_exports."pyrite.transport"]
+Case = { target = "pyrite.montecarlo.case:Case", status = "advanced-stable" }
+simulate_trajectories = { target = "pyrite.montecarlo.transport:simulate_trajectories", status = "advanced-stable" }
+summarize_trajectories = { target = "pyrite.montecarlo.trajectory_summary:summarize_trajectories", status = "advanced-stable" }
+iter_primary_summaries = { target = "pyrite.montecarlo.trajectory_summary:iter_primary_summaries", status = "advanced-stable" }
+depth_loss_profile = { target = "pyrite.montecarlo.trajectory_summary:depth_loss_profile", status = "advanced-stable" }
+capture_secondary_energy_balance = { target = "pyrite.montecarlo.trajectory_balance:capture_secondary_energy_balance", status = "advanced-stable" }
+
+[package_exports."pyrite.radiation"]
+photon_energies = { target = "pyrite.materials.emission:photon_energies", status = "advanced-stable" }
+directional_source = { target = "pyrite.directional:directional_source", status = "experimental" }
+directional_sources = { target = "pyrite.directional:directional_sources", status = "experimental" }
+mc_cxr_spectrum = { target = "pyrite.montecarlo.spectrum:mc_cxr_spectrum", status = "advanced-stable" }
+mc_cxr_spectrum_solid_angle = { target = "pyrite.montecarlo.spectrum:mc_cxr_spectrum_solid_angle", status = "advanced-stable" }
+mc_brem_spectrum = { target = "pyrite.montecarlo.spectrum:mc_brem_spectrum", status = "advanced-stable" }
+
+[package_exports."pyrite.results.directional"]
+DirectionalSpectrum = { target = "pyrite.results.directional:DirectionalSpectrum", status = "experimental" }

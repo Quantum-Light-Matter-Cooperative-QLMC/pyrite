@@ -134,7 +134,10 @@ it before any transport. Regression:
 
 ```python
 import numpy as np
-from pyrite import Beam, Footprint, PointSpot, PointBunch, Slab, Numerics, directional_source
+from pyrite import Beam, Numerics
+from pyrite.beams import PointSpot, PointBunch
+from pyrite.geometry import Footprint, Slab
+from pyrite.radiation import directional_source
 from pyrite.directional import source_line_ceiling_eV
 
 beam = Beam(
@@ -162,7 +165,7 @@ unsupported and rejected. Existing target geometry restrictions still apply. It
 transports once per scalar target/tilt, then evaluates bounded direction batches
 on the same segments. `brem_trials` is replaced by `cxr_trials` to avoid an
 unnecessary second population; only the requested adapters are evaluated.
-`pyrite.directional_sources(..., components=("pxr-cbs", "characteristic",
+`pyrite.radiation.directional_sources(..., components=("pxr-cbs", "characteristic",
 "bremsstrahlung"))` returns one `DirectionalSpectrum` per component from one
 transport; characteristic and continuum use the live runner's lower-cutoff
 population, as in production. Pick a manual photon stop for the continuum,

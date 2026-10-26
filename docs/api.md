@@ -195,8 +195,8 @@ public API.
 | `TransportNumerics` | Deprecated | `pyrite.config.TransportNumerics` | Use the established canonical domain import. |
 | `TransverseSpot` | Deprecated | `pyrite.beams.TransverseSpot` | Use the established canonical domain import. |
 | `TransverseStateSpec` | Deferred | `pyrite.quantum.TransverseStateSpec` | Canonical quantum ownership is resolved in #704; retain the root alias without warnings pending a separate migration decision. |
-| `directional_source` | Deferred | `pyrite.directional.directional_source` | Keep the existing import pending canonical ownership review in #705. |
-| `directional_sources` | Deferred | `pyrite.directional.directional_sources` | Keep the existing import pending canonical ownership review in #705. |
+| `directional_source` | Deprecated | `pyrite.radiation.directional_source` | Canonical radiation import; remains experimental. |
+| `directional_sources` | Deprecated | `pyrite.radiation.directional_sources` | Canonical radiation import; remains experimental. |
 | `fetch_tables` | Deferred | `pyrite.xsgen.install.fetch_tables` | Keep the existing import pending canonical ownership review in #707. |
 | `load_numerics` | Deprecated | `pyrite.config.load_numerics` | Use the established canonical domain import. |
 | `load_physics` | Deprecated | `pyrite.config.load_physics` | Use the established canonical domain import. |
@@ -460,27 +460,106 @@ the slab normal, independently of the reflections selected for scoring.
    pyrite.materials.attenuation.linear_attenuation_inv_mm
 ```
 
-## Simulation kernels
+(simulation-kernels)=
+## Advanced transport and radiation
 
-These lower-level entry points use the units in their docstrings. `Case` is
-the frozen, validated input record; `to_dict()` provides its serialization
-mapping. Prefer keyword arguments for optional model controls.
+Use `pyrite.transport` for trajectory simulation and saved-capture reductions;
+use `pyrite.radiation` for source-level spectra. These lazy facades resolve to
+exactly the existing implementation objects: signatures, errors, numerical
+outputs, RNG streams, provenance, serialization and scientific identities are
+unchanged. Importing either namespace loads no engines or material datasets;
+resolving a function loads its implementation, and calling it may read tables,
+select an accelerator or perform the documented artifact I/O.
+
+```python
+from pyrite.transport import Case, simulate_trajectories, summarize_trajectories
+from pyrite.radiation import photon_energies, mc_cxr_spectrum, mc_brem_spectrum
+
+# Provisional directional API; no stability promotion:
+from pyrite.radiation import directional_source, directional_sources
+from pyrite.results.directional import DirectionalSpectrum
+```
+
+`pyrite.simulate(scene)` remains the supported high-level one-scene operation.
+`Case` is the frozen, validated lowered record with `to_dict()` serialization;
+it remains advanced-stable for existing advanced callers. Prefer `Scene` for
+new scene construction. No engine package becomes stable as a whole.
+
+### Scientific contracts and migration
+
+All transport facade entries below are **advanced-stable**. Units in keyword
+and table-column names are literal: angstroms, keV and radians. Optional model
+controls should be passed by keyword. The linked function docstrings define
+full defaults, supported combinations and exceptions.
+
+| Canonical import (`pyrite.transport.`) | Previous import | Input/output and effects |
+| --- | --- | --- |
+| `Case` | `pyrite.montecarlo.Case` | Validated lowered simulation/configuration record; field-specific units, frozen mapping serialization. Invalid fields raise validation errors; no transport on construction. |
+| `simulate_trajectories` | `pyrite.montecarlo.transport.simulate_trajectories` | Incident energy/cutoff in keV, thickness/segment positions and lengths in angstroms; returns segment arrays and incident `Ne`/fate metadata. Samples transport with the supplied seed; may resolve elastic/stopping tables and backend. Unsupported model combinations/table coverage raise errors; incomplete step-limited histories raise. No detector response or photon tally. |
+| `summarize_trajectories` | `pyrite.montecarlo.trajectory_summary.summarize_trajectories` | Reads a saved capture and explicit depth/energy/angle edges; returns histogram DataFrames. Fate fractions divide by stored incident `Ne`, including missed entries. Depth loss is keV/bin without primary, mass or volume normalization. Invalid edges/missing row fields raise. |
+| `iter_primary_summaries` | `pyrite.montecarlo.trajectory_summary.iter_primary_summaries` | Streams capture DataFrames: primary fate, depth/range (angstrom), terminal pre-event energy (keV), angle (rad). Descendants do not determine primary fate; missed entries have no material rows. Artifact validation and file errors propagate. |
+| `depth_loss_profile` | `pyrite.montecarlo.trajectory_summary.depth_loss_profile` | Stored segment mapping plus depth edges (angstrom) to continuous-loss keV/bin by layer. Excludes cutoff residuals/hard transfers; no primary normalization or file I/O. Invalid edges raise. |
+| `capture_secondary_energy_balance` | `pyrite.montecarlo.trajectory_balance.capture_secondary_energy_balance` | Reads secondary-transport capture, reuses its canonical energy ledger; returns `term, energy_keV`. Requires secondary metadata and positive block limit; propagates artifact/file errors. No resimulation. |
+
+Radiation energy grids are in **eV**; low-level segment electron energies are
+in **keV**. Directions use the frame and angle unit specified by each function.
+
+| Canonical import (`pyrite.radiation.`) | Status | Previous import | Input/output and effects |
+| --- | --- | --- | --- |
+| `photon_energies` | Advanced-stable | `pyrite.photon_energies` (retained convenience), `pyrite.materials.emission.photon_energies` | Catalog materials, electron energy (eV), geometry angles (degrees); returns vacuum line centres (eV), with broadcast or Cartesian axes. Reads catalog when called; no transport/yield/provenance result. Invalid values, unresolved cuts or catalog keys raise. |
+| `mc_cxr_spectrum` | Advanced-stable | `pyrite.montecarlo.spectrum.mc_cxr_spectrum` | Segments, crystal/reflections, photon grid (eV), direction/angles (rad); escaped CXR density in ph/incident-electron/eV/sr, optionally separate PXR/CBS components. Uses stored incident population or explicit electron limit, with existing coherent population controls; reads material response and may use accelerator arrays. Unsupported coherence/geometry/quadrature combinations raise. |
+| `mc_cxr_spectrum_solid_angle` | Advanced-stable | `pyrite.montecarlo.spectrum.mc_cxr_spectrum_solid_angle` | Same source inputs plus directions and weights (sr); returns ph/incident-electron/eV, already integrated over solid angle. Shape mismatch or tiled grooves raise. Never multiply by solid angle again. |
+| `mc_brem_spectrum` | Advanced-stable | `pyrite.montecarlo.spectrum.mc_brem_spectrum` | Segments, photon grid (eV), composition (atoms/angstrom³), direction/angles (rad); escaped incoherent density in ph/incident-electron/eV/sr. Existing cutoff/population and cross-section selection remain in force; reads cross-section/material tables as needed; invalid models/inputs or missing required coverage raise. |
+| `directional_source`, `directional_sources` | Experimental | `pyrite.directional.directional_source`, `pyrite.directional.directional_sources`; deprecated root aliases | Public scalar beam and flat target, explicit grid (eV), periodic angle points (degrees), fixed sampling and seed. One shared transport returns one `DirectionalSpectrum` per component with ph/incident-electron/eV/sr, case, provenance and support mask; unsupported infinite-slab grazing points are masked NaN. Invalid grids/angles, adaptive precision and grooves raise. |
+
+The low-level spectrum arrays carry no new provenance wrapper: retain their
+input segments, table/model choices and normalization metadata. Directional
+results retain their existing case/provenance and current-scaled `rate()`;
+`DirectionalSpectrum` remains an experimental **results** type at
+`pyrite.results.directional`. No additional result class is introduced here.
+These escaped densities include source self-absorption; they are distinct from
+transported photon events, aperture tallies and acquisition counts. Neither
+facade applies detector efficiency, electronic response or exposure.
+
+Previous implementation imports remain supported compatibility paths. Only the
+two root directional aliases enter the existing versioned deprecation registry;
+use their canonical radiation imports. Future kernel exports require explicit
+review and manifest entries; `montecarlo.__all__` is frozen by its export guard.
 
 ```{eval-rst}
 .. autosummary::
    :toctree: _autosummary
 
-   pyrite.montecarlo.Case
-   pyrite.montecarlo.transport.simulate_trajectories
-   pyrite.montecarlo.spectrum.mc_cxr_spectrum
-   pyrite.montecarlo.spectrum.mc_cxr_spectrum_solid_angle
-   pyrite.montecarlo.spectrum.mc_brem_spectrum
+   pyrite.transport.Case
+   pyrite.transport.simulate_trajectories
+   pyrite.radiation.mc_cxr_spectrum
+   pyrite.radiation.mc_cxr_spectrum_solid_angle
+   pyrite.radiation.mc_brem_spectrum
    pyrite.detectors.response.detector_efficiency
    pyrite.detectors.response.convolve_detector
-   pyrite.montecarlo.trajectory_summary.summarize_trajectories
-   pyrite.montecarlo.trajectory_summary.iter_primary_summaries
-   pyrite.montecarlo.trajectory_summary.depth_loss_profile
-   pyrite.montecarlo.trajectory_balance.capture_secondary_energy_balance
+   pyrite.transport.summarize_trajectories
+   pyrite.transport.iter_primary_summaries
+   pyrite.transport.depth_loss_profile
+   pyrite.transport.capture_secondary_energy_balance
+```
+
+### Other documented engine operations
+
+These remain at their current owners; listing them does not promote other
+engine internals. All retain their existing support level.
+
+| Entry | Owner / status | Scientific contract and effects |
+| --- | --- | --- |
+| `detector_efficiency`, `convolve_detector` | Detectors, advanced-stable | Photon grid (eV), window thicknesses (nm) to dimensionless efficiency; Gaussian FWHM (eV) convolution preserves spectral-density units. Optional outside mass has density × eV units. Reads attenuation tables when efficiency is evaluated; invalid grid/array inputs propagate numerical errors. Neither function applies an exposure. |
+| `capture_beam_metrics` | Beam diagnostics, advanced-stable | Reads a bounded deterministic prefix of stored initial particles (including missed entries); returns beam metrics plus sampled/available counts. Metric field units follow `BeamMetrics`; invalid prefix limits or missing artifact data raise. No new transport. |
+| `run_case`, `run_cases` | Runner orchestration, advanced-stable compatibility paths | Lowered `Case`/case mappings, field-specific units; execute transport and scoring, resolving tables/backend and retaining existing result/provenance contracts. Batch scheduling/collection and existing errors remain runner concerns; use `simulate` for public scene orchestration. No new transport facade aliases. |
+| `spatial_density` | Quantum/channeling, advanced-stable | Density matrix, basis eigenfunctions and spatial grid (angstrom); Born-rule probability density (1/angstrom), including retained survival weight, without conditioning or renormalization. Array compatibility errors propagate; no transport or artifact I/O. |
+| `AxialDiagnosticConfig`, `AxialDiagnosticResult`, `axial_diagnostic` | Quantum/channeling, experimental | Bounded solver configuration (field-specific units), populations and incident-normalized spatial density on recorded depths; retained solver/configuration diagnostics. Explicit solver/allocation limits and invalid configurations raise. No standard axial transport integration. Ownership consolidation belongs to #704. |
+
+```{eval-rst}
+.. autosummary::
+   :toctree: _autosummary
+
    pyrite.campaign.beam_metrics.capture_beam_metrics
    pyrite.montecarlo.runner.run_case
    pyrite.montecarlo.runner.run_cases
@@ -553,12 +632,12 @@ consume it.
 
 ## Provisional directional source API
 
-`pyrite.directional_source(beam, target, energy_eV=..., angle_deg=..., ...)`
-returns `pyrite.DirectionalSpectrum` without a detector or checkpoint. The result
+`pyrite.radiation.directional_source(beam, target, energy_eV=..., angle_deg=..., ...)`
+returns `pyrite.results.directional.DirectionalSpectrum` without a detector or checkpoint. The result
 contains explicit coordinates, escaped incoherent PXR/CBS density per incident
 electron/eV/sr, supported-direction mask and resolved provenance. `.rate()` uses
 the beam mean current; `.rate(current_na)` rescales stored arrays to ph/s/eV/sr.
-`pyrite.directional_sources(..., components=...)` returns one such result per
+`pyrite.radiation.directional_sources(..., components=...)` returns one such result per
 component (`"pxr-cbs"`, `"characteristic"`, `"bremsstrahlung"`, `"transition"`)
 from one transport. The opt-in `"transition"` component uses the production
 history-coherent planar-crossing model; it requires `footprint=None` and the
@@ -566,6 +645,15 @@ supported X-ray dielectric band. Cherenkov remains an internal bulk diagnostic
 in the app, outside this escaped-source API.
 This new surface is provisional; see [directional heatmaps](guides/directional-source-heatmap.md)
 for the bounded example, full-circle convention, supported geometry and limits.
+
+```{eval-rst}
+.. autosummary::
+   :toctree: _autosummary
+
+   pyrite.radiation.directional_source
+   pyrite.radiation.directional_sources
+   pyrite.results.directional.DirectionalSpectrum
+```
 
 ## Provisional optical diagnostic response
 
