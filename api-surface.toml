@@ -166,6 +166,29 @@ cxr_metrics = { target = "pyrite.results.metrics:cxr_metrics", status = "advance
 summary_table = { target = "pyrite.results.tables:summary_table", status = "advanced-stable" }
 Result = { target = "pyrite.results.model:Result", status = "stable" }
 Provenance = { target = "pyrite.results.provenance:Provenance", status = "advanced-stable" }
+SpectralDensity = { target = "pyrite.results.model:SpectralDensity", status = "advanced-stable" }
+CxrSpectra = { target = "pyrite.results.model:CxrSpectra", status = "advanced-stable" }
+SpatialResult = { target = "pyrite.results.model:SpatialResult", status = "advanced-stable" }
+SpectralFactors = { target = "pyrite.results.model:SpectralFactors", status = "advanced-stable" }
+PixelRayMap = { target = "pyrite.results.model:PixelRayMap", status = "advanced-stable" }
+PixelMetadata = { target = "pyrite.results.model:PixelMetadata", status = "advanced-stable" }
+
+[package_exports."pyrite.storage"]
+checkpoint_manifest = { target = "pyrite.checkpoints.persistence:checkpoint_manifest", status = "advanced-stable" }
+checkpoint_path_for = { target = "pyrite.checkpoints.persistence:checkpoint_path_for", status = "advanced-stable" }
+default_checkpoint_dir = { target = "pyrite.checkpoints.persistence:default_checkpoint_dir", status = "advanced-stable" }
+load_checkpoint = { target = "pyrite.checkpoints.persistence:load_checkpoint", status = "advanced-stable" }
+ObservationStore = { target = "pyrite.observations.store:ObservationStore", status = "advanced-stable" }
+ObservationStoreError = { target = "pyrite.observations.store:ObservationStoreError", status = "advanced-stable" }
+StoredObservation = { target = "pyrite.observations.store:StoredObservation", status = "advanced-stable" }
+default_observation_root = { target = "pyrite.observations.store:default_observation_root", status = "advanced-stable" }
+observation_from_result = { target = "pyrite.observations.store:observation_from_result", status = "advanced-stable" }
+ArtifactIntegrityError = { target = "pyrite.execution.artifacts:ArtifactIntegrityError", status = "advanced-stable" }
+CaseArtifactRef = { target = "pyrite.execution.artifacts:CaseArtifactRef", status = "advanced-stable" }
+CaseArtifactStore = { target = "pyrite.execution.artifacts:CaseArtifactStore", status = "advanced-stable" }
+DirectionalArtifactRef = { target = "pyrite.execution.artifacts:DirectionalArtifactRef", status = "advanced-stable" }
+directional_content_key = { target = "pyrite.execution.artifacts:directional_content_key", status = "advanced-stable" }
+load_directional_result = { target = "pyrite.execution.artifacts:load_directional_result", status = "advanced-stable" }
 
 # Historical underscored __all__ entries: compatibility only, not public APIs.
 # Exact sets are guarded; new private exports require a deliberate review.

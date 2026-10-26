@@ -36,7 +36,16 @@ from .metrics import (
     cxr_metrics,
     cxr_quality,
 )
-from .model import FLUX_UNITS, Result
+from .model import (
+    FLUX_UNITS,
+    CxrSpectra,
+    PixelMetadata,
+    PixelRayMap,
+    Result,
+    SpatialResult,
+    SpectralDensity,
+    SpectralFactors,
+)
 from .provenance import Provenance
 from .scoring import (
     SELECTION_MODES,
@@ -97,6 +106,12 @@ __all__ = [
     "store_result",
     "detected_background",
     "Result",
+    "SpectralDensity",
+    "CxrSpectra",
+    "SpatialResult",
+    "SpectralFactors",
+    "PixelRayMap",
+    "PixelMetadata",
     "Provenance",
     "FLUX_UNITS",
     "records",
