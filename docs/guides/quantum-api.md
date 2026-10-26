@@ -45,6 +45,42 @@ objects. Use `TransverseStateSpec.recipe(...)` and `.to_runtime()` when a
 durable source description is needed. Production source injection remains
 limited to its existing admitted subset, detailed in the planar guide.
 
+## Runtime quantity inputs
+
+With the optional `pyrite.units` extra, runtime factories through
+`pyrite.quantum` (and the identical `pyrite.states` aliases) normalize
+`waist_ang`, `scale_ang`, `center_ang`, `spacing_ang`, `origin_ang` and
+`offset_ang` to Å; `k_radial_inv_ang` to Å⁻¹; and
+`kinetic_energy_eV` to eV. Aperture semiangles use radians; `Cnm`
+aberrations use Å and `phiNM` aberrations use radians. Sample arrays in
+`from_array` remain unitless wavefunction amplitudes.
+
+The planar diagnostic wrappers accept depth, sampling and geometric path
+lengths (Å); stopping power (eV/Å); photon-energy grids and energy spread
+(eV); and detector angles, divergence and aperture (rad). Layer endpoints
+use Å and the surface normal is dimensionless. Quantity arrays and lists
+are supported where the existing interface accepts array inputs. Bare
+numbers retain their existing unit convention, and dimensionless Pint
+quantities are refused for angular fields. Runtime state and solver values
+remain ordinary numeric types; portable source JSON and digests are unchanged.
+
+```python
+import numpy as np
+from pyrite.quantum import aperture_probe, from_array, gaussian
+from pyrite.units import ureg
+
+state = gaussian(waist_ang=1 * ureg.nm, center_ang=(0, 25 * ureg.pm))
+sampled = from_array(np.ones(16), spacing_ang=0.1 * ureg.nm)
+probe = aperture_probe(
+    30 * ureg.keV,
+    semiangle_rad=20 * ureg.mrad,
+    aberrations={"C10": -3 * ureg.nm, "phi12": 45 * ureg.degree},
+)
+```
+
+Direct experimental solver constructors, arbitrary low-level helpers, and
+callback-defined phase plates are not part of this quantity boundary.
+
 ## Coherent example: experimental diagnostic only
 
 This bounded free-space example uses a periodic 2D envelope. Coordinates are
