@@ -9,7 +9,7 @@ import numpy as np
 
 from .._numerics import CxrReflections, Numerics
 from ..campaign.beam import Beam, PointBunch, PointSpot
-from ..campaign.geometry import Footprint, Slab, _quantized_angles
+from ..campaign.geometry import Footprint, Slab
 from ..directional import DIRECTIONAL_COMPONENTS, directional_sources, source_line_ceiling_eV
 from .angular_maps import AngularPanel
 
@@ -90,9 +90,9 @@ class MapConfig:
             raise ValueError("target tilts must be distinct")
         if not self.azimuths or not np.all(np.isfinite(self.azimuths)):
             raise ValueError("supply at least one finite target azimuth")
-        resolved = _quantized_angles(self.azimuths) % 360
+        resolved = np.asarray(self.azimuths, dtype=float) % 360
         if len(set(resolved)) != len(self.azimuths):
-            raise ValueError("target azimuths must be distinct after half-degree resolution")
+            raise ValueError("target azimuths must be distinct modulo 360 degrees")
 
     @property
     def result_elements(self) -> int:

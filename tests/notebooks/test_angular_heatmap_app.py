@@ -189,6 +189,13 @@ def test_close_target_tilts_remain_distinct():
     config = replace(MapConfig(), tilts_deg=(30.123456789, 30.2))
     assert config.tilts_deg == (30.123456789, 30.2)
 
+
+def test_close_target_azimuths_remain_distinct():
+    config = replace(MapConfig(), tilt_azimuths_deg=(0.0, 0.1, 0.123456789))
+    assert config.azimuths == (0.0, 0.1, 0.123456789)
+    assert config.target(30.0, 0.123456789).tilt_azim_deg == 0.123456789
+
+
 def test_azimuth_grid_cache_and_export(monkeypatch):
     import io
 
@@ -230,7 +237,7 @@ def test_transition_requires_explicit_planar_geometry_and_uses_beam_stop():
         MapConfig(components=("transition",))
     config = MapConfig(components=("transition",), width_mm=None, height_mm=None, energy_points=8)
     assert config.energy_grid()[-1] == config.beam_keV * 1000
-    for azimuths in ((), (0, 360), (0, 0.1), (np.nan,)):
+    for azimuths in ((), (0, 360), (-10, 350), (0, 0), (np.nan,)):
         with pytest.raises(ValueError, match="azimuth"):
             MapConfig(tilt_azimuths_deg=azimuths)
 
