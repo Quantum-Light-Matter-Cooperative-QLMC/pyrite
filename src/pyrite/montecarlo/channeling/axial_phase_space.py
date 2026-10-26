@@ -128,3 +128,129 @@ def sample_phase_space(state, window, rng: np.random.Generator) -> PhaseSpaceOut
     kx, ky = np.unravel_index(flat_momentum, phi.shape)
     momentum = (int(kx), int(ky))
     return PhaseSpaceOutcome(position, momentum, weight)
+
+
+def _density_inputs(density, window, max_working_bytes):
+    """Admit the dense measurement before complex copies or eigensolvers."""
+    if (
+        isinstance(max_working_bytes, bool)
+        or not isinstance(max_working_bytes, Integral)
+        or max_working_bytes < 1
+    ):
+        raise ValueError("max_working_bytes must be a positive integer")
+    raw = np.asarray(window)
+    if raw.ndim != 2 or not raw.size:
+        raise ValueError("window must have a nonempty 2D shape")
+    # Includes density conversion, Hermiticity/PSD checks, FFT temporaries and
+    # a full joint output. This is an admission estimate, not measured peak RSS.
+    if 16 * 16 * raw.size**2 > max_working_bytes:
+        raise ValueError("density measurement exceeds working-memory budget")
+    g, _, _ = _inputs(raw, raw)
+    raw_density = np.asarray(density)
+    if raw_density.shape != (g.size, g.size):
+        raise ValueError("density must be a finite square matrix matching the window size")
+    rho = np.asarray(raw_density, dtype=complex)
+    if not np.all(np.isfinite(rho)):
+        raise ValueError("density must be a finite square matrix matching the window size")
+    scale = float(np.max(np.abs(rho)))
+    if not np.isfinite(np.trace(rho)):
+        raise ValueError("density trace must be finite")
+    tolerance = 64 * np.finfo(float).eps * g.size * scale
+    if not np.allclose(rho, rho.conj().T, atol=tolerance, rtol=0):
+        raise ValueError("density must be Hermitian positive semidefinite")
+    if np.linalg.eigvalsh(rho).min() < -tolerance:
+        raise ValueError("density must be Hermitian positive semidefinite")
+    weight = float(np.trace(rho).real)
+    if weight < 0:
+        raise ValueError("density trace must be nonnegative")
+    return rho, g, weight
+
+
+def _density_momentum_weights(rho, window, position):
+    r"""Weyl weights for one position, including the factor 1/M.
+
+    Validation: cr-axial-phase-space-instrument
+    """
+    shifted = np.roll(window, position, axis=(0, 1)).ravel()
+    localized = shifted.conj()[:, None] * rho * shifted[None, :]
+    transformed = np.fft.fft2(localized.reshape(*window.shape, *window.shape), axes=(0, 1))
+    transformed = np.fft.ifft2(transformed, axes=(2, 3))
+    weights = np.diag(transformed.reshape(rho.shape)).real.reshape(window.shape)
+    if not np.all(np.isfinite(weights)):
+        raise FloatingPointError("momentum weights must be finite")
+    tolerance = 128 * np.finfo(float).eps * window.size * float(np.max(np.abs(rho)))
+    if np.min(weights) < -tolerance:
+        raise FloatingPointError("negative momentum weights exceed FFT roundoff tolerance")
+    return np.maximum(weights, 0.0)
+
+
+def density_phase_space_weights(
+    density, window, *, max_outcomes: int = 1_048_576, max_working_bytes: int = 64 * 1024**2
+) -> np.ndarray:
+    r"""Measure a supplied mixed outgoing density without discarding coherence.
+
+    For the Weyl modes of :func:`phase_space_weights`, return
+    $q_{ab}=\langle g_{ab}|\rho|g_{ab}\rangle/M$. Finite Fourier
+    orthogonality gives $\sum_{ab}q_{ab}=\mathrm{tr}\rho$; this is linear
+    in the incident-normalized density, not its diagonal or a normalized
+    survivor state. Source: finite Weyl identity, as in the pure-state owner.
+    Assumptions: finite periodic grid, supplied positive density in the discrete
+    position basis and a unit window. A rank-one density recovers the pure
+    measurement; zero density gives zero. No physical escape map is inferred.
+
+    ``density[n,m]`` uses flattened C-order position indices. Physical
+    coordinate densities require the cell-area factor before this boundary.
+    A gain density per angstrom instead produces weights per angstrom; this
+    function neither integrates depth nor supplies event probabilities.
+    Dense input and FFT workspace cost O(M²). Limits precede those allocations.
+
+    Validation: cr-axial-phase-space-instrument
+    """
+    if isinstance(max_outcomes, bool) or not isinstance(max_outcomes, Integral) or max_outcomes < 1:
+        raise ValueError("max_outcomes must be a positive integer")
+    if np.size(window) ** 2 > max_outcomes:
+        raise ValueError("joint phase-space weights exceed max_outcomes")
+    rho, g, _ = _density_inputs(density, window, max_working_bytes)
+    weights = np.empty((*g.shape, *g.shape), dtype=float)
+    for position in np.ndindex(g.shape):
+        weights[position] = _density_momentum_weights(rho, g, position)
+    return weights
+
+
+def sample_density_phase_space(
+    density, window, rng: np.random.Generator, *, max_working_bytes: int = 64 * 1024**2
+) -> PhaseSpaceOutcome:
+    r"""Sample a mixed-state joint law with two conditional draws and O(M²) memory.
+
+    The position marginal is $p_a=\sum_n|g_{n-a}|^2\rho_{nn}$.
+    Conditional momentum uses the full localized density, including its
+    off-diagonal elements, rather than separate position/momentum marginals.
+    Source/assumptions: :func:`density_phase_space_weights`. A delta window
+    resolves the position diagonal with uniform conditional momentum. Zero
+    trace refuses before any draw. ``state_weight`` preserves the input trace;
+    no pure-state decomposition or additional mixture draw is performed.
+    Retain the incident-addressed generator across successive events.
+
+    Validation: cr-axial-phase-space-instrument
+    """
+    rho, g, weight = _density_inputs(density, window, max_working_bytes)
+    if weight <= 0:
+        raise ValueError("cannot sample a zero-weight density")
+    # Scaling preserves conditional probabilities and avoids FFT overflow.
+    rho = rho / weight
+    marginal = np.empty(g.shape)
+    diagonal = np.diag(rho).real.reshape(g.shape)
+    for position in np.ndindex(g.shape):
+        marginal[position] = np.sum(np.abs(np.roll(g, position, axis=(0, 1))) ** 2 * diagonal)
+    marginal = np.maximum(marginal, 0.0).ravel()
+    flat_position = rng.choice(g.size, p=marginal / marginal.sum())
+    px, py = np.unravel_index(flat_position, g.shape)
+    position = (int(px), int(py))
+    conditional = _density_momentum_weights(rho, g, position).ravel()
+    total = float(conditional.sum())
+    if total <= 0 or not np.isfinite(total):
+        raise FloatingPointError("selected position has no finite momentum probability")
+    flat_momentum = rng.choice(g.size, p=conditional / total)
+    kx, ky = np.unravel_index(flat_momentum, g.shape)
+    momentum = (int(kx), int(ky))
+    return PhaseSpaceOutcome(position, momentum, weight)
