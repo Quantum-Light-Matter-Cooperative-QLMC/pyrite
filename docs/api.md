@@ -474,6 +474,7 @@ select an accelerator or perform the documented artifact I/O.
 ```python
 from pyrite.transport import Case, simulate_trajectories, summarize_trajectories
 from pyrite.radiation import photon_energies, mc_cxr_spectrum, mc_brem_spectrum
+
 # Provisional directional API; no stability promotion:
 from pyrite.radiation import directional_source, directional_sources
 from pyrite.results.directional import DirectionalSpectrum
