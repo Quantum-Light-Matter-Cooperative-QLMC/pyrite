@@ -90,7 +90,8 @@ Out of scope, and owned elsewhere:
   this bulk source must not be added to a TR result for the same layer
   without an explicit double-counting decision.
 - **Finite-slab escape and absorption.** No escaped or detected yield is
-  implied; production optical/IR routes remain under #533.
+  implied; [#692's proposed production contract](../../research/physics/production-cherenkov.md)
+  defines the geometry, TR refusal and validation gates for that extension.
 - **Strong absorption and resonant X-ray Cherenkov emission** near
   absorption edges, which need the complex susceptibility (see the in-medium
   resonance discussion in [photon escape and dispersion](photon-escape-and-dispersion.md)).

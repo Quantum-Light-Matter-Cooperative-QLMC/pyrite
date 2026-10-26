@@ -211,6 +211,14 @@ Use `pyrite.materials.MaterialDefinition`, `build_medium`, `build_crystal` and
 g/cm³, composition in atoms/Å³ and photon grids in eV. See
 [Adding materials](guides/adding-materials.md) for inputs and storage rules.
 
+The provisional `pyrite.materials.optical.OpticalResponse.to_record()` and
+`OpticalResponse.from_record(record)` preserve explicit optical response
+arrays, disjoint supported bands and provenance through JSON round trips.
+They validate the existing content digest without reloading source data.
+These response records remain outside the supported API contract and do not
+enable optical production transport; see the
+[proposed Cherenkov integration boundary](research/physics/production-cherenkov.md#identity-and-portable-response-records).
+
 ## Photon-energy comparisons
 
 {py:func}`pyrite.photon_energies` computes vacuum CXR line-centre energies
@@ -568,6 +576,13 @@ response and per-component supported bands; they do not lower the production
 X-ray floor or supply optical detector/transport models. See
 [explicit optical TR response](physics/radiation-physics/transition-radiation.md#explicit-optical-response-for-bounded-diagnostics)
 for units, sample/provenance metadata, interpolation policy and an example.
+
+`pyrite.materials.optical.fused_silica_franta_response()` provides pinned
+fitted fused-silica complex-index data with absorption retained.
+`OpticalResponse.require_band(lower_eV, upper_eV)` requires whole-interval
+coverage within one segment, preventing integration across unsupported gaps.
+These provisional inputs do not establish production Cherenkov validity or
+detector calibration; see the [reference-input contract](research/physics/production-cherenkov.md#fused-silica-reference-input).
 
 `pyrite.detectors.optical_energy.CalibratedPulseEnergyDetector.predict_batch`
 integrates collected photon densities shaped `(..., energy)` on a shared

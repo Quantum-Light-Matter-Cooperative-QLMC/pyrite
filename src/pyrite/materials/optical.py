@@ -6,8 +6,10 @@ exp(-i omega t), so Im(epsilon) >= 0. Validation: optical-material-response
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from hashlib import sha256
+from math import isfinite
 from pathlib import Path
 from typing import Any
 
@@ -15,6 +17,24 @@ import numpy as np
 import yaml
 
 from .crystal import HC_EV_ANG
+
+_RECORD_SCHEMA = "pyrite.optical-response-v1"
+_INTERPOLATION = "linear-epsilon-in-eV-v1"
+_METADATA_FIELDS = (
+    "medium",
+    "source",
+    "source_sha256",
+    "license",
+    "sample_state",
+    "dataset_id",
+    "reference",
+    "source_units",
+    "temperature_K",
+    "orientation",
+    "uncertainty",
+    "convention",
+    "symmetry",
+)
 
 
 @dataclass(frozen=True)
@@ -154,6 +174,118 @@ class OpticalResponse:
             )
         return xp.asarray(result, dtype=xp.complex128)
 
+    def require_band(self, lower_eV: float, upper_eV: float) -> None:
+        """Require a positive, finite, nonzero-width closed photon interval.
+
+        The entire interval must lie within one supported segment. Checking
+        only grid nodes would miss gaps crossed by integration intervals.
+        This checks response coverage, not weak-loss or production validity.
+        """
+        if not np.isfinite(lower_eV) or not np.isfinite(upper_eV) or not 0 < lower_eV < upper_eV:
+            raise ValueError(f"{self.medium}: optical band requires 0 < lower < upper, finite eV")
+        if not any(lo <= lower_eV < upper_eV <= hi for lo, hi in self.bands_eV):
+            raise ValueError(
+                f"{self.medium}: optical band crosses unsupported energy or gap; "
+                f"bands {self.bands_eV} eV"
+            )
+
+    def to_record(self) -> dict[str, Any]:
+        """Return a self-contained JSON record of data, support and provenance.
+
+        No source URL is fetched on restoration. The stored digest pins all
+        response content; it is an integrity check, not source authentication.
+        This provisional record does not enable a production optical scorer.
+        Metadata must use strings and a Python int/float or None temperature.
+        """
+        metadata = {key: getattr(self, key) for key in _METADATA_FIELDS}
+        _validate_record_metadata(metadata)
+        return {
+            "schema": _RECORD_SCHEMA,
+            "interpolation": _INTERPOLATION,
+            "digest": self.digest,
+            "metadata": metadata,
+            "segments": [
+                {
+                    "energy_eV": energy.tolist(),
+                    "epsilon_real": eps.real.tolist(),
+                    "epsilon_imag": eps.imag.tolist(),
+                }
+                for energy, eps in self.segments
+            ],
+        }
+
+    @classmethod
+    def from_record(cls, record: Mapping[str, Any]) -> OpticalResponse:
+        """Restore a versioned response, rejecting invalid data or identity.
+
+        Unknown fields, schemas and interpolation policies fail closed. Each
+        segment retains its closed supported interval; gaps are never filled.
+        Numeric columns must be finite JSON numbers, without string coercion.
+        """
+        _record_keys(record, {"schema", "interpolation", "digest", "metadata", "segments"})
+        if record["schema"] != _RECORD_SCHEMA or record["interpolation"] != _INTERPOLATION:
+            raise ValueError("optical response record: unsupported schema or interpolation")
+        metadata = record["metadata"]
+        _validate_record_metadata(metadata)
+        if not isinstance(record["segments"], list) or not record["segments"]:
+            raise ValueError("optical response record: segments must be a nonempty list")
+        segments = []
+        for segment in record["segments"]:
+            _record_keys(segment, {"energy_eV", "epsilon_real", "epsilon_imag"})
+            energy, real, imag = (
+                _record_column(segment[key])
+                for key in ("energy_eV", "epsilon_real", "epsilon_imag")
+            )
+            if real.shape != energy.shape or imag.shape != energy.shape:
+                raise ValueError("optical response record: segment columns must match")
+            eps = np.empty(energy.shape, dtype=complex)
+            eps.real, eps.imag = real, imag
+            segments.append((energy, eps))
+        response = cls(segments=tuple(segments), **metadata)
+        if record["digest"] != response.digest:
+            raise ValueError("optical response record: digest does not match content")
+        return response
+
+
+def _record_keys(record: object, keys: set[str]) -> None:
+    if not isinstance(record, Mapping) or set(record) != keys:
+        raise ValueError("optical response record: missing or unknown fields")
+
+
+def _validate_record_metadata(metadata: Any) -> None:
+    _record_keys(metadata, set(_METADATA_FIELDS))
+    for key in _METADATA_FIELDS:
+        value = metadata[key]
+        if key == "temperature_K":
+            if value is None:
+                continue
+            try:
+                valid = type(value) in (int, float) and value > 0 and isfinite(value)
+            except OverflowError:
+                valid = False
+            if not valid:
+                raise ValueError(
+                    "optical response record: temperature must be a positive number or null"
+                )
+        elif not isinstance(value, str) or not value.strip():
+            raise ValueError(f"optical response record: {key} must be a nonempty string")
+
+
+def _record_column(value: Any) -> np.ndarray:
+    if (
+        not isinstance(value, list)
+        or len(value) < 2
+        or any(type(item) not in (int, float) for item in value)
+    ):
+        raise ValueError("optical response record: columns need at least two JSON numbers")
+    try:
+        column = np.asarray(value, dtype=float)
+    except (OverflowError, ValueError) as error:
+        raise ValueError("optical response record: columns must be finite") from error
+    if not np.all(np.isfinite(column)):
+        raise ValueError("optical response record: columns must be finite")
+    return column
+
 
 def _validate_segment(energy: np.ndarray, eps: np.ndarray, previous: float) -> None:
     if energy.ndim != 1 or energy.size < 2 or eps.shape != energy.shape:
@@ -215,6 +347,36 @@ def gold_johnson_christy_response() -> OpticalResponse:
         sample_state="Johnson–Christy 1972 measured thin films; room temperature, value unstated",
         reference="P. B. Johnson and R. W. Christy, Phys. Rev. B 6, 4370–4379 (1972); "
         "doi:10.1103/PhysRevB.6.4370",
+        temperature_K=None,
+    )
+
+
+_FRANTA_SILICA_SHA256 = "89e3065c48040e9347fb8707371d5528ab45ff4e05be5fd6644658b588ce458e"
+
+
+def fused_silica_franta_response() -> OpticalResponse:
+    """Pinned CC0 fitted fused-silica n,k, including the source's absorption.
+
+    The source describes a 0.405 mm plate and combines optical measurements
+    with published data. Room temperature has no numeric value. The broad
+    table includes absorbing regimes; coverage is not a weak-loss validity
+    claim. In particular, tiny/zero fitted k values are not measured bounds
+    on absorption. No quartz transport material or detector is inferred.
+
+    Source: Franta et al., Proc. SPIE 9890, 989014 (2016),
+    doi:10.1117/12.2227580; pinned refractiveindex.info SiO2/nk/Franta.
+    Uses the existing scalar nonmagnetic n,k conversion/interpolation contract.
+    Validation: optical-material-response (conversion only).
+    """
+    return _refractiveindex_nk(
+        "SiO2-Franta.yml",
+        _FRANTA_SILICA_SHA256,
+        medium="fused silica",
+        record="SiO2/nk/Franta",
+        sample_state="Franta 2016 fitted fused-silica plate, thickness 0.405 mm; "
+        "combined measurements and published data; room temperature, value unstated; "
+        "tiny/zero fitted extinction is not a measured absorption bound",
+        reference="D. Franta et al., Proc. SPIE 9890, 989014 (2016); doi:10.1117/12.2227580",
         temperature_K=None,
     )
 
