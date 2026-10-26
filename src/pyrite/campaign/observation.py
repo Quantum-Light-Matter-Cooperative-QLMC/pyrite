@@ -5,16 +5,11 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any, cast
 
-from ..detectors import IdealPhotonCounter, Timepix3
-from ..instrument import (
-    Acquisition,
-    FilterPlate,
-    PixelGrid,
-    PixelScorer,
-    PlanarDetector,
-    PlanarPose,
-    ResolvedObservation,
-)
+from ..config import AngularSampling as PixelScorer
+from ..config import Timepix3ResponseNumerics
+from ..detectors import IdealPhotonCounter, PixelGrid, PlanarDetector, PlanarPose, Timepix3
+from ..geometry import FilterPlate
+from ..instrument import Acquisition, ResolvedObservation
 from ..materials import MaterialCatalog
 
 
@@ -43,6 +38,9 @@ def _response_from_config(row: Mapping[str, object] | None):
     if row.get("kind") != "timepix3":
         raise ValueError("observation response kind must be 'ideal' or 'timepix3'")
     values = {key: value for key, value in row.items() if key != "kind"}
+    if "numerics" in values:
+        settings = cast(Mapping[str, object], values["numerics"])
+        values["numerics"] = Timepix3ResponseNumerics(**cast(Any, dict(settings)))
     return Timepix3(**cast(dict[str, Any], values))
 
 

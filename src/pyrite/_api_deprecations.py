@@ -27,7 +27,6 @@ def _api_entry(spelling: str, replacement: str, *, since: str) -> ApiDeprecation
 ROOT_API_DEPRECATED_IN = "0.20.5"
 ROOT_API_REPLACEMENTS = {
     "pyrite.Acquisition": "pyrite.observations.Acquisition",
-    "pyrite.AcquisitionBatch": "pyrite.observations.AcquisitionBatch",
     "pyrite.AdaptiveSampling": "pyrite.config.AdaptiveSampling",
     "pyrite.AngularAcceptance": "pyrite.detectors.AngularAcceptance",
     "pyrite.BlazedGrooves": "pyrite.geometry.BlazedGrooves",
@@ -37,7 +36,7 @@ ROOT_API_REPLACEMENTS = {
     "pyrite.CxrReflections": "pyrite.config.CxrReflections",
     "pyrite.EnergyBins": "pyrite.detectors.EnergyBins",
     "pyrite.Filter": "pyrite.geometry.Filter",
-    "pyrite.FilterPlate": "pyrite.detectors.FilterPlate",
+    "pyrite.FilterPlate": "pyrite.geometry.FilterPlate",
     "pyrite.FixedSampling": "pyrite.config.FixedSampling",
     "pyrite.Footprint": "pyrite.geometry.Footprint",
     "pyrite.GdfSource": "pyrite.beams.GdfSource",
@@ -46,7 +45,7 @@ ROOT_API_REPLACEMENTS = {
     "pyrite.NativeAcquisition": "pyrite.observations.NativeAcquisition",
     "pyrite.Offsets": "pyrite.beams.Offsets",
     "pyrite.PixelGrid": "pyrite.detectors.PixelGrid",
-    "pyrite.PixelScorer": "pyrite.observations.PixelScorer",
+    "pyrite.PixelScorer": "pyrite.config.PixelScorer",
     "pyrite.PlanarDetector": "pyrite.detectors.PlanarDetector",
     "pyrite.PlanarPose": "pyrite.detectors.PlanarPose",
     "pyrite.PointBunch": "pyrite.beams.PointBunch",

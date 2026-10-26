@@ -129,7 +129,7 @@ _PHYSICAL_DETECTOR_KEYS = frozenset(
 )
 _PIXEL_SCORER_KEYS = frozenset({"reconstruction", "angular_shape"})
 _OBSERVATION_RESPONSE_KEYS = frozenset(
-    {"kind", "thickness_um", "bias_v", "dE_mc", "dE_out", "n_mc", "seed"}
+    {"kind", "thickness_um", "bias_v", "dE_mc", "dE_out", "n_mc", "seed", "numerics"}
 )
 _ACQUISITION_KEYS = frozenset(
     {
@@ -751,7 +751,40 @@ def _parse_observation_response(
             errors.add(f"{path}.{key}", f"must be a {relation} integer")
         else:
             cleaned[key] = value
+    nested = _parse_nested_timepix_numerics(row, path, errors)
+    if nested is not None:
+        cleaned["numerics"] = nested
     return MappingProxyType(cleaned)
+
+
+def _parse_nested_timepix_numerics(
+    row: Mapping[str, object],
+    path: str,
+    errors: _Errors,
+) -> Mapping[str, object] | None:
+    """Validate optional response matrix settings using the existing decoder.
+
+    The recursive call only receives the four numerical fields, so recursion
+    ends after one level and physical response fields remain disallowed.
+    """
+    if "numerics" not in row:
+        return None
+    location = f"{path}.numerics"
+    nested = _table(row["numerics"], location, errors)
+    if nested is None:
+        return None
+    allowed = {"dE_mc", "dE_out", "n_mc", "seed"}
+    errors.keys(nested, location, allowed)
+    for key in sorted(allowed & row.keys() & nested.keys()):
+        errors.add(f"{path}.{key}", "conflicts with response.numerics; choose one form")
+    parsed = _parse_observation_response(
+        {"kind": "timepix3", **{key: val for key, val in nested.items() if key in allowed}},
+        location,
+        errors,
+    )
+    if parsed is None:
+        return None
+    return MappingProxyType({key: val for key, val in parsed.items() if key != "kind"})
 
 
 _ACQUISITION_UNIFORM_KEYS = ("measured_min_eV", "measured_max_eV", "measured_bin_width_eV")

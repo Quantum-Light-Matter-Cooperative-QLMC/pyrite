@@ -19,20 +19,36 @@ changes when choosing these imports.
 
 ```python
 from pyrite.beams import Beam, TransverseSpot, BunchLength
-from pyrite.geometry import Target, Slab, CrystalCut, RectangularBody
-from pyrite.config import Physics, Numerics, FixedSampling, load_physics
-from pyrite.detectors import Detector, PlanarDetector, PixelGrid, PlanarPose
+from pyrite.geometry import Target, Slab, CrystalCut, RectangularBody, FilterPlate
+from pyrite.config import Physics, Numerics, AngularSampling, load_physics
+from pyrite.detectors import AngularDetector, PlanarDetector, PixelGrid, PlanarPose
+from pyrite.detectors import Timepix3Response, IdealPhotonCounter
 from pyrite.observations import Acquisition, Observation, PixelSampling, ObservationPlan
 ```
 
-The **detector** namespace owns scalar and physical/pixel detector models,
-acceptance, geometry and sensor responses. The **observations** namespace owns
-acquisition requests, pixel scoring, observation plans and observation stores;
-scientific spectra and spatial outputs still live under `pyrite.results`.
-`FilterPlate` is a supported detector-adjacent geometry compatibility type;
-new passive filter roles remain under `pyrite.geometry.Filter`. All these
-new imports resolve to the same objects as the existing root and
-`pyrite.instrument` paths where applicable.
+The **detectors** namespace owns virtual angular acceptance, physical pixel
+geometry, and response models. `AngularDetector` is a semantic alias for the
+legacy scalar `Detector`; `Timepix3Response` and `EagleXOResponse` are aliases
+for existing response implementations, not new physical models. The
+**observations** namespace owns immutable measurement requests (`Observation`,
+`Acquisition`) and retains supported legacy plans and resolved types.
+`pyrite.config.AngularSampling` is the immutable numerical scoring policy
+formerly named `PixelScorer`; changing its `angular_shape` does *not* change
+physical `PixelGrid.shape`. `pyrite.geometry.FilterPlate` owns the passive
+filter plate role while the old detector import remains supported. Computed
+`AcquisitionBatch` values canonically belong to `pyrite.results` (also
+available as the descriptive `PixelCountResult` alias), with the older
+observation/instrument imports preserved. These are object-identical
+aliases: cache payloads, class pickle paths and numerical defaults do not change.
+
+`Timepix3Response` supports the independent immutable
+`pyrite.config.Timepix3ResponseNumerics` policy via its `numerics=` constructor
+argument. Its four historical flat fields remain readable and constructible;
+the underlying value and response identity are unchanged. Passing inconsistent
+flat and grouped settings raises an error. `NativeBinnedResponse` is an optional
+measured-energy-bin interface; a continuous `DetectorResponse.score()` alone
+does not guarantee native bins. Event-level photon readout/digitization remains
+a separate future capability, not implied by the factorized scorer.
 A detector with a response and an `Acquisition` can request expected or
 realized counts; intrinsic spectra remain photons/(incident electron eV sr),
 whereas pixel-integrated and acquired results have different acceptances and
@@ -110,7 +126,7 @@ public API.
 | Root name | Classification | Recommended import | Reason |
 | --- | --- | --- | --- |
 | `Acquisition` | Deprecated | `pyrite.observations.Acquisition` | Use the established canonical domain import. |
-| `AcquisitionBatch` | Deprecated | `pyrite.observations.AcquisitionBatch` | Use the established canonical domain import. |
+| `AcquisitionBatch` | Deferred | `pyrite.results.AcquisitionBatch` | Acquired pixel counts are result values; root migration awaits #707 facade approval. |
 | `AdaptiveSampling` | Deprecated | `pyrite.config.AdaptiveSampling` | Use the established canonical domain import. |
 | `Analysis` | Deferred | `pyrite.campaign.model.Analysis` | Keep the existing import pending canonical ownership review in #707. |
 | `AngularAcceptance` | Deprecated | `pyrite.detectors.AngularAcceptance` | Use the established canonical domain import. |
@@ -126,7 +142,7 @@ public API.
 | `EnergyBins` | Deprecated | `pyrite.detectors.EnergyBins` | Use the established canonical domain import. |
 | `ExecutionConfig` | Deferred | `pyrite.config.ExecutionConfig` | Keep the existing kernel-control name pending composition and naming decisions in #695 and #702. |
 | `Filter` | Deprecated | `pyrite.geometry.Filter` | Use the established canonical domain import. |
-| `FilterPlate` | Deprecated | `pyrite.detectors.FilterPlate` | Use the established canonical domain import. |
+| `FilterPlate` | Deprecated | `pyrite.geometry.FilterPlate` | Passive downstream geometry. |
 | `FixedSampling` | Deprecated | `pyrite.config.FixedSampling` | Use the established canonical domain import. |
 | `Footprint` | Deprecated | `pyrite.geometry.Footprint` | Use the established canonical domain import. |
 | `GdfSource` | Deprecated | `pyrite.beams.GdfSource` | Use the established canonical domain import. |
@@ -140,7 +156,7 @@ public API.
 | `PixelGrid` | Deprecated | `pyrite.detectors.PixelGrid` | Use the established canonical domain import. |
 | `PixelMetadata` | Deferred | `pyrite.results.model.PixelMetadata` | Keep the existing import pending canonical ownership review in #707. |
 | `PixelRayMap` | Deferred | `pyrite.results.model.PixelRayMap` | Keep the existing import pending canonical ownership review in #707. |
-| `PixelScorer` | Deprecated | `pyrite.observations.PixelScorer` | Use the established canonical domain import. |
+| `PixelScorer` | Deprecated | `pyrite.config.PixelScorer` | Use `pyrite.config.AngularSampling` for new code; the legacy name remains the root replacement. |
 | `PlanarDetector` | Deprecated | `pyrite.detectors.PlanarDetector` | Use the established canonical domain import. |
 | `PlanarPose` | Deprecated | `pyrite.detectors.PlanarPose` | Use the established canonical domain import. |
 | `PointBunch` | Deprecated | `pyrite.beams.PointBunch` | Use the established canonical domain import. |

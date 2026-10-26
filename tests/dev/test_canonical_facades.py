@@ -27,6 +27,7 @@ _GEOMETRY_OWNERS = {
     "BlazedGrooves": "pyrite.campaign.geometry",
     "CrystalCut": "pyrite.campaign.geometry",
     "Filter": "pyrite.instrument",
+    "FilterPlate": "pyrite.instrument.model",
     "Footprint": "pyrite.campaign.geometry",
     "Layer": "pyrite.campaign.geometry",
     "RectangularBody": "pyrite.bodies",

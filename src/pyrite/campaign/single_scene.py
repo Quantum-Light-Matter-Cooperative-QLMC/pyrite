@@ -32,8 +32,8 @@ def resolve_pixel_scene(
     from pyrite.campaign.longitudinal import LongitudinalDistribution
     from pyrite.campaign.model import Beam, Numerics, Physics
     from pyrite.campaign.sweep import BeamSpec, beam_replace, target_from_flat
+    from pyrite.config import AngularSampling as PixelScorer
     from pyrite.detectors import EnergyBins
-    from pyrite.instrument import PixelScorer
     from pyrite.montecarlo.transverse import TransverseDistribution
 
     spec = catalog.material(material)

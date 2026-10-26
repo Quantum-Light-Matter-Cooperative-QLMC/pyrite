@@ -27,7 +27,7 @@ class Observation:
         Exposure, reporting bins and optional count realization. Omit to
         inherit legacy Scene acquisition; ``None`` requests spectra only.
     sampling
-        Independent :class:`~pyrite.observations.PixelScorer` numerical policy
+        Independent ``pyrite.config.AngularSampling`` numerical policy
         for a physical pixel detector. Omit to inherit legacy scoring;
         ``None`` selects its default policy.
     name

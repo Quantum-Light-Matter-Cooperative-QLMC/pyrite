@@ -40,6 +40,15 @@ if TYPE_CHECKING:
         FixedSampling as FixedSampling,
     )
     from pyrite.campaign.model import Numerics as Numerics
+    from pyrite.config.response_numerics import (
+        Timepix3ResponseNumerics as Timepix3ResponseNumerics,
+    )
+    from pyrite.instrument.model import (
+        PixelScorer as AngularSampling,
+    )
+    from pyrite.instrument.model import (
+        PixelScorer as PixelScorer,
+    )
 
 _EXPORTS = {
     "AdaptiveSampling": ("pyrite._sampling", "AdaptiveSampling"),
@@ -48,6 +57,7 @@ _EXPORTS = {
     "FixedSampling": ("pyrite._sampling", "FixedSampling"),
     "Numerics": ("pyrite.campaign.model", "Numerics"),
     "PhotonTransport": ("pyrite._photon_config", "PhotonTransport"),
+    "PixelScorer": ("pyrite.instrument", "PixelScorer"),
     "Physics": ("pyrite._numerics", "Physics"),
     "Precision": ("pyrite._precision", "Precision"),
     "RadiationNumerics": ("pyrite._numerics_groups", "RadiationNumerics"),
@@ -56,11 +66,36 @@ _EXPORTS = {
     "load_physics": ("pyrite._config_presets", "load_physics"),
 }
 
-__all__ = list(_EXPORTS)
+# AngularSampling is package-only: avoid expanding the governed root API.
+__all__ = [
+    "AdaptiveSampling",
+    "AngularSampling",
+    "CxrReflections",
+    "ExecutionConfig",
+    "FixedSampling",
+    "Numerics",
+    "PhotonTransport",
+    "Physics",
+    "PixelScorer",
+    "Precision",
+    "RadiationNumerics",
+    "TransportNumerics",
+    "Timepix3ResponseNumerics",
+    "load_numerics",
+    "load_physics",
+]
 
 
 def __getattr__(name: str) -> Any:
     """Resolve a canonical API name without eagerly loading numerical engines."""
+    if name == "Timepix3ResponseNumerics":
+        value = getattr(import_module("pyrite.config.response_numerics"), name)
+        globals()[name] = value
+        return value
+    if name == "AngularSampling":
+        value = import_module("pyrite.instrument").PixelScorer
+        globals()[name] = value
+        return value
     try:
         module, attribute = _EXPORTS[name]
     except KeyError as exc:

@@ -26,6 +26,10 @@ backward compatibility. The submodules are:
   tables    -- results_dataframe, summary_table/show_summary
 """
 
+# Acquired pixel counts are scientific values, not observation requests.
+# Retain their implementation path for existing pickle/checkpoint data.
+from pyrite.instrument.acquisition import AcquisitionBatch
+
 from .metrics import (
     _find_peaks_props,
     cxr_index,
@@ -79,7 +83,12 @@ from .tables import (
     summary_table,
 )
 
+# Compatibility identity: public result spelling without changing pickle module paths.
+PixelCountResult = AcquisitionBatch
+
 __all__ = [
+    "AcquisitionBatch",
+    "PixelCountResult",
     "PER_NA",
     "DEFAULT_BEAM_CURRENT_NA",
     "EmissionMode",
@@ -124,3 +133,14 @@ __all__ = [
     "cxr_quality",
     "cxr_metrics",
 ]
+
+
+def __getattr__(name: str):
+    """Lazy scientific acquisition result aliases; preserve old pickle paths."""
+    if name not in {"AcquisitionBatch", "PixelCountResult"}:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    from pyrite.instrument.acquisition import AcquisitionBatch
+
+    globals()["AcquisitionBatch"] = AcquisitionBatch
+    globals()["PixelCountResult"] = AcquisitionBatch
+    return AcquisitionBatch
