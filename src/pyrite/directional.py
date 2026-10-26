@@ -117,6 +117,8 @@ def directional_source(
 ) -> DirectionalSpectrum:
     """Calculate a detector-free incoherent PXR/CBS angular slice.
 
+    Experimental; canonical import: ``pyrite.radiation.directional_source``.
+
     Equivalent to ``directional_sources(..., components=("pxr-cbs",))["pxr-cbs"]``;
     see :func:`directional_sources` for the parameters.
     """
@@ -145,6 +147,8 @@ def directional_sources(
     components: tuple[str, ...] = ("pxr-cbs",),
 ) -> dict[str, DirectionalSpectrum]:
     """Calculate detector-free escaped angular slices for selected components.
+
+    Experimental; canonical import: ``pyrite.radiation.directional_sources``.
 
     One transport serves every component and direction. Components are kept
     separate (never summed): ``"pxr-cbs"`` (incoherent PXR/CBS with their
@@ -189,7 +193,7 @@ def directional_sources(
         provenance. Each holds escaped density per incident electron/eV/sr and current-scaled rate.
         A finite footprint evaluates every direction, tracing escape to the
         first prism face (side exits included). Only the laterally infinite
-        slab marks face-parallel directions (|n_sample,z| <= 1e-10)
+        slab marks face-parallel directions (``|n_sample,z| <= 1e-10``)
         unsupported (NaN plus mask), never interpreted as zero emission.
         ``provenance["line_window_ceiling_eV"]`` reports the kinematic line
         ceiling; a grid stopping below it truncates relativistic lines.

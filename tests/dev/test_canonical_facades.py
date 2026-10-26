@@ -165,7 +165,15 @@ def test_canonical_names_match_reviewed_manifest() -> None:
     assert not errors
     domains, errors = api_surface.read_facade_domains(root / "api-surface.toml")
     assert not errors
-    assert set(domains) == {"beams", "geometry", "config", "detectors", "observations"}
+    assert set(domains) == {
+        "beams",
+        "geometry",
+        "config",
+        "detectors",
+        "observations",
+        "transport",
+        "radiation",
+    }
     assert not api_surface.check_facades(root, exports, domains)
 
 

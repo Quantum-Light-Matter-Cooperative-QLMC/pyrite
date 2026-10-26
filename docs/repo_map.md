@@ -35,7 +35,9 @@ Components (a + b denotes a static import cycle):
   p11: materials
   p12: optimization
   p13: plots
-  p14: xsgen
+  p14: radiation
+  p15: transport
+  p16: xsgen
 Edges (importer -> imported):
   p0 -> p11
   p0 -> p3
@@ -55,18 +57,18 @@ Edges (importer -> imported):
   p13 -> p3
   p13 -> p6
   p13 -> p7
-  p14 -> p11
-  p14 -> p6
+  p16 -> p11
+  p16 -> p6
   p3 -> p10
   p3 -> p11
-  p3 -> p14
+  p3 -> p16
   p3 -> p5
   p3 -> p6
   p3 -> p7
   p3 -> p9
   p4 -> p10
   p4 -> p11
-  p4 -> p14
+  p4 -> p16
   p4 -> p3
   p4 -> p6
   p4 -> p7
@@ -85,6 +87,7 @@ Edges (importer -> imported):
 ## Entry points
 
 - **`pyrite.quantum`** remains a module and owns quantum configuration plus a curated lazy facade for portable `TransverseStateSpec`, nonportable runtime factories, planar projection, and selected experimental planar/axial solvers and diagnostics. Definitions remain in `quantum_state`, `planar_source`, and `montecarlo.channeling` leaves; aliases preserve object/pickle identity and production admission. `api-surface.toml` governs this module through `package_exports`; the [quantum API map](guides/quantum-api.md) lists status, units, and bounded examples.
+- **Advanced scientific facades**: `transport/__init__.py` lazily aliases the supported lowered `Case`, trajectory simulation and saved-capture summaries; `radiation/__init__.py` aliases deterministic line energies, three supported spectrum functions and experimental directional sources. No engine moves or numerical changes; existing implementation paths retain compatibility. `DirectionalSpectrum` remains owned by `results.directional`. Contracts and migration: [advanced API](api.md#advanced-transport-and-radiation).
 
 - **`pyrite` console script** → `cli:main` (`pyproject.toml [project.scripts]`), lazy Click dispatch for user workflows including `physics` and `numerics`; remote lifecycle is canonical at `remote job`, with the former root `job` hidden through 0.17.0. Retired top-level setup, completion, performance, energy-grid, scan, analyze/export, and flat checkpoint spellings remain hidden compatibility aliases where the D7 registry documents a replacement. Checked user-facing inventory: [CLI reference](repo-design/cli/cli-reference.md).
 - **`import pyrite`** → `__init__`: lightweight lazy exports for `Beam`, target variants, shared `SubstanceRef`/`RectangularBody` descriptions and `Target`/`Filter` roles, `Detector`, `Scene`, path-addressed `Sweep`, `Physics`, `Numerics`, `CxrReflections`, `Precision`, `Analysis`, `Result`, and `simulate`.

@@ -6,7 +6,8 @@ import numpy as np
 import pytest
 
 from pyrite import Beam, Footprint, Numerics, PointBunch, PointSpot, Slab
-from pyrite.directional import directional_source, observation_directions
+from pyrite.directional import observation_directions
+from pyrite.radiation import directional_source
 from pyrite.results.directional import DirectionalSpectrum
 
 

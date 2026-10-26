@@ -13,7 +13,11 @@ import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 
-from pyrite.devtools.api_packages import check_package_contracts, check_runtime_package_contracts
+from pyrite.devtools.api_packages import (
+    check_package_contracts,
+    check_runtime_package_contracts,
+    read_package_inventory,
+)
 from pyrite.devtools.api_root import check_root_policy
 from pyrite.devtools.api_typing import check_typing_exports
 
@@ -282,7 +286,7 @@ def read_facade_exports(source: Path) -> tuple[dict[str, tuple[str, str]], list[
 
 def check_facades(root: Path, exports: dict[str, Export], domains: tuple[str, ...]) -> list[str]:
     """Reject undocumented public facade members and diverging bindings."""
-    errors: list[str] = []
+    packages, _, errors = read_package_inventory(root / "api-surface.toml")
     for domain in domains:
         path = root / "src" / "pyrite" / domain / "__init__.py"
         actual, source_errors = read_facade_exports(path)
@@ -292,6 +296,16 @@ def check_facades(root: Path, exports: dict[str, Export], domains: tuple[str, ..
             for name, export in exports.items()
             if export.domain == domain
         }
+        root_owned = bool(expected)
+        for name, row in packages.get(f"pyrite.{domain}", {}).items():
+            # Existing mixed facades also expose eager/legacy package members.
+            # Their __all__, typing and runtime bindings are checked separately.
+            if root_owned and name not in actual:
+                continue
+            binding = (row.module, row.attribute)
+            if name in expected and expected[name] != binding:
+                errors.append(f"{domain}.{name}: root and facade inventory bindings disagree")
+            expected[name] = binding
         if not expected:
             errors.append(f"{domain}: canonical facade has no owned exports in inventory")
         for name in sorted(expected.keys() - actual.keys()):

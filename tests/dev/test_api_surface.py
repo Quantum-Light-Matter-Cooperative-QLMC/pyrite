@@ -203,3 +203,28 @@ def test_runtime_allowlist_and_warning_replacements_are_governed(tmp_path):
     errors = check_root_policy(root, set(api_surface.CORE_ROOT), api_surface.CORE_ROOT)
     assert any("_ROOT_API differs" in error for error in errors)
     assert any("deprecation replacements differ" in error for error in errors)
+
+
+def test_facade_can_govern_package_exports_without_root_growth(tmp_path):
+    root = _project(tmp_path)
+    manifest = root / "api-surface.toml"
+    manifest.write_text(
+        manifest.read_text().replace(
+            "schema_version = 1\n", 'schema_version = 1\ncanonical_facades = ["transport"]\n'
+        )
+        + '\n[package_exports."pyrite.transport"]\n'
+        + 'Example = {target="pyrite.beam:Example", status="advanced-stable"}\n'
+    )
+    facade = root / "src/pyrite/transport/__init__.py"
+    facade.parent.mkdir()
+    facade.write_text('_EXPORTS = {"Example": ("pyrite.beam", "Example")}\n__all__ = ["Example"]\n')
+    exports, errors = api_surface.read_manifest(manifest)
+    assert not errors
+    assert not api_surface.check_facades(root, exports, ("transport",))
+    facade.write_text(
+        facade.read_text().replace('"pyrite.beam", "Example"', '"pyrite.beam", "Other"')
+    )
+    assert any(
+        "facade binding" in error
+        for error in api_surface.check_facades(root, exports, ("transport",))
+    )
