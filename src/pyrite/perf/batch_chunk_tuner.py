@@ -140,6 +140,7 @@ def _benchmark_worker(
     arrays = {key: np.asarray(_to_cpu(output[key])) for key in _OUTPUTS if output.get(key) is not None}
     np.savez_compressed(
         output_path,
+        allow_pickle=False,
         **arrays,
         n_segments=np.array(output["n_segments"], dtype=np.int64),
         eta=np.array(output["eta"], dtype=np.float64),
