@@ -1,0 +1,18 @@
+created beam lab-beam
+created profile lab-scan from quickstart (inherited: beam, detector)
+profile.current = lab-scan
+KEY              VALUE     SOURCE
+profile.current  lab-scan  config store
+hopg: profile lab-scan
+  label: HOPG (0001)
+  formula: C
+  phase: 2H
+  name: Highly Oriented Pyrolytic Graphite
+  cut: (0001)
+  source: bundled
+  density: 2.26646 g/cm³
+  composition (atoms/angstrom³): {'C': 0.11363677327755675}
+  thickness: [50000] (inherited)
+  energy: [30, 60] (inherited)
+  polar: [45] (inherited)
+  azimuth: [180] (inherited)

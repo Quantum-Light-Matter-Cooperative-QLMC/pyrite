@@ -1,10 +1,13 @@
 # Configuration and profile resolution
 
-PyRITE has three distinct configuration layers. Keeping them separate prevents surprising runs and makes dataset identity reproducible.
+PyRITE separates machine context, catalog campaigns and resolved calculation
+controls. All inputs resolve before dataset identity is computed.
 
 1. **CLI context** selects the current campaign profile, remote target, and workspace root.
 2. **Catalog profiles** select campaign grids, membership, beam, detector, and emission policy from the material catalog (`data/catalog/profiles/`).
-3. **Fidelity presets** (`full` or `survey`) set workload and reduce resolved grids. Fidelity is not a catalog profile. The `--fidelity` option was removed in 0.6.0 (issues #215, #387); every CLI run resolves `full`, and `survey` is retired.
+3. **Calculation controls** select physics, numerics and sampling from explicit
+   profile fields, named presets and built-in defaults. Use profile ranges and
+   trial counts to bound a campaign.
 
 ## CLI context precedence
 
@@ -41,7 +44,7 @@ keys. The inventory below is their maintained owner.
 
 `config set` writes atomically to Click's platform-specific user configuration directory.
 
-The workspace resolver uses an explicit command path first, then the effective `workspace.root`. Generated output paths use `<workspace>/pyrite-output/<kind>/`. With no explicit workspace, output resolution searches upward from cwd for an existing `pyrite-output/` tree before falling back to cwd. See the [output-home rules](../guides/configuration-cookbook.md#choose-an-output-home) for migration and cache lifecycle. Packaged catalog and CIF data remain package-relative and are never redirected into the workspace.
+The workspace resolver uses an explicit command path first, then the effective `workspace.root`. Generated output paths use `<workspace>/pyrite-output/<kind>/`. With no explicit workspace, output resolution searches upward from cwd for an existing `pyrite-output/` tree before falling back to cwd. See the [output-home rules](../reference/catalogs-and-workspaces.md#output-home) for migration and cache lifecycle. Packaged catalog and CIF data remain package-relative and are never redirected into the workspace.
 
 ## Environment-variable reference
 
@@ -163,7 +166,7 @@ owning tools or execution environment.
 
 `pyrite run [PROFILE]` uses the positional profile when present; otherwise it uses `profile.current`. The selected `[profiles.NAME]` row supplies shared scan values. `[profiles.NAME.overrides.MATERIAL]` replaces values for one material. An explicit membership list limits the campaign; an absent list means every configured material. `-m/--material` narrows that resolved membership and does not create another profile.
 
-Named beam references resolve to beam values before hashing. Each detector in the selected profile resolves independently. Scalar fields inherit the built-in 90-degree geometry where omitted; pixel geometry determines its own scalar acceptance. A profile with no declaration has one implicit scalar `default` detector. Referenced object names and labels are display metadata, while detector IDs identify separate output datasets. The built-in detector has no spectral response; scoring preserves the source spectrum apart from acceptance scaling. An explicit emission policy overrides the fidelity preset's default. The photon dispersion model is not configurable: the in-medium relation always applies. Energy-grid references are verified and resolved for the selected profile before a material sweep is built.
+Named beam references resolve to beam values before hashing. Each detector in the selected profile resolves independently. Runs require explicit scalar acceptance fields or pixel geometry, which determines its own scalar acceptance. A profile with no detector declaration must attach one before running. Referenced object names and labels are display metadata, while detector IDs identify separate output datasets. The built-in detector has no spectral response; scoring preserves the source spectrum apart from acceptance scaling. An explicit emission policy overrides the fidelity preset's default. The photon dispersion model is not configurable: the in-medium relation always applies. Energy-grid references are verified and resolved for the selected profile before a material sweep is built.
 
 ## Run resolution order
 

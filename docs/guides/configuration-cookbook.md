@@ -1,100 +1,56 @@
-# Configuration cookbook
+(configuration-cookbook)=
+# Configure and inspect a campaign
 
-Use these recipes to configure a run without editing checkpoint data. Commands show intent; consult the [CLI reference](../repo-design/cli/cli-reference.md) for every option.
+Clone a bundled campaign, attach a narrower beam, and inspect a two-energy HOPG
+scan before computing. This Linux shell exercise uses an installed `pyrite`;
+it needs no reference tables, downloads, or simulation.
 
-## Select defaults for this machine
+(select-defaults-for-this-machine)=
+(choose-an-output-home)=
+(create-and-inspect-a-campaign)=
+(reuse-a-named-beam)=
+(change-one-material-safely)=
+(derive-missing-photon-grids)=
+(diagnose-precedence)=
+## Create and inspect
 
-```bash
-pyrite config set profile.current standard
-pyrite config set remote.target my-cluster
-pyrite config set workspace.root /path/to/pyrite-workspace
-pyrite config list
+Run the block in a subshell with `sh`, or download
+{download}`configuration_cookbook.sh <../examples/configuration_cookbook.sh>`.
+It isolates configuration, catalog edits and workspace in a temporary directory,
+then removes the exercise on exit. Your existing defaults stay intact.
+
+```{literalinclude} ../examples/configuration_cookbook.sh
+:language: bash
 ```
 
-For a temporary override, use a command option or environment variable. It wins over the persistent store and does not mutate it:
+Actual captured command output:
 
-```bash
-PYRITE_PROFILE=quickstart pyrite run -m hopg --quick
-PYRITE_HOME=/scratch/my-run pyrite checkpoint list  # active checkpoints in that workspace
+```{literalinclude} ../examples/data/configuration_cookbook.txt
+:language: text
 ```
 
-For the complete inventory, accepted formats, defaults, and operational controls, see the [environment-variable reference](../repo-design/configuration-resolution.md#environment-variable-reference).
+The scan keeps the demo's explicit `example`-derived beam, `reference` scalar
+detector and adaptive sampling policy. It now selects 30 and 60 keV, with a
+5 µm target (`50000` Å). `inherited` means a range comes from the profile;
+`overridden` would identify a material-specific replacement. Inspect effective
+ranges after edits: those resolved inputs determine checkpoint identity.
 
-## Choose an output home
+## Keep a laboratory setup
 
-Generated outputs default to `<workspace>/pyrite-output/`: `checkpoints/`,
-`observations/`, `trajectories/`, `performance/`, `results/`, `figures/`, and
-`cache/`. Set `workspace.root` once for a fixed home when using `uv tool install`.
-A per-kind directory option overrides its default. Otherwise `PYRITE_HOME` wins
-over `workspace.root`; without either, the nearest ancestor of cwd containing
-`pyrite-output/` is used, falling back to cwd. Running
-from a workspace subdirectory therefore reuses its existing output tree.
+For persistent work, create your own profile with the same commands outside
+the disposable exercise. Bundled names are read-only; user objects go into
+the user catalog layer. Clone a single-material profile when one target needs
+different ranges. Set `workspace.root` to your desired output directory
+with `pyrite config set workspace.root PATH`. A complete, separately versioned
+catalog is useful when the whole laboratory configuration must travel together;
+follow [catalog setup](../reference/catalogs-and-workspaces.md#copy-a-complete-catalog).
 
-On the first CLI output-path resolution, legacy `checkpoints/`, `observations/`,
-`performance-profiles/`, and `results/` with data move into the new tree. A notice
-on stderr names each move. Cross-filesystem moves copy and verify contents
-before removing the source. When both locations exist, PyRITE warns once and uses
-the new location without merging or reading the old one. Help and library imports
-do not move files. Symlinked legacy directories are left alone.
+Once reviewed, `pyrite run lab-scan` executes the saved campaign. Running
+transport needs the [reference tables](getting-started.md#install-and-fetch-reference-data)
+in the selected workspace. Changing the workspace also changes table discovery.
 
-`cache/` contains regenerable Zhai reproductions, analysis intermediates, photon
-grid resolutions, and viewer renders; it is safe to delete. Checkpoints,
-observations, captured trajectories, and exports remain outside it. Remote jobs
-use the same `pyrite-output/<kind>/` layout; remote pulls resolve local destinations
-from the current workspace, including installed-package runs.
-
-## Create and inspect a campaign
-
-```bash
-pyrite profile create my-survey
-pyrite profile set my-survey --material hopg,hbn
-pyrite profile show my-survey
-pyrite profile ranges show my-survey hopg
-```
-
-Set ranges on the profile. When one material needs different ranges, give it its own profile (`pyrite profile create NAME --from PROFILE --material MATERIAL`) rather than a per-material override: overrides silently diverge one material from the profile it appears to follow. `pyrite material set` was removed in 0.6.0 (issue #359); remove existing `[profiles.NAME.overrides.MATERIAL]` range keys by editing the catalog TOML. Inspect the effective material after every edit; `pyrite profile ranges show PROFILE MATERIAL` marks each range `inherited` or `overridden`, and the displayed result, not the TOML fragment alone, is what a run hashes.
-
-## Reuse a named beam
-
-```bash
-pyrite beam create bench --transverse-fwhm-mm 0.1
-pyrite profile set my-survey --beam bench
-pyrite beam show bench
-```
-
-Renaming a beam updates profile references and leaves identities unchanged because resolved values, not names, are hashed. Deletion is blocked while a profile references the beam.
-
-## Change one material safely
-
-```bash
-pyrite profile ranges show my-survey hopg
-pyrite profile create hopg-thick --from my-survey --material hopg
-pyrite profile set hopg-thick --thickness 50000 --dry-run
-pyrite profile ranges show hopg-thick hopg
-```
-
-After changing a profile or material, existing variant checkpoints are not silently reused as the new dataset. Preview stale data with:
-
-```bash
-pyrite checkpoint gc --profile my-survey
-```
-
-Add `--yes` only after checking the exact selection.
-
-## Derive missing photon grids
-
-If `run` reports missing line bounds:
-
-```bash
-PYRITE_PROFILE=my-survey pyrite numerics energy-grid derive --material hopg --energy 30,60
-pyrite-dev energy-grid add PATH_FROM_DERIVE --profile my-survey --material hopg
-pyrite-dev energy-grid verify
-```
-
-Derivation can be remote for heavy work. The stored artifact contains full bounds; do not paste reduced bounds into the catalog.
-
-## Diagnose precedence
-
-Start with `pyrite config list`, then inspect shell variables and the resolved profile/material. Empty configuration environment variables are errors, not a request to fall through. See [Configuration and profile resolution](../repo-design/configuration-resolution.md) for the complete chain and environment-variable reference.
-
-For native GPT time-output electron beams, see [GDF beam import](gpt-gdf-beams.md),including named beam configuration, run overrides, and normalization.
+Use [profile fields](../repo-design/profile-settings.md) for units and setters,
+[campaign contracts](../reference/campaign-configuration.md) for sampling,
+beams and detectors, and [configuration precedence](../repo-design/configuration-resolution.md)
+to diagnose which value wins. [Catalogs and workspaces](../reference/catalogs-and-workspaces.md)
+owns output directories, input tables and catalog selection.

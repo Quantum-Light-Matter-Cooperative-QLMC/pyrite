@@ -24,9 +24,8 @@ performance-profile-analysis
 transition-radiation-demo
 radiation-diagnostics
 directional-source-heatmap
+detector-observations
 analysis-tutorial
-sweep-profiles
-external-catalog
 adding-materials
 gpt-gdf-beams
 troubleshooting

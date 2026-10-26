@@ -133,7 +133,7 @@ The phase-sensitive straggling checks and their scope are recorded under `energy
 
 ## Adaptive electron counts
 
-An adaptive case chooses its own electron count from a target relative standard error instead of a fixed `Ne`. Catalog profiles that set no fixed counts run it by default (target 0.05, 200–20,000 electrons; see [sweep profiles](../guides/sweep-profiles.md#adaptive-electron-counts)). Select it with `Numerics(precision=Precision(...))` in the [Python API](../api.md), or with `pyrite numerics precision set` on a catalog profile ([sweep profiles](../guides/sweep-profiles.md#adaptive-electron-counts)). `run_case` and both phases of `run_cases` retain the policy and report realized statistics under `adaptive_sampling`. The implementation is ledgered as `adaptive-sample-size-stopping`.
+An adaptive case chooses its own electron count from a target relative standard error instead of a fixed `Ne`. Catalog profiles that set no fixed counts run it by default (target 0.05, 200–20,000 electrons; see [adaptive campaign sampling](../reference/campaign-configuration.md#adaptive-electron-counts)). Select it with `Numerics(precision=Precision(...))` in the [Python API](../api.md), or with `pyrite numerics precision set` on a catalog profile ([adaptive campaign sampling](../reference/campaign-configuration.md#adaptive-electron-counts)). `run_case` and both phases of `run_cases` retain the policy and report realized statistics under `adaptive_sampling`. The implementation is ledgered as `adaptive-sample-size-stopping`.
 
 **What is watched.** Transport runs in equal electron blocks $[kB, (k+1)B)$ (`montecarlo/runner/block_transport.py`). After each block, the runner folds a per-electron scalar $m_i$ into running moments for each watched observable:
 
@@ -232,7 +232,7 @@ Spectra are accumulated onto an energy grid, and the grid is a choice with stati
 
 **Peak-pick is unstable near a bin edge.** When a resonance falls close to a boundary, a small parameter change can move the argmax by one bin and the reported peak position discontinuously. Two mitigations apply: compare integrated intensity over a window rather than a single bin where the physics permits, and hold the grid fixed across the arms of a comparison so that any edge effect is common-mode.
 
-The grid construction and its schema are documented separately — the derivation workflow under [material energy grids](../guides/sweep-profiles.md) and the schema decisions in [ADR 0005](../adr/0005-energy-grid-schema-decisions.md). Chunking the reduction over segments never affects binning; it partitions a sum and nothing more.
+The grid construction and its schema are documented separately — the derivation workflow under [campaign photon grids](../reference/campaign-configuration.md#photon-grids) and the schema decisions in [ADR 0005](../adr/0005-energy-grid-schema-decisions.md). Chunking the reduction over segments never affects binning; it partitions a sum and nothing more.
 
 ## Validation
 

@@ -134,7 +134,7 @@ The physical-input facades have these complete `__all__` inventories:
 the existing classes; they preserve constructor signatures, dataclass fields,
 pickle module paths, and scientific serialization. Importing either namespace
 does not load transport engines. `Scene` and `Sweep` remain high-level root
-imports. See the [physical-input ownership guide](../guides/python-api-workflow.md#choose-physical-input-imports)
+imports. See the [physical-input ownership guide](../reference/python-scene-recipes.md#choose-physical-input-imports)
 for body, material-reference, and scene-role conventions.
 
 Specialized root aliases classified as deprecated warn through the existing

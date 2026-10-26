@@ -59,6 +59,8 @@ extensions = [
     "_source_refs",  # checked links to current repository files and definitions
     "_warning_baseline",  # exact boundary around inherited autodoc parse debt
     "_marimo_demo",  # browser-only results demo embedded on the overview page
+    "_tutorials",  # reject stale precomputed tutorial outputs
+    "matplotlib.sphinxext.plot_directive",  # native figures from maintained sources
     "myst_parser",  # render the docs/*.md design notes
     "sphinx.ext.autodoc",  # API docs from docstrings
     "sphinx.ext.autosummary",  # per-module summary tables + stub pages
@@ -121,6 +123,11 @@ myst_enable_extensions = [
 
 myst_heading_anchors = 3
 myst_ref_domains = ["std"]
+
+# Static tutorials render small committed outputs; never run transport in Sphinx.
+plot_formats = [("png", 150), "svg"]
+plot_html_show_formats = False
+plot_html_show_source_link = False
 
 # -- General -----------------------------------------------------------------
 root_doc = "index"

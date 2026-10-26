@@ -220,6 +220,98 @@ pyrite-dev docs --linkcheck
 
 External link checking requires network access and is therefore not part of the offline gate.
 
+## Static executable tutorials
+
+Ordinary tutorials use maintained Python sources plus Matplotlib's
+[`plot` directive](https://matplotlib.org/stable/api/sphinxext_plot_directive_api.html)
+inside MyST pages. A `literalinclude` displays the executable source and the
+directive places its generated figure directly below it in the PyData theme.
+Wrap `.. plot::` in an `eval-rst` fence: the directive inserts generated
+reStructuredText, which MyST's direct directive adapter cannot handle.
+Matplotlib is declared in the docs dependency group. Interactive workflows keep
+the marimo export below.
+
+The infrastructure prototype compared these approaches:
+
+| Approach | Strength | Cost for the current static guides |
+| --- | --- | --- |
+| [MyST-NB](https://myst-nb.readthedocs.io/en/latest/computation/execute.html) | Native notebook cells/outputs and `jupyter-cache` execution | Adds a notebook parser/kernel/cache stack alongside current MyST pages; cache keys still need care for external data and package changes. |
+| [Sphinx-Gallery](https://sphinx-gallery.github.io/stable/configuration.html) | Executable scripts, captured outputs, figures and generated galleries | Adds gallery generation and script narrative conventions for a workflow that needs one figure in an existing page. |
+| [marimo export](https://docs.marimo.io/guides/exporting/) | Maintained reactive sources export to HTML or notebook formats | Best for interactive analysis; native notebook rendering adds an export and parser stage. Static HTML is a separate embedded page. |
+| Matplotlib `plot` directive (selected) | Existing MyST, copyable Python source, native figures, no new rendering package | Explicitly manage small precomputed outputs and their provenance. |
+
+Conventions:
+
+- `docs/examples/NAME.py` owns an executable example. `compute()` returns a
+  JSON-serializable mapping (including resolved seed and result provenance);
+  `plot(data)` returns its Matplotlib figure. A main guard runs the workflow and
+  `plt.show()`. Analysis examples may accept a saved input path in `compute`;
+  pass it through the regeneration command's `--input PATH` option. Use
+  canonical public imports. Use supported PyRITE plotting
+  functions when they accept the result; direct Matplotlib is appropriate for
+  native-grid component comparisons, including loaded checkpoint records,
+  without manufacturing campaign or `Result` adapters.
+- `docs/examples/data/NAME.json` is a small, committed **simulation output**,
+  never invented or experimental data. The wrapper records source SHA-256,
+  package/Python versions and generating checkout revision. Preserve result
+  provenance, table/model identity, units and actual resolved seeds. A dirty
+  generating checkout is recorded by result provenance; the source hash pins
+  the tutorial itself. Do not claim cross-version/backend bitwise identity.
+- `docs/_tutorials.py` registers examples in `NAMES`, regenerates their outputs
+  only on explicit request, and supplies a named rendering entry point for each
+  `plot` directive. It rejects missing outputs or changed source hashes at
+  Sphinx builder initialization. Rendering uses the same `plot(data)` function
+  as the runnable simulation. No Monte Carlo or table downloads run in Sphinx.
+- CLI tutorials may return `display_text` instead of a figure. Regeneration
+  writes that captured output to `docs/examples/data/NAME.txt` for
+  `literalinclude`; freshness checks verify it matches the JSON record.
+  Keep machine-readable completion metadata alongside the transcript. A CLI
+  exercise may own a downloadable `docs/examples/NAME.sh`, invoked by its
+  Python capture helper. Store its SHA-256 as `script_sha256`; freshness checks
+  then reject edits to either source. Isolate user configuration, writable
+  catalog and workspace before any example writes.
+- Figures live only in `docs/_build/` (PNG at 150 dpi plus SVG). Do not commit
+  hand-edited screenshots. Plot native component grids separately; label units,
+  normalization and sample/convergence limitations in the tutorial.
+- Inputs requiring external fixtures belong in `docs/examples/data/` with
+  source/license/provenance metadata. Record their filenames and SHA-256 hashes
+  in the output's `input_sha256` mapping; freshness checks reject changed inputs.
+  Do not silently fetch them. Large or
+  GPU-dependent runs require explicit regeneration outside the normal build;
+  publish only bounded reduced outputs. Optional interactive entry points use
+  maintained marimo sources and lightweight/precomputed inputs.
+
+For the first example, explicitly regenerate with installed reference tables:
+
+```bash
+MPLCONFIGDIR=/tmp/pyrite-matplotlib PYRITE_MC_BACKEND=cpu \
+  uv run python docs/_tutorials.py --regenerate python_api_workflow
+```
+
+The results tutorial loads an existing single-case quickstart checkpoint:
+
+```bash
+uv run python docs/_tutorials.py --regenerate working_with_results \
+  --input pyrite-output/checkpoints/hopg@quickstart-cdf8eed9af74
+```
+
+Use the stem reported by your run when its resolved inputs differ. This
+regeneration reads stored components and preserves their hashes and dataset
+identity; it does not run transport.
+
+Review source and JSON changes together. For a deterministic check in the same
+environment, regenerate twice and compare spectral arrays and resolved identity;
+the metadata can change independently. Source-hash checking detects tutorial
+edits, not scientific drift in the library: rerun affected examples explicitly
+after relevant model/API/data changes. Expensive examples belong in scheduled or
+explicit checks, never normal RTD execution.
+
+`pyrite-dev docs` checks output freshness and renders every registered tutorial
+under warnings-as-errors, with no table dependency. It clears `_build`, so plot
+directive caches cannot hide changed output data. Incremental Sphinx builds can
+reuse figure caches; use the canonical clean command for verification. Focused
+freshness/rendering checks live in `tests/dev/test_docs_tutorials.py`.
+
 ## Browser results demo
 
 The overview page embeds `docs/demo/results_app.py`, a marimo notebook that

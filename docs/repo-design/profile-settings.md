@@ -3,7 +3,7 @@
 Every key a `[profiles.NAME]` table accepts, with its editing path. "TOML" means
 no CLI setter exists: edit `profiles/NAME.toml` in the catalog directory and run
 `pyrite material validate CATALOG_DIR` (catalog commands also validate on load). The
-workflow guide is [Sweep profiles](../guides/sweep-profiles.md); the full schema
+workflow guide is [Configure a campaign](../guides/configuration-cookbook.md); the full schema
 is [Materials catalog schema](materials-catalog-schema.md).
 
 All keys below except `materials` membership bookkeeping are result-affecting:
@@ -31,9 +31,15 @@ on one line. `--output json` retains the stable machine payload.
 | `tilt_deg` | grid, deg | `profile set\|add\|remove --polar` | |
 | `tilt_azim_deg` | grid, deg | `profile set\|add\|remove --azimuth` | |
 | `E_grid_brem` | grid, eV | TOML (`pyrite-dev energy-grid brem set` stores per-material artifacts instead) | absent = built-in 25 eV uniform spacing; uniform bounds resolve per case |
-| `E_grid_line` | grid, eV | TOML (`pyrite-dev energy-grid line` maintains artifacts) | ignored while a line-grid policy is set |
+| `E_grid_cxr` | grid, eV | TOML (`pyrite-dev energy-grid line` maintains artifacts) | ignored while a line-grid policy is set |
 | `energy_grid_refs` | material -> artifact digest | `pyrite numerics energy-grid derive`, `pyrite-dev energy-grid add` | line rows ignored while a line-grid policy is set; brem still applies |
-| `overrides.MATERIAL.*` | any range/grid key above, plus counts | none: `pyrite material set` was removed in 0.6.0 (#359); use a single-material profile | Remove existing override keys by editing the TOML. Bundled stack rows (`thickness_layers`, sapphire thickness) stay until materials and physical objects are separated |
+| `overrides.MATERIAL.*` | any range/grid key above, plus counts | TOML; prefer a single-material profile | Remove existing override keys by editing the TOML. Bundled stack rows (`thickness_layers`, sapphire thickness) stay until materials and physical objects are separated |
+
+Catalog writes use `cxr_trials`, `brem_trials`, `E_grid_cxr` and
+`cxr_grid_policy`. The compatibility spellings `n_electrons`,
+`n_electrons_brem`, `E_grid_line` and `line_grid_policy` still decode to the
+same fields; declaring both spellings of one field is an error. Resolved run
+metadata retains its identity vocabulary.
 
 ## Calculation numerics
 
@@ -46,7 +52,7 @@ in human output. The JSON payload retains its existing source spellings.
 
 | TOML key | Setter flag | Notes |
 |---|---|---|
-| `n_electrons`, `n_electrons_brem` | `--cxr-trials`, `--brem-trials` | single-value grids; `profile set\|add -l/-b` edit them as sweepable grids; old electron options warn and are scheduled for removal in 0.8.0 |
+| `cxr_trials`, `brem_trials` | `--cxr-trials`, `--brem-trials` | single-value grids; `profile set\|add -l/-b` edit them as sweepable grids |
 | `n_families`, `max_reflections` | `--reflection-families`, `--maximum-reflections` | |
 | `mosaic_nodes`, `mosaic_route` | `--mosaic-nodes`, `--mosaic-route` | |
 | `straggling`, `energy_model`, `max_dE_frac` | `--straggling`, `--energy-model`, `--maximum-fractional-energy-loss` | also accepted by `profile create\|set` for compatibility |
@@ -58,7 +64,7 @@ in human output. The JSON payload retains its existing source spellings.
 
 ## Line-grid policy
 
-`pyrite numerics cxr-grid show|set|reset NAME` owns `[profiles.NAME.line_grid_policy]`.
+`pyrite numerics cxr-grid show|set|reset NAME` owns `[profiles.NAME.cxr_grid_policy]`.
 
 | TOML key | Values (default first) | Flag |
 |---|---|---|
@@ -94,8 +100,8 @@ detected counts), `max_spacing_eV` (`PYRITE_ENERGY_GRID_MAX_SPACING_EV`; 3 eV),
 | `emission` | `profile set --emission`; `profile add\|remove --coherent/--incoherent` | absent = `incoherent` |
 | `temporal_profile` | `profile set --temporal-profile/--no-temporal-profile` | absent = off |
 
-Scalar detector fields must be explicit. Since 0.11.0, omitted geometry is a
-usage error; attach `reference` to preserve the old acceptance
+Scalar detector fields must be explicit. Omitted geometry is a
+usage error; attach `reference` to preserve the equivalent scalar acceptance
 and checkpoint identity. This bundled object integrates the 14.08 mm Timepix3
 aperture at 400 mm as one ideal scalar detector (90°, 2.016603235051288° full
 polar span, 0.0012390399999999998 sr), exposing raw spectra without pixel/count
@@ -109,7 +115,7 @@ member-material overrides. An omitted `E_grid_brem` uses the built-in default.
 Creation copies no instrument (pass `--detector reference` for the ideal
 aperture), numerics or line-grid policy. `profile create NAME --from SOURCE`
 copies every SOURCE key except `overrides`, including numerics and
-`line_grid_policy`, and lists the inherited sections.
+`cxr_grid_policy`, and lists the inherited sections.
 
 Detector collections are edited with `profile detector list|show|add|set|reset|rm`.
 Named scalar/pixel objects belong to `pyrite detector`; profile-local edits of a
@@ -117,7 +123,7 @@ reference require `set NAME ID --inline-copy`. Legacy `default` and `physical`
 IDs retain their storage until explicit `profile detector migrate NAME`
 (preview/confirmation, including checkpoint variant consequences). The single
 `profile set --detector` shortcut updates one collection entry and rejects
-ambiguous collections. See [detector workflow](../guides/sweep-profiles.md) for
+ambiguous collections. See [detector contracts](../reference/campaign-configuration.md#detector-collections-filters-and-counting-observations) for
 membership, optional-section resets, migration, and inspection JSON.
 
 ## Pixel acquisition reporting bins
@@ -130,4 +136,4 @@ explicit edges. `profile detector set PROFILE ID --reporting-bins native` and
 `detector create|set NAME --reporting-bins native` replace prior axis settings.
 Concrete native edges resolve per complete observation before identity or
 storage, with at most 65,536 reporting bins. See the
-[profile detector workflow](../guides/sweep-profiles.md).
+[detector contracts](../reference/campaign-configuration.md#detector-collections-filters-and-counting-observations).

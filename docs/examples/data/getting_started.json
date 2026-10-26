@@ -1,0 +1,44 @@
+{
+  "schema": "pyrite.tutorial.v1",
+  "source_sha256": "309a800502fcc80ff37dfe5e87233bd6bcf0edb7c178b5a7e94b08bb91b4bf39",
+  "pyrite_version": "0.21.0",
+  "python_version": "3.14.4",
+  "git_revision": "12839a3d9572db450fd84889da0625715f05fc42",
+  "output": {
+    "command": [
+      "pyrite",
+      "run",
+      "quickstart",
+      "--checkpoint-dir",
+      "<workspace>/pyrite-output/checkpoints",
+      "--workers",
+      "0",
+      "--no-progress",
+      "-o",
+      "json"
+    ],
+    "run": {
+      "errors": [],
+      "ok": true,
+      "payload": {
+        "checkpoints": [
+          "<workspace>/pyrite-output/checkpoints/hopg@quickstart-cdf8eed9af74"
+        ],
+        "completed_materials": [
+          "hopg"
+        ],
+        "elapsed_seconds": 35.541244077999636,
+        "failed_materials": [],
+        "material_errors": {},
+        "operation": "run",
+        "requested_materials": [
+          "hopg"
+        ],
+        "resumable": false
+      },
+      "schema": "cxr.operation-summary",
+      "schema_version": 1
+    },
+    "display_text": "  hopg@quickstart-cdf8eed9af74          0.6 MB       1 records  quickstart\n"
+  }
+}
