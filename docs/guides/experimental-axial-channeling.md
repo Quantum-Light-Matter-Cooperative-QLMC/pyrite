@@ -1,5 +1,8 @@
 # Experimental axial quantum channeling and diagnostics
 
+See the [quantum API map](quantum-api.md) for canonical imports, portable
+specifications, runtime states, and solver/diagnostic status.
+
 :::{warning}
 **Experimental — not rigorously validated.** Axial propagation, stochastic
 scattering, state/coherence observables and radiation diagnostics are research
