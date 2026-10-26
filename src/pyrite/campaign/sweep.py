@@ -957,8 +957,9 @@ def _resolve_case_models(
     bremsstrahlung_model: str,
     radiative: dict[str, Any],
     radiative_model: str,
+    check_kinematic_validity: bool = True,
 ) -> list[Case]:
-    """Resolve "auto" models on the assembled cases, then screen their validity."""
+    """Resolve "auto" models; skip photon optics for transport-only consumers."""
     if inelastic_model == "auto":
         cases = resolve_auto_inelastic(
             cases,
@@ -970,12 +971,14 @@ def _resolve_case_models(
     cases = resolve_atomic_electron_deflection(cases, atomic_electron_deflection)
     if bremsstrahlung_model == "auto":
         cases = resolve_auto_bremsstrahlung(cases, radiative)
-    from .kinematic_validity import warn_kinematic_validity
+    if check_kinematic_validity:
+        from .kinematic_validity import warn_kinematic_validity
     from .thick_target import warn_thick_target
 
     for case in cases:
         require_coupled_radiative(case, radiative_model)
-        warn_kinematic_validity(case)
+        if check_kinematic_validity:
+            warn_kinematic_validity(case)
         warn_thick_target(case)
     return cases
 
@@ -1000,6 +1003,7 @@ def build_cases(
     atomic_electron_deflection="kawrakow",
     positron_transport=False,
     precision: Precision | None = None,
+    check_kinematic_validity: bool = True,
 ):
     """Expand a :class:`Sweep` into a list of :class:`montecarlo.Case` records (the Cartesian
     product over the swept thickness / tilt / azimuth / footprint, each
@@ -1158,4 +1162,5 @@ def build_cases(
         bremsstrahlung_model=bremsstrahlung_model,
         radiative=radiative,
         radiative_model=radiative_model,
+        check_kinematic_validity=check_kinematic_validity,
     )

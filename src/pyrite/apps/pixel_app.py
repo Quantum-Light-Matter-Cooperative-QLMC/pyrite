@@ -107,7 +107,9 @@ def _():
 
 @app.cell
 def _(material_ui):
-    checkpoint_ui = make_checkpoint_picker(mo, material_ui.value["value"], DEFAULT_CHECKPOINT_DIR)
+    checkpoint_ui = make_checkpoint_picker(
+        mo, material_ui.value["value"], DEFAULT_CHECKPOINT_DIR, prefer_observations=True
+    )
     return (checkpoint_ui,)
 
 

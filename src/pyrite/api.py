@@ -208,7 +208,9 @@ def run_provenance(case: Case | Mapping[str, Any], xsgen_tables: Mapping[str, st
     }
 
 
-def build_configured_cases(old_sweep: Any, settings: Any) -> list[Case]:
+def build_configured_cases(
+    old_sweep: Any, settings: Any, *, check_kinematic_validity: bool = True
+) -> list[Case]:
     """Lower a configured `campaign.sweep.Sweep`/`Settings` pair to cases.
 
     This is the production path `pyrite scan` and `pyrite material blaze` take,
@@ -219,7 +221,10 @@ def build_configured_cases(old_sweep: Any, settings: Any) -> list[Case]:
     """
     from .campaign.legacy import adapt_configured_sweep
 
-    return build_sweep_cases(adapt_configured_sweep(old_sweep, settings))
+    return build_sweep_cases(
+        adapt_configured_sweep(old_sweep, settings),
+        check_kinematic_validity=check_kinematic_validity,
+    )
 
 
 def simulate(

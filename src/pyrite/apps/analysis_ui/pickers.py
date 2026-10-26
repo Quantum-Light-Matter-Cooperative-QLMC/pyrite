@@ -59,12 +59,21 @@ def default_checkpoint(material: str | None, menu: tuple[MaterialMenuRow, ...]) 
 
 
 def checkpoint_picker_options(
-    material: str | None, checkpoint_dir: Path | str
+    material: str | None, checkpoint_dir: Path | str, *, prefer_observations: bool = False
 ) -> tuple[list[MaterialMenuRow], str | None]:
-    """Picker rows and initial value; a disabled placeholder leads when there is no default."""
+    """Picker rows and initial value; optionally prefer a stored counting observation."""
     menu = checkpoint_menu(material, checkpoint_dir)
     initial = default_checkpoint(material, menu)
     rows = list(menu)
+    if prefer_observations:
+        from pyrite.observations import observation_inventory
+
+        # A pixel-only named profile has no standard flat checkpoint. Select a
+        # real counting artifact, not an arbitrary variant or an empty index.
+        for row in rows:
+            if observation_inventory(row["value"], checkpoint_dir=checkpoint_dir).entries:
+                initial = row["value"]
+                break
     if menu and initial is None:
         placeholder: MaterialMenuRow = {
             "value": PLACEHOLDER,
@@ -76,9 +85,13 @@ def checkpoint_picker_options(
     return rows, initial
 
 
-def make_checkpoint_picker(mo, material: str | None, checkpoint_dir: Path | str):
+def make_checkpoint_picker(
+    mo, material: str | None, checkpoint_dir: Path | str, *, prefer_observations: bool = False
+):
     """The Checkpoint dropdown for ``material`` (an anywidget ``MaterialSelect``)."""
-    rows, initial = checkpoint_picker_options(material, checkpoint_dir)
+    rows, initial = checkpoint_picker_options(
+        material, checkpoint_dir, prefer_observations=prefer_observations
+    )
     return mo.ui.anywidget(
         MaterialSelect(
             options=rows,

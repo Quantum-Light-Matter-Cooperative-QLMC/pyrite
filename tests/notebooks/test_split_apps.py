@@ -75,6 +75,7 @@ def test_pixel_app_discovers_observations_without_loading_the_checkpoint() -> No
     source = PIXEL_APP.read_text()
 
     assert "selected_checkpoint_stem(checkpoint_ui)" in source
+    assert "prefer_observations=True" in source
     assert "discover_observations(observation_stem)" in source
     assert "load_context" not in source
     assert "from pyrite.apps.analysis_ui.views.pixels import render_pixel_detector" in source

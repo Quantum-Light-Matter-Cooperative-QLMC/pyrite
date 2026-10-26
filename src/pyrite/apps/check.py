@@ -107,7 +107,7 @@ def start_remote_zhai(*, ne, ne_brem, ne_supp, tmd_azimuth, refresh=False):
         "--detach",
         "--ne",
         str(int(ne)),
-        "--ne-brem",
+        "--brem-trials",
         str(int(ne_brem)),
         "--ne-supp",
         str(int(ne_supp)),

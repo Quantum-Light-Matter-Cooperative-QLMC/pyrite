@@ -112,6 +112,7 @@ def build_sweep_cases(
     physics: Physics | None = None,
     quantum: QuantumSetup | None | _Unset = UNSET,
     observation: Observation | None = None,
+    check_kinematic_validity: bool = True,
 ) -> list[Case]:
     """Lower a public sweep; preserve exact D7 expansion for converted sweeps."""
     if sweep._legacy_source is not None:
@@ -177,9 +178,12 @@ def build_sweep_cases(
             positron_transport=physics.positron_transport,
             atomic_electron_deflection=physics.atomic_electron_deflection,
             precision=resolved_numerics.precision,
+            check_kinematic_validity=check_kinematic_validity,
         )
         cases = resolve_shell_ionization(resolve_transition_radiation(cases, physics), physics)
         return resolve_channeling(cases, physics, resolved_numerics)
+    if not check_kinematic_validity:
+        raise ValueError("check_kinematic_validity=False requires a configured legacy sweep")
     overrides = {}
     if numerics is not None:
         overrides["numerics"] = numerics

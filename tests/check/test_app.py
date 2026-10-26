@@ -89,7 +89,7 @@ def test_start_remote_zhai_returns_detached_job_id(monkeypatch):
         "--detach",
         "--ne",
         "11",
-        "--ne-brem",
+        "--brem-trials",
         "3",
         "--ne-supp",
         "5",

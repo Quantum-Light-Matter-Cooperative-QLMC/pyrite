@@ -83,6 +83,35 @@ def test_missing_flat_checkpoint_never_falls_back_to_another_profile(tmp_path):
     assert selected_checkpoint_stem(SimpleNamespace(value={"value": PLACEHOLDER})) is None
 
 
+def test_pixel_picker_prefers_a_named_profile_only_with_stored_observations(tmp_path, monkeypatch):
+    stem = "hopg@pixelated_detector_demo-ab1234"
+    other = "hopg@high_energy-d605b4"
+    _variant(tmp_path, stem, material="hopg", profile="pixelated_detector_demo", digest="ab1234")
+    _variant(tmp_path, other, material="hopg", profile="high_energy", digest="d605b4")
+    seen = []
+
+    def inventory(name, *, checkpoint_dir):
+        seen.append((name, checkpoint_dir))
+        return SimpleNamespace(entries=(object(),) if name == stem else ())
+
+    monkeypatch.setattr("pyrite.observations.observation_inventory", inventory)
+    assert checkpoint_picker_options("hopg", tmp_path)[1] == PLACEHOLDER
+    rows, initial = checkpoint_picker_options("hopg", tmp_path, prefer_observations=True)
+    assert initial == stem
+    assert rows[0]["value"] != PLACEHOLDER
+    assert {row["value"] for row in rows} == {stem, other}
+    assert (stem, tmp_path) in seen
+    assert all(checkpoint_dir == tmp_path for _, checkpoint_dir in seen)
+
+    # An absent observation must not cause an unrelated variant to auto-load.
+    seen.clear()
+    monkeypatch.setattr(
+        "pyrite.observations.observation_inventory",
+        lambda name, *, checkpoint_dir: SimpleNamespace(entries=()),
+    )
+    assert checkpoint_picker_options("hopg", tmp_path, prefer_observations=True)[1] == PLACEHOLDER
+
+
 def test_empty_material_has_no_menu_or_notice(tmp_path):
     assert checkpoint_menu(None, tmp_path) == ()
     assert checkpoint_picker_options("hopg", tmp_path) == ([], None)

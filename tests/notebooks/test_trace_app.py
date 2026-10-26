@@ -9,6 +9,10 @@ APP = Path(__file__).parents[2] / "src" / "pyrite" / "apps" / "trace_app.py"
 def test_penetration_controls_read_the_active_material_scan() -> None:
     source = APP.read_text()
 
+    assert (
+        source.count("build_configured_cases(_sweep, settings, check_kinematic_validity=False)")
+        == 2
+    )
     assert "if MATERIAL is None:" in source
     assert "def _(CATALOG, MATERIAL, fmt_thickness, mo):" in source
     assert "_scan = CATALOG.material(MATERIAL).scan" in source

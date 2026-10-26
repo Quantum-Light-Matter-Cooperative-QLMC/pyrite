@@ -574,14 +574,14 @@ def _(
 
         try:
             _sweep = _make_sweep(_groove_spacing)
-            _traj = build_configured_cases(_sweep, settings)
+            _traj = build_configured_cases(_sweep, settings, check_kinematic_validity=False)
         except ValueError as _exc:
             # geometry/material rejects grooves (tilt=0, substrate/stack, ...):
             # fall back to the flat face and surface the reason.
             _groove_spacing = None
             _groove_note = mo.md(f"*Grooves not applied: {_exc}*")
             _sweep = _make_sweep(None)
-            _traj = build_configured_cases(_sweep, settings)
+            _traj = build_configured_cases(_sweep, settings, check_kinematic_validity=False)
         if not _traj:
             return mo.vstack([_md, mo.md("*No trajectory cases.*")])
         # The sweep has one selected energy and tilt; keep the nearest-case guard

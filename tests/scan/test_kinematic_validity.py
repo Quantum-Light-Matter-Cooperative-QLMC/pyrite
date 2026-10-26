@@ -97,6 +97,22 @@ def test_case_lowering_warns_for_thick_silicon():
     assert "kinematic_validity" not in cases[0].to_dict()
 
 
+def test_transport_only_case_lowering_omits_photon_born_screen(monkeypatch):
+    from pyrite.campaign import kinematic_validity as screen
+    from pyrite.campaign.config import default_settings, trajectory_sweep
+
+    calls = []
+    monkeypatch.setattr(screen, "warn_kinematic_validity", lambda case: calls.append(case["name"]))
+    sweep = trajectory_sweep("hopg", energies=(30,), tilts=(45,), thickness_ang=20000)
+
+    cases = api.build_configured_cases(sweep, default_settings(), check_kinematic_validity=False)
+    assert cases
+    assert calls == []
+
+    api.build_configured_cases(sweep, default_settings())
+    assert len(calls) == len(cases)
+
+
 @pytest.mark.slow
 @pytest.mark.parametrize("material", MATERIALS)
 def test_standard_profile_passes_screen(material):
