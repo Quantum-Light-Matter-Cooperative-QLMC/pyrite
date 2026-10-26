@@ -7,7 +7,7 @@ import pytest
 import pyrite as pr
 from pyrite import api
 from pyrite.detectors import Timepix3
-from pyrite.observations import (
+from pyrite.storage import (
     ObservationStore,
     ObservationStoreError,
     observation_from_result,

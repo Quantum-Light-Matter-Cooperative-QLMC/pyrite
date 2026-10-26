@@ -16,6 +16,11 @@ Start with the [Python API workflow](guides/python-api-workflow.md) for runnable
 examples, units and result interpretation. The [CLI reference](repo-design/cli/cli-reference.md)
 covers command-line contracts.
 
+The [result and storage contracts](repo-design/result-storage-contracts.md)
+explain where scientific spectra, acquired counts, checkpoint readers,
+observations, and worker artifacts belong. Use `pyrite.results` for values
+and `pyrite.storage` for supported persistence operations.
+
 ## Canonical domain imports
 
 New code can import the supported beam, geometry, and configuration objects
