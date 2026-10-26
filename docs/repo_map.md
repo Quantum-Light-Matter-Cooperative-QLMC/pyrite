@@ -60,8 +60,10 @@ Edges (importer -> imported):
   p3 -> p10
   p3 -> p11
   p3 -> p14
+  p3 -> p5
   p3 -> p6
   p3 -> p7
+  p3 -> p9
   p4 -> p10
   p4 -> p11
   p4 -> p14
@@ -70,6 +72,7 @@ Edges (importer -> imported):
   p4 -> p7
   p6 -> p11
   p7 -> p11
+  p7 -> p5
   p8 -> p13
   p8 -> p3
   p8 -> p4
