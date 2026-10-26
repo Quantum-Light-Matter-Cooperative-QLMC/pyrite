@@ -241,7 +241,7 @@ def _(CATALOG, MATERIAL, fmt_thickness, mo):
         value=f"{_energy_values[0]:g} keV",
         label="",
     )
-    _log_energy_values = (1, 3, 10, 30, 100, 300, 1_000, 3_000, 10_000, 30_000, 100_000)
+    _log_energy_values = (10, 20, 50, 100, 200, 500, 1_000, 2_000, 5_000, 10_000, 20_000, 50_000, 100_000)
     _log_energy_options = {
         f"{value / 1000:g} MeV" if value >= 1000 else f"{value:g} keV": value
         for value in _log_energy_values
@@ -401,7 +401,7 @@ def _(mo):
     )
     penetration_secondaries_ui = mo.ui.switch(value=False, label="generate secondaries")
     penetration_secondary_threshold_ui = mo.ui.number(
-        value=1000.0, start=50.0, step=100.0, label="secondary threshold (eV)"
+        value=1_000.0, start=50.0, step=100.0, label="secondary threshold (eV)"
     )
     penetration_max_generation_ui = mo.ui.number(
         value=64, start=0, step=1, label="show through generation"

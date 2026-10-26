@@ -122,7 +122,7 @@ def _tracks_trace(case, data, unit, *, R=_IDENTITY_R, reveal_until_fs=None, gene
         line={
             "color": energy,
             "colorscale": "Turbo",
-            "cmin": 0.0,
+            "cmin": 1.0,  # keV
             "cmax": float(case["E0_keV"]),
             "width": 4 if generation == 0 else 2,
             "showscale": generation == 0,
@@ -222,7 +222,7 @@ def vacuum_legs_trace(
         line={
             "color": vertex_energy,
             "colorscale": "Turbo",
-            "cmin": 0.0,
+            "cmin": 1.0,  # keV
             "cmax": color_max,
             "width": 3,
             "showscale": False,
@@ -455,7 +455,7 @@ def _exit_paths_3d(
     against that roundoff while still well inside any physical slab.
 
     Each dash is colored by its electron's terminal-segment energy on the SAME
-    Turbo scale as the in-crystal tracks (``cmin=0``, ``cmax=E0_keV``), so an
+    Turbo scale as the in-crystal tracks (``cmin=1``, ``cmax=E0_keV``), so an
     exit continuation reads as a faint prolongation of the track that produced
     it rather than a disconnected gray stub. ``showscale`` stays off so the
     tracks own the single energy colorbar. The line is ``"solid"``: any dashed
@@ -534,7 +534,7 @@ def _exit_paths_3d(
         line={
             "color": color,
             "colorscale": "Turbo",
-            "cmin": 0.0,
+            "cmin": 1.0,  # keV
             "cmax": cmax,
             "showscale": False,
             "width": 3,
