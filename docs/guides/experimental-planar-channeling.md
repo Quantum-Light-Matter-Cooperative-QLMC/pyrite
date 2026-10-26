@@ -1,5 +1,8 @@
 # Experimental planar quantum channeling and sources
 
+See the [quantum API map](quantum-api.md) for canonical imports, portable
+specifications, runtime states, and solver/diagnostic status.
+
 :::{warning}
 **Experimental — not rigorously validated.** The planar channeling solver,
 quantum-source projection and channeling-radiation predictions are restricted

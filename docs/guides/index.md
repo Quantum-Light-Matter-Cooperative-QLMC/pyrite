@@ -13,6 +13,7 @@ how-pyrite-works
 python-api-workflow
 configuration-cookbook
 running-on-a-cluster
+quantum-api
 experimental-planar-channeling
 experimental-axial-channeling
 optimization-studies

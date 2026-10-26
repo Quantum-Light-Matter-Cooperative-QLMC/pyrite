@@ -24,6 +24,7 @@ from pyrite.config import Physics, Numerics, AngularSampling, load_physics
 from pyrite.detectors import AngularDetector, PlanarDetector, PixelGrid, PlanarPose
 from pyrite.detectors import Timepix3Response, IdealPhotonCounter
 from pyrite.observations import Acquisition, Observation, PixelSampling, ObservationPlan
+from pyrite.quantum import QuantumSetup, TransverseStateSpec
 ```
 
 The **detectors** namespace owns virtual angular acceptance, physical pixel
@@ -53,6 +54,11 @@ A detector with a response and an `Acquisition` can request expected or
 realized counts; intrinsic spectra remain photons/(incident electron eV sr),
 whereas pixel-integrated and acquired results have different acceptances and
 normalizations (see the [API workflow](guides/python-api-workflow.md)).
+
+The [quantum API map](guides/quantum-api.md) documents portable specs, runtime
+states, configuration, solver results, and experimental diagnostics through
+`pyrite.quantum`. Existing quantum imports retain object identity, serialization,
+and production admission.
 
 Other namespaces retain their existing documented import paths. In particular,
 `pyrite.config.KernelTuning` selects *local kernel controls* and is the **same
@@ -121,8 +127,8 @@ by the linked follow-up. The governed classification is in `api-surface.toml`;
 removal dates are owned by the existing deprecation registry.
 
 `__version__` and `DATA_DIR` remain package metadata. The lazy `states` module
-remains a supported compatibility exposure pending quantum consolidation in
-[#704](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/704);
+remains a supported compatibility exposure for the runtime factories now
+available canonically from `pyrite.quantum`;
 it is outside the domain-object allowlist. Logger and import plumbing are not
 public API.
 
@@ -167,10 +173,10 @@ public API.
 | `PointSpot` | Deprecated | `pyrite.beams.PointSpot` | Use the established canonical domain import. |
 | `Precision` | Deprecated | `pyrite.config.Precision` | Use the established canonical domain import. |
 | `Provenance` | Deferred | `pyrite.results.provenance.Provenance` | Keep the existing import pending canonical ownership review in #707. |
-| `QuantumDynamics` | Deferred | `pyrite.quantum.QuantumDynamics` | Keep the existing import pending canonical ownership review in #704. |
-| `QuantumNumerics` | Deferred | `pyrite.quantum.QuantumNumerics` | Keep the existing import pending canonical ownership review in #704. |
-| `QuantumRegion` | Deferred | `pyrite.quantum.QuantumRegion` | Keep the existing import pending canonical ownership review in #704. |
-| `QuantumSetup` | Deferred | `pyrite.quantum.QuantumSetup` | Keep the existing quantum composition boundary pending #695 and #704. |
+| `QuantumDynamics` | Deferred | `pyrite.quantum.QuantumDynamics` | Canonical quantum ownership is resolved in #704; retain the root alias without warnings pending a separate migration decision. |
+| `QuantumNumerics` | Deferred | `pyrite.quantum.QuantumNumerics` | Canonical quantum ownership is resolved in #704; retain the root alias without warnings pending a separate migration decision. |
+| `QuantumRegion` | Deferred | `pyrite.quantum.QuantumRegion` | Canonical quantum ownership is resolved in #704; retain the root alias without warnings pending a separate migration decision. |
+| `QuantumSetup` | Deferred | `pyrite.quantum.QuantumSetup` | Canonical quantum ownership is resolved in #704; retain the root alias without warnings pending a separate migration decision. |
 | `RadiationNumerics` | Deprecated | `pyrite.config.RadiationNumerics` | Use the established canonical domain import. |
 | `RectangularBody` | Deprecated | `pyrite.geometry.RectangularBody` | Use the established canonical domain import. |
 | `ResolvedObservation` | Deprecated | `pyrite.observations.ResolvedObservation` | Use the established canonical domain import. |
@@ -188,7 +194,7 @@ public API.
 | `Target` | Retained | `pyrite.Target` | Foundational simulation entry point. |
 | `TransportNumerics` | Deprecated | `pyrite.config.TransportNumerics` | Use the established canonical domain import. |
 | `TransverseSpot` | Deprecated | `pyrite.beams.TransverseSpot` | Use the established canonical domain import. |
-| `TransverseStateSpec` | Deferred | `pyrite.quantum_state.TransverseStateSpec` | Keep the existing import pending canonical ownership review in #704. |
+| `TransverseStateSpec` | Deferred | `pyrite.quantum.TransverseStateSpec` | Canonical quantum ownership is resolved in #704; retain the root alias without warnings pending a separate migration decision. |
 | `directional_source` | Deferred | `pyrite.directional.directional_source` | Keep the existing import pending canonical ownership review in #705. |
 | `directional_sources` | Deferred | `pyrite.directional.directional_sources` | Keep the existing import pending canonical ownership review in #705. |
 | `fetch_tables` | Deferred | `pyrite.xsgen.install.fetch_tables` | Keep the existing import pending canonical ownership review in #707. |
@@ -379,6 +385,7 @@ catalog/CLI selectors and full-track external validation remain open.
    pyrite.config.CxrReflections
    pyrite.Numerics
    pyrite.config.Precision
+   pyrite.quantum.TransverseStateSpec
    pyrite.quantum.QuantumSetup
    pyrite.quantum.QuantumRegion
    pyrite.quantum.QuantumDynamics
@@ -544,7 +551,11 @@ contains explicit coordinates, escaped incoherent PXR/CBS density per incident
 electron/eV/sr, supported-direction mask and resolved provenance. `.rate()` uses
 the beam mean current; `.rate(current_na)` rescales stored arrays to ph/s/eV/sr.
 `pyrite.directional_sources(..., components=...)` returns one such result per
-component (`"pxr-cbs"`, `"characteristic"`, `"bremsstrahlung"`) from one transport.
+component (`"pxr-cbs"`, `"characteristic"`, `"bremsstrahlung"`, `"transition"`)
+from one transport. The opt-in `"transition"` component uses the production
+history-coherent planar-crossing model; it requires `footprint=None` and the
+supported X-ray dielectric band. Cherenkov remains an internal bulk diagnostic
+in the app, outside this escaped-source API.
 This new surface is provisional; see [directional heatmaps](guides/directional-source-heatmap.md)
 for the bounded example, full-circle convention, supported geometry and limits.
 

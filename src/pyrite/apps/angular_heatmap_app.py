@@ -7,7 +7,7 @@
 # [tool.marimo.display]
 # theme = "light"
 # ///
-"""Detector-free incoherent PXR/CBS energy–angle heatmap."""
+"""Directional transported-source and internal Cherenkov energy–angle maps."""
 
 import marimo
 
@@ -46,14 +46,14 @@ def _():
             page_title(
                 mo,
                 "Directional source heatmap",
-                "Escaped PXR/CBS, characteristic and bremsstrahlung from a finite target"
+                "PXR/CBS, characteristic, bremsstrahlung, planar TR and bulk Cherenkov"
                 " · no detector or checkpoint",
             ),
             mo.md("""
-        Photon intensity in **ph/s/eV/sr** versus signed observation angle in the
-        lab plane (**0° = incoming beam**, ±180° = backward). Each component is a
-        separate map from the same transport; target self-absorption is traced to
-        the actual crystal faces. No aperture, filter or detector response.
+        Select transported radiation in **ph/s/eV/sr** versus signed lab-plane
+        angle (**0° = incoming beam**, ±180° = backward), or the separate internal
+        Cherenkov source in **ph/electron/eV/polar bin**. Each view states its
+        geometry and normalization. No aperture, filter or detector response.
         """),
         ]
     )
@@ -78,7 +78,20 @@ def _():
 
 
 @app.cell
-def _(fetch_tables, mo):
+def _(mo):
+    source_view = mo.ui.radio(
+        ["Transported sources", "Cherenkov (internal bulk)"],
+        value="Transported sources",
+        label="Radiation view",
+        inline=True,
+    )
+    source_view
+    return (source_view,)
+
+
+@app.cell
+def _(fetch_tables, mo, source_view):
+    mo.stop(source_view.value != "Transported sources")
     # Fresh hosted sessions (e.g. molab) start without PyRITE's pinned data;
     # a complete install returns without network access.
     try:
@@ -92,7 +105,17 @@ def _(fetch_tables, mo):
 
 
 @app.cell
-def _(BACKEND, COMPONENT_LABELS, MapConfig, form_template, material_options, mo, transport_cores):
+def _(
+    BACKEND,
+    COMPONENT_LABELS,
+    MapConfig,
+    form_template,
+    material_options,
+    mo,
+    source_view,
+    transport_cores,
+):
+    mo.stop(source_view.value != "Transported sources")
     _d = MapConfig()
     _materials = material_options()
     _cores = transport_cores(BACKEND.name)
@@ -130,8 +153,8 @@ def _(BACKEND, COMPONENT_LABELS, MapConfig, form_template, material_options, mo,
                 label="Tilts (deg): list or start:stop:step",
                 full_width=True,
             ),
-            tilt_azimuth=mo.ui.number(
-                0, 359.5, value=0, step=0.5, label="Tilt azimuth (deg)", full_width=True
+            tilt_azimuth=mo.ui.text(
+                value="0", label="Target azimuths (deg): list or start:stop:step", full_width=True
             ),
             width=mo.ui.number(1e-4, 1000, value=_d.width_mm, label="Width (mm)", full_width=True),
             height=mo.ui.number(
@@ -151,7 +174,9 @@ def _(BACKEND, COMPONENT_LABELS, MapConfig, form_template, material_options, mo,
                 4, 36_000, value=_d.angle_points, label="Angle samples", full_width=True
             ),
             start=mo.ui.number(10, 1e9, value=_d.start_eV, label="Start (eV)", full_width=True),
-            auto_stop=mo.ui.checkbox(value=True, label="Stop at kinematic line ceiling"),
+            auto_stop=mo.ui.checkbox(
+                value=True, label="Automatic stop (TR: beam; otherwise: lines)"
+            ),
             stop=mo.ui.number(20, 1e9, value=5000, label="Manual stop (eV)", full_width=True),
             energy_points=mo.ui.number(
                 2, 1_000_000, value=_d.energy_points, label="Points", full_width=True
@@ -197,7 +222,7 @@ def _(
                 width_mm=None if _v["infinite"] else _v["width"],
                 height_mm=None if _v["infinite"] else _v["height"],
                 tilts_deg=parse_tilts(_v["tilts"]),
-                tilt_azimuth_deg=_v["tilt_azimuth"],
+                tilt_azimuths_deg=parse_tilts(_v["tilt_azimuth"]),
                 plane_azimuth_deg=_v["plane"],
                 start_eV=_v["start"],
                 stop_eV=None if _v["auto_stop"] else _v["stop"],
@@ -214,7 +239,7 @@ def _(
         )
         _start = time.perf_counter()
         with mo.status.spinner(
-            f"{BACKEND.name.upper()}: one transport per tilt, then "
+            f"{BACKEND.name.upper()}: one transport per polar/azimuth orientation, then "
             f"{config.scoring_work:.3g} electron·component·direction·energy evaluations…"
         ):
             maps, cached = calculate_maps_reporting_cache(config)
@@ -226,7 +251,11 @@ def _(
 
 @app.cell
 def _(COMPONENT_LABELS, config, maps, maps_npz, mo):
-    _tilts = {f"{m[config.components[0]].case['tilt_deg']:g}°": i for i, m in enumerate(maps)}
+    _tilts = {
+        f"{m[config.components[0]].case['tilt_deg']:g}° / "
+        f"{m[config.components[0]].case['tilt_azim_deg']:g}°": i
+        for i, m in enumerate(maps)
+    }
     _first = maps[0][config.components[0]]
     component = mo.ui.radio(
         {COMPONENT_LABELS[c]: c for c in config.components},
@@ -246,9 +275,13 @@ def _(COMPONENT_LABELS, config, maps, maps_npz, mo):
     selection = mo.ui.multiselect(
         options=_tilts, value=list(_tilts)[:4], label="Tilts shown (compare)"
     )
-    tilt_values = [float(m[config.components[0]].case["tilt_deg"]) for m in maps]
+    tilt_values = sorted({float(m[config.components[0]].case["tilt_deg"]) for m in maps})
     step = mo.ui.slider(
         steps=tilt_values, value=tilt_values[0], label="Tilt (deg, step)", show_value=True
+    )
+    _azimuths = sorted({float(m[config.components[0]].case["tilt_azim_deg"]) for m in maps})
+    azimuth_step = mo.ui.slider(
+        steps=_azimuths, value=_azimuths[0], label="Target azimuth (deg)", show_value=True
     )
     cut_energy = mo.ui.number(
         float(_first.energy_eV[0]),
@@ -266,10 +299,14 @@ def _(COMPONENT_LABELS, config, maps, maps_npz, mo):
     )
     mo.vstack(
         [
-            mo.md("**Display** · redraws cached maps, no recompute"),
+            mo.md(
+                "**Display** · sliders browse cached polar/azimuth pairs, no recompute. "
+                "New orientations require **Run source maps** above. "
+                "TR requires the explicitly selected infinite-slab geometry."
+            ),
             mo.hstack([component, layout], justify="start", gap=2, wrap=True),
             mo.hstack(
-                [current, color, decades, selection, step],
+                [current, color, decades, selection, step, azimuth_step],
                 justify="start",
                 gap=2,
                 align="end",
@@ -279,6 +316,7 @@ def _(COMPONENT_LABELS, config, maps, maps_npz, mo):
         ]
     )
     return (
+        azimuth_step,
         color,
         component,
         current,
@@ -295,6 +333,7 @@ def _(COMPONENT_LABELS, config, maps, maps_npz, mo):
 @app.cell
 def _(
     BACKEND,
+    azimuth_step,
     cached,
     color,
     component,
@@ -313,10 +352,14 @@ def _(
     selection,
     step,
     tilt_panels,
-    tilt_values,
 ):
     _indices = (
-        [tilt_values.index(step.value)]
+        [
+            i
+            for i, m in enumerate(maps)
+            if m[component.value].case["tilt_deg"] == step.value
+            and m[component.value].case["tilt_azim_deg"] == azimuth_step.value
+        ]
         if layout.value == "Step through tilts"
         else sorted(selection.value)
     )
@@ -341,7 +384,7 @@ def _(
                     "Footprint": _footprint,
                     "Photon grid": f"{_grid[0]:g}–{_grid[-1]:g} eV × {len(_grid)}",
                     "Line ceiling": f"{_ceiling:g} eV",
-                    "Histories/tilt": config.electrons,
+                    "Histories/orientation": config.electrons,
                 },
             ),
             mo.callout(
@@ -400,17 +443,106 @@ def _(maps, mo):
       interference. Characteristic lines are emitted isotropically, so their map
       shows escape geometry. Bremsstrahlung uses the BremsLib angular model when its
       tables are installed (`pyrite tables fetch bremslib`), otherwise isotropic EEDL.
-      Coherent, channeling and transition radiation are excluded here; see the TR app.
+      TR uses the production history-coherent planar crossing scorer, only for
+      explicitly selected infinite slabs and supported X-ray dielectric bands.
+      Bunch-coherent and channeling radiation are excluded.
     - **Photon window:** the automatic stop is the closed-form PXR/CBS bound
-      ħcβ|g|max/(1 − β), capped at the beam energy. Use a manual stop for the
-      bremsstrahlung continuum, which extends to the beam energy.
+      ħcβ|g|max/(1 − β), capped at the beam energy. When TR is selected, automatic
+      stop uses beam energy instead. Resolve/refine the relevant TR band manually;
+      finite grids do not certify formation-zone or classical-emission validity.
     - **Tilts:** a comma list or `start:stop:step` range (e.g. `0:80:5`). Each tilt is
-      one transport; *Step through tilts* browses the cached maps with a slider.
+      one transport per target polar/azimuth pair; sliders browse cached pairs.
+      Target azimuth rotates the sample; plane azimuth rotates the observation
+      plane. Submit the form to calculate new orientations.
     - **Execution:** the array backend is fixed when the app starts. Launch with
       `pyrite app angular-heatmap launch --backend cuda` to offer the CUDA core.
       Use `pyrite.directional_sources` for scripted or remote studies.
     """)
                 }
+            ),
+        ]
+    )
+    return
+
+
+@app.cell
+def _(mo, source_view):
+    mo.stop(source_view.value != "Cherenkov (internal bulk)")
+    from pyrite.apps.angular_cherenkov import cherenkov_form, submitted_config
+
+    cone_form = cherenkov_form(mo)
+    mo.vstack(
+        [
+            mo.md(
+                "**Internal homogeneous Cherenkov source** · explicit constant index, straight "
+                "fixed-speed passage. No target escape, interfaces, refraction or TIR. "
+                "Target polar/azimuth settings do not affect this bulk model. "
+                "This diagnostic is separate from TR and is never added to it. "
+                "Choose a transparent band where the declared index is nearly constant "
+                "and photon energy is far below the beam kinetic energy."
+            ),
+            cone_form,
+        ]
+    )
+    return cone_form, submitted_config
+
+
+@app.cell
+def _(cone_form, mo, submitted_config):
+    import numpy as _np
+
+    from pyrite.apps.angular_cherenkov import VALUE_LABEL, calculate_cherenkov, cherenkov_npz
+
+    try:
+        cone_config = submitted_config(cone_form.value)
+        cone_panel, _edges, _source = calculate_cherenkov(cone_config)
+    except ValueError as error:
+        mo.stop(True, mo.callout(mo.md(str(error)), kind="danger"))
+    cone_energy = mo.ui.number(
+        cone_config.start_eV,
+        cone_config.stop_eV,
+        value=float(cone_panel.energy_eV[len(cone_panel.energy_eV) // 2]),
+        label="Cherenkov cut energy (eV)",
+    )
+    cone_angle = mo.ui.number(0, 180, value=45, label="Cone cut angle (deg)")
+    mo.vstack(
+        [
+            mo.md(
+                "Yield integrates each full-azimuth polar bin and the declared path; "
+                "**ph/electron/eV/bin**, not a pointwise per-sr density. "
+                + (
+                    "Below threshold: physical zero yield."
+                    if not _source.above_threshold.any()
+                    else f"Cone half-angle: {_np.degrees(_source.theta_rad[0]):.3g}°."
+                )
+            ),
+            mo.hstack([cone_energy, cone_angle]),
+            mo.download(
+                data=lambda: cherenkov_npz(cone_config),
+                filename="cherenkov_bulk_source.npz",
+                mimetype="application/octet-stream",
+                label="Download Cherenkov source (.npz)",
+            ),
+        ]
+    )
+    return VALUE_LABEL, cone_angle, cone_energy, cone_panel
+
+
+@app.cell
+def _(VALUE_LABEL, cone_angle, cone_energy, cone_panel, heatmap_figure, mo, profile_figure):
+    mo.vstack(
+        [
+            heatmap_figure(
+                [cone_panel],
+                value_label=VALUE_LABEL,
+                angle_label="Polar angle about velocity (deg, full-azimuth bins)",
+            ),
+            profile_figure(
+                [cone_panel],
+                value_label=VALUE_LABEL,
+                energy_eV=cone_energy.value,
+                angle_deg=cone_angle.value,
+                angle_label="Polar-bin centre (deg)",
             ),
         ]
     )
