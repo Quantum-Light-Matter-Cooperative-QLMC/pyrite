@@ -8,7 +8,7 @@ from dataclasses import fields, is_dataclass
 from functools import cache
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 
@@ -51,6 +51,9 @@ from .observations.plan import ObservationPlan, PixelSampling
 from .observations.spec import Observation
 from .quantum import QuantumSetup
 from .results.model import CxrSpectra, Result, SpectralDensity
+
+if TYPE_CHECKING:
+    from .execution.protocol import Executor
 
 
 def _canonical_value(value: Any) -> Any:
@@ -230,6 +233,7 @@ def simulate(
     acquisition: Acquisition | NativeAcquisition | None = None,
     quantum: QuantumSetup | None | _Unset = UNSET,
     observation: Observation | None = None,
+    executor: "Executor | None" = None,
 ) -> Result:
     """Simulate one scene without reading or writing a checkpoint.
 
@@ -270,6 +274,12 @@ def simulate(
         Independent response, acquisition and numerical sampling request.
         References the scene's detector or supplies a virtual angular detector.
         Conflicting embedded legacy settings raise before transport.
+    executor
+        Optional existing :class:`~pyrite.execution.Executor` scheduler. Omit
+        for the historical in-process path. Requires automatic transport-core
+        selection; distributed executors may write their configured worker
+        artifacts, but never simulation checkpoints. Scheduler selection is
+        recorded separately from scientific identity.
 
     Returns
     -------
@@ -297,13 +307,19 @@ def simulate(
         acquisition=acquisition,
         quantum=quantum,
         observation=observation,
+        executor=executor,
         require_detector=True,
     )
     scene, resolved_numerics = request.scene, request.numerics
     case, xsgen_tables = _source_case(request)
     if isinstance(scene.detector, PlanarDetector):
         return _simulate_planar(request, case, xsgen_tables)
-    output = run_case(case, transport_core=resolved_numerics.transport_core)
+    if request.executor is None:
+        output = run_case(case, transport_core=resolved_numerics.transport_core)
+    else:
+        from .execution._simulation import execute_simulation
+
+        output = execute_simulation(request.executor, case, xsgen_tables)
     background_energy = output.get("E_grid_brem", output["E_grid"])
     background = output.get("brem_wide", output["brem"])
     if scene.physics.brem_source != "mc":
@@ -453,11 +469,8 @@ def _simulate_planar(
     identity_provenance: dict[str, Any] = {}
     if scene.acquisition is None:
         sampling = PixelSampling.of(detector, scorer.angular_shape)
-        output = run_case_directions(
-            case,
-            sampling.directions_sample(tilt_deg=tilt_deg, tilt_azim_deg=tilt_azim_deg),
-            transport_core=numerics.transport_core,
-        )
+        directions = sampling.directions_sample(tilt_deg=tilt_deg, tilt_azim_deg=tilt_azim_deg)
+        output = _execute_planar(request, case, xsgen_tables, directions)
         spatial = sampling.spatial(
             output,
             detector=detector,
@@ -487,9 +500,7 @@ def _simulate_planar(
             emission=scene.physics.emission_policy,
             brem_source=cast(str, scene.physics.brem_source),
         )
-        output = run_case_directions(
-            case, plan.directions_sample, transport_core=numerics.transport_core
-        )
+        output = _execute_planar(request, case, xsgen_tables, plan.directions_sample)
         stored = plan.assemble(output, provenance={})
         spatial = stored.spatial
         observation_digest = stored.digest
@@ -562,6 +573,16 @@ def _aperture_result(output):
     from .results.aperture import aperture_from_payload
 
     return aperture_from_payload(output.get("photon_aperture"))
+
+
+def _execute_planar(
+    request: ResolvedSimulation, case: Case, xsgen_tables: Mapping[str, str], directions: np.ndarray
+) -> dict[str, Any]:
+    if request.executor is None:
+        return run_case_directions(case, directions, transport_core=request.numerics.transport_core)
+    from .execution._simulation import execute_simulation
+
+    return execute_simulation(request.executor, case, xsgen_tables, directions=directions)
 
 
 __all__ = ["build_case", "build_configured_cases", "build_sweep_cases", "simulate"]

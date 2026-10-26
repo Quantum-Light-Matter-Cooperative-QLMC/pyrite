@@ -265,6 +265,26 @@ change case or observation identity. Meanwhile,
 The [observation example](guides/python-api-workflow.md#compose-independent-observations)
 shows how to reuse the same geometry.
 
+Use `simulate(scene, executor=executor)` to select an existing
+`pyrite.execution.Executor` independently of the physical scene. For example,
+`LocalExecutor()` uses the established batch runner for the single case.
+Omitting `executor` retains the original in-process simulation path. Scalar,
+planar and counting observations use the same result assembly and scientific
+identity in both forms. The executor must return one completed result;
+interrupted or missing directional results fail explicitly.
+
+This opt-in route currently requires `Numerics.transport_core="auto"`, since
+batch executors do not accept a per-call transport-core override. Kernel
+chunk settings remain on `Numerics`; scheduler settings remain on the executor.
+Dask and SLURM executors keep their existing caller-configured artifact stores
+and table-aware case keys. Their returned artifacts are checked against the
+resolved source key and requested directions before use. Such executors can
+write worker artifacts; `simulate` does not write simulation checkpoints.
+`result.provenance["execution"]` records the executor class and its available
+typed resource, scheduler and retry settings separately from scientific
+identity. These describe requests, not measured worker hardware. A shared scientific identity does not promise bitwise
+agreement across backends or scheduling strategies.
+
 `simulate` returns an in-memory `Result` without reading or writing checkpoints.
 Radiation families remain separate: `cxr.incoherent`, optional `cxr.coherent`,
 `brem` and optional `characteristic`. Each spectrum carries its energy grid

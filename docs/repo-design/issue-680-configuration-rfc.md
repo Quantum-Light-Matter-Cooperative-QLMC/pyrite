@@ -1,11 +1,12 @@
 # Simulation composition RFC: physical scenes and independent run configuration
 
-**Status:** Target contract; shared resolution and independent quantum and
-observation composition are implemented. Scene's run/acquisition settings are
+**Status:** Shared resolution and independent quantum, observation and executor
+composition are implemented. Scene's run/acquisition settings are
 compatibility-only `InitVar`s excluded from its canonical dataclass fields;
 angular and planar detector responses and planar scoring do as well.
 Configured profile adapters accept independent run and observation arguments;
-downstream consumer migration remains. Unit-bearing physical inputs use the
+result acquisition, display and observation persistence use independent run
+metadata, with legacy-result fallbacks. Unit-bearing physical inputs use the
 normalization introduced by #709.
 **Audit base:** `main` at `2ce1f174`, 2026-10-25.
 **Scope:** [#680](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/680),
@@ -52,8 +53,11 @@ compatibility attribute access while `physics`, `numerics`, `quantum` and
 and `.scorer` are likewise excluded from their dataclass values. Compatibility
 values survive `replace()` and pickle round-trips but do not enter physical
 dataclass representations. The
-independent execution argument in the proposed example below remains future
-work; current execution controls use `Numerics.execution`.
+independent `simulate(..., executor=...)` argument uses the existing batch
+executor protocol for scalar and planar observations. Omission retains the
+historical direct path. Batch execution requires automatic transport-core
+selection because the executor protocol cannot forward an explicit core pin;
+kernel tuning stays in `Numerics.execution`, distinct from scheduling.
 No new public request type, units package, case schema or numerical model is
 introduced by the resolver migration.
 
@@ -137,7 +141,7 @@ result = simulate(
     numerics=numerics,
     observation=observation,
     quantum=quantum_setup,
-    execution=execution,
+    executor=executor,
 )
 ```
 
@@ -240,7 +244,7 @@ not an undocumented recursive merge:
 | Omitted run argument with legacy scene settings | Use legacy values; retain historical defaults and serialized output. |
 | Omitted run argument with canonical scene | Use the documented schema default. |
 | Canonical `observation` plus embedded legacy response/acquisition/scorer | Accept if their effective values agree; reject differing explicit values with both paths in the diagnostic. |
-| Explicit execution plus legacy numerical execution fields | Accept agreeing values; reject differing explicitly supplied fields. Omitted legacy defaults do not conflict. |
+| Explicit `executor` plus numerical kernel tuning | Scheduler and kernel settings remain independent. Reject an explicit transport-core pin before preparation because batch executors cannot preserve it. Chunk settings still lower through the existing case fields. |
 | Scene plus component `target`, `detector` or `filters` | Keep the existing mixed-input error; physical changes require a new scene. |
 | Conflicting quantum setup and legacy channeling fields | Preserve refusal of contradictory explicit settings; never silently choose one. |
 | Invalid detector reference or unsupported response/acquisition capability | Refuse before transport or writes. |
