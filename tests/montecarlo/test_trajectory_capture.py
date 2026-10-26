@@ -306,7 +306,8 @@ def test_cuda_resident_run_captures_device_segments(tmp_path):
 # ---- completion and overwrite ---------------------------------------------
 
 
-def test_interrupted_write_leaves_nothing_readable(tmp_path, monkeypatch):
+@pytest.mark.parametrize("storage_policy", ["compact", "throughput"])
+def test_interrupted_write_leaves_nothing_readable(tmp_path, monkeypatch, storage_policy):
     real = traj._write_node
     calls = []
 
@@ -320,7 +321,9 @@ def test_interrupted_write_leaves_nothing_readable(tmp_path, monkeypatch):
     segs = simulate_trajectories(20.0, 5, 2000.0, seed=0, **_SI)
 
     with pytest.raises(KeyboardInterrupt):
-        write_trajectory_artifact(tmp_path / "a.h5", segs, case=_case())
+        write_trajectory_artifact(
+            tmp_path / "a.h5", segs, case=_case(), storage_policy=storage_policy
+        )
 
     assert list(tmp_path.iterdir()) == []
 
@@ -1009,6 +1012,45 @@ def test_schema_3_stores_compact_rows_and_reads_them_back_exactly(tmp_path):
     artifact = read_trajectory_artifact(path)
     assert artifact.schema_version == 3
     _assert_same_tree(artifact.transport, segs)
+
+
+@pytest.mark.parametrize(
+    ("storage_policy", "compression"), [("compact", "lzf"), ("throughput", None)]
+)
+def test_capture_storage_policy_round_trip(tmp_path, storage_policy, compression):
+    segs = _bunched_interleaved_transport()
+    capture = TrajectoryCapture(root=str(tmp_path), storage_policy=storage_policy)
+    path = capture.write(_case(), segs)
+
+    with h5py.File(path) as handle:
+        assert handle.attrs["schema_version"] == traj.SCHEMA_VERSION
+        assert handle.attrs["storage_policy"] == storage_policy
+        assert handle.attrs["complete"]
+        row = handle["transport/r_mid"]
+        assert row.compression == compression
+        assert bool(row.shuffle) == (compression is not None)
+        assert row.chunks == (min(traj._ROW_CHUNK, len(segs["r_mid"])), 3)
+        assert handle["transport/electron_id"].dtype == np.dtype("int32")
+        assert handle["transport/t0_ang"].attrs["pyrite_kind"] == "electron_rows"
+        assert handle["transport/elec_id"].id == handle["transport/electron_id"].id
+        assert handle["electron_index/electron_id"].compression == compression
+        assert handle["transport_order"].compression == compression
+
+    _assert_same_tree(read_trajectory_artifact(path).transport, segs)
+
+
+@pytest.mark.parametrize("invalid", ["fast", "", "Compact"])
+def test_invalid_capture_storage_policy_is_rejected_before_io(tmp_path, invalid):
+    with pytest.raises(ValueError, match="storage_policy"):
+        TrajectoryCapture(root=str(tmp_path), storage_policy=invalid)
+    with pytest.raises(ValueError, match="storage_policy"):
+        write_trajectory_artifact(
+            tmp_path / "bad.h5",
+            {"r_mid": np.zeros((3, 3))},
+            case=_case(),
+            storage_policy=invalid,
+        )
+    assert not list(tmp_path.iterdir())
 
 
 def test_per_history_field_that_varies_stays_per_row(tmp_path):

@@ -6,11 +6,29 @@
 
 Schema 3 changes only how row fields (one entry per segment) sit on disk. `read_trajectory_artifact(...).transport` still returns the transported mapping with the same dtype, shape, row order and values. Spectra replayed from a schema-3 artifact equal those from schema 2.
 
-- **Chunked, compressed rows.** Each row dataset uses 4,096-row chunks with the `shuffle` filter and LZF (`_ROW_CHUNK`, `_ROW_FILTERS`). Rows are written in bounded blocks aligned to whole chunks, so device-resident captures still download one block at a time.
+- **Chunked, compressed rows.** By default each row dataset uses 4,096-row chunks with the `shuffle` filter and LZF (`_ROW_CHUNK`, `_ROW_FILTERS`). Rows are written in bounded blocks aligned to whole chunks, so device-resident captures still download one block at a time.
 - **Per-electron index.** `/electron_index` holds `electron_id`, `row_start` and `row_stop` for each stored history run. Streaming (`iter_electron_row_blocks`), history selection (`select_trajectories` with histories, `--first` or `--sample`) and export read run boundaries from it instead of scanning or bisecting `electron_id`.
 - **Per-history constants.** `t0_ang` is stored once per index entry (`pyrite_kind = "electron_rows"`). Before choosing that form, the writer checks that the value is bitwise identical across every row of each history. If any history varies, the field stays per-row.
 - **Narrow IDs.** `electron_id`, `track_id`, `parent_id` and `flight_id` are stored as `int32`, and `substep_id` as `int16` (or `int32` when needed). Each narrowing applies only when the field's full range fits; the transported dtype is kept in `pyrite_dtype`. `/transport_order` and the index arrays use `int32` when they fit.
 - **One reader seam.** Raw `/transport` datasets no longer equal the transported arrays, so every reader goes through `transport_view(handle)`. It restores the transported dtype, expands per-history fields to rows, and slices rows like an h5py dataset. Schema 1/2 nodes pass through it unchanged. The view caches node lookups, because h5py attribute and group access cost more than a small selected read.
+
+## Capture storage policies
+
+`TrajectoryCapture(root=..., storage_policy="compact")` is the default.
+`storage_policy="throughput"` disables HDF5 compression and shuffle for
+chunked transport and index datasets while retaining schema-3 electron-major
+layout, integer narrowing, per-history compaction, aliases, and atomic
+publication. The direct `write_trajectory_artifact(..., storage_policy=...)`
+entry point accepts the same setting. Existing readers need no policy
+argument; the selected policy is stored in the HDF5 root attribute
+`storage_policy`. Storage policy does not affect transport or scoring.
+
+Use `throughput` when GPU transport outpaces LZF compression and disk space is
+less important than capture latency. The schema-2-like uncompressed reference
+below is **not** identical to the new schema-3 throughput policy: the latter
+retains compact indexing and ID storage. Its actual write/read times, peak
+host RAM and VRAM, and transfer volume must be measured on the target host
+before changing the default. No new measurements are claimed here.
 
 ## Benchmarks
 
@@ -56,7 +74,7 @@ Case (b) is the `trajectory_demo` hopg geometry at 30 keV: 45° tilt, 180° azim
 
 The size reduction carries over at scale: 55%, from 1.28 to 0.57 GiB. The write budget does not. LZF compresses about 1 million segments per second on this host's CPU, but the CUDA core transports about 3.4 million per second. A schema-3 capture therefore costs several times the GPU transport it records, against about 0.8× uncompressed. Case (a)'s 25% bound holds only for CPU transport. Ways to bring GPU captures back under budget, none adopted here:
 
-- an opt-in uncompressed or lighter filter for GPU-transported cases;
+- the new opt-in `throughput` policy, which keeps schema-3 compaction while removing HDF5 compression (GPU timings still to be measured);
 - compressing on a writer thread that overlaps the spectrum phase;
 - storing floats at lower precision.
 
