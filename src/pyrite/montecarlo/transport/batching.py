@@ -247,7 +247,29 @@ class PerElectronTransportConfig:
     probe_electrons: int = 1024
 
 
-DEFAULT_PER_ELECTRON_TRANSPORT_CONFIG = PerElectronTransportConfig()
+def _default_batch_limit_from_env() -> int:
+    """Optional per-process max electrons per transport launch for CUDA tuning.
+
+    Fresh subprocesses are required when sweeping this value because the API
+    and JIT driver capture DEFAULT_PER_ELECTRON_TRANSPORT_CONFIG at import time.
+    This does not change separately constructed PerElectronTransportConfig's
+    defaults; the legacy default remains 65536 when the variable is absent.
+    """
+    raw = env_value("PYRITE_MC_ELECTRON_BATCH_MAX", "").strip()
+    if not raw:
+        return 65536
+    try:
+        size = int(raw)
+    except ValueError as exc:
+        raise ValueError("PYRITE_MC_ELECTRON_BATCH_MAX must be a positive integer") from exc
+    if size < 1:
+        raise ValueError("PYRITE_MC_ELECTRON_BATCH_MAX must be a positive integer")
+    return size
+
+
+DEFAULT_PER_ELECTRON_TRANSPORT_CONFIG = PerElectronTransportConfig(
+    max_batch=_default_batch_limit_from_env()
+)
 
 TRANSPORT_CORES = ("auto", "lockstep", "per-electron", "cuda")
 

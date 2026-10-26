@@ -315,6 +315,7 @@ class PyriteEvaluator:
         from dataclasses import replace
 
         from ..campaign.model import Sweep
+        from ..campaign.profiles import case_content_key
         from ..runs.run import run_sweep
 
         (case,) = Sweep(base=scene).cases()
@@ -331,6 +332,7 @@ class PyriteEvaluator:
         # Per-study durable resume needs its own compatibility-checked identity.
         # Do not blindly reuse checkpoints from earlier unrelated studies.
         options.setdefault("resume", False)
+        options.setdefault("content_key_fn", case_content_key)
         complete = run_sweep([case], results, executor=self.executor, **options)
         if not complete:
             raise RuntimeError("sweep stopped before trial completed")

@@ -17,6 +17,7 @@ quantum-api
 experimental-planar-channeling
 experimental-axial-channeling
 optimization-studies
+batch-chunk-tuning
 working-with-results
 performance-profile-analysis
 transition-radiation-demo

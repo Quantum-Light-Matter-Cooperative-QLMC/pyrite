@@ -2,6 +2,16 @@
 
 Part of the [physics validation ledger](physics-validation-ledger.md). See the [validation methodology](methodology.md) for the status lifecycle and the [domain inventories](domain-inventories.md) for a claim-by-claim index.
 
+## `optimization-fixed-window-yield`
+
+- **Claim:** a fixed-band incoherent PXR/CBS source objective is the integral of the piecewise-linear node density over explicit in-grid energy bounds, in photons/(sr incident electron); no detector acceptance, current or macro-electron factor is applied
+- **Code:** `optimization/scoring.py::FixedWindowYield`
+- **Source:** [energy-grid semantics](../physics/radiation-physics/energy-grid-semantics.md), `eq-grid-physical-integral` and density units; definition of the integral of a piecewise-linear interpolant
+- **Status:** anchored
+- **Checks:** constant and linear analytic densities on nonuniform nodes with interpolated endpoints; zero and signed limits; component isolation; explicit rejection of unsupported quadrature, joint-field line corrections, invalid coverage and nonfinite data
+- **Anchor:** `tests/optimization/test_scoring.py`
+- **Notes:** post-processing claim only; does not validate the underlying PXR/CBS model or establish angular convergence. Node data must resolve the spectral structure. [Independent verification](radiation-physics/optimization-fixed-window-yield.md). Human sign-off belongs to #277.
+
 ## `optical-planar-tr`
 
 - **Claim:** Optical TR of transported planar-stack crossings is the exact planar Maxwell (Ginzburg–Frank) crossing amplitude with explicit measured scalar permittivity per layer, summed per history with crossing phases `exp[i(omega t - k_par . r_par)]`; matched media and vanishing films give zero and the conductor limit is the Ginzburg–Frank form. Locally straight formation is bounded from transported straight runs and unbounded use is refused

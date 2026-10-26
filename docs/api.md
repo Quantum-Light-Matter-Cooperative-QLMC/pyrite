@@ -203,6 +203,23 @@ public API.
 | `photon_energies` | Retained | `pyrite.photon_energies` | Approved deterministic line-energy convenience exception. |
 | `simulate` | Retained | `pyrite.simulate` | Foundational simulation entry point. |
 
+
+## Experimental optimization
+
+The provisional `pyrite.optimization` API operates above immutable Scenes and
+existing executors. It is outside the supported compatibility contract below.
+See [optimization studies](guides/optimization-studies.md) for persistence,
+constraints, normalization and the fixed-window PXR/CBS example.
+
+```{eval-rst}
+.. autosummary::
+   :toctree: _autosummary
+
+   pyrite.optimization.FixedWindowYield
+   pyrite.optimization.PyriteEvaluator
+   pyrite.optimization.OptimizationStudy
+```
+
 ## Material authoring
 
 Use `pyrite.materials.MaterialDefinition`, `build_medium`, `build_crystal` and
