@@ -52,7 +52,7 @@ def _lowered_source(beam, target, grid, numerics, seed):
     if controls.precision is not None:
         raise ValueError("directional_source requires fixed counts; precision is unsupported")
     controls = replace(controls, brem_trials=controls.cxr_trials, energy_bins=EnergyBins(cxr=grid))
-    scene = Scene(beam, target, detector=None, physics=Physics(), numerics=controls)
+    scene = Scene(beam, target, detector=None)
     slab = scene.target_spec
     if getattr(slab, "entrance_face", None) is not None:
         raise ValueError("directional_source supports flat slabs/stacks; grooves are unsupported")
@@ -60,7 +60,7 @@ def _lowered_source(beam, target, grid, numerics, seed):
         raise ValueError(
             "directional_source does not support direction-targeted longitudinal modes"
         )
-    return replace(build_case(scene), seed=seed), controls
+    return replace(build_case(scene, physics=Physics(), numerics=controls), seed=seed), controls
 
 
 def source_line_ceiling_eV(

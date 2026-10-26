@@ -18,6 +18,7 @@ from ..quantum import QuantumSetup
 
 if TYPE_CHECKING:
     from ..detectors import Detector
+    from ..execution.protocol import Executor
     from .model import Scene
 
 
@@ -30,13 +31,24 @@ class ResolvedSimulation:
     numerics: Numerics
     input_scene: Scene
     observation: Observation | None = None
+    executor: Executor | None = None
 
     @property
     def composition_provenance(self) -> dict[str, Any]:
-        """Keep the original physical input and normalized observation available."""
+        """Keep physical inputs and independent effective configuration available."""
+        provenance: dict[str, Any] = {
+            "input_scene": self.input_scene,
+            "physics": self.physics,
+            "quantum": self.scene.quantum,
+            "acquisition": self.scene.acquisition,
+        }
+        if self.executor is not None:
+            from ..execution._simulation import execution_provenance
+
+            provenance["execution"] = execution_provenance(self.executor)
         if self.observation is None:
-            return {}
-        return {"input_scene": self.input_scene, "observation_spec": self.observation}
+            return provenance
+        return {**provenance, "observation_spec": self.observation}
 
 
 def resolve_models(scene: Scene, numerics: Numerics) -> tuple[Physics, Numerics]:
@@ -92,6 +104,7 @@ def resolve_simulation(
     filters: tuple[FilterPlate | Filter, ...] | None = None,
     acquisition: Acquisition | NativeAcquisition | None = None,
     observation: Observation | None = None,
+    executor: Executor | None = None,
     require_detector: bool = False,
 ) -> ResolvedSimulation:
     """Resolve Scene/component compatibility and explicit run overrides.
@@ -103,12 +116,7 @@ def resolve_simulation(
     from .model import Scene
 
     if isinstance(beam, Scene):
-        if (
-            target is not None
-            or detector is not None
-            or filters is not None
-            or acquisition is not None
-        ):
+        if any(value is not None for value in (target, detector, filters, acquisition)):
             raise TypeError("with a Scene, omit target, detector, filters and acquisition")
         scene = beam
         numerics = scene.numerics if numerics is None else numerics
@@ -122,6 +130,10 @@ def resolve_simulation(
         scene = None
     if not isinstance(numerics, Numerics):
         raise TypeError("numerics must be a Numerics")
+    if executor is not None:
+        from ..execution._simulation import validate_executor
+
+        validate_executor(executor, numerics)
     physics = resolve_physics(physics, numerics)
     if quantum is not None and not isinstance(quantum, QuantumSetup):
         raise TypeError("quantum must be a QuantumSetup or None")
@@ -145,5 +157,5 @@ def resolve_simulation(
         raise TypeError("simulate requires a detector; use directional_source for source maps")
     effective_physics, effective_numerics = resolve_models(scene, numerics)
     return ResolvedSimulation(
-        scene, effective_physics, effective_numerics, input_scene, observation
+        scene, effective_physics, effective_numerics, input_scene, observation, executor
     )

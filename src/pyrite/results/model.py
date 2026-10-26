@@ -429,7 +429,7 @@ class Result:
                 "—"
                 if scene is None
                 else f"{type(scene.target).__name__}, "
-                f"{type(scene.detector).__name__}, {scene.physics.emission_policy}",
+                f"{type(scene.detector).__name__}, {self._emission_policy()}",
                 "resolved inputs",
             ),
             ("case", f"Case, {len(self.case)} keys", "low-level transport input"),
@@ -460,9 +460,19 @@ class Result:
             f"densities in {units}\n\n| attribute | contents | meaning |\n|---|---|---|\n" + rows
         )
 
+    def _emission_policy(self):
+        physics = self.provenance.get("physics")
+        if physics is None:
+            physics = getattr(self.provenance.scene, "physics", None)
+        return "incoherent" if physics is None else physics.emission_policy
+
     def _acquisition_context(self):
         scene = self.provenance.get("scene")
-        acquisition = getattr(scene, "acquisition", None)
+        acquisition = (
+            self.provenance["acquisition"]
+            if "acquisition" in self.provenance
+            else getattr(scene, "acquisition", None)
+        )
         beam = getattr(scene, "beam", None)
         if acquisition is None or beam is None:
             raise ValueError("result was not produced with an acquisition configuration")
@@ -490,11 +500,7 @@ class Result:
         acquisition, beam, digest, scene = self._acquisition_context()
         assert self.spatial is not None
         selected = (
-            (
-                ("coherent", "brem")
-                if scene.physics.emission_policy == "coherent"
-                else ("cxr", "brem")
-            )
+            (("coherent", "brem") if self._emission_policy() == "coherent" else ("cxr", "brem"))
             if components is None
             else components
         )
@@ -519,11 +525,7 @@ class Result:
         acquisition, beam, digest, scene = self._acquisition_context()
         assert self.spatial is not None
         selected = (
-            (
-                ("coherent", "brem")
-                if scene.physics.emission_policy == "coherent"
-                else ("cxr", "brem")
-            )
+            (("coherent", "brem") if self._emission_policy() == "coherent" else ("cxr", "brem"))
             if components is None
             else components
         )

@@ -255,11 +255,37 @@ virtual angular observation, including on a detector-free source scene.
 Omitted observation fields inherit legacy embedded settings. Differing explicit
 settings raise; start from a detector without embedded response/scorer and a
 scene without acquisition to reuse one physical definition across observations.
-Names are labels and do not change scientific identity. For the new call form,
-`result.provenance["input_scene"]` retains the original scene, while
+Names are labels and do not change scientific identity.
+`result.provenance["input_scene"]` retains the original scene for both legacy
+and independently composed calls. The `"physics"`, `"quantum"` and
+`"acquisition"` provenance keys expose the effective independent configuration;
+`"numerics"` retains the effective numerical controls. These values do not
+change case or observation identity. Meanwhile,
 `result.scene` remains the resolved compatibility view used by read-time methods.
 The [observation example](guides/python-api-workflow.md#compose-independent-observations)
 shows how to reuse the same geometry.
+
+Use `simulate(scene, executor=executor)` to select an existing
+`pyrite.execution.Executor` independently of the physical scene. For example,
+`LocalExecutor()` uses the established batch runner for the single case.
+It can start CPU worker processes, so scripts should invoke it inside an
+`if __name__ == "__main__":` guard, as with other batch-runner calls.
+Omitting `executor` retains the original in-process simulation path. Scalar,
+planar and counting observations use the same result assembly and scientific
+identity in both forms. The executor must return one completed result;
+interrupted or missing directional results fail explicitly.
+
+This opt-in route currently requires `Numerics.transport_core="auto"`, since
+batch executors do not accept a per-call transport-core override. Kernel
+chunk settings remain on `Numerics`; scheduler settings remain on the executor.
+Dask and SLURM executors keep their existing caller-configured artifact stores
+and table-aware case keys. Their returned artifacts are checked against the
+resolved source key and requested directions before use. Such executors can
+write worker artifacts; `simulate` does not write simulation checkpoints.
+`result.provenance["execution"]` records the executor class and its available
+typed resource, scheduler and retry settings separately from scientific
+identity. These describe requests, not measured worker hardware. A shared scientific identity does not promise bitwise
+agreement across backends or scheduling strategies.
 
 `simulate` returns an in-memory `Result` without reading or writing checkpoints.
 Radiation families remain separate: `cxr.incoherent`, optional `cxr.coherent`,
