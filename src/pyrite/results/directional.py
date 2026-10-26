@@ -14,6 +14,7 @@ COMPONENT_IDS = {
     "pxr-cbs": "incoherent-pxr-cbs",
     "characteristic": "characteristic",
     "bremsstrahlung": "bremsstrahlung",
+    "transition": "transition-radiation-history",
 }
 
 
@@ -22,7 +23,9 @@ class DirectionalSpectrum:
     """Escaped density of one directional source component.
 
     ``component`` names it: ``incoherent-pxr-cbs`` (with PXR–CBS
-    interference), ``characteristic`` or ``bremsstrahlung``.
+    interference), ``characteristic``, ``bremsstrahlung`` or
+    ``transition-radiation-history`` (independent histories, coherent crossings
+    within each history).
 
     ``density`` has shape (angle, energy), in ph/incident-electron/eV/sr.
     ``supported`` flags sample-face grazing directions; their density is NaN.

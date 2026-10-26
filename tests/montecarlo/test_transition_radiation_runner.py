@@ -26,6 +26,48 @@ _HISTORY = {"model": "planar-stack", "coherence": "history"}
 _DROP = object()
 
 
+def test_detector_free_tr_matches_production_shared_histories(transported, monkeypatch):
+    from pyrite.montecarlo.runner.directional_source import source_outputs
+
+    case, transport = transported
+    requests = []
+
+    def reuse(*args, **kwargs):
+        requests.append(1)
+        return transport
+
+    monkeypatch.setattr(runner, "_transport_case", reuse)
+    directions = np.array([[0.2, 0, np.sqrt(0.96)], [0, 0.6, -0.8], [1, 0, 0]])
+    outputs, supported = source_outputs(
+        case, directions, components=("characteristic", "transition"), direction_batch=1
+    )
+    assert len(requests) == 1
+    np.testing.assert_array_equal(supported, [True, True, False])
+    assert np.isnan(outputs["transition"][-1]).all()
+    for index, direction in enumerate(directions[:2]):
+        expected = case_transition_spectrum(case, dict(transport, n_hat=direction))
+        np.testing.assert_array_equal(outputs["transition"][index], expected)
+
+
+def test_directional_tr_preflights_geometry_and_dielectric_before_transport(
+    transported, monkeypatch
+):
+    from pyrite.montecarlo.runner.directional_source import source_outputs
+
+    case, _ = transported
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("invalid TR request must fail before transport")
+
+    monkeypatch.setattr(runner, "_transport_case", forbidden)
+    finite = replace(case, crystal_width_mm=5, crystal_height_mm=5)
+    with pytest.raises(ValueError, match="infinite planar"):
+        source_outputs(finite, [[0, 0, 1]], components=("transition",))
+    low_band = replace(case, E_grid=np.array([1.0, 2.0]))
+    with pytest.raises(ValueError, match="X-ray floor"):
+        source_outputs(low_band, [[0, 0, 1]], components=("transition",))
+
+
 def _case(**overrides):
     fields = dict(
         name="hopg tr", crystal="hopg", composition=CATALOG.crystal("hopg").composition,

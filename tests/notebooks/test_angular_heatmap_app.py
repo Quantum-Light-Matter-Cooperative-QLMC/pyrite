@@ -22,7 +22,7 @@ def _fake_map(tilt, density):
         np.zeros((len(angles), 3)),
         density,
         np.isfinite(density).all(axis=1),
-        {"tilt_deg": tilt, "rep_rate_hz": 5000.0, "bunch_charge_pc": 1.0},
+        {"tilt_deg": tilt, "tilt_azim_deg": 0.0, "rep_rate_hz": 5000.0, "bunch_charge_pc": 1.0},
         {"line_window_ceiling_eV": 200.0},
     )
 
@@ -188,3 +188,74 @@ def test_download_archive_round_trip():
 def test_close_target_tilts_remain_distinct():
     config = replace(MapConfig(), tilts_deg=(30.123456789, 30.2))
     assert config.tilts_deg == (30.123456789, 30.2)
+
+
+def test_close_target_azimuths_remain_distinct():
+    config = replace(MapConfig(), tilt_azimuths_deg=(0.0, 0.1, 0.123456789))
+    assert config.azimuths == (0.0, 0.1, 0.123456789)
+    assert config.target(30.0, 0.123456789).tilt_azim_deg == 0.123456789
+
+
+def test_azimuth_grid_cache_and_export(monkeypatch):
+    import io
+
+    from pyrite.apps import angular_heatmap as owner
+
+    calls = []
+
+    def source(beam, target, **kwargs):
+        calls.append((target.tilt_deg, target.tilt_azim_deg))
+        result = _fake_map(target.tilt_deg, np.ones((4, 2)))
+        return {
+            "pxr-cbs": replace(
+                result,
+                case={
+                    **result.case,
+                    "tilt_azim_deg": target.tilt_azim_deg,
+                },
+            )
+        }
+
+    monkeypatch.setattr(owner, "directional_sources", source)
+    calculate_maps.cache_clear()
+    config = MapConfig(tilts_deg=(30, 45), tilt_azimuths_deg=(0, 60), stop_eV=200)
+    maps = calculate_maps(config)
+    assert calls == [(30, 0), (30, 60), (45, 0), (45, 60)]
+    assert config.result_elements == 4 * config.angle_points * config.energy_points
+    assert calculate_maps(config) is maps
+    assert len(calls) == 4
+    calculate_maps(replace(config, tilt_azimuths_deg=(45,)))
+    assert calls[-2:] == [(30, 45), (45, 45)]
+    archive = np.load(io.BytesIO(owner.maps_npz(config, maps, current_na=1)))
+    np.testing.assert_array_equal(archive["tilt_deg"], [30, 30, 45, 45])
+    np.testing.assert_array_equal(archive["tilt_azim_deg"], [0, 60, 0, 60])
+    calculate_maps.cache_clear()
+
+
+def test_transition_requires_explicit_planar_geometry_and_uses_beam_stop():
+    with pytest.raises(ValueError, match="infinite"):
+        MapConfig(components=("transition",))
+    config = MapConfig(components=("transition",), width_mm=None, height_mm=None, energy_points=8)
+    assert config.energy_grid()[-1] == config.beam_keV * 1000
+    for azimuths in ((), (0, 360), (-10, 350), (0, 0), (np.nan,)):
+        with pytest.raises(ValueError, match="azimuth"):
+            MapConfig(tilt_azimuths_deg=azimuths)
+
+
+def test_notebook_cached_sources_include_single_azimuth_slider(monkeypatch):
+    import pyrite
+    from pyrite.apps.angular_heatmap_app import app
+
+    monkeypatch.setattr(pyrite, "fetch_tables", lambda: [])
+    maps = _maps((30.0, np.ones((4, 2))), (45.0, np.ones((4, 2))))
+    _, definitions = app.run(
+        defs={
+            "cached": True,
+            "config": MapConfig(),
+            "elapsed": 0.0,
+            "maps": maps,
+        }
+    )
+    assert definitions["azimuth_step"].value == 0
+    assert definitions["step"].value == 30
+    assert "cone_panel" not in definitions

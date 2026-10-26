@@ -44,7 +44,7 @@ def observation_directions(angle_deg: ArrayLike, plane_azimuth_deg: float = 0.0)
     )
 
 
-def _lowered_source(beam, target, grid, numerics, seed):
+def _lowered_source(beam, target, grid, numerics, seed, *, transition=False):
     """Validated detector-free case on ``grid``, plus its resolved numerics."""
     controls = Numerics() if numerics is None else numerics
     if not isinstance(controls, Numerics):
@@ -52,15 +52,18 @@ def _lowered_source(beam, target, grid, numerics, seed):
     if controls.precision is not None:
         raise ValueError("directional_source requires fixed counts; precision is unsupported")
     controls = replace(controls, brem_trials=controls.cxr_trials, energy_bins=EnergyBins(cxr=grid))
+    physics = Physics(transition_radiation="history" if transition else "off")
     scene = Scene(beam, target, detector=None)
     slab = scene.target_spec
     if getattr(slab, "entrance_face", None) is not None:
         raise ValueError("directional_source supports flat slabs/stacks; grooves are unsupported")
+    if transition and slab.footprint is not None:
+        raise ValueError("directional TR requires an infinite planar slab (footprint=None)")
     if getattr(beam.longitudinal, "kind", "gaussian") not in {"point", "gaussian"}:
         raise ValueError(
             "directional_source does not support direction-targeted longitudinal modes"
         )
-    return replace(build_case(scene, physics=Physics(), numerics=controls), seed=seed), controls
+    return replace(build_case(scene, physics=physics, numerics=controls), seed=seed), controls
 
 
 def source_line_ceiling_eV(
@@ -151,6 +154,10 @@ def directional_sources(
     Characteristic and continuum use the live runner's lower-cutoff
     population, which equals the line population here because
     ``brem_trials`` is replaced by ``cxr_trials``.
+    ``"transition"`` adds history-coherent planar-stack TR, using that same
+    population. It requires an infinite planar target and the existing X-ray
+    dielectric band; finite lateral interfaces and optical response are not
+    inferred. Components remain separate; no TR–line cross term is added.
 
     Parameters
     ----------
@@ -208,13 +215,15 @@ def directional_sources(
     lab = observation_directions(angles, plane_azimuth_deg)
     if np.any(np.diff(angles) <= 0) or (len(angles) > 1 and angles[-1] - angles[0] >= 360):
         raise ValueError("angle_deg must increase without duplicated periodic endpoints")
-    case, controls = _lowered_source(beam, target, grid, numerics, seed)
-    if grid[-1] > case["E0_keV"] * 1000:
-        raise ValueError("energy_eV must not exceed the incident electron energy")
-    sample = lab @ case_rotation(case)
     components = tuple(dict.fromkeys(components))
     if not components or not set(components) <= set(DIRECTIONAL_COMPONENTS):
         raise ValueError(f"components must be a nonempty subset of {DIRECTIONAL_COMPONENTS}")
+    case, controls = _lowered_source(
+        beam, target, grid, numerics, seed, transition="transition" in components
+    )
+    if grid[-1] > case["E0_keV"] * 1000:
+        raise ValueError("energy_eV must not exceed the incident electron energy")
+    sample = lab @ case_rotation(case)
     densities, supported = source_outputs(
         case,
         sample,
