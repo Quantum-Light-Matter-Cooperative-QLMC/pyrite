@@ -268,6 +268,8 @@ shows how to reuse the same geometry.
 Use `simulate(scene, executor=executor)` to select an existing
 `pyrite.execution.Executor` independently of the physical scene. For example,
 `LocalExecutor()` uses the established batch runner for the single case.
+It can start CPU worker processes, so scripts should invoke it inside an
+`if __name__ == "__main__":` guard, as with other batch-runner calls.
 Omitting `executor` retains the original in-process simulation path. Scalar,
 planar and counting observations use the same result assembly and scientific
 identity in both forms. The executor must return one completed result;

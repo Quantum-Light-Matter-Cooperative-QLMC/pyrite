@@ -244,9 +244,10 @@ A `PlanarDetector` scores angular tiles and can project downstream
 attenuation across a pixel grid:
 
 ```python
-from pyrite.config import FixedSampling
-from pyrite.detectors import FilterPlate, PlanarDetector, PlanarPose
-from pyrite.observations import Observation, PixelScorer
+from pyrite.config import AngularSampling, FixedSampling
+from pyrite.detectors import PlanarDetector, PlanarPose
+from pyrite.geometry import FilterPlate
+from pyrite.observations import Observation
 
 pose = PlanarPose.from_observation(distance_mm=400.0, polar_deg=90.0)
 pixels = PlanarDetector.timepix3_chip(
@@ -264,7 +265,7 @@ pixel_result = pr.simulate(
     pixels,
     filters=(plate,),
     numerics=pr.Numerics(sampling=FixedSampling(100, 50)),
-    observation=Observation(detector="detector", sampling=PixelScorer((2, 2))),
+    observation=Observation(detector="detector", sampling=AngularSampling((2, 2))),
 )
 image = pixel_result.spatial.image((1_000.0, 10_000.0), component="cxr")
 ```
@@ -287,8 +288,9 @@ scoring choices in an `Observation`:
 ```python
 from dataclasses import replace
 
+from pyrite.config import AngularSampling, FixedSampling
 from pyrite.detectors import IdealPhotonCounter, PixelGrid, PlanarDetector, PlanarPose
-from pyrite.observations import Acquisition, Observation, PixelScorer
+from pyrite.observations import Acquisition, Observation
 
 panel = PlanarDetector(
     PlanarPose.from_observation(100.0, 60.0),
@@ -299,7 +301,7 @@ observation = Observation(
     detector="detector",
     response=IdealPhotonCounter(),
     acquisition=Acquisition.native(exposure_s=1.0),
-    sampling=PixelScorer((4, 4)),
+    sampling=AngularSampling((4, 4)),
     name="counts",
 )
 controls = pr.Numerics(sampling=FixedSampling(100, 50))
@@ -311,7 +313,9 @@ more_counts = pr.simulate(scene, numerics=controls, observation=longer_exposure)
 
 Both calls use the same unchanged scene. `detector="detector"` resolves the
 registered geometry; a planar value is also accepted when its geometry matches.
-For a virtual angular measurement, use `Observation(detector=Detector(...))`.
+For a virtual angular measurement, use
+`Observation(detector=AngularDetector(...))` with `AngularDetector` from
+`pyrite.detectors`.
 Observation names do not affect digests. Response or acquisition changes retain
 compatible source and true-spatial identities, while changed angular sampling
 invalidates affected spatial factors. `simulate` performs transport on each
@@ -326,6 +330,30 @@ remain supported through compatibility adapters. Observation omission inherits
 those values; differing explicit settings raise before transport. Starting with
 geometry-only detector construction, as above, allows independent requests
 without those conflicts.
+
+### Select execution independently
+
+Pass an existing executor without changing the scene or observation:
+
+```python
+from pyrite.execution import LocalExecutor
+
+if __name__ == "__main__":
+    counts = pr.simulate(
+        scene,
+        numerics=controls,
+        observation=observation,
+        executor=LocalExecutor(),
+    )
+```
+
+The guard allows the batch runner to start CPU worker processes safely.
+Omitting `executor` keeps the direct single-case path. Explicit executors
+currently require automatic transport-core selection; kernel chunks remain
+part of `Numerics`. Scheduler requests are recorded separately in
+`result.provenance["execution"]` and do not alter case or observation identity.
+See [Scene simulation](../api.md#scene-simulation) for worker-artifact checks
+and distributed-executor requirements.
 
 ### Named CLI pixel profiles use the same composition
 

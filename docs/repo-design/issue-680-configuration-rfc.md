@@ -8,15 +8,15 @@ Configured profile adapters accept independent run and observation arguments;
 result acquisition, display and observation persistence use independent run
 metadata, with legacy-result fallbacks. Unit-bearing physical inputs use the
 normalization introduced by #709.
-**Audit base:** `main` at `2ce1f174`, 2026-10-25.
+**Audit base:** `main` at `41c69b13`, after merged #702 and #703, 2026-10-25.
 **Scope:** [#680](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/680),
 [#695](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/695),
 and the composition boundary with
 [#703](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/703).
 
 This revision supersedes the earlier proposal to make `Scene` the simulation
-composition root. It specifies the intended contract; examples marked proposed
-are not executable API documentation. Current usage remains in
+composition root. It records the implemented composition and compatibility
+contract. Current usage remains in
 [the API reference](../api.md#scene-simulation). Implementation progress belongs
 in the issues.
 
@@ -34,9 +34,10 @@ retaining their historical expansion and defaults.
 `Observation` now independently composes detector references, response,
 acquisition and pixel scoring through `simulate`, case lowering, observation
 planning, production and Scene-based sweeps. Geometry references and matching planar values resolve
-to the registered physical detector. The current virtual angular adapter uses
-`Detector`, and sampling uses `PixelScorer`; renaming those concepts stays with
-their owning issues. Legacy scoring omission is tracked through constructor
+to the registered physical detector. `pyrite.detectors.AngularDetector` and
+`pyrite.config.AngularSampling` are the canonical names established by #703;
+they preserve the identity of `Detector` and `PixelScorer`, respectively.
+Legacy scoring omission is tracked through constructor
 provenance, including dataclass replacement, outside scientific dataclass fields.
 Scene-based sweeps apply independent physics/numerics/quantum overrides before
 axes and bind the observation after expansion. Converted configured sweeps retain
@@ -67,18 +68,19 @@ The previous RFC predated work already present on the audit base:
 
 - `Numerics.sampling` accepts `FixedSampling` and `AdaptiveSampling`, while
   retaining the historical count/`Precision` interface and serialization.
-- `TransportNumerics`, `RadiationNumerics` and `ExecutionConfig` provide typed
-  sections; `Numerics` still lowers them through legacy fields.
+- `TransportNumerics`, `RadiationNumerics` and `KernelTuning` provide typed
+  sections under `pyrite.config`; `Numerics` lowers them through legacy fields.
+  `KernelTuning` is the same class as the supported `ExecutionConfig` name.
 - `QuantumSetup` and `Beam.state` already have supported planar adapters and
   compatibility tests. General quantum production support remains bounded.
 - `Scene` keeps physics, numerics, quantum setup and acquisition as
   constructor/access compatibility values outside its physical dataclass
   representation. Detector specifications do the same for read-time response
   and pixel scoring.
-  `api._simulation_scene`, case lowering, profile adapters and observation
-  planning still consume these compatibility values at different boundaries.
+  `campaign.resolution.resolve_simulation` extracts those values and binds
+  explicit run and observation arguments before case or observation lowering.
 
-Reuse these implementations. `ExecutionConfig` describes local kernel/core
+Reuse these implementations. `KernelTuning` describes local kernel/core
 and chunk choices; it is distinct from `pyrite.execution.Executor` and resource
 requests. A common composition boundary must retain that distinction rather
 than introduce another scheduler or configuration store.
@@ -100,7 +102,8 @@ physical downstream bodies and positioned detector geometry.
 | Trial counts, stopping rules, grids, integration, quantum solver | Numerical/run configuration | Numerical approximations participate in affected scientific identities. |
 | Virtual angular direction/acceptance, response, acquisition | `Observation` | A mathematical angular observation needs no positioned physical detector. |
 | Angular sampling/reconstruction and response construction budgets | Observation numerical configuration | Owned by `pyrite.config`, composed by the observation. |
-| Backend, chunks, workers, memory, scheduler | Execution configuration | Record provenance; preserve existing identity exclusions. |
+| Transport core and spectrum chunks | `pyrite.config.KernelTuning` | Preserve numerical lowering and reproducibility constraints. |
+| Scheduler backend, workers and requested resources | `pyrite.execution.Executor` | Record execution provenance separately; preserve existing identity exclusions. |
 
 A canonical scene contains no `physics`, `numerics`, `quantum` setup,
 `acquisition`, response model, scorer or execution settings. Its physical
@@ -111,10 +114,10 @@ Compatibility constructors may still accept those values during migration.
 A physical quantum entrance state remains on `Beam.state`. Crystal alignment
 and actual physical region bounds belong to target/region geometry. Interaction
 recipes, solver choice, FFT boundaries and requests for quantum observables
-belong to run configuration. The current `QuantumRegion.zone_max_ang` needs an
-explicit classification during migration: a computational handoff cap is not
-made a physical boundary by moving it to geometry. Preserve its present lowered
-meaning until that distinction is resolved. An absorbing FFT boundary never
+belong to run configuration. `QuantumRegion.zone_max_ang` is a computational
+handoff cap retained in the independent quantum setup for compatibility; it
+does not describe a physical target face. Preserve its current lowered meaning.
+An absorbing FFT boundary never
 becomes evidence of physical dechanneling.
 
 ## Composition through simulate
@@ -123,7 +126,7 @@ Keep `simulate` as the straightforward entry point. Compose a physical scene
 with independent physics, numerics, observations, quantum setup and execution
 arguments. Reuse typed values and named catalog objects under ADR-0021.
 
-Proposed shape, with constructor spellings subject to their owning issues:
+Implemented composition (the variables represent independently constructed inputs):
 
 ```python
 scene = Scene(beam=beam, target=target, detector=panel, filters=filters)
@@ -156,14 +159,16 @@ part of the new physical scene.
 configuration values and catalog references already provide reusable settings.
 A new public wrapper would duplicate `simulate` arguments without demonstrated
 campaign or serialization value. Use an internal immutable resolved request to
-share validation and lowering. It must carry physical inputs, effective
-scientific settings, observation requests, execution settings, schema origin and
-per-field resolution provenance. Public promotion requires a concrete consumer
+share validation and lowering. It carries the physical input, requested
+compatibility view, effective scientific settings, normalized observation and
+executor. Profile/schema provenance remains with its existing catalog adapters;
+this migration introduces no second profile-resolution schema.
+Public promotion requires a concrete consumer
 that benefits from a portable reusable request, plus API-governance review.
 
 ## Observation references and names
 
-Use the proposed `pyrite.observations.Observation` from #703. It composes a
+Use `pyrite.observations.Observation` from #703. It composes a
 reference to physical detector geometry **or** a virtual angular specification,
 response, acquisition, and numerical scoring configuration. Its resolved rays,
 tiles and internal plan remain derived representations.
@@ -183,8 +188,8 @@ pose, size or pixel layout raises an error naming the conflicting reference;
 never allow an observation to override scene geometry. Portable requests store
 the reference, avoiding independently mutable copies of physical geometry.
 
-Use `AngularObservation` as the proposed name for the virtual direction and
-acceptance specification, pending #703's export review. Retain root `Detector`
+Use `pyrite.detectors.AngularDetector` for the virtual direction and
+acceptance specification. Retain root `Detector`
 and its defaults through the compatibility adapter. No angular geometry is
 inferred from an unrelated physical detector. Keep scalar source densities,
 solid-angle-weighted averages, spatial accepted flux and acquired counts in
@@ -253,11 +258,12 @@ Continue rejecting `simulate(scene, acquisition=...)` under the existing API;
 introduce independent acquisition via the new observation argument. The new
 observation route must not weaken mixed-component diagnostics.
 
-Warn when explicitly using migrated configuration fields in Scene or detector
-constructors; implicit historical defaults must remain usable. Define field
-warnings and removal dates in the implementation using the project's
+Migrated Scene and detector constructor fields remain supported without new
+field-level warnings or removal dates in this migration. Existing root-import
+warnings follow their registered schedule. A later constructor deprecation
+must separately define its warnings and removal dates under the project's
 [API compatibility policy](../development/api-policy.md); this RFC neither
-starts a removal clock nor changes existing import-deprecation schedules.
+starts that removal clock nor changes existing import-deprecation schedules.
 Historical stored artifacts load through schema adapters without warnings for
 each field. Never rewrite stored identities merely to normalize the Python API.
 
@@ -330,7 +336,7 @@ describes the required integration contract; issue checklists own scheduling.
 
 | Current seam | Required migration and focused evidence |
 | --- | --- |
-| `campaign/model.py::Scene`, `api.py::_simulation_scene` | Extract compatibility settings, retain constructor/access behavior and override semantics; `tests/scan/test_public_api.py`. |
+| `campaign/model.py::Scene`, `campaign/resolution.py::resolve_simulation` | Extract compatibility settings, retain constructor/access behavior and override semantics; `tests/scan/test_scene_model.py`, `test_simulation_resolution.py`. |
 | `campaign/lowering.py::build_case` and `build_sweep_cases` | Consume resolved inputs once; preserve case payloads, seed order and legacy sweep handling. |
 | `Sweep` and optimization parameter paths | Keep physical axes on scene; route run axes to run settings. Preserve legacy `physics.*`/`numerics.*` paths, label order, Cartesian expansion and override-before-axis precedence through adapters. |
 | `campaign/legacy.py` and profile/settings adapters | Map existing profiles into the same resolver; preserve their schema defaults and named-preset layering under ADR-0021. |
