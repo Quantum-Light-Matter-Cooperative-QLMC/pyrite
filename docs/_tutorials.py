@@ -23,6 +23,7 @@ NAMES = (
     "detector_observations",
     "gpt_gdf_beams",
     "transition_radiation_demo",
+    "radiation_diagnostics",
 )
 
 
@@ -89,6 +90,10 @@ def transition_radiation_demo(view="analytic"):
     load_example("transition_radiation_demo").plot(
         checked_output("transition_radiation_demo"), view=view
     )
+
+
+def radiation_diagnostics(view="signal"):
+    load_example("radiation_diagnostics").plot(checked_output("radiation_diagnostics"), view=view)
 
 
 def _json_default(value):

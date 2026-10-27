@@ -441,3 +441,71 @@ def test_tr_ctr_app_output_renders_signed_native_arrays_without_transport(
             assert (tmp_path / f"tr-ctr-{view}.svg").stat().st_size > 1_000
     finally:
         plt.close("all")
+
+
+def test_optical_diagnostic_profiles_render_without_inference(tutorials, monkeypatch, tmp_path):
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    example = tutorials.load_example("radiation_diagnostics")
+    data = tutorials.checked_output("radiation_diagnostics")
+    wide = data["bands"]["turnover_in_band"]
+    high = data["bands"]["turnover_below_band"]
+    assert data["settings"]["nodes"] == 61
+    assert wide["fit"]["is_identified_95"]
+    assert wide["fit"]["rms_duration_fs"] == pytest.approx(200, rel=0.005)
+    assert wide["fit"]["confidence_interval_95_fs"] == pytest.approx((198.62745, 201.38390))
+    assert not high["fit"]["is_identified_95"]
+    assert high["fit"]["is_multimodal"]
+    assert high["fit"]["confidence_interval_95_fs"] == [None, None]
+    for record in (wide, high):
+        scan, fit = record["scan"], record["fit"]
+        np.testing.assert_allclose(scan["uncertainty_v_ports"], 15e-6)
+        np.testing.assert_allclose(
+            np.asarray(scan["voltage_v_ports"]) - np.asarray(fit["predicted_voltage_v_ports"]),
+            fit["residual_v_ports"],
+        )
+        assert "SYNTHETIC noise-free" in scan["provenance"]
+        provenance = record["instrument_provenance"]
+        assert "unanchored; synthetic reference only" in provenance["validation"]
+        assert all(len(digest) == 64 for digest in provenance["detector_response_sha256"])
+
+    def forbid_compute():
+        pytest.fail("documentation rendering must never run the optical forward model or fit")
+
+    monkeypatch.setattr(example, "compute", forbid_compute)
+    monkeypatch.setattr(tutorials, "load_example", lambda _: example)
+    tutorials._check_outputs(None)
+    try:
+        for view in ("signal", "profile"):
+            tutorials.radiation_diagnostics(view)
+            fig = plt.gcf()
+            if view == "signal":
+                assert len(fig.axes) == 2
+                np.testing.assert_array_equal(
+                    fig.axes[0].lines[0].get_xdata(),
+                    np.asarray(wide["scan"]["mirror_displacement_m"]) * 1e3,
+                )
+                np.testing.assert_array_equal(
+                    fig.axes[0].lines[0].get_ydata(),
+                    np.asarray(wide["scan"]["voltage_v_ports"])[:, 0] * 1e3,
+                )
+                np.testing.assert_array_equal(
+                    fig.axes[1].lines[0].get_ydata(),
+                    np.asarray(wide["fit"]["residual_v_ports"])[:, 0] * 1e6,
+                )
+            else:
+                assert len(fig.axes) == 1
+                assert fig.axes[0].get_xscale() == "log"
+                assert fig.axes[0].get_yscale() == "symlog"
+                for line, record in zip(fig.axes[0].lines, (wide, high), strict=False):
+                    profile = record["fit"]["metadata"]["diagnostic_profile"]
+                    np.testing.assert_array_equal(line.get_xdata(), profile["sigma_fs"])
+                    np.testing.assert_array_equal(line.get_ydata(), profile["delta_chi2"])
+            target = tmp_path / f"optical-{view}.svg"
+            fig.savefig(target)
+            assert target.stat().st_size > 1_000
+    finally:
+        plt.close("all")

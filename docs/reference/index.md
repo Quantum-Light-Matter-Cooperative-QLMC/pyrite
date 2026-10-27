@@ -13,6 +13,7 @@ results-and-apps
 trajectory-workflows
 directional-sources
 tr-ctr-app
+optical-diagnostics-app
 gdf-beams
 campaign-configuration
 catalogs-and-workspaces

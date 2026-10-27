@@ -65,7 +65,7 @@ pyrite run my_ctr
 
 Each profile produces an identity-qualified checkpoint stem with a separate
 `transition.h5` component. Select that stem in the analysis app. The
-[radiation diagnostics reference](../guides/radiation-diagnostics.md#checkpoint-components-and-dtr)
+[checkpoint component reference](#checkpoint-components-and-dtr)
 describes component selection, signed plotting and stored band metrics. Use the
 [remote workflow](../guides/running-on-a-cluster.md) for larger sampling studies,
 for example `pyrite run my_ctr --remote`, after configuring the host.
@@ -84,4 +84,34 @@ tunnel mode binds port 2723 for SSH forwarding. Export writes
 `pyrite-output/results/tr_ctr_demo.html` with the initial analytic plots. Controls
 and transported calculations require the live app. The separately triggered DTR
 view is experimental and unverified; see
-[radiation diagnostics](../guides/radiation-diagnostics.md#checkpoint-components-and-dtr).
+[checkpoint components and DTR](#checkpoint-components-and-dtr).
+
+## Checkpoint components and DTR
+
+Analysis and case comparison offer **TR/CTR** selection when plotting. Absent
+components contribute zero; the radiation panel reports availability by case.
+Deselect other components to isolate TR. Existing totals retain TR by default.
+Plotly switches requested log-y plots to linear when signed values are present,
+and identifies that change in the title. Arrays are never clipped.
+
+The radiation panel integrates stored source densities over the line band,
+without current, charge or acceptance scaling. It reports units, spectrum basis,
+physical population, sampled histories and negative TR bins. The reusable
+`pyrite.results.radiation.radiation_band_metrics` also accepts an explicit
+in-grid band with interpolated endpoints. Existing map/ranking metrics include
+all stored additive line components; compatibility names such as `coherent_flux`
+do not identify pure coherent PXR/CBS.
+
+For experimental two-beam cases, **Line** means signed joint-field correction,
+**TR/CTR** means the TR baseline, and their sum is the joint total. Removing the
+baseline is not a DTR-off counterfactual. The model status remains unverified.
+
+The TR notebook (`pyrite app transition-radiation launch`) also has an explicitly
+triggered Plotly DTR reference view. It displays Born component/cross-term
+spectra, optionally with coupled two-beam source rows. All curves reuse the
+maintained deterministic reference. See [experimental DTR](../physics/radiation-physics/diffracted-transition-radiation.md).
+
+The validation app has a **Saved radiation evidence** section. It reads saved
+omission and optical hardware records from a checkout, or `reference.json` from
+a DTR export directory. Missing/malformed files remain visible. Reading a saved
+pass does not promote a ledger claim; CUDA parity is not a physical anchor.
