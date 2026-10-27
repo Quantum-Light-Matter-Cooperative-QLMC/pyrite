@@ -56,4 +56,5 @@ radiation-physics/index
 geometry/index
 detectors/index
 materials/index
+numerical-methods/index
 ```

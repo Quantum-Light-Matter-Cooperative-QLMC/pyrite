@@ -64,10 +64,13 @@ result inspection, and the optional analysis app.
 ## Models and evidence
 
 The [physical models](physics/index.md) describe approximations and conventions;
-[computation and statistics](computation/index.md) cover sampling, uncertainty,
-execution, and reproducibility. Optional secondary tracking and experimental
-channeling have narrower conditions than standard transport; consult the
-[capability matrix](physics/capabilities.md) for their defaults and boundaries.
+[numerical and statistical methods](physics/numerical-methods/index.md) cover
+estimators, uncertainty, and convergence. [Runtime configuration and
+reproducibility](reference/configuration/index.md) covers backend selection,
+resource budgets, precision, and random streams. Optional secondary tracking
+and experimental channeling have narrower conditions than standard transport;
+consult the [capability matrix](physics/capabilities.md) for their defaults and
+boundaries.
 
 Start scientific review with the [validation status summary](validation/status-summary.md),
 then follow [domain inventories](validation/domain-inventories.md) to the evidence.
@@ -96,7 +99,6 @@ Getting Started <guides/getting-started>
 Interactive Tutorials <notebooks/index>
 How-to Guides <guides/index>
 Physics <physics/index>
-Computation <computation/index>
 Validation <validation/index>
 Reference <reference/index>
 Development <development/index>

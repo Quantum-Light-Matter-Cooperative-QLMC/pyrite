@@ -205,7 +205,7 @@ Nothing in the output signals whether a run is converged. Two independent axes h
 - **electron count and seed.** Ordinary Monte Carlo error, falling as $1/\sqrt{N}$. Aggregate observables must be compared with their standard errors, never realization by realization.
 - **numerical step refinement.** Refining `max_dE_frac` *decorrelates* trajectories, so per-realization quantities such as flight counts move for reasons that carry no information. Convergence must be read from ensemble means with Monte Carlo errors.
 
-Statistical technique (estimators, error bars, seed handling, and the convergence protocol the validation records use) is collected in the [computation section](../../computation/index.md).
+Statistical technique (estimators, error bars, seed handling, and the convergence protocol the validation records use) is collected in [numerical and statistical methods](../numerical-methods/index.md).
 
 ## Validation
 
