@@ -221,10 +221,11 @@ assert a.energy_keV == b.energy_keV == 60
 assert a.kinetic_energy.to("eV").magnitude == 60_000
 grid = Beam(kinetic_energy=Q_([30, 45, 60], "keV"), **beam_options)
 
-Beam(kinetic_energy=60, **beam_options)             # TypeError: units required
-Beam(kinetic_energy=1 * ureg.mm, **beam_options)   # ValueError: expected energy
-Beam(energy_keV=60, kinetic_energy=60 * ureg.keV,
-     **beam_options)                              # TypeError: conflicting arguments
+Beam(kinetic_energy=60, **beam_options)  # TypeError: units required
+Beam(kinetic_energy=1 * ureg.mm, **beam_options)  # ValueError: expected energy
+Beam(
+    energy_keV=60, kinetic_energy=60 * ureg.keV, **beam_options
+)  # TypeError: conflicting arguments
 ```
 
 ### Replacement, sweeps and serialization
