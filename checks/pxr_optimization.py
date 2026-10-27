@@ -17,8 +17,12 @@ from time import perf_counter
 import numpy as np
 
 import pyrite as pr
+from pyrite.beams import PointBunch, PointSpot
 from pyrite.campaign.profiles import case_content_key
+from pyrite.config import CxrReflections
+from pyrite.detectors import EnergyBins
 from pyrite.execution import LocalExecutor
+from pyrite.geometry import Footprint, Slab
 from pyrite.optimization import (
     Constraint,
     FixedWindowYield,
@@ -27,10 +31,10 @@ from pyrite.optimization import (
     OptimizationStudy,
     OptunaOptimizer,
     ParameterSpace,
+    PyriteEvaluator,
     TrialState,
 )
 from pyrite.optimization.identity import study_definition_digest
-from pyrite.optimization.study import PyriteEvaluator
 from pyrite.results import records
 
 SCORER = FixedWindowYield(820.0, 900.0)
@@ -54,13 +58,13 @@ def scene(histories: int = 32, step_eV: float = 2.0) -> pr.Scene:
     ELSEPA transport and continuous stopping are held fixed across methods.
     """
     return pr.Scene(
-        pr.Beam(energy_keV=30, transverse=pr.beams.PointSpot(), longitudinal=pr.beams.PointBunch()),
-        pr.geometry.Slab(
+        pr.Beam(energy_keV=30, transverse=PointSpot(), longitudinal=PointBunch()),
+        Slab(
             "hopg",
             thickness_ang=500,
             tilt_deg=45,
             tilt_azim_deg=180,
-            footprint=pr.geometry.Footprint(5, 5),
+            footprint=Footprint(5, 5),
             mosaic=False,
         ),
         pr.Detector(observation_angle_deg=90),
@@ -76,11 +80,11 @@ def scene(histories: int = 32, step_eV: float = 2.0) -> pr.Scene:
             cxr_trials=histories,
             brem_trials=histories,
             transport_core="per-electron",
-            energy_bins=pr.detectors.EnergyBins(
+            energy_bins=EnergyBins(
                 cxr=np.linspace(750, 1000, round(250 / step_eV) + 1),
                 brem=np.array([750.0, 1000.0]),
             ),
-            cxr_reflections=pr.config.CxrReflections(n_families=1),
+            cxr_reflections=CxrReflections(n_families=1),
         ),
     )
 

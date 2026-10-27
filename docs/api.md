@@ -5,7 +5,7 @@ Stable and advanced-stable compatibility follows
 semantic versioning: removal or an incompatible change requires a documented
 deprecation or a major release. Unlisted public objects are provisional.
 Entries labeled experimental follow the shorter compatibility contract in the
-[experimental API lifecycle](guides/experimental-api.md), which also records
+[experimental API lifecycle](reference/experimental-api.md), which also records
 domain owners, bounded feature contracts, and promotion criteria. Selected
 experimental interfaces are discoverable under `pyrite.experimental.radiation`,
 `pyrite.experimental.observations`, and `pyrite.experimental.quantum`.
@@ -174,8 +174,9 @@ public API.
 
 The provisional `pyrite.optimization` API operates above immutable Scenes and
 existing executors. It is outside the supported compatibility contract below.
-See [optimization studies](guides/optimization-studies.md) for persistence,
-constraints, normalization and the fixed-window PXR/CBS example.
+See the [study reference](reference/optimization-studies.md) for persistence,
+constraints and normalization, and the [visual tutorial](guides/optimization-studies.md)
+for a complete fixed-window PXR/CBS workflow.
 
 ```{eval-rst}
 .. autosummary::
@@ -192,7 +193,7 @@ Use `pyrite.materials.MaterialDefinition`, `build_medium`, `build_crystal` and
 `save_material` to author materials. Builders validate without registration;
 `save_material` persists and returns a fresh immutable catalog. Density is in
 g/cm³, composition in atoms/Å³ and photon grids in eV. See
-[Adding materials](guides/adding-materials.md) for inputs and storage rules.
+[Material authoring](reference/material-authoring.md) for inputs and storage rules.
 
 The provisional `pyrite.materials.optical.OpticalResponse.to_record()` and
 `OpticalResponse.from_record(record)` preserve explicit optical response

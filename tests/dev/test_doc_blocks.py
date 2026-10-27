@@ -1,19 +1,16 @@
-"""Verify the fenced code examples in ``docs/guides/*.md`` stay live.
+"""Verify guide commands, including relocated material/cluster contracts.
 
 ``docs/conf.py`` loads no doctest/notebook Sphinx extension (see the "verify
 documented code blocks" task doc), so nothing else in the documentation build
 notices a renamed ``pyrite``/``pyrite-dev`` command, a removed flag, or a
 renamed Python API symbol used in a guide. This module is that check:
 
-- every ``bash`` block is resolved against the live Click (``pyrite``) and
+- every guide ``bash`` block (plus the relocated contracts) is resolved against
+  the live Click (``pyrite``) and
   argparse (``pyrite-dev``) command trees, or carries an explicit
   ``<!-- verify: skip (reason) -->`` marker (never both silently);
-- the opening scalar workflow blocks in ``python-api-workflow.md`` execute in document
-  order as one accumulating namespace (measured cost ~2.5s on CPU -- cheap
-  enough to run directly here rather than split into a bind-only fast tier
-  plus a separate integration-tier execution pass; see Decision 1 in the task
-  doc);
-- the ``toml`` block in ``sweep-profiles.md`` gets a lightweight structural
+- the Python tutorial's included source executes in the explicit slow tier;
+- the canonical catalog schema's ``toml`` blocks get a lightweight structural
   check (parses, internal beam reference resolves).
 
 No command is ever executed; only ``pyrite``/``pyrite-dev`` command lines are
@@ -33,6 +30,10 @@ from pyrite.devtools.doc_toml_check import check_toml_block
 ROOT = Path(__file__).resolve().parents[2]
 GUIDES = ROOT / "docs" / "guides"
 GUIDE_FILES = sorted(GUIDES.glob("*.md"))
+COMMAND_FILES = GUIDE_FILES + [
+    ROOT / "docs/reference/material-authoring.md",
+    ROOT / "docs/reference/cluster-execution.md",
+]
 
 
 # --- extractor -----------------------------------------------------------
@@ -119,7 +120,7 @@ def test_extractor_does_not_close_on_shorter_fence_or_info_string(tmp_path):
 
 def _bash_blocks() -> list[FencedBlock]:
     blocks = []
-    for path in GUIDE_FILES:
+    for path in COMMAND_FILES:
         blocks.extend(b for b in extract_fenced_blocks(path) if b.language == "bash")
     return blocks
 

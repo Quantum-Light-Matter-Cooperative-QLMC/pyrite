@@ -1,0 +1,16 @@
+{
+  "schema": "pyrite.tutorial.v1",
+  "source_sha256": "2058a29336f9ca7887707650fc1130778648b8bc65765bf7d6d60e5aa4645acb",
+  "pyrite_version": "0.22.1",
+  "python_version": "3.14.6",
+  "git_revision": "0f0d2efbab713c7d6dcb6caa91318060fede171e",
+  "output": {
+    "density_g_cm3": 2.1999999999999975,
+    "composition": {
+      "O": 0.0441013586938069,
+      "Si": 0.0220506793469034
+    },
+    "identity": "b48768077a5e675b9c56a3401872c02db24b5668c91d4763a63506455ff3eda1",
+    "display_text": "Bulk density: 2.200 g/cm^3\nO: 0.044101 atoms/angstrom^3\nSi: 0.022051 atoms/angstrom^3\n"
+  }
+}

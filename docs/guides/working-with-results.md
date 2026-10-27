@@ -76,12 +76,31 @@ table downloads.
 (pixel-detector-observations)=
 (preserve-or-reduce-data)=
 
+## Explore and export interactively
+
+With `pyrite-mc[apps]` installed, open the saved-dataset picker:
+
+```bash
+pyrite app analysis launch hopg
+```
+
+Choose **Checkpoint**, then beam energy, thickness, tilt and azimuth. Inspect
+source components before enabling detector response. Keep the dataset identity
+with the figure: matching material names can hide different resolved inputs.
+
+```bash
+pyrite app analysis export hopg-analysis
+```
+
+This writes `pyrite-output/results/hopg-analysis.html`. Retain the component
+checkpoint and record its identity, revision, selected coordinates, response
+and post-processing settings; exported HTML is a presentation artifact.
+
 ## Other checkpoint workflows
 
 Use the [checkpoint and app reference](../reference/results-and-apps.md) for
 component files, dataset identity, interactive analysis, pixel observations,
-comparison, export and archiving. For example, `pyrite app analysis launch hopg`
-opens the saved-dataset picker with the `apps` extra installed.
+comparison, export and archiving.
 
 (save-electron-trajectories)=
 (find-and-describe-captures)=

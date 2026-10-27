@@ -16,6 +16,7 @@ illustrate the workflow; no convergence or predictive-accuracy claim is made.
 
 From a source checkout, run the maintained example or open its reactive notebook:
 
+<!-- verify: skip (downloadable Python example and marimo editor; checked by notebook export) -->
 ```bash
 uv sync --extra apps
 uv run python docs/examples/experimental_planar_channeling.py

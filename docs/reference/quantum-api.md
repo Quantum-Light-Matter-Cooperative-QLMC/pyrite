@@ -22,7 +22,7 @@ import home. The approved experimental solvers and planar bridge also have
 identity aliases under `pyrite.experimental.quantum`; new experimental examples
 use that facade to make their status visible. Specifications, configuration and
 runtime factories stay under `pyrite.quantum`. See the
-[experimental lifecycle](../guides/experimental-api.md).
+[experimental lifecycle](experimental-api.md).
 
 | Role | Names | API status and persistence |
 | --- | --- | --- |

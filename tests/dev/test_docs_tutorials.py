@@ -9,6 +9,82 @@ import numpy as np
 import pytest
 
 
+def test_material_authoring_example_matches_checked_composition(tutorials):
+    data = tutorials.load_example("adding_materials").compute()
+    assert data == tutorials.checked_output("adding_materials")
+    assert data["density_g_cm3"] == pytest.approx(2.2)
+    assert data["composition"]["O"] == pytest.approx(2 * data["composition"]["Si"])
+
+
+def test_optimization_plots_preserve_recorded_selection_uncertainty_and_units(
+    tutorials, monkeypatch, tmp_path
+):
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    example = tutorials.load_example("optimization_studies")
+    data = tutorials.checked_output("optimization_studies")
+    assert example.compute() == data
+    assert data["simulation_source"]["code_revision"].startswith("c941146c")
+    assert data["units"] == "photons/(sr incident electron)"
+    rows = data["comparisons"]
+    assert len(rows) == 9 and all(row["precision_pass"] for row in rows)
+
+    def forbid_compute():
+        pytest.fail("documentation rendering must use checked optimization evidence")
+
+    monkeypatch.setattr(example, "compute", forbid_compute)
+    monkeypatch.setattr(tutorials, "load_example", lambda _: example)
+    try:
+        tutorials.optimization_studies()
+        ax = plt.gcf().axes[0]
+        np.testing.assert_allclose(
+            ax.lines[0].get_ydata(), [row["selected_search_yield"] * 1e8 for row in rows]
+        )
+        container = ax.containers[0]
+        np.testing.assert_allclose(
+            container.lines[0].get_ydata(orig=False), [row["validation_mean"] * 1e8 for row in rows]
+        )
+        expected = [
+            [
+                [index, (row["validation_mean"] - row["validation_sem"]) * 1e8],
+                [index, (row["validation_mean"] + row["validation_sem"]) * 1e8],
+            ]
+            for index, row in enumerate(rows)
+        ]
+        np.testing.assert_allclose(container.lines[2][0].get_segments(), expected)
+        tutorials.optimization_studies(view="precision")
+        ax = plt.gcf().axes[0]
+        assert ax.get_yscale() == "log"
+        np.testing.assert_allclose(
+            ax.lines[1].get_ydata(),
+            [row["max_relative_paired_grid_difference"] * 100 for row in rows],
+        )
+        np.testing.assert_allclose(ax.lines[2].get_ydata(), 5)
+        np.testing.assert_allclose(ax.lines[3].get_ydata(), 2)
+        plt.gcf().savefig(tmp_path / "optimization.svg")
+    finally:
+        plt.close("all")
+
+    evidence = tmp_path / "evidence.json"
+    evidence.write_text("changed")
+    monkeypatch.setattr(tutorials, "DOCS", tmp_path / "docs")
+    data["repository_input_sha256"] = {evidence.name: "0" * 64}
+    cache = tmp_path / "data"
+    cache.mkdir()
+    (tmp_path / "optimization_studies.py").write_text("source")
+    monkeypatch.setattr(tutorials, "EXAMPLES", tmp_path)
+    (cache / "optimization_studies.json").write_text(
+        json.dumps(
+            {"source_sha256": tutorials.source_digest("optimization_studies"), "output": data}
+        )
+    )
+    with pytest.raises(ValueError, match="stale tutorial repository input"):
+        tutorials.checked_output("optimization_studies")
+
+
 def test_multiple_inline_guide_plots_have_distinct_image_names():
     guides = Path(__file__).parents[2] / "docs" / "guides"
     for page in guides.glob("*.md"):

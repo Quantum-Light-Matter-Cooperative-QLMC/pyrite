@@ -137,7 +137,7 @@ HTML page contains 21 `math notranslate` elements and no unrendered dollar
 delimiters in its article. These checks establish the stated integration
 claim. The separate physical search/finalist study completed as SLURM job 2511
 at `c941146c`; its [scalar comparison record](../check-records/pxr-optimization.json)
-and [workflow interpretation](../../guides/optimization-studies.md#measured-bounded-comparison)
+and [workflow interpretation](../../reference/optimization-studies.md#measured-bounded-comparison)
 record all nine independently re-evaluated finalists. That study does not extend
 this integral claim to upstream radiation-model or detector validation.
 
