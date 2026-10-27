@@ -4201,7 +4201,7 @@ wheels = [
 
 [[package]]
 name = "pyrite-mc"
-version = "0.22.0"
+version = "0.22.1"
 source = { editable = "." }
 default-groups = "all"
 dependencies = [
