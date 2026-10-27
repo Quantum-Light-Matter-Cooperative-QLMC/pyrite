@@ -45,7 +45,7 @@ before interpreting fringe minima or integrating a yield.
 
 ## Run the reference profiles
 
-[Fetch the reference tables](getting-started.md#install-and-fetch-reference-data),
+[Fetch the reference tables](getting-started.md#fetch-reference-data),
 then click **Run transported comparison** in the notebook. It runs history TR
 and bunch CTR with the same default scene, using **2048 line histories and 4096
 continuum histories per run**. TR is scored from the continuum population.

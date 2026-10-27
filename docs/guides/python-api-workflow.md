@@ -3,7 +3,7 @@
 Simulate 30 keV electrons crossing a 100 nm HOPG target, then plot the
 raw emitted X-ray spectra at 135° to the incident beam.
 
-Install `pyrite-mc[plots]` and [fetch the reference tables](getting-started.md#install-and-fetch-reference-data).
+Install `pyrite-mc[plots]` and [fetch the reference tables](getting-started.md#fetch-reference-data).
 This small CPU example uses 32,768 line-scoring and 128 continuum-scoring electron trials;
 first use also compiles CPU kernels. Download {download}`the complete script <../examples/python_api_workflow.py>`
 and run it in your installed environment:

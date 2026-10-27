@@ -1,22 +1,102 @@
 # Getting started
 
 Install PyRITE, run one CPU simulation, and open its saved spectrum.
-You need Python **3.13 or newer** and [uv](https://docs.astral.sh/uv/).
-For a library install or GPU dependencies, use the
-[README installation matrix](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite#install).
+You need Python **3.13 or newer**. Choose [uv](https://docs.astral.sh/uv/)
+(recommended) or pip below; both install into a virtual environment that also
+supports Python and notebook use. If you already have an active environment,
+run only the install command.
 
-## Install and fetch reference data
+(install-and-fetch-reference-data)=
 
-Install the CLI with its analysis app:
+## Install PyRITE on CPU
 
-<!-- verify: skip (external shell tools or downloadable Python example) -->
+The `apps` extra includes the analysis app used below. Install `pyrite-mc`
+without extras if you only need the core library and CLI.
+
+::::{tab-set}
+:sync-group: installer
+
+:::{tab-item} uv
+:sync: uv
+:selected:
+
+<!-- verify: skip (external installer; creates a user environment) -->
 ```bash
 uv tool install "pyrite-mc[apps]"
 uv tool update-shell
 ```
 
-Open a new shell so `pyrite` is on `PATH`, then choose a workspace and fetch
-PyRITE's pinned cross-section and atomic reference data:
+:::
+
+:::{tab-item} pip
+:sync: pip
+
+Use a Python 3.13+ interpreter:
+
+<!-- verify: skip (external installer; creates a user environment) -->
+```bash
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install "pyrite-mc[apps]"
+```
+
+:::
+::::
+
+These activation commands are for bash/zsh on Linux or macOS. In Windows
+PowerShell, activate with `.venv\Scripts\Activate.ps1` instead.
+
+## Add GPU support or other extras
+
+For an NVIDIA GPU with a compatible driver, install the `nvidia` extra into
+the same environment. The combined requirement keeps the analysis app:
+
+::::{tab-set}
+:sync-group: installer
+
+:::{tab-item} uv
+:sync: uv
+:selected:
+
+<!-- verify: skip (external installer; optional GPU dependencies) -->
+```bash
+uv tool install "pyrite-mc[nvidia,apps]"
+```
+
+:::
+
+:::{tab-item} pip
+:sync: pip
+
+<!-- verify: skip (external installer; optional GPU dependencies) -->
+```bash
+python -m pip install "pyrite-mc[nvidia,apps]"
+```
+
+:::
+::::
+
+Combine any extras with commas in the same brackets:
+
+| Extra | Adds |
+| --- | --- |
+| `nvidia` | NVIDIA CUDA/CuPy acceleration; requires a compatible GPU and driver. |
+| `apps` | Interactive Marimo apps, including the plotting dependencies. |
+| `plots` | Python plotting and figure export without the full app stack. |
+| `dask` | Experimental Dask distributed execution. |
+| `optimization` | Optuna parameter studies and batch/chunk tuning. |
+| `external-db` | Materials Project database access. |
+
+For example, use `"pyrite-mc[nvidia,apps,optimization]"` with either installer.
+GPU extras install dependencies; the quickstart below explicitly selects CPU.
+Intel and ROCm remain untested; consult
+[backend setup](../repo-design/cli/cli-reference-config.md#pyrite-config-setup)
+for backend configuration and limitations.
+
+## Fetch reference data
+
+Keep the environment active, choose a workspace, and fetch PyRITE's pinned
+cross-section and atomic reference data:
 
 ```bash
 mkdir -p pyrite-demo
@@ -82,7 +162,7 @@ simulation, follow [Your first Python simulation](python-api-workflow.md).
 
 ## Choose the next workflow
 
-- [How PyRITE works](how-pyrite-works.md): simulation stages and observables.
+- [How PyRITE works](../physics/how-pyrite-works.md): simulation stages and observables.
 - [Configure a campaign](configuration-cookbook.md): change inputs or the output home.
 - [Completion](../repo-design/cli/cli-reference-config.md#pyrite-config-completion-install) and [backend setup](../repo-design/cli/cli-reference-config.md#pyrite-config-setup): optional machine setup. NVIDIA CUDA is supported; Intel and ROCm remain untested.
 - [Running on a cluster](running-on-a-cluster.md): larger sweeps and GPU jobs.

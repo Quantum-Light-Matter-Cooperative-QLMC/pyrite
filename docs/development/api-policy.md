@@ -23,7 +23,7 @@ The inventory's `root_role` is independent of stability: `core` identifies the
 nine foundational names; `specialized` records preexisting root exports, **not**
 a deprecation; `experimental` identifies clearly provisional root entries.
 `root_policy` now separately classifies every root name as retained,
-deprecated, or deferred; see the complete [migration table](../api.md#root-import-compatibility).
+deprecated, or deferred; see the complete [migration table](../reference/python-api/compatibility.md#root-import-compatibility).
 The forward root allowlist contains the nine foundational names and the approved
 `photon_energies` convenience exception. Stability does not change when a root
 alias is deprecated. All existing imports keep working during the support window.

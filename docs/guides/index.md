@@ -1,16 +1,16 @@
-# User Guides
+# How-to Guides
 
-Start with [installation and a first run](getting-started.md), then
-[plot its saved results](working-with-results.md) or build a scene in Python.
-Scientific tutorials show simulated outputs; each guide states its model and
-sampling limits.
+Use these recipes when you have a specific task to complete. For a guided
+introduction, begin with [Getting Started](getting-started.md) and the
+[Interactive Tutorials](../notebooks/index.md). Scientific background belongs in
+[Physics](../physics/index.md), including the
+[simulation overview](../physics/how-pyrite-works.md); exact contracts belong in [Reference](../reference/index.md).
 
 ```{toctree}
 :maxdepth: 1
 :caption: Getting started
 
 python-api-workflow
-how-pyrite-works
 ```
 
 ```{toctree}
@@ -39,12 +39,18 @@ cover capture, replay and ParaView independently of spectral checkpoints.
 
 adding-materials
 gpt-gdf-beams
-running-on-a-cluster
 optimization-studies
 ```
 
-For execution tuning, use [performance profiling](../computation/performance-profile-analysis.md)
-and [CUDA batch/chunk tuning](../computation/batch-chunk-tuning.md).
+```{toctree}
+:maxdepth: 1
+:caption: Execution and performance
+
+running-on-a-cluster
+performance-profile-analysis
+batch-chunk-tuning
+```
+
 Scene construction and configuration contracts live in
 [Reference](../reference/index.md).
 

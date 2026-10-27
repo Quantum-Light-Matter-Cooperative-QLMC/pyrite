@@ -1,0 +1,8 @@
+.navbar-brand img.logo {
+  width: 190px;
+  height: auto;
+  max-height: 3.25rem;
+}
+@media (max-width: 575.98px) {
+  .navbar-brand img.logo { width: 150px; }
+}

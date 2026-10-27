@@ -66,7 +66,7 @@ feature's stated range, rather than approval of the entire facade at once.
 
 Optical response helpers and `PhotonTransport` remain classified above without
 new experimental aliases. Their existing bounded contracts remain at
-[optical response](../api.md#provisional-optical-diagnostic-response) and
+[optical response](../reference/python-api/experimental.md#provisional-optical-diagnostic-response) and
 [photon aperture selection](../repo-design/compute/photon-aperture.md).
 
 ## Admission and promotion checklist

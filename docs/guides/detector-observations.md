@@ -4,7 +4,7 @@ Predict an ideal detector image, then compare it with a simulated counting
 realization from the same source. This example separates physical detector
 geometry, readout response and exposure without rerunning transport.
 
-Install `pyrite-mc[plots]` and [fetch the reference tables](getting-started.md#install-and-fetch-reference-data).
+Install `pyrite-mc[plots]` and [fetch the reference tables](getting-started.md#fetch-reference-data).
 Download {download}`the complete runnable script <../examples/detector_observations.py>`:
 
 <!-- verify: skip (external shell tools or downloadable Python example) -->

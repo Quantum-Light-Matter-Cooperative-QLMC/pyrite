@@ -189,6 +189,89 @@ pressure. For an existing scheduler, set it in line with the workers actually
 available to the campaign; `workers` is a planning value, not a remote cluster
 reservation.
 
+## Native SLURM Python API
+
+For advanced Python orchestration, supply resolved `cases`, an existing
+`results` mapping and the campaign's table-aware content-key function. This
+example wires the experimental executor to the normal sweep coordinator; it
+is not a standalone simulation. The coordinator and compute nodes require
+compatible Python/PyRITE installations and the same absolute shared paths.
+
+```python
+from pyrite.storage import CaseArtifactStore
+from pyrite.execution.slurm import SlurmArrayConfig, SlurmArrayExecutor
+from pyrite.execution import ResourceRequest, RetryPolicy
+from pyrite.runs.run import run_sweep
+
+# Supply `cases` from the existing campaign builder, and a content-key
+# function that includes exactly the same physics/table markers as the sweep.
+store = CaseArtifactStore("/shared/pyrite-output/checkpoints")
+key_fn = ...  # existing resolved case identity function for this campaign
+executor = SlurmArrayExecutor(
+    store,
+    key_fn,
+    resources=ResourceRequest(cpu_cores=8, memory_bytes=32 * 1024**3),
+    config=SlurmArrayConfig(partition="cpu", cases_per_task=4, max_concurrent=16),
+    retry_policy=RetryPolicy(max_attempts=3),  # 1 (no automatic retries) by default
+)
+run_sweep(
+    cases,
+    results,
+    executor=executor,
+    artifact_store=store,
+    content_key_fn=key_fn,
+    checkpoint_dir="/shared/pyrite-output/checkpoints",
+)
+```
+
+GPU tasks use one process; CPU tasks may use local multiprocessing bounded
+by the allocated `cpu_cores`. The GPU request must match the scheduler's real
+allocation and device visibility; see [GPU allocation](#native-slurm-array-cpu).
+
+The operational files are under
+`<artifact-root>/.execution-jobs/<run-id>/{inputs,logs,status}`. Immutable case
+artifacts live under `<artifact-root>/<material>/.execution-artifacts/`.
+A worker can publish valid results before a failure prevents its task completion
+marker; the coordinator recovers those results before surfacing the failure.
+See [worker artifact integrity](distributed-artifacts.md) for publication rules.
+
+## Retry, cancellation and resumption
+
+`RetryPolicy(max_attempts=N)` bounds the **total** number of SLURM array
+submissions. The default is `N=1` (no automatic retries); opt in with e.g.
+`max_attempts=3` for preemption-prone allocations. A failed or abruptly
+terminated job submits only incomplete array indices with a new `sbatch
+--array=...` override. Each attempt tags its status JSON so a stale failure
+report cannot masquerade as a retry result. Before running numerical work,
+each worker validates committed artifacts and skips already-completed cases;
+coordinator callbacks run **at most once per case** within one `execute` call.
+A corrupt committed artifact raises rather than being overwritten.
+
+While `execute` is active, `executor.cancel()` can be called from another
+thread or an event callback. It requests `scancel` for this executor's current
+SLURM allocation, recovers any published case artifacts, and raises
+`ExecutionCancelledError` from the coordinating `execute` call. Cancellation
+does not delete the artifact inbox; resume the sweep to reuse completed work.
+It requires permission to cancel the submitted SLURM job and a running
+coordinator; it is **not** a background job-management service after the
+coordinator itself exits. The `submitted_job_ids` and `last_run_dir` attributes
+provide basic debugging/provenance for a live or finished invocation.
+
+If all retry attempts fail, `execute` raises with the remaining failed task
+indices. Successfully published case results stay in the artifact store and
+are recovered by a subsequent `run_sweep(..., resume=True)`, including after
+the coordinator or login session was interrupted. No recomputation is done for
+committed and valid cases. Standard checkpoint metadata is always consolidated
+by the coordinator rather than compute-node workers.
+
+The native coordinator is synchronous: keep it alive while tasks run. It does
+not reattach to an old allocation after coordinator termination. Resume reuses
+committed artifacts through a new invocation. The common
+[distributed limitations](#validation-and-limitations) also apply; no cluster
+scaling or physical-validation claim follows from successful dispatch.
+
+Implementation: {source}`src/pyrite/execution/slurm.py::SlurmArrayExecutor`.
+
 ## SSH remote helper and manual SLURM
 
 For a cluster reached through PyRITE's SSH/SLURM helper:

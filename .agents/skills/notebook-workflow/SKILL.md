@@ -5,6 +5,10 @@ description: Use when changing PyRITE scan, analysis, pixel, compare, trace, or 
 
 # Notebook Workflow
 
+This skill owns packaged Marimo applications and the legacy Jupyter check,
+**not** public scientific notebooks in `docs/notebooks/`. Use
+`tutorial-authoring` for those, with a separate canonical source/export policy.
+
 - `scan_app.py`: sweep runner.
 - `analysis_app.py`: checkpoint analysis.
 - `pixel_app.py`: stored pixel-detector observations.

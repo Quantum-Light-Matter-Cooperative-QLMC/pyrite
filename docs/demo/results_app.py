@@ -18,7 +18,11 @@ Pyodide, so it must never import ``pyrite``: it reads the bundled
 import marimo
 
 __generated_with = "0.25.1"
-app = marimo.App(width="medium")
+app = marimo.App(
+    width="medium",
+    app_title="PyRITE · Results demo",
+    html_head_file="../../src/pyrite/_assets/branding/head.html",
+)
 
 with app.setup:
     import json
@@ -169,6 +173,18 @@ def trajectory_figure(data, case, *, secondaries=True):
         height=560,
     )
     return fig
+
+
+@app.cell(hide_code=True)
+def _():
+    _base = mo.notebook_location()
+    _logo = (
+        _base / "public" / "pyrite-wordmark.png"
+        if sys.platform == "emscripten"
+        else _base / "../../src/pyrite/_assets/branding/pyrite-wordmark.png"
+    )
+    mo.image(str(_logo), alt="PyRITE", width=300)
+    return
 
 
 @app.cell(hide_code=True)

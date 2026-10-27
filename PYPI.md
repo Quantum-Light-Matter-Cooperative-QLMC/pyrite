@@ -1,5 +1,7 @@
 # PyRITE
 
+![PyRITE](https://raw.githubusercontent.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/main/src/pyrite/_assets/branding/pyrite-wordmark.png)
+
 PyRITE is a Python toolkit for Monte Carlo electron transport and X-ray
 emission in crystalline and amorphous solids. It models parametric X-ray
 radiation (PXR) and coherent bremsstrahlung (CBS) from crystals, alongside
@@ -13,7 +15,8 @@ CPU execution is included; NVIDIA GPU acceleration is available through the
 
 ## Install
 
-Requires Python 3.13 or newer.
+Requires Python 3.13 or newer. The [installation guide](https://pyrite.readthedocs.io/en/latest/guides/getting-started.html#install-pyrite-on-cpu)
+offers uv (recommended) and pip instructions, followed by GPU and extras options.
 
 ```bash
 pip install pyrite-mc

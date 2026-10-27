@@ -14,6 +14,53 @@ before adding logs or reports. Preserve numerical measurements, scientific
 configuration, source revisions and content digests; indicate when published
 metadata contains placeholders rather than original operator paths.
 
+## Choose the reader's documentation need
+
+PyRITE uses [Diátaxis](https://diataxis.fr/) as an editorial guide, not a rule
+that the sidebar must have exactly four sections. Choose one primary mode
+before adding a page, and link to other modes rather than repeating their content.
+
+| Reader's question | Mode and primary location | Example |
+| --- | --- | --- |
+| Teach me to do this | **Tutorial**, `docs/notebooks/` | Simulate and plot a first PXR spectrum |
+| How do I accomplish this task? | **How-to**, `docs/guides/` | Configure a detector acquisition |
+| What does this interface accept? | **Reference**, `docs/reference/` and public docstrings | `Observation` parameters |
+| Why does this work? | **Explanation**, `docs/physics/` | Detector acceptance and broadening |
+
+The existing `docs/api.md` is a compatibility-preserving inventory while
+namespace pages grow under `docs/reference/python-api/`. CLI help and settings
+remain generated from their canonical owners. Do not manually synchronize API
+signatures or introduce unsupported/private objects to make a reference complete.
+
+**Tutorials** guide a novice through one scientific objective, with minimal
+setup, visible results, short interpretation, and suggested variations. The
+Marimo/MoLab notebook source and static export workflow are owned by #758;
+use the `tutorial-authoring` skill, not the application `notebook-workflow`.
+**How-tos** assume relevant background and give a concise, tested recipe for a
+specific outcome, with required alternatives or cautions but no introductory
+lesson. A short API example need not become a separate guide. **Reference**
+describes complete and authoritative contracts without a long narrative;
+**explanation** develops physical or numerical reasoning without duplicating
+signature tables.
+
+Additional sections serve distinct audiences or evidence needs:
+
+- `docs/validation/` owns applicability, independent evidence and sign-off
+  status; verification is not automatically experimental validation.
+- `docs/development/`, `docs/repo-design/` and `docs/adr/` own contributor
+  procedures, current internals, and durable architectural decisions.
+- `docs/research/` marks proposals and unsupported explorations explicitly.
+- `README.md` and Getting Started provide brief entry points, not fifth modes.
+
+Find the canonical existing owner before creating a page. Choose task-based
+titles, short sections, and one primary toctree parent; group long inventories
+behind section index pages. Preserve published URLs and stable scientific
+anchors when relocating content; add a redirect/compatibility page if necessary.
+Review inbound links and move the explanation rather than copying it. Every
+scientific claim still needs applicable units, assumptions, provenance,
+limitations, and links to its validation evidence. Agent plans stay outside
+published documentation.
+
 ## Structure, labels, and references
 
 Use one `#` document title, then descend through headings without skipping a level.
@@ -220,9 +267,17 @@ pyrite-dev docs --linkcheck
 
 External link checking requires network access and is therefore not part of the offline gate.
 
-## Static executable tutorials
+(static-executable-tutorials)=
+## Existing static examples
 
-Ordinary tutorials use maintained Python sources plus Matplotlib's
+New guided learning content belongs in the Marimo/MoLab curriculum under
+`docs/notebooks/`, following `tutorial-authoring` and #758. Do not extend the
+legacy static example system into a parallel tutorial curriculum. Retain its
+checked outputs while examples still support published pages; when a notebook
+supersedes a walkthrough, link to that notebook and preserve useful task recipes
+and reference material at their canonical owners.
+
+Existing static examples use maintained Python sources plus Matplotlib's
 [`plot` directive](https://matplotlib.org/stable/api/sphinxext_plot_directive_api.html)
 inside MyST pages. A `literalinclude` displays the executable source and the
 directive places its generated figure directly below it in the PyData theme.
@@ -243,7 +298,7 @@ The infrastructure prototype compared these approaches:
 | [marimo export](https://docs.marimo.io/guides/exporting/) | Maintained reactive sources export to HTML or notebook formats | Best for interactive analysis; native notebook rendering adds an export and parser stage. Static HTML is a separate embedded page. |
 | Matplotlib `plot` directive (selected) | Existing MyST, copyable Python source, native figures, no new rendering package | Explicitly manage small precomputed outputs and their provenance. |
 
-Conventions:
+Maintenance conventions for existing examples:
 
 - `docs/examples/NAME.py` owns an executable example. `compute()` returns a
   JSON-serializable mapping (including resolved seed and result provenance);

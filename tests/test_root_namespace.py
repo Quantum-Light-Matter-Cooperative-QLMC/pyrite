@@ -112,7 +112,7 @@ def test_documented_root_classification_matches_governed_inventory():
         name: (classification.lower(), canonical)
         for name, classification, canonical in re.findall(
             r"^\| `([\w]+)` \| (Retained|Deprecated|Deferred) \| `([\w.]+)` \|",
-            (root / "docs/api.md").read_text(),
+            (root / "docs/reference/python-api/compatibility.md").read_text(),
             re.M,
         )
     }

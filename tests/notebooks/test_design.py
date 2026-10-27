@@ -42,16 +42,16 @@ def test_design_tokens_are_complete_and_export_safe() -> None:
     assert "https://" not in css and "http://" not in css
 
 
-def test_notebook_css_resource_preserves_pre_extraction_rendering() -> None:
+def test_notebook_css_resource_renders_expected_design() -> None:
     template = files("pyrite.apps").joinpath("_design.css").read_text()
     css = _design.notebook_css()
 
     assert "${DARK_BG}" in template
     assert "${LIGHT_TEXT}" in template
     assert "${" not in css
-    assert len(css.splitlines()) == 261
+    assert len(css.splitlines()) == 265
     assert sha256(css.encode()).hexdigest() == (
-        "a74bbb0eb2336ee656f951de6b9bf6a8d2f2a6a0f460470600c2f16ebabd4ab4"
+        "bcb610443b9833f320165591c4e3ad17dcc6712542299225b158984e5b2cc3b7"
     )
 
 

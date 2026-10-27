@@ -5,38 +5,44 @@ description: Use when changing PyRITE README/docs/public docstrings/generated re
 
 # Documentation Maintenance
 
-Document behavior once at its durable owner:
+Use `docs/repo-design/documentation.md` as the canonical authoring policy.
+Classify the reader's *primary need* before editing (Diátaxis):
 
-| Change | Owner |
-|---|---|
-| Science, install, primary workflow | `README.md` |
-| User task/workflow | `docs/guides/` |
-| Current physical model/convention | `docs/physics/` |
-| Independent evidence/reproduction | `docs/validation/` |
-| Exploratory/unimplemented proposal | `docs/research/` |
-| Current implementation/design reference | `docs/repo-design/` |
-| Durable architecture decision | `docs/adr/` |
-| CLI contract | Source help + generated CLI reference; use `cli-ui-ux` |
-| Public API | Source docstring + `docs/api.md`; use `scientific-library` |
-| Ownership/entry point/dependency | `docs/repo_map.md`; use `repo-orientation` |
-| Backlog/task plan | GitHub Issues |
+| Need | Canonical home |
+| --- | --- |
+| Learn by doing | `docs/notebooks/`; use `tutorial-authoring` and #758 |
+| Solve a specific user task | `docs/guides/` (How-to Guides) |
+| Look up a public interface | Public docstring, `docs/reference/python-api/` and the transitional `docs/api.md` |
+| Understand physical or numerical behavior | `docs/physics/` |
+| Inspect independent evidence | `docs/validation/` |
+| Read contributor workflow/current architecture | `docs/development/`, `docs/repo-design/` |
+| Understand design decisions or proposals | `docs/adr/`, explicitly labeled `docs/research/` |
+| Find CLI options, settings, results contracts | Generated CLI help and `docs/reference/` |
+| Locate package owners | `docs/repo_map.md`; use `repo-orientation` |
+| Track implementation work | GitHub Issues, not public docs |
 
-Read only the relevant owning docs plus source/tests/runtime evidence needed to
-verify them. Add maintained pages to the nearest index/toctree. Preserve units,
-assumptions, citations, validation state, and current-vs-proposed distinctions.
-Prefer relative links and one canonical explanation.
+1. Find the existing canonical owner and current source, tests, and evidence.
+2. Shorten, consolidate, or cross-link before creating another page. Tutorials
+   teach; how-tos solve; reference specifies; explanation motivates.
+3. Add one primary toctree owner with appropriate nested index. When moving a
+   page, preserve its published URL via an alias/redirect and update inbound
+   links, explicit labels and source references.
+4. Preserve public API stability, model assumptions, quantities and units,
+   provenance, validation state, and current-versus-proposed distinctions.
+5. Keep disposable plans in `agentdocs/`, not public docs.
 
-Keep disposable agent plans/reports out of durable docs. Optional `agentdocs/`
-working notes are branch-local scratch; promote only durable outcomes.
+Example: a Timepix3 acquisition recipe goes in `docs/guides/`; its constructor
+signature belongs in generated Python API reference, and response physics in
+`docs/physics/`. Do not copy either into the recipe.
 
-## Verify touched artifacts
+## Focused checks
 
-Run only applicable checks:
+- CLI edits: regenerate and check `pyrite-dev cli-reference` and
+  `pyrite-dev cli-deprecations` as applicable.
+- Ownership edits: `pyrite-dev repo-map --check`.
+- MyST, Sphinx and navigation: `uv run pyrite-dev docs`.
+- Skill edits: `uv run pyrite-dev sync-skills`, then
+  `uv run pyrite-dev check-skills`.
 
-- CLI: `pyrite-dev cli-reference --write`, `pyrite-dev cli-deprecations --write`,
-  then their `--check` modes.
-- Ownership/topology: `pyrite-dev repo-map`.
-- Docs/public API/navigation: `pyrite-dev docs`.
-- Skills: `pyrite-dev sync-skills`, then `check-skills`.
-
-Inspect the scoped diff and report checks/evidence gaps.
+Inspect the scoped diff and report evidence gaps. For sidebar changes, check
+rendered deep navigation and mobile layout as well as link validity.

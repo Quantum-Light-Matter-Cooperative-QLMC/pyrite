@@ -1,6 +1,8 @@
 """Shared presentation primitives for PyRITE Marimo applications."""
 
+from base64 import b64encode
 from collections.abc import Iterable, Mapping
+from functools import cache
 from html import escape
 from importlib.resources import files
 from string import Template
@@ -347,9 +349,16 @@ def apply_plotly_theme(fig, theme: str):
     return fig
 
 
+@cache
+def _logo_uri() -> str:
+    asset = files("pyrite").joinpath("_assets/branding/pyrite-wordmark.png")
+    return "data:image/png;base64," + b64encode(asset.read_bytes()).decode("ascii")
+
+
 def page_title(mo, title: str, intro: str, *, eyebrow: str = "PyRITE"):
     return mo.Html(
         '<header class="pyrite-shell pyrite-title">'
+        f'<img class="pyrite-title__logo" src="{_logo_uri()}" alt="PyRITE">'
         f'<div class="pyrite-title__eyebrow">{escape(eyebrow)}</div>'
         f"<h1>{escape(title)}</h1><p>{escape(intro)}</p></header>"
     )

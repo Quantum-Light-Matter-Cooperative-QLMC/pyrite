@@ -46,7 +46,7 @@ catalog is useful when the whole laboratory configuration must travel together;
 follow [catalog setup](../reference/catalogs-and-workspaces.md#copy-a-complete-catalog).
 
 Once reviewed, `pyrite run lab-scan` executes the saved campaign. Running
-transport needs the [reference tables](getting-started.md#install-and-fetch-reference-data)
+transport needs the [reference tables](getting-started.md#fetch-reference-data)
 in the selected workspace. Changing the workspace also changes table discovery.
 
 Use [profile fields](../repo-design/profile-settings.md) for units and setters,

@@ -16,10 +16,12 @@ prose keep required format.
   skip `activate_project`, onboarding, and the instructions manual unless
   troubleshooting Serena. No hook forces Serena use (`serena-hooks remind`
   denied ordinary Read-before-Edit loops); choosing the right tool is on you.
-- `README.md`: science/install/primary workflow. Classify maintained pages under
-  `docs/guides/`, `docs/physics/`, `docs/validation/`, `docs/research/`,
-  `docs/repo-design/`, or `docs/adr/`; see
-  `docs/repo-design/documentation.md`. Backlog: GitHub Issues
+- `README.md` owns science/install/primary workflow. Before writing docs,
+  classify the reader's need (tutorial, how-to, reference, or explanation),
+  find the canonical page, and follow `docs/repo-design/documentation.md`.
+  Use `tutorial-authoring` for `docs/notebooks/`, `documentation-maintenance`
+  for other docs; preserve API ownership, units, evidence and stable links.
+  Backlog: GitHub Issues
   (`gh issue list`). Status labels (one per open issue): `needs-triage`,
   `backlog`, `active`, `gated`, `paused`. Area labels: `physics`, `cli`,
   `api`, `notebooks`, `tests`, `performance`, `remote`, `geometry`,
@@ -116,8 +118,9 @@ tests or changes formatting.
 ## Work rules
 
 - Make smallest owning change. Preserve unrelated dirty-tree work.
-- Prefer reusable logic in `src/pyrite/`; keep marimo apps thin. Keep notebooks
-  output-free. Run `uv run marimo check <app.py>` after marimo edits.
+- Prefer reusable logic in `src/pyrite/`; keep marimo apps thin. Keep notebook
+  sources output-free; checked tutorial exports follow `tutorial-authoring`.
+  Run `uv run marimo check <app.py>` after marimo edits.
 - Invoke matching repo skill for CLI, notebooks, Monte Carlo, performance,
   physics, docs, runtime, remote GPU, regression, catalog-golden, or backlog
   work.

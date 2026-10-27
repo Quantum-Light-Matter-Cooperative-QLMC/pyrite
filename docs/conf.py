@@ -61,6 +61,7 @@ extensions = [
     "_marimo_demo",  # browser-only results demo embedded on the overview page
     "_tutorials",  # reject stale precomputed tutorial outputs
     "matplotlib.sphinxext.plot_directive",  # native figures from maintained sources
+    "sphinx_design",  # synchronized uv/pip installation tabs
     "myst_parser",  # render the docs/*.md design notes
     "sphinx.ext.autodoc",  # API docs from docstrings
     "sphinx.ext.autosummary",  # per-module summary tables + stub pages
@@ -155,6 +156,11 @@ html_theme = "pydata_sphinx_theme"
 templates_path = ["_templates"]
 html_sidebars = {"**": ["sidebar-collapse.html", "sidebar-sections.html"]}
 html_title = "PyRITE"
+BRANDING = ROOT / "src" / "pyrite" / "_assets" / "branding"
+html_static_path = ["_static", str(BRANDING)]
+html_css_files = ["branding.css", "sidebar.css"]
+html_logo = str(BRANDING / "pyrite-wordmark.png")
+html_favicon = str(BRANDING / "pyrite-favicon.ico")
 # RTD supplies the preferred domain/version; Sphinx appends each document path.
 html_baseurl = os.environ.get(
     "READTHEDOCS_CANONICAL_URL", "https://pyrite.readthedocs.io/en/latest/"
@@ -162,12 +168,14 @@ html_baseurl = os.environ.get(
 
 
 html_theme_options = {
-    "navigation_depth": 2,
+    "navigation_depth": 4,
     "show_nav_level": 1,
-    "collapse_navigation": True,
+    "collapse_navigation": False,
     "logo": {
-        "text": "PyRITE",
-        "image_light": "_static/pyrite_full.jpg",
-        "image_dark": "_static/pyrite_full.jpg",
+        "alt_text": "PyRITE — Home",
+        "image_light": "_static/pyrite-wordmark.png",
+        "image_dark": "_static/pyrite-wordmark.png",
     },
 }
+
+html_context = {"brand_image_url": html_baseurl.rstrip("/") + "/_static/pyrite-social.png"}

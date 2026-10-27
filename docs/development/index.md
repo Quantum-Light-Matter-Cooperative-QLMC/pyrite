@@ -8,6 +8,7 @@ implementation; research pages describe proposals; ADRs record durable decisions
 :maxdepth: 1
 
 api-policy
+branding
 ../repo-design/index
 ../research/index
 ../adr/index

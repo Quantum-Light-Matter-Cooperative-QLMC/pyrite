@@ -8,7 +8,9 @@
 import marimo
 
 __generated_with = "0.23.11"
-app = marimo.App(width="full")
+app = marimo.App(
+    width="full", app_title="PyRITE · Channeling", html_head_file="../_assets/branding/head.html"
+)
 
 
 @app.cell

@@ -59,8 +59,8 @@ storage/trajectory-scenes
 ```
 
 For current profiling and tuning workflows, use
-[performance profiling](../computation/performance-profile-analysis.md) and
-[CUDA batch/chunk tuning](../computation/batch-chunk-tuning.md).
+[performance profiling](../guides/performance-profile-analysis.md) and
+[CUDA batch/chunk tuning](../guides/batch-chunk-tuning.md).
 
 ## Architecture decision records
 
