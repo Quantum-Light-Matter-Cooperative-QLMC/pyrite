@@ -17,9 +17,11 @@ It is research software under active development: read the
 [capabilities and limitations](physics/capabilities.md) and
 [validation status](validation/status-summary.md) before interpreting predictions.
 
-- **[Install and run](guides/getting-started.md)** — one small CPU simulation and its output.
-- **[Understand the physics](guides/how-pyrite-works.md)** — follow a simulation from beam to observable.
-- **[Use Python](guides/python-api-workflow.md)** — build a scene and inspect an in-memory result.
+- **[Get started](guides/getting-started.md)** — install PyRITE and run a small CPU simulation.
+- **[Interactive Tutorials](notebooks/index.md)** — follow a progressive, executable learning path.
+- **[How-to Guides](guides/index.md)** — solve a specific simulation or analysis task.
+- **[Python API](reference/python-api/index.md)** — find supported interfaces and their contracts.
+- **[Physics](physics/index.md) and [Validation](validation/index.md)** — examine models and evidence.
 
 ## Explore results in the browser
 
@@ -75,9 +77,10 @@ The [bibliography](references.md) collects the scientific sources.
 
 ## Find your next task
 
-[User guides](guides/index.md) cover profiles, materials, detectors, results,
-and cluster execution. [Reference](reference/index.md) contains generated CLI
-help, the supported Python API, and configuration contracts.
+[How-to Guides](guides/index.md) cover profiles, materials, detectors, results,
+and cluster execution. [Reference](reference/index.md) separates the Python API,
+CLI, configuration, and result contracts. The [interactive curriculum](notebooks/index.md)
+is developed under [#758](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/758).
 
 For contributors, start with [development setup](repo-design/development-workspace.md)
 and the [development index](development/index.md). Source and issue tracking
@@ -86,11 +89,12 @@ see the repository [license](https://github.com/Quantum-Light-Matter-Cooperative
 and [README](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite#readme).
 
 ```{toctree}
-:maxdepth: 2
+:maxdepth: 4
 :hidden:
 
-Getting started <guides/getting-started>
-User guide <guides/index>
+Getting Started <guides/getting-started>
+Interactive Tutorials <notebooks/index>
+How-to Guides <guides/index>
 Physics <physics/index>
 Computation <computation/index>
 Validation <validation/index>

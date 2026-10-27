@@ -4,7 +4,7 @@ The [visual tutorial](../guides/directional-source-heatmap.md) demonstrates one
 seeded PXR/CBS map. This page owns the reusable source and interactive-app
 contracts. The canonical imports are `pyrite.radiation.directional_source` and
 `pyrite.radiation.directional_sources`; both remain **experimental**. See the
-[API reference](../api.md#provisional-directional-source-api) for signatures.
+[API reference](../reference/python-api/radiation.md#provisional-directional-source-api) for signatures.
 
 ## Components and shared transport
 

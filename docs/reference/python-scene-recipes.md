@@ -353,7 +353,7 @@ Omitting `executor` keeps the direct single-case path. Explicit executors
 currently require automatic transport-core selection; kernel chunks remain
 part of `Numerics`. Scheduler requests are recorded separately in
 `result.provenance["execution"]` and do not alter case or observation identity.
-See [Scene simulation](../api.md#scene-simulation) for worker-artifact checks
+See [Scene simulation](../reference/python-api/core.md#scene-simulation) for worker-artifact checks
 and distributed-executor requirements.
 
 ### Named CLI pixel profiles use the same composition

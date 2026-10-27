@@ -17,7 +17,7 @@ and the composition boundary with
 This revision supersedes the earlier proposal to make `Scene` the simulation
 composition root. It records the implemented composition and compatibility
 contract. Current usage remains in
-[the API reference](../api.md#scene-simulation). Implementation progress belongs
+[the API reference](../reference/python-api/core.md#scene-simulation). Implementation progress belongs
 in the issues.
 
 ## Implemented resolution boundary

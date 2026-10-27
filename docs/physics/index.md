@@ -43,76 +43,17 @@ capabilities
 - Photons follow straight rays from segment midpoints and receive passive Beer--Lambert attenuation. Bulk refractive dispersion shifts coherent-line resonance and phase; interface optics, photon scattering, re-emission, and feedback on the electron are excluded. See [Photon escape and in-medium dispersion](radiation-physics/photon-escape-and-dispersion.md).
 - The default detector treatment evaluates one far-field direction, applies flat solid-angle scaling and analytic aperture broadening, then treats quantum efficiency and measured-energy redistribution downstream. See [Detector solid-angle integration](detectors/detector-solid-angle.md) and [Detector and instrument response](detectors/detector-response.md).
 
-## Reference pages
+(reference-pages)=
+## Explore the models
 
 ```{toctree}
-:maxdepth: 1
-:caption: Atomic physics
+:maxdepth: 2
 
-atomic-physics/atomic-form-factors
-atomic-physics/elemental-transport-data
-```
-
-```{toctree}
-:maxdepth: 1
-:caption: Beam and electron transport
-
-beam-transport/beam-phase-space
-beam-transport/longitudinal-structure
-beam-transport/electron-transport
-beam-transport/elastic-scattering
-beam-transport/atomic-electron-deflection
-beam-transport/stopping-power
-beam-transport/inelastic-scattering-events
-beam-transport/shell-soft-hard-transport
-beam-transport/positron-transport
-```
-
-```{toctree}
-:maxdepth: 1
-:caption: Radiation physics
-
-radiation-physics/coherent-radiation
-radiation-physics/channeling-energy-ensemble
-radiation-physics/channeling-energy-resolved-mcwf
-radiation-physics/coherent-emission
-radiation-physics/temporal-intensity-profile
-radiation-physics/bremsstrahlung
-radiation-physics/hard-bremsstrahlung-events
-radiation-physics/characteristic-radiation
-radiation-physics/photon-escape-and-dispersion
-radiation-physics/spectral-observables
-radiation-physics/transition-radiation
-radiation-physics/optical-transition-radiation
-radiation-physics/cherenkov-radiation
-radiation-physics/optical-wavefront-and-detectors
-radiation-physics/diffracted-transition-radiation
-```
-
-```{toctree}
-:maxdepth: 1
-:caption: Geometry and orientation
-
-geometry/tilt-convention
-geometry/transport-geometry
-```
-
-```{toctree}
-:maxdepth: 1
-:caption: Detectors and optics
-
-detectors/detector-solid-angle
-detectors/detector-response
-```
-
-```{toctree}
-:maxdepth: 1
-:caption: Materials and crystallography
-
-materials/crystal-structure
-materials/structure-factor
-materials/reflection-selection
-materials/material-composition
-materials/crystal-mosaicity
-materials/multilayer-materials
+how-pyrite-works
+atomic-physics/index
+beam-transport/index
+radiation-physics/index
+geometry/index
+detectors/index
+materials/index
 ```

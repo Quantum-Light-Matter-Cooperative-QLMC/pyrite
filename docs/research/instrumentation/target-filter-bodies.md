@@ -3,7 +3,7 @@
 **Status:** Architectural direction approved on 2026-10-13 for
 [#401](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/401).
 The homogeneous resolver and finite rectangular `Target`/`Filter` adapters
-are implemented; see the [supported body API](../../api.md#shared-bodies-and-explicit-roles).
+are implemented; see the [supported body API](../../reference/python-api/geometry.md#shared-bodies-and-explicit-roles).
 The discussion below preserves design-stage sketches. Broader slab/stack
 shape sharing, layered-filter adapters and additional interactions remain
 follow-up proposals.

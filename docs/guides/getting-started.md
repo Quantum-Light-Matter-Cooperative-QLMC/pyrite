@@ -82,7 +82,7 @@ simulation, follow [Your first Python simulation](python-api-workflow.md).
 
 ## Choose the next workflow
 
-- [How PyRITE works](how-pyrite-works.md): simulation stages and observables.
+- [How PyRITE works](../physics/how-pyrite-works.md): simulation stages and observables.
 - [Configure a campaign](configuration-cookbook.md): change inputs or the output home.
 - [Completion](../repo-design/cli/cli-reference-config.md#pyrite-config-completion-install) and [backend setup](../repo-design/cli/cli-reference-config.md#pyrite-config-setup): optional machine setup. NVIDIA CUDA is supported; Intel and ROCm remain untested.
 - [Running on a cluster](running-on-a-cluster.md): larger sweeps and GPU jobs.

@@ -162,9 +162,9 @@ html_baseurl = os.environ.get(
 
 
 html_theme_options = {
-    "navigation_depth": 2,
+    "navigation_depth": 4,
     "show_nav_level": 1,
-    "collapse_navigation": True,
+    "collapse_navigation": False,
     "logo": {
         "text": "PyRITE",
         "image_light": "_static/pyrite_full.jpg",
