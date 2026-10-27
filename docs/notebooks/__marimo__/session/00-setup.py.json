@@ -1,0 +1,139 @@
+{
+  "version": "1",
+  "metadata": {
+    "marimo_version": "0.25.2",
+    "script_metadata_hash": "fce36330dca2f57e525c313d03f49ab3"
+  },
+  "cells": [
+    {
+      "id": "Hbol",
+      "code_hash": "fa2b59a0becfb8c1edb6633d34ec5489",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/html": "<div style='display: flex;flex: 1;flex-direction: column;justify-content: flex-start;align-items: normal;flex-wrap: nowrap;gap: 0.5rem'><marimo-ui-element object-id='Hbol-0' random-id='9ef17e22-b899-4ae8-cc07-7b86c87d6cf5'><marimo-anywidget data-initial-value='{&quot;model_id&quot;:&quot;b414fe1aa52a40eda20ea7b78cbecd9f&quot;}' data-label='null' data-model-id='&quot;b414fe1aa52a40eda20ea7b78cbecd9f&quot;'></marimo-anywidget></marimo-ui-element></div>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "MJUe",
+      "code_hash": "7f7a732431c0d3f07d727dbf30b83fc9",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h1 id=\"environment-and-gpu-setup\">Environment and GPU setup</h1>\n<span class=\"paragraph\"><a href=\"https://molab.marimo.io/github/Quantum-Light-Matter-Cooperative-QLMC/pyrite/blob/main/docs/notebooks/00-setup.py\" rel=\"noopener noreferrer\" target=\"_blank\"><img alt=\"Open in Molab\" src=\"https://marimo.io/molab-shield.svg\" /></a></span>\n<span class=\"paragraph\">Verify your Python environment, choose a backend, and complete one tiny CPU simulation.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "vblA",
+      "code_hash": "862fc6205a125ae8e1af599c5fe9b711",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"install-and-fetch-tables-once\">Install and fetch tables once</h2>\n<span class=\"paragraph\">Use Python <strong>3.13 or newer</strong>. Locally, create an environment and install:</span>\n<div class=\"language-bash codehilite\"><pre><span></span><code>uv<span class=\"w\"> </span>venv<span class=\"w\"> </span>--python<span class=\"w\"> </span><span class=\"m\">3</span>.13\nuv<span class=\"w\"> </span>pip<span class=\"w\"> </span>install<span class=\"w\"> </span><span class=\"s1\">'pyrite-mc[apps]==0.22.3'</span>\nuv<span class=\"w\"> </span>run<span class=\"w\"> </span>pyrite<span class=\"w\"> </span>tables<span class=\"w\"> </span>fetch\nuv<span class=\"w\"> </span>run<span class=\"w\"> </span>pyrite<span class=\"w\"> </span>tables<span class=\"w\"> </span>verify\nuv<span class=\"w\"> </span>run<span class=\"w\"> </span>marimo<span class=\"w\"> </span>edit<span class=\"w\"> </span>docs/notebooks/00-setup.py\n</code></pre></div>\n<span class=\"paragraph\">The reference data download is about 100 MB. Fetch verifies archive SHA-256\nbefore installation; <code>tables verify</code> checks installed pins and payloads.\nKeep these explicit setup commands outside notebook execution: opening this\nnotebook never downloads reference tables automatically. If the smoke run\nreports missing data, run fetch/verify in a terminal in this same environment.\nSee the <a href=\"https://pyrite.readthedocs.io/en/latest/repo-design/cli/cli-reference-tables.html\" rel=\"noopener noreferrer\" target=\"_blank\">tables reference</a>.</span>\n<span class=\"paragraph\"><strong>Molab:</strong> open the badge above; its inline dependency manifest installs the\nCPU environment. Open Molab's terminal to run <code>pyrite tables fetch</code> followed by\n<code>pyrite tables verify</code>. Start with CPU. If your Molab session offers an NVIDIA\nRTX Pro 6000, select that GPU in Molab, then install the NVIDIA extra into the\nsame environment:</span>\n<div class=\"language-bash codehilite\"><pre><span></span><code>uv<span class=\"w\"> </span>pip<span class=\"w\"> </span>install<span class=\"w\"> </span><span class=\"s1\">'pyrite-mc[nvidia]==0.22.3'</span>\nnvidia-smi\n</code></pre></div>\n<span class=\"paragraph\">Use the same extra for a local NVIDIA GPU. A compatible NVIDIA driver is still\nrequired; the current extra supplies CUDA 13 CuPy/toolkit packages. GPU type,\navailability and account quotas depend on the host. This notebook does not\nrequire a GPU or allocate GPU transport by default.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "bkHC",
+      "code_hash": "0fcf85db5adb3fd1612c4f8903bdb3ab",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/html": "<marimo-json-output data-json-data='{&quot;python&quot;:&quot;3.14.4&quot;,&quot;pyrite&quot;:&quot;0.22.3&quot;,&quot;cupy_installed&quot;:false,&quot;selected_backend&quot;:&quot;cpu&quot;,&quot;cuda_status&quot;:&quot;CuPy not installed; CPU execution is available&quot;}' data-value-types='&quot;json&quot;'></marimo-json-output>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "lEQa",
+      "code_hash": "da8e788098280722335982d84ac6ad8b",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"choose-the-backend-before-import\">Choose the backend before import</h2>\n<span class=\"paragraph\">The first code cell sets <code>PYRITE_MC_BACKEND</code> to <code>cpu</code> unless the environment\nalready selected another backend. For GPU execution, set it to <code>cuda</code> <strong>before\nimporting PyRITE</strong>. Restart the kernel after changing the backend or installing\nCuPy; rerunning a later cell does not undo imports cached in a live kernel.\nThe smoke result below records the actual backend, which should match your\nselection. <code>nvidia-smi</code> confirms driver/GPU visibility; importing CuPy alone\ndoes not prove a compatible device exists.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "PKri",
+      "code_hash": "e2e5e648fbd7582e0e43c75c2614f0ae",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "Xref",
+      "code_hash": "35eba7291b6eb2c85eeef45a2c169d08",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "SFPL",
+      "code_hash": "e8bc7e93844841e7496be8c160561a96",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/html": "<marimo-json-output data-json-data='{&quot;backend&quot;:&quot;cpu&quot;,&quot;energy_nodes&quot;:1231,&quot;finite_spectrum&quot;:true,&quot;nonzero_spectrum&quot;:true}' data-value-types='&quot;json&quot;'></marimo-json-output>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "BYtC",
+      "code_hash": "fe2383a1b37a427b8bc78f94634daa7d",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/html": "<marimo-json-output data-json-data='{&quot;tutorial&quot;:&quot;00-setup&quot;,&quot;pyrite_version&quot;:&quot;0.22.3&quot;,&quot;backend&quot;:&quot;cpu&quot;,&quot;seed&quot;:1,&quot;table_identity&quot;:{&quot;918b1a9013e4c19c584e2cf4eb8b605f0063a7237b8b0d67749867a4c6804832&quot;:&quot;c3f8eab1f03c1c66cfe0355b68f312e0ca450cbacaabe4f72eebecefe8d1e08d&quot;,&quot;ea7657ec94db1acf9f16cb260a5b107c3d2a4ecc71e43facee0e6a845487cbeb&quot;:&quot;beed169ba64a48fd11dc8c5a7bb81471abaa21806bde7943dba6da43e5b01b6f&quot;,&quot;44461d55c05a7fea30a0f52bceb2aa384d6b71c1e12765da576b5cbc2592dbe3&quot;:&quot;3f32446ff553a97b14755b475c4d88287ff44eff2ffce0cdd790dbd9b40a83f2&quot;,&quot;dfea6d21d4f6196cb74ef19486b6d86f6f5af40e89d7241efe09507a3b982e85&quot;:&quot;61fb7f4cf6dceab2a4d10c5fc641357d80b0ba6bbe037b64dd000e08f024acd9&quot;},&quot;source_identity&quot;:&quot;cb3e432170e2cbe9eb6379f2353e45bc8d398b53bd802cc6442e01c8ed6a7b4f&quot;}' data-value-types='&quot;json&quot;'></marimo-json-output>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "RGSE",
+      "code_hash": "edbc2ad6372d453a8996a46520d57636",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"continue\">Continue</h2>\n<span class=\"paragraph\">This tiny, fixed-seed run verifies that the selected backend can produce finite,\nnonzero spectral data with the installed tables. It is <strong>not a convergence or\nphysics-validation test</strong>. The histories are numerical samples, not a physical\nbeam charge. Check the <a href=\"https://pyrite.readthedocs.io/en/latest/validation/status-summary.html\" rel=\"noopener noreferrer\" target=\"_blank\">validation status</a>\nfor scientific evidence and limitations.</span>\n<span class=\"paragraph\">Continue with <strong>01 \u2014 Your first X-ray spectrum</strong>. Keep the core sequence on CPU\nuntil workload size justifies a GPU. GPU outputs can differ across architectures;\ncompare physically meaningful quantities with justified tolerances, not exact\nrandom-history identity.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    }
+  ]
+}

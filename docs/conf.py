@@ -154,6 +154,8 @@ exclude_patterns = [
 # -- HTML output -------------------------------------------------------------
 html_theme = "pydata_sphinx_theme"
 templates_path = ["_templates"]
+# Canonical notebook HTML captures and PNG fallbacks are embedded by URL.
+html_static_path = ["_static"]
 html_sidebars = {"**": ["sidebar-collapse.html", "sidebar-sections.html"]}
 html_title = "PyRITE"
 BRANDING = ROOT / "src" / "pyrite" / "_assets" / "branding"

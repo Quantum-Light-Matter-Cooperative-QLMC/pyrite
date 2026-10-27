@@ -1,0 +1,26 @@
+{
+  "schema": "pyrite.marimo-tutorial.v1",
+  "source_sha256": "f6e31c9afb98209822873ecb25669589ff19d485b6a2bbdddda49e914b8d209a",
+  "exporter_sha256": "4daf350c1a6c8f01a553637eaa9b876369f50ef239b741858cd62e695208f3e4",
+  "git_revision": "579891ae52a11e088f1ad47dd9b34799c8f23e3c",
+  "git_dirty": true,
+  "python_version": "3.14.4",
+  "execution": {
+    "tutorial": "01-first-spectrum",
+    "pyrite_version": "0.22.3",
+    "backend": "cpu",
+    "seed": 1,
+    "table_identity": {
+      "918b1a9013e4c19c584e2cf4eb8b605f0063a7237b8b0d67749867a4c6804832": "c3f8eab1f03c1c66cfe0355b68f312e0ca450cbacaabe4f72eebecefe8d1e08d",
+      "ea7657ec94db1acf9f16cb260a5b107c3d2a4ecc71e43facee0e6a845487cbeb": "beed169ba64a48fd11dc8c5a7bb81471abaa21806bde7943dba6da43e5b01b6f",
+      "44461d55c05a7fea30a0f52bceb2aa384d6b71c1e12765da576b5cbc2592dbe3": "3f32446ff553a97b14755b475c4d88287ff44eff2ffce0cdd790dbd9b40a83f2",
+      "dfea6d21d4f6196cb74ef19486b6d86f6f5af40e89d7241efe09507a3b982e85": "61fb7f4cf6dceab2a4d10c5fc641357d80b0ba6bbe037b64dd000e08f024acd9"
+    },
+    "source_identity": "51de1ede625a02b490a1cf55cf25157c071da685b8214c47e3ab48d43b6ed272"
+  },
+  "artifacts": {
+    "notebooks/__marimo__/session/01-first-spectrum.py.json": "d0bdfdd03277462741279ac2c3d0fbb7694952f389bd610471c6969d2240e57c",
+    "_static/notebooks/01-first-spectrum.html": "587e9eb6969452f3e93e980d296270a1f97beacf19a73ced30c8fc6eeb81866c",
+    "_static/notebooks/01-first-spectrum-1.png": "99436b957fef1df2d423645340b0890f9c4c774d488d6c3da838c1873a3b4e75"
+  }
+}

@@ -1,18 +1,22 @@
 # Interactive Tutorials
 
-Learn PyRITE by running short, self-contained scientific examples. The
-[Marimo/MoLab curriculum (#758)](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/758)
-will add executable notebooks and corresponding checked static outputs here.
-Until those sources land, the following maintained examples provide a practical
-learning sequence:
+Learn PyRITE through short, executable scientific notebooks. Start with
+Fundamentals: verify your environment, simulate a spectrum, then predict line
+energies. Each notebook stands alone and uses the public Python API.
 
-1. [Install and run your first simulation](../guides/getting-started.md).
-2. [Construct and inspect a Python simulation](../guides/python-api-workflow.md).
-3. [Explore radiation geometry](../guides/directional-source-heatmap.md).
-4. [Model detector observations](../guides/detector-observations.md).
+The pages show **captured outputs**, including code and figures from the same
+canonical `.py` file used by Molab and local marimo. Static pages need no Python
+kernel or GPU. Recompute and edit in Molab or a local marimo session; static
+controls cannot rerun simulations. The HTML viewer loads marimo frontend assets
+from a CDN; source downloads and captured figure links remain available if it
+cannot load.
 
-These are **existing static walkthroughs**, not substitutes for the planned
-interactive notebooks. Future tutorials will use a single canonical Marimo
-source for both Molab execution and the Read the Docs rendering. For exact
-parameters consult [Python API](../reference/python-api/index.md); for specific
-tasks consult [How-to Guides](../guides/index.md).
+```{toctree}
+:maxdepth: 2
+
+Fundamentals <fundamentals/index>
+```
+
+For specific tasks, use the [guides](../guides/index.md); for exact interfaces,
+consult [Python API](../api.md). The [physics](../physics/index.md) and
+[validation](../validation/index.md) sections explain assumptions and evidence.

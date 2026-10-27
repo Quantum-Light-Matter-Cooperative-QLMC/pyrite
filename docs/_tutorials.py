@@ -152,14 +152,31 @@ def regenerate(name, input_path=None):
     print(path)
 
 
+def _check_notebooks(app):
+    import _notebooks
+
+    _notebooks.check_all()
+
+
 def setup(app):
     app.connect("builder-inited", _check_outputs)
+    app.connect("builder-inited", _check_notebooks)
     return {"parallel_read_safe": True, "parallel_write_safe": True}
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--regenerate", required=True, choices=NAMES)
+    import _notebooks
+
+    actions = parser.add_mutually_exclusive_group(required=True)
+    actions.add_argument("--regenerate", choices=NAMES)
+    actions.add_argument("--regenerate-notebook", choices=_notebooks.NOTEBOOK_FIGURES)
+    actions.add_argument("--check-notebooks", action="store_true")
     parser.add_argument("--input", type=Path, help="saved input required by the example")
     args = parser.parse_args()
-    regenerate(args.regenerate, args.input)
+    if args.regenerate_notebook:
+        _notebooks.regenerate(args.regenerate_notebook)
+    elif args.check_notebooks:
+        _notebooks.check_all()
+    else:
+        regenerate(args.regenerate, args.input)
