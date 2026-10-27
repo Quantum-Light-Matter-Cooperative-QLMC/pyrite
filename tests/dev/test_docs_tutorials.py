@@ -26,6 +26,50 @@ def test_multiple_inline_guide_plots_have_distinct_image_names():
         assert len(set(names)) == len(names), f"{page.name}: duplicate plot filename-prefix"
 
 
+def test_planar_diagnostic_renders_cached_native_arrays_without_solving(tutorials, monkeypatch):
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    example = tutorials.load_example("experimental_planar_channeling")
+
+    def forbid_solve(*args, **kwargs):
+        pytest.fail("documentation rendering must never run planar quantum solvers")
+
+    for name in ("compute", "calculate", "propagate_planar_source", "score_planar_source"):
+        monkeypatch.setattr(example, name, forbid_solve)
+    monkeypatch.setattr(tutorials, "load_example", lambda _: example)
+    data = tutorials.checked_output("experimental_planar_channeling")
+    depth = np.asarray(data["depth_ang"])
+    energy = np.asarray(data["energy_eV"])
+    assert len(depth) == 101 and depth[0] == 0 and depth[-1] == 2_000
+    assert len(energy) == 1_025 and energy[0] == 1_000 and energy[-1] == 50_000
+    assert np.all(np.diff(energy) > 0)
+    assert data["units"]["spectrum"] == "ph/incident-electron/eV/sr"
+    assert sum(data["entry"].values()) == pytest.approx(1.0, abs=2e-3)
+    retained = np.asarray(data["retained_population"])
+    bound = np.asarray(data["bound_population"])
+    assert np.all(bound <= retained + 1e-12)
+    # The default history returns the bound-band prefix, not all retained bands.
+    assert np.all(np.sum(data["band_populations"], axis=1) <= retained + 1e-12)
+    for name in ("spectrum", "capture_spectrum"):
+        values = np.asarray(data[name])
+        assert values.shape == energy.shape and np.isfinite(values).all()
+        assert np.any(values > 0)
+    assert data["settings"]["backend"] == "cpu" and not data["settings"]["absorption"]
+    try:
+        tutorials.experimental_planar_channeling()
+        figure = plt.gcf()
+        np.testing.assert_array_equal(figure.axes[0].lines[0].get_xdata(), depth / 10_000)
+        np.testing.assert_array_equal(figure.axes[0].lines[0].get_ydata(), retained)
+        np.testing.assert_array_equal(figure.axes[1].lines[0].get_xdata(), energy / 1_000)
+        np.testing.assert_array_equal(figure.axes[1].lines[0].get_ydata(), data["spectrum"])
+        np.testing.assert_array_equal(figure.axes[1].lines[1].get_ydata(), data["capture_spectrum"])
+    finally:
+        plt.close("all")
+
+
 @pytest.fixture
 def tutorials():
     path = Path(__file__).parents[2] / "docs" / "_tutorials.py"

@@ -24,6 +24,7 @@ NAMES = (
     "gpt_gdf_beams",
     "transition_radiation_demo",
     "radiation_diagnostics",
+    "experimental_planar_channeling",
 )
 
 
@@ -94,6 +95,12 @@ def transition_radiation_demo(view="analytic"):
 
 def radiation_diagnostics(view="signal"):
     load_example("radiation_diagnostics").plot(checked_output("radiation_diagnostics"), view=view)
+
+
+def experimental_planar_channeling():
+    load_example("experimental_planar_channeling").plot(
+        checked_output("experimental_planar_channeling")
+    )
 
 
 def _json_default(value):
