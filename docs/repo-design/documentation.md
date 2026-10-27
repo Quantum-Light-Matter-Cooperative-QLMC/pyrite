@@ -228,6 +228,9 @@ inside MyST pages. A `literalinclude` displays the executable source and the
 directive places its generated figure directly below it in the PyData theme.
 Wrap `.. plot::` in an `eval-rst` fence: the directive inserts generated
 reStructuredText, which MyST's direct directive adapter cannot handle.
+Give each inline plot on a page a distinct `:filename-prefix:`. Separate
+`eval-rst` blocks can reset the automatic plot counter and otherwise reuse the
+first image even when their code differs.
 Matplotlib is declared in the docs dependency group. Interactive workflows keep
 the marimo export below.
 

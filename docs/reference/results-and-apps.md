@@ -144,8 +144,8 @@ Display controls reuse solver output and use each depth's current basis. See
 
 The app also offers an [experimental axial mode](../guides/experimental-axial-channeling.md)
 with an explicit Run action, 2-D maps, coherent phase and optional string-centred
-OAM. [Quantum API recipes](../guides/quantum-api.md) cover shaped entry states.
-The [planar entrance-state guide](../guides/experimental-planar-channeling.md#specify-and-inspect-quantum-entrance-states)
+OAM. [Quantum API recipes](quantum-api.md) cover shaped entry states.
+The [planar entrance-state reference](quantum-api.md#specify-and-inspect-quantum-entrance-states)
 distinguishes runtime diagnostic factories from the restricted experimental
 `Beam(state=...)` source admitted in production scenes.
 

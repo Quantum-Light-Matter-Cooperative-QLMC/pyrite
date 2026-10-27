@@ -36,7 +36,7 @@ Commands:
     release-notes  render notes for a pushed vX.Y.Z tag (release workflow)
     sync-skills mirror .agents/skills into .claude/skills
     check-skills validate the canonical skills and exact mirror
-    check-lines check source modules against the 1,250-line budget
+    check-lines check source size (1,250 lines; marimo notebooks 4,000)
     complexity report source complexity; --check runs the high-CC ratchet,
                --write rewrites its baseline
     verify     check types, lint, formatting, source size, complexity ratchet,
@@ -679,12 +679,16 @@ def cmd_docs(args: argparse.Namespace) -> None:
 
 
 def cmd_check_lines(_: argparse.Namespace) -> None:
-    from pyrite.devtools.source_checks import SOURCE_LINE_LIMIT, oversized_source_modules
+    from pyrite.devtools.source_checks import oversized_source_modules, source_line_limit
 
-    oversized = oversized_source_modules(ROOT / "src" / "pyrite")
+    package = ROOT / "src" / "pyrite"
+    oversized = oversized_source_modules(package)
     if oversized:
-        details = ", ".join(f"{path}: {count}" for path, count in oversized.items())
-        raise AgentToolingError(f"source modules exceed {SOURCE_LINE_LIMIT} lines: {details}")
+        details = ", ".join(
+            f"{path}: {count} (limit {source_line_limit(path, (package / path).read_text())})"
+            for path, count in oversized.items()
+        )
+        raise AgentToolingError(f"source modules exceed their line budgets: {details}")
 
 
 def cmd_complexity(args: argparse.Namespace) -> None:

@@ -2,10 +2,118 @@
 
 import importlib.util
 import json
+import re
 from pathlib import Path
 
 import numpy as np
 import pytest
+
+
+def test_multiple_inline_guide_plots_have_distinct_image_names():
+    guides = Path(__file__).parents[2] / "docs" / "guides"
+    for page in guides.glob("*.md"):
+        blocks = re.findall(
+            r"^\.\. plot::[^\S\n]*\n((?:[ \t]+[^\n]*\n|\n)*)", page.read_text(), re.MULTILINE
+        )
+        if len(blocks) < 2:
+            continue
+        prefixes = [
+            re.search(r"^[ \t]+:filename-prefix:[ \t]+(\S+)[ \t]*$", block, re.MULTILINE)
+            for block in blocks
+        ]
+        assert all(prefixes), f"{page.name}: each inline plot needs a filename-prefix"
+        names = [prefix.group(1) for prefix in prefixes]
+        assert len(set(names)) == len(names), f"{page.name}: duplicate plot filename-prefix"
+
+
+def test_planar_diagnostic_renders_cached_native_arrays_without_solving(tutorials, monkeypatch):
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    example = tutorials.load_example("experimental_planar_channeling")
+
+    def forbid_solve(*args, **kwargs):
+        pytest.fail("documentation rendering must never run planar quantum solvers")
+
+    for name in ("compute", "calculate", "propagate_planar_source", "score_planar_source"):
+        monkeypatch.setattr(example, name, forbid_solve)
+    monkeypatch.setattr(tutorials, "load_example", lambda _: example)
+    data = tutorials.checked_output("experimental_planar_channeling")
+    depth = np.asarray(data["depth_ang"])
+    energy = np.asarray(data["energy_eV"])
+    assert len(depth) == 101 and depth[0] == 0 and depth[-1] == 2_000
+    assert len(energy) == 1_025 and energy[0] == 1_000 and energy[-1] == 50_000
+    assert np.all(np.diff(energy) > 0)
+    assert data["units"]["spectrum"] == "ph/incident-electron/eV/sr"
+    assert sum(data["entry"].values()) == pytest.approx(1.0, abs=2e-3)
+    retained = np.asarray(data["retained_population"])
+    bound = np.asarray(data["bound_population"])
+    assert np.all(bound <= retained + 1e-12)
+    # The default history returns the bound-band prefix, not all retained bands.
+    assert np.all(np.sum(data["band_populations"], axis=1) <= retained + 1e-12)
+    for name in ("spectrum", "capture_spectrum"):
+        values = np.asarray(data[name])
+        assert values.shape == energy.shape and np.isfinite(values).all()
+        assert np.any(values > 0)
+    assert data["settings"]["backend"] == "cpu" and not data["settings"]["absorption"]
+    try:
+        tutorials.experimental_planar_channeling()
+        figure = plt.gcf()
+        np.testing.assert_array_equal(figure.axes[0].lines[0].get_xdata(), depth / 10_000)
+        np.testing.assert_array_equal(figure.axes[0].lines[0].get_ydata(), retained)
+        np.testing.assert_array_equal(figure.axes[1].lines[0].get_xdata(), energy / 1_000)
+        np.testing.assert_array_equal(figure.axes[1].lines[0].get_ydata(), data["spectrum"])
+        np.testing.assert_array_equal(figure.axes[1].lines[1].get_ydata(), data["capture_spectrum"])
+    finally:
+        plt.close("all")
+
+
+def test_axial_diagnostic_renders_cached_density_and_overlap_without_solving(
+    tutorials, monkeypatch
+):
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    example = tutorials.load_example("experimental_axial_channeling")
+
+    def forbid_solve(*args, **kwargs):
+        pytest.fail("documentation rendering must never run axial quantum solvers")
+
+    for name in ("compute", "calculate", "axial_diagnostic"):
+        monkeypatch.setattr(example, name, forbid_solve)
+    monkeypatch.setattr(tutorials, "load_example", lambda _: example)
+    data = tutorials.checked_output("experimental_axial_channeling")
+    density = np.asarray(data["density_per_ang2"])
+    depth = np.asarray(data["depth_ang"])
+    norm = np.asarray(data["retained_norm"])
+    overlap = np.asarray(data["initial_state_overlap"])
+    assert density.shape == (3, 64, 64)
+    assert data["snapshot_indices"] == [0, 25, 50]
+    assert depth[0] == 0 and depth[-1] == 500 and len(depth) == 51
+    assert np.isfinite(density).all() and np.all(density >= 0)
+    np.testing.assert_allclose(density.sum(axis=(1, 2)) * data["cell_area_ang2"], norm[[0, 25, 50]])
+    np.testing.assert_allclose(norm, 1, atol=1e-12)
+    assert overlap[0] == pytest.approx(1)
+    assert np.all(overlap >= 0) and np.all(overlap <= norm + 1e-12)
+    assert data["config"]["mode"] == "coherent" and data["config"]["backend"] == "cpu"
+    assert data["units"]["density"] == "per incident electron / angstrom^2"
+    try:
+        tutorials.experimental_axial_channeling(view="density")
+        figure = plt.gcf()
+        for ax, values in zip(figure.axes[:3], density, strict=True):
+            np.testing.assert_array_equal(ax.images[0].get_array(), values.T)
+        assert len({ax.images[0].get_clim() for ax in figure.axes[:3]}) == 1
+        tutorials.experimental_axial_channeling(view="evolution")
+        ax = plt.gcf().axes[0]
+        np.testing.assert_array_equal(ax.lines[0].get_ydata(), norm)
+        np.testing.assert_array_equal(ax.lines[1].get_ydata(), overlap)
+        np.testing.assert_array_equal(ax.lines[1].get_xdata(), depth / 10)
+    finally:
+        plt.close("all")
 
 
 @pytest.fixture
@@ -95,7 +203,11 @@ def test_precomputed_spectrum_renders_without_simulating(tutorials, monkeypatch,
     try:
         tutorials.python_api_workflow()
         figure = plt.gcf()
-        assert {line.get_label() for line in figure.axes[0].lines} == set(data["spectra"])
+        assert [line.get_label() for line in figure.axes[0].lines] == [
+            "PXR + CBS",
+            "Bremsstrahlung",
+            "Total Spectrum",
+        ]
         figure.savefig(tmp_path / "spectrum.svg")
         assert (tmp_path / "spectrum.svg").stat().st_size > 1_000
     finally:
@@ -226,7 +338,7 @@ def test_directional_map_renders_native_grids_without_transport(tutorials, monke
     assert np.all(data["supported"])  # Finite footprint has no unsupported grazing directions.
     assert data["units"] == "ph/incident-electron/eV/sr"
     assert data["seed"] == data["case"]["seed"] == 1
-    assert data["case"]["Ne"] == data["case"]["Ne_brem"] == 4096
+    assert data["case"]["Ne"] == data["case"]["Ne_brem"] == 4_096
     assert data["provenance"]["backend"] == "cpu"
     assert any("LineOpticalDataWarning" in warning for warning in data["warnings"])
     try:
@@ -358,3 +470,132 @@ def test_tutorial_build_rejects_changed_input_fixture(tutorials, monkeypatch, tm
     fixture.write_bytes(b"changed input")
     with pytest.raises(ValueError, match="stale tutorial input"):
         tutorials.checked_output("gpt_gdf_beams")
+
+
+def test_tr_ctr_app_output_renders_signed_native_arrays_without_transport(
+    tutorials, monkeypatch, tmp_path
+):
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    example = tutorials.load_example("transition_radiation_demo")
+
+    def forbid_compute():
+        pytest.fail("documentation rendering must never execute the app calculations")
+
+    monkeypatch.setattr(example, "compute", forbid_compute)
+    monkeypatch.setattr(tutorials, "load_example", lambda _: example)
+    tutorials._check_outputs(None)
+    data = tutorials.checked_output("transition_radiation_demo")
+    assert data["units"] == "ph/incident-electron/eV/sr"
+    assert data["physical_electrons"] == pytest.approx(624.1509074460763)
+    analytic = data["analytic"]
+    np.testing.assert_array_equal(analytic["energy_eV"], np.arange(200, 1010, 10))
+    np.testing.assert_array_equal(analytic["angle_deg"], np.arange(100, 176))
+    np.testing.assert_allclose(
+        analytic["ctr"],
+        np.asarray(analytic["film"])
+        * (1 + (data["physical_electrons"] - 1) * np.asarray(analytic["form_factor"])),
+    )
+    for record in data["transport"].values():
+        assert record["case"]["Ne"] == 32 and record["case"]["Ne_brem"] == 64
+        assert record["seed"] == record["case"]["seed"] == 1
+        assert record["provenance"]["backend"] == "cpu"
+        np.testing.assert_array_equal(record["energy_eV"], analytic["energy_eV"])
+        np.testing.assert_allclose(
+            record["combined_cxr"],
+            np.asarray(record["transition"]) + np.asarray(record["other_cxr"]),
+        )
+    negative = np.count_nonzero(np.asarray(data["transport"]["bunch"]["transition"]) < 0)
+    assert negative > 0
+    assert any(f"negative in {negative} of 81 bins" in warning for warning in data["warnings"])
+    try:
+        for view in ("analytic", "transport"):
+            tutorials.transition_radiation_demo(view)
+            figure = plt.gcf()
+            assert len(figure.axes) == 2
+            if view == "analytic":
+                np.testing.assert_array_equal(figure.axes[0].lines[0].get_ydata(), analytic["film"])
+                np.testing.assert_array_equal(
+                    figure.axes[1].lines[1].get_ydata(), analytic["ctr_cut"]
+                )
+            else:
+                for ax, mode in zip(figure.axes, ("history", "bunch"), strict=True):
+                    assert ax.get_yscale() == "symlog"
+                    np.testing.assert_array_equal(
+                        ax.lines[0].get_ydata(), data["transport"][mode]["transition"]
+                    )
+            figure.savefig(tmp_path / f"tr-ctr-{view}.svg")
+            assert (tmp_path / f"tr-ctr-{view}.svg").stat().st_size > 1_000
+    finally:
+        plt.close("all")
+
+
+def test_optical_diagnostic_profiles_render_without_inference(tutorials, monkeypatch, tmp_path):
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    example = tutorials.load_example("radiation_diagnostics")
+    data = tutorials.checked_output("radiation_diagnostics")
+    wide = data["bands"]["turnover_in_band"]
+    high = data["bands"]["turnover_below_band"]
+    assert data["settings"]["nodes"] == 61
+    assert wide["fit"]["is_identified_95"]
+    assert wide["fit"]["rms_duration_fs"] == pytest.approx(200, rel=0.005)
+    assert wide["fit"]["confidence_interval_95_fs"] == pytest.approx((198.62745, 201.38390))
+    assert not high["fit"]["is_identified_95"]
+    assert high["fit"]["is_multimodal"]
+    assert high["fit"]["confidence_interval_95_fs"] == [None, None]
+    for record in (wide, high):
+        scan, fit = record["scan"], record["fit"]
+        np.testing.assert_allclose(scan["uncertainty_v_ports"], 15e-6)
+        np.testing.assert_allclose(
+            np.asarray(scan["voltage_v_ports"]) - np.asarray(fit["predicted_voltage_v_ports"]),
+            fit["residual_v_ports"],
+        )
+        assert "SYNTHETIC noise-free" in scan["provenance"]
+        provenance = record["instrument_provenance"]
+        assert "unanchored; synthetic reference only" in provenance["validation"]
+        assert all(len(digest) == 64 for digest in provenance["detector_response_sha256"])
+
+    def forbid_compute():
+        pytest.fail("documentation rendering must never run the optical forward model or fit")
+
+    monkeypatch.setattr(example, "compute", forbid_compute)
+    monkeypatch.setattr(tutorials, "load_example", lambda _: example)
+    tutorials._check_outputs(None)
+    try:
+        for view in ("signal", "profile"):
+            tutorials.radiation_diagnostics(view)
+            fig = plt.gcf()
+            if view == "signal":
+                assert len(fig.axes) == 2
+                np.testing.assert_array_equal(
+                    fig.axes[0].lines[0].get_xdata(),
+                    np.asarray(wide["scan"]["mirror_displacement_m"]) * 1e3,
+                )
+                np.testing.assert_array_equal(
+                    fig.axes[0].lines[0].get_ydata(),
+                    np.asarray(wide["scan"]["voltage_v_ports"])[:, 0] * 1e3,
+                )
+                np.testing.assert_array_equal(
+                    fig.axes[1].lines[0].get_ydata(),
+                    np.asarray(wide["fit"]["residual_v_ports"])[:, 0] * 1e6,
+                )
+            else:
+                assert len(fig.axes) == 1
+                assert fig.axes[0].get_xscale() == "log"
+                assert fig.axes[0].get_yscale() == "symlog"
+                for line, record in zip(fig.axes[0].lines, (wide, high), strict=False):
+                    profile = record["fit"]["metadata"]["diagnostic_profile"]
+                    np.testing.assert_array_equal(line.get_xdata(), profile["sigma_fs"])
+                    np.testing.assert_array_equal(line.get_ydata(), profile["delta_chi2"])
+            target = tmp_path / f"optical-{view}.svg"
+            fig.savefig(target)
+            assert target.stat().st_size > 1_000
+    finally:
+        plt.close("all")

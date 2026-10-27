@@ -9,9 +9,12 @@ complete signatures, option defaults, configuration fields, and scientific sourc
 ../repo-design/cli/cli-reference
 ../api
 python-scene-recipes
+quantum-api
 results-and-apps
 trajectory-workflows
 directional-sources
+tr-ctr-app
+optical-diagnostics-app
 gdf-beams
 campaign-configuration
 catalogs-and-workspaces

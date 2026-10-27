@@ -1,108 +1,94 @@
 # Radiation diagnostics
 
-Install the apps extra, then launch the Plotly optical diagnostic:
-
-```bash
-uv run pyrite app optical-diagnostics launch
-uv run pyrite app optical-diagnostics launch --smoke
-uv run pyrite app optical-diagnostics export
-```
-
-The initial page performs no numerical calculation. Select a view and click its
-compute button. Cached numerical results are reused for repeated settings.
-Static HTML contains the controls and explanation; use the live app to compute.
-Tunnel mode uses port 2725. The app requires the finite-source and instrument
-APIs introduced under #616/#617.
-
-## Optical source and collection
-
-The default reference is a 20 µm PEC disc (TR; a nonzero hole radius gives an
-aperture, DR) with a normal straight electron at β=0.95. The source band is
-0.8–1.2 eV in 9 points, the FFT grid 128×128 at 0.5 µm pitch, and the collection
-radius 10 µm at 100 µm. Every one of these, plus physical charge and Gaussian RMS
-duration, is a form field bounded only by physical validation and a 4096² FFT
-memory limit; the app reports the resulting window (samples × pitch), which
-must exceed the screen. *Field device* offers CUDA on a
-`pyrite app optical-diagnostics launch --backend cuda` session. Two identical,
-offset-free numerical histories evaluate an analytic temporal-only Gaussian
-law; they are not two physical bunch electrons or transported trajectories.
-
-The spectrum is photons/(eV physical pulse); field intensity/phase maps show a
-single electron's spectral electric field in V·s/m. A synthetic flat 25%
-absorptance and 10¹² V/J pulse gain produce J/pulse and V. The 1 kHz repetition
-rate scales average W only. Neither detector prediction nor inference applies
-physical population a second time. This is not a measured calibration.
-
-Use **Convergence** to compare independent pitch/window refinements, hemisphere
-FFT bias and non-periodic direct-Green collection, at the submitted settings.
-A convergence flag covers only those tests at the band's geometric-mean energy. Energy integration, angular/aperture integration,
-source validity and spectral/delay convergence require separate studies.
-Physical optics requires the screen/hole/edge scales to be much larger than the
-wavelength; the app does not certify the approximations by displaying a plot.
+Explore when a far-IR interferogram constrains a Gaussian bunch duration.
+These are **synthetic model outputs**, using the optical diagnostics app's
+ideal instrument and response; they are not measured data or a validated
+bunch-length diagnostic.
 
 ## Interferograms and conditional inference
 
-This is a separate synthetic far-IR exercise, not a continuation of the visible
-PEC example. The two-port ideal Martin–Puplett uses 45° linear polarization,
-a declared RMS voltage error and synthetic flat photon templates. Mechanical
-mirror displacement is half the optical path difference. The detector response
-and source provenance travel with the result.
+From a source checkout:
 
-The form sets the synthetic RMS duration, detector band, mirror travel, node
-count and declared RMS error. The fit plots the existing profiled Δχ² objective
-and tabulates Gaussian RMS duration, conditional 95% interval, open endpoints,
-multimodality and band-edge temporal factors; assumptions and provenance sit in
-a collapsed section. A 200 fs turnover is near 0.0033 eV; a band above it
-demonstrates loss of identifiability. No systematic covariance, measured response uncertainty,
-nonparametric phase retrieval or unique bunch-profile reconstruction is implied.
-Refine delay step/range and spectral integration before interpreting a fit.
+```bash
+uv sync --extra apps
+uv run pyrite app optical-diagnostics launch
+```
 
-## Cherenkov cone
+For an installed distribution, install `pyrite-mc[apps]`, then omit `uv run`.
+Select **Instrument and inference** and click
+**Compute interferogram and conditional fit** with the defaults:
+**200 fs RMS**, **0.0005–0.025 eV**, **±1.2 mm mirror travel**, **61 nodes** and
+**15 µV declared RMS error**. This CPU exercise needs no transport tables or GPU.
 
-**Cherenkov cone** maps the bulk Frank–Tamm source
-(`frank-tamm-homogeneous-dielectric`) of one electron in an unbounded,
-lossless medium of constant refractive index: polar angle about the velocity
-against electron kinetic energy, in bin-averaged photons/m/eV/sr. Sliders for
-the index, photon energy, kinetic range and polar binning redraw live and
-report the kinetic threshold and the saturated cone angle arccos(1/n). It is an
-internal yield only: no interfaces, escape, total internal reflection,
-multiple scattering or slowing down.
+```{eval-rst}
+.. plot::
+   :filename-prefix: radiation-diagnostics-signal
+   :alt: Two synthetic isolated-pulse port voltages and their fitted curves versus mechanical mirror displacement, with signed noise-free residuals below.
+   :caption: Default two-port expectation (markers), fitted signal (lines) and signed residuals. Optical path difference is twice the mechanical displacement.
+
+   from _tutorials import radiation_diagnostics
+   radiation_diagnostics()
+```
+
+The input is a noise-free expectation with declared errors; no random noise was
+added. Synthetic flat photon templates, 45° linear polarization, 25% absorptance
+and a 10¹² V/J pulse gain set the signal. Population and acceptance are already
+in the templates; no further charge scaling applies.
+
+Change **Detector band low** to **0.02 eV** and submit again:
+
+```{eval-rst}
+.. plot::
+   :filename-prefix: radiation-diagnostics-profile
+   :alt: Conditional chi-square duration profiles for bands containing or excluding the 200 femtosecond Gaussian turnover, with the 95 percent threshold.
+   :caption: App profile samples for two bands; lines join display nodes. The intervals below come from the fitter, rather than these coarse display crossings.
+
+   from _tutorials import radiation_diagnostics
+   radiation_diagnostics(view="profile")
+```
+
+| Photon band | Fitted RMS duration | Conditional 95% interval |
+|---|---:|---|
+| 0.0005–0.025 eV | 200.00 fs | 198.63–201.38 fs |
+| 0.02–0.025 eV | 200.46 fs | Both endpoints open within 20–3000 fs search |
+
+The 200 fs turnover is near **0.0033 eV**. Removing it from the band leaves the
+duration unidentified: the profile is multimodal with open endpoints, even
+though a numerical minimum still exists. The fit profiles a source scale with calibration fixed. Its interval assumes independent
+Gaussian voltage errors; it excludes systematic covariance and response
+uncertainty and implies no unique bunch-profile or phase reconstruction.
+Refine spectral integration and delay step/range independently before interpreting
+a fit. See the [model and validation limits](../physics/radiation-physics/optical-wavefront-and-detectors.md).
 
 ## Saved outputs
 
-**Saved outputs** reads existing planar-source, interferogram or Gaussian-fit
-NPZ files through their owning loaders. It plots arrays and provenance without
-running transport. Saved fit axes use scan index because the fit artifact does
-not carry mechanical mirror coordinates. See the
-[optical model and instrument reference](../physics/radiation-physics/optical-wavefront-and-detectors.md)
-for artifact creation, APIs, assumptions and current validation status.
+```bash
+uv run pyrite app optical-diagnostics export --stem optical_diagnostics
+```
+
+Open `pyrite-output/results/optical_diagnostics.html` for the initial controls
+and explanation. Computation requires the live app. The
+{download}`cached guide output <../examples/data/radiation_diagnostics.json>`
+records both scans, fits, assumptions and instrument/response hashes;
+documentation builds only render these arrays. The maintained notebook is
+{download}`optical_diagnostics_app.py <../../src/pyrite/apps/optical_diagnostics_app.py>`.
+Existing NPZ inspection and launch modes are described in the
+[app reference](../reference/optical-diagnostics-app.md#saved-outputs).
+
+## Optical source and collection
+
+The separate **Source and collection** exercise computes finite PEC TR/DR fields
+and collected spectra. It does not supply the synthetic templates above.
+See [settings, units and convergence limits](../reference/optical-diagnostics-app.md#optical-source-and-collection).
+
+## Cherenkov cone
+
+The separate **Cherenkov cone** view plots an internal bulk source in a lossless
+medium. It does not predict escaped light or detector counts; see
+[the source restrictions](../reference/optical-diagnostics-app.md#cherenkov-cone).
 
 ## Checkpoint components and DTR
 
-Analysis and case comparison offer **TR/CTR** selection when plotting. Absent
-components contribute zero; the radiation panel reports availability by case.
-Deselect other components to isolate TR. Existing totals retain TR by default.
-Plotly switches requested log-y plots to linear when signed values are present,
-and identifies that change in the title. Arrays are never clipped.
-
-The radiation panel integrates stored source densities over the line band,
-without current, charge or acceptance scaling. It reports units, spectrum basis,
-physical population, sampled histories and negative TR bins. The reusable
-`pyrite.results.radiation.radiation_band_metrics` also accepts an explicit
-in-grid band with interpolated endpoints. Existing map/ranking metrics include
-all stored additive line components; compatibility names such as `coherent_flux`
-do not identify pure coherent PXR/CBS.
-
-For experimental two-beam cases, **Line** means signed joint-field correction,
-**TR/CTR** means the TR baseline, and their sum is the joint total. Removing the
-baseline is not a DTR-off counterfactual. The model status remains unverified.
-
-The TR notebook (`pyrite app transition-radiation launch`) also has an explicitly
-triggered Plotly DTR reference view. It displays Born component/cross-term
-spectra, optionally with coupled two-beam source rows. All curves reuse the
-maintained deterministic reference. See [experimental DTR](../physics/radiation-physics/diffracted-transition-radiation.md).
-
-The validation app has a **Saved radiation evidence** section. It reads saved
-omission and optical hardware records from a checkout, or `reference.json` from
-a DTR export directory. Missing/malformed files remain visible. Reading a saved
-pass does not promote a ledger claim; CUDA parity is not a physical anchor.
+For saved TR/CTR selection, signed source-band metrics and the **experimental,
+unverified** DTR view, see the
+[TR/CTR app reference](../reference/tr-ctr-app.md#checkpoint-components-and-dtr).

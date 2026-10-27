@@ -36,7 +36,7 @@ It plots `result.cxr.incoherent` and `result.brem` on their native photon grids.
 ```{eval-rst}
 .. plot::
    :alt: Synthetic lab-frame records show positive x-angle and x-energy correlations, a weighted electron-energy distribution around 30 keV, and actual simulated PXR/CBS and bremsstrahlung spectra.
-   :caption: Original synthetic input and actual seeded CPU radiation output. Marker area represents relative record probability. The spectrum is a source density at 135°, without detector response or solid-angle integration.
+   :caption: Synthetic input and seeded CPU source spectra at 135°.
 
    from _tutorials import gpt_gdf_beams
    gpt_gdf_beams()
@@ -45,6 +45,8 @@ It plots `result.cxr.incoherent` and `result.brem` on their native photon grids.
 The tilted cloud shows a position–angle correlation; its color gradient shows
 the energy correlation. Import preserves these as **whole records**. Drawing
 position, angle and energy independently would describe a different beam.
+The spectra show 0.5–4 keV, not total photon yield; they include neither
+detector response nor solid-angle integration.
 
 (choose-the-snapshot-and-coordinate-origin)=
 ## From lab snapshot to entrance

@@ -66,7 +66,7 @@ realized counts; intrinsic spectra remain photons/(incident electron eV sr),
 whereas pixel-integrated and acquired results have different acceptances and
 normalizations (see the [API workflow](guides/python-api-workflow.md)).
 
-The [quantum API map](guides/quantum-api.md) documents portable specs, runtime
+The [quantum API map](reference/quantum-api.md) documents portable specs, runtime
 states, configuration, solver results, and experimental diagnostics through
 `pyrite.quantum`. Existing quantum imports retain object identity, serialization,
 and production admission.

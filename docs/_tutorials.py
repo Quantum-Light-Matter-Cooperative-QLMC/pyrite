@@ -22,6 +22,10 @@ NAMES = (
     "directional_source_heatmap",
     "detector_observations",
     "gpt_gdf_beams",
+    "transition_radiation_demo",
+    "radiation_diagnostics",
+    "experimental_planar_channeling",
+    "experimental_axial_channeling",
 )
 
 
@@ -82,6 +86,28 @@ def detector_observations():
 
 def gpt_gdf_beams():
     load_example("gpt_gdf_beams").plot(checked_output("gpt_gdf_beams"))
+
+
+def transition_radiation_demo(view="analytic"):
+    load_example("transition_radiation_demo").plot(
+        checked_output("transition_radiation_demo"), view=view
+    )
+
+
+def radiation_diagnostics(view="signal"):
+    load_example("radiation_diagnostics").plot(checked_output("radiation_diagnostics"), view=view)
+
+
+def experimental_planar_channeling():
+    load_example("experimental_planar_channeling").plot(
+        checked_output("experimental_planar_channeling")
+    )
+
+
+def experimental_axial_channeling(view="density"):
+    load_example("experimental_axial_channeling").plot(
+        checked_output("experimental_axial_channeling"), view=view
+    )
 
 
 def _json_default(value):

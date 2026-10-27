@@ -554,14 +554,25 @@ def test_verify_help_explains_static_gate_without_running_checks(
     assert "--skip-tests" not in output
 
 
-def test_check_lines_reports_oversized_source_path(dev_module, monkeypatch, tmp_path) -> None:
+@pytest.mark.parametrize(
+    ("relative_path", "source", "limit"),
+    [
+        ("oversized.py", "# line\n" * 1_251, 1_250),
+        ("apps/oversized.py", "app = marimo.App()\n" + "# cell\n" * 4_000, 4_000),
+    ],
+)
+def test_check_lines_reports_oversized_source_path(
+    dev_module, monkeypatch, tmp_path, relative_path, source, limit
+) -> None:
     package = tmp_path / "src/pyrite"
-    package.mkdir(parents=True)
-    (package / "oversized.py").write_text("# line\n" * 1_251)
+    path = package / relative_path
+    path.parent.mkdir(parents=True)
+    path.write_text(source)
     monkeypatch.setattr(dev_module, "ROOT", tmp_path)
 
-    with pytest.raises(dev_module.AgentToolingError, match=r"oversized.py: 1251"):
+    with pytest.raises(dev_module.AgentToolingError, match="oversized.py") as error:
         dev_module.main(["check-lines"])
+    assert f": {limit + 1} (limit {limit})" in str(error.value)
 
 
 def test_source_line_budget_accepts_limit_and_ignores_non_python(tmp_path) -> None:
@@ -571,6 +582,27 @@ def test_source_line_budget_accepts_limit_and_ignores_non_python(tmp_path) -> No
     (tmp_path / "large.txt").write_text("text\n" * 2_000)
 
     assert oversized_source_modules(tmp_path) == {}
+
+
+def test_source_line_budget_distinguishes_notebooks_from_helpers(tmp_path) -> None:
+    from pathlib import Path
+
+    from pyrite.devtools.source_checks import NOTEBOOK_LINE_LIMIT, oversized_source_modules
+
+    apps = tmp_path / "apps"
+    apps.mkdir()
+    notebook = "import marimo\napp = marimo.App()\n"
+    at_limit = apps / "notebook.py"
+    at_limit.write_text(notebook + "# cell\n" * (NOTEBOOK_LINE_LIMIT - 2))
+    (apps / "too_large.py").write_text(notebook + "# cell\n" * (NOTEBOOK_LINE_LIMIT - 1))
+    (apps / "helper.py").write_text("import marimo\n" + "# helper\n" * 1_250)
+    (tmp_path / "engine.py").write_text(notebook + "# source\n" * 1_249)
+
+    assert oversized_source_modules(tmp_path) == {
+        Path("apps/helper.py"): 1_251,
+        Path("apps/too_large.py"): NOTEBOOK_LINE_LIMIT + 1,
+        Path("engine.py"): 1_251,
+    }
 
 
 def test_smoke_forwards_material_and_output_directory(dev_module, monkeypatch) -> None:

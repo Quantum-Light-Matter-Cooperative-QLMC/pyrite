@@ -94,5 +94,13 @@ the baseline as ordinary debt. Their refactors need separate scope.
 - Churn counts moves as full deletes plus adds and is not a gate.
 - Radon skips lambdas, and its CC can change between releases, which is why
   the baseline pins its version.
-- The 1,250-line source budget (`pyrite-dev check-lines`) remains a separate
-  gate. The report also counts modules at 1,100 lines or more.
+- Source size (`pyrite-dev check-lines`) remains a separate gate: reusable
+  Python modules have a 1,250-line ceiling; marimo notebook entry points under
+  `src/pyrite/apps/` have a 4,000-line ceiling. Entry points construct a top-level
+  `marimo.App`; importing marimo alone does not exempt app helpers. Notebook
+  cells, controls and explanatory text can stay together, while reusable
+  computation still belongs in library modules. Guides, documentation examples
+  and other files outside the package are not subject to this source-size gate;
+  judge their length by the workflow they teach rather than a code-module cap.
+  The complexity report still counts modules at 1,100 lines or more; the
+  high-CC ratchet applies to notebook routines too.
