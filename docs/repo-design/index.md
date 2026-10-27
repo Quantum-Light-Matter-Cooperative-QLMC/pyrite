@@ -27,7 +27,6 @@ import-architecture
 :maxdepth: 1
 :caption: Compute optimization/GPU Acceleration
 
-../guides/performance-profile-analysis
 compute/coherent-streaming-rawkernel.md
 compute/compute-performance-optimization.md
 compute/startup-latency.md
@@ -58,6 +57,10 @@ storage/trajectory-artifacts
 storage/trajectory-scenes
 ../physics/beam-transport/transport-outputs
 ```
+
+For current profiling and tuning workflows, use
+[performance profiling](../computation/performance-profile-analysis.md) and
+[CUDA batch/chunk tuning](../computation/batch-chunk-tuning.md).
 
 ## Architecture decision records
 

@@ -21,6 +21,8 @@ precision-and-tolerances
 ../physics/radiation-physics/energy-grid-semantics
 statistical-methods
 random-streams
+performance-profile-analysis
+batch-chunk-tuning
 ```
 
 ## Reference material

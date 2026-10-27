@@ -80,7 +80,7 @@ pyrite material create crystal lab-si --cif ./silicon.cif --formula Si --phase d
 
 The example's physical inputs are illustrative: choose values justified for
 your sample. Photon grids belong to numerics and resolve automatically unless
-explicitly configured there. Legacy `--photon-grid` arguments are deprecated and ignored.
+explicitly configured there.
 `--surface-hkl` specifies reciprocal Miller indices; `--beam-uvw` is the
 mutually exclusive direct-lattice alternative. An existing-crystal reference
 rejects configuration overrides; this workflow does not add an editor for cuts.

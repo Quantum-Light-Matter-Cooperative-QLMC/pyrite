@@ -5,7 +5,7 @@ Stable and advanced-stable compatibility follows
 semantic versioning: removal or an incompatible change requires a documented
 deprecation or a major release. Unlisted public objects are provisional.
 Entries labeled experimental follow the shorter compatibility contract in the
-[experimental API lifecycle](guides/experimental-api.md), which also records
+[experimental API lifecycle](reference/experimental-api.md), which also records
 domain owners, bounded feature contracts, and promotion criteria. Selected
 experimental interfaces are discoverable under `pyrite.experimental.radiation`,
 `pyrite.experimental.observations`, and `pyrite.experimental.quantum`.

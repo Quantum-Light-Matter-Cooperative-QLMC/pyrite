@@ -1,4 +1,4 @@
-"""Quantum facade compatibility, import isolation, and executable guide contracts."""
+"""Quantum facade compatibility, import isolation, and executable reference contracts."""
 
 from __future__ import annotations
 
@@ -111,10 +111,11 @@ def test_facade_rejects_unreviewed_engine_helpers():
         quantum.__getattr__("zone_solver")
 
 
-def test_quantum_guide_examples_keep_normalization_and_result_meanings():
-    """Execute the actual guide so public snippets cannot drift from the API."""
-    path = Path(__file__).resolve().parents[2] / "docs/guides/quantum-api.md"
-    snippets = re.findall(r"```python\n(.*?)```", path.read_text(), flags=re.DOTALL)
+def test_quantum_reference_examples_keep_normalization_and_result_meanings():
+    """Execute bounded facade examples, excluding the larger transport recipes."""
+    path = Path(__file__).resolve().parents[2] / "docs/reference/quantum-api.md"
+    examples, _ = path.read_text().split("\n## Planar transport and source contracts\n", 1)
+    snippets = re.findall(r"```python\n(.*?)```", examples, flags=re.DOTALL)
     assert len(snippets) == 4
     scope = {}
     for snippet in snippets:

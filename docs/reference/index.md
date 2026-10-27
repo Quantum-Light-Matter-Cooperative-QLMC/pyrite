@@ -10,6 +10,7 @@ complete signatures, option defaults, configuration fields, and scientific sourc
 ../api
 python-scene-recipes
 quantum-api
+experimental-api
 results-and-apps
 trajectory-workflows
 directional-sources
