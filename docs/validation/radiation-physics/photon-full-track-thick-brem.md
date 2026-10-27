@@ -189,3 +189,150 @@ The claim remains **discrepancy** pending fresh-context independent
 adjudication of this corrected matrix. This evidence covers the bounded
 photon-only thick-target comparison; alloy fluorescence, 511 keV escape
 and charged-feedback validation remain separate.
+
+## Independent estimator derivation (2026-10-27)
+
+This fresh-context derivation was recorded before reading the scorer or
+reducer bodies. The quantity is the expected number of photons crossing a
+physical aperture in an energy window per incident primary electron, including
+zero-hit histories. It is neither a density per keV nor per steradian.
+For equal independent blocks of $n$ primaries, let $X_b$ be the block's
+weighted count divided by $n$. With $B$ blocks,
+
+$$
+\widehat\mu_X=\frac{1}{B}\sum_b X_b,\qquad
+\operatorname{Cov}(\widehat\mu_X,\widehat\mu_Y)
+=\frac{\sum_b(X_b-\overline X)(Y_b-\overline Y)}{B(B-1)}.
+$$
+
+The yield standard error is the square root of this diagonal covariance.
+Direct and redistributed counts must partition total counts within every
+block. For redistributed fraction $f=\overline R/\overline T$, the delta-method
+standard error retains the paired denominator fluctuation:
+
+$$
+\operatorname{SE}(f)^2
+=\frac{\sum_b[(R_b-\overline R)-f(T_b-\overline T)]^2}
+{B(B-1)\overline T^2}.
+$$
+
+It vanishes when every block has the same fraction; treating the denominator
+as exact fails this limit. For a net line with equal-width peak and adjacent
+side windows, form $L_b=P_b-(S_{b,-}+S_{b,+})/2$ first, then estimate its
+mean and error from the same blocks. Linear continuum cancels; the covariance
+between all three windows remains. Counts per primary are dimensionless;
+fractions and all their errors are dimensionless. Energy-window boundaries
+use keV consistently; aperture geometry carries no extra solid-angle factor.
+
+Independent engines give combined error
+$\sigma=\sqrt{\operatorname{SE}_P^2+\operatorname{SE}_G^2}$.
+Redistributed-yield and net-line gates require
+$|P-G|\le\max(0.10G,3\sigma)$; fraction gates require
+$|f_P-f_G|\le\max(0.02,3\sigma)$, with the documented 1,000-reference-count
+eligibility. Total/direct yields remain report-only under the disclosed
+post-inspection revision. These gates define bounded agreement, not a
+universal confidence statement or a comparison of all spectral shapes.
+
+### Implementation comparison and independent adjudication
+
+The source and reducer were inspected after the expressions above were
+recorded. The actual line-side windows each have **half** the peak width,
+rather than the equal widths used in the preliminary example above. Their
+correct integrated continuum is therefore $S_{b,-}+S_{b,+}$ and the actual
+net count is $L_b=P_b-S_{b,-}-S_{b,+}$. Integrating any linear continuum over
+these three symmetric windows verifies this coefficient exactly. The
+implementation uses this correct half-width convention; there is no
+factor-of-two discrepancy. Net-line eligibility uses 1,000 **net** reference
+counts, rather than 1,000 unsubtracted peak counts.
+
+`_mean_se`, `_fraction` and `_line` agree with the independent block
+expressions for the evidence's equal blocks. Each Geant4 record has 100
+equal blocks, including zero-hit blocks; each PyRITE record has 400 blocks
+of 50 original electron histories. Multiplying PyRITE's stored spectral
+density by bin width and block population restores weighted counts before
+reduction. Scoring divides by original primary population, not photon
+proposals or accepted hits; no aperture-area or solid-angle division is
+appropriate. Total, direct and redistributed arrays partition within every
+block to floating-point precision. Direct means an uncollided source photon;
+Geant4 fluorescence remains redistributed even without a subsequent collision.
+Source attenuation is applied by tracking once. Energy-band integration uses
+whole enclosed histogram bins, consistently on both engines; compact records
+retain those projections rather than reconstructing missing fine-bin shape.
+
+A separate NumPy calculation, importing no comparison/scoring helpers,
+recomputed all reported means, block standard errors, correlated fractions,
+net lines, ratios, combined errors, gate limits and decisions from the compact
+blocks. Every numeric report field agrees within $3\times10^{-13}$ relative
+precision (absolute floor $10^{-18}$). All historical gate keys remain present:
+
+| Case | Complete-cascade primaries | Passing revised gates |
+|---|---:|---:|
+| Si 0.3 MeV | 30,000,000 | 7/7 |
+| Si 1 MeV | 10,000,000 | 10/10 |
+| Si 3 MeV | 3,000,000 | 14/14 |
+| Si 10 MeV | 1,000,000 | 14/14 |
+| W 0.3 MeV | 10,000,000 | 11/11 |
+| W 1 MeV | 3,000,000 | 13/13 |
+| W 3 MeV | 1,000,000 | 13/13 |
+| W 10 MeV | 1,000,000 | 18/18 |
+
+The independent calculation also reproduces the historical 98/100 result,
+with exactly the two reflected W 300 keV failures. Original PyRITE inputs,
+all 16 historical compact-reference/result digests, both targeted-W artifact
+digests, all 83 corrected-matrix manifest entries and all 12 monoenergetic
+artifact digests match. All seven matrix exit records are zero. Retained
+history counts and recorded job completion evidence support all eight cases;
+no low-count disappearance has removed an old gate.
+
+Read-only inspection of the retained lab checkout independently checked all
+59 compressed raw-log digests against the compact records and all completed
+million-electron run summaries, including the expected incident energies and
+both cascade flags. All 59 cascade macros restore the historical macro bytes
+after reversing only Auger generation, deexcitation-ignore-cut and output-name
+changes. Thus geometry, electron transport, primary seeds and the charged
+secondary kill setting remain fixed. The retained TestEm5 stacking body keeps
+primaries and photons and kills every charged secondary at creation; its
+integer switch preserves mode 3. The executable digest matches
+`fe3fc52d65477c780e9b77c4eb1385c752b66c403b045b988855a5d48541cc4f`.
+
+The retained Geant4 atomic-deexcitation source matches
+`90625567d9421cbc3dcdb3aaba0e3af2ad1200a94db4b3a4bdda0e5cec185d53`.
+Both it and the pinned
+[upstream 11.4.2 source](https://github.com/Geant4/geant4/blob/v11.4.2/source/processes/electromagnetic/lowenergy/src/G4UAtomicDeexcitation.cc)
+return from `GenerateAuger` before enqueuing the two daughter vacancies when
+Auger generation is disabled or its electron fails the production cut.
+Generating the electron with deexcitation cuts ignored and then killing its
+track preserves both vacancies. This is a physical settings correction,
+not a tolerance adjustment. The monoenergetic arms and controlled full-track
+rerun support this mechanism as the cause of the resolved low-energy W
+failure, without proving exact equality of the engines' atomic data.
+
+The tested corrected-reference checkpoint `981c1141` and its four source
+digests remain available locally. The original pre-rebase `c2cb361a` object
+is unavailable in the current Git database; its archived lab source files
+still exist and match all three original sampler/scorer/benchmark digests.
+Raw logs, fine-bin reductions, and executable remain available in the staging
+locations recorded above. Their retention matters: compact blocks certify
+these projected observables, not discarded spectral detail.
+
+**Filters:** units pass; zero-history/partition/constant-fraction/linear-
+continuum limits pass; sign and normalization conventions pass; settings,
+reference integrity, evidence retention and gate coverage pass. The tolerance
+basis remains the disclosed model allowance and post-inspection revision;
+this is not a preregistered validation of total/direct spectra. Known
+BremsLib/PenBrem angular and Compton-vacancy differences remain.
+
+**Independent verdict: rederived for this bounded CPU measurement.** The
+corrected matrix clears the historical discrepancy under the unchanged revised
+gates. Existing regressions pin all corrected reports, historical failures,
+covariance cancellations, input hashes, complete-run checks and missing-gate
+refusal; they support the task owner's advancement to **anchored** after this
+adjudication. No constituent sampler, CUDA backend, alloy, annihilation line,
+charged feedback or general shower validation is implied. Human sign-off
+remains separate.
+
+Verification: `UV_CACHE_DIR=/tmp/pyrite-uv-cache PYRITE_MC_BACKEND=cpu uv run
+pyrite-dev test tests/montecarlo/test_photon_full_track.py tests/dev/test_docs.py`
+passed **32 tests**. The documentation build with writable uv tool directories
+passed, including the marimo demo export; rendered mathematics was inspected
+in the generated validation page.
