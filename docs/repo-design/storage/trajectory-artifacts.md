@@ -166,3 +166,68 @@ uv run python scripts/pyrite_issue610_overlap_benchmark.py --local \
 The benchmark warms CUDA with 32 electrons and alternates paired policy order.
 Existing results predate recording a source SHA and full environment metadata;
 their JSON records are preserved as recovered, rather than presented as new runs.
+
+### Reproducible chunk, transfer and memory follow-up
+
+SLURM job **2543** on `qlmc` repeated the same 30,000-electron, seed-42
+workload from clean published revision
+`eccf609c38f021f543c5d318ea04628b5bb9c55c` (2026-10-27 UTC).
+The RTX 5080 was initially idle (105 MiB used); the allocation requested one
+GPU, two CPUs and 8 GiB host memory. Python 3.14.6, CuPy 14.2.0, CUDA runtime
+13.2 / driver API 13.3, and HDF5 2.0.0 were recorded. Each table row uses a
+fresh process, one reused 8,410,118-segment payload, and three alternating
+policy pairs after CUDA warm-up. No filesystem cache flush or `fsync` was used.
+The [raw follow-up records](evidence/capture-followup-610.json) include the
+sync stamp, source checksum, arguments, environment, timings and memory samples.
+
+| Source | Chunk rows | Transfer block | Compact median write (range), s | Throughput median write (range), s |
+|---|---:|---:|---:|---:|
+| Device | 1,024 | 64 MiB | 4.977 (4.889–5.127) | 1.132 (1.065–1.161) |
+| Device | 4,096 | 64 MiB | 3.865 (3.780–3.889) | 0.674 (0.579–0.872) |
+| Device | 16,384 | 64 MiB | 2.898 (2.873–3.067) | 0.508 (0.482–0.764) |
+| Device | 4,096 | 8 MiB | 3.774 (3.612–3.846) | 0.482 (0.402–0.832) |
+| Device | 4,096 | 256 MiB | 3.842 (3.762–3.944) | 0.607 (0.540–0.870) |
+| Host | 4,096 | — | 3.558 (3.529–3.587) | 0.474 (0.370–0.512) |
+
+At the production 4,096-row / 64 MiB settings, throughput wrote **5.73×**
+faster from device and **7.51×** faster from host. Device streaming reads
+were 1.087 s compact / 0.177 s throughput; file sizes remained 667.127 /
+878.029 MiB. The 1,024- and 16,384-row layouts occupied 675.619 / 880.787
+and 664.523 / 878.152 MiB respectively. Larger chunks helped this full-capture
+workload, but selected-history latency and other workloads were not compared;
+the default chunk size remains 4,096.
+
+For device captures at production settings, sampled RSS peaks ranged from
+821.4–992.0 MiB compact and 952.1–1,013.6 MiB throughput. Sampled GPU usage
+(`total - free` from CUDA, including context and allocator reservations) peaked
+at 3,987.6 MiB for both. The 8 MiB transfer arm peaked at 826.5 / 829.0 MiB
+RSS; the 256 MiB arm at 1,034.0 MiB for either policy. All device arms moved
+1,115.080 MiB. The index's 64.164 MiB electron-ID download is independent of
+the row-transfer block limit; other fields stay block-bounded. The 256 MiB arm
+increased the largest individual download to 192.492 MiB without a consistent
+latency advantage. The smaller-block timing ranges overlap the default's,
+so the production transfer limit remains 64 MiB.
+
+Host-only runs released the device payload and unused pool before writing.
+Their sampled RSS peaks were 1,976.8 MiB compact / 1,966.5 MiB throughput,
+with 1,353.6 MiB remaining GPU context/cache allocation and no writer transfers.
+Full host staging took 0.460 s once, outside writer timing. That additional
+copy and host memory cost do not support replacing bounded device downloads
+with eager full-payload staging. All memory peaks are 50 ms samples, may miss
+short spikes, and include live source data and allocator/cache retention.
+
+Five fresh bounded-overlap pairs gave compact median pair times of 3.874 s
+sequential / 3.726 s concurrent (1.04×), and throughput 0.598 s / 0.600 s
+(no gain). Two throughput pairs regressed. Retaining the next case raised
+sampled GPU usage as high as 6,701.6 MiB. **Decision:** keep production capture
+synchronous, preserve default compression/chunks/transfers, and offer the
+explicit throughput policy. This transport-only overlap experiment gives no
+evidence for adding the lifetime, error and memory costs of an asynchronous
+production writer; spectrum overlap remains a possible future investigation.
+
+The benchmark exposes `--chunk-rows` and `--device-block-mib` for these
+comparisons. Run `--residency device` and `--residency host` in separate
+processes for isolated source-memory measurements. Every capture checks exact
+sampled values/dtypes/order, completion and streamed row counts; the regression
+suite checks complete synthetic round trips, unchanged spectra, bounded
+downloads and failed/interrupted writes for both storage policies.
