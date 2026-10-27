@@ -46,7 +46,7 @@ def _kinetic_energy_keV(value: object) -> float | np.ndarray:
         )
     if energy.size == 0 or not np.all(np.isfinite(energy)) or np.any(energy <= 0):
         raise ValueError("Beam.kinetic_energy must contain finite positive energies")
-    return float(energy) if energy.ndim == 0 else energy.copy()
+    return _positive("Beam.kinetic_energy", float(energy)) if energy.ndim == 0 else energy.copy()
 
 
 def _positive(name: str, value: float) -> float:

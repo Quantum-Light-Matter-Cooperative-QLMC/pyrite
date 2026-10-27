@@ -138,6 +138,22 @@ def test_semantic_and_numeric_energy_arguments_conflict_even_when_equivalent() -
         replace(beam, kinetic_energy=80 * ureg.keV)
 
 
+@pytest.mark.parametrize("magnitude", ["1e400", "1e-400"])
+def test_semantic_scalar_energy_must_remain_finite_positive_as_python_float(
+    magnitude: str,
+) -> None:
+    if np.finfo(np.longdouble).max <= np.finfo(float).max:
+        pytest.skip("longdouble has no wider exponent range than Python float")
+    value = np.longdouble(magnitude)
+    assert np.isfinite(value) and value > 0
+    quantity = Q_(value, "keV")
+    options = dict(transverse=Spot(), longitudinal=PointBunch())
+    with pytest.raises(ValueError, match="kinetic_energy.*finite.*positive"):
+        Beam(kinetic_energy=quantity, **options)
+    with pytest.raises(ValueError, match="kinetic_energy.*finite.*positive"):
+        Beam(60, **options).with_kinetic_energy(quantity)
+
+
 def test_quantity_arrays_and_compound_geometry_normalize_to_plain_values() -> None:
     beam = Beam(
         energy_keV=np.array([0.03, 0.045, 0.06]) * ureg.MeV,
