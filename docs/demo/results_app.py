@@ -129,7 +129,7 @@ def spectrum_figure(data, case, *, quantity="line", brem=False, log_y=False, com
         height=420,
         margin={"l": 64, "r": 16, "t": 48, "b": 52},
         legend={"orientation": "h", "y": 1.02, "yanchor": "bottom", "x": 0},
-        xaxis={**axis, "title": "Photon energy (eV)"},
+        xaxis={**axis, "title": "Photon energy (eV)", "range": [600.0, 1100.0]},
         yaxis={
             **axis,
             "title": f"Intensity ({spectra['units']})",
