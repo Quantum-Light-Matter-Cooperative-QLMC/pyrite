@@ -25,6 +25,7 @@ NAMES = (
     "transition_radiation_demo",
     "radiation_diagnostics",
     "experimental_planar_channeling",
+    "experimental_axial_channeling",
 )
 
 
@@ -100,6 +101,12 @@ def radiation_diagnostics(view="signal"):
 def experimental_planar_channeling():
     load_example("experimental_planar_channeling").plot(
         checked_output("experimental_planar_channeling")
+    )
+
+
+def experimental_axial_channeling(view="density"):
+    load_example("experimental_axial_channeling").plot(
+        checked_output("experimental_axial_channeling"), view=view
     )
 
 

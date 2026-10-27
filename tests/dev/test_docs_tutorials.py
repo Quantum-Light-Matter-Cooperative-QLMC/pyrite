@@ -70,6 +70,52 @@ def test_planar_diagnostic_renders_cached_native_arrays_without_solving(tutorial
         plt.close("all")
 
 
+def test_axial_diagnostic_renders_cached_density_and_overlap_without_solving(
+    tutorials, monkeypatch
+):
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    example = tutorials.load_example("experimental_axial_channeling")
+
+    def forbid_solve(*args, **kwargs):
+        pytest.fail("documentation rendering must never run axial quantum solvers")
+
+    for name in ("compute", "calculate", "axial_diagnostic"):
+        monkeypatch.setattr(example, name, forbid_solve)
+    monkeypatch.setattr(tutorials, "load_example", lambda _: example)
+    data = tutorials.checked_output("experimental_axial_channeling")
+    density = np.asarray(data["density_per_ang2"])
+    depth = np.asarray(data["depth_ang"])
+    norm = np.asarray(data["retained_norm"])
+    overlap = np.asarray(data["initial_state_overlap"])
+    assert density.shape == (3, 64, 64)
+    assert data["snapshot_indices"] == [0, 25, 50]
+    assert depth[0] == 0 and depth[-1] == 500 and len(depth) == 51
+    assert np.isfinite(density).all() and np.all(density >= 0)
+    np.testing.assert_allclose(density.sum(axis=(1, 2)) * data["cell_area_ang2"], norm[[0, 25, 50]])
+    np.testing.assert_allclose(norm, 1, atol=1e-12)
+    assert overlap[0] == pytest.approx(1)
+    assert np.all(overlap >= 0) and np.all(overlap <= norm + 1e-12)
+    assert data["config"]["mode"] == "coherent" and data["config"]["backend"] == "cpu"
+    assert data["units"]["density"] == "per incident electron / angstrom^2"
+    try:
+        tutorials.experimental_axial_channeling(view="density")
+        figure = plt.gcf()
+        for ax, values in zip(figure.axes[:3], density, strict=True):
+            np.testing.assert_array_equal(ax.images[0].get_array(), values.T)
+        assert len({ax.images[0].get_clim() for ax in figure.axes[:3]}) == 1
+        tutorials.experimental_axial_channeling(view="evolution")
+        ax = plt.gcf().axes[0]
+        np.testing.assert_array_equal(ax.lines[0].get_ydata(), norm)
+        np.testing.assert_array_equal(ax.lines[1].get_ydata(), overlap)
+        np.testing.assert_array_equal(ax.lines[1].get_xdata(), depth / 10)
+    finally:
+        plt.close("all")
+
+
 @pytest.fixture
 def tutorials():
     path = Path(__file__).parents[2] / "docs" / "_tutorials.py"
