@@ -9,6 +9,7 @@ from .._deprecations import canonical_option
 from .._groups import LazyGroup
 
 _LEAVES = {
+    "configuration": "pyrite.cli.commands.app.configuration_command",
     "analysis": "pyrite.cli.commands.app.analysis_command",
     "pixels": "pyrite.cli.commands.app.pixels_command",
     "compare": "pyrite.cli.commands.app.compare_command",
@@ -20,6 +21,7 @@ _LEAVES = {
     "validation": "pyrite.cli.commands.app.validation_command",
 }
 _HELP = {
+    "configuration": "Build, validate and save simulation configurations.",
     "analysis": "Launch or export the analysis app.",
     "pixels": "Launch or export the pixel-detector observation app.",
     "compare": "Launch or export the case and cross-material comparison app.",
@@ -76,6 +78,15 @@ def analysis_command() -> click.Group:
         "pyrite.cli.commands.app_analysis.command",
         "pyrite.cli.commands.export.command",
     )
+
+
+def configuration_command() -> click.Group:
+    """Configuration is an editor; only launch is meaningful, not static export."""
+    leaf = click.Group("configuration", help=_HELP["configuration"], no_args_is_help=True)
+    launch = copy(_load("pyrite.cli.commands.app_views.configuration_command"))
+    launch.name = "launch"
+    leaf.add_command(launch)
+    return leaf
 
 
 def pixels_command() -> click.Group:

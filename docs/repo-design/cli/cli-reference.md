@@ -146,6 +146,8 @@ Existing command fragments remain available below; each link opens the full fami
 
 - <span id="pyrite-run"></span>[`pyrite run`](cli-reference-run.md#pyrite-run)
 - <span id="pyrite-app"></span>[`pyrite app`](cli-reference-app.md#pyrite-app)
+- <span id="pyrite-app-configuration"></span>[`pyrite app configuration`](cli-reference-app.md#pyrite-app-configuration)
+- <span id="pyrite-app-configuration-launch"></span>[`pyrite app configuration launch`](cli-reference-app.md#pyrite-app-configuration-launch)
 - <span id="pyrite-app-analysis"></span>[`pyrite app analysis`](cli-reference-app.md#pyrite-app-analysis)
 - <span id="pyrite-app-analysis-export"></span>[`pyrite app analysis export`](cli-reference-app.md#pyrite-app-analysis-export)
 - <span id="pyrite-app-analysis-launch"></span>[`pyrite app analysis launch`](cli-reference-app.md#pyrite-app-analysis-launch)

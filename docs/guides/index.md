@@ -14,6 +14,7 @@ then run [Your first Python simulation](python-api-workflow.md).
 :caption: Simulations
 
 configuration-cookbook
+configuration-notebook
 directional-source-heatmap
 detector-observations
 ```
