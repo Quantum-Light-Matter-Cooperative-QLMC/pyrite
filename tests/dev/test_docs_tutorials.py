@@ -9,6 +9,13 @@ import numpy as np
 import pytest
 
 
+def test_material_authoring_example_matches_checked_composition(tutorials):
+    data = tutorials.load_example("adding_materials").compute()
+    assert data == tutorials.checked_output("adding_materials")
+    assert data["density_g_cm3"] == pytest.approx(2.2)
+    assert data["composition"]["O"] == pytest.approx(2 * data["composition"]["Si"])
+
+
 def test_optimization_plots_preserve_recorded_selection_uncertainty_and_units(
     tutorials, monkeypatch, tmp_path
 ):

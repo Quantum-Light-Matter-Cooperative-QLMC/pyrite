@@ -193,7 +193,7 @@ Use `pyrite.materials.MaterialDefinition`, `build_medium`, `build_crystal` and
 `save_material` to author materials. Builders validate without registration;
 `save_material` persists and returns a fresh immutable catalog. Density is in
 g/cm³, composition in atoms/Å³ and photon grids in eV. See
-[Adding materials](guides/adding-materials.md) for inputs and storage rules.
+[Material authoring](reference/material-authoring.md) for inputs and storage rules.
 
 The provisional `pyrite.materials.optical.OpticalResponse.to_record()` and
 `OpticalResponse.from_record(record)` preserve explicit optical response

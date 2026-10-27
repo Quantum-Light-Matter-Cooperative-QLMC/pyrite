@@ -17,6 +17,7 @@ predictive-accuracy claim is made. Production transport refuses
 
 From a source checkout, run the maintained example or open its reactive notebook:
 
+<!-- verify: skip (downloadable Python example and marimo editor; checked by notebook export) -->
 ```bash
 uv sync --extra apps
 uv run python docs/examples/experimental_axial_channeling.py

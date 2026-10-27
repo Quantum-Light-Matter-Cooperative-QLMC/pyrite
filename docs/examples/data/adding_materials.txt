@@ -1,0 +1,3 @@
+Bulk density: 2.200 g/cm^3
+O: 0.044101 atoms/angstrom^3
+Si: 0.022051 atoms/angstrom^3

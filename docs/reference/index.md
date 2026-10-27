@@ -20,6 +20,8 @@ gdf-beams
 optimization-studies
 campaign-configuration
 catalogs-and-workspaces
+material-authoring
+cluster-execution
 ../repo-design/profile-settings
 ../repo-design/configuration-resolution
 ../repo-design/cli/cli-deprecations

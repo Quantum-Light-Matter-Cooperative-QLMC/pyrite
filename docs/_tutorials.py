@@ -27,6 +27,7 @@ NAMES = (
     "experimental_planar_channeling",
     "experimental_axial_channeling",
     "optimization_studies",
+    "adding_materials",
 )
 
 
