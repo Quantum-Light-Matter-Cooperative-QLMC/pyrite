@@ -49,6 +49,14 @@ Distinguish physical models, numerical approximations, sampling, kernel tuning,
 and scheduler resource policies. Specify physical units, defaults, side effects,
 serialization, result units, scientific identity, and reproducibility behavior.
 
+For dimensional values, follow the
+[physical-quantity naming policy](../repo-design/physical-units.md#naming-and-representation-policy):
+use semantic names for values that carry units and unit suffixes for raw
+magnitudes. Accepting a Pint input does not change a numeric field's read-back
+contract. A proposed quantity interface must specify missing-extra behavior,
+replacement, array ownership, lowering and serialization before implementation;
+the additive beam pilot remains a design proposal.
+
 ## Before approving a public feature
 
 1. Identify its user-facing concept, owning domain, and API status.

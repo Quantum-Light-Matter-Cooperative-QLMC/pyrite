@@ -116,6 +116,14 @@ See the [unit boundary and field inventory](repo-design/physical-units.md)
 for supported fields, profile string syntax, serialization policy, and measured
 overhead.
 
+Unit suffixes describe the numeric value returned by current fields, even when
+assignment uses a different compatible unit: `Beam.energy_keV` always reads
+back as a magnitude in keV. Semantic quantity-valued names require explicit
+assignment and read-back contracts. The
+[proposed beam-energy pilot](repo-design/physical-units.md#proposed-beam-energy-pilot)
+defines that future contract; `Beam(kinetic_energy=...)` and its quantity
+property/replacement method are not available in the current API.
+
 ## Root import compatibility
 
 The forward-looking root API is `Beam`, `Target`, `Detector`, `Scene`,
