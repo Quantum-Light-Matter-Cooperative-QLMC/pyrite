@@ -9,7 +9,10 @@ myst:
 # PyRITE — Electron transport and X-ray radiation simulation
 
 **PyRITE (`pyrite-mc`)** models electron transport in crystalline and amorphous
-solids, coherent PXR/CBS lines, bremsstrahlung, and characteristic radiation.
+solids, PXR and coherent bremsstrahlung (CBS), transition radiation, characteristic radiation,
+and standard bremsstrahlung; other types of radiation are under active development  
+(namely Cherenkov and channeling radiation).
+
 It is research software under active development: read the
 [capabilities and limitations](physics/capabilities.md) and
 [validation status](validation/status-summary.md) before interpreting predictions.
@@ -20,11 +23,9 @@ It is research software under active development: read the
 
 ## Explore results in the browser
 
-The demo below runs in your browser with no install: HOPG PXR+CBS spectra in
-the Zhai et al. (2025) Fig. 1c geometry, bulk versus 29 nm film, beside a 3D
-view of the simulated electron tracks. The first load fetches a Python runtime
-and can take a minute. Its provenance footer lists the PyRITE version, model
-markers, and the validation status of each claim it shows.
+The demo below runs in your browser with no install: HOPG PXR+CBS spectra
+in bulk versus 29 nm film, beside a 3D view of the simulated electron tracks.
+The first load fetches a Python runtime and can take a minute.
 
 ```{raw} html
 <iframe class="pyrite-demo" src="demo/index.html" title="PyRITE results demo"
@@ -35,6 +36,9 @@ markers, and the validation status of each claim it shows.
 <noscript><img src="demo/preview.png" alt="PyRITE results demo preview" style="width: 100%;"></noscript>
 <p><a href="demo/index.html">Open the demo full screen</a>.</p>
 ```
+
+This simulation emulates the results demonstrated in the paper from Zhai et al. (2025),
+namely Fig. 1c.
 
 ## First simulation
 
@@ -93,3 +97,4 @@ Validation <validation/index>
 Reference <reference/index>
 Development <development/index>
 ```
+

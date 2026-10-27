@@ -196,7 +196,7 @@ def _(data):
         inline=True,
     )
     quantity_ui = mo.ui.dropdown(
-        {"Detected (EDS-convolved)": "line", "Response-free source": "source"},
+        {"Detected (EDS-convolved)": "line", "Raw spectrum": "source"},
         value="Detected (EDS-convolved)",
         label="Spectrum",
     )
@@ -230,11 +230,9 @@ def _(brem_ui, case_ui, compare_ui, data, log_ui, quantity_ui, secondaries_ui):
             mo.md(
                 f"PXR+CBS from HOPG (002) observed at "
                 f"θ<sub>obs</sub> = {_spectra['detector']['theta_obs_deg']:g}° into "
-                f"{_spectra['detector']['solid_angle_sr']:g} sr, the Zhai et al. (2025) "
-                "Fig. 1c geometry. Dotted lines mark the Eq. (10) line energy. "
-                f"At {_enh['E0_keV']:g} keV the bulk/film peak ratio is "
-                f"{_enh['mc_peak_ratio']:.1f}× (no-transport ceiling "
-                f"{_enh['no_transport_ceiling']:.0f}×)."
+                f"{_spectra['detector']['solid_angle_sr']:g} sr, the parameter set used "
+                "in Fig. 1c from Zhai et al. (2025). Dotted lines mark the Eq. (10) "
+                f"line energy."
             ).style({"color": MUTED, "font-size": "0.9em"}),
         ]
     )
@@ -246,7 +244,7 @@ def _(brem_ui, case_ui, compare_ui, data, log_ui, quantity_ui, secondaries_ui):
             trajectory_figure(data, _case, secondaries=secondaries_ui.value),
             mo.md(
                 f"{_view['n_primaries']} primary electrons at {_view['E0_keV']:g} keV, "
-                f"tilt {_view['tilt_deg']:g}°, azimuth {_view['azim_deg']:g}°; colour is "
+                f"tilt {_view['tilt_deg']:g}°, azimuth {_view['azim_deg']:g}°; color is "
                 "electron kinetic energy. Lateral extent is fitted to the tracks; depth is "
                 "to scale"
                 + (
@@ -271,14 +269,10 @@ def _(brem_ui, case_ui, compare_ui, data, log_ui, quantity_ui, secondaries_ui):
 @app.cell(hide_code=True)
 def _(data):
     _p = data["provenance"]
-    _claims = ", ".join(f"`{c['id']}` ({c['status']})" for c in _p["validation"])
-    _markers = ", ".join(f"{k} `{v}`" for k, v in _p["model_markers"].items())
     mo.md(
         f"""
-        **Provenance.** PyRITE {_p["pyrite_version"]} (`{_p["git_commit"]}`), exported
-        {_p["exported"]}. Spectra: {_p["spectra_electrons"]:,} electrons per beam energy
-        from `{_p["spectra_cache"]}`. Ledger claims: {_claims}. Results beyond those
-        statuses are illustrative, not validated predictions. Model markers: {_markers}.
+        **Provenance.** PyRITE {_p["pyrite_version"]} (`{_p["git_commit"]}`).
+        Spectra: {_p["spectra_electrons"]:,} electrons per beam energy.
         """
     ).style({"color": MUTED, "font-size": "0.85em"})
     return
