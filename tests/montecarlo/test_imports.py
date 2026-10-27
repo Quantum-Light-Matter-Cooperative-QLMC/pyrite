@@ -14,6 +14,8 @@ def test_public_scene_construction_does_not_initialize_execution() -> None:
         """
         import sys
         import pyrite as pr
+        import pyrite.beams
+        import pyrite.geometry
         scene = pr.Scene(
             pr.Beam(energy_keV=30.0, transverse=pr.beams.Spot(), longitudinal=pr.beams.PointBunch()),
             pr.geometry.Slab("hopg", footprint=pr.geometry.Footprint(1.0, 1.0)),

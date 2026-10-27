@@ -95,7 +95,7 @@ def test_precomputed_spectrum_renders_without_simulating(tutorials, monkeypatch,
     try:
         tutorials.python_api_workflow()
         figure = plt.gcf()
-        assert len(figure.axes[0].lines) == 2
+        assert {line.get_label() for line in figure.axes[0].lines} == set(data["spectra"])
         figure.savefig(tmp_path / "spectrum.svg")
         assert (tmp_path / "spectrum.svg").stat().st_size > 1_000
     finally:
@@ -226,7 +226,7 @@ def test_directional_map_renders_native_grids_without_transport(tutorials, monke
     assert np.all(data["supported"])  # Finite footprint has no unsupported grazing directions.
     assert data["units"] == "ph/incident-electron/eV/sr"
     assert data["seed"] == data["case"]["seed"] == 1
-    assert data["case"]["Ne"] == data["case"]["Ne_brem"] == 64
+    assert data["case"]["Ne"] == data["case"]["Ne_brem"] == 4096
     assert data["provenance"]["backend"] == "cpu"
     assert any("LineOpticalDataWarning" in warning for warning in data["warnings"])
     try:

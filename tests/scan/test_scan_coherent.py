@@ -206,8 +206,8 @@ def test_temporal_profile_opt_in_is_divergence_only(monkeypatch):
 
 
 def test_catalog_profile_precision_reaches_run_settings_identity_and_cases(monkeypatch):
-    from pyrite import Precision
     from pyrite.api import build_configured_cases
+    from pyrite.config import Precision
 
     _s, _sw, id_fixed, _stem = _resolved_run(monkeypatch, [])
     policy = Precision(target_rse=0.1, min_electrons=20, max_electrons=60, block_electrons=20)

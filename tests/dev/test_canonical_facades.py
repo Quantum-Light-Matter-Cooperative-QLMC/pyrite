@@ -49,7 +49,11 @@ def test_physical_facades_preserve_implementation_and_pickle_identity(domain, na
 
     canonical = getattr(importlib.import_module(f"pyrite.{domain}"), name)
     original = getattr(importlib.import_module(owner), name)
-    assert canonical is original is getattr(pyrite, name)
+    assert canonical is original
+    if name in pyrite.__all__:
+        assert canonical is getattr(pyrite, name)
+    else:
+        assert not hasattr(pyrite, name)
     # Class identity also preserves constructor signatures and dataclass Fields.
     assert pickle.dumps(canonical) == pickle.dumps(original)
     assert pickle.loads(pickle.dumps(original)) is canonical
@@ -156,7 +160,11 @@ def test_canonical_facade_preserves_root_object_identity(domain: str, name: str)
     import pyrite
 
     facade = importlib.import_module(f"pyrite.{domain}")
-    assert getattr(facade, name) is getattr(pyrite, name)
+    if name in pyrite.__all__:
+        assert getattr(facade, name) is getattr(pyrite, name)
+    else:
+        assert not hasattr(pyrite, name)
+        assert getattr(facade, name) is not None
 
 
 def test_canonical_names_match_reviewed_manifest() -> None:

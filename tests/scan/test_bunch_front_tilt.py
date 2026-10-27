@@ -112,7 +112,7 @@ def test_unsupported_source_combinations_fail_explicitly(kind):
     if kind == "spread":
         fields["energy_spread_frac"] = 0.01
     elif kind == "offsets":
-        fields["longitudinal"] = pr.beam.Offsets((0.0, 1.0))
+        fields["longitudinal"] = pr.beams.Offsets((0.0, 1.0))
     elif kind == "uniform":
         fields["longitudinal"] = pr.beams.BunchLength(1.0, shape="uniform")
     elif kind == "twiss":

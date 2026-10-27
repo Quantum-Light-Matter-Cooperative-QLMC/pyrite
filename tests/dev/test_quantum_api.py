@@ -115,7 +115,7 @@ def test_quantum_guide_examples_keep_normalization_and_result_meanings():
     """Execute the actual guide so public snippets cannot drift from the API."""
     path = Path(__file__).resolve().parents[2] / "docs/guides/quantum-api.md"
     snippets = re.findall(r"```python\n(.*?)```", path.read_text(), flags=re.DOTALL)
-    assert len(snippets) == 3
+    assert len(snippets) == 4
     scope = {}
     for snippet in snippets:
         exec(compile(snippet, str(path), "exec"), scope)

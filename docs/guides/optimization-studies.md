@@ -158,6 +158,7 @@ Select the CPU backend before importing PyRITE. The following commands are
 for a checkout with the optional optimization extra and required ELSEPA data.
 A bounded local preflight runs only one four-history case:
 
+<!-- verify: skip (external shell tools or downloadable Python example) -->
 ```bash
 PYRITE_MC_BACKEND=cpu uv run --extra optimization python checks/pxr_optimization.py \
   preflight --output /tmp/pxr-optimization
@@ -168,6 +169,7 @@ Run the comparison and finalist validation on the lab worker through the
 committed and synced revision, with explicit catalog environment and memory
 request:
 
+<!-- verify: skip (external shell tools or downloadable Python example) -->
 ```bash
 PYRITE_MC_BACKEND=cpu OPENBLAS_NUM_THREADS=1 uv run --extra optimization \
   python checks/pxr_optimization.py search --output pyrite-output/optimization/pxr-demo

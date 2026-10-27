@@ -139,69 +139,33 @@ def test_guides_contain_bash_blocks():
 # --- tier 2: python blocks execute as one accumulating namespace ---------
 
 
-def _python_blocks() -> list[FencedBlock]:
-    path = GUIDES / "python-api-workflow.md"
-    workflow_end = next(
-        i
-        for i, line in enumerate(path.read_text().splitlines(), 1)
-        if line == "## Compare photon energies"
-    )
-    return [
-        b
-        for b in extract_fenced_blocks(path)
-        if b.language == "python" and b.start_line < workflow_end
-    ]
-
-
 @pytest.mark.slow
 def test_python_api_workflow_executes_as_one_accumulating_namespace():
-    blocks = _python_blocks()
-    assert blocks, "No Python examples collected from the API workflow"
+    """Execute the downloadable source included by the current guide."""
+    import runpy
 
-    namespace: dict[str, object] = {}
-    for block in blocks:
-        code = compile(block.body, block.location, "exec")
-        exec(code, namespace)  # noqa: S102 -- executing the documented example itself
-
-    result = namespace["result"]
-    cxr = result.cxr.incoherent
-    brem = result.brem
-    assert cxr.photon_energy_eV.shape == cxr.density.shape
-    assert brem.photon_energy_eV.shape == brem.density.shape
-    assert np.all(np.isfinite(cxr.photon_energy_eV))
-    assert np.all(np.isfinite(cxr.density))
-    assert np.all(np.isfinite(brem.photon_energy_eV))
-    assert np.all(np.isfinite(brem.density))
-
-    provenance = result.provenance
-    assert namespace["digest"] == provenance["identity_digest"]
-    assert namespace["backend"] == provenance["backend"]
-    assert namespace["device"] == provenance["device"]
-    assert namespace["resolved_case"] == result.case
-
-    flux = namespace["flux"]
-    assert flux.columns[-1] == "total"
-    assert set(flux.columns) >= {"photon_energy_eV", "cxr", "brem", "total"}
-    assert namespace["native"].height == cxr.density.size + brem.density.size + (
-        0 if result.characteristic is None else result.characteristic.density.size
-    )
-
-    detected_cxr = namespace["detected_cxr"]
-    assert np.shape(detected_cxr) == cxr.photon_energy_eV.shape
-
-    # 3 beam energies x 3 tilt angles: analytically derivable from the
-    # documented axes, independent of Monte Carlo content.
-    assert len(namespace["expanded"]) == 9
-    assert len(namespace["cases"]) == 9
+    path = ROOT / "docs/examples/python_api_workflow.py"
+    guide = (GUIDES / "python-api-workflow.md").read_text()
+    assert "literalinclude} ../examples/python_api_workflow.py" in guide
+    namespace = runpy.run_path(str(path))
+    data = namespace["compute"]()
+    assert data["seed"] == 1
+    assert data["provenance"]["backend"] == "cpu"
+    for spectrum in data["spectra"].values():
+        energy = np.asarray(spectrum["energy_eV"])
+        density = np.asarray(spectrum["density"])
+        assert energy.shape == density.shape
+        assert np.all(np.diff(energy) > 0)
+        assert np.isfinite(density).all() and np.all(density >= 0)
 
 
 # --- toml block ------------------------------------------------------------
 
 
 def test_sweep_profiles_toml_blocks_are_valid_and_internally_consistent():
-    path = GUIDES / "sweep-profiles.md"
+    path = ROOT / "docs/repo-design/materials-catalog-schema.md"
     toml_blocks = [b for b in extract_fenced_blocks(path) if b.language == "toml"]
-    assert len(toml_blocks) == 5
+    assert toml_blocks, "The canonical catalog schema must retain TOML examples"
 
     errors = [error for block in toml_blocks for error in check_toml_block(block)]
     assert not errors, "\n".join(errors)

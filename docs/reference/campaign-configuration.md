@@ -43,7 +43,7 @@ stay on the profile. Edits affect future runs of all referencing profiles.
 Renames update references, deletion refuses referenced objects, and
 `profile remove PROFILE --physics` (or `--numerics`) detaches a preset.
 Names do not enter scientific identity; runs record preset names and definition
-digests as provenance. Python uses `pyrite.load_physics` / `pyrite.load_numerics`
+digests as provenance. Python uses `pyrite.config.load_physics` / `pyrite.config.load_numerics`
 to obtain frozen configurations. See [named presets ADR](../adr/0021-named-physics-numerics-presets.md).
 
 ## Adaptive electron counts

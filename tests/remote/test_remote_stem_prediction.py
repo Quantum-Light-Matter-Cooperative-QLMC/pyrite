@@ -10,8 +10,9 @@ from dataclasses import replace
 
 import pytest
 
-from pyrite import Precision, materials
+from pyrite import materials
 from pyrite.campaign.profiles import canonical_profile_run, named_profile_stem
+from pyrite.config import Precision
 from pyrite.remote import _queue_scripts as scripts
 from pyrite.runs import scan
 

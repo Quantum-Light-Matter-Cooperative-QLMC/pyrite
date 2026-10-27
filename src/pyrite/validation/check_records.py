@@ -13,6 +13,8 @@ SCHEMA_REVISION = 1
 Verdict = Literal["pass", "fail", "skip"]
 
 CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
+    # Optimization comparison is a study diagnostic, not an independent physics claim.
+    "checks/pxr_optimization.py": (),
     "checks/brem_source_comparison.py": ("brem-source-comparison",),
     "checks/sb85_eta_small_kappa_fit.py": ("bremslib-electron-electron",),
     "checks/coherent_flat_omission.py": ("coherent-flat-term-omission",),

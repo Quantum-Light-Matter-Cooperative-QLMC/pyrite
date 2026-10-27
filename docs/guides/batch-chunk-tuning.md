@@ -17,6 +17,7 @@ Optuna directly, separately from `OptimizationStudy`'s scene-parameter API.
 
 After `uv sync --extra nvidia --extra optimization`, from the repository root:
 
+<!-- verify: skip (external shell tools or downloadable Python example) -->
 ```bash
 PYRITE_FP64=1 uv run --no-sync python -m pyrite.perf.batch_chunk_tuner \
   --scene examples/molab_batch_chunk_scene.py \
@@ -52,6 +53,7 @@ name or SQLite database. Only run one tuning coordinator per SQLite study.
 
 Afterward apply the suggested values to a **new** PyRITE process:
 
+<!-- verify: skip (external shell tools or downloadable Python example) -->
 ```bash
 export PYRITE_MC_ELECTRON_BATCH_MAX=4096  # replace with Optuna winner
 export PYRITE_MC_CXR_CHUNK=1024          # replace with Optuna winner

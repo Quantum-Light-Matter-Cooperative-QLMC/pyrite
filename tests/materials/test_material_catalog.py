@@ -2426,7 +2426,7 @@ def test_profile_temporal_profile_opt_in_parses_and_validates(tmp_path):
 
 def test_profile_precision_parses_and_rejects_incompatible_profiles(tmp_path):
     """#361: ``profiles.NAME.precision`` is a validated adaptive policy."""
-    from pyrite import Precision
+    from pyrite.config import Precision
     from pyrite.materials import MaterialConfigError, load_material_catalog
 
     policy = (

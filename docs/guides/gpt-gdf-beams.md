@@ -10,6 +10,7 @@ Save {download}`the runnable script <../examples/gpt_gdf_beams.py>` and
 {download}`synthetic_beam.gdf <../examples/data/synthetic_beam.gdf>` in the same
 directory, then run:
 
+<!-- verify: skip (external shell tools or downloadable Python example) -->
 ```bash
 PYRITE_MC_BACKEND=cpu python gpt_gdf_beams.py --input synthetic_beam.gdf
 ```
@@ -115,6 +116,7 @@ catalog/CLI recipes, shape-only mode and error remedies.
 Documentation builds render checked JSON only. Input and example SHA-256
 checks reject stale output; explicit regeneration runs import and transport:
 
+<!-- verify: skip (external shell tools or downloadable Python example) -->
 ```bash
 MPLCONFIGDIR=/tmp/pyrite-matplotlib PYRITE_MC_BACKEND=cpu \
   uv run python docs/_tutorials.py --regenerate gpt_gdf_beams

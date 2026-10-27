@@ -9,6 +9,7 @@ For a library install or GPU dependencies, use the
 
 Install the CLI with its analysis app:
 
+<!-- verify: skip (external shell tools or downloadable Python example) -->
 ```bash
 uv tool install "pyrite-mc[apps]"
 uv tool update-shell

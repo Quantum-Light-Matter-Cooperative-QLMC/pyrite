@@ -18,6 +18,7 @@ pyrite checkpoint list
 Download {download}`working_with_results.py <../examples/working_with_results.py>`
 and pass the checkpoint directory printed by the run. For the bundled inputs:
 
+<!-- verify: skip (external shell tools or downloadable Python example) -->
 ```bash
 python working_with_results.py pyrite-output/checkpoints/hopg@quickstart-cdf8eed9af74
 ```
