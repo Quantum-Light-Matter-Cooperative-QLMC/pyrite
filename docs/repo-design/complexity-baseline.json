@@ -40,7 +40,7 @@
     {
       "path": "src/pyrite/apps/trace_app.py",
       "name": "_.penetration_tab",
-      "cc": 36
+      "cc": 35
     },
     {
       "path": "src/pyrite/campaign/axial_spec.py",
@@ -150,7 +150,7 @@
     {
       "path": "src/pyrite/cli/commands/remote.py",
       "name": "_reject_exclusive_start_flags",
-      "cc": 23
+      "cc": 22
     },
     {
       "path": "src/pyrite/cli/commands/remote.py",
@@ -714,7 +714,7 @@
     {
       "path": "src/pyrite/remote/_queue_scripts.py",
       "name": "_queue_script",
-      "cc": 32
+      "cc": 30
     },
     {
       "path": "src/pyrite/remote/cleanup.py",
