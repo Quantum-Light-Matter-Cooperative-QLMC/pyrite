@@ -184,13 +184,25 @@ def model_spectra(anchor: ZhaiAnchor, ne: int = 500, ne_brem: int = 200) -> dict
             seed=case["seed"] + 1,
             beam_dir=beam_dir,
         )
-        brem = mc_brem_spectrum(
+        sigma_eV = fwhm / (2 * np.sqrt(2 * np.log(2)))
+        pad = int(np.ceil(5 * sigma_eV / anchor.de_eV))
+
+        E_brem = E_grid[0] + anchor.de_eV * np.arange(-pad, E_grid.size + pad)
+
+        brem_wide = mc_brem_spectrum(
             segs_b,
-            E_grid,
+            E_brem,
             composition=case["composition"],
             n_hat=n_hat,
         )
-        brem_det = Detector(response=LegacyEDS(convolve=True)).score(E_grid, brem, fwhm_eV=fwhm)
+
+        brem_det_wide = Detector(response=LegacyEDS(convolve=True)).score(
+            E_brem, brem_wide, fwhm_eV=fwhm
+        )
+
+        window = slice(pad, pad + E_grid.size)
+        brem = brem_wide[window]
+        brem_det = brem_det_wide[window]
         out[E0] = {
             "spec": spec,
             "spec_det": spec_det,
