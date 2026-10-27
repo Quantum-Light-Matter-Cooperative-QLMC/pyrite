@@ -86,7 +86,7 @@ keep their meaning. `pyrite profile set PROFILE --physics NAME` attaches and
 profile references the preset; rename updates references atomically. All
 logic lives in a CLI-independent service in `pyrite.campaign`.
 
-**Python API.** `pyrite.load_physics(NAME)` (and `load_numerics` in phase 2)
+**Python API.** `pyrite.config.load_physics(NAME)` (and `load_numerics` in phase 2)
 returns the existing frozen typed object built from the same catalog
 resolution and validation, so API users can start from a named configuration
 and adjust it with `dataclasses.replace`. Direct construction stays available;

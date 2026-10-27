@@ -2,10 +2,10 @@
 table-top electron beams in crystals.
 
 The package is intentionally light at import time: ``import pyrite`` pulls in
-no heavy dependencies (matplotlib / cupy / the MC pipeline). Use the curated root for primary simulation objects and canonical domain
-imports for specialized types, e.g. ``from pyrite.beams import TransverseSpot``
-and ``from pyrite.geometry import Slab``. Historical root aliases remain
-available through their documented compatibility windows.
+no heavy dependencies (matplotlib / cupy / the MC pipeline). Use the curated
+root for primary simulation objects and canonical domain namespaces for
+specialized types, e.g. ``pyrite.beams.TransverseSpot`` and
+``pyrite.geometry.Slab``. Canonical namespaces are imported lazily.
 
 See the README for the scientific overview, ``docs/api.md`` for the supported
 surface, and ``AGENTS.md`` for repository working conventions.
@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, Any
 from ._env import env_value
 from .paths import data_dir
 
-__version__ = "0.21.0"
+__version__ = "0.22.0"
 
 # Packaged data (catalog/, cifs/,
 # eaglexo_qe.csv, and the other entries ADR-0014 classifies as in-wheel).
@@ -40,7 +40,7 @@ if env_value("PYRITE_MC_DEBUG"):
     logger.setLevel(logging.DEBUG)
 
 if TYPE_CHECKING:
-    # Static declarations retain compatibility while recommending canonical owners.
+    # Static declarations retain the approved remaining root objects.
     from pyrite._numerics import Physics as Physics
     from pyrite._numerics_groups import ExecutionConfig as ExecutionConfig
     from pyrite._numerics_groups import KernelTuning as KernelTuning
@@ -222,26 +222,33 @@ if TYPE_CHECKING:
     from pyrite.results.provenance import Provenance as Provenance
     from pyrite.xsgen.install import fetch_tables as fetch_tables
 
+    # Domain module handles are part of the dot-access API, e.g. pr.beams.Beam.
+    # These imports are static-only; normal `import pyrite` remains light.
+    from . import beams as beams
+    from . import campaign as campaign
+    from . import config as config
+    from . import datasets as datasets
+    from . import detectors as detectors
+    from . import execution as execution
+    from . import experimental as experimental
+    from . import geometry as geometry
+    from . import materials as materials
+    from . import observations as observations
+    from . import optimization as optimization
+    from . import plots as plots
+    from . import quantum as quantum
+    from . import radiation as radiation
+    from . import results as results
+    from . import storage as storage
+    from . import transport as transport
+    from . import units as units
+
 _PUBLIC_OBJECTS = {
     "Analysis": ("pyrite.campaign.model", "Analysis"),
-    "Acquisition": ("pyrite.instrument", "Acquisition"),
-    "NativeAcquisition": ("pyrite.instrument", "NativeAcquisition"),
     "AcquisitionBatch": ("pyrite.instrument", "AcquisitionBatch"),
     "Beam": ("pyrite.campaign.beam", "Beam"),
-    "BunchLength": ("pyrite.campaign.beam", "BunchLength"),
-    "GdfSource": ("pyrite.campaign.beam", "GdfSource"),
-    "Offsets": ("pyrite.campaign.beam", "Offsets"),
-    "PointBunch": ("pyrite.campaign.beam", "PointBunch"),
-    "PointSpot": ("pyrite.campaign.beam", "PointSpot"),
-    "Spot": ("pyrite.campaign.beam", "Spot"),
-    "TransverseSpot": ("pyrite.campaign.beam", "TransverseSpot"),
-    "BunchFrontTilt": ("pyrite.campaign.beam", "BunchFrontTilt"),
-    "BlazedGrooves": ("pyrite.campaign.geometry", "BlazedGrooves"),
-    "CrystalCut": ("pyrite.campaign.geometry", "CrystalCut"),
     "Physics": ("pyrite._numerics", "Physics"),
     "PhotonTransport": ("pyrite._photon_config", "PhotonTransport"),
-    "TransportNumerics": ("pyrite._numerics_groups", "TransportNumerics"),
-    "RadiationNumerics": ("pyrite._numerics_groups", "RadiationNumerics"),
     "ExecutionConfig": ("pyrite._numerics_groups", "ExecutionConfig"),
     "KernelTuning": ("pyrite._numerics_groups", "KernelTuning"),
     "QuantumRegion": ("pyrite.quantum", "QuantumRegion"),
@@ -249,60 +256,58 @@ _PUBLIC_OBJECTS = {
     "QuantumNumerics": ("pyrite.quantum", "QuantumNumerics"),
     "QuantumSetup": ("pyrite.quantum", "QuantumSetup"),
     "TransverseStateSpec": ("pyrite.quantum_state", "TransverseStateSpec"),
-    "CxrReflections": ("pyrite._numerics", "CxrReflections"),
     "CxrSpectra": ("pyrite.results.model", "CxrSpectra"),
-    "AngularAcceptance": ("pyrite.detectors", "AngularAcceptance"),
-    "SensorAcceptance": ("pyrite.detectors", "SensorAcceptance"),
     "Detector": ("pyrite.detectors", "Detector"),
-    "EnergyBins": ("pyrite.detectors", "EnergyBins"),
-    "Footprint": ("pyrite.campaign.geometry", "Footprint"),
-    "Filter": ("pyrite.instrument", "Filter"),
-    "FilterPlate": ("pyrite.instrument", "FilterPlate"),
-    "IdealPhotonCounter": ("pyrite.detectors", "IdealPhotonCounter"),
-    "Layer": ("pyrite.campaign.geometry", "Layer"),
     "Numerics": ("pyrite.campaign.model", "Numerics"),
-    "Precision": ("pyrite._precision", "Precision"),
-    "FixedSampling": ("pyrite._sampling", "FixedSampling"),
-    "AdaptiveSampling": ("pyrite._sampling", "AdaptiveSampling"),
-    "PixelGrid": ("pyrite.instrument", "PixelGrid"),
-    "PixelScorer": ("pyrite.instrument", "PixelScorer"),
-    "PlanarDetector": ("pyrite.instrument", "PlanarDetector"),
-    "PlanarPose": ("pyrite.instrument", "PlanarPose"),
     "PixelMetadata": ("pyrite.results.model", "PixelMetadata"),
     "PixelRayMap": ("pyrite.results.model", "PixelRayMap"),
     "Provenance": ("pyrite.results.provenance", "Provenance"),
-    "RectangularBody": ("pyrite.bodies", "RectangularBody"),
     "Result": ("pyrite.results.model", "Result"),
-    "ResolvedObservation": ("pyrite.instrument", "ResolvedObservation"),
     "Scene": ("pyrite.campaign.model", "Scene"),
-    "Slab": ("pyrite.campaign.geometry", "Slab"),
-    "Stack": ("pyrite.campaign.geometry", "Stack"),
     "SpatialResult": ("pyrite.results.model", "SpatialResult"),
     "SpectralDensity": ("pyrite.results.model", "SpectralDensity"),
     "SpectralFactors": ("pyrite.results.model", "SpectralFactors"),
     "Sweep": ("pyrite.campaign.model", "Sweep"),
-    "SubstanceRef": ("pyrite.bodies", "SubstanceRef"),
     "Target": ("pyrite.campaign.target", "Target"),
     "fetch_tables": ("pyrite.xsgen.install", "fetch_tables"),
-    "load_numerics": ("pyrite._config_presets", "load_numerics"),
-    "load_physics": ("pyrite._config_presets", "load_physics"),
     "photon_energies": ("pyrite.materials.emission", "photon_energies"),
     "simulate": ("pyrite.api", "simulate"),
-    "directional_source": ("pyrite.directional", "directional_source"),
-    "directional_sources": ("pyrite.directional", "directional_sources"),
     "DirectionalSpectrum": ("pyrite.results.directional", "DirectionalSpectrum"),
 }
 
+# Public domain *modules* are separate from the curated root object API.
+# Listing a module here does not restore any removed root class aliases.
+# Keep these lazy to preserve fast, low-dependency `import pyrite`.
+_PUBLIC_MODULES = frozenset(
+    {
+        "beams",
+        "campaign",
+        "config",
+        "datasets",
+        "detectors",
+        "execution",
+        "experimental",
+        "geometry",
+        "materials",
+        "observations",
+        "optimization",
+        "plots",
+        "quantum",
+        "radiation",
+        "results",
+        "storage",
+        "transport",
+        "units",
+    }
+)
+
 
 def __getattr__(name: str) -> Any:
-    """Resolve the public simulation surface lazily."""
-    # import_module keeps these resolutions dynamic: a static ``from ... import``
-    # here would make every ``import pyrite`` depend on the whole surface for the
-    # import-linter layer contracts.
+    """Resolve curated root objects and approved submodules lazily."""
     from importlib import import_module
 
-    if name == "states":
-        module = import_module("pyrite.states")
+    if name == "states" or name in _PUBLIC_MODULES:
+        module = import_module(f"{__name__}.{name}")
         globals()[name] = module
         return module
 
@@ -311,25 +316,17 @@ def __getattr__(name: str) -> Any:
     except KeyError as exc:
         raise AttributeError(name) from exc
 
-    from ._api_deprecations import ROOT_API_REPLACEMENTS, warn_api
-
-    spelling = f"pyrite.{name}"
-    if spelling in ROOT_API_REPLACEMENTS:
-        # Do not cache compatibility aliases: every access must reach the warning
-        # hook, including after callers change their warning filters.
-        warn_api(spelling)
-        return getattr(import_module(module_name), attribute)
-
     value = getattr(import_module(module_name), attribute)
     globals()[name] = value
     return value
 
 
+# __all__ stays unchanged: star imports retain the curated 0.22.0 root object
+# surface. Domain-module dot access does not reintroduce deprecated aliases.
 __all__ = ["DATA_DIR", "__version__", "states", *_PUBLIC_OBJECTS]
 
 
-# Forward-looking domain contract. __all__ also preserves historical star imports
-# throughout the support window; dir() lists both without resolving any object.
+# Forward-looking domain contract for the curated root object surface.
 _ROOT_API = (
     "Beam",
     "Target",
@@ -345,5 +342,5 @@ _ROOT_API = (
 
 
 def __dir__() -> list[str]:
-    """Discover retained and compatibility exports without importing their owners."""
-    return sorted(set(globals()) | set(__all__))
+    """Discover root objects and public domain namespaces without importing them."""
+    return sorted(set(globals()) | set(__all__) | _PUBLIC_MODULES)

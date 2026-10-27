@@ -139,9 +139,11 @@ def test_public_simulate_returns_separate_aperture_after_one_primary_pass(
     monkeypatch.setattr(case_tables, "case_table_markers", lambda case: {"bremslib:Si": "0" * 64})
     monkeypatch.setattr(photon, "case_table_markers", case_tables.case_table_markers)
     scene = pr.Scene(
-        pr.Beam(energy_keV=40.0, transverse=pr.PointSpot(), longitudinal=pr.PointBunch()),
-        pr.Slab("silicon", thickness_ang=100.0, tilt_deg=5.0, footprint=None),
-        pr.PlanarDetector(pr.PlanarPose((0, 0, 10)), size_mm=(1.0, 1.0)),
+        pr.Beam(
+            energy_keV=40.0, transverse=pr.beams.PointSpot(), longitudinal=pr.beams.PointBunch()
+        ),
+        pr.geometry.Slab("silicon", thickness_ang=100.0, tilt_deg=5.0, footprint=None),
+        pr.detectors.PlanarDetector(pr.detectors.PlanarPose((0, 0, 10)), size_mm=(1.0, 1.0)),
         physics=pr.Physics(
             elastic_model="mott",
             inelastic_model="continuous",
@@ -153,7 +155,7 @@ def test_public_simulate_returns_separate_aperture_after_one_primary_pass(
         numerics=pr.Numerics(
             cxr_trials=4,
             brem_trials=3,
-            energy_bins=pr.EnergyBins(
+            energy_bins=pr.detectors.EnergyBins(
                 cxr=np.array([1500.0, 2000.0]),
                 brem=np.array([5000.0, 10000.0]),
             ),

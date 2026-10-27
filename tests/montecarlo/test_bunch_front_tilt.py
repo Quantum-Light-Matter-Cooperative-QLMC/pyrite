@@ -6,7 +6,7 @@ Validation: linear-bunch-front-tilt, transverse-bunch-form-factor
 import numpy as np
 import pytest
 
-from pyrite import BunchFrontTilt
+from pyrite.beams import BunchFrontTilt
 from pyrite.materials.crystal import HBARC_EV_ANG, beta_from_Ee
 from pyrite.montecarlo.geometry import project_beam_entry, sample_to_lab_R
 from pyrite.montecarlo.spectrum.coherent_transverse import (

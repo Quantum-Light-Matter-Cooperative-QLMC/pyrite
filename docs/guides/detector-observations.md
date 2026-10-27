@@ -7,6 +7,7 @@ geometry, readout response and exposure without rerunning transport.
 Install `pyrite-mc[plots]` and [fetch the reference tables](getting-started.md#install-and-fetch-reference-data).
 Download {download}`the complete runnable script <../examples/detector_observations.py>`:
 
+<!-- verify: skip (external shell tools or downloadable Python example) -->
 ```bash
 PYRITE_MC_BACKEND=cpu python detector_observations.py
 ```

@@ -8,6 +8,7 @@ This small CPU example uses 32,768 line-scoring and 128 continuum-scoring electr
 first use also compiles CPU kernels. Download {download}`the complete script <../examples/python_api_workflow.py>`
 and run it in your installed environment:
 
+<!-- verify: skip (external shell tools or downloadable Python example) -->
 ```bash
 PYRITE_MC_BACKEND=cpu python python_api_workflow.py
 ```

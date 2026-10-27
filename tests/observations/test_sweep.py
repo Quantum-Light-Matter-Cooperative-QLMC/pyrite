@@ -52,18 +52,18 @@ CASES = [_case("tilt30", 30.0), _case("tilt45", 45.0)]
 
 def _observation(**acquisition) -> ResolvedObservation:
     return ResolvedObservation(
-        detector=pr.PlanarDetector(
-            pose=pr.PlanarPose.from_observation(100.0, 90.0),
-            pixels=pr.PixelGrid((4, 6), (0.5, 0.5)),
-            response=pr.IdealPhotonCounter(),
+        detector=pr.detectors.PlanarDetector(
+            pose=pr.detectors.PlanarPose.from_observation(100.0, 90.0),
+            pixels=pr.detectors.PixelGrid((4, 6), (0.5, 0.5)),
+            response=pr.detectors.IdealPhotonCounter(),
         ),
-        scorer=pr.PixelScorer((2, 2)),
+        scorer=pr.config.PixelScorer((2, 2)),
         filters=(
-            pr.FilterPlate(
-                "silicon", 0.05, (1.5, 10.0), pr.PlanarPose.from_observation(50.0, 90.0)
+            pr.geometry.FilterPlate(
+                "silicon", 0.05, (1.5, 10.0), pr.detectors.PlanarPose.from_observation(50.0, 90.0)
             ),
         ),
-        acquisition=pr.Acquisition(
+        acquisition=pr.observations.Acquisition(
             **{"exposure_s": 1.0, "measured_edges_eV": (0.0, 250.0, 500.0), **acquisition}
         ),
     )
@@ -233,7 +233,7 @@ def test_geometry_change_transports_again(tmp_path, transports) -> None:
     moved = _sweep_observation(tmp_path)
     moved = replace(
         moved,
-        observation=replace(moved.observation, scorer=pr.PixelScorer((1, 3))),
+        observation=replace(moved.observation, scorer=pr.config.PixelScorer((1, 3))),
     )
 
     complete, _ = _run(tmp_path, moved)

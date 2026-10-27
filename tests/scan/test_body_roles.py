@@ -16,28 +16,32 @@ from pyrite.materials import CATALOG, MediumSpec
 
 
 def _body(*, key="silicon", kind="crystal", thickness_mm=0.0001):
-    return pr.RectangularBody(pr.SubstanceRef(kind, key), (5.0, 5.0), thickness_mm)
+    return pr.geometry.RectangularBody(
+        pr.geometry.SubstanceRef(kind, key), (5.0, 5.0), thickness_mm
+    )
 
 
 def _scene(target=None, *, filters=()):
     return pr.Scene(
-        beam=pr.Beam(energy_keV=30.0, transverse=pr.Spot(), longitudinal=pr.PointBunch()),
+        beam=pr.Beam(
+            energy_keV=30.0, transverse=pr.beams.Spot(), longitudinal=pr.beams.PointBunch()
+        ),
         target=pr.Target(_body()) if target is None else target,
-        detector=pr.PlanarDetector(
-            pr.PlanarPose((0, 0, 100)),
-            pixels=pr.PixelGrid((4, 4), (0.5, 0.5)),
-            response=pr.IdealPhotonCounter(),
-            scorer=pr.PixelScorer((2, 2)),
+        detector=pr.detectors.PlanarDetector(
+            pr.detectors.PlanarPose((0, 0, 100)),
+            pixels=pr.detectors.PixelGrid((4, 4), (0.5, 0.5)),
+            response=pr.detectors.IdealPhotonCounter(),
+            scorer=pr.config.PixelScorer((2, 2)),
         ),
         filters=filters,
-        acquisition=pr.Acquisition(1.0, (0.0, 1000.0, 2000.0)),
+        acquisition=pr.observations.Acquisition(1.0, (0.0, 1000.0, 2000.0)),
         physics=pr.Physics(brem_source="none"),
         numerics=pr.Numerics(cxr_trials=1, brem_trials=1),
     )
 
 
 def _identity(scene):
-    resolved = pr.ResolvedObservation(
+    resolved = pr.observations.ResolvedObservation(
         scene.detector, scene.detector.scorer, scene.filter_plates, scene.acquisition
     )
     return observation_identity(
@@ -53,19 +57,21 @@ def _identity(scene):
 def test_same_silicon_description_has_independent_target_and_filter_roles():
     body = _body(thickness_mm=0.1)
     target = pr.Target(body, tilt_deg=30.2, tilt_azim_deg=10.0, mosaic=True)
-    window = pr.Filter(body, pr.PlanarPose((0, 0, 50)), name="window")
-    other = replace(window, pose=pr.PlanarPose((4, 0, 60)), name="other")
+    window = pr.geometry.Filter(body, pr.detectors.PlanarPose((0, 0, 50)), name="window")
+    other = replace(window, pose=pr.detectors.PlanarPose((4, 0, 60)), name="other")
 
     assert target.body is window.body is other.body
-    assert target.to_slab() == pr.Slab(
+    assert target.to_slab() == pr.geometry.Slab(
         "silicon",
         thickness_ang=1_000_000.0,
         tilt_deg=30.2,
         tilt_azim_deg=10.0,
-        footprint=pr.Footprint(5, 5),
+        footprint=pr.geometry.Footprint(5, 5),
         mosaic=True,
     )
-    assert window.to_plate() == pr.FilterPlate("silicon", 0.1, (5, 5), window.pose, "window")
+    assert window.to_plate() == pr.geometry.FilterPlate(
+        "silicon", 0.1, (5, 5), window.pose, "window"
+    )
     assert other.to_plate().pose != window.to_plate().pose
     assert window.pose.center_mm == (0.0, 0.0, 50.0)
     with pytest.raises(FrozenInstanceError):
@@ -74,23 +80,26 @@ def test_same_silicon_description_has_independent_target_and_filter_roles():
 
 def test_inline_body_freezes_composition_and_accepts_filters_only():
     composition = [["Al", 0.06]]
-    body = pr.RectangularBody(MediumSpec("foil", composition), [5, 5], 0.1)
+    body = pr.geometry.RectangularBody(MediumSpec("foil", composition), [5, 5], 0.1)
     composition[0][1] = 99.0
     assert body.substance.composition == (("Al", 0.06),)
     assert body.size_mm == (5.0, 5.0)
-    assert pr.Filter(body, pr.PlanarPose((0, 0, 50))).to_plate().material == body.substance
+    assert (
+        pr.geometry.Filter(body, pr.detectors.PlanarPose((0, 0, 50))).to_plate().material
+        == body.substance
+    )
     with pytest.raises(ValueError, match="crystalline SubstanceRef"):
         pr.Target(body)
 
 
 def test_inline_body_rejects_mutable_non_scalar_density_values():
     with pytest.raises(TypeError, match="scalar densities"):
-        pr.RectangularBody(MediumSpec("foil", (("Al", np.array([0.06])),)), (5, 5), 0.1)
+        pr.geometry.RectangularBody(MediumSpec("foil", (("Al", np.array([0.06])),)), (5, 5), 0.1)
 
 
 def test_adapted_scene_retains_wrappers_and_lowers_to_identical_case_and_snapshot():
     target = pr.Target(_body(), tilt_deg=30.2)
-    window = pr.Filter(_body(), pr.PlanarPose((0, 0, 50)), name="window")
+    window = pr.geometry.Filter(_body(), pr.detectors.PlanarPose((0, 0, 50)), name="window")
     scene = _scene(target, filters=(window,))
     legacy = replace(scene, target=target.to_slab(), filters=(window.to_plate(),))
 
@@ -128,9 +137,9 @@ def test_body_sweep_expands_before_legacy_lowering_and_preserves_order_and_seeds
 
 
 def test_filter_only_body_edits_preserve_source_and_change_observation_identity():
-    window = pr.Filter(_body(), pr.PlanarPose((0, 0, 50)), name="window")
+    window = pr.geometry.Filter(_body(), pr.detectors.PlanarPose((0, 0, 50)), name="window")
     scene = _scene(filters=(window,))
-    moved = replace(scene, filters=(replace(window, pose=pr.PlanarPose((1, 0, 50))),))
+    moved = replace(scene, filters=(replace(window, pose=pr.detectors.PlanarPose((1, 0, 50))),))
     thicker = replace(
         scene, filters=(replace(window, body=replace(window.body, thickness_mm=0.1)),)
     )
@@ -142,7 +151,7 @@ def test_filter_only_body_edits_preserve_source_and_change_observation_identity(
 
 
 def test_filter_sweep_paths_remain_on_shared_body_and_validate_each_expanded_pose():
-    window = pr.Filter(_body(), pr.PlanarPose((0, 0, 50)))
+    window = pr.geometry.Filter(_body(), pr.detectors.PlanarPose((0, 0, 50)))
     sweep = pr.Sweep(_scene(filters=(window,)), {"filters[0].body.thickness_mm": [0.0001, 0.1]})
     assert [s.filter_plates[0].thickness_mm for _, s in sweep.expand()] == [0.0001, 0.1]
     with pytest.raises(ValueError, match="full FilterPlate volume"):
@@ -153,8 +162,8 @@ def test_explicit_filter_namespace_and_catalog_cannot_be_reinterpreted():
     custom = replace(
         CATALOG, media=MappingProxyType({"silicon": MediumSpec("silicon", (("Al", 0.06),))})
     )
-    crystal_filter = pr.Filter(_body(), pr.PlanarPose((0, 0, 50)))
-    medium_filter = pr.Filter(_body(kind="medium"), crystal_filter.pose)
+    crystal_filter = pr.geometry.Filter(_body(), pr.detectors.PlanarPose((0, 0, 50)))
+    medium_filter = pr.geometry.Filter(_body(kind="medium"), crystal_filter.pose)
     assert (
         crystal_filter.to_plate(catalog=custom).material.composition
         == CATALOG.crystals["silicon"].composition
@@ -170,8 +179,8 @@ def test_selected_catalog_collision_preserves_explicit_crystal_composition(monke
         CATALOG, media=MappingProxyType({"silicon": MediumSpec("silicon", (("Al", 0.06),))})
     )
     monkeypatch.setattr(model, "CATALOG", custom)
-    crystal_filter = pr.Filter(_body(), pr.PlanarPose((0, 0, 50)))
-    medium_filter = pr.Filter(_body(kind="medium"), crystal_filter.pose)
+    crystal_filter = pr.geometry.Filter(_body(), pr.detectors.PlanarPose((0, 0, 50)))
+    medium_filter = pr.geometry.Filter(_body(kind="medium"), crystal_filter.pose)
     assert isinstance(crystal_filter.to_plate().material, MediumSpec)
     assert crystal_filter.to_plate().material.composition == CATALOG.crystals["silicon"].composition
     assert medium_filter.to_plate().material == "silicon"
@@ -189,7 +198,7 @@ def test_simulate_and_observation_planning_have_legacy_parity(monkeypatch, with_
         }
 
     monkeypatch.setattr(api, "run_case_directions", directional)
-    window = pr.Filter(_body(), pr.PlanarPose((0, 0, 50)))
+    window = pr.geometry.Filter(_body(), pr.detectors.PlanarPose((0, 0, 50)))
     scene = _scene(filters=(window,))
     if not with_acquisition:
         scene = replace(scene, acquisition=None)
@@ -237,7 +246,7 @@ def test_body_rejects_non_scalar_or_nonphysical_thickness(thickness):
 )
 def test_filter_rejects_unsupported_interaction_policies(policy):
     with pytest.raises(ValueError, match="primary-attenuation-only"):
-        pr.Filter(_body(), pr.PlanarPose((0, 0, 50)), interaction=policy)
+        pr.geometry.Filter(_body(), pr.detectors.PlanarPose((0, 0, 50)), interaction=policy)
 
 
 def test_unsupported_target_material_cut_pose_and_shapes_are_rejected():
@@ -246,8 +255,10 @@ def test_unsupported_target_material_cut_pose_and_shapes_are_rejected():
     with pytest.raises(ValueError, match="lattice_cut"):
         pr.Target(_body(), lattice_cut="custom")
     with pytest.raises(TypeError, match="pose"):
-        pr.Target(_body(), pose=pr.PlanarPose((0, 0, 50)))
+        pr.Target(_body(), pose=pr.detectors.PlanarPose((0, 0, 50)))
     with pytest.raises(TypeError, match="RectangularBody"):
-        pr.Filter(pr.Slab("silicon", footprint=None), pr.PlanarPose((0, 0, 50)))
+        pr.geometry.Filter(
+            pr.geometry.Slab("silicon", footprint=None), pr.detectors.PlanarPose((0, 0, 50))
+        )
     with pytest.raises(TypeError, match="scalar real angle"):
         pr.Target(_body(), tilt_deg=[20, 30])

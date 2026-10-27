@@ -32,20 +32,20 @@ def make_result(waist_ang: float, args: argparse.Namespace) -> pr.Result:
     state = pr.TransverseStateSpec.recipe("gaussian", dimension=1, waist_ang=waist_ang)
     beam = pr.Beam(
         energy_keV=args.energy_keV,
-        transverse=pr.Spot(),
-        longitudinal=pr.PointBunch(),
+        transverse=pr.beams.Spot(),
+        longitudinal=pr.beams.PointBunch(),
         state=state,
     )
-    slab = pr.Slab(
+    slab = pr.geometry.Slab(
         "silicon",
         thickness_ang=args.thickness_ang,
         tilt_deg=3.0,
         tilt_azim_deg=45.0,
-        footprint=pr.Footprint(5.0, 5.0),
+        footprint=pr.geometry.Footprint(5.0, 5.0),
     )
     detector = pr.Detector(
         0.0,
-        acceptance=pr.SensorAcceptance(distance_mm=1000.0, width_mm=3.0, height_mm=3.0),
+        acceptance=pr.detectors.SensorAcceptance(distance_mm=1000.0, width_mm=3.0, height_mm=3.0),
     )
     physics = pr.Physics(
         channeling_model="planar",
@@ -59,7 +59,7 @@ def make_result(waist_ang: float, args: argparse.Namespace) -> pr.Result:
         channeling_basis_size=args.basis_size,
         channeling_bloch_cells=args.bloch_cells,
         channeling_dz_ang=args.dz_ang,
-        energy_bins=pr.EnergyBins(
+        energy_bins=pr.detectors.EnergyBins(
             cxr=np.arange(1000.0, 24000.0 + args.line_step_eV / 2, args.line_step_eV),
             brem=np.geomspace(1000.0, args.energy_keV * 1000.0, 80),
         ),

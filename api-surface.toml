@@ -6,72 +6,33 @@ schema_version = 1
 canonical_facades = ["beams", "geometry", "config", "detectors", "observations", "transport", "radiation"]
 
 [root_exports]
-Acquisition = { target = "pyrite.instrument:Acquisition", status = "advanced-stable", domain = "observations", root_role = "specialized" }
 AcquisitionBatch = { target = "pyrite.instrument:AcquisitionBatch", status = "advanced-stable", domain = "results", root_role = "specialized" }
-AdaptiveSampling = { target = "pyrite._sampling:AdaptiveSampling", status = "advanced-stable", domain = "config", root_role = "specialized" }
 Analysis = { target = "pyrite.campaign.model:Analysis", status = "advanced-stable", domain = "results", root_role = "specialized" }
-AngularAcceptance = { target = "pyrite.detectors:AngularAcceptance", status = "advanced-stable", domain = "detectors", root_role = "specialized" }
 Beam = { target = "pyrite.campaign.beam:Beam", status = "stable", domain = "beams", root_role = "core" }
-BlazedGrooves = { target = "pyrite.campaign.geometry:BlazedGrooves", status = "advanced-stable", domain = "geometry", root_role = "specialized" }
-BunchFrontTilt = { target = "pyrite.campaign.beam:BunchFrontTilt", status = "advanced-stable", domain = "beams", root_role = "specialized" }
-BunchLength = { target = "pyrite.campaign.beam:BunchLength", status = "advanced-stable", domain = "beams", root_role = "specialized" }
-CrystalCut = { target = "pyrite.campaign.geometry:CrystalCut", status = "advanced-stable", domain = "geometry", root_role = "specialized" }
-CxrReflections = { target = "pyrite._numerics:CxrReflections", status = "advanced-stable", domain = "config", root_role = "specialized" }
 CxrSpectra = { target = "pyrite.results.model:CxrSpectra", status = "advanced-stable", domain = "results", root_role = "specialized" }
 Detector = { target = "pyrite.detectors:Detector", status = "stable", domain = "detectors", root_role = "core" }
 DirectionalSpectrum = { target = "pyrite.results.directional:DirectionalSpectrum", status = "experimental", domain = "results", root_role = "experimental" }
-EnergyBins = { target = "pyrite.detectors:EnergyBins", status = "advanced-stable", domain = "detectors", root_role = "specialized" }
 ExecutionConfig = { target = "pyrite._numerics_groups:ExecutionConfig", status = "advanced-stable", domain = "config", root_role = "specialized" }
 KernelTuning = { target = "pyrite._numerics_groups:KernelTuning", status = "advanced-stable", domain = "config", root_role = "specialized" }
-Filter = { target = "pyrite.instrument:Filter", status = "advanced-stable", domain = "geometry", root_role = "specialized" }
-FilterPlate = { target = "pyrite.instrument:FilterPlate", status = "advanced-stable", domain = "geometry", root_role = "specialized" }
-FixedSampling = { target = "pyrite._sampling:FixedSampling", status = "advanced-stable", domain = "config", root_role = "specialized" }
-Footprint = { target = "pyrite.campaign.geometry:Footprint", status = "advanced-stable", domain = "geometry", root_role = "specialized" }
-GdfSource = { target = "pyrite.campaign.beam:GdfSource", status = "advanced-stable", domain = "beams", root_role = "specialized" }
-IdealPhotonCounter = { target = "pyrite.detectors:IdealPhotonCounter", status = "advanced-stable", domain = "detectors", root_role = "specialized" }
-Layer = { target = "pyrite.campaign.geometry:Layer", status = "advanced-stable", domain = "geometry", root_role = "specialized" }
-NativeAcquisition = { target = "pyrite.instrument:NativeAcquisition", status = "advanced-stable", domain = "observations", root_role = "specialized" }
 Numerics = { target = "pyrite.campaign.model:Numerics", status = "stable", domain = "config", root_role = "core" }
-Offsets = { target = "pyrite.campaign.beam:Offsets", status = "advanced-stable", domain = "beams", root_role = "specialized" }
 PhotonTransport = { target = "pyrite._photon_config:PhotonTransport", status = "experimental", domain = "config", root_role = "experimental" }
 Physics = { target = "pyrite._numerics:Physics", status = "stable", domain = "config", root_role = "core" }
-PixelGrid = { target = "pyrite.instrument:PixelGrid", status = "advanced-stable", domain = "detectors", root_role = "specialized" }
 PixelMetadata = { target = "pyrite.results.model:PixelMetadata", status = "advanced-stable", domain = "results", root_role = "specialized" }
 PixelRayMap = { target = "pyrite.results.model:PixelRayMap", status = "advanced-stable", domain = "results", root_role = "specialized" }
-PixelScorer = { target = "pyrite.instrument:PixelScorer", status = "advanced-stable", domain = "config", root_role = "specialized" }
-PlanarDetector = { target = "pyrite.instrument:PlanarDetector", status = "advanced-stable", domain = "detectors", root_role = "specialized" }
-PlanarPose = { target = "pyrite.instrument:PlanarPose", status = "advanced-stable", domain = "detectors", root_role = "specialized" }
-PointBunch = { target = "pyrite.campaign.beam:PointBunch", status = "advanced-stable", domain = "beams", root_role = "specialized" }
-PointSpot = { target = "pyrite.campaign.beam:PointSpot", status = "advanced-stable", domain = "beams", root_role = "specialized" }
-Precision = { target = "pyrite._precision:Precision", status = "advanced-stable", domain = "config", root_role = "specialized" }
 Provenance = { target = "pyrite.results.provenance:Provenance", status = "advanced-stable", domain = "results", root_role = "specialized" }
 QuantumDynamics = { target = "pyrite.quantum:QuantumDynamics", status = "advanced-stable", domain = "quantum", root_role = "specialized" }
 QuantumNumerics = { target = "pyrite.quantum:QuantumNumerics", status = "advanced-stable", domain = "quantum", root_role = "specialized" }
 QuantumRegion = { target = "pyrite.quantum:QuantumRegion", status = "advanced-stable", domain = "quantum", root_role = "specialized" }
 QuantumSetup = { target = "pyrite.quantum:QuantumSetup", status = "advanced-stable", domain = "quantum", root_role = "specialized" }
-RadiationNumerics = { target = "pyrite._numerics_groups:RadiationNumerics", status = "advanced-stable", domain = "config", root_role = "specialized" }
-RectangularBody = { target = "pyrite.bodies:RectangularBody", status = "advanced-stable", domain = "geometry", root_role = "specialized" }
-ResolvedObservation = { target = "pyrite.instrument:ResolvedObservation", status = "advanced-stable", domain = "observations", root_role = "specialized" }
 Result = { target = "pyrite.results.model:Result", status = "stable", domain = "results", root_role = "core" }
 Scene = { target = "pyrite.campaign.model:Scene", status = "stable", domain = "campaign", root_role = "core" }
-SensorAcceptance = { target = "pyrite.detectors:SensorAcceptance", status = "advanced-stable", domain = "detectors", root_role = "specialized" }
-Slab = { target = "pyrite.campaign.geometry:Slab", status = "advanced-stable", domain = "geometry", root_role = "specialized" }
 SpatialResult = { target = "pyrite.results.model:SpatialResult", status = "advanced-stable", domain = "results", root_role = "specialized" }
 SpectralDensity = { target = "pyrite.results.model:SpectralDensity", status = "advanced-stable", domain = "results", root_role = "specialized" }
 SpectralFactors = { target = "pyrite.results.model:SpectralFactors", status = "advanced-stable", domain = "results", root_role = "specialized" }
-Spot = { target = "pyrite.campaign.beam:Spot", status = "advanced-stable", domain = "beams", root_role = "specialized" }
-Stack = { target = "pyrite.campaign.geometry:Stack", status = "advanced-stable", domain = "geometry", root_role = "specialized" }
-SubstanceRef = { target = "pyrite.bodies:SubstanceRef", status = "advanced-stable", domain = "geometry", root_role = "specialized" }
 Sweep = { target = "pyrite.campaign.model:Sweep", status = "stable", domain = "campaign", root_role = "core" }
 Target = { target = "pyrite.campaign.target:Target", status = "stable", domain = "geometry", root_role = "core" }
-TransportNumerics = { target = "pyrite._numerics_groups:TransportNumerics", status = "advanced-stable", domain = "config", root_role = "specialized" }
-TransverseSpot = { target = "pyrite.campaign.beam:TransverseSpot", status = "advanced-stable", domain = "beams", root_role = "specialized" }
 TransverseStateSpec = { target = "pyrite.quantum_state:TransverseStateSpec", status = "advanced-stable", domain = "quantum", root_role = "specialized" }
-directional_source = { target = "pyrite.directional:directional_source", status = "experimental", domain = "radiation", root_role = "experimental" }
-directional_sources = { target = "pyrite.directional:directional_sources", status = "experimental", domain = "radiation", root_role = "experimental" }
 fetch_tables = { target = "pyrite.xsgen.install:fetch_tables", status = "advanced-stable", domain = "datasets", root_role = "specialized" }
-load_numerics = { target = "pyrite._config_presets:load_numerics", status = "advanced-stable", domain = "config", root_role = "specialized" }
-load_physics = { target = "pyrite._config_presets:load_physics", status = "advanced-stable", domain = "config", root_role = "specialized" }
 photon_energies = { target = "pyrite.materials.emission:photon_energies", status = "advanced-stable", domain = "radiation", root_role = "specialized" }
 # simulate composes independent models, observations and executor= scheduling;
 # no public request-wrapper export or change to serialized Case identity.
@@ -98,9 +59,21 @@ build_crystal = { target = "pyrite.materials.authoring:build_crystal", status = 
 save_material = { target = "pyrite.materials.authoring:save_material", status = "advanced-stable" }
 
 [package_exports."pyrite.geometry"]
+BlazedGrooves = { target = "pyrite.campaign.geometry:BlazedGrooves", status = "advanced-stable" }
+CrystalCut = { target = "pyrite.campaign.geometry:CrystalCut", status = "advanced-stable" }
+Filter = { target = "pyrite.instrument:Filter", status = "advanced-stable" }
 FilterPlate = { target = "pyrite.instrument:FilterPlate", status = "advanced-stable" }
+Footprint = { target = "pyrite.campaign.geometry:Footprint", status = "advanced-stable" }
+Layer = { target = "pyrite.campaign.geometry:Layer", status = "advanced-stable" }
+RectangularBody = { target = "pyrite.bodies:RectangularBody", status = "advanced-stable" }
+Slab = { target = "pyrite.campaign.geometry:Slab", status = "advanced-stable" }
+Stack = { target = "pyrite.campaign.geometry:Stack", status = "advanced-stable" }
+SubstanceRef = { target = "pyrite.bodies:SubstanceRef", status = "advanced-stable" }
 
 [package_exports."pyrite.observations"]
+Acquisition = { target = "pyrite.instrument:Acquisition", status = "advanced-stable" }
+NativeAcquisition = { target = "pyrite.instrument:NativeAcquisition", status = "advanced-stable" }
+ResolvedObservation = { target = "pyrite.instrument:ResolvedObservation", status = "advanced-stable" }
 Observation = { target = "pyrite.observations.spec:Observation", status = "advanced-stable" }
 ObservationPlan = { target = "pyrite.observations.plan:ObservationPlan", status = "advanced-stable" }
 PixelSampling = { target = "pyrite.observations.plan:PixelSampling", status = "advanced-stable" }
@@ -279,18 +252,33 @@ AxialDiagnosticResult = { target = "pyrite.montecarlo.channeling.axial_diagnosti
 axial_diagnostic = { target = "pyrite.montecarlo.channeling.axial_diagnostic:axial_diagnostic", status = "experimental" }
 
 [package_exports."pyrite.config"]
+AdaptiveSampling = { target = "pyrite._sampling:AdaptiveSampling", status = "advanced-stable" }
+CxrReflections = { target = "pyrite._numerics:CxrReflections", status = "advanced-stable" }
+FixedSampling = { target = "pyrite._sampling:FixedSampling", status = "advanced-stable" }
+PixelScorer = { target = "pyrite.instrument:PixelScorer", status = "advanced-stable" }
+Precision = { target = "pyrite._precision:Precision", status = "advanced-stable" }
+RadiationNumerics = { target = "pyrite._numerics_groups:RadiationNumerics", status = "advanced-stable" }
+TransportNumerics = { target = "pyrite._numerics_groups:TransportNumerics", status = "advanced-stable" }
+load_numerics = { target = "pyrite._config_presets:load_numerics", status = "advanced-stable" }
+load_physics = { target = "pyrite._config_presets:load_physics", status = "advanced-stable" }
 AngularSampling = { target = "pyrite.config:AngularSampling", status = "advanced-stable" }
 KernelTuning = { target = "pyrite._numerics_groups:KernelTuning", status = "advanced-stable" }
 Timepix3ResponseNumerics = { target = "pyrite.config:Timepix3ResponseNumerics", status = "advanced-stable" }
 
 [package_exports."pyrite.detectors"]
+AngularAcceptance = { target = "pyrite.detectors:AngularAcceptance", status = "advanced-stable" }
+EnergyBins = { target = "pyrite.detectors:EnergyBins", status = "advanced-stable" }
+IdealPhotonCounter = { target = "pyrite.detectors:IdealPhotonCounter", status = "advanced-stable" }
+PixelGrid = { target = "pyrite.instrument:PixelGrid", status = "advanced-stable" }
+PlanarDetector = { target = "pyrite.instrument:PlanarDetector", status = "advanced-stable" }
+PlanarPose = { target = "pyrite.instrument:PlanarPose", status = "advanced-stable" }
+SensorAcceptance = { target = "pyrite.detectors:SensorAcceptance", status = "advanced-stable" }
 FilterPlate = { target = "pyrite.instrument:FilterPlate", status = "advanced-stable" }
 AngularDetector = { target = "pyrite.detectors:AngularDetector", status = "advanced-stable" }
 NativeBinnedResponse = { target = "pyrite.detectors.spec:NativeBinnedResponse", status = "advanced-stable" }
 Timepix3Response = { target = "pyrite.detectors:Timepix3Response", status = "advanced-stable" }
 EagleXOResponse = { target = "pyrite.detectors:EagleXOResponse", status = "advanced-stable" }
 Detector = { target = "pyrite.detectors:Detector", status = "stable" }
-EnergyBins = { target = "pyrite.detectors:EnergyBins", status = "advanced-stable" }
 NativeSpectrum = { target = "pyrite.detectors.spec:NativeSpectrum", status = "advanced-stable" }
 Timepix3 = { target = "pyrite.detectors.spec:Timepix3", status = "advanced-stable" }
 EagleXO = { target = "pyrite.detectors.spec:EagleXO", status = "advanced-stable" }
@@ -315,72 +303,33 @@ radiation_band_metrics = { target = "pyrite.results.radiation:radiation_band_met
 
 # Complete root migration classification; schedules live only in _api_deprecations.py.
 [root_policy]
-Acquisition = { classification = "deprecated", canonical = "pyrite.observations:Acquisition", reason = "Use the established canonical domain import." }
 AcquisitionBatch = { classification = "deferred", canonical = "pyrite.results:AcquisitionBatch", reason = "Await formal canonical facade approval in #707; preserve both supported results and observations imports." }
-AdaptiveSampling = { classification = "deprecated", canonical = "pyrite.config:AdaptiveSampling", reason = "Use the established canonical domain import." }
 Analysis = { classification = "deferred", canonical = "pyrite.campaign.model:Analysis", reason = "Keep the existing import pending canonical ownership review in #707." }
-AngularAcceptance = { classification = "deprecated", canonical = "pyrite.detectors:AngularAcceptance", reason = "Use the established canonical domain import." }
 Beam = { classification = "retained", canonical = "pyrite:Beam", reason = "Foundational simulation entry point." }
-BlazedGrooves = { classification = "deprecated", canonical = "pyrite.geometry:BlazedGrooves", reason = "Use the established canonical domain import." }
-BunchFrontTilt = { classification = "deprecated", canonical = "pyrite.beams:BunchFrontTilt", reason = "Use the established canonical domain import." }
-BunchLength = { classification = "deprecated", canonical = "pyrite.beams:BunchLength", reason = "Use the established canonical domain import." }
-CrystalCut = { classification = "deprecated", canonical = "pyrite.geometry:CrystalCut", reason = "Use the established canonical domain import." }
-CxrReflections = { classification = "deprecated", canonical = "pyrite.config:CxrReflections", reason = "Use the established canonical domain import." }
 CxrSpectra = { classification = "deferred", canonical = "pyrite.results.model:CxrSpectra", reason = "Keep the existing import pending canonical ownership review in #707." }
 Detector = { classification = "retained", canonical = "pyrite:Detector", reason = "Foundational simulation entry point." }
 DirectionalSpectrum = { classification = "deferred", canonical = "pyrite.results.directional:DirectionalSpectrum", reason = "Keep the existing import pending canonical ownership review in #707." }
-EnergyBins = { classification = "deprecated", canonical = "pyrite.detectors:EnergyBins", reason = "Use the established canonical domain import." }
 ExecutionConfig = { classification = "deferred", canonical = "pyrite.config:ExecutionConfig", reason = "Preserve the legacy kernel-control import during the #695 composition migration; KernelTuning is its preferred identity-preserving alias." }
 KernelTuning = { classification = "deferred", canonical = "pyrite.config:KernelTuning", reason = "Preserve compatibility during the #695 composition migration; prefer the canonical namespace for local kernel controls." }
-Filter = { classification = "deprecated", canonical = "pyrite.geometry:Filter", reason = "Use the established canonical domain import." }
-FilterPlate = { classification = "deprecated", canonical = "pyrite.geometry:FilterPlate", reason = "Passive attenuating bodies belong to physical geometry." }
-FixedSampling = { classification = "deprecated", canonical = "pyrite.config:FixedSampling", reason = "Use the established canonical domain import." }
-Footprint = { classification = "deprecated", canonical = "pyrite.geometry:Footprint", reason = "Use the established canonical domain import." }
-GdfSource = { classification = "deprecated", canonical = "pyrite.beams:GdfSource", reason = "Use the established canonical domain import." }
-IdealPhotonCounter = { classification = "deprecated", canonical = "pyrite.detectors:IdealPhotonCounter", reason = "Use the established canonical domain import." }
-Layer = { classification = "deprecated", canonical = "pyrite.geometry:Layer", reason = "Use the established canonical domain import." }
-NativeAcquisition = { classification = "deprecated", canonical = "pyrite.observations:NativeAcquisition", reason = "Use the established canonical domain import." }
 Numerics = { classification = "retained", canonical = "pyrite:Numerics", reason = "Foundational simulation entry point." }
-Offsets = { classification = "deprecated", canonical = "pyrite.beams:Offsets", reason = "Use the established canonical domain import." }
 PhotonTransport = { classification = "deferred", canonical = "pyrite.config:PhotonTransport", reason = "Keep the experimental root path pending lifecycle review in #706." }
 Physics = { classification = "retained", canonical = "pyrite:Physics", reason = "Foundational simulation entry point." }
-PixelGrid = { classification = "deprecated", canonical = "pyrite.detectors:PixelGrid", reason = "Use the established canonical domain import." }
 PixelMetadata = { classification = "deferred", canonical = "pyrite.results.model:PixelMetadata", reason = "Keep the existing import pending canonical ownership review in #707." }
 PixelRayMap = { classification = "deferred", canonical = "pyrite.results.model:PixelRayMap", reason = "Keep the existing import pending canonical ownership review in #707." }
-PixelScorer = { classification = "deprecated", canonical = "pyrite.config:PixelScorer", reason = "Use pyrite.config.AngularSampling for new configurations; the same-name import remains the compatible root replacement." }
-PlanarDetector = { classification = "deprecated", canonical = "pyrite.detectors:PlanarDetector", reason = "Use the established canonical domain import." }
-PlanarPose = { classification = "deprecated", canonical = "pyrite.detectors:PlanarPose", reason = "Use the established canonical domain import." }
-PointBunch = { classification = "deprecated", canonical = "pyrite.beams:PointBunch", reason = "Use the established canonical domain import." }
-PointSpot = { classification = "deprecated", canonical = "pyrite.beams:PointSpot", reason = "Use the established canonical domain import." }
-Precision = { classification = "deprecated", canonical = "pyrite.config:Precision", reason = "Use the established canonical domain import." }
 Provenance = { classification = "deferred", canonical = "pyrite.results.provenance:Provenance", reason = "Keep the existing import pending canonical ownership review in #707." }
 QuantumDynamics = { classification = "deferred", canonical = "pyrite.quantum:QuantumDynamics", reason = "Canonical quantum ownership is resolved in #704; retain the root alias without warnings pending a separate migration decision." }
 QuantumNumerics = { classification = "deferred", canonical = "pyrite.quantum:QuantumNumerics", reason = "Canonical quantum ownership is resolved in #704; retain the root alias without warnings pending a separate migration decision." }
 QuantumRegion = { classification = "deferred", canonical = "pyrite.quantum:QuantumRegion", reason = "Canonical quantum ownership is resolved in #704; retain the root alias without warnings pending a separate migration decision." }
 QuantumSetup = { classification = "deferred", canonical = "pyrite.quantum:QuantumSetup", reason = "Canonical quantum ownership is resolved in #704; retain the root alias without warnings pending a separate migration decision." }
-RadiationNumerics = { classification = "deprecated", canonical = "pyrite.config:RadiationNumerics", reason = "Use the established canonical domain import." }
-RectangularBody = { classification = "deprecated", canonical = "pyrite.geometry:RectangularBody", reason = "Use the established canonical domain import." }
-ResolvedObservation = { classification = "deprecated", canonical = "pyrite.observations:ResolvedObservation", reason = "Use the established canonical domain import." }
 Result = { classification = "retained", canonical = "pyrite:Result", reason = "Foundational simulation entry point." }
 Scene = { classification = "retained", canonical = "pyrite:Scene", reason = "Foundational simulation entry point." }
-SensorAcceptance = { classification = "deprecated", canonical = "pyrite.detectors:SensorAcceptance", reason = "Use the established canonical domain import." }
-Slab = { classification = "deprecated", canonical = "pyrite.geometry:Slab", reason = "Use the established canonical domain import." }
 SpatialResult = { classification = "deferred", canonical = "pyrite.results.model:SpatialResult", reason = "Keep the existing import pending canonical ownership review in #707." }
 SpectralDensity = { classification = "deferred", canonical = "pyrite.results.model:SpectralDensity", reason = "Keep the existing import pending canonical ownership review in #707." }
 SpectralFactors = { classification = "deferred", canonical = "pyrite.results.model:SpectralFactors", reason = "Keep the existing import pending canonical ownership review in #707." }
-Spot = { classification = "deprecated", canonical = "pyrite.beams:Spot", reason = "Use the established canonical domain import." }
-Stack = { classification = "deprecated", canonical = "pyrite.geometry:Stack", reason = "Use the established canonical domain import." }
-SubstanceRef = { classification = "deprecated", canonical = "pyrite.geometry:SubstanceRef", reason = "Use the established canonical domain import." }
 Sweep = { classification = "retained", canonical = "pyrite:Sweep", reason = "Foundational simulation entry point." }
 Target = { classification = "retained", canonical = "pyrite:Target", reason = "Foundational simulation entry point." }
-TransportNumerics = { classification = "deprecated", canonical = "pyrite.config:TransportNumerics", reason = "Use the established canonical domain import." }
-TransverseSpot = { classification = "deprecated", canonical = "pyrite.beams:TransverseSpot", reason = "Use the established canonical domain import." }
 TransverseStateSpec = { classification = "deferred", canonical = "pyrite.quantum:TransverseStateSpec", reason = "Canonical quantum ownership is resolved in #704; retain the root alias without warnings pending a separate migration decision." }
-directional_source = { classification = "deprecated", canonical = "pyrite.radiation:directional_source", reason = "Use the canonical radiation import; API remains experimental." }
-directional_sources = { classification = "deprecated", canonical = "pyrite.radiation:directional_sources", reason = "Use the canonical radiation import; API remains experimental." }
 fetch_tables = { classification = "deferred", canonical = "pyrite.xsgen.install:fetch_tables", reason = "Keep the existing import pending canonical ownership review in #707." }
-load_numerics = { classification = "deprecated", canonical = "pyrite.config:load_numerics", reason = "Use the established canonical domain import." }
-load_physics = { classification = "deprecated", canonical = "pyrite.config:load_physics", reason = "Use the established canonical domain import." }
 photon_energies = { classification = "retained", canonical = "pyrite:photon_energies", reason = "Approved deterministic line-energy convenience exception." }
 simulate = { classification = "retained", canonical = "pyrite:simulate", reason = "Foundational simulation entry point." }
 
@@ -393,9 +342,9 @@ depth_loss_profile = { target = "pyrite.montecarlo.trajectory_summary:depth_loss
 capture_secondary_energy_balance = { target = "pyrite.montecarlo.trajectory_balance:capture_secondary_energy_balance", status = "advanced-stable" }
 
 [package_exports."pyrite.radiation"]
-photon_energies = { target = "pyrite.materials.emission:photon_energies", status = "advanced-stable" }
 directional_source = { target = "pyrite.directional:directional_source", status = "experimental" }
 directional_sources = { target = "pyrite.directional:directional_sources", status = "experimental" }
+photon_energies = { target = "pyrite.materials.emission:photon_energies", status = "advanced-stable" }
 mc_cxr_spectrum = { target = "pyrite.montecarlo.spectrum:mc_cxr_spectrum", status = "advanced-stable" }
 mc_cxr_spectrum_solid_angle = { target = "pyrite.montecarlo.spectrum:mc_cxr_spectrum_solid_angle", status = "advanced-stable" }
 mc_brem_spectrum = { target = "pyrite.montecarlo.spectrum:mc_brem_spectrum", status = "advanced-stable" }
@@ -437,3 +386,18 @@ propagate_planar_source = { target = "pyrite.planar_source:propagate_planar_sour
 score_planar_source = { target = "pyrite.planar_source:score_planar_source", status = "experimental" }
 RealSpaceGrid = { target = "pyrite.montecarlo.channeling.realspace:RealSpaceGrid", status = "experimental" }
 SplitStepPropagator = { target = "pyrite.montecarlo.channeling.realspace:SplitStepPropagator", status = "experimental" }
+
+[package_exports."pyrite.beams"]
+BunchFrontTilt = { target = "pyrite.campaign.beam:BunchFrontTilt", status = "advanced-stable" }
+BunchLength = { target = "pyrite.campaign.beam:BunchLength", status = "advanced-stable" }
+GdfSource = { target = "pyrite.campaign.beam:GdfSource", status = "advanced-stable" }
+Offsets = { target = "pyrite.campaign.beam:Offsets", status = "advanced-stable" }
+PointBunch = { target = "pyrite.campaign.beam:PointBunch", status = "advanced-stable" }
+PointSpot = { target = "pyrite.campaign.beam:PointSpot", status = "advanced-stable" }
+Spot = { target = "pyrite.campaign.beam:Spot", status = "advanced-stable" }
+TransverseSpot = { target = "pyrite.campaign.beam:TransverseSpot", status = "advanced-stable" }
+
+[package_exports."pyrite.optimization"]
+FixedWindowYield = { target = "pyrite.optimization.scoring:FixedWindowYield", status = "experimental" }
+PyriteEvaluator = { target = "pyrite.optimization.study:PyriteEvaluator", status = "experimental" }
+OptimizationStudy = { target = "pyrite.optimization.study:OptimizationStudy", status = "experimental" }

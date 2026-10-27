@@ -26,8 +26,8 @@ import pyrite as pr
 pr.Beam
 beam_s = time.perf_counter() - start
 start = time.perf_counter()
-beam = pr.Beam(energy_keV=30.0, transverse=pr.TransverseSpot(), longitudinal=pr.PointBunch())
-target = pr.Slab("hopg", thickness_ang=10_000.0, tilt_deg=30.0, footprint=pr.Footprint(5.0, 5.0))
+beam = pr.Beam(energy_keV=30.0, transverse=pr.beams.TransverseSpot(), longitudinal=pr.beams.PointBunch())
+target = pr.geometry.Slab("hopg", thickness_ang=10_000.0, tilt_deg=30.0, footprint=pr.geometry.Footprint(5.0, 5.0))
 detector = pr.Detector()
 numerics = pr.Numerics(cxr_trials=450, brem_trials=100)
 setup_s = time.perf_counter() - start

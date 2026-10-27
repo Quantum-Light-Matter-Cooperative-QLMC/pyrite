@@ -15,11 +15,13 @@ from pyrite.materials.crystal import HBARC_EV_ANG, beta_from_Ee, reciprocal_g_ve
 from pyrite.montecarlo.geometry import _orientation_R
 
 HOPG = CATALOG.crystal("hopg")  # hexagonal (gamma = 120 deg): a nonorthogonal cell
-CUT = pr.CrystalCut(surface_hkl=(1, 0, 1), roll_deg=17.0, miscut_deg=5.56512, miscut_azim_deg=200.0)
+CUT = pr.geometry.CrystalCut(
+    surface_hkl=(1, 0, 1), roll_deg=17.0, miscut_deg=5.56512, miscut_azim_deg=200.0
+)
 
 
 def _slab(cut=None, tilt=84.5, azimuth=0.0, **kwargs):
-    return pr.Slab(
+    return pr.geometry.Slab(
         "hopg", 500.0, tilt_deg=tilt, tilt_azim_deg=azimuth, footprint=None, cut=cut, **kwargs
     )
 
@@ -28,8 +30,8 @@ def _scene(cut=None, tilt=84.5, azimuth=0.0):
     return pr.Scene(
         beam=pr.Beam(
             energy_keV=30.0,
-            transverse=pr.TransverseSpot(0.001, 0.002),
-            longitudinal=pr.BunchLength(0.001),
+            transverse=pr.beams.TransverseSpot(0.001, 0.002),
+            longitudinal=pr.beams.BunchLength(0.001),
         ),
         target=_slab(cut, tilt, azimuth),
         detector=pr.Detector(observation_angle_deg=145.0),
@@ -58,7 +60,9 @@ def _independent_lattice_rotation(cut):
     return _minimal_rotation(z, tilted) @ Rz @ _minimal_rotation(axis, z)
 
 
-@pytest.mark.parametrize("cut", [pr.CrystalCut(), pr.CrystalCut(surface_hkl=HOPG.surface_hkl)])
+@pytest.mark.parametrize(
+    "cut", [pr.geometry.CrystalCut(), pr.geometry.CrystalCut(surface_hkl=HOPG.surface_hkl)]
+)
 def test_noop_cuts_preserve_the_catalog_case_payload(cut):
     assert build_case(_scene(cut)).to_dict() == build_case(_scene()).to_dict()
 
@@ -80,11 +84,11 @@ def test_explicit_cut_reaches_the_case_without_touching_the_catalog():
 def test_distinct_cuts_have_distinct_case_identities():
     cuts = [
         None,
-        pr.CrystalCut(beam_uvw=(1, 0, 0)),
-        pr.CrystalCut(roll_deg=10.0),
-        pr.CrystalCut(miscut_deg=5.56512),
-        pr.CrystalCut(miscut_deg=5.565121),
-        pr.CrystalCut(miscut_deg=5.56512, miscut_azim_deg=90.0),
+        pr.geometry.CrystalCut(beam_uvw=(1, 0, 0)),
+        pr.geometry.CrystalCut(roll_deg=10.0),
+        pr.geometry.CrystalCut(miscut_deg=5.56512),
+        pr.geometry.CrystalCut(miscut_deg=5.565121),
+        pr.geometry.CrystalCut(miscut_deg=5.56512, miscut_azim_deg=90.0),
         CUT,
     ]
     cases = [build_case(_scene(cut)) for cut in cuts]
@@ -94,7 +98,9 @@ def test_distinct_cuts_have_distinct_case_identities():
 
 
 def test_target_role_lowers_the_same_cut():
-    body = pr.RectangularBody(pr.SubstanceRef("crystal", "hopg"), (5.0, 5.0), 0.00005)
+    body = pr.geometry.RectangularBody(
+        pr.geometry.SubstanceRef("crystal", "hopg"), (5.0, 5.0), 0.00005
+    )
     target = pr.Target(body, tilt_deg=84.5, lattice_cut=CUT)
     assert target.to_slab().cut == CUT
     assert pr.Target(body).to_slab().cut is None
@@ -117,26 +123,28 @@ def test_target_role_lowers_the_same_cut():
 )
 def test_invalid_cuts_are_rejected(kwargs, error):
     with pytest.raises(error):
-        pr.CrystalCut(**kwargs)
+        pr.geometry.CrystalCut(**kwargs)
 
 
 def test_cut_is_flat_single_slab_only():
     with pytest.raises(ValueError, match="flat entrance face"):
-        _slab(CUT, tilt=30.0, azimuth=180.0, entrance_face=pr.BlazedGrooves(1e4))
+        _slab(CUT, tilt=30.0, azimuth=180.0, entrance_face=pr.geometry.BlazedGrooves(1e4))
     with pytest.raises(TypeError, match="CrystalCut"):
         _slab("(001)")
     with pytest.raises(ValueError, match="single-slab"):
         target_from_flat("hopg", substrate="silicon", cut=CUT)
     with pytest.raises(ValueError, match="lattice_cut"):
         pr.Target(
-            pr.RectangularBody(pr.SubstanceRef("crystal", "hopg"), (5.0, 5.0), 0.00005),
+            pr.geometry.RectangularBody(
+                pr.geometry.SubstanceRef("crystal", "hopg"), (5.0, 5.0), 0.00005
+            ),
             lattice_cut="custom",  # type: ignore[arg-type]
         )
 
 
 def test_sweep_axis_and_cut_axis_conflict():
     sweep = Sweep(
-        target=_slab(pr.CrystalCut(surface_hkl=(1, 0, 1))),
+        target=_slab(pr.geometry.CrystalCut(surface_hkl=(1, 0, 1))),
         beam=BeamSpec(energy_keV=30.0),
         beam_uvw=(0, 0, 1),
     )
@@ -146,7 +154,7 @@ def test_sweep_axis_and_cut_axis_conflict():
 
 def test_targeted_longitudinal_timing_rejects_a_miscut():
     sweep = Sweep(
-        target=_slab(pr.CrystalCut(miscut_deg=3.0), tilt=45.0, azimuth=180.0),
+        target=_slab(pr.geometry.CrystalCut(miscut_deg=3.0), tilt=45.0, azimuth=180.0),
         beam=BeamSpec(
             energy_keV=30.0,
             transverse_fwhm_x_mm=0.1,
@@ -223,12 +231,12 @@ def test_uncut_front_is_unchanged():
     assert _scene().phase_matched_bunch_front_tilt((0, 0, 2)).tilt_deg == pytest.approx(
         85.7217094848694, abs=1e-12
     )
-    assert replace(_scene(), target=_slab(pr.CrystalCut())).phase_matched_bunch_front_tilt(
+    assert replace(_scene(), target=_slab(pr.geometry.CrystalCut())).phase_matched_bunch_front_tilt(
         (0, 0, 2)
     ) == _scene().phase_matched_bunch_front_tilt((0, 0, 2))
 
 
-@pytest.mark.parametrize("cut", [pr.CrystalCut(surface_hkl=(1, 0, 1)), CUT])
+@pytest.mark.parametrize("cut", [pr.geometry.CrystalCut(surface_hkl=(1, 0, 1)), CUT])
 @pytest.mark.parametrize("tilt", [0.0, 20.0, -35.0])
 def test_tilt_is_measured_from_the_cut_face_normal(cut, tilt):
     from pyrite.montecarlo.geometry import tilted_geometry

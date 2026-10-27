@@ -155,7 +155,10 @@ def test_refusal_before_case_creation_or_propagation():
         propagate_planar_source(projection, depth_ang=10.0, stopping_eV_per_ang=-1)
     # Explicit production injection remains refused until handoff is validated.
     beam = pr.Beam(
-        energy_keV=17000.0, transverse=pr.Spot(), longitudinal=pr.PointBunch(), state=spec
+        energy_keV=17000.0,
+        transverse=pr.beams.Spot(),
+        longitudinal=pr.beams.PointBunch(),
+        state=spec,
     )
     with pytest.raises(ValueError, match="not yet.*transport"):
         beam.to_spec()

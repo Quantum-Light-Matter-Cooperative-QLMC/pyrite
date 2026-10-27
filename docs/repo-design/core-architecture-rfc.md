@@ -122,7 +122,7 @@ A user-facing function that takes scalar scene components and returns a result, 
 import pyrite as pr
 
 beam = pr.Beam(energy_keV=45.0)
-target = pr.Slab("hopg", thickness_ang=20_000.0, tilt_deg=30.0)
+target = pr.geometry.Slab("hopg", thickness_ang=20_000.0, tilt_deg=30.0)
 detector = pr.Detector(observation_angle_deg=90.0)
 
 result = pr.simulate(beam, target, detector, numerics=pr.Numerics(cxr_trials=450))
@@ -272,19 +272,29 @@ The constraints between these families are real and are currently enforced by sc
 One `Target` object holding a **closed, named set of variants**. No dispatch protocol, no navigator interface, no constructive solid geometry:
 
 ```python
-target = pr.Slab(material, thickness_ang=2e4, tilt_deg=30.0, tilt_azim_deg=0.0)
+target = pr.geometry.Slab(material, thickness_ang=2e4, tilt_deg=30.0, tilt_azim_deg=0.0)
 
-target = pr.Stack(
-    layers=[pr.Layer("mos2", 2.85e3), pr.Layer("sio2", 2.85e3), pr.Layer("silicon", 5e6)],
+target = pr.geometry.Stack(
+    layers=[
+        pr.geometry.Layer("mos2", 2.85e3),
+        pr.geometry.Layer("sio2", 2.85e3),
+        pr.geometry.Layer("silicon", 5e6),
+    ],
     tilt_deg=30.0,
 )
 
-target = pr.Slab(
-    material, thickness_ang=2e4, tilt_deg=30.0, footprint=pr.Footprint(width_mm=5.0, height_mm=5.0)
+target = pr.geometry.Slab(
+    material,
+    thickness_ang=2e4,
+    tilt_deg=30.0,
+    footprint=pr.geometry.Footprint(width_mm=5.0, height_mm=5.0),
 )
 
-target = pr.Slab(
-    material, thickness_ang=2e4, tilt_deg=30.0, entrance_face=pr.BlazedGrooves(spacing_ang=1e4)
+target = pr.geometry.Slab(
+    material,
+    thickness_ang=2e4,
+    tilt_deg=30.0,
+    entrance_face=pr.geometry.BlazedGrooves(spacing_ang=1e4),
 )
 ```
 

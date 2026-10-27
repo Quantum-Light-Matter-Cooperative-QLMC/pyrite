@@ -8,19 +8,21 @@ from pyrite import api
 from pyrite.materials import MediumSpec
 
 
-def _detector(scorer=None) -> pr.PlanarDetector:
-    return pr.PlanarDetector(
-        pose=pr.PlanarPose.from_observation(100.0, 0.0),
-        pixels=pr.PixelGrid(shape=(10, 10), pitch_mm=(1.0, 1.0)),
+def _detector(scorer=None) -> pr.detectors.PlanarDetector:
+    return pr.detectors.PlanarDetector(
+        pose=pr.detectors.PlanarPose.from_observation(100.0, 0.0),
+        pixels=pr.detectors.PixelGrid(shape=(10, 10), pitch_mm=(1.0, 1.0)),
         scorer=scorer,
     )
 
 
 def _scene(*, filters=()) -> pr.Scene:
     return pr.Scene(
-        beam=pr.Beam(energy_keV=30.0, transverse=pr.Spot(), longitudinal=pr.PointBunch()),
-        target=pr.Slab(
-            "hopg", thickness_ang=1_000.0, tilt_deg=30.0, footprint=pr.Footprint(5.0, 5.0)
+        beam=pr.Beam(
+            energy_keV=30.0, transverse=pr.beams.Spot(), longitudinal=pr.beams.PointBunch()
+        ),
+        target=pr.geometry.Slab(
+            "hopg", thickness_ang=1_000.0, tilt_deg=30.0, footprint=pr.geometry.Footprint(5.0, 5.0)
         ),
         detector=_detector(),
         filters=filters,
@@ -28,7 +30,7 @@ def _scene(*, filters=()) -> pr.Scene:
 
 
 def test_from_observation_defines_downstream_normal_and_source_facing_side() -> None:
-    pose = pr.PlanarPose.from_observation(400.0, 90.0)
+    pose = pr.detectors.PlanarPose.from_observation(400.0, 90.0)
 
     np.testing.assert_allclose(pose.center_mm, [400.0, 0.0, 0.0], atol=1.0e-13)
     np.testing.assert_allclose(pose.normal, [1.0, 0.0, 0.0], atol=1.0e-13)
@@ -38,24 +40,24 @@ def test_from_observation_defines_downstream_normal_and_source_facing_side() -> 
 
 
 def test_from_observation_positive_roll_rotates_x_toward_y() -> None:
-    pose = pr.PlanarPose.from_observation(10.0, 0.0, roll_deg=90.0)
+    pose = pr.detectors.PlanarPose.from_observation(10.0, 0.0, roll_deg=90.0)
 
     np.testing.assert_allclose(pose.x_axis, [0.0, 1.0, 0.0], atol=1.0e-13)
     np.testing.assert_allclose(pose.y_axis, [-1.0, 0.0, 0.0], atol=1.0e-13)
 
 
 def test_pose_normalizes_axes_but_rejects_ambiguous_nonorthogonal_axes() -> None:
-    pose = pr.PlanarPose((0.0, 0.0, 10.0), normal=(0.0, 0.0, 2.0), x_axis=(3.0, 0.0, 0.0))
+    pose = pr.detectors.PlanarPose((0.0, 0.0, 10.0), normal=(0.0, 0.0, 2.0), x_axis=(3.0, 0.0, 0.0))
     assert pose.normal == (0.0, 0.0, 1.0)
     assert pose.x_axis == (1.0, 0.0, 0.0)
 
     with pytest.raises(ValueError, match="must be orthogonal"):
-        pr.PlanarPose((0.0, 0.0, 10.0), normal=(0.0, 0.0, 1.0), x_axis=(1.0, 0.0, 1.0))
+        pr.detectors.PlanarPose((0.0, 0.0, 10.0), normal=(0.0, 0.0, 1.0), x_axis=(1.0, 0.0, 1.0))
 
 
 def test_timepix_preset_is_one_physical_chip_not_a_response() -> None:
-    grid = pr.PixelGrid.timepix3_chip()
-    detector = pr.PlanarDetector.timepix3_chip(pr.PlanarPose((0.0, 0.0, 400.0)))
+    grid = pr.detectors.PixelGrid.timepix3_chip()
+    detector = pr.detectors.PlanarDetector.timepix3_chip(pr.detectors.PlanarPose((0.0, 0.0, 400.0)))
 
     assert grid.shape == (256, 256)
     assert grid.pitch_mm == (0.055, 0.055)
@@ -65,9 +67,9 @@ def test_timepix_preset_is_one_physical_chip_not_a_response() -> None:
 
 
 def test_filter_accepts_catalog_or_explicit_number_density_material() -> None:
-    pose = pr.PlanarPose((0.0, 0.0, 50.0))
-    catalog = pr.FilterPlate("silicon", 0.1, (5.0, 5.0), pose)
-    custom = pr.FilterPlate(
+    pose = pr.detectors.PlanarPose((0.0, 0.0, 50.0))
+    catalog = pr.geometry.FilterPlate("silicon", 0.1, (5.0, 5.0), pose)
+    custom = pr.geometry.FilterPlate(
         MediumSpec("al-foil", (("Al", 0.0602),)),
         0.1,
         (5.0, 5.0),
@@ -79,11 +81,11 @@ def test_filter_accepts_catalog_or_explicit_number_density_material() -> None:
 
 
 def test_off_centre_filter_is_valid_without_central_ray_intersection() -> None:
-    plate = pr.FilterPlate(
+    plate = pr.geometry.FilterPlate(
         "silicon",
         thickness_mm=0.1,
         size_mm=(2.0, 2.0),
-        pose=pr.PlanarPose((4.0, 0.0, 50.0)),
+        pose=pr.detectors.PlanarPose((4.0, 0.0, 50.0)),
         name="right-edge",
     )
 
@@ -94,11 +96,11 @@ def test_off_centre_filter_is_valid_without_central_ray_intersection() -> None:
 
 @pytest.mark.parametrize("z", [0.04, 99.96, 101.0])
 def test_full_filter_volume_must_lie_between_source_and_detector_plane(z: float) -> None:
-    plate = pr.FilterPlate(
+    plate = pr.geometry.FilterPlate(
         "silicon",
         thickness_mm=0.1,
         size_mm=(2.0, 2.0),
-        pose=pr.PlanarPose((0.0, 0.0, z)),
+        pose=pr.detectors.PlanarPose((0.0, 0.0, z)),
     )
 
     with pytest.raises(ValueError, match="full FilterPlate volume"):
@@ -106,11 +108,11 @@ def test_full_filter_volume_must_lie_between_source_and_detector_plane(z: float)
 
 
 def test_reversed_public_normal_is_rejected_instead_of_hidden_by_absolute_dot() -> None:
-    plate = pr.FilterPlate(
+    plate = pr.geometry.FilterPlate(
         "silicon",
         thickness_mm=0.1,
         size_mm=(2.0, 2.0),
-        pose=pr.PlanarPose((0.0, 0.0, 50.0), normal=(0.0, 0.0, -1.0)),
+        pose=pr.detectors.PlanarPose((0.0, 0.0, 50.0), normal=(0.0, 0.0, -1.0)),
     )
 
     with pytest.raises(ValueError, match=r"local \+z must point downstream"):
@@ -119,15 +121,20 @@ def test_reversed_public_normal_is_rejected_instead_of_hidden_by_absolute_dot() 
 
 def test_pixel_scorer_requires_physical_pixels_and_bounded_angular_shape() -> None:
     with pytest.raises(ValueError, match="scorer requires pixels"):
-        pr.PlanarDetector(
-            pose=pr.PlanarPose((0.0, 0.0, 100.0)),
+        pr.detectors.PlanarDetector(
+            pose=pr.detectors.PlanarPose((0.0, 0.0, 100.0)),
             size_mm=(10.0, 10.0),
-            scorer=pr.PixelScorer(),
+            scorer=pr.config.PixelScorer(),
         )
     with pytest.raises(ValueError, match="cannot exceed"):
-        _detector(pr.PixelScorer((11, 1)))
-    assert _detector().scorer == pr.PixelScorer()
-    assert pr.PlanarDetector(pr.PlanarPose((0.0, 0.0, 100.0)), size_mm=(1.0, 1.0)).scorer is None
+        _detector(pr.config.PixelScorer((11, 1)))
+    assert _detector().scorer == pr.config.PixelScorer()
+    assert (
+        pr.detectors.PlanarDetector(
+            pr.detectors.PlanarPose((0.0, 0.0, 100.0)), size_mm=(1.0, 1.0)
+        ).scorer
+        is None
+    )
 
 
 def test_loose_pixel_scorer_is_removed() -> None:
@@ -137,11 +144,11 @@ def test_loose_pixel_scorer_is_removed() -> None:
             beam=scene.beam,
             target=scene.target,
             detector=_detector(),
-            pixel_scorer=pr.PixelScorer(),
+            pixel_scorer=pr.config.PixelScorer(),
         )
     with pytest.raises(TypeError, match="pixel_scorer"):
-        pr.simulate(scene.beam, scene.target, _detector(), pixel_scorer=pr.PixelScorer())
-    assert _detector(pr.PixelScorer((2, 2))).scorer == pr.PixelScorer((2, 2))
+        pr.simulate(scene.beam, scene.target, _detector(), pixel_scorer=pr.config.PixelScorer())
+    assert _detector(pr.config.PixelScorer((2, 2))).scorer == pr.config.PixelScorer((2, 2))
 
 
 def test_numerics_backend_is_removed() -> None:
@@ -161,11 +168,11 @@ def test_physical_detector_projects_to_unchanged_case_schema() -> None:
 def test_simulate_returns_partial_filter_spatial_result_and_observation_identity(
     monkeypatch,
 ) -> None:
-    plate = pr.FilterPlate(
+    plate = pr.geometry.FilterPlate(
         "silicon",
         thickness_mm=0.1,
         size_mm=(2.0, 10.0),
-        pose=pr.PlanarPose((0.0, 0.0, 50.0)),
+        pose=pr.detectors.PlanarPose((0.0, 0.0, 50.0)),
     )
 
     def fake_directional(case, n_hats, *, transport_core):
@@ -185,8 +192,10 @@ def test_simulate_returns_partial_filter_spatial_result_and_observation_identity
     )
     result = pr.simulate(
         pr.Scene(
-            pr.Beam(30.0, transverse=pr.Spot(), longitudinal=pr.PointBunch()),
-            pr.Slab("hopg", 1_000.0, tilt_deg=30.0, footprint=pr.Footprint(5.0, 5.0)),
+            pr.Beam(30.0, transverse=pr.beams.Spot(), longitudinal=pr.beams.PointBunch()),
+            pr.geometry.Slab(
+                "hopg", 1_000.0, tilt_deg=30.0, footprint=pr.geometry.Footprint(5.0, 5.0)
+            ),
             _detector(),
             **kwargs,
         )
@@ -211,15 +220,15 @@ def test_simulate_returns_partial_filter_spatial_result_and_observation_identity
     assert result.provenance["observation"]["schema"] == "pyrite.observation.v1"
     assert "true_spatial_digest" not in result.provenance
 
-    moved = pr.FilterPlate(
+    moved = pr.geometry.FilterPlate(
         "silicon",
         thickness_mm=plate.thickness_mm,
         size_mm=plate.size_mm,
-        pose=pr.PlanarPose((1.0, 0.0, 50.0)),
+        pose=pr.detectors.PlanarPose((1.0, 0.0, 50.0)),
     )
     moved_result = pr.simulate(
-        pr.Beam(30.0, transverse=pr.Spot(), longitudinal=pr.PointBunch()),
-        pr.Slab("hopg", 1_000.0, tilt_deg=30.0, footprint=pr.Footprint(5.0, 5.0)),
+        pr.Beam(30.0, transverse=pr.beams.Spot(), longitudinal=pr.beams.PointBunch()),
+        pr.geometry.Slab("hopg", 1_000.0, tilt_deg=30.0, footprint=pr.geometry.Footprint(5.0, 5.0)),
         _detector(),
         **{**kwargs, "filters": (moved,)},
     )
@@ -229,7 +238,7 @@ def test_simulate_returns_partial_filter_spatial_result_and_observation_identity
         != result.provenance["observation_identity_digest"]
     )
 
-    labeled = pr.FilterPlate(
+    labeled = pr.geometry.FilterPlate(
         "silicon",
         thickness_mm=plate.thickness_mm,
         size_mm=plate.size_mm,
@@ -237,8 +246,8 @@ def test_simulate_returns_partial_filter_spatial_result_and_observation_identity
         name="operator label only",
     )
     labeled_result = pr.simulate(
-        pr.Beam(30.0, transverse=pr.Spot(), longitudinal=pr.PointBunch()),
-        pr.Slab("hopg", 1_000.0, tilt_deg=30.0, footprint=pr.Footprint(5.0, 5.0)),
+        pr.Beam(30.0, transverse=pr.beams.Spot(), longitudinal=pr.beams.PointBunch()),
+        pr.geometry.Slab("hopg", 1_000.0, tilt_deg=30.0, footprint=pr.geometry.Footprint(5.0, 5.0)),
         _detector(),
         **{**kwargs, "filters": (labeled,)},
     )
@@ -260,12 +269,12 @@ def test_acquisition_enabled_simulation_exposes_layered_identity(monkeypatch) ->
         }
 
     monkeypatch.setattr(api, "run_case_directions", fake_directional)
-    detector = pr.PlanarDetector(
-        pose=pr.PlanarPose.from_observation(100.0, 60.0),
-        pixels=pr.PixelGrid((2, 2), (0.055, 0.055)),
-        response=pr.IdealPhotonCounter(),
+    detector = pr.detectors.PlanarDetector(
+        pose=pr.detectors.PlanarPose.from_observation(100.0, 60.0),
+        pixels=pr.detectors.PixelGrid((2, 2), (0.055, 0.055)),
+        response=pr.detectors.IdealPhotonCounter(),
     )
-    acquisition = pr.Acquisition(
+    acquisition = pr.observations.Acquisition(
         exposure_s=1.0,
         measured_edges_eV=(0.0, 500.0, 1_000.0),
     )
@@ -274,30 +283,37 @@ def test_acquisition_enabled_simulation_exposes_layered_identity(monkeypatch) ->
     )
     first = pr.simulate(
         pr.Scene(
-            pr.Beam(30.0, transverse=pr.Spot(), longitudinal=pr.PointBunch()),
-            pr.Slab("hopg", 1_000.0, tilt_deg=30.0, footprint=pr.Footprint(5.0, 5.0)),
+            pr.Beam(30.0, transverse=pr.beams.Spot(), longitudinal=pr.beams.PointBunch()),
+            pr.geometry.Slab(
+                "hopg", 1_000.0, tilt_deg=30.0, footprint=pr.geometry.Footprint(5.0, 5.0)
+            ),
             detector,
             acquisition=acquisition,
             **kwargs,
         )
     )
     rescored = pr.simulate(
-        pr.Beam(30.0, transverse=pr.Spot(), longitudinal=pr.PointBunch()),
-        pr.Slab("hopg", 1_000.0, tilt_deg=30.0, footprint=pr.Footprint(5.0, 5.0)),
+        pr.Beam(30.0, transverse=pr.beams.Spot(), longitudinal=pr.beams.PointBunch()),
+        pr.geometry.Slab("hopg", 1_000.0, tilt_deg=30.0, footprint=pr.geometry.Footprint(5.0, 5.0)),
         detector,
         acquisition=replace(acquisition, exposure_s=2.0),
         **kwargs,
     )
     implicit_scorer = pr.simulate(
-        pr.Beam(30.0, transverse=pr.Spot(), longitudinal=pr.PointBunch()),
-        pr.Slab("hopg", 1_000.0, tilt_deg=30.0, footprint=pr.Footprint(5.0, 5.0)),
+        pr.Beam(30.0, transverse=pr.beams.Spot(), longitudinal=pr.beams.PointBunch()),
+        pr.geometry.Slab("hopg", 1_000.0, tilt_deg=30.0, footprint=pr.geometry.Footprint(5.0, 5.0)),
         detector,
         acquisition=acquisition,
         numerics=kwargs["numerics"],
     )
     renormalized = pr.simulate(
-        pr.Beam(30.0, bunch_charge_pc=2.0, transverse=pr.Spot(), longitudinal=pr.PointBunch()),
-        pr.Slab("hopg", 1_000.0, tilt_deg=30.0, footprint=pr.Footprint(5.0, 5.0)),
+        pr.Beam(
+            30.0,
+            bunch_charge_pc=2.0,
+            transverse=pr.beams.Spot(),
+            longitudinal=pr.beams.PointBunch(),
+        ),
+        pr.geometry.Slab("hopg", 1_000.0, tilt_deg=30.0, footprint=pr.geometry.Footprint(5.0, 5.0)),
         detector,
         acquisition=acquisition,
         **kwargs,
@@ -338,12 +354,12 @@ def test_acquisition_enabled_simulation_exposes_layered_identity(monkeypatch) ->
     )
 
 
-def _box(z: float, *, x: float = 0.0, thickness: float = 0.1, **pose) -> pr.FilterPlate:
-    return pr.FilterPlate(
+def _box(z: float, *, x: float = 0.0, thickness: float = 0.1, **pose) -> pr.geometry.FilterPlate:
+    return pr.geometry.FilterPlate(
         "silicon",
         thickness_mm=thickness,
         size_mm=(2.0, 2.0),
-        pose=pr.PlanarPose((x, 0.0, z), **pose),
+        pose=pr.detectors.PlanarPose((x, 0.0, z), **pose),
     )
 
 
@@ -355,12 +371,12 @@ def _box(z: float, *, x: float = 0.0, thickness: float = 0.1, **pose) -> pr.Filt
         _box(50.0, x=0.5, normal=(0.0, 0.6, 0.8), x_axis=(1.0, 0.0, 0.0)),  # tilted
     ],
 )
-def test_overlapping_filter_volumes_are_rejected(second: pr.FilterPlate) -> None:
+def test_overlapping_filter_volumes_are_rejected(second: pr.geometry.FilterPlate) -> None:
     with pytest.raises(ValueError, match="must not overlap"):
         _scene(filters=(_box(50.0), second))
 
 
 @pytest.mark.parametrize("second", [_box(50.1), _box(50.0, x=2.0), _box(60.0)])
-def test_touching_or_separated_filter_volumes_are_accepted(second: pr.FilterPlate) -> None:
+def test_touching_or_separated_filter_volumes_are_accepted(second: pr.geometry.FilterPlate) -> None:
     first = _box(50.0)
     assert _scene(filters=(first, second)).filters == (first, second)

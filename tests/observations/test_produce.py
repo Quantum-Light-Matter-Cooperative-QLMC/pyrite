@@ -33,21 +33,27 @@ def transports(monkeypatch) -> list[int]:
 
 
 NUMERICS = pr.Numerics(cxr_trials=1, brem_trials=1)
-PLATE = pr.FilterPlate("silicon", 0.05, (1.5, 10.0), pr.PlanarPose.from_observation(50.0, 60.0))
+PLATE = pr.geometry.FilterPlate(
+    "silicon", 0.05, (1.5, 10.0), pr.detectors.PlanarPose.from_observation(50.0, 60.0)
+)
 
 
 def _scene(**overrides) -> pr.Scene:
     values = dict(
-        beam=pr.Beam(30.0, transverse=pr.Spot(), longitudinal=pr.PointBunch()),
-        target=pr.Slab("hopg", 1_000.0, tilt_deg=30.0, footprint=pr.Footprint(5.0, 5.0)),
-        detector=pr.PlanarDetector(
-            pose=pr.PlanarPose.from_observation(100.0, 60.0),
-            pixels=pr.PixelGrid((4, 6), (0.5, 0.5)),
-            response=pr.IdealPhotonCounter(),
-            scorer=pr.PixelScorer((2, 2)),
+        beam=pr.Beam(30.0, transverse=pr.beams.Spot(), longitudinal=pr.beams.PointBunch()),
+        target=pr.geometry.Slab(
+            "hopg", 1_000.0, tilt_deg=30.0, footprint=pr.geometry.Footprint(5.0, 5.0)
+        ),
+        detector=pr.detectors.PlanarDetector(
+            pose=pr.detectors.PlanarPose.from_observation(100.0, 60.0),
+            pixels=pr.detectors.PixelGrid((4, 6), (0.5, 0.5)),
+            response=pr.detectors.IdealPhotonCounter(),
+            scorer=pr.config.PixelScorer((2, 2)),
         ),
         filters=(PLATE,),
-        acquisition=pr.Acquisition(exposure_s=1.0, measured_edges_eV=(0.0, 1_500.0, 3_000.0)),
+        acquisition=pr.observations.Acquisition(
+            exposure_s=1.0, measured_edges_eV=(0.0, 1_500.0, 3_000.0)
+        ),
     )
     return pr.Scene(**{**values, **overrides})
 
@@ -67,10 +73,17 @@ def test_repeat_request_reuses_the_stored_observation(tmp_path, transports) -> N
 @pytest.mark.parametrize(
     "overrides",
     [
-        {"acquisition": pr.Acquisition(exposure_s=5.0, measured_edges_eV=(0.0, 3_000.0))},
+        {
+            "acquisition": pr.observations.Acquisition(
+                exposure_s=5.0, measured_edges_eV=(0.0, 3_000.0)
+            )
+        },
         {
             "beam": pr.Beam(
-                30.0, bunch_charge_pc=3.0, transverse=pr.Spot(), longitudinal=pr.PointBunch()
+                30.0,
+                bunch_charge_pc=3.0,
+                transverse=pr.beams.Spot(),
+                longitudinal=pr.beams.PointBunch(),
             )
         },
         {"filters": (replace(PLATE, name="display label only"),)},
@@ -111,10 +124,14 @@ def test_response_change_rescores_without_transport(tmp_path, transports) -> Non
 @pytest.mark.parametrize(
     "overrides",
     [
-        {"detector": replace(_scene().detector, scorer=pr.PixelScorer((1, 3)))},
+        {"detector": replace(_scene().detector, scorer=pr.config.PixelScorer((1, 3)))},
         {"filters": (replace(PLATE, thickness_mm=0.1),)},
         {"filters": ()},
-        {"target": pr.Slab("hopg", 1_000.0, tilt_deg=31.0, footprint=pr.Footprint(5.0, 5.0))},
+        {
+            "target": pr.geometry.Slab(
+                "hopg", 1_000.0, tilt_deg=31.0, footprint=pr.geometry.Footprint(5.0, 5.0)
+            )
+        },
     ],
     ids=["angular-shape", "filter-thickness", "no-filter", "source"],
 )
@@ -148,7 +165,9 @@ def test_scalar_detector_scenes_are_rejected(tmp_path) -> None:
 
 def test_native_request_reuses_and_resolves_before_identity(tmp_path, transports):
     store = ObservationStore("hopg", root=tmp_path)
-    scene = _scene(acquisition=pr.Acquisition.native(exposure_s=0.001, mode="poisson", seed=5))
+    scene = _scene(
+        acquisition=pr.observations.Acquisition.native(exposure_s=0.001, mode="poisson", seed=5)
+    )
     first = produce_observation(scene, NUMERICS, store)
     second = produce_observation(scene, NUMERICS, store)
     assert first.transported and not second.transported
@@ -172,7 +191,9 @@ def test_quantum_observation_preserves_solver_settings_and_reuses_source(
     )
     scene = _scene(
         beam=replace(_scene().beam, energy_keV=5_000.0),
-        target=pr.Slab("silicon", 5_000.0, tilt_deg=30.0, footprint=pr.Footprint(5.0, 5.0)),
+        target=pr.geometry.Slab(
+            "silicon", 5_000.0, tilt_deg=30.0, footprint=pr.geometry.Footprint(5.0, 5.0)
+        ),
         physics=pr.Physics(radiative_model="uncoupled"),
         quantum=setup if embedded else None,
     )

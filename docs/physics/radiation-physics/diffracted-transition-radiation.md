@@ -375,15 +375,15 @@ physics = pr.Physics(
 numerics = pr.Numerics(
     cxr_trials=3,
     brem_trials=3,
-    cxr_reflections=pr.CxrReflections(max_reflections=1),
-    energy_bins=pr.EnergyBins(
+    cxr_reflections=pr.config.CxrReflections(max_reflections=1),
+    energy_bins=pr.detectors.EnergyBins(
         cxr=np.linspace(500.0, 1500.0, 9),
         brem=np.array([500.0, 5000.0]),
     ),
 )
 result = pr.simulate(
-    pr.Beam(energy_keV=30.0, transverse=pr.Spot(), longitudinal=pr.PointBunch()),
-    pr.Slab("hopg", thickness_ang=100.0, tilt_deg=30.0, footprint=None),
+    pr.Beam(energy_keV=30.0, transverse=pr.beams.Spot(), longitudinal=pr.beams.PointBunch()),
+    pr.geometry.Slab("hopg", thickness_ang=100.0, tilt_deg=30.0, footprint=None),
     pr.Detector(),
     physics=physics,
     numerics=numerics,

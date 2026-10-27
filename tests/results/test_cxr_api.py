@@ -6,9 +6,11 @@ from dataclasses import asdict, replace
 import numpy as np
 import pytest
 
-from pyrite import CxrSpectra, EnergyBins, Numerics, Precision, Result, SpectralDensity
+from pyrite import CxrSpectra, Numerics, Result, SpectralDensity
 from pyrite.campaign.beam import PointBunch, Spot
 from pyrite.campaign.geometry import Footprint
+from pyrite.config import Precision
+from pyrite.detectors import EnergyBins
 
 
 def _result():
@@ -150,7 +152,8 @@ def test_catalog_aliases_reject_duplicate_spellings():
 
 
 def test_old_sweep_axis_path_is_removed():
-    from pyrite import Beam, Detector, Scene, Slab, Sweep
+    from pyrite import Beam, Detector, Scene, Sweep
+    from pyrite.geometry import Slab
 
     scene = Scene(
         Beam(energy_keV=30, transverse=Spot(), longitudinal=PointBunch()),

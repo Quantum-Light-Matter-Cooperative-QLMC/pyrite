@@ -17,8 +17,8 @@ from pyrite.results.store import store_result
 
 def _scene(mode="two-beam"):
     return pr.Scene(
-        pr.Beam(energy_keV=30.0, transverse=pr.Spot(), longitudinal=pr.PointBunch()),
-        pr.Slab("hopg", thickness_ang=100.0, tilt_deg=30.0, footprint=None),
+        pr.Beam(energy_keV=30.0, transverse=pr.beams.Spot(), longitudinal=pr.beams.PointBunch()),
+        pr.geometry.Slab("hopg", thickness_ang=100.0, tilt_deg=30.0, footprint=None),
         pr.Detector(),
         physics=pr.Physics(
             transition_radiation=mode, radiative_model="uncoupled", bremsstrahlung_model="eedl"
@@ -30,8 +30,8 @@ def _numerics():
     return pr.Numerics(
         cxr_trials=3,
         brem_trials=3,
-        cxr_reflections=pr.CxrReflections(max_reflections=1),
-        energy_bins=pr.EnergyBins(
+        cxr_reflections=pr.config.CxrReflections(max_reflections=1),
+        energy_bins=pr.detectors.EnergyBins(
             cxr=np.linspace(500.0, 1500.0, 9), brem=np.array([500.0, 5000.0])
         ),
     )
@@ -192,7 +192,7 @@ def test_dataset_identity_tracks_model_and_termination():
 
 def test_unsupported_configs_refuse_before_transport():
     with pytest.raises(ValueError, match="one reflection"):
-        api.build_case(_scene(), replace(_numerics(), cxr_reflections=pr.CxrReflections()))
+        api.build_case(_scene(), replace(_numerics(), cxr_reflections=pr.config.CxrReflections()))
     with pytest.raises(ValueError, match="equal line and continuum"):
         api.build_case(_scene(), replace(_numerics(), brem_trials=2))
     with pytest.raises(ValueError, match="three finite"):

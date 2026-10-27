@@ -8,6 +8,7 @@ Install `pyrite-mc[plots]` and [fetch the reference tables](getting-started.md#i
 Download {download}`the complete script <../examples/directional_source_heatmap.py>`
 and run it in your installed environment:
 
+<!-- verify: skip (external shell tools or downloadable Python example) -->
 ```bash
 PYRITE_MC_BACKEND=cpu python directional_source_heatmap.py
 ```

@@ -25,8 +25,10 @@ PLANAR = dict(channeling_model="planar", channeling_plane=(1, -1, 0), radiative_
 def _scene(physics=None, *, energy_keV=5000.0, **slab):
     slab = {"thickness_ang": 20000.0, "tilt_deg": 3.0, "tilt_azim_deg": 45.0, **slab}
     return pr.Scene(
-        pr.Beam(energy_keV=energy_keV, transverse=pr.Spot(), longitudinal=pr.PointBunch()),
-        pr.Slab("silicon", footprint=pr.Footprint(5.0, 5.0), **slab),
+        pr.Beam(
+            energy_keV=energy_keV, transverse=pr.beams.Spot(), longitudinal=pr.beams.PointBunch()
+        ),
+        pr.geometry.Slab("silicon", footprint=pr.geometry.Footprint(5.0, 5.0), **slab),
         pr.Detector(),
         physics=physics,
     )
@@ -142,8 +144,10 @@ def test_gates_refuse_crystals_without_thermal_data():
     from pyrite.materials.channeling import ChannelingDataError
 
     scene = pr.Scene(
-        pr.Beam(energy_keV=5000.0, transverse=pr.Spot(), longitudinal=pr.PointBunch()),
-        pr.Slab("hopg", thickness_ang=20000.0, tilt_deg=3.0, footprint=pr.Footprint(5.0, 5.0)),
+        pr.Beam(energy_keV=5000.0, transverse=pr.beams.Spot(), longitudinal=pr.beams.PointBunch()),
+        pr.geometry.Slab(
+            "hopg", thickness_ang=20000.0, tilt_deg=3.0, footprint=pr.geometry.Footprint(5.0, 5.0)
+        ),
         pr.Detector(),
         physics=pr.Physics(**{**PLANAR, "channeling_plane": (0, 0, 1)}),
     )
@@ -209,7 +213,7 @@ def test_adaptive_refuses_before_work(planar_case):
     from pyrite.montecarlo.runner.adaptive import transport_case_adaptive
 
     with pytest.raises(ValueError, match="adaptive precision"):
-        transport_case_adaptive(planar_case, pr.Precision(0.1, 40, 60, 20))
+        transport_case_adaptive(planar_case, pr.config.Precision(0.1, 40, 60, 20))
 
 
 # -- event contract ------------------------------------------------------------

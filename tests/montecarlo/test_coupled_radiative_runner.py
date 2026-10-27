@@ -200,11 +200,11 @@ def _coupled_case(target=None, **numerics_overrides):
         elastic_model="mott", bremsstrahlung_model="bremslib", **{**COUPLED, **numerics_overrides}
     )
     if target is None:
-        target = pr.Slab(
-            "silicon", thickness_ang=2.0e4, tilt_deg=30.0, footprint=pr.Footprint(5.0, 5.0)
+        target = pr.geometry.Slab(
+            "silicon", thickness_ang=2.0e4, tilt_deg=30.0, footprint=pr.geometry.Footprint(5.0, 5.0)
         )
     scene = pr.Scene(
-        pr.Beam(energy_keV=40.0, transverse=pr.Spot(), longitudinal=pr.PointBunch()),
+        pr.Beam(energy_keV=40.0, transverse=pr.beams.Spot(), longitudinal=pr.beams.PointBunch()),
         target,
         detector,
         physics=physics,

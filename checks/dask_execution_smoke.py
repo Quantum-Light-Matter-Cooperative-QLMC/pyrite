@@ -24,14 +24,16 @@ def smoke_cases():
     import pyrite as pr
 
     scene = pr.Scene(
-        beam=pr.Beam(energy_keV=30, transverse=pr.PointSpot(), longitudinal=pr.PointBunch()),
-        target=pr.Slab("hopg", thickness_ang=100, tilt_deg=30, footprint=None),
+        beam=pr.Beam(
+            energy_keV=30, transverse=pr.beams.PointSpot(), longitudinal=pr.beams.PointBunch()
+        ),
+        target=pr.geometry.Slab("hopg", thickness_ang=100, tilt_deg=30, footprint=None),
         numerics=pr.Numerics(
-            sampling=pr.FixedSampling(4, 2),
-            energy_bins=pr.EnergyBins(
+            sampling=pr.config.FixedSampling(4, 2),
+            energy_bins=pr.detectors.EnergyBins(
                 cxr=np.linspace(100, 1_000, 19), brem=np.linspace(100, 1_000, 19)
             ),
-            cxr_reflections=pr.CxrReflections(n_families=1, max_reflections=2),
+            cxr_reflections=pr.config.CxrReflections(n_families=1, max_reflections=2),
         ),
     )
     (case,) = pr.Sweep(base=scene).cases()

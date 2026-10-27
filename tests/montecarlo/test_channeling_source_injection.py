@@ -21,17 +21,17 @@ def _scene(state=None, *, physics=None, energy_spread_frac=None):
     return pr.Scene(
         pr.Beam(
             energy_keV=5000.0,
-            transverse=pr.Spot(),
-            longitudinal=pr.PointBunch(),
+            transverse=pr.beams.Spot(),
+            longitudinal=pr.beams.PointBunch(),
             state=state,
             energy_spread_frac=energy_spread_frac,
         ),
-        pr.Slab(
+        pr.geometry.Slab(
             "silicon",
             thickness_ang=5000.0,
             tilt_deg=3.0,
             tilt_azim_deg=45.0,
-            footprint=pr.Footprint(5.0, 5.0),
+            footprint=pr.geometry.Footprint(5.0, 5.0),
         ),
         pr.Detector(),
         physics=physics
@@ -53,7 +53,7 @@ def _numerics():
         brem_trials=12,
         # Replay equality needs only a few photon nodes; the automatic grid
         # would score >300,000 nodes at every detector quadrature direction.
-        energy_bins=pr.EnergyBins(
+        energy_bins=pr.detectors.EnergyBins(
             cxr=np.linspace(1e3, 2e3, 9),
             brem=np.linspace(1e3, 2e3, 9),
         ),

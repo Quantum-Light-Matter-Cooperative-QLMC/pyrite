@@ -9,14 +9,14 @@ from pyrite.instrument import Acquisition, ResolvedObservation, observation_iden
 
 
 def _observation(*, response=None, acquisition=None, filters=()) -> ResolvedObservation:
-    detector = pr.PlanarDetector(
-        pose=pr.PlanarPose.from_observation(100.0, 60.0),
-        pixels=pr.PixelGrid((8, 10), (0.055, 0.055)),
+    detector = pr.detectors.PlanarDetector(
+        pose=pr.detectors.PlanarPose.from_observation(100.0, 60.0),
+        pixels=pr.detectors.PixelGrid((8, 10), (0.055, 0.055)),
         response=IdealPhotonCounter() if response is None else response,
     )
     return ResolvedObservation(
         detector=detector,
-        scorer=pr.PixelScorer((3, 5)),
+        scorer=pr.config.PixelScorer((3, 5)),
         filters=filters,
         acquisition=(
             Acquisition.uniform(
@@ -138,7 +138,7 @@ def test_identity_layers_change_only_for_their_owner() -> None:
             base,
             detector=replace(
                 base.detector,
-                pose=pr.PlanarPose.from_observation(101.0, 60.0),
+                pose=pr.detectors.PlanarPose.from_observation(101.0, 60.0),
             ),
         )
     )
@@ -199,10 +199,10 @@ def test_identity_requires_canonical_source_digest(digest) -> None:
 
 
 def test_true_identity_preserves_filter_order_but_ignores_display_names() -> None:
-    pose = pr.PlanarPose.from_observation(50.0, 60.0)
-    first = pr.FilterPlate("silicon", 0.1, (2.0, 2.0), pose, name="first")
-    second_pose = pr.PlanarPose.from_observation(51.0, 60.0)
-    second = pr.FilterPlate("sio2", 0.2, (3.0, 3.0), second_pose, name="second")
+    pose = pr.detectors.PlanarPose.from_observation(50.0, 60.0)
+    first = pr.geometry.FilterPlate("silicon", 0.1, (2.0, 2.0), pose, name="first")
+    second_pose = pr.detectors.PlanarPose.from_observation(51.0, 60.0)
+    second = pr.geometry.FilterPlate("sio2", 0.2, (3.0, 3.0), second_pose, name="second")
     base = _identity(_observation(filters=(first, second)))
     renamed = _identity(_observation(filters=(replace(first, name="operator label"), second)))
     reordered = _identity(_observation(filters=(second, first)))

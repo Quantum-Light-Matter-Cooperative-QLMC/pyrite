@@ -13,8 +13,10 @@ from pyrite.execution import LocalExecutor, ResourceRequest
 
 def _scene():
     return pr.Scene(
-        pr.Beam(energy_keV=30.0, transverse=pr.Spot(), longitudinal=pr.PointBunch()),
-        pr.Slab("hopg", thickness_ang=10_000.0, tilt_deg=30.0, footprint=pr.Footprint(5.0, 5.0)),
+        pr.Beam(energy_keV=30.0, transverse=pr.beams.Spot(), longitudinal=pr.beams.PointBunch()),
+        pr.geometry.Slab(
+            "hopg", thickness_ang=10_000.0, tilt_deg=30.0, footprint=pr.geometry.Footprint(5.0, 5.0)
+        ),
         pr.Detector(),
         physics=pr.Physics(bremsstrahlung_model="eedl"),
     )
@@ -32,8 +34,8 @@ def _same_case(a, b):
 def test_defaults_and_legacy_read_views():
     n = pr.Numerics()
     assert n.transport is n.radiation is n.execution is None
-    assert n.resolved_transport == pr.TransportNumerics()
-    assert n.resolved_radiation == pr.RadiationNumerics()
+    assert n.resolved_transport == pr.config.TransportNumerics()
+    assert n.resolved_radiation == pr.config.RadiationNumerics()
     assert n.resolved_execution == pr.ExecutionConfig()
     old = pr.Numerics(
         31,
@@ -42,7 +44,7 @@ def test_defaults_and_legacy_read_views():
         brem_chunk=8,
         energy_model="midpoint",
         max_dE_frac=0.01,
-        cxr_reflections=pr.CxrReflections(n_families=2),
+        cxr_reflections=pr.config.CxrReflections(n_families=2),
     )
     assert old.resolved_execution == pr.ExecutionConfig(cxr_chunk=4, brem_chunk=8)
     assert old.resolved_transport.max_dE_frac == 0.01
@@ -51,8 +53,8 @@ def test_defaults_and_legacy_read_views():
         _case(n),
         _case(
             pr.Numerics(
-                transport=pr.TransportNumerics(),
-                radiation=pr.RadiationNumerics(),
+                transport=pr.config.TransportNumerics(),
+                radiation=pr.config.RadiationNumerics(),
                 execution=pr.ExecutionConfig(),
             )
         ),
@@ -65,16 +67,16 @@ def test_typed_sections_lower_to_identical_case_payload_and_hash():
         brem_trials=17,
         energy_model="midpoint",
         max_dE_frac=0.01,
-        cxr_reflections=pr.CxrReflections(n_families=2, mosaic_nodes=3),
+        cxr_reflections=pr.config.CxrReflections(n_families=2, mosaic_nodes=3),
         transport_core="per-electron",
         cxr_chunk=8,
         brem_chunk=4,
     )
     typed = pr.Numerics(
-        sampling=pr.FixedSampling(31, 17),
-        transport=pr.TransportNumerics(max_dE_frac=0.01),
-        radiation=pr.RadiationNumerics(
-            cxr_reflections=pr.CxrReflections(n_families=2, mosaic_nodes=3)
+        sampling=pr.config.FixedSampling(31, 17),
+        transport=pr.config.TransportNumerics(max_dE_frac=0.01),
+        radiation=pr.config.RadiationNumerics(
+            cxr_reflections=pr.config.CxrReflections(n_families=2, mosaic_nodes=3)
         ),
         execution=pr.ExecutionConfig(transport_core="per-electron", cxr_chunk=8, brem_chunk=4),
     )
@@ -87,9 +89,11 @@ def test_typed_sections_lower_to_identical_case_payload_and_hash():
 
 
 def test_adaptive_and_grouped_execution_remain_compatible():
-    p = pr.AdaptiveSampling(0.1, 40, 80, 20)
+    p = pr.config.AdaptiveSampling(0.1, 40, 80, 20)
     old = pr.Numerics(
-        precision=pr.Precision.from_dict(p.to_dict()), transport_core="per-electron", cxr_chunk=2
+        precision=pr.config.Precision.from_dict(p.to_dict()),
+        transport_core="per-electron",
+        cxr_chunk=2,
     )
     new = pr.Numerics(
         sampling=p, execution=pr.ExecutionConfig(transport_core="per-electron", cxr_chunk=2)
@@ -101,15 +105,19 @@ def test_adaptive_and_grouped_execution_remain_compatible():
 
 def test_conflicting_flat_and_grouped_fields_fail_early():
     with pytest.raises(ValueError, match="energy_model"):
-        pr.Numerics(transport=pr.TransportNumerics(energy_model="midpoint"), energy_model="frozen")
+        pr.Numerics(
+            transport=pr.config.TransportNumerics(energy_model="midpoint"), energy_model="frozen"
+        )
     with pytest.raises(ValueError, match="max_dE_frac"):
-        pr.Numerics(transport=pr.TransportNumerics(max_dE_frac=0.02), max_dE_frac=0.01)
+        pr.Numerics(transport=pr.config.TransportNumerics(max_dE_frac=0.02), max_dE_frac=0.01)
     with pytest.raises(ValueError, match="cxr_chunk"):
         pr.Numerics(execution=pr.ExecutionConfig(cxr_chunk=5), cxr_chunk=4)
     with pytest.raises(ValueError, match="cxr_reflections"):
         pr.Numerics(
-            radiation=pr.RadiationNumerics(cxr_reflections=pr.CxrReflections(n_families=2)),
-            cxr_reflections=pr.CxrReflections(n_families=3),
+            radiation=pr.config.RadiationNumerics(
+                cxr_reflections=pr.config.CxrReflections(n_families=2)
+            ),
+            cxr_reflections=pr.config.CxrReflections(n_families=3),
         )
     with pytest.raises(TypeError, match="TransportNumerics"):
         pr.Numerics(transport={"energy_model": "midpoint"})
@@ -119,20 +127,21 @@ def test_conflicting_flat_and_grouped_fields_fail_early():
 
 def test_group_validations():
     with pytest.raises(ValueError, match="energy_model"):
-        pr.TransportNumerics(energy_model="oops")
+        pr.config.TransportNumerics(energy_model="oops")
     with pytest.raises(ValueError, match="midpoint"):
-        pr.TransportNumerics(energy_model="frozen", max_dE_frac=0.02)
+        pr.config.TransportNumerics(energy_model="frozen", max_dE_frac=0.02)
     with pytest.raises(ValueError, match="non-negative"):
-        pr.TransportNumerics(max_dE_frac=float("nan"))
+        pr.config.TransportNumerics(max_dE_frac=float("nan"))
     with pytest.raises(ValueError, match="positive integer"):
         pr.ExecutionConfig(cxr_chunk=True)
     with pytest.raises(TypeError, match="CxrReflections"):
-        pr.RadiationNumerics(cxr_reflections=None)
+        pr.config.RadiationNumerics(cxr_reflections=None)
 
 
 def test_explicit_group_replace_helpers():
     n = pr.Numerics(
-        transport=pr.TransportNumerics(max_dE_frac=0.02), execution=pr.ExecutionConfig(cxr_chunk=3)
+        transport=pr.config.TransportNumerics(max_dE_frac=0.02),
+        execution=pr.ExecutionConfig(cxr_chunk=3),
     )
     changed = n.with_transport(replace(n.resolved_transport, max_dE_frac=0.03))
     assert changed.max_dE_frac == 0.03
@@ -140,7 +149,7 @@ def test_explicit_group_replace_helpers():
     changed = changed.with_execution(replace(changed.resolved_execution, cxr_chunk=6))
     assert changed.cxr_chunk == 6
     changed = changed.with_radiation(
-        pr.RadiationNumerics(cxr_reflections=pr.CxrReflections(max_reflections=4))
+        pr.config.RadiationNumerics(cxr_reflections=pr.config.CxrReflections(max_reflections=4))
     )
     assert changed.cxr_reflections.max_reflections == 4
     assert n.max_dE_frac == 0.02

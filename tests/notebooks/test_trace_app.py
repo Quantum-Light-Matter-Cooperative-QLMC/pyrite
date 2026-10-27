@@ -120,20 +120,17 @@ def test_penetration_view_offers_prerendered_render_button() -> None:
     source = APP.read_text()
 
     assert "from pyrite.plots.plotly.render import (" in source
-    for name in (
-        "cached_render_path,",
-        "prune_render_cache,",
-        "render_cache_key,",
-        "render_reveal_animation,",
-    ):
+    for name in ("cached_render_path,", "render_cache_key,", "render_trace_animation,"):
         assert name in source
     assert "penetration_render_frames_ui = mo.ui.slider(" in source
     assert "start=24, stop=120, value=60, step=12" in source
     assert 'penetration_render_button_ui = mo.ui.run_button(label="Render animation")' in source
     assert "penetration_speed_ui" not in source
-    assert "render_reveal_animation(" in source
+    helper = (APP.parent / "viewer.py").read_text()
+    assert "render_trace_animation(" in source
+    assert "render_reveal_animation(" in helper
     assert "logarithmic_color=penetration_log_color_ui.value" in source
-    assert "mo.status.progress_bar(" in source
+    assert "mo.status.progress_bar(" in helper
     # Video is served as bytes (file handle, not a local path string) and its
     # display is gated on the cached file existing, not on the transient
     # run_button value -- see the render block's comments in the app.
@@ -145,8 +142,9 @@ def test_penetration_view_offers_prerendered_render_button() -> None:
     # hands the result to the tab via the render-status state.
     assert "mo.stop(not penetration_render_button_ui.value)" in source
     assert "get_penetration_render_status, set_penetration_render_status = mo.state(None)" in source
-    assert "set_penetration_render_status((_render_key, None))" in source
-    assert "set_penetration_render_status((_render_key, str(_exc)))" in source
+    assert "set_penetration_render_status(" in source
+    assert "return render_key, None" in helper
+    assert "return render_key, str(exc)" in helper
     # The tab body stores the case record alongside data so the eager cell
     # can render without redoing transport.
     assert "set_penetration_data((_data_key, _data, _nc))" in source
@@ -176,9 +174,27 @@ def test_penetration_controls_offer_material_presets_and_uncapped_energy() -> No
         assert bound in source
     assert 'start=1.0, step=1.0, value=_energy_values[0], label="(keV)"' in source
     assert '"Log presets": "log"' in source
-    assert (
-        "_log_energy_values = (1, 3, 10, 30, 100, 300, 1_000, 3_000, 10_000, 30_000, 100_000)"
-        in source
+    tree = ast.parse(source)
+    presets = next(
+        node.value
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Assign)
+        and any(isinstance(t, ast.Name) and t.id == "_log_energy_values" for t in node.targets)
+    )
+    assert ast.literal_eval(presets) == (
+        10,
+        20,
+        50,
+        100,
+        200,
+        500,
+        1_000,
+        2_000,
+        5_000,
+        10_000,
+        20_000,
+        50_000,
+        100_000,
     )
     assert 'value="1 MeV"' in source
     assert '"log": penetration_energy_log_grid_ui.value' in source
@@ -198,7 +214,7 @@ def test_thickness_controls_and_context_use_shared_human_units() -> None:
     source = APP.read_text()
 
     assert "from pyrite._formatting import fmt_thickness" in source
-    assert "build_configured_cases(_sweep, settings)" in source
+    assert "build_configured_cases(_sweep, settings, check_kinematic_validity=False)" in source
     # The preset-thickness dropdown labels its options in human units.
     assert "fmt_thickness(value)" in source
     assert source.count("fmt_thickness(") >= 2

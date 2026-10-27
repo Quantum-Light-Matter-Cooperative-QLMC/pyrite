@@ -21,8 +21,10 @@ from pyrite.results import Settings, store_result
 @pytest.fixture
 def scene():
     return pr.Scene(
-        pr.Beam(energy_keV=30.0, transverse=pr.Spot(), longitudinal=pr.PointBunch()),
-        pr.Slab("hopg", thickness_ang=1e4, tilt_deg=30.0, footprint=pr.Footprint(5.0, 5.0)),
+        pr.Beam(energy_keV=30.0, transverse=pr.beams.Spot(), longitudinal=pr.beams.PointBunch()),
+        pr.geometry.Slab(
+            "hopg", thickness_ang=1e4, tilt_deg=30.0, footprint=pr.geometry.Footprint(5.0, 5.0)
+        ),
         pr.Detector(),
         physics=pr.Physics(bremsstrahlung_model="eedl"),
     )
@@ -30,7 +32,7 @@ def scene():
 
 @pytest.fixture
 def precision():
-    return pr.Precision(0.1, 40, 60, 20, observables=("cxr", "brem"))
+    return pr.config.Precision(0.1, 40, 60, 20, observables=("cxr", "brem"))
 
 
 @pytest.fixture
@@ -39,7 +41,7 @@ def numerics(precision):
 
 
 def test_precision_roundtrips_json_and_process_pickle(precision):
-    assert pr.Precision.from_dict(json.loads(json.dumps(precision.to_dict()))) == precision
+    assert pr.config.Precision.from_dict(json.loads(json.dumps(precision.to_dict()))) == precision
     assert pickle.loads(pickle.dumps(precision)) == precision
     assert "realized_electrons" not in precision.to_dict()
 
@@ -47,7 +49,7 @@ def test_precision_roundtrips_json_and_process_pickle(precision):
 def test_precision_freezes_caller_owned_sequences():
     observables = ["cxr"]
     band = [1000.0, 3000.0]
-    precision = pr.Precision(0.1, 40, 60, 20, observables=observables, band_eV=band)
+    precision = pr.config.Precision(0.1, 40, 60, 20, observables=observables, band_eV=band)
     observables.append("brem")
     band[1] = 5000.0
     assert precision.observables == ("cxr",)
@@ -58,7 +60,7 @@ def test_numerics_requires_typed_precision():
     with pytest.raises(TypeError, match="precision must be a Precision"):
         pr.Numerics(precision={"target_rse": 0.1})
     with pytest.raises(ValueError, match="per-electron or CUDA"):
-        pr.Numerics(precision=pr.Precision(0.1, 40, 60, 20), transport_core="lockstep")
+        pr.Numerics(precision=pr.config.Precision(0.1, 40, 60, 20), transport_core="lockstep")
 
 
 def test_lowering_uses_policy_maximum_and_ignores_fixed_defaults(scene, numerics):
@@ -148,7 +150,7 @@ def test_split_transport_spectrum_path_retains_provenance(scene, numerics):
 
 @pytest.mark.parametrize("split", [False, True])
 def test_early_stop_preserves_requested_case_and_matches_realized_fixed_n(scene, split):
-    precision = pr.Precision(
+    precision = pr.config.Precision(
         1.0,
         40,
         200,
@@ -300,7 +302,9 @@ def test_unsupported_block_routes_are_rejected_at_case_boundary(scene, numerics,
 
 
 def test_physical_detector_is_rejected_at_lowering(scene, numerics):
-    detector = pr.PlanarDetector(pr.PlanarPose((0.0, 0.0, 50.0)), size_mm=(1.0, 1.0))
+    detector = pr.detectors.PlanarDetector(
+        pr.detectors.PlanarPose((0.0, 0.0, 50.0)), size_mm=(1.0, 1.0)
+    )
     with pytest.raises(ValueError, match="physical detectors"):
         api.build_case(replace(scene, detector=detector), numerics)
 
@@ -308,7 +312,7 @@ def test_physical_detector_is_rejected_at_lowering(scene, numerics):
 @pytest.mark.slow
 def test_mixed_cpu_pool_preserves_fixed_case_and_adaptive_provenance(scene, monkeypatch):
     monkeypatch.delenv("PYRITE_MC_TRANSPORT_CORE", raising=False)
-    precision = pr.Precision(
+    precision = pr.config.Precision(
         1.0, 40, 200, 20, max_electron_share=1.0, min_effective_electrons=0.0, stability_blocks=0
     )
     adaptive = api.build_case(scene, pr.Numerics(precision=precision))
@@ -355,7 +359,7 @@ def test_precision_cannot_cross_with_electron_count_sweep(scene, precision):
 
 def test_precision_accepts_a_bare_observable_name():
     """A single name is one observable, not its characters (``tuple("cxr")``)."""
-    precision = pr.Precision(
+    precision = pr.config.Precision(
         target_rse=0.1,
         min_electrons=10,
         max_electrons=20,
@@ -367,9 +371,9 @@ def test_precision_accepts_a_bare_observable_name():
 
 def test_precision_min_electrons_defaults_to_one_block():
     """Issue #443: an omitted minimum is one block, the smallest legal stop."""
-    precision = pr.Precision(target_rse=0.1, max_electrons=60, block_electrons=20)
+    precision = pr.config.Precision(target_rse=0.1, max_electrons=60, block_electrons=20)
     assert precision.min_electrons == 20
-    assert pr.Precision.from_dict(precision.to_dict()) == precision
+    assert pr.config.Precision.from_dict(precision.to_dict()) == precision
 
 
 @pytest.mark.parametrize("missing", ["max_electrons", "block_electrons"])
@@ -377,4 +381,4 @@ def test_precision_still_requires_max_and_block_counts(missing):
     values = {"target_rse": 0.1, "max_electrons": 60, "block_electrons": 20}
     del values[missing]
     with pytest.raises(TypeError, match=f"requires {missing}"):
-        pr.Precision(**values)
+        pr.config.Precision(**values)

@@ -256,9 +256,9 @@ def simulate(
         :class:`~pyrite.Scene`. With a scene, omit target, detector, filters
         and acquisition; physics, numerics and quantum may override its settings.
     target
-        Scalar :class:`~pyrite.Target`, :class:`~pyrite.Slab` or :class:`~pyrite.Stack`.
+        Scalar :class:`~pyrite.Target`, :class:`~pyrite.geometry.Slab` or :class:`~pyrite.geometry.Stack`.
     detector
-        Scalar detector model or physical :class:`~pyrite.PlanarDetector`.
+        Scalar detector model or physical :class:`~pyrite.detectors.PlanarDetector`.
     physics
         Emission and interaction models. ``None`` uses the scene's settings,
         or :class:`~pyrite.Physics` for a component call.

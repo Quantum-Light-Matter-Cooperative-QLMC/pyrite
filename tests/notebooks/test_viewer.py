@@ -255,3 +255,45 @@ def test_command_watch_combines_with_run_and_edit():
     assert edit_cmd[3] == "edit"
     assert edit_cmd[4] == "--watch"
     assert edit_cmd[5] == viewer_cli.NOTEBOOK
+
+
+@pytest.mark.parametrize("cached", [False, True])
+def test_render_trace_animation_preserves_cache_and_reports_renderer_failure(
+    cached, tmp_path, monkeypatch
+):
+    from contextlib import nullcontext
+    from types import SimpleNamespace
+
+    from pyrite.plots.plotly import render, trajectories
+
+    path = tmp_path / "trace.mp4"
+    if cached:
+        path.touch()
+    calls = []
+
+    def fail(*args, **kwargs):
+        calls.append(kwargs)
+        raise RuntimeError("renderer unavailable")
+
+    monkeypatch.setattr(render, "render_reveal_animation", fail)
+    monkeypatch.setattr(trajectories, "visible_trajectory_data", lambda *a, **k: {})
+    mo = SimpleNamespace(status=SimpleNamespace(progress_bar=lambda **k: nullcontext(None)))
+    status = viewer.render_trace_animation(
+        mo,
+        "key",
+        path,
+        {},
+        {},
+        max_generation=2,
+        min_energy_keV=1,
+        realistic=False,
+        beam_fwhm_mm=0.1,
+        n_frames=24,
+        camera={"eye": {}},
+        logarithmic_color=True,
+    )
+    assert status == ("key", None if cached else "renderer unavailable")
+    assert len(calls) == (0 if cached else 1)
+    if calls:
+        assert calls[0]["logarithmic_color"] is True
+        assert calls[0]["camera"] == {"eye": {}}

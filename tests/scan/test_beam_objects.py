@@ -70,10 +70,16 @@ def test_wrong_types_name_the_allowed_options():
         pr.Beam(transverse=Spot(), longitudinal=100.0)
     with pytest.raises(TypeError):
         pr.Beam(
-            transverse_fwhm_x_mm=1.0, transverse=pr.TransverseSpot(), longitudinal=pr.PointBunch()
+            transverse_fwhm_x_mm=1.0,
+            transverse=pr.beams.TransverseSpot(),
+            longitudinal=pr.beams.PointBunch(),
         )  # flat spellings are gone
     with pytest.raises(TypeError):
-        pr.Beam(divergence_mrad=1.0, transverse=pr.TransverseSpot(), longitudinal=pr.PointBunch())
+        pr.Beam(
+            divergence_mrad=1.0,
+            transverse=pr.beams.TransverseSpot(),
+            longitudinal=pr.beams.PointBunch(),
+        )
 
 
 def test_sub_object_validation():
@@ -116,7 +122,9 @@ def test_derived_divergence_is_available_on_the_public_beam():
 
 def test_scene_and_sweep_axes_use_sub_objects():
     beam = pr.Beam(energy_keV=30.0, transverse=Spot(), longitudinal=PointBunch())
-    scene = pr.Scene(beam=beam, target=pr.Slab("hopg", footprint=pr.Footprint(5.0, 5.0)))
+    scene = pr.Scene(
+        beam=beam, target=pr.geometry.Slab("hopg", footprint=pr.geometry.Footprint(5.0, 5.0))
+    )
     sweep = pr.Sweep(scene, {"beam.transverse": [Spot(0.5), Spot(1.0), PointSpot()]})
     assert [s.beam.transverse for _, s in sweep.expand()] == [Spot(0.5), Spot(1.0), PointSpot()]
     with pytest.raises(ValueError, match="no field"):

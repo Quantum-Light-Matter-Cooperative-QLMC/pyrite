@@ -5,8 +5,10 @@ from dataclasses import replace
 import numpy as np
 import pytest
 
-from pyrite import Beam, Footprint, Numerics, PointBunch, PointSpot, Slab
+from pyrite import Beam, Numerics
+from pyrite.beams import PointBunch, PointSpot
 from pyrite.directional import observation_directions
+from pyrite.geometry import Footprint, Slab
 from pyrite.radiation import directional_source
 from pyrite.results.directional import DirectionalSpectrum
 
@@ -153,8 +155,9 @@ def test_invalid_requests(inputs, kwargs, match):
 @pytest.mark.slow
 def test_shared_transport_matches_fixed_direction_cxr_only(inputs, monkeypatch):
     import pyrite.directional as owner
-    from pyrite import EnergyBins, Scene
+    from pyrite import Scene
     from pyrite.api import build_case
+    from pyrite.detectors import EnergyBins
     from pyrite.montecarlo import runner
 
     controls = Numerics(
@@ -205,8 +208,9 @@ def test_shared_transport_matches_fixed_direction_cxr_only(inputs, monkeypatch):
 @pytest.mark.slow
 def test_shared_transport_components_match_fixed_direction_scorers(inputs, monkeypatch):
     import pyrite.directional as owner
-    from pyrite import EnergyBins, Scene
+    from pyrite import Scene
     from pyrite.api import build_case
+    from pyrite.detectors import EnergyBins
     from pyrite.directional import directional_sources
     from pyrite.montecarlo import runner
 
@@ -276,7 +280,8 @@ def test_grazing_explicitly_masked_without_scoring(monkeypatch):
 
 
 def test_detector_acceptance_remains_strictly_positive():
-    from pyrite import AngularAcceptance, Detector
+    from pyrite import Detector
+    from pyrite.detectors import AngularAcceptance
 
     with pytest.raises(ValueError):
         Detector(acceptance=AngularAcceptance(polar_deg=1.0, solid_angle_sr=0.0))

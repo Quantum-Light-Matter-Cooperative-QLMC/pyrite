@@ -33,24 +33,26 @@ def fake_directional(monkeypatch):
     monkeypatch.setattr(api, "run_case_directions", fake)
 
 
-def _acquisition(**overrides) -> pr.Acquisition:
+def _acquisition(**overrides) -> pr.observations.Acquisition:
     values = dict(exposure_s=1.0, measured_edges_eV=(0.0, 1_000.0, 2_000.0, 3_000.0))
-    return pr.Acquisition(**{**values, **overrides})
+    return pr.observations.Acquisition(**{**values, **overrides})
 
 
 def _simulate(
     *, acquisition=None, angular_shape=(2, 2), response=None, reconstruction="nearest_tile"
 ) -> pr.Result:
-    detector = pr.PlanarDetector(
-        pose=pr.PlanarPose.from_observation(100.0, 60.0),
-        pixels=pr.PixelGrid((4, 6), (0.5, 0.5)),
-        response=pr.IdealPhotonCounter() if response is None else response,
-        scorer=pr.PixelScorer(angular_shape, reconstruction),
+    detector = pr.detectors.PlanarDetector(
+        pose=pr.detectors.PlanarPose.from_observation(100.0, 60.0),
+        pixels=pr.detectors.PixelGrid((4, 6), (0.5, 0.5)),
+        response=pr.detectors.IdealPhotonCounter() if response is None else response,
+        scorer=pr.config.PixelScorer(angular_shape, reconstruction),
     )
-    plate = pr.FilterPlate("silicon", 0.05, (1.5, 10.0), pr.PlanarPose.from_observation(50.0, 60.0))
+    plate = pr.geometry.FilterPlate(
+        "silicon", 0.05, (1.5, 10.0), pr.detectors.PlanarPose.from_observation(50.0, 60.0)
+    )
     return pr.simulate(
-        pr.Beam(30.0, transverse=pr.Spot(), longitudinal=pr.PointBunch()),
-        pr.Slab("hopg", 1_000.0, tilt_deg=30.0, footprint=pr.Footprint(5.0, 5.0)),
+        pr.Beam(30.0, transverse=pr.beams.Spot(), longitudinal=pr.beams.PointBunch()),
+        pr.geometry.Slab("hopg", 1_000.0, tilt_deg=30.0, footprint=pr.geometry.Footprint(5.0, 5.0)),
         detector,
         numerics=pr.Numerics(cxr_trials=1, brem_trials=1),
         filters=(plate,),
@@ -136,7 +138,12 @@ def test_rescoring_reuses_true_factors_and_matches_a_fresh_run(tmp_path) -> None
     store.put(rescored)
     fresh = _simulate(acquisition=new_acquisition)
     fresh = pr.simulate(
-        pr.Beam(30.0, bunch_charge_pc=2.0, transverse=pr.Spot(), longitudinal=pr.PointBunch()),
+        pr.Beam(
+            30.0,
+            bunch_charge_pc=2.0,
+            transverse=pr.beams.Spot(),
+            longitudinal=pr.beams.PointBunch(),
+        ),
         fresh.provenance["scene"].target,
         fresh.provenance["scene"].detector,
         numerics=fresh.provenance["numerics"],
@@ -210,14 +217,14 @@ def test_reconstruction_mode_is_a_new_true_object_and_survives_reopen(tmp_path) 
 
 
 def test_acquisition_free_simulation_keeps_the_reconstruction_mode() -> None:
-    detector = pr.PlanarDetector(
-        pose=pr.PlanarPose.from_observation(100.0, 60.0),
-        pixels=pr.PixelGrid((4, 6), (0.5, 0.5)),
-        scorer=pr.PixelScorer((2, 3), "bilinear_tile"),
+    detector = pr.detectors.PlanarDetector(
+        pose=pr.detectors.PlanarPose.from_observation(100.0, 60.0),
+        pixels=pr.detectors.PixelGrid((4, 6), (0.5, 0.5)),
+        scorer=pr.config.PixelScorer((2, 3), "bilinear_tile"),
     )
     result = pr.simulate(
-        pr.Beam(30.0, transverse=pr.Spot(), longitudinal=pr.PointBunch()),
-        pr.Slab("hopg", 1_000.0, tilt_deg=30.0, footprint=pr.Footprint(5.0, 5.0)),
+        pr.Beam(30.0, transverse=pr.beams.Spot(), longitudinal=pr.beams.PointBunch()),
+        pr.geometry.Slab("hopg", 1_000.0, tilt_deg=30.0, footprint=pr.geometry.Footprint(5.0, 5.0)),
         detector,
         numerics=pr.Numerics(cxr_trials=1, brem_trials=1),
     )
@@ -355,7 +362,9 @@ def test_reopened_pixel_metadata_matches_the_scoring_geometry(tmp_path) -> None:
     np.testing.assert_allclose(metadata.solid_angle_sr, flat, rtol=1.0e-14)
     np.testing.assert_allclose(metadata.direction_lab, rays.directions_lab.reshape(-1, 3))
     np.testing.assert_allclose(np.linalg.norm(metadata.direction_lab, axis=1), 1.0)
-    plate = pr.FilterPlate("silicon", 0.05, (1.5, 10.0), pr.PlanarPose.from_observation(50.0, 60.0))
+    plate = pr.geometry.FilterPlate(
+        "silicon", 0.05, (1.5, 10.0), pr.detectors.PlanarPose.from_observation(50.0, 60.0)
+    )
     np.testing.assert_allclose(
         metadata.path_length_mm, filter_path_lengths(rays, (plate,)).reshape(-1, 1)
     )
@@ -388,10 +397,12 @@ def test_simulate_rejects_removed_pixel_scorer_keyword() -> None:
 
 @pytest.mark.parametrize("mode,seed", [("expected", None), ("poisson", 19)])
 def test_native_reporting_matches_explicit_identity_counts_and_storage(tmp_path, mode, seed):
-    request = pr.Acquisition.native(exposure_s=0.001, mode=mode, seed=seed, hit_threshold_eV=600)
+    request = pr.observations.Acquisition.native(
+        exposure_s=0.001, mode=mode, seed=seed, hit_threshold_eV=600
+    )
     result = _simulate(acquisition=request)
     native = observation_from_result(result)
-    assert isinstance(native.acquisition, pr.Acquisition)
+    assert isinstance(native.acquisition, pr.observations.Acquisition)
     assert native.acquisition.measured_edges_eV == (250, 750, 1250, 1750, 2250, 2750, 3250)
     explicit_result = _simulate(acquisition=native.acquisition)
     explicit = observation_from_result(explicit_result)
@@ -464,7 +475,9 @@ def test_native_timepix_reporting_covers_mixed_domains_and_broadened_tails(monke
     monkeypatch.setattr(api, "run_case_directions", directional)
     monkeypatch.setattr(timepix_response, "get_response", get_response)
     native = observation_from_result(
-        _simulate(acquisition=pr.Acquisition.native(exposure_s=0.001), response=Timepix3())
+        _simulate(
+            acquisition=pr.observations.Acquisition.native(exposure_s=0.001), response=Timepix3()
+        )
     )
     assert native.acquisition.measured_edges_eV == (0, 1000, 1500, 2000, 3000, 4500)
     assert set(used_axes) == {tuple(line), tuple(continuum)}

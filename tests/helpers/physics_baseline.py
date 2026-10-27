@@ -171,8 +171,8 @@ def _channeling_scene(physics_kwargs=None):
         **(physics_kwargs or {}),
     )
     return pr.Scene(
-        pr.Beam(energy_keV=5000.0, transverse=pr.Spot(), longitudinal=pr.PointBunch()),
-        pr.Slab(
+        pr.Beam(energy_keV=5000.0, transverse=pr.beams.Spot(), longitudinal=pr.beams.PointBunch()),
+        pr.geometry.Slab(
             "silicon",
             thickness_ang=20000.0,
             tilt_deg=3.0,

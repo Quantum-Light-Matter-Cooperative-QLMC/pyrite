@@ -106,3 +106,54 @@ def saved_capture_panel(
             ),
         ]
     )
+
+
+def render_trace_animation(
+    mo,
+    render_key,
+    render_path,
+    case,
+    data,
+    *,
+    max_generation,
+    min_energy_keV,
+    realistic,
+    beam_fwhm_mm,
+    n_frames,
+    camera,
+    logarithmic_color,
+):
+    """Render an uncached trace movie and return the notebook's status pair."""
+    from ..plots.plotly.render import prune_render_cache, render_reveal_animation
+    from ..plots.plotly.trajectories import visible_trajectory_data
+
+    if render_path.exists():
+        return render_key, None
+    try:
+        with mo.status.progress_bar(
+            total=n_frames,
+            title="Rendering animation",
+            subtitle=f"{n_frames} frames, ~3 s each offscreen",
+        ) as bar:
+
+            def progress_cb(_k, _n):
+                bar.update()
+
+            render_reveal_animation(
+                case,
+                visible_trajectory_data(
+                    data, max_generation=max_generation, min_energy_keV=min_energy_keV
+                ),
+                render_path,
+                realistic=realistic,
+                beam_fwhm_mm=beam_fwhm_mm,
+                n_frames=n_frames,
+                fps=12,
+                camera=camera,
+                logarithmic_color=logarithmic_color,
+                progress_cb=progress_cb,
+            )
+        prune_render_cache()
+    except (ImportError, RuntimeError) as exc:
+        return render_key, str(exc)
+    return render_key, None

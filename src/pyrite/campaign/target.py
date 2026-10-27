@@ -17,10 +17,10 @@ class Target:
 
     ``tilt_deg`` and ``tilt_azim_deg`` are scalar target angles in degrees;
     ``lattice_cut='catalog'`` retains the selected crystal's existing cut; a
-    :class:`~pyrite.CrystalCut` orients the lattice relative to the entrance
+    :class:`~pyrite.geometry.CrystalCut` orients the lattice relative to the entrance
     face instead.
     ``mosaic`` and ``allow_normal_incidence`` have the same meaning as on
-    :class:`~pyrite.Slab`. The target reference remains the entrance origin.
+    :class:`~pyrite.geometry.Slab`. The target reference remains the entrance origin.
     Arbitrary lab poses, amorphous entrances, layers and grooves are unsupported
     by this adapter; existing ``Slab``/``Stack`` constructors remain available.
     Interaction models and sampling belong to ``Scene.physics``/``numerics``.

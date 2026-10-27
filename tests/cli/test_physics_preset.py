@@ -55,14 +55,14 @@ def test_unit_bearing_physics_preset_resolves_before_profile_identity(_isolate_u
     profile_path.write_text(profile_path.read_text() + 'inelastic_cutoff_eV = "3 keV"\n')
 
     catalog = load_material_catalog(profile="campaign")
-    physics = pyrite.load_physics("physical", catalog=load_material_catalog())
+    physics = pyrite.config.load_physics("physical", catalog=load_material_catalog())
     effective = catalog.profile_numerics("campaign")
     assert physics.inelastic_cutoff_eV == 2000.0
     assert effective["inelastic_cutoff_eV"] == 3000.0
 
 
 def test_bundled_reference_preset_restates_built_in_physics():
-    assert pyrite.load_physics("electron-standard") == pyrite.Physics()
+    assert pyrite.config.load_physics("electron-standard") == pyrite.Physics()
     refused = invoke(command, ["physics", "preset", "set", "electron-standard", "--straggling"])
     assert refused.exit_code == 1
     assert "read-only" in refused.stderr
@@ -87,10 +87,10 @@ def test_clone_edit_show_and_load_through_the_api(_isolate_user_catalog):
     sources = {row["name"]: row["source"] for row in listed["presets"]}
     assert sources == {"electron-standard": "bundled", "mine": "user"}
 
-    physics = pyrite.load_physics("mine", catalog=load_material_catalog())
+    physics = pyrite.config.load_physics("mine", catalog=load_material_catalog())
     assert physics == replace(pyrite.Physics(), elastic_model="mott", straggling=True)
     with pytest.raises(KeyError, match="unknown physics preset"):
-        pyrite.load_physics("missing", catalog=load_material_catalog())
+        pyrite.config.load_physics("missing", catalog=load_material_catalog())
 
 
 def test_profile_reference_resolution_overrides_and_provenance(_isolate_user_catalog):

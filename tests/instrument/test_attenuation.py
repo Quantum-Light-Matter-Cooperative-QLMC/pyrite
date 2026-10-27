@@ -54,7 +54,9 @@ def test_attenuation_matrix_makes_zero_energy_opaque_and_keeps_positive_energies
     from pyrite.instrument.attenuation import attenuation_matrix
     from pyrite.materials.attenuation import linear_attenuation_inv_mm
 
-    plate = pr.FilterPlate("silicon", 0.1, (1.0, 1.0), pr.PlanarPose((0.0, 0.0, 10.0)))
+    plate = pr.geometry.FilterPlate(
+        "silicon", 0.1, (1.0, 1.0), pr.detectors.PlanarPose((0.0, 0.0, 10.0))
+    )
     energy = np.array([0.0, 1_000.0, 8_000.0])
 
     coefficient = attenuation_matrix((plate,), energy)

@@ -38,13 +38,13 @@ def _case(plane=(1, -1, 0), *, n=N, numerics=SMALL, thickness_ang=10000.0):
         channeling_model="planar", channeling_plane=plane, radiative_model="uncoupled"
     )
     scene = pr.Scene(
-        pr.Beam(energy_keV=5000.0, transverse=pr.Spot(), longitudinal=pr.PointBunch()),
-        pr.Slab(
+        pr.Beam(energy_keV=5000.0, transverse=pr.beams.Spot(), longitudinal=pr.beams.PointBunch()),
+        pr.geometry.Slab(
             "silicon",
             thickness_ang=thickness_ang,
             tilt_deg=3.0,
             tilt_azim_deg=45.0,
-            footprint=pr.Footprint(5.0, 5.0),
+            footprint=pr.geometry.Footprint(5.0, 5.0),
         ),
         pr.Detector(),
         physics=physics,
@@ -54,7 +54,7 @@ def _case(plane=(1, -1, 0), *, n=N, numerics=SMALL, thickness_ang=10000.0):
         pr.Numerics(
             cxr_trials=n,
             brem_trials=n,
-            energy_bins=pr.EnergyBins(cxr=np.linspace(1e3, 2e3, 9)),
+            energy_bins=pr.detectors.EnergyBins(cxr=np.linspace(1e3, 2e3, 9)),
             **numerics,
         ),
     )

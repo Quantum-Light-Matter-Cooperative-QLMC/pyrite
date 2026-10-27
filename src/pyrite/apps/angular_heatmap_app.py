@@ -456,7 +456,7 @@ def _(maps, mo):
       plane. Submit the form to calculate new orientations.
     - **Execution:** the array backend is fixed when the app starts. Launch with
       `pyrite app angular-heatmap launch --backend cuda` to offer the CUDA core.
-      Use `pyrite.directional_sources` for scripted or remote studies.
+      Use `pyrite.radiation.directional_sources` for scripted or remote studies.
     """)
                 }
             ),

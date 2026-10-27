@@ -164,15 +164,17 @@ def test_configuration_refuses_invalid_inputs(tmp_path):
 
 def test_beam_stores_spec_but_refuses_unimplemented_production_injection():
     spec = pr.TransverseStateSpec.recipe("gaussian", waist_ang=10)
-    beam = pr.Beam(energy_keV=30, transverse=pr.Spot(), longitudinal=pr.PointBunch(), state=spec)
+    beam = pr.Beam(
+        energy_keV=30, transverse=pr.beams.Spot(), longitudinal=pr.beams.PointBunch(), state=spec
+    )
     assert beam.state == spec
     with pytest.raises(ValueError, match="not yet.*transport"):
         beam.to_spec()
     with pytest.raises(TypeError, match="TransverseStateSpec"):
         pr.Beam(
             energy_keV=30,
-            transverse=pr.Spot(),
-            longitudinal=pr.PointBunch(),
+            transverse=pr.beams.Spot(),
+            longitudinal=pr.beams.PointBunch(),
             state={"kind": "gaussian"},
         )
     # No-state legacy lowering retains its exact field set and behavior.

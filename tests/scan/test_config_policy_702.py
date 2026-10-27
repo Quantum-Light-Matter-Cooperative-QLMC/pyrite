@@ -24,8 +24,10 @@ from pyrite.campaign.profiles import case_content_key
 
 def _scene(numerics):
     return pr.Scene(
-        pr.Beam(energy_keV=30.0, transverse=pr.Spot(), longitudinal=pr.PointBunch()),
-        pr.Slab("hopg", thickness_ang=1000.0, tilt_deg=30.0, footprint=pr.Footprint(5.0, 5.0)),
+        pr.Beam(energy_keV=30.0, transverse=pr.beams.Spot(), longitudinal=pr.beams.PointBunch()),
+        pr.geometry.Slab(
+            "hopg", thickness_ang=1000.0, tilt_deg=30.0, footprint=pr.geometry.Footprint(5.0, 5.0)
+        ),
         pr.Detector(),
         physics=cfg.Physics(bremsstrahlung_model="eedl"),
         numerics=numerics,

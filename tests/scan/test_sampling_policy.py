@@ -11,15 +11,17 @@ from pyrite.campaign.profiles import case_content_key
 
 def _scene():
     return pr.Scene(
-        pr.Beam(energy_keV=30.0, transverse=pr.Spot(), longitudinal=pr.PointBunch()),
-        pr.Slab("hopg", thickness_ang=10_000.0, tilt_deg=30.0, footprint=pr.Footprint(5.0, 5.0)),
+        pr.Beam(energy_keV=30.0, transverse=pr.beams.Spot(), longitudinal=pr.beams.PointBunch()),
+        pr.geometry.Slab(
+            "hopg", thickness_ang=10_000.0, tilt_deg=30.0, footprint=pr.geometry.Footprint(5.0, 5.0)
+        ),
         pr.Detector(),
         physics=pr.Physics(bremsstrahlung_model="eedl"),
     )
 
 
 def _policy():
-    return pr.AdaptiveSampling(
+    return pr.config.AdaptiveSampling(
         0.1,
         40,
         80,
@@ -38,7 +40,9 @@ def test_fixed_policy_matches_legacy_case_payload_and_key():
     new = build_case(
         replace(
             scene,
-            numerics=pr.Numerics(sampling=pr.FixedSampling(cxr_electrons=31, brem_electrons=17)),
+            numerics=pr.Numerics(
+                sampling=pr.config.FixedSampling(cxr_electrons=31, brem_electrons=17)
+            ),
         )
     )
     assert pickle.dumps(old.to_dict(), protocol=5) == pickle.dumps(new.to_dict(), protocol=5)
@@ -52,7 +56,7 @@ def test_adaptive_policy_matches_legacy_identity_and_brem_prefix():
 
     scene = _scene()
     policy = _policy()
-    legacy = pr.Precision.from_dict(policy.to_dict())
+    legacy = pr.config.Precision.from_dict(policy.to_dict())
     old = build_case(replace(scene, numerics=pr.Numerics(precision=legacy)))
     new_numerics = pr.Numerics(sampling=policy)
     new = build_case(replace(scene, numerics=new_numerics))
@@ -73,9 +77,9 @@ def test_default_and_existing_legacy_path_are_unchanged():
     numerics = pr.Numerics()
     assert numerics.sampling is None
     assert numerics.precision is None
-    assert numerics.resolved_sampling == pr.FixedSampling()
+    assert numerics.resolved_sampling == pr.config.FixedSampling()
     assert numerics.describe_sampling()["source"] == "legacy"
-    legacy = pr.Numerics(precision=pr.Precision(0.1, 40, 80, 20))
+    legacy = pr.Numerics(precision=pr.config.Precision(0.1, 40, 80, 20))
     assert legacy.sampling is None
     assert legacy.resolved_sampling.to_dict() == legacy.precision.to_dict()
     assert legacy.describe_sampling()["source"] == "legacy"
@@ -84,7 +88,7 @@ def test_default_and_existing_legacy_path_are_unchanged():
 @pytest.mark.parametrize("value", [0, -1, True, 1.5, "5"])
 def test_fixed_policy_validates_counts(value):
     with pytest.raises(ValueError, match="positive integer"):
-        pr.FixedSampling(cxr_electrons=value)
+        pr.config.FixedSampling(cxr_electrons=value)
 
 
 def test_explicit_conflicting_sources_are_rejected():
@@ -92,11 +96,13 @@ def test_explicit_conflicting_sources_are_rejected():
     with pytest.raises(ValueError, match="cannot combine"):
         pr.Numerics(sampling=policy, cxr_trials=7)
     with pytest.raises(ValueError, match="cannot combine"):
-        pr.Numerics(sampling=pr.FixedSampling(31, 17), brem_trials=23)
+        pr.Numerics(sampling=pr.config.FixedSampling(31, 17), brem_trials=23)
     with pytest.raises(ValueError, match="cannot combine"):
-        pr.Numerics(sampling=pr.FixedSampling(), precision=pr.Precision(0.1, 40, 80, 20))
+        pr.Numerics(
+            sampling=pr.config.FixedSampling(), precision=pr.config.Precision(0.1, 40, 80, 20)
+        )
     with pytest.raises(ValueError, match="conflicts"):
-        pr.Numerics(sampling=policy, precision=pr.Precision(0.2, 40, 80, 20))
+        pr.Numerics(sampling=policy, precision=pr.config.Precision(0.2, 40, 80, 20))
     with pytest.raises(TypeError, match="sampling must be"):
         pr.Numerics(sampling={"mode": "fixed"})
     with pytest.raises(ValueError, match="per-electron or CUDA"):
@@ -104,7 +110,7 @@ def test_explicit_conflicting_sources_are_rejected():
 
 
 def test_replace_preserves_sampling_selection_and_positional_legacy():
-    original = pr.Numerics(sampling=pr.FixedSampling(31, 17))
+    original = pr.Numerics(sampling=pr.config.FixedSampling(31, 17))
     assert replace(original, max_dE_frac=0.01).resolved_sampling == original.sampling
     assert pr.Numerics(31, 17).resolved_sampling == original.sampling
     adaptive = pr.Numerics(sampling=_policy())

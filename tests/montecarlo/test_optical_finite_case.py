@@ -45,12 +45,14 @@ def transported():
     # Ne > Ne_brem exercises selection of scored primaries from real segments.
     # No planar TR is scored; the separately specified PEC is a diagnostic.
     scene = pr.Scene(
-        pr.Beam(energy_keV=30.0, transverse=pr.PointSpot(), longitudinal=pr.PointBunch()),
-        pr.Slab(
+        pr.Beam(
+            energy_keV=30.0, transverse=pr.beams.PointSpot(), longitudinal=pr.beams.PointBunch()
+        ),
+        pr.geometry.Slab(
             "hopg",
             thickness_ang=1e4,
             tilt_deg=0.0,
-            footprint=pr.Footprint(5.0, 5.0),
+            footprint=pr.geometry.Footprint(5.0, 5.0),
             allow_normal_incidence=True,
         ),
         pr.Detector(),

@@ -15,10 +15,12 @@ def _scene(tilt=84.5, azimuth=0.0):
     return pr.Scene(
         beam=pr.Beam(
             energy_keV=30.0,
-            transverse=pr.TransverseSpot(0.001, 0.002),
-            longitudinal=pr.BunchLength(0.001),
+            transverse=pr.beams.TransverseSpot(0.001, 0.002),
+            longitudinal=pr.beams.BunchLength(0.001),
         ),
-        target=pr.Slab("hopg", 500.0, tilt_deg=tilt, tilt_azim_deg=azimuth, footprint=None),
+        target=pr.geometry.Slab(
+            "hopg", 500.0, tilt_deg=tilt, tilt_azim_deg=azimuth, footprint=None
+        ),
         detector=pr.Detector(observation_angle_deg=145.0),
     )
 
@@ -111,7 +113,10 @@ def test_unsupported_source_and_stack_are_rejected():
     with pytest.raises(ValueError, match="monoenergetic"):
         spread.phase_matched_bunch_front_tilt((0, 0, 2))
     stack = replace(
-        scene, target=pr.Stack((pr.Layer("hopg", 500), pr.Layer("hopg", 500)), footprint=None)
+        scene,
+        target=pr.geometry.Stack(
+            (pr.geometry.Layer("hopg", 500), pr.geometry.Layer("hopg", 500)), footprint=None
+        ),
     )
     with pytest.raises(ValueError, match="single Slab"):
         stack.phase_matched_bunch_front_tilt((0, 0, 2))
@@ -121,8 +126,8 @@ def test_planar_detector_requires_an_explicit_ray():
     scene = _scene()
     planar = replace(
         scene,
-        detector=pr.PlanarDetector(
-            pose=pr.PlanarPose(
+        detector=pr.detectors.PlanarDetector(
+            pose=pr.detectors.PlanarPose(
                 center_mm=(0.0, 0.0, 100.0), normal=(0.0, 0.0, 1.0), x_axis=(1.0, 0.0, 0.0)
             ),
             size_mm=(10.0, 10.0),

@@ -52,8 +52,8 @@ def produce_observation(
     Parameters
     ----------
     scene
-        Scene with a pixelated :class:`~pyrite.PlanarDetector`, an explicit
-        response, and an :class:`~pyrite.Acquisition`.
+        Scene with a pixelated :class:`~pyrite.detectors.PlanarDetector`, an explicit
+        response, and an :class:`~pyrite.observations.Acquisition`.
     numerics
         Transport numerics; part of the source identity.
     store

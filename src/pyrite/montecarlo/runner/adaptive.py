@@ -546,7 +546,7 @@ def run_case_adaptive(
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Compatibility helper returning the realized fixed-N result and statistics.
 
-    Public callers select a :class:`~pyrite.Precision` on ``Numerics`` and use
+    Public callers select a :class:`~pyrite.config.Precision` on ``Numerics`` and use
     ``simulate`` or ``run_case``; their output carries ``adaptive_sampling``.
     This helper retains the internal two-value return convention.
 
