@@ -9,6 +9,7 @@ import numpy as np
 import pytest
 
 from pyrite.apps.transition_radiation import (
+    DEFAULT_LINE_HISTORIES,
     DemoConfig,
     comparison_figure,
     photon_grid,
@@ -37,8 +38,8 @@ def test_reference_profiles_match_notebook_scene(profile, mode):
     direct = build_case(
         reference_scene(DemoConfig(), mode),
         pr.Numerics(
-            cxr_trials=32,
-            brem_trials=64,
+            cxr_trials=DEFAULT_LINE_HISTORIES,
+            brem_trials=2 * DEFAULT_LINE_HISTORIES,
             energy_bins=EnergyBins(cxr=photon_grid(), brem=np.arange(200.0, 30000.0, 100.0)),
         ),
         physics=reference_physics(mode),
@@ -149,7 +150,9 @@ def test_app_initial_export_has_analytic_plots_and_waits_for_transport():
     _, definitions = app.run()
     assert definitions["scene_form"].value is None
     assert definitions["config"] == DemoConfig()
-    assert definitions["analytic"]["energy"].size == 81
+    assert definitions["analytic"]["energy"].size == 801
+    assert definitions["analytic"]["angles"].size == 301
+    assert definitions["trials_ui"].value == DEFAULT_LINE_HISTORIES
     assert "production" not in definitions
     plt.close("all")
 

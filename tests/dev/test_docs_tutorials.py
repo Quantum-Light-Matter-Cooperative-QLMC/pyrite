@@ -553,6 +553,8 @@ def test_tr_ctr_app_output_renders_signed_native_arrays_without_transport(
 ):
     import matplotlib
 
+    from pyrite.apps.transition_radiation import DEFAULT_LINE_HISTORIES
+
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
@@ -568,15 +570,16 @@ def test_tr_ctr_app_output_renders_signed_native_arrays_without_transport(
     assert data["units"] == "ph/incident-electron/eV/sr"
     assert data["physical_electrons"] == pytest.approx(624.1509074460763)
     analytic = data["analytic"]
-    np.testing.assert_array_equal(analytic["energy_eV"], np.arange(200, 1010, 10))
-    np.testing.assert_array_equal(analytic["angle_deg"], np.arange(100, 176))
+    np.testing.assert_array_equal(analytic["energy_eV"], np.arange(200, 1001))
+    np.testing.assert_array_equal(analytic["angle_deg"], np.arange(100, 175.25, 0.25))
     np.testing.assert_allclose(
         analytic["ctr"],
         np.asarray(analytic["film"])
         * (1 + (data["physical_electrons"] - 1) * np.asarray(analytic["form_factor"])),
     )
     for record in data["transport"].values():
-        assert record["case"]["Ne"] == 32 and record["case"]["Ne_brem"] == 64
+        assert record["case"]["Ne"] == DEFAULT_LINE_HISTORIES
+        assert record["case"]["Ne_brem"] == 2 * DEFAULT_LINE_HISTORIES
         assert record["seed"] == record["case"]["seed"] == 1
         assert record["provenance"]["backend"] == "cpu"
         np.testing.assert_array_equal(record["energy_eV"], analytic["energy_eV"])
@@ -585,8 +588,10 @@ def test_tr_ctr_app_output_renders_signed_native_arrays_without_transport(
             np.asarray(record["transition"]) + np.asarray(record["other_cxr"]),
         )
     negative = np.count_nonzero(np.asarray(data["transport"]["bunch"]["transition"]) < 0)
-    assert negative > 0
-    assert any(f"negative in {negative} of 81 bins" in warning for warning in data["warnings"])
+    ctr_warnings = [w for w in data["warnings"] if "CTR pair estimate is negative" in w]
+    assert bool(ctr_warnings) == bool(negative)
+    if negative:
+        assert f"negative in {negative} of 801 bins" in ctr_warnings[0]
     try:
         for view in ("analytic", "transport"):
             tutorials.transition_radiation_demo(view)

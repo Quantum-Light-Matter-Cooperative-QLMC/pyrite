@@ -26,7 +26,9 @@ arrival delays on the tilted film. Production instead samples these offsets.
 
 **Run transported comparison** explicitly starts two fixed-count runs.
 **Line histories** sets the line population; the continuum population is twice
-it and scores TR. **Transport core** offers CPU cores, plus CUDA when launched
+it and scores TR. Defaults are 2048 line and 4096 continuum histories per run;
+the source grid has 801 energies (1 eV spacing) and 301 map angles (0.25° spacing).
+**Transport core** offers CPU cores, plus CUDA when launched
 with `pyrite app transition-radiation launch --backend cuda`. Both runs use
 midpoint integration, continuous inelastic loss, incoherent PXR/CBS, uncoupled
 radiative transport and explicitly selected EEDL bremsstrahlung. The app reports
@@ -51,7 +53,7 @@ Coherent PXR/CBS requires the documented
 ## Profiles and checkpoints
 
 `tr_demo` and `ctr_demo` select only silicon with the app's default beam, film,
-detector, photon grid and 32/64 fixed counts. `transition_radiation = "history"`
+detector, photon grid and 2048/4096 fixed counts. `transition_radiation = "history"`
 selects the former; `"bunch"` selects the latter. Physical charge controls the
 bunch population independently of trial counts. `emission = "incoherent"`
 selects PXR/CBS coherence and does not disable CTR.

@@ -44,11 +44,11 @@ class DemoConfig:
     tilt_deg: float = 5.0
     start_eV: float = 200.0
     stop_eV: float = 1000.0
-    energy_points: int = 81
+    energy_points: int = 801
     log_energy: bool = False
     angle_min_deg: float = 100.0
     angle_max_deg: float = 175.0
-    angle_points: int = 76
+    angle_points: int = 301
 
     def __post_init__(self):
         for name, lower, upper in (
@@ -87,6 +87,8 @@ class DemoConfig:
 
 #: Largest (energy x angle) straight-track map; about 0.5 GB of complex scratch.
 MAX_MAP_ELEMENTS = 4_000_000
+#: Shared app, guide and reference-profile line count; TR uses twice this count.
+DEFAULT_LINE_HISTORIES = 2048
 #: Directions within this |cos| of the film plane are not radiated into.
 GRAZING_COS = 1e-6
 
@@ -94,8 +96,6 @@ GRAZING_COS = 1e-6
 def photon_grid(config: DemoConfig | None = None):
     """Photon sample energies in eV; the default matches the catalog reference profiles."""
     config = DemoConfig() if config is None else config
-    if config == DemoConfig():
-        return np.arange(200.0, 1010.0, 10.0)
     spacing = np.geomspace if config.log_energy else np.linspace
     return spacing(config.start_eV, config.stop_eV, config.energy_points)
 
@@ -254,7 +254,9 @@ def reference_physics(mode: str):
 
 
 @lru_cache(maxsize=2)
-def transported_demo(config: DemoConfig, *, trials=32, transport_core="per-electron"):
+def transported_demo(
+    config: DemoConfig, *, trials=DEFAULT_LINE_HISTORIES, transport_core="per-electron"
+):
     """Run two fixed-count scenes, retaining signed spectra and warnings.
 
     ``trials`` line histories (twice as many continuum histories). The CUDA

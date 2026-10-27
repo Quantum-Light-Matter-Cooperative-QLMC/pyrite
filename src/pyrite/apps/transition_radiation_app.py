@@ -23,6 +23,7 @@ def _():
         transport_cores,
     )
     from pyrite.apps.transition_radiation import (
+        DEFAULT_LINE_HISTORIES,
         DemoConfig,
         comparison_figure,
         map_panels,
@@ -56,6 +57,7 @@ def _():
     )
     return (
         BACKEND,
+        DEFAULT_LINE_HISTORIES,
         DemoConfig,
         comparison_figure,
         form_template,
@@ -230,9 +232,9 @@ def _(config, mo):
 
 
 @app.cell
-def _(BACKEND, mo, transport_cores):
+def _(BACKEND, DEFAULT_LINE_HISTORIES, mo, transport_cores):
     transport_button = mo.ui.run_button(label="Run transported comparison")
-    trials_ui = mo.ui.number(1, 1_000_000, value=32, label="Line histories")
+    trials_ui = mo.ui.number(1, 1_000_000, value=DEFAULT_LINE_HISTORIES, label="Line histories")
     core_ui = mo.ui.dropdown(
         [c for c in transport_cores(BACKEND.name) if c != "auto"],
         value="per-electron",

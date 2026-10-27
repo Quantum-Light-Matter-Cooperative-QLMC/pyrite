@@ -38,14 +38,16 @@ also includes the Gaussian time/position form factor. In the live app, change
 **RMS duration** to **100 as** and submit **Update comparison**: the bunch excess
 vanishes over this band. Angle–energy maps and the form-factor plot let you
 explore the same calculation interactively.
-The default 10 eV energy spacing and 1° angular spacing are visualization
-samples; refine them before interpreting fringe minima or integrating a yield.
+The default 1 eV energy spacing and 0.25° angular spacing resolve the film
+fringes more clearly than the former 10 eV / 1° grids. The repeated minima are
+physical entry/exit interference. These are visualization samples; refine them
+before interpreting fringe minima or integrating a yield.
 
 ## Run the reference profiles
 
 [Fetch the reference tables](getting-started.md#install-and-fetch-reference-data),
 then click **Run transported comparison** in the notebook. It runs history TR
-and bunch CTR with the same default scene, using **32 line histories and 64
+and bunch CTR with the same default scene, using **2048 line histories and 4096
 continuum histories per run**. TR is scored from the continuum population.
 The sampled trajectories include scattering and energy loss; bunch CTR samples
 the time/position offsets rather than multiplying by an analytic form factor.
@@ -54,17 +56,11 @@ the time/position offsets rather than multiplying by an analytic form factor.
 .. plot::
    :filename-prefix: tr-ctr-transport
    :alt: Seeded transported history TR and signed bunch CTR spectra, with other CXR, combined CXR and dotted straight-track references on symmetric log axes.
-   :caption: Actual CPU transport at seed 1: 32 line and 64 continuum histories per run. Dotted curves reproduce the analytic comparison above.
+   :caption: Actual CPU transport at seed 1: 2048 line and 4096 continuum histories per run, sampled every 1 eV. Dotted curves reproduce the analytic comparison above.
 
    from _tutorials import transition_radiation_demo
    transition_radiation_demo(view="transport")
 ```
-
-The two runs estimate different coherence laws. Their departure from the
-straight-track references includes transport effects and finite-sample noise;
-these small samples do not establish convergence. Increase **Line histories**
-for a sampling study. This run warned of **31 negative CTR bins out of 81**;
-the symmetric log scale preserves them.
 
 To save the same default cases as campaign checkpoints instead:
 
