@@ -7,6 +7,7 @@ from typing import Any
 import numpy as np
 from scipy.constants import elementary_charge
 
+from .quantified_directional import QuantifiedDirectionalSpectrum
 from .store import beam_current_na
 
 #: Result component identity for each public directional component name.
@@ -45,6 +46,23 @@ class DirectionalSpectrum:
     provenance: Mapping[str, Any]
     component: str = "incoherent-pxr-cbs"
     units: str = "ph/incident-electron/eV/sr"
+
+    def quantify(self) -> QuantifiedDirectionalSpectrum:
+        """Copy native angle/energy nodes, density and support into a unit view.
+
+        The experimental view exposes ``angle`` in degrees, ``photon_energy``
+        in eV, and ``density`` per incident electron, eV and steradian.
+        ``to_energy("keV")`` converts energy and density together. Angles
+        remain point samples; no angular Jacobian or acceptance is applied.
+        Component identity and unsupported NaNs are preserved. Case and
+        provenance remain on this numeric source; no current scaling occurs.
+        Pint loads only when this method is called.
+        """
+        if self.units != "ph/incident-electron/eV/sr":
+            raise ValueError("quantify requires ph/incident-electron/eV/sr source density")
+        return QuantifiedDirectionalSpectrum(
+            self.angle_deg, self.energy_eV, self.density, self.supported, self.component
+        )
 
     @property
     def current_na(self) -> float:

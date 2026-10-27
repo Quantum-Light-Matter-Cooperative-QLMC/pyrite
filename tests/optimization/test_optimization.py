@@ -36,7 +36,7 @@ def study():
                 "target.thickness_ang": Integer(1_000, 4_000, step=100),
             }
         ),
-        objectives=(Objective("flux", "maximize", "photons/electron"),),
+        objectives=(Objective("flux", "maximize", "1/sr"),),
         constraints=(Constraint("line_fwhm_eV", "<=", 1.0, "eV"),),
     )
 
@@ -124,7 +124,7 @@ def test_multiobjective_pareto_and_selection():
     s = OptimizationStudy(
         scene(),
         ParameterSpace({"beam.energy_keV": Continuous(30, 100)}),
-        (Objective("flux", "maximize", "ph/s"), Objective("width", "minimize", "eV")),
+        (Objective("flux", "maximize", "1/s"), Objective("width", "minimize", "eV")),
     )
     sampler = OptunaOptimizer(s.parameters, s.objectives, seed=1)
     result = s.run(
@@ -187,7 +187,7 @@ def test_pyrite_evaluator_routes_through_existing_run_sweep(monkeypatch):
 def test_optimizer_definition_mismatch_cannot_silently_change_objectives():
     pytest.importorskip("optuna")
     s = study()
-    bad = OptunaOptimizer(s.parameters, (Objective("flux", "minimize", "photons/electron"),))
+    bad = OptunaOptimizer(s.parameters, (Objective("flux", "minimize", "1/sr"),))
     with pytest.raises(ValueError, match="optimizer objectives"):
         s.run(lambda *_: {"flux": 1, "line_fwhm_eV": 0}, bad, max_trials=1)
     assert len(bad.study.trials) == 0

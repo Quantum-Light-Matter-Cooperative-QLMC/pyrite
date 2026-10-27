@@ -223,3 +223,40 @@ def test_target_beam_timing_physics_and_numerics_normalize_units() -> None:
     numerics = Numerics(channeling_dz_ang=0.025 * ureg.um)
     assert physics.inelastic_cutoff_eV == 500.0
     assert numerics.channeling_dz_ang == 250.0
+
+
+@pytest.mark.parametrize(
+    ("quantity", "kelvin"),
+    [
+        (ureg.Quantity(293.15, "kelvin"), 293.15),
+        (ureg.Quantity(20, "degC"), 293.15),
+        (ureg.Quantity(68, "degF"), 293.15),
+        (ureg.Quantity(527.67, "degR"), 293.15),
+        (ureg.Quantity(20, "millikelvin"), 0.02),
+    ],
+)
+def test_absolute_temperature_kind_converts_offsets(quantity, kelvin):
+    from pyrite._units import normalize_unit
+
+    got = normalize_unit(quantity, "kelvin", field="T", expected="temperature", kind="temperature")
+    assert got == pytest.approx(kelvin)
+    assert (
+        normalize_unit(300, "kelvin", field="T", expected="temperature", kind="temperature") == 300
+    )
+
+
+@pytest.mark.parametrize("unit", ["delta_degC", "delta_degF"])
+def test_absolute_temperature_kind_refuses_temperature_differences(unit):
+    from pyrite._units import normalize_unit, normalize_unit_input
+
+    with pytest.raises(ValueError, match="T received temperature difference"):
+        normalize_unit(
+            ureg.Quantity(20, unit), "kelvin", field="T", expected="temperature", kind="temperature"
+        )
+    with pytest.raises(ValueError, match="T received temperature difference"):
+        normalize_unit_input(
+            f"20 {unit}", "kelvin", field="T", expected="temperature", kind="temperature"
+        )
+    assert normalize_unit_input(
+        "20 degC", "kelvin", field="T", expected="temperature", kind="temperature"
+    ) == pytest.approx(293.15)

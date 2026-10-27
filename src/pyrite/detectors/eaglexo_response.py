@@ -73,8 +73,12 @@ which is ~60 eV at 1 keV -- far sharper than the Timepix ToT (~1 keV) but real.
 Units
 -----
 Energies in eV; sensor dimensions and distance in mm; solid angle in sr;
-QE dimensionless in [0, 1]; charge in electrons (e-). The photon<->charge bridge
-is W_Si = 3.65 eV/pair (each absorbed photon of energy E makes E/W_Si electrons).
+QE dimensionless in [0, 1]. Collected charge (``charge_density``,
+``integrated_charge``, ``FULL_WELL_E``, ``READ_NOISE_E``, dark current) is a
+charge expressed in units of the elementary charge e (Pint ``elementary_charge``
+/ ``e``, convertible to C or pC), not a dimensionless count; "e-" below means
+that unit; a future quantity read-back uses Pint ``e``. The photon<->charge bridge is
+W_Si = 3.65 eV/pair (each absorbed photon of energy E collects E/W_Si e).
 
 ### The working DISTANCE and the active-silicon thickness are flagged '### FILL
 ### IN'. The Eagle XO is an open-front camera bolted to a vacuum chamber, so the
@@ -87,6 +91,7 @@ import numpy as np
 
 from .. import DATA_DIR
 from .._planar_geometry import solid_angle_sr
+from .._units import reject_quantity
 from ..materials.crystal import absorption_length_ang
 from ._si_sensor import (
     FANO_SI,
@@ -120,7 +125,7 @@ ACTIVE_SI_UM = 16.0  ### FILL IN -- active (depleted) Si thickness [um]; only
 # ---- readout / noise (datasheet; used only by the 'measured' realization) -----
 READ_NOISE_E = 2.3  # read noise [e- RMS], 75 kHz typical (9.0 e- @ 2 MHz)
 DARK_CURRENT_E_PER_S = 0.0005  # dark current [e-/pixel/s], deep-cooled (<0.0005)
-FULL_WELL_E = 100_000.0  # full-well capacity [e-] (100 ke- typical)
+FULL_WELL_E = 100_000.0  # full-well capacity [e, elementary charges] (100 ke typical)
 
 # QE table: digitized datasheet curve (energy_eV, QE_BN_%, QE_BEN_%)
 _QE_PATH = DATA_DIR / "eaglexo_qe.csv"
@@ -216,6 +221,7 @@ def qe(E_eV, coating="BN"):
         f2 tables stop at ~30 keV, exactly where we need the extrapolation.)
 
     Accepts scalars or arrays; returns the same shape."""
+    reject_quantity(E_eV, field="E_eV", unit="eV")
     E = np.asarray(E_eV, dtype=float)
     Et, bn, ben, sl_bn, sl_ben = load_qe_table()
     col, slope = (ben, sl_ben) if coating.upper() == "BEN" else (bn, sl_bn)
@@ -237,6 +243,8 @@ def qe_absorption_model(E_eV, active_um=None, peak=0.93):
     or model a different back-thinning. ``peak`` caps it for entrance reflection
     / incomplete collection. Valid where Henke f2 is tabulated (~30 eV - 30 keV);
     outside that it returns 0 (NaN guarded), so restrict overlays to that range."""
+    reject_quantity(E_eV, field="E_eV", unit="eV")
+    reject_quantity(active_um, field="active_um", unit="um")
     t = ACTIVE_SI_UM if active_um is None else active_um
     E = np.asarray(E_eV, dtype=float)
     L_ang = absorption_length_ang("Si", np.clip(E, 1e-3, None), SI_N_PER_ANG3)
@@ -254,6 +262,7 @@ def energy_fwhm_eV(E_eV, n_pix=4):
     ~60 eV at 1 keV for n_pix=4 -- Fano/read-limited, i.e. far better than the
     Timepix ToT and roughly sqrt(E)-shaped. Irrelevant in plain integrating
     mode; used only when EagleResponse.apply(resolve_energy=True)."""
+    reject_quantity(E_eV, field="E_eV", unit="eV")
     E = np.asarray(E_eV, dtype=float)
     var_e = FANO_SI * (E / W_EHP_EV) + n_pix * READ_NOISE_E**2  # [e-^2]
     return 2.3548 * W_EHP_EV * np.sqrt(var_e)  # [eV]
@@ -282,6 +291,7 @@ class EagleResponse:
     """
 
     def __init__(self, E_grid_eV, *, coating="BN", resolve_energy=False, n_pix=4):
+        reject_quantity(E_grid_eV, field="E_grid_eV", unit="eV")
         self.E = np.asarray(E_grid_eV, dtype=float)
         self.coating = coating
         self.resolve_energy = resolve_energy
@@ -331,7 +341,7 @@ class EagleResponse:
         return qe(E_eV, coating=self.coating)
 
     def charge_density(self, spec):
-        """Detected CHARGE spectral density [e-/eV/...] -- what the CCD actually
+        """Detected CHARGE spectral density [e/eV/...] -- what the CCD actually
         records, as opposed to the photon density :meth:`apply` returns.
 
         A CCD integrates charge: it has no per-photon counting, so it cannot
@@ -344,18 +354,23 @@ class EagleResponse:
         That energy weighting is the qualitative difference from a photon counter
         (the Timepix): it tilts the recorded signal toward harder photons, partly
         offsetting the thin-sensor QE roll-off. Same grid as the input; units are
-        the input flux units * e- (e.g. e-/eV/s/nA for a Phs/eV/s/nA input)."""
+        the input flux units times charge in elementary charges e, per eV
+        (e.g. e/eV/s/nA for a Phs/eV/s/nA input). The number is a charge in
+        units of e (Pint ``elementary_charge``, 1 e = 1.602176634e-19 C), not a
+        dimensionless electron count."""
         det = self.apply(spec)  # detected photon density [Phs/eV/...]
-        return det * (self.E / W_EHP_EV)  # -> electrons (charge) per eV
+        return det * (self.E / W_EHP_EV)  # -> charge [e] per eV
 
     def integrated_charge(self, spec):
         """Total detected charge RATE: trapz of :meth:`charge_density` over the
-        grid (input flux units * e-, e.g. e-/s/nA for a Phs/eV/s/nA input).
+        grid: input flux units times charge in elementary charges e (e.g.
+        e/s/nA for a Phs/eV/s/nA input; Pint ``elementary_charge``, convertible
+        to C or pC).
 
         This is the scalar "brightness" the CCD reports for a spectrum -- no
         energy information survives, just collected charge. Multiply by the beam
-        current [nA] and the exposure [s] to get the electrons accumulated, and
-        compare to :data:`FULL_WELL_E` for saturation."""
+        current [nA] and the exposure [s] to get the charge accumulated [e], and
+        compare to :data:`FULL_WELL_E` (also in e) for saturation."""
         return float(np.trapezoid(self.charge_density(spec), self.E))
 
 
@@ -383,6 +398,7 @@ def get_response(E_grid_eV, *, coating="BN", resolve_energy=False, n_pix=4):
     EagleResponse
         Shared response instance for the exact grid and settings signature.
     """
+    reject_quantity(E_grid_eV, field="E_grid_eV", unit="eV")
     E = np.asarray(E_grid_eV, dtype=float)
     key = grid_key(E) + (coating.upper(), bool(resolve_energy), int(n_pix))
     resp = _RESPONSE_CACHE.get(key)
@@ -407,6 +423,8 @@ def poisson_counts(
     per photon-equivalent, plus dark over the exposure) -- usually negligible
     next to photon Poisson for these rates, off by default.
     Returns (counts_per_bin, expected_per_bin): the integer draw and its mean."""
+    reject_quantity(E_grid_eV, field="E_grid_eV", unit="eV")
+    reject_quantity(time_s, field="time_s", unit="s")
     rng = np.random.default_rng() if rng is None else rng
     E = np.asarray(E_grid_eV, dtype=float)
     counts, expected = poisson_core(E_grid_eV, detected_per_s, time_s, rng)

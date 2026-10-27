@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 import numpy as np
 
@@ -13,6 +13,7 @@ from ..instrument import PlanarDetector
 from ..montecarlo import Case
 from .aperture import ApertureResult, aperture_dataframe
 from .provenance import Provenance
+from .quantified import QuantifiedSpectrum
 from .spatial import (
     COMPONENTS,
     PixelMetadata,
@@ -71,6 +72,20 @@ class SpectralDensity:
             raise ValueError("normalization must be 'source' or 'observation-average'")
         object.__setattr__(self, "photon_energy_eV", energy)
         object.__setattr__(self, "density", density)
+
+    def quantify(self) -> QuantifiedSpectrum:
+        """Return an independent, unit-aware node-sampled spectrum.
+
+        ``photon_energy`` is a Pint quantity in eV and ``density`` is a Pint
+        quantity per eV and sr, both per incident electron. Use
+        ``.to_energy("keV")`` on the returned spectrum to change the energy
+        coordinate and density together. Native nodes, source/observation
+        normalization, numeric fields and scientific identities are unchanged.
+        Pint is loaded only when this method is called.
+        """
+        # __post_init__ validates this legacy string field's two supported values.
+        normalization = cast(Literal["source", "observation-average"], self.normalization)
+        return QuantifiedSpectrum(self.photon_energy_eV, self.density, normalization)
 
 
 @dataclass(frozen=True)

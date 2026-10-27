@@ -31,6 +31,7 @@ from dataclasses import dataclass
 import numpy as np
 import scipy.fft
 
+from ..._units import reject_quantity
 from ...materials.channeling.transverse import HBAR2_2M_EV_ANG2, longitudinal_kinematics
 from .axial_dissipator import AxialDissipator
 from .mcwf import _rng
@@ -239,7 +240,11 @@ class AxialMCWF:
         ``cuda_compatible = True`` and consume/return CuPy arrays. Observable
         ``recording_bytes`` and ``scratch_bytes`` declarations reserve custom
         reductions before device allocation. Results contain host arrays.
+        Depths, step and tilt are numeric-only; Pint quantities raise ``TypeError``.
         """
+        reject_quantity(depths_ang, field="AxialMCWF.run.depths_ang", unit="angstrom")
+        reject_quantity(step_ang, field="AxialMCWF.run.step_ang", unit="angstrom")
+        reject_quantity(tilt_rad, field="AxialMCWF.run.tilt_rad", unit="rad")
         if batch_size is not None and (
             isinstance(batch_size, bool) or not isinstance(batch_size, int) or batch_size < 1
         ):

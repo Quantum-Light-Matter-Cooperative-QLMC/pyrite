@@ -28,7 +28,7 @@ def _study():
             target=Slab("hopg", thickness_ang=2_000, footprint=Footprint(5.0, 5.0)),
         ),
         ParameterSpace({"beam.energy_keV": Continuous(30.0, 100.0)}),
-        (Objective("flux", "maximize", "photons/electron"),),
+        (Objective("flux", "maximize", "1/sr"),),
         (Constraint("fwhm", "<=", 1.0, "eV"),),
     )
 
@@ -86,7 +86,7 @@ def test_rejects_unsafe_resume_before_scheduling_work(tmp_path):
             replace(s, parameters=ParameterSpace({"beam.energy_keV": Continuous(31, 100)})),
             "score-v1",
         ),
-        (replace(s, objectives=(Objective("flux", "maximize", "ph/s"),)), "score-v1"),
+        (replace(s, objectives=(Objective("flux", "maximize", "1/s"),)), "score-v1"),
         (replace(s, constraints=(Constraint("fwhm", "<=", 0.5, "eV"),)), "score-v1"),
     ]
     for altered, evaluator_id in cases:
@@ -205,3 +205,19 @@ def test_in_memory_optimizer_can_continue_with_total_budget():
     assert len(s.run(_score, opt, max_trials=2).trials) == 2
     result = s.run(_score, opt, max_trials=4)
     assert [trial.number for trial in result.trials] == [0, 1, 2, 3]
+
+
+def test_numeric_study_resumes_with_equivalent_quantity_definition(tmp_path):
+    from pyrite.units import ureg
+
+    s = _study()
+    first = s.run(_score, _opt(s, tmp_path), max_trials=3, evaluation_id="flux-window-v1")
+    quantified = replace(s, constraints=(Constraint("fwhm", "<=", 1000.0 * ureg.meV, "eV"),))
+    resumed = quantified.run(
+        lambda *_: pytest.fail("persisted trials must load, not re-run"),
+        _opt(quantified, tmp_path),
+        max_trials=3,
+        evaluation_id="flux-window-v1",
+    )
+    assert resumed.trials == first.trials
+    assert all(isinstance(v, float) for t in resumed.trials for v in t.parameters.values())

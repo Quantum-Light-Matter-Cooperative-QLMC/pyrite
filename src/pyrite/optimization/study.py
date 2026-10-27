@@ -9,9 +9,16 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
-from math import isfinite
+from math import isclose, isfinite
+from numbers import Real
 from typing import Any, Literal, Protocol
 
+from .._units import (
+    _is_pint_quantity,
+    normalize_unit,
+    parse_unit_expression,
+    unit_conversion_factor,
+)
 from .space import ParameterSpace, apply_scene_parameters
 
 Direction = Literal["maximize", "minimize"]
@@ -19,7 +26,13 @@ Direction = Literal["maximize", "minimize"]
 
 @dataclass(frozen=True, slots=True)
 class Objective:
-    """Named scalar observable with an explicit unit and optimization direction."""
+    """Named scalar observable with an explicit unit and optimization direction.
+
+    ``unit`` is a Pint unit expression (or Pint ``Unit``), parsed and
+    validated at construction; empty means dimensionless. The stored text is
+    the caller's, so persisted study definitions stay byte-identical. Semantic
+    normalizations such as "per incident electron" are not Pint units.
+    """
 
     name: str
     direction: Direction
@@ -30,13 +43,25 @@ class Objective:
             raise ValueError("objective name must be nonempty")
         if self.direction not in ("minimize", "maximize"):
             raise ValueError("objective direction must be minimize or maximize")
-        if not isinstance(self.unit, str):
-            raise TypeError("objective unit must be a string (empty means dimensionless)")
+        object.__setattr__(self, "unit", parse_unit_expression(self.unit, field="Objective.unit"))
+
+    @property
+    def pint_unit(self) -> Any:
+        """Parsed Pint unit (imports Pint on first use)."""
+        from ..units import ureg
+
+        return ureg.Unit(self.unit.strip() or "dimensionless")
 
 
 @dataclass(frozen=True, slots=True)
 class Constraint:
-    """Physical feasibility bound evaluated on the same observation dictionary."""
+    """Physical feasibility bound evaluated on the same observation dictionary.
+
+    ``unit`` follows :class:`Objective`. ``bound`` is a plain number in
+    ``unit`` or a Pint quantity with compatible root units, lowered to
+    ``unit`` at construction (a plain number in the declared unit stays
+    identical in persisted definitions).
+    """
 
     name: str
     relation: Literal["<=", ">="]
@@ -48,14 +73,54 @@ class Constraint:
             raise ValueError("constraint name must be nonempty")
         if self.relation not in ("<=", ">="):
             raise ValueError("constraint relation must be <= or >=")
+        unit = parse_unit_expression(self.unit, field="Constraint.unit")
+        object.__setattr__(self, "unit", unit)
+        if _is_pint_quantity(self.bound):
+            object.__setattr__(self, "bound", _lower_bound(self.bound, unit))
         if not isfinite(self.bound):
             raise ValueError("constraint bound must be finite")
-        if not isinstance(self.unit, str):
-            raise TypeError("constraint unit must be a string")
 
     def violation(self, value: float) -> float:
         """Nonpositive is feasible; positive is an actual constraint violation."""
         return value - self.bound if self.relation == "<=" else self.bound - value
+
+
+def _lower_bound(value: Any, unit: str) -> float:
+    """Lower a quantity bound to the constraint unit, refusing root-unit mismatch."""
+    received = str(value.units)
+    if unit_conversion_factor(received, unit) is None:
+        raise ValueError(
+            f"Constraint.bound received unit {received!r}; expected a quantity "
+            f"convertible to {unit or 'dimensionless'!r}"
+        )
+    lowered = normalize_unit(
+        value, unit.strip() or "dimensionless", field="Constraint.bound", expected="a value"
+    )
+    if hasattr(lowered, "item") and getattr(lowered, "ndim", 1) == 0:
+        lowered = lowered.item()
+    if isinstance(lowered, bool) or not isinstance(lowered, Real):
+        raise TypeError("Constraint.bound must be a scalar")
+    return lowered
+
+
+def _check_declared_units(
+    objectives: tuple[Objective, ...],
+    constraints: tuple[Constraint, ...],
+    declared: Mapping[str, str] | None,
+) -> None:
+    """Refuse objectives/constraints whose unit differs from the scorer's output."""
+    if declared is None:
+        return
+    for kind, items in (("objective", objectives), ("constraint", constraints)):
+        for item in items:
+            if item.name not in declared:
+                continue
+            factor = unit_conversion_factor(declared[item.name], item.unit)
+            if factor is None or not isclose(factor, 1.0, rel_tol=1e-12):
+                raise ValueError(
+                    f"{kind} {item.name!r} declares unit {item.unit!r}, but the scorer "
+                    f"returns {item.name!r} in {declared[item.name]!r}"
+                )
 
 
 @dataclass(frozen=True)
@@ -202,6 +267,10 @@ class OptimizationStudy:
     ) -> OptimizationResult:
         if isinstance(max_trials, bool) or not isinstance(max_trials, int) or max_trials < 1:
             raise ValueError("max_trials must be a positive integer")
+        # Scorers may declare the Pint unit of each observable they return.
+        _check_declared_units(
+            self.objectives, self.constraints, getattr(evaluator, "output_units", None)
+        )
         # Optuna (and other configured adapters) must not silently optimize
         # different objectives, constraint bounds, or parameter distributions.
         for attr in ("parameters", "objectives", "constraints"):
@@ -310,6 +379,11 @@ class PyriteEvaluator:
         reserved = {"executor", "on_case", "on_progress"}
         if reserved & self.run_options.keys():
             raise ValueError(f"run_options may not override {sorted(reserved)}")
+
+    @property
+    def output_units(self) -> Mapping[str, str] | None:
+        """The scorer's declared output units, when it declares them."""
+        return getattr(self.score, "output_units", None)
 
     def __call__(self, scene: Any, trial_number: int) -> Mapping[str, float]:
         from dataclasses import replace

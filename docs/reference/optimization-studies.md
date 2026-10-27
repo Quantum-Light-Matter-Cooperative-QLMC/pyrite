@@ -11,12 +11,23 @@ Use the experimental `pyrite.optimization` imports `Integer`, `ParameterSpace`,
 `Objective`, `Constraint`, `OptimizationStudy` and `OptunaOptimizer` to define a
 finite design search. Parameter paths select physical Scene fields;
 `Integer(low, high, step)` includes both bounds and refuses implicit rounding.
-Values use the units of the selected field, such as degrees for
-`target.tilt_deg` and ångströms for `target.thickness_ang`.
+Values are plain numbers in the units of the selected field, such as degrees
+for `target.tilt_deg` and ångströms for `target.thickness_ang`. Parameter
+paths do not declare a unit, so Pint quantity bounds and values raise
+`TypeError` rather than being lowered by guessing from a field-name suffix.
 
 An `Objective` declares its observable name, `"maximize"` or `"minimize"`, and
-unit. A `Constraint` uses an observable in that same declared unit and an
-inclusive `"<="` or `">="` bound. The evaluator must return every named
+a Pint unit expression (or Pint `Unit`); an empty string means dimensionless.
+Units are parsed at construction and unparseable text raises `ValueError`;
+the caller's text is kept, so persisted study definitions are unchanged.
+Counted normalizations such as "per incident electron" are not Pint units.
+A `Constraint` uses an observable in that same declared unit and an
+inclusive `"<="` or `">="` bound, given as a plain number in that unit or a
+Pint quantity with compatible root units (lowered to the unit; radians and
+steradians are not interchangeable with bare ratios). When the evaluator
+declares `output_units` (as `PyriteEvaluator` does for `FixedWindowYield`),
+`OptimizationStudy.run` refuses any objective or constraint on that output
+whose unit is not the scorer's, before proposing work. The evaluator must return every named
 objective and constraint. Failed and infeasible trials remain in `.trials`;
 only feasible trials enter `.best_trial` or `.pareto_front`. These interfaces
 are experimental; importing them does not initialize Optuna or transport.
@@ -95,22 +106,26 @@ scorer and an explicit independent-finalist validation protocol.
 ```python
 from pyrite.optimization import FixedWindowYield, Objective, PyriteEvaluator
 
-score = FixedWindowYield(820.0, 900.0)
-objective = Objective(score.name, "maximize", score.units)
+score = FixedWindowYield(820.0, 900.0)  # or 0.82 * ureg.keV, 0.9 * ureg.keV
+objective = Objective(score.name, "maximize", score.units)  # "1/sr"
 evaluator = PyriteEvaluator(score, base_seed=21)
 # Pass evaluation_id=score.evaluation_id to study.run for durable resume.
 ```
 
 It integrates the separate incoherent `spec` array in physical eV, with exact
 window endpoints interpolated between samples. The result is
-**photons/(sr incident electron)**. No current, sampled-history count,
+**photons/(sr incident electron)**: its Pint unit is `score.units == "1/sr"`,
+and the counted normalization is the separate label
+`score.normalization == "photons per incident electron"`. No current, sampled-history count,
 solid angle or detector response is applied. Other emission components are
 excluded. The window must be covered by strictly increasing finite nodes;
 nonfinite densities, multiple records, bin-mean quadrature and two-beam
 joint-field corrections are errors. It integrates the stored interpolant;
 it cannot recover a narrow line missed by the nodes. See the
 [independent integral verification](../validation/radiation-physics/optimization-fixed-window-yield.md).
-The scorer's `evaluation_id` changes with its bounds and observable name;
+Bounds accept plain eV numbers or Pint energy quantities, lowered to eV, so
+equivalent bounds give the same `evaluation_id`. The scorer's `evaluation_id`
+changes with its bounds and observable name;
 version any additional scoring/constraint logic separately.
 
 The checkout example `checks/pxr_optimization.py` supplies one complete bounded

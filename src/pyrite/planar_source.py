@@ -188,6 +188,7 @@ def project_planar_source(
         "kelvin",
         field="project_planar_source.temperature_K",
         expected="temperature",
+        kind="temperature",
     )
     incidence_rad = normalize_unit(
         incidence_rad,

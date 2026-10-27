@@ -51,6 +51,11 @@ from .model import (
     SpectralFactors,
 )
 from .provenance import Provenance
+from .quantified import QuantifiedSpectrum
+from .quantified_acquisition import QuantifiedAcquisitionBatch
+from .quantified_aperture import QuantifiedApertureSpectrum
+from .quantified_directional import QuantifiedDirectionalSpectrum
+from .quantified_spatial import QuantifiedSpatialImage, QuantifiedSpatialSpectrum
 from .scoring import (
     SELECTION_MODES,
     selection_score,
@@ -111,6 +116,12 @@ __all__ = [
     "detected_background",
     "Result",
     "SpectralDensity",
+    "QuantifiedSpectrum",
+    "QuantifiedAcquisitionBatch",
+    "QuantifiedApertureSpectrum",
+    "QuantifiedDirectionalSpectrum",
+    "QuantifiedSpatialSpectrum",
+    "QuantifiedSpatialImage",
     "CxrSpectra",
     "SpatialResult",
     "SpectralFactors",

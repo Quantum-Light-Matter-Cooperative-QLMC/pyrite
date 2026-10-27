@@ -19,7 +19,9 @@ def test_exact_bounds_constant_and_linear_density_on_nonuniform_nodes():
     assert score(store(density=(0, 0, 0, 0))) == {"window_yield": 0}
     # Signed numerical estimates are retained, never clipped or rewarded.
     assert score(store(density=(-1, -1, -1, -1))) == {"window_yield": -125}
-    assert score.units == "photons/(sr incident electron)"
+    assert score.units == "1/sr"
+    assert score.normalization == "photons per incident electron"
+    assert score.output_units == {"window_yield": "1/sr"}
 
 
 def test_only_requested_component_no_population_acceptance_or_current_scaling():
@@ -91,3 +93,32 @@ def test_scorer_identity_changes_with_bounds_and_name():
     assert identity != FixedWindowYield(100, 200, "another").evaluation_id
     with pytest.raises(ValueError, match="name"):
         FixedWindowYield(100, 200, " ")
+
+
+def test_quantity_bounds_lower_to_ev_with_identical_evaluation_id():
+    from pyrite.units import ureg
+
+    numeric = FixedWindowYield(500.0, 1500.0)
+    for lower, upper in (
+        (0.5 * ureg.keV, 1.5 * ureg.keV),
+        (500 * ureg.eV, 1500 * ureg.eV),
+        (0.5 * ureg.keV, 1500.0),
+    ):
+        quantified = FixedWindowYield(lower, upper)
+        assert quantified.evaluation_id == numeric.evaluation_id
+        assert (quantified.lower_eV, quantified.upper_eV) == (500.0, 1500.0)
+        assert quantified == numeric
+    # Pinned before quantities were accepted: numeric identity is unchanged.
+    assert numeric.evaluation_id == (
+        "fixed-window-cxr-nodes-v1:0x1.f400000000000p+8:0x1.7700000000000p+10:window_yield"
+    )
+    assert FixedWindowYield(0.115 * ureg.keV, 0.24 * ureg.keV)(store()) == {"window_yield": 125}
+
+
+def test_quantity_bounds_refuse_wrong_dimensions_and_arrays():
+    from pyrite.units import ureg
+
+    with pytest.raises(ValueError, match=r"FixedWindowYield\.lower_eV.*energy"):
+        FixedWindowYield(1 * ureg.nm, 1500.0)
+    with pytest.raises(TypeError, match=r"FixedWindowYield\.upper_eV must be a scalar"):
+        FixedWindowYield(500.0, [1, 2] * ureg.keV)

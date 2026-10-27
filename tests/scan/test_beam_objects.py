@@ -143,3 +143,28 @@ def test_required_beam_distributions_and_removed_point_alias():
         pr.Beam(energy_keV=30.0, longitudinal=PointBunch())
     assert not hasattr(pr, "Point")
     assert not hasattr(beam_module, "Point")
+
+
+def test_quantity_timing_preserves_cases_and_nested_sweep_replacement():
+    from dataclasses import replace
+
+    from pyrite.units import Q_
+
+    duration = BunchLength(rms_duration=Q_(250, "fs"))
+    offsets = Offsets(arrival_offsets=Q_([-125, 250], "fs"))
+    for timing in (duration, offsets):
+        beam = pr.Beam(30, transverse=Spot(), longitudinal=timing)
+        assert _case(beam) == _case(beam.to_spec())
+        assert _case(pr.Beam.from_spec(beam.to_spec())) == _case(beam)
+
+    scene = pr.Scene(
+        beam=pr.Beam(30, transverse=Spot(), longitudinal=duration),
+        target=pr.geometry.Slab("hopg", footprint=pr.geometry.Footprint(5.0, 5.0)),
+    )
+    sweep = pr.Sweep(scene, {"beam.longitudinal.rms_fs": [125.0, 500.0]})
+    assert [s.beam.longitudinal for _, s in sweep.expand()] == [BunchLength(125), BunchLength(500)]
+    timings = [duration, duration.with_rms_duration(Q_(500, "fs"))]
+    sweep = pr.Sweep(scene, {"beam.longitudinal": timings})
+    assert [s.beam.longitudinal for _, s in sweep.expand()] == timings
+    retimed = replace(scene.beam, longitudinal=offsets.with_arrival_offsets(Q_([0, 125], "fs")))
+    assert retimed.to_spec().long_offsets_fs == (0.0, 125.0)

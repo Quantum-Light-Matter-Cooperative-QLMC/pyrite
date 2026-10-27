@@ -107,3 +107,22 @@ def test_invalid_spatial_grid_is_rejected(grid):
         spatial_density(
             grid, np.ones((1, 1, 1)), np.ones((1, 1, 1)), np.array([0]), np.array([0]), 1
         )
+
+
+@pytest.mark.parametrize("name", ["x_ang", "kappa_inv_ang", "period_ang"])
+def test_spatial_density_refuses_quantities_instead_of_reading_angstrom(name):
+    from pyrite.units import ureg
+
+    args = {
+        "x_ang": np.array([0.1, 0.2]),
+        "density": np.ones((1, 1, 1)),
+        "coefficients": np.ones((1, 1, 1)),
+        "orders": np.array([0]),
+        "kappa_inv_ang": np.array([0.0]),
+        "period_ang": 2.0,
+    }
+    plain = spatial_density(**args)
+    args[name] = args[name] * {"kappa_inv_ang": 1 / ureg.angstrom}.get(name, ureg.nm)
+    with pytest.raises(TypeError, match=f"{name} is numeric-only"):
+        spatial_density(**args)
+    assert np.all(np.isfinite(plain))

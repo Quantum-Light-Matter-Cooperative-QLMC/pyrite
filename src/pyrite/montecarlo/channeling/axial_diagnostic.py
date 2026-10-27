@@ -9,6 +9,7 @@ from typing import Literal
 
 import numpy as np
 
+from pyrite._units import reject_quantity
 from pyrite.materials.channeling.axial import AxialProfile, axial_profile
 
 from .axial_dissipator import axial_dissipator
@@ -28,6 +29,7 @@ class AxialDiagnosticConfig:
     MCWF uses the existing per-electron Philox streams keyed by seed/electron.
     ``oam_string`` optionally selects a profile string; the projection uses a
     disk of radius ``oam_radius_ang`` and reports modes -8 through 8.
+    Fields are numeric-only; Pint quantities raise ``TypeError`` at construction.
     """
 
     crystal: str = "silicon"
@@ -58,6 +60,26 @@ class AxialDiagnosticConfig:
     record_current_divergence: bool = False
     # (x_start, y_start, width_pixels, height_pixels), with periodic wrap.
     current_contour: tuple[int, int, int, int] | None = None
+
+    def __post_init__(self) -> None:
+        for name, unit in _NUMERIC_FIELD_UNITS:
+            reject_quantity(getattr(self, name), field=f"AxialDiagnosticConfig.{name}", unit=unit)
+
+
+_NUMERIC_FIELD_UNITS = (
+    ("kinetic_energy_eV", "eV"),
+    ("temperature_K", "kelvin"),
+    ("depths_ang", "angstrom"),
+    ("step_ang", "angstrom"),
+    ("tilt_rad", "rad"),
+    ("oam_radius_ang", "angstrom"),
+    ("spectral_cutoff_eV", "eV"),
+    ("cells", "dimensionless count"),
+    ("shape", "dimensionless count"),
+    ("n_electrons", "dimensionless count"),
+    ("spectral_states", "dimensionless count"),
+    ("spectral_energy_bins", "dimensionless count"),
+)
 
 
 def _validate(config: AxialDiagnosticConfig) -> None:

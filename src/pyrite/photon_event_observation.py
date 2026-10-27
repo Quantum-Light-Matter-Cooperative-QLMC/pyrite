@@ -29,6 +29,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from .photon_events import PhotonEventObservation
+    from .results.quantified_aperture import QuantifiedApertureSpectrum
 
 SCHEMA = "pyrite.photon-event-tally.v1"
 _LOCAL = "local_source_energy_eV"
@@ -81,6 +82,12 @@ class PhotonEventTally:
     local_source_energy_eV: np.ndarray
     tracked_source_energy_eV: np.ndarray
     relaxation: PhotonRelaxationBudget | None
+
+    def quantify(self) -> QuantifiedApertureSpectrum:
+        """Return an independent aperture histogram without altering event budgets."""
+        from .results.quantified_aperture import QuantifiedApertureSpectrum
+
+        return QuantifiedApertureSpectrum.from_tally(self)
 
 
 def _per_primary_energy(parents, energy, n_primaries):

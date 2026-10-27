@@ -26,20 +26,35 @@ from __future__ import annotations
 
 import math
 from collections.abc import Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from itertools import product
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol, Self
 
 import numpy as np
 
-from .._energy_grid_encoding import decode_energy_grid
 from .._formatting import fmt_thickness
+from .._spec_defaults import UNSET as _UNSET
+from .._spec_defaults import _Unset
+from .._units import _positive_length_quantity as _geometry_length
 from .._units import normalize_unit
 from ..materials import CATALOG, LayerSpec
 from ..materials._composition import resolve_composition
 from ..materials.crystal import dominant_reflections
+from ._geometry_table import geometry_table as geometry_table
+from ._geometry_values import (
+    _as_miller,
+    _miller,
+    _positive_values,
+    _quantity_geometry,
+    _reject_banned_angles,
+    _seq,
+    _unique_angles,
+)
 
 ScalarOrSeq = float | Sequence[float] | np.ndarray
+
+if TYPE_CHECKING:
+    from pint import Quantity
 
 
 class _ObservationDirection(Protocol):
@@ -47,16 +62,6 @@ class _ObservationDirection(Protocol):
 
     @property
     def observation_angle_deg(self) -> float: ...
-
-
-def _seq(x):
-    """Normalize a scalar-or-sequence into a 1-D float array, order preserved."""
-    return np.atleast_1d(np.asarray(x, dtype=float))
-
-
-def _unique_angles(values: ScalarOrSeq) -> np.ndarray:
-    """Preserve degree values and order, removing only exact duplicates."""
-    return np.asarray(list(dict.fromkeys(float(value) for value in _seq(values))), dtype=float)
 
 
 def substrate_composition(substrate):
@@ -188,68 +193,73 @@ def crystal_params(material: str, n_families: int = 4) -> dict[str, Any]:
     )
 
 
-def _reject_banned_angles(
-    tilts: np.ndarray, azimuths: np.ndarray, *, allow_normal_incidence: bool = False
-) -> None:
-    """Refuse the degenerate geometries no emission sweep may use (issue_notes.md #1).
-
-    polar tilt == 0 deg radiates zero coherent-line intensity (the tilt=0
-    degeneracy the line-grid coverage search flags), and azimuth == 90 deg sits
-    on a symmetry axis that mis-ranked the coverage search (the azim-90 bug).
-    Guarding at construction makes every downstream path -- production sweeps,
-    catalog grids, the analyze_line_grid_bounds diagnostic -- structurally
-    incapable of silently sampling them; callers must pick a small nonzero tilt
-    (e.g. 5 deg) and an azimuth off 90 (e.g. 100-180 deg) instead.
-
-    ``allow_normal_incidence`` is the transport-only escape hatch: the
-    penetration-depth study is not an emission sweep and uses tilt=0 as its
-    physical baseline, so it opts out of the tilt check only. The azimuth==90 ban
-    is unconditional -- it has no legitimate use.
-    """
-    if not allow_normal_incidence and np.any(np.isclose(tilts, 0.0)):
-        raise ValueError(
-            "polar tilt_deg == 0 is disallowed for emission sweeps (degenerate "
-            "zero coherent-line geometry); use a small nonzero tilt such as 5 deg, "
-            "or set allow_normal_incidence=True for a transport-only study"
-        )
-    if np.any(np.isclose(azimuths, 90.0)):
-        raise ValueError(
-            "tilt_azim_deg == 90 is disallowed (degenerate symmetry axis, the "
-            "azim-90 ranking bug); use an azimuth off 90 such as 100-180 deg"
-        )
-
-
-def _positive_values(name: str, values: ScalarOrSeq) -> np.ndarray:
-    """One vocabulary for every swept positive-length geometry field."""
-    try:
-        numbers = _seq(values)
-    except (TypeError, ValueError) as exc:
-        raise TypeError(f"{name} must be a number or a sequence of numbers") from exc
-    if numbers.size == 0:
-        raise ValueError(f"{name} must supply at least one value")
-    if not np.all(np.isfinite(numbers) & (numbers > 0.0)):
-        raise ValueError(f"{name} must be finite and positive")
-    return numbers
-
-
-@dataclass(frozen=True)
+@dataclass(frozen=True, init=False)
 class Footprint:
     """Bounded rectangular crystal footprint: FULL width and height in mm.
 
-    Supplying a ``Footprint`` at all is what makes the crystal transversely
-    finite; ``footprint=None`` is the legacy infinite slab. Holding both
-    dimensions on one object makes the historical "both or neither" pairing rule
-    unrepresentable rather than checked.
+    Supplying a ``Footprint`` at all makes the crystal transversely finite;
+    ``footprint=None`` is the legacy infinite slab. Holding both dimensions
+    together makes the historical "both or neither" pairing rule unrepresentable.
 
     Parameters
     ----------
     width_mm, height_mm
-        Full transverse dimensions in mm. Each may be a positive scalar or a
-        sequence expanded by campaign case construction.
+        Legacy full transverse dimensions in mm, scalar or sweep sequence;
+        positional arguments remain supported and may contain compatible Pint
+        quantities. The numeric fields remain the serialized/lowered contract.
+    width, height
+        Keyword-only explicit Pint lengths, scalar or one-dimensional sweep
+        arrays. Each conflicts with its matching ``*_mm`` spelling. Quantity
+        read-back returns detached mm values; ``with_width`` / ``with_height``
+        replace one dimension without changing the other.
     """
 
     width_mm: ScalarOrSeq
     height_mm: ScalarOrSeq
+
+    def __init__(
+        self,
+        width_mm: ScalarOrSeq | _Unset = _UNSET,
+        height_mm: ScalarOrSeq | _Unset = _UNSET,
+        *,
+        width: object = _UNSET,
+        height: object = _UNSET,
+    ) -> None:
+        if width is not _UNSET:
+            if width_mm is not _UNSET:
+                raise TypeError("Footprint.width_mm and width are mutually exclusive")
+            width_mm = _geometry_length(width, unit="mm", field="Footprint.width")
+        elif width_mm is _UNSET:
+            raise TypeError("Footprint requires width_mm or width")
+        if height is not _UNSET:
+            if height_mm is not _UNSET:
+                raise TypeError("Footprint.height_mm and height are mutually exclusive")
+            height_mm = _geometry_length(height, unit="mm", field="Footprint.height")
+        elif height_mm is _UNSET:
+            raise TypeError("Footprint requires height_mm or height")
+        object.__setattr__(self, "width_mm", width_mm)
+        object.__setattr__(self, "height_mm", height_mm)
+        self.__post_init__()
+
+    @property
+    def width(self) -> Quantity:
+        """Fresh full x width in mm, retaining the original scalar/sweep shape."""
+        return _quantity_geometry(self.width_mm, "mm")
+
+    @property
+    def height(self) -> Quantity:
+        """Fresh full y height in mm, retaining the original scalar/sweep shape."""
+        return _quantity_geometry(self.height_mm, "mm")
+
+    def with_width(self, width: object) -> Self:
+        """Return a copy with an explicitly unit-bearing full x width."""
+        return replace(self, width_mm=_geometry_length(width, unit="mm", field="Footprint.width"))
+
+    def with_height(self, height: object) -> Self:
+        """Return a copy with an explicitly unit-bearing full y height."""
+        return replace(
+            self, height_mm=_geometry_length(height, unit="mm", field="Footprint.height")
+        )
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -281,7 +291,7 @@ DEFAULT_SUBSTRATE_THICKNESS_ANG = 5e6
 """The historical ``substrate_thickness_ang`` default: a 0.5 mm wafer."""
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, init=False)
 class BlazedGrooves:
     """Blazed sawtooth grooves machined into the beam-entrance face.
 
@@ -296,9 +306,40 @@ class BlazedGrooves:
     spacing_ang
         Positive groove period in angstroms. The supported geometry fixes the
         groove orientation and derives facet angles from the target tilt.
+    spacing
+        Keyword-only scalar Pint length, mutually exclusive with ``spacing_ang``.
+        Read-back is a fresh angstrom quantity; ``with_spacing`` replaces it.
+        Numeric fields, positional construction and serialization stay unchanged.
+        ``dataclasses.replace`` uses ``spacing_ang``; passing ``spacing`` conflicts.
     """
 
     spacing_ang: float
+
+    def __init__(self, spacing_ang: float | _Unset = _UNSET, *, spacing: object = _UNSET) -> None:
+        if spacing is not _UNSET:
+            if spacing_ang is not _UNSET:
+                raise TypeError("BlazedGrooves received both spacing_ang and spacing")
+            spacing_ang = float(
+                _geometry_length(spacing, unit="angstrom", field="BlazedGrooves.spacing", shape=())
+            )
+        elif spacing_ang is _UNSET:
+            raise TypeError("BlazedGrooves requires spacing_ang or spacing")
+        object.__setattr__(self, "spacing_ang", spacing_ang)
+        self.__post_init__()
+
+    @property
+    def spacing(self) -> Quantity:
+        """Groove period as a fresh scalar quantity in angstroms."""
+        return _quantity_geometry(self.spacing_ang, "angstrom")
+
+    def with_spacing(self, spacing: object) -> Self:
+        """Replace the period using an explicit scalar length quantity."""
+        return replace(
+            self,
+            spacing_ang=_geometry_length(
+                spacing, unit="angstrom", field="BlazedGrooves.spacing", shape=()
+            ),
+        )
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -319,27 +360,6 @@ class BlazedGrooves:
 
 
 Miller = tuple[int, int, int]
-
-
-def _as_miller(value: Any) -> Miller | None:
-    if value is None:
-        return None
-    h, k, l = (int(i) for i in value)  # noqa: E741
-    return (h, k, l)
-
-
-def _miller(name: str, value: Any) -> Miller | None:
-    if value is None:
-        return None
-    indices = tuple(value) if isinstance(value, (Sequence, np.ndarray)) else None
-    if (
-        indices is None
-        or len(indices) != 3
-        or any(isinstance(i, bool) or not isinstance(i, (int, np.integer)) for i in indices)
-        or not any(indices)
-    ):
-        raise ValueError(f"CrystalCut.{name} must be three integer indices, not all zero")
-    return _as_miller(indices)
 
 
 @dataclass(frozen=True)
@@ -472,7 +492,7 @@ def resolve_crystal_cut(
     )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, init=False)
 class Layer:
     """One layer of a :class:`Stack`, in beam-entrance order.
 
@@ -484,7 +504,11 @@ class Layer:
     material
         Catalog material or medium key.
     thickness_ang
-        Layer thickness in angstroms. Only the entrance film may use a sequence.
+        Legacy numeric angstroms; only the entrance film may use a sequence.
+    thickness
+        Keyword-only Pint length, scalar or one-dimensional sweep quantity.
+        Conflicts with ``thickness_ang``. Read-back is a detached angstrom
+        quantity; ``with_thickness`` replaces it without changing stored fields.
     beam_uvw
         Optional three-index crystal direction aligned with the incident beam.
     azimuth_deg
@@ -495,6 +519,39 @@ class Layer:
     thickness_ang: ScalarOrSeq
     beam_uvw: tuple[int, int, int] | None = None
     azimuth_deg: float = 0.0
+
+    def __init__(
+        self,
+        material: str,
+        thickness_ang: ScalarOrSeq | _Unset = _UNSET,
+        beam_uvw: tuple[int, int, int] | None = None,
+        azimuth_deg: float = 0.0,
+        *,
+        thickness: object = _UNSET,
+    ) -> None:
+        if thickness is not _UNSET:
+            if thickness_ang is not _UNSET:
+                raise TypeError("Layer.thickness_ang and thickness are mutually exclusive")
+            thickness_ang = _geometry_length(thickness, unit="angstrom", field="Layer.thickness")
+        elif thickness_ang is _UNSET:
+            raise TypeError("Layer requires thickness_ang or thickness")
+        object.__setattr__(self, "material", material)
+        object.__setattr__(self, "thickness_ang", thickness_ang)
+        object.__setattr__(self, "beam_uvw", beam_uvw)
+        object.__setattr__(self, "azimuth_deg", azimuth_deg)
+        self.__post_init__()
+
+    @property
+    def thickness(self) -> Quantity:
+        """Fresh angstrom-valued layer thickness, scalar or film sweep."""
+        return _quantity_geometry(self.thickness_ang, "angstrom")
+
+    def with_thickness(self, thickness: object) -> Self:
+        """Copy with an explicitly unit-bearing thickness; retain other fields."""
+        return replace(
+            self,
+            thickness_ang=_geometry_length(thickness, unit="angstrom", field="Layer.thickness"),
+        )
 
     def __post_init__(self) -> None:
         if not isinstance(self.material, str) or not self.material.strip():
@@ -727,7 +784,7 @@ class _TargetGeometry:
         return tuple(lowered)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, init=False)
 class Slab(_TargetGeometry):
     """Describe a single crystal slab, optionally bounded or grooved.
 
@@ -736,8 +793,12 @@ class Slab(_TargetGeometry):
     material
         Catalog material key for the radiator.
     thickness_ang
-        Positive thickness in angstroms; a sequence is expanded by campaign
-        builders.
+        Legacy numeric angstrom thickness, scalar or campaign sweep sequence.
+        Omission preserves the historical 20000 Å default.
+    thickness
+        Keyword-only explicit Pint length, scalar or one-dimensional sweep.
+        Conflicts with ``thickness_ang``; the ``thickness`` property returns
+        a fresh angstrom quantity and ``with_thickness`` provides replacement.
     tilt_deg, tilt_azim_deg
         Polar and azimuthal crystal tilt angles in degrees. Scalars or sequences.
     footprint
@@ -768,6 +829,52 @@ class Slab(_TargetGeometry):
     # and ``mosaic_nodes`` -- stay on ``Sweep``; they are numerics.
     mosaic: bool = False
     cut: CrystalCut | None = None
+
+    def __init__(
+        self,
+        material: str,
+        thickness_ang: ScalarOrSeq | _Unset = _UNSET,
+        tilt_deg: ScalarOrSeq = 30.0,
+        tilt_azim_deg: ScalarOrSeq = 0.0,
+        entrance_face: BlazedGrooves | None = None,
+        allow_normal_incidence: bool = False,
+        mosaic: bool = False,
+        cut: CrystalCut | None = None,
+        *,
+        footprint: Footprint | None,
+        thickness: object = _UNSET,
+    ) -> None:
+        if thickness is not _UNSET:
+            if thickness_ang is not _UNSET:
+                raise TypeError("Slab.thickness_ang and thickness are mutually exclusive")
+            thickness_ang = _geometry_length(thickness, unit="angstrom", field="Slab.thickness")
+        elif thickness_ang is _UNSET:
+            thickness_ang = 2e4
+        for name, value in (
+            ("material", material),
+            ("thickness_ang", thickness_ang),
+            ("tilt_deg", tilt_deg),
+            ("tilt_azim_deg", tilt_azim_deg),
+            ("footprint", footprint),
+            ("entrance_face", entrance_face),
+            ("allow_normal_incidence", allow_normal_incidence),
+            ("mosaic", mosaic),
+            ("cut", cut),
+        ):
+            object.__setattr__(self, name, value)
+        self.__post_init__()
+
+    @property
+    def thickness(self) -> Quantity:
+        """Fresh angstrom-valued thickness, keeping scalar/sweep shape."""
+        return _quantity_geometry(self.thickness_ang, "angstrom")
+
+    def with_thickness(self, thickness: object) -> Self:
+        """Copy with a Pint thickness; preserve orientation and other settings."""
+        return replace(
+            self,
+            thickness_ang=_geometry_length(thickness, unit="angstrom", field="Slab.thickness"),
+        )
 
     def __post_init__(self) -> None:
         if not isinstance(self.material, str) or not self.material.strip():
@@ -1114,46 +1221,3 @@ def target_replace(target: Target, **changes: Any) -> Target:
         raise ValueError("substrate_thickness_ang override requires substrate=")
     flat.update(changes)
     return target_from_flat(**flat)
-
-
-def geometry_table(cases):
-    """A one-row-per-config DataFrame summarizing the geometry of a case list,
-    for a quick sanity check before running."""
-    import pandas as pd
-
-    def _grid(encoded):
-        """Compact label for a legacy uniform triple or an exact grid array."""
-        if encoded is None:
-            return "-"
-        values = decode_energy_grid(encoded)
-        if isinstance(encoded, tuple):
-            return f"{values[0] / 1e3:g}-{values[-1] / 1e3:g} keV @ {encoded[2]:g} eV"
-        if values.size == 1:
-            return f"{values[0] / 1e3:g} keV (1 value)"
-        return f"{values[0] / 1e3:g}-{values[-1] / 1e3:g} keV ({values.size} values)"
-
-    rows, seen = [], set()
-    for c in cases:
-        if c["name"] in seen:
-            continue
-        seen.add(c["name"])
-        same = [k for k in cases if k["name"] == c["name"]]
-        rows.append(
-            {
-                "config": c["name"],
-                "beam_uvw": c["beam_uvw"],
-                "surface_hkl": c.get("surface_hkl"),
-                "refl": len(c["hkl_list"]),
-                "t [um]": c["thickness_ang"] / 1e4,
-                "width [mm]": c.get("crystal_width_mm"),
-                "height [mm]": c.get("crystal_height_mm"),
-                "polar [deg]": round(c["tilt_deg"], 2),
-                "azim [deg]": round(c["tilt_azim_deg"], 2),
-                "energies [keV]": [k["E0_keV"] for k in same],
-                "line grid": _grid(c.get("E_grid_line", c["E_grid"])),
-                "brem grid": _grid(c.get("E_grid_brem")),
-                "theta_obs [deg]": round(np.degrees(c["theta_obs_rad"]), 1),
-                "dOmega [sr]": c["domega_sr"],
-            }
-        )
-    return pd.DataFrame(rows)

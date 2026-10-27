@@ -1,10 +1,16 @@
 """Closed scalar-detector acceptance descriptions, independent of response."""
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from numbers import Real
+from typing import TYPE_CHECKING, Any, Self, cast
 
-from .._units import normalize_unit
+from .._spec_defaults import UNSET as _UNSET
+from .._spec_defaults import _Unset
+from .._units import _is_pint_quantity, _positive_length_quantity, normalize_unit
+
+if TYPE_CHECKING:
+    from pint import Quantity
 
 
 def _positive(name: str, value: object) -> float:
@@ -16,18 +22,163 @@ def _positive(name: str, value: object) -> float:
     return result
 
 
-@dataclass(frozen=True)
+def _explicit_angular_quantity(
+    value: object, *, field: str, unit: str, kind: str, maximum: float, positive: bool
+) -> float:
+    """Check a scalar angular Pint input without importing Pint on numeric paths."""
+    import numpy as np
+
+    if not _is_pint_quantity(value):
+        raise TypeError(f"{field} requires an explicit Pint {kind.replace('_', ' ')} quantity")
+    original = np.asarray(cast(Any, value).magnitude)
+    if original.ndim != 0 or original.dtype.kind not in "iuf":
+        raise TypeError(f"{field} must be a real scalar {kind.replace('_', ' ')} quantity")
+    converted = normalize_unit(value, unit, field=field, expected=kind.replace("_", " "), kind=kind)
+    magnitude = np.asarray(converted)
+    if magnitude.ndim != 0 or magnitude.dtype.kind not in "iuf":
+        raise TypeError(f"{field} must be a real scalar {kind.replace('_', ' ')} quantity")
+    number = float(magnitude)
+    if not np.isfinite(magnitude) or not math.isfinite(number) or (original != 0 and number == 0):
+        raise ValueError(f"{field} is not representable as a finite {unit} scalar")
+    if number < 0 or (positive and number == 0) or number > maximum:
+        lower = "positive" if positive else "nonnegative"
+        raise ValueError(f"{field} must be {lower} and <= {maximum:g} {unit}")
+    return number
+
+
+@dataclass(frozen=True, init=False)
 class AngularAcceptance:
     """Spherical patch specified by exactly two full spans or solid angle.
 
     ``polar_deg`` and ``azimuthal_deg`` are full angular spans in degrees;
     ``solid_angle_sr`` is in steradians. The missing quantity is resolved at
     the detector's observation angle, not at construction.
+
+    Keyword-only ``polar``, ``azimuthal`` and ``solid_angle`` require explicit
+    scalar Pint quantities. Matching numeric/semantic keywords conflict.
+    Their properties return the *specified* values (None for the unresolved
+    member), not a value calculated for any observation angle. Use ``resolve``
+    for numeric degree/sr geometry. Replacements preserve the specified pair;
+    switching pairs requires a new acceptance value.
     """
 
     polar_deg: float | None = None
     azimuthal_deg: float | None = None
     solid_angle_sr: float | None = None
+
+    def __init__(
+        self,
+        polar_deg: float | None | _Unset = _UNSET,
+        azimuthal_deg: float | None | _Unset = _UNSET,
+        solid_angle_sr: float | None | _Unset = _UNSET,
+        *,
+        polar: object = _UNSET,
+        azimuthal: object = _UNSET,
+        solid_angle: object = _UNSET,
+    ) -> None:
+        for semantic, suffix, numeric, quantity, unit, kind, maximum in (
+            ("polar", "polar_deg", polar_deg, polar, "degree", "angle", 180.0),
+            ("azimuthal", "azimuthal_deg", azimuthal_deg, azimuthal, "degree", "angle", 360.0),
+            (
+                "solid_angle",
+                "solid_angle_sr",
+                solid_angle_sr,
+                solid_angle,
+                "steradian",
+                "solid_angle",
+                4 * math.pi,
+            ),
+        ):
+            if quantity is not _UNSET:
+                if numeric is not _UNSET:
+                    raise TypeError(f"AngularAcceptance received both {suffix} and {semantic}")
+                numeric = _explicit_angular_quantity(
+                    quantity,
+                    field=f"AngularAcceptance.{semantic}",
+                    unit=unit,
+                    kind=kind,
+                    maximum=maximum,
+                    positive=True,
+                )
+            elif numeric is _UNSET:
+                numeric = None
+            object.__setattr__(self, suffix, numeric)
+        self.__post_init__()
+
+    @property
+    def polar(self) -> "Quantity | None":
+        """Specified full polar span as a fresh degree quantity, or None."""
+        if self.polar_deg is None:
+            return None
+        from ..units import Q_
+
+        return Q_(self.polar_deg, "degree")
+
+    @property
+    def azimuthal(self) -> "Quantity | None":
+        """Specified full azimuthal span as a fresh degree quantity, or None."""
+        if self.azimuthal_deg is None:
+            return None
+        from ..units import Q_
+
+        return Q_(self.azimuthal_deg, "degree")
+
+    @property
+    def solid_angle(self) -> "Quantity | None":
+        """Specified solid angle as a fresh steradian quantity, or None."""
+        if self.solid_angle_sr is None:
+            return None
+        from ..units import Q_
+
+        return Q_(self.solid_angle_sr, "steradian")
+
+    def with_polar(self, polar: object) -> Self:
+        """Replace the specified full polar span, keeping the chosen pair."""
+        if self.polar_deg is None:
+            raise ValueError("polar was not specified; construct a new two-field acceptance")
+        return replace(
+            self,
+            polar_deg=_explicit_angular_quantity(
+                polar,
+                field="AngularAcceptance.polar",
+                unit="degree",
+                kind="angle",
+                maximum=180.0,
+                positive=True,
+            ),
+        )
+
+    def with_azimuthal(self, azimuthal: object) -> Self:
+        """Replace the specified full azimuthal span, keeping the chosen pair."""
+        if self.azimuthal_deg is None:
+            raise ValueError("azimuthal was not specified; construct a new two-field acceptance")
+        return replace(
+            self,
+            azimuthal_deg=_explicit_angular_quantity(
+                azimuthal,
+                field="AngularAcceptance.azimuthal",
+                unit="degree",
+                kind="angle",
+                maximum=360.0,
+                positive=True,
+            ),
+        )
+
+    def with_solid_angle(self, solid_angle: object) -> Self:
+        """Replace the specified solid angle, keeping the chosen pair."""
+        if self.solid_angle_sr is None:
+            raise ValueError("solid_angle was not specified; construct a new two-field acceptance")
+        return replace(
+            self,
+            solid_angle_sr=_explicit_angular_quantity(
+                solid_angle,
+                field="AngularAcceptance.solid_angle",
+                unit="steradian",
+                kind="solid_angle",
+                maximum=4 * math.pi,
+                positive=True,
+            ),
+        )
 
     def __post_init__(self) -> None:
         if (
@@ -103,17 +254,101 @@ class AngularAcceptance:
         return polar, azimuthal, omega
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, init=False)
 class SensorAcceptance:
     """Source-facing rectangle at radial ``distance_mm``, all lengths in mm.
 
     ``height_mm`` runs along the polar direction; ``width_mm`` along the
     local azimuthal tangent. No pixels, pose, or response are implied.
+
+    Keyword-only ``distance``, ``width`` and ``height`` require positive finite
+    scalar Pint lengths. Each conflicts with its corresponding numeric field.
+    Their properties return fresh mm quantities; ``with_distance``, ``with_width``
+    and ``with_height`` provide quantity-aware replacement. Positional numeric
+    arguments, dataclass fields and persistence retain mm. ``dataclasses.replace``
+    uses those numeric fields; semantic keywords conflict with the stored fields.
+    ``resolve()`` still returns numeric degree spans and steradians.
     """
 
     distance_mm: float
     width_mm: float
     height_mm: float
+
+    def __init__(
+        self,
+        distance_mm: float | _Unset = _UNSET,
+        width_mm: float | _Unset = _UNSET,
+        height_mm: float | _Unset = _UNSET,
+        *,
+        distance: object = _UNSET,
+        width: object = _UNSET,
+        height: object = _UNSET,
+    ) -> None:
+        for name, numeric, quantity in (
+            ("distance", distance_mm, distance),
+            ("width", width_mm, width),
+            ("height", height_mm, height),
+        ):
+            if quantity is not _UNSET:
+                if numeric is not _UNSET:
+                    raise TypeError(f"SensorAcceptance received both {name}_mm and {name}")
+                numeric = float(
+                    _positive_length_quantity(
+                        quantity, unit="mm", field=f"SensorAcceptance.{name}", shape=()
+                    )
+                )
+            elif numeric is _UNSET:
+                raise TypeError(f"SensorAcceptance requires {name}_mm or {name}")
+            object.__setattr__(self, f"{name}_mm", numeric)
+        self.__post_init__()
+
+    @property
+    def distance(self) -> "Quantity":
+        """Radial source-to-sensor distance as a fresh scalar mm quantity."""
+        from ..units import Q_
+
+        return Q_(self.distance_mm, "mm")
+
+    @property
+    def width(self) -> "Quantity":
+        """Full local azimuthal width as a fresh scalar mm quantity."""
+        from ..units import Q_
+
+        return Q_(self.width_mm, "mm")
+
+    @property
+    def height(self) -> "Quantity":
+        """Full local polar height as a fresh scalar mm quantity."""
+        from ..units import Q_
+
+        return Q_(self.height_mm, "mm")
+
+    def with_distance(self, distance: object) -> Self:
+        """Replace radial distance using an explicit scalar length quantity."""
+        return replace(
+            self,
+            distance_mm=_positive_length_quantity(
+                distance, unit="mm", field="SensorAcceptance.distance", shape=()
+            ),
+        )
+
+    def with_width(self, width: object) -> Self:
+        """Replace full azimuthal width using an explicit scalar length quantity."""
+        return replace(
+            self,
+            width_mm=_positive_length_quantity(
+                width, unit="mm", field="SensorAcceptance.width", shape=()
+            ),
+        )
+
+    def with_height(self, height: object) -> Self:
+        """Replace full polar height using an explicit scalar length quantity."""
+        return replace(
+            self,
+            height_mm=_positive_length_quantity(
+                height, unit="mm", field="SensorAcceptance.height", shape=()
+            ),
+        )
 
     def __post_init__(self) -> None:
         for name in ("distance_mm", "width_mm", "height_mm"):

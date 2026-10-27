@@ -41,6 +41,61 @@ Use these objects for detector efficiency, energy redistribution and grating
 images. Physical pixel scoring and acquisition are illustrated in the
 [workflow guide](../../reference/python-scene-recipes.md#place-a-finite-filter-over-detector-pixels).
 
+## Angular acceptance and observation with units
+
+Scalar detector angles and spherical-patch acceptance support Pint inputs with
+explicit semantic names alongside the established numeric degree/sr fields:
+
+```python
+from pyrite.detectors import AngularAcceptance, Detector
+from pyrite.units import Q_
+
+patch = AngularAcceptance(polar=Q_(2, "degree"), azimuthal=Q_(0.1, "rad"))
+detector = Detector(observation_angle=Q_(0.5, "rad"), acceptance=patch)
+detector.observation_angle.to("rad")  # fresh quantity, stored degrees unchanged
+rotated = detector.with_observation_angle(Q_(90, "degree"))
+resized = patch.with_polar(Q_(4, "degree"))
+```
+
+`AngularAcceptance` requires exactly two of `polar`/`polar_deg`,
+`azimuthal`/`azimuthal_deg`, or `solid_angle`/`solid_angle_sr`.
+Semantic inputs must be real, finite scalar Pint angles or solid angles, not
+bare numbers, arrays, or arbitrary dimensionless quantities. The three
+semantic properties return only the *specified* values as fresh degree/sr
+quantities; the omitted member stays `None` until `resolve()` is called at a
+given observation angle. `with_polar`, `with_azimuthal` and
+`with_solid_angle` update an existing member; use a new object to change the
+specified pair. `Detector.observation_angle` is a fresh degree quantity and
+`with_observation_angle` preserves the acceptance and read-time response.
+
+Both APIs reject the numeric and semantic spelling together, including
+positional numeric arguments. `dataclasses.replace` continues to use the
+numeric `*_deg`/`*_sr` fields. Numeric scoring, angular integration,
+`resolve()` output, stored records, and source/case identities are unchanged.
+
+## Sensor dimensions with units
+
+Use scalar length quantities for the source-facing rectangle:
+
+```python
+from pyrite.detectors import Detector, SensorAcceptance
+from pyrite.units import Q_
+
+sensor = SensorAcceptance(distance=Q_(40, "cm"), width=Q_(14, "mm"), height=Q_(7, "mm"))
+sensor.distance.to("cm")  # fresh scalar quantity; canonical read-back is mm
+wider = sensor.with_width(Q_(28, "mm"))
+detector = Detector(135, acceptance=wider)
+```
+
+`distance` is radial distance; `width` and `height` are full local azimuthal
+and polar dimensions. Each semantic input requires a positive finite scalar
+Pint length and conflicts with its corresponding `*_mm` spelling.
+`with_distance`, `with_width` and `with_height` preserve the other dimensions.
+Legacy positional and `*_mm` arguments remain numeric-compatible;
+`dataclasses.replace` uses those numeric fields. The exact numeric
+`resolve()` tuple retains degree spans and steradians, and detector lowering
+and saved records retain their existing numeric representation.
+
 ## Response contracts
 
 | Entry | Owner / status | Scientific contract and effects |

@@ -94,6 +94,8 @@ def _(mo):
 
     This example uses 30 keV electrons incident upon a 100 nm HOPG slab.
     The sampled electron histories do not represent a physical bunch population.
+    Use Pint quantities from `pyrite.units.ureg` for dimensional inputs.
+    PyRITE validates and normalizes them before numerical transport.
     """)
     return
 
@@ -105,10 +107,17 @@ def _(tables_ready):
     from pyrite.config import CxrReflections, FixedSampling, Numerics
     from pyrite.detectors import Detector
     from pyrite.geometry import Footprint, Slab
+    from pyrite.units import ureg
 
-    beam = Beam(energy_keV=30.0, transverse=PointSpot(), longitudinal=PointBunch())
-    target = Slab("hopg", thickness_ang=1_000.0, tilt_deg=30.0, footprint=Footprint(5.0, 5.0))
-    detector = Detector(observation_angle_deg=135.0)
+    # Quantities are checked at the API boundary; the simulation stays numeric.
+    beam = Beam(kinetic_energy=30 * ureg.keV, transverse=PointSpot(), longitudinal=PointBunch())
+    target = Slab(
+        "hopg",
+        thickness_ang=100 * ureg.nm,
+        tilt_deg=30 * ureg.degree,
+        footprint=Footprint(5 * ureg.mm, 5 * ureg.mm),
+    )
+    detector = Detector(observation_angle_deg=135 * ureg.degree)
 
     numerics = Numerics(
         sampling=FixedSampling(cxr_electrons=32_768, brem_electrons=128),

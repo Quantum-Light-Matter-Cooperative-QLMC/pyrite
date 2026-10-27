@@ -1,7 +1,11 @@
 # Quantity-output conversion contract (#755)
 
-**Status: proposed for review; no quantity-valued result accessor has been
-introduced.** This is the gate before implementation of result views. It
+**Status: node-sampled `SpectralDensity.quantify()`, experimental
+`DirectionalSpectrum.quantify()`, experimental binned aperture tallies,
+selected-pixel `SpatialResult.quantify_spectra()`, integrated spatial-image
+and acquisition count views are implemented; other families remain proposed
+for review.** This is the
+contract for incremental result views. It
 builds on the [physical-quantity migration inventory](quantity-migration-inventory.md)
 and [existing numeric result/storage contracts](result-storage-contracts.md).
 
@@ -115,13 +119,173 @@ fields, dataclass equality, CLI numeric defaults and all identity hashes stay
 identical. Return unsupported input dimensions/normalizations as a clear
 error, not a guessed conversion.
 
-No spelling is approved yet for a typed output view, its `to(...)` method, or
-any semantic result property. The first API review must choose between small
-family-specific accessors and a typed metadata adapter that can express
-(node/bin, physical measure, normalization, support mask) without requiring a
-per-pixel-energy materialization. Existing Polars/CSV schema fields retain
-their unit-suffixed numeric names unless a separately versioned output format
-is authorized.
+### First implemented slice: scalar component source spectra
+
+`SpectralDensity.quantify()` returns an independent
+`pyrite.results.QuantifiedSpectrum` on native energy nodes. It has Pint
+`photon_energy` and `density` properties, an immutable conversion operation
+`to_energy(unit)`, and explicit `sampling="nodes"`,
+`measure="per_energy_per_steradian"`,
+`count_basis="photons_per_incident_electron"`, and unchanged
+`normalization` (`"source"` or `"observation-average"`).
+
+```python
+from pyrite.results import SpectralDensity
+
+component = SpectralDensity([1000, 2000], [2.0, 2.0])
+spectrum = component.quantify()
+converted = spectrum.to_energy("keV")
+assert list(converted.photon_energy.magnitude) == [1.0, 2.0]
+assert list(converted.density.magnitude) == [2000.0, 2000.0]
+assert spectrum.photon_energy.units != converted.photon_energy.units
+assert converted.count_basis == "photons_per_incident_electron"
+```
+
+The energy-coordinate change scales density inversely. In a `QuantifiedSpectrum`,
+**unit conversion of the spectral axis is coupled to density conversion**;
+using Pint's ordinary `.to(...)` on an individual returned quantity is only
+for calculations and cannot change the spectrum's paired state.
+`photon_energy` and `density` are freshly constructed on property access, so
+callers cannot mutate this spectrum's backing arrays through Pint magnitudes.
+No source arrays, simulation, current scaling, or solid-angle integration
+are altered. A non-energy `to_energy` request raises `ValueError`.
+
+Do not confuse a quantity with its physical semantics: Pint's `steradian` is
+dimensionless, so the explicit measure and count-basis labels remain required.
+Other families (aperture histograms, spatial and
+acquisition data, quantum and optical outputs) need their own reviewed contracts.
+No generic result adapter is approved. Existing Polars/CSV fields retain their
+unit-suffixed numeric names unless a versioned format is approved.
+
+### Directional source view
+
+`DirectionalSpectrum.quantify()` returns experimental
+`pyrite.results.QuantifiedDirectionalSpectrum`. `axis_names` declares
+`("angle", "photon_energy")`; `angle` returns degree quantities,
+`photon_energy` returns eV quantities, and `density` returns per-eV/sr
+quantities. `to_energy(unit)` couples energy and reciprocal density conversion
+on each angular row. `supported` returns the original boolean angular mask;
+NaNs remain unchanged. Component identity, node sampling, source normalization,
+per-sr measure and photon/incident-electron count basis are explicit metadata.
+
+Converting `view.angle.to("radian")` changes only the returned coordinate.
+No angular Jacobian, sr-bin width, current, exposure or acceptance is inferred.
+The view accepts CPU NumPy source arrays only and snapshots them. Every array
+property returns a fresh copy; modifying the source or a returned array cannot
+alter another view. Case and provenance remain on the numeric source rather
+than being serialized into a registry-bound carrier. Reconstruct the view
+from numeric results after loading. Nonstandard `DirectionalSpectrum.units`
+are rejected explicitly rather than assumed to describe per-primary density.
+No uncertainty array exists on this source type; none is invented by the view.
+
+### Binned aperture histogram view
+
+`PhotonContinuumTally.quantify()` and `PhotonEventTally.quantify()` return an
+experimental, detached `pyrite.results.QuantifiedApertureSpectrum`.
+`photon_energy_edges` and `bin_widths` are Pint energy quantities, with
+N+1 and N values respectively. `density`, `direct_density` and
+`redistributed_density` are bin means in reciprocal display energy;
+`counts`, `direct_counts` and `redistributed_counts` are dimensionless Pint
+quantities with N bin-integrated values. `to_energy(unit)` converts the
+axis, widths and densities together, **not** counts.
+
+`detected_counts == sum(counts) + unbinned_counts` within the stored tally's
+validation tolerance. Unbinned detections are never assigned to energy bins.
+Metadata includes `sampling="bin_means"`, `measure="per_energy"`,
+`normalization="aperture-integrated"`, `count_basis="photons_per_incident_electron"`
+and `source_component` (`continuum`, `characteristic` or `annihilation`). There
+is no per-sr factor, rebinning, current normalization, exposure scaling or
+response resimulation. Counts are Pint-dimensionless but semantically photons
+per original primary, not electron charge. Event relaxation budgets and
+persistence provenance are left on the numeric tally. Invalid source arrays
+are rejected, CPU arrays are snapshotted and each property returns a fresh
+quantity. Reconstruct after loading; no serialized schema changes.
+
+### Selected-pixel spectral view
+
+`SpatialResult.quantify_spectra(pixels=... | region=..., component=...,
+measured=...)` returns an experimental, detached
+`pyrite.results.QuantifiedSpatialSpectrum`, carrying ordered integer
+`pixel_coordinates` and node-sampled `(pixel, photon_energy)` values. The
+underlying bounded `spectra()` call applies per-pixel solid-angle acceptance
+and primary filter transmission. Its spectral density has Pint units of
+`1/energy`, **not** `1/energy/sr`, and retains the semantic measure
+`"per_energy"`, normalization `"pixel-accepted"`, and count basis
+`"photons_per_incident_electron"`. The `measured` flag records whether the
+existing detector response was used. Energy conversion changes the energy
+node and reciprocal density scale, but does not reapply filters/acceptance,
+response, exposure or source-current scaling. The brem and line grids stay
+separate. Pixel coordinates are index labels, not a physical length axis.
+
+Selected CPU arrays are snapshotted and returned Pint quantities always own
+fresh magnitudes. The view does not eagerly construct a full pixel-energy
+cube, retain a detector or mutate the numeric result. Integrating over the
+selected native nodes yields per-primary pixel photons; `SpatialResult.image()`
+already provides window-integrated **numeric** photon yields. Pixel geometry
+metadata and measured `AcquisitionBatch` **counts** require separate quantity
+contracts; the view does not convert between source, accepted, and registered
+normalizations.
+
+### Integrated spatial-image view
+
+`SpatialResult.quantify_image(energy_range_eV, ...)` returns a detached
+`pyrite.results.QuantifiedSpatialImage` after calling the existing chunked
+`SpatialResult.image()` calculation exactly once. Its `photon_yield` array has
+`(pixel_row, pixel_column)` axes, `sampling="integrated_window"`,
+`measure="per_pixel"`, `normalization="pixel-accepted"` and
+`count_basis="photons_per_incident_electron"`. Integrating over the original
+energy nodes has already removed the reciprocal-energy density; per-pixel
+solid-angle acceptance has removed the reciprocal-steradian factor. Pint
+represents these per-primary photon yields as dimensionless **but their count
+basis is not detector counts**. Nothing in this view provides beam current or
+acquisition exposure.
+
+`photon_energy_window` is the requested pair of inclusive eV node-selection bounds,
+convertible with `to_energy(unit)`. Converted limits do not resample the native
+nodes or change the already-integrated yields. `measured=True` records the
+response applied at scoring time; display conversion does not run response
+again. Native result, pixel factors, hashes, serialized records and numeric
+`SpatialResult.image()` are unaffected. Each view copies only the resulting
+2D CPU array, not a detector × energy cube; all Pint read-back magnitudes are
+fresh, isolated arrays. Unlike `AcquisitionBatch`, this has neither measured
+energy bins nor event realization or exposure-normalized counts.
+
+### Measured-energy acquisition counts
+
+`AcquisitionBatch.quantify()` produces an independent experimental
+`QuantifiedAcquisitionBatch` view, with `axis_names=("pixel",
+"measured_photon_energy")`, `sampling="bin_counts"`, `measure="per_bin"`,
+`normalization="acquisition_exposure"`, and
+`count_basis="detector_events_per_exposure"`. The measured-energy axis has
+N+1 **edges**; `expected_counts`, optional `realized_counts` and selected
+`counts` have `(pixel, bin)` shapes. All count quantities are Pint-dimensionless
+but semantically detector events over an exposure, never photon density,
+per-incident-electron yield or current-normalized rate.
+
+The underflow, overflow and below-cut channels stay separate from reporting
+bins; `total_counts` sums only the latter. `to_energy()` converts measured
+energy edges and widths together without changing any count, RNG draw or
+observation digest. No re-scoring, response replay, resampling, hidden
+beam/exposure normalization or schema change takes place. CPU array snapshots
+and fresh Pint read-backs isolate all mutable state.
+
+### Selected-pixel geometry read-back
+
+`pyrite.results.PixelMetadata` exposes semantic quantity properties directly:
+`local_position`, `center`, `distance` and `path_length` in mm; `polar` and
+`azimuth` in degrees; `solid_angle` in sr. Each returns a fresh CPU array bound
+to the shared registry. Pint `.to(...)` converts only that physical value;
+there is no paired spectral density or normalization to transform. Shapes,
+coordinate frames, selection order and filter order follow the existing
+numeric fields. A zero-filter selection retains shape `(n_pixel, 0)`.
+
+Directions, pixel coordinates and tile indices retain their numeric contracts.
+In particular, pixel solid angle is acceptance metadata, not a per-sr photon
+density. Reading or converting it neither applies acceptance nor rescores
+geometry. Numeric dataclass fields and saved observations stay unchanged;
+`dataclasses.replace` continues to accept the numeric field names. Quantity
+properties are reconstructed on access after loading, with no registry state
+in serialized records. Numeric metadata construction remains Pint-lazy.
 
 ## Required tests before the first output implementation
 
@@ -143,8 +307,8 @@ is authorized.
    Pint-lazy; no new source/worker/checkpoint Pint payloads; API import and
    formatting/docs checks pass.
 
-**Open review questions:** exact output accessor spelling; typed carrier and
-mask/uncertainty model; whether a quantity view may wrap non-CPU arrays (if
+**Open review questions:** typed carriers for additional output families and
+mask/uncertainty models; whether a quantity view may wrap non-CPU arrays (if
 not, refuse explicitly); explicit dimensional model for optical coherency;
 and preservation of normalized finite-domain quantum densities. Resolve these
 *before* adding a generalized output wrapper.

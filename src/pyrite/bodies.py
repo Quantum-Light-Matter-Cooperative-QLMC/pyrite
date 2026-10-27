@@ -1,13 +1,18 @@
 """Scalar homogeneous body descriptions shared by source and filter roles."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from numbers import Real
-from typing import Literal
+from typing import TYPE_CHECKING, Literal, Self
 
 from ._planar_geometry import _positive_pair, _positive_real
-from ._units import normalize_unit
+from ._spec_defaults import UNSET as _UNSET
+from ._spec_defaults import _Unset
+from ._units import _positive_length_quantity, normalize_unit
 from .materials._composition import has_positive_number_densities, resolve_composition
 from .materials._schema import MaterialCatalog, MediumSpec
+
+if TYPE_CHECKING:
+    from pint import Quantity
 
 
 @dataclass(frozen=True)
@@ -40,7 +45,7 @@ class SubstanceRef:
             raise ValueError(f"unknown {self.kind} substance {self.key!r}") from None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, init=False)
 class RectangularBody:
     """Immutable homogeneous rectangular solid without a scene role or pose.
 
@@ -53,6 +58,13 @@ class RectangularBody:
     thickness_mm
         Positive finite full thickness along its local normal, in mm.
 
+    size, thickness
+        Keyword-only Pint lengths, mutually exclusive with the corresponding
+        numeric spelling. ``size`` has exactly two components; ``thickness`` is
+        scalar. Read-back returns detached quantities in mm. ``with_size`` and
+        ``with_thickness`` replace dimensions without changing the substance.
+        ``dataclasses.replace`` uses numeric fields; semantic aliases conflict.
+
     All dimensions are scalar. Use ``Sweep.axes`` to vary a scene's body;
     sequence-valued thicknesses, layers and infinite extent are unsupported.
     """
@@ -60,6 +72,71 @@ class RectangularBody:
     substance: SubstanceRef | MediumSpec
     size_mm: tuple[float, float]
     thickness_mm: float
+
+    def __init__(
+        self,
+        substance: SubstanceRef | MediumSpec,
+        size_mm: tuple[float, float] | _Unset = _UNSET,
+        thickness_mm: float | _Unset = _UNSET,
+        *,
+        size: object = _UNSET,
+        thickness: object = _UNSET,
+    ) -> None:
+        if size is not _UNSET:
+            if size_mm is not _UNSET:
+                raise TypeError("RectangularBody received both size_mm and size")
+            size_values = _positive_length_quantity(
+                size, unit="mm", field="RectangularBody.size", shape=(2,)
+            )
+            size_mm = _positive_pair("RectangularBody.size", size_values)
+        elif size_mm is _UNSET:
+            raise TypeError("RectangularBody requires size_mm or size")
+        if thickness is not _UNSET:
+            if thickness_mm is not _UNSET:
+                raise TypeError("RectangularBody received both thickness_mm and thickness")
+            thickness_mm = float(
+                _positive_length_quantity(
+                    thickness, unit="mm", field="RectangularBody.thickness", shape=()
+                )
+            )
+        elif thickness_mm is _UNSET:
+            raise TypeError("RectangularBody requires thickness_mm or thickness")
+        object.__setattr__(self, "substance", substance)
+        object.__setattr__(self, "size_mm", size_mm)
+        object.__setattr__(self, "thickness_mm", thickness_mm)
+        self.__post_init__()
+
+    @property
+    def size(self) -> "Quantity":
+        """Full local x/y dimensions as a detached two-component mm quantity."""
+        from .units import Q_
+
+        return Q_(list(self.size_mm), "mm")
+
+    @property
+    def thickness(self) -> "Quantity":
+        """Full normal thickness as a fresh scalar quantity in mm."""
+        from .units import Q_
+
+        return Q_(self.thickness_mm, "mm")
+
+    def with_size(self, size: object) -> Self:
+        """Replace full x/y dimensions using an explicit two-component length."""
+        return replace(
+            self,
+            size_mm=_positive_length_quantity(
+                size, unit="mm", field="RectangularBody.size", shape=(2,)
+            ),
+        )
+
+    def with_thickness(self, thickness: object) -> Self:
+        """Replace the normal thickness using an explicit scalar length."""
+        return replace(
+            self,
+            thickness_mm=_positive_length_quantity(
+                thickness, unit="mm", field="RectangularBody.thickness", shape=()
+            ),
+        )
 
     def __post_init__(self) -> None:
         if not isinstance(self.substance, (SubstanceRef, MediumSpec)):
