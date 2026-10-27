@@ -1,5 +1,9 @@
 # Physical unit inputs
 
+The [#755 migration inventory](quantity-migration-inventory.md) and
+[quantity-output conversion contract](quantity-output-contract.md) record the
+proposed next-stage interfaces. They do not change this page's shipped API.
+
 PyRITE accepts unit-bearing values at selected public configuration boundaries.
 The boundary converts them to the field's existing numeric representation;
 case payloads, transport buffers, result arrays, and checkpoint schemas remain
