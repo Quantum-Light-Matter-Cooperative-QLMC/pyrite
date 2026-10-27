@@ -305,14 +305,15 @@ def _reject_exclusive_start_flags(flags):
         raise click.UsageError("--cpu-only cannot be combined with --nsys")
     if flags.py_spy and flags.nsys:
         raise click.UsageError("--py-spy and --nsys are mutually exclusive")
-    if flags.cpu_only and flags.py_spy:
-        raise click.UsageError("--cpu-only cannot be combined with --py-spy")
-    if flags.cpu_only and flags.performance_repetitions != 1:
-        raise click.UsageError("--cpu-only cannot be combined with --perf-reps")
-    if flags.cpu_only and flags.performance_interval != 5.0:
-        raise click.UsageError("--cpu-only cannot be combined with --perf-interval")
-    if flags.cpu_only and (flags.spec_chunk is not None or flags.brem_chunk is not None):
-        raise click.UsageError("--cpu-only cannot be combined with GPU chunk pins")
+    if flags.cpu_only:
+        if flags.py_spy:
+            raise click.UsageError("--cpu-only cannot be combined with --py-spy")
+        if flags.performance_repetitions != 1:
+            raise click.UsageError("--cpu-only cannot be combined with --perf-reps")
+        if flags.performance_interval != 5.0:
+            raise click.UsageError("--cpu-only cannot be combined with --perf-interval")
+        if flags.spec_chunk is not None or flags.brem_chunk is not None:
+            raise click.UsageError("--cpu-only cannot be combined with GPU chunk pins")
 
 
 def _resolve_performance_profile(flags, catalog_profile):

@@ -32,7 +32,7 @@ Layout (``schema_version`` 3)::
                         fields (``pyrite_row``) stored electron-major
 
 Schema 3 compacts row fields on disk without changing what readers see: they
-are chunked (``_ROW_CHUNK`` rows) and compressed; integer IDs narrow to the
+are chunked (``_ROW_CHUNK`` rows), with LZF compression by default; integer IDs narrow to the
 smallest dtype holding their range, recording the transported dtype in
 ``pyrite_dtype``; and a row field constant within every history (``t0_ang``)
 is stored once per ``/electron_index`` entry (``pyrite_kind``

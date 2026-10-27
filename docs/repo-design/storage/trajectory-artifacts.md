@@ -26,9 +26,9 @@ argument; the selected policy is stored in the HDF5 root attribute
 Use `throughput` when GPU transport outpaces LZF compression and disk space is
 less important than capture latency. The schema-2-like uncompressed reference
 below is **not** identical to the new schema-3 throughput policy: the latter
-retains compact indexing and ID storage. RTX 5080 write/read timings and transfer volume for the new policy are
-recorded below. Policy-specific RAM/VRAM peaks, cold-storage durability,
-and full end-to-end runtime have not yet been measured.
+retains compact indexing and ID storage. RTX 5080 write/read timings, sampled
+memory peaks, and transfer volume for the new policy are recorded below.
+Cold-storage durability and full end-to-end runtime have not been measured.
 
 For CLI captures use `pyrite run PROFILE --trajectories --trajectory-storage throughput` (also available via `pyrite remote run` and `pyrite run --remote`). The policy affects storage only; it is not part of simulation physics or checkpoint identity.
 
@@ -74,11 +74,11 @@ Case (b) is the `trajectory_demo` hopg geometry at 30 keV: 45° tilt, 180° azim
 | schema 3, host segments | 0.57 GiB | 89.4 | 7.0 s (345%) | 5.6 s | 5.1 / 3.7 s | 38 ms |
 | schema 3, device-resident segments | 0.57 GiB | 89.4 | 5.7 s (248%) | 3.1 s | 3.5 / 3.2 s | 162 ms |
 
-The size reduction carries over at scale: 55%, from 1.28 to 0.57 GiB. The write budget does not. LZF compresses about 1 million segments per second on this host's CPU, but the CUDA core transports about 3.4 million per second. A schema-3 capture therefore costs several times the GPU transport it records, against about 0.8× uncompressed. Case (a)'s 25% bound holds only for CPU transport. Ways to bring GPU captures back under budget, none adopted here:
+The size reduction carries over at scale: 55%, from 1.28 to 0.57 GiB. The write budget does not. LZF compresses about 1 million segments per second on this host's CPU, but the CUDA core transports about 3.4 million per second. A schema-3 capture therefore costs several times the GPU transport it records, against about 0.8× uncompressed. Case (a)'s 25% bound holds only for CPU transport. Options evaluated or deferred:
 
-- the new opt-in `throughput` policy, which keeps schema-3 compaction while removing HDF5 compression (GPU timings still to be measured);
-- compressing on a writer thread that overlaps the spectrum phase;
-- storing floats at lower precision.
+- the opt-in `throughput` policy, which keeps schema-3 compaction while removing HDF5 compression (measurements below);
+- compressing on a writer thread that overlaps the spectrum phase (deferred pending a representative scoring benchmark);
+- storing floats at lower precision (excluded here to preserve exact values).
 
 Host and device-resident captures both read back equal to the transported arrays.
 
@@ -106,20 +106,63 @@ Readers accept schemas 1 to 3. Schema-2 files keep their plain row datasets and 
 alternating captures per policy on `qlmc` (RTX 5080, CuPy 14.2.0). The
 benchmark used an isolated bundled catalog, without the user's catalog layer.
 
-| Residency | Compact median write | Throughput median write | Speedup |
+| Residency | Compact median write (range) | Throughput median write (range) | Speedup |
 |---|---:|---:|---:|
-| Device | 3.934 s | 0.863 s | 4.56× |
-| Host | 3.555 s | 0.441 s | 8.05× |
+| Device | 3.934 s (3.900–4.132) | 0.863 s (0.756–0.906) | 4.56× |
+| Host | 3.555 s (3.520–3.613) | 0.441 s (0.412–0.557) | 8.05× |
 
 Artifact size: 667.1 MiB compact versus 878.0 MiB throughput (+32%).
 Streaming read: approximately 1.09 s versus 0.17 s. Device-to-host transfer
 volume was approximately 1,115 MiB per capture in both modes. CUDA transport
 itself took 0.165 s (after warm-up); host staging took 0.456 s and was
-excluded from host writer times. Peak sampled RSS (884 MiB) and CuPy pool
-(2,086 MiB) are transport measurements, not policy-specific write peaks.
+excluded from host writer times. The largest writer download was 64.164 MiB
+(the electron-ID column used to build the index); other row fields retain
+bounded block transfers. Host-resident writes transferred no device bytes.
+
+| Residency | Compact sampled RSS range | Throughput sampled RSS range | CuPy reserved pool (both policies) |
+|---|---:|---:|---:|
+| Device | 2,075.7–2,103.6 MiB | 2,054.4–2,076.1 MiB | 2,599.3 MiB |
+| Host | 2,011.7–2,044.1 MiB | 1,979.4–2,056.1 MiB | 2,599.3 MiB |
+
+These 50 ms samples include preexisting host and device transport buffers,
+and may miss short peaks. The CuPy pool is an allocation proxy, not total
+process VRAM. Allocator/cache retention prevents interpreting the ranges as
+isolated policy memory requirements. Raw [capture measurements](evidence/capture-610.json)
+retain all repetitions, including CPU time, transfer counts, and memory samples.
 
 **Decision:** keep `compact` the backward-compatible default, make
 `throughput` selectable on the CLI, and measure realistic overlap of writing
 with spectrum scoring before introducing a background writer. These write/read
 timings are warm-cache benchmark observations, not cold-storage durability
 or end-to-end application speedups.
+
+### Bounded overlap experiment
+
+The [three paired trials](evidence/capture-overlap-610.json) compare capture of
+one device-resident case plus transport of the next, sequentially and with one
+outstanding writer future. Compact median pair time changed from 3.925 s to
+3.716 s (1.06×); throughput changed from 0.640 s to 0.486 s (1.32×), but one
+throughput pair regressed from 0.508 s to 0.712 s. Retaining both cases raised
+the reserved CuPy pool as high as 4,913.4 MiB. This experiment does not measure
+overlap with spectrum scoring, and the first throughput pair has a large
+write-time imbalance. It does not establish a reliable application speedup.
+
+The benchmark joins each future, propagates writer exceptions, and allows
+only one outstanding write. No asynchronous writer or transfer buffer is
+enabled in production: captures finish synchronously before scoring, keeping
+the existing atomic completion and buffer lifetime guarantees. Chunk size
+remains 4,096 rows; these measurements isolate compression with that layout
+and do not establish an optimal chunk size or pinned-transfer strategy.
+
+Reproduce inside a GPU scheduler allocation after the remote pre-flight:
+
+```bash
+uv run python scripts/pyrite_issue610_overlap_benchmark.py --local \
+  --ne 30000 --seed 42 --repeats 5 --residency both
+uv run python scripts/pyrite_issue610_overlap_benchmark.py --local \
+  --ne 30000 --seed 42 --repeats 3 --overlap-only
+```
+
+The benchmark warms CUDA with 32 electrons and alternates paired policy order.
+Existing results predate recording a source SHA and full environment metadata;
+their JSON records are preserved as recovered, rather than presented as new runs.

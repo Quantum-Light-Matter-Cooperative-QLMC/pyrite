@@ -1,0 +1,122 @@
+[
+  {
+    "trial": 1,
+    "policy": "throughput",
+    "mode": "sequential",
+    "wall_s": 1.132202,
+    "write_s": 1.064692,
+    "next_transport_s": 0.067506,
+    "peak_rss_mib": 855.8,
+    "peak_pool_reserved_mib": 4013.9
+  },
+  {
+    "trial": 1,
+    "policy": "throughput",
+    "mode": "overlap",
+    "wall_s": 0.485785,
+    "write_s": 0.485139,
+    "next_transport_s": 0.078917,
+    "peak_rss_mib": 854.5,
+    "peak_pool_reserved_mib": 4527.6
+  },
+  {
+    "trial": 1,
+    "policy": "compact",
+    "mode": "sequential",
+    "wall_s": 3.74637,
+    "write_s": 3.685963,
+    "next_transport_s": 0.060403,
+    "peak_rss_mib": 895.6,
+    "peak_pool_reserved_mib": 4527.6
+  },
+  {
+    "trial": 1,
+    "policy": "compact",
+    "mode": "overlap",
+    "wall_s": 3.715663,
+    "write_s": 3.715154,
+    "next_transport_s": 0.08362,
+    "peak_rss_mib": 910.7,
+    "peak_pool_reserved_mib": 4527.6
+  },
+  {
+    "trial": 2,
+    "policy": "throughput",
+    "mode": "overlap",
+    "wall_s": 0.711853,
+    "write_s": 0.711077,
+    "next_transport_s": 0.315323,
+    "peak_rss_mib": 947.7,
+    "peak_pool_reserved_mib": 4527.6
+  },
+  {
+    "trial": 2,
+    "policy": "throughput",
+    "mode": "sequential",
+    "wall_s": 0.508091,
+    "write_s": 0.451747,
+    "next_transport_s": 0.05634,
+    "peak_rss_mib": 845.7,
+    "peak_pool_reserved_mib": 4527.6
+  },
+  {
+    "trial": 2,
+    "policy": "compact",
+    "mode": "overlap",
+    "wall_s": 3.679724,
+    "write_s": 3.679063,
+    "next_transport_s": 0.079467,
+    "peak_rss_mib": 904.7,
+    "peak_pool_reserved_mib": 4527.6
+  },
+  {
+    "trial": 2,
+    "policy": "compact",
+    "mode": "sequential",
+    "wall_s": 3.924782,
+    "write_s": 3.748779,
+    "next_transport_s": 0.176002,
+    "peak_rss_mib": 903.7,
+    "peak_pool_reserved_mib": 4527.6
+  },
+  {
+    "trial": 3,
+    "policy": "throughput",
+    "mode": "sequential",
+    "wall_s": 0.639829,
+    "write_s": 0.57914,
+    "next_transport_s": 0.060687,
+    "peak_rss_mib": 951.7,
+    "peak_pool_reserved_mib": 4527.6
+  },
+  {
+    "trial": 3,
+    "policy": "throughput",
+    "mode": "overlap",
+    "wall_s": 0.478966,
+    "write_s": 0.478424,
+    "next_transport_s": 0.092879,
+    "peak_rss_mib": 845.7,
+    "peak_pool_reserved_mib": 4913.4
+  },
+  {
+    "trial": 3,
+    "policy": "compact",
+    "mode": "sequential",
+    "wall_s": 3.931516,
+    "write_s": 3.714938,
+    "next_transport_s": 0.216576,
+    "peak_rss_mib": 951.7,
+    "peak_pool_reserved_mib": 4913.4
+  },
+  {
+    "trial": 3,
+    "policy": "compact",
+    "mode": "overlap",
+    "wall_s": 3.760327,
+    "write_s": 3.759544,
+    "next_transport_s": 0.084122,
+    "peak_rss_mib": 904.7,
+    "peak_pool_reserved_mib": 4913.4
+  }
+]

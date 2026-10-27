@@ -255,7 +255,8 @@ def test_unsupported_values_fail_before_publishing(tmp_path):
     assert list(tmp_path.iterdir()) == []
 
 
-def test_device_arrays_download_in_bounded_blocks(tmp_path, monkeypatch):
+@pytest.mark.parametrize("storage_policy", ["compact", "throughput"])
+def test_device_arrays_download_in_bounded_blocks(tmp_path, monkeypatch, storage_policy):
     class FakeDevice:
         """Minimal device-array stand-in: slicing stays on device."""
 
@@ -276,7 +277,9 @@ def test_device_arrays_download_in_bounded_blocks(tmp_path, monkeypatch):
     monkeypatch.setattr(traj, "_DEVICE_BLOCK_BYTES", 10 * 3 * 8)
     host = np.arange(95 * 3, dtype=np.float64).reshape(95, 3)
 
-    path = write_trajectory_artifact(tmp_path / "d.h5", {"r_mid": FakeDevice(host)}, case=_case())
+    path = write_trajectory_artifact(
+        tmp_path / "d.h5", {"r_mid": FakeDevice(host)}, case=_case(), storage_policy=storage_policy
+    )
 
     assert max(downloads) == 10 and sum(downloads) == 95
     np.testing.assert_array_equal(read_trajectory_artifact(path).transport["r_mid"], host)
@@ -286,9 +289,9 @@ def test_cuda_resident_run_captures_device_segments(tmp_path):
     """GPU-path check: resident CUDA segments are captured without a host copy."""
     from pyrite import _backend
 
-    cupy = pytest.importorskip("cupy")
-    if not _backend.is_device_array(cupy.zeros(1)):
+    if _backend.BACKEND.name != "cuda":
         pytest.skip("selected backend is not CUDA")
+    pytest.importorskip("cupy")
     case = _case()
     capture = TrajectoryCapture(root=str(tmp_path))
 
@@ -363,6 +366,26 @@ def test_existing_artifact_requires_explicit_overwrite(tmp_path):
     _assert_same_tree(read_trajectory_artifact(path).transport, second)
 
 
+@pytest.mark.parametrize("storage_policy", ["compact", "throughput"])
+def test_failed_overwrite_preserves_complete_artifact(tmp_path, monkeypatch, storage_policy):
+    original = _bunched_interleaved_transport()
+    path = write_trajectory_artifact(tmp_path / "saved.h5", original, case=_case())
+    before = path.read_bytes()
+
+    def fail(*args, **kwargs):
+        raise OSError("writer failed")
+
+    monkeypatch.setattr(traj, "_write_node", fail)
+    with pytest.raises(OSError, match="writer failed"):
+        write_trajectory_artifact(
+            path, original, case=_case(), overwrite=True, storage_policy=storage_policy
+        )
+
+    assert path.read_bytes() == before
+    assert not path.with_suffix(".h5.partial").exists()
+    _assert_same_tree(read_trajectory_artifact(path).transport, original)
+
+
 def test_artifact_paths_are_deterministic_and_collision_free():
     a = traj.artifact_relpath({"name": "hopg ne=10/5", "E0_keV": 30.0})
     b = traj.artifact_relpath({"name": "hopg ne=10_5", "E0_keV": 30.0})
@@ -426,9 +449,10 @@ def test_preflight_rejects_a_cached_artifact_of_different_physics(tmp_path, stal
 # ---- run pipeline ----------------------------------------------------------
 
 
-def test_run_case_capture_matches_transport_and_leaves_spectra_unchanged(tmp_path):
+@pytest.mark.parametrize("storage_policy", ["compact", "throughput"])
+def test_run_case_capture_matches_transport_and_leaves_spectra_unchanged(tmp_path, storage_policy):
     case = _case()
-    capture = TrajectoryCapture(root=str(tmp_path))
+    capture = TrajectoryCapture(root=str(tmp_path), storage_policy=storage_policy)
 
     plain = runner.run_case(case)
     captured = runner.run_case(case, trajectory_capture=capture)
@@ -1078,7 +1102,8 @@ def test_ids_outside_the_compact_range_keep_their_dtype(tmp_path):
     _assert_same_tree(read_trajectory_artifact(path).transport, segs)
 
 
-def test_device_row_fields_compact_in_bounded_blocks(tmp_path, monkeypatch):
+@pytest.mark.parametrize("storage_policy", ["compact", "throughput"])
+def test_device_row_fields_compact_in_bounded_blocks(tmp_path, monkeypatch, storage_policy):
     class FakeDevice:
         """Device-array stand-in: slicing and reductions stay on device."""
 
@@ -1108,7 +1133,9 @@ def test_device_row_fields_compact_in_bounded_blocks(tmp_path, monkeypatch):
     rows = ("r_mid", "electron_id", "t0_ang", "L_ang")
     device = {key: FakeDevice(host[key]) for key in rows}
 
-    path = write_trajectory_artifact(tmp_path / "d.h5", device, case=_case())
+    path = write_trajectory_artifact(
+        tmp_path / "d.h5", device, case=_case(), storage_policy=storage_policy
+    )
 
     # Only the ID column the row order and index derive from comes down whole.
     n_rows = host["L_ang"].size

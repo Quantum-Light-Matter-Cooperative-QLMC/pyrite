@@ -374,11 +374,7 @@ def _cli_start(
             {
                 "trajectories": trajectories,
                 "overwrite_trajectories": overwrite_trajectories,
-                **(
-                    {"trajectory_storage": trajectory_storage}
-                    if trajectory_storage is not None
-                    else {}
-                ),
+                "trajectory_storage": trajectory_storage,
             }
             if trajectories is not None
             else {}

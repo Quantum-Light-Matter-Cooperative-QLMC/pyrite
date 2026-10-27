@@ -274,6 +274,18 @@ def _cpu_profile_block(catalog_profile, performance_profile, cpu_flags):
 """
 
 
+def _trajectory_flags(trajectories, overwrite_trajectories, trajectory_storage):
+    """Serialize capture options identically for monolithic and chunked jobs."""
+    if trajectories is None:
+        return ""
+    flags = f" --trajectories {config.shell_word(trajectories)}"
+    if overwrite_trajectories:
+        flags += " --overwrite-trajectories"
+    if trajectory_storage is not None:
+        flags += f" --trajectory-storage {config.shell_arg(trajectory_storage)}"
+    return flags
+
+
 def _queue_script(
     jobid,
     materials,
@@ -313,13 +325,7 @@ def _queue_script(
         raise ValueError("py_spy requires a performance profile and excludes nsys/cpu_only")
     if no_cache and recompute:
         raise ValueError("no_cache and recompute are mutually exclusive")
-    flags = ""
-    if trajectories is not None:
-        flags += f" --trajectories {config.shell_word(trajectories)}"
-        if overwrite_trajectories:
-            flags += " --overwrite-trajectories"
-        if trajectory_storage is not None:
-            flags += f" --trajectory-storage {config.shell_arg(trajectory_storage)}"
+    flags = _trajectory_flags(trajectories, overwrite_trajectories, trajectory_storage)
     if quick:
         flags += " --quick"
     if workers is not None:
@@ -683,13 +689,7 @@ def _chunked_queue_script(
     State-first ordering keeps the EXIT trap from releasing reservations while
     the next slice is already pending (spec Component 2 step 4).
     """
-    flags = ""
-    if trajectories is not None:
-        flags += f" --trajectories {config.shell_word(trajectories)}"
-        if overwrite_trajectories:
-            flags += " --overwrite-trajectories"
-        if trajectory_storage is not None:
-            flags += f" --trajectory-storage {config.shell_arg(trajectory_storage)}"
+    flags = _trajectory_flags(trajectories, overwrite_trajectories, trajectory_storage)
     if quick:
         flags += " --quick"
     if workers is not None:
