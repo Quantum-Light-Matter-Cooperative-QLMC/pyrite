@@ -51,6 +51,9 @@ To use PyRITE as a Python library instead, install it in your environment:
 pip install pyrite-mc
 ```
 
+Pint is included for physical quantity inputs through `pyrite.units`; numeric
+configuration and simulation storage retain their documented units.
+
 For interactive local apps, optional GPU support, configuration, and a walk-through of your first results, see the **[getting-started guide](https://pyrite.readthedocs.io/en/latest/guides/getting-started.html)**. For library usage, see the **[Python API guide](https://pyrite.readthedocs.io/en/latest/guides/python-api-workflow.html)**.
 
 ## Research status and validation

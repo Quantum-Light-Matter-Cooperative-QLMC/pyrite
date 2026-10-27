@@ -53,9 +53,9 @@ For dimensional values, follow the
 [physical-quantity naming policy](../repo-design/physical-units.md#naming-and-representation-policy):
 use semantic names for values that carry units and unit suffixes for raw
 magnitudes. Accepting a Pint input does not change a numeric field's read-back
-contract. A proposed quantity interface must specify missing-extra behavior,
+contract. A quantity interface must specify lazy dependency loading,
 replacement, array ownership, lowering and serialization before implementation;
-the additive beam pilot remains a design proposal.
+the additive beam-energy interface keeps the numeric dataclass representation.
 
 ## Before approving a public feature
 

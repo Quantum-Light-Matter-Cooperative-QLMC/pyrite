@@ -355,7 +355,7 @@ def test_quantity_scene_and_observation_preserve_values_and_identity(
     )
     quantity_scene = replace(
         scene,
-        beam=replace(scene.beam, energy_keV=0.03 * ureg.MeV),
+        beam=scene.beam.with_kinetic_energy(0.03 * ureg.MeV),
         target=replace(scene.target, thickness_ang=100 * ureg.nm, tilt_deg=30 * ureg.degree),
         detector=replace(
             scene.detector,

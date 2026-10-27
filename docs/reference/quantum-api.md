@@ -51,7 +51,7 @@ limited to its existing admitted subset, detailed in the planar guide.
 
 ## Runtime quantity inputs
 
-With the optional `pyrite.units` extra, runtime factories through
+Using the shared registry in `pyrite.units` (Pint is a core dependency), runtime factories through
 `pyrite.quantum` (and the identical `pyrite.states` aliases) normalize
 `waist_ang`, `scale_ang`, `center_ang`, `spacing_ang`, `origin_ang` and
 `offset_ang` to Å; `k_radial_inv_ang` to Å⁻¹; and

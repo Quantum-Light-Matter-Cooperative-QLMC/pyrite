@@ -66,8 +66,9 @@ def test_catalog_flat_and_nested_response_rows_lower_identically() -> None:
     assert any("conflicts" in item for item in invalid.items)
 
 
-def test_policy_respects_optional_pint_units() -> None:
-    pint = pytest.importorskip("pint")
+def test_policy_respects_pint_units() -> None:
+    import pint
+
     ureg = pint.UnitRegistry()
     config = Timepix3ResponseNumerics(dE_mc=0.2 * ureg.keV, dE_out=100 * ureg.eV)
     assert config.dE_mc == pytest.approx(200.0)

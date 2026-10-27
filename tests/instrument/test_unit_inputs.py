@@ -1,7 +1,9 @@
 """Unit-bearing physical configuration inputs normalize at their constructors."""
 
+import pickle
 import subprocess
 import sys
+from dataclasses import asdict, fields, replace
 
 import numpy as np
 import pint
@@ -31,12 +33,22 @@ def test_shared_registry_converts_beam_and_accepts_external_registry() -> None:
     assert Q_(1, ureg.pC).to("pC").magnitude == 1
 
 
-def test_pint_is_not_loaded_by_plain_import_and_missing_extra_has_guidance() -> None:
+def test_numeric_beam_paths_do_not_import_pint() -> None:
     import_check = subprocess.run(
         [
             sys.executable,
             "-c",
-            "import sys; import pyrite; assert 'pint' not in sys.modules",
+            "import builtins, sys; original=builtins.__import__; "
+            "builtins.__import__=lambda name,*a,**k: "
+            "(_ for _ in ()).throw(AssertionError('Pint imported on numeric path')) "
+            "if name.split('.')[0]=='pint' else original(name,*a,**k); "
+            "import pyrite; from dataclasses import replace, asdict; "
+            "from pyrite.beams import Beam, Spot, PointBunch; "
+            "beam=Beam(60, transverse=Spot(), longitudinal=PointBunch()); "
+            "assert replace(beam).energy_keV == 60; "
+            "assert Beam.from_spec(beam.to_spec()).energy_keV == 60; "
+            "assert asdict(beam)['energy_keV'] == 60; "
+            "assert 'pint' not in sys.modules",
         ],
         check=False,
         capture_output=True,
@@ -44,22 +56,86 @@ def test_pint_is_not_loaded_by_plain_import_and_missing_extra_has_guidance() -> 
     )
     assert import_check.returncode == 0, import_check.stderr
 
-    missing_extra = subprocess.run(
-        [
-            sys.executable,
-            "-c",
-            "import builtins; original=builtins.__import__; "
-            "builtins.__import__=lambda name,*a,**k: "
-            "(_ for _ in ()).throw(ModuleNotFoundError('pint')) if name=='pint' "
-            "else original(name,*a,**k); "
-            "from pyrite.units import ureg",
-        ],
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    assert missing_extra.returncode != 0
-    assert "pyrite-mc[units]" in missing_extra.stderr
+
+def test_semantic_beam_energy_preserves_numeric_records_and_replacement() -> None:
+    options = dict(transverse=Spot(), longitudinal=PointBunch())
+    numeric = Beam(60, **options)
+    quantity = Beam(kinetic_energy=0.06 * ureg.MeV, **options)
+    assert quantity == numeric
+    assert asdict(quantity) == asdict(numeric)
+    assert "kinetic_energy" not in {item.name for item in fields(quantity)}
+    assert quantity.to_spec() == numeric.to_spec()
+    assert Beam.from_spec(quantity.to_spec()) == numeric
+    assert pickle.loads(pickle.dumps(quantity)) == numeric
+    assert quantity.kinetic_energy.to("eV").magnitude == 60_000
+    assert replace(quantity) == numeric
+    assert replace(quantity, rep_rate_hz=100).energy_keV == 60
+    assert replace(quantity, energy_keV=80).kinetic_energy == 80 * ureg.keV
+    changed = quantity.with_kinetic_energy(0.08 * ureg.MeV)
+    assert changed == replace(numeric, energy_keV=80)
+    assert quantity.energy_keV == 60
+    assert Beam(**options).energy_keV == (30.0, 45.0, 60.0)
+    positional = Beam(60, 0.1, 2000, 2, None, None, **options)
+    assert positional.energy_spread_frac == 0.1
+    assert positional.rep_rate_hz == 2000
+    assert positional.bunch_charge_pc == 2
+
+
+def test_semantic_energy_arrays_and_external_registry_have_independent_readback() -> None:
+    external = pint.UnitRegistry()
+    source = external.Quantity(np.array([0.03, 0.045, 0.06]), "MeV")
+    beam = Beam(kinetic_energy=source, transverse=Spot(), longitudinal=PointBunch())
+    assert np.allclose(beam.energy_keV, [30, 45, 60])
+    readback = beam.kinetic_energy
+    assert readback._REGISTRY is ureg
+    assert readback.units == ureg.keV
+    source.magnitude[0] = 1
+    readback.magnitude[1] = 1
+    assert np.allclose(beam.energy_keV, [30, 45, 60])
+    assert np.allclose(beam.to_spec().energy_keV, [30, 45, 60])
+    changed = beam.with_kinetic_energy(Q_([60, 80], "keV"))
+    assert np.array_equal(changed.energy_keV, [60, 80])
+    numeric = Beam(energy_keV=[30, 45], transverse=Spot(), longitudinal=PointBunch())
+    numeric.kinetic_energy.magnitude[0] = 0
+    assert numeric.energy_keV == [30, 45]
+
+
+@pytest.mark.parametrize(
+    ("value", "error"),
+    [
+        (60, TypeError),
+        ("60 keV", TypeError),
+        (np.array([30, 60]), TypeError),
+        ([30 * ureg.keV, 60 * ureg.keV], TypeError),
+        (ureg.Quantity(1, "dimensionless"), ValueError),
+        (1 * ureg.mm, ValueError),
+        (Q_([[30, 60]], "keV"), TypeError),
+        (Q_(np.array([True]), "keV"), TypeError),
+        (Q_(1 + 1j, "keV"), TypeError),
+        (Q_([], "keV"), ValueError),
+        (Q_([30, np.nan], "keV"), ValueError),
+        (np.inf * ureg.keV, ValueError),
+        (0 * ureg.keV, ValueError),
+        (-1 * ureg.keV, ValueError),
+    ],
+)
+def test_semantic_energy_rejects_invalid_inputs(value: object, error: type[Exception]) -> None:
+    beam = Beam(60, transverse=Spot(), longitudinal=PointBunch())
+    with pytest.raises(error, match="kinetic_energy"):
+        Beam(kinetic_energy=value, transverse=Spot(), longitudinal=PointBunch())
+    with pytest.raises(error, match="kinetic_energy"):
+        beam.with_kinetic_energy(value)
+
+
+def test_semantic_and_numeric_energy_arguments_conflict_even_when_equivalent() -> None:
+    options = dict(transverse=Spot(), longitudinal=PointBunch())
+    with pytest.raises(TypeError, match="energy_keV.*kinetic_energy"):
+        Beam(energy_keV=60, kinetic_energy=60 * ureg.keV, **options)
+    with pytest.raises(TypeError, match="energy_keV.*kinetic_energy"):
+        Beam(60, kinetic_energy=60 * ureg.keV, **options)
+    beam = Beam(kinetic_energy=60 * ureg.keV, **options)
+    with pytest.raises(TypeError, match="energy_keV.*kinetic_energy"):
+        replace(beam, kinetic_energy=80 * ureg.keV)
 
 
 def test_quantity_arrays_and_compound_geometry_normalize_to_plain_values() -> None:
