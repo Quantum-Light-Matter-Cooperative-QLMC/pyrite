@@ -66,33 +66,38 @@ def ray_layer_intervals(
     origins, directions = _validate_rays(origins, directions)
     _validate_layers(layers)
     width_ang, height_ang = validate_transverse_dimensions(width_ang, height_ang, unit="Ang")
+    return _layer_intervals(origins, directions, layers, width_ang, height_ang)
+
+
+def _layer_intervals(origins, directions, layers, width_ang, height_ang, *, xp=np):
+    """Clip validated rays/layers on the selected array backend."""
     bounds = [
-        (2, np.array([layer[0] for layer in layers]), np.array([layer[1] for layer in layers]))
+        (2, xp.asarray([layer[0] for layer in layers]), xp.asarray([layer[1] for layer in layers]))
     ]
     if width_ang is not None:
         assert height_ang is not None  # validated as a pair above
         bounds.extend([(0, -width_ang / 2, width_ang / 2), (1, -height_ang / 2, height_ang / 2)])
-    return _clip_axes(origins, directions, bounds, len(layers))
+    return _clip_axes(origins, directions, bounds, len(layers), xp=xp)
 
 
-def _clip_axes(origins, directions, bounds, k: int) -> tuple[np.ndarray, np.ndarray]:
+def _clip_axes(origins, directions, bounds, k: int, *, xp=np):
     """Intersect forward rays with per-axis [lower, upper) bands for K bodies.
 
     Validation: photon-scene-navigation
     """
     shape = (origins.shape[0], k)
-    start, end = np.zeros(shape), np.full(shape, np.inf)
+    start, end = xp.zeros(shape), xp.full(shape, np.inf)
     for axis, lower, upper in bounds:
         coordinate, direction = origins[:, axis, None], directions[:, axis, None]
         parallel = direction == 0.0
         with np.errstate(divide="ignore", invalid="ignore"):
             a, b = (lower - coordinate) / direction, (upper - coordinate) / direction
         inside = (coordinate >= lower) & (coordinate < upper)
-        near = np.where(parallel, -np.inf, np.minimum(a, b))
-        far = np.where(parallel, np.where(inside, np.inf, -np.inf), np.maximum(a, b))
-        start, end = np.maximum(start, near), np.minimum(end, far)
+        near = xp.where(parallel, -np.inf, xp.minimum(a, b))
+        far = xp.where(parallel, xp.where(inside, np.inf, -np.inf), xp.maximum(a, b))
+        start, end = xp.maximum(start, near), xp.minimum(end, far)
     hit = end > start
-    return np.where(hit, start, 0.0), np.where(hit, end, 0.0)
+    return xp.where(hit, start, 0.0), xp.where(hit, end, 0.0)
 
 
 @dataclass(frozen=True, slots=True)
@@ -135,15 +140,20 @@ def ray_box_intervals(origins, directions, boxes: Sequence[PhotonBox]):
     path length. Validation: photon-scene-navigation
     """
     origins, directions = _validate_rays(origins, directions)
-    start = np.zeros((origins.shape[0], len(boxes)))
-    end = np.zeros_like(start)
+    return _box_intervals(origins, directions, boxes)
+
+
+def _box_intervals(origins, directions, boxes, *, xp=np):
+    """Clip validated rays/boxes on the selected array backend."""
+    start = xp.zeros((origins.shape[0], len(boxes)))
+    end = xp.zeros_like(start)
     for j, box in enumerate(boxes):
-        axes = np.asarray(box.axes, dtype=float)
-        half = np.asarray(box.half_extent_ang, dtype=float)
-        local_o = (origins - np.asarray(box.center_ang, dtype=float)) @ axes.T
+        axes = xp.asarray(box.axes, dtype=float)
+        half = xp.asarray(box.half_extent_ang, dtype=float)
+        local_o = (origins - xp.asarray(box.center_ang, dtype=float)) @ axes.T
         local_d = directions @ axes.T
         bounds = [(axis, -half[axis], half[axis]) for axis in range(3)]
-        lo, hi = _clip_axes(local_o, local_d, bounds, 1)
+        lo, hi = _clip_axes(local_o, local_d, bounds, 1, xp=xp)
         start[:, j], end[:, j] = lo[:, 0], hi[:, 0]
     return start, end
 
@@ -160,22 +170,22 @@ def _coefficients(composition, energies):
     return rates
 
 
-def _collision_distances(start, end, mu, optical_depth):
+def _collision_distances(start, end, mu, optical_depth, *, xp=np):
     """Invert accumulated depth along positive material intervals."""
     with np.errstate(invalid="ignore"):
-        depths = np.where((end > start) & (mu > 0.0), mu * (end - start), 0.0)
-    order = np.argsort(start, axis=1, kind="stable")
-    rows = np.arange(start.shape[0])
+        depths = xp.where((end > start) & (mu > 0.0), mu * (end - start), 0.0)
+    order = xp.argsort(start, axis=1, kind="stable")
+    rows = xp.arange(start.shape[0])
     ordered = depths[rows[:, None], order]
-    cumulative = np.cumsum(ordered, axis=1)
+    cumulative = xp.cumsum(ordered, axis=1)
     # Strict comparison assigns an exact interface to the following interval.
     reached = (cumulative > optical_depth[:, None]) & (ordered > 0.0)
     interacts = reached.any(axis=1)
-    slot = np.argmax(reached, axis=1)
-    layer = np.where(interacts, order[rows, slot], -1)
-    before = np.where(slot > 0, cumulative[rows, np.maximum(slot - 1, 0)], 0.0)
-    selected = np.flatnonzero(interacts)
-    distance = np.full(rows.size, np.inf)
+    slot = xp.argmax(reached, axis=1)
+    layer = xp.where(interacts, order[rows, slot], -1)
+    before = xp.where(slot > 0, cumulative[rows, xp.maximum(slot - 1, 0)], 0.0)
+    selected = xp.flatnonzero(interacts)
+    distance = xp.full(rows.size, np.inf)
     distance[selected] = (
         start[selected, layer[selected]]
         + (optical_depth[selected] - before[selected]) / mu[selected, layer[selected]]
@@ -353,27 +363,33 @@ def validate_photon_regions(
             raise ValueError("a scoring surface must lie outside all modeled material")
 
 
-def _interval_first_interactions(start, end, compositions, energies, uniforms):
+def _interval_first_interactions(start, end, compositions, energies, uniforms, *, xp=np):
     """Optical-depth inversion and channel/atom choice over precomputed intervals.
 
     Validation: photon-scene-navigation
     """
     n = energies.shape[0]
-    distance = np.full(n, np.inf)
-    layer, channel, element = (np.full(n, -1, dtype=np.int64) for _ in range(3))
+    distance = xp.full(n, np.inf)
+    layer, channel, element = (xp.full(n, -1, dtype=np.int64) for _ in range(3))
     if n and compositions:
         rates = [_coefficients(composition, energies) for composition in compositions]
         mu = np.stack([r.sum(axis=1) for r in rates], axis=1)
         if not np.isfinite(mu).all():
             raise ValueError("total photon rates must be finite")
-        distance, layer = _collision_distances(start, end, mu, -np.log1p(-uniforms[:, 0]))
+        # Table evaluation and draw conversion stay on the host. Device geometry,
+        # depth inversion and channel selection use the same equations below.
+        mu = xp.asarray(mu)
+        rates = [xp.asarray(rate) for rate in rates]
+        optical_depth = xp.asarray(-np.log1p(-uniforms[:, 0]))
+        uniforms = xp.asarray(uniforms)
+        distance, layer = _collision_distances(start, end, mu, optical_depth, xp=xp)
         for region in range(len(compositions)):
-            rows = np.flatnonzero(layer == region)
+            rows = xp.flatnonzero(layer == region)
             if rows.size == 0:
                 continue
-            cumulative = np.cumsum(rates[region][rows], axis=1)
+            cumulative = xp.cumsum(rates[region][rows], axis=1)
             total = cumulative[:, -1]
-            threshold = np.minimum(uniforms[rows, 1] * total, np.nextafter(total, 0.0))
-            selected = np.sum(cumulative <= threshold[:, None], axis=1)
-            element[rows], channel[rows] = np.divmod(selected, len(PHOTON_CHANNEL_ORDER))
+            threshold = xp.minimum(uniforms[rows, 1] * total, xp.nextafter(total, 0.0))
+            selected = xp.sum(cumulative <= threshold[:, None], axis=1)
+            element[rows], channel[rows] = xp.divmod(selected, len(PHOTON_CHANNEL_ORDER))
     return {"distance_ang": distance, "layer": layer, "channel": channel, "element": element}

@@ -327,22 +327,20 @@ def sample_bremslib_continuum(
     unrelated angular law. Units follow ``mc_brem_spectrum``: cm^2/eV/sr
     converted to Angstrom^2, times atoms/Angstrom^3.
 
-    No GPU implicit host copies: this is deliberately a CPU reference source.
+    Inputs remain explicit host arrays. NumPy staging/evaluation is independent
+    of the selected transport backend; no implicit device-to-host copy occurs.
     Source: BremsLib DDCS convention (bremslib-angular-model) and the
     importance-sampling identity in sample_continuous_photons. Assumes a
     fixed representative energy per segment; zero supported path gives no
     photons. No attenuation or second energy debit is applied.
     Validation: photon-continuous-source.
     """
-    from ..._backend import xp
     from ..spectrum.brem_bremslib import (
         bremslib_segment_state,
         evaluate_bremslib_rows,
         stage_bremslib_table,
     )
 
-    if xp is not np:
-        raise RuntimeError("BremsLib photon source is CPU-only; select the NumPy backend")
     if not compositions:
         raise ValueError("at least one material composition is required")
     n = np.asarray(segments["L_ang"]).size
@@ -365,7 +363,9 @@ def sample_bremslib_continuum(
         if not comp.keys() <= tables.keys():
             raise ValueError("BremsLib table missing for at least one composition element")
         densities.append(comp)
-    staged = {el: stage_bremslib_table(tables[el]) for comp in densities for el in comp}
+    staged = {
+        el: stage_bremslib_table(tables[el], array_module=np) for comp in densities for el in comp
+    }
     energy_field = "E_repr_keV" if segments.get("E_repr_keV") is not None else "E_keV"
     kinetic = np.asarray(segments[energy_field], dtype=float)
     electron_direction = np.asarray(segments["v_hat"], dtype=float)

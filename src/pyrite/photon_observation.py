@@ -81,6 +81,8 @@ def _validate_identity(metadata: dict, arrays: dict[str, np.ndarray]) -> None:
     payload = {key: provenance[key] for key in _IDENTITY_KEYS}
     if "charged_feedback" in provenance:
         payload["charged_feedback"] = provenance["charged_feedback"]
+    if "execution" in provenance:
+        payload["execution"] = provenance["execution"]
     digest = hashlib.sha256(_json(payload).encode()).hexdigest()
     if (
         payload["schema"] != "pyrite.photon-continuum-observation.v1"

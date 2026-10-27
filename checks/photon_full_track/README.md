@@ -185,3 +185,93 @@ mean-cosine differences up to 9.9 nominal SE. These selected-photon errors
 are not history-clustered; they are descriptive, not significance gates.
 This source difference does not identify the cause of the low-energy W
 redistribution failure. See the [validation evidence](../../docs/validation/radiation-physics/photon-full-track-thick-brem.md).
+
+## Matched incident-photon cascade diagnostic
+
+`monoenergetic.py` removes the electron/bremsstrahlung source difference:
+12, 20 and 30 keV photons enter the same 0.1 mm W slab normally, 1 nm
+upstream of its entrance face. The finite footprint and both apertures match
+the full-track check. `run_monoenergetic.sbatch` runs three Geant4 arms per
+energy plus the PyRITE CPU photon-only reference. All charged secondaries are
+killed, including generated Auger electrons.
+
+The arms distinguish disabling Auger transitions (`auger-off`, the original
+reference), enabling them with the original large charged production cuts
+(`auger-cut`), and enabling them with deexcitation cuts ignored (`cascade`).
+In Geant4 11.4.2, `G4UAtomicDeexcitation::GenerateAuger` returns before adding
+daughter vacancies when Auger is disabled or the emitted electron is below
+its production cut. Killing a generated electron later in the stacking
+action preserves its daughter vacancies. Thus disabling Auger generation
+does not implement PyRITE's full vacancy cascade with discarded electrons.
+Source: [Geant4 11.4.2 atomic deexcitation](https://github.com/Geant4/geant4/blob/v11.4.2/source/processes/electromagnetic/lowenergy/src/G4UAtomicDeexcitation.cc).
+
+From an isolated, committed checkout on the box:
+
+```bash
+uv sync --locked
+uv run python checks/photon_full_track/monoenergetic.py macros macros --events 100000
+mkdir -p results
+# Set PHOTON_DATA_ROOT, PHOTON_G4_ROOT, PHOTON_G4_ENV and PHOTON_MICROMAMBA
+# to the pinned data home, original TestEm5 staging root, Geant4 env and runner.
+sbatch --export=ALL checks/photon_full_track/run_monoenergetic.sbatch
+uv run python checks/photon_full_track/monoenergetic.py summary results/w_20kev_cascade.json
+```
+
+Reductions retain 100 equal incident-history blocks, including zero-hit
+blocks, with total/direct/redistributed spectra and Geant4 creator-resolved
+spectra. Primary gamma escape is direct only when its energy and direction
+are unchanged; fluorescence is always redistributed. Summaries report
+photons per incident photon and block standard errors for the 1–10 keV
+band and W L-alpha/L-beta windows. These are report-only diagnostics, with
+no new gates or ledger promotion. They do not by themselves establish the
+cause or resolution of the thick-target electron-source discrepancy.
+
+## Complete-cascade full-track rerun
+
+Generate a separate reference arm without overwriting the historical macros
+or reference records. The default macro generator still reproduces all 59
+historical inputs exactly. The explicit cascade arm changes only Auger
+generation, deexcitation cut handling and the output name; electron source,
+transport, geometry, seeds and charged-secondary suppression stay identical.
+
+```bash
+uv run python checks/photon_full_track/make_macros.py --case w_0p3mev \
+  --complete-cascade --output /path/to/isolated-staging
+# In that directory, create results/ and set GEANT4_ENV, MICROMAMBA, and
+# TESTEM5 to the existing pinned environment, runner and patched binary.
+sbatch --array=1-10 --export=ALL /path/to/checkout/checks/photon_full_track/run_geant4.sbatch
+uv run python checks/photon_full_track/compare.py reduce-geant4-cascade \
+  w_0p3mev cascade-reference.json /path/to/isolated-staging/results/*.log.gz
+uv run python checks/photon_full_track/compare.py compare-cascade \
+  w_0p3mev cascade-reference.json --output cascade-report.json
+```
+
+The runner writes isolated per-task files and atomically publishes a compressed
+log only after successful execution. Each shard retains resource measurements.
+Reduction requires a completed electron-run summary with the declared primary
+count/energy and enabled Auger plus ignore-cut flags in every log. Log hashes
+join the reduced record. The targeted comparison uses the unchanged committed
+PyRITE result and original gates, reports the historical reference separately,
+and fails if a previously gated observable loses coverage. Other cases are
+explicitly outside this rerun; its outcome cannot certify the full matrix.
+
+Collected 2026-10-27: smoke job 2556 passed; full reference job **2557**
+completed all ten million-electron shards, and reduction/comparison job
+**2567** passed **11/11 W-case gates with no lost coverage**. Against the
+unchanged PyRITE result, reflected 1–10 keV redistributed yield is
+0.0001245723 / 0.0001256000 (ratio 0.9918), and redistributed fractions are
+0.3420517 / 0.3488889. Both historical W failures clear without changing
+tolerances or production models. `cascade-results/` retains compact blocks,
+the report including historical comparisons, and provenance for tested
+checkpoint `981c1141`. The historical matrix still reports 98/100; the other
+seven cases have not yet been rerun with complete cascades. See the canonical
+[W rerun evidence](../../docs/validation/radiation-physics/photon-full-track-thick-brem.md#matched-cascade-w-full-track-rerun-2026-10-27).
+
+The remaining seven complete-cascade cases were collected on 2026-10-27:
+array **2568** (49 million-primary shards), reduction **2577**, exit zero.
+All **89/89** additional gates pass with no lost coverage; including W
+300 keV, the corrected eight-case matrix passes **100/100**. Compact blocks,
+reports and provenance are under `cascade-matrix-results/`. Historical
+references and the 98/100 regression remain intact. Independent adjudication
+is pending; the ledger remains `discrepancy`. See the canonical
+[corrected matrix evidence](../../docs/validation/radiation-physics/photon-full-track-thick-brem.md#complete-cascade-eight-case-matrix-2026-10-27).

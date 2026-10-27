@@ -15,10 +15,17 @@ def resolve_photon_transport(scene, case, numerics=None):
 
     if numerics is not None:
         scene = replace(scene, numerics=numerics)
-    detector, numerics = _preflight_scene(scene)
+    detector, numerics = _preflight_scene(scene, allow_cuda=True)
     _, aperture, boxes, (width, height) = _scene_geometry(case, detector, scene.filter_plates)
     context = prepare_source(
-        case, selection, aperture, boxes, width, height, numerics.transport_core
+        case,
+        selection,
+        aperture,
+        boxes,
+        width,
+        height,
+        numerics.transport_core,
+        box_materials=[plate.material for plate in scene.filter_plates],
     )
     source_digest = case_content_key(case, xsgen_tables=case_table_markers(case))
     return replace(case, photon_transport=photon_case_record(case, source_digest, context))

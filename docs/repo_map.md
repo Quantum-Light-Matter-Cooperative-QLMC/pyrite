@@ -196,7 +196,7 @@ Tests: `tests/optimization/`. Guide: `docs/guides/optimization-studies.md`.
 - **`pyrite` console script** → `cli:main` (`pyproject.toml [project.scripts]`), lazy Click dispatch for user workflows including `physics` and `numerics`; remote lifecycle is canonical at `remote job`, with the former root `job` hidden through 0.17.0. Retired top-level setup, completion, performance, energy-grid, scan, analyze/export, and flat checkpoint spellings remain hidden compatibility aliases where the D7 registry documents a replacement. Checked user-facing inventory: [CLI reference](repo-design/cli/cli-reference.md).
 - **`import pyrite`** → `__init__`: lightweight lazy exports for `Beam`, target variants, shared `SubstanceRef`/`RectangularBody` descriptions and `Target`/`Filter` roles, `Detector`, `Scene`, path-addressed `Sweep`, `Physics`, `Numerics`, `CxrReflections`, `Precision`, `Analysis`, `Result`, and `simulate`.
 - **`pyrite.simulate(scene)` / `pyrite.simulate(beam, target, detector, ...)`** → `api:simulate`: lower one scalar scene to the typed `Case`, run it without checkpoint I/O, and return response-free source arrays plus resolved provenance in `Result`.
-- **Opt-in photon aperture** → `_photon_config.PhotonTransport`, `campaign.photon_cases`, `montecarlo.runner.photon_aperture`: lower a scalar physical Scene's selected CPU photon source, share its primary rows with directional scoring, and expose the separate `Result.aperture` tally. `_photon_support` owns shared reference identity/preparation; `results.aperture` owns checked checkpoint reconstruction and histogram/current views. Optional `photon.h5` and CAS payloads retain original pins; full artifact replay supports the mode, bounded replay refuses it. Contract: [photon aperture observations](repo-design/compute/photon-aperture.md).
+- **Opt-in photon aperture** → `_photon_config.PhotonTransport`, `campaign.photon_cases`, `montecarlo.runner.photon_aperture`: lower a scalar physical Scene's selected CPU/CUDA photon source, share its primary rows with directional scoring, and expose the separate `Result.aperture` tally. `_photon_support` owns shared reference identity/preparation; `results.aperture` owns checked checkpoint reconstruction and histogram/current views. Optional `photon.h5` and CAS payloads retain original pins; full artifact replay supports the mode, bounded replay refuses it. Contract: [photon aperture observations](repo-design/compute/photon-aperture.md).
 - **`pyrite.photon_energies(materials, beam_energy_eV, ...)`** → `materials.emission:photon_energies`: deterministic vacuum line-centre arrays with paired NumPy broadcasting or Cartesian grids; catalogue cut/reflection resolution, no transport or accelerator initialization.
 - **`pyrite profile ...`** → `cli.commands.profile`: manage named campaign defaults and material membership through `set|add|remove`; an absent membership key means all catalog materials. Bundled demo profiles are read-only; edits write to the user catalog layer. **`pyrite-dev profile ...`** → `devtools.dev_cli:cmd_profile`: the same tree against the bundled catalog for maintaining the shipped demos. **`pyrite-dev beam ...`** and **`pyrite-dev detector ...`** likewise maintain packaged instrument examples; user commands copy them with `create NAME --from SOURCE` and edit the user layer.
 - **`pyrite profile detector list|show|add|set|reset|rm|migrate`** → `cli.commands._profile_detectors` (registered on `profile`): detector collection membership, inline scalar/pixel settings, optional-section resets, and explicit legacy migration, with storage/merge primitives in `campaign/profile_detectors.py`. An acquisition makes the profile a counting observation whose projection supersedes the scalar detector for sweeps. **`pyrite profile filter add|set|rm|list|show`** → `cli.commands._profile_filters` (registered on `profile`): edits ordered plates and no longer touches the physical detector. **`pyrite numerics cxr-grid show|set|reset`** → `cli.commands._profile_cxr_grid` (registered on `profile`): the `[profiles.NAME.line_grid_policy]` selectors and the profile's grid-source summary; selector-combination checks shared with `_cxr_grid_policy.check_selector_combination`, edit primitives in `campaign/profile_cxr_grid.py`. Settings inventory: `docs/repo-design/profile-settings.md`.
@@ -394,24 +394,37 @@ EPDL2025 subshell photoionization (EADL designators and binding energies), coher
 `transport/photon_navigation.py` owns the standalone host all-channel photon
 first-flight reference: sample-frame stack/prism ray intervals, vacuum entry
 and gaps, and EPDL channel/element competition from explicit uniforms. It has
-no production callers; the existing pair/annihilation route remains separate.
+a production caller through `photon_histories`; the existing primary pair/annihilation route remains separate.
+
+`transport/photon_cuda.py::scene_first_interactions_cuda` adds explicit CUDA
+first flights: `_photon_cuda_kernel.py` owns fused binary64 clipping and stable
+interval/channel selection, with the shared NumPy/CuPy array reference retained
+as an explicit comparison path. Host inputs/rates/draw conversion feed device
+navigation and sampling; repeated compositions reuse host rates and outputs
+remain on device. `photon_scattering_cuda`, `photon_pair_cuda` and
+`photon_photoelectric_cuda` own explicit-draw conditional samplers, backed by
+private raw kernels and canonical `_photon_cuda_relaxation` tables.
+`photon_cuda_events` admits bounded device event waves, groups conditional
+collisions, retries identical Philox prefixes/capacities and reconstructs
+physical products for the shared lineage/ledger queue. No CPU sampler fallback.
+The production selector and execution identity live in `runner/photon_aperture`.
 
 `transport/relaxation.py` owns the standalone host sampled EADL vacancy
 cascade: explicit draws, depth-first transition ancestry, terminal-hole
 multiplicity, and individual energy budgets with signed transition defects.
 It consumes validated `eadl_relaxation` data; the existing expected cascade
-and characteristic scorer retain their current paths. No production caller.
+and characteristic scorer retain their current paths. CPU photon histories call this sampler.
 
 `transport/photon_scattering.py` owns standalone CPU Rayleigh (Thomson × F²)
 and Compton (Klein–Nishina × S, without Doppler/binding corrections) events,
 including recoil and sample-frame directions. `transport/photoelectric.py`
 selects EPDL subshells, samples Sauter–Gavrila photoelectrons and calls the
 sampled EADL cascade. `transport/photon_sampling.py` supplies explicit-draw
-validation and stable angular rotations. These references have no production
-callers; integrated EPDL rates still own channel/atom competition.
+validation and stable angular rotations. CPU photon histories call these
+references; integrated EPDL rates own channel/atom competition.
 
 `transport/photon_histories.py` chains those references into a host photon
-history queue: lineage-keyed Philox streams, isotropic relaxation emission,
+history queue with optional bounded CUDA event waves: lineage-keyed Philox streams, isotropic relaxation emission,
 charged electron/positron handoff rows, an absorbing sample-frame aperture
 for ordinary hits, and a per-history weighted energy ledger. Filter plates
 navigate as oriented `PhotonBox`es (`photon_navigation.scene_first_interactions`);
@@ -424,22 +437,34 @@ threshold inside the transport stack, `cascade_charged_stage` runs them
 through the shell soft/hard cascade from an explicit `LaunchState`
 (`secondaries.transport_secondary_cascade(launch=...)`), and their hard
 bremsstrahlung photons re-enter the queue with lineage keys. Electron-only
-stages keep positrons pending; per-history coupled ledger closes. No production caller.
+stages keep positrons pending; per-history coupled ledger closes. Production aperture scoring uses this owner when feedback is enabled.
 
-`transport/photon_feedback.py` adds the CPU `FeedbackChargedStage`: in-stack
+`transport/photon_feedback.py` adds `FeedbackChargedStage`: in-stack
 positron transport/annihilation, sampled charged-impact EADL relaxation and
 Auger re-entry. `transport/photon_event_sources.py` adapts unattenuated primary
 characteristic/annihilation emissions, retaining sub-cutoff source energy.
 `photon_transport.simulate_photon_continuum(charged_feedback=True)` connects
 the stage to the experimental Scene boundary with enabled-only positron table
-provenance. Charged filters/gaps are refused; no production Result/checkpoint
-integration or independent full-track validation is implied. Contract:
+provenance. The production aperture path also uses the stage, forcing the CUDA
+charged core on that backend. Production `_photon_scene_feedback` prepares
+per-body catalog tables/pins for named filters; independent full-track validation
+remains open. Contract:
 [CPU secondary feedback](research/physics/photon-secondary-feedback.md).
+
+`transport/photon_charged_escape.py` retains terminal charged phase space;
+`transport/photon_reentry.py` owns explicit CPU/CUDA scene feedback
+scheduling across target slabs, vacuum gaps and filter boxes. Production
+`_photon_scene_feedback.py` owns per-body table slices and enabled-only pins;
+local transforms and scheduling stay on the host, ray clipping follows the
+selected backend. The coupled
+queue validates matching geometry and uses this stage's material ownership.
 
 `photon_observation.py` owns explicit atomic save/load of the experimental
 Scene continuum aperture tally, including identities and pinned provenance.
-It stores reduced arrays only, separately from Result/checkpoints and replay;
-`PhotonContinuumObservation.save` is the convenience entry point.
+It stores reduced arrays; `PhotonContinuumObservation.save` is the standalone
+entry point. `results.aperture` adapts the same checked payload into production
+Result/checkpoints and replay. Finished CPU/CUDA payloads need no accelerator
+or current scientific tables to read.
 
 Simulation core: electron transport, segment-sum PXR+CBS and EEDL characteristic line spectra, bremsstrahlung, parallel case runner, and detector-convolution helpers. Split from single module into submodules; **every public and internal name re-exported from package** — `from pyrite.montecarlo import X` unchanged (`tests/montecarlo/test_exports.py` freeze export set).
 - `case` — frozen, validating `Case` input schema. `build_cases` returns it; `to_dict()` reproduces the version-1 legacy mapping and `run_case` temporarily accepts either representation.

@@ -95,6 +95,22 @@ BUILTIN_DESCRIPTORS = DescriptorCatalog(
             required_datasets=("epdl", "epdl-differential", "eadl"),
         ),
         ModelDescriptor(
+            "observation.photon",
+            "cuda-reference",
+            "montecarlo.runner.photon_aperture",
+            (
+                "CUDA photon flight and conditional kernels",
+                "host lineage/Philox and compensated ledgers",
+                "coupled BremsLib",
+                "ideal unpixelated physical aperture",
+                "fixed population",
+                "whole source segments",
+            ),
+            _EXACT,
+            output_slots=("photon_aperture",),
+            required_datasets=("epdl", "epdl-differential", "eadl"),
+        ),
+        ModelDescriptor(
             "transport.stopping",
             "sbethe",
             "montecarlo.transport.stopping",

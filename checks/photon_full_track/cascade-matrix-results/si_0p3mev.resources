@@ -1,0 +1,23 @@
+	Command being timed: "uv run --locked python checks/photon_full_track/compare.py reduce-geant4-cascade si_0p3mev matrix/si_0p3mev.json matrix/results/si_0p3mev_s00_cascade.log.gz matrix/results/si_0p3mev_s01_cascade.log.gz matrix/results/si_0p3mev_s02_cascade.log.gz matrix/results/si_0p3mev_s03_cascade.log.gz matrix/results/si_0p3mev_s04_cascade.log.gz matrix/results/si_0p3mev_s05_cascade.log.gz matrix/results/si_0p3mev_s06_cascade.log.gz matrix/results/si_0p3mev_s07_cascade.log.gz matrix/results/si_0p3mev_s08_cascade.log.gz matrix/results/si_0p3mev_s09_cascade.log.gz matrix/results/si_0p3mev_s10_cascade.log.gz matrix/results/si_0p3mev_s11_cascade.log.gz matrix/results/si_0p3mev_s12_cascade.log.gz matrix/results/si_0p3mev_s13_cascade.log.gz matrix/results/si_0p3mev_s14_cascade.log.gz matrix/results/si_0p3mev_s15_cascade.log.gz matrix/results/si_0p3mev_s16_cascade.log.gz matrix/results/si_0p3mev_s17_cascade.log.gz matrix/results/si_0p3mev_s18_cascade.log.gz matrix/results/si_0p3mev_s19_cascade.log.gz matrix/results/si_0p3mev_s20_cascade.log.gz matrix/results/si_0p3mev_s21_cascade.log.gz matrix/results/si_0p3mev_s22_cascade.log.gz matrix/results/si_0p3mev_s23_cascade.log.gz matrix/results/si_0p3mev_s24_cascade.log.gz matrix/results/si_0p3mev_s25_cascade.log.gz matrix/results/si_0p3mev_s26_cascade.log.gz matrix/results/si_0p3mev_s27_cascade.log.gz matrix/results/si_0p3mev_s28_cascade.log.gz matrix/results/si_0p3mev_s29_cascade.log.gz"
+	User time (seconds): 1.07
+	System time (seconds): 0.07
+	Percent of CPU this job got: 95%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:01.19
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 267308
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 46
+	Minor (reclaiming a frame) page faults: 77362
+	Voluntary context switches: 64
+	Involuntary context switches: 3
+	Swaps: 0
+	File system inputs: 8208
+	File system outputs: 1544
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

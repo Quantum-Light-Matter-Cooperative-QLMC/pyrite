@@ -1,0 +1,57 @@
+JobId=2577 JobName=issue341-matrix-reduce-981c1141
+   UserId=aamador(1002) GroupId=aamador(1003) MCS_label=N/A
+   Priority=1 Nice=0 Account=(null) QOS=(null)
+   JobState=COMPLETED Reason=None Dependency=(null)
+   Requeue=1 Restarts=0 BatchFlag=1 Reboot=0 ExitCode=0:0
+   RunTime=00:00:15 TimeLimit=00:30:00 TimeMin=N/A
+   SubmitTime=2026-10-27T08:11:37 EligibleTime=2026-10-27T08:26:49
+   AccrueTime=2026-10-27T08:26:49
+   StartTime=2026-10-27T08:26:49 EndTime=2026-10-27T08:27:04 Deadline=N/A
+   SuspendTime=None SecsPreSuspend=0 LastSchedEval=2026-10-27T08:26:49 Scheduler=Main
+   Partition=cpu AllocNode:Sid=DESKTOP-QNIHO3D:2418291
+   ReqNodeList=(null) ExcNodeList=(null)
+   NodeList=DESKTOP-QNIHO3D
+   BatchHost=DESKTOP-QNIHO3D
+   NumNodes=1 NumCPUs=2 NumTasks=1 CPUs/Task=1 ReqB:S:C:T=0:0:*:*
+   ReqTRES=cpu=1,mem=4G,node=1,billing=1
+   AllocTRES=cpu=2,mem=4G,node=1,billing=2
+   Socks/Node=* NtasksPerN:B:S:C=0:0:*:* CoreSpec=*
+   MinCPUsNode=1 MinMemoryNode=4G MinTmpDiskNode=0
+   Features=(null) DelayBoot=00:00:00
+   OverSubscribe=OK Contiguous=0 Licenses=(null) LicensesAlloc=(null) Network=(null)
+   Command=/home/aamador/.local/opt/pyrite-341-cascade-981c1141/matrix/reduce.sbatch
+   SubmitLine=sbatch --dependency=afterok:2568 reduce.sbatch
+   WorkDir=/home/aamador/.local/opt/pyrite-341-cascade-981c1141/matrix
+   StdErr=
+   StdIn=/dev/null
+   StdOut=/home/aamador/.local/opt/pyrite-341-cascade-981c1141/matrix/reduce-2577.log
+   TresPerTask=cpu=1
+
+JobId=2568 ArrayJobId=2568 ArrayTaskId=49 ArrayTaskThrottle=8 JobName=issue341-matrix-981c1141
+   UserId=aamador(1002) GroupId=aamador(1003) MCS_label=N/A
+   Priority=1 Nice=0 Account=(null) QOS=(null)
+   JobState=COMPLETED Reason=None Dependency=(null)
+   Requeue=1 Restarts=0 BatchFlag=1 Reboot=0 ExitCode=0:0
+   RunTime=00:06:55 TimeLimit=02:00:00 TimeMin=N/A
+   SubmitTime=2026-10-27T08:11:23 EligibleTime=2026-10-27T08:19:54
+   AccrueTime=2026-10-27T08:12:41
+   StartTime=2026-10-27T08:19:54 EndTime=2026-10-27T08:26:49 Deadline=N/A
+   SuspendTime=None SecsPreSuspend=0 LastSchedEval=2026-10-27T08:19:54 Scheduler=Main
+   Partition=cpu AllocNode:Sid=DESKTOP-QNIHO3D:2417953
+   ReqNodeList=(null) ExcNodeList=(null)
+   NodeList=DESKTOP-QNIHO3D
+   BatchHost=DESKTOP-QNIHO3D
+   NumNodes=1 NumCPUs=2 NumTasks=1 CPUs/Task=1 ReqB:S:C:T=0:0:*:*
+   ReqTRES=cpu=1,mem=2G,node=1,billing=1
+   AllocTRES=cpu=2,mem=2G,node=1,billing=2
+   Socks/Node=* NtasksPerN:B:S:C=0:0:*:* CoreSpec=*
+   MinCPUsNode=1 MinMemoryNode=2G MinTmpDiskNode=0
+   Features=(null) DelayBoot=00:00:00
+   OverSubscribe=OK Contiguous=0 Licenses=(null) LicensesAlloc=(null) Network=(null)
+   Command=/home/aamador/.local/opt/pyrite-341-cascade-981c1141/checks/photon_full_track/run_geant4.sbatch
+   SubmitLine=sbatch --array=1-49%8 --time=02:00:00 --job-name=issue341-matrix-981c1141 --export=ALL /home/aamador/.local/opt/pyrite-341-cascade-981c1141/checks/photon_full_track/run_geant4.sbatch
+   WorkDir=/home/aamador/.local/opt/pyrite-341-cascade-981c1141/matrix
+   StdErr=
+   StdIn=/dev/null
+   StdOut=/home/aamador/.local/opt/pyrite-341-cascade-981c1141/matrix/results/issue341-matrix-981c1141_49.out
+   TresPerTask=cpu=1

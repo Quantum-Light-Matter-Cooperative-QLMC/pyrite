@@ -10,11 +10,18 @@
 #SBATCH --array=1-59
 #SBATCH --output=results/%x_%a.out
 set -euo pipefail
+export PATH=$HOME/.local/bin:$PATH
 ROOT=${SLURM_SUBMIT_DIR}
 MAC=$(sed -n "${SLURM_ARRAY_TASK_ID}p" "$ROOT/cases.txt")
-cd "$ROOT/build"
-cp "$ROOT/$MAC" .
-# Drop the inherited #182 per-photon EBREM creation lines; keep GAM and the summary.
-"$MICROMAMBA" run -p "$GEANT4_ENV" ./TestEm5 "$MAC" 2>&1 | grep -v "EBREM " \
-  | gzip > "$ROOT/results/${MAC%.mac}.log.gz"
-rm "$MAC"
+test -n "$MAC"
+test -f "$ROOT/$MAC"
+TESTEM5=${TESTEM5:-$ROOT/build/TestEm5}
+mkdir -p "$ROOT/results/task-$SLURM_ARRAY_TASK_ID"
+cd "$ROOT/results/task-$SLURM_ARRAY_TASK_ID"
+# Retain photon records and complete-run/configuration headers; omit unrelated
+# primary-electron exits and bremsstrahlung creation records. No shared build writes.
+/usr/bin/time -v -o "$ROOT/results/${MAC%.mac}.resources" \
+  "$MICROMAMBA" run -p "$GEANT4_ENV" "$TESTEM5" "$ROOT/$MAC" 2>&1 \
+  | awk 'index($0, "EBREM ") == 0 && index($0, "EXIT ") == 0' \
+  | gzip > "$ROOT/results/${MAC%.mac}.log.gz.partial"
+mv "$ROOT/results/${MAC%.mac}.log.gz.partial" "$ROOT/results/${MAC%.mac}.log.gz"

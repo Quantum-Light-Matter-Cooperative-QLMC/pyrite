@@ -9,6 +9,8 @@ import numpy as np
 
 MODEL = "bremslib-continuum-photon-only-cpu.v2"
 EVENT_MODEL = "physical-event-photon-cpu.v1"
+CUDA_MODEL = "bremslib-continuum-photon-only-cuda.v1"
+CUDA_EVENT_MODEL = "physical-event-photon-cuda.v1"
 _RELAXATION_SALT = 0x341EADE1
 # Explicit segment fields only: never select arbitrary metadata by its array length.
 _SEGMENT_KEYS = ("L_ang", "r_mid", "v_hat", "elec_id", "E_repr_keV", "E_keV", "layer")
@@ -21,7 +23,9 @@ def _sample_segments(segments, n_primaries: int) -> dict:
     ``max(Ne, Ne_brem)`` can exceed ``Ne_brem``. Unselected line-only
     electrons must neither enter the weighted estimator nor its denominator.
     """
-    owners = np.asarray(segments["elec_id"])
+    from .montecarlo.transport.secondaries import _host
+
+    owners = _host(segments["elec_id"])
     if owners.ndim != 1 or not np.issubdtype(owners.dtype, np.integer):
         raise ValueError("transport electron ids must be a one-dimensional integer array")
     if owners.size and owners.min() < 0:
@@ -31,7 +35,7 @@ def _sample_segments(segments, n_primaries: int) -> dict:
     for key in _SEGMENT_KEYS:
         value = segments.get(key)
         if value is not None:
-            array = np.asarray(value)
+            array = _host(value)
             if array.ndim == 0 or array.shape[0] != owners.size:
                 raise ValueError(
                     f"transport segment field {key!r} does not align with electron ids"
@@ -52,6 +56,7 @@ def _identity(
     electron_cutoff_eV,
     source_ceiling_eV,
     charged_feedback=None,
+    execution=None,
 ):
     """Observation digest includes all source proposals and physical acceptance.
 
@@ -103,13 +108,29 @@ def _identity(
     }
     if charged_feedback is not None:
         payload["charged_feedback"] = charged_feedback
+    if execution is not None:
+        if execution.get("backend") != "cuda":
+            raise ValueError("unsupported photon observation execution backend")
+        payload["execution"] = dict(execution)
+        payload["model"] = CUDA_MODEL
     digest = hashlib.sha256(
         json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
     ).hexdigest()
     return digest, payload
 
 
-def _scene_feedback(case, layers, width, height, numerics, photon_cutoff, electron_cutoff):
+def _scene_feedback(
+    case,
+    layers,
+    width,
+    height,
+    numerics,
+    photon_cutoff,
+    electron_cutoff,
+    *,
+    boxes=(),
+    box_materials=None,
+):
     """Prepare enabled-only feedback and its additional positron table provenance.
 
     Validation: photon-secondary-feedback
@@ -124,6 +145,20 @@ def _scene_feedback(case, layers, width, height, numerics, photon_cutoff, electr
 
     if case.get("inelastic_model") != "shell-soft-hard":
         raise ValueError("charged feedback requires inelastic_model='shell-soft-hard'")
+    if boxes:
+        from ._photon_scene_feedback import prepare_feedback_scene
+
+        return prepare_feedback_scene(
+            case,
+            layers,
+            boxes,
+            box_materials,
+            width,
+            height,
+            numerics,
+            photon_cutoff,
+            electron_cutoff,
+        )
     options = {
         **_case_inelastic_kwargs(case),
         **_case_elastic_kwargs(case),
@@ -204,6 +239,7 @@ def _event_identity(
     electron,
     charged_feedback,
     feedback_identity,
+    execution=None,
 ):
     """Reuse canonical geometry/pins, replacing the continuous proposal contract."""
     from .materials.photon_cross_sections import EPDL_E_MAX_EV
@@ -218,10 +254,11 @@ def _event_identity(
         photon_cutoff_eV=low,
         electron_cutoff_eV=electron,
         source_ceiling_eV=EPDL_E_MAX_EV,
+        execution=execution,
     )
     payload.update(
         schema="pyrite.photon-event-observation.v1",
-        model=EVENT_MODEL,
+        model=EVENT_MODEL if execution is None else CUDA_EVENT_MODEL,
         proposal={
             "component": source,
             "source_role": "physical-event",

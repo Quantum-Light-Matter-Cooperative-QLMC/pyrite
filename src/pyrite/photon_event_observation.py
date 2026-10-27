@@ -124,6 +124,8 @@ def _validate_identity(metadata, arrays):
     payload = {
         key: provenance[key] for key in (*_IDENTITY_KEYS, "charged_feedback", "relaxation_feedback")
     }
+    if "execution" in provenance:
+        payload["execution"] = provenance["execution"]
     digest = hashlib.sha256(_json(payload).encode()).hexdigest()
     if (
         payload["schema"] != "pyrite.photon-event-observation.v1"

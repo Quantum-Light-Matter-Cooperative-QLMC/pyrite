@@ -64,7 +64,9 @@ class ChargedStageResult:
     ``photons`` holds ``position_ang (M, 3)``, ``direction``,
     ``energy_eV``, ``parent`` (launched-row index) and ``ordinal`` (that
     row's emission order, independent of batch composition); their energies
-    sum to ``radiated_eV`` per parent.
+    sum to ``radiated_eV`` per parent. Optional ``escaped_particles`` retains
+    boundary phase space (Å/eV, species, key, parent); its kinetic plus
+    positron-rest sum equals ``escaped_eV``. It is not an additional energy term.
     """
 
     escaped_eV: np.ndarray
@@ -73,6 +75,7 @@ class ChargedStageResult:
     radiated_eV: np.ndarray
     photons: Mapping[str, np.ndarray]
     rest_energy_eV: np.ndarray | None = None
+    escaped_particles: Mapping[str, np.ndarray] | None = None
 
 
 class ChargedStage(Protocol):
@@ -163,7 +166,7 @@ def coupled_ledger_residual_eV(ledger: Mapping[str, np.ndarray]) -> np.ndarray:
     return ledger["incident_eV"] - sum(ledger[name] for name in LEDGER_TERMS)
 
 
-def _split_charged(charged, threshold_eV, layers, footprint, *, positrons=False):
+def _split_charged(charged, threshold_eV, layers, footprint, *, positrons=False, inside=None):
     """Fates of one round's charged rows: launch, local, positron.
 
     Validation: photon-charged-coupling
@@ -171,7 +174,8 @@ def _split_charged(charged, threshold_eV, layers, footprint, *, positrons=False)
     position = charged["position_ang"].reshape(-1, 3)
     electron = charged["species"] == ELECTRON
     above = charged["kinetic_eV"] > threshold_eV
-    inside = _in_stack(position, layers, footprint["width_ang"], footprint["height_ang"])
+    if inside is None:
+        inside = _in_stack(position, layers, footprint["width_ang"], footprint["height_ang"])
     fate = np.where(electron, np.where(inside & above, "launched", "local"), "positron")
     if positrons:
         fate[~electron & inside] = "launched"
@@ -261,7 +265,10 @@ def track_coupled_histories(
     ``photon_cutoff_eV`` restart in the photon queue with key
     ``daughter_stream_key(charged key, ordinal)``, their parent's weight,
     history and root ``source_kind``; softer ones deposit at their vertex.
-    After ``max_rounds`` stages any remaining launch is unresolved.
+    A scene-aware stage may provide ``contains`` and ``validate_geometry``
+    to select material ownership over the same target/filter geometry instead
+    of the bounded stack-only rule. After ``max_rounds`` stages any remaining
+    launch is unresolved.
 
     Per history: incident = photon terminal terms + charged escaped,
     deposited, binding, local, radiated-local, positron-pending and
@@ -276,6 +283,10 @@ def track_coupled_histories(
         raise ValueError("electron_cutoff_eV is the charged stage's threshold_eV")
     if getattr(charged_stage, "requires_stack_only", False) and photon_options.get("boxes"):
         raise ValueError("this charged feedback stage does not support filter boxes")
+    validate_geometry = getattr(charged_stage, "validate_geometry", None)
+    if callable(validate_geometry):
+        validate_geometry(layers, photon_options.get("boxes", ()), width_ang, height_ang)
+    contains = getattr(charged_stage, "contains", None)
     threshold = float(charged_stage.threshold_eV)
     footprint = {"width_ang": width_ang, "height_ang": height_ang}
     options: dict[str, Any] = dict(
@@ -297,6 +308,7 @@ def track_coupled_histories(
             layers,
             footprint,
             positrons=getattr(charged_stage, "transports_positrons", False),
+            inside=contains(charged) if callable(contains) else None,
         )
         launch = fate == "launched"
         if launch.any() and round_index >= max_rounds:

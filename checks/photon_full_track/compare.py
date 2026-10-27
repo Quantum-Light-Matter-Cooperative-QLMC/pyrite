@@ -2,6 +2,8 @@
 
 Usage:
   compare.py reduce-geant4 CASE LOG.gz [LOG.gz ...] [--events N_PER_LOG]
+  compare.py reduce-geant4-cascade CASE OUTPUT.json LOG.gz [...] [--events N_PER_LOG]
+  compare.py compare-cascade CASE REFERENCE.json[.gz] [--output REPORT.json]
   compare.py reduce-pyrite CASE SHARD.npz [SHARD.npz ...]
   compare.py compact RECORD.json OUTPUT.json.gz
   compare.py [--output REPORT.json]
@@ -20,7 +22,9 @@ and aperture, an observable passes when ``|P - G| <= max(tol * G, 3 sigma)``.
 """
 
 import gzip
+import hashlib
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -46,7 +50,7 @@ REDIST_TOL = 0.10
 MIN_COUNTS = 1000
 
 
-def _parse(paths, thickness_mm, events_per_log):
+def _parse(paths, thickness_mm, events_per_log, *, source_creator="eBrem"):
     """Shard ``k`` of ``paths`` holds events ``[k, k + 1) * events_per_log``."""
     rows = []
     for k, path in enumerate(paths):
@@ -71,7 +75,7 @@ def _parse(paths, thickness_mm, events_per_log):
     creator = np.array([r[8] for r in rows])
     # PyRITE's "direct" is an uncollided *source* photon; fluorescence and other
     # secondary photons are redistributed even when they escape uncollided.
-    direct = np.array([r[9] for r in rows], dtype=bool) & (creator == "eBrem")
+    direct = np.array([r[9] for r in rows], dtype=bool) & (creator == source_creator)
     return event, energy, position, direction, creator, direct
 
 
@@ -222,6 +226,9 @@ def compact_record(record):
 
 def load_record(path):
     """Read an original reduction or its committed gzip window projection."""
+    if path.suffix == ".gz":
+        with gzip.open(path, "rt") as stream:
+            return json.load(stream)
     if path.exists():
         return json.loads(path.read_text())
     with gzip.open(str(path) + ".gz", "rt") as stream:
@@ -243,8 +250,10 @@ def _gate(p, g, tol, gated=True, abs_tol=None):
     )
 
 
-def compare_case(case):
-    g = load_record(HERE / "reference" / f"{case}.json")
+def compare_case(case, *, reference=None):
+    g = load_record(HERE / "reference" / f"{case}.json") if reference is None else reference
+    if g["case"] != case:
+        raise ValueError("reference case does not match requested comparison")
     p = load_record(HERE / "results" / f"{case}.json")
     edges = np.asarray(g["edges_eV"])
     if not np.array_equal(edges, p["edges_eV"]):
@@ -293,6 +302,30 @@ def compare_case(case):
     return report
 
 
+def verify_cascade_logs(case, paths, events_per_log):
+    """Require completed primary histories and both cascade settings in every shard."""
+    if events_per_log <= 0 or not paths or len(set(map(str, paths))) != len(paths):
+        raise ValueError("expected nonduplicate logs and a positive event count")
+    expected_energy = CASES[case][3] * 1e6
+    for path in paths:
+        summary, auger, ignore = None, False, False
+        with gzip.open(path, "rt") as stream:
+            for line in stream:
+                match = re.search(r"The run was\s+(\d+) e- of\s+([\d.eE+-]+) (\w+)", line)
+                if match:
+                    summary = match.groups()
+                auger |= bool(re.search(r"Auger electron cascade enabled\s+1\s*$", line))
+                ignore |= bool(re.search(r"Ignore cuts flag:\s+1\s*$", line))
+        if summary is None:
+            raise ValueError(f"{path}: missing completed electron run summary")
+        count, energy, unit = summary
+        energy_eV = float(energy) * {"eV": 1, "keV": 1000, "MeV": 1e6}.get(unit, 0)
+        if int(count) != events_per_log or energy_eV != expected_energy:
+            raise ValueError(f"{path}: wrong primary count or energy")
+        if not (auger and ignore):
+            raise ValueError(f"{path}: complete vacancy cascades not enabled")
+
+
 def _summary(report):
     for c, ap in report.items():
         for a, rows in ap.items():
@@ -312,22 +345,72 @@ def _summary(report):
 
 
 def main(argv):
+    if argv and argv[0] == "compare-cascade":
+        case, path = argv[1:3]
+        reference = load_record(Path(path))
+        if reference.get("relaxation") != "complete-cascade":
+            raise ValueError("expected a verified complete-cascade reference")
+        matched = compare_case(case, reference=reference)
+        historical = compare_case(case)
+
+        def gated(report):
+            return {
+                (a, b, k)
+                for a, rows in report.items()
+                for b, row in rows.items()
+                for k, v in row.items()
+                if isinstance(v, dict) and v["gated"]
+            }
+
+        missing = sorted(gated(historical) - gated(matched))
+        failures = [
+            (a, b, k)
+            for a, rows in matched.items()
+            for b, row in rows.items()
+            for k, v in row.items()
+            if isinstance(v, dict) and v["gated"] and not v["pass_"]
+        ]
+        record = dict(
+            scope=case,
+            historical=historical,
+            matched=matched,
+            failures=failures,
+            gated_count=len(gated(matched)),
+            missing_gates=missing,
+        )
+        if "--output" in argv:
+            Path(argv[argv.index("--output") + 1]).write_text(json.dumps(record, indent=2))
+        _summary({case: matched})
+        print(
+            f"{len(failures)} failing, {len(missing)} missing gates (only {case}; other cases not rerun)"
+        )
+        return bool(failures or missing or not gated(matched))
     if argv and argv[0] == "compact":
         record = compact_record(json.loads(Path(argv[1]).read_text()))
         with gzip.GzipFile(argv[2], "wb", mtime=0) as stream:
             stream.write(json.dumps(record, separators=(",", ":")).encode())
         return 0
-    if argv and argv[0] == "reduce-geant4":
+    if argv and argv[0] in ("reduce-geant4", "reduce-geant4-cascade"):
         events = None
         if "--events" in argv:
             i = argv.index("--events")
             events = int(argv[i + 1])
             argv = argv[:i] + argv[i + 2 :]
-        case, paths = argv[1], argv[2:]
+        cascade = argv[0] == "reduce-geant4-cascade"
+        case = argv[1]
+        paths = argv[3:] if cascade else argv[2:]
         from make_macros import EVENTS
 
+        if cascade:
+            verify_cascade_logs(case, paths, events or EVENTS)
         record = reduce_geant4(case, paths, events or EVENTS)
-        out = HERE / "reference" / f"{case}.json"
+        out = Path(argv[2]) if cascade else HERE / "reference" / f"{case}.json"
+        if cascade:
+            digests = {}
+            for path in paths:
+                with Path(path).open("rb") as stream:
+                    digests[Path(path).name] = hashlib.file_digest(stream, "sha256").hexdigest()
+            record.update(relaxation="complete-cascade", log_sha256=digests)
     elif argv and argv[0] == "reduce-pyrite":
         record = reduce_pyrite(argv[1], argv[2:])
         out = HERE / "results" / f"{argv[1]}.json"

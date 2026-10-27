@@ -260,6 +260,7 @@ Generated browsing views of every claim in the [detailed validation ledger](phys
 | [`gpt-gdf-injection`](ledger-transport-background.md#gpt-gdf-injection) | native GPT time-output and screen records preserve correlated electron phase space, relativistic kinetic energy, signed bunch charge, and unbiased current-normalized sampling through explicit entrance-plane projection | `anchored` |
 | [`linear-bunch-front-tilt`](ledger-transport-background.md#linear-bunch-front-tilt) | signed electron-front angle from the beam-normal plane gives incoming arrival delay `c*t0 = c*epsilon + tan(theta) u.w / beta0`; adding the separate ray-to-face delay once makes matching front and crystal angles parallel to the entrance face. Gaussian position-time correlation shifts the coherent mismatch from `K` to `K - omega J^-T a`. | `anchored` |
 | [`trajectory-depth-loss-profile`](ledger-transport-background.md#trajectory-depth-loss-profile) | saved-segment continuous-loss depth attribution, per stored layer, conserving covered segment loss | `anchored` |
+| [`photon-charged-reentry`](ledger-transport-background.md#photon-charged-reentry) | explicit reference charged feedback retains all escaping primary/shell/Auger tracks and continues them through vacuum into the nearest disjoint target/filter body, counting final kinetic and positron rest energy exactly once | `rederived` |
 
 ## Mosaicity & multilayer (code-cross-checked; need sign-off + measured data)
 

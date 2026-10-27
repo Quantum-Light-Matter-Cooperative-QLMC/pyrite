@@ -127,9 +127,9 @@ def _scene_geometry(case, detector, plates):
     )
 
 
-def _preflight_scene(scene):
+def _preflight_scene(scene, *, allow_cuda=False):
     """Reject unsupported *physical* and execution requests before transport."""
-    from ._backend import xp
+    from ._backend import BACKEND, xp
     from ._numerics import Numerics
     from .campaign.model import Scene
     from .instrument import PlanarDetector
@@ -145,14 +145,20 @@ def _preflight_scene(scene):
         raise ValueError("photon reference does not support acquisition response")
     if scene.physics is None or scene.physics.brem_source != "mc":
         raise ValueError("photon reference requires Physics(brem_source='mc')")
-    if xp is not np:
+    cuda = allow_cuda and BACKEND.name == "cuda"
+    if xp is not np and not cuda:
         raise ValueError("photon reference is CPU-only (PYRITE_MC_BACKEND=cpu)")
     numerics = scene.numerics
     if not isinstance(numerics, Numerics):
         raise TypeError("scene.numerics must be Numerics")
     if numerics.precision is not None:
         raise ValueError("photon reference does not support adaptive precision")
-    if numerics.transport_core not in ("auto", "lockstep", "per-electron"):
+    cores = (
+        ("auto", "lockstep", "per-electron", "cuda")
+        if cuda
+        else ("auto", "lockstep", "per-electron")
+    )
+    if numerics.transport_core not in cores:
         raise ValueError("photon reference needs a CPU transport core")
     return detector, numerics
 
