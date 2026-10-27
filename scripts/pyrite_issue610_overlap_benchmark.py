@@ -18,10 +18,12 @@ import argparse
 import atexit
 import csv
 import gc
+import hashlib
 import inspect
 import json
 import math
 import os
+import platform
 import shlex
 import statistics
 import subprocess
@@ -68,6 +70,10 @@ def cli():
         default="pyrite-output/issue610-bench",
         help="Where to save remote CSV, JSON and temporary artifacts",
     )
+    p.add_argument("--chunk-rows", type=int, default=4096, help="HDF5 rows per chunk")
+    p.add_argument(
+        "--device-block-mib", type=int, default=64, help="Writer transfer block limit in MiB"
+    )
     p.add_argument("--read-block", type=int, default=65536, help="Max streamed rows per block")
     p.add_argument(
         "--keep", action="store_true", help="Keep large HDF5 benchmark files (off by default)"
@@ -113,6 +119,10 @@ def ssh_launch(args):
         args.out_dir,
         "--read-block",
         str(args.read_block),
+        "--chunk-rows",
+        str(args.chunk_rows),
+        "--device-block-mib",
+        str(args.device_block_mib),
     ]
     if args.keep:
         pass_args += ["--keep"]
@@ -164,6 +174,9 @@ class PeakSampler:
         self.peak_rss = self.before_rss or 0
         self.peak_pool_used = 0
         self.peak_pool_reserved = 0
+        free, total = cp.cuda.runtime.memGetInfo()
+        self.before_vram = total - free
+        self.peak_vram = self.before_vram
 
     def poll(self):
         pool = self.cp.get_default_memory_pool()
@@ -173,6 +186,8 @@ class PeakSampler:
                 self.peak_rss = max(self.peak_rss, rss)
             self.peak_pool_used = max(self.peak_pool_used, pool.used_bytes())
             self.peak_pool_reserved = max(self.peak_pool_reserved, pool.total_bytes())
+            free, total = self.cp.cuda.runtime.memGetInfo()
+            self.peak_vram = max(self.peak_vram, total - free)
             self.stop.wait(self.period)
 
     def __enter__(self):
@@ -306,6 +321,7 @@ def run_overlap_benchmark(
                     write_s=round(write_s, 6),
                     next_transport_s=round(next_s, 6),
                     peak_rss_mib=round(sample.peak_rss / 2**20, 1),
+                    peak_vram_mib=round(sample.peak_vram / 2**20, 1),
                     peak_pool_reserved_mib=round(sample.peak_pool_reserved / 2**20, 1),
                 )
                 runs.append(record)
@@ -345,6 +361,8 @@ def run_overlap_benchmark(
 def run_benchmark(args):
     if args.ne <= 0 or args.repeats <= 0 or args.read_block <= 0 or args.thickness_ang <= 0:
         raise SystemExit("--ne, --repeats, --read-block and --thickness-ang must be positive")
+    if args.chunk_rows <= 0 or args.device_block_mib <= 0:
+        raise SystemExit("--chunk-rows and --device-block-mib must be positive")
     if args.overlap_only:
         args.overlap_test = True
 
@@ -382,11 +400,36 @@ def run_benchmark(args):
             "or update the remote checkout before trying again."
         )
 
+    traj._ROW_CHUNK = args.chunk_rows
+    traj._DEVICE_BLOCK_BYTES = args.device_block_mib * 2**20
+    import h5py
+    import numpy as np
+
+    stamp = checkout / ".pyrite-sync"
+    metadata = dict(
+        arguments=vars(args),
+        python=sys.version,
+        platform=platform.platform(),
+        cupy=cp.__version__,
+        numpy=np.__version__,
+        h5py=h5py.__version__,
+        hdf5=h5py.version.hdf5_version,
+        cuda_runtime=cp.cuda.runtime.runtimeGetVersion(),
+        cuda_driver=cp.cuda.runtime.driverGetVersion(),
+        trajectory_source_sha256=hashlib.sha256(Path(traj.__file__).read_bytes()).hexdigest(),
+        sync_stamp=stamp.read_text() if stamp.is_file() else None,
+        slurm_job_id=os.environ.get("SLURM_JOB_ID"),
+        memory_sampling_period_s=0.05,
+        vram_metric="device total minus free; includes context/allocator and other processes",
+        cache_state="warm CUDA; filesystem page cache not dropped; no fsync",
+    )
     out_dir = Path(args.out_dir).expanduser().resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
     gpu = cp.cuda.runtime.getDeviceProperties(0).get("name", "CUDA GPU")
     if isinstance(gpu, bytes):
         gpu = gpu.decode(errors="replace")
+    metadata["gpu"] = str(gpu)
+    (out_dir / "benchmark_environment.json").write_text(json.dumps(metadata, indent=2) + "\n")
     print(f"GPU: {gpu} | backend: {_backend.BACKEND.name} | CuPy: {cp.__version__}", flush=True)
     print(f"Python: {sys.version.split()[0]} | code: {Path(traj.__file__).resolve()}", flush=True)
     print("Catalog: synchronized bundled catalog with isolated empty user layer", flush=True)
@@ -452,18 +495,26 @@ def run_benchmark(args):
     if num_rows == 0:
         raise SystemExit("No segments generated; increase slab thickness / adjust inputs")
 
+    staging_s = 0.0
     if args.residency in ("host", "both"):
         print("Making a host-resident copy once (outside timed captures)...", flush=True)
         start = time.perf_counter()
         host_segments = host_copy_tree(device_segments, cp)
         cp.cuda.Stream.null.synchronize()
+        staging_s = time.perf_counter() - start
         print(
-            f"Host staging: {time.perf_counter() - start:.3f}s (not included in writer timings)",
+            f"Host staging: {staging_s:.3f}s (not included in writer timings)",
             flush=True,
         )
     else:
         host_segments = None
 
+    # Host-only runs model a pipeline that has already released its GPU payload.
+    # Use separate device/host invocations for comparable isolated memory peaks.
+    if args.residency == "host" and not args.overlap_test:
+        del device_segments
+        gc.collect()
+        cp.get_default_memory_pool().free_all_blocks()
     if not args.overlap_only:
         entries = []
         for residency in ("device", "host") if args.residency == "both" else (args.residency,):
@@ -524,6 +575,9 @@ def run_benchmark(args):
                         ne=args.ne,
                         rows=num_rows,
                         transport_s=round(transport_time, 6),
+                        staging_s=round(staging_s, 6),
+                        chunk_rows=args.chunk_rows,
+                        device_block_mib=args.device_block_mib,
                         write_s=round(elapsed, 6),
                         cpu_write_s=round(cpu_elapsed, 6),
                         read_stream_s=round(read_elapsed, 6),
@@ -532,7 +586,10 @@ def run_benchmark(args):
                         transferred_mib=round(traffic["bytes"] / 2**20, 3),
                         download_calls=traffic["calls"],
                         max_download_mib=round(traffic["max_bytes"] / 2**20, 3),
+                        before_rss_mib=round(sample.before_rss / 2**20, 1),
                         peak_rss_mib=round(sample.peak_rss / 2**20, 1),
+                        before_vram_mib=round(sample.before_vram / 2**20, 1),
+                        peak_vram_mib=round(sample.peak_vram / 2**20, 1),
                         peak_pool_reserved_mib=round(sample.peak_pool_reserved / 2**20, 1),
                     )
                     entries.append(row)
@@ -567,7 +624,10 @@ def run_benchmark(args):
             writer.writerows(entries)
         json_path = out_dir / "capture_issue610.json"
         json_path.write_text(
-            json.dumps(dict(gpu=str(gpu), transport_s=transport_time, records=entries), indent=2)
+            json.dumps(
+                dict(gpu=str(gpu), metadata=metadata, transport_s=transport_time, records=entries),
+                indent=2,
+            )
             + "\n"
         )
         print(f"\nSaved remote results: {csv_path} and {json_path}", flush=True)
