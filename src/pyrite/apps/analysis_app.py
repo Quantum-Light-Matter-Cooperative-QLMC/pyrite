@@ -226,7 +226,7 @@ def _():
     detector_ui = make_detector_choice(mo)
     map_backend_ui = mo.ui.dropdown(
         {"Altair (stable)": "altair", "Plotly (experimental)": "plotly"},
-        value="altair",
+        value="Altair (stable)",
         label="Map renderer",
     )
     return detector_ui, map_backend_ui, map_quantity_ui, spectrum_components_ui, vary_ui
