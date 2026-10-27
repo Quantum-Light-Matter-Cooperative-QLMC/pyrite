@@ -1,5 +1,7 @@
 # PyRITE
 
+![PyRITE](src/pyrite/_assets/branding/pyrite-wordmark.png)
+
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23487183.svg)](https://doi.org/10.5281/zenodo.23487183)  [![PyPI](https://img.shields.io/pypi/v/pyrite-mc)](https://pypi.org/project/pyrite-mc/) [![Documentation](https://readthedocs.org/projects/pyrite/badge/?version=latest)](https://pyrite.readthedocs.io/en/latest/) ![Python Version from PEP 621 TOML](https://img.shields.io/python/required-version-toml?tomlFilePath=https%3A%2F%2Fraw.githubusercontent.com%2FQuantum-Light-Matter-Cooperative-QLMC%2Fpyrite%2Fmain%2Fpyproject.toml) [![Downloads](https://img.shields.io/pypi/dm/pyrite-mc?label=downloads%2Fmonth)](https://pypistats.org/packages/pyrite-mc) [![License](https://img.shields.io/badge/License-UCLA-blue)](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/blob/main/LICENSE.txt)
 
 **Simulate how electrons travel through matter—and the X-rays they produce.**
@@ -54,7 +56,7 @@ pip install pyrite-mc
 Pint is included for physical quantity inputs through `pyrite.units`; numeric
 configuration and simulation storage retain their documented units.
 
-For interactive local apps, optional GPU support, configuration, and a walk-through of your first results, see the **[getting-started guide](https://pyrite.readthedocs.io/en/latest/guides/getting-started.html)**. For library usage, see the **[Python API guide](https://pyrite.readthedocs.io/en/latest/guides/python-api-workflow.html)**.
+For selectable **uv/pip installation instructions**, GPU and other extras, and your first results, see the **[getting-started guide](https://pyrite.readthedocs.io/en/latest/guides/getting-started.html)**. For library usage, see the **[Python API guide](https://pyrite.readthedocs.io/en/latest/guides/python-api-workflow.html)**.
 
 ## Research status and validation
 

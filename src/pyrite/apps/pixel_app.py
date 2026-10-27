@@ -6,7 +6,9 @@
 import marimo
 
 __generated_with = "0.24.0"
-app = marimo.App(width="full")
+app = marimo.App(
+    width="full", app_title="PyRITE · Pixel", html_head_file="../_assets/branding/head.html"
+)
 
 with app.setup:
     import altair as alt

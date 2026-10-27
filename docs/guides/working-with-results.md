@@ -7,7 +7,7 @@ checkpoint does not rerun electron transport.
 ## Plot one saved case
 
 Install `pyrite-mc[plots]`. If you have not run the quickstart, first
-[fetch its reference tables](getting-started.md#install-and-fetch-reference-data)
+[fetch its reference tables](getting-started.md#fetch-reference-data)
 and create the checkpoint:
 
 ```bash

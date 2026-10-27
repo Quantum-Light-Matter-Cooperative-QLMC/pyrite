@@ -125,7 +125,7 @@ PYRITE_MC_BACKEND=cpu uv run --extra optimization python checks/pxr_optimization
 ```
 
 Run the comparison and finalist validation on the lab worker through the
-[remote-job workflow](../computation/native-slurm-execution.md), from a clean,
+[remote-job workflow](../guides/running-on-a-cluster.md), from a clean,
 committed and synced revision, with explicit catalog environment and memory
 request:
 

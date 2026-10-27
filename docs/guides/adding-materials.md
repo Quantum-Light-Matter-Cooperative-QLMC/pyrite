@@ -56,5 +56,5 @@ physical model.
 For a new CIF, mixtures, density checks, managed assets and maintainer commands,
 use [material authoring contracts](../reference/material-authoring.md).
 [Configure a campaign](configuration-cookbook.md) to select materials and
-[prepare reference tables](getting-started.md#install-and-fetch-reference-data)
+[prepare reference tables](getting-started.md#fetch-reference-data)
 before transport.

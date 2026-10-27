@@ -9,6 +9,7 @@ application contracts. For walkthroughs, see
 
 ../results-and-apps
 ../trajectory-workflows
+../distributed-artifacts
 ../tr-ctr-app
 ../optical-diagnostics-app
 ```

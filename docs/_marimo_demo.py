@@ -48,11 +48,17 @@ def _export(app: Sphinx, exception: Exception | None) -> None:
             "--force",
         ],
         check=True,
+        # WASM export resolves the head file against its short notebook name.
+        # Keep relative notebook assets valid in both run and export modes.
+        cwd=DEMO,
     )
     # marimo drops an assistant prompt file into exports; it is not site content.
     (out / "CLAUDE.md").unlink(missing_ok=True)
     if (DEMO / "public").is_dir():
         shutil.copytree(DEMO / "public", out / "public", dirs_exist_ok=True)
+    branding = DOCS.parent / "src" / "pyrite" / "_assets" / "branding"
+    (out / "public").mkdir(exist_ok=True)
+    shutil.copyfile(branding / "pyrite-wordmark.png", out / "public" / "pyrite-wordmark.png")
     if PREVIEW.is_file():
         shutil.copyfile(PREVIEW, out / "preview.png")
 

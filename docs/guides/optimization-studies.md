@@ -35,7 +35,7 @@ fabrication constraint accepting only thickness ≤500 Å. Failed and infeasible
 attempts count against the budget.
 
 Run search and validation on the lab worker using the
-[remote-job workflow](../computation/native-slurm-execution.md), with a committed,
+[remote-job workflow](running-on-a-cluster.md), with a committed,
 synced checkout, explicit catalog environment and memory allocation:
 
 <!-- verify: skip (external shell tools or downloadable Python example) -->

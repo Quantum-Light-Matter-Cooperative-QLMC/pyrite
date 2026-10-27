@@ -1,0 +1,6 @@
+/* Reduce the desktop navigation column by 25%; retain the mobile drawer. */
+@media (min-width: 992px) {
+  .bd-sidebar-primary {
+    --pst-sidebar-primary-width: 20.00%;
+  }
+}

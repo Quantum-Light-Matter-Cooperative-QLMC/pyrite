@@ -1,0 +1,15 @@
+{% extends "!layout.html" %}
+{% block extrahead %}
+  {{ super() }}
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="PyRITE">
+  <meta property="og:title" content="{{ title|striptags|e }} — PyRITE">
+  <meta property="og:image" content="{{ brand_image_url|e }}">
+  <meta property="og:image:alt" content="PyRITE logo with simulated electron trajectories and an X-ray spectrum">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="{{ brand_image_url|e }}">
+  <meta name="twitter:image:alt" content="PyRITE logo with simulated electron trajectories and an X-ray spectrum">
+  <link rel="apple-touch-icon" href="{{ pathto('_static/apple-touch-icon.png', 1) }}">
+{% endblock %}

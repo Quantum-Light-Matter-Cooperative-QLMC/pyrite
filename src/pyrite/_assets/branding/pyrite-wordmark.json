@@ -1,0 +1,59 @@
+{
+  "generator": "scripts/pyrite_logo.py",
+  "generator_sha256": "d7a20c768587fbccf906f471ed1532797f99c20b6817f088c93d82d9fff4f962",
+  "source_revision": "23abb93ce963dff9a82645224ce6de4ea2ab4102",
+  "source_dirty": true,
+  "numpy_version": "2.5.4",
+  "matplotlib_version": "3.11.2",
+  "y": {
+    "material": "hopg",
+    "energy_keV": 30.0,
+    "thickness_ang": 70000.0,
+    "electrons": 4096,
+    "seed": 17,
+    "max_steps": 2000
+  },
+  "i": {
+    "energy_keV": 30.0,
+    "thickness_ang": 140.0,
+    "electrons": 256,
+    "material": "hopg",
+    "tilt_deg": 45.0,
+    "observation_angle_deg": 90.0,
+    "mosaic": false,
+    "resolved_seed": 1
+  },
+  "rendering": {
+    "font_family": "DejaVu Sans",
+    "dpi": 150,
+    "background": "#0C1628",
+    "selection": "transmitted histories, stratified by signed lateral exit offset",
+    "lateral_axis": "magnified for typography",
+    "spectral_baseline": "15th percentile (750-1000 eV)",
+    "spectrum": "incoherent PXR/CBS, source density, no detector response",
+    "y_stem_width_requested": 0.075,
+    "y_beam_width_nm_requested": null,
+    "beam_profile": "uniform rectangular top-hat in x and y, zero divergence",
+    "uniform_source_method": "Exact per-electron translation of PyRITE transport histories, valid for a laterally invariant homogeneous infinite slab at normal incidence",
+    "beam_seed": 17,
+    "y_color_gamma": 1.85,
+    "i_width": 0.45,
+    "i_caps": false
+  },
+  "trajectories_selected": 56,
+  "y_lateral_scale_ang": 26463.08641898,
+  "y_energy_color_floor_keV": 9.53007019970897,
+  "y_beam_full_width_ang": 2543.8752645776726,
+  "y_beam_full_width_nm": 254.38752645776725,
+  "y_stem_rendered_width": 0.075,
+  "y_beam_sampled_x_min_ang": -1265.160037848392,
+  "y_beam_sampled_x_max_ang": 1188.158903620775,
+  "line_peak_eV": 858.0,
+  "line_fwhm_eV": 18.785386625281603,
+  "line_density_peak": 7.695563430180835e-10,
+  "pyrite_version": "0.22.3",
+  "cache_sha256": {
+    "Y-a8554e344a915f.npz": "cee11ea613654131654f8644baf8f15668c596dfab687e0782029f6d9f89b5bf",
+    "I-c81735bad8ef3e.npz": "f6dd90f5b1e9487c9733a9581835246a0b3655a4e8e6c16439bceea821c06fac"
+  }
+}

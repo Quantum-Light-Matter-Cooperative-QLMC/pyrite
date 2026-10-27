@@ -16,3 +16,9 @@ description: "Use when deterministic PyRITE library/API code needs work on vecto
 Own library/API quality. Defer stochastic behavior to `monte-carlo`, physics
 claims to `physics-review`, benchmarks to `performance`, and CLI surfaces to
 `cli-ui-ux`.
+
+For API documentation, follow `docs/repo-design/documentation.md`: source
+docstrings own signatures, units, defaults and return semantics; canonical
+namespace pages under `docs/reference/python-api/` expose supported objects.
+Keep recipes in How-to Guides and physical rationale in Physics, linked rather
+than repeated. Use `documentation-maintenance` for reference/navigation edits.

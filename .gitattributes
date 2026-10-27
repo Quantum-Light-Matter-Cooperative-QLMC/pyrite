@@ -7,3 +7,6 @@
 vendor/xsgen/elsepa/** -text -diff
 vendor/xsgen/sbethe/sbethe.f -text -diff
 tests/data/xsgen/elsepa/** -text -diff
+
+# Artwork is reviewed visually; scripts/pyrite_logo.py owns regeneration.
+src/pyrite/_assets/branding/** linguist-generated=true

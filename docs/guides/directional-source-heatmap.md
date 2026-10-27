@@ -4,7 +4,7 @@ Map the escaped PXR/CBS spectrum around a silicon film, then compare spectra at
 three observation angles. This **experimental** API scores a detector-free
 angular slice from one shared electron transport.
 
-Install `pyrite-mc[plots]` and [fetch the reference tables](getting-started.md#install-and-fetch-reference-data).
+Install `pyrite-mc[plots]` and [fetch the reference tables](getting-started.md#fetch-reference-data).
 Download {download}`the complete script <../examples/directional_source_heatmap.py>`
 and run it in your installed environment:
 

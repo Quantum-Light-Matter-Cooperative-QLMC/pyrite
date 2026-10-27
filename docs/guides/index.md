@@ -39,12 +39,18 @@ cover capture, replay and ParaView independently of spectral checkpoints.
 
 adding-materials
 gpt-gdf-beams
-running-on-a-cluster
 optimization-studies
 ```
 
-For execution tuning, use [performance profiling](../computation/performance-profile-analysis.md)
-and [CUDA batch/chunk tuning](../computation/batch-chunk-tuning.md).
+```{toctree}
+:maxdepth: 1
+:caption: Execution and performance
+
+running-on-a-cluster
+performance-profile-analysis
+batch-chunk-tuning
+```
+
 Scene construction and configuration contracts live in
 [Reference](../reference/index.md).
 

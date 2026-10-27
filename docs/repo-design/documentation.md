@@ -267,9 +267,17 @@ pyrite-dev docs --linkcheck
 
 External link checking requires network access and is therefore not part of the offline gate.
 
-## Static executable tutorials
+(static-executable-tutorials)=
+## Existing static examples
 
-Ordinary tutorials use maintained Python sources plus Matplotlib's
+New guided learning content belongs in the Marimo/MoLab curriculum under
+`docs/notebooks/`, following `tutorial-authoring` and #758. Do not extend the
+legacy static example system into a parallel tutorial curriculum. Retain its
+checked outputs while examples still support published pages; when a notebook
+supersedes a walkthrough, link to that notebook and preserve useful task recipes
+and reference material at their canonical owners.
+
+Existing static examples use maintained Python sources plus Matplotlib's
 [`plot` directive](https://matplotlib.org/stable/api/sphinxext_plot_directive_api.html)
 inside MyST pages. A `literalinclude` displays the executable source and the
 directive places its generated figure directly below it in the PyData theme.
@@ -290,7 +298,7 @@ The infrastructure prototype compared these approaches:
 | [marimo export](https://docs.marimo.io/guides/exporting/) | Maintained reactive sources export to HTML or notebook formats | Best for interactive analysis; native notebook rendering adds an export and parser stage. Static HTML is a separate embedded page. |
 | Matplotlib `plot` directive (selected) | Existing MyST, copyable Python source, native figures, no new rendering package | Explicitly manage small precomputed outputs and their provenance. |
 
-Conventions:
+Maintenance conventions for existing examples:
 
 - `docs/examples/NAME.py` owns an executable example. `compute()` returns a
   JSON-serializable mapping (including resolved seed and result provenance);

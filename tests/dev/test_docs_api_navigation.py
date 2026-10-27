@@ -1,6 +1,7 @@
 """Static API-reference ownership checks for issue #759."""
 
 import re
+import tomllib
 from pathlib import Path
 
 DOCS = Path(__file__).resolve().parents[2] / "docs"
@@ -31,7 +32,7 @@ def test_api_object_page_ownership_and_navigation():
         "pyrite.observations.Observation",
         "pyrite.results.Settings",
         "pyrite.quantum.QuantumSetup",
-        "pyrite.execution.ExecutionProfile",
+        "pyrite.storage.CaseArtifactStore",
     ):
         assert obj in owners
 
@@ -87,3 +88,12 @@ def test_legacy_api_sections_link_to_namespace_contracts():
     ):
         assert contract in (REFERENCE / f"{owner}.md").read_text(encoding="utf-8")
         assert contract not in legacy
+
+
+def test_storage_reference_covers_supported_inventory():
+    """New supported storage exports must remain discoverable in reference."""
+    manifest = tomllib.loads((DOCS.parent / "api-surface.toml").read_text())
+    supported = manifest["package_exports"]["pyrite.storage"]
+    page = (REFERENCE / "storage.md").read_text(encoding="utf-8")
+    documented = set(re.findall(r"^   pyrite\.storage\.(\w+)$", page, re.M))
+    assert documented == set(supported)

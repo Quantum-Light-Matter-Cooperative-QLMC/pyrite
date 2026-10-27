@@ -12,7 +12,11 @@
 import marimo
 
 __generated_with = "0.25.1"
-app = marimo.App(width="full")
+app = marimo.App(
+    width="full",
+    app_title="PyRITE · Angular Heatmap",
+    html_head_file="../_assets/branding/head.html",
+)
 
 
 @app.cell

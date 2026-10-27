@@ -118,8 +118,9 @@ tests or changes formatting.
 ## Work rules
 
 - Make smallest owning change. Preserve unrelated dirty-tree work.
-- Prefer reusable logic in `src/pyrite/`; keep marimo apps thin. Keep notebooks
-  output-free. Run `uv run marimo check <app.py>` after marimo edits.
+- Prefer reusable logic in `src/pyrite/`; keep marimo apps thin. Keep notebook
+  sources output-free; checked tutorial exports follow `tutorial-authoring`.
+  Run `uv run marimo check <app.py>` after marimo edits.
 - Invoke matching repo skill for CLI, notebooks, Monte Carlo, performance,
   physics, docs, runtime, remote GPU, regression, catalog-golden, or backlog
   work.

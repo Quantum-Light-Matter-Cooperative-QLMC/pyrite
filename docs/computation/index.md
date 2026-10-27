@@ -15,15 +15,20 @@ Physical models are documented in [Physics and simulation models](../physics/ind
 
 execution-and-acceleration
 memory-and-scheduling
-distributed-artifacts
-native-slurm-execution
 precision-and-tolerances
 ../physics/radiation-physics/energy-grid-semantics
 statistical-methods
 random-streams
-performance-profile-analysis
-batch-chunk-tuning
 ```
+
+## Execution workflows and contracts
+
+For tasks, use [cluster execution](../guides/running-on-a-cluster.md),
+[performance profiling](../guides/performance-profile-analysis.md), or
+[CUDA batch/chunk tuning](../guides/batch-chunk-tuning.md). Exact scheduler
+configuration belongs in [cluster reference](../reference/cluster-execution.md);
+worker publication and integrity belong in
+[distributed worker artifacts](../reference/distributed-artifacts.md).
 
 ## Reference material
 

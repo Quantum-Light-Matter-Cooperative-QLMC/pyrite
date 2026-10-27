@@ -5,7 +5,7 @@ Import correlated electron records, inspect their phase space and simulate
 their radiation from a thin HOPG target. The input is a **synthetic
 demonstration**, not experimental data or a GPT simulation.
 
-Install `pyrite-mc[plots]` and [fetch the reference tables](getting-started.md#install-and-fetch-reference-data).
+Install `pyrite-mc[plots]` and [fetch the reference tables](getting-started.md#fetch-reference-data).
 Save {download}`the runnable script <../examples/gpt_gdf_beams.py>` and
 {download}`synthetic_beam.gdf <../examples/data/synthetic_beam.gdf>` in the same
 directory, then run:

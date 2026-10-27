@@ -143,7 +143,14 @@ def test_documented_autosummary_exports_have_inventory_entries() -> None:
         if export.domain in facades
     )
     registered.update(f"{module}.{name}" for module, rows in packages.items() for name in rows)
-    documented = set(re.findall(r"^   (pyrite\.[\w.]+)$", (root / "docs/api.md").read_text(), re.M))
+    reference = root / "docs/reference/python-api"
+    pages = sorted(reference.glob("*.md"))
+    assert pages
+    documented = {
+        name
+        for page in pages
+        for name in re.findall(r"^   (pyrite\.[\w.]+)$", page.read_text(), re.M)
+    }
     assert documented
     assert documented <= registered, sorted(documented - registered)
 

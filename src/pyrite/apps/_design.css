@@ -178,6 +178,10 @@
     color: ${LIGHT_TEXT} !important;
   }
   .pyrite-title { max-width: ${WIDTHS_PROSE}; margin: 0 0 1.25rem; }
+  .pyrite-title__logo {
+    display: block; width: 16rem; max-width: 100%; height: auto;
+    margin-bottom: .85rem; border-radius: .25rem;
+  }
   .pyrite-title__eyebrow {
     color: var(--pyrite-focus); font: 600 .75rem/1.2 ${TYPOGRAPHY_DATA};
     letter-spacing: .14em;
