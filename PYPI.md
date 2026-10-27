@@ -21,6 +21,9 @@ pyrite tables fetch
 pyrite run quickstart
 ```
 
+Pint is included for physical quantity inputs through `pyrite.units`; numeric
+configuration and simulation storage retain their documented units.
+
 Reference physics tables are downloaded separately by `pyrite tables fetch`.
 For NVIDIA GPUs, install `pyrite-mc[nvidia]` with compatible CUDA drivers.
 For `pyrite.plots`, install `pyrite-mc[plots]`; for the interactive marimo apps

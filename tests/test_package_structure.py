@@ -4,6 +4,8 @@ from importlib import import_module, util
 from importlib.metadata import distribution
 from pathlib import Path
 
+from packaging.requirements import Requirement
+
 import pyrite
 
 
@@ -15,6 +17,17 @@ def test_distribution_identity_exposes_only_canonical_namespace() -> None:
     assert util.find_spec("pyrite") is not None
     assert util.find_spec("cxr_mc") is None
     assert util.find_spec("pyrite_mc") is None
+
+
+def test_pint_is_a_core_dependency_and_units_extra_remains_compatible() -> None:
+    installed = distribution("pyrite-mc")
+    requirements = [Requirement(value) for value in installed.requires or []]
+    pint_requirements = [value for value in requirements if value.name.lower() == "pint"]
+    assert len(pint_requirements) == 1
+    assert pint_requirements[0].marker is None
+    assert "0.26.2" in pint_requirements[0].specifier
+    assert "0.27" not in pint_requirements[0].specifier
+    assert "units" in installed.metadata.get_all("Provides-Extra", [])
 
 
 def test_root_exports_stay_frozen() -> None:

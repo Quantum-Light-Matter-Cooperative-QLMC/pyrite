@@ -9,7 +9,7 @@ _SOLID_ANGLE_MARKERS = ("steradian", "sr")
 
 
 def _is_pint_quantity(value: object) -> bool:
-    """Recognize Pint quantities without importing its optional dependency."""
+    """Recognize Pint quantities without importing Pint on numeric paths."""
     return (
         type(value).__module__.split(".", maxsplit=1)[0] == "pint"
         and hasattr(value, "magnitude")
@@ -50,7 +50,7 @@ def normalize_unit(
             converted = value.to(target_unit)
         except Exception as exc:
             # Pint uses its own DimensionalityError and UndefinedUnitError types;
-            # keep this optional dependency out of the module-level imports.
+            # keep Pint out of the module-level imports for numeric paths.
             raise ValueError(
                 f"{field} received unit {received!r}; expected {expected} convertible to "
                 f"{target_unit!r}"

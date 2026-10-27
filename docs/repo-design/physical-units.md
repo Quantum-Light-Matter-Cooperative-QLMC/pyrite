@@ -8,10 +8,10 @@ dimension mismatch before simulation.
 
 ## Public interface and dependency
 
-Install the optional extra and use the one project registry:
+Pint is a core runtime dependency. Use the one project registry:
 
 ```bash
-pip install 'pyrite-mc[units]'
+pip install pyrite-mc
 ```
 
 ```python
@@ -34,23 +34,11 @@ Pint is the adapter dependency. Its supported unit registry and quantity model
 cover scalar values, NumPy array magnitudes, common and compound units, custom
 definitions, and explicit conversion. The implementation uses the documented
 registry `.Quantity(...)`, quantity `.to(...)`, and `.magnitude` interfaces.
-The issue's suggested `pint>=0.26,<0.27` range resolved to Pint 0.26.2 under
-Python 3.14.4; PyRITE's supported floor is Python 3.13. Pint is installed only
-by the `units` extra (and the test dependency group).
-
-| Candidate | Evaluation |
-| --- | --- |
-| Pint | Chosen. A single registry is straightforward to share from `pyrite.units`; scalar and array quantities convert with `.to`, dimensional mismatches raise, and explicit strings can be parsed by that same registry. Pint's serialization format is not used for PyRITE records: normalized numbers keep checkpoints and identities independent of registry state. |
-| unyt | Viable for NumPy-oriented scalar and array quantities, conversions, dimensional errors, custom units, and registries. Its array-first model is useful for scientific arrays; PyRITE needs boundary conversion for mostly scalar immutable configuration records and Python/TOML string parity. The Context7 entry for unyt returned an unrelated project, so the comparison used the [official unyt documentation](https://unyt.readthedocs.io/en/stable/usage.html). |
-| Astropy Units | Viable for scalar and array conversion, custom units, and explicit equivalencies. It provides more astronomy-specific equivalency machinery than this API needs and carries the broader Astropy package context. See the [official Astropy unit conversion documentation](https://docs.astropy.org/en/stable/units/conversion.html). |
-| Custom algebra | Rejected. It would require PyRITE to own parsing, conversion factors, dimensional validation, arrays, registry behavior, and serialization instead of keeping that machinery in a maintained dependency. |
-
-Pint follows SI in treating radians as dimensionless. PyRITE therefore checks
-that angle inputs use a recognized angular unit before conversion to a `*_deg`
-field. Solid-angle fields require steradian units. Plain numbers retain each
-field's existing convention, and arbitrary dimensionless quantities are
-rejected for angle and solid-angle fields. No implicit energy/frequency or
-other physical equivalencies are enabled.
+The supported range is `pint>=0.26,<0.27`; PyRITE's supported Python floor is
+3.13. Pint ships with every installation, while imports remain lazy to keep
+numeric configuration inexpensive. The empty `units` extra is retained for
+compatibility with existing `pyrite-mc[units]` installation commands. Numerical
+kernels and persisted records continue to contain ordinary magnitudes.
 
 ## Current normalization boundaries
 
@@ -134,6 +122,204 @@ components use distinct grids and spectral-density semantics, while pixel and
 aperture results are integrated quantities. A generic quantity wrapper would
 need a result-wide unit metadata map and could misrepresent those distinctions,
 so this remains a separate result-contract design decision.
+
+## Naming and representation policy
+
+Choose a name from the value's representation, not the unit used by its caller:
+
+| Representation | Naming rule | Example |
+| --- | --- | --- |
+| Public quantity carrying its unit | Semantic physical name; document whether energy is kinetic or total | `kinetic_energy`, `exposure` |
+| Raw scalar/array with a prescribed unit | Explicit unit suffix | `energy_keV`, `exposure_s`, `thickness_ang` |
+| Serialized magnitude | Unit suffix or mandatory, versioned unit metadata | Existing `energy_keV` keys |
+| Dimensionless physical parameter | Semantic name and documented meaning | `energy_spread_frac` |
+
+Quantity input support alone does not make a field quantity-valued. Today
+`Beam.energy_keV` accepts compatible quantities but reads back a magnitude in
+keV. Keep that name while accepting bare numbers. Do not rename it to `energy`
+and silently retain an implicit keV convention. A semantic quantity interface
+must specify both assignment and read-back, including array and missing-extra
+behavior. Local equation symbols may follow mathematical notation when their
+units are explicit in the routine's contract; boundary arguments and converted
+intermediates should retain the information needed to distinguish conventions.
+
+### Why Geant4 and PENELOPE use unsuffixed names
+
+[Geant4's CLHEP unit definitions](https://github.com/Geant4/geant4/blob/master/source/externals/clhep/include/CLHEP/Units/SystemOfUnits.h)
+are numeric scale constants: `millimeter = 1`, `centimeter = 10 * millimeter`,
+`megaelectronvolt = 1`, and `kiloelectronvolt = 1.e-3 * megaelectronvolt`.
+Long names have short aliases such as `mm`, `cm`, `MeV` and `keV`. Its
+[unit guide](https://geant4.web.cern.ch/documentation/pipelines/master/bfad_html/ForApplicationDevelopers/Fundamentals/unitSystem.html)
+prescribes explicit units when introducing dimensional inputs, converting
+external data and formatting output. Existing internal values participate in
+ordinary arithmetic without repeatedly attaching units. Internal bases include
+mm, ns, MeV and positron charge, alongside temperature, amount, luminous
+intensity and angular units.
+
+The [particle gun](https://github.com/Geant4/geant4/blob/master/source/event/include/G4ParticleGun.hh)
+stores `particle_energy`; the
+[basic example](https://github.com/Geant4/geant4/blob/master/examples/basic/B1/src/PrimaryGeneratorAction.cc)
+assigns `SetParticleEnergy(6. * MeV)`. These are ordinary doubles, so the
+constants convert scale without enforcing dimensions at a C++ setter.
+
+The [PENELOPE-2018 manual, §7.1.2/Table 7.3](https://www.oecd-nea.org/upload/docs/application/pdf/2020-10/penelope-2018__a_code_system_for_monte_carlo_simulation_of_electron_and_photon_transport.pdf#page=307)
+lists double-precision track variables `E` in eV and `X`, `Y`, `Z` in cm;
+`U`, `V`, `W` are direction cosines. This interface relies on fixed documented
+units, without quantity objects or suffixes. This comparison concerns the 2018
+core, not all subsequent versions or wrappers.
+
+PyRITE should retain Pint's dimension checks at boundaries and numeric kernels.
+Geant4's semantic naming is suitable for a quantity interface; adopting that
+naming for PyRITE's mixed-unit magnitudes would hide their contract.
+
+## Beam-energy quantity interface
+
+The additive constructor keyword, property and replacement method retain `Beam`'s canonical import
+from `pyrite.beams`, concrete owner in `campaign/beam.py`, and numeric
+`energy_keV` dataclass field.
+
+### Constructor and read-back contract
+
+- Keyword-only `kinetic_energy` accepts a real Pint scalar quantity or a
+  quantity with a one-dimensional real numeric array magnitude. Require explicit
+  energy units: bare numbers, numeric arrays, strings, mixed component lists and
+  dimensionless quantities are rejected. Lists remain available through the
+  existing numeric `energy_keV` interface. Quantity inputs must be finite and
+  positive, with nonempty arrays; scalar-scene versus sweep checks still apply
+  at their current owners. Legacy numeric input validation is unchanged.
+- An omitted-value sentinel distinguishes explicit `energy_keV` arguments. If
+  neither argument is supplied, preserve the existing `(30, 45, 60)` keV default.
+  If both are supplied, raise `TypeError` naming both arguments, even if their
+  values are equivalent. An explicit legacy positional energy also conflicts.
+  All other positional/keyword conventions and defaults are preserved.
+- The supplied quantity normalizes once to the existing numeric keV field.
+  The read-only `kinetic_energy` property returns a fresh quantity from the
+  shared registry in keV. Thus read-back carries units but does not preserve
+  the caller's original spelling, registry, or choice of MeV versus keV.
+  For sequences, return a quantity with a copied one-dimensional array magnitude;
+  mutating it must not mutate the beam. Scalar input reads back as a scalar.
+- `energy_keV` stays numeric. `to_spec()` and `from_spec()` continue to use it;
+  representation, dataclass fields, equality behavior and persisted records do
+  not acquire a second energy value. The quantity property is not cached.
+- Construction from external Pint registries uses the existing conversion
+  boundary. Read-back uses PyRITE's unmodified registry. Numeric construction,
+  lowering and record loading do not import Pint; requesting quantity read-back
+  imports the core Pint dependency lazily. An incomplete installation missing
+  Pint raises its normal import error; the property never falls back to a
+  unitless value. No separate extra is required.
+
+Examples:
+
+```python
+from pyrite.beams import Beam, PointBunch, Spot
+from pyrite.units import Q_, ureg
+
+beam_options = dict(transverse=Spot(), longitudinal=PointBunch())
+a = Beam(kinetic_energy=60 * ureg.keV, **beam_options)
+b = Beam(kinetic_energy=0.06 * ureg.MeV, **beam_options)
+assert a.energy_keV == b.energy_keV == 60
+assert a.kinetic_energy.to("eV").magnitude == 60_000
+grid = Beam(kinetic_energy=Q_([30, 45, 60], "keV"), **beam_options)
+
+Beam(kinetic_energy=60, **beam_options)  # TypeError: units required
+Beam(kinetic_energy=1 * ureg.mm, **beam_options)  # ValueError: expected energy
+Beam(
+    energy_keV=60, kinetic_energy=60 * ureg.keV, **beam_options
+)  # TypeError: conflicting arguments
+```
+
+### Replacement, sweeps and serialization
+
+Retaining the numeric dataclass field has an explicit consequence:
+`dataclasses.replace(beam, energy_keV=80)` remains supported, while
+`replace(beam, kinetic_energy=80 * ureg.keV)` is rejected. `replace` supplies the
+existing `energy_keV` field as well as the new keyword, so the constructor must
+report the conflict rather than guess which input wins. Unrelated replacements
+and `replace(beam)` must preserve all existing values without loading Pint.
+
+Use `beam.with_kinetic_energy(quantity)` for quantity-aware
+replacement. It validates through the same new-input boundary, then replaces
+only the numeric field; all other beam fields survive. An explicit numeric
+alternative remains `replace(beam, energy_keV=quantity.to("keV").magnitude)`.
+Do not add `kinetic_energy` as an `InitVar`: retaining or forwarding a second
+energy input would make replacement ambiguous.
+
+Array quantities describe the existing energy grid, not per-particle energies.
+They lower to the current `BeamSpec.energy_keV` grid. Sweep path addresses
+remain `beam.energy_keV`; scalar scene admission and GDF-derived correlated
+energies retain their existing semantics. The property describes configured
+energy, not a new override of sampled GDF particle energies.
+
+`dataclasses.asdict`, beam/spec round-trips, observation records and checkpoint
+cases retain their existing numeric keys and shapes. Do not serialize the
+property, caller registry or supplied unit label. Quantity read-back may
+allocate an array; it belongs in configuration/inspection, not kernel loops.
+No new identity rounding is introduced: use tolerance-based comparisons for
+general unit conversions and exact existing identity fixtures where already
+guaranteed. Do not promise bitwise identity for all mathematically equivalent
+floating-point expressions.
+
+### Representative migration inventory
+
+All current fields below accept compatible Pint inputs and return numeric
+values. Strings are accepted by the catalog/preset parser, not generally by
+Python constructors. The table identifies representation owners rather than
+promoting every implementation module to public API.
+
+| Canonical public input | Current accepted form and read-back | Numeric lowering/record owner | Pilot disposition |
+| --- | --- | --- | --- |
+| `pyrite.beams.Beam.energy_keV` | Scalar/sequence numbers or compatible quantities → keV | `campaign/beam.py::Beam.to_spec`, `campaign/sweep.py::BeamSpec`, `campaign/beam_cases.py` | Quantity keyword/property and explicit replacement method are available |
+| `pyrite.beams.BunchLength.rms_fs` | Number or time quantity → fs | `campaign/beam.py::Beam.to_spec` | Keep numeric name; separate future quantity interface |
+| `pyrite.geometry.RectangularBody.thickness_mm` | Number or length quantity → mm | `bodies.py`, `campaign/geometry.py` | Keep current body serialization and units |
+| `pyrite.detectors.PlanarPose.center_mm`, `PixelGrid.pitch_mm` | Numeric components or compatible quantities, including array magnitudes → numeric mm components | `_planar_geometry.py`, persisted geometry in `observations/store.py` | Preserve coordinate and pixel representations |
+| `pyrite.observations.Acquisition.exposure_s`, `measured_edges_eV` | Numbers/components or compatible quantities → s/eV | `instrument/observation.py`, persisted acquisition in `observations/store.py` | Preserve exposure and measured-bin meaning |
+| `pyrite.config.Physics.inelastic_cutoff_eV`, `Numerics.channeling_dz_ang` | Number or compatible quantity → eV/Å | `_numerics.py`, preset parsing in `_config_presets.py` | Keep numeric controls and preset keys |
+| `pyrite.quantum.TransverseStateSpec` recipe lengths/energies/angles | Numbers or compatible quantities → Å/eV/rad | `quantum_state.py` numeric JSON schema; runtime adapters in `montecarlo/channeling/states.py` | Preserve recipe-specific units and JSON identity |
+
+Coverage remains selective. A helper import is not evidence that every physical
+argument in its module accepts quantities. `BeamSpec` and low-level numerical
+functions retain their documented numeric contracts; result arrays currently
+have no generic Pint view. Any additional semantic field needs its own
+assignment/read-back and serialization review.
+
+Source anchors: {source}`src/pyrite/campaign/beam.py::Beam.to_spec`,
+{source}`src/pyrite/_units.py::normalize_unit`,
+{source}`src/pyrite/_planar_geometry.py`,
+{source}`src/pyrite/instrument/observation.py`,
+{source}`src/pyrite/observations/store.py`,
+{source}`src/pyrite/_numerics.py` and
+{source}`src/pyrite/quantum_state.py::TransverseStateSpec`.
+
+Angle migration must retain explicit angular validation: for example current
+`Detector(0.5 * ureg.radian)` converts to `observation_angle_deg`, whereas
+`Detector(1 * ureg.dimensionless)` fails. Steradian inputs must remain distinct
+from arbitrary dimensionless inputs. Do not add energy/frequency equivalencies
+or change these guards as a naming side effect.
+
+### Compatibility and verification
+
+| Stage | Owner and deliverable | Required evidence |
+| --- | --- | --- |
+| Quantity boundary | `campaign/beam.py` | `tests/instrument/test_unit_inputs.py`: scalar/array equivalence, wrong dimensions, required units, conflicts, external registry, copied read-back arrays and blocked-Pint numeric subprocesses |
+| Numeric consumers | `campaign/model.py`, `campaign/sweep.py`, `campaign/beam_cases.py`, `observations/spec.py` | Focused cases in `tests/scan/test_beam_objects.py`, `test_scene_model.py`, `test_sweep.py` and `tests/observations/test_spec.py`: replacement, unchanged defaults, numeric spec/record round-trips and existing identity fixtures |
+| Dependency and public API | `pyproject.toml`, `uv.lock`, `docs/api.md`, beam docstrings, `api-surface.toml` | Core metadata in `tests/test_package_structure.py`; `pyrite-dev api check`, `api check --imports`, API tests in `tests/dev/test_api_surface.py`, and `pyrite-dev docs` |
+| Further fields (future work) | Their existing geometry/observation/config/quantum owners | Review each new quantity-valued contract separately; quantum examples already have `tests/scan/test_quantum_runtime_units.py` and portable JSON checks |
+
+The pilot keeps legacy numeric constructor arguments, properties, TOML keys and
+sweep paths without warnings. It does not schedule their removal. If a later
+review chooses to deprecate a spelling, register it in the existing API
+deprecation machinery, announce it in the actual shipping release, and retain
+the two-minor support window before removal. Release work owns version changes;
+do not invent a parallel unit-migration schedule.
+
+The bounded beam interface uses canonical keV read-back, lazy core Pint access
+and the explicit `dataclasses.replace` restriction above. Expansion to further
+fields requires a separate review;
+preserving arbitrary input-unit labels would require a different storage and
+compatibility proposal. A future result quantity view additionally needs
+per-component grid/axis metadata, density versus integrated-measure semantics,
+normalization and solid-angle contracts, and explicit conversion tests. It is
+independent of this beam pilot.
 
 ## Measured overhead
 

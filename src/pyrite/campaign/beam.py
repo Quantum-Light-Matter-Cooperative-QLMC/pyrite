@@ -17,17 +17,36 @@ record, an internal lowering target that also backs profile files and case
 payloads. :meth:`Beam.to_spec` lowers to it field-for-field.
 """
 
-from dataclasses import dataclass, field
-from typing import Any
+from dataclasses import dataclass, field, replace
+from typing import TYPE_CHECKING, Any, Self
 
 import numpy as np
 
-from .._units import normalize_unit
+from .._spec_defaults import UNSET as _UNSET
+from .._units import _is_pint_quantity, normalize_unit
 from ..montecarlo.bunch_front import BunchFrontTilt, validate_front_source
 from ..montecarlo.transverse import TransverseDistribution
 from ..quantum_state import TransverseStateSpec
 from .longitudinal import LongitudinalDistribution
 from .sweep import BeamSpec
+
+if TYPE_CHECKING:
+    from pint import Quantity
+
+
+def _kinetic_energy_keV(value: object) -> float | np.ndarray:
+    """Validate an explicit energy quantity and own its numeric keV magnitude."""
+    if not _is_pint_quantity(value):
+        raise TypeError("Beam.kinetic_energy requires a Pint quantity with energy units")
+    magnitude = normalize_unit(value, "keV", field="Beam.kinetic_energy", expected="energy")
+    energy = np.asarray(magnitude)
+    if energy.dtype.kind not in "iuf" or energy.ndim > 1:
+        raise TypeError(
+            "Beam.kinetic_energy must be a real scalar or one-dimensional numeric array"
+        )
+    if energy.size == 0 or not np.all(np.isfinite(energy)) or np.any(energy <= 0):
+        raise ValueError("Beam.kinetic_energy must contain finite positive energies")
+    return _positive("Beam.kinetic_energy", float(energy)) if energy.ndim == 0 else energy.copy()
 
 
 def _positive(name: str, value: float) -> float:
@@ -205,8 +224,7 @@ Transverse = TransverseSpot | PointSpot | TransverseDistribution
 Longitudinal = PointBunch | BunchLength | Offsets | LongitudinalDistribution
 
 
-#: Placeholder for a beam property the caller left out. Through the #451
-@dataclass(frozen=True)
+@dataclass(frozen=True, init=False)
 class Beam:
     """Describe the electron beam at the crystal entrance plane.
 
@@ -223,7 +241,13 @@ class Beam:
     ----------
     energy_keV
         Central kinetic energy in keV. A scalar creates one scene; campaign
-        builders may expand a sequence.
+        builders may expand a sequence. Compatible Pint quantities are converted
+        to numeric keV. Mutually exclusive with ``kinetic_energy``; omitting
+        both preserves the default grid ``(30, 45, 60)`` keV.
+    kinetic_energy
+        Keyword-only Pint energy quantity: a real scalar or one-dimensional
+        array of finite positive values. Bare numbers and strings are rejected.
+        Read-back returns a fresh quantity in keV; storage remains numeric.
     transverse
         Required: :class:`TransverseSpot`, :class:`PointSpot`, or a Courant--Snyder
         :class:`~pyrite.montecarlo.transverse.TransverseDistribution`.
@@ -259,6 +283,63 @@ class Beam:
     gdf: GdfSource | None = None
     bunch_front_tilt: BunchFrontTilt | None = None
     state: TransverseStateSpec | None = field(default=None, kw_only=True)
+
+    def __init__(
+        self,
+        energy_keV: Any = _UNSET,
+        energy_spread_frac: float | None = None,
+        rep_rate_hz: float = 5000.0,
+        bunch_charge_pc: float = 1.0,
+        gdf: GdfSource | None = None,
+        bunch_front_tilt: BunchFrontTilt | None = None,
+        *,
+        transverse: Transverse,
+        longitudinal: Longitudinal,
+        state: TransverseStateSpec | None = None,
+        kinetic_energy: object = _UNSET,
+    ) -> None:
+        if kinetic_energy is not _UNSET:
+            if energy_keV is not _UNSET:
+                raise TypeError("Beam.energy_keV and kinetic_energy are mutually exclusive")
+            energy_keV = _kinetic_energy_keV(kinetic_energy)
+        elif energy_keV is _UNSET:
+            energy_keV = (30.0, 45.0, 60.0)
+        values = {
+            "energy_keV": energy_keV,
+            "transverse": transverse,
+            "longitudinal": longitudinal,
+            "energy_spread_frac": energy_spread_frac,
+            "rep_rate_hz": rep_rate_hz,
+            "bunch_charge_pc": bunch_charge_pc,
+            "gdf": gdf,
+            "bunch_front_tilt": bunch_front_tilt,
+            "state": state,
+        }
+        for name, value in values.items():
+            object.__setattr__(self, name, value)
+        self.__post_init__()
+
+    @property
+    def kinetic_energy(self) -> "Quantity":
+        """Configured kinetic energy as a fresh scalar/array quantity in keV.
+
+        Array magnitudes are copied. This property does not override correlated
+        GDF particle energies. Use ``energy_keV`` for numeric storage/lowering.
+        """
+        from ..units import Q_
+
+        energy = np.asarray(self.energy_keV)
+        magnitude = energy.copy() if energy.ndim else energy.item()
+        return Q_(magnitude, "keV")
+
+    def with_kinetic_energy(self, kinetic_energy: object) -> Self:
+        """Return a beam with a validated scalar/array energy quantity.
+
+        All other fields are preserved. ``dataclasses.replace`` supports the
+        numeric ``energy_keV`` field; passing ``kinetic_energy`` to it conflicts
+        with the numeric field it forwards to the constructor.
+        """
+        return replace(self, energy_keV=_kinetic_energy_keV(kinetic_energy))
 
     def __post_init__(self) -> None:
         object.__setattr__(

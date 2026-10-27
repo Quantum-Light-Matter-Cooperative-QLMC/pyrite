@@ -83,7 +83,7 @@ the historical lowering. This is not a scheduler profile
 
 ## Physical quantity inputs
 
-Install the optional units extra to construct Pint quantities through PyRITE's
+Pint is included in the core installation. Construct quantities through PyRITE's
 single shared registry. Existing numeric inputs keep the units encoded by their
 field names. Supported configuration boundaries convert compatible quantities
 to those same numeric values before case lowering or persistence.
@@ -95,7 +95,7 @@ from pyrite.detectors import PixelGrid, PlanarPose
 from pyrite.units import ureg
 
 beam = Beam(
-    energy_keV=0.06 * ureg.MeV,
+    kinetic_energy=0.06 * ureg.MeV,
     transverse=Spot(),
     longitudinal=PointBunch(),
 )
@@ -107,14 +107,24 @@ acquisition = Acquisition(
 )
 ```
 
-`from pyrite.units import ureg, Q_` requires `pip install 'pyrite-mc[units]'`.
-The normal `import pyrite` path does not load Pint. Incompatible dimensions,
+The normal `import pyrite` and numeric beam paths do not load Pint. Incompatible dimensions,
 non-real magnitudes, and dimensionless values supplied to angular fields fail
 at configuration construction. Stored values remain ordinary Python numbers
 and NumPy arrays; quantities do not enter transport kernels or checkpoints.
 See the [unit boundary and field inventory](repo-design/physical-units.md)
 for supported fields, profile string syntax, serialization policy, and measured
 overhead.
+
+Unit suffixes describe the numeric value returned by current fields, even when
+assignment uses a different compatible unit: `Beam.energy_keV` always reads
+back as a magnitude in keV. `Beam.kinetic_energy` returns a fresh quantity in
+keV; array magnitudes are copied. Its constructor keyword requires a real,
+finite positive energy quantity and conflicts with an explicit `energy_keV`.
+Use `beam.with_kinetic_energy(80 * ureg.keV)` for quantity-aware replacement;
+`dataclasses.replace` continues to accept the numeric `energy_keV` field.
+See the [beam-energy contract](repo-design/physical-units.md#beam-energy-quantity-interface)
+for scalar/array, replacement and serialization details. The empty `units`
+installation extra remains a compatibility spelling.
 
 ## Root import compatibility
 

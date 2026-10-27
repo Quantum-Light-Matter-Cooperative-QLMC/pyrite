@@ -120,7 +120,6 @@ def test_legacy_resolver_tuple_dispatches_independent_configuration(profile_part
 
 
 def test_pixel_composition_normalizes_unit_values_before_case_lowering(profile_parts):
-    pytest.importorskip("pint")
     from pyrite.units import ureg
 
     parts = list(profile_parts)

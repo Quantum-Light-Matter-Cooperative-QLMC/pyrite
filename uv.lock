@@ -4215,6 +4215,7 @@ dependencies = [
     { name = "numba" },
     { name = "numpy" },
     { name = "pandas" },
+    { name = "pint" },
     { name = "platformdirs" },
     { name = "polars" },
     { name = "psutil" },
@@ -4270,9 +4271,6 @@ plots = [
     { name = "plotly" },
     { name = "vl-convert-python" },
 ]
-units = [
-    { name = "pint" },
-]
 
 [package.dev-dependencies]
 dev = [
@@ -4280,7 +4278,6 @@ dev = [
     { name = "import-linter" },
     { name = "nbqa" },
     { name = "nbstripout" },
-    { name = "pint" },
     { name = "pre-commit" },
     { name = "pytest" },
     { name = "pytest-cov" },
@@ -4321,7 +4318,6 @@ oracle = [
     { name = "xraylib" },
 ]
 test = [
-    { name = "pint" },
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "pytest-timeout" },
@@ -4356,7 +4352,7 @@ requires-dist = [
     { name = "numpy", specifier = ">=2.4.6" },
     { name = "optuna", marker = "extra == 'optimization'", specifier = ">=4.5,<5" },
     { name = "pandas", specifier = ">=3.0.3" },
-    { name = "pint", marker = "extra == 'units'", specifier = ">=0.26,<0.27" },
+    { name = "pint", specifier = ">=0.26,<0.27" },
     { name = "platformdirs", specifier = ">=4.9" },
     { name = "plotly", marker = "extra == 'plots'", specifier = ">=6.8.0" },
     { name = "polars", specifier = ">=1.44.2" },
@@ -4379,7 +4375,6 @@ dev = [
     { name = "import-linter", specifier = ">=2.9" },
     { name = "nbqa", specifier = ">=1.9.1" },
     { name = "nbstripout", specifier = ">=0.9.1" },
-    { name = "pint", specifier = ">=0.26,<0.27" },
     { name = "pre-commit", specifier = ">=4.6.0" },
     { name = "pytest", specifier = ">=9.1.0" },
     { name = "pytest-cov", specifier = ">=7.1.0" },
@@ -4420,7 +4415,6 @@ oracle = [
     { name = "xraylib", specifier = "==4.3.0" },
 ]
 test = [
-    { name = "pint", specifier = ">=0.26,<0.27" },
     { name = "pytest", specifier = ">=9.1.0" },
     { name = "pytest-cov", specifier = ">=7.1.0" },
     { name = "pytest-timeout", specifier = ">=2.4.0" },
