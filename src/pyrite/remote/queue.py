@@ -153,11 +153,17 @@ def _validate_nsys_allocation(*, chunked, repetitions, single_process, materials
         raise SystemExit("nsys requires an NVIDIA target (remote.gpu_vendor=nvidia)")
 
 
-def _trajectory_capture_options(trajectories, overwrite_trajectories, modes):
+def _trajectory_capture_options(
+    trajectories, overwrite_trajectories, modes, trajectory_storage=None
+):
     """Resolve opt-in trajectory capture to its remote root and script options."""
+    if trajectory_storage not in (None, "compact", "throughput"):
+        raise SystemExit("trajectory-storage must be compact or throughput")
     if trajectories is None:
         if overwrite_trajectories:
             raise SystemExit("overwrite-trajectories requires trajectories")
+        if trajectory_storage is not None:
+            raise SystemExit("trajectory-storage requires trajectories")
         return None, {}
     from .trajectories import capture_root
 
@@ -170,6 +176,7 @@ def _trajectory_capture_options(trajectories, overwrite_trajectories, modes):
     return trajectories, {
         "trajectories": trajectories,
         "overwrite_trajectories": overwrite_trajectories,
+        **({"trajectory_storage": trajectory_storage} if trajectory_storage is not None else {}),
     }
 
 
@@ -208,6 +215,7 @@ def start_queue(
     py_spy=False,
     trajectories=None,
     overwrite_trajectories=False,
+    trajectory_storage=None,
 ):
     """Submit a material queue to SLURM. Returns its job id.
 
@@ -255,7 +263,7 @@ def start_queue(
         py_spy=py_spy,
     )
     trajectories, capture_options = _trajectory_capture_options(
-        trajectories, overwrite_trajectories, modes
+        trajectories, overwrite_trajectories, modes, trajectory_storage
     )
     chunked = chunk_minutes > 0
     modes.validate(chunked=chunked, parallel_materials=parallel_materials, materials=materials)

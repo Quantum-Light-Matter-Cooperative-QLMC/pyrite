@@ -12,6 +12,8 @@ Checkpoints keep spectra, not the electron histories behind them. To keep the co
 
 ```bash
 pyrite run trajectory_demo --trajectories
+# Faster uncompressed writes, with a larger disk footprint:
+pyrite run trajectory_demo --trajectories --trajectory-storage throughput
 ```
 
 The bundled `trajectory_demo` profile runs one case: 100 fixed histories of 30 keV electrons in a 2 µm HOPG slab, tilted 45° at azimuth 180°, with a round 1 µm FWHM incident beam. Its compact beam spot keeps multiple histories visible at the same scale as their scattering paths. These counts are for visualization, not converged spectra. The profile needs neither `--quick` nor edits to `standard`.
@@ -25,7 +27,7 @@ Capture never changes a result. The file is written after transport and before t
 Things to know before enabling it:
 
 - **Fixed counts required.** The default `standard` profile uses adaptive counts, which cannot capture trajectories. `trajectory_demo` already sets fixed counts. For another profile, set them with `pyrite numerics set NAME --cxr-trials N --brem-trials N`; reset any explicit precision policy first (see [adaptive electron counts](campaign-configuration.md#adaptive-electron-counts)).
-- **Size.** A file holds every segment of every electron. Row fields are stored compressed: a 30 keV silicon capture with the default midpoint and radiative fields measured about 90 bytes per segment, against 208 before compression (schema 2). Files are usually still far larger than the spectra; start with `-m` and `--quick` to gauge it. See [trajectory artifact storage](../repo-design/storage/trajectory-artifacts.md) for measurements.
+- **Size and throughput.** A file holds every segment of every electron. The default `compact` policy uses LZF-compressed rows: a 30 keV silicon capture measured about 90 bytes per segment, against 208 for the older uncompressed layout. Use `--trajectory-storage throughput` alongside `--trajectories` for uncompressed schema-3 chunks in local or remote captures. Python callers can use `TrajectoryCapture(root=..., storage_policy="throughput")`. This trades disk space for faster writes and affects storage only. The default remains `compact`. See [trajectory artifact storage](../repo-design/storage/trajectory-artifacts.md) for measurements and limitations.
 - **Cached cases are not captured.** Only cases this run transports get a file. Cases resumed from a checkpoint or replayed from the shared cache are never re-transported just to write one; the run reports how many and `--recompute` transports them again.
 - **Existing files.** Before any transport the run checks the directory. A case that already has a file stops the run unless `--overwrite-trajectories` is given. A cached case whose file records different physics also stops the run: remove the file or pick another directory.
 - **Interrupted runs.** Files are written as `<name>.partial` and renamed only once complete, so a crash or budget stop cannot leave a truncated file under the final name. A resumed run discards stale `.partial` files of the cases it transports.

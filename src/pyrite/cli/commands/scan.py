@@ -299,6 +299,12 @@ def _reproduce_zhai(ne, ne_brem, ne_supp, tmd_azimuth, refresh):
     is_flag=True,
     help="Replace existing trajectory files for cases this run transports; requires --trajectories.",
 )
+@click.option(
+    "--trajectory-storage",
+    type=click.Choice(("compact", "throughput")),
+    default=None,
+    help="Capture storage: compact (default, LZF) or throughput (uncompressed); requires --trajectories.",
+)
 @click.option("--progress-file", type=click.Path(path_type=Path), default=None, hidden=True)
 @click.option(
     "--progress-phase",
@@ -455,6 +461,7 @@ _NORMAL_RUN_PARAMETER_FLAGS = {
     "recompute": "--recompute",
     "trajectories": "--trajectories",
     "overwrite_trajectories": "--overwrite-trajectories",
+    "trajectory_storage": "--trajectory-storage",
     "progress_file": "--progress-file",
     "progress_phase": "--progress-phase",
     "no_progress": "--no-progress",
@@ -554,6 +561,8 @@ def _check_mode_combinations(ctx, options):
         raise click.UsageError("--py-spy and --nsys are mutually exclusive")
     if options["overwrite_trajectories"] and options["trajectories"] is None:
         raise click.UsageError("--overwrite-trajectories requires --trajectories")
+    if options["trajectory_storage"] is not None and options["trajectories"] is None:
+        raise click.UsageError("--trajectory-storage requires --trajectories")
     explicit_zhai = _explicit_flags(ctx, _ZHAI_PARAMETER_FLAGS)
     if options["preset"] is None and explicit_zhai:
         raise click.UsageError(f"Zhai option(s) require --preset zhai: {', '.join(explicit_zhai)}")
@@ -641,6 +650,7 @@ def _run_remote(ctx, options):
             chunk_minutes=options["chunk_minutes"],
             trajectories=trajectories,
             overwrite_trajectories=options["overwrite_trajectories"],
+            trajectory_storage=options["trajectory_storage"],
         )
 
 
@@ -746,6 +756,11 @@ def _run_local(options):
         else {
             "trajectories": trajectories,
             "overwrite_trajectories": options["overwrite_trajectories"],
+            **(
+                {"trajectory_storage": options["trajectory_storage"]}
+                if options["trajectory_storage"] is not None
+                else {}
+            ),
         }
     )
     execution = (
@@ -876,6 +891,7 @@ performance_command = _derived_command(
         "performance_profile",
         "trajectories",
         "overwrite_trajectories",
+        "trajectory_storage",
         "ephemeral",
         "detector_id",
         "output_file",
@@ -888,6 +904,7 @@ performance_command = _derived_command(
         "output_file": None,
         "trajectories": None,
         "overwrite_trajectories": False,
+        "trajectory_storage": None,
         "performance_profile": None,
         "preset": None,
         "ne": 20_000,

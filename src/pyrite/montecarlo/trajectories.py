@@ -32,7 +32,7 @@ Layout (``schema_version`` 3)::
                         fields (``pyrite_row``) stored electron-major
 
 Schema 3 compacts row fields on disk without changing what readers see: they
-are chunked (``_ROW_CHUNK`` rows) and compressed; integer IDs narrow to the
+are chunked (``_ROW_CHUNK`` rows), with LZF compression by default; integer IDs narrow to the
 smallest dtype holding their range, recording the transported dtype in
 ``pyrite_dtype``; and a row field constant within every history (``t0_ang``)
 is stored once per ``/electron_index`` entry (``pyrite_kind``
@@ -87,6 +87,14 @@ _BOUNDARY_SCAN_ROWS = 1 << 16
 # behind the choice: docs/repo-design/storage/trajectory-artifacts.md.
 _ROW_CHUNK = 1 << 12
 _ROW_FILTERS: dict[str, Any] = {"compression": "lzf", "shuffle": True}
+_STORAGE_POLICIES = frozenset({"compact", "throughput"})
+
+
+def _validate_storage_policy(value: str) -> None:
+    if value not in _STORAGE_POLICIES:
+        raise ValueError(f"storage_policy must be 'compact' or 'throughput', got {value!r}")
+
+
 # On-disk dtypes tried, narrowest first, for integer ID row fields.
 _COMPACT_IDS: dict[str, tuple[type[np.signedinteger], ...]] = {
     "electron_id": (np.int32,),
@@ -216,12 +224,20 @@ class TrajectoryCapture:
     scene
         Optional JSON-safe resolved downstream geometry, independent of the
         case digest. Preserved in every captured artifact.
+    storage_policy
+        ``"compact"`` (default) uses LZF + shuffle for chunked row fields.
+        ``"throughput"`` retains schema-3 indexing and exact values but
+        writes uncompressed chunks, trading disk space for capture speed.
     """
 
     root: str
     overwrite: bool = False
     provenance: Mapping[str, Any] = field(default_factory=dict)
     scene: Mapping[str, Any] | None = None
+    storage_policy: str = "compact"
+
+    def __post_init__(self) -> None:
+        _validate_storage_policy(self.storage_policy)
 
     def path_for(self, case: Mapping[str, Any]) -> Path:
         """Final artifact path of ``case``."""
@@ -244,6 +260,7 @@ class TrajectoryCapture:
             scene=self.scene,
             overwrite=self.overwrite,
             spectrum_inputs=spectrum_inputs,
+            storage_policy=self.storage_policy,
         )
 
 
@@ -356,8 +373,9 @@ def _write_rows(
     units: str | None,
     order: np.ndarray | None,
     index: Sequence[np.ndarray] | None,
+    storage_policy: str = "compact",
 ):
-    """Write one row field in the compact schema-3 form, in bounded blocks."""
+    """Write a row field as lossless schema-3 chunks, with optional compression."""
     n_rows = int(value.shape[0])
     block = _row_block(value)
     per = (
@@ -373,7 +391,10 @@ def _write_rows(
         dtype = np.dtype(value.dtype)
         disk = _compact_dtype(name, value)
         filters = (
-            dict(chunks=(min(_ROW_CHUNK, n_rows), *value.shape[1:]), **_ROW_FILTERS)
+            dict(
+                chunks=(min(_ROW_CHUNK, n_rows), *value.shape[1:]),
+                **(_ROW_FILTERS if storage_policy == "compact" else {}),
+            )
             if value.size
             else {}
         )
@@ -400,6 +421,7 @@ def _write_node(
     row: bool = False,
     order: np.ndarray | None = None,
     index: Sequence[np.ndarray] | None = None,
+    storage_policy: str = "compact",
 ) -> None:
     if isinstance(value, np.ndarray) or is_device_array(value):
         # Aliases share one array object; link instead of duplicating rows.
@@ -408,7 +430,7 @@ def _write_node(
             group[name] = group.file[target]
             return
         if row:
-            dataset = _write_rows(group, name, value, units, order, index)
+            dataset = _write_rows(group, name, value, units, order, index, storage_policy)
         else:
             dataset = _write_array(group, name, value, units)
         links[id(value)] = dataset.name
@@ -526,12 +548,19 @@ def _electron_index(
     )
 
 
-def _compact_index_array(group, name: str, data: np.ndarray):
+def _compact_index_array(group, name: str, data: np.ndarray, storage_policy: str = "compact"):
     """Row-index array narrowed to int32 when it fits, chunked and filtered."""
     info = np.iinfo(np.int32)
     if data.size and info.min <= int(data.min()) and int(data.max()) <= info.max:
         data = data.astype(np.int32)
-    filters = dict(chunks=(min(_ROW_CHUNK, data.size),), **_ROW_FILTERS) if data.size else {}
+    filters = (
+        dict(
+            chunks=(min(_ROW_CHUNK, data.size),),
+            **(_ROW_FILTERS if storage_policy == "compact" else {}),
+        )
+        if data.size
+        else {}
+    )
     return group.create_dataset(name, data=data, **filters)
 
 
@@ -545,6 +574,7 @@ def write_trajectory_artifact(
     scene: Mapping[str, Any] | None = None,
     overwrite: bool = False,
     spectrum_inputs: Mapping[str, Any] | None = None,
+    storage_policy: str = "compact",
 ) -> Path:
     """Write one complete transport result to ``path`` atomically.
 
@@ -572,6 +602,10 @@ def write_trajectory_artifact(
         Every non-segment input the spectrum phase reads, as the runner built
         it after resolving the line grid. Without it the artifact is still a
         complete transport record but cannot feed the spectrum phase.
+    storage_policy
+        ``"compact"`` (default) uses LZF-compressed shuffled chunks;
+        ``"throughput"`` writes uncompressed chunks but keeps schema-3
+        indexing, compact IDs, and lossless readback.
 
     Returns
     -------
@@ -587,6 +621,7 @@ def write_trajectory_artifact(
     """
     import h5py
 
+    _validate_storage_policy(storage_policy)
     final = Path(path)
     if final.exists() and not overwrite:
         raise TrajectoryArtifactExistsError(f"trajectory artifact already exists: {final}")
@@ -599,6 +634,7 @@ def write_trajectory_artifact(
             handle.attrs["format"] = FORMAT
             handle.attrs["schema_version"] = SCHEMA_VERSION
             handle.attrs["complete"] = False
+            handle.attrs["storage_policy"] = storage_policy
             handle.attrs["created_utc"] = _dt.datetime.now(_dt.UTC).isoformat(timespec="seconds")
             handle.attrs["pyrite_version"] = _pyrite_version()
             handle.attrs["case_name"] = str(case["name"])
@@ -630,11 +666,11 @@ def write_trajectory_artifact(
             handle.attrs["row_order"] = "electron"
             if order is not None:
                 # Stored row i is transported row order[i]; readers invert it.
-                _compact_index_array(handle, "transport_order", order)
+                _compact_index_array(handle, "transport_order", order, storage_policy)
             if index is not None:
                 index_group = handle.create_group("electron_index")
                 for key, data in zip(("electron_id", "row_start", "row_stop"), index, strict=True):
-                    _compact_index_array(index_group, key, data)
+                    _compact_index_array(index_group, key, data, storage_policy)
             rows = row_fields()
             group = handle.create_group("transport", track_order=True)
             group.attrs["pyrite_kind"] = "dict"
@@ -655,6 +691,7 @@ def write_trajectory_artifact(
                     row=row,
                     order=order if row else None,
                     index=index if row else None,
+                    storage_policy=storage_policy,
                 )
             handle.attrs["complete"] = True
         os.replace(partial, final)

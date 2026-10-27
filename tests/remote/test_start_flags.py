@@ -39,6 +39,7 @@ DEFAULT_FLAGS = {
     "level9": False,
     "trajectories": None,
     "overwrite_trajectories": False,
+    "trajectory_storage": None,
 }
 
 
@@ -171,3 +172,9 @@ def test_earlier_rules_win_when_several_are_violated():
     # first even though --chunk-minutes 1 is also invalid for both.
     with pytest.raises(click.UsageError, match="mutually exclusive"):
         plan(cpu=True, cpu_only=True, chunk_minutes=1.0)
+
+
+def test_remote_storage_requires_capture():
+    with pytest.raises(click.UsageError, match="--trajectory-storage requires --trajectories"):
+        plan(trajectory_storage="throughput")
+    assert plan(trajectories="pyrite-output/trajectories", trajectory_storage="throughput")

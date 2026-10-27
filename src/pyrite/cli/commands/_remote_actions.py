@@ -344,6 +344,7 @@ def _cli_start(
     py_spy=False,
     trajectories=None,
     overwrite_trajectories=False,
+    trajectory_storage=None,
 ):
     materials, high_energy_min_kev = _start_selected(materials, catalog_profile)
     if nsys and len(materials) != 1:
@@ -370,7 +371,11 @@ def _cli_start(
         recompute=recompute,
         py_spy=py_spy,
         **(
-            {"trajectories": trajectories, "overwrite_trajectories": overwrite_trajectories}
+            {
+                "trajectories": trajectories,
+                "overwrite_trajectories": overwrite_trajectories,
+                "trajectory_storage": trajectory_storage,
+            }
             if trajectories is not None
             else {}
         ),

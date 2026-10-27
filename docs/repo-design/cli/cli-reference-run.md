@@ -65,6 +65,9 @@ Options:
                                   re-transported (use --recompute to capture them).
   --overwrite-trajectories        Replace existing trajectory files for cases this run
                                   transports; requires --trajectories.
+  --trajectory-storage [compact|throughput]
+                                  Capture storage: compact (default, LZF) or throughput
+                                  (uncompressed); requires --trajectories.
   --no-progress                   Disable progress bars/dashboard.
   -v, --verbose                   Increase dashboard detail.
   --preset [zhai]                 Run a named reproduction workflow; zhai runs here
