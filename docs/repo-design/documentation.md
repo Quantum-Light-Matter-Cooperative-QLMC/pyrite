@@ -279,6 +279,10 @@ Conventions:
 - Inputs requiring external fixtures belong in `docs/examples/data/` with
   source/license/provenance metadata. Record their filenames and SHA-256 hashes
   in the output's `input_sha256` mapping; freshness checks reject changed inputs.
+  Existing small repository evidence can instead be pinned by repository-relative
+  path in `repository_input_sha256`. Analysis-only examples preserve the original
+  simulation revision/version separately from their rendering-wrapper metadata;
+  reducing historical evidence does not constitute a fresh simulation.
   Do not silently fetch them. Large or
   GPU-dependent runs require explicit regeneration outside the normal build;
   publish only bounded reduced outputs. Optional interactive entry points use

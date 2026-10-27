@@ -16,6 +16,7 @@ directional-sources
 tr-ctr-app
 optical-diagnostics-app
 gdf-beams
+optimization-studies
 campaign-configuration
 catalogs-and-workspaces
 ../repo-design/profile-settings

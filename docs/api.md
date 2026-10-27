@@ -174,8 +174,9 @@ public API.
 
 The provisional `pyrite.optimization` API operates above immutable Scenes and
 existing executors. It is outside the supported compatibility contract below.
-See [optimization studies](guides/optimization-studies.md) for persistence,
-constraints, normalization and the fixed-window PXR/CBS example.
+See the [study reference](reference/optimization-studies.md) for persistence,
+constraints and normalization, and the [visual tutorial](guides/optimization-studies.md)
+for a complete fixed-window PXR/CBS workflow.
 
 ```{eval-rst}
 .. autosummary::
