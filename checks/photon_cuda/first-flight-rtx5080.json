@@ -1,0 +1,65 @@
+{
+  "compute_capability": "120",
+  "cuda_driver": 13030,
+  "cuda_over_cpu_median": 1.0132647131684829,
+  "cuda_runtime": 13020,
+  "cupy": "14.2.0",
+  "device": "NVIDIA GeForce RTX 5080",
+  "device_pool_reserved_bytes": 9717248,
+  "distance_atol_ang": 1e-13,
+  "distance_rtol": 2e-13,
+  "end_to_end_seconds": {
+    "cpu": [
+      0.007305232109501958,
+      0.007329861866310239,
+      0.007241640938445926,
+      0.007299911929294467,
+      0.00726158102042973
+    ],
+    "cuda": [
+      0.007368782069534063,
+      0.007503163069486618,
+      0.007634815061464906,
+      0.007289520930498838,
+      0.007396743167191744
+    ]
+  },
+  "epdl_table_sha256": "fcc2f00c5bb969e99bc84cac16762f13e939f071d585c433a5c0f420913fcfc9",
+  "hardware_tests": {
+    "command": "uv run --extra nvidia pyrite-dev test tests/montecarlo/test_photon_cuda.py --durations=0 -rA --junitxml=first-flight.xml",
+    "errors": "0",
+    "failures": "0",
+    "skipped": "0",
+    "test_source_sha256": "aac45bbe562f2304550598ee38280e33c0313a2cf8c78beb51eb8f9ce61bd4e8",
+    "tests": "8",
+    "time": "1.824"
+  },
+  "input_arrays_sha256": "8fd5055d27fc701d0a9c69fda8e23bc2486feefafc636cbfca4dcb7658b4e76b",
+  "interactions": 6870,
+  "max_distance_abs_difference_ang": 0.0,
+  "measurement_command": "uv run --extra nvidia python checks/photon_first_flight_cuda.py",
+  "memory_scope": "combined process peak RSS and retained CuPy pool; not per-arm peaks",
+  "numpy": "2.5.4",
+  "peak_process_rss_kib": 804300,
+  "platform": "Linux-6.6.114.1-microsoft-standard-WSL2-x86_64-with-glibc2.35",
+  "python": "3.14.6",
+  "rays": 16384,
+  "regions": 3,
+  "repeats": 5,
+  "scope": "standalone first-flight parity; no full-track validation",
+  "seed": 341701,
+  "slurm_job_id": "2510",
+  "source_sha256": {
+    "checks/photon_first_flight_cuda.py": "1318ff1a82f836c476a6797cceb018cd86ec150ec687791990da46ff71882c82",
+    "src/pyrite/montecarlo/transport/photon_cuda.py": "d7dff5683fb2cb421699b5be519919b62a5568d83696b7ff6022ef6819726890",
+    "src/pyrite/montecarlo/transport/photon_navigation.py": "8aae067e26982f013b8a098cf788fd9deb894bb85a2161c885d37813e617df55"
+  },
+  "synced_code": {
+    "code_digest": "868aae7131446afebc852f02f17f9caa419d3e5f4fb892109612bf04ecbd1b26",
+    "code_dirty": "False",
+    "code_revision": "a508db995f9e746234a6fe480e5326f7e37855fd",
+    "code_tables_digest": "bafd74d27ac4dee76ed2b16d2c605f2d1bd8a09caf388ee74e37ec15e3edaae1"
+  },
+  "timestamp_utc": "2026-10-25T05:45:29.482063+00:00",
+  "warmups": 2
+}

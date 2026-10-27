@@ -1,8 +1,11 @@
-"""Immutable opt-in selection for CPU ordinary-hit photon transport."""
+"""Immutable opt-in selection for CPU/CUDA ordinary-hit photon transport."""
 
 from dataclasses import dataclass
 from math import isfinite
 from typing import Literal
+
+CPU_MODEL = "ordinary-hit-photon-cpu.v1"
+CUDA_MODEL = "ordinary-hit-photon-cuda.v1"
 
 
 @dataclass(frozen=True, slots=True)
@@ -15,9 +18,11 @@ class PhotonTransport:
     ``n_samples=None``. Counts use the original incident-electron population.
     ``seed=None`` uses the resolved Case seed. Cutoffs/ceiling are in eV.
 
-    CPU, ideal unpixelated physical detectors and fixed populations only.
-    Charged feedback retains the bounded contiguous-stack reference contract;
-    this selector does not certify full-track MeV validation or pixel response.
+    CPU/CUDA, ideal unpixelated physical detectors and fixed populations only.
+    Charged feedback follows target and named catalog filter materials across
+    vacuum gaps and re-entry; source primary transport stays target-only.
+    The bounded reference models do not certify full-track MeV validation or
+    pixel response.
     """
 
     edges_eV: tuple[float, ...]
@@ -75,7 +80,7 @@ def validate_photon_record(record: object) -> None:
     }
     if not isinstance(record, dict) or record.keys() != keys:
         raise ValueError("photon_transport must be a complete resolved photon record")
-    if record["model"] != "ordinary-hit-photon-cpu.v1":
+    if record["model"] not in (CPU_MODEL, CUDA_MODEL):
         raise ValueError("unsupported photon transport model")
     if not isinstance(record["selection"], dict):
         raise ValueError("photon transport selection must be a record")

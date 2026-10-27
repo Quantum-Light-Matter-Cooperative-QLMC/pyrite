@@ -271,6 +271,38 @@ def test_bremslib_source_matches_sdcs_energy_integral():
     assert set(sample.history_id) == {0, 1}
 
 
+def test_host_bremslib_source_is_independent_of_active_spectrum_namespace(monkeypatch):
+    from pyrite.montecarlo.spectrum import brem_bremslib as brem
+    from tests.helpers.bremslib import synthetic_bremslib_arrays
+
+    table = brem.prepare_bremslib_table(synthetic_bremslib_arrays(), atomic_number=6)
+    segments = _segments()
+    segments["E_repr_keV"] = np.full(2, 50.0)
+
+    def sample():
+        return sample_bremslib_continuum(
+            segments,
+            [[("C", 0.1)]],
+            {"C": table},
+            n_samples=128,
+            n_primaries=2,
+            seed=341_908,
+            cutoff_eV=5000,
+            ceiling_eV=30000,
+        )
+
+    expected = sample()
+    # CUDA sessions normally have a device namespace and may use float32 for
+    # directional spectra. Neither may change this explicit host proposal.
+    monkeypatch.setattr(brem, "xp", object())
+    monkeypatch.setattr(brem, "REAL", np.float32)
+    actual = sample()
+    for before, after in zip(expected.track_args, actual.track_args, strict=True):
+        np.testing.assert_array_equal(after, before)
+        assert after.dtype == before.dtype
+    np.testing.assert_array_equal(actual.segment_index, expected.segment_index)
+
+
 def test_bremslib_missing_table_and_material_assignment_fail_closed():
     from pyrite._backend import xp
 

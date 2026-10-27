@@ -1,0 +1,339 @@
+{
+  "allocation": {
+    "cpus": 2,
+    "gpus": 1,
+    "memory_GiB": 8,
+    "time_limit_minutes": 20
+  },
+  "canonical_photon_data_sha256": {
+    "eadl": "78ccf8a4e07c1c120a2e3d94ff051aab2180d151f35e8bc3406d52df5af5e88c",
+    "epdl_differential": "d36a50d1add5c6f0b3df80a108e83aa8db8a4822445ca192534f6bc0a55bb166",
+    "epdl_integrated": "fcc2f00c5bb969e99bc84cac16762f13e939f071d585c433a5c0f420913fcfc9"
+  },
+  "code_dirty": false,
+  "code_tables_digest": "bafd74d27ac4dee76ed2b16d2c605f2d1bd8a09caf388ee74e37ec15e3edaae1",
+  "default_gpu_precision_production": {
+    "PYRITE_FP64": "0",
+    "cases": [
+      {
+        "name": "tests.montecarlo.test_photon_production_cuda::test_public_cuda_selector_uses_one_primary_pass_and_returns_aperture[False-brem]",
+        "seconds": 7.031
+      },
+      {
+        "name": "tests.montecarlo.test_photon_production_cuda::test_public_cuda_selector_uses_one_primary_pass_and_returns_aperture[False-characteristic]",
+        "seconds": 0.516
+      },
+      {
+        "name": "tests.montecarlo.test_photon_production_cuda::test_public_cuda_selector_uses_one_primary_pass_and_returns_aperture[False-annihilation]",
+        "seconds": 0.239
+      },
+      {
+        "name": "tests.montecarlo.test_photon_production_cuda::test_public_cuda_selector_uses_one_primary_pass_and_returns_aperture[True-brem]",
+        "seconds": 0.272
+      },
+      {
+        "name": "tests.montecarlo.test_photon_production_cuda::test_public_cuda_selector_uses_one_primary_pass_and_returns_aperture[True-characteristic]",
+        "seconds": 0.265
+      },
+      {
+        "name": "tests.montecarlo.test_photon_production_cuda::test_public_cuda_selector_uses_one_primary_pass_and_returns_aperture[True-annihilation]",
+        "seconds": 0.29
+      },
+      {
+        "name": "tests.montecarlo.test_photon_production_cuda::test_cuda_aperture_replay_checkpoint_cas_and_cpu_portability",
+        "seconds": 1.686
+      },
+      {
+        "name": "tests.montecarlo.test_photon_production_cuda::test_cuda_mode_off_arrays_are_bitwise_stable_around_selected_run",
+        "seconds": 0.516
+      },
+      {
+        "name": "tests.montecarlo.test_photon_production_cuda::test_cuda_pair_electron_positron_feedback_closes_rest_reservoir",
+        "seconds": 0.296
+      }
+    ],
+    "errors": 0,
+    "failures": 0,
+    "job": 2525,
+    "job_log_remote": "~/.local/opt/pyrite-issue-341-cuda/production-fp32-2525.log",
+    "job_log_sha256": "a5a03c1202596c881131e159998ae813b36b91eec6914c8cceaba6e2769c7cd2",
+    "skipped": 0,
+    "source_revision": "652d5f04854482653a1bc63507ce3b1f461bec8a",
+    "tests": 9,
+    "time_seconds": 13.111,
+    "xml_sha256": "15f2794c80b7cf1af2da5150bc91fc0c17c4ed537e1a8eebb0e6db29715b9e97"
+  },
+  "environment": {
+    "OPENBLAS_NUM_THREADS": "1",
+    "PYRITE_FP64": "1",
+    "PYRITE_MC_BACKEND": "cuda",
+    "PYRITE_TEST_BACKEND": "cuda"
+  },
+  "hardware": {
+    "cuda_runtime": 13020,
+    "cupy": "14.2.0",
+    "device": "NVIDIA GeForce RTX 5080",
+    "device_memory_GiB": 16,
+    "numpy": "2.5.4",
+    "python": "3.14.6"
+  },
+  "job": 2524,
+  "job_log_remote": "~/.local/opt/pyrite-issue-341-cuda/production-2524.log",
+  "job_log_sha256": "7b9ba1a26b7c537f4feccf2a065f63ec788dc97e3fb7f7e1a38328cad5b69d1d",
+  "kernels_and_histories": {
+    "cases": [
+      {
+        "name": "tests.montecarlo.test_photon_cuda::test_explicit_cuda_never_falls_back",
+        "seconds": 0.002
+      },
+      {
+        "name": "tests.montecarlo.test_photon_cuda::test_invalid_inputs_fail_before_device_selection",
+        "seconds": 0.001
+      },
+      {
+        "name": "tests.montecarlo.test_photon_cuda::test_fused_launch_sizes_and_noncontiguous_inputs[32]",
+        "seconds": 0.017
+      },
+      {
+        "name": "tests.montecarlo.test_photon_cuda::test_fused_launch_sizes_and_noncontiguous_inputs[64]",
+        "seconds": 0.003
+      },
+      {
+        "name": "tests.montecarlo.test_photon_cuda::test_fused_launch_sizes_and_noncontiguous_inputs[128]",
+        "seconds": 0.002
+      },
+      {
+        "name": "tests.montecarlo.test_photon_cuda::test_fused_launch_sizes_and_noncontiguous_inputs[256]",
+        "seconds": 0.002
+      },
+      {
+        "name": "tests.montecarlo.test_photon_cuda::test_fused_launch_sizes_and_noncontiguous_inputs[512]",
+        "seconds": 0.002
+      },
+      {
+        "name": "tests.montecarlo.test_photon_cuda::test_cuda_box_only_contacts_thin_layers_and_grazing_rays",
+        "seconds": 0.121
+      },
+      {
+        "name": "tests.montecarlo.test_photon_cuda::test_cuda_boundaries_channels_gaps_and_reverse_flights[None]",
+        "seconds": 0.01
+      },
+      {
+        "name": "tests.montecarlo.test_photon_cuda::test_cuda_boundaries_channels_gaps_and_reverse_flights[4.0]",
+        "seconds": 0.01
+      },
+      {
+        "name": "tests.montecarlo.test_photon_cuda::test_cuda_vacuum_and_empty_batches[layers0]",
+        "seconds": 0.006
+      },
+      {
+        "name": "tests.montecarlo.test_photon_cuda::test_cuda_vacuum_and_empty_batches[layers1]",
+        "seconds": 0.008
+      },
+      {
+        "name": "tests.montecarlo.test_photon_cuda::test_cuda_vacuum_and_empty_batches[layers2]",
+        "seconds": 0.004
+      },
+      {
+        "name": "tests.montecarlo.test_photon_cuda::test_cuda_epdl_oriented_boxes_and_batch_invariance",
+        "seconds": 0.071
+      },
+      {
+        "name": "tests.montecarlo.test_photon_scattering_cuda::test_same_draw_epdl_scattering_matches_cpu[C-coherent]",
+        "seconds": 0.074
+      },
+      {
+        "name": "tests.montecarlo.test_photon_scattering_cuda::test_same_draw_epdl_scattering_matches_cpu[C-incoherent]",
+        "seconds": 0.007
+      },
+      {
+        "name": "tests.montecarlo.test_photon_scattering_cuda::test_same_draw_epdl_scattering_matches_cpu[Si-coherent]",
+        "seconds": 0.006
+      },
+      {
+        "name": "tests.montecarlo.test_photon_scattering_cuda::test_same_draw_epdl_scattering_matches_cpu[Si-incoherent]",
+        "seconds": 0.006
+      },
+      {
+        "name": "tests.montecarlo.test_photon_scattering_cuda::test_same_draw_epdl_scattering_matches_cpu[W-coherent]",
+        "seconds": 0.006
+      },
+      {
+        "name": "tests.montecarlo.test_photon_scattering_cuda::test_same_draw_epdl_scattering_matches_cpu[W-incoherent]",
+        "seconds": 0.006
+      },
+      {
+        "name": "tests.montecarlo.test_photon_scattering_cuda::test_exhausted_prefix_is_explicit_and_refill_preserves_event[coherent]",
+        "seconds": 0.004
+      },
+      {
+        "name": "tests.montecarlo.test_photon_scattering_cuda::test_exhausted_prefix_is_explicit_and_refill_preserves_event[incoherent]",
+        "seconds": 0.003
+      },
+      {
+        "name": "tests.montecarlo.test_photon_scattering_cuda::test_invalid_scatter_inputs_fail_before_device_probe",
+        "seconds": 0.001
+      },
+      {
+        "name": "tests.montecarlo.test_photon_pair_cuda::test_same_draw_pairs_and_threshold_limit_match_cpu[6]",
+        "seconds": 0.006
+      },
+      {
+        "name": "tests.montecarlo.test_photon_pair_cuda::test_same_draw_pairs_and_threshold_limit_match_cpu[74]",
+        "seconds": 0.005
+      },
+      {
+        "name": "tests.montecarlo.test_photon_pair_cuda::test_same_draw_pairs_and_threshold_limit_match_cpu[90]",
+        "seconds": 0.005
+      },
+      {
+        "name": "tests.montecarlo.test_photon_pair_cuda::test_pair_prefix_refill_and_zero_kinetic_threshold",
+        "seconds": 0.003
+      },
+      {
+        "name": "tests.montecarlo.test_photon_pair_cuda::test_pair_domain_fails_before_device_probe",
+        "seconds": 0.001
+      },
+      {
+        "name": "tests.montecarlo.test_photon_photoelectric_cuda::test_same_draw_photoelectron_and_full_cascade_match_cpu[C]",
+        "seconds": 0.037
+      },
+      {
+        "name": "tests.montecarlo.test_photon_photoelectric_cuda::test_same_draw_photoelectron_and_full_cascade_match_cpu[Si]",
+        "seconds": 0.028
+      },
+      {
+        "name": "tests.montecarlo.test_photon_photoelectric_cuda::test_same_draw_photoelectron_and_full_cascade_match_cpu[W]",
+        "seconds": 0.06
+      },
+      {
+        "name": "tests.montecarlo.test_photon_photoelectric_cuda::test_photoelectric_prefix_and_capacity_retries_keep_the_same_history",
+        "seconds": 0.006
+      },
+      {
+        "name": "tests.montecarlo.test_photon_photoelectric_cuda::test_terminal_primary_consumes_no_relaxation_or_isotropic_draws",
+        "seconds": 0.003
+      },
+      {
+        "name": "tests.montecarlo.test_photon_photoelectric_cuda::test_photoelectric_inputs_fail_before_device_probe",
+        "seconds": 0.001
+      },
+      {
+        "name": "tests.montecarlo.test_photon_histories_cuda::test_device_history_matches_cpu_without_host_sampler_fallback[C-0.1-50000.0]",
+        "seconds": 0.018
+      },
+      {
+        "name": "tests.montecarlo.test_photon_histories_cuda::test_device_history_matches_cpu_without_host_sampler_fallback[W-0.063-20000.0]",
+        "seconds": 0.042
+      },
+      {
+        "name": "tests.montecarlo.test_photon_histories_cuda::test_device_history_matches_cpu_without_host_sampler_fallback[W-0.063-6000000.0]",
+        "seconds": 0.016
+      },
+      {
+        "name": "tests.montecarlo.test_photon_histories_cuda::test_device_queue_refill_and_batch_controls_preserve_histories",
+        "seconds": 0.483
+      },
+      {
+        "name": "tests.montecarlo.test_photon_histories_cuda::test_cuda_history_backend_is_explicit_even_for_empty_batches",
+        "seconds": 0.002
+      }
+    ],
+    "errors": 0,
+    "failures": 0,
+    "skipped": 0,
+    "tests": 39,
+    "time_seconds": 1.609,
+    "xml_sha256": "ef2cfa8464237887da2a31f8136b636aabedc3d83e68205b0bd16ff324b51f32"
+  },
+  "limitations": [
+    "Host lineage queue, Philox RNG, EPDL rate evaluation, source proposals and fsum ledgers remain.",
+    "Charged feedback supports contiguous target stacks; charged filters/gaps/re-entry remain open.",
+    "Production tests use real Si ELSEPA/BremsLib tables, a 40 keV primary beam and four primary electrons. The pair/positron closure test controls only first-flight rates to force pair production at 1.03 MeV.",
+    "Public annihilation tests exercise the physical zero-source 40 keV limit; nonempty positron annihilation is exercised through coupled feedback.",
+    "No full-track validation status or tolerance is changed."
+  ],
+  "portable_observation_identity_digest": "1c16f47a12a9e8c9dc013dd60dcd10bf7944c1db37503f06a06328c9c4d7f1b1",
+  "production": {
+    "cases": [
+      {
+        "name": "tests.montecarlo.test_photon_production_cuda::test_public_cuda_selector_uses_one_primary_pass_and_returns_aperture[False-brem]",
+        "seconds": 1.285
+      },
+      {
+        "name": "tests.montecarlo.test_photon_production_cuda::test_public_cuda_selector_uses_one_primary_pass_and_returns_aperture[False-characteristic]",
+        "seconds": 0.465
+      },
+      {
+        "name": "tests.montecarlo.test_photon_production_cuda::test_public_cuda_selector_uses_one_primary_pass_and_returns_aperture[False-annihilation]",
+        "seconds": 0.224
+      },
+      {
+        "name": "tests.montecarlo.test_photon_production_cuda::test_public_cuda_selector_uses_one_primary_pass_and_returns_aperture[True-brem]",
+        "seconds": 0.263
+      },
+      {
+        "name": "tests.montecarlo.test_photon_production_cuda::test_public_cuda_selector_uses_one_primary_pass_and_returns_aperture[True-characteristic]",
+        "seconds": 0.255
+      },
+      {
+        "name": "tests.montecarlo.test_photon_production_cuda::test_public_cuda_selector_uses_one_primary_pass_and_returns_aperture[True-annihilation]",
+        "seconds": 0.263
+      },
+      {
+        "name": "tests.montecarlo.test_photon_production_cuda::test_cuda_aperture_replay_checkpoint_cas_and_cpu_portability",
+        "seconds": 1.661
+      },
+      {
+        "name": "tests.montecarlo.test_photon_production_cuda::test_cuda_mode_off_arrays_are_bitwise_stable_around_selected_run",
+        "seconds": 0.481
+      },
+      {
+        "name": "tests.montecarlo.test_photon_production_cuda::test_cuda_pair_electron_positron_feedback_closes_rest_reservoir",
+        "seconds": 0.302
+      }
+    ],
+    "errors": 0,
+    "failures": 0,
+    "skipped": 0,
+    "tests": 9,
+    "time_seconds": 7.166,
+    "xml_sha256": "a0b63c6903c3516201ec97e963b4ec75ed4479ae2bc0e2fc42e893b0b4833f3c"
+  },
+  "scope": "CUDA implementation/production integration and same-draw CPU parity; no independent full-track physics validation or end-to-end throughput claim",
+  "source_revision": "652d5f04854482653a1bc63507ce3b1f461bec8a",
+  "source_sha256": {
+    "src/pyrite/_photon_config.py": "4d264a184185760575b1ee624ee8f72581c8b4c6237eb43ea3fa3fa257a23fb1",
+    "src/pyrite/_photon_support.py": "89b4c7337c7ea9dad014aaf095460cd3653b2b3c660d22a52426cba40e0b2d55",
+    "src/pyrite/_physics_contract.py": "7d0fa488bfefd764f5c4f26a973fe8068b0dc2ed8f9c978771c03963239bf09d",
+    "src/pyrite/_physics_provenance.py": "92c364e1a8e65d044b6e6c393efad123d03f5acb61f748d77784ab9ea936e832",
+    "src/pyrite/campaign/photon_cases.py": "babcc06ee903cf50a38f0079405fa9ef3a59f54fc5396e2321fc4ad52437cc81",
+    "src/pyrite/montecarlo/runner/photon_aperture.py": "fd11e7ed37ea78cb2fc50de71fb5df9b56462a753ffdc4b716fa1045a3a3fe4e",
+    "src/pyrite/montecarlo/runner/photon_emission.py": "6c115e5d051b5b2c41462b63c578d69969e858ed9463420119cd88715270da74",
+    "src/pyrite/montecarlo/spectrum/brem_bremslib.py": "5b51a61a28459f4f0e752bcb720a7b95ec4415aed88c27bcc570219c8e5dc36c",
+    "src/pyrite/montecarlo/transport/_photon_cuda_kernel.py": "9bdc4eb5e6670cb1e65b3171f8b688164f1be82a240f40d76427b23cc2401420",
+    "src/pyrite/montecarlo/transport/_photon_cuda_relaxation.py": "b6c62c52303e722174caa35a5a3dc3f07943d0787abac9d5b78f20bfad2f5ac1",
+    "src/pyrite/montecarlo/transport/_photon_cuda_sampling.py": "2732913fe03949a7835eb819ac7c432ff0d5ecd1bd7fa84faab58eae56f7380c",
+    "src/pyrite/montecarlo/transport/_photon_pair_cuda_kernel.py": "dadbacce98eb3973174802d1db9e8eb194f96f8fa44d7e990cc6921a22f2aac2",
+    "src/pyrite/montecarlo/transport/_photon_photoelectric_cuda_kernel.py": "0ad1fcd5be5fa115b01767ae59dd3fe68a06172e714816f39fa1f5eb23e4e80e",
+    "src/pyrite/montecarlo/transport/_photon_scatter_cuda_kernel.py": "ad3d9a3e7ea9cbda14a146b3464e2f5512b7d7c685bc474b68ca515ccf68a457",
+    "src/pyrite/montecarlo/transport/photon_cuda.py": "b8688f25ce605827609a20b44336ce4d700f5ca7436b7ed4a3d970f1df34e1d9",
+    "src/pyrite/montecarlo/transport/photon_cuda_events.py": "7daa61d6fca41ca45690cb2c9c7eb4fba7460c546bb6f08907434d2768cfe44a",
+    "src/pyrite/montecarlo/transport/photon_histories.py": "8ef4dc87770d0393028c01e28fc4ab6d634d3652ab259cd12b4ea6e0d8d779f1",
+    "src/pyrite/montecarlo/transport/photon_navigation.py": "8aae067e26982f013b8a098cf788fd9deb894bb85a2161c885d37813e617df55",
+    "src/pyrite/montecarlo/transport/photon_pair_cuda.py": "8b2eb0eab449c1c8c94e0aed2ef5b682a4489d43059e3c22b583c269e585a7b4",
+    "src/pyrite/montecarlo/transport/photon_photoelectric_cuda.py": "a60ade9d3ec296b0c52b493e2fd3608febc8cddf688087b36fd184025c5c4071",
+    "src/pyrite/montecarlo/transport/photon_scattering_cuda.py": "4f62bed4f0767ff49496bd367b9771d095a043d977bfc41ab5ff43733539e7a4",
+    "src/pyrite/montecarlo/transport/photon_sources.py": "fed478a9cac46b27cacf0420f5c83cf8c3b98ea086f3915facd7250a02d73621",
+    "src/pyrite/photon_event_observation.py": "0bb0b4899d702a0ce61031b468da98cf3fcff12f606484c2ab880b685b308fec",
+    "src/pyrite/photon_observation.py": "566be665b9a1f612f50ab9d49e270d892d974b3ea474ebfcc605d2d9f6d6ae32",
+    "src/pyrite/photon_transport.py": "87260c84f5878c7833bb17ac7daacc74261d8cbabb9143f49d69a37ee36202d8",
+    "tests/montecarlo/test_photon_cuda.py": "f80e561841bdc48ba95228f121db1145bca3d31fc7d353c0cedde88b6e2c90a1",
+    "tests/montecarlo/test_photon_histories_cuda.py": "726f6c741c60ef59da59ed11da35bc25ee6a658aa31e42414b25a5ce95e7e5fb",
+    "tests/montecarlo/test_photon_pair_cuda.py": "e1cdc6b265d1ce8c7ab55aadf143ab89fb62317fdaee1ae9f5ce1248e792ad34",
+    "tests/montecarlo/test_photon_photoelectric_cuda.py": "8169a114cff9d92798b42d7fa3124e65edfbd0be58580add946d0bac6b9043b5",
+    "tests/montecarlo/test_photon_production_cuda.py": "18883f039a08132c303ccc5aee234fcca28a3fd2f1f5c4533e5e69c713f2f99b",
+    "tests/montecarlo/test_photon_scattering_cuda.py": "82bb8f53231066e8f240bed330c6142a870344b051d1437c6d34931d39f7bef4",
+    "tests/montecarlo/test_photon_sources.py": "e39f27f87ec1020fa5df459ad58d3180f1c85f5824c62fb974ed85b4aa548bbb"
+  }
+}

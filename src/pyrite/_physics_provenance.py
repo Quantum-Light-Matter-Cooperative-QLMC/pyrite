@@ -82,7 +82,13 @@ def resolved_physics_view(
     if transition is not None:
         selections["emission.transition"] = transition["model"]
     if resolved.get("photon_transport") is not None:
-        selections["observation.photon"] = "cpu-reference"
+        from ._photon_config import CUDA_MODEL
+
+        selections["observation.photon"] = (
+            "cuda-reference"
+            if resolved["photon_transport"]["model"] == CUDA_MODEL
+            else "cpu-reference"
+        )
     # Reuse facade policy with legacy defaults, without mutating Case omissions.
     Physics(
         elastic_model=selections["transport.elastic"],

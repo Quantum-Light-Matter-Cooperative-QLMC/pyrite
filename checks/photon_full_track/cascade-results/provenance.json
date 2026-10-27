@@ -1,0 +1,215 @@
+{
+  "schema": "photon-full-track-cascade-evidence.v1",
+  "run_date_utc": "2026-10-27",
+  "scope": "w_0p3mev only; other cases not rerun with complete cascades",
+  "tested_commit": "981c1141dc63c76e2b1e102b5d70083e2fc85bef",
+  "staging_root": "~/.local/opt/pyrite-341-cascade-981c1141",
+  "smoke_job": 2556,
+  "reference_job": 2557,
+  "reduction_job": 2567,
+  "events": 10000000,
+  "shards": 10,
+  "events_per_shard": 1000000,
+  "seeds": [
+    [
+      34100,
+      5
+    ],
+    [
+      34101,
+      5
+    ],
+    [
+      34102,
+      5
+    ],
+    [
+      34103,
+      5
+    ],
+    [
+      34104,
+      5
+    ],
+    [
+      34105,
+      5
+    ],
+    [
+      34106,
+      5
+    ],
+    [
+      34107,
+      5
+    ],
+    [
+      34108,
+      5
+    ],
+    [
+      34109,
+      5
+    ]
+  ],
+  "jobs": [
+    {
+      "JobId": "2558",
+      "JobState": "COMPLETED",
+      "ExitCode": "0:0",
+      "RunTime": "00:01:30",
+      "NodeList": "DESKTOP-QNIHO3D"
+    },
+    {
+      "JobId": "2559",
+      "JobState": "COMPLETED",
+      "ExitCode": "0:0",
+      "RunTime": "00:01:29",
+      "NodeList": "DESKTOP-QNIHO3D"
+    },
+    {
+      "JobId": "2560",
+      "JobState": "COMPLETED",
+      "ExitCode": "0:0",
+      "RunTime": "00:01:29",
+      "NodeList": "DESKTOP-QNIHO3D"
+    },
+    {
+      "JobId": "2561",
+      "JobState": "COMPLETED",
+      "ExitCode": "0:0",
+      "RunTime": "00:01:29",
+      "NodeList": "DESKTOP-QNIHO3D"
+    },
+    {
+      "JobId": "2562",
+      "JobState": "COMPLETED",
+      "ExitCode": "0:0",
+      "RunTime": "00:01:29",
+      "NodeList": "DESKTOP-QNIHO3D"
+    },
+    {
+      "JobId": "2563",
+      "JobState": "COMPLETED",
+      "ExitCode": "0:0",
+      "RunTime": "00:01:30",
+      "NodeList": "DESKTOP-QNIHO3D"
+    },
+    {
+      "JobId": "2564",
+      "JobState": "COMPLETED",
+      "ExitCode": "0:0",
+      "RunTime": "00:01:29",
+      "NodeList": "DESKTOP-QNIHO3D"
+    },
+    {
+      "JobId": "2565",
+      "JobState": "COMPLETED",
+      "ExitCode": "0:0",
+      "RunTime": "00:01:29",
+      "NodeList": "DESKTOP-QNIHO3D"
+    },
+    {
+      "JobId": "2566",
+      "JobState": "COMPLETED",
+      "ExitCode": "0:0",
+      "RunTime": "00:00:48",
+      "NodeList": "qlmc-ace"
+    },
+    {
+      "JobId": "2557",
+      "JobState": "COMPLETED",
+      "ExitCode": "0:0",
+      "RunTime": "00:00:47",
+      "NodeList": "qlmc-ace"
+    },
+    {
+      "JobId": "2567",
+      "JobState": "COMPLETED",
+      "ExitCode": "0:0",
+      "RunTime": "00:00:01",
+      "NodeList": "DESKTOP-QNIHO3D"
+    }
+  ],
+  "allocation": {
+    "partition": "cpu",
+    "cpus_per_task": 1,
+    "memory_GiB_per_task": 2,
+    "reference_time_limit_minutes": 30,
+    "reduction_memory_GiB": 4
+  },
+  "settings": {
+    "auger": true,
+    "deexcitationIgnoreCut": true,
+    "killSecondaries": 3
+  },
+  "gated_count": 11,
+  "failures": [],
+  "missing_gates": [],
+  "historical_failures": [
+    [
+      "R",
+      "1-10keV",
+      "redistributed"
+    ],
+    [
+      "R",
+      "1-10keV",
+      "redistributed_fraction"
+    ]
+  ],
+  "ledger_status": "discrepancy; targeted W failures cleared, full corrected matrix pending",
+  "source_sha256": {
+    "checks/photon_full_track/compare.py": "e7cb036a70ba1d1ebbc3dbe56c0865b2d35493c178248b7f2bbab0adb2af6b41",
+    "checks/photon_full_track/make_macros.py": "46bc85075699dcaa25b50c98c8680a1c82945a5d291b6188316492b9b674fb42",
+    "checks/photon_full_track/cases.py": "023953fe1997f7b9cbd968fedb47ac25b7219e5049644c298a52541ff3172fc5",
+    "checks/photon_full_track/run_geant4.sbatch": "3f32eacb77e131aaf29d6c80ce13637577e5f1ca24d99fbbad8f4b8f431aea54"
+  },
+  "macro_sha256": {
+    "full/w_0p3mev_s00_cascade.mac": "303d2248dfcdc0100af2a8a759f25399ff80695eb21f08c398fe4a37170007eb",
+    "full/w_0p3mev_s01_cascade.mac": "e47e6b9da8d2f3b9e04b09f67e7cd815ffa350342411457cf8cf1843b22aa1b0",
+    "full/w_0p3mev_s02_cascade.mac": "465febef7f4fbae09df20d058f5ac6ced3ff492399d572228a43262ef119d7fd",
+    "full/w_0p3mev_s03_cascade.mac": "27d3b6f0217d81bd7a7b4ba9a2c6ab3b015df625ef13b26e693c67909451affb",
+    "full/w_0p3mev_s04_cascade.mac": "18eefcfe511331ff25c6d8539af1c0159fcf71bd818f5a2aec3ed07c1723c5c5",
+    "full/w_0p3mev_s05_cascade.mac": "e598011680f19d9a4a68a2675d04f438fce34211637c8ecc2998d8ce4f816689",
+    "full/w_0p3mev_s06_cascade.mac": "42b6badd70f36d4c1858bb4ae9053f755867e908a9f4d2b8716547a06cf82c3f",
+    "full/w_0p3mev_s07_cascade.mac": "689198b0e089f559406050a591f9da304b684a7feb6c695100c3dc213d3a4dee",
+    "full/w_0p3mev_s08_cascade.mac": "4f5969b6857a60ff80aa3a7c00d955eba3cb164b82896879f515a61c09f58ff4",
+    "full/w_0p3mev_s09_cascade.mac": "5f78baadb690679e5002231047e0c725e04e7bbc434f3582ab66e624b99e52e5"
+  },
+  "geant4_version": "11.4.2 / EMLOW8.8",
+  "geant4_executable_sha256": "fe3fc52d65477c780e9b77c4eb1385c752b66c403b045b988855a5d48541cc4f",
+  "geant4_atomic_deexcitation_source_sha256": "90625567d9421cbc3dcdb3aaba0e3af2ad1200a94db4b3a4bdda0e5cec185d53",
+  "reduction_script_sha256": "f3e0ee661e7cdd2ed45d017683f0d89d29d9618853f6dcb9cc2dbe6b857fd4ad",
+  "raw_reduction_sha256": "a6705ce65f8635f934ea8f810561872d2b99873a2338981f340ebf6de2c27bf8",
+  "original_pyrite_result_sha256": "aff05a7519bfaf75c299cda89afb2052039b929a68fe035e260606cf98352a91",
+  "historical_geant4_reference_sha256": "77653858e80fb66421c4e629cebf11ff00f0f40d825f07a7f73a016b9b56cc82",
+  "committed_sha256": {
+    "reference.json.gz": "a9959e2306f6de5971abe2ceeb46bf785b32868a3f26085ee6b3c8b4713a6dd6",
+    "report.json": "1f44829d8202af288d23f7df14cb46d7c1ecac28ab4f9b32738114344df5bad0"
+  },
+  "wall_seconds": [
+    89.62,
+    89.4,
+    88.95,
+    89.44,
+    89.57,
+    89.92,
+    89.16,
+    89.34,
+    47.98,
+    47.88
+  ],
+  "max_rss_KiB": [
+    88736,
+    87304,
+    88372,
+    87300,
+    88476,
+    88652,
+    88216,
+    88452,
+    84444,
+    83756
+  ]
+}

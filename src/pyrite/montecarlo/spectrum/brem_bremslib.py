@@ -60,13 +60,23 @@ class _StagedBremsLib:
     scaled_sdcs_mb: Any
     theta_rad: Any
     scaled_ddcs_mb_sr: Any
+    array_module: Any = None
 
 
-def stage_bremslib_table(table: BremsLibBremsstrahlungTable) -> _StagedBremsLib:
-    """Upload one table's interpolation arrays once per spectrum call."""
+def stage_bremslib_table(
+    table: BremsLibBremsstrahlungTable, *, array_module: Any = None
+) -> _StagedBremsLib:
+    """Stage interpolation arrays once per call on the selected array namespace.
+
+    The default retains the active backend/REAL precision. An explicit namespace
+    (e.g. NumPy for the weighted photon source) uses binary64 independently of
+    that backend; evaluation follows the staged namespace without hidden copies.
+    """
+    module = xp if array_module is None else array_module
+    real = REAL if array_module is None else module.float64
 
     def staged(values):
-        return xp.ascontiguousarray(xp.asarray(values, dtype=REAL))
+        return module.ascontiguousarray(module.asarray(values, dtype=real))
 
     return _StagedBremsLib(
         table=table,
@@ -79,6 +89,7 @@ def stage_bremslib_table(table: BremsLibBremsstrahlungTable) -> _StagedBremsLib:
         # ``(T1, theta, k/T1)`` on the device: the per-segment gather below
         # then uses adjacent advanced indices, which dpnp requires.
         scaled_ddcs_mb_sr=staged(np.swapaxes(table.scaled_ddcs_mb_sr, 1, 2)),
+        array_module=array_module,
     )
 
 
@@ -94,7 +105,16 @@ class _BremsLibSegmentState:
     upper_values: Any
 
 
+def _table_namespace(staged):
+    return (
+        (xp, REAL)
+        if staged.array_module is None
+        else (staged.array_module, staged.array_module.float64)
+    )
+
+
 def _incident_bracket(staged: _StagedBremsLib, T_keV):
+    xp, REAL = _table_namespace(staged)
     T = xp.asarray(T_keV, dtype=REAL)
     log_grid = staged.log_incident_energy
     table = staged.table
@@ -116,6 +136,7 @@ def bremslib_segment_state(staged: _StagedBremsLib, T_keV, cos_theta=None):
 
     Validation: bremslib-angular-model
     """
+    xp, REAL = _table_namespace(staged)
     T, available, row, fraction = _incident_bracket(staged, T_keV)
     if cos_theta is None:
         lower = staged.scaled_sdcs_mb[row]
@@ -151,6 +172,7 @@ def _along_reduced_energy(staged, values, top, reduced):
     Above the top node (``k/T`` between it and 1) the top value is held: the
     library stops a 50 eV (or 1e-4 T) outgoing electron short of the tip.
     """
+    xp, REAL = _table_namespace(staged)
     inner = staged.inner_reduced_energy
     nominal = staged.table.nominal_reduced_energy
     lower = xp.searchsorted(inner, reduced, side="right")  # 0..16
@@ -173,6 +195,7 @@ def _evaluate(staged: _StagedBremsLib, state: _BremsLibSegmentState, photon_eV):
     ``photon_eV`` is ``(1, NE)`` for a shared grid or ``(Nsegment, 1)`` for
     one photon energy per row; the result has the broadcast shape.
     """
+    xp, REAL = _table_namespace(staged)
     T_eV = state.incident_energy_keV * REAL(1.0e3)
     reduced = photon_eV / xp.maximum(T_eV, REAL(1.0e-30))[:, None]
     top = staged.top_reduced_energy
@@ -196,6 +219,7 @@ def evaluate_bremslib(staged: _StagedBremsLib, state: _BremsLibSegmentState, pho
 
     Validation: bremslib-angular-model
     """
+    xp, REAL = _table_namespace(staged)
     return _evaluate(staged, state, xp.asarray(photon_energy_eV, dtype=REAL)[None, :])
 
 
@@ -207,6 +231,7 @@ def evaluate_bremslib_rows(staged: _StagedBremsLib, state: _BremsLibSegmentState
 
     Validation: bremslib-angular-model
     """
+    xp, REAL = _table_namespace(staged)
     return _evaluate(staged, state, xp.asarray(photon_energy_eV, dtype=REAL)[:, None])[:, 0]
 
 

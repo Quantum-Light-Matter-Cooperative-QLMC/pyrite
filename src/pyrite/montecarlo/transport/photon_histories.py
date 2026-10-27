@@ -1,11 +1,12 @@
-"""Host reference photon histories with ordinary detector hits (#341).
+"""Lineage-controlled photon histories with ordinary detector hits (#341).
 
 Chains the standalone first-flight navigator and interaction samplers into a
 lineage-keyed photon queue. Charged daughters are returned as handoff rows for
 the charged launch boundary; they are not transported here. Filter plates and
 detectors enter as sample-frame boxes and apertures converted from lab poses.
 The opt-in CPU aperture runner supplies source adapters and observation identity;
-device execution remains unsupported. Coordinates are sample-frame Å, energies eV.
+an explicit CUDA backend uses device flights/final states with host orchestration.
+Coordinates are sample-frame Å, energies eV.
 """
 
 from collections.abc import Callable, Iterator, Mapping, Sequence
@@ -404,7 +405,17 @@ def _validate_options(energy, photon_cutoff_eV, electron_cutoff_eV, max_generati
     return kinds
 
 
-def _flight(queue, active: list[_Photon], layers, boxes, footprint, aperture, rngs):
+def _flight(
+    queue,
+    active: list[_Photon],
+    layers,
+    boxes,
+    footprint,
+    aperture,
+    rngs,
+    cuda=None,
+    cuda_batch_size=65536,
+):
     """Advance one generation: record hits/escapes, return collisions and points.
 
     Validation: photon-history-queue
@@ -413,9 +424,21 @@ def _flight(queue, active: list[_Photon], layers, boxes, footprint, aperture, rn
     directions = np.array([p.direction for p in active], dtype=float).reshape(-1, 3)
     energies = np.array([p.energy for p in active], dtype=float)
     uniforms = np.array([rng.random(2) for rng in rngs]).reshape(-1, 2)
-    flight = scene_first_interactions(
-        origins, directions, energies, uniforms, layers, boxes, **footprint
-    )
+    if cuda is None:
+        flight = scene_first_interactions(
+            origins, directions, energies, uniforms, layers, boxes, **footprint
+        )
+    else:
+        flight = cuda.cuda_first_flights(
+            origins,
+            directions,
+            energies,
+            uniforms,
+            layers,
+            boxes,
+            batch_size=cuda_batch_size,
+            **footprint,
+        )
     hit_distance = np.full(len(active), np.inf)
     local = np.full((len(active), 2), np.nan)
     if aperture is not None and active:
@@ -432,6 +455,66 @@ def _flight(queue, active: list[_Photon], layers, boxes, footprint, aperture, rn
         )  # fmt: skip
     step = np.where(collided, flight["distance_ang"], 0.0)
     return flight, collided, origins + step[:, None] * directions
+
+
+def _execution(backend, relaxation, batch_size):
+    if backend not in ("cpu", "cuda"):
+        raise ValueError("photon history backend must be 'cpu' or 'cuda'")
+    if isinstance(batch_size, bool) or not isinstance(batch_size, int) or batch_size <= 0:
+        raise ValueError("cuda_batch_size must be a positive integer")
+    if backend == "cpu":
+        return None
+    if relaxation is not load_eadl_relaxation:
+        raise ValueError("CUDA photon histories require canonical pinned EADL relaxation")
+    from ..._backend import select_backend
+    from . import photon_cuda_events
+
+    select_backend("cuda")  # fail closed even for empty/all-unresolved batches
+    return photon_cuda_events
+
+
+def _collisions(
+    queue,
+    active,
+    flight,
+    collided,
+    points,
+    compositions,
+    relaxation,
+    rngs,
+    cache,
+    cuda,
+    cuda_batch_size,
+):
+    """Preserve collision/daughter row order across CPU and device event waves."""
+    products = (
+        None
+        if cuda is None
+        else cuda.cuda_collision_products(
+            active,
+            flight,
+            collided,
+            compositions,
+            rngs,
+            cutoff_eV=min(queue.photon_cutoff_eV, queue.electron_cutoff_eV),
+            batch_size=cuda_batch_size,
+        )
+    )
+    for i in np.flatnonzero(collided):
+        parent = active[i]
+        layer, element_index = int(flight["layer"][i]), int(flight["element"][i])
+        element = compositions[layer][element_index][0]
+        channel = int(flight["channel"][i])
+        queue.interactions.append(
+            (points[i], parent.energy, parent.row, parent.key, parent.generation, layer,
+             element_index, channel)
+        )  # fmt: skip
+        if products is not None:
+            cuda.apply_cuda_collision(queue, parent, points[i], products[int(i)])
+        else:
+            if PHOTON_CHANNEL_ORDER[channel] == "photoelectric" and element not in cache:
+                cache[element] = relaxation(element)
+            _interact(queue, parent, channel, element, cache.get(element), rngs[i], points[i])
 
 
 def track_photon_histories(
@@ -454,6 +537,8 @@ def track_photon_histories(
     max_generations: int = 1000,
     relaxation: Callable[[str], EADLRelaxation] = load_eadl_relaxation,
     stream_key=None,
+    backend="cpu",
+    cuda_batch_size=65536,
 ) -> PhotonHistories:
     """Transport analog photons to escape, detection, absorption or cutoff.
 
@@ -486,6 +571,12 @@ def track_photon_histories(
     source keys of photons returned by a charged stage; ids then only label
     histories. Source photons need ``photon_cutoff_eV < E <= 100 GeV``.
     History and event labels must be nonnegative integers fitting int64.
+    ``backend="cuda"`` explicitly selects device flights and all conditional
+    samplers, with host-controlled lineage/Philox waves and fsum ledgers. No
+    host sampler fallback occurs. ``cuda_batch_size`` bounds wave admission;
+    prefixes/buffers grow only for unfinished events with original stream
+    states, so batching does not define RNG identity. Canonical pinned EADL
+    tables are required on CUDA; injected relaxation callbacks remain CPU-only.
     Source: PENELOPE-2024 §1.4 and §2.4 (photon histories, pair kinematics),
     ENDF-102 File 28; component samplers' own ledger claims.
     Validation: photon-history-queue, photon-scene-navigation
@@ -496,6 +587,7 @@ def track_photon_histories(
     kinds = _validate_options(
         energy, photon_cutoff_eV, electron_cutoff_eV, max_generations, source_kind
     )
+    cuda = _execution(backend, relaxation, cuda_batch_size)
     footprint = {"width_ang": width_ang, "height_ang": height_ang}
     surfaces = () if aperture is None else (aperture.region(),)
     validate_photon_regions(layers, boxes, surfaces=surfaces, **footprint)
@@ -516,19 +608,22 @@ def track_photon_histories(
                 queue.book("unresolved_eV", p.row, p.weight * p.energy)
         active = [p for p in active if p.generation < max_generations]
         rngs = [np.random.Generator(np.random.Philox(key=int(p.key))) for p in active]
-        flight, collided, points = _flight(queue, active, layers, boxes, footprint, aperture, rngs)
-        for i in np.flatnonzero(collided):
-            parent = active[i]
-            layer, element_index = int(flight["layer"][i]), int(flight["element"][i])
-            element = compositions[layer][element_index][0]
-            channel = int(flight["channel"][i])
-            queue.interactions.append(
-                (points[i], parent.energy, parent.row, parent.key, parent.generation, layer,
-                 element_index, channel)
-            )  # fmt: skip
-            if PHOTON_CHANNEL_ORDER[channel] == "photoelectric" and element not in cache:
-                cache[element] = relaxation(element)
-            _interact(queue, parent, channel, element, cache.get(element), rngs[i], points[i])
+        flight, collided, points = _flight(
+            queue, active, layers, boxes, footprint, aperture, rngs, cuda, cuda_batch_size
+        )
+        _collisions(
+            queue,
+            active,
+            flight,
+            collided,
+            points,
+            compositions,
+            relaxation,
+            rngs,
+            cache,
+            cuda,
+            cuda_batch_size,
+        )
     return _assemble(queue, rows, energy * weight)
 
 

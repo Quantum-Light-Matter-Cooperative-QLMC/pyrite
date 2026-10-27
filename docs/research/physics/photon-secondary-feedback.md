@@ -85,6 +85,74 @@ filter boxes with this stage. Photon-only filter navigation remains available.
 Mott electron tables are not reused for positrons. Soft radiative losses retain
 the underlying charged transport's deposition approximation.
 
+### Scene re-entry and production
+
+`transport/photon_reentry.py::scene_feedback_stage` supplies explicit CPU/CUDA
+photon-born charged transport across target slabs, vacuum gaps
+and disjoint oriented filter boxes. Pass it as `charged_stage` to
+`track_coupled_histories` or `score_photon_sources`, using the same `layers`,
+`boxes`, `width_ang` and `height_ang` in both stages. A geometry mismatch is
+rejected before photon tracking. Production `PhotonTransport` prepares this
+stage for named catalog filters. The no-filter stack path and legacy standalone
+Scene diagnostics retain their existing contracts.
+
+```python
+from pyrite.montecarlo.transport.photon_reentry import scene_feedback_stage
+
+stage = scene_feedback_stage(
+    layers,
+    boxes=boxes,
+    width_ang=width_ang,
+    height_ang=height_ang,
+    photon_cutoff_eV=1000,
+    backend="cpu",  # "cuda" requires the device and forces every charged visit to CUDA
+    **charged_transport,
+)
+```
+
+`charged_transport` supplies the existing shell/BremsLib settings, including
+matching charged cutoff/threshold, material names and stopping/elastic tables.
+Per-body lists cover every target layer, including explicit vacuum entries,
+followed by every filter box. Each material stage receives its own table slice
+and local coordinates; no target table is silently reused for a filter.
+Explicit gaps between slabs need no dummy material table.
+
+`FeedbackChargedStage(..., retain_exits=True)` retains every escaping primary,
+shell-secondary and Auger track as `ChargedStageResult.escaped_particles`:
+position/direction, kinetic energy, species, lineage key and original launch
+parent. This table partitions the existing escaped term; it adds no energy.
+The scene scheduler follows each exit to the nearest material interval,
+transforming into that body's local frame. Analytically selected entries are
+clipped to the exact local kernel bounds to prevent rotated-face roundoff
+from dropping a launch; no displacement into material is added. Vacuum
+changes position only.
+After leaving a convex body, the scheduler excludes it until another material
+visit, preventing rounding at an outgoing face from creating a false re-entry.
+A filter may reverse the particle and send it into the target again.
+
+Intermediate escape is replaced by the next material history. A positron
+carries its rest reservoir through every vacuum crossing and either escapes
+with it or releases it once through annihilation in material. A subthreshold
+positron missing all bodies escapes without annihilation in vacuum. Returned
+photons retain the original charged parent and enter the existing photon queue;
+weights are still applied there once. Each material visit must close its
+energy ledger and partition its escaped kinetic/rest energy into retained
+phase space, or the scheduler raises. The crossing cap raises on exhaustion.
+
+Material visits start new lineage-derived transport streams. They do not
+promise bitwise agreement with one monolithic charged flight or invariance to
+splitting identical material into extra regions. Clocks restart per visit;
+time-dependent scoring is outside this model. The production path pins every
+body's catalog material and electron/positron tables in the enabled observation
+identity; full replay checks those original pins before execution. CUDA
+navigation and charged visits are hardware-checked under both precision
+settings, with host scheduling/transforms and ledgers retained. See the
+[production contract and evidence](../../repo-design/compute/photon-aperture.md#charged-scene-re-entry-evidence).
+External full-track validation remains open. The ledger claim is
+`photon-charged-reentry`, now **rederived** after [independent verification
+and the rotated-face repair](../../validation/beam-transport/photon-charged-reentry.md);
+bounded stack feedback keeps its prior verdict.
+
 ## Physical characteristic and annihilation sources
 
 These low-level adapters expose separate physical sources. They do not add

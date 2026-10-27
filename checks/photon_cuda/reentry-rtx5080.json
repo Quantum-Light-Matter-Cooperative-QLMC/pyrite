@@ -1,0 +1,337 @@
+{
+  "allocation": {
+    "cpus": 2,
+    "gpus": 1,
+    "memory_GiB": 8,
+    "time_limit_minutes": 20
+  },
+  "default_gpu_precision": {
+    "canonical_photon_data_sha256": {
+      "eadl": "78ccf8a4e07c1c120a2e3d94ff051aab2180d151f35e8bc3406d52df5af5e88c",
+      "epdl_differential": "d36a50d1add5c6f0b3df80a108e83aa8db8a4822445ca192534f6bc0a55bb166",
+      "epdl_integrated": "fcc2f00c5bb969e99bc84cac16762f13e939f071d585c433a5c0f420913fcfc9"
+    },
+    "cases": [
+      {
+        "name": "tests.montecarlo.test_photon_reentry_cuda::test_public_cuda_filter_feedback_is_explicit_and_one_primary_pass[brem-True-silicon]",
+        "seconds": 1.672
+      },
+      {
+        "name": "tests.montecarlo.test_photon_reentry_cuda::test_public_cuda_filter_feedback_is_explicit_and_one_primary_pass[brem-True-tungsten]",
+        "seconds": 0.63
+      },
+      {
+        "name": "tests.montecarlo.test_photon_reentry_cuda::test_public_cuda_filter_feedback_is_explicit_and_one_primary_pass[characteristic-True-silicon]",
+        "seconds": 0.343
+      },
+      {
+        "name": "tests.montecarlo.test_photon_reentry_cuda::test_public_cuda_filter_feedback_is_explicit_and_one_primary_pass[characteristic-True-tungsten]",
+        "seconds": 0.342
+      },
+      {
+        "name": "tests.montecarlo.test_photon_reentry_cuda::test_public_cuda_filter_feedback_is_explicit_and_one_primary_pass[annihilation-True-silicon]",
+        "seconds": 0.364
+      },
+      {
+        "name": "tests.montecarlo.test_photon_reentry_cuda::test_public_cuda_filter_feedback_is_explicit_and_one_primary_pass[annihilation-True-tungsten]",
+        "seconds": 0.354
+      },
+      {
+        "name": "tests.montecarlo.test_photon_reentry_cuda::test_public_cuda_filter_feedback_is_explicit_and_one_primary_pass[characteristic-False-silicon]",
+        "seconds": 0.343
+      },
+      {
+        "name": "tests.montecarlo.test_photon_reentry_cuda::test_public_cuda_filter_feedback_is_explicit_and_one_primary_pass[characteristic-False-tungsten]",
+        "seconds": 0.344
+      },
+      {
+        "name": "tests.montecarlo.test_photon_reentry_cuda::test_real_cuda_charged_gap_filter_matches_cpu[0]",
+        "seconds": 2.768
+      },
+      {
+        "name": "tests.montecarlo.test_photon_reentry_cuda::test_real_cuda_charged_gap_filter_matches_cpu[1]",
+        "seconds": 1.754
+      },
+      {
+        "name": "tests.montecarlo.test_photon_reentry_cuda::test_cuda_scene_boundaries_match_cpu_and_empty_batch_is_explicit",
+        "seconds": 0.156
+      },
+      {
+        "name": "tests.montecarlo.test_photon_reentry_cuda::test_cuda_filter_capture_replay_checkpoint_cas_cpu_read",
+        "seconds": 1.919
+      },
+      {
+        "name": "tests.montecarlo.test_photon_reentry_cuda::test_cuda_reentry_mode_off_arrays_are_bitwise_unchanged",
+        "seconds": 0.661
+      },
+      {
+        "name": "tests.montecarlo.test_photon_production_cuda::test_public_cuda_selector_uses_one_primary_pass_and_returns_aperture[False-brem]",
+        "seconds": 0.364
+      },
+      {
+        "name": "tests.montecarlo.test_photon_production_cuda::test_public_cuda_selector_uses_one_primary_pass_and_returns_aperture[False-characteristic]",
+        "seconds": 0.262
+      },
+      {
+        "name": "tests.montecarlo.test_photon_production_cuda::test_public_cuda_selector_uses_one_primary_pass_and_returns_aperture[False-annihilation]",
+        "seconds": 0.224
+      },
+      {
+        "name": "tests.montecarlo.test_photon_production_cuda::test_public_cuda_selector_uses_one_primary_pass_and_returns_aperture[True-brem]",
+        "seconds": 0.265
+      },
+      {
+        "name": "tests.montecarlo.test_photon_production_cuda::test_public_cuda_selector_uses_one_primary_pass_and_returns_aperture[True-characteristic]",
+        "seconds": 0.263
+      },
+      {
+        "name": "tests.montecarlo.test_photon_production_cuda::test_public_cuda_selector_uses_one_primary_pass_and_returns_aperture[True-annihilation]",
+        "seconds": 0.271
+      },
+      {
+        "name": "tests.montecarlo.test_photon_production_cuda::test_cuda_aperture_replay_checkpoint_cas_and_cpu_portability",
+        "seconds": 1.618
+      },
+      {
+        "name": "tests.montecarlo.test_photon_production_cuda::test_cuda_mode_off_arrays_are_bitwise_stable_around_selected_run",
+        "seconds": 0.521
+      },
+      {
+        "name": "tests.montecarlo.test_photon_production_cuda::test_cuda_pair_electron_positron_feedback_closes_rest_reservoir",
+        "seconds": 0.301
+      }
+    ],
+    "code_digest": "40148dc3263f9750de7c682aa6b060a805dce82c9e268393c370410df4cdd14c",
+    "code_dirty": false,
+    "code_tables_digest": "bafd74d27ac4dee76ed2b16d2c605f2d1bd8a09caf388ee74e37ec15e3edaae1",
+    "environment": {
+      "OPENBLAS_NUM_THREADS": "1",
+      "PYRITE_FP64": "0",
+      "PYRITE_MC_BACKEND": "cuda",
+      "PYRITE_TEST_BACKEND": "cuda"
+    },
+    "errors": 0,
+    "failures": 0,
+    "hardware": {
+      "cuda_runtime": 13020,
+      "cupy": "14.2.0",
+      "device": "NVIDIA GeForce RTX 5080",
+      "numpy": "2.5.4",
+      "python": "3.14.6"
+    },
+    "job": 2529,
+    "job_log_sha256": "5abb08722bbe75b607c3cc0d9e9cf05aecc9cf63f6d5b27d5ec5a7bf9503fbd5",
+    "skipped": 0,
+    "source_revision": "70d37305b16ac193a5985496180188a9c45c5e9b",
+    "source_sha256": {
+      "src/pyrite/_photon_config.py": "ec87281d3bb4b23efca543f18a651895ad1aedf1a209883ffec30d93b4df2036",
+      "src/pyrite/_photon_scene_feedback.py": "008b36afa8a617d300bd3e0ed593ba42710a4a177d4e9a6fba1505663aa9ebd6",
+      "src/pyrite/_photon_support.py": "aa7a5888447e79d5a3bad4e2520305d4fbe2dac66747d230c1c20c63d3595ad7",
+      "src/pyrite/campaign/photon_cases.py": "9063dc9b3b9ba90dba97c482110d46c6794cca5f5d99a3b2918371881ea0431a",
+      "src/pyrite/montecarlo/runner/photon_aperture.py": "092060da0355135f2fd1a2a35a3b59f5d6b2837ed8e1b10de556957be34fb03e",
+      "src/pyrite/montecarlo/transport/_jit_kernel.py": "27d8995292c373788985cb2d6db3c37d270180ed58e5831025bc46a4d59db06f",
+      "src/pyrite/montecarlo/transport/photon_charged_escape.py": "88ac00424922029b404b3f7f8debd4ebd83539ea5e63b473658580b9207709d5",
+      "src/pyrite/montecarlo/transport/photon_coupling.py": "3d90b336b38a135d360fddbbf3017ef4c022246ed250394142f294d7f04bcc78",
+      "src/pyrite/montecarlo/transport/photon_feedback.py": "06ea5fc3bc5f6c103f1aeb943b867cd6fce60782344aeadefb2c6dd31516531d",
+      "src/pyrite/montecarlo/transport/photon_histories.py": "8ef4dc87770d0393028c01e28fc4ab6d634d3652ab259cd12b4ea6e0d8d779f1",
+      "src/pyrite/montecarlo/transport/photon_navigation.py": "8aae067e26982f013b8a098cf788fd9deb894bb85a2161c885d37813e617df55",
+      "src/pyrite/montecarlo/transport/photon_reentry.py": "ced1318f44d799746979cf5a944abb1851c291bc1567434e600262766fec17c7",
+      "tests/montecarlo/test_photon_production_cuda.py": "18883f039a08132c303ccc5aee234fcca28a3fd2f1f5c4533e5e69c713f2f99b",
+      "tests/montecarlo/test_photon_reentry_cuda.py": "91cd99be6ec94f133d7ba754edca97db4b3302ced8d2a9bfcd3af9b2d87d5701"
+    },
+    "tests": 22,
+    "time_seconds": 17.777,
+    "xml_sha256": "2e143858627c07a0ee78ea030d27e5c3006c4e6b131ba159c17dd9093f6d9fca"
+  },
+  "filter_born_pair_queue": {
+    "code_digest": "0199ebb958a45dc30a2f303047f542936e5681c3e6721d03e8781cb70a8dff9f",
+    "code_dirty": false,
+    "job": 2530,
+    "job_log_sha256": "d4748157338867811f71b45a04ee28f812e499f4f3e5332b4078fbe7c32023d3",
+    "precision_runs": {
+      "0": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 1,
+        "time_seconds": 1.643,
+        "xml_sha256": "97d0abb1f51b825efdb5cf7c3e9b2770e923d814facc1b687d60dd2cd75b2c60"
+      },
+      "1": {
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "tests": 1,
+        "time_seconds": 3.195,
+        "xml_sha256": "4f6061861f81c60ef8ff0e03ed1fb6769201f11e1fe30cf3867dbb63de3e3b8d"
+      }
+    },
+    "reproduction": "uv run pyrite-dev test --slow tests/montecarlo/test_photon_reentry_pair_cuda.py",
+    "scope": "Nonempty pair conversion inside a production-prepared Si filter. Photon channel rates are replaced throughout: forced pair conversion above threshold, transparent returned photons below threshold. Conditional final states, CUDA charged flights, vacancies, annihilation and coupled-queue rest accounting remain real; high-energy exit count is checked in aggregate.",
+    "source_revision": "cbcb7302e8d173c27bb1c251da315309d7805450",
+    "source_sha256": {
+      "src/pyrite/_photon_scene_feedback.py": "008b36afa8a617d300bd3e0ed593ba42710a4a177d4e9a6fba1505663aa9ebd6",
+      "src/pyrite/montecarlo/runner/photon_aperture.py": "092060da0355135f2fd1a2a35a3b59f5d6b2837ed8e1b10de556957be34fb03e",
+      "src/pyrite/montecarlo/transport/photon_coupling.py": "3d90b336b38a135d360fddbbf3017ef4c022246ed250394142f294d7f04bcc78",
+      "src/pyrite/montecarlo/transport/photon_feedback.py": "06ea5fc3bc5f6c103f1aeb943b867cd6fce60782344aeadefb2c6dd31516531d",
+      "src/pyrite/montecarlo/transport/photon_reentry.py": "ced1318f44d799746979cf5a944abb1851c291bc1567434e600262766fec17c7",
+      "tests/montecarlo/test_photon_reentry_pair_cuda.py": "e283ca873a90decc68c1d5d04b2977a6fb9da151fe8d2179fbd557db05b6850a"
+    }
+  },
+  "fp64": {
+    "canonical_photon_data_sha256": {
+      "eadl": "78ccf8a4e07c1c120a2e3d94ff051aab2180d151f35e8bc3406d52df5af5e88c",
+      "epdl_differential": "d36a50d1add5c6f0b3df80a108e83aa8db8a4822445ca192534f6bc0a55bb166",
+      "epdl_integrated": "fcc2f00c5bb969e99bc84cac16762f13e939f071d585c433a5c0f420913fcfc9"
+    },
+    "cases": [
+      {
+        "name": "tests.montecarlo.test_photon_reentry_cuda::test_public_cuda_filter_feedback_is_explicit_and_one_primary_pass[brem-True-silicon]",
+        "seconds": 1.477
+      },
+      {
+        "name": "tests.montecarlo.test_photon_reentry_cuda::test_public_cuda_filter_feedback_is_explicit_and_one_primary_pass[brem-True-tungsten]",
+        "seconds": 0.618
+      },
+      {
+        "name": "tests.montecarlo.test_photon_reentry_cuda::test_public_cuda_filter_feedback_is_explicit_and_one_primary_pass[characteristic-True-silicon]",
+        "seconds": 0.345
+      },
+      {
+        "name": "tests.montecarlo.test_photon_reentry_cuda::test_public_cuda_filter_feedback_is_explicit_and_one_primary_pass[characteristic-True-tungsten]",
+        "seconds": 0.344
+      },
+      {
+        "name": "tests.montecarlo.test_photon_reentry_cuda::test_public_cuda_filter_feedback_is_explicit_and_one_primary_pass[annihilation-True-silicon]",
+        "seconds": 0.356
+      },
+      {
+        "name": "tests.montecarlo.test_photon_reentry_cuda::test_public_cuda_filter_feedback_is_explicit_and_one_primary_pass[annihilation-True-tungsten]",
+        "seconds": 0.355
+      },
+      {
+        "name": "tests.montecarlo.test_photon_reentry_cuda::test_public_cuda_filter_feedback_is_explicit_and_one_primary_pass[characteristic-False-silicon]",
+        "seconds": 0.344
+      },
+      {
+        "name": "tests.montecarlo.test_photon_reentry_cuda::test_public_cuda_filter_feedback_is_explicit_and_one_primary_pass[characteristic-False-tungsten]",
+        "seconds": 0.346
+      },
+      {
+        "name": "tests.montecarlo.test_photon_reentry_cuda::test_real_cuda_charged_gap_filter_matches_cpu[0]",
+        "seconds": 2.762
+      },
+      {
+        "name": "tests.montecarlo.test_photon_reentry_cuda::test_real_cuda_charged_gap_filter_matches_cpu[1]",
+        "seconds": 1.741
+      },
+      {
+        "name": "tests.montecarlo.test_photon_reentry_cuda::test_cuda_scene_boundaries_match_cpu_and_empty_batch_is_explicit",
+        "seconds": 0.148
+      },
+      {
+        "name": "tests.montecarlo.test_photon_reentry_cuda::test_cuda_filter_capture_replay_checkpoint_cas_cpu_read",
+        "seconds": 1.916
+      },
+      {
+        "name": "tests.montecarlo.test_photon_reentry_cuda::test_cuda_reentry_mode_off_arrays_are_bitwise_unchanged",
+        "seconds": 0.66
+      },
+      {
+        "name": "tests.montecarlo.test_photon_production_cuda::test_public_cuda_selector_uses_one_primary_pass_and_returns_aperture[False-brem]",
+        "seconds": 0.363
+      },
+      {
+        "name": "tests.montecarlo.test_photon_production_cuda::test_public_cuda_selector_uses_one_primary_pass_and_returns_aperture[False-characteristic]",
+        "seconds": 0.266
+      },
+      {
+        "name": "tests.montecarlo.test_photon_production_cuda::test_public_cuda_selector_uses_one_primary_pass_and_returns_aperture[False-annihilation]",
+        "seconds": 0.232
+      },
+      {
+        "name": "tests.montecarlo.test_photon_production_cuda::test_public_cuda_selector_uses_one_primary_pass_and_returns_aperture[True-brem]",
+        "seconds": 0.273
+      },
+      {
+        "name": "tests.montecarlo.test_photon_production_cuda::test_public_cuda_selector_uses_one_primary_pass_and_returns_aperture[True-characteristic]",
+        "seconds": 0.276
+      },
+      {
+        "name": "tests.montecarlo.test_photon_production_cuda::test_public_cuda_selector_uses_one_primary_pass_and_returns_aperture[True-annihilation]",
+        "seconds": 0.277
+      },
+      {
+        "name": "tests.montecarlo.test_photon_production_cuda::test_cuda_aperture_replay_checkpoint_cas_and_cpu_portability",
+        "seconds": 1.577
+      },
+      {
+        "name": "tests.montecarlo.test_photon_production_cuda::test_cuda_mode_off_arrays_are_bitwise_stable_around_selected_run",
+        "seconds": 0.539
+      },
+      {
+        "name": "tests.montecarlo.test_photon_production_cuda::test_cuda_pair_electron_positron_feedback_closes_rest_reservoir",
+        "seconds": 0.305
+      }
+    ],
+    "code_digest": "40148dc3263f9750de7c682aa6b060a805dce82c9e268393c370410df4cdd14c",
+    "code_dirty": false,
+    "code_tables_digest": "bafd74d27ac4dee76ed2b16d2c605f2d1bd8a09caf388ee74e37ec15e3edaae1",
+    "environment": {
+      "OPENBLAS_NUM_THREADS": "1",
+      "PYRITE_FP64": "1",
+      "PYRITE_MC_BACKEND": "cuda",
+      "PYRITE_TEST_BACKEND": "cuda"
+    },
+    "errors": 0,
+    "failures": 0,
+    "hardware": {
+      "cuda_runtime": 13020,
+      "cupy": "14.2.0",
+      "device": "NVIDIA GeForce RTX 5080",
+      "numpy": "2.5.4",
+      "python": "3.14.6"
+    },
+    "job": 2528,
+    "job_log_sha256": "93d40a76d770016167fe5795cd228de0282d319f0f0a598300fc30bfd4186001",
+    "skipped": 0,
+    "source_revision": "70d37305b16ac193a5985496180188a9c45c5e9b",
+    "source_sha256": {
+      "src/pyrite/_photon_config.py": "ec87281d3bb4b23efca543f18a651895ad1aedf1a209883ffec30d93b4df2036",
+      "src/pyrite/_photon_scene_feedback.py": "008b36afa8a617d300bd3e0ed593ba42710a4a177d4e9a6fba1505663aa9ebd6",
+      "src/pyrite/_photon_support.py": "aa7a5888447e79d5a3bad4e2520305d4fbe2dac66747d230c1c20c63d3595ad7",
+      "src/pyrite/campaign/photon_cases.py": "9063dc9b3b9ba90dba97c482110d46c6794cca5f5d99a3b2918371881ea0431a",
+      "src/pyrite/montecarlo/runner/photon_aperture.py": "092060da0355135f2fd1a2a35a3b59f5d6b2837ed8e1b10de556957be34fb03e",
+      "src/pyrite/montecarlo/transport/_jit_kernel.py": "27d8995292c373788985cb2d6db3c37d270180ed58e5831025bc46a4d59db06f",
+      "src/pyrite/montecarlo/transport/photon_charged_escape.py": "88ac00424922029b404b3f7f8debd4ebd83539ea5e63b473658580b9207709d5",
+      "src/pyrite/montecarlo/transport/photon_coupling.py": "3d90b336b38a135d360fddbbf3017ef4c022246ed250394142f294d7f04bcc78",
+      "src/pyrite/montecarlo/transport/photon_feedback.py": "06ea5fc3bc5f6c103f1aeb943b867cd6fce60782344aeadefb2c6dd31516531d",
+      "src/pyrite/montecarlo/transport/photon_histories.py": "8ef4dc87770d0393028c01e28fc4ab6d634d3652ab259cd12b4ea6e0d8d779f1",
+      "src/pyrite/montecarlo/transport/photon_navigation.py": "8aae067e26982f013b8a098cf788fd9deb894bb85a2161c885d37813e617df55",
+      "src/pyrite/montecarlo/transport/photon_reentry.py": "ced1318f44d799746979cf5a944abb1851c291bc1567434e600262766fec17c7",
+      "tests/montecarlo/test_photon_production_cuda.py": "18883f039a08132c303ccc5aee234fcca28a3fd2f1f5c4533e5e69c713f2f99b",
+      "tests/montecarlo/test_photon_reentry_cuda.py": "91cd99be6ec94f133d7ba754edca97db4b3302ced8d2a9bfcd3af9b2d87d5701"
+    },
+    "tests": 22,
+    "time_seconds": 17.553,
+    "xml_sha256": "f4943f59955002cc0e461fd02eb372a471208b6614221f921ed6846cd4dfaed0"
+  },
+  "limitations": [
+    "Primary charged source transport stays in its target; re-entry applies to photon-born and relaxation descendants.",
+    "Only catalog materials with existing shell, stopping, ELSEPA and BremsLib resources are admitted.",
+    "Lineage/RNG, local transforms, visit scheduling and energy ledgers remain host controlled; ray clipping and charged flights run on selected CUDA backend.",
+    "Visit clocks reset; no time-dependent scoring, pixel/acquisition response, full-shower batching invariance or external full-track validation is certified."
+  ],
+  "previous_attempts": [
+    {
+      "job": 2526,
+      "result": "Preflight stopped before tests: remote rg unavailable; replaced with grep"
+    },
+    {
+      "job": 2527,
+      "result": "18 passed; four Cu fixtures refused before primary transport because Cu lacks shell conduction data. Switched fixture to supported W and added a CPU refusal regression. No model/tolerance change."
+    }
+  ],
+  "reproduction": "uv run pyrite-dev test --slow tests/montecarlo/test_photon_reentry_cuda.py tests/montecarlo/test_photon_production_cuda.py",
+  "scope": "Production charged scene re-entry and CPU/CUDA implementation parity; no external full-track validation"
+}

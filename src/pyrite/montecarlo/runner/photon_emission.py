@@ -111,6 +111,14 @@ def _score_exits(histories, edges: np.ndarray, n_primaries: int):
     return total, direct_spec, other_spec, total_hits, unbinned
 
 
+def _execution_options(backend, cuda_batch_size):
+    if backend not in ("cpu", "cuda"):
+        raise ValueError("photon scoring backend must be 'cpu' or 'cuda'")
+    if type(cuda_batch_size) is not int or cuda_batch_size <= 0:
+        raise ValueError("cuda_batch_size must be a positive integer")
+    return {} if backend == "cpu" else {"backend": "cuda", "cuda_batch_size": cuda_batch_size}
+
+
 def score_bremslib_continuum(
     segments: "Mapping",
     layers: "Sequence",
@@ -132,6 +140,8 @@ def score_bremslib_continuum(
     max_generations: int = 1000,
     max_rounds: int = 64,
     source_kind: int = 0,
+    backend: str = "cpu",
+    cuda_batch_size: int = 65536,
 ) -> PhotonContinuumScore:
     """Run the complete *reference* weighted photon source and ordinary-hit tally.
 
@@ -165,6 +175,7 @@ def score_bremslib_continuum(
     """
     from ..transport.photon_sources import sample_bremslib_continuum
 
+    execution = _execution_options(backend, cuda_batch_size)
     edges = _edges(edges_eV)
     if aperture is None:
         raise ValueError("an explicit physical aperture is required for ordinary-hit scoring")
@@ -213,6 +224,7 @@ def score_bremslib_continuum(
         height_ang=height_ang,
         max_generations=max_generations,
         max_rounds=max_rounds,
+        **execution,
     )
 
 
@@ -233,6 +245,8 @@ def score_photon_sources(
     max_generations: int = 1000,
     max_rounds: int = 64,
     n_proposals: int | None = None,
+    backend: str = "cpu",
+    cuda_batch_size: int = 65536,
 ) -> PhotonContinuumScore:
     """Track an explicit source batch and score ordinary physical-aperture hits.
 
@@ -257,6 +271,7 @@ def score_photon_sources(
     from ..transport.photon_coupling import track_coupled_histories
     from ..transport.photon_histories import track_photon_histories
 
+    execution = _execution_options(backend, cuda_batch_size)
     edges = _edges(edges_eV)
     if aperture is None:
         raise ValueError("an explicit physical aperture is required for ordinary-hit scoring")
@@ -296,6 +311,7 @@ def score_photon_sources(
             width_ang=width_ang,
             height_ang=height_ang,
             max_generations=max_generations,
+            **execution,
         )
     else:
         histories = track_coupled_histories(
@@ -311,6 +327,7 @@ def score_photon_sources(
             width_ang=width_ang,
             height_ang=height_ang,
             max_generations=max_generations,
+            **execution,
         )
     total, direct, other, hits, outside = _score_exits(histories, edges, n_primaries)
     return PhotonContinuumScore(

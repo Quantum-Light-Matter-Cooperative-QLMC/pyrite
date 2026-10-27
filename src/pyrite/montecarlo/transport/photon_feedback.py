@@ -268,6 +268,7 @@ class FeedbackChargedStage:
     base: CascadeChargedStage
     photon_cutoff_eV: float
     max_relaxation_rounds: int = 64
+    retain_exits: bool = False
     transports_positrons = True
     requires_stack_only = True
 
@@ -292,6 +293,7 @@ class FeedbackChargedStage:
         n = pending["kinetic_eV"].size
         rest = np.where(pending["species"] == POSITRON, _REST_EV, 0.0)
         owners, totals, emitted = np.arange(n), np.zeros((4, n)), []
+        escaped_parts = []
         low = (pending["species"] == POSITRON) & (pending["kinetic_eV"] <= self.threshold_eV)
         if low.any():
             from .annihilation import ANNIHILATION_AT_REST
@@ -317,16 +319,21 @@ class FeedbackChargedStage:
                     continue
                 part = {name: value[select] for name, value in pending.items()}
                 owner = owners[select]
-                values, photons, auger, parents = _feedback_batch(
+                values, photons, auger, parents, escaped = _feedback_batch(
                     self, part, stage_seed(seed, round_index)
                 )
                 emitted.append({**photons, "parent": owner[photons["parent"]]})
+                if escaped is not None:
+                    escaped_parts.append({**escaped, "parent": owner[escaped["parent"]]})
                 next_parts.append(auger)
                 next_owners.append(owner[parents])
                 for term in range(4):
                     np.add.at(totals[term], owner, values[term])
             if not next_owners or not sum(len(v) for v in next_owners):
-                return ChargedStageResult(*totals, _join_emissions(emitted), rest)
+                from .photon_charged_escape import join_charged_exits
+
+                exits = join_charged_exits(escaped_parts) if self.retain_exits else None
+                return ChargedStageResult(*totals, _join_emissions(emitted), rest, exits)
             pending = {
                 name: np.concatenate([p[name] for p in next_parts], axis=0) for name in pending
             }
@@ -404,7 +411,12 @@ def _feedback_batch(stage, part, seed):
         key=particles["key"][keep],
         species=np.full(np.count_nonzero(keep), ELECTRON),
     )
-    return values, _join_emissions(emitted), auger, particles["parent"][keep]
+    escaped = None
+    if stage.retain_exits:
+        from .photon_charged_escape import escaped_charged_rows
+
+        escaped = escaped_charged_rows(result, part)
+    return values, _join_emissions(emitted), auger, particles["parent"][keep], escaped
 
 
 def cascade_feedback_stage(layers, *, photon_cutoff_eV, **transport):

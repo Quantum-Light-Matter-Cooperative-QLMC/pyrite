@@ -1,0 +1,67 @@
+{
+  "schema": "photon-monoenergetic-evidence.v1",
+  "job": 2544,
+  "run_date_utc": "2026-10-27",
+  "tested_commit": "64ab0b5fc28b15a5c5ec629298edef824f22f91b",
+  "seed": 34101,
+  "events_per_arm": 100000,
+  "staging_root": "~/.local/opt/pyrite-341-mono-64ab0b5f",
+  "state": "12 tasks COMPLETED, ExitCode=0:0",
+  "allocation": {
+    "partition": "cpu",
+    "cpus_per_task": 1,
+    "memory_GiB_per_task": 2,
+    "time_limit_minutes": 30,
+    "pyrite_node": "qlmc-ace",
+    "pyrite_wall_seconds": [76, 78, 79]
+  },
+  "ledger_status": "discrepancy",
+  "source_sha256": {
+    "checks/photon_full_track/cases.py": "023953fe1997f7b9cbd968fedb47ac25b7219e5049644c298a52541ff3172fc5",
+    "checks/photon_full_track/compare.py": "49d4bb5aa25a618d079252cecaced32189003cbafa5e418579c817d5e792593c",
+    "checks/photon_full_track/monoenergetic.py": "f9348158808adb4da1b7849e8d763ee30e4b8b5825f24a51748b6739b653bf8b",
+    "checks/photon_full_track/run_monoenergetic.sbatch": "eeb6378ad4279f28e4389cff948512853a1b9b5ba5a0229c71214fc7340d3a63",
+    "src/pyrite/montecarlo/transport/photon_histories.py": "8ef4dc87770d0393028c01e28fc4ab6d634d3652ab259cd12b4ea6e0d8d779f1",
+    "src/pyrite/montecarlo/transport/photon_scattering.py": "bf20452b17e538232b4cfa28535c4ca8e3be9c50714db5e9612ae0e9e4a998d1",
+    "src/pyrite/montecarlo/transport/relaxation.py": "4ca1afb2a75c9d5a2d3a40490973187e6fff78cfd2b18dee61b6348a3883e17f",
+    "src/pyrite/montecarlo/eadl_relaxation.py": "0d8ba0b83d4c81d8ca6622dbcf0e3acf8b1128e0f1744903e64487814deaab51",
+    "src/pyrite/montecarlo/transport/photon_navigation.py": "8aae067e26982f013b8a098cf788fd9deb894bb85a2161c885d37813e617df55"
+  },
+  "verification_note": "Added completed-run verification after the run; all nine Geant4 logs pass it and reproduce identical history-block counts. Unused log-grid nodes above 100 keV differ by platform roundoff; the original remote records are retained. Photon simulation source unchanged.",
+  "geant4_version": "11.4.2 / EMLOW8.8",
+  "geant4_executable_sha256": "fe3fc52d65477c780e9b77c4eb1385c752b66c403b045b988855a5d48541cc4f",
+  "geant4_atomic_deexcitation_source_sha256": "90625567d9421cbc3dcdb3aaba0e3af2ad1200a94db4b3a4bdda0e5cec185d53",
+  "data_sha256": {
+    "eadl": "78ccf8a4e07c1c120a2e3d94ff051aab2180d151f35e8bc3406d52df5af5e88c",
+    "epdl": "fcc2f00c5bb969e99bc84cac16762f13e939f071d585c433a5c0f420913fcfc9",
+    "epdl_differential": "d36a50d1add5c6f0b3df80a108e83aa8db8a4822445ca192534f6bc0a55bb166"
+  },
+  "raw_reduction_sha256": {
+    "w_12kev_auger-cut.json": "5656db091c20b200c074db73f91f62d4e9a13871fd4e53b87a167b4105fc2cc0",
+    "w_12kev_auger-off.json": "f2d7935bbfc9451b08567b176db58f38ef6ebe6c6ee3a03970c50810a3cd0e9b",
+    "w_12kev_cascade.json": "60803da4e865b3d70a31c0f3d13989fd6643b7a5ed4af3322366cc18c4d99c89",
+    "w_12kev_pyrite.json": "5fdb27c060f6fb940abbabe88921388d9becba70715170638c15e46b65ec740d",
+    "w_20kev_auger-cut.json": "1b6cf012a6594356942fa3d4b80b22f07e0d3e8dc67176bd515890a9493b638b",
+    "w_20kev_auger-off.json": "a847ca9764e763b90534347e39162cfa3f9fcef067aafc77342fa2b337dc3c68",
+    "w_20kev_cascade.json": "0765e28d4b6702e9552b18363edfd17c3ad2cd1078ad3b0b7cff35f1ec1fba59",
+    "w_20kev_pyrite.json": "bb9f6e95ede9b5d9615e3ca56766b7c910b0d2819e840f39ffc994064f94e4f0",
+    "w_30kev_auger-cut.json": "1da98c2a59e5f544eb3b5efbb1405d1f22db28495f2a31c0666b666c29e79fd7",
+    "w_30kev_auger-off.json": "8a40ef1c6a90510554116b1aff320437809bf4e522f8eba354d1c51a1537d47d",
+    "w_30kev_cascade.json": "18232521bda98097f54b0af923dc4c078dd0f01334a4fd0db7e81403a5719dd2",
+    "w_30kev_pyrite.json": "41a0996f3ed80eb609fd6b6db38286c1159d5bd1a0c02839091eb47315926b39"
+  },
+  "committed_reduction_sha256": {
+    "w_12kev_auger-cut.json.gz": "9a870dd029bff298509e481ea96a7c6dc053c3230b4f56fb2ad59ccc30b91c09",
+    "w_12kev_auger-off.json.gz": "72ae2f3b912f2766044c3b001e53a97a27d6fd2bda35f0764962c3b320595151",
+    "w_12kev_cascade.json.gz": "d0bea52ef2c210d09b71806d69747082c5be5415f480fc166b8559b99d553688",
+    "w_12kev_pyrite.json.gz": "fd52b70fab446454cfdd06d5af6218c0c41b63a5dd74d9f26c58be54e5f88de5",
+    "w_20kev_auger-cut.json.gz": "4e81bd8f37c311d471d240e7e5d99432ae1a59a60fc5002f14ca81523909bbc4",
+    "w_20kev_auger-off.json.gz": "1877cc7250aa6a6f5e4d0b5fddbdd92ba3ff3319c7f0209e84e81b5ce0fd31a7",
+    "w_20kev_cascade.json.gz": "2446171df78eecdb4ad4ef3d4dc3a6a488a28c5df3a372a8c1dd506c1bb47671",
+    "w_20kev_pyrite.json.gz": "fc4417fce398f4eed895a572633a780d4c254d8ebf44537b93c080f08ff53b32",
+    "w_30kev_auger-cut.json.gz": "560ceace58abbcff474b137615278890a80911834e0a85466e69fc9006b1afbb",
+    "w_30kev_auger-off.json.gz": "f21915013026627a174576cb0d2b11cc977079373f7d9e1a93f19e2d04c3f780",
+    "w_30kev_cascade.json.gz": "c2d0a68d533ba6d01cf2b7ecf5f953d7ad66e3361a03e3b6a72af1ffe139caf4",
+    "w_30kev_pyrite.json.gz": "b2c08f5dc4d1665ae47af45d8e106a5d213a65319c23af0020fd5ae4edf0dcd3"
+  }
+}

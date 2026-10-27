@@ -1,0 +1,1138 @@
+{
+  "baseline": {
+    "scaling": {
+      "cprofile_cumulative": [
+        {
+          "calls": 1,
+          "cumulative_seconds": 0.008560327000000001,
+          "exclusive_seconds": 4.3660000000000005e-05,
+          "function": "benchmark.py:42:cuda_host"
+        },
+        {
+          "calls": 1,
+          "cumulative_seconds": 0.008289145000000001,
+          "exclusive_seconds": 3.156e-05,
+          "function": "photon_cuda.py:15:scene_first_interactions_cuda"
+        },
+        {
+          "calls": 1,
+          "cumulative_seconds": 0.0063012120000000005,
+          "exclusive_seconds": 0.000373292,
+          "function": "photon_navigation.py:366:_interval_first_interactions"
+        },
+        {
+          "calls": 3,
+          "cumulative_seconds": 0.0037707350000000003,
+          "exclusive_seconds": 6.9591e-05,
+          "function": "photon_navigation.py:161:_coefficients"
+        },
+        {
+          "calls": 4,
+          "cumulative_seconds": 0.0034327010000000002,
+          "exclusive_seconds": 0.000304454,
+          "function": "photon_cross_sections.py:130:photon_cross_sections_ang2"
+        },
+        {
+          "calls": 20,
+          "cumulative_seconds": 0.003038256,
+          "exclusive_seconds": 0.001235495,
+          "function": "photon_cross_sections.py:111:_interpolate"
+        },
+        {
+          "calls": 40,
+          "cumulative_seconds": 0.001706131,
+          "exclusive_seconds": 1.774e-05,
+          "function": "fromnumeric.py:48:_wrapfunc"
+        },
+        {
+          "calls": 20,
+          "cumulative_seconds": 0.001579041,
+          "exclusive_seconds": 1.1200000000000001e-05,
+          "function": "fromnumeric.py:1459:searchsorted"
+        },
+        {
+          "calls": 20,
+          "cumulative_seconds": 0.001555881,
+          "exclusive_seconds": 0.001555881,
+          "function": "~:0:<method 'searchsorted' of 'numpy.ndarray' objects>"
+        },
+        {
+          "calls": 2,
+          "cumulative_seconds": 0.000959586,
+          "exclusive_seconds": 0.000612026,
+          "function": "photon_navigation.py:83:_clip_axes"
+        },
+        {
+          "calls": 1,
+          "cumulative_seconds": 0.000871136,
+          "exclusive_seconds": 0.000458963,
+          "function": "photon_navigation.py:173:_collision_distances"
+        },
+        {
+          "calls": 1,
+          "cumulative_seconds": 0.000669155,
+          "exclusive_seconds": 0.000183561,
+          "function": "photon_navigation.py:146:_box_intervals"
+        },
+        {
+          "calls": 22,
+          "cumulative_seconds": 0.000653004,
+          "exclusive_seconds": 0.000653004,
+          "function": "~:0:<method 'reduce' of 'numpy.ufunc' objects>"
+        },
+        {
+          "calls": 1,
+          "cumulative_seconds": 0.0006248940000000001,
+          "exclusive_seconds": 8.910000000000001e-06,
+          "function": "photon_navigation.py:72:_layer_intervals"
+        },
+        {
+          "calls": 3,
+          "cumulative_seconds": 0.000494463,
+          "exclusive_seconds": 2.43e-06,
+          "function": "~:0:<method 'sum' of 'numpy.ndarray' objects>"
+        },
+        {
+          "calls": 3,
+          "cumulative_seconds": 0.000492033,
+          "exclusive_seconds": 8.6e-07,
+          "function": "_methods.py:47:_sum"
+        },
+        {
+          "calls": 18,
+          "cumulative_seconds": 0.000479353,
+          "exclusive_seconds": 5.65e-06,
+          "function": "from_data.py:59:asarray"
+        },
+        {
+          "calls": 4,
+          "cumulative_seconds": 0.00047919300000000005,
+          "exclusive_seconds": 5.09e-06,
+          "function": "search.py:145:flatnonzero"
+        },
+        {
+          "calls": 18,
+          "cumulative_seconds": 0.000473703,
+          "exclusive_seconds": 0.000465133,
+          "function": "~:0:<built-in method cupy._core.core.array>"
+        },
+        {
+          "calls": 4,
+          "cumulative_seconds": 0.000470053,
+          "exclusive_seconds": 0.00045042300000000003,
+          "function": "~:0:<method 'nonzero' of 'cupy._core.core._ndarray_base' objects>"
+        },
+        {
+          "calls": 25,
+          "cumulative_seconds": 0.00028327100000000003,
+          "exclusive_seconds": 0.000268981,
+          "function": "search.py:175:where"
+        },
+        {
+          "calls": 1,
+          "cumulative_seconds": 0.000273422,
+          "exclusive_seconds": 2.604e-05,
+          "function": "photon_navigation.py:262:_validate_flights"
+        },
+        {
+          "calls": 1,
+          "cumulative_seconds": 0.00024185200000000003,
+          "exclusive_seconds": 2.373e-05,
+          "function": "photon_navigation.py:36:_validate_rays"
+        },
+        {
+          "calls": 4,
+          "cumulative_seconds": 0.00022113200000000002,
+          "exclusive_seconds": 3.2000000000000003e-06,
+          "function": "__init__.py:826:asnumpy"
+        },
+        {
+          "calls": 4,
+          "cumulative_seconds": 0.00021758200000000002,
+          "exclusive_seconds": 0.000213582,
+          "function": "~:0:<method 'get' of 'cupy._core.core._ndarray_base' objects>"
+        }
+      ],
+      "cuda_runtime": 13020,
+      "cupy": "14.2.0",
+      "device": "NVIDIA GeForce RTX 5080",
+      "device_pool_reserved_bytes": 932995584,
+      "memory_scope": "combined process peak and retained device pool, not per-arm peaks",
+      "numpy": "2.5.4",
+      "peak_process_rss_kib": 1689544,
+      "python": "3.14.6",
+      "scaling": [
+        {
+          "cpu_seconds": [
+            0.0008703451603651047,
+            0.0009303558617830276,
+            0.0009766758885234594,
+            0.0008438359946012497,
+            0.0009280550293624401
+          ],
+          "cuda_seconds": [
+            0.0039716900791972876,
+            0.0036493330262601376,
+            0.003518342040479183,
+            0.003577271942049265,
+            0.00359030207619071
+          ],
+          "parity": "pass",
+          "rays": 1024,
+          "regions": 3
+        },
+        {
+          "cpu_seconds": [
+            0.0072257560677826405,
+            0.007205963833257556,
+            0.007277456112205982,
+            0.007265045074746013,
+            0.0072809248231351376
+          ],
+          "cuda_seconds": [
+            0.007581077981740236,
+            0.007294995943084359,
+            0.007420197129249573,
+            0.007604666985571384,
+            0.007491081953048706
+          ],
+          "parity": "pass",
+          "rays": 16384,
+          "regions": 3
+        },
+        {
+          "cpu_seconds": [
+            0.1278174719773233,
+            0.1277160921599716,
+            0.13104781322181225,
+            0.1279029780998826,
+            0.1286730219144374
+          ],
+          "cuda_seconds": [
+            0.08281377796083689,
+            0.08266304200515151,
+            0.08283258392475545,
+            0.08327430603094399,
+            0.08328073611482978
+          ],
+          "parity": "pass",
+          "rays": 262144,
+          "regions": 3
+        },
+        {
+          "cpu_seconds": [
+            0.004374548094347119,
+            0.004354387987405062,
+            0.004304456990212202,
+            0.004311948083341122,
+            0.004245745949447155
+          ],
+          "cuda_seconds": [
+            0.010346655966714025,
+            0.009949382860213518,
+            0.010635828133672476,
+            0.009751441888511181,
+            0.010038943029940128
+          ],
+          "parity": "pass",
+          "rays": 1024,
+          "regions": 17
+        },
+        {
+          "cpu_seconds": [
+            0.03941005002707243,
+            0.039373830892145634,
+            0.03915236913599074,
+            0.03911426803097129,
+            0.0393277311231941
+          ],
+          "cuda_seconds": [
+            0.04040536703541875,
+            0.040533107006922364,
+            0.040479227900505066,
+            0.04002189100719988,
+            0.04028262314386666
+          ],
+          "parity": "pass",
+          "rays": 16384,
+          "regions": 17
+        },
+        {
+          "cpu_seconds": [
+            0.8117242739535868,
+            0.8602118259295821,
+            0.81283701187931,
+            0.8040916800964624,
+            0.8601299689617008
+          ],
+          "cuda_seconds": [
+            0.6763985739089549,
+            0.6696183870080858,
+            0.671540766954422,
+            0.6753832129761577,
+            0.6694779889658093
+          ],
+          "parity": "pass",
+          "rays": 262144,
+          "regions": 17
+        }
+      ],
+      "seed": 341701,
+      "source_sha256": {
+        "checks/photon_cuda/benchmark.py": "5f6e30f701ac7bc5c907660b966ea115047d4fe96a3d4485949d5f74f99de195",
+        "checks/photon_first_flight_cuda.py": "3772c4e9dec39e22e8ecfd3659adfbf97ce8810eac9645715f717e056cdbb171",
+        "src/pyrite/montecarlo/transport/photon_cuda.py": "d7dff5683fb2cb421699b5be519919b62a5568d83696b7ff6022ef6819726890",
+        "src/pyrite/montecarlo/transport/photon_navigation.py": "8aae067e26982f013b8a098cf788fd9deb894bb85a2161c885d37813e617df55"
+      },
+      "warmups": 2
+    },
+    "tuning": {
+      "cuda_runtime": 13020,
+      "cupy": "14.2.0",
+      "device": "NVIDIA GeForce RTX 5080",
+      "device_pool_reserved_bytes": 219750400,
+      "memory_scope": "combined process peak and retained device pool, not per-arm peaks",
+      "numpy": "2.5.4",
+      "peak_process_rss_kib": 1013004,
+      "python": "3.14.6",
+      "seed": 341701,
+      "source_sha256": {
+        "checks/photon_cuda/benchmark.py": "5f6e30f701ac7bc5c907660b966ea115047d4fe96a3d4485949d5f74f99de195",
+        "checks/photon_first_flight_cuda.py": "3772c4e9dec39e22e8ecfd3659adfbf97ce8810eac9645715f717e056cdbb171",
+        "src/pyrite/montecarlo/transport/photon_cuda.py": "d7dff5683fb2cb421699b5be519919b62a5568d83696b7ff6022ef6819726890",
+        "src/pyrite/montecarlo/transport/photon_navigation.py": "8aae067e26982f013b8a098cf788fd9deb894bb85a2161c885d37813e617df55"
+      },
+      "tuning": {
+        "holdout_seconds": {
+          "selected": [
+            0.08885442791506648,
+            0.09811183204874396,
+            0.09852820099331439,
+            0.09976770379580557,
+            0.09871132182888687,
+            0.09999990789219737,
+            0.09833476599305868,
+            0.09828745992854238,
+            0.0983233351726085
+          ],
+          "unchunked": [
+            0.09051185101270676,
+            0.10421223100274801,
+            0.10499239107593894,
+            0.10580684384331107,
+            0.1061498080380261,
+            0.10605646693147719,
+            0.1052796058356762,
+            0.10585489706136286,
+            0.10501451091840863
+          ]
+        },
+        "rays": 262144,
+        "regions": 3,
+        "seed": 341701,
+        "selected_chunk": 65536,
+        "trials": [
+          {
+            "chunk": 65536,
+            "seconds": [
+              0.08063301700167358,
+              0.08051633415743709,
+              0.08057477581314743
+            ]
+          },
+          {
+            "chunk": 131072,
+            "seconds": [
+              0.0810906388796866,
+              0.08201333112083375,
+              0.08140035718679428
+            ]
+          },
+          {
+            "chunk": 65536,
+            "seconds": [
+              0.0812888981308788,
+              0.08138751913793385,
+              0.08139161881990731
+            ]
+          },
+          {
+            "chunk": 262144,
+            "seconds": [
+              0.08259641891345382,
+              0.08325140294618905,
+              0.08247816585935652
+            ]
+          },
+          {
+            "chunk": 16384,
+            "seconds": [
+              0.1180817810818553,
+              0.11915399017743766,
+              0.11884266696870327
+            ]
+          },
+          {
+            "chunk": 16384,
+            "seconds": [
+              0.1194210050161928,
+              0.11920133396051824,
+              0.11885883705690503
+            ]
+          },
+          {
+            "chunk": 262144,
+            "seconds": [
+              0.08246853901073337,
+              0.08278201101347804,
+              0.08300884300842881
+            ]
+          },
+          {
+            "chunk": 16384,
+            "seconds": [
+              0.11852770391851664,
+              0.11993916309438646,
+              0.11886314093135297
+            ]
+          },
+          {
+            "chunk": 65536,
+            "seconds": [
+              0.08038959396071732,
+              0.08089822484180331,
+              0.08198671182617545
+            ]
+          },
+          {
+            "chunk": 4096,
+            "seconds": [
+              0.2759304088540375,
+              0.2762355050072074,
+              0.27621457586064935
+            ]
+          },
+          {
+            "chunk": 65536,
+            "seconds": [
+              0.08098558709025383,
+              0.08106224588118494,
+              0.08107698708772659
+            ]
+          },
+          {
+            "chunk": 65536,
+            "seconds": [
+              0.08720436389558017,
+              0.08677990501746535,
+              0.08693874790333211
+            ]
+          },
+          {
+            "chunk": 65536,
+            "seconds": [
+              0.08707449119538069,
+              0.08731448277831078,
+              0.08720896206796169
+            ]
+          },
+          {
+            "chunk": 65536,
+            "seconds": [
+              0.090284792939201,
+              0.08794644800946116,
+              0.08749407390132546
+            ]
+          },
+          {
+            "chunk": 4096,
+            "seconds": [
+              0.29209446511231363,
+              0.2874787640757859,
+              0.2909716588910669
+            ]
+          },
+          {
+            "chunk": 131072,
+            "seconds": [
+              0.08806444006040692,
+              0.08790729194879532,
+              0.08758707181550562
+            ]
+          }
+        ]
+      },
+      "warmups": 2
+    }
+  },
+  "baseline_job": 2512,
+  "baseline_revision": "ba6dbda412cc931a82dde56136eee709352381df",
+  "commands": [
+    "uv run --extra nvidia --extra optimization python -m checks.photon_cuda.benchmark scaling",
+    "uv run --extra nvidia --extra optimization python -m checks.photon_cuda.benchmark tune",
+    "uv run --extra nvidia --extra optimization python -m checks.photon_cuda.benchmark trace"
+  ],
+  "failed_predecessor": {
+    "job": 2513,
+    "reason": "NVRTC lacked host math.h; fixed by using CUDA built-in math functions"
+  },
+  "final_geometry_tests": {
+    "errors": "0",
+    "failures": "0",
+    "job": 2515,
+    "revision": "2405abb99aca06194b5b2086ed1cbb8220b4e93e",
+    "skipped": "0",
+    "test_source_sha256": "f80e561841bdc48ba95228f121db1145bca3d31fc7d353c0cedde88b6e2c90a1",
+    "tests": "14",
+    "time": "2.255"
+  },
+  "fused": {
+    "scaling": {
+      "cprofile_cumulative": [
+        {
+          "calls": 1,
+          "cumulative_seconds": 0.006278012,
+          "exclusive_seconds": 5.0591000000000004e-05,
+          "function": "benchmark.py:43:cuda_host"
+        },
+        {
+          "calls": 1,
+          "cumulative_seconds": 0.005894959,
+          "exclusive_seconds": 3.097e-05,
+          "function": "photon_cuda.py:16:scene_first_interactions_cuda"
+        },
+        {
+          "calls": 1,
+          "cumulative_seconds": 0.0051058100000000006,
+          "exclusive_seconds": 0.000103281,
+          "function": "_photon_cuda_kernel.py:135:fused_first_interactions"
+        },
+        {
+          "calls": 1,
+          "cumulative_seconds": 0.0045974760000000005,
+          "exclusive_seconds": 0.000210191,
+          "function": "_photon_cuda_kernel.py:118:_material_rates"
+        },
+        {
+          "calls": 3,
+          "cumulative_seconds": 0.003875972,
+          "exclusive_seconds": 7.246000000000001e-05,
+          "function": "photon_navigation.py:161:_coefficients"
+        },
+        {
+          "calls": 4,
+          "cumulative_seconds": 0.0035609910000000003,
+          "exclusive_seconds": 0.00035110100000000004,
+          "function": "photon_cross_sections.py:130:photon_cross_sections_ang2"
+        },
+        {
+          "calls": 20,
+          "cumulative_seconds": 0.00309858,
+          "exclusive_seconds": 0.001273141,
+          "function": "photon_cross_sections.py:111:_interpolate"
+        },
+        {
+          "calls": 41,
+          "cumulative_seconds": 0.0017431990000000002,
+          "exclusive_seconds": 2.0090000000000002e-05,
+          "function": "fromnumeric.py:48:_wrapfunc"
+        },
+        {
+          "calls": 20,
+          "cumulative_seconds": 0.001590699,
+          "exclusive_seconds": 1.073e-05,
+          "function": "fromnumeric.py:1459:searchsorted"
+        },
+        {
+          "calls": 20,
+          "cumulative_seconds": 0.001565889,
+          "exclusive_seconds": 0.001565889,
+          "function": "~:0:<method 'searchsorted' of 'numpy.ndarray' objects>"
+        },
+        {
+          "calls": 22,
+          "cumulative_seconds": 0.000715164,
+          "exclusive_seconds": 0.000715164,
+          "function": "~:0:<method 'reduce' of 'numpy.ufunc' objects>"
+        },
+        {
+          "calls": 3,
+          "cumulative_seconds": 0.00046697300000000003,
+          "exclusive_seconds": 2.08e-06,
+          "function": "~:0:<method 'sum' of 'numpy.ndarray' objects>"
+        },
+        {
+          "calls": 3,
+          "cumulative_seconds": 0.000464893,
+          "exclusive_seconds": 8.200000000000001e-07,
+          "function": "_methods.py:47:_sum"
+        },
+        {
+          "calls": 1,
+          "cumulative_seconds": 0.000450122,
+          "exclusive_seconds": 3.1140000000000003e-05,
+          "function": "photon_navigation.py:262:_validate_flights"
+        },
+        {
+          "calls": 1,
+          "cumulative_seconds": 0.000410212,
+          "exclusive_seconds": 4.4590000000000005e-05,
+          "function": "photon_navigation.py:36:_validate_rays"
+        },
+        {
+          "calls": 10,
+          "cumulative_seconds": 0.000360711,
+          "exclusive_seconds": 3.1600000000000002e-06,
+          "function": "from_data.py:59:asarray"
+        },
+        {
+          "calls": 10,
+          "cumulative_seconds": 0.000357551,
+          "exclusive_seconds": 0.00035172100000000004,
+          "function": "~:0:<built-in method cupy._core.core.array>"
+        },
+        {
+          "calls": 4,
+          "cumulative_seconds": 0.000314532,
+          "exclusive_seconds": 2.65e-06,
+          "function": "__init__.py:826:asnumpy"
+        },
+        {
+          "calls": 4,
+          "cumulative_seconds": 0.000311542,
+          "exclusive_seconds": 0.00030830200000000004,
+          "function": "~:0:<method 'get' of 'cupy._core.core._ndarray_base' objects>"
+        },
+        {
+          "calls": 1,
+          "cumulative_seconds": 0.000280707,
+          "exclusive_seconds": 8.301e-06,
+          "function": "_backend.py:311:select_backend"
+        },
+        {
+          "calls": 1,
+          "cumulative_seconds": 0.000271506,
+          "exclusive_seconds": 1.916e-05,
+          "function": "_backend.py:286:_load_cupy"
+        },
+        {
+          "calls": 1,
+          "cumulative_seconds": 0.000265682,
+          "exclusive_seconds": 3.9711e-05,
+          "function": "_linalg.py:2615:norm"
+        },
+        {
+          "calls": 1,
+          "cumulative_seconds": 0.00020392600000000003,
+          "exclusive_seconds": 2.555e-05,
+          "function": "_backend.py:108:__init__"
+        },
+        {
+          "calls": 4,
+          "cumulative_seconds": 0.00016802100000000002,
+          "exclusive_seconds": 0.000164591,
+          "function": "shape_base.py:378:stack"
+        },
+        {
+          "calls": 20,
+          "cumulative_seconds": 0.00015517000000000002,
+          "exclusive_seconds": 1.3880000000000001e-05,
+          "function": "fromnumeric.py:2245:clip"
+        }
+      ],
+      "cuda_runtime": 13020,
+      "cupy": "14.2.0",
+      "device": "NVIDIA GeForce RTX 5080",
+      "device_pool_reserved_bytes": 890396160,
+      "epdl_table_sha256": "fcc2f00c5bb969e99bc84cac16762f13e939f071d585c433a5c0f420913fcfc9",
+      "memory_scope": "combined process peak and retained device pool, not per-arm peaks",
+      "numpy": "2.5.4",
+      "peak_process_rss_kib": 1616652,
+      "python": "3.14.6",
+      "scaling": [
+        {
+          "array_seconds": [
+            0.003383041825145483,
+            0.003504944033920765,
+            0.00347534311003983,
+            0.0034239119850099087,
+            0.0035141839180141687
+          ],
+          "cpu_seconds": [
+            0.0008990259375423193,
+            0.0009395559318363667,
+            0.0008430059533566236,
+            0.0009125659707933664,
+            0.0008734250441193581
+          ],
+          "cuda_seconds": [
+            0.0010988970752805471,
+            0.001093406928703189,
+            0.0010981368832290173,
+            0.0011641979217529297,
+            0.0011337879113852978
+          ],
+          "parity": "pass",
+          "rays": 1024,
+          "regions": 3
+        },
+        {
+          "array_seconds": [
+            0.00742352893576026,
+            0.007370049133896828,
+            0.007350568892434239,
+            0.007494210032746196,
+            0.007631415035575628
+          ],
+          "cpu_seconds": [
+            0.007279197918251157,
+            0.007327808998525143,
+            0.007327658124268055,
+            0.007263817824423313,
+            0.007282359059900045
+          ],
+          "cuda_seconds": [
+            0.00512647395953536,
+            0.0051305938977748156,
+            0.005119763081893325,
+            0.0066226699855178595,
+            0.005130288191139698
+          ],
+          "parity": "pass",
+          "rays": 16384,
+          "regions": 3
+        },
+        {
+          "array_seconds": [
+            0.08278555097058415,
+            0.08299364312551916,
+            0.08320219395682216,
+            0.08251092908903956,
+            0.08184370002709329
+          ],
+          "cpu_seconds": [
+            0.12714881403371692,
+            0.12618736899457872,
+            0.1272750049829483,
+            0.12662590108811855,
+            0.12637878907844424
+          ],
+          "cuda_seconds": [
+            0.0862369870301336,
+            0.08621647907420993,
+            0.08660560986027122,
+            0.08636870980262756,
+            0.08695322903804481
+          ],
+          "parity": "pass",
+          "rays": 262144,
+          "regions": 3
+        },
+        {
+          "array_seconds": [
+            0.010132997995242476,
+            0.009883746039122343,
+            0.010845517041161656,
+            0.010401929030194879,
+            0.010540639981627464
+          ],
+          "cpu_seconds": [
+            0.00445522996596992,
+            0.0043260990642011166,
+            0.004257118096575141,
+            0.0043174889869987965,
+            0.004293208941817284
+          ],
+          "cuda_seconds": [
+            0.0011433628387749195,
+            0.0010950970463454723,
+            0.001157047925516963,
+            0.0010687371250241995,
+            0.0013598687946796417
+          ],
+          "parity": "pass",
+          "rays": 1024,
+          "regions": 17
+        },
+        {
+          "array_seconds": [
+            0.040346069959923625,
+            0.040523511124774814,
+            0.04041648888960481,
+            0.0404133889824152,
+            0.05133689800277352
+          ],
+          "cpu_seconds": [
+            0.03872309811413288,
+            0.03863314795307815,
+            0.03890729905106127,
+            0.038787269964814186,
+            0.03858331707306206
+          ],
+          "cuda_seconds": [
+            0.004212788073346019,
+            0.00417414796538651,
+            0.004100217949599028,
+            0.004199898103252053,
+            0.004160786978900433
+          ],
+          "parity": "pass",
+          "rays": 16384,
+          "regions": 17
+        },
+        {
+          "array_seconds": [
+            0.6759818040300161,
+            0.6613387928809971,
+            0.6596300369128585,
+            0.6667215831112117,
+            0.6594506329856813
+          ],
+          "cpu_seconds": [
+            0.7957266739103943,
+            0.8709191309753805,
+            0.8073188590351492,
+            0.8001581139396876,
+            0.8757710799109191
+          ],
+          "cuda_seconds": [
+            0.08809267194010317,
+            0.09161061001941562,
+            0.08820966305211186,
+            0.09210258489474654,
+            0.08818972390145063
+          ],
+          "parity": "pass",
+          "rays": 262144,
+          "regions": 17
+        }
+      ],
+      "seed": 341701,
+      "source_sha256": {
+        "checks/photon_cuda/benchmark.py": "47f29353a565045924b04d0423e1e2c81b4f186e83b9f7937a895f4d322affbe",
+        "checks/photon_first_flight_cuda.py": "3772c4e9dec39e22e8ecfd3659adfbf97ce8810eac9645715f717e056cdbb171",
+        "src/pyrite/montecarlo/transport/_photon_cuda_kernel.py": "9bdc4eb5e6670cb1e65b3171f8b688164f1be82a240f40d76427b23cc2401420",
+        "src/pyrite/montecarlo/transport/photon_cuda.py": "b8688f25ce605827609a20b44336ce4d700f5ca7436b7ed4a3d970f1df34e1d9",
+        "src/pyrite/montecarlo/transport/photon_navigation.py": "8aae067e26982f013b8a098cf788fd9deb894bb85a2161c885d37813e617df55"
+      },
+      "warmups": 2
+    },
+    "tuning": {
+      "cuda_runtime": 13020,
+      "cupy": "14.2.0",
+      "device": "NVIDIA GeForce RTX 5080",
+      "device_pool_reserved_bytes": 90178560,
+      "epdl_table_sha256": "fcc2f00c5bb969e99bc84cac16762f13e939f071d585c433a5c0f420913fcfc9",
+      "memory_scope": "combined process peak and retained device pool, not per-arm peaks",
+      "numpy": "2.5.4",
+      "peak_process_rss_kib": 912196,
+      "python": "3.14.6",
+      "seed": 341701,
+      "source_sha256": {
+        "checks/photon_cuda/benchmark.py": "47f29353a565045924b04d0423e1e2c81b4f186e83b9f7937a895f4d322affbe",
+        "checks/photon_first_flight_cuda.py": "3772c4e9dec39e22e8ecfd3659adfbf97ce8810eac9645715f717e056cdbb171",
+        "src/pyrite/montecarlo/transport/_photon_cuda_kernel.py": "9bdc4eb5e6670cb1e65b3171f8b688164f1be82a240f40d76427b23cc2401420",
+        "src/pyrite/montecarlo/transport/photon_cuda.py": "b8688f25ce605827609a20b44336ce4d700f5ca7436b7ed4a3d970f1df34e1d9",
+        "src/pyrite/montecarlo/transport/photon_navigation.py": "8aae067e26982f013b8a098cf788fd9deb894bb85a2161c885d37813e617df55"
+      },
+      "tuning": {
+        "holdout_seconds": {
+          "selected": [
+            0.09531646803952754,
+            0.09342795494012535,
+            0.09562346898019314,
+            0.09616364282555878,
+            0.0937902219593525,
+            0.09422861598432064,
+            0.09607772994786501,
+            0.09635374904610217,
+            0.09440819197334349
+          ],
+          "unchunked": [
+            0.11471714894287288,
+            0.10636399290524423,
+            0.10263049392960966,
+            0.10347181395627558,
+            0.1032162788324058,
+            0.12512703309766948,
+            0.10200434201397002,
+            0.10189267713576555,
+            0.10174721595831215
+          ]
+        },
+        "rays": 262144,
+        "regions": 3,
+        "seed": 341701,
+        "selected_chunk": 65536,
+        "selected_threads": 256,
+        "trials": [
+          {
+            "chunk": 65536,
+            "seconds": [
+              0.07509096688590944,
+              0.07575383596122265,
+              0.07509722700342536
+            ],
+            "threads": 256
+          },
+          {
+            "chunk": 65536,
+            "seconds": [
+              0.07600783207453787,
+              0.07520353700965643,
+              0.07505811681039631
+            ],
+            "threads": 512
+          },
+          {
+            "chunk": 16384,
+            "seconds": [
+              0.08089228183962405,
+              0.08333857590332627,
+              0.08145811990834773
+            ],
+            "threads": 64
+          },
+          {
+            "chunk": 262144,
+            "seconds": [
+              0.0845773140899837,
+              0.08505326695740223,
+              0.0847920048981905
+            ],
+            "threads": 64
+          },
+          {
+            "chunk": 65536,
+            "seconds": [
+              0.07555722817778587,
+              0.07555400696583092,
+              0.07575595797970891
+            ],
+            "threads": 32
+          },
+          {
+            "chunk": 262144,
+            "seconds": [
+              0.08541171601973474,
+              0.08497601700946689,
+              0.08885425003245473
+            ],
+            "threads": 512
+          },
+          {
+            "chunk": 131072,
+            "seconds": [
+              0.08053256804123521,
+              0.08048311807215214,
+              0.08044894598424435
+            ],
+            "threads": 32
+          },
+          {
+            "chunk": 65536,
+            "seconds": [
+              0.07587168994359672,
+              0.07533423602581024,
+              0.07583370991051197
+            ],
+            "threads": 32
+          },
+          {
+            "chunk": 65536,
+            "seconds": [
+              0.07629949296824634,
+              0.07603260292671621,
+              0.07611326198093593
+            ],
+            "threads": 256
+          },
+          {
+            "chunk": 4096,
+            "seconds": [
+              0.11800006404519081,
+              0.11803930415771902,
+              0.11817375291138887
+            ],
+            "threads": 256
+          },
+          {
+            "chunk": 16384,
+            "seconds": [
+              0.08248860598541796,
+              0.08144557406194508,
+              0.08104409207589924
+            ],
+            "threads": 128
+          },
+          {
+            "chunk": 65536,
+            "seconds": [
+              0.07542294496670365,
+              0.07573756296187639,
+              0.07641329406760633
+            ],
+            "threads": 512
+          },
+          {
+            "chunk": 65536,
+            "seconds": [
+              0.07598047982901335,
+              0.0753096619155258,
+              0.07584113907068968
+            ],
+            "threads": 512
+          },
+          {
+            "chunk": 4096,
+            "seconds": [
+              0.12266502482816577,
+              0.13247984112240374,
+              0.13320325291715562
+            ],
+            "threads": 256
+          },
+          {
+            "chunk": 131072,
+            "seconds": [
+              0.0876555209979415,
+              0.08617627713829279,
+              0.08674794598482549
+            ],
+            "threads": 128
+          },
+          {
+            "chunk": 65536,
+            "seconds": [
+              0.08226549113169312,
+              0.0830531190149486,
+              0.08609628211706877
+            ],
+            "threads": 512
+          },
+          {
+            "chunk": 65536,
+            "seconds": [
+              0.08327103010378778,
+              0.08436234691180289,
+              0.09188633505254984
+            ],
+            "threads": 256
+          },
+          {
+            "chunk": 65536,
+            "seconds": [
+              0.09535558801144361,
+              0.0938401089515537,
+              0.09550330997444689
+            ],
+            "threads": 512
+          },
+          {
+            "chunk": 262144,
+            "seconds": [
+              0.10081637394614518,
+              0.10208570305258036,
+              0.10132925701327622
+            ],
+            "threads": 256
+          },
+          {
+            "chunk": 16384,
+            "seconds": [
+              0.10716723604127765,
+              0.10723948804661632,
+              0.10681751905940473
+            ],
+            "threads": 128
+          },
+          {
+            "chunk": 131072,
+            "seconds": [
+              0.09873377694748342,
+              0.09850996686145663,
+              0.09805952408351004
+            ],
+            "threads": 64
+          },
+          {
+            "chunk": 65536,
+            "seconds": [
+              0.09523155586794019,
+              0.09538967697881162,
+              0.09491701400838792
+            ],
+            "threads": 32
+          },
+          {
+            "chunk": 65536,
+            "seconds": [
+              0.09479981404729187,
+              0.09483932494185865,
+              0.09536339808255434
+            ],
+            "threads": 32
+          },
+          {
+            "chunk": 65536,
+            "seconds": [
+              0.09464784292504191,
+              0.09486109903082252,
+              0.0941316878888756
+            ],
+            "threads": 32
+          }
+        ]
+      },
+      "warmups": 2
+    }
+  },
+  "fused_job": 2514,
+  "fused_revision": "505561bdbe6925561aa3666c8ac43507b4f9db12",
+  "hardware_tests": {
+    "errors": "0",
+    "failures": "0",
+    "skipped": "0",
+    "tests": "13",
+    "time": "1.003"
+  },
+  "nsight": {
+    "array": {
+      "api_csv_sha256": "3e1e10189a27001f84572fa154027e05c370428c144df88c700b5895715e16fb",
+      "api_total_ns": 10387858,
+      "calls": 5,
+      "kernel_instances": 1110,
+      "kernels_csv_sha256": "9dcb1b1e5750c0a7732cc6528eb2a65448eaffcf9c02bc0edde66c2875683971",
+      "kernels_total_ns": 2112983,
+      "launch_api_calls": {
+        "cuLaunchKernel": 1035,
+        "cudaLaunchKernel": 10,
+        "cudaLaunchKernelExC_v11060": 65
+      },
+      "nsys_version": "2025.6.3",
+      "rays_per_call": 16384,
+      "regions": 3,
+      "report_remote_path": "~/.local/opt/pyrite-issue-341-cuda/first-flight-trace.nsys-rep",
+      "report_sha256": "3e832d4f7cb39a511d13640a07a4a1af37be1170e892c46e71f9bd3a09148d9f"
+    },
+    "fused": {
+      "api_csv_sha256": "298a5028e9e18f4ab4a45699e8f3c6e0eb13abdda2b61b9abc3a0b615a0fabad",
+      "api_total_ns": 3217935,
+      "calls": 5,
+      "kernel_instances": 10,
+      "kernels_csv_sha256": "325fc55eb443fa35b9dd642239c6211acbd358a99cfd06fab56e8caf7e1b301d",
+      "kernels_total_ns": 151818,
+      "launch_api_calls": {
+        "cuLaunchKernel": 10
+      },
+      "nsys_version": "2025.6.3",
+      "rays_per_call": 16384,
+      "regions": 3,
+      "report_remote_path": "~/.local/opt/pyrite-issue-341-cuda/fused-flight-trace.nsys-rep",
+      "report_sha256": "8d9fb29e518edfa3e0a0d751dcbe900f1579b5b9a3f669f78720ab950b745f03"
+    }
+  },
+  "nsight_command": "nsys profile --trace=cuda,nvtx --sample=none --cpuctxsw=none --capture-range=cudaProfilerApi --capture-range-end=stop --force-overwrite=true --output=fused-flight-trace uv run --extra nvidia --extra optimization python -m checks.photon_cuda.benchmark trace",
+  "optuna_version": "4.9.0",
+  "scope": "Standalone analytic photon first-flight performance and backend parity only; not full-track validation"
+}

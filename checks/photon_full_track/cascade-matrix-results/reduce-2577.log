@@ -1,0 +1,75 @@
+wrote matrix/si_0p3mev.json
+si_0p3mev  T 10-30keV    total 1.043 rep  direct 1.043 rep  redistri 1.056 rep  redistri 0.033/0.033 ok
+si_0p3mev  T 30-100keV   total 1.060 rep  direct 1.061 rep  redistri 1.032 rep  redistri 0.024/0.025 ok
+si_0p3mev  T 100-300keV  total 1.014 rep  direct 1.014 rep  redistri 0.960 rep  redistri 0.011/0.012 ok
+si_0p3mev  R 1-10keV     total 1.038 rep  direct 1.037 rep  redistri 1.084 rep  redistri 0.038/0.036 ok
+si_0p3mev  R 10-30keV    total 1.013 rep  direct 1.011 rep  redistri 1.061 rep  redistri 0.036/0.035 ok
+si_0p3mev  R 30-100keV   total 0.966 rep  direct 0.960 rep  redistri 1.069 rep  redistri 0.058/0.052 ok
+si_0p3mev  R 100-300keV  total 0.979 rep  direct 0.974 rep  redistri 1.124 rep  redistri 0.037/0.032 ok
+0 failing, 0 missing gates (only si_0p3mev; other cases not rerun)
+wrote matrix/si_1mev.json
+si_1mev    T 10-30keV    total 1.033 rep  direct 1.029 rep  redistri 1.076 rep  redistri 0.090/0.086 ok
+si_1mev    T 30-100keV   total 1.038 rep  direct 1.037 rep  redistri 1.049 ok  redistri 0.074/0.073 ok
+si_1mev    T 100-300keV  total 1.076 rep  direct 1.077 rep  redistri 1.050 ok  redistri 0.043/0.044 ok
+si_1mev    T 0.3-1MeV    total 1.087 rep  direct 1.088 rep  redistri 1.008 rep  redistri 0.014/0.016 ok
+si_1mev    R 10-30keV    total 1.097 rep  direct 1.092 rep  redistri 1.136 rep  redistri 0.109/0.105 ok
+si_1mev    R 30-100keV   total 1.042 rep  direct 1.044 rep  redistri 1.037 ok  redistri 0.222/0.223 ok
+si_1mev    R 100-300keV  total 0.969 rep  direct 0.960 rep  redistri 1.013 rep  redistri 0.181/0.173 ok
+0 failing, 0 missing gates (only si_1mev; other cases not rerun)
+wrote matrix/si_3mev.json
+si_3mev    T 10-30keV    total 1.002 rep  direct 1.024 rep  redistri 0.907 rep  redistri 0.173/0.191 ok
+si_3mev    T 30-100keV   total 1.022 rep  direct 1.017 rep  redistri 1.052 ok  redistri 0.145/0.141 ok
+si_3mev    T 100-300keV  total 1.022 rep  direct 1.024 rep  redistri 1.007 ok  redistri 0.090/0.091 ok
+si_3mev    T 0.3-1MeV    total 1.046 rep  direct 1.046 rep  redistri 1.046 ok  redistri 0.044/0.044 ok
+si_3mev    T 1-3MeV      total 1.034 rep  direct 1.034 rep  redistri 1.023 rep  redistri 0.017/0.017 ok
+si_3mev    R 10-30keV    total 1.028 rep  direct 1.040 rep  redistri 0.992 rep  redistri 0.244/0.253 ok
+si_3mev    R 30-100keV   total 1.044 rep  direct 1.048 rep  redistri 1.040 ok  redistri 0.518/0.520 ok
+si_3mev    R 100-300keV  total 1.004 rep  direct 1.002 rep  redistri 1.006 ok  redistri 0.499/0.498 ok
+si_3mev    R 0.3-1MeV    total 0.908 rep  direct 0.907 rep  redistri 0.924 rep  redistri 0.083/0.082 ok
+0 failing, 0 missing gates (only si_3mev; other cases not rerun)
+wrote matrix/si_10mev.json
+si_10mev   T 30-100keV   total 1.006 rep  direct 1.001 rep  redistri 1.022 ok  redistri 0.266/0.262 ok
+si_10mev   T 100-300keV  total 1.009 rep  direct 1.007 rep  redistri 1.015 ok  redistri 0.172/0.170 ok
+si_10mev   T 0.3-1MeV    total 1.015 rep  direct 1.013 rep  redistri 1.027 ok  redistri 0.102/0.101 ok
+si_10mev   T 1-3MeV      total 1.029 rep  direct 1.028 rep  redistri 1.054 ok  redistri 0.059/0.058 ok
+si_10mev   T 3-10MeV     total 1.019 rep  direct 1.019 rep  redistri 0.988 rep  redistri 0.020/0.021 ok
+si_10mev   R 30-100keV   total 1.022 rep  direct 1.092 rep  redistri 1.012 ok  redistri 0.855/0.864 ok
+si_10mev   R 100-300keV  total 1.036 rep  direct 1.100 rep  redistri 1.024 ok  redistri 0.841/0.850 ok
+si_10mev   R 0.3-1MeV    total 0.977 rep  direct 0.968 rep  redistri 1.006 rep  redistri 0.257/0.250 ok
+0 failing, 0 missing gates (only si_10mev; other cases not rerun)
+wrote matrix/w_1mev.json
+w_1mev     T 30-100keV   total 0.992 rep  direct 0.994 rep  redistri 0.992 ok  redistri 0.789/0.790 ok
+w_1mev     T 100-300keV  total 0.994 rep  direct 0.987 rep  redistri 1.046 ok  redistri 0.116/0.110 ok
+w_1mev     T 0.3-1MeV    total 1.015 rep  direct 1.014 rep  redistri 1.032 rep  redistri 0.040/0.040 ok
+w_1mev     T W_Ka        net 0.997 ok
+w_1mev     R 10-30keV    total 1.018 rep  direct 1.013 rep  redistri 1.118 rep  redistri 0.055/0.050 ok
+w_1mev     R 30-100keV   total 1.022 rep  direct 1.027 rep  redistri 1.016 ok  redistri 0.435/0.437 ok
+w_1mev     R 100-300keV  total 1.001 rep  direct 1.000 rep  redistri 1.018 rep  redistri 0.069/0.067 ok
+w_1mev     R 0.3-1MeV    total 1.005 rep  direct 1.003 rep  redistri 1.139 rep  redistri 0.011/0.010 ok
+w_1mev     R W_Ka        net 1.026 ok
+w_1mev     R W_Kb        net 1.043 ok
+0 failing, 0 missing gates (only w_1mev; other cases not rerun)
+wrote matrix/w_3mev.json
+w_3mev     T 100-300keV  total 1.002 rep  direct 0.980 rep  redistri 1.070 ok  redistri 0.258/0.242 ok
+w_3mev     T 0.3-1MeV    total 0.990 rep  direct 0.988 rep  redistri 1.001 ok  redistri 0.117/0.116 ok
+w_3mev     T 1-3MeV      total 0.987 rep  direct 0.987 rep  redistri 0.971 rep  redistri 0.029/0.029 ok
+w_3mev     R 30-100keV   total 1.024 rep  direct 1.047 rep  redistri 1.011 ok  redistri 0.627/0.635 ok
+w_3mev     R 100-300keV  total 1.030 rep  direct 1.023 rep  redistri 1.066 ok  redistri 0.174/0.168 ok
+w_3mev     R 0.3-1MeV    total 1.000 rep  direct 0.999 rep  redistri 1.001 rep  redistri 0.062/0.061 ok
+w_3mev     R 1-3MeV      total 0.951 rep  direct 0.952 rep  redistri 0.723 rep  redistri 0.003/0.004 ok
+w_3mev     R W_Ka        net 1.027 ok
+w_3mev     R W_Kb        net 1.086 ok
+0 failing, 0 missing gates (only w_3mev; other cases not rerun)
+wrote matrix/w_10mev.json
+w_10mev    T 100-300keV  total 0.978 rep  direct 0.924 rep  redistri 1.040 ok  redistri 0.495/0.465 ok
+w_10mev    T 0.3-1MeV    total 1.009 rep  direct 1.009 rep  redistri 1.009 ok  redistri 0.229/0.229 ok
+w_10mev    T 1-3MeV      total 1.015 rep  direct 1.014 rep  redistri 1.018 ok  redistri 0.090/0.089 ok
+w_10mev    T 3-10MeV     total 1.003 rep  direct 1.003 rep  redistri 1.007 ok  redistri 0.026/0.025 ok
+w_10mev    R 30-100keV   total 1.003 rep  direct 1.072 rep  redistri 0.985 ok  redistri 0.772/0.786 ok
+w_10mev    R 100-300keV  total 1.012 rep  direct 1.009 rep  redistri 1.016 ok  redistri 0.380/0.378 ok
+w_10mev    R 0.3-1MeV    total 0.985 rep  direct 0.990 rep  redistri 0.964 ok  redistri 0.202/0.207 ok
+w_10mev    R 1-3MeV      total 0.984 rep  direct 0.985 rep  redistri 0.975 rep  redistri 0.023/0.023 ok
+w_10mev    R 3-10MeV     total 0.900 rep  direct 0.898 rep  redistri 1.502 rep  redistri 0.005/0.003 ok
+w_10mev    R W_Ka        net 0.990 ok
+w_10mev    R W_Kb        net 1.117 ok
+0 failing, 0 missing gates (only w_10mev; other cases not rerun)
