@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
+
+if TYPE_CHECKING:
+    import numpy as np
 
 _ANGLE_MARKERS = ("rad", "degree", "deg", "arcminute", "arcsecond", "turn", "grad")
 _SOLID_ANGLE_MARKERS = ("steradian", "sr")
@@ -71,6 +74,34 @@ def normalize_unit(
             for item in value
         ]
     return value
+
+
+def _positive_length_quantity(
+    value: object, *, unit: str, field: str, shape: tuple[int, ...] | None = None
+) -> float | np.ndarray:
+    """Normalize an explicit length, retaining scalar/sweep shape and float range."""
+    import numpy as np
+
+    if not _is_pint_quantity(value):
+        raise TypeError(f"{field} requires a Pint quantity with length units")
+    original = np.asarray(cast(Any, value).magnitude)
+    if original.dtype.kind not in "iuf":
+        raise TypeError(f"{field} must be a real scalar or one-dimensional length quantity")
+    magnitude = normalize_unit(value, unit, field=field, expected="length")
+    source = np.asarray(magnitude)
+    if source.dtype.kind not in "iuf" or source.ndim > 1:
+        raise TypeError(f"{field} must be a real scalar or one-dimensional length quantity")
+    if shape is not None and source.shape != shape:
+        raise TypeError(f"{field} must have shape {shape}; received {source.shape}")
+    if source.size == 0 or not np.all(np.isfinite(source)):
+        raise ValueError(f"{field} must contain nonempty finite lengths")
+    with np.errstate(over="ignore", under="ignore"):
+        stored = source.astype(float)
+    if not np.all(np.isfinite(stored)) or np.any((source != 0) & (stored == 0)):
+        raise ValueError(f"{field} is not representable in numeric {unit} storage")
+    if not np.all(stored > 0.0):
+        raise ValueError(f"{field} must be finite and positive")
+    return float(stored) if stored.ndim == 0 else stored.copy()
 
 
 def parse_unit_string(

@@ -35,7 +35,7 @@ Components (a + b denotes a static import cycle):
   p11: execution
   p12: experimental
   p13: geometry
-  p14: instrument
+  p14: instrument + results
   p15: materials
   p16: montecarlo
   p17: observations
@@ -44,18 +44,18 @@ Components (a + b denotes a static import cycle):
   p20: plots
   p21: radiation
   p22: remote
-  p23: results
-  p24: runs
-  p25: storage
-  p26: transport
-  p27: validation
-  p28: xsgen
+  p23: runs
+  p24: storage
+  p25: transport
+  p26: validation
+  p27: xsgen
 Edges (importer -> imported):
   p0 -> p15
-  p0 -> p27
+  p0 -> p26
   p0 -> p5
   p0 -> p7
   p1 -> p13
+  p1 -> p14
   p1 -> p15
   p1 -> p16
   p1 -> p17
@@ -64,16 +64,15 @@ Edges (importer -> imported):
   p1 -> p22
   p1 -> p23
   p1 -> p24
-  p1 -> p25
-  p1 -> p27
+  p1 -> p26
   p1 -> p3
   p1 -> p4
   p1 -> p7
   p1 -> p8
+  p10 -> p14
   p10 -> p15
   p10 -> p16
   p10 -> p22
-  p10 -> p23
   p10 -> p3
   p10 -> p4
   p10 -> p7
@@ -82,72 +81,66 @@ Edges (importer -> imported):
   p11 -> p3
   p11 -> p4
   p14 -> p15
+  p14 -> p16
   p14 -> p8
   p16 -> p15
-  p16 -> p28
+  p16 -> p27
   p16 -> p7
   p17 -> p14
   p17 -> p16
-  p17 -> p23
   p17 -> p7
   p17 -> p8
+  p18 -> p14
   p18 -> p23
-  p18 -> p24
   p18 -> p3
   p19 -> p15
   p19 -> p16
   p19 -> p3
   p19 -> p7
+  p20 -> p14
   p20 -> p15
   p20 -> p16
-  p20 -> p23
   p20 -> p7
   p20 -> p8
+  p22 -> p14
   p22 -> p15
   p22 -> p16
   p22 -> p19
   p22 -> p23
-  p22 -> p24
+  p22 -> p26
   p22 -> p27
-  p22 -> p28
   p22 -> p3
   p22 -> p4
   p22 -> p7
+  p23 -> p11
   p23 -> p14
   p23 -> p15
   p23 -> p16
-  p23 -> p8
-  p24 -> p11
-  p24 -> p14
-  p24 -> p15
-  p24 -> p16
-  p24 -> p17
-  p24 -> p19
-  p24 -> p23
-  p24 -> p28
-  p24 -> p3
-  p24 -> p4
-  p24 -> p7
+  p23 -> p17
+  p23 -> p19
+  p23 -> p27
+  p23 -> p3
+  p23 -> p4
+  p23 -> p7
+  p26 -> p15
+  p26 -> p16
+  p26 -> p3
+  p26 -> p4
+  p26 -> p7
+  p26 -> p8
   p27 -> p15
-  p27 -> p16
-  p27 -> p3
-  p27 -> p4
   p27 -> p7
-  p27 -> p8
-  p28 -> p15
-  p28 -> p7
   p3 -> p13
   p3 -> p14
   p3 -> p15
   p3 -> p16
   p3 -> p17
-  p3 -> p23
-  p3 -> p28
+  p3 -> p27
   p3 -> p6
   p3 -> p8
+  p4 -> p14
   p4 -> p15
   p4 -> p16
-  p4 -> p23
   p4 -> p3
   p4 -> p7
   p5 -> p10
@@ -156,8 +149,8 @@ Edges (importer -> imported):
   p5 -> p16
   p5 -> p19
   p5 -> p22
-  p5 -> p24
-  p5 -> p28
+  p5 -> p23
+  p5 -> p27
   p5 -> p3
   p5 -> p4
   p5 -> p7
@@ -166,10 +159,10 @@ Edges (importer -> imported):
   p8 -> p15
   p8 -> p6
   p9 -> p10
+  p9 -> p14
   p9 -> p20
   p9 -> p23
-  p9 -> p24
-  p9 -> p27
+  p9 -> p26
   p9 -> p3
   p9 -> p5
   p9 -> p7
@@ -627,6 +620,10 @@ Axial selection remains configuration-only (#624). The data-only `_channeling_ad
 - Deps: `montecarlo.case`; lazily `materials.channeling`, `materials.crystal`, `materials.atomic`, `montecarlo.geometry`, `montecarlo.channeling`.
 
 ### `campaign/geometry.py`
+
+Internal `_geometry_values.py` owns scalar/sweep/index validation and copied
+quantity read-back; `_geometry_table.py` owns numeric case summary tables.
+The original geometry imports and public class owners remain available.
 The closed target variant set and its lowering to today's geometry case keys (`abs_layers`, `layer_radiators`, `crystal_width_mm`, `crystal_height_mm`, `groove_spacing_ang`, `mosaic`). Each variant owns its validity at construction, so an impossible target raises in the user's script rather than after profile resolution; arbitrary geometry is a recorded non-goal (ADR-0008), so there is no dispatch protocol or region algebra. `target_from_flat` / `target_flat_fields` / `target_replace` are the inverse pair between a `Target` and the flat geometry vocabulary that catalog data, profile overrides, and identity digests still speak. Sits below `campaign/sweep.py` and imports without it.
 - Public: `Slab`, `Stack`, `Target` (the variant union), `Layer`, `Footprint`, `BlazedGrooves`, `LoweredTarget`, `Stack.on_substrate` (the sanctioned one-layer film-on-wafer stack), `DEFAULT_FOOTPRINT`, `DEFAULT_SUBSTRATE_THICKNESS_ANG`, `target_from_flat`, `target_flat_fields`, `target_replace`, `retired_flat_input`, `crystal_params`, `substrate_composition`, `stack_layers`, `film_on_substrate_layers`, `layer_radiator`, `substrate_radiator`, `fmt_thickness`, `ScalarOrSeq`.
 - Deps: `detectors` (`Detector`, for the target×detector groove check), `materials` (`CATALOG`, `LayerSpec`), `materials.crystal`.

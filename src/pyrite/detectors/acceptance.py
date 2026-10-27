@@ -1,10 +1,16 @@
 """Closed scalar-detector acceptance descriptions, independent of response."""
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from numbers import Real
+from typing import TYPE_CHECKING, Self
 
-from .._units import normalize_unit
+from .._spec_defaults import UNSET as _UNSET
+from .._spec_defaults import _Unset
+from .._units import _positive_length_quantity, normalize_unit
+
+if TYPE_CHECKING:
+    from pint import Quantity
 
 
 def _positive(name: str, value: object) -> float:
@@ -103,17 +109,101 @@ class AngularAcceptance:
         return polar, azimuthal, omega
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, init=False)
 class SensorAcceptance:
     """Source-facing rectangle at radial ``distance_mm``, all lengths in mm.
 
     ``height_mm`` runs along the polar direction; ``width_mm`` along the
     local azimuthal tangent. No pixels, pose, or response are implied.
+
+    Keyword-only ``distance``, ``width`` and ``height`` require positive finite
+    scalar Pint lengths. Each conflicts with its corresponding numeric field.
+    Their properties return fresh mm quantities; ``with_distance``, ``with_width``
+    and ``with_height`` provide quantity-aware replacement. Positional numeric
+    arguments, dataclass fields and persistence retain mm. ``dataclasses.replace``
+    uses those numeric fields; semantic keywords conflict with the stored fields.
+    ``resolve()`` still returns numeric degree spans and steradians.
     """
 
     distance_mm: float
     width_mm: float
     height_mm: float
+
+    def __init__(
+        self,
+        distance_mm: float | _Unset = _UNSET,
+        width_mm: float | _Unset = _UNSET,
+        height_mm: float | _Unset = _UNSET,
+        *,
+        distance: object = _UNSET,
+        width: object = _UNSET,
+        height: object = _UNSET,
+    ) -> None:
+        for name, numeric, quantity in (
+            ("distance", distance_mm, distance),
+            ("width", width_mm, width),
+            ("height", height_mm, height),
+        ):
+            if quantity is not _UNSET:
+                if numeric is not _UNSET:
+                    raise TypeError(f"SensorAcceptance received both {name}_mm and {name}")
+                numeric = float(
+                    _positive_length_quantity(
+                        quantity, unit="mm", field=f"SensorAcceptance.{name}", shape=()
+                    )
+                )
+            elif numeric is _UNSET:
+                raise TypeError(f"SensorAcceptance requires {name}_mm or {name}")
+            object.__setattr__(self, f"{name}_mm", numeric)
+        self.__post_init__()
+
+    @property
+    def distance(self) -> "Quantity":
+        """Radial source-to-sensor distance as a fresh scalar mm quantity."""
+        from ..units import Q_
+
+        return Q_(self.distance_mm, "mm")
+
+    @property
+    def width(self) -> "Quantity":
+        """Full local azimuthal width as a fresh scalar mm quantity."""
+        from ..units import Q_
+
+        return Q_(self.width_mm, "mm")
+
+    @property
+    def height(self) -> "Quantity":
+        """Full local polar height as a fresh scalar mm quantity."""
+        from ..units import Q_
+
+        return Q_(self.height_mm, "mm")
+
+    def with_distance(self, distance: object) -> Self:
+        """Replace radial distance using an explicit scalar length quantity."""
+        return replace(
+            self,
+            distance_mm=_positive_length_quantity(
+                distance, unit="mm", field="SensorAcceptance.distance", shape=()
+            ),
+        )
+
+    def with_width(self, width: object) -> Self:
+        """Replace full azimuthal width using an explicit scalar length quantity."""
+        return replace(
+            self,
+            width_mm=_positive_length_quantity(
+                width, unit="mm", field="SensorAcceptance.width", shape=()
+            ),
+        )
+
+    def with_height(self, height: object) -> Self:
+        """Replace full polar height using an explicit scalar length quantity."""
+        return replace(
+            self,
+            height_mm=_positive_length_quantity(
+                height, unit="mm", field="SensorAcceptance.height", shape=()
+            ),
+        )
 
     def __post_init__(self) -> None:
         for name in ("distance_mm", "width_mm", "height_mm"):

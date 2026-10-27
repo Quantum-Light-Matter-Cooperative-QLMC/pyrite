@@ -41,6 +41,31 @@ Use these objects for detector efficiency, energy redistribution and grating
 images. Physical pixel scoring and acquisition are illustrated in the
 [workflow guide](../../reference/python-scene-recipes.md#place-a-finite-filter-over-detector-pixels).
 
+## Sensor dimensions with units
+
+Use scalar length quantities for the source-facing rectangle:
+
+```python
+from pyrite.detectors import Detector, SensorAcceptance
+from pyrite.units import Q_
+
+sensor = SensorAcceptance(
+    distance=Q_(40, "cm"), width=Q_(14, "mm"), height=Q_(7, "mm")
+)
+sensor.distance.to("cm")       # fresh scalar quantity; canonical read-back is mm
+wider = sensor.with_width(Q_(28, "mm"))
+detector = Detector(135, acceptance=wider)
+```
+
+`distance` is radial distance; `width` and `height` are full local azimuthal
+and polar dimensions. Each semantic input requires a positive finite scalar
+Pint length and conflicts with its corresponding `*_mm` spelling.
+`with_distance`, `with_width` and `with_height` preserve the other dimensions.
+Legacy positional and `*_mm` arguments remain numeric-compatible;
+`dataclasses.replace` uses those numeric fields. The exact numeric
+`resolve()` tuple retains degree spans and steradians, and detector lowering
+and saved records retain their existing numeric representation.
+
 ## Response contracts
 
 | Entry | Owner / status | Scientific contract and effects |

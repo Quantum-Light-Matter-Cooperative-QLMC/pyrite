@@ -273,7 +273,7 @@ promoting every implementation module to public API.
 | Canonical public input | Current accepted form and read-back | Numeric lowering/record owner | Pilot disposition |
 | --- | --- | --- | --- |
 | `pyrite.beams.Beam.energy_keV` | Scalar/sequence numbers or compatible quantities → keV | `campaign/beam.py::Beam.to_spec`, `campaign/sweep.py::BeamSpec`, `campaign/beam_cases.py` | Quantity keyword/property and explicit replacement method are available |
-| `pyrite.beams.BunchLength.rms_fs` | Number or time quantity → fs | `campaign/beam.py::Beam.to_spec` | Keep numeric name; separate future quantity interface |
+| `pyrite.beams.BunchLength.rms_fs`, `Offsets.offsets_fs` | Number(s) or time quantity → fs | `campaign/beam.py::Beam.to_spec` | Numeric fields retained; semantic timing interfaces described below |
 | `pyrite.geometry.RectangularBody.thickness_mm` | Number or length quantity → mm | `bodies.py`, `campaign/geometry.py` | Keep current body serialization and units |
 | `pyrite.detectors.PlanarPose.center_mm`, `PixelGrid.pitch_mm` | Numeric components or compatible quantities, including array magnitudes → numeric mm components | `_planar_geometry.py`, persisted geometry in `observations/store.py` | Preserve coordinate and pixel representations |
 | `pyrite.observations.Acquisition.exposure_s`, `measured_edges_eV` | Numbers/components or compatible quantities → s/eV | `instrument/observation.py`, persisted acquisition in `observations/store.py` | Preserve exposure and measured-bin meaning |
@@ -324,6 +324,52 @@ compatibility proposal. A future result quantity view additionally needs
 per-component grid/axis metadata, density versus integrated-measure semantics,
 normalization and solid-angle contracts, and explicit conversion tests. It is
 independent of this beam pilot.
+
+## Bunch timing quantity interfaces
+
+`pyrite.beams.BunchLength` and `Offsets` extend the beam-energy naming pattern
+at their existing owners in `campaign/beam.py`:
+
+| Descriptor | Quantity constructor/read-back | Quantity replacement | Numeric field retained |
+| --- | --- | --- | --- |
+| `BunchLength` | `rms_duration` | `with_rms_duration(quantity)` | `rms_fs` |
+| `Offsets` | `arrival_offsets` | `with_arrival_offsets(quantity)` | `offsets_fs` |
+
+The semantic constructor arguments are keyword-only and require explicit Pint
+time quantities. Duration requires a real finite positive scalar; offsets
+require a nonempty one-dimensional real array, with signed times and zero
+allowed. Bare numbers, strings, component lists, complex and boolean magnitudes,
+wrong dimensions and nonfinite values are rejected. The numeric constructor
+spellings retain their existing behavior, including positional calls and
+existing compatible quantity inputs. One numeric or semantic argument is
+required; supplying both fails even if equivalent.
+
+Convert once to canonical fs and retain numeric storage. The new interfaces
+reject overflow and loss of a nonzero value to zero in Python float storage;
+they do not round generally equivalent unit expressions to force identical
+floating-point values. Existing numeric identities stay exact. External
+registries convert through their own definitions, while read-back uses the
+shared project registry. `rms_duration` returns a fresh scalar quantity;
+`arrival_offsets` returns a fresh quantity with a copied NumPy array on every
+access. Input arrays are detached into the existing tuple storage. Read-back
+and replacement neither sample arrival times nor consume RNG state.
+
+Numeric dataclass fields, `shape`, beam/spec round-trips and pickle/JSON records
+remain unchanged. `dataclasses.replace(timing)` works, and numeric changes use
+`rms_fs` or `offsets_fs`; semantic changes through `replace` conflict with its
+forwarded numeric field. The explicit methods in the table preserve the other
+fields. Use `replace(beam, longitudinal=new_timing)` for nested replacement.
+Sweeps may replace the complete `beam.longitudinal` object, or continue to use
+numeric dataclass paths such as `beam.longitudinal.rms_fs`. Semantic properties
+are not additional sweep fields. Numeric construction, lowering and loading
+remain Pint-lazy. No sampled GPT/GDF crossing times or longitudinal distribution
+policies are changed by these interfaces.
+
+Focused evidence: `tests/instrument/test_beam_timing_quantities.py`,
+`tests/instrument/test_unit_inputs.py` and `tests/scan/test_beam_objects.py`.
+The [beam reference](../reference/python-api/beams.md#bunch-timing-with-units)
+contains migration examples. Legacy fields remain supported without warnings;
+any removal belongs to the existing release/deprecation policy.
 
 ## Measured overhead
 

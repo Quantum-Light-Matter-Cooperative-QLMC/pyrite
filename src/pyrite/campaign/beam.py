@@ -23,6 +23,7 @@ from typing import TYPE_CHECKING, Any, Self
 import numpy as np
 
 from .._spec_defaults import UNSET as _UNSET
+from .._spec_defaults import _Unset
 from .._units import _is_pint_quantity, normalize_unit
 from ..montecarlo.bunch_front import BunchFrontTilt, validate_front_source
 from ..montecarlo.transverse import TransverseDistribution
@@ -56,7 +57,42 @@ def _positive(name: str, value: float) -> float:
     return value
 
 
-@dataclass(frozen=True)
+def _timing_quantity_fs(value: object, *, field: str, ndim: int) -> np.ndarray:
+    """Own a real explicit-time quantity representable in numeric fs storage."""
+    if not _is_pint_quantity(value):
+        raise TypeError(f"{field} requires a Pint quantity with time units")
+    magnitude = normalize_unit(value, "fs", field=field, expected="time")
+    array = np.asarray(magnitude)
+    if array.dtype.kind not in "iuf" or array.ndim != ndim:
+        shape = "scalar" if ndim == 0 else "one-dimensional array"
+        raise TypeError(f"{field} must be a real {shape}")
+    if array.size == 0 or not np.all(np.isfinite(array)):
+        raise ValueError(f"{field} must contain nonempty finite times")
+    with np.errstate(over="ignore", under="ignore"):
+        stored = array.astype(float)
+    if not np.all(np.isfinite(stored)) or np.any((array != 0) & (stored == 0)):
+        raise ValueError(
+            f"{field} must be representable in numeric fs storage without overflow or underflow"
+        )
+    return stored
+
+
+def _spot_width_mm(value: object, *, field: str) -> float:
+    """Validate an explicit scalar length and own a numeric mm magnitude."""
+    if not _is_pint_quantity(value):
+        raise TypeError(f"{field} requires a Pint quantity with length units")
+    magnitude = normalize_unit(value, "mm", field=field, expected="length")
+    array = np.asarray(magnitude)
+    if array.ndim != 0 or array.dtype.kind not in "iuf":
+        raise TypeError(f"{field} must be a real scalar length quantity")
+    with np.errstate(over="ignore", under="ignore"):
+        stored = float(array)
+    if not np.isfinite(stored) or (array != 0 and stored == 0.0):
+        raise ValueError(f"{field} is not representable in numeric mm storage")
+    return _positive(field, stored)
+
+
+@dataclass(frozen=True, init=False)
 class TransverseSpot:
     """Gaussian entrance spot, a zero-emittance waist.
 
@@ -66,10 +102,67 @@ class TransverseSpot:
         Full width at half maximum along x in mm.
     fwhm_y_mm
         FWHM along y in mm; ``None`` (default) makes the spot round.
+    fwhm_x, fwhm_y
+        Keyword-only, strictly quantity-valued alternative lengths. Each is
+        mutually exclusive with the matching ``*_mm`` argument. ``fwhm_y``
+        sets an explicit y width; omit it for a round spot.
     """
 
     fwhm_x_mm: float = 1.0
     fwhm_y_mm: float | None = None
+
+    def __init__(
+        self,
+        fwhm_x_mm: float | _Unset = _UNSET,
+        fwhm_y_mm: float | None | _Unset = _UNSET,
+        *,
+        fwhm_x: object = _UNSET,
+        fwhm_y: object = _UNSET,
+    ) -> None:
+        if fwhm_x is not _UNSET:
+            if fwhm_x_mm is not _UNSET:
+                raise TypeError("TransverseSpot.fwhm_x_mm and fwhm_x are mutually exclusive")
+            fwhm_x_mm = _spot_width_mm(fwhm_x, field="TransverseSpot.fwhm_x")
+        elif fwhm_x_mm is _UNSET:
+            fwhm_x_mm = 1.0
+        if fwhm_y is not _UNSET:
+            if fwhm_y_mm is not _UNSET:
+                raise TypeError("TransverseSpot.fwhm_y_mm and fwhm_y are mutually exclusive")
+            fwhm_y_mm = _spot_width_mm(fwhm_y, field="TransverseSpot.fwhm_y")
+        elif fwhm_y_mm is _UNSET:
+            fwhm_y_mm = None
+        object.__setattr__(self, "fwhm_x_mm", fwhm_x_mm)
+        object.__setattr__(self, "fwhm_y_mm", fwhm_y_mm)
+        self.__post_init__()
+
+    @property
+    def fwhm_x(self) -> "Quantity":
+        """Fresh x FWHM length quantity in mm, independent of stored fields."""
+        from ..units import Q_
+
+        return Q_(float(self.fwhm_x_mm), "mm")
+
+    @property
+    def fwhm_y(self) -> "Quantity":
+        """Fresh effective y FWHM in mm; a round spot mirrors x."""
+        from ..units import Q_
+
+        return Q_(float(self.plane_y_mm), "mm")
+
+    def with_fwhm_x(self, fwhm_x: object) -> Self:
+        """Replace x FWHM via a quantity; preserve the implicit-round y."""
+        return replace(
+            self, fwhm_x_mm=_spot_width_mm(fwhm_x, field="TransverseSpot.fwhm_x")
+        )
+
+    def with_fwhm_y(self, fwhm_y: object) -> Self:
+        """Replace y FWHM via a quantity; ``None`` restores roundness."""
+        y_mm = (
+            None
+            if fwhm_y is None
+            else _spot_width_mm(fwhm_y, field="TransverseSpot.fwhm_y")
+        )
+        return replace(self, fwhm_y_mm=y_mm)
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -114,20 +207,62 @@ class PointBunch:
     """Every electron arrives at t = 0."""
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, init=False)
 class BunchLength:
     """Sampled arrival times with an RMS duration.
 
     Parameters
     ----------
     rms_fs
-        RMS bunch duration in fs.
+        RMS bunch duration in fs. Mutually exclusive with ``rms_duration``.
+    rms_duration
+        Keyword-only real scalar Pint time quantity, finite and positive.
+        Read-back is a fresh quantity in fs; numeric storage remains ``rms_fs``.
     shape
         Sampling law name, ``"gaussian"`` by default.
     """
 
     rms_fs: float
     shape: str = "gaussian"
+
+    def __init__(
+        self,
+        rms_fs: float | _Unset = _UNSET,
+        shape: str = "gaussian",
+        *,
+        rms_duration: object = _UNSET,
+    ) -> None:
+        if rms_duration is not _UNSET:
+            if rms_fs is not _UNSET:
+                raise TypeError("BunchLength.rms_fs and rms_duration are mutually exclusive")
+            rms_fs = _positive(
+                "BunchLength.rms_duration",
+                _timing_quantity_fs(rms_duration, field="BunchLength.rms_duration", ndim=0).item(),
+            )
+        elif rms_fs is _UNSET:
+            raise TypeError("BunchLength requires rms_fs or rms_duration")
+        object.__setattr__(self, "rms_fs", rms_fs)
+        object.__setattr__(self, "shape", shape)
+        self.__post_init__()
+
+    @property
+    def rms_duration(self) -> "Quantity":
+        """RMS duration as a fresh scalar quantity in fs; no sampling occurs."""
+        from ..units import Q_
+
+        return Q_(float(self.rms_fs), "fs")
+
+    def with_rms_duration(self, rms_duration: object) -> Self:
+        """Replace duration using an explicit time quantity, preserving shape.
+
+        ``dataclasses.replace`` continues to use the numeric ``rms_fs`` field;
+        supplying ``rms_duration`` there conflicts with its forwarded field.
+        """
+        rms_fs = _positive(
+            "BunchLength.rms_duration",
+            _timing_quantity_fs(rms_duration, field="BunchLength.rms_duration", ndim=0).item(),
+        )
+        return replace(self, rms_fs=rms_fs)
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -140,12 +275,63 @@ class BunchLength:
             raise ValueError("shape must be a non-empty string")
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, init=False)
 class Offsets:
-    """Explicit per-electron arrival offsets in fs, replacing random sampling."""
+    """Explicit per-electron arrival offsets, replacing random sampling.
+
+    Parameters
+    ----------
+    offsets_fs
+        Nonempty finite numeric offsets in fs; signed values and zero are valid.
+        Mutually exclusive with ``arrival_offsets``.
+    shape
+        Retained longitudinal sampling-law label, default ``"gaussian"``.
+    arrival_offsets
+        Keyword-only Pint time quantity with a nonempty one-dimensional real
+        array magnitude. Values must remain finite and representable in numeric
+        fs storage. Read-back returns a fresh quantity with a copied array in fs.
+        Numeric dataclass fields and per-electron ordering are unchanged.
+    """
 
     offsets_fs: tuple[float, ...]
     shape: str = "gaussian"
+
+    def __init__(
+        self,
+        offsets_fs: tuple[float, ...] | _Unset = _UNSET,
+        shape: str = "gaussian",
+        *,
+        arrival_offsets: object = _UNSET,
+    ) -> None:
+        if arrival_offsets is not _UNSET:
+            if offsets_fs is not _UNSET:
+                raise TypeError("Offsets.offsets_fs and arrival_offsets are mutually exclusive")
+            offsets_fs = tuple(
+                _timing_quantity_fs(
+                    arrival_offsets, field="Offsets.arrival_offsets", ndim=1
+                ).tolist()
+            )
+        elif offsets_fs is _UNSET:
+            raise TypeError("Offsets requires offsets_fs or arrival_offsets")
+        object.__setattr__(self, "offsets_fs", offsets_fs)
+        object.__setattr__(self, "shape", shape)
+        self.__post_init__()
+
+    @property
+    def arrival_offsets(self) -> "Quantity":
+        """Fresh quantity array of signed per-electron arrival offsets in fs."""
+        from ..units import Q_
+
+        return Q_(np.array(self.offsets_fs, dtype=float), "fs")
+
+    def with_arrival_offsets(self, arrival_offsets: object) -> Self:
+        """Replace explicit time offsets, preserving order and the shape label.
+
+        Use numeric ``offsets_fs`` with ``dataclasses.replace``. Passing
+        ``arrival_offsets`` there conflicts with the numeric field it forwards.
+        """
+        offsets = _timing_quantity_fs(arrival_offsets, field="Offsets.arrival_offsets", ndim=1)
+        return replace(self, offsets_fs=tuple(offsets.tolist()))
 
     def __post_init__(self) -> None:
         offsets = normalize_unit(self.offsets_fs, "fs", field="Offsets.offsets_fs", expected="time")
