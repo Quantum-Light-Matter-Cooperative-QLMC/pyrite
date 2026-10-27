@@ -113,7 +113,7 @@ def round_svg_canvas(path: Path, corner_fraction: float) -> None:
         '<defs><clipPath id="pyrite-rounded-canvas">'
         f'<rect x="{x:g}" y="{y:g}" width="{width:g}" height="{height:g}" '
         f'rx="{radius:g}" ry="{radius:g}"/>'
-        '</clipPath></defs>\n'
+        "</clipPath></defs>\n"
     )
     svg = svg.replace(
         marker,
@@ -662,7 +662,7 @@ def main():
     parser.add_argument(
         "--corner-radius-fraction",
         type=float,
-        default=0.035,
+        default=0.07,
         help="Rounded-canvas corner radius as a fraction of the shortest side",
     )
     parser.add_argument(

@@ -1,8 +1,19 @@
 # Quantum and channeling
 
-Review supported portable quantum configurations and bounded experimental diagnostic entry points. See the [quantum API map](../quantum-api.md).
+Use `pyrite.quantum` for portable source specifications, quantum configuration,
+nonportable runtime states, and state factories. The API contract is distinct
+from scientific validation: most direct channeling solvers are **experimental**,
+and only the bounded planar Bloch density-matrix recipe is admitted by
+`simulate`. See the [quantum API map](../quantum-api.md) for details.
 
-The entries below use generated docstrings, signatures, and source links. API support and scientific validation are separate contracts.
+The tables below link to generated signatures, docstrings, and source code.
+The advanced-stable names come from `api-surface.toml`; exposing a factory here
+does not make its outputs serializable or production-admitted.
+
+## Portable sources and configuration
+
+`TransverseStateSpec` is a portable recipe; the four configuration objects
+select physical quantum regions, dynamics, and numerical representation.
 
 ```{eval-rst}
 .. autosummary::
@@ -14,6 +25,68 @@ The entries below use generated docstrings, signatures, and source links. API su
    pyrite.quantum.QuantumRegion
    pyrite.quantum.QuantumDynamics
    pyrite.quantum.QuantumNumerics
+```
+
+## Runtime state objects
+
+These advanced-stable interfaces describe evaluated wavefunctions or mixtures.
+They are **not** portable source specifications or persisted simulation
+checkpoints; construct `TransverseStateSpec` when a serializable input is needed.
+
+```{eval-rst}
+.. autosummary::
+   :toctree: ../../_autosummary
+   :template: autosummary/public-alias.rst
+   :nosignatures:
+
+   pyrite.quantum.TransverseState
+   pyrite.quantum.SampledState
+   pyrite.quantum.EntryState
+   pyrite.quantum.Superposition
+   pyrite.quantum.MixedState
+   pyrite.quantum.Translated
+```
+
+## Runtime state factories
+
+The following advanced-stable factories construct states without admitting
+them to production transport. Superpositions combine complex amplitudes;
+mixtures combine populations. Array-based and abTEM-backed sources require the
+caller's data (or installed external dependency). Dimensions and quantity
+inputs follow the [quantum quantity contract](../quantum-api.md#runtime-quantity-inputs).
+
+```{eval-rst}
+.. autosummary::
+   :toctree: ../../_autosummary
+   :nosignatures:
+
+   pyrite.quantum.gaussian
+   pyrite.quantum.hermite_gauss
+   pyrite.quantum.laguerre_gauss
+   pyrite.quantum.bessel_gauss
+   pyrite.quantum.airy
+   pyrite.quantum.donut
+   pyrite.quantum.aperture_probe
+   pyrite.quantum.from_array
+   pyrite.quantum.from_abtem
+   pyrite.quantum.superpose
+   pyrite.quantum.mixture
+   pyrite.quantum.translate
+```
+
+## Additional solver diagnostics
+
+These legacy leaf-module paths retain their generated object pages and link to
+existing code owners. The same axial objects can be imported from the
+`pyrite.quantum` facade; new experimental examples should use
+`pyrite.experimental.quantum`, as described in the
+[quantum API map](../quantum-api.md#imports-and-contracts).
+
+```{eval-rst}
+.. autosummary::
+   :toctree: ../../_autosummary
+   :nosignatures:
+
    pyrite.montecarlo.channeling.spatial.spatial_density
    pyrite.montecarlo.channeling.axial_diagnostic.AxialDiagnosticConfig
    pyrite.montecarlo.channeling.axial_diagnostic.AxialDiagnosticResult

@@ -43,7 +43,7 @@ rendering checkout is not a claim that cached arrays were freshly simulated.
 The navy background is part of the artwork and works in light and dark UI
 surfaces. The wordmark (PNG/SVG) and icon have subtly rounded transparent
 corners; the social sharing card deliberately retains an opaque navy backdrop.
-The default `--corner-radius-fraction 0.035` controls how rounded the logo is.
+The default `--corner-radius-fraction 0.07` controls how rounded the logo is.
 Preserve the aspect ratio and provide `PyRITE` alternative text.
 Sphinx copies the canonical assets through `html_static_path`; the demo export
 copies its wordmark into `demo/public/`. App headers embed the PNG as a data URL

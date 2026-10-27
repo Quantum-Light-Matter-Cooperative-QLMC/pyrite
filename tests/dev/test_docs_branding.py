@@ -1,5 +1,6 @@
 """Focused presentation tests for issue #759 branding/header updates."""
 
+import ast
 from pathlib import Path
 
 import pytest
@@ -44,3 +45,21 @@ def test_desktop_header_has_no_duplicate_top_level_nav():
     assert '"navbar_center": []' in conf
     assert '"navbar_persistent": ["search-button-field"]' in conf
     assert '"navbar_end": ["theme-switcher"]' in conf
+
+
+def test_logo_corner_radius_cli_default_is_seven_percent():
+    script = (Path(__file__).resolve().parents[2] / "scripts/pyrite_logo.py").read_text()
+    tree = ast.parse(script)
+    defaults = [
+        {kw.arg: kw.value for kw in node.keywords}["default"]
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "add_argument"
+        and node.args
+        and isinstance(node.args[0], ast.Constant)
+        and node.args[0].value == "--corner-radius-fraction"
+    ]
+    assert len(defaults) == 1
+    assert isinstance(defaults[0], ast.Constant)
+    assert defaults[0].value == 0.07
