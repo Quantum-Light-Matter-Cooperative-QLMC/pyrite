@@ -26,6 +26,7 @@ NAMES = (
     "radiation_diagnostics",
     "experimental_planar_channeling",
     "experimental_axial_channeling",
+    "optimization_studies",
 )
 
 
@@ -52,6 +53,9 @@ def checked_output(name):
     for filename, digest in output.get("input_sha256", {}).items():
         if hashlib.sha256((EXAMPLES / "data" / filename).read_bytes()).hexdigest() != digest:
             raise ValueError(f"stale tutorial input: {name}/{filename}; regenerate its output")
+    for filename, digest in output.get("repository_input_sha256", {}).items():
+        if hashlib.sha256((DOCS.parent / filename).read_bytes()).hexdigest() != digest:
+            raise ValueError(f"stale tutorial repository input: {name}/{filename}")
     if "script_sha256" in output:
         script = EXAMPLES / f"{name}.sh"
         if hashlib.sha256(script.read_bytes()).hexdigest() != output["script_sha256"]:
@@ -108,6 +112,10 @@ def experimental_axial_channeling(view="density"):
     load_example("experimental_axial_channeling").plot(
         checked_output("experimental_axial_channeling"), view=view
     )
+
+
+def optimization_studies(view="finalists"):
+    load_example("optimization_studies").plot(checked_output("optimization_studies"), view=view)
 
 
 def _json_default(value):
