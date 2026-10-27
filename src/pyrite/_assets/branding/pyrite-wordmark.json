@@ -1,7 +1,7 @@
 {
   "generator": "scripts/pyrite_logo.py",
-  "generator_sha256": "d7a20c768587fbccf906f471ed1532797f99c20b6817f088c93d82d9fff4f962",
-  "source_revision": "23abb93ce963dff9a82645224ce6de4ea2ab4102",
+  "generator_sha256": "9bb3864ab1d87fa00076a46f86dd679ab48e80fbbc55b95ae2c2c3da374fe4d7",
+  "source_revision": "6449cae0058865032c644b00e78fb1148441b97c",
   "source_dirty": true,
   "numpy_version": "2.5.4",
   "matplotlib_version": "3.11.2",
@@ -38,7 +38,13 @@
     "beam_seed": 17,
     "y_color_gamma": 1.85,
     "i_width": 0.45,
-    "i_caps": false
+    "i_caps": false,
+    "corner_radius_fraction": 0.07,
+    "social_logo_width_fraction": 0.86,
+    "social_card_size_px": [
+      1200,
+      630
+    ]
   },
   "trajectories_selected": 56,
   "y_lateral_scale_ang": 26463.08641898,

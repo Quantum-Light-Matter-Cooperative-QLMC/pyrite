@@ -6,3 +6,26 @@
 @media (max-width: 575.98px) {
   .navbar-brand img.logo { width: 150px; }
 }
+
+/* Preserve a single desktop header row: logo left, search and appearance
+   selector right. The mobile drawer/search controls retain theme defaults. */
+@media (min-width: 992px) {
+  #pst-header .bd-header__inner {
+    flex-wrap: nowrap;
+  }
+  #pst-header .navbar-header-items {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  #pst-header .navbar-header-items__end {
+    margin-left: auto;
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: flex-end;
+    white-space: nowrap;
+  }
+  #pst-header .navbar-header-items__end > .navbar-item {
+    flex: 0 0 auto;
+  }
+}

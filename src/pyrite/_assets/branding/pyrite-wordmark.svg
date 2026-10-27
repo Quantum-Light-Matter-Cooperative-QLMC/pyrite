@@ -18,7 +18,8 @@
  <defs>
   <style type="text/css">*{stroke-linejoin: round; stroke-linecap: butt}</style>
  </defs>
- <g id="figure_1">
+ <defs><clipPath id="pyrite-rounded-canvas"><rect x="0" y="0" width="1022.4" height="223.2" rx="15.624" ry="15.624"/></clipPath></defs>
+<g id="figure_1" clip-path="url(#pyrite-rounded-canvas)">
   <g id="patch_1">
    <path d="M 0 223.2
 L 1022.4 223.2

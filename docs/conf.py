@@ -168,6 +168,11 @@ html_baseurl = os.environ.get(
 
 
 html_theme_options = {
+    # Top-level navigation remains in the primary sidebar, rather than
+    # duplicating it in the header and pushing search onto a second row.
+    "navbar_center": [],
+    "navbar_persistent": ["search-button-field"],
+    "navbar_end": ["theme-switcher"],
     "navigation_depth": 4,
     "show_nav_level": 1,
     "collapse_navigation": False,

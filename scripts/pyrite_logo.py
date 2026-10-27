@@ -27,6 +27,7 @@ import base64
 import hashlib
 import json
 import os
+import re
 import subprocess
 from pathlib import Path
 
@@ -43,7 +44,7 @@ from matplotlib.font_manager import FontProperties
 from matplotlib.patches import PathPatch, Rectangle
 from matplotlib.textpath import TextPath
 from matplotlib.transforms import Affine2D
-from PIL import Image, ImageOps
+from PIL import Image, ImageDraw, ImageOps
 
 BG = "#0C1628"
 INK = "#F5F5F0"
@@ -62,6 +63,64 @@ PALETTE = LinearSegmentedColormap.from_list(
 ROOT = Path(__file__).resolve().parents[1]
 ASSETS = ROOT / "src" / "pyrite" / "_assets" / "branding"
 CACHE_SCHEMA = 1  # Transport cache remains reusable: beam offsets are separate.
+
+
+def rounded_image(image: Image.Image, corner_fraction: float) -> Image.Image:
+    """Mask a raster logo to a gently rounded canvas, with antialiased edges.
+
+    The source is not resimulated or redrawn: only the outside background
+    corners become transparent. The social sharing card stays opaque navy.
+    """
+    if corner_fraction == 0:
+        return image
+    image = image.convert("RGBA")
+    width, height = image.size
+    scale = 4
+    mask = Image.new("L", (width * scale, height * scale), 0)
+    ImageDraw.Draw(mask).rounded_rectangle(
+        (0, 0, width * scale - 1, height * scale - 1),
+        radius=round(corner_fraction * min(width, height) * scale),
+        fill=255,
+    )
+    image.putalpha(mask.resize((width, height), Image.Resampling.LANCZOS))
+    return image
+
+
+def social_card_image(image: Image.Image, logo_width_fraction: float) -> Image.Image:
+    """Center the wordmark inside GitHub's safe area on an opaque navy card."""
+    content = ImageOps.contain(
+        image,
+        (round(1200 * logo_width_fraction), 400),
+        Image.Resampling.LANCZOS,
+    )
+    card = Image.new("RGB", (1200, 630), BG)
+    card.paste(content.convert("RGB"), ((1200 - content.width) // 2, (630 - content.height) // 2))
+    return card
+
+
+def round_svg_canvas(path: Path, corner_fraction: float) -> None:
+    """Apply matching rounded bounds to Matplotlib's scalable SVG master."""
+    if corner_fraction == 0:
+        return
+    svg = path.read_text(encoding="utf-8")
+    viewbox = re.search(r'\bviewBox="([^"]+)"', svg)
+    marker = '<g id="figure_1">'
+    if viewbox is None or marker not in svg:
+        raise ValueError("Unexpected Matplotlib SVG layout; cannot round logo canvas")
+    x, y, width, height = map(float, viewbox.group(1).split())
+    radius = corner_fraction * min(width, height)
+    clip = (
+        '<defs><clipPath id="pyrite-rounded-canvas">'
+        f'<rect x="{x:g}" y="{y:g}" width="{width:g}" height="{height:g}" '
+        f'rx="{radius:g}" ry="{radius:g}"/>'
+        '</clipPath></defs>\n'
+    )
+    svg = svg.replace(
+        marker,
+        clip + '<g id="figure_1" clip-path="url(#pyrite-rounded-canvas)">',
+        1,
+    )
+    path.write_text(svg, encoding="utf-8")
 
 
 def _cache_key(tag: str, config: dict) -> str:
@@ -523,9 +582,13 @@ def write_brand_assets(y_data, args, thickness_ang):
     wordmark = args.out.with_suffix(".png")
     with Image.open(wordmark) as source:
         image = ImageOps.contain(source.convert("RGB"), (1200, 400), Image.Resampling.LANCZOS)
-    image.save(wordmark, optimize=True)
-    social = ImageOps.pad(image, (1200, 630), color=BG, method=Image.Resampling.LANCZOS)
-    social.save(out / "pyrite-social.png", optimize=True)
+    rounded_image(image, args.corner_radius_fraction).save(wordmark, optimize=True)
+    # GitHub's social-preview safe area needs horizontal breathing room. Only
+    # this derivative is scaled down: the main wordmark remains full size.
+    social_card_image(image, args.social_logo_width_fraction).save(
+        out / "pyrite-social.png", optimize=True
+    )
+    round_svg_canvas(args.out.with_suffix(".svg"), args.corner_radius_fraction)
 
     fig, ax = plt.subplots(figsize=(3, 3), dpi=120)
     fig.patch.set_facecolor(BG)
@@ -551,6 +614,7 @@ def write_brand_assets(y_data, args, thickness_ang):
     plt.close(fig)
     with Image.open(icon) as source:
         image = source.convert("RGB").resize((256, 256), Image.Resampling.LANCZOS)
+    image = rounded_image(image, args.corner_radius_fraction)
     image.save(icon, optimize=True)
     image.save(out / "pyrite-favicon.ico", sizes=[(16, 16), (32, 32), (48, 48), (256, 256)])
     image.resize((180, 180), Image.Resampling.LANCZOS).save(out / "apple-touch-icon.png")
@@ -596,6 +660,18 @@ def main():
     )
     parser.add_argument("--dpi", type=int, default=150)
     parser.add_argument(
+        "--corner-radius-fraction",
+        type=float,
+        default=0.035,
+        help="Rounded-canvas corner radius as a fraction of the shortest side",
+    )
+    parser.add_argument(
+        "--social-logo-width-fraction",
+        type=float,
+        default=0.86,
+        help="Fraction of the 1200 px social card width occupied by the logo (default: 0.86)",
+    )
+    parser.add_argument(
         "--y-stem-width",
         type=float,
         default=0.075,
@@ -629,6 +705,10 @@ def main():
         parser.error("--y-beam-width-nm must be finite and positive")
     if args.y_max_steps < 1:
         parser.error("--y-max-steps must be positive")
+    if not 0 <= args.corner_radius_fraction <= 0.12:
+        parser.error("--corner-radius-fraction must be in [0, 0.12]")
+    if not 0.5 <= args.social_logo_width_fraction <= 1.0:
+        parser.error("--social-logo-width-fraction must be in [0.5, 1.0]")
     y_thick_ang = args.y_thickness_um * 1e4
     i_thick_ang = args.i_thickness_nm * 10.0
     y_config = {
@@ -709,6 +789,9 @@ def main():
             "y_color_gamma": args.y_color_gamma,
             "i_width": args.i_width,
             "i_caps": False,
+            "corner_radius_fraction": args.corner_radius_fraction,
+            "social_logo_width_fraction": args.social_logo_width_fraction,
+            "social_card_size_px": [1200, 630],
         },
         **stats,
     }

@@ -41,7 +41,10 @@ rendering checkout is not a claim that cached arrays were freshly simulated.
 | `pyrite-wordmark.json` | Input and rendering provenance. |
 
 The navy background is part of the artwork and works in light and dark UI
-surfaces. Preserve the aspect ratio and provide `PyRITE` alternative text.
+surfaces. The wordmark (PNG/SVG) and icon have subtly rounded transparent
+corners; the social sharing card deliberately retains an opaque navy backdrop.
+The default `--corner-radius-fraction 0.035` controls how rounded the logo is.
+Preserve the aspect ratio and provide `PyRITE` alternative text.
 Sphinx copies the canonical assets through `html_static_path`; the demo export
 copies its wordmark into `demo/public/`. App headers embed the PNG as a data URL
 so exported HTML works without a running asset server. App head-file paths are
@@ -56,6 +59,12 @@ settings; the matching assets above are ready for those uploads.
 
 For the GitHub repository, upload `pyrite-social.png` in the Social preview
 section of [repository settings](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/settings).
+The generated 1200 × 630 card uses only 86% of its width for the wordmark,
+leaving about 84 px of navy space at each side so GitHub's crop guides do not
+crowd the artwork. Override with `--social-logo-width-fraction` if needed.
+After regenerating and committing an updated image, re-upload it manually in
+GitHub **Settings → General → Social preview → Edit → Upload an image**;
+repository settings are not automatically synchronized from committed assets.
 Use `pyrite-icon.png` when an account or social profile needs a square avatar,
 and `pyrite-social.png` for wide sharing cards. Changing a repository preview
 does not change the organization avatar. Documentation Open Graph and Twitter
