@@ -25,6 +25,16 @@ This static page requires no Python kernel, GPU or reference-table download.
 [Captured beam-profile figure](../../_static/notebooks/04-beams-crystals-target-geometry-1.png) ·
 [Captured PXR/CBS figure](../../_static/notebooks/04-beams-crystals-target-geometry-2.png).
 
+## Continue learning
+
+Next: [Angular radiation distributions](05-angular-radiation-distributions.md).
+Use the [beam API](../../reference/python-api/beams.md) and
+[geometry API](../../reference/python-api/geometry.md) to configure inputs.
+[Beam phase space](../../physics/beam-transport/beam-phase-space.md) and
+[transport geometry](../../physics/geometry/transport-geometry.md) explain the
+coordinates; [beam-injection evidence](../../validation/beam-transport/beam-phase-space-injection.md)
+records the sampling checks.
+
 ## Canonical source
 
 The source below is the exact notebook used for captured output and Molab.

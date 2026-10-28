@@ -22,6 +22,15 @@ need a GPU. The directional source API is experimental.
 
 [Captured source map and directional spectra](../../_static/notebooks/05-angular-radiation-distributions-1.png).
 
+## Continue learning
+
+Next: [From X-rays to detector counts](06-detector-counts.md).
+For a task recipe, use [Directional source heatmaps](../../guides/directional-source-heatmap.md).
+The [directional source reference](../../reference/directional-sources.md) defines
+coordinates, support masks and limits; [spectral observables](../../physics/radiation-physics/spectral-observables.md)
+explain density normalization. See [finite-crystal evidence](../../validation/geometry/finite-transverse-crystal.md)
+for the escape-geometry checks.
+
 ## Canonical source
 
 ```{literalinclude} ../05-angular-radiation-distributions.py

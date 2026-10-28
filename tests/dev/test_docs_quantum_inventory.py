@@ -15,11 +15,19 @@ def test_advanced_stable_quantum_exports_are_documented():
         name for name, declaration in exports.items() if declaration["status"] == "advanced-stable"
     }
     content = QUANTUM_PAGE.read_text(encoding="utf-8")
-    listed = re.findall(r"^   pyrite\.quantum\.([A-Za-z_]\w*)$", content, re.M)
-    assert len(listed) == len(set(listed)), "duplicate canonical quantum API page"
+    stable_content, experimental_content = content.split(
+        "## Experimental solvers and planar projection", maxsplit=1
+    )
+    pattern = r"^   pyrite\.quantum\.([A-Za-z_]\w*)$"
+    all_listed = re.findall(pattern, content, re.M)
+    assert len(all_listed) == len(set(all_listed)), "duplicate canonical quantum API page"
+    listed = re.findall(pattern, stable_content, re.M)
     assert set(listed) == stable, (
         f"missing: {sorted(stable - set(listed))}; unexpected: {sorted(set(listed) - stable)}"
     )
+    experimental = set(re.findall(pattern, experimental_content, re.M))
+    assert experimental == {"ScatteringKernel", "electronic_kernel", "tds_kernel"}
+    assert all(exports[name]["status"] == "experimental" for name in experimental)
     assert ":toctree: ../../_autosummary" in content
 
 

@@ -2,7 +2,7 @@
   "schema": "pyrite.marimo-tutorial.v1",
   "source_sha256": "5cc2355d9f94a40d43a1635bfe9ef5a0d67dab01e64e11ddee83b2e850d76192",
   "exporter_sha256": "1f0b344ae3ac7471396ec06aa30b4a464a8705961d3e8eb60343d84923a476f9",
-  "git_revision": "dae2f5a96c69e8c426ada800cc77f6cba465099e",
+  "git_revision": "28be14d65ab9d54089b69171fabe813bcb63e0d5",
   "git_dirty": true,
   "python_version": "3.14.6",
   "execution": {
@@ -17,7 +17,7 @@
       "dfea6d21d4f6196cb74ef19486b6d86f6f5af40e89d7241efe09507a3b982e85": "61fb7f4cf6dceab2a4d10c5fc641357d80b0ba6bbe037b64dd000e08f024acd9"
     },
     "source_identity": "60000fac994649fd80846d1da0ba79334051cf14461e8d64c9a3cc481f2df5a0",
-    "observation_identity": "15c33ae9c8ba5c9c37030d21bf11e0af64f972ec3ba173eac93bc13c7d4029c4",
+    "observation_identity": "87507a5385a4c55a469c08f58316cf3bf8676a93da6c8b1bf4c65be54bb4cb85",
     "acquisition_seed": 23,
     "exposure_s": 1.0,
     "current_nA": 10.0,
@@ -40,8 +40,8 @@
     ],
     "sampled_cxr_histories": 512,
     "sampled_brem_histories": 128,
-    "expected_total": 929.8047082716505,
-    "realized_total": 905,
+    "expected_total": 929.8047082716506,
+    "realized_total": 931,
     "outside_window_expected": {
       "underflow": 13981.857636154802,
       "overflow": 381.55792220834155,
@@ -49,8 +49,8 @@
     }
   },
   "artifacts": {
-    "notebooks/__marimo__/session/06-detector-counts.py.json": "11ec05dfb47bcd679fa5032fc1ecf722cb3893b1cfdd7cb771ecf0559c7108e3",
-    "_static/notebooks/06-detector-counts.html": "dfba2cf680e0fa06643d0b77499b8846b1d13724f860a6cef185368491651fab",
-    "_static/notebooks/06-detector-counts-1.png": "b850615f5c9be349e6f96f2a43b5225d30cebf0d0204e53533656a3d5f1262ae"
+    "notebooks/__marimo__/session/06-detector-counts.py.json": "fc9c4c2319aa1fcd7e97dfeb194275ad3a25f2e5ae8e70cd09c9d5caf907e435",
+    "_static/notebooks/06-detector-counts.html": "23e402fd7567ec9e853ca1a3078c093609b3ed4da68cc4404c78ed294df35a08",
+    "_static/notebooks/06-detector-counts-1.png": "a4f02b8941945a4f655e392956ff98e9da87a5734f9c15db95578c8df0c36ff5"
   }
 }

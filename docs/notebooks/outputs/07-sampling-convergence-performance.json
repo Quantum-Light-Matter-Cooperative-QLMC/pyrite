@@ -1,8 +1,8 @@
 {
   "schema": "pyrite.marimo-tutorial.v1",
-  "source_sha256": "1d1665958d0be08fbdb2ee280ad5df431d56c86bd8e152d724dd565e7d1f8871",
+  "source_sha256": "5ac6c741aa900e5a3de62e32a8ba695120f7478ada23bee1d3df6d99f85564e7",
   "exporter_sha256": "1f0b344ae3ac7471396ec06aa30b4a464a8705961d3e8eb60343d84923a476f9",
-  "git_revision": "dae2f5a96c69e8c426ada800cc77f6cba465099e",
+  "git_revision": "28be14d65ab9d54089b69171fabe813bcb63e0d5",
   "git_dirty": true,
   "python_version": "3.14.6",
   "execution": {
@@ -16,7 +16,7 @@
       "44461d55c05a7fea30a0f52bceb2aa384d6b71c1e12765da576b5cbc2592dbe3": "3f32446ff553a97b14755b475c4d88287ff44eff2ffce0cdd790dbd9b40a83f2",
       "dfea6d21d4f6196cb74ef19486b6d86f6f5af40e89d7241efe09507a3b982e85": "61fb7f4cf6dceab2a4d10c5fc641357d80b0ba6bbe037b64dd000e08f024acd9"
     },
-    "source_identity": "d852f7f503f8a634a50f9c2d028d432cbd46c8c309c84bebfee8e7faecb5f009",
+    "source_identity": "9d92cbae3ca0a984911b34cab70e901759fd28f80edbf2acef010be7dc607001",
     "band_eV": [
       600.0,
       2000.0
@@ -26,42 +26,42 @@
         "histories": 256,
         "seed": 1,
         "yield_per_electron_sr": 1.1370006696615955e-07,
-        "elapsed_s": 0.1613892940004007,
+        "elapsed_s": 0.13141117291525006,
         "source_identity": "cd9b16b2b7eb81a83a5ad7903a9298f2efc157a8e19da603d8fe3d1a55a702a5"
       },
       {
         "histories": 1024,
         "seed": 1,
-        "yield_per_electron_sr": 1.1337416570393222e-07,
-        "elapsed_s": 0.607017498001369,
+        "yield_per_electron_sr": 1.133741657039322e-07,
+        "elapsed_s": 0.430259644985199,
         "source_identity": "62aaf0de46c0e754eed1d0f4dcd27a5223e5cd83796b66250bb133f026ee6c8c"
       },
       {
         "histories": 4096,
         "seed": 1,
         "yield_per_electron_sr": 1.133832547310012e-07,
-        "elapsed_s": 2.114488621000419,
+        "elapsed_s": 1.402842887910083,
         "source_identity": "75cfeb48cecc335741aead81c079e643a56c6e1a27f32a26c2e63da315dcd397"
       },
       {
         "histories": 8192,
         "seed": 1,
         "yield_per_electron_sr": 1.1332684472435915e-07,
-        "elapsed_s": 4.551907578999817,
+        "elapsed_s": 2.843087006127462,
         "source_identity": "55fe48ba83daeecd1b3b06aa7579f41352db6e254e5977f8618b439ab90e5ebe"
       },
       {
         "histories": 16384,
         "seed": 1,
         "yield_per_electron_sr": 1.1330287287189257e-07,
-        "elapsed_s": 12.914767746999132,
+        "elapsed_s": 8.098381090909243,
         "source_identity": "b0bb8c23d397a17ce73973149e704be61caa7a1009c58def40798c12e812b50e"
       },
       {
         "histories": 32768,
         "seed": 1,
         "yield_per_electron_sr": 1.1333229667088497e-07,
-        "elapsed_s": 19.367665916999613,
+        "elapsed_s": 11.647968580015004,
         "source_identity": "da8f5a3b7e7f86dac123b26d092de4fc2726273548202333e62a412b986939df"
       }
     ],
@@ -69,9 +69,9 @@
       "histories": 1024,
       "stop_reason": "converged",
       "statistics_limited": false,
-      "rse": 0.002501345509210702,
-      "effective_sample_size": 1017.4874351937768,
-      "max_electron_share": 0.0027392020511017748,
+      "rse": 0.0025013455092107026,
+      "effective_sample_size": 1017.4874351937767,
+      "max_electron_share": 0.002739202051101775,
       "stability": 0.004337179412025244,
       "guard_passes": {
         "relative_se": true,
@@ -80,16 +80,16 @@
         "stability": true
       },
       "seed": 1,
-      "yield_per_electron_sr": 1.1337416570393222e-07,
-      "elapsed_s": 0.8098118029993202,
-      "target_rse": 0.4,
+      "yield_per_electron_sr": 1.133741657039322e-07,
+      "elapsed_s": 0.4381737771909684,
+      "target_rse": 0.1,
       "max_electrons": 32768,
-      "source_identity": "d852f7f503f8a634a50f9c2d028d432cbd46c8c309c84bebfee8e7faecb5f009"
+      "source_identity": "9d92cbae3ca0a984911b34cab70e901759fd28f80edbf2acef010be7dc607001"
     },
     "adaptive_stopping_diagnostics": {
       "mode": "adaptive",
       "precision": {
-        "target_rse": 0.4,
+        "target_rse": 0.1,
         "min_electrons": 256,
         "max_electrons": 32768,
         "block_electrons": 256,
@@ -107,7 +107,7 @@
         ],
         "batch_means_band_eV": null
       },
-      "target_rse": 0.4,
+      "target_rse": 0.1,
       "min_electrons": 256,
       "max_electrons": 32768,
       "block_electrons": 256,
@@ -135,9 +135,9 @@
         "cxr": {
           "n_electrons": 1024,
           "mean": 1.1452375404253678e-07,
-          "relative_se": 0.002501345509210702,
-          "max_electron_share": 0.0027392020511017748,
-          "effective_sample_size": 1017.4874351937768,
+          "relative_se": 0.0025013455092107026,
+          "max_electron_share": 0.002739202051101775,
+          "effective_sample_size": 1017.4874351937767,
           "stability": 0.004337179412025244,
           "passes": {
             "relative_se": true,
@@ -154,8 +154,8 @@
     "timing": "perf_counter, local wall seconds, after one untimed warmup"
   },
   "artifacts": {
-    "notebooks/__marimo__/session/07-sampling-convergence-performance.py.json": "c346b4a1e5f11f70bb993e80f809a97e4f9229e7c9e13d52b8f0a9b6044d3d2d",
-    "_static/notebooks/07-sampling-convergence-performance.html": "e87c3817c8d2963882f2e610a42848bec52eeefa70dda8c37d35cb0d2dd74bbc",
-    "_static/notebooks/07-sampling-convergence-performance-1.png": "9617c5eada067589e02a8b2f2f839f745df54a67032715aa44b7df0ba44f23dc"
+    "notebooks/__marimo__/session/07-sampling-convergence-performance.py.json": "7271cbadd06f470c809dab2c9b9bfc65d124e5b85b6229d2f274d829da92f322",
+    "_static/notebooks/07-sampling-convergence-performance.html": "fbec685028ebded7c234f5896f24c021159269937debf995f80ad49f9c9011fa",
+    "_static/notebooks/07-sampling-convergence-performance-1.png": "946833dd81d24c743daa1eeb224f3f7f4f1c6c5b83e7007bc996e04d7cda946c"
   }
 }

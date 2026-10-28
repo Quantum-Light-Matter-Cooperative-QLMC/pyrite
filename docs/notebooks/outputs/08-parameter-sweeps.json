@@ -1,0 +1,237 @@
+{
+  "schema": "pyrite.marimo-tutorial.v1",
+  "source_sha256": "a8a61494fbfc401a47b29a1351c036d6a9f89db302ad4fce256e52d0db330a13",
+  "exporter_sha256": "1f0b344ae3ac7471396ec06aa30b4a464a8705961d3e8eb60343d84923a476f9",
+  "git_revision": "9b7cdcaf8a1fa87eba456da16f2ccfa173186259",
+  "git_dirty": true,
+  "python_version": "3.13.14",
+  "execution": {
+    "tutorial": "08-parameter-sweeps",
+    "pyrite_version": "0.22.5",
+    "backend": "cpu",
+    "seed": 1,
+    "table_identity": {
+      "918b1a9013e4c19c584e2cf4eb8b605f0063a7237b8b0d67749867a4c6804832": "c3f8eab1f03c1c66cfe0355b68f312e0ca450cbacaabe4f72eebecefe8d1e08d",
+      "ea7657ec94db1acf9f16cb260a5b107c3d2a4ecc71e43facee0e6a845487cbeb": "beed169ba64a48fd11dc8c5a7bb81471abaa21806bde7943dba6da43e5b01b6f",
+      "44461d55c05a7fea30a0f52bceb2aa384d6b71c1e12765da576b5cbc2592dbe3": "3f32446ff553a97b14755b475c4d88287ff44eff2ffce0cdd790dbd9b40a83f2",
+      "dfea6d21d4f6196cb74ef19486b6d86f6f5af40e89d7241efe09507a3b982e85": "61fb7f4cf6dceab2a4d10c5fc641357d80b0ba6bbe037b64dd000e08f024acd9"
+    },
+    "energies_keV": [
+      20.0,
+      25.0,
+      30.0,
+      35.0,
+      40.0
+    ],
+    "thicknesses_nm": [
+      25.0,
+      50.0,
+      75.0,
+      100.0,
+      125.0
+    ],
+    "band_eV": [
+      600.0,
+      2000.0
+    ],
+    "yield_per_electron_sr": [
+      [
+        4.633405396253742e-08,
+        3.741983372005754e-08,
+        3.1227029393661194e-08,
+        2.6734415658708886e-08,
+        2.3340657141864853e-08
+      ],
+      [
+        8.806092323998848e-08,
+        7.196963848645651e-08,
+        6.046870439347694e-08,
+        5.208486965048754e-08,
+        4.565596578808792e-08
+      ],
+      [
+        1.2494990618344888e-07,
+        1.0372866910251443e-07,
+        8.788762570889991e-08,
+        7.592276887425585e-08,
+        6.678420382258701e-08
+      ],
+      [
+        1.5764341013608072e-07,
+        1.3270787979676401e-07,
+        1.1336808019423506e-07,
+        9.843580778231444e-08,
+        8.683328621237816e-08
+      ],
+      [
+        1.864571176494386e-07,
+        1.592886316996941e-07,
+        1.3712593674524276e-07,
+        1.1959433123744675e-07,
+        1.0562871455682771e-07
+      ]
+    ],
+    "sampled_cxr_histories": 2048,
+    "sampled_brem_histories": 2048,
+    "runs": [
+      {
+        "energy_keV": 20.0,
+        "thickness_nm": 25.0,
+        "seed": 1,
+        "source_identity": "db2b99346a0d0f6b6a790d602ac48605a03bf10829df3ccd9fb7c1f63594fb00"
+      },
+      {
+        "energy_keV": 25.0,
+        "thickness_nm": 25.0,
+        "seed": 1,
+        "source_identity": "05744125f0efde2752abdbd71522a051259e19ef7c5b9c5560ceec9d27c1bc35"
+      },
+      {
+        "energy_keV": 30.0,
+        "thickness_nm": 25.0,
+        "seed": 1,
+        "source_identity": "7988f4b5688266d806cffe4a14659ee6d90d0d8f04d93ed62905f18a68c3c686"
+      },
+      {
+        "energy_keV": 35.0,
+        "thickness_nm": 25.0,
+        "seed": 1,
+        "source_identity": "cae7125e0439d052dceb1d0d3f6731470b4747d5058f8710112be539cee2cee6"
+      },
+      {
+        "energy_keV": 40.0,
+        "thickness_nm": 25.0,
+        "seed": 1,
+        "source_identity": "b852ef0cf5012c8c39035add9dc3a374da5a6cb1d24b3dcda6fab9ca4d75a687"
+      },
+      {
+        "energy_keV": 20.0,
+        "thickness_nm": 50.0,
+        "seed": 1,
+        "source_identity": "5be60762ea07484fc9d3d3655120a301e21ddb7204d36759306a4281c3546f64"
+      },
+      {
+        "energy_keV": 25.0,
+        "thickness_nm": 50.0,
+        "seed": 1,
+        "source_identity": "c7ab1526a63eb8437c98372e537e4e86043cb7bc9b1853a25e4cc9b53d24f51c"
+      },
+      {
+        "energy_keV": 30.0,
+        "thickness_nm": 50.0,
+        "seed": 1,
+        "source_identity": "40cd8ef3fc8eb901bae172c2c2c4ae603d205a50a6f20e23c45cb3b60b5d4b20"
+      },
+      {
+        "energy_keV": 35.0,
+        "thickness_nm": 50.0,
+        "seed": 1,
+        "source_identity": "9af663b9992ec9edeb4cdc421c8357cacde74e83b904d903ffa142663214daf0"
+      },
+      {
+        "energy_keV": 40.0,
+        "thickness_nm": 50.0,
+        "seed": 1,
+        "source_identity": "d597ea5bf3c44c4d1a6f2734c02bf12841825c8d3b50352f8ebf8153236c9935"
+      },
+      {
+        "energy_keV": 20.0,
+        "thickness_nm": 75.0,
+        "seed": 1,
+        "source_identity": "20de27ae2b97ff246b879f3fcdf435354b50a37565f6fb48a555ce7ebc7090eb"
+      },
+      {
+        "energy_keV": 25.0,
+        "thickness_nm": 75.0,
+        "seed": 1,
+        "source_identity": "2cc7163cdbbf9a44dc64f34d998b096836a078cfb8c0ab95635b101d44be191b"
+      },
+      {
+        "energy_keV": 30.0,
+        "thickness_nm": 75.0,
+        "seed": 1,
+        "source_identity": "2abcc30a4336b9c69362848696e22731d2ea3b44e9125d7caa74a28313868578"
+      },
+      {
+        "energy_keV": 35.0,
+        "thickness_nm": 75.0,
+        "seed": 1,
+        "source_identity": "9e33815ced41f81b834dd6324b0c5cbf110b0ddf28c849468e6aa5fe9a466065"
+      },
+      {
+        "energy_keV": 40.0,
+        "thickness_nm": 75.0,
+        "seed": 1,
+        "source_identity": "f01e2d2e42eaadfa0c0dd0df34d6d168c30ca6e8a227c50782674aab539e30cc"
+      },
+      {
+        "energy_keV": 20.0,
+        "thickness_nm": 100.0,
+        "seed": 1,
+        "source_identity": "2a0f8003da2c1217fa9896359003b50769cb3c73f6b0488adf92b1dd743e7526"
+      },
+      {
+        "energy_keV": 25.0,
+        "thickness_nm": 100.0,
+        "seed": 1,
+        "source_identity": "d1d353babee56ff780cae241d201e34c35018fe49b792fc1aa923be5465813d0"
+      },
+      {
+        "energy_keV": 30.0,
+        "thickness_nm": 100.0,
+        "seed": 1,
+        "source_identity": "a0f351ced76e7b6a1a0e22a1dc72cf6faa2e0acb684aed7d440ed7ab991b008f"
+      },
+      {
+        "energy_keV": 35.0,
+        "thickness_nm": 100.0,
+        "seed": 1,
+        "source_identity": "40a12ea8a3619560db93d0e5f69c64f0e5c68cbb0f21c2c18e1f7d5be242f44f"
+      },
+      {
+        "energy_keV": 40.0,
+        "thickness_nm": 100.0,
+        "seed": 1,
+        "source_identity": "d70954db35495af20c935509fdbb8dba5e42bc0f8516127d553acf76eeb3b37e"
+      },
+      {
+        "energy_keV": 20.0,
+        "thickness_nm": 125.0,
+        "seed": 1,
+        "source_identity": "c468f983df958d1d1e78ea34f3b6fea7bd15a6d3772a7590f8671b95ff5b864f"
+      },
+      {
+        "energy_keV": 25.0,
+        "thickness_nm": 125.0,
+        "seed": 1,
+        "source_identity": "0c358f01fadbc77fd520bab3050ece1e7dcdaffd9ebcbbbd69bec1746a22a5de"
+      },
+      {
+        "energy_keV": 30.0,
+        "thickness_nm": 125.0,
+        "seed": 1,
+        "source_identity": "a6c3f1ab146c4e2f8b05abd84e16e811fe8f49f7afe281abd1458d6b58319835"
+      },
+      {
+        "energy_keV": 35.0,
+        "thickness_nm": 125.0,
+        "seed": 1,
+        "source_identity": "dd813e656d0528e088e85af62cb859f7afb6fe2ee51a50fd70054b0136a4e12c"
+      },
+      {
+        "energy_keV": 40.0,
+        "thickness_nm": 125.0,
+        "seed": 1,
+        "source_identity": "b2ed97e0cd0a6ad37b8cd5c3ddb17dcd9f3052433746ba6744ae3c9bf19b8083"
+      }
+    ]
+  },
+  "artifacts": {
+    "notebooks/__marimo__/session/08-parameter-sweeps.py.json": "da08e92ae59fb829c160986dc70af73f5d6b77e341c06155ac2103fd1926d78c",
+    "_static/notebooks/08-parameter-sweeps.html": "97041d86fdbd8fb80e305dc020efd9aefd9d915239ff4930ab544c26b247425a",
+    "_static/notebooks/08-parameter-sweeps-1.png": "183f6ee636c1f1c2cde57cbb95644f259cbabdac40b4aeadbd9b9dc5904f8d9b"
+  },
+  "redactions": [
+    "Operator home directory paths replaced with /home/user/."
+  ]
+}

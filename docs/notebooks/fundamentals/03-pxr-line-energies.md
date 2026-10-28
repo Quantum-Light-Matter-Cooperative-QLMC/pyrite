@@ -22,6 +22,14 @@ Python kernel or CUDA.
 
 [Captured figure](../../_static/notebooks/03-pxr-line-energies-1.png).
 
+## Continue learning
+
+Next: [Beams, crystals and target geometry](../designing/04-beams-crystals-target-geometry.md).
+See [photon-energy comparisons](../../reference/python-api/radiation.md#photon-energy-comparisons)
+for API units and broadcasting, and [crystal tilt conventions](../../physics/geometry/tilt-convention.md)
+for the orientation geometry. The [PXR amplitude evidence](../../validation/radiation-physics/pxr-amplitude.md)
+describes the separate source model; line-centre prediction alone does not determine yield.
+
 ## Canonical source
 
 The source below is the exact notebook used for the captured output and Molab.

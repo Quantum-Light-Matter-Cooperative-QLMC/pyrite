@@ -23,6 +23,15 @@ need a GPU. The images are simulated observations of an ideal counter.
 
 [Captured expected and realized count images](../../_static/notebooks/06-detector-counts-1.png).
 
+## Continue learning
+
+Next: [Sampling, convergence and performance](07-sampling-convergence-performance.md).
+Use the [detector-observation how-to](../../guides/detector-observations.md)
+for an acquisition recipe and the [observations API](../../reference/python-api/observations.md)
+for interfaces. [Detector response](../../physics/detectors/detector-response.md)
+explains the physical model; [pixel angular interpolation evidence](../../validation/detectors/pixel-angular-interpolation.md)
+records checks on pixel reconstruction from angular tiles.
+
 ## Canonical source
 
 ```{literalinclude} ../06-detector-counts.py
