@@ -3,7 +3,10 @@
 
 Run from a PyRITE checkout with the reference tables installed:
 
-    PYRITE_MC_BACKEND=cpu uv run python scripts/pyrite_logo.py
+    PYRITE_MC_BACKEND=cpu uv run python scripts/pyrite_logo.py --ri-gap 0.10
+
+Adjust --ri-gap to add space before the spectral I (logo units; 0 restores
+the original spacing). Cached simulations are reused when only spacing changes.
 
 Requires pyrite-mc, NumPy and Matplotlib (e.g. pyrite-mc[plots]).  The two
 simulations are cached as NPZ so typography changes do not repeat transport.
@@ -510,6 +513,7 @@ def render(
     font_family: str,
     stem_width: float = 0.075,
     i_width: float = 0.45,
+    ri_gap: float = 0.10,
     color_gamma: float = 1.85,
     beam_seed: int = 17,
     beam_width_nm: float | None = None,
@@ -527,6 +531,7 @@ def render(
     y_center = cursor + 0.85
     cursor += 1.70 + gap
     cursor += draw_glyph(ax, "R", cursor, baseline, letter_height, INK, font_family) + gap
+    cursor += ri_gap  # Optical correction; shift I, T and E together to preserve I–T spacing.
     i_center = cursor + 0.34
     cursor += 0.68 + gap
     cursor += draw_glyph(ax, "T", cursor, baseline, letter_height, INK, font_family) + gap
@@ -692,7 +697,15 @@ def main():
     parser.add_argument(
         "--i-width", type=float, default=0.45, help="Horizontal display scale of the spectral I"
     )
+    parser.add_argument(
+        "--ri-gap",
+        type=float,
+        default=0.10,
+        help="Extra R-to-I spacing in logo units (default: 0.10; 0 restores original spacing)",
+    )
     args = parser.parse_args()
+    if not np.isfinite(args.ri_gap) or args.ri_gap < 0:
+        parser.error("--ri-gap must be finite and nonnegative")
     if args.y_thickness_um <= 0 or args.i_thickness_nm <= 0 or args.energy_kev <= 5:
         parser.error("Thicknesses must be positive and beam energy >5 keV")
     if args.y_electrons < 20 or args.i_electrons < 20:
@@ -745,6 +758,7 @@ def main():
         font_family=args.font_family,
         stem_width=args.y_stem_width,
         i_width=args.i_width,
+        ri_gap=args.ri_gap,
         color_gamma=args.y_color_gamma,
         beam_seed=args.seed,
         beam_width_nm=args.y_beam_width_nm,
@@ -788,6 +802,7 @@ def main():
             "beam_seed": args.seed,
             "y_color_gamma": args.y_color_gamma,
             "i_width": args.i_width,
+            "ri_gap": args.ri_gap,
             "i_caps": False,
             "corner_radius_fraction": args.corner_radius_fraction,
             "social_logo_width_fraction": args.social_logo_width_fraction,
