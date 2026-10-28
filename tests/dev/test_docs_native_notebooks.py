@@ -105,6 +105,9 @@ def test_export_migrates_wrapper_and_retains_hidden_input(tmp_path, monkeypatch)
                                         "C:/project/spectrum.py:328: "
                                         "LineOpticalDataWarning: unavailable optical data\n"
                                         "  publish_line_data_coverage(coverage)\n"
+                                        "C:/project/transition_emission.py:134: "
+                                        "CoherentSamplingWarning: unresolved bunch excess\n"
+                                        "  spectrum = crossing_transition_radiation()\n"
                                     ),
                                 ),
                                 nbformat.v4.new_output(
@@ -191,3 +194,24 @@ def test_docs_links_target_exported_notebooks_not_deleted_md_wrappers():
                 assert (source.parent / path).is_file(), (
                     f"{source.relative_to(docs)}: missing notebook target {target}"
                 )
+
+
+def test_published_tutorial_outputs_have_no_json_dump_widgets():
+    notebooks = Path(__file__).parents[2] / "docs/notebooks"
+    for path in notebooks.glob("*/*.ipynb"):
+        captured = nbformat.read(path, as_version=4)
+        for cell in captured.cells:
+            for output in cell.get("outputs", []):
+                html = output.get("data", {}).get("text/html", "")
+                assert "marimo-json-output" not in html, path.name
+
+
+def test_environment_healthcheck_is_a_rendered_table():
+    path = Path(__file__).parents[2] / "docs/notebooks/fundamentals/01-first-spectrum.ipynb"
+    captured = nbformat.read(path, as_version=4)
+    tables = [
+        output.get("data", {}).get("text/html", "")
+        for cell in captured.cells
+        for output in cell.get("outputs", [])
+    ]
+    assert any("<table>" in html and "selected backend" in html for html in tables)

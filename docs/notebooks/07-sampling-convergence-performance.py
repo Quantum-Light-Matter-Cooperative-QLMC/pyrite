@@ -63,7 +63,18 @@ def _():
     physics = Physics(brem_source="none")
     reflections = CxrReflections(n_families=2)
     band_eV = (600.0, 2_000.0)
-    budgets = (256, 256*2, 256*3, 256*4, 256*5, 256*6, 256*7, 256*8, 256*9, 256*10)
+    budgets = (
+        256,
+        256 * 2,
+        256 * 3,
+        256 * 4,
+        256 * 5,
+        256 * 6,
+        256 * 7,
+        256 * 8,
+        256 * 9,
+        256 * 10,
+    )
     electron_block_size = 256  # Adaptive stopping checks after each transport block.
     spectrum_chunk_size = 512  # Segments per spectrum reduction, not electron histories.
     return (
@@ -145,7 +156,6 @@ def _(
                 "seed": int(_result.case["seed"]),
                 "yield_per_electron_sr": _yield,
                 "elapsed_s": _elapsed,
-                "source_identity": _result.provenance["identity_digest"],
             }
         )
     assert [row["histories"] for row in fixed_rows] == list(budgets)
@@ -232,23 +242,8 @@ def _(
         "elapsed_s": _elapsed,
         "target_rse": policy.target_rse,
         "max_electrons": policy.max_electrons,
-        "source_identity": adaptive_result.provenance["identity_digest"],
     }
-    stopping_diagnostics = _stop
-    return adaptive_row, stopping_diagnostics
-
-
-@app.cell(hide_code=True)
-def _(adaptive_row, fixed_rows, mo, stopping_diagnostics):
-    mo.json(
-        {
-            "fixed_budget": fixed_rows,
-            "adaptive": adaptive_row,
-            "adaptive_stopping_diagnostics": stopping_diagnostics,
-            "note": "Elapsed times are environment-specific, not portable GPU/CPU benchmarks.",
-        }
-    )
-    return
+    return (adaptive_row,)
 
 
 @app.cell
@@ -264,7 +259,7 @@ def _(adaptive_row, budgets, fixed_rows, np, plt):
         [adaptive_row["histories"]],
         [adaptive_row["yield_per_electron_sr"]],
         marker="D",
-        color='red',
+        color="red",
         label="Adaptive run",
         zorder=3,
     )
@@ -283,7 +278,7 @@ def _(adaptive_row, budgets, fixed_rows, np, plt):
         [adaptive_row["histories"]],
         [adaptive_row["elapsed_s"]],
         marker="D",
-        color='red',
+        color="red",
         label="Adaptive run",
         zorder=3,
     )
@@ -294,11 +289,6 @@ def _(adaptive_row, budgets, fixed_rows, np, plt):
     )
     _time_ax.grid(alpha=0.25)
     fig_convergence  # noqa: B018 - captured by marimo
-    return
-
-
-@app.cell
-def _():
     return
 
 

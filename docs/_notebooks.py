@@ -99,10 +99,11 @@ def output_contains_figure(notebook):
     return False
 
 
-def suppress_optical_data_warnings(notebook):
-    """Omit optical-coverage warning tracebacks from published tutorial output."""
+def suppress_model_warnings(notebook):
+    """Omit known model-warning tracebacks explained in the tutorial prose."""
     pattern = re.compile(
-        r"^[^\n]*:\d+: LineOpticalDataWarning:[^\n]*(?:\n[ \t]+[^\n]*)?\n?",
+        r"^[^\n]*:\d+: (?:LineOpticalDataWarning|CoherentSamplingWarning):"
+        r"[^\n]*(?:\n[ \t]+[^\n]*)?\n?",
         re.MULTILINE,
     )
     for cell in notebook["cells"]:
@@ -147,7 +148,7 @@ def captured_notebook(source, notebook, title, footer):
     else:
         raise ValueError(f"{source.stem}: missing Markdown title cell")
 
-    suppress_optical_data_warnings(notebook)
+    suppress_model_warnings(notebook)
     notebook["cells"].append(
         nbformat.v4.new_markdown_cell(
             "## Continue learning\n\n"

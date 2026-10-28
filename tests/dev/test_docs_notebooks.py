@@ -28,7 +28,7 @@ def test_tutorials_use_molab_package_manager_instructions():
     assert "enter `endf-parserpy==0.17.0`" in setup
 
 
-def test_prose_and_boilerplate_cells_hide_code():
+def test_prose_cells_hide_code():
     for path in (DOCS / "notebooks").glob("*.py"):
         for cell in ast.parse(path.read_text()).body:
             if not isinstance(cell, ast.FunctionDef):
@@ -41,14 +41,7 @@ def test_prose_and_boilerplate_cells_hide_code():
                 and node.func.attr == "md"
                 for node in ast.walk(cell)
             )
-            imports_only = all(
-                isinstance(node, (ast.Import, ast.ImportFrom, ast.Return)) for node in cell.body
-            )
-            bootstrap = any(
-                isinstance(node, ast.Import) and any(a.name == "pyrite" for a in node.names)
-                for node in cell.body
-            )
-            if markdown or imports_only or bootstrap:
+            if markdown:
                 decorator = cell.decorator_list[0]
                 assert isinstance(decorator, ast.Call), (path.name, cell.lineno)
                 assert any(

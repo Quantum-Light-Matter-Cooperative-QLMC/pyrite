@@ -90,21 +90,6 @@ def _(beam, directional_source, np, numerics, tables_ready, target):
     return (source,)
 
 
-@app.cell(hide_code=True)
-def _(mo, np, source):
-    summary = {
-        "source_component": source.component,
-        "density_units": source.units,
-        "angles": int(source.angle_deg.size),
-        "energy_nodes": int(source.energy_eV.size),
-        "supported_directions": int(np.count_nonzero(source.supported)),
-        "mean_current_nA": source.current_na,
-        "kinematic_line_ceiling_eV": source.provenance["line_window_ceiling_eV"],
-    }
-    mo.json(summary)
-    return
-
-
 @app.cell
 def _(np, plt, source):
     from matplotlib.colors import LogNorm
