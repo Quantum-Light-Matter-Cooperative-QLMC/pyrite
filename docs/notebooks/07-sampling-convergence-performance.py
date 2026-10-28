@@ -1,6 +1,12 @@
 # /// script
 # requires-python = ">=3.13"
-# dependencies = ["endf-parserpy==0.17.0", "marimo>=0.25.1", "pyrite-mc==0.22.5", "matplotlib>=3.11", "numpy>=2"]
+# dependencies = [
+#     "endf-parserpy==0.17.0",
+#     "marimo>=0.23.3",
+#     "pyrite-mc==0.22.5",
+#     "matplotlib>=3.11",
+#     "numpy>=2",
+# ]
 # ///
 
 import marimo
@@ -58,7 +64,7 @@ def _():
     physics = Physics(brem_source="none")
     reflections = CxrReflections(n_families=2)
     band_eV = (600.0, 2_000.0)
-    budgets = (256, 1_024, 4_096)
+    budgets = (256, 1_024, 4_096, 8_192, 16_384, 32_768)
     return (
         AdaptiveSampling,
         FixedSampling,
@@ -92,6 +98,7 @@ def _(
     target,
 ):
     assert tables_ready  # Wait for reference tables before executing transport.
+    electron_batch_size = 256
 
     # One untimed warmup reduces, but does not eliminate, first-call compilation costs.
     _ = simulate(
@@ -102,6 +109,7 @@ def _(
         numerics=Numerics(
             sampling=FixedSampling(cxr_electrons=16, brem_electrons=1),
             cxr_reflections=reflections,
+            cxr_chunk=electron_batch_size,
         ),
     )
     fixed_rows = []
@@ -115,6 +123,7 @@ def _(
             numerics=Numerics(
                 sampling=FixedSampling(cxr_electrons=_n, brem_electrons=1),
                 cxr_reflections=reflections,
+                cxr_chunk=512,
             ),
         )
         _elapsed = perf_counter() - _start
@@ -135,7 +144,7 @@ def _(
             }
         )
     assert [row["histories"] for row in fixed_rows] == list(budgets)
-    return (fixed_rows,)
+    return electron_batch_size, fixed_rows
 
 
 @app.cell(hide_code=True)
@@ -158,6 +167,7 @@ def _(
     band_eV,
     beam,
     detector,
+    electron_batch_size,
     np,
     perf_counter,
     physics,
@@ -169,10 +179,9 @@ def _(
     assert tables_ready  # Wait for reference tables before executing transport.
 
     policy = AdaptiveSampling(
-        target_rse=0.25,
-        min_electrons=256,
-        max_electrons=2_048,
-        block_electrons=256,
+        target_rse=0.4,
+        max_electrons=32_768,
+        block_electrons=electron_batch_size,
         observables=("cxr",),
         band_eV=band_eV,
     )

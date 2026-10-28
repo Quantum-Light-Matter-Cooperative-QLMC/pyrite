@@ -1,6 +1,12 @@
 # /// script
 # requires-python = ">=3.13"
-# dependencies = ["endf-parserpy==0.17.0", "marimo>=0.25.1", "pyrite-mc==0.22.5", "matplotlib>=3.11", "numpy>=2"]
+# dependencies = [
+#     "endf-parserpy==0.17.0",
+#     "marimo>=0.23.3",
+#     "pyrite-mc==0.22.5",
+#     "matplotlib>=3.11",
+#     "numpy>=2",
+# ]
 # ///
 
 import marimo
@@ -24,7 +30,7 @@ def _():
     _ = pyrite.fetch_tables()  # Installed pins are reused without downloading again.
 
     tables_ready = True
-    return tables_ready, mo, np, plt, pyrite
+    return mo, np, plt, pyrite, tables_ready
 
 
 @app.cell(hide_code=True)
@@ -68,7 +74,7 @@ def _():
 
 
 @app.cell
-def _(beam, mo, np, plt, target):
+def _(beam, np, plt, target):
     # Analytic INPUT profile, not a plot of Monte Carlo electron histories.
     sigma_mm = beam.transverse.fwhm_x_mm / (2 * np.sqrt(2 * np.log(2)))
     x_mm = np.linspace(-1.25, 1.25, 401)
@@ -96,7 +102,7 @@ def _(mo):
 
 
 @app.cell
-def _(beam, detector, simulate, target, tables_ready):
+def _(beam, detector, simulate, tables_ready, target):
     assert tables_ready  # Wait for reference-table installation before transport.
     from pyrite.config import CxrReflections, FixedSampling, Numerics, Physics
 
@@ -168,7 +174,7 @@ def _(beam, material, mo, pyrite, result, target):
     }
     # Preserve machine-readable export metadata without displaying it to readers.
     mo.json(tutorial_provenance).style({"display": "none"})
-    return (tutorial_provenance,)
+    return
 
 
 if __name__ == "__main__":

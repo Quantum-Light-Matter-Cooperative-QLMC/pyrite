@@ -1,6 +1,12 @@
 # /// script
 # requires-python = ">=3.13"
-# dependencies = ["endf-parserpy==0.17.0", "marimo>=0.25.1", "pyrite-mc==0.22.5", "matplotlib>=3.11", "numpy>=2"]
+# dependencies = [
+#     "endf-parserpy==0.17.0",
+#     "marimo>=0.23.3",
+#     "pyrite-mc==0.22.5",
+#     "matplotlib>=3.11",
+#     "numpy>=2",
+# ]
 # ///
 
 import marimo
@@ -22,8 +28,7 @@ def _():
     import pyrite
 
     _ = pyrite.fetch_tables()  # Fetch missing pinned tables once; reuse installed data.
-
-    return mo, np, os, plt, pyrite
+    return mo, np, plt, pyrite
 
 
 @app.cell(hide_code=True)
@@ -47,11 +52,11 @@ def _():
     beam_energy_eV = 30_000.0
     tilt_deg = 30.0
     hkl = (0, 0, 2)
-    return catalog, beam_energy_eV, hkl, photon_energies, tilt_deg
+    return beam_energy_eV, catalog, hkl, photon_energies, tilt_deg
 
 
 @app.cell
-def _(beam_energy_eV, catalog, hkl, np, photon_energies, tilt_deg):
+def _(catalog, hkl, np, photon_energies, tilt_deg):
     observation_deg = np.linspace(30, 160, 131)
     energy_scan_eV = np.array([30_000.0, 60_000.0, 100_000.0])
     energy_lines_eV = photon_energies(
@@ -78,7 +83,7 @@ def _(energy_lines_eV, energy_scan_eV, observation_deg, plt):
     axis.grid(alpha=0.25)
     axis.legend()
     figure  # noqa: B018 - marimo renders the final expression
-    return (figure,)
+    return
 
 
 @app.cell
@@ -148,7 +153,7 @@ def _(catalog, hkl, mo, pyrite):
     }
     # Preserve machine-readable export metadata without displaying it to readers.
     mo.json(tutorial_provenance).style({"display": "none"})
-    return (tutorial_provenance,)
+    return
 
 
 if __name__ == "__main__":

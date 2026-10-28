@@ -2,7 +2,7 @@
   "version": "1",
   "metadata": {
     "marimo_version": "0.25.2",
-    "script_metadata_hash": "be882373ce9f9752409aa815b3a6adb0"
+    "script_metadata_hash": "0bd4a502c6636b3b44fe85ee22d08f69"
   },
   "cells": [
     {
@@ -12,7 +12,7 @@
         {
           "type": "data",
           "data": {
-            "text/html": "<div style='display: flex;flex: 1;flex-direction: column;justify-content: flex-start;align-items: normal;flex-wrap: nowrap;gap: 0.5rem'><marimo-ui-element object-id='Hbol-0' random-id='e5595791-f43c-580e-7442-1eceb83e3f4b'><marimo-anywidget data-initial-value='{&quot;model_id&quot;:&quot;8796dd3d6cb04f6ebdd688312a2e6cc9&quot;}' data-label='null' data-model-id='&quot;8796dd3d6cb04f6ebdd688312a2e6cc9&quot;'></marimo-anywidget></marimo-ui-element></div>"
+            "text/plain": ""
           }
         }
       ],
@@ -20,12 +20,12 @@
     },
     {
       "id": "MJUe",
-      "code_hash": "16551ac364cbbdcea6fcac3e738c21a4",
+      "code_hash": "a975abb5acb562df2f9cf7c52fd83587",
       "outputs": [
         {
           "type": "data",
           "data": {
-            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h1 id=\"angular-radiation-distributions\">Angular radiation distributions</h1>\n<span class=\"paragraph\">Compute a detector-free PXR/CBS energy\u2013angle map and compare spectra at three observation directions.</span></span>"
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h1 id=\"angular-radiation-distributions\">Angular radiation distributions</h1>\n<span class=\"paragraph\">Compute an <strong>experimental</strong>, detector-free PXR/CBS energy\u2013angle map\nfor a finite silicon slab. Directions are signed in the lab <strong>x\u2013z</strong>\nplane: 0\u00b0 is forward, +90\u00b0 is +x, and \u00b1180\u00b0 is backward.\nThe source is <strong>per steradian</strong>, not integrated over an angular bin.</span></span>"
           }
         }
       ],
@@ -33,19 +33,6 @@
     },
     {
       "id": "vblA",
-      "code_hash": "c46e2392b4044f3f2d8bd4f7b41f7801",
-      "outputs": [
-        {
-          "type": "data",
-          "data": {
-            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"define-an-angular-slice\">Define an angular slice</h2>\n<span class=\"paragraph\">The incident electron travels along lab <strong>+z</strong>. Angles are signed in the\n<strong>x\u2013z plane</strong>: 0\u00b0 is forward, +90\u00b0 is +x, and \u00b1180\u00b0 is backward. The result\nis a pointwise source density <strong>per steradian</strong>, not a count in an angular bin.</span>\n<span class=\"paragraph\"><code>directional_source()</code> is <strong>experimental</strong>. Use a finite slab so every sampled\ndirection has an escape path. The explicit energy grid is deliberately limited\nto 100\u20132,000 eV; it is not guaranteed to contain every possible PXR line.</span></span>"
-          }
-        }
-      ],
-      "console": []
-    },
-    {
-      "id": "bkHC",
       "code_hash": "25429fb759bd8beba38c8dcecba52b7d",
       "outputs": [
         {
@@ -58,7 +45,7 @@
       "console": []
     },
     {
-      "id": "lEQa",
+      "id": "bkHC",
       "code_hash": "167ecfc182b8cfc99d6d247b026d1616",
       "outputs": [
         {
@@ -72,13 +59,13 @@
         {
           "type": "stream",
           "name": "stderr",
-          "text": "/home/alexa/dev/pyrite/src/pyrite/montecarlo/spectrum/cxr/_spectrum.py:328: LineOpticalDataWarning: 6/19304 line escape-piece/reflection/mosaic pairs reach unavailable optical data (vacuum-seed screen or root lookup). High-energy PXR/CBS lines may be omitted, even on an automatically clipped photon grid. Counts are not lost photon yield. Inspect line_data_coverage; see issue #249.\n  publish_line_data_coverage(coverage)\n/home/alexa/dev/pyrite/src/pyrite/montecarlo/spectrum/cxr/_spectrum.py:328: LineOpticalDataWarning: 5/19304 line escape-piece/reflection/mosaic pairs reach unavailable optical data (vacuum-seed screen or root lookup). High-energy PXR/CBS lines may be omitted, even on an automatically clipped photon grid. Counts are not lost photon yield. Inspect line_data_coverage; see issue #249.\n  publish_line_data_coverage(coverage)\n/home/alexa/dev/pyrite/src/pyrite/montecarlo/spectrum/cxr/_spectrum.py:328: LineOpticalDataWarning: 74/19304 line escape-piece/reflection/mosaic pairs reach unavailable optical data (vacuum-seed screen or root lookup). High-energy PXR/CBS lines may be omitted, even on an automatically clipped photon grid. Counts are not lost photon yield. Inspect line_data_coverage; see issue #249.\n  publish_line_data_coverage(coverage)\n/home/alexa/dev/pyrite/src/pyrite/montecarlo/spectrum/cxr/_spectrum.py:328: LineOpticalDataWarning: 105/19304 line escape-piece/reflection/mosaic pairs reach unavailable optical data (vacuum-seed screen or root lookup). High-energy PXR/CBS lines may be omitted, even on an automatically clipped photon grid. Counts are not lost photon yield. Inspect line_data_coverage; see issue #249.\n  publish_line_data_coverage(coverage)\n/home/alexa/dev/pyrite/src/pyrite/montecarlo/spectrum/cxr/_spectrum.py:328: LineOpticalDataWarning: 22/19304 line escape-piece/reflection/mosaic pairs reach unavailable optical data (vacuum-seed screen or root lookup). High-energy PXR/CBS lines may be omitted, even on an automatically clipped photon grid. Counts are not lost photon yield. Inspect line_data_coverage; see issue #249.\n  publish_line_data_coverage(coverage)\n/home/alexa/dev/pyrite/src/pyrite/montecarlo/spectrum/cxr/_spectrum.py:328: LineOpticalDataWarning: 9/19304 line escape-piece/reflection/mosaic pairs reach unavailable optical data (vacuum-seed screen or root lookup). High-energy PXR/CBS lines may be omitted, even on an automatically clipped photon grid. Counts are not lost photon yield. Inspect line_data_coverage; see issue #249.\n  publish_line_data_coverage(coverage)\n/home/alexa/dev/pyrite/src/pyrite/montecarlo/spectrum/cxr/_spectrum.py:328: LineOpticalDataWarning: 7/19304 line escape-piece/reflection/mosaic pairs reach unavailable optical data (vacuum-seed screen or root lookup). High-energy PXR/CBS lines may be omitted, even on an automatically clipped photon grid. Counts are not lost photon yield. Inspect line_data_coverage; see issue #249.\n  publish_line_data_coverage(coverage)\n/home/alexa/dev/pyrite/src/pyrite/montecarlo/spectrum/cxr/_spectrum.py:328: LineOpticalDataWarning: 10/19304 line escape-piece/reflection/mosaic pairs reach unavailable optical data (vacuum-seed screen or root lookup). High-energy PXR/CBS lines may be omitted, even on an automatically clipped photon grid. Counts are not lost photon yield. Inspect line_data_coverage; see issue #249.\n  publish_line_data_coverage(coverage)\n/home/alexa/dev/pyrite/src/pyrite/montecarlo/spectrum/cxr/_spectrum.py:328: LineOpticalDataWarning: 26/19304 line escape-piece/reflection/mosaic pairs reach unavailable optical data (vacuum-seed screen or root lookup). High-energy PXR/CBS lines may be omitted, even on an automatically clipped photon grid. Counts are not lost photon yield. Inspect line_data_coverage; see issue #249.\n  publish_line_data_coverage(coverage)\n/home/alexa/dev/pyrite/src/pyrite/montecarlo/spectrum/cxr/_spectrum.py:328: LineOpticalDataWarning: 117/19304 line escape-piece/reflection/mosaic pairs reach unavailable optical data (vacuum-seed screen or root lookup). High-energy PXR/CBS lines may be omitted, even on an automatically clipped photon grid. Counts are not lost photon yield. Inspect line_data_coverage; see issue #249.\n  publish_line_data_coverage(coverage)\n/home/alexa/dev/pyrite/src/pyrite/montecarlo/spectrum/cxr/_spectrum.py:328: LineOpticalDataWarning: 11/19304 line escape-piece/reflection/mosaic pairs reach unavailable optical data (vacuum-seed screen or root lookup). High-energy PXR/CBS lines may be omitted, even on an automatically clipped photon grid. Counts are not lost photon yield. Inspect line_data_coverage; see issue #249.\n  publish_line_data_coverage(coverage)\n",
+          "text": "/home/alexa/.cache/uv/environments-v2/05-angular-radiation-distributions-55e62fddd03c1192/lib/python3.14/site-packages/pyrite/montecarlo/spectrum/cxr/_spectrum.py:328: LineOpticalDataWarning: 6/19304 line escape-piece/reflection/mosaic pairs reach unavailable optical data (vacuum-seed screen or root lookup). High-energy PXR/CBS lines may be omitted, even on an automatically clipped photon grid. Counts are not lost photon yield. Inspect line_data_coverage; see issue #249.\n  publish_line_data_coverage(coverage)\n/home/alexa/.cache/uv/environments-v2/05-angular-radiation-distributions-55e62fddd03c1192/lib/python3.14/site-packages/pyrite/montecarlo/spectrum/cxr/_spectrum.py:328: LineOpticalDataWarning: 5/19304 line escape-piece/reflection/mosaic pairs reach unavailable optical data (vacuum-seed screen or root lookup). High-energy PXR/CBS lines may be omitted, even on an automatically clipped photon grid. Counts are not lost photon yield. Inspect line_data_coverage; see issue #249.\n  publish_line_data_coverage(coverage)\n/home/alexa/.cache/uv/environments-v2/05-angular-radiation-distributions-55e62fddd03c1192/lib/python3.14/site-packages/pyrite/montecarlo/spectrum/cxr/_spectrum.py:328: LineOpticalDataWarning: 74/19304 line escape-piece/reflection/mosaic pairs reach unavailable optical data (vacuum-seed screen or root lookup). High-energy PXR/CBS lines may be omitted, even on an automatically clipped photon grid. Counts are not lost photon yield. Inspect line_data_coverage; see issue #249.\n  publish_line_data_coverage(coverage)\n/home/alexa/.cache/uv/environments-v2/05-angular-radiation-distributions-55e62fddd03c1192/lib/python3.14/site-packages/pyrite/montecarlo/spectrum/cxr/_spectrum.py:328: LineOpticalDataWarning: 105/19304 line escape-piece/reflection/mosaic pairs reach unavailable optical data (vacuum-seed screen or root lookup). High-energy PXR/CBS lines may be omitted, even on an automatically clipped photon grid. Counts are not lost photon yield. Inspect line_data_coverage; see issue #249.\n  publish_line_data_coverage(coverage)\n/home/alexa/.cache/uv/environments-v2/05-angular-radiation-distributions-55e62fddd03c1192/lib/python3.14/site-packages/pyrite/montecarlo/spectrum/cxr/_spectrum.py:328: LineOpticalDataWarning: 22/19304 line escape-piece/reflection/mosaic pairs reach unavailable optical data (vacuum-seed screen or root lookup). High-energy PXR/CBS lines may be omitted, even on an automatically clipped photon grid. Counts are not lost photon yield. Inspect line_data_coverage; see issue #249.\n  publish_line_data_coverage(coverage)\n/home/alexa/.cache/uv/environments-v2/05-angular-radiation-distributions-55e62fddd03c1192/lib/python3.14/site-packages/pyrite/montecarlo/spectrum/cxr/_spectrum.py:328: LineOpticalDataWarning: 9/19304 line escape-piece/reflection/mosaic pairs reach unavailable optical data (vacuum-seed screen or root lookup). High-energy PXR/CBS lines may be omitted, even on an automatically clipped photon grid. Counts are not lost photon yield. Inspect line_data_coverage; see issue #249.\n  publish_line_data_coverage(coverage)\n/home/alexa/.cache/uv/environments-v2/05-angular-radiation-distributions-55e62fddd03c1192/lib/python3.14/site-packages/pyrite/montecarlo/spectrum/cxr/_spectrum.py:328: LineOpticalDataWarning: 7/19304 line escape-piece/reflection/mosaic pairs reach unavailable optical data (vacuum-seed screen or root lookup). High-energy PXR/CBS lines may be omitted, even on an automatically clipped photon grid. Counts are not lost photon yield. Inspect line_data_coverage; see issue #249.\n  publish_line_data_coverage(coverage)\n/home/alexa/.cache/uv/environments-v2/05-angular-radiation-distributions-55e62fddd03c1192/lib/python3.14/site-packages/pyrite/montecarlo/spectrum/cxr/_spectrum.py:328: LineOpticalDataWarning: 10/19304 line escape-piece/reflection/mosaic pairs reach unavailable optical data (vacuum-seed screen or root lookup). High-energy PXR/CBS lines may be omitted, even on an automatically clipped photon grid. Counts are not lost photon yield. Inspect line_data_coverage; see issue #249.\n  publish_line_data_coverage(coverage)\n/home/alexa/.cache/uv/environments-v2/05-angular-radiation-distributions-55e62fddd03c1192/lib/python3.14/site-packages/pyrite/montecarlo/spectrum/cxr/_spectrum.py:328: LineOpticalDataWarning: 26/19304 line escape-piece/reflection/mosaic pairs reach unavailable optical data (vacuum-seed screen or root lookup). High-energy PXR/CBS lines may be omitted, even on an automatically clipped photon grid. Counts are not lost photon yield. Inspect line_data_coverage; see issue #249.\n  publish_line_data_coverage(coverage)\n/home/alexa/.cache/uv/environments-v2/05-angular-radiation-distributions-55e62fddd03c1192/lib/python3.14/site-packages/pyrite/montecarlo/spectrum/cxr/_spectrum.py:328: LineOpticalDataWarning: 117/19304 line escape-piece/reflection/mosaic pairs reach unavailable optical data (vacuum-seed screen or root lookup). High-energy PXR/CBS lines may be omitted, even on an automatically clipped photon grid. Counts are not lost photon yield. Inspect line_data_coverage; see issue #249.\n  publish_line_data_coverage(coverage)\n/home/alexa/.cache/uv/environments-v2/05-angular-radiation-distributions-55e62fddd03c1192/lib/python3.14/site-packages/pyrite/montecarlo/spectrum/cxr/_spectrum.py:328: LineOpticalDataWarning: 11/19304 line escape-piece/reflection/mosaic pairs reach unavailable optical data (vacuum-seed screen or root lookup). High-energy PXR/CBS lines may be omitted, even on an automatically clipped photon grid. Counts are not lost photon yield. Inspect line_data_coverage; see issue #249.\n  publish_line_data_coverage(coverage)\n",
           "mimetype": "text/plain"
         }
       ]
     },
     {
-      "id": "PKri",
+      "id": "lEQa",
       "code_hash": "309dea374a7a5c1a887314277de82d69",
       "outputs": [
         {
@@ -91,7 +78,7 @@
       "console": []
     },
     {
-      "id": "Xref",
+      "id": "PKri",
       "code_hash": "838d83771d31841bf3de481c49d191e5",
       "outputs": [
         {
@@ -104,20 +91,20 @@
       "console": []
     },
     {
-      "id": "SFPL",
-      "code_hash": "738d17cac21e8954effe96b23f00fc23",
+      "id": "Xref",
+      "code_hash": "72c393bfb3f70d522c708297354790ee",
       "outputs": [
         {
           "type": "data",
           "data": {
-            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"interpret-the-map\">Interpret the map</h2>\n<span class=\"paragraph\">The upper panel is <strong>per electron, per eV, per sr</strong>; the lower panel\nmultiplies by the physical electron rate using the configured <strong>50 nA</strong>\nmean current. Neither plot integrates solid angle, applies a detector\nresponse, or predicts measured photon counts. <strong>PXR + CBS</strong> includes their\nmutual interference, but not characteristic lines or bremsstrahlung.</span>\n<span class=\"paragraph\">The angular grid omits the duplicate +180\u00b0 endpoint. Masked/unsupported\ndirections (if any) are not physical zeros. Modest Monte Carlo sampling,\none reflection family, and a restricted photon window mean the figure is\nillustrative, <strong>not convergence or validation evidence</strong>.</span>\n<span class=\"paragraph\">Try changing the target tilt or increasing histories, then refine the\nenergy and angular grids independently. For interface restrictions, see the\n<a href=\"https://pyrite.readthedocs.io/en/latest/reference/directional-sources.html\" rel=\"noopener noreferrer\" target=\"_blank\">directional-source reference</a>\nand <a href=\"https://pyrite.readthedocs.io/en/latest/validation/status-summary.html\" rel=\"noopener noreferrer\" target=\"_blank\">validation status</a>.</span></span>"
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"interpretation\">Interpretation</h2>\n<span class=\"paragraph\">The map gives <strong>photons / (electron \u00b7 eV \u00b7 sr)</strong>; the line cuts use\nthe configured <strong>50 nA</strong> current to give photons / (s \u00b7 eV \u00b7 sr).\nNeither includes angular acceptance or detector response. Only PXR/CBS\nis calculated here; the energy range is restricted to <strong>100\u20132,000 eV</strong>.</span>\n<span class=\"paragraph\">Unsupported directions are masked, not physical zeros. One reflection\nfamily and modest sampling make this an illustration, not convergence\nevidence. Try changing target tilt, history count or grid spacing.\nSee the <a href=\"https://pyrite.readthedocs.io/en/latest/reference/directional-sources.html\" rel=\"noopener noreferrer\" target=\"_blank\">directional-source reference</a>.</span></span>"
           }
         }
       ],
       "console": []
     },
     {
-      "id": "BYtC",
+      "id": "SFPL",
       "code_hash": "ae3c4875a646d0733b4e5ce8a9f4f54c",
       "outputs": [
         {

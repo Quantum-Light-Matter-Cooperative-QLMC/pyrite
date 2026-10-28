@@ -2,7 +2,7 @@
   "version": "1",
   "metadata": {
     "marimo_version": "0.25.2",
-    "script_metadata_hash": "be882373ce9f9752409aa815b3a6adb0"
+    "script_metadata_hash": "0bd4a502c6636b3b44fe85ee22d08f69"
   },
   "cells": [
     {
@@ -12,7 +12,7 @@
         {
           "type": "data",
           "data": {
-            "text/html": "<div style='display: flex;flex: 1;flex-direction: column;justify-content: flex-start;align-items: normal;flex-wrap: nowrap;gap: 0.5rem'><marimo-ui-element object-id='Hbol-0' random-id='e82a61dc-d84f-3f0c-b2ae-b2f690922f7a'><marimo-anywidget data-initial-value='{&quot;model_id&quot;:&quot;9110099f10434a05b74ac00862d0f697&quot;}' data-label='null' data-model-id='&quot;9110099f10434a05b74ac00862d0f697&quot;'></marimo-anywidget></marimo-ui-element></div>"
+            "text/plain": ""
           }
         }
       ],
@@ -20,12 +20,12 @@
     },
     {
       "id": "MJUe",
-      "code_hash": "4ae7f021d7676830ab9fe33ae1aa14af",
+      "code_hash": "b47b0e7b55341e0e5fcc8a1c35a516a8",
       "outputs": [
         {
           "type": "data",
           "data": {
-            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h1 id=\"predicting-pxr-line-energies\">Predicting PXR line energies</h1>\n<span class=\"paragraph\">Predict where a HOPG reflection appears before running Monte Carlo transport.</span></span>"
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h1 id=\"predicting-pxr-line-energies\">Predicting PXR line energies</h1>\n<span class=\"paragraph\">Predict ideal HOPG (002) resonance energies before simulating transport.\n<code>photon_energies()</code> takes beam energy in <strong>eV</strong>, angles in <strong>degrees</strong>,\nand returns a leading material axis even for one material.</span></span>"
           }
         }
       ],
@@ -33,19 +33,6 @@
     },
     {
       "id": "vblA",
-      "code_hash": "596402af760e1e29550c312b26c1d78e",
-      "outputs": [
-        {
-          "type": "data",
-          "data": {
-            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"setup\">Setup</h2>\n<span class=\"paragraph\"><code>photon_energies()</code> uses electron kinetic energy in <strong>eV</strong> and angles in degrees.\nIt returns a leading material axis, even for one material. Here the basal (002)\nreflection, sample tilt, and lab observation angle are explicit.</span></span>"
-          }
-        }
-      ],
-      "console": []
-    },
-    {
-      "id": "bkHC",
       "code_hash": "d80df086a213583c2664a75a0a17ba80",
       "outputs": [
         {
@@ -58,8 +45,8 @@
       "console": []
     },
     {
-      "id": "lEQa",
-      "code_hash": "bd2fecfb28df0fabe6598dabb440474f",
+      "id": "bkHC",
+      "code_hash": "7e7a5b12420b12c54260d1cf183afcff",
       "outputs": [
         {
           "type": "data",
@@ -71,7 +58,7 @@
       "console": []
     },
     {
-      "id": "PKri",
+      "id": "lEQa",
       "code_hash": "82b745bad3b1a9e5498c0a68c140e36d",
       "outputs": [
         {
@@ -84,7 +71,7 @@
       "console": []
     },
     {
-      "id": "Xref",
+      "id": "PKri",
       "code_hash": "0546147c4a707b7cdccc64a63366a41c",
       "outputs": [
         {
@@ -97,7 +84,7 @@
       "console": []
     },
     {
-      "id": "SFPL",
+      "id": "Xref",
       "code_hash": "8ab57b98d37b62271c2755c4d3335788",
       "outputs": [
         {
@@ -110,20 +97,20 @@
       "console": []
     },
     {
-      "id": "BYtC",
-      "code_hash": "ed5f042ac80c5b24878b8f9e916179d0",
+      "id": "SFPL",
+      "code_hash": "603157742d3cb30e2db8ec78af6c313c",
       "outputs": [
         {
           "type": "data",
           "data": {
-            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"interpretation-and-next-steps\">Interpretation and next steps</h2>\n<span class=\"paragraph\">These are <strong>vacuum line centres</strong>, not intensities or detector counts. A straight\nentrance-energy electron and one ideal crystal orientation are assumed. Transport,\nenergy loss, mosaic averaging, in-medium dispersion and detector response are\nexcluded. An allowed energy does not guarantee nonzero intensity; unreachable\nresonances return NaN. Compare with the captured spectrum in notebook 01 only\nwith those approximations in mind.</span>\n<span class=\"paragraph\">Try changing <code>tilt_deg</code> or <code>hkl</code>. Consult the\n<a href=\"https://pyrite.readthedocs.io/en/latest/api.html#advanced-transport-and-radiation\" rel=\"noopener noreferrer\" target=\"_blank\">radiation API</a>\nand <a href=\"https://pyrite.readthedocs.io/en/latest/physics/index.html\" rel=\"noopener noreferrer\" target=\"_blank\">physics and validation</a>\nfor conventions and model limitations.</span></span>"
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"interpretation\">Interpretation</h2>\n<span class=\"paragraph\">These are <strong>vacuum line centers</strong>, not intensities or counts. The model\nassumes straight electrons at their entrance energy and an ideal lattice;\nit excludes transport, mosaic spread, in-medium dispersion and response.\nA kinematically allowed line need not have measurable intensity.</span>\n<span class=\"paragraph\">Try changing <code>tilt_deg</code>, electron energy or <code>hkl</code>. The (004) reflection\nappears at twice the (002) energy for the same geometry. Compare with\nnotebook 01's spectrum and the\n<a href=\"https://pyrite.readthedocs.io/en/latest/physics/index.html\" rel=\"noopener noreferrer\" target=\"_blank\">physics and validation</a>\ndocumentation.</span></span>"
           }
         }
       ],
       "console": []
     },
     {
-      "id": "RGSE",
+      "id": "BYtC",
       "code_hash": "251de976197c35dbcc2e7a7955396f3d",
       "outputs": [
         {

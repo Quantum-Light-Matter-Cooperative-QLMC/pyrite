@@ -2,7 +2,7 @@
   "version": "1",
   "metadata": {
     "marimo_version": "0.25.2",
-    "script_metadata_hash": "be882373ce9f9752409aa815b3a6adb0"
+    "script_metadata_hash": "0bd4a502c6636b3b44fe85ee22d08f69"
   },
   "cells": [
     {
@@ -12,7 +12,7 @@
         {
           "type": "data",
           "data": {
-            "text/html": "<div style='display: flex;flex: 1;flex-direction: column;justify-content: flex-start;align-items: normal;flex-wrap: nowrap;gap: 0.5rem'><marimo-ui-element object-id='Hbol-0' random-id='2a05e759-bd70-0950-8dc9-4560b47e794b'><marimo-anywidget data-initial-value='{&quot;model_id&quot;:&quot;9a6daba310f94b42b50635ebbcd304c9&quot;}' data-label='null' data-model-id='&quot;9a6daba310f94b42b50635ebbcd304c9&quot;'></marimo-anywidget></marimo-ui-element></div>"
+            "text/plain": ""
           }
         }
       ],
@@ -20,12 +20,12 @@
     },
     {
       "id": "MJUe",
-      "code_hash": "af638ecfb2e3449332b64e755edf0f3c",
+      "code_hash": "db5ffc7237537192aab1a4e674670c79",
       "outputs": [
         {
           "type": "data",
           "data": {
-            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h1 id=\"from-x-rays-to-detector-counts\">From X-rays to detector counts</h1>\n<span class=\"paragraph\">Predict an ideal pixel detector's expected counts and compare a seeded Poisson realization.</span>\n<h2 id=\"define-the-physical-scene\">Define the physical scene</h2>\n<span class=\"paragraph\">A 30 keV beam illuminates 100 nm HOPG. The 16 \u00d7 16 mm panel sits 100 mm\naway, at 135\u00b0 from the incident beam direction. Its 16 \u00d7 16 pixels have\n1 mm pitch. A 0.01 pC bunch at 1 MHz gives <strong>10 nA</strong> mean current.\nThese physical beam populations are independent of sampled histories.</span></span>"
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h1 id=\"from-x-rays-to-detector-counts\">From X-rays to detector counts</h1>\n<span class=\"paragraph\">Simulate a 30 keV beam on 100 nm HOPG and acquire an ideal pixel image.\nThe <strong>16 \u00d7 16</strong> pixel panel sits <strong>100 mm</strong> away at <strong>135\u00b0</strong>;\n<strong>0.01 pC</strong> bunches at <strong>1 MHz</strong> give <strong>10 nA</strong> average current.</span></span>"
           }
         }
       ],
@@ -46,12 +46,12 @@
     },
     {
       "id": "bkHC",
-      "code_hash": "9b20effb96955663c77741439cf4f040",
+      "code_hash": "d1190becdbf87a9804943198e66b3533",
       "outputs": [
         {
           "type": "data",
           "data": {
-            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"specify-what-is-measured\">Specify what is measured</h2>\n<span class=\"paragraph\">Geometry belongs to <code>Scene</code>; response and exposure belong to <code>Observation</code>.\n<code>IdealPhotonCounter()</code> has unit efficiency and no energy broadening. Count\nphotons in the half-open reporting interval <strong>[0.5, 4) keV</strong> during <strong>1 s</strong>.\n<code>mode=\"poisson\"</code> retains the fractional expectation and adds integer draws.</span>\n<span class=\"paragraph\">Score 4 \u00d7 4 angular tiles across the panel: neighboring pixels share source\nspectra within each tile, while their pixel-centre ray geometry is retained.\nPixel pitch alone does not set the angular scoring resolution.</span></span>"
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"define-the-observation\">Define the observation</h2>\n<span class=\"paragraph\"><code>Scene</code> defines the geometry; <code>Observation</code> specifies response,\nexposure and angular sampling. <code>IdealPhotonCounter</code> has unit efficiency\nand no energy broadening. Count photons in <strong>[0.5, 4) keV</strong> over <strong>1 s</strong>\nusing a seeded Poisson draw. The <strong>4 \u00d7 4</strong> angular tiles are the\nsource-scoring resolution, not the <strong>16 \u00d7 16</strong> detector pixels.</span></span>"
           }
         }
       ],
@@ -111,12 +111,12 @@
     },
     {
       "id": "BYtC",
-      "code_hash": "c5faccd86c1dd58833fe7297f24134af",
+      "code_hash": "f22a6c2226a7ae09c954493a34ae264e",
       "outputs": [
         {
           "type": "data",
           "data": {
-            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"interpret-and-explore\">Interpret and explore</h2>\n<span class=\"paragraph\">Both images already integrate energy and pixel solid angle, apply the\nideal response, and scale by physical electrons during the exposure.\n<strong>Do not multiply by current, solid angle or exposure again.</strong> They include\nPXR/CBS, bremsstrahlung and characteristic emission in the reporting window;\nunderflow, overflow and below-threshold expectations remain separate.\nNo downstream filter or background is included.</span>\n<span class=\"paragraph\">The nearly uniform expectation and noisier integer image share one color\nscale. Counting fluctuations are conditional on the estimated source:\nthey exclude its Monte Carlo uncertainty, calibration errors and backgrounds.\nThe modest histories, two reflection families and coarse angular tiles are\nillustrative; they do not establish convergence or detector calibration.</span>\n<span class=\"paragraph\">First change only <code>acquisition.seed</code>: the expectation stays fixed while\ncounts change. Then double <code>exposure_s</code>: expected counts double, while the\nrealized total need not double exactly. More source histories refine the\nexpectation; they do not increase the physical exposure.</span>\n<span class=\"paragraph\">Consult the <a href=\"https://pyrite.readthedocs.io/en/latest/guides/detector-observations.html\" rel=\"noopener noreferrer\" target=\"_blank\">detector how-to</a>,\n<a href=\"https://pyrite.readthedocs.io/en/latest/reference/python-api/observations.html\" rel=\"noopener noreferrer\" target=\"_blank\">observation reference</a>,\n<a href=\"https://pyrite.readthedocs.io/en/latest/physics/detectors/detector-response.html\" rel=\"noopener noreferrer\" target=\"_blank\">response physics</a>,\nand <a href=\"https://pyrite.readthedocs.io/en/latest/validation/status-summary.html\" rel=\"noopener noreferrer\" target=\"_blank\">validation status</a>.</span></span>"
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"interpretation\">Interpretation</h2>\n<span class=\"paragraph\">Both images already include beam current, exposure, pixel solid angle\nand ideal response. <strong>Do not rescale them again.</strong> They include CXR,\nbremsstrahlung and characteristic photons within the reporting window;\nno downstream filter or background is modeled.</span>\n<span class=\"paragraph\">The left panel is an <em>expected</em> count image; the right is one Poisson\nrealization. The shared color scale exposes counting noise, but does not\ninclude Monte Carlo uncertainty or calibration effects.</span>\n<span class=\"paragraph\">Try changing only <code>acquisition.seed</code>, then doubling <code>exposure_s</code>.\nCounts vary with the seed; expectations scale with exposure.\nSee the <a href=\"https://pyrite.readthedocs.io/en/latest/guides/detector-observations.html\" rel=\"noopener noreferrer\" target=\"_blank\">detector how-to</a>\nand <a href=\"https://pyrite.readthedocs.io/en/latest/physics/detectors/detector-response.html\" rel=\"noopener noreferrer\" target=\"_blank\">response physics</a>.</span></span>"
           }
         }
       ],

@@ -1,6 +1,12 @@
 # /// script
 # requires-python = ">=3.13"
-# dependencies = ["endf-parserpy==0.17.0", "marimo>=0.25.1", "pyrite-mc==0.22.5", "matplotlib>=3.11", "numpy>=2"]
+# dependencies = [
+#     "endf-parserpy==0.17.0",
+#     "marimo>=0.23.3",
+#     "pyrite-mc==0.22.5",
+#     "matplotlib>=3.11",
+#     "numpy>=2",
+# ]
 # ///
 
 import marimo
@@ -23,7 +29,7 @@ def _():
 
     _ = pyrite.fetch_tables()  # Complete installed tables require no network access.
     tables_ready = True
-    return tables_ready, mo, np, plt, pyrite
+    return mo, np, plt, pyrite, tables_ready
 
 
 @app.cell(hide_code=True)
@@ -67,7 +73,7 @@ def _():
 
 
 @app.cell
-def _(beam, directional_source, np, numerics, target, tables_ready):
+def _(beam, directional_source, np, numerics, tables_ready, target):
     assert tables_ready  # Wait for reference-table installation before transport.
     angles_deg = np.linspace(-180.0, 180.0, 48, endpoint=False)
     energies_eV = np.linspace(100.0, 2_000.0, 257)
@@ -181,7 +187,7 @@ def _(mo, np, pyrite, source):
     }
     # Preserve machine-readable export metadata without displaying it to readers.
     mo.json(tutorial_provenance).style({"display": "none"})
-    return (tutorial_provenance,)
+    return
 
 
 if __name__ == "__main__":
