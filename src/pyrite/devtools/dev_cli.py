@@ -5,46 +5,7 @@ Exposed as the ``pyrite-dev`` console script (see ``[project.scripts]``); run vi
 
     uv run pyrite-dev <command>
 
-Commands:
-    acp-up     start the Claude and Codex ACP WebSocket bridges
-    acp-down   stop bridges started by acp-up
-    repo-map   print a compact repo tree and the canonical commands
-    api        check governed Python API root exports (and optional alias identity)
-    docs       clean, strict Sphinx build (optional external link check)
-    lint       run Ruff over the repository
-    format     run Ruff formatter
-    typecheck  run ty
-    precommit  run all pre-commit hooks
-    nbqa       lint notebooks with nbQA + Ruff
-    nbstrip    strip notebook outputs in-place
-    test       run pytest, forwarding selectors and arguments
-               (--numba disables JIT via NUMBA_DISABLE_JIT=1, must precede
-               other forwarded args, to measure @njit bodies under --cov;
-               runs without test paths use memory-bounded xdist workers,
-               PYRITE_TEST_WORKERS=N overrides, 1 = serial;
-               --slow also runs tests marked slow via PYRITE_SLOW_TESTS=1)
-    test-suite run one focused domain suite (integration overlaps domains)
-               with the same memory-bounded xdist worker default and --slow
-               flag as test
-    package-smoke build and install clean wheel/editable environments
-    smoke      exercise checkpoint loading and plotting
-    perf       measure MC sweeps with compute-performance telemetry
-    startup    benchmark fresh-process CPU imports and the README simulation
-    performance list, analyze, or delete compute-performance artifacts
-    energy-grid maintain derived detector energy-grid artifacts
-    release    bump version, gate on due deprecation removals, print release notes
-    release-notes  render notes for a pushed vX.Y.Z tag (release workflow)
-    sync-skills mirror .agents/skills into .claude/skills
-    check-skills validate the canonical skills and exact mirror
-    check-lines check source size (1,250 lines; marimo notebooks 4,000)
-    complexity report source complexity; --check runs the high-CC ratchet,
-               --write rewrites its baseline
-    verify     check types, lint, formatting, source size, complexity ratchet,
-               docs, and imports (no tests)
-    cli-reference     write or --check docs/repo-design/cli/cli-reference.md
-    cli-deprecations  write or --check docs/repo-design/cli/cli-deprecations.md
-    validation-ledger write or --check generated validation-ledger views
-    validation-records run one standalone check and write its evidence records
+Use ``pyrite-dev --help`` for the maintained command inventory.
 """
 
 import argparse
@@ -646,6 +607,17 @@ def cmd_imports(_: argparse.Namespace) -> None:
     subprocess.run(["lint-imports", "--no-cache"], cwd=ROOT, check=True)
 
 
+def cmd_notebooks(args: argparse.Namespace) -> None:
+    """Regenerate or check all registered CPU tutorial captures."""
+    run_uv(
+        "--group",
+        "docs",
+        "python",
+        str(ROOT / "docs" / "_tutorials.py"),
+        "--check-notebooks" if args.check else "--regenerate-notebooks",
+    )
+
+
 def cmd_docs(args: argparse.Namespace) -> None:
     """Build all maintained and generated documentation from clean state."""
     from pyrite.devtools.docs_paths import check_doc_paths
@@ -723,13 +695,14 @@ def cmd_api(args: argparse.Namespace) -> None:
 
 
 def cmd_verify(args: argparse.Namespace) -> None:
-    """Run static repository gates; test selection is always explicit."""
+    """Refresh CPU tutorial captures and run repository gates, without pytest."""
     cmd_typecheck(args)
     cmd_lint(args)
     run("-m", "ruff", "format", "--check", ".")
     cmd_check_lines(args)
     cmd_complexity(argparse.Namespace(check=True))
     cmd_api(argparse.Namespace(imports=False))
+    cmd_notebooks(argparse.Namespace(check=False))
     cmd_docs(argparse.Namespace(linkcheck=False))
     cmd_imports(args)
 
@@ -1077,9 +1050,10 @@ def build_parser(prog_name: str = "pyrite-dev") -> argparse.ArgumentParser:
     api_check.set_defaults(func=cmd_api)
     verify = sub.add_parser(
         "verify",
-        help="run static repository checks (no tests)",
+        help="regenerate CPU tutorials and run repository checks (no tests)",
         description=(
-            "Check types, lint, formatting, source size, complexity ratchet, docs, and imports; "
+            "Regenerate all CPU tutorial captures; check types, lint, formatting, source size, "
+            "complexity ratchet, docs, and imports; "
             "no tests run."
         ),
     )
@@ -1089,6 +1063,15 @@ def build_parser(prog_name: str = "pyrite-dev") -> argparse.ArgumentParser:
         help=argparse.SUPPRESS,  # Compatible no-op for older automation.
     )
     verify.set_defaults(func=cmd_verify)
+    notebooks = sub.add_parser(
+        "notebooks",
+        help="regenerate all CPU tutorial captures (executes notebooks and writes outputs)",
+        description="Execute all registered tutorials on CPU and refresh their captured outputs.",
+    )
+    notebooks.add_argument(
+        "--check", action="store_true", help="only check captures; no execution or writes"
+    )
+    notebooks.set_defaults(func=cmd_notebooks)
     regen_golden = sub.add_parser("regen-golden")
     regen_golden.add_argument("--check", action="store_true")
     regen_golden.set_defaults(func=cmd_regen_golden)

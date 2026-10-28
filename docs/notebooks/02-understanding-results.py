@@ -31,8 +31,6 @@ def _(mo):
     mo.md(r"""
     # Understanding simulation results
 
-    [![Open in Molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/Quantum-Light-Matter-Cooperative-QLMC/pyrite/blob/main/docs/notebooks/02-understanding-results.py)
-
     Turn an electron-normalized source spectrum into an energy-integrated yield
     and a physical photon rate, without confusing either with detector counts.
     """)

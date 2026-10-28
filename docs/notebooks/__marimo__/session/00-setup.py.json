@@ -12,7 +12,7 @@
         {
           "type": "data",
           "data": {
-            "text/html": "<div style='display: flex;flex: 1;flex-direction: column;justify-content: flex-start;align-items: normal;flex-wrap: nowrap;gap: 0.5rem'><marimo-ui-element object-id='Hbol-0' random-id='4bce7814-9323-0dec-39f6-f72e59ccf54f'><marimo-anywidget data-initial-value='{&quot;model_id&quot;:&quot;44696b0d56cd498588df347e37ffc702&quot;}' data-label='null' data-model-id='&quot;44696b0d56cd498588df347e37ffc702&quot;'></marimo-anywidget></marimo-ui-element></div>"
+            "text/html": "<div style='display: flex;flex: 1;flex-direction: column;justify-content: flex-start;align-items: normal;flex-wrap: nowrap;gap: 0.5rem'><marimo-ui-element object-id='Hbol-0' random-id='8328423c-9f97-baff-23ab-3d61d566be70'><marimo-anywidget data-initial-value='{&quot;model_id&quot;:&quot;396b3f21f2a1412e88ccdb32553ed5d7&quot;}' data-label='null' data-model-id='&quot;396b3f21f2a1412e88ccdb32553ed5d7&quot;'></marimo-anywidget></marimo-ui-element></div>"
           }
         }
       ],
@@ -20,12 +20,12 @@
     },
     {
       "id": "MJUe",
-      "code_hash": "7f7a732431c0d3f07d727dbf30b83fc9",
+      "code_hash": "5a00f1836f16c4f3093d65b66dd248f1",
       "outputs": [
         {
           "type": "data",
           "data": {
-            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h1 id=\"environment-and-gpu-setup\">Environment and GPU setup</h1>\n<span class=\"paragraph\"><a href=\"https://molab.marimo.io/github/Quantum-Light-Matter-Cooperative-QLMC/pyrite/blob/main/docs/notebooks/00-setup.py\" rel=\"noopener noreferrer\" target=\"_blank\"><img alt=\"Open in Molab\" src=\"https://marimo.io/molab-shield.svg\" /></a></span>\n<span class=\"paragraph\">Verify your Python environment, choose a backend, and complete one tiny CPU simulation.</span></span>"
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h1 id=\"environment-and-gpu-setup\">Environment and GPU setup</h1>\n<span class=\"paragraph\">Verify your Python environment, choose a backend, and complete one tiny CPU simulation.</span></span>"
           }
         }
       ],

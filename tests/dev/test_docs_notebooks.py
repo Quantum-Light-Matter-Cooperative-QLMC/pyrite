@@ -95,11 +95,36 @@ def test_notebook_links_source_and_navigation_agree(notebooks):
         source = DOCS / "notebooks" / f"{name}.py"
         page = (DOCS / "notebooks" / "fundamentals" / f"{name}.md").read_text()
         assert name in group
-        assert notebooks.MOLAB + source.name in source.read_text()
+        assert "molab-shield.svg" not in source.read_text()
         assert notebooks.MOLAB + source.name in page
         assert f"{{literalinclude}} ../{source.name}" in page
         assert f"../../_static/notebooks/{name}.html" in page
         assert f"../outputs/{name}.json" in page
+
+
+def test_all_badges_follow_rtd_titles_only(notebooks):
+    for source in (DOCS / "notebooks").glob("*.py"):
+        notebooks.validate_source(source)
+        assert "molab-shield.svg" not in source.read_text()
+
+
+@pytest.mark.parametrize("placement", ["missing", "after_description", "inside_notebook"])
+def test_badge_placement_is_validated(notebooks, monkeypatch, tmp_path, placement):
+    monkeypatch.setattr(notebooks, "NOTEBOOKS", tmp_path)
+    page = tmp_path / "fundamentals" / "example.md"
+    page.parent.mkdir()
+    badge = f"[![Open in Molab](https://marimo.io/molab-shield.svg)]({notebooks.MOLAB}example.py)"
+    source = tmp_path / "example.py"
+    source.write_text("# Standalone notebook\n")
+    if placement == "missing":
+        page.write_text("# Example\n\nDescription.\n")
+    elif placement == "after_description":
+        page.write_text(f"# Example\n\nDescription.\n\n{badge}\n")
+    else:
+        page.write_text(f"# Example\n\n{badge}\n")
+        source.write_text(f"# {badge}\n")
+    with pytest.raises(ValueError, match="Molab badge"):
+        notebooks.validate_source(source)
 
 
 def test_failed_or_incomplete_sessions_are_rejected(notebooks, tmp_path):
@@ -107,6 +132,22 @@ def test_failed_or_incomplete_sessions_are_rejected(notebooks, tmp_path):
     path.write_text(json.dumps({"cells": [{"outputs": [{"type": "error", "evalue": "failed"}]}]}))
     with pytest.raises(ValueError, match="failed notebook cell"):
         notebooks.read_session(path)
+
+
+def test_notebook_exports_explicitly_decline_sandbox_prompts(notebooks, monkeypatch):
+    calls = []
+
+    def export(command, **kwargs):
+        calls.append(command)
+        if "export" in command:
+            assert "--no-sandbox" in command
+        if "html" in command:
+            raise RuntimeError("stop before promoting mocked captures")
+
+    monkeypatch.setattr(notebooks.subprocess, "run", export)
+    with pytest.raises(RuntimeError, match="stop before promoting"):
+        notebooks.regenerate("03-pxr-line-energies")
+    assert len(calls) == 3
 
 
 def test_line_energy_notebook_cpu_smoke(monkeypatch):

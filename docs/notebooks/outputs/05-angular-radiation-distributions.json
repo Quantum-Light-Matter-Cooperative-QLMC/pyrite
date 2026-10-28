@@ -1,8 +1,8 @@
 {
   "schema": "pyrite.marimo-tutorial.v1",
-  "source_sha256": "130b28c67634d2dd4ad5e9c390cbe55f499bd1af23317dfdc733a59a942a10e0",
-  "exporter_sha256": "6eedb7b2d84c7c81cfe4bb58c476c02676f6fd3a5784f844f613efe30412ab24",
-  "git_revision": "6cbc2fb04fb936c7eda6be6c0b1436c1135fcac4",
+  "source_sha256": "0e2bbda2f31eac9e48b29a5233dbaf428846b55d2c57b469fde2c2cebea5dd69",
+  "exporter_sha256": "ce45dc420ac6068c0bda3a17b7a1fdb77216182d54fd16489a8b9746d7e9653f",
+  "git_revision": "8ca8abf3193f6a888a1b9746116aadb8443ec038",
   "git_dirty": true,
   "python_version": "3.14.4",
   "execution": {
@@ -28,8 +28,8 @@
     "sampled_cxr_histories": 512
   },
   "artifacts": {
-    "notebooks/__marimo__/session/05-angular-radiation-distributions.py.json": "cbc8fde1f0b14528d976513170d5626834da19567be9943b95c381c9e05c6a98",
-    "_static/notebooks/05-angular-radiation-distributions.html": "abd91f1205b1e9b3c428b5892b1535bd4ded6183d4f29cae331bb66b8684b332",
+    "notebooks/__marimo__/session/05-angular-radiation-distributions.py.json": "fc03a7e610cd0d7be0f2888abccc9042e9ade42e96de97e01fe89d3efa05d082",
+    "_static/notebooks/05-angular-radiation-distributions.html": "06fef501eab9c94e4faed9c47d5940c7fa2090d993b92320729a149b691f4df1",
     "_static/notebooks/05-angular-radiation-distributions-1.png": "d9edafec96a189ca867c0c66dcc022d906776b443d165e968b05343d84522a04"
   }
 }

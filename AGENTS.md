@@ -62,6 +62,7 @@ UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev check-lines
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev complexity --check
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev nbstrip
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev docs
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev notebooks
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev verify
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev precommit
 ```
@@ -111,9 +112,12 @@ Select slow tests explicitly by node ID, or put `--slow` before test paths;
 do not enable every slow test just to exercise one changed path. Full
 `pyrite-dev test --slow` and CPU `test --slow --numba --cov` are explicit
 release/audit operations; CI runs every primary domain with slow tests on both
-supported Python versions. `verify` runs only types, lint/format checks, source
-line budgets, the complexity ratchet, docs, and import-linter; it never runs
-tests or changes formatting.
+supported Python versions. `verify` runs types, lint/format checks, source
+line budgets, the complexity ratchet, API checks, CPU tutorial capture
+regeneration, docs, and import-linter; it never runs pytest or changes formatting.
+`pyrite-dev notebooks` regenerates every registered CPU tutorial independently;
+`notebooks --check` validates captures without execution or writes. Sphinx builds
+consume captures without executing the scientific notebooks.
 
 ## Work rules
 

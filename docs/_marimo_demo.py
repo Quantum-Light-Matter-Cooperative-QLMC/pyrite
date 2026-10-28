@@ -46,6 +46,7 @@ def _export(app: Sphinx, exception: Exception | None) -> None:
             "run",
             "--no-show-code",
             "--force",
+            "--no-sandbox",
         ],
         check=True,
         # WASM export resolves the head file against its short notebook name.

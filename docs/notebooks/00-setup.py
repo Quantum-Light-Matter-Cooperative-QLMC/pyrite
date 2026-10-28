@@ -31,8 +31,6 @@ def _(mo):
     mo.md(r"""
     # Environment and GPU setup
 
-    [![Open in Molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/Quantum-Light-Matter-Cooperative-QLMC/pyrite/blob/main/docs/notebooks/00-setup.py)
-
     Verify your Python environment, choose a backend, and complete one tiny CPU simulation.
     """)
     return

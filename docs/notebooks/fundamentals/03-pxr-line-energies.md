@@ -1,8 +1,9 @@
 # Predicting PXR line energies
 
+[![Open in Molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/Quantum-Light-Matter-Cooperative-QLMC/pyrite/blob/main/docs/notebooks/03-pxr-line-energies.py)
+
 Explore ideal vacuum resonances without Monte Carlo transport.
 
-[![Open in Molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/Quantum-Light-Matter-Cooperative-QLMC/pyrite/blob/main/docs/notebooks/03-pxr-line-energies.py)
 
 These are **captured outputs**. Recompute in Molab or locally after the setup
 steps in notebook 00. This static view requires no Python kernel or CUDA.

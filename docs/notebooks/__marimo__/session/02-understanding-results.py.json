@@ -12,7 +12,7 @@
         {
           "type": "data",
           "data": {
-            "text/html": "<div style='display: flex;flex: 1;flex-direction: column;justify-content: flex-start;align-items: normal;flex-wrap: nowrap;gap: 0.5rem'><marimo-ui-element object-id='Hbol-0' random-id='082c03d8-f961-ab46-e153-0465aecf194d'><marimo-anywidget data-initial-value='{&quot;model_id&quot;:&quot;1493c7340747452b847119784c12c424&quot;}' data-label='null' data-model-id='&quot;1493c7340747452b847119784c12c424&quot;'></marimo-anywidget></marimo-ui-element></div>"
+            "text/html": "<div style='display: flex;flex: 1;flex-direction: column;justify-content: flex-start;align-items: normal;flex-wrap: nowrap;gap: 0.5rem'><marimo-ui-element object-id='Hbol-0' random-id='02108774-aa77-b8f5-b735-3ea5db008b49'><marimo-anywidget data-initial-value='{&quot;model_id&quot;:&quot;0c9acb570fbf45328cd9585c504e528c&quot;}' data-label='null' data-model-id='&quot;0c9acb570fbf45328cd9585c504e528c&quot;'></marimo-anywidget></marimo-ui-element></div>"
           }
         }
       ],
@@ -20,12 +20,12 @@
     },
     {
       "id": "MJUe",
-      "code_hash": "81289a988f8e293c2d0acedae62a2dbe",
+      "code_hash": "ee2f84f6ff80c802b4cd7435f96d0c61",
       "outputs": [
         {
           "type": "data",
           "data": {
-            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h1 id=\"understanding-simulation-results\">Understanding simulation results</h1>\n<span class=\"paragraph\"><a href=\"https://molab.marimo.io/github/Quantum-Light-Matter-Cooperative-QLMC/pyrite/blob/main/docs/notebooks/02-understanding-results.py\" rel=\"noopener noreferrer\" target=\"_blank\"><img alt=\"Open in Molab\" src=\"https://marimo.io/molab-shield.svg\" /></a></span>\n<span class=\"paragraph\">Turn an electron-normalized source spectrum into an energy-integrated yield\nand a physical photon rate, without confusing either with detector counts.</span></span>"
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h1 id=\"understanding-simulation-results\">Understanding simulation results</h1>\n<span class=\"paragraph\">Turn an electron-normalized source spectrum into an energy-integrated yield\nand a physical photon rate, without confusing either with detector counts.</span></span>"
           }
         }
       ],

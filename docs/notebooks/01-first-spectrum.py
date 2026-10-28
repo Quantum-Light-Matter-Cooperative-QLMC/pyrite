@@ -31,8 +31,6 @@ def _(mo):
     mo.md(r"""
     # Your first X-ray spectrum
 
-    [![Open in Molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/Quantum-Light-Matter-Cooperative-QLMC/pyrite/blob/main/docs/notebooks/01-first-spectrum.py)
-
     Simulate a small crystalline target and compare PXR + CBS with bremsstrahlung.
     """)
     return

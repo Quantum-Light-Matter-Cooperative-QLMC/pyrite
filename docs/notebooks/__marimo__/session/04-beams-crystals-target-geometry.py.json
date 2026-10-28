@@ -12,7 +12,7 @@
         {
           "type": "data",
           "data": {
-            "text/html": "<div style='display: flex;flex: 1;flex-direction: column;justify-content: flex-start;align-items: normal;flex-wrap: nowrap;gap: 0.5rem'><marimo-ui-element object-id='Hbol-0' random-id='d5133dea-49f9-5d67-d666-1b574c717401'><marimo-anywidget data-initial-value='{&quot;model_id&quot;:&quot;dc87287def8348c99288e7d1f3dc44ed&quot;}' data-label='null' data-model-id='&quot;dc87287def8348c99288e7d1f3dc44ed&quot;'></marimo-anywidget></marimo-ui-element></div>"
+            "text/html": "<div style='display: flex;flex: 1;flex-direction: column;justify-content: flex-start;align-items: normal;flex-wrap: nowrap;gap: 0.5rem'><marimo-ui-element object-id='Hbol-0' random-id='a44df99d-ed3a-b475-8e51-dc7daa3c7790'><marimo-anywidget data-initial-value='{&quot;model_id&quot;:&quot;56dc9a398d384ceeb26c1cab3bacc4ac&quot;}' data-label='null' data-model-id='&quot;56dc9a398d384ceeb26c1cab3bacc4ac&quot;'></marimo-anywidget></marimo-ui-element></div>"
           }
         }
       ],
@@ -20,12 +20,12 @@
     },
     {
       "id": "MJUe",
-      "code_hash": "76362ebff10fa1c1f2ed07cfad298520",
+      "code_hash": "f4d9400e7b35bea317794725df688ee3",
       "outputs": [
         {
           "type": "data",
           "data": {
-            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h1 id=\"beams-crystals-and-target-geometry\">Beams, crystals and target geometry</h1>\n<span class=\"paragraph\"><a href=\"https://molab.marimo.io/github/Quantum-Light-Matter-Cooperative-QLMC/pyrite/blob/main/docs/notebooks/04-beams-crystals-target-geometry.py\" rel=\"noopener noreferrer\" target=\"_blank\"><img alt=\"Open in Molab\" src=\"https://marimo.io/molab-shield.svg\" /></a></span>\n<span class=\"paragraph\">Describe an electron beam and a finite crystal, then run one small PXR/CBS simulation.</span></span>"
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h1 id=\"beams-crystals-and-target-geometry\">Beams, crystals and target geometry</h1>\n<span class=\"paragraph\">Describe an electron beam and a finite crystal, then run one small PXR/CBS simulation.</span></span>"
           }
         }
       ],

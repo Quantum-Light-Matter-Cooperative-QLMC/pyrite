@@ -478,7 +478,7 @@ def test_test_suite_respects_explicit_worker_choice(dev_module, monkeypatch, pyt
 
 
 @pytest.mark.parametrize("argv", [["verify"], ["verify", "--skip-tests"]])
-def test_verify_runs_static_checks_without_tests(dev_module, monkeypatch, argv) -> None:
+def test_verify_refreshes_notebooks_and_checks_without_tests(dev_module, monkeypatch, argv) -> None:
     calls = []
     for name in (
         "cmd_imports",
@@ -488,6 +488,7 @@ def test_verify_runs_static_checks_without_tests(dev_module, monkeypatch, argv) 
         "cmd_check_lines",
         "cmd_complexity",
         "cmd_api",
+        "cmd_notebooks",
     ):
         monkeypatch.setattr(dev_module, name, lambda _args, name=name: calls.append(name))
     monkeypatch.setattr(dev_module, "run", lambda *args: calls.append(args))
@@ -502,6 +503,7 @@ def test_verify_runs_static_checks_without_tests(dev_module, monkeypatch, argv) 
         "cmd_check_lines",
         "cmd_complexity",
         "cmd_api",
+        "cmd_notebooks",
         "cmd_docs",
         "cmd_imports",
     ]
@@ -541,7 +543,7 @@ def test_verify_rejects_pytest_arguments(dev_module, monkeypatch, args) -> None:
         dev_module.main(["verify", *args])
 
 
-def test_verify_help_explains_static_gate_without_running_checks(
+def test_verify_help_explains_regeneration_without_running_checks(
     dev_module, monkeypatch, capsys
 ) -> None:
     monkeypatch.setattr(dev_module, "cmd_verify", lambda _args: pytest.fail("verify ran"))
@@ -551,7 +553,24 @@ def test_verify_help_explains_static_gate_without_running_checks(
 
     output = capsys.readouterr().out
     assert "no tests run" in output
+    assert "Regenerate all CPU tutorial captures" in output
     assert "--skip-tests" not in output
+
+
+@pytest.mark.parametrize("check", [False, True])
+def test_notebooks_dispatches_canonical_exporter(dev_module, monkeypatch, check) -> None:
+    calls = []
+    monkeypatch.setattr(dev_module, "run_uv", lambda *args: calls.append(args))
+    dev_module.main(["notebooks", *(["--check"] if check else [])])
+    assert calls == [
+        (
+            "--group",
+            "docs",
+            "python",
+            str(dev_module.ROOT / "docs" / "_tutorials.py"),
+            "--check-notebooks" if check else "--regenerate-notebooks",
+        )
+    ]
 
 
 @pytest.mark.parametrize(

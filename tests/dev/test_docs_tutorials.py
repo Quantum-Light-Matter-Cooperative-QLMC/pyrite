@@ -9,6 +9,36 @@ import numpy as np
 import pytest
 
 
+@pytest.mark.parametrize("fail", [False, True])
+def test_regenerate_all_uses_registered_order_and_stops_on_failure(tutorials, monkeypatch, fail):
+    from types import SimpleNamespace
+
+    calls = []
+
+    def regenerate(name):
+        calls.append(("capture", name))
+        if fail and name == "second":
+            raise RuntimeError("export failed")
+
+    monkeypatch.setattr(
+        tutorials,
+        "configured_notebooks",
+        lambda: SimpleNamespace(
+            NOTEBOOK_FIGURES=dict.fromkeys(("first", "second", "third")), regenerate=regenerate
+        ),
+    )
+    monkeypatch.setattr(
+        tutorials, "sync_notebook_version", lambda name: calls.append(("pin", name))
+    )
+    if fail:
+        with pytest.raises(RuntimeError, match="export failed"):
+            tutorials.regenerate_notebooks()
+    else:
+        tutorials.regenerate_notebooks()
+    names = ("first", "second") if fail else ("first", "second", "third")
+    assert calls == [(action, name) for name in names for action in ("pin", "capture")]
+
+
 def test_material_authoring_example_matches_checked_composition(tutorials):
     data = tutorials.load_example("adding_materials").compute()
     assert data == tutorials.checked_output("adding_materials")

@@ -20,7 +20,7 @@ def test_directional_tutorial_uses_public_api_and_fetches_tables_first():
     assert "endpoint=False" in text  # periodic angular boundary is not repeated
     fetch = text.index("pyrite.fetch_tables()")
     assert fetch < text.index("source = directional_source(")
-    assert f"docs/notebooks/{NAME}.py" in text
+    assert "molab-shield.svg" not in text
     page = (DOCS / "notebooks" / "designing" / f"{NAME}.md").read_text()
     group = (DOCS / "notebooks" / "designing" / "index.md").read_text()
     assert NAME in group

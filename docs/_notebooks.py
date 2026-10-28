@@ -54,10 +54,15 @@ def validate_source(path):
             if module == "pyrite" or module.startswith("pyrite."):
                 if module not in exports or (name is not None and name not in exports[module]):
                     raise ValueError(f"{path.name}: unsupported public API import {module}:{name}")
-    if MOLAB + path.name not in source:
-        raise ValueError(f"{path.name}: missing notebook-specific Molab URL")
-    if "https://marimo.io/molab-shield.svg" not in source:
-        raise ValueError(f"{path.name}: missing Molab badge")
+    if "molab-shield.svg" in source:
+        raise ValueError(f"{path.name}: Molab badge belongs on the RTD page only")
+    pages = list(NOTEBOOKS.glob(f"*/{path.stem}.md"))
+    if len(pages) != 1:
+        raise ValueError(f"{path.name}: expected one notebook-specific RTD page")
+    lines = [line for line in pages[0].read_text().splitlines() if line.strip()]
+    badge = f"[![Open in Molab](https://marimo.io/molab-shield.svg)]({MOLAB}{path.name})"
+    if len(lines) < 2 or not lines[0].startswith("# ") or lines[1] != badge:
+        raise ValueError(f"{path.name}: Molab badge must immediately follow the RTD title")
 
 
 class _Capture(HTMLParser):
@@ -159,6 +164,7 @@ def regenerate(name):
                 "html",
                 str(staged),
                 "--include-code",
+                "--no-sandbox",
                 "-o",
                 str(staged.with_suffix(".html")),
             ],

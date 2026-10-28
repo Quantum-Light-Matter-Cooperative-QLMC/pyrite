@@ -1,8 +1,8 @@
 {
   "schema": "pyrite.marimo-tutorial.v1",
-  "source_sha256": "4b5e1d125d927d9d6589223192b23bb0bb697d40a9c407a11830369c1ed2a303",
-  "exporter_sha256": "6eedb7b2d84c7c81cfe4bb58c476c02676f6fd3a5784f844f613efe30412ab24",
-  "git_revision": "6cbc2fb04fb936c7eda6be6c0b1436c1135fcac4",
+  "source_sha256": "adc66d333f98b1c0162a125d52bd5cebb6985b91413a26ce9ab088d3bf7cdd7b",
+  "exporter_sha256": "ce45dc420ac6068c0bda3a17b7a1fdb77216182d54fd16489a8b9746d7e9653f",
+  "git_revision": "8ca8abf3193f6a888a1b9746116aadb8443ec038",
   "git_dirty": true,
   "python_version": "3.14.4",
   "execution": {
@@ -49,8 +49,8 @@
     }
   },
   "artifacts": {
-    "notebooks/__marimo__/session/06-detector-counts.py.json": "491760f09dbb7fc0de6e4d57911323d9554413b9b5de28308a227ba1a697014a",
-    "_static/notebooks/06-detector-counts.html": "f267bd4ee6f65c8e9c9ccf85e12d357a70c005b10ede9bfbc4ffad39b00bb02d",
+    "notebooks/__marimo__/session/06-detector-counts.py.json": "fd28380ca6fcc3684e60fb49815b429fdb893b3b6d72a8d85b7a7dc1105155a1",
+    "_static/notebooks/06-detector-counts.html": "663bfc76a8a807ee012959a53e07a29a502441a8dca5bf8052655a61bf8591ac",
     "_static/notebooks/06-detector-counts-1.png": "b850615f5c9be349e6f96f2a43b5225d30cebf0d0204e53533656a3d5f1262ae"
   }
 }

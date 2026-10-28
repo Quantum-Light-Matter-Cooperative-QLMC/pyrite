@@ -10,6 +10,24 @@ import pytest
 from pyrite.devtools.docs_paths import StaleDocPath, check_doc_paths, find_stale_doc_paths
 
 
+def test_demo_export_explicitly_declines_sandbox_prompt(monkeypatch, tmp_path):
+    path = Path(__file__).parents[2] / "docs" / "_marimo_demo.py"
+    spec = importlib.util.spec_from_file_location("docs_marimo_demo", path)
+    demo = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(demo)
+
+    def export(command, **kwargs):
+        assert "html-wasm" in command and "--no-sandbox" in command
+        assert command[command.index("--mode") + 1] == "run"
+        assert "--single-file" not in command  # Worker and public data share the demo directory.
+        raise RuntimeError("stop before copying mocked export")
+
+    monkeypatch.setattr(demo.subprocess, "run", export)
+    app = SimpleNamespace(builder=SimpleNamespace(format="html"), outdir=tmp_path)
+    with pytest.raises(RuntimeError, match="stop before copying"):
+        demo._export(app, None)
+
+
 @pytest.fixture(scope="module")
 def warning_baseline_module():
     path = Path(__file__).parents[2] / "docs" / "_warning_baseline.py"
@@ -127,6 +145,7 @@ def test_validation_writeups_use_rendering_math_delimiters() -> None:
 def test_browser_demo_imports_only_pyodide_safe_modules() -> None:
     """The docs demo runs under Pyodide, which has no numba build for pyrite."""
     import ast
+    import tomllib
 
     path = Path(__file__).parents[2] / "docs" / "demo" / "results_app.py"
     imported = set()
@@ -137,6 +156,9 @@ def test_browser_demo_imports_only_pyodide_safe_modules() -> None:
             imported.add(node.module.split(".")[0])
 
     assert imported <= {"json", "sys", "pathlib", "marimo", "numpy", "plotly", "pyodide"}
+    metadata = path.read_text().split("# /// script\n", 1)[1].split("# ///", 1)[0]
+    inline = tomllib.loads("\n".join(line.removeprefix("# ") for line in metadata.splitlines()))
+    assert set(inline["dependencies"]) >= {"marimo", "numpy", "plotly"}
 
 
 def test_demo_export_joins_interleaved_segments_per_track() -> None:

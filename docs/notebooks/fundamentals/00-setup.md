@@ -1,8 +1,9 @@
 # Environment and GPU setup
 
+[![Open in Molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/Quantum-Light-Matter-Cooperative-QLMC/pyrite/blob/main/docs/notebooks/00-setup.py)
+
 Verify the selected backend and installed reference tables with a tiny simulation.
 
-[![Open in Molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/Quantum-Light-Matter-Cooperative-QLMC/pyrite/blob/main/docs/notebooks/00-setup.py)
 
 These are **captured outputs**. Recompute in Molab or locally after the setup
 steps in notebook 00. This static view requires no Python kernel or CUDA.

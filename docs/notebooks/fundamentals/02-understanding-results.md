@@ -1,9 +1,10 @@
 # Understanding simulation results
 
+[![Open in Molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/Quantum-Light-Matter-Cooperative-QLMC/pyrite/blob/main/docs/notebooks/02-understanding-results.py)
+
 Convert native-grid source densities into energy-integrated yields and physical
 photon rates, while keeping acquisition counts separate.
 
-[![Open in Molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/Quantum-Light-Matter-Cooperative-QLMC/pyrite/blob/main/docs/notebooks/02-understanding-results.py)
 
 These are **captured outputs**. Recompute in Molab or locally after installing
 the reference tables described in notebook 00. The static page needs no Python

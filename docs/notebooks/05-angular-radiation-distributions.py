@@ -30,8 +30,6 @@ def _(mo):
     mo.md(r"""
     # Angular radiation distributions
 
-    [![Open in Molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/Quantum-Light-Matter-Cooperative-QLMC/pyrite/blob/main/docs/notebooks/05-angular-radiation-distributions.py)
-
     Compute a detector-free PXR/CBS energy–angle map and compare spectra at three observation directions.
     """)
     return

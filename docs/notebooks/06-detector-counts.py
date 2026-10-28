@@ -30,8 +30,6 @@ def _(mo):
     mo.md(r"""
     # From X-rays to detector counts
 
-    [![Open in Molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/Quantum-Light-Matter-Cooperative-QLMC/pyrite/blob/main/docs/notebooks/06-detector-counts.py)
-
     Predict an ideal pixel detector's expected counts and compare a seeded Poisson realization.
 
     ## Define the physical scene

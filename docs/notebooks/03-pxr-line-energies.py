@@ -31,8 +31,6 @@ def _(mo):
     mo.md(r"""
     # Predicting PXR line energies
 
-    [![Open in Molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/Quantum-Light-Matter-Cooperative-QLMC/pyrite/blob/main/docs/notebooks/03-pxr-line-energies.py)
-
     Predict where a HOPG reflection appears before running Monte Carlo transport.
     """)
     return

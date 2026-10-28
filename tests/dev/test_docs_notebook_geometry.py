@@ -74,7 +74,7 @@ def test_designing_navigation():
     assert NAME in (DOCS / "notebooks" / "designing" / "index.md").read_text()
     notebook = (DOCS / "notebooks" / f"{NAME}.py").read_text()
     page = (DOCS / "notebooks" / "designing" / f"{NAME}.md").read_text()
-    assert f"docs/notebooks/{NAME}.py" in notebook
+    assert "molab-shield.svg" not in notebook
     assert f"docs/notebooks/{NAME}.py" in page
     assert f"{{literalinclude}} ../{NAME}.py" in page
     assert f"../../_static/notebooks/{NAME}.html" in page

@@ -12,7 +12,7 @@
         {
           "type": "data",
           "data": {
-            "text/html": "<div style='display: flex;flex: 1;flex-direction: column;justify-content: flex-start;align-items: normal;flex-wrap: nowrap;gap: 0.5rem'><marimo-ui-element object-id='Hbol-0' random-id='8c95b95a-319e-4990-9cd8-4a4ffac15d06'><marimo-anywidget data-initial-value='{&quot;model_id&quot;:&quot;eb773bb58a4848249733d35c75b3aab9&quot;}' data-label='null' data-model-id='&quot;eb773bb58a4848249733d35c75b3aab9&quot;'></marimo-anywidget></marimo-ui-element></div>"
+            "text/html": "<div style='display: flex;flex: 1;flex-direction: column;justify-content: flex-start;align-items: normal;flex-wrap: nowrap;gap: 0.5rem'><marimo-ui-element object-id='Hbol-0' random-id='1510d369-94db-2811-e810-f2196c0ebe7a'><marimo-anywidget data-initial-value='{&quot;model_id&quot;:&quot;b1b4b03c4c4a4ad8a674fb739a926c79&quot;}' data-label='null' data-model-id='&quot;b1b4b03c4c4a4ad8a674fb739a926c79&quot;'></marimo-anywidget></marimo-ui-element></div>"
           }
         }
       ],
@@ -20,12 +20,12 @@
     },
     {
       "id": "MJUe",
-      "code_hash": "405394870ebef4c3ab5b29bbd5ab2a5a",
+      "code_hash": "22ac9a3c7f15dd3a57f9e9e82f23a61b",
       "outputs": [
         {
           "type": "data",
           "data": {
-            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h1 id=\"your-first-x-ray-spectrum\">Your first X-ray spectrum</h1>\n<span class=\"paragraph\"><a href=\"https://molab.marimo.io/github/Quantum-Light-Matter-Cooperative-QLMC/pyrite/blob/main/docs/notebooks/01-first-spectrum.py\" rel=\"noopener noreferrer\" target=\"_blank\"><img alt=\"Open in Molab\" src=\"https://marimo.io/molab-shield.svg\" /></a></span>\n<span class=\"paragraph\">Simulate a small crystalline target and compare PXR + CBS with bremsstrahlung.</span></span>"
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h1 id=\"your-first-x-ray-spectrum\">Your first X-ray spectrum</h1>\n<span class=\"paragraph\">Simulate a small crystalline target and compare PXR + CBS with bremsstrahlung.</span></span>"
           }
         }
       ],

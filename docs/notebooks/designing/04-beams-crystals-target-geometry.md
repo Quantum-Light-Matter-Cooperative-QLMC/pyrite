@@ -1,9 +1,10 @@
 # Beams, crystals and target geometry
 
+[![Open in Molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/Quantum-Light-Matter-Cooperative-QLMC/pyrite/blob/main/docs/notebooks/04-beams-crystals-target-geometry.py)
+
 Describe a finite HOPG target and Gaussian incident beam, then compute one
 illustrative PXR/CBS spectrum.
 
-[![Open in Molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/Quantum-Light-Matter-Cooperative-QLMC/pyrite/blob/main/docs/notebooks/04-beams-crystals-target-geometry.py)
 
 These are **captured outputs** from the canonical marimo notebook. To change
 inputs or recompute, open Molab or run it locally after the setup in notebook 00.

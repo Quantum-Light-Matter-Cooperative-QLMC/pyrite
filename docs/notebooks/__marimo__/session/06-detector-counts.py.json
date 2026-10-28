@@ -12,7 +12,7 @@
         {
           "type": "data",
           "data": {
-            "text/html": "<div style='display: flex;flex: 1;flex-direction: column;justify-content: flex-start;align-items: normal;flex-wrap: nowrap;gap: 0.5rem'><marimo-ui-element object-id='Hbol-0' random-id='df0e7427-12ec-c476-c376-bab57e350124'><marimo-anywidget data-initial-value='{&quot;model_id&quot;:&quot;ddd1d053ee9b4069a49ff3d179f34dca&quot;}' data-label='null' data-model-id='&quot;ddd1d053ee9b4069a49ff3d179f34dca&quot;'></marimo-anywidget></marimo-ui-element></div>"
+            "text/html": "<div style='display: flex;flex: 1;flex-direction: column;justify-content: flex-start;align-items: normal;flex-wrap: nowrap;gap: 0.5rem'><marimo-ui-element object-id='Hbol-0' random-id='cfa05946-f3b6-bb45-f457-97e9781932f8'><marimo-anywidget data-initial-value='{&quot;model_id&quot;:&quot;b226b6e34b204852908c4ea79ad84ede&quot;}' data-label='null' data-model-id='&quot;b226b6e34b204852908c4ea79ad84ede&quot;'></marimo-anywidget></marimo-ui-element></div>"
           }
         }
       ],
@@ -20,12 +20,12 @@
     },
     {
       "id": "MJUe",
-      "code_hash": "16dd2ac534c19e626c29f70158bf8bbd",
+      "code_hash": "af638ecfb2e3449332b64e755edf0f3c",
       "outputs": [
         {
           "type": "data",
           "data": {
-            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h1 id=\"from-x-rays-to-detector-counts\">From X-rays to detector counts</h1>\n<span class=\"paragraph\"><a href=\"https://molab.marimo.io/github/Quantum-Light-Matter-Cooperative-QLMC/pyrite/blob/main/docs/notebooks/06-detector-counts.py\" rel=\"noopener noreferrer\" target=\"_blank\"><img alt=\"Open in Molab\" src=\"https://marimo.io/molab-shield.svg\" /></a></span>\n<span class=\"paragraph\">Predict an ideal pixel detector's expected counts and compare a seeded Poisson realization.</span>\n<h2 id=\"define-the-physical-scene\">Define the physical scene</h2>\n<span class=\"paragraph\">A 30 keV beam illuminates 100 nm HOPG. The 16 \u00d7 16 mm panel sits 100 mm\naway, at 135\u00b0 from the incident beam direction. Its 16 \u00d7 16 pixels have\n1 mm pitch. A 0.01 pC bunch at 1 MHz gives <strong>10 nA</strong> mean current.\nThese physical beam populations are independent of sampled histories.</span></span>"
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h1 id=\"from-x-rays-to-detector-counts\">From X-rays to detector counts</h1>\n<span class=\"paragraph\">Predict an ideal pixel detector's expected counts and compare a seeded Poisson realization.</span>\n<h2 id=\"define-the-physical-scene\">Define the physical scene</h2>\n<span class=\"paragraph\">A 30 keV beam illuminates 100 nm HOPG. The 16 \u00d7 16 mm panel sits 100 mm\naway, at 135\u00b0 from the incident beam direction. Its 16 \u00d7 16 pixels have\n1 mm pitch. A 0.01 pC bunch at 1 MHz gives <strong>10 nA</strong> mean current.\nThese physical beam populations are independent of sampled histories.</span></span>"
           }
         }
       ],

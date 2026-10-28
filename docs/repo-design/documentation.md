@@ -464,8 +464,9 @@ existing canonical owners; link to them from the learning sequence.
 Install the docs dependency group and fetch/verify reference tables once before
 executing a transport notebook. Run each notebook locally with
 `uv run marimo edit docs/notebooks/01-first-spectrum.py`, or open its
-notebook-specific Molab badge. Inline dependency metadata pins the PyRITE release
-for standalone/Molab execution; checkout captures use the current project.
+notebook-specific Molab badge on its RTD page. Place the badge immediately after
+the RTD page title; keep it out of the notebook source. Inline dependency metadata
+pins the PyRITE release for standalone/Molab execution; checkout captures use the current project.
 The explicit `--regenerate-notebook NAME` command first synchronizes that
 notebook's inline `pyrite-mc` pin and any installation examples with the version
 in `pyproject.toml`. Source, session, figure and manifest must be committed
@@ -476,19 +477,30 @@ returns without network access. This runs only during explicit capture, local
 marimo or Molab execution, **not** during Sphinx builds; a fresh hosted session
 may need network access to acquire tables.
 
-Regeneration is explicit and executes the canonical notebook on CPU:
+Regenerate every registered tutorial on CPU with `pyrite-dev notebooks`. The
+command provisions the docs dependency group, synchronizes version pins and
+executes each notebook sequentially, stopping on the first failure. `verify`
+runs this regeneration before its Sphinx build, so it refreshes captured files
+and needs the CPU runtime/reference tables. `pyrite-dev docs` itself remains
+capture-only. Use `--check` for read-only freshness/import/badge validation, or
+the lower-level single-notebook command for a targeted refresh:
 
 ```bash
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run --group docs python docs/_tutorials.py \
   --regenerate-notebook 01-first-spectrum
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run --group docs python docs/_tutorials.py \
-  --check-notebooks
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev notebooks
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev notebooks --check
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run marimo check docs/notebooks/*.py
 ```
 
 The exporter first runs marimo's structure check, then its session and normal
-HTML exports (both execute the same notebook). It includes source code, extracts
-PNG fallback figures from the captured session, and records source/exporter and
+HTML exports (both execute the same notebook). Both exports and the Sphinx
+browser-demo export pass `--no-sandbox`, using the current project environment
+without inline-dependency sandbox prompts. The WASM demo retains its inline
+browser dependencies and Pyodide runtime; `--no-sandbox` only disables the local
+export-time environment prompt. Its frontend assets, worker directory and
+`public/` data remain part of the RTD export. The exporter includes source code,
+extracts PNG fallback figures from the captured session, and records source/exporter and
 artifact digests, Git revision/dirty state, Python/PyRITE versions, backend,
 resolved seeds and table identities. Commit source, HTML, session, figure and
 manifest together. Review the figures and provenance; freshness hashes establish

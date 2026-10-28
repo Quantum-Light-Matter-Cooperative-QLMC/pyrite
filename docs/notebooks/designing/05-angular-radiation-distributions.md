@@ -1,8 +1,9 @@
 # Angular radiation distributions
 
+[![Open in Molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/Quantum-Light-Matter-Cooperative-QLMC/pyrite/blob/main/docs/notebooks/05-angular-radiation-distributions.py)
+
 Calculate a detector-free energy–angle PXR/CBS map and compare three directions.
 
-[![Open in Molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/Quantum-Light-Matter-Cooperative-QLMC/pyrite/blob/main/docs/notebooks/05-angular-radiation-distributions.py)
 
 This page displays **captured outputs**; changing parameters requires Molab or a
 local marimo session. The static page does not run PyRITE, download tables, or

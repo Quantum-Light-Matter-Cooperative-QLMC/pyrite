@@ -79,7 +79,7 @@ pyrite-dev precommit
 # Cross-boundary sample only when those public boundaries are affected.
 pyrite-dev test-suite integration
 
-# Static gate: types, lint, format check, source line budget, complexity ratchet, docs, imports.
+# Refresh all CPU tutorial captures, then build docs alongside the repository checks.
 pyrite-dev verify
 
 # Full slow-inclusive CPU suite: explicit audit/release operation.
@@ -94,7 +94,7 @@ Agent and git hooks:
 - `uv run pre-commit install` installs both configured stages: commit-time Ruff,
   notebook stripping and skill-mirror sync, and pre-push import-linter,
   `check-skills` and `repo-map --check`. `pyrite-dev verify` stays the full
-  static gate.
+  repository gate, including CPU tutorial regeneration.
 - `.agents/hooks/guard_bash.sh` (Claude Code and Codex `PreToolUse`) blocks
   pattern kills, bulk `git add`, non-lease force pushes, and pushes to `main`.
 - `.agents/hooks/ruff_after_edit.sh` (Claude Code `PostToolUse`) formats each
@@ -136,7 +136,24 @@ remain in `energy-grid`.
 
 For ordinary edits, select the changed behavior's node/module and trace its affected callers and consumers. Widen to a domain only for changes spanning that domain or its fixtures; do not run all of `core` as a generic safety check. See `AGENTS.md` "Choose tests by impact" for examples. Documentation/guidance-only work needs relevant static checks, not simulation tests. Repeat checks only after new edits, failures or unresolved concerns.
 
-`verify` never invokes pytest: it checks types, Ruff lint and formatting (without rewriting files), the 1,250-line Python source-module budget, the high-CC ratchet ([source complexity baseline](complexity.md)), a clean offline warnings-as-errors Sphinx build, and import-linter. `--skip-tests` remains an undocumented compatibility no-op; pytest arguments and `--slow` are rejected. Run tests explicitly. CI runs each primary domain with the `slow` tier once per supported Python version (3.13 and 3.14), with adaptive workers and duration reporting; skills and generated repository-map checks remain separate CI steps.
+`verify` never invokes pytest. It checks types, Ruff lint and formatting
+(without formatting files), the 1,250-line Python source-module budget, the
+high-CC ratchet ([source complexity baseline](complexity.md)), the API inventory,
+all registered CPU tutorial captures, a clean offline warnings-as-errors Sphinx
+build, and import-linter.
+
+Before building docs, `verify` **executes and regenerates** the CPU tutorials,
+refreshing their source pins and captured outputs. `pyrite-dev notebooks` runs
+this regeneration separately with the docs dependency group and no marimo
+sandbox prompts. Use `pyrite-dev notebooks --check` for read-only capture
+validation. The standalone `pyrite-dev docs` build consumes checked captures
+without executing tutorials.
+
+`--skip-tests` remains an undocumented compatibility no-op; pytest arguments
+and `--slow` are rejected. Run tests explicitly. CI runs each primary domain
+with the `slow` tier once per supported Python version (3.13 and 3.14), with
+adaptive workers and duration reporting; skills and generated repository-map
+checks remain separate CI steps.
 
 The suites read hash-pinned fetched data rather than packaged data (ADR-0014): the EPICS2025 EEDL and EADL files, the derived EPDL photon table, SBETHE's `sdbase/` and catalogue stopping tables, and the ELSEPA and BremsLib tables, with the positron SBETHE and ELSEPA pins alongside the electron ones. Install all of it once per machine with `pyrite tables fetch` (about 140 MB; one code with `pyrite tables fetch CODE`, a positron pin with `pyrite tables fetch {sbethe-tables,elsepa} --projectile positron`, or `--archive PATH` from a local copy); a test that needs one fails naming the command. Positron tests check every table their pinned release lists (`tests/helpers/positron_tables.py`): none installed skips, naming the fetch command (fails instead when `CI` is set, so CI never skips a positron anchor silently); some installed fails, naming the command. Tests never see a developer's `PYRITE_HOME` or config store, so they read the default user-data location, `~/.local/share/pyrite/datasets/` on Linux; fetch without `PYRITE_HOME` set. PyRITE's own archives (EPDL, SBETHE tables, ELSEPA, BremsLib, and the EEDL/EADL mirrors) are public GitHub Release assets, so fetching them needs no GitHub token. CI caches the datasets, `xsgen/tables` and `xsgen/reference-data` directories under a key derived from `src/pyrite/datasets.py`, `src/pyrite/xsgen/fetch.py` (the `sdbase/` pin) and `src/pyrite/data/xsgen/*-tables.json`, and runs `pyrite tables fetch`; they verify a cached copy and need no network on a hit. The `elastic_model="mott"` tests read the synthetic SRD 64-format tables in `tests/data/mott_srd64_synthetic/` (regenerate with `uv run python -m tests.helpers.mott_synthetic`).
 

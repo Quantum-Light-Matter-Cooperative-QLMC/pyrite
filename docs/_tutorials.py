@@ -196,6 +196,14 @@ def _check_notebooks(app):
     configured_notebooks().check_all()
 
 
+def regenerate_notebooks():
+    """Refresh every registered CPU tutorial through the canonical exporter."""
+    notebooks = configured_notebooks()
+    for name in notebooks.NOTEBOOK_FIGURES:
+        sync_notebook_version(name)
+        notebooks.regenerate(name)
+
+
 def setup(app):
     app.connect("builder-inited", _check_outputs)
     app.connect("builder-inited", _check_notebooks)
@@ -209,10 +217,13 @@ if __name__ == "__main__":
     actions = parser.add_mutually_exclusive_group(required=True)
     actions.add_argument("--regenerate", choices=NAMES)
     actions.add_argument("--regenerate-notebook", choices=notebooks.NOTEBOOK_FIGURES)
+    actions.add_argument("--regenerate-notebooks", action="store_true")
     actions.add_argument("--check-notebooks", action="store_true")
     parser.add_argument("--input", type=Path, help="saved input required by the example")
     args = parser.parse_args()
-    if args.regenerate_notebook:
+    if args.regenerate_notebooks:
+        regenerate_notebooks()
+    elif args.regenerate_notebook:
         sync_notebook_version(args.regenerate_notebook)
         notebooks.regenerate(args.regenerate_notebook)
     elif args.check_notebooks:

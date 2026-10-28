@@ -31,8 +31,6 @@ def _(mo):
     mo.md(r"""
     # Beams, crystals and target geometry
 
-    [![Open in Molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/Quantum-Light-Matter-Cooperative-QLMC/pyrite/blob/main/docs/notebooks/04-beams-crystals-target-geometry.py)
-
     Describe an electron beam and a finite crystal, then run one small PXR/CBS simulation.
     """)
     return

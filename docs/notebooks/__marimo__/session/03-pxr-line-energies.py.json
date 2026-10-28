@@ -12,7 +12,7 @@
         {
           "type": "data",
           "data": {
-            "text/html": "<div style='display: flex;flex: 1;flex-direction: column;justify-content: flex-start;align-items: normal;flex-wrap: nowrap;gap: 0.5rem'><marimo-ui-element object-id='Hbol-0' random-id='a4819fa5-623c-e25c-d669-5da6fa0edd1b'><marimo-anywidget data-initial-value='{&quot;model_id&quot;:&quot;8c65e5e4014e4d8b94302d84d8bc9cb7&quot;}' data-label='null' data-model-id='&quot;8c65e5e4014e4d8b94302d84d8bc9cb7&quot;'></marimo-anywidget></marimo-ui-element></div>"
+            "text/html": "<div style='display: flex;flex: 1;flex-direction: column;justify-content: flex-start;align-items: normal;flex-wrap: nowrap;gap: 0.5rem'><marimo-ui-element object-id='Hbol-0' random-id='cd6cd59f-0fa1-a3a1-f787-109dbb08315f'><marimo-anywidget data-initial-value='{&quot;model_id&quot;:&quot;fb34c21633e74658a02176f7ad595443&quot;}' data-label='null' data-model-id='&quot;fb34c21633e74658a02176f7ad595443&quot;'></marimo-anywidget></marimo-ui-element></div>"
           }
         }
       ],
@@ -20,12 +20,12 @@
     },
     {
       "id": "MJUe",
-      "code_hash": "f392e4b23e03b78d8eec55ce99b49943",
+      "code_hash": "4ae7f021d7676830ab9fe33ae1aa14af",
       "outputs": [
         {
           "type": "data",
           "data": {
-            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h1 id=\"predicting-pxr-line-energies\">Predicting PXR line energies</h1>\n<span class=\"paragraph\"><a href=\"https://molab.marimo.io/github/Quantum-Light-Matter-Cooperative-QLMC/pyrite/blob/main/docs/notebooks/03-pxr-line-energies.py\" rel=\"noopener noreferrer\" target=\"_blank\"><img alt=\"Open in Molab\" src=\"https://marimo.io/molab-shield.svg\" /></a></span>\n<span class=\"paragraph\">Predict where a HOPG reflection appears before running Monte Carlo transport.</span></span>"
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h1 id=\"predicting-pxr-line-energies\">Predicting PXR line energies</h1>\n<span class=\"paragraph\">Predict where a HOPG reflection appears before running Monte Carlo transport.</span></span>"
           }
         }
       ],

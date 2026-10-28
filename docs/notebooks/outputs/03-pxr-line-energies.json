@@ -1,8 +1,8 @@
 {
   "schema": "pyrite.marimo-tutorial.v1",
-  "source_sha256": "55bba8c8bfbdbcfb420f83873bdef8ae9328d138fe8a5bd8603fdcc2e0ec49f5",
-  "exporter_sha256": "6eedb7b2d84c7c81cfe4bb58c476c02676f6fd3a5784f844f613efe30412ab24",
-  "git_revision": "6cbc2fb04fb936c7eda6be6c0b1436c1135fcac4",
+  "source_sha256": "7b548828b3f4bd0f00aa07cb94aa3e032991bbde06a076f815b0e178299071a3",
+  "exporter_sha256": "ce45dc420ac6068c0bda3a17b7a1fdb77216182d54fd16489a8b9746d7e9653f",
+  "git_revision": "8ca8abf3193f6a888a1b9746116aadb8443ec038",
   "git_dirty": true,
   "python_version": "3.14.4",
   "execution": {
@@ -20,8 +20,8 @@
     "catalog_cif_sha256": "fa9027e4f14b36b2f31c773c0c4a0a166b0810f358a075ffe20d52d73bdbdcb7"
   },
   "artifacts": {
-    "notebooks/__marimo__/session/03-pxr-line-energies.py.json": "1815fd177964474b1ce68c92c81d36c70a4212c40fd9dac30d8daf9e6c91109b",
-    "_static/notebooks/03-pxr-line-energies.html": "824b644a6bdebf61b7c45fe06accf13eebc75dee0d1140f8b0c2faab2d4d0753",
+    "notebooks/__marimo__/session/03-pxr-line-energies.py.json": "d0d0966a3b3a177db168b9e82b50f49dd0c7e81edb3fefa6ee79c9bb54043fac",
+    "_static/notebooks/03-pxr-line-energies.html": "a84969d7dd58416d8e61c58f7882ad7864eb76f71d42a0b0b84f7210077f1d45",
     "_static/notebooks/03-pxr-line-energies-1.png": "844288b4cba1e6a1d179029addd574ce5cb8629b263b5f116d312f2058113bff"
   }
 }
