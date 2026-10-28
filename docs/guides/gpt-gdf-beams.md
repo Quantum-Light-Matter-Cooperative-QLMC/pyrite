@@ -51,55 +51,53 @@ detector response nor solid-angle integration.
 (choose-the-snapshot-and-coordinate-origin)=
 ## From lab snapshot to entrance
 
-This snapshot is at lab `z = 0.1 m`, the chosen target-origin z coordinate.
-The first two panels show the **lab snapshot**, before entrance projection.
-`Bx`, `By`, `Bz` are velocities divided by c, **not magnetic fields**.
-`Bx/Bz` is a slope; its value in mrad approximates the angle only at small
-divergence.
+The fixture is a lab snapshot at `z = 0.1 m`, chosen to match the
+target-origin coordinate. Its first two plots show **lab phase space before
+entrance projection**. GPT's `Bx`, `By` and `Bz` are velocity components
+divided by c, *not magnetic fields*; `Bx/Bz` approximates the x angle only
+for small divergence.
 
-The target is tilted by 30°. PyRITE subtracts the target origin, rotates both
-positions and velocities to the sample frame, then intersects each ray with
-entrance `z = 0`. Consequently these raw lab x coordinates are not the
-transport entrance x coordinates. Only for an untilted target and a snapshot
-already on its entrance would x/y be unchanged. This signed, field-free
-extrapolation is not beamline or space-charge tracking; no transverse
-recentering is inferred. See the [projection contract](../reference/gdf-beams.md#choose-the-snapshot-and-coordinate-origin)
-and [independent validation](../validation/beam-transport/gpt-gdf-injection.md).
+For the 30°-tilted target, PyRITE translates to the specified origin,
+rotates positions and velocities into the sample frame, then extrapolates each
+ray to the entrance plane. The plotted lab x positions therefore need not equal
+transport entrance x. This signed, field-free projection does not model
+beamline or space-charge tracking and never infers transverse recentering.
+For selectors, coordinate validation and screen output, see the
+[GDF projection contract](../reference/gdf-beams.md#choose-the-snapshot-and-coordinate-origin).
 
 (configure-normalization)=
-## Probabilities, charge and histories
+## Preserve weights without double-counting charge
 
-The file has **96 records**, unequal positive `nmacro` weights and **1 pC**
-total represented charge. With `gdf_charge` and 1 MHz repetition rate, the
-physical average current is **1 µA**. PyRITE samples complete records with
-replacement, using normalized `nmacro` probabilities; it does not multiply
-each sampled contribution by `nmacro` again. The 64 histories per source
-component are a numerical sample, distinct from record count and physical
-electrons per bunch.
+The fixture contains **96 correlated records** with unequal positive
+`nmacro` weights and **1 pC** of represented charge. In `gdf_charge` mode,
+1 MHz repetition rate therefore gives **1 µA** mean current. Each of the 64
+sampled histories per source component selects a *whole record* with
+replacement, using normalized `nmacro` probabilities; no second weight
+multiplier is applied.
 
-The displayed radiation remains **photons/(incident electron · eV · sr)**;
-charge and repetition rate do not rescale these source densities. To obtain
-rates, use the [current conversion](../physics/radiation-physics/spectral-observables.md)
-once. The alternative `pyrite_current` mode uses configured charge/current
-normalization while retaining the same relative record probabilities. See
-[normalization modes](../reference/gdf-beams.md#configure-normalization).
+Source spectra remain **photons/(incident electron · eV · sr)**, not rates or
+detected counts. Apply the [current conversion](../physics/radiation-physics/spectral-observables.md)
+once when reporting physical rates. Alternatively,
+`pyrite_current` uses explicitly configured charge and current while retaining
+relative particle weights. See the [normalization contract](../reference/gdf-beams.md#configure-normalization)
+for defaults, supported modes and identity behavior.
 
 (errors-and-limits)=
-## Sampling and limits
+## Check sampling and supported geometry
 
-The input generator uses seed `42`; this single-scene transport resolves seed
-`1`, recorded with the [cached output and provenance](../examples/data/gpt_gdf_beams.json).
-The example's small history count and two reflection families do not establish
-convergence, uncertainty or beam quality. Refine sampling, photon grids and
-reflection coverage before quantitative use. See
-[capabilities](../physics/capabilities.md) for model and validation limits.
+The synthetic generator uses seed `42`; transport resolves seed `1` and
+records it in the [cached provenance](../examples/data/gpt_gdf_beams.json).
+The small history count and two reflection families do **not** demonstrate
+convergence or beam quality. Refine sampling and the photon grid before
+quantitative use; consult the [capability matrix](../physics/capabilities.md).
 
-Imported beams currently support local execution, flat slab/stack entrances
-and incoherent emission. The native energy distribution replaces the scalar
-scene placeholder; `shape_only=True` instead preserves directions and weights
-while assigning the selected energy. It preserves divergence, not momentum.
-Do not combine imported phase space with analytic spot, energy-spread or
-longitudinal-distribution settings.
+Imported records currently support local execution, flat slab/stack entrances
+and incoherent emission. The imported energies replace the scalar scene
+placeholder; `shape_only=True` instead assigns the selected energy while
+retaining imported positions, directions and weights. Do not combine GDF
+phase space with analytic spot, spread or longitudinal settings. The
+[GDF error and restriction reference](../reference/gdf-beams.md#errors-and-limits)
+owns input validation, field tolerances and unsupported combinations.
 
 (export-and-inspect)=
 (catalog-example)=

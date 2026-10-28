@@ -155,6 +155,48 @@ Measured-bandwidth runs record a truncation audit and per-electron yield error
 in `line_grid_resolved`; relative error above 0.1 raises
 `CxrYieldStatisticsWarning` and flags statistics-limited output.
 
+### Automatic line-grid diagnostics
+
+The resolved line-grid tolerance, coordinates and source are recorded under
+`line_grid_policy` and `line_grid_resolved`. The following environment controls
+select automatic resolution when a stored
+line-grid row would otherwise be used. An explicit API
+`EnergyBins.line` still supplies its own coordinates; profile policy,
+inline coordinates and stored-row precedence are described above.
+
+| Variable | Purpose |
+| --- | --- |
+| `PYRITE_ENERGY_GRID_RTOL` | Global fallback relative tolerance. |
+| `PYRITE_ENERGY_GRID_RTOL_INTRINSIC_SOURCE` | Per-observable override (default `1e-3`). |
+| `PYRITE_ENERGY_GRID_RTOL_DETECTED_COUNTS` | Per-observable override (default `1e-2`). |
+| `PYRITE_ENERGY_GRID_MAX_SPACING_EV` | Coarsest allowed spacing (default `3.0` eV). |
+| `PYRITE_ENERGY_GRID_ULPS` | Coordinate-precision safety factor. |
+| `PYRITE_ENERGY_GRID_MAX_POINTS` | Point budget (default `600,000`). |
+
+If the requested tolerance is impossible within the point budget or the
+backend ULP floor, the run **raises** and names the unmet constraint. Relax
+that observable's tolerance, narrow the window, raise the point budget or
+use `PYRITE_FP64=1`; the grid is never silently coarsened.
+
+Local line windows remain opt-in while their convergence is being measured
+(issue #101). `line_grid_policy={"windows": True}` on a `Sweep`
+retains a backbone at the maximum spacing while refining around PXR/CBS
+resonances from sampled segments, absorption edges and characteristic lines.
+A mapping can supply `samples_per_feature` (default `8`),
+`tail_widths` (default `2.0`) and `providers`; `False` disables
+stored windows. The plan is recorded in `line_grid_resolved` and changes
+case identity. Windowed grids are nonuniform, so
+`EagleXO(resolve_energy=True)` and `LegacyEDS(convolve=True)`
+refuse them.
+
+The optional `pyrite numerics energy-grid derive --profile NAME` command
+measures a 95%-integrated-coverage **bandwidth**, not a convergence or
+accuracy target. It installs immutable grid artifacts and repoints the profile.
+With `--remote`, detached submission returns before installation: attach
+or rerun without `--detach` to resume, pull and install. Verify with
+`pyrite-dev energy-grid verify`. Do not paste survey-cropped bounds into
+the catalog; subsequent fidelity reduction is a separate decision.
+
 ## Named beams and explicit instruments
 
 A profile attaches `beam = "NAME"`; an inline `[profiles.NAME.beam]` table has
