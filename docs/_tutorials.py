@@ -35,7 +35,10 @@ NAMES = (
 # Register additional notebooks from the Sphinx/CLI wrapper rather than changing
 # _notebooks.py: that exporter's exact file digest is in existing capture manifests.
 # Appending a tutorial must not invalidate unrelated, already captured notebooks.
-ADDITIONAL_NOTEBOOK_FIGURES = {"04-beams-crystals-target-geometry": 2}
+ADDITIONAL_NOTEBOOK_FIGURES = {
+    "04-beams-crystals-target-geometry": 2,
+    "05-angular-radiation-distributions": 1,
+}
 _PIN = re.compile(r"(?P<prefix>\bpyrite-mc(?:\[[A-Za-z0-9,_.-]+\])?==)\d[\w.+-]*")
 
 
@@ -55,9 +58,7 @@ def sync_notebook_version(name):
     explicit --regenerate-notebook action.
     """
     source = DOCS / "notebooks" / f"{name}.py"
-    version = tomllib.loads((DOCS.parent / "pyproject.toml").read_text())["project"][
-        "version"
-    ]
+    version = tomllib.loads((DOCS.parent / "pyproject.toml").read_text())["project"]["version"]
     previous = source.read_text()
     updated = _PIN.sub(lambda match: match.group("prefix") + version, previous)
     if f'"pyrite-mc=={version}"' not in updated:

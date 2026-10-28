@@ -80,9 +80,13 @@ def test_unsupported_imports_fail_before_execution(notebooks, tmp_path, import_s
 
 def test_notebook_links_source_and_navigation_agree(notebooks):
     index = (DOCS / "index.md").read_text()
-    assert index.index("Getting started <") < index.index("Interactive Tutorials <")
-    guides_entry = "How-to Guides <" if "How-to Guides <" in index else "User guide <"
-    assert index.index("Interactive Tutorials <") < index.index(guides_entry)
+    # Check stable Sphinx destinations instead of presentation labels, whose
+    # capitalization and display names are owned by the #759 docs overhaul.
+    assert (
+        index.index("<guides/getting-started>")
+        < index.index("<notebooks/index>")
+        < index.index("<guides/index>")
+    )
     assert "fundamentals/index" in (DOCS / "notebooks" / "index.md").read_text()
     # Raw iframe URLs bypass Sphinx's download-link rewriting.
     assert 'html_static_path = ["_static"]' in (DOCS / "conf.py").read_text()

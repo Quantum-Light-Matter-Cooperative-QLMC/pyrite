@@ -1,8 +1,8 @@
 {
   "schema": "pyrite.marimo-tutorial.v1",
-  "source_sha256": "98a33dde1f75cf29b49c4bcb7917787db57b45adc61c24e79fe94eb3b87bb4b6",
+  "source_sha256": "77753ea04f7084b2b9776e11746e6ec26d337e8c39c89358abfb9ed8b4205291",
   "exporter_sha256": "6eedb7b2d84c7c81cfe4bb58c476c02676f6fd3a5784f844f613efe30412ab24",
-  "git_revision": "874ea108df36c2aaf3624f9a143690e62ca8dca3",
+  "git_revision": "85900c77ef03a529c868b01ba790952145431f85",
   "git_dirty": true,
   "python_version": "3.14.4",
   "execution": {
@@ -19,7 +19,7 @@
     "source_identity": "cb3e432170e2cbe9eb6379f2353e45bc8d398b53bd802cc6442e01c8ed6a7b4f"
   },
   "artifacts": {
-    "notebooks/__marimo__/session/00-setup.py.json": "83fa960f40bfea56e39c58b13d48951b0d58a769f5d21bce25ff65817a48db3d",
-    "_static/notebooks/00-setup.html": "54dd7aad3645019ed614dbcce00fb7974450bd07808d28cf14e84ed987e42cc2"
+    "notebooks/__marimo__/session/00-setup.py.json": "ff2b1bf0fe0b63d0ac4d04a195b5af17a654c14881390e102145cf17a2cdec1e",
+    "_static/notebooks/00-setup.html": "78eb58612604ec85716c796be07acd75d52725df891caca3114540e29be93a9a"
   }
 }

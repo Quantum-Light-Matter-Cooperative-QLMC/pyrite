@@ -94,17 +94,21 @@ def test_all_notebooks_bootstrap_tables_before_simulation():
         source = (DOCS / "notebooks" / f"{name}.py").read_text()
         tree = ast.parse(source)
         first_cell = next(
-            node for node in tree.body
+            node
+            for node in tree.body
             if isinstance(node, ast.FunctionDef)
-            and any(isinstance(dec, ast.Attribute) and dec.attr == "cell" for dec in node.decorator_list)
+            and any(
+                isinstance(dec, ast.Attribute) and dec.attr == "cell" for dec in node.decorator_list
+            )
         )
         imports = [
-            stmt for stmt in first_cell.body
-            if isinstance(stmt, ast.Import)
-            and any(alias.name == "pyrite" for alias in stmt.names)
+            stmt
+            for stmt in first_cell.body
+            if isinstance(stmt, ast.Import) and any(alias.name == "pyrite" for alias in stmt.names)
         ]
         fetches = [
-            stmt for stmt in first_cell.body
+            stmt
+            for stmt in first_cell.body
             if isinstance(stmt, ast.Expr)
             and isinstance(stmt.value, ast.Call)
             and isinstance(stmt.value.func, ast.Attribute)

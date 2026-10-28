@@ -20,6 +20,7 @@ def _():
     import numpy as np
 
     import pyrite
+
     pyrite.fetch_tables()  # Fetch missing pinned tables once; reuse installed data.
 
     return mo, np, plt, pyrite
@@ -142,9 +143,7 @@ def _(beam, cxr, into_acceptance, mo, np, per_sr, result):
     # For a scalar detector, the accepted rate assumes locally uniform intensity.
     acceptance_sr = result.accepted_solid_angle_sr()
     assert np.isclose(cxr_rate_sr, yield_per_electron_sr * electrons_per_second, rtol=1e-10)
-    assert np.array_equal(
-        into_acceptance.get_column("photon_energy_eV").to_numpy(), flux_sr_grid
-    )
+    assert np.array_equal(into_acceptance.get_column("photon_energy_eV").to_numpy(), flux_sr_grid)
     band_summary = {
         "band_eV": list(band_eV),
         "mean_current_nA": current_nA,

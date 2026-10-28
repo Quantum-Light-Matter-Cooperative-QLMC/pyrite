@@ -20,6 +20,7 @@ def _():
     import numpy as np
 
     import pyrite
+
     pyrite.fetch_tables()  # Installed pins are reused without downloading again.
 
     return mo, np, plt, pyrite
