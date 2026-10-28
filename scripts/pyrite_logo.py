@@ -359,95 +359,86 @@ def draw_hbn_e(
     cap: float,
     width: float,
     tilt_deg: float = 13.0,
+    azimuth_deg: float = 10.0,
 ) -> dict[str, float | int | str]:
-    """Three slightly tipped hBN basal planes, without any typographic E stroke.
+    """Three matching, shallowly viewed CIF-derived hBN monolayers.
 
-    Atom sites and nearest-neighbor bonds come from PyRITE's existing crystal
-    renderer, using the catalog's CIF-derived hBN basis. Two repeated bulk
-    cells supply three successive planes, retaining their AA' registry.
-    This is a shallow, stylized orthographic view, not an arbitrary dot grid.
+    The bulk hBN CIF uses AA' stacking, exchanging B/N registry in alternating
+    planes. Repeat ONE catalog-derived basal plane here instead: the logo's
+    three bars should share the same visible honeycomb, not imply two different
+    patterns. This visual AA registration is artistic, not the bulk structure.
     """
     from pyrite.materials import CATALOG
     from pyrite.plots.plotly.crystal_lattice import crystal_atom_sites, crystal_bonds
 
     spec = CATALOG.crystal("hbn")
-    all_elements, all_coords = crystal_atom_sites(spec, n_a=7, n_b=3, n_c=2)
-    plane_heights = np.unique(np.round(all_coords[:, 2], 5))
-    if len(plane_heights) < 3:
-        raise RuntimeError("The hBN lattice does not contain three basal planes")
-    selected = np.isin(np.round(all_coords[:, 2], 5), plane_heights[:3])
-    coords = all_coords[selected]
-    elements = np.asarray(all_elements)[selected]
+    elements_full, coords_full = crystal_atom_sites(spec, n_a=7, n_b=3, n_c=1)
+    mask = np.isclose(coords_full[:, 2], coords_full[:, 2].min())
+    coords = coords_full[mask]
+    elements = np.asarray(elements_full)[mask]
     bonds = crystal_bonds(elements.tolist(), coords)
-    if len(elements) == 0 or not bonds:
-        raise RuntimeError("Could not construct the hBN sheet bonds")
+    if not len(elements) or not bonds:
+        raise RuntimeError("Could not construct the hBN basal sheet")
 
-    # Rotate slightly in-plane, then view the basal sheets close to edge-on.
-    # Small elevation exposes the honeycomb depth without making three flat
-    # sheets look like three face-on patches of crystal.
-    u = coords[:, 0] + 0.23 * coords[:, 1]
-    v = coords[:, 1]
-    pad = 0.050
-    px = x + pad + (width - 2 * pad) * (u - u.min()) / np.ptp(u)
-    py = np.empty(len(px), dtype=float)
-    row_separation = (cap - baseline - 0.28) / 2.0
-    for row, height in enumerate(plane_heights[:3]):
-        in_row = np.isclose(coords[:, 2], height)
-        row_v = v[in_row]
-        depth_span = max(float(np.ptp(row_v)), 1e-12)
-        py[in_row] = (
-            cap
-            - 0.14
-            - row * row_separation
-            + np.sin(np.deg2rad(tilt_deg))
-            * width
-            * 0.80
-            * (row_v - 0.5 * (row_v.min() + row_v.max()))
-            / depth_span
-        )
+    # Rotate the real basal-plane coordinates in azimuth, then project a shallow
+    # polar elevation. The modest depth exaggeration keeps bonds legible when
+    # the logo is reduced to a narrow documentation header.
+    phi = np.deg2rad(azimuth_deg)
+    u = np.cos(phi) * coords[:, 0] + np.sin(phi) * coords[:, 1]
+    depth = -np.sin(phi) * coords[:, 0] + np.cos(phi) * coords[:, 1]
+    pad = 0.069  # leave room for the slightly enlarged boundary atoms
+    scale = (width - 2 * pad) / np.ptp(u)
+    px = x + pad + scale * (u - u.min())
+    depth_offset = (
+        2.2 * scale * np.sin(np.deg2rad(tilt_deg)) * (depth - depth.mean())
+    )
+    row_spacing = (cap - baseline - 0.28) / 2.0
+    row_heights = [cap - 0.14 - row * row_spacing for row in range(3)]
 
     segments = [
-        [(px[first], py[first]), (px[second], py[second])]
-        for first, second in bonds
+        [(px[a], py + depth_offset[a]), (px[b], py + depth_offset[b])]
+        for py in row_heights
+        for a, b in bonds
     ]
     ax.add_collection(
-        LineCollection(
-            segments, colors="#96B7C1", linewidths=1.12, alpha=0.83, zorder=3
-        )
+        LineCollection(segments, colors="#B6D6D8", linewidths=1.5, alpha=0.89, zorder=3)
     )
 
-    # Paint rear atoms before foreground atoms. Small offset highlights imply
-    # rounded atomic spheres while preserving the actual B/N site positions.
-    for idx in np.argsort(v):
-        element = elements[idx]
-        radius = 0.042 if element == "B" else 0.052
-        fill = "#71D8F0" if element == "B" else "#F5E4C0"
-        ax.add_patch(
-            Circle(
-                (px[idx], py[idx]),
-                radius,
-                facecolor=fill,
-                edgecolor="#233A51",
-                linewidth=0.45,
-                zorder=4,
+    # Identical B/N motifs on all three sheets; paint back-to-front within each.
+    for py in row_heights:
+        for idx in np.argsort(depth):
+            element = elements[idx]
+            radius = 0.050 if element == "B" else 0.056
+            fill = "#1EDCF5" if element == "B" else "#FFD064"
+            center = (px[idx], py + depth_offset[idx])
+            ax.add_patch(
+                Circle(
+                    center,
+                    radius,
+                    facecolor=fill,
+                    edgecolor="#233A51",
+                    linewidth=0.45,
+                    zorder=4,
+                )
             )
-        )
-        ax.add_patch(
-            Circle(
-                (px[idx] - 0.27 * radius, py[idx] + 0.28 * radius),
-                0.30 * radius,
-                facecolor="white",
-                edgecolor="none",
-                alpha=0.19,
-                zorder=5,
+            ax.add_patch(
+                Circle(
+                    (center[0] - 0.27 * radius, center[1] + 0.28 * radius),
+                    0.30 * radius,
+                    facecolor="white",
+                    edgecolor="none",
+                    alpha=0.22,
+                    zorder=5,
+                )
             )
-        )
+
     return {
         "e_material": "hbn",
         "e_sheets": 3,
-        "e_atoms": len(elements),
-        "e_bonds": len(bonds),
+        "e_atoms": 3 * len(elements),
+        "e_bonds": 3 * len(bonds),
         "e_tilt_deg": float(tilt_deg),
+        "e_azimuth_deg": float(azimuth_deg),
     }
 
 def draw_y(
@@ -616,7 +607,8 @@ def render(
     color_gamma: float = 1.85,
     beam_seed: int = 17,
     beam_width_nm: float | None = None,
-    e_tilt_deg: float = 13.0,
+    e_tilt_deg: float = -13.0,
+    e_azimuth_deg: float = 0.0,
 ):
     plt.rcParams["svg.fonttype"] = "path"
     plt.rcParams["svg.hashsalt"] = "pyrite-brand-v1"
@@ -640,7 +632,13 @@ def render(
     e_bounds = TextPath((0, 0), "E", size=1.0, prop=font).get_extents()
     e_width = letter_height * e_bounds.width / e_bounds.height
     e_stats = draw_hbn_e(
-        ax, x=cursor, baseline=baseline, cap=cap, width=e_width, tilt_deg=e_tilt_deg
+        ax,
+        x=cursor,
+        baseline=baseline,
+        cap=cap,
+        width=e_width,
+        tilt_deg=e_tilt_deg,
+        azimuth_deg=e_azimuth_deg,
     )
     cursor += e_width
 
@@ -769,14 +767,20 @@ def main():
     parser.add_argument(
         "--font-family",
         default="DejaVu Sans",
-        help="Installed font for P, R, T and E-width matching (e.g. 'Space Grotesk')",
+        help="Installed font for P, R, T and E-width matching",
     )
     parser.add_argument("--dpi", type=int, default=150)
     parser.add_argument(
         "--e-tilt-deg",
         type=float,
-        default=13.0,
+        default=17.0,
         help="Shallow viewing elevation of the three hBN E sheets in degrees",
+    )
+    parser.add_argument(
+        "--e-azimuth-deg",
+        type=float,
+        default=-5.0,
+        help="In-plane azimuth rotation of the hBN lattice (degrees)",
     )
     parser.add_argument(
         "--corner-radius-fraction",
@@ -832,10 +836,6 @@ def main():
         parser.error("--y-beam-width-nm must be finite and positive")
     if args.y_max_steps < 1:
         parser.error("--y-max-steps must be positive")
-    if not np.isfinite(args.e_tilt_deg) or not 0 <= args.e_tilt_deg <= 25:
-        parser.error("--e-tilt-deg must be finite and in [0, 25]")
-    if not 0 <= args.corner_radius_fraction <= 0.12:
-        parser.error("--corner-radius-fraction must be in [0, 0.12]")
     if not 0.5 <= args.social_logo_width_fraction <= 1.0:
         parser.error("--social-logo-width-fraction must be in [0.5, 1.0]")
     y_thick_ang = args.y_thickness_um * 1e4
@@ -879,6 +879,7 @@ def main():
         beam_seed=args.seed,
         beam_width_nm=args.y_beam_width_nm,
         e_tilt_deg=args.e_tilt_deg,
+        e_azimuth_deg=args.e_azimuth_deg,
     )
     write_brand_assets(y_data, args, y_thick_ang)
     report = {
@@ -921,8 +922,9 @@ def main():
             "i_width": args.i_width,
             "ri_gap": args.ri_gap,
             "i_caps": False,
-            "e_crystal": "hbn (CIF-derived, three successive AA'-stacked basal planes)",
+            "e_crystal": "hbn (three matching CIF-derived basal planes, artistic AA registry)",
             "e_tilt_deg": args.e_tilt_deg,
+            "e_azimuth_deg": args.e_azimuth_deg,
             "corner_radius_fraction": args.corner_radius_fraction,
             "social_logo_width_fraction": args.social_logo_width_fraction,
             "social_card_size_px": [1200, 630],
