@@ -1,6 +1,12 @@
 # /// script
 # requires-python = ">=3.13"
-# dependencies = ["endf-parserpy==0.17.0", "marimo>=0.25.1", "pyrite-mc==0.22.5", "matplotlib>=3.11", "numpy>=2"]
+# dependencies = [
+#     "endf-parserpy==0.17.0",
+#     "marimo>=0.23.3",
+#     "pyrite-mc==0.22.5",
+#     "matplotlib>=3.11",
+#     "numpy>=2",
+# ]
 # ///
 
 import marimo
@@ -17,14 +23,13 @@ def _():
     os.environ.setdefault("PYRITE_MC_BACKEND", "cpu")
     import marimo as mo
     import matplotlib.pyplot as plt
-    import numpy as np
 
     import pyrite
 
     _ = pyrite.fetch_tables()  # Fetch missing pinned tables once; reuse installed data.
 
     tables_ready = True
-    return tables_ready, mo, np, os, plt, pyrite
+    return mo, plt, pyrite, tables_ready
 
 
 @app.cell(hide_code=True)
@@ -33,74 +38,47 @@ def _(mo):
     # Your first X-ray spectrum
 
     Simulate a small crystalline target and compare PXR + CBS with bremsstrahlung.
-    """)
-    return
 
-
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""
     ## Setup
 
-    Complete notebook 00 once to install PyRITE and fetch/verify its reference tables.
-    This example uses 30 keV electrons and a 100 nm HOPG slab. Its fixed history
-    counts keep it CPU-friendly; the curves are **illustrative, not converged**.
+    This example uses 30 keV electrons incident upon a 100 nm HOPG slab. Its small
+    trial counts keep it CPU-friendly; the curves are **only illustrative**.
     The sampled electron histories do not represent a physical bunch population.
     """)
     return
 
 
-@app.cell(hide_code=True)
-def _():
+@app.cell
+def _(tables_ready):
     from pyrite import simulate
     from pyrite.beams import Beam, PointBunch, PointSpot
     from pyrite.config import CxrReflections, FixedSampling, Numerics
     from pyrite.detectors import Detector
     from pyrite.geometry import Footprint, Slab
 
-    return (
-        Beam,
-        CxrReflections,
-        Detector,
-        FixedSampling,
-        Footprint,
-        Numerics,
-        PointBunch,
-        PointSpot,
-        Slab,
-        simulate,
-    )
-
-
-@app.cell
-def _(Beam, Detector, Footprint, PointBunch, PointSpot, Slab):
     beam = Beam(energy_keV=30.0, transverse=PointSpot(), longitudinal=PointBunch())
     target = Slab("hopg", thickness_ang=1_000.0, tilt_deg=30.0, footprint=Footprint(5.0, 5.0))
     detector = Detector(observation_angle_deg=135.0)
-    return beam, detector, target
 
-
-@app.cell
-def _(CxrReflections, FixedSampling, Numerics):
     numerics = Numerics(
         sampling=FixedSampling(cxr_electrons=32_768, brem_electrons=128),
         cxr_reflections=CxrReflections(n_families=2),
     )
-    return (numerics,)
 
-
-@app.cell
-def _(beam, detector, numerics, simulate, target, tables_ready):
     assert tables_ready  # Wait for reference-table installation before transport.
     result = simulate(beam, target, detector, numerics=numerics)
-    return (result,)
 
-
-@app.cell
-def _(result):
     cxr = result.cxr.incoherent
     brem = result.brem
-    return brem, cxr
+    return brem, cxr, result
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Plot the results
+    """)
+    return
 
 
 @app.cell
@@ -110,7 +88,7 @@ def _(brem, cxr, plt):
     axis.plot(brem.photon_energy_eV / 1_000, brem.density, label="Bremsstrahlung")
     axis.set(
         xlabel="Photon energy (keV)",
-        ylabel="Photons / (incident electron · eV · sr)",
+        ylabel="Photons / (electron · eV · sr)",
         title="30 keV electrons → 100 nm HOPG",
         xlim=(0.3, 3.7),
         yscale="log",
@@ -119,7 +97,7 @@ def _(brem, cxr, plt):
     axis.grid(alpha=0.25)
     axis.legend()
     figure  # noqa: B018 - marimo renders the final expression
-    return (figure,)
+    return
 
 
 @app.cell(hide_code=True)
@@ -128,11 +106,11 @@ def _(mo):
     ## Interpretation
 
     PXR and CBS are combined here because their amplitudes interfere. Their line
-    structure differs from the broad bremsstrahlung continuum. Plot each component
+    structure differs from the broad bremsstrahlung continuum. Each component is plotted
     on its **native photon-energy grid**; adding array entries by index would mix
     different energies. The vertical axis is source spectral density per incident
-    electron, per eV, per steradian: it is neither physical beam flux nor acquired
-    counts. Low history counts can leave noisy features and empty bins.
+    electron, per eV, per steradian, i.e., integrating over the spectrum, beam current,
+    and detection solid-angle cone would translate to Phs
 
     Try doubling the history counts, then change only the target thickness. Keep a
     record of the resolved seed when comparing configurations; different backends need not produce
@@ -159,7 +137,7 @@ def _(mo, pyrite, result):
     }
     # Preserve machine-readable export metadata without displaying it to readers.
     mo.json(tutorial_provenance).style({"display": "none"})
-    return (tutorial_provenance,)
+    return
 
 
 if __name__ == "__main__":

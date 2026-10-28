@@ -1,6 +1,12 @@
 # /// script
 # requires-python = ">=3.13"
-# dependencies = ["endf-parserpy==0.17.0", "marimo>=0.25.1", "pyrite-mc==0.22.5", "matplotlib>=3.11", "numpy>=2"]
+# dependencies = [
+#     "endf-parserpy==0.17.0",
+#     "marimo>=0.23.3",
+#     "pyrite-mc==0.22.5",
+#     "matplotlib>=3.11",
+#     "numpy>=2",
+# ]
 # ///
 
 import marimo
@@ -9,7 +15,7 @@ __generated_with = "0.25.2"
 app = marimo.App(width="medium")
 
 
-@app.cell(hide_code=False)
+@app.cell
 def _():
     import os
 
@@ -22,7 +28,7 @@ def _():
 
     _ = pyrite.fetch_tables()  # Fetch missing pinned tables once; reuse installed data.
     tables_ready = True
-    return tables_ready, mo, np, os, pyrite
+    return mo, np, os, pyrite, tables_ready
 
 
 @app.cell(hide_code=True)
@@ -97,7 +103,7 @@ def _(mo):
     return
 
 
-@app.cell(hide_code=False)
+@app.cell
 def _():
     from pyrite import simulate
     from pyrite.beams import Beam, PointBunch, PointSpot
@@ -132,6 +138,8 @@ def _(
     PointBunch,
     PointSpot,
     Slab,
+    mo,
+    np,
     simulate,
     tables_ready,
 ):
@@ -146,11 +154,6 @@ def _(
             cxr_reflections=CxrReflections(n_families=1),
         ),
     )
-    return (smoke,)
-
-
-@app.cell(hide_code=True)
-def _(mo, np, smoke):
     smoke_summary = {
         "backend": smoke.provenance["backend"],
         "energy_nodes": int(smoke.cxr.incoherent.photon_energy_eV.size),
@@ -158,8 +161,9 @@ def _(mo, np, smoke):
         "nonzero_spectrum": bool(np.any(smoke.cxr.incoherent.density > 0)),
     }
     assert smoke_summary["finite_spectrum"] and smoke_summary["nonzero_spectrum"]
-    mo.json(smoke_summary)
-    return
+
+    _ = mo.json(smoke_summary)
+    return (smoke,)
 
 
 @app.cell(hide_code=True)
@@ -173,7 +177,7 @@ def _(mo, pyrite, smoke):
         "source_identity": smoke.provenance["identity_digest"],
     }
     # Preserve machine-readable export metadata without displaying it to readers.
-    mo.json(tutorial_provenance).style({"display": "none"})
+    _ = mo.json(tutorial_provenance)
     return
 
 
