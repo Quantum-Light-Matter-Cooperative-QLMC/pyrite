@@ -168,25 +168,5 @@ def _(mo):
     return
 
 
-@app.cell(hide_code=True)
-def _(band_eV, energies_keV, mo, pyrite, runs, sweep_result, sweep_yield, thicknesses_nm):
-    tutorial_provenance = {
-        "tutorial": "08-parameter-sweeps",
-        "pyrite_version": pyrite.__version__,
-        "backend": sweep_result.provenance["backend"],
-        "seed": sweep_result.case["seed"],
-        "table_identity": dict(sweep_result.provenance["xsgen_tables"]),
-        "energies_keV": energies_keV.tolist(),
-        "thicknesses_nm": thicknesses_nm.tolist(),
-        "band_eV": list(band_eV),
-        "yield_per_electron_sr": sweep_yield.tolist(),
-        "sampled_cxr_histories": 2_048,
-        "sampled_brem_histories": 2_048,
-        "runs": runs,
-    }
-    mo.json(tutorial_provenance).style({"display": "none"})
-    return
-
-
 if __name__ == "__main__":
     app.run()

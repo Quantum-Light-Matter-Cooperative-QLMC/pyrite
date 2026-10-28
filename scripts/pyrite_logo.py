@@ -389,9 +389,7 @@ def draw_hbn_e(
     pad = 0.069  # leave room for the slightly enlarged boundary atoms
     scale = (width - 2 * pad) / np.ptp(u)
     px = x + pad + scale * (u - u.min())
-    depth_offset = (
-        2.2 * scale * np.sin(np.deg2rad(tilt_deg)) * (depth - depth.mean())
-    )
+    depth_offset = 2.2 * scale * np.sin(np.deg2rad(tilt_deg)) * (depth - depth.mean())
     row_spacing = (cap - baseline - 0.45) / 2.0  # 0.28) / 2.0
     row_heights = [cap - 0.24 - row * row_spacing for row in range(3)]
 

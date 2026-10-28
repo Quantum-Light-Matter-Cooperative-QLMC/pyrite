@@ -18,12 +18,9 @@ This static page requires no Python kernel, GPU or reference-table download.
 </iframe>
 ```
 
-[Open captured notebook full screen](../../_static/notebooks/04-beams-crystals-target-geometry.html).
-{download}`Download canonical notebook <../04-beams-crystals-target-geometry.py>` ·
-{download}`Execution provenance <../outputs/04-beams-crystals-target-geometry.json>`.
+<a href="../../_static/notebooks/04-beams-crystals-target-geometry.html">Open captured notebook full screen</a>.
+{download}`Download canonical notebook <../04-beams-crystals-target-geometry.py>`.
 
-[Captured beam-profile figure](../../_static/notebooks/04-beams-crystals-target-geometry-1.png) ·
-[Captured PXR/CBS figure](../../_static/notebooks/04-beams-crystals-target-geometry-2.png).
 
 ## Continue learning
 

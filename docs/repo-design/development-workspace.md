@@ -79,7 +79,7 @@ pyrite-dev precommit
 # Cross-boundary sample only when those public boundaries are affected.
 pyrite-dev test-suite integration
 
-# Refresh all CPU tutorial captures, then build docs alongside the repository checks.
+# Build docs (including CPU tutorial execution) alongside the repository checks.
 pyrite-dev verify
 
 # Full slow-inclusive CPU suite: explicit audit/release operation.
@@ -139,15 +139,14 @@ For ordinary edits, select the changed behavior's node/module and trace its affe
 `verify` never invokes pytest. It checks types, Ruff lint and formatting
 (without formatting files), the 1,250-line Python source-module budget, the
 high-CC ratchet ([source complexity baseline](complexity.md)), the API inventory,
-all registered CPU tutorial captures, a clean offline warnings-as-errors Sphinx
-build, and import-linter.
+a clean warnings-as-errors Sphinx build, and import-linter.
 
-Before building docs, `verify` **executes and regenerates** the CPU tutorials,
-refreshing their source pins and captured outputs. `pyrite-dev notebooks` runs
-this regeneration separately with the docs dependency group and no marimo
-sandbox prompts. Use `pyrite-dev notebooks --check` for read-only capture
-validation. The standalone `pyrite-dev docs` build consumes checked captures
-without executing tutorials.
+The HTML documentation build executes each tutorial once on CPU and writes
+untracked HTML under `docs/_build/`. It does not update notebook sources,
+release pins, provenance manifests or committed captures. `verify` calls that
+same build without a separate notebook regeneration step. Install the reference
+tables before building offline, and use a suitably provisioned worker for a full
+tutorial build. See [tutorial authoring](documentation.md#interactive-notebook-builds).
 
 `--skip-tests` remains an undocumented compatibility no-op; pytest arguments
 and `--slow` are rejected. Run tests explicitly. CI runs each primary domain

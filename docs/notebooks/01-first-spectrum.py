@@ -169,20 +169,5 @@ def _(mo):
     return
 
 
-@app.cell(hide_code=True)
-def _(mo, pyrite, result):
-    tutorial_provenance = {
-        "tutorial": "01-first-spectrum",
-        "pyrite_version": pyrite.__version__,
-        "backend": result.provenance["backend"],
-        "seed": result.case["seed"],
-        "table_identity": dict(result.provenance["xsgen_tables"]),
-        "source_identity": result.provenance["identity_digest"],
-    }
-    # Preserve machine-readable export metadata without displaying it to readers.
-    mo.json(tutorial_provenance).style({"display": "none"})
-    return
-
-
 if __name__ == "__main__":
     app.run()

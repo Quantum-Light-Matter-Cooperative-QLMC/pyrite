@@ -173,47 +173,5 @@ def _(mo):
     return
 
 
-@app.cell(hide_code=True)
-def _(
-    acquisition,
-    batch,
-    beam,
-    count_image,
-    expected_image,
-    mo,
-    np,
-    pyrite,
-    result,
-):
-    tutorial_provenance = {
-        "tutorial": "06-detector-counts",
-        "pyrite_version": pyrite.__version__,
-        "backend": result.provenance["backend"],
-        "seed": result.case["seed"],
-        "table_identity": dict(result.provenance["xsgen_tables"]),
-        "source_identity": result.provenance["identity_digest"],
-        "observation_identity": batch.observation_digest,
-        "acquisition_seed": acquisition.seed,
-        "exposure_s": acquisition.exposure_s,
-        "current_nA": beam.rep_rate_hz * beam.bunch_charge_pc / 1_000,
-        "measured_edges_eV": batch.measured_edges_eV.tolist(),
-        "components": list(batch.components),
-        "pixel_shape": list(expected_image.shape),
-        "angular_tiles": [4, 4],
-        "sampled_cxr_histories": 512,
-        "sampled_brem_histories": 128,
-        "expected_total": float(np.sum(expected_image)),
-        "realized_total": int(np.sum(count_image)),
-        "outside_window_expected": {
-            "underflow": float(batch.underflow_expected.sum()),
-            "overflow": float(batch.overflow_expected.sum()),
-            "below_cut": float(batch.below_cut_expected.sum()),
-        },
-    }
-    # Preserve machine-readable export metadata without displaying it to readers.
-    mo.json(tutorial_provenance).style({"display": "none"})
-    return
-
-
 if __name__ == "__main__":
     app.run()

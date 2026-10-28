@@ -15,11 +15,9 @@ steps included in this notebook. This static view requires no Python kernel or C
 </iframe>
 ```
 
-[Open captured notebook full screen](../../_static/notebooks/01-first-spectrum.html).
-{download}`Download canonical notebook <../01-first-spectrum.py>` ·
-{download}`Execution provenance <../outputs/01-first-spectrum.json>`.
+<a href="../../_static/notebooks/01-first-spectrum.html">Open captured notebook full screen</a>.
+{download}`Download canonical notebook <../01-first-spectrum.py>`.
 
-[Captured figure](../../_static/notebooks/01-first-spectrum-1.png).
 
 ## Continue learning
 

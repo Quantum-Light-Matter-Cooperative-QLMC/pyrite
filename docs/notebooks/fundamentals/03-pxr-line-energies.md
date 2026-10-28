@@ -16,11 +16,9 @@ Python kernel or CUDA.
 </iframe>
 ```
 
-[Open captured notebook full screen](../../_static/notebooks/03-pxr-line-energies.html).
-{download}`Download canonical notebook <../03-pxr-line-energies.py>` ·
-{download}`Execution provenance <../outputs/03-pxr-line-energies.json>`.
+<a href="../../_static/notebooks/03-pxr-line-energies.html">Open captured notebook full screen</a>.
+{download}`Download canonical notebook <../03-pxr-line-energies.py>`.
 
-[Captured figure](../../_static/notebooks/03-pxr-line-energies-1.png).
 
 ## Continue learning
 

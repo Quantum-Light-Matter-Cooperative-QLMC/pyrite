@@ -8,6 +8,7 @@ import pytest
 from pyrite.campaign.config import material_sweep
 from pyrite.campaign.sweep import build_cases
 from pyrite.montecarlo import runner
+from pyrite.montecarlo.runner.step_budget import retry_step_budget
 from pyrite.montecarlo.transport import TransportStepLimitError
 
 
@@ -47,3 +48,46 @@ def test_step_limit_gives_up_at_the_ceiling(monkeypatch, case):
     with pytest.raises(TransportStepLimitError, match="incomplete electron transport"):
         runner._transport_case(case, transport_core="lockstep")
     assert budgets[-1] == runner.TRANSPORT_MAX_STEPS_CEILING
+
+
+def test_smaller_initial_budget_preserves_transport(monkeypatch, case):
+    reference = runner._transport_case(case, transport_core="lockstep")
+    monkeypatch.setenv("PYRITE_MC_TRANSPORT_INITIAL_MAX_STEPS", "128")
+    reduced = runner._transport_case(case, transport_core="lockstep")
+    for key in ("L_ang", "E_keV", "r_mid"):
+        np.testing.assert_array_equal(reduced["segs"][key], reference["segs"][key])
+
+
+def test_small_initial_budget_retries_without_truncating(monkeypatch):
+    monkeypatch.setenv("PYRITE_MC_TRANSPORT_INITIAL_MAX_STEPS", "128")
+    budgets = []
+
+    def run(*, max_steps):
+        budgets.append(max_steps)
+        if max_steps < 512:
+            raise TransportStepLimitError(1, 1, max_steps)
+        return "transported"
+
+    assert retry_step_budget(run) == "transported"
+    assert budgets == [128, 256, 512]
+
+
+def test_retry_cannot_exceed_the_original_ceiling(monkeypatch):
+    ceiling = runner.TRANSPORT_MAX_STEPS_CEILING
+    monkeypatch.setenv("PYRITE_MC_TRANSPORT_INITIAL_MAX_STEPS", str(ceiling - 1))
+    budgets = []
+
+    def fail(*, max_steps):
+        budgets.append(max_steps)
+        raise TransportStepLimitError(1, 1, max_steps)
+
+    with pytest.raises(TransportStepLimitError):
+        retry_step_budget(fail)
+    assert budgets == [ceiling - 1, ceiling]
+
+
+@pytest.mark.parametrize("value", ["", "0", "-1", "nan", "1.5", "160001"])
+def test_invalid_initial_budget_is_rejected(monkeypatch, value):
+    monkeypatch.setenv("PYRITE_MC_TRANSPORT_INITIAL_MAX_STEPS", value)
+    with pytest.raises(ValueError, match="PYRITE_MC_TRANSPORT_INITIAL_MAX_STEPS"):
+        retry_step_budget(lambda *, max_steps: None)

@@ -17,12 +17,9 @@ The static page needs no Python kernel, GPU or simulation run.
 </iframe>
 ```
 
-[Open captured notebook full screen](../../_static/notebooks/02-understanding-results.html).
-{download}`Download canonical notebook <../02-understanding-results.py>` ·
-{download}`Execution provenance <../outputs/02-understanding-results.json>`.
+<a href="../../_static/notebooks/02-understanding-results.html">Open captured notebook full screen</a>.
+{download}`Download canonical notebook <../02-understanding-results.py>`.
 
-[Captured source-spectrum figure](../../_static/notebooks/02-understanding-results-1.png) ·
-[Captured accepted-rate figure](../../_static/notebooks/02-understanding-results-2.png).
 
 ## Continue learning
 

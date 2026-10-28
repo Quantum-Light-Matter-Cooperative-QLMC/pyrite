@@ -16,11 +16,9 @@ need a GPU. The plotted changes are **not** independent Monte Carlo error bars.
 </iframe>
 ```
 
-[Open captured notebook full screen](../../_static/notebooks/07-sampling-convergence-performance.html).
-{download}`Download canonical notebook <../07-sampling-convergence-performance.py>` ·
-{download}`Execution provenance <../outputs/07-sampling-convergence-performance.json>`.
+<a href="../../_static/notebooks/07-sampling-convergence-performance.html">Open captured notebook full screen</a>.
+{download}`Download canonical notebook <../07-sampling-convergence-performance.py>`.
 
-[Captured convergence and timing plot](../../_static/notebooks/07-sampling-convergence-performance-1.png).
 
 ## Continue learning
 

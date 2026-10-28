@@ -59,7 +59,8 @@ extensions = [
     "_source_refs",  # checked links to current repository files and definitions
     "_warning_baseline",  # exact boundary around inherited autodoc parse debt
     "_marimo_demo",  # browser-only results demo embedded on the overview page
-    "_tutorials",  # reject stale precomputed tutorial outputs
+    "_tutorials",  # checked legacy static examples
+    "_notebooks",  # execute tutorial sources into the HTML build
     "matplotlib.sphinxext.plot_directive",  # native figures from maintained sources
     "sphinx_design",  # synchronized uv/pip installation tabs
     "myst_parser",  # render the docs/*.md design notes
@@ -154,7 +155,7 @@ exclude_patterns = [
 # -- HTML output -------------------------------------------------------------
 html_theme = "pydata_sphinx_theme"
 templates_path = ["_templates"]
-# Canonical notebook HTML captures and PNG fallbacks are embedded by URL.
+# Tutorial HTML is generated directly under the build output, beside static assets.
 html_static_path = ["_static"]
 html_sidebars = {"**": ["sidebar-collapse.html", "sidebar-sections.html"]}
 html_title = "PyRITE"

@@ -17,11 +17,9 @@ need a GPU. The images are simulated observations of an ideal counter.
 </iframe>
 ```
 
-[Open captured notebook full screen](../../_static/notebooks/06-detector-counts.html).
-{download}`Download canonical notebook <../06-detector-counts.py>` ·
-{download}`Execution provenance <../outputs/06-detector-counts.json>`.
+<a href="../../_static/notebooks/06-detector-counts.html">Open captured notebook full screen</a>.
+{download}`Download canonical notebook <../06-detector-counts.py>`.
 
-[Captured expected and realized count images](../../_static/notebooks/06-detector-counts-1.png).
 
 ## Continue learning
 

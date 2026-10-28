@@ -16,11 +16,9 @@ need a GPU. The directional source API is experimental.
 </iframe>
 ```
 
-[Open captured notebook full screen](../../_static/notebooks/05-angular-radiation-distributions.html).
-{download}`Download canonical notebook <../05-angular-radiation-distributions.py>` ·
-{download}`Execution provenance <../outputs/05-angular-radiation-distributions.json>`.
+<a href="../../_static/notebooks/05-angular-radiation-distributions.html">Open captured notebook full screen</a>.
+{download}`Download canonical notebook <../05-angular-radiation-distributions.py>`.
 
-[Captured source map and directional spectra](../../_static/notebooks/05-angular-radiation-distributions-1.png).
 
 ## Continue learning
 

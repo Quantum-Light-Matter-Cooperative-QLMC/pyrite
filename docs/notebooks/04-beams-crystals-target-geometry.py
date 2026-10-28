@@ -156,26 +156,5 @@ def _(mo):
     return
 
 
-@app.cell(hide_code=True)
-def _(beam, material, mo, pyrite, result, target):
-    tutorial_provenance = {
-        "tutorial": "04-beams-crystals-target-geometry",
-        "pyrite_version": pyrite.__version__,
-        "backend": result.provenance["backend"],
-        "seed": result.case["seed"],
-        "table_identity": dict(result.provenance["xsgen_tables"]),
-        "source_identity": result.provenance["identity_digest"],
-        "beam_energy_keV": beam.energy_keV,
-        "spot_fwhm_x_mm": beam.transverse.fwhm_x_mm,
-        "material": material,
-        "thickness_ang": target.thickness_ang,
-        "cut_beam_uvw": list(target.cut.beam_uvw),
-        "sampled_cxr_histories": 2_048,
-    }
-    # Preserve machine-readable export metadata without displaying it to readers.
-    mo.json(tutorial_provenance).style({"display": "none"})
-    return
-
-
 if __name__ == "__main__":
     app.run()

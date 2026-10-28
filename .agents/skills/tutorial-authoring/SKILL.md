@@ -15,19 +15,22 @@ packaged marimo applications (which use `notebook-workflow`).
 - Use canonical PyRITE imports, explicit units, reproducible seeds, and honest
   performance limits. Never import from `pyrite.apps` or private modules.
 - The canonical `docs/notebooks/*.py` Marimo source must drive both local/MoLab
-  execution and the checked static Read the Docs output. Never maintain a
+  execution and the generated static Read the Docs output. Never maintain a
   second Markdown or application implementation of the same notebook.
-- Add an Open in Molab link for that exact source. Record execution provenance,
-  backend and relevant model/table identity; distinguish Monte Carlo sample
-  counts from physical populations and flux from acquired detector counts.
+- Add an Open in Molab link for that exact source. State units, seeds, backend
+  and scientific assumptions visibly; distinguish Monte Carlo sample counts
+  from physical populations and flux from acquired detector counts. Do not add
+  hidden provenance cells or separate JSON manifests to tutorials.
 - Mark quantum/channeling and other experimental science with API admission
   boundaries and physical validation limitations, without implying sign-off.
-- Ensure a standard Sphinx build consumes precomputed outputs only; CUDA and
-  expensive Monte Carlo regenerate explicitly, not in CI docs rendering.
+- HTML Sphinx builds execute each tutorial once on CPU and write disposable
+  HTML under `docs/_build/`. Never commit HTML, figures, sessions or provenance
+  manifests. Keep notebook sources output-free; builds never rewrite them or
+  synchronize release pins. Use a suitably provisioned worker for full builds.
 - Cross-link related how-to, API, Physics and Validation pages instead of
   turning the notebook into a manual.
 
-Validate with `uv run marimo check <notebook.py>` and #758's source/output
-freshness and public-import checks when that infrastructure lands; run
+Validate with `uv run marimo check <notebook.py>` and the focused source,
+public-import and scientific checks; run
 `uv run pyrite-dev docs`. Use `uv run pyrite-dev sync-skills` and
 `uv run pyrite-dev check-skills` if this canonical skill changes.

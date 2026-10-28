@@ -12,10 +12,8 @@ These are **captured outputs**; edit and recompute in Molab or local marimo.
 </iframe>
 ```
 
-[Open captured notebook full screen](../../_static/notebooks/08-parameter-sweeps.html) ·
-[Captured response surface](../../_static/notebooks/08-parameter-sweeps-1.png).
-{download}`Download canonical notebook <../08-parameter-sweeps.py>` ·
-{download}`Execution provenance <../outputs/08-parameter-sweeps.json>`.
+<a href="../../_static/notebooks/08-parameter-sweeps.html">Open captured notebook full screen</a>.
+{download}`Download canonical notebook <../08-parameter-sweeps.py>`.
 
 ## Continue learning
 

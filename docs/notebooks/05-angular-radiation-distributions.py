@@ -169,26 +169,5 @@ def _(mo):
     return
 
 
-@app.cell(hide_code=True)
-def _(mo, np, pyrite, source):
-    tutorial_provenance = {
-        "tutorial": "05-angular-radiation-distributions",
-        "pyrite_version": pyrite.__version__,
-        "backend": source.provenance["backend"],
-        "seed": source.case["seed"],
-        "table_identity": dict(source.provenance["xsgen_tables"]),
-        "source_identity": source.provenance["identity_digest"],
-        "component": source.component,
-        "current_nA": source.current_na,
-        "energy_bounds_eV": [float(source.energy_eV[0]), float(source.energy_eV[-1])],
-        "angles": int(source.angle_deg.size),
-        "supported": int(np.count_nonzero(source.supported)),
-        "sampled_cxr_histories": int(source.case["Ne"]),
-    }
-    # Preserve machine-readable export metadata without displaying it to readers.
-    mo.json(tutorial_provenance).style({"display": "none"})
-    return
-
-
 if __name__ == "__main__":
     app.run()

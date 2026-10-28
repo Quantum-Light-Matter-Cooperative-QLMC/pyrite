@@ -70,7 +70,7 @@ their audience, rather than additional tutorials or interface specifications.
 
 | Pages | Primary mode and audience | Canonical owner |
 | --- | --- | --- |
-| `notebooks/fundamentals/`, `notebooks/designing/` | Tutorial; learners | [Interactive Tutorials](../notebooks/index.md); executable sources and captures stay with the tutorial workflow. |
+| `notebooks/fundamentals/`, `notebooks/designing/` | Tutorial; learners | [Interactive Tutorials](../notebooks/index.md); executable sources own the tutorial; HTML is disposable build output. |
 | `guides/getting-started.md`, `guides/python-api-workflow.md` | Entry point and how-to; new users | [Getting Started](../guides/getting-started.md); link to the first notebook for guided Python learning. |
 | `guides/configuration-cookbook.md`, `guides/configuration-notebook.md` | How-to; campaign authors | [How-to Guides](../guides/index.md); fields and editor behavior belong in [configuration reference](../reference/configuration/index.md). |
 | `guides/directional-source-heatmap.md`, `guides/detector-observations.md`, `guides/working-with-results.md` | How-to; simulation and analysis users | [How-to Guides](../guides/index.md); link to notebooks for learning and reference for complete contracts. |
@@ -295,7 +295,7 @@ Before review, run:
 pyrite-dev docs
 ```
 
-This removes generated doctrees and autosummary stubs and performs the canonical offline warnings-as-errors documentation build.
+This removes generated doctrees and autosummary stubs and performs the canonical warnings-as-errors documentation build. The HTML build executes the tutorial notebooks on CPU and may fetch missing reference tables; install the tables beforehand for an offline build.
 
 To additionally check external links, run:
 
@@ -485,69 +485,50 @@ property. Metadata and indexing requests do not guarantee search ranking;
 retain useful API and validation pages in search.
 
 
-## Interactive notebook captures
+## Interactive notebook builds
 
-Canonical tutorial notebooks live in `docs/notebooks/`, independently of
-`pyrite.apps`. Their documentation pages embed normal marimo static HTML and
-include the same `.py` source. Follow this page's authoring policy and the
-repository's tutorial-authoring guidance when available. Keep conceptual
-explanation, task recipes, interface contracts and validation evidence at their
-existing canonical owners; link to them from the learning sequence.
+Canonical tutorials live in `docs/notebooks/*.py`, independently of
+`pyrite.apps`. Their documentation pages embed static HTML exported from the
+same source used by local marimo and Molab. Keep units, seeds, model assumptions
+and scientific limitations in the visible notebook; use the physics and
+validation pages for formal evidence. Tutorials do not maintain separate
+provenance manifests, hidden metadata cells or committed output snapshots.
 
-Install the docs dependency group and fetch/verify reference tables once before
-executing a transport notebook. Run each notebook locally with
-`uv run marimo edit docs/notebooks/01-first-spectrum.py`, or open its
-notebook-specific Molab badge on its RTD page. Place the badge immediately after
-the RTD page title; keep it out of the notebook source. Inline dependency metadata
-pins the PyRITE release for standalone/Molab execution; checkout captures use the current project.
-The explicit `--regenerate-notebook NAME` command first synchronizes that
-notebook's inline `pyrite-mc` pin and any installation examples with the version
-in `pyproject.toml`. Source, session, figure and manifest must be committed
-together. Normal docs builds and `--check-notebooks` never change sources.
-The first cell of each notebook calls `pyrite.fetch_tables()` immediately after
-import, installing missing pinned tables before simulation. A complete install
-returns without network access. This runs only during explicit capture, local
-marimo or Molab execution, **not** during Sphinx builds; a fresh hosted session
-may need network access to acquire tables.
+An HTML Sphinx build executes each tutorial once on CPU with
+`marimo export html --include-code --no-sandbox`. Exports go directly to
+`docs/_build/html/_static/notebooks/`. Temporary copies of the sources keep
+marimo's session caches out of the source tree. HTML and session files are
+untracked, and the build never rewrites sources or synchronizes release pins.
+Export failures fail the documentation build. Tutorial embeds and full-screen
+links use raw HTML because their targets exist only in the build output, not as
+source-tree documents for MyST to resolve. Non-HTML builders validate the
+source and links without executing tutorials. The separate browser-only results
+demo retains its existing WASM export.
 
-Regenerate every registered tutorial on CPU with `pyrite-dev notebooks`. The
-command provisions the docs dependency group, synchronizes version pins and
-executes each notebook sequentially, stopping on the first failure. `verify`
-runs this regeneration before its Sphinx build, so it refreshes captured files
-and needs the CPU runtime/reference tables. `pyrite-dev docs` itself remains
-capture-only. Use `--check` for read-only freshness/import/badge validation, or
-the lower-level single-notebook command for a targeted refresh:
+Install the docs dependency group and fetch the reference tables before an
+offline build. Notebook startup fetches any missing tables for local/Molab users;
+a complete install returns without network access. Full tutorial builds can use
+substantial CPU time and memory: run them on a suitably provisioned worker.
+Do not reduce scientific settings just to fit a documentation host.
+
+Use the notebook-specific Molab badge or run locally:
 
 ```bash
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run --group docs python docs/_tutorials.py \
-  --regenerate-notebook 01-first-spectrum
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev notebooks
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev notebooks --check
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run marimo edit docs/notebooks/01-first-spectrum.py
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run marimo check docs/notebooks/*.py
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev docs
 ```
 
-The exporter first runs marimo's structure check, then its session and normal
-HTML exports (both execute the same notebook). Both exports and the Sphinx
-browser-demo export pass `--no-sandbox`, using the current project environment
-without inline-dependency sandbox prompts. The WASM demo retains its inline
-browser dependencies and Pyodide runtime; `--no-sandbox` only disables the local
-export-time environment prompt. Its frontend assets, worker directory and
-`public/` data remain part of the RTD export. The exporter includes source code,
-extracts PNG fallback figures from the captured session, and records source/exporter and
-artifact digests, Git revision/dirty state, Python/PyRITE versions, backend,
-resolved seeds and table identities. Commit source, HTML, session, figure and
-manifest together. Review the figures and provenance; freshness hashes establish
-source/artifact correspondence, not scientific validity. A dirty capture records
-the pre-commit revision together with the exact notebook digest.
+Place each badge immediately after its RTD page title, outside the notebook
+source. Keep standalone/Molab dependencies in inline script metadata; update
+release pins deliberately when testing against a newer release. Checkout builds
+use the project environment. A badge targeting `main` becomes launchable after
+its source is merged; do not claim a live Molab session was checked from an
+unpublished branch.
 
-Sphinx only validates and copies these committed captures. It never executes the
-scientific notebooks or fetches their reference tables. CI's documentation build
-therefore rejects stale source/artifact digests and unsupported imports without
-requiring a GPU. Focused tutorial tests additionally check capture contents and a
-small deterministic CPU notebook. Transport smoke execution belongs in explicit
-capture regeneration, not the documentation build. Large/GPU examples need an
-explicit remote regeneration process; do not add them to this CPU exporter.
-
-Check the notebook-specific Molab path and inline dependencies before publishing.
-A badge targeting `main` becomes launchable after its source is merged; do not
-claim that a live Molab session was checked from an unpublished branch.
+`verify` runs the docs build once alongside the repository checks; there is no
+separate notebook regeneration step or output-freshness gate. Focused tests
+cover source/import contracts, navigation, export failures and scientific
+behavior without comparing generated provenance or artifact hashes. Review
+rendered figures and scientific limitations when changing a tutorial; successful
+export alone does not establish physical validity.

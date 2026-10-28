@@ -256,42 +256,5 @@ def _(mo):
     return
 
 
-@app.cell(hide_code=True)
-def _(
-    acceptance_sr,
-    band_eV,
-    current_nA,
-    cxr_rate_sr,
-    cxr_yield_per_electron_sr,
-    mo,
-    pyrite,
-    result,
-):
-    band_summary = {
-        "band_eV": list(band_eV),
-        "mean_current_nA": current_nA,
-        "sampled_cxr_histories": 8_192,
-        "accepted_solid_angle_sr": acceptance_sr,
-        "cxr_yield_photons_per_electron_sr": cxr_yield_per_electron_sr,
-        "cxr_rate_photons_per_s_sr": cxr_rate_sr,
-        "cxr_rate_into_acceptance_photons_per_s": cxr_rate_sr * acceptance_sr,
-    }
-    tutorial_provenance = {
-        "tutorial": "02-understanding-results",
-        "pyrite_version": pyrite.__version__,
-        "backend": result.provenance["backend"],
-        "seed": result.case["seed"],
-        "table_identity": dict(result.provenance["xsgen_tables"]),
-        "source_identity": result.provenance["identity_digest"],
-        "band_eV": band_summary["band_eV"],
-        "mean_current_nA": band_summary["mean_current_nA"],
-        "accepted_solid_angle_sr": band_summary["accepted_solid_angle_sr"],
-        "sampled_cxr_histories": band_summary["sampled_cxr_histories"],
-    }
-    # Preserve machine-readable export metadata without displaying it to readers.
-    mo.json(tutorial_provenance).style({"display": "none"})
-    return
-
-
 if __name__ == "__main__":
     app.run()

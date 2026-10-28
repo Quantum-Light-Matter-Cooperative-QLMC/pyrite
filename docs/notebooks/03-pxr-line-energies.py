@@ -137,24 +137,5 @@ def _(mo):
     return
 
 
-@app.cell(hide_code=True)
-def _(catalog, hkl, mo, pyrite):
-    import hashlib
-
-    tutorial_provenance = {
-        "tutorial": "03-pxr-line-energies",
-        "pyrite_version": pyrite.__version__,
-        "backend": "cpu",
-        "seed": None,
-        "table_identity": "not used: deterministic catalog geometry only",
-        "material": "hopg",
-        "hkl": list(hkl),
-        "catalog_cif_sha256": hashlib.sha256(catalog.crystals["hopg"].cif.read_bytes()).hexdigest(),
-    }
-    # Preserve machine-readable export metadata without displaying it to readers.
-    mo.json(tutorial_provenance).style({"display": "none"})
-    return
-
-
 if __name__ == "__main__":
     app.run()

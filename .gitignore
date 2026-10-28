@@ -294,9 +294,6 @@ scripts/user_scripts/set_qlmc_ace_remote.sh
 !src/pyrite/_assets/branding/*.png
 !src/pyrite/_assets/branding/head.html
 
-# Checked documentation notebooks: single-source HTML/session captures.
-!docs/_static/notebooks/*.html
-!docs/_static/notebooks/*.png
-!docs/notebooks/__marimo__/
-!docs/notebooks/__marimo__/session/
-!docs/notebooks/__marimo__/session/*.py.json
+# Tutorial HTML, sessions and other generated outputs are disposable.
+/docs/_static/notebooks/
+/docs/notebooks/outputs/

@@ -5,12 +5,13 @@ Fundamentals: verify your environment, simulate a spectrum, interpret its
 results and predict line energies. Each notebook stands alone and uses the
 public Python API.
 
-The pages show **captured outputs**, including code and figures from the same
+The docs build executes each notebook and embeds its **static output**, including
+code and figures from the same
 canonical `.py` file used by Molab and local marimo. Static pages need no Python
 kernel or GPU. Recompute and edit in Molab or a local marimo session; static
 controls cannot rerun simulations. The HTML viewer loads marimo frontend assets
-from a CDN; source downloads and captured figure links remain available if it
-cannot load.
+from a CDN; the canonical source downloads remain available if it cannot load.
+Generated HTML is a build artifact and is not committed to the repository.
 
 ```{toctree}
 :maxdepth: 2

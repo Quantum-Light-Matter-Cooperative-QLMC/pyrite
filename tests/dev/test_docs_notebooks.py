@@ -1,8 +1,7 @@
-"""Executable tutorial sources and captured outputs stay one scientific example."""
+"""Tutorial sources, public imports, navigation and disposable HTML export."""
 
 import ast
 import importlib.util
-import json
 import tomllib
 from pathlib import Path
 
@@ -110,69 +109,6 @@ def notebooks():
     return module
 
 
-def test_all_captures_render_without_execution(notebooks, monkeypatch):
-    def forbidden(*args, **kwargs):
-        pytest.fail("checking captures must not execute notebooks, transport, or downloads")
-
-    monkeypatch.setattr(notebooks.subprocess, "run", forbidden)
-    monkeypatch.setattr(notebooks.subprocess, "check_output", forbidden)
-    notebooks.check_all()
-    for name, count in notebooks.NOTEBOOK_FIGURES.items():
-        data = notebooks.checked_notebook(name)
-        assert len(data["git_revision"]) == 40
-        assert data["execution"]["backend"] == "cpu"
-        _, session = notebooks.read_session(
-            DOCS / "notebooks" / "__marimo__" / "session" / f"{name}.py.json"
-        )
-        assert len(session.figures) == count
-        if count:
-            assert session.figures[0].startswith(b"\x89PNG\r\n\x1a\n")
-
-
-def test_combined_setup_capture_shows_environment_and_figure_with_hidden_provenance(notebooks):
-    session, capture = notebooks.read_session(
-        DOCS / "notebooks" / "__marimo__" / "session" / "01-first-spectrum.py.json"
-    )
-    assert capture.provenance["tutorial"] == "01-first-spectrum"
-    assert len(capture.figures) == 1
-    html = [
-        value
-        for cell in session["cells"]
-        for output in cell["outputs"]
-        for mime, value in output.get("data", {}).items()
-        if mime == "text/html"
-    ]
-    summary = next(value for value in html if "selected_backend" in value)
-    provenance = next(value for value in html if "source_identity" in value)
-    assert "cupy_installed" in summary
-    assert "display:none" not in summary.replace(" ", "")
-    assert "display:none" in provenance.replace(" ", "")
-    assert not (DOCS / "notebooks" / "00-setup.py").exists()
-    legacy_page = (DOCS / "notebooks" / "fundamentals" / "00-setup.md").read_text()
-    assert "(01-first-spectrum.md)" in legacy_page
-
-
-def test_changed_source_and_capture_are_rejected(notebooks, monkeypatch, tmp_path):
-    import shutil
-
-    shutil.copytree(DOCS / "notebooks", tmp_path / "docs" / "notebooks")
-    shutil.copytree(DOCS / "_static" / "notebooks", tmp_path / "docs" / "_static" / "notebooks")
-    shutil.copyfile(DOCS.parent / "api-surface.toml", tmp_path / "api-surface.toml")
-    shutil.copyfile(DOCS.parent / "pyproject.toml", tmp_path / "pyproject.toml")
-    monkeypatch.setattr(notebooks, "DOCS", tmp_path / "docs")
-    monkeypatch.setattr(notebooks, "NOTEBOOKS", tmp_path / "docs" / "notebooks")
-    source = tmp_path / "docs" / "notebooks" / "01-first-spectrum.py"
-    original = source.read_text()
-    source.write_text(original + "\n# changed source\n")
-    with pytest.raises(ValueError, match="stale notebook output"):
-        notebooks.checked_notebook("01-first-spectrum")
-    source.write_text(original)
-    capture = tmp_path / "docs" / "_static" / "notebooks" / "01-first-spectrum.html"
-    capture.write_text("corrupt output")
-    with pytest.raises(ValueError, match="stale notebook artifact"):
-        notebooks.checked_notebook("01-first-spectrum")
-
-
 @pytest.mark.parametrize(
     "import_statement",
     [
@@ -206,15 +142,15 @@ def test_notebook_links_source_and_navigation_agree(notebooks):
     # Raw iframe URLs bypass Sphinx's download-link rewriting.
     assert 'html_static_path = ["_static"]' in (DOCS / "conf.py").read_text()
     group = (DOCS / "notebooks" / "fundamentals" / "index.md").read_text()
-    for name in notebooks.NOTEBOOK_FIGURES:
-        source = DOCS / "notebooks" / f"{name}.py"
-        page = (DOCS / "notebooks" / "fundamentals" / f"{name}.md").read_text()
+    for source in sorted(notebooks.NOTEBOOKS.glob("*.py")):
+        name = source.stem
+        (page,) = notebooks.NOTEBOOKS.glob(f"*/{name}.md")
+        group = (page.parent / "index.md").read_text()
+        text = page.read_text()
         assert name in group
-        assert "molab-shield.svg" not in source.read_text()
-        assert notebooks.MOLAB + source.name in page
-        assert f"{{literalinclude}} ../{source.name}" in page
-        assert f"../../_static/notebooks/{name}.html" in page
-        assert f"../outputs/{name}.json" in page
+        assert f"{{literalinclude}} ../{name}.py" in text
+        assert notebooks.MOLAB + source.name in text
+        assert f"../../_static/notebooks/{name}.html" in text
 
 
 def test_all_badges_follow_rtd_titles_only(notebooks):
@@ -242,29 +178,6 @@ def test_badge_placement_is_validated(notebooks, monkeypatch, tmp_path, placemen
         notebooks.validate_source(source)
 
 
-def test_failed_or_incomplete_sessions_are_rejected(notebooks, tmp_path):
-    path = tmp_path / "failed.py.json"
-    path.write_text(json.dumps({"cells": [{"outputs": [{"type": "error", "evalue": "failed"}]}]}))
-    with pytest.raises(ValueError, match="failed notebook cell"):
-        notebooks.read_session(path)
-
-
-def test_notebook_exports_explicitly_decline_sandbox_prompts(notebooks, monkeypatch):
-    calls = []
-
-    def export(command, **kwargs):
-        calls.append(command)
-        if "export" in command:
-            assert "--no-sandbox" in command
-        if "html" in command:
-            raise RuntimeError("stop before promoting mocked captures")
-
-    monkeypatch.setattr(notebooks.subprocess, "run", export)
-    with pytest.raises(RuntimeError, match="stop before promoting"):
-        notebooks.regenerate("03-pxr-line-energies")
-    assert len(calls) == 3
-
-
 def test_line_energy_notebook_cpu_smoke(monkeypatch):
     monkeypatch.setenv("PYRITE_MC_BACKEND", "cpu")
     monkeypatch.setenv("MPLBACKEND", "Agg")
@@ -283,7 +196,75 @@ def test_line_energy_notebook_cpu_smoke(monkeypatch):
     # Same basal Friedel pair: doubling Miller order doubles the vacuum resonance.
     first_order = definitions["tilting_lines_eV"][1]
     assert definitions["second_order_eV"] == pytest.approx(2 * first_order)
-    assert definitions["tutorial_provenance"]["seed"] is None
     import matplotlib.pyplot as plt
 
     plt.close("all")
+
+
+@pytest.mark.parametrize("builder", ["html", "linkcheck"])
+def test_notebook_export_writes_only_disposable_html(notebooks, monkeypatch, tmp_path, builder):
+    from types import SimpleNamespace
+
+    docs = tmp_path / "docs"
+    sources = docs / "notebooks"
+    sources.mkdir(parents=True)
+    originals = {"first.py": "# first\n", "second.py": "# second\n"}
+    for name, content in originals.items():
+        (sources / name).write_text(content)
+    monkeypatch.setattr(notebooks, "DOCS", docs)
+    monkeypatch.setattr(notebooks, "NOTEBOOKS", sources)
+    validated = []
+    monkeypatch.setattr(notebooks, "validate_source", lambda path: validated.append(path.name))
+    calls = []
+    outdir = docs / "_build" / builder
+
+    def export(command, **kwargs):
+        calls.append(command)
+        assert kwargs["check"] is True
+        assert kwargs["env"]["PYRITE_MC_BACKEND"] == "cpu"
+        assert kwargs["env"]["PYRITE_MC_TRANSPORT_INITIAL_MAX_STEPS"] == "128"
+        if "export" not in command:
+            assert command[3] == "check"
+            return
+        assert "html" in command and "session" not in command
+        assert "--no-sandbox" in command and "--include-code" in command
+        staged = Path(command[5])
+        assert staged.parent != sources
+        assert staged.read_text() == originals[staged.name]
+        destination = Path(command[command.index("-o") + 1])
+        assert destination.parent == outdir / "_static/notebooks"
+        destination.write_text("<html>executed notebook</html>")
+        # A session written by marimo stays beside the temporary source.
+        (staged.parent / "__marimo__").mkdir(exist_ok=True)
+
+    monkeypatch.setattr(notebooks.subprocess, "run", export)
+    app = SimpleNamespace(builder=SimpleNamespace(format=builder), outdir=outdir)
+    notebooks.export_notebooks(app)
+    assert validated == list(originals)
+    assert len(calls) == (3 if builder == "html" else 0)
+    for name, content in originals.items():
+        assert (sources / name).read_text() == content
+    assert sorted(path.name for path in sources.iterdir()) == list(originals)
+    if builder == "html":
+        assert sorted(path.name for path in (outdir / "_static/notebooks").iterdir()) == [
+            "first.html",
+            "second.html",
+        ]
+
+
+def test_notebook_export_failure_fails_build(notebooks, monkeypatch, tmp_path):
+    import subprocess
+    from types import SimpleNamespace
+
+    monkeypatch.setattr(notebooks, "NOTEBOOKS", tmp_path)
+    (tmp_path / "example.py").write_text("# source\n")
+    monkeypatch.setattr(notebooks, "validate_source", lambda path: None)
+
+    def fail(command, **kwargs):
+        if "export" in command:
+            raise subprocess.CalledProcessError(1, command)
+
+    monkeypatch.setattr(notebooks.subprocess, "run", fail)
+    app = SimpleNamespace(builder=SimpleNamespace(format="html"), outdir=tmp_path / "_build")
+    with pytest.raises(subprocess.CalledProcessError):
+        notebooks.export_notebooks(app)

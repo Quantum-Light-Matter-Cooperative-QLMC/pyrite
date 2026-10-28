@@ -327,33 +327,5 @@ def _(mo):
     return
 
 
-@app.cell(hide_code=True)
-def _(
-    adaptive_result,
-    adaptive_row,
-    band_eV,
-    fixed_rows,
-    mo,
-    pyrite,
-    stopping_diagnostics,
-):
-    tutorial_provenance = {
-        "tutorial": "07-sampling-convergence-performance",
-        "pyrite_version": pyrite.__version__,
-        "backend": adaptive_result.provenance["backend"],
-        "seed": adaptive_result.case["seed"],
-        "table_identity": dict(adaptive_result.provenance["xsgen_tables"]),
-        "source_identity": adaptive_result.provenance["identity_digest"],
-        "band_eV": list(band_eV),
-        "fixed_runs": fixed_rows,
-        "adaptive_run": adaptive_row,
-        "adaptive_stopping_diagnostics": stopping_diagnostics,
-        "physics": "pxr-cbs only; brem scoring disabled",
-        "timing": "perf_counter, local wall seconds, after one untimed warmup",
-    }
-    mo.json(tutorial_provenance).style({"display": "none"})
-    return
-
-
 if __name__ == "__main__":
     app.run()
