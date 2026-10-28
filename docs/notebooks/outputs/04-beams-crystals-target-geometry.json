@@ -1,0 +1,37 @@
+{
+  "schema": "pyrite.marimo-tutorial.v1",
+  "source_sha256": "b5c38aa946ade925d00f2ea333261e228536c0aeb9acdbd04dcbc5ed45fb55b6",
+  "exporter_sha256": "6eedb7b2d84c7c81cfe4bb58c476c02676f6fd3a5784f844f613efe30412ab24",
+  "git_revision": "874ea108df36c2aaf3624f9a143690e62ca8dca3",
+  "git_dirty": true,
+  "python_version": "3.14.4",
+  "execution": {
+    "tutorial": "04-beams-crystals-target-geometry",
+    "pyrite_version": "0.22.4",
+    "backend": "cpu",
+    "seed": 1,
+    "table_identity": {
+      "918b1a9013e4c19c584e2cf4eb8b605f0063a7237b8b0d67749867a4c6804832": "c3f8eab1f03c1c66cfe0355b68f312e0ca450cbacaabe4f72eebecefe8d1e08d",
+      "ea7657ec94db1acf9f16cb260a5b107c3d2a4ecc71e43facee0e6a845487cbeb": "beed169ba64a48fd11dc8c5a7bb81471abaa21806bde7943dba6da43e5b01b6f",
+      "44461d55c05a7fea30a0f52bceb2aa384d6b71c1e12765da576b5cbc2592dbe3": "3f32446ff553a97b14755b475c4d88287ff44eff2ffce0cdd790dbd9b40a83f2",
+      "dfea6d21d4f6196cb74ef19486b6d86f6f5af40e89d7241efe09507a3b982e85": "61fb7f4cf6dceab2a4d10c5fc641357d80b0ba6bbe037b64dd000e08f024acd9"
+    },
+    "source_identity": "03921d216b005088661347e23ea5263f7fbe95eaa49a1197e4c863419d42a406",
+    "beam_energy_keV": 30.0,
+    "spot_fwhm_x_mm": 0.45,
+    "material": "hopg",
+    "thickness_ang": 1000.0,
+    "cut_beam_uvw": [
+      0,
+      0,
+      2
+    ],
+    "sampled_cxr_histories": 2048
+  },
+  "artifacts": {
+    "notebooks/__marimo__/session/04-beams-crystals-target-geometry.py.json": "1777ab023744810d20247505a94e0a15823197eef3f6658291a43bfbf2518269",
+    "_static/notebooks/04-beams-crystals-target-geometry.html": "4242bdbc3fff22a667f4e6f266e1d6baa4eb9ed1be18a2acebee78ef877da94e",
+    "_static/notebooks/04-beams-crystals-target-geometry-1.png": "efa97a91fa2f491690b21acf75604b4c1972653890a758be5b3f54ba921c7aaa",
+    "_static/notebooks/04-beams-crystals-target-geometry-2.png": "28e5a5c46c40cf56f410399053141e6c25f5c32da94a475048b8b6f766dd09ab"
+  }
+}

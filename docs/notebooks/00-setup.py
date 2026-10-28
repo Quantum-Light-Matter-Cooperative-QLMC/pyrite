@@ -20,6 +20,7 @@ def _():
     import numpy as np
 
     import pyrite
+    pyrite.fetch_tables()  # Fetch missing pinned tables once; reuse installed data.
 
     return mo, np, os, plt, pyrite
 
@@ -45,7 +46,7 @@ def _(mo):
 
     ```bash
     uv venv --python 3.13
-    uv pip install 'pyrite-mc[apps]==0.22.3'
+    uv pip install 'pyrite-mc[apps]==0.22.4'
     uv run pyrite tables fetch
     uv run pyrite tables verify
     uv run marimo edit docs/notebooks/00-setup.py
@@ -53,19 +54,20 @@ def _(mo):
 
     The reference data download is about 100 MB. Fetch verifies archive SHA-256
     before installation; `tables verify` checks installed pins and payloads.
-    Keep these explicit setup commands outside notebook execution: opening this
-    notebook never downloads reference tables automatically. If the smoke run
-    reports missing data, run fetch/verify in a terminal in this same environment.
+    The setup cell calls `pyrite.fetch_tables()` to install missing pinned tables
+    automatically. Complete installations are reused without a network request.
+    The CLI commands above remain useful for manual verification or troubleshooting.
     See the [tables reference](https://pyrite.readthedocs.io/en/latest/repo-design/cli/cli-reference-tables.html).
 
     **Molab:** open the badge above; its inline dependency manifest installs the
-    CPU environment. Open Molab's terminal to run `pyrite tables fetch` followed by
-    `pyrite tables verify`. Start with CPU. If your Molab session offers an NVIDIA
-    RTX Pro 6000, select that GPU in Molab, then install the NVIDIA extra into the
+    CPU environment. The first cell fetches missing tables automatically; you can
+    run `pyrite tables verify` in Molab's terminal. Start with CPU. If your Molab
+    session offers an NVIDIA RTX Pro 6000, select that GPU in Molab, then install
+    the NVIDIA extra into the
     same environment:
 
     ```bash
-    uv pip install 'pyrite-mc[nvidia]==0.22.3'
+    uv pip install 'pyrite-mc[nvidia]==0.22.4'
     nvidia-smi
     ```
 

@@ -112,6 +112,10 @@ def test_line_energy_notebook_cpu_smoke(monkeypatch):
     spec = importlib.util.spec_from_file_location("line_energy_notebook", path)
     notebook = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(notebook)
+    # Notebook startup fetches data for users, but unit tests must stay offline.
+    import pyrite
+
+    monkeypatch.setattr(pyrite, "fetch_tables", lambda: [])
     _, definitions = notebook.app.run()
     energies = definitions["energy_lines_eV"]
     assert energies.shape == (3, 131)

@@ -461,7 +461,15 @@ executing a transport notebook. Run each notebook locally with
 `uv run marimo edit docs/notebooks/01-first-spectrum.py`, or open its
 notebook-specific Molab badge. Inline dependency metadata pins the PyRITE release
 for standalone/Molab execution; checkout captures use the current project.
-After a release/API change, deliberately update those pins before recapturing.
+The explicit `--regenerate-notebook NAME` command first synchronizes that
+notebook's inline `pyrite-mc` pin and any installation examples with the version
+in `pyproject.toml`. Source, session, figure and manifest must be committed
+together. Normal docs builds and `--check-notebooks` never change sources.
+The first cell of each notebook calls `pyrite.fetch_tables()` immediately after
+import, installing missing pinned tables before simulation. A complete install
+returns without network access. This runs only during explicit capture, local
+marimo or Molab execution, **not** during Sphinx builds; a fresh hosted session
+may need network access to acquire tables.
 
 Regeneration is explicit and executes the canonical notebook on CPU:
 

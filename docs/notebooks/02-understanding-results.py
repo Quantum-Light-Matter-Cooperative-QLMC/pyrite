@@ -20,6 +20,7 @@ def _():
     import numpy as np
 
     import pyrite
+    pyrite.fetch_tables()  # Fetch missing pinned tables once; reuse installed data.
 
     return mo, np, plt, pyrite
 
