@@ -2,7 +2,7 @@
   "version": "1",
   "metadata": {
     "marimo_version": "0.25.2",
-    "script_metadata_hash": "fce36330dca2f57e525c313d03f49ab3"
+    "script_metadata_hash": "de80b48a2ab3ad86fc2e852f64d79b8d"
   },
   "cells": [
     {
@@ -12,7 +12,7 @@
         {
           "type": "data",
           "data": {
-            "text/html": "<div style='display: flex;flex: 1;flex-direction: column;justify-content: flex-start;align-items: normal;flex-wrap: nowrap;gap: 0.5rem'><marimo-ui-element object-id='Hbol-0' random-id='16efe2e9-8952-0748-6f70-1a5e5ab1eed6'><marimo-anywidget data-initial-value='{&quot;model_id&quot;:&quot;484fefbe2ba2484a94ba42ac4862f1d9&quot;}' data-label='null' data-model-id='&quot;484fefbe2ba2484a94ba42ac4862f1d9&quot;'></marimo-anywidget></marimo-ui-element></div>"
+            "text/html": "<div style='display: flex;flex: 1;flex-direction: column;justify-content: flex-start;align-items: normal;flex-wrap: nowrap;gap: 0.5rem'><marimo-ui-element object-id='Hbol-0' random-id='fd9d52c6-54e0-3948-babe-fac325cbabef'><marimo-anywidget data-initial-value='{&quot;model_id&quot;:&quot;d679d729f52446c1b62262ee157d9769&quot;}' data-label='null' data-model-id='&quot;d679d729f52446c1b62262ee157d9769&quot;'></marimo-anywidget></marimo-ui-element></div>"
           }
         }
       ],
@@ -131,12 +131,12 @@
     },
     {
       "id": "RGSE",
-      "code_hash": "165b61081b00df14ba85cfa03450d20c",
+      "code_hash": "443921dff027eb3bcb88b85f50f545d8",
       "outputs": [
         {
           "type": "data",
           "data": {
-            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"interpretation\">Interpretation</h2>\n<span class=\"paragraph\">PXR and CBS are combined here because their amplitudes interfere. Their line\nstructure differs from the broad bremsstrahlung continuum. Plot each component\non its <strong>native photon-energy grid</strong>; adding array entries by index would mix\ndifferent energies. The vertical axis is source spectral density per incident\nelectron, per eV, per steradian: it is neither physical beam flux nor acquired\ncounts. Low history counts can leave noisy features and empty bins.</span>\n<span class=\"paragraph\">Try doubling the history counts, then change only the target thickness. Keep a\nrecord of the resolved seed when comparing configurations; different backends need not produce\nidentical random trajectories. Notebook 02 will develop results/flux analysis;\nuntil then use the <a href=\"https://pyrite.readthedocs.io/en/latest/guides/working-with-results.html\" rel=\"noopener noreferrer\" target=\"_blank\">results how-to</a>.\nContinue with notebook 03 to predict vacuum line energies. See\n<a href=\"https://pyrite.readthedocs.io/en/latest/physics/capabilities.html\" rel=\"noopener noreferrer\" target=\"_blank\">model limitations</a>\nand <a href=\"https://pyrite.readthedocs.io/en/latest/validation/status-summary.html\" rel=\"noopener noreferrer\" target=\"_blank\">validation status</a>\nbefore interpreting these small-sample results quantitatively.</span></span>"
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"interpretation\">Interpretation</h2>\n<span class=\"paragraph\">PXR and CBS are combined here because their amplitudes interfere. Their line\nstructure differs from the broad bremsstrahlung continuum. Plot each component\non its <strong>native photon-energy grid</strong>; adding array entries by index would mix\ndifferent energies. The vertical axis is source spectral density per incident\nelectron, per eV, per steradian: it is neither physical beam flux nor acquired\ncounts. Low history counts can leave noisy features and empty bins.</span>\n<span class=\"paragraph\">Try doubling the history counts, then change only the target thickness. Keep a\nrecord of the resolved seed when comparing configurations; different backends need not produce\nidentical random trajectories. Continue to notebook 02 to separate source\nyields from beam-current-scaled photon rates. Notebook 03 predicts vacuum line\nenergies; the <a href=\"https://pyrite.readthedocs.io/en/latest/guides/working-with-results.html\" rel=\"noopener noreferrer\" target=\"_blank\">results how-to</a>\ncovers saved checkpoints. See\n<a href=\"https://pyrite.readthedocs.io/en/latest/physics/capabilities.html\" rel=\"noopener noreferrer\" target=\"_blank\">model limitations</a>\nand <a href=\"https://pyrite.readthedocs.io/en/latest/validation/status-summary.html\" rel=\"noopener noreferrer\" target=\"_blank\">validation status</a>\nbefore interpreting these small-sample results quantitatively.</span></span>"
           }
         }
       ],
@@ -149,7 +149,7 @@
         {
           "type": "data",
           "data": {
-            "text/html": "<marimo-json-output data-json-data='{&quot;tutorial&quot;:&quot;01-first-spectrum&quot;,&quot;pyrite_version&quot;:&quot;0.22.3&quot;,&quot;backend&quot;:&quot;cpu&quot;,&quot;seed&quot;:1,&quot;table_identity&quot;:{&quot;918b1a9013e4c19c584e2cf4eb8b605f0063a7237b8b0d67749867a4c6804832&quot;:&quot;c3f8eab1f03c1c66cfe0355b68f312e0ca450cbacaabe4f72eebecefe8d1e08d&quot;,&quot;ea7657ec94db1acf9f16cb260a5b107c3d2a4ecc71e43facee0e6a845487cbeb&quot;:&quot;beed169ba64a48fd11dc8c5a7bb81471abaa21806bde7943dba6da43e5b01b6f&quot;,&quot;44461d55c05a7fea30a0f52bceb2aa384d6b71c1e12765da576b5cbc2592dbe3&quot;:&quot;3f32446ff553a97b14755b475c4d88287ff44eff2ffce0cdd790dbd9b40a83f2&quot;,&quot;dfea6d21d4f6196cb74ef19486b6d86f6f5af40e89d7241efe09507a3b982e85&quot;:&quot;61fb7f4cf6dceab2a4d10c5fc641357d80b0ba6bbe037b64dd000e08f024acd9&quot;},&quot;source_identity&quot;:&quot;51de1ede625a02b490a1cf55cf25157c071da685b8214c47e3ab48d43b6ed272&quot;}' data-value-types='&quot;json&quot;'></marimo-json-output>"
+            "text/html": "<marimo-json-output data-json-data='{&quot;tutorial&quot;:&quot;01-first-spectrum&quot;,&quot;pyrite_version&quot;:&quot;0.22.4&quot;,&quot;backend&quot;:&quot;cpu&quot;,&quot;seed&quot;:1,&quot;table_identity&quot;:{&quot;918b1a9013e4c19c584e2cf4eb8b605f0063a7237b8b0d67749867a4c6804832&quot;:&quot;c3f8eab1f03c1c66cfe0355b68f312e0ca450cbacaabe4f72eebecefe8d1e08d&quot;,&quot;ea7657ec94db1acf9f16cb260a5b107c3d2a4ecc71e43facee0e6a845487cbeb&quot;:&quot;beed169ba64a48fd11dc8c5a7bb81471abaa21806bde7943dba6da43e5b01b6f&quot;,&quot;44461d55c05a7fea30a0f52bceb2aa384d6b71c1e12765da576b5cbc2592dbe3&quot;:&quot;3f32446ff553a97b14755b475c4d88287ff44eff2ffce0cdd790dbd9b40a83f2&quot;,&quot;dfea6d21d4f6196cb74ef19486b6d86f6f5af40e89d7241efe09507a3b982e85&quot;:&quot;61fb7f4cf6dceab2a4d10c5fc641357d80b0ba6bbe037b64dd000e08f024acd9&quot;},&quot;source_identity&quot;:&quot;51de1ede625a02b490a1cf55cf25157c071da685b8214c47e3ab48d43b6ed272&quot;}' data-value-types='&quot;json&quot;'></marimo-json-output>"
           }
         }
       ],

@@ -1,8 +1,9 @@
 # Interactive Tutorials
 
 Learn PyRITE through short, executable scientific notebooks. Start with
-Fundamentals: verify your environment, simulate a spectrum, then predict line
-energies. Each notebook stands alone and uses the public Python API.
+Fundamentals: verify your environment, simulate a spectrum, interpret its
+results and predict line energies. Each notebook stands alone and uses the
+public Python API.
 
 The pages show **captured outputs**, including code and figures from the same
 canonical `.py` file used by Molab and local marimo. Static pages need no Python

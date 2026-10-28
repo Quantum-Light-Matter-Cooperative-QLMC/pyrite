@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.13"
-# dependencies = ["marimo>=0.25.1", "pyrite-mc==0.22.3", "matplotlib>=3.11", "numpy>=2"]
+# dependencies = ["marimo>=0.25.1", "pyrite-mc==0.22.4", "matplotlib>=3.11", "numpy>=2"]
 # ///
 
 import marimo
@@ -134,9 +134,10 @@ def _(mo):
 
     Try doubling the history counts, then change only the target thickness. Keep a
     record of the resolved seed when comparing configurations; different backends need not produce
-    identical random trajectories. Notebook 02 will develop results/flux analysis;
-    until then use the [results how-to](https://pyrite.readthedocs.io/en/latest/guides/working-with-results.html).
-    Continue with notebook 03 to predict vacuum line energies. See
+    identical random trajectories. Continue to notebook 02 to separate source
+    yields from beam-current-scaled photon rates. Notebook 03 predicts vacuum line
+    energies; the [results how-to](https://pyrite.readthedocs.io/en/latest/guides/working-with-results.html)
+    covers saved checkpoints. See
     [model limitations](https://pyrite.readthedocs.io/en/latest/physics/capabilities.html)
     and [validation status](https://pyrite.readthedocs.io/en/latest/validation/status-summary.html)
     before interpreting these small-sample results quantitatively.

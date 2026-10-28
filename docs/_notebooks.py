@@ -19,7 +19,12 @@ DOCS = Path(__file__).resolve().parent
 NOTEBOOKS = DOCS / "notebooks"
 STATIC = DOCS / "_static" / "notebooks"
 # Number of primary figures required in each captured session.
-NOTEBOOK_FIGURES = {"00-setup": 0, "01-first-spectrum": 1, "03-pxr-line-energies": 1}
+NOTEBOOK_FIGURES = {
+    "00-setup": 0,
+    "01-first-spectrum": 1,
+    "02-understanding-results": 2,
+    "03-pxr-line-energies": 1,
+}
 MOLAB = "https://molab.marimo.io/github/Quantum-Light-Matter-Cooperative-QLMC/pyrite/blob/main/docs/notebooks/"
 
 
