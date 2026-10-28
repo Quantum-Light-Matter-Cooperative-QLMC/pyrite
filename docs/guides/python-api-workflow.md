@@ -1,46 +1,42 @@
-# Your first Python simulation
+(your-first-python-simulation)=
+# Run one simulation from Python
 
-Simulate 30 keV electrons crossing a 100 nm HOPG target, then plot the
-raw emitted X-ray spectra at 135° to the incident beam.
+Use [Your first X-ray spectrum](../notebooks/fundamentals/01-first-spectrum.md)
+for the guided, editable example and its captured spectrum. The notebook is the
+canonical learning source for constructing a beam, target and detector, running
+`simulate`, and plotting PXR/CBS and bremsstrahlung.
 
-Install `pyrite-mc[plots]` and [fetch the reference tables](getting-started.md#fetch-reference-data).
-This small CPU example uses 32,768 line-scoring and 128 continuum-scoring electron trials;
-first use also compiles CPU kernels. Download {download}`the complete script <../examples/python_api_workflow.py>`
-and run it in your installed environment:
+## Run the notebook locally
+
+Install `pyrite-mc[apps]` and
+[fetch the reference tables](getting-started.md#fetch-reference-data).
+Download the source from the tutorial page, then open it with marimo:
 
 <!-- verify: skip (external shell tools or downloadable Python example) -->
 ```bash
-PYRITE_MC_BACKEND=cpu python python_api_workflow.py
+marimo edit 01-first-spectrum.py
 ```
 
-```{literalinclude} ../examples/python_api_workflow.py
-:language: python
-:lines: 3-
-```
+For a script or existing Python session, use the
+[one-scene recipe](../reference/python-scene-recipes.md#run-one-scene-in-memory).
+`simulate` returns an in-memory `Result`; it does not write a campaign checkpoint.
+To persist a campaign run, follow the [CLI quickstart](getting-started.md).
 
-```{eval-rst}
-.. plot::
-   :alt: Simulated HOPG source spectrum with narrow PXR/CBS peaks and a broad bremsstrahlung continuum.
-   :caption: Actual simulation output, precomputed from the downloadable script.
+## Inspect the source result
 
-   from _tutorials import python_api_workflow
-   python_api_workflow()
-```
+Plot each component against its own photon-energy grid. Source density has
+units **photons/(incident electron · eV · sr)**; beam current, detector response
+and exposure are separate operations. Follow
+[Understanding results](../notebooks/fundamentals/02-understanding-results.md)
+for native grids, integrated yields and rates, and the
+[spectral-observables explanation](../physics/radiation-physics/spectral-observables.md)
+for normalization. Review [model capabilities](../physics/capabilities.md) and
+[validation status](../validation/status-summary.md) before quantitative use.
 
-The narrow PXR/CBS structure sits above a broad bremsstrahlung background.
-The total adds those two components after interpolating bremsstrahlung onto
-the line grid; it excludes characteristic emission.
-The vertical axis is **photons/(incident electron · eV · sr)**: no beam-current,
-solid-angle, exposure or detector-response scaling has been applied. Target
-thickness is in **Å**, beam dimensions in **mm**, and angles in **degrees**.
-`simulate` returns an in-memory result without writing a checkpoint.
-
-Single-scene simulation uses a fixed resolved seed (recorded in `data["seed"]`);
-repeatability also depends on the backend, software and reference tables. The
-{download}`stored output and provenance <../examples/data/python_api_workflow.json>` record
-this example's configuration and identity. Review the
-[capability matrix](../physics/capabilities.md) and
-[validation status](../validation/status-summary.md) for model limitations.
+The earlier fixed CPU calculation remains available as a
+{download}`script <../examples/python_api_workflow.py>` with its
+{download}`stored output and provenance <../examples/data/python_api_workflow.json>`
+for reproduction.
 
 (choose-physical-input-imports)=
 (run-one-scene-in-memory)=

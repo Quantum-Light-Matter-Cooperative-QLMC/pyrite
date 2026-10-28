@@ -2,8 +2,8 @@
 
 The [angular radiation tutorial](../notebooks/designing/05-angular-radiation-distributions.md)
 introduces directional scoring interactively; the
-[heatmap how-to](../guides/directional-source-heatmap.md) reproduces a seeded
-PXR/CBS map. This page owns the reusable source and interactive-app
+[heatmap how-to](../guides/directional-source-heatmap.md) covers choosing and
+computing a map, with the earlier seeded script available for reproduction. This page owns the reusable source and interactive-app
 contracts. The canonical imports are `pyrite.radiation.directional_source` and
 `pyrite.radiation.directional_sources`; both remain **experimental**. See the
 [API reference](../reference/python-api/radiation.md#provisional-directional-source-api) for signatures.

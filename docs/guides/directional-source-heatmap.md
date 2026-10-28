@@ -1,49 +1,45 @@
-# Detector-free directional source heatmaps
+(detector-free-directional-source-heatmaps)=
+# Compute a detector-free directional source map
 
-For the interactive, public-API learning path, start with
-[Angular radiation distributions](../notebooks/designing/05-angular-radiation-distributions.md).
-This guide reproduces a fixed seeded angle–energy map and documents the
-finite-target escape and numerical limits of that example.
+Use [Angular radiation distributions](../notebooks/designing/05-angular-radiation-distributions.md)
+for the guided public-API example, complete source and captured map. Directional
+scoring is **experimental** and reuses one transported electron population for
+all directions.
 
-Map the escaped PXR/CBS spectrum around a silicon film, then compare spectra at
-three observation angles. This **experimental** API scores a detector-free
-angular slice from one shared electron transport.
+## Choose and compute the map
 
-Install `pyrite-mc[plots]` and [fetch the reference tables](getting-started.md#fetch-reference-data).
-Download {download}`the complete script <../examples/directional_source_heatmap.py>`
-and run it in your installed environment:
+1. Define the beam and target. Set the target footprint to the physical sample
+   dimensions when side-face escape matters.
+2. Choose observation angles and an explicit photon-energy point grid. Set
+   equal CXR and bremsstrahlung counts in `FixedSampling` for the shared
+   directional population.
+3. Call `pyrite.radiation.directional_source` for PXR/CBS, or
+   `directional_sources(..., components=...)` for separate supported components.
+4. Plot each returned density on its own angle and energy axes. Retain its
+   support mask, resolved seed and provenance with the result.
+
+The [directional-source reference](../reference/directional-sources.md)
+owns supported component selectors, grids, geometry and API restrictions;
+[generated signatures](../reference/python-api/radiation.md#provisional-directional-source-api)
+cover the calls. The source includes PXR–CBS interference and target absorption;
+it excludes cross-electron coherence, downstream filters, detector acceptance
+and detector response. These are simulated source densities, not measured counts.
+
+To reproduce the earlier fixed seeded CPU map, download
+{download}`directional_source_heatmap.py <../examples/directional_source_heatmap.py>`
+and install `pyrite-mc[plots]` with the
+[reference tables](getting-started.md#fetch-reference-data):
 
 <!-- verify: skip (external shell tools or downloadable Python example) -->
 ```bash
 PYRITE_MC_BACKEND=cpu python directional_source_heatmap.py
 ```
 
-The example uses 4,096 incident electrons, 48 angles and 513 photon energies on
-CPU; first use also compiles kernels. Both sampling counts are set to 4,096 because
-the directional scorer uses the same transported population for its components.
-The target is 1000 Å (100 nm) thick with a finite 5 × 5 mm footprint.
-
-```{literalinclude} ../examples/directional_source_heatmap.py
-:language: python
-:start-after: tutorial-start
-:end-before: tutorial-end
-```
-
-```{eval-rst}
-.. plot::
-   :alt: Simulated silicon energy–angle map and three spectra showing angle-dependent PXR/CBS peaks and strong attenuation near directions parallel to the film faces.
-   :caption: Actual seeded CPU simulation, precomputed from the downloadable script.
-
-   from _tutorials import directional_source_heatmap
-   directional_source_heatmap()
-```
-
-The peak energies change with observation angle. Compare the three spectra to
-see why one detector direction does not describe the whole source. The map
-includes intra-electron PXR–CBS interference and target self-absorption; it
-excludes cross-electron coherent radiation, downstream filters, angular
-acceptance and detector response. These are simulated source densities, not
-experimental measurements.
+That script uses 4,096 histories, 48 directions, 513 energies and a 100 nm silicon
+film with a finite 5 × 5 mm footprint. Its
+{download}`stored output and provenance <../examples/data/directional_source_heatmap.json>`
+retain the resolved models and table identity. Continue with the notebook to
+explore the map interactively.
 
 ## Coordinates and units
 
@@ -78,7 +74,7 @@ heights. The finite energy window is not a total yield. A brighter region alone
 does not establish statistical significance.
 
 This run emits `LineOpticalDataWarning`: some line contributions encounter
-unavailable optical data and may be omitted. The cached output records these
+unavailable optical data and may be omitted. The stored fixed-run output records these
 warnings; their pair counts are not a missing-yield estimate. See the
 [runtime coverage screen](../physics/radiation-physics/coherent-radiation.md#runtime-kinematic-screen)
 before interpreting absolute intensities.
@@ -89,7 +85,7 @@ can truncate forward lines, especially at relativistic energies. The
 [grid contract](../reference/directional-sources.md#photon-grids-and-limits)
 explains bounds and restrictions. The {download}`stored output and provenance <../examples/data/directional_source_heatmap.json>`
 record this run's seed, grids, resolved models and table identity; source hashes
-keep the displayed figure synchronized with the example.
+pin that fixed example and its output.
 
 (reusable-source-calculation)=
 (run-on-molab)=

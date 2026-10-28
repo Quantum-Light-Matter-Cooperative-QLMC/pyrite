@@ -27,12 +27,12 @@ model descriptions; validation pages record evidence about them.
 status-summary
 methodology
 domain-inventories
+evidence-index
 physics-validation-ledger
 ```
 
 ```{toctree}
 :hidden:
 
-evidence-index
 check-records/channeling_overflow_runs/initial/README
 ```

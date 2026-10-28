@@ -20,7 +20,7 @@ def _toctree_targets(page: Path) -> set[Path]:
     return targets
 
 
-def test_first_python_simulation_belongs_to_getting_started() -> None:
+def test_python_scene_recipe_belongs_to_getting_started() -> None:
     homepage = DOCS / "index.md"
     started = DOCS / "guides/getting-started.md"
     howtos = DOCS / "guides/index.md"
@@ -29,7 +29,7 @@ def test_first_python_simulation_belongs_to_getting_started() -> None:
     assert started.resolve() in _toctree_targets(homepage)
     assert example.resolve() in _toctree_targets(started)
     assert example.resolve() not in _toctree_targets(howtos)
-    assert "Your first Python simulation <python-api-workflow>" in started.read_text()
+    assert "Run one simulation from Python <python-api-workflow>" in started.read_text()
     assert "[Interactive Tutorials](../notebooks/index.md)" in howtos.read_text()
     assert (DOCS / "notebooks/index.md").is_file()  # #758 owns the notebooks.
 
@@ -43,3 +43,16 @@ def test_learning_path_targets_exist_and_reference_is_canonical() -> None:
     example = (DOCS / "guides/python-api-workflow.md").read_text()
     assert "[Python API reference](../reference/python-api/index.md)" in example
     assert "[supported API](../api.md) owns signatures" not in example
+
+
+def test_python_recipe_retains_reproduction_downloads_and_links_to_tutorial() -> None:
+    page = DOCS / "guides/python-api-workflow.md"
+    guide = page.read_text()
+    downloads = re.findall(r"\{download\}`[^`]*<([^>]+)>`", guide)
+    assert "../examples/python_api_workflow.py" in downloads
+    assert "../examples/data/python_api_workflow.json" in downloads
+    for target in downloads:
+        assert (page.parent / target).is_file(), target
+    tutorial = "../notebooks/fundamentals/01-first-spectrum.md"
+    assert f"]({tutorial})" in guide
+    assert (page.parent / tutorial).is_file()

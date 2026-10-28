@@ -9,7 +9,7 @@ renamed Python API symbol used in a guide. This module is that check:
   the live Click (``pyrite``) and
   argparse (``pyrite-dev``) command trees, or carries an explicit
   ``<!-- verify: skip (reason) -->`` marker (never both silently);
-- the Python tutorial's included source executes in the explicit slow tier;
+- the legacy Python example's downloadable source executes in the explicit slow tier;
 - the canonical catalog schema's ``toml`` blocks get a lightweight structural
   check (parses, internal beam reference resolves).
 
@@ -142,12 +142,10 @@ def test_guides_contain_bash_blocks():
 
 @pytest.mark.slow
 def test_python_api_workflow_executes_as_one_accumulating_namespace():
-    """Execute the downloadable source included by the current guide."""
+    """Execute the fixed example retained for reproduction by the current guide."""
     import runpy
 
     path = ROOT / "docs/examples/python_api_workflow.py"
-    guide = (GUIDES / "python-api-workflow.md").read_text()
-    assert "literalinclude} ../examples/python_api_workflow.py" in guide
     namespace = runpy.run_path(str(path))
     data = namespace["compute"]()
     assert data["seed"] == 1

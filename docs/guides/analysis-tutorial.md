@@ -19,7 +19,7 @@ See [Explore and export interactively](working-with-results.md#explore-and-expor
 ## Compare components and response
 
 Use the [plotted components and units](working-with-results.md#plot-one-saved-case)
-and the [detector tutorial](detector-observations.md).
+and the [detector-count how-to](detector-observations.md).
 
 ## Export a reproducible view
 

@@ -279,7 +279,8 @@ registered photon counts, configure `Observation.response` and an
 `Observation.acquisition`, then use `result.acquire(...)` or
 `result.acquisition_image(...)`. See the
 [detector model](../physics/detectors/detector-response.md) and
-[pixel-count tutorial](../guides/detector-observations.md) for a runnable example.
+[pixel-count how-to](../guides/detector-observations.md) for acquisition steps
+and the linked runnable notebook.
 
 ## Compose independent observations
 

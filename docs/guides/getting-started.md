@@ -158,16 +158,15 @@ normalization.
 
 ## Continue with Python
 
-For a guided notebook, start with
-[Environment setup](../notebooks/fundamentals/00-setup.md) and
+For environment setup and a guided Python simulation, start with
 [Your first spectrum](../notebooks/fundamentals/01-first-spectrum.md).
-The CLI quickstart writes a checkpoint. For a small in-memory simulation and
-an inline source-spectrum figure, continue with the Python API example:
+The CLI quickstart writes a checkpoint. For an in-memory call from an existing
+Python session, use the one-scene recipe:
 
 ```{toctree}
 :maxdepth: 1
 
-Your first Python simulation <python-api-workflow>
+Run one simulation from Python <python-api-workflow>
 ```
 
 (install-completion-optional)=
