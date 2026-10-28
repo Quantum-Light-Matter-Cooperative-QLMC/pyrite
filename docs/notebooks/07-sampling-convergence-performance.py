@@ -29,7 +29,7 @@ def _():
 
     _ = pyrite.fetch_tables()  # Reuse the installed tables without network access.
     tables_ready = True
-    return mo, np, plt, pyrite, tables_ready
+    return mo, np, plt, tables_ready
 
 
 @app.cell(hide_code=True)
@@ -63,7 +63,7 @@ def _():
     physics = Physics(brem_source="none")
     reflections = CxrReflections(n_families=2)
     band_eV = (600.0, 2_000.0)
-    budgets = (256, 1_024, 4_096, 8_192, 16_384, 32_768)
+    budgets = (256, 256*2, 256*3, 256*4, 256*5, 256*6, 256*7, 256*8, 256*9, 256*10)
     electron_block_size = 256  # Adaptive stopping checks after each transport block.
     spectrum_chunk_size = 512  # Segments per spectrum reduction, not electron histories.
     return (
@@ -189,8 +189,8 @@ def _(
     assert tables_ready  # Wait for reference tables before executing transport.
 
     policy = AdaptiveSampling(
-        target_rse=0.1,
-        max_electrons=32_768,
+        target_rse=0.025,
+        max_electrons=8_192,
         block_electrons=electron_block_size,
         observables=("cxr",),
         band_eV=band_eV,
@@ -235,7 +235,7 @@ def _(
         "source_identity": adaptive_result.provenance["identity_digest"],
     }
     stopping_diagnostics = _stop
-    return adaptive_result, adaptive_row, stopping_diagnostics
+    return adaptive_row, stopping_diagnostics
 
 
 @app.cell(hide_code=True)
@@ -259,29 +259,31 @@ def _(adaptive_row, budgets, fixed_rows, np, plt):
     fig_convergence, (_yield_ax, _time_ax) = plt.subplots(
         1, 2, figsize=(9.2, 3.9), layout="constrained"
     )
-    _yield_ax.plot(_counts, _yields, "o-", label="Fixed budget")
+    _yield_ax.plot(_counts, _yields, "bo-", label="Fixed budget")
     _yield_ax.scatter(
         [adaptive_row["histories"]],
         [adaptive_row["yield_per_electron_sr"]],
         marker="D",
+        color='red',
         label="Adaptive run",
         zorder=3,
     )
     _yield_ax.axhline(_yields[-1], color="grey", ls=":", label="Largest fixed budget")
     _yield_ax.set(
-        xlabel="Sampled CXR electron histories",
+        xlabel="CXR Monte Carlo Trials",
         ylabel="PXR/CBS yield (photons / electron / sr)",
         title="[600, 2,000] eV band yield",
-        xscale="log",
     )
     _yield_ax.legend(fontsize=8)
     _yield_ax.grid(alpha=0.25)
+    _yield_ax.tick_params("x", rotation=45, rotation_mode="xtick")
 
-    _time_ax.plot(_counts, _times, "o-", label="Fixed budget")
+    _time_ax.plot(_counts, _times, "bo-", label="Fixed budget")
     _time_ax.scatter(
         [adaptive_row["histories"]],
         [adaptive_row["elapsed_s"]],
         marker="D",
+        color='red',
         label="Adaptive run",
         zorder=3,
     )
@@ -289,10 +291,14 @@ def _(adaptive_row, budgets, fixed_rows, np, plt):
         xlabel="Sampled CXR electron histories",
         ylabel="Wall time (s)",
         title="Single-machine execution time",
-        xscale="log",
     )
     _time_ax.grid(alpha=0.25)
     fig_convergence  # noqa: B018 - captured by marimo
+    return
+
+
+@app.cell
+def _():
     return
 
 
