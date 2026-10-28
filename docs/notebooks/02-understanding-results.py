@@ -21,7 +21,7 @@ def _():
 
     # Set the backend before importing PyRITE; restart the kernel to change it.
     os.environ.setdefault("PYRITE_MC_BACKEND", "cpu")
-    import marimo as mo
+    import marimo as mo  # noqa: F401
     import matplotlib.pyplot as plt
     import numpy as np
 

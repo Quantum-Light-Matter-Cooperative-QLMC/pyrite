@@ -139,18 +139,15 @@ def test_notebook_links_source_and_navigation_agree(notebooks):
         < index.index("<guides/index>")
     )
     assert "fundamentals/index" in (DOCS / "notebooks" / "index.md").read_text()
-    # Raw iframe URLs bypass Sphinx's download-link rewriting.
-    assert 'html_static_path = ["_static"]' in (DOCS / "conf.py").read_text()
-    group = (DOCS / "notebooks" / "fundamentals" / "index.md").read_text()
+    assert 'nb_execution_mode = "off"' in (DOCS / "conf.py").read_text()
     for source in sorted(notebooks.NOTEBOOKS.glob("*.py")):
         name = source.stem
-        (page,) = notebooks.NOTEBOOKS.glob(f"*/{name}.md")
-        group = (page.parent / "index.md").read_text()
-        text = page.read_text()
-        assert name in group
-        assert f"{{literalinclude}} ../{name}.py" in text
-        assert notebooks.MOLAB + source.name in text
-        assert f"../../_static/notebooks/{name}.html" in text
+        page = notebooks.page_location(source)
+        assert page.suffix == ".ipynb", name
+        assert name in (page.parent / "index.md").read_text()
+        notebook = __import__("json").loads(page.read_text())
+        assert notebooks.MOLAB + source.name in str(notebook["cells"])
+        assert "iframe" not in str(notebook["cells"])
 
 
 def test_all_badges_follow_rtd_titles_only(notebooks):
@@ -159,23 +156,14 @@ def test_all_badges_follow_rtd_titles_only(notebooks):
         assert "molab-shield.svg" not in source.read_text()
 
 
-@pytest.mark.parametrize("placement", ["missing", "after_description", "inside_notebook"])
-def test_badge_placement_is_validated(notebooks, monkeypatch, tmp_path, placement):
-    monkeypatch.setattr(notebooks, "NOTEBOOKS", tmp_path)
-    page = tmp_path / "fundamentals" / "example.md"
-    page.parent.mkdir()
-    badge = f"[![Open in Molab](https://marimo.io/molab-shield.svg)]({notebooks.MOLAB}example.py)"
+def test_missing_title_rejected_by_native_export(notebooks, tmp_path):
+    import nbformat
+
     source = tmp_path / "example.py"
-    source.write_text("# Standalone notebook\n")
-    if placement == "missing":
-        page.write_text("# Example\n\nDescription.\n")
-    elif placement == "after_description":
-        page.write_text(f"# Example\n\nDescription.\n\n{badge}\n")
-    else:
-        page.write_text(f"# Example\n\n{badge}\n")
-        source.write_text(f"# {badge}\n")
-    with pytest.raises(ValueError, match="Molab badge"):
-        notebooks.validate_source(source)
+    source.write_text("# source\n")
+    nb = nbformat.v4.new_notebook(cells=[nbformat.v4.new_markdown_cell("No heading")])
+    with pytest.raises(ValueError, match="lost the tutorial figures"):
+        notebooks.captured_notebook(source, nb, "Example", "Next")
 
 
 def test_line_energy_notebook_cpu_smoke(monkeypatch):
@@ -201,70 +189,4 @@ def test_line_energy_notebook_cpu_smoke(monkeypatch):
     plt.close("all")
 
 
-@pytest.mark.parametrize("builder", ["html", "linkcheck"])
-def test_notebook_export_writes_only_disposable_html(notebooks, monkeypatch, tmp_path, builder):
-    from types import SimpleNamespace
-
-    docs = tmp_path / "docs"
-    sources = docs / "notebooks"
-    sources.mkdir(parents=True)
-    originals = {"first.py": "# first\n", "second.py": "# second\n"}
-    for name, content in originals.items():
-        (sources / name).write_text(content)
-    monkeypatch.setattr(notebooks, "DOCS", docs)
-    monkeypatch.setattr(notebooks, "NOTEBOOKS", sources)
-    validated = []
-    monkeypatch.setattr(notebooks, "validate_source", lambda path: validated.append(path.name))
-    calls = []
-    outdir = docs / "_build" / builder
-
-    def export(command, **kwargs):
-        calls.append(command)
-        assert kwargs["check"] is True
-        assert kwargs["env"]["PYRITE_MC_BACKEND"] == "cpu"
-        assert kwargs["env"]["PYRITE_MC_TRANSPORT_INITIAL_MAX_STEPS"] == "128"
-        if "export" not in command:
-            assert command[3] == "check"
-            return
-        assert "html" in command and "session" not in command
-        assert "--no-sandbox" in command and "--include-code" in command
-        staged = Path(command[5])
-        assert staged.parent != sources
-        assert staged.read_text() == originals[staged.name]
-        destination = Path(command[command.index("-o") + 1])
-        assert destination.parent == outdir / "_static/notebooks"
-        destination.write_text("<html>executed notebook</html>")
-        # A session written by marimo stays beside the temporary source.
-        (staged.parent / "__marimo__").mkdir(exist_ok=True)
-
-    monkeypatch.setattr(notebooks.subprocess, "run", export)
-    app = SimpleNamespace(builder=SimpleNamespace(format=builder), outdir=outdir)
-    notebooks.export_notebooks(app)
-    assert validated == list(originals)
-    assert len(calls) == (3 if builder == "html" else 0)
-    for name, content in originals.items():
-        assert (sources / name).read_text() == content
-    assert sorted(path.name for path in sources.iterdir()) == list(originals)
-    if builder == "html":
-        assert sorted(path.name for path in (outdir / "_static/notebooks").iterdir()) == [
-            "first.html",
-            "second.html",
-        ]
-
-
-def test_notebook_export_failure_fails_build(notebooks, monkeypatch, tmp_path):
-    import subprocess
-    from types import SimpleNamespace
-
-    monkeypatch.setattr(notebooks, "NOTEBOOKS", tmp_path)
-    (tmp_path / "example.py").write_text("# source\n")
-    monkeypatch.setattr(notebooks, "validate_source", lambda path: None)
-
-    def fail(command, **kwargs):
-        if "export" in command:
-            raise subprocess.CalledProcessError(1, command)
-
-    monkeypatch.setattr(notebooks.subprocess, "run", fail)
-    app = SimpleNamespace(builder=SimpleNamespace(format="html"), outdir=tmp_path / "_build")
-    with pytest.raises(subprocess.CalledProcessError):
-        notebooks.export_notebooks(app)
+# Native capture/regeneration behavior is tested in test_docs_native_notebooks.py.

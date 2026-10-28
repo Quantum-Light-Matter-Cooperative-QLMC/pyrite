@@ -21,15 +21,14 @@ def _():
 
     # Select the backend before importing PyRITE; restart to change it.
     os.environ.setdefault("PYRITE_MC_BACKEND", "cpu")
-    import marimo as mo
+    import marimo as mo  # noqa: F401
     import matplotlib.pyplot as plt
-    import numpy as np
 
     import pyrite
 
     _ = pyrite.fetch_tables()  # Complete installed tables need no download.
     tables_ready = True
-    return mo, np, plt, pyrite, tables_ready
+    return mo, plt, pyrite, tables_ready
 
 
 @app.cell(hide_code=True)

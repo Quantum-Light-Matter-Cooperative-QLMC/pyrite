@@ -60,10 +60,10 @@ extensions = [
     "_warning_baseline",  # exact boundary around inherited autodoc parse debt
     "_marimo_demo",  # browser-only results demo embedded on the overview page
     "_tutorials",  # checked legacy static examples
-    "_notebooks",  # execute tutorial sources into the HTML build
+    "_notebooks",  # validate checked native notebook captures (never execute)
     "matplotlib.sphinxext.plot_directive",  # native figures from maintained sources
     "sphinx_design",  # synchronized uv/pip installation tabs
-    "myst_parser",  # render the docs/*.md design notes
+    "myst_nb",  # MyST pages and exported Jupyter notebook cells/figures
     "sphinx.ext.autodoc",  # API docs from docstrings
     "sphinx.ext.autosummary",  # per-module summary tables + stub pages
     "sphinx.ext.napoleon",  # Google/NumPy docstring styles
@@ -125,6 +125,8 @@ myst_enable_extensions = [
 
 myst_heading_anchors = 3
 myst_ref_domains = ["std"]
+# Notebooks include captured outputs; RTD must never run Monte Carlo.
+nb_execution_mode = "off"
 
 # Static tutorials render small committed outputs; never run transport in Sphinx.
 plot_formats = [("png", 150), "svg"]

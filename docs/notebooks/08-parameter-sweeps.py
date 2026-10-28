@@ -21,7 +21,7 @@ def _():
 
     # Select "cuda" before the first PyRITE import, then restart the kernel.
     os.environ.setdefault("PYRITE_MC_BACKEND", "cpu")
-    import marimo as mo
+    import marimo as mo  # noqa: F401
     import matplotlib.pyplot as plt
     import numpy as np
 

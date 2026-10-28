@@ -488,47 +488,55 @@ retain useful API and validation pages in search.
 ## Interactive notebook builds
 
 Canonical tutorials live in `docs/notebooks/*.py`, independently of
-`pyrite.apps`. Their documentation pages embed static HTML exported from the
-same source used by local marimo and Molab. Keep units, seeds, model assumptions
-and scientific limitations in the visible notebook; use the physics and
-validation pages for formal evidence. Tutorials do not maintain separate
-provenance manifests, hidden metadata cells or committed output snapshots.
+`pyrite.apps`. Their `.ipynb` documentation pages are **generated snapshots**
+from the same source used by local marimo and Molab. Marimo Markdown cells become
+native page headings/prose; code visibility and captured Matplotlib outputs are
+carried into MyST-NB. Keep units, seeds, model assumptions and scientific
+limitations in the visible notebook; use physics and validation pages for formal
+evidence. Only the `.py` is an authored executable notebook.
 
-An HTML Sphinx build executes each tutorial once on CPU with
-`marimo export html --include-code --no-sandbox`. Exports go directly to
-`docs/_build/html/_static/notebooks/`. Temporary copies of the sources keep
-marimo's session caches out of the source tree. HTML and session files are
-untracked, and the build never rewrites sources or synchronizes release pins.
-Export failures fail the documentation build. Tutorial embeds and full-screen
-links use raw HTML because their targets exist only in the build output, not as
-source-tree documents for MyST to resolve. Non-HTML builders validate the
-source and links without executing tutorials. The separate browser-only results
-demo retains its existing WASM export.
+A regular Sphinx/RTD build **never executes any tutorial**. The `_notebooks`
+extension verifies source SHA-256, capture PyRITE version, Molab badge, captured
+figures and the absence of execution errors; `nb_execution_mode = "off"` tells
+MyST-NB to use the committed outputs. Builds fail on missing or stale captures.
+Expensive execution, reference-table fetching and required CPU memory belong to
+an explicit regeneration step on a sufficiently provisioned machine. The
+separate browser-only homepage results demo still uses its existing WASM export.
 
-Install the docs dependency group and fetch the reference tables before an
-offline build. Notebook startup fetches any missing tables for local/Molab users;
-a complete install returns without network access. Full tutorial builds can use
-substantial CPU time and memory: run them on a suitably provisioned worker.
-Do not reduce scientific settings just to fit a documentation host.
-
-Use the notebook-specific Molab badge or run locally:
+First-time migration from the old iframe wrappers, after syncing docs dependencies
+and acquiring reference tables, is explicit:
 
 ```bash
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run marimo edit docs/notebooks/01-first-spectrum.py
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run marimo check docs/notebooks/*.py
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev docs
+uv lock
+uv run --group docs python docs/_notebooks.py --regenerate-all
+uv run --group docs python docs/_notebooks.py --check
+uv run --group docs sphinx-build -b html -W --keep-going docs docs/_build/html
 ```
 
-Place each badge immediately after its RTD page title, outside the notebook
-source. Keep standalone/Molab dependencies in inline script metadata; update
-release pins deliberately when testing against a newer release. Checkout builds
-use the project environment. A badge targeting `main` becomes launchable after
-its source is merged; do not claim a live Molab session was checked from an
-unpublished branch.
+Regeneration executes each notebook **once** using `marimo export ipynb
+--include-outputs --sort=top-down --no-sandbox`, using disposable source copies
+and CPU transport with a conservative initial allocation. Only after all
+exports succeed are generated `.ipynb` pages promoted and the corresponding
+`.md` iframe wrappers removed. The migration carries over each page's title,
+`Continue learning` links and canonical-source download. The author-controlled
+Molab badge is inserted immediately after the native notebook title, never into
+Marimo source. Repeated regeneration uses stored page metadata. Commit the
+`.ipynb` captures, removed `.md` wrappers and updated `uv.lock` together.
 
-`verify` runs the docs build once alongside the repository checks; there is no
-separate notebook regeneration step or output-freshness gate. Focused tests
-cover source/import contracts, navigation, export failures and scientific
-behavior without comparing generated provenance or artifact hashes. Review
-rendered figures and scientific limitations when changing a tutorial; successful
-export alone does not establish physical validity.
+For subsequent notebook changes, regenerate only the affected capture, then
+check and review its rendered plots, source digest, and scientific limitations:
+
+```bash
+uv run --group docs python docs/_notebooks.py --regenerate 03-pxr-line-energies
+uv run --group docs python docs/_notebooks.py --check
+uv run marimo edit docs/notebooks/01-first-spectrum.py
+```
+
+Sphinx keeps the same document names and published `.html` URLs when Markdown
+wrappers are replaced by `.ipynb` pages. Captured outputs are static: reactive
+controls require Molab or local marimo. Keep standalone/Molab dependencies in
+inline script metadata; when bumping PyRITE, update notebook pins and regenerate.
+A badge targeting `main` becomes launchable after its source is merged.
+This workflow deliberately adds tracked rendered artifacts but removes generated
+HTML and nested iframes. The output-format transition should be validated on
+notebook 03, then the full curriculum, before publishing the converted pages.

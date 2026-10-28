@@ -130,6 +130,7 @@ docs = [
     "matplotlib>=3.11.0",
     "sphinx>=8.2",
     "myst-parser[linkify]>=4.0",
+    "myst-nb>=1.4.0",
     "sphinx-autobuild>=2025.8.25",
     "pydata-sphinx-theme>=0.20.0",
     "sphinxcontrib-bibtex>=2.6",
