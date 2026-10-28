@@ -82,6 +82,23 @@ Device out-of-memory errors are handled at three levels.
 
 The pool is released every 4, 8, or 16 cases, depending on policy, or when a reserved-pool watermark is crossed. The pool cap and retries handle allocation growth between releases.
 
+### Interpreting recovery in performance logs
+
+Retries reduce eligible chunks without resampling physical histories, as
+explained above. Under automatic **engine and backend** selection, exhausted
+spectrum retries or device admission rejection can fall back to CPU scoring
+when host memory admission succeeds. Explicit accelerator selection cannot
+silently switch to CPU. Resident CUDA transport failure has its own same-core
+replay using host-resident segments.
+
+For profiling, examine `gpu_oom_retry_count`, `recovery_events`, `recovery_path`,
+`backend_fallback_reason` and **effective** rather than requested chunks to
+interpret performance logs. A resource admission rejection and an allocator
+OOM are different failures. Recovery preserves seeds and scientific settings,
+although different reduction grouping and device arithmetic can change
+floating-point roundoff. For the measurement workflow see
+[analyze performance profiles](../guides/performance-profile-analysis.md#understand-memory-recovery).
+
 ## Execution engines
 
 A sweep resolves to one of three topologies.

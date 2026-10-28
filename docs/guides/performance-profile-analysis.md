@@ -123,19 +123,13 @@ Both options require remote execution; `--cpu-only` cannot be combined with
 
 ## Understand memory recovery
 
-Accelerator allocation failures can retry spectrum scoring against already
-transported electrons with reduced `spec_chunk` or `brem_chunk`; they do not
-require resampling the physics. Under automatic engine **and** backend
-selection, exhausted spectrum retries or device admission rejection may fall
-back to CPU scoring if host-memory admission succeeds. Explicit accelerator
-selection does not silently switch to CPU. CUDA resident-transport allocation
-failure has a separate same-core replay using host-resident segments.
-
-Inspect `gpu_oom_retry_count`, `recovery_events`, `recovery_path`,
-`backend_fallback_reason`, and the **effective** chunks before interpreting
-slowdowns. A resource-admission rejection is not an allocator OOM. Recovery
-preserves seeds and scientific settings, although different reduction
-chunking or device arithmetic may change floating-point roundoff.
+When a profile slows down after an OOM or changes its effective chunks,
+inspect `gpu_oom_retry_count`, `recovery_events`, `recovery_path`,
+`backend_fallback_reason` and the resolved runtime plan. A resource
+admission rejection is not necessarily an allocator OOM. The
+[memory and scheduling contract](../computation/memory-and-scheduling.md#interpreting-recovery-in-performance-logs)
+explains when retries, host-resident replay or CPU scoring may occur and how
+these routes affect reproducibility.
 
 ## Record the conclusion
 

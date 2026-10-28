@@ -1,0 +1,45 @@
+"""Getting Started and How-to navigation contracts for issue #759."""
+
+import re
+from pathlib import Path
+
+DOCS = Path(__file__).resolve().parents[2] / "docs"
+
+
+def _toctree_targets(page: Path) -> set[Path]:
+    """Resolve explicit MyST toctree entries (including titled entries)."""
+    targets = set()
+    for block in re.findall(r"```\{toctree\}\n(.*?)```", page.read_text(), re.S):
+        for entry in block.splitlines():
+            entry = entry.strip()
+            if not entry or entry.startswith(":"):
+                continue
+            match = re.fullmatch(r"[^<>]+<([^<>]+)>", entry)
+            target = match.group(1) if match else entry
+            targets.add((page.parent / f"{target}.md").resolve())
+    return targets
+
+
+def test_first_python_simulation_belongs_to_getting_started() -> None:
+    homepage = DOCS / "index.md"
+    started = DOCS / "guides/getting-started.md"
+    howtos = DOCS / "guides/index.md"
+    example = DOCS / "guides/python-api-workflow.md"
+
+    assert started.resolve() in _toctree_targets(homepage)
+    assert example.resolve() in _toctree_targets(started)
+    assert example.resolve() not in _toctree_targets(howtos)
+    assert "Your first Python simulation <python-api-workflow>" in started.read_text()
+    assert "[Interactive Tutorials](../notebooks/index.md)" in howtos.read_text()
+    assert (DOCS / "notebooks/index.md").is_file()  # #758 owns the notebooks.
+
+
+def test_learning_path_targets_exist_and_reference_is_canonical() -> None:
+    for name in ("index.md", "guides/index.md", "guides/getting-started.md"):
+        page = DOCS / name
+        for target in _toctree_targets(page):
+            assert target.is_file(), f"{name} links to missing document {target}"
+
+    example = (DOCS / "guides/python-api-workflow.md").read_text()
+    assert "[Python API reference](../reference/python-api/index.md)" in example
+    assert "[supported API](../api.md) owns signatures" not in example

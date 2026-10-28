@@ -63,5 +63,6 @@ this example's configuration and identity. Review the
 
 For detector response, observations, sweeps, adaptive sampling, filters and
 crystal cuts, use the [Python scene recipes](../reference/python-scene-recipes.md).
-The [supported API](../api.md) owns signatures and defaults;
-[Working with results](working-with-results.md) covers saved results.
+The [Python API reference](../reference/python-api/index.md) owns generated
+signatures and supported contracts; [Working with results](working-with-results.md)
+covers saved results.

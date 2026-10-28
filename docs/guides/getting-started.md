@@ -154,8 +154,18 @@ Select the **quickstart** dataset in the app's **Checkpoint** picker, then use
 output without rerunning transport. This is simulated emission, not measured
 data; display scaling and detector response affect the plotted observable.
 [Working with results](working-with-results.md) explains the plots, units and
-normalization. For an inline source-spectrum figure and a runnable in-memory
-simulation, follow [Your first Python simulation](python-api-workflow.md).
+normalization.
+
+## Continue with Python
+
+The CLI quickstart writes a checkpoint. For a small in-memory simulation and
+an inline source-spectrum figure, continue with the Python API example:
+
+```{toctree}
+:maxdepth: 1
+
+Your first Python simulation <python-api-workflow>
+```
 
 (install-completion-optional)=
 (backend-setup-optional)=

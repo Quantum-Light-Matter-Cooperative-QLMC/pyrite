@@ -1,25 +1,26 @@
+---
+orphan: true
+---
+
 # Computation and Statistics
 
-These pages explain execution, numerical precision, and statistical uncertainty in PyRITE.
+This compatibility landing page preserves the former top-level Computation URL.
+The original subpage URLs, equations, and anchors remain unchanged, but their
+primary navigation now follows their reader purpose:
 
-* [Execution and acceleration](execution-and-acceleration.md): backend and transport-core selection, CUDA kernels, lookup tables, and reproducibility.
-* [Memory, chunking, and scheduling](memory-and-scheduling.md): memory budgets, chunk sizing, worker pools, and out-of-memory recovery.
-* [Precision and tolerances](precision-and-tolerances.md): floating-point types and how to interpret numerical differences.
-* [Statistical methods](statistical-methods.md): estimators, error bars, convergence, and comparisons between runs.
-* [Random number streams](random-streams.md): stream assignment, seeding, and reproducibility contracts.
+* [Numerical and statistical methods](../physics/numerical-methods/index.md) — estimators, error bars, convergence, and comparisons between simulations.
+* [Execution and runtime configuration](../reference/configuration/index.md) — backend and transport-core selection, memory and chunking, floating-point precision, and reproducible streams.
 
-Physical models are documented in [Physics and simulation models](../physics/index.md). Implementation details and measurement records are in [Dev. Reference](../repo-design/index.md). The [validation methodology](../validation/methodology.md) defines the evidence required for physics claims.
+Direct links remain available to [execution and acceleration](execution-and-acceleration.md),
+[memory, chunking, and scheduling](memory-and-scheduling.md),
+[precision and tolerances](precision-and-tolerances.md),
+[statistical methods](statistical-methods.md), and
+[random number streams](random-streams.md).
 
-```{toctree}
-:maxdepth: 1
-
-execution-and-acceleration
-memory-and-scheduling
-precision-and-tolerances
-../physics/radiation-physics/energy-grid-semantics
-statistical-methods
-random-streams
-```
+For physical models see [Physics](../physics/index.md); for current implementation
+and measurement records see [Development](../development/index.md).
+The [validation methodology](../validation/methodology.md) describes the evidence
+required for physics claims.
 
 ## Execution workflows and contracts
 

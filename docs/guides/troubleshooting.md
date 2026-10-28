@@ -10,28 +10,35 @@ Use `pyrite material validate [PATH]`. Errors are grouped by TOML location. Comm
 
 ## How line grids are selected
 
-Bundled profiles have no stored line-grid rows. PyRITE resolves a case-local line grid automatically — a closed-form kinematic bandwidth, then a sinc-Nyquist resolution measured from the run's own trajectories. The resolved policy, tolerance, coordinates, and configuration source are recorded in the result's provenance under `line_grid_policy` and `line_grid_resolved`, and the policy is part of case/checkpoint identity.
+If a run produces an unexpectedly broad or dense line grid, inspect its
+resolved policy before changing physical settings:
 
-Automatic grids are deliberately conservative — the bandwidth is a bound, not a measurement — so they cost more points than a derived row. Tune them through the usual precedence chain (per-call/API > `PYRITE_*` > stored artifact > built-in):
+```bash
+pyrite numerics cxr-grid show PROFILE
+```
 
-| Variable | Meaning |
-|---|---|
-| `PYRITE_ENERGY_GRID_RTOL` | global *fallback* relative tolerance |
-| `PYRITE_ENERGY_GRID_RTOL_INTRINSIC_SOURCE` | per-observable override (default `1e-3`) |
-| `PYRITE_ENERGY_GRID_RTOL_DETECTED_COUNTS` | per-observable override (default `1e-2`) |
-| `PYRITE_ENERGY_GRID_MAX_SPACING_EV` | coarsest admissible spacing (default `3.0`) |
-| `PYRITE_ENERGY_GRID_ULPS` | backend coordinate-precision safety factor |
-| `PYRITE_ENERGY_GRID_MAX_POINTS` | point budget before the run refuses (default `600,000`) |
+Automatic grids bound the case's kinematic bandwidth and resolve the spacing
+from sampled trajectories; a bound is not a measured emission spectrum.
+The result records `line_grid_policy` and `line_grid_resolved` in provenance,
+and changing the policy changes checkpoint identity. A request that exceeds
+the point budget or coordinate precision **raises**, rather than silently
+coarsening the grid.
 
-Setting any of these selects automatic resolution even where an opt-in stored row exists. An explicit `EnergyBins.line` still wins over all of them.
-
-A requested tolerance that cannot be met inside the point budget or the backend ULP floor **raises** and names the unmet tolerance and the correction. The grid is never silently coarsened; raise the budget, relax that observable's tolerance, narrow the bandwidth, or run with `PYRITE_FP64=1`.
-
-Local line windows are opt-in while their convergence is being measured (issue #101). Passing `line_grid_policy={"windows": True}` on a `Sweep` keeps a backbone at the maximum spacing and refines windows around PXR/CBS resonances (from the run's own segments), absorption edges, and characteristic lines. A mapping may set `samples_per_feature` (default `8`), `tail_widths` (default `2.0`), and `providers`; `False` disables windows from a stored policy. The window plan is recorded under `line_grid_resolved`, and enabling or changing windows changes case/checkpoint identity. Windowed grids are nonuniform, so `EagleXO(resolve_energy=True)` and `LegacyEDS(convolve=True)` refuse them.
+For environment overrides, point-budget and ULP limits, nonuniform local
+windows and their restrictions, use
+[automatic line-grid diagnostics](../reference/campaign-configuration.md#automatic-line-grid-diagnostics).
+For the precedence of explicit coordinates, stored rows and automatic policies,
+see [photon grids](../reference/campaign-configuration.md#photon-grids).
 
 ## Deriving grids on purpose
 
-`pyrite numerics energy-grid derive --profile NAME` is an inspection and prewarming command, not a prerequisite. It measures a 95%-integrated-coverage **bandwidth** (not an accuracy target) and installs immutable artifacts, repointing that profile automatically; add `--remote` for the configured compute host, then run `pyrite-dev energy-grid verify`. Detached submission returns before installation; attach to the job for progress, then rerun without `--detach` to resume, pull, and install. Do not paste survey-cropped bounds into the catalog; fidelity reduction happens later.
+Use `pyrite numerics energy-grid derive --profile NAME` to measure a bandwidth
+and install reusable rows when automatic resolution is too costly. This is
+**optional**, not a prerequisite to running a campaign. Do not copy
+survey-cropped bounds into the catalog; check the installed rows with
+`pyrite-dev energy-grid verify`. The
+[derivation contract](../reference/campaign-configuration.md#photon-grids)
+covers installation, remote execution and grid identity.
 
 ## A run does not resume the checkpoint I expected
 

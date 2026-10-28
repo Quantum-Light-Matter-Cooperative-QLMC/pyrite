@@ -29,6 +29,7 @@ hard-bremsstrahlung-events
 characteristic-radiation
 photon-escape-and-dispersion
 spectral-observables
+energy-grid-semantics
 ```
 
 ```{toctree}
