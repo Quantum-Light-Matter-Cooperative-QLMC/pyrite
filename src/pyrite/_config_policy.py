@@ -48,6 +48,7 @@ NUMERICS_FIELD_OWNERS = MappingProxyType(
         "cxr_reflections": SAMPLING_CONVERGENCE,
         "precision": SAMPLING_CONVERGENCE,
         "sampling": SAMPLING_CONVERGENCE,
+        "seed": SAMPLING_CONVERGENCE,
         "energy_bins": NUMERICAL_APPROXIMATION,
         "transport": NUMERICAL_APPROXIMATION,
         "radiation": NUMERICAL_APPROXIMATION,
