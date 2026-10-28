@@ -24,7 +24,7 @@
     {
       "path": "src/pyrite/_numerics.py",
       "name": "Numerics.__post_init__",
-      "cc": 22,
+      "cc": 24,
       "exception": "#709: normalize the existing Physics/Numerics fields at construction while preserving their established units and validation order. Keep all config invariants at the boundary; unit conversion itself is delegated to _units.normalize_unit."
     },
     {
@@ -71,6 +71,11 @@
       "path": "src/pyrite/campaign/longitudinal.py",
       "name": "LongitudinalDistribution.__post_init__",
       "cc": 23
+    },
+    {
+      "path": "src/pyrite/campaign/lowering.py",
+      "name": "build_sweep_cases",
+      "cc": 21
     },
     {
       "path": "src/pyrite/campaign/single_scene.py",
@@ -436,7 +441,7 @@
     {
       "path": "src/pyrite/montecarlo/spectrum/brem.py",
       "name": "_extract_bremsstrahlung_table",
-      "cc": 32
+      "cc": 31
     },
     {
       "path": "src/pyrite/montecarlo/spectrum/brem.py",

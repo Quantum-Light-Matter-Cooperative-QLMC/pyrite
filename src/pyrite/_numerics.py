@@ -388,6 +388,8 @@ class Numerics:
 
     ``cxr_trials`` and ``brem_trials`` count macro-electron trials. Optional
     ``cxr_chunk`` and ``brem_chunk`` bound spectrum-kernel batches.
+    ``seed`` sets the reproducible Monte Carlo draw stream; ``None`` retains
+    the historical automatically assigned case seed.
     ``energy_model`` is frozen left-endpoint or midpoint integration;
     ``max_dE_frac`` limits predicted fractional mean loss per row (zero disables
     substeps). ``transport_core`` chooses auto, lockstep, per-electron, or CUDA.
@@ -419,6 +421,7 @@ class Numerics:
     cxr_reflections: CxrReflections = field(default_factory=CxrReflections, kw_only=True)
     precision: Precision | None = field(default=None, kw_only=True)
     sampling: SamplingPolicy | None = field(default=None, kw_only=True)
+    seed: int | None = field(default=None, kw_only=True)
     energy_bins: EnergyBins | None = field(default=None, kw_only=True)
     transport: "TransportNumerics | None" = field(default=None, kw_only=True)
     radiation: "RadiationNumerics | None" = field(default=None, kw_only=True)
@@ -471,6 +474,8 @@ class Numerics:
             value = getattr(self, name)
             if value is not None and (type(value) is not int or value <= 0):
                 raise ValueError(f"{name} must be a positive integer or None")
+        if self.seed is not None and type(self.seed) is not int:
+            raise ValueError("seed must be an integer or None")
         if not isinstance(self.cxr_reflections, CxrReflections):
             raise TypeError("cxr_reflections must be a CxrReflections")
         if self.energy_bins is not None and not isinstance(self.energy_bins, EnergyBins):
