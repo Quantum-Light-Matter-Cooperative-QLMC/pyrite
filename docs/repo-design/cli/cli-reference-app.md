@@ -17,6 +17,7 @@ Options:
   -h, --help  Show this message and exit.
 
 Commands:
+  configuration         Build, validate and save simulation configurations.
   analysis              Launch or export the analysis app.
   pixels                Launch or export the pixel-detector observation app.
   compare               Launch or export the case and cross-material comparison app.
@@ -26,6 +27,43 @@ Commands:
   optical-diagnostics   Launch or export optical source and instrument diagnostics.
   viewer                Launch or export the 3D trajectory viewer.
   validation            Launch or export cached validation figures.
+```
+
+## `pyrite app configuration`
+
+```text
+Usage: pyrite app configuration [OPTIONS] COMMAND [ARGS]...
+
+  Build, validate and save simulation configurations.
+
+Options:
+  -h, --help  Show this message and exit.
+
+Commands:
+  launch  Launch the interactive configuration app with marimo run or edit.
+```
+
+## `pyrite app configuration launch`
+
+```text
+Usage: pyrite app configuration launch [OPTIONS]
+
+  Launch the interactive configuration app with marimo run or edit.
+
+  Choose the crystal and beam settings inside the app; no checkpoint is needed.
+
+Options:
+  --watch                         Reload app when source files change.
+  --smoke                         Execute app once headlessly and exit.
+  --edit                          Use `marimo edit` instead of `marimo run`.
+  --acp                           Start local Claude and Codex ACP bridges.
+  --tunnel                        Bind fixed port for SSH tunneling.
+  --no-token                      Disable marimo auth token.
+  --backend [auto|cpu|cuda|rocm|sycl]
+                                  Array backend for the app process (sets
+                                  PYRITE_MC_BACKEND). Default: inherit the environment.
+                                  An explicit accelerator fails if unavailable.
+  -h, --help                      Show this message and exit.
 ```
 
 ## `pyrite app analysis`

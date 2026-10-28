@@ -44,7 +44,7 @@ class CatalogDraft:
     def diff(self):
         return "".join(
             difflib.unified_diff(
-                self.original.splitlines(True),
+                translate_catalog_text(self.original, canonical=True).splitlines(True),
                 self.serialize().splitlines(True),
                 "catalog (current)",
                 "catalog (proposed)",

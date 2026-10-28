@@ -58,6 +58,7 @@ class MarimoApp:
 
 
 PIXELS = MarimoApp("pixels", "pixel_app.py", 2720, "pixel-detector observation")
+CONFIGURATION = MarimoApp("configuration", "configuration_app.py", 2726, "configuration", False)
 COMPARE = MarimoApp("compare", "compare_app.py", 2721, "case and cross-material comparison")
 CHANNELING = MarimoApp("channeling", "channeling_app.py", 2722, "planar channeling", False)
 ANGULAR_HEATMAP = MarimoApp(
@@ -243,6 +244,7 @@ def _export_command(app: MarimoApp) -> click.Command:
 
 
 pixels_command = _launch_command(PIXELS)
+configuration_command = _launch_command(CONFIGURATION)
 pixels_export_command = _export_command(PIXELS)
 compare_command = _launch_command(COMPARE)
 compare_export_command = _export_command(COMPARE)

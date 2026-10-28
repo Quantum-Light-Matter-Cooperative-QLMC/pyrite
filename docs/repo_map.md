@@ -64,6 +64,7 @@ Edges (importer -> imported):
   p1 -> p22
   p1 -> p23
   p1 -> p24
+  p1 -> p25
   p1 -> p27
   p1 -> p3
   p1 -> p4
@@ -846,6 +847,14 @@ Canonical `pyrite beam list|show|create|set|rename|delete` Click layer over top-
 Canonical `pyrite detector list|show|create|set|reset|rename|delete` Click layer over top-level `[detectors.NAME]` scalar/pixel objects. Profiles attach references through `detector = "NAME"` or ID collections; rename updates every reference and delete refuses while any survives. Named objects own reusable geometry and optional scorer/response/acquisition sections; `_profile_detectors.py` owns profile membership and inline edits. `_detector_shared.py` and `_pixel_detector_shared.py` share scalar/pixel options and updates. Names and display-only labels are removed during catalog resolution, so identity depends on resolved settings.
 
 ### Configuration editor services
+
+`campaign/configuration_editor.py` adapts catalog drafts for the configuration
+notebook: profile transactions, private beam copies, local detector slots,
+validation/review and existing run-command generation. `apps/configuration_app.py`
+owns reactive wiring; `configuration_controls.py`/`configuration_sections.py`
+own typed forms and `configuration_exports.py` filters saved source-array
+downloads. Launch: `pyrite app configuration launch` (port 2726). Guide:
+[configuration notebook](guides/configuration-notebook.md).
 
 `catalog_edit.CatalogDraft` owns explicit-path in-memory drafts, canonical TOML,
 validation, diffs, stale-edit checks and atomic selected-layer saving.
