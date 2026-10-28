@@ -6,12 +6,8 @@ introduction, begin with [Getting Started](getting-started.md) and the
 [Physics](../physics/index.md), including the
 [simulation overview](../physics/how-pyrite-works.md); exact contracts belong in [Reference](../reference/index.md).
 
-```{toctree}
-:maxdepth: 1
-:caption: Getting started
-
-python-api-workflow
-```
+New to the Python API? Follow the [CLI quickstart](getting-started.md),
+then run [Your first Python simulation](python-api-workflow.md).
 
 ```{toctree}
 :maxdepth: 1
