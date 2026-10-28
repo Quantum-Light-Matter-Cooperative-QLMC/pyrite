@@ -9,4 +9,5 @@ from thin films. Each notebook can be run independently after the introductory
 
 09-importing-electron-beams
 10-transition-radiation
+11-optimizing-xray-source
 ```

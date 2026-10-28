@@ -4,23 +4,28 @@ Provisional APIs are not guaranteed stable and do not imply experimentally valid
 
 The entries below use generated docstrings, signatures, and source links. API support and scientific validation are separate contracts.
 
-```{eval-rst}
-.. autosummary::
-   :toctree: ../../_autosummary
-   :nosignatures:
-
-   pyrite.optimization.FixedWindowYield
-   pyrite.optimization.PyriteEvaluator
-   pyrite.optimization.OptimizationStudy
-```
-
 ## Experimental optimization
 
 The provisional `pyrite.optimization` API operates above immutable Scenes and
 existing executors. It is outside the [stable compatibility contract](compatibility.md).
 See the [study reference](../../reference/optimization-studies.md) for persistence,
-constraints and normalization, and the [visual tutorial](../../guides/optimization-studies.md)
-for a complete fixed-window PXR/CBS workflow.
+constraints and normalization, and the [optimization tutorial](../../notebooks/specialized/11-optimizing-xray-source.ipynb)
+for a bounded fixed-window PXR/CBS search.
+
+```{eval-rst}
+.. autosummary::
+   :toctree: ../../_autosummary
+   :nosignatures:
+
+   pyrite.optimization.Integer
+   pyrite.optimization.ParameterSpace
+   pyrite.optimization.Objective
+   pyrite.optimization.Constraint
+   pyrite.optimization.OptunaOptimizer
+   pyrite.optimization.FixedWindowYield
+   pyrite.optimization.PyriteEvaluator
+   pyrite.optimization.OptimizationStudy
+```
 
 ## Photon aperture interfaces
 

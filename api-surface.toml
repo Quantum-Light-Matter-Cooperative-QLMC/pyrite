@@ -403,3 +403,8 @@ TransverseSpot = { target = "pyrite.campaign.beam:TransverseSpot", status = "adv
 FixedWindowYield = { target = "pyrite.optimization.scoring:FixedWindowYield", status = "experimental" }
 PyriteEvaluator = { target = "pyrite.optimization.study:PyriteEvaluator", status = "experimental" }
 OptimizationStudy = { target = "pyrite.optimization.study:OptimizationStudy", status = "experimental" }
+Integer = { target = "pyrite.optimization.space:Integer", status = "experimental" }
+ParameterSpace = { target = "pyrite.optimization.space:ParameterSpace", status = "experimental" }
+Objective = { target = "pyrite.optimization.study:Objective", status = "experimental" }
+Constraint = { target = "pyrite.optimization.study:Constraint", status = "experimental" }
+OptunaOptimizer = { target = "pyrite.optimization.optuna_adapter:OptunaOptimizer", status = "experimental" }

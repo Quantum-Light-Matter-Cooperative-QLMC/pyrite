@@ -5,6 +5,27 @@ not replace the existing Monte Carlo runner, executor, or case checkpoints.
 Optuna is optional: install `pyrite-mc[optimization]` or use
 `uv sync --extra optimization` in a checkout.
 
+## Defining a bounded study
+
+Use the experimental `pyrite.optimization` imports `Integer`, `ParameterSpace`,
+`Objective`, `Constraint`, `OptimizationStudy` and `OptunaOptimizer` to define a
+finite design search. Parameter paths select physical Scene fields;
+`Integer(low, high, step)` includes both bounds and refuses implicit rounding.
+Values use the units of the selected field, such as degrees for
+`target.tilt_deg` and ångströms for `target.thickness_ang`.
+
+An `Objective` declares its observable name, `"maximize"` or `"minimize"`, and
+unit. A `Constraint` uses an observable in that same declared unit and an
+inclusive `"<="` or `">="` bound. The evaluator must return every named
+objective and constraint. Failed and infeasible trials remain in `.trials`;
+only feasible trials enter `.best_trial` or `.pareto_front`. These interfaces
+are experimental; importing them does not initialize Optuna or transport.
+
+For a short executable example, see
+[Optimizing an X-ray source](../notebooks/specialized/11-optimizing-xray-source.ipynb).
+The [generated optimization entries](python-api/experimental.md#experimental-optimization)
+provide signatures and source links.
+
 ## Persisting and resuming a study
 
 The complete {download}`comparison script <../../checks/pxr_optimization.py>` constructs a

@@ -11,6 +11,8 @@ independent finalist evaluation; the
 [optimization reference](../reference/optimization-studies.md) defines the API.
 
 :::{warning}
+For a short guided search, use [Optimizing an X-ray source](../notebooks/specialized/11-optimizing-xray-source.ipynb).
+
 The optimization API is **experimental**. This ideal-crystal simulation
 demonstrates search and validation; it establishes neither a global optimum nor
 experimental accuracy. Yield is **photons/(sr incident electron)** in one
