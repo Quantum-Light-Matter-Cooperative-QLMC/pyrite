@@ -110,3 +110,43 @@ position sampling, both the grid and density are `None`. See the
 and [channeling demo](../../reference/results-and-apps.md#planar-channeling-demo).
 The [experimental axial diagnostic](../../guides/experimental-axial-channeling.md) runs independently
 of `simulate`.
+
+## Experimental solvers and planar projection
+
+These direct solvers and result records use the experimental namespace. Their
+presence in the reference does not broaden production admission; consult the
+[solver and source contracts](../quantum-api.md) before selecting a solver.
+
+```{eval-rst}
+.. autosummary::
+   :toctree: ../../_autosummary
+   :nosignatures:
+
+   pyrite.experimental.quantum.DensityMatrixSolver
+   pyrite.experimental.quantum.DensityMatrixResult
+   pyrite.experimental.quantum.MCWFSolver
+   pyrite.experimental.quantum.MCWFResult
+   pyrite.experimental.quantum.AxialMCWF
+   pyrite.experimental.quantum.AxialMCWFResult
+   pyrite.experimental.quantum.RealSpaceGrid
+   pyrite.experimental.quantum.SplitStepPropagator
+   pyrite.experimental.quantum.PlanarStateProjection
+   pyrite.experimental.quantum.project_planar_source
+   pyrite.experimental.quantum.propagate_planar_source
+   pyrite.experimental.quantum.score_planar_source
+```
+
+### Scattering operators
+
+These experimental operators remain at `pyrite.quantum`; they are not part of
+the curated `pyrite.experimental.quantum` facade.
+
+```{eval-rst}
+.. autosummary::
+   :toctree: ../../_autosummary
+   :nosignatures:
+
+   pyrite.quantum.ScatteringKernel
+   pyrite.quantum.electronic_kernel
+   pyrite.quantum.tds_kernel
+```

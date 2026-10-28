@@ -36,3 +36,18 @@ in [component checkpoints](../../repo-design/storage/dataset-identity-and-storag
 `Settings` is the compatibility surface for checkpoint analysis. `Analysis`
 holds presentation controls and legacy conversions; `simulate` does not
 consume it.
+
+## Pixel count result alias
+
+`PixelCountResult` is the advanced-stable alias for `AcquisitionBatch` returned
+by pixel acquisition. Measurement requests remain under
+[`pyrite.observations`](observations.md).
+
+```{eval-rst}
+.. autosummary::
+   :toctree: ../../_autosummary
+   :template: autosummary/public-alias.rst
+   :nosignatures:
+
+   pyrite.results.PixelCountResult
+```

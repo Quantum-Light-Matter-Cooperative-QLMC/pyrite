@@ -24,6 +24,42 @@ for a complete fixed-window PXR/CBS workflow.
 
 ## Photon aperture interfaces
 
+The governed `pyrite.experimental.observations` namespace exposes the bounded
+photon simulation and reduced-artifact operations below. They remain
+**experimental**, with the restrictions and normalization described here and
+in their linked contracts.
+
+### Continuum aperture observations
+
+```{eval-rst}
+.. autosummary::
+   :toctree: ../../_autosummary
+   :nosignatures:
+
+   pyrite.experimental.observations.PhotonContinuumObservation
+   pyrite.experimental.observations.simulate_photon_continuum
+   pyrite.experimental.observations.PhotonContinuumTally
+   pyrite.experimental.observations.save_photon_continuum
+   pyrite.experimental.observations.load_photon_continuum
+```
+
+### Physical-event aperture observations
+
+```{eval-rst}
+.. autosummary::
+   :toctree: ../../_autosummary
+   :nosignatures:
+
+   pyrite.experimental.observations.PhotonEventObservation
+   pyrite.experimental.observations.simulate_photon_events
+   pyrite.experimental.observations.PhotonEventTally
+   pyrite.experimental.observations.PhotonRelaxationBudget
+   pyrite.experimental.observations.save_photon_events
+   pyrite.experimental.observations.load_photon_events
+```
+
+### Selection and persistence contracts
+
 The provisional photon-continuum reference has a separate
 [aperture tally artifact](../../research/physics/photon-scene-handoff.md#explicit-reduced-observation-persistence):
 `PhotonContinuumObservation.save(path)` and
@@ -55,6 +91,20 @@ and its original pins; full artifact replay is supported and bounded replay is
 refused. See the [selection, units and persistence contract](../../repo-design/compute/photon-aperture.md).
 `PhotonTransport` and the aperture APIs remain provisional; pixel response,
 catalog/CLI selectors and full-track external validation remain open.
+
+### Scalar simulation selector
+
+`PhotonTransport` is the experimental selector accepted through `Physics`.
+Its root import remains governed pending canonical ownership review; documenting
+it here does not introduce a new configuration import.
+
+```{eval-rst}
+.. autosummary::
+   :toctree: ../../_autosummary
+   :nosignatures:
+
+   pyrite.PhotonTransport
+```
 
 ## Provisional optical diagnostic response
 

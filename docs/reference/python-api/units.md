@@ -58,3 +58,20 @@ Use `beam.with_kinetic_energy(80 * ureg.keV)` for quantity-aware replacement;
 See the [beam-energy contract](../../repo-design/physical-units.md#beam-energy-quantity-interface)
 for scalar/array, replacement and serialization details. The empty `units`
 installation extra remains a compatibility spelling.
+
+## Shared registry and quantity constructor
+
+`ureg` owns the shared unit definitions; `Q_` constructs quantities bound to
+that registry. Both are advanced-stable exports. Do not mutate the registry's
+definitions after import. Their values are omitted from generated reference to
+avoid expanding registry internals.
+
+```{eval-rst}
+.. autosummary::
+   :toctree: ../../_autosummary
+   :template: autosummary/public-data.rst
+   :nosignatures:
+
+   pyrite.units.ureg
+   pyrite.units.Q_
+```

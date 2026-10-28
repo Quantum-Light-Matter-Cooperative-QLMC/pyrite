@@ -57,3 +57,17 @@ enable optical production transport; see the
 `CRYSTALS`, `MATERIALS` and `MATERIAL_LABELS` are compatibility projections.
 A material's display label derives from its `MaterialIdentity`; its cut names
 the slab normal, independently of the reflections selected for scoring.
+
+## Bundled catalog data
+
+The bundled immutable catalog is a data object, not a constructor. Use
+`load_material_catalog` to select another complete catalog.
+
+```{eval-rst}
+.. autosummary::
+   :toctree: ../../_autosummary
+   :template: autosummary/public-data.rst
+   :nosignatures:
+
+   pyrite.materials.CATALOG
+```

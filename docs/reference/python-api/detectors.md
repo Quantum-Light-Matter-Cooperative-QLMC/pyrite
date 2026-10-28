@@ -46,3 +46,19 @@ images. Physical pixel scoring and acquisition are illustrated in the
 | Entry | Owner / status | Scientific contract and effects |
 | --- | --- | --- |
 | `detector_efficiency`, `convolve_detector` | Detectors, advanced-stable | Photon grid (eV), window thicknesses (nm) to dimensionless efficiency; Gaussian FWHM (eV) convolution preserves spectral-density units. Optional outside mass has density × eV units. Reads attenuation tables when efficiency is evaluated; invalid grid/array inputs propagate numerical errors. Neither function applies an exposure. |
+
+## Semantic response aliases
+
+These advanced-stable spellings preserve the identity and behavior of
+`Detector`, `Timepix3`, and `EagleXO`, respectively.
+
+```{eval-rst}
+.. autosummary::
+   :toctree: ../../_autosummary
+   :template: autosummary/public-alias.rst
+   :nosignatures:
+
+   pyrite.detectors.AngularDetector
+   pyrite.detectors.Timepix3Response
+   pyrite.detectors.EagleXOResponse
+```

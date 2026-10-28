@@ -97,3 +97,28 @@ def test_storage_reference_covers_supported_inventory():
     page = (REFERENCE / "storage.md").read_text(encoding="utf-8")
     documented = set(re.findall(r"^   pyrite\.storage\.(\w+)$", page, re.M))
     assert documented == set(supported)
+
+
+def test_api_reference_covers_every_governed_target():
+    """Every governed object has a generated page, allowing import aliases.
+
+    Compare concrete inventory targets so compatibility spellings do not need
+    duplicate pages. Canonical facade imports derived from root exports have
+    the same coverage as their implementation or historical package paths.
+    """
+    manifest = tomllib.loads((DOCS.parent / "api-surface.toml").read_text())
+    exports = {f"pyrite.{name}": row for name, row in manifest["root_exports"].items()}
+    for module, rows in manifest["package_exports"].items():
+        exports.update({f"{module}.{name}": row for name, row in rows.items()})
+    for name, row in manifest["root_exports"].items():
+        if row["domain"] in manifest["canonical_facades"]:
+            exports[f"pyrite.{row['domain']}.{name}"] = row
+
+    documented = {
+        name
+        for page in REFERENCE.glob("*.md")
+        for name in re.findall(r"^   (pyrite\.[\w.]+)$", page.read_text(), re.M)
+    }
+    covered = {exports[name]["target"] for name in documented}
+    missing = {name: row["target"] for name, row in exports.items() if row["target"] not in covered}
+    assert not missing, missing

@@ -32,3 +32,20 @@ is documented in [execution and scheduling](execution.md).
 
    pyrite.config.KernelTuning
 ```
+
+## Angular sampling and legacy kernel controls
+
+`AngularSampling` is the advanced-stable semantic alias for `PixelScorer`;
+it controls angular quadrature, independently of physical detector geometry.
+`ExecutionConfig` retains its root compatibility import; prefer
+`pyrite.config.KernelTuning` for the same local kernel controls.
+
+```{eval-rst}
+.. autosummary::
+   :toctree: ../../_autosummary
+   :template: autosummary/public-alias.rst
+   :nosignatures:
+
+   pyrite.config.AngularSampling
+   pyrite.ExecutionConfig
+```
