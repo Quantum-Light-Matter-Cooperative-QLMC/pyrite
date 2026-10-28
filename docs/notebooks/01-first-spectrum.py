@@ -29,7 +29,7 @@ def _():
     _ = pyrite.fetch_tables()  # Fetch missing pinned tables once; reuse installed data.
 
     tables_ready = True
-    return mo, plt, pyrite, tables_ready
+    return mo, os, plt, pyrite, tables_ready
 
 
 @app.cell(hide_code=True)
@@ -37,9 +37,52 @@ def _(mo):
     mo.md(r"""
     # Your first X-ray spectrum
 
-    Simulate a small crystalline target and compare PXR + CBS with bremsstrahlung.
+    Set up PyRITE, simulate a small crystalline target, and plot its X-ray spectrum.
 
-    ## Setup
+    ## Environment and reference tables
+
+    Locally, install the project environment and open this file with
+    `uv run marimo edit docs/notebooks/01-first-spectrum.py`.
+    In Molab, the inline dependencies provide the environment. Use its
+    **built-in package manager** to add packages; if table loading reports a
+    missing MF=26/MT=527 photon yield, enter `endf-parserpy==0.17.0` and restart.
+
+    The first cell calls `pyrite.fetch_tables()` to install about 100 MB of
+    pinned interaction data once; subsequent runs reuse the installed tables.
+    Start on CPU. For NVIDIA execution, add `pyrite-mc[nvidia]`, select an
+    available GPU in Molab (or use your local CUDA GPU), and set
+    `PYRITE_MC_BACKEND` to `cuda` **before importing PyRITE**. Restart the
+    kernel after changing the backend or installing CuPy.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo, os, pyrite):
+    import importlib.util
+    import platform
+
+    environment = {
+        "python": platform.python_version(),
+        "pyrite": pyrite.__version__,
+        "selected_backend": os.environ["PYRITE_MC_BACKEND"],
+        "cupy_installed": importlib.util.find_spec("cupy") is not None,
+    }
+    if environment["cupy_installed"]:
+        try:
+            import cupy as cp
+
+            environment["cuda_device_count"] = cp.cuda.runtime.getDeviceCount()
+        except Exception as _error:
+            environment["cuda_status"] = f"Unavailable: {type(_error).__name__}"
+    mo.json(environment)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Simulate a crystalline target
 
     This example uses 30 keV electrons incident upon a 100 nm HOPG slab. Its small
     trial counts keep it CPU-friendly; the curves are **only illustrative**.
@@ -109,8 +152,9 @@ def _(mo):
     structure differs from the broad bremsstrahlung continuum. Each component is plotted
     on its **native photon-energy grid**; adding array entries by index would mix
     different energies. The vertical axis is source spectral density per incident
-    electron, per eV, per steradian, i.e., integrating over the spectrum, beam current,
-    and detection solid-angle cone would translate to Phs
+    electron, per eV, per steradian. Integrating over photon energy gives
+    photons / (electron · sr). Multiplying by the electron rate and accepted
+    solid angle gives an expected photon rate in photons / s.
 
     Try doubling the history counts, then change only the target thickness. Keep a
     record of the resolved seed when comparing configurations; different backends need not produce

@@ -22,7 +22,7 @@ def test_sync_version_updates_base_and_extras(tmp_path, monkeypatch):
     notebook_dir = docs / "notebooks"
     notebook_dir.mkdir(parents=True)
     (tmp_path / "pyproject.toml").write_text('[project]\nversion = "0.22.5"\n')
-    source = notebook_dir / "00-setup.py"
+    source = notebook_dir / "01-first-spectrum.py"
     source.write_text(
         '# dependencies = ["pyrite-mc==0.22.4", "numpy>=2"]\n'
         "uv pip install 'pyrite-mc[apps]==0.22.3'\n"
@@ -30,12 +30,12 @@ def test_sync_version_updates_base_and_extras(tmp_path, monkeypatch):
         'unrelated_version = "0.22.3"\n'
     )
     monkeypatch.setattr(tutorials, "DOCS", docs)
-    assert tutorials.sync_notebook_version("00-setup") is True
+    assert tutorials.sync_notebook_version("01-first-spectrum") is True
     assert '"pyrite-mc==0.22.5"' in source.read_text()
     assert "pyrite-mc[apps]==0.22.5" in source.read_text()
     assert "pyrite-mc[nvidia]==0.22.5" in source.read_text()
     assert 'unrelated_version = "0.22.3"' in source.read_text()
-    assert tutorials.sync_notebook_version("00-setup") is False
+    assert tutorials.sync_notebook_version("01-first-spectrum") is False
 
 
 def test_sync_version_rejects_notebook_without_inline_pin(tmp_path, monkeypatch):
@@ -84,7 +84,6 @@ def test_all_notebooks_bootstrap_tables_before_simulation():
     import ast
 
     names = (
-        "00-setup",
         "01-first-spectrum",
         "02-understanding-results",
         "03-pxr-line-energies",

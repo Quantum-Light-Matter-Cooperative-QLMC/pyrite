@@ -2,11 +2,11 @@
 
 [![Open in Molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/Quantum-Light-Matter-Cooperative-QLMC/pyrite/blob/main/docs/notebooks/01-first-spectrum.py)
 
-Compare PXR + CBS and bremsstrahlung on their native energy grids.
+Set up CPU or GPU execution, then plot PXR + CBS and bremsstrahlung on their native energy grids.
 
 
-These are **captured outputs**. Recompute in Molab or locally after the setup
-steps in notebook 00. This static view requires no Python kernel or CUDA.
+These are **captured outputs**. Recompute in Molab or locally using the setup
+steps included in this notebook. This static view requires no Python kernel or CUDA.
 
 ```{raw} html
 <iframe src="../../_static/notebooks/01-first-spectrum.html"

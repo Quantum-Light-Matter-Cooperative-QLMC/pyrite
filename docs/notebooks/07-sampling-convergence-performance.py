@@ -65,7 +65,6 @@ def _():
     reflections = CxrReflections(n_families=2)
     band_eV = (600.0, 2_000.0)
     budgets = (256, 1_024, 4_096, 8_192, 16_384, 32_768)
-    seed = 7
     electron_block_size = 256  # Adaptive stopping checks after each transport block.
     spectrum_chunk_size = 512  # Segments per spectrum reduction, not electron histories.
     return (
@@ -80,7 +79,6 @@ def _():
         perf_counter,
         physics,
         reflections,
-        seed,
         simulate,
         spectrum_chunk_size,
         target,
@@ -99,7 +97,6 @@ def _(
     perf_counter,
     physics,
     reflections,
-    seed,
     simulate,
     spectrum_chunk_size,
     tables_ready,
@@ -118,7 +115,6 @@ def _(
             cxr_reflections=reflections,
             cxr_chunk=spectrum_chunk_size,
             transport_core="per-electron",
-            seed=seed,
         ),
     )
     fixed_rows = []
@@ -134,7 +130,6 @@ def _(
                 cxr_reflections=reflections,
                 cxr_chunk=spectrum_chunk_size,
                 transport_core="per-electron",
-                seed=seed,
             ),
         )
         _elapsed = perf_counter() - _start
@@ -187,7 +182,6 @@ def _(
     perf_counter,
     physics,
     reflections,
-    seed,
     simulate,
     spectrum_chunk_size,
     tables_ready,
@@ -196,7 +190,7 @@ def _(
     assert tables_ready  # Wait for reference tables before executing transport.
 
     policy = AdaptiveSampling(
-        target_rse=0.4,
+        target_rse=0.1,
         max_electrons=32_768,
         block_electrons=electron_block_size,
         observables=("cxr",),
@@ -213,7 +207,6 @@ def _(
             cxr_reflections=reflections,
             cxr_chunk=spectrum_chunk_size,
             transport_core="per-electron",
-            seed=seed,
         ),
     )
     _elapsed = perf_counter() - _start
@@ -310,7 +303,7 @@ def _(mo):
     ## Interpretation
 
     The largest fixed-budget yield is only a reference, **not ground truth**.
-    Both modes use seed 7, the same per-electron CPU core, the same CXR
+    Both modes use the default seed 1, the same per-electron CPU core, the same CXR
     spectrum chunk size, and equal CXR/bremsstrahlung transport populations.
     Those choices matter even with bremsstrahlung scoring disabled: the second
     population affects transport energy cutoffs. Fixed-budget points share
@@ -325,8 +318,8 @@ def _(mo):
     tests systematic discretization, not sampling convergence.
 
     Wall times depend on compilation, caching and hardware. The untimed
-    warmup helps, but these are **not portable benchmarks**. Change `seed`
-    to run independent trials; use `transport_core="cuda"` consistently for
+    warmup helps, but these are **not portable benchmarks**. These runs do
+    not estimate uncertainty across independent seeds. Use `transport_core="cuda"` consistently for
     GPU comparisons. Try increasing
     the budgets and compare the [sampling reference](https://pyrite.readthedocs.io/en/latest/reference/python-api/config.html)
     and [performance guidance](https://pyrite.readthedocs.io/en/latest/computation/index.html).

@@ -75,8 +75,19 @@ def _(tables_ready):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ### Examine the returned data structures
-    by looking at component spectra on their own native energy grids
+    ## Inspect the native spectra
+
+    `to_dataframe()` returns a Polars table: one row per energy sample of
+    one component. `component` identifies CXR, bremsstrahlung or characteristic
+    radiation; `mode` distinguishes incoherent/coherent CXR (null for other
+    components). `photon_energy_eV` is in eV, and `density` is in
+    **photons / (incident electron · eV · sr)**. `normalization="source"`
+    identifies the source density used here.
+
+    Components keep their own energy grids, so rows with the same index need
+    not describe the same energy. This table has no summed `total`, beam-current
+    scaling or detector efficiency. Integrating `density` over an energy band
+    gives photons / (incident electron · sr).
     """)
     return
 
@@ -111,13 +122,53 @@ def _(plt, result):
     return (cxr,)
 
 
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Put components on one grid and choose units
+
+    `spectral_flux()` returns a wide Polars table: one row per energy, one
+    column per component, plus `total`. It combines all native energy nodes,
+    linearly interpolates each component between its nodes, and uses zero
+    outside that component's range. Columns can now be added at the same energy.
+
+    `units` chooses the normalization of **every component and `total`**:
+
+    | `units=` | Spectral values | Scaling from `"electron"` |
+    | --- | --- | --- |
+    | `"electron"` | photons / (incident electron · eV · sr) | None |
+    | `"sr"` | photons / (s · eV · sr) | Multiply by physical electrons / s |
+    | `"detector"` (default) | photons / (s · eV) into acceptance | Also multiply by accepted sr |
+    | `"nA"` | photons / (s · nA · eV) into acceptance | Accepted rate per 1 nA of current |
+
+    The energy columns remain in eV and keV; selecting `photon_energy_keV`
+    does **not** change a density from per eV to per keV (that needs ×1,000).
+    These are expected rates before detector efficiency and exposure, not
+    acquired counts. This scalar-detector conversion assumes intensity is
+    uniform across its accepted solid angle.
+    """)
+    return
+
+
 @app.cell
 def _(result):
     # Each table has a common, interpolated energy grid and explicit units.
-    # per_electron = result.spectral_flux(units="electron")
-    # per_sr = result.spectral_flux(units="sr")
+    per_sr = result.spectral_flux(units="sr")
     into_acceptance = result.spectral_flux(units="detector")
-    return (into_acceptance,)
+    into_acceptance  # noqa: B018 - display the common-grid table in marimo
+    return into_acceptance, per_sr
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    For this beam, **50 nA ≈ 3.12 × 10¹¹ electrons / s**. Thus the `"sr"`
+    table is the electron-normalized table multiplied by that rate; the
+    `"detector"` table also includes the detector's accepted solid angle.
+    Integrating a `"detector"` column over energy in **eV** gives photons / s.
+    The following check applies those conversions to the CXR band alone.
+    """)
+    return
 
 
 @app.cell

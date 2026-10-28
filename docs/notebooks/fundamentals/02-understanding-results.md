@@ -7,8 +7,8 @@ photon rates, while keeping acquisition counts separate.
 
 
 These are **captured outputs**. Recompute in Molab or locally after installing
-the reference tables described in notebook 00. The static page needs no Python
-kernel, GPU or simulation run.
+the reference tables described in [notebook 01](01-first-spectrum.md).
+The static page needs no Python kernel, GPU or simulation run.
 
 ```{raw} html
 <iframe src="../../_static/notebooks/02-understanding-results.html"
