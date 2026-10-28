@@ -44,7 +44,7 @@ import numpy as np
 from matplotlib.collections import LineCollection
 from matplotlib.colors import LinearSegmentedColormap, PowerNorm
 from matplotlib.font_manager import FontProperties
-from matplotlib.patches import PathPatch, Rectangle
+from matplotlib.patches import Circle, PathPatch, Rectangle
 from matplotlib.textpath import TextPath
 from matplotlib.transforms import Affine2D
 from PIL import Image, ImageDraw, ImageOps
@@ -351,6 +351,105 @@ def draw_glyph(
     return box.width * scale
 
 
+def draw_hbn_e(
+    ax,
+    *,
+    x: float,
+    baseline: float,
+    cap: float,
+    width: float,
+    tilt_deg: float = 13.0,
+) -> dict[str, float | int | str]:
+    """Three slightly tipped hBN basal planes, without any typographic E stroke.
+
+    Atom sites and nearest-neighbor bonds come from PyRITE's existing crystal
+    renderer, using the catalog's CIF-derived hBN basis. Two repeated bulk
+    cells supply three successive planes, retaining their AA' registry.
+    This is a shallow, stylized orthographic view, not an arbitrary dot grid.
+    """
+    from pyrite.materials import CATALOG
+    from pyrite.plots.plotly.crystal_lattice import crystal_atom_sites, crystal_bonds
+
+    spec = CATALOG.crystal("hbn")
+    all_elements, all_coords = crystal_atom_sites(spec, n_a=7, n_b=3, n_c=2)
+    plane_heights = np.unique(np.round(all_coords[:, 2], 5))
+    if len(plane_heights) < 3:
+        raise RuntimeError("The hBN lattice does not contain three basal planes")
+    selected = np.isin(np.round(all_coords[:, 2], 5), plane_heights[:3])
+    coords = all_coords[selected]
+    elements = np.asarray(all_elements)[selected]
+    bonds = crystal_bonds(elements.tolist(), coords)
+    if len(elements) == 0 or not bonds:
+        raise RuntimeError("Could not construct the hBN sheet bonds")
+
+    # Rotate slightly in-plane, then view the basal sheets close to edge-on.
+    # Small elevation exposes the honeycomb depth without making three flat
+    # sheets look like three face-on patches of crystal.
+    u = coords[:, 0] + 0.23 * coords[:, 1]
+    v = coords[:, 1]
+    pad = 0.050
+    px = x + pad + (width - 2 * pad) * (u - u.min()) / np.ptp(u)
+    py = np.empty(len(px), dtype=float)
+    row_separation = (cap - baseline - 0.28) / 2.0
+    for row, height in enumerate(plane_heights[:3]):
+        in_row = np.isclose(coords[:, 2], height)
+        row_v = v[in_row]
+        depth_span = max(float(np.ptp(row_v)), 1e-12)
+        py[in_row] = (
+            cap
+            - 0.14
+            - row * row_separation
+            + np.sin(np.deg2rad(tilt_deg))
+            * width
+            * 0.80
+            * (row_v - 0.5 * (row_v.min() + row_v.max()))
+            / depth_span
+        )
+
+    segments = [
+        [(px[first], py[first]), (px[second], py[second])]
+        for first, second in bonds
+    ]
+    ax.add_collection(
+        LineCollection(
+            segments, colors="#96B7C1", linewidths=1.12, alpha=0.83, zorder=3
+        )
+    )
+
+    # Paint rear atoms before foreground atoms. Small offset highlights imply
+    # rounded atomic spheres while preserving the actual B/N site positions.
+    for idx in np.argsort(v):
+        element = elements[idx]
+        radius = 0.042 if element == "B" else 0.052
+        fill = "#71D8F0" if element == "B" else "#F5E4C0"
+        ax.add_patch(
+            Circle(
+                (px[idx], py[idx]),
+                radius,
+                facecolor=fill,
+                edgecolor="#233A51",
+                linewidth=0.45,
+                zorder=4,
+            )
+        )
+        ax.add_patch(
+            Circle(
+                (px[idx] - 0.27 * radius, py[idx] + 0.28 * radius),
+                0.30 * radius,
+                facecolor="white",
+                edgecolor="none",
+                alpha=0.19,
+                zorder=5,
+            )
+        )
+    return {
+        "e_material": "hbn",
+        "e_sheets": 3,
+        "e_atoms": len(elements),
+        "e_bonds": len(bonds),
+        "e_tilt_deg": float(tilt_deg),
+    }
+
 def draw_y(
     ax,
     y: dict[str, np.ndarray],
@@ -513,10 +612,11 @@ def render(
     font_family: str,
     stem_width: float = 0.075,
     i_width: float = 0.45,
-    ri_gap: float = 0.10,
+    ri_gap: float = 0.17,
     color_gamma: float = 1.85,
     beam_seed: int = 17,
     beam_width_nm: float | None = None,
+    e_tilt_deg: float = 13.0,
 ):
     plt.rcParams["svg.fonttype"] = "path"
     plt.rcParams["svg.hashsalt"] = "pyrite-brand-v1"
@@ -535,7 +635,14 @@ def render(
     i_center = cursor + 0.34
     cursor += 0.68 + gap
     cursor += draw_glyph(ax, "T", cursor, baseline, letter_height, INK, font_family) + gap
-    cursor += draw_glyph(ax, "E", cursor, baseline, letter_height, INK, font_family)
+    # Match the original E glyph's advance width, but render no glyph outline.
+    font = FontProperties(family=font_family, weight="bold")
+    e_bounds = TextPath((0, 0), "E", size=1.0, prop=font).get_extents()
+    e_width = letter_height * e_bounds.width / e_bounds.height
+    e_stats = draw_hbn_e(
+        ax, x=cursor, baseline=baseline, cap=cap, width=e_width, tilt_deg=e_tilt_deg
+    )
+    cursor += e_width
 
     stats = draw_y(
         ax,
@@ -554,6 +661,7 @@ def render(
     stats.update(
         draw_i(ax, line_data, x_center=i_center, baseline=baseline, cap=cap, width_scale=i_width)
     )
+    stats.update(e_stats)
     ax.set_xlim(0.0, cursor + 0.40)
     ax.set_ylim(baseline - 0.16, cap + 0.16)
     ax.set_aspect("equal", adjustable="box")
@@ -661,9 +769,15 @@ def main():
     parser.add_argument(
         "--font-family",
         default="DejaVu Sans",
-        help="Installed font for P, R, T, E (e.g. 'Space Grotesk')",
+        help="Installed font for P, R, T and E-width matching (e.g. 'Space Grotesk')",
     )
     parser.add_argument("--dpi", type=int, default=150)
+    parser.add_argument(
+        "--e-tilt-deg",
+        type=float,
+        default=13.0,
+        help="Shallow viewing elevation of the three hBN E sheets in degrees",
+    )
     parser.add_argument(
         "--corner-radius-fraction",
         type=float,
@@ -718,6 +832,8 @@ def main():
         parser.error("--y-beam-width-nm must be finite and positive")
     if args.y_max_steps < 1:
         parser.error("--y-max-steps must be positive")
+    if not np.isfinite(args.e_tilt_deg) or not 0 <= args.e_tilt_deg <= 25:
+        parser.error("--e-tilt-deg must be finite and in [0, 25]")
     if not 0 <= args.corner_radius_fraction <= 0.12:
         parser.error("--corner-radius-fraction must be in [0, 0.12]")
     if not 0.5 <= args.social_logo_width_fraction <= 1.0:
@@ -762,6 +878,7 @@ def main():
         color_gamma=args.y_color_gamma,
         beam_seed=args.seed,
         beam_width_nm=args.y_beam_width_nm,
+        e_tilt_deg=args.e_tilt_deg,
     )
     write_brand_assets(y_data, args, y_thick_ang)
     report = {
@@ -804,6 +921,8 @@ def main():
             "i_width": args.i_width,
             "ri_gap": args.ri_gap,
             "i_caps": False,
+            "e_crystal": "hbn (CIF-derived, three successive AA'-stacked basal planes)",
+            "e_tilt_deg": args.e_tilt_deg,
             "corner_radius_fraction": args.corner_radius_fraction,
             "social_logo_width_fraction": args.social_logo_width_fraction,
             "social_card_size_px": [1200, 630],
