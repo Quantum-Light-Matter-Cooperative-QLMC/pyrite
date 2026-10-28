@@ -1,0 +1,56 @@
+{
+  "schema": "pyrite.marimo-tutorial.v1",
+  "source_sha256": "4ab270b8daaf48d6151d15e6e891cf9e5e114734702c9308fd4e9e6f09d2d4ca",
+  "exporter_sha256": "6eedb7b2d84c7c81cfe4bb58c476c02676f6fd3a5784f844f613efe30412ab24",
+  "git_revision": "238140e8a615785dc24cdbc1dbfc21608c161947",
+  "git_dirty": true,
+  "python_version": "3.14.4",
+  "execution": {
+    "tutorial": "06-detector-counts",
+    "pyrite_version": "0.22.4",
+    "backend": "cpu",
+    "seed": 1,
+    "table_identity": {
+      "918b1a9013e4c19c584e2cf4eb8b605f0063a7237b8b0d67749867a4c6804832": "c3f8eab1f03c1c66cfe0355b68f312e0ca450cbacaabe4f72eebecefe8d1e08d",
+      "ea7657ec94db1acf9f16cb260a5b107c3d2a4ecc71e43facee0e6a845487cbeb": "beed169ba64a48fd11dc8c5a7bb81471abaa21806bde7943dba6da43e5b01b6f",
+      "44461d55c05a7fea30a0f52bceb2aa384d6b71c1e12765da576b5cbc2592dbe3": "3f32446ff553a97b14755b475c4d88287ff44eff2ffce0cdd790dbd9b40a83f2",
+      "dfea6d21d4f6196cb74ef19486b6d86f6f5af40e89d7241efe09507a3b982e85": "61fb7f4cf6dceab2a4d10c5fc641357d80b0ba6bbe037b64dd000e08f024acd9"
+    },
+    "source_identity": "60000fac994649fd80846d1da0ba79334051cf14461e8d64c9a3cc481f2df5a0",
+    "observation_identity": "15c33ae9c8ba5c9c37030d21bf11e0af64f972ec3ba173eac93bc13c7d4029c4",
+    "acquisition_seed": 23,
+    "exposure_s": 1.0,
+    "current_nA": 10.0,
+    "measured_edges_eV": [
+      500.0,
+      4000.0
+    ],
+    "components": [
+      "brem",
+      "characteristic",
+      "cxr"
+    ],
+    "pixel_shape": [
+      16,
+      16
+    ],
+    "angular_tiles": [
+      4,
+      4
+    ],
+    "sampled_cxr_histories": 512,
+    "sampled_brem_histories": 128,
+    "expected_total": 929.8047082716506,
+    "realized_total": 905,
+    "outside_window_expected": {
+      "underflow": 13981.857636154802,
+      "overflow": 381.55792220834155,
+      "below_cut": 0.0
+    }
+  },
+  "artifacts": {
+    "notebooks/__marimo__/session/06-detector-counts.py.json": "71e6ed438aa4051f87d922b4f3004c59f68d6010275fbfd1a07063df11c08784",
+    "_static/notebooks/06-detector-counts.html": "7a7870aaf3e0a080de327c20c5fdf2ff053c34ad378af5cb3ae4b0eb6b35baa2",
+    "_static/notebooks/06-detector-counts-1.png": "b850615f5c9be349e6f96f2a43b5225d30cebf0d0204e53533656a3d5f1262ae"
+  }
+}

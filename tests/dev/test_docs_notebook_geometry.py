@@ -89,6 +89,8 @@ def test_all_notebooks_bootstrap_tables_before_simulation():
         "02-understanding-results",
         "03-pxr-line-energies",
         NAME,
+        "05-angular-radiation-distributions",
+        "06-detector-counts",
     )
     for name in names:
         source = (DOCS / "notebooks" / f"{name}.py").read_text()
@@ -109,7 +111,7 @@ def test_all_notebooks_bootstrap_tables_before_simulation():
         fetches = [
             stmt
             for stmt in first_cell.body
-            if isinstance(stmt, ast.Expr)
+            if isinstance(stmt, (ast.Expr, ast.Assign))
             and isinstance(stmt.value, ast.Call)
             and isinstance(stmt.value.func, ast.Attribute)
             and isinstance(stmt.value.func.value, ast.Name)

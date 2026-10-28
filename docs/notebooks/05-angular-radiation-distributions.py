@@ -21,7 +21,7 @@ def _():
 
     import pyrite
 
-    pyrite.fetch_tables()  # Complete installed tables require no network access.
+    _ = pyrite.fetch_tables()  # Complete installed tables require no network access.
     return mo, np, plt, pyrite
 
 

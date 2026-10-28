@@ -21,7 +21,7 @@ def _():
 
     import pyrite
 
-    pyrite.fetch_tables()  # Fetch missing pinned tables once; reuse installed data.
+    _ = pyrite.fetch_tables()  # Fetch missing pinned tables once; reuse installed data.
 
     return mo, np, os, plt, pyrite
 
@@ -55,7 +55,7 @@ def _(mo):
 
     The reference data download is about 100 MB. Fetch verifies archive SHA-256
     before installation; `tables verify` checks installed pins and payloads.
-    The setup cell calls `pyrite.fetch_tables()` to install missing pinned tables
+    The setup cell calls `_ = pyrite.fetch_tables()` to install missing pinned tables
     automatically. Complete installations are reused without a network request.
     The CLI commands above remain useful for manual verification or troubleshooting.
     See the [tables reference](https://pyrite.readthedocs.io/en/latest/repo-design/cli/cli-reference-tables.html).

@@ -21,7 +21,7 @@ def _():
 
     import pyrite
 
-    pyrite.fetch_tables()  # Fetch missing pinned tables once; reuse installed data.
+    _ = pyrite.fetch_tables()  # Fetch missing pinned tables once; reuse installed data.
 
     return mo, np, os, plt, pyrite
 

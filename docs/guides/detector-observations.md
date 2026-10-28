@@ -1,5 +1,8 @@
 # From emitted photons to pixel counts
 
+For a guided, editable introduction, use
+[From X-rays to detector counts](../notebooks/designing/06-detector-counts.md).
+
 Predict an ideal detector image, then compare it with a simulated counting
 realization from the same source. This example separates physical detector
 geometry, readout response and exposure without rerunning transport.
