@@ -5,6 +5,8 @@ Compare film transition radiation (TR) with coherent transition radiation (CTR),
 then see what changes when electrons scatter and lose energy. The figures below
 are actual outputs of the packaged marimo app, not measurements.
 
+For a public-API walkthrough, open [Transition and coherent transition radiation](../notebooks/specialized/10-transition-radiation.ipynb).
+
 ## Launch the notebook
 
 From a source checkout:

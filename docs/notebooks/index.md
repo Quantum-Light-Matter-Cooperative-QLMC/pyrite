@@ -12,6 +12,7 @@ downloadable Marimo source locally.
 
 Fundamentals <fundamentals/index>
 Designing simulations <designing/index>
+Specialized workflows <specialized/index>
 ```
 
 For specific tasks, use the [guides](../guides/index.md); for exact interfaces,
