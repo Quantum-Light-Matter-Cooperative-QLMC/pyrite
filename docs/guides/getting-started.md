@@ -161,13 +161,7 @@ normalization.
 For environment setup and a guided Python simulation, start with
 [Your first spectrum](../notebooks/fundamentals/01-first-spectrum.ipynb).
 The CLI quickstart writes a checkpoint. For an in-memory call from an existing
-Python session, use the one-scene recipe:
-
-```{toctree}
-:maxdepth: 1
-
-Run one simulation from Python <python-api-workflow>
-```
+Python session, use the [one-scene recipe](../reference/python-scene-recipes.md#run-one-scene-in-memory).
 
 (install-completion-optional)=
 (backend-setup-optional)=

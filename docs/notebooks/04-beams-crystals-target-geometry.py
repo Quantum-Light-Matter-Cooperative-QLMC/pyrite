@@ -149,9 +149,6 @@ def _(mo):
 
     Try changing `beam.energy_keV`, `target.thickness_ang`, or `material`
     one at a time. Other crystals may need different cuts and energy windows.
-    These small-sample spectra are illustrative; consult
-    [validation](https://pyrite.readthedocs.io/en/latest/validation/status-summary.html)
-    before making quantitative predictions.
     """)
     return
 

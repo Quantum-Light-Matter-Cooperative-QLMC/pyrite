@@ -99,6 +99,25 @@ def output_contains_figure(notebook):
     return False
 
 
+def suppress_optical_data_warnings(notebook):
+    """Omit optical-coverage warning tracebacks from published tutorial output."""
+    pattern = re.compile(
+        r"^[^\n]*:\d+: LineOpticalDataWarning:[^\n]*(?:\n[ \t]+[^\n]*)?\n?",
+        re.MULTILINE,
+    )
+    for cell in notebook["cells"]:
+        if cell["cell_type"] != "code":
+            continue
+        outputs = []
+        for output in cell.get("outputs", []):
+            if output.get("output_type") == "stream" and output.get("name") == "stderr":
+                output["text"] = pattern.sub("", output["text"])
+                if not output["text"].strip():
+                    continue
+            outputs.append(output)
+        cell["outputs"] = outputs
+
+
 def captured_notebook(source, notebook, title, footer):
     """Add site-only material without changing the editable marimo source."""
     import nbformat
@@ -122,16 +141,13 @@ def captured_notebook(source, notebook, title, footer):
             continue
         if match.group(1).strip() != title:
             raise ValueError(f"{source.name}: Marimo and documentation titles disagree")
-        notice = (
-            f"# {title}\n\n{badge}\n\n"
-            "**Captured results.** Edit and recompute in Molab or local marimo; "
-            "this static page does not execute PyRITE or download reference tables."
-        )
-        cell["source"] = markdown[: match.start()] + notice + markdown[match.end() :]
+        heading = f"# {title}\n\n{badge}"
+        cell["source"] = markdown[: match.start()] + heading + markdown[match.end() :]
         break
     else:
         raise ValueError(f"{source.stem}: missing Markdown title cell")
 
+    suppress_optical_data_warnings(notebook)
     notebook["cells"].append(
         nbformat.v4.new_markdown_cell(
             "## Continue learning\n\n"

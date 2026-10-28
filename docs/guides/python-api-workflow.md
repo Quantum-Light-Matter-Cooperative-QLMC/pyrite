@@ -1,3 +1,7 @@
+---
+orphan: true
+---
+
 (your-first-python-simulation)=
 # Run one simulation from Python
 

@@ -63,7 +63,7 @@ a separate future capability, not implied by the factorized scorer.
 A detector with a response and an `Acquisition` can request expected or
 realized counts; intrinsic spectra remain photons/(incident electron eV sr),
 whereas pixel-integrated and acquired results have different acceptances and
-normalizations (see the [API workflow](../../guides/python-api-workflow.md)).
+normalizations (see the [spectral observables](../../physics/radiation-physics/spectral-observables.md)).
 
 The [quantum API map](../quantum-api.md) documents portable specs, runtime
 states, configuration, solver results, and experimental diagnostics through

@@ -87,8 +87,32 @@ def test_export_migrates_wrapper_and_retains_hidden_input(tmp_path, monkeypatch)
                             "figure",
                             outputs=[
                                 nbformat.v4.new_output(
+                                    "stream",
+                                    name="stderr",
+                                    text=(
+                                        "before\n"
+                                        "/usr/lib/python3.14/contextlib.py:148: "
+                                        "LineOpticalDataWarning: unavailable optical data\n"
+                                        "  next(self.gen)\n"
+                                        "example.py:7: UserWarning: keep this warning\n"
+                                        "  warn('keep this warning')\n"
+                                    ),
+                                ),
+                                nbformat.v4.new_output(
+                                    "stream",
+                                    name="stderr",
+                                    text=(
+                                        "C:/project/spectrum.py:328: "
+                                        "LineOpticalDataWarning: unavailable optical data\n"
+                                        "  publish_line_data_coverage(coverage)\n"
+                                    ),
+                                ),
+                                nbformat.v4.new_output(
+                                    "stream", name="stdout", text="result: 42\n"
+                                ),
+                                nbformat.v4.new_output(
                                     "display_data", data={"image/png": "iVBORw0KGgo="}
-                                )
+                                ),
                             ],
                         ),
                     ]
@@ -103,6 +127,14 @@ def test_export_migrates_wrapper_and_retains_hidden_input(tmp_path, monkeypatch)
     nb = nbformat.read(exported, as_version=4)
     assert nb.cells[0]["metadata"]["tags"] == ["remove-input"]
     assert f"{module.MOLAB}first.py" in nb.cells[1].source
+    assert "Captured results" not in nb.cells[1].source
+    outputs = nb.cells[2].outputs
+    assert len(outputs) == 3
+    assert outputs[0].text == (
+        "before\nexample.py:7: UserWarning: keep this warning\n  warn('keep this warning')\n"
+    )
+    assert outputs[1].text == "result: 42\n"
+    assert "image/png" in outputs[2].data
     assert "02-second.ipynb" in nb.cells[-1].source
     assert nb.metadata["pyrite_docs"]["source_sha256"] == module.digest(sources / "first.py")
     assert len(calls) == 2  # marimo check, then a single captured ipynb export

@@ -1,7 +1,7 @@
 # How PyRITE works
 
 Follow a case from incident electrons to source spectra and detector predictions.
-To run one, use the [Python tutorial](../guides/python-api-workflow.md) or
+To run one, use the [Python tutorial](../notebooks/fundamentals/01-first-spectrum.ipynb) or
 [CLI quickstart](../guides/getting-started.md).
 
 ## From a case to a result
@@ -67,7 +67,7 @@ determine reciprocal vectors; a surface normal alone does not.
 
 ## Where to go next
 
-- [Python tutorial](../guides/python-api-workflow.md): simulate and plot a scalar case.
+- [Python tutorial](../notebooks/fundamentals/01-first-spectrum.ipynb): simulate and plot a scalar case.
 - [Working with results](../guides/working-with-results.md): load and interpret checkpoints.
 - [Checkpoint and app reference](../reference/results-and-apps.md): inspect
   stored components and pixel observations.

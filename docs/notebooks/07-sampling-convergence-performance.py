@@ -42,8 +42,7 @@ def _(mo):
     135° observation, and no bremsstrahlung.
 
     The **600–2,000 eV** band integral is less noisy than individual grid
-    samples. Small CPU budgets illustrate the method, not validated precision;
-    sampled histories are not physical bunch charge.
+    samples. Sampled histories are not physical bunch charge.
     """)
     return
 

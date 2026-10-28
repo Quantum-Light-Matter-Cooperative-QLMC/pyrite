@@ -2,15 +2,10 @@
 
 Learn PyRITE through short, executable scientific notebooks. Start with
 Fundamentals: verify your environment, simulate a spectrum, interpret its
-results and predict line energies. Each notebook stands alone and uses the
-public Python API.
+results and predict line energies using the public Python API.
 
-The published pages are **native MyST-NB documents** with captured code, Markdown
-and figures from the same canonical marimo `.py` files used by Molab. The
-exported `.ipynb` pages are committed publication artifacts, not editable
-source notebooks. They render without an iframe, Python kernel, GPU or table
-downloads on Read the Docs. To change parameters or recompute, open the
-**Open in Molab** badge or the canonical source locally.
+To change parameters and rerun a tutorial, use **Open in Molab** or open its
+downloadable Marimo source locally.
 
 ```{toctree}
 :maxdepth: 2

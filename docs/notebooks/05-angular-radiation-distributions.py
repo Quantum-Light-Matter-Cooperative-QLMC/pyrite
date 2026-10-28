@@ -161,9 +161,8 @@ def _(mo):
     Neither includes angular acceptance or detector response. Only PXR/CBS
     is calculated here; the energy range is restricted to **100–2,000 eV**.
 
-    Unsupported directions are masked, not physical zeros. One reflection
-    family and modest sampling make this an illustration, not convergence
-    evidence. Try changing target tilt, history count or grid spacing.
+    Unsupported directions are masked, not physical zeros.
+    Try changing target tilt, history count or grid spacing.
     See the [directional-source reference](https://pyrite.readthedocs.io/en/latest/reference/directional-sources.html).
     """)
     return

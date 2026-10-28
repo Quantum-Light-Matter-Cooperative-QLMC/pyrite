@@ -20,16 +20,17 @@ def _toctree_targets(page: Path) -> set[Path]:
     return targets
 
 
-def test_python_scene_recipe_belongs_to_getting_started() -> None:
+def test_getting_started_is_a_single_top_level_page() -> None:
     homepage = DOCS / "index.md"
     started = DOCS / "guides/getting-started.md"
     howtos = DOCS / "guides/index.md"
     example = DOCS / "guides/python-api-workflow.md"
 
     assert started.resolve() in _toctree_targets(homepage)
-    assert example.resolve() in _toctree_targets(started)
+    assert not _toctree_targets(started)
     assert example.resolve() not in _toctree_targets(howtos)
-    assert "Run one simulation from Python <python-api-workflow>" in started.read_text()
+    assert "../reference/python-scene-recipes.md#run-one-scene-in-memory" in started.read_text()
+    assert "orphan: true" in example.read_text()
     assert "[Interactive Tutorials](../notebooks/index.md)" in howtos.read_text()
     assert (DOCS / "notebooks/index.md").is_file()  # #758 owns the notebooks.
 

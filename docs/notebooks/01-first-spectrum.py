@@ -84,8 +84,7 @@ def _(mo):
     mo.md(r"""
     ## Simulate a crystalline target
 
-    This example uses 30 keV electrons incident upon a 100 nm HOPG slab. Its small
-    trial counts keep it CPU-friendly; the curves are **only illustrative**.
+    This example uses 30 keV electrons incident upon a 100 nm HOPG slab.
     The sampled electron histories do not represent a physical bunch population.
     """)
     return

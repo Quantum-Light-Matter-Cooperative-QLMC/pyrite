@@ -71,7 +71,7 @@ their audience, rather than additional tutorials or interface specifications.
 | Pages | Primary mode and audience | Canonical owner |
 | --- | --- | --- |
 | `notebooks/fundamentals/`, `notebooks/designing/` | Tutorial; learners | [Interactive Tutorials](../notebooks/index.md); executable sources own the tutorial; HTML is disposable build output. |
-| `guides/getting-started.md`, `guides/python-api-workflow.md` | Entry point and how-to; new users | [Getting Started](../guides/getting-started.md); link to the first notebook for guided Python learning. |
+| `guides/getting-started.md` | Entry point; new users | [Getting Started](../guides/getting-started.md) is a single top-level page without child pages; link to the first notebook for guided Python learning. |
 | `guides/configuration-cookbook.md`, `guides/configuration-notebook.md` | How-to; campaign authors | [How-to Guides](../guides/index.md); fields and editor behavior belong in [configuration reference](../reference/configuration/index.md). |
 | `guides/directional-source-heatmap.md`, `guides/detector-observations.md`, `guides/working-with-results.md` | How-to; simulation and analysis users | [How-to Guides](../guides/index.md); link to notebooks for learning and reference for complete contracts. |
 | `guides/adding-materials.md`, `guides/gpt-gdf-beams.md`, `guides/optimization-studies.md` | How-to; users with specialized inputs or studies | [How-to Guides](../guides/index.md); schemas and restrictions remain in reference. |
@@ -87,7 +87,7 @@ their audience, rather than additional tutorials or interface specifications.
 
 Compatibility pages preserve URLs and anchors and direct readers to their
 canonical owner. Do not expand them into competing guides. This applies to
-`guides/analysis-tutorial.md`, `external-catalog.md`, `sweep-profiles.md`,
+`guides/python-api-workflow.md`, `analysis-tutorial.md`, `external-catalog.md`, `sweep-profiles.md`,
 `quantum-api.md`, `experimental-api.md` and `how-pyrite-works.md` (all under
 `guides/`), plus `computation/index.md` and the former computation workflow
 pages. Keep their destination links current; new inbound links should target
