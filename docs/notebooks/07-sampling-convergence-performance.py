@@ -31,25 +31,13 @@ def _(mo):
     mo.md(r"""
     # Sampling, convergence and performance
 
-    Examine how the PXR/CBS yield changes with sampled electron histories,
-    then try PyRITE's bounded adaptive stopping rule.
-    """)
-    return
+    Compare PXR/CBS yields for three sampled-history budgets and one
+    adaptive stopping policy. All runs use a 30 keV beam, 100 nm HOPG,
+    135° observation, and no bremsstrahlung.
 
-
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""
-    ## Keep the physics fixed
-
-    We compare the **same** 30 keV beam, 100 nm HOPG slab and 135° observation
-    direction for three numerical budgets. Bremsstrahlung is disabled to isolate
-    the CXR estimator; a **[600, 2,000] eV** band integral avoids comparing
-    individual noisy grid samples. Each yield is in photons per incident
-    electron per steradian. Sampled histories are *not* physical bunch charge.
-
-    This tutorial uses the CPU backend and intentionally small budgets.
-    It illustrates a convergence workflow, **not validated precision**.
+    The **600–2,000 eV** band integral is less noisy than individual grid
+    samples. Small CPU budgets illustrate the method, not validated precision;
+    sampled histories are not physical bunch charge.
     """)
     return
 
@@ -153,13 +141,12 @@ def _(
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## Adaptive sampling is a separate stopping policy
+    ## Adaptive stopping
 
-    `AdaptiveSampling` checks a batch-means relative standard error (RSE),
-    subject to minimum histories, effective-sample and largest-contribution
-    guards. It can reach its maximum **without meeting the target**. Its RSE
-    estimate is not the difference between successive fixed-budget runs.
-    The bounded example below uses a deliberately loose teaching target.
+    `AdaptiveSampling` estimates a batch-means relative standard error
+    (RSE), subject to minimum-sample and contribution guards. It can reach
+    its history limit **without meeting the target**. The deliberately
+    loose RSE target here is for teaching.
     """)
     return
 
@@ -217,7 +204,7 @@ def _(
     return adaptive_result, adaptive_row
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(adaptive_row, fixed_rows, mo):
     mo.json(
         {
@@ -277,31 +264,21 @@ def _(adaptive_row, budgets, fixed_rows, np, plt):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## Interpret and explore
+    ## Interpretation
 
-    A stable band integral across increasing budgets is useful **evidence to
-    investigate**, but not a confidence interval. The three fixed runs reuse
-    PyRITE's resolved default seed; their overlapping histories can be
-    correlated, so their spread is **not an independent-sample SEM**. The
-    largest fixed budget is only a *reference estimate*, not ground truth.
+    The largest fixed-budget yield is only a reference, **not ground truth**.
+    These runs share a resolved default seed, so their differences are not
+    an independent-sample error estimate. For uncertainty, use independent
+    seeds and inspect the convergence diagnostics.
 
-    Adaptive sampling stops according to its internal checks or at its maximum.
-    Reaching a configured target must be confirmed from the run's convergence
-    diagnostics; **do not infer success from the final count**. A noisy or
-    rare-event-dominated observable may need many more histories. Changing
-    reflection families or energy bins is a *systematic discretization study*,
-    distinct from sampling convergence.
+    An adaptive run may stop at its maximum without achieving its RSE
+    target; check its diagnostics. Changing reflection families or energy
+    grids tests systematic discretization, not sampling convergence.
 
-    Wall times include Python, compilation/caching and scheduling overheads;
-    the small untimed warmup does not make these hardware-comparable timings.
-    Try increasing all budgets by 4×, repeating on a clean process, and testing
-    the adaptive target with stronger guards. For quantitative uncertainty,
-    use independently seeded runs where the execution interface supports them,
-    and inspect validated batch-means diagnostics rather than assigning error
-    bars to the three plotted points. See the
-    [sampling policy reference](https://pyrite.readthedocs.io/en/latest/reference/python-api/config.html),
-    [performance guidance](https://pyrite.readthedocs.io/en/latest/computation/index.html),
-    and [validation](https://pyrite.readthedocs.io/en/latest/validation/status-summary.html).
+    Wall times depend on compilation, caching and hardware. The untimed
+    warmup helps, but these are **not portable benchmarks**. Try increasing
+    the budgets and compare the [sampling reference](https://pyrite.readthedocs.io/en/latest/reference/python-api/config.html)
+    and [performance guidance](https://pyrite.readthedocs.io/en/latest/computation/index.html).
     """)
     return
 

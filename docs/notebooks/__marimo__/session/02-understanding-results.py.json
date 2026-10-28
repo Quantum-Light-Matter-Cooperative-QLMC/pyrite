@@ -2,51 +2,12 @@
   "version": "1",
   "metadata": {
     "marimo_version": "0.25.2",
-    "script_metadata_hash": "be882373ce9f9752409aa815b3a6adb0"
+    "script_metadata_hash": "0bd4a502c6636b3b44fe85ee22d08f69"
   },
   "cells": [
     {
       "id": "Hbol",
       "code_hash": "a1d27f6f01e8ed604074c197eb7fd02b",
-      "outputs": [
-        {
-          "type": "data",
-          "data": {
-            "text/html": "<div style='display: flex;flex: 1;flex-direction: column;justify-content: flex-start;align-items: normal;flex-wrap: nowrap;gap: 0.5rem'><marimo-ui-element object-id='Hbol-0' random-id='f865f45d-0375-b173-c020-8c7c3b80b07c'><marimo-anywidget data-initial-value='{&quot;model_id&quot;:&quot;814a2436abed4c1db98a0ab37a616ce9&quot;}' data-label='null' data-model-id='&quot;814a2436abed4c1db98a0ab37a616ce9&quot;'></marimo-anywidget></marimo-ui-element></div>"
-          }
-        }
-      ],
-      "console": []
-    },
-    {
-      "id": "MJUe",
-      "code_hash": "ee2f84f6ff80c802b4cd7435f96d0c61",
-      "outputs": [
-        {
-          "type": "data",
-          "data": {
-            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h1 id=\"understanding-simulation-results\">Understanding simulation results</h1>\n<span class=\"paragraph\">Turn an electron-normalized source spectrum into an energy-integrated yield\nand a physical photon rate, without confusing either with detector counts.</span></span>"
-          }
-        }
-      ],
-      "console": []
-    },
-    {
-      "id": "vblA",
-      "code_hash": "b3d4e4101b9166a9d7d9cd0a6a47b86f",
-      "outputs": [
-        {
-          "type": "data",
-          "data": {
-            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"a-source-and-its-numerical-sampling\">A source and its numerical sampling</h2>\n<span class=\"paragraph\">This independently runnable example follows notebook 01. A <strong>0.5 pC</strong> bunch\nat <strong>100 kHz</strong> corresponds to <strong>50 nA</strong> average beam current, regardless of\nhow many Monte Carlo histories we sample. The low history counts below are\nchosen for teaching, <strong>not</strong> precision or convergence.</span></span>"
-          }
-        }
-      ],
-      "console": []
-    },
-    {
-      "id": "bkHC",
-      "code_hash": "8bf164645f11f7694ed9492d9da73002",
       "outputs": [
         {
           "type": "data",
@@ -58,8 +19,21 @@
       "console": []
     },
     {
-      "id": "lEQa",
-      "code_hash": "d84391c6592a5f695a7fb4d783978416",
+      "id": "MJUe",
+      "code_hash": "2ae1e7f188bf106531aa705022b9c047",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h1 id=\"understanding-simulation-results\">Understanding simulation results</h1>\n<span class=\"paragraph\">Convert an electron-normalized PXR/CBS spectrum into a photon rate for\na specified beam current and angular acceptance. A <strong>0.5 pC</strong> bunch at\n<strong>100 kHz</strong> gives <strong>50 nA</strong> average current; the <strong>8,192 sampled histories</strong>\nare numerical estimators, not bunch electrons.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "vblA",
+      "code_hash": "4f0204df49b467a3aadd85da5e03bdc1",
       "outputs": [
         {
           "type": "data",
@@ -78,20 +52,33 @@
       ]
     },
     {
-      "id": "PKri",
-      "code_hash": "78d41b6d1a05d1ba56fad37a365fe691",
+      "id": "c14cc50c-da48-434f-a627-1f0882e08353",
+      "code_hash": "80bc9e7b7afca07901a1046eb568f74f",
       "outputs": [
         {
           "type": "data",
           "data": {
-            "text/html": "<marimo-json-output data-json-data='{&quot;native_grid_sizes&quot;:[{&quot;component&quot;:&quot;cxr&quot;,&quot;len&quot;:3987},{&quot;component&quot;:&quot;characteristic&quot;,&quot;len&quot;:3987},{&quot;component&quot;:&quot;brem&quot;,&quot;len&quot;:600}],&quot;sample_rows&quot;:[{&quot;component&quot;:&quot;cxr&quot;,&quot;mode&quot;:&quot;incoherent&quot;,&quot;photon_energy_eV&quot;:10.0,&quot;density&quot;:8.244377665933233e-14,&quot;normalization&quot;:&quot;source&quot;},{&quot;component&quot;:&quot;cxr&quot;,&quot;mode&quot;:&quot;incoherent&quot;,&quot;photon_energy_eV&quot;:10.925740090316106,&quot;density&quot;:7.690341978277584e-14,&quot;normalization&quot;:&quot;source&quot;},{&quot;component&quot;:&quot;cxr&quot;,&quot;mode&quot;:&quot;incoherent&quot;,&quot;photon_energy_eV&quot;:11.851480180632212,&quot;density&quot;:7.517509846748756e-14,&quot;normalization&quot;:&quot;source&quot;}]}' data-value-types='&quot;json&quot;'></marimo-json-output>"
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h3 id=\"examine-the-returned-data-structures\">Examine the returned data structures</h3>\n<span class=\"paragraph\">by looking at component spectra on their own native energy grids</span></span>"
           }
         }
       ],
       "console": []
     },
     {
-      "id": "Xref",
+      "id": "bkHC",
+      "code_hash": "669f24b72d9a47f5f17cd34535312d21",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/html": "<marimo-ui-element object-id='bkHC-0' random-id='4053011e-44d4-4beb-46d0-713446008860'><marimo-table data-initial-value='[]' data-label='null' data-data='&quot;[{&#92;&quot;component&#92;&quot;:&#92;&quot;cxr&#92;&quot;,&#92;&quot;mode&#92;&quot;:&#92;&quot;incoherent&#92;&quot;,&#92;&quot;photon_energy_eV&#92;&quot;:10.0,&#92;&quot;density&#92;&quot;:8.244377665933233e-14,&#92;&quot;normalization&#92;&quot;:&#92;&quot;source&#92;&quot;},{&#92;&quot;component&#92;&quot;:&#92;&quot;cxr&#92;&quot;,&#92;&quot;mode&#92;&quot;:&#92;&quot;incoherent&#92;&quot;,&#92;&quot;photon_energy_eV&#92;&quot;:10.925740090316106,&#92;&quot;density&#92;&quot;:7.690341978277584e-14,&#92;&quot;normalization&#92;&quot;:&#92;&quot;source&#92;&quot;},{&#92;&quot;component&#92;&quot;:&#92;&quot;cxr&#92;&quot;,&#92;&quot;mode&#92;&quot;:&#92;&quot;incoherent&#92;&quot;,&#92;&quot;photon_energy_eV&#92;&quot;:11.851480180632212,&#92;&quot;density&#92;&quot;:7.517509846748756e-14,&#92;&quot;normalization&#92;&quot;:&#92;&quot;source&#92;&quot;},{&#92;&quot;component&#92;&quot;:&#92;&quot;cxr&#92;&quot;,&#92;&quot;mode&#92;&quot;:&#92;&quot;incoherent&#92;&quot;,&#92;&quot;photon_energy_eV&#92;&quot;:12.77722027094832,&#92;&quot;density&#92;&quot;:8.382204539859832e-14,&#92;&quot;normalization&#92;&quot;:&#92;&quot;source&#92;&quot;},{&#92;&quot;component&#92;&quot;:&#92;&quot;cxr&#92;&quot;,&#92;&quot;mode&#92;&quot;:&#92;&quot;incoherent&#92;&quot;,&#92;&quot;photon_energy_eV&#92;&quot;:13.702960361264426,&#92;&quot;density&#92;&quot;:7.911262521605144e-14,&#92;&quot;normalization&#92;&quot;:&#92;&quot;source&#92;&quot;},{&#92;&quot;component&#92;&quot;:&#92;&quot;cxr&#92;&quot;,&#92;&quot;mode&#92;&quot;:&#92;&quot;incoherent&#92;&quot;,&#92;&quot;photon_energy_eV&#92;&quot;:14.628700451580531,&#92;&quot;density&#92;&quot;:7.821428737536526e-14,&#92;&quot;normalization&#92;&quot;:&#92;&quot;source&#92;&quot;},{&#92;&quot;component&#92;&quot;:&#92;&quot;cxr&#92;&quot;,&#92;&quot;mode&#92;&quot;:&#92;&quot;incoherent&#92;&quot;,&#92;&quot;photon_energy_eV&#92;&quot;:15.55444054189664,&#92;&quot;density&#92;&quot;:8.666634217381396e-14,&#92;&quot;normalization&#92;&quot;:&#92;&quot;source&#92;&quot;},{&#92;&quot;component&#92;&quot;:&#92;&quot;cxr&#92;&quot;,&#92;&quot;mode&#92;&quot;:&#92;&quot;incoherent&#92;&quot;,&#92;&quot;photon_energy_eV&#92;&quot;:16.480180632212743,&#92;&quot;density&#92;&quot;:8.478359059591028e-14,&#92;&quot;normalization&#92;&quot;:&#92;&quot;source&#92;&quot;},{&#92;&quot;component&#92;&quot;:&#92;&quot;cxr&#92;&quot;,&#92;&quot;mode&#92;&quot;:&#92;&quot;incoherent&#92;&quot;,&#92;&quot;photon_energy_eV&#92;&quot;:17.40592072252885,&#92;&quot;density&#92;&quot;:8.009009735361539e-14,&#92;&quot;normalization&#92;&quot;:&#92;&quot;source&#92;&quot;},{&#92;&quot;component&#92;&quot;:&#92;&quot;cxr&#92;&quot;,&#92;&quot;mode&#92;&quot;:&#92;&quot;incoherent&#92;&quot;,&#92;&quot;photon_energy_eV&#92;&quot;:18.33166081284496,&#92;&quot;density&#92;&quot;:8.555230339518654e-14,&#92;&quot;normalization&#92;&quot;:&#92;&quot;source&#92;&quot;}]&quot;' data-total-rows='8574' data-total-columns='5' data-max-columns='50' data-banner-text='&quot;&quot;' data-pagination='true' data-page-size='10' data-field-types='[[&quot;component&quot;,[&quot;string&quot;,&quot;enum&quot;]],[&quot;mode&quot;,[&quot;string&quot;,&quot;enum&quot;]],[&quot;photon_energy_eV&quot;,[&quot;number&quot;,&quot;f64&quot;]],[&quot;density&quot;,[&quot;number&quot;,&quot;f64&quot;]],[&quot;normalization&quot;,[&quot;string&quot;,&quot;enum&quot;]]]' data-show-filters='true' data-show-download='true' data-show-search='true' data-show-column-summaries='true' data-show-data-types='true' data-show-page-size-selector='true' data-show-column-explorer='true' data-show-chart-builder='true' data-row-headers='[]' data-hidden-columns='[]' data-has-stable-row-id='false' data-lazy='false' data-preload='false'></marimo-table></marimo-ui-element>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "lEQa",
       "code_hash": "62d1f0b69968bf647cde260b6c47ce7b",
       "outputs": [
         {
@@ -104,8 +91,8 @@
       "console": []
     },
     {
-      "id": "SFPL",
-      "code_hash": "16e43e2e803d96c6a38141e6a6c3c627",
+      "id": "PKri",
+      "code_hash": "b07f47407f57225f6194224a3835f257",
       "outputs": [
         {
           "type": "data",
@@ -117,20 +104,33 @@
       "console": []
     },
     {
-      "id": "BYtC",
-      "code_hash": "c3ec07a06d19f06f2b44fd9a718231f6",
+      "id": "Xref",
+      "code_hash": "5adef3351f11713e2ee09532c7f8b6f5",
       "outputs": [
         {
-          "type": "data",
-          "data": {
-            "text/html": "<marimo-json-output data-json-data='{&quot;band_eV&quot;:[600.0,2000.0],&quot;mean_current_nA&quot;:50.0,&quot;sampled_cxr_histories&quot;:8192,&quot;accepted_solid_angle_sr&quot;:0.0012390399999999998,&quot;cxr_yield_photons_per_electron_sr&quot;:1.1337954841806297e-7,&quot;cxr_rate_photons_per_s_sr&quot;:35382.97401548018,&quot;cxr_rate_into_acceptance_photons_per_s&quot;:43.84092012414055}' data-value-types='&quot;json&quot;'></marimo-json-output>"
-          }
+          "type": "error",
+          "ename": "exception",
+          "evalue": "name 'per_sr' is not defined",
+          "traceback": null
         }
       ],
+      "console": [
+        {
+          "type": "stream",
+          "name": "stderr",
+          "text": "<span class=\"codehilite\"><div class=\"highlight\"><pre><span></span><span class=\"gt\">Traceback (most recent call last):</span>\n  File <span class=\"nb\">\"/tmp/marimo_65593/__marimo__cell_Xref_.py\"</span>, line <span class=\"m\">14</span>, in <span class=\"n\">&lt;module&gt;</span>\n<span class=\"w\">    </span><span class=\"n\">flux_sr_grid</span> <span class=\"o\">=</span> <span class=\"n\">per_sr</span><span class=\"o\">.</span><span class=\"n\">get_column</span><span class=\"p\">(</span><span class=\"s2\">\"photon_energy_eV\"</span><span class=\"p\">)</span><span class=\"o\">.</span><span class=\"n\">to_numpy</span><span class=\"p\">()</span>\n<span class=\"w\">                   </span><span class=\"pm\">^^^^^^</span>\n<span class=\"gr\">NameError</span>: <span class=\"n\">name 'per_sr' is not defined</span>\n</pre></div>\n</span>",
+          "mimetype": "application/vnd.marimo+traceback"
+        }
+      ]
+    },
+    {
+      "id": "3e35996d-e6c5-4e11-821d-faa4e1428eab",
+      "code_hash": null,
+      "outputs": [],
       "console": []
     },
     {
-      "id": "RGSE",
+      "id": "SFPL",
       "code_hash": "e42f8dbb52c58f33a3c533a69859ffa2",
       "outputs": [
         {
@@ -143,27 +143,27 @@
       "console": []
     },
     {
-      "id": "Kclp",
-      "code_hash": "3a6984972e11a4bf89c0eb590215e056",
+      "id": "BYtC",
+      "code_hash": "2a373106cbdc4f47bcbda39e46e1c644",
       "outputs": [
         {
           "type": "data",
           "data": {
-            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"interpretation\">Interpretation</h2>\n<span class=\"paragraph\"><code>result.to_dataframe()</code> keeps each component's <strong>native energy grid</strong>.\n<code>result.spectral_flux()</code> forms a common grid by interpolation: <code>\"electron\"</code>\nreturns source density, <code>\"sr\"</code> applies the physical electron rate, and\n<code>\"detector\"</code> also applies the accepted solid angle. Here the band integral\nintentionally uses <strong>CXR only</strong>, whereas the second plot includes all\ncomputed components. Integrating over energy removes the <code>/eV</code> dimension.</span>\n<span class=\"paragraph\">These are <em>expected emitted photon rates</em>, not acquired counts: no exposure\ntime, quantum efficiency, energy redistribution or Poisson counting has been\napplied. The scalar-detector acceptance uses a uniform-angular-density\napproximation. See the <a href=\"https://pyrite.readthedocs.io/en/latest/guides/working-with-results.html\" rel=\"noopener noreferrer\" target=\"_blank\">results how-to</a>\nfor saved checkpoints, and the <a href=\"https://pyrite.readthedocs.io/en/latest/physics/capabilities.html\" rel=\"noopener noreferrer\" target=\"_blank\">model limitations</a>\nand <a href=\"https://pyrite.readthedocs.io/en/latest/validation/status-summary.html\" rel=\"noopener noreferrer\" target=\"_blank\">validation status</a>\nbefore using a spectrum quantitatively.</span>\n<span class=\"paragraph\">Try doubling <code>bunch_charge_pc</code> <strong>without</strong> changing histories: the\nelectron-normalized yield stays the same, but the photon rate doubles.\nThen change the number of histories at fixed beam current to examine Monte\nCarlo variation. Continue to notebook 03 for ideal PXR line energies.</span></span>"
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"interpretation\">Interpretation</h2>\n<span class=\"paragraph\"><code>to_dataframe()</code> preserves each component's native energy grid;\n<code>spectral_flux()</code> interpolates onto a common one. <code>\"electron\"</code> gives\nthe electron-normalized density, <code>\"sr\"</code> scales by the physical electron\nrate, and <code>\"detector\"</code> also multiplies by accepted solid angle.</span>\n<span class=\"paragraph\">The <strong>600\u20132,000 eV</strong> band integral uses CXR only; the photon-rate plot\nincludes all computed components. These are <em>expected source rates</em>,\nnot measured counts: no exposure, efficiency or Poisson noise is applied.\nThe scalar acceptance assumes locally uniform angular density.</span>\n<span class=\"paragraph\">Try doubling <code>bunch_charge_pc</code> without changing the history count.\nNotebook 06 adds detector response and counts. See the\n<a href=\"https://pyrite.readthedocs.io/en/latest/guides/working-with-results.html\" rel=\"noopener noreferrer\" target=\"_blank\">results how-to</a>\nfor saving and reloading results.</span></span>"
           }
         }
       ],
       "console": []
     },
     {
-      "id": "emfo",
-      "code_hash": "167f8bc3856b189cb83b7c5a15c600de",
+      "id": "RGSE",
+      "code_hash": "50b05e5832720af45955860a98e184a7",
       "outputs": [
         {
-          "type": "data",
-          "data": {
-            "text/html": "<div style='display:none'><marimo-json-output data-json-data='{&quot;tutorial&quot;:&quot;02-understanding-results&quot;,&quot;pyrite_version&quot;:&quot;0.22.5&quot;,&quot;backend&quot;:&quot;cpu&quot;,&quot;seed&quot;:1,&quot;table_identity&quot;:{&quot;918b1a9013e4c19c584e2cf4eb8b605f0063a7237b8b0d67749867a4c6804832&quot;:&quot;c3f8eab1f03c1c66cfe0355b68f312e0ca450cbacaabe4f72eebecefe8d1e08d&quot;,&quot;ea7657ec94db1acf9f16cb260a5b107c3d2a4ecc71e43facee0e6a845487cbeb&quot;:&quot;beed169ba64a48fd11dc8c5a7bb81471abaa21806bde7943dba6da43e5b01b6f&quot;,&quot;44461d55c05a7fea30a0f52bceb2aa384d6b71c1e12765da576b5cbc2592dbe3&quot;:&quot;3f32446ff553a97b14755b475c4d88287ff44eff2ffce0cdd790dbd9b40a83f2&quot;,&quot;dfea6d21d4f6196cb74ef19486b6d86f6f5af40e89d7241efe09507a3b982e85&quot;:&quot;61fb7f4cf6dceab2a4d10c5fc641357d80b0ba6bbe037b64dd000e08f024acd9&quot;},&quot;source_identity&quot;:&quot;7e8ac33df0256612b7cbcb9ca7ef1a4d8c13d2a939b690206ed1295459bdb791&quot;,&quot;band_eV&quot;:[600.0,2000.0],&quot;mean_current_nA&quot;:50.0,&quot;accepted_solid_angle_sr&quot;:0.0012390399999999998,&quot;sampled_cxr_histories&quot;:8192}' data-value-types='&quot;json&quot;'></marimo-json-output></div>"
-          }
+          "type": "error",
+          "ename": "exception",
+          "evalue": "An ancestor raised an exception (NameError): ",
+          "traceback": null
         }
       ],
       "console": []

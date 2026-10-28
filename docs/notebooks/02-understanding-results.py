@@ -1,6 +1,12 @@
 # /// script
 # requires-python = ">=3.13"
-# dependencies = ["endf-parserpy==0.17.0", "marimo>=0.25.1", "pyrite-mc==0.22.5", "matplotlib>=3.11", "numpy>=2"]
+# dependencies = [
+#     "endf-parserpy==0.17.0",
+#     "marimo>=0.23.3",
+#     "pyrite-mc==0.22.5",
+#     "matplotlib>=3.11",
+#     "numpy>=2",
+# ]
 # ///
 
 import marimo
@@ -24,7 +30,7 @@ def _():
     _ = pyrite.fetch_tables()  # Fetch missing pinned tables once; reuse installed data.
 
     tables_ready = True
-    return tables_ready, mo, np, plt, pyrite
+    return mo, np, plt, pyrite, tables_ready
 
 
 @app.cell(hide_code=True)
@@ -32,27 +38,16 @@ def _(mo):
     mo.md(r"""
     # Understanding simulation results
 
-    Turn an electron-normalized source spectrum into an energy-integrated yield
-    and a physical photon rate, without confusing either with detector counts.
-    """)
-    return
-
-
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""
-    ## A source and its numerical sampling
-
-    This independently runnable example follows notebook 01. A **0.5 pC** bunch
-    at **100 kHz** corresponds to **50 nA** average beam current, regardless of
-    how many Monte Carlo histories we sample. The low history counts below are
-    chosen for teaching, **not** precision or convergence.
+    Convert an electron-normalized PXR/CBS spectrum into a photon rate for
+    a specified beam current and angular acceptance. A **0.5 pC** bunch at
+    **100 kHz** gives **50 nA** average current; the **8,192 sampled histories**
+    are numerical estimators, not bunch electrons.
     """)
     return
 
 
 @app.cell
-def _():
+def _(tables_ready):
     from pyrite import simulate
     from pyrite.beams import Beam, PointBunch, PointSpot
     from pyrite.config import CxrReflections, FixedSampling, Numerics
@@ -70,24 +65,26 @@ def _():
     detector = Detector(observation_angle_deg=135.0)
     numerics = Numerics(
         sampling=FixedSampling(cxr_electrons=8_192, brem_electrons=128),
-        cxr_reflections=CxrReflections(n_families=2),
+        cxr_reflections=CxrReflections(n_families=1),
     )
-    return beam, detector, numerics, simulate, target
-
-
-@app.cell
-def _(beam, detector, numerics, simulate, target, tables_ready):
-    assert tables_ready  # Wait for reference-table installation before transport.
+    assert tables_ready  # Reference tables must be ready before transport.
     result = simulate(beam, target, detector, numerics=numerics)
-    return (result,)
+    return beam, result
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Examine the returned data structures
+    by looking at component spectra on their own native energy grids
+    """)
+    return
 
 
 @app.cell
-def _(mo, result):
-    # Long-form rows retain the original energy nodes of each radiation family.
-    native_rows = result.to_dataframe()
-    native_overview = native_rows.group_by("component").len().sort("component").to_dicts()
-    mo.json({"native_grid_sizes": native_overview, "sample_rows": native_rows.head(3).to_dicts()})
+def _(result):
+    # Inspect component spectra on their native energy grids.
+    result.to_dataframe()
     return
 
 
@@ -117,44 +114,50 @@ def _(plt, result):
 @app.cell
 def _(result):
     # Each table has a common, interpolated energy grid and explicit units.
-    per_electron = result.spectral_flux(units="electron")
-    per_sr = result.spectral_flux(units="sr")
+    # per_electron = result.spectral_flux(units="electron")
+    # per_sr = result.spectral_flux(units="sr")
     into_acceptance = result.spectral_flux(units="detector")
-    return into_acceptance, per_electron, per_sr
+    return (into_acceptance,)
 
 
 @app.cell
-def _(beam, cxr, into_acceptance, mo, np, per_sr, result):
+def _(beam, cxr, into_acceptance, np, per_sr, result):
     from scipy.constants import elementary_charge
 
     band_eV = (600.0, 2_000.0)
     lo, hi = band_eV
     energy = cxr.photon_energy_eV
-    if not energy[0] <= lo < hi <= energy[-1]:
-        raise ValueError("selected band must fit entirely within the CXR grid")
     nodes = np.r_[lo, energy[(energy > lo) & (energy < hi)], hi]
-    # Insert exact band endpoints before integrating a sampled density.
-    yield_per_electron_sr = float(np.trapezoid(np.interp(nodes, energy, cxr.density), nodes))
-    current_nA = beam.bunch_charge_pc * beam.rep_rate_hz / 1_000
-    electrons_per_second = current_nA * 1e-9 / elementary_charge
+
+    # Integrating photon number flux density per electron per sr
+    cxr_yield_per_electron_sr = float(np.trapezoid(np.interp(nodes, energy, cxr.density), nodes))
+
+    current_nA = beam.bunch_charge_pc * beam.rep_rate_hz / 1_000  # Current
+    electrons_per_second = current_nA * 1e-9 / elementary_charge  # electron number flux density
+
     flux_sr_grid = per_sr.get_column("photon_energy_eV").to_numpy()
     flux_sr_cxr = per_sr.get_column("cxr").to_numpy()
     cxr_rate_sr = float(np.trapezoid(np.interp(nodes, flux_sr_grid, flux_sr_cxr), nodes))
+
     # For a scalar detector, the accepted rate assumes locally uniform intensity.
     acceptance_sr = result.accepted_solid_angle_sr()
-    assert np.isclose(cxr_rate_sr, yield_per_electron_sr * electrons_per_second, rtol=1e-10)
+    assert np.isclose(cxr_rate_sr, cxr_yield_per_electron_sr * electrons_per_second, rtol=1e-10)
     assert np.array_equal(into_acceptance.get_column("photon_energy_eV").to_numpy(), flux_sr_grid)
-    band_summary = {
-        "band_eV": list(band_eV),
-        "mean_current_nA": current_nA,
-        "sampled_cxr_histories": 8_192,
-        "accepted_solid_angle_sr": acceptance_sr,
-        "cxr_yield_photons_per_electron_sr": yield_per_electron_sr,
-        "cxr_rate_photons_per_s_sr": cxr_rate_sr,
-        "cxr_rate_into_acceptance_photons_per_s": cxr_rate_sr * acceptance_sr,
-    }
-    mo.json(band_summary)
-    return (band_summary,)
+    return (
+        acceptance_sr,
+        band_eV,
+        current_nA,
+        cxr_rate_sr,
+        cxr_yield_per_electron_sr,
+    )
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Plot the complete spectrum summed over all components
+    """)
+    return
 
 
 @app.cell
@@ -184,31 +187,44 @@ def _(mo):
     mo.md(r"""
     ## Interpretation
 
-    `result.to_dataframe()` keeps each component's **native energy grid**.
-    `result.spectral_flux()` forms a common grid by interpolation: `"electron"`
-    returns source density, `"sr"` applies the physical electron rate, and
-    `"detector"` also applies the accepted solid angle. Here the band integral
-    intentionally uses **CXR only**, whereas the second plot includes all
-    computed components. Integrating over energy removes the `/eV` dimension.
+    `to_dataframe()` preserves each component's native energy grid;
+    `spectral_flux()` interpolates onto a common one. `"electron"` gives
+    the electron-normalized density, `"sr"` scales by the physical electron
+    rate, and `"detector"` also multiplies by accepted solid angle.
 
-    These are *expected emitted photon rates*, not acquired counts: no exposure
-    time, quantum efficiency, energy redistribution or Poisson counting has been
-    applied. The scalar-detector acceptance uses a uniform-angular-density
-    approximation. See the [results how-to](https://pyrite.readthedocs.io/en/latest/guides/working-with-results.html)
-    for saved checkpoints, and the [model limitations](https://pyrite.readthedocs.io/en/latest/physics/capabilities.html)
-    and [validation status](https://pyrite.readthedocs.io/en/latest/validation/status-summary.html)
-    before using a spectrum quantitatively.
+    The **600–2,000 eV** band integral uses CXR only; the photon-rate plot
+    includes all computed components. These are *expected source rates*,
+    not measured counts: no exposure, efficiency or Poisson noise is applied.
+    The scalar acceptance assumes locally uniform angular density.
 
-    Try doubling `bunch_charge_pc` **without** changing histories: the
-    electron-normalized yield stays the same, but the photon rate doubles.
-    Then change the number of histories at fixed beam current to examine Monte
-    Carlo variation. Continue to notebook 03 for ideal PXR line energies.
+    Try doubling `bunch_charge_pc` without changing the history count.
+    Notebook 06 adds detector response and counts. See the
+    [results how-to](https://pyrite.readthedocs.io/en/latest/guides/working-with-results.html)
+    for saving and reloading results.
     """)
     return
 
 
 @app.cell(hide_code=True)
-def _(band_summary, mo, pyrite, result):
+def _(
+    acceptance_sr,
+    band_eV,
+    current_nA,
+    cxr_rate_sr,
+    cxr_yield_per_electron_sr,
+    mo,
+    pyrite,
+    result,
+):
+    band_summary = {
+        "band_eV": list(band_eV),
+        "mean_current_nA": current_nA,
+        "sampled_cxr_histories": 8_192,
+        "accepted_solid_angle_sr": acceptance_sr,
+        "cxr_yield_photons_per_electron_sr": cxr_yield_per_electron_sr,
+        "cxr_rate_photons_per_s_sr": cxr_rate_sr,
+        "cxr_rate_into_acceptance_photons_per_s": cxr_rate_sr * acceptance_sr,
+    }
     tutorial_provenance = {
         "tutorial": "02-understanding-results",
         "pyrite_version": pyrite.__version__,
@@ -223,7 +239,7 @@ def _(band_summary, mo, pyrite, result):
     }
     # Preserve machine-readable export metadata without displaying it to readers.
     mo.json(tutorial_provenance).style({"display": "none"})
-    return (tutorial_provenance,)
+    return
 
 
 if __name__ == "__main__":

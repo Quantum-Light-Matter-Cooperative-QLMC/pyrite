@@ -31,23 +31,10 @@ def _(mo):
     mo.md(r"""
     # Angular radiation distributions
 
-    Compute a detector-free PXR/CBS energy–angle map and compare spectra at three observation directions.
-    """)
-    return
-
-
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""
-    ## Define an angular slice
-
-    The incident electron travels along lab **+z**. Angles are signed in the
-    **x–z plane**: 0° is forward, +90° is +x, and ±180° is backward. The result
-    is a pointwise source density **per steradian**, not a count in an angular bin.
-
-    `directional_source()` is **experimental**. Use a finite slab so every sampled
-    direction has an escape path. The explicit energy grid is deliberately limited
-    to 100–2,000 eV; it is not guaranteed to contain every possible PXR line.
+    Compute an **experimental**, detector-free PXR/CBS energy–angle map
+    for a finite silicon slab. Directions are signed in the lab **x–z**
+    plane: 0° is forward, +90° is +x, and ±180° is backward.
+    The source is **per steradian**, not integrated over an angular bin.
     """)
     return
 
@@ -97,7 +84,7 @@ def _(beam, directional_source, np, numerics, target, tables_ready):
     return (source,)
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo, np, source):
     summary = {
         "source_component": source.component,
@@ -161,23 +148,17 @@ def _(np, plt, source):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## Interpret the map
+    ## Interpretation
 
-    The upper panel is **per electron, per eV, per sr**; the lower panel
-    multiplies by the physical electron rate using the configured **50 nA**
-    mean current. Neither plot integrates solid angle, applies a detector
-    response, or predicts measured photon counts. **PXR + CBS** includes their
-    mutual interference, but not characteristic lines or bremsstrahlung.
+    The map gives **photons / (electron · eV · sr)**; the line cuts use
+    the configured **50 nA** current to give photons / (s · eV · sr).
+    Neither includes angular acceptance or detector response. Only PXR/CBS
+    is calculated here; the energy range is restricted to **100–2,000 eV**.
 
-    The angular grid omits the duplicate +180° endpoint. Masked/unsupported
-    directions (if any) are not physical zeros. Modest Monte Carlo sampling,
-    one reflection family, and a restricted photon window mean the figure is
-    illustrative, **not convergence or validation evidence**.
-
-    Try changing the target tilt or increasing histories, then refine the
-    energy and angular grids independently. For interface restrictions, see the
-    [directional-source reference](https://pyrite.readthedocs.io/en/latest/reference/directional-sources.html)
-    and [validation status](https://pyrite.readthedocs.io/en/latest/validation/status-summary.html).
+    Unsupported directions are masked, not physical zeros. One reflection
+    family and modest sampling make this an illustration, not convergence
+    evidence. Try changing target tilt, history count or grid spacing.
+    See the [directional-source reference](https://pyrite.readthedocs.io/en/latest/reference/directional-sources.html).
     """)
     return
 
