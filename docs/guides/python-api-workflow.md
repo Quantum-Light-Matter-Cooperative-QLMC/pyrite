@@ -1,7 +1,7 @@
 (your-first-python-simulation)=
 # Run one simulation from Python
 
-Use [Your first X-ray spectrum](../notebooks/fundamentals/01-first-spectrum.md)
+Use [Your first X-ray spectrum](../notebooks/fundamentals/01-first-spectrum.ipynb)
 for the guided, editable example and its captured spectrum. The notebook is the
 canonical learning source for constructing a beam, target and detector, running
 `simulate`, and plotting PXR/CBS and bremsstrahlung.
@@ -27,7 +27,7 @@ To persist a campaign run, follow the [CLI quickstart](getting-started.md).
 Plot each component against its own photon-energy grid. Source density has
 units **photons/(incident electron · eV · sr)**; beam current, detector response
 and exposure are separate operations. Follow
-[Understanding results](../notebooks/fundamentals/02-understanding-results.md)
+[Understanding results](../notebooks/fundamentals/02-understanding-results.ipynb)
 for native grids, integrated yields and rates, and the
 [spectral-observables explanation](../physics/radiation-physics/spectral-observables.md)
 for normalization. Review [model capabilities](../physics/capabilities.md) and

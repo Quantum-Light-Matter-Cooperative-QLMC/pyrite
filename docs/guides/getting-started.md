@@ -159,7 +159,7 @@ normalization.
 ## Continue with Python
 
 For environment setup and a guided Python simulation, start with
-[Your first spectrum](../notebooks/fundamentals/01-first-spectrum.md).
+[Your first spectrum](../notebooks/fundamentals/01-first-spectrum.ipynb).
 The CLI quickstart writes a checkpoint. For an in-memory call from an existing
 Python session, use the one-scene recipe:
 

@@ -1,6 +1,6 @@
 # Directional sources and angular-map app
 
-The [angular radiation tutorial](../notebooks/designing/05-angular-radiation-distributions.md)
+The [angular radiation tutorial](../notebooks/designing/05-angular-radiation-distributions.ipynb)
 introduces directional scoring interactively; the
 [heatmap how-to](../guides/directional-source-heatmap.md) covers choosing and
 computing a map, with the earlier seeded script available for reproduction. This page owns the reusable source and interactive-app

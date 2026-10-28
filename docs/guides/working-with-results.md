@@ -1,7 +1,7 @@
 # Working with results
 
 For an editable introduction to source-spectrum components, integrated yields
-and photon rates, use [Understanding results](../notebooks/fundamentals/02-understanding-results.md).
+and photon rates, use [Understanding results](../notebooks/fundamentals/02-understanding-results.ipynb).
 This guide instead works with an existing **saved checkpoint**, not an
 in-memory `Result`.
 

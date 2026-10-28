@@ -4,9 +4,9 @@ Use the configuration app to duplicate a catalog profile, change its beam,
 target, detector and numerical settings, then save it for a CLI run. The editor
 manages **campaign profiles**, not arbitrary Python `Scene` objects. For
 in-memory scene construction, see the
-[beam and target tutorial](../notebooks/designing/04-beams-crystals-target-geometry.md).
+[beam and target tutorial](../notebooks/designing/04-beams-crystals-target-geometry.ipynb).
 For a Python response surface rather than a saved profile, use
-[Parameter sweeps](../notebooks/designing/08-parameter-sweeps.md).
+[Parameter sweeps](../notebooks/designing/08-parameter-sweeps.ipynb).
 
 ## Launch the editor
 

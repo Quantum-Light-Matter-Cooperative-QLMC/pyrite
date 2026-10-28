@@ -1,7 +1,7 @@
 (detector-free-directional-source-heatmaps)=
 # Compute a detector-free directional source map
 
-Use [Angular radiation distributions](../notebooks/designing/05-angular-radiation-distributions.md)
+Use [Angular radiation distributions](../notebooks/designing/05-angular-radiation-distributions.ipynb)
 for the guided public-API example, complete source and captured map. Directional
 scoring is **experimental** and reuses one transported electron population for
 all directions.

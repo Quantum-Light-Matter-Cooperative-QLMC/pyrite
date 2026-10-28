@@ -1,7 +1,7 @@
 (from-emitted-photons-to-pixel-counts)=
 # Acquire expected and realized pixel counts
 
-Use [From X-rays to detector counts](../notebooks/designing/06-detector-counts.md)
+Use [From X-rays to detector counts](../notebooks/designing/06-detector-counts.ipynb)
 for the guided, editable example, its complete public-API source and captured
 images. This recipe assumes a physical beam and target are already configured.
 

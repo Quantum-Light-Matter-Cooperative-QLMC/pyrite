@@ -135,3 +135,27 @@ def test_failed_export_leaves_old_pages_intact(tmp_path, monkeypatch):
         module.regenerate(["first"])
     assert page.exists()
     assert not page.with_suffix(".ipynb").exists()
+
+
+def test_docs_links_target_exported_notebooks_not_deleted_md_wrappers():
+    """Avoid Sphinx warnings for .md links after MyST-NB takes over the pages."""
+    import re
+
+    docs = Path(__file__).parents[2] / "docs"
+    notebook_names = {source.stem for source in (docs / "notebooks").glob("*.py")}
+    assert notebook_names
+    for source in docs.rglob("*.md"):
+        if "_build" in source.parts or "_autosummary" in source.parts:
+            continue
+        for target in re.findall(r"\]\(([^)]+)\)", source.read_text()):
+            path = target.split("#", 1)[0]
+            basename = path.rsplit("/", 1)[-1]
+            if basename.endswith(".md") and basename[:-3] in notebook_names:
+                raise AssertionError(
+                    f"{source.relative_to(docs)} links to deleted notebook wrapper "
+                    f"{target}; use .ipynb instead"
+                )
+            if basename.endswith(".ipynb") and basename[:-6] in notebook_names:
+                assert (source.parent / path).is_file(), (
+                    f"{source.relative_to(docs)}: missing notebook target {target}"
+                )

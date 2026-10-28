@@ -6,7 +6,7 @@ execution settings. Optimize **uncached, compute-weighted throughput**
 scientific workload fixed when comparing execution configurations.
 
 For an editable introduction to history counts, convergence and runtime, use
-[Sampling, convergence and performance](../notebooks/designing/07-sampling-convergence-performance.md).
+[Sampling, convergence and performance](../notebooks/designing/07-sampling-convergence-performance.ipynb).
 This recipe diagnoses an existing run using its execution telemetry.
 
 ## Collect and analyze a run

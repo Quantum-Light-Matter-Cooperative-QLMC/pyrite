@@ -53,6 +53,6 @@ def test_python_recipe_retains_reproduction_downloads_and_links_to_tutorial() ->
     assert "../examples/data/python_api_workflow.json" in downloads
     for target in downloads:
         assert (page.parent / target).is_file(), target
-    tutorial = "../notebooks/fundamentals/01-first-spectrum.md"
+    tutorial = "../notebooks/fundamentals/01-first-spectrum.ipynb"
     assert f"]({tutorial})" in guide
     assert (page.parent / tutorial).is_file()

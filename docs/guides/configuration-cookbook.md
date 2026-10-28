@@ -6,7 +6,7 @@ scan before computing. This Linux shell exercise uses an installed `pyrite`;
 it needs no reference tables, downloads, or simulation.
 
 For an editable Python parameter study, start with
-[Parameter sweeps](../notebooks/designing/08-parameter-sweeps.md). Use this
+[Parameter sweeps](../notebooks/designing/08-parameter-sweeps.ipynb). Use this
 recipe when the scan needs a reusable named CLI profile; the
 [campaign reference](../reference/campaign-configuration.md) owns its settings.
 
