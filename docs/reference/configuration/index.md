@@ -9,6 +9,7 @@ see [Numerical and statistical methods](../../physics/numerical-methods/index.md
 :maxdepth: 1
 
 ../campaign-configuration
+../configuration-app
 ../../repo-design/profile-settings
 ../../repo-design/configuration-resolution
 ../catalogs-and-workspaces

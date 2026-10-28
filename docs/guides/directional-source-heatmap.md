@@ -1,5 +1,10 @@
 # Detector-free directional source heatmaps
 
+For the interactive, public-API learning path, start with
+[Angular radiation distributions](../notebooks/designing/05-angular-radiation-distributions.md).
+This guide reproduces a fixed seeded angle–energy map and documents the
+finite-target escape and numerical limits of that example.
+
 Map the escaped PXR/CBS spectrum around a silicon film, then compare spectra at
 three observation angles. This **experimental** API scores a detector-free
 angular slice from one shared electron transport.

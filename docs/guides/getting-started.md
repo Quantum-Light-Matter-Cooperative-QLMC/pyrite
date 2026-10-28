@@ -158,6 +158,9 @@ normalization.
 
 ## Continue with Python
 
+For a guided notebook, start with
+[Environment setup](../notebooks/fundamentals/00-setup.md) and
+[Your first spectrum](../notebooks/fundamentals/01-first-spectrum.md).
 The CLI quickstart writes a checkpoint. For a small in-memory simulation and
 an inline source-spectrum figure, continue with the Python API example:
 

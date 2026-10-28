@@ -20,5 +20,5 @@ Designing simulations <designing/index>
 ```
 
 For specific tasks, use the [guides](../guides/index.md); for exact interfaces,
-consult [Python API](../api.md). The [physics](../physics/index.md) and
+consult [Python API](../reference/python-api/index.md). The [physics](../physics/index.md) and
 [validation](../validation/index.md) sections explain assumptions and evidence.

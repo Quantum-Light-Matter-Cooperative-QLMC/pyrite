@@ -1,5 +1,10 @@
 # Working with results
 
+For an editable introduction to source-spectrum components, integrated yields
+and photon rates, use [Understanding results](../notebooks/fundamentals/02-understanding-results.md).
+This guide instead works with an existing **saved checkpoint**, not an
+in-memory `Result`.
+
 Reopen the saved [quickstart run](getting-started.md), separate its radiation
 components, and integrate a fixed photon-energy band. Loading and plotting a
 checkpoint does not rerun electron transport.
