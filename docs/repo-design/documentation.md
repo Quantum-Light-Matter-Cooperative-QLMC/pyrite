@@ -445,3 +445,59 @@ inspect homepage indexability, last crawl, selected canonical, and sitemap
 submission. Repository-only automation has no authenticated access to that
 property. Metadata and indexing requests do not guarantee search ranking;
 retain useful API and validation pages in search.
+
+
+## Interactive notebook captures
+
+Canonical tutorial notebooks live in `docs/notebooks/`, independently of
+`pyrite.apps`. Their documentation pages embed normal marimo static HTML and
+include the same `.py` source. Follow this page's authoring policy and the
+repository's tutorial-authoring guidance when available. Keep conceptual
+explanation, task recipes, interface contracts and validation evidence at their
+existing canonical owners; link to them from the learning sequence.
+
+Install the docs dependency group and fetch/verify reference tables once before
+executing a transport notebook. Run each notebook locally with
+`uv run marimo edit docs/notebooks/01-first-spectrum.py`, or open its
+notebook-specific Molab badge. Inline dependency metadata pins the PyRITE release
+for standalone/Molab execution; checkout captures use the current project.
+The explicit `--regenerate-notebook NAME` command first synchronizes that
+notebook's inline `pyrite-mc` pin and any installation examples with the version
+in `pyproject.toml`. Source, session, figure and manifest must be committed
+together. Normal docs builds and `--check-notebooks` never change sources.
+The first cell of each notebook calls `pyrite.fetch_tables()` immediately after
+import, installing missing pinned tables before simulation. A complete install
+returns without network access. This runs only during explicit capture, local
+marimo or Molab execution, **not** during Sphinx builds; a fresh hosted session
+may need network access to acquire tables.
+
+Regeneration is explicit and executes the canonical notebook on CPU:
+
+```bash
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run --group docs python docs/_tutorials.py \
+  --regenerate-notebook 01-first-spectrum
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run --group docs python docs/_tutorials.py \
+  --check-notebooks
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run marimo check docs/notebooks/*.py
+```
+
+The exporter first runs marimo's structure check, then its session and normal
+HTML exports (both execute the same notebook). It includes source code, extracts
+PNG fallback figures from the captured session, and records source/exporter and
+artifact digests, Git revision/dirty state, Python/PyRITE versions, backend,
+resolved seeds and table identities. Commit source, HTML, session, figure and
+manifest together. Review the figures and provenance; freshness hashes establish
+source/artifact correspondence, not scientific validity. A dirty capture records
+the pre-commit revision together with the exact notebook digest.
+
+Sphinx only validates and copies these committed captures. It never executes the
+scientific notebooks or fetches their reference tables. CI's documentation build
+therefore rejects stale source/artifact digests and unsupported imports without
+requiring a GPU. Focused tutorial tests additionally check capture contents and a
+small deterministic CPU notebook. Transport smoke execution belongs in explicit
+capture regeneration, not the documentation build. Large/GPU examples need an
+explicit remote regeneration process; do not add them to this CPU exporter.
+
+Check the notebook-specific Molab path and inline dependencies before publishing.
+A badge targeting `main` becomes launchable after its source is merged; do not
+claim that a live Molab session was checked from an unpublished branch.

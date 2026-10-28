@@ -8,7 +8,9 @@ import hashlib
 import importlib.util
 import json
 import platform
+import re
 import subprocess
+import tomllib
 from collections.abc import Mapping
 from pathlib import Path
 
@@ -29,6 +31,43 @@ NAMES = (
     "optimization_studies",
     "adding_materials",
 )
+
+# Register additional notebooks from the Sphinx/CLI wrapper rather than changing
+# _notebooks.py: that exporter's exact file digest is in existing capture manifests.
+# Appending a tutorial must not invalidate unrelated, already captured notebooks.
+ADDITIONAL_NOTEBOOK_FIGURES = {
+    "04-beams-crystals-target-geometry": 2,
+    "05-angular-radiation-distributions": 1,
+}
+_PIN = re.compile(r"(?P<prefix>\bpyrite-mc(?:\[[A-Za-z0-9,_.-]+\])?==)\d[\w.+-]*")
+
+
+def configured_notebooks():
+    """Reuse the sole marimo exporter with the complete published curriculum."""
+    import _notebooks
+
+    _notebooks.NOTEBOOK_FIGURES.update(ADDITIONAL_NOTEBOOK_FIGURES)
+    return _notebooks
+
+
+def sync_notebook_version(name):
+    """Update an explicit tutorial's PyPI pins from pyproject before recapture.
+
+    Also correct the install-command extras in notebook 00. Read-only docs
+    checks never call this function, and no source changes occur without an
+    explicit --regenerate-notebook action.
+    """
+    source = DOCS / "notebooks" / f"{name}.py"
+    version = tomllib.loads((DOCS.parent / "pyproject.toml").read_text())["project"]["version"]
+    previous = source.read_text()
+    updated = _PIN.sub(lambda match: match.group("prefix") + version, previous)
+    if f'"pyrite-mc=={version}"' not in updated:
+        raise ValueError(f"{name}: missing required inline pyrite-mc pin")
+    if updated == previous:
+        return False
+    source.write_text(updated)
+    print(f"Synchronized {source} to pyrite-mc=={version}")
+    return True
 
 
 def load_example(name):
@@ -152,14 +191,30 @@ def regenerate(name, input_path=None):
     print(path)
 
 
+def _check_notebooks(app):
+    configured_notebooks().check_all()
+
+
 def setup(app):
     app.connect("builder-inited", _check_outputs)
+    app.connect("builder-inited", _check_notebooks)
     return {"parallel_read_safe": True, "parallel_write_safe": True}
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--regenerate", required=True, choices=NAMES)
+    notebooks = configured_notebooks()
+
+    actions = parser.add_mutually_exclusive_group(required=True)
+    actions.add_argument("--regenerate", choices=NAMES)
+    actions.add_argument("--regenerate-notebook", choices=notebooks.NOTEBOOK_FIGURES)
+    actions.add_argument("--check-notebooks", action="store_true")
     parser.add_argument("--input", type=Path, help="saved input required by the example")
     args = parser.parse_args()
-    regenerate(args.regenerate, args.input)
+    if args.regenerate_notebook:
+        sync_notebook_version(args.regenerate_notebook)
+        notebooks.regenerate(args.regenerate_notebook)
+    elif args.check_notebooks:
+        notebooks.check_all()
+    else:
+        regenerate(args.regenerate, args.input)

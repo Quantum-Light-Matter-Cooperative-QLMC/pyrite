@@ -1,0 +1,35 @@
+{
+  "schema": "pyrite.marimo-tutorial.v1",
+  "source_sha256": "529f75d6ab04c94de17116d902ff7207ad2ad9311cd4f5450b52357c507775ca",
+  "exporter_sha256": "6eedb7b2d84c7c81cfe4bb58c476c02676f6fd3a5784f844f613efe30412ab24",
+  "git_revision": "85900c77ef03a529c868b01ba790952145431f85",
+  "git_dirty": true,
+  "python_version": "3.14.4",
+  "execution": {
+    "tutorial": "05-angular-radiation-distributions",
+    "pyrite_version": "0.22.4",
+    "backend": "cpu",
+    "seed": 1,
+    "table_identity": {
+      "86c73cd7a10433ce547de2ae9458e3fd7c09da3c394e8e07e5f7f9415bfaff32": "cd6144893da65f70656bd7880c6083642862cd6068b34aaeb0d36bf73e7fe20f",
+      "240a6150bdcf027eac2d9c13171f33776cc96556c258ab8277342d9b83dad860": "9efa28ecaf839767de6b369eb87ff89694049c16dbb1988fbfd2a2293bc343ae",
+      "47fa2c31dd413cb42b6569105e85862d1a141b35be26d54d8e5a679b8765d1be": "42a70d18f3f1a622cf7fdb98747199b9a8c1ee4eb29bfae32027a1d835cc166f",
+      "cff95de45a327e3ac277930ae56f236ea19e519ccfa199d2a903c297c4677fee": "848f5d188f965678f290e0738bb4762e1b50a11e325e38a2c53de7aa24e5c67a"
+    },
+    "source_identity": "b6420019156363aefda42bd68d13dafc9ee3fe25ce05fd515cb8f745419ad272",
+    "component": "incoherent-pxr-cbs",
+    "current_nA": 50.0,
+    "energy_bounds_eV": [
+      100.0,
+      2000.0
+    ],
+    "angles": 48,
+    "supported": 48,
+    "sampled_cxr_histories": 512
+  },
+  "artifacts": {
+    "notebooks/__marimo__/session/05-angular-radiation-distributions.py.json": "f19103acf67f19ec4d25a8e0f0519c77f37388c2847d734e749328373122cab4",
+    "_static/notebooks/05-angular-radiation-distributions.html": "4c842d2223fd137f7fd7bec3484dbde2610c874ddb6bf5ef48fc61161699c502",
+    "_static/notebooks/05-angular-radiation-distributions-1.png": "d9edafec96a189ca867c0c66dcc022d906776b443d165e968b05343d84522a04"
+  }
+}
