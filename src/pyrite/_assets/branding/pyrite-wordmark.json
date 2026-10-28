@@ -1,7 +1,7 @@
 {
   "generator": "scripts/pyrite_logo.py",
-  "generator_sha256": "9bb3864ab1d87fa00076a46f86dd679ab48e80fbbc55b95ae2c2c3da374fe4d7",
-  "source_revision": "6449cae0058865032c644b00e78fb1148441b97c",
+  "generator_sha256": "d46dc3718199a5d9e9762074debcca2eac11f12eb14779b8d57636093c25ccbc",
+  "source_revision": "5eeaaada41382fbd6319a55433fa312d844d94b6",
   "source_dirty": true,
   "numpy_version": "2.5.4",
   "matplotlib_version": "3.11.2",
@@ -38,6 +38,7 @@
     "beam_seed": 17,
     "y_color_gamma": 1.85,
     "i_width": 0.45,
+    "ri_gap": 0.17,
     "i_caps": false,
     "corner_radius_fraction": 0.07,
     "social_logo_width_fraction": 0.86,
@@ -57,7 +58,7 @@
   "line_peak_eV": 858.0,
   "line_fwhm_eV": 18.785386625281603,
   "line_density_peak": 7.695563430180835e-10,
-  "pyrite_version": "0.22.3",
+  "pyrite_version": "0.22.4",
   "cache_sha256": {
     "Y-a8554e344a915f.npz": "cee11ea613654131654f8644baf8f15668c596dfab687e0782029f6d9f89b5bf",
     "I-c81735bad8ef3e.npz": "f6dd90f5b1e9487c9733a9581835246a0b3655a4e8e6c16439bceea821c06fac"
