@@ -13,6 +13,7 @@ downloadable Marimo source locally.
 Fundamentals <fundamentals/index>
 Designing simulations <designing/index>
 Specialized workflows <specialized/index>
+Quantum and channeling (experimental) <quantum/index>
 ```
 
 For specific tasks, use the [guides](../guides/index.md); for exact interfaces,

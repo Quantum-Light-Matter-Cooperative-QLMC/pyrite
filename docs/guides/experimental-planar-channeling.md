@@ -5,6 +5,8 @@ Project a 1D Gaussian into Si(110), evolve its transverse populations, and plot
 forward channeling radiation at 17 MeV. This direct CPU diagnostic needs no
 transport tables or GPU.
 
+For a standalone public-API walkthrough, open [Planar channeling and radiation](../notebooks/quantum/13-planar-channeling-radiation.ipynb).
+
 :::{warning}
 **Experimental — not rigorously validated.** These are restricted model outputs,
 not experimental data or detector predictions. The small basis and fixed grids

@@ -6,6 +6,9 @@ from scientific validation: most direct channeling solvers are **experimental**,
 and only the bounded planar Bloch density-matrix recipe is admitted by
 `simulate`. See the [quantum API map](../quantum-api.md) for details.
 
+Learn the interfaces in [Constructing transverse quantum states](../../notebooks/quantum/12-transverse-quantum-states.ipynb),
+then continue to the planar and axial diagnostics.
+
 The tables below link to generated signatures, docstrings, and source code.
 The advanced-stable names come from `api-surface.toml`; exposing a factory here
 does not make its outputs serializable or production-admitted.
