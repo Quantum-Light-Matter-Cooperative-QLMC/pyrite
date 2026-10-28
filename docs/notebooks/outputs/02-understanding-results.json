@@ -2,7 +2,7 @@
   "schema": "pyrite.marimo-tutorial.v1",
   "source_sha256": "e7f33e1ba60944b360d5f608956f0044197a76bad75b69698916ebbe19d4f0d4",
   "exporter_sha256": "1f0b344ae3ac7471396ec06aa30b4a464a8705961d3e8eb60343d84923a476f9",
-  "git_revision": "dae2f5a96c69e8c426ada800cc77f6cba465099e",
+  "git_revision": "28be14d65ab9d54089b69171fabe813bcb63e0d5",
   "git_dirty": true,
   "python_version": "3.14.6",
   "execution": {
@@ -26,9 +26,12 @@
     "sampled_cxr_histories": 8192
   },
   "artifacts": {
-    "notebooks/__marimo__/session/02-understanding-results.py.json": "0d9ec44c0f5e589994c4aee65ca912f8af093bd2d917f55a21f9f932eddaff4f",
-    "_static/notebooks/02-understanding-results.html": "33def3c35eb3126d67ff774989b5271161029106eb10f3bf4e2c081da3663a43",
+    "notebooks/__marimo__/session/02-understanding-results.py.json": "a4e2f2c2acadaa1132f007703103d7d9521bbebc444e90bf0b53b9be0057adab",
+    "_static/notebooks/02-understanding-results.html": "d434d7eb40efa1b7425ba1bfda9b27b3f4d847b77e43c0fe98e63f205c281141",
     "_static/notebooks/02-understanding-results-1.png": "1ed4d5b7f199eec0f1de1f653a2cb6dca2041e6ac41b87c983af0db568e6b8c5",
     "_static/notebooks/02-understanding-results-2.png": "3fd40ce95ee03611acdb8575e5c64a138428c7e8272ccc199cfcfebf105570e3"
-  }
+  },
+  "redactions": [
+    "Operator home directory paths replaced with /home/user/."
+  ]
 }

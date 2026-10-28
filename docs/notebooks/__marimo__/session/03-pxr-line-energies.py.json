@@ -12,7 +12,7 @@
         {
           "type": "data",
           "data": {
-            "text/plain": ""
+            "text/html": "<div style='display: flex;flex: 1;flex-direction: column;justify-content: flex-start;align-items: normal;flex-wrap: nowrap;gap: 0.5rem'><marimo-ui-element object-id='Hbol-0' random-id='56d43acb-9dd0-d2fc-1e56-12a08376c379'><marimo-anywidget data-initial-value='{&quot;model_id&quot;:&quot;858c10de87c1475ebe81359fd67594e8&quot;}' data-label='null' data-model-id='&quot;858c10de87c1475ebe81359fd67594e8&quot;'></marimo-anywidget></marimo-ui-element></div>"
           }
         }
       ],

@@ -12,32 +12,33 @@
         {
           "type": "data",
           "data": {
-            "text/plain": ""
+            "text/html": "<div style='display: flex;flex: 1;flex-direction: column;justify-content: flex-start;align-items: normal;flex-wrap: nowrap;gap: 0.5rem'><marimo-ui-element object-id='Hbol-0' random-id='76023cf6-96e9-8c63-5442-649de6034c2f'><marimo-anywidget data-initial-value='{&quot;model_id&quot;:&quot;4d031349784e496e8084cacc00ea7049&quot;}' data-label='null' data-model-id='&quot;4d031349784e496e8084cacc00ea7049&quot;'></marimo-anywidget></marimo-ui-element></div>"
           }
         }
       ],
       "console": []
     },
     {
-      "id": "c99a30a2-5001-4ea8-85b2-95fe1a90afa8",
-      "code_hash": null,
-      "outputs": [],
-      "console": []
-    },
-    {
-      "id": "e2ddee25-9a72-4082-83f8-4ebe37b0ac16",
-      "code_hash": null,
-      "outputs": [],
-      "console": []
-    },
-    {
-      "id": "vblA",
-      "code_hash": "54b0de54ca33e97141906e3bc0858b08",
+      "id": "MJUe",
+      "code_hash": "103b650e5d36d6555b0a082f044fa99c",
       "outputs": [
         {
           "type": "data",
           "data": {
-            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h1 id=\"your-first-x-ray-spectrum\">Your first X-ray spectrum</h1>\n<span class=\"paragraph\">Simulate a small crystalline target and compare PXR + CBS with bremsstrahlung.</span>\n<h2 id=\"setup\">Setup</h2>\n<span class=\"paragraph\">This example uses 30 keV electrons incident upon a 100 nm HOPG slab. Its small\ntrial counts keep it CPU-friendly; the curves are <strong>only illustrative</strong>.\nThe sampled electron histories do not represent a physical bunch population.</span></span>"
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h1 id=\"your-first-x-ray-spectrum\">Your first X-ray spectrum</h1>\n<span class=\"paragraph\">Set up PyRITE, simulate a small crystalline target, and plot its X-ray spectrum.</span>\n<h2 id=\"environment-and-reference-tables\">Environment and reference tables</h2>\n<span class=\"paragraph\">Locally, install the project environment and open this file with\n<code>uv run marimo edit docs/notebooks/01-first-spectrum.py</code>.\nIn Molab, the inline dependencies provide the environment. Use its\n<strong>built-in package manager</strong> to add packages; if table loading reports a\nmissing MF=26/MT=527 photon yield, enter <code>endf-parserpy==0.17.0</code> and restart.</span>\n<span class=\"paragraph\">The first cell calls <code>pyrite.fetch_tables()</code> to install about 100 MB of\npinned interaction data once; subsequent runs reuse the installed tables.\nStart on CPU. For NVIDIA execution, add <code>pyrite-mc[nvidia]</code>, select an\navailable GPU in Molab (or use your local CUDA GPU), and set\n<code>PYRITE_MC_BACKEND</code> to <code>cuda</code> <strong>before importing PyRITE</strong>. Restart the\nkernel after changing the backend or installing CuPy.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "vblA",
+      "code_hash": "e2e353bbbc18b495b7887b5cbc801eae",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/html": "<marimo-json-output data-json-data='{&quot;python&quot;:&quot;3.14.6&quot;,&quot;pyrite&quot;:&quot;0.22.5&quot;,&quot;selected_backend&quot;:&quot;cpu&quot;,&quot;cupy_installed&quot;:false}' data-value-types='&quot;json&quot;'></marimo-json-output>"
           }
         }
       ],
@@ -45,6 +46,19 @@
     },
     {
       "id": "bkHC",
+      "code_hash": "7639a72470654255ce756b98c058b685",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"simulate-a-crystalline-target\">Simulate a crystalline target</h2>\n<span class=\"paragraph\">This example uses 30 keV electrons incident upon a 100 nm HOPG slab. Its small\ntrial counts keep it CPU-friendly; the curves are <strong>only illustrative</strong>.\nThe sampled electron histories do not represent a physical bunch population.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "lEQa",
       "code_hash": "e08872c5da8f14f1db4022a3c8181804",
       "outputs": [
         {
@@ -58,19 +72,26 @@
         {
           "type": "stream",
           "name": "stderr",
-          "text": "/home/alexa/.local/share/uv/python/cpython-3.14.6-linux-x86_64-gnu/lib/python3.14/contextlib.py:148: LineOpticalDataWarning: 3/351812 line escape-piece/reflection/mosaic pairs reach unavailable optical data (vacuum-seed screen or root lookup). High-energy PXR/CBS lines may be omitted, even on an automatically clipped photon grid. Counts are not lost photon yield. Inspect line_data_coverage; see issue #249.\n  next(self.gen)\n",
+          "text": "/home/user/.local/share/uv/python/cpython-3.14.6-linux-x86_64-gnu/lib/python3.14/contextlib.py:148: LineOpticalDataWarning: 3/351812 line escape-piece/reflection/mosaic pairs reach unavailable optical data (vacuum-seed screen or root lookup). High-energy PXR/CBS lines may be omitted, even on an automatically clipped photon grid. Counts are not lost photon yield. Inspect line_data_coverage; see issue #249.\n  next(self.gen)\n",
           "mimetype": "text/plain"
         }
       ]
     },
     {
-      "id": "9251ecc3-912f-4bc1-b0d0-d63ed7f79497",
-      "code_hash": null,
-      "outputs": [],
+      "id": "PKri",
+      "code_hash": "7acbd169d286fdf9c58dd2c248511734",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"plot-the-results\">Plot the results</h2></span>"
+          }
+        }
+      ],
       "console": []
     },
     {
-      "id": "lEQa",
+      "id": "Xref",
       "code_hash": "0a3620fd9c3eedbeab52710deba614a1",
       "outputs": [
         {
@@ -83,20 +104,20 @@
       "console": []
     },
     {
-      "id": "PKri",
-      "code_hash": "443921dff027eb3bcb88b85f50f545d8",
+      "id": "SFPL",
+      "code_hash": "16798787cd349817112f76f330567862",
       "outputs": [
         {
           "type": "data",
           "data": {
-            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"interpretation\">Interpretation</h2>\n<span class=\"paragraph\">PXR and CBS are combined here because their amplitudes interfere. Their line\nstructure differs from the broad bremsstrahlung continuum. Plot each component\non its <strong>native photon-energy grid</strong>; adding array entries by index would mix\ndifferent energies. The vertical axis is source spectral density per incident\nelectron, per eV, per steradian: it is neither physical beam flux nor acquired\ncounts. Low history counts can leave noisy features and empty bins.</span>\n<span class=\"paragraph\">Try doubling the history counts, then change only the target thickness. Keep a\nrecord of the resolved seed when comparing configurations; different backends need not produce\nidentical random trajectories. Continue to notebook 02 to separate source\nyields from beam-current-scaled photon rates. Notebook 03 predicts vacuum line\nenergies; the <a href=\"https://pyrite.readthedocs.io/en/latest/guides/working-with-results.html\" rel=\"noopener noreferrer\" target=\"_blank\">results how-to</a>\ncovers saved checkpoints. See\n<a href=\"https://pyrite.readthedocs.io/en/latest/physics/capabilities.html\" rel=\"noopener noreferrer\" target=\"_blank\">model limitations</a>\nand <a href=\"https://pyrite.readthedocs.io/en/latest/validation/status-summary.html\" rel=\"noopener noreferrer\" target=\"_blank\">validation status</a>\nbefore interpreting these small-sample results quantitatively.</span></span>"
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"interpretation\">Interpretation</h2>\n<span class=\"paragraph\">PXR and CBS are combined here because their amplitudes interfere. Their line\nstructure differs from the broad bremsstrahlung continuum. Each component is plotted\non its <strong>native photon-energy grid</strong>; adding array entries by index would mix\ndifferent energies. The vertical axis is source spectral density per incident\nelectron, per eV, per steradian. Integrating over photon energy gives\nphotons / (electron \u00b7 sr). Multiplying by the electron rate and accepted\nsolid angle gives an expected photon rate in photons / s.</span>\n<span class=\"paragraph\">Try doubling the history counts, then change only the target thickness. Keep a\nrecord of the resolved seed when comparing configurations; different backends need not produce\nidentical random trajectories. Continue to notebook 02 to separate source\nyields from beam-current-scaled photon rates. Notebook 03 predicts vacuum line\nenergies; the <a href=\"https://pyrite.readthedocs.io/en/latest/guides/working-with-results.html\" rel=\"noopener noreferrer\" target=\"_blank\">results how-to</a>\ncovers saved checkpoints. See\n<a href=\"https://pyrite.readthedocs.io/en/latest/physics/capabilities.html\" rel=\"noopener noreferrer\" target=\"_blank\">model limitations</a>\nand <a href=\"https://pyrite.readthedocs.io/en/latest/validation/status-summary.html\" rel=\"noopener noreferrer\" target=\"_blank\">validation status</a>\nbefore interpreting these small-sample results quantitatively.</span></span>"
           }
         }
       ],
       "console": []
     },
     {
-      "id": "Xref",
+      "id": "BYtC",
       "code_hash": "1d62d4db2438291a955aee63c04ac1b3",
       "outputs": [
         {
