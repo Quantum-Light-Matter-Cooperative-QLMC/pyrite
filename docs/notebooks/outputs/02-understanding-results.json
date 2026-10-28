@@ -1,13 +1,13 @@
 {
   "schema": "pyrite.marimo-tutorial.v1",
-  "source_sha256": "898fdb0665edcf87f9535aa56a9048a2940a2d58879c703740cd10785c48c35e",
+  "source_sha256": "6cd308907d450d3e9227de90f844c8e86bd93267a9bb6c72d442c9bd6cee1cc7",
   "exporter_sha256": "6eedb7b2d84c7c81cfe4bb58c476c02676f6fd3a5784f844f613efe30412ab24",
-  "git_revision": "cd58097bb51a92347337e7dd904f546064b8f322",
+  "git_revision": "6cbc2fb04fb936c7eda6be6c0b1436c1135fcac4",
   "git_dirty": true,
   "python_version": "3.14.4",
   "execution": {
     "tutorial": "02-understanding-results",
-    "pyrite_version": "0.22.4",
+    "pyrite_version": "0.22.5",
     "backend": "cpu",
     "seed": 1,
     "table_identity": {
@@ -26,8 +26,8 @@
     "sampled_cxr_histories": 8192
   },
   "artifacts": {
-    "notebooks/__marimo__/session/02-understanding-results.py.json": "c2227a9fc76ecb38e40fcc2605c1e1cf4a90ed30401aff929cec9513d6502e94",
-    "_static/notebooks/02-understanding-results.html": "6ef13a4fa5c5ec3ebac75916f1e74ec70d407fc309df22960d4fcc076103b419",
+    "notebooks/__marimo__/session/02-understanding-results.py.json": "abc03cbb22ac46b8c77f1595de189e921e9c01aae4f274606186a46db15da2ec",
+    "_static/notebooks/02-understanding-results.html": "278bc55f0c9a656f63b4e8c0b2a641a392a821947cdf5156acb420590ddaf177",
     "_static/notebooks/02-understanding-results-1.png": "1ed4d5b7f199eec0f1de1f653a2cb6dca2041e6ac41b87c983af0db568e6b8c5",
     "_static/notebooks/02-understanding-results-2.png": "3fd40ce95ee03611acdb8575e5c64a138428c7e8272ccc199cfcfebf105570e3"
   }

@@ -2,7 +2,7 @@
   "version": "1",
   "metadata": {
     "marimo_version": "0.25.2",
-    "script_metadata_hash": "de80b48a2ab3ad86fc2e852f64d79b8d"
+    "script_metadata_hash": "9d9c4c0fe6d7dbb90d7cebe0776cf0d7"
   },
   "cells": [
     {
@@ -12,7 +12,7 @@
         {
           "type": "data",
           "data": {
-            "text/html": "<div style='display: flex;flex: 1;flex-direction: column;justify-content: flex-start;align-items: normal;flex-wrap: nowrap;gap: 0.5rem'><marimo-ui-element object-id='Hbol-0' random-id='f118b736-2676-11e2-8a52-af3ba04d1d70'><marimo-anywidget data-initial-value='{&quot;model_id&quot;:&quot;a05091f779514dc08e462be1f3080e05&quot;}' data-label='null' data-model-id='&quot;a05091f779514dc08e462be1f3080e05&quot;'></marimo-anywidget></marimo-ui-element></div>"
+            "text/html": "<div style='display: flex;flex: 1;flex-direction: column;justify-content: flex-start;align-items: normal;flex-wrap: nowrap;gap: 0.5rem'><marimo-ui-element object-id='Hbol-0' random-id='df0e7427-12ec-c476-c376-bab57e350124'><marimo-anywidget data-initial-value='{&quot;model_id&quot;:&quot;ddd1d053ee9b4069a49ff3d179f34dca&quot;}' data-label='null' data-model-id='&quot;ddd1d053ee9b4069a49ff3d179f34dca&quot;'></marimo-anywidget></marimo-ui-element></div>"
           }
         }
       ],
@@ -129,7 +129,7 @@
         {
           "type": "data",
           "data": {
-            "text/html": "<div style='display:none'><marimo-json-output data-json-data='{&quot;tutorial&quot;:&quot;06-detector-counts&quot;,&quot;pyrite_version&quot;:&quot;0.22.4&quot;,&quot;backend&quot;:&quot;cpu&quot;,&quot;seed&quot;:1,&quot;table_identity&quot;:{&quot;918b1a9013e4c19c584e2cf4eb8b605f0063a7237b8b0d67749867a4c6804832&quot;:&quot;c3f8eab1f03c1c66cfe0355b68f312e0ca450cbacaabe4f72eebecefe8d1e08d&quot;,&quot;ea7657ec94db1acf9f16cb260a5b107c3d2a4ecc71e43facee0e6a845487cbeb&quot;:&quot;beed169ba64a48fd11dc8c5a7bb81471abaa21806bde7943dba6da43e5b01b6f&quot;,&quot;44461d55c05a7fea30a0f52bceb2aa384d6b71c1e12765da576b5cbc2592dbe3&quot;:&quot;3f32446ff553a97b14755b475c4d88287ff44eff2ffce0cdd790dbd9b40a83f2&quot;,&quot;dfea6d21d4f6196cb74ef19486b6d86f6f5af40e89d7241efe09507a3b982e85&quot;:&quot;61fb7f4cf6dceab2a4d10c5fc641357d80b0ba6bbe037b64dd000e08f024acd9&quot;},&quot;source_identity&quot;:&quot;60000fac994649fd80846d1da0ba79334051cf14461e8d64c9a3cc481f2df5a0&quot;,&quot;observation_identity&quot;:&quot;15c33ae9c8ba5c9c37030d21bf11e0af64f972ec3ba173eac93bc13c7d4029c4&quot;,&quot;acquisition_seed&quot;:23,&quot;exposure_s&quot;:1.0,&quot;current_nA&quot;:10.0,&quot;measured_edges_eV&quot;:[500.0,4000.0],&quot;components&quot;:[&quot;brem&quot;,&quot;characteristic&quot;,&quot;cxr&quot;],&quot;pixel_shape&quot;:[16,16],&quot;angular_tiles&quot;:[4,4],&quot;sampled_cxr_histories&quot;:512,&quot;sampled_brem_histories&quot;:128,&quot;expected_total&quot;:929.8047082716506,&quot;realized_total&quot;:905,&quot;outside_window_expected&quot;:{&quot;underflow&quot;:13981.857636154802,&quot;overflow&quot;:381.55792220834155,&quot;below_cut&quot;:0.0}}' data-value-types='&quot;json&quot;'></marimo-json-output></div>"
+            "text/html": "<div style='display:none'><marimo-json-output data-json-data='{&quot;tutorial&quot;:&quot;06-detector-counts&quot;,&quot;pyrite_version&quot;:&quot;0.22.5&quot;,&quot;backend&quot;:&quot;cpu&quot;,&quot;seed&quot;:1,&quot;table_identity&quot;:{&quot;918b1a9013e4c19c584e2cf4eb8b605f0063a7237b8b0d67749867a4c6804832&quot;:&quot;c3f8eab1f03c1c66cfe0355b68f312e0ca450cbacaabe4f72eebecefe8d1e08d&quot;,&quot;ea7657ec94db1acf9f16cb260a5b107c3d2a4ecc71e43facee0e6a845487cbeb&quot;:&quot;beed169ba64a48fd11dc8c5a7bb81471abaa21806bde7943dba6da43e5b01b6f&quot;,&quot;44461d55c05a7fea30a0f52bceb2aa384d6b71c1e12765da576b5cbc2592dbe3&quot;:&quot;3f32446ff553a97b14755b475c4d88287ff44eff2ffce0cdd790dbd9b40a83f2&quot;,&quot;dfea6d21d4f6196cb74ef19486b6d86f6f5af40e89d7241efe09507a3b982e85&quot;:&quot;61fb7f4cf6dceab2a4d10c5fc641357d80b0ba6bbe037b64dd000e08f024acd9&quot;},&quot;source_identity&quot;:&quot;60000fac994649fd80846d1da0ba79334051cf14461e8d64c9a3cc481f2df5a0&quot;,&quot;observation_identity&quot;:&quot;15c33ae9c8ba5c9c37030d21bf11e0af64f972ec3ba173eac93bc13c7d4029c4&quot;,&quot;acquisition_seed&quot;:23,&quot;exposure_s&quot;:1.0,&quot;current_nA&quot;:10.0,&quot;measured_edges_eV&quot;:[500.0,4000.0],&quot;components&quot;:[&quot;brem&quot;,&quot;characteristic&quot;,&quot;cxr&quot;],&quot;pixel_shape&quot;:[16,16],&quot;angular_tiles&quot;:[4,4],&quot;sampled_cxr_histories&quot;:512,&quot;sampled_brem_histories&quot;:128,&quot;expected_total&quot;:929.8047082716506,&quot;realized_total&quot;:905,&quot;outside_window_expected&quot;:{&quot;underflow&quot;:13981.857636154802,&quot;overflow&quot;:381.55792220834155,&quot;below_cut&quot;:0.0}}' data-value-types='&quot;json&quot;'></marimo-json-output></div>"
           }
         }
       ],
