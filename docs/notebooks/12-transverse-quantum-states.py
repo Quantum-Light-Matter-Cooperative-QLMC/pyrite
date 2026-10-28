@@ -15,7 +15,7 @@ __generated_with = "0.25.2"
 app = marimo.App(width="medium")
 
 
-@app.cell(hide_code=False)
+@app.cell
 def _():
     import os
 
@@ -26,7 +26,16 @@ def _():
 
     from pyrite.quantum import gaussian, hermite_gauss, laguerre_gauss, mixture, superpose
 
-    return gaussian, hermite_gauss, laguerre_gauss, mixture, mo, np, plt, superpose
+    return (
+        gaussian,
+        hermite_gauss,
+        laguerre_gauss,
+        mixture,
+        mo,
+        np,
+        plt,
+        superpose,
+    )
 
 
 @app.cell(hide_code=True)
@@ -45,23 +54,40 @@ def _(mo):
 def _(gaussian, hermite_gauss, laguerre_gauss, np):
     coordinates_ang = np.linspace(-5.0, 5.0, 101)
     ground = gaussian(waist_ang=1.5, dimension=2)
-    hermite = hermite_gauss(1, 0, waist_ang=1.5)
+    hermite_32 = hermite_gauss(3, 2, waist_ang=1.5)
     positive = laguerre_gauss(ell=1, waist_ang=1.5)
     negative = laguerre_gauss(ell=-1, waist_ang=1.5)
-    return coordinates_ang, ground, hermite, negative, positive
+    positive_lg_32 = laguerre_gauss(ell=3, p=2, waist_ang=1.5)
+    return (
+        coordinates_ang,
+        ground,
+        hermite_32,
+        negative,
+        positive,
+        positive_lg_32,
+    )
 
 
 @app.cell
-def _(coordinates_ang, ground, hermite, np, plt, positive):
-    fig_modes, _axes = plt.subplots(1, 3, figsize=(8, 3), layout="constrained", sharey=True)
-    for _ax, _state, _label in zip(
-        _axes, (ground, hermite, positive), ("Gaussian", "HG₁₀", "LG₀¹"), strict=True
-    ):
+def _(coordinates_ang, ground, hermite_32, np, plt, positive, positive_lg_32):
+
+    fig_modes, _axes = plt.subplots(2, 2, figsize=(9, 7), layout="constrained", sharey=True)
+    flattened_axes = [
+        axis for _axis_pair in _axes for axis in _axis_pair
+    ]
+    plot_tuple = zip(
+        flattened_axes,
+        (ground, hermite_32, positive, positive_lg_32),
+        ("Gaussian", r"$\mathrm{HG}_{32}$", r"$\mathrm{LG}_0^1$", r"$\mathrm{LG}_2^3$"),
+        strict=True
+    )
+    for _ax, _state, _label in plot_tuple:
         _density = np.abs(_state.wavefunction(coordinates_ang, coordinates_ang)) ** 2
         _image = _ax.imshow(_density.T, origin="lower", extent=(-5, 5, -5, 5), cmap="magma", vmin=0)
         _ax.set(xlabel="x (Å)", title=_label)
         fig_modes.colorbar(_image, ax=_ax, shrink=0.7, label="Density (Å⁻²)")
-    _axes[0].set_ylabel("y (Å)")
+    _axes[0][0].set_ylabel("y (Å)")
+    _axes[1][0].set_ylabel("y (Å)")
     fig_modes  # noqa: B018 - displayed by marimo
     return
 
@@ -75,7 +101,9 @@ def _(mixture, negative, positive, superpose):
 
 @app.cell
 def _(coherent, coordinates_ang, incoherent, np, plt):
-    coherent_density = np.abs(coherent.wavefunction(coordinates_ang, coordinates_ang)) ** 2
+    coherent_density = np.abs(
+        coherent.wavefunction(coordinates_ang, coordinates_ang)
+    ) ** 2
     mixed_density = sum(
         _weight * np.abs(_state.wavefunction(coordinates_ang, coordinates_ang)) ** 2
         for _weight, _state in incoherent.components
@@ -95,9 +123,10 @@ def _(coherent, coordinates_ang, incoherent, np, plt):
             vmin=0,
             vmax=float(coherent_density.max()),
         )
-        _ax.set(xlabel="x (Å)", title=_label)
-    _axes[0].set_ylabel("y (Å)")
-    fig_coherence.colorbar(_image, ax=_axes, shrink=0.8, label="Density (Å⁻²)")
+        _ax.set(xlabel=r"$x\,\mathrm{(\AA)}$", title=_label)
+    _axes[0].set_ylabel(r"$y\,\mathrm{(\AA)}$")
+    fig_coherence.suptitle(r"Summing $\mathrm{LG_0^1}$ and $\mathrm{LG_0^{-1}}$")
+    fig_coherence.colorbar(_image, ax=_axes, shrink=0.8, label=r"Density ($\mathrm{\AA^{-2}}$)")
     fig_coherence  # noqa: B018 - displayed by marimo
     return
 

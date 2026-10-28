@@ -35,7 +35,17 @@ def _():
     _ = pyrite.fetch_tables()
     tables_ready = True
     checkpoint_directory = TemporaryDirectory(prefix="pyrite-optimization-tutorial-")
-    return Path, checkpoint_directory, mo, np, optuna, plt, replace, tables_ready, warnings
+    return (
+        Path,
+        checkpoint_directory,
+        mo,
+        np,
+        optuna,
+        plt,
+        replace,
+        tables_ready,
+        warnings,
+    )
 
 
 @app.cell(hide_code=True)
@@ -46,6 +56,12 @@ def _(mo):
     Search graphite tilt and thickness for PXR/CBS yield in **820–900 eV**,
     subject to a **50 nm** thickness limit. Then evaluate the selected design
     with independent seeds. The optimization API is experimental.
+
+    If run locally rather than on Molab, first install `Optuna` alongside `pyrite` with
+
+    ```code{python}
+    uv tool install "pyrite-mc[optimization]"
+    ```
     """)
     return
 
@@ -130,9 +146,9 @@ def _(records, score):
 
 @app.cell
 def _(
+    OptunaOptimizer,
     Path,
     PyriteEvaluator,
-    OptunaOptimizer,
     candidate_metrics,
     checkpoint_directory,
     definition,
