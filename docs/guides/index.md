@@ -54,7 +54,7 @@ Scene construction and configuration contracts live in
 
 ```{toctree}
 :maxdepth: 1
-:caption: Specialized examples
+:caption: Specialized workflows
 
 experimental-planar-channeling
 experimental-axial-channeling

@@ -1,4 +1,5 @@
-# Radiation diagnostics
+(radiation-diagnostics)=
+# Fit a synthetic bunch duration from an interferogram
 
 Explore when a far-IR interferogram constrains a Gaussian bunch duration.
 These are **synthetic model outputs**, using the optical diagnostics app's

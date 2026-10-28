@@ -1,4 +1,5 @@
-# Experimental planar channeling
+(experimental-planar-channeling)=
+# Project and evolve a planar channeling state (experimental)
 
 Project a 1D Gaussian into Si(110), evolve its transverse populations, and plot
 forward channeling radiation at 17 MeV. This direct CPU diagnostic needs no

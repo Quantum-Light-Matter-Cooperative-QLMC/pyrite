@@ -441,6 +441,7 @@ def draw_hbn_e(
         "e_azimuth_deg": float(azimuth_deg),
     }
 
+
 def draw_y(
     ax,
     y: dict[str, np.ndarray],

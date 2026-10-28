@@ -4,6 +4,12 @@ Choose crystal tilt and thickness to maximize the 820–900 eV directional
 PXR/CBS yield, then re-evaluate the selected designs with independent seeds.
 Compare constrained TPE, random sampling and a 15-point grid at equal budgets.
 
+For a first parameter study, use
+[Parameter sweeps](../notebooks/designing/08-parameter-sweeps.md) to map a fixed
+grid before choosing an optimizer. This recipe adds constrained search and
+independent finalist evaluation; the
+[optimization reference](../reference/optimization-studies.md) defines the API.
+
 :::{warning}
 The optimization API is **experimental**. This ideal-crystal simulation
 demonstrates search and validation; it establishes neither a global optimum nor

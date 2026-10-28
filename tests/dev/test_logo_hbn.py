@@ -22,8 +22,13 @@ def test_hbn_e_has_three_identical_sheets_and_no_vertical_bar():
     fig, ax = plt.subplots()
     try:
         stats = draw_hbn_e(
-            ax, x=0.0, baseline=0.81, cap=2.70, width=1.34,
-            tilt_deg=13.0, azimuth_deg=10.0,
+            ax,
+            x=0.0,
+            baseline=0.81,
+            cap=2.70,
+            width=1.34,
+            tilt_deg=13.0,
+            azimuth_deg=10.0,
         )
         assert stats["e_material"] == "hbn"
         assert stats["e_sheets"] == 3
@@ -69,8 +74,13 @@ def test_hbn_e_azimuth_changes_actual_projected_atom_coordinates():
         fig, ax = plt.subplots()
         try:
             draw_hbn_e(
-                ax, x=0.0, baseline=0.81, cap=2.70, width=1.34,
-                tilt_deg=13.0, azimuth_deg=azimuth,
+                ax,
+                x=0.0,
+                baseline=0.81,
+                cap=2.70,
+                width=1.34,
+                tilt_deg=13.0,
+                azimuth_deg=azimuth,
             )
             xs.append([atom.center[0] for atom in _atom_circles(ax)[:42]])
         finally:

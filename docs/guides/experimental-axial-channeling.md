@@ -1,5 +1,6 @@
 (experimental-axial-quantum-channeling-and-diagnostics)=
-# Experimental axial channeling
+(experimental-axial-channeling)=
+# Evolve an axial channeling state (experimental)
 
 Evolve a 2D Gaussian in Si[001] at 5 MeV, then inspect its density and overlap
 with the initial state. This coherent CPU diagnostic needs no transport tables

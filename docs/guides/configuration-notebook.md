@@ -5,6 +5,8 @@ target, detector and numerical settings, then save it for a CLI run. The editor
 manages **campaign profiles**, not arbitrary Python `Scene` objects. For
 in-memory scene construction, see the
 [beam and target tutorial](../notebooks/designing/04-beams-crystals-target-geometry.md).
+For a Python response surface rather than a saved profile, use
+[Parameter sweeps](../notebooks/designing/08-parameter-sweeps.md).
 
 ## Launch the editor
 

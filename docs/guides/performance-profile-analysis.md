@@ -5,6 +5,10 @@ execution settings. Optimize **uncached, compute-weighted throughput**
 (`done_cost / elapsed_seconds`), not CPU or GPU utilization alone. Keep the
 scientific workload fixed when comparing execution configurations.
 
+For an editable introduction to history counts, convergence and runtime, use
+[Sampling, convergence and performance](../notebooks/designing/07-sampling-convergence-performance.md).
+This recipe diagnoses an existing run using its execution telemetry.
+
 ## Collect and analyze a run
 
 `PROFILE` must be an existing catalog profile (`pyrite profile list`), not an

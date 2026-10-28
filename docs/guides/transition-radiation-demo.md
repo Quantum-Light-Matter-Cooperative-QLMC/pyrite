@@ -1,4 +1,5 @@
-# TR and CTR demo
+(tr-and-ctr-demo)=
+# Compare straight-track and transported TR/CTR
 
 Compare film transition radiation (TR) with coherent transition radiation (CTR),
 then see what changes when electrons scatter and lose energy. The figures below
