@@ -392,8 +392,8 @@ def draw_hbn_e(
     depth_offset = (
         2.2 * scale * np.sin(np.deg2rad(tilt_deg)) * (depth - depth.mean())
     )
-    row_spacing = (cap - baseline - 0.28) / 2.0
-    row_heights = [cap - 0.14 - row * row_spacing for row in range(3)]
+    row_spacing = (cap - baseline - 0.45) / 2.0  # 0.28) / 2.0
+    row_heights = [cap - 0.24 - row * row_spacing for row in range(3)]
 
     segments = [
         [(px[a], py + depth_offset[a]), (px[b], py + depth_offset[b])]
