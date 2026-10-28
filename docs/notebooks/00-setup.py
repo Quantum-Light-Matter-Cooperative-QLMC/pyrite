@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.13"
-# dependencies = ["marimo>=0.25.1", "pyrite-mc==0.22.5", "matplotlib>=3.11", "numpy>=2"]
+# dependencies = ["endf-parserpy==0.17.0", "marimo>=0.25.1", "pyrite-mc==0.22.5", "matplotlib>=3.11", "numpy>=2"]
 # ///
 
 import marimo
@@ -9,24 +9,23 @@ __generated_with = "0.25.2"
 app = marimo.App(width="medium")
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _():
     import os
 
     # Change to "cuda" before the first PyRITE import; restart an existing kernel.
     os.environ.setdefault("PYRITE_MC_BACKEND", "cpu")
     import marimo as mo
-    import matplotlib.pyplot as plt
     import numpy as np
 
     import pyrite
 
     _ = pyrite.fetch_tables()  # Fetch missing pinned tables once; reuse installed data.
+    tables_ready = True
+    return tables_ready, mo, np, os, pyrite
 
-    return mo, np, os, plt, pyrite
 
-
-@app.cell
+@app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
     # Environment and GPU setup
@@ -36,16 +35,21 @@ def _(mo):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
     ## Install and fetch tables once
 
-    Use Python **3.13 or newer**. Locally, create an environment and install:
+    Use Python **3.13 or newer**. **MoLab** installs the CPU environment from
+    this notebook's dependency list. To add or change a dependency, open MoLab's
+    built-in package manager and enter the package name and version, for example
+    `endf-parserpy==0.17.0`.
+
+    **Locally**, install `pyrite-mc[apps]==0.22.5` and `endf-parserpy==0.17.0`
+    with your package manager, then open the notebook. These optional commands
+    fetch and verify the tables and launch the local editor:
 
     ```bash
-    uv venv --python 3.13
-    uv pip install 'pyrite-mc[apps]==0.22.5'
     uv run pyrite tables fetch
     uv run pyrite tables verify
     uv run marimo edit docs/notebooks/00-setup.py
@@ -58,17 +62,17 @@ def _(mo):
     The CLI commands above remain useful for manual verification or troubleshooting.
     See the [tables reference](https://pyrite.readthedocs.io/en/latest/repo-design/cli/cli-reference-tables.html).
 
-    **Molab:** open the badge above; its inline dependency manifest installs the
-    CPU environment. The first cell fetches missing tables automatically; you can
-    run `pyrite tables verify` in Molab's terminal. Start with CPU. If your Molab
-    session offers an NVIDIA RTX Pro 6000, select that GPU in Molab, then install
-    the NVIDIA extra into the
-    same environment:
+    These notebooks pin `endf-parserpy==0.17.0` for the released PyRITE version.
+    If an existing session reports **MF=26/MT=527 photon yield table is missing**,
+    open MoLab's package manager, enter `endf-parserpy==0.17.0`, and restart
+    the kernel.
 
-    ```bash
-    uv pip install 'pyrite-mc[nvidia]==0.22.5'
-    nvidia-smi
-    ```
+    The EEDL file itself is valid; downloading it again does not fix this parser
+    compatibility error.
+
+    **NVIDIA GPU:** start with CPU. If your MoLab session offers an NVIDIA
+    RTX Pro 6000, select that GPU, then add `pyrite-mc[nvidia]==0.22.5` through
+    MoLab's package manager and restart the kernel.
 
     Use the same extra for a local NVIDIA GPU. A compatible NVIDIA driver is still
     required; the current extra supplies CUDA 13 CuPy/toolkit packages. GPU type,
@@ -78,7 +82,7 @@ def _(mo):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo, os, pyrite):
     import importlib.util
     import platform
@@ -101,10 +105,10 @@ def _(mo, os, pyrite):
     else:
         environment["cuda_status"] = "CuPy not installed; CPU execution is available"
     mo.json(environment)
-    return (environment,)
+    return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
     ## Choose the backend before import
@@ -120,7 +124,7 @@ def _(mo):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _():
     from pyrite import simulate
     from pyrite.beams import Beam, PointBunch, PointSpot
@@ -156,7 +160,9 @@ def _(
     PointSpot,
     Slab,
     simulate,
+    tables_ready,
 ):
+    assert tables_ready  # Wait for reference-table installation before transport.
     smoke = simulate(
         Beam(energy_keV=30.0, transverse=PointSpot(), longitudinal=PointBunch()),
         Slab("hopg", thickness_ang=100.0, tilt_deg=30.0, footprint=Footprint(5.0, 5.0)),
@@ -170,7 +176,7 @@ def _(
     return (smoke,)
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo, np, smoke):
     smoke_summary = {
         "backend": smoke.provenance["backend"],
@@ -180,7 +186,7 @@ def _(mo, np, smoke):
     }
     assert smoke_summary["finite_spectrum"] and smoke_summary["nonzero_spectrum"]
     mo.json(smoke_summary)
-    return (smoke_summary,)
+    return
 
 
 @app.cell(hide_code=True)
@@ -195,10 +201,10 @@ def _(mo, pyrite, smoke):
     }
     # Preserve machine-readable export metadata without displaying it to readers.
     mo.json(tutorial_provenance).style({"display": "none"})
-    return (tutorial_provenance,)
+    return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
     ## Continue

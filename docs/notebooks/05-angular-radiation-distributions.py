@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.13"
-# dependencies = ["marimo>=0.25.1", "pyrite-mc==0.22.5", "matplotlib>=3.11", "numpy>=2"]
+# dependencies = ["endf-parserpy==0.17.0", "marimo>=0.25.1", "pyrite-mc==0.22.5", "matplotlib>=3.11", "numpy>=2"]
 # ///
 
 import marimo
@@ -9,7 +9,7 @@ __generated_with = "0.25.2"
 app = marimo.App(width="medium")
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _():
     import os
 
@@ -22,10 +22,11 @@ def _():
     import pyrite
 
     _ = pyrite.fetch_tables()  # Complete installed tables require no network access.
-    return mo, np, plt, pyrite
+    tables_ready = True
+    return tables_ready, mo, np, plt, pyrite
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
     # Angular radiation distributions
@@ -35,7 +36,7 @@ def _(mo):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
     ## Define an angular slice
@@ -79,7 +80,8 @@ def _():
 
 
 @app.cell
-def _(beam, directional_source, np, numerics, target):
+def _(beam, directional_source, np, numerics, target, tables_ready):
+    assert tables_ready  # Wait for reference-table installation before transport.
     angles_deg = np.linspace(-180.0, 180.0, 48, endpoint=False)
     energies_eV = np.linspace(100.0, 2_000.0, 257)
     source = directional_source(
@@ -156,7 +158,7 @@ def _(np, plt, source):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
     ## Interpret the map

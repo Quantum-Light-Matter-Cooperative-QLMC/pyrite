@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.13"
-# dependencies = ["marimo>=0.25.1", "pyrite-mc==0.22.5", "matplotlib>=3.11", "numpy>=2"]
+# dependencies = ["endf-parserpy==0.17.0", "marimo>=0.25.1", "pyrite-mc==0.22.5", "matplotlib>=3.11", "numpy>=2"]
 # ///
 
 import marimo
@@ -9,7 +9,7 @@ __generated_with = "0.25.2"
 app = marimo.App(width="medium")
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _():
     import os
 
@@ -22,10 +22,11 @@ def _():
     import pyrite
 
     _ = pyrite.fetch_tables()  # Complete installed tables need no download.
-    return mo, np, plt, pyrite
+    tables_ready = True
+    return tables_ready, mo, np, plt, pyrite
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
     # From X-rays to detector counts
@@ -68,7 +69,7 @@ def _():
     return beam, panel, scene, simulate
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
     ## Specify what is measured
@@ -107,7 +108,8 @@ def _():
 
 
 @app.cell
-def _(observation, scene, simulate):
+def _(observation, scene, simulate, tables_ready):
+    assert tables_ready  # Wait for reference-table installation before transport.
     from pyrite.config import CxrReflections, FixedSampling, Numerics
 
     result = simulate(
@@ -151,7 +153,7 @@ def _(count_image, expected_image, plt):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
     ## Interpret and explore

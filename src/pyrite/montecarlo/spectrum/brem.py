@@ -201,11 +201,18 @@ def _extract_bremsstrahlung_table(
     if np.any(total_barn < 0.0):
         raise ValueError(f"{total_label} cross sections must be non-negative")
 
-    yield_label = f"{path}: EEDL MF=26/MT=527 photon yield"
+    spectrum_label = f"{path}: EEDL MF=26/MT=527 photon spectrum"
     try:
-        yields = cast(Mapping[str, object], product_section["yields"])
-    except KeyError as exc:
-        raise ValueError(f"{yield_label} table is missing") from exc
+        subsections = cast(Mapping[int, object], product_section["subsection"])
+        photon = cast(Mapping[str, object], subsections[1])
+        panel_count = _integer(photon["NE"], f"{spectrum_label} NE")
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ValueError(f"{spectrum_label} subsection is missing or invalid") from exc
+
+    yield_label = f"{path}: EEDL MF=26/MT=527 photon yield"
+    # endf-parserpy 0.18 moved yields into the product subsection; 0.17 stores
+    # them at section level. Both layouts describe the same pinned ENDF data.
+    yields = cast(Mapping[str, object], photon.get("yields", product_section.get("yields", {})))
     yield_energy = _section_vector(yields, "Eint", yield_label)
     yield_value = _section_vector(yields, "yi", yield_label)
     if yield_energy.size != yield_value.size or yield_energy.size < 2:
@@ -216,13 +223,6 @@ def _extract_bremsstrahlung_table(
     if not np.allclose(yield_value, 1.0, rtol=0.0, atol=1.0e-12):
         raise ValueError(f"{yield_label} must declare one photon per reaction")
 
-    spectrum_label = f"{path}: EEDL MF=26/MT=527 photon spectrum"
-    try:
-        subsections = cast(Mapping[int, object], product_section["subsection"])
-        photon = cast(Mapping[str, object], subsections[1])
-        panel_count = _integer(photon["NE"], f"{spectrum_label} NE")
-    except (KeyError, TypeError, ValueError) as exc:
-        raise ValueError(f"{spectrum_label} subsection is missing or invalid") from exc
     if (
         _integer(photon.get("LANG", -1), f"{spectrum_label} LANG") != 1
         or _integer(photon.get("LEP", -1), f"{spectrum_label} LEP") != 2

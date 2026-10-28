@@ -2,17 +2,17 @@
   "version": "1",
   "metadata": {
     "marimo_version": "0.25.2",
-    "script_metadata_hash": "9d9c4c0fe6d7dbb90d7cebe0776cf0d7"
+    "script_metadata_hash": "be882373ce9f9752409aa815b3a6adb0"
   },
   "cells": [
     {
       "id": "Hbol",
-      "code_hash": "7f9a85c578793b24e48b4b051c906f01",
+      "code_hash": "45c1cbe7237243328d0595bab6e46d29",
       "outputs": [
         {
           "type": "data",
           "data": {
-            "text/html": "<div style='display: flex;flex: 1;flex-direction: column;justify-content: flex-start;align-items: normal;flex-wrap: nowrap;gap: 0.5rem'><marimo-ui-element object-id='Hbol-0' random-id='8328423c-9f97-baff-23ab-3d61d566be70'><marimo-anywidget data-initial-value='{&quot;model_id&quot;:&quot;396b3f21f2a1412e88ccdb32553ed5d7&quot;}' data-label='null' data-model-id='&quot;396b3f21f2a1412e88ccdb32553ed5d7&quot;'></marimo-anywidget></marimo-ui-element></div>"
+            "text/html": "<div style='display: flex;flex: 1;flex-direction: column;justify-content: flex-start;align-items: normal;flex-wrap: nowrap;gap: 0.5rem'><marimo-ui-element object-id='Hbol-0' random-id='396abb34-aa7d-a7fc-fe04-907d0f1407d4'><marimo-anywidget data-initial-value='{&quot;model_id&quot;:&quot;35c43e17755a4819a397346012646e0b&quot;}' data-label='null' data-model-id='&quot;35c43e17755a4819a397346012646e0b&quot;'></marimo-anywidget></marimo-ui-element></div>"
           }
         }
       ],
@@ -33,12 +33,12 @@
     },
     {
       "id": "vblA",
-      "code_hash": "700e857ac369ebe9f04e4965e434cc44",
+      "code_hash": "af4599e318ce98ce9ce3e4738abb45d7",
       "outputs": [
         {
           "type": "data",
           "data": {
-            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"install-and-fetch-tables-once\">Install and fetch tables once</h2>\n<span class=\"paragraph\">Use Python <strong>3.13 or newer</strong>. Locally, create an environment and install:</span>\n<div class=\"language-bash codehilite\"><pre><span></span><code>uv<span class=\"w\"> </span>venv<span class=\"w\"> </span>--python<span class=\"w\"> </span><span class=\"m\">3</span>.13\nuv<span class=\"w\"> </span>pip<span class=\"w\"> </span>install<span class=\"w\"> </span><span class=\"s1\">'pyrite-mc[apps]==0.22.5'</span>\nuv<span class=\"w\"> </span>run<span class=\"w\"> </span>pyrite<span class=\"w\"> </span>tables<span class=\"w\"> </span>fetch\nuv<span class=\"w\"> </span>run<span class=\"w\"> </span>pyrite<span class=\"w\"> </span>tables<span class=\"w\"> </span>verify\nuv<span class=\"w\"> </span>run<span class=\"w\"> </span>marimo<span class=\"w\"> </span>edit<span class=\"w\"> </span>docs/notebooks/00-setup.py\n</code></pre></div>\n<span class=\"paragraph\">The reference data download is about 100 MB. Fetch verifies archive SHA-256\nbefore installation; <code>tables verify</code> checks installed pins and payloads.\nThe setup cell calls <code>_ = pyrite.fetch_tables()</code> to install missing pinned tables\nautomatically. Complete installations are reused without a network request.\nThe CLI commands above remain useful for manual verification or troubleshooting.\nSee the <a href=\"https://pyrite.readthedocs.io/en/latest/repo-design/cli/cli-reference-tables.html\" rel=\"noopener noreferrer\" target=\"_blank\">tables reference</a>.</span>\n<span class=\"paragraph\"><strong>Molab:</strong> open the badge above; its inline dependency manifest installs the\nCPU environment. The first cell fetches missing tables automatically; you can\nrun <code>pyrite tables verify</code> in Molab's terminal. Start with CPU. If your Molab\nsession offers an NVIDIA RTX Pro 6000, select that GPU in Molab, then install\nthe NVIDIA extra into the\nsame environment:</span>\n<div class=\"language-bash codehilite\"><pre><span></span><code>uv<span class=\"w\"> </span>pip<span class=\"w\"> </span>install<span class=\"w\"> </span><span class=\"s1\">'pyrite-mc[nvidia]==0.22.5'</span>\nnvidia-smi\n</code></pre></div>\n<span class=\"paragraph\">Use the same extra for a local NVIDIA GPU. A compatible NVIDIA driver is still\nrequired; the current extra supplies CUDA 13 CuPy/toolkit packages. GPU type,\navailability and account quotas depend on the host. This notebook does not\nrequire a GPU or allocate GPU transport by default.</span></span>"
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"install-and-fetch-tables-once\">Install and fetch tables once</h2>\n<span class=\"paragraph\">Use Python <strong>3.13 or newer</strong>. <strong>MoLab</strong> installs the CPU environment from\nthis notebook's dependency list. To add or change a dependency, open MoLab's\nbuilt-in package manager and enter the package name and version, for example\n<code>endf-parserpy==0.17.0</code>.</span>\n<span class=\"paragraph\"><strong>Locally</strong>, install <code>pyrite-mc[apps]==0.22.5</code> and <code>endf-parserpy==0.17.0</code>\nwith your package manager, then open the notebook. These optional commands\nfetch and verify the tables and launch the local editor:</span>\n<div class=\"language-bash codehilite\"><pre><span></span><code>uv<span class=\"w\"> </span>run<span class=\"w\"> </span>pyrite<span class=\"w\"> </span>tables<span class=\"w\"> </span>fetch\nuv<span class=\"w\"> </span>run<span class=\"w\"> </span>pyrite<span class=\"w\"> </span>tables<span class=\"w\"> </span>verify\nuv<span class=\"w\"> </span>run<span class=\"w\"> </span>marimo<span class=\"w\"> </span>edit<span class=\"w\"> </span>docs/notebooks/00-setup.py\n</code></pre></div>\n<span class=\"paragraph\">The reference data download is about 100 MB. Fetch verifies archive SHA-256\nbefore installation; <code>tables verify</code> checks installed pins and payloads.\nThe setup cell calls <code>_ = pyrite.fetch_tables()</code> to install missing pinned tables\nautomatically. Complete installations are reused without a network request.\nThe CLI commands above remain useful for manual verification or troubleshooting.\nSee the <a href=\"https://pyrite.readthedocs.io/en/latest/repo-design/cli/cli-reference-tables.html\" rel=\"noopener noreferrer\" target=\"_blank\">tables reference</a>.</span>\n<span class=\"paragraph\">These notebooks pin <code>endf-parserpy==0.17.0</code> for the released PyRITE version.\nIf an existing session reports <strong>MF=26/MT=527 photon yield table is missing</strong>,\nopen MoLab's package manager, enter <code>endf-parserpy==0.17.0</code>, and restart\nthe kernel.</span>\n<span class=\"paragraph\">The EEDL file itself is valid; downloading it again does not fix this parser\ncompatibility error.</span>\n<span class=\"paragraph\"><strong>NVIDIA GPU:</strong> start with CPU. If your MoLab session offers an NVIDIA\nRTX Pro 6000, select that GPU, then add <code>pyrite-mc[nvidia]==0.22.5</code> through\nMoLab's package manager and restart the kernel.</span>\n<span class=\"paragraph\">Use the same extra for a local NVIDIA GPU. A compatible NVIDIA driver is still\nrequired; the current extra supplies CUDA 13 CuPy/toolkit packages. GPU type,\navailability and account quotas depend on the host. This notebook does not\nrequire a GPU or allocate GPU transport by default.</span></span>"
           }
         }
       ],
@@ -85,7 +85,7 @@
     },
     {
       "id": "Xref",
-      "code_hash": "35eba7291b6eb2c85eeef45a2c169d08",
+      "code_hash": "7fc2cf3097dcb5a209c2ac2b417b13ce",
       "outputs": [
         {
           "type": "data",

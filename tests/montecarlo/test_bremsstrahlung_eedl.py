@@ -51,6 +51,41 @@ def test_packaged_carbon_total_cross_section_and_photon_tables():
         assert not density.flags.writeable
 
 
+@pytest.mark.parametrize("yield_location", ["section", "subsection"])
+@pytest.mark.parametrize("yield_value", [1.0, 2.0])
+def test_photon_yields_support_both_endf_parser_layouts(tmp_path, yield_location, yield_value):
+    total = {"Eint": [10.0, 20.0], "sigma": [1.0, 2.0], "NBT": [2], "INT": [2]}
+    yields = {"Eint": [10.0, 20.0], "yi": [yield_value] * 2, "NBT": [2], "INT": [2]}
+    photon = {
+        "NE": 2,
+        "LANG": 1,
+        "LEP": 2,
+        "NBT": [2],
+        "INT": [2],
+        "E": {1: 10.0, 2: 20.0},
+        "NEP": {1: 2, 2: 2},
+        "ND": {1: 0, 2: 0},
+        "NA": {1: 0, 2: 0},
+        "Ep": {1: {1: 1.0, 2: 10.0}, 2: {1: 1.0, 2: 20.0}},
+        "b": {1: {1: {0: 1 / 9}, 2: {0: 1 / 9}}, 2: {1: {0: 1 / 19}, 2: {0: 1 / 19}}},
+    }
+    product = {"subsection": {1: photon}}
+    # 0.17 stores yields at section level; 0.18 puts them with their product.
+    (product if yield_location == "section" else photon)["yields"] = yields
+    if yield_value != 1.0:
+        with pytest.raises(ValueError, match="must declare one photon per reaction"):
+            brem._extract_bremsstrahlung_table(tmp_path, "C", 6, total, product)
+        return
+    table = brem._extract_bremsstrahlung_table(tmp_path, "C", 6, total, product)
+    np.testing.assert_array_equal(table.total_cross_section_cm2, np.array([1.0, 2.0]) * 1e-24)
+    for energy, density in zip(
+        table.photon_energy_eV_by_incident,
+        table.photon_probability_density_per_eV_by_incident,
+        strict=True,
+    ):
+        assert np.trapezoid(density, energy) == pytest.approx(1.0)
+
+
 def test_eedl_differential_cross_section_integrates_to_total_at_native_panel():
     table = brem.load_bremsstrahlung_cross_sections("C")
     panel = 4

@@ -2,7 +2,7 @@
   "version": "1",
   "metadata": {
     "marimo_version": "0.25.2",
-    "script_metadata_hash": "9d9c4c0fe6d7dbb90d7cebe0776cf0d7"
+    "script_metadata_hash": "be882373ce9f9752409aa815b3a6adb0"
   },
   "cells": [
     {
@@ -12,7 +12,7 @@
         {
           "type": "data",
           "data": {
-            "text/html": "<div style='display: flex;flex: 1;flex-direction: column;justify-content: flex-start;align-items: normal;flex-wrap: nowrap;gap: 0.5rem'><marimo-ui-element object-id='Hbol-0' random-id='cd6cd59f-0fa1-a3a1-f787-109dbb08315f'><marimo-anywidget data-initial-value='{&quot;model_id&quot;:&quot;fb34c21633e74658a02176f7ad595443&quot;}' data-label='null' data-model-id='&quot;fb34c21633e74658a02176f7ad595443&quot;'></marimo-anywidget></marimo-ui-element></div>"
+            "text/html": "<div style='display: flex;flex: 1;flex-direction: column;justify-content: flex-start;align-items: normal;flex-wrap: nowrap;gap: 0.5rem'><marimo-ui-element object-id='Hbol-0' random-id='4c146ad9-a035-fbfd-f1fb-27a9a2581474'><marimo-anywidget data-initial-value='{&quot;model_id&quot;:&quot;1f6b2882dec4445a9a5fcdd0711bf180&quot;}' data-label='null' data-model-id='&quot;1f6b2882dec4445a9a5fcdd0711bf180&quot;'></marimo-anywidget></marimo-ui-element></div>"
           }
         }
       ],

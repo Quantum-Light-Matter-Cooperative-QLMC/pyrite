@@ -100,7 +100,9 @@ def test_all_notebooks_bootstrap_tables_before_simulation():
             for node in tree.body
             if isinstance(node, ast.FunctionDef)
             and any(
-                isinstance(dec, ast.Attribute) and dec.attr == "cell" for dec in node.decorator_list
+                isinstance(dec.func if isinstance(dec, ast.Call) else dec, ast.Attribute)
+                and (dec.func if isinstance(dec, ast.Call) else dec).attr == "cell"
+                for dec in node.decorator_list
             )
         )
         imports = [

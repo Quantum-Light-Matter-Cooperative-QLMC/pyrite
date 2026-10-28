@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.13"
-# dependencies = ["marimo>=0.25.1", "pyrite-mc==0.22.5", "matplotlib>=3.11", "numpy>=2"]
+# dependencies = ["endf-parserpy==0.17.0", "marimo>=0.25.1", "pyrite-mc==0.22.5", "matplotlib>=3.11", "numpy>=2"]
 # ///
 
 import marimo
@@ -9,7 +9,7 @@ __generated_with = "0.25.2"
 app = marimo.App(width="medium")
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _():
     import os
 
@@ -26,7 +26,7 @@ def _():
     return mo, np, os, plt, pyrite
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
     # Predicting PXR line energies
@@ -36,7 +36,7 @@ def _(mo):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
     ## Setup
@@ -121,7 +121,7 @@ def _(beam_energy_eV, catalog, hkl, photon_energies):
     return second_order_eV, tilt_scan_deg, tilting_lines_eV
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo, second_order_eV, tilt_scan_deg, tilting_lines_eV):
     mo.md(
         f"At 135° observation, tilts {tilt_scan_deg}° give "
@@ -131,7 +131,7 @@ def _(mo, second_order_eV, tilt_scan_deg, tilting_lines_eV):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
     ## Interpretation and next steps

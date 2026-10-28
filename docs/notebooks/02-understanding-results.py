@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.13"
-# dependencies = ["marimo>=0.25.1", "pyrite-mc==0.22.5", "matplotlib>=3.11", "numpy>=2"]
+# dependencies = ["endf-parserpy==0.17.0", "marimo>=0.25.1", "pyrite-mc==0.22.5", "matplotlib>=3.11", "numpy>=2"]
 # ///
 
 import marimo
@@ -9,7 +9,7 @@ __generated_with = "0.25.2"
 app = marimo.App(width="medium")
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _():
     import os
 
@@ -23,10 +23,11 @@ def _():
 
     _ = pyrite.fetch_tables()  # Fetch missing pinned tables once; reuse installed data.
 
-    return mo, np, plt, pyrite
+    tables_ready = True
+    return tables_ready, mo, np, plt, pyrite
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
     # Understanding simulation results
@@ -37,7 +38,7 @@ def _(mo):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
     ## A source and its numerical sampling
@@ -75,7 +76,8 @@ def _():
 
 
 @app.cell
-def _(beam, detector, numerics, simulate, target):
+def _(beam, detector, numerics, simulate, target, tables_ready):
+    assert tables_ready  # Wait for reference-table installation before transport.
     result = simulate(beam, target, detector, numerics=numerics)
     return (result,)
 
@@ -177,7 +179,7 @@ def _(into_acceptance, plt):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
     ## Interpretation

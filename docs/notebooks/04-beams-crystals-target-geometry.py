@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.13"
-# dependencies = ["marimo>=0.25.1", "pyrite-mc==0.22.5", "matplotlib>=3.11", "numpy>=2"]
+# dependencies = ["endf-parserpy==0.17.0", "marimo>=0.25.1", "pyrite-mc==0.22.5", "matplotlib>=3.11", "numpy>=2"]
 # ///
 
 import marimo
@@ -9,7 +9,7 @@ __generated_with = "0.25.2"
 app = marimo.App(width="medium")
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _():
     import os
 
@@ -23,10 +23,11 @@ def _():
 
     _ = pyrite.fetch_tables()  # Installed pins are reused without downloading again.
 
-    return mo, np, plt, pyrite
+    tables_ready = True
+    return tables_ready, mo, np, plt, pyrite
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
     # Beams, crystals and target geometry
@@ -36,7 +37,7 @@ def _(mo):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
     ## Choose a beam and crystal
@@ -96,7 +97,7 @@ def _(beam, mo, np, plt, target):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
     ## Run one source calculation
@@ -110,7 +111,8 @@ def _(mo):
 
 
 @app.cell
-def _(beam, detector, simulate, target):
+def _(beam, detector, simulate, target, tables_ready):
+    assert tables_ready  # Wait for reference-table installation before transport.
     from pyrite.config import CxrReflections, FixedSampling, Numerics, Physics
 
     result = simulate(
@@ -144,7 +146,7 @@ def _(plt, result):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
     ## Interpret and experiment

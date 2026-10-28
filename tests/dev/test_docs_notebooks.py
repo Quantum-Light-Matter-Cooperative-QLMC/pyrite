@@ -1,13 +1,100 @@
 """Executable tutorial sources and captured outputs stay one scientific example."""
 
+import ast
 import importlib.util
 import json
+import tomllib
 from pathlib import Path
 
 import numpy as np
 import pytest
 
 DOCS = Path(__file__).parents[2] / "docs"
+
+
+def test_released_tutorial_environment_pins_compatible_endf_parser():
+    for path in (DOCS / "notebooks").glob("*.py"):
+        metadata = path.read_text().split("# /// script\n", 1)[1].split("# ///", 1)[0]
+        script = tomllib.loads("\n".join(line.removeprefix("# ") for line in metadata.splitlines()))
+        # The published 0.22.5 loader expects the pre-0.18 MF26 dictionary layout.
+        # Revisit this pin when the notebooks move to a release with the adapter.
+        assert "endf-parserpy==0.17.0" in script["dependencies"], path.name
+
+
+def test_tutorials_use_molab_package_manager_instructions():
+    for path in (DOCS / "notebooks").glob("*.py"):
+        assert "pip install" not in path.read_text(), path.name
+    setup = (DOCS / "notebooks" / "00-setup.py").read_text()
+    assert "built-in package manager" in setup
+    assert "enter `endf-parserpy==0.17.0`" in setup
+
+
+def test_prose_and_boilerplate_cells_hide_code():
+    for path in (DOCS / "notebooks").glob("*.py"):
+        for cell in ast.parse(path.read_text()).body:
+            if not isinstance(cell, ast.FunctionDef):
+                continue
+            markdown = any(
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Attribute)
+                and isinstance(node.func.value, ast.Name)
+                and node.func.value.id == "mo"
+                and node.func.attr == "md"
+                for node in ast.walk(cell)
+            )
+            imports_only = all(
+                isinstance(node, (ast.Import, ast.ImportFrom, ast.Return)) for node in cell.body
+            )
+            bootstrap = any(
+                isinstance(node, ast.Import) and any(a.name == "pyrite" for a in node.names)
+                for node in cell.body
+            )
+            if markdown or imports_only or bootstrap:
+                decorator = cell.decorator_list[0]
+                assert isinstance(decorator, ast.Call), (path.name, cell.lineno)
+                assert any(
+                    keyword.arg == "hide_code"
+                    and isinstance(keyword.value, ast.Constant)
+                    and keyword.value.value is True
+                    for keyword in decorator.keywords
+                ), (path.name, cell.lineno)
+
+
+def test_transport_depends_on_completed_table_fetch():
+    for path in (DOCS / "notebooks").glob("*.py"):
+        cells = [n for n in ast.parse(path.read_text()).body if isinstance(n, ast.FunctionDef)]
+        for cell in cells:
+            transport = any(
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Name)
+                and node.func.id in {"simulate", "directional_source"}
+                for node in ast.walk(cell)
+            )
+            if not transport:
+                continue
+            assert "tables_ready" in {arg.arg for arg in cell.args.args}, path.name
+            assert isinstance(cell.body[0], ast.Assert), path.name
+            assert isinstance(cell.body[0].test, ast.Name), path.name
+            assert cell.body[0].test.id == "tables_ready", path.name
+            bootstrap = cells[0]
+            ready = next(
+                n
+                for n in bootstrap.body
+                if isinstance(n, ast.Assign)
+                and any(isinstance(t, ast.Name) and t.id == "tables_ready" for t in n.targets)
+            )
+            fetch = next(
+                n
+                for n in ast.walk(bootstrap)
+                if isinstance(n, ast.Call)
+                and isinstance(n.func, ast.Attribute)
+                and n.func.attr == "fetch_tables"
+            )
+            assert fetch.lineno < ready.lineno, path.name
+            assert any(
+                isinstance(n, ast.Name) and n.id == "tables_ready"
+                for n in ast.walk(bootstrap.body[-1])
+            ), path.name
 
 
 @pytest.fixture

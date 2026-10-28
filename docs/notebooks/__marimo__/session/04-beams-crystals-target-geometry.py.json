@@ -2,17 +2,17 @@
   "version": "1",
   "metadata": {
     "marimo_version": "0.25.2",
-    "script_metadata_hash": "9d9c4c0fe6d7dbb90d7cebe0776cf0d7"
+    "script_metadata_hash": "be882373ce9f9752409aa815b3a6adb0"
   },
   "cells": [
     {
       "id": "Hbol",
-      "code_hash": "b7535afad1f3038ab2775ca66c9b76e8",
+      "code_hash": "df78bf78a9e5ba64c71c66ea4ce14fe0",
       "outputs": [
         {
           "type": "data",
           "data": {
-            "text/html": "<div style='display: flex;flex: 1;flex-direction: column;justify-content: flex-start;align-items: normal;flex-wrap: nowrap;gap: 0.5rem'><marimo-ui-element object-id='Hbol-0' random-id='a44df99d-ed3a-b475-8e51-dc7daa3c7790'><marimo-anywidget data-initial-value='{&quot;model_id&quot;:&quot;56dc9a398d384ceeb26c1cab3bacc4ac&quot;}' data-label='null' data-model-id='&quot;56dc9a398d384ceeb26c1cab3bacc4ac&quot;'></marimo-anywidget></marimo-ui-element></div>"
+            "text/html": "<div style='display: flex;flex: 1;flex-direction: column;justify-content: flex-start;align-items: normal;flex-wrap: nowrap;gap: 0.5rem'><marimo-ui-element object-id='Hbol-0' random-id='886a7b8b-c27a-8d2b-21a7-cbcab452246f'><marimo-anywidget data-initial-value='{&quot;model_id&quot;:&quot;5448f08b52d2451288bf248cadea2b03&quot;}' data-label='null' data-model-id='&quot;5448f08b52d2451288bf248cadea2b03&quot;'></marimo-anywidget></marimo-ui-element></div>"
           }
         }
       ],
@@ -85,7 +85,7 @@
     },
     {
       "id": "Xref",
-      "code_hash": "9633e1f21f139339c26f425b29acdcdf",
+      "code_hash": "c1d7ce72c3a1a92243b4b4c3cafb04a0",
       "outputs": [
         {
           "type": "data",
