@@ -26,6 +26,16 @@ Its particular focus is **parametric X-ray radiation (PXR)** and **coherent brem
 
 PyRITE is especially useful for investigating **tunable, crystal-based X-ray sources**, including how electron scattering and background radiation affect the spectra that an experiment might measure. Unlike general-purpose transport codes such as PENELOPE and Geant4, its central focus includes native PXR/CBS calculations.
 
+## Why Python?
+
+Python keeps scientific models **readable, accessible, and easy to extend**.
+Its broad open-source ecosystem provides mature tools for numerical methods,
+data analysis, visualization, and reproducible research. **Numba** JIT-compiles
+performance-critical CPU code to native machine code, while **CuPy and CUDA**
+make GPU acceleration practical without rewriting the entire application in
+C++ or Fortran. This combines a flexible research interface with optimized
+computational kernels.
+
 ## Try it in your browser
 
 The **[interactive results demo](https://pyrite.readthedocs.io/en/latest/demo/index.html)** lets you explore sample X-ray spectra and electron trajectories without installing Python or downloading any datasets. It's the easiest way to see what PyRITE produces.

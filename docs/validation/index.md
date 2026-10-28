@@ -12,7 +12,8 @@ model or regime.
 
 1. Read the [methodology](methodology.md) for status meanings and promotion rules.
 2. Browse the [domain inventories](domain-inventories.md) to find a claim and its status.
-3. Follow its link into the [full ledger](physics-validation-ledger.md) for sources, checks, limitations and evidence.
+3. Read the [PyRITE–Geant4 accuracy and performance comparison](geant4-comparison.md) for a short cross-code overview.
+4. Follow its link into the [full ledger](physics-validation-ledger.md) for sources, checks, limitations and evidence.
 
 The [detailed evidence index](evidence-index.md) groups individual derivations,
 analytic checks, external-oracle comparisons and experimental reproductions.
@@ -25,6 +26,7 @@ model descriptions; validation pages record evidence about them.
 :caption: Validation overview
 
 status-summary
+geant4-comparison
 methodology
 domain-inventories
 evidence-index

@@ -508,10 +508,13 @@ and acquiring reference tables, is explicit:
 
 ```bash
 uv lock
-uv run --group docs python docs/_notebooks.py --regenerate-all
+uv run --group docs --extra optimization python docs/_notebooks.py --regenerate-all
 uv run --group docs python docs/_notebooks.py --check
 uv run --group docs sphinx-build -b html -W --keep-going docs docs/_build/html
 ```
+
+The `optimization` extra supplies Optuna for notebook 11. Regeneration uses the
+project environment, so inline notebook dependencies must already be installed.
 
 Regeneration executes each notebook **once** using `marimo export ipynb
 --include-outputs --sort=top-down --no-sandbox`, using disposable source copies
