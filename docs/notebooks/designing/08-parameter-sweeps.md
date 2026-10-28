@@ -17,10 +17,15 @@ These are **captured outputs**; edit and recompute in Molab or local marimo.
 {download}`Download canonical notebook <../08-parameter-sweeps.py>` ·
 {download}`Execution provenance <../outputs/08-parameter-sweeps.json>`.
 
-Continue from [sampling](07-sampling-convergence-performance.md).
-See the [configuration API](../../reference/python-api/config.md),
-[radiation physics](../../physics/index.md), and
-[validation evidence](../../validation/status-summary.md).
+## Continue learning
+
+Revisit [sampling](07-sampling-convergence-performance.md) before comparing
+nearby yields. For reusable campaign settings, use
+[Campaign configuration](../../guides/sweep-profiles.md); the
+[scene and sweep API](../../reference/python-api/core.md) defines parameter studies.
+[Spectral observables](../../physics/radiation-physics/spectral-observables.md)
+explain band-yield normalization. Review the selected models'
+[validation status](../../validation/status-summary.md) before interpreting a response surface.
 
 ## Canonical source
 

@@ -24,6 +24,15 @@ The static page needs no Python kernel, GPU or simulation run.
 [Captured source-spectrum figure](../../_static/notebooks/02-understanding-results-1.png) ·
 [Captured accepted-rate figure](../../_static/notebooks/02-understanding-results-2.png).
 
+## Continue learning
+
+Next: [Predicting PXR line energies](03-pxr-line-energies.md).
+Use [Working with results](../../guides/working-with-results.md) to inspect saved
+calculations and the [results API](../../reference/python-api/results.md) for
+analysis interfaces. [Spectral observables](../../physics/radiation-physics/spectral-observables.md)
+and [energy-grid semantics](../../physics/radiation-physics/energy-grid-semantics.md)
+explain the units and integration conventions used here.
+
 ## Canonical source
 
 The source below is the exact notebook used for both captured output and Molab.

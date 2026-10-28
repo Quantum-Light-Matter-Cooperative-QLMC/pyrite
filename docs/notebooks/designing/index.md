@@ -6,6 +6,10 @@ shows how the emitted PXR/CBS spectrum depends on observation direction.
 Then turn emitted photons into expected and acquired pixel counts.
 Next study history-count convergence and adaptive stopping; then map a two-parameter response surface.
 
+New to the API? Begin with [Fundamentals](../fundamentals/index.md).
+For task recipes beyond these examples, use [How-to Guides](../../guides/index.md);
+for exact inputs and result contracts, use the [Python API reference](../../reference/python-api/index.md).
+
 ```{toctree}
 :maxdepth: 1
 

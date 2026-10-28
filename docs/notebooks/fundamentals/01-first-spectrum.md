@@ -21,6 +21,15 @@ steps included in this notebook. This static view requires no Python kernel or C
 
 [Captured figure](../../_static/notebooks/01-first-spectrum-1.png).
 
+## Continue learning
+
+Next: [Understanding simulation results](02-understanding-results.md).
+For installation and table acquisition, use [Getting started](../../guides/getting-started.md).
+Consult the [scene API](../../reference/python-api/core.md) for object contracts,
+[spectral observables](../../physics/radiation-physics/spectral-observables.md)
+for normalization, and [validation status](../../validation/status-summary.md)
+for the evidence behind the selected models.
+
 ## Canonical source
 
 The source below is the exact notebook used for the captured output and Molab.

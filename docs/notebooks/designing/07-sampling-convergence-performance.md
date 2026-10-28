@@ -22,10 +22,17 @@ need a GPU. The plotted changes are **not** independent Monte Carlo error bars.
 
 [Captured convergence and timing plot](../../_static/notebooks/07-sampling-convergence-performance-1.png).
 
+## Continue learning
+
+Next: [Parameter sweeps](08-parameter-sweeps.md).
+See [precision and tolerances](../../computation/precision-and-tolerances.md)
+for stopping controls and the [configuration API](../../reference/python-api/config.md)
+for their Python interfaces. [Statistical methods](../../computation/statistical-methods.md)
+explain uncertainty; [adaptive-stopping evidence](../../validation/beam-transport/adaptive-sample-size-stopping.md)
+records the estimator's assumptions and checks.
+
 ## Canonical source
 
 ```{literalinclude} ../07-sampling-convergence-performance.py
 :language: python
 ```
-
-Next: [Parameter sweeps](08-parameter-sweeps.md).
