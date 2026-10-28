@@ -7,7 +7,8 @@ illustrative PXR/CBS spectrum.
 
 
 These are **captured outputs** from the canonical marimo notebook. To change
-inputs or recompute, open Molab or run it locally after the setup in notebook 00.
+inputs or recompute, open Molab or run it locally after the setup in
+[notebook 01](../fundamentals/01-first-spectrum.md).
 This static page requires no Python kernel, GPU or reference-table download.
 
 ```{raw} html

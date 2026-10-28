@@ -100,6 +100,8 @@ def lower_simulation(request: ResolvedSimulation) -> Case:
         from ..montecarlo.channeling.planar_injection import source_record
 
         case = replace(case, channeling_source=source_record(scene.beam.state))
+    if numerics.seed is not None:
+        case = replace(case, seed=numerics.seed)
     from .photon_cases import resolve_photon_transport
 
     return resolve_photon_transport(scene, case, numerics)
@@ -181,10 +183,17 @@ def build_sweep_cases(
             check_kinematic_validity=check_kinematic_validity,
         )
         cases = resolve_shell_ionization(resolve_transition_radiation(cases, physics), physics)
-        return resolve_channeling(cases, physics, resolved_numerics)
+        cases = resolve_channeling(cases, physics, resolved_numerics)
+        if resolved_numerics.seed is not None:
+            cases = [
+                replace(case, seed=resolved_numerics.seed + index)
+                for index, case in enumerate(cases)
+            ]
+        return cases
     if not check_kinematic_validity:
         raise ValueError("check_kinematic_validity=False requires a configured legacy sweep")
     overrides = {}
+    seed_start = numerics.seed if numerics is not None else sweep.base.numerics.seed
     if numerics is not None:
         overrides["numerics"] = numerics
     if physics is not None:
@@ -202,5 +211,5 @@ def build_sweep_cases(
         case = build_case(scene, observation=observation)
         if label:
             case = replace(case, name=f"{case.name} {label}")
-        cases.append(replace(case, seed=index + 1))
+        cases.append(replace(case, seed=index + 1 if seed_start is None else seed_start + index))
     return cases

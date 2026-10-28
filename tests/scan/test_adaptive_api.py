@@ -63,6 +63,22 @@ def test_numerics_requires_typed_precision():
         pr.Numerics(precision=pr.config.Precision(0.1, 40, 60, 20), transport_core="lockstep")
 
 
+@pytest.mark.parametrize("invalid", [True, 1.5, "123"])
+def test_numerics_rejects_noninteger_seeds(invalid):
+    with pytest.raises(ValueError, match="seed must be an integer"):
+        pr.Numerics(seed=invalid)
+
+
+def test_seed_override_preserves_default_and_sweep_independence(scene):
+    baseline = api.build_case(scene, pr.Numerics())
+    seeded = api.build_case(scene, pr.Numerics(seed=123))
+    assert baseline.seed == 1
+    assert seeded.seed == 123
+    assert case_content_key(baseline) != case_content_key(seeded)
+    points = pr.Sweep(scene, {"beam.energy_keV": (20.0, 30.0)}).cases(pr.Numerics(seed=123))
+    assert [case.seed for case in points] == [123, 124]
+
+
 def test_lowering_uses_policy_maximum_and_ignores_fixed_defaults(scene, numerics):
     first = api.build_case(scene, numerics)
     other = api.build_case(scene, replace(numerics, cxr_trials=7, brem_trials=3))

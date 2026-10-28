@@ -2,7 +2,7 @@
   "version": "1",
   "metadata": {
     "marimo_version": "0.25.2",
-    "script_metadata_hash": "be882373ce9f9752409aa815b3a6adb0"
+    "script_metadata_hash": "0bd4a502c6636b3b44fe85ee22d08f69"
   },
   "cells": [
     {
@@ -12,7 +12,7 @@
         {
           "type": "data",
           "data": {
-            "text/html": "<div style='display: flex;flex: 1;flex-direction: column;justify-content: flex-start;align-items: normal;flex-wrap: nowrap;gap: 0.5rem'><marimo-ui-element object-id='Hbol-0' random-id='ada2326d-276b-526e-8397-155fe50d3ea7'><marimo-anywidget data-initial-value='{&quot;model_id&quot;:&quot;1a34e77780ae4661bc8ad916c96cb6ea&quot;}' data-label='null' data-model-id='&quot;1a34e77780ae4661bc8ad916c96cb6ea&quot;'></marimo-anywidget></marimo-ui-element></div>"
+            "text/plain": ""
           }
         }
       ],
@@ -20,12 +20,12 @@
     },
     {
       "id": "MJUe",
-      "code_hash": "f4d9400e7b35bea317794725df688ee3",
+      "code_hash": "d217763b81401fe97ab5ae86bdb41ced",
       "outputs": [
         {
           "type": "data",
           "data": {
-            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h1 id=\"beams-crystals-and-target-geometry\">Beams, crystals and target geometry</h1>\n<span class=\"paragraph\">Describe an electron beam and a finite crystal, then run one small PXR/CBS simulation.</span></span>"
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h1 id=\"beams-crystals-and-target-geometry\">Beams, crystals and target geometry</h1>\n<span class=\"paragraph\">Configure a 30 keV electron beam, finite HOPG crystal and 135\u00b0 observation.\n<code>TransverseSpot</code> sets the incident <strong>FWHM</strong> in mm; <code>Slab</code> uses thickness\nin \u00c5 and footprint widths in mm. <code>CrystalCut</code> fixes the lattice\norientation, while <code>tilt_deg</code> rotates the entrance face in the lab.</span></span>"
           }
         }
       ],
@@ -33,19 +33,6 @@
     },
     {
       "id": "vblA",
-      "code_hash": "15255ee187500405d9f4fb69e7087f83",
-      "outputs": [
-        {
-          "type": "data",
-          "data": {
-            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"choose-a-beam-and-crystal\">Choose a beam and crystal</h2>\n<span class=\"paragraph\">An electron <strong>energy</strong> (keV) and a transverse <strong>FWHM</strong> (mm) describe the\nincident beam. The crystal has its own thickness (\u00c5), transverse footprint\n(full widths in mm), and tilt (degrees). A crystal's <strong>lattice cut</strong> is\ndistinct from its lab-frame tilt and from the reflections used in scoring.</span>\n<span class=\"paragraph\">Material keys come from the catalog. Change <code>\"hopg\"</code> to another crystal\nkey such as <code>\"silicon\"</code> to explore a different target.</span></span>"
-          }
-        }
-      ],
-      "console": []
-    },
-    {
-      "id": "bkHC",
       "code_hash": "6a99032511f22a90726d78e17eda0d1c",
       "outputs": [
         {
@@ -58,7 +45,7 @@
       "console": []
     },
     {
-      "id": "lEQa",
+      "id": "bkHC",
       "code_hash": "f41a22fc2af69fff12393f5bc3ff9bc2",
       "outputs": [
         {
@@ -71,20 +58,20 @@
       "console": []
     },
     {
-      "id": "PKri",
-      "code_hash": "bd720c9826def7c3ce03d32a562a8dfd",
+      "id": "lEQa",
+      "code_hash": "eb4e8ce25165cfc8007481696aea2f71",
       "outputs": [
         {
           "type": "data",
           "data": {
-            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"run-one-source-calculation\">Run one source calculation</h2>\n<span class=\"paragraph\">Keep the physics and numerical settings separate from the beam and geometry.\nThe sample histories below are a numerical estimator\u2014not the number of\nelectrons in a physical bunch. Bremsstrahlung is disabled to focus on\nthe crystal's PXR/CBS source spectrum.</span></span>"
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"simulate-pxrcbs\">Simulate PXR/CBS</h2>\n<span class=\"paragraph\">Use a small history budget to illustrate the crystal source spectrum.\nBremsstrahlung is disabled so the result isolates PXR/CBS.</span></span>"
           }
         }
       ],
       "console": []
     },
     {
-      "id": "Xref",
+      "id": "PKri",
       "code_hash": "c1d7ce72c3a1a92243b4b4c3cafb04a0",
       "outputs": [
         {
@@ -97,7 +84,7 @@
       "console": []
     },
     {
-      "id": "SFPL",
+      "id": "Xref",
       "code_hash": "4813d01b65e32d27ed57a3d516f10e1a",
       "outputs": [
         {
@@ -110,20 +97,20 @@
       "console": []
     },
     {
-      "id": "BYtC",
-      "code_hash": "d74f1bacccdce16849519f934fffcee3",
+      "id": "SFPL",
+      "code_hash": "d26e4788c76f523cd4146b67c9079812",
       "outputs": [
         {
           "type": "data",
           "data": {
-            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"interpret-and-experiment\">Interpret and experiment</h2>\n<span class=\"paragraph\">The first plot is the <em>configured entrance distribution</em>; the second is the\n<em>computed response-free source density</em>. It is not a measured spectrum or\ndetector count rate. The <code>CrystalCut(beam_uvw=(0, 0, 2))</code> places a direct\nlattice _axis along the entrance-face normal; <code>tilt_deg</code> then rotates that\nface in the laboratory. Neither chooses which diffraction planes the\nradiation calculation sums. That is a separate numerical/reflection policy.</span>\n<span class=\"paragraph\">Try changing <strong>one parameter at a time</strong>: first <code>beam.energy_keV</code>, then\n<code>target.thickness_ang</code>, then <code>material</code>. A different crystal may need a\ndifferent cut or energy range. Only the finite sample is illustrated; do not\nuse the curve quantitatively without convergence and validation checks.\nCompare the <a href=\"https://pyrite.readthedocs.io/en/latest/guides/index.html\" rel=\"noopener noreferrer\" target=\"_blank\">beam/target how-to</a>,\n<a href=\"https://pyrite.readthedocs.io/en/latest/physics/index.html\" rel=\"noopener noreferrer\" target=\"_blank\">physics</a>, and\n<a href=\"https://pyrite.readthedocs.io/en/latest/validation/status-summary.html\" rel=\"noopener noreferrer\" target=\"_blank\">validation status</a>.</span></span>"
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"interpretation\">Interpretation</h2>\n<span class=\"paragraph\">The first plot shows the <em>configured entrance spot</em>, not sampled\ntrajectories. The second is the <em>response-free</em> PXR/CBS source density,\nnot detector counts. The (002) <code>CrystalCut</code> sets the lattice axis;\nthe selected diffraction families are controlled separately by numerics.</span>\n<span class=\"paragraph\">Try changing <code>beam.energy_keV</code>, <code>target.thickness_ang</code>, or <code>material</code>\none at a time. Other crystals may need different cuts and energy windows.\nThese small-sample spectra are illustrative; consult\n<a href=\"https://pyrite.readthedocs.io/en/latest/validation/status-summary.html\" rel=\"noopener noreferrer\" target=\"_blank\">validation</a>\nbefore making quantitative predictions.</span></span>"
           }
         }
       ],
       "console": []
     },
     {
-      "id": "RGSE",
+      "id": "BYtC",
       "code_hash": "8865f4917790a727f238fc9a00533578",
       "outputs": [
         {

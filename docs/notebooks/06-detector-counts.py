@@ -1,6 +1,12 @@
 # /// script
 # requires-python = ">=3.13"
-# dependencies = ["endf-parserpy==0.17.0", "marimo>=0.25.1", "pyrite-mc==0.22.5", "matplotlib>=3.11", "numpy>=2"]
+# dependencies = [
+#     "endf-parserpy==0.17.0",
+#     "marimo>=0.23.3",
+#     "pyrite-mc==0.22.5",
+#     "matplotlib>=3.11",
+#     "numpy>=2",
+# ]
 # ///
 
 import marimo
@@ -23,7 +29,7 @@ def _():
 
     _ = pyrite.fetch_tables()  # Complete installed tables need no download.
     tables_ready = True
-    return tables_ready, mo, np, plt, pyrite
+    return mo, np, plt, pyrite, tables_ready
 
 
 @app.cell(hide_code=True)
@@ -31,14 +37,9 @@ def _(mo):
     mo.md(r"""
     # From X-rays to detector counts
 
-    Predict an ideal pixel detector's expected counts and compare a seeded Poisson realization.
-
-    ## Define the physical scene
-
-    A 30 keV beam illuminates 100 nm HOPG. The 16 × 16 mm panel sits 100 mm
-    away, at 135° from the incident beam direction. Its 16 × 16 pixels have
-    1 mm pitch. A 0.01 pC bunch at 1 MHz gives **10 nA** mean current.
-    These physical beam populations are independent of sampled histories.
+    Simulate a 30 keV beam on 100 nm HOPG and acquire an ideal pixel image.
+    The **16 × 16** pixel panel sits **100 mm** away at **135°**;
+    **0.01 pC** bunches at **1 MHz** give **10 nA** average current.
     """)
     return
 
@@ -72,16 +73,13 @@ def _():
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## Specify what is measured
+    ## Define the observation
 
-    Geometry belongs to `Scene`; response and exposure belong to `Observation`.
-    `IdealPhotonCounter()` has unit efficiency and no energy broadening. Count
-    photons in the half-open reporting interval **[0.5, 4) keV** during **1 s**.
-    `mode="poisson"` retains the fractional expectation and adds integer draws.
-
-    Score 4 × 4 angular tiles across the panel: neighboring pixels share source
-    spectra within each tile, while their pixel-centre ray geometry is retained.
-    Pixel pitch alone does not set the angular scoring resolution.
+    `Scene` defines the geometry; `Observation` specifies response,
+    exposure and angular sampling. `IdealPhotonCounter` has unit efficiency
+    and no energy broadening. Count photons in **[0.5, 4) keV** over **1 s**
+    using a seeded Poisson draw. The **4 × 4** angular tiles are the
+    source-scoring resolution, not the **16 × 16** detector pixels.
     """)
     return
 
@@ -156,36 +154,37 @@ def _(count_image, expected_image, plt):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## Interpret and explore
+    ## Interpretation
 
-    Both images already integrate energy and pixel solid angle, apply the
-    ideal response, and scale by physical electrons during the exposure.
-    **Do not multiply by current, solid angle or exposure again.** They include
-    PXR/CBS, bremsstrahlung and characteristic emission in the reporting window;
-    underflow, overflow and below-threshold expectations remain separate.
-    No downstream filter or background is included.
+    Both images already include beam current, exposure, pixel solid angle
+    and ideal response. **Do not rescale them again.** They include CXR,
+    bremsstrahlung and characteristic photons within the reporting window;
+    no downstream filter or background is modeled.
 
-    The nearly uniform expectation and noisier integer image share one color
-    scale. Counting fluctuations are conditional on the estimated source:
-    they exclude its Monte Carlo uncertainty, calibration errors and backgrounds.
-    The modest histories, two reflection families and coarse angular tiles are
-    illustrative; they do not establish convergence or detector calibration.
+    The left panel is an *expected* count image; the right is one Poisson
+    realization. The shared color scale exposes counting noise, but does not
+    include Monte Carlo uncertainty or calibration effects.
 
-    First change only `acquisition.seed`: the expectation stays fixed while
-    counts change. Then double `exposure_s`: expected counts double, while the
-    realized total need not double exactly. More source histories refine the
-    expectation; they do not increase the physical exposure.
-
-    Consult the [detector how-to](https://pyrite.readthedocs.io/en/latest/guides/detector-observations.html),
-    [observation reference](https://pyrite.readthedocs.io/en/latest/reference/python-api/observations.html),
-    [response physics](https://pyrite.readthedocs.io/en/latest/physics/detectors/detector-response.html),
-    and [validation status](https://pyrite.readthedocs.io/en/latest/validation/status-summary.html).
+    Try changing only `acquisition.seed`, then doubling `exposure_s`.
+    Counts vary with the seed; expectations scale with exposure.
+    See the [detector how-to](https://pyrite.readthedocs.io/en/latest/guides/detector-observations.html)
+    and [response physics](https://pyrite.readthedocs.io/en/latest/physics/detectors/detector-response.html).
     """)
     return
 
 
 @app.cell(hide_code=True)
-def _(acquisition, batch, beam, count_image, expected_image, mo, np, pyrite, result):
+def _(
+    acquisition,
+    batch,
+    beam,
+    count_image,
+    expected_image,
+    mo,
+    np,
+    pyrite,
+    result,
+):
     tutorial_provenance = {
         "tutorial": "06-detector-counts",
         "pyrite_version": pyrite.__version__,
@@ -213,7 +212,7 @@ def _(acquisition, batch, beam, count_image, expected_image, mo, np, pyrite, res
     }
     # Preserve machine-readable export metadata without displaying it to readers.
     mo.json(tutorial_provenance).style({"display": "none"})
-    return (tutorial_provenance,)
+    return
 
 
 if __name__ == "__main__":

@@ -1,6 +1,12 @@
 # /// script
 # requires-python = ">=3.13"
-# dependencies = ["endf-parserpy==0.17.0", "marimo>=0.25.1", "pyrite-mc==0.22.5", "matplotlib>=3.11", "numpy>=2"]
+# dependencies = [
+#     "endf-parserpy==0.17.0",
+#     "marimo>=0.23.3",
+#     "pyrite-mc==0.22.5",
+#     "matplotlib>=3.11",
+#     "numpy>=2",
+# ]
 # ///
 
 import marimo
@@ -24,7 +30,7 @@ def _():
     _ = pyrite.fetch_tables()  # Installed pins are reused without downloading again.
 
     tables_ready = True
-    return tables_ready, mo, np, plt, pyrite
+    return mo, np, plt, pyrite, tables_ready
 
 
 @app.cell(hide_code=True)
@@ -32,23 +38,10 @@ def _(mo):
     mo.md(r"""
     # Beams, crystals and target geometry
 
-    Describe an electron beam and a finite crystal, then run one small PXR/CBS simulation.
-    """)
-    return
-
-
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""
-    ## Choose a beam and crystal
-
-    An electron **energy** (keV) and a transverse **FWHM** (mm) describe the
-    incident beam. The crystal has its own thickness (Å), transverse footprint
-    (full widths in mm), and tilt (degrees). A crystal's **lattice cut** is
-    distinct from its lab-frame tilt and from the reflections used in scoring.
-
-    Material keys come from the catalog. Change `"hopg"` to another crystal
-    key such as `"silicon"` to explore a different target.
+    Configure a 30 keV electron beam, finite HOPG crystal and 135° observation.
+    `TransverseSpot` sets the incident **FWHM** in mm; `Slab` uses thickness
+    in Å and footprint widths in mm. `CrystalCut` fixes the lattice
+    orientation, while `tilt_deg` rotates the entrance face in the lab.
     """)
     return
 
@@ -81,7 +74,7 @@ def _():
 
 
 @app.cell
-def _(beam, mo, np, plt, target):
+def _(beam, np, plt, target):
     # Analytic INPUT profile, not a plot of Monte Carlo electron histories.
     sigma_mm = beam.transverse.fwhm_x_mm / (2 * np.sqrt(2 * np.log(2)))
     x_mm = np.linspace(-1.25, 1.25, 401)
@@ -100,18 +93,16 @@ def _(beam, mo, np, plt, target):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## Run one source calculation
+    ## Simulate PXR/CBS
 
-    Keep the physics and numerical settings separate from the beam and geometry.
-    The sample histories below are a numerical estimator—not the number of
-    electrons in a physical bunch. Bremsstrahlung is disabled to focus on
-    the crystal's PXR/CBS source spectrum.
+    Use a small history budget to illustrate the crystal source spectrum.
+    Bremsstrahlung is disabled so the result isolates PXR/CBS.
     """)
     return
 
 
 @app.cell
-def _(beam, detector, simulate, target, tables_ready):
+def _(beam, detector, simulate, tables_ready, target):
     assert tables_ready  # Wait for reference-table installation before transport.
     from pyrite.config import CxrReflections, FixedSampling, Numerics, Physics
 
@@ -149,22 +140,18 @@ def _(plt, result):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## Interpret and experiment
+    ## Interpretation
 
-    The first plot is the *configured entrance distribution*; the second is the
-    *computed response-free source density*. It is not a measured spectrum or
-    detector count rate. The `CrystalCut(beam_uvw=(0, 0, 2))` places a direct
-    lattice _axis along the entrance-face normal; `tilt_deg` then rotates that
-    face in the laboratory. Neither chooses which diffraction planes the
-    radiation calculation sums. That is a separate numerical/reflection policy.
+    The first plot shows the *configured entrance spot*, not sampled
+    trajectories. The second is the *response-free* PXR/CBS source density,
+    not detector counts. The (002) `CrystalCut` sets the lattice axis;
+    the selected diffraction families are controlled separately by numerics.
 
-    Try changing **one parameter at a time**: first `beam.energy_keV`, then
-    `target.thickness_ang`, then `material`. A different crystal may need a
-    different cut or energy range. Only the finite sample is illustrated; do not
-    use the curve quantitatively without convergence and validation checks.
-    Compare the [beam/target how-to](https://pyrite.readthedocs.io/en/latest/guides/index.html),
-    [physics](https://pyrite.readthedocs.io/en/latest/physics/index.html), and
-    [validation status](https://pyrite.readthedocs.io/en/latest/validation/status-summary.html).
+    Try changing `beam.energy_keV`, `target.thickness_ang`, or `material`
+    one at a time. Other crystals may need different cuts and energy windows.
+    These small-sample spectra are illustrative; consult
+    [validation](https://pyrite.readthedocs.io/en/latest/validation/status-summary.html)
+    before making quantitative predictions.
     """)
     return
 
@@ -187,7 +174,7 @@ def _(beam, material, mo, pyrite, result, target):
     }
     # Preserve machine-readable export metadata without displaying it to readers.
     mo.json(tutorial_provenance).style({"display": "none"})
-    return (tutorial_provenance,)
+    return
 
 
 if __name__ == "__main__":

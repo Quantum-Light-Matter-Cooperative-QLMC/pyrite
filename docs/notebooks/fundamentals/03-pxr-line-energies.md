@@ -6,7 +6,8 @@ Explore ideal vacuum resonances without Monte Carlo transport.
 
 
 These are **captured outputs**. Recompute in Molab or locally after the setup
-steps in notebook 00. This static view requires no Python kernel or CUDA.
+steps in [notebook 01](01-first-spectrum.md). This static view requires no
+Python kernel or CUDA.
 
 ```{raw} html
 <iframe src="../../_static/notebooks/03-pxr-line-energies.html"

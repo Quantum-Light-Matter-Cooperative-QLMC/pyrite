@@ -24,7 +24,7 @@ def test_released_tutorial_environment_pins_compatible_endf_parser():
 def test_tutorials_use_molab_package_manager_instructions():
     for path in (DOCS / "notebooks").glob("*.py"):
         assert "pip install" not in path.read_text(), path.name
-    setup = (DOCS / "notebooks" / "00-setup.py").read_text()
+    setup = (DOCS / "notebooks" / "01-first-spectrum.py").read_text()
     assert "built-in package manager" in setup
     assert "enter `endf-parserpy==0.17.0`" in setup
 
@@ -64,18 +64,23 @@ def test_transport_depends_on_completed_table_fetch():
     for path in (DOCS / "notebooks").glob("*.py"):
         cells = [n for n in ast.parse(path.read_text()).body if isinstance(n, ast.FunctionDef)]
         for cell in cells:
-            transport = any(
-                isinstance(node, ast.Call)
+            transport = [
+                node
+                for node in ast.walk(cell)
+                if isinstance(node, ast.Call)
                 and isinstance(node.func, ast.Name)
                 and node.func.id in {"simulate", "directional_source"}
-                for node in ast.walk(cell)
-            )
+            ]
             if not transport:
                 continue
             assert "tables_ready" in {arg.arg for arg in cell.args.args}, path.name
-            assert isinstance(cell.body[0], ast.Assert), path.name
-            assert isinstance(cell.body[0].test, ast.Name), path.name
-            assert cell.body[0].test.id == "tables_ready", path.name
+            assert any(
+                isinstance(statement, ast.Assert)
+                and isinstance(statement.test, ast.Name)
+                and statement.test.id == "tables_ready"
+                and statement.lineno < min(call.lineno for call in transport)
+                for statement in cell.body
+            ), path.name
             bootstrap = cells[0]
             ready = next(
                 n
@@ -122,6 +127,29 @@ def test_all_captures_render_without_execution(notebooks, monkeypatch):
         assert len(session.figures) == count
         if count:
             assert session.figures[0].startswith(b"\x89PNG\r\n\x1a\n")
+
+
+def test_combined_setup_capture_shows_environment_and_figure_with_hidden_provenance(notebooks):
+    session, capture = notebooks.read_session(
+        DOCS / "notebooks" / "__marimo__" / "session" / "01-first-spectrum.py.json"
+    )
+    assert capture.provenance["tutorial"] == "01-first-spectrum"
+    assert len(capture.figures) == 1
+    html = [
+        value
+        for cell in session["cells"]
+        for output in cell["outputs"]
+        for mime, value in output.get("data", {}).items()
+        if mime == "text/html"
+    ]
+    summary = next(value for value in html if "selected_backend" in value)
+    provenance = next(value for value in html if "source_identity" in value)
+    assert "cupy_installed" in summary
+    assert "display:none" not in summary.replace(" ", "")
+    assert "display:none" in provenance.replace(" ", "")
+    assert not (DOCS / "notebooks" / "00-setup.py").exists()
+    legacy_page = (DOCS / "notebooks" / "fundamentals" / "00-setup.md").read_text()
+    assert "(01-first-spectrum.md)" in legacy_page
 
 
 def test_changed_source_and_capture_are_rejected(notebooks, monkeypatch, tmp_path):

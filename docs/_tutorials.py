@@ -55,7 +55,7 @@ def configured_notebooks():
 def sync_notebook_version(name):
     """Update an explicit tutorial's PyPI pins from pyproject before recapture.
 
-    Also correct the install-command extras in notebook 00. Read-only docs
+    Also correct any install-command extras in the setup tutorial. Read-only docs
     checks never call this function, and no source changes occur without an
     explicit --regenerate-notebook action.
     """

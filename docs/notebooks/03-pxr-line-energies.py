@@ -1,6 +1,12 @@
 # /// script
 # requires-python = ">=3.13"
-# dependencies = ["endf-parserpy==0.17.0", "marimo>=0.25.1", "pyrite-mc==0.22.5", "matplotlib>=3.11", "numpy>=2"]
+# dependencies = [
+#     "endf-parserpy==0.17.0",
+#     "marimo>=0.23.3",
+#     "pyrite-mc==0.22.5",
+#     "matplotlib>=3.11",
+#     "numpy>=2",
+# ]
 # ///
 
 import marimo
@@ -22,8 +28,7 @@ def _():
     import pyrite
 
     _ = pyrite.fetch_tables()  # Fetch missing pinned tables once; reuse installed data.
-
-    return mo, np, os, plt, pyrite
+    return mo, np, plt, pyrite
 
 
 @app.cell(hide_code=True)
@@ -31,19 +36,9 @@ def _(mo):
     mo.md(r"""
     # Predicting PXR line energies
 
-    Predict where a HOPG reflection appears before running Monte Carlo transport.
-    """)
-    return
-
-
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""
-    ## Setup
-
-    `photon_energies()` uses electron kinetic energy in **eV** and angles in degrees.
-    It returns a leading material axis, even for one material. Here the basal (002)
-    reflection, sample tilt, and lab observation angle are explicit.
+    Predict ideal HOPG (002) resonance energies before simulating transport.
+    `photon_energies()` takes beam energy in **eV**, angles in **degrees**,
+    and returns a leading material axis even for one material.
     """)
     return
 
@@ -57,20 +52,12 @@ def _():
     beam_energy_eV = 30_000.0
     tilt_deg = 30.0
     hkl = (0, 0, 2)
-    return catalog, beam_energy_eV, hkl, photon_energies, tilt_deg
+    return beam_energy_eV, catalog, hkl, photon_energies, tilt_deg
 
 
 @app.cell
-def _(beam_energy_eV, catalog, hkl, np, photon_energies, tilt_deg):
+def _(catalog, hkl, np, photon_energies, tilt_deg):
     observation_deg = np.linspace(30, 160, 131)
-    line_eV = photon_energies(
-        "hopg",
-        beam_energy_eV,
-        tilt_deg=tilt_deg,
-        theta_obs_deg=observation_deg,
-        hkl=hkl,
-        catalog=catalog,
-    )[0]
     energy_scan_eV = np.array([30_000.0, 60_000.0, 100_000.0])
     energy_lines_eV = photon_energies(
         "hopg",
@@ -80,7 +67,7 @@ def _(beam_energy_eV, catalog, hkl, np, photon_energies, tilt_deg):
         hkl=hkl,
         catalog=catalog,
     )[0]
-    return energy_lines_eV, energy_scan_eV, line_eV, observation_deg
+    return energy_lines_eV, energy_scan_eV, observation_deg
 
 
 @app.cell
@@ -96,7 +83,7 @@ def _(energy_lines_eV, energy_scan_eV, observation_deg, plt):
     axis.grid(alpha=0.25)
     axis.legend()
     figure  # noqa: B018 - marimo renders the final expression
-    return (figure,)
+    return
 
 
 @app.cell
@@ -134,19 +121,18 @@ def _(mo, second_order_eV, tilt_scan_deg, tilting_lines_eV):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## Interpretation and next steps
+    ## Interpretation
 
-    These are **vacuum line centres**, not intensities or detector counts. A straight
-    entrance-energy electron and one ideal crystal orientation are assumed. Transport,
-    energy loss, mosaic averaging, in-medium dispersion and detector response are
-    excluded. An allowed energy does not guarantee nonzero intensity; unreachable
-    resonances return NaN. Compare with the captured spectrum in notebook 01 only
-    with those approximations in mind.
+    These are **vacuum line centers**, not intensities or counts. The model
+    assumes straight electrons at their entrance energy and an ideal lattice;
+    it excludes transport, mosaic spread, in-medium dispersion and response.
+    A kinematically allowed line need not have measurable intensity.
 
-    Try changing `tilt_deg` or `hkl`. Consult the
-    [radiation API](https://pyrite.readthedocs.io/en/latest/api.html#advanced-transport-and-radiation)
-    and [physics and validation](https://pyrite.readthedocs.io/en/latest/physics/index.html)
-    for conventions and model limitations.
+    Try changing `tilt_deg`, electron energy or `hkl`. The (004) reflection
+    appears at twice the (002) energy for the same geometry. Compare with
+    notebook 01's spectrum and the
+    [physics and validation](https://pyrite.readthedocs.io/en/latest/physics/index.html)
+    documentation.
     """)
     return
 
@@ -167,7 +153,7 @@ def _(catalog, hkl, mo, pyrite):
     }
     # Preserve machine-readable export metadata without displaying it to readers.
     mo.json(tutorial_provenance).style({"display": "none"})
-    return (tutorial_provenance,)
+    return
 
 
 if __name__ == "__main__":

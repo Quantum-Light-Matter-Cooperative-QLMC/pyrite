@@ -1,8 +1,8 @@
 {
   "schema": "pyrite.marimo-tutorial.v1",
-  "source_sha256": "13041a1cdec8e9587db894c5423d4d4fce73c42f3b9dfc214b6528131f547554",
-  "exporter_sha256": "ce45dc420ac6068c0bda3a17b7a1fdb77216182d54fd16489a8b9746d7e9653f",
-  "git_revision": "5b6f9b3de12f59261e43fb2a716c63f40424f7da",
+  "source_sha256": "e04d7fcf4e2a04cccac88cd54f6fdf7a2402b1afa3fa379c76197dedb4f03198",
+  "exporter_sha256": "1f0b344ae3ac7471396ec06aa30b4a464a8705961d3e8eb60343d84923a476f9",
+  "git_revision": "dae2f5a96c69e8c426ada800cc77f6cba465099e",
   "git_dirty": true,
   "python_version": "3.14.6",
   "execution": {
@@ -29,8 +29,8 @@
     "sampled_cxr_histories": 2048
   },
   "artifacts": {
-    "notebooks/__marimo__/session/04-beams-crystals-target-geometry.py.json": "491b7897a36581d1a3abf7a2607234f1cfa15a086ea9119b6d1182de72ae346d",
-    "_static/notebooks/04-beams-crystals-target-geometry.html": "5dfc6cd24fc9e57d55cd7621950f7c1c95b66fe61778788e7e2627f55889bc38",
+    "notebooks/__marimo__/session/04-beams-crystals-target-geometry.py.json": "f0d80e434f29a6015444697c6935754f0c7cd0041e4f206be2b8fdc039b8c259",
+    "_static/notebooks/04-beams-crystals-target-geometry.html": "ae48fc80c8d7a26c4f6e4a783da4ae1181270e0a982b0e39efa14debf61432b1",
     "_static/notebooks/04-beams-crystals-target-geometry-1.png": "efa97a91fa2f491690b21acf75604b4c1972653890a758be5b3f54ba921c7aaa",
     "_static/notebooks/04-beams-crystals-target-geometry-2.png": "28e5a5c46c40cf56f410399053141e6c25f5c32da94a475048b8b6f766dd09ab"
   }
