@@ -185,7 +185,7 @@ def _(mo, np, smoke):
     return (smoke_summary,)
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo, pyrite, smoke):
     tutorial_provenance = {
         "tutorial": "00-setup",
@@ -195,7 +195,8 @@ def _(mo, pyrite, smoke):
         "table_identity": dict(smoke.provenance["xsgen_tables"]),
         "source_identity": smoke.provenance["identity_digest"],
     }
-    mo.json(tutorial_provenance)
+    # Preserve machine-readable export metadata without displaying it to readers.
+    mo.json(tutorial_provenance).style({"display": "none"})
     return (tutorial_provenance,)
 
 

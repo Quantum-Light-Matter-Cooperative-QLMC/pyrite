@@ -182,7 +182,7 @@ def _(mo):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo, np, pyrite, source):
     tutorial_provenance = {
         "tutorial": "05-angular-radiation-distributions",
@@ -198,7 +198,8 @@ def _(mo, np, pyrite, source):
         "supported": int(np.count_nonzero(source.supported)),
         "sampled_cxr_histories": int(source.case["Ne"]),
     }
-    mo.json(tutorial_provenance)
+    # Preserve machine-readable export metadata without displaying it to readers.
+    mo.json(tutorial_provenance).style({"display": "none"})
     return (tutorial_provenance,)
 
 

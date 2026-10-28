@@ -12,7 +12,7 @@
         {
           "type": "data",
           "data": {
-            "text/html": "<div style='display: flex;flex: 1;flex-direction: column;justify-content: flex-start;align-items: normal;flex-wrap: nowrap;gap: 0.5rem'><marimo-ui-element object-id='Hbol-0' random-id='35305144-484b-d1a9-c47f-d9a0d72fcda3'><marimo-anywidget data-initial-value='{&quot;model_id&quot;:&quot;3568f99e8e724125a04c2a1be4384cba&quot;}' data-label='null' data-model-id='&quot;3568f99e8e724125a04c2a1be4384cba&quot;'></marimo-anywidget></marimo-ui-element></div>"
+            "text/html": "<div style='display: flex;flex: 1;flex-direction: column;justify-content: flex-start;align-items: normal;flex-wrap: nowrap;gap: 0.5rem'><marimo-ui-element object-id='Hbol-0' random-id='99f63e44-e2dd-9b4a-848b-81e7bcd46de7'><marimo-anywidget data-initial-value='{&quot;model_id&quot;:&quot;2ca03d1f6fd24e27b94cee7d972747a0&quot;}' data-label='null' data-model-id='&quot;2ca03d1f6fd24e27b94cee7d972747a0&quot;'></marimo-anywidget></marimo-ui-element></div>"
           }
         }
       ],
@@ -157,12 +157,12 @@
     },
     {
       "id": "emfo",
-      "code_hash": "9cab8aa91ffc8adbca648c836d35af3b",
+      "code_hash": "167f8bc3856b189cb83b7c5a15c600de",
       "outputs": [
         {
           "type": "data",
           "data": {
-            "text/html": "<marimo-json-output data-json-data='{&quot;tutorial&quot;:&quot;02-understanding-results&quot;,&quot;pyrite_version&quot;:&quot;0.22.4&quot;,&quot;backend&quot;:&quot;cpu&quot;,&quot;seed&quot;:1,&quot;table_identity&quot;:{&quot;918b1a9013e4c19c584e2cf4eb8b605f0063a7237b8b0d67749867a4c6804832&quot;:&quot;c3f8eab1f03c1c66cfe0355b68f312e0ca450cbacaabe4f72eebecefe8d1e08d&quot;,&quot;ea7657ec94db1acf9f16cb260a5b107c3d2a4ecc71e43facee0e6a845487cbeb&quot;:&quot;beed169ba64a48fd11dc8c5a7bb81471abaa21806bde7943dba6da43e5b01b6f&quot;,&quot;44461d55c05a7fea30a0f52bceb2aa384d6b71c1e12765da576b5cbc2592dbe3&quot;:&quot;3f32446ff553a97b14755b475c4d88287ff44eff2ffce0cdd790dbd9b40a83f2&quot;,&quot;dfea6d21d4f6196cb74ef19486b6d86f6f5af40e89d7241efe09507a3b982e85&quot;:&quot;61fb7f4cf6dceab2a4d10c5fc641357d80b0ba6bbe037b64dd000e08f024acd9&quot;},&quot;source_identity&quot;:&quot;7e8ac33df0256612b7cbcb9ca7ef1a4d8c13d2a939b690206ed1295459bdb791&quot;,&quot;band_eV&quot;:[600.0,2000.0],&quot;mean_current_nA&quot;:50.0,&quot;accepted_solid_angle_sr&quot;:0.0012390399999999998,&quot;sampled_cxr_histories&quot;:8192}' data-value-types='&quot;json&quot;'></marimo-json-output>"
+            "text/html": "<div style='display:none'><marimo-json-output data-json-data='{&quot;tutorial&quot;:&quot;02-understanding-results&quot;,&quot;pyrite_version&quot;:&quot;0.22.4&quot;,&quot;backend&quot;:&quot;cpu&quot;,&quot;seed&quot;:1,&quot;table_identity&quot;:{&quot;918b1a9013e4c19c584e2cf4eb8b605f0063a7237b8b0d67749867a4c6804832&quot;:&quot;c3f8eab1f03c1c66cfe0355b68f312e0ca450cbacaabe4f72eebecefe8d1e08d&quot;,&quot;ea7657ec94db1acf9f16cb260a5b107c3d2a4ecc71e43facee0e6a845487cbeb&quot;:&quot;beed169ba64a48fd11dc8c5a7bb81471abaa21806bde7943dba6da43e5b01b6f&quot;,&quot;44461d55c05a7fea30a0f52bceb2aa384d6b71c1e12765da576b5cbc2592dbe3&quot;:&quot;3f32446ff553a97b14755b475c4d88287ff44eff2ffce0cdd790dbd9b40a83f2&quot;,&quot;dfea6d21d4f6196cb74ef19486b6d86f6f5af40e89d7241efe09507a3b982e85&quot;:&quot;61fb7f4cf6dceab2a4d10c5fc641357d80b0ba6bbe037b64dd000e08f024acd9&quot;},&quot;source_identity&quot;:&quot;7e8ac33df0256612b7cbcb9ca7ef1a4d8c13d2a939b690206ed1295459bdb791&quot;,&quot;band_eV&quot;:[600.0,2000.0],&quot;mean_current_nA&quot;:50.0,&quot;accepted_solid_angle_sr&quot;:0.0012390399999999998,&quot;sampled_cxr_histories&quot;:8192}' data-value-types='&quot;json&quot;'></marimo-json-output></div>"
           }
         }
       ],

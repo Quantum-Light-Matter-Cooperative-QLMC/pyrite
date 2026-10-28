@@ -207,7 +207,7 @@ def _(mo):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(band_summary, mo, pyrite, result):
     tutorial_provenance = {
         "tutorial": "02-understanding-results",
@@ -221,7 +221,8 @@ def _(band_summary, mo, pyrite, result):
         "accepted_solid_angle_sr": band_summary["accepted_solid_angle_sr"],
         "sampled_cxr_histories": band_summary["sampled_cxr_histories"],
     }
-    mo.json(tutorial_provenance)
+    # Preserve machine-readable export metadata without displaying it to readers.
+    mo.json(tutorial_provenance).style({"display": "none"})
     return (tutorial_provenance,)
 
 

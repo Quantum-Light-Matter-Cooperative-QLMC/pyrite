@@ -12,7 +12,7 @@
         {
           "type": "data",
           "data": {
-            "text/html": "<div style='display: flex;flex: 1;flex-direction: column;justify-content: flex-start;align-items: normal;flex-wrap: nowrap;gap: 0.5rem'><marimo-ui-element object-id='Hbol-0' random-id='a621c731-d2cb-d96a-54cd-23555a9cdd51'><marimo-anywidget data-initial-value='{&quot;model_id&quot;:&quot;0e41e6746b9c4da0a6164449d4c0d777&quot;}' data-label='null' data-model-id='&quot;0e41e6746b9c4da0a6164449d4c0d777&quot;'></marimo-anywidget></marimo-ui-element></div>"
+            "text/html": "<div style='display: flex;flex: 1;flex-direction: column;justify-content: flex-start;align-items: normal;flex-wrap: nowrap;gap: 0.5rem'><marimo-ui-element object-id='Hbol-0' random-id='04404c3b-44c9-24c0-fcdc-95a24713db21'><marimo-anywidget data-initial-value='{&quot;model_id&quot;:&quot;ffd1ff7d957d4f52b83bc08557ed8544&quot;}' data-label='null' data-model-id='&quot;ffd1ff7d957d4f52b83bc08557ed8544&quot;'></marimo-anywidget></marimo-ui-element></div>"
           }
         }
       ],
@@ -124,12 +124,12 @@
     },
     {
       "id": "RGSE",
-      "code_hash": "77f752ebf8a33f3ef6704bf6abba5b36",
+      "code_hash": "251de976197c35dbcc2e7a7955396f3d",
       "outputs": [
         {
           "type": "data",
           "data": {
-            "text/html": "<marimo-json-output data-json-data='{&quot;tutorial&quot;:&quot;03-pxr-line-energies&quot;,&quot;pyrite_version&quot;:&quot;0.22.4&quot;,&quot;backend&quot;:&quot;cpu&quot;,&quot;seed&quot;:null,&quot;table_identity&quot;:&quot;not used: deterministic catalog geometry only&quot;,&quot;material&quot;:&quot;hopg&quot;,&quot;hkl&quot;:[0,0,2],&quot;catalog_cif_sha256&quot;:&quot;fa9027e4f14b36b2f31c773c0c4a0a166b0810f358a075ffe20d52d73bdbdcb7&quot;}' data-value-types='&quot;json&quot;'></marimo-json-output>"
+            "text/html": "<div style='display:none'><marimo-json-output data-json-data='{&quot;tutorial&quot;:&quot;03-pxr-line-energies&quot;,&quot;pyrite_version&quot;:&quot;0.22.4&quot;,&quot;backend&quot;:&quot;cpu&quot;,&quot;seed&quot;:null,&quot;table_identity&quot;:&quot;not used: deterministic catalog geometry only&quot;,&quot;material&quot;:&quot;hopg&quot;,&quot;hkl&quot;:[0,0,2],&quot;catalog_cif_sha256&quot;:&quot;fa9027e4f14b36b2f31c773c0c4a0a166b0810f358a075ffe20d52d73bdbdcb7&quot;}' data-value-types='&quot;json&quot;'></marimo-json-output></div>"
           }
         }
       ],

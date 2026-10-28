@@ -147,7 +147,7 @@ def _(mo):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo, pyrite, result):
     tutorial_provenance = {
         "tutorial": "01-first-spectrum",
@@ -157,7 +157,8 @@ def _(mo, pyrite, result):
         "table_identity": dict(result.provenance["xsgen_tables"]),
         "source_identity": result.provenance["identity_digest"],
     }
-    mo.json(tutorial_provenance)
+    # Preserve machine-readable export metadata without displaying it to readers.
+    mo.json(tutorial_provenance).style({"display": "none"})
     return (tutorial_provenance,)
 
 

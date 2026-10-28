@@ -1,8 +1,8 @@
 {
   "schema": "pyrite.marimo-tutorial.v1",
-  "source_sha256": "5565a7a88b018bc14cf6650486b4fb9ef97242021c6af5512fd2487c42df5002",
+  "source_sha256": "41adadca026614fe523827706d11e163ac15409a1aaa80963b5e07c40b353275",
   "exporter_sha256": "6eedb7b2d84c7c81cfe4bb58c476c02676f6fd3a5784f844f613efe30412ab24",
-  "git_revision": "238140e8a615785dc24cdbc1dbfc21608c161947",
+  "git_revision": "cd58097bb51a92347337e7dd904f546064b8f322",
   "git_dirty": true,
   "python_version": "3.14.4",
   "execution": {
@@ -19,8 +19,8 @@
     "source_identity": "51de1ede625a02b490a1cf55cf25157c071da685b8214c47e3ab48d43b6ed272"
   },
   "artifacts": {
-    "notebooks/__marimo__/session/01-first-spectrum.py.json": "33ba5d9276007a0a68c7fdb52e681448af47c1aca658717049fcaee113bd2740",
-    "_static/notebooks/01-first-spectrum.html": "40f280d6a398282f1adc210bf06567ce1ee5d9d3f845593312ee37212b28b634",
+    "notebooks/__marimo__/session/01-first-spectrum.py.json": "66f0f24e55daca4e34740b4cf1d86a4a4f6e9274fe6e95bda1dbda656d5ec246",
+    "_static/notebooks/01-first-spectrum.html": "fa81df019763336643d2098c1af07566d6d91501e5da259674665c7b4bdb3e63",
     "_static/notebooks/01-first-spectrum-1.png": "99436b957fef1df2d423645340b0890f9c4c774d488d6c3da838c1873a3b4e75"
   }
 }

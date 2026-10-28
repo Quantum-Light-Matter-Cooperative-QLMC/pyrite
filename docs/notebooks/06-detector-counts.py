@@ -184,7 +184,7 @@ def _(mo):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(acquisition, batch, beam, count_image, expected_image, mo, np, pyrite, result):
     tutorial_provenance = {
         "tutorial": "06-detector-counts",
@@ -211,7 +211,8 @@ def _(acquisition, batch, beam, count_image, expected_image, mo, np, pyrite, res
             "below_cut": float(batch.below_cut_expected.sum()),
         },
     }
-    mo.json(tutorial_provenance)
+    # Preserve machine-readable export metadata without displaying it to readers.
+    mo.json(tutorial_provenance).style({"display": "none"})
     return (tutorial_provenance,)
 
 

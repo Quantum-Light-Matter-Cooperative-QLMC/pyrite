@@ -12,7 +12,7 @@
         {
           "type": "data",
           "data": {
-            "text/html": "<div style='display: flex;flex: 1;flex-direction: column;justify-content: flex-start;align-items: normal;flex-wrap: nowrap;gap: 0.5rem'><marimo-ui-element object-id='Hbol-0' random-id='51957115-d72a-8de3-787a-c8c554b35570'><marimo-anywidget data-initial-value='{&quot;model_id&quot;:&quot;9be5ef31de1145fe8d39c66b6fdf9214&quot;}' data-label='null' data-model-id='&quot;9be5ef31de1145fe8d39c66b6fdf9214&quot;'></marimo-anywidget></marimo-ui-element></div>"
+            "text/html": "<div style='display: flex;flex: 1;flex-direction: column;justify-content: flex-start;align-items: normal;flex-wrap: nowrap;gap: 0.5rem'><marimo-ui-element object-id='Hbol-0' random-id='e8c73f14-0576-411a-192b-751c630bf0b1'><marimo-anywidget data-initial-value='{&quot;model_id&quot;:&quot;f2690de169d64e97806e18cf42b8ce85&quot;}' data-label='null' data-model-id='&quot;f2690de169d64e97806e18cf42b8ce85&quot;'></marimo-anywidget></marimo-ui-element></div>"
           }
         }
       ],
@@ -111,12 +111,12 @@
     },
     {
       "id": "BYtC",
-      "code_hash": "fe2383a1b37a427b8bc78f94634daa7d",
+      "code_hash": "460737fb46f84bbbb249a0ebc8262720",
       "outputs": [
         {
           "type": "data",
           "data": {
-            "text/html": "<marimo-json-output data-json-data='{&quot;tutorial&quot;:&quot;00-setup&quot;,&quot;pyrite_version&quot;:&quot;0.22.4&quot;,&quot;backend&quot;:&quot;cpu&quot;,&quot;seed&quot;:1,&quot;table_identity&quot;:{&quot;918b1a9013e4c19c584e2cf4eb8b605f0063a7237b8b0d67749867a4c6804832&quot;:&quot;c3f8eab1f03c1c66cfe0355b68f312e0ca450cbacaabe4f72eebecefe8d1e08d&quot;,&quot;ea7657ec94db1acf9f16cb260a5b107c3d2a4ecc71e43facee0e6a845487cbeb&quot;:&quot;beed169ba64a48fd11dc8c5a7bb81471abaa21806bde7943dba6da43e5b01b6f&quot;,&quot;44461d55c05a7fea30a0f52bceb2aa384d6b71c1e12765da576b5cbc2592dbe3&quot;:&quot;3f32446ff553a97b14755b475c4d88287ff44eff2ffce0cdd790dbd9b40a83f2&quot;,&quot;dfea6d21d4f6196cb74ef19486b6d86f6f5af40e89d7241efe09507a3b982e85&quot;:&quot;61fb7f4cf6dceab2a4d10c5fc641357d80b0ba6bbe037b64dd000e08f024acd9&quot;},&quot;source_identity&quot;:&quot;cb3e432170e2cbe9eb6379f2353e45bc8d398b53bd802cc6442e01c8ed6a7b4f&quot;}' data-value-types='&quot;json&quot;'></marimo-json-output>"
+            "text/html": "<div style='display:none'><marimo-json-output data-json-data='{&quot;tutorial&quot;:&quot;00-setup&quot;,&quot;pyrite_version&quot;:&quot;0.22.4&quot;,&quot;backend&quot;:&quot;cpu&quot;,&quot;seed&quot;:1,&quot;table_identity&quot;:{&quot;918b1a9013e4c19c584e2cf4eb8b605f0063a7237b8b0d67749867a4c6804832&quot;:&quot;c3f8eab1f03c1c66cfe0355b68f312e0ca450cbacaabe4f72eebecefe8d1e08d&quot;,&quot;ea7657ec94db1acf9f16cb260a5b107c3d2a4ecc71e43facee0e6a845487cbeb&quot;:&quot;beed169ba64a48fd11dc8c5a7bb81471abaa21806bde7943dba6da43e5b01b6f&quot;,&quot;44461d55c05a7fea30a0f52bceb2aa384d6b71c1e12765da576b5cbc2592dbe3&quot;:&quot;3f32446ff553a97b14755b475c4d88287ff44eff2ffce0cdd790dbd9b40a83f2&quot;,&quot;dfea6d21d4f6196cb74ef19486b6d86f6f5af40e89d7241efe09507a3b982e85&quot;:&quot;61fb7f4cf6dceab2a4d10c5fc641357d80b0ba6bbe037b64dd000e08f024acd9&quot;},&quot;source_identity&quot;:&quot;cb3e432170e2cbe9eb6379f2353e45bc8d398b53bd802cc6442e01c8ed6a7b4f&quot;}' data-value-types='&quot;json&quot;'></marimo-json-output></div>"
           }
         }
       ],

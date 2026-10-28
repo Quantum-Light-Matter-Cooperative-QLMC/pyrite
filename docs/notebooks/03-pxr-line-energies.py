@@ -153,7 +153,7 @@ def _(mo):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(catalog, hkl, mo, pyrite):
     import hashlib
 
@@ -167,7 +167,8 @@ def _(catalog, hkl, mo, pyrite):
         "hkl": list(hkl),
         "catalog_cif_sha256": hashlib.sha256(catalog.crystals["hopg"].cif.read_bytes()).hexdigest(),
     }
-    mo.json(tutorial_provenance)
+    # Preserve machine-readable export metadata without displaying it to readers.
+    mo.json(tutorial_provenance).style({"display": "none"})
     return (tutorial_provenance,)
 
 

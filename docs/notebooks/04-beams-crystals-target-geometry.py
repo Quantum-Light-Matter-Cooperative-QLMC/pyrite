@@ -169,7 +169,7 @@ def _(mo):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(beam, material, mo, pyrite, result, target):
     tutorial_provenance = {
         "tutorial": "04-beams-crystals-target-geometry",
@@ -185,7 +185,8 @@ def _(beam, material, mo, pyrite, result, target):
         "cut_beam_uvw": list(target.cut.beam_uvw),
         "sampled_cxr_histories": 2_048,
     }
-    mo.json(tutorial_provenance)
+    # Preserve machine-readable export metadata without displaying it to readers.
+    mo.json(tutorial_provenance).style({"display": "none"})
     return (tutorial_provenance,)
 
 
