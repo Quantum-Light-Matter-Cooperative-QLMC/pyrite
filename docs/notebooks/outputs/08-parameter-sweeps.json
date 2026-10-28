@@ -227,8 +227,11 @@
     ]
   },
   "artifacts": {
-    "notebooks/__marimo__/session/08-parameter-sweeps.py.json": "48821a1e3840c94b9167a691c8e114b4ad7c0d82f12d5670a350921f45af4d3f",
-    "_static/notebooks/08-parameter-sweeps.html": "3363723be192947efce3d4b8c7c79e1a81c33dd6e228cbce77a5fc97199785cc",
+    "notebooks/__marimo__/session/08-parameter-sweeps.py.json": "da08e92ae59fb829c160986dc70af73f5d6b77e341c06155ac2103fd1926d78c",
+    "_static/notebooks/08-parameter-sweeps.html": "97041d86fdbd8fb80e305dc020efd9aefd9d915239ff4930ab544c26b247425a",
     "_static/notebooks/08-parameter-sweeps-1.png": "183f6ee636c1f1c2cde57cbb95644f259cbabdac40b4aeadbd9b9dc5904f8d9b"
-  }
+  },
+  "redactions": [
+    "Operator home directory paths replaced with /home/user/."
+  ]
 }
