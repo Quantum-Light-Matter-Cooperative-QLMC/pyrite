@@ -96,8 +96,13 @@ For example:
 {ref}`validation-atomic-form-factor`
 ```
 
-API pages also provide Sphinx's `[source]` links. Do not add private helpers to
-the public API inventory solely to obtain links.
+API pages also provide Sphinx's `[source]` links. For functions that preserve
+a historical `__module__` after relocation, the documentation extension resolves
+the implementation from the function's code filename through Sphinx's
+`viewcode-follow-imported` hook. Runtime import and pickle identities stay intact.
+Alias pages link to their documented class; data exports use `autodata` without
+expanded values. Do not add private helpers to the public API inventory solely
+to obtain links.
 
 ### Current and historical source references
 

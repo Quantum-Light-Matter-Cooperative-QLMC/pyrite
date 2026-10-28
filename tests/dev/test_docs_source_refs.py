@@ -1,10 +1,12 @@
 """Source and explicit-reference failures must stop publishing documentation."""
 
+import importlib
 import importlib.util
 import os
 import subprocess
 import sys
 from pathlib import Path
+from types import ModuleType
 
 import pytest
 
@@ -82,13 +84,63 @@ def test_rendered_links_pin_revision_and_leave_literals_and_history_alone(tmp_pa
     assert 'href="https://example.org/blob/old-sha/retired.py"' in html
 
 
-def _build(root: Path, reference: str):
+def test_viewcode_resolution_preserves_runtime_module_identity(source_refs):
+    cases = (
+        ("pyrite.transport", "simulate_trajectories", "pyrite.montecarlo.transport.api"),
+        ("pyrite.radiation", "mc_cxr_spectrum", "pyrite.montecarlo.spectrum.cxr._spectrum"),
+        ("pyrite.montecarlo.runner", "run_cases", "pyrite.montecarlo.runner.scheduling"),
+    )
+    for module, name, owner in cases:
+        function = getattr(importlib.import_module(module), name)
+        historical_module = function.__module__
+        assert historical_module != owner
+        assert source_refs.follow_function_source(None, module, name) == owner
+        assert function.__module__ == historical_module
+
+
+def test_viewcode_resolution_leaves_other_objects_to_sphinx(source_refs, monkeypatch):
+    module = ModuleType("pyrite.docs_source_test")
+    module.external_function = test_viewcode_resolution_leaves_other_objects_to_sphinx
+    module.builtin = len
+    module.class_object = Path
+    monkeypatch.setitem(sys.modules, module.__name__, module)
+    for name in ("external_function", "builtin", "class_object", "missing"):
+        assert source_refs.follow_function_source(None, module.__name__, name) is None
+    assert source_refs.follow_function_source(None, "pyrite.not_loaded", "function") is None
+    assert source_refs.follow_function_source(None, "pathlib", "Path") is None
+    assert source_refs.follow_function_source(None, None, "function") is None
+
+
+def test_viewcode_follows_compatibility_functions_to_their_definitions(tmp_path):
+    functions = {
+        "pyrite.transport.simulate_trajectories": "pyrite/montecarlo/transport/api",
+        "pyrite.radiation.mc_cxr_spectrum": "pyrite/montecarlo/spectrum/cxr/_spectrum",
+        "pyrite.radiation.mc_cxr_spectrum_solid_angle": "pyrite/montecarlo/spectrum/cxr/_spectrum",
+        "pyrite.radiation.mc_brem_spectrum": "pyrite/montecarlo/spectrum/brem",
+        "pyrite.montecarlo.runner.run_cases": "pyrite/montecarlo/runner/scheduling",
+    }
+    reference = "\n\n".join(f"```{{eval-rst}}\n.. autofunction:: {name}\n```" for name in functions)
+    result, html = _build(
+        tmp_path,
+        reference,
+        extensions=("sphinx.ext.autodoc", "sphinx.ext.napoleon", "sphinx.ext.viewcode"),
+    )
+    assert result.returncode == 0, result.stdout
+    for name, owner in functions.items():
+        symbol = name.rsplit(".", 1)[1]
+        target = f"_modules/{owner}.html#{symbol}"
+        assert f'href="{target}"' in html, name
+        source = tmp_path / "html" / "_modules" / f"{owner}.html"
+        assert f'id="{symbol}"' in source.read_text(), name
+
+
+def _build(root: Path, reference: str, *, extensions: tuple[str, ...] = ()):
     docs = root / "docs"
     docs.mkdir()
     (root / "owner.py").write_text("def current(): pass\n")
     (docs / "conf.py").write_text(
         f"import sys\nsys.path.insert(0, {str(DOCS)!r})\n"
-        "extensions = ['myst_parser', '_source_refs']\n"
+        f"extensions = {['myst_parser', '_source_refs', *extensions]!r}\n"
         "source_repository = 'https://example.org/repo'\nsource_revision = 'build-sha'\n"
         "master_doc = 'index'\n"
     )

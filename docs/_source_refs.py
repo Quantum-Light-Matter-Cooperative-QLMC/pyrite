@@ -5,7 +5,9 @@ from __future__ import annotations
 import ast
 import os
 import subprocess
+import sys
 from pathlib import Path
+from types import FunctionType
 from urllib.parse import quote
 
 from docutils import nodes
@@ -75,9 +77,40 @@ def require_authored_references(app, doctree):
             node["refwarn"] = True
 
 
+def follow_function_source(app, modname: str, attribute: str) -> str | None:
+    """Find relocated function definitions without changing compatibility metadata.
+
+    Some PyRITE functions retain a historical ``__module__`` for import/pickle
+    compatibility. Their code filename still identifies the implementation.
+    Leave classes, external objects and unloaded modules to Sphinx's resolver.
+    """
+    if not modname or not modname.startswith("pyrite.") or not attribute:
+        return None
+    value = sys.modules.get(modname)
+    if value is None:
+        return None
+    for part in attribute.split("."):
+        value = getattr(value, part, None)
+    if not isinstance(value, FunctionType):
+        return None
+    source_root = Path(__file__).resolve().parent.parent / "src"
+    try:
+        relative = Path(value.__code__.co_filename).resolve().relative_to(source_root)
+    except ValueError:
+        return None
+    if relative.suffix != ".py" or relative.parts[0] != "pyrite":
+        return None
+    parts = relative.with_suffix("").parts
+    if parts[-1] == "__init__":
+        parts = parts[:-1]
+    return ".".join(parts)
+
+
 def setup(app):
+    app.setup_extension("sphinx.ext.viewcode")
     app.add_config_value("source_repository", "", "html")
     app.add_config_value("source_revision", "", "html")
     app.add_role("source", SourceRole())
     app.connect("doctree-read", require_authored_references)
+    app.connect("viewcode-follow-imported", follow_function_source)
     return {"parallel_read_safe": True, "parallel_write_safe": True}
