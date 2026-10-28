@@ -9,7 +9,7 @@ __generated_with = "0.25.2"
 app = marimo.App(width="medium")
 
 
-@app.cell(hide_code=True)
+@app.cell(hide_code=False)
 def _():
     import os
 
@@ -40,44 +40,20 @@ def _(mo):
     mo.md(r"""
     ## Install and fetch tables once
 
-    Use Python **3.13 or newer**. **MoLab** installs the CPU environment from
-    this notebook's dependency list. To add or change a dependency, open MoLab's
-    built-in package manager and enter the package name and version, for example
-    `endf-parserpy==0.17.0`.
+    **Add Packages**
+    To add or change a dependency, open MoLab's built-in package manager on the
+    left and enter the package name and version, for example `endf-parserpy==0.17.0`.
 
-    **Locally**, install `pyrite-mc[apps]==0.22.5` and `endf-parserpy==0.17.0`
-    with your package manager, then open the notebook. These optional commands
-    fetch and verify the tables and launch the local editor:
+    The required interaction data download is about 100 MB. The setup cell calls `_ = pyrite.fetch_tables()`
+    to install missing tables automatically -- see the [tables reference](https://pyrite.readthedocs.io/en/latest/repo-design/cli/cli-reference-tables.html).
 
-    ```bash
-    uv run pyrite tables fetch
-    uv run pyrite tables verify
-    uv run marimo edit docs/notebooks/00-setup.py
-    ```
-
-    The reference data download is about 100 MB. Fetch verifies archive SHA-256
-    before installation; `tables verify` checks installed pins and payloads.
-    The setup cell calls `_ = pyrite.fetch_tables()` to install missing pinned tables
-    automatically. Complete installations are reused without a network request.
-    The CLI commands above remain useful for manual verification or troubleshooting.
-    See the [tables reference](https://pyrite.readthedocs.io/en/latest/repo-design/cli/cli-reference-tables.html).
-
-    These notebooks pin `endf-parserpy==0.17.0` for the released PyRITE version.
     If an existing session reports **MF=26/MT=527 photon yield table is missing**,
     open MoLab's package manager, enter `endf-parserpy==0.17.0`, and restart
     the kernel.
 
-    The EEDL file itself is valid; downloading it again does not fix this parser
-    compatibility error.
-
     **NVIDIA GPU:** start with CPU. If your MoLab session offers an NVIDIA
-    RTX Pro 6000, select that GPU, then add `pyrite-mc[nvidia]==0.22.5` through
-    MoLab's package manager and restart the kernel.
-
-    Use the same extra for a local NVIDIA GPU. A compatible NVIDIA driver is still
-    required; the current extra supplies CUDA 13 CuPy/toolkit packages. GPU type,
-    availability and account quotas depend on the host. This notebook does not
-    require a GPU or allocate GPU transport by default.
+    RTX Pro 6000, first add `pyrite-mc[nvidia]` as a dependency, then select
+    that GPU in the Molab menu before restarting the kernel.
     """)
     return
 
@@ -116,15 +92,12 @@ def _(mo):
     The first code cell sets `PYRITE_MC_BACKEND` to `cpu` unless the environment
     already selected another backend. For GPU execution, set it to `cuda` **before
     importing PyRITE**. Restart the kernel after changing the backend or installing
-    CuPy; rerunning a later cell does not undo imports cached in a live kernel.
-    The smoke result below records the actual backend, which should match your
-    selection. `nvidia-smi` confirms driver/GPU visibility; importing CuPy alone
-    does not prove a compatible device exists.
+    CuPy.
     """)
     return
 
 
-@app.cell(hide_code=True)
+@app.cell(hide_code=False)
 def _():
     from pyrite import simulate
     from pyrite.beams import Beam, PointBunch, PointSpot
@@ -210,10 +183,7 @@ def _(mo):
     ## Continue
 
     This tiny, fixed-seed run verifies that the selected backend can produce finite,
-    nonzero spectral data with the installed tables. It is **not a convergence or
-    physics-validation test**. The histories are numerical samples, not a physical
-    beam charge. Check the [validation status](https://pyrite.readthedocs.io/en/latest/validation/status-summary.html)
-    for scientific evidence and limitations.
+    nonzero spectral data with the installed tables.
 
     Continue with **01 — Your first X-ray spectrum**. Keep the core sequence on CPU
     until workload size justifies a GPU. GPU outputs can differ across architectures;
