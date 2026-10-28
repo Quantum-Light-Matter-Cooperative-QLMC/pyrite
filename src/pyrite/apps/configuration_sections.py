@@ -9,7 +9,7 @@ from pyrite._config_presets import NUMERICS, PHYSICS
 from pyrite.campaign.configuration_editor import ConfigurationEditor, plain
 from pyrite.campaign.profile_detectors import profile_detector_entries
 
-from .configuration_controls import calculation_defaults, fields_form
+from .configuration_controls import calculation_defaults, fields_form, parameter_list
 
 
 def transact(get_state: Callable, set_state: Callable, operation: Callable, message: str) -> None:
@@ -31,7 +31,8 @@ def overview(mo: Any, editor: ConfigurationEditor, apply: Callable) -> Any:
         label="Profile (unsaved edits are retained)",
         on_change=lambda name: apply(lambda current: current.select(name), "Profile selected"),
     )
-    create = mo.ui.dictionary(
+    create = parameter_list(
+        mo,
         {
             "name": mo.ui.text(label="New profile name"),
             "source": mo.ui.dropdown(
@@ -39,7 +40,8 @@ def overview(mo: Any, editor: ConfigurationEditor, apply: Callable) -> Any:
                 value=editor.profile,
                 label="Duplicate source, or create new",
             ),
-        }
+        },
+        title="New profile",
     ).form(
         submit_button_label="Create unsaved profile",
         on_change=lambda value: (
@@ -63,7 +65,7 @@ def overview(mo: Any, editor: ConfigurationEditor, apply: Callable) -> Any:
     )
 
 
-def geometry(mo: Any, editor: ConfigurationEditor, apply: Callable) -> Any:
+def geometry(mo: Any, editor: ConfigurationEditor, apply: Callable, thickness_key: str) -> Any:
     keys = ("energy_keV", "thickness_ang", "thickness_layers", "tilt_deg", "tilt_azim_deg")
     row = plain(editor.row)
     current = {key: row[key] for key in keys if key in row}
@@ -76,18 +78,12 @@ def geometry(mo: Any, editor: ConfigurationEditor, apply: Callable) -> Any:
     }
 
     def update(build: Callable) -> None:
-        apply(lambda e: e.patch({**dict.fromkeys(keys), **build()}), "Geometry ranges staged")
+        apply(lambda e: e.patch({**dict.fromkeys(keys), **build()}), "Scene and materials staged")
 
     members = mo.ui.multiselect(
         list(editor.draft.document["materials"]),
         value=list(row.get("materials", editor.draft.document["materials"])),
         label="Target materials (catalog geometry/cut/stack)",
-    ).form(
-        submit_button_label="Set material membership",
-        on_change=lambda value: (
-            value is not None
-            and apply(lambda e: e.patch({"materials": value}), "Material membership staged")
-        ),
     )
     return mo.vstack(
         [
@@ -99,8 +95,16 @@ def geometry(mo: Any, editor: ConfigurationEditor, apply: Callable) -> Any:
                 "Scene bodies are not profile fields. Material overrides can supersede ranges; "
                 "inspect the resolved review before saving."
             ),
-            members,
-            fields_form(mo, current, suggestions, update, title="Apply scene sweep ranges"),
+            fields_form(
+                mo,
+                current,
+                suggestions,
+                update,
+                title="Apply scene and materials",
+                thickness_key=thickness_key,
+                extra_controls={"materials": members},
+                heading="Scene and materials",
+            ),
         ]
     )
 
@@ -126,28 +130,44 @@ def calculation(
         {"Inherit without a named preset": "", **{name: name for name in presets}},
         value=row.get(kind, "Inherit without a named preset"),
         label=f"Named {kind} preset",
-    ).form(
-        submit_button_label=f"Attach {kind} preset (explicit overrides remain)",
-        on_change=lambda value: (
-            value is not None
-            and apply(lambda e: e.patch({kind: value or None}), f"{kind} reference staged")
-        ),
     )
+    if kind == "numerics":
+        preset = preset.form(
+            submit_button_label="Attach numerics preset (explicit overrides remain)",
+            on_change=lambda value: (
+                value is not None
+                and apply(lambda e: e.patch({kind: value or None}), f"{kind} reference staged")
+            ),
+        )
 
     def update(build: Callable) -> None:
-        apply(lambda e: e.patch({**dict.fromkeys(shown), **build()}), f"{kind} values staged")
+        def operation(e: ConfigurationEditor) -> ConfigurationEditor:
+            values = build()
+            if kind in values:
+                values[kind] = values[kind] or None
+            return e.patch({**dict.fromkeys(shown), **values})
+
+        apply(operation, f"{kind} values staged")
 
     return mo.vstack(
         [
             mo.md(
-                "**Set explicitly** writes an override. Unchecked restores preset/default "
+                "**Override previous** writes an override. Unchecked restores preset/default "
                 "resolution; displayed suggestions are not new defaults. Coupled settings are "
                 "validated together. Fixed trial counts and adaptive precision cannot mix. "
                 "PXR/CBS are a joint line scorer; emission selects incoherent/coherent scoring. "
                 "These controls affect computation, not export filtering."
             ),
-            preset,
-            fields_form(mo, current, suggestions, update, title=f"Apply {kind} values"),
+            *([preset] if kind == "numerics" else []),
+            fields_form(
+                mo,
+                current,
+                suggestions,
+                update,
+                title=f"Apply {kind} settings",
+                extra_controls={"physics": preset} if kind == "physics" else None,
+                heading="Physics" if kind == "physics" else "Parameters",
+            ),
         ]
     )
 
@@ -155,7 +175,8 @@ def calculation(
 def detector_membership(mo: Any, editor: ConfigurationEditor, apply: Callable) -> Any:
     entries = profile_detector_entries(editor.row)
     named = list(editor.draft.document.get("detectors", {}))
-    form = mo.ui.dictionary(
+    form = parameter_list(
+        mo,
         {
             "action": mo.ui.dropdown(
                 ["add", "duplicate", "remove", "set", "migrate"], value="add", label="Action"
@@ -166,7 +187,8 @@ def detector_membership(mo: Any, editor: ConfigurationEditor, apply: Callable) -
             ),
             "reference": mo.ui.dropdown(named, label="Named detector (add/set)"),
             "migrate": mo.ui.checkbox(label="Explicitly convert legacy slots to an ID collection"),
-        }
+        },
+        title="Detector membership",
     ).form(
         submit_button_label="Apply detector membership",
         on_change=lambda value: (

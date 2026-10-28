@@ -31,7 +31,7 @@ explicit detector before saving if the new profile has none.
 All changes are staged in one in-memory catalog draft. Switching profiles keeps
 staged changes. Closing the notebook loses changes that were not saved.
 
-**Set explicitly** means that a field is written into the configuration.
+**Override previous** means that a field is written into the configuration.
 Unchecking it removes the field and restores existing preset/default resolution.
 Unchecked suggested values do not change the simulation. Apply each form to
 stage its values; validation feedback appears above the sections. Correct any
@@ -39,7 +39,9 @@ errors before saving.
 
 **Scene and Materials** selects catalog targets and edits kinetic energy in
 keV, thickness in Å or supported layer counts, incidence and azimuth in degrees.
-Comma-separated values create the existing profile sweep grids. A
+Choose one thickness definition: angstroms or crystal layers. Applying the form
+keeps only the selected thickness representation. Comma-separated values create
+the existing profile sweep grids. A
 material-specific override form edits or removes ranges that supersede the
 profile's common ranges. The resolved review shows actual material geometry,
 cuts and stack definitions. Profiles represent campaigns, rather than arbitrary

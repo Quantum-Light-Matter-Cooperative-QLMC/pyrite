@@ -12,7 +12,12 @@ def _():
 
     from pyrite._catalog_layout import selected_catalog
     from pyrite.apps._design import page_title, style_sheet
-    from pyrite.apps.configuration_controls import beam_template, detector_template, fields_form
+    from pyrite.apps.configuration_controls import (
+        beam_template,
+        detector_template,
+        fields_form,
+        parameter_list,
+    )
     from pyrite.apps.configuration_sections import (
         calculation,
         detector_membership,
@@ -37,6 +42,7 @@ def _():
         detector_membership,
         detector_template,
         fields_form,
+        parameter_list,
         geometry,
         mo,
         output_dir,
@@ -66,7 +72,7 @@ def _(ConfigurationEditor, mo, selected_catalog):
 
 
 @app.cell
-def _(ConfigurationEditor, get_state, mo, selected_catalog, set_state):
+def _(ConfigurationEditor, get_state, mo, parameter_list, selected_catalog, set_state):
     def _open(value):
         if value is None:
             return
@@ -79,7 +85,8 @@ def _(ConfigurationEditor, get_state, mo, selected_catalog, set_state):
         except (OSError, ValueError, KeyError) as error:
             set_state((_previous, f"Open rejected: {error}"))
 
-    open_form = mo.ui.dictionary(
+    open_form = parameter_list(
+        mo,
         {
             "path": mo.ui.text(
                 value=str(selected_catalog()),
@@ -88,7 +95,8 @@ def _(ConfigurationEditor, get_state, mo, selected_catalog, set_state):
             ),
             "profile": mo.ui.text(value="standard", label="Profile to open"),
             "discard": mo.ui.checkbox(label="Discard unsaved changes when opening"),
-        }
+        },
+        title="Open configuration",
     ).form(submit_button_label="Open catalog", on_change=_open)
     open_form
     return
@@ -109,7 +117,7 @@ def _(get_state, mo, set_state, transact):
             *([mo.callout(mo.md("\n\n".join(_errors)), kind="warn")] if _errors else []),
         ]
     )
-    return apply, editor
+    return apply, editor, notice
 
 
 @app.cell
@@ -129,22 +137,54 @@ def _(mo):
         inline=True,
         label="Configuration section",
     )
-    advanced = mo.ui.checkbox(label="Show advanced physics and numerics")
-    mo.vstack([section, advanced])
-    return advanced, section
+    section
+    return (section,)
 
 
 @app.cell
-def _(advanced, apply, calculation, editor, geometry, mo, overview, section):
-    mo.stop(section.value not in {"Overview", "Scene and Materials", "Physics", "Numerics"})
+def _(mo, section):
+    advanced = (
+        mo.ui.checkbox(label=f"Show advanced {section.value.lower()}")
+        if section.value in {"Physics", "Numerics"}
+        else None
+    )
+    advanced
+    return (advanced,)
+
+
+@app.cell
+def _(advanced, apply, calculation, editor, mo, overview, section):
+    mo.stop(section.value not in {"Overview", "Physics", "Numerics"})
     if section.value == "Overview":
-        _content = overview(mo, editor, apply)
-    elif section.value == "Scene and Materials":
-        _content = geometry(mo, editor, apply)
+        configuration_view = overview(mo, editor, apply)
     else:
-        _content = calculation(mo, editor, section.value.lower(), advanced.value, apply)
-    _content
-    return
+        configuration_view = calculation(mo, editor, section.value.lower(), advanced.value, apply)
+    configuration_view
+    return (configuration_view,)
+
+
+@app.cell
+def _(editor, mo, section):
+    mo.stop(section.value != "Scene and Materials")
+    thickness_mode = mo.ui.dropdown(
+        {
+            "Thickness in angstroms (Å)": "thickness_ang",
+            "Thickness in crystal layers": "thickness_layers",
+        },
+        value="Thickness in crystal layers"
+        if "thickness_layers" in editor.row
+        else "Thickness in angstroms (Å)",
+        label="Thickness definition",
+    )
+    thickness_mode
+    return (thickness_mode,)
+
+
+@app.cell
+def _(apply, editor, geometry, mo, thickness_mode):
+    scene_view = geometry(mo, editor, apply, thickness_mode.value)
+    scene_view
+    return (scene_view,)
 
 
 @app.cell
@@ -158,12 +198,31 @@ def _(editor, mo, section):
 
 
 @app.cell
-def _(apply, editor, fields_form, mo, override_material, plain):
+def _(editor, mo, override_material):
+    mo.stop(not override_material.value)
+    _current = editor.row.get("overrides", {}).get(override_material.value, {})
+    override_thickness_mode = mo.ui.dropdown(
+        {
+            "Thickness in angstroms (Å)": "thickness_ang",
+            "Thickness in crystal layers": "thickness_layers",
+        },
+        value="Thickness in crystal layers"
+        if "thickness_layers" in _current
+        else "Thickness in angstroms (Å)",
+        label="Material override thickness definition",
+    )
+    override_thickness_mode
+    return (override_thickness_mode,)
+
+
+@app.cell
+def _(apply, editor, fields_form, mo, override_material, override_thickness_mode, plain):
     mo.stop(not override_material.value)
     _overrides = plain(editor.row.get("overrides", {}))
     _current = _overrides.get(override_material.value, {})
     _suggestions = {
         "thickness_ang": {"values": [20000.0]},
+        "thickness_layers": {"values": [3]},
         "energy_keV": {"values": [30.0]},
         "tilt_deg": {"values": [45.0]},
         "tilt_azim_deg": {"values": [180.0]},
@@ -181,8 +240,16 @@ def _(apply, editor, fields_form, mo, override_material, plain):
 
         apply(_operation, "Material override staged")
 
-    fields_form(mo, _current, _suggestions, _submit, title="Apply material-specific ranges")
-    return
+    material_parameters = fields_form(
+        mo,
+        _current,
+        _suggestions,
+        _submit,
+        title="Apply material-specific ranges",
+        thickness_key=override_thickness_mode.value,
+    )
+    material_parameters
+    return (material_parameters,)
 
 
 @app.cell
@@ -283,8 +350,11 @@ def _(
             lambda e: e.beam(beam_name.value, build()), "Private beam created and attached in draft"
         )
 
-    fields_form(mo, _source, _template, _submit, title="Create private beam and attach")
-    return
+    beam_parameters = fields_form(
+        mo, _source, _template, _submit, title="Create private beam and attach"
+    )
+    beam_parameters
+    return (beam_parameters,)
 
 
 @app.cell
@@ -300,8 +370,9 @@ def _(apply, detector_membership, editor, mo, profile_detector_entries, section)
         label="Geometry template (explicit replacement)",
     )
     detector_name = mo.ui.text(label="Optional new named detector; blank = local inline copy")
-    mo.vstack([detector_membership(mo, editor, apply), detector_id, detector_kind, detector_name])
-    return detector_id, detector_kind, detector_name
+    detector_membership_view = detector_membership(mo, editor, apply)
+    mo.vstack([detector_membership_view, detector_id, detector_kind, detector_name])
+    return detector_id, detector_kind, detector_name, detector_membership_view
 
 
 @app.cell
@@ -344,7 +415,7 @@ def _(
 
         apply(_operation, "Detector edited in draft; named source unchanged")
 
-    mo.vstack(
+    detector_parameters = mo.vstack(
         [
             mo.md(
                 "Scalar acceptance: observation/full polar span **deg**, solid angle **sr**. "
@@ -358,19 +429,24 @@ def _(
             ),
         ]
     )
-    return
+    detector_parameters
+    return (detector_parameters,)
 
 
 @app.cell
-def _(mo, output_dir):
-    execution = mo.ui.dictionary(
+def _(mo, output_dir, parameter_list):
+    execution = parameter_list(
+        mo,
         {
             "checkpoint_dir": mo.ui.text(
-                label="Checkpoint directory; blank = normal workspace default"
+                label="Checkpoint directory; blank = normal workspace default",
+                full_width=True,
             ),
             "trajectories": mo.ui.checkbox(label="Record transported electron histories (HDF5)"),
             "trajectory_dir": mo.ui.text(
-                value=str(output_dir("trajectories")), label="Trajectory capture directory"
+                value=str(output_dir("trajectories")),
+                label="Trajectory capture directory",
+                full_width=True,
             ),
             "trajectory_storage": mo.ui.dropdown(
                 ["compact", "throughput"], value="compact", label="HDF5 capture storage"
@@ -380,7 +456,8 @@ def _(mo, output_dir):
                 value="inherit",
                 label="Run backend (new process)",
             ),
-        }
+        },
+        title="Execution and outputs",
     )
     return (execution,)
 
@@ -431,15 +508,21 @@ def _(editor, execution, mo, run_command, section):
 
 
 @app.cell
-def _(mo, output_dir, section):
+def _(mo, output_dir, parameter_list, section):
     mo.stop(section.value != "Outputs and Exports")
-    stored = mo.ui.dictionary(
+    stored = parameter_list(
+        mo,
         {
             "root": mo.ui.text(
-                value=str(output_dir("checkpoints")), label="Existing checkpoint directory"
+                value=str(output_dir("checkpoints")),
+                label="Existing checkpoint directory",
+                full_width=True,
             ),
-            "stem": mo.ui.text(label="Exact saved checkpoint stem (including identity variant)"),
-        }
+            "stem": mo.ui.text(
+                label="Exact saved checkpoint stem (including identity variant)", full_width=True
+            ),
+        },
+        title="Saved spectra",
     ).form(submit_button_label="Load saved source arrays for export")
     stored
     return (stored,)
@@ -527,7 +610,7 @@ def _(
 
 
 @app.cell
-def _(apply, editor, mo, section):
+def _(apply, editor, mo, notice, section):
     mo.stop(section.value != "Review and Save")
     _errors = editor.errors()
     _status = mo.callout(
@@ -538,7 +621,7 @@ def _(apply, editor, mo, section):
         ),
         kind="warn" if _errors else "success",
     )
-    _save = mo.ui.button(
+    save_catalog_button = mo.ui.button(
         label="Save catalog changes",
         disabled=bool(_errors),
         on_click=lambda _: apply(lambda e: e.save(), "Catalog changes saved"),
@@ -568,8 +651,12 @@ def _(apply, editor, mo, section):
         )
     else:
         _review = mo.md("Correct the fields above; saving is disabled.")
-    mo.vstack(
+    review_view = mo.vstack(
         [
+            mo.md(f"Profile: **{editor.profile}**"),
+            mo.callout(
+                mo.md(notice), kind="warn" if notice.startswith("Change rejected:") else "info"
+            ),
             _status,
             _review,
             mo.accordion(
@@ -586,11 +673,12 @@ def _(apply, editor, mo, section):
                 "paths and immutable grid references: transfer their referenced assets as well. "
                 "Resolved JSON is an inspection report, not an executable configuration format."
             ),
-            _save,
+            save_catalog_button,
             *_downloads,
         ]
     )
-    return
+    review_view
+    return review_view, save_catalog_button
 
 
 if __name__ == "__main__":

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from dataclasses import fields
+from html import escape
 from typing import Any, Literal, get_args, get_origin
 
 from pyrite._config_presets import EMISSION_VALUES, NUMERICS, PHYSICS
@@ -15,7 +16,23 @@ from pyrite.campaign.configuration_editor import plain
 def label(key: str) -> str:
     """Keep canonical names and their unit suffixes visible."""
     reverse = {value: name for name, value in CATALOG_FIELDS.items()}
-    return reverse.get(key, key).replace("_", " ")
+    return " / ".join(
+        reverse.get(part, part).replace("_", " ") for part in key.split(".") if part != "values"
+    )
+
+
+def parameter_list(
+    mo: Any, elements: Mapping[str, Any], *, title: str | None = "Parameters"
+) -> Any:
+    """A vertical form layout with named values and no JSON-tree presentation."""
+    heading = f"<h3>{escape(title)}</h3>" if title else ""
+    rows = "".join(f"<div>{{{key}}}</div>" for key in elements)
+    return mo.ui.batch(
+        mo.Html(
+            heading + '<div style="display:flex;flex-direction:column;gap:1rem">' + rows + "</div>"
+        ),
+        elements,
+    )
 
 
 def choices() -> dict[str, list[Any]]:
@@ -217,29 +234,60 @@ def fields_form(
     submit: Callable,
     *,
     title: str,
+    thickness_key: str | None = None,
+    extra_controls: Mapping[str, Any] | None = None,
+    heading: str = "Parameters",
 ) -> Any:
     """Optional typed controls. Unchecked means absent, preserving defaults/presets.
 
     Existing fields always remain visible, including nested supported settings
     for which there is no creation suggestion.
     """
-    present = _flatten(plain(current))
-    templates = {**_flatten(plain(suggestions)), **present}
+    current, suggestions = plain(current), plain(suggestions)
+    if thickness_key is not None:
+        thickness_keys = {"thickness_ang", "thickness_layers"}
+        if thickness_key not in thickness_keys:
+            raise ValueError("Choose thickness in angstroms or layers")
+        had_thickness = bool(thickness_keys.intersection(current))
+        for other in thickness_keys - {thickness_key}:
+            current.pop(other, None)
+            suggestions.pop(other, None)
+        if had_thickness and thickness_key not in current:
+            current[thickness_key] = suggestions[thickness_key]
+        if thickness_key in current and not isinstance(current[thickness_key], Mapping):
+            current[thickness_key] = {"values": [current[thickness_key]]}
+    present = _flatten(current)
+    templates = {**_flatten(suggestions), **present}
+    paths = list(templates)
     widgets = {
-        path: mo.ui.dictionary(
+        f"parameter_{index}": mo.ui.batch(
+            mo.Html(
+                '<div style="display:flex;align-items:center;gap:0.75rem">'
+                '<div>{value}</div><div style="white-space:nowrap">{explicit}</div></div>'
+            ),
             {
-                "explicit": mo.ui.checkbox(value=path in present, label="Set explicitly"),
                 "value": _widget(mo, path, value),
-            }
+                "explicit": mo.ui.checkbox(value=path in present, label="Override previous"),
+            },
         )
-        for path, value in templates.items()
+        for index, (path, value) in enumerate(templates.items())
     }
+    extra_controls = extra_controls or {}
+    widgets = {**extra_controls, **widgets}
 
     def changed(value: Any) -> None:
         if value is not None:
-            submit(lambda: field_values(value, templates))
+            submit(
+                lambda: {
+                    **field_values(
+                        {path: value[f"parameter_{index}"] for index, path in enumerate(paths)},
+                        templates,
+                    ),
+                    **{key: value[key] for key in extra_controls},
+                }
+            )
 
-    return mo.ui.dictionary(widgets).form(
+    return parameter_list(mo, widgets, title=heading).form(
         submit_button_label=title,
         on_change=changed,
         bordered=True,

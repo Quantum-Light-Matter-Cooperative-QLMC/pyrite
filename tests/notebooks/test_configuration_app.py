@@ -200,6 +200,157 @@ def test_save_reload_round_trip(editor):
     assert json.loads(reopened.resolved_json())["profile"] == "notebook"
 
 
+def test_save_catalog_button_persists_staged_objects(editor, monkeypatch, _isolate_user_catalog):
+    import gc
+    import weakref
+    from types import SimpleNamespace
+
+    import marimo as mo
+
+    from pyrite.apps.configuration_app import app
+    from pyrite.apps.configuration_sections import transact
+    from pyrite.materials.catalog import load_material_catalog
+
+    edited = editor.patch({"energy_keV": {"values": [42.0]}}).beam(
+        "notebook-beam", {"transverse_fwhm_mm": 0.5, "bunch_charge_pc": 2.0}
+    )
+    state = [(edited, "Changes staged")]
+    buttons = []
+    callback_globals = []
+    original_button = mo.ui.button
+
+    def capture_button(*args, **kwargs):
+        button = original_button(*args, **kwargs)
+        if kwargs.get("label") == "Save catalog changes":
+            buttons.append(weakref.ref(button))
+            callback_globals.append(kwargs["on_click"].__globals__)
+        return button
+
+    def apply(operation, message):
+        transact(
+            lambda: state[0], lambda updated: state.__setitem__(0, updated), operation, message
+        )
+
+    monkeypatch.setattr(mo.ui, "button", capture_button)
+    outputs, definitions = app.run(
+        defs={
+            "section": SimpleNamespace(value="Review and Save"),
+            "editor": edited,
+            "notice": "Changes staged",
+            "apply": apply,
+        }
+    )
+    profile_file = _isolate_user_catalog / "profiles" / "notebook.toml"
+    beam_file = _isolate_user_catalog / "beams" / "notebook-beam.toml"
+    assert not profile_file.exists()
+    assert not beam_file.exists()
+    assert outputs and definitions
+    # The live kernel discards cell temporaries after displaying HTML.
+    for cell in app._graph.cells.values():
+        for name in cell.temporaries - cell.closed_over_temporaries:
+            callback_globals[0].pop(name, None)
+    del outputs
+    gc.collect()
+    assert len(buttons) == 1
+    button = buttons[0]()
+    assert button is not None, "Save button must stay alive to receive browser clicks"
+    button._update(1)
+    assert state[0][1] == "Catalog changes saved"
+    assert profile_file.is_file() and beam_file.is_file()
+    reloaded = load_material_catalog(edited.draft.path, profile="notebook")
+    assert reloaded.material("hopg").scan.energy_keV.tolist() == [42.0]
+    assert reloaded.profile_beam("notebook")["bunch_charge_pc"] == 2.0
+    assert state[0][0].draft.diff() == ""
+    from pyrite.cli import command
+
+    listed = CliRunner().invoke(command, ["profile", "list"])
+    assert listed.exit_code == 0, listed.output
+    assert "notebook:" in listed.output
+
+
+@pytest.mark.parametrize("kind", ["geometry", "physics", "numerics"])
+def test_configuration_layout_retains_forms_for_browser_events(editor, monkeypatch, kind):
+    import gc
+    import weakref
+
+    import marimo as mo
+
+    from pyrite.apps import configuration_sections as sections
+
+    forms = []
+    original = sections.fields_form
+
+    def capture(*args, **kwargs):
+        form = original(*args, **kwargs)
+        forms.append(weakref.ref(form))
+        return form
+
+    monkeypatch.setattr(sections, "fields_form", capture)
+    if kind == "geometry":
+        rendered = sections.geometry(mo, editor, lambda *_: None, "thickness_ang")
+    else:
+        rendered = sections.calculation(mo, editor, kind, False, lambda *_: None)
+    gc.collect()
+    assert rendered is not None
+    assert forms and all(form() is not None for form in forms), (
+        "Rendered forms must retain event handlers"
+    )
+
+
+def test_create_then_save_remains_interactive_after_cell_cleanup(
+    monkeypatch, _isolate_user_catalog
+):
+    import gc
+    from copy import deepcopy
+    from types import SimpleNamespace
+
+    from pyrite.apps.configuration_app import app
+    from pyrite.apps.configuration_sections import transact
+    from pyrite.cli import command
+
+    state = [(ConfigurationEditor.open(bundled_catalog(), "quickstart"), "Catalog opened")]
+    # The JSON inspection preview is independent of widget events and saving.
+    monkeypatch.setattr(ConfigurationEditor, "resolved_json", lambda self: "{}")
+
+    def apply(operation, message):
+        transact(
+            lambda: state[0], lambda updated: state.__setitem__(0, updated), operation, message
+        )
+
+    def render(section):
+        outputs, definitions = app.run(
+            defs={
+                "section": SimpleNamespace(value=section),
+                "editor": state[0][0],
+                "notice": state[0][1],
+                "apply": apply,
+            }
+        )
+        glbls = definitions["open_form"]._on_change.__globals__
+        for cell in app._graph.cells.values():
+            for name in cell.temporaries - cell.closed_over_temporaries:
+                glbls.pop(name, None)
+        del outputs
+        gc.collect()
+        return definitions
+
+    overview = render("Overview")
+    create = overview["configuration_view"]._live_children[1]
+    values = deepcopy(create.element._value_frontend)
+    values["name"] = "test_ui"
+    values["source"] = ["quickstart"]
+    create._update(values)
+    assert state[0][0].profile == "test_ui"
+    assert not (_isolate_user_catalog / "profiles" / "test_ui.toml").exists()
+    review = render("Review and Save")
+    review["save_catalog_button"]._update(1)
+    assert state[0][1] == "Catalog changes saved"
+    assert (_isolate_user_catalog / "profiles" / "test_ui.toml").is_file()
+    listed = CliRunner().invoke(command, ["profile", "list"])
+    assert listed.exit_code == 0, listed.output
+    assert "test_ui:" in listed.output
+
+
 def test_stale_edits_cannot_overwrite_newer_profile(editor):
     editor.save()
     reopened = ConfigurationEditor.open(bundled_catalog(), "notebook")
@@ -249,6 +400,58 @@ def test_widget_decode_preserves_optional_settings_and_numeric_types():
         field_values(
             {"energy_keV.values": {"explicit": True, "value": "bad"}}, {"energy_keV.values": [30.0]}
         )
+
+
+@pytest.mark.parametrize("selected", ["thickness_ang", "thickness_layers"])
+@pytest.mark.parametrize("initial", ["other_mode", "selected_scalar"])
+def test_thickness_selector_applies_only_selected_representation(editor, selected, initial):
+    import marimo as mo
+
+    from pyrite.apps.configuration_controls import fields_form
+
+    other = "thickness_layers" if selected == "thickness_ang" else "thickness_ang"
+    suggestions = {"thickness_ang": {"values": [20000.0]}, "thickness_layers": {"values": [3]}}
+    submitted = []
+    current = (
+        {other: suggestions[other]}
+        if initial == "other_mode"
+        else {selected: suggestions[selected]["values"][0]}
+    )
+    form = fields_form(
+        mo,
+        current,
+        suggestions,
+        lambda build: submitted.append(build()),
+        title="Apply thickness",
+        thickness_key=selected,
+    )
+    form._on_change(form.element.value)
+    assert submitted == [{selected: suggestions[selected]}]
+    updated = editor.patch({"materials": ["mos2"], other: None, **submitted[0]})
+    assert other not in updated.row
+    assert not updated.errors()
+
+
+def test_material_and_scene_values_submit_together(editor):
+    import marimo as mo
+
+    from pyrite.apps.configuration_controls import fields_form
+
+    submitted = []
+    form = fields_form(
+        mo,
+        {"energy_keV": {"values": [30.0]}},
+        {},
+        lambda build: submitted.append(build()),
+        title="Apply scene and materials",
+        extra_controls={"materials": mo.ui.multiselect(["hopg", "mos2"], value=["hopg"])},
+    )
+    values = form.element.value
+    values["materials"] = ["mos2"]
+    values["parameter_0"]["value"] = "40"
+    form._on_change(values)
+    assert submitted == [{"energy_keV": {"values": [40.0]}, "materials": ["mos2"]}]
+    assert not editor.patch(submitted[0]).errors()
 
 
 def test_selected_source_exports_retain_distinct_axes_and_metadata():
@@ -313,11 +516,47 @@ def test_every_notebook_section_executes_without_simulation(section, monkeypatch
         pytest.fail("configuration widgets must not start simulation or save")
 
     monkeypatch.setattr(CatalogDraft, "save", forbidden)
-    outputs, definitions = app.run(
-        defs={"section": SimpleNamespace(value=section), "advanced": SimpleNamespace(value=True)}
-    )
+    outputs, definitions = app.run(defs={"section": SimpleNamespace(value=section)})
     assert outputs
     assert definitions["editor"].profile == "standard"
+    if section in {"Physics", "Numerics"}:
+        assert f"Show advanced {section.lower()}" in definitions["advanced"].text
+    else:
+        assert definitions["advanced"] is None
+
+
+def test_physics_preset_and_overrides_apply_together(editor, monkeypatch):
+    import marimo as mo
+
+    from pyrite.apps import configuration_sections as sections
+
+    forms = []
+    current = [editor]
+    original = sections.fields_form
+
+    def capture(*args, **kwargs):
+        form = original(*args, **kwargs)
+        forms.append(form)
+        return form
+
+    def apply(operation, _message):
+        current[0] = operation(current[0])
+
+    monkeypatch.setattr(sections, "fields_form", capture)
+    rendered = sections.calculation(mo, editor, "physics", False, apply)
+    assert len(forms) == 1
+    assert "Attach physics preset" not in rendered.text
+    values = forms[0].element.value
+    values["physics"] = "electron-standard"
+    values["parameter_0"] = {"explicit": True, "value": "both"}
+    forms[0]._on_change(values)
+    assert current[0].row["physics"] == "electron-standard"
+    assert current[0].row["emission"] == "both"
+    assert not current[0].errors()
+    values["physics"] = ""
+    forms[0]._on_change(values)
+    assert "physics" not in current[0].row
+    assert current[0].row["emission"] == "both"
 
 
 @pytest.mark.slow
