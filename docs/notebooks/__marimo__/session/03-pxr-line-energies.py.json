@@ -2,7 +2,7 @@
   "version": "1",
   "metadata": {
     "marimo_version": "0.25.2",
-    "script_metadata_hash": "de80b48a2ab3ad86fc2e852f64d79b8d"
+    "script_metadata_hash": "9d9c4c0fe6d7dbb90d7cebe0776cf0d7"
   },
   "cells": [
     {
@@ -12,7 +12,7 @@
         {
           "type": "data",
           "data": {
-            "text/html": "<div style='display: flex;flex: 1;flex-direction: column;justify-content: flex-start;align-items: normal;flex-wrap: nowrap;gap: 0.5rem'><marimo-ui-element object-id='Hbol-0' random-id='04404c3b-44c9-24c0-fcdc-95a24713db21'><marimo-anywidget data-initial-value='{&quot;model_id&quot;:&quot;ffd1ff7d957d4f52b83bc08557ed8544&quot;}' data-label='null' data-model-id='&quot;ffd1ff7d957d4f52b83bc08557ed8544&quot;'></marimo-anywidget></marimo-ui-element></div>"
+            "text/html": "<div style='display: flex;flex: 1;flex-direction: column;justify-content: flex-start;align-items: normal;flex-wrap: nowrap;gap: 0.5rem'><marimo-ui-element object-id='Hbol-0' random-id='a4819fa5-623c-e25c-d669-5da6fa0edd1b'><marimo-anywidget data-initial-value='{&quot;model_id&quot;:&quot;8c65e5e4014e4d8b94302d84d8bc9cb7&quot;}' data-label='null' data-model-id='&quot;8c65e5e4014e4d8b94302d84d8bc9cb7&quot;'></marimo-anywidget></marimo-ui-element></div>"
           }
         }
       ],
@@ -129,7 +129,7 @@
         {
           "type": "data",
           "data": {
-            "text/html": "<div style='display:none'><marimo-json-output data-json-data='{&quot;tutorial&quot;:&quot;03-pxr-line-energies&quot;,&quot;pyrite_version&quot;:&quot;0.22.4&quot;,&quot;backend&quot;:&quot;cpu&quot;,&quot;seed&quot;:null,&quot;table_identity&quot;:&quot;not used: deterministic catalog geometry only&quot;,&quot;material&quot;:&quot;hopg&quot;,&quot;hkl&quot;:[0,0,2],&quot;catalog_cif_sha256&quot;:&quot;fa9027e4f14b36b2f31c773c0c4a0a166b0810f358a075ffe20d52d73bdbdcb7&quot;}' data-value-types='&quot;json&quot;'></marimo-json-output></div>"
+            "text/html": "<div style='display:none'><marimo-json-output data-json-data='{&quot;tutorial&quot;:&quot;03-pxr-line-energies&quot;,&quot;pyrite_version&quot;:&quot;0.22.5&quot;,&quot;backend&quot;:&quot;cpu&quot;,&quot;seed&quot;:null,&quot;table_identity&quot;:&quot;not used: deterministic catalog geometry only&quot;,&quot;material&quot;:&quot;hopg&quot;,&quot;hkl&quot;:[0,0,2],&quot;catalog_cif_sha256&quot;:&quot;fa9027e4f14b36b2f31c773c0c4a0a166b0810f358a075ffe20d52d73bdbdcb7&quot;}' data-value-types='&quot;json&quot;'></marimo-json-output></div>"
           }
         }
       ],

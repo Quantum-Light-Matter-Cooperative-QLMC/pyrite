@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.13"
-# dependencies = ["marimo>=0.25.1", "pyrite-mc==0.22.4", "matplotlib>=3.11", "numpy>=2"]
+# dependencies = ["marimo>=0.25.1", "pyrite-mc==0.22.5", "matplotlib>=3.11", "numpy>=2"]
 # ///
 
 import marimo
@@ -47,7 +47,7 @@ def _(mo):
 
     ```bash
     uv venv --python 3.13
-    uv pip install 'pyrite-mc[apps]==0.22.4'
+    uv pip install 'pyrite-mc[apps]==0.22.5'
     uv run pyrite tables fetch
     uv run pyrite tables verify
     uv run marimo edit docs/notebooks/00-setup.py
@@ -68,7 +68,7 @@ def _(mo):
     same environment:
 
     ```bash
-    uv pip install 'pyrite-mc[nvidia]==0.22.4'
+    uv pip install 'pyrite-mc[nvidia]==0.22.5'
     nvidia-smi
     ```
 
