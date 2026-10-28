@@ -710,3 +710,45 @@ def test_optical_diagnostic_profiles_render_without_inference(tutorials, monkeyp
             assert target.stat().st_size > 1_000
     finally:
         plt.close("all")
+
+
+def test_parameter_sweep_capture_and_navigation(tutorials):
+    spec = importlib.util.spec_from_file_location(
+        "sweep_notebooks", tutorials.DOCS / "_notebooks.py"
+    )
+    notebooks = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(notebooks)
+    assert tutorials.ADDITIONAL_NOTEBOOK_FIGURES["08-parameter-sweeps"] == 1
+    notebooks.NOTEBOOK_FIGURES.update(tutorials.ADDITIONAL_NOTEBOOK_FIGURES)
+    data = notebooks.checked_notebook("08-parameter-sweeps")
+    execution = data["execution"]
+    yields = np.asarray(execution["yield_per_electron_sr"])
+    energies = execution["energies_keV"]
+    thicknesses = execution["thicknesses_nm"]
+    assert yields.shape == (len(thicknesses), len(energies)) == (5, 5)
+    assert np.isfinite(yields).all() and np.all(yields >= 0) and np.ptp(yields) > 0
+    assert [(run["thickness_nm"], run["energy_keV"]) for run in execution["runs"]] == [
+        (thickness, energy) for thickness in thicknesses for energy in energies
+    ]
+    assert {run["seed"] for run in execution["runs"]} == {1}
+    assert len({run["source_identity"] for run in execution["runs"]}) == yields.size
+    session, capture = notebooks.read_session(
+        tutorials.DOCS / "notebooks/__marimo__/session/08-parameter-sweeps.py.json"
+    )
+    assert len(capture.figures) == 1
+    provenance_output = next(
+        value
+        for cell in session["cells"]
+        for output in cell["outputs"]
+        for mime, value in output.get("data", {}).items()
+        if mime == "text/html" and "yield_per_electron_sr" in value
+    )
+    assert "display:none" in provenance_output.replace(" ", "")
+    group = tutorials.DOCS / "notebooks/designing"
+    assert "08-parameter-sweeps" in (group / "index.md").read_text()
+    assert (
+        "08-parameter-sweeps.md" in (group / "07-sampling-convergence-performance.md").read_text()
+    )
+    page = (group / "08-parameter-sweeps.md").read_text()
+    assert "{literalinclude} ../08-parameter-sweeps.py" in page
+    assert "../../_static/notebooks/08-parameter-sweeps.html" in page

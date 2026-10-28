@@ -4,7 +4,7 @@ Start by separating beam phase space, finite target geometry and crystal lattice
 orientation. The first notebook combines these choices in one small CPU example. The next
 shows how the emitted PXR/CBS spectrum depends on observation direction.
 Then turn emitted photons into expected and acquired pixel counts.
-Next study history-count convergence and adaptive stopping; parameter sweeps follow later.
+Next study history-count convergence and adaptive stopping; then map a two-parameter response surface.
 
 ```{toctree}
 :maxdepth: 1
@@ -13,4 +13,5 @@ Next study history-count convergence and adaptive stopping; parameter sweeps fol
 05-angular-radiation-distributions
 06-detector-counts
 07-sampling-convergence-performance
+08-parameter-sweeps
 ```

@@ -27,3 +27,5 @@ need a GPU. The plotted changes are **not** independent Monte Carlo error bars.
 ```{literalinclude} ../07-sampling-convergence-performance.py
 :language: python
 ```
+
+Next: [Parameter sweeps](08-parameter-sweeps.md).
