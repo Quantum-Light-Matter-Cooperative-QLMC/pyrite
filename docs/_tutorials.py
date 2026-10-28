@@ -39,6 +39,7 @@ ADDITIONAL_NOTEBOOK_FIGURES = {
     "04-beams-crystals-target-geometry": 2,
     "05-angular-radiation-distributions": 1,
     "06-detector-counts": 1,
+    "07-sampling-convergence-performance": 1,
 }
 _PIN = re.compile(r"(?P<prefix>\bpyrite-mc(?:\[[A-Za-z0-9,_.-]+\])?==)\d[\w.+-]*")
 

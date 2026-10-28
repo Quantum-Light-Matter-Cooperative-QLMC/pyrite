@@ -12,7 +12,7 @@
         {
           "type": "data",
           "data": {
-            "text/html": "<div style='display: flex;flex: 1;flex-direction: column;justify-content: flex-start;align-items: normal;flex-wrap: nowrap;gap: 0.5rem'><marimo-ui-element object-id='Hbol-0' random-id='2e3371ad-f5e8-529b-56db-bfb25727eede'><marimo-anywidget data-initial-value='{&quot;model_id&quot;:&quot;fe54c5ea4cb1419db89f0588f5c67a4f&quot;}' data-label='null' data-model-id='&quot;fe54c5ea4cb1419db89f0588f5c67a4f&quot;'></marimo-anywidget></marimo-ui-element></div>"
+            "text/html": "<div style='display: flex;flex: 1;flex-direction: column;justify-content: flex-start;align-items: normal;flex-wrap: nowrap;gap: 0.5rem'><marimo-ui-element object-id='Hbol-0' random-id='d67127c6-9065-7a81-2ee4-3d2a3ee52a3a'><marimo-anywidget data-initial-value='{&quot;model_id&quot;:&quot;e0baa072fcf4482e9c8f0d2996ada2c9&quot;}' data-label='null' data-model-id='&quot;e0baa072fcf4482e9c8f0d2996ada2c9&quot;'></marimo-anywidget></marimo-ui-element></div>"
           }
         }
       ],
@@ -98,7 +98,7 @@
         {
           "type": "stream",
           "name": "stderr",
-          "text": "/usr/lib/python3.14/contextlib.py:148: LineOpticalDataWarning: 3/351812 line escape-piece/reflection/mosaic pairs reach unavailable optical data (vacuum-seed screen or root lookup). High-energy PXR/CBS lines may be omitted, even on an automatically clipped photon grid. Counts are not lost photon yield. Inspect line_data_coverage; see issue #249.\n  next(self.gen)\n",
+          "text": "/home/alexa/.local/share/uv/python/cpython-3.14.6-linux-x86_64-gnu/lib/python3.14/contextlib.py:148: LineOpticalDataWarning: 3/351812 line escape-piece/reflection/mosaic pairs reach unavailable optical data (vacuum-seed screen or root lookup). High-energy PXR/CBS lines may be omitted, even on an automatically clipped photon grid. Counts are not lost photon yield. Inspect line_data_coverage; see issue #249.\n  next(self.gen)\n",
           "mimetype": "text/plain"
         }
       ]

@@ -12,7 +12,7 @@
         {
           "type": "data",
           "data": {
-            "text/html": "<div style='display: flex;flex: 1;flex-direction: column;justify-content: flex-start;align-items: normal;flex-wrap: nowrap;gap: 0.5rem'><marimo-ui-element object-id='Hbol-0' random-id='886a7b8b-c27a-8d2b-21a7-cbcab452246f'><marimo-anywidget data-initial-value='{&quot;model_id&quot;:&quot;5448f08b52d2451288bf248cadea2b03&quot;}' data-label='null' data-model-id='&quot;5448f08b52d2451288bf248cadea2b03&quot;'></marimo-anywidget></marimo-ui-element></div>"
+            "text/html": "<div style='display: flex;flex: 1;flex-direction: column;justify-content: flex-start;align-items: normal;flex-wrap: nowrap;gap: 0.5rem'><marimo-ui-element object-id='Hbol-0' random-id='ada2326d-276b-526e-8397-155fe50d3ea7'><marimo-anywidget data-initial-value='{&quot;model_id&quot;:&quot;1a34e77780ae4661bc8ad916c96cb6ea&quot;}' data-label='null' data-model-id='&quot;1a34e77780ae4661bc8ad916c96cb6ea&quot;'></marimo-anywidget></marimo-ui-element></div>"
           }
         }
       ],

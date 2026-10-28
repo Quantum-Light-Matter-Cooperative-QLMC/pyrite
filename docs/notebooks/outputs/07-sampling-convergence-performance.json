@@ -1,0 +1,64 @@
+{
+  "schema": "pyrite.marimo-tutorial.v1",
+  "source_sha256": "e52e7c8f91d1cc1dc91c2e43e6b091d16af60658e6149c2ff32de648290b9d9c",
+  "exporter_sha256": "ce45dc420ac6068c0bda3a17b7a1fdb77216182d54fd16489a8b9746d7e9653f",
+  "git_revision": "5b6f9b3de12f59261e43fb2a716c63f40424f7da",
+  "git_dirty": true,
+  "python_version": "3.14.6",
+  "execution": {
+    "tutorial": "07-sampling-convergence-performance",
+    "pyrite_version": "0.22.5",
+    "backend": "cpu",
+    "seed": 1,
+    "table_identity": {
+      "918b1a9013e4c19c584e2cf4eb8b605f0063a7237b8b0d67749867a4c6804832": "c3f8eab1f03c1c66cfe0355b68f312e0ca450cbacaabe4f72eebecefe8d1e08d",
+      "ea7657ec94db1acf9f16cb260a5b107c3d2a4ecc71e43facee0e6a845487cbeb": "beed169ba64a48fd11dc8c5a7bb81471abaa21806bde7943dba6da43e5b01b6f",
+      "44461d55c05a7fea30a0f52bceb2aa384d6b71c1e12765da576b5cbc2592dbe3": "3f32446ff553a97b14755b475c4d88287ff44eff2ffce0cdd790dbd9b40a83f2",
+      "dfea6d21d4f6196cb74ef19486b6d86f6f5af40e89d7241efe09507a3b982e85": "61fb7f4cf6dceab2a4d10c5fc641357d80b0ba6bbe037b64dd000e08f024acd9"
+    },
+    "source_identity": "1694c277a73fe54ea41892d3bc4489d61f62d6ffff5ffd758b3054be3111b7ce",
+    "band_eV": [
+      600.0,
+      2000.0
+    ],
+    "fixed_runs": [
+      {
+        "histories": 256,
+        "seed": 1,
+        "yield_per_electron_sr": 1.1344976729166623e-07,
+        "elapsed_s": 0.29518418399993607,
+        "source_identity": "0ddac66e785779906b2916c6d9cacc911940316f9c0e53b547f0d53a671d23aa"
+      },
+      {
+        "histories": 1024,
+        "seed": 1,
+        "yield_per_electron_sr": 1.1334294189611053e-07,
+        "elapsed_s": 0.690766258999929,
+        "source_identity": "f69ac9456242904d95f11034b91840e782d35946c501bde42df83ccf78df5367"
+      },
+      {
+        "histories": 4096,
+        "seed": 1,
+        "yield_per_electron_sr": 1.1337263281763239e-07,
+        "elapsed_s": 3.4089215129999957,
+        "source_identity": "1bded00f755c28d4ed45d2733dff5af67805161109abcf5f6fd8937164fd77c6"
+      }
+    ],
+    "adaptive_run": {
+      "histories": 2048,
+      "seed": 1,
+      "yield_per_electron_sr": 1.1337416570393225e-07,
+      "elapsed_s": 2.560387632999891,
+      "target_rse": 0.25,
+      "max_electrons": 2048,
+      "source_identity": "1694c277a73fe54ea41892d3bc4489d61f62d6ffff5ffd758b3054be3111b7ce"
+    },
+    "physics": "pxr-cbs only; brem disabled",
+    "timing": "perf_counter, local wall seconds, after one untimed warmup"
+  },
+  "artifacts": {
+    "notebooks/__marimo__/session/07-sampling-convergence-performance.py.json": "caf9122b4751b0ce3bedf06aeb5de1f2451855e8b75c629b476ec31dfb214cce",
+    "_static/notebooks/07-sampling-convergence-performance.html": "76aa2cdd4cfb32afd7acad3fe8e1dc71dc3819900dfe8e6a37cf03779aed960b",
+    "_static/notebooks/07-sampling-convergence-performance-1.png": "792f0cf893bd45b97c04231ded8858c14f9c2c8167c9e65013d153240069a86b"
+  }
+}

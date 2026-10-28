@@ -12,7 +12,7 @@
         {
           "type": "data",
           "data": {
-            "text/html": "<div style='display: flex;flex: 1;flex-direction: column;justify-content: flex-start;align-items: normal;flex-wrap: nowrap;gap: 0.5rem'><marimo-ui-element object-id='Hbol-0' random-id='396abb34-aa7d-a7fc-fe04-907d0f1407d4'><marimo-anywidget data-initial-value='{&quot;model_id&quot;:&quot;35c43e17755a4819a397346012646e0b&quot;}' data-label='null' data-model-id='&quot;35c43e17755a4819a397346012646e0b&quot;'></marimo-anywidget></marimo-ui-element></div>"
+            "text/html": "<div style='display: flex;flex: 1;flex-direction: column;justify-content: flex-start;align-items: normal;flex-wrap: nowrap;gap: 0.5rem'><marimo-ui-element object-id='Hbol-0' random-id='5d80c4f8-1db4-5104-4aec-28134750aafe'><marimo-anywidget data-initial-value='{&quot;model_id&quot;:&quot;3015be907cb24582811ec7ef3f38c125&quot;}' data-label='null' data-model-id='&quot;3015be907cb24582811ec7ef3f38c125&quot;'></marimo-anywidget></marimo-ui-element></div>"
           }
         }
       ],
@@ -51,7 +51,7 @@
         {
           "type": "data",
           "data": {
-            "text/html": "<marimo-json-output data-json-data='{&quot;python&quot;:&quot;3.14.4&quot;,&quot;pyrite&quot;:&quot;0.22.5&quot;,&quot;cupy_installed&quot;:false,&quot;selected_backend&quot;:&quot;cpu&quot;,&quot;cuda_status&quot;:&quot;CuPy not installed; CPU execution is available&quot;}' data-value-types='&quot;json&quot;'></marimo-json-output>"
+            "text/html": "<marimo-json-output data-json-data='{&quot;python&quot;:&quot;3.14.6&quot;,&quot;pyrite&quot;:&quot;0.22.5&quot;,&quot;cupy_installed&quot;:true,&quot;selected_backend&quot;:&quot;cpu&quot;,&quot;cupy_version&quot;:&quot;14.2.0&quot;,&quot;cuda_device_count&quot;:1,&quot;cuda_runtime_version&quot;:13020}' data-value-types='&quot;json&quot;'></marimo-json-output>"
           }
         }
       ],
