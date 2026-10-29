@@ -251,6 +251,7 @@ def check_transport_only(result, radiative_loss):
 def parse_args():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("scene")
+    parser.add_argument("--radiative-moments", choices=["exact", "table"], default="exact")
     parser.add_argument("--histories", type=int, required=True)
     parser.add_argument("--seed", type=int, required=True)
     parser.add_argument("--core", choices=["per-electron", "cuda"], required=True)
@@ -359,6 +360,7 @@ def main():
     if args.audit_cxr:
         sys.setprofile(audit)
     transport_args = dict(
+        radiative_moments=args.radiative_moments,
         E0_keV=spec["energy_keV"],
         Ne=args.histories,
         composition=comp,

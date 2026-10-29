@@ -14,6 +14,7 @@ from .._numerics import (
     validate_pair_production_numerics,
     validate_radiative_numerics,
 )
+from .._radiative_moment_policy import RADIATIVE_MOMENT_MODEL
 from ..montecarlo.case import Case
 
 
@@ -45,6 +46,7 @@ def radiative_case_keys(
         return {}
     return {
         "radiative_model": "bremslib-soft-hard",
+        "radiative_moment_model": RADIATIVE_MOMENT_MODEL,
         "radiative_cutoff_eV": (
             DEFAULT_RADIATIVE_CUTOFF_EV if cutoff_eV is None else float(cast(float, cutoff_eV))
         ),

@@ -28,8 +28,8 @@ def install_cpu_core(audit):
 
     owner = Path(package.__file__).with_name("cores.py")
     original = owner.read_text()
-    name = "radiative_layer_moments_scalar("
-    if original.count(name) != 4:
+    name = "transport_layer_moments("
+    if original.count(name) != 3:
         raise RuntimeError("CPU radiative moment call-site inventory drifted")
     helper_name = package.__name__ + "._moment_transport_cpu_device"
     helper_path = Path(__file__).with_name("moment_transport_cpu_device.py")
@@ -88,7 +88,7 @@ def install_tables(rtol, audit):
     original_result = hard_radiative.add_radiative_result_fields
     cache = {}
 
-    def arguments(compositions, tables, cutoff, electron_cutoffs, energies, *tail):
+    def arguments(compositions, tables, cutoff, electron_cutoffs, energies, *tail, **kwargs):
         packed = original(compositions, tables, cutoff, electron_cutoffs, energies, *tail)
         lo = float(np.min(electron_cutoffs)) * 1e3
         hi = float(np.max(energies)) * 1e3
@@ -162,6 +162,7 @@ def parse_args():
 
 def main():
     args, adapter_args = parse_args()
+    adapter_args.extend(["--radiative-moments", "exact"])
     args.audit.parent.mkdir(parents=True, exist_ok=True)
     source = {} if args.variant == "exact" else install_cpu_core(args.audit)
     package = importlib.import_module("pyrite.montecarlo.transport")

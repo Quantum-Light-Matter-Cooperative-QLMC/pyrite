@@ -2,6 +2,36 @@
 
 Validation: `radiative-moment-interpolation`.
 
+## Current default and remaining qualification
+
+At the user's explicit request, coupled CPU/CUDA transport now defaults to
+prepared float64 moment tables at the frozen $2\times10^{-4}$ relative budget.
+This is a default-selection decision, **not** completed ensemble qualification
+or a change to any physical validation status. Exact event-row totals, element
+selection, conditional photon sampling, photon debit and RNG addressing remain
+unchanged. The keyword-only advanced transport argument
+`radiative_moments="exact"` retains the reference quadrature.
+
+New coupled cases serialize `radiative_moment_model` with the versioned marker
+`radiative-moments-v1/positive-linear-log-energy-v1/rtol2e-4`. Result row metadata
+also retain the actual packed moment-buffer SHA-256. A legacy case lacking the
+marker replays exact quadrature; it is not silently reinterpreted as a table
+case. Prepared buffers belong to one transport pass and are uploaded once by
+its batching owner; no process-global host/device table cache is introduced.
+Preparation and out-of-coverage failures remain explicit.
+
+Held-out CPU job **2669**, frozen at `8db53f2d` before the #795/#799 rebase,
+was cancelled at the user's request to release its 24 GiB reservation for
+other GPU tests. The [interruption record](../check-records/equal-precision/moment-heldout-interrupted-788.json)
+lists completed requests. Partial records remain in its isolated evidence directory;
+missing fixed-seed groups remain unresolved. This run did not include #795.
+Issue #788 stays open for complete held-out ensemble qualification, remaining
+hard-count/continuous-observable limits, wider CPU/CUDA transport comparisons
+and matched timing of the combined production source. No unfinished check is
+counted as passing. The job's six Si preflights passed within-process replay
+and matched score/trajectory hashes across the two independent processes for
+exact, table and refined policies.
+
 ## Independent derivation
 
 This verifier did not implement this claim. Before reading implementation

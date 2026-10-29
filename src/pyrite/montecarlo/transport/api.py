@@ -62,6 +62,7 @@ def simulate_trajectories(
     max_secondary_generations=64,
     max_secondary_tracks=None,
     *,
+    radiative_moments="table",
     pair_production_model=None,
     positron_transport=False,
     atomic_electron_deflection=None,
@@ -216,6 +217,10 @@ def simulate_trajectories(
     atomic_electron_deflection: None (default, BIT-FOR-BIT) or "kawrakow" (Numerics
       default): elastic rate Z^2 -> Z(Z + xi). Validation: inelastic-angular-deflection
 
+    radiative_moments: "table" (default) uses prepared float64 log-energy
+      interpolation for frequent soft/rate totals; "exact" retains quadrature.
+      Exact event totals and conditional photon sampling are unchanged.
+      Validation: radiative-moment-interpolation (ensemble qualification incomplete).
     radiative_model: "auto" (default) couples when BremsLib tables are supplied,
       otherwise keeps post-hoc brem scoring and the existing tracks.
       "bremslib-soft-hard" (exact cores only, no LUT) adds soft BremsLib loss
@@ -462,6 +467,7 @@ def simulate_trajectories(
         inelastic_materials=inelastic_materials,
         elastic_tables=elastic_tables,
         radiative_model=radiative_model,
+        radiative_moments=radiative_moments,
         radiative_cutoff_eV=radiative_cutoff_eV,
         bremslib_tables=bremslib_tables,
         gdf_source=gdf_source,

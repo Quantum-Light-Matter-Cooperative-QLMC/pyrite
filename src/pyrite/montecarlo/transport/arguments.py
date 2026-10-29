@@ -58,6 +58,7 @@ class TransportInputs:
     inelastic_cutoff_eV: Any
     inelastic_materials: Any
     elastic_tables: Any
+    radiative_moments: Any
     radiative_model: Any
     radiative_cutoff_eV: Any
     bremslib_tables: Any

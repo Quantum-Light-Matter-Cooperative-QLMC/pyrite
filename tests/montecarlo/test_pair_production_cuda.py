@@ -65,6 +65,7 @@ def _cascade(*, Ne=8, seed=11, **core):
     table = prepare_bremslib_table(arrays, atomic_number=14)
     table = replace(
         table,
+        incident_energy_keV=np.r_[10.0, table.incident_energy_keV[1:-1], 5000.0],
         scaled_sdcs_mb=table.scaled_sdcs_mb * 3e3,
         scaled_ddcs_mb_sr=table.scaled_ddcs_mb_sr * 3e3,
     )

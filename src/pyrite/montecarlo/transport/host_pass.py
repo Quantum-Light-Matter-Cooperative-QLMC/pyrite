@@ -303,6 +303,8 @@ def _validated_controls(p, launch, electron_start):
         groove=p.groove,
         stopping_tables=p.stopping_tables,
     )
+    if p.radiative_moments not in ("table", "exact"):
+        raise ValueError("radiative_moments must be table or exact")
     radiative_mode = validate_radiative_args(
         p.radiative_model,
         p.radiative_cutoff_eV,
@@ -431,6 +433,7 @@ def _sample_entry(p, c, stack, launch, electron_start):
             p.seed,
             p.Ne,
             electron_start,
+            moment_mode=p.radiative_moments,
         )
         if launch is not None:
             radiative_args = (launch.radiative_keys,) + radiative_args[1:]
@@ -985,8 +988,11 @@ def _add_optional_fields(t, o, rows, result):
             p.bremslib_tables,
             c.radiative_cutoff_eV,
             p.seed if p._secondary is None else p._secondary.photon_seed,
-            t.radiative_args[-1],
+            t.radiative_args[-1][: len(c.layers)],
         )
+        from .radiative_moment_transport import add_moment_identity
+
+        add_moment_identity(result, t.radiative_args)
     if p.collect_diagnostics:
         result["transport_diagnostics"] = _flight_diagnostic_summary(
             rows["seg_E"],

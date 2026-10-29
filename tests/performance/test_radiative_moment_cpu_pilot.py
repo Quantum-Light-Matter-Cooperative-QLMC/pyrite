@@ -8,7 +8,6 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-
 CHECKS = Path(__file__).parents[2] / "checks/equal_precision"
 
 
@@ -24,27 +23,38 @@ def _helper():
 def _packed(plasma, grids, moments):
     counts = np.asarray([len(a) for a in grids], dtype=np.int64)
     starts = np.r_[0, np.cumsum(counts[:-1])]
-    return np.r_[plasma, starts, counts, *grids, *(np.log(g) for g in grids),
-                 np.concatenate(moments).ravel()].astype(np.float64)
+    return np.r_[
+        plasma, starts, counts, *grids, *(np.log(g) for g in grids), np.concatenate(moments).ravel()
+    ].astype(np.float64)
 
 
 def _evaluate(lookup, layer, energy, packed):
     # Other input arrays do not matter: they are read only by the exact event
     # call, which is outside the diagnostic helper.
     return lookup(
-        np.array([1, 1], dtype=np.int32), np.empty((2, 1), dtype=np.int32),
-        np.empty((2, 1), dtype=np.int32), np.empty((2, 1)),
-        np.empty((2, 1, 1)), np.empty((2, 1, 1)),
-        np.empty((2, 1, 1)), np.empty((2, 1, 1)),
-        layer, energy, 1000.0, np.empty(1), packed,
+        np.array([1, 1], dtype=np.int32),
+        np.empty((2, 1), dtype=np.int32),
+        np.empty((2, 1), dtype=np.int32),
+        np.empty((2, 1)),
+        np.empty((2, 1, 1)),
+        np.empty((2, 1, 1)),
+        np.empty((2, 1, 1)),
+        np.empty((2, 1, 1)),
+        layer,
+        energy,
+        1000.0,
+        np.empty(1),
+        packed,
     )
 
 
 def test_cpu_helper_interpolates_float64_tables_without_touching_plasma():
     lookup = _helper()
     grids = [np.array([1e3, 2e3, 8e3]), np.array([1e3, 4e3])]
-    values = [np.array([[1., 0., 9.], [3., 4., 8.], [7., 8., 7.]]),
-              np.array([[2., 0., 1.], [8., 6., 2.]])]
+    values = [
+        np.array([[1.0, 0.0, 9.0], [3.0, 4.0, 8.0], [7.0, 8.0, 7.0]]),
+        np.array([[2.0, 0.0, 1.0], [8.0, 6.0, 2.0]]),
+    ]
     packed = _packed(np.array([12.0, 34.0]), grids, values)
     assert packed[:2].tolist() == [12.0, 34.0]
     assert _evaluate(lookup, 0, 1000.0, packed) == (1.0, 0.0)
@@ -68,8 +78,9 @@ def test_cpu_wrapper_rejects_invalid_core_and_arm(monkeypatch):
 
 def test_cpu_kernel_call_inventory_is_exactly_three_plus_one():
     source = (Path(__file__).parents[2] / "src/pyrite/montecarlo/transport/cores.py").read_text()
-    assert source.count("radiative_layer_moments_scalar(") == 4
-    transformed = source.replace("radiative_layer_moments_scalar(", "lookup_layer_moment_cpu(", 3)
+    assert source.count("radiative_layer_moments_scalar(") == 1
+    assert source.count("transport_layer_moments(") == 3
+    transformed = source.replace("transport_layer_moments(", "lookup_layer_moment_cpu(", 3)
     assert transformed.count("lookup_layer_moment_cpu(") == 3
     assert transformed.count("radiative_layer_moments_scalar(") == 1
     # The retained exact call is the physical row-end sampler prerequisite.

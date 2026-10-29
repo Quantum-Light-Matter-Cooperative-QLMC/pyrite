@@ -1222,6 +1222,7 @@
       "energy_model": "midpoint",
       "bremsstrahlung_model": "bremslib",
       "radiative_model": "bremslib-soft-hard",
+      "radiative_moment_model": "radiative-moments-v1/positive-linear-log-energy-v1/rtol2e-4",
       "radiative_cutoff_eV": 1000.0,
       "atomic_electron_deflection": "kawrakow",
       "beam_uvw": null,
@@ -1244,8 +1245,8 @@
       "dtheta_obs_rad": 0.0351963661580141,
       "domega_sr": 0.0012390399999999998
     },
-    "case_content_key": "3d25bd012da970369ae6a27271f63f446b43d9910505ad4b5cc3c8363678078d",
-    "parameter_sha256": "84b3ec71a776dd83ae26ad19d99d4d7d008fdb3dc20f466205cfb33cbf2cac46"
+    "case_content_key": "5582909f365fa04d82a8ebfec6642252e087229d1492309e300c0ba483f9c984",
+    "parameter_sha256": "e602abb882980096fb284e1924f80e8bb27318aa8a5d59fce8bdee2d73b2d0d5"
   },
   "multilayer": {
     "case": {
@@ -2454,6 +2455,7 @@
       "secondary_threshold_eV": 1000.0,
       "bremsstrahlung_model": "bremslib",
       "radiative_model": "bremslib-soft-hard",
+      "radiative_moment_model": "radiative-moments-v1/positive-linear-log-energy-v1/rtol2e-4",
       "radiative_cutoff_eV": 1000.0,
       "pair_production_model": "penelope-2024",
       "positron_transport": true,
@@ -2477,7 +2479,7 @@
       "dtheta_obs_rad": 0.0351963661580141,
       "domega_sr": 0.0012390399999999998
     },
-    "case_content_key": "45128076c5aeed8a03e745e1729bc7c9f83f43961b2ba94cf7ac80171040158f",
-    "parameter_sha256": "c713d1d2fc6c12d2948b960a89d9c45aa34475df1b9000400185ce577e6a72b9"
+    "case_content_key": "f8461e8706c03c2389bbc7136cc0ca626711dad35841a3d144f8c3d160b01e16",
+    "parameter_sha256": "90779a7ef032a31f2f404537e4905b9980c29285d15f2bb57bf8d93be395753a"
   }
 }

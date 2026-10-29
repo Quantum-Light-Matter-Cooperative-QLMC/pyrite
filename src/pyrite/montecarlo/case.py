@@ -104,6 +104,7 @@ _CASE_KEY_ORDER = (
     "elastic_model",
     "bremsstrahlung_model",
     "radiative_model",
+    "radiative_moment_model",
     "radiative_cutoff_eV",
     "pair_production_model",
     "positron_transport",
@@ -323,6 +324,7 @@ class Case(Mapping[str, Any]):
     bremsstrahlung_model: Literal["bremslib"] | _Absent = _ABSENT
     radiative_model: Literal["bremslib-soft-hard"] | _Absent = _ABSENT
     radiative_cutoff_eV: float | _Absent = _ABSENT
+    radiative_moment_model: str | _Absent = _ABSENT
     pair_production_model: Literal["penelope-2024"] | _Absent = _ABSENT
     positron_transport: Literal[True] | _Absent = _ABSENT
     atomic_electron_deflection: Literal["kawrakow"] | _Absent = _ABSENT
@@ -423,6 +425,7 @@ class Case(Mapping[str, Any]):
             raise ValueError("elastic_model must be absent or 'elsepa'")
         if self.bremsstrahlung_model is not _ABSENT and self.bremsstrahlung_model != "bremslib":
             raise ValueError("bremsstrahlung_model must be absent or 'bremslib'")
+        self._validate_radiative_moment_model()
         if (self.radiative_model is _ABSENT) != (self.radiative_cutoff_eV is _ABSENT):
             raise ValueError("radiative_model and radiative_cutoff_eV are set together")
         if self.radiative_model is not _ABSENT:
@@ -564,6 +567,17 @@ class Case(Mapping[str, Any]):
         for key, what in refused.items():
             if getattr(self, key) is not _ABSENT:
                 raise ValueError(f"transition_radiation does not support {what}")
+
+    def _validate_radiative_moment_model(self) -> None:
+        """Validate the versioned numerical approximation independently of physics."""
+        if self.radiative_moment_model is not _ABSENT:
+            from .._radiative_moment_policy import RADIATIVE_MOMENT_MODEL
+
+            if self.radiative_model is _ABSENT or self.radiative_moment_model not in (
+                "exact",
+                RADIATIVE_MOMENT_MODEL,
+            ):
+                raise ValueError("invalid radiative_moment_model or missing radiative model")
 
     def _validate_radiative(self) -> None:
         if self.radiative_model != "bremslib-soft-hard":

@@ -169,6 +169,8 @@ def _synthetic_table(element, atomic_number):
     # Inflated so a dozen electrons emit hard photons (as test_hard_radiative_transport).
     return replace(
         table,
+        # Exact intended endpoints; log-grid refinement can shift them by an ulp.
+        incident_energy_keV=np.r_[5.0, table.incident_energy_keV[1:-1], 200.0],
         scaled_sdcs_mb=table.scaled_sdcs_mb * 1e4,
         scaled_ddcs_mb_sr=table.scaled_ddcs_mb_sr * 1e4,
     )

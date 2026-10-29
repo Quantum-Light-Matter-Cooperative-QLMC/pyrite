@@ -1,4 +1,4 @@
-"""Isolated prepared radiative-moment prototype; no production admission.
+"""Prepared radiative moments and independent held-out component checks.
 
 Source: the BremsLib/Ter-Mikaelian moments in ``hard_radiative`` and
 ``dielectric_radiative``. On each log-energy interval use the convex linear
