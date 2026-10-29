@@ -231,6 +231,34 @@ flight counts, or complete-request/equal-achieved-precision measurements in
 this run. No transport speedup, baseline trajectory equivalence or wider
 physical-model admission follows from these measurements.
 
+### Diagnostic transport pilot (job 2644)
+
+Job 2644 ran `checks/equal_precision/moment-transport-788.sbatch` from clean
+source `fd265543` on the same GPU. An isolated kernel copy replaces exactly
+the four frequent total-moment calls; the row-end event total, element
+selection, conditional samplers, photon debit and RNG source stay exact.
+Preflights at 256 histories passed for exact, table and refined variants on
+both Si 300 keV/100 µm and W 300 keV/10 µm: in-process and separate-process
+same-seed score hashes matched, the largest energy-ledger error was
+$2.9\times10^{-12}$ keV and the largest photon-debit error was
+$2.8\times10^{-14}$ keV.
+
+The paired pilot used 5000 histories for each of seeds 78811–78813, with
+99% Student-t intervals against the predeclared margins. Table and refined
+moments changed continuous observables only at round-off scale: mean
+photon-energy and exit-energy differences were below $10^{-9}$ keV per
+primary, and path-length differences were about $10^{-5}$ Å. These
+observables screen inside their margins. Hard-event count, transmission and
+backscatter did not change for any history. The predeclared zero-variance
+rule therefore reports them as `unresolved`, not passing. Median complete
+warm request ratios (exact/table, all reductions included) were 1.44 (Si)
+and 1.86 (W); refined gave 1.37 and 1.88. These are three-seed timings of
+an isolated diagnostic kernel. They are not a production or
+equal-achieved-precision speedup.
+[Job record](../check-records/equal-precision/moment-transport-788.json).
+Wider anchors, CPU transport and opt-in production integration remain
+pending.
+
 ## Verdict
 
 - **Claim:** `radiative-moment-interpolation` —
