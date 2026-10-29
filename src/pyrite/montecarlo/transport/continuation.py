@@ -184,8 +184,9 @@ def _drive_continuation_rounds(
     quantum = int(cont.rows_per_round)
     row_bytes = continuation_row_bytes(alloc_scratch(1))
     n_active, per_lane = active_population(Ne, row_bytes, config, cont)
-    # Frozen rows keep seven columns; the allocator's empty end fields drop.
-    scratch = alloc_scratch(n_active * quantum)[: len(out_bufs)]
+    scratch = alloc_scratch(n_active * quantum)
+    # Frozen rows keep seven columns; the kernel still takes the empty end fields.
+    columns = scratch[: len(out_bufs)]
     seg_count = xp.zeros(n_active, dtype=xp.int64)
     exit_code = xp.zeros(n_active, dtype=xp.int8)
     state = tuple(xp.zeros((Ne, _STATE_WORDS), dtype=t) for t in (xp.int32, xp.uint64, xp.float64))
@@ -211,7 +212,7 @@ def _drive_continuation_rounds(
         nseg += int(index.size)
         if nseg > max_segments:
             raise RuntimeError("segment buffer exhausted")
-        gathered = tuple(a[index] if a.shape[0] else a for a in scratch)
+        gathered = tuple(a[index] if a.shape[0] else a for a in columns)
         del index
         retained.append(gathered if keep_on_device else tuple(to_host(a) for a in gathered))
         del gathered
@@ -244,5 +245,5 @@ def _drive_continuation_rounds(
         if finished.any() and on_batch is not None:
             on_batch(int(next_pending - active.size), Ne)
 
-    joined = _assemble(xp, chunks, rows_total, retained, scratch, out_bufs, nseg, keep_on_device)
+    joined = _assemble(xp, chunks, rows_total, retained, columns, out_bufs, nseg, keep_on_device)
     return (nseg, *(tallies[code] for code in _TALLIED), joined, to_host(d_stragg))
