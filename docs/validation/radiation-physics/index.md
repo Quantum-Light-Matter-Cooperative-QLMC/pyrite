@@ -22,6 +22,7 @@ bremslib-angular-model
 bremslib-coupled-expected-spectrum
 bremslib-radiative-event-spectrum
 bremslib-radiative-partition
+radiative-moment-interpolation
 cbs-amplitude
 characteristic-radiation
 eedl-shell-ionization-comparison
