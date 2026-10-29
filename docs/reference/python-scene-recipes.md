@@ -90,7 +90,13 @@ resolved_case = result.case
 `combined_cxr()` adds the applicable line components once; bremsstrahlung
 remains separate because its energy grid can differ. `spectral_flux` combines
 grids with interpolation and scales using beam current and acceptance;
-`to_dataframe` preserves native nodes without interpolation. Save the identity
+`to_dataframe` preserves native nodes without interpolation.
+`result.dataframe_units()` and `result.spectral_flux_units(units="detector")`
+return JSON-ready `{column: {"unit": ..., "basis": ...}}` metadata for those
+tables without changing their columns. Units are Pint-parsable strings;
+`basis` records what Pint cannot, such as photons per incident electron.
+Write it next to a CSV or Parquet export when another program must read the
+units. Save the identity
 digest and software revision with derived plots. For checkpoint analysis and
 persistence, see [Working with results](../guides/working-with-results.md).
 
