@@ -133,7 +133,7 @@ final evidence; use bounded forced-pair tests and point-only size stress.
 
 Nsight Compute (SLURM 1249) reported `ERR_NVGPUCTRPERM`. Occupancy, registers,
 spills, DRAM/L2 and instruction/SFU counters are unavailable; no measured
-memory-versus-sine bottleneck verdict follows. Molab remains unmeasured (paused 2026-10-29).
+memory-versus-sine bottleneck verdict follows. Matched Molab RTX Pro 6000 measurements moved to the [#776](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/776) CUDA tuning tutorial, which replays this page's h-BN fixture there.
 Tiling, device-specific defaults and batching changes need production evidence.
 
 Raw fixtures/logs remain in `/home/aamador/pyrite-200-cxr-tuning/results/`;
