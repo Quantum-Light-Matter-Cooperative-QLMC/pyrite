@@ -10,6 +10,11 @@ CUDA device and run through ``pyrite remote``.
 Validation: gpu-transport-core
 """
 
+import json
+import os
+import subprocess
+import sys
+import textwrap
 from dataclasses import replace
 from functools import partial
 
@@ -25,6 +30,7 @@ from pyrite.montecarlo.transport import (
     check_segment_event_contract,
     simulate_trajectories,
 )
+from pyrite.montecarlo.transport import continuation as continuation_module
 from pyrite.montecarlo.transport.batching import PerElectronTransportConfig
 from pyrite.montecarlo.transport.continuation import (
     TransportContinuationConfig,
@@ -328,3 +334,118 @@ def test_lut_is_rejected():
             transport_lut_config=TransportLUTConfig(),
             per_electron_config=_continued(8),
         )
+
+
+# Production elastic model (#799): ELSEPA always runs the exact kernel.
+_ELSEPA = dict(
+    E0_keV=30.0,
+    thickness_ang=5.0e4,
+    element="Si",
+    n_atoms_per_ang3=0.04996,
+    seed=11,
+    elastic_model="elsepa",
+    energy_model="midpoint",
+    transport_core="cuda",
+)
+
+
+def _elsepa(config, Ne=200, **kw):
+    return simulate_trajectories(Ne=Ne, per_electron_config=config, **(_ELSEPA | kw))
+
+
+@pytest.mark.parametrize("energy_model", ["midpoint", "frozen"])
+def test_elsepa_rows_match_full_history(energy_model):
+    reference = _elsepa(REFERENCE, energy_model=energy_model)
+    for config in (_continued(5, 31), _continued(256)):
+        _assert_identical(reference, _elsepa(config, energy_model=energy_model))
+
+
+def test_elsepa_coupled_radiative_rows_match_full_history():
+    kw = dict(
+        element="C",
+        n_atoms_per_ang3=0.1,
+        E0_keV=60.0,
+        thickness_ang=4_000.0,
+        E_cut_keV=10.0,
+        max_dE_frac=0.05,
+        radiative_model="bremslib-soft-hard",
+        radiative_cutoff_eV=1_000.0,
+        bremslib_tables={"C": _table(1e5)},
+    )
+    reference = _elsepa(REFERENCE, **kw)
+    assert np.count_nonzero(reference["event_kind"] == EVENT_HARD_RADIATIVE) > 0
+    _assert_identical(reference, _elsepa(_continued(6, 40), **kw))
+
+
+def test_electron_block_with_beam_spot_and_bunch_matches_full_history():
+    """An adaptive block draws its slice of the streams; spot, spread, bunch."""
+    kw = dict(
+        _electron_start=70,
+        _energy_range_keV=(5.0, 30.1),
+        crystal_width_mm=2e-3,
+        crystal_height_mm=2e-3,
+        beam_fwhm_mm=1e-3,
+        energy_spread_frac=1e-3,
+        bunch_length_fs=10.0,
+    )
+    reference = _elsepa(REFERENCE, Ne=90, **kw)
+    assert reference["n_missed"] > 0
+    _assert_identical(reference, _elsepa(_continued(7, 19), Ne=90, **kw))
+
+
+def test_auto_schedule_continues_and_matches(monkeypatch, caplog):
+    caplog.set_level("INFO", logger=continuation_module.__name__)
+    monkeypatch.setattr(continuation_module, "CONTINUATION_AUTO_MIN_HISTORIES", 100)
+    reference = _elsepa(REFERENCE)
+    auto = replace(REFERENCE, schedule="auto")
+    _assert_identical(reference, _elsepa(auto))
+    assert "auto: continuation for 200 histories" in caplog.text
+    caplog.clear()
+    lut = simulate_trajectories(
+        Ne=200,
+        per_electron_config=auto,
+        **(_ELSEPA | {"elastic_model": "sr", "transport_lut_config": TransportLUTConfig()}),
+    )
+    assert lut["electron_id"].size
+    assert "full-history because the CUDA transport LUT" in caplog.text
+
+
+_RUNNER_SCRIPT = textwrap.dedent(
+    """
+    import hashlib, json, sys
+    import numpy as np
+    from pyrite.campaign.sweep import BeamSpec, Sweep, build_cases
+    from pyrite.montecarlo import runner
+
+    case = build_cases(Sweep(material=sys.argv[1], thickness_ang=2.0e4,
+        beam=BeamSpec(energy_keV=60.0, energy_spread_frac=1e-3, bunch_length_fs=5.0),
+        tilt_deg=30.0, n_electrons=96, n_electrons_brem=64))[0]
+    out = runner.run_case(case, transport_core="cuda")
+    digest = {}
+    for key in sorted(out):
+        value = out[key]
+        if isinstance(value, np.ndarray) and value.dtype != object:
+            digest[key] = hashlib.sha256(np.ascontiguousarray(value).tobytes()).hexdigest()
+    print(json.dumps(digest))
+    """
+)
+
+
+def _runner_digest(material, schedule):
+    env = os.environ | {"PYRITE_MC_TRANSPORT_SCHEDULE": schedule}
+    done = subprocess.run(
+        [sys.executable, "-c", _RUNNER_SCRIPT, material], env=env, capture_output=True, text=True
+    )
+    assert done.returncode == 0, done.stderr[-4000:]
+    return json.loads(done.stdout.strip().splitlines()[-1])
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("material", ["pbwo4", "silicon"])
+def test_runner_production_defaults_identical_under_env_continuation(material):
+    """Production defaults (ELSEPA, coupled BremsLib, ``auto`` inelastic:
+    continuous for pbwo4, shell soft/hard for silicon) reach continuation
+    through the process environment and return identical spectra."""
+    reference = _runner_digest(material, "full-history")
+    assert reference
+    assert _runner_digest(material, "continuation") == reference

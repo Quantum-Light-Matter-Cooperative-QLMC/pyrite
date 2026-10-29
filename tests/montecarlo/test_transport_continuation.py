@@ -20,11 +20,15 @@ from pyrite.montecarlo.transport.batching import (
     _alloc_scratch,
 )
 from pyrite.montecarlo.transport.continuation import (
+    CONTINUATION_AUTO_MIN_HISTORIES,
     EXIT_SUSPENDED,
     TransportContinuationConfig,
     _drive_continuation_rounds,
     active_population,
     continuation_row_bytes,
+    effective_schedule,
+    resolve_schedule,
+    schedule_from_env,
 )
 from pyrite.montecarlo.transport.cores import (
     EXIT_BACKSCATTERED,
@@ -295,8 +299,14 @@ def test_segment_overflow_raises():
 
 
 @pytest.mark.parametrize("core", ["per-electron", "lockstep"])
-def test_host_cores_reject_continuation(core):
-    config = PerElectronTransportConfig(continuation=TransportContinuationConfig())
+@pytest.mark.parametrize(
+    "config",
+    [
+        PerElectronTransportConfig(continuation=TransportContinuationConfig()),
+        PerElectronTransportConfig(schedule="continuation"),
+    ],
+)
+def test_host_cores_reject_continuation(core, config):
     with pytest.raises(ValueError, match="requires transport_core='cuda'"):
         simulate_trajectories(
             E0_keV=60.0,
@@ -308,3 +318,88 @@ def test_host_cores_reject_continuation(core):
             transport_core=core,
             per_electron_config=config,
         )
+
+
+# Every ``auto`` support flag off: a supported CUDA pass.
+SUPPORTED = dict(cuda=True, lut=False, launched=False, gdf=False)
+AUTO = PerElectronTransportConfig(schedule="auto")
+
+
+def test_schedule_defaults_to_continuation_field():
+    assert effective_schedule(PerElectronTransportConfig()) == "full-history"
+    cont = PerElectronTransportConfig(continuation=TransportContinuationConfig())
+    assert effective_schedule(cont) == "continuation"
+    forced = replace(cont, schedule="full-history")
+    assert resolve_schedule(forced, 10**6, **SUPPORTED).continuation is None
+
+
+def test_explicit_continuation_keeps_or_creates_its_config():
+    created = resolve_schedule(PerElectronTransportConfig(schedule="continuation"), 1, **SUPPORTED)
+    assert created.continuation == TransportContinuationConfig()
+    cont = TransportContinuationConfig(rows_per_round=9)
+    kept = PerElectronTransportConfig(schedule="continuation", continuation=cont)
+    # Explicit requests are not second-guessed: unsupported modes raise later.
+    assert resolve_schedule(kept, 1, **(SUPPORTED | {"lut": True})).continuation is cont
+
+
+def test_auto_continues_a_supported_large_pass(caplog):
+    caplog.set_level("INFO", logger="pyrite.montecarlo.transport.continuation")
+    resolved = resolve_schedule(AUTO, CONTINUATION_AUTO_MIN_HISTORIES, **SUPPORTED)
+    assert resolved.schedule == "continuation"
+    assert resolved.continuation == TransportContinuationConfig()
+    assert "continuation for" in caplog.text
+
+
+@pytest.mark.parametrize(
+    ("flag", "reason"),
+    [
+        ("cuda", "not 'cuda'"),
+        ("lut", "transport LUT"),
+        ("launched", "launched passes"),
+        ("gdf", "GDF"),
+    ],
+)
+def test_auto_falls_back_with_a_stated_reason(flag, reason, caplog):
+    caplog.set_level("INFO", logger="pyrite.montecarlo.transport.continuation")
+    support = SUPPORTED | {flag: not SUPPORTED[flag]}
+    resolved = resolve_schedule(AUTO, 10 * CONTINUATION_AUTO_MIN_HISTORIES, **support)
+    assert (resolved.schedule, resolved.continuation) == ("full-history", None)
+    assert reason in caplog.text
+
+
+def test_auto_keeps_full_history_below_the_history_threshold(caplog):
+    caplog.set_level("INFO", logger="pyrite.montecarlo.transport.continuation")
+    resolved = resolve_schedule(AUTO, CONTINUATION_AUTO_MIN_HISTORIES - 1, **SUPPORTED)
+    assert resolved.continuation is None
+    assert "below" in caplog.text
+
+
+def test_unknown_schedule_is_rejected(monkeypatch):
+    with pytest.raises(ValueError, match="transport schedule"):
+        PerElectronTransportConfig(schedule="streaming")
+    monkeypatch.setenv("PYRITE_MC_TRANSPORT_SCHEDULE", "fast")
+    with pytest.raises(ValueError, match="PYRITE_MC_TRANSPORT_SCHEDULE"):
+        schedule_from_env()
+
+
+@pytest.mark.parametrize(("raw", "expected"), [("", None), (" auto ", "auto")])
+def test_schedule_env_default(monkeypatch, raw, expected):
+    monkeypatch.setenv("PYRITE_MC_TRANSPORT_SCHEDULE", raw)
+    assert schedule_from_env() == expected
+
+
+def test_auto_on_a_host_core_is_the_full_history_run():
+    kw = dict(
+        E0_keV=60.0,
+        Ne=4,
+        thickness_ang=1_000.0,
+        element="C",
+        n_atoms_per_ang3=0.1,
+        seed=1,
+        transport_core="per-electron",
+    )
+    reference = simulate_trajectories(**kw)
+    auto = simulate_trajectories(**kw, per_electron_config=AUTO)
+    for key, value in reference.items():
+        if isinstance(value, np.ndarray):
+            np.testing.assert_array_equal(auto[key], value, err_msg=key)

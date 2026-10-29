@@ -32,6 +32,7 @@ from .beam_entry import (
     resolve_bunch_times,
     table_energy_range,
 )
+from .continuation import effective_schedule, resolve_schedule
 from .cores import (
     _transport_core_grooved,
     _transport_core_ungrooved_lut,
@@ -347,7 +348,7 @@ def _checked_core(p, launch, electron_start):
         raise ValueError("grooved transport is only implemented for the lockstep core")
     if electron_start and transport_core == "lockstep":
         raise ValueError("electron blocks need counter-addressed streams, not the lockstep core")
-    if p.per_electron_config.continuation is not None and transport_core != "cuda":
+    if effective_schedule(p.per_electron_config) == "continuation" and transport_core != "cuda":
         raise ValueError(
             "transport continuation requires transport_core='cuda'; "
             f"{p.transport_core!r} resolved to {transport_core!r}"
@@ -688,7 +689,14 @@ def _run_per_electron(t, *, lut):
     )
     rows = tuple(b[name] for name in _ROW_FIELDS)
     options = {
-        "config": p.per_electron_config,
+        "config": resolve_schedule(
+            p.per_electron_config,
+            p.Ne,
+            cuda=c.transport_core == "cuda",
+            lut=lut,
+            launched=p._secondary is not None,
+            gdf=p.gdf_source is not None,
+        ),
         "keep_on_device": p.keep_segments_on_device,
         "inelastic": (
             (t.inelastic_args, b["seg_hard_W"], b["seg_hard_ch"], b["seg_hard_dir"], t.sec_on)

@@ -8,7 +8,12 @@ from functools import cache
 import numpy as np
 
 from ..._env import env_value
-from .continuation import TransportContinuationConfig, _drive_continuation_rounds
+from .continuation import (
+    TransportContinuationConfig,
+    _drive_continuation_rounds,
+    check_schedule,
+    schedule_from_env,
+)
 from .cores import (
     EXIT_BACKSCATTERED,
     EXIT_CUTOFF_STOPPED,
@@ -244,6 +249,14 @@ class PerElectronTransportConfig:
     (:class:`.continuation.TransportContinuationConfig`, #789) under the same
     ``scratch_budget_bytes`` and ``max_batch``; ``seg_capacity`` and
     ``probe_electrons`` then do not apply. Unsupported cores and modes raise.
+
+    ``schedule`` (#799) selects ``"full-history"``, ``"continuation"`` or
+    ``"auto"``; ``None`` means continuation exactly when ``continuation`` is
+    set. ``auto`` continues only where it is supported and pays off, and logs
+    the reason when it keeps full-history; see
+    :func:`.continuation.resolve_schedule`. Explicit ``"continuation"`` takes
+    ``continuation`` or the default :class:`.continuation.TransportContinuationConfig`.
+    The process default comes from ``PYRITE_MC_TRANSPORT_SCHEDULE``.
     """
 
     seg_capacity: int = 512
@@ -252,6 +265,10 @@ class PerElectronTransportConfig:
     max_batch: int = 65536
     probe_electrons: int = 1024
     continuation: TransportContinuationConfig | None = None
+    schedule: str | None = None
+
+    def __post_init__(self):
+        check_schedule(self.schedule)
 
 
 def _default_batch_limit_from_env() -> int:
@@ -275,7 +292,7 @@ def _default_batch_limit_from_env() -> int:
 
 
 DEFAULT_PER_ELECTRON_TRANSPORT_CONFIG = PerElectronTransportConfig(
-    max_batch=_default_batch_limit_from_env()
+    max_batch=_default_batch_limit_from_env(), schedule=schedule_from_env()
 )
 
 TRANSPORT_CORES = ("auto", "lockstep", "per-electron", "cuda")
