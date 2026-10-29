@@ -362,8 +362,10 @@ def test_elsepa_rows_match_full_history(energy_model):
 
 @pytest.mark.slow
 def test_mott_rows_match_full_history():
-    reference = _elsepa(REFERENCE, elastic_model="mott")
-    _assert_identical(reference, _elsepa(_continued(7, 31), elastic_model="mott"))
+    # Mott defaults to the LUT; compare schedules on the supported exact core.
+    kw = dict(elastic_model="mott", transport_lut_config=NO_LUT)
+    reference = _elsepa(REFERENCE, **kw)
+    _assert_identical(reference, _elsepa(_continued(7, 31), **kw))
 
 
 def test_elsepa_coupled_radiative_rows_match_full_history():
