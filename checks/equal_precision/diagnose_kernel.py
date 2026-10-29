@@ -70,6 +70,7 @@ def main():
         "nodes",
         "both",
         "capacity",
+        "capacity32",
         "both-capacity",
         "threads32",
         "both-capacity32",
@@ -80,7 +81,7 @@ def main():
         _jit_radiative_device._rad_next_node = indexed_next_node
     if variant in {"both", "both-capacity", "both-capacity32"}:
         _jit_radiative_device._rad_row_chi = indexed_row_chi
-    if variant in {"capacity", "both-capacity", "both-capacity32"}:
+    if variant in {"capacity", "capacity32", "both-capacity", "both-capacity32"}:
         original_config = batching.PerElectronTransportConfig
 
         def configured(*args, **kwargs):
@@ -101,7 +102,7 @@ def main():
     original_factory = _jit_launch.make_cuda_transport_core
 
     def factory(*args, **kwargs):
-        if variant in {"threads32", "both-capacity32"}:
+        if variant in {"threads32", "capacity32", "both-capacity32"}:
             kwargs["config"] = replace(_jit_launch.DEFAULT_TRANSPORT_KERNEL_CONFIG, nthreads=32)
         original, array_module = original_factory(*args, **kwargs)
 
@@ -198,7 +199,9 @@ def main():
                 "blocks": blocks,
                 "device": device,
                 "compiled_kernel_resources": resources,
-                "threads_per_block": 32 if variant in {"threads32", "both-capacity32"} else 128,
+                "threads_per_block": (
+                    32 if variant in {"threads32", "capacity32", "both-capacity32"} else 128
+                ),
                 "interpretation": "Diagnostic only. First request is warmup; hashes/reductions are outside transport timers. Initial capacity 12500 is not a safe bound. Launch timers include dispatch and synchronization; first includes JIT.",
             },
             indent=2,
