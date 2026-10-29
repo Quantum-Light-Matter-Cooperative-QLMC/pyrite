@@ -189,6 +189,7 @@ def run_transport_kernel(
     inelastic_args=None,
     radiative_args=None,
     config=DEFAULT_TRANSPORT_KERNEL_CONFIG,
+    continuation=None,
 ):
     """Launch one thread per electron over ``[e_start, e_start + e_count)``.
 
@@ -225,6 +226,20 @@ def run_transport_kernel(
     tuple the CPU radiative cores unpack, ``packed`` being
     :func:`.hard_radiative.pack_radiative_layer_tables`; its two photon row
     columns follow any hard-inelastic ones in ``segments``.
+
+    ``continuation`` (#789) is ``(slots, state_i32, state_u64, state_f64)``
+    from :mod:`.continuation`; ``None`` keeps run-to-completion. Thread ``i``
+    then owns history ``slots[i]``, not ``e_start + i``, and ``cap`` is this
+    launch's row quantum, not a track capacity. After ``cap`` rows a running
+    history yields at the top of its step loop, where its only loop-carried
+    values are ``(step, flight_id, substep_id)`` (int32), the elastic, hard
+    and radiative stream counters (uint64) and open optical depths (float64),
+    three per history each; position, direction, energy, clock and the
+    straggling accumulator are already global. It stores them and reports
+    ``I8_SUSPENDED``. A history with nonzero ``step`` resumes from them, so its
+    arithmetic, draws and rows are those of one uninterrupted run. Rows land
+    at ``i * cap`` plus their index within the launch, and ``seg_count``
+    counts this launch's rows only.
 
     Validation: gpu-transport-core
     """
@@ -366,7 +381,28 @@ def run_transport_kernel(
             stragg_dE,
             *shell_arguments,
             *radiative_arguments,
+            *_continuation_kernel_args(continuation),
         ),
+    )
+
+
+def _continuation_kernel_args(continuation):
+    """Continuation slot/state arrays, or inert placeholders."""
+    if continuation is None:
+        return (
+            np.int32(0),
+            xp.zeros(1, dtype=xp.int32),
+            xp.zeros(1, dtype=xp.int32),
+            xp.zeros(1, dtype=xp.uint64),
+            xp.zeros(1, dtype=xp.float64),
+        )
+    slots, state_i32, state_u64, state_f64 = continuation
+    return (
+        np.int32(1),
+        slots.astype(xp.int32, copy=False),
+        state_i32.reshape(-1),
+        state_u64.reshape(-1),
+        state_f64.reshape(-1),
     )
 
 
@@ -498,7 +534,7 @@ def _radiative_kernel_args(radiative_args, photon_segments):
 def make_cuda_transport_core(config=DEFAULT_TRANSPORT_KERNEL_CONFIG):
     """Return ``(core, array_module)`` for ``_run_per_electron_transport``."""
 
-    def core(*args):
-        run_transport_kernel(*args, config=config)
+    def core(*args, **kwargs):
+        run_transport_kernel(*args, config=config, **kwargs)
 
     return core, xp

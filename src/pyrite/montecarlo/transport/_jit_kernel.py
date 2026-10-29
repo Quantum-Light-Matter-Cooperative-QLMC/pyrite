@@ -67,6 +67,7 @@ from ._jit_device import (
     I8_NOT_ENTERED,
     I8_SIDE,
     I8_STEP_LIMITED,
+    I8_SUSPENDED,
     I8_TRANSMITTED,
     I32_ONE,
     I32_THREE,
@@ -229,8 +230,13 @@ def _transport_kernel(
     rad_n_red,
     seg_rad_k,
     seg_rad_Z,
+    cont_on,
+    cont_slots,
+    cont_i32,
+    cont_u64,
+    cont_f64,
 ):
-    """One electron per thread, run to completion.
+    """One electron per thread, run to completion or to a continuation yield.
 
     ``pos``, ``dirs``, ``seg_dir`` and ``seg_mid`` are flattened C-order; the
     per-layer element tables are ``(n_layers, max_el)`` flattened the same way,
@@ -254,6 +260,9 @@ def _transport_kernel(
     flattened C-order (see ``_jit_radiative_device``); off, they and the two
     photon row columns are never read. With straggling the soft radiative
     loss is added to the sampled collision loss as its mean.
+
+    ``cont_on`` selects bounded continuation; ``_jit_launch.run_transport_kernel``
+    documents its slot and state contract.
     """
     # The launch indices are uint32, and every other index here is int32. In
     # CUDA mode the transpiler promotes a mixed int32/uint32 expression to
@@ -266,7 +275,11 @@ def _transport_kernel(
     seg_count[local_electron_index] = I32_ZERO
     exit_code[local_electron_index] = I8_NOT_ENTERED
     electron_index = e_start + local_electron_index
-    if straggle_on == I32_ONE:
+    resuming = False
+    if cont_on == I32_ONE:
+        electron_index = cont_slots[local_electron_index]
+        resuming = cont_i32[electron_index * I32_THREE] > I32_ZERO
+    if straggle_on == I32_ONE and not resuming:
         stragg_dE[electron_index] = F64_ZERO
     if alive[electron_index] == np.uint8(0):
         return
@@ -298,6 +311,16 @@ def _transport_kernel(
         rad_key = rad_keys[electron_index]
 
     step = I32_ZERO
+    if resuming:
+        step = cont_i32[electron_offset]
+        flight_id = cont_i32[electron_offset + I32_ONE]
+        substep_id = cont_i32[electron_offset + I32_TWO]
+        elastic_draw_counter = cont_u64[electron_offset]
+        hard_draw_counter = cont_u64[electron_offset + I32_ONE]
+        radiative_draw_counter = cont_u64[electron_offset + I32_TWO]
+        elastic_optical_depth = cont_f64[electron_offset]
+        hard_optical_depth = cont_f64[electron_offset + I32_ONE]
+        radiative_optical_depth = cont_f64[electron_offset + I32_TWO]
     running = True
     while running and step < max_steps:
         step += I32_ONE
@@ -1208,5 +1231,19 @@ def _transport_kernel(
                     dirs[electron_offset] = rotated_x / direction_norm
                     dirs[electron_offset + I32_ONE] = rotated_y / direction_norm
                     dirs[electron_offset + I32_TWO] = rotated_z / direction_norm
+
+        # Continuation yield, between steps; the step limit still wins.
+        if cont_on == I32_ONE and running and step < max_steps and local_segment_count >= cap:
+            running = False
+            exit_code[local_electron_index] = I8_SUSPENDED
+            cont_i32[electron_offset] = step
+            cont_i32[electron_offset + I32_ONE] = flight_id
+            cont_i32[electron_offset + I32_TWO] = substep_id
+            cont_u64[electron_offset] = elastic_draw_counter
+            cont_u64[electron_offset + I32_ONE] = hard_draw_counter
+            cont_u64[electron_offset + I32_TWO] = radiative_draw_counter
+            cont_f64[electron_offset] = elastic_optical_depth
+            cont_f64[electron_offset + I32_ONE] = hard_optical_depth
+            cont_f64[electron_offset + I32_TWO] = radiative_optical_depth
 
     seg_count[local_electron_index] = local_segment_count

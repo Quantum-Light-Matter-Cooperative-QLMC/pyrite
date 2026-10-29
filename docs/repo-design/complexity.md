@@ -74,7 +74,7 @@ Entries may carry an `exception` note, which `--write` keeps while the routine
 remains a hotspot. Exceptions are capped at their recorded CC like every other
 entry. Three numerical kernels carry one: the CPU transport body
 (`make_cpu_transport_core.body`, CC 227), the exact CUDA kernel
-(`_transport_kernel`, 140) and the LUT kernel (`_transport_lut_kernel`, 88).
+(`_transport_kernel`, 147) and the LUT kernel (`_transport_lut_kernel`, 88).
 Restructuring them needs RNG-stream, event-order, CPU/GPU parity, and
 performance evidence; parity work stays in #344.
 
