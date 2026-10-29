@@ -16,6 +16,7 @@ from ..spectrum.brem_bremslib import (
     _StagedBremsLib,
     bremslib_segment_state,
     evaluate_bremslib,
+    evaluate_bremslib_rows,
     stage_bremslib_table,
 )
 from .dielectric_radiative import dielectric_cell_moments, dielectric_scale_eV
@@ -306,38 +307,156 @@ def hard_radiative_photon_at_energy(
     return HardRadiativePhoton(energy, photon_direction, remaining, electron_out, target_momentum)
 
 
-def complete_hard_radiative_events(segments, tables, seed: int) -> None:
-    """Attach sampled photon directions and residual target momenta to event rows.
+# Limit simultaneous angle rows, including backends that expand a row into
+# multiple (18-node) BremsLib gather temporaries. This is a working-set cap,
+# not a device-wide cache or a configurable change to the sampling law.
+_COMPLETION_MAX_PHOTONS = 128
+_COMPLETION_MAX_ANGLE_ROWS = 32_768
 
-    This uses a stream separate from electron transport, so adding photon
-    directions cannot perturb the electron tracks or their sampled energies.
-    Both vector fields are zero on rows without a hard photon.
+
+def _complete_hard_radiative_chunk(staged, incident, energy, incoming, uniforms):
+    """Complete one element's photons using the scalar DDCS/CDF arithmetic.
+
+    The sole host transfer is the (photon, theta) DDCS. For each photon the
+    theta nodes, cell integration, side='right' search and 52 midpoint steps
+    are those of :func:`hard_radiative_photon_at_energy`.
+    """
+    theta = np.asarray(staged.table.theta_rad, dtype=float)
+    n = energy.size
+    if (
+        np.any(~np.isfinite(incident))
+        or np.any(~np.isfinite(energy))
+        or np.any((energy <= 0.0) | (energy > incident))
+    ):
+        raise ValueError("photon energy must be positive and at most the incident energy")
+    if (
+        incoming.shape != (n, 3)
+        or np.any(~np.isfinite(incoming))
+        or np.any(~np.isclose(np.linalg.norm(incoming, axis=1), 1.0, atol=1e-10))
+    ):
+        raise ValueError("electron_direction must be a finite unit vector")
+    if np.any((uniforms < 0.0) | (uniforms >= 1.0)):
+        raise ValueError("angle uniforms must be in [0, 1)")
+
+    # A row of the existing backend evaluator represents one emission angle.
+    # Flatten photon-major, preserving each scalar call's theta order. Unlike
+    # evaluate_bremslib(..., energy), the rows evaluator does not accidentally
+    # form an (Nphotons * Ntheta)**2 broadcast matrix.
+    state = bremslib_segment_state(
+        staged,
+        np.repeat(incident / 1e3, theta.size),
+        np.tile(np.cos(theta), n),
+    )
+    ddcs = np.asarray(
+        BACKEND.to_cpu(evaluate_bremslib_rows(staged, state, np.repeat(energy, theta.size)))
+    ).reshape(n, theta.size)
+    widths = np.diff(theta)
+    a, b = theta[:-1], theta[1:]
+    cell_mass = (
+        2.0
+        * np.pi
+        * (
+            ddcs[:, :-1] * (np.cos(a) - np.cos(b))
+            + np.diff(ddcs, axis=1) / widths
+            * (np.sin(b) - np.sin(a) - widths * np.cos(b))
+        )
+    )
+    cumulative = np.cumsum(cell_mass, axis=1)
+    if np.any(~np.isfinite(cumulative[:, -1]) | (cumulative[:, -1] <= 0.0)):
+        raise ValueError("BremsLib DDCS has no positive angular integral")
+    target = uniforms[:, 0] * cumulative[:, -1]
+    # searchsorted(..., side='right') on each monotone CDF row, including
+    # zero-mass cells and exact boundaries. Do not sort photon rows by element
+    # before drawing their two uniforms.
+    cell = np.minimum(np.count_nonzero(cumulative <= target[:, None], axis=1), widths.size - 1)
+    row = np.arange(n)
+    target -= np.where(cell > 0, cumulative[row, np.maximum(cell - 1, 0)], 0.0)
+    low, high = theta[cell].copy(), theta[cell + 1].copy()
+    left, right = ddcs[row, cell], ddcs[row, cell + 1]
+    left_theta, width = a[cell], widths[cell]
+    for _ in range(52):
+        mid = 0.5 * (low + high)
+        partial = (
+            2.0
+            * np.pi
+            * (
+                left * (np.cos(left_theta) - np.cos(mid))
+                + (right - left) / width
+                * (np.sin(mid) - np.sin(left_theta) - (mid - left_theta) * np.cos(mid))
+            )
+        )
+        take_low = partial < target
+        low = np.where(take_low, mid, low)
+        high = np.where(take_low, high, mid)
+    polar = 0.5 * (low + high)
+
+    reference = np.where(
+        (np.abs(incoming[:, 0]) < 0.9)[:, None],
+        [1.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0],
+    )
+    transverse = np.cross(incoming, reference)
+    # np.linalg.norm(transverse, axis=1) changes the reduction kernel vs the
+    # scalar three-vector np.linalg.norm on some NumPy/BLAS builds (1 ULP).
+    # Keep only these tiny norms scalar; all cross products, angles and momenta
+    # are still vectorized, preserving the pre-batch vector bit pattern.
+    transverse /= np.array([np.linalg.norm(vector) for vector in transverse])[:, None]
+    other = np.cross(incoming, transverse)
+    phi = 2.0 * np.pi * uniforms[:, 1]
+    photon_direction = np.cos(polar)[:, None] * incoming + np.sin(polar)[:, None] * (
+        np.cos(phi)[:, None] * transverse + np.sin(phi)[:, None] * other
+    )
+    remaining = incident - energy
+    p_in = np.sqrt(incident * (incident + 2.0 * _ELECTRON_REST_EV))
+    p_out = np.sqrt(remaining * (remaining + 2.0 * _ELECTRON_REST_EV))
+    target_momentum = (
+        p_in[:, None] * incoming - energy[:, None] * photon_direction
+        - p_out[:, None] * incoming
+    )
+    return photon_direction, target_momentum
+
+
+def complete_hard_radiative_events(segments, tables, seed: int) -> None:
+    """Attach photon directions and recoil momenta without changing RNG order.
+
+    Draw (polar, azimuth) in canonical positive-photon row order, then group
+    by element. Each call owns its element stages; no global device cache.
+    Non-photon rows retain the two zero-vector result fields.
 
     Validation: bremslib-radiative-partition
     """
     energies = np.asarray(segments["hard_radiative_k_eV"])
     directions = np.zeros((energies.size, 3), dtype=float)
     momenta = np.zeros_like(directions)
-    by_Z = {table.atomic_number: table for table in tables.values()}
-    # Own immutable stages for this completion call: repeated sparse photons
-    # must not upload the same DDCS arrays again or retain a global device cache.
-    staged_by_Z = {}
+    photon_rows = np.flatnonzero(energies > 0.0)
     rng = np.random.default_rng(int(seed) ^ 0xD6023FEA38B57C29)
-    for index in np.flatnonzero(energies > 0.0):
-        atomic_number = int(segments["hard_radiative_Z"][index])
-        if atomic_number not in staged_by_Z:
-            staged_by_Z[atomic_number] = stage_bremslib_table(by_Z[atomic_number])
-        photon = hard_radiative_photon_at_energy(
-            by_Z[atomic_number],
-            float(segments["E_end_keV"][index]) * 1e3,
-            float(energies[index]),
-            segments["v_hat"][index],
-            float(rng.random()),
-            float(rng.random()),
-            _staged_table=staged_by_Z[atomic_number],
+    # Shape (N, 2) consumes exactly the same consecutive MT/PCG uniform words
+    # as the former two scalar random() calls per photon (even for N=0).
+    uniforms = rng.random((photon_rows.size, 2))
+    by_z = {table.atomic_number: table for table in tables.values()}
+    element = np.asarray(segments["hard_radiative_Z"])[photon_rows]
+    incident = np.asarray(segments["E_end_keV"], dtype=float)[photon_rows] * 1e3
+    photon_energy = np.asarray(energies, dtype=float)[photon_rows]
+    incoming = np.asarray(segments["v_hat"], dtype=float)[photon_rows]
+    for z in dict.fromkeys(element.tolist()):
+        staged = stage_bremslib_table(by_z[int(z)])
+        selected = np.flatnonzero(element == z)
+        max_photons = max(
+            1,
+            min(_COMPLETION_MAX_PHOTONS, _COMPLETION_MAX_ANGLE_ROWS // staged.table.theta_rad.size),
         )
-        directions[index] = photon.direction
-        momenta[index] = photon.target_momentum_eV_c
+        for start in range(0, selected.size, max_photons):
+            offsets = selected[start : start + max_photons]
+            completed, target = _complete_hard_radiative_chunk(
+                staged,
+                incident[offsets],
+                photon_energy[offsets],
+                incoming[offsets],
+                uniforms[offsets],
+            )
+            rows = photon_rows[offsets]
+            directions[rows] = completed
+            momenta[rows] = target
     segments["hard_radiative_direction"] = directions
     segments["hard_radiative_target_momentum_eV_c"] = momenta
 
