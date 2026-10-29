@@ -347,6 +347,11 @@ def _checked_core(p, launch, electron_start):
         raise ValueError("grooved transport is only implemented for the lockstep core")
     if electron_start and transport_core == "lockstep":
         raise ValueError("electron blocks need counter-addressed streams, not the lockstep core")
+    if p.per_electron_config.continuation is not None and transport_core != "cuda":
+        raise ValueError(
+            "transport continuation requires transport_core='cuda'; "
+            f"{p.transport_core!r} resolved to {transport_core!r}"
+        )
     if p.keep_segments_on_device and transport_core != "cuda":
         raise ValueError(
             "keep_segments_on_device requires transport_core='cuda'; "

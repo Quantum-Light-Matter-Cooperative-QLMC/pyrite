@@ -596,7 +596,7 @@
     {
       "path": "src/pyrite/montecarlo/transport/_jit_kernel.py",
       "name": "_transport_kernel",
-      "cc": 140,
+      "cc": 147,
       "exception": "Numerical transport kernel: a split or rewrite needs RNG-stream, event-order, CPU/GPU parity and performance evidence (#567, #344); never refactor for the metric alone."
     },
     {
