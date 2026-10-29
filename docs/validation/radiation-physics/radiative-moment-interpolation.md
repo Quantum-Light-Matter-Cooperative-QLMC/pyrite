@@ -256,8 +256,22 @@ and 1.86 (W); refined gave 1.37 and 1.88. These are three-seed timings of
 an isolated diagnostic kernel. They are not a production or
 equal-achieved-precision speedup.
 [Job record](../check-records/equal-precision/moment-transport-788.json).
-Wider anchors, CPU transport and opt-in production integration remain
-pending.
+
+Job 2647 (`moment-anchors-788.sbatch`, source `0c25658d`) compared exact
+moments with default-budget tables on five wider anchors. These were
+Si and W at 800 keV, Si at 100 keV/1 µm, W at 100 keV/100 µm and 75°
+(backscatter-dominated), and Si at 300 keV with a 10 keV photon cutoff.
+All replay and energy/photon-debit preflights passed. The pattern matched
+job 2644. Continuous observables changed only at round-off scale and
+screened inside their margins, except where no history changed. Hard-event
+count, transmission and backscatter changed for no history and remain
+`unresolved`. Median exact/table complete request ratios were 2.15
+(Si 100 keV), 1.65 (Si 300 keV, 10 keV cutoff), 2.34 (Si 800 keV), 1.35
+(W 100 keV, 75°) and 1.59 (W 800 keV). The same diagnostic-kernel caveats
+apply.
+[Job record](../check-records/equal-precision/moment-anchors-788.json).
+Mixed compound transport, CPU transport and opt-in production integration
+remain pending.
 
 ## Verdict
 
