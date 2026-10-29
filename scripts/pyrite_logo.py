@@ -50,8 +50,20 @@ from matplotlib.transforms import Affine2D
 from PIL import Image, ImageDraw, ImageOps
 
 BG = "#0C1628"
-INK = "#F5F5F0"
 ACCENT = "#FFC858"
+ATOM_BLUE = "#1EDCF5"
+ATOM_GOLD = "#FFD064"
+SVG_GLYPH_FILL = "#D301C2"  # Unique marker replaced with a native SVG gradient.
+GLYPH_MID = "#A5D59E"  # 60% gold, 40% blue
+
+GLYPH_PALETTE = LinearSegmentedColormap.from_list(
+    "pyrite_letter_gradient",
+    [
+        (0.0, ATOM_GOLD),
+        (0.6, GLYPH_MID),
+        (1.0, ATOM_BLUE),
+    ],
+)
 PALETTE = LinearSegmentedColormap.from_list(
     "pyrite_kinetic",
     [
@@ -123,6 +135,24 @@ def round_svg_canvas(path: Path, corner_fraction: float) -> None:
         clip + '<g id="figure_1" clip-path="url(#pyrite-rounded-canvas)">',
         1,
     )
+    path.write_text(svg, encoding="utf-8")
+
+
+def install_svg_glyph_gradient(path: Path) -> None:
+    """Replace three temporary glyph fills with a scalable SVG linear gradient."""
+    svg = path.read_text(encoding="utf-8")
+    marker = f"fill: {SVG_GLYPH_FILL.lower()}"
+    if svg.count(marker) != 3 or "<defs>" not in svg:
+        raise ValueError("Expected three P/R/T outlines in the Matplotlib SVG")
+    svg = svg.replace(marker, "fill: url(#pyrite-glyph-gradient)")
+    stops = (
+        '<linearGradient id="pyrite-glyph-gradient" x1="0%" y1="100%" '
+        'x2="0%" y2="0%">'
+        f'<stop offset="0%" stop-color="{ATOM_GOLD}"/>'
+        f'<stop offset="100%" stop-color="{ATOM_BLUE}"/>'
+        '</linearGradient>'
+    )
+    svg = svg.replace("<defs>", "<defs>\n" + stops, 1)
     path.write_text(svg, encoding="utf-8")
 
 
@@ -337,7 +367,7 @@ def dominant_line(line: dict[str, np.ndarray]):
 
 
 def draw_glyph(
-    ax, letter: str, x: float, baseline: float, height: float, color: str, font_family: str
+    ax, letter: str, x: float, baseline: float, height: float, font_family: str
 ) -> float:
     # Explicit glyph outlines, not font-dependent SVG <text> placement.
     font = FontProperties(family=font_family, weight="bold")
@@ -347,7 +377,24 @@ def draw_glyph(
     transform = (
         Affine2D().translate(-box.x0, -box.y0).scale(scale).translate(x, baseline) + ax.transData
     )
-    ax.add_patch(PathPatch(path, transform=transform, facecolor=color, edgecolor="none"))
+    outline = PathPatch(path, transform=transform, facecolor="none", edgecolor="none")
+    outline.set_gid(f"pyrite-glyph-{letter.lower()}")
+    ax.add_patch(outline)
+    # PNG: a smooth bottom-gold/top-blue gradient clipped to the vector path.
+    # SVG: hide this raster image and paint the same path with a native gradient.
+    image = ax.imshow(
+        np.linspace(0.0, 1.0, 1024)[:, None],
+        cmap=GLYPH_PALETTE,
+        vmin=0.0,
+        vmax=1.0,
+        origin="lower",
+        extent=(x, x + box.width * scale, baseline, baseline + height),
+        interpolation="bilinear",
+        aspect="auto",
+        clip_path=outline,
+        zorder=2,
+    )
+    image.set_gid(f"pyrite-gradient-{letter.lower()}")
     return box.width * scale
 
 
@@ -407,7 +454,7 @@ def draw_hbn_e(
         for idx in np.argsort(depth):
             element = elements[idx]
             radius = 0.050 if element == "B" else 0.056
-            fill = "#1EDCF5" if element == "B" else "#FFD064"
+            fill = ATOM_GOLD if element == "B" else ATOM_BLUE
             center = (px[idx], py + depth_offset[idx])
             ax.add_patch(
                 Circle(
@@ -618,14 +665,14 @@ def render(
     baseline, cap = 0.81, 2.70
     letter_height, gap = cap - baseline, 0.19
     cursor = 0.45
-    cursor += draw_glyph(ax, "P", cursor, baseline, letter_height, INK, font_family) + gap
+    cursor += draw_glyph(ax, "P", cursor, baseline, letter_height, font_family) + gap
     y_center = cursor + 0.85
     cursor += 1.70 + gap
-    cursor += draw_glyph(ax, "R", cursor, baseline, letter_height, INK, font_family) + gap
+    cursor += draw_glyph(ax, "R", cursor, baseline, letter_height, font_family) + gap
     cursor += ri_gap  # Optical correction; shift I, T and E together to preserve I–T spacing.
     i_center = cursor + 0.34
     cursor += 0.68 + gap
-    cursor += draw_glyph(ax, "T", cursor, baseline, letter_height, INK, font_family) + gap
+    cursor += draw_glyph(ax, "T", cursor, baseline, letter_height, font_family) + gap
     # Match the original E glyph's advance width, but render no glyph outline.
     font = FontProperties(family=font_family, weight="bold")
     e_bounds = TextPath((0, 0), "E", size=1.0, prop=font).get_extents()
@@ -665,7 +712,16 @@ def render(
     ax.axis("off")
     fig.subplots_adjust(0.005, 0.005, 0.995, 0.995)
     out.parent.mkdir(parents=True, exist_ok=True)
+    glyphs = [p for p in ax.patches if (p.get_gid() or "").startswith("pyrite-glyph-")]
+    gradients = [im for im in ax.images if (im.get_gid() or "").startswith("pyrite-gradient-")]
+    if len(glyphs) != 3 or len(gradients) != 3:
+        raise RuntimeError("Expected exactly three P/R/T gradient glyphs")
     for ext in (".svg", ".png"):
+        is_svg = ext == ".svg"
+        for glyph in glyphs:
+            glyph.set_facecolor(SVG_GLYPH_FILL if is_svg else "none")
+        for gradient in gradients:
+            gradient.set_visible(not is_svg)
         path = out.with_suffix(ext)
         fig.savefig(
             path,
@@ -673,9 +729,10 @@ def render(
             facecolor=BG,
             transparent=False,
             dpi=dpi,
-            metadata={"Date": None} if ext == ".svg" else None,
+            metadata={"Date": None} if is_svg else None,
         )
-        if ext == ".svg":
+        if is_svg:
+            install_svg_glyph_gradient(path)
             # Matplotlib emits trailing spaces inside multiline path attributes.
             # Newlines already separate the coordinates; keep generated diffs clean.
             path.write_text(
@@ -772,13 +829,13 @@ def main():
     parser.add_argument(
         "--e-tilt-deg",
         type=float,
-        default=17.0,
+        default=14.0,
         help="Shallow viewing elevation of the three hBN E sheets in degrees",
     )
     parser.add_argument(
         "--e-azimuth-deg",
         type=float,
-        default=-5.0,
+        default=-3.0,
         help="In-plane azimuth rotation of the hBN lattice (degrees)",
     )
     parser.add_argument(

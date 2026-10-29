@@ -1,7 +1,7 @@
 {
   "generator": "scripts/pyrite_logo.py",
-  "generator_sha256": "ab52eb60c33333fb41ded4880c52fc71c49352ca8d4083d766887e1370612cba",
-  "source_revision": "c6eb9c9d8533d8c96d2f06c248c5906e3a1653a8",
+  "generator_sha256": "f3d600759f8fb9e626d854518cafa65a4d605f2dcb7be7c3a2e3fcd29b736087",
+  "source_revision": "3b56d25eb6a7fe45d541379eee50ab0869a2de1b",
   "source_dirty": true,
   "numpy_version": "2.5.4",
   "matplotlib_version": "3.11.2",
@@ -41,8 +41,8 @@
     "ri_gap": 0.1,
     "i_caps": false,
     "e_crystal": "hbn (three matching CIF-derived basal planes, artistic AA registry)",
-    "e_tilt_deg": 17.0,
-    "e_azimuth_deg": -5.0,
+    "e_tilt_deg": 14.0,
+    "e_azimuth_deg": -3.0,
     "corner_radius_fraction": 0.07,
     "social_logo_width_fraction": 0.86,
     "social_card_size_px": [
@@ -65,9 +65,9 @@
   "e_sheets": 3,
   "e_atoms": 126,
   "e_bonds": 141,
-  "e_tilt_deg": 17.0,
-  "e_azimuth_deg": -5.0,
-  "pyrite_version": "0.22.5",
+  "e_tilt_deg": 14.0,
+  "e_azimuth_deg": -3.0,
+  "pyrite_version": "0.23.0",
   "cache_sha256": {
     "Y-a8554e344a915f.npz": "cee11ea613654131654f8644baf8f15668c596dfab687e0782029f6d9f89b5bf",
     "I-c81735bad8ef3e.npz": "f6dd90f5b1e9487c9733a9581835246a0b3655a4e8e6c16439bceea821c06fac"
