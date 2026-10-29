@@ -295,7 +295,12 @@ Before review, run:
 pyrite-dev docs
 ```
 
-This removes generated doctrees and autosummary stubs and performs the canonical warnings-as-errors documentation build. The HTML build executes the tutorial notebooks on CPU and may fetch missing reference tables; install the tables beforehand for an offline build.
+This removes generated doctrees and autosummary stubs and performs the canonical
+warnings-as-errors documentation build. It validates and renders committed
+tutorial captures without executing notebooks or fetching reference tables.
+Changed tutorials require the separate explicit regeneration workflow in
+[Interactive notebook builds](#interactive-notebook-builds). The browser results
+demo is exported to WASM during the build; it runs only when opened in a browser.
 
 To additionally check external links, run:
 

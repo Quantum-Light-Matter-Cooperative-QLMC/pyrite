@@ -79,7 +79,7 @@ pyrite-dev precommit
 # Cross-boundary sample only when those public boundaries are affected.
 pyrite-dev test-suite integration
 
-# Build docs (including CPU tutorial execution) alongside the repository checks.
+# Validate and render committed tutorial captures alongside repository checks.
 pyrite-dev verify
 
 # Full slow-inclusive CPU suite: explicit audit/release operation.
@@ -94,7 +94,7 @@ Agent and git hooks:
 - `uv run pre-commit install` installs both configured stages: commit-time Ruff,
   notebook stripping and skill-mirror sync, and pre-push import-linter,
   `check-skills` and `repo-map --check`. `pyrite-dev verify` stays the full
-  repository gate, including CPU tutorial regeneration.
+  repository gate, including tutorial capture validation and rendering.
 - `.agents/hooks/guard_bash.sh` (Claude Code and Codex `PreToolUse`) blocks
   pattern kills, bulk `git add`, non-lease force pushes, and pushes to `main`.
 - `.agents/hooks/ruff_after_edit.sh` (Claude Code `PostToolUse`) formats each
@@ -141,12 +141,16 @@ For ordinary edits, select the changed behavior's node/module and trace its affe
 high-CC ratchet ([source complexity baseline](complexity.md)), the API inventory,
 a clean warnings-as-errors Sphinx build, and import-linter.
 
-The HTML documentation build executes each tutorial once on CPU and writes
-untracked HTML under `docs/_build/`. It does not update notebook sources,
-release pins, provenance manifests or committed captures. `verify` calls that
-same build without a separate notebook regeneration step. Install the reference
-tables before building offline, and use a suitably provisioned worker for a full
-tutorial build. See [tutorial authoring](documentation.md#interactive-notebook-builds).
+The HTML documentation build validates committed tutorial captures and renders
+their stored outputs into untracked HTML under `docs/_build/`, without executing
+notebooks or fetching reference tables. Missing or stale captures fail the build.
+`verify` calls that same build; it does not update notebook sources, release pins
+or committed captures. Regenerate affected captures explicitly on a suitably
+provisioned worker with the required dependencies and reference tables, then
+commit them with their sources. See
+[tutorial authoring](documentation.md#interactive-notebook-builds). The separate
+browser results demo is exported to WASM during the build and executes only
+when opened in a browser.
 
 `--skip-tests` remains an undocumented compatibility no-op; pytest arguments
 and `--slow` are rejected. Run tests explicitly. CI runs each primary domain
