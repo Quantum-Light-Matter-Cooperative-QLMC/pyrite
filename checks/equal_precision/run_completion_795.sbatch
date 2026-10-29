@@ -9,7 +9,9 @@
 #SBATCH --output=completion-795-%j.log
 set -euo pipefail
 cd "${SLURM_SUBMIT_DIR:-$PWD}"
+export PATH="$HOME/.local/bin:$PATH"
 export PYRITE_HOME="$PWD" PYRITE_CATALOG="$PWD/src/pyrite/data/catalog"
+export PYRITE_USER_CATALOG="$PWD/user-catalog"
 export PYRITE_MC_BACKEND=cuda PYRITE_FP64=1
 export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 NUMBA_NUM_THREADS=1
 export UV_CACHE_DIR="${UV_CACHE_DIR:-/tmp/pyrite-uv-cache}"
@@ -40,7 +42,7 @@ fi
     sha256sum "$BASE_FILE" "$OUT/baseline-hard_radiative.py" \
         checks/equal_precision/{benchmark_completion_795.py,pyrite_adapter.py,manifest.json}
     "$UV" --version
-    python --version
+    "$UV" run --no-sync python --version
 } > "$OUT/provenance.txt"
 if command -v scontrol >/dev/null && [ -n "${SLURM_JOB_ID:-}" ]; then
     scontrol show job "$SLURM_JOB_ID" > "$OUT/job.txt"
