@@ -533,16 +533,10 @@ def _drive_per_electron_batches(
     return nseg, n_back, n_trans, n_side, n_cutoff, n_step_limited, joined, to_host(d_stragg)
 
 
-def _check_continuation_support(xp, inelastic, straggle_on):
-    """Reject continuation outside its tested exact-CUDA contract (#789)."""
+def _check_continuation_support(xp):
+    """Reject continuation outside its tested exact-CUDA contract (#789, #797)."""
     if xp is np:
         raise NotImplementedError("transport continuation requires the exact CUDA core")
-    if inelastic:
-        raise NotImplementedError(
-            "transport continuation does not support inelastic_model='shell-soft-hard'"
-        )
-    if straggle_on:
-        raise NotImplementedError("transport continuation does not support straggling")
 
 
 def _run_per_electron_transport_lut(
@@ -835,16 +829,21 @@ def _run_per_electron_transport(
         out_bufs += radiative[1:]
     core_args = (control, geometry, d_materials, d_mott, state)
     if config.continuation is not None:
-        _check_continuation_support(xp, inelastic is not None, straggle_on)
+        _check_continuation_support(xp)
         midpoint = energy_model_code == 1
+        secondaries = None if inelastic is None else bool(inelastic[4])
 
         def alloc_rows(rows):
             scratch = _alloc_scratch(xp, rows, 1, midpoint)
+            if inelastic_args is not None:
+                scratch += _alloc_hard_scratch(xp, rows, 1, secondaries)
             if radiative_args is not None:
                 scratch += _alloc_hard_scratch(xp, rows, 1)
             return scratch
 
-        extra = ((), radiative_args) if radiative_args is not None else ()
+        extra = (inelastic_args,) if inelastic_args is not None else ()
+        if radiative_args is not None:
+            extra = (inelastic_args if inelastic_args is not None else (), radiative_args)
         return _drive_continuation_rounds(
             core,
             core_args,

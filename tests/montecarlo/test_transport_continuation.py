@@ -77,17 +77,32 @@ def _alloc(rows):
     return _alloc_scratch(np, rows, 1, midpoint=True) + _alloc_hard_scratch(np, rows, 1)
 
 
+def _shell_alloc(secondaries):
+    """Shell soft/hard schema (#797): hard pair, secondary rows, photon pair."""
+
+    def alloc(rows):
+        return (
+            _alloc_scratch(np, rows, 1, midpoint=True)
+            + _alloc_hard_scratch(np, rows, 1, secondaries)
+            + _alloc_hard_scratch(np, rows, 1)
+        )
+
+    return alloc
+
+
 def _expected():
     history = np.repeat(np.arange(NE), LENGTHS)
     ordinal = np.concatenate([np.arange(n) for n in LENGTHS])
     return history, ordinal
 
 
-def _drive(cont, *, budget=1 << 30, keep_on_device=False, order=None, lengths=LENGTHS):
+def _drive(
+    cont, *, budget=1 << 30, keep_on_device=False, order=None, lengths=LENGTHS, alloc=_alloc
+):
     launches = []
     total = int(lengths.sum())
     out = tuple(
-        np.full((total,) + a.shape[1:], -7, dtype=a.dtype) if a.shape[0] else a for a in _alloc(1)
+        np.full((total,) + a.shape[1:], -7, dtype=a.dtype) if a.shape[0] else a for a in alloc(1)
     )
     config = PerElectronTransportConfig(scratch_budget_bytes=budget, continuation=cont)
     progress = []
@@ -101,7 +116,7 @@ def _drive(cont, *, budget=1 << 30, keep_on_device=False, order=None, lengths=LE
         np.zeros(lengths.size),
         (False, None),
         (),
-        _alloc,
+        alloc,
         out,
         lambda a: a,
         config,
@@ -195,6 +210,37 @@ def test_scratch_respects_budget_with_staging_and_event_columns():
     assert max(r["launched"] for r in records) == 3
     assert all(r["scratch_bytes"] <= budget for r in records)
     assert all(r["scratch_bytes"] == 3 * 8 * row_bytes for r in records)
+
+
+@pytest.mark.parametrize("secondaries", [False, True])
+@pytest.mark.parametrize("keep_on_device", [False, True])
+def test_shell_schema_rows_and_budget(secondaries, keep_on_device):
+    alloc = _shell_alloc(secondaries)
+    row_bytes = continuation_row_bytes(alloc(1))
+    # Midpoint 115 + hard W/channel 10 + photon pair 10, plus (3,) float64 directions.
+    assert row_bytes == 135 + (24 if secondaries else 0)
+    budget = 2 * (4 * (2 * row_bytes + 24) + 13)
+    records = []
+    cont = TransportContinuationConfig(rows_per_round=4, on_round=records.append)
+    counts, rows, _, _ = _drive(cont, budget=budget, keep_on_device=keep_on_device, alloc=alloc)
+    history, ordinal = _expected()
+    np.testing.assert_array_equal(rows[5], history)
+    np.testing.assert_array_equal(rows[2], ordinal)
+    secondary = rows[14]
+    assert secondary.shape == ((LENGTHS.sum(), 3) if secondaries else (0, 3))
+    records = [r for r in records if r["phase"] == "round"]
+    assert max(r["launched"] for r in records) == 2
+    assert all(r["scratch_bytes"] <= budget for r in records)
+    assert all(r["scratch_bytes"] == 2 * 4 * row_bytes for r in records)
+
+
+@pytest.mark.parametrize("secondaries", [False, True])
+def test_shell_schema_zero_row_launch(secondaries):
+    lengths = np.zeros(4, dtype=np.int64)
+    cont = TransportContinuationConfig(rows_per_round=3)
+    counts, rows, _, _ = _drive(cont, lengths=lengths, alloc=_shell_alloc(secondaries))
+    assert counts[0] == 0
+    assert all(column.shape[0] == 0 for column in rows)
 
 
 def test_one_lane_above_budget_is_rejected():

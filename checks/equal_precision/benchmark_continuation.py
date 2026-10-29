@@ -1,4 +1,4 @@
-"""Benchmark bounded CUDA transport continuation against full-history launches (#789).
+"""Benchmark bounded CUDA transport continuation against full-history launches (#789, #797).
 
 One process runs every requested policy for one scene and seed, interleaved in
 the given order. Each policy performs a complete same-workload warmup at
@@ -19,6 +19,11 @@ Policies (``--policies``, comma-separated):
   full-history arm at the concurrency of a continuation population.
 - ``cont-Q<rows>-A<active|all>-T<threads>[-D]``: continuation rounds; ``-D``
   stages retained rows on the device.
+
+``--inelastic shell`` switches the scene to ``inelastic_model="shell-soft-hard"``
+at the production 50 eV cutoff on its catalog material (as campaign
+``inelastic_model="auto"`` resolves a covered material); ``--straggling``
+forces the scene's straggling flag on (#797).
 
 Run on the lab box from a synced checkout after ``prepare_stopping.py``; the
 continuation policies need a branch that provides
@@ -41,6 +46,7 @@ from pathlib import Path
 import cupy as cp
 import numpy as np
 
+from pyrite._numerics import DEFAULT_INELASTIC_CUTOFF_EV
 from pyrite.montecarlo.transport import TransportLUTConfig, _jit_launch, simulate_trajectories
 from pyrite.montecarlo.transport.batching import PerElectronTransportConfig
 from pyrite.xsgen.bremslib.tables import load_bremsstrahlung_tables
@@ -104,7 +110,7 @@ def array_digest(result):
     return digest.hexdigest()
 
 
-def transport_kwargs(spec, histories, scratch_mib):
+def transport_kwargs(spec, histories, scratch_mib, inelastic="continuous", straggling=False):
     comp = spec["composition"]
     elements = [element for element, _ in comp]
     entries = resolve_layer_tables(comp)
@@ -127,7 +133,7 @@ def transport_kwargs(spec, histories, scratch_mib):
         elastic_tables=[[dict(e.arrays) for e in entries]],
         stopping_tables=[stopping.arrays()],
         atomic_electron_deflection="kawrakow",
-        straggling=spec["straggling"],
+        straggling=spec["straggling"] or straggling,
         **ADAPTER["radiative_arguments"](
             "source", "bremslib-soft-hard", spec["hard_photon_cutoff_eV"], brem
         ),
@@ -135,6 +141,15 @@ def transport_kwargs(spec, histories, scratch_mib):
         transport_lut_config=TransportLUTConfig(enabled=False),
         per_electron_config=PerElectronTransportConfig(
             scratch_budget_bytes=scratch_mib * 1024**2, probe_electrons=0
+        ),
+        **(
+            {
+                "inelastic_model": "shell-soft-hard",
+                "inelastic_cutoff_eV": DEFAULT_INELASTIC_CUTOFF_EV,
+                "inelastic_materials": [spec["catalog_key"]],
+            }
+            if inelastic == "shell"
+            else {}
         ),
     )
 
@@ -311,6 +326,8 @@ def main():
     parser.add_argument("--policies", required=True)
     parser.add_argument("--scratch-mib", type=int, default=4096)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--inelastic", choices=("continuous", "shell"), default="continuous")
+    parser.add_argument("--straggling", action="store_true")
     parser.add_argument(
         "--cprofile",
         action="store_true",
@@ -318,7 +335,7 @@ def main():
     )
     args = parser.parse_args()
     _raw, spec, _path = ADAPTER["load_scene"](args.scene)
-    base = transport_kwargs(spec, args.histories, args.scratch_mib)
+    base = transport_kwargs(spec, args.histories, args.scratch_mib, args.inelastic, args.straggling)
     hook = PeakPoolHook()
     original_factory = _jit_launch.make_cuda_transport_core
     samples = []
@@ -346,6 +363,8 @@ def main():
         "histories": args.histories,
         "seed": args.seed,
         "scratch_mib": args.scratch_mib,
+        "inelastic": args.inelastic,
+        "straggling": bool(spec["straggling"] or args.straggling),
         "probe_electrons": 0,
         "git_revision": revision or None,
         "device": {
