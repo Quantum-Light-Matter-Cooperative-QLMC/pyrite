@@ -74,17 +74,26 @@ their audience, rather than additional tutorials or interface specifications.
 | `guides/getting-started.md` | Entry point; new users | [Getting Started](../guides/getting-started.md) is a single top-level page without child pages; link to the first notebook for guided Python learning. |
 | `guides/configuration-cookbook.md`, `guides/configuration-notebook.md` | How-to; campaign authors | [How-to Guides](../guides/index.md); fields and editor behavior belong in [configuration reference](../reference/configuration/index.md). |
 | `guides/directional-source-heatmap.md`, `guides/detector-observations.md`, `guides/working-with-results.md` | How-to; simulation and analysis users | [How-to Guides](../guides/index.md); link to notebooks for learning and reference for complete contracts. |
+| `reference/python-scene-recipes.md` | How-to; Python API users composing scenes, observations and sweeps | [How-to Guides](../guides/index.md) owns its navigation; keep the published URL and recipe anchors. Signatures stay in the namespace reference. |
 | `guides/adding-materials.md`, `guides/gpt-gdf-beams.md`, `guides/optimization-studies.md` | How-to; users with specialized inputs or studies | [How-to Guides](../guides/index.md); schemas and restrictions remain in reference. |
 | `guides/running-on-a-cluster.md`, `guides/performance-profile-analysis.md`, `guides/batch-chunk-tuning.md` | How-to; cluster users and performance investigators | [Execution guides](../guides/index.md); runtime contracts and developer benchmarks have separate owners. |
 | `guides/experimental-planar-channeling.md`, `guides/experimental-axial-channeling.md`, `guides/transition-radiation-demo.md`, `guides/radiation-diagnostics.md` | How-to; specialist users | [Specialized workflows](../guides/index.md); retain experimental boundaries and evidence links. These app recipes do not own the progressive notebook curriculum. |
 | `guides/troubleshooting.md` | How-to; users diagnosing failures | [How-to Guides](../guides/index.md). |
-| `reference/`, `api.md` | Reference; API and CLI users | [Reference](../reference/index.md); generated signatures and the governed API inventory own interface details. |
+| Other `reference/` pages, `api.md`, `references.md` | Reference; API, CLI and citation users | [Reference](../reference/index.md); generated signatures and the governed API inventory own interface details. |
 | `repo-design/result-storage-contracts.md`, `physics/beam-transport/transport-outputs.md` | Reference; result, persistence and trajectory API users | [Results and storage](../reference/results/index.md); retain the existing URLs, units, schema anchors and evidence links. Developer storage pages link here for shared contracts. |
 | Remaining `physics/` pages, `computation/statistical-methods.md` | Explanation; researchers assessing models and estimators | [Physics](../physics/index.md), including [numerical methods](../physics/numerical-methods/index.md). |
 | `computation/execution-and-acceleration.md`, `memory-and-scheduling.md`, `precision-and-tolerances.md`, `random-streams.md` (all under `computation/`) | Reference; users configuring execution | [Configuration and execution](../reference/configuration/index.md); preserve these published paths. |
 | `validation/` | Evidence/reference; researchers and validators | [Validation](../validation/index.md); domain indexes own detailed records, and the ledger owns claim status. |
 | `development/`, `repo-design/` | Contributor how-to, implementation reference or architecture explanation, according to the page's stated purpose | [Development](../development/index.md); [repository design](index.md) groups current internals. Public field contracts linked from Reference remain authoritative at their existing URLs. |
+| `index.md`, section `index.md` pages, `project-readme.md` | Discovery; all readers | The homepage and section indexes route readers to their mode and own only navigation. `project-readme.md` renders `README.md`, which owns its content. |
+| `examples/` | Reproduction artifacts; guide readers | The page that downloads or links the script/data owns its context; these files are not a separate learning path. |
+| `repo_map.md` | Contributor reference; agents and maintainers | Repository navigation aid; `pyrite-dev repo-map` checks its generated region. |
 | `adr/`, `research/` | Decision rationale and proposals; contributors | [ADRs](../adr/index.md) and [Research](../research/index.md); label proposed behavior explicitly. |
+
+Every page except the homepage has exactly one toctree parent or is an explicit
+orphan compatibility/artifact page; `tests/dev/test_docs_computation_navigation.py`
+enforces this. Use a titled toctree entry (`Title <../reference/page>`) to place a
+page under its mode's section without moving its published URL.
 
 Compatibility pages preserve URLs and anchors and direct readers to their
 canonical owner. Do not expand them into competing guides. This applies to

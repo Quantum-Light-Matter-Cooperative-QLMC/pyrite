@@ -14,6 +14,7 @@ For an existing script or session, use [the one-scene recipe](../reference/pytho
 :maxdepth: 1
 :caption: Simulations
 
+Python scene recipes <../reference/python-scene-recipes>
 configuration-cookbook
 configuration-notebook
 directional-source-heatmap

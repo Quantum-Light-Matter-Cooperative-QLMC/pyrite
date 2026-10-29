@@ -1,7 +1,3 @@
----
-orphan: true
----
-
 # Continuous BremsLib source sampling for photon histories (#341)
 
 This is a standalone, CPU-only *weighted mean-response* source adapter in

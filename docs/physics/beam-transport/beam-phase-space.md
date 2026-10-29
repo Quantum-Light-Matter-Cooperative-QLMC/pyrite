@@ -141,5 +141,5 @@ Space charge, source-to-crystal beamline transport, the coherent form factor, `<
 
 `source="gpt_gdf"` replaces analytic sampling with correlated time-output or screen records.
 See the [GDF input contract](../../reference/gdf-beams.md) for units, explicit ray-plane
-projection, normalization and limitations, the [visual import tutorial](../../guides/gpt-gdf-beams.md),
+projection, normalization and limitations, the [visual import guide](../../guides/gpt-gdf-beams.md),
 and the [independent derivation](../../validation/beam-transport/gpt-gdf-injection.md).

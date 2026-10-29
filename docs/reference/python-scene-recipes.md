@@ -3,7 +3,7 @@
 Use Python to construct a scene, run a simulation in memory, and inspect its
 spectra. For named profiles, resumable checkpoints, or distributed runs, use
 [`pyrite run`](../guides/running-on-a-cluster.md) instead. The complete object and field
-reference is in the [supported Python API](../api.md).
+reference is in the [supported Python API](python-api/index.md).
 
 ## Choose physical-input imports
 

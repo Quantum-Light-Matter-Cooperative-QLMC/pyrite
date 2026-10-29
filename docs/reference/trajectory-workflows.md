@@ -1,7 +1,7 @@
 # Saved trajectory workflows
 
 Capture, inspect, reduce, replay and export electron histories independently of
-spectral checkpoints. The [results tutorial](../guides/working-with-results.md)
+spectral checkpoints. The [results guide](../guides/working-with-results.md)
 covers source spectra; checkpoints alone cannot reconstruct these histories.
 VTK/ParaView exports require no extra PyRITE viewer dependency. Interactive
 PyRITE views require `pyrite-mc[apps]`.
