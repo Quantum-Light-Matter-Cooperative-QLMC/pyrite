@@ -178,7 +178,7 @@ def _lattice_origin_ang(value: object) -> tuple[float, ...] | None:
     return _length_vector(value, field="Physics.transition_lattice_origin", size=3, unit="angstrom")
 
 
-def _optional_quantity(value: object, unit: str) -> Quantity | None:
+def _optional_quantity(value: object, unit: str) -> "Quantity | None":
     if value is None:
         return None
     from .units import Q_
@@ -377,22 +377,22 @@ class Physics:
         self.__post_init__()
 
     @property
-    def inelastic_cutoff(self) -> Quantity | None:
+    def inelastic_cutoff(self) -> "Quantity | None":
         """Hard inelastic energy-loss cutoff ``W_c`` as a fresh eV quantity."""
         return _optional_quantity(self.inelastic_cutoff_eV, "eV")
 
     @property
-    def secondary_threshold(self) -> Quantity | None:
+    def secondary_threshold(self) -> "Quantity | None":
         """Secondary production and tracking threshold as a fresh eV quantity."""
         return _optional_quantity(self.secondary_threshold_eV, "eV")
 
     @property
-    def radiative_cutoff(self) -> Quantity | None:
+    def radiative_cutoff(self) -> "Quantity | None":
         """Soft/hard radiative photon cutoff ``k_c`` as a fresh eV quantity."""
         return _optional_quantity(self.radiative_cutoff_eV, "eV")
 
     @property
-    def transition_lattice_origin(self) -> Quantity | None:
+    def transition_lattice_origin(self) -> "Quantity | None":
         """Two-beam lattice origin as a fresh three-component Å quantity."""
         return _optional_quantity(self.transition_lattice_origin_ang, "angstrom")
 

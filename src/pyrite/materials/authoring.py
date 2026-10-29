@@ -58,7 +58,7 @@ class MaterialDefinition:
     cif_bytes: bytes | None = None
 
     @property
-    def density(self) -> Quantity:
+    def density(self) -> "Quantity":
         """Fresh scalar bulk mass density in g/cm³."""
         from ..units import Q_
 
