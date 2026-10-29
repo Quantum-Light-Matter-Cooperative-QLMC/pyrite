@@ -6,10 +6,10 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-
 NOTEBOOK = Path(__file__).parents[2] / "docs/notebooks/00-electron-trajectories.py"
 
 
+@pytest.mark.slow
 def test_electron_trajectories_cpu_smoke(monkeypatch):
     """Capture-facing notebook must execute from the public API on CPU.
 
@@ -30,7 +30,7 @@ def test_electron_trajectories_cpu_smoke(monkeypatch):
     result = values["transport_result"]
     n = values["histories"]
     rows = result["electron_id"]
-    assert n == 64
+    assert n == 16_384
     assert np.unique(rows).size == n
     assert np.asarray(result["r_mid"]).shape[1] == 3
     assert np.all(np.asarray(result["L_ang"]) > 0)
