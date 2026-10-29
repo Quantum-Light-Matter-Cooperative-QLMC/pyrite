@@ -35,6 +35,12 @@ FROZEN_EXPORTS = frozenset(
         "FLUX_UNITS",
         "AcquisitionBatch",
         "PixelCountResult",
+        "QuantifiedSpectrum",
+        "QuantifiedAcquisitionBatch",
+        "QuantifiedApertureSpectrum",
+        "QuantifiedDirectionalSpectrum",
+        "QuantifiedSpatialSpectrum",
+        "QuantifiedSpatialImage",
         # selection
         "records",
         "records_for_cases",
