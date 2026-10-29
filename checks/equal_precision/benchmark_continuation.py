@@ -26,9 +26,11 @@ continuation policies need a branch that provides
 """
 
 import argparse
+import cProfile
 import hashlib
 import json
 import math
+import pstats
 import resource
 import runpy
 import subprocess
@@ -137,7 +139,7 @@ def transport_kwargs(spec, histories, scratch_mib):
     )
 
 
-def run_policy(policy, base, seed, hook, original_factory):
+def run_policy(policy, base, seed, hook, original_factory, cprofile=False):
     launches, rounds = [], []
     state = {"hint": 512}
 
@@ -197,9 +199,14 @@ def run_policy(policy, base, seed, hook, original_factory):
         hook.reset()
         # NVTX names the request so nsys/ncu can capture the measured one only.
         cp.cuda.nvtx.RangePush(f"bench.{label}")
+        profiler = cProfile.Profile() if cprofile and label == "measured" else None
         start = time.perf_counter()
+        if profiler is not None:
+            profiler.enable()
         result = simulate_trajectories(**dict(base, seed=run_seed, per_electron_config=config))
         cp.cuda.Device().synchronize()
+        if profiler is not None:
+            profiler.disable()
         wall = time.perf_counter() - start
         cp.cuda.nvtx.RangePop()
         retained = sum(
@@ -227,6 +234,13 @@ def run_policy(policy, base, seed, hook, original_factory):
         hashed = time.perf_counter()
         record["arrays_sha256"] = array_digest(result)
         record["hash_s"] = time.perf_counter() - hashed
+        if profiler is not None:
+            stats = pstats.Stats(profiler)
+            record["cprofile_cumulative_s"] = {
+                f"{path.rsplit('/', 1)[-1]}:{name}": entry[3]
+                for (path, _line, name), entry in stats.stats.items()
+                if entry[3] > 0.02 * wall
+            }
         del result
         return record
 
@@ -297,6 +311,11 @@ def main():
     parser.add_argument("--policies", required=True)
     parser.add_argument("--scratch-mib", type=int, default=4096)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument(
+        "--cprofile",
+        action="store_true",
+        help="cProfile the measured request (adds overhead; diagnostics only)",
+    )
     args = parser.parse_args()
     _raw, spec, _path = ADAPTER["load_scene"](args.scene)
     base = transport_kwargs(spec, args.histories, args.scratch_mib)
@@ -305,7 +324,10 @@ def main():
     samples = []
     with hook:
         for name in args.policies.split(","):
-            samples.append(run_policy(parse_policy(name), base, args.seed, hook, original_factory))
+            policy = parse_policy(name)
+            samples.append(
+                run_policy(policy, base, args.seed, hook, original_factory, args.cprofile)
+            )
             args.output.parent.mkdir(parents=True, exist_ok=True)
             partial = {"status": "partial", "samples": samples}
             args.output.write_text(json.dumps(partial, indent=2) + "\n")
