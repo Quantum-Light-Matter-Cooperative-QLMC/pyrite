@@ -35,6 +35,11 @@ for seed in 78601 78602; do
     run_in "$BR" "branch-$scene-20000-$seed" "$scene" --histories 20000 --seed $seed --policies $pol
   done
 done
+# Binding scratch budget: 256 MiB holds fewer lanes than histories.
+for scene in si-300-100um-0deg w-300-10um-0deg; do
+  run_in "$BR" "branch-$scene-20000-256MiB-78601" "$scene" --histories 20000 --seed 78601 \
+    --scratch-mib 256 --policies learned32,cont-Q256-Aall-T32,cont-Q64-Aall-T32
+done
 # Mixed-length stress scene at the matched 5000-history request, with main's reference.
 run_in "$BR" "branch-w-100-100um-75deg-5000-78601" w-100-100um-75deg --histories 5000 --seed 78601 \
   --policies reference,learned32,cont-Q256-Aall-T32,cont-Q256-A2500-T32

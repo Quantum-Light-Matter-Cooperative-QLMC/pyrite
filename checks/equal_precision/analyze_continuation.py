@@ -97,9 +97,8 @@ def main():
             hashes = (sample["warmup"]["arrays_sha256"], sample["measured"]["arrays_sha256"])
             if hashes != expected:
                 mismatches.append({"key": list(key), "policy": name})
-            groups[(record["git_revision"], record["scene"], record["histories"], name)].append(
-                sample["measured"]
-            )
+            group = (record["git_revision"], record["scene"], record["histories"])
+            groups[(*group, record["scratch_mib"], name)].append(sample["measured"])
     revisions = sorted(resources)
     cross = []
     for (revision, scene, histories, seed), hashes in sorted(reference.items()):
@@ -116,13 +115,14 @@ def main():
                     }
                 )
     summary = []
-    for (revision, scene, histories, name), samples in sorted(groups.items()):
+    for (revision, scene, histories, scratch_mib, name), samples in sorted(groups.items()):
         tails, efficiencies = zip(*(schedule(m) for m in samples), strict=True)
         summary.append(
             {
                 "revision": revision,
                 "scene": scene,
                 "histories": histories,
+                "scratch_mib": scratch_mib,
                 "policy": name,
                 "request_s": spread([m["request_s"] for m in samples]),
                 "launch_s": spread([m["launch_s"] for m in samples]),
@@ -154,6 +154,7 @@ def main():
             g["revision"][:8],
             g["scene"],
             g["histories"],
+            f"{g['scratch_mib']}MiB",
             g["policy"],
             f"req {g['request_s']['median']:.3f}",
             f"launch {g['launch_s']['median']:.3f}",
