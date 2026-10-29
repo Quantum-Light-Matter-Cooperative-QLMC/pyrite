@@ -145,7 +145,7 @@ Result = { target = "pyrite.results.model:Result", status = "stable" }
 Provenance = { target = "pyrite.results.provenance:Provenance", status = "advanced-stable" }
 SpectralDensity = { target = "pyrite.results.model:SpectralDensity", status = "advanced-stable" }
 QuantifiedApertureSpectrum = { target = "pyrite.results.quantified_aperture:QuantifiedApertureSpectrum", status = "experimental" }
-QuantifiedAcquisitionBatch = { target = "pyrite.results.quantified_acquisition:QuantifiedAcquisitionBatch", status = "experimental" }
+QuantifiedAcquisitionBatch = { target = "pyrite.instrument.quantified_acquisition:QuantifiedAcquisitionBatch", status = "experimental" }
 QuantifiedDirectionalSpectrum = { target = "pyrite.results.quantified_directional:QuantifiedDirectionalSpectrum", status = "experimental" }
 QuantifiedSpatialSpectrum = { target = "pyrite.results.quantified_spatial:QuantifiedSpatialSpectrum", status = "experimental" }
 QuantifiedSpatialImage = { target = "pyrite.results.quantified_spatial:QuantifiedSpatialImage", status = "experimental" }

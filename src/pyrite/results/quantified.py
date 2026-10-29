@@ -7,20 +7,10 @@ from typing import TYPE_CHECKING, Literal, Self
 
 import numpy as np
 
+from .._units import _check_energy_unit
+
 if TYPE_CHECKING:
     from pint import Quantity
-
-
-def _check_energy_unit(unit: str) -> None:
-    """Validate a displayed energy unit without importing Pint on numeric paths."""
-    from ..units import Q_
-
-    if not isinstance(unit, str) or not unit.strip():
-        raise TypeError("energy_unit must be a nonempty energy-unit string")
-    try:
-        Q_(1, unit).to("eV")
-    except Exception as exc:
-        raise ValueError(f"energy_unit {unit!r} must be an energy unit") from exc
 
 
 @dataclass(frozen=True, slots=True, eq=False)

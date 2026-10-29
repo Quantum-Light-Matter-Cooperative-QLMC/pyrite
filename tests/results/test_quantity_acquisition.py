@@ -79,6 +79,24 @@ def test_snapshot_and_mutable_readback_are_isolated() -> None:
     np.testing.assert_array_equal(view.expected_counts.magnitude, [[2.5, 3.25], [4.5, 5.75]])
 
 
+def test_public_alias_and_pickle_identity_survive_owner_move() -> None:
+    import pickle
+
+    from pyrite.instrument.quantified_acquisition import QuantifiedAcquisitionBatch as Owner
+    from pyrite.results.quantified_acquisition import QuantifiedAcquisitionBatch as Legacy
+
+    assert Owner is Legacy is QuantifiedAcquisitionBatch
+    assert Owner.__module__ == "pyrite.results.quantified_acquisition"
+    view = _batch(realized=True).quantify().to_energy("keV")
+    restored = pickle.loads(pickle.dumps(view))
+    assert type(restored) is Owner
+    assert restored.observation_digest == view.observation_digest
+    np.testing.assert_array_equal(restored.counts.magnitude, view.counts.magnitude)
+    np.testing.assert_array_equal(
+        restored.measured_energy_edges.magnitude, view.measured_energy_edges.magnitude
+    )
+
+
 @pytest.mark.parametrize("unit", ["s", "Hz", "mm", "radian", "dimensionless"])
 def test_bad_energy_unit_refused(unit: str) -> None:
     with pytest.raises(ValueError, match="energy_unit.*energy"):

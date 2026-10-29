@@ -17,7 +17,7 @@ from ..detectors import Detector, NativeSpectrum
 from .observation import REALIZATION_RNG, Acquisition, NativeAcquisition
 
 if TYPE_CHECKING:
-    from ..results.quantified_acquisition import QuantifiedAcquisitionBatch
+    from .quantified_acquisition import QuantifiedAcquisitionBatch
 
 MAX_NATIVE_REPORTING_BINS = 65_536
 
@@ -190,7 +190,7 @@ class AcquisitionBatch:
 
     def quantify(self) -> QuantifiedAcquisitionBatch:
         """Return a detached quantity view; never rescore or redraw acquisition."""
-        from ..results.quantified_acquisition import QuantifiedAcquisitionBatch
+        from .quantified_acquisition import QuantifiedAcquisitionBatch
 
         return QuantifiedAcquisitionBatch.from_batch(self)
 
