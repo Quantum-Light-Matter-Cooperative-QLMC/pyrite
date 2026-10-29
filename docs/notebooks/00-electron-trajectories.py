@@ -152,8 +152,9 @@ def _(
     from matplotlib.collections import LineCollection
 
     # Two-dimensional projection of the true three-dimensional segments.
-    lines = np.stack((starts_nm[displayed_rows][:, [0, 2]],
-                      ends_nm[displayed_rows][:, [0, 2]]), axis=1)
+    lines = np.stack(
+        (starts_nm[displayed_rows][:, [0, 2]], ends_nm[displayed_rows][:, [0, 2]]), axis=1
+    )
     fig_tracks, ax_tracks = plt.subplots(figsize=(7.5, 5), layout="constrained")
     ax_tracks.axhspan(0, thickness_nm, color="0.4", alpha=0.35, zorder=0)
     tracks = LineCollection(lines, cmap="turbo", linewidths=1.3)
@@ -163,21 +164,36 @@ def _(
 
     # Mark visible terminal track endpoints, using row-end event codes:
     # 4 = exit through entrance (backscatter), 5 = exit through back face.
-    fate_legend = ((4, "^", "Backscattered", 'b'), (5, "v", "Transmitted", 'g'), (7, "x", "Absorbed", 'r'))
+    fate_legend = (
+        (4, "^", "Backscattered", "b"),
+        (5, "v", "Transmitted", "g"),
+        (7, "x", "Absorbed", "r"),
+    )
     for code, symbol, label, color in fate_legend:
-        selected = last_rows[(last_rows < len(displayed_rows))
-                             & displayed_rows[last_rows]
-                             & (event_codes[last_rows] == code)]
+        selected = last_rows[
+            (last_rows < len(displayed_rows))
+            & displayed_rows[last_rows]
+            & (event_codes[last_rows] == code)
+        ]
         if selected.size:
-            ax_tracks.scatter(ends_nm[selected, 0], ends_nm[selected, 2],
-                              marker=symbol, s=35, label=label, zorder=3, color=color)
+            ax_tracks.scatter(
+                ends_nm[selected, 0],
+                ends_nm[selected, 2],
+                marker=symbol,
+                s=35,
+                label=label,
+                zorder=3,
+                color=color,
+            )
     extent = np.concatenate((starts_nm[displayed_rows, 0], ends_nm[displayed_rows, 0]))
     margin = max(80.0, 0.07 * np.ptp(extent))
-    ax_tracks.set(xlim=(extent.min() - margin, extent.max() + margin),
-                  ylim=(thickness_nm + 80.0, -80.0),
-                  xlabel="Transverse position x (nm)",
-                  ylabel="Depth z (nm)",
-                  title="32 sampled primary tracks · 30 keV on HOPG")
+    ax_tracks.set(
+        xlim=(extent.min() - margin, extent.max() + margin),
+        ylim=(thickness_nm + 80.0, -80.0),
+        xlabel="Transverse position x (nm)",
+        ylabel="Depth z (nm)",
+        title="32 sampled primary tracks · 30 keV on HOPG",
+    )
     ax_tracks.grid(alpha=0.2)
     if ax_tracks.get_legend_handles_labels()[0]:
         ax_tracks.legend(loc="lower right", fontsize=8)
@@ -226,19 +242,19 @@ def _(
     low = np.minimum(starts_nm[:, 2], ends_nm[:, 2])[:, None]
     high = np.maximum(starts_nm[:, 2], ends_nm[:, 2])[:, None]
     dz = high - low
-    overlap = np.maximum(0, np.minimum(high, depth_edges_nm[1:])
-                         - np.maximum(low, depth_edges_nm[:-1]))
+    overlap = np.maximum(
+        0, np.minimum(high, depth_edges_nm[1:]) - np.maximum(low, depth_edges_nm[:-1])
+    )
     shares = np.divide(overlap, dz, out=np.zeros_like(overlap), where=dz > 1e-12)
     # Zero-depth-span (nearly transverse) rows deposit in their midpoint bin.
-    flat = (dz[:, 0] <= 1e-12)
+    flat = dz[:, 0] <= 1e-12
     if np.any(flat):
         index = np.searchsorted(depth_edges_nm, starts_nm[flat, 2], side="right") - 1
         valid = (index >= 0) & (index < len(depth_edges_nm) - 1)
         shares[np.flatnonzero(flat)[valid], index[valid]] = 1.0
     continuous_loss_keV = np.maximum(0, energy_start_keV - energy_end_keV)
     depth_loss_per_electron_nm = (
-        np.sum(shares * continuous_loss_keV[:, None], axis=0)
-        / histories / np.diff(depth_edges_nm)
+        np.sum(shares * continuous_loss_keV[:, None], axis=0) / histories / np.diff(depth_edges_nm)
     )
 
     fates = {
@@ -278,26 +294,39 @@ def _(
     fig_summary, axes = plt.subplots(1, 3, figsize=(11, 3.6), layout="constrained")
     centers = 0.5 * (depth_edges_nm[1:] + depth_edges_nm[:-1])
     axes[0].step(centers, depth_loss_per_electron_nm, where="mid")
-    axes[0].set(xlabel="Depth (nm)",
-                ylabel="Continuous energy loss (keV / electron / nm)",
-                title="Loss along flights")
+    axes[0].set(
+        xlabel="Depth (nm)",
+        ylabel="Continuous energy loss (keV / electron / nm)",
+        title="Loss along flights",
+    )
     axes[0].grid(alpha=0.2)
 
     bins = np.linspace(0, 30, 61)
-    axes[1].hist([escaped_top_keV, escaped_bottom_keV], bins=bins,
-                 label=["Backscatter", "Transmission"], stacked=True)
-    axes[1].set(xlabel="Exit kinetic energy (keV)",
-                ylabel="Sampled electrons", title="Escaping primaries",
-                yscale="log")
+    axes[1].hist(
+        [escaped_top_keV, escaped_bottom_keV],
+        bins=bins,
+        label=["Backscatter", "Transmission"],
+        stacked=True,
+    )
+    axes[1].set(
+        xlabel="Exit kinetic energy (keV)",
+        ylabel="Sampled electrons",
+        title="Escaping primaries",
+        yscale="log",
+    )
     axes[1].legend(fontsize=8)
     axes[1].grid(alpha=0.2)
 
     labels = list(fates)
     percentages = [100.0 * count / histories for count in fates.values()]
     axes[2].bar(range(len(labels)), percentages)
-    axes[2].set(xticks=range(len(labels)), xticklabels=labels,
-                ylabel="Incident histories (%)", ylim=(0, 105),
-                title="Terminal outcomes")
+    axes[2].set(
+        xticks=range(len(labels)),
+        xticklabels=labels,
+        ylabel="Incident histories (%)",
+        ylim=(0, 105),
+        title="Terminal outcomes",
+    )
     axes[2].tick_params(axis="x", labelrotation=35)
     fig_summary.suptitle(f"30 keV HOPG · N={histories} histories · seed={seed}")
     fig_summary  # noqa: B018 - display the figure in marimo

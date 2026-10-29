@@ -17,7 +17,9 @@ def main():
     for directory in args.directories:
         for path in sorted(directory.glob("*-audit.json")):
             stem = path.name.removesuffix("-audit.json")
-            if (directory / f"{stem}.failed").exists():
+            if any(
+                (directory / f"{stem}{suffix}").exists() for suffix in (".failed", ".failed.json")
+            ):
                 continue
             audit = json.loads(path.read_text())
             sample = json.loads(path.with_name(path.name.replace("-audit", "")).read_text())

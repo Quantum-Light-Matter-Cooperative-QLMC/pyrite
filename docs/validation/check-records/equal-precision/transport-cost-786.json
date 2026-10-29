@@ -1,0 +1,2177 @@
+{
+  "schema": "pyrite.equal-precision.kernel-summary.v1",
+  "groups": [
+    {
+      "scene": "si-300-100um-0deg",
+      "histories": 5000,
+      "variant": "baseline",
+      "repeats": 3,
+      "median_s": 3.1239352920092642,
+      "min_s": 2.966474200831726,
+      "max_s": 3.2193813549820334
+    },
+    {
+      "scene": "si-300-100um-0deg",
+      "histories": 5000,
+      "variant": "capacity",
+      "repeats": 3,
+      "median_s": 3.015436259098351,
+      "min_s": 2.9784256140701473,
+      "max_s": 3.030349296052009
+    },
+    {
+      "scene": "si-300-100um-0deg",
+      "histories": 5000,
+      "variant": "capacity32",
+      "repeats": 3,
+      "median_s": 2.4507812538649887,
+      "min_s": 2.438072301913053,
+      "max_s": 2.540441371034831
+    },
+    {
+      "scene": "si-300-100um-0deg",
+      "histories": 5000,
+      "variant": "learned32",
+      "repeats": 3,
+      "median_s": 1.528072440996766,
+      "min_s": 1.5017449581064284,
+      "max_s": 1.6279687718488276
+    },
+    {
+      "scene": "si-300-100um-0deg",
+      "histories": 5000,
+      "variant": "threads32",
+      "repeats": 3,
+      "median_s": 2.5229757020715624,
+      "min_s": 2.4670665820594877,
+      "max_s": 2.6281202589161694
+    },
+    {
+      "scene": "w-300-10um-0deg",
+      "histories": 5000,
+      "variant": "baseline",
+      "repeats": 3,
+      "median_s": 10.607492265990004,
+      "min_s": 10.53562002396211,
+      "max_s": 10.99228034983389
+    },
+    {
+      "scene": "w-300-10um-0deg",
+      "histories": 5000,
+      "variant": "capacity",
+      "repeats": 3,
+      "median_s": 8.03248383384198,
+      "min_s": 7.954576917923987,
+      "max_s": 8.15984186786227
+    },
+    {
+      "scene": "w-300-10um-0deg",
+      "histories": 5000,
+      "variant": "capacity32",
+      "repeats": 3,
+      "median_s": 6.825271400157362,
+      "min_s": 6.721913350047544,
+      "max_s": 6.858448745915666
+    },
+    {
+      "scene": "w-300-10um-0deg",
+      "histories": 5000,
+      "variant": "learned32",
+      "repeats": 3,
+      "median_s": 6.764097483828664,
+      "min_s": 6.697690119035542,
+      "max_s": 6.886436038883403
+    },
+    {
+      "scene": "w-300-10um-0deg",
+      "histories": 5000,
+      "variant": "threads32",
+      "repeats": 3,
+      "median_s": 8.863649445818737,
+      "min_s": 8.801202166825533,
+      "max_s": 8.996725487988442
+    }
+  ],
+  "samples": [
+    {
+      "file": "evidence/transport-cost/2630/si-300-100um-0deg-78601-baseline-audit.json",
+      "scene": "si-300-100um-0deg",
+      "histories": 5000,
+      "seed": 78601,
+      "variant": "baseline",
+      "transport_s": 3.2193813549820334,
+      "launch_s": 2.2116027111187577,
+      "launches": 2,
+      "replayed_launches": 1,
+      "executed_segments": 10423834,
+      "retained_segments": 5211917,
+      "measured_hashes": [
+        "6e33930e9c374f5db36cc04ddd0a99320d28ed5e5ac119640860cfec8e6e8e91"
+      ],
+      "warmup_hashes": [
+        "10f7251232b11c000612bab626d0870b60093a59ac99fa1fbf4ac3fa1fb2391f"
+      ],
+      "max_launch_electrons": 5000,
+      "identical_to_baseline": true,
+      "phase_timings_s": {
+        "imports_and_tables": 0.1690724289510399,
+        "warmup": 4.373788650147617,
+        "transport_and_emission": 3.2193813549820334,
+        "request_with_reductions": 4.0210043508559465,
+        "reductions": 0.8015605751425028,
+        "adapter_total": 8.564485355047509
+      },
+      "warmup": {
+        "repeats": 1,
+        "histories": 5000,
+        "seed": 1078601,
+        "wall_s": 4.373788650147617,
+        "same_scene_tables_numerics": true,
+        "device_synchronized": true
+      },
+      "peak_rss_kib": 1795068,
+      "measured_launches": [
+        {
+          "electrons": 5000,
+          "capacity": 512,
+          "segments": 5211917,
+          "max_segments": 4213,
+          "replayed": true,
+          "synchronized_wall_s": 1.1040606449823827,
+          "scratch_bytes": 320000000
+        },
+        {
+          "electrons": 5000,
+          "capacity": 5267,
+          "segments": 5211917,
+          "max_segments": 4213,
+          "replayed": false,
+          "synchronized_wall_s": 1.107542066136375,
+          "scratch_bytes": 3291875000
+        }
+      ],
+      "request_initial_capacities": [],
+      "capacity_hint_policy": null,
+      "sample_sha256": "6b86c70b0a699339124c1ecf1963e4e0579a24fd25724808eedaa37d0906812e",
+      "audit_sha256": "f99fcf268d6b66f42d6cc661fae528a4ed124fcf551977a7d3dde4d5fc246e22"
+    },
+    {
+      "file": "evidence/transport-cost/2630/si-300-100um-0deg-78601-capacity-audit.json",
+      "scene": "si-300-100um-0deg",
+      "histories": 5000,
+      "seed": 78601,
+      "variant": "capacity",
+      "transport_s": 3.015436259098351,
+      "launch_s": 2.168676228960976,
+      "launches": 2,
+      "replayed_launches": 0,
+      "executed_segments": 5211917,
+      "retained_segments": 5211917,
+      "measured_hashes": [
+        "6e33930e9c374f5db36cc04ddd0a99320d28ed5e5ac119640860cfec8e6e8e91"
+      ],
+      "warmup_hashes": [
+        "10f7251232b11c000612bab626d0870b60093a59ac99fa1fbf4ac3fa1fb2391f"
+      ],
+      "max_launch_electrons": 4190,
+      "identical_to_baseline": true,
+      "phase_timings_s": {
+        "imports_and_tables": 0.1275351969525218,
+        "warmup": 4.143511547939852,
+        "transport_and_emission": 3.015436259098351,
+        "request_with_reductions": 3.8053947798907757,
+        "reductions": 0.7898947009816766,
+        "adapter_total": 8.077116449829191
+      },
+      "warmup": {
+        "repeats": 1,
+        "histories": 5000,
+        "seed": 1078601,
+        "wall_s": 4.143511547939852,
+        "same_scene_tables_numerics": true,
+        "device_synchronized": true
+      },
+      "peak_rss_kib": 1803372,
+      "measured_launches": [
+        {
+          "electrons": 4190,
+          "capacity": 12500,
+          "segments": 4355805,
+          "max_segments": 4183,
+          "replayed": false,
+          "synchronized_wall_s": 1.1067136770579964,
+          "scratch_bytes": 6546875000
+        },
+        {
+          "electrons": 810,
+          "capacity": 5229,
+          "segments": 856112,
+          "max_segments": 4213,
+          "replayed": false,
+          "synchronized_wall_s": 1.0619625519029796,
+          "scratch_bytes": 529436250
+        }
+      ],
+      "request_initial_capacities": [],
+      "capacity_hint_policy": null,
+      "sample_sha256": "24217a308bb6892142f87f024f50e61e6a7956ccc176f867a73f1ff25741219d",
+      "audit_sha256": "7f017dea96047a89d31c75b76940ae10c781e0fd1bcccadb102c2335ac28334a"
+    },
+    {
+      "file": "evidence/transport-cost/2630/si-300-100um-0deg-78601-capacity32-audit.json",
+      "scene": "si-300-100um-0deg",
+      "histories": 5000,
+      "seed": 78601,
+      "variant": "capacity32",
+      "transport_s": 2.4507812538649887,
+      "launch_s": 1.6359959810506552,
+      "launches": 2,
+      "replayed_launches": 0,
+      "executed_segments": 5211917,
+      "retained_segments": 5211917,
+      "measured_hashes": [
+        "6e33930e9c374f5db36cc04ddd0a99320d28ed5e5ac119640860cfec8e6e8e91"
+      ],
+      "warmup_hashes": [
+        "10f7251232b11c000612bab626d0870b60093a59ac99fa1fbf4ac3fa1fb2391f"
+      ],
+      "max_launch_electrons": 4190,
+      "identical_to_baseline": true,
+      "phase_timings_s": {
+        "imports_and_tables": 0.12779572303406894,
+        "warmup": 3.6437780170235783,
+        "transport_and_emission": 2.4507812538649887,
+        "request_with_reductions": 3.2295832438394427,
+        "reductions": 0.7787323400843889,
+        "adapter_total": 7.001812957925722
+      },
+      "warmup": {
+        "repeats": 1,
+        "histories": 5000,
+        "seed": 1078601,
+        "wall_s": 3.6437780170235783,
+        "same_scene_tables_numerics": true,
+        "device_synchronized": true
+      },
+      "peak_rss_kib": 1803780,
+      "measured_launches": [
+        {
+          "electrons": 4190,
+          "capacity": 12500,
+          "segments": 4355805,
+          "max_segments": 4183,
+          "replayed": false,
+          "synchronized_wall_s": 0.8532814779318869,
+          "scratch_bytes": 6546875000
+        },
+        {
+          "electrons": 810,
+          "capacity": 5229,
+          "segments": 856112,
+          "max_segments": 4213,
+          "replayed": false,
+          "synchronized_wall_s": 0.7827145031187683,
+          "scratch_bytes": 529436250
+        }
+      ],
+      "request_initial_capacities": [],
+      "capacity_hint_policy": null,
+      "sample_sha256": "f6e4c6ba7fed6d196513c4c0286ceb5854a9174ae3e8cef4e72e229ad8fb704d",
+      "audit_sha256": "ecc5235c631323dd06e7ef6a7339103a3432d3e6884791b2a69f1bbe7f60e688"
+    },
+    {
+      "file": "evidence/transport-cost/2630/si-300-100um-0deg-78601-learned32-audit.json",
+      "scene": "si-300-100um-0deg",
+      "histories": 5000,
+      "seed": 78601,
+      "variant": "learned32",
+      "transport_s": 1.528072440996766,
+      "launch_s": 0.8318839189596474,
+      "launches": 1,
+      "replayed_launches": 0,
+      "executed_segments": 5211917,
+      "retained_segments": 5211917,
+      "measured_hashes": [
+        "6e33930e9c374f5db36cc04ddd0a99320d28ed5e5ac119640860cfec8e6e8e91"
+      ],
+      "warmup_hashes": [
+        "10f7251232b11c000612bab626d0870b60093a59ac99fa1fbf4ac3fa1fb2391f"
+      ],
+      "max_launch_electrons": 5000,
+      "identical_to_baseline": true,
+      "phase_timings_s": {
+        "imports_and_tables": 0.12859713612124324,
+        "warmup": 3.7396154259331524,
+        "transport_and_emission": 1.528072440996766,
+        "request_with_reductions": 2.3121416040230542,
+        "reductions": 0.7840045418124646,
+        "adapter_total": 6.1809707609936595
+      },
+      "warmup": {
+        "repeats": 1,
+        "histories": 5000,
+        "seed": 1078601,
+        "wall_s": 3.7396154259331524,
+        "same_scene_tables_numerics": true,
+        "device_synchronized": true
+      },
+      "peak_rss_kib": 1797588,
+      "measured_launches": [
+        {
+          "electrons": 5000,
+          "capacity": 5249,
+          "segments": 5211917,
+          "max_segments": 4213,
+          "replayed": false,
+          "synchronized_wall_s": 0.8318839189596474,
+          "scratch_bytes": 3280625000
+        }
+      ],
+      "request_initial_capacities": [
+        512,
+        5249
+      ],
+      "capacity_hint_policy": "Request-local diagnostic cache: carry 1.25 times the largest observed track across complete requests, including warmup. Overflow replay stays enabled; warmup and measurement use the same adaptive policy, with different learned state. Not a production capacity policy.",
+      "sample_sha256": "d9699b655369e970cdfc7850d65176dd624fec448498e11b725198953b644b81",
+      "audit_sha256": "05fefd5e857132d4edd97adc4f70315edb31aab6620abe5a5ce7222e44346cf7"
+    },
+    {
+      "file": "evidence/transport-cost/2630/si-300-100um-0deg-78601-threads32-audit.json",
+      "scene": "si-300-100um-0deg",
+      "histories": 5000,
+      "seed": 78601,
+      "variant": "threads32",
+      "transport_s": 2.5229757020715624,
+      "launch_s": 1.6547607537359,
+      "launches": 2,
+      "replayed_launches": 1,
+      "executed_segments": 10423834,
+      "retained_segments": 5211917,
+      "measured_hashes": [
+        "6e33930e9c374f5db36cc04ddd0a99320d28ed5e5ac119640860cfec8e6e8e91"
+      ],
+      "warmup_hashes": [
+        "10f7251232b11c000612bab626d0870b60093a59ac99fa1fbf4ac3fa1fb2391f"
+      ],
+      "max_launch_electrons": 5000,
+      "identical_to_baseline": true,
+      "phase_timings_s": {
+        "imports_and_tables": 0.12849469482898712,
+        "warmup": 3.7315321560017765,
+        "transport_and_emission": 2.5229757020715624,
+        "request_with_reductions": 3.3029695339500904,
+        "reductions": 0.7799287210218608,
+        "adapter_total": 7.163757520960644
+      },
+      "warmup": {
+        "repeats": 1,
+        "histories": 5000,
+        "seed": 1078601,
+        "wall_s": 3.7315321560017765,
+        "same_scene_tables_numerics": true,
+        "device_synchronized": true
+      },
+      "peak_rss_kib": 1798340,
+      "measured_launches": [
+        {
+          "electrons": 5000,
+          "capacity": 512,
+          "segments": 5211917,
+          "max_segments": 4213,
+          "replayed": true,
+          "synchronized_wall_s": 0.8262783489190042,
+          "scratch_bytes": 320000000
+        },
+        {
+          "electrons": 5000,
+          "capacity": 5267,
+          "segments": 5211917,
+          "max_segments": 4213,
+          "replayed": false,
+          "synchronized_wall_s": 0.8284824048168957,
+          "scratch_bytes": 3291875000
+        }
+      ],
+      "request_initial_capacities": [],
+      "capacity_hint_policy": null,
+      "sample_sha256": "710c4033dfbaae366ec85e05ecb2602d1826551d3e94d2ff49a6187a7d6637ae",
+      "audit_sha256": "2696ee26a982565622eba246c16767ba9f2c27b7cd68a61609bd1fc9cd347a21"
+    },
+    {
+      "file": "evidence/transport-cost/2630/si-300-100um-0deg-78602-baseline-audit.json",
+      "scene": "si-300-100um-0deg",
+      "histories": 5000,
+      "seed": 78602,
+      "variant": "baseline",
+      "transport_s": 3.1239352920092642,
+      "launch_s": 2.1609687141608447,
+      "launches": 2,
+      "replayed_launches": 1,
+      "executed_segments": 10221158,
+      "retained_segments": 5110579,
+      "measured_hashes": [
+        "ee52f0c9b3ab8aaa35ea46edef720ce46636bce71f35b00fbb49aab94e829679"
+      ],
+      "warmup_hashes": [
+        "bb6898c7b127df8cdc6ee1be9961f88e5e539132ee1b5fb40a36968a4b6371c3"
+      ],
+      "max_launch_electrons": 5000,
+      "identical_to_baseline": true,
+      "phase_timings_s": {
+        "imports_and_tables": 0.13703860621899366,
+        "warmup": 4.280588891822845,
+        "transport_and_emission": 3.1239352920092642,
+        "request_with_reductions": 3.9111834031064063,
+        "reductions": 0.7871865010820329,
+        "adapter_total": 8.329434843035415
+      },
+      "warmup": {
+        "repeats": 1,
+        "histories": 5000,
+        "seed": 1078602,
+        "wall_s": 4.280588891822845,
+        "same_scene_tables_numerics": true,
+        "device_synchronized": true
+      },
+      "peak_rss_kib": 1805092,
+      "measured_launches": [
+        {
+          "electrons": 5000,
+          "capacity": 512,
+          "segments": 5110579,
+          "max_segments": 4210,
+          "replayed": true,
+          "synchronized_wall_s": 1.0787870280910283,
+          "scratch_bytes": 320000000
+        },
+        {
+          "electrons": 5000,
+          "capacity": 5263,
+          "segments": 5110579,
+          "max_segments": 4210,
+          "replayed": false,
+          "synchronized_wall_s": 1.0821816860698164,
+          "scratch_bytes": 3289375000
+        }
+      ],
+      "request_initial_capacities": [],
+      "capacity_hint_policy": null,
+      "sample_sha256": "3b00a9e5c3508174115f8656b0d7bb1a6b81488311e0f2befc6f688c0512a8e1",
+      "audit_sha256": "7585376bb0604c37f9a4fbee95abb8b3778183f8f1359b6a4e1aa837657f585e"
+    },
+    {
+      "file": "evidence/transport-cost/2630/si-300-100um-0deg-78602-capacity-audit.json",
+      "scene": "si-300-100um-0deg",
+      "histories": 5000,
+      "seed": 78602,
+      "variant": "capacity",
+      "transport_s": 3.030349296052009,
+      "launch_s": 2.133905563969165,
+      "launches": 2,
+      "replayed_launches": 0,
+      "executed_segments": 5110579,
+      "retained_segments": 5110579,
+      "measured_hashes": [
+        "ee52f0c9b3ab8aaa35ea46edef720ce46636bce71f35b00fbb49aab94e829679"
+      ],
+      "warmup_hashes": [
+        "bb6898c7b127df8cdc6ee1be9961f88e5e539132ee1b5fb40a36968a4b6371c3"
+      ],
+      "max_launch_electrons": 4190,
+      "identical_to_baseline": true,
+      "phase_timings_s": {
+        "imports_and_tables": 0.12932077911682427,
+        "warmup": 4.240984884090722,
+        "transport_and_emission": 3.030349296052009,
+        "request_with_reductions": 3.8065080700907856,
+        "reductions": 0.776086893863976,
+        "adapter_total": 8.177464237902313
+      },
+      "warmup": {
+        "repeats": 1,
+        "histories": 5000,
+        "seed": 1078602,
+        "wall_s": 4.240984884090722,
+        "same_scene_tables_numerics": true,
+        "device_synchronized": true
+      },
+      "peak_rss_kib": 1810552,
+      "measured_launches": [
+        {
+          "electrons": 4190,
+          "capacity": 12500,
+          "segments": 4281160,
+          "max_segments": 4182,
+          "replayed": false,
+          "synchronized_wall_s": 1.0810933739412576,
+          "scratch_bytes": 6546875000
+        },
+        {
+          "electrons": 810,
+          "capacity": 5228,
+          "segments": 829419,
+          "max_segments": 4210,
+          "replayed": false,
+          "synchronized_wall_s": 1.0528121900279075,
+          "scratch_bytes": 529335000
+        }
+      ],
+      "request_initial_capacities": [],
+      "capacity_hint_policy": null,
+      "sample_sha256": "fb1ee4c160e6c483d58a2278ccfab1185d92c2d7c2767e95f4d3edf19ccca007",
+      "audit_sha256": "43dcbfb4916078ea3d0cf542cb19c8f7b27d177d06bb823ee49388c6f0b5f9a0"
+    },
+    {
+      "file": "evidence/transport-cost/2630/si-300-100um-0deg-78602-capacity32-audit.json",
+      "scene": "si-300-100um-0deg",
+      "histories": 5000,
+      "seed": 78602,
+      "variant": "capacity32",
+      "transport_s": 2.540441371034831,
+      "launch_s": 1.6151044198777527,
+      "launches": 2,
+      "replayed_launches": 0,
+      "executed_segments": 5110579,
+      "retained_segments": 5110579,
+      "measured_hashes": [
+        "ee52f0c9b3ab8aaa35ea46edef720ce46636bce71f35b00fbb49aab94e829679"
+      ],
+      "warmup_hashes": [
+        "bb6898c7b127df8cdc6ee1be9961f88e5e539132ee1b5fb40a36968a4b6371c3"
+      ],
+      "max_launch_electrons": 4190,
+      "identical_to_baseline": true,
+      "phase_timings_s": {
+        "imports_and_tables": 0.14318678295239806,
+        "warmup": 3.660997004015371,
+        "transport_and_emission": 2.540441371034831,
+        "request_with_reductions": 3.3053115280345082,
+        "reductions": 0.7647493658587337,
+        "adapter_total": 7.110347501933575
+      },
+      "warmup": {
+        "repeats": 1,
+        "histories": 5000,
+        "seed": 1078602,
+        "wall_s": 3.660997004015371,
+        "same_scene_tables_numerics": true,
+        "device_synchronized": true
+      },
+      "peak_rss_kib": 1812040,
+      "measured_launches": [
+        {
+          "electrons": 4190,
+          "capacity": 12500,
+          "segments": 4281160,
+          "max_segments": 4182,
+          "replayed": false,
+          "synchronized_wall_s": 0.8357082249131054,
+          "scratch_bytes": 6546875000
+        },
+        {
+          "electrons": 810,
+          "capacity": 5228,
+          "segments": 829419,
+          "max_segments": 4210,
+          "replayed": false,
+          "synchronized_wall_s": 0.7793961949646473,
+          "scratch_bytes": 529335000
+        }
+      ],
+      "request_initial_capacities": [],
+      "capacity_hint_policy": null,
+      "sample_sha256": "d1ce4b575dfa472eb61b962b8848d15cc32a0e9daa9acc865b738030daec9e49",
+      "audit_sha256": "cee5a67633ea254727631ec1399f76ae436cfff5b37eb3f69f2532230e1d0089"
+    },
+    {
+      "file": "evidence/transport-cost/2630/si-300-100um-0deg-78602-learned32-audit.json",
+      "scene": "si-300-100um-0deg",
+      "histories": 5000,
+      "seed": 78602,
+      "variant": "learned32",
+      "transport_s": 1.6279687718488276,
+      "launch_s": 0.8342264979146421,
+      "launches": 1,
+      "replayed_launches": 0,
+      "executed_segments": 5110579,
+      "retained_segments": 5110579,
+      "measured_hashes": [
+        "ee52f0c9b3ab8aaa35ea46edef720ce46636bce71f35b00fbb49aab94e829679"
+      ],
+      "warmup_hashes": [
+        "bb6898c7b127df8cdc6ee1be9961f88e5e539132ee1b5fb40a36968a4b6371c3"
+      ],
+      "max_launch_electrons": 5000,
+      "identical_to_baseline": true,
+      "phase_timings_s": {
+        "imports_and_tables": 0.13165608001872897,
+        "warmup": 3.4550394520629197,
+        "transport_and_emission": 1.6279687718488276,
+        "request_with_reductions": 2.384932782035321,
+        "reductions": 0.7569017391651869,
+        "adapter_total": 5.972301308996975
+      },
+      "warmup": {
+        "repeats": 1,
+        "histories": 5000,
+        "seed": 1078602,
+        "wall_s": 3.4550394520629197,
+        "same_scene_tables_numerics": true,
+        "device_synchronized": true
+      },
+      "peak_rss_kib": 1807368,
+      "measured_launches": [
+        {
+          "electrons": 5000,
+          "capacity": 5245,
+          "segments": 5110579,
+          "max_segments": 4210,
+          "replayed": false,
+          "synchronized_wall_s": 0.8342264979146421,
+          "scratch_bytes": 3278125000
+        }
+      ],
+      "request_initial_capacities": [
+        512,
+        5245
+      ],
+      "capacity_hint_policy": "Request-local diagnostic cache: carry 1.25 times the largest observed track across complete requests, including warmup. Overflow replay stays enabled; warmup and measurement use the same adaptive policy, with different learned state. Not a production capacity policy.",
+      "sample_sha256": "0c6fcecd3d772599457d7177c0a466262a4e64237e9705350f1ff807314faec5",
+      "audit_sha256": "959336133dd30de743f601e8d74982ff675afa22869c11e5ba55c14e1b3032a1"
+    },
+    {
+      "file": "evidence/transport-cost/2630/si-300-100um-0deg-78602-threads32-audit.json",
+      "scene": "si-300-100um-0deg",
+      "histories": 5000,
+      "seed": 78602,
+      "variant": "threads32",
+      "transport_s": 2.6281202589161694,
+      "launch_s": 1.666920694988221,
+      "launches": 2,
+      "replayed_launches": 1,
+      "executed_segments": 10221158,
+      "retained_segments": 5110579,
+      "measured_hashes": [
+        "ee52f0c9b3ab8aaa35ea46edef720ce46636bce71f35b00fbb49aab94e829679"
+      ],
+      "warmup_hashes": [
+        "bb6898c7b127df8cdc6ee1be9961f88e5e539132ee1b5fb40a36968a4b6371c3"
+      ],
+      "max_launch_electrons": 5000,
+      "identical_to_baseline": true,
+      "phase_timings_s": {
+        "imports_and_tables": 0.1289827770087868,
+        "warmup": 3.644412289839238,
+        "transport_and_emission": 2.6281202589161694,
+        "request_with_reductions": 3.4104476082138717,
+        "reductions": 0.782250297954306,
+        "adapter_total": 7.184505148092285
+      },
+      "warmup": {
+        "repeats": 1,
+        "histories": 5000,
+        "seed": 1078602,
+        "wall_s": 3.644412289839238,
+        "same_scene_tables_numerics": true,
+        "device_synchronized": true
+      },
+      "peak_rss_kib": 1804956,
+      "measured_launches": [
+        {
+          "electrons": 5000,
+          "capacity": 512,
+          "segments": 5110579,
+          "max_segments": 4210,
+          "replayed": true,
+          "synchronized_wall_s": 0.8325074601452798,
+          "scratch_bytes": 320000000
+        },
+        {
+          "electrons": 5000,
+          "capacity": 5263,
+          "segments": 5110579,
+          "max_segments": 4210,
+          "replayed": false,
+          "synchronized_wall_s": 0.8344132348429412,
+          "scratch_bytes": 3289375000
+        }
+      ],
+      "request_initial_capacities": [],
+      "capacity_hint_policy": null,
+      "sample_sha256": "3b79be2d26f5f1f730f8c311dc5b326fccacec66a03d65e7c2d2f8a0af553853",
+      "audit_sha256": "94716c22388cd9fb8fff5797b9a872ffd5365e46bb8fdf996ca9dd767bbd3787"
+    },
+    {
+      "file": "evidence/transport-cost/2630/si-300-100um-0deg-78603-baseline-audit.json",
+      "scene": "si-300-100um-0deg",
+      "histories": 5000,
+      "seed": 78603,
+      "variant": "baseline",
+      "transport_s": 2.966474200831726,
+      "launch_s": 2.16850673686713,
+      "launches": 2,
+      "replayed_launches": 1,
+      "executed_segments": 10283190,
+      "retained_segments": 5141595,
+      "measured_hashes": [
+        "ff57fa2db9f75a6c3cdd924e2767d32ff6c0ea496fd5a1cd747e65af130d7ed4"
+      ],
+      "warmup_hashes": [
+        "3d3eb8e88a1b3d4e73ce88adee26dffaf6d229dbd0e5a1b27f8021a0ede74f6a"
+      ],
+      "max_launch_electrons": 5000,
+      "identical_to_baseline": true,
+      "phase_timings_s": {
+        "imports_and_tables": 0.12981796194799244,
+        "warmup": 4.021298479987308,
+        "transport_and_emission": 2.966474200831726,
+        "request_with_reductions": 3.746767729986459,
+        "reductions": 0.7802376982290298,
+        "adapter_total": 7.89850979601033
+      },
+      "warmup": {
+        "repeats": 1,
+        "histories": 5000,
+        "seed": 1078603,
+        "wall_s": 4.021298479987308,
+        "same_scene_tables_numerics": true,
+        "device_synchronized": true
+      },
+      "peak_rss_kib": 1793388,
+      "measured_launches": [
+        {
+          "electrons": 5000,
+          "capacity": 512,
+          "segments": 5141595,
+          "max_segments": 4138,
+          "replayed": true,
+          "synchronized_wall_s": 1.0831300949212164,
+          "scratch_bytes": 320000000
+        },
+        {
+          "electrons": 5000,
+          "capacity": 5173,
+          "segments": 5141595,
+          "max_segments": 4138,
+          "replayed": false,
+          "synchronized_wall_s": 1.0853766419459134,
+          "scratch_bytes": 3233125000
+        }
+      ],
+      "request_initial_capacities": [],
+      "capacity_hint_policy": null,
+      "sample_sha256": "aac8207f405bd1cf7747a20bd64b02d019d788e41347103f7e74cea45ca347f0",
+      "audit_sha256": "98d3e85e47a4103af45665093a86a23d11a7a8ae11d2a41aa5f7204d01cb8f03"
+    },
+    {
+      "file": "evidence/transport-cost/2630/si-300-100um-0deg-78603-capacity-audit.json",
+      "scene": "si-300-100um-0deg",
+      "histories": 5000,
+      "seed": 78603,
+      "variant": "capacity",
+      "transport_s": 2.9784256140701473,
+      "launch_s": 2.1687954992521554,
+      "launches": 2,
+      "replayed_launches": 0,
+      "executed_segments": 5141595,
+      "retained_segments": 5141595,
+      "measured_hashes": [
+        "ff57fa2db9f75a6c3cdd924e2767d32ff6c0ea496fd5a1cd747e65af130d7ed4"
+      ],
+      "warmup_hashes": [
+        "3d3eb8e88a1b3d4e73ce88adee26dffaf6d229dbd0e5a1b27f8021a0ede74f6a"
+      ],
+      "max_launch_electrons": 4190,
+      "identical_to_baseline": true,
+      "phase_timings_s": {
+        "imports_and_tables": 0.13063882593996823,
+        "warmup": 4.32516077789478,
+        "transport_and_emission": 2.9784256140701473,
+        "request_with_reductions": 3.7582316619809717,
+        "reductions": 0.7797425370663404,
+        "adapter_total": 8.214697471121326
+      },
+      "warmup": {
+        "repeats": 1,
+        "histories": 5000,
+        "seed": 1078603,
+        "wall_s": 4.32516077789478,
+        "same_scene_tables_numerics": true,
+        "device_synchronized": true
+      },
+      "peak_rss_kib": 1797004,
+      "measured_launches": [
+        {
+          "electrons": 4190,
+          "capacity": 12500,
+          "segments": 4327396,
+          "max_segments": 4138,
+          "replayed": false,
+          "synchronized_wall_s": 1.0870492961257696,
+          "scratch_bytes": 6546875000
+        },
+        {
+          "electrons": 810,
+          "capacity": 5173,
+          "segments": 814199,
+          "max_segments": 4113,
+          "replayed": false,
+          "synchronized_wall_s": 1.0817462031263858,
+          "scratch_bytes": 523766250
+        }
+      ],
+      "request_initial_capacities": [],
+      "capacity_hint_policy": null,
+      "sample_sha256": "645e3cdf02929a9b3b60349cbba182ec01659044122c6eb5c77bfb270dff06ed",
+      "audit_sha256": "4ed3384e7be9384361a40fd4c4e395b299276c565ddb0bbf722bdf4c0d6e5ba3"
+    },
+    {
+      "file": "evidence/transport-cost/2630/si-300-100um-0deg-78603-capacity32-audit.json",
+      "scene": "si-300-100um-0deg",
+      "histories": 5000,
+      "seed": 78603,
+      "variant": "capacity32",
+      "transport_s": 2.438072301913053,
+      "launch_s": 1.614431767957285,
+      "launches": 2,
+      "replayed_launches": 0,
+      "executed_segments": 5141595,
+      "retained_segments": 5141595,
+      "measured_hashes": [
+        "ff57fa2db9f75a6c3cdd924e2767d32ff6c0ea496fd5a1cd747e65af130d7ed4"
+      ],
+      "warmup_hashes": [
+        "3d3eb8e88a1b3d4e73ce88adee26dffaf6d229dbd0e5a1b27f8021a0ede74f6a"
+      ],
+      "max_launch_electrons": 4190,
+      "identical_to_baseline": true,
+      "phase_timings_s": {
+        "imports_and_tables": 0.13159686606377363,
+        "warmup": 3.755603202851489,
+        "transport_and_emission": 2.438072301913053,
+        "request_with_reductions": 3.252529877005145,
+        "reductions": 0.8143900339491665,
+        "adapter_total": 7.140370280947536
+      },
+      "warmup": {
+        "repeats": 1,
+        "histories": 5000,
+        "seed": 1078603,
+        "wall_s": 3.755603202851489,
+        "same_scene_tables_numerics": true,
+        "device_synchronized": true
+      },
+      "peak_rss_kib": 1794532,
+      "measured_launches": [
+        {
+          "electrons": 4190,
+          "capacity": 12500,
+          "segments": 4327396,
+          "max_segments": 4138,
+          "replayed": false,
+          "synchronized_wall_s": 0.8286182549782097,
+          "scratch_bytes": 6546875000
+        },
+        {
+          "electrons": 810,
+          "capacity": 5173,
+          "segments": 814199,
+          "max_segments": 4113,
+          "replayed": false,
+          "synchronized_wall_s": 0.7858135129790753,
+          "scratch_bytes": 523766250
+        }
+      ],
+      "request_initial_capacities": [],
+      "capacity_hint_policy": null,
+      "sample_sha256": "22cd623abb04e379eb25573f78e1d2548695c26b23755db49c76e04df6237cf3",
+      "audit_sha256": "5d8e6e04c6bc0fc6adcfaec648f2a5deed9d64efe6398fe9d72461bc715abe53"
+    },
+    {
+      "file": "evidence/transport-cost/2630/si-300-100um-0deg-78603-learned32-audit.json",
+      "scene": "si-300-100um-0deg",
+      "histories": 5000,
+      "seed": 78603,
+      "variant": "learned32",
+      "transport_s": 1.5017449581064284,
+      "launch_s": 0.830063495086506,
+      "launches": 1,
+      "replayed_launches": 0,
+      "executed_segments": 5141595,
+      "retained_segments": 5141595,
+      "measured_hashes": [
+        "ff57fa2db9f75a6c3cdd924e2767d32ff6c0ea496fd5a1cd747e65af130d7ed4"
+      ],
+      "warmup_hashes": [
+        "3d3eb8e88a1b3d4e73ce88adee26dffaf6d229dbd0e5a1b27f8021a0ede74f6a"
+      ],
+      "max_launch_electrons": 5000,
+      "identical_to_baseline": true,
+      "phase_timings_s": {
+        "imports_and_tables": 0.13235383993014693,
+        "warmup": 3.873705720063299,
+        "transport_and_emission": 1.5017449581064284,
+        "request_with_reductions": 2.2658854089677334,
+        "reductions": 0.7640765008982271,
+        "adapter_total": 6.272619443945587
+      },
+      "warmup": {
+        "repeats": 1,
+        "histories": 5000,
+        "seed": 1078603,
+        "wall_s": 3.873705720063299,
+        "same_scene_tables_numerics": true,
+        "device_synchronized": true
+      },
+      "peak_rss_kib": 1793628,
+      "measured_launches": [
+        {
+          "electrons": 5000,
+          "capacity": 5229,
+          "segments": 5141595,
+          "max_segments": 4138,
+          "replayed": false,
+          "synchronized_wall_s": 0.830063495086506,
+          "scratch_bytes": 3268125000
+        }
+      ],
+      "request_initial_capacities": [
+        512,
+        5229
+      ],
+      "capacity_hint_policy": "Request-local diagnostic cache: carry 1.25 times the largest observed track across complete requests, including warmup. Overflow replay stays enabled; warmup and measurement use the same adaptive policy, with different learned state. Not a production capacity policy.",
+      "sample_sha256": "af4bd0faa6b3954c70acad4c3065953798690c86be9633e6a82eb6563d069d1e",
+      "audit_sha256": "cf8c79bec9bfec91f75fccd0c13e44142a0fc96e7c69bb73516bc5fcba048ae0"
+    },
+    {
+      "file": "evidence/transport-cost/2630/si-300-100um-0deg-78603-threads32-audit.json",
+      "scene": "si-300-100um-0deg",
+      "histories": 5000,
+      "seed": 78603,
+      "variant": "threads32",
+      "transport_s": 2.4670665820594877,
+      "launch_s": 1.657875563018024,
+      "launches": 2,
+      "replayed_launches": 1,
+      "executed_segments": 10283190,
+      "retained_segments": 5141595,
+      "measured_hashes": [
+        "ff57fa2db9f75a6c3cdd924e2767d32ff6c0ea496fd5a1cd747e65af130d7ed4"
+      ],
+      "warmup_hashes": [
+        "3d3eb8e88a1b3d4e73ce88adee26dffaf6d229dbd0e5a1b27f8021a0ede74f6a"
+      ],
+      "max_launch_electrons": 5000,
+      "identical_to_baseline": true,
+      "phase_timings_s": {
+        "imports_and_tables": 0.1283755369950086,
+        "warmup": 3.8834356530569494,
+        "transport_and_emission": 2.4670665820594877,
+        "request_with_reductions": 3.2339027980342507,
+        "reductions": 0.7667642249725759,
+        "adapter_total": 7.246354883071035
+      },
+      "warmup": {
+        "repeats": 1,
+        "histories": 5000,
+        "seed": 1078603,
+        "wall_s": 3.8834356530569494,
+        "same_scene_tables_numerics": true,
+        "device_synchronized": true
+      },
+      "peak_rss_kib": 1795560,
+      "measured_launches": [
+        {
+          "electrons": 5000,
+          "capacity": 512,
+          "segments": 5141595,
+          "max_segments": 4138,
+          "replayed": true,
+          "synchronized_wall_s": 0.8279115399345756,
+          "scratch_bytes": 320000000
+        },
+        {
+          "electrons": 5000,
+          "capacity": 5173,
+          "segments": 5141595,
+          "max_segments": 4138,
+          "replayed": false,
+          "synchronized_wall_s": 0.8299640230834484,
+          "scratch_bytes": 3233125000
+        }
+      ],
+      "request_initial_capacities": [],
+      "capacity_hint_policy": null,
+      "sample_sha256": "b1c85f3dd7be63457b066cbe393dc729f2f16d2e1c7b35f8358c6475f8c184a1",
+      "audit_sha256": "19b63292fd0602b74875fb044921274b14336396b7f286dca9a3d5aa8faa4e4a"
+    },
+    {
+      "file": "evidence/transport-cost/2630/w-300-10um-0deg-78601-baseline-audit.json",
+      "scene": "w-300-10um-0deg",
+      "histories": 5000,
+      "seed": 78601,
+      "variant": "baseline",
+      "transport_s": 10.607492265990004,
+      "launch_s": 7.471073625143617,
+      "launches": 3,
+      "replayed_launches": 1,
+      "executed_segments": 19550432,
+      "retained_segments": 9775216,
+      "measured_hashes": [
+        "1f5300205f1a7a2a4d3899d547aff5a7e3a9656b6f49a99f8150cad648bd252d"
+      ],
+      "warmup_hashes": [
+        "989a0b350b57fcd73b2c9fa5a978a43838c2e6e11e26673fc0a1fb4d76749858"
+      ],
+      "max_launch_electrons": 5000,
+      "identical_to_baseline": true,
+      "phase_timings_s": {
+        "imports_and_tables": 0.12443668488413095,
+        "warmup": 13.374394587939605,
+        "transport_and_emission": 10.607492265990004,
+        "request_with_reductions": 12.124821717152372,
+        "reductions": 1.5172495800070465,
+        "adapter_total": 25.624279516050592
+      },
+      "warmup": {
+        "repeats": 1,
+        "histories": 5000,
+        "seed": 1078601,
+        "wall_s": 13.374394587939605,
+        "same_scene_tables_numerics": true,
+        "device_synchronized": true
+      },
+      "peak_rss_kib": 2824824,
+      "measured_launches": [
+        {
+          "electrons": 5000,
+          "capacity": 512,
+          "segments": 9775216,
+          "max_segments": 9874,
+          "replayed": true,
+          "synchronized_wall_s": 2.5595289319753647,
+          "scratch_bytes": 320000000
+        },
+        {
+          "electrons": 4243,
+          "capacity": 12343,
+          "segments": 8337703,
+          "max_segments": 9874,
+          "replayed": false,
+          "synchronized_wall_s": 2.5703257811255753,
+          "scratch_bytes": 6546418625
+        },
+        {
+          "electrons": 757,
+          "capacity": 12343,
+          "segments": 1437513,
+          "max_segments": 9768,
+          "replayed": false,
+          "synchronized_wall_s": 2.3412189120426774,
+          "scratch_bytes": 1167956375
+        }
+      ],
+      "request_initial_capacities": [],
+      "capacity_hint_policy": null,
+      "sample_sha256": "77b5676b56c4f6e9402759ac396f344df7bf7d4f60ec60e472b1b29440496958",
+      "audit_sha256": "7beffa9fb7c2984683ca6403f4c3d42e8e1d24b2ea1373478bec87905f1afc22"
+    },
+    {
+      "file": "evidence/transport-cost/2630/w-300-10um-0deg-78601-capacity-audit.json",
+      "scene": "w-300-10um-0deg",
+      "histories": 5000,
+      "seed": 78601,
+      "variant": "capacity",
+      "transport_s": 7.954576917923987,
+      "launch_s": 4.967029558727518,
+      "launches": 2,
+      "replayed_launches": 0,
+      "executed_segments": 9775216,
+      "retained_segments": 9775216,
+      "measured_hashes": [
+        "1f5300205f1a7a2a4d3899d547aff5a7e3a9656b6f49a99f8150cad648bd252d"
+      ],
+      "warmup_hashes": [
+        "989a0b350b57fcd73b2c9fa5a978a43838c2e6e11e26673fc0a1fb4d76749858"
+      ],
+      "max_launch_electrons": 4190,
+      "identical_to_baseline": true,
+      "phase_timings_s": {
+        "imports_and_tables": 0.12638466013595462,
+        "warmup": 10.347748716827482,
+        "transport_and_emission": 7.954576917923987,
+        "request_with_reductions": 9.444900153204799,
+        "reductions": 1.4902593451552093,
+        "adapter_total": 19.91970886499621
+      },
+      "warmup": {
+        "repeats": 1,
+        "histories": 5000,
+        "seed": 1078601,
+        "wall_s": 10.347748716827482,
+        "same_scene_tables_numerics": true,
+        "device_synchronized": true
+      },
+      "peak_rss_kib": 2824564,
+      "measured_launches": [
+        {
+          "electrons": 4190,
+          "capacity": 12500,
+          "segments": 8241606,
+          "max_segments": 9874,
+          "replayed": false,
+          "synchronized_wall_s": 2.569752028910443,
+          "scratch_bytes": 6546875000
+        },
+        {
+          "electrons": 810,
+          "capacity": 12343,
+          "segments": 1533610,
+          "max_segments": 9768,
+          "replayed": false,
+          "synchronized_wall_s": 2.3972775298170745,
+          "scratch_bytes": 1249728750
+        }
+      ],
+      "request_initial_capacities": [],
+      "capacity_hint_policy": null,
+      "sample_sha256": "800191d75369f78da0e49498dcd3060bbedb1ebf414081fd1efa746c5c5b94f1",
+      "audit_sha256": "f0a93060cd17c207c7a737651fa732dcaa7301d32a46f1a888507c15b6b320b9"
+    },
+    {
+      "file": "evidence/transport-cost/2630/w-300-10um-0deg-78601-capacity32-audit.json",
+      "scene": "w-300-10um-0deg",
+      "histories": 5000,
+      "seed": 78601,
+      "variant": "capacity32",
+      "transport_s": 6.721913350047544,
+      "launch_s": 3.8136693187989295,
+      "launches": 2,
+      "replayed_launches": 0,
+      "executed_segments": 9775216,
+      "retained_segments": 9775216,
+      "measured_hashes": [
+        "1f5300205f1a7a2a4d3899d547aff5a7e3a9656b6f49a99f8150cad648bd252d"
+      ],
+      "warmup_hashes": [
+        "989a0b350b57fcd73b2c9fa5a978a43838c2e6e11e26673fc0a1fb4d76749858"
+      ],
+      "max_launch_electrons": 4190,
+      "identical_to_baseline": true,
+      "phase_timings_s": {
+        "imports_and_tables": 0.1250817619729787,
+        "warmup": 9.076966057997197,
+        "transport_and_emission": 6.721913350047544,
+        "request_with_reductions": 8.210428460966796,
+        "reductions": 1.4884381908923388,
+        "adapter_total": 17.413095926865935
+      },
+      "warmup": {
+        "repeats": 1,
+        "histories": 5000,
+        "seed": 1078601,
+        "wall_s": 9.076966057997197,
+        "same_scene_tables_numerics": true,
+        "device_synchronized": true
+      },
+      "peak_rss_kib": 2824344,
+      "measured_launches": [
+        {
+          "electrons": 4190,
+          "capacity": 12500,
+          "segments": 8241606,
+          "max_segments": 9874,
+          "replayed": false,
+          "synchronized_wall_s": 1.9734518709592521,
+          "scratch_bytes": 6546875000
+        },
+        {
+          "electrons": 810,
+          "capacity": 12343,
+          "segments": 1533610,
+          "max_segments": 9768,
+          "replayed": false,
+          "synchronized_wall_s": 1.8402174478396773,
+          "scratch_bytes": 1249728750
+        }
+      ],
+      "request_initial_capacities": [],
+      "capacity_hint_policy": null,
+      "sample_sha256": "098de2ab765f2f95903772b324e4d6fa20b863d7edb453928a8ecd5d96c69081",
+      "audit_sha256": "619aae710dcde91ef22beff7e426278ae620be1e4345977261cc6d23600e3223"
+    },
+    {
+      "file": "evidence/transport-cost/2630/w-300-10um-0deg-78601-learned32-audit.json",
+      "scene": "w-300-10um-0deg",
+      "histories": 5000,
+      "seed": 78601,
+      "variant": "learned32",
+      "transport_s": 6.697690119035542,
+      "launch_s": 3.810461511835456,
+      "launches": 2,
+      "replayed_launches": 0,
+      "executed_segments": 9775216,
+      "retained_segments": 9775216,
+      "measured_hashes": [
+        "1f5300205f1a7a2a4d3899d547aff5a7e3a9656b6f49a99f8150cad648bd252d"
+      ],
+      "warmup_hashes": [
+        "989a0b350b57fcd73b2c9fa5a978a43838c2e6e11e26673fc0a1fb4d76749858"
+      ],
+      "max_launch_electrons": 4231,
+      "identical_to_baseline": true,
+      "phase_timings_s": {
+        "imports_and_tables": 0.12794083403423429,
+        "warmup": 11.020609193015844,
+        "transport_and_emission": 6.697690119035542,
+        "request_with_reductions": 8.207630072021857,
+        "reductions": 1.5098714721389115,
+        "adapter_total": 19.35687403497286
+      },
+      "warmup": {
+        "repeats": 1,
+        "histories": 5000,
+        "seed": 1078601,
+        "wall_s": 11.020609193015844,
+        "same_scene_tables_numerics": true,
+        "device_synchronized": true
+      },
+      "peak_rss_kib": 2824020,
+      "measured_launches": [
+        {
+          "electrons": 4231,
+          "capacity": 12379,
+          "segments": 8317870,
+          "max_segments": 9874,
+          "replayed": false,
+          "synchronized_wall_s": 1.973523295018822,
+          "scratch_bytes": 6546943625
+        },
+        {
+          "electrons": 769,
+          "capacity": 12343,
+          "segments": 1457346,
+          "max_segments": 9768,
+          "replayed": false,
+          "synchronized_wall_s": 1.836938216816634,
+          "scratch_bytes": 1186470875
+        }
+      ],
+      "request_initial_capacities": [
+        512,
+        12379
+      ],
+      "capacity_hint_policy": "Request-local diagnostic cache: carry 1.25 times the largest observed track across complete requests, including warmup. Overflow replay stays enabled; warmup and measurement use the same adaptive policy, with different learned state. Not a production capacity policy.",
+      "sample_sha256": "c829792997e7938d7e4a92f78ac7a6039df10003332c2225b56fe4a77d641b3f",
+      "audit_sha256": "e059c70eea8e1e3f608d0da7fbbf4484f93cf84b30fc2bcabd7edb3c58a2e906"
+    },
+    {
+      "file": "evidence/transport-cost/2630/w-300-10um-0deg-78601-threads32-audit.json",
+      "scene": "w-300-10um-0deg",
+      "histories": 5000,
+      "seed": 78601,
+      "variant": "threads32",
+      "transport_s": 8.801202166825533,
+      "launch_s": 5.770015482790768,
+      "launches": 3,
+      "replayed_launches": 1,
+      "executed_segments": 19550432,
+      "retained_segments": 9775216,
+      "measured_hashes": [
+        "1f5300205f1a7a2a4d3899d547aff5a7e3a9656b6f49a99f8150cad648bd252d"
+      ],
+      "warmup_hashes": [
+        "989a0b350b57fcd73b2c9fa5a978a43838c2e6e11e26673fc0a1fb4d76749858"
+      ],
+      "max_launch_electrons": 5000,
+      "identical_to_baseline": true,
+      "phase_timings_s": {
+        "imports_and_tables": 0.1270672050304711,
+        "warmup": 11.152411678107455,
+        "transport_and_emission": 8.801202166825533,
+        "request_with_reductions": 10.312528830952942,
+        "reductions": 1.5112623141612858,
+        "adapter_total": 21.592646677978337
+      },
+      "warmup": {
+        "repeats": 1,
+        "histories": 5000,
+        "seed": 1078601,
+        "wall_s": 11.152411678107455,
+        "same_scene_tables_numerics": true,
+        "device_synchronized": true
+      },
+      "peak_rss_kib": 2822960,
+      "measured_launches": [
+        {
+          "electrons": 5000,
+          "capacity": 512,
+          "segments": 9775216,
+          "max_segments": 9874,
+          "replayed": true,
+          "synchronized_wall_s": 1.9673248569015414,
+          "scratch_bytes": 320000000
+        },
+        {
+          "electrons": 4243,
+          "capacity": 12343,
+          "segments": 8337703,
+          "max_segments": 9874,
+          "replayed": false,
+          "synchronized_wall_s": 1.9730578949674964,
+          "scratch_bytes": 6546418625
+        },
+        {
+          "electrons": 757,
+          "capacity": 12343,
+          "segments": 1437513,
+          "max_segments": 9768,
+          "replayed": false,
+          "synchronized_wall_s": 1.8296327309217304,
+          "scratch_bytes": 1167956375
+        }
+      ],
+      "request_initial_capacities": [],
+      "capacity_hint_policy": null,
+      "sample_sha256": "62c8719f3fffe04a3c3febfa539d986839156d0715cb8278c1157b55a0c6ef73",
+      "audit_sha256": "97733a737050f7eaacdeffede699a56e69a9a479ba782114ff4553f22b23fe2a"
+    },
+    {
+      "file": "evidence/transport-cost/2630/w-300-10um-0deg-78602-baseline-audit.json",
+      "scene": "w-300-10um-0deg",
+      "histories": 5000,
+      "seed": 78602,
+      "variant": "baseline",
+      "transport_s": 10.99228034983389,
+      "launch_s": 7.713647187687457,
+      "launches": 3,
+      "replayed_launches": 1,
+      "executed_segments": 20121288,
+      "retained_segments": 10060644,
+      "measured_hashes": [
+        "4d4983a0b996d4e47c1c4502e583d015201fb0fd72e67bdb948f173760ee0e77"
+      ],
+      "warmup_hashes": [
+        "e3f8dcee99a6387b98e4ba964e3cd3c73c0a3dddbd0f94f9a0a976a6ad969b0e"
+      ],
+      "max_launch_electrons": 5000,
+      "identical_to_baseline": true,
+      "phase_timings_s": {
+        "imports_and_tables": 0.12793353316374123,
+        "warmup": 12.548893171129748,
+        "transport_and_emission": 10.99228034983389,
+        "request_with_reductions": 12.557115518022329,
+        "reductions": 1.5647728780750185,
+        "adapter_total": 25.23468897701241
+      },
+      "warmup": {
+        "repeats": 1,
+        "histories": 5000,
+        "seed": 1078602,
+        "wall_s": 12.548893171129748,
+        "same_scene_tables_numerics": true,
+        "device_synchronized": true
+      },
+      "peak_rss_kib": 2849236,
+      "measured_launches": [
+        {
+          "electrons": 5000,
+          "capacity": 512,
+          "segments": 10060644,
+          "max_segments": 9878,
+          "replayed": true,
+          "synchronized_wall_s": 2.590054720873013,
+          "scratch_bytes": 320000000
+        },
+        {
+          "electrons": 4241,
+          "capacity": 12348,
+          "segments": 8531648,
+          "max_segments": 9878,
+          "replayed": false,
+          "synchronized_wall_s": 2.599637216888368,
+          "scratch_bytes": 6545983500
+        },
+        {
+          "electrons": 759,
+          "capacity": 12348,
+          "segments": 1528996,
+          "max_segments": 9758,
+          "replayed": false,
+          "synchronized_wall_s": 2.5239552499260753,
+          "scratch_bytes": 1171516500
+        }
+      ],
+      "request_initial_capacities": [],
+      "capacity_hint_policy": null,
+      "sample_sha256": "496fe116dd3ae934a74e3b7f53089e320b89be986b71620f25d344373c271c2a",
+      "audit_sha256": "c7d799b564cdfd571ddae7ccf5a941dd8cf3f3c31214a7fcf843e219b1e52af2"
+    },
+    {
+      "file": "evidence/transport-cost/2630/w-300-10um-0deg-78602-capacity-audit.json",
+      "scene": "w-300-10um-0deg",
+      "histories": 5000,
+      "seed": 78602,
+      "variant": "capacity",
+      "transport_s": 8.15984186786227,
+      "launch_s": 4.9707255710382015,
+      "launches": 2,
+      "replayed_launches": 0,
+      "executed_segments": 10060644,
+      "retained_segments": 10060644,
+      "measured_hashes": [
+        "4d4983a0b996d4e47c1c4502e583d015201fb0fd72e67bdb948f173760ee0e77"
+      ],
+      "warmup_hashes": [
+        "e3f8dcee99a6387b98e4ba964e3cd3c73c0a3dddbd0f94f9a0a976a6ad969b0e"
+      ],
+      "max_launch_electrons": 4190,
+      "identical_to_baseline": true,
+      "phase_timings_s": {
+        "imports_and_tables": 0.12620049202814698,
+        "warmup": 9.658123495988548,
+        "transport_and_emission": 8.15984186786227,
+        "request_with_reductions": 9.709148237947375,
+        "reductions": 1.5492418999783695,
+        "adapter_total": 19.49412168096751
+      },
+      "warmup": {
+        "repeats": 1,
+        "histories": 5000,
+        "seed": 1078602,
+        "wall_s": 9.658123495988548,
+        "same_scene_tables_numerics": true,
+        "device_synchronized": true
+      },
+      "peak_rss_kib": 2850260,
+      "measured_launches": [
+        {
+          "electrons": 4190,
+          "capacity": 12500,
+          "segments": 8441879,
+          "max_segments": 9878,
+          "replayed": false,
+          "synchronized_wall_s": 2.5984495549928397,
+          "scratch_bytes": 6546875000
+        },
+        {
+          "electrons": 810,
+          "capacity": 12348,
+          "segments": 1618765,
+          "max_segments": 9758,
+          "replayed": false,
+          "synchronized_wall_s": 2.3722760160453618,
+          "scratch_bytes": 1250235000
+        }
+      ],
+      "request_initial_capacities": [],
+      "capacity_hint_policy": null,
+      "sample_sha256": "61785f9e150ecebd5488fe0f0839a257038169c197c5313649c0196e9c8b16c6",
+      "audit_sha256": "116eb60c9c6e06f18085d466d01ba21f99630d4babd2a5cbb47cdc875e0dc28b"
+    },
+    {
+      "file": "evidence/transport-cost/2630/w-300-10um-0deg-78602-capacity32-audit.json",
+      "scene": "w-300-10um-0deg",
+      "histories": 5000,
+      "seed": 78602,
+      "variant": "capacity32",
+      "transport_s": 6.858448745915666,
+      "launch_s": 3.793350252090022,
+      "launches": 2,
+      "replayed_launches": 0,
+      "executed_segments": 10060644,
+      "retained_segments": 10060644,
+      "measured_hashes": [
+        "4d4983a0b996d4e47c1c4502e583d015201fb0fd72e67bdb948f173760ee0e77"
+      ],
+      "warmup_hashes": [
+        "e3f8dcee99a6387b98e4ba964e3cd3c73c0a3dddbd0f94f9a0a976a6ad969b0e"
+      ],
+      "max_launch_electrons": 4190,
+      "identical_to_baseline": true,
+      "phase_timings_s": {
+        "imports_and_tables": 0.12571428599767387,
+        "warmup": 8.680831997888163,
+        "transport_and_emission": 6.858448745915666,
+        "request_with_reductions": 8.384393159067258,
+        "reductions": 1.525876082945615,
+        "adapter_total": 17.19157576817088
+      },
+      "warmup": {
+        "repeats": 1,
+        "histories": 5000,
+        "seed": 1078602,
+        "wall_s": 8.680831997888163,
+        "same_scene_tables_numerics": true,
+        "device_synchronized": true
+      },
+      "peak_rss_kib": 2849796,
+      "measured_launches": [
+        {
+          "electrons": 4190,
+          "capacity": 12500,
+          "segments": 8441879,
+          "max_segments": 9878,
+          "replayed": false,
+          "synchronized_wall_s": 1.9681280150543898,
+          "scratch_bytes": 6546875000
+        },
+        {
+          "electrons": 810,
+          "capacity": 12348,
+          "segments": 1618765,
+          "max_segments": 9758,
+          "replayed": false,
+          "synchronized_wall_s": 1.8252222370356321,
+          "scratch_bytes": 1250235000
+        }
+      ],
+      "request_initial_capacities": [],
+      "capacity_hint_policy": null,
+      "sample_sha256": "ce8fdccdbb85bfff234ffdf9ddd5f9db064e7a6ca46358390f7807bd4a306611",
+      "audit_sha256": "bbba2d503e4759df38963aa436d3bbe1d612a55a99b4511eee8a7f0a6d1cfb22"
+    },
+    {
+      "file": "evidence/transport-cost/2630/w-300-10um-0deg-78602-learned32-audit.json",
+      "scene": "w-300-10um-0deg",
+      "histories": 5000,
+      "seed": 78602,
+      "variant": "learned32",
+      "transport_s": 6.886436038883403,
+      "launch_s": 3.8102337759919465,
+      "launches": 2,
+      "replayed_launches": 0,
+      "executed_segments": 10060644,
+      "retained_segments": 10060644,
+      "measured_hashes": [
+        "4d4983a0b996d4e47c1c4502e583d015201fb0fd72e67bdb948f173760ee0e77"
+      ],
+      "warmup_hashes": [
+        "e3f8dcee99a6387b98e4ba964e3cd3c73c0a3dddbd0f94f9a0a976a6ad969b0e"
+      ],
+      "max_launch_electrons": 4244,
+      "identical_to_baseline": true,
+      "phase_timings_s": {
+        "imports_and_tables": 0.12396129406988621,
+        "warmup": 11.059464340098202,
+        "transport_and_emission": 6.886436038883403,
+        "request_with_reductions": 8.426369557157159,
+        "reductions": 1.539868517080322,
+        "adapter_total": 19.610520136076957
+      },
+      "warmup": {
+        "repeats": 1,
+        "histories": 5000,
+        "seed": 1078602,
+        "wall_s": 11.059464340098202,
+        "same_scene_tables_numerics": true,
+        "device_synchronized": true
+      },
+      "peak_rss_kib": 2849692,
+      "measured_launches": [
+        {
+          "electrons": 4244,
+          "capacity": 12340,
+          "segments": 8538462,
+          "max_segments": 9878,
+          "replayed": false,
+          "synchronized_wall_s": 2.0060568500775844,
+          "scratch_bytes": 6546370000
+        },
+        {
+          "electrons": 756,
+          "capacity": 12348,
+          "segments": 1522182,
+          "max_segments": 9758,
+          "replayed": false,
+          "synchronized_wall_s": 1.804176925914362,
+          "scratch_bytes": 1166886000
+        }
+      ],
+      "request_initial_capacities": [
+        512,
+        12340
+      ],
+      "capacity_hint_policy": "Request-local diagnostic cache: carry 1.25 times the largest observed track across complete requests, including warmup. Overflow replay stays enabled; warmup and measurement use the same adaptive policy, with different learned state. Not a production capacity policy.",
+      "sample_sha256": "cc4f6e225c9fc55ccc063d4cd3f52e03f0561bfee92243523c67a01a2cdf613f",
+      "audit_sha256": "96fbed040fba7a10e697008ee488d7f3cc5f3f022888868d18c3b06ce291ad6b"
+    },
+    {
+      "file": "evidence/transport-cost/2630/w-300-10um-0deg-78602-threads32-audit.json",
+      "scene": "w-300-10um-0deg",
+      "histories": 5000,
+      "seed": 78602,
+      "variant": "threads32",
+      "transport_s": 8.996725487988442,
+      "launch_s": 5.8109810459427536,
+      "launches": 3,
+      "replayed_launches": 1,
+      "executed_segments": 20121288,
+      "retained_segments": 10060644,
+      "measured_hashes": [
+        "4d4983a0b996d4e47c1c4502e583d015201fb0fd72e67bdb948f173760ee0e77"
+      ],
+      "warmup_hashes": [
+        "e3f8dcee99a6387b98e4ba964e3cd3c73c0a3dddbd0f94f9a0a976a6ad969b0e"
+      ],
+      "max_launch_electrons": 5000,
+      "identical_to_baseline": true,
+      "phase_timings_s": {
+        "imports_and_tables": 0.12729298882186413,
+        "warmup": 10.724956532008946,
+        "transport_and_emission": 8.996725487988442,
+        "request_with_reductions": 10.545422806870192,
+        "reductions": 1.5486302189528942,
+        "adapter_total": 21.398318852996454
+      },
+      "warmup": {
+        "repeats": 1,
+        "histories": 5000,
+        "seed": 1078602,
+        "wall_s": 10.724956532008946,
+        "same_scene_tables_numerics": true,
+        "device_synchronized": true
+      },
+      "peak_rss_kib": 2849024,
+      "measured_launches": [
+        {
+          "electrons": 5000,
+          "capacity": 512,
+          "segments": 10060644,
+          "max_segments": 9878,
+          "replayed": true,
+          "synchronized_wall_s": 2.003931222949177,
+          "scratch_bytes": 320000000
+        },
+        {
+          "electrons": 4241,
+          "capacity": 12348,
+          "segments": 8531648,
+          "max_segments": 9878,
+          "replayed": false,
+          "synchronized_wall_s": 2.009726834949106,
+          "scratch_bytes": 6545983500
+        },
+        {
+          "electrons": 759,
+          "capacity": 12348,
+          "segments": 1528996,
+          "max_segments": 9758,
+          "replayed": false,
+          "synchronized_wall_s": 1.7973229880444705,
+          "scratch_bytes": 1171516500
+        }
+      ],
+      "request_initial_capacities": [],
+      "capacity_hint_policy": null,
+      "sample_sha256": "be6ef8d778d7399dcc65cbad1e3ae0d809e1fed2ff97aa3f30751a82837dac7d",
+      "audit_sha256": "828ced3492a18522dbe81b01d6f782807a906044ec27cad59a3304a686835f85"
+    },
+    {
+      "file": "evidence/transport-cost/2630/w-300-10um-0deg-78603-baseline-audit.json",
+      "scene": "w-300-10um-0deg",
+      "histories": 5000,
+      "seed": 78603,
+      "variant": "baseline",
+      "transport_s": 10.53562002396211,
+      "launch_s": 7.356859280262142,
+      "launches": 3,
+      "replayed_launches": 1,
+      "executed_segments": 19969486,
+      "retained_segments": 9984743,
+      "measured_hashes": [
+        "3588f13b866d283a8ab5ab5ab95892e67bbe4baa70a5f17ed4af683f5d6e88b7"
+      ],
+      "warmup_hashes": [
+        "4ee77b100b9ef43c4d27bc008fa9f8c73f3e9dcf68cb43d1f3c844a08bc20ff2"
+      ],
+      "max_launch_electrons": 5000,
+      "identical_to_baseline": true,
+      "phase_timings_s": {
+        "imports_and_tables": 0.12628723517991602,
+        "warmup": 12.92587508703582,
+        "transport_and_emission": 10.53562002396211,
+        "request_with_reductions": 12.115016584983096,
+        "reductions": 1.5793339000083506,
+        "adapter_total": 25.167808572063223
+      },
+      "warmup": {
+        "repeats": 1,
+        "histories": 5000,
+        "seed": 1078603,
+        "wall_s": 12.92587508703582,
+        "same_scene_tables_numerics": true,
+        "device_synchronized": true
+      },
+      "peak_rss_kib": 2836224,
+      "measured_launches": [
+        {
+          "electrons": 5000,
+          "capacity": 512,
+          "segments": 9984743,
+          "max_segments": 9836,
+          "replayed": true,
+          "synchronized_wall_s": 2.469345841091126,
+          "scratch_bytes": 320000000
+        },
+        {
+          "electrons": 4260,
+          "capacity": 12295,
+          "segments": 8462434,
+          "max_segments": 9836,
+          "replayed": false,
+          "synchronized_wall_s": 2.4845264970790595,
+          "scratch_bytes": 6547087500
+        },
+        {
+          "electrons": 740,
+          "capacity": 12295,
+          "segments": 1522309,
+          "max_segments": 9741,
+          "replayed": false,
+          "synchronized_wall_s": 2.4029869420919567,
+          "scratch_bytes": 1137287500
+        }
+      ],
+      "request_initial_capacities": [],
+      "capacity_hint_policy": null,
+      "sample_sha256": "32aa7447fa1411d8a48026f6ab47166ae398f9a8546b657770c2d8ba266170d4",
+      "audit_sha256": "2b9df54c1c0ddb59e14216f33132f15efe1ad214654ef029837c00bdb0c11b53"
+    },
+    {
+      "file": "evidence/transport-cost/2630/w-300-10um-0deg-78603-capacity-audit.json",
+      "scene": "w-300-10um-0deg",
+      "histories": 5000,
+      "seed": 78603,
+      "variant": "capacity",
+      "transport_s": 8.03248383384198,
+      "launch_s": 5.0398677620105445,
+      "launches": 2,
+      "replayed_launches": 0,
+      "executed_segments": 9984743,
+      "retained_segments": 9984743,
+      "measured_hashes": [
+        "3588f13b866d283a8ab5ab5ab95892e67bbe4baa70a5f17ed4af683f5d6e88b7"
+      ],
+      "warmup_hashes": [
+        "4ee77b100b9ef43c4d27bc008fa9f8c73f3e9dcf68cb43d1f3c844a08bc20ff2"
+      ],
+      "max_launch_electrons": 4190,
+      "identical_to_baseline": true,
+      "phase_timings_s": {
+        "imports_and_tables": 0.1262706231791526,
+        "warmup": 9.935512518044561,
+        "transport_and_emission": 8.03248383384198,
+        "request_with_reductions": 9.580911120865494,
+        "reductions": 1.5483681361656636,
+        "adapter_total": 19.643342496128753
+      },
+      "warmup": {
+        "repeats": 1,
+        "histories": 5000,
+        "seed": 1078603,
+        "wall_s": 9.935512518044561,
+        "same_scene_tables_numerics": true,
+        "device_synchronized": true
+      },
+      "peak_rss_kib": 2836204,
+      "measured_launches": [
+        {
+          "electrons": 4190,
+          "capacity": 12500,
+          "segments": 8303254,
+          "max_segments": 9836,
+          "replayed": false,
+          "synchronized_wall_s": 2.4854148470330983,
+          "scratch_bytes": 6546875000
+        },
+        {
+          "electrons": 810,
+          "capacity": 12295,
+          "segments": 1681489,
+          "max_segments": 9741,
+          "replayed": false,
+          "synchronized_wall_s": 2.554452914977446,
+          "scratch_bytes": 1244868750
+        }
+      ],
+      "request_initial_capacities": [],
+      "capacity_hint_policy": null,
+      "sample_sha256": "8bb713c1ee48b544f3955e82d7e3025292840c3b54352f79b26a024e53ffd35e",
+      "audit_sha256": "772f4bd82fc982e181485aa3a09299db4830da21aab22f9e3f30ca981f4678e3"
+    },
+    {
+      "file": "evidence/transport-cost/2630/w-300-10um-0deg-78603-capacity32-audit.json",
+      "scene": "w-300-10um-0deg",
+      "histories": 5000,
+      "seed": 78603,
+      "variant": "capacity32",
+      "transport_s": 6.825271400157362,
+      "launch_s": 3.83714931900613,
+      "launches": 2,
+      "replayed_launches": 0,
+      "executed_segments": 9984743,
+      "retained_segments": 9984743,
+      "measured_hashes": [
+        "3588f13b866d283a8ab5ab5ab95892e67bbe4baa70a5f17ed4af683f5d6e88b7"
+      ],
+      "warmup_hashes": [
+        "4ee77b100b9ef43c4d27bc008fa9f8c73f3e9dcf68cb43d1f3c844a08bc20ff2"
+      ],
+      "max_launch_electrons": 4190,
+      "identical_to_baseline": true,
+      "phase_timings_s": {
+        "imports_and_tables": 0.12551178806461394,
+        "warmup": 8.795800687978044,
+        "transport_and_emission": 6.825271400157362,
+        "request_with_reductions": 8.37467537005432,
+        "reductions": 1.5492767789401114,
+        "adapter_total": 17.296717441175133
+      },
+      "warmup": {
+        "repeats": 1,
+        "histories": 5000,
+        "seed": 1078603,
+        "wall_s": 8.795800687978044,
+        "same_scene_tables_numerics": true,
+        "device_synchronized": true
+      },
+      "peak_rss_kib": 2836932,
+      "measured_launches": [
+        {
+          "electrons": 4190,
+          "capacity": 12500,
+          "segments": 8303254,
+          "max_segments": 9836,
+          "replayed": false,
+          "synchronized_wall_s": 1.9903218429535627,
+          "scratch_bytes": 6546875000
+        },
+        {
+          "electrons": 810,
+          "capacity": 12295,
+          "segments": 1681489,
+          "max_segments": 9741,
+          "replayed": false,
+          "synchronized_wall_s": 1.8468274760525674,
+          "scratch_bytes": 1244868750
+        }
+      ],
+      "request_initial_capacities": [],
+      "capacity_hint_policy": null,
+      "sample_sha256": "99507fcfc5b561801ed18ef1326cab41491240f3c6352359b069571ac46c11d7",
+      "audit_sha256": "db00577169e108148df88740c8fa2d419a32d5af84f3a8904831a5c157746807"
+    },
+    {
+      "file": "evidence/transport-cost/2630/w-300-10um-0deg-78603-learned32-audit.json",
+      "scene": "w-300-10um-0deg",
+      "histories": 5000,
+      "seed": 78603,
+      "variant": "learned32",
+      "transport_s": 6.764097483828664,
+      "launch_s": 3.8452941928990185,
+      "launches": 2,
+      "replayed_launches": 0,
+      "executed_segments": 9984743,
+      "retained_segments": 9984743,
+      "measured_hashes": [
+        "3588f13b866d283a8ab5ab5ab95892e67bbe4baa70a5f17ed4af683f5d6e88b7"
+      ],
+      "warmup_hashes": [
+        "4ee77b100b9ef43c4d27bc008fa9f8c73f3e9dcf68cb43d1f3c844a08bc20ff2"
+      ],
+      "max_launch_electrons": 4277,
+      "identical_to_baseline": true,
+      "phase_timings_s": {
+        "imports_and_tables": 0.13076737616211176,
+        "warmup": 10.843294683843851,
+        "transport_and_emission": 6.764097483828664,
+        "request_with_reductions": 8.303825136972591,
+        "reductions": 1.539662362076342,
+        "adapter_total": 19.278632362838835
+      },
+      "warmup": {
+        "repeats": 1,
+        "histories": 5000,
+        "seed": 1078603,
+        "wall_s": 10.843294683843851,
+        "same_scene_tables_numerics": true,
+        "device_synchronized": true
+      },
+      "peak_rss_kib": 2836488,
+      "measured_launches": [
+        {
+          "electrons": 4277,
+          "capacity": 12245,
+          "segments": 8500963,
+          "max_segments": 9836,
+          "replayed": false,
+          "synchronized_wall_s": 1.9906598899979144,
+          "scratch_bytes": 6546483125
+        },
+        {
+          "electrons": 723,
+          "capacity": 12295,
+          "segments": 1483780,
+          "max_segments": 9741,
+          "replayed": false,
+          "synchronized_wall_s": 1.854634302901104,
+          "scratch_bytes": 1111160625
+        }
+      ],
+      "request_initial_capacities": [
+        512,
+        12245
+      ],
+      "capacity_hint_policy": "Request-local diagnostic cache: carry 1.25 times the largest observed track across complete requests, including warmup. Overflow replay stays enabled; warmup and measurement use the same adaptive policy, with different learned state. Not a production capacity policy.",
+      "sample_sha256": "99cad4b2b60e8d5c6883a02d4f408cb939470dbea47d691cd363044cc81d4db0",
+      "audit_sha256": "a7158cf0a31452a632a184efe5093fe92c6ddf30794574e8ed56e7d6c26a31a1"
+    },
+    {
+      "file": "evidence/transport-cost/2630/w-300-10um-0deg-78603-threads32-audit.json",
+      "scene": "w-300-10um-0deg",
+      "histories": 5000,
+      "seed": 78603,
+      "variant": "threads32",
+      "transport_s": 8.863649445818737,
+      "launch_s": 5.825972771970555,
+      "launches": 3,
+      "replayed_launches": 1,
+      "executed_segments": 19969486,
+      "retained_segments": 9984743,
+      "measured_hashes": [
+        "3588f13b866d283a8ab5ab5ab95892e67bbe4baa70a5f17ed4af683f5d6e88b7"
+      ],
+      "warmup_hashes": [
+        "4ee77b100b9ef43c4d27bc008fa9f8c73f3e9dcf68cb43d1f3c844a08bc20ff2"
+      ],
+      "max_launch_electrons": 5000,
+      "identical_to_baseline": true,
+      "phase_timings_s": {
+        "imports_and_tables": 0.13013754109852016,
+        "warmup": 10.807455996982753,
+        "transport_and_emission": 8.863649445818737,
+        "request_with_reductions": 10.403205286012962,
+        "reductions": 1.539491139119491,
+        "adapter_total": 21.34151632897556
+      },
+      "warmup": {
+        "repeats": 1,
+        "histories": 5000,
+        "seed": 1078603,
+        "wall_s": 10.807455996982753,
+        "same_scene_tables_numerics": true,
+        "device_synchronized": true
+      },
+      "peak_rss_kib": 2836224,
+      "measured_launches": [
+        {
+          "electrons": 5000,
+          "capacity": 512,
+          "segments": 9984743,
+          "max_segments": 9836,
+          "replayed": true,
+          "synchronized_wall_s": 1.9851361149922013,
+          "scratch_bytes": 320000000
+        },
+        {
+          "electrons": 4260,
+          "capacity": 12295,
+          "segments": 8462434,
+          "max_segments": 9836,
+          "replayed": false,
+          "synchronized_wall_s": 1.9904608610086143,
+          "scratch_bytes": 6547087500
+        },
+        {
+          "electrons": 740,
+          "capacity": 12295,
+          "segments": 1522309,
+          "max_segments": 9741,
+          "replayed": false,
+          "synchronized_wall_s": 1.8503757959697396,
+          "scratch_bytes": 1137287500
+        }
+      ],
+      "request_initial_capacities": [],
+      "capacity_hint_policy": null,
+      "sample_sha256": "af62bf50c2ad61ec5b98ee38b5e519d3a09709d6fe9d50f1e1204fa20f88135b",
+      "audit_sha256": "cdd93424ba67e64b790e6f0fff75a0d2375158bcc5658297ba8f5b3c268c8fe4"
+    }
+  ],
+  "interpretation": "Instrumented current-code diagnostics with frozen continuous-loss controls. All 30 GPU samples match their paired baseline warmup and measured trajectory array hashes. The learned32 arm reuses request-owned capacity state from warmup; it does not establish cold-request speedup. Geant4 native process timers include initialization and logging, unlike GPU warm transport timers. Different physical models and no joint accuracy qualification; no equal-precision or whole-application speed ratio. Initial failed W setup attempts and co-resident pilot job 2627 are excluded. Peak VRAM and instruction-level occupancy/stalls were not measured. Generic evidence paths replace operator-specific metadata.",
+  "date": "2026-10-29",
+  "gpu_job": 2630,
+  "geant4_serial_job": 2629,
+  "gpu_source_revision": "9d5b2f9ee8450fc529d3b3b5e574f7fd9c19d50e",
+  "geant4_source_revision": "15217e0d77bb10974bf619309c5802554fe5cf2b",
+  "device": {
+    "multiProcessorCount": 84,
+    "warpSize": 32,
+    "maxThreadsPerMultiProcessor": 1536,
+    "major": 12,
+    "minor": 0,
+    "name": "NVIDIA GeForce RTX 5080",
+    "single_to_double_precision_perf_ratio": 64
+  },
+  "compiled_kernel_resources": [
+    {
+      "registers_per_thread": 200,
+      "local_bytes_per_thread": 40,
+      "max_threads_per_block": 256
+    }
+  ],
+  "tables": {
+    "si-300-100um-0deg": {
+      "elsepa": [
+        [
+          {
+            "key": "240a6150bdcf027eac2d9c13171f33776cc96556c258ab8277342d9b83dad860",
+            "manifest_sha256": "9efa28ecaf839767de6b369eb87ff89694049c16dbb1988fbfd2a2293bc343ae",
+            "arrays_sha256": "3879a0e97df26c1342dd1eed7cd9eb1954634ce1cc56b335a553b3e1cab29f0d"
+          },
+          {
+            "key": "47fa2c31dd413cb42b6569105e85862d1a141b35be26d54d8e5a679b8765d1be",
+            "manifest_sha256": "42a70d18f3f1a622cf7fdb98747199b9a8c1ee4eb29bfae32027a1d835cc166f",
+            "arrays_sha256": "02be6be167718b9adbc84814fdd383ecf47b2c9ad952caca5d61b7ad94cd07d6"
+          }
+        ]
+      ],
+      "sbethe": {
+        "key": "86c73cd7a10433ce547de2ae9458e3fd7c09da3c394e8e07e5f7f9415bfaff32",
+        "manifest_sha256": "cd6144893da65f70656bd7880c6083642862cd6068b34aaeb0d36bf73e7fe20f",
+        "arrays_sha256": "512a76527a5341c2276e4a187e4fcfb9a1b4381a24ae381aa597f36756fe38e5"
+      },
+      "bremslib": {
+        "key": "cff95de45a327e3ac277930ae56f236ea19e519ccfa199d2a903c297c4677fee",
+        "manifest_sha256": "848f5d188f965678f290e0738bb4762e1b50a11e325e38a2c53de7aa24e5c67a"
+      }
+    },
+    "w-300-10um-0deg": {
+      "elsepa": [
+        [
+          {
+            "key": "016589c75e4b80a0737fedab58d71817c45159b6f5b18c9216ab335b9a38dd63",
+            "manifest_sha256": "eb6d7b04ae7ae3d427b59212204e7732f176a405b1b779ae4cc0707938354168",
+            "arrays_sha256": "4bd33f5f3baaff74667327313d0a958f1ae350ca918cc19f71f575c0c54e1b55"
+          }
+        ]
+      ],
+      "sbethe": {
+        "key": "6a7b4dbfeffcbb8243196a6c1633d5a3373c763e1ab8187d14f8fdc78b040abe",
+        "manifest_sha256": "b963525ed08204a0c6192872b9037bb2094a8d1ceec2132c35773b06a5d249a3",
+        "arrays_sha256": "9cdd5f93621b2e924985254cb8c8a117256b0ac7ead51b05aa11a0515d62a74f"
+      },
+      "bremslib": {
+        "key": "dfccd9efa5bdcd0968b2cbbabd708106d123f6df654bc03d19b3e96cec0beec0",
+        "manifest_sha256": "ec1cfd4c6f5e97dec8aca7a3153a3f212cfcce90d7ec296b12a7d876e4c1886d"
+      }
+    }
+  },
+  "geant4_samples": [
+    {
+      "scene": "si-300-100um-0deg",
+      "seed": 78601,
+      "histories": 5000,
+      "fresh_process_with_logging_s": 5.084633617894724,
+      "rounded_mean_charged_steps_per_primary": 1733.0,
+      "raw_log_sha256": "cecbb1d234338a4d84a4a997ed42d0a566e39dc45fcf5380f8f4ec5a16cbbd65",
+      "macro_sha256": "92d9a109f8237f6655bb3de309ae77a8f5b1f34ca5c9eb4d879059f23a8ff1d6"
+    },
+    {
+      "scene": "si-300-100um-0deg",
+      "seed": 78602,
+      "histories": 5000,
+      "fresh_process_with_logging_s": 5.1233229278586805,
+      "rounded_mean_charged_steps_per_primary": 1757.0,
+      "raw_log_sha256": "f812ac1e117f3af3fcf57c99906b974676f2df4e83ccd11b5372f5fe0141a9bc",
+      "macro_sha256": "66504b4b0716a8a9942275cb38421d917df5d743320b7a6f399b999cc3565201"
+    },
+    {
+      "scene": "si-300-100um-0deg",
+      "seed": 78603,
+      "histories": 5000,
+      "fresh_process_with_logging_s": 5.233854836085811,
+      "rounded_mean_charged_steps_per_primary": 1794.0,
+      "raw_log_sha256": "50003d6cfe9ed7c52cdd87ed1a6f76c7e9d28d41fe0edf4a9a06a950a5848a1e",
+      "macro_sha256": "e3c52b915fd1ce6971de2e287ab9ea7f39e942b371d20fdd2e27dd76ce7cb4d7"
+    },
+    {
+      "scene": "w-300-10um-0deg",
+      "seed": 78601,
+      "histories": 5000,
+      "fresh_process_with_logging_s": 6.298052687896416,
+      "rounded_mean_charged_steps_per_primary": 2206.0,
+      "raw_log_sha256": "e996f115147e004643f933c8acb9382e0b57135ff5239c7fe32e35c82b274c73",
+      "macro_sha256": "13e3af9d75e701a69c01dd2167b0da359b528a88d92aa99842bd159b2b8b8ecd"
+    },
+    {
+      "scene": "w-300-10um-0deg",
+      "seed": 78602,
+      "histories": 5000,
+      "fresh_process_with_logging_s": 6.3037409810349345,
+      "rounded_mean_charged_steps_per_primary": 2216.0,
+      "raw_log_sha256": "dc164bd2ddc570a6f99b0a1c107b4b158ba6f22fb14dc7c87da8adbe2dc3726e",
+      "macro_sha256": "a3da1aa28352f618f26b000ca2e3ac5bdfb2df0d52ac6f1b4906de405e061fd6"
+    },
+    {
+      "scene": "w-300-10um-0deg",
+      "seed": 78603,
+      "histories": 5000,
+      "fresh_process_with_logging_s": 6.325311952969059,
+      "rounded_mean_charged_steps_per_primary": 2212.0,
+      "raw_log_sha256": "1dc676f2891b30c08aef350e1267907452d304cfac5f76d34722563aa8a8a6fc",
+      "macro_sha256": "23d52c3105fd91b6ded12bfdc6ed977c0bf6553eaeddc6cda6a508542f24ce15"
+    }
+  ],
+  "controls": {
+    "histories": 5000,
+    "seeds": [
+      78601,
+      78602,
+      78603
+    ],
+    "batch_histories": 5000,
+    "scratch_mib": 4096,
+    "probe_electrons": 0,
+    "max_de_frac": 0.05,
+    "hard_photon_cutoff_eV": 1000,
+    "electron_cutoff_keV": 10,
+    "inelastic_model": "continuous",
+    "straggling": false
+  },
+  "hardware_validation": {
+    "geometry_job": 2632,
+    "geometry_tests_passed": 6,
+    "geometry_test_sha256": "39529d34d5590684ae42f6a383adc64c9e6b038f7815c6a009becf51b9dee34b",
+    "radiative_job": 2631,
+    "radiative_tests_passed": 9,
+    "initial_lut_setup_failures": 3,
+    "geometry_log_sha256": "308fef888d9f4eeec2e5c08bebd12917a02d0c05f002f2720a176edfeb405750",
+    "radiative_log_sha256": "417021bf3e0ff61456b4b3857aa620ef71d5609120f800ed0a0ead24c32d4ad6"
+  },
+  "software": {
+    "python": "3.14.6",
+    "cupy": "14.2.0",
+    "numpy": "2.5.4",
+    "cuda_driver_api": 13030,
+    "geant4": "11.4.2"
+  },
+  "sources_sha256": {
+    "diagnose_kernel.py": "f122baa01090b358d5b39272e2e2a1ee86f888b3cd3ec957155b396e0f2f4d5b",
+    "pyrite_adapter.py": "da8fb9045516ba11ff2c7805bfaf537b0b68f1447206226a2950e5d409d8b261",
+    "manifest.json": "58c74807dbb80cf425d5f8d9d8d9975cdf37b012c3838d17bea3460e3d73ce2e",
+    "transport-cost.sbatch": "3da1d7eb4488840659fc9f12e26b7c23c031e6dbd915170827cbf0822a87e3f6",
+    "_jit_kernel.py": "27d8995292c373788985cb2d6db3c37d270180ed58e5831025bc46a4d59db06f",
+    "_jit_radiative_device.py": "83c1464e0244b315bcf3a396766b436b5696d361da55ebde5ed0bc2bdc9a398b",
+    "_jit_launch.py": "37f77214305b7215c13db211f06bfcfd4cf84d76cc5f3a6006d6bc0417767f71",
+    "batching.py": "155a0850284118788ac45ff8bbf003217c30f7be212dd3509df40fa91e746bf4"
+  },
+  "sync_provenance": {
+    "code_digest": "c4bda8f17754ae6754e9472bcf53b80a9c43461542e30c865553d83f820b8bf0",
+    "code_revision": "9d5b2f9ee8450fc529d3b3b5e574f7fd9c19d50e",
+    "code_dirty": "False",
+    "code_synced_at": "2026-10-29T08:06:22+00:00",
+    "code_tables_digest": "fa64dadcf63912be948c11f4b30745483bbe14b5df3a81dc6613ae46b7cf5e1e"
+  }
+}

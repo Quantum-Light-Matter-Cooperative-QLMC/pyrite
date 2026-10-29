@@ -70,6 +70,8 @@ def main():
         "nodes",
         "both",
         "capacity",
+        "capacity32",
+        "learned32",
         "both-capacity",
         "threads32",
         "both-capacity32",
@@ -80,7 +82,7 @@ def main():
         _jit_radiative_device._rad_next_node = indexed_next_node
     if variant in {"both", "both-capacity", "both-capacity32"}:
         _jit_radiative_device._rad_row_chi = indexed_row_chi
-    if variant in {"capacity", "both-capacity", "both-capacity32"}:
+    if variant in {"capacity", "capacity32", "both-capacity", "both-capacity32"}:
         original_config = batching.PerElectronTransportConfig
 
         def configured(*args, **kwargs):
@@ -88,6 +90,19 @@ def main():
 
         batching.PerElectronTransportConfig = configured
     launches = []
+    capacity_hint = 512
+    request_capacities = []
+    if variant == "learned32":
+        original_simulate = transport.simulate_trajectories
+
+        def with_capacity_hint(**kwargs):
+            request_capacities.append(capacity_hint)
+            kwargs["per_electron_config"] = replace(
+                kwargs["per_electron_config"], seg_capacity=capacity_hint
+            )
+            return original_simulate(**kwargs)
+
+        transport.simulate_trajectories = with_capacity_hint
     if variant == "radiation-off":
         original_simulate = transport.simulate_trajectories
 
@@ -101,11 +116,12 @@ def main():
     original_factory = _jit_launch.make_cuda_transport_core
 
     def factory(*args, **kwargs):
-        if variant in {"threads32", "both-capacity32"}:
+        if variant in {"threads32", "capacity32", "learned32", "both-capacity32"}:
             kwargs["config"] = replace(_jit_launch.DEFAULT_TRANSPORT_KERNEL_CONFIG, nthreads=32)
         original, array_module = original_factory(*args, **kwargs)
 
         def core(*core_args):
+            nonlocal capacity_hint
             xp.cuda.Device().synchronize()
             start = time.perf_counter()
             original(*core_args)
@@ -113,6 +129,8 @@ def main():
             elapsed = time.perf_counter() - start
             counts = xp.asnumpy(core_args[7][0])
             cap = int(core_args[0][2])
+            if variant == "learned32":
+                capacity_hint = max(capacity_hint, int(np.ceil(1.25 * counts.max())))
             launches.append(
                 {
                     "electrons": int(core_args[0][1]),
@@ -198,7 +216,20 @@ def main():
                 "blocks": blocks,
                 "device": device,
                 "compiled_kernel_resources": resources,
-                "threads_per_block": 32 if variant in {"threads32", "both-capacity32"} else 128,
+                "threads_per_block": (
+                    32
+                    if variant in {"threads32", "capacity32", "learned32", "both-capacity32"}
+                    else 128
+                ),
+                "request_initial_capacities": request_capacities,
+                "capacity_hint_policy": (
+                    "Request-local diagnostic cache: carry 1.25 times the largest observed "
+                    "track across complete requests, including warmup. Overflow replay stays "
+                    "enabled; warmup and measurement use the same adaptive policy, with "
+                    "different learned state. Not a production capacity policy."
+                    if variant == "learned32"
+                    else None
+                ),
                 "interpretation": "Diagnostic only. First request is warmup; hashes/reductions are outside transport timers. Initial capacity 12500 is not a safe bound. Launch timers include dispatch and synchronization; first includes JIT.",
             },
             indent=2,

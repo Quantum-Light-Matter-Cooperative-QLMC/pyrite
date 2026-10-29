@@ -5,6 +5,7 @@ Validation: bremslib-radiative-partition
 
 import hashlib
 import io
+from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
@@ -89,6 +90,61 @@ def test_photon_and_recoiled_electron_have_valid_states(table):
         + photon.target_momentum_eV_c,
         atol=1e-10,
     )
+
+
+@pytest.mark.parametrize("elements", [(), (6, 6, 6), (6, 14, 6, 14)])
+def test_completion_stages_only_used_tables_once_and_preserves_draw_order(
+    table, elements, monkeypatch
+):
+    from pyrite.montecarlo.transport import hard_radiative as radiative
+
+    # Distinct angular shapes catch accidental reuse of another element's table.
+    silicon = replace(
+        table,
+        atomic_number=14,
+        scaled_ddcs_mb_sr=table.scaled_ddcs_mb_sr * (1.0 + table.theta_rad[None, None, :]),
+    )
+    tables = {"C": table, "Si": silicon}
+    by_z = {6: table, 14: silicon}
+    count = len(elements) + 1
+    segments = {
+        "hard_radiative_k_eV": np.array([0.0] + [2000.0] * len(elements)),
+        "hard_radiative_Z": np.array([0, *elements]),
+        "E_end_keV": np.full(count, 60.0),
+        "v_hat": np.tile([0.6, 0.0, 0.8], (count, 1)),
+    }
+    expected_directions = np.zeros((count, 3))
+    expected_momenta = np.zeros((count, 3))
+    rng = np.random.default_rng(73 ^ 0xD6023FEA38B57C29)
+    for row, z in enumerate(elements, start=1):
+        photon = radiative.hard_radiative_photon_at_energy(
+            by_z[z],
+            60_000.0,
+            2000.0,
+            segments["v_hat"][row],
+            float(rng.random()),
+            float(rng.random()),
+        )
+        expected_directions[row] = photon.direction
+        expected_momenta[row] = photon.target_momentum_eV_c
+
+    stage = radiative.stage_bremslib_table
+    staged = []
+
+    def tracked(table):
+        staged.append(table.atomic_number)
+        return stage(table)
+
+    monkeypatch.setattr(radiative, "stage_bremslib_table", tracked)
+    # A second completion call must own fresh stages, not retain a global cache.
+    for _ in range(2):
+        staged.clear()
+        radiative.complete_hard_radiative_events(segments, tables, 73)
+        assert staged == list(dict.fromkeys(elements))
+        np.testing.assert_array_equal(segments["hard_radiative_direction"], expected_directions)
+        np.testing.assert_array_equal(
+            segments["hard_radiative_target_momentum_eV_c"], expected_momenta
+        )
 
 
 def test_invalid_partition_and_empty_hard_range(table):
