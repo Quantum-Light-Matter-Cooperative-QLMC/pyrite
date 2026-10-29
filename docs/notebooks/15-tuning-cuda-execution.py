@@ -3,13 +3,14 @@
 # dependencies = [
 #     "endf-parserpy==0.17.0",
 #     "marimo>=0.23.3",
-#     "pyrite-mc[nvidia,optimization]==0.23.0",
+#     "pyrite-mc[nvidia,optimization]==0.24.0",
 #     "matplotlib>=3.11",
 #     "numpy>=2",
 # ]
 #
 # [tool.pyrite]
 # backend = "cuda"
+# freshness = false
 # ///
 
 import marimo

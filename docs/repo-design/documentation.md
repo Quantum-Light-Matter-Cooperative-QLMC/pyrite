@@ -537,6 +537,9 @@ MyST-NB to use the committed outputs. Builds fail on missing or stale captures,
 except for a tutorial whose script metadata declares `[tool.pyrite] backend =
 "cuda"`: a stale CUDA capture prints a warning to stderr (not a Sphinx warning)
 and publishes the old capture, since a GPU is not always available.
+`[tool.pyrite] freshness = false` skips the freshness check entirely for a
+tutorial too slow or hardware-bound to regenerate routinely (notebook 15); its
+committed capture is published as is until someone regenerates it explicitly.
 Expensive execution, reference-table fetching and required CPU memory belong to
 an explicit regeneration step on a sufficiently provisioned machine. The
 separate browser-only homepage results demo still uses its existing WASM export.

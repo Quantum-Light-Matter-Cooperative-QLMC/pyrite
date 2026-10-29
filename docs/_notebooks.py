@@ -200,6 +200,16 @@ def capture_backend(source):
     return backend
 
 
+def checks_freshness(source):
+    """False when script metadata sets ``[tool.pyrite] freshness = false``."""
+    fresh = True
+    for block in script_metadata(source.read_text()):
+        fresh = block.get("tool", {}).get("pyrite", {}).get("freshness", fresh)
+    if not isinstance(fresh, bool):
+        raise ValueError(f"{source.name}: [tool.pyrite] freshness must be true or false")
+    return fresh
+
+
 def require_cuda(env):
     """Fail before any export when a CUDA tutorial has no device to run on."""
     probe = "import cupy; assert cupy.cuda.runtime.getDeviceCount() > 0"
@@ -382,7 +392,7 @@ def check_notebooks(app=None):
                 "uv run --group docs python docs/_notebooks.py --migrate-hashes"
             )
         # `pyrite_version` is provenance only: releases do not re-execute tutorials.
-        if (
+        if checks_freshness(source) and (
             metadata.get("schema") != SCHEMA
             or metadata.get("source_fingerprint") != FINGERPRINT
             or metadata.get("source_fingerprint_sha256") != fingerprint(source)
