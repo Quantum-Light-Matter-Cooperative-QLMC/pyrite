@@ -369,12 +369,16 @@ def test_cuda_core_is_deterministic():
 @pytest.mark.hardware
 @requires_cuda
 @pytest.mark.parametrize("nthreads", [32, 64, 128])
-def test_cuda_results_do_not_depend_on_launch_geometry(nthreads, monkeypatch):
+@pytest.mark.parametrize("use_lut", [False, True])
+def test_cuda_results_do_not_depend_on_launch_geometry(nthreads, use_lut, monkeypatch):
     from pyrite.montecarlo.transport import _jit_launch as tjl
 
-    base = _run(transport_core="cuda")
-    factory = tjl.make_cuda_transport_core
-    launch = tjl.run_transport_kernel
+    kwargs = dict(transport_core="cuda", transport_lut_config=TransportLUTConfig(enabled=use_lut))
+    base = _run(**kwargs)
+    factory_name = "make_cuda_transport_lut_core" if use_lut else "make_cuda_transport_core"
+    launch_name = "run_transport_lut_kernel" if use_lut else "run_transport_kernel"
+    factory = getattr(tjl, factory_name)
+    launch = getattr(tjl, launch_name)
     launched = []
 
     def configured_core():
@@ -384,9 +388,9 @@ def test_cuda_results_do_not_depend_on_launch_geometry(nthreads, monkeypatch):
         launched.append(kwargs["config"].nthreads)
         return launch(*args, **kwargs)
 
-    monkeypatch.setattr(tjl, "make_cuda_transport_core", configured_core)
-    monkeypatch.setattr(tjl, "run_transport_kernel", record_launch)
-    assert _identical(base, _run(transport_core="cuda"))
+    monkeypatch.setattr(tjl, factory_name, configured_core)
+    monkeypatch.setattr(tjl, launch_name, record_launch)
+    assert _identical(base, _run(**kwargs))
     assert launched and set(launched) == {nthreads}
 
 
