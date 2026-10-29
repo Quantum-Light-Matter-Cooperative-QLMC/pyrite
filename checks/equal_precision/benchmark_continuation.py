@@ -172,7 +172,7 @@ def run_policy(policy, base, seed, hook, original_factory):
 
         return timed, xp
 
-    def request(run_seed):
+    def request(run_seed, label):
         config = base["per_electron_config"]
         if policy.get("max_batch"):
             config = replace(config, max_batch=policy["max_batch"])
@@ -195,10 +195,13 @@ def run_policy(policy, base, seed, hook, original_factory):
         cp.cuda.Device().synchronize()
         before = hook.live
         hook.reset()
+        # NVTX names the request so nsys/ncu can capture the measured one only.
+        cp.cuda.nvtx.RangePush(f"bench.{label}")
         start = time.perf_counter()
         result = simulate_trajectories(**dict(base, seed=run_seed, per_electron_config=config))
         cp.cuda.Device().synchronize()
         wall = time.perf_counter() - start
+        cp.cuda.nvtx.RangePop()
         retained = sum(
             int(np.asarray(v).nbytes) for v in result.values() if isinstance(v, np.ndarray)
         )
@@ -215,6 +218,7 @@ def run_policy(policy, base, seed, hook, original_factory):
             "retained_host_bytes": retained,
             "peak_pool_above_request_bytes": hook.peak - before,
             "max_launch_scratch_bytes": max(launch["scratch_bytes"] for launch in launches),
+            "track_rows": track_distribution(result["electron_id"], base["Ne"]),
             "exits": {
                 key: int(result[key])
                 for key in ["n_backscattered", "n_transmitted", "n_side_exited", "n_cutoff_stopped"]
@@ -228,26 +232,60 @@ def run_policy(policy, base, seed, hook, original_factory):
 
     _jit_launch.make_cuda_transport_core = factory
     try:
-        warmup = request(seed + 1_000_000)
-        measured = request(seed)
+        warmup = request(seed + 1_000_000, "warmup")
+        measured = request(seed, "measured")
     finally:
         _jit_launch.make_cuda_transport_core = original_factory
     return {"policy": policy, "warmup": warmup, "measured": measured}
 
 
+def track_distribution(electron_id, n_histories):
+    """Per-history row-count quantiles and the surviving-history curve.
+
+    A history with ``n`` rows is still running at its ``n``-th step, so
+    ``surviving[f]`` is the fraction of histories longer than ``f`` times the
+    longest: the lanes a full-history launch keeps busy at that point.
+    """
+    rows = np.bincount(np.asarray(electron_id), minlength=n_histories)
+    longest = int(rows.max())
+    return {
+        "mean": float(rows.mean()),
+        "quantiles": {str(q): float(np.quantile(rows, q)) for q in (0.0, 0.1, 0.5, 0.9, 0.99, 1.0)},
+        "zero_row_histories": int(np.count_nonzero(rows == 0)),
+        "surviving": {
+            f"{f:.1f}": float(np.mean(rows > f * longest)) for f in np.arange(0.1, 1.0, 0.1)
+        },
+    }
+
+
 def kernel_resources():
+    """Compiled attributes, plus theoretical occupancy from the occupancy API."""
     out = []
+    properties = cp.cuda.runtime.getDeviceProperties(cp.cuda.Device().id)
     for kernel, _ in _jit_launch._transport_kernel._cache.values():
-        out.append(
-            {
-                name: cp.cuda.driver.funcGetAttribute(code, kernel.ptr)
-                for name, code in [
-                    ("registers_per_thread", 4),
-                    ("local_bytes_per_thread", 3),
-                    ("max_threads_per_block", 0),
-                ]
+        entry = {
+            name: cp.cuda.driver.funcGetAttribute(code, kernel.ptr)
+            for name, code in [
+                ("registers_per_thread", 4),
+                ("local_bytes_per_thread", 3),
+                ("max_threads_per_block", 0),
+            ]
+        }
+        occupancy = {}
+        for block in (32, 64, 128, 256):
+            try:
+                blocks = cp.cuda.driver.occupancyMaxActiveBlocksPerMultiprocessor(
+                    kernel.ptr, block, 0
+                )
+            except Exception as error:  # older CuPy: record why, keep the run
+                occupancy[str(block)] = repr(error)
+                continue
+            occupancy[str(block)] = {
+                "blocks_per_sm": blocks,
+                "theoretical": blocks * block / properties["maxThreadsPerMultiProcessor"],
             }
-        )
+        entry["theoretical_occupancy_by_block"] = occupancy
+        out.append(entry)
     return out
 
 

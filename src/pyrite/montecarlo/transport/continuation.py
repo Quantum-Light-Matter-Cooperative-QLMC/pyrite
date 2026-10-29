@@ -206,8 +206,11 @@ def _drive_continuation_rounds(
     active = pending[:n_active]
     next_pending = active.size
     nseg = 0
+    from ..runner import _nsys_pop, _nsys_push
+
     while active.size:
         m = int(active.size)
+        _nsys_push("pyrite.transport.continuation.launch")
         core(
             (0, m, quantum, d_keys),
             *core_args,
@@ -217,16 +220,20 @@ def _drive_continuation_rounds(
             *extra_args,
             continuation=(xp.asarray(active), *state),
         )
+        _nsys_pop()
+        # The first device read in the stage range is also the launch's sync.
+        _nsys_push("pyrite.transport.continuation.stage")
         index = _gather_index(xp, seg_count[:m], quantum)
-        nseg += int(index.size)
-        if nseg > max_segments:
-            raise RuntimeError("segment buffer exhausted")
         gathered = tuple(a[index] if a.shape[0] else a for a in columns)
+        nseg += int(index.size)
         del index
         retained.append(gathered if on_device else tuple(to_host(a) for a in gathered))
         del gathered
         counts = to_host(seg_count[:m]).astype(np.int64)
         codes = to_host(exit_code[:m])
+        _nsys_pop()
+        if nseg > max_segments:
+            raise RuntimeError("segment buffer exhausted")
         chunks.append((active.copy(), counts))
         rows_total[active] += counts
         for code in tallies:
@@ -256,12 +263,14 @@ def _drive_continuation_rounds(
             on_batch(int(next_pending - active.size), Ne)
 
     assembly = time.perf_counter()
+    _nsys_push("pyrite.transport.continuation.assemble")
     joined = _assemble(xp, chunks, rows_total, retained, columns, out_bufs, nseg, on_device)
     if on_device and not keep_on_device:
         for buf, column in zip(out_bufs, joined, strict=True):
             if column.shape[0]:
                 buf[:nseg] = to_host(column)
         joined = None
+    _nsys_pop()
     if cont.on_round is not None:
         cont.on_round({"phase": "assembly", "rows": nseg, "wall_s": time.perf_counter() - assembly})
     return (nseg, *(tallies[code] for code in _TALLIED), joined, to_host(d_stragg))
