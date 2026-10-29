@@ -310,14 +310,17 @@ def _(counts, line_band, measured_edges, mo, np, side_bands):
         _b = _background[_line_mask].sum()
         _side_background = _total[_side_mask].sum() * _width_ratio
         _rows.append(
-            f"| {_name} | {_s:.3g} | {_b:.3g} | {_s / _b:.3g} | "
-            f"{_total[_line_mask].sum():.3g} | "
-            f"{(_total[_line_mask].sum() - _side_background) / _side_background:.3g} |"
+            f"<tr><th scope='row'>{_name}</th><td>{_s:.3g}</td><td>{_b:.3g}</td>"
+            f"<td>{_s / _b:.3g}</td><td>{_total[_line_mask].sum():.3g}</td>"
+            f"<td>{(_total[_line_mask].sum() - _side_background) / _side_background:.3g}</td></tr>"
         )
-    mo.md(
-        "Expected counts per **1 s** exposure; half-open measured-energy bands.\n\n"
-        "| Configuration | CXR signal S | Background B | Model S/B | Band total | Side-band excess/B |\n"
-        "| --- | ---: | ---: | ---: | ---: | ---: |\n" + "\n".join(_rows)
+    # MyST-NB does not parse tables inside Markdown outputs; emit a native HTML table.
+    mo.Html(
+        "<table><caption>Expected counts per 1 s exposure; half-open measured-energy bands.</caption>"
+        "<thead><tr><th scope='col'>Configuration</th><th scope='col'>CXR signal S</th>"
+        "<th scope='col'>Background B</th><th scope='col'>Model S/B</th>"
+        "<th scope='col'>Band total</th><th scope='col'>Side-band excess/B</th></tr></thead>"
+        "<tbody>" + "".join(_rows) + "</tbody></table>"
     )
     return
 
