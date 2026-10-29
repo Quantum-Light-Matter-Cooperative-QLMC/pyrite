@@ -24,6 +24,7 @@ principle but has no continuation regression yet.
 
 from __future__ import annotations
 
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
@@ -64,8 +65,9 @@ class TransportContinuationConfig:
     enabled row schema. Ne-sized per-history state and retained output are
     outside it: bounded scratch does not bound total trajectory storage.
 
-    ``on_round`` (diagnostics only) receives one dict per launch with the
-    launched population, rows, finished/refilled counts and scratch bytes.
+    ``on_round`` (diagnostics only) receives one ``phase="round"`` dict per
+    launch with the launched population, rows, finished/refilled counts and
+    scratch bytes, then one ``phase="assembly"`` dict timing the reassembly.
     """
 
     rows_per_round: int = 256
@@ -228,6 +230,7 @@ def _drive_continuation_rounds(
         if cont.on_round is not None:
             cont.on_round(
                 {
+                    "phase": "round",
                     "round": len(chunks) - 1,
                     "launched": m,
                     "rows": int(counts.sum()),
@@ -245,5 +248,8 @@ def _drive_continuation_rounds(
         if finished.any() and on_batch is not None:
             on_batch(int(next_pending - active.size), Ne)
 
+    assembly = time.perf_counter()
     joined = _assemble(xp, chunks, rows_total, retained, columns, out_bufs, nseg, keep_on_device)
+    if cont.on_round is not None:
+        cont.on_round({"phase": "assembly", "rows": nseg, "wall_s": time.perf_counter() - assembly})
     return (nseg, *(tallies[code] for code in _TALLIED), joined, to_host(d_stragg))

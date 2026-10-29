@@ -150,6 +150,8 @@ def test_finished_lanes_are_refilled_and_long_histories_resume():
         rows_per_round=4, active_histories=4, on_round=records.append
     )
     _counts, _rows, launches, _progress = _drive(cont)
+    assembly = records.pop()
+    assert assembly["phase"] == "assembly" and assembly["rows"] == LENGTHS.sum()
     # Short histories finish first; pending ones join while long ones resume.
     assert launches[0].tolist() == [0, 1, 2, 3]
     assert launches[1].tolist() == [2, 4, 5, 6]
@@ -179,6 +181,7 @@ def test_scratch_respects_budget_with_staging_and_event_columns():
     budget = 3 * (8 * (2 * row_bytes + 24) + 13) + 5
     records = []
     _drive(replace(cont, on_round=records.append), budget=budget)
+    records = [r for r in records if r["phase"] == "round"]
     assert {r["launched"] for r in records} <= {1, 2, 3}
     assert max(r["launched"] for r in records) == 3
     assert all(r["scratch_bytes"] <= budget for r in records)

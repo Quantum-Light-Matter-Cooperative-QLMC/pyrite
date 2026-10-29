@@ -126,6 +126,7 @@ def main():
                 "policy": name,
                 "request_s": spread([m["request_s"] for m in samples]),
                 "launch_s": spread([m["launch_s"] for m in samples]),
+                "assembly_s": spread([m.get("assembly_s", 0.0) for m in samples]),
                 "tail_s": spread(list(tails)),
                 "lane_step_efficiency": spread(list(efficiencies)),
                 "launches": spread([len(m["launches"]) for m in samples]),

@@ -156,6 +156,7 @@ def test_budget_bounds_population_and_matches(radiative_reference):
     budget = 50 * (8 * (2 * 125 + 24) + 13)
     config = replace(REFERENCE, scratch_budget_bytes=budget, continuation=cont)
     _assert_identical(radiative_reference, _radiative(config))
+    records = [r for r in records if r["phase"] == "round"]
     assert max(r["launched"] for r in records) == 50
     assert all(r["scratch_bytes"] <= budget for r in records)
     assert sum(r["rows"] for r in records) == radiative_reference["electron_id"].size
