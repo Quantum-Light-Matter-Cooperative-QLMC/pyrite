@@ -12,6 +12,7 @@ from numba import njit
 
 from ..geometry import X_MIN, Y_MAX, Z_MAX, Z_MIN
 from ..groove import _first_surface_event_scalar_numba
+from ._jit_moment_lookup import transport_layer_moments
 from ._jit_radiative import (
     radiative_layer_moments_scalar,
     sample_hard_photon_energy_scalar,
@@ -368,7 +369,7 @@ def make_cpu_transport_core(
                     step_j, hard_j = tau_h[e] / mu_hard, True
             rad_j = False
             if radiative:
-                rad_soft, mu_rad = radiative_layer_moments_scalar(
+                rad_soft, mu_rad = transport_layer_moments(
                     rad_nel,
                     rad_nT,
                     rad_Z,
@@ -584,7 +585,7 @@ def make_cpu_transport_core(
                             J_arr, k_arr, coeff_arr, E_cross_arr, 0.0, 0.5 * (E_j + E_cut_e)
                         )
                     if radiative:
-                        rad_cut_soft, _ = radiative_layer_moments_scalar(
+                        rad_cut_soft, _ = transport_layer_moments(
                             rad_nel,
                             rad_nT,
                             rad_Z,
@@ -640,7 +641,7 @@ def make_cpu_transport_core(
                                 J_arr, k_arr, coeff_arr, E_cross_arr, 0.0, 0.5 * (E_j + E_pred)
                             )
                         if radiative:
-                            rad_mid_soft, _ = radiative_layer_moments_scalar(
+                            rad_mid_soft, _ = transport_layer_moments(
                                 rad_nel,
                                 rad_nT,
                                 rad_Z,

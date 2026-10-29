@@ -150,7 +150,7 @@ def install_svg_glyph_gradient(path: Path) -> None:
         'x2="0%" y2="0%">'
         f'<stop offset="0%" stop-color="{ATOM_GOLD}"/>'
         f'<stop offset="100%" stop-color="{ATOM_BLUE}"/>'
-        '</linearGradient>'
+        "</linearGradient>"
     )
     svg = svg.replace("<defs>", "<defs>\n" + stops, 1)
     path.write_text(svg, encoding="utf-8")

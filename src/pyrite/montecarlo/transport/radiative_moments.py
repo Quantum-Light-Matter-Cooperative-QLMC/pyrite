@@ -1,4 +1,4 @@
-"""Isolated prepared radiative-moment prototype; no production admission.
+"""Prepared radiative moments and independent held-out component checks.
 
 Source: the BremsLib/Ter-Mikaelian moments in ``hard_radiative`` and
 ``dielectric_radiative``. On each log-energy interval use the convex linear
@@ -179,6 +179,26 @@ def _validate(packed, layer, grid, values, cutoff, policy):
     return error
 
 
+def _check_source_coverage(compositions, tables, min_energy_eV, max_energy_eV, source_admission):
+    """Choose strict component admission or the existing exact reference boundary."""
+    if source_admission not in ("strict", "exact-reference"):
+        raise ValueError("source_admission must be strict or exact-reference")
+    if source_admission == "exact-reference":
+        return  # pack_radiative_layer_tables owns reference admission below
+    for composition in compositions:
+        for element, _ in composition:
+            table = tables.get(element)
+            if (
+                source_admission == "strict"
+                and table is not None
+                and (
+                    min_energy_eV < table.minimum_incident_energy_keV * 1e3
+                    or max_energy_eV > table.maximum_incident_energy_keV * 1e3
+                )
+            ):
+                raise ValueError(f"energy coverage outside the BremsLib table for {element}")
+
+
 def prepare_radiative_moments(
     compositions,
     tables,
@@ -189,6 +209,7 @@ def prepare_radiative_moments(
     policy=MomentPolicy(),
     projectile="electron",
     dielectric=True,
+    source_admission="strict",
 ):
     """Prepare and independently probe an explicitly bounded diagnostic table.
 
@@ -196,6 +217,10 @@ def prepare_radiative_moments(
     existing positron scaling when applicable). Composition density is in
     Angstrom^-3. The existing exact quadrature owns all physical admission.
     The held-out check is numerical evidence, not an interval-wide proof.
+    ``source_admission="strict"`` rejects even adjacent source-outside energies.
+    Production uses ``"exact-reference"`` to retain the existing exact packer's
+    1e-12 relative endpoint allowance; the reference clamps to its endpoint
+    there. This does not relax interpolation queries outside prepared coverage.
 
     Validation: radiative-moment-interpolation
     """
@@ -205,14 +230,7 @@ def prepare_radiative_moments(
         raise ValueError("finite coverage and an explicit electron/positron projectile required")
     if any(not np.isfinite(n) or n <= 0 for comp in compositions for _, n in comp):
         raise ValueError("number densities must be finite and positive")
-    for composition in compositions:
-        for element, _ in composition:
-            table = tables.get(element)
-            if table is not None and (
-                min_energy_eV < table.minimum_incident_energy_keV * 1e3
-                or max_energy_eV > table.maximum_incident_energy_keV * 1e3
-            ):
-                raise ValueError(f"energy coverage outside the BremsLib table for {element}")
+    _check_source_coverage(compositions, tables, min_energy_eV, max_energy_eV, source_admission)
     packed = pack_radiative_layer_tables(
         compositions, tables, min_energy_eV, max_energy_eV, dielectric=dielectric
     )
@@ -230,6 +248,8 @@ def prepare_radiative_moments(
         "sources": sorted((k, t.key, t.digest) for k, t in tables.items()),
         "reference": BREMSSTRAHLUNG_BREMSLIB_MODEL,
     }
+    if source_admission != "strict":
+        metadata["source_admission"] = source_admission
     identity = json.dumps(metadata, sort_keys=True, separators=(",", ":"))
     digest = hashlib.sha256(identity.encode())
     # Hash actual quadrature inputs too; synthetic/custom providers can reuse

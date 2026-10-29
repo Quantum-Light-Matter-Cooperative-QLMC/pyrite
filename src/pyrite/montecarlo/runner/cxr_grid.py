@@ -113,6 +113,7 @@ _RESOLUTION_INPUT_KEYS = (
     "inelastic_cutoff_eV",
     "secondary_threshold_eV",
     "radiative_model",
+    "radiative_moment_model",
     "radiative_cutoff_eV",
     "pair_production_model",
     "positron_transport",

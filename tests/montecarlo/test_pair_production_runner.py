@@ -110,6 +110,7 @@ def test_case_pair_model_reaches_runner_transport(monkeypatch):
     monkeypatch.setattr(bremslib_tables, "resolve_bremsstrahlung_model", lambda *_: "bremslib")
     arrays = synthetic_bremslib_arrays(t1_MeV=np.array([1e-3, 1e-2, 5e-2, 1e-1]))
     table = prepare_bremslib_table(arrays, atomic_number=14)
+    table = replace(table, incident_energy_keV=np.r_[1.0, table.incident_energy_keV[1:-1], 100.0])
     monkeypatch.setattr(case_tables, "_case_bremslib_tables", lambda _case: {"Si": table})
     numerics = pr.Numerics(
         cxr_trials=4,

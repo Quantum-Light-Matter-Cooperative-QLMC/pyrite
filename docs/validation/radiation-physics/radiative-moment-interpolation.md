@@ -2,6 +2,43 @@
 
 Validation: `radiative-moment-interpolation`.
 
+## Current default and remaining qualification
+
+At the user's explicit request, coupled CPU/CUDA transport now defaults to
+prepared float64 moment tables at the frozen $2\times10^{-4}$ relative budget.
+This is a default-selection decision, **not** completed ensemble qualification
+or a change to any physical validation status. Exact event-row totals, element
+selection, conditional photon sampling, photon debit and RNG addressing remain
+unchanged. The keyword-only advanced transport argument
+`radiative_moments="exact"` retains the reference quadrature.
+
+New coupled cases serialize `radiative_moment_model` with the versioned marker
+`radiative-moments-v1/positive-linear-log-energy-v1/rtol2e-4`. Result row metadata
+also retain the actual packed moment-buffer SHA-256. A legacy case lacking the
+marker replays exact quadrature; it is not silently reinterpreted as a table
+case. Prepared buffers belong to one transport pass and are uploaded once by
+its batching owner; no process-global host/device table cache is introduced.
+Preparation and out-of-coverage failures remain explicit. Production table
+construction retains the exact reference packer's existing relative
+$10^{-12}$ source-endpoint allowance, needed when incident-grid refinement
+moves an intended endpoint by a floating-point step. At these admitted source
+edges the reference uses its endpoint value; no additional physical energy
+range is admitted. The standalone component preparation API remains strict
+by default. All interpolation queries, including production queries, still
+reject energies outside their explicitly prepared interval.
+
+Held-out CPU job **2669**, frozen at `8db53f2d` before the #795/#799 rebase,
+was cancelled at the user's request to release its 24 GiB reservation for
+other GPU tests. The [interruption record](../check-records/equal-precision/moment-heldout-interrupted-788.json)
+lists completed requests. Partial records remain in its isolated evidence directory;
+missing fixed-seed groups remain unresolved. This run did not include #795.
+Issue #788 stays open for complete held-out ensemble qualification, remaining
+hard-count/continuous-observable limits, wider CPU/CUDA transport comparisons
+and matched timing of the combined production source. No unfinished check is
+counted as passing. The job's six Si preflights passed within-process replay
+and matched score/trajectory hashes across the two independent processes for
+exact, table and refined policies.
+
 ## Independent derivation
 
 This verifier did not implement this claim. Before reading implementation
@@ -278,7 +315,57 @@ error at $6.5\times10^{-12}$ keV. Continuous observables again changed only at
 round-off scale. Hard-event count, transmission and backscatter changed for
 no history (`unresolved`). The median exact/table request ratio was 2.04.
 [Job record](../check-records/equal-precision/moment-compound-788.json).
-CPU transport and opt-in production integration remain pending.
+Opt-in production integration remains pending.
+
+### CPU diagnostic transport pilot (job 2666)
+
+Job 2666 ran `checks/equal_precision/moment-cpu-788.sbatch` on the remote
+Ryzen 9 9950X3D, Python 3.14.6, with one requested CPU, 24 GiB and one
+thread per numerical library. The sync record identifies a **dirty** checkout
+at `c9a345e7`; recorded CPU core, wrapper, helper, exact sampler and policy
+hashes match the committed diagnostic branch `7ea08549`. This establishes
+those measured file identities, not whole-checkout equivalence. Job 2665
+stopped before measurements because the host-metadata command could not find
+`python` on PATH. Scheduler accounting storage was disabled.
+
+The isolated CPU core replaces three frequent total-moment evaluations and
+retains the fourth, row-end hard-event total. Conditional photon sampling,
+actual photon debit and RNG addressing remain exact. Six 256-history
+preflights passed within-process same-seed replay. Separate-process replay
+was not tested. Across preflights and measured requests, maximum energy-ledger
+and photon-debit errors were respectively $2.51\times10^{-12}$ keV and
+$2.85\times10^{-14}$ keV.
+
+Each scene/variant used three paired seeds, 2048 histories per seed
+(6144 total), a 1 keV photon cutoff, 2048-history batches and no probe
+histories. Exact, default-table and refined-table policies used the same
+inputs and an independent same-workload warmup before each measurement.
+All continuous checks screen inside the frozen 99% paired-pilot margins;
+hard counts, transmission and backscatter changed for no history and remain
+`unresolved`. Table refinement also preserves this pattern.
+
+| CPU anchor | Exact median request, s | Table median request, s | Exact/table | Exact/refined |
+|---|---:|---:|---:|---:|
+| Si 300 keV, 100 µm | 33.208 | 2.990 | 11.11 | 11.12 |
+| W 300 keV, 10 µm | 61.770 | 5.752 | 10.74 | 10.85 |
+
+Request timings include reductions; preparation and warmup/JIT are separate.
+Default-table builds in the measured runs took 0.049–0.051 s and used
+9864 host bytes for Si and 9744 for W; CPU upload cost is zero. These
+preparation observations are not a cold-cache benchmark.
+The [complete CPU record](../check-records/equal-precision/moment-cpu-788.json)
+retains every repeat, preparation cost, storage, source/table pins, process
+peak RSS and accounting maxima. Recomputing the paired analysis from all
+18 raw score archives reproduces the supplied analysis exactly. Published
+metadata omit operator paths and hostnames.
+
+These are diagnostic warm-request ratios. There is no production or
+equal-achieved-precision speedup claim. Useful/replayed flight counters and
+CPU profiling were not collected. The existing component CPU/CUDA comparison
+does not qualify CPU/CUDA transport ensembles. Wider CPU anchors, held-out
+ensemble qualification (including sparse discrete outcomes), separate-process
+CPU replay and production identity integration remain open. The frozen pilot
+rule is unchanged; unchanged outcomes are not promoted to passing.
 
 ## Verdict
 

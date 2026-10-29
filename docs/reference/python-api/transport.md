@@ -81,3 +81,27 @@ See [detector response contracts](detectors.md#response-contracts),
 [saved beam diagnostics](beams.md#saved-beam-diagnostics), and
 [quantum solver diagnostics](quantum.md#solver-diagnostic-contracts) for
 other reviewed engine operations.
+
+
+## Coupled radiative moment evaluation
+
+`simulate_trajectories(..., radiative_moments="table")` is the default for
+coupled BremsLib transport on CPU and CUDA. Prepared float64 tables interpolate
+soft stopping in eV/Å and hard-event rate in Å⁻¹ using linear weights in log
+kinetic energy, with relative budget `2e-4` and explicit coverage checks.
+Use `radiative_moments="exact"` for reference quadrature. This keyword-only
+switch preserves the existing positional call interface. It has no effect on
+uncoupled radiation. Exact conditional photon sampling and the sampled photon
+energy debit remain in both modes.
+
+New coupled cases include `radiative_moment_model` in content/replay identity;
+legacy cases without that field retain exact evaluation. Advanced callers can
+use `dataclasses.replace(case, radiative_moment_model="exact")` to select an
+exact case explicitly. Result `radiative` metadata include `moment_model` and,
+for tables, `moment_table_sha256`. The latter pins the actual packed numerical
+buffer, including coverage and physical plasma values. The existing source
+and physical table identities are retained separately.
+
+Default activation was explicitly requested before ensemble qualification was
+complete. See [radiative moment evidence](../../validation/radiation-physics/radiative-moment-interpolation.md)
+for passed component/replay checks and the remaining scope of issue #788.

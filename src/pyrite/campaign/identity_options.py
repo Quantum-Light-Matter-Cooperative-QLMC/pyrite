@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, cast
 
 from .._numerics import DEFAULT_INELASTIC_CUTOFF_EV, DEFAULT_RADIATIVE_CUTOFF_EV
+from .._radiative_moment_policy import RADIATIVE_MOMENT_MODEL
 from .inelastic_cases import covered_shell_materials, shell_fallback_reason, target_shell_materials
 
 if TYPE_CHECKING:
@@ -119,6 +120,7 @@ def radiative_numerics_payload(
         return {}
     numerics: dict[str, Any] = {
         "radiative_model": "bremslib-soft-hard",
+        "radiative_moment_model": RADIATIVE_MOMENT_MODEL,
         "radiative_cutoff_eV": (
             DEFAULT_RADIATIVE_CUTOFF_EV
             if options.radiative_cutoff_eV is None

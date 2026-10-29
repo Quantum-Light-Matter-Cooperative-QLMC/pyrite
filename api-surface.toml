@@ -2,6 +2,8 @@
 # target is the *current* concrete binding; domain is the intended public owner.
 # root_role records ownership/stability; root_policy separately classifies root compatibility.
 # canonical_facades lists active domain imports; other domains retain existing paths.
+# simulate_trajectories adds keyword-only radiative_moments="table"|"exact" (#788);
+# Case.radiative_moment_model persists approximation identity; absence replays exact.
 schema_version = 1
 canonical_facades = ["beams", "geometry", "config", "detectors", "observations", "transport", "radiation"]
 

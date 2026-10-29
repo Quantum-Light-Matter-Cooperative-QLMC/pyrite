@@ -65,6 +65,7 @@ class TransportInputs:
     secondary_threshold_eV: Any
     max_secondary_generations: Any
     max_secondary_tracks: Any
+    radiative_moments: Any
     pair_production_model: Any
     positron_transport: Any
     atomic_electron_deflection: Any

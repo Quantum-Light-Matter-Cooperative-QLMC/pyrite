@@ -89,6 +89,7 @@ from ._jit_device import (
     _urban_sample_compound,
     _urban_stream_key,
 )
+from ._jit_moment_lookup_device import _rad_transport_moment
 from ._jit_radiative_device import (
     F64_KEV_PER_EV,
     RAD_HARD_RATE,
@@ -406,7 +407,7 @@ def _transport_kernel(
         rad_soft = F64_ZERO
         mu_rad = F64_ZERO
         if rad_on == I32_ONE:
-            rad_soft = _rad_layer_moment(
+            rad_soft = _rad_transport_moment(
                 RAD_SOFT,
                 layer_index,
                 rad_nel,
@@ -424,7 +425,7 @@ def _transport_kernel(
                 rad_cutoff_eV,
                 rad_plasma,
             )
-            mu_rad = _rad_layer_moment(
+            mu_rad = _rad_transport_moment(
                 RAD_HARD_RATE,
                 layer_index,
                 rad_nel,
@@ -694,7 +695,7 @@ def _transport_kernel(
                     )
                 if rad_on == I32_ONE:
                     cutoff_rate -= (
-                        _rad_layer_moment(
+                        _rad_transport_moment(
                             RAD_SOFT,
                             layer_index,
                             rad_nel,
@@ -766,7 +767,7 @@ def _transport_kernel(
                         )
                     if rad_on == I32_ONE:
                         midpoint_rate -= (
-                            _rad_layer_moment(
+                            _rad_transport_moment(
                                 RAD_SOFT,
                                 layer_index,
                                 rad_nel,

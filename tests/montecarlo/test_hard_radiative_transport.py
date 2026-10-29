@@ -36,6 +36,8 @@ def _table(scale):
     table = prepare_bremslib_table(synthetic_bremslib_arrays(), atomic_number=6)
     return replace(
         table,
+        # Exact intended endpoints; log-grid refinement can shift them by an ulp.
+        incident_energy_keV=np.r_[10.0, table.incident_energy_keV[1:-1], 200.0],
         scaled_sdcs_mb=table.scaled_sdcs_mb * scale,
         scaled_ddcs_mb_sr=table.scaled_ddcs_mb_sr * scale,
     )

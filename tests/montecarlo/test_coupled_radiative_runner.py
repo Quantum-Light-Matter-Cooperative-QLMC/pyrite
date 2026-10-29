@@ -169,6 +169,8 @@ def _synthetic_table(element, atomic_number):
     # Inflated so a dozen electrons emit hard photons (as test_hard_radiative_transport).
     return replace(
         table,
+        # Exact intended endpoints; log-grid refinement can shift them by an ulp.
+        incident_energy_keV=np.r_[5.0, table.incident_energy_keV[1:-1], 200.0],
         scaled_sdcs_mb=table.scaled_sdcs_mb * 1e4,
         scaled_ddcs_mb_sr=table.scaled_ddcs_mb_sr * 1e4,
     )
@@ -299,7 +301,7 @@ def test_pre_adapter_seeded_coupled_baseline(synthetic_si_tables, monkeypatch):
     from tests.helpers.photon_mode_off import assert_photon_mode_off_bitwise
     from tests.helpers.physics_baseline import assert_output_baseline, transport_signature
 
-    case = _coupled_case()
+    case = replace(_coupled_case(), radiative_moment_model="exact")
     tp, output = assert_photon_mode_off_bitwise(case, monkeypatch)
     continuum = output["brem_wide"]
     assert_output_baseline(

@@ -29,9 +29,9 @@ def install_kernel(audit):
     sys.modules[helper_name] = helper
     helper_spec.loader.exec_module(helper)
     original = Path(package.__file__).with_name("_jit_kernel.py").read_text()
-    if original.count("_rad_layer_moment(") != 5:
+    if original.count("_rad_transport_moment(") != 4:
         raise ValueError("radiative total-moment call-site inventory changed")
-    source = original.replace("_rad_layer_moment(", "lookup_layer_moment(", 4)
+    source = original.replace("_rad_transport_moment(", "lookup_layer_moment(", 4)
     source += "\nfrom ._moment_transport_device import lookup_layer_moment\n"
     destination = audit.with_suffix(".kernel.py")
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -64,7 +64,7 @@ def install_tables(rtol, audit):
     original_result = hard_radiative.add_radiative_result_fields
     cache = {}
 
-    def arguments(compositions, tables, cutoff, electron_cutoffs, energies, *tail):
+    def arguments(compositions, tables, cutoff, electron_cutoffs, energies, *tail, **kwargs):
         packed = original(compositions, tables, cutoff, electron_cutoffs, energies, *tail)
         lo = float(np.min(electron_cutoffs)) * 1e3
         hi = float(np.max(energies)) * 1e3
@@ -136,6 +136,7 @@ def parse_args():
 
 def main():
     args, adapter_args = parse_args()
+    adapter_args.extend(["--radiative-moments", "exact"])
     args.audit.parent.mkdir(parents=True, exist_ok=True)
     source = {} if args.variant == "exact" else install_kernel(args.audit)
     package = importlib.import_module("pyrite.montecarlo.transport")

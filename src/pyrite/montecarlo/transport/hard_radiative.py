@@ -648,9 +648,18 @@ def validate_radiative_args(
 
 
 def radiative_core_args(
-    compositions, tables, cutoff_eV, electron_cutoffs_keV, energies_keV, seed, n_electrons, start=0
+    compositions,
+    tables,
+    cutoff_eV,
+    electron_cutoffs_keV,
+    energies_keV,
+    seed,
+    n_electrons,
+    start=0,
+    *,
+    moment_mode="exact",
 ) -> tuple:
-    """The exact cores' ``radiative_args``: stream keys, cutoff, packed tables.
+    """Transport ``radiative_args``: stream keys, cutoff, physical and moment tables.
 
     Validation: dielectric-suppression
     """
@@ -665,6 +674,15 @@ def radiative_core_args(
     packed = pack_radiative_layer_tables(
         compositions, tables, min_cutoff_eV, maximum_eV, dielectric=True
     )
+    if moment_mode == "table":
+        from .radiative_moment_transport import pack_transport_moments
+
+        plasma = pack_transport_moments(
+            compositions, tables, min_cutoff_eV, maximum_eV, cutoff_eV, packed[-1]
+        )
+        packed = (*packed[:-1], plasma)
+    elif moment_mode != "exact":
+        raise ValueError("moment_mode must be table or exact")
     keys = radiative_stream_keys(seed, n_electrons, start=start)
     return (keys, float(cutoff_eV)) + packed
 

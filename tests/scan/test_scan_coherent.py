@@ -98,6 +98,7 @@ def test_catalog_profile_transport_numerics_reach_run_identity(monkeypatch):
         "elastic_model": "elsepa",
         "atomic_electron_deflection": "kawrakow",
         "radiative_model": "bremslib-soft-hard",
+        "radiative_moment_model": "radiative-moments-v1/positive-linear-log-energy-v1/rtol2e-4",
         "radiative_cutoff_eV": 1000.0,
     }
     assert stem.startswith("hopg@full-")

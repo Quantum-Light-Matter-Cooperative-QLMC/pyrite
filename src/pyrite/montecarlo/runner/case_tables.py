@@ -180,11 +180,14 @@ def _case_radiative_kwargs(case):
     tables as the continuum scorer, so transport and spectrum agree on the
     table identity recorded on the rows.
     """
+    from ..._radiative_moment_policy import radiative_moment_mode
+
     model = case.get("radiative_model")
     if model is None:
         return {}
     return dict(
         radiative_model=model,
+        radiative_moments=radiative_moment_mode(case.get("radiative_moment_model", "exact")),
         radiative_cutoff_eV=float(case["radiative_cutoff_eV"]),
         bremslib_tables=_case_bremslib_tables(case),
         # Opt-in pair conversion (#275); absent leaves every photon radiated.
