@@ -214,17 +214,6 @@ def test_published_tutorial_outputs_have_no_json_dump_widgets():
                 assert "marimo-json-output" not in html, path.name
 
 
-def test_environment_healthcheck_is_a_rendered_table():
-    path = Path(__file__).parents[2] / "docs/notebooks/fundamentals/01-first-spectrum.ipynb"
-    captured = nbformat.read(path, as_version=4)
-    tables = [
-        output.get("data", {}).get("text/html", "")
-        for cell in captured.cells
-        for output in cell.get("outputs", [])
-    ]
-    assert any("<table>" in html and "selected backend" in html for html in tables)
-
-
 def _notebook_extension():
     spec = importlib.util.spec_from_file_location(
         "_notebooks", Path(__file__).parents[2] / "docs/_notebooks.py"

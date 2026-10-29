@@ -66,6 +66,7 @@ I8_TRANSMITTED = np.int8(2)
 I8_SIDE = np.int8(3)
 I8_STEP_LIMITED = np.int8(4)
 I8_NOT_ENTERED = np.int8(5)
+I8_SUSPENDED = np.int8(6)  # continuation yield (#789)
 
 F64_ONE_OVER_511 = 1 / np.float64(510.99895)
 # Berger-Seltzer / ICRU-37 constants, mirroring montecarlo.transport.

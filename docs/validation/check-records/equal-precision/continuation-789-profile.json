@@ -1,0 +1,834 @@
+{
+  "schema": "pyrite.transport-continuation.profile-summary.v1",
+  "issue": 789,
+  "date": "2026-10-29",
+  "jobs": {
+    "2646": "nsys (measured request only via NVTX capture range) and ncu attempts; branch 0c93ac63",
+    "2648": "cProfile of measured request; branch 133e1e9d"
+  },
+  "nsys": {
+    "si5000-cont256": {
+      "nvtx_s": {
+        "bench.measured": {
+          "total": 1.5352725950000001,
+          "instances": 1
+        },
+        "pyrite.transport.core": {
+          "total": 1.30101886,
+          "instances": 1
+        },
+        "pyrite.transport.continuation.launch": {
+          "total": 0.9254208220000001,
+          "instances": 17
+        },
+        "pyrite.transport.continuation.assemble": {
+          "total": 0.275963831,
+          "instances": 1
+        },
+        "pyrite.transport.continuation.stage": {
+          "total": 0.092808734,
+          "instances": 17
+        },
+        "pyrite.transport.output": {
+          "total": 0.003439128,
+          "instances": 1
+        }
+      },
+      "memory": {
+        "memcpy Device-to-Host": {
+          "MB": 652.135,
+          "count": 382,
+          "device_time_s": 0.037869576
+        },
+        "memset": {
+          "MB": 48.177,
+          "count": 1019,
+          "device_time_s": 0.000537348
+        },
+        "memcpy Host-to-Device": {
+          "MB": 18.517,
+          "count": 600,
+          "device_time_s": 0.0013220620000000002
+        }
+      },
+      "api": {
+        "cudaDeviceSynchronize": {
+          "calls": 35,
+          "host_time_s": 0.8988118860000001
+        },
+        "cudaMemcpyAsync": {
+          "calls": 982,
+          "host_time_s": 0.08223124100000001
+        },
+        "cuLaunchKernel": {
+          "calls": 9098,
+          "host_time_s": 0.056129674000000004
+        },
+        "cudaStreamSynchronize": {
+          "calls": 382,
+          "host_time_s": 0.000591027
+        }
+      },
+      "transport_kernel": {
+        "instances": 17,
+        "device_time_s": 0.898561448
+      },
+      "outside_transport_core_s": 0.23425373500000002
+    },
+    "si5000-learned32": {
+      "nvtx_s": {
+        "bench.measured": {
+          "total": 1.3518125300000001,
+          "instances": 1
+        },
+        "pyrite.transport.core": {
+          "total": 1.014948707,
+          "instances": 1
+        },
+        "pyrite.transport.launch": {
+          "total": 0.832596062,
+          "instances": 1
+        },
+        "pyrite.transport.compact": {
+          "total": 0.17866425600000002,
+          "instances": 1
+        },
+        "pyrite.transport.output": {
+          "total": 0.017727234,
+          "instances": 1
+        }
+      },
+      "memory": {
+        "memcpy Device-to-Host": {
+          "MB": 651.785,
+          "count": 112,
+          "device_time_s": 0.07824043400000001
+        },
+        "memcpy Host-to-Device": {
+          "MB": 18.425,
+          "count": 583,
+          "device_time_s": 0.0013053350000000001
+        },
+        "memset": {
+          "MB": 6.181,
+          "count": 923,
+          "device_time_s": 0.000487939
+        }
+      },
+      "api": {
+        "cudaDeviceSynchronize": {
+          "calls": 3,
+          "host_time_s": 0.8309330580000001
+        },
+        "cudaMemcpyAsync": {
+          "calls": 695,
+          "host_time_s": 0.09842558100000001
+        },
+        "cuLaunchKernel": {
+          "calls": 8712,
+          "host_time_s": 0.053855513
+        },
+        "cudaStreamSynchronize": {
+          "calls": 112,
+          "host_time_s": 0.000327755
+        }
+      },
+      "transport_kernel": {
+        "instances": 1,
+        "device_time_s": 0.830889948
+      },
+      "outside_transport_core_s": 0.33686382300000006
+    },
+    "w20000-cont256A5000D": {
+      "nvtx_s": {
+        "bench.measured": {
+          "total": 11.848987383,
+          "instances": 1
+        },
+        "pyrite.transport.core": {
+          "total": 6.471635834000001,
+          "instances": 1
+        },
+        "pyrite.transport.continuation.launch": {
+          "total": 4.017848058,
+          "instances": 64
+        },
+        "pyrite.transport.continuation.assemble": {
+          "total": 2.326154482,
+          "instances": 1
+        },
+        "pyrite.transport.continuation.stage": {
+          "total": 0.112753983,
+          "instances": 64
+        },
+        "pyrite.transport.output": {
+          "total": 0.078236839,
+          "instances": 1
+        }
+      },
+      "memory": {
+        "memcpy Device-to-Host": {
+          "MB": 4885.776,
+          "count": 1802,
+          "device_time_s": 0.692913387
+        },
+        "memset": {
+          "MB": 437.117,
+          "count": 18773,
+          "device_time_s": 0.010250385
+        },
+        "memcpy Host-to-Device": {
+          "MB": 342.814,
+          "count": 10903,
+          "device_time_s": 0.026152833
+        }
+      },
+      "api": {
+        "cudaDeviceSynchronize": {
+          "calls": 129,
+          "host_time_s": 3.9108227120000003
+        },
+        "cuLaunchKernel": {
+          "calls": 175932,
+          "host_time_s": 1.06582259
+        },
+        "cudaMemcpyAsync": {
+          "calls": 12705,
+          "host_time_s": 0.9767718200000001
+        },
+        "cudaStreamSynchronize": {
+          "calls": 1802,
+          "host_time_s": 0.003992039
+        }
+      },
+      "transport_kernel": {
+        "instances": 64,
+        "device_time_s": 3.9101544440000002
+      },
+      "outside_transport_core_s": 5.377351549
+    },
+    "w20000-cont256A5000": {
+      "nvtx_s": {
+        "bench.measured": {
+          "total": 12.325403094,
+          "instances": 1
+        },
+        "pyrite.transport.core": {
+          "total": 7.768997776000001,
+          "instances": 1
+        },
+        "pyrite.transport.continuation.launch": {
+          "total": 4.016274665,
+          "instances": 64
+        },
+        "pyrite.transport.continuation.assemble": {
+          "total": 2.9501819690000004,
+          "instances": 1
+        },
+        "pyrite.transport.continuation.stage": {
+          "total": 0.787918738,
+          "instances": 64
+        },
+        "pyrite.transport.output": {
+          "total": 0.026156101,
+          "instances": 1
+        }
+      },
+      "memory": {
+        "memcpy Device-to-Host": {
+          "MB": 4885.776,
+          "count": 2684,
+          "device_time_s": 0.48516128100000006
+        },
+        "memset": {
+          "MB": 437.117,
+          "count": 18773,
+          "device_time_s": 0.010386949000000001
+        },
+        "memcpy Host-to-Device": {
+          "MB": 30.631,
+          "count": 10839,
+          "device_time_s": 0.015178655000000001
+        }
+      },
+      "api": {
+        "cudaDeviceSynchronize": {
+          "calls": 129,
+          "host_time_s": 3.90975162
+        },
+        "cuLaunchKernel": {
+          "calls": 175036,
+          "host_time_s": 0.9823360560000001
+        },
+        "cudaMemcpyAsync": {
+          "calls": 13523,
+          "host_time_s": 0.914184717
+        },
+        "cudaStreamSynchronize": {
+          "calls": 2684,
+          "host_time_s": 0.005343579
+        }
+      },
+      "transport_kernel": {
+        "instances": 64,
+        "device_time_s": 3.908911347
+      },
+      "outside_transport_core_s": 4.5564053179999995
+    },
+    "w20000-learnedB5000": {
+      "nvtx_s": {
+        "bench.measured": {
+          "total": 17.649537488,
+          "instances": 1
+        },
+        "pyrite.transport.core": {
+          "total": 12.333416278000001,
+          "instances": 1
+        },
+        "pyrite.transport.launch": {
+          "total": 10.01322871,
+          "instances": 5
+        },
+        "pyrite.transport.compact": {
+          "total": 2.292403636,
+          "instances": 5
+        },
+        "pyrite.transport.output": {
+          "total": 0.155427745,
+          "instances": 1
+        }
+      },
+      "memory": {
+        "memcpy Device-to-Host": {
+          "MB": 4883.176,
+          "count": 1712,
+          "device_time_s": 0.803710967
+        },
+        "memset": {
+          "MB": 123.868,
+          "count": 18439,
+          "device_time_s": 0.009875444
+        },
+        "memcpy Host-to-Device": {
+          "MB": 29.981,
+          "count": 10775,
+          "device_time_s": 0.019174972000000002
+        }
+      },
+      "api": {
+        "cudaDeviceSynchronize": {
+          "calls": 11,
+          "host_time_s": 10.005142576
+        },
+        "cudaMemcpyAsync": {
+          "calls": 12487,
+          "host_time_s": 1.125874438
+        },
+        "cuLaunchKernel": {
+          "calls": 173752,
+          "host_time_s": 0.999149712
+        },
+        "cudaStreamSynchronize": {
+          "calls": 1712,
+          "host_time_s": 0.004233154
+        }
+      },
+      "transport_kernel": {
+        "instances": 5,
+        "device_time_s": 9.86773065
+      },
+      "outside_transport_core_s": 5.316121209999999
+    },
+    "w5000-cont256D": {
+      "nvtx_s": {
+        "bench.measured": {
+          "total": 3.882883472,
+          "instances": 1
+        },
+        "pyrite.transport.core": {
+          "total": 2.7206740280000004,
+          "instances": 1
+        },
+        "pyrite.transport.continuation.launch": {
+          "total": 2.339972309,
+          "instances": 39
+        },
+        "pyrite.transport.continuation.assemble": {
+          "total": 0.328210958,
+          "instances": 1
+        },
+        "pyrite.transport.continuation.stage": {
+          "total": 0.043591071,
+          "instances": 39
+        },
+        "pyrite.transport.output": {
+          "total": 0.011827839000000001,
+          "instances": 1
+        }
+      },
+      "memory": {
+        "memcpy Device-to-Host": {
+          "MB": 1223.815,
+          "count": 533,
+          "device_time_s": 0.14499261300000002
+        },
+        "memset": {
+          "MB": 107.855,
+          "count": 4595,
+          "device_time_s": 0.0024194060000000002
+        },
+        "memcpy Host-to-Device": {
+          "MB": 98.804,
+          "count": 2670,
+          "device_time_s": 0.004508662
+        }
+      },
+      "api": {
+        "cudaDeviceSynchronize": {
+          "calls": 79,
+          "host_time_s": 2.27916861
+        },
+        "cuLaunchKernel": {
+          "calls": 42735,
+          "host_time_s": 0.23552961200000003
+        },
+        "cudaMemcpyAsync": {
+          "calls": 3203,
+          "host_time_s": 0.209487951
+        },
+        "cudaStreamSynchronize": {
+          "calls": 533,
+          "host_time_s": 0.001260868
+        }
+      },
+      "transport_kernel": {
+        "instances": 39,
+        "device_time_s": 2.278464838
+      },
+      "outside_transport_core_s": 1.1622094439999997
+    },
+    "w5000-cont256": {
+      "nvtx_s": {
+        "bench.measured": {
+          "total": 4.333910595,
+          "instances": 1
+        },
+        "pyrite.transport.core": {
+          "total": 3.2347128030000003,
+          "instances": 1
+        },
+        "pyrite.transport.continuation.launch": {
+          "total": 2.341040244,
+          "instances": 39
+        },
+        "pyrite.transport.continuation.assemble": {
+          "total": 0.532356649,
+          "instances": 1
+        },
+        "pyrite.transport.continuation.stage": {
+          "total": 0.352253215,
+          "instances": 39
+        },
+        "pyrite.transport.output": {
+          "total": 0.006283516,
+          "instances": 1
+        }
+      },
+      "memory": {
+        "memcpy Device-to-Host": {
+          "MB": 1223.815,
+          "count": 1065,
+          "device_time_s": 0.113993301
+        },
+        "memset": {
+          "MB": 107.855,
+          "count": 4595,
+          "device_time_s": 0.0024788360000000003
+        },
+        "memcpy Host-to-Device": {
+          "MB": 20.603,
+          "count": 2631,
+          "device_time_s": 0.002897904
+        }
+      },
+      "api": {
+        "cudaDeviceSynchronize": {
+          "calls": 79,
+          "host_time_s": 2.279499142
+        },
+        "cudaMemcpyAsync": {
+          "calls": 3696,
+          "host_time_s": 0.35230073
+        },
+        "cuLaunchKernel": {
+          "calls": 42189,
+          "host_time_s": 0.253444306
+        },
+        "cudaStreamSynchronize": {
+          "calls": 1065,
+          "host_time_s": 0.002526791
+        }
+      },
+      "transport_kernel": {
+        "instances": 39,
+        "device_time_s": 2.2790381390000003
+      },
+      "outside_transport_core_s": 1.0991977919999996
+    },
+    "w5000-learned32": {
+      "nvtx_s": {
+        "bench.measured": {
+          "total": 5.419517181000001,
+          "instances": 1
+        },
+        "pyrite.transport.core": {
+          "total": 4.150302504,
+          "instances": 1
+        },
+        "pyrite.transport.launch": {
+          "total": 3.813997983,
+          "instances": 2
+        },
+        "pyrite.transport.compact": {
+          "total": 0.33067224900000003,
+          "instances": 2
+        },
+        "pyrite.transport.output": {
+          "total": 0.022774830000000003,
+          "instances": 1
+        }
+      },
+      "memory": {
+        "memcpy Device-to-Host": {
+          "MB": 1223.163,
+          "count": 435,
+          "device_time_s": 0.14237112100000002
+        },
+        "memset": {
+          "MB": 29.352,
+          "count": 4378,
+          "device_time_s": 0.0023204980000000003
+        },
+        "memcpy Host-to-Device": {
+          "MB": 20.44,
+          "count": 2592,
+          "device_time_s": 0.002898903
+        }
+      },
+      "api": {
+        "cudaDeviceSynchronize": {
+          "calls": 5,
+          "host_time_s": 3.806896393
+        },
+        "cuLaunchKernel": {
+          "calls": 41271,
+          "host_time_s": 0.248389194
+        },
+        "cudaMemcpyAsync": {
+          "calls": 3027,
+          "host_time_s": 0.21425949100000002
+        },
+        "cudaStreamSynchronize": {
+          "calls": 435,
+          "host_time_s": 0.001021355
+        }
+      },
+      "transport_kernel": {
+        "instances": 2,
+        "device_time_s": 3.8068509460000004
+      },
+      "outside_transport_core_s": 1.2692146770000008
+    }
+  },
+  "ncu": {
+    "ncu-w5000-cont1024": {
+      "status": "failed",
+      "log_tail": "n the target device 0. For instructions on enabling permissions and to get more information see https://developer.nvidia.com/ERR_NVGPUCTRPERM\ncont-Q1024-Aall-T32 request=9.886s launch=2.827s launches=10 rows=9775216/9775216 peak_pool=1211.5MiB 1f5300205f1a\n==PROF== Disconnected from process 2582092\n"
+    },
+    "ncu-w5000-cont256": {
+      "status": "failed",
+      "log_tail": "on the target device 0. For instructions on enabling permissions and to get more information see https://developer.nvidia.com/ERR_NVGPUCTRPERM\ncont-Q256-Aall-T32 request=11.011s launch=3.518s launches=39 rows=9775216/9775216 peak_pool=314.8MiB 1f5300205f1a\n==PROF== Disconnected from process 2582225\n"
+    },
+    "ncu-w5000-learned32": {
+      "status": "failed",
+      "log_tail": "Counters on the target device 0. For instructions on enabling permissions and to get more information see https://developer.nvidia.com/ERR_NVGPUCTRPERM\nlearned32 request=10.402s launch=3.887s launches=2 rows=9775216/9775216 peak_pool=7435.4MiB 1f5300205f1a\n==PROF== Disconnected from process 2582037\n"
+    }
+  },
+  "cprofile": {
+    "w-300-10um-0deg-20000-learned32-B5000": {
+      "request_s_profiled": 17.391219339100644,
+      "cumulative_s": {
+        "batching.py:_drive_per_electron_batches": 12.346772438,
+        "api.py:simulate_trajectories": 17.391121218000002,
+        "host_pass.py:_dispatch_core": 12.349866788,
+        "hard_radiative.py:complete_hard_radiative_events": 4.56603764,
+        "host_pass.py:_assemble_result": 5.039267674
+      }
+    },
+    "w-300-10um-0deg-20000-cont-Q256-A5000-T32": {
+      "request_s_profiled": 13.527653409168124,
+      "cumulative_s": {
+        "continuation.py:_assemble": 4.16695934,
+        "continuation.py:_drive_continuation_rounds": 9.134639185000001,
+        "api.py:simulate_trajectories": 13.527538588,
+        "host_pass.py:_dispatch_core": 9.13716943,
+        "hard_radiative.py:complete_hard_radiative_events": 4.306463310000001,
+        "host_pass.py:_assemble_result": 4.3881105300000005
+      }
+    },
+    "w-300-10um-0deg-20000-cont-Q256-A5000-T32-D": {
+      "request_s_profiled": 10.475920531898737,
+      "cumulative_s": {
+        "continuation.py:_drive_continuation_rounds": 6.1736465030000005,
+        "api.py:simulate_trajectories": 10.475823621,
+        "host_pass.py:_dispatch_core": 6.176782108,
+        "hard_radiative.py:complete_hard_radiative_events": 4.216083691000001,
+        "host_pass.py:_assemble_result": 4.297007436
+      }
+    },
+    "w-300-10um-0deg-5000-learned32": {
+      "request_s_profiled": 5.411188643891364,
+      "cumulative_s": {
+        "batching.py:_drive_per_electron_batches": 4.161535347,
+        "api.py:simulate_trajectories": 5.411091973,
+        "host_pass.py:_dispatch_core": 4.163121810000001,
+        "hard_radiative.py:complete_hard_radiative_events": 1.129945215,
+        "host_pass.py:_assemble_result": 1.2353629400000001
+      }
+    },
+    "w-300-10um-0deg-5000-cont-Q256-Aall-T32": {
+      "request_s_profiled": 4.459178274963051,
+      "cumulative_s": {
+        "continuation.py:_assemble": 0.6343027450000001,
+        "continuation.py:_drive_continuation_rounds": 3.397789336,
+        "api.py:simulate_trajectories": 4.459077754,
+        "host_pass.py:_dispatch_core": 3.39953113,
+        "hard_radiative.py:complete_hard_radiative_events": 1.038798704,
+        "host_pass.py:_assemble_result": 1.057815661
+      }
+    },
+    "w-300-10um-0deg-5000-cont-Q256-Aall-T32-D": {
+      "request_s_profiled": 3.7335741228889674,
+      "cumulative_s": {
+        "continuation.py:_drive_continuation_rounds": 2.794973331,
+        "api.py:simulate_trajectories": 3.733486263,
+        "host_pass.py:_dispatch_core": 2.797178778,
+        "hard_radiative.py:complete_hard_radiative_events": 0.9116156240000001,
+        "host_pass.py:_assemble_result": 0.934672182
+      }
+    }
+  },
+  "track_rows_and_survivors": {
+    "si5000-cont256": {
+      "mean": 1042.3834,
+      "quantiles": {
+        "0.0": 52.0,
+        "0.1": 587.0,
+        "0.5": 701.0,
+        "0.9": 1944.2000000000007,
+        "0.99": 4068.01,
+        "1.0": 4213.0
+      },
+      "zero_row_histories": 0,
+      "surviving": {
+        "0.1": 0.9954,
+        "0.2": 0.331,
+        "0.3": 0.19,
+        "0.4": 0.1286,
+        "0.5": 0.0898,
+        "0.6": 0.0706,
+        "0.7": 0.0536,
+        "0.8": 0.0486,
+        "0.9": 0.0458
+      }
+    },
+    "si5000-learned32": {
+      "mean": 1042.3834,
+      "quantiles": {
+        "0.0": 52.0,
+        "0.1": 587.0,
+        "0.5": 701.0,
+        "0.9": 1944.2000000000007,
+        "0.99": 4068.01,
+        "1.0": 4213.0
+      },
+      "zero_row_histories": 0,
+      "surviving": {
+        "0.1": 0.9954,
+        "0.2": 0.331,
+        "0.3": 0.19,
+        "0.4": 0.1286,
+        "0.5": 0.0898,
+        "0.6": 0.0706,
+        "0.7": 0.0536,
+        "0.8": 0.0486,
+        "0.9": 0.0458
+      }
+    },
+    "w20000-cont256A5000": {
+      "mean": 1951.14465,
+      "quantiles": {
+        "0.0": 2.0,
+        "0.1": 785.0,
+        "0.5": 1391.0,
+        "0.9": 3724.2000000000044,
+        "0.99": 9601.009999999998,
+        "1.0": 9975.0
+      },
+      "zero_row_histories": 0,
+      "surviving": {
+        "0.1": 0.73495,
+        "0.2": 0.3115,
+        "0.3": 0.15615,
+        "0.4": 0.08675,
+        "0.5": 0.05515,
+        "0.6": 0.0377,
+        "0.7": 0.02845,
+        "0.8": 0.0231,
+        "0.9": 0.0206
+      }
+    },
+    "w20000-cont256A5000D": {
+      "mean": 1951.14465,
+      "quantiles": {
+        "0.0": 2.0,
+        "0.1": 785.0,
+        "0.5": 1391.0,
+        "0.9": 3724.2000000000044,
+        "0.99": 9601.009999999998,
+        "1.0": 9975.0
+      },
+      "zero_row_histories": 0,
+      "surviving": {
+        "0.1": 0.73495,
+        "0.2": 0.3115,
+        "0.3": 0.15615,
+        "0.4": 0.08675,
+        "0.5": 0.05515,
+        "0.6": 0.0377,
+        "0.7": 0.02845,
+        "0.8": 0.0231,
+        "0.9": 0.0206
+      }
+    },
+    "w20000-learnedB5000": {
+      "mean": 1951.14465,
+      "quantiles": {
+        "0.0": 2.0,
+        "0.1": 785.0,
+        "0.5": 1391.0,
+        "0.9": 3724.2000000000044,
+        "0.99": 9601.009999999998,
+        "1.0": 9975.0
+      },
+      "zero_row_histories": 0,
+      "surviving": {
+        "0.1": 0.73495,
+        "0.2": 0.3115,
+        "0.3": 0.15615,
+        "0.4": 0.08675,
+        "0.5": 0.05515,
+        "0.6": 0.0377,
+        "0.7": 0.02845,
+        "0.8": 0.0231,
+        "0.9": 0.0206
+      }
+    },
+    "w5000-cont256": {
+      "mean": 1955.0432,
+      "quantiles": {
+        "0.0": 8.0,
+        "0.1": 763.9000000000001,
+        "0.5": 1396.0,
+        "0.9": 3717.7000000000025,
+        "0.99": 9616.03,
+        "1.0": 9874.0
+      },
+      "zero_row_histories": 0,
+      "surviving": {
+        "0.1": 0.7456,
+        "0.2": 0.3202,
+        "0.3": 0.1612,
+        "0.4": 0.0892,
+        "0.5": 0.0552,
+        "0.6": 0.0388,
+        "0.7": 0.0298,
+        "0.8": 0.0244,
+        "0.9": 0.022
+      }
+    },
+    "w5000-cont256D": {
+      "mean": 1955.0432,
+      "quantiles": {
+        "0.0": 8.0,
+        "0.1": 763.9000000000001,
+        "0.5": 1396.0,
+        "0.9": 3717.7000000000025,
+        "0.99": 9616.03,
+        "1.0": 9874.0
+      },
+      "zero_row_histories": 0,
+      "surviving": {
+        "0.1": 0.7456,
+        "0.2": 0.3202,
+        "0.3": 0.1612,
+        "0.4": 0.0892,
+        "0.5": 0.0552,
+        "0.6": 0.0388,
+        "0.7": 0.0298,
+        "0.8": 0.0244,
+        "0.9": 0.022
+      }
+    },
+    "w5000-learned32": {
+      "mean": 1955.0432,
+      "quantiles": {
+        "0.0": 8.0,
+        "0.1": 763.9000000000001,
+        "0.5": 1396.0,
+        "0.9": 3717.7000000000025,
+        "0.99": 9616.03,
+        "1.0": 9874.0
+      },
+      "zero_row_histories": 0,
+      "surviving": {
+        "0.1": 0.7456,
+        "0.2": 0.3202,
+        "0.3": 0.1612,
+        "0.4": 0.0892,
+        "0.5": 0.0552,
+        "0.6": 0.0388,
+        "0.7": 0.0298,
+        "0.8": 0.0244,
+        "0.9": 0.022
+      }
+    }
+  },
+  "compiled_kernel_resources": [
+    {
+      "registers_per_thread": 204,
+      "local_bytes_per_thread": 40,
+      "max_threads_per_block": 256,
+      "theoretical_occupancy_by_block": {
+        "32": {
+          "blocks_per_sm": 8,
+          "theoretical": 0.16666666666666666
+        },
+        "64": {
+          "blocks_per_sm": 4,
+          "theoretical": 0.16666666666666666
+        },
+        "128": {
+          "blocks_per_sm": 2,
+          "theoretical": 0.16666666666666666
+        },
+        "256": {
+          "blocks_per_sm": 1,
+          "theoretical": 0.16666666666666666
+        }
+      }
+    }
+  ],
+  "interpretation": "Profiled timings carry nsys/cProfile overhead and are not benchmark results; cProfile inflates Python-heavy reassembly. cudaDeviceSynchronize counts include two benchmark-wrapper synchronizations per launch. ncu hardware counters are refused (ERR_NVGPUCTRPERM): occupancy is the occupancy-API theoretical value only, and no achieved occupancy or SM-activity is measured.",
+  "raw_evidence": "lab box: ~/pyrite-789-continuation/evidence/continuation/{profile/2646,cprofile/2648}"
+}

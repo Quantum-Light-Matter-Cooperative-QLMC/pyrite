@@ -58,27 +58,6 @@ def _(mo):
 
 
 @app.cell(hide_code=True)
-def _(mo, os, pyrite):
-    import importlib.util
-    import platform
-
-    environment = {
-        "python": platform.python_version(),
-        "pyrite": pyrite.__version__,
-        "selected_backend": os.environ["PYRITE_MC_BACKEND"],
-        "cupy_installed": importlib.util.find_spec("cupy") is not None,
-    }
-    if environment["cupy_installed"]:
-        try:
-            import cupy as cp
-
-            environment["cuda_device_count"] = cp.cuda.runtime.getDeviceCount()
-        except Exception as _error:
-            environment["cuda_status"] = f"Unavailable: {type(_error).__name__}"
-    return
-
-
-@app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
     ## Simulate a crystalline target

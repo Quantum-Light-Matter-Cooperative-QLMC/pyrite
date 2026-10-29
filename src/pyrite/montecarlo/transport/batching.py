@@ -8,6 +8,7 @@ from functools import cache
 import numpy as np
 
 from ..._env import env_value
+from .continuation import TransportContinuationConfig, _drive_continuation_rounds
 from .cores import (
     EXIT_BACKSCATTERED,
     EXIT_CUTOFF_STOPPED,
@@ -238,6 +239,11 @@ class PerElectronTransportConfig:
     than a full batch. Set it to 0 to let the first batch run full width, which is
     what a GPU run wants: there a batch costs about one electron lifetime whatever
     its width, so a discarded batch and a probe cost the same launch.
+
+    ``continuation`` opts the exact CUDA core into bounded continuation rounds
+    (:class:`.continuation.TransportContinuationConfig`, #789) under the same
+    ``scratch_budget_bytes`` and ``max_batch``; ``seg_capacity`` and
+    ``probe_electrons`` then do not apply. Unsupported cores and modes raise.
     """
 
     seg_capacity: int = 512
@@ -245,6 +251,7 @@ class PerElectronTransportConfig:
     capacity_headroom: float = 1.25
     max_batch: int = 65536
     probe_electrons: int = 1024
+    continuation: TransportContinuationConfig | None = None
 
 
 def _default_batch_limit_from_env() -> int:
@@ -526,6 +533,18 @@ def _drive_per_electron_batches(
     return nseg, n_back, n_trans, n_side, n_cutoff, n_step_limited, joined, to_host(d_stragg)
 
 
+def _check_continuation_support(xp, inelastic, straggle_on):
+    """Reject continuation outside its tested exact-CUDA contract (#789)."""
+    if xp is np:
+        raise NotImplementedError("transport continuation requires the exact CUDA core")
+    if inelastic:
+        raise NotImplementedError(
+            "transport continuation does not support inelastic_model='shell-soft-hard'"
+        )
+    if straggle_on:
+        raise NotImplementedError("transport continuation does not support straggling")
+
+
 def _run_per_electron_transport_lut(
     core,
     xp,
@@ -582,6 +601,8 @@ def _run_per_electron_transport_lut(
     writes into -- downloaded once at the end like the compacted segments,
     since it lives outside the capacity-replay scratch/compaction path.
     """
+    if config.continuation is not None:
+        raise NotImplementedError("transport continuation does not support the transport LUT")
     on_device = xp is not np
     to_dev = xp.asarray if on_device else (lambda a: a)
     to_host = xp.asnumpy if on_device else (lambda a: a)
@@ -813,6 +834,34 @@ def _run_per_electron_transport(
         radiative_args = tuple(to_dev(a) if isinstance(a, np.ndarray) else a for a in radiative[0])
         out_bufs += radiative[1:]
     core_args = (control, geometry, d_materials, d_mott, state)
+    if config.continuation is not None:
+        _check_continuation_support(xp, inelastic is not None, straggle_on)
+        midpoint = energy_model_code == 1
+
+        def alloc_rows(rows):
+            scratch = _alloc_scratch(xp, rows, 1, midpoint)
+            if radiative_args is not None:
+                scratch += _alloc_hard_scratch(xp, rows, 1)
+            return scratch
+
+        extra = ((), radiative_args) if radiative_args is not None else ()
+        return _drive_continuation_rounds(
+            core,
+            core_args,
+            xp,
+            Ne,
+            max_segments,
+            d_keys,
+            d_stragg,
+            straggling_args,
+            extra,
+            alloc_rows,
+            out_bufs,
+            to_host,
+            config,
+            keep_on_device,
+            on_batch=on_batch,
+        )
     return _drive_per_electron_batches(
         core,
         core_args,
