@@ -1,0 +1,275 @@
+{
+  "schema": "radiative-moment-transport-pilot-788-record-v1",
+  "job_id": 2650,
+  "source_revision": "42e3d12ce9959b3d6e3bfd9c21e11515a58b4fcb",
+  "source_dirty": false,
+  "code_digest": "8e4c34c2f4296441e1aedc812890cbe2fac8cf94db1295d0a23f180675056615",
+  "tables_digest": "fa64dadcf63912be948c11f4b30745483bbe14b5df3a81dc6613ae46b7cf5e1e",
+  "sbatch": "checks/equal_precision/moment-anchors-788.sbatch",
+  "environment_override": {
+    "MOMENT_CASES": "sio2-800kev-tr0.3-0deg-compound"
+  },
+  "analysis_command": "python checks/equal_precision/analyze_moment_transport.py EVIDENCE_DIR OUTPUT.json",
+  "bounded_stop": false,
+  "variants": [
+    "exact",
+    "table"
+  ],
+  "preflight": [
+    {
+      "case": "preflight-sio2-800kev-tr0.3-0deg-compound-exact",
+      "histories": 256,
+      "seed": 78811,
+      "cutoff_eV": 1000,
+      "max_energy_ledger_error_keV": 6.480149750132114e-12,
+      "max_photon_debit_error_keV": 1.1368683772161603e-13,
+      "replayed_launches": 1,
+      "launches": 5,
+      "registers_per_thread": 200,
+      "timings_s": {
+        "imports_and_tables": 0.19373156689107418,
+        "warmup": 7.667608118848875,
+        "request_with_reductions": 3.9351528470870107,
+        "adapter_total": 11.805995639879256,
+        "scoring": 0.17140812310390174,
+        "transport": 3.7636827840469778
+      },
+      "in_process_replay_passed": true,
+      "process_replay_scores_match": true
+    },
+    {
+      "case": "preflight-sio2-800kev-tr0.3-0deg-compound-table",
+      "histories": 256,
+      "seed": 78811,
+      "cutoff_eV": 1000,
+      "max_energy_ledger_error_keV": 5.9117155615240335e-12,
+      "max_photon_debit_error_keV": 5.684341886080802e-14,
+      "replayed_launches": 1,
+      "launches": 5,
+      "registers_per_thread": 206,
+      "timings_s": {
+        "imports_and_tables": 0.24792649084702134,
+        "warmup": 1.4307317449711263,
+        "request_with_reductions": 0.7303018590901047,
+        "adapter_total": 2.4176405048929155,
+        "scoring": 0.17080895183607936,
+        "transport": 0.5594252771697938
+      },
+      "in_process_replay_passed": true,
+      "process_replay_scores_match": true
+    }
+  ],
+  "analysis": {
+    "schema": "radiative-moment-transport-pilot-788-v1",
+    "comparisons": [
+      {
+        "scene": "sio2-800kev-tr0.3-0deg-compound",
+        "variant": "table",
+        "paired_seeds": 3,
+        "complete_seed_set": true,
+        "histories": 15000,
+        "checks": {
+          "hard_count": {
+            "mean_difference": 0.0,
+            "confidence_interval": [
+              0.0,
+              0.0
+            ],
+            "margin": 0.0005693333333333334,
+            "nonzero_differences": 0,
+            "status": "unresolved",
+            "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+          },
+          "photon_energy_keV_per_primary": {
+            "mean_difference": -5.29768634442244e-10,
+            "confidence_interval": [
+              -7.96801581025264e-10,
+              -2.627356878592241e-10
+            ],
+            "margin": 0.02243304407457848,
+            "nonzero_differences": 826,
+            "status": "screening_pass",
+            "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+          },
+          "path_length": {
+            "mean_difference": 3.651887685215721e-05,
+            "confidence_interval": [
+              1.57038232012324e-05,
+              5.733393050308203e-05
+            ],
+            "margin": 17094.252222899246,
+            "nonzero_differences": 15000,
+            "status": "screening_pass",
+            "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+          },
+          "transmitted_energy_keV_per_primary": {
+            "mean_difference": 8.729998487429688e-09,
+            "confidence_interval": [
+              7.894132490694781e-09,
+              9.565864484164594e-09
+            ],
+            "margin": 0.8899095337382407,
+            "nonzero_differences": 12343,
+            "status": "screening_pass",
+            "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+          },
+          "transmitted": {
+            "mean_difference": 0.0,
+            "confidence_interval": [
+              0.0,
+              0.0
+            ],
+            "margin": 0.002,
+            "nonzero_differences": 0,
+            "status": "unresolved",
+            "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+          },
+          "backscattered": {
+            "mean_difference": 0.0,
+            "confidence_interval": [
+              0.0,
+              0.0
+            ],
+            "margin": 0.002,
+            "nonzero_differences": 0,
+            "status": "unresolved",
+            "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+          }
+        },
+        "complete_warm_request_s": [
+          6.912775946082547,
+          6.755951517960057,
+          7.0563754548784345
+        ],
+        "exact_complete_warm_request_s": [
+          14.14363836683333,
+          14.068562926026061,
+          14.048014836851507
+        ],
+        "timing_limit": "three-seed pilot only; include all reductions; no production or equal-precision speedup"
+      }
+    ],
+    "protocol_sha256": "1b3d0748828ab001b385644208020b50d28eb1f484aa9f5a310458ba437d376f",
+    "scope": "paired pilot screening, not qualified ensemble equivalence or an equal-precision benchmark"
+  },
+  "runs": [
+    {
+      "case": "sio2-800kev-tr0.3-0deg-compound-78811-exact",
+      "histories": 5000,
+      "seed": 78811,
+      "cutoff_eV": 1000,
+      "max_energy_ledger_error_keV": 7.503331289626658e-12,
+      "max_photon_debit_error_keV": 1.1368683772161603e-13,
+      "replayed_launches": 1,
+      "launches": 5,
+      "registers_per_thread": 200,
+      "timings_s": {
+        "imports_and_tables": 0.2062494750134647,
+        "warmup": 19.33880711393431,
+        "request_with_reductions": 14.14363836683333,
+        "adapter_total": 33.696813913062215,
+        "scoring": 4.64815439702943,
+        "transport": 9.495407090056688
+      }
+    },
+    {
+      "case": "sio2-800kev-tr0.3-0deg-compound-78811-table",
+      "histories": 5000,
+      "seed": 78811,
+      "cutoff_eV": 1000,
+      "max_energy_ledger_error_keV": 7.844391802791506e-12,
+      "max_photon_debit_error_keV": 5.684341886080802e-14,
+      "replayed_launches": 1,
+      "launches": 5,
+      "registers_per_thread": 206,
+      "timings_s": {
+        "imports_and_tables": 0.18468232708983123,
+        "warmup": 7.904944106005132,
+        "request_with_reductions": 6.912775946082547,
+        "adapter_total": 15.010934766149148,
+        "scoring": 4.555289736017585,
+        "transport": 2.357423939043656
+      }
+    },
+    {
+      "case": "sio2-800kev-tr0.3-0deg-compound-78812-exact",
+      "histories": 5000,
+      "seed": 78812,
+      "cutoff_eV": 1000,
+      "max_energy_ledger_error_keV": 6.59383658785373e-12,
+      "max_photon_debit_error_keV": 5.684341886080802e-14,
+      "replayed_launches": 1,
+      "launches": 5,
+      "registers_per_thread": 200,
+      "timings_s": {
+        "imports_and_tables": 0.1805927320383489,
+        "warmup": 18.485524979885668,
+        "request_with_reductions": 14.068562926026061,
+        "adapter_total": 32.74294228083454,
+        "scoring": 4.515520264161751,
+        "transport": 9.552979580825195
+      }
+    },
+    {
+      "case": "sio2-800kev-tr0.3-0deg-compound-78812-table",
+      "histories": 5000,
+      "seed": 78812,
+      "cutoff_eV": 1000,
+      "max_energy_ledger_error_keV": 8.526512829121202e-12,
+      "max_photon_debit_error_keV": 5.684341886080802e-14,
+      "replayed_launches": 1,
+      "launches": 5,
+      "registers_per_thread": 206,
+      "timings_s": {
+        "imports_and_tables": 0.18259203503839672,
+        "warmup": 7.714458051137626,
+        "request_with_reductions": 6.755951517960057,
+        "adapter_total": 14.661262999055907,
+        "scoring": 4.50974533194676,
+        "transport": 2.2461329251527786
+      }
+    },
+    {
+      "case": "sio2-800kev-tr0.3-0deg-compound-78813-exact",
+      "histories": 5000,
+      "seed": 78813,
+      "cutoff_eV": 1000,
+      "max_energy_ledger_error_keV": 7.048583938740194e-12,
+      "max_photon_debit_error_keV": 5.684341886080802e-14,
+      "replayed_launches": 1,
+      "launches": 5,
+      "registers_per_thread": 200,
+      "timings_s": {
+        "imports_and_tables": 0.1779525380115956,
+        "warmup": 18.39057814818807,
+        "request_with_reductions": 14.048014836851507,
+        "adapter_total": 32.6253506639041,
+        "scoring": 4.583279042970389,
+        "transport": 9.464679344091564
+      }
+    },
+    {
+      "case": "sio2-800kev-tr0.3-0deg-compound-78813-table",
+      "histories": 5000,
+      "seed": 78813,
+      "cutoff_eV": 1000,
+      "max_energy_ledger_error_keV": 7.16227077646181e-12,
+      "max_photon_debit_error_keV": 5.684341886080802e-14,
+      "replayed_launches": 1,
+      "launches": 5,
+      "registers_per_thread": 206,
+      "timings_s": {
+        "imports_and_tables": 0.18605877505615354,
+        "warmup": 7.778035958996043,
+        "request_with_reductions": 7.0563754548784345,
+        "adapter_total": 15.029824463883415,
+        "scoring": 4.611953831044957,
+        "transport": 2.4443642841652036
+      }
+    }
+  ],
+  "median_exact_over_table_request": {
+    "sio2-800kev-tr0.3-0deg-compound": 2.0351538999320065
+  },
+  "interpretation": "Compound (SiO2, two-element layer table) diagnostic CUDA anchor at 800 keV. Replay and energy/photon-debit accounting pass. Continuous observables change only at round-off and screen inside margins; hard-event count, transmission and backscatter changed for no history and remain unresolved. Request ratio is an isolated diagnostic-kernel timing, not a production or equal-precision speedup. CPU transport remains pending."
+}

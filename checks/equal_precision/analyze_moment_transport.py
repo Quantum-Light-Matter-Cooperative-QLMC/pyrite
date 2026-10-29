@@ -63,6 +63,10 @@ def main():
         r = json.loads(path.read_text())
         if r.get("schema") != "radiative-moment-transport-diagnostic-v1":
             continue
+        if "provenance" in r:
+            # Matrix cases use the comparison-record layout; pilot fields live
+            # in provenance and the scene id is the case id.
+            r = r["provenance"] | r | {"scene": {"id": r["case_id"]}}
         raw = path.with_suffix(".npz")
         if hashlib.sha256(raw.read_bytes()).hexdigest() != r["raw_scores_sha256"]:
             raise ValueError(f"score digest mismatch: {path.name}")

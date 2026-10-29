@@ -270,8 +270,15 @@ count, transmission and backscatter changed for no history and remain
 (W 100 keV, 75°) and 1.59 (W 800 keV). The same diagnostic-kernel caveats
 apply.
 [Job record](../check-records/equal-precision/moment-anchors-788.json).
-Mixed compound transport, CPU transport and opt-in production integration
-remain pending.
+
+Job 2650 (source `42e3d12c`) ran the same protocol on the compound matrix
+case `sio2-800kev-tr0.3-0deg-compound`, a two-element Si/O layer table.
+Replay and accounting preflights passed, with the largest energy-ledger
+error at $6.5\times10^{-12}$ keV. Continuous observables again changed only at
+round-off scale. Hard-event count, transmission and backscatter changed for
+no history (`unresolved`). The median exact/table request ratio was 2.04.
+[Job record](../check-records/equal-precision/moment-compound-788.json).
+CPU transport and opt-in production integration remain pending.
 
 ## Verdict
 
