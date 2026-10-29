@@ -126,6 +126,7 @@ MoSe2 goes from 0.727 s to 0.491 s (−32%) with no tuning, and lands on a tight
 
 **The probe buys nothing on the GPU and a great deal on the CPU.** A GPU batch costs about one electron lifetime whatever its width — 16000 electrons fit in one concurrent wave on this card — so a discarded full batch and a probe cost the same single launch, and the probe is a ~2% premium (one extra launch when the guess was already right, as for hopg). On the CPU per-electron core the loop is serial, so a discarded batch costs its electrons: MoSe2 at Ne=8000 goes 2.571 s → 1.712 s (−33%), transporting 9024 electrons instead of 16000. One shared driver, one default, priced on the arm that cares.
 
+(bounded-continuation-opt-in-prototype)=
 ## Bounded continuation (automatic production schedule)
 
 Full-history batches tie live scratch to the longest track: every electron of a launch reserves `cap` dense rows, and a launch lasts as long as its longest member. `PerElectronTransportConfig(continuation=TransportContinuationConfig(...))` ([#789](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/789)) instead keeps a fixed population of *active* histories, launches each for at most `rows_per_round` rows, and between launches retires finished histories and refills their lanes from pending primaries. The production process default is `auto`: continuation for qualified exact-CUDA passes, full-history with a logged reason elsewhere. Set `PYRITE_MC_TRANSPORT_SCHEDULE=full-history` to retain the reference schedule.
