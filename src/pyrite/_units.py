@@ -178,6 +178,23 @@ def _scalar_quantity(
     return stored
 
 
+def _length_vector(value: object, *, field: str, size: int, unit: str = "mm") -> tuple[float, ...]:
+    """Own an explicit ``size``-component length quantity as numeric ``unit`` floats."""
+    import numpy as np
+
+    if not _is_pint_quantity(value):
+        raise TypeError(f"{field} requires a Pint quantity with length units")
+    original = np.asarray(cast(Any, value).magnitude)
+    if original.shape != (size,) or original.dtype.kind not in "iuf":
+        raise TypeError(f"{field} must be a real {size}-component length quantity")
+    magnitude = np.asarray(normalize_unit(value, unit, field=field, expected="length"))
+    with np.errstate(over="ignore", under="ignore"):
+        stored = magnitude.astype(float)
+    if not np.all(np.isfinite(stored)) or np.any((magnitude != 0) & (stored == 0)):
+        raise ValueError(f"{field} must be finite and representable in numeric {unit} storage")
+    return tuple(float(x) for x in stored)
+
+
 def _quantity_spelling(
     owner: str,
     numeric_name: str,

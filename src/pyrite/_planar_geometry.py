@@ -12,12 +12,12 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass, replace
 from numbers import Integral, Real
-from typing import TYPE_CHECKING, Any, Self, cast
+from typing import TYPE_CHECKING, Self
 
 import numpy as np
 
 from ._spec_defaults import UNSET, _Unset
-from ._units import _is_pint_quantity, _quantity_spelling, _scalar_quantity, normalize_unit
+from ._units import _length_vector, _quantity_spelling, _scalar_quantity, normalize_unit
 
 if TYPE_CHECKING:
     from pint import Quantity
@@ -42,21 +42,6 @@ def _positive_pair(name: str, value: object) -> tuple[float, float]:
     if np.any(numbers <= 0.0):
         raise ValueError(f"{name} values must be positive")
     return float(numbers[0]), float(numbers[1])
-
-
-def _length_vector(value: object, *, field: str, size: int) -> tuple[float, ...]:
-    """Own an explicit ``size``-component length quantity as numeric mm floats."""
-    if not _is_pint_quantity(value):
-        raise TypeError(f"{field} requires a Pint quantity with length units")
-    original = np.asarray(cast(Any, value).magnitude)
-    if original.shape != (size,) or original.dtype.kind not in "iuf":
-        raise TypeError(f"{field} must be a real {size}-component length quantity")
-    magnitude = np.asarray(normalize_unit(value, "mm", field=field, expected="length"))
-    with np.errstate(over="ignore", under="ignore"):
-        stored = magnitude.astype(float)
-    if not np.all(np.isfinite(stored)) or np.any((magnitude != 0) & (stored == 0)):
-        raise ValueError(f"{field} must be finite and representable in numeric mm storage")
-    return tuple(float(x) for x in stored)
 
 
 def _angle_deg(value: object, *, field: str) -> float:

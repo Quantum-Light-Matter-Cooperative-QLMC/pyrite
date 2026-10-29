@@ -61,6 +61,14 @@ back as fresh mm quantities (`center`, `pitch`, `active_size`) and replace via
 `with_center` / `with_pitch`. `PlanarPose.from_observation` accepts
 `distance`, `polar`, `azimuth`, `roll` and `offset` quantities; angles must
 carry plane-angle units. Direction vectors stay dimensionless tuples.
+`Physics` takes keyword-only `inelastic_cutoff`, `secondary_threshold` and
+`radiative_cutoff` energies and a three-component `transition_lattice_origin`
+length; each reads back as a fresh eV/Å quantity (or `None`) and replaces via
+`with_*`. `EnergyBins.cxr` / `brem` keep returning numeric eV arrays;
+`cxr_energies` / `brem_energies` return fresh quantities and
+`with_cxr_energies` / `with_brem_energies` replace a grid. Planar channeling
+lengths use `QuantumNumerics.step_length` and `QuantumRegion.zone_max_length`;
+the flat `Numerics.channeling_*` fields stay numeric.
 `PlanarDetector(size=...)` and `FilterPlate(thickness=..., size=...)` take a
 positive two-component `(width_x, height_y)` length and a positive scalar
 thickness; they read back as fresh mm quantities and replace via `with_size` /

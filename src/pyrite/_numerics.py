@@ -1,8 +1,8 @@
 """Low-level typed calculation-numerics policy and profile validation."""
 
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field, fields
-from typing import TYPE_CHECKING, Any, Literal, cast
+from dataclasses import dataclass, field, fields, replace
+from typing import TYPE_CHECKING, Any, Literal, Self, cast
 
 import numpy as np
 
@@ -10,9 +10,12 @@ from ._energy_bins import EnergyBins
 from ._photon_config import PhotonTransport
 from ._precision import Precision
 from ._sampling import AdaptiveSampling, FixedSampling, SamplingPolicy
-from ._units import normalize_unit
+from ._spec_defaults import UNSET, _Unset
+from ._units import _length_vector, _quantity_spelling, _scalar_quantity, normalize_unit
 
 if TYPE_CHECKING:
+    from pint import Quantity
+
     from ._numerics_groups import ExecutionConfig, RadiationNumerics, TransportNumerics
 
 MosaicRoute = Literal["analytic", "mc"]
@@ -155,7 +158,35 @@ class CxrReflections:
             raise ValueError("mosaic_route must be 'analytic' or 'mc'")
 
 
-@dataclass(frozen=True)
+#: Keyword-only ``Physics`` energy quantities and their numeric eV fields.
+_PHYSICS_ENERGIES = {
+    "inelastic_cutoff": "inelastic_cutoff_eV",
+    "secondary_threshold": "secondary_threshold_eV",
+    "radiative_cutoff": "radiative_cutoff_eV",
+}
+
+
+def _physics_energy_eV(name: str, value: object) -> float | None:
+    if value is None:
+        return None
+    return _scalar_quantity(value, unit="eV", field=f"Physics.{name}", expected="energy")
+
+
+def _lattice_origin_ang(value: object) -> tuple[float, ...] | None:
+    if value is None:
+        return None
+    return _length_vector(value, field="Physics.transition_lattice_origin", size=3, unit="angstrom")
+
+
+def _optional_quantity(value: object, unit: str) -> Quantity | None:
+    if value is None:
+        return None
+    from .units import Q_
+
+    return Q_(np.array(value, dtype=float), unit)
+
+
+@dataclass(frozen=True, init=False)
 class Physics:
     """Choose emission and particle-interaction models, independently of sampling.
 
@@ -254,6 +285,14 @@ class Physics:
         ``"eedl"`` (default) characteristic primary-vacancy cross sections, or
         the opt-in ``"bote-salvat"`` K/L/M fit (#92; ``pyrite tables fetch
         bote-salvat``), which keeps EEDL for higher shells and the EADL cascade.
+    inelastic_cutoff, secondary_threshold, radiative_cutoff
+        Keyword-only real scalar Pint energy quantities (finite, positive) or
+        ``None``, each mutually exclusive with its ``*_eV`` field. Read-back
+        returns a fresh quantity in eV or ``None``; replace with
+        :meth:`with_inelastic_cutoff` and siblings.
+    transition_lattice_origin
+        Keyword-only three-component Pint length quantity or ``None``, mutually
+        exclusive with ``transition_lattice_origin_ang``; reads back in Å.
 
     photon_transport
         ``None`` (default) leaves straight-ray spectra and identities unchanged.
@@ -286,6 +325,94 @@ class Physics:
     transition_lattice_origin_ang: tuple[float, float, float] | None = None
     shell_ionization_model: Literal["eedl", "bote-salvat"] = "eedl"
     photon_transport: PhotonTransport | None = None
+
+    def __init__(
+        self,
+        emission: EmissionSelection = "incoherent",
+        brem_source: Literal["mc", "external", "none"] | None = "mc",
+        straggling: bool = False,
+        inelastic_model: Literal["auto", "continuous", "shell-soft-hard"] = "auto",
+        inelastic_cutoff_eV: float | None | _Unset = UNSET,
+        secondary_threshold_eV: float | None | _Unset = UNSET,
+        elastic_model: Literal["mott", "elsepa"] = "elsepa",
+        bremsstrahlung_model: Literal["auto", "eedl", "bremslib"] = "auto",
+        radiative_model: Literal["auto", "uncoupled", "bremslib-soft-hard"] = "auto",
+        radiative_cutoff_eV: float | None | _Unset = UNSET,
+        pair_production_model: Literal["penelope-2024"] | None = None,
+        positron_transport: bool = False,
+        atomic_electron_deflection: Literal["kawrakow", "none"] = "kawrakow",
+        channeling_model: Literal["off", "planar", "axial"] = "off",
+        channeling_plane: tuple[int, int, int] | None = None,
+        channeling_axial: Mapping[str, object] | None = None,
+        transition_radiation: Literal["off", "history", "bunch", "two-beam"] = "off",
+        transition_lattice_origin_ang: tuple[float, float, float] | None | _Unset = UNSET,
+        shell_ionization_model: Literal["eedl", "bote-salvat"] = "eedl",
+        photon_transport: PhotonTransport | None = None,
+        *,
+        inelastic_cutoff: object = UNSET,
+        secondary_threshold: object = UNSET,
+        radiative_cutoff: object = UNSET,
+        transition_lattice_origin: object = UNSET,
+    ) -> None:
+        values = dict(locals())
+        semantic = {
+            name: values.pop(name) for name in (*_PHYSICS_ENERGIES, "transition_lattice_origin")
+        }
+        del values["self"]
+        for name, numeric in (
+            *_PHYSICS_ENERGIES.items(),
+            ("transition_lattice_origin", "transition_lattice_origin_ang"),
+        ):
+            convert = (
+                _lattice_origin_ang
+                if name == "transition_lattice_origin"
+                else lambda q, name=name: _physics_energy_eV(name, q)
+            )
+            resolved = _quantity_spelling(
+                "Physics", numeric, values[numeric], name, semantic[name], convert
+            )
+            values[numeric] = None if resolved is UNSET else resolved
+        for name, value in values.items():
+            object.__setattr__(self, name, value)
+        self.__post_init__()
+
+    @property
+    def inelastic_cutoff(self) -> Quantity | None:
+        """Hard inelastic energy-loss cutoff ``W_c`` as a fresh eV quantity."""
+        return _optional_quantity(self.inelastic_cutoff_eV, "eV")
+
+    @property
+    def secondary_threshold(self) -> Quantity | None:
+        """Secondary production and tracking threshold as a fresh eV quantity."""
+        return _optional_quantity(self.secondary_threshold_eV, "eV")
+
+    @property
+    def radiative_cutoff(self) -> Quantity | None:
+        """Soft/hard radiative photon cutoff ``k_c`` as a fresh eV quantity."""
+        return _optional_quantity(self.radiative_cutoff_eV, "eV")
+
+    @property
+    def transition_lattice_origin(self) -> Quantity | None:
+        """Two-beam lattice origin as a fresh three-component Å quantity."""
+        return _optional_quantity(self.transition_lattice_origin_ang, "angstrom")
+
+    def with_inelastic_cutoff(self, value: object) -> Self:
+        """Return physics with a validated ``W_c`` quantity, or ``None`` to clear it."""
+        return replace(self, inelastic_cutoff_eV=_physics_energy_eV("inelastic_cutoff", value))
+
+    def with_secondary_threshold(self, value: object) -> Self:
+        """Return physics with a validated secondary threshold quantity or ``None``."""
+        return replace(
+            self, secondary_threshold_eV=_physics_energy_eV("secondary_threshold", value)
+        )
+
+    def with_radiative_cutoff(self, value: object) -> Self:
+        """Return physics with a validated ``k_c`` quantity, or ``None`` to clear it."""
+        return replace(self, radiative_cutoff_eV=_physics_energy_eV("radiative_cutoff", value))
+
+    def with_transition_lattice_origin(self, value: object) -> Self:
+        """Return physics with a validated lattice-origin quantity or ``None``."""
+        return replace(self, transition_lattice_origin_ang=_lattice_origin_ang(value))
 
     def __post_init__(self) -> None:
         for name in ("inelastic_cutoff_eV", "secondary_threshold_eV", "radiative_cutoff_eV"):
