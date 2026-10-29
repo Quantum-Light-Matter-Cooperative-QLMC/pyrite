@@ -21,7 +21,12 @@ def test_electron_trajectories_cpu_smoke(monkeypatch):
     import pyrite
 
     monkeypatch.setattr(pyrite, "fetch_tables", lambda: [])
-    spec = importlib.util.spec_from_file_location("electron_trajectory_notebook", NOTEBOOK)
+    # Smoke-test a bounded copy; the published capture retains the full budget.
+    source = NOTEBOOK.read_text()
+    assert source.count("histories = 16_384") == 1
+    bounded_notebook = tmp_path / NOTEBOOK.name
+    bounded_notebook.write_text(source.replace("histories = 16_384", "histories = 64"))
+    spec = importlib.util.spec_from_file_location("electron_trajectory_notebook", bounded_notebook)
     notebook = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
     spec.loader.exec_module(notebook)
