@@ -332,13 +332,14 @@ def test_cuda_tutorials_declare_backend_and_nvidia_extra(tmp_path):
         module.capture_backend(rocm)
 
 
-@pytest.mark.parametrize("backend", ["cpu", "cuda"])
+@pytest.mark.parametrize("backend", ["cpu", "cuda", "opt-out"])
 def test_stale_capture_fails_unless_it_needs_a_gpu(tmp_path, monkeypatch, capsys, backend):
     module = _notebook_extension()
     sources = tmp_path / "notebooks"
     (sources / "fundamentals").mkdir(parents=True)
     source = sources / "first.py"
-    source.write_text(f'# /// script\n# [tool.pyrite]\n# backend = "{backend}"\n# ///\n')
+    tool = "freshness = false" if backend == "opt-out" else f'backend = "{backend}"'
+    source.write_text(f"# /// script\n# [tool.pyrite]\n# {tool}\n# ///\n")
     captured = nbformat.v4.new_notebook(
         cells=[
             nbformat.v4.new_markdown_cell(
@@ -367,9 +368,12 @@ def test_stale_capture_fails_unless_it_needs_a_gpu(tmp_path, monkeypatch, capsys
     if backend == "cpu":
         with pytest.raises(ValueError, match="stale tutorial capture"):
             module.check_notebooks()
-    else:
+    elif backend == "cuda":
         module.check_notebooks()
         assert "--extra nvidia" in capsys.readouterr().err
+    else:
+        module.check_notebooks()
+        assert "stale" not in capsys.readouterr().err
 
 
 def test_regenerated_capture_is_ruff_format_clean(tmp_path, monkeypatch):

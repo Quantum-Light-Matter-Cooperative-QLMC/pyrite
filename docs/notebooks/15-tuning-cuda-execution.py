@@ -10,6 +10,7 @@
 #
 # [tool.pyrite]
 # backend = "cuda"
+# freshness = false
 # ///
 
 import marimo
