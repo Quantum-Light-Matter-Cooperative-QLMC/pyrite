@@ -15,6 +15,8 @@ Policies (``--policies``, comma-separated):
 - ``reference``: current default driver, 128 threads, initial capacity 512.
 - ``learned32``: #786's request-local capacity hint (1.25 x largest observed
   track, carried from warmup) with 32-thread blocks.
+- ``reference-B<n>`` / ``learned32-B<n>``: the same with ``max_batch=n``, a
+  full-history arm at the concurrency of a continuation population.
 - ``cont-Q<rows>-A<active|all>-T<threads>``: continuation rounds.
 
 Run on the lab box from a synced checkout after ``prepare_stopping.py``; the
@@ -69,13 +71,16 @@ class PeakPoolHook(cp.cuda.memory_hook.MemoryHook):
 
 
 def parse_policy(name):
-    if name in {"reference", "learned32"}:
-        return {"name": name, "threads": 128 if name == "reference" else 32}
+    kind, _, limit = name.partition("-B")
+    if kind in {"reference", "learned32"} and (not limit or limit.isdigit()):
+        threads = 128 if kind == "reference" else 32
+        return {"name": name, "kind": kind, "threads": threads, "max_batch": int(limit or 0)}
     fields = {part[:1]: part[1:] for part in name.split("-")[1:]}
     if not name.startswith("cont-") or set(fields) != {"Q", "A", "T"}:
         raise SystemExit(f"unknown policy {name!r}")
     return {
         "name": name,
+        "kind": "continuation",
         "rows_per_round": int(fields["Q"]),
         "active": None if fields["A"] == "all" else int(fields["A"]),
         "threads": int(fields["T"]),
@@ -160,16 +165,18 @@ def run_policy(policy, base, seed, hook, original_factory):
                     "synchronized_wall_s": elapsed,
                 }
             )
-            if policy["name"] == "learned32" and counts.size:
+            if policy["kind"] == "learned32" and counts.size:
                 state["hint"] = max(state["hint"], int(np.ceil(1.25 * counts.max())))
 
         return timed, xp
 
     def request(run_seed):
         config = base["per_electron_config"]
-        if policy["name"] == "learned32":
+        if policy.get("max_batch"):
+            config = replace(config, max_batch=policy["max_batch"])
+        if policy["kind"] == "learned32":
             config = replace(config, seg_capacity=state["hint"])
-        elif policy["name"].startswith("cont-"):
+        elif policy["kind"] == "continuation":
             from pyrite.montecarlo.transport.continuation import TransportContinuationConfig
 
             config = replace(
@@ -264,6 +271,10 @@ def main():
     revision = subprocess.run(
         ["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=False
     ).stdout.strip()
+    sync = Path.cwd() / ".pyrite-sync"
+    if not revision and sync.exists():  # a synced lab checkout is not a git work tree
+        fields = dict(line.split(": ", 1) for line in sync.read_text().splitlines() if ": " in line)
+        revision = fields.get("code_revision", "")
     record = {
         "schema": "pyrite.transport-continuation.benchmark.v1",
         "status": "ok",
