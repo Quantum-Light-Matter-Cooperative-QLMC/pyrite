@@ -32,6 +32,9 @@ if TYPE_CHECKING:
         RadiationNumerics as RadiationNumerics,
     )
     from pyrite._numerics_groups import (
+        TransportKernelTuning as TransportKernelTuning,
+    )
+    from pyrite._numerics_groups import (
         TransportNumerics as TransportNumerics,
     )
     from pyrite._photon_config import PhotonTransport as PhotonTransport
@@ -65,6 +68,7 @@ _EXPORTS = {
     "Physics": ("pyrite._numerics", "Physics"),
     "Precision": ("pyrite._precision", "Precision"),
     "RadiationNumerics": ("pyrite._numerics_groups", "RadiationNumerics"),
+    "TransportKernelTuning": ("pyrite._numerics_groups", "TransportKernelTuning"),
     "TransportNumerics": ("pyrite._numerics_groups", "TransportNumerics"),
     "load_numerics": ("pyrite._config_presets", "load_numerics"),
     "load_physics": ("pyrite._config_presets", "load_physics"),
@@ -84,6 +88,7 @@ __all__ = [
     "PixelScorer",
     "Precision",
     "RadiationNumerics",
+    "TransportKernelTuning",
     "TransportNumerics",
     "Timepix3ResponseNumerics",
     "load_numerics",

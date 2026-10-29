@@ -19,6 +19,12 @@ def validate_executor(executor: Executor, numerics: Numerics) -> None:
             "executor requires numerics.transport_core='auto'; "
             "batch executors cannot preserve an explicit transport-core override"
         )
+    execution = getattr(numerics, "resolved_execution", None)
+    if execution is not None and execution.transport.schedule is not None:
+        raise ValueError(
+            "executor requires KernelTuning.transport.schedule=None; batch executors "
+            "take the schedule from PYRITE_MC_TRANSPORT_SCHEDULE"
+        )
 
 
 def execution_provenance(executor: Executor) -> dict[str, Any]:

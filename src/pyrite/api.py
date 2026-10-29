@@ -43,6 +43,7 @@ from .materials._composition import resolve_composition
 from .materials.photon_cross_sections import ATTENUATION_MODEL
 from .montecarlo import Case, run_case
 from .montecarlo.runner import cached_case_table_markers, case_table_markers, run_case_directions
+from .montecarlo.runner.transport_options import kernel_schedule
 from .montecarlo.spectrum import (
     BREM_ENDF_PARSERPY_VERSION,
 )
@@ -320,7 +321,8 @@ def simulate(
     if isinstance(scene.detector, PlanarDetector):
         return _simulate_planar(request, case, xsgen_tables)
     if request.executor is None:
-        output = run_case(case, transport_core=resolved_numerics.transport_core)
+        with kernel_schedule(resolved_numerics):
+            output = run_case(case, transport_core=resolved_numerics.transport_core)
     else:
         from .execution._simulation import execute_simulation
 
@@ -584,7 +586,10 @@ def _execute_planar(
     request: ResolvedSimulation, case: Case, xsgen_tables: Mapping[str, str], directions: np.ndarray
 ) -> dict[str, Any]:
     if request.executor is None:
-        return run_case_directions(case, directions, transport_core=request.numerics.transport_core)
+        with kernel_schedule(request.numerics):
+            return run_case_directions(
+                case, directions, transport_core=request.numerics.transport_core
+            )
     from .execution._simulation import execute_simulation
 
     return execute_simulation(request.executor, case, xsgen_tables, directions=directions)

@@ -61,6 +61,37 @@ class RadiationNumerics:
             raise TypeError("energy_bins must be an EnergyBins or None")
 
 
+TRANSPORT_SCHEDULES = ("full-history", "continuation", "auto")
+
+
+@dataclass(frozen=True)
+class TransportKernelTuning:
+    """CUDA transport schedule controls (experimental, #776).
+
+    ``schedule`` is ``"full-history"``, ``"continuation"`` or ``"auto"``
+    (#799) and takes precedence over ``PYRITE_MC_TRANSPORT_SCHEDULE``;
+    ``None`` defers to that variable, then full-history.
+    ``continuation_rows`` is the continuation row quantum: the trajectory rows
+    each active history may emit per launch (``None``: 256). It counts emitted
+    rows, not wall-clock time, and no launch ends early when its first history
+    finishes; it requires ``"continuation"`` or ``"auto"``. Neither field
+    enters case identity: every schedule returns bitwise-identical transport.
+    Batch executors reject a non-default value and use the variable.
+    """
+
+    schedule: Literal["full-history", "continuation", "auto"] | None = None
+    continuation_rows: int | None = None
+
+    def __post_init__(self) -> None:
+        if self.schedule is not None and self.schedule not in TRANSPORT_SCHEDULES:
+            raise ValueError(f"schedule must be one of {TRANSPORT_SCHEDULES} or None")
+        rows = self.continuation_rows
+        if rows is not None and (type(rows) is not int or rows <= 0):
+            raise ValueError("continuation_rows must be a positive integer or None")
+        if rows is not None and self.schedule not in TRANSPORT_SCHEDULES[1:]:
+            raise ValueError("continuation_rows requires schedule='continuation' or 'auto'")
+
+
 @dataclass(frozen=True)
 class ExecutionConfig:
     """Local transport-kernel selection and spectrum batch sizes.
@@ -70,11 +101,14 @@ class ExecutionConfig:
     are owned by #681's execution orchestration API. These controls still
     lower through existing case fields; their effect on cache identity is
     **not** changed or presumed invariant in this compatibility slice.
+    ``transport`` holds the experimental CUDA transport schedule
+    (:class:`TransportKernelTuning`), which never enters case identity.
     """
 
     transport_core: str = "auto"
     cxr_chunk: int | None = None
     brem_chunk: int | None = None
+    transport: TransportKernelTuning = field(default_factory=TransportKernelTuning)
 
     def __post_init__(self) -> None:
         if not isinstance(self.transport_core, str) or not self.transport_core:
@@ -83,6 +117,13 @@ class ExecutionConfig:
             value = getattr(self, name)
             if value is not None and (type(value) is not int or value <= 0):
                 raise ValueError(f"{name} must be a positive integer or None")
+        if not isinstance(self.transport, TransportKernelTuning):
+            raise TypeError("transport must be a TransportKernelTuning")
+
+    def __setstate__(self, state: dict[str, object]) -> None:
+        # Pickles from before #776 carry no ``transport`` entry.
+        state.setdefault("transport", TransportKernelTuning())
+        self.__dict__.update(state)
 
 
 # Preferred public spelling (#702). No second dataclass or pickle schema.

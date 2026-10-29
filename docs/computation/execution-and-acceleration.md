@@ -26,6 +26,8 @@ A run makes these separate choices:
   - How the CUDA core batches histories: `full-history` (default), `continuation` or `auto`. Results are identical; see [bounded continuation](../repo-design/compute/gpu-transport-rawkernel.md#bounded-continuation-automatic-production-schedule).
 ```
 
+In Python, `KernelTuning(transport=TransportKernelTuning(schedule=..., continuation_rows=...))` (experimental) selects the schedule and the continuation row quantum for one `simulate` call and takes precedence over `PYRITE_MC_TRANSPORT_SCHEDULE`; `schedule=None` defers to the variable. The row quantum (default 256) counts trajectory rows each active history may emit per launch, not a time interval, and requires `continuation` or `auto`. Batch executors reject a per-call schedule and use the variable.
+
 The CUDA transport core requires a CUDA array backend for its `cupyx.jit` kernel. A ROCm or SYCL backend runs its spectrum kernels on the device and its transport on the CPU.
 
 ### Backend resolution

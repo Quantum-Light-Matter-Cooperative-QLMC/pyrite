@@ -33,6 +33,19 @@ is documented in [execution and scheduling](execution.md).
    pyrite.config.KernelTuning
 ```
 
+`TransportKernelTuning` (experimental) is `KernelTuning.transport`: the CUDA
+transport schedule and continuation row quantum for in-process runs. It takes
+precedence over `PYRITE_MC_TRANSPORT_SCHEDULE` and never changes case identity
+or results.
+
+```{eval-rst}
+.. autosummary::
+   :toctree: ../../_autosummary
+   :nosignatures:
+
+   pyrite.config.TransportKernelTuning
+```
+
 ## Angular sampling and legacy kernel controls
 
 `AngularSampling` is the advanced-stable semantic alias for `PixelScorer`;

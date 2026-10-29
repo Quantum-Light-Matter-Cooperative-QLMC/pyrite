@@ -276,6 +276,7 @@ load_numerics = { target = "pyrite._config_presets:load_numerics", status = "adv
 load_physics = { target = "pyrite._config_presets:load_physics", status = "advanced-stable" }
 AngularSampling = { target = "pyrite.config:AngularSampling", status = "advanced-stable" }
 KernelTuning = { target = "pyrite._numerics_groups:KernelTuning", status = "advanced-stable" }
+TransportKernelTuning = { target = "pyrite._numerics_groups:TransportKernelTuning", status = "experimental" }
 Timepix3ResponseNumerics = { target = "pyrite.config:Timepix3ResponseNumerics", status = "advanced-stable" }
 
 [package_exports."pyrite.detectors"]
