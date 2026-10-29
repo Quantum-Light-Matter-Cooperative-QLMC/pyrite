@@ -4,7 +4,7 @@
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=24G
-#SBATCH --time=00:45:00
+#SBATCH --time=01:00:00
 #SBATCH --output=elsepa-rate792-%j.log
 # #792 profiling gate: marginal cost of exact ELSEPA flight-rate sums on CPU
 # (per-electron Numba, one thread) and CUDA, via probe_elsepa_rate_cost.py.
@@ -23,7 +23,7 @@ cp .pyrite-sync "$out/sync.txt"
 scontrol show job "$SLURM_JOB_ID" > "$out/job.txt"
 nvidia-smi -q > "$out/gpu.txt"
 lscpu > "$out/cpu.txt"
-deadline=$((SECONDS + 2580))
+deadline=$((SECONDS + 3480))
 scenes=(si-300-100um-0deg w-300-10um-0deg sio2-800kev-tr0.3-0deg-compound silicon-5000kev-tr0.3-0deg)
 declare -A histories=([per-electron]=1000 [cuda]=10000)
 for repeat in 1 2 3; do
@@ -43,7 +43,7 @@ for repeat in 1 2 3; do
                     uv run --no-sync python checks/equal_precision/probe_elsepa_rate_cost.py \
                     "$k" "$stem-audit.json" "$scene" --histories "${histories[$core]}" \
                     --seed 79201 --core "$core" --arm transport --radiative-loss none \
-                    --probe-electrons 0 --scratch-mib 4096 --output "$stem.json" \
+                    --probe-electrons 0 --scratch-mib 4096 --max-steps 200000 --output "$stem.json" \
                     > "$stem.log" 2>&1 || printf 'FAILED %s\n' "$stem"
             done
         done
