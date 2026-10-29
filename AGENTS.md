@@ -113,15 +113,16 @@ do not enable every slow test just to exercise one changed path. Full
 release/audit operations; CI runs every primary domain with slow tests on both
 supported Python versions. `verify` runs types, lint/format checks, source
 line budgets, the complexity ratchet, API checks, docs, and import-linter; it
-never runs pytest or changes formatting. HTML docs builds execute tutorials once
-on CPU, writing only untracked build outputs. No tutorial provenance manifests,
-committed captures or separate regeneration gate are maintained.
+never runs pytest or changes formatting. HTML docs builds validate and render
+committed native MyST-NB tutorial snapshots without executing tutorials. Explicit regeneration uses
+`docs/_notebooks.py`; commit affected `.ipynb` captures with their Marimo sources.
+Do not add separate tutorial provenance manifests or HTML/session exports.
 
 ## Work rules
 
 - Make smallest owning change. Preserve unrelated dirty-tree work.
 - Prefer reusable logic in `src/pyrite/`; keep marimo apps thin. Keep notebook
-  sources output-free; disposable tutorial HTML builds follow `tutorial-authoring`.
+  sources output-free; tutorial snapshot regeneration follows `tutorial-authoring`.
   Run `uv run marimo check <app.py>` after marimo edits.
 - Invoke matching repo skill for CLI, notebooks, Monte Carlo, performance,
   physics, docs, runtime, remote GPU, regression, catalog-golden, or backlog

@@ -27,8 +27,8 @@ before adding a page, and link to other modes rather than repeating their conten
 | What does this interface accept? | **Reference**, `docs/reference/` and public docstrings | `Observation` parameters |
 | Why does this work? | **Explanation**, `docs/physics/` | Detector acceptance and broadening |
 
-The existing `docs/api.md` is a compatibility-preserving inventory while
-namespace pages grow under `docs/reference/python-api/`. CLI help and settings
+The existing `docs/api.md` preserves compatibility links to the canonical
+namespace reference under `docs/reference/python-api/`. CLI help and settings
 remain generated from their canonical owners. Do not manually synchronize API
 signatures or introduce unsupported/private objects to make a reference complete.
 
@@ -70,7 +70,7 @@ their audience, rather than additional tutorials or interface specifications.
 
 | Pages | Primary mode and audience | Canonical owner |
 | --- | --- | --- |
-| `notebooks/fundamentals/`, `notebooks/designing/` | Tutorial; learners | [Interactive Tutorials](../notebooks/index.md); executable sources own the tutorial; HTML is disposable build output. |
+| `notebooks/fundamentals/`, `notebooks/designing/`, `notebooks/specialized/`, `notebooks/quantum/` | Tutorial; learners | [Interactive Tutorials](../notebooks/index.md); canonical Marimo sources own the tutorial; commit generated native MyST-NB snapshots with their sources. HTML is disposable build output. |
 | `guides/getting-started.md` | Entry point; new users | [Getting Started](../guides/getting-started.md) is a single top-level page without child pages; link to the first notebook for guided Python learning. |
 | `guides/configuration-cookbook.md`, `guides/configuration-notebook.md` | How-to; campaign authors | [How-to Guides](../guides/index.md); fields and editor behavior belong in [configuration reference](../reference/configuration/index.md). |
 | `guides/directional-source-heatmap.md`, `guides/detector-observations.md`, `guides/working-with-results.md` | How-to; simulation and analysis users | [How-to Guides](../guides/index.md); link to notebooks for learning and reference for complete contracts. |

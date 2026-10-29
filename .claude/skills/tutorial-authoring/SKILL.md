@@ -17,16 +17,19 @@ packaged marimo applications (which use `notebook-workflow`).
 - The canonical `docs/notebooks/*.py` Marimo source must drive both local/MoLab
   execution and the generated static Read the Docs output. Never maintain a
   second Markdown or application implementation of the same notebook.
-- Add an Open in Molab link for that exact source. State units, seeds, backend
-  and scientific assumptions visibly; distinguish Monte Carlo sample counts
+- Add an Open in Molab badge immediately below the generated page title for
+  that exact source; keep badges out of the Marimo source. State units, seeds,
+  backend and scientific assumptions visibly; distinguish Monte Carlo sample counts
   from physical populations and flux from acquired detector counts. Do not add
   hidden provenance cells or separate JSON manifests to tutorials.
 - Mark quantum/channeling and other experimental science with API admission
   boundaries and physical validation limitations, without implying sign-off.
-- HTML Sphinx builds execute each tutorial once on CPU and write disposable
-  HTML under `docs/_build/`. Never commit HTML, figures, sessions or provenance
-  manifests. Keep notebook sources output-free; builds never rewrite them or
-  synchronize release pins. Use a suitably provisioned worker for full builds.
+- Keep Marimo sources output-free. Explicitly regenerate affected native
+  MyST-NB `.ipynb` snapshots with `docs/_notebooks.py --regenerate <name>`
+  and commit them with their sources. Sphinx checks freshness and renders
+  committed outputs without executing tutorials. Use a suitably provisioned
+  worker for expensive regeneration; never lower scientific settings to fit
+  a build host. Do not restore HTML/session exports or separate manifests.
 - Cross-link related how-to, API, Physics and Validation pages instead of
   turning the notebook into a manual.
 

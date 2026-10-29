@@ -1,61 +1,41 @@
 (import-a-gpt-electron-beam)=
 # Import and visualize an electron beam
 
-Import correlated electron records, inspect their phase space and simulate
-their radiation from a thin HOPG target. The input is a **synthetic
-demonstration**, not experimental data or a GPT simulation.
+Import correlated electron records while preserving their positions, directions,
+energies and relative weights. For a guided phase-space visualization and source
+simulation, open [Importing a realistic electron beam](../notebooks/specialized/09-importing-electron-beams.ipynb).
 
-For a guided example, open [Importing a realistic electron beam](../notebooks/specialized/09-importing-electron-beams.ipynb).
+Install `pyrite-mc[plots]` and [fetch the reference tables](getting-started.md#fetch-reference-data)
+when running transport. Inspect the input before choosing its snapshot:
 
-Install `pyrite-mc[plots]` and [fetch the reference tables](getting-started.md#fetch-reference-data).
-Save {download}`the runnable script <../examples/gpt_gdf_beams.py>` and
-{download}`synthetic_beam.gdf <../examples/data/synthetic_beam.gdf>` in the same
-directory, then run:
+```bash
+pyrite beam gdf inspect beam.gdf
+```
+
+Use `--time-s` for a time snapshot or `--screen-position-m` for a screen.
+The [GDF input reference](../reference/gdf-beams.md) owns required arrays, units,
+selectors and the `Beam.from_gdf` interface. GPT is not required to read a file.
+
+For a fixed reproduction, save {download}`the runnable script <../examples/gpt_gdf_beams.py>`
+and {download}`synthetic_beam.gdf <../examples/data/synthetic_beam.gdf>` together:
 
 <!-- verify: skip (external shell tools or downloadable Python example) -->
 ```bash
 PYRITE_MC_BACKEND=cpu python gpt_gdf_beams.py --input synthetic_beam.gdf
 ```
 
-GPT is not required. The [fixture provenance and license](../examples/data/synthetic_beam.md)
-describe the deterministic generator, available in the script with
-`--make-fixture`. EasyGDF is already a PyRITE dependency; its
-[raw block API](https://github.com/electronsandstuff/easygdf#quickstart)
-supplies the arrays for plotting. PyRITE validates the electron records when
-building the simulation.
-
-```{literalinclude} ../examples/gpt_gdf_beams.py
-:language: python
-:start-after: tutorial-start
-:end-before: tutorial-end
-```
-
-`calculate(path)` returns the input fields and the simulated result. The script
-plots `x × 10⁶` against `1000 × Bx/Bz`, colors each point by beta-derived
-kinetic energy, and weights the energy histogram by `nmacro/sum(nmacro)`.
-It plots `result.cxr.incoherent` and `result.brem` on their native photon grids.
-
-```{eval-rst}
-.. plot::
-   :alt: Synthetic lab-frame records show positive x-angle and x-energy correlations, a weighted electron-energy distribution around 30 keV, and actual simulated PXR/CBS and bremsstrahlung spectra.
-   :caption: Synthetic input and seeded CPU source spectra at 135°.
-
-   from _tutorials import gpt_gdf_beams
-   gpt_gdf_beams()
-```
-
-The tilted cloud shows a position–angle correlation; its color gradient shows
-the energy correlation. Import preserves these as **whole records**. Drawing
-position, angle and energy independently would describe a different beam.
-The spectra show 0.5–4 keV, not total photon yield; they include neither
-detector response nor solid-angle integration.
+This fixture is a **synthetic demonstration**, not experimental data or a GPT
+simulation. Its [provenance and license](../examples/data/synthetic_beam.md)
+describe the deterministic generator (`--make-fixture` in the script).
+The script expects the supplied single-time fixture; arbitrary files need
+explicit block selection. The notebook owns the guided plots and interpretation.
 
 (choose-the-snapshot-and-coordinate-origin)=
 ## From lab snapshot to entrance
 
 The fixture is a lab snapshot at `z = 0.1 m`, chosen to match the
-target-origin coordinate. Its first two plots show **lab phase space before
-entrance projection**. GPT's `Bx`, `By` and `Bz` are velocity components
+target-origin coordinate. Its plotted lab phase space precedes entrance projection.
+GPT's `Bx`, `By` and `Bz` are velocity components
 divided by c, *not magnetic fields*; `Bx/Bz` approximates the x angle only
 for small divergence.
 
@@ -87,8 +67,8 @@ for defaults, supported modes and identity behavior.
 (errors-and-limits)=
 ## Check sampling and supported geometry
 
-The synthetic generator uses seed `42`; transport resolves seed `1` and
-records it in the [cached provenance](../examples/data/gpt_gdf_beams.json).
+The synthetic generator uses seed `42`; the fixed script resolves transport
+seed `1`, recorded in its {download}`cached provenance <../examples/data/gpt_gdf_beams.json>`.
 The small history count and two reflection families do **not** demonstrate
 convergence or beam quality. Refine sampling and the photon grid before
 quantitative use; consult the [capability matrix](../physics/capabilities.md).
