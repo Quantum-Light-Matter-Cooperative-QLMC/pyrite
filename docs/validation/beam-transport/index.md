@@ -53,6 +53,7 @@ sbethe-atomic-shell-inputs-verification
 gos-core-edge
 electron-transport
 equal-precision-pilot
+completion-795
 transport-precision-equivalence
 cheap-numerical-validation
 equal-precision-protocol

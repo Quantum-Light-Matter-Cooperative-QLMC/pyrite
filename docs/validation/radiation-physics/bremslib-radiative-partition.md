@@ -56,6 +56,8 @@ The target is treated as infinitely heavy: its recoil energy is neglected. This 
 
 `hard_radiative_photon_at_energy` integrates the piecewise-linear DDCS against $2\pi\sin\theta$, draws uniform azimuth, keeps the outgoing electron direction, and assigns the vector residual above to the target. `complete_hard_radiative_events` uses a separate random stream for the post-transport direction. The test checks photon plus outgoing-electron energy, unit directions, and the full three-vector momentum sum.
 
+The issue [#795](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/795) completion path batches that same angle calculation by element without changing the hard-photon energy sampler, distribution, draw order, or output schema. It retains the scalar sampler as the bitwise reference; the [remote verification protocol](../beam-transport/completion-795.md) specifies the outstanding CUDA and performance gates. No new physics-validation or speedup claim is made before those results.
+
 The focused `test_hard_radiative.py` and `test_brem_events.py` run passed together (14 tests, 2026-09-25). These synthetic-table and internal-parity anchors do not compare a full transport history with an independent transport code; the Geant4 comparison below does. `test_hard_radiative_cuda.py` passes 4/4 on an NVIDIA GeForce RTX 5080 (CuPy 14.2.0, 2026-09-25), including first-row parity with the per-electron CPU core at `rtol=1e-12`.
 
 ## Full-track cross-check against Geant4 (issue #182)
