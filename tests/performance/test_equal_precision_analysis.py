@@ -87,3 +87,19 @@ def test_complete_replica_observables_use_all_incident_primaries(tmp_path, monke
 
     table = (tmp_path / "summary" / "table.md").read_text(encoding="utf-8")
     assert "≥10 keV" in table
+
+
+@pytest.mark.parametrize("suffix", [".failed", ".failed.json"])
+def test_kernel_diagnostic_excludes_late_failed_attempt(tmp_path, monkeypatch, suffix):
+    # A timed-out child can leave an audit after its launcher records failure.
+    # Failed evidence must be skipped before attempting to parse or rank it.
+    (tmp_path / "sample-audit.json").write_text("late invalid audit")
+    (tmp_path / f"sample{suffix}").write_text("failed")
+    output = tmp_path / "summary.json"
+    monkeypatch.setattr(sys, "argv", ["analyze", str(tmp_path), "--output", str(output)])
+    script = (
+        Path(__file__).resolve().parents[2] / "checks/equal_precision/analyze_kernel_diagnostic.py"
+    )
+    runpy.run_path(str(script), run_name="__main__")
+    result = json.loads(output.read_text())
+    assert result["groups"] == result["samples"] == []
