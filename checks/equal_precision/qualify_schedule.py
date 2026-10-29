@@ -7,11 +7,13 @@ elastic, ``auto`` inelastic (shell soft/hard on covered materials, continuous
 stopping otherwise), coupled BremsLib radiation, midpoint transport. A full
 same-workload warmup at ``seed + 1000000`` precedes the measured request.
 
-Per request it records end-to-end ``run_case`` wall time, the runner's
+Each request calls only ``runner._transport_case``: production transport,
+including coupled photon completion and runner preparation, without spectral
+scoring. It records synchronized transport-request wall time, the runner's
 transport interval, peak CuPy pool bytes above the pre-request level, process
-peak RSS, the schedule the transport resolved (from the INFO log) and a
-SHA-256 per returned array. Diagnostic timings: one process per sample, no
-profiler attached.
+peak RSS, the resolved schedule, and hashes of trajectory arrays and exit
+tallies. Hashing is outside the timer. Diagnostic timings: one process per
+sample, no profiler attached.
 """
 
 import argparse
@@ -82,27 +84,35 @@ def digest(out):
     hashes = {}
     for key in sorted(out):
         value = out[key]
-        if key.startswith("_t_") or not isinstance(value, np.ndarray) or value.dtype == object:
-            continue
-        hashes[key] = hashlib.sha256(np.ascontiguousarray(value).tobytes()).hexdigest()
+        if isinstance(value, np.ndarray) and value.dtype != object:
+            h = hashlib.sha256()
+            h.update(str(value.dtype).encode())
+            h.update(str(value.shape).encode())
+            h.update(np.ascontiguousarray(value).tobytes())
+            hashes[key] = h.hexdigest()
+        elif (key == "Ne" or key.startswith("n_")) and isinstance(value, (int, np.integer)):
+            hashes[key] = hashlib.sha256(str(int(value)).encode()).hexdigest()
     return hashes
 
 
-def request(case, hook, log):
+def request(case, hook, log, phase):
+    print(f"START {phase}", flush=True)
     log.messages.clear()
     cp.cuda.Device().synchronize()
     before = hook.live
     hook.peak = hook.live
     start = time.perf_counter()
-    out = runner.run_case(case, record_timing=True, transport_core="cuda")
+    out = runner._transport_case(case, record_timing=True, transport_core="cuda")
     cp.cuda.Device().synchronize()
     wall = time.perf_counter() - start
+    print(f"DONE {phase}: transport request {wall:.3f} s", flush=True)
     return {
         "wall_s": wall,
         "transport_s": out.get("_t_transport"),
         "peak_pool_bytes": hook.peak - before,
         "schedule_log": sorted(set(m for m in log.messages if "transport schedule" in m)),
-        "digest": digest(out),
+        "segments": int(out["segs"]["L_ang"].size),
+        "digest": digest(out["segs"]),
     }
 
 
@@ -120,9 +130,12 @@ def main():
     logger.setLevel(logging.INFO)
     hook = PeakPoolHook()
     with hook:
-        warmup = request(build_case(args.scene, args.histories, args.seed + 1_000_000), hook, log)
-        measured = request(build_case(args.scene, args.histories, args.seed), hook, log)
+        warmup = request(
+            build_case(args.scene, args.histories, args.seed + 1_000_000), hook, log, "warmup"
+        )
+        measured = request(build_case(args.scene, args.histories, args.seed), hook, log, "measured")
     record = {
+        "measurement_scope": "runner-transport-only",
         "scene": args.scene,
         "histories": args.histories,
         "seed": args.seed,

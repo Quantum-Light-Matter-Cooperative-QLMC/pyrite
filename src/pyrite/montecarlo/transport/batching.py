@@ -256,7 +256,8 @@ class PerElectronTransportConfig:
     the reason when it keeps full-history; see
     :func:`.continuation.resolve_schedule`. Explicit ``"continuation"`` takes
     ``continuation`` or the default :class:`.continuation.TransportContinuationConfig`.
-    The process default comes from ``PYRITE_MC_TRANSPORT_SCHEDULE``.
+    The process default is ``auto``; ``PYRITE_MC_TRANSPORT_SCHEDULE`` overrides it.
+    Separately constructed configs retain the ``None`` compatibility rule above.
     """
 
     seg_capacity: int = 512

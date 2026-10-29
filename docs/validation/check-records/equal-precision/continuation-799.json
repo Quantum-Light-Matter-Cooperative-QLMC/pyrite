@@ -1,0 +1,1195 @@
+{
+  "schema": "pyrite.continuation-qualification.v1",
+  "issue": 799,
+  "job": 2675,
+  "source_revision": "402be84a796c90a1d8449649c047231e21da7fe8",
+  "environment": {
+    "gpu": "NVIDIA GeForce RTX 5080",
+    "driver": "610.47",
+    "cuda_reported": "13.3"
+  },
+  "protocol": {
+    "measurement_scope": "runner-transport-only",
+    "request": "runner._transport_case; includes preparation/retries/coupled photon completion; excludes spectral scoring and hashing",
+    "scenes": {
+      "silicon": {
+        "energy_keV": 300,
+        "thickness_um": 100
+      },
+      "tungsten": {
+        "energy_keV": 300,
+        "thickness_um": 10
+      },
+      "pbwo4": {
+        "energy_keV": 300,
+        "thickness_um": 10
+      }
+    },
+    "schedules": [
+      "full-history",
+      "auto"
+    ],
+    "histories": [
+      5000,
+      20000,
+      100000
+    ],
+    "seeds_by_histories": {
+      "5000": [
+        79901,
+        79902
+      ],
+      "20000": [
+        79901,
+        79902
+      ],
+      "100000": [
+        79901
+      ]
+    },
+    "warmup": "one complete same-policy workload at seed + 1000000 per fresh process",
+    "order": "interleaved schedules, reversed on even seed",
+    "continuation": {
+      "rows_per_round": 256,
+      "scratch_budget_bytes": 536870912,
+      "max_batch": 65536,
+      "device_staging": false
+    },
+    "memory": "peak pool allocation above pre-request level; not hardware VRAM high water; process peak RSS includes warmup",
+    "coupled_radiative_moments": "prepared production default from #805; batched photon completion from #804"
+  },
+  "expected_samples": 30,
+  "completed_samples": 28,
+  "failures": [
+    {
+      "scene": "tungsten",
+      "histories": 100000,
+      "seed": 79901,
+      "schedule": "full-history",
+      "exit_code": 137,
+      "reason": "confirmed global host OOM during warmup"
+    },
+    {
+      "scene": "tungsten",
+      "histories": 100000,
+      "seed": 79901,
+      "schedule": "auto",
+      "exit_code": 143,
+      "reason": "operator termination during warmup near host memory exhaustion"
+    }
+  ],
+  "groups": [
+    {
+      "scene": "pbwo4",
+      "histories": 5000,
+      "schedule": "auto",
+      "seeds": [
+        79901,
+        79902
+      ],
+      "wall_s": {
+        "median": 0.9957161975326017,
+        "min": 0.7568074769806117,
+        "max": 1.2346249180845916,
+        "n": 2
+      },
+      "transport_s": {
+        "median": 0.9956081919372082,
+        "min": 0.7567422068677843,
+        "max": 1.234474177006632,
+        "n": 2
+      },
+      "peak_pool_bytes": {
+        "median": 330833920.0,
+        "min": 330830336,
+        "max": 330837504,
+        "n": 2
+      },
+      "peak_rss_bytes": {
+        "median": 1971261440.0,
+        "min": 1925693440,
+        "max": 2016829440,
+        "n": 2
+      },
+      "schedule_log": [
+        "transport schedule auto: continuation for 5000 histories"
+      ]
+    },
+    {
+      "scene": "pbwo4",
+      "histories": 5000,
+      "schedule": "full-history",
+      "seeds": [
+        79901,
+        79902
+      ],
+      "wall_s": {
+        "median": 3.1339693020563573,
+        "min": 1.622326048091054,
+        "max": 4.645612556021661,
+        "n": 2
+      },
+      "transport_s": {
+        "median": 3.133889621589333,
+        "min": 1.622267018072307,
+        "max": 4.6455122251063585,
+        "n": 2
+      },
+      "peak_pool_bytes": {
+        "median": 1864517632.0,
+        "min": 1651842048,
+        "max": 2077193216,
+        "n": 2
+      },
+      "peak_rss_bytes": {
+        "median": 1732218880.0,
+        "min": 1528393728,
+        "max": 1936044032,
+        "n": 2
+      },
+      "schedule_log": []
+    },
+    {
+      "scene": "pbwo4",
+      "histories": 20000,
+      "schedule": "auto",
+      "seeds": [
+        79901,
+        79902
+      ],
+      "wall_s": {
+        "median": 3.2417842294089496,
+        "min": 2.18229603394866,
+        "max": 4.301272424869239,
+        "n": 2
+      },
+      "transport_s": {
+        "median": 3.2416366984834895,
+        "min": 2.182204552926123,
+        "max": 4.301068844040856,
+        "n": 2
+      },
+      "peak_pool_bytes": {
+        "median": 507109376.0,
+        "min": 507095552,
+        "max": 507123200,
+        "n": 2
+      },
+      "peak_rss_bytes": {
+        "median": 4858642432.0,
+        "min": 4773736448,
+        "max": 4943548416,
+        "n": 2
+      },
+      "schedule_log": [
+        "transport schedule auto: continuation for 20000 histories"
+      ]
+    },
+    {
+      "scene": "pbwo4",
+      "histories": 20000,
+      "schedule": "full-history",
+      "seeds": [
+        79901,
+        79902
+      ],
+      "wall_s": {
+        "median": 6.851077608997002,
+        "min": 4.8872939159628,
+        "max": 8.814861302031204,
+        "n": 2
+      },
+      "transport_s": {
+        "median": 6.850973108434118,
+        "min": 4.887208524858579,
+        "max": 8.814737692009658,
+        "n": 2
+      },
+      "peak_pool_bytes": {
+        "median": 2238986496.0,
+        "min": 2078527488,
+        "max": 2399445504,
+        "n": 2
+      },
+      "peak_rss_bytes": {
+        "median": 4027537408.0,
+        "min": 3513905152,
+        "max": 4541169664,
+        "n": 2
+      },
+      "schedule_log": []
+    },
+    {
+      "scene": "pbwo4",
+      "histories": 100000,
+      "schedule": "auto",
+      "seeds": [
+        79901
+      ],
+      "wall_s": {
+        "median": 8.03575913514942,
+        "min": 8.03575913514942,
+        "max": 8.03575913514942,
+        "n": 1
+      },
+      "transport_s": {
+        "median": 8.035690595163032,
+        "min": 8.035690595163032,
+        "max": 8.035690595163032,
+        "n": 1
+      },
+      "peak_pool_bytes": {
+        "median": 519043072,
+        "min": 519043072,
+        "max": 519043072,
+        "n": 1
+      },
+      "peak_rss_bytes": {
+        "median": 19914108928,
+        "min": 19914108928,
+        "max": 19914108928,
+        "n": 1
+      },
+      "schedule_log": [
+        "transport schedule auto: continuation for 100000 histories"
+      ]
+    },
+    {
+      "scene": "pbwo4",
+      "histories": 100000,
+      "schedule": "full-history",
+      "seeds": [
+        79901
+      ],
+      "wall_s": {
+        "median": 53.86340374010615,
+        "min": 53.86340374010615,
+        "max": 53.86340374010615,
+        "n": 1
+      },
+      "transport_s": {
+        "median": 53.86324347904883,
+        "min": 53.86324347904883,
+        "max": 53.86324347904883,
+        "n": 1
+      },
+      "peak_pool_bytes": {
+        "median": 2406565376,
+        "min": 2406565376,
+        "max": 2406565376,
+        "n": 1
+      },
+      "peak_rss_bytes": {
+        "median": 19225505792,
+        "min": 19225505792,
+        "max": 19225505792,
+        "n": 1
+      },
+      "schedule_log": []
+    },
+    {
+      "scene": "silicon",
+      "histories": 5000,
+      "schedule": "auto",
+      "seeds": [
+        79901,
+        79902
+      ],
+      "wall_s": {
+        "median": 2.4691388158826157,
+        "min": 1.9019890138879418,
+        "max": 3.0362886178772897,
+        "n": 2
+      },
+      "transport_s": {
+        "median": 2.4690412000054494,
+        "min": 1.9019017429091036,
+        "max": 3.036180657101795,
+        "n": 2
+      },
+      "peak_pool_bytes": {
+        "median": 357093376.0,
+        "min": 357029376,
+        "max": 357157376,
+        "n": 2
+      },
+      "peak_rss_bytes": {
+        "median": 2953318400.0,
+        "min": 2623193088,
+        "max": 3283443712,
+        "n": 2
+      },
+      "schedule_log": [
+        "transport schedule auto: continuation for 5000 histories"
+      ]
+    },
+    {
+      "scene": "silicon",
+      "histories": 5000,
+      "schedule": "full-history",
+      "seeds": [
+        79901,
+        79902
+      ],
+      "wall_s": {
+        "median": 5.006030000047758,
+        "min": 4.4059780680108815,
+        "max": 5.606081932084635,
+        "n": 2
+      },
+      "transport_s": {
+        "median": 5.005930504063144,
+        "min": 4.405891387024894,
+        "max": 5.605969621101394,
+        "n": 2
+      },
+      "peak_pool_bytes": {
+        "median": 1781815808.0,
+        "min": 1781694464,
+        "max": 1781937152,
+        "n": 2
+      },
+      "peak_rss_bytes": {
+        "median": 2690156544.0,
+        "min": 2201563136,
+        "max": 3178749952,
+        "n": 2
+      },
+      "schedule_log": []
+    },
+    {
+      "scene": "silicon",
+      "histories": 20000,
+      "schedule": "auto",
+      "seeds": [
+        79901,
+        79902
+      ],
+      "wall_s": {
+        "median": 8.527470960980281,
+        "min": 5.3410913839470595,
+        "max": 11.713850538013503,
+        "n": 2
+      },
+      "transport_s": {
+        "median": 8.527353603974916,
+        "min": 5.341008682036772,
+        "max": 11.71369852591306,
+        "n": 2
+      },
+      "peak_pool_bytes": {
+        "median": 511018752.0,
+        "min": 510903296,
+        "max": 511134208,
+        "n": 2
+      },
+      "peak_rss_bytes": {
+        "median": 9968400384.0,
+        "min": 9163825152,
+        "max": 10772975616,
+        "n": 2
+      },
+      "schedule_log": [
+        "transport schedule auto: continuation for 20000 histories"
+      ]
+    },
+    {
+      "scene": "silicon",
+      "histories": 20000,
+      "schedule": "full-history",
+      "seeds": [
+        79901,
+        79902
+      ],
+      "wall_s": {
+        "median": 18.959536835434847,
+        "min": 15.16667822492309,
+        "max": 22.752395445946604,
+        "n": 2
+      },
+      "transport_s": {
+        "median": 18.959421050036326,
+        "min": 15.166605944978073,
+        "max": 22.75223615509458,
+        "n": 2
+      },
+      "peak_pool_bytes": {
+        "median": 1783269888.0,
+        "min": 1783148544,
+        "max": 1783391232,
+        "n": 2
+      },
+      "peak_rss_bytes": {
+        "median": 7644252160.0,
+        "min": 6528122880,
+        "max": 8760381440,
+        "n": 2
+      },
+      "schedule_log": []
+    },
+    {
+      "scene": "silicon",
+      "histories": 100000,
+      "schedule": "auto",
+      "seeds": [
+        79901
+      ],
+      "wall_s": {
+        "median": 23.009707920020446,
+        "min": 23.009707920020446,
+        "max": 23.009707920020446,
+        "n": 1
+      },
+      "transport_s": {
+        "median": 22.999016696121544,
+        "min": 22.999016696121544,
+        "max": 22.999016696121544,
+        "n": 1
+      },
+      "peak_pool_bytes": {
+        "median": 523694080,
+        "min": 523694080,
+        "max": 523694080,
+        "n": 1
+      },
+      "peak_rss_bytes": {
+        "median": 41760034816,
+        "min": 41760034816,
+        "max": 41760034816,
+        "n": 1
+      },
+      "schedule_log": [
+        "transport schedule auto: continuation for 100000 histories"
+      ]
+    },
+    {
+      "scene": "silicon",
+      "histories": 100000,
+      "schedule": "full-history",
+      "seeds": [
+        79901
+      ],
+      "wall_s": {
+        "median": 128.28605965315364,
+        "min": 128.28605965315364,
+        "max": 128.28605965315364,
+        "n": 1
+      },
+      "transport_s": {
+        "median": 128.27720004599541,
+        "min": 128.27720004599541,
+        "max": 128.27720004599541,
+        "n": 1
+      },
+      "peak_pool_bytes": {
+        "median": 1790908416,
+        "min": 1790908416,
+        "max": 1790908416,
+        "n": 1
+      },
+      "peak_rss_bytes": {
+        "median": 40207998976,
+        "min": 40207998976,
+        "max": 40207998976,
+        "n": 1
+      },
+      "schedule_log": []
+    },
+    {
+      "scene": "tungsten",
+      "histories": 5000,
+      "schedule": "auto",
+      "seeds": [
+        79901,
+        79902
+      ],
+      "wall_s": {
+        "median": 4.0513288849033415,
+        "min": 2.9698061170056462,
+        "max": 5.132851652801037,
+        "n": 2
+      },
+      "transport_s": {
+        "median": 4.051234014565125,
+        "min": 2.9697473670821637,
+        "max": 5.1327206620480865,
+        "n": 2
+      },
+      "peak_pool_bytes": {
+        "median": 355444224.0,
+        "min": 355118080,
+        "max": 355770368,
+        "n": 2
+      },
+      "peak_rss_bytes": {
+        "median": 4411148288.0,
+        "min": 4183310336,
+        "max": 4638986240,
+        "n": 2
+      },
+      "schedule_log": [
+        "transport schedule auto: continuation for 5000 histories"
+      ]
+    },
+    {
+      "scene": "tungsten",
+      "histories": 5000,
+      "schedule": "full-history",
+      "seeds": [
+        79901,
+        79902
+      ],
+      "wall_s": {
+        "median": 12.16303924145177,
+        "min": 11.587392827961594,
+        "max": 12.738685654941946,
+        "n": 2
+      },
+      "transport_s": {
+        "median": 12.162915650522336,
+        "min": 11.587312228046358,
+        "max": 12.738519072998315,
+        "n": 2
+      },
+      "peak_pool_bytes": {
+        "median": 1781615360.0,
+        "min": 1781033472,
+        "max": 1782197248,
+        "n": 2
+      },
+      "peak_rss_bytes": {
+        "median": 3517003776.0,
+        "min": 3227140096,
+        "max": 3806867456,
+        "n": 2
+      },
+      "schedule_log": []
+    },
+    {
+      "scene": "tungsten",
+      "histories": 20000,
+      "schedule": "auto",
+      "seeds": [
+        79901,
+        79902
+      ],
+      "wall_s": {
+        "median": 12.938088044524193,
+        "min": 8.222367358161137,
+        "max": 17.65380873088725,
+        "n": 2
+      },
+      "transport_s": {
+        "median": 12.937982808449306,
+        "min": 8.22229885798879,
+        "max": 17.65366675890982,
+        "n": 2
+      },
+      "peak_pool_bytes": {
+        "median": 508711936.0,
+        "min": 508483072,
+        "max": 508940800,
+        "n": 2
+      },
+      "peak_rss_bytes": {
+        "median": 13993916416.0,
+        "min": 12905304064,
+        "max": 15082528768,
+        "n": 2
+      },
+      "schedule_log": [
+        "transport schedule auto: continuation for 20000 histories"
+      ]
+    },
+    {
+      "scene": "tungsten",
+      "histories": 20000,
+      "schedule": "full-history",
+      "seeds": [
+        79901,
+        79902
+      ],
+      "wall_s": {
+        "median": 50.77518638048787,
+        "min": 46.557918841950595,
+        "max": 54.99245391902514,
+        "n": 2
+      },
+      "transport_s": {
+        "median": 50.77507255447563,
+        "min": 46.55782480095513,
+        "max": 54.992320307996124,
+        "n": 2
+      },
+      "peak_pool_bytes": {
+        "median": 1783069440.0,
+        "min": 1782487552,
+        "max": 1783651328,
+        "n": 2
+      },
+      "peak_rss_bytes": {
+        "median": 11070242816.0,
+        "min": 9452765184,
+        "max": 12687720448,
+        "n": 2
+      },
+      "schedule_log": []
+    }
+  ],
+  "pairs": [
+    {
+      "scene": "pbwo4",
+      "histories": 5000,
+      "seed": 79901,
+      "identical": true,
+      "speedup": 6.13843374613049
+    },
+    {
+      "scene": "pbwo4",
+      "histories": 5000,
+      "seed": 79902,
+      "identical": true,
+      "speedup": 1.3140234125583221
+    },
+    {
+      "scene": "pbwo4",
+      "histories": 20000,
+      "seed": 79901,
+      "identical": true,
+      "speedup": 4.039260102618406
+    },
+    {
+      "scene": "pbwo4",
+      "histories": 20000,
+      "seed": 79902,
+      "identical": true,
+      "speedup": 1.1362437514316188
+    },
+    {
+      "scene": "pbwo4",
+      "histories": 100000,
+      "seed": 79901,
+      "identical": true,
+      "speedup": 6.702963943319413
+    },
+    {
+      "scene": "silicon",
+      "histories": 5000,
+      "seed": 79901,
+      "identical": true,
+      "speedup": 2.947483866179116
+    },
+    {
+      "scene": "silicon",
+      "histories": 5000,
+      "seed": 79902,
+      "identical": true,
+      "speedup": 1.451106473234801
+    },
+    {
+      "scene": "silicon",
+      "histories": 20000,
+      "seed": 79901,
+      "identical": true,
+      "speedup": 4.259877581261794
+    },
+    {
+      "scene": "silicon",
+      "histories": 20000,
+      "seed": 79902,
+      "identical": true,
+      "speedup": 1.2947645332936897
+    },
+    {
+      "scene": "silicon",
+      "histories": 100000,
+      "seed": 79901,
+      "identical": true,
+      "speedup": 5.575301524863495
+    },
+    {
+      "scene": "tungsten",
+      "histories": 5000,
+      "seed": 79901,
+      "identical": true,
+      "speedup": 4.289399763169027
+    },
+    {
+      "scene": "tungsten",
+      "histories": 5000,
+      "seed": 79902,
+      "identical": true,
+      "speedup": 2.257496146735171
+    },
+    {
+      "scene": "tungsten",
+      "histories": 20000,
+      "seed": 79901,
+      "identical": true,
+      "speedup": 6.688153365519749
+    },
+    {
+      "scene": "tungsten",
+      "histories": 20000,
+      "seed": 79902,
+      "identical": true,
+      "speedup": 2.6372733245088624
+    }
+  ],
+  "samples": [
+    {
+      "scene": "pbwo4",
+      "histories": 100000,
+      "seed": 79901,
+      "schedule": "auto",
+      "warmup_wall_s": 9.8227019358892,
+      "wall_s": 8.03575913514942,
+      "transport_s": 8.035690595163032,
+      "peak_pool_bytes": 519043072,
+      "peak_rss_bytes": 19914108928,
+      "segments": 62304926,
+      "schedule_log": [
+        "transport schedule auto: continuation for 100000 histories"
+      ],
+      "digest_fields": 40,
+      "digest_sha256": "f1aabe1caff7dda1a9a946bb1e62407efe67afaeba1bb8274965d6278efe8bf1"
+    },
+    {
+      "scene": "pbwo4",
+      "histories": 100000,
+      "seed": 79901,
+      "schedule": "full-history",
+      "warmup_wall_s": 55.54214333393611,
+      "wall_s": 53.86340374010615,
+      "transport_s": 53.86324347904883,
+      "peak_pool_bytes": 2406565376,
+      "peak_rss_bytes": 19225505792,
+      "segments": 62304926,
+      "schedule_log": [],
+      "digest_fields": 40,
+      "digest_sha256": "f1aabe1caff7dda1a9a946bb1e62407efe67afaeba1bb8274965d6278efe8bf1"
+    },
+    {
+      "scene": "pbwo4",
+      "histories": 20000,
+      "seed": 79901,
+      "schedule": "auto",
+      "warmup_wall_s": 2.1338627450168133,
+      "wall_s": 2.18229603394866,
+      "transport_s": 2.182204552926123,
+      "peak_pool_bytes": 507123200,
+      "peak_rss_bytes": 4773736448,
+      "segments": 12496916,
+      "schedule_log": [
+        "transport schedule auto: continuation for 20000 histories"
+      ],
+      "digest_fields": 40,
+      "digest_sha256": "a7049866a88f47e71bbe03aebd6049b49e680f57b68257b72a88f8e22bd19a1b"
+    },
+    {
+      "scene": "pbwo4",
+      "histories": 20000,
+      "seed": 79901,
+      "schedule": "full-history",
+      "warmup_wall_s": 9.517457490088418,
+      "wall_s": 8.814861302031204,
+      "transport_s": 8.814737692009658,
+      "peak_pool_bytes": 2399445504,
+      "peak_rss_bytes": 4541169664,
+      "segments": 12496916,
+      "schedule_log": [],
+      "digest_fields": 40,
+      "digest_sha256": "a7049866a88f47e71bbe03aebd6049b49e680f57b68257b72a88f8e22bd19a1b"
+    },
+    {
+      "scene": "pbwo4",
+      "histories": 20000,
+      "seed": 79902,
+      "schedule": "auto",
+      "warmup_wall_s": 4.614000391913578,
+      "wall_s": 4.301272424869239,
+      "transport_s": 4.301068844040856,
+      "peak_pool_bytes": 507095552,
+      "peak_rss_bytes": 4943548416,
+      "segments": 12475856,
+      "schedule_log": [
+        "transport schedule auto: continuation for 20000 histories"
+      ],
+      "digest_fields": 40,
+      "digest_sha256": "9ab067aa73496955bf862e615e5f8882e45556f10634b57aeb1b540fcbe13080"
+    },
+    {
+      "scene": "pbwo4",
+      "histories": 20000,
+      "seed": 79902,
+      "schedule": "full-history",
+      "warmup_wall_s": 7.774278635857627,
+      "wall_s": 4.8872939159628,
+      "transport_s": 4.887208524858579,
+      "peak_pool_bytes": 2078527488,
+      "peak_rss_bytes": 3513905152,
+      "segments": 12475856,
+      "schedule_log": [],
+      "digest_fields": 40,
+      "digest_sha256": "9ab067aa73496955bf862e615e5f8882e45556f10634b57aeb1b540fcbe13080"
+    },
+    {
+      "scene": "pbwo4",
+      "histories": 5000,
+      "seed": 79901,
+      "schedule": "auto",
+      "warmup_wall_s": 1.0148066030815244,
+      "wall_s": 0.7568074769806117,
+      "transport_s": 0.7567422068677843,
+      "peak_pool_bytes": 330837504,
+      "peak_rss_bytes": 1925693440,
+      "segments": 3137870,
+      "schedule_log": [
+        "transport schedule auto: continuation for 5000 histories"
+      ],
+      "digest_fields": 40,
+      "digest_sha256": "481a7eb80e8258fef84858bf78addccf1a828e750671a04e5ce3cff98703ba72"
+    },
+    {
+      "scene": "pbwo4",
+      "histories": 5000,
+      "seed": 79901,
+      "schedule": "full-history",
+      "warmup_wall_s": 2.417133138049394,
+      "wall_s": 4.645612556021661,
+      "transport_s": 4.6455122251063585,
+      "peak_pool_bytes": 1651842048,
+      "peak_rss_bytes": 1936044032,
+      "segments": 3137870,
+      "schedule_log": [],
+      "digest_fields": 40,
+      "digest_sha256": "481a7eb80e8258fef84858bf78addccf1a828e750671a04e5ce3cff98703ba72"
+    },
+    {
+      "scene": "pbwo4",
+      "histories": 5000,
+      "seed": 79902,
+      "schedule": "auto",
+      "warmup_wall_s": 1.5980626880191267,
+      "wall_s": 1.2346249180845916,
+      "transport_s": 1.234474177006632,
+      "peak_pool_bytes": 330830336,
+      "peak_rss_bytes": 2016829440,
+      "segments": 3070931,
+      "schedule_log": [
+        "transport schedule auto: continuation for 5000 histories"
+      ],
+      "digest_fields": 40,
+      "digest_sha256": "f8b8021989992ad1025dd2077553af23771b874c8f486c6b8dde1ac8845e3c7a"
+    },
+    {
+      "scene": "pbwo4",
+      "histories": 5000,
+      "seed": 79902,
+      "schedule": "full-history",
+      "warmup_wall_s": 2.5902847489342093,
+      "wall_s": 1.622326048091054,
+      "transport_s": 1.622267018072307,
+      "peak_pool_bytes": 2077193216,
+      "peak_rss_bytes": 1528393728,
+      "segments": 3070931,
+      "schedule_log": [],
+      "digest_fields": 40,
+      "digest_sha256": "f8b8021989992ad1025dd2077553af23771b874c8f486c6b8dde1ac8845e3c7a"
+    },
+    {
+      "scene": "silicon",
+      "histories": 100000,
+      "seed": 79901,
+      "schedule": "auto",
+      "warmup_wall_s": 27.66568774706684,
+      "wall_s": 23.009707920020446,
+      "transport_s": 22.999016696121544,
+      "peak_pool_bytes": 523694080,
+      "peak_rss_bytes": 41760034816,
+      "segments": 133580471,
+      "schedule_log": [
+        "transport schedule auto: continuation for 100000 histories"
+      ],
+      "digest_fields": 42,
+      "digest_sha256": "64f8a6f889e6823a769b4c20befc0ef0ae2ced08d732640a0c86b3d00de1e61f"
+    },
+    {
+      "scene": "silicon",
+      "histories": 100000,
+      "seed": 79901,
+      "schedule": "full-history",
+      "warmup_wall_s": 126.49584750598297,
+      "wall_s": 128.28605965315364,
+      "transport_s": 128.27720004599541,
+      "peak_pool_bytes": 1790908416,
+      "peak_rss_bytes": 40207998976,
+      "segments": 133580471,
+      "schedule_log": [],
+      "digest_fields": 42,
+      "digest_sha256": "64f8a6f889e6823a769b4c20befc0ef0ae2ced08d732640a0c86b3d00de1e61f"
+    },
+    {
+      "scene": "silicon",
+      "histories": 20000,
+      "seed": 79901,
+      "schedule": "auto",
+      "warmup_wall_s": 6.4524269921239465,
+      "wall_s": 5.3410913839470595,
+      "transport_s": 5.341008682036772,
+      "peak_pool_bytes": 511134208,
+      "peak_rss_bytes": 9163825152,
+      "segments": 26753175,
+      "schedule_log": [
+        "transport schedule auto: continuation for 20000 histories"
+      ],
+      "digest_fields": 42,
+      "digest_sha256": "8e0a66ca0f6f7d7fe8ed97e57767bd0745eb7e7fcc9fefda00c4d3f501621b74"
+    },
+    {
+      "scene": "silicon",
+      "histories": 20000,
+      "seed": 79901,
+      "schedule": "full-history",
+      "warmup_wall_s": 23.374143891967833,
+      "wall_s": 22.752395445946604,
+      "transport_s": 22.75223615509458,
+      "peak_pool_bytes": 1783148544,
+      "peak_rss_bytes": 8760381440,
+      "segments": 26753175,
+      "schedule_log": [],
+      "digest_fields": 42,
+      "digest_sha256": "8e0a66ca0f6f7d7fe8ed97e57767bd0745eb7e7fcc9fefda00c4d3f501621b74"
+    },
+    {
+      "scene": "silicon",
+      "histories": 20000,
+      "seed": 79902,
+      "schedule": "auto",
+      "warmup_wall_s": 12.862131781177595,
+      "wall_s": 11.713850538013503,
+      "transport_s": 11.71369852591306,
+      "peak_pool_bytes": 510903296,
+      "peak_rss_bytes": 10772975616,
+      "segments": 26637797,
+      "schedule_log": [
+        "transport schedule auto: continuation for 20000 histories"
+      ],
+      "digest_fields": 42,
+      "digest_sha256": "f0edf0ff58b913d599a06fbe82224f58205a6077b0f6111c99cd7ada25b3229e"
+    },
+    {
+      "scene": "silicon",
+      "histories": 20000,
+      "seed": 79902,
+      "schedule": "full-history",
+      "warmup_wall_s": 16.512001102091745,
+      "wall_s": 15.16667822492309,
+      "transport_s": 15.166605944978073,
+      "peak_pool_bytes": 1783391232,
+      "peak_rss_bytes": 6528122880,
+      "segments": 26637797,
+      "schedule_log": [],
+      "digest_fields": 42,
+      "digest_sha256": "f0edf0ff58b913d599a06fbe82224f58205a6077b0f6111c99cd7ada25b3229e"
+    },
+    {
+      "scene": "silicon",
+      "histories": 5000,
+      "seed": 79901,
+      "schedule": "auto",
+      "warmup_wall_s": 3.189828811911866,
+      "wall_s": 1.9019890138879418,
+      "transport_s": 1.9019017429091036,
+      "peak_pool_bytes": 357157376,
+      "peak_rss_bytes": 2623193088,
+      "segments": 6653701,
+      "schedule_log": [
+        "transport schedule auto: continuation for 5000 histories"
+      ],
+      "digest_fields": 42,
+      "digest_sha256": "82731c6f1d8dfa38b6790da6bf88265a9933768d8cffc80ae7646e2414d488dd"
+    },
+    {
+      "scene": "silicon",
+      "histories": 5000,
+      "seed": 79901,
+      "schedule": "full-history",
+      "warmup_wall_s": 22.25724010891281,
+      "wall_s": 5.606081932084635,
+      "transport_s": 5.605969621101394,
+      "peak_pool_bytes": 1781694464,
+      "peak_rss_bytes": 3178749952,
+      "segments": 6653701,
+      "schedule_log": [],
+      "digest_fields": 42,
+      "digest_sha256": "82731c6f1d8dfa38b6790da6bf88265a9933768d8cffc80ae7646e2414d488dd"
+    },
+    {
+      "scene": "silicon",
+      "histories": 5000,
+      "seed": 79902,
+      "schedule": "auto",
+      "warmup_wall_s": 4.013385469093919,
+      "wall_s": 3.0362886178772897,
+      "transport_s": 3.036180657101795,
+      "peak_pool_bytes": 357029376,
+      "peak_rss_bytes": 3283443712,
+      "segments": 6643313,
+      "schedule_log": [
+        "transport schedule auto: continuation for 5000 histories"
+      ],
+      "digest_fields": 42,
+      "digest_sha256": "cd648ebc2ebf8a805c6d255f513c535eb4cabbe890c899e6d14cda83ace337d9"
+    },
+    {
+      "scene": "silicon",
+      "histories": 5000,
+      "seed": 79902,
+      "schedule": "full-history",
+      "warmup_wall_s": 4.928625882137567,
+      "wall_s": 4.4059780680108815,
+      "transport_s": 4.405891387024894,
+      "peak_pool_bytes": 1781937152,
+      "peak_rss_bytes": 2201563136,
+      "segments": 6643313,
+      "schedule_log": [],
+      "digest_fields": 42,
+      "digest_sha256": "cd648ebc2ebf8a805c6d255f513c535eb4cabbe890c899e6d14cda83ace337d9"
+    },
+    {
+      "scene": "tungsten",
+      "histories": 20000,
+      "seed": 79901,
+      "schedule": "auto",
+      "warmup_wall_s": 9.794414161937311,
+      "wall_s": 8.222367358161137,
+      "transport_s": 8.22229885798879,
+      "peak_pool_bytes": 508940800,
+      "peak_rss_bytes": 12905304064,
+      "segments": 39171170,
+      "schedule_log": [
+        "transport schedule auto: continuation for 20000 histories"
+      ],
+      "digest_fields": 42,
+      "digest_sha256": "185a4789555b5e0831135178d6104142d244b3d5ba467950f6166770c73b28b5"
+    },
+    {
+      "scene": "tungsten",
+      "histories": 20000,
+      "seed": 79901,
+      "schedule": "full-history",
+      "warmup_wall_s": 54.26966106612235,
+      "wall_s": 54.99245391902514,
+      "transport_s": 54.992320307996124,
+      "peak_pool_bytes": 1782487552,
+      "peak_rss_bytes": 12687720448,
+      "segments": 39171170,
+      "schedule_log": [],
+      "digest_fields": 42,
+      "digest_sha256": "185a4789555b5e0831135178d6104142d244b3d5ba467950f6166770c73b28b5"
+    },
+    {
+      "scene": "tungsten",
+      "histories": 20000,
+      "seed": 79902,
+      "schedule": "auto",
+      "warmup_wall_s": 19.849166572792456,
+      "wall_s": 17.65380873088725,
+      "transport_s": 17.65366675890982,
+      "peak_pool_bytes": 508483072,
+      "peak_rss_bytes": 15082528768,
+      "segments": 39003274,
+      "schedule_log": [
+        "transport schedule auto: continuation for 20000 histories"
+      ],
+      "digest_fields": 42,
+      "digest_sha256": "b0eddae166a6bfbf6dba47a811d541b3c68ab32669fcb481e798d85f079f1f73"
+    },
+    {
+      "scene": "tungsten",
+      "histories": 20000,
+      "seed": 79902,
+      "schedule": "full-history",
+      "warmup_wall_s": 46.02956117806025,
+      "wall_s": 46.557918841950595,
+      "transport_s": 46.55782480095513,
+      "peak_pool_bytes": 1783651328,
+      "peak_rss_bytes": 9452765184,
+      "segments": 39003274,
+      "schedule_log": [],
+      "digest_fields": 42,
+      "digest_sha256": "b0eddae166a6bfbf6dba47a811d541b3c68ab32669fcb481e798d85f079f1f73"
+    },
+    {
+      "scene": "tungsten",
+      "histories": 5000,
+      "seed": 79901,
+      "schedule": "auto",
+      "warmup_wall_s": 4.035861770855263,
+      "wall_s": 2.9698061170056462,
+      "transport_s": 2.9697473670821637,
+      "peak_pool_bytes": 355770368,
+      "peak_rss_bytes": 4183310336,
+      "segments": 9838019,
+      "schedule_log": [
+        "transport schedule auto: continuation for 5000 histories"
+      ],
+      "digest_fields": 42,
+      "digest_sha256": "2db5ccefc2f0a4255bd6e0d85a393461db7f5c200d737c5f681fcc524567824c"
+    },
+    {
+      "scene": "tungsten",
+      "histories": 5000,
+      "seed": 79901,
+      "schedule": "full-history",
+      "warmup_wall_s": 14.80013529304415,
+      "wall_s": 12.738685654941946,
+      "transport_s": 12.738519072998315,
+      "peak_pool_bytes": 1781033472,
+      "peak_rss_bytes": 3806867456,
+      "segments": 9838019,
+      "schedule_log": [],
+      "digest_fields": 42,
+      "digest_sha256": "2db5ccefc2f0a4255bd6e0d85a393461db7f5c200d737c5f681fcc524567824c"
+    },
+    {
+      "scene": "tungsten",
+      "histories": 5000,
+      "seed": 79902,
+      "schedule": "auto",
+      "warmup_wall_s": 6.487669410882518,
+      "wall_s": 5.132851652801037,
+      "transport_s": 5.1327206620480865,
+      "peak_pool_bytes": 355118080,
+      "peak_rss_bytes": 4638986240,
+      "segments": 9731663,
+      "schedule_log": [
+        "transport schedule auto: continuation for 5000 histories"
+      ],
+      "digest_fields": 42,
+      "digest_sha256": "412ed5f23ac916b55465504f0c252a716f36902028687bcfd8da9f55f4362cdf"
+    },
+    {
+      "scene": "tungsten",
+      "histories": 5000,
+      "seed": 79902,
+      "schedule": "full-history",
+      "warmup_wall_s": 15.396048081107438,
+      "wall_s": 11.587392827961594,
+      "transport_s": 11.587312228046358,
+      "peak_pool_bytes": 1782197248,
+      "peak_rss_bytes": 3227140096,
+      "segments": 9731663,
+      "schedule_log": [],
+      "digest_fields": 42,
+      "digest_sha256": "412ed5f23ac916b55465504f0c252a716f36902028687bcfd8da9f55f4362cdf"
+    }
+  ],
+  "limitations": [
+    "100000-history tungsten unqualified; no timing ratio for failed arms",
+    "Two seeds at 5000/20000, one seed at 100000",
+    "Bounded scratch does not bound retained trajectories; host admission/containment follow-up #807, streaming #611",
+    "No end-to-end spectral or cross-revision speedup claim"
+  ]
+}

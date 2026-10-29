@@ -355,6 +355,10 @@ def _checked_core(p, launch, electron_start):
             "transport continuation requires transport_core='cuda'; "
             f"{p.transport_core!r} resolved to {transport_core!r}"
         )
+    if transport_core == "lockstep" and effective_schedule(p.per_electron_config) == "auto":
+        resolve_schedule(
+            p.per_electron_config, p.Ne, cuda=False, lut=False, launched=False, gdf=False
+        )
     if p.keep_segments_on_device and transport_core != "cuda":
         raise ValueError(
             "keep_segments_on_device requires transport_core='cuda'; "

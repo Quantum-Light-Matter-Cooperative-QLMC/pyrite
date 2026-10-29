@@ -974,3 +974,79 @@ already fits one launch here and stays fastest end to end when memory is
 plentiful; continuation is 1.2–1.4× slower than it but 1.5–1.7× faster than
 the default `reference` driver, which replays a capacity overflow. Raw records
 stay on the lab box under `pyrite-797/evidence/continuation/bench797/2657`.
+
+## Production continuation qualification (#799)
+
+Job 2675 at `402be84a796c90a1d8449649c047231e21da7fe8` compares
+`full-history` with `auto` through `runner._transport_case` on the lab RTX
+5080 (reported driver 610.47, CUDA 13.3). This source includes #804's batched
+photon completion and #805's prepared radiative moments. Both arms use the
+same production physics: ELSEPA, `auto` inelastic losses, coupled BremsLib
+radiation and midpoint transport. Si is 300 keV/100 µm; W and PbWO4 are
+300 keV/10 µm. Each sample is a fresh process with one complete same-policy
+warmup at seed +1000000. Schedules are interleaved and reversed on the even
+seed. The default continuation uses 256 rows per round, a 512 MiB scratch
+budget, at most 65536 active histories and host staging.
+
+The timer includes runner preparation, retries, transport and coupled photon
+completion, with synchronization before and after. It excludes trajectory
+hashing and **all spectral scoring**. Earlier full-spectrum jobs 2661, 2671
+and 2674 were cancelled and supply no timing comparisons. These results
+compare scheduling within this revision; they do not measure a combined
+cross-revision speedup from #804 and #805.
+
+Median [min,max] transport-request seconds, two independent seeds
+(79901–79902) at 5000/20000 histories; one seed (79901) at 100000:
+
+| Material | Histories | Full-history (s) | Auto continuation (s) | Ratio of medians |
+| --- | ---: | ---: | ---: | ---: |
+| Si | 5000 | 5.01 [4.41, 5.61] | 2.47 [1.90, 3.04] | 2.03× |
+| W | 5000 | 12.16 [11.59, 12.74] | 4.05 [2.97, 5.13] | 3.00× |
+| PbWO4 | 5000 | 3.13 [1.62, 4.65] | 1.00 [0.76, 1.23] | 3.13× |
+| Si | 20000 | 18.96 [15.17, 22.75] | 8.53 [5.34, 11.71] | 2.22× |
+| W | 20000 | 50.78 [46.56, 54.99] | 12.94 [8.22, 17.65] | 3.92× |
+| PbWO4 | 20000 | 6.85 [4.89, 8.81] | 3.24 [2.18, 4.30] | 2.11× |
+| Si | 100000 | 128.29 | 23.01 | 5.58× |
+| PbWO4 | 100000 | 53.86 | 8.04 | 6.70× |
+
+All **14 completed pairs (28 samples)** have identical trajectory-array
+hashes (including dtype and shape) and integer exit-tally hashes. Every auto
+record logs selection of continuation. GPU regression job 2673 at `70a5ac5c`
+passed 115 tests, including exact SR/ELSEPA/Mott, layered and resident rows,
+shell/straggling/radiative combinations, runner retry/block monitor and
+silicon/PbWO4 runner spectral parity. Process-default schedule and explicit
+overrides also preserve scientific case keys.
+
+Peak CuPy allocation above the pre-request level is 316–341 MiB for
+continuation at 5000 histories, 484–487 MiB at 20000 and 495–499 MiB for the
+completed 100000 cases. Full-history ranges from 1575 to 2295 MiB. This is
+allocator accounting, **not a hardware VRAM high-water measurement**. Peak
+process RSS includes warmup and can be larger under continuation: at 20000
+histories, maximum RSS is 10.0/14.0/4.6 GiB for Si/W/PbWO4 continuation,
+versus 8.2/11.8/4.2 GiB for full-history. Si 100000 reaches 37.4/38.9 GiB
+full-history/continuation; PbWO4 reaches 17.9/18.5 GiB.
+
+**Failed coverage.** W 100000 full-history was killed during warmup by a
+confirmed global host OOM (exit 137, about 38.3 GiB anonymous RSS). Its
+continuation counterpart reached about 39.3 GiB RSS and was explicitly
+terminated (exit 143) to avoid another global OOM. No timing or parity claim
+is made for that pair. The 28 GiB Slurm reservation did not enforce a memory
+limit. Host admission and benchmark containment are tracked in #807;
+bounded live consumption remains #611. Neither is solved by this schedule.
+
+**Default decision.** Promote the production process schedule to `auto`, at
+the user's explicit request despite the unqualified W 100000 pair. Every
+completed pair is bitwise-identical and faster; supported production modes
+have CUDA regressions. Keep the existing eligibility threshold/fallbacks,
+256-row quantum and full-history override. Separately constructed
+`PerElectronTransportConfig` objects retain their compatibility semantics.
+Scheduling changes neither scientific identity nor default numerical output;
+no physics model marker changes. This does not establish bounded total
+memory, a spectral speedup or complete coverage of arbitrarily large cases.
+
+The [reduced machine-readable record](../check-records/equal-precision/continuation-799.json)
+retains individual timings, spread, memory, hashes and failed-arm inventory.
+Raw sample files and logs remain under
+`pyrite-799-transport-402be84a/evidence/continuation/qualify799/2675` on the lab
+box. Reproduce with `checks/equal_precision/qualify-schedule-799.sbatch` and
+reduce with `analyze_qualify_schedule.py`.

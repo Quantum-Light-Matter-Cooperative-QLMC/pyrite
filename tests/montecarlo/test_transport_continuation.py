@@ -8,11 +8,16 @@ row is visible. The device kernel itself is exercised by
 ``test_transport_continuation_cuda.py``.
 """
 
+import os
+import subprocess
+import sys
+import textwrap
 from dataclasses import replace
 
 import numpy as np
 import pytest
 
+from pyrite.montecarlo.groove import GrooveSpec
 from pyrite.montecarlo.transport import simulate_trajectories
 from pyrite.montecarlo.transport.batching import (
     PerElectronTransportConfig,
@@ -382,9 +387,15 @@ def test_unknown_schedule_is_rejected(monkeypatch):
         schedule_from_env()
 
 
-@pytest.mark.parametrize(("raw", "expected"), [("", None), (" auto ", "auto")])
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [(None, "auto"), ("", "auto"), (" auto ", "auto"), ("full-history", "full-history")],
+)
 def test_schedule_env_default(monkeypatch, raw, expected):
-    monkeypatch.setenv("PYRITE_MC_TRANSPORT_SCHEDULE", raw)
+    if raw is None:
+        monkeypatch.delenv("PYRITE_MC_TRANSPORT_SCHEDULE", raising=False)
+    else:
+        monkeypatch.setenv("PYRITE_MC_TRANSPORT_SCHEDULE", raw)
     assert schedule_from_env() == expected
 
 
@@ -403,3 +414,53 @@ def test_auto_on_a_host_core_is_the_full_history_run():
     for key, value in reference.items():
         if isinstance(value, np.ndarray):
             np.testing.assert_array_equal(auto[key], value, err_msg=key)
+
+
+@pytest.mark.slow
+def test_auto_groove_logs_fallback_and_preserves_output(caplog):
+    kw = dict(
+        E0_keV=60.0,
+        Ne=4,
+        thickness_ang=1_000.0,
+        element="C",
+        n_atoms_per_ang3=0.1,
+        seed=1,
+        transport_core="auto",
+        groove=GrooveSpec(spacing_ang=1.0e4, depth_ang=1.0e3, tilt_polar_rad=0.2),
+    )
+    reference = simulate_trajectories(**kw)
+    caplog.set_level("INFO", logger="pyrite.montecarlo.transport.continuation")
+    auto = simulate_trajectories(**kw, per_electron_config=AUTO)
+    assert "full-history because the transport core is not 'cuda'" in caplog.text
+    for key, value in reference.items():
+        if isinstance(value, np.ndarray):
+            np.testing.assert_array_equal(auto[key], value, err_msg=key)
+
+
+@pytest.mark.slow
+def test_schedule_environment_does_not_change_case_identity():
+    script = textwrap.dedent("""
+        from pyrite.campaign.config import material_sweep
+        from pyrite.campaign.profiles import case_content_key
+        from pyrite.campaign.sweep import build_cases
+        from pyrite.montecarlo.transport.batching import DEFAULT_PER_ELECTRON_TRANSPORT_CONFIG
+        case = build_cases(material_sweep("silicon"), 4, 4)[0]
+        print(DEFAULT_PER_ELECTRON_TRANSPORT_CONFIG.schedule, case_content_key(case))
+    """)
+    keys = []
+    for schedule in (None, "full-history", "continuation", "auto"):
+        env = os.environ.copy()
+        env.pop("PYRITE_MC_TRANSPORT_SCHEDULE", None)
+        if schedule is not None:
+            env["PYRITE_MC_TRANSPORT_SCHEDULE"] = schedule
+        result = subprocess.run(
+            [sys.executable, "-c", script],
+            env=env,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        selected, key = result.stdout.strip().split()
+        assert selected == (schedule or "auto")
+        keys.append(key)
+    assert len(set(keys)) == 1

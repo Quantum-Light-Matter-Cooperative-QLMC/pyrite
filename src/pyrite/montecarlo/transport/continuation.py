@@ -136,10 +136,10 @@ def check_schedule(schedule):
 
 
 def schedule_from_env():
-    """Process default schedule from ``PYRITE_MC_TRANSPORT_SCHEDULE``, or None."""
+    """Process default schedule: ``auto`` unless explicitly overridden."""
     raw = env_value("PYRITE_MC_TRANSPORT_SCHEDULE", "").strip()
     if not raw:
-        return None
+        return "auto"
     if raw not in TRANSPORT_SCHEDULES:
         raise ValueError(f"PYRITE_MC_TRANSPORT_SCHEDULE must be one of {TRANSPORT_SCHEDULES}")
     return raw
