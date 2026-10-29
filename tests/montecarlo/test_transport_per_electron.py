@@ -373,7 +373,13 @@ def test_cuda_core_is_deterministic():
 def test_cuda_results_do_not_depend_on_launch_geometry(nthreads, use_lut, monkeypatch):
     from pyrite.montecarlo.transport import _jit_launch as tjl
 
-    kwargs = dict(transport_core="cuda", transport_lut_config=TransportLUTConfig(enabled=use_lut))
+    # ELSEPA and coupled radiation deliberately bypass the LUT even when enabled.
+    kwargs = dict(
+        transport_core="cuda",
+        elastic_model="mott",
+        radiative_model="uncoupled",
+        transport_lut_config=TransportLUTConfig(enabled=use_lut),
+    )
     base = _run(**kwargs)
     factory_name = "make_cuda_transport_lut_core" if use_lut else "make_cuda_transport_core"
     launch_name = "run_transport_lut_kernel" if use_lut else "run_transport_kernel"
