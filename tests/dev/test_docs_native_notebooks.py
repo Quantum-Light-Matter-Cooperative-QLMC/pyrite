@@ -8,7 +8,8 @@ import nbformat
 import pytest
 
 
-def test_capture_builder_never_executes(tmp_path, monkeypatch):
+@pytest.mark.parametrize("legacy", [False, True])
+def test_capture_builder_never_executes(tmp_path, monkeypatch, legacy):
     spec = importlib.util.spec_from_file_location(
         "_notebooks", Path(__file__).parents[2] / "docs/_notebooks.py"
     )
@@ -38,7 +39,7 @@ def test_capture_builder_never_executes(tmp_path, monkeypatch):
         ],
         metadata={
             "pyrite_docs": {
-                "schema": module.SCHEMA,
+                "schema": module.LEGACY_SCHEMA if legacy else module.SCHEMA,
                 "source_sha256": module.digest(source),
                 "source_fingerprint": module.FINGERPRINT,
                 "source_fingerprint_sha256": module.fingerprint(source),
@@ -49,7 +50,11 @@ def test_capture_builder_never_executes(tmp_path, monkeypatch):
     nbformat.write(captured, sources / "fundamentals/first.ipynb")
     monkeypatch.setattr(module.subprocess, "run", lambda *a, **kw: pytest.fail("build ran marimo"))
     app = SimpleNamespace(builder=SimpleNamespace(format="html"))
-    module.check_notebooks(app)
+    if legacy:
+        with pytest.raises(ValueError, match="--migrate-hashes"):
+            module.check_notebooks(app)
+    else:
+        module.check_notebooks(app)
 
 
 def test_export_migrates_wrapper_and_retains_hidden_input(tmp_path, monkeypatch):

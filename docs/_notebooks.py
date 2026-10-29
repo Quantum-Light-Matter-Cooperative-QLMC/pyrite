@@ -288,6 +288,11 @@ def check_notebooks(app=None):
             )
         notebook = json.loads(page.read_text())
         metadata = notebook.get("metadata", {}).get("pyrite_docs", {})
+        if metadata.get("schema") == LEGACY_SCHEMA:
+            raise ValueError(
+                f"{source.stem}: legacy capture fingerprint; run "
+                "uv run --group docs python docs/_notebooks.py --migrate-hashes"
+            )
         if (
             metadata.get("schema") != SCHEMA
             or metadata.get("source_fingerprint") != FINGERPRINT
