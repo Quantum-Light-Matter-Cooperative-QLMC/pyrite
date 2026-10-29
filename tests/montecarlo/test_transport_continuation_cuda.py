@@ -128,6 +128,9 @@ def _assert_identical(reference, candidate):
             ), key
         elif isinstance(expected, dict):
             _assert_identical(expected, actual)
+        elif isinstance(expected, (list, tuple)):
+            assert len(actual) == len(expected), key
+            _assert_identical(dict(enumerate(expected)), dict(enumerate(actual)))
         else:
             assert actual == expected, key
 
@@ -260,12 +263,13 @@ def test_shell_rows_match_full_history(mode, rows_per_round, active, staging):
 def test_shell_refill_order_and_small_population(monkeypatch):
     mode = {"secondaries": True, "straggling": True}
     reference = _shell(REFERENCE, **mode)
-    order = np.random.default_rng(5).permutation(200).astype(np.int32)
-    monkeypatch.setattr(
-        batching,
-        "_drive_continuation_rounds",
-        partial(_drive_continuation_rounds, history_order=order),
-    )
+
+    def permuted(*args, **kwargs):
+        # Every transport pass, the secondary cascade's included, gets its own order.
+        order = np.random.default_rng(5).permutation(args[3]).astype(np.int32)
+        return _drive_continuation_rounds(*args, **kwargs, history_order=order)
+
+    monkeypatch.setattr(batching, "_drive_continuation_rounds", permuted)
     _assert_identical(reference, _shell(_continued(3, 5), **mode))
 
 
