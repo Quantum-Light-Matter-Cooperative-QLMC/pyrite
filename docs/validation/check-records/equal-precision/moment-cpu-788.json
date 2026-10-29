@@ -1,0 +1,2953 @@
+{
+  "schema": "radiative-moment-transport-pilot-788-record-v1",
+  "job_id": 2666,
+  "backend": "cpu",
+  "core": "per-electron",
+  "source_revision": "c9a345e7ccc13548eb2f22423152cff0e4fbb0d1",
+  "source_dirty": true,
+  "code_digest": "42a7ab7bcb43f44ec6a3f52e7c6f1cb1f0f00676ad5973edf01a7c3ab48546b2",
+  "tables_digest": "bafd74d27ac4dee76ed2b16d2c605f2d1bd8a09caf388ee74e37ec15e3edaae1",
+  "source_note": "Synced dirty checkout; measured wrapper, helper, CPU core, exact sampler and policy byte hashes match branch 7ea08549. This does not prove whole-checkout equivalence.",
+  "sbatch": "checks/equal_precision/moment-cpu-788.sbatch",
+  "environment": {
+    "cpu": "AMD Ryzen 9 9950X3D",
+    "python": "3.14.6",
+    "platform": "Linux WSL2 x86_64",
+    "requested_cpus": 1,
+    "requested_memory_gib": 24,
+    "threads": 1
+  },
+  "previous_attempt": {
+    "job_id": 2665,
+    "result": "Stopped before measurement: python not on PATH"
+  },
+  "analysis": {
+    "schema": "radiative-moment-transport-pilot-788-v1",
+    "comparisons": [
+      {
+        "scene": "si-300-100um-0deg",
+        "variant": "table",
+        "paired_seeds": 3,
+        "complete_seed_set": true,
+        "histories": 6144,
+        "checks": {
+          "hard_count": {
+            "mean_difference": 0.0,
+            "confidence_interval": [
+              0.0,
+              0.0
+            ],
+            "margin": 0.00016438802083333333,
+            "nonzero_differences": 0,
+            "status": "unresolved",
+            "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+          },
+          "photon_energy_keV_per_primary": {
+            "mean_difference": -2.81648103891569e-10,
+            "confidence_interval": [
+              -6.133221526713106e-10,
+              5.0025944888172535e-11
+            ],
+            "margin": 0.0036795667819294682,
+            "nonzero_differences": 100,
+            "status": "screening_pass",
+            "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+          },
+          "path_length": {
+            "mean_difference": 1.0595915963899452e-05,
+            "confidence_interval": [
+              -3.956141274544046e-06,
+              2.514797320234295e-05
+            ],
+            "margin": 3315.3110750066676,
+            "nonzero_differences": 6137,
+            "status": "screening_pass",
+            "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+          },
+          "transmitted_energy_keV_per_primary": {
+            "mean_difference": 4.21303936760468e-10,
+            "confidence_interval": [
+              -1.815958350486959e-10,
+              1.0242037085696319e-09
+            ],
+            "margin": 0.394161881795837,
+            "nonzero_differences": 5175,
+            "status": "screening_pass",
+            "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+          },
+          "transmitted": {
+            "mean_difference": 0.0,
+            "confidence_interval": [
+              0.0,
+              0.0
+            ],
+            "margin": 0.002,
+            "nonzero_differences": 0,
+            "status": "unresolved",
+            "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+          },
+          "backscattered": {
+            "mean_difference": 0.0,
+            "confidence_interval": [
+              0.0,
+              0.0
+            ],
+            "margin": 0.002,
+            "nonzero_differences": 0,
+            "status": "unresolved",
+            "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+          }
+        },
+        "complete_warm_request_s": [
+          2.9900578460656106,
+          3.0314807649701834,
+          2.971388002857566
+        ],
+        "exact_complete_warm_request_s": [
+          33.20785786304623,
+          33.50135996402241,
+          33.07675005798228
+        ],
+        "timing_limit": "three-seed pilot only; include all reductions; no production or equal-precision speedup"
+      },
+      {
+        "scene": "si-300-100um-0deg",
+        "variant": "refined",
+        "paired_seeds": 3,
+        "complete_seed_set": true,
+        "histories": 6144,
+        "checks": {
+          "hard_count": {
+            "mean_difference": 0.0,
+            "confidence_interval": [
+              0.0,
+              0.0
+            ],
+            "margin": 0.00016438802083333333,
+            "nonzero_differences": 0,
+            "status": "unresolved",
+            "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+          },
+          "photon_energy_keV_per_primary": {
+            "mean_difference": -2.816491156690364e-10,
+            "confidence_interval": [
+              -6.13323191409541e-10,
+              5.002496007146827e-11
+            ],
+            "margin": 0.0036795667819294682,
+            "nonzero_differences": 100,
+            "status": "screening_pass",
+            "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+          },
+          "path_length": {
+            "mean_difference": 1.049448164932206e-05,
+            "confidence_interval": [
+              -4.057114612905648e-06,
+              2.5046077911549767e-05
+            ],
+            "margin": 3315.3110750066676,
+            "nonzero_differences": 6137,
+            "status": "screening_pass",
+            "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+          },
+          "transmitted_energy_keV_per_primary": {
+            "mean_difference": 4.202198583315904e-10,
+            "confidence_interval": [
+              -1.8267479350007935e-10,
+              1.0231145101632603e-09
+            ],
+            "margin": 0.394161881795837,
+            "nonzero_differences": 5175,
+            "status": "screening_pass",
+            "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+          },
+          "transmitted": {
+            "mean_difference": 0.0,
+            "confidence_interval": [
+              0.0,
+              0.0
+            ],
+            "margin": 0.002,
+            "nonzero_differences": 0,
+            "status": "unresolved",
+            "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+          },
+          "backscattered": {
+            "mean_difference": 0.0,
+            "confidence_interval": [
+              0.0,
+              0.0
+            ],
+            "margin": 0.002,
+            "nonzero_differences": 0,
+            "status": "unresolved",
+            "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+          }
+        },
+        "complete_warm_request_s": [
+          2.9967847508378327,
+          2.8400058161932975,
+          2.9866294669918716
+        ],
+        "exact_complete_warm_request_s": [
+          33.20785786304623,
+          33.50135996402241,
+          33.07675005798228
+        ],
+        "timing_limit": "three-seed pilot only; include all reductions; no production or equal-precision speedup"
+      },
+      {
+        "scene": "w-300-10um-0deg",
+        "variant": "table",
+        "paired_seeds": 3,
+        "complete_seed_set": true,
+        "histories": 6144,
+        "checks": {
+          "hard_count": {
+            "mean_difference": 0.0,
+            "confidence_interval": [
+              0.0,
+              0.0
+            ],
+            "margin": 0.0007861328125,
+            "nonzero_differences": 0,
+            "status": "unresolved",
+            "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+          },
+          "photon_energy_keV_per_primary": {
+            "mean_difference": -5.456350070838963e-10,
+            "confidence_interval": [
+              -7.779756595811069e-10,
+              -3.132943545866858e-10
+            ],
+            "margin": 0.02502116283346816,
+            "nonzero_differences": 457,
+            "status": "screening_pass",
+            "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+          },
+          "path_length": {
+            "mean_difference": 8.592394726207134e-06,
+            "confidence_interval": [
+              4.415479183943298e-06,
+              1.276931026847097e-05
+            ],
+            "margin": 462.43493146448236,
+            "nonzero_differences": 6143,
+            "status": "screening_pass",
+            "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+          },
+          "transmitted_energy_keV_per_primary": {
+            "mean_difference": 8.091914164195154e-10,
+            "confidence_interval": [
+              5.0614560494183485e-11,
+              1.5677682723448473e-09
+            ],
+            "margin": 0.26424200141160076,
+            "nonzero_differences": 3330,
+            "status": "screening_pass",
+            "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+          },
+          "transmitted": {
+            "mean_difference": 0.0,
+            "confidence_interval": [
+              0.0,
+              0.0
+            ],
+            "margin": 0.002,
+            "nonzero_differences": 0,
+            "status": "unresolved",
+            "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+          },
+          "backscattered": {
+            "mean_difference": 0.0,
+            "confidence_interval": [
+              0.0,
+              0.0
+            ],
+            "margin": 0.002,
+            "nonzero_differences": 0,
+            "status": "unresolved",
+            "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+          }
+        },
+        "complete_warm_request_s": [
+          5.751701874891296,
+          5.980739803053439,
+          5.507663758005947
+        ],
+        "exact_complete_warm_request_s": [
+          63.395551877096295,
+          61.7703187209554,
+          60.2408325530123
+        ],
+        "timing_limit": "three-seed pilot only; include all reductions; no production or equal-precision speedup"
+      },
+      {
+        "scene": "w-300-10um-0deg",
+        "variant": "refined",
+        "paired_seeds": 3,
+        "complete_seed_set": true,
+        "histories": 6144,
+        "checks": {
+          "hard_count": {
+            "mean_difference": 0.0,
+            "confidence_interval": [
+              0.0,
+              0.0
+            ],
+            "margin": 0.0007861328125,
+            "nonzero_differences": 0,
+            "status": "unresolved",
+            "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+          },
+          "photon_energy_keV_per_primary": {
+            "mean_difference": -5.456350070838963e-10,
+            "confidence_interval": [
+              -7.779756595811069e-10,
+              -3.132943545866858e-10
+            ],
+            "margin": 0.02502116283346816,
+            "nonzero_differences": 457,
+            "status": "screening_pass",
+            "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+          },
+          "path_length": {
+            "mean_difference": 8.596816454968051e-06,
+            "confidence_interval": [
+              4.419831946179907e-06,
+              1.2773800963756194e-05
+            ],
+            "margin": 462.43493146448236,
+            "nonzero_differences": 6143,
+            "status": "screening_pass",
+            "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+          },
+          "transmitted_energy_keV_per_primary": {
+            "mean_difference": 8.091914164195154e-10,
+            "confidence_interval": [
+              5.0614560494183485e-11,
+              1.5677682723448473e-09
+            ],
+            "margin": 0.26424200141160076,
+            "nonzero_differences": 3330,
+            "status": "screening_pass",
+            "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+          },
+          "transmitted": {
+            "mean_difference": 0.0,
+            "confidence_interval": [
+              0.0,
+              0.0
+            ],
+            "margin": 0.002,
+            "nonzero_differences": 0,
+            "status": "unresolved",
+            "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+          },
+          "backscattered": {
+            "mean_difference": 0.0,
+            "confidence_interval": [
+              0.0,
+              0.0
+            ],
+            "margin": 0.002,
+            "nonzero_differences": 0,
+            "status": "unresolved",
+            "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+          }
+        },
+        "complete_warm_request_s": [
+          5.822396480012685,
+          5.691397043177858,
+          5.455155300209299
+        ],
+        "exact_complete_warm_request_s": [
+          63.395551877096295,
+          61.7703187209554,
+          60.2408325530123
+        ],
+        "timing_limit": "three-seed pilot only; include all reductions; no production or equal-precision speedup"
+      }
+    ],
+    "protocol_sha256": "1b3d0748828ab001b385644208020b50d28eb1f484aa9f5a310458ba437d376f",
+    "scope": "paired pilot screening, not qualified ensemble equivalence or an equal-precision benchmark"
+  },
+  "preflight": [
+    {
+      "scene": {
+        "id": "si-300-100um-0deg",
+        "element": "Si",
+        "catalog_key": "silicon",
+        "density_g_cm3": 2.3291534103942357,
+        "atomic_weight": 28.085,
+        "energy_keV": 300,
+        "thickness_um": 100,
+        "angle_deg": 0,
+        "number_density_ang3": 0.049942993373787194
+      },
+      "seed": 78811,
+      "histories": 256,
+      "core": "per-electron",
+      "batch_histories": 256,
+      "scratch_mib": 4096,
+      "probe_electrons": 0,
+      "cutoff_eV": 1000,
+      "max_de_frac": 0.05,
+      "max_steps": 20000,
+      "tables": {
+        "elsepa": [
+          [
+            {
+              "key": "240a6150bdcf027eac2d9c13171f33776cc96556c258ab8277342d9b83dad860",
+              "manifest_sha256": "9efa28ecaf839767de6b369eb87ff89694049c16dbb1988fbfd2a2293bc343ae",
+              "arrays_sha256": "3879a0e97df26c1342dd1eed7cd9eb1954634ce1cc56b335a553b3e1cab29f0d"
+            },
+            {
+              "key": "47fa2c31dd413cb42b6569105e85862d1a141b35be26d54d8e5a679b8765d1be",
+              "manifest_sha256": "42a70d18f3f1a622cf7fdb98747199b9a8c1ee4eb29bfae32027a1d835cc166f",
+              "arrays_sha256": "02be6be167718b9adbc84814fdd383ecf47b2c9ad952caca5d61b7ad94cd07d6"
+            }
+          ]
+        ],
+        "sbethe": {
+          "key": "86c73cd7a10433ce547de2ae9458e3fd7c09da3c394e8e07e5f7f9415bfaff32",
+          "manifest_sha256": "cd6144893da65f70656bd7880c6083642862cd6068b34aaeb0d36bf73e7fe20f",
+          "arrays_sha256": "512a76527a5341c2276e4a187e4fcfb9a1b4381a24ae381aa597f36756fe38e5"
+        },
+        "bremslib": {
+          "key": "cff95de45a327e3ac277930ae56f236ea19e519ccfa199d2a903c297c4677fee",
+          "manifest_sha256": "848f5d188f965678f290e0738bb4762e1b50a11e325e38a2c53de7aa24e5c67a"
+        }
+      },
+      "timings_s": {
+        "imports_and_tables": 0.19000703794881701,
+        "warmup": 13.511008577886969,
+        "transport_and_emission": 4.532696307869628,
+        "request_with_reductions": 4.57694111391902,
+        "reductions": 0.044236926129087806,
+        "adapter_total": 18.27849403419532
+      },
+      "peak_rss_kib": 690656,
+      "raw_scores_sha256": "84058a55116b1b4747262142b596c02a4f996bf3320fd6a4b1bef2a95bba2c0a",
+      "moment_variant": "exact",
+      "moment_source": {
+        "reference_sha256": "794d3b99e19a526bbb1c0883bd1e333f5b03a8d2d0cea6bd277977745048042c",
+        "wrapper_sha256": "ae8be30ba30b2a95731d0a58509851c563b182a83a5c70ce8672a0b7cd7fc092",
+        "protocol_sha256": "1b3d0748828ab001b385644208020b50d28eb1f484aa9f5a310458ba437d376f",
+        "exact_sampler_sha256": "94cf1515e58a1c3436077c5d58ec895309e2a33c235caf7fa35352ffbd69360b"
+      },
+      "preparations": [],
+      "same_seed_replay": {
+        "passed": true,
+        "blocks": 1,
+        "hashes": [
+          "f4aea12c4f8a4ee8f34d9d346efb5842909a225e6f4e79433b4db6c8d2ede753"
+        ]
+      },
+      "case": "preflight-si-300-100um-0deg-exact",
+      "raw_record_sha256": "b189c4a33d071c16852d3393f60577c1e1e053158be168bd8fcecbb93f73bc22",
+      "max_accounting_errors": {
+        "energy_ledger_max_error_keV": 1.4779288903810084e-12,
+        "photon_debit_max_error_keV": 2.842170943040401e-14,
+        "direction_norm_max_error": 2.220446049250313e-16
+      },
+      "process_replay_checked": false
+    },
+    {
+      "scene": {
+        "id": "si-300-100um-0deg",
+        "element": "Si",
+        "catalog_key": "silicon",
+        "density_g_cm3": 2.3291534103942357,
+        "atomic_weight": 28.085,
+        "energy_keV": 300,
+        "thickness_um": 100,
+        "angle_deg": 0,
+        "number_density_ang3": 0.049942993373787194
+      },
+      "seed": 78811,
+      "histories": 256,
+      "core": "per-electron",
+      "batch_histories": 256,
+      "scratch_mib": 4096,
+      "probe_electrons": 0,
+      "cutoff_eV": 1000,
+      "max_de_frac": 0.05,
+      "max_steps": 20000,
+      "tables": {
+        "elsepa": [
+          [
+            {
+              "key": "240a6150bdcf027eac2d9c13171f33776cc96556c258ab8277342d9b83dad860",
+              "manifest_sha256": "9efa28ecaf839767de6b369eb87ff89694049c16dbb1988fbfd2a2293bc343ae",
+              "arrays_sha256": "3879a0e97df26c1342dd1eed7cd9eb1954634ce1cc56b335a553b3e1cab29f0d"
+            },
+            {
+              "key": "47fa2c31dd413cb42b6569105e85862d1a141b35be26d54d8e5a679b8765d1be",
+              "manifest_sha256": "42a70d18f3f1a622cf7fdb98747199b9a8c1ee4eb29bfae32027a1d835cc166f",
+              "arrays_sha256": "02be6be167718b9adbc84814fdd383ecf47b2c9ad952caca5d61b7ad94cd07d6"
+            }
+          ]
+        ],
+        "sbethe": {
+          "key": "86c73cd7a10433ce547de2ae9458e3fd7c09da3c394e8e07e5f7f9415bfaff32",
+          "manifest_sha256": "cd6144893da65f70656bd7880c6083642862cd6068b34aaeb0d36bf73e7fe20f",
+          "arrays_sha256": "512a76527a5341c2276e4a187e4fcfb9a1b4381a24ae381aa597f36756fe38e5"
+        },
+        "bremslib": {
+          "key": "cff95de45a327e3ac277930ae56f236ea19e519ccfa199d2a903c297c4677fee",
+          "manifest_sha256": "848f5d188f965678f290e0738bb4762e1b50a11e325e38a2c53de7aa24e5c67a"
+        }
+      },
+      "timings_s": {
+        "imports_and_tables": 0.16824166383594275,
+        "warmup": 1.6865107470657676,
+        "transport_and_emission": 0.3690331338439137,
+        "request_with_reductions": 0.4121941558551043,
+        "reductions": 0.043153782142326236,
+        "adapter_total": 2.267487741075456
+      },
+      "peak_rss_kib": 565520,
+      "raw_scores_sha256": "03637afa48696e1ad868051d56752c36bda0ecece9986b9b4f70706fafb62b8d",
+      "moment_variant": "refined",
+      "moment_source": {
+        "reference_sha256": "794d3b99e19a526bbb1c0883bd1e333f5b03a8d2d0cea6bd277977745048042c",
+        "candidate_sha256": "f30490f4c180a435b1dc9c1e04067e3b1cf6199dba7a28f9fd8316a1967fa8d6",
+        "helper_sha256": "731b3bdae1c06ddfff2a27f0660eb19c732d22fa878bba34101826a249e29b99",
+        "frequent_calls_replaced": 3,
+        "exact_event_total_calls_retained": 1,
+        "wrapper_sha256": "ae8be30ba30b2a95731d0a58509851c563b182a83a5c70ce8672a0b7cd7fc092",
+        "protocol_sha256": "1b3d0748828ab001b385644208020b50d28eb1f484aa9f5a310458ba437d376f",
+        "exact_sampler_sha256": "94cf1515e58a1c3436077c5d58ec895309e2a33c235caf7fa35352ffbd69360b"
+      },
+      "preparations": [
+        {
+          "digest": "fbe21d0aedc4fb81972bff1bd62045c03b3e27988809f87d28b15364b9da983b",
+          "identity": {
+            "atol": [
+              1e-10,
+              1e-14,
+              1e-10
+            ],
+            "composition": [
+              [
+                [
+                  "Si",
+                  0.049942993373787194
+                ]
+              ]
+            ],
+            "coverage_eV": [
+              10000.0,
+              300000.0
+            ],
+            "cutoff_eV": 1000.0,
+            "held_out_count": 8191,
+            "max_nodes": 32768,
+            "plasma_eV": [
+              31.049785193007793
+            ],
+            "policy": "positive-linear-log-energy-v1",
+            "projectile": "electron",
+            "reference": "bremslib-v2.0-sdcs-ddcs/lin-x18-geo4-ln-t-lin-theta-v2/tm-coupled-v2/ee-sb85-v1",
+            "rtol": 0.0001,
+            "sources": [
+              [
+                "Si",
+                "cff95de45a327e3ac277930ae56f236ea19e519ccfa199d2a903c297c4677fee",
+                "848f5d188f965678f290e0738bb4762e1b50a11e325e38a2c53de7aa24e5c67a"
+              ]
+            ]
+          },
+          "held_out_max_error_fraction": [
+            0.2438659817428869
+          ],
+          "build_s": 0.053627719869837165,
+          "upload_s": 0.0,
+          "host_bytes": 15144,
+          "layers": 1
+        }
+      ],
+      "same_seed_replay": {
+        "passed": true,
+        "blocks": 1,
+        "hashes": [
+          "baf48f779c49b314ba73cbcb563868f0b9d20c6afa77812576662d6c2f48f73c"
+        ]
+      },
+      "case": "preflight-si-300-100um-0deg-refined",
+      "raw_record_sha256": "5f7155b0107239392deb737e0684d9cc553d903dcd51890eacdc38b8a77d028a",
+      "max_accounting_errors": {
+        "energy_ledger_max_error_keV": 1.2505552149377763e-12,
+        "photon_debit_max_error_keV": 1.687538997430238e-14,
+        "direction_norm_max_error": 2.220446049250313e-16
+      },
+      "process_replay_checked": false
+    },
+    {
+      "scene": {
+        "id": "si-300-100um-0deg",
+        "element": "Si",
+        "catalog_key": "silicon",
+        "density_g_cm3": 2.3291534103942357,
+        "atomic_weight": 28.085,
+        "energy_keV": 300,
+        "thickness_um": 100,
+        "angle_deg": 0,
+        "number_density_ang3": 0.049942993373787194
+      },
+      "seed": 78811,
+      "histories": 256,
+      "core": "per-electron",
+      "batch_histories": 256,
+      "scratch_mib": 4096,
+      "probe_electrons": 0,
+      "cutoff_eV": 1000,
+      "max_de_frac": 0.05,
+      "max_steps": 20000,
+      "tables": {
+        "elsepa": [
+          [
+            {
+              "key": "240a6150bdcf027eac2d9c13171f33776cc96556c258ab8277342d9b83dad860",
+              "manifest_sha256": "9efa28ecaf839767de6b369eb87ff89694049c16dbb1988fbfd2a2293bc343ae",
+              "arrays_sha256": "3879a0e97df26c1342dd1eed7cd9eb1954634ce1cc56b335a553b3e1cab29f0d"
+            },
+            {
+              "key": "47fa2c31dd413cb42b6569105e85862d1a141b35be26d54d8e5a679b8765d1be",
+              "manifest_sha256": "42a70d18f3f1a622cf7fdb98747199b9a8c1ee4eb29bfae32027a1d835cc166f",
+              "arrays_sha256": "02be6be167718b9adbc84814fdd383ecf47b2c9ad952caca5d61b7ad94cd07d6"
+            }
+          ]
+        ],
+        "sbethe": {
+          "key": "86c73cd7a10433ce547de2ae9458e3fd7c09da3c394e8e07e5f7f9415bfaff32",
+          "manifest_sha256": "cd6144893da65f70656bd7880c6083642862cd6068b34aaeb0d36bf73e7fe20f",
+          "arrays_sha256": "512a76527a5341c2276e4a187e4fcfb9a1b4381a24ae381aa597f36756fe38e5"
+        },
+        "bremslib": {
+          "key": "cff95de45a327e3ac277930ae56f236ea19e519ccfa199d2a903c297c4677fee",
+          "manifest_sha256": "848f5d188f965678f290e0738bb4762e1b50a11e325e38a2c53de7aa24e5c67a"
+        }
+      },
+      "timings_s": {
+        "imports_and_tables": 0.13087929086759686,
+        "warmup": 6.284250683849677,
+        "transport_and_emission": 0.3481980769429356,
+        "request_with_reductions": 0.3908352400176227,
+        "reductions": 0.042629112023860216,
+        "adapter_total": 6.806522749830037
+      },
+      "peak_rss_kib": 633864,
+      "raw_scores_sha256": "71106bdcc07edfe38d1b6feefe61f8b02247f421a8c99767df0e35e176c507a5",
+      "moment_variant": "table",
+      "moment_source": {
+        "reference_sha256": "794d3b99e19a526bbb1c0883bd1e333f5b03a8d2d0cea6bd277977745048042c",
+        "candidate_sha256": "f30490f4c180a435b1dc9c1e04067e3b1cf6199dba7a28f9fd8316a1967fa8d6",
+        "helper_sha256": "731b3bdae1c06ddfff2a27f0660eb19c732d22fa878bba34101826a249e29b99",
+        "frequent_calls_replaced": 3,
+        "exact_event_total_calls_retained": 1,
+        "wrapper_sha256": "ae8be30ba30b2a95731d0a58509851c563b182a83a5c70ce8672a0b7cd7fc092",
+        "protocol_sha256": "1b3d0748828ab001b385644208020b50d28eb1f484aa9f5a310458ba437d376f",
+        "exact_sampler_sha256": "94cf1515e58a1c3436077c5d58ec895309e2a33c235caf7fa35352ffbd69360b"
+      },
+      "preparations": [
+        {
+          "digest": "ce5ad876a20936e77a4e9d5702ce32b99140f0d374aacd23d195e45bc2ca8ba2",
+          "identity": {
+            "atol": [
+              1e-10,
+              1e-14,
+              1e-10
+            ],
+            "composition": [
+              [
+                [
+                  "Si",
+                  0.049942993373787194
+                ]
+              ]
+            ],
+            "coverage_eV": [
+              10000.0,
+              300000.0
+            ],
+            "cutoff_eV": 1000.0,
+            "held_out_count": 8191,
+            "max_nodes": 32768,
+            "plasma_eV": [
+              31.049785193007793
+            ],
+            "policy": "positive-linear-log-energy-v1",
+            "projectile": "electron",
+            "reference": "bremslib-v2.0-sdcs-ddcs/lin-x18-geo4-ln-t-lin-theta-v2/tm-coupled-v2/ee-sb85-v1",
+            "rtol": 0.0002,
+            "sources": [
+              [
+                "Si",
+                "cff95de45a327e3ac277930ae56f236ea19e519ccfa199d2a903c297c4677fee",
+                "848f5d188f965678f290e0738bb4762e1b50a11e325e38a2c53de7aa24e5c67a"
+              ]
+            ]
+          },
+          "held_out_max_error_fraction": [
+            0.20598760999820137
+          ],
+          "build_s": 0.8188381281215698,
+          "upload_s": 0.0,
+          "host_bytes": 9864,
+          "layers": 1
+        }
+      ],
+      "same_seed_replay": {
+        "passed": true,
+        "blocks": 1,
+        "hashes": [
+          "3f33e306957a29d5d4959d854577a78fba091a1c8ea52da0b9b714f96c1be794"
+        ]
+      },
+      "case": "preflight-si-300-100um-0deg-table",
+      "raw_record_sha256": "7459ce51f1f5e8099f714c1e154dc55c7d198422524422ecf304497d6d4fc983",
+      "max_accounting_errors": {
+        "energy_ledger_max_error_keV": 1.1937117960769683e-12,
+        "photon_debit_max_error_keV": 1.687538997430238e-14,
+        "direction_norm_max_error": 2.220446049250313e-16
+      },
+      "process_replay_checked": false
+    },
+    {
+      "scene": {
+        "id": "w-300-10um-0deg",
+        "element": "W",
+        "catalog_key": "W",
+        "density_g_cm3": 19.3,
+        "atomic_weight": 183.84,
+        "energy_keV": 300,
+        "thickness_um": 10,
+        "angle_deg": 0,
+        "number_density_ang3": 0.06322199557658834
+      },
+      "seed": 78811,
+      "histories": 256,
+      "core": "per-electron",
+      "batch_histories": 256,
+      "scratch_mib": 4096,
+      "probe_electrons": 0,
+      "cutoff_eV": 1000,
+      "max_de_frac": 0.05,
+      "max_steps": 20000,
+      "tables": {
+        "elsepa": [
+          [
+            {
+              "key": "016589c75e4b80a0737fedab58d71817c45159b6f5b18c9216ab335b9a38dd63",
+              "manifest_sha256": "eb6d7b04ae7ae3d427b59212204e7732f176a405b1b779ae4cc0707938354168",
+              "arrays_sha256": "4bd33f5f3baaff74667327313d0a958f1ae350ca918cc19f71f575c0c54e1b55"
+            }
+          ]
+        ],
+        "sbethe": {
+          "key": "6a7b4dbfeffcbb8243196a6c1633d5a3373c763e1ab8187d14f8fdc78b040abe",
+          "manifest_sha256": "aad81627544f969bf61ce96c2dca5a919f772a438f4493b3d6973394b23aefd6",
+          "arrays_sha256": "9cdd5f93621b2e924985254cb8c8a117256b0ac7ead51b05aa11a0515d62a74f"
+        },
+        "bremslib": {
+          "key": "dfccd9efa5bdcd0968b2cbbabd708106d123f6df654bc03d19b3e96cec0beec0",
+          "manifest_sha256": "ec1cfd4c6f5e97dec8aca7a3153a3f212cfcce90d7ec296b12a7d876e4c1886d"
+        }
+      },
+      "timings_s": {
+        "imports_and_tables": 0.1256534531712532,
+        "warmup": 7.753704425878823,
+        "transport_and_emission": 7.862610307987779,
+        "request_with_reductions": 7.938613788923249,
+        "reductions": 0.0759944710880518,
+        "adapter_total": 15.818578792968765
+      },
+      "peak_rss_kib": 814580,
+      "raw_scores_sha256": "a76b57bea842a06ea40700f80644b0c2c426fa2ff756c530b9e24de5680b5159",
+      "moment_variant": "exact",
+      "moment_source": {
+        "reference_sha256": "794d3b99e19a526bbb1c0883bd1e333f5b03a8d2d0cea6bd277977745048042c",
+        "wrapper_sha256": "ae8be30ba30b2a95731d0a58509851c563b182a83a5c70ce8672a0b7cd7fc092",
+        "protocol_sha256": "1b3d0748828ab001b385644208020b50d28eb1f484aa9f5a310458ba437d376f",
+        "exact_sampler_sha256": "94cf1515e58a1c3436077c5d58ec895309e2a33c235caf7fa35352ffbd69360b"
+      },
+      "preparations": [],
+      "same_seed_replay": {
+        "passed": true,
+        "blocks": 1,
+        "hashes": [
+          "358d79fff8340ad9d8aa35400b332b9e862c093eebc026f074821dcab6dea4c5"
+        ]
+      },
+      "case": "preflight-w-300-10um-0deg-exact",
+      "raw_record_sha256": "b1b2e2ac2825b32dea67b07f9196437b72fc0ad10390c7a3211c83e452daa582",
+      "max_accounting_errors": {
+        "energy_ledger_max_error_keV": 1.7621459846850485e-12,
+        "photon_debit_max_error_keV": 2.842170943040401e-14,
+        "direction_norm_max_error": 2.220446049250313e-16
+      },
+      "process_replay_checked": false
+    },
+    {
+      "scene": {
+        "id": "w-300-10um-0deg",
+        "element": "W",
+        "catalog_key": "W",
+        "density_g_cm3": 19.3,
+        "atomic_weight": 183.84,
+        "energy_keV": 300,
+        "thickness_um": 10,
+        "angle_deg": 0,
+        "number_density_ang3": 0.06322199557658834
+      },
+      "seed": 78811,
+      "histories": 256,
+      "core": "per-electron",
+      "batch_histories": 256,
+      "scratch_mib": 4096,
+      "probe_electrons": 0,
+      "cutoff_eV": 1000,
+      "max_de_frac": 0.05,
+      "max_steps": 20000,
+      "tables": {
+        "elsepa": [
+          [
+            {
+              "key": "016589c75e4b80a0737fedab58d71817c45159b6f5b18c9216ab335b9a38dd63",
+              "manifest_sha256": "eb6d7b04ae7ae3d427b59212204e7732f176a405b1b779ae4cc0707938354168",
+              "arrays_sha256": "4bd33f5f3baaff74667327313d0a958f1ae350ca918cc19f71f575c0c54e1b55"
+            }
+          ]
+        ],
+        "sbethe": {
+          "key": "6a7b4dbfeffcbb8243196a6c1633d5a3373c763e1ab8187d14f8fdc78b040abe",
+          "manifest_sha256": "aad81627544f969bf61ce96c2dca5a919f772a438f4493b3d6973394b23aefd6",
+          "arrays_sha256": "9cdd5f93621b2e924985254cb8c8a117256b0ac7ead51b05aa11a0515d62a74f"
+        },
+        "bremslib": {
+          "key": "dfccd9efa5bdcd0968b2cbbabd708106d123f6df654bc03d19b3e96cec0beec0",
+          "manifest_sha256": "ec1cfd4c6f5e97dec8aca7a3153a3f212cfcce90d7ec296b12a7d876e4c1886d"
+        }
+      },
+      "timings_s": {
+        "imports_and_tables": 0.12715886905789375,
+        "warmup": 1.9284695067908615,
+        "transport_and_emission": 0.6273272410035133,
+        "request_with_reductions": 0.7050576549954712,
+        "reductions": 0.07772275409661233,
+        "adapter_total": 2.761250385083258
+      },
+      "peak_rss_kib": 846696,
+      "raw_scores_sha256": "a6ee7c15713403b736341b47a40202f3ec2ff21db43c040e1c8ef28cc98c7f78",
+      "moment_variant": "refined",
+      "moment_source": {
+        "reference_sha256": "794d3b99e19a526bbb1c0883bd1e333f5b03a8d2d0cea6bd277977745048042c",
+        "candidate_sha256": "f30490f4c180a435b1dc9c1e04067e3b1cf6199dba7a28f9fd8316a1967fa8d6",
+        "helper_sha256": "731b3bdae1c06ddfff2a27f0660eb19c732d22fa878bba34101826a249e29b99",
+        "frequent_calls_replaced": 3,
+        "exact_event_total_calls_retained": 1,
+        "wrapper_sha256": "ae8be30ba30b2a95731d0a58509851c563b182a83a5c70ce8672a0b7cd7fc092",
+        "protocol_sha256": "1b3d0748828ab001b385644208020b50d28eb1f484aa9f5a310458ba437d376f",
+        "exact_sampler_sha256": "94cf1515e58a1c3436077c5d58ec895309e2a33c235caf7fa35352ffbd69360b"
+      },
+      "preparations": [
+        {
+          "digest": "ece2fc0debc6b0019b48afb718f1bd56be6b021b1f6a735088cae0f14f013bb1",
+          "identity": {
+            "atol": [
+              1e-10,
+              1e-14,
+              1e-10
+            ],
+            "composition": [
+              [
+                [
+                  "W",
+                  0.06322199557658834
+                ]
+              ]
+            ],
+            "coverage_eV": [
+              10000.0,
+              300000.0
+            ],
+            "cutoff_eV": 1000.0,
+            "held_out_count": 8191,
+            "max_nodes": 32768,
+            "plasma_eV": [
+              80.31695920801324
+            ],
+            "policy": "positive-linear-log-energy-v1",
+            "projectile": "electron",
+            "reference": "bremslib-v2.0-sdcs-ddcs/lin-x18-geo4-ln-t-lin-theta-v2/tm-coupled-v2/ee-sb85-v1",
+            "rtol": 0.0001,
+            "sources": [
+              [
+                "W",
+                "dfccd9efa5bdcd0968b2cbbabd708106d123f6df654bc03d19b3e96cec0beec0",
+                "ec1cfd4c6f5e97dec8aca7a3153a3f212cfcce90d7ec296b12a7d876e4c1886d"
+              ]
+            ]
+          },
+          "held_out_max_error_fraction": [
+            0.19541371328768495
+          ],
+          "build_s": 0.049259083112701774,
+          "upload_s": 0.0,
+          "host_bytes": 9864,
+          "layers": 1
+        }
+      ],
+      "same_seed_replay": {
+        "passed": true,
+        "blocks": 1,
+        "hashes": [
+          "2ffccd9d414fb784a17040e66afe284939e66cc399fe4fe0fdff776646d580dc"
+        ]
+      },
+      "case": "preflight-w-300-10um-0deg-refined",
+      "raw_record_sha256": "63ce09b5a21ae9cb382141772518dfa9cbf49de452ef6f1714bfb26790846832",
+      "max_accounting_errors": {
+        "energy_ledger_max_error_keV": 9.094947017729282e-13,
+        "photon_debit_max_error_keV": 2.7977620220553945e-14,
+        "direction_norm_max_error": 2.220446049250313e-16
+      },
+      "process_replay_checked": false
+    },
+    {
+      "scene": {
+        "id": "w-300-10um-0deg",
+        "element": "W",
+        "catalog_key": "W",
+        "density_g_cm3": 19.3,
+        "atomic_weight": 183.84,
+        "energy_keV": 300,
+        "thickness_um": 10,
+        "angle_deg": 0,
+        "number_density_ang3": 0.06322199557658834
+      },
+      "seed": 78811,
+      "histories": 256,
+      "core": "per-electron",
+      "batch_histories": 256,
+      "scratch_mib": 4096,
+      "probe_electrons": 0,
+      "cutoff_eV": 1000,
+      "max_de_frac": 0.05,
+      "max_steps": 20000,
+      "tables": {
+        "elsepa": [
+          [
+            {
+              "key": "016589c75e4b80a0737fedab58d71817c45159b6f5b18c9216ab335b9a38dd63",
+              "manifest_sha256": "eb6d7b04ae7ae3d427b59212204e7732f176a405b1b779ae4cc0707938354168",
+              "arrays_sha256": "4bd33f5f3baaff74667327313d0a958f1ae350ca918cc19f71f575c0c54e1b55"
+            }
+          ]
+        ],
+        "sbethe": {
+          "key": "6a7b4dbfeffcbb8243196a6c1633d5a3373c763e1ab8187d14f8fdc78b040abe",
+          "manifest_sha256": "aad81627544f969bf61ce96c2dca5a919f772a438f4493b3d6973394b23aefd6",
+          "arrays_sha256": "9cdd5f93621b2e924985254cb8c8a117256b0ac7ead51b05aa11a0515d62a74f"
+        },
+        "bremslib": {
+          "key": "dfccd9efa5bdcd0968b2cbbabd708106d123f6df654bc03d19b3e96cec0beec0",
+          "manifest_sha256": "ec1cfd4c6f5e97dec8aca7a3153a3f212cfcce90d7ec296b12a7d876e4c1886d"
+        }
+      },
+      "timings_s": {
+        "imports_and_tables": 0.12727758917026222,
+        "warmup": 1.9300052290782332,
+        "transport_and_emission": 0.7052852360066026,
+        "request_with_reductions": 0.7825112810824066,
+        "reductions": 0.07721814489923418,
+        "adapter_total": 2.8403067039325833
+      },
+      "peak_rss_kib": 839072,
+      "raw_scores_sha256": "9a8dbedd51cf5c6f0ad0b42acf3318d5acf01a486146e74663eafc2eeb1ed294",
+      "moment_variant": "table",
+      "moment_source": {
+        "reference_sha256": "794d3b99e19a526bbb1c0883bd1e333f5b03a8d2d0cea6bd277977745048042c",
+        "candidate_sha256": "f30490f4c180a435b1dc9c1e04067e3b1cf6199dba7a28f9fd8316a1967fa8d6",
+        "helper_sha256": "731b3bdae1c06ddfff2a27f0660eb19c732d22fa878bba34101826a249e29b99",
+        "frequent_calls_replaced": 3,
+        "exact_event_total_calls_retained": 1,
+        "wrapper_sha256": "ae8be30ba30b2a95731d0a58509851c563b182a83a5c70ce8672a0b7cd7fc092",
+        "protocol_sha256": "1b3d0748828ab001b385644208020b50d28eb1f484aa9f5a310458ba437d376f",
+        "exact_sampler_sha256": "94cf1515e58a1c3436077c5d58ec895309e2a33c235caf7fa35352ffbd69360b"
+      },
+      "preparations": [
+        {
+          "digest": "383693fbebd9f23125e15d5db6909bce81d07139ed612108c475197740545b28",
+          "identity": {
+            "atol": [
+              1e-10,
+              1e-14,
+              1e-10
+            ],
+            "composition": [
+              [
+                [
+                  "W",
+                  0.06322199557658834
+                ]
+              ]
+            ],
+            "coverage_eV": [
+              10000.0,
+              300000.0
+            ],
+            "cutoff_eV": 1000.0,
+            "held_out_count": 8191,
+            "max_nodes": 32768,
+            "plasma_eV": [
+              80.31695920801324
+            ],
+            "policy": "positive-linear-log-energy-v1",
+            "projectile": "electron",
+            "reference": "bremslib-v2.0-sdcs-ddcs/lin-x18-geo4-ln-t-lin-theta-v2/tm-coupled-v2/ee-sb85-v1",
+            "rtol": 0.0002,
+            "sources": [
+              [
+                "W",
+                "dfccd9efa5bdcd0968b2cbbabd708106d123f6df654bc03d19b3e96cec0beec0",
+                "ec1cfd4c6f5e97dec8aca7a3153a3f212cfcce90d7ec296b12a7d876e4c1886d"
+              ]
+            ]
+          },
+          "held_out_max_error_fraction": [
+            0.23847308900854305
+          ],
+          "build_s": 0.050398169085383415,
+          "upload_s": 0.0,
+          "host_bytes": 9744,
+          "layers": 1
+        }
+      ],
+      "same_seed_replay": {
+        "passed": true,
+        "blocks": 1,
+        "hashes": [
+          "bf5e2619f46c5f5c5f3d504cde1c42df3b5671f28a97fd21c7423dc0a75f757a"
+        ]
+      },
+      "case": "preflight-w-300-10um-0deg-table",
+      "raw_record_sha256": "50f03357bf3f3845b9bcf9287f4f5539b8c99afd55bbe4dd813bc9dabee699f9",
+      "max_accounting_errors": {
+        "energy_ledger_max_error_keV": 9.663381206337363e-13,
+        "photon_debit_max_error_keV": 2.7977620220553945e-14,
+        "direction_norm_max_error": 2.220446049250313e-16
+      },
+      "process_replay_checked": false
+    }
+  ],
+  "runs": [
+    {
+      "scene": {
+        "id": "si-300-100um-0deg",
+        "element": "Si",
+        "catalog_key": "silicon",
+        "density_g_cm3": 2.3291534103942357,
+        "atomic_weight": 28.085,
+        "energy_keV": 300,
+        "thickness_um": 100,
+        "angle_deg": 0,
+        "number_density_ang3": 0.049942993373787194
+      },
+      "seed": 78811,
+      "histories": 2048,
+      "core": "per-electron",
+      "batch_histories": 2048,
+      "scratch_mib": 4096,
+      "probe_electrons": 0,
+      "cutoff_eV": 1000,
+      "max_de_frac": 0.05,
+      "max_steps": 20000,
+      "tables": {
+        "elsepa": [
+          [
+            {
+              "key": "240a6150bdcf027eac2d9c13171f33776cc96556c258ab8277342d9b83dad860",
+              "manifest_sha256": "9efa28ecaf839767de6b369eb87ff89694049c16dbb1988fbfd2a2293bc343ae",
+              "arrays_sha256": "3879a0e97df26c1342dd1eed7cd9eb1954634ce1cc56b335a553b3e1cab29f0d"
+            },
+            {
+              "key": "47fa2c31dd413cb42b6569105e85862d1a141b35be26d54d8e5a679b8765d1be",
+              "manifest_sha256": "42a70d18f3f1a622cf7fdb98747199b9a8c1ee4eb29bfae32027a1d835cc166f",
+              "arrays_sha256": "02be6be167718b9adbc84814fdd383ecf47b2c9ad952caca5d61b7ad94cd07d6"
+            }
+          ]
+        ],
+        "sbethe": {
+          "key": "86c73cd7a10433ce547de2ae9458e3fd7c09da3c394e8e07e5f7f9415bfaff32",
+          "manifest_sha256": "cd6144893da65f70656bd7880c6083642862cd6068b34aaeb0d36bf73e7fe20f",
+          "arrays_sha256": "512a76527a5341c2276e4a187e4fcfb9a1b4381a24ae381aa597f36756fe38e5"
+        },
+        "bremslib": {
+          "key": "cff95de45a327e3ac277930ae56f236ea19e519ccfa199d2a903c297c4677fee",
+          "manifest_sha256": "848f5d188f965678f290e0738bb4762e1b50a11e325e38a2c53de7aa24e5c67a"
+        }
+      },
+      "timings_s": {
+        "imports_and_tables": 0.13169953017495573,
+        "warmup": 34.90870252205059,
+        "transport_and_emission": 32.83404011419043,
+        "request_with_reductions": 33.20785786304623,
+        "reductions": 0.37380700884386897,
+        "adapter_total": 68.2488750400953
+      },
+      "peak_rss_kib": 2046044,
+      "raw_scores_sha256": "e2e14f754ec9e2d71a39582bfb663d88c83edb4668a2dc5da59836ee53f94999",
+      "moment_variant": "exact",
+      "moment_source": {
+        "reference_sha256": "794d3b99e19a526bbb1c0883bd1e333f5b03a8d2d0cea6bd277977745048042c",
+        "wrapper_sha256": "ae8be30ba30b2a95731d0a58509851c563b182a83a5c70ce8672a0b7cd7fc092",
+        "protocol_sha256": "1b3d0748828ab001b385644208020b50d28eb1f484aa9f5a310458ba437d376f",
+        "exact_sampler_sha256": "94cf1515e58a1c3436077c5d58ec895309e2a33c235caf7fa35352ffbd69360b"
+      },
+      "preparations": [],
+      "same_seed_replay": null,
+      "case": "si-300-100um-0deg-78811-exact",
+      "raw_record_sha256": "c1492cb39c1c102aaefa64f4feda9f1d56dc93c1a4af128411b631b61bf47a83",
+      "max_accounting_errors": {
+        "energy_ledger_max_error_keV": 1.5916157281026244e-12,
+        "photon_debit_max_error_keV": 2.842170943040401e-14,
+        "direction_norm_max_error": 2.220446049250313e-16
+      }
+    },
+    {
+      "scene": {
+        "id": "si-300-100um-0deg",
+        "element": "Si",
+        "catalog_key": "silicon",
+        "density_g_cm3": 2.3291534103942357,
+        "atomic_weight": 28.085,
+        "energy_keV": 300,
+        "thickness_um": 100,
+        "angle_deg": 0,
+        "number_density_ang3": 0.049942993373787194
+      },
+      "seed": 78811,
+      "histories": 2048,
+      "core": "per-electron",
+      "batch_histories": 2048,
+      "scratch_mib": 4096,
+      "probe_electrons": 0,
+      "cutoff_eV": 1000,
+      "max_de_frac": 0.05,
+      "max_steps": 20000,
+      "tables": {
+        "elsepa": [
+          [
+            {
+              "key": "240a6150bdcf027eac2d9c13171f33776cc96556c258ab8277342d9b83dad860",
+              "manifest_sha256": "9efa28ecaf839767de6b369eb87ff89694049c16dbb1988fbfd2a2293bc343ae",
+              "arrays_sha256": "3879a0e97df26c1342dd1eed7cd9eb1954634ce1cc56b335a553b3e1cab29f0d"
+            },
+            {
+              "key": "47fa2c31dd413cb42b6569105e85862d1a141b35be26d54d8e5a679b8765d1be",
+              "manifest_sha256": "42a70d18f3f1a622cf7fdb98747199b9a8c1ee4eb29bfae32027a1d835cc166f",
+              "arrays_sha256": "02be6be167718b9adbc84814fdd383ecf47b2c9ad952caca5d61b7ad94cd07d6"
+            }
+          ]
+        ],
+        "sbethe": {
+          "key": "86c73cd7a10433ce547de2ae9458e3fd7c09da3c394e8e07e5f7f9415bfaff32",
+          "manifest_sha256": "cd6144893da65f70656bd7880c6083642862cd6068b34aaeb0d36bf73e7fe20f",
+          "arrays_sha256": "512a76527a5341c2276e4a187e4fcfb9a1b4381a24ae381aa597f36756fe38e5"
+        },
+        "bremslib": {
+          "key": "cff95de45a327e3ac277930ae56f236ea19e519ccfa199d2a903c297c4677fee",
+          "manifest_sha256": "848f5d188f965678f290e0738bb4762e1b50a11e325e38a2c53de7aa24e5c67a"
+        }
+      },
+      "timings_s": {
+        "imports_and_tables": 0.13302495912648737,
+        "warmup": 4.347747378051281,
+        "transport_and_emission": 2.6208568059373647,
+        "request_with_reductions": 2.9967847508378327,
+        "reductions": 0.37591824517585337,
+        "adapter_total": 7.478174692951143
+      },
+      "peak_rss_kib": 2050688,
+      "raw_scores_sha256": "8c19ef08a5cd4ea62ec3487e7f2d5d5306466f130231da5874c44c0227b0b970",
+      "moment_variant": "refined",
+      "moment_source": {
+        "reference_sha256": "794d3b99e19a526bbb1c0883bd1e333f5b03a8d2d0cea6bd277977745048042c",
+        "candidate_sha256": "f30490f4c180a435b1dc9c1e04067e3b1cf6199dba7a28f9fd8316a1967fa8d6",
+        "helper_sha256": "731b3bdae1c06ddfff2a27f0660eb19c732d22fa878bba34101826a249e29b99",
+        "frequent_calls_replaced": 3,
+        "exact_event_total_calls_retained": 1,
+        "wrapper_sha256": "ae8be30ba30b2a95731d0a58509851c563b182a83a5c70ce8672a0b7cd7fc092",
+        "protocol_sha256": "1b3d0748828ab001b385644208020b50d28eb1f484aa9f5a310458ba437d376f",
+        "exact_sampler_sha256": "94cf1515e58a1c3436077c5d58ec895309e2a33c235caf7fa35352ffbd69360b"
+      },
+      "preparations": [
+        {
+          "digest": "fbe21d0aedc4fb81972bff1bd62045c03b3e27988809f87d28b15364b9da983b",
+          "identity": {
+            "atol": [
+              1e-10,
+              1e-14,
+              1e-10
+            ],
+            "composition": [
+              [
+                [
+                  "Si",
+                  0.049942993373787194
+                ]
+              ]
+            ],
+            "coverage_eV": [
+              10000.0,
+              300000.0
+            ],
+            "cutoff_eV": 1000.0,
+            "held_out_count": 8191,
+            "max_nodes": 32768,
+            "plasma_eV": [
+              31.049785193007793
+            ],
+            "policy": "positive-linear-log-energy-v1",
+            "projectile": "electron",
+            "reference": "bremslib-v2.0-sdcs-ddcs/lin-x18-geo4-ln-t-lin-theta-v2/tm-coupled-v2/ee-sb85-v1",
+            "rtol": 0.0001,
+            "sources": [
+              [
+                "Si",
+                "cff95de45a327e3ac277930ae56f236ea19e519ccfa199d2a903c297c4677fee",
+                "848f5d188f965678f290e0738bb4762e1b50a11e325e38a2c53de7aa24e5c67a"
+              ]
+            ]
+          },
+          "held_out_max_error_fraction": [
+            0.2438659817428869
+          ],
+          "build_s": 0.05384838720783591,
+          "upload_s": 0.0,
+          "host_bytes": 15144,
+          "layers": 1
+        }
+      ],
+      "same_seed_replay": null,
+      "case": "si-300-100um-0deg-78811-refined",
+      "raw_record_sha256": "9d5dca9a281f47afcf6e7b17de77defcdb5e7f802462dae5e68881729a618952",
+      "max_accounting_errors": {
+        "energy_ledger_max_error_keV": 1.5916157281026244e-12,
+        "photon_debit_max_error_keV": 2.842170943040401e-14,
+        "direction_norm_max_error": 2.220446049250313e-16
+      }
+    },
+    {
+      "scene": {
+        "id": "si-300-100um-0deg",
+        "element": "Si",
+        "catalog_key": "silicon",
+        "density_g_cm3": 2.3291534103942357,
+        "atomic_weight": 28.085,
+        "energy_keV": 300,
+        "thickness_um": 100,
+        "angle_deg": 0,
+        "number_density_ang3": 0.049942993373787194
+      },
+      "seed": 78811,
+      "histories": 2048,
+      "core": "per-electron",
+      "batch_histories": 2048,
+      "scratch_mib": 4096,
+      "probe_electrons": 0,
+      "cutoff_eV": 1000,
+      "max_de_frac": 0.05,
+      "max_steps": 20000,
+      "tables": {
+        "elsepa": [
+          [
+            {
+              "key": "240a6150bdcf027eac2d9c13171f33776cc96556c258ab8277342d9b83dad860",
+              "manifest_sha256": "9efa28ecaf839767de6b369eb87ff89694049c16dbb1988fbfd2a2293bc343ae",
+              "arrays_sha256": "3879a0e97df26c1342dd1eed7cd9eb1954634ce1cc56b335a553b3e1cab29f0d"
+            },
+            {
+              "key": "47fa2c31dd413cb42b6569105e85862d1a141b35be26d54d8e5a679b8765d1be",
+              "manifest_sha256": "42a70d18f3f1a622cf7fdb98747199b9a8c1ee4eb29bfae32027a1d835cc166f",
+              "arrays_sha256": "02be6be167718b9adbc84814fdd383ecf47b2c9ad952caca5d61b7ad94cd07d6"
+            }
+          ]
+        ],
+        "sbethe": {
+          "key": "86c73cd7a10433ce547de2ae9458e3fd7c09da3c394e8e07e5f7f9415bfaff32",
+          "manifest_sha256": "cd6144893da65f70656bd7880c6083642862cd6068b34aaeb0d36bf73e7fe20f",
+          "arrays_sha256": "512a76527a5341c2276e4a187e4fcfb9a1b4381a24ae381aa597f36756fe38e5"
+        },
+        "bremslib": {
+          "key": "cff95de45a327e3ac277930ae56f236ea19e519ccfa199d2a903c297c4677fee",
+          "manifest_sha256": "848f5d188f965678f290e0738bb4762e1b50a11e325e38a2c53de7aa24e5c67a"
+        }
+      },
+      "timings_s": {
+        "imports_and_tables": 0.1299927809741348,
+        "warmup": 4.349528837017715,
+        "transport_and_emission": 2.6131071988493204,
+        "request_with_reductions": 2.9900578460656106,
+        "reductions": 0.3769411670509726,
+        "adapter_total": 7.470129737863317
+      },
+      "peak_rss_kib": 2049444,
+      "raw_scores_sha256": "c50ae113ad4bdc45b9978aaf988639c4bbc35b1d25d3cbf5742f1a2cd65cf715",
+      "moment_variant": "table",
+      "moment_source": {
+        "reference_sha256": "794d3b99e19a526bbb1c0883bd1e333f5b03a8d2d0cea6bd277977745048042c",
+        "candidate_sha256": "f30490f4c180a435b1dc9c1e04067e3b1cf6199dba7a28f9fd8316a1967fa8d6",
+        "helper_sha256": "731b3bdae1c06ddfff2a27f0660eb19c732d22fa878bba34101826a249e29b99",
+        "frequent_calls_replaced": 3,
+        "exact_event_total_calls_retained": 1,
+        "wrapper_sha256": "ae8be30ba30b2a95731d0a58509851c563b182a83a5c70ce8672a0b7cd7fc092",
+        "protocol_sha256": "1b3d0748828ab001b385644208020b50d28eb1f484aa9f5a310458ba437d376f",
+        "exact_sampler_sha256": "94cf1515e58a1c3436077c5d58ec895309e2a33c235caf7fa35352ffbd69360b"
+      },
+      "preparations": [
+        {
+          "digest": "ce5ad876a20936e77a4e9d5702ce32b99140f0d374aacd23d195e45bc2ca8ba2",
+          "identity": {
+            "atol": [
+              1e-10,
+              1e-14,
+              1e-10
+            ],
+            "composition": [
+              [
+                [
+                  "Si",
+                  0.049942993373787194
+                ]
+              ]
+            ],
+            "coverage_eV": [
+              10000.0,
+              300000.0
+            ],
+            "cutoff_eV": 1000.0,
+            "held_out_count": 8191,
+            "max_nodes": 32768,
+            "plasma_eV": [
+              31.049785193007793
+            ],
+            "policy": "positive-linear-log-energy-v1",
+            "projectile": "electron",
+            "reference": "bremslib-v2.0-sdcs-ddcs/lin-x18-geo4-ln-t-lin-theta-v2/tm-coupled-v2/ee-sb85-v1",
+            "rtol": 0.0002,
+            "sources": [
+              [
+                "Si",
+                "cff95de45a327e3ac277930ae56f236ea19e519ccfa199d2a903c297c4677fee",
+                "848f5d188f965678f290e0738bb4762e1b50a11e325e38a2c53de7aa24e5c67a"
+              ]
+            ]
+          },
+          "held_out_max_error_fraction": [
+            0.20598760999820137
+          ],
+          "build_s": 0.050754419062286615,
+          "upload_s": 0.0,
+          "host_bytes": 9864,
+          "layers": 1
+        }
+      ],
+      "same_seed_replay": null,
+      "case": "si-300-100um-0deg-78811-table",
+      "raw_record_sha256": "c0b4984d6f0d7c3ba50140fa74b75e3c9d60568a2089b1277cda3e334688209e",
+      "max_accounting_errors": {
+        "energy_ledger_max_error_keV": 1.7621459846850485e-12,
+        "photon_debit_max_error_keV": 2.842170943040401e-14,
+        "direction_norm_max_error": 2.220446049250313e-16
+      }
+    },
+    {
+      "scene": {
+        "id": "si-300-100um-0deg",
+        "element": "Si",
+        "catalog_key": "silicon",
+        "density_g_cm3": 2.3291534103942357,
+        "atomic_weight": 28.085,
+        "energy_keV": 300,
+        "thickness_um": 100,
+        "angle_deg": 0,
+        "number_density_ang3": 0.049942993373787194
+      },
+      "seed": 78812,
+      "histories": 2048,
+      "core": "per-electron",
+      "batch_histories": 2048,
+      "scratch_mib": 4096,
+      "probe_electrons": 0,
+      "cutoff_eV": 1000,
+      "max_de_frac": 0.05,
+      "max_steps": 20000,
+      "tables": {
+        "elsepa": [
+          [
+            {
+              "key": "240a6150bdcf027eac2d9c13171f33776cc96556c258ab8277342d9b83dad860",
+              "manifest_sha256": "9efa28ecaf839767de6b369eb87ff89694049c16dbb1988fbfd2a2293bc343ae",
+              "arrays_sha256": "3879a0e97df26c1342dd1eed7cd9eb1954634ce1cc56b335a553b3e1cab29f0d"
+            },
+            {
+              "key": "47fa2c31dd413cb42b6569105e85862d1a141b35be26d54d8e5a679b8765d1be",
+              "manifest_sha256": "42a70d18f3f1a622cf7fdb98747199b9a8c1ee4eb29bfae32027a1d835cc166f",
+              "arrays_sha256": "02be6be167718b9adbc84814fdd383ecf47b2c9ad952caca5d61b7ad94cd07d6"
+            }
+          ]
+        ],
+        "sbethe": {
+          "key": "86c73cd7a10433ce547de2ae9458e3fd7c09da3c394e8e07e5f7f9415bfaff32",
+          "manifest_sha256": "cd6144893da65f70656bd7880c6083642862cd6068b34aaeb0d36bf73e7fe20f",
+          "arrays_sha256": "512a76527a5341c2276e4a187e4fcfb9a1b4381a24ae381aa597f36756fe38e5"
+        },
+        "bremslib": {
+          "key": "cff95de45a327e3ac277930ae56f236ea19e519ccfa199d2a903c297c4677fee",
+          "manifest_sha256": "848f5d188f965678f290e0738bb4762e1b50a11e325e38a2c53de7aa24e5c67a"
+        }
+      },
+      "timings_s": {
+        "imports_and_tables": 0.13194159790873528,
+        "warmup": 34.239963290980086,
+        "transport_and_emission": 33.119153941981494,
+        "request_with_reductions": 33.50135996402241,
+        "reductions": 0.38219599216245115,
+        "adapter_total": 67.87382657686248
+      },
+      "peak_rss_kib": 2056968,
+      "raw_scores_sha256": "d5c167baf25fec35330a164d9b2dff4c838503c95339cb891f373c6eba441230",
+      "moment_variant": "exact",
+      "moment_source": {
+        "reference_sha256": "794d3b99e19a526bbb1c0883bd1e333f5b03a8d2d0cea6bd277977745048042c",
+        "wrapper_sha256": "ae8be30ba30b2a95731d0a58509851c563b182a83a5c70ce8672a0b7cd7fc092",
+        "protocol_sha256": "1b3d0748828ab001b385644208020b50d28eb1f484aa9f5a310458ba437d376f",
+        "exact_sampler_sha256": "94cf1515e58a1c3436077c5d58ec895309e2a33c235caf7fa35352ffbd69360b"
+      },
+      "preparations": [],
+      "same_seed_replay": null,
+      "case": "si-300-100um-0deg-78812-exact",
+      "raw_record_sha256": "53450c85b8b36b031a3a7019e3ab8a6d183d09f2f185319d0352e45da772cadb",
+      "max_accounting_errors": {
+        "energy_ledger_max_error_keV": 1.4779288903810084e-12,
+        "photon_debit_max_error_keV": 2.531308496145357e-14,
+        "direction_norm_max_error": 2.220446049250313e-16
+      }
+    },
+    {
+      "scene": {
+        "id": "si-300-100um-0deg",
+        "element": "Si",
+        "catalog_key": "silicon",
+        "density_g_cm3": 2.3291534103942357,
+        "atomic_weight": 28.085,
+        "energy_keV": 300,
+        "thickness_um": 100,
+        "angle_deg": 0,
+        "number_density_ang3": 0.049942993373787194
+      },
+      "seed": 78812,
+      "histories": 2048,
+      "core": "per-electron",
+      "batch_histories": 2048,
+      "scratch_mib": 4096,
+      "probe_electrons": 0,
+      "cutoff_eV": 1000,
+      "max_de_frac": 0.05,
+      "max_steps": 20000,
+      "tables": {
+        "elsepa": [
+          [
+            {
+              "key": "240a6150bdcf027eac2d9c13171f33776cc96556c258ab8277342d9b83dad860",
+              "manifest_sha256": "9efa28ecaf839767de6b369eb87ff89694049c16dbb1988fbfd2a2293bc343ae",
+              "arrays_sha256": "3879a0e97df26c1342dd1eed7cd9eb1954634ce1cc56b335a553b3e1cab29f0d"
+            },
+            {
+              "key": "47fa2c31dd413cb42b6569105e85862d1a141b35be26d54d8e5a679b8765d1be",
+              "manifest_sha256": "42a70d18f3f1a622cf7fdb98747199b9a8c1ee4eb29bfae32027a1d835cc166f",
+              "arrays_sha256": "02be6be167718b9adbc84814fdd383ecf47b2c9ad952caca5d61b7ad94cd07d6"
+            }
+          ]
+        ],
+        "sbethe": {
+          "key": "86c73cd7a10433ce547de2ae9458e3fd7c09da3c394e8e07e5f7f9415bfaff32",
+          "manifest_sha256": "cd6144893da65f70656bd7880c6083642862cd6068b34aaeb0d36bf73e7fe20f",
+          "arrays_sha256": "512a76527a5341c2276e4a187e4fcfb9a1b4381a24ae381aa597f36756fe38e5"
+        },
+        "bremslib": {
+          "key": "cff95de45a327e3ac277930ae56f236ea19e519ccfa199d2a903c297c4677fee",
+          "manifest_sha256": "848f5d188f965678f290e0738bb4762e1b50a11e325e38a2c53de7aa24e5c67a"
+        }
+      },
+      "timings_s": {
+        "imports_and_tables": 0.13064635801129043,
+        "warmup": 4.080992194823921,
+        "transport_and_emission": 2.4655686339829117,
+        "request_with_reductions": 2.8400058161932975,
+        "reductions": 0.374424692010507,
+        "adapter_total": 7.052171282004565
+      },
+      "peak_rss_kib": 2062224,
+      "raw_scores_sha256": "9ead95df749ff5f3d2f1ec25cb4f55cfd6311aec682b8d634d6552703d03f444",
+      "moment_variant": "refined",
+      "moment_source": {
+        "reference_sha256": "794d3b99e19a526bbb1c0883bd1e333f5b03a8d2d0cea6bd277977745048042c",
+        "candidate_sha256": "f30490f4c180a435b1dc9c1e04067e3b1cf6199dba7a28f9fd8316a1967fa8d6",
+        "helper_sha256": "731b3bdae1c06ddfff2a27f0660eb19c732d22fa878bba34101826a249e29b99",
+        "frequent_calls_replaced": 3,
+        "exact_event_total_calls_retained": 1,
+        "wrapper_sha256": "ae8be30ba30b2a95731d0a58509851c563b182a83a5c70ce8672a0b7cd7fc092",
+        "protocol_sha256": "1b3d0748828ab001b385644208020b50d28eb1f484aa9f5a310458ba437d376f",
+        "exact_sampler_sha256": "94cf1515e58a1c3436077c5d58ec895309e2a33c235caf7fa35352ffbd69360b"
+      },
+      "preparations": [
+        {
+          "digest": "fbe21d0aedc4fb81972bff1bd62045c03b3e27988809f87d28b15364b9da983b",
+          "identity": {
+            "atol": [
+              1e-10,
+              1e-14,
+              1e-10
+            ],
+            "composition": [
+              [
+                [
+                  "Si",
+                  0.049942993373787194
+                ]
+              ]
+            ],
+            "coverage_eV": [
+              10000.0,
+              300000.0
+            ],
+            "cutoff_eV": 1000.0,
+            "held_out_count": 8191,
+            "max_nodes": 32768,
+            "plasma_eV": [
+              31.049785193007793
+            ],
+            "policy": "positive-linear-log-energy-v1",
+            "projectile": "electron",
+            "reference": "bremslib-v2.0-sdcs-ddcs/lin-x18-geo4-ln-t-lin-theta-v2/tm-coupled-v2/ee-sb85-v1",
+            "rtol": 0.0001,
+            "sources": [
+              [
+                "Si",
+                "cff95de45a327e3ac277930ae56f236ea19e519ccfa199d2a903c297c4677fee",
+                "848f5d188f965678f290e0738bb4762e1b50a11e325e38a2c53de7aa24e5c67a"
+              ]
+            ]
+          },
+          "held_out_max_error_fraction": [
+            0.2438659817428869
+          ],
+          "build_s": 0.05367128807120025,
+          "upload_s": 0.0,
+          "host_bytes": 15144,
+          "layers": 1
+        }
+      ],
+      "same_seed_replay": null,
+      "case": "si-300-100um-0deg-78812-refined",
+      "raw_record_sha256": "53070b87bb6090ca6b4a962f8f6240e721142d1ba48adc7229e9a35c10db0ea9",
+      "max_accounting_errors": {
+        "energy_ledger_max_error_keV": 1.7621459846850485e-12,
+        "photon_debit_max_error_keV": 2.6645352591003757e-14,
+        "direction_norm_max_error": 2.220446049250313e-16
+      }
+    },
+    {
+      "scene": {
+        "id": "si-300-100um-0deg",
+        "element": "Si",
+        "catalog_key": "silicon",
+        "density_g_cm3": 2.3291534103942357,
+        "atomic_weight": 28.085,
+        "energy_keV": 300,
+        "thickness_um": 100,
+        "angle_deg": 0,
+        "number_density_ang3": 0.049942993373787194
+      },
+      "seed": 78812,
+      "histories": 2048,
+      "core": "per-electron",
+      "batch_histories": 2048,
+      "scratch_mib": 4096,
+      "probe_electrons": 0,
+      "cutoff_eV": 1000,
+      "max_de_frac": 0.05,
+      "max_steps": 20000,
+      "tables": {
+        "elsepa": [
+          [
+            {
+              "key": "240a6150bdcf027eac2d9c13171f33776cc96556c258ab8277342d9b83dad860",
+              "manifest_sha256": "9efa28ecaf839767de6b369eb87ff89694049c16dbb1988fbfd2a2293bc343ae",
+              "arrays_sha256": "3879a0e97df26c1342dd1eed7cd9eb1954634ce1cc56b335a553b3e1cab29f0d"
+            },
+            {
+              "key": "47fa2c31dd413cb42b6569105e85862d1a141b35be26d54d8e5a679b8765d1be",
+              "manifest_sha256": "42a70d18f3f1a622cf7fdb98747199b9a8c1ee4eb29bfae32027a1d835cc166f",
+              "arrays_sha256": "02be6be167718b9adbc84814fdd383ecf47b2c9ad952caca5d61b7ad94cd07d6"
+            }
+          ]
+        ],
+        "sbethe": {
+          "key": "86c73cd7a10433ce547de2ae9458e3fd7c09da3c394e8e07e5f7f9415bfaff32",
+          "manifest_sha256": "cd6144893da65f70656bd7880c6083642862cd6068b34aaeb0d36bf73e7fe20f",
+          "arrays_sha256": "512a76527a5341c2276e4a187e4fcfb9a1b4381a24ae381aa597f36756fe38e5"
+        },
+        "bremslib": {
+          "key": "cff95de45a327e3ac277930ae56f236ea19e519ccfa199d2a903c297c4677fee",
+          "manifest_sha256": "848f5d188f965678f290e0738bb4762e1b50a11e325e38a2c53de7aa24e5c67a"
+        }
+      },
+      "timings_s": {
+        "imports_and_tables": 0.12892014998942614,
+        "warmup": 4.11419766000472,
+        "transport_and_emission": 2.65160581888631,
+        "request_with_reductions": 3.0314807649701834,
+        "reductions": 0.3798650160897523,
+        "adapter_total": 7.275106720160693
+      },
+      "peak_rss_kib": 2062536,
+      "raw_scores_sha256": "0d5644a0d8a6ab1e9c2e9e039a11b745075bf8f76ebb9bc382a57b0cf69553b6",
+      "moment_variant": "table",
+      "moment_source": {
+        "reference_sha256": "794d3b99e19a526bbb1c0883bd1e333f5b03a8d2d0cea6bd277977745048042c",
+        "candidate_sha256": "f30490f4c180a435b1dc9c1e04067e3b1cf6199dba7a28f9fd8316a1967fa8d6",
+        "helper_sha256": "731b3bdae1c06ddfff2a27f0660eb19c732d22fa878bba34101826a249e29b99",
+        "frequent_calls_replaced": 3,
+        "exact_event_total_calls_retained": 1,
+        "wrapper_sha256": "ae8be30ba30b2a95731d0a58509851c563b182a83a5c70ce8672a0b7cd7fc092",
+        "protocol_sha256": "1b3d0748828ab001b385644208020b50d28eb1f484aa9f5a310458ba437d376f",
+        "exact_sampler_sha256": "94cf1515e58a1c3436077c5d58ec895309e2a33c235caf7fa35352ffbd69360b"
+      },
+      "preparations": [
+        {
+          "digest": "ce5ad876a20936e77a4e9d5702ce32b99140f0d374aacd23d195e45bc2ca8ba2",
+          "identity": {
+            "atol": [
+              1e-10,
+              1e-14,
+              1e-10
+            ],
+            "composition": [
+              [
+                [
+                  "Si",
+                  0.049942993373787194
+                ]
+              ]
+            ],
+            "coverage_eV": [
+              10000.0,
+              300000.0
+            ],
+            "cutoff_eV": 1000.0,
+            "held_out_count": 8191,
+            "max_nodes": 32768,
+            "plasma_eV": [
+              31.049785193007793
+            ],
+            "policy": "positive-linear-log-energy-v1",
+            "projectile": "electron",
+            "reference": "bremslib-v2.0-sdcs-ddcs/lin-x18-geo4-ln-t-lin-theta-v2/tm-coupled-v2/ee-sb85-v1",
+            "rtol": 0.0002,
+            "sources": [
+              [
+                "Si",
+                "cff95de45a327e3ac277930ae56f236ea19e519ccfa199d2a903c297c4677fee",
+                "848f5d188f965678f290e0738bb4762e1b50a11e325e38a2c53de7aa24e5c67a"
+              ]
+            ]
+          },
+          "held_out_max_error_fraction": [
+            0.20598760999820137
+          ],
+          "build_s": 0.049861746141687036,
+          "upload_s": 0.0,
+          "host_bytes": 9864,
+          "layers": 1
+        }
+      ],
+      "same_seed_replay": null,
+      "case": "si-300-100um-0deg-78812-table",
+      "raw_record_sha256": "b5660e8ba2bceade91647085fe5d089b3150d1713c84d556336e284be7bc741b",
+      "max_accounting_errors": {
+        "energy_ledger_max_error_keV": 1.3642420526593924e-12,
+        "photon_debit_max_error_keV": 2.6645352591003757e-14,
+        "direction_norm_max_error": 2.220446049250313e-16
+      }
+    },
+    {
+      "scene": {
+        "id": "si-300-100um-0deg",
+        "element": "Si",
+        "catalog_key": "silicon",
+        "density_g_cm3": 2.3291534103942357,
+        "atomic_weight": 28.085,
+        "energy_keV": 300,
+        "thickness_um": 100,
+        "angle_deg": 0,
+        "number_density_ang3": 0.049942993373787194
+      },
+      "seed": 78813,
+      "histories": 2048,
+      "core": "per-electron",
+      "batch_histories": 2048,
+      "scratch_mib": 4096,
+      "probe_electrons": 0,
+      "cutoff_eV": 1000,
+      "max_de_frac": 0.05,
+      "max_steps": 20000,
+      "tables": {
+        "elsepa": [
+          [
+            {
+              "key": "240a6150bdcf027eac2d9c13171f33776cc96556c258ab8277342d9b83dad860",
+              "manifest_sha256": "9efa28ecaf839767de6b369eb87ff89694049c16dbb1988fbfd2a2293bc343ae",
+              "arrays_sha256": "3879a0e97df26c1342dd1eed7cd9eb1954634ce1cc56b335a553b3e1cab29f0d"
+            },
+            {
+              "key": "47fa2c31dd413cb42b6569105e85862d1a141b35be26d54d8e5a679b8765d1be",
+              "manifest_sha256": "42a70d18f3f1a622cf7fdb98747199b9a8c1ee4eb29bfae32027a1d835cc166f",
+              "arrays_sha256": "02be6be167718b9adbc84814fdd383ecf47b2c9ad952caca5d61b7ad94cd07d6"
+            }
+          ]
+        ],
+        "sbethe": {
+          "key": "86c73cd7a10433ce547de2ae9458e3fd7c09da3c394e8e07e5f7f9415bfaff32",
+          "manifest_sha256": "cd6144893da65f70656bd7880c6083642862cd6068b34aaeb0d36bf73e7fe20f",
+          "arrays_sha256": "512a76527a5341c2276e4a187e4fcfb9a1b4381a24ae381aa597f36756fe38e5"
+        },
+        "bremslib": {
+          "key": "cff95de45a327e3ac277930ae56f236ea19e519ccfa199d2a903c297c4677fee",
+          "manifest_sha256": "848f5d188f965678f290e0738bb4762e1b50a11e325e38a2c53de7aa24e5c67a"
+        }
+      },
+      "timings_s": {
+        "imports_and_tables": 0.13393359701149166,
+        "warmup": 33.867545407032594,
+        "transport_and_emission": 32.70037425495684,
+        "request_with_reductions": 33.07675005798228,
+        "reductions": 0.3763666320592165,
+        "adapter_total": 67.07879780582152
+      },
+      "peak_rss_kib": 2067632,
+      "raw_scores_sha256": "0a7daf54bb77e2a7f906258e0f5b8cef29e86342f1745b6aed6cbf9ce5cd869f",
+      "moment_variant": "exact",
+      "moment_source": {
+        "reference_sha256": "794d3b99e19a526bbb1c0883bd1e333f5b03a8d2d0cea6bd277977745048042c",
+        "wrapper_sha256": "ae8be30ba30b2a95731d0a58509851c563b182a83a5c70ce8672a0b7cd7fc092",
+        "protocol_sha256": "1b3d0748828ab001b385644208020b50d28eb1f484aa9f5a310458ba437d376f",
+        "exact_sampler_sha256": "94cf1515e58a1c3436077c5d58ec895309e2a33c235caf7fa35352ffbd69360b"
+      },
+      "preparations": [],
+      "same_seed_replay": null,
+      "case": "si-300-100um-0deg-78813-exact",
+      "raw_record_sha256": "b7271d765e11c0d9bc96736d9999eb28da91cf8ed6431bf6b0a065b9180fb71d",
+      "max_accounting_errors": {
+        "energy_ledger_max_error_keV": 1.9895196601282805e-12,
+        "photon_debit_max_error_keV": 2.7977620220553945e-14,
+        "direction_norm_max_error": 2.220446049250313e-16
+      }
+    },
+    {
+      "scene": {
+        "id": "si-300-100um-0deg",
+        "element": "Si",
+        "catalog_key": "silicon",
+        "density_g_cm3": 2.3291534103942357,
+        "atomic_weight": 28.085,
+        "energy_keV": 300,
+        "thickness_um": 100,
+        "angle_deg": 0,
+        "number_density_ang3": 0.049942993373787194
+      },
+      "seed": 78813,
+      "histories": 2048,
+      "core": "per-electron",
+      "batch_histories": 2048,
+      "scratch_mib": 4096,
+      "probe_electrons": 0,
+      "cutoff_eV": 1000,
+      "max_de_frac": 0.05,
+      "max_steps": 20000,
+      "tables": {
+        "elsepa": [
+          [
+            {
+              "key": "240a6150bdcf027eac2d9c13171f33776cc96556c258ab8277342d9b83dad860",
+              "manifest_sha256": "9efa28ecaf839767de6b369eb87ff89694049c16dbb1988fbfd2a2293bc343ae",
+              "arrays_sha256": "3879a0e97df26c1342dd1eed7cd9eb1954634ce1cc56b335a553b3e1cab29f0d"
+            },
+            {
+              "key": "47fa2c31dd413cb42b6569105e85862d1a141b35be26d54d8e5a679b8765d1be",
+              "manifest_sha256": "42a70d18f3f1a622cf7fdb98747199b9a8c1ee4eb29bfae32027a1d835cc166f",
+              "arrays_sha256": "02be6be167718b9adbc84814fdd383ecf47b2c9ad952caca5d61b7ad94cd07d6"
+            }
+          ]
+        ],
+        "sbethe": {
+          "key": "86c73cd7a10433ce547de2ae9458e3fd7c09da3c394e8e07e5f7f9415bfaff32",
+          "manifest_sha256": "cd6144893da65f70656bd7880c6083642862cd6068b34aaeb0d36bf73e7fe20f",
+          "arrays_sha256": "512a76527a5341c2276e4a187e4fcfb9a1b4381a24ae381aa597f36756fe38e5"
+        },
+        "bremslib": {
+          "key": "cff95de45a327e3ac277930ae56f236ea19e519ccfa199d2a903c297c4677fee",
+          "manifest_sha256": "848f5d188f965678f290e0738bb4762e1b50a11e325e38a2c53de7aa24e5c67a"
+        }
+      },
+      "timings_s": {
+        "imports_and_tables": 0.12950385198928416,
+        "warmup": 4.271002240013331,
+        "transport_and_emission": 2.612731941975653,
+        "request_with_reductions": 2.9866294669918716,
+        "reductions": 0.3738857239950448,
+        "adapter_total": 7.3876590128056705
+      },
+      "peak_rss_kib": 2071596,
+      "raw_scores_sha256": "cb875833ba3c99a79883ddaddf611625c955059bfc13aa23ee0f3b67c270d754",
+      "moment_variant": "refined",
+      "moment_source": {
+        "reference_sha256": "794d3b99e19a526bbb1c0883bd1e333f5b03a8d2d0cea6bd277977745048042c",
+        "candidate_sha256": "f30490f4c180a435b1dc9c1e04067e3b1cf6199dba7a28f9fd8316a1967fa8d6",
+        "helper_sha256": "731b3bdae1c06ddfff2a27f0660eb19c732d22fa878bba34101826a249e29b99",
+        "frequent_calls_replaced": 3,
+        "exact_event_total_calls_retained": 1,
+        "wrapper_sha256": "ae8be30ba30b2a95731d0a58509851c563b182a83a5c70ce8672a0b7cd7fc092",
+        "protocol_sha256": "1b3d0748828ab001b385644208020b50d28eb1f484aa9f5a310458ba437d376f",
+        "exact_sampler_sha256": "94cf1515e58a1c3436077c5d58ec895309e2a33c235caf7fa35352ffbd69360b"
+      },
+      "preparations": [
+        {
+          "digest": "fbe21d0aedc4fb81972bff1bd62045c03b3e27988809f87d28b15364b9da983b",
+          "identity": {
+            "atol": [
+              1e-10,
+              1e-14,
+              1e-10
+            ],
+            "composition": [
+              [
+                [
+                  "Si",
+                  0.049942993373787194
+                ]
+              ]
+            ],
+            "coverage_eV": [
+              10000.0,
+              300000.0
+            ],
+            "cutoff_eV": 1000.0,
+            "held_out_count": 8191,
+            "max_nodes": 32768,
+            "plasma_eV": [
+              31.049785193007793
+            ],
+            "policy": "positive-linear-log-energy-v1",
+            "projectile": "electron",
+            "reference": "bremslib-v2.0-sdcs-ddcs/lin-x18-geo4-ln-t-lin-theta-v2/tm-coupled-v2/ee-sb85-v1",
+            "rtol": 0.0001,
+            "sources": [
+              [
+                "Si",
+                "cff95de45a327e3ac277930ae56f236ea19e519ccfa199d2a903c297c4677fee",
+                "848f5d188f965678f290e0738bb4762e1b50a11e325e38a2c53de7aa24e5c67a"
+              ]
+            ]
+          },
+          "held_out_max_error_fraction": [
+            0.2438659817428869
+          ],
+          "build_s": 0.05381799605675042,
+          "upload_s": 0.0,
+          "host_bytes": 15144,
+          "layers": 1
+        }
+      ],
+      "same_seed_replay": null,
+      "case": "si-300-100um-0deg-78813-refined",
+      "raw_record_sha256": "bc3350f34a107453ea6cd9936173182d33eb9b81dd6cdb9f698d7a6ecf7d7bac",
+      "max_accounting_errors": {
+        "energy_ledger_max_error_keV": 1.8189894035458565e-12,
+        "photon_debit_max_error_keV": 2.842170943040401e-14,
+        "direction_norm_max_error": 2.220446049250313e-16
+      }
+    },
+    {
+      "scene": {
+        "id": "si-300-100um-0deg",
+        "element": "Si",
+        "catalog_key": "silicon",
+        "density_g_cm3": 2.3291534103942357,
+        "atomic_weight": 28.085,
+        "energy_keV": 300,
+        "thickness_um": 100,
+        "angle_deg": 0,
+        "number_density_ang3": 0.049942993373787194
+      },
+      "seed": 78813,
+      "histories": 2048,
+      "core": "per-electron",
+      "batch_histories": 2048,
+      "scratch_mib": 4096,
+      "probe_electrons": 0,
+      "cutoff_eV": 1000,
+      "max_de_frac": 0.05,
+      "max_steps": 20000,
+      "tables": {
+        "elsepa": [
+          [
+            {
+              "key": "240a6150bdcf027eac2d9c13171f33776cc96556c258ab8277342d9b83dad860",
+              "manifest_sha256": "9efa28ecaf839767de6b369eb87ff89694049c16dbb1988fbfd2a2293bc343ae",
+              "arrays_sha256": "3879a0e97df26c1342dd1eed7cd9eb1954634ce1cc56b335a553b3e1cab29f0d"
+            },
+            {
+              "key": "47fa2c31dd413cb42b6569105e85862d1a141b35be26d54d8e5a679b8765d1be",
+              "manifest_sha256": "42a70d18f3f1a622cf7fdb98747199b9a8c1ee4eb29bfae32027a1d835cc166f",
+              "arrays_sha256": "02be6be167718b9adbc84814fdd383ecf47b2c9ad952caca5d61b7ad94cd07d6"
+            }
+          ]
+        ],
+        "sbethe": {
+          "key": "86c73cd7a10433ce547de2ae9458e3fd7c09da3c394e8e07e5f7f9415bfaff32",
+          "manifest_sha256": "cd6144893da65f70656bd7880c6083642862cd6068b34aaeb0d36bf73e7fe20f",
+          "arrays_sha256": "512a76527a5341c2276e4a187e4fcfb9a1b4381a24ae381aa597f36756fe38e5"
+        },
+        "bremslib": {
+          "key": "cff95de45a327e3ac277930ae56f236ea19e519ccfa199d2a903c297c4677fee",
+          "manifest_sha256": "848f5d188f965678f290e0738bb4762e1b50a11e325e38a2c53de7aa24e5c67a"
+        }
+      },
+      "timings_s": {
+        "imports_and_tables": 0.1330321109853685,
+        "warmup": 4.256652779178694,
+        "transport_and_emission": 2.598878893069923,
+        "request_with_reductions": 2.971388002857566,
+        "reductions": 0.3724995900411159,
+        "adapter_total": 7.3617816178593785
+      },
+      "peak_rss_kib": 2072024,
+      "raw_scores_sha256": "0040ef11b3167f39ba7cde2025d6fd3832b0ba90f414e10668e623fdf8ced1c4",
+      "moment_variant": "table",
+      "moment_source": {
+        "reference_sha256": "794d3b99e19a526bbb1c0883bd1e333f5b03a8d2d0cea6bd277977745048042c",
+        "candidate_sha256": "f30490f4c180a435b1dc9c1e04067e3b1cf6199dba7a28f9fd8316a1967fa8d6",
+        "helper_sha256": "731b3bdae1c06ddfff2a27f0660eb19c732d22fa878bba34101826a249e29b99",
+        "frequent_calls_replaced": 3,
+        "exact_event_total_calls_retained": 1,
+        "wrapper_sha256": "ae8be30ba30b2a95731d0a58509851c563b182a83a5c70ce8672a0b7cd7fc092",
+        "protocol_sha256": "1b3d0748828ab001b385644208020b50d28eb1f484aa9f5a310458ba437d376f",
+        "exact_sampler_sha256": "94cf1515e58a1c3436077c5d58ec895309e2a33c235caf7fa35352ffbd69360b"
+      },
+      "preparations": [
+        {
+          "digest": "ce5ad876a20936e77a4e9d5702ce32b99140f0d374aacd23d195e45bc2ca8ba2",
+          "identity": {
+            "atol": [
+              1e-10,
+              1e-14,
+              1e-10
+            ],
+            "composition": [
+              [
+                [
+                  "Si",
+                  0.049942993373787194
+                ]
+              ]
+            ],
+            "coverage_eV": [
+              10000.0,
+              300000.0
+            ],
+            "cutoff_eV": 1000.0,
+            "held_out_count": 8191,
+            "max_nodes": 32768,
+            "plasma_eV": [
+              31.049785193007793
+            ],
+            "policy": "positive-linear-log-energy-v1",
+            "projectile": "electron",
+            "reference": "bremslib-v2.0-sdcs-ddcs/lin-x18-geo4-ln-t-lin-theta-v2/tm-coupled-v2/ee-sb85-v1",
+            "rtol": 0.0002,
+            "sources": [
+              [
+                "Si",
+                "cff95de45a327e3ac277930ae56f236ea19e519ccfa199d2a903c297c4677fee",
+                "848f5d188f965678f290e0738bb4762e1b50a11e325e38a2c53de7aa24e5c67a"
+              ]
+            ]
+          },
+          "held_out_max_error_fraction": [
+            0.20598760999820137
+          ],
+          "build_s": 0.05035597691312432,
+          "upload_s": 0.0,
+          "host_bytes": 9864,
+          "layers": 1
+        }
+      ],
+      "same_seed_replay": null,
+      "case": "si-300-100um-0deg-78813-table",
+      "raw_record_sha256": "70aa86ccec335b24b4a905cfb9a6aca69bff599404f6bb7a710102cf6083a563",
+      "max_accounting_errors": {
+        "energy_ledger_max_error_keV": 1.6484591469634324e-12,
+        "photon_debit_max_error_keV": 2.842170943040401e-14,
+        "direction_norm_max_error": 2.220446049250313e-16
+      }
+    },
+    {
+      "scene": {
+        "id": "w-300-10um-0deg",
+        "element": "W",
+        "catalog_key": "W",
+        "density_g_cm3": 19.3,
+        "atomic_weight": 183.84,
+        "energy_keV": 300,
+        "thickness_um": 10,
+        "angle_deg": 0,
+        "number_density_ang3": 0.06322199557658834
+      },
+      "seed": 78811,
+      "histories": 2048,
+      "core": "per-electron",
+      "batch_histories": 2048,
+      "scratch_mib": 4096,
+      "probe_electrons": 0,
+      "cutoff_eV": 1000,
+      "max_de_frac": 0.05,
+      "max_steps": 20000,
+      "tables": {
+        "elsepa": [
+          [
+            {
+              "key": "016589c75e4b80a0737fedab58d71817c45159b6f5b18c9216ab335b9a38dd63",
+              "manifest_sha256": "eb6d7b04ae7ae3d427b59212204e7732f176a405b1b779ae4cc0707938354168",
+              "arrays_sha256": "4bd33f5f3baaff74667327313d0a958f1ae350ca918cc19f71f575c0c54e1b55"
+            }
+          ]
+        ],
+        "sbethe": {
+          "key": "6a7b4dbfeffcbb8243196a6c1633d5a3373c763e1ab8187d14f8fdc78b040abe",
+          "manifest_sha256": "aad81627544f969bf61ce96c2dca5a919f772a438f4493b3d6973394b23aefd6",
+          "arrays_sha256": "9cdd5f93621b2e924985254cb8c8a117256b0ac7ead51b05aa11a0515d62a74f"
+        },
+        "bremslib": {
+          "key": "dfccd9efa5bdcd0968b2cbbabd708106d123f6df654bc03d19b3e96cec0beec0",
+          "manifest_sha256": "ec1cfd4c6f5e97dec8aca7a3153a3f212cfcce90d7ec296b12a7d876e4c1886d"
+        }
+      },
+      "timings_s": {
+        "imports_and_tables": 0.12572321901097894,
+        "warmup": 63.02938081510365,
+        "transport_and_emission": 62.66987948096357,
+        "request_with_reductions": 63.395551877096295,
+        "reductions": 0.7256605059374124,
+        "adapter_total": 126.5512280750554
+      },
+      "peak_rss_kib": 4100064,
+      "raw_scores_sha256": "5ab45027df9f2aee6d1a971477b4a0b601af3a04c85b1355dafaa2674a5e50e6",
+      "moment_variant": "exact",
+      "moment_source": {
+        "reference_sha256": "794d3b99e19a526bbb1c0883bd1e333f5b03a8d2d0cea6bd277977745048042c",
+        "wrapper_sha256": "ae8be30ba30b2a95731d0a58509851c563b182a83a5c70ce8672a0b7cd7fc092",
+        "protocol_sha256": "1b3d0748828ab001b385644208020b50d28eb1f484aa9f5a310458ba437d376f",
+        "exact_sampler_sha256": "94cf1515e58a1c3436077c5d58ec895309e2a33c235caf7fa35352ffbd69360b"
+      },
+      "preparations": [],
+      "same_seed_replay": null,
+      "case": "w-300-10um-0deg-78811-exact",
+      "raw_record_sha256": "4fd580c1b88011a11e46a1467d9d679456b5fd3e5cb8fad2b373e9ecc4b08e58",
+      "max_accounting_errors": {
+        "energy_ledger_max_error_keV": 1.7621459846850485e-12,
+        "photon_debit_max_error_keV": 2.842170943040401e-14,
+        "direction_norm_max_error": 2.220446049250313e-16
+      }
+    },
+    {
+      "scene": {
+        "id": "w-300-10um-0deg",
+        "element": "W",
+        "catalog_key": "W",
+        "density_g_cm3": 19.3,
+        "atomic_weight": 183.84,
+        "energy_keV": 300,
+        "thickness_um": 10,
+        "angle_deg": 0,
+        "number_density_ang3": 0.06322199557658834
+      },
+      "seed": 78811,
+      "histories": 2048,
+      "core": "per-electron",
+      "batch_histories": 2048,
+      "scratch_mib": 4096,
+      "probe_electrons": 0,
+      "cutoff_eV": 1000,
+      "max_de_frac": 0.05,
+      "max_steps": 20000,
+      "tables": {
+        "elsepa": [
+          [
+            {
+              "key": "016589c75e4b80a0737fedab58d71817c45159b6f5b18c9216ab335b9a38dd63",
+              "manifest_sha256": "eb6d7b04ae7ae3d427b59212204e7732f176a405b1b779ae4cc0707938354168",
+              "arrays_sha256": "4bd33f5f3baaff74667327313d0a958f1ae350ca918cc19f71f575c0c54e1b55"
+            }
+          ]
+        ],
+        "sbethe": {
+          "key": "6a7b4dbfeffcbb8243196a6c1633d5a3373c763e1ab8187d14f8fdc78b040abe",
+          "manifest_sha256": "aad81627544f969bf61ce96c2dca5a919f772a438f4493b3d6973394b23aefd6",
+          "arrays_sha256": "9cdd5f93621b2e924985254cb8c8a117256b0ac7ead51b05aa11a0515d62a74f"
+        },
+        "bremslib": {
+          "key": "dfccd9efa5bdcd0968b2cbbabd708106d123f6df654bc03d19b3e96cec0beec0",
+          "manifest_sha256": "ec1cfd4c6f5e97dec8aca7a3153a3f212cfcce90d7ec296b12a7d876e4c1886d"
+        }
+      },
+      "timings_s": {
+        "imports_and_tables": 0.12656638282351196,
+        "warmup": 7.095463348086923,
+        "transport_and_emission": 5.110617937985808,
+        "request_with_reductions": 5.822396480012685,
+        "reductions": 0.7117658120114356,
+        "adapter_total": 13.044941185973585
+      },
+      "peak_rss_kib": 4106208,
+      "raw_scores_sha256": "23a1f778cdfe7748896ca5b9226acb1bc8889a676c5f1a4440fb75fac03bb9e6",
+      "moment_variant": "refined",
+      "moment_source": {
+        "reference_sha256": "794d3b99e19a526bbb1c0883bd1e333f5b03a8d2d0cea6bd277977745048042c",
+        "candidate_sha256": "f30490f4c180a435b1dc9c1e04067e3b1cf6199dba7a28f9fd8316a1967fa8d6",
+        "helper_sha256": "731b3bdae1c06ddfff2a27f0660eb19c732d22fa878bba34101826a249e29b99",
+        "frequent_calls_replaced": 3,
+        "exact_event_total_calls_retained": 1,
+        "wrapper_sha256": "ae8be30ba30b2a95731d0a58509851c563b182a83a5c70ce8672a0b7cd7fc092",
+        "protocol_sha256": "1b3d0748828ab001b385644208020b50d28eb1f484aa9f5a310458ba437d376f",
+        "exact_sampler_sha256": "94cf1515e58a1c3436077c5d58ec895309e2a33c235caf7fa35352ffbd69360b"
+      },
+      "preparations": [
+        {
+          "digest": "ece2fc0debc6b0019b48afb718f1bd56be6b021b1f6a735088cae0f14f013bb1",
+          "identity": {
+            "atol": [
+              1e-10,
+              1e-14,
+              1e-10
+            ],
+            "composition": [
+              [
+                [
+                  "W",
+                  0.06322199557658834
+                ]
+              ]
+            ],
+            "coverage_eV": [
+              10000.0,
+              300000.0
+            ],
+            "cutoff_eV": 1000.0,
+            "held_out_count": 8191,
+            "max_nodes": 32768,
+            "plasma_eV": [
+              80.31695920801324
+            ],
+            "policy": "positive-linear-log-energy-v1",
+            "projectile": "electron",
+            "reference": "bremslib-v2.0-sdcs-ddcs/lin-x18-geo4-ln-t-lin-theta-v2/tm-coupled-v2/ee-sb85-v1",
+            "rtol": 0.0001,
+            "sources": [
+              [
+                "W",
+                "dfccd9efa5bdcd0968b2cbbabd708106d123f6df654bc03d19b3e96cec0beec0",
+                "ec1cfd4c6f5e97dec8aca7a3153a3f212cfcce90d7ec296b12a7d876e4c1886d"
+              ]
+            ]
+          },
+          "held_out_max_error_fraction": [
+            0.19541371328768495
+          ],
+          "build_s": 0.04965590592473745,
+          "upload_s": 0.0,
+          "host_bytes": 9864,
+          "layers": 1
+        }
+      ],
+      "same_seed_replay": null,
+      "case": "w-300-10um-0deg-78811-refined",
+      "raw_record_sha256": "e745813092c942ef2d2fb2d443a3cf469269dbc23c5f9082e3f490ff1b0ab5f3",
+      "max_accounting_errors": {
+        "energy_ledger_max_error_keV": 2.2168933355715126e-12,
+        "photon_debit_max_error_keV": 2.842170943040401e-14,
+        "direction_norm_max_error": 2.220446049250313e-16
+      }
+    },
+    {
+      "scene": {
+        "id": "w-300-10um-0deg",
+        "element": "W",
+        "catalog_key": "W",
+        "density_g_cm3": 19.3,
+        "atomic_weight": 183.84,
+        "energy_keV": 300,
+        "thickness_um": 10,
+        "angle_deg": 0,
+        "number_density_ang3": 0.06322199557658834
+      },
+      "seed": 78811,
+      "histories": 2048,
+      "core": "per-electron",
+      "batch_histories": 2048,
+      "scratch_mib": 4096,
+      "probe_electrons": 0,
+      "cutoff_eV": 1000,
+      "max_de_frac": 0.05,
+      "max_steps": 20000,
+      "tables": {
+        "elsepa": [
+          [
+            {
+              "key": "016589c75e4b80a0737fedab58d71817c45159b6f5b18c9216ab335b9a38dd63",
+              "manifest_sha256": "eb6d7b04ae7ae3d427b59212204e7732f176a405b1b779ae4cc0707938354168",
+              "arrays_sha256": "4bd33f5f3baaff74667327313d0a958f1ae350ca918cc19f71f575c0c54e1b55"
+            }
+          ]
+        ],
+        "sbethe": {
+          "key": "6a7b4dbfeffcbb8243196a6c1633d5a3373c763e1ab8187d14f8fdc78b040abe",
+          "manifest_sha256": "aad81627544f969bf61ce96c2dca5a919f772a438f4493b3d6973394b23aefd6",
+          "arrays_sha256": "9cdd5f93621b2e924985254cb8c8a117256b0ac7ead51b05aa11a0515d62a74f"
+        },
+        "bremslib": {
+          "key": "dfccd9efa5bdcd0968b2cbbabd708106d123f6df654bc03d19b3e96cec0beec0",
+          "manifest_sha256": "ec1cfd4c6f5e97dec8aca7a3153a3f212cfcce90d7ec296b12a7d876e4c1886d"
+        }
+      },
+      "timings_s": {
+        "imports_and_tables": 0.1277018019463867,
+        "warmup": 7.024709985824302,
+        "transport_and_emission": 5.032569675939158,
+        "request_with_reductions": 5.751701874891296,
+        "reductions": 0.71912089898251,
+        "adapter_total": 12.904796599177644
+      },
+      "peak_rss_kib": 4103412,
+      "raw_scores_sha256": "120cc34cce4a88a8f0af9053b683d6d015917e92bbaecba70bdabc957916fb79",
+      "moment_variant": "table",
+      "moment_source": {
+        "reference_sha256": "794d3b99e19a526bbb1c0883bd1e333f5b03a8d2d0cea6bd277977745048042c",
+        "candidate_sha256": "f30490f4c180a435b1dc9c1e04067e3b1cf6199dba7a28f9fd8316a1967fa8d6",
+        "helper_sha256": "731b3bdae1c06ddfff2a27f0660eb19c732d22fa878bba34101826a249e29b99",
+        "frequent_calls_replaced": 3,
+        "exact_event_total_calls_retained": 1,
+        "wrapper_sha256": "ae8be30ba30b2a95731d0a58509851c563b182a83a5c70ce8672a0b7cd7fc092",
+        "protocol_sha256": "1b3d0748828ab001b385644208020b50d28eb1f484aa9f5a310458ba437d376f",
+        "exact_sampler_sha256": "94cf1515e58a1c3436077c5d58ec895309e2a33c235caf7fa35352ffbd69360b"
+      },
+      "preparations": [
+        {
+          "digest": "383693fbebd9f23125e15d5db6909bce81d07139ed612108c475197740545b28",
+          "identity": {
+            "atol": [
+              1e-10,
+              1e-14,
+              1e-10
+            ],
+            "composition": [
+              [
+                [
+                  "W",
+                  0.06322199557658834
+                ]
+              ]
+            ],
+            "coverage_eV": [
+              10000.0,
+              300000.0
+            ],
+            "cutoff_eV": 1000.0,
+            "held_out_count": 8191,
+            "max_nodes": 32768,
+            "plasma_eV": [
+              80.31695920801324
+            ],
+            "policy": "positive-linear-log-energy-v1",
+            "projectile": "electron",
+            "reference": "bremslib-v2.0-sdcs-ddcs/lin-x18-geo4-ln-t-lin-theta-v2/tm-coupled-v2/ee-sb85-v1",
+            "rtol": 0.0002,
+            "sources": [
+              [
+                "W",
+                "dfccd9efa5bdcd0968b2cbbabd708106d123f6df654bc03d19b3e96cec0beec0",
+                "ec1cfd4c6f5e97dec8aca7a3153a3f212cfcce90d7ec296b12a7d876e4c1886d"
+              ]
+            ]
+          },
+          "held_out_max_error_fraction": [
+            0.23847308900854305
+          ],
+          "build_s": 0.050090959994122386,
+          "upload_s": 0.0,
+          "host_bytes": 9744,
+          "layers": 1
+        }
+      ],
+      "same_seed_replay": null,
+      "case": "w-300-10um-0deg-78811-table",
+      "raw_record_sha256": "cee25c2e2026ffc55fe26187f5f1291bc45ff55937f23e18bcb08adc3977319d",
+      "max_accounting_errors": {
+        "energy_ledger_max_error_keV": 2.5011104298755527e-12,
+        "photon_debit_max_error_keV": 2.842170943040401e-14,
+        "direction_norm_max_error": 2.220446049250313e-16
+      }
+    },
+    {
+      "scene": {
+        "id": "w-300-10um-0deg",
+        "element": "W",
+        "catalog_key": "W",
+        "density_g_cm3": 19.3,
+        "atomic_weight": 183.84,
+        "energy_keV": 300,
+        "thickness_um": 10,
+        "angle_deg": 0,
+        "number_density_ang3": 0.06322199557658834
+      },
+      "seed": 78812,
+      "histories": 2048,
+      "core": "per-electron",
+      "batch_histories": 2048,
+      "scratch_mib": 4096,
+      "probe_electrons": 0,
+      "cutoff_eV": 1000,
+      "max_de_frac": 0.05,
+      "max_steps": 20000,
+      "tables": {
+        "elsepa": [
+          [
+            {
+              "key": "016589c75e4b80a0737fedab58d71817c45159b6f5b18c9216ab335b9a38dd63",
+              "manifest_sha256": "eb6d7b04ae7ae3d427b59212204e7732f176a405b1b779ae4cc0707938354168",
+              "arrays_sha256": "4bd33f5f3baaff74667327313d0a958f1ae350ca918cc19f71f575c0c54e1b55"
+            }
+          ]
+        ],
+        "sbethe": {
+          "key": "6a7b4dbfeffcbb8243196a6c1633d5a3373c763e1ab8187d14f8fdc78b040abe",
+          "manifest_sha256": "aad81627544f969bf61ce96c2dca5a919f772a438f4493b3d6973394b23aefd6",
+          "arrays_sha256": "9cdd5f93621b2e924985254cb8c8a117256b0ac7ead51b05aa11a0515d62a74f"
+        },
+        "bremslib": {
+          "key": "dfccd9efa5bdcd0968b2cbbabd708106d123f6df654bc03d19b3e96cec0beec0",
+          "manifest_sha256": "ec1cfd4c6f5e97dec8aca7a3153a3f212cfcce90d7ec296b12a7d876e4c1886d"
+        }
+      },
+      "timings_s": {
+        "imports_and_tables": 0.12492318986915052,
+        "warmup": 61.47593453805894,
+        "transport_and_emission": 61.059061060193926,
+        "request_with_reductions": 61.7703187209554,
+        "reductions": 0.7112459109630436,
+        "adapter_total": 123.37168875290081
+      },
+      "peak_rss_kib": 4107564,
+      "raw_scores_sha256": "3c2e2d54e3aeb79b0af0f82520e1c8e74ef3cd3daddde4764e01e2cf9a263e8b",
+      "moment_variant": "exact",
+      "moment_source": {
+        "reference_sha256": "794d3b99e19a526bbb1c0883bd1e333f5b03a8d2d0cea6bd277977745048042c",
+        "wrapper_sha256": "ae8be30ba30b2a95731d0a58509851c563b182a83a5c70ce8672a0b7cd7fc092",
+        "protocol_sha256": "1b3d0748828ab001b385644208020b50d28eb1f484aa9f5a310458ba437d376f",
+        "exact_sampler_sha256": "94cf1515e58a1c3436077c5d58ec895309e2a33c235caf7fa35352ffbd69360b"
+      },
+      "preparations": [],
+      "same_seed_replay": null,
+      "case": "w-300-10um-0deg-78812-exact",
+      "raw_record_sha256": "9e773418f6e0db930c0ad26898c1fe00011bb512918f22b792ecb2949d2b57dc",
+      "max_accounting_errors": {
+        "energy_ledger_max_error_keV": 2.1600499167107046e-12,
+        "photon_debit_max_error_keV": 2.842170943040401e-14,
+        "direction_norm_max_error": 2.220446049250313e-16
+      }
+    },
+    {
+      "scene": {
+        "id": "w-300-10um-0deg",
+        "element": "W",
+        "catalog_key": "W",
+        "density_g_cm3": 19.3,
+        "atomic_weight": 183.84,
+        "energy_keV": 300,
+        "thickness_um": 10,
+        "angle_deg": 0,
+        "number_density_ang3": 0.06322199557658834
+      },
+      "seed": 78812,
+      "histories": 2048,
+      "core": "per-electron",
+      "batch_histories": 2048,
+      "scratch_mib": 4096,
+      "probe_electrons": 0,
+      "cutoff_eV": 1000,
+      "max_de_frac": 0.05,
+      "max_steps": 20000,
+      "tables": {
+        "elsepa": [
+          [
+            {
+              "key": "016589c75e4b80a0737fedab58d71817c45159b6f5b18c9216ab335b9a38dd63",
+              "manifest_sha256": "eb6d7b04ae7ae3d427b59212204e7732f176a405b1b779ae4cc0707938354168",
+              "arrays_sha256": "4bd33f5f3baaff74667327313d0a958f1ae350ca918cc19f71f575c0c54e1b55"
+            }
+          ]
+        ],
+        "sbethe": {
+          "key": "6a7b4dbfeffcbb8243196a6c1633d5a3373c763e1ab8187d14f8fdc78b040abe",
+          "manifest_sha256": "aad81627544f969bf61ce96c2dca5a919f772a438f4493b3d6973394b23aefd6",
+          "arrays_sha256": "9cdd5f93621b2e924985254cb8c8a117256b0ac7ead51b05aa11a0515d62a74f"
+        },
+        "bremslib": {
+          "key": "dfccd9efa5bdcd0968b2cbbabd708106d123f6df654bc03d19b3e96cec0beec0",
+          "manifest_sha256": "ec1cfd4c6f5e97dec8aca7a3153a3f212cfcce90d7ec296b12a7d876e4c1886d"
+        }
+      },
+      "timings_s": {
+        "imports_and_tables": 0.12740973802283406,
+        "warmup": 7.51266206195578,
+        "transport_and_emission": 4.984616033965722,
+        "request_with_reductions": 5.691397043177858,
+        "reductions": 0.7067708589602262,
+        "adapter_total": 13.332068776944652
+      },
+      "peak_rss_kib": 4109840,
+      "raw_scores_sha256": "38eab94213e491d884161c5cd9376eff04fde20c518792fcdc43879900a7dcba",
+      "moment_variant": "refined",
+      "moment_source": {
+        "reference_sha256": "794d3b99e19a526bbb1c0883bd1e333f5b03a8d2d0cea6bd277977745048042c",
+        "candidate_sha256": "f30490f4c180a435b1dc9c1e04067e3b1cf6199dba7a28f9fd8316a1967fa8d6",
+        "helper_sha256": "731b3bdae1c06ddfff2a27f0660eb19c732d22fa878bba34101826a249e29b99",
+        "frequent_calls_replaced": 3,
+        "exact_event_total_calls_retained": 1,
+        "wrapper_sha256": "ae8be30ba30b2a95731d0a58509851c563b182a83a5c70ce8672a0b7cd7fc092",
+        "protocol_sha256": "1b3d0748828ab001b385644208020b50d28eb1f484aa9f5a310458ba437d376f",
+        "exact_sampler_sha256": "94cf1515e58a1c3436077c5d58ec895309e2a33c235caf7fa35352ffbd69360b"
+      },
+      "preparations": [
+        {
+          "digest": "ece2fc0debc6b0019b48afb718f1bd56be6b021b1f6a735088cae0f14f013bb1",
+          "identity": {
+            "atol": [
+              1e-10,
+              1e-14,
+              1e-10
+            ],
+            "composition": [
+              [
+                [
+                  "W",
+                  0.06322199557658834
+                ]
+              ]
+            ],
+            "coverage_eV": [
+              10000.0,
+              300000.0
+            ],
+            "cutoff_eV": 1000.0,
+            "held_out_count": 8191,
+            "max_nodes": 32768,
+            "plasma_eV": [
+              80.31695920801324
+            ],
+            "policy": "positive-linear-log-energy-v1",
+            "projectile": "electron",
+            "reference": "bremslib-v2.0-sdcs-ddcs/lin-x18-geo4-ln-t-lin-theta-v2/tm-coupled-v2/ee-sb85-v1",
+            "rtol": 0.0001,
+            "sources": [
+              [
+                "W",
+                "dfccd9efa5bdcd0968b2cbbabd708106d123f6df654bc03d19b3e96cec0beec0",
+                "ec1cfd4c6f5e97dec8aca7a3153a3f212cfcce90d7ec296b12a7d876e4c1886d"
+              ]
+            ]
+          },
+          "held_out_max_error_fraction": [
+            0.19541371328768495
+          ],
+          "build_s": 0.04951634490862489,
+          "upload_s": 0.0,
+          "host_bytes": 9864,
+          "layers": 1
+        }
+      ],
+      "same_seed_replay": null,
+      "case": "w-300-10um-0deg-78812-refined",
+      "raw_record_sha256": "007e883e2c8f370a20055bc0a31b0b1c5735e7c9748249ca1bf042281af3bfeb",
+      "max_accounting_errors": {
+        "energy_ledger_max_error_keV": 1.8758328224066645e-12,
+        "photon_debit_max_error_keV": 2.842170943040401e-14,
+        "direction_norm_max_error": 2.220446049250313e-16
+      }
+    },
+    {
+      "scene": {
+        "id": "w-300-10um-0deg",
+        "element": "W",
+        "catalog_key": "W",
+        "density_g_cm3": 19.3,
+        "atomic_weight": 183.84,
+        "energy_keV": 300,
+        "thickness_um": 10,
+        "angle_deg": 0,
+        "number_density_ang3": 0.06322199557658834
+      },
+      "seed": 78812,
+      "histories": 2048,
+      "core": "per-electron",
+      "batch_histories": 2048,
+      "scratch_mib": 4096,
+      "probe_electrons": 0,
+      "cutoff_eV": 1000,
+      "max_de_frac": 0.05,
+      "max_steps": 20000,
+      "tables": {
+        "elsepa": [
+          [
+            {
+              "key": "016589c75e4b80a0737fedab58d71817c45159b6f5b18c9216ab335b9a38dd63",
+              "manifest_sha256": "eb6d7b04ae7ae3d427b59212204e7732f176a405b1b779ae4cc0707938354168",
+              "arrays_sha256": "4bd33f5f3baaff74667327313d0a958f1ae350ca918cc19f71f575c0c54e1b55"
+            }
+          ]
+        ],
+        "sbethe": {
+          "key": "6a7b4dbfeffcbb8243196a6c1633d5a3373c763e1ab8187d14f8fdc78b040abe",
+          "manifest_sha256": "aad81627544f969bf61ce96c2dca5a919f772a438f4493b3d6973394b23aefd6",
+          "arrays_sha256": "9cdd5f93621b2e924985254cb8c8a117256b0ac7ead51b05aa11a0515d62a74f"
+        },
+        "bremslib": {
+          "key": "dfccd9efa5bdcd0968b2cbbabd708106d123f6df654bc03d19b3e96cec0beec0",
+          "manifest_sha256": "ec1cfd4c6f5e97dec8aca7a3153a3f212cfcce90d7ec296b12a7d876e4c1886d"
+        }
+      },
+      "timings_s": {
+        "imports_and_tables": 0.12923179217614233,
+        "warmup": 7.147980662062764,
+        "transport_and_emission": 5.255640296032652,
+        "request_with_reductions": 5.980739803053439,
+        "reductions": 0.7250887569971383,
+        "adapter_total": 13.258464141050354
+      },
+      "peak_rss_kib": 4109712,
+      "raw_scores_sha256": "6bf091f260bcaa3141e67196b8b5e501dbe0494899eb9442183adb5ba561a3d4",
+      "moment_variant": "table",
+      "moment_source": {
+        "reference_sha256": "794d3b99e19a526bbb1c0883bd1e333f5b03a8d2d0cea6bd277977745048042c",
+        "candidate_sha256": "f30490f4c180a435b1dc9c1e04067e3b1cf6199dba7a28f9fd8316a1967fa8d6",
+        "helper_sha256": "731b3bdae1c06ddfff2a27f0660eb19c732d22fa878bba34101826a249e29b99",
+        "frequent_calls_replaced": 3,
+        "exact_event_total_calls_retained": 1,
+        "wrapper_sha256": "ae8be30ba30b2a95731d0a58509851c563b182a83a5c70ce8672a0b7cd7fc092",
+        "protocol_sha256": "1b3d0748828ab001b385644208020b50d28eb1f484aa9f5a310458ba437d376f",
+        "exact_sampler_sha256": "94cf1515e58a1c3436077c5d58ec895309e2a33c235caf7fa35352ffbd69360b"
+      },
+      "preparations": [
+        {
+          "digest": "383693fbebd9f23125e15d5db6909bce81d07139ed612108c475197740545b28",
+          "identity": {
+            "atol": [
+              1e-10,
+              1e-14,
+              1e-10
+            ],
+            "composition": [
+              [
+                [
+                  "W",
+                  0.06322199557658834
+                ]
+              ]
+            ],
+            "coverage_eV": [
+              10000.0,
+              300000.0
+            ],
+            "cutoff_eV": 1000.0,
+            "held_out_count": 8191,
+            "max_nodes": 32768,
+            "plasma_eV": [
+              80.31695920801324
+            ],
+            "policy": "positive-linear-log-energy-v1",
+            "projectile": "electron",
+            "reference": "bremslib-v2.0-sdcs-ddcs/lin-x18-geo4-ln-t-lin-theta-v2/tm-coupled-v2/ee-sb85-v1",
+            "rtol": 0.0002,
+            "sources": [
+              [
+                "W",
+                "dfccd9efa5bdcd0968b2cbbabd708106d123f6df654bc03d19b3e96cec0beec0",
+                "ec1cfd4c6f5e97dec8aca7a3153a3f212cfcce90d7ec296b12a7d876e4c1886d"
+              ]
+            ]
+          },
+          "held_out_max_error_fraction": [
+            0.23847308900854305
+          ],
+          "build_s": 0.0504604778252542,
+          "upload_s": 0.0,
+          "host_bytes": 9744,
+          "layers": 1
+        }
+      ],
+      "same_seed_replay": null,
+      "case": "w-300-10um-0deg-78812-table",
+      "raw_record_sha256": "5394f1ef09e5fe2cb473c44fd944ba9e2fb1d6c802a7ac9e888965863b178363",
+      "max_accounting_errors": {
+        "energy_ledger_max_error_keV": 1.9895196601282805e-12,
+        "photon_debit_max_error_keV": 2.842170943040401e-14,
+        "direction_norm_max_error": 2.220446049250313e-16
+      }
+    },
+    {
+      "scene": {
+        "id": "w-300-10um-0deg",
+        "element": "W",
+        "catalog_key": "W",
+        "density_g_cm3": 19.3,
+        "atomic_weight": 183.84,
+        "energy_keV": 300,
+        "thickness_um": 10,
+        "angle_deg": 0,
+        "number_density_ang3": 0.06322199557658834
+      },
+      "seed": 78813,
+      "histories": 2048,
+      "core": "per-electron",
+      "batch_histories": 2048,
+      "scratch_mib": 4096,
+      "probe_electrons": 0,
+      "cutoff_eV": 1000,
+      "max_de_frac": 0.05,
+      "max_steps": 20000,
+      "tables": {
+        "elsepa": [
+          [
+            {
+              "key": "016589c75e4b80a0737fedab58d71817c45159b6f5b18c9216ab335b9a38dd63",
+              "manifest_sha256": "eb6d7b04ae7ae3d427b59212204e7732f176a405b1b779ae4cc0707938354168",
+              "arrays_sha256": "4bd33f5f3baaff74667327313d0a958f1ae350ca918cc19f71f575c0c54e1b55"
+            }
+          ]
+        ],
+        "sbethe": {
+          "key": "6a7b4dbfeffcbb8243196a6c1633d5a3373c763e1ab8187d14f8fdc78b040abe",
+          "manifest_sha256": "aad81627544f969bf61ce96c2dca5a919f772a438f4493b3d6973394b23aefd6",
+          "arrays_sha256": "9cdd5f93621b2e924985254cb8c8a117256b0ac7ead51b05aa11a0515d62a74f"
+        },
+        "bremslib": {
+          "key": "dfccd9efa5bdcd0968b2cbbabd708106d123f6df654bc03d19b3e96cec0beec0",
+          "manifest_sha256": "ec1cfd4c6f5e97dec8aca7a3153a3f212cfcce90d7ec296b12a7d876e4c1886d"
+        }
+      },
+      "timings_s": {
+        "imports_and_tables": 0.12626231485046446,
+        "warmup": 62.05394996399991,
+        "transport_and_emission": 59.56453867792152,
+        "request_with_reductions": 60.2408325530123,
+        "reductions": 0.6762831751257181,
+        "adapter_total": 122.42157530598342
+      },
+      "peak_rss_kib": 4044584,
+      "raw_scores_sha256": "3c64ebeed0531a6805bf92be69767fd6efae756568d88764ef0781506c7d86a2",
+      "moment_variant": "exact",
+      "moment_source": {
+        "reference_sha256": "794d3b99e19a526bbb1c0883bd1e333f5b03a8d2d0cea6bd277977745048042c",
+        "wrapper_sha256": "ae8be30ba30b2a95731d0a58509851c563b182a83a5c70ce8672a0b7cd7fc092",
+        "protocol_sha256": "1b3d0748828ab001b385644208020b50d28eb1f484aa9f5a310458ba437d376f",
+        "exact_sampler_sha256": "94cf1515e58a1c3436077c5d58ec895309e2a33c235caf7fa35352ffbd69360b"
+      },
+      "preparations": [],
+      "same_seed_replay": null,
+      "case": "w-300-10um-0deg-78813-exact",
+      "raw_record_sha256": "4a81cb5f1c588c78ba4bd4cae6b9a524fdd7800b4e3e9eddfcd98a9aa3d61770",
+      "max_accounting_errors": {
+        "energy_ledger_max_error_keV": 2.2168933355715126e-12,
+        "photon_debit_max_error_keV": 2.842170943040401e-14,
+        "direction_norm_max_error": 2.220446049250313e-16
+      }
+    },
+    {
+      "scene": {
+        "id": "w-300-10um-0deg",
+        "element": "W",
+        "catalog_key": "W",
+        "density_g_cm3": 19.3,
+        "atomic_weight": 183.84,
+        "energy_keV": 300,
+        "thickness_um": 10,
+        "angle_deg": 0,
+        "number_density_ang3": 0.06322199557658834
+      },
+      "seed": 78813,
+      "histories": 2048,
+      "core": "per-electron",
+      "batch_histories": 2048,
+      "scratch_mib": 4096,
+      "probe_electrons": 0,
+      "cutoff_eV": 1000,
+      "max_de_frac": 0.05,
+      "max_steps": 20000,
+      "tables": {
+        "elsepa": [
+          [
+            {
+              "key": "016589c75e4b80a0737fedab58d71817c45159b6f5b18c9216ab335b9a38dd63",
+              "manifest_sha256": "eb6d7b04ae7ae3d427b59212204e7732f176a405b1b779ae4cc0707938354168",
+              "arrays_sha256": "4bd33f5f3baaff74667327313d0a958f1ae350ca918cc19f71f575c0c54e1b55"
+            }
+          ]
+        ],
+        "sbethe": {
+          "key": "6a7b4dbfeffcbb8243196a6c1633d5a3373c763e1ab8187d14f8fdc78b040abe",
+          "manifest_sha256": "aad81627544f969bf61ce96c2dca5a919f772a438f4493b3d6973394b23aefd6",
+          "arrays_sha256": "9cdd5f93621b2e924985254cb8c8a117256b0ac7ead51b05aa11a0515d62a74f"
+        },
+        "bremslib": {
+          "key": "dfccd9efa5bdcd0968b2cbbabd708106d123f6df654bc03d19b3e96cec0beec0",
+          "manifest_sha256": "ec1cfd4c6f5e97dec8aca7a3153a3f212cfcce90d7ec296b12a7d876e4c1886d"
+        }
+      },
+      "timings_s": {
+        "imports_and_tables": 0.12553331488743424,
+        "warmup": 6.9212107649073005,
+        "transport_and_emission": 4.784425935009494,
+        "request_with_reductions": 5.455155300209299,
+        "reductions": 0.6707184452097863,
+        "adapter_total": 12.502495435066521
+      },
+      "peak_rss_kib": 4047128,
+      "raw_scores_sha256": "5e4f692fb1f0a03e83087cc986fe4afe67bdf4e12dc5a2276cf195881208b804",
+      "moment_variant": "refined",
+      "moment_source": {
+        "reference_sha256": "794d3b99e19a526bbb1c0883bd1e333f5b03a8d2d0cea6bd277977745048042c",
+        "candidate_sha256": "f30490f4c180a435b1dc9c1e04067e3b1cf6199dba7a28f9fd8316a1967fa8d6",
+        "helper_sha256": "731b3bdae1c06ddfff2a27f0660eb19c732d22fa878bba34101826a249e29b99",
+        "frequent_calls_replaced": 3,
+        "exact_event_total_calls_retained": 1,
+        "wrapper_sha256": "ae8be30ba30b2a95731d0a58509851c563b182a83a5c70ce8672a0b7cd7fc092",
+        "protocol_sha256": "1b3d0748828ab001b385644208020b50d28eb1f484aa9f5a310458ba437d376f",
+        "exact_sampler_sha256": "94cf1515e58a1c3436077c5d58ec895309e2a33c235caf7fa35352ffbd69360b"
+      },
+      "preparations": [
+        {
+          "digest": "ece2fc0debc6b0019b48afb718f1bd56be6b021b1f6a735088cae0f14f013bb1",
+          "identity": {
+            "atol": [
+              1e-10,
+              1e-14,
+              1e-10
+            ],
+            "composition": [
+              [
+                [
+                  "W",
+                  0.06322199557658834
+                ]
+              ]
+            ],
+            "coverage_eV": [
+              10000.0,
+              300000.0
+            ],
+            "cutoff_eV": 1000.0,
+            "held_out_count": 8191,
+            "max_nodes": 32768,
+            "plasma_eV": [
+              80.31695920801324
+            ],
+            "policy": "positive-linear-log-energy-v1",
+            "projectile": "electron",
+            "reference": "bremslib-v2.0-sdcs-ddcs/lin-x18-geo4-ln-t-lin-theta-v2/tm-coupled-v2/ee-sb85-v1",
+            "rtol": 0.0001,
+            "sources": [
+              [
+                "W",
+                "dfccd9efa5bdcd0968b2cbbabd708106d123f6df654bc03d19b3e96cec0beec0",
+                "ec1cfd4c6f5e97dec8aca7a3153a3f212cfcce90d7ec296b12a7d876e4c1886d"
+              ]
+            ]
+          },
+          "held_out_max_error_fraction": [
+            0.19541371328768495
+          ],
+          "build_s": 0.0494654739741236,
+          "upload_s": 0.0,
+          "host_bytes": 9864,
+          "layers": 1
+        }
+      ],
+      "same_seed_replay": null,
+      "case": "w-300-10um-0deg-78813-refined",
+      "raw_record_sha256": "7b9d34222534aab9c77dcf3fea729e29555fc0ae394779c2425eb13a2e717cbd",
+      "max_accounting_errors": {
+        "energy_ledger_max_error_keV": 2.0463630789890885e-12,
+        "photon_debit_max_error_keV": 2.842170943040401e-14,
+        "direction_norm_max_error": 2.220446049250313e-16
+      }
+    },
+    {
+      "scene": {
+        "id": "w-300-10um-0deg",
+        "element": "W",
+        "catalog_key": "W",
+        "density_g_cm3": 19.3,
+        "atomic_weight": 183.84,
+        "energy_keV": 300,
+        "thickness_um": 10,
+        "angle_deg": 0,
+        "number_density_ang3": 0.06322199557658834
+      },
+      "seed": 78813,
+      "histories": 2048,
+      "core": "per-electron",
+      "batch_histories": 2048,
+      "scratch_mib": 4096,
+      "probe_electrons": 0,
+      "cutoff_eV": 1000,
+      "max_de_frac": 0.05,
+      "max_steps": 20000,
+      "tables": {
+        "elsepa": [
+          [
+            {
+              "key": "016589c75e4b80a0737fedab58d71817c45159b6f5b18c9216ab335b9a38dd63",
+              "manifest_sha256": "eb6d7b04ae7ae3d427b59212204e7732f176a405b1b779ae4cc0707938354168",
+              "arrays_sha256": "4bd33f5f3baaff74667327313d0a958f1ae350ca918cc19f71f575c0c54e1b55"
+            }
+          ]
+        ],
+        "sbethe": {
+          "key": "6a7b4dbfeffcbb8243196a6c1633d5a3373c763e1ab8187d14f8fdc78b040abe",
+          "manifest_sha256": "aad81627544f969bf61ce96c2dca5a919f772a438f4493b3d6973394b23aefd6",
+          "arrays_sha256": "9cdd5f93621b2e924985254cb8c8a117256b0ac7ead51b05aa11a0515d62a74f"
+        },
+        "bremslib": {
+          "key": "dfccd9efa5bdcd0968b2cbbabd708106d123f6df654bc03d19b3e96cec0beec0",
+          "manifest_sha256": "ec1cfd4c6f5e97dec8aca7a3153a3f212cfcce90d7ec296b12a7d876e4c1886d"
+        }
+      },
+      "timings_s": {
+        "imports_and_tables": 0.12676854501478374,
+        "warmup": 6.967800343874842,
+        "transport_and_emission": 4.830486475024372,
+        "request_with_reductions": 5.507663758005947,
+        "reductions": 0.6771670528687537,
+        "adapter_total": 12.602952611865476
+      },
+      "peak_rss_kib": 4047236,
+      "raw_scores_sha256": "e3cbf1627777d628d2e61959b1b7e307e72641b319d9629a9fe08337e39ac850",
+      "moment_variant": "table",
+      "moment_source": {
+        "reference_sha256": "794d3b99e19a526bbb1c0883bd1e333f5b03a8d2d0cea6bd277977745048042c",
+        "candidate_sha256": "f30490f4c180a435b1dc9c1e04067e3b1cf6199dba7a28f9fd8316a1967fa8d6",
+        "helper_sha256": "731b3bdae1c06ddfff2a27f0660eb19c732d22fa878bba34101826a249e29b99",
+        "frequent_calls_replaced": 3,
+        "exact_event_total_calls_retained": 1,
+        "wrapper_sha256": "ae8be30ba30b2a95731d0a58509851c563b182a83a5c70ce8672a0b7cd7fc092",
+        "protocol_sha256": "1b3d0748828ab001b385644208020b50d28eb1f484aa9f5a310458ba437d376f",
+        "exact_sampler_sha256": "94cf1515e58a1c3436077c5d58ec895309e2a33c235caf7fa35352ffbd69360b"
+      },
+      "preparations": [
+        {
+          "digest": "383693fbebd9f23125e15d5db6909bce81d07139ed612108c475197740545b28",
+          "identity": {
+            "atol": [
+              1e-10,
+              1e-14,
+              1e-10
+            ],
+            "composition": [
+              [
+                [
+                  "W",
+                  0.06322199557658834
+                ]
+              ]
+            ],
+            "coverage_eV": [
+              10000.0,
+              300000.0
+            ],
+            "cutoff_eV": 1000.0,
+            "held_out_count": 8191,
+            "max_nodes": 32768,
+            "plasma_eV": [
+              80.31695920801324
+            ],
+            "policy": "positive-linear-log-energy-v1",
+            "projectile": "electron",
+            "reference": "bremslib-v2.0-sdcs-ddcs/lin-x18-geo4-ln-t-lin-theta-v2/tm-coupled-v2/ee-sb85-v1",
+            "rtol": 0.0002,
+            "sources": [
+              [
+                "W",
+                "dfccd9efa5bdcd0968b2cbbabd708106d123f6df654bc03d19b3e96cec0beec0",
+                "ec1cfd4c6f5e97dec8aca7a3153a3f212cfcce90d7ec296b12a7d876e4c1886d"
+              ]
+            ]
+          },
+          "held_out_max_error_fraction": [
+            0.23847308900854305
+          ],
+          "build_s": 0.04936592094600201,
+          "upload_s": 0.0,
+          "host_bytes": 9744,
+          "layers": 1
+        }
+      ],
+      "same_seed_replay": null,
+      "case": "w-300-10um-0deg-78813-table",
+      "raw_record_sha256": "3976745fe073f593fc5703e834329f90bc79f4d4e4f6478a140d509020d5a17c",
+      "max_accounting_errors": {
+        "energy_ledger_max_error_keV": 1.7053025658242404e-12,
+        "photon_debit_max_error_keV": 2.842170943040401e-14,
+        "direction_norm_max_error": 2.220446049250313e-16
+      }
+    }
+  ],
+  "metadata_note": "Operator paths and hostnames omitted. Scheduler accounting storage disabled; peak RSS is adapter process high-water mark, not exclusive transport allocation.",
+  "median_request_ratios": [
+    {
+      "scene": "si-300-100um-0deg",
+      "variant": "table",
+      "exact_over_candidate": 11.10609211348266
+    },
+    {
+      "scene": "si-300-100um-0deg",
+      "variant": "refined",
+      "exact_over_candidate": 11.118840897425796
+    },
+    {
+      "scene": "w-300-10um-0deg",
+      "variant": "table",
+      "exact_over_candidate": 10.739485471354133
+    },
+    {
+      "scene": "w-300-10um-0deg",
+      "variant": "refined",
+      "exact_over_candidate": 10.85327877361816
+    }
+  ],
+  "limitations": "Paired screening only. Zero-variance discrete endpoints unresolved. In-process replay checked; separate-process replay and CPU/CUDA ensemble equivalence not checked. No production or equal-achieved-precision claim; no useful/replayed flight counters or CPU profiler collected. Preparation includes possible first-use specialization."
+}

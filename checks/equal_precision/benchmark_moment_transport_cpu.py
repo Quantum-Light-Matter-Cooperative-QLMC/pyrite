@@ -109,8 +109,14 @@ def install_tables(rtol, audit):
             starts = np.r_[0, np.cumsum(counts[:-1])]
             # Prefix is the *physical* plasma energy, not an approximate input.
             host = np.ascontiguousarray(
-                np.r_[packed[-1], starts, counts, *prepared.energy_eV,
-                      *prepared.log_energy, np.concatenate(prepared.moments).ravel()],
+                np.r_[
+                    packed[-1],
+                    starts,
+                    counts,
+                    *prepared.energy_eV,
+                    *prepared.log_energy,
+                    np.concatenate(prepared.moments).ravel(),
+                ],
                 dtype=np.float64,
             )
             if not np.all(np.isfinite(host)):
@@ -162,16 +168,18 @@ def main():
     transport_dir = Path(package.__file__).parent
     source.setdefault("reference_sha256", _sha((transport_dir / "cores.py").read_bytes()))
     source["wrapper_sha256"] = _sha(Path(__file__).read_bytes())
-    source["protocol_sha256"] = _sha(Path(__file__).with_name("moment-policy-788.json").read_bytes())
+    source["protocol_sha256"] = _sha(
+        Path(__file__).with_name("moment-policy-788.json").read_bytes()
+    )
     source["exact_sampler_sha256"] = _sha((transport_dir / "_jit_radiative.py").read_bytes())
     preparations = []
     if args.variant != "exact":
         install_tables(2e-4 if args.variant == "table" else 1e-4, preparations)
 
     import numpy as np
+    from paired_equivalence import coupling_record
     from precision_checks import trajectory_checks
 
-    from pyrite.montecarlo import transport
     from pyrite.perf.precision import grouped_scores
 
     namespace = runpy.run_path(str(Path(__file__).with_name("pyrite_adapter.py")))
@@ -207,18 +215,20 @@ def main():
         sys.argv = [sys.argv[0], *alternate]
         namespace["main"]()
         # Each complete adapter invocation runs one warmup and one measurement.
-        first = [b["arrays_sha256"] for b in prior[len(prior) // 2:]]
-        second_blocks = blocks[len(prior):]
-        second = [b["arrays_sha256"] for b in second_blocks[len(second_blocks) // 2:]]
+        first = [b["arrays_sha256"] for b in prior[len(prior) // 2 :]]
+        second_blocks = blocks[len(prior) :]
+        second = [b["arrays_sha256"] for b in second_blocks[len(second_blocks) // 2 :]]
         if first != second or not first:
             raise ValueError("CPU within-policy same-seed replay changed trajectory arrays")
         replay = {"passed": True, "blocks": len(first), "hashes": first}
+    metadata = sample.get("provenance", {}) | sample
     sample.update(
         schema="radiative-moment-transport-diagnostic-v1",
         moment_variant=args.variant,
         moment_source=source,
         preparations=preparations,
         same_seed_replay=replay,
+        primary_coupling=coupling_record(metadata["seed"], metadata["histories"]),
     )
     sample_path.write_text(json.dumps(sample, indent=2) + "\n")
     args.audit.write_text(
@@ -234,7 +244,8 @@ def main():
                 "limitations": "cold JIT and host allocation measured only by adapter; no profiler register data on CPU",
             },
             indent=2,
-        ) + "\n"
+        )
+        + "\n"
     )
 
 

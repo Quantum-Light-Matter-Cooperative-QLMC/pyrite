@@ -42,3 +42,39 @@ as ensemble equivalence. Do not mix the CPU and CUDA `.json` roots when
 running the paired analyzer, which keys cases by scene, seed and variant.
 CPU/CUDA statistical comparisons and wider energy/material anchors remain
 separate qualification work before production opt-in or default promotion.
+
+## Held-out binary endpoints and wider CPU anchors
+
+`moment-cpu-heldout-788.sbatch` freezes fresh seeds 78821–78823 and eight
+cases in `moment-heldout-788.json` before collecting results. It includes
+the Si/W pilot anchors, 100/800 keV and oblique anchors, a 10 keV photon
+cutoff and the supported SiO2 case. Each policy uses 2048 histories per seed.
+The existing three-seed pilot and its zero-variance rule remain unchanged.
+
+`qualify_moment_fractions.py` qualifies only transmission and backscatter.
+For paired binary outcomes A,B, absolute mean bias is at most P(A != B).
+It bounds this probability with a one-sided exact binomial upper confidence
+limit, allocating 0.01/32 failure probability to each of the 32 fixed
+case/variant/endpoint comparisons. This yields simultaneous 99% coverage
+by the union bound, assuming independent incident-primary pairs. Zero
+observed mismatches still give a positive upper bound. No optional stopping,
+pilot reuse, or shrinking the comparison family for missing cases is allowed.
+An incomplete seed group remains unresolved. Source, physical table, ordered
+stream fingerprints, score digests and fixed sample sizes must agree.
+Hard counts and continuous means are outside this binary qualification;
+passing these endpoints cannot open the whole production gate.
+
+Six additional preflights compare repeated within-process replay and retain
+scores from two independent processes under each policy. These records must
+be checked after collection; merely running them is not a replay verdict.
+The batch uses an isolated remote checkout and records source sync metadata.
+Job failure or a timeout leaves the qualification incomplete.
+
+### Interaction with #795
+
+#795's element-batched photon-angle completion is separate WIP in
+`issue-795-batched-photon`; its source, dirty documentation and job 2668
+evidence must be preserved. This #788 branch retains scalar completion.
+The 2666 CPU ratios and held-out run cannot be multiplied by #795's gains.
+Any integrated performance claim needs matched baseline/candidate requests
+on the combined source, with completion provenance and peak memory retained.

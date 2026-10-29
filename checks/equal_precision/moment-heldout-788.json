@@ -1,0 +1,34 @@
+{
+  "schema": "radiative-moment-heldout-fractions-788-v1",
+  "purpose": "Fresh-seed CPU coverage and finite-sample qualification of two binary endpoints only; no production gate promotion.",
+  "ensemble": {
+    "seeds": [
+      78821,
+      78822,
+      78823
+    ]
+  },
+  "histories_per_seed": 2048,
+  "alpha": 0.01,
+  "margin": 0.002,
+  "variants": [
+    "table",
+    "refined"
+  ],
+  "metrics": [
+    "transmitted",
+    "backscattered"
+  ],
+  "cases": [
+    "si-300-100um-0deg",
+    "w-300-10um-0deg",
+    "si-800-100um-0deg",
+    "w-800-10um-0deg",
+    "si-100-1um-0deg",
+    "w-100-100um-75deg",
+    "si-300-100um-0deg:10000",
+    "sio2-800kev-tr0.3-0deg-compound"
+  ],
+  "method": "One-sided exact binomial upper bound on paired discordance. Absolute mean difference <= discordance probability. Bonferroni alpha over all 32 predeclared comparisons. Independent primary pairs, fixed N, no optional stopping or pilot reuse. Missing groups stay unresolved.",
+  "exclusions": "Hard-count and continuous-mean equivalence remain outside this binary-endpoint qualification. Existing frozen pilot rules and production gates unchanged. #795 is not included; completion remains the measured scalar implementation."
+}

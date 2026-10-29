@@ -21,7 +21,7 @@ out="evidence/moment-cpu788/$SLURM_JOB_ID"
 mkdir -p "$out"
 [[ ! -f .pyrite-sync ]] || cp .pyrite-sync "$out/sync.txt"
 scontrol show job "$SLURM_JOB_ID" > "$out/job.txt"
-python -c 'import platform, sys; print(platform.platform()); print(sys.version)' > "$out/host.txt"
+uv run --no-sync python -c 'import platform, sys; print(platform.platform()); print(sys.version)' > "$out/host.txt"
 uv run --no-sync python checks/equal_precision/prepare_stopping.py > "$out/tables.json"
 # Preflight only: these runs must hash identically within each numerical policy.
 for scene in si-300-100um-0deg w-300-10um-0deg; do
