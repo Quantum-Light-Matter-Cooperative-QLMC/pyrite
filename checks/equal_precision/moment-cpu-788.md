@@ -74,7 +74,11 @@ Job failure or a timeout leaves the qualification incomplete.
 
 #795's element-batched photon-angle completion is separate WIP in
 `issue-795-batched-photon`; its source, dirty documentation and job 2668
-evidence must be preserved. This #788 branch retains scalar completion.
+evidence must be preserved. Job 2669 retains scalar completion at its frozen
+pre-rebase source `8db53f2d`. The current branch is rebased onto main including
+#795 and #799; it is not the measured source of that job. Future runs on this
+combined source require a separately identified protocol rather than reusing
+the held-out protocol's scalar-completion exclusion.
 The 2666 CPU ratios and held-out run cannot be multiplied by #795's gains.
 Any integrated performance claim needs matched baseline/candidate requests
 on the combined source, with completion provenance and peak memory retained.
