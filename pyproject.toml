@@ -1,6 +1,6 @@
 [project]
 name = "pyrite-mc"
-version = "0.23.0"
+version = "0.24.0"
 description = "Monte Carlo electron transport and X-ray emission in crystalline and amorphous solids."
 readme = "PYPI.md"
 license = { file = "LICENSE.txt" }
