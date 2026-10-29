@@ -848,17 +848,16 @@ full-history driver's scratch-limited 626-history batches are 7–13× slower.
 This is evidence for scheduling, not occupancy: no profiler counters were
 collected. `lane_step_efficiency` in the summary is a schedule proxy only.
 
-**Remaining bottleneck.** Once launches are efficient, retaining complete
-trajectories on the host dominates both schedules: about 3–8 s of each
-20000-history request is outside the launches. Continuation adds per-round
-device-to-host copies and a host-side canonical scatter. The stress case
-regresses slightly end to end (5.258 → 5.347 s); at 5000 histories it is
-1.270 s for `learned32` against 1.526 s. Unbounded `learned32` remains fastest
-there when memory is plentiful (4.391 s at 20000, 9.8 GiB peak). Bounded live
-scratch does not bound total trajectory storage; streaming consumption belongs
-to [#611](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/611).
-Transfers and synchronization are not yet attributed separately, and the stress
-rows have one or two samples.
+**Host time outside the launches.** About 3–8 s of each 20000-history
+request lies outside the launches. The profiles below attribute most of it to
+schedule-independent hard-photon completion, not to device-to-host copies.
+Continuation adds per-round staging and a host-side canonical scatter. The
+stress case regresses slightly end to end (5.258 → 5.347 s); at 5000 histories
+it takes 1.270 s with `learned32` against 1.526 s. Unbounded `learned32`
+remains fastest there when memory is plentiful (4.391 s at 20000, 9.8 GiB
+peak). Bounded live scratch does not bound total trajectory storage; streaming
+consumption belongs to [#611](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/611).
+The stress rows have one or two samples.
 
 **Device staging.** Job 2645 (`f2e09fcc`, seeds 78601–78602; all 62 continuation tests,
 13 of them CUDA, pass in the same allocation) compares the default host staging with opt-in
@@ -887,6 +886,56 @@ overhead: Si at 5000 histories is within 3% of `learned32`, and W at 20000 is
 48% below `learned32-B5000` with all histories active. It does so by holding
 up to twice the retained output on the device during reassembly. Live scratch
 stays bounded, but peak device memory again scales with total trajectory rows.
-It therefore remains opt-in. The rest of the request outside the launches and
-reassembly is the shared full-trajectory output path, which is #611's
-streaming target.
+It therefore remains opt-in. Most of the remaining request time outside the
+launches and reassembly is hard-photon completion (below).
+
+**Profiles and distributions.** Job 2646 (`0c93ac63`) captures only the
+measured request with Nsight Systems; job 2648 (`133e1e9d`) runs cProfile on it.
+Both use W 300 keV unless stated and seed 78601. The
+[profile summary](../check-records/equal-precision/continuation-789-profile.json)
+retains every report. Profiled times carry overhead and are not benchmark
+results; cProfile in particular inflates Python-heavy reassembly.
+
+| W, histories, policy | Request | Transport core | Outside core | Hard-photon completion (cProfile) | DtoH: data, copy time, copies |
+| --- | --- | --- | --- | --- | --- |
+| 5000, learned32 | 5.42 | 4.15 | 1.27 | 1.13 | 1223 MB, 0.142 s, 435 |
+| 5000, cont-Q256, host | 4.33 | 3.23 | 1.10 | 1.04 | 1224 MB, 0.114 s, 1065 |
+| 5000, cont-Q256, device | 3.88 | 2.72 | 1.16 | 0.91 | 1224 MB, 0.145 s, 533 |
+| 20000, learned32-B5000 | 17.65 | 12.33 | 5.32 | 4.57 | 4883 MB, 0.804 s, 1712 |
+| 20000, cont-Q256-A5000, host | 12.33 | 7.77 | 4.56 | 4.31 | 4886 MB, 0.485 s, 2684 |
+| 20000, cont-Q256-A5000, device | 11.85 | 6.47 | 5.38 | 4.22 | 4886 MB, 0.693 s, 1802 |
+
+Times are in seconds. "Transport core" is the `pyrite.transport.core` NVTX
+range, which holds the launches plus each driver's compaction or staging and
+reassembly. The table supports five conclusions:
+
+- `complete_hard_radiative_events`, which runs inside `simulate_trajectories`,
+  takes 0.9–1.1 s per 5000-history W request and 4.2–4.6 s per 20000-history
+  request in every schedule. It is the largest cost outside the transport core.
+- Device-to-host copy time is small in every policy, at most 0.8 s for 4.9 GB.
+  Continuation issues more, smaller copies; device staging reduces their number.
+- Host staging's reassembly is visible in the core range: Si takes 1.30 s in
+  the core against 1.01 s for `learned32`, while their outside-core times are
+  0.23 and 0.34 s.
+- Continuation issues 79–129 `cudaDeviceSynchronize` calls against 3–11. Two
+  per launch come from the benchmark's own launch timers, so the counts mostly
+  measure the number of launches. Each round also reads its row counts and
+  exit codes back to the host.
+- Hard-photon completion and the per-round host loop, not PCIe bandwidth, are
+  the next host-side targets.
+
+**Track lengths and survivors.** Per-history returned rows have a long tail:
+W has median 1396, p90 3718, p99 9616 and a maximum of 9874; Si has median
+701, p90 1944 and a maximum of 4213. Only 5.5% (W) and 9.0% (Si) of histories
+outlive half of the longest track, and 2.2% (W) outlive 90% of it. A
+full-history launch therefore spends its second half on fewer than a tenth of
+its lanes. That is the idle tail continuation refills when primaries are
+pending.
+
+**Occupancy.** Nsight Compute counters are refused on this host
+(`ERR_NVGPUCTRPERM`, all three attempts), so no achieved occupancy, SM activity
+or SIMT efficiency is measured. The occupancy API reports a register-limited
+theoretical occupancy of 16.7% for the compiled kernel (204 registers, 256
+resident threads per SM) at every block size from 32 to 256. The scheduling
+gains above are launch-population and tail effects; no occupancy improvement is
+claimed.
