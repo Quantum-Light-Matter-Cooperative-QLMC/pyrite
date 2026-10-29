@@ -496,7 +496,8 @@ limitations in the visible notebook; use physics and validation pages for formal
 evidence. Only the `.py` is an authored executable notebook.
 
 A regular Sphinx/RTD build **never executes any tutorial**. The `_notebooks`
-extension verifies source SHA-256, capture PyRITE version, Molab badge, captured
+extension verifies a format-insensitive Python AST/script-metadata fingerprint,
+capture PyRITE version, Molab badge, captured
 figures and the absence of execution errors; `nb_execution_mode = "off"` tells
 MyST-NB to use the committed outputs. Builds fail on missing or stale captures.
 Expensive execution, reference-table fetching and required CPU memory belong to
@@ -534,6 +535,35 @@ uv run --group docs python docs/_notebooks.py --regenerate 03-pxr-line-energies
 uv run --group docs python docs/_notebooks.py --check
 uv run marimo edit docs/notebooks/01-first-spectrum.py
 ```
+
+Formatting and ordinary Python comments do not invalidate capture fingerprints.
+Executable statements, literal prose, cell decorators and inline script dependency
+metadata remain part of the fingerprint. The original byte SHA-256 is retained
+as capture provenance; freshness uses the explicitly versioned fingerprint.
+
+Upgrade existing byte-hash captures without execution using:
+
+```bash
+uv run --group docs python docs/_notebooks.py --migrate-hashes
+```
+
+Migration requires the exact captured source, recovered by its byte digest from
+the current file or Git history, and accepts only an equal normalized fingerprint.
+It reports changed tutorials without altering their captures. It does not make
+changed code, prose or dependencies fresh.
+
+For prose-only edits, explicitly refresh the generated page without rerunning
+unchanged computation:
+
+```bash
+uv run --group docs python docs/_notebooks.py --refresh-page 11-optimizing-xray-source
+```
+
+This exports without execution and preserves outputs only when all exported
+executable cells, their order and script dependencies match the prior capture.
+Changed computations or plots require normal regeneration. Review the refreshed
+page and commit it with its source; Sphinx never performs either migration or
+presentation refresh automatically.
 
 Sphinx keeps the same document names and published `.html` URLs when Markdown
 wrappers are replaced by `.ipynb` pages. Captured outputs are static: reactive

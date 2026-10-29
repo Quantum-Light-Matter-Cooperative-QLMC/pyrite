@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import ast
 import hashlib
+import io
 import json
 import os
 import re
@@ -16,6 +17,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import tokenize
 import tomllib
 from pathlib import Path
 
@@ -25,11 +27,108 @@ MOLAB = (
     "https://molab.marimo.io/github/Quantum-Light-Matter-Cooperative-QLMC/pyrite/"
     "blob/main/docs/notebooks/"
 )
-SCHEMA = "pyrite.myst-nb-tutorial.v1"
+LEGACY_SCHEMA = "pyrite.myst-nb-tutorial.v1"
+SCHEMA = "pyrite.myst-nb-tutorial.v2"
+FINGERPRINT = "python-ast-pep723-v1"
 
 
 def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def script_metadata(content):
+    """Read script metadata from real comments, not lookalikes inside strings."""
+    metadata = []
+    block = None
+    for token in tokenize.generate_tokens(io.StringIO(content).readline):
+        if token.type != tokenize.COMMENT or token.start[1] != 0:
+            continue
+        comment = token.string
+        if comment == "# /// script":
+            if block is not None or metadata:
+                raise ValueError("duplicate or nested script metadata")
+            block = []
+        elif block is not None:
+            if comment == "# ///":
+                metadata.append(tomllib.loads("\n".join(block)))
+                block = None
+            else:
+                block.append(comment.removeprefix("#").removeprefix(" "))
+    if block is not None:
+        raise ValueError("unterminated script metadata")
+    return metadata
+
+
+def source_fingerprint(content):
+    """Ignore Python formatting/comments, retaining prose and script dependencies."""
+    canonical = json.dumps(
+        [ast.dump(ast.parse(content), include_attributes=False), script_metadata(content)],
+        sort_keys=True,
+        ensure_ascii=True,
+    )
+    return hashlib.sha256(canonical.encode()).hexdigest()
+
+
+def fingerprint(path):
+    return source_fingerprint(path.read_text())
+
+
+def legacy_source(source, expected):
+    """Recover the exact captured source, never infer provenance from current code."""
+    if digest(source) == expected:
+        return source.read_text()
+    relative = source.relative_to(DOCS.parent).as_posix()
+    revisions = subprocess.run(
+        ["git", "log", "--all", "--format=%H", "--", relative],
+        cwd=DOCS.parent,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.splitlines()
+    for revision in revisions:
+        content = subprocess.run(
+            ["git", "show", f"{revision}:{relative}"],
+            cwd=DOCS.parent,
+            check=True,
+            capture_output=True,
+        ).stdout
+        if hashlib.sha256(content).hexdigest() == expected:
+            return content.decode()
+    raise ValueError("captured source cannot be recovered from version control")
+
+
+def migrate_hashes():
+    """Upgrade proven equivalent legacy captures without running notebooks."""
+    import nbformat
+
+    rejected = []
+    for source in sorted(NOTEBOOKS.glob("*.py")):
+        page = page_location(source)
+        notebook = nbformat.read(page, as_version=4)
+        metadata = notebook.metadata.get("pyrite_docs", {})
+        if metadata.get("schema") == SCHEMA:
+            continue
+        try:
+            if (
+                metadata.get("schema") != LEGACY_SCHEMA
+                or metadata.get("pyrite_version") != project_version()
+            ):
+                raise ValueError("capture schema or PyRITE version is incompatible")
+            original = legacy_source(source, metadata.get("source_sha256"))
+            canonical = fingerprint(source)
+            if source_fingerprint(original) != canonical:
+                raise ValueError("code, prose or script dependencies changed; regenerate capture")
+            metadata.update(
+                schema=SCHEMA, source_fingerprint=FINGERPRINT, source_fingerprint_sha256=canonical
+            )
+            stage = page.with_suffix(".ipynb.tmp")
+            nbformat.write(notebook, stage)
+            os.replace(stage, page)
+            print(f"Migrated capture fingerprint: {source.stem}")
+        except (ValueError, subprocess.CalledProcessError) as error:
+            rejected.append(source.stem)
+            print(f"Cannot migrate {source.stem}: {error}", file=sys.stderr)
+    return not rejected
 
 
 def project_version():
@@ -161,6 +260,8 @@ def captured_notebook(source, notebook, title, footer):
         "title": title,
         "footer": footer,
         "source_sha256": digest(source),
+        "source_fingerprint": FINGERPRINT,
+        "source_fingerprint_sha256": fingerprint(source),
         "pyrite_version": project_version(),
         "backend": "cpu",
     }
@@ -189,7 +290,8 @@ def check_notebooks(app=None):
         metadata = notebook.get("metadata", {}).get("pyrite_docs", {})
         if (
             metadata.get("schema") != SCHEMA
-            or metadata.get("source_sha256") != digest(source)
+            or metadata.get("source_fingerprint") != FINGERPRINT
+            or metadata.get("source_fingerprint_sha256") != fingerprint(source)
             or metadata.get("pyrite_version") != project_version()
         ):
             raise ValueError(f"stale tutorial capture: {source.stem}; regenerate its .ipynb")
@@ -274,6 +376,102 @@ def regenerate(names):
             print(destination)
 
 
+def runtime_structure(content):
+    """Retain runtime/module/cell options while excluding literal Markdown prose."""
+    tree = ast.parse(content)
+    for node in ast.walk(tree):
+        if isinstance(node, ast.FunctionDef) and any(
+            isinstance(decorator, ast.Attribute)
+            and isinstance(decorator.value, ast.Name)
+            and decorator.value.id == "app"
+            and decorator.attr == "cell"
+            or isinstance(decorator, ast.Call)
+            and isinstance(decorator.func, ast.Attribute)
+            and isinstance(decorator.func.value, ast.Name)
+            and decorator.func.value.id == "app"
+            and decorator.func.attr == "cell"
+            for decorator in node.decorator_list
+        ):
+            # Marimo injects these dependency parameters by name, not position.
+            if (
+                not node.args.defaults
+                and not node.args.posonlyargs
+                and not node.args.kwonlyargs
+                and node.args.vararg is None
+                and node.args.kwarg is None
+            ):
+                node.args.args.sort(key=lambda argument: argument.arg)
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and isinstance(node.func.value, ast.Name)
+            and node.func.value.id == "mo"
+            and node.func.attr == "md"
+            and len(node.args) == 1
+            and isinstance(node.args[0], ast.Constant)
+            and isinstance(node.args[0].value, str)
+        ):
+            node.args[0] = ast.Constant(value="<literal Markdown>")
+    return ast.dump(tree, include_attributes=False)
+
+
+def refreshed_notebook(source, exported, captured):
+    """Reuse outputs only when every executable cell and dependency is unchanged."""
+    metadata = captured.metadata["pyrite_docs"]
+    if metadata.get("schema") not in {SCHEMA, LEGACY_SCHEMA} or (
+        metadata.get("pyrite_version") != project_version()
+    ):
+        raise ValueError("capture schema or PyRITE version is incompatible")
+    original = legacy_source(source, metadata.get("source_sha256"))
+    if script_metadata(original) != script_metadata(source.read_text()):
+        raise ValueError("script dependencies changed; regenerate capture")
+    if runtime_structure(original) != runtime_structure(source.read_text()):
+        raise ValueError("runtime or cell configuration changed; regenerate capture")
+    old_cells = [cell for cell in captured.cells if cell.cell_type == "code"]
+    new_cells = [cell for cell in exported.cells if cell.cell_type == "code"]
+    old_code = [ast.dump(ast.parse(cell.source), include_attributes=False) for cell in old_cells]
+    new_code = [ast.dump(ast.parse(cell.source), include_attributes=False) for cell in new_cells]
+    if old_code != new_code:
+        raise ValueError("executable cells changed; regenerate capture")
+    for old, new in zip(old_cells, new_cells, strict=True):
+        new.outputs = old.outputs
+        new.execution_count = old.execution_count
+    return captured_notebook(source, exported, metadata["title"], metadata["footer"])
+
+
+def refresh_page(name):
+    """Export presentation only, retaining proven unchanged captured outputs."""
+    import nbformat
+
+    source = NOTEBOOKS / f"{name}.py"
+    validate_source(source)
+    page = page_location(source)
+    captured = nbformat.read(page, as_version=4)
+    with tempfile.TemporaryDirectory(prefix="pyrite-notebook-page-") as temporary:
+        exported = Path(temporary) / page.name
+        subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "marimo",
+                "export",
+                "ipynb",
+                str(source),
+                "--sort=top-down",
+                "--no-sandbox",
+                "-o",
+                str(exported),
+            ],
+            cwd=DOCS.parent,
+            check=True,
+        )
+        notebook = refreshed_notebook(source, nbformat.read(exported, as_version=4), captured)
+        nbformat.validate(notebook)
+        stage = page.with_suffix(".ipynb.tmp")
+        nbformat.write(notebook, stage)
+        os.replace(stage, page)
+
+
 def setup(app):
     app.connect("builder-inited", check_notebooks)
     return {"parallel_read_safe": True, "parallel_write_safe": True}
@@ -285,8 +483,14 @@ if __name__ == "__main__":
     group.add_argument("--regenerate", metavar="NAME")
     group.add_argument("--regenerate-all", action="store_true")
     group.add_argument("--check", action="store_true")
+    group.add_argument("--migrate-hashes", action="store_true")
+    group.add_argument("--refresh-page", metavar="NAME")
     args = parser.parse_args()
-    if args.check:
+    if args.refresh_page:
+        refresh_page(args.refresh_page)
+    elif args.migrate_hashes:
+        sys.exit(0 if migrate_hashes() else 1)
+    elif args.check:
         check_notebooks()
     elif args.regenerate_all:
         regenerate([source.stem for source in sorted(NOTEBOOKS.glob("*.py"))])
