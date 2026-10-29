@@ -48,7 +48,7 @@ def test_hbn_atom_colors_are_swapped_without_changing_sites():
         plt.close(fig)
 
 
-def test_prt_gradient_endpoints_match_atom_colors():
+def test_prt_gradient_runs_gold_through_atom_blue_to_violet():
     fig, ax = plt.subplots()
     try:
         for i, letter in enumerate("PRT"):
@@ -56,7 +56,8 @@ def test_prt_gradient_endpoints_match_atom_colors():
         assert len(ax.images) == 3
         for image in ax.images:
             assert to_hex(image.cmap(0.0)).upper() == ATOM_GOLD
-            assert to_hex(image.cmap(1.0)).upper() == ATOM_BLUE
+            assert to_hex(image.cmap(0.6)).upper() == ATOM_BLUE
+            assert to_hex(image.cmap(1.0)).upper() == "#4A58E8"  # lettering tail (3afd08dc)
             assert image.origin == "lower"
             assert image.get_clip_path() is not None
     finally:
