@@ -127,6 +127,17 @@ dictionaries. `build_crystal` accepts a local `cif`, `formula`, `phase`,
 `mosaic_fwhm_deg`, and optional density consistency check. `catalog=Path(...)`
 selects an independent complete catalog for existing-crystal lookup or save.
 
+Each physical keyword also has a keyword-only Pint spelling:
+`build_medium(..., density=Q_(2.2, "g/cm**3"))` and
+`build_crystal(..., b_factor=Q_(0.46, "angstrom**2"), mosaic_fwhm=Q_(0.4, "deg"),
+density=...)`. Inputs must be real scalars with matching dimensions: mass
+density, area (the isotropic Debye–Waller B, nonnegative) and plane angle
+(positive). Supplying both spellings of one value raises `TypeError`, and the
+numeric `density_g_cm3`, `B_ang2` and `mosaic_fwhm_deg` keywords refuse Pint
+quantities. `MaterialDefinition.density` reads back a fresh g/cm³ quantity.
+Canonical-unit inputs produce identical definitions and identities; other
+units agree within floating-point conversion.
+
 Build operations return an immutable `MaterialDefinition` and do not persist
 anything. `save_material` returns a fresh immutable `MaterialCatalog` and
 invalidates the parse cache. Saving to the currently selected catalog also

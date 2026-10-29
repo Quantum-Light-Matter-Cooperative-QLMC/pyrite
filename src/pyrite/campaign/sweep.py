@@ -82,6 +82,13 @@ from .cost import (  # noqa: F401  (re-exported: pyrite.campaign.sweep is the st
     scan_grid_rows,
     sweep_cost_weights,
 )
+from .flat_geometry import (  # noqa: F401  (re-exported: pyrite.campaign.sweep is the stable import path)
+    _RetiredFlatInput,
+    retired_flat_input,
+    target_flat_fields,
+    target_from_flat,
+    target_replace,
+)
 from .geometry import (  # noqa: F401  (re-exported: pyrite.campaign.sweep is the stable import path)
     BlazedGrooves,
     Footprint,
@@ -94,7 +101,6 @@ from .geometry import (  # noqa: F401  (re-exported: pyrite.campaign.sweep is th
     Target,
     _radiator,
     _reject_banned_angles,
-    _RetiredFlatInput,
     _seq,
     _unique_angles,
     crystal_params,
@@ -102,13 +108,9 @@ from .geometry import (  # noqa: F401  (re-exported: pyrite.campaign.sweep is th
     geometry_table,
     layer_radiator,
     resolve_crystal_cut,
-    retired_flat_input,
     stack_layers,
     substrate_composition,
     substrate_radiator,
-    target_flat_fields,
-    target_from_flat,
-    target_replace,
 )
 from .inelastic_cases import resolve_atomic_electron_deflection, resolve_auto_inelastic
 from .longitudinal import LongitudinalDistribution
@@ -358,7 +360,7 @@ class Sweep:
     ``allow_normal_incidence``, ``mosaic``) remain accepted as construction-time aliases
     that build that target; they are ``InitVar``s, so they do NOT survive as
     attributes -- read geometry through ``sweep.target`` (or
-    :func:`~pyrite.campaign.geometry.target_flat_fields` for the flat view).
+    :func:`~pyrite.campaign.flat_geometry.target_flat_fields` for the flat view).
     Passing both ``target=`` and any flat geometry input is an error.
 
     Each of ``target.thickness``, ``beam.energy_keV``, ``target.tilt_deg``, and

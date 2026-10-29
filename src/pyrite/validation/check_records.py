@@ -87,6 +87,8 @@ CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
     "checks/trajectory_paraview_probe.py": (),
     "checks/trajectory_trame_probe.py": (),
     "checks/trajectory_viewer_benchmark.py": (),
+    # CUDA reducer launch timing (#200): performance evidence, no physics claim.
+    "checks/cxr_reduction_benchmark.py": (),
     # Experimental model comparison is descriptive, with no pass/fail verdict.
     "checks/inner_shell_experiment_comparison.py": (),
     "checks/shell_ionization_comparison.py": ("eedl-shell-ionization-comparison",),

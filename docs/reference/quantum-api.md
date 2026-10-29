@@ -185,6 +185,24 @@ control the zone's numerical representation and require independent
 convergence checks. To run it, follow
 [Add planar channeling to a transport run](../guides/experimental-planar-channeling.md#add-planar-channeling-to-a-transport-run).
 
+`QuantumRegion(..., zone_max_length=Q_(2, "nm"))` and
+`QuantumNumerics(step_length=Q_(10, "nm"))` take explicit positive scalar Pint
+lengths for the zone cap and depth step. Each conflicts with its numeric
+`zone_max_ang`/`step_ang` spelling, reads back as a fresh Å quantity
+(`zone_max_length` is `None` when uncapped) and is replaced by
+`with_zone_max_length` (which also accepts `None`) or `with_step_length`. Numeric
+fields, pickles and the lowered `channeling_*` controls are unchanged;
+`basis_size` and `bloch_cells` stay counts.
+
+Diagnostic outputs keep their numeric fields. `PlanarStateProjection` adds
+fresh `kinetic_energy`, `temperature`, `margin` and `incidence` quantities.
+`ChannelingSpectrum.quantify()` returns a copied view whose `density` and
+`capture_density` are node-sampled photons per energy and steradian per
+incident electron; `to_energy("keV")` rescales the density inversely with the
+energy axis, so integrated yields are unchanged. `line_yield` is a
+dimensionless count per incident electron, `line_rates` is per Å of depth and
+`theta`/`phi` are in radians. Density-matrix and MCWF results remain numeric.
+
 ### Specify and inspect quantum entrance states
 
 `TransverseStateSpec` describes a transverse wavefunction or an **incoherent**
@@ -202,6 +220,25 @@ minus = pr.TransverseStateSpec.recipe("laguerre_gauss", ell=-1, p=0, waist_ang=8
 superposition = pr.TransverseStateSpec.superpose([(1, plus), (1j, minus)])
 mixture = pr.TransverseStateSpec.mixture([(3, plus), (1, minus)])
 restored = pr.TransverseStateSpec.from_dict(superposition.to_dict())
+```
+
+`recipe`, `from_npy` and `translated` also take semantic Pint spellings of the
+unit-bearing parameters: `waist`, `scale`, `center`, `spacing`, `origin`,
+`offset`, `k_radial`, `kinetic_energy`, `semiangle` and `inner_semiangle`. A
+semantic name requires a quantity and conflicts with its suffixed numeric name;
+the stored parameters, JSON and digest match the equivalent numeric recipe.
+`parameter_quantities` returns fresh quantities in Å, Å⁻¹, eV and rad keyed by
+semantic name, and `with_parameters(...)` revalidates a replacement in either
+spelling. Mode orders, selectors and aberration coefficients stay numeric.
+
+```python
+from pyrite.units import ureg
+
+probe = pr.TransverseStateSpec.recipe(
+    "aperture_probe", kinetic_energy=60 * ureg.keV, semiangle=20 * ureg.mrad
+)
+probe.parameter_quantities["semiangle"].to("mrad")
+narrower = probe.with_parameters(semiangle=10 * ureg.mrad)
 ```
 
 Other analytic recipes include Gaussian, Hermite–Gaussian, Bessel–Gaussian,

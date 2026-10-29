@@ -125,6 +125,52 @@ def test_path_axes_expand_nested_and_indexed_fields_mechanically() -> None:
     assert expanded[-1][0] == ("beam.energy_keV=45 target.layers[1].thickness_ang=5000")
 
 
+def test_quantity_paths_delegate_to_owners_and_preserve_numeric_cases() -> None:
+    from pyrite.units import ureg
+
+    base = _scene()
+    quantity = Sweep(
+        base=base,
+        axes={
+            "beam.kinetic_energy": [0.03 * ureg.MeV, 45 * ureg.keV],
+            "target.layers[1].thickness": [285 * ureg.nm, 0.5 * ureg.um],
+            "target.footprint.width": [0.5 * ureg.cm, 6 * ureg.mm],
+        },
+    )
+    numeric = Sweep(
+        base=base,
+        axes={
+            "beam.energy_keV": [30.0, 45.0],
+            "target.layers[1].thickness_ang": [2850.0, 5000.0],
+            "target.footprint.width_mm": [5.0, 6.0],
+        },
+    )
+    for (_, actual), (_, expected) in zip(quantity.expand(), numeric.expand(), strict=True):
+        assert actual.beam.energy_keV == pytest.approx(expected.beam.energy_keV)
+        assert actual.target.layers[1].thickness_ang == pytest.approx(
+            expected.target.layers[1].thickness_ang
+        )
+        assert actual.target.footprint == expected.target.footprint
+        assert actual.target.layers[0] == base.target.layers[0]
+    assert base.beam.energy_keV == 30.0
+    assert base.target.layers[1].thickness_ang == 2850.0
+    assert "beam.kinetic_energy=" in quantity.expand()[0][0]
+
+
+@pytest.mark.parametrize("value", [40.0, "40 keV"])
+def test_quantity_paths_keep_owner_requirement_for_explicit_quantities(value) -> None:
+    with pytest.raises(TypeError, match="requires a Pint quantity"):
+        Sweep(base=_scene(), axes={"beam.kinetic_energy": [value]})
+
+
+def test_quantity_paths_keep_owner_dimension_and_value_checks() -> None:
+    from pyrite.units import ureg
+
+    for value in (1 * ureg.second, -1 * ureg.nm):
+        with pytest.raises(ValueError):
+            Sweep(base=_scene(), axes={"target.layers[1].thickness": [value]})
+
+
 @pytest.mark.parametrize(
     "path, message",
     [

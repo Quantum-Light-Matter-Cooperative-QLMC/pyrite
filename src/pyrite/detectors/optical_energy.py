@@ -19,7 +19,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 
@@ -29,9 +29,68 @@ __all__ = ["CalibratedPulseEnergyDetector", "OpticalPulseReading", "OpticalPulse
 
 _ELECTRON_VOLT_J = 1.602176634e-19
 
+if TYPE_CHECKING:
+    from pint import Quantity
+
+
+def _quantity(value: Any, unit: str) -> Quantity:
+    """Fresh quantity wrapping a copy on the value's own NumPy/CuPy backend."""
+    from ..units import Q_
+
+    copy = getattr(value, "copy", None)
+    return Q_(copy() if callable(copy) else value, unit)
+
+
+def _optional_quantity(value: Any, unit: str) -> Quantity | None:
+    return None if value is None else _quantity(value, unit)
+
+
+class _ReadingQuantities:
+    """Semantic J/V/W read-back shared by host and batch pulse readings.
+
+    Each property returns a fresh Pint quantity wrapping a copy of the stored
+    value on its own NumPy/CuPy backend (no host transfer). Values are per
+    collected pulse; average powers are ``None`` without a repetition rate.
+    """
+
+    @property
+    def incident_energy(self) -> Quantity:
+        """Collected optical energy per pulse in J."""
+        return _quantity(cast(Any, self).incident_joule_per_pulse, "J")
+
+    @property
+    def absorbed_energy(self) -> Quantity:
+        """Absorbed optical energy per pulse in J."""
+        return _quantity(cast(Any, self).absorbed_joule_per_pulse, "J")
+
+    @property
+    def expected_voltage(self) -> Quantity:
+        """Unsaturated expected peak readout voltage in V."""
+        return _quantity(cast(Any, self).expected_voltage_v, "V")
+
+    @property
+    def reported_voltage(self) -> Quantity:
+        """Saturation-clipped reported peak voltage in V."""
+        return _quantity(cast(Any, self).reported_voltage_v, "V")
+
+    @property
+    def noise_rms_voltage(self) -> Quantity:
+        """Reported RMS readout uncertainty in V."""
+        return _quantity(cast(Any, self).noise_rms_voltage_v, "V")
+
+    @property
+    def average_incident_power(self) -> Quantity | None:
+        """Average collected optical power in W, or ``None``."""
+        return _optional_quantity(cast(Any, self).average_incident_power_w, "W")
+
+    @property
+    def average_absorbed_power(self) -> Quantity | None:
+        """Average absorbed optical power in W, or ``None``."""
+        return _optional_quantity(cast(Any, self).average_absorbed_power_w, "W")
+
 
 @dataclass(frozen=True, eq=False)
-class OpticalPulseReading:
+class OpticalPulseReading(_ReadingQuantities):
     """Deterministic prediction for one collected bunch/pulse."""
 
     incident_joule_per_pulse: float
@@ -46,7 +105,7 @@ class OpticalPulseReading:
 
 
 @dataclass(frozen=True, eq=False)
-class OpticalPulseBatchReading:
+class OpticalPulseBatchReading(_ReadingQuantities):
     """Pulse predictions with NumPy/CuPy arrays over the input's batch axes.
 
     Every numerical member has shape ``photon_density.shape[:-1]``. Scalars
@@ -138,6 +197,26 @@ class CalibratedPulseEnergyDetector:
         hasher.update(energy.tobytes())
         hasher.update(response.tobytes())
         object.__setattr__(self, "response_sha256", hasher.hexdigest())
+
+    @property
+    def energies(self) -> Quantity:
+        """Calibration photon-energy knots as a fresh eV quantity."""
+        return _quantity(self.energy_eV, "eV")
+
+    @property
+    def pulse_gain(self) -> Quantity:
+        """Isolated-pulse readout gain as a fresh V/J quantity."""
+        return _quantity(float(self.pulse_gain_v_per_j), "V / J")
+
+    @property
+    def noise_rms(self) -> Quantity:
+        """RMS readout noise as a fresh V quantity."""
+        return _quantity(float(self.noise_rms_v), "V")
+
+    @property
+    def saturation(self) -> Quantity | None:
+        """Saturation voltage as a fresh V quantity, or ``None``."""
+        return None if self.saturation_v is None else _quantity(float(self.saturation_v), "V")
 
     def predict(
         self,

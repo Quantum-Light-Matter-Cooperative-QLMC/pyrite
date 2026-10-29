@@ -10,7 +10,7 @@ canonical_facades = ["beams", "geometry", "config", "detectors", "observations",
 [root_exports]
 AcquisitionBatch = { target = "pyrite.instrument:AcquisitionBatch", status = "advanced-stable", domain = "results", root_role = "specialized" }
 Analysis = { target = "pyrite.campaign.model:Analysis", status = "advanced-stable", domain = "results", root_role = "specialized" }
-# Beam's additive quantity boundary (kinetic_energy / with_kinetic_energy)
+# Beam's additive quantity boundaries (kinetic_energy, repetition_rate, bunch_charge)
 # retains this class binding, numeric dataclass storage and legacy imports.
 Beam = { target = "pyrite.campaign.beam:Beam", status = "stable", domain = "beams", root_role = "core" }
 CxrSpectra = { target = "pyrite.results.model:CxrSpectra", status = "advanced-stable", domain = "results", root_role = "specialized" }

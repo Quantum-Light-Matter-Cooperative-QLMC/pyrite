@@ -1,11 +1,40 @@
 """Sampled true-photon grids shared below policy, transport, and detectors."""
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from typing import TYPE_CHECKING, Any, Self, cast
 
 import numpy as np
 
 from ._units import _is_pint_quantity, normalize_unit
+
+if TYPE_CHECKING:
+    from pint import Quantity
+
+
+def _grid_eV(value: object, *, field: str) -> np.ndarray | None:
+    """Own an explicit one-dimensional energy-grid quantity as numeric eV, or ``None``."""
+    if value is None:
+        return None
+    if not _is_pint_quantity(value):
+        raise TypeError(f"{field} requires a Pint quantity with energy units")
+    original = np.asarray(cast(Any, value).magnitude)
+    if original.ndim != 1 or original.dtype.kind not in "iuf":
+        raise TypeError(f"{field} must be a real one-dimensional energy quantity")
+    magnitude = np.asarray(normalize_unit(value, "eV", field=field, expected="energy"))
+    with np.errstate(over="ignore", under="ignore"):
+        stored = magnitude.astype(float)
+    if not np.all(np.isfinite(stored)) or np.any((magnitude != 0) & (stored == 0)):
+        raise ValueError(f"{field} must be finite and representable in numeric eV storage")
+    return stored
+
+
+def _ev_quantity(grid: np.ndarray | None) -> "Quantity | None":
+    if grid is None:
+        return None
+    from .units import Q_
+
+    return Q_(np.array(grid, dtype=float), "eV")
 
 
 @dataclass(frozen=True, eq=False)
@@ -26,6 +55,15 @@ class EnergyBins:
         Mutually exclusive with ``CXR`` at catalog resolution.
     brem
         Optional one-dimensional bremsstrahlung photon-energy grid in eV.
+
+    Notes
+    -----
+    The unsuffixed fields predate the unit naming policy and keep returning
+    numeric eV arrays. :attr:`cxr_energies` and :attr:`brem_energies` return
+    fresh eV quantities; :meth:`with_cxr_energies` and
+    :meth:`with_brem_energies` replace a grid from an explicit
+    one-dimensional energy quantity (or ``None``). ``cxr_by_energy`` stays
+    numeric: keys in keV, grids in eV.
     """
 
     cxr: np.ndarray | None = None
@@ -67,6 +105,24 @@ class EnergyBins:
                 for energy, grid in self.cxr_by_energy.items()
             }
             object.__setattr__(self, "cxr_by_energy", normalized)
+
+    @property
+    def cxr_energies(self) -> "Quantity | None":
+        """Shared CXR photon-energy grid as a fresh eV quantity, or ``None``."""
+        return _ev_quantity(self.cxr)
+
+    @property
+    def brem_energies(self) -> "Quantity | None":
+        """Bremsstrahlung photon-energy grid as a fresh eV quantity, or ``None``."""
+        return _ev_quantity(self.brem)
+
+    def with_cxr_energies(self, energies: object) -> Self:
+        """Return bins with a validated CXR energy-grid quantity, or ``None``."""
+        return replace(self, cxr=_grid_eV(energies, field="EnergyBins.cxr_energies"))
+
+    def with_brem_energies(self, energies: object) -> Self:
+        """Return bins with a validated bremsstrahlung energy-grid quantity, or ``None``."""
+        return replace(self, brem=_grid_eV(energies, field="EnergyBins.brem_energies"))
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, EnergyBins):

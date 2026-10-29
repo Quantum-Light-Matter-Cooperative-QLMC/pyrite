@@ -12,9 +12,11 @@ Use the experimental `pyrite.optimization` imports `Integer`, `ParameterSpace`,
 finite design search. Parameter paths select physical Scene fields;
 `Integer(low, high, step)` includes both bounds and refuses implicit rounding.
 Values are plain numbers in the units of the selected field, such as degrees
-for `target.tilt_deg` and ångströms for `target.thickness_ang`. Parameter
-paths do not declare a unit, so Pint quantity bounds and values raise
+for `target.tilt_deg` and ångströms for `target.thickness_ang`. These
+legacy paths do not declare a quantity unit, so Pint quantity bounds and values raise
 `TypeError` rather than being lowered by guessing from a field-name suffix.
+Semantic paths such as `target.tilt` and `target.thickness` take quantities
+instead (see [quantity parameter paths](#quantity-parameter-paths)).
 
 An `Objective` declares its observable name, `"maximize"` or `"minimize"`, and
 a Pint unit expression (or Pint `Unit`); an empty string means dimensionless.
@@ -36,6 +38,57 @@ For a short executable example, see
 [Optimizing an X-ray source](../notebooks/specialized/11-optimizing-xray-source.ipynb).
 The [generated optimization entries](python-api/experimental.md#experimental-optimization)
 provide signatures and source links.
+
+## Quantity parameter paths
+
+`Continuous` and `Integer` can target semantic quantity properties such as
+`beam.kinetic_energy` or `target.thickness`. Units come from the property's
+quantity read-back and replacement uses its existing `with_<name>` method.
+Both bounds must be explicit quantities. Mixed quantity/numeric bounds,
+incompatible dimensions and categorical quantity domains are refused.
+
+```python
+from pyrite import Beam, Scene
+from pyrite.beams import PointBunch, Spot
+from pyrite.geometry import Slab
+from pyrite.optimization import Continuous, Integer, Objective, OptimizationStudy, ParameterSpace
+from pyrite.units import ureg
+
+scene = Scene(
+    Beam(kinetic_energy=40 * ureg.keV, transverse=Spot(), longitudinal=PointBunch()),
+    Slab("hopg", thickness=200 * ureg.nm, footprint=None),
+)
+study = OptimizationStudy(
+    scene,
+    ParameterSpace(
+        {
+            "beam.kinetic_energy": Continuous(0.03 * ureg.MeV, 100 * ureg.keV),
+            "target.thickness": Integer(
+                100 * ureg.angstrom, 500 * ureg.angstrom, step=50 * ureg.angstrom
+            ),
+        }
+    ),
+    (Objective("yield", "maximize", "1/sr"),),
+)
+```
+
+Study construction binds the domains to the owner's units: keV and ångströms
+in this example. Alternatively, call `space.bind(scene)` explicitly. Configure
+an optimizer with `study.parameters`, which contains the bound numeric domains.
+Optimizer proposals and persisted trials use numbers in those units. Direct
+`study.scene(values)` also accepts compatible quantity candidates.
+
+`Integer` bounds and step must be exactly integral in the owner's unit after
+conversion; values must lie on that lattice. A plain/default step is in that
+unit, so the default is 1 keV for `beam.kinetic_energy`, regardless of the units
+used for the bounds. No rounding repairs conversion residuals. Fractional
+domains should use `Continuous`. Bounds are copied at construction and binding
+leaves the input space and base scene unchanged.
+
+Persistence hashes bound numeric domains plus their owner unit strings. No
+registry-bound quantity is stored. Equivalent converted bounds produce the
+same definition when their stored numbers are exactly equal; existing legacy
+numeric study digests remain unchanged.
 
 ## Persisting and resuming a study
 

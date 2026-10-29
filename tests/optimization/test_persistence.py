@@ -48,6 +48,31 @@ def _score(scene, n):
     return {"flux": scene.beam.energy_keV, "fwhm": 0.5 if n % 2 else 2.0}
 
 
+def test_quantity_domains_resume_with_numeric_trials(tmp_path):
+    from pyrite.units import ureg
+
+    def study(low, high):
+        return replace(
+            _study(),
+            parameters=ParameterSpace(
+                {
+                    "beam.kinetic_energy": Continuous(low, high),
+                }
+            ),
+        )
+
+    initial = study(30 * ureg.keV, 100 * ureg.keV)
+    first = initial.run(_score, _opt(initial, tmp_path), max_trials=2, evaluation_id="quantity-v1")
+    resumed = study(0.03 * ureg.MeV, 0.1 * ureg.MeV)
+    optimizer = _opt(resumed, tmp_path)
+    result = resumed.run(_score, optimizer, max_trials=3, evaluation_id="quantity-v1")
+    assert result.trials[:2] == first.trials
+    assert all(isinstance(t.parameters["beam.kinetic_energy"], float) for t in result.trials)
+    assert all(
+        isinstance(t.params["beam.kinetic_energy"], float) for t in optimizer.study.get_trials()
+    )
+
+
 def test_resumes_without_recomputing_completed_trials(tmp_path):
     s = _study()
     first = s.run(_score, _opt(s, tmp_path), max_trials=5, evaluation_id="flux-window-v1")

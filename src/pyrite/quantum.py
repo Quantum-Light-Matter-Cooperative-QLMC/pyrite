@@ -14,12 +14,15 @@ from __future__ import annotations
 from dataclasses import dataclass, field, replace
 from importlib import import_module
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any, Literal, Self
 
 from ._numerics import Numerics, Physics, _miller, validate_channeling_numerics
-from ._units import normalize_unit
+from ._spec_defaults import UNSET, _Unset
+from ._units import _positive_length_quantity, normalize_unit
 
 if TYPE_CHECKING:
+    from pint import Quantity
+
     from pyrite.montecarlo.channeling.axial_diagnostic import (
         AxialDiagnosticConfig as AxialDiagnosticConfig,
     )
@@ -133,14 +136,68 @@ if TYPE_CHECKING:
     )
 
 
-@dataclass(frozen=True)
+def _angstrom(value: float) -> Quantity:
+    """Fresh registry-owned scalar angstrom read-back."""
+    from .units import Q_
+
+    return Q_(float(value), "angstrom")
+
+
+def _length_spelling(owner: str, numeric_name: str, numeric: Any, name: str, semantic: object):
+    """Resolve a numeric-angstrom field against its keyword-only semantic length."""
+    if semantic is UNSET:
+        return numeric
+    if numeric is not UNSET:
+        raise TypeError(f"{owner}.{numeric_name} and {name} are mutually exclusive")
+    return _positive_length_quantity(semantic, unit="angstrom", field=f"{owner}.{name}", shape=())
+
+
+@dataclass(frozen=True, init=False)
 class QuantumRegion:
-    """Physical region and handoff cap, not an FFT grid or numerical boundary."""
+    """Physical region and handoff cap, not an FFT grid or numerical boundary.
+
+    ``zone_max_ang`` is the optional zone-length cap in Å. Keyword-only
+    ``zone_max_length`` takes an explicit positive scalar Pint length instead;
+    the property reads it back as a fresh Å quantity (``None`` when uncapped)
+    and ``with_zone_max_length`` replaces it.
+    """
 
     kind: Literal["free", "planar", "axial"] = "free"
     plane_hkl: tuple[int, int, int] | None = None
     axis_uvw: tuple[int, int, int] | None = None
     zone_max_ang: float | None = None
+
+    def __init__(
+        self,
+        kind: Literal["free", "planar", "axial"] = "free",
+        plane_hkl: tuple[int, int, int] | None = None,
+        axis_uvw: tuple[int, int, int] | None = None,
+        zone_max_ang: float | None | _Unset = UNSET,
+        *,
+        zone_max_length: object = UNSET,
+    ) -> None:
+        zone = _length_spelling(
+            "QuantumRegion", "zone_max_ang", zone_max_ang, "zone_max_length", zone_max_length
+        )
+        object.__setattr__(self, "kind", kind)
+        object.__setattr__(self, "plane_hkl", plane_hkl)
+        object.__setattr__(self, "axis_uvw", axis_uvw)
+        object.__setattr__(self, "zone_max_ang", None if zone is UNSET else zone)
+        self.__post_init__()
+
+    @property
+    def zone_max_length(self) -> Quantity | None:
+        """Fresh Å zone-length cap, or ``None`` when the region is uncapped."""
+        return None if self.zone_max_ang is None else _angstrom(self.zone_max_ang)
+
+    def with_zone_max_length(self, zone_max_length: object) -> Self:
+        """Copy with an explicit positive length cap, or ``None`` to remove it."""
+        if zone_max_length is None:
+            return replace(self, zone_max_ang=None)
+        length = _length_spelling(
+            "QuantumRegion", "zone_max_ang", UNSET, "zone_max_length", zone_max_length
+        )
+        return replace(self, zone_max_ang=length)
 
     def __post_init__(self) -> None:
         if self.zone_max_ang is not None:
@@ -185,15 +242,49 @@ class QuantumDynamics:
             raise ValueError("unknown quantum dynamics kind")
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, init=False)
 class QuantumNumerics:
-    """Propagation representation and numerical integration controls."""
+    """Propagation representation and numerical integration controls.
+
+    ``step_ang`` is the depth step in Å. Keyword-only ``step_length`` takes an
+    explicit positive scalar Pint length instead; the property reads it back
+    as a fresh Å quantity and ``with_step_length`` replaces it. ``basis_size``
+    and ``bloch_cells`` are counts, not quantities.
+    """
 
     representation: Literal["bloch", "real-space"] = "bloch"
     method: Literal["coherent", "density-matrix", "mcwf"] = "density-matrix"
     basis_size: int = 16
     bloch_cells: int = 16
     step_ang: float = 250.0
+
+    def __init__(
+        self,
+        representation: Literal["bloch", "real-space"] = "bloch",
+        method: Literal["coherent", "density-matrix", "mcwf"] = "density-matrix",
+        basis_size: int = 16,
+        bloch_cells: int = 16,
+        step_ang: float | _Unset = UNSET,
+        *,
+        step_length: object = UNSET,
+    ) -> None:
+        step = _length_spelling("QuantumNumerics", "step_ang", step_ang, "step_length", step_length)
+        object.__setattr__(self, "representation", representation)
+        object.__setattr__(self, "method", method)
+        object.__setattr__(self, "basis_size", basis_size)
+        object.__setattr__(self, "bloch_cells", bloch_cells)
+        object.__setattr__(self, "step_ang", 250.0 if step is UNSET else step)
+        self.__post_init__()
+
+    @property
+    def step_length(self) -> Quantity:
+        """Fresh Å quantity for the propagation depth step."""
+        return _angstrom(self.step_ang)
+
+    def with_step_length(self, step_length: object) -> Self:
+        """Copy with an explicit positive step length; preserve other controls."""
+        step = _length_spelling("QuantumNumerics", "step_ang", UNSET, "step_length", step_length)
+        return replace(self, step_ang=step)
 
     def __post_init__(self) -> None:
         object.__setattr__(

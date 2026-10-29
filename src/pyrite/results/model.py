@@ -34,6 +34,17 @@ FLUX_UNITS: Mapping[str, str] = MappingProxyType(
     }
 )
 
+#: Pint-parsable unit and count basis of each :data:`FLUX_UNITS` choice.
+_FLUX_COLUMN_UNITS: Mapping[str, tuple[str, str]] = MappingProxyType(
+    {
+        "detector": ("1 / s / eV", "photons"),
+        "nA": ("1 / s / nA / eV", "photons"),
+        "sr": ("1 / s / eV / sr", "photons"),
+        "electron": ("1 / eV / sr", "photons_per_incident_electron"),
+    }
+)
+_ENERGY_COLUMN = {"unit": "eV", "basis": None}
+
 if TYPE_CHECKING:
     import polars as pl
 
@@ -331,6 +342,38 @@ class Result:
                 for name, mode, component in parts
             ]
         )
+
+    def dataframe_units(self) -> dict[str, dict[str, str | None]]:
+        """Machine-readable units of :meth:`to_dataframe`'s physical columns.
+
+        Each entry is ``{"unit": <Pint-parsable string>, "basis": <count
+        basis or None>}``. ``basis`` carries what Pint cannot: ``density`` is
+        photons per incident electron, not Pint's electron charge. Categorical
+        columns are omitted. The returned dictionary is fresh and JSON-ready,
+        e.g. for a sidecar file next to a CSV/Parquet export.
+        """
+        return {
+            "photon_energy_eV": dict(_ENERGY_COLUMN),
+            "density": {"unit": "1 / eV / sr", "basis": "photons_per_incident_electron"},
+        }
+
+    def spectral_flux_units(
+        self, *, units: FluxUnits = "detector", mode: str = "incoherent"
+    ) -> dict[str, dict[str, str | None]]:
+        """Machine-readable units of :meth:`spectral_flux` columns for ``units``.
+
+        Entries follow :meth:`dataframe_units`; every family column and
+        ``total`` share the selected flux unit and count basis.
+        """
+        if units not in FLUX_UNITS:
+            raise ValueError(f"units must be one of {', '.join(map(repr, FLUX_UNITS))}")
+        unit, basis = _FLUX_COLUMN_UNITS[units]
+        families = [name for name, _, _ in self._components(mode)]
+        return {
+            "photon_energy_eV": dict(_ENERGY_COLUMN),
+            "photon_energy_keV": {"unit": "keV", "basis": None},
+            **{name: {"unit": unit, "basis": basis} for name in (*families, "total")},
+        }
 
     def accepted_solid_angle_sr(self) -> float:
         """Solid angle in sr that turns this result's per-sr density into accepted flux.

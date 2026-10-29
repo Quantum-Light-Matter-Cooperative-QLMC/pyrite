@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
+
+from .._units import _is_pint_quantity, normalize_unit
 
 if TYPE_CHECKING:
     from pint import Quantity
@@ -74,6 +76,59 @@ def _quantity_geometry(value: ScalarOrSeq, unit: str) -> Quantity:
 
     magnitude = np.asarray(value)
     return Q_(float(magnitude) if magnitude.ndim == 0 else magnitude.copy(), unit)
+
+
+def _angle_quantity(value: object, *, field: str) -> float | np.ndarray:
+    """Explicit finite plane angle(s) in degrees, scalar or one-dimensional sweep.
+
+    Values keep their sign, turn count and order; no wrapping is applied.
+    """
+    if not _is_pint_quantity(value):
+        raise TypeError(f"{field} requires a Pint quantity with angle units")
+    original = np.asarray(cast(Any, value).magnitude)
+    if original.ndim > 1 or original.dtype.kind not in "iuf":
+        raise TypeError(f"{field} must be a real scalar or one-dimensional angle quantity")
+    magnitude = np.asarray(
+        normalize_unit(value, "degree", field=field, expected="angle", kind="angle")
+    )
+    if magnitude.size == 0:
+        raise ValueError(f"{field} must supply at least one angle")
+    with np.errstate(over="ignore", under="ignore"):
+        stored = magnitude.astype(float)
+    if not np.all(np.isfinite(stored)) or np.any((magnitude != 0) & (stored == 0)):
+        raise ValueError(f"{field} must be finite and representable in numeric degree storage")
+    return float(stored) if stored.ndim == 0 else stored.copy()
+
+
+def _scalar_angle_quantity(value: object, *, field: str) -> float:
+    """Explicit finite plane angle in degrees, without wrapping or sign changes."""
+    if _is_pint_quantity(value) and np.ndim(cast(Any, value).magnitude) != 0:
+        raise TypeError(f"{field} must be a real scalar angle quantity")
+    return cast(float, _angle_quantity(value, field=field))
+
+
+def _angle_spelling(
+    owner: str,
+    numeric_name: str,
+    numeric: Any,
+    semantic_name: str,
+    semantic: object,
+    *,
+    unset: object,
+    default: Any,
+    scalar: bool = False,
+) -> Any:
+    """Resolve one numeric-degree field against its keyword-only semantic angle.
+
+    Supplying both spellings conflicts even at the default; omitting both keeps
+    the numeric default.
+    """
+    if semantic is not unset:
+        if numeric is not unset:
+            raise TypeError(f"{owner}.{numeric_name} and {semantic_name} are mutually exclusive")
+        convert = _scalar_angle_quantity if scalar else _angle_quantity
+        return convert(semantic, field=f"{owner}.{semantic_name}")
+    return default if numeric is unset else numeric
 
 
 def _as_miller(value: Any) -> Miller | None:

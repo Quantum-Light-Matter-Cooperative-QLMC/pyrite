@@ -704,6 +704,12 @@ class ChannelingSpectrum:
         """Free -> bound capture photons per electron (``4 pi``, unabsorbed)."""
         return float(self.line_yield[self.lines.kind == KIND_CAPTURE].sum())
 
+    def quantify(self):
+        """Return a copied :class:`QuantifiedChannelingSpectrum` quantity view."""
+        from .quantified_emission import QuantifiedChannelingSpectrum
+
+        return QuantifiedChannelingSpectrum.from_spectrum(self)
+
 
 def _direction_nodes(aperture_rad: float, n_aperture: int):
     """Offsets ``(r, chi, weight)`` over a cone of half angle ``aperture_rad``."""

@@ -28,7 +28,7 @@ import math
 from collections.abc import Sequence
 from dataclasses import dataclass, field, replace
 from itertools import product
-from typing import TYPE_CHECKING, Any, Protocol, Self
+from typing import TYPE_CHECKING, Any, Protocol, Self, cast
 
 import numpy as np
 
@@ -42,11 +42,14 @@ from ..materials._composition import resolve_composition
 from ..materials.crystal import dominant_reflections
 from ._geometry_table import geometry_table as geometry_table
 from ._geometry_values import (
+    _angle_quantity,
+    _angle_spelling,
     _as_miller,
     _miller,
     _positive_values,
     _quantity_geometry,
     _reject_banned_angles,
+    _scalar_angle_quantity,
     _seq,
     _unique_angles,
 )
@@ -362,7 +365,7 @@ class BlazedGrooves:
 Miller = tuple[int, int, int]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, init=False)
 class CrystalCut:
     """Orient the crystal lattice relative to a slab's entrance face.
 
@@ -387,6 +390,10 @@ class CrystalCut:
     miscut_deg, miscut_azim_deg
         Continuous lattice tilt off the face normal (``0 <= miscut_deg < 90``)
         and the sample-frame azimuth it tilts toward, degrees.
+    roll, miscut, miscut_azimuth
+        Keyword-only explicit scalar Pint plane angles, each conflicting with
+        its ``*_deg`` spelling. Read-back is a fresh degree quantity;
+        ``with_roll``/``with_miscut``/``with_miscut_azimuth`` replace them.
 
     An all-default cut is the catalog orientation; omitting the cut and passing
     ``CrystalCut()`` lower to identical cases.
@@ -399,6 +406,67 @@ class CrystalCut:
     roll_deg: float = 0.0
     miscut_deg: float = 0.0
     miscut_azim_deg: float = 0.0
+
+    def __init__(
+        self,
+        surface_hkl: Miller | None = None,
+        beam_uvw: Miller | None = None,
+        roll_deg: float | _Unset = _UNSET,
+        miscut_deg: float | _Unset = _UNSET,
+        miscut_azim_deg: float | _Unset = _UNSET,
+        *,
+        roll: object = _UNSET,
+        miscut: object = _UNSET,
+        miscut_azimuth: object = _UNSET,
+    ) -> None:
+        object.__setattr__(self, "surface_hkl", surface_hkl)
+        object.__setattr__(self, "beam_uvw", beam_uvw)
+        for numeric_name, numeric, semantic_name, semantic in (
+            ("roll_deg", roll_deg, "roll", roll),
+            ("miscut_deg", miscut_deg, "miscut", miscut),
+            ("miscut_azim_deg", miscut_azim_deg, "miscut_azimuth", miscut_azimuth),
+        ):
+            value = _angle_spelling(
+                "CrystalCut",
+                numeric_name,
+                numeric,
+                semantic_name,
+                semantic,
+                unset=_UNSET,
+                default=0.0,
+                scalar=True,
+            )
+            object.__setattr__(self, numeric_name, value)
+        self.__post_init__()
+
+    @property
+    def roll(self) -> Quantity:
+        """Fresh scalar degree quantity for the roll about the face normal."""
+        return _quantity_geometry(self.roll_deg, "degree")
+
+    def with_roll(self, roll: object) -> Self:
+        """Copy with an explicit plane-angle roll; preserve axis and miscut."""
+        return replace(self, roll_deg=_scalar_angle_quantity(roll, field="CrystalCut.roll"))
+
+    @property
+    def miscut(self) -> Quantity:
+        """Fresh scalar degree quantity for the lattice tilt off the face normal."""
+        return _quantity_geometry(self.miscut_deg, "degree")
+
+    def with_miscut(self, miscut: object) -> Self:
+        """Copy with an explicit plane-angle miscut; ``0 <= miscut < 90 deg``."""
+        degrees = _scalar_angle_quantity(miscut, field="CrystalCut.miscut")
+        return replace(self, miscut_deg=degrees)
+
+    @property
+    def miscut_azimuth(self) -> Quantity:
+        """Fresh scalar degree quantity for the sample-frame miscut azimuth."""
+        return _quantity_geometry(self.miscut_azim_deg, "degree")
+
+    def with_miscut_azimuth(self, miscut_azimuth: object) -> Self:
+        """Copy with an explicit plane-angle miscut azimuth; preserve other settings."""
+        degrees = _scalar_angle_quantity(miscut_azimuth, field="CrystalCut.miscut_azimuth")
+        return replace(self, miscut_azim_deg=degrees)
 
     def __post_init__(self) -> None:
         surface = _miller("surface_hkl", self.surface_hkl)
@@ -513,6 +581,10 @@ class Layer:
         Optional three-index crystal direction aligned with the incident beam.
     azimuth_deg
         In-plane crystal rotation in degrees relative to the entrance film.
+    azimuth
+        Keyword-only explicit scalar Pint angle, conflicting with ``azimuth_deg``.
+        Read-back is a fresh degree quantity; ``with_azimuth`` replaces it.
+        Signed and multi-turn angles retain their configured values.
     """
 
     material: str
@@ -525,9 +597,10 @@ class Layer:
         material: str,
         thickness_ang: ScalarOrSeq | _Unset = _UNSET,
         beam_uvw: tuple[int, int, int] | None = None,
-        azimuth_deg: float = 0.0,
+        azimuth_deg: float | _Unset = _UNSET,
         *,
         thickness: object = _UNSET,
+        azimuth: object = _UNSET,
     ) -> None:
         if thickness is not _UNSET:
             if thickness_ang is not _UNSET:
@@ -535,6 +608,16 @@ class Layer:
             thickness_ang = _geometry_length(thickness, unit="angstrom", field="Layer.thickness")
         elif thickness_ang is _UNSET:
             raise TypeError("Layer requires thickness_ang or thickness")
+        azimuth_deg = _angle_spelling(
+            "Layer",
+            "azimuth_deg",
+            azimuth_deg,
+            "azimuth",
+            azimuth,
+            unset=_UNSET,
+            default=0.0,
+            scalar=True,
+        )
         object.__setattr__(self, "material", material)
         object.__setattr__(self, "thickness_ang", thickness_ang)
         object.__setattr__(self, "beam_uvw", beam_uvw)
@@ -552,6 +635,15 @@ class Layer:
             self,
             thickness_ang=_geometry_length(thickness, unit="angstrom", field="Layer.thickness"),
         )
+
+    @property
+    def azimuth(self) -> Quantity:
+        """Fresh scalar degree quantity for rotation relative to the entrance film."""
+        return _quantity_geometry(self.azimuth_deg, "degree")
+
+    def with_azimuth(self, azimuth: object) -> Self:
+        """Copy with an explicit plane angle; preserve material, thickness and direction."""
+        return replace(self, azimuth_deg=_scalar_angle_quantity(azimuth, field="Layer.azimuth"))
 
     def __post_init__(self) -> None:
         if not isinstance(self.material, str) or not self.material.strip():
@@ -632,6 +724,29 @@ class LoweredTarget:
         return keys
 
 
+def _tilt_inputs(
+    owner: str,
+    tilt_deg: ScalarOrSeq | _Unset,
+    tilt_azim_deg: ScalarOrSeq | _Unset,
+    *,
+    tilt: object,
+    tilt_azimuth: object,
+) -> tuple[ScalarOrSeq, ScalarOrSeq]:
+    """Resolve numeric and semantic tilt spellings, preserving the numeric defaults."""
+    return (
+        _angle_spelling(owner, "tilt_deg", tilt_deg, "tilt", tilt, unset=_UNSET, default=30.0),
+        _angle_spelling(
+            owner,
+            "tilt_azim_deg",
+            tilt_azim_deg,
+            "tilt_azimuth",
+            tilt_azimuth,
+            unset=_UNSET,
+            default=0.0,
+        ),
+    )
+
+
 class _TargetGeometry:
     """Angle validity and product lowering shared by the target variants.
 
@@ -658,6 +773,29 @@ class _TargetGeometry:
 
         @property
         def mosaic(self) -> bool: ...
+
+    # -- semantic orientation quantities ---------------------------------------
+
+    @property
+    def tilt(self) -> Quantity:
+        """Fresh degree-valued polar tilt, keeping scalar/sweep shape."""
+        return _quantity_geometry(self.tilt_deg, "degree")
+
+    def with_tilt(self, tilt: object) -> Self:
+        """Copy with an explicit Pint polar tilt; preserve other settings."""
+        label = f"{type(self).__name__}.tilt"
+        return cast(Self, replace(cast(Any, self), tilt_deg=_angle_quantity(tilt, field=label)))
+
+    @property
+    def tilt_azimuth(self) -> Quantity:
+        """Fresh degree-valued tilt azimuth, keeping scalar/sweep shape."""
+        return _quantity_geometry(self.tilt_azim_deg, "degree")
+
+    def with_tilt_azimuth(self, tilt_azimuth: object) -> Self:
+        """Copy with an explicit Pint tilt azimuth; preserve other settings."""
+        label = f"{type(self).__name__}.tilt_azimuth"
+        degrees = _angle_quantity(tilt_azimuth, field=label)
+        return cast(Self, replace(cast(Any, self), tilt_azim_deg=degrees))
 
     # -- variant hooks --------------------------------------------------------
 
@@ -801,6 +939,10 @@ class Slab(_TargetGeometry):
         a fresh angstrom quantity and ``with_thickness`` provides replacement.
     tilt_deg, tilt_azim_deg
         Polar and azimuthal crystal tilt angles in degrees. Scalars or sequences.
+    tilt, tilt_azimuth
+        Keyword-only explicit Pint plane angles, scalar or one-dimensional
+        sweep, conflicting with ``tilt_deg``/``tilt_azim_deg``. Read-back is a
+        fresh degree quantity; ``with_tilt``/``with_tilt_azimuth`` replace them.
     footprint
         Required: a finite :class:`Footprint`, or ``None`` for a laterally
         infinite slab.
@@ -834,8 +976,8 @@ class Slab(_TargetGeometry):
         self,
         material: str,
         thickness_ang: ScalarOrSeq | _Unset = _UNSET,
-        tilt_deg: ScalarOrSeq = 30.0,
-        tilt_azim_deg: ScalarOrSeq = 0.0,
+        tilt_deg: ScalarOrSeq | _Unset = _UNSET,
+        tilt_azim_deg: ScalarOrSeq | _Unset = _UNSET,
         entrance_face: BlazedGrooves | None = None,
         allow_normal_incidence: bool = False,
         mosaic: bool = False,
@@ -843,6 +985,8 @@ class Slab(_TargetGeometry):
         *,
         footprint: Footprint | None,
         thickness: object = _UNSET,
+        tilt: object = _UNSET,
+        tilt_azimuth: object = _UNSET,
     ) -> None:
         if thickness is not _UNSET:
             if thickness_ang is not _UNSET:
@@ -850,6 +994,9 @@ class Slab(_TargetGeometry):
             thickness_ang = _geometry_length(thickness, unit="angstrom", field="Slab.thickness")
         elif thickness_ang is _UNSET:
             thickness_ang = 2e4
+        tilt_deg, tilt_azim_deg = _tilt_inputs(
+            "Slab", tilt_deg, tilt_azim_deg, tilt=tilt, tilt_azimuth=tilt_azimuth
+        )
         for name, value in (
             ("material", material),
             ("thickness_ang", thickness_ang),
@@ -918,7 +1065,7 @@ class Slab(_TargetGeometry):
         return None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, init=False)
 class Stack(_TargetGeometry):
     """A crystal film on one or more layers beneath it, in beam-entrance order.
 
@@ -933,6 +1080,10 @@ class Stack(_TargetGeometry):
         Only the first layer may have multiple thickness values.
     tilt_deg, tilt_azim_deg
         Polar and azimuthal stack tilt angles in degrees. Scalars or sequences.
+    tilt, tilt_azimuth
+        Keyword-only explicit Pint plane angles, scalar or one-dimensional
+        sweep, conflicting with ``tilt_deg``/``tilt_azim_deg``. Read-back is a
+        fresh degree quantity; ``with_tilt``/``with_tilt_azimuth`` replace them.
     footprint
         Required: a finite :class:`Footprint`, or ``None`` for infinite lateral
         extent.
@@ -948,6 +1099,32 @@ class Stack(_TargetGeometry):
     footprint: Footprint | None = field(kw_only=True)
     allow_normal_incidence: bool = False
     mosaic: bool = False
+
+    def __init__(
+        self,
+        layers: Sequence[Layer],
+        tilt_deg: ScalarOrSeq | _Unset = _UNSET,
+        tilt_azim_deg: ScalarOrSeq | _Unset = _UNSET,
+        allow_normal_incidence: bool = False,
+        mosaic: bool = False,
+        *,
+        footprint: Footprint | None,
+        tilt: object = _UNSET,
+        tilt_azimuth: object = _UNSET,
+    ) -> None:
+        tilt_deg, tilt_azim_deg = _tilt_inputs(
+            "Stack", tilt_deg, tilt_azim_deg, tilt=tilt, tilt_azimuth=tilt_azimuth
+        )
+        for name, value in (
+            ("layers", layers),
+            ("tilt_deg", tilt_deg),
+            ("tilt_azim_deg", tilt_azim_deg),
+            ("footprint", footprint),
+            ("allow_normal_incidence", allow_normal_incidence),
+            ("mosaic", mosaic),
+        ):
+            object.__setattr__(self, name, value)
+        self.__post_init__()
 
     def __post_init__(self) -> None:
         if isinstance(self.layers, Layer) or not isinstance(self.layers, Sequence):
@@ -989,11 +1166,13 @@ class Stack(_TargetGeometry):
         substrate: str,
         substrate_thickness_ang: float = DEFAULT_SUBSTRATE_THICKNESS_ANG,
         *,
-        tilt_deg: ScalarOrSeq = 30.0,
-        tilt_azim_deg: ScalarOrSeq = 0.0,
+        tilt_deg: ScalarOrSeq | _Unset = _UNSET,
+        tilt_azim_deg: ScalarOrSeq | _Unset = _UNSET,
         footprint: Footprint | None,
         allow_normal_incidence: bool = False,
         mosaic: bool = False,
+        tilt: object = _UNSET,
+        tilt_azimuth: object = _UNSET,
     ) -> Stack:
         """A film on one substrate wafer -- the sanctioned one-layer stack.
 
@@ -1011,6 +1190,8 @@ class Stack(_TargetGeometry):
             footprint=footprint,
             allow_normal_incidence=allow_normal_incidence,
             mosaic=mosaic,
+            tilt=tilt,
+            tilt_azimuth=tilt_azimuth,
         )
 
     @property
@@ -1029,195 +1210,22 @@ Target = Slab | Stack
 """The closed target variant set. Not an extension point -- see the module docstring."""
 
 
-class _RetiredFlatInput:
-    """The class attribute a retired flat geometry ``InitVar`` leaves behind.
-
-    It does two jobs. It is the "was not supplied at all" sentinel that ``None``
-    cannot serve -- ``crystal_width_mm=None`` IS the explicit infinite slab, a
-    different statement from not mentioning the footprint. And it is what a READ
-    of the retired name returns: ``dataclasses`` keeps an ``InitVar``'s default
-    as a class attribute and ``dataclasses.replace`` reads it back, so the name
-    cannot simply be deleted. Every use of the value other than an identity or
-    ``isinstance`` check raises, so a stale ``sweep.tilt_deg`` reader fails
-    loudly instead of silently seeing ``None``.
-    """
-
-    __slots__ = ("_name",)
-
-    def __init__(self, name: str) -> None:
-        self._name = name
-
-    def __repr__(self) -> str:
-        return f"<retired flat geometry input {self._name!r}>"
-
-    def _retired(self, *_args: Any, **_kwargs: Any) -> Any:
-        raise AttributeError(
-            f"{self._name!r} is not state on Sweep: geometry lives on sweep.target "
-            f"(target_flat_fields(sweep.target) gives the flat projection)"
-        )
-
-    __bool__ = _retired
-    __eq__ = _retired
-    __ne__ = _retired
-    __lt__ = _retired
-    __le__ = _retired
-    __gt__ = _retired
-    __ge__ = _retired
-    __float__ = _retired
-    __int__ = _retired
-    __iter__ = _retired
-    __len__ = _retired
-    __getitem__ = _retired
-    __hash__ = None  # type: ignore[assignment]
-
-
-def retired_flat_input(name: str) -> Any:
-    """The default for a retired flat geometry ``InitVar`` named *name*."""
-    return _RetiredFlatInput(name)
-
-
-def target_from_flat(
-    material: str,
-    *,
-    thickness_ang: ScalarOrSeq = 2e4,
-    tilt_deg: ScalarOrSeq = 30.0,
-    tilt_azim_deg: ScalarOrSeq = 0.0,
-    crystal_width_mm: ScalarOrSeq | None = 5.0,
-    crystal_height_mm: ScalarOrSeq | None = 5.0,
-    groove_spacing_ang: float | None = None,
-    substrate: str | None = None,
-    substrate_thickness_ang: float = DEFAULT_SUBSTRATE_THICKNESS_ANG,
-    stack: Sequence[LayerSpec] | None = None,
-    allow_normal_incidence: bool = False,
-    mosaic: bool = False,
-    cut: CrystalCut | None = None,
-) -> Target:
-    """Build the target described by the legacy flat geometry inputs.
-
-    The defaults are the historical :class:`pyrite.campaign.sweep.Sweep` field
-    defaults, so a flat construction that named nothing lowers exactly as it did.
-    Every geometry RULE is owned by the target objects; the three checks here
-    exist solely because the flat inputs are separate keys -- footprint pairing
-    (unrepresentable once both dimensions sit on one :class:`Footprint`), the
-    substrate/stack exclusion, and grooves-forbid-a-stack (a type constraint once
-    ``entrance_face`` is reachable only through :class:`Slab`).
-    """
-    footprint = None
-    if crystal_width_mm is not None or crystal_height_mm is not None:
-        if crystal_width_mm is None or crystal_height_mm is None:
-            raise ValueError("crystal_width_mm and crystal_height_mm must be supplied together")
-        footprint = Footprint(crystal_width_mm, crystal_height_mm)
-
-    if substrate is not None and stack is not None:
-        raise ValueError("give either substrate= or stack=, not both")
-    if groove_spacing_ang is not None and (substrate is not None or stack is not None):
-        raise ValueError("grooves are v1 single-slab only (no substrate/stack)")
-    if cut is not None and (substrate is not None or stack is not None):
-        raise ValueError("a crystal cut is single-slab only (no substrate/stack)")
-
-    # the substrate sugar IS the one-layer stack, so it goes through its helper
-    if substrate is not None:
-        return Stack.on_substrate(
-            material,
-            thickness_ang,
-            substrate,
-            substrate_thickness_ang,
-            tilt_deg=tilt_deg,
-            tilt_azim_deg=tilt_azim_deg,
-            footprint=footprint,
-            allow_normal_incidence=allow_normal_incidence,
-            mosaic=mosaic,
-        )
-
-    if stack is not None:
-        return Stack(
-            layers=(
-                Layer(material, thickness_ang),
-                *(
-                    Layer(lay.material, lay.thickness_ang, lay.beam_uvw, lay.azimuth_deg)
-                    for lay in stack
-                ),
-            ),
-            tilt_deg=tilt_deg,
-            tilt_azim_deg=tilt_azim_deg,
-            footprint=footprint,
-            allow_normal_incidence=allow_normal_incidence,
-            mosaic=mosaic,
-        )
-    return Slab(
-        material,
-        thickness_ang=thickness_ang,
-        tilt_deg=tilt_deg,
-        tilt_azim_deg=tilt_azim_deg,
-        footprint=footprint,
-        entrance_face=(None if groove_spacing_ang is None else BlazedGrooves(groove_spacing_ang)),
-        allow_normal_incidence=allow_normal_incidence,
-        mosaic=mosaic,
-        cut=cut,
-    )
-
-
-def target_flat_fields(target: Target) -> dict[str, Any]:
-    """The flat geometry inputs that rebuild ``target`` through
-    :func:`target_from_flat`.
-
-    Exactly one default-oriented layer beneath the film inverts to the
-    ``substrate=`` sugar rather than the general ``stack=`` spelling, because
-    that IS its definition -- ``substrate="x"`` means
-    ``stack=(LayerSpec("x", substrate_thickness_ang),)``. Keeping the sugar makes
-    the projection lossless in both directions and lets the legacy identity
-    payload keep the spelling it has always hashed. ``cut`` joins only when set,
-    for the same reason.
-    """
-    footprint = target.footprint
-    face = target._entrance_face()
-    below = target._below_film()
-    substrate = None
-    substrate_thickness_ang = DEFAULT_SUBSTRATE_THICKNESS_ANG
-    stack: tuple[LayerSpec, ...] | None = None if below is None else tuple(below)
-    if stack is not None and len(stack) == 1 and stack[0].beam_uvw is None:
-        only = stack[0]
-        if float(only.azimuth_deg) == 0.0:
-            substrate = only.material
-            substrate_thickness_ang = float(only.thickness_ang)
-            stack = None
-    cut = target._crystal_cut()
-    return {
-        "material": target.material,
-        "thickness_ang": target._film_thickness(),
-        "tilt_deg": target.tilt_deg,
-        "tilt_azim_deg": target.tilt_azim_deg,
-        "crystal_width_mm": None if footprint is None else footprint.width_mm,
-        "crystal_height_mm": None if footprint is None else footprint.height_mm,
-        "groove_spacing_ang": None if face is None else face.spacing_ang,
-        "substrate": substrate,
-        "substrate_thickness_ang": substrate_thickness_ang,
-        "stack": stack,
-        "allow_normal_incidence": target.allow_normal_incidence,
-        "mosaic": target.mosaic,
-        **({} if cut is None else {"cut": cut}),
+_FLAT_EXPORTS = frozenset(
+    {
+        "_RetiredFlatInput",
+        "retired_flat_input",
+        "target_flat_fields",
+        "target_from_flat",
+        "target_replace",
     }
+)
 
 
-def target_replace(target: Target, **changes: Any) -> Target:
-    """``target`` with flat geometry overrides applied, rebuilt and revalidated.
+def __getattr__(name: str) -> Any:
+    # The flat-vocabulary adapters live in ``flat_geometry``, which imports the
+    # target variants from here; resolve the historical names lazily.
+    if name in _FLAT_EXPORTS:
+        from . import flat_geometry
 
-    Overrides are flat because that is the vocabulary the CLI, catalog profiles
-    and the sweep override path already speak. A rebuild rather than a field
-    replace is required: ``substrate=`` / ``stack=`` change which variant the
-    target IS, and a footprint dimension has to merge with the one it keeps.
-    """
-    flat = target_flat_fields(target)
-    unknown = sorted(set(changes) - set(flat) - {"cut"})
-    if unknown:
-        raise TypeError(f"target_replace: unknown geometry override(s): {', '.join(unknown)}")
-    if "substrate" in changes or "stack" in changes:
-        # The pair states the layers beneath the film as a whole; keeping the
-        # inherited stack would make substrate=None a no-op instead of a clear.
-        flat["substrate"] = None
-        flat["stack"] = None
-        flat["substrate_thickness_ang"] = DEFAULT_SUBSTRATE_THICKNESS_ANG
-    elif "substrate_thickness_ang" in changes and flat["substrate"] is None:
-        raise ValueError("substrate_thickness_ang override requires substrate=")
-    flat.update(changes)
-    return target_from_flat(**flat)
+        return getattr(flat_geometry, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
