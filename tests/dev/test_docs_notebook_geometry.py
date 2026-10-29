@@ -1,20 +1,29 @@
 """Geometry notebook capture, registration and explicit pin synchronization."""
 
+import json
 from pathlib import Path
 
 DOCS = Path(__file__).parents[2] / "docs"
 NAME = "04-beams-crystals-target-geometry"
 
 
+def page_contract(path):
+    """Return the native page's Markdown and whether it carries a captured figure."""
+    cells = json.loads(path.read_text())["cells"]
+    markdown = "".join("".join(cell["source"]) for cell in cells if cell["cell_type"] == "markdown")
+    outputs = [output.get("data", {}) for cell in cells for output in cell.get("outputs", [])]
+    return markdown, any("image/png" in data or "image/svg+xml" in data for data in outputs)
+
+
 def test_designing_navigation():
     assert "designing/index" in (DOCS / "notebooks" / "index.md").read_text()
     assert NAME in (DOCS / "notebooks" / "designing" / "index.md").read_text()
     notebook = (DOCS / "notebooks" / f"{NAME}.py").read_text()
-    page = (DOCS / "notebooks" / "designing" / f"{NAME}.md").read_text()
+    page, figure = page_contract(DOCS / "notebooks" / "designing" / f"{NAME}.ipynb")
     assert "molab-shield.svg" not in notebook
     assert f"docs/notebooks/{NAME}.py" in page
-    assert f"{{literalinclude}} ../{NAME}.py" in page
-    assert f"../../_static/notebooks/{NAME}.html" in page
+    assert f"<../{NAME}.py>" in page
+    assert figure
 
 
 def test_all_notebooks_bootstrap_tables_before_simulation():
