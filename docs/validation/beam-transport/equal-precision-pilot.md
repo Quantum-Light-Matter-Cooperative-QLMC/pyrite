@@ -939,3 +939,36 @@ theoretical occupancy of 16.7% for the compiled kernel (204 registers, 256
 resident threads per SM) at every block size from 32 to 256. The scheduling
 gains above are launch-population and tail effects; no occupancy improvement is
 claimed.
+
+**Shell soft/hard and straggling (#797).** [#797](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/797)
+extends continuation to `inelastic_model="shell-soft-hard"` and straggling.
+Job 2657 (`continuation-797.sbatch`, branch revision `f2c3689c`) runs the Si 300-keV anchor with 5000 histories, seeds 78601–78603,
+and the same methodology as above: one process per scene and seed, interleaved
+policies (reversed on the even seed) and a same-policy warmup. The *shell* rows
+use `benchmark_continuation.py --inelastic shell` (shell soft/hard at the
+production 50 eV cutoff on `silicon`, as campaign `inelastic_model="auto"`
+resolves it); the *straggling* rows use `--straggling` (Urban, continuous
+losses). Every policy's measured arrays hash identically within each seed.
+CUDA regressions (job 2654, 90 tests) require bitwise-identical arrays for
+shell with secondaries on and off, shell and Urban straggling, each alone and
+with coupled hard photons, across quanta 1–4096, populations 5–all, permuted
+refill, frozen and midpoint rows, side exits and step-limit errors.
+
+Median [min,max] s and peak pool:
+
+| Policy | Shell request | Shell launches | Shell pool | Straggling request | Straggling launches | Straggling pool |
+| --- | --- | --- | --- | --- | --- | --- |
+| reference | 3.935 [3.898,3.948] | 3.240 | 4826 MiB | 2.358 [2.345,2.418] | 1.838 | 4146 MiB |
+| learned32 | 1.872 [1.679,1.925] | 1.322 | 4929 MiB | 1.145 [1.097,1.225] | 0.715 | 4183 MiB |
+| cont-Q256-Aall | 2.610 [2.525,2.704] | 1.739 | 341 MiB | 1.385 [1.368,1.413] | 0.814 | 316 MiB |
+| cont-Q256-A2500 | 2.939 [2.935,3.000] | 2.124 | 171 MiB | 1.616 [1.607,1.630] | 1.025 | 159 MiB |
+| cont-Q64-Aall | 2.794 [2.675,2.802] | 1.825 | 86 MiB | 1.702 [1.656,1.744] | 0.876 | 80 MiB |
+
+Peak pool is from seed 78601 (the other seeds agree within 5%). The shell
+schema adds 10 bytes per row (hard-event pair) and 24 bytes with secondary
+directions; continuation's pool stays within its 4096 MiB budget, 13–14× below
+full history at Q256 and about 50× below at Q64. As for the continuous-loss Si anchor, `learned32`
+already fits one launch here and stays fastest end to end when memory is
+plentiful; continuation is 1.2–1.4× slower than it but 1.5–1.7× faster than
+the default `reference` driver, which replays a capacity overflow. Raw records
+stay on the lab box under `pyrite-797/evidence/continuation/bench797/2657`.
