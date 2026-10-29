@@ -27,3 +27,42 @@ def test_paired_pilot_screening_refuses_false_certainty(delta, status):
         assert (
             -0.001 <= result["confidence_interval"][0] <= result["confidence_interval"][1] <= 0.001
         )
+
+
+@pytest.mark.parametrize("arm", ["--arm=transport", "--arm=detector"])
+def test_pilot_rejects_arms_that_skip_trajectory_checks(monkeypatch, arm):
+    import sys
+
+    path = Path(__file__).parents[2] / "checks/equal_precision/benchmark_moment_transport.py"
+    parse = runpy.run_path(str(path))["parse_args"]
+    monkeypatch.setattr(
+        sys, "argv", [str(path), "table", "audit.json", "scene", "--core=cuda", arm]
+    )
+    with pytest.raises(SystemExit) as error:
+        parse()
+    assert error.value.code == 2
+
+
+def test_pilot_forwards_resolved_cutoff_and_source_arm(monkeypatch):
+    import sys
+
+    path = Path(__file__).parents[2] / "checks/equal_precision/benchmark_moment_transport.py"
+    parse = runpy.run_path(str(path))["parse_args"]
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            str(path),
+            "table",
+            "audit.json",
+            "scene",
+            "--core=cuda",
+            "--arm=source",
+            "--cutoff-ev=10000",
+        ],
+    )
+    args, forwarded = parse()
+    assert args.cutoff_ev == 10000
+    assert forwarded[0] == "scene"
+    assert forwarded[forwarded.index("--arm") + 1] == "source"
+    assert float(forwarded[forwarded.index("--cutoff-ev") + 1]) == 10000

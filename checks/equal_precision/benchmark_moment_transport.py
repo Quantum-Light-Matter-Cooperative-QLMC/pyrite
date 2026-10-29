@@ -119,16 +119,23 @@ def install_tables(rtol, audit):
     hard_radiative.add_radiative_result_fields = result_fields
 
 
-def main():
+def parse_args():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("variant", choices=["exact", "table", "refined"])
     parser.add_argument("audit", type=Path)
     parser.add_argument("--replay", action="store_true")
+    parser.add_argument("--core", choices=["cuda"], required=True)
+    parser.add_argument("--arm", choices=["source"], default="source")
+    parser.add_argument("--cutoff-ev", type=float)
     args, adapter_args = parser.parse_known_args()
-    if "--arm" in adapter_args and adapter_args[adapter_args.index("--arm") + 1] != "source":
-        parser.error("moment pilot requires the source arm and its trajectory checks")
-    if "--core" not in adapter_args or adapter_args[adapter_args.index("--core") + 1] != "cuda":
-        parser.error("explicit --core cuda required")
+    adapter_args.extend(["--core", args.core, "--arm", args.arm])
+    if args.cutoff_ev is not None:
+        adapter_args.extend(["--cutoff-ev", str(args.cutoff_ev)])
+    return args, adapter_args
+
+
+def main():
+    args, adapter_args = parse_args()
     args.audit.parent.mkdir(parents=True, exist_ok=True)
     source = {} if args.variant == "exact" else install_kernel(args.audit)
     package = importlib.import_module("pyrite.montecarlo.transport")
@@ -201,9 +208,7 @@ def main():
     namespace = runpy.run_path(str(Path(__file__).with_name("pyrite_adapter.py")))
     _, scene, _ = namespace["load_scene"](adapter_args[0])
     resolved_cutoff = (
-        float(adapter_args[adapter_args.index("--cutoff-ev") + 1])
-        if "--cutoff-ev" in adapter_args
-        else scene["hard_photon_cutoff_eV"]
+        args.cutoff_ev if args.cutoff_ev is not None else scene["hard_photon_cutoff_eV"]
     )
     score_original = namespace["score_segments"]
     blocks = []
