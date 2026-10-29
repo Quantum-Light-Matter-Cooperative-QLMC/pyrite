@@ -185,6 +185,15 @@ control the zone's numerical representation and require independent
 convergence checks. To run it, follow
 [Add planar channeling to a transport run](../guides/experimental-planar-channeling.md#add-planar-channeling-to-a-transport-run).
 
+`QuantumRegion(..., zone_max_length=Q_(2, "nm"))` and
+`QuantumNumerics(step_length=Q_(10, "nm"))` take explicit positive scalar Pint
+lengths for the zone cap and depth step. Each conflicts with its numeric
+`zone_max_ang`/`step_ang` spelling, reads back as a fresh Å quantity
+(`zone_max_length` is `None` when uncapped) and is replaced by
+`with_zone_max_length` (which also accepts `None`) or `with_step_length`. Numeric
+fields, pickles and the lowered `channeling_*` controls are unchanged;
+`basis_size` and `bloch_cells` stay counts.
+
 ### Specify and inspect quantum entrance states
 
 `TransverseStateSpec` describes a transverse wavefunction or an **incoherent**

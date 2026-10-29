@@ -14,6 +14,7 @@ from .._numerics import EmissionMode as EmissionMode
 from .._numerics import MosaicRoute as MosaicRoute
 from .._precision import Precision
 from .._spec_defaults import UNSET, _Unset
+from .._units import _is_pint_quantity
 from ..detectors import Detector, EnergyBins
 from ..instrument import Acquisition, Filter, FilterPlate, NativeAcquisition, PlanarDetector
 from ..instrument.model import validate_downstream_scene
@@ -370,6 +371,12 @@ def _replace_path(
     child = _descend(value, name, indexes, path)
     replacement = leaf if len(parts) == 1 else _replace_path(child, parts[1:], leaf, path)
     replacement = _replace_indexes(getattr(value, name), indexes, replacement, path)
+    # Semantic quantities own their conversion and validation. Dataclass
+    # replacement would forward both the numeric field and its semantic alias.
+    if _is_pint_quantity(child):
+        updater = getattr(value, f"with_{name}", None)
+        if callable(updater):
+            return updater(replacement)
     try:
         return replace(value, **{name: replacement})
     except TypeError as exc:
@@ -395,7 +402,10 @@ class Sweep:
     axes
         Ordered mapping from dotted dataclass paths to non-empty replacement
         sequences. Indexed segments address sequence elements, for example
-        ``"target.layers[1].thickness_ang"``.
+        ``"target.layers[1].thickness_ang"``. Semantic quantity properties with
+        an owning ``with_<name>`` method (for example ``beam.kinetic_energy``)
+        accept quantity values through that method, preserving its unit and
+        validation contract. Numeric dataclass paths keep their existing units.
 
     Raises
     ------

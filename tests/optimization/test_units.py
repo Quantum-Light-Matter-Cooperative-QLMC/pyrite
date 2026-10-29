@@ -120,13 +120,127 @@ def test_constraint_on_scorer_output_is_unit_checked():
 @pytest.mark.parametrize(
     "build",
     [
-        lambda: Continuous(30 * ureg.keV, 100.0),
-        lambda: Continuous(30.0, 0.1 * ureg.MeV),
         lambda: Integer(1 * ureg.dimensionless, 4),
         lambda: Continuous(30.0, 100.0).validate(40 * ureg.keV),
         lambda: Integer(1, 4).validate(2 * ureg.dimensionless),
     ],
 )
 def test_parameter_quantities_refused_without_declared_path_unit(build):
-    with pytest.raises(TypeError, match="paths declare no unit"):
+    with pytest.raises(TypeError):
         build()
+
+
+def test_quantity_parameter_domains_bind_to_owner_units():
+    space = ParameterSpace(
+        {
+            "beam.kinetic_energy": Continuous(0.03 * ureg.MeV, 100 * ureg.keV),
+            "target.thickness": Integer(
+                100 * ureg.angstrom, 200 * ureg.angstrom, step=50 * ureg.angstrom
+            ),
+        }
+    )
+    study = OptimizationStudy(_base(), space, (Objective("f", "maximize", ""),))
+    assert study.parameters.parameters["beam.kinetic_energy"] == Continuous(30, 100)
+    assert study.parameters.parameters["target.thickness"] == Integer(100, 200, step=50)
+    scene = study.scene({"beam.kinetic_energy": 40, "target.thickness": 150})
+    assert scene.beam.energy_keV == 40
+    assert scene.target.thickness_ang == 150
+    assert _base().target.thickness_ang == 2000
+    quantity_scene = study.scene(
+        {
+            "beam.kinetic_energy": 0.04 * ureg.MeV,
+            "target.thickness": 150 * ureg.angstrom,
+        }
+    )
+    assert quantity_scene == scene
+    assert study.parameters.bind(_base()) == study.parameters
+
+
+def test_quantity_parameter_digest_has_numeric_storage_and_canonical_owner_unit():
+    objectives = (Objective("f", "maximize", ""),)
+    digests = []
+    for lo, hi in ((30 * ureg.keV, 100 * ureg.keV), (0.03 * ureg.MeV, 0.1 * ureg.MeV)):
+        space = ParameterSpace({"beam.kinetic_energy": Continuous(lo, hi)})
+        digests.append(study_definition_digest(_base(), space, objectives, (), evaluation_id="v1"))
+    assert digests[0] == digests[1]
+
+
+@pytest.mark.parametrize(
+    "path, interval, error",
+    [
+        ("beam.energy_keV", Continuous(30 * ureg.keV, 100 * ureg.keV), TypeError),
+        ("beam.kinetic_energy", Continuous(30, 100), TypeError),
+        ("beam.kinetic_energy", Continuous(30 * ureg.nm, 100 * ureg.nm), ValueError),
+        ("beam.kinetic_energy", Integer(30.5 * ureg.keV, 40 * ureg.keV), ValueError),
+        (
+            "beam.kinetic_energy",
+            Integer(30 * ureg.keV, 40 * ureg.keV, step=0.5 * ureg.keV),
+            ValueError,
+        ),
+    ],
+)
+def test_invalid_quantity_parameter_domains(path, interval, error):
+    with pytest.raises(error):
+        ParameterSpace({path: interval}).bind(_base())
+
+
+def test_quantity_parameter_candidates_keep_bounds_lattice_and_dimensions():
+    space = ParameterSpace(
+        {"beam.kinetic_energy": Integer(30 * ureg.keV, 40 * ureg.keV, step=2 * ureg.keV)}
+    ).bind(_base())
+    assert space.validate({"beam.kinetic_energy": 32 * ureg.keV}) == {"beam.kinetic_energy": 32}
+    for value in (31 * ureg.keV, 30.5 * ureg.keV, 50 * ureg.keV, 32 * ureg.nm):
+        with pytest.raises(ValueError):
+            space.validate({"beam.kinetic_energy": value})
+
+
+@pytest.mark.parametrize(
+    "bounds",
+    [
+        (30 * ureg.keV, 100),
+        (30, 100 * ureg.keV),
+        (30 * ureg.keV, 100 * ureg.nm),
+    ],
+)
+def test_mixed_or_incompatible_quantity_bounds_are_refused(bounds):
+    with pytest.raises((TypeError, ValueError)):
+        Continuous(*bounds)
+
+
+def test_external_quantity_bounds_are_detached_and_nested_paths_bind():
+    import numpy as np
+    import pint
+
+    external = pint.UnitRegistry()
+    low = external.Quantity(np.array(4.0), "mm")
+    high = external.Quantity(0.6, "cm")
+    space = ParameterSpace({"target.footprint.width": Continuous(low, high)})
+    low.magnitude[...] = 20.0
+    bound = space.bind(_base())
+    assert bound.parameters["target.footprint.width"] == Continuous(4, 6)
+    study = OptimizationStudy(_base(), bound, (Objective("f", "maximize", ""),))
+    assert (
+        study.scene(
+            {"target.footprint.width": external.Quantity(0.5, "cm")}
+        ).target.footprint.width_mm
+        == 5.0
+    )
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        [1, 2] * ureg.keV,
+        float("nan") * ureg.keV,
+        float("inf") * ureg.keV,
+        (1 + 2j) * ureg.keV,
+    ],
+)
+def test_quantity_bounds_reject_non_scalar_non_real_or_unrepresentable_values(value):
+    with pytest.raises((TypeError, ValueError)):
+        Continuous(value, 100 * ureg.keV)
+
+
+def test_quantity_integer_magnitudes_do_not_silently_round_to_float_storage():
+    with pytest.raises(ValueError, match="exactly representable"):
+        Integer((2**53 + 1) * ureg.keV, (2**54) * ureg.keV)

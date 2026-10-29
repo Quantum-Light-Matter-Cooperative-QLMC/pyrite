@@ -7,7 +7,7 @@ import pytest
 
 import pyrite as pr
 from pyrite.api import build_case
-from pyrite.campaign.geometry import target_flat_fields, target_from_flat, target_replace
+from pyrite.campaign.flat_geometry import target_flat_fields, target_from_flat, target_replace
 from pyrite.campaign.longitudinal import LongitudinalDistribution
 from pyrite.campaign.sweep import BeamSpec, Sweep, build_cases
 from pyrite.materials import CATALOG

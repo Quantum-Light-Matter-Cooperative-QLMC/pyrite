@@ -236,6 +236,7 @@ class OptimizationStudy:
 
         if not isinstance(self.base, Scene):
             raise TypeError("base must be a PyRITE Scene")
+        object.__setattr__(self, "parameters", self.parameters.bind(self.base))
         for path in self.parameters.parameters:
             if path.split(".", 1)[0].split("[", 1)[0] not in (
                 "beam",

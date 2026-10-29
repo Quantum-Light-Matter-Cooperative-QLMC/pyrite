@@ -629,8 +629,10 @@ Axial selection remains configuration-only (#624). The data-only `_channeling_ad
 ### `campaign/geometry.py`
 
 Internal `_geometry_values.py` owns scalar/sweep/index validation and copied
-quantity read-back; `_geometry_table.py` owns numeric case summary tables.
-The original geometry imports and public class owners remain available.
+quantity read-back; `_geometry_table.py` owns numeric case summary tables;
+`flat_geometry.py` owns the flat-vocabulary adapters (`target_from_flat`,
+`target_flat_fields`, `target_replace`, `retired_flat_input`).
+The original geometry imports (including those adapter names) and public class owners remain available.
 The closed target variant set and its lowering to today's geometry case keys (`abs_layers`, `layer_radiators`, `crystal_width_mm`, `crystal_height_mm`, `groove_spacing_ang`, `mosaic`). Each variant owns its validity at construction, so an impossible target raises in the user's script rather than after profile resolution; arbitrary geometry is a recorded non-goal (ADR-0008), so there is no dispatch protocol or region algebra. `target_from_flat` / `target_flat_fields` / `target_replace` are the inverse pair between a `Target` and the flat geometry vocabulary that catalog data, profile overrides, and identity digests still speak. Sits below `campaign/sweep.py` and imports without it.
 - Public: `Slab`, `Stack`, `Target` (the variant union), `Layer`, `Footprint`, `BlazedGrooves`, `LoweredTarget`, `Stack.on_substrate` (the sanctioned one-layer film-on-wafer stack), `DEFAULT_FOOTPRINT`, `DEFAULT_SUBSTRATE_THICKNESS_ANG`, `target_from_flat`, `target_flat_fields`, `target_replace`, `retired_flat_input`, `crystal_params`, `substrate_composition`, `stack_layers`, `film_on_substrate_layers`, `layer_radiator`, `substrate_radiator`, `fmt_thickness`, `ScalarOrSeq`.
 - Deps: `detectors` (`Detector`, for the target×detector groove check), `materials` (`CATALOG`, `LayerSpec`), `materials.crystal`.

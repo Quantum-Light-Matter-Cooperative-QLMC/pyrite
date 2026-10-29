@@ -32,11 +32,11 @@ beam = Beam(
     transverse=Spot(),
     longitudinal=PointBunch(),
 )
-pose = PlanarPose(center_mm=(0, 0, 10 * ureg.cm))
-pixels = PixelGrid(shape=(256, 256), pitch_mm=(55 * ureg.um, 55 * ureg.um))
+pose = PlanarPose(center=[0, 0, 10] * ureg.cm)
+pixels = PixelGrid(shape=(256, 256), pitch=[55, 55] * ureg.um)
 acquisition = Acquisition(
-    exposure_s=500 * ureg.ms,
-    measured_edges_eV=(0.1 * ureg.keV, 0.2 * ureg.keV, 0.3 * ureg.keV),
+    exposure=500 * ureg.ms,
+    measured_edges=[0.1, 0.2, 0.3] * ureg.keV,
 )
 ```
 
@@ -55,9 +55,56 @@ keV; array magnitudes are copied. Its constructor keyword requires a real,
 finite positive energy quantity and conflicts with an explicit `energy_keV`.
 Use `beam.with_kinetic_energy(80 * ureg.keV)` for quantity-aware replacement;
 `dataclasses.replace` continues to accept the numeric `energy_keV` field.
+`PlanarPose(center=...)` takes a three-component length and
+`PixelGrid(pitch=...)` a two-component `(pitch_y, pitch_x)` length; they read
+back as fresh mm quantities (`center`, `pitch`, `active_size`) and replace via
+`with_center` / `with_pitch`. `PlanarPose.from_observation` accepts
+`distance`, `polar`, `azimuth`, `roll` and `offset` quantities; angles must
+carry plane-angle units. Direction vectors stay dimensionless tuples.
+`Acquisition` follows the same pattern: keyword-only `exposure` (positive
+scalar time), `measured_edges` (one-dimensional energy array) and
+`hit_threshold` (nonnegative scalar energy) read back as fresh quantities in s
+and eV, with `with_exposure`, `with_measured_edges` and `with_hit_threshold`
+replacement. `Acquisition.uniform` takes `exposure`, `minimum`, `maximum`,
+`bin_width` and `hit_threshold`; `Acquisition.native` and `NativeAcquisition`
+take `exposure` and `hit_threshold`. Numeric `*_s` / `*_eV` spellings keep
+their meaning, and acquisition identities and stored observations are
+unchanged.
 See the [beam-energy contract](../../repo-design/physical-units.md#beam-energy-quantity-interface)
 for scalar/array, replacement and serialization details. The empty `units`
 installation extra remains a compatibility spelling.
+
+## Quantity sweep paths
+
+`Sweep.axes` accepts semantic quantity properties whose owner provides a
+`with_<name>` replacement method. Each value follows that method's unit,
+shape and validation rules. Nested and indexed owner paths work as well:
+
+```python
+from pyrite import Beam, Scene, Sweep
+from pyrite.beams import PointBunch, Spot
+from pyrite.geometry import Footprint, Slab
+
+scene = Scene(
+    Beam(kinetic_energy=30 * ureg.keV, transverse=Spot(), longitudinal=PointBunch()),
+    Slab(
+        "hopg", thickness=200 * ureg.nm, footprint=Footprint(width=5 * ureg.mm, height=5 * ureg.mm)
+    ),
+)
+sweep = Sweep(
+    scene,
+    axes={
+        "beam.kinetic_energy": [30 * ureg.keV, 0.045 * ureg.MeV],
+        "target.thickness": [200 * ureg.nm, 0.5 * ureg.um],
+    },
+)
+```
+
+Expansion produces numeric scene storage through the owning replacement
+methods; it leaves the base scene unchanged. Axis labels include the supplied
+quantity's unit. Legacy numeric paths such as `beam.energy_keV` keep their
+existing numeric units and validation. Optimization domains can target the same
+semantic properties; see [quantity parameter paths](../optimization-studies.md#quantity-parameter-paths).
 
 ## Shared registry and quantity constructor
 

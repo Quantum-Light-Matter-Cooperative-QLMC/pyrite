@@ -10,12 +10,17 @@ The public names stay importable from :mod:`pyrite.instrument` and
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from numbers import Integral, Real
+from typing import TYPE_CHECKING, Any, Self, cast
 
 import numpy as np
 
-from ._units import normalize_unit
+from ._spec_defaults import UNSET, _Unset
+from ._units import _is_pint_quantity, _quantity_spelling, _scalar_quantity, normalize_unit
+
+if TYPE_CHECKING:
+    from pint import Quantity
 
 _AXIS_ATOL = 1.0e-10
 
@@ -39,6 +44,33 @@ def _positive_pair(name: str, value: object) -> tuple[float, float]:
     return float(numbers[0]), float(numbers[1])
 
 
+def _length_vector(value: object, *, field: str, size: int) -> tuple[float, ...]:
+    """Own an explicit ``size``-component length quantity as numeric mm floats."""
+    if not _is_pint_quantity(value):
+        raise TypeError(f"{field} requires a Pint quantity with length units")
+    original = np.asarray(cast(Any, value).magnitude)
+    if original.shape != (size,) or original.dtype.kind not in "iuf":
+        raise TypeError(f"{field} must be a real {size}-component length quantity")
+    magnitude = np.asarray(normalize_unit(value, "mm", field=field, expected="length"))
+    with np.errstate(over="ignore", under="ignore"):
+        stored = magnitude.astype(float)
+    if not np.all(np.isfinite(stored)) or np.any((magnitude != 0) & (stored == 0)):
+        raise ValueError(f"{field} must be finite and representable in numeric mm storage")
+    return tuple(float(x) for x in stored)
+
+
+def _angle_deg(value: object, *, field: str) -> float:
+    return _scalar_quantity(
+        value, unit="degree", field=field, expected="angle", kind="angle", signed=True
+    )
+
+
+def _mm_quantity(value: object) -> Quantity:
+    from .units import Q_
+
+    return Q_(np.array(value, dtype=float), "mm")
+
+
 def _positive_real(name: str, value: object) -> float:
     if isinstance(value, bool) or not isinstance(value, Real):
         raise TypeError(f"{name} must be a real number")
@@ -48,7 +80,11 @@ def _positive_real(name: str, value: object) -> float:
     return number
 
 
-@dataclass(frozen=True)
+def _pose_center_mm(value: object) -> tuple[float, ...]:
+    return _length_vector(value, field="PlanarPose.center", size=3)
+
+
+@dataclass(frozen=True, init=False)
 class PlanarPose:
     """Pose of a bounded plane in the target-centred lab frame.
 
@@ -67,11 +103,43 @@ class PlanarPose:
     x_axis
         Local ``+x`` direction, orthogonal to ``normal``. It is normalized
         during construction.
+    center
+        Keyword-only three-component Pint length quantity, mutually exclusive
+        with ``center_mm``. Read-back returns a fresh quantity in mm; use
+        :meth:`with_center` for quantity-aware replacement. Directions are
+        dimensionless unit vectors, not quantities.
     """
 
     center_mm: tuple[float, float, float]
     normal: tuple[float, float, float] = (0.0, 0.0, 1.0)
     x_axis: tuple[float, float, float] = (1.0, 0.0, 0.0)
+
+    def __init__(
+        self,
+        center_mm: tuple[float, float, float] | _Unset = UNSET,
+        normal: tuple[float, float, float] = (0.0, 0.0, 1.0),
+        x_axis: tuple[float, float, float] = (1.0, 0.0, 0.0),
+        *,
+        center: object = UNSET,
+    ) -> None:
+        center_mm = _quantity_spelling(
+            "PlanarPose", "center_mm", center_mm, "center", center, _pose_center_mm
+        )
+        if center_mm is UNSET:
+            raise TypeError("PlanarPose requires center_mm or center")
+        object.__setattr__(self, "center_mm", center_mm)
+        object.__setattr__(self, "normal", normal)
+        object.__setattr__(self, "x_axis", x_axis)
+        self.__post_init__()
+
+    @property
+    def center(self) -> Quantity:
+        """Plane centre as a fresh three-component quantity in mm."""
+        return _mm_quantity(self.center_mm)
+
+    def with_center(self, center: object) -> Self:
+        """Return a pose with a validated centre quantity and unchanged axes."""
+        return replace(self, center_mm=_pose_center_mm(center))
 
     def __post_init__(self) -> None:
         center = _finite_vector(
@@ -104,11 +172,17 @@ class PlanarPose:
     @classmethod
     def from_observation(
         cls,
-        distance_mm: float,
-        polar_deg: float,
-        azimuth_deg: float = 0.0,
-        roll_deg: float = 0.0,
-        offset_mm: tuple[float, float] = (0.0, 0.0),
+        distance_mm: float | _Unset = UNSET,
+        polar_deg: float | _Unset = UNSET,
+        azimuth_deg: float | _Unset = UNSET,
+        roll_deg: float | _Unset = UNSET,
+        offset_mm: tuple[float, float] | _Unset = UNSET,
+        *,
+        distance: object = UNSET,
+        polar: object = UNSET,
+        azimuth: object = UNSET,
+        roll: object = UNSET,
+        offset: object = UNSET,
     ) -> PlanarPose:
         """Place a plane at a spherical observation direction.
 
@@ -128,12 +202,48 @@ class PlanarPose:
             Clockwise local-axis rotation in degrees about ``+z``.
         offset_mm
             Local ``(x, y)`` centre offset in mm.
+        distance, polar, azimuth, roll, offset
+            Keyword-only Pint quantity spellings (positive scalar length,
+            scalar plane angles, two-component length), each mutually
+            exclusive with its numeric counterpart.
 
         Returns
         -------
         PlanarPose
             Normalized pose in the target-centred lab frame.
         """
+        owner = "PlanarPose.from_observation"
+
+        def resolve(numeric_name, numeric, semantic_name, semantic, convert, default):
+            value = _quantity_spelling(
+                owner, numeric_name, numeric, semantic_name, semantic, convert
+            )
+            return default if value is UNSET else value
+
+        def angle(name):
+            return lambda q: _angle_deg(q, field=f"{owner}.{name}")
+
+        distance_mm = resolve(
+            "distance_mm",
+            distance_mm,
+            "distance",
+            distance,
+            lambda q: _scalar_quantity(q, unit="mm", field=f"{owner}.distance", expected="length"),
+            UNSET,
+        )
+        if distance_mm is UNSET or (polar_deg is UNSET and polar is UNSET):
+            raise TypeError(f"{owner} requires a distance and a polar angle")
+        polar_deg = resolve("polar_deg", polar_deg, "polar", polar, angle("polar"), UNSET)
+        azimuth_deg = resolve("azimuth_deg", azimuth_deg, "azimuth", azimuth, angle("azimuth"), 0.0)
+        roll_deg = resolve("roll_deg", roll_deg, "roll", roll, angle("roll"), 0.0)
+        offset_mm = resolve(
+            "offset_mm",
+            offset_mm,
+            "offset",
+            offset,
+            lambda q: _length_vector(q, field=f"{owner}.offset", size=2),
+            (0.0, 0.0),
+        )
         distance = _positive_real(
             "distance_mm",
             normalize_unit(distance_mm, "mm", field="distance_mm", expected="length"),
@@ -184,7 +294,14 @@ class PlanarPose:
         return cls(tuple(center), tuple(normal), tuple(x_axis))
 
 
-@dataclass(frozen=True)
+def _pitch_mm(value: object) -> tuple[float, ...]:
+    pitch = _length_vector(value, field="PixelGrid.pitch", size=2)
+    if any(x <= 0.0 for x in pitch):
+        raise ValueError("PixelGrid.pitch values must be positive")
+    return pitch
+
+
+@dataclass(frozen=True, init=False)
 class PixelGrid:
     """Centred rectangular physical-pixel grid.
 
@@ -198,10 +315,42 @@ class PixelGrid:
         Positive ``(ny, nx)`` pixel counts.
     pitch_mm
         Positive ``(pitch_y, pitch_x)`` values in mm.
+    pitch
+        Keyword-only two-component ``(pitch_y, pitch_x)`` Pint length
+        quantity, mutually exclusive with ``pitch_mm``. Read-back returns a
+        fresh quantity in mm; use :meth:`with_pitch` for replacement.
     """
 
     shape: tuple[int, int]
     pitch_mm: tuple[float, float]
+
+    def __init__(
+        self,
+        shape: tuple[int, int],
+        pitch_mm: tuple[float, float] | _Unset = UNSET,
+        *,
+        pitch: object = UNSET,
+    ) -> None:
+        pitch_mm = _quantity_spelling("PixelGrid", "pitch_mm", pitch_mm, "pitch", pitch, _pitch_mm)
+        if pitch_mm is UNSET:
+            raise TypeError("PixelGrid requires pitch_mm or pitch")
+        object.__setattr__(self, "shape", shape)
+        object.__setattr__(self, "pitch_mm", pitch_mm)
+        self.__post_init__()
+
+    @property
+    def pitch(self) -> Quantity:
+        """``(pitch_y, pitch_x)`` as a fresh quantity in mm."""
+        return _mm_quantity(self.pitch_mm)
+
+    @property
+    def active_size(self) -> Quantity:
+        """Full active ``(width_x, height_y)`` as a fresh quantity in mm."""
+        return _mm_quantity(self.active_size_mm)
+
+    def with_pitch(self, pitch: object) -> Self:
+        """Return a grid with a validated pitch quantity and unchanged shape."""
+        return replace(self, pitch_mm=_pitch_mm(pitch))
 
     def __post_init__(self) -> None:
         try:

@@ -86,11 +86,14 @@ def study_definition_digest(
     """
     if not isinstance(evaluation_id, str) or not evaluation_id.strip():
         raise ValueError("durable studies require a nonempty evaluation_id")
+    parameters = parameters.bind(base)
     specs: dict[str, Any] = {}
     for name, parameter in parameters.parameters.items():
         if not isinstance(parameter, (Continuous, Integer, Categorical)):
             raise TypeError(f"unsupported distribution {name}")
         specs[name] = _canonical(parameter)
+        if name in parameters._quantity_units:
+            specs[name]["unit"] = parameters._quantity_units[name]
     body = {
         "schema": SCHEMA_VERSION,
         "base": _canonical(base),

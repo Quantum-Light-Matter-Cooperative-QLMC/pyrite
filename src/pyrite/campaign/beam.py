@@ -24,7 +24,7 @@ import numpy as np
 
 from .._spec_defaults import UNSET as _UNSET
 from .._spec_defaults import _Unset
-from .._units import _is_pint_quantity, normalize_unit
+from .._units import _is_pint_quantity, _scalar_quantity, normalize_unit
 from ..montecarlo.bunch_front import BunchFrontTilt, validate_front_source
 from ..montecarlo.transverse import TransverseDistribution
 from ..quantum_state import TransverseStateSpec
@@ -90,6 +90,18 @@ def _spot_width_mm(value: object, *, field: str) -> float:
     if not np.isfinite(stored) or (array != 0 and stored == 0.0):
         raise ValueError(f"{field} is not representable in numeric mm storage")
     return _positive(field, stored)
+
+
+def _repetition_rate_hz(value: object) -> float:
+    return _scalar_quantity(
+        value, unit="Hz", field="Beam.repetition_rate", expected="frequency", allow_zero=True
+    )
+
+
+def _bunch_charge_pc(value: object) -> float:
+    return _scalar_quantity(
+        value, unit="pC", field="Beam.bunch_charge", expected="charge", allow_zero=True
+    )
 
 
 @dataclass(frozen=True, init=False)
@@ -437,9 +449,15 @@ class Beam:
     energy_spread_frac
         RMS fractional kinetic-energy spread; ``None`` is monoenergetic.
     rep_rate_hz
-        Pulse repetition rate in Hz used for flux normalization.
+        Pulse repetition rate in Hz used for flux normalization. Mutually
+        exclusive with ``repetition_rate``.
     bunch_charge_pc
-        Charge per bunch in pC used for flux normalization.
+        Charge per bunch in pC used for flux normalization. Mutually exclusive
+        with ``bunch_charge``.
+    repetition_rate, bunch_charge
+        Keyword-only real scalar Pint frequency and charge quantities, finite
+        and nonnegative. Bare numbers and strings are rejected. Read-back
+        returns fresh quantities in Hz and pC; storage remains numeric.
     gdf
         A :class:`GdfSource`; build through :meth:`from_gdf`.
     bunch_front_tilt
@@ -468,8 +486,8 @@ class Beam:
         self,
         energy_keV: Any = _UNSET,
         energy_spread_frac: float | None = None,
-        rep_rate_hz: float = 5000.0,
-        bunch_charge_pc: float = 1.0,
+        rep_rate_hz: float | _Unset = _UNSET,
+        bunch_charge_pc: float | _Unset = _UNSET,
         gdf: GdfSource | None = None,
         bunch_front_tilt: BunchFrontTilt | None = None,
         *,
@@ -477,7 +495,21 @@ class Beam:
         longitudinal: Longitudinal,
         state: TransverseStateSpec | None = None,
         kinetic_energy: object = _UNSET,
+        repetition_rate: object = _UNSET,
+        bunch_charge: object = _UNSET,
     ) -> None:
+        if repetition_rate is not _UNSET:
+            if rep_rate_hz is not _UNSET:
+                raise TypeError("Beam.rep_rate_hz and repetition_rate are mutually exclusive")
+            rep_rate_hz = _repetition_rate_hz(repetition_rate)
+        elif rep_rate_hz is _UNSET:
+            rep_rate_hz = 5000.0
+        if bunch_charge is not _UNSET:
+            if bunch_charge_pc is not _UNSET:
+                raise TypeError("Beam.bunch_charge_pc and bunch_charge are mutually exclusive")
+            bunch_charge_pc = _bunch_charge_pc(bunch_charge)
+        elif bunch_charge_pc is _UNSET:
+            bunch_charge_pc = 1.0
         if kinetic_energy is not _UNSET:
             if energy_keV is not _UNSET:
                 raise TypeError("Beam.energy_keV and kinetic_energy are mutually exclusive")
@@ -520,6 +552,28 @@ class Beam:
         with the numeric field it forwards to the constructor.
         """
         return replace(self, energy_keV=_kinetic_energy_keV(kinetic_energy))
+
+    @property
+    def repetition_rate(self) -> "Quantity":
+        """Pulse repetition rate as a fresh scalar quantity in Hz."""
+        from ..units import Q_
+
+        return Q_(float(self.rep_rate_hz), "Hz")
+
+    def with_repetition_rate(self, repetition_rate: object) -> Self:
+        """Return a beam with a validated repetition-rate quantity."""
+        return replace(self, rep_rate_hz=_repetition_rate_hz(repetition_rate))
+
+    @property
+    def bunch_charge(self) -> "Quantity":
+        """Charge per bunch as a fresh scalar quantity in pC."""
+        from ..units import Q_
+
+        return Q_(float(self.bunch_charge_pc), "pC")
+
+    def with_bunch_charge(self, bunch_charge: object) -> Self:
+        """Return a beam with a validated bunch-charge quantity."""
+        return replace(self, bunch_charge_pc=_bunch_charge_pc(bunch_charge))
 
     def __post_init__(self) -> None:
         object.__setattr__(

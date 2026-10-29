@@ -6,14 +6,16 @@ import hashlib
 import json
 import math
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, fields, is_dataclass
+from dataclasses import dataclass, fields, is_dataclass, replace
 from numbers import Integral, Real
 from types import MappingProxyType
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal, Self, cast
 
 import numpy as np
 
-from .._units import normalize_unit
+from .._spec_defaults import UNSET, _Unset
+from .._units import _is_pint_quantity, _scalar_quantity, normalize_unit
+from .._units import _quantity_spelling as _spelling
 from ..detectors import IdealPhotonCounter, Timepix3
 from ..materials import CATALOG, MediumSpec
 from ..materials._composition import resolve_composition
@@ -23,6 +25,9 @@ from .model import (
     PlanarDetector,
     validate_downstream_scene,
 )
+
+if TYPE_CHECKING:
+    from pint import Quantity
 
 AcquisitionMode = Literal["expected", "poisson"]
 REALIZATION_RNG = "pyrite.coordinate-philox.v1"
@@ -39,7 +44,33 @@ def _finite_real(name: str, value: object, *, minimum: float, open_minimum: bool
     return number
 
 
-@dataclass(frozen=True)
+def _exposure_s(value: object, *, owner: str = "Acquisition") -> float:
+    return _scalar_quantity(value, unit="s", field=f"{owner}.exposure", expected="time")
+
+
+def _threshold_eV(value: object, *, owner: str = "Acquisition") -> float:
+    return _scalar_quantity(
+        value, unit="eV", field=f"{owner}.hit_threshold", expected="energy", allow_zero=True
+    )
+
+
+def _edges_eV(value: object) -> tuple[float, ...]:
+    """Own explicit one-dimensional energy edges as numeric eV floats."""
+    field = "Acquisition.measured_edges"
+    if not _is_pint_quantity(value):
+        raise TypeError(f"{field} requires a Pint quantity with energy units")
+    original = np.asarray(cast(Any, value).magnitude)
+    if original.ndim != 1 or original.dtype.kind not in "iuf":
+        raise TypeError(f"{field} must be a real one-dimensional energy quantity")
+    magnitude = np.asarray(normalize_unit(value, "eV", field=field, expected="energy"))
+    with np.errstate(over="ignore", under="ignore"):
+        stored = magnitude.astype(float)
+    if not np.all(np.isfinite(stored)) or np.any((magnitude != 0) & (stored == 0)):
+        raise ValueError(f"{field} must be finite and representable in numeric eV storage")
+    return tuple(float(edge) for edge in stored)
+
+
+@dataclass(frozen=True, init=False)
 class Acquisition:
     """Exposure, reporting-axis, threshold, and realization configuration.
 
@@ -47,6 +78,13 @@ class Acquisition:
     overflow, and events below ``hit_threshold_eV`` are separate accounting in
     the acquisition core; this record does not conflate those concepts with a
     detector response's physical discriminator or energy resolution.
+
+    Keyword-only ``exposure`` (positive scalar time), ``measured_edges``
+    (one-dimensional energy array) and ``hit_threshold`` (nonnegative scalar
+    energy) require explicit Pint quantities and are mutually exclusive with
+    the numeric ``exposure_s``, ``measured_edges_eV`` and ``hit_threshold_eV``
+    fields. Read-back returns fresh quantities in s and eV; storage, identity
+    and persistence stay numeric.
     """
 
     exposure_s: float
@@ -55,22 +93,110 @@ class Acquisition:
     mode: AcquisitionMode = "expected"
     seed: int | None = None
 
+    def __init__(
+        self,
+        exposure_s: float | _Unset = UNSET,
+        measured_edges_eV: Sequence[float] | _Unset = UNSET,
+        hit_threshold_eV: float | _Unset = UNSET,
+        mode: AcquisitionMode = "expected",
+        seed: int | None = None,
+        *,
+        exposure: object = UNSET,
+        measured_edges: object = UNSET,
+        hit_threshold: object = UNSET,
+    ) -> None:
+        owner = "Acquisition"
+        exposure_s = _spelling(owner, "exposure_s", exposure_s, "exposure", exposure, _exposure_s)
+        edges = _spelling(
+            owner,
+            "measured_edges_eV",
+            measured_edges_eV,
+            "measured_edges",
+            measured_edges,
+            _edges_eV,
+        )
+        threshold = _spelling(
+            owner,
+            "hit_threshold_eV",
+            hit_threshold_eV,
+            "hit_threshold",
+            hit_threshold,
+            _threshold_eV,
+        )
+        if exposure_s is UNSET:
+            raise TypeError("Acquisition requires exposure_s or exposure")
+        if edges is UNSET:
+            raise TypeError("Acquisition requires measured_edges_eV or measured_edges")
+        values = {
+            "exposure_s": exposure_s,
+            "measured_edges_eV": edges,
+            "hit_threshold_eV": 0.0 if threshold is UNSET else threshold,
+            "mode": mode,
+            "seed": seed,
+        }
+        for name, value in values.items():
+            object.__setattr__(self, name, value)
+        self.__post_init__()
+
+    @property
+    def exposure(self) -> Quantity:
+        """Exposure time as a fresh scalar quantity in s."""
+        from ..units import Q_
+
+        return Q_(self.exposure_s, "s")
+
+    @property
+    def measured_edges(self) -> Quantity:
+        """Reporting-bin edges as a fresh one-dimensional quantity in eV."""
+        from ..units import Q_
+
+        return Q_(np.array(self.measured_edges_eV, dtype=float), "eV")
+
+    @property
+    def hit_threshold(self) -> Quantity:
+        """Hit threshold as a fresh scalar quantity in eV."""
+        from ..units import Q_
+
+        return Q_(self.hit_threshold_eV, "eV")
+
+    def with_exposure(self, exposure: object) -> Self:
+        """Return a copy with a validated exposure-time quantity."""
+        return replace(self, exposure_s=_exposure_s(exposure))
+
+    def with_measured_edges(self, measured_edges: object) -> Self:
+        """Return a copy with validated measured-energy edges."""
+        return replace(self, measured_edges_eV=_edges_eV(measured_edges))
+
+    def with_hit_threshold(self, hit_threshold: object) -> Self:
+        """Return a copy with a validated hit-threshold quantity."""
+        return replace(self, hit_threshold_eV=_threshold_eV(hit_threshold))
+
     @classmethod
     def native(
         cls,
         *,
-        exposure_s: float,
-        hit_threshold_eV: float = 0.0,
+        exposure_s: float | _Unset = UNSET,
+        hit_threshold_eV: float | _Unset = UNSET,
         mode: AcquisitionMode = "expected",
         seed: int | None = None,
+        exposure: object = UNSET,
+        hit_threshold: object = UNSET,
     ) -> NativeAcquisition:
         """Request native reporting bins, resolved over the complete observation.
 
         The sorted union of response output edges (source midpoint-cell edges
         for the ideal counter) must contain at most 65,536 bins. Resolution
         precedes acquisition identity, persistence, and Poisson realization.
+        ``exposure`` / ``hit_threshold`` are the quantity spellings.
         """
-        return NativeAcquisition(exposure_s, hit_threshold_eV, mode, seed)
+        return NativeAcquisition(
+            exposure_s,
+            hit_threshold_eV,
+            mode,
+            seed,
+            exposure=exposure,
+            hit_threshold=hit_threshold,
+        )
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -148,15 +274,63 @@ class Acquisition:
     def uniform(
         cls,
         *,
-        exposure_s: float,
-        minimum_eV: float,
-        maximum_eV: float,
-        bin_width_eV: float,
-        hit_threshold_eV: float = 0.0,
+        exposure_s: float | _Unset = UNSET,
+        minimum_eV: float | _Unset = UNSET,
+        maximum_eV: float | _Unset = UNSET,
+        bin_width_eV: float | _Unset = UNSET,
+        hit_threshold_eV: float | _Unset = UNSET,
         mode: AcquisitionMode = "expected",
         seed: int | None = None,
+        exposure: object = UNSET,
+        minimum: object = UNSET,
+        maximum: object = UNSET,
+        bin_width: object = UNSET,
+        hit_threshold: object = UNSET,
     ) -> Acquisition:
-        """Construct explicit uniform reporting edges from bounds and width."""
+        """Construct explicit uniform reporting edges from bounds and width.
+
+        ``exposure``, ``minimum``, ``maximum``, ``bin_width`` and
+        ``hit_threshold`` are explicit-quantity spellings of the numeric
+        keywords; supplying both spellings of one value conflicts.
+        """
+        owner = "Acquisition.uniform"
+        exposure_s = _spelling(owner, "exposure_s", exposure_s, "exposure", exposure, _exposure_s)
+        hit_threshold_eV = _spelling(
+            owner,
+            "hit_threshold_eV",
+            hit_threshold_eV,
+            "hit_threshold",
+            hit_threshold,
+            _threshold_eV,
+        )
+        bounds = {}
+        for name, numeric, semantic in (
+            ("minimum", minimum_eV, minimum),
+            ("maximum", maximum_eV, maximum),
+            ("bin_width", bin_width_eV, bin_width),
+        ):
+            value = _spelling(
+                owner,
+                f"{name}_eV",
+                numeric,
+                name,
+                semantic,
+                lambda q, name=name: _scalar_quantity(
+                    q, unit="eV", field=f"{owner}.{name}", expected="energy", allow_zero=True
+                ),
+            )
+            if value is UNSET:
+                raise TypeError(f"{owner} requires {name}_eV or {name}")
+            bounds[name] = value
+        if exposure_s is UNSET:
+            raise TypeError(f"{owner} requires exposure_s or exposure")
+        minimum_eV, maximum_eV, bin_width_eV = (
+            bounds["minimum"],
+            bounds["maximum"],
+            bounds["bin_width"],
+        )
+        if hit_threshold_eV is UNSET:
+            hit_threshold_eV = 0.0
         exposure_s = normalize_unit(
             exposure_s, "s", field="Acquisition.exposure_s", expected="time"
         )
@@ -186,18 +360,68 @@ class Acquisition:
         )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, init=False)
 class NativeAcquisition:
     """Unresolved native-bin request returned by :meth:`Acquisition.native`.
 
     This request has no measured edges and cannot enter counting or identity.
     Observation assembly replaces it with a concrete :class:`Acquisition`.
+    ``exposure`` / ``hit_threshold`` follow :class:`Acquisition`'s quantity
+    spellings, read-back and replacement.
     """
 
     exposure_s: float
     hit_threshold_eV: float = 0.0
     mode: AcquisitionMode = "expected"
     seed: int | None = None
+
+    def __init__(
+        self,
+        exposure_s: float | _Unset = UNSET,
+        hit_threshold_eV: float | _Unset = UNSET,
+        mode: AcquisitionMode = "expected",
+        seed: int | None = None,
+        *,
+        exposure: object = UNSET,
+        hit_threshold: object = UNSET,
+    ) -> None:
+        owner = "NativeAcquisition"
+        exposure_s = _spelling(
+            owner,
+            "exposure_s",
+            exposure_s,
+            "exposure",
+            exposure,
+            lambda q: _exposure_s(q, owner=owner),
+        )
+        threshold = _spelling(
+            owner,
+            "hit_threshold_eV",
+            hit_threshold_eV,
+            "hit_threshold",
+            hit_threshold,
+            lambda q: _threshold_eV(q, owner=owner),
+        )
+        if exposure_s is UNSET:
+            raise TypeError("NativeAcquisition requires exposure_s or exposure")
+        object.__setattr__(self, "exposure_s", exposure_s)
+        object.__setattr__(self, "hit_threshold_eV", 0.0 if threshold is UNSET else threshold)
+        object.__setattr__(self, "mode", mode)
+        object.__setattr__(self, "seed", seed)
+        self.__post_init__()
+
+    exposure = Acquisition.exposure
+    hit_threshold = Acquisition.hit_threshold
+
+    def with_exposure(self, exposure: object) -> Self:
+        """Return a copy with a validated exposure-time quantity."""
+        return replace(self, exposure_s=_exposure_s(exposure, owner="NativeAcquisition"))
+
+    def with_hit_threshold(self, hit_threshold: object) -> Self:
+        """Return a copy with a validated hit-threshold quantity."""
+        return replace(
+            self, hit_threshold_eV=_threshold_eV(hit_threshold, owner="NativeAcquisition")
+        )
 
     def __post_init__(self) -> None:
         validated = Acquisition(

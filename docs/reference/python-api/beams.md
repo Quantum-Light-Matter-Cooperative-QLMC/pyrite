@@ -96,6 +96,35 @@ after loading neither samples arrival times nor changes RNG state. See the
 [timing boundary contract](../../repo-design/physical-units.md#bunch-timing-quantity-interfaces)
 for shapes, representability, replacement and compatibility.
 
+## Repetition rate and bunch charge with units
+
+`Beam(repetition_rate=..., bunch_charge=...)` accepts finite, nonnegative
+scalar frequency and charge quantities. They set the same flux normalization
+as `rep_rate_hz` / `bunch_charge_pc`.
+
+```python
+from pyrite.beams import Beam, PointBunch, Spot
+from pyrite.units import Q_
+
+beam = Beam(
+    60,
+    transverse=Spot(),
+    longitudinal=PointBunch(),
+    repetition_rate=Q_(5, "kHz"),
+    bunch_charge=Q_(2, "pC"),
+)
+rate_khz = beam.repetition_rate.to("kHz")
+brighter = beam.with_bunch_charge(Q_(0.5, "nC"))
+```
+
+Read-back returns fresh quantities in Hz and pC. Bare numbers, strings,
+arrays and incompatible dimensions are refused on the semantic spellings;
+passing a numeric and a semantic spelling together raises `TypeError`. The
+numeric fields, positional calls, `BeamSpec` lowering and saved cases are
+unchanged. Sweep and optimization paths `beam.repetition_rate` and
+`beam.bunch_charge` take quantities through `with_repetition_rate` /
+`with_bunch_charge`.
+
 ## Saved beam diagnostics
 
 | Entry | Owner / status | Scientific contract and effects |

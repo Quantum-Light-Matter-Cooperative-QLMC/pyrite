@@ -1,21 +1,32 @@
 """Source-target role adapter for a shared homogeneous rectangular body."""
 
-import math
-from dataclasses import dataclass
-from numbers import Real
-from typing import Literal
+from __future__ import annotations
 
+import math
+from dataclasses import dataclass, replace
+from numbers import Real
+from typing import TYPE_CHECKING, Literal, Self
+
+from .._spec_defaults import UNSET as _UNSET
+from .._spec_defaults import _Unset
 from .._units import normalize_unit
 from ..bodies import RectangularBody, SubstanceRef
 from . import geometry
+from ._geometry_values import _angle_spelling, _quantity_geometry, _scalar_angle_quantity
 from .geometry import CrystalCut, Footprint, Slab
 
+if TYPE_CHECKING:
+    from pint import Quantity
 
-@dataclass(frozen=True)
+
+@dataclass(frozen=True, init=False)
 class Target:
     """Assign a finite homogeneous crystalline body to the source-target role.
 
     ``tilt_deg`` and ``tilt_azim_deg`` are scalar target angles in degrees;
+    keyword-only ``tilt``/``tilt_azimuth`` take explicit scalar Pint plane
+    angles instead, read back as fresh degree quantities and replaced through
+    ``with_tilt``/``with_tilt_azimuth``;
     ``lattice_cut='catalog'`` retains the selected crystal's existing cut; a
     :class:`~pyrite.geometry.CrystalCut` orients the lattice relative to the entrance
     face instead.
@@ -32,6 +43,62 @@ class Target:
     lattice_cut: Literal["catalog"] | CrystalCut = "catalog"
     mosaic: bool = False
     allow_normal_incidence: bool = False
+
+    def __init__(
+        self,
+        body: RectangularBody,
+        tilt_deg: float | _Unset = _UNSET,
+        tilt_azim_deg: float | _Unset = _UNSET,
+        lattice_cut: Literal["catalog"] | CrystalCut = "catalog",
+        mosaic: bool = False,
+        allow_normal_incidence: bool = False,
+        *,
+        tilt: object = _UNSET,
+        tilt_azimuth: object = _UNSET,
+    ) -> None:
+        angles = {
+            "tilt_deg": ("tilt", tilt_deg, tilt, 30.0),
+            "tilt_azim_deg": ("tilt_azimuth", tilt_azim_deg, tilt_azimuth, 0.0),
+        }
+        for numeric_name, (semantic_name, numeric, semantic, default) in angles.items():
+            value = _angle_spelling(
+                "Target",
+                numeric_name,
+                numeric,
+                semantic_name,
+                semantic,
+                unset=_UNSET,
+                default=default,
+                scalar=True,
+            )
+            object.__setattr__(self, numeric_name, value)
+        for name, value in (
+            ("body", body),
+            ("lattice_cut", lattice_cut),
+            ("mosaic", mosaic),
+            ("allow_normal_incidence", allow_normal_incidence),
+        ):
+            object.__setattr__(self, name, value)
+        self.__post_init__()
+
+    @property
+    def tilt(self) -> Quantity:
+        """Fresh scalar degree quantity for the polar target tilt."""
+        return _quantity_geometry(self.tilt_deg, "degree")
+
+    def with_tilt(self, tilt: object) -> Self:
+        """Copy with an explicit scalar plane-angle tilt; preserve other settings."""
+        return replace(self, tilt_deg=_scalar_angle_quantity(tilt, field="Target.tilt"))
+
+    @property
+    def tilt_azimuth(self) -> Quantity:
+        """Fresh scalar degree quantity for the target tilt azimuth."""
+        return _quantity_geometry(self.tilt_azim_deg, "degree")
+
+    def with_tilt_azimuth(self, tilt_azimuth: object) -> Self:
+        """Copy with an explicit scalar plane-angle tilt azimuth; preserve other settings."""
+        degrees = _scalar_angle_quantity(tilt_azimuth, field="Target.tilt_azimuth")
+        return replace(self, tilt_azim_deg=degrees)
 
     def __post_init__(self) -> None:
         if not isinstance(self.body, RectangularBody):

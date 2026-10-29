@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
@@ -143,6 +144,60 @@ def _positive_length_quantity(
     if not np.all(stored > 0.0):
         raise ValueError(f"{field} must be finite and positive")
     return float(stored) if stored.ndim == 0 else stored.copy()
+
+
+def _scalar_quantity(
+    value: object,
+    *,
+    unit: str,
+    field: str,
+    expected: str,
+    kind: str | None = None,
+    allow_zero: bool = False,
+    signed: bool = False,
+) -> float:
+    """Normalize an explicit real scalar quantity to a positive (or nonnegative) float.
+
+    ``signed=True`` accepts any finite value, for coordinates and angles.
+    """
+    import numpy as np
+
+    if not _is_pint_quantity(value):
+        raise TypeError(f"{field} requires a Pint quantity with {expected} units")
+    original = np.asarray(cast(Any, value).magnitude)
+    if original.ndim != 0 or original.dtype.kind not in "iuf":
+        raise TypeError(f"{field} must be a real scalar {expected} quantity")
+    source = np.asarray(normalize_unit(value, unit, field=field, expected=expected, kind=kind))
+    with np.errstate(over="ignore", under="ignore"):
+        stored = float(source)
+    if not np.isfinite(stored) or (source != 0 and stored == 0):
+        raise ValueError(f"{field} must be finite and representable in numeric {unit} storage")
+    if not signed and (stored < 0 or (stored == 0 and not allow_zero)):
+        sign = "nonnegative" if allow_zero else "positive"
+        raise ValueError(f"{field} must be finite and {sign}")
+    return stored
+
+
+def _quantity_spelling(
+    owner: str,
+    numeric_name: str,
+    numeric: Any,
+    semantic_name: str,
+    semantic: object,
+    convert: Callable[[object], Any],
+) -> Any:
+    """Resolve a numeric field against its keyword-only quantity spelling.
+
+    Both spellings default to ``pyrite._spec_defaults.UNSET``; an omitted
+    pair returns ``UNSET`` so the caller applies its own default.
+    """
+    from ._spec_defaults import UNSET
+
+    if semantic is UNSET:
+        return numeric
+    if numeric is not UNSET:
+        raise TypeError(f"{owner}.{numeric_name} and {semantic_name} are mutually exclusive")
+    return convert(semantic)
 
 
 def parse_unit_string(

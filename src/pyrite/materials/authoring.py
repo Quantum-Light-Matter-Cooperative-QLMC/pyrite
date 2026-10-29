@@ -13,10 +13,13 @@ from collections.abc import Generator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 from scipy.constants import Avogadro
 
 from .. import _catalog_layout as layout
+from .._spec_defaults import UNSET, _Unset
+from .._units import _scalar_quantity, reject_quantity
 from ._catalog_decode import _Errors
 from ._parse import _parse_crystals, _parse_media
 from ._schema import MaterialConfigError, MediumSpec
@@ -27,6 +30,9 @@ from .catalog import (
     _refresh_default_catalog,
     load_material_catalog,
 )
+
+if TYPE_CHECKING:
+    from pint import Quantity
 
 _NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 _TOKEN = re.compile(r"([A-Z][a-z]?)([0-9]+(?:\.[0-9]+)?)?")
@@ -40,6 +46,7 @@ class MaterialDefinition:
     physical definition, excluding its registration name. ``record_toml`` is
     an implementation serialization, not the authoring input interface. CIF
     bytes are captured at build time, so save does not depend on the input file.
+    ``density`` reads ``density_g_cm3`` back as a fresh g/cm³ quantity.
     """
 
     name: str
@@ -49,6 +56,13 @@ class MaterialDefinition:
     identity: str
     record_toml: str
     cif_bytes: bytes | None = None
+
+    @property
+    def density(self) -> Quantity:
+        """Fresh scalar bulk mass density in g/cm³."""
+        from ..units import Q_
+
+        return Q_(self.density_g_cm3, "g/cm**3")
 
     @property
     def medium(self) -> MediumSpec:
@@ -73,6 +87,33 @@ def _positive(value: float, field: str) -> float:
     if not math.isfinite(number) or number <= 0:
         raise ValueError(f"{field} must be finite and positive")
     return number
+
+
+# Keyword-only semantic quantities and their numeric spellings, canonical units
+# and Pint checks. B is the isotropic Debye-Waller factor, nonnegative.
+_SEMANTIC = {
+    "density": ("density_g_cm3", "g/cm**3", "mass density", None, False),
+    "b_factor": ("B_ang2", "angstrom**2", "area", None, True),
+    "mosaic_fwhm": ("mosaic_fwhm_deg", "degree", "angle", "angle", False),
+}
+
+
+def _semantic(owner: str, name: str, numeric: Any, semantic: object) -> Any:
+    """Resolve a numeric authoring keyword against its explicit quantity spelling."""
+    numeric_name, unit, expected, kind, allow_zero = _SEMANTIC[name]
+    reject_quantity(numeric, field=f"{owner}.{numeric_name}", unit=unit)
+    if semantic is UNSET:
+        return None if numeric is UNSET else numeric
+    if numeric is not UNSET and numeric is not None:
+        raise TypeError(f"{owner}: {numeric_name} and {name} are mutually exclusive")
+    return _scalar_quantity(
+        semantic,
+        unit=unit,
+        field=f"{owner}.{name}",
+        expected=expected,
+        kind=kind,
+        allow_zero=allow_zero,
+    )
 
 
 def _supported(elements: Mapping[str, float]) -> None:
@@ -149,22 +190,28 @@ def _definition(
 def build_medium(
     name: str,
     *,
-    density_g_cm3: float,
+    density_g_cm3: float | _Unset = UNSET,
     formula: str | None = None,
     mass_fractions: Mapping[str, float] | None = None,
     atomic_fractions: Mapping[str, float] | None = None,
     atom_counts: Mapping[str, float] | None = None,
+    density: object = UNSET,
 ) -> MaterialDefinition:
     """Build an amorphous medium without writes.
 
-    Supply exactly one composition representation and an explicit bulk density
-    in g/cm³. Fractions must sum to one; atom counts are positive ratios. Simple
-    ASCII formulas allow fractional counts. Native number densities use the
-    existing transport atomic weights and Avogadro's constant. Supported
-    elements are limited to ``TRANSPORT_ELEMENTS``; no isotopic enrichment.
+    Supply exactly one composition representation and an explicit bulk density:
+    numeric ``density_g_cm3`` in g/cm³, or ``density`` as a positive scalar
+    Pint mass density (not both). Fractions must sum to one; atom counts are
+    positive ratios. Simple ASCII formulas allow fractional counts. Native
+    number densities use the existing transport atomic weights and Avogadro's
+    constant. Supported elements are limited to ``TRANSPORT_ELEMENTS``; no
+    isotopic enrichment.
     """
     _name(name)
-    density = _positive(density_g_cm3, "density_g_cm3 (g/cm³)")
+    value = _semantic("build_medium", "density", density_g_cm3, density)
+    if value is None:
+        raise TypeError("build_medium requires density_g_cm3 or density")
+    density = _positive(value, "density_g_cm3 (g/cm³)")
     if (
         sum(value is not None for value in (formula, mass_fractions, atomic_fractions, atom_counts))
         != 1
@@ -221,6 +268,9 @@ def build_crystal(
     mosaic_fwhm_deg: float | None = None,
     density_g_cm3: float | None = None,
     catalog: Path | None = None,
+    b_factor: object = UNSET,
+    mosaic_fwhm: object = UNSET,
+    density: object = UNSET,
 ) -> MaterialDefinition:
     """Build a crystal recipe from an existing crystal or a fully occupied CIF.
 
@@ -230,8 +280,14 @@ def build_crystal(
     automatic selection policy. Density is derived from the lattice; an optional
     supplied density must agree within 1e-6 relative tolerance. Partial occupancy
     and unsupported transport elements are rejected by existing validators.
+    ``b_factor`` (Å² area), ``mosaic_fwhm`` (plane angle) and ``density`` (mass
+    density) are keyword-only Pint alternatives to the three numeric keywords;
+    supplying both spellings of one value is an error.
     """
     _name(name)
+    B_ang2 = _semantic("build_crystal", "b_factor", B_ang2, b_factor)
+    mosaic_fwhm_deg = _semantic("build_crystal", "mosaic_fwhm", mosaic_fwhm_deg, mosaic_fwhm)
+    density_g_cm3 = _semantic("build_crystal", "density", density_g_cm3, density)
     if (crystal is None) == (cif is None):
         raise ValueError("supply exactly one of crystal or cif")
     if crystal is not None:
