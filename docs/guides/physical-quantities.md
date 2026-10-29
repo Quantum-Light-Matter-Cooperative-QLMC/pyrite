@@ -188,7 +188,7 @@ script to quantities.
 | Quantum setup and recipes | `step_ang`, `zone_max_ang`, `waist_ang`, `kinetic_energy_eV`, … | `step_length`, `zone_max_length`, `waist`, `kinetic_energy`, … | Both supported |
 | `Numerics.channeling_*` lengths | `channeling_dz_ang`, `channeling_zone_max_ang` | Set through `QuantumNumerics` / `QuantumRegion` | Numeric only |
 | Experimental axial diagnostic, real-space solvers, response grids | `*_eV`, `*_ang`, `*_rad` | — | Numeric only; quantities raise `TypeError` |
-| CLI options, profile TOML | Option-name and key units; TOML also takes unit strings | — | Numeric CLI; unit-string CLI input is future work |
+| CLI options, profile TOML | Option-name and key units; TOML also takes unit strings | — | Numeric CLI; unit-string CLI input is tracked separately |
 | `cxr_metrics` peak keys | `peak_flux`, `peak_flux_per_na` | `peak_spectral_flux_density`, `peak_spectral_flux_density_per_na` | Deprecated since 0.23.1; removal planned for 0.25.0 |
 
 A future deprecation of a numeric spelling follows the
