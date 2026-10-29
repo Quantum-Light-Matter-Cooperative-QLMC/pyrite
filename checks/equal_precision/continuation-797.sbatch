@@ -19,6 +19,7 @@ out="$BR/evidence/continuation/bench797/$SLURM_JOB_ID"; mkdir -p "$out"
 scontrol show job "$SLURM_JOB_ID" > "$out/job.txt"; nvidia-smi -q > "$out/gpu.txt"
 sha256sum "$BR"/checks/equal_precision/{benchmark_continuation.py,pyrite_adapter.py,manifest.json} \
   "$BR"/src/pyrite/montecarlo/transport/{_jit_kernel.py,_jit_launch.py,batching.py,continuation.py} > "$out/code.txt"
+uv sync --package pyrite-mc --no-default-groups --group dev --extra nvidia -q
 uv run --no-sync python "$BR/checks/equal_precision/prepare_stopping.py" > "$out/tables.json"
 run() {  # stem args...
   local stem=$1; shift
