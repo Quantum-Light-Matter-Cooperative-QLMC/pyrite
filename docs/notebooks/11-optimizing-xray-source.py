@@ -53,9 +53,11 @@ def _(mo):
     mo.md(r"""
     # Optimizing an X-ray source
 
-    Search graphite tilt and thickness for PXR/CBS yield in **820–900 eV**,
-    subject to a **50 nm** thickness limit. Then evaluate the selected design
-    with independent seeds. The optimization API is experimental.
+    Search graphite tilt (35–55°) and thickness (10–75 nm) for PXR/CBS yield
+    in **820–900 eV**, subject to a **50 nm** thickness limit. The 294-point
+    design space is larger than the 30-evaluation budget, so the optimizer must
+    choose where to look. Then evaluate the selected design with independent
+    seeds. The optimization API is experimental.
 
     If run locally rather than on Molab, first install `Optuna` alongside `pyrite` with
 
@@ -115,8 +117,8 @@ def _(np):
         base,
         ParameterSpace(
             {
-                "target.tilt_deg": Integer(41, 49, step=2),
-                "target.thickness_ang": Integer(250, 750, step=250),
+                "target.tilt_deg": Integer(35, 55, step=1),
+                "target.thickness_ang": Integer(100, 750, step=50),
             }
         ),
         (Objective(score.name, "maximize", score.units),),
@@ -173,8 +175,8 @@ def _(
             seed=21,
         )
     with mo.capture_stdout():
-        search_result = definition.run(evaluator, optimizer, max_trials=12)
-    assert len(search_result.trials) == 12
+        search_result = definition.run(evaluator, optimizer, max_trials=30)
+    assert len(search_result.trials) == 30
     assert all(_trial.state.value != "failed" for _trial in search_result.trials)
     finalist = search_result.best_trial
     assert finalist is not None
@@ -196,7 +198,6 @@ def _(np, plt, score, search_result):
     _ax.set(
         xlabel="Search evaluation",
         ylabel="Yield (photons / incident electron / sr)",
-        xticks=_numbers,
     )
     _ax.legend()
     fig_search  # noqa: B018
@@ -283,13 +284,23 @@ def _(mo):
     before detector response or angular acceptance. The physical beam energy
     and material model stay fixed while the optimizer selects geometry.
 
-    Twelve search evaluations use 16 histories per population and seeds 21–32;
-    the first ten Optuna proposals are startup samples. The finalist uses
-    three new seeds, 1,001–1,003, and a finer **1 eV** grid instead of **2 eV**.
-    Its error bar describes sampling only, not grid or model uncertainty.
+    Thirty search evaluations use 16 histories per population and seeds 21–50.
+    Optuna's TPE sampler draws its first ten proposals at random, then
+    concentrates later proposals near the best feasible designs. Thicknesses
+    above the constraint are evaluated but can never be selected.
 
-    Try increasing the search budget or tightening the thickness constraint.
-    A selected noisy maximum does not establish a global optimum.
+    **Report the independent estimate, not the search value.** Picking the best
+    of many noisy evaluations biases the search value upward (the "winner's
+    curse"); the bias matters when competing designs differ by less than the
+    per-evaluation noise. Here the designs differ by much more than the
+    16-history noise, so that bias is small, and the gap between the two points
+    mostly reflects sampling noise and the change from a **2 eV** to a **1 eV**
+    grid. The re-evaluation uses three new seeds, 1,001–1,003, and 128 histories;
+    its error bar describes sampling only, not grid or model uncertainty.
+
+    Try tightening the thickness constraint or narrowing the tilt range so the
+    candidates become similar, then compare the search and independent values
+    again. A selected maximum does not establish a global optimum.
     """)
     return
 

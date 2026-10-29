@@ -37,18 +37,21 @@ def _(mo):
     mo.md(r"""
     # Sampling, convergence and performance
 
-    Compare PXR/CBS yields for six fixed-history budgets and one
-    adaptive stopping policy. All runs use a 30 keV beam, 100 nm HOPG,
-    135° observation, and no bremsstrahlung.
+    How many electron histories does a PXR/CBS yield need? Repeat each
+    history budget with **independent seeds**, measure the spread, and compare
+    it with the $1/\sqrt{N}$ law and with an adaptive stopping rule. All runs
+    use a 30 keV beam, 100 nm HOPG, 135° observation and no bremsstrahlung.
 
-    The **600–2,000 eV** band integral is less noisy than individual grid
-    samples. Sampled histories are not physical bunch charge.
+    The observable is the source yield integrated over **600–2,000 eV**, in
+    photons / (incident electron · sr). Sampled histories are numerical
+    estimators, not physical bunch charge.
     """)
     return
 
 
 @app.cell
-def _():
+def _(np, tables_ready):
+    assert tables_ready  # Wait for reference tables before executing transport.
     from time import perf_counter
 
     from pyrite import simulate
@@ -61,105 +64,51 @@ def _():
     target = Slab("hopg", thickness_ang=1_000.0, tilt_deg=30.0, footprint=Footprint(5, 5))
     detector = Detector(observation_angle_deg=135.0)
     physics = Physics(brem_source="none")
-    reflections = CxrReflections(n_families=2)
     band_eV = (600.0, 2_000.0)
-    budgets = (
-        256,
-        256 * 2,
-        256 * 3,
-        256 * 4,
-        256 * 5,
-        256 * 6,
-        256 * 7,
-        256 * 8,
-        256 * 9,
-        256 * 10,
-    )
-    electron_block_size = 256  # Adaptive stopping checks after each transport block.
-    spectrum_chunk_size = 512  # Segments per spectrum reduction, not electron histories.
-    return (
-        AdaptiveSampling,
-        FixedSampling,
-        Numerics,
-        band_eV,
-        beam,
-        budgets,
-        detector,
-        electron_block_size,
-        perf_counter,
-        physics,
-        reflections,
-        simulate,
-        spectrum_chunk_size,
-        target,
-    )
+    budgets = (256, 512, 1_024, 2_048, 4_096, 8_192)
+    replicates = 6
+
+    def run(sampling, seed):
+        """Simulate one case; fixed and adaptive runs share the same transport core."""
+        numerics = Numerics(
+            sampling=sampling,
+            cxr_reflections=CxrReflections(n_families=2),
+            transport_core="per-electron",
+            seed=seed,
+        )
+        start = perf_counter()
+        result = simulate(beam, target, detector, physics=physics, numerics=numerics)
+        return result, perf_counter() - start
+
+    def band_yield(result):
+        """Integrate the CXR density over the band, with interpolated band edges."""
+        spectrum = result.cxr.incoherent
+        grid, lo, hi = spectrum.photon_energy_eV, *band_eV
+        nodes = np.r_[lo, grid[(grid > lo) & (grid < hi)], hi]
+        return float(np.trapezoid(np.interp(nodes, grid, spectrum.density), nodes))
+
+    return AdaptiveSampling, FixedSampling, band_eV, band_yield, budgets, replicates, run
 
 
 @app.cell
-def _(
-    FixedSampling,
-    Numerics,
-    band_eV,
-    beam,
-    budgets,
-    detector,
-    np,
-    perf_counter,
-    physics,
-    reflections,
-    simulate,
-    spectrum_chunk_size,
-    tables_ready,
-    target,
-):
+def _(FixedSampling, band_yield, budgets, np, replicates, run, tables_ready):
     assert tables_ready  # Wait for reference tables before executing transport.
-    # Both policies use the same per-electron CPU transport core and CXR chunk.
-    # One untimed warmup reduces, but does not eliminate, first-call compilation costs.
-    _ = simulate(
-        beam,
-        target,
-        detector,
-        physics=physics,
-        numerics=Numerics(
-            sampling=FixedSampling(cxr_electrons=16, brem_electrons=16),
-            cxr_reflections=reflections,
-            cxr_chunk=spectrum_chunk_size,
-            transport_core="per-electron",
-        ),
-    )
-    fixed_rows = []
-    for _n in budgets:
-        _start = perf_counter()
-        _result = simulate(
-            beam,
-            target,
-            detector,
-            physics=physics,
-            numerics=Numerics(
-                sampling=FixedSampling(cxr_electrons=_n, brem_electrons=_n),
-                cxr_reflections=reflections,
-                cxr_chunk=spectrum_chunk_size,
-                transport_core="per-electron",
-            ),
-        )
-        _elapsed = perf_counter() - _start
-        _spectrum = _result.cxr.incoherent
-        _grid = _spectrum.photon_energy_eV
-        _lo, _hi = band_eV
-        assert _grid[0] <= _lo < _hi <= _grid[-1]
-        _nodes = np.r_[_lo, _grid[(_grid > _lo) & (_grid < _hi)], _hi]
-        _yield = float(np.trapezoid(np.interp(_nodes, _grid, _spectrum.density), _nodes))
-        assert np.isfinite(_yield) and _yield >= 0.0
-        fixed_rows.append(
-            {
-                "histories": int(_result.case["Ne"]),
-                "seed": int(_result.case["seed"]),
-                "yield_per_electron_sr": _yield,
-                "elapsed_s": _elapsed,
-            }
-        )
-    assert [row["histories"] for row in fixed_rows] == list(budgets)
-    return (fixed_rows,)
+    _ = run(FixedSampling(cxr_electrons=16, brem_electrons=16), seed=1)  # untimed warmup
+    yields = np.zeros((len(budgets), replicates))
+    seconds = np.zeros_like(yields)
+    for _i, _n in enumerate(budgets):
+        for _k in range(replicates):
+            # A distinct seed per (budget, replicate) makes every run independent.
+            _result, seconds[_i, _k] = run(
+                FixedSampling(cxr_electrons=_n, brem_electrons=_n), seed=1_000 * _i + _k + 1
+            )
+            yields[_i, _k] = band_yield(_result)
+    assert np.isfinite(yields).all() and (yields > 0).all()
+    mean = yields.mean(axis=1)
+    rse = yields.std(axis=1, ddof=1) / mean  # empirical relative standard error of one run
+    # Fit RSE = c / sqrt(N) in log space.
+    rse_scale = float(np.exp(np.mean(np.log(rse * np.sqrt(budgets)))))
+    return mean, rse, rse_scale, seconds, yields
 
 
 @app.cell(hide_code=True)
@@ -167,128 +116,107 @@ def _(mo):
     mo.md(r"""
     ## Adaptive stopping
 
-    `AdaptiveSampling` monitors the **per-electron** relative standard error
-    (RSE) of the selected CXR band contribution, with additional maximum-share,
-    effective-sample-size and stability guards. This is **not** an RSE estimate
-    for each photon-energy bin. A run can reach its maximum without convergence.
-
-    `block_electrons` determines how often stopping is checked; `cxr_chunk`
-    separately controls the spectrum-reduction kernel. The loose RSE target
-    is illustrative, and the default safeguards remain enabled.
+    `AdaptiveSampling` transports electrons in blocks and stops once its own
+    estimate of the **per-run** relative standard error (RSE) of the CXR band
+    reaches `target_rse`, subject to effective-sample-size, maximum-share and
+    stability guards. It needs no replicate runs: the estimate comes from the
+    spread of per-electron contributions within one run.
     """)
     return
 
 
 @app.cell
-def _(
-    AdaptiveSampling,
-    Numerics,
-    band_eV,
-    beam,
-    detector,
-    electron_block_size,
-    np,
-    perf_counter,
-    physics,
-    reflections,
-    simulate,
-    spectrum_chunk_size,
-    tables_ready,
-    target,
-):
-    assert tables_ready  # Wait for reference tables before executing transport.
-
+def _(AdaptiveSampling, band_eV, band_yield, run, tables_ready):
+    assert tables_ready
     policy = AdaptiveSampling(
-        target_rse=0.025,
-        max_electrons=8_192,
-        block_electrons=electron_block_size,
+        target_rse=5e-4,
+        max_electrons=32_768,
+        block_electrons=256,  # stopping is checked after each block
         observables=("cxr",),
         band_eV=band_eV,
     )
-    _start = perf_counter()
-    adaptive_result = simulate(
-        beam,
-        target,
-        detector,
-        physics=physics,
-        numerics=Numerics(
-            sampling=policy,
-            cxr_reflections=reflections,
-            cxr_chunk=spectrum_chunk_size,
-            transport_core="per-electron",
-        ),
-    )
-    _elapsed = perf_counter() - _start
-    _spectrum = adaptive_result.cxr.incoherent
-    _grid = _spectrum.photon_energy_eV
-    _lo, _hi = band_eV
-    assert _grid[0] <= _lo < _hi <= _grid[-1]
-    _nodes = np.r_[_lo, _grid[(_grid > _lo) & (_grid < _hi)], _hi]
-    _yield = float(np.trapezoid(np.interp(_nodes, _grid, _spectrum.density), _nodes))
-    assert np.isfinite(_yield) and _yield >= 0.0
+    adaptive_result, adaptive_seconds = run(policy, seed=99)
     _stop = adaptive_result.provenance["adaptive_sampling"]
-    _cxr_status = _stop["statistics"]["cxr"]
-    adaptive_row = {
+    adaptive = {
         "histories": int(_stop["realized_electrons"]),
         "stop_reason": _stop["stop_reason"],
         "statistics_limited": _stop["statistics_limited"],
-        "rse": _cxr_status["relative_se"],
-        "effective_sample_size": _cxr_status["effective_sample_size"],
-        "max_electron_share": _cxr_status["max_electron_share"],
-        "stability": _cxr_status["stability"],
-        "guard_passes": _cxr_status["passes"],
-        "seed": int(adaptive_result.case["seed"]),
-        "yield_per_electron_sr": _yield,
-        "elapsed_s": _elapsed,
-        "target_rse": policy.target_rse,
-        "max_electrons": policy.max_electrons,
+        "rse": float(_stop["statistics"]["cxr"]["relative_se"]),
+        "guards_passed": _stop["statistics"]["cxr"]["passes"],
+        "yield": band_yield(adaptive_result),
     }
-    return (adaptive_row,)
+    return adaptive, adaptive_seconds, policy
 
 
 @app.cell
-def _(adaptive_row, budgets, fixed_rows, np, plt):
-    _counts = np.array(budgets, dtype=float)
-    _yields = np.array([row["yield_per_electron_sr"] for row in fixed_rows])
-    _times = np.array([row["elapsed_s"] for row in fixed_rows])
-    fig_convergence, (_yield_ax, _time_ax) = plt.subplots(
-        1, 2, figsize=(9.2, 3.9), layout="constrained"
+def _(adaptive, budgets, mean, np, plt, policy, replicates, rse, rse_scale, yields):
+    from matplotlib.ticker import NullFormatter
+
+    _n = np.array(budgets, dtype=float)
+    _n_fine = np.geomspace(_n[0], 1.2 * max(_n[-1], adaptive["histories"]), 50)
+
+    fig_convergence, (_yield_ax, _rse_ax) = plt.subplots(
+        1, 2, figsize=(9.4, 3.9), layout="constrained"
     )
-    _yield_ax.plot(_counts, _yields, "bo-", label="Fixed budget")
-    _yield_ax.scatter(
-        [adaptive_row["histories"]],
-        [adaptive_row["yield_per_electron_sr"]],
-        marker="D",
-        color="red",
-        label="Adaptive run",
-        zorder=3,
+    for _k in range(replicates):
+        _yield_ax.scatter(
+            _n, yields[:, _k], s=10, color="0.65", label="Single run" if _k == 0 else None
+        )
+    _yield_ax.errorbar(
+        _n, mean, yerr=mean * rse / np.sqrt(replicates), fmt="o-", capsize=3, label="Mean ± SEM"
     )
-    _yield_ax.axhline(_yields[-1], color="grey", ls=":", label="Largest fixed budget")
+    _yield_ax.errorbar(
+        adaptive["histories"],
+        adaptive["yield"],
+        yerr=adaptive["yield"] * adaptive["rse"],
+        fmt="D",
+        color="C3",
+        capsize=3,
+        label="Adaptive (own RSE)",
+    )
     _yield_ax.set(
-        xlabel="CXR Monte Carlo Trials",
-        ylabel="PXR/CBS yield (photons / electron / sr)",
-        title="[600, 2,000] eV band yield",
+        xscale="log",
+        xlabel="Sampled CXR electron histories N",
+        ylabel="Band yield (photons / electron / sr)",
+        title="600–2,000 eV PXR/CBS yield",
     )
     _yield_ax.legend(fontsize=8)
-    _yield_ax.grid(alpha=0.25)
-    _yield_ax.tick_params("x", rotation=45, rotation_mode="xtick")
 
-    _time_ax.plot(_counts, _times, "bo-", label="Fixed budget")
-    _time_ax.scatter(
-        [adaptive_row["histories"]],
-        [adaptive_row["elapsed_s"]],
-        marker="D",
-        color="red",
-        label="Adaptive run",
-        zorder=3,
+    _rse_ax.loglog(_n, rse, "o", label=f"Across {replicates} seeds")
+    _rse_ax.loglog(
+        _n_fine, rse_scale / np.sqrt(_n_fine), "--", color="0.4", label=r"$c/\sqrt{N}$ fit"
     )
-    _time_ax.set(
-        xlabel="Sampled CXR electron histories",
-        ylabel="Wall time (s)",
-        title="Single-machine execution time",
+    _rse_ax.axhline(policy.target_rse, color="C3", lw=0.8, ls=":", label="Adaptive target")
+    _rse_ax.loglog(
+        adaptive["histories"], adaptive["rse"], "D", color="C3", label="Adaptive estimate"
     )
-    _time_ax.grid(alpha=0.25)
+    _rse_ax.set(
+        xlabel="Sampled CXR electron histories N",
+        ylabel="Relative standard error",
+        title="Statistical uncertainty of one run",
+    )
+    _rse_ax.legend(fontsize=8)
+    for _ax in (_yield_ax, _rse_ax):
+        _ticks = (*budgets, adaptive["histories"])
+        _ax.set_xticks(_ticks, labels=[f"{_b:,}" for _b in _ticks], rotation=30)
+        _ax.xaxis.set_minor_formatter(NullFormatter())
+        _ax.grid(alpha=0.25, which="both")
     fig_convergence  # noqa: B018 - captured by marimo
+    return
+
+
+@app.cell(hide_code=True)
+def _(adaptive, adaptive_seconds, budgets, mo, np, rse_scale, seconds):
+    _per_history_ms = 1_000 * np.median(seconds[-2:] / np.array(budgets[-2:])[:, None])
+    _extrapolated = rse_scale / np.sqrt(adaptive["histories"])
+    mo.md(
+        f"Largest fixed budgets: **{_per_history_ms:.2f} ms per history** (median, this CPU). "
+        f"The adaptive run stopped after **{adaptive['histories']:,} histories** "
+        f"(`{adaptive['stop_reason']}`, statistics-limited: {adaptive['statistics_limited']}, "
+        f"guards passed: {all(adaptive['guards_passed'].values())}) in **{adaptive_seconds:.1f} s**. "
+        f"Its internal RSE is "
+        f"**{adaptive['rse'] / _extrapolated:.1f}×** the replicate fit extrapolated to that budget."
+    )
     return
 
 
@@ -297,26 +225,29 @@ def _(mo):
     mo.md(r"""
     ## Interpretation
 
-    The largest fixed-budget yield is only a reference, **not ground truth**.
-    Both modes use the default seed 1, the same per-electron CPU core, the same CXR
-    spectrum chunk size, and equal CXR/bremsstrahlung transport populations.
-    Those choices matter even with bremsstrahlung scoring disabled: the second
-    population affects transport energy cutoffs. Fixed-budget points share
-    random draws, so their spread is **not** an independent-sample uncertainty.
+    Independent runs scatter about a common mean, and their spread falls as
+    $1/\sqrt{N}$: halving the uncertainty costs four times the histories, and
+    wall time grows linearly with $N$. The adaptive run estimates its *own*
+    RSE from the spread of per-electron contributions, without replicates; a
+    ratio near one means a single run can report its own error bar. Six seeds
+    estimate an RSE only to roughly ±30 %, and extrapolating the fit adds more
+    uncertainty, so judge the trend rather than individual points.
 
-    Check `stop_reason`, `statistics_limited`, the measured RSE, and every
-    entry in `guard_passes` before calling an adaptive run converged. The
-    requested `case["Ne"]` remains its *maximum*, for provenance and cache
-    identity; the plotted count is `realized_electrons`. The stopping monitor
-    measures per-electron CXR mass, whereas the plot integrates the final
-    gridded spectral density. Changing reflection families or photon grids
-    tests systematic discretization, not sampling convergence.
+    A band integral averages many lines, so this thin-target yield is already
+    sub-percent precise at a few hundred histories. Individual spectral bins,
+    weak lines and angular maps converge far more slowly; set the target on the
+    observable you will actually report.
 
-    Wall times depend on compilation, caching and hardware. The untimed
-    warmup helps, but these are **not portable benchmarks**. These runs do
-    not estimate uncertainty across independent seeds. Use `transport_core="cuda"` consistently for
-    GPU comparisons. Try increasing
-    the budgets and compare the [sampling reference](https://pyrite.readthedocs.io/en/latest/reference/python-api/config.html)
+    Before calling an adaptive run converged, check `stop_reason`,
+    `statistics_limited` and every entry in `guards_passed`. Sampling error is
+    not the only error: changing reflection families or the photon grid tests
+    discretization, which more histories cannot reduce.
+
+    Timings include compilation caches and depend on hardware; they are not
+    portable benchmarks. For GPU runs, set `PYRITE_MC_BACKEND="cuda"` before the
+    first import and use `transport_core="cuda"` consistently. See the
+    [sampling reference](https://pyrite.readthedocs.io/en/latest/reference/python-api/config.html),
+    [statistical methods](https://pyrite.readthedocs.io/en/latest/computation/statistical-methods.html)
     and [performance guidance](https://pyrite.readthedocs.io/en/latest/computation/index.html).
     """)
     return

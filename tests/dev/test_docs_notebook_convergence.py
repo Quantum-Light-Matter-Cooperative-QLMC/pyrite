@@ -24,11 +24,11 @@ def test_convergence_tutorial_structure():
     assert "FixedSampling" in source
     assert 'brem_source="none"' in source
     assert "perf_counter" in source
-    assert "not** an independent-sample uncertainty" in source
+    assert r"1/\sqrt{N}" in source
     assert "pyrite.apps" not in source
     assert "molab-shield.svg" not in source
     assert all(not isinstance(node, ast.ImportFrom) or node.level == 0 for node in ast.walk(tree))
-    # The pinned release predates the checkout's Numerics(seed=...) addition.
+    # Replicates are independent only when every run receives its own explicit seed.
     numerics_calls = [
         node
         for node in ast.walk(tree)
@@ -36,8 +36,8 @@ def test_convergence_tutorial_structure():
         and isinstance(node.func, ast.Name)
         and node.func.id == "Numerics"
     ]
-    assert len(numerics_calls) == 3
-    assert all("seed" not in {kw.arg for kw in call.keywords} for call in numerics_calls)
+    assert len(numerics_calls) == 1
+    assert "seed" in {kw.arg for kw in numerics_calls[0].keywords}
     group = (DOCS / "notebooks" / "designing" / "index.md").read_text()
     page, figure = page_contract(DOCS / "notebooks" / "designing" / f"{NAME}.ipynb")
     assert NAME in group

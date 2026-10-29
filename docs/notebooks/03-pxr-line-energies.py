@@ -28,7 +28,7 @@ def _():
     import pyrite
 
     _ = pyrite.fetch_tables()  # Fetch missing pinned tables once; reuse installed data.
-    return mo, np, plt, pyrite
+    return mo, np, plt
 
 
 @app.cell(hide_code=True)
@@ -36,9 +36,10 @@ def _(mo):
     mo.md(r"""
     # Predicting PXR line energies
 
-    Predict ideal HOPG (002) resonance energies before simulating transport.
+    Predict ideal HOPG resonance energies before simulating transport.
     `photon_energies()` takes beam energy in **eV**, angles in **degrees**,
-    and returns a leading material axis even for one material.
+    and returns a leading material axis even for one material. It is
+    analytic, so the controls below recompute instantly.
     """)
     return
 
@@ -49,72 +50,84 @@ def _():
     from pyrite.radiation import photon_energies
 
     catalog = load_material_catalog()
-    beam_energy_eV = 30_000.0
-    tilt_deg = 30.0
-    hkl = (0, 0, 2)
-    return beam_energy_eV, catalog, hkl, photon_energies, tilt_deg
+    return catalog, photon_energies
 
 
 @app.cell
-def _(catalog, hkl, np, photon_energies, tilt_deg):
-    observation_deg = np.linspace(30, 160, 131)
-    energy_scan_eV = np.array([30_000.0, 60_000.0, 100_000.0])
-    energy_lines_eV = photon_energies(
+def _(mo):
+    # Live in Molab or a local marimo session; the static page shows the defaults.
+    energy_keV = mo.ui.slider(10, 200, step=5, value=30, label="Electron energy (keV)")
+    tilt_deg = mo.ui.slider(0, 75, step=5, value=30, label="Sample tilt (°)")
+    observation_deg = mo.ui.slider(30, 160, step=5, value=135, label="Observation angle (°)")
+    reflection = mo.ui.dropdown(
+        {"(002)": (0, 0, 2), "(004)": (0, 0, 4), "(006)": (0, 0, 6)},
+        value="(002)",
+        label="Reflection",
+    )
+    mo.vstack([energy_keV, tilt_deg, observation_deg, reflection])
+    return energy_keV, observation_deg, reflection, tilt_deg
+
+
+@app.cell
+def _(catalog, energy_keV, np, observation_deg, photon_energies, reflection, tilt_deg):
+    angles_deg = np.linspace(30, 160, 131)
+    reference_keV = np.array([60.0, 100.0, 200.0])
+    beam_energies_eV = np.r_[reference_keV, energy_keV.value] * 1_000
+    lines_eV = photon_energies(
         "hopg",
-        energy_scan_eV[:, None],
-        tilt_deg=tilt_deg,
-        theta_obs_deg=observation_deg[None, :],
-        hkl=hkl,
+        beam_energies_eV[:, None],
+        tilt_deg=tilt_deg.value,
+        theta_obs_deg=angles_deg[None, :],
+        hkl=reflection.value,
         catalog=catalog,
     )[0]
-    return energy_lines_eV, energy_scan_eV, observation_deg
+    selected_eV = float(
+        photon_energies(
+            "hopg",
+            energy_keV.value * 1_000,
+            tilt_deg=tilt_deg.value,
+            theta_obs_deg=observation_deg.value,
+            hkl=reflection.value,
+            catalog=catalog,
+        )[0]
+    )
+    return angles_deg, lines_eV, reference_keV, selected_eV
 
 
 @app.cell
-def _(energy_lines_eV, energy_scan_eV, observation_deg, plt):
+def _(
+    angles_deg,
+    energy_keV,
+    lines_eV,
+    observation_deg,
+    plt,
+    reference_keV,
+    reflection,
+    selected_eV,
+    tilt_deg,
+):
     figure, axis = plt.subplots(figsize=(7, 3.8), layout="constrained")
-    for _energy, _line in zip(energy_scan_eV, energy_lines_eV, strict=True):
-        axis.plot(observation_deg, _line / 1_000, label=f"{_energy / 1_000:g} keV electrons")
+    for _energy, _line in zip(reference_keV, lines_eV[:-1], strict=True):
+        axis.plot(angles_deg, _line / 1_000, lw=1, alpha=0.5, label=f"{_energy:g} keV")
+    axis.plot(
+        angles_deg, lines_eV[-1] / 1_000, "k", lw=2, label=f"{energy_keV.value:g} keV (selected)"
+    )
+    axis.plot(observation_deg.value, selected_eV / 1_000, "ro", zorder=3)
+    axis.annotate(
+        f"{selected_eV:.0f} eV",
+        (observation_deg.value, selected_eV / 1_000),
+        textcoords="offset points",
+        xytext=(-8, 8),
+        ha="right",
+    )
     axis.set(
         xlabel="Lab observation angle (°)",
         ylabel="Vacuum line energy (keV)",
-        title="HOPG (002), sample tilt 30°",
+        title=f"HOPG {reflection.selected_key}, sample tilt {tilt_deg.value:g}°",
     )
     axis.grid(alpha=0.25)
-    axis.legend()
+    axis.legend(title="Electron energy", fontsize=8)
     figure  # noqa: B018 - marimo renders the final expression
-    return
-
-
-@app.cell
-def _(beam_energy_eV, catalog, hkl, photon_energies):
-    tilt_scan_deg = [0.0, 30.0, 60.0]
-    tilting_lines_eV = photon_energies(
-        "hopg",
-        beam_energy_eV,
-        tilt_deg=tilt_scan_deg,
-        theta_obs_deg=135.0,
-        hkl=hkl,
-        catalog=catalog,
-    )[0]
-    second_order_eV = photon_energies(
-        "hopg",
-        beam_energy_eV,
-        tilt_deg=30.0,
-        theta_obs_deg=135.0,
-        hkl=(0, 0, 4),
-        catalog=catalog,
-    )[0]
-    return second_order_eV, tilt_scan_deg, tilting_lines_eV
-
-
-@app.cell(hide_code=True)
-def _(mo, second_order_eV, tilt_scan_deg, tilting_lines_eV):
-    mo.md(
-        f"At 135° observation, tilts {tilt_scan_deg}° give "
-        f"{[round(float(x), 1) for x in tilting_lines_eV]} eV. "
-        f"The (004) line at 30° tilt is {second_order_eV:.1f} eV."
-    )
     return
 
 
@@ -123,14 +136,17 @@ def _(mo):
     mo.md(r"""
     ## Interpretation
 
-    These are **vacuum line centers**, not intensities or counts. The model
-    assumes straight electrons at their entrance energy and an ideal lattice;
-    it excludes transport, mosaic spread, in-medium dispersion and response.
-    A kinematically allowed line need not have measurable intensity.
+    These are **vacuum line centers**, not intensities or counts. Faster
+    electrons raise every line, most strongly near forward observation, because
+    the resonance energy scales as $\mathbf v\cdot\mathbf g/(1-\hat{\mathbf n}\cdot\mathbf v)$.
+    Tilting the sample rotates $\mathbf g$ relative to the beam and slides the
+    whole curve; higher orders of the same planes, such as (004), appear at
+    integer multiples of the (002) energy.
 
-    Try changing `tilt_deg`, electron energy or `hkl`. The (004) reflection
-    appears at twice the (002) energy for the same geometry. Compare with
-    notebook 01's spectrum and the
+    The model assumes straight electrons at their entrance energy and an ideal
+    lattice; it excludes transport, mosaic spread, in-medium dispersion and
+    response. A kinematically allowed line need not have measurable intensity.
+    Compare the selected point with notebook 01's spectrum, then see the
     [physics and validation](https://pyrite.readthedocs.io/en/latest/physics/index.html)
     documentation.
     """)

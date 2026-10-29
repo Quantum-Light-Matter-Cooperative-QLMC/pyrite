@@ -171,12 +171,16 @@ def test_line_energy_notebook_cpu_smoke(monkeypatch):
 
     monkeypatch.setattr(pyrite, "fetch_tables", lambda: [])
     _, definitions = notebook.app.run()
-    energies = definitions["energy_lines_eV"]
-    assert energies.shape == (3, 131)
+    # Three reference beam energies plus the slider-selected one.
+    energies = definitions["lines_eV"]
+    assert energies.shape == (4, 131)
     assert np.isfinite(energies).all() and np.all(energies > 0)
     # Same basal Friedel pair: doubling Miller order doubles the vacuum resonance.
-    first_order = definitions["tilting_lines_eV"][1]
-    assert definitions["second_order_eV"] == pytest.approx(2 * first_order)
+    line = definitions["photon_energies"]
+    kwargs = {"tilt_deg": 30.0, "theta_obs_deg": 135.0, "catalog": definitions["catalog"]}
+    first_order = line("hopg", 30_000.0, hkl=(0, 0, 2), **kwargs)[0]
+    assert line("hopg", 30_000.0, hkl=(0, 0, 4), **kwargs)[0] == pytest.approx(2 * first_order)
+    assert definitions["selected_eV"] == pytest.approx(first_order)
     import matplotlib.pyplot as plt
 
     plt.close("all")

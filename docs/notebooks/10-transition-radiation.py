@@ -36,109 +36,149 @@ def _(mo):
     mo.md(r"""
     # Transition and coherent transition radiation
 
-    Compare transition radiation (TR) from two silicon film thicknesses,
-    then vary bunch duration to see coherent transition radiation (CTR).
-    The beam energy is **30 keV** and the observation angle is **150°**.
+    An electron crossing a thin film radiates transition radiation (TR) at both
+    faces. Show that the two contributions interfere with a fringe period set by
+    film thickness, then let a short bunch radiate coherently (CTR) and compare
+    the enhancement with the ideal bunch form factor. The beam is **30 keV**,
+    the film is silicon, and observation is at **150°**.
     """)
     return
 
 
 @app.cell
-def _(np):
+def _(np, tables_ready):
+    assert tables_ready
+    from scipy.constants import physical_constants
+
     from pyrite import simulate
     from pyrite.beams import Beam, BunchLength, TransverseSpot
     from pyrite.config import CxrReflections, FixedSampling, Numerics, Physics
     from pyrite.detectors import Detector, EnergyBins
     from pyrite.geometry import Footprint, Slab
 
-    tr_detector = Detector(observation_angle_deg=150.0)
-    tr_numerics = Numerics(
-        sampling=FixedSampling(cxr_electrons=64, brem_electrons=128),
+    beam_keV, observation_deg = 30.0, 150.0
+    bunch_charge_pc = 1e-4  # about 624 physical electrons per bunch
+    photon_grid_eV = np.arange(200.0, 600.5, 1.0)  # 1 eV resolves the thinnest fringes
+    numerics = Numerics(
+        sampling=FixedSampling(
+            cxr_electrons=64, brem_electrons=512
+        ),  # TR uses the continuum population
         cxr_reflections=CxrReflections(n_families=1),
         energy_model="midpoint",
         seed=1,
-        energy_bins=EnergyBins(
-            cxr=np.linspace(200.0, 1_000.0, 201), brem=np.array([200.0, 1_000.0])
-        ),
+        energy_bins=EnergyBins(cxr=photon_grid_eV, brem=np.array([200.0, 600.0])),
     )
-    # Film thickness (Å), RMS bunch duration (fs), coherence.
-    tr_cases = (
-        (100.0, 0.001, "history"),
-        (200.0, 0.001, "history"),
-        (200.0, 0.001, "bunch"),
-        (200.0, 0.1, "bunch"),
+
+    def transition(thickness_nm, *, coherence="history", rms_as=1.0):
+        """TR spectrum per incident electron for one film and bunch duration."""
+        result = simulate(
+            Beam(
+                energy_keV=beam_keV,
+                transverse=TransverseSpot(fwhm_x_mm=1e-6),
+                longitudinal=BunchLength(rms_fs=rms_as / 1_000),
+                bunch_charge_pc=bunch_charge_pc,
+                rep_rate_hz=5_000.0,
+            ),
+            Slab(
+                "silicon", thickness_ang=10 * thickness_nm, tilt_deg=5.0, footprint=Footprint(5, 5)
+            ),
+            Detector(observation_angle_deg=observation_deg),
+            physics=Physics(
+                transition_radiation=coherence,
+                radiative_model="uncoupled",
+                bremsstrahlung_model="eedl",
+            ),
+            numerics=numerics,
+        )
+        return result.transition
+
+    electron_rest_keV = physical_constants["electron mass energy equivalent in MeV"][0] * 1_000
+    hc_eV_nm = (
+        physical_constants["Planck constant in eV/Hz"][0]
+        * physical_constants["speed of light in vacuum"][0]
+        * 1e9
     )
+    gamma = 1 + beam_keV / electron_rest_keV
+    beta = np.sqrt(1 - gamma**-2)
     return (
-        Beam,
-        BunchLength,
-        Footprint,
-        Physics,
-        Slab,
-        TransverseSpot,
-        simulate,
-        tr_cases,
-        tr_detector,
-        tr_numerics,
+        beta,
+        bunch_charge_pc,
+        hc_eV_nm,
+        observation_deg,
+        transition,
     )
+
+
+@app.cell
+def _(tables_ready, transition):
+    assert tables_ready
+    film_nm = (10.0, 40.0)
+    films = {_t: transition(_t) for _t in film_nm}
+    # Same 20 nm film and seed: incoherent histories versus two bunch durations.
+    tr_20 = transition(20.0)
+    durations_as = (1.0, 2.0)
+    ctr_20 = {_s: transition(20.0, coherence="bunch", rms_as=_s) for _s in durations_as}
+    return ctr_20, durations_as, film_nm, films, tr_20
 
 
 @app.cell
 def _(
-    Beam,
-    BunchLength,
-    Footprint,
-    Physics,
-    Slab,
-    TransverseSpot,
-    simulate,
-    tables_ready,
-    tr_cases,
-    tr_detector,
-    tr_numerics,
+    beta,
+    bunch_charge_pc,
+    ctr_20,
+    durations_as,
+    film_nm,
+    films,
+    hc_eV_nm,
+    np,
+    observation_deg,
+    plt,
+    tr_20,
 ):
-    assert tables_ready
-    tr_results = []
-    for _thickness_ang, _duration_fs, _mode in tr_cases:
-        _result = simulate(
-            Beam(
-                energy_keV=30.0,
-                transverse=TransverseSpot(fwhm_x_mm=1e-6),
-                longitudinal=BunchLength(rms_fs=_duration_fs),
-                bunch_charge_pc=0.0001,
-                rep_rate_hz=5_000.0,
-            ),
-            Slab(
-                "silicon",
-                thickness_ang=_thickness_ang,
-                tilt_deg=5.0,
-                footprint=Footprint(5, 5),
-            ),
-            tr_detector,
-            physics=Physics(
-                transition_radiation=_mode,
-                radiative_model="uncoupled",
-                bremsstrahlung_model="eedl",
-            ),
-            numerics=tr_numerics,
+    from scipy.constants import elementary_charge, hbar
+
+    fig_tr, (_film_ax, _ctr_ax) = plt.subplots(1, 2, figsize=(9.6, 3.9), layout="constrained")
+    # Entry and exit fields differ in phase by omega * L * (1/beta - cos theta) / c.
+    _phase_factor = 1 / beta - np.cos(np.radians(observation_deg))
+    for _t in film_nm:
+        _spectrum = films[_t]
+        _period = hc_eV_nm / (_t * _phase_factor)
+        _film_ax.plot(
+            _spectrum.photon_energy_eV,
+            _spectrum.density,
+            lw=1,
+            label=f"{_t:g} nm (predicted period {_period:.0f} eV)",
         )
-        tr_results.append(_result.transition)
-    return (tr_results,)
+    _film_ax.set(xlim=(200, 400), yscale="log", title="Entry–exit interference")
 
-
-@app.cell
-def _(plt, tr_results):
-    fig_tr, _axes = plt.subplots(1, 2, figsize=(9, 3.8), layout="constrained", sharex=True)
-    for _spectrum, _label in zip(tr_results[:2], ("10 nm film", "20 nm film"), strict=True):
-        _axes[0].plot(_spectrum.photon_energy_eV, _spectrum.density, label=_label)
-    for _index, _label in ((1, "TR"), (2, "CTR: 1 as"), (3, "CTR: 100 as")):
-        _spectrum = tr_results[_index]
-        _axes[1].plot(_spectrum.photon_energy_eV, _spectrum.density, label=_label)
-    _axes[0].set(title="Film interference", yscale="log")
-    _axes[1].set_title("Bunch duration")
-    _axes[1].set_yscale("symlog", linthresh=1e-11)
-    for _ax in _axes:
-        _ax.set(xlabel="Photon energy (eV)", ylabel="Photons / (incident electron · eV · sr)")
+    _energy = tr_20.photon_energy_eV
+    _electrons = bunch_charge_pc * 1e-12 / elementary_charge
+    for _i, _sigma in enumerate(durations_as):
+        _ratio = ctr_20[_sigma].density / tr_20.density
+        _limit = 1 + (_electrons - 1) * np.exp(
+            -((_energy / (hbar / elementary_charge) * _sigma * 1e-18) ** 2)
+        )
+        _ctr_ax.plot(
+            _energy,
+            np.where(_ratio > 0, _ratio, np.nan),
+            color=f"C{_i}",
+            lw=1,
+            label=f"{_sigma:g} as bunch",
+        )
+        _ctr_ax.plot(_energy, _limit, "--", color=f"C{_i}", lw=1)
+    _ctr_ax.plot([], [], "k--", lw=1, label="Rigid-bunch limit")
+    _ctr_ax.axhline(1, color="0.5", lw=0.8)
+    _ctr_ax.set(
+        yscale="log",
+        ylim=(0.5, 2 * _electrons),
+        ylabel="CTR / TR per electron",
+        title=f"Bunch of {_electrons:.0f} electrons, 20 nm film",
+    )
+    _film_ax.set_ylabel("Photons / (incident electron · eV · sr)")
+    for _ax in (_film_ax, _ctr_ax):
+        _ax.set_xlabel("Photon energy (eV)")
         _ax.legend(fontsize=8)
+        _ax.grid(alpha=0.2)
     fig_tr  # noqa: B018
     return
 
@@ -146,19 +186,29 @@ def _(plt, tr_results):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    Entry and exit fields interfere, making the spectrum depend on film
-    thickness. A short bunch can add coherently; a longer bunch loses
-    phase alignment over this X-ray band. The physical bunch contains about
-    **624 electrons**, independent of the **128 continuum histories** used
-    for each transported TR estimate (seed 1).
+    ## Interpretation
 
-    CTR uses a signed finite-sample estimator, so negative samples are retained
-    on the symmetric logarithmic axis. These are directional source densities,
-    before detector acceptance. The model assumes flat, laterally infinite
-    interfaces with a local isotropic dielectric response.
+    **Film interference.** Fields from the entry and exit faces differ in phase
+    by $\omega L(1/\beta-\cos\theta)/c$, so the spectrum oscillates with period
+    $\Delta E \approx hc/[L(1/\beta-\cos\theta)]$. Quadrupling the thickness
+    shrinks the period fourfold, as the predicted values in the legend show.
 
-    Try increasing the continuum history count to resolve the bunch excess,
-    or changing film thickness to move the interference fringes.
+    **Coherent bunches.** Per electron, a bunch of $N$ radiates
+    $\langle|S|^2\rangle + (N-1)F(\omega)\,|\langle S\rangle|^2$, where $S$ is one
+    history's field and $F=e^{-(\omega\sigma_t)^2}$ is the Gaussian form factor.
+    Dashed lines show the rigid-bunch limit, where every electron follows the same
+    trajectory. Transported electrons scatter differently, so
+    $|\langle S\rangle|^2 < \langle|S|^2\rangle$ and the measured enhancement sits
+    below the limit. Longer bunches lose coherence at lower photon energy. The
+    signed pair estimator becomes noisy where the enhancement is small; masked
+    (non-positive) points there are sampling noise, not physics.
+
+    The bunch contains about 624 physical electrons, independent of the 512
+    transported histories (seed 1). These are directional source densities before
+    detector acceptance; the model assumes flat, laterally infinite interfaces with
+    a local isotropic dielectric response. See the
+    [transition-radiation physics](https://pyrite.readthedocs.io/en/latest/physics/radiation-physics/transition-radiation.html)
+    and [TR/CTR how-to](https://pyrite.readthedocs.io/en/latest/guides/transition-radiation-demo.html).
     """)
     return
 
