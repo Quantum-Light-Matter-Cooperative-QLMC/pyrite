@@ -13,6 +13,7 @@ from ..._backend import BACKEND
 from ...materials._transport_data import TRANSPORT_ELEMENTS
 from ..spectrum.brem_bremslib import (
     BremsLibBremsstrahlungTable,
+    _StagedBremsLib,
     bremslib_segment_state,
     evaluate_bremslib,
     stage_bremslib_table,
@@ -228,6 +229,8 @@ def hard_radiative_photon_at_energy(
     electron_direction: np.ndarray,
     angle_uniform: float,
     azimuth_uniform: float,
+    *,
+    _staged_table: _StagedBremsLib | None = None,
 ) -> HardRadiativePhoton:
     """Complete a sampled transport photon with its conditional BremsLib angle.
 
@@ -249,7 +252,7 @@ def hard_radiative_photon_at_energy(
     ):
         raise ValueError("electron_direction must be a finite unit vector")
     theta = np.asarray(table.theta_rad, dtype=float)
-    staged = stage_bremslib_table(table)
+    staged = stage_bremslib_table(table) if _staged_table is None else _staged_table
     state = bremslib_segment_state(staged, np.full(theta.size, incident / 1e3), np.cos(theta))
     ddcs = BACKEND.to_cpu(evaluate_bremslib(staged, state, [energy]))[:, 0]
     # Exact integral of each linear-in-theta cell; the same rule normalizes DDCS.
@@ -316,9 +319,14 @@ def complete_hard_radiative_events(segments, tables, seed: int) -> None:
     directions = np.zeros((energies.size, 3), dtype=float)
     momenta = np.zeros_like(directions)
     by_Z = {table.atomic_number: table for table in tables.values()}
+    # Own immutable stages for this completion call: repeated sparse photons
+    # must not upload the same DDCS arrays again or retain a global device cache.
+    staged_by_Z = {}
     rng = np.random.default_rng(int(seed) ^ 0xD6023FEA38B57C29)
     for index in np.flatnonzero(energies > 0.0):
         atomic_number = int(segments["hard_radiative_Z"][index])
+        if atomic_number not in staged_by_Z:
+            staged_by_Z[atomic_number] = stage_bremslib_table(by_Z[atomic_number])
         photon = hard_radiative_photon_at_energy(
             by_Z[atomic_number],
             float(segments["E_end_keV"][index]) * 1e3,
@@ -326,6 +334,7 @@ def complete_hard_radiative_events(segments, tables, seed: int) -> None:
             segments["v_hat"][index],
             float(rng.random()),
             float(rng.random()),
+            _staged_table=staged_by_Z[atomic_number],
         )
         directions[index] = photon.direction
         momenta[index] = photon.target_momentum_eV_c
