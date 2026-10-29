@@ -27,6 +27,23 @@ for a bounded fixed-window PXR/CBS search.
    pyrite.optimization.OptimizationStudy
 ```
 
+### CUDA execution tuning
+
+`tune_kernels` tunes execution controls (`KernelTuning`), not physical
+parameters, and is separate from `OptimizationStudy`. See
+[tune CUDA execution controls](../../guides/batch-chunk-tuning.md).
+
+```{eval-rst}
+.. autosummary::
+   :toctree: ../../_autosummary
+   :nosignatures:
+
+   pyrite.optimization.tune_kernels
+   pyrite.optimization.KernelLattice
+   pyrite.optimization.KernelTrial
+   pyrite.optimization.KernelTuningResult
+```
+
 ## Photon aperture interfaces
 
 The governed `pyrite.experimental.observations` namespace exposes the bounded

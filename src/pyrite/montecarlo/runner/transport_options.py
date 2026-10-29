@@ -1,6 +1,66 @@
 """Transport option forwarding and opt-in capability checks."""
 
+from contextlib import contextmanager
+from contextvars import ContextVar
+from dataclasses import replace
+from typing import Any
+
 from ..case import refuse_axial_channeling, refuse_channeling, refuse_transition_radiation
+
+# Public KernelTuning.transport override (#776): a ``PerElectronTransportConfig``
+# set by in-process callers around ``run_case`` and read by ``_transport_case``.
+# Like the progress sink, it keeps case payloads and call shapes unchanged, so
+# these controls stay out of case identity; it never reaches pool workers.
+_TRANSPORT_TUNING: ContextVar[Any] = ContextVar("pyrite_transport_tuning", default=None)
+
+
+def tuned_transport_kwargs():
+    """``simulate_trajectories`` kwargs of the active override, if any."""
+    config = _TRANSPORT_TUNING.get()
+    return {} if config is None else {"per_electron_config": config}
+
+
+def transport_kernel_tuning(numerics):
+    """``numerics``' ``TransportKernelTuning``, or None for a duck-typed stand-in."""
+    execution = getattr(numerics, "resolved_execution", None)
+    return None if execution is None else execution.transport
+
+
+def per_electron_config(tuning):
+    """The process default ``PerElectronTransportConfig`` with ``tuning`` applied."""
+    from ..transport import DEFAULT_PER_ELECTRON_TRANSPORT_CONFIG
+    from ..transport.continuation import TransportContinuationConfig
+
+    config = DEFAULT_PER_ELECTRON_TRANSPORT_CONFIG
+    if tuning.electron_batch is not None:
+        config = replace(config, max_batch=tuning.electron_batch)
+    if tuning.schedule is not None:
+        rows = tuning.continuation_rows
+        config = replace(
+            config,
+            schedule=tuning.schedule,
+            continuation=None if rows is None else TransportContinuationConfig(rows_per_round=rows),
+        )
+    return config
+
+
+@contextmanager
+def transport_tuning(numerics):
+    """Apply ``KernelTuning.transport`` to in-process runs.
+
+    ``numerics`` is a ``Numerics``; internal stand-ins carrying only
+    ``transport_core``, and unset fields, keep the process defaults
+    (``PYRITE_MC_TRANSPORT_SCHEDULE``, ``PYRITE_MC_ELECTRON_BATCH_MAX``).
+    """
+    tuning = transport_kernel_tuning(numerics)
+    if tuning is None or tuning == type(tuning)():
+        yield
+        return
+    token = _TRANSPORT_TUNING.set(per_electron_config(tuning))
+    try:
+        yield
+    finally:
+        _TRANSPORT_TUNING.reset(token)
 
 
 def _beam_kwargs(case):

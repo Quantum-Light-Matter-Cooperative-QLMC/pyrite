@@ -533,7 +533,10 @@ A regular Sphinx/RTD build **never executes any tutorial**. The `_notebooks`
 extension verifies a format-insensitive Python AST/script-metadata fingerprint,
 Molab badge, captured
 figures and the absence of execution errors; `nb_execution_mode = "off"` tells
-MyST-NB to use the committed outputs. Builds fail on missing or stale captures.
+MyST-NB to use the committed outputs. Builds fail on missing or stale captures,
+except for a tutorial whose script metadata declares `[tool.pyrite] backend =
+"cuda"`: a stale CUDA capture prints a warning to stderr (not a Sphinx warning)
+and publishes the old capture, since a GPU is not always available.
 Expensive execution, reference-table fetching and required CPU memory belong to
 an explicit regeneration step on a sufficiently provisioned machine. The
 separate browser-only homepage results demo still uses its existing WASM export.
@@ -569,6 +572,12 @@ uv run --group docs python docs/_notebooks.py --regenerate 03-pxr-line-energies
 uv run --group docs python docs/_notebooks.py --check
 uv run marimo edit docs/notebooks/01-first-spectrum.py
 ```
+
+CUDA tutorials (`backend = "cuda"`) are regenerated on the lab GPU whenever it
+is free. From a clean checkout of the commit on the box, submit
+`sbatch checks/tutorial_capture_cuda.sbatch 15-tuning-cuda-execution`, then copy
+the `.ipynb` back and commit it with its source. Local regeneration stops
+before exporting when CuPy finds no device.
 
 Regeneration Ruff-formats each capture's code cells before promotion, so
 regenerated pages pass `ruff format --check` without a manual follow-up.

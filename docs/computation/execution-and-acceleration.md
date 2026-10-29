@@ -23,8 +23,10 @@ A run makes these separate choices:
   - Which electron-transport implementation runs: `auto`, `lockstep`, `per-electron`, `cuda`.
 * - **Transport schedule**
   - `PYRITE_MC_TRANSPORT_SCHEDULE`
-  - How the CUDA core batches histories: `full-history` (default), `continuation` or `auto`. Results are identical; see [bounded continuation](../repo-design/compute/gpu-transport-rawkernel.md#bounded-continuation-automatic-production-schedule).
+  - How the CUDA core batches histories: `auto` (default since #799), `full-history` or `continuation`. Results are identical; see [bounded continuation](../repo-design/compute/gpu-transport-rawkernel.md#bounded-continuation-automatic-production-schedule).
 ```
+
+In Python, `KernelTuning(transport=TransportKernelTuning(schedule=..., continuation_rows=..., electron_batch=...))` (experimental) selects the schedule and the continuation row quantum for one `simulate` call and takes precedence over `PYRITE_MC_TRANSPORT_SCHEDULE`; `schedule=None` defers to the variable. The row quantum (default 256) counts trajectory rows each active history may emit per launch, not a time interval, and requires `continuation` or `auto`. `electron_batch` caps electrons per transport launch and overrides `PYRITE_MC_ELECTRON_BATCH_MAX`. Batch executors reject these per-call values and use the variables.
 
 The CUDA transport core requires a CUDA array backend for its `cupyx.jit` kernel. A ROCm or SYCL backend runs its spectrum kernels on the device and its transport on the CPU.
 

@@ -4,6 +4,7 @@ The public API here does not import Optuna or launch a numerical engine until
 explicitly requested. No change to existing sweeping or execution defaults.
 """
 
+from .kernel_tuning import KernelLattice, KernelTrial, KernelTuningResult, tune_kernels
 from .optuna_adapter import OptunaOptimizer
 from .scoring import FixedWindowYield
 from .space import Categorical, Continuous, Integer, ParameterSpace, apply_scene_parameters
@@ -25,6 +26,9 @@ __all__ = [
     "Integer",
     "ParameterSpace",
     "FixedWindowYield",
+    "KernelLattice",
+    "KernelTrial",
+    "KernelTuningResult",
     "apply_scene_parameters",
     "Constraint",
     "Objective",
@@ -36,4 +40,5 @@ __all__ = [
     "Proposal",
     "PyriteEvaluator",
     "TrialState",
+    "tune_kernels",
 ]
