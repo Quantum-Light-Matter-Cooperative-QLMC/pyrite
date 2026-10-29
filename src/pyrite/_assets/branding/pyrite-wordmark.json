@@ -1,7 +1,7 @@
 {
   "generator": "scripts/pyrite_logo.py",
-  "generator_sha256": "f3d600759f8fb9e626d854518cafa65a4d605f2dcb7be7c3a2e3fcd29b736087",
-  "source_revision": "3b56d25eb6a7fe45d541379eee50ab0869a2de1b",
+  "generator_sha256": "c8bba1ae3fd7c3bc1932e9b70930c43ca8f57ce4cd3890636dd31311fa387adc",
+  "source_revision": "32bd17957831ee9e8b554cfda87cbd05ee833267",
   "source_dirty": true,
   "numpy_version": "2.5.4",
   "matplotlib_version": "3.11.2",

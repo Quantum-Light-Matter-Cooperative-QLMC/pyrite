@@ -60,8 +60,8 @@ GLYPH_PALETTE = LinearSegmentedColormap.from_list(
     "pyrite_letter_gradient",
     [
         (0.0, ATOM_GOLD),
-        (0.6, GLYPH_MID),
-        (1.0, ATOM_BLUE),
+        (0.6, ATOM_BLUE),
+        (1.0, "#4A58E8"),
     ],
 )
 PALETTE = LinearSegmentedColormap.from_list(
