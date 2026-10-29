@@ -10,8 +10,8 @@ myst:
 
 **PyRITE (`pyrite-mc`)** models electron transport in crystalline and amorphous
 solids, PXR and coherent bremsstrahlung (CBS), transition radiation, characteristic radiation,
-and standard bremsstrahlung; other types of radiation are under active development  
-(namely Cherenkov and channeling radiation).
+and standard bremsstrahlung. Cherenkov and channeling radiation are under
+active development.
 
 It is research software under active development: read the
 [capabilities and limitations](physics/capabilities.md) and
@@ -82,8 +82,7 @@ The [bibliography](references.md) collects the scientific sources.
 
 [How-to Guides](guides/index.md) cover profiles, materials, detectors, results,
 and cluster execution. [Reference](reference/index.md) separates the Python API,
-CLI, configuration, and result contracts. The [interactive curriculum](notebooks/index.md)
-is developed under [#758](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/758).
+CLI, configuration, and result contracts.
 
 For contributors, start with [development setup](repo-design/development-workspace.md)
 and the [development index](development/index.md). Source and issue tracking

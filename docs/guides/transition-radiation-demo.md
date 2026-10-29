@@ -1,13 +1,13 @@
 (tr-and-ctr-demo)=
 # Compare straight-track and transported TR/CTR
 
-Compare film transition radiation (TR) with coherent transition radiation (CTR),
-then see what changes when electrons scatter and lose energy. The figures below
-are actual outputs of the packaged marimo app, not measurements.
+Compute film transition radiation (TR) and bunch coherent transition radiation
+(CTR) for straight tracks, then rerun both with transported electrons that
+scatter and lose energy. The figures below are actual outputs of the packaged
+marimo app, not measurements. To learn TR and CTR step by step through the
+Python API, follow [Transition and coherent transition radiation](../notebooks/specialized/10-transition-radiation.ipynb).
 
-For a public-API walkthrough, open [Transition and coherent transition radiation](../notebooks/specialized/10-transition-radiation.ipynb).
-
-## Launch the notebook
+## Compute the straight-track comparison
 
 From a source checkout:
 
@@ -35,18 +35,14 @@ An illustrative Gaussian bunch has **1 as RMS duration**, **1 nm FWHM spot** and
    transition_radiation_demo()
 ```
 
-The finite film includes interference between entry and exit fields and
-absorption; it differs from a single semi-infinite interface. The CTR expectation
-also includes the Gaussian time/position form factor. In the live app, change
-**RMS duration** to **100 as** and submit **Update comparison**: the bunch excess
-vanishes over this band. Angle–energy maps and the form-factor plot let you
-explore the same calculation interactively.
-The default 1 eV energy spacing and 0.25° angular spacing resolve the film
-fringes more clearly than the former 10 eV / 1° grids. The repeated minima are
-physical entry/exit interference. These are visualization samples; refine them
-before interpreting fringe minima or integrating a yield.
+The film curve includes entry/exit interference and absorption; its repeated
+minima are physical fringes. The CTR curve also includes the Gaussian
+time/position form factor: change the bunch inputs and submit
+**Update comparison** to recompute it. The default 1 eV and 0.25° grids are
+visualization samples; refine them before interpreting fringe minima or
+integrating a yield.
 
-## Run the reference profiles
+## Add transported electrons
 
 [Fetch the reference tables](getting-started.md#fetch-reference-data),
 then click **Run transported comparison** in the notebook. It runs history TR
@@ -65,7 +61,9 @@ the time/position offsets rather than multiplying by an analytic form factor.
    transition_radiation_demo(view="transport")
 ```
 
-To save the same default cases as campaign checkpoints instead:
+## Save the cases as checkpoints
+
+To keep the same default cases as campaign checkpoints:
 
 ```bash
 uv run pyrite run tr_demo
@@ -77,7 +75,7 @@ Select the corresponding identity-qualified checkpoint in the analysis app.
 `tr_demo` uses history coherence; `ctr_demo` uses bunch coherence. Clone a profile
 before editing it. See [controls, table requirements and profile storage](../reference/tr-ctr-app.md).
 
-## Units, coherence and sampling
+## Check units before comparing
 
 Every curve is **photons/(incident electron · eV · sr)** at one observation
 direction. The app's **per bunch** option multiplies by physical population N,
@@ -91,7 +89,7 @@ the sample does not resolve the bunch excess. See the
 separately gridded bremsstrahlung continuum. This comparison uses incoherent
 PXR/CBS; coherent TR–line interference and diffracted TR are outside it.
 
-## Export and limits
+## Export a static page
 
 ```bash
 uv run pyrite app transition-radiation export --stem tr_ctr_demo

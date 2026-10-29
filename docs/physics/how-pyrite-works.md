@@ -28,7 +28,7 @@ measured data. Stages describe data flow; a command need not execute them all.
    experimental status and execution restrictions.
 4. **Retain results.** `simulate` returns an in-memory `Result` without
    checkpoint I/O. Profile runs save resumable component checkpoints;
-   full histories require separate opt-in [trajectory capture](../reference/trajectory-workflows.md).
+   full histories require separate opt-in [trajectory capture](../guides/saved-trajectories.md).
    [Working with results](../guides/working-with-results.md) plots actual saved components.
 5. **Form an observation.** Acceptance, filters, response and acquisition
    produce detector predictions. [Observation recipes](../reference/python-scene-recipes.md#compose-independent-observations)

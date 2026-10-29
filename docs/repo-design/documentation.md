@@ -73,11 +73,11 @@ their audience, rather than additional tutorials or interface specifications.
 | `notebooks/fundamentals/`, `notebooks/designing/`, `notebooks/specialized/`, `notebooks/quantum/` | Tutorial; learners | [Interactive Tutorials](../notebooks/index.md); canonical Marimo sources own the tutorial; commit generated native MyST-NB snapshots with their sources. HTML is disposable build output. |
 | `guides/getting-started.md` | Entry point; new users | [Getting Started](../guides/getting-started.md) is a single top-level page without child pages; link to the first notebook for guided Python learning. |
 | `guides/configuration-cookbook.md`, `guides/configuration-notebook.md` | How-to; campaign authors | [How-to Guides](../guides/index.md); fields and editor behavior belong in [configuration reference](../reference/configuration/index.md). |
-| `guides/directional-source-heatmap.md`, `guides/detector-observations.md`, `guides/working-with-results.md` | How-to; simulation and analysis users | [How-to Guides](../guides/index.md); link to notebooks for learning and reference for complete contracts. |
+| `guides/directional-source-heatmap.md`, `guides/detector-observations.md`, `guides/working-with-results.md`, `guides/saved-trajectories.md` | How-to; simulation and analysis users | [How-to Guides](../guides/index.md); link to notebooks for learning and reference for complete contracts. |
 | `reference/python-scene-recipes.md` | How-to; Python API users composing scenes, observations and sweeps | [How-to Guides](../guides/index.md) owns its navigation; keep the published URL and recipe anchors. Signatures stay in the namespace reference. |
 | `guides/adding-materials.md`, `guides/gpt-gdf-beams.md`, `guides/optimization-studies.md` | How-to; users with specialized inputs or studies | [How-to Guides](../guides/index.md); schemas and restrictions remain in reference. |
 | `guides/running-on-a-cluster.md`, `guides/performance-profile-analysis.md`, `guides/batch-chunk-tuning.md` | How-to; cluster users and performance investigators | [Execution guides](../guides/index.md); runtime contracts and developer benchmarks have separate owners. |
-| `guides/experimental-planar-channeling.md`, `guides/experimental-axial-channeling.md`, `guides/transition-radiation-demo.md`, `guides/radiation-diagnostics.md` | How-to; specialist users | [Specialized workflows](../guides/index.md); retain experimental boundaries and evidence links. These app recipes do not own the progressive notebook curriculum. |
+| `guides/experimental-planar-channeling.md`, `guides/experimental-axial-channeling.md`, `guides/transition-radiation-demo.md`, `guides/radiation-diagnostics.md` | How-to; specialist users | [Specialist recipes](../guides/index.md); retain experimental boundaries and evidence links. These app recipes do not own the progressive notebook curriculum. |
 | `guides/troubleshooting.md` | How-to; users diagnosing failures | [How-to Guides](../guides/index.md). |
 | Other `reference/` pages, `api.md`, `references.md` | Reference; API, CLI and citation users | [Reference](../reference/index.md); generated signatures and the governed API inventory own interface details. |
 | `repo-design/result-storage-contracts.md`, `physics/beam-transport/transport-outputs.md` | Reference; result, persistence and trajectory API users | [Results and storage](../reference/results/index.md); retain the existing URLs, units, schema anchors and evidence links. Developer storage pages link here for shared contracts. |
@@ -94,6 +94,25 @@ Every page except the homepage has exactly one toctree parent or is an explicit
 orphan compatibility/artifact page; `tests/dev/test_docs_computation_navigation.py`
 enforces this. Use a titled toctree entry (`Title <../reference/page>`) to place a
 page under its mode's section without moving its published URL.
+
+### Published URLs are frozen
+
+The toctree parent, not the directory, states a page's mode. Several pages
+predate this organization and live outside their mode's directory:
+`reference/python-scene-recipes.md` (how-to), `computation/` runtime contracts
+(reference), and `repo-design/profile-settings.md`,
+`repo-design/configuration-resolution.md`, `repo-design/result-storage-contracts.md`
+and `repo-design/cli/` (user reference). Keep these URLs: external citations,
+issue links, CLI help and generated pages reference them, and a move adds a
+redirect page without helping readers, who navigate by sidebar.
+
+Do not move a page only to match its directory to its mode. When a page mixes
+modes, split it: write the extracted content as a new page in its mode's
+directory, leave the remaining content at the original URL, and keep inbound
+anchors working. Saved-trajectory recipes, for example, moved to
+`guides/saved-trajectories.md`, while their contracts stayed at
+`reference/trajectory-workflows.md`. New pages always go in their mode's
+directory.
 
 Compatibility pages preserve URLs and anchors and direct readers to their
 canonical owner. Do not expand them into competing guides. This applies to

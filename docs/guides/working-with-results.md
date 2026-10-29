@@ -118,14 +118,14 @@ comparison, export and archiving.
 
 ## Saved electron histories
 
-Checkpoints retain spectra. [Saved trajectory workflows](../reference/trajectory-workflows.md)
-cover separate capture artifacts, reductions, replay, VTK scenes and ParaView.
+Checkpoints retain spectra. To keep and visualize the electron histories
+behind them, follow [Save and inspect electron trajectories](saved-trajectories.md).
 
 (planar-channeling-demo)=
 (shaped-entry-wavefunctions-experimental)=
 
 ## Experimental quantum views
 
-The [channeling app reference](../reference/results-and-apps.md#planar-channeling-demo)
+The [channeling app reference](../reference/results-and-apps.md#channeling-app)
 and [planar channeling guide](experimental-planar-channeling.md) cover solver
 visualization and the restrictions on entrance-state selection.

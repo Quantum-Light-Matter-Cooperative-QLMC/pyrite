@@ -26,11 +26,8 @@ detector-observations
 :caption: Results
 
 working-with-results
+saved-trajectories
 ```
-
-[Checkpoint and app contracts](../reference/results-and-apps.md) cover dataset
-identity, comparison and archiving. [Saved electron histories](../reference/trajectory-workflows.md)
-cover capture, replay and ParaView independently of spectral checkpoints.
 
 ```{toctree}
 :maxdepth: 1
@@ -50,12 +47,9 @@ performance-profile-analysis
 batch-chunk-tuning
 ```
 
-Scene construction and configuration contracts live in
-[Reference](../reference/index.md).
-
 ```{toctree}
 :maxdepth: 1
-:caption: Specialized workflows
+:caption: Specialist recipes
 
 experimental-planar-channeling
 experimental-axial-channeling

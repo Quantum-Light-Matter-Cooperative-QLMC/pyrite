@@ -1,4 +1,4 @@
-# Quantum API map
+# Quantum API contracts
 
 Use `pyrite.quantum` for quantum specifications, configuration, runtime states,
 and selected advanced diagnostics. It remains a module, with lazy exports:
@@ -170,76 +170,20 @@ channeling zone hands dechanneled electrons to ordinary Monte Carlo transport.
 **Channeling radiation (CR)** is recorded separately from PXR/CBS,
 characteristic radiation and bremsstrahlung; it is not Cherenkov radiation.
 
-### Run planar channeling
+### Production planar channeling
 
-Install the material tables, including SBETHE, and inspect the packaged example:
-
-```bash
-pyrite tables fetch
-pyrite tables fetch sbethe
-pyrite profile show channeling_demo
-pyrite run channeling_demo
-pyrite app analysis launch silicon
-```
-
-The example uses a 17 MeV beam through a 2 µm silicon slab with a forward
-detector. Clone it to change the beam, target, detector or numerical settings:
-
-```bash
-pyrite profile create my_channeling --from channeling_demo
-miller_negative=-1
-pyrite physics set my_channeling \
-  --channeling-model planar --channeling-plane 1 "$miller_negative" 0 \
-  --radiative-model uncoupled --emission incoherent
-pyrite run my_channeling
-```
-
-The equivalent Python selection is `Physics(channeling_model="planar",
-channeling_plane=(1, -1, 0), radiative_model="uncoupled")`. For example:
-
-```python
-import numpy as np
-import pyrite as pr
-
-result = pr.simulate(
-    pr.Beam(energy_keV=17_000, transverse=pr.Spot(), longitudinal=pr.PointBunch()),
-    pr.Slab(
-        "silicon",
-        thickness_ang=20_000,
-        tilt_deg=3,
-        tilt_azim_deg=45,
-        footprint=pr.Footprint(5, 5),
-    ),
-    pr.Detector(
-        0,
-        acceptance=pr.SensorAcceptance(
-            distance_mm=1_000,
-            width_mm=3,
-            height_mm=3,
-        ),
-    ),
-    physics=pr.Physics(
-        channeling_model="planar",
-        channeling_plane=(1, -1, 0),
-        radiative_model="uncoupled",
-    ),
-    numerics=pr.Numerics(
-        cxr_trials=200,
-        brem_trials=200,
-        energy_bins=pr.EnergyBins(
-            cxr=np.arange(1_000, 24_000, 50),
-            brem=np.arange(1_000, 17_000_000, 500),
-        ),
-    ),
-)
-cr = result.channeling  # photons / (incident electron · eV · sr), or None
-combined = result.combined_cxr()  # includes CR
-```
-
-The channeling grid and line coverage matter: tune
-`channeling_basis_size`, `channeling_bloch_cells`, `channeling_dz_ang` and
-`channeling_zone_max_ang` with independent convergence checks. Profile runs
-persist a `channeling.h5` component that can be selected in the analysis app.
+`Physics(channeling_model="planar", channeling_plane=(h, k, l))` (CLI:
+`pyrite physics set NAME --channeling-model planar --channeling-plane H K L`)
+admits the planar zone in `simulate` and profile runs; the packaged
+`channeling_demo` profile is a 17 MeV, 2 µm silicon example with a forward
+detector. `Result.channeling` holds CR in
+photons/(incident electron · eV · sr), or `None` when the zone is inactive;
+`Result.combined_cxr()` includes it. Profile runs persist a `channeling.h5`
+component that the analysis app can select. `channeling_basis_size`,
+`channeling_bloch_cells`, `channeling_dz_ang` and `channeling_zone_max_ang`
+control the zone's numerical representation and require independent
+convergence checks. To run it, follow
+[Add planar channeling to a transport run](../guides/experimental-planar-channeling.md#add-planar-channeling-to-a-transport-run).
 
 ### Specify and inspect quantum entrance states
 
@@ -267,36 +211,9 @@ path supports a centered one-dimensional Gaussian with lattice-averaged impact
 for compatible planar scenes. Do not assume a source accepted by a standalone
 diagnostic is accepted by a transport scene.
 
-To project and propagate a portable 1D source *without* running transport:
-
-```python
-import numpy as np
-import pyrite as pr
-from pyrite.experimental.quantum import propagate_planar_source, score_planar_source
-
-source = pr.TransverseStateSpec.recipe("gaussian", waist_ang=1, dimension=1)
-setup = pr.QuantumSetup(
-    region=pr.QuantumRegion(kind="planar", plane_hkl=(1, 1, 0)),
-    dynamics=pr.QuantumDynamics(kind="channeling"),
-    numerics=pr.QuantumNumerics(basis_size=8, bloch_cells=4, step_ang=50),
-)
-entry = setup.project_state(
-    source,
-    crystal="silicon",
-    kinetic_energy_eV=17e6,
-    incidence_rad=0,
-    impact="fixed",
-)
-evolution = propagate_planar_source(entry, depth_ang=500)
-spectrum = score_planar_source(
-    entry,
-    depth_ang=500,
-    photon_energy_eV=np.linspace(1_000, 50_000, 500),
-    theta_rad=0,
-    absorption=False,
-)
-print(entry.retained_population, evolution.trace[-1], spectrum.spectrum.shape)
-```
+`pyrite.experimental.quantum.propagate_planar_source` and
+`score_planar_source` evolve and score a projected entry without transport; see
+[the planar guide](../guides/experimental-planar-channeling.md#project-a-portable-source-from-python).
 
 `incidence_rad` is the effective incidence relative to the crystal planes,
 not the laboratory target tilt. `impact="fixed"` retains position-dependent
@@ -334,35 +251,12 @@ Use `pyrite.experimental.quantum` for direct axial diagnostics and
 factory Pint boundary. Axial diagnostics remain experimental and do not enable
 `Physics(channeling_model="axial")` in production transport.
 
-### Run an axial diagnostic
+### Configuration and normalization
 
-```python
-from pyrite.experimental.quantum import (
-    AxialDiagnosticConfig,
-    axial_diagnostic,
-)
-
-config = AxialDiagnosticConfig(
-    crystal="silicon",
-    axis=(0, 0, 1),
-    kinetic_energy_eV=5e6,
-    cells=(2, 2),
-    shape=(48, 48),
-    depths_ang=(0, 250, 500),
-    step_ang=5,
-    mode="mcwf",
-    n_electrons=16,
-    seed=17,
-    spectral_states=16,
-    spectral_representation="energy_bins",
-    record_coherence=True,
-    record_current=True,
-    record_current_divergence=True,
-    current_contour=(0, 0, 12, 12),
-)
-result = axial_diagnostic(config, record_metrics=True)
-print(result.surviving, result.density_per_ang2.shape)
-```
+`axial_diagnostic(config, *, entry=None, observable=None, record_metrics=False)`
+runs one `AxialDiagnosticConfig`; see
+[the axial guide](../guides/experimental-axial-channeling.md#run-an-mcwf-diagnostic-from-python)
+for a complete call.
 
 `mode="coherent"` performs deterministic split-step propagation; `mode="mcwf"`
 uses Monte Carlo wavefunctions with thermal-diffuse and electronic scattering.
@@ -372,20 +266,8 @@ incident electron**: integrating `density_per_ang2` over the periodic cell
 gives `surviving`; `result.density(conditional=True)` instead conditions on
 survival. A mixed MCWF ensemble has no single wavefunction phase.
 
-Custom Gaussian, vortex or incoherent-mixture entry states can be supplied via
-`entry=` using `pyrite.quantum`. For example:
-
-```python
-from pyrite.quantum import laguerre_gauss, mixture
-
-entry = mixture(
-    [
-        (0.5, laguerre_gauss(1, waist_ang=0.5)),
-        (0.5, laguerre_gauss(-1, waist_ang=0.5)),
-    ]
-)
-result = axial_diagnostic(config, entry=entry, record_metrics=True)
-```
+Custom Gaussian, vortex or incoherent-mixture entry states from
+`pyrite.quantum` can be supplied via `entry=`.
 
 ### Interpret the recorded observables
 
@@ -405,7 +287,7 @@ far-field dipole-pattern diagnostics. These are model observables, **not**
 validated detected photon spectra; a local eigenstate population histogram
 is not the same as a radiation-active line population.
 
-### Supercell, boundaries and convergence
+### Supercell and boundaries
 
 `cells=(cx, cy)` counts crystal periods in one **periodically repeated**
 supercell, while `shape=(nx, ny)` is the FFT sampling grid over the *entire*
@@ -415,8 +297,7 @@ Raising `cells` without increasing `shape` reduces spatial resolution.
 
 Flux crossing an internal cell boundary is redistribution. Flux leaving one
 edge of the periodic supercell re-enters at the opposite edge. A cropped map
-is only a viewport, not an open boundary. Check cell count, samples per cell,
-propagation step, observation depths and ensemble size independently. An
+is only a viewport, not an open boundary. An
 above-barrier finite-grid component or a recorded `numerical_sink` is **not**
 a validated quantum-to-classical handoff.
 
@@ -431,14 +312,6 @@ Install the `nvidia` extra and set `backend="cuda"` on the axial diagnostic
 configuration for MCWF. CUDA requires available hardware and does not fall
 back silently. Results return as NumPy arrays; the solver uses float64 and
 complex128 arithmetic.
-
-For example, to repeat the diagnostic above on CUDA:
-
-```python
-from dataclasses import replace
-
-gpu_result = axial_diagnostic(replace(config, backend="cuda"), record_metrics=True)
-```
 
 The lower-level `AxialMCWF(..., backend="cuda")` API additionally supports
 `batch_size` and `memory_budget_bytes` limits on device allocations.
