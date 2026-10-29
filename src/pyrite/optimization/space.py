@@ -13,8 +13,22 @@ from numbers import Integral, Real
 from types import MappingProxyType
 from typing import Any
 
+from .._units import _is_pint_quantity
+
+
+def _refuse_quantity(value: Any, *, name: str) -> None:
+    # No Scene path declares its unit explicitly, and field-name suffixes are
+    # not a reliable unit source, so path values stay plain numbers for now.
+    if _is_pint_quantity(value):
+        raise TypeError(
+            f"{name} must be a plain number in the addressed field's unit; parameter "
+            f"paths declare no unit, so Pint quantities (received {str(value.units)!r}) "
+            "are refused rather than lowered by guess"
+        )
+
 
 def _finite_real(value: Any, *, name: str) -> float:
+    _refuse_quantity(value, name=name)
     if isinstance(value, bool) or not isinstance(value, Real):
         raise TypeError(f"{name} must be a real number")
     result = float(value)
@@ -62,6 +76,7 @@ class Integer:
     def __post_init__(self) -> None:
         for key in ("low", "high", "step"):
             value = getattr(self, key)
+            _refuse_quantity(value, name=f"integer {key}")
             if isinstance(value, bool) or not isinstance(value, Integral):
                 raise TypeError(f"integer {key} must be an integer")
         if not isinstance(self.log, bool):
@@ -74,6 +89,7 @@ class Integer:
             raise ValueError("logarithmic integer range requires low > 0 and step=1")
 
     def validate(self, value: Any) -> int:
+        _refuse_quantity(value, name="integer parameter")
         if isinstance(value, bool) or not isinstance(value, Integral):
             raise TypeError("integer parameter requires an integer; refusing implicit rounding")
         number = int(value)

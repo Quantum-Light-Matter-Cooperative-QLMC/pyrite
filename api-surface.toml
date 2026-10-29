@@ -61,12 +61,14 @@ build_crystal = { target = "pyrite.materials.authoring:build_crystal", status = 
 save_material = { target = "pyrite.materials.authoring:save_material", status = "advanced-stable" }
 
 [package_exports."pyrite.geometry"]
+# Quantity spacing/with_spacing retain numeric spacing_ang records.
 BlazedGrooves = { target = "pyrite.campaign.geometry:BlazedGrooves", status = "advanced-stable" }
 CrystalCut = { target = "pyrite.campaign.geometry:CrystalCut", status = "advanced-stable" }
 Filter = { target = "pyrite.instrument:Filter", status = "advanced-stable" }
 FilterPlate = { target = "pyrite.instrument:FilterPlate", status = "advanced-stable" }
 Footprint = { target = "pyrite.campaign.geometry:Footprint", status = "advanced-stable" }
 Layer = { target = "pyrite.campaign.geometry:Layer", status = "advanced-stable" }
+# Quantity size/thickness preserve scalar numeric body and sweep fields.
 RectangularBody = { target = "pyrite.bodies:RectangularBody", status = "advanced-stable" }
 Slab = { target = "pyrite.campaign.geometry:Slab", status = "advanced-stable" }
 Stack = { target = "pyrite.campaign.geometry:Stack", status = "advanced-stable" }
@@ -142,10 +144,17 @@ summary_table = { target = "pyrite.results.tables:summary_table", status = "adva
 Result = { target = "pyrite.results.model:Result", status = "stable" }
 Provenance = { target = "pyrite.results.provenance:Provenance", status = "advanced-stable" }
 SpectralDensity = { target = "pyrite.results.model:SpectralDensity", status = "advanced-stable" }
+QuantifiedApertureSpectrum = { target = "pyrite.results.quantified_aperture:QuantifiedApertureSpectrum", status = "experimental" }
+QuantifiedAcquisitionBatch = { target = "pyrite.results.quantified_acquisition:QuantifiedAcquisitionBatch", status = "experimental" }
+QuantifiedDirectionalSpectrum = { target = "pyrite.results.quantified_directional:QuantifiedDirectionalSpectrum", status = "experimental" }
+QuantifiedSpatialSpectrum = { target = "pyrite.results.quantified_spatial:QuantifiedSpatialSpectrum", status = "experimental" }
+QuantifiedSpatialImage = { target = "pyrite.results.quantified_spatial:QuantifiedSpatialImage", status = "experimental" }
+QuantifiedSpectrum = { target = "pyrite.results.quantified:QuantifiedSpectrum", status = "advanced-stable" }
 CxrSpectra = { target = "pyrite.results.model:CxrSpectra", status = "advanced-stable" }
 SpatialResult = { target = "pyrite.results.model:SpatialResult", status = "advanced-stable" }
 SpectralFactors = { target = "pyrite.results.model:SpectralFactors", status = "advanced-stable" }
 PixelRayMap = { target = "pyrite.results.model:PixelRayMap", status = "advanced-stable" }
+# PixelMetadata also owns copied semantic geometry quantities; numeric fields persist.
 PixelMetadata = { target = "pyrite.results.model:PixelMetadata", status = "advanced-stable" }
 
 [package_exports."pyrite.storage"]
@@ -274,6 +283,7 @@ IdealPhotonCounter = { target = "pyrite.detectors:IdealPhotonCounter", status = 
 PixelGrid = { target = "pyrite.instrument:PixelGrid", status = "advanced-stable" }
 PlanarDetector = { target = "pyrite.instrument:PlanarDetector", status = "advanced-stable" }
 PlanarPose = { target = "pyrite.instrument:PlanarPose", status = "advanced-stable" }
+# Semantic distance/width/height retain numeric mm fields and exact acceptance resolution.
 SensorAcceptance = { target = "pyrite.detectors:SensorAcceptance", status = "advanced-stable" }
 FilterPlate = { target = "pyrite.instrument:FilterPlate", status = "advanced-stable" }
 AngularDetector = { target = "pyrite.detectors:AngularDetector", status = "advanced-stable" }
@@ -391,6 +401,8 @@ SplitStepPropagator = { target = "pyrite.montecarlo.channeling.realspace:SplitSt
 
 [package_exports."pyrite.beams"]
 BunchFrontTilt = { target = "pyrite.campaign.beam:BunchFrontTilt", status = "advanced-stable" }
+# BunchLength/Offsets own additive semantic time inputs, read-back and replacement;
+# their numeric dataclass fields and transport records remain unchanged.
 BunchLength = { target = "pyrite.campaign.beam:BunchLength", status = "advanced-stable" }
 GdfSource = { target = "pyrite.campaign.beam:GdfSource", status = "advanced-stable" }
 Offsets = { target = "pyrite.campaign.beam:Offsets", status = "advanced-stable" }

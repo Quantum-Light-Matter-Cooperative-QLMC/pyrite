@@ -36,6 +36,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from ..._units import reject_quantity
 from ...materials.channeling.transverse import HBAR2_2M_EV_ANG2, longitudinal_kinematics
 from ...materials.crystal import HBARC_EV_ANG
 from .states import EntryState, MixedState, TransverseState, momentum_inv_ang
@@ -59,6 +60,7 @@ class RealSpaceGrid:
     shape: tuple[int, int]
 
     def __post_init__(self) -> None:
+        reject_quantity(self.extent_ang, field="RealSpaceGrid.extent_ang", unit="angstrom")
         if min(self.shape) < 2 or min(self.extent_ang) <= 0.0:
             raise ValueError("grid needs positive extent and at least 2 samples per axis")
 
@@ -134,6 +136,9 @@ class SplitStepPropagator:
     tilt_rad
         Mean carrier tilt ``(theta_x, theta_y)`` relative to ``z`` [rad].
 
+    Inputs are numeric-only; Pint quantities (including dimensionless tilts)
+    raise ``TypeError``.
+
     Validation: cr-axial-realspace-propagation
     """
 
@@ -146,6 +151,13 @@ class SplitStepPropagator:
         absorptive_eV: np.ndarray | None = None,
         tilt_rad: tuple[float, float] = (0.0, 0.0),
     ) -> None:
+        for name, value, unit in (
+            ("kinetic_energy_eV", kinetic_energy_eV, "eV"),
+            ("potential_eV", potential_eV, "eV"),
+            ("absorptive_eV", absorptive_eV, "eV"),
+            ("tilt_rad", tilt_rad, "rad"),
+        ):
+            reject_quantity(value, field=f"SplitStepPropagator.{name}", unit=unit)
         if not np.isfinite(kinetic_energy_eV) or kinetic_energy_eV <= 0.0:
             raise ValueError("kinetic_energy_eV must be finite and positive")
         self.grid = grid

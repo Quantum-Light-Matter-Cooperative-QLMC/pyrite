@@ -272,3 +272,18 @@ def test_two_dimensional_source_requires_explicit_in_plane_angular_model():
             theta_rad=0.0,
             absorption=False,
         )
+
+
+@pytest.mark.parametrize("unit", ["delta_degC", "delta_degF"])
+def test_projection_refuses_temperature_difference_as_absolute_temperature(unit):
+    spec = pr.TransverseStateSpec.recipe("gaussian", waist_ang=0.8, dimension=1)
+    with pytest.raises(ValueError, match="project_planar_source.temperature_K.*difference"):
+        _project(spec, temperature_K=ureg.Quantity(20, unit))
+    with pytest.raises(ValueError, match="project_planar_source.temperature_K.*difference"):
+        _setup().project_state(
+            spec,
+            crystal="silicon",
+            kinetic_energy_eV=ENERGY_EV,
+            incidence_rad=0.0,
+            temperature_K=ureg.Quantity(20, unit),
+        )

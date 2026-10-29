@@ -12,8 +12,11 @@ import numpy as np
 from ..instrument import PlanarDetector
 
 if TYPE_CHECKING:
+    from pint import Quantity
+
     from ..instrument import Acquisition, AcquisitionBatch
     from ..instrument.geometry import PixelRays
+    from .quantified_spatial import QuantifiedSpatialImage, QuantifiedSpatialSpectrum
 
 #: Spatial result components. ``*_total`` adds characteristic, channeling and transition radiation.
 COMPONENTS = (
@@ -163,6 +166,16 @@ class PixelMetadata:
         result does not retain tile directions.
     path_length_mm
         ``(n_pixel, n_filter)`` filter path lengths in mm, in filter order.
+
+    Notes
+    -----
+    Semantic properties ``local_position``, ``center``, ``polar``, ``azimuth``,
+    ``distance``, ``solid_angle`` and ``path_length`` return fresh Pint quantities
+    in mm, degrees or sr. Convert their display units with ``.to(...)``.
+    Each read-back copies its array; modifying it cannot alter this metadata.
+    Directions, coordinates and tile indices remain numeric geometric labels.
+    Quantity access does not rescore geometry, apply acceptance, or change
+    numeric storage. Pint loads only when a quantity property is accessed.
     """
 
     coordinates: np.ndarray
@@ -181,6 +194,55 @@ class PixelMetadata:
         for name, value in vars(self).items():
             if value is not None:
                 object.__setattr__(self, name, _readonly_array(value))
+
+    @property
+    def local_position(self) -> Quantity:
+        """Fresh detector-local pixel-centre offsets, shape (pixel, 2), in mm."""
+        from ..units import Q_
+
+        return Q_(self.local_position_mm.copy(), "mm")
+
+    @property
+    def center(self) -> Quantity:
+        """Fresh lab-frame pixel centres, shape (pixel, 3), in mm."""
+        from ..units import Q_
+
+        return Q_(self.center_mm.copy(), "mm")
+
+    @property
+    def polar(self) -> Quantity:
+        """Fresh lab polar angles from the beam (+z), shape (pixel,), in degrees."""
+        from ..units import Q_
+
+        return Q_(self.polar_deg.copy(), "degree")
+
+    @property
+    def azimuth(self) -> Quantity:
+        """Fresh lab azimuths from +x toward +y, shape (pixel,), in degrees."""
+        from ..units import Q_
+
+        return Q_(self.azimuth_deg.copy(), "degree")
+
+    @property
+    def distance(self) -> Quantity:
+        """Fresh source-to-pixel-centre distances, shape (pixel,), in mm."""
+        from ..units import Q_
+
+        return Q_(self.distance_mm.copy(), "mm")
+
+    @property
+    def solid_angle(self) -> Quantity:
+        """Fresh scored pixel acceptances, shape (pixel,), in sr."""
+        from ..units import Q_
+
+        return Q_(self.solid_angle_sr.copy(), "sr")
+
+    @property
+    def path_length(self) -> Quantity:
+        """Fresh filter paths, shape (pixel, filter), in mm and filter order."""
+        from ..units import Q_
+
+        return Q_(self.path_length_mm.copy(), "mm")
 
 
 @dataclass(frozen=True)
@@ -535,6 +597,31 @@ class SpatialResult:
                 raise ValueError("detector response must preserve the requested energy grid")
         return factor.energy_eV, spectra
 
+    def quantify_spectra(
+        self,
+        *,
+        pixels=None,
+        region=None,
+        component: str = "cxr",
+        measured: bool = False,
+        fwhm_eV: float | None = None,
+    ) -> QuantifiedSpatialSpectrum:
+        """Return detached physical quantities for explicitly selected pixels.
+
+        The ``(pixel, photon_energy)`` result contains the same node-sampled,
+        solid-angle-accepted per-primary spectra as :meth:`spectra`. The Pint
+        density is per energy, **not** per steradian. Use ``to_energy()`` to
+        convert nodes and density together, without rerunning detector response.
+        Pixel selections are required; no full-detector cube is materialized.
+        """
+        from .quantified_spatial import QuantifiedSpatialSpectrum
+
+        coordinates = self._coordinates(pixels=pixels, region=region)
+        energy, density = self.spectra(
+            pixels=coordinates, component=component, measured=measured, fwhm_eV=fwhm_eV
+        )
+        return QuantifiedSpatialSpectrum(energy, density, coordinates, component, measured, fwhm_eV)
+
     def image(
         self,
         energy_range_eV: tuple[float, float],
@@ -599,6 +686,35 @@ class SpatialResult:
                     raise ValueError("detector response must preserve the requested energy grid")
             image[chosen] = np.trapezoid(spectra[:, selected], factor.energy_eV[selected], axis=1)
         return image.reshape(ny, nx)
+
+    def quantify_image(
+        self,
+        energy_range_eV: tuple[float, float],
+        *,
+        component: str = "cxr",
+        measured: bool = False,
+        fwhm_eV: float | None = None,
+        pixel_chunk: int = 1024,
+    ) -> QuantifiedSpatialImage:
+        """Return detached per-primary photon yields integrated over a window.
+
+        Uses the same numeric integration and pixel chunks as :meth:`image`.
+        ``photon_yield`` has axes ``(pixel_row, pixel_column)`` and no energy
+        density or per-steradian factor. The reported window can be converted
+        with ``to_energy()``, without recomputing the image or response.
+        This is not a detector-acquisition count image.
+        """
+        from .quantified_spatial import QuantifiedSpatialImage
+
+        values = self.image(
+            energy_range_eV,
+            component=component,
+            measured=measured,
+            fwhm_eV=fwhm_eV,
+            pixel_chunk=pixel_chunk,
+        )
+        window = np.asarray(energy_range_eV, dtype=float)
+        return QuantifiedSpatialImage(values, window, component, measured, fwhm_eV)
 
     def average_density(self, component: str, *, pixel_chunk: int = 1024) -> np.ndarray:
         """Return the solid-angle-weighted detector-average density.

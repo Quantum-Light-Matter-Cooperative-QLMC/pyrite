@@ -319,3 +319,13 @@ def test_photon_observation_readout_refused_before_lowering(monkeypatch, entry):
             ),
             **options,
         )
+
+
+def test_quantity_edges_refused_instead_of_stripped():
+    from pyrite.units import ureg
+
+    # Shared by simulate_photon_continuum and simulate_photon_events.
+    for edges in ([1, 2] * ureg.keV, [1 * ureg.keV, 2 * ureg.keV], (1000.0, 2 * ureg.keV)):
+        with pytest.raises(TypeError, match="edges_eV is numeric-only.*'eV'"):
+            photon._energy_edges(edges)
+    np.testing.assert_array_equal(photon._energy_edges([1000, 2000]), [1000.0, 2000.0])

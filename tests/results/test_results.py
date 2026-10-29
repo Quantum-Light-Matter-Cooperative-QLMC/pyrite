@@ -123,9 +123,9 @@ def test_summary_table_reports_intrinsic_and_rep_rate_count_rates():
 
     # Presentation rounds each column independently, so allow its displayed
     # 0.1-count precision rather than comparing the unrounded ratio exactly.
-    assert row[("", "line [cts/s]")] == pytest.approx(20.0 * row[("", "line [cts/s/nA]")], abs=0.5)
-    assert row[("", "total [cts/s]")] == pytest.approx(
-        20.0 * row[("", "total [cts/s/nA]")], abs=0.5
+    assert row[("", "line [Phs/s]")] == pytest.approx(20.0 * row[("", "line [Phs/s/nA]")], abs=0.5)
+    assert row[("", "total [Phs/s]")] == pytest.approx(
+        20.0 * row[("", "total [Phs/s/nA]")], abs=0.5
     )
 
 

@@ -28,8 +28,14 @@ class BeamLike(Protocol):
 class PlaneMetrics:
     """One transverse plane's RMS, emittance, and Twiss diagnostics.
 
-    ``position_sigma_mm`` has mm units, ``slope_sigma_rad`` is dimensionless,
-    and geometric/normalized emittance values have mm rad units.
+    ``position_sigma_mm`` is the RMS position in mm. ``slope_sigma_rad`` is
+    the RMS trace-space slope ``x' = dx/dz = u_x/u_z`` (``tan(theta)``, equal
+    to the angle ``theta`` only paraxially), reported in rad by accelerator
+    convention. It is not an angular spread for strongly scattered or
+    non-paraxial beams. Geometric/normalized emittances are in mm rad,
+    ``beta_mm_per_rad`` in mm/rad and ``gamma_rad_per_mm`` in rad/mm, all with
+    the same slope-as-rad convention; ``alpha`` is dimensionless. A future
+    quantity read-back uses rad, mm rad, mm/rad and rad/mm respectively.
     """
 
     position_sigma_mm: float

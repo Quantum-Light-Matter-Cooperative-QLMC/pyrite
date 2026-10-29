@@ -5,14 +5,19 @@ import warnings
 import weakref
 from dataclasses import InitVar, dataclass, field
 from numbers import Real
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
 import numpy as np
 
 from .._energy_bins import EnergyBins as EnergyBins
-from .._units import normalize_unit
+from .._spec_defaults import UNSET as _UNSET
+from .._spec_defaults import _Unset
+from .._units import normalize_unit, reject_quantity
 from ..config.response_numerics import Timepix3ResponseNumerics
-from .acceptance import AngularAcceptance, SensorAcceptance
+from .acceptance import AngularAcceptance, SensorAcceptance, _explicit_angular_quantity
+
+if TYPE_CHECKING:
+    from pint import Quantity
 
 _DETECTOR_RESPONSES: dict[int, tuple[weakref.ReferenceType, object | None]] = {}
 
@@ -181,7 +186,9 @@ class Timepix3:
         Optional ``Timepix3ResponseNumerics`` grouped numerical policy. The
         original flat fields remain accepted for compatibility.
     dE_mc, dE_out
-        Numerical response-input and measured-output histogram widths in eV.
+        Numerical response-input and measured-output histogram widths in eV,
+        finite and positive. The flat fields are numeric-only and refuse Pint
+        quantities; pass quantities through ``numerics`` instead.
         They approximate continuous recorded energies, not ADC/ToT quantization
         or the acquisition reporting bins.
     n_mc
@@ -216,7 +223,12 @@ class Timepix3:
                         expected=expected,
                     ),
                 )
+        for name in ("dE_mc", "dE_out"):
+            reject_quantity(getattr(self, name), field=f"Timepix3.{name}", unit="eV")
         if numerics is None:
+            # Flat fields get the grouped policy's finite/positive validation
+            # without replacing the caller's stored values or response identity.
+            Timepix3ResponseNumerics(self.dE_mc, self.dE_out, self.n_mc, self.seed)
             return
         if not isinstance(numerics, Timepix3ResponseNumerics):
             raise TypeError("Timepix3.numerics must be a Timepix3ResponseNumerics")
@@ -334,7 +346,11 @@ class Detector:
     Parameters
     ----------
     observation_angle_deg
-        Polar observation angle from the beam axis in degrees.
+        Legacy numeric polar observation angle from the beam axis in degrees.
+    observation_angle
+        Keyword-only Pint angular quantity; conflicts with an explicit
+        ``observation_angle_deg`` (including a positional angle). Read-back
+        uses a fresh degree quantity and ``with_observation_angle`` replaces it.
     acceptance
         AngularAcceptance or SensorAcceptance. Resolved full spans in degrees
         and solid angle in sr are available as read-only attributes. None
@@ -357,12 +373,28 @@ class Detector:
 
     def __init__(
         self,
-        observation_angle_deg: float = 90.0,
+        observation_angle_deg: float | _Unset = _UNSET,
         *,
+        observation_angle: object = _UNSET,
         acceptance: AngularAcceptance | SensorAcceptance | None = None,
         response: DetectorResponse | None = None,
         _legacy_acceptance: tuple[float | None, float | None] = (None, None),
     ) -> None:
+        if observation_angle is not _UNSET:
+            if observation_angle_deg is not _UNSET:
+                raise TypeError(
+                    "Detector received both observation_angle_deg and observation_angle"
+                )
+            observation_angle_deg = _explicit_angular_quantity(
+                observation_angle,
+                field="Detector.observation_angle",
+                unit="degree",
+                kind="angle",
+                maximum=180.0,
+                positive=False,
+            )
+        elif observation_angle_deg is _UNSET:
+            observation_angle_deg = 90.0
         if acceptance is not None and not isinstance(
             acceptance, (AngularAcceptance, SensorAcceptance)
         ):
@@ -378,6 +410,30 @@ class Detector:
         )
         _remember_response(self, response)
         self.__post_init__(response)
+
+    @property
+    def observation_angle(self) -> "Quantity":
+        """Fresh polar observation angle in degrees, independent of input units."""
+        from ..units import Q_
+
+        return Q_(self.observation_angle_deg, "degree")
+
+    def with_observation_angle(self, observation_angle: object) -> "Detector":
+        """Return a detector at another polar angle, retaining response and acceptance."""
+        value = _explicit_angular_quantity(
+            observation_angle,
+            field="Detector.observation_angle",
+            unit="degree",
+            kind="angle",
+            maximum=180.0,
+            positive=False,
+        )
+        return Detector(
+            value,
+            acceptance=self.acceptance,
+            response=self.response,
+            _legacy_acceptance=self._legacy_acceptance,
+        )
 
     def _resolve_acceptance(self, acceptance: AngularAcceptance | SensorAcceptance) -> None:
         polar, azimuthal, omega = (

@@ -197,8 +197,12 @@ def cxr_metrics(r, settings, rel_prominence=0.03, n_fwhm=3.0, metric="sharpness"
     are deliberately distinct:
 
     * ``peak_spectral_flux_density`` is the tallest sampled line density in
-      photons/eV/s. ``peak_flux`` is its compatibility alias, not an
-      integrated flux; ``peak_sample_spacing_eV`` records its local sampling.
+      photons/eV/s; ``peak_sample_spacing_eV`` records its local sampling.
+      ``peak_flux`` and ``peak_flux_per_na`` are **deprecated** aliases of
+      ``peak_spectral_flux_density`` and ``peak_spectral_flux_density_per_na``
+      (a density, not an integrated flux). They return identical values until
+      their scheduled removal (``pyrite._api_deprecations``); dictionary keys
+      cannot warn at runtime, so migrate readers to the density names.
     * ``coherent_flux`` integrates every line over the complete line grid.
     * ``line_flux`` integrates only the dominant peak over ``n_fwhm`` widths.
     * ``line_eV`` and ``fwhm_eV`` locate and characterize that dominant peak.
@@ -214,7 +218,7 @@ def cxr_metrics(r, settings, rel_prominence=0.03, n_fwhm=3.0, metric="sharpness"
     TR baseline completes that joint spectrum. Brem enters
     total_flux, the line_frac denominator, coherent_brem_ratio (over the full
     line grid), and line_brem_ratio (over the dominant line's local window).
-    peak_flux / coherent_flux / total_flux need no peak and stay valid
+    peak_spectral_flux_density / coherent_flux / total_flux need no peak and stay valid
     everywhere; the cxr_index-based quantities are unreliable where
     cxr_quality is low (broad ramps, or many comparable peaks).
 
@@ -274,14 +278,15 @@ def cxr_metrics(r, settings, rel_prominence=0.03, n_fwhm=3.0, metric="sharpness"
         # use case-derived pulsed-source current: photons/s at its rep rate.
         "peak_spectral_flux_density_per_na": smax * sc,
         "peak_sample_spacing_eV": _peak_sample_spacing(E, idx),
-        # Compatibility aliases. Despite their historical names these are
-        # sampled spectral densities, not energy-integrated fluxes.
+        # Deprecated alias of peak_spectral_flux_density_per_na: despite the
+        # historical name, a sampled spectral density, not an integrated flux.
         "peak_flux_per_na": smax * sc,
+        # Energy-integrated fluxes (photons/(s nA)); the names are correct.
         "coherent_flux_per_na": coh_int * sc,
         "line_flux_per_na": cxr_int * sc,
         "total_flux_per_na": total_int * sc,
         "peak_spectral_flux_density": smax * sc * cur,
-        "peak_flux": smax * sc * cur,
+        "peak_flux": smax * sc * cur,  # deprecated alias of the density above
         "coherent_flux": coh_int * sc * cur,
         "line_eV": float(E[idx]),
         "fwhm_eV": fwhm_eV,

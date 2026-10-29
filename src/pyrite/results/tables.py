@@ -67,23 +67,27 @@ _ROUND = {
     "peak [Phs/eV/s]": 2,
     "peak [Phs/eV/s/nA]": 2,
     "peak/bg": 2,
-    "line [cts/s]": 1,
-    "line [cts/s/nA]": 1,
-    "brem [cts/s]": 1,
-    "brem [cts/s/nA]": 1,
-    "total [cts/s]": 1,
-    "total [cts/s/nA]": 1,
+    "line [Phs/s]": 1,
+    "line [Phs/s/nA]": 1,
+    "brem [Phs/s]": 1,
+    "brem [Phs/s/nA]": 1,
+    "total [Phs/s]": 1,
+    "total [Phs/s/nA]": 1,
 }
 _CONFIG_COLS = {"material", "thickness", "polar [deg]", "azimuth [deg]"}
 
 
 def summary_table(recs, settings):
-    """Photon-counting stats for a list of records. The geometry (material,
+    """Line/background stats for a list of records. The geometry (material,
     thickness, polar/azimuthal tilt) is broken out of the config name into its
     own columns under a 'config' super-header; the rest are the line peak, the
-    EDS-convolved peak height, peak-over-background, and the integrated line /
-    brem / total count rates [counts/s] at the case's bunch charge and
-    repetition rate, alongside current-normalized per-nA values. Old checkpoints fall
+    ``LegacyEDS``-scored (EDS-convolved, optionally window-QE) peak spectral
+    density ``peak [Phs/eV/s]``, peak-over-background, and the integrated
+    line / brem / total photon rates ``[Phs/s]`` at the case's bunch charge
+    and repetition rate, alongside current-normalized ``[Phs/s/nA]`` values.
+    The integrals are **source-side**: photons emitted into the detector
+    aperture, with no detector QE, convolution or counting applied, so they
+    are not detected counts. Old checkpoints fall
     back to ``settings.beam_current_na``. Returns a DataFrame with a 2-level
     column index (empty if ``recs`` is empty).
 
@@ -116,17 +120,17 @@ def summary_table(recs, settings):
         cxr_det = detector.score(r["E_grid"], cxr, fwhm_eV=r["fwhm"])
         brem_det = detected_background(r, settings) / r["scale"]
         i_pk = np.argmax(cxr_det)
-        cxr_cts_per_na = np.trapezoid(cxr, r["E_grid"]) * r["scale"]
-        cxr_cts = cxr_cts_per_na * cur
+        cxr_phs_per_na = np.trapezoid(cxr, r["E_grid"]) * r["scale"]
+        cxr_phs = cxr_phs_per_na * cur
         # brem over the FULL measured range (the wide grid) when available, so the
         # total rate reflects the real measurement out to the beam energy; fall
         # back to the line-grid brem if a (stale) wide brem is non-finite
-        brem_cts_per_na = np.trapezoid(r["brem"], r["E_grid"]) * r["scale"]
+        brem_phs_per_na = np.trapezoid(r["brem"], r["E_grid"]) * r["scale"]
         if r.get("brem_wide") is not None:
             wide_per_na = np.trapezoid(r["brem_wide"], r["E_grid_brem"]) * r["scale"]
             if np.isfinite(wide_per_na):
-                brem_cts_per_na = wide_per_na
-        brem_cts = brem_cts_per_na * cur
+                brem_phs_per_na = wide_per_na
+        brem_phs = brem_phs_per_na * cur
         rows.append(
             {
                 "material": (
@@ -142,12 +146,12 @@ def summary_table(recs, settings):
                 "peak [Phs/eV/s/nA]": cxr_det[i_pk] * r["scale"],
                 "peak [Phs/eV/s]": cxr_det[i_pk] * r["scale"] * cur,
                 "peak/bg": (cxr_det[i_pk] / brem_det[i_pk]) if brem_det[i_pk] else np.inf,
-                "line [cts/s/nA]": cxr_cts_per_na,
-                "line [cts/s]": cxr_cts,
-                "brem [cts/s/nA]": brem_cts_per_na,
-                "brem [cts/s]": brem_cts,
-                "total [cts/s/nA]": cxr_cts_per_na + brem_cts_per_na,
-                "total [cts/s]": cxr_cts + brem_cts,
+                "line [Phs/s/nA]": cxr_phs_per_na,
+                "line [Phs/s]": cxr_phs,
+                "brem [Phs/s/nA]": brem_phs_per_na,
+                "brem [Phs/s]": brem_phs,
+                "total [Phs/s/nA]": cxr_phs_per_na + brem_phs_per_na,
+                "total [Phs/s]": cxr_phs + brem_phs,
             }
         )
     df = pd.DataFrame(rows)
@@ -172,6 +176,8 @@ def show_summary(recs, settings):
         ("window-QE applied, " if settings.apply_detector_qe else "unity QE, ")
         + "per-nA columns are current-normalized; rate columns use each case's "
         "bunch charge x repetition rate  |  "
+        "peak columns are LegacyEDS-scored densities; [Phs/s] integrals are "
+        "source-side photons into the aperture (no QE/convolution)  |  "
         "peak/bg = EDS-convolved peak height / background at the peak"
     )
     display(df)

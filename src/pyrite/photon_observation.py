@@ -18,6 +18,7 @@ import numpy as np
 
 if TYPE_CHECKING:
     from .photon_transport import PhotonContinuumObservation
+    from .results.quantified_aperture import QuantifiedApertureSpectrum
 
 SCHEMA = "pyrite.photon-continuum-tally.v1"
 NORMALIZATION = "photons / (incident electron eV), aperture-integrated"
@@ -60,6 +61,12 @@ class PhotonContinuumTally:
     source_identity_digest: str
     observation_identity_digest: str
     provenance: dict[str, Any]
+
+    def quantify(self) -> QuantifiedApertureSpectrum:
+        """Return an independent, aperture-integrated binned Pint spectrum."""
+        from .results.quantified_aperture import QuantifiedApertureSpectrum
+
+        return QuantifiedApertureSpectrum.from_tally(self)
 
 
 def _json(value: object) -> str:

@@ -90,6 +90,7 @@ from .._grid_semantics import (
     rebin_piecewise_constant_density,
     zero_based_detector_edges,
 )
+from .._units import reject_quantity
 from ..materials.crystal import absorption_length_ang
 from . import _si_sensor
 from ._si_sensor import FANO_SI, SI_N_PER_ANG3, W_EHP_EV
@@ -140,6 +141,15 @@ def sigma_diffusion_um(thickness_um=None, bias_v=None, temperature_k=None):
     return d * np.sqrt(2.0 * K_OVER_Q_V_PER_K * T / V)
 
 
+def _reject_response_quantities(E_grid_eV, dE_mc, dE_out, thickness_um, bias_v):
+    """Refuse Pint values: the response grid and hardware settings are numeric-only."""
+    reject_quantity(E_grid_eV, field="E_grid_eV", unit="eV")
+    reject_quantity(dE_mc, field="dE_mc", unit="eV")
+    reject_quantity(dE_out, field="dE_out", unit="eV")
+    reject_quantity(thickness_um, field="thickness_um", unit="um")
+    reject_quantity(bias_v, field="bias_v", unit="V")
+
+
 def absorption_efficiency(E_eV, thickness_um=None):
     """Probability a photon is photoabsorbed in the sensor (Beer-Lambert):
         eps_abs(E) = 1 - exp(-t / L_abs(E)),
@@ -149,6 +159,8 @@ def absorption_efficiency(E_eV, thickness_um=None):
     The Si K-edge at 1.839 keV is present but invisible in eps_abs because the
     sensor is already fully absorbing on both sides of it -- it would only show
     in a much thinner sensor. Accepts scalars or arrays."""
+    reject_quantity(E_eV, field="E_eV", unit="eV")
+    reject_quantity(thickness_um, field="thickness_um", unit="um")
     d = SENSOR_THICKNESS_UM if thickness_um is None else thickness_um
     E = np.asarray(E_eV, dtype=float)
     L_abs_ang = absorption_length_ang("Si", E, SI_N_PER_ANG3)  # [Angstrom]
@@ -166,6 +178,7 @@ def energy_fwhm_eV(E_eV, n_pix=1):
         W*F*E in eV^2 (tens of eV at a few keV -- negligible here).
     This is the analytic core only; the MC effective width (build_response's
     fwhm_rec) is larger because it also includes the charge-loss tail."""
+    reject_quantity(E_eV, field="E_eV", unit="eV")
     E = np.asarray(E_eV, dtype=float)
     sigma2 = n_pix * SIGMA_TOT_EV**2 + W_EHP_EV * FANO_SI * E  # variance [eV^2]
     return 2.3548 * np.sqrt(sigma2)  # 2*sqrt(2 ln2)*sigma
@@ -386,6 +399,7 @@ class TimepixResponse:
         thickness_um=None,
         bias_v=None,
     ):
+        _reject_response_quantities(E_grid_eV, dE_mc, dE_out, thickness_um, bias_v)
         E = np.asarray(E_grid_eV, dtype=float)
         if (
             E.ndim != 1
@@ -531,6 +545,7 @@ class TimepixResponse:
         """P_det interpolated onto E_eV (default: the fine grid). This is the
         s-curve x charge-sharing turn-on -- ~0 below threshold, rising through
         ~2-4 keV, plateauing near eps_abs above ~5 keV."""
+        reject_quantity(E_eV, field="E_eV", unit="eV")
         E = self.E if E_eV is None else np.asarray(E_eV, dtype=float)
         return np.interp(E, self.E_in, self.P_det)
 
@@ -573,6 +588,7 @@ def get_response(
     TimepixResponse
         Shared response instance for the exact grid and settings signature.
     """
+    _reject_response_quantities(E_grid_eV, dE_mc, dE_out, thickness_um, bias_v)
     E = np.asarray(E_grid_eV, dtype=float)
     thick = SENSOR_THICKNESS_UM if thickness_um is None else thickness_um
     bias = BIAS_VOLTAGE_V if bias_v is None else bias_v
@@ -608,4 +624,6 @@ def poisson_counts(E_grid_eV, detected_per_s, time_s, rng=None):
     mean, per energy bin -- plot counts as the 'measurement', expected as the
     smooth truth."""
     rng = np.random.default_rng() if rng is None else rng
+    reject_quantity(E_grid_eV, field="E_grid_eV", unit="eV")
+    reject_quantity(time_s, field="time_s", unit="s")
     return _si_sensor.poisson_core(E_grid_eV, detected_per_s, time_s, rng)

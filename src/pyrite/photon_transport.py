@@ -30,6 +30,7 @@ from ._photon_support import (
     _scene_feedback as _scene_feedback,
 )
 from ._spec_defaults import UNSET, _Unset
+from ._units import reject_quantity
 from .campaign.resolution import resolve_simulation
 
 if TYPE_CHECKING:
@@ -87,6 +88,7 @@ def _positive(name: str, value: float) -> float:
 
 
 def _energy_edges(edges_eV) -> np.ndarray:
+    reject_quantity(edges_eV, field="edges_eV", unit="eV")
     edges = np.asarray(edges_eV, dtype=np.float64)
     if edges.ndim != 1 or len(edges) < 2 or not np.isfinite(edges).all():
         raise ValueError("energy edges must be a finite one-dimensional array of length >= 2")

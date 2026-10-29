@@ -26,7 +26,24 @@ def _api_entry(spelling: str, replacement: str, *, since: str) -> ApiDeprecation
 # announcement version (and recalculate the window if bundled in a later minor).
 ROOT_API_REPLACEMENTS = {}
 
-API_DEPRECATIONS = {}
+#: Returned-dictionary keys cannot warn at runtime; these rows schedule their
+#: removal and are documented in the owning docstring. The announcement version
+#: is the first release after tagged 0.23.0; the release PR must confirm it.
+_RESULT_KEY_DEPRECATED_IN = "0.23.1"
+
+API_DEPRECATIONS = {
+    spelling: _api_entry(spelling, replacement, since=_RESULT_KEY_DEPRECATED_IN)
+    for spelling, replacement in (
+        (
+            "cxr_metrics()['peak_flux']",
+            "cxr_metrics()['peak_spectral_flux_density']",
+        ),
+        (
+            "cxr_metrics()['peak_flux_per_na']",
+            "cxr_metrics()['peak_spectral_flux_density_per_na']",
+        ),
+    )
+}
 
 
 def warn_api(spelling: str, *, stacklevel: int = 3) -> None:

@@ -77,3 +77,17 @@ def test_policy_respects_pint_units() -> None:
     assert response_payload(sensor) == response_payload(Timepix3(thickness_um=300.0, bias_v=100.0))
     with pytest.raises(ValueError, match="energy"):
         Timepix3ResponseNumerics(dE_mc=1 * ureg.mm)
+
+
+@pytest.mark.parametrize("name", ["dE_mc", "dE_out"])
+def test_flat_widths_refuse_quantities_and_validate_at_construction(name) -> None:
+    from pyrite.units import ureg
+
+    with pytest.raises(TypeError, match=rf"Timepix3\.{name} is numeric-only.*'eV'"):
+        Timepix3(**{name: 0.05 * ureg.keV})
+    for bad in (-1.0, 0.0, float("nan"), float("inf")):
+        with pytest.raises(ValueError, match=f"{name} must be finite and positive"):
+            Timepix3(**{name: bad})
+    # Plain numbers keep their stored type and value (response identity).
+    assert getattr(Timepix3(**{name: 200}), name) == 200
+    assert type(getattr(Timepix3(**{name: 200}), name)) is int

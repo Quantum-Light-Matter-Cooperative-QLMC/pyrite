@@ -2,6 +2,8 @@
 
 import numpy as np
 
+from ..._units import reject_quantity
+
 
 def spatial_density(
     x_ang: np.ndarray,
@@ -29,8 +31,14 @@ def spatial_density(
     In the pure-state limit it is the squared coherent wavefunction; mixtures
     add linearly. This does not reconstruct a unique ensemble wavefunction.
 
+    Inputs are numeric-only (angstrom, inverse angstrom); Pint quantities
+    raise ``TypeError`` instead of being read as angstrom magnitudes.
+
     Validation: cr-planar-spatial-density-reconstruction
     """
+    reject_quantity(x_ang, field="x_ang", unit="angstrom")
+    reject_quantity(kappa_inv_ang, field="kappa_inv_ang", unit="1/angstrom")
+    reject_quantity(period_ang, field="period_ang", unit="angstrom")
     x = np.asarray(x_ang, dtype=float)
     rho = np.asarray(density, dtype=complex)
     vectors = np.asarray(coefficients, dtype=complex)

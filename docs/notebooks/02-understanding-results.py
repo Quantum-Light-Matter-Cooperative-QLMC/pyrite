@@ -53,16 +53,22 @@ def _(tables_ready):
     from pyrite.config import CxrReflections, FixedSampling, Numerics
     from pyrite.detectors import Detector
     from pyrite.geometry import Footprint, Slab
+    from pyrite.units import ureg
 
     beam = Beam(
-        energy_keV=30.0,
+        kinetic_energy=30 * ureg.keV,
         transverse=PointSpot(),
         longitudinal=PointBunch(),
-        bunch_charge_pc=0.5,
-        rep_rate_hz=100_000.0,
+        bunch_charge_pc=0.5 * ureg.pC,
+        rep_rate_hz=100 * ureg.kHz,
     )
-    target = Slab("hopg", thickness_ang=1_000.0, tilt_deg=30.0, footprint=Footprint(5, 5))
-    detector = Detector(observation_angle_deg=135.0)
+    target = Slab(
+        "hopg",
+        thickness_ang=100 * ureg.nm,
+        tilt_deg=30 * ureg.degree,
+        footprint=Footprint(5 * ureg.mm, 5 * ureg.mm),
+    )
+    detector = Detector(observation_angle_deg=135 * ureg.degree)
     numerics = Numerics(
         sampling=FixedSampling(cxr_electrons=8_192, brem_electrons=128),
         cxr_reflections=CxrReflections(n_families=1),

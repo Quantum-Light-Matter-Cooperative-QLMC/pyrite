@@ -2,9 +2,12 @@
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+from numbers import Real
 from typing import Any, ClassVar
 
 import numpy as np
+
+from .._units import _is_pint_quantity, normalize_unit
 
 
 @dataclass(frozen=True)
@@ -24,20 +27,43 @@ class FixedWindowYield:
     Characteristic, channeling, transition, coherent and continuum arrays are
     excluded. Bin-mean line records and two-beam joint-field corrections are
     refused rather than reinterpreted as sampled PXR/CBS source densities.
+
+    Bounds accept plain eV numbers or Pint energy quantities, lowered to eV
+    at construction, so equivalent inputs give the same ``evaluation_id``.
+    The output's Pint unit is ``units`` (``"1/sr"``); photons and the incident
+    electron are counts, recorded separately as the semantic
+    ``normalization`` label rather than as Pint units (Pint has no photon
+    unit, and its ``e`` is elementary *charge*).
     """
 
     lower_eV: float
     upper_eV: float
     name: str = "window_yield"
-    units: ClassVar[str] = "photons/(sr incident electron)"
+    units: ClassVar[str] = "1/sr"
+    normalization: ClassVar[str] = "photons per incident electron"
 
     def __post_init__(self) -> None:
+        for bound in ("lower_eV", "upper_eV"):
+            value = getattr(self, bound)
+            if _is_pint_quantity(value):
+                field = f"FixedWindowYield.{bound}"
+                lowered = normalize_unit(value, "eV", field=field, expected="energy")
+                if isinstance(lowered, np.generic):
+                    lowered = lowered.item()
+                if isinstance(lowered, bool) or not isinstance(lowered, Real):
+                    raise TypeError(f"{field} must be a scalar energy")
+                object.__setattr__(self, bound, lowered)
         if not np.isfinite([self.lower_eV, self.upper_eV]).all() or not (
             0 < self.lower_eV < self.upper_eV
         ):
             raise ValueError("window requires finite positive lower_eV < upper_eV")
         if not isinstance(self.name, str) or not self.name.strip():
             raise ValueError("objective name must be nonempty")
+
+    @property
+    def output_units(self) -> dict[str, str]:
+        """Declared Pint unit of each returned observable, keyed by name."""
+        return {self.name: self.units}
 
     @property
     def evaluation_id(self) -> str:
