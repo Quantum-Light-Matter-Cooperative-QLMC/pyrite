@@ -3066,6 +3066,1028 @@
         "max": 2043.9502449035645,
         "n": 3
       }
+    },
+    {
+      "revision": "f2e09fcc2ef746f6fb9df5627283c31f1c7f0da9",
+      "scene": "si-300-100um-0deg",
+      "histories": 5000,
+      "scratch_mib": 4096,
+      "policy": "cont-Q256-Aall-T32",
+      "request_s": {
+        "median": 1.6350271140690893,
+        "min": 1.6261820690706372,
+        "max": 1.6438721590675414,
+        "n": 2
+      },
+      "launch_s": {
+        "median": 0.9258296474581584,
+        "min": 0.9201363562606275,
+        "max": 0.9315229386556894,
+        "n": 2
+      },
+      "assembly_s": {
+        "median": 0.34613474051002413,
+        "min": 0.27897133002988994,
+        "max": 0.4132981509901583,
+        "n": 2
+      },
+      "tail_s": {
+        "median": 0.7622847503516823,
+        "min": 0.754258104134351,
+        "max": 0.7703113965690136,
+        "n": 2
+      },
+      "lane_step_efficiency": {
+        "median": 0.8879638771980577,
+        "min": 0.8873229288131638,
+        "max": 0.8886048255829516,
+        "n": 2
+      },
+      "launches": {
+        "median": 17.0,
+        "min": 17,
+        "max": 17,
+        "n": 2
+      },
+      "executed_rows": {
+        "median": 5161248.0,
+        "min": 5110579,
+        "max": 5211917,
+        "n": 2
+      },
+      "retained_rows": {
+        "median": 5161248.0,
+        "min": 5110579,
+        "max": 5211917,
+        "n": 2
+      },
+      "peak_pool_above_request_mib": {
+        "median": 316.206298828125,
+        "min": 316.16845703125,
+        "max": 316.244140625,
+        "n": 2
+      },
+      "max_launch_scratch_mib": {
+        "median": 152.587890625,
+        "min": 152.587890625,
+        "max": 152.587890625,
+        "n": 2
+      },
+      "retained_host_mib": {
+        "median": 1048.7230529785156,
+        "min": 1038.4305257797241,
+        "max": 1059.0155801773071,
+        "n": 2
+      }
+    },
+    {
+      "revision": "f2e09fcc2ef746f6fb9df5627283c31f1c7f0da9",
+      "scene": "si-300-100um-0deg",
+      "histories": 5000,
+      "scratch_mib": 4096,
+      "policy": "cont-Q256-Aall-T32-D",
+      "request_s": {
+        "median": 1.3271096023963764,
+        "min": 1.2866708228830248,
+        "max": 1.367548381909728,
+        "n": 2
+      },
+      "launch_s": {
+        "median": 0.924795763916336,
+        "min": 0.9196704898495227,
+        "max": 0.9299210379831493,
+        "n": 2
+      },
+      "assembly_s": {
+        "median": 0.15262582048308104,
+        "min": 0.14390408690087497,
+        "max": 0.1613475540652871,
+        "n": 2
+      },
+      "tail_s": {
+        "median": 0.7614764587488025,
+        "min": 0.7539483045693487,
+        "max": 0.7690046129282564,
+        "n": 2
+      },
+      "lane_step_efficiency": {
+        "median": 0.8879638771980577,
+        "min": 0.8873229288131638,
+        "max": 0.8886048255829516,
+        "n": 2
+      },
+      "launches": {
+        "median": 17.0,
+        "min": 17,
+        "max": 17,
+        "n": 2
+      },
+      "executed_rows": {
+        "median": 5161248.0,
+        "min": 5110579,
+        "max": 5211917,
+        "n": 2
+      },
+      "retained_rows": {
+        "median": 5161248.0,
+        "min": 5110579,
+        "max": 5211917,
+        "n": 2
+      },
+      "peak_pool_above_request_mib": {
+        "median": 1394.339111328125,
+        "min": 1382.26220703125,
+        "max": 1406.416015625,
+        "n": 2
+      },
+      "max_launch_scratch_mib": {
+        "median": 152.587890625,
+        "min": 152.587890625,
+        "max": 152.587890625,
+        "n": 2
+      },
+      "retained_host_mib": {
+        "median": 1048.7230529785156,
+        "min": 1038.4305257797241,
+        "max": 1059.0155801773071,
+        "n": 2
+      }
+    },
+    {
+      "revision": "f2e09fcc2ef746f6fb9df5627283c31f1c7f0da9",
+      "scene": "si-300-100um-0deg",
+      "histories": 5000,
+      "scratch_mib": 4096,
+      "policy": "learned32",
+      "request_s": {
+        "median": 1.2937829301226884,
+        "min": 1.2373098011594266,
+        "max": 1.3502560590859503,
+        "n": 2
+      },
+      "launch_s": {
+        "median": 0.8361463744658977,
+        "min": 0.8351781070232391,
+        "max": 0.8371146419085562,
+        "n": 2
+      },
+      "assembly_s": {
+        "median": 0.0,
+        "min": 0,
+        "max": 0,
+        "n": 2
+      },
+      "tail_s": {
+        "median": 0.0,
+        "min": 0,
+        "max": 0,
+        "n": 2
+      },
+      "lane_step_efficiency": {
+        "median": 0.24510177409815675,
+        "min": 0.24278285035629454,
+        "max": 0.247420697840019,
+        "n": 2
+      },
+      "launches": {
+        "median": 1.0,
+        "min": 1,
+        "max": 1,
+        "n": 2
+      },
+      "executed_rows": {
+        "median": 5161248.0,
+        "min": 5110579,
+        "max": 5211917,
+        "n": 2
+      },
+      "retained_rows": {
+        "median": 5161248.0,
+        "min": 5110579,
+        "max": 5211917,
+        "n": 2
+      },
+      "peak_pool_above_request_mib": {
+        "median": 3572.2578125,
+        "min": 3569.78076171875,
+        "max": 3574.73486328125,
+        "n": 2
+      },
+      "max_launch_scratch_mib": {
+        "median": 3127.455711364746,
+        "min": 3126.2636184692383,
+        "max": 3128.647804260254,
+        "n": 2
+      },
+      "retained_host_mib": {
+        "median": 1048.7230529785156,
+        "min": 1038.4305257797241,
+        "max": 1059.0155801773071,
+        "n": 2
+      }
+    },
+    {
+      "revision": "f2e09fcc2ef746f6fb9df5627283c31f1c7f0da9",
+      "scene": "si-300-100um-0deg",
+      "histories": 20000,
+      "scratch_mib": 4096,
+      "policy": "cont-Q256-A5000-T32",
+      "request_s": {
+        "median": 5.026451773010194,
+        "min": 4.9485125709325075,
+        "max": 5.104390975087881,
+        "n": 2
+      },
+      "launch_s": {
+        "median": 1.8586040526861325,
+        "min": 1.8543593268841505,
+        "max": 1.8628487784881145,
+        "n": 2
+      },
+      "assembly_s": {
+        "median": 1.6361270354827866,
+        "min": 1.5944860340096056,
+        "max": 1.6777680369559675,
+        "n": 2
+      },
+      "tail_s": {
+        "median": 0.844848461332731,
+        "min": 0.8386665740981698,
+        "max": 0.8510303485672921,
+        "n": 2
+      },
+      "lane_step_efficiency": {
+        "median": 0.8874242499563243,
+        "min": 0.8873563333792855,
+        "max": 0.8874921665333632,
+        "n": 2
+      },
+      "launches": {
+        "median": 32.0,
+        "min": 32,
+        "max": 32,
+        "n": 2
+      },
+      "executed_rows": {
+        "median": 20643487.5,
+        "min": 20605518,
+        "max": 20681457,
+        "n": 2
+      },
+      "retained_rows": {
+        "median": 20643487.5,
+        "min": 20605518,
+        "max": 20681457,
+        "n": 2
+      },
+      "peak_pool_above_request_mib": {
+        "median": 318.336669921875,
+        "min": 318.298828125,
+        "max": 318.37451171875,
+        "n": 2
+      },
+      "max_launch_scratch_mib": {
+        "median": 152.587890625,
+        "min": 152.587890625,
+        "max": 152.587890625,
+        "n": 2
+      },
+      "retained_host_mib": {
+        "median": 4194.586598873138,
+        "min": 4186.873754501343,
+        "max": 4202.299443244934,
+        "n": 2
+      }
+    },
+    {
+      "revision": "f2e09fcc2ef746f6fb9df5627283c31f1c7f0da9",
+      "scene": "si-300-100um-0deg",
+      "histories": 20000,
+      "scratch_mib": 4096,
+      "policy": "cont-Q256-A5000-T32-D",
+      "request_s": {
+        "median": 3.964479723596014,
+        "min": 3.760145387146622,
+        "max": 4.168814060045406,
+        "n": 2
+      },
+      "launch_s": {
+        "median": 1.861045490950346,
+        "min": 1.8577793119475245,
+        "max": 1.8643116699531674,
+        "n": 2
+      },
+      "assembly_s": {
+        "median": 0.8280011503957212,
+        "min": 0.7114903528708965,
+        "max": 0.9445119479205459,
+        "n": 2
+      },
+      "tail_s": {
+        "median": 0.8441540725762025,
+        "min": 0.8382319747470319,
+        "max": 0.850076170405373,
+        "n": 2
+      },
+      "lane_step_efficiency": {
+        "median": 0.8874242499563243,
+        "min": 0.8873563333792855,
+        "max": 0.8874921665333632,
+        "n": 2
+      },
+      "launches": {
+        "median": 32.0,
+        "min": 32,
+        "max": 32,
+        "n": 2
+      },
+      "executed_rows": {
+        "median": 20643487.5,
+        "min": 20605518,
+        "max": 20681457,
+        "n": 2
+      },
+      "retained_rows": {
+        "median": 20643487.5,
+        "min": 20605518,
+        "max": 20681457,
+        "n": 2
+      },
+      "peak_pool_above_request_mib": {
+        "median": 5087.7734375,
+        "min": 5078.7197265625,
+        "max": 5096.8271484375,
+        "n": 2
+      },
+      "max_launch_scratch_mib": {
+        "median": 152.587890625,
+        "min": 152.587890625,
+        "max": 152.587890625,
+        "n": 2
+      },
+      "retained_host_mib": {
+        "median": 4194.586598873138,
+        "min": 4186.873754501343,
+        "max": 4202.299443244934,
+        "n": 2
+      }
+    },
+    {
+      "revision": "f2e09fcc2ef746f6fb9df5627283c31f1c7f0da9",
+      "scene": "si-300-100um-0deg",
+      "histories": 20000,
+      "scratch_mib": 4096,
+      "policy": "cont-Q256-Aall-T32-D",
+      "request_s": {
+        "median": 3.2680250405101106,
+        "min": 3.0755216809920967,
+        "max": 3.4605284000281245,
+        "n": 2
+      },
+      "launch_s": {
+        "median": 1.2381689430912957,
+        "min": 1.2269911032635719,
+        "max": 1.2493467829190195,
+        "n": 2
+      },
+      "assembly_s": {
+        "median": 0.8330460523720831,
+        "min": 0.7214635598938912,
+        "max": 0.9446285448502749,
+        "n": 2
+      },
+      "tail_s": {
+        "median": 0.8059643446467817,
+        "min": 0.8055088783148676,
+        "max": 0.8064198109786958,
+        "n": 2
+      },
+      "lane_step_efficiency": {
+        "median": 0.8878264211475534,
+        "min": 0.8877502572169591,
+        "max": 0.8879025850781477,
+        "n": 2
+      },
+      "launches": {
+        "median": 17.0,
+        "min": 17,
+        "max": 17,
+        "n": 2
+      },
+      "executed_rows": {
+        "median": 20643487.5,
+        "min": 20605518,
+        "max": 20681457,
+        "n": 2
+      },
+      "retained_rows": {
+        "median": 20643487.5,
+        "min": 20605518,
+        "max": 20681457,
+        "n": 2
+      },
+      "peak_pool_above_request_mib": {
+        "median": 5574.869873046875,
+        "min": 5565.81787109375,
+        "max": 5583.921875,
+        "n": 2
+      },
+      "max_launch_scratch_mib": {
+        "median": 610.3515625,
+        "min": 610.3515625,
+        "max": 610.3515625,
+        "n": 2
+      },
+      "retained_host_mib": {
+        "median": 4194.586598873138,
+        "min": 4186.873754501343,
+        "max": 4202.299443244934,
+        "n": 2
+      }
+    },
+    {
+      "revision": "f2e09fcc2ef746f6fb9df5627283c31f1c7f0da9",
+      "scene": "si-300-100um-0deg",
+      "histories": 20000,
+      "scratch_mib": 4096,
+      "policy": "learned32-B5000",
+      "request_s": {
+        "median": 5.350077374023385,
+        "min": 5.3356488139834255,
+        "max": 5.364505934063345,
+        "n": 2
+      },
+      "launch_s": {
+        "median": 3.3709191059460863,
+        "min": 3.3546602078713477,
+        "max": 3.387178004020825,
+        "n": 2
+      },
+      "assembly_s": {
+        "median": 0.0,
+        "min": 0,
+        "max": 0,
+        "n": 2
+      },
+      "tail_s": {
+        "median": 0.0,
+        "min": 0,
+        "max": 0,
+        "n": 2
+      },
+      "lane_step_efficiency": {
+        "median": 0.2457045790009859,
+        "min": 0.24568401096935735,
+        "max": 0.2457251470326145,
+        "n": 2
+      },
+      "launches": {
+        "median": 4.0,
+        "min": 4,
+        "max": 4,
+        "n": 2
+      },
+      "executed_rows": {
+        "median": 20643487.5,
+        "min": 20605518,
+        "max": 20681457,
+        "n": 2
+      },
+      "retained_rows": {
+        "median": 20643487.5,
+        "min": 20605518,
+        "max": 20681457,
+        "n": 2
+      },
+      "peak_pool_above_request_mib": {
+        "median": 6329.31005859375,
+        "min": 6326.9033203125,
+        "max": 6331.716796875,
+        "n": 2
+      },
+      "max_launch_scratch_mib": {
+        "median": 3138.1845474243164,
+        "min": 3136.9924545288086,
+        "max": 3139.376640319824,
+        "n": 2
+      },
+      "retained_host_mib": {
+        "median": 4194.586598873138,
+        "min": 4186.873754501343,
+        "max": 4202.299443244934,
+        "n": 2
+      }
+    },
+    {
+      "revision": "f2e09fcc2ef746f6fb9df5627283c31f1c7f0da9",
+      "scene": "w-300-10um-0deg",
+      "histories": 5000,
+      "scratch_mib": 4096,
+      "policy": "cont-Q256-Aall-T32",
+      "request_s": {
+        "median": 4.341098968521692,
+        "min": 4.261444385861978,
+        "max": 4.420753551181406,
+        "n": 2
+      },
+      "launch_s": {
+        "median": 2.3182319157058373,
+        "min": 2.302841105731204,
+        "max": 2.3336227256804705,
+        "n": 2
+      },
+      "assembly_s": {
+        "median": 0.6479149075457826,
+        "min": 0.6254901660140604,
+        "max": 0.6703396490775049,
+        "n": 2
+      },
+      "tail_s": {
+        "median": 1.9531724049011245,
+        "min": 1.9320764576550573,
+        "max": 1.9742683521471918,
+        "n": 2
+      },
+      "lane_step_efficiency": {
+        "median": 0.9397956217198383,
+        "min": 0.9392413173262605,
+        "max": 0.9403499261134162,
+        "n": 2
+      },
+      "launches": {
+        "median": 39.0,
+        "min": 39,
+        "max": 39,
+        "n": 2
+      },
+      "executed_rows": {
+        "median": 9917930.0,
+        "min": 9775216,
+        "max": 10060644,
+        "n": 2
+      },
+      "retained_rows": {
+        "median": 9917930.0,
+        "min": 9775216,
+        "max": 10060644,
+        "n": 2
+      },
+      "peak_pool_above_request_mib": {
+        "median": 314.920166015625,
+        "min": 314.822265625,
+        "max": 315.01806640625,
+        "n": 2
+      },
+      "max_launch_scratch_mib": {
+        "median": 152.587890625,
+        "min": 152.587890625,
+        "max": 152.587890625,
+        "n": 2
+      },
+      "retained_host_mib": {
+        "median": 2014.9603748321533,
+        "min": 1985.9705047607422,
+        "max": 2043.9502449035645,
+        "n": 2
+      }
+    },
+    {
+      "revision": "f2e09fcc2ef746f6fb9df5627283c31f1c7f0da9",
+      "scene": "w-300-10um-0deg",
+      "histories": 5000,
+      "scratch_mib": 4096,
+      "policy": "cont-Q256-Aall-T32-D",
+      "request_s": {
+        "median": 3.695110344910063,
+        "min": 3.6513786430004984,
+        "max": 3.7388420468196273,
+        "n": 2
+      },
+      "launch_s": {
+        "median": 2.314235877012834,
+        "min": 2.299144009826705,
+        "max": 2.329327744198963,
+        "n": 2
+      },
+      "assembly_s": {
+        "median": 0.36478931503370404,
+        "min": 0.35129717900417745,
+        "max": 0.37828145106323063,
+        "n": 2
+      },
+      "tail_s": {
+        "median": 1.9499256300041452,
+        "min": 1.9308906008955091,
+        "max": 1.9689606591127813,
+        "n": 2
+      },
+      "lane_step_efficiency": {
+        "median": 0.9397956217198383,
+        "min": 0.9392413173262605,
+        "max": 0.9403499261134162,
+        "n": 2
+      },
+      "launches": {
+        "median": 39.0,
+        "min": 39,
+        "max": 39,
+        "n": 2
+      },
+      "executed_rows": {
+        "median": 9917930.0,
+        "min": 9775216,
+        "max": 10060644,
+        "n": 2
+      },
+      "retained_rows": {
+        "median": 9917930.0,
+        "min": 9775216,
+        "max": 10060644,
+        "n": 2
+      },
+      "peak_pool_above_request_mib": {
+        "median": 2528.419677734375,
+        "min": 2494.3955078125,
+        "max": 2562.44384765625,
+        "n": 2
+      },
+      "max_launch_scratch_mib": {
+        "median": 152.587890625,
+        "min": 152.587890625,
+        "max": 152.587890625,
+        "n": 2
+      },
+      "retained_host_mib": {
+        "median": 2014.9603748321533,
+        "min": 1985.9705047607422,
+        "max": 2043.9502449035645,
+        "n": 2
+      }
+    },
+    {
+      "revision": "f2e09fcc2ef746f6fb9df5627283c31f1c7f0da9",
+      "scene": "w-300-10um-0deg",
+      "histories": 5000,
+      "scratch_mib": 4096,
+      "policy": "learned32",
+      "request_s": {
+        "median": 5.282170802471228,
+        "min": 5.190735218115151,
+        "max": 5.373606386827305,
+        "n": 2
+      },
+      "launch_s": {
+        "median": 3.8211083355126902,
+        "min": 3.8208936788141727,
+        "max": 3.8213229922112077,
+        "n": 2
+      },
+      "assembly_s": {
+        "median": 0.0,
+        "min": 0,
+        "max": 0,
+        "n": 2
+      },
+      "tail_s": {
+        "median": 1.8260018315631896,
+        "min": 1.809516925131902,
+        "max": 1.8424867379944772,
+        "n": 2
+      },
+      "lane_step_efficiency": {
+        "median": 0.20119970045116073,
+        "min": 0.19832656251604078,
+        "max": 0.20407283838628068,
+        "n": 2
+      },
+      "launches": {
+        "median": 2.0,
+        "min": 2,
+        "max": 2,
+        "n": 2
+      },
+      "executed_rows": {
+        "median": 9917930.0,
+        "min": 9775216,
+        "max": 10060644,
+        "n": 2
+      },
+      "retained_rows": {
+        "median": 9917930.0,
+        "min": 9775216,
+        "max": 10060644,
+        "n": 2
+      },
+      "peak_pool_above_request_mib": {
+        "median": 7425.68603515625,
+        "min": 7415.99853515625,
+        "max": 7435.37353515625,
+        "n": 2
+      },
+      "max_launch_scratch_mib": {
+        "median": 6243.378460407257,
+        "min": 6243.104934692383,
+        "max": 6243.651986122131,
+        "n": 2
+      },
+      "retained_host_mib": {
+        "median": 2014.9603748321533,
+        "min": 1985.9705047607422,
+        "max": 2043.9502449035645,
+        "n": 2
+      }
+    },
+    {
+      "revision": "f2e09fcc2ef746f6fb9df5627283c31f1c7f0da9",
+      "scene": "w-300-10um-0deg",
+      "histories": 20000,
+      "scratch_mib": 4096,
+      "policy": "cont-Q256-A5000-T32",
+      "request_s": {
+        "median": 12.796893880469725,
+        "min": 11.81018672278151,
+        "max": 13.78360103815794,
+        "n": 2
+      },
+      "launch_s": {
+        "median": 3.986521502607502,
+        "min": 3.983417780138552,
+        "max": 3.989625225076452,
+        "n": 2
+      },
+      "assembly_s": {
+        "median": 3.527017339481972,
+        "min": 2.9580094888806343,
+        "max": 4.09602519008331,
+        "n": 2
+      },
+      "tail_s": {
+        "median": 2.0672259487910196,
+        "min": 2.0658160615712404,
+        "max": 2.068635836010799,
+        "n": 2
+      },
+      "lane_step_efficiency": {
+        "median": 0.938944574301821,
+        "min": 0.9387715417902792,
+        "max": 0.9391176068133626,
+        "n": 2
+      },
+      "launches": {
+        "median": 64.0,
+        "min": 64,
+        "max": 64,
+        "n": 2
+      },
+      "executed_rows": {
+        "median": 39256759.5,
+        "min": 39022893,
+        "max": 39490626,
+        "n": 2
+      },
+      "retained_rows": {
+        "median": 39256759.5,
+        "min": 39022893,
+        "max": 39490626,
+        "n": 2
+      },
+      "peak_pool_above_request_mib": {
+        "median": 317.050537109375,
+        "min": 316.95263671875,
+        "max": 317.1484375,
+        "n": 2
+      },
+      "max_launch_scratch_mib": {
+        "median": 152.587890625,
+        "min": 152.587890625,
+        "max": 152.587890625,
+        "n": 2
+      },
+      "retained_host_mib": {
+        "median": 7975.549481868744,
+        "min": 7928.043564796448,
+        "max": 8023.05539894104,
+        "n": 2
+      }
+    },
+    {
+      "revision": "f2e09fcc2ef746f6fb9df5627283c31f1c7f0da9",
+      "scene": "w-300-10um-0deg",
+      "histories": 20000,
+      "scratch_mib": 4096,
+      "policy": "cont-Q256-A5000-T32-D",
+      "request_s": {
+        "median": 10.720385872991756,
+        "min": 10.539868369931355,
+        "max": 10.900903376052156,
+        "n": 2
+      },
+      "launch_s": {
+        "median": 3.9850411909865215,
+        "min": 3.9810005810577422,
+        "max": 3.989081800915301,
+        "n": 2
+      },
+      "assembly_s": {
+        "median": 1.8731191625120118,
+        "min": 1.5192023110575974,
+        "max": 2.2270360139664263,
+        "n": 2
+      },
+      "tail_s": {
+        "median": 2.064906315645203,
+        "min": 2.064658262534067,
+        "max": 2.065154368756339,
+        "n": 2
+      },
+      "lane_step_efficiency": {
+        "median": 0.938944574301821,
+        "min": 0.9387715417902792,
+        "max": 0.9391176068133626,
+        "n": 2
+      },
+      "launches": {
+        "median": 64.0,
+        "min": 64,
+        "max": 64,
+        "n": 2
+      },
+      "executed_rows": {
+        "median": 39256759.5,
+        "min": 39022893,
+        "max": 39490626,
+        "n": 2
+      },
+      "retained_rows": {
+        "median": 39256759.5,
+        "min": 39022893,
+        "max": 39490626,
+        "n": 2
+      },
+      "peak_pool_above_request_mib": {
+        "median": 9525.554931640625,
+        "min": 9469.78857421875,
+        "max": 9581.3212890625,
+        "n": 2
+      },
+      "max_launch_scratch_mib": {
+        "median": 152.587890625,
+        "min": 152.587890625,
+        "max": 152.587890625,
+        "n": 2
+      },
+      "retained_host_mib": {
+        "median": 7975.549481868744,
+        "min": 7928.043564796448,
+        "max": 8023.05539894104,
+        "n": 2
+      }
+    },
+    {
+      "revision": "f2e09fcc2ef746f6fb9df5627283c31f1c7f0da9",
+      "scene": "w-300-10um-0deg",
+      "histories": 20000,
+      "scratch_mib": 4096,
+      "policy": "cont-Q256-Aall-T32-D",
+      "request_s": {
+        "median": 8.993116529542021,
+        "min": 8.072852940065786,
+        "max": 9.913380119018257,
+        "n": 2
+      },
+      "launch_s": {
+        "median": 2.86027195234783,
+        "min": 2.8586489462759346,
+        "max": 2.8618949584197253,
+        "n": 2
+      },
+      "assembly_s": {
+        "median": 1.7743142370600253,
+        "min": 1.206493569072336,
+        "max": 2.3421349050477147,
+        "n": 2
+      },
+      "tail_s": {
+        "median": 2.070368117536418,
+        "min": 2.058683059643954,
+        "max": 2.0820531754288822,
+        "n": 2
+      },
+      "lane_step_efficiency": {
+        "median": 0.9389990146655449,
+        "min": 0.9387772329862729,
+        "max": 0.939220796344817,
+        "n": 2
+      },
+      "launches": {
+        "median": 39.0,
+        "min": 39,
+        "max": 39,
+        "n": 2
+      },
+      "executed_rows": {
+        "median": 39256759.5,
+        "min": 39022893,
+        "max": 39490626,
+        "n": 2
+      },
+      "retained_rows": {
+        "median": 39256759.5,
+        "min": 39022893,
+        "max": 39490626,
+        "n": 2
+      },
+      "peak_pool_above_request_mib": {
+        "median": 10012.4208984375,
+        "min": 9956.69091796875,
+        "max": 10068.15087890625,
+        "n": 2
+      },
+      "max_launch_scratch_mib": {
+        "median": 610.3515625,
+        "min": 610.3515625,
+        "max": 610.3515625,
+        "n": 2
+      },
+      "retained_host_mib": {
+        "median": 7975.549481868744,
+        "min": 7928.043564796448,
+        "max": 8023.05539894104,
+        "n": 2
+      }
+    },
+    {
+      "revision": "f2e09fcc2ef746f6fb9df5627283c31f1c7f0da9",
+      "scene": "w-300-10um-0deg",
+      "histories": 20000,
+      "scratch_mib": 4096,
+      "policy": "learned32-B5000",
+      "request_s": {
+        "median": 17.40018868946936,
+        "min": 17.046650144970044,
+        "max": 17.753727233968675,
+        "n": 2
+      },
+      "launch_s": {
+        "median": 9.90140947769396,
+        "min": 9.886709549231455,
+        "max": 9.916109406156465,
+        "n": 2
+      },
+      "assembly_s": {
+        "median": 0.0,
+        "min": 0,
+        "max": 0,
+        "n": 2
+      },
+      "tail_s": {
+        "median": 0.0,
+        "min": 0,
+        "max": 0,
+        "n": 2
+      },
+      "lane_step_efficiency": {
+        "median": 0.19889768137987157,
+        "min": 0.19743480470908117,
+        "max": 0.200360558050662,
+        "n": 2
+      },
+      "launches": {
+        "median": 5.0,
+        "min": 5,
+        "max": 5,
+        "n": 2
+      },
+      "executed_rows": {
+        "median": 39256759.5,
+        "min": 39022893,
+        "max": 39490626,
+        "n": 2
+      },
+      "retained_rows": {
+        "median": 39256759.5,
+        "min": 39022893,
+        "max": 39490626,
+        "n": 2
+      },
+      "peak_pool_above_request_mib": {
+        "median": 12589.13720703125,
+        "min": 12588.6025390625,
+        "max": 12589.671875,
+        "n": 2
+      },
+      "max_launch_scratch_mib": {
+        "median": 6243.696510791779,
+        "min": 6243.496537208557,
+        "max": 6243.896484375,
+        "n": 2
+      },
+      "retained_host_mib": {
+        "median": 7975.549481868744,
+        "min": 7928.043564796448,
+        "max": 8023.05539894104,
+        "n": 2
+      }
     }
   ],
   "hash_mismatches_vs_reference": [],
@@ -3162,6 +4184,13 @@
         "local_bytes_per_thread": 40,
         "max_threads_per_block": 256
       }
+    ],
+    "f2e09fcc2ef746f6fb9df5627283c31f1c7f0da9": [
+      {
+        "registers_per_thread": 204,
+        "local_bytes_per_thread": 40,
+        "max_threads_per_block": 256
+      }
     ]
   },
   "failed_or_partial": [],
@@ -3169,7 +4198,8 @@
   "date": "2026-10-29",
   "gpu_jobs": {
     "2640": "matched #786 controls, branch 2316a5bd vs main a1d15d01",
-    "2642": "sustained 20000-history, binding budget, stress scene; branch ee1b1809"
+    "2642": "sustained 20000-history, binding budget, stress scene; branch ee1b1809",
+    "2645": "host vs device staging of retained rows; branch f2e09fcc; seeds 78601-78602"
   },
   "device": "NVIDIA GeForce RTX 5080, 84 SMs",
   "controls": {
@@ -3182,5 +4212,5 @@
     "warmup": "complete same-policy request at seed+1000000"
   },
   "interpretation": "Diagnostic, n=1-3 per group. Launch timers include dispatch and synchronization. Peak pool bytes are CuPy pool allocations above the pre-request level, not driver-reported VRAM. lane_step_efficiency is a schedule proxy, not measured occupancy. Continuation code between 2316a5bd and ee1b1809 differs only in frozen-schema scratch passing and diagnostics; all runs here use midpoint rows.",
-  "raw_evidence": "lab box: ~/pyrite-789-continuation/evidence/continuation/{bench786/2640,sustained/2642}"
+  "raw_evidence": "lab box: ~/pyrite-789-continuation/evidence/continuation/{bench786/2640,sustained/2642,staging/2645}"
 }

@@ -859,3 +859,34 @@ scratch does not bound total trajectory storage; streaming consumption belongs
 to [#611](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/611).
 Transfers and synchronization are not yet attributed separately, and the stress
 rows have one or two samples.
+
+**Device staging.** Job 2645 (`f2e09fcc`, seeds 78601–78602; all 62 continuation tests,
+13 of them CUDA, pass in the same allocation) compares the default host staging with opt-in
+`device_staging`. That variant keeps each round's retained rows on the device
+and downloads the reassembled columns once. Median s, n=2:
+
+| Scene, histories, policy | Request | Launches | Reassembly | Peak pool |
+| --- | --- | --- | --- | --- |
+| Si, 5000, learned32 | 1.294 | 0.836 | — | 3572 MiB |
+| Si, 5000, cont-Q256-Aall, host | 1.635 | 0.926 | 0.346 | 316 MiB |
+| Si, 5000, cont-Q256-Aall, device | 1.327 | 0.925 | 0.153 | 1394 MiB |
+| W, 5000, learned32 | 5.282 | 3.821 | — | 7426 MiB |
+| W, 5000, cont-Q256-Aall, host | 4.341 | 2.318 | 0.648 | 315 MiB |
+| W, 5000, cont-Q256-Aall, device | 3.695 | 2.314 | 0.365 | 2528 MiB |
+| Si, 20000, learned32-B5000 | 5.350 | 3.371 | — | 6329 MiB |
+| Si, 20000, cont-Q256-A5000, host | 5.026 | 1.859 | 1.636 | 318 MiB |
+| Si, 20000, cont-Q256-A5000, device | 3.964 | 1.861 | 0.828 | 5088 MiB |
+| Si, 20000, cont-Q256-Aall, device | 3.268 | 1.238 | 0.833 | 5575 MiB |
+| W, 20000, learned32-B5000 | 17.400 | 9.901 | — | 12589 MiB |
+| W, 20000, cont-Q256-A5000, host | 12.797 | 3.987 | 3.527 | 317 MiB |
+| W, 20000, cont-Q256-A5000, device | 10.720 | 3.985 | 1.873 | 9526 MiB |
+| W, 20000, cont-Q256-Aall, device | 8.993 | 2.860 | 1.774 | 10012 MiB |
+
+Device staging halves reassembly and closes most of continuation's own host
+overhead: Si at 5000 histories is within 3% of `learned32`, and W at 20000 is
+48% below `learned32-B5000` with all histories active. It does so by holding
+up to twice the retained output on the device during reassembly. Live scratch
+stays bounded, but peak device memory again scales with total trajectory rows.
+It therefore remains opt-in. The rest of the request outside the launches and
+reassembly is the shared full-trajectory output path, which is #611's
+streaming target.
