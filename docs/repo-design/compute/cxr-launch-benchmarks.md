@@ -4,6 +4,9 @@ RTX 5080 measurements for [issue #200](https://github.com/Quantum-Light-Matter-C
 2026-10-13. Retain **512 threads, three energies per block**, the 400,000-row
 batch target, and the existing bin-mean pair/tree selection. These bounded
 measurements do not justify a production default or hardware-selection change.
+A [2026-10-29 MeV capture](#2026-10-29-mev-production-batch) confirms this and
+shows that the production MeV reduction is the bin-mean route, not the point
+kernel these launch settings tune.
 
 The [machine-readable evidence](data/cxr-launch-2026-10-13.json) records every
 configuration, timing sample, deviation, fixture hash, and saved case. The
@@ -83,17 +86,54 @@ are below the five-billion-pair crossover and do not calibrate a replacement.
 Original adjacent edges are preserved; the small bin control differs from the
 subsampled point axis.
 
+## 2026-10-29 MeV production batch
+
+SLURM 2676, code `f877bf3d` (rebased on main `3afd08dc`), fresh clone
+`qlmc:~/pyrite-200-r2`. Same RTX 5080, driver 610.47, CUDA driver API 13.3,
+runtime 13.2, CuPy 14.2.0, Python 3.14.6; clocks not pinned. Nine repeats per
+arm, same protocol. Evidence: [data](data/cxr-launch-2026-10-29.json).
+
+- **Fixture:** `high_energy_demo` h-BN, maximum-energy case (300 keV, 1 mm,
+  tilt 5°), 2,000 electrons, seed 392081. The first production flush held
+  416,114 lines on 27,303 bin-mean bins, about 1.14e10 line-bin pairs
+  (SHA-256 `4ee24c08…`). Capture took 6 min 14 s wall and 3.6 GB peak host RSS.
+  Job 1242 timed out at 8,000 electrons and 10 minutes.
+- **Point kernel on this batch's axis** (diagnostic: production uses bin-mean
+  here). Small slice 4,097 lines × 1,051 nodes: default 512 × 3 0.05718
+  [0.05491, 0.08890] ms; best 512 × 2 0.05542 [0.05251, 0.09747] ms, with
+  overlapping ranges. Full batch: default 22.336 [22.271, 22.401] ms
+  (5.1e11 pairs/s); best **512 × 4 21.567 [21.503, 21.620] ms**, a 3.4% gain
+  with separated ranges; 256 × 4 21.657 ms. Every arm is within the
+  peak-roundoff allowance; maximum peak-scaled deviation 1.21e-6.
+- **Bin-mean reduction (the production route).** Small control (1,025 bins):
+  pairs 3.54 ms, tree 16.47 ms, auto 3.55 ms (auto selects pairs). Full batch:
+  auto selected the tree route at **8,633 ms**, tree 8,629 ms (synchronized wall, including tree setup and transfers). The forced
+  all-pairs arm was skipped above the 5e9-pair budget. That is about 1.3e9
+  pairs/s, roughly 400 times slower per pair than the point kernel.
+- **HOPG drift check:** the 2026-10-13 fixture replayed on current main gives
+  default 0.22186 [0.21622, 0.22650] ms against 0.21862 ms then, and best
+  512 × 4 0.21258 ms (4.2%). The ranking and size of the gain are unchanged.
+- CUDA bin integration/tree checks: **15 passed in 4.99 s**.
+
+Decision: retain 512 × 3. Four energies per block wins small, repeatable gains
+(3–4%) on the full point batches, but the point kernel costs about 22 ms per
+MeV flush against about 8.6 s for the bin-mean reduction. Retuning point
+launch geometry cannot change MeV end-to-end time materially. Any MeV
+reduction work belongs to the bin-mean tree/pair kernels; this measurement
+does not justify a change to them either.
+
 ## Limits and reproduction
 
 The h-BN 300 keV, 1 mm, 8,000-electron capture (SLURM 1242) hit its ten-minute
 limit before saving a batch. Its stage was not independently profiled; this
-is not a measured reduction time. No fresh 5 MeV batch or catalog golden
-comparison completed. Large derived bin arms were stopped and excluded from
+is not a measured reduction time. The 2026-10-29 section supplies a
+300 keV production batch; no 5 MeV batch or catalog golden comparison has
+completed. Large derived bin arms were stopped and excluded from
 final evidence; use bounded forced-pair tests and point-only size stress.
 
 Nsight Compute (SLURM 1249) reported `ERR_NVGPUCTRPERM`. Occupancy, registers,
 spills, DRAM/L2 and instruction/SFU counters are unavailable; no measured
-memory-versus-sine bottleneck verdict follows. Molab remains unmeasured.
+memory-versus-sine bottleneck verdict follows. Molab remains unmeasured (paused 2026-10-29).
 Tiling, device-specific defaults and batching changes need production evidence.
 
 Raw fixtures/logs remain in `/home/aamador/pyrite-200-cxr-tuning/results/`;
