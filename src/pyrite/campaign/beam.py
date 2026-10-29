@@ -151,17 +151,11 @@ class TransverseSpot:
 
     def with_fwhm_x(self, fwhm_x: object) -> Self:
         """Replace x FWHM via a quantity; preserve the implicit-round y."""
-        return replace(
-            self, fwhm_x_mm=_spot_width_mm(fwhm_x, field="TransverseSpot.fwhm_x")
-        )
+        return replace(self, fwhm_x_mm=_spot_width_mm(fwhm_x, field="TransverseSpot.fwhm_x"))
 
     def with_fwhm_y(self, fwhm_y: object) -> Self:
         """Replace y FWHM via a quantity; ``None`` restores roundness."""
-        y_mm = (
-            None
-            if fwhm_y is None
-            else _spot_width_mm(fwhm_y, field="TransverseSpot.fwhm_y")
-        )
+        y_mm = None if fwhm_y is None else _spot_width_mm(fwhm_y, field="TransverseSpot.fwhm_y")
         return replace(self, fwhm_y_mm=y_mm)
 
     def __post_init__(self) -> None:

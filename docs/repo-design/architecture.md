@@ -11,6 +11,8 @@ import-architecture
 issue-680-configuration-rfc
 issue-703-observations
 physical-units
+quantity-migration-inventory
+quantity-output-contract
 materials-catalog-schema
 data-distribution-and-repository-size
 ```

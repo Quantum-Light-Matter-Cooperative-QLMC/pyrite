@@ -49,24 +49,30 @@ def _():
     from pyrite.beams import Beam, PointBunch, PointSpot
     from pyrite.detectors import PixelGrid, PlanarDetector, PlanarPose
     from pyrite.geometry import Footprint, Slab
+    from pyrite.units import ureg
 
     beam = Beam(
-        energy_keV=30.0,
+        kinetic_energy=30 * ureg.keV,
         transverse=PointSpot(),
         longitudinal=PointBunch(),
-        bunch_charge_pc=0.01,
-        rep_rate_hz=1_000_000.0,
+        bunch_charge_pc=0.01 * ureg.pC,
+        rep_rate_hz=1 * ureg.MHz,
     )
     panel = PlanarDetector(
-        PlanarPose.from_observation(distance_mm=100.0, polar_deg=135.0),
-        pixels=PixelGrid(shape=(16, 16), pitch_mm=(1.0, 1.0)),
+        PlanarPose.from_observation(distance_mm=100 * ureg.mm, polar_deg=135 * ureg.degree),
+        pixels=PixelGrid(shape=(16, 16), pitch_mm=(1 * ureg.mm, 1 * ureg.mm)),
     )
     scene = Scene(
         beam,
-        Slab("hopg", 1_000.0, tilt_deg=30.0, footprint=Footprint(5.0, 5.0)),
+        Slab(
+            "hopg",
+            100 * ureg.nm,
+            tilt_deg=30 * ureg.degree,
+            footprint=Footprint(5 * ureg.mm, 5 * ureg.mm),
+        ),
         panel,
     )
-    return beam, panel, scene, simulate
+    return beam, panel, scene, simulate, ureg
 
 
 @app.cell(hide_code=True)
@@ -84,14 +90,14 @@ def _(mo):
 
 
 @app.cell
-def _():
+def _(ureg):
     from pyrite.config import AngularSampling
     from pyrite.detectors import IdealPhotonCounter
     from pyrite.observations import Acquisition, Observation
 
     acquisition = Acquisition(
-        exposure_s=1.0,
-        measured_edges_eV=(500.0, 4_000.0),
+        exposure_s=1 * ureg.s,
+        measured_edges_eV=(0.5 * ureg.keV, 4 * ureg.keV),
         mode="poisson",
         seed=23,
     )

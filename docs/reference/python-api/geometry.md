@@ -34,8 +34,8 @@ body = RectangularBody(
     size=Q_([5, 6], "mm"),
     thickness=Q_(100, "um"),
 )
-body.size.to("cm")          # detached two-component quantity
-body.thickness.to("um")     # scalar quantity
+body.size.to("cm")  # detached two-component quantity
+body.thickness.to("um")  # scalar quantity
 thicker = body.with_thickness(Q_(200, "um"))
 wider = body.with_size(Q_([7, 8], "mm"))
 ```

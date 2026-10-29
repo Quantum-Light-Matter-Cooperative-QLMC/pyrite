@@ -49,10 +49,8 @@ Use scalar length quantities for the source-facing rectangle:
 from pyrite.detectors import Detector, SensorAcceptance
 from pyrite.units import Q_
 
-sensor = SensorAcceptance(
-    distance=Q_(40, "cm"), width=Q_(14, "mm"), height=Q_(7, "mm")
-)
-sensor.distance.to("cm")       # fresh scalar quantity; canonical read-back is mm
+sensor = SensorAcceptance(distance=Q_(40, "cm"), width=Q_(14, "mm"), height=Q_(7, "mm"))
+sensor.distance.to("cm")  # fresh scalar quantity; canonical read-back is mm
 wider = sensor.with_width(Q_(28, "mm"))
 detector = Detector(135, acceptance=wider)
 ```
