@@ -16,10 +16,13 @@ in launch order and finally scattered to the canonical electron-major,
 step-minor positions the full-history driver produces, so the active
 population, the row quantum and the refill order change only performance.
 
-Supported: the exact CUDA core under continuous losses, with or without
-coupled radiative transport. The shell soft/hard mode, straggling, the
-transport LUT and every CPU core are rejected; their state is resumable in
-principle but has no continuation regression yet.
+Supported: the exact CUDA core under continuous losses, the shell soft/hard
+mode (secondary directions on or off) and straggling, each with or without
+coupled radiative transport (#797). Shell hard events are sampled and stored
+within their step and the hard stream counter and optical depth are in the
+record; straggling draws are keyed by (flight, substep) and its per-history
+accumulator is reset only on a fresh history. The transport LUT and every CPU
+core are rejected.
 """
 
 from __future__ import annotations
