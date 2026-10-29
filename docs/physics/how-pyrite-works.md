@@ -21,7 +21,9 @@ measured data. Stages describe data flow; a command need not execute them all.
    [campaign configuration](../reference/campaign-configuration.md) cover scalar and campaign inputs.
 2. **Transport electrons.** Scattering, energy loss and boundaries produce
    flight histories. The [transport contract](../physics/beam-transport/transport-outputs.md)
-   defines their positions, directions, energies and timing.
+   defines their positions, directions, energies and timing. The
+   [electron-trajectory tutorial](../notebooks/fundamentals/00-electron-trajectories.ipynb)
+   visualizes those histories and distinguishes energy loss from photon emission.
 3. **Score source spectra.** Radiation models evaluate PXR/CBS, bremsstrahlung
    and characteristic components on photon-energy grids. The
    [capability map](../physics/capabilities.md) lists optional models,
@@ -67,6 +69,8 @@ determine reciprocal vectors; a surface normal alone does not.
 
 ## Where to go next
 
+- [Electron trajectories](../notebooks/fundamentals/00-electron-trajectories.ipynb):
+  visualize scattering, energy loss and terminal outcomes before scoring photons.
 - [Python tutorial](../notebooks/fundamentals/01-first-spectrum.ipynb): simulate and plot a scalar case.
 - [Working with results](../guides/working-with-results.md): load and interpret checkpoints.
 - [Checkpoint and app reference](../reference/results-and-apps.md): inspect

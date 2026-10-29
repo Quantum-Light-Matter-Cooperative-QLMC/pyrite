@@ -75,15 +75,6 @@ def _(mo, os, pyrite):
             environment["cuda_device_count"] = cp.cuda.runtime.getDeviceCount()
         except Exception as _error:
             environment["cuda_status"] = f"Unavailable: {type(_error).__name__}"
-    # Emit HTML because MyST-NB does not parse pipe tables in Markdown outputs.
-    mo.Html(
-        mo.md(
-            "| Environment | Value |\n| --- | --- |\n"
-            + "\n".join(
-                f"| {key.replace('_', ' ')} | {value} |" for key, value in environment.items()
-            )
-        ).text
-    )
     return
 
 
