@@ -586,3 +586,120 @@ Its matching primary-only scorer, pinned material databases and converged
 settings are not implemented in this stage. It is not reported as standalone
 PENELOPE-2024. Optional EGSnrc remains deferred until the two-engine accuracy
 and scoring contracts are established.
+
+## Current transport cost and exact-result trials, 2026-10-29
+
+[#786](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/786)
+revisits the residual single-scattering gap on current code with the frozen
+continuous-loss Si/W 300-keV controls above. This is a frozen transport workload,
+rather than a benchmark of the complete public API default simulation. No PXR/CBS,
+secondary transport, physics model or production precision is changed.
+
+Job 2630 completed **30 diagnostic samples**: two scenes, five policies and
+three seeds (78601–78603), each with 5000 primaries and a complete same-workload
+warmup at seed +1000000. Scratch is 4096 MiB; the initial probe is disabled.
+Variant order reverses for the middle seed. The
+[machine-readable evidence](../check-records/equal-precision/transport-cost-786.json)
+retains phase timings, useful/executed work, measured launches, all trajectory
+hashes, table identities and source provenance. All 24 candidate samples match
+their baseline's complete warmup **and** measured trajectory-array hashes.
+
+Hardware remains the RTX 5080 (84 SMs) and Ryzen 9 9950X3D under WSL, with Python
+3.14.6, CuPy 14.2.0, NumPy 2.5.4 and CUDA driver API 13.3. The current
+exact kernel reports **200 registers/thread**, 40 local bytes/thread and a
+256-thread maximum block. Its device-reported FP32/FP64 throughput ratio is 64.
+These resource attributes do not measure occupancy, spills or instruction
+stalls. Current source includes the later dielectric-corrected radiative cells;
+the older October 15 timings are separate evidence, not a current baseline.
+
+Warmed synchronized transport/emission seconds, median [min,max]:
+
+| Policy | Si, 100 µm | W, 10 µm |
+| --- | --- | --- |
+| Baseline: 128 threads, initial capacity 512 | 3.124 [2.966,3.219] | 10.607 [10.536,10.992] |
+| 32 threads only | 2.523 [2.467,2.628] | 8.864 [8.801,8.997] |
+| Initial capacity 12500 only | 3.015 [2.978,3.030] | 8.032 [7.955,8.160] |
+| Capacity 12500 and 32 threads | 2.451 [2.438,2.540] | 6.825 [6.722,6.858] |
+| Learned capacity and 32 threads | 1.528 [1.502,1.628] | 6.764 [6.698,6.886] |
+
+The final policy carries a request-owned capacity hint across complete calls,
+starting at 512 and retaining 1.25 times the largest observed track. Overflow
+replay remains enabled; it is a hint, not a track-length limit. The warmup learns
+the capacity used by measurement. This is the same adaptive policy in both
+requests, with different learned state; its **51.1% Si / 36.2% W** interval
+reductions describe warmed reuse, not a cold first request or application-wide
+speedup. The prototype remains isolated in `diagnose_kernel.py`.
+
+Including diagnostic hashing and score reduction, median complete measured
+requests fall from 3.911 to 2.312 s (Si), and 12.125 to 8.304 s (W). Complete
+warmups take 4.281/3.740 s and 12.926/11.021 s for baseline/learned policies.
+Full process wall, instrumentation overhead and peak VRAM were not measured.
+The recorded `adapter_total` also excludes the diagnostic wrapper's initial
+imports and final serialization; it is not a whole-process timer.
+
+### What the measurements explain
+
+**Requested population is not concurrent work.** A 5000-primary, 128-thread
+launch has 40 blocks for 84 SMs. At 32 threads it has 157 blocks. That is an
+SM-coverage bound, not measured occupancy. Smaller blocks reduce transport
+intervals by 19.2% (Si) and 16.4% (W) in this experiment, preserving results.
+
+**Replay repeats real physics work.** At seed 78602, Si baseline executes
+10221158 rows to retain 5110579; W executes 20121288 to retain 10060644.
+Learned reuse executes only the retained rows, reducing measured launches from
+two to one (Si) and three to two (W). Raising capacity blindly is less effective:
+the larger dense scratch can split a useful request into sparse batches. W's
+learned policy still splits 5000 primaries into multiple launches. Whole-history
+tails and dense trajectory storage remain constraints.
+
+**Geant4 is doing substantial single-scattering work.** A rebuilt pinned
+TestEm5, job 2629, ran serially after GPU work, with one physics worker and
+`CoulombScat` / `eDPWACoulombScattering` confirmed in every log. Three fresh
+5000-primary native-process intervals have median [min,max] 5.123 [5.085,5.234] s
+for Si and 6.304 [6.298,6.325] s for W. Logs report about 1733–1794 and 2206–2216
+charged material steps per primary, respectively. These rounded step counts
+and PyRITE's returned rows have different definitions; they do not support an
+explanation based on Geant4 doing only a few events.
+
+W still has a lower raw Geant4 interval than the best CUDA trial. The timers
+remain asymmetric: Geant4 includes initialization/logging; CUDA excludes
+warmup/setup. Elastic, ionization, radiative and angular models also differ.
+These are workload diagnostics, not an equal-accuracy or equal-precision rank.
+
+**Work per step remains different.** Geant4 retrieves continuous losses/ranges
+from initialization tables. PyRITE integrates soft stopping and hard rates
+inside the exact transport loop, including additional cutoff/midpoint soft
+evaluations and FP64 dielectric-cell `log1p`/`atan` work. The earlier radiative
+ablation and current launch timers identify the path to investigate; they do
+not assign an exclusive percentage to current FP64 arithmetic. A validated
+rate/stopping lookup and bounded continuation/storage are remaining candidates.
+
+### Reproduction and validation boundary
+
+Use a clean synced checkout at measurement revision
+`9d5b2f9ee8450fc529d3b3b5e574f7fd9c19d50e`, with the pinned reference data and
+locked GPU environment. Submit `checks/equal_precision/transport-cost.sbatch`;
+it prepares exact frozen SBETHE inputs before timing. The frozen W composition
+is 19.3 g/cm³ and has its own generated request key; substituting the catalog
+crystal density would change the experiment. Job 2627's twelve W setup failures
+are retained and excluded. Its valid Si pilot overlaps the comparator build
+and is not pooled into job 2630. Job 2628 is the comparator build/preflight;
+job 2629 is the serial confirmation.
+
+Submit `checks/equal_precision/transport-cost-geant4.sbatch` separately from
+GPU timing. It rebuilds the pinned material/scoring patch and preserves native
+logs, macros and executable hashes. Summarize a completed GPU evidence folder:
+
+```bash
+uv run python checks/equal_precision/analyze_kernel_diagnostic.py \
+  evidence/transport-cost/JOB_ID --output transport-cost-summary.json
+```
+
+Failed markers are checked before parsing late outputs. The corrected hardware
+regression selects geometry explicitly and checks the actual launcher for both
+exact and LUT kernels; changing an import-time default constant alone did not
+exercise the requested geometry. LUT coverage explicitly selects compatible
+Mott/uncoupled controls. All six geometry checks pass in job 2632; nine
+coupled-radiative CUDA checks pass in job 2631. The initial LUT test-setup
+failures are retained separately from timing evidence. No production transport
+default or model marker is changed.
