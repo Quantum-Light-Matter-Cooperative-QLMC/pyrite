@@ -29,6 +29,7 @@ slow-test-audit
 phase-retention
 transport-precision-experiment
 physics-adapter-overhead
+cxr-launch-benchmarks
 ```
 
 Earlier optimization rounds and paired phase-retention measurements remain in

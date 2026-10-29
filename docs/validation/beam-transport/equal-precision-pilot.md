@@ -775,7 +775,7 @@ analyzer checks paired trajectory hashes and summarizes its evidence folder.
 [#789](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/789)
 prototypes opt-in bounded continuation for the exact CUDA core: a fixed active
 population, a per-launch row quantum `Q`, refill of finished lanes, and
-canonical reassembly. The [design contract](../../repo-design/compute/gpu-transport-rawkernel.md#bounded-continuation-opt-in-prototype)
+canonical reassembly. The [design contract](../../repo-design/compute/gpu-transport-rawkernel.md#bounded-continuation-automatic-production-schedule)
 covers its resumable state and memory accounting. Scenes and controls are this
 page's frozen continuous-loss Si/W 300-keV anchors plus the W 100-keV, 75°
 scene as a mixed-length stress case. Each run uses 4096 MiB nominal scratch, no
