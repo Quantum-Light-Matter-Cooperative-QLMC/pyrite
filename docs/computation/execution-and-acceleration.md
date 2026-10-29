@@ -23,7 +23,7 @@ A run makes these separate choices:
   - Which electron-transport implementation runs: `auto`, `lockstep`, `per-electron`, `cuda`.
 * - **Transport schedule**
   - `PYRITE_MC_TRANSPORT_SCHEDULE`
-  - How the CUDA core batches histories: `full-history` (default), `continuation` or `auto`. Results are identical; see [bounded continuation](../repo-design/compute/gpu-transport-rawkernel.md#bounded-continuation-opt-in-prototype).
+  - How the CUDA core batches histories: `full-history` (default), `continuation` or `auto`. Results are identical; see [bounded continuation](../repo-design/compute/gpu-transport-rawkernel.md#bounded-continuation-automatic-production-schedule).
 ```
 
 The CUDA transport core requires a CUDA array backend for its `cupyx.jit` kernel. A ROCm or SYCL backend runs its spectrum kernels on the device and its transport on the CPU.
