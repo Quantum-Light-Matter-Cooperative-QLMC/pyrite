@@ -174,6 +174,63 @@ bounds in this diagnostic preparation path and regression checks for both
 adjacent outside endpoints. This resolves the stated no-clamping coverage
 contract without changing the existing packer contract.
 
+## Released-table component qualification
+
+SLURM job 2637 ran the committed `592aa34f` prototype on 2026-10-29:
+Ryzen 9 9950X3D, RTX 5080 (driver 610.47), Python 3.14.6,
+NumPy 2.5.4 and CuPy 14.2.0. The allocation requested one CPU and 8 GiB;
+the scheduler assigned two logical CPUs. BLAS/OpenMP/Numba threads were
+limited to one. Job 2636 produced no measurements because the environment
+lacked CuPy; the declared NVIDIA extra was restored before resubmission.
+
+The reproduction command is
+`uv run --no-sync python checks/equal_precision/qualify_moments.py OUTPUT.json`
+inside the environment in `checks/equal_precision/moments-788.sbatch`.
+The [complete numerical record](../check-records/equal-precision/radiative-moments-788.json)
+retains source/table/policy digests and every timing repeat; published metadata
+omits operator paths and hostnames.
+
+All twelve component cases passed: Si, W and a mixed Si/W layer over
+10 keV–100 MeV, photon cutoffs 1 and 10 keV, and relative budgets
+$2\times10^{-4}$ and $10^{-4}$. Each preparation used 8191 fixed held-out
+energies; a separate 65,536-energy grid also passed. The largest component
+error was 0.249924 of its mixed budget. Held-out soft/hard closure passed.
+Identical prepared float64 tables agreed between CPU and CUDA within
+$10^{-24}+2\times10^{-12}|M|$; exact CPU/CUDA soft/rate probes separately
+agreed within $10^{-20}+2\times10^{-10}|M|$. The two hardware regressions
+passed, including repeated-call determinism and unsupported-energy NaNs.
+These are component/runtime comparisons, not ensemble transport equivalence.
+
+For 65,536 matched energies, five synchronized warm repeats at the default
+budget gave the following medians (exact computes soft/rate, table computes
+all three components):
+
+| Cutoff | Layer | Exact GPU, ms | Table GPU, ms | Median ratio |
+|---|---|---:|---:|---:|
+| 1 keV | Si | 1.182 | 0.102 | 11.56 |
+| 1 keV | W | 1.285 | 0.135 | 9.52 |
+| 1 keV | Si/W | 2.306 | 0.103 | 22.34 |
+| 10 keV | Si | 1.185 | 0.105 | 11.25 |
+| 10 keV | W | 1.187 | 0.107 | 11.05 |
+| 10 keV | Si/W | 2.220 | 0.114 | 19.42 |
+
+All-three-layer preparation cost 0.205–0.227 s at the default budget;
+upload cost 0.522–0.593 ms and table storage 93,240–120,480 bytes on each
+of host and device. The tighter budget used 150,000–195,360 bytes and
+0.216–0.236 s preparation. Build times can include remaining first-use
+Numba specialization cost. Using the default medians, amortizing the entire
+three-layer build against a single layer's savings requires about 93–211
+such microbenchmark batches. This is a microbenchmark accounting exercise,
+not a request-size threshold for transport.
+
+Launch geometry was 128 threads/block with one query per thread. The exact
+probe compiled to 92 registers/thread and zero local bytes/thread. No
+profiler evidence establishes an exclusive FP64 or occupancy bottleneck.
+There are no transported histories, batch/probe scheduling, useful/replayed
+flight counts, or complete-request/equal-achieved-precision measurements in
+this run. No transport speedup, baseline trajectory equivalence or wider
+physical-model admission follows from these measurements.
+
 ## Verdict
 
 - **Claim:** `radiative-moment-interpolation` —
@@ -183,19 +240,20 @@ contract without changing the existing packer contract.
   in log kinetic energy.
 - **Filters:** units pass; limits pass; signs/conventions pass. Reference
   transcriptions: no new external tabulated measurements. Tolerances:
-  predeclared numerical approximation budgets. External-code and hardware
-  evidence: none claimed for this prototype by this verification.
+  predeclared numerical approximation budgets. Hardware component evidence:
+  job 2637 as recorded above; no external transport-code comparison.
 - **Re-derivation:** matches — no remaining divergent factor, sign,
   exponent, unit, or interpolation convention after correction of the
   closure absolute budget and strict source-table coverage checks.
-- **Verdict:** `rederived` for the interpolation equations and host
-  component scope. Device source agrees symbolically; runtime parity remains
-  a separate hardware qualification gate.
+- **Verdict:** `rederived` for the interpolation equations and component
+  scope. Device source agrees symbolically; job 2637 establishes the stated
+  component runtime parity on the tested GPU and released-table grids.
 - **Write-up:**
   `docs/validation/radiation-physics/radiative-moment-interpolation.md`.
 - **Suggested ledger change:** set `rederived`; `anchored` is supported for
   the host synthetic component scope by the passing named regression module.
-  Keep hardware/released-table/ensemble qualification explicitly pending.
+  Released-table component qualification passed; keep ensemble and production
+  qualification explicitly pending.
   Only a human may set `signed-off`.
 
 Strict admission exposed a separate fixture representation detail: staging
@@ -206,7 +264,7 @@ strict comparison against the actual staged table interval. Released-table
 diagnostics must derive coverage from the intersection of actual staged
 elemental intervals. The implementer reports the corrected eight-test
 component module passes in 8.56 s. The analytic constant-SDCS calculation
-above is also being retained as a regression anchor by the implementer.
+above is retained as a regression anchor.
 
 Final focused rerun, explicitly including the four slow parametrizations:
 `pyrite-dev test --slow tests/montecarlo/test_radiative_moments.py tests/dev/test_docs.py`:

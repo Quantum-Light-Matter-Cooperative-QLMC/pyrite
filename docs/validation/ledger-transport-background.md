@@ -99,7 +99,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 - **Status:** anchored
 - **Checks:** Frozen budgets and qualification protocol in `checks/equal_precision/moment-policy-788.json`; adaptive probes separate from held-out grid; independent host partition comparisons and constant-SDCS analytic primitives, positivity, cutoff/tip boundaries, compound layers, exact endpoints, identity perturbations, coverage refusal and zero/tiny rates.
 - **Anchor:** `tests/montecarlo/test_radiative_moments.py`
-- **Notes:** Issue #788. Fresh-context derivation matches the interpolation equations and host component scope. CUDA runtime, released-table qualification and ensemble gates remain separate and pending. No ensemble or transport speedup claim follows from component checks. [Independent verification](radiation-physics/radiative-moment-interpolation.md).
+- **Notes:** Issue #788. Fresh-context derivation matches the interpolation equations and host component scope. Released Si/W/mixed-layer float64 component qualification passed on RTX 5080, SLURM 2637 (2026-10-29, source `592aa34f`): 10 keV–100 MeV, 1/10 keV photon cutoffs, two refinement levels, 8191 held-out and 65,536 additional probe energies; maximum component error 0.249924 of its mixed budget. Same-table CPU/CUDA and exact CPU/CUDA moment parity pass; two hardware regressions pass. Warm GPU moment microbenchmarks are 9.52–22.34 times faster at the default budget, with 0.205–0.227 s preparation for three layers. Ensemble/production qualification remains pending; no transport speedup claim follows. [Independent verification and complete measurements](radiation-physics/radiative-moment-interpolation.md).
 
 ## `bremslib-radiative-partition`
 

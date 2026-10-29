@@ -128,6 +128,7 @@ TEST_SUITE_PATTERNS = {
         "montecarlo/test_hard_radiative*.py",
         "montecarlo/test_pair_production*.py",
         "montecarlo/test_positron_*.py",
+        "montecarlo/test_radiative_moments*.py",
         "montecarlo/test_shell_secondary*.py",
     ),
     "transport-collisions": (

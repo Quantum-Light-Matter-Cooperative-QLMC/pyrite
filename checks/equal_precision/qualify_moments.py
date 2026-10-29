@@ -194,6 +194,11 @@ def main():
                 actual_gpu = uploaded.evaluate(layer, query_device).get()
                 exact_gpu()
                 reference_gpu = exact_output.get()
+                if not all(
+                    np.all(np.isfinite(a))
+                    for a in (expected, actual_cpu, actual_gpu, reference_gpu)
+                ):
+                    raise ValueError("nonfinite moment probe; qualification cannot pass")
                 budgets = np.array(policy.atol) + policy.rtol * np.abs(expected)
                 component_error = np.max(np.abs(actual_gpu - expected) / budgets, axis=0)
                 # Shared table CPU/CUDA parity is separate from interpolation error.

@@ -81,12 +81,14 @@ def test_snapshot_and_mutable_readback_are_isolated() -> None:
 
 def test_public_alias_and_pickle_identity_survive_owner_move() -> None:
     import pickle
+    from typing import get_type_hints
 
     from pyrite.instrument.quantified_acquisition import QuantifiedAcquisitionBatch as Owner
     from pyrite.results.quantified_acquisition import QuantifiedAcquisitionBatch as Legacy
 
     assert Owner is Legacy is QuantifiedAcquisitionBatch
     assert Owner.__module__ == "pyrite.results.quantified_acquisition"
+    assert get_type_hints(Owner)["_coordinates"] is np.ndarray
     view = _batch(realized=True).quantify().to_energy("keV")
     restored = pickle.loads(pickle.dumps(view))
     assert type(restored) is Owner

@@ -8,6 +8,8 @@
 #SBATCH --output=moments788-%j.log
 set -euo pipefail
 cd "$SLURM_SUBMIT_DIR"
+exec 9>.pyrite-sync.lock
+flock -s -w 30 9
 export PATH="$HOME/.local/bin:$PATH"
 export PYRITE_HOME="$PWD" PYRITE_CATALOG="$PWD/src/pyrite/data/catalog"
 export PYRITE_USER_CATALOG="$PWD/user-catalog"
