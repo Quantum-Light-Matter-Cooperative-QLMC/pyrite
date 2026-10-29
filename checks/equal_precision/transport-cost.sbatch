@@ -25,9 +25,9 @@ sha256sum checks/equal_precision/{diagnose_kernel.py,pyrite_adapter.py,manifest.
 uv run --no-sync python checks/equal_precision/prepare_stopping.py > "$out/tables.json"
 deadline=$((SECONDS + 540))
 for seed in 78601 78602 78603; do
-    variants=(baseline threads32 capacity capacity32)
+    variants=(baseline threads32 capacity capacity32 learned32)
     if (( seed % 2 == 0 )); then
-        variants=(capacity32 capacity threads32 baseline)
+        variants=(learned32 capacity32 capacity threads32 baseline)
     fi
     for scene in si-300-100um-0deg w-300-10um-0deg; do
         for variant in "${variants[@]}"; do
