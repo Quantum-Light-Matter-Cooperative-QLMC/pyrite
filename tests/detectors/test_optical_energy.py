@@ -119,3 +119,32 @@ def test_batched_pulse_reduction_checks_every_spectrum():
     for photons in (np.ones((2, 4)), [[1, 1, 1], [1, -1, 1]], [[1, 1, 1], [1, np.nan, 1]]):
         with pytest.raises(ValueError):
             det.predict_batch([1, 2, 3], photons)
+
+
+def test_semantic_readings_and_calibration_quantities():
+    from pyrite.units import ureg
+
+    det = _calibrated(saturation_v=1.0, noise_rms_v=0.002)
+    energy = np.array([1.0, 2.0, 3.0])
+    photons = np.ones((2, 3)) * 1e7
+    batch = det.predict_batch(energy, photons, repetition_hz=1e3)
+    single = det.predict(energy, photons[0])
+    assert single.incident_energy.units == ureg.J
+    assert single.incident_energy.magnitude == single.incident_joule_per_pulse
+    assert single.reported_voltage.to("mV").magnitude == pytest.approx(
+        single.reported_voltage_v * 1e3
+    )
+    assert single.average_incident_power is None
+    np.testing.assert_array_equal(batch.absorbed_energy.magnitude, batch.absorbed_joule_per_pulse)
+    assert batch.average_absorbed_power.units == ureg.W
+    readback = batch.expected_voltage
+    readback.magnitude[...] = 0
+    assert np.all(batch.expected_voltage_v > 0)
+    assert det.energies.units == ureg.eV
+    assert det.pulse_gain.to("V/pJ").magnitude == pytest.approx(1.0)
+    assert det.noise_rms.magnitude == 0.002
+    assert det.saturation.magnitude == 1.0
+    assert _calibrated().saturation is None
+    knots = det.energies
+    knots.magnitude[...] = 0
+    assert det.energy_eV[0] == 1.0

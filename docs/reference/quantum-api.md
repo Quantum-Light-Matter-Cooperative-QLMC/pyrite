@@ -194,6 +194,15 @@ lengths for the zone cap and depth step. Each conflicts with its numeric
 fields, pickles and the lowered `channeling_*` controls are unchanged;
 `basis_size` and `bloch_cells` stay counts.
 
+Diagnostic outputs keep their numeric fields. `PlanarStateProjection` adds
+fresh `kinetic_energy`, `temperature`, `margin` and `incidence` quantities.
+`ChannelingSpectrum.quantify()` returns a copied view whose `density` and
+`capture_density` are node-sampled photons per energy and steradian per
+incident electron; `to_energy("keV")` rescales the density inversely with the
+energy axis, so integrated yields are unchanged. `line_yield` is a
+dimensionless count per incident electron, `line_rates` is per Å of depth and
+`theta`/`phi` are in radians. Density-matrix and MCWF results remain numeric.
+
 ### Specify and inspect quantum entrance states
 
 `TransverseStateSpec` describes a transverse wavefunction or an **incoherent**

@@ -93,6 +93,11 @@ def test_projection_configuration_accepts_quantities_at_the_diagnostic_boundary(
     assert projected.temperature_K == pytest.approx(293.15)
     assert projected.incidence_rad == pytest.approx(np.deg2rad(0.1))
     assert projected.margin_eV == 100.0
+    assert projected.kinetic_energy.to("MeV").magnitude == pytest.approx(17.0)
+    assert projected.temperature.units == ureg.kelvin
+    assert projected.temperature.magnitude == pytest.approx(293.15)
+    assert projected.incidence.to("degree").magnitude == pytest.approx(0.1)
+    assert projected.margin.units == ureg.eV
 
 
 def test_projection_rejects_wrong_dimension_before_solver_work():

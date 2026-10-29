@@ -25,6 +25,8 @@ from .quantum import QuantumSetup
 from .quantum_state import TransverseStateSpec
 
 if TYPE_CHECKING:
+    from pint import Quantity
+
     from .montecarlo.channeling.density import DensityMatrixResult
 
 
@@ -80,6 +82,12 @@ def _check_source_energy(spec: TransverseStateSpec, kinetic_energy_eV: float) ->
         _check_source_energy(child, kinetic_energy_eV)
 
 
+def _quantity(value: float, unit: str) -> Quantity:
+    from .units import Q_
+
+    return Q_(float(value), unit)
+
+
 @dataclass(frozen=True)
 class PlanarStateProjection:
     """Read-only diagnostic Bloch entry population for one source and solver.
@@ -108,6 +116,26 @@ class PlanarStateProjection:
     free_population: np.ndarray
     outside_population: float
     source_dimension: int = 1
+
+    @property
+    def kinetic_energy(self) -> Quantity:
+        """Electron kinetic energy as a fresh eV quantity."""
+        return _quantity(self.kinetic_energy_eV, "eV")
+
+    @property
+    def temperature(self) -> Quantity:
+        """Absolute crystal temperature as a fresh K quantity."""
+        return _quantity(self.temperature_K, "kelvin")
+
+    @property
+    def margin(self) -> Quantity:
+        """Transverse-energy band margin as a fresh eV quantity."""
+        return _quantity(self.margin_eV, "eV")
+
+    @property
+    def incidence(self) -> Quantity:
+        """Incidence angle to the plane as a fresh rad quantity."""
+        return _quantity(self.incidence_rad, "radian")
 
     @property
     def retained_population(self) -> float:
