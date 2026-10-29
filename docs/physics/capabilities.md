@@ -35,6 +35,11 @@ none is human signed-off.
 
 Channeling ([#56](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/56)) and coherent PXR/CBS line couplings above ~1 MeV photon energy (#249) are tracked separately.
 
+Explore the 1–30 MeV tier in the
+[classical MeV radiation tutorial](../notebooks/specialized/16-classical-mev-radiation.ipynb),
+which compares directional PXR/CBS, bremsstrahlung and transition radiation
+from a thin silicon film.
+
 Research designs may describe later tiers alongside implemented outcomes. Use
 the linked run-surface restrictions for execution support, and the ledger for
 the evidence behind a numerical claim. No maturity label in this table promotes
