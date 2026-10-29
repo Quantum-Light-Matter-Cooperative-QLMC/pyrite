@@ -357,8 +357,7 @@ def _complete_hard_radiative_chunk(staged, incident, energy, incoming, uniforms)
         * np.pi
         * (
             ddcs[:, :-1] * (np.cos(a) - np.cos(b))
-            + np.diff(ddcs, axis=1) / widths
-            * (np.sin(b) - np.sin(a) - widths * np.cos(b))
+            + np.diff(ddcs, axis=1) / widths * (np.sin(b) - np.sin(a) - widths * np.cos(b))
         )
     )
     cumulative = np.cumsum(cell_mass, axis=1)
@@ -381,7 +380,8 @@ def _complete_hard_radiative_chunk(staged, incident, energy, incoming, uniforms)
             * np.pi
             * (
                 left * (np.cos(left_theta) - np.cos(mid))
-                + (right - left) / width
+                + (right - left)
+                / width
                 * (np.sin(mid) - np.sin(left_theta) - (mid - left_theta) * np.cos(mid))
             )
         )
@@ -410,8 +410,7 @@ def _complete_hard_radiative_chunk(staged, incident, energy, incoming, uniforms)
     p_in = np.sqrt(incident * (incident + 2.0 * _ELECTRON_REST_EV))
     p_out = np.sqrt(remaining * (remaining + 2.0 * _ELECTRON_REST_EV))
     target_momentum = (
-        p_in[:, None] * incoming - energy[:, None] * photon_direction
-        - p_out[:, None] * incoming
+        p_in[:, None] * incoming - energy[:, None] * photon_direction - p_out[:, None] * incoming
     )
     return photon_direction, target_momentum
 

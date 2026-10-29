@@ -86,12 +86,10 @@ def run(args, adapter_args):
             )
         )
         arrays[f"rows_{index}"] = rows
-        arrays[f"direction_{index}"] = np.asarray(segments["hard_radiative_direction"])[
+        arrays[f"direction_{index}"] = np.asarray(segments["hard_radiative_direction"])[rows].copy()
+        arrays[f"momentum_{index}"] = np.asarray(segments["hard_radiative_target_momentum_eV_c"])[
             rows
         ].copy()
-        arrays[f"momentum_{index}"] = np.asarray(
-            segments["hard_radiative_target_momentum_eV_c"]
-        )[rows].copy()
 
     hard_radiative.complete_hard_radiative_events = timed_completion
     try:
@@ -106,7 +104,7 @@ def run(args, adapter_args):
     block_size = int(adapter["batch_histories"])
     nblocks = (histories + block_size - 1) // block_size
     if len(captures) != 2 * nblocks:
-        raise RuntimeError(f"expected {2*nblocks} completions, got {len(captures)}")
+        raise RuntimeError(f"expected {2 * nblocks} completions, got {len(captures)}")
     measured = captures[nblocks:]
     metadata = {
         "schema": "pyrite.issue-795.completion-benchmark.v1",
@@ -155,9 +153,10 @@ def compare(reference, candidate):
         if left[key] != right[key]:
             raise RuntimeError(f"comparison differs in {key}: {left[key]!r} vs {right[key]!r}")
     failures = []
-    with np.load(reference.with_suffix(".completion.npz")) as a, np.load(
-        candidate.with_suffix(".completion.npz")
-    ) as b:
+    with (
+        np.load(reference.with_suffix(".completion.npz")) as a,
+        np.load(candidate.with_suffix(".completion.npz")) as b,
+    ):
         if set(a.files) != set(b.files):
             failures.append("different completed block/field keys")
         for key in sorted(set(a.files) & set(b.files)):
@@ -196,8 +195,11 @@ def compare(reference, candidate):
 def summarize(directory):
     data = defaultdict(
         lambda: {
-            "completion_s": [], "request_s": [], "photons": [],
-            "rss_kib": [], "peak_pool_mib": [],
+            "completion_s": [],
+            "request_s": [],
+            "photons": [],
+            "rss_kib": [],
+            "peak_pool_mib": [],
         }
     )
     for path in sorted(directory.glob("*.completion.json")):
@@ -213,20 +215,26 @@ def summarize(directory):
     for (scene, n, variant), group in sorted(data.items()):
         elapsed = group["completion_s"]
         photons = group["photons"]
-        rows.append({
-            "scene": scene, "histories": n, "variant": variant,
-            "repeats": len(elapsed),
-            "median_completion_s": statistics.median(elapsed),
-            "median_request_s": statistics.median(group["request_s"]),
-            "median_photons": statistics.median(photons),
-            "median_us_per_photon": statistics.median(
-                [1e6 * t / p for t, p in zip(elapsed, photons, strict=True) if p]
-            ) if any(photons) else None,
-            "max_peak_rss_mib": max(group["rss_kib"]) / 1024,
-            "max_peak_pool_mib": max(
-                (x for x in group["peak_pool_mib"] if x is not None), default=None
-            ),
-        })
+        rows.append(
+            {
+                "scene": scene,
+                "histories": n,
+                "variant": variant,
+                "repeats": len(elapsed),
+                "median_completion_s": statistics.median(elapsed),
+                "median_request_s": statistics.median(group["request_s"]),
+                "median_photons": statistics.median(photons),
+                "median_us_per_photon": statistics.median(
+                    [1e6 * t / p for t, p in zip(elapsed, photons, strict=True) if p]
+                )
+                if any(photons)
+                else None,
+                "max_peak_rss_mib": max(group["rss_kib"]) / 1024,
+                "max_peak_pool_mib": max(
+                    (x for x in group["peak_pool_mib"] if x is not None), default=None
+                ),
+            }
+        )
     indexed = {(row["scene"], row["histories"], row["variant"]): row for row in rows}
     for row in rows:
         if row["variant"] != "candidate":
