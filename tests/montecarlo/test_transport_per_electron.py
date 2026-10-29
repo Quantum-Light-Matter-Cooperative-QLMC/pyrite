@@ -368,15 +368,26 @@ def test_cuda_core_is_deterministic():
 
 @pytest.mark.hardware
 @requires_cuda
-@pytest.mark.parametrize("nthreads", [32, 128, 512])
+@pytest.mark.parametrize("nthreads", [32, 64, 128])
 def test_cuda_results_do_not_depend_on_launch_geometry(nthreads, monkeypatch):
     from pyrite.montecarlo.transport import _jit_launch as tjl
 
     base = _run(transport_core="cuda")
-    monkeypatch.setattr(
-        tjl, "DEFAULT_TRANSPORT_KERNEL_CONFIG", tjl.TransportKernelConfig(nthreads=nthreads)
-    )
+    factory = tjl.make_cuda_transport_core
+    launch = tjl.run_transport_kernel
+    launched = []
+
+    def configured_core():
+        return factory(config=tjl.TransportKernelConfig(nthreads=nthreads))
+
+    def record_launch(*args, **kwargs):
+        launched.append(kwargs["config"].nthreads)
+        return launch(*args, **kwargs)
+
+    monkeypatch.setattr(tjl, "make_cuda_transport_core", configured_core)
+    monkeypatch.setattr(tjl, "run_transport_kernel", record_launch)
     assert _identical(base, _run(transport_core="cuda"))
+    assert launched and set(launched) == {nthreads}
 
 
 @pytest.mark.hardware

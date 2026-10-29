@@ -22,6 +22,7 @@ nvidia-smi -q > "$out/gpu.txt"
 sha256sum checks/equal_precision/{diagnose_kernel.py,pyrite_adapter.py,manifest.json,transport-cost.sbatch} \
     src/pyrite/montecarlo/transport/{_jit_kernel.py,_jit_radiative_device.py,_jit_launch.py,batching.py} \
     > "$out/code.txt"
+uv run --no-sync python checks/equal_precision/prepare_stopping.py > "$out/tables.json"
 deadline=$((SECONDS + 540))
 for seed in 78601 78602 78603; do
     variants=(baseline threads32 capacity capacity32)
