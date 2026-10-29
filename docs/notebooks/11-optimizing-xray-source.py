@@ -59,7 +59,7 @@ def _(mo):
 
     If run locally rather than on Molab, first install `Optuna` alongside `pyrite` with
 
-    ```code{python}
+    ```bash
     uv tool install "pyrite-mc[optimization]"
     ```
     """)
