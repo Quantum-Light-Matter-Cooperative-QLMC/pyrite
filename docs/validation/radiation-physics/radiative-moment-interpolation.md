@@ -18,7 +18,14 @@ also retain the actual packed moment-buffer SHA-256. A legacy case lacking the
 marker replays exact quadrature; it is not silently reinterpreted as a table
 case. Prepared buffers belong to one transport pass and are uploaded once by
 its batching owner; no process-global host/device table cache is introduced.
-Preparation and out-of-coverage failures remain explicit.
+Preparation and out-of-coverage failures remain explicit. Production table
+construction retains the exact reference packer's existing relative
+$10^{-12}$ source-endpoint allowance, needed when incident-grid refinement
+moves an intended endpoint by a floating-point step. At these admitted source
+edges the reference uses its endpoint value; no additional physical energy
+range is admitted. The standalone component preparation API remains strict
+by default. All interpolation queries, including production queries, still
+reject energies outside their explicitly prepared interval.
 
 Held-out CPU job **2669**, frozen at `8db53f2d` before the #795/#799 rebase,
 was cancelled at the user's request to release its 24 GiB reservation for

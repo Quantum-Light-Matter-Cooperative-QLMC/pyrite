@@ -301,7 +301,7 @@ def test_pre_adapter_seeded_coupled_baseline(synthetic_si_tables, monkeypatch):
     from tests.helpers.photon_mode_off import assert_photon_mode_off_bitwise
     from tests.helpers.physics_baseline import assert_output_baseline, transport_signature
 
-    case = _coupled_case()
+    case = replace(_coupled_case(), radiative_moment_model="exact")
     tp, output = assert_photon_mode_off_bitwise(case, monkeypatch)
     continuum = output["brem_wide"]
     assert_output_baseline(

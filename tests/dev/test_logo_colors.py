@@ -34,10 +34,15 @@ def test_hbn_atom_colors_are_swapped_without_changing_sites():
     fig, ax = plt.subplots()
     try:
         draw_hbn_e(
-            ax, x=0.0, baseline=0.81, cap=2.70, width=1.34,
-            tilt_deg=13.0, azimuth_deg=10.0,
+            ax,
+            x=0.0,
+            baseline=0.81,
+            cap=2.70,
+            width=1.34,
+            tilt_deg=13.0,
+            azimuth_deg=10.0,
         )
-        atoms = ax.patches[::2][:len(expected)]  # highlights alternate with atom circles
+        atoms = ax.patches[::2][: len(expected)]  # highlights alternate with atom circles
         assert [to_hex(atom.get_facecolor()).upper() for atom in atoms] == expected
     finally:
         plt.close(fig)

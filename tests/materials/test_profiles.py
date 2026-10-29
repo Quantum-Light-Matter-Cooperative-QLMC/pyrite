@@ -123,8 +123,9 @@ def test_typed_case_content_key_matches_pre_case_golden():
     # #340: literal CIF parameters from Gemmi change rounding and the content key.
     # #513: static CBS potential U_g bumps the line-escape marker to v4.
     # #439: cancellation-free line kinematics bump the line-escape marker to v5.
+    # #788: the default radiative-moment policy now participates in identity.
     assert case_content_key(case) == (
-        "b8c1e10262ad785ab66024bc996cdd3395e33a9909c6639d0d5872d2d109f045"
+        "3432292002c181c6d0b88b3c28722aa8162e1e840bb9e8deebb0597d2adf52cf"
     )
 
 
@@ -135,7 +136,7 @@ def test_dataset_identity_dispatches_through_recorded_v1():
     assert set(IDENTITY_MIGRATIONS) == {1}
     assert identity["identity_version"] == 1
     assert identity["parameter_sha256"] == (
-        "dfe4f577199451fb775d4d7f190fec0ef27c28e070a46c2bf38e7af44aa67ad0"
+        "3d9e9473643b9dca75d37437c8ae4722011f8816d443a7180806f5a19a8fa413"
     )
     with pytest.raises(ValueError, match="unsupported dataset identity version"):
         dataset_identity("hopg", "full", default_settings(), sweep, identity_version=2)
@@ -338,6 +339,7 @@ def test_transport_numerics_fork_dataset_identity_only_when_nondefault():
         "elastic_model": "elsepa",
         "atomic_electron_deflection": "kawrakow",
         "radiative_model": "bremslib-soft-hard",
+        "radiative_moment_model": "radiative-moments-v1/positive-linear-log-energy-v1/rtol2e-4",
         "radiative_cutoff_eV": 1000.0,
     }
     assert active["parameter_sha256"] != base["parameter_sha256"]
@@ -350,6 +352,7 @@ def test_transport_numerics_fork_dataset_identity_only_when_nondefault():
         "elastic_model": "elsepa",
         "atomic_electron_deflection": "kawrakow",
         "radiative_model": "bremslib-soft-hard",
+        "radiative_moment_model": "radiative-moments-v1/positive-linear-log-energy-v1/rtol2e-4",
         "radiative_cutoff_eV": 1000.0,
     }
 
@@ -551,7 +554,7 @@ def test_standard_detector_keeps_current_payload_and_digest_bit_for_bit():
     sweep_payload = identity["resolved_parameters"]["sweep"]
 
     assert identity["parameter_sha256"] == (
-        "dfe4f577199451fb775d4d7f190fec0ef27c28e070a46c2bf38e7af44aa67ad0"
+        "3d9e9473643b9dca75d37437c8ae4722011f8816d443a7180806f5a19a8fa413"
     )
     assert "detector" not in sweep_payload
     assert sweep_payload["theta_obs_deg"] == 90.0
@@ -565,43 +568,43 @@ def test_standard_detector_keeps_current_payload_and_digest_bit_for_bit():
         (
             "hopg_hbn_gaussian_200fs",
             "hopg",
-            "b63fa593d222e18e07d98798ded0507bbe73fca9d8f2036140a6f69f24703883",
+            "3695b0b24a0c6803c7201f42d6c5e4c921c24412b1944122fa009bbb76c8dae1",
         ),
         (
             "hopg_hbn_gaussian_200fs",
             "hbn",
-            "1f1dca7c87ad0a828801d02a65e58914792ad17c179aa512f9530abcbd3a8e4e",
+            "69c8b22cc49df3a13b96835939b45f0435c62a7b94ffd9bf2560aa3226ac7778",
         ),
         (
             "hopg_hbn_microtrain_200fs",
             "hopg",
-            "d049d44c8a28a33d7431be9f06a1fdcd3fd8c0a286d66008e9fa7d0c2951e461",
+            "7cdf308b0dd61a9a737979a3feb4ae9f498d48a518021335b4c6e75937d2a17d",
         ),
         (
             "hopg_hbn_microtrain_200fs",
             "hbn",
-            "75089379a8c5031541193baf634af52781c5a8cd684235aa20686e6f78f8f8b7",
+            "62ffba8ac2f47a7adc6ec1fb6ec736574a7d0769ea4d6ab0bd29c4ea7d63bdf2",
         ),
         (
             "hopg_hbn_compressed_microbunch",
             "hopg",
-            "7cddfc946b25d95c972c9392ddf63943fb19fb9ed16705abbf35380ae0c29632",
+            "e23706a80e290ef80a5b33cfe48f15ba96eaf831b1a7a7fa8b3e75bedbf8122d",
         ),
         (
             "hopg_hbn_compressed_microbunch",
             "hbn",
-            "9b73688a325d8f5530a11bc79561a92ff1679a97b1bc0a4746ba23d0896f2420",
+            "27c166984077a0af0ccbc571c06a09434b3a8917b50e3ad4fb33171cd4e47317",
         ),
         (
             "hopg_emittance_demo",
             "hopg",
-            "7d9f2942e37043284c4026fa62f53a0a472ac7513d2577cf5dffe91e6a2e38fb",
+            "2d35946d2b05579f3869b00a862314aaf294dbbf99aef8c5e8384b001825e804",
         ),
         (
             "promising_low_ne",
             "hopg",
             # #465: coherent operator identity advanced to physical-distinct-pairs-v4.
-            "edee160662531536d3437de44686dca18a7a67942ff5e428fe9fabe810609beb",
+            "28d465050705451286460a63f270742ee41ca442b87378528f1fdb94d38f629f",
         ),
     ],
 )
@@ -798,7 +801,7 @@ def test_emission_modes_yield_three_distinct_digests_incoherent_unchanged():
     # issue #256's dropped uniform E_grid_brem override, which the sweep-level
     # payload hashes although no case grid changed) must stay bit-for-bit.
     assert incoherent["parameter_sha256"] == (
-        "dfe4f577199451fb775d4d7f190fec0ef27c28e070a46c2bf38e7af44aa67ad0"
+        "3d9e9473643b9dca75d37437c8ae4722011f8816d443a7180806f5a19a8fa413"
     )
     survey_incoherent = dataset_identity(
         "mose2", "survey", default_settings("survey"), material_sweep("mose2", fidelity="survey")
@@ -815,7 +818,7 @@ def test_emission_modes_yield_three_distinct_digests_incoherent_unchanged():
     # issue #218: mose2 gained conduction-band data, so the default "auto"
     # inelastic model now resolves to shell-soft-hard (50 eV cutoff).
     assert survey_incoherent["parameter_sha256"] == (
-        "bb6c892364413f7301dec7f1da24684f3120d28bef90650d9e8f8e72e97c09fb"
+        "0c0a32bba743be39437f033693d2f0c9c5daa28dc9e9221d573126cf25d15fa2"
     )
 
 
@@ -920,6 +923,7 @@ def test_shell_inelastic_mode_forks_identity_and_case_payload_only_when_on():
         "elastic_model": "elsepa",
         "atomic_electron_deflection": "kawrakow",
         "radiative_model": "bremslib-soft-hard",
+        "radiative_moment_model": "radiative-moments-v1/positive-linear-log-energy-v1/rtol2e-4",
         "radiative_cutoff_eV": 1000.0,
     }
     assert (
@@ -997,6 +1001,7 @@ def test_default_elsepa_model_forks_identity_and_case_payload_from_mott():
         "elastic_model": "elsepa",
         "atomic_electron_deflection": "kawrakow",
         "radiative_model": "bremslib-soft-hard",
+        "radiative_moment_model": "radiative-moments-v1/positive-linear-log-energy-v1/rtol2e-4",
         "radiative_cutoff_eV": 1000.0,
     }
     assert "elastic_model" not in mott["resolved_parameters"]["transport_numerics"]
@@ -1021,14 +1026,14 @@ def test_atomic_electron_deflection_forks_identity_and_none_restores_it():
     # The pre-#317 pins of test_dataset_identity_dispatches_through_recorded_v1
     # and test_typed_case_content_key_matches_pre_case_golden.
     assert dataset_identity("hopg", "full", off, sweep)["parameter_sha256"] == (
-        "6bb8c81f24654715d537538815fe054d92be0aced97220afccaebc64c8cb313d"
+        "10299308ae72c41af7852d59d8978f7f6039420b1d6a74015b1a91f41a8b31ea"
     )
     case = build_cases(
         sweep, n_electrons=300, n_electrons_brem=150, atomic_electron_deflection="none"
     )[0]
     assert "atomic_electron_deflection" not in case
     assert case_content_key(case) == (
-        "dfc41833cff718a3e0410ff33ac24145e2186a74c81d76efacf88a783811e1ee"
+        "9308956e794fb1676331ee684ddc3636fc10e8b32e6bbd20cd707e2c4163caeb"
     )
     with pytest.raises(ValueError, match="atomic_electron_deflection"):
         build_cases(sweep, 4, 4, atomic_electron_deflection="z1")

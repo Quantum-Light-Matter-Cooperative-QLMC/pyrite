@@ -72,3 +72,38 @@ def test_unknown_saved_moment_policy_is_refused(monkeypatch):
                 "radiative_moment_model": "unknown-policy",
             }
         )
+
+
+def test_production_endpoint_admission_matches_exact_without_relaxing_query_bounds():
+    from pyrite.montecarlo.transport._jit_moment_lookup import transport_layer_moments
+    from pyrite.montecarlo.transport._jit_radiative import radiative_layer_moments_scalar
+    from pyrite.montecarlo.transport.hard_radiative import radiative_core_args
+    from pyrite.montecarlo.transport.radiative_moments import prepare_radiative_moments
+
+    table = _table()
+    grid = table.incident_energy_keV.copy()
+    grid[0] = np.nextafter(10.0, np.inf)
+    table = replace(table, incident_energy_keV=grid)
+    compositions, tables = [[("C", 0.1)]], {"C": table}
+    args = (compositions, tables, 1000.0, np.array([10.0]), np.array([60.0]), 42, 1)
+    exact = radiative_core_args(*args)
+    candidate = radiative_core_args(*args, moment_mode="table")
+    # Source-refinement roundoff remains admissible exactly where it was before.
+    expected = radiative_layer_moments_scalar(
+        *exact[2:-1], 0, 10000.0, 1000.0, np.empty(1), exact[-1]
+    )
+    actual = transport_layer_moments(
+        *candidate[2:-1], 0, 10000.0, 1000.0, np.empty(1), candidate[-1]
+    )
+    np.testing.assert_allclose(actual, expected, rtol=1e-14, atol=0)
+    # The standalone numerical API remains strict about source coverage.
+    with pytest.raises(ValueError, match="coverage outside"):
+        prepare_radiative_moments(compositions, tables, 10000.0, 60000.0, 1000.0)
+    # Production interpolation must still refuse even adjacent outside queries.
+    with pytest.raises(ValueError, match="outside prepared"):
+        transport_layer_moments(
+            *candidate[2:-1], 0, np.nextafter(10000.0, -np.inf), 1000.0, np.empty(1), candidate[-1]
+        )
+    # Nor may a physically unsupported source range be admitted by preparation.
+    with pytest.raises(ValueError, match="outside the BremsLib table"):
+        radiative_core_args(*(args[:3] + (np.array([9.0]),) + args[4:]), moment_mode="table")

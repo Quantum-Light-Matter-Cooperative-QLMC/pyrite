@@ -58,7 +58,6 @@ class TransportInputs:
     inelastic_cutoff_eV: Any
     inelastic_materials: Any
     elastic_tables: Any
-    radiative_moments: Any
     radiative_model: Any
     radiative_cutoff_eV: Any
     bremslib_tables: Any
@@ -66,6 +65,7 @@ class TransportInputs:
     secondary_threshold_eV: Any
     max_secondary_generations: Any
     max_secondary_tracks: Any
+    radiative_moments: Any
     pair_production_model: Any
     positron_transport: Any
     atomic_electron_deflection: Any

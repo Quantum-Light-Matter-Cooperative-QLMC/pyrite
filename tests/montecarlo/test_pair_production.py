@@ -581,7 +581,7 @@ def test_pre_adapter_seeded_cascade_baseline(monkeypatch):
 
     exercise_photon_reference(seed=11)
     with pytest.warns(UserWarning, match="not transported"):
-        segments = _cascade(monkeypatch, pair_scale=1e9)
+        segments = _cascade(monkeypatch, pair_scale=1e9, radiative_moments="exact")
     events = segments["pair_production"]["events"]
     assert_output_baseline(
         "cascade",

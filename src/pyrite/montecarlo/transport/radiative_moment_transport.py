@@ -15,7 +15,9 @@ from .radiative_moments import prepare_radiative_moments
 
 
 def pack_transport_moments(compositions, tables, lo, hi, cutoff, plasma):
-    prepared = prepare_radiative_moments(compositions, tables, lo, hi, cutoff)
+    prepared = prepare_radiative_moments(
+        compositions, tables, lo, hi, cutoff, source_admission="exact-reference"
+    )
     counts = np.asarray([g.size for g in prepared.energy_eV], dtype=np.int64)
     starts = np.r_[0, np.cumsum(counts[:-1])]
     packed = np.ascontiguousarray(
