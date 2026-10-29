@@ -213,6 +213,25 @@ mixture = pr.TransverseStateSpec.mixture([(3, plus), (1, minus)])
 restored = pr.TransverseStateSpec.from_dict(superposition.to_dict())
 ```
 
+`recipe`, `from_npy` and `translated` also take semantic Pint spellings of the
+unit-bearing parameters: `waist`, `scale`, `center`, `spacing`, `origin`,
+`offset`, `k_radial`, `kinetic_energy`, `semiangle` and `inner_semiangle`. A
+semantic name requires a quantity and conflicts with its suffixed numeric name;
+the stored parameters, JSON and digest match the equivalent numeric recipe.
+`parameter_quantities` returns fresh quantities in Å, Å⁻¹, eV and rad keyed by
+semantic name, and `with_parameters(...)` revalidates a replacement in either
+spelling. Mode orders, selectors and aberration coefficients stay numeric.
+
+```python
+from pyrite.units import ureg
+
+probe = pr.TransverseStateSpec.recipe(
+    "aperture_probe", kinetic_energy=60 * ureg.keV, semiangle=20 * ureg.mrad
+)
+probe.parameter_quantities["semiangle"].to("mrad")
+narrower = probe.with_parameters(semiangle=10 * ureg.mrad)
+```
+
 Other analytic recipes include Gaussian, Hermite–Gaussian, Bessel–Gaussian,
 Airy and aperture-probe states. Most are **diagnostic-only**, not sources for
 production `simulate` runs. The restricted experimental `Beam(state=...)`

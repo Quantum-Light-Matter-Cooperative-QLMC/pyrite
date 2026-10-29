@@ -17,9 +17,12 @@ import math
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Self
+from typing import TYPE_CHECKING, Any, Self
 
-from ._units import normalize_unit
+from ._units import _is_pint_quantity, normalize_unit
+
+if TYPE_CHECKING:
+    from pint import Quantity
 
 SCHEMA = "pyrite.quantum.transverse-state.v1"
 _ANALYTIC = {
@@ -70,6 +73,52 @@ _REQUIRED = {
     "superposition": set(),
     "mixture": set(),
 }
+
+
+#: Unit-bearing recipe parameters: semantic keyword, canonical unit, dimension
+#: label and optional angle kind. Selectors, counts and digests are absent.
+_PARAMETER_UNITS = {
+    "waist_ang": ("waist", "angstrom", "length", None),
+    "scale_ang": ("scale", "angstrom", "length", None),
+    "center_ang": ("center", "angstrom", "length", None),
+    "spacing_ang": ("spacing", "angstrom", "length", None),
+    "origin_ang": ("origin", "angstrom", "length", None),
+    "offset_ang": ("offset", "angstrom", "length", None),
+    "k_radial_inv_ang": ("k_radial", "1 / angstrom", "inverse length", None),
+    "kinetic_energy_eV": ("kinetic_energy", "eV", "energy", None),
+    "semiangle_rad": ("semiangle", "radian", "angle", "angle"),
+    "inner_semiangle_rad": ("inner_semiangle", "radian", "angle", "angle"),
+}
+_SEMANTIC_PARAMETERS = {spec[0]: name for name, spec in _PARAMETER_UNITS.items()}
+
+
+def _semantic_parameters(parameters: Mapping[str, Any]) -> dict[str, Any]:
+    """Lower keyword-only quantity spellings to their numeric recipe fields."""
+    values = dict(parameters)
+    for semantic, numeric in _SEMANTIC_PARAMETERS.items():
+        if semantic not in values:
+            continue
+        if numeric in values:
+            raise TypeError(f"TransverseStateSpec {numeric} and {semantic} are mutually exclusive")
+        value = values.pop(semantic)
+        _, unit, expected, kind = _PARAMETER_UNITS[numeric]
+        field = f"TransverseStateSpec.{semantic}"
+        if value is not None and not _is_pint_quantity(value):
+            raise TypeError(f"{field} requires a Pint quantity with {expected} units")
+        if value is None:
+            values[numeric] = None
+            continue
+        import numpy as np
+
+        magnitude = np.asarray(
+            normalize_unit(value, unit, field=field, expected=expected, kind=kind)
+        )
+        if magnitude.dtype.kind not in "iuf":
+            raise TypeError(f"{field} must be a real {expected} quantity")
+        values[numeric] = (
+            float(magnitude) if magnitude.ndim == 0 else tuple(float(x) for x in magnitude)
+        )
+    return values
 
 
 def _finite(name: str, value: object, *, positive: bool = False) -> float:
@@ -334,8 +383,42 @@ class TransverseStateSpec:
 
     @classmethod
     def recipe(cls, kind: str, **parameters: Any) -> Self:
-        """Create a validated analytic-state recipe from named parameters."""
-        return cls(kind, tuple(parameters.items()))
+        """Create a validated analytic-state recipe from named parameters.
+
+        Unit-bearing parameters take either their numeric suffixed name
+        (``waist_ang=80``) or a semantic Pint quantity (``waist=8 * ureg.nm``):
+        ``waist``, ``scale``, ``center``, ``spacing``, ``origin``, ``offset``,
+        ``k_radial``, ``kinetic_energy``, ``semiangle`` and
+        ``inner_semiangle``. Both spellings of one parameter conflict.
+        Aberration coefficients, mode orders and selectors stay numeric.
+        """
+        return cls(kind, tuple(_semantic_parameters(parameters).items()))
+
+    @property
+    def parameter_quantities(self) -> dict[str, Quantity]:
+        """Fresh quantities for this recipe's unit-bearing parameters.
+
+        Keys are semantic names; values carry the canonical units (Å, Å⁻¹, eV,
+        rad). Unset optional values, selectors and child terms are omitted.
+        """
+        from .units import Q_
+
+        result = {}
+        for name, value in self.parameters:
+            if name in _PARAMETER_UNITS and value is not None:
+                semantic, unit, _, _ = _PARAMETER_UNITS[name]
+                magnitude = list(value) if isinstance(value, tuple) else value
+                result[semantic] = Q_(magnitude, unit)
+        return result
+
+    def with_parameters(self, **changes: Any) -> Self:
+        """Return a revalidated recipe with replaced numeric or quantity parameters."""
+        values = dict(self.parameters)
+        if self.kind == "aperture_probe":
+            values["aberrations"] = dict(values["aberrations"])
+        changes = _semantic_parameters(changes)
+        values.update(changes)
+        return type(self)(self.kind, tuple(values.items()), self.terms)
 
     @classmethod
     def superpose(cls, terms: Sequence[tuple[complex, TransverseStateSpec]]) -> Self:
@@ -345,17 +428,24 @@ class TransverseStateSpec:
     def mixture(cls, components: Sequence[tuple[float, TransverseStateSpec]]) -> Self:
         return cls("mixture", terms=tuple(components))
 
-    def translated(self, offset_ang: object) -> Self:
-        return type(self)("translated", (("offset_ang", offset_ang),), ((1.0, self),))
+    def translated(self, offset_ang: object = None, *, offset: object = None) -> Self:
+        """Translate by numeric ``offset_ang`` or a length quantity ``offset``."""
+        if (offset_ang is None) == (offset is None):
+            raise TypeError("translated requires exactly one of offset_ang or offset")
+        given = {"offset_ang": offset_ang} if offset is None else {"offset": offset}
+        return type(self)("translated", tuple(_semantic_parameters(given).items()), ((1.0, self),))
 
     @classmethod
     def from_npy(
         cls,
         path: str | Path,
         *,
-        spacing_ang: object,
-        origin_ang: object = 0.0,
+        spacing_ang: object = None,
+        origin_ang: object = None,
         kinetic_energy_eV: float | None = None,
+        spacing: object = None,
+        origin: object = None,
+        kinetic_energy: object = None,
     ) -> Self:
         """Reference a saved .npy array by its exact contents (no embedding).
 
@@ -363,6 +453,8 @@ class TransverseStateSpec:
         :meth:`to_runtime`. The SHA covers contiguous array data; dtype and
         shape are tracked separately. Only 1D/2D finite floating arrays with
         nonzero amplitude are accepted. Files remain external to JSON.
+        ``spacing``, ``origin`` and ``kinetic_energy`` are Pint quantity
+        spellings of the numeric keywords; ``origin`` defaults to zero.
         """
         import numpy as np
 
@@ -371,15 +463,29 @@ class TransverseStateSpec:
             raise ValueError("sample asset must be a .npy file")
         array = np.load(file, allow_pickle=False)
         _validate_samples(array)
+        given = {
+            name: value
+            for name, value in (
+                ("spacing_ang", spacing_ang),
+                ("origin_ang", origin_ang),
+                ("kinetic_energy_eV", kinetic_energy_eV),
+                ("spacing", spacing),
+                ("origin", origin),
+                ("kinetic_energy", kinetic_energy),
+            )
+            if value is not None
+        }
+        if "spacing_ang" not in given and "spacing" not in given:
+            raise TypeError("from_npy requires spacing_ang or spacing")
+        if "origin_ang" not in given and "origin" not in given:
+            given["origin_ang"] = 0.0
         return cls.recipe(
             "sampled",
             path=str(file),
             sha256=_array_digest(array),
             shape=array.shape,
             dtype=array.dtype.str,
-            spacing_ang=spacing_ang,
-            origin_ang=origin_ang,
-            kinetic_energy_eV=kinetic_energy_eV,
+            **given,
         )
 
     def to_dict(self) -> dict[str, Any]:
