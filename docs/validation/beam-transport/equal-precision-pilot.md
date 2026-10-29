@@ -703,3 +703,69 @@ Mott/uncoupled controls. All six geometry checks pass in job 2632; nine
 coupled-radiative CUDA checks pass in job 2631. The initial LUT test-setup
 failures are retained separately from timing evidence. No production transport
 default or model marker is changed.
+
+## Reuse BremsLib stages during photon completion
+
+A final profile of the improved W policy uncovered a separate host-side cost.
+Job 2633 ran 5000 primaries at seed 78604, with a complete warmup, under Nsight
+Systems and cProfile. `complete_hard_radiative_events` completed 712 photons
+across the two requests and called `stage_bremslib_table` **712 times**. Each
+photon uploaded the same immutable element table again. The profile records
+11.968 GB of host-to-device traffic; table staging consumes 2.925 s cumulative
+and complete photon processing 5.438 s. These times cover warmup and measurement
+together and are excluded from benchmark timing groups.
+
+The production fix owns a lazy stage per used atomic number for one completion
+call. It retains the existing backend precision, event order, random draws,
+DDCS interpolation and angle inversion. Empty event lists stage nothing;
+different elements use different tables; later requests own fresh stages.
+There is no global device cache or changed physics/model identity.
+
+Job 2634 compares the retained old completion routine with this change, keeping
+the current transport preparation and the identical `learned32` policy in both
+arms. Three fresh seeds (78611–78613), two scenes, 5000 primaries and one complete
+same-policy warmup produce twelve timing samples. The
+[paired staging evidence](../check-records/equal-precision/completion-staging-786.json)
+retains source pins, timings and full-array hashes. Every candidate's warmup and
+measured trajectory bundle matches its paired baseline exactly, including
+photon directions and target momenta.
+
+Warmed synchronized transport/emission seconds, median [min,max]:
+
+| Scene | Old per-photon staging | Per-element staging | Interval reduction |
+| --- | --- | --- | --- |
+| Si, 300 keV / 100 µm | 1.542 [1.496,1.751] | 1.232 [1.190,1.252] | 20.1% |
+| W, 300 keV / 10 µm | 6.758 [6.743,7.030] | 5.235 [5.156,5.250] | 22.5% |
+
+These are paired within-PyRITE improvements under the declared warmed policy,
+separate from the earlier launch/capacity series. They do not establish a
+combined speedup by multiplying results from different series. The new W raw
+interval is below the earlier Geant4 native-process interval, but the different
+physics and timing boundaries still prevent an accuracy-qualified engine rank.
+
+Post-fix profile job 2635 repeats job 2633's seed and controls. All warmup and
+measured trajectory hashes also match across the profiles. Staging calls fall
+from **712 to 2**, and host-to-device traffic from **11967.711 to 40.782 MB**
+(99.66% less). Cumulative completion falls from 5.438 to 2.296 s; staging itself
+falls from 2.925 to 0.018 s. Recorded device-side HtoD copy durations are only
+0.290/0.006 s before/after: the staging cost includes CPU/driver work and waits,
+and must not be attributed exclusively to PCIe copy duration. Device-to-host
+traffic remains 2.480 GB, preserving the trajectory-storage cost for future
+bounded-memory work.
+
+Three cache-lifetime/mixed-element regressions and nine existing coupled CUDA
+checks pass in job 2634. Four selected CPU photon tests and six owning CPU
+transport tests pass; slow transport cases remain excluded. Complexity is
+unchanged. This is an exact-result implementation optimization, with no model
+marker or numerical-default change.
+
+To reproduce, retain `src/pyrite/montecarlo/transport/hard_radiative.py` from
+revision `41e755fd` before syncing the candidate. Its SHA-256 is
+`eaa34cc2eba296e0d05243fa8f9a7346bc883e122249a6cb92879366e4e72bcd`.
+Pass that copied file to `checks/equal_precision/completion-staging.sbatch`.
+The measurement candidate is revision `eccdbb8e`, source SHA-256
+`a400ceb50189a31199bcc5dbdedf1d86ad3c3528df4b28a83e20fdbc204c10f6`.
+The benchmark loads the old completion routine under an isolated module name
+for the baseline and uses the production routine for the candidate; it keeps
+all other current transport preparation intact. The existing diagnostic
+analyzer checks paired trajectory hashes and summarizes its evidence folder.
