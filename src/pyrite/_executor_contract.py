@@ -20,10 +20,10 @@ def validate_executor(executor: Executor, numerics: Numerics) -> None:
             "batch executors cannot preserve an explicit transport-core override"
         )
     execution = getattr(numerics, "resolved_execution", None)
-    if execution is not None and execution.transport.schedule is not None:
+    if execution is not None and execution.transport != type(execution.transport)():
         raise ValueError(
-            "executor requires KernelTuning.transport.schedule=None; batch executors "
-            "take the schedule from PYRITE_MC_TRANSPORT_SCHEDULE"
+            "executor requires the default KernelTuning.transport; batch executors take "
+            "PYRITE_MC_TRANSPORT_SCHEDULE and PYRITE_MC_ELECTRON_BATCH_MAX instead"
         )
 
 

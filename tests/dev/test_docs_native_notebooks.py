@@ -312,6 +312,66 @@ def test_regenerate_command_declares_tutorial_extras(tmp_path):
     )
 
 
+def test_cuda_tutorials_declare_backend_and_nvidia_extra(tmp_path):
+    module = _notebook_extension()
+    plain = tmp_path / "01-plain.py"
+    plain.write_text('# /// script\n# dependencies = ["pyrite-mc==0.23.0"]\n# ///\n')
+    cuda = tmp_path / "15-cuda.py"
+    cuda.write_text(
+        '# /// script\n# dependencies = ["pyrite-mc==0.23.0"]\n#\n'
+        '# [tool.pyrite]\n# backend = "cuda"\n# ///\n'
+    )
+    assert module.capture_backend(plain) == "cpu"
+    assert module.capture_backend(cuda) == "cuda"
+    assert module.regenerate_command([cuda]) == (
+        "uv run --group docs --extra nvidia python docs/_notebooks.py --regenerate 15-cuda"
+    )
+    rocm = tmp_path / "16-rocm.py"
+    rocm.write_text('# /// script\n# [tool.pyrite]\n# backend = "rocm"\n# ///\n')
+    with pytest.raises(ValueError, match="capture backend"):
+        module.capture_backend(rocm)
+
+
+@pytest.mark.parametrize("backend", ["cpu", "cuda"])
+def test_stale_capture_fails_unless_it_needs_a_gpu(tmp_path, monkeypatch, capsys, backend):
+    module = _notebook_extension()
+    sources = tmp_path / "notebooks"
+    (sources / "fundamentals").mkdir(parents=True)
+    source = sources / "first.py"
+    source.write_text(f'# /// script\n# [tool.pyrite]\n# backend = "{backend}"\n# ///\n')
+    captured = nbformat.v4.new_notebook(
+        cells=[
+            nbformat.v4.new_markdown_cell(
+                "# First\n\n[![Open in Molab](https://marimo.io/molab-shield.svg)]"
+                f"({module.MOLAB}first.py)"
+            ),
+            nbformat.v4.new_code_cell(
+                "1 + 1",
+                outputs=[
+                    nbformat.v4.new_output("display_data", data={"image/png": "iVBORw0KGgo="})
+                ],
+            ),
+        ],
+        metadata={
+            "pyrite_docs": {
+                "schema": module.SCHEMA,
+                "source_fingerprint": module.FINGERPRINT,
+                "source_fingerprint_sha256": "stale",
+            }
+        },
+    )
+    nbformat.write(captured, sources / "fundamentals/first.ipynb")
+    monkeypatch.setattr(module, "NOTEBOOKS", sources)
+    monkeypatch.setattr(module, "validate_source", lambda source: None)
+    monkeypatch.setattr(module.subprocess, "run", lambda *args, **kw: pytest.fail("executed"))
+    if backend == "cpu":
+        with pytest.raises(ValueError, match="stale tutorial capture"):
+            module.check_notebooks()
+    else:
+        module.check_notebooks()
+        assert "--extra nvidia" in capsys.readouterr().err
+
+
 def test_regenerated_capture_is_ruff_format_clean(tmp_path, monkeypatch):
     import subprocess
     import sys

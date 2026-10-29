@@ -14,8 +14,9 @@ import pytest
 import pyrite as pr
 import pyrite.config as cfg
 from pyrite.campaign.lowering import build_case
+from pyrite.campaign.profiles import case_content_key
 from pyrite.montecarlo import runner
-from pyrite.montecarlo.runner.transport_options import kernel_schedule
+from pyrite.montecarlo.runner.transport_options import transport_tuning
 
 try:  # pragma: no cover - depends on the machine, not the branch
     import cupy
@@ -73,7 +74,7 @@ def test_simulate_spectra_identical_across_schedules_and_quanta():
         )
     reference = results[0]
     for result in results[1:]:
-        assert result.case.to_dict() == reference.case.to_dict()
+        assert case_content_key(result.case) == case_content_key(reference.case)
         for name in ("cxr", "brem"):
             ref = reference.cxr.incoherent if name == "cxr" else reference.brem
             got = result.cxr.incoherent if name == "cxr" else result.brem
@@ -85,7 +86,7 @@ def test_transport_arrays_identical_across_schedules_and_quanta():
     case = build_case(_scene(SCHEDULES[0]))
     digests = []
     for transport in SCHEDULES:
-        with kernel_schedule(_numerics(transport)):
+        with transport_tuning(_numerics(transport)):
             segs = runner._transport_case(case, transport_core="cuda")["segs"]
         digests.append(
             {
@@ -100,3 +101,23 @@ def test_transport_arrays_identical_across_schedules_and_quanta():
         assert candidate.keys() == reference.keys()
         for key in reference:
             _bitwise(reference[key], candidate[key], key)
+
+
+@pytest.mark.slow
+def test_tune_kernels_accepts_exact_quanta_on_a_real_device():
+    """End to end: fresh-process workers, equivalence guard, typed result."""
+    pytest.importorskip("optuna")
+    from pyrite.optimization import KernelLattice, tune_kernels
+
+    scene = _scene(cfg.TransportKernelTuning())
+    scene = pr.Scene(
+        scene.beam,
+        scene.target,
+        scene.detector,
+        numerics=scene.numerics.with_kernel_tuning(cfg.KernelTuning()),
+    )
+    lattice = KernelLattice(schedule=("continuation",), continuation_rows=(64, 256))
+    result = tune_kernels(scene, lattice, trials=2, warmups=1, repeats=1, rtol=0.0, atol=0.0)
+    assert result.environment["backend"] == "cuda"
+    assert all(t.state == "complete" for t in result.trials), result.trials
+    assert result.best.transport_core == "cuda"

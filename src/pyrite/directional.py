@@ -20,7 +20,7 @@ from .materials import CATALOG
 from .materials.crystal import reciprocal_g_vector
 from .montecarlo.runner import case_table_markers
 from .montecarlo.runner.directional_source import SOURCE_COMPONENTS, source_outputs
-from .montecarlo.runner.transport_options import kernel_schedule
+from .montecarlo.runner.transport_options import transport_tuning
 from .results.directional import COMPONENT_IDS, DirectionalSpectrum
 
 #: Public component names accepted by :func:`directional_sources`.
@@ -229,7 +229,7 @@ def directional_sources(
     if grid[-1] > case["E0_keV"] * 1000:
         raise ValueError("energy_eV must not exceed the incident electron energy")
     sample = lab @ case_rotation(case)
-    with kernel_schedule(controls):
+    with transport_tuning(controls):
         densities, supported = source_outputs(
             case,
             sample,

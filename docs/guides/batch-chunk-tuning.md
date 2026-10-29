@@ -1,8 +1,52 @@
 (optuna-batch-cxr-chunk-tuning-experimental-682)=
-# Tune CUDA batches and CXR chunks (experimental)
+# Tune CUDA execution controls (experimental)
 
-This tool tunes **two execution parameters jointly** against the median duration
-of an **uncached full case** (transport and spectra):
+Tune CUDA execution controls against the median duration of an **uncached
+full simulation** (transport and spectra). None of them is a physical
+optimization variable. The tuner uses Optuna directly, separately from
+`OptimizationStudy`'s scene-parameter API.
+
+## Python API
+
+`pyrite.optimization.tune_kernels` tunes any subset of the transport
+`electron_batch`, continuation `schedule` and `continuation_rows`, and the
+spectral `cxr_chunk`/`brem_chunk`, for one fixed scene, and returns a
+`KernelTuning` to apply through ordinary `Numerics`:
+
+<!-- verify: skip (requires a CUDA device and the optimization extra) -->
+```python
+import pyrite as pr
+from pyrite.optimization import KernelLattice, tune_kernels
+
+result = tune_kernels(
+    scene,  # a pr.Scene whose numerics leave transport_core="auto"
+    KernelLattice(
+        electron_batch=(2048, 4096, 8192),
+        schedule=("full-history", "continuation"),
+        continuation_rows=(None, 128, 512),
+        cxr_chunk=(512, 1024, 2048),
+    ),
+    trials=24,
+    storage="sqlite:///kernel-tuning.sqlite3",
+)
+print(result.environment, result.speedup)
+tuned = scene.numerics.with_kernel_tuning(result.best)  # use in a fresh process
+```
+
+The baseline is the scene's own `KernelTuning` on the CUDA core. Each trial
+runs `simulate` in a fresh process. Its spectral grids must equal the
+baseline's and its densities agree within `rtol`/`atol`, or it is rejected.
+`result.trials` keeps every candidate, its timings and any rejection reason.
+`result.best` is the baseline unless a candidate was faster. A row quantum
+paired with `full-history` is an invalid combination and is skipped. The
+`environment` field records GPU, driver, CUDA/CuPy versions and precision;
+winners do not transfer between devices. Persistent studies refuse to resume
+with a different workload, lattice, protocol or device.
+
+## MoLab example
+
+The older command-line tool tunes two parameters, through environment
+variables:
 
 - `PYRITE_MC_ELECTRON_BATCH_MAX` caps CUDA transport electrons per launch
   (`PerElectronTransportConfig.max_batch`); the segment-scratch budget can
@@ -10,11 +54,6 @@ of an **uncached full case** (transport and spectra):
 - `PYRITE_MC_CXR_CHUNK` sets the requested **segment** chunk for CXR spectral
   processing (this is *not* the electron count). The VRAM admission policy can
   clamp it to a smaller effective value.
-
-Neither parameter is a physical optimization variable. The implementation uses
-Optuna directly, separately from `OptimizationStudy`'s scene-parameter API.
-
-## MoLab example
 
 Run on an allocated GPU worker through the
 [cluster workflow](running-on-a-cluster.md), from the repository root after

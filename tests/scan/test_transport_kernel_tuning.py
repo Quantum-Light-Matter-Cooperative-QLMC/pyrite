@@ -17,7 +17,7 @@ from pyrite.campaign.profiles import case_content_key
 from pyrite.execution import LocalExecutor
 from pyrite.montecarlo import runner
 from pyrite.montecarlo import transport as transport_module
-from pyrite.montecarlo.runner.transport_options import _TRANSPORT_SCHEDULE, kernel_schedule
+from pyrite.montecarlo.runner.transport_options import _TRANSPORT_TUNING, transport_tuning
 
 
 def _scene(numerics=None):
@@ -40,8 +40,8 @@ def _tuned(schedule="continuation", rows=64, core="auto"):
 def test_defaults_leave_the_process_schedule_alone():
     assert cfg.KernelTuning().transport == cfg.TransportKernelTuning()
     assert pr.Numerics().resolved_execution.transport.schedule is None
-    with kernel_schedule(pr.Numerics(execution=cfg.KernelTuning())):
-        assert _TRANSPORT_SCHEDULE.get() is None
+    with transport_tuning(pr.Numerics(execution=cfg.KernelTuning())):
+        assert _TRANSPORT_TUNING.get() is None
 
 
 @pytest.mark.parametrize(
@@ -51,6 +51,8 @@ def test_defaults_leave_the_process_schedule_alone():
         ({"schedule": "auto", "continuation_rows": True}, "positive integer"),
         ({"schedule": "auto", "continuation_rows": 0}, "positive integer"),
         ({"schedule": "auto", "continuation_rows": 2.0}, "positive integer"),
+        ({"electron_batch": 0}, "electron_batch must be a positive integer"),
+        ({"electron_batch": False}, "electron_batch must be a positive integer"),
         ({"continuation_rows": 64}, "requires schedule"),
         ({"schedule": "full-history", "continuation_rows": 64}, "requires schedule"),
     ],
@@ -72,14 +74,18 @@ def test_schedule_overrides_the_env_default_and_keeps_other_fields(monkeypatch):
         max_batch=123,
     )
     monkeypatch.setattr(transport_module, "DEFAULT_PER_ELECTRON_TRANSPORT_CONFIG", env_default)
-    with kernel_schedule(pr.Numerics(execution=_tuned(rows=48))):
-        config = _TRANSPORT_SCHEDULE.get()
+    with transport_tuning(pr.Numerics(execution=_tuned(rows=48))):
+        config = _TRANSPORT_TUNING.get()
     assert config.schedule == "continuation"
     assert config.continuation.rows_per_round == 48
     assert config.max_batch == 123
-    assert _TRANSPORT_SCHEDULE.get() is None
-    with kernel_schedule(pr.Numerics(execution=_tuned("auto", None))):
-        assert _TRANSPORT_SCHEDULE.get().continuation is None  # driver default quantum
+    assert _TRANSPORT_TUNING.get() is None
+    with transport_tuning(pr.Numerics(execution=_tuned("auto", None))):
+        assert _TRANSPORT_TUNING.get().continuation is None  # driver default quantum
+    batch_only = cfg.KernelTuning(transport=cfg.TransportKernelTuning(electron_batch=512))
+    with transport_tuning(pr.Numerics(execution=batch_only)):
+        config = _TRANSPORT_TUNING.get()
+    assert (config.max_batch, config.schedule) == (512, "full-history")  # env schedule kept
 
 
 def test_scheduling_stays_out_of_case_identity_and_pickles():
@@ -114,7 +120,7 @@ def test_transport_case_receives_the_scheduled_config(monkeypatch):
     with pytest.raises(_Stop):
         runner._transport_case(case, transport_core="per-electron")
     assert "per_electron_config" not in seen
-    with kernel_schedule(pr.Numerics(execution=_tuned("auto", 32))), pytest.raises(_Stop):
+    with transport_tuning(pr.Numerics(execution=_tuned("auto", 32))), pytest.raises(_Stop):
         runner._transport_case(case, transport_core="per-electron")
     assert seen["per_electron_config"].schedule == "auto"
     assert seen["per_electron_config"].continuation.rows_per_round == 32
@@ -124,7 +130,7 @@ def test_simulate_applies_kernel_tuning_around_run_case(monkeypatch):
     seen = []
 
     def fake_run_case(case, transport_core="auto"):
-        seen.append((_TRANSPORT_SCHEDULE.get(), transport_core))
+        seen.append((_TRANSPORT_TUNING.get(), transport_core))
         raise _Stop
 
     monkeypatch.setattr(api, "run_case", fake_run_case)
@@ -138,7 +144,7 @@ def test_simulate_applies_kernel_tuning_around_run_case(monkeypatch):
 
 def test_batch_executors_reject_a_per_call_schedule():
     scene = _scene(pr.Numerics(execution=_tuned()))
-    with pytest.raises(ValueError, match="transport.schedule=None"):
+    with pytest.raises(ValueError, match="default KernelTuning.transport"):
         pr.simulate(
             scene.beam,
             scene.target,

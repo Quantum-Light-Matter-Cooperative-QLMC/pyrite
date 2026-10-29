@@ -120,7 +120,7 @@ from .transport_options import (
 from .transport_options import (
     _check_opt_in_transport as _check_opt_in_transport,
 )
-from .transport_options import scheduled_transport_kwargs
+from .transport_options import tuned_transport_kwargs
 
 _RESOURCE_POLICY.n_cpus = _usable_cpus()
 
@@ -417,7 +417,7 @@ def _transport_case(
     # Passed only when a caller asked, so progress-free calls keep their shape.
     transport_progress = _TRANSPORT_PROGRESS.get()
     progress_kw = {} if transport_progress is None else {"transport_progress": transport_progress}
-    schedule_kw = scheduled_transport_kwargs()  # KernelTuning override (#776)
+    schedule_kw = tuned_transport_kwargs()  # KernelTuning override (#776)
 
     if block_electrons is not None and core == "lockstep":
         raise ValueError(

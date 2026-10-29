@@ -34,9 +34,9 @@ is documented in [execution and scheduling](execution.md).
 ```
 
 `TransportKernelTuning` (experimental) is `KernelTuning.transport`: the CUDA
-transport schedule and continuation row quantum for in-process runs. It takes
-precedence over `PYRITE_MC_TRANSPORT_SCHEDULE` and never changes case identity
-or results.
+transport schedule, continuation row quantum and electron launch batch for
+in-process runs. It takes precedence over `PYRITE_MC_TRANSPORT_SCHEDULE` and
+`PYRITE_MC_ELECTRON_BATCH_MAX` and never changes case identity or results.
 
 ```{eval-rst}
 .. autosummary::

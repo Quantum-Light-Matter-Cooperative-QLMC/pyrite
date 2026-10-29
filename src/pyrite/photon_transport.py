@@ -239,7 +239,7 @@ def simulate_photon_continuum(
     from .montecarlo import runner
     from .montecarlo.runner.case_tables import case_table_markers
     from .montecarlo.runner.photon_emission import score_bremslib_continuum
-    from .montecarlo.runner.transport_options import kernel_schedule
+    from .montecarlo.runner.transport_options import transport_tuning
 
     case = lower_simulation(request)
     if case.get("bremsstrahlung_model") != "bremslib":
@@ -290,7 +290,7 @@ def simulate_photon_continuum(
     tables = runner._case_bremslib_tables(case)
     if tables is None:
         raise ValueError("resolved BremsLib tables are unavailable")
-    with kernel_schedule(numerics):
+    with transport_tuning(numerics):
         transport = runner._transport_case(
             case, transport_core=numerics.transport_core, keep_segments_on_device=False
         )

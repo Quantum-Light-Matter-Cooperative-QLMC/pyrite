@@ -147,7 +147,7 @@ def simulate_photon_events(
     from .montecarlo import runner
     from .montecarlo.runner.case_tables import case_table_markers
     from .montecarlo.runner.photon_emission import score_photon_sources
-    from .montecarlo.runner.transport_options import kernel_schedule
+    from .montecarlo.runner.transport_options import transport_tuning
 
     if source not in ("characteristic", "annihilation"):
         raise ValueError("source must be 'characteristic' or 'annihilation'")
@@ -199,7 +199,7 @@ def simulate_photon_events(
         charged_feedback=charged_feedback,
         feedback_identity=feedback_identity,
     )
-    with kernel_schedule(numerics):
+    with transport_tuning(numerics):
         transport = runner._transport_case(
             case, transport_core=numerics.transport_core, keep_segments_on_device=False
         )

@@ -66,28 +66,34 @@ TRANSPORT_SCHEDULES = ("full-history", "continuation", "auto")
 
 @dataclass(frozen=True)
 class TransportKernelTuning:
-    """CUDA transport schedule controls (experimental, #776).
+    """Per-electron/CUDA transport batching and schedule controls (experimental, #776).
 
     ``schedule`` is ``"full-history"``, ``"continuation"`` or ``"auto"``
     (#799) and takes precedence over ``PYRITE_MC_TRANSPORT_SCHEDULE``;
-    ``None`` defers to that variable, then full-history.
+    ``None`` defers to that variable, then ``"auto"`` (the #799 default).
     ``continuation_rows`` is the continuation row quantum: the trajectory rows
     each active history may emit per launch (``None``: 256). It counts emitted
     rows, not wall-clock time, and no launch ends early when its first history
-    finishes; it requires ``"continuation"`` or ``"auto"``. Neither field
-    enters case identity: every schedule returns bitwise-identical transport.
-    Batch executors reject a non-default value and use the variable.
+    finishes; it requires ``"continuation"`` or ``"auto"``.
+    ``electron_batch`` caps the electrons (or concurrent continuation
+    histories) per transport launch and takes precedence over
+    ``PYRITE_MC_ELECTRON_BATCH_MAX`` (``None``: that variable, then 65536).
+    No field enters case identity: transport is bitwise-identical under every
+    value. Batch executors reject non-default values and use the variables.
     """
 
     schedule: Literal["full-history", "continuation", "auto"] | None = None
     continuation_rows: int | None = None
+    electron_batch: int | None = None
 
     def __post_init__(self) -> None:
         if self.schedule is not None and self.schedule not in TRANSPORT_SCHEDULES:
             raise ValueError(f"schedule must be one of {TRANSPORT_SCHEDULES} or None")
+        for name in ("continuation_rows", "electron_batch"):
+            value = getattr(self, name)
+            if value is not None and (type(value) is not int or value <= 0):
+                raise ValueError(f"{name} must be a positive integer or None")
         rows = self.continuation_rows
-        if rows is not None and (type(rows) is not int or rows <= 0):
-            raise ValueError("continuation_rows must be a positive integer or None")
         if rows is not None and self.schedule not in TRANSPORT_SCHEDULES[1:]:
             raise ValueError("continuation_rows requires schedule='continuation' or 'auto'")
 

@@ -2,6 +2,9 @@
 
 The explicit regeneration CLI is the *only* place where PyRITE simulations run.
 Sphinx validates committed captures and never invokes marimo or downloads tables.
+A tutorial whose script metadata declares ``[tool.pyrite] backend = "cuda"`` is
+captured on a CUDA device (the lab GPU through ``checks/tutorial_capture_cuda.sbatch``);
+because a GPU is not always available, its stale capture warns instead of failing.
 """
 
 from __future__ import annotations
@@ -31,6 +34,7 @@ LEGACY_SCHEMA = "pyrite.myst-nb-tutorial.v1"
 SCHEMA = "pyrite.myst-nb-tutorial.v2"
 LEGACY_FINGERPRINT = "python-ast-pep723-v1"
 FINGERPRINT = "python-ast-pep723-v2"
+CAPTURE_BACKENDS = ("cpu", "cuda")
 # PyRITE's own release pin; the version is provenance, like `pyrite_version`.
 PYRITE_PIN = re.compile(r"^(pyrite-mc(?:\[([^\]]*)\])?)\s*==\s*[^;\s]+")
 
@@ -186,6 +190,26 @@ def validate_source(path):
         raise ValueError(f"{path.name}: Molab badge belongs on the RTD page only")
 
 
+def capture_backend(source):
+    """The backend a tutorial is captured on: ``[tool.pyrite] backend``, else CPU."""
+    backend = "cpu"
+    for block in script_metadata(source.read_text()):
+        backend = block.get("tool", {}).get("pyrite", {}).get("backend", backend)
+    if backend not in CAPTURE_BACKENDS:
+        raise ValueError(f"{source.name}: capture backend must be one of {CAPTURE_BACKENDS}")
+    return backend
+
+
+def require_cuda(env):
+    """Fail before any export when a CUDA tutorial has no device to run on."""
+    probe = "import cupy; assert cupy.cuda.runtime.getDeviceCount() > 0"
+    if subprocess.run([sys.executable, "-c", probe], env=env, capture_output=True).returncode:
+        raise RuntimeError(
+            "CUDA tutorial capture needs a CUDA device and the nvidia extra; run it on the "
+            "lab GPU with checks/tutorial_capture_cuda.sbatch"
+        )
+
+
 def regenerate_command(sources):
     """The full regeneration command, including extras the tutorials declare."""
     extras = sorted(
@@ -198,6 +222,8 @@ def regenerate_command(sources):
             for extra in match.group(2).split(",")
         }
     )
+    if any(capture_backend(source) == "cuda" for source in sources):
+        extras = sorted({*extras, "nvidia"})
     flags = "".join(f" --extra {extra}" for extra in extras)
     target = f"--regenerate {sources[0].stem}" if len(sources) == 1 else "--regenerate-all"
     return f"uv run --group docs{flags} python docs/_notebooks.py {target}"
@@ -305,7 +331,7 @@ def captured_notebook(source, notebook, title, footer):
         "source_fingerprint": FINGERPRINT,
         "source_fingerprint_sha256": fingerprint(source),
         "pyrite_version": project_version(),
-        "backend": "cpu",
+        "backend": capture_backend(source),
     }
     notebook["metadata"]["kernelspec"] = {
         "display_name": "Python 3",
@@ -361,9 +387,11 @@ def check_notebooks(app=None):
             or metadata.get("source_fingerprint") != FINGERPRINT
             or metadata.get("source_fingerprint_sha256") != fingerprint(source)
         ):
-            raise ValueError(
-                f"stale tutorial capture: {source.stem}; run " + regenerate_command([source])
-            )
+            message = f"stale tutorial capture: {source.stem}; run " + regenerate_command([source])
+            if capture_backend(source) != "cuda":
+                raise ValueError(message)
+            # Not a Sphinx warning: -W builds must still pass without a GPU.
+            print(f"warning: {message} on a CUDA host; publishing the old capture", file=sys.stderr)
         if not output_contains_figure(notebook):
             raise ValueError(f"{source.stem}: missing captured notebook figure")
         if any(
@@ -389,14 +417,17 @@ def regenerate(names):
         if not source.is_file():
             raise ValueError(f"unknown tutorial: {source.stem}")
         validate_source(source)
-    env = dict(os.environ, PYRITE_MC_BACKEND="cpu", MPLBACKEND="Agg")
-    env.setdefault("PYRITE_MC_TRANSPORT_INITIAL_MAX_STEPS", "128")
-    env.setdefault("MPLCONFIGDIR", "/tmp/pyrite-mpl-cache")
-    env.setdefault("NUMBA_CACHE_DIR", "/tmp/pyrite-notebook-numba")
+    base = dict(os.environ, MPLBACKEND="Agg")
+    base.setdefault("PYRITE_MC_TRANSPORT_INITIAL_MAX_STEPS", "128")
+    base.setdefault("MPLCONFIGDIR", "/tmp/pyrite-mpl-cache")
+    base.setdefault("NUMBA_CACHE_DIR", "/tmp/pyrite-notebook-numba")
+    envs = {source: dict(base, PYRITE_MC_BACKEND=capture_backend(source)) for source in sources}
+    if any(env["PYRITE_MC_BACKEND"] == "cuda" for env in envs.values()):
+        require_cuda(dict(base, PYRITE_MC_BACKEND="cuda"))
     subprocess.run(
         [sys.executable, "-m", "marimo", "check", *map(str, sources)],
         check=True,
-        env=env,
+        env=dict(base, PYRITE_MC_BACKEND="cpu"),
     )
     # Stage *all* exports before touching tracked documentation pages. Failures
     # cannot leave a partially migrated published curriculum.
@@ -425,7 +456,7 @@ def regenerate(names):
                     str(exported),
                 ],
                 check=True,
-                env=env,
+                env=envs[source],
                 cwd=DOCS.parent,
             )
             notebook = captured_notebook(
