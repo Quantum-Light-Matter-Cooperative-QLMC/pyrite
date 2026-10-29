@@ -17,7 +17,9 @@ For the full field inventory and serialization contract, see the
 ## Physical quantity inputs
 
 Pint is included in the core installation. Construct quantities through PyRITE's
-single shared registry. Existing numeric inputs keep the units encoded by their
+single shared registry. To convert an existing script, follow
+[Migrate scripts to physical quantities](../../guides/physical-quantities.md).
+Existing numeric inputs keep the units encoded by their
 field names. Supported configuration boundaries convert compatible quantities
 to those same numeric values before case lowering or persistence.
 

@@ -19,6 +19,7 @@ configuration-cookbook
 configuration-notebook
 directional-source-heatmap
 detector-observations
+physical-quantities
 ```
 
 ```{toctree}
