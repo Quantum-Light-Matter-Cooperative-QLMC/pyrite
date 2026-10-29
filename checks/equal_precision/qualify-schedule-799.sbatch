@@ -20,7 +20,7 @@ out="$BR/evidence/continuation/qualify799/$SLURM_JOB_ID"; mkdir -p "$out"
 git rev-parse HEAD > "$out/head.txt"
 scontrol show job "$SLURM_JOB_ID" > "$out/job.txt"; nvidia-smi -q > "$out/gpu.txt"
 uv sync --package pyrite-mc --no-default-groups --group dev --extra nvidia -q
-for code in elsepa bremslib sbethe sbethe-tables eedl eadl; do uv run --no-sync pyrite tables fetch "$code" > /dev/null; done
+for code in elsepa bremslib sbethe sbethe-tables eedl eadl epdl; do uv run --no-sync pyrite tables fetch "$code" > /dev/null; done
 run() {  # schedule scene histories seed
   local stem="$2-$3-$4-$1"
   PYRITE_MC_TRANSPORT_SCHEDULE=$1 timeout --signal=TERM --kill-after=5s 2400s uv run --no-sync \

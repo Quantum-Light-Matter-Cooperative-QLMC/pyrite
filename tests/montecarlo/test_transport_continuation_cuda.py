@@ -377,8 +377,11 @@ def test_elsepa_coupled_radiative_rows_match_full_history():
     _assert_identical(reference, _elsepa(_continued(6, 40), **kw))
 
 
-def test_electron_block_with_beam_spot_and_bunch_matches_full_history():
-    """An adaptive block draws its slice of the streams; spot, spread, bunch."""
+def test_electron_block_with_beam_spot_matches_full_history():
+    """An adaptive block draws its slice of the streams; spot and energy spread.
+
+    Blocks take no in-block bunch sampling (the block driver offsets times).
+    """
     kw = dict(
         _electron_start=70,
         _energy_range_keV=(5.0, 30.1),
@@ -386,7 +389,6 @@ def test_electron_block_with_beam_spot_and_bunch_matches_full_history():
         crystal_height_mm=2e-3,
         beam_fwhm_mm=1e-3,
         energy_spread_frac=1e-3,
-        bunch_length_fs=10.0,
     )
     reference = _elsepa(REFERENCE, Ne=90, **kw)
     assert reference["n_missed"] > 0
