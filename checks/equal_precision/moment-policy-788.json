@@ -1,0 +1,29 @@
+{
+  "schema": "radiative-moment-qualification-v1",
+  "policy": "positive-linear-log-energy-v1",
+  "reference": ["bremslib-radiative-partition", "dielectric-suppression"],
+  "component_order": ["soft_eV_per_ang", "hard_per_ang", "hard_first_eV_per_ang"],
+  "relative_tolerance": 0.0002,
+  "absolute_tolerance": [1e-10, 1e-14, 1e-10],
+  "refinement_budget_fraction": 0.25,
+  "refinement_fractions": [0.25, 0.5, 0.75],
+  "held_out": {"log_uniform_count": 8191, "offset": 0.3819660112501051},
+  "closure": "soft + hard first versus exact uncut first; same mixed first-moment budget",
+  "coverage": "closed explicit energy interval; reject outside; no clamp or extrapolation",
+  "ensemble": {
+    "seeds": [78811, 78812, 78813],
+    "confidence": 0.99,
+    "rule": "entire paired difference confidence interval inside equivalence margins; unresolved is not pass",
+    "relative_margins": {"hard_count": 0.01, "hard_energy": 0.01, "path_length": 0.002, "exit_energy": 0.002},
+    "absolute_margins": {"transmission_fraction": 0.002, "backscatter_fraction": 0.002},
+    "precision_refinement": "compare rtol 2e-4 and 1e-4 to exact, with identical inputs and seed addressing"
+  },
+  "timing": {
+    "repeats": 5,
+    "warmups": 1,
+    "separate": ["build", "upload", "warm moments", "warm transport", "complete request", "memory"],
+    "report": ["all repeats", "median", "range", "launch geometry", "batch/probe policy", "useful/replayed work", "register resources", "profiler limitations"],
+    "claim_limit": "moment microbenchmarks alone do not establish transport or equal-precision speedup"
+  },
+  "production_gate": "isolated diagnostic only until component, CPU/CUDA and ensemble qualification pass"
+}

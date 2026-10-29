@@ -8,6 +8,18 @@ if TYPE_CHECKING:
     import numpy as np
 
 
+def _check_energy_unit(unit: str) -> None:
+    """Validate a displayed energy unit without importing Pint on numeric paths."""
+    from .units import Q_
+
+    if not isinstance(unit, str) or not unit.strip():
+        raise TypeError("energy_unit must be a nonempty energy-unit string")
+    try:
+        Q_(1, unit).to("eV")
+    except Exception as exc:
+        raise ValueError(f"energy_unit {unit!r} must be an energy unit") from exc
+
+
 def _is_pint_quantity(value: object) -> bool:
     """Recognize Pint quantities without importing Pint on numeric paths."""
     return (

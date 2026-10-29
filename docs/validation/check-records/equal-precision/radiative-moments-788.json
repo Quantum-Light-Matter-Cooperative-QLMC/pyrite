@@ -1,0 +1,1588 @@
+{
+  "schema": "radiative-moment-components-788-v1",
+  "protocol_sha256": "1b3d0748828ab001b385644208020b50d28eb1f484aa9f5a310458ba437d376f",
+  "sync": {
+    "code_digest": "f3627df89be0841fc815f79f639d1fbe02d24273a0a42fd21c2187f09b57c44e",
+    "code_revision": "592aa34fd78bc4f3f79e0092e5c3bd45da0a8f88",
+    "code_dirty": "False",
+    "code_synced_at": "2026-10-29T15:26:45+00:00",
+    "code_tables_digest": "fa64dadcf63912be948c11f4b30745483bbe14b5df3a81dc6613ae46b7cf5e1e"
+  },
+  "python": "3.14.6",
+  "numpy": "2.5.4",
+  "cupy": "14.2.0",
+  "device": "NVIDIA GeForce RTX 5080",
+  "coverage_eV": [
+    10000.0,
+    100000000.0
+  ],
+  "queries": 65536,
+  "threads_per_block": 128,
+  "scope": "moment evaluations only; no transport, histories, batching, replay or equal-precision speedup",
+  "profiler_limit": "synchronized wall timings; no exclusive FP64/occupancy attribution",
+  "cases": [
+    {
+      "cutoff_eV": 1000.0,
+      "rtol": 0.0002,
+      "layer": 0,
+      "composition": [
+        [
+          "Si",
+          0.049942993373787194
+        ]
+      ],
+      "digest": "566c9808181b13390ee3486d6165f8ff50a5ca4f46049ce54ac054656967d37c",
+      "identity": {
+        "atol": [
+          1e-10,
+          1e-14,
+          1e-10
+        ],
+        "composition": [
+          [
+            [
+              "Si",
+              0.049942993373787194
+            ]
+          ],
+          [
+            [
+              "W",
+              0.06322199557658834
+            ]
+          ],
+          [
+            [
+              "Si",
+              0.025
+            ],
+            [
+              "W",
+              0.03
+            ]
+          ]
+        ],
+        "coverage_eV": [
+          10000.0,
+          100000000.0
+        ],
+        "cutoff_eV": 1000.0,
+        "held_out_count": 8191,
+        "max_nodes": 32768,
+        "plasma_eV": [
+          31.049785193007793,
+          80.31695920801324,
+          59.52835199420215
+        ],
+        "policy": "positive-linear-log-energy-v1",
+        "projectile": "electron",
+        "reference": "bremslib-v2.0-sdcs-ddcs/lin-x18-geo4-ln-t-lin-theta-v2/tm-coupled-v2/ee-sb85-v1",
+        "rtol": 0.0002,
+        "sources": [
+          [
+            "Si",
+            "cff95de45a327e3ac277930ae56f236ea19e519ccfa199d2a903c297c4677fee",
+            "848f5d188f965678f290e0738bb4762e1b50a11e325e38a2c53de7aa24e5c67a"
+          ],
+          [
+            "W",
+            "dfccd9efa5bdcd0968b2cbbabd708106d123f6df654bc03d19b3e96cec0beec0",
+            "ec1cfd4c6f5e97dec8aca7a3153a3f212cfcce90d7ec296b12a7d876e4c1886d"
+          ]
+        ]
+      },
+      "nodes": 822,
+      "heldout_budget_fraction": 0.2376380607073992,
+      "dense_budget_fraction": [
+        0.06365417194504902,
+        0.13242833351897831,
+        0.23775240576916395
+      ],
+      "same_table_cpu_cuda_budget_fraction": 0.002067991370293627,
+      "exact_cpu_cuda_budget_fraction": 9.698894698958309e-05,
+      "build_all_layers_s": 0.20485203387215734,
+      "upload_all_layers_s": 0.0005218731239438057,
+      "host_bytes_all_layers": 93240,
+      "device_bytes_all_layers": 93240,
+      "gpu_exact_two_components": {
+        "seconds": [
+          0.0011815959587693214,
+          0.001183337066322565,
+          0.0011979970149695873,
+          0.00117463618516922,
+          0.0011779568158090115
+        ],
+        "median_s": 0.0011815959587693214,
+        "range_s": [
+          0.00117463618516922,
+          0.0011979970149695873
+        ]
+      },
+      "gpu_table_three_components": {
+        "seconds": [
+          0.00012151012197136879,
+          0.00010474096052348614,
+          0.00010221987031400204,
+          0.00010028085671365261,
+          0.00010028993710875511
+        ],
+        "median_s": 0.00010221987031400204,
+        "range_s": [
+          0.00010028085671365261,
+          0.00012151012197136879
+        ]
+      },
+      "cpu_exact_three_components": {
+        "seconds": [
+          0.14447137108072639,
+          0.14372080308385193,
+          0.14435118506662548,
+          0.14441962214186788,
+          0.14353248290717602
+        ],
+        "median_s": 0.14435118506662548,
+        "range_s": [
+          0.14353248290717602,
+          0.14447137108072639
+        ]
+      },
+      "status": "passed"
+    },
+    {
+      "cutoff_eV": 1000.0,
+      "rtol": 0.0002,
+      "layer": 1,
+      "composition": [
+        [
+          "W",
+          0.06322199557658834
+        ]
+      ],
+      "digest": "566c9808181b13390ee3486d6165f8ff50a5ca4f46049ce54ac054656967d37c",
+      "identity": {
+        "atol": [
+          1e-10,
+          1e-14,
+          1e-10
+        ],
+        "composition": [
+          [
+            [
+              "Si",
+              0.049942993373787194
+            ]
+          ],
+          [
+            [
+              "W",
+              0.06322199557658834
+            ]
+          ],
+          [
+            [
+              "Si",
+              0.025
+            ],
+            [
+              "W",
+              0.03
+            ]
+          ]
+        ],
+        "coverage_eV": [
+          10000.0,
+          100000000.0
+        ],
+        "cutoff_eV": 1000.0,
+        "held_out_count": 8191,
+        "max_nodes": 32768,
+        "plasma_eV": [
+          31.049785193007793,
+          80.31695920801324,
+          59.52835199420215
+        ],
+        "policy": "positive-linear-log-energy-v1",
+        "projectile": "electron",
+        "reference": "bremslib-v2.0-sdcs-ddcs/lin-x18-geo4-ln-t-lin-theta-v2/tm-coupled-v2/ee-sb85-v1",
+        "rtol": 0.0002,
+        "sources": [
+          [
+            "Si",
+            "cff95de45a327e3ac277930ae56f236ea19e519ccfa199d2a903c297c4677fee",
+            "848f5d188f965678f290e0738bb4762e1b50a11e325e38a2c53de7aa24e5c67a"
+          ],
+          [
+            "W",
+            "dfccd9efa5bdcd0968b2cbbabd708106d123f6df654bc03d19b3e96cec0beec0",
+            "ec1cfd4c6f5e97dec8aca7a3153a3f212cfcce90d7ec296b12a7d876e4c1886d"
+          ]
+        ]
+      },
+      "nodes": 810,
+      "heldout_budget_fraction": 0.2429395017263397,
+      "dense_budget_fraction": [
+        0.24379249339191836,
+        0.2384928810533673,
+        0.23593857555163578
+      ],
+      "same_table_cpu_cuda_budget_fraction": 0.0028925953152463624,
+      "exact_cpu_cuda_budget_fraction": 0.00021037937022212416,
+      "build_all_layers_s": 0.20485203387215734,
+      "upload_all_layers_s": 0.0005218731239438057,
+      "host_bytes_all_layers": 93240,
+      "device_bytes_all_layers": 93240,
+      "gpu_exact_two_components": {
+        "seconds": [
+          0.0013227970339357853,
+          0.0012785170692950487,
+          0.0012792670167982578,
+          0.001285027014091611,
+          0.0012870070058852434
+        ],
+        "median_s": 0.001285027014091611,
+        "range_s": [
+          0.0012785170692950487,
+          0.0013227970339357853
+        ]
+      },
+      "gpu_table_three_components": {
+        "seconds": [
+          0.0002352469600737095,
+          0.00035690213553607464,
+          0.00013498100452125072,
+          0.00012946082279086113,
+          0.00011000991798937321
+        ],
+        "median_s": 0.00013498100452125072,
+        "range_s": [
+          0.00011000991798937321,
+          0.00035690213553607464
+        ]
+      },
+      "cpu_exact_three_components": {
+        "seconds": [
+          0.1444048818666488,
+          0.1443491659592837,
+          0.14479579986073077,
+          0.14376895385794342,
+          0.14337945682927966
+        ],
+        "median_s": 0.1443491659592837,
+        "range_s": [
+          0.14337945682927966,
+          0.14479579986073077
+        ]
+      },
+      "status": "passed"
+    },
+    {
+      "cutoff_eV": 1000.0,
+      "rtol": 0.0002,
+      "layer": 2,
+      "composition": [
+        [
+          "Si",
+          0.025
+        ],
+        [
+          "W",
+          0.03
+        ]
+      ],
+      "digest": "566c9808181b13390ee3486d6165f8ff50a5ca4f46049ce54ac054656967d37c",
+      "identity": {
+        "atol": [
+          1e-10,
+          1e-14,
+          1e-10
+        ],
+        "composition": [
+          [
+            [
+              "Si",
+              0.049942993373787194
+            ]
+          ],
+          [
+            [
+              "W",
+              0.06322199557658834
+            ]
+          ],
+          [
+            [
+              "Si",
+              0.025
+            ],
+            [
+              "W",
+              0.03
+            ]
+          ]
+        ],
+        "coverage_eV": [
+          10000.0,
+          100000000.0
+        ],
+        "cutoff_eV": 1000.0,
+        "held_out_count": 8191,
+        "max_nodes": 32768,
+        "plasma_eV": [
+          31.049785193007793,
+          80.31695920801324,
+          59.52835199420215
+        ],
+        "policy": "positive-linear-log-energy-v1",
+        "projectile": "electron",
+        "reference": "bremslib-v2.0-sdcs-ddcs/lin-x18-geo4-ln-t-lin-theta-v2/tm-coupled-v2/ee-sb85-v1",
+        "rtol": 0.0002,
+        "sources": [
+          [
+            "Si",
+            "cff95de45a327e3ac277930ae56f236ea19e519ccfa199d2a903c297c4677fee",
+            "848f5d188f965678f290e0738bb4762e1b50a11e325e38a2c53de7aa24e5c67a"
+          ],
+          [
+            "W",
+            "dfccd9efa5bdcd0968b2cbbabd708106d123f6df654bc03d19b3e96cec0beec0",
+            "ec1cfd4c6f5e97dec8aca7a3153a3f212cfcce90d7ec296b12a7d876e4c1886d"
+          ]
+        ]
+      },
+      "nodes": 699,
+      "heldout_budget_fraction": 0.24694419515936092,
+      "dense_budget_fraction": [
+        0.23349756211598044,
+        0.24694942959204882,
+        0.2373869754662874
+      ],
+      "same_table_cpu_cuda_budget_fraction": 0.0025743411384994016,
+      "exact_cpu_cuda_budget_fraction": 0.0002102397332429132,
+      "build_all_layers_s": 0.20485203387215734,
+      "upload_all_layers_s": 0.0005218731239438057,
+      "host_bytes_all_layers": 93240,
+      "device_bytes_all_layers": 93240,
+      "gpu_exact_two_components": {
+        "seconds": [
+          0.0023376320023089647,
+          0.0022897731978446245,
+          0.0023129931651055813,
+          0.0023057619109749794,
+          0.0023005730472505093
+        ],
+        "median_s": 0.0023057619109749794,
+        "range_s": [
+          0.0022897731978446245,
+          0.0023376320023089647
+        ]
+      },
+      "gpu_table_three_components": {
+        "seconds": [
+          0.00010968092828989029,
+          0.00010320008732378483,
+          0.00010160100646317005,
+          0.00011014007031917572,
+          0.00010134093463420868
+        ],
+        "median_s": 0.00010320008732378483,
+        "range_s": [
+          0.00010134093463420868,
+          0.00011014007031917572
+        ]
+      },
+      "cpu_exact_three_components": {
+        "seconds": [
+          0.2876129848882556,
+          0.2903922151308507,
+          0.28762232000008225,
+          0.2871060990728438,
+          0.28811569418758154
+        ],
+        "median_s": 0.28762232000008225,
+        "range_s": [
+          0.2871060990728438,
+          0.2903922151308507
+        ]
+      },
+      "status": "passed"
+    },
+    {
+      "cutoff_eV": 1000.0,
+      "rtol": 0.0001,
+      "layer": 0,
+      "composition": [
+        [
+          "Si",
+          0.049942993373787194
+        ]
+      ],
+      "digest": "82aa824e394094f4ed4dc33b6a5381761fc56ae74e856308c6a0a174a535e595",
+      "identity": {
+        "atol": [
+          1e-10,
+          1e-14,
+          1e-10
+        ],
+        "composition": [
+          [
+            [
+              "Si",
+              0.049942993373787194
+            ]
+          ],
+          [
+            [
+              "W",
+              0.06322199557658834
+            ]
+          ],
+          [
+            [
+              "Si",
+              0.025
+            ],
+            [
+              "W",
+              0.03
+            ]
+          ]
+        ],
+        "coverage_eV": [
+          10000.0,
+          100000000.0
+        ],
+        "cutoff_eV": 1000.0,
+        "held_out_count": 8191,
+        "max_nodes": 32768,
+        "plasma_eV": [
+          31.049785193007793,
+          80.31695920801324,
+          59.52835199420215
+        ],
+        "policy": "positive-linear-log-energy-v1",
+        "projectile": "electron",
+        "reference": "bremslib-v2.0-sdcs-ddcs/lin-x18-geo4-ln-t-lin-theta-v2/tm-coupled-v2/ee-sb85-v1",
+        "rtol": 0.0001,
+        "sources": [
+          [
+            "Si",
+            "cff95de45a327e3ac277930ae56f236ea19e519ccfa199d2a903c297c4677fee",
+            "848f5d188f965678f290e0738bb4762e1b50a11e325e38a2c53de7aa24e5c67a"
+          ],
+          [
+            "W",
+            "dfccd9efa5bdcd0968b2cbbabd708106d123f6df654bc03d19b3e96cec0beec0",
+            "ec1cfd4c6f5e97dec8aca7a3153a3f212cfcce90d7ec296b12a7d876e4c1886d"
+          ]
+        ]
+      },
+      "nodes": 1386,
+      "heldout_budget_fraction": 0.24291872852504895,
+      "dense_budget_fraction": [
+        0.04908340644847781,
+        0.16976798392654924,
+        0.2440578316611211
+      ],
+      "same_table_cpu_cuda_budget_fraction": 0.002067991370293627,
+      "exact_cpu_cuda_budget_fraction": 9.698894698958309e-05,
+      "build_all_layers_s": 0.21587708801962435,
+      "upload_all_layers_s": 0.0005216931458562613,
+      "host_bytes_all_layers": 150000,
+      "device_bytes_all_layers": 150000,
+      "gpu_exact_two_components": {
+        "seconds": [
+          0.00117394607514143,
+          0.0011761169880628586,
+          0.0011856269557029009,
+          0.0011800958309322596,
+          0.0011929369065910578
+        ],
+        "median_s": 0.0011800958309322596,
+        "range_s": [
+          0.00117394607514143,
+          0.0011929369065910578
+        ]
+      },
+      "gpu_table_three_components": {
+        "seconds": [
+          0.00012694112956523895,
+          0.0001103309914469719,
+          0.00011228001676499844,
+          0.0001105510164052248,
+          0.0001012999564409256
+        ],
+        "median_s": 0.0001105510164052248,
+        "range_s": [
+          0.0001012999564409256,
+          0.00012694112956523895
+        ]
+      },
+      "cpu_exact_three_components": {
+        "seconds": [
+          0.14938935381360352,
+          0.14923184108920395,
+          0.14912687009200454,
+          0.15009460295550525,
+          0.15038672601804137
+        ],
+        "median_s": 0.14938935381360352,
+        "range_s": [
+          0.14912687009200454,
+          0.15038672601804137
+        ]
+      },
+      "status": "passed"
+    },
+    {
+      "cutoff_eV": 1000.0,
+      "rtol": 0.0001,
+      "layer": 1,
+      "composition": [
+        [
+          "W",
+          0.06322199557658834
+        ]
+      ],
+      "digest": "82aa824e394094f4ed4dc33b6a5381761fc56ae74e856308c6a0a174a535e595",
+      "identity": {
+        "atol": [
+          1e-10,
+          1e-14,
+          1e-10
+        ],
+        "composition": [
+          [
+            [
+              "Si",
+              0.049942993373787194
+            ]
+          ],
+          [
+            [
+              "W",
+              0.06322199557658834
+            ]
+          ],
+          [
+            [
+              "Si",
+              0.025
+            ],
+            [
+              "W",
+              0.03
+            ]
+          ]
+        ],
+        "coverage_eV": [
+          10000.0,
+          100000000.0
+        ],
+        "cutoff_eV": 1000.0,
+        "held_out_count": 8191,
+        "max_nodes": 32768,
+        "plasma_eV": [
+          31.049785193007793,
+          80.31695920801324,
+          59.52835199420215
+        ],
+        "policy": "positive-linear-log-energy-v1",
+        "projectile": "electron",
+        "reference": "bremslib-v2.0-sdcs-ddcs/lin-x18-geo4-ln-t-lin-theta-v2/tm-coupled-v2/ee-sb85-v1",
+        "rtol": 0.0001,
+        "sources": [
+          [
+            "Si",
+            "cff95de45a327e3ac277930ae56f236ea19e519ccfa199d2a903c297c4677fee",
+            "848f5d188f965678f290e0738bb4762e1b50a11e325e38a2c53de7aa24e5c67a"
+          ],
+          [
+            "W",
+            "dfccd9efa5bdcd0968b2cbbabd708106d123f6df654bc03d19b3e96cec0beec0",
+            "ec1cfd4c6f5e97dec8aca7a3153a3f212cfcce90d7ec296b12a7d876e4c1886d"
+          ]
+        ]
+      },
+      "nodes": 1206,
+      "heldout_budget_fraction": 0.24872868921868246,
+      "dense_budget_fraction": [
+        0.24901210622119674,
+        0.14215127914026063,
+        0.2243561912577108
+      ],
+      "same_table_cpu_cuda_budget_fraction": 0.0029482967127812823,
+      "exact_cpu_cuda_budget_fraction": 0.00021037937022212416,
+      "build_all_layers_s": 0.21587708801962435,
+      "upload_all_layers_s": 0.0005216931458562613,
+      "host_bytes_all_layers": 150000,
+      "device_bytes_all_layers": 150000,
+      "gpu_exact_two_components": {
+        "seconds": [
+          0.0013146968558430672,
+          0.0013458060566335917,
+          0.0012951469980180264,
+          0.001292677130550146,
+          0.001328865997493267
+        ],
+        "median_s": 0.0013146968558430672,
+        "range_s": [
+          0.001292677130550146,
+          0.0013458060566335917
+        ]
+      },
+      "gpu_table_three_components": {
+        "seconds": [
+          0.00011578109115362167,
+          0.0001052499283105135,
+          0.00010434095747768879,
+          0.00011150003410875797,
+          0.00014347094111144543
+        ],
+        "median_s": 0.00011150003410875797,
+        "range_s": [
+          0.00010434095747768879,
+          0.00014347094111144543
+        ]
+      },
+      "cpu_exact_three_components": {
+        "seconds": [
+          0.14922255091369152,
+          0.15044441213831306,
+          0.14904019283130765,
+          0.14956771186552942,
+          0.1528825769200921
+        ],
+        "median_s": 0.14956771186552942,
+        "range_s": [
+          0.14904019283130765,
+          0.1528825769200921
+        ]
+      },
+      "status": "passed"
+    },
+    {
+      "cutoff_eV": 1000.0,
+      "rtol": 0.0001,
+      "layer": 2,
+      "composition": [
+        [
+          "Si",
+          0.025
+        ],
+        [
+          "W",
+          0.03
+        ]
+      ],
+      "digest": "82aa824e394094f4ed4dc33b6a5381761fc56ae74e856308c6a0a174a535e595",
+      "identity": {
+        "atol": [
+          1e-10,
+          1e-14,
+          1e-10
+        ],
+        "composition": [
+          [
+            [
+              "Si",
+              0.049942993373787194
+            ]
+          ],
+          [
+            [
+              "W",
+              0.06322199557658834
+            ]
+          ],
+          [
+            [
+              "Si",
+              0.025
+            ],
+            [
+              "W",
+              0.03
+            ]
+          ]
+        ],
+        "coverage_eV": [
+          10000.0,
+          100000000.0
+        ],
+        "cutoff_eV": 1000.0,
+        "held_out_count": 8191,
+        "max_nodes": 32768,
+        "plasma_eV": [
+          31.049785193007793,
+          80.31695920801324,
+          59.52835199420215
+        ],
+        "policy": "positive-linear-log-energy-v1",
+        "projectile": "electron",
+        "reference": "bremslib-v2.0-sdcs-ddcs/lin-x18-geo4-ln-t-lin-theta-v2/tm-coupled-v2/ee-sb85-v1",
+        "rtol": 0.0001,
+        "sources": [
+          [
+            "Si",
+            "cff95de45a327e3ac277930ae56f236ea19e519ccfa199d2a903c297c4677fee",
+            "848f5d188f965678f290e0738bb4762e1b50a11e325e38a2c53de7aa24e5c67a"
+          ],
+          [
+            "W",
+            "dfccd9efa5bdcd0968b2cbbabd708106d123f6df654bc03d19b3e96cec0beec0",
+            "ec1cfd4c6f5e97dec8aca7a3153a3f212cfcce90d7ec296b12a7d876e4c1886d"
+          ]
+        ]
+      },
+      "nodes": 1158,
+      "heldout_budget_fraction": 0.22661431442633298,
+      "dense_budget_fraction": [
+        0.21184117101437813,
+        0.14737787092056207,
+        0.22662520732498892
+      ],
+      "same_table_cpu_cuda_budget_fraction": 0.0025743411384994016,
+      "exact_cpu_cuda_budget_fraction": 0.0002102397332429132,
+      "build_all_layers_s": 0.21587708801962435,
+      "upload_all_layers_s": 0.0005216931458562613,
+      "host_bytes_all_layers": 150000,
+      "device_bytes_all_layers": 150000,
+      "gpu_exact_two_components": {
+        "seconds": [
+          0.002317408099770546,
+          0.002306868089362979,
+          0.0023086180444806814,
+          0.00232115900143981,
+          0.0023159082047641277
+        ],
+        "median_s": 0.0023159082047641277,
+        "range_s": [
+          0.002306868089362979,
+          0.00232115900143981
+        ]
+      },
+      "gpu_table_three_components": {
+        "seconds": [
+          0.00011791195720434189,
+          0.00011334195733070374,
+          0.00011560204438865185,
+          0.00011261203326284885,
+          0.00011150096543133259
+        ],
+        "median_s": 0.00011334195733070374,
+        "range_s": [
+          0.00011150096543133259,
+          0.00011791195720434189
+        ]
+      },
+      "cpu_exact_three_components": {
+        "seconds": [
+          0.2964236761908978,
+          0.2963249159511179,
+          0.29628948005847633,
+          0.2971997349523008,
+          0.2976994269993156
+        ],
+        "median_s": 0.2964236761908978,
+        "range_s": [
+          0.29628948005847633,
+          0.2976994269993156
+        ]
+      },
+      "status": "passed"
+    },
+    {
+      "cutoff_eV": 10000.0,
+      "rtol": 0.0002,
+      "layer": 0,
+      "composition": [
+        [
+          "Si",
+          0.049942993373787194
+        ]
+      ],
+      "digest": "8a47cd7cbef1c6cc64179b44cd9d281b67b61eaaf35cf9321cf69a009b8c9c1b",
+      "identity": {
+        "atol": [
+          1e-10,
+          1e-14,
+          1e-10
+        ],
+        "composition": [
+          [
+            [
+              "Si",
+              0.049942993373787194
+            ]
+          ],
+          [
+            [
+              "W",
+              0.06322199557658834
+            ]
+          ],
+          [
+            [
+              "Si",
+              0.025
+            ],
+            [
+              "W",
+              0.03
+            ]
+          ]
+        ],
+        "coverage_eV": [
+          10000.0,
+          100000000.0
+        ],
+        "cutoff_eV": 10000.0,
+        "held_out_count": 8191,
+        "max_nodes": 32768,
+        "plasma_eV": [
+          31.049785193007793,
+          80.31695920801324,
+          59.52835199420215
+        ],
+        "policy": "positive-linear-log-energy-v1",
+        "projectile": "electron",
+        "reference": "bremslib-v2.0-sdcs-ddcs/lin-x18-geo4-ln-t-lin-theta-v2/tm-coupled-v2/ee-sb85-v1",
+        "rtol": 0.0002,
+        "sources": [
+          [
+            "Si",
+            "cff95de45a327e3ac277930ae56f236ea19e519ccfa199d2a903c297c4677fee",
+            "848f5d188f965678f290e0738bb4762e1b50a11e325e38a2c53de7aa24e5c67a"
+          ],
+          [
+            "W",
+            "dfccd9efa5bdcd0968b2cbbabd708106d123f6df654bc03d19b3e96cec0beec0",
+            "ec1cfd4c6f5e97dec8aca7a3153a3f212cfcce90d7ec296b12a7d876e4c1886d"
+          ]
+        ]
+      },
+      "nodes": 1156,
+      "heldout_budget_fraction": 0.23766663563512452,
+      "dense_budget_fraction": [
+        0.039951902540805426,
+        0.2133052476641953,
+        0.23778116044490047
+      ],
+      "same_table_cpu_cuda_budget_fraction": 0.005633317519738809,
+      "exact_cpu_cuda_budget_fraction": 0.0007687295808086931,
+      "build_all_layers_s": 0.226666740141809,
+      "upload_all_layers_s": 0.0005930031184107065,
+      "host_bytes_all_layers": 120480,
+      "device_bytes_all_layers": 120480,
+      "gpu_exact_two_components": {
+        "seconds": [
+          0.0012034459505230188,
+          0.0011854460462927818,
+          0.0011924759019166231,
+          0.0011845959816128016,
+          0.001181496074423194
+        ],
+        "median_s": 0.0011854460462927818,
+        "range_s": [
+          0.001181496074423194,
+          0.0012034459505230188
+        ]
+      },
+      "gpu_table_three_components": {
+        "seconds": [
+          0.00011510099284350872,
+          0.00010926998220384121,
+          0.00010538101196289062,
+          0.00010538101196289062,
+          0.0001044201198965311
+        ],
+        "median_s": 0.00010538101196289062,
+        "range_s": [
+          0.0001044201198965311,
+          0.00011510099284350872
+        ]
+      },
+      "cpu_exact_three_components": {
+        "seconds": [
+          0.14487232104875147,
+          0.14380934601649642,
+          0.14400547300465405,
+          0.14453077502548695,
+          0.14443387417122722
+        ],
+        "median_s": 0.14443387417122722,
+        "range_s": [
+          0.14380934601649642,
+          0.14487232104875147
+        ]
+      },
+      "status": "passed"
+    },
+    {
+      "cutoff_eV": 10000.0,
+      "rtol": 0.0002,
+      "layer": 1,
+      "composition": [
+        [
+          "W",
+          0.06322199557658834
+        ]
+      ],
+      "digest": "8a47cd7cbef1c6cc64179b44cd9d281b67b61eaaf35cf9321cf69a009b8c9c1b",
+      "identity": {
+        "atol": [
+          1e-10,
+          1e-14,
+          1e-10
+        ],
+        "composition": [
+          [
+            [
+              "Si",
+              0.049942993373787194
+            ]
+          ],
+          [
+            [
+              "W",
+              0.06322199557658834
+            ]
+          ],
+          [
+            [
+              "Si",
+              0.025
+            ],
+            [
+              "W",
+              0.03
+            ]
+          ]
+        ],
+        "coverage_eV": [
+          10000.0,
+          100000000.0
+        ],
+        "cutoff_eV": 10000.0,
+        "held_out_count": 8191,
+        "max_nodes": 32768,
+        "plasma_eV": [
+          31.049785193007793,
+          80.31695920801324,
+          59.52835199420215
+        ],
+        "policy": "positive-linear-log-energy-v1",
+        "projectile": "electron",
+        "reference": "bremslib-v2.0-sdcs-ddcs/lin-x18-geo4-ln-t-lin-theta-v2/tm-coupled-v2/ee-sb85-v1",
+        "rtol": 0.0002,
+        "sources": [
+          [
+            "Si",
+            "cff95de45a327e3ac277930ae56f236ea19e519ccfa199d2a903c297c4677fee",
+            "848f5d188f965678f290e0738bb4762e1b50a11e325e38a2c53de7aa24e5c67a"
+          ],
+          [
+            "W",
+            "dfccd9efa5bdcd0968b2cbbabd708106d123f6df654bc03d19b3e96cec0beec0",
+            "ec1cfd4c6f5e97dec8aca7a3153a3f212cfcce90d7ec296b12a7d876e4c1886d"
+          ]
+        ]
+      },
+      "nodes": 940,
+      "heldout_budget_fraction": 0.2487463158382236,
+      "dense_budget_fraction": [
+        0.24874325869708258,
+        0.23857746947039438,
+        0.24229549649983242
+      ],
+      "same_table_cpu_cuda_budget_fraction": 0.005812264700952889,
+      "exact_cpu_cuda_budget_fraction": 0.0001152391746616633,
+      "build_all_layers_s": 0.226666740141809,
+      "upload_all_layers_s": 0.0005930031184107065,
+      "host_bytes_all_layers": 120480,
+      "device_bytes_all_layers": 120480,
+      "gpu_exact_two_components": {
+        "seconds": [
+          0.001207956112921238,
+          0.0011871359311044216,
+          0.001181876054033637,
+          0.0011780860368162394,
+          0.0011917059309780598
+        ],
+        "median_s": 0.0011871359311044216,
+        "range_s": [
+          0.0011780860368162394,
+          0.001207956112921238
+        ]
+      },
+      "gpu_table_three_components": {
+        "seconds": [
+          0.00011779996566474438,
+          0.00011232099495828152,
+          0.00010742014274001122,
+          0.00010647089220583439,
+          0.00010538985952734947
+        ],
+        "median_s": 0.00010742014274001122,
+        "range_s": [
+          0.00010538985952734947,
+          0.00011779996566474438
+        ]
+      },
+      "cpu_exact_three_components": {
+        "seconds": [
+          0.14338946877978742,
+          0.14429109496995807,
+          0.14442628505639732,
+          0.14366299100220203,
+          0.1442285601515323
+        ],
+        "median_s": 0.1442285601515323,
+        "range_s": [
+          0.14338946877978742,
+          0.14442628505639732
+        ]
+      },
+      "status": "passed"
+    },
+    {
+      "cutoff_eV": 10000.0,
+      "rtol": 0.0002,
+      "layer": 2,
+      "composition": [
+        [
+          "Si",
+          0.025
+        ],
+        [
+          "W",
+          0.03
+        ]
+      ],
+      "digest": "8a47cd7cbef1c6cc64179b44cd9d281b67b61eaaf35cf9321cf69a009b8c9c1b",
+      "identity": {
+        "atol": [
+          1e-10,
+          1e-14,
+          1e-10
+        ],
+        "composition": [
+          [
+            [
+              "Si",
+              0.049942993373787194
+            ]
+          ],
+          [
+            [
+              "W",
+              0.06322199557658834
+            ]
+          ],
+          [
+            [
+              "Si",
+              0.025
+            ],
+            [
+              "W",
+              0.03
+            ]
+          ]
+        ],
+        "coverage_eV": [
+          10000.0,
+          100000000.0
+        ],
+        "cutoff_eV": 10000.0,
+        "held_out_count": 8191,
+        "max_nodes": 32768,
+        "plasma_eV": [
+          31.049785193007793,
+          80.31695920801324,
+          59.52835199420215
+        ],
+        "policy": "positive-linear-log-energy-v1",
+        "projectile": "electron",
+        "reference": "bremslib-v2.0-sdcs-ddcs/lin-x18-geo4-ln-t-lin-theta-v2/tm-coupled-v2/ee-sb85-v1",
+        "rtol": 0.0002,
+        "sources": [
+          [
+            "Si",
+            "cff95de45a327e3ac277930ae56f236ea19e519ccfa199d2a903c297c4677fee",
+            "848f5d188f965678f290e0738bb4762e1b50a11e325e38a2c53de7aa24e5c67a"
+          ],
+          [
+            "W",
+            "dfccd9efa5bdcd0968b2cbbabd708106d123f6df654bc03d19b3e96cec0beec0",
+            "ec1cfd4c6f5e97dec8aca7a3153a3f212cfcce90d7ec296b12a7d876e4c1886d"
+          ]
+        ]
+      },
+      "nodes": 916,
+      "heldout_budget_fraction": 0.2426249489653357,
+      "dense_budget_fraction": [
+        0.16622344926833246,
+        0.2415727638467308,
+        0.24298593857421366
+      ],
+      "same_table_cpu_cuda_budget_fraction": 0.005814912904973069,
+      "exact_cpu_cuda_budget_fraction": 0.0032251207961018972,
+      "build_all_layers_s": 0.226666740141809,
+      "upload_all_layers_s": 0.0005930031184107065,
+      "host_bytes_all_layers": 120480,
+      "device_bytes_all_layers": 120480,
+      "gpu_exact_two_components": {
+        "seconds": [
+          0.002230192068964243,
+          0.0022074109874665737,
+          0.0022197109647095203,
+          0.0021973319817334414,
+          0.002225890988484025
+        ],
+        "median_s": 0.0022197109647095203,
+        "range_s": [
+          0.0021973319817334414,
+          0.002230192068964243
+        ]
+      },
+      "gpu_table_three_components": {
+        "seconds": [
+          0.00011709099635481834,
+          0.00011464091949164867,
+          0.00011430983431637287,
+          0.00010433094576001167,
+          0.00010441988706588745
+        ],
+        "median_s": 0.00011430983431637287,
+        "range_s": [
+          0.00010433094576001167,
+          0.00011709099635481834
+        ]
+      },
+      "cpu_exact_three_components": {
+        "seconds": [
+          0.28635044395923615,
+          0.28824222390539944,
+          0.28652617102488875,
+          0.2877172981388867,
+          0.2863555010408163
+        ],
+        "median_s": 0.28652617102488875,
+        "range_s": [
+          0.28635044395923615,
+          0.28824222390539944
+        ]
+      },
+      "status": "passed"
+    },
+    {
+      "cutoff_eV": 10000.0,
+      "rtol": 0.0001,
+      "layer": 0,
+      "composition": [
+        [
+          "Si",
+          0.049942993373787194
+        ]
+      ],
+      "digest": "ef96a89f2e3a3c934ccde78878362c557b6c892a7e9da2105788f10c103f49a6",
+      "identity": {
+        "atol": [
+          1e-10,
+          1e-14,
+          1e-10
+        ],
+        "composition": [
+          [
+            [
+              "Si",
+              0.049942993373787194
+            ]
+          ],
+          [
+            [
+              "W",
+              0.06322199557658834
+            ]
+          ],
+          [
+            [
+              "Si",
+              0.025
+            ],
+            [
+              "W",
+              0.03
+            ]
+          ]
+        ],
+        "coverage_eV": [
+          10000.0,
+          100000000.0
+        ],
+        "cutoff_eV": 10000.0,
+        "held_out_count": 8191,
+        "max_nodes": 32768,
+        "plasma_eV": [
+          31.049785193007793,
+          80.31695920801324,
+          59.52835199420215
+        ],
+        "policy": "positive-linear-log-energy-v1",
+        "projectile": "electron",
+        "reference": "bremslib-v2.0-sdcs-ddcs/lin-x18-geo4-ln-t-lin-theta-v2/tm-coupled-v2/ee-sb85-v1",
+        "rtol": 0.0001,
+        "sources": [
+          [
+            "Si",
+            "cff95de45a327e3ac277930ae56f236ea19e519ccfa199d2a903c297c4677fee",
+            "848f5d188f965678f290e0738bb4762e1b50a11e325e38a2c53de7aa24e5c67a"
+          ],
+          [
+            "W",
+            "dfccd9efa5bdcd0968b2cbbabd708106d123f6df654bc03d19b3e96cec0beec0",
+            "ec1cfd4c6f5e97dec8aca7a3153a3f212cfcce90d7ec296b12a7d876e4c1886d"
+          ]
+        ]
+      },
+      "nodes": 1780,
+      "heldout_budget_fraction": 0.247412313069326,
+      "dense_budget_fraction": [
+        0.03529832133939532,
+        0.248955459729277,
+        0.24814723322845755
+      ],
+      "same_table_cpu_cuda_budget_fraction": 0.005633317519738809,
+      "exact_cpu_cuda_budget_fraction": 0.0007687295808086931,
+      "build_all_layers_s": 0.23642275016754866,
+      "upload_all_layers_s": 0.0006229430437088013,
+      "host_bytes_all_layers": 195360,
+      "device_bytes_all_layers": 195360,
+      "gpu_exact_two_components": {
+        "seconds": [
+          0.001204845029860735,
+          0.0012134748976677656,
+          0.0011864749249070883,
+          0.0011975239031016827,
+          0.001191415125504136
+        ],
+        "median_s": 0.0011975239031016827,
+        "range_s": [
+          0.0011864749249070883,
+          0.0012134748976677656
+        ]
+      },
+      "gpu_table_three_components": {
+        "seconds": [
+          0.0001417009625583887,
+          0.00011752196587622166,
+          0.00011666095815598965,
+          0.00015003187581896782,
+          0.00012650201097130775
+        ],
+        "median_s": 0.00012650201097130775,
+        "range_s": [
+          0.00011666095815598965,
+          0.00015003187581896782
+        ]
+      },
+      "cpu_exact_three_components": {
+        "seconds": [
+          0.14870257303118706,
+          0.14875540300272405,
+          0.14874959690496325,
+          0.1479904348962009,
+          0.14891229895874858
+        ],
+        "median_s": 0.14874959690496325,
+        "range_s": [
+          0.1479904348962009,
+          0.14891229895874858
+        ]
+      },
+      "status": "passed"
+    },
+    {
+      "cutoff_eV": 10000.0,
+      "rtol": 0.0001,
+      "layer": 1,
+      "composition": [
+        [
+          "W",
+          0.06322199557658834
+        ]
+      ],
+      "digest": "ef96a89f2e3a3c934ccde78878362c557b6c892a7e9da2105788f10c103f49a6",
+      "identity": {
+        "atol": [
+          1e-10,
+          1e-14,
+          1e-10
+        ],
+        "composition": [
+          [
+            [
+              "Si",
+              0.049942993373787194
+            ]
+          ],
+          [
+            [
+              "W",
+              0.06322199557658834
+            ]
+          ],
+          [
+            [
+              "Si",
+              0.025
+            ],
+            [
+              "W",
+              0.03
+            ]
+          ]
+        ],
+        "coverage_eV": [
+          10000.0,
+          100000000.0
+        ],
+        "cutoff_eV": 10000.0,
+        "held_out_count": 8191,
+        "max_nodes": 32768,
+        "plasma_eV": [
+          31.049785193007793,
+          80.31695920801324,
+          59.52835199420215
+        ],
+        "policy": "positive-linear-log-energy-v1",
+        "projectile": "electron",
+        "reference": "bremslib-v2.0-sdcs-ddcs/lin-x18-geo4-ln-t-lin-theta-v2/tm-coupled-v2/ee-sb85-v1",
+        "rtol": 0.0001,
+        "sources": [
+          [
+            "Si",
+            "cff95de45a327e3ac277930ae56f236ea19e519ccfa199d2a903c297c4677fee",
+            "848f5d188f965678f290e0738bb4762e1b50a11e325e38a2c53de7aa24e5c67a"
+          ],
+          [
+            "W",
+            "dfccd9efa5bdcd0968b2cbbabd708106d123f6df654bc03d19b3e96cec0beec0",
+            "ec1cfd4c6f5e97dec8aca7a3153a3f212cfcce90d7ec296b12a7d876e4c1886d"
+          ]
+        ]
+      },
+      "nodes": 1549,
+      "heldout_budget_fraction": 0.24992111229043149,
+      "dense_budget_fraction": [
+        0.13830615794639242,
+        0.24992357459717496,
+        0.22649960539426858
+      ],
+      "same_table_cpu_cuda_budget_fraction": 0.005812264700952889,
+      "exact_cpu_cuda_budget_fraction": 0.0001152391746616633,
+      "build_all_layers_s": 0.23642275016754866,
+      "upload_all_layers_s": 0.0006229430437088013,
+      "host_bytes_all_layers": 195360,
+      "device_bytes_all_layers": 195360,
+      "gpu_exact_two_components": {
+        "seconds": [
+          0.001213644864037633,
+          0.0011837841011583805,
+          0.001197295030578971,
+          0.0011812250595539808,
+          0.0011816639453172684
+        ],
+        "median_s": 0.0011837841011583805,
+        "range_s": [
+          0.0011812250595539808,
+          0.001213644864037633
+        ]
+      },
+      "gpu_table_three_components": {
+        "seconds": [
+          0.00011687097139656544,
+          0.00010729092173278332,
+          0.00014540203846991062,
+          0.00014513195492327213,
+          0.00011261086910963058
+        ],
+        "median_s": 0.00011687097139656544,
+        "range_s": [
+          0.00010729092173278332,
+          0.00014540203846991062
+        ]
+      },
+      "cpu_exact_three_components": {
+        "seconds": [
+          0.14917244506068528,
+          0.14868450607173145,
+          0.14920535404235125,
+          0.1488710450939834,
+          0.1482039790134877
+        ],
+        "median_s": 0.1488710450939834,
+        "range_s": [
+          0.1482039790134877,
+          0.14920535404235125
+        ]
+      },
+      "status": "passed"
+    },
+    {
+      "cutoff_eV": 10000.0,
+      "rtol": 0.0001,
+      "layer": 2,
+      "composition": [
+        [
+          "Si",
+          0.025
+        ],
+        [
+          "W",
+          0.03
+        ]
+      ],
+      "digest": "ef96a89f2e3a3c934ccde78878362c557b6c892a7e9da2105788f10c103f49a6",
+      "identity": {
+        "atol": [
+          1e-10,
+          1e-14,
+          1e-10
+        ],
+        "composition": [
+          [
+            [
+              "Si",
+              0.049942993373787194
+            ]
+          ],
+          [
+            [
+              "W",
+              0.06322199557658834
+            ]
+          ],
+          [
+            [
+              "Si",
+              0.025
+            ],
+            [
+              "W",
+              0.03
+            ]
+          ]
+        ],
+        "coverage_eV": [
+          10000.0,
+          100000000.0
+        ],
+        "cutoff_eV": 10000.0,
+        "held_out_count": 8191,
+        "max_nodes": 32768,
+        "plasma_eV": [
+          31.049785193007793,
+          80.31695920801324,
+          59.52835199420215
+        ],
+        "policy": "positive-linear-log-energy-v1",
+        "projectile": "electron",
+        "reference": "bremslib-v2.0-sdcs-ddcs/lin-x18-geo4-ln-t-lin-theta-v2/tm-coupled-v2/ee-sb85-v1",
+        "rtol": 0.0001,
+        "sources": [
+          [
+            "Si",
+            "cff95de45a327e3ac277930ae56f236ea19e519ccfa199d2a903c297c4677fee",
+            "848f5d188f965678f290e0738bb4762e1b50a11e325e38a2c53de7aa24e5c67a"
+          ],
+          [
+            "W",
+            "dfccd9efa5bdcd0968b2cbbabd708106d123f6df654bc03d19b3e96cec0beec0",
+            "ec1cfd4c6f5e97dec8aca7a3153a3f212cfcce90d7ec296b12a7d876e4c1886d"
+          ]
+        ]
+      },
+      "nodes": 1555,
+      "heldout_budget_fraction": 0.2456372374787877,
+      "dense_budget_fraction": [
+        0.04781290179464371,
+        0.24736795721596735,
+        0.228718086375452
+      ],
+      "same_table_cpu_cuda_budget_fraction": 0.005814912904973069,
+      "exact_cpu_cuda_budget_fraction": 0.0032251207961018972,
+      "build_all_layers_s": 0.23642275016754866,
+      "upload_all_layers_s": 0.0006229430437088013,
+      "host_bytes_all_layers": 195360,
+      "device_bytes_all_layers": 195360,
+      "gpu_exact_two_components": {
+        "seconds": [
+          0.0022156371269375086,
+          0.002206766977906227,
+          0.0021993271075189114,
+          0.002201296854764223,
+          0.0021996870636940002
+        ],
+        "median_s": 0.002201296854764223,
+        "range_s": [
+          0.0021993271075189114,
+          0.0022156371269375086
+        ]
+      },
+      "gpu_table_three_components": {
+        "seconds": [
+          0.0001200009137392044,
+          0.00010629091411828995,
+          0.00014747190289199352,
+          0.00012168195098638535,
+          0.00010842084884643555
+        ],
+        "median_s": 0.0001200009137392044,
+        "range_s": [
+          0.00010629091411828995,
+          0.00014747190289199352
+        ]
+      },
+      "cpu_exact_three_components": {
+        "seconds": [
+          0.2992549219634384,
+          0.2990526689682156,
+          0.29929658700712025,
+          0.299321903148666,
+          0.30017509893514216
+        ],
+        "median_s": 0.29929658700712025,
+        "range_s": [
+          0.2990526689682156,
+          0.30017509893514216
+        ]
+      },
+      "status": "passed"
+    }
+  ],
+  "compiled_exact_resources": [
+    {
+      "registers_per_thread": 92,
+      "local_bytes_per_thread": 0
+    }
+  ],
+  "job_id": 2637,
+  "hardware": {
+    "cpu": "AMD Ryzen 9 9950X3D 16-Core Processor",
+    "gpu": "NVIDIA GeForce RTX 5080",
+    "driver": "610.47",
+    "gpu_memory_MiB": 16303,
+    "requested_cpus": 1,
+    "allocated_logical_cpus": 2,
+    "memory_GiB": 8,
+    "time_limit_minutes": 8
+  },
+  "cuda_regression": {
+    "module": "tests/montecarlo/test_radiative_moments_cuda.py",
+    "passed": 2,
+    "wall_s": 4.98
+  },
+  "interpretation": "Component qualification only. Exact GPU probe returns soft/rate; candidate returns all three moments. Setup is for all three layers, measured once per policy. First build can include remaining Numba specialization cost. No flight/replay work or full-request/equal-achieved-precision claim; no inference of exclusive FP64 or occupancy bottlenecks."
+}
