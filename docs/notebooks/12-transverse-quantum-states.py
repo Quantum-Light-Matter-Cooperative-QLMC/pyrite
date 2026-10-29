@@ -3,7 +3,7 @@
 # dependencies = [
 #     "endf-parserpy==0.17.0",
 #     "marimo>=0.23.3",
-#     "pyrite-mc==0.22.5",
+#     "pyrite-mc==0.23.0",
 #     "matplotlib>=3.11",
 #     "numpy>=2",
 # ]
@@ -72,14 +72,12 @@ def _(gaussian, hermite_gauss, laguerre_gauss, np):
 def _(coordinates_ang, ground, hermite_32, np, plt, positive, positive_lg_32):
 
     fig_modes, _axes = plt.subplots(2, 2, figsize=(9, 7), layout="constrained", sharey=True)
-    flattened_axes = [
-        axis for _axis_pair in _axes for axis in _axis_pair
-    ]
+    flattened_axes = [axis for _axis_pair in _axes for axis in _axis_pair]
     plot_tuple = zip(
         flattened_axes,
         (ground, hermite_32, positive, positive_lg_32),
         ("Gaussian", r"$\mathrm{HG}_{32}$", r"$\mathrm{LG}_0^1$", r"$\mathrm{LG}_2^3$"),
-        strict=True
+        strict=True,
     )
     for _ax, _state, _label in plot_tuple:
         _density = np.abs(_state.wavefunction(coordinates_ang, coordinates_ang)) ** 2
@@ -101,9 +99,7 @@ def _(mixture, negative, positive, superpose):
 
 @app.cell
 def _(coherent, coordinates_ang, incoherent, np, plt):
-    coherent_density = np.abs(
-        coherent.wavefunction(coordinates_ang, coordinates_ang)
-    ) ** 2
+    coherent_density = np.abs(coherent.wavefunction(coordinates_ang, coordinates_ang)) ** 2
     mixed_density = sum(
         _weight * np.abs(_state.wavefunction(coordinates_ang, coordinates_ang)) ** 2
         for _weight, _state in incoherent.components
