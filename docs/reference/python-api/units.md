@@ -61,6 +61,11 @@ back as fresh mm quantities (`center`, `pitch`, `active_size`) and replace via
 `with_center` / `with_pitch`. `PlanarPose.from_observation` accepts
 `distance`, `polar`, `azimuth`, `roll` and `offset` quantities; angles must
 carry plane-angle units. Direction vectors stay dimensionless tuples.
+`PlanarDetector(size=...)` and `FilterPlate(thickness=..., size=...)` take a
+positive two-component `(width_x, height_y)` length and a positive scalar
+thickness; they read back as fresh mm quantities and replace via `with_size` /
+`with_thickness`. `PlanarDetector.with_size` keeps a legacy embedded response
+and scorer; pixelated detectors still require the size to match the grid.
 `Acquisition` follows the same pattern: keyword-only `exposure` (positive
 scalar time), `measured_edges` (one-dimensional energy array) and
 `hit_threshold` (nonnegative scalar energy) read back as fresh quantities in s

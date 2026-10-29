@@ -294,11 +294,16 @@ class PlanarPose:
         return cls(tuple(center), tuple(normal), tuple(x_axis))
 
 
+def _positive_length_pair(value: object, *, field: str) -> tuple[float, ...]:
+    """Own an explicit two-component positive length quantity as numeric mm."""
+    pair = _length_vector(value, field=field, size=2)
+    if any(x <= 0.0 for x in pair):
+        raise ValueError(f"{field} values must be positive")
+    return pair
+
+
 def _pitch_mm(value: object) -> tuple[float, ...]:
-    pitch = _length_vector(value, field="PixelGrid.pitch", size=2)
-    if any(x <= 0.0 for x in pitch):
-        raise ValueError("PixelGrid.pitch values must be positive")
-    return pitch
+    return _positive_length_pair(value, field="PixelGrid.pitch")
 
 
 @dataclass(frozen=True, init=False)
