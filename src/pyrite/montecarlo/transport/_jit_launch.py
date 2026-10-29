@@ -189,6 +189,7 @@ def run_transport_kernel(
     inelastic_args=None,
     radiative_args=None,
     config=DEFAULT_TRANSPORT_KERNEL_CONFIG,
+    *,
     continuation=None,
 ):
     """Launch one thread per electron over ``[e_start, e_start + e_count)``.

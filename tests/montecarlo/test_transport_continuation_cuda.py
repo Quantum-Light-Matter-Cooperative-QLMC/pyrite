@@ -91,8 +91,8 @@ def _layered(config, *, energy_model="midpoint", **kw):
         thickness_ang=5.0e4,
         layers=[(0.0, 1.0e4, [("C", 0.176)]), (1.0e4, 5.0e4, [("W", 0.0632)])],
         elastic_model="sr",
-        crystal_width_mm=2.0e-4,
-        crystal_height_mm=2.0e-4,
+        crystal_width_mm=2.0e-3,
+        crystal_height_mm=2.0e-3,
         E_cut_keV=5.0,
         seed=7,
         energy_model=energy_model,
@@ -165,7 +165,8 @@ def test_budget_bounds_population_and_matches(radiative_reference):
 def test_layered_prism_exits_match_full_history(energy_model):
     reference = _layered(REFERENCE, energy_model=energy_model)
     assert reference["n_side_exited"] > 0
-    assert reference["n_transmitted"] + reference["n_backscattered"] > 0
+    assert reference["n_backscattered"] > 0
+    assert np.unique(reference["layer"]).size == 2
     _assert_identical(reference, _layered(_continued(3, 41), energy_model=energy_model))
 
 
