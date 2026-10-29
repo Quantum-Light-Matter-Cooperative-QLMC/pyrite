@@ -25,7 +25,9 @@ uv run --no-sync python checks/equal_precision/prepare_stopping.py > "$out/table
 deadline=$((SECONDS + 1380))
 # Wider #788 anchors: energy extremes, oblique backscatter and a 10 keV cutoff.
 # Each case is "scene[:cutoff_eV]"; only exact versus default-budget tables.
-cases=(si-800-100um-0deg w-800-10um-0deg si-100-1um-0deg w-100-100um-75deg si-300-100um-0deg:10000)
+default_cases="si-800-100um-0deg w-800-10um-0deg si-100-1um-0deg w-100-100um-75deg si-300-100um-0deg:10000"
+# MOMENT_CASES overrides the list, e.g. a compound matrix case.
+read -ra cases <<< "${MOMENT_CASES:-$default_cases}"
 run() {
     local case=$1 variant=$2 seed=$3 histories=$4 stem=$5; shift 5
     local scene=${case%%:*} cutoff=()
