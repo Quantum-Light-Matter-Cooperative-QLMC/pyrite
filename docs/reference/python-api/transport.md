@@ -105,3 +105,20 @@ and physical table identities are retained separately.
 Default activation was explicitly requested before ensemble qualification was
 complete. See [radiative moment evidence](../../validation/radiation-physics/radiative-moment-interpolation.md)
 for passed component/replay checks and the remaining scope of issue #788.
+
+## Transport scheduling
+
+The production process defaults to the `auto` transport schedule. Supported
+exact-CUDA passes of at least 5000 histories use bounded continuation with
+256 rows per round. Other passes retain full-history with an INFO-level
+reason. Set `PYRITE_MC_TRANSPORT_SCHEDULE=full-history` before importing
+PyRITE to force the reference schedule; `continuation` forces continuation
+and rejects unsupported modes. `pyrite remote` forwards this override.
+
+Advanced callers can pass `PerElectronTransportConfig` to
+`simulate_trajectories`; separately constructed configs keep the existing
+`schedule=None` rule (continuation exactly when a continuation config is
+provided). Scheduling does not change scientific case/checkpoint identity.
+Live scratch is bounded; retained trajectories still scale with total rows
+and can exhaust host RAM. See the
+[production qualification and limits](../../validation/beam-transport/equal-precision-pilot.md#production-continuation-qualification-799).

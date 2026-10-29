@@ -387,9 +387,15 @@ def test_unknown_schedule_is_rejected(monkeypatch):
         schedule_from_env()
 
 
-@pytest.mark.parametrize(("raw", "expected"), [("", None), (" auto ", "auto")])
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [(None, "auto"), ("", "auto"), (" auto ", "auto"), ("full-history", "full-history")],
+)
 def test_schedule_env_default(monkeypatch, raw, expected):
-    monkeypatch.setenv("PYRITE_MC_TRANSPORT_SCHEDULE", raw)
+    if raw is None:
+        monkeypatch.delenv("PYRITE_MC_TRANSPORT_SCHEDULE", raising=False)
+    else:
+        monkeypatch.setenv("PYRITE_MC_TRANSPORT_SCHEDULE", raw)
     assert schedule_from_env() == expected
 
 
@@ -442,15 +448,19 @@ def test_schedule_environment_does_not_change_case_identity():
         print(DEFAULT_PER_ELECTRON_TRANSPORT_CONFIG.schedule, case_content_key(case))
     """)
     keys = []
-    for schedule in ("full-history", "continuation", "auto"):
+    for schedule in (None, "full-history", "continuation", "auto"):
+        env = os.environ.copy()
+        env.pop("PYRITE_MC_TRANSPORT_SCHEDULE", None)
+        if schedule is not None:
+            env["PYRITE_MC_TRANSPORT_SCHEDULE"] = schedule
         result = subprocess.run(
             [sys.executable, "-c", script],
-            env=os.environ | {"PYRITE_MC_TRANSPORT_SCHEDULE": schedule},
+            env=env,
             capture_output=True,
             text=True,
             check=True,
         )
         selected, key = result.stdout.strip().split()
-        assert selected == schedule
+        assert selected == (schedule or "auto")
         keys.append(key)
     assert len(set(keys)) == 1
