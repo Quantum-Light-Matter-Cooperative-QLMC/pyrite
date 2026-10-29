@@ -6,9 +6,9 @@ The cores implement the same physical models, but changing cores can change the 
 
 ## Two independent selections
 
-A run makes two separate choices:
+A run makes these separate choices:
 
-```{list-table} The two runtime selections and what each governs.
+```{list-table} The runtime selections and what each governs.
 :name: tbl-execution-selections
 :header-rows: 1
 
@@ -21,6 +21,9 @@ A run makes two separate choices:
 * - **Transport core**
   - `PYRITE_MC_TRANSPORT_CORE`
   - Which electron-transport implementation runs: `auto`, `lockstep`, `per-electron`, `cuda`.
+* - **Transport schedule**
+  - `PYRITE_MC_TRANSPORT_SCHEDULE`
+  - How the CUDA core batches histories: `full-history` (default), `continuation` or `auto`. Results are identical; see [bounded continuation](../repo-design/compute/gpu-transport-rawkernel.md#bounded-continuation-opt-in-prototype).
 ```
 
 The CUDA transport core requires a CUDA array backend for its `cupyx.jit` kernel. A ROCm or SYCL backend runs its spectrum kernels on the device and its transport on the CPU.
