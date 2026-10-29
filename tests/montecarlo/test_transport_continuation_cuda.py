@@ -360,6 +360,12 @@ def test_elsepa_rows_match_full_history(energy_model):
         _assert_identical(reference, _elsepa(config, energy_model=energy_model))
 
 
+@pytest.mark.slow
+def test_mott_rows_match_full_history():
+    reference = _elsepa(REFERENCE, elastic_model="mott")
+    _assert_identical(reference, _elsepa(_continued(7, 31), elastic_model="mott"))
+
+
 def test_elsepa_coupled_radiative_rows_match_full_history():
     kw = dict(
         element="C",
@@ -451,3 +457,55 @@ def test_runner_production_defaults_identical_under_env_continuation(material):
     reference = _runner_digest(material, "full-history")
     assert reference
     assert _runner_digest(material, "continuation") == reference
+
+
+@pytest.mark.slow
+def test_runner_retry_and_block_monitor_match_full_history(monkeypatch):
+    """Real step-limit retries and an early block stop preserve the output."""
+    from pyrite.campaign.sweep import BeamSpec, Sweep, build_cases
+    from pyrite.montecarlo import runner
+
+    case = build_cases(
+        Sweep(
+            material="hopg",
+            thickness_ang=1e4,
+            beam=BeamSpec(energy_keV=30.0),
+            tilt_deg=30.0,
+            n_electrons=60,
+            n_electrons_brem=60,
+        )
+    )[0]
+    real_simulate = runner.simulate_trajectories
+
+    class Monitor:
+        def __init__(self):
+            self.blocks = []
+
+        def on_block(self, start, stop, block):
+            self.blocks.append((start, stop, block["electron_id"].size))
+
+        def should_stop(self, stop):
+            return stop >= 40
+
+    def run(config):
+        budgets = []
+
+        def simulate(*args, max_steps, **kwargs):
+            budgets.append(max_steps)
+            kwargs["transport_lut_config"] = NO_LUT
+            return real_simulate(*args, max_steps=max_steps, per_electron_config=config, **kwargs)
+
+        monkeypatch.setattr(runner, "simulate_trajectories", simulate)
+        monitor = Monitor()
+        result = runner._transport_case(
+            case, transport_core="cuda", block_electrons=20, block_monitor=monitor
+        )
+        return result, monitor.blocks, budgets
+
+    monkeypatch.setenv("PYRITE_MC_TRANSPORT_INITIAL_MAX_STEPS", "1")
+    reference, ref_blocks, ref_budgets = run(REFERENCE)
+    candidate, blocks, budgets = run(_continued(7, 13))
+    assert ref_budgets == budgets
+    assert max(budgets) > 1
+    assert blocks == ref_blocks and [b[:2] for b in blocks] == [(0, 20), (20, 40)]
+    _assert_identical(reference["segs"], candidate["segs"])
