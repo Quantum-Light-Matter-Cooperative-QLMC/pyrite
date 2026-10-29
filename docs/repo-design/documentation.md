@@ -531,7 +531,7 @@ evidence. Only the `.py` is an authored executable notebook.
 
 A regular Sphinx/RTD build **never executes any tutorial**. The `_notebooks`
 extension verifies a format-insensitive Python AST/script-metadata fingerprint,
-capture PyRITE version, Molab badge, captured
+Molab badge, captured
 figures and the absence of execution errors; `nb_execution_mode = "off"` tells
 MyST-NB to use the committed outputs. Builds fail on missing or stale captures.
 Expensive execution, reference-table fetching and required CPU memory belong to
@@ -570,12 +570,22 @@ uv run --group docs python docs/_notebooks.py --check
 uv run marimo edit docs/notebooks/01-first-spectrum.py
 ```
 
+Regeneration Ruff-formats each capture's code cells before promotion, so
+regenerated pages pass `ruff format --check` without a manual follow-up.
+
 Formatting and ordinary Python comments do not invalidate capture fingerprints.
 Executable statements, literal prose, cell decorators and inline script dependency
 metadata remain part of the fingerprint. The original byte SHA-256 is retained
 as capture provenance; freshness uses the explicitly versioned fingerprint.
 
-Upgrade existing byte-hash captures without execution using:
+A release alone never stales captures. `pyrite_version` records the PyRITE
+version that executed a capture but is not checked, and the fingerprint ignores
+the version of the tutorials' own `pyrite-mc[...]==X.Y.Z` pin, which
+`pyrite-dev release` rewrites. Captures can therefore show older numerics after
+a release. A PR that changes default numerical output regenerates the
+tutorials it affects.
+
+Upgrade existing byte-hash or v1-fingerprint captures without execution using:
 
 ```bash
 uv run --group docs python docs/_notebooks.py --migrate-hashes
@@ -583,6 +593,8 @@ uv run --group docs python docs/_notebooks.py --migrate-hashes
 
 Migration requires the exact captured source, recovered by its byte digest from
 the current file or Git history, and accepts only an equal normalized fingerprint.
+A v1 capture, whose fingerprint hashed the PyRITE pin, migrates only when its
+v1 fingerprint equals that of the current source.
 It reports changed tutorials without altering their captures. It does not make
 changed code, prose or dependencies fresh.
 

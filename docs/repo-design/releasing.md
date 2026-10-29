@@ -50,7 +50,9 @@ The command:
    (module shims, command/option spellings, implicit defaults, `Sweep.from_legacy`,
    the legacy xsgen table tier) targets a minor at or before `X.Y`. Do those
    removals first, with call sites, tests, and docs.
-3. Bumps `pyproject.toml` and `src/pyrite/__init__.py`, then refreshes `uv.lock` (CI syncs with `--locked`).
+3. Bumps `pyproject.toml`, `src/pyrite/__init__.py` and the tutorial
+   `pyrite-mc[...]==X.Y.Z` script pins in `docs/notebooks/*.py`, then refreshes
+   `uv.lock` (CI syncs with `--locked`).
 4. Regenerates `docs/repo-design/cli/cli-reference.md` and
    `docs/repo-design/cli/cli-deprecations.md`.
 5. Prints release notes from conventional commits since the last `v*` tag
@@ -59,6 +61,12 @@ The command:
    physics-changing entries are listed in their own sections; physics-changing
    is detected from the physics scopes in `pyrite.devtools.release` or a
    `Physics-Changing` body line, so review that list by hand.
+
+A release does not regenerate tutorial captures. Their recorded
+`pyrite_version` is provenance only, and capture fingerprints ignore the
+PyRITE pin version, so the bumped tree passes `verify` as is. Tutorials whose
+numerics change are regenerated in the PR that changes them; see
+[the documentation workflow](documentation.md).
 
 `--check` validates and prints notes without editing files. Put the notes in
 the PR description, then run `pyrite-dev verify`. After the PR merges,

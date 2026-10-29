@@ -29,7 +29,10 @@ MOLAB = (
 )
 LEGACY_SCHEMA = "pyrite.myst-nb-tutorial.v1"
 SCHEMA = "pyrite.myst-nb-tutorial.v2"
-FINGERPRINT = "python-ast-pep723-v1"
+LEGACY_FINGERPRINT = "python-ast-pep723-v1"
+FINGERPRINT = "python-ast-pep723-v2"
+# PyRITE's own release pin; the version is provenance, like `pyrite_version`.
+PYRITE_PIN = re.compile(r"^(pyrite-mc(?:\[([^\]]*)\])?)\s*==\s*[^;\s]+")
 
 
 def digest(path):
@@ -59,10 +62,24 @@ def script_metadata(content):
     return metadata
 
 
-def source_fingerprint(content):
-    """Ignore Python formatting/comments, retaining prose and script dependencies."""
+def unpinned_metadata(content):
+    """Script metadata with PyRITE's own release pin reduced to its name and extras."""
+    metadata = script_metadata(content)
+    for block in metadata:
+        if "dependencies" in block:
+            block["dependencies"] = [PYRITE_PIN.sub(r"\1", dep) for dep in block["dependencies"]]
+    return metadata
+
+
+def source_fingerprint(content, *, legacy=False):
+    """Ignore Python formatting/comments, retaining prose and script dependencies.
+
+    Releases rewrite every tutorial's ``pyrite-mc==X.Y.Z`` pin, so a version
+    change alone never stales a capture; the legacy v1 form hashed the pin.
+    """
+    metadata = script_metadata(content) if legacy else unpinned_metadata(content)
     canonical = json.dumps(
-        [ast.dump(ast.parse(content), include_attributes=False), script_metadata(content)],
+        [ast.dump(ast.parse(content), include_attributes=False), metadata],
         sort_keys=True,
         ensure_ascii=True,
     )
@@ -106,18 +123,26 @@ def migrate_hashes():
         page = page_location(source)
         notebook = nbformat.read(page, as_version=4)
         metadata = notebook.metadata.get("pyrite_docs", {})
-        if metadata.get("schema") == SCHEMA:
+        schema = metadata.get("schema")
+        if schema == SCHEMA and metadata.get("source_fingerprint") == FINGERPRINT:
             continue
         try:
-            if (
-                metadata.get("schema") != LEGACY_SCHEMA
-                or metadata.get("pyrite_version") != project_version()
-            ):
-                raise ValueError("capture schema or PyRITE version is incompatible")
-            original = legacy_source(source, metadata.get("source_sha256"))
             canonical = fingerprint(source)
-            if source_fingerprint(original) != canonical:
-                raise ValueError("code, prose or script dependencies changed; regenerate capture")
+            if schema == SCHEMA and metadata.get("source_fingerprint") == LEGACY_FINGERPRINT:
+                # The v1 hash covers the current source exactly, pin included.
+                current = source_fingerprint(source.read_text(), legacy=True)
+                if metadata.get("source_fingerprint_sha256") != current:
+                    raise ValueError(
+                        "code, prose or script dependencies changed; regenerate capture"
+                    )
+            elif schema == LEGACY_SCHEMA:
+                original = legacy_source(source, metadata.get("source_sha256"))
+                if source_fingerprint(original) != canonical:
+                    raise ValueError(
+                        "code, prose or script dependencies changed; regenerate capture"
+                    )
+            else:
+                raise ValueError("capture schema is incompatible")
             metadata.update(
                 schema=SCHEMA, source_fingerprint=FINGERPRINT, source_fingerprint_sha256=canonical
             )
@@ -159,6 +184,23 @@ def validate_source(path):
                     raise ValueError(f"{path.name}: unsupported public API import {module}:{name}")
     if "molab-shield.svg" in source:
         raise ValueError(f"{path.name}: Molab badge belongs on the RTD page only")
+
+
+def regenerate_command(sources):
+    """The full regeneration command, including extras the tutorials declare."""
+    extras = sorted(
+        {
+            extra.strip()
+            for source in sources
+            for block in script_metadata(source.read_text())
+            for dep in block.get("dependencies", [])
+            if (match := PYRITE_PIN.match(dep)) and match.group(2)
+            for extra in match.group(2).split(",")
+        }
+    )
+    flags = "".join(f" --extra {extra}" for extra in extras)
+    target = f"--regenerate {sources[0].stem}" if len(sources) == 1 else "--regenerate-all"
+    return f"uv run --group docs{flags} python docs/_notebooks.py {target}"
 
 
 def page_location(source):
@@ -273,6 +315,23 @@ def captured_notebook(source, notebook, title, footer):
     return notebook
 
 
+def format_capture(path):
+    """Ruff-format exported code cells as published; fingerprints ignore formatting."""
+    subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "ruff",
+            "format",
+            "--quiet",
+            "--config",
+            str(DOCS.parent / "pyproject.toml"),
+            str(path),
+        ],
+        check=True,
+    )
+
+
 def check_notebooks(app=None):
     """Validate captures during every Sphinx build; do not execute anything."""
     sources = sorted(NOTEBOOKS.glob("*.py"))
@@ -284,22 +343,27 @@ def check_notebooks(app=None):
         if page.suffix != ".ipynb":
             raise ValueError(
                 f"{source.stem}: old iframe page has not been migrated; run "
-                "uv run --group docs python docs/_notebooks.py --regenerate-all"
+                + regenerate_command(sources)
             )
         notebook = json.loads(page.read_text())
         metadata = notebook.get("metadata", {}).get("pyrite_docs", {})
-        if metadata.get("schema") == LEGACY_SCHEMA:
+        if (
+            metadata.get("schema") == LEGACY_SCHEMA
+            or metadata.get("source_fingerprint") == LEGACY_FINGERPRINT
+        ):
             raise ValueError(
                 f"{source.stem}: legacy capture fingerprint; run "
                 "uv run --group docs python docs/_notebooks.py --migrate-hashes"
             )
+        # `pyrite_version` is provenance only: releases do not re-execute tutorials.
         if (
             metadata.get("schema") != SCHEMA
             or metadata.get("source_fingerprint") != FINGERPRINT
             or metadata.get("source_fingerprint_sha256") != fingerprint(source)
-            or metadata.get("pyrite_version") != project_version()
         ):
-            raise ValueError(f"stale tutorial capture: {source.stem}; regenerate its .ipynb")
+            raise ValueError(
+                f"stale tutorial capture: {source.stem}; run " + regenerate_command([source])
+            )
         if not output_contains_figure(notebook):
             raise ValueError(f"{source.stem}: missing captured notebook figure")
         if any(
@@ -369,6 +433,7 @@ def regenerate(names):
             )
             nbformat.validate(notebook)
             nbformat.write(notebook, exported)
+            format_capture(exported)
             completed.append((page, exported))
         for old_page, exported in completed:
             destination = old_page.with_suffix(".ipynb")
@@ -423,12 +488,10 @@ def runtime_structure(content):
 def refreshed_notebook(source, exported, captured):
     """Reuse outputs only when every executable cell and dependency is unchanged."""
     metadata = captured.metadata["pyrite_docs"]
-    if metadata.get("schema") not in {SCHEMA, LEGACY_SCHEMA} or (
-        metadata.get("pyrite_version") != project_version()
-    ):
-        raise ValueError("capture schema or PyRITE version is incompatible")
+    if metadata.get("schema") not in {SCHEMA, LEGACY_SCHEMA}:
+        raise ValueError("capture schema is incompatible")
     original = legacy_source(source, metadata.get("source_sha256"))
-    if script_metadata(original) != script_metadata(source.read_text()):
+    if unpinned_metadata(original) != unpinned_metadata(source.read_text()):
         raise ValueError("script dependencies changed; regenerate capture")
     if runtime_structure(original) != runtime_structure(source.read_text()):
         raise ValueError("runtime or cell configuration changed; regenerate capture")
@@ -472,8 +535,10 @@ def refresh_page(name):
         )
         notebook = refreshed_notebook(source, nbformat.read(exported, as_version=4), captured)
         nbformat.validate(notebook)
+        nbformat.write(notebook, exported)
+        format_capture(exported)
         stage = page.with_suffix(".ipynb.tmp")
-        nbformat.write(notebook, stage)
+        shutil.copyfile(exported, stage)
         os.replace(stage, page)
 
 
