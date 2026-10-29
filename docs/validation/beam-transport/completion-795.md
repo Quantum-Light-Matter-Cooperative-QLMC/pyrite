@@ -1,4 +1,4 @@
-# Issue #795 — batched hard-photon completion (measurement protocol)
+# Issue #795 — batched hard-photon completion
 
 `complete_hard_radiative_events` still samples *exactly two* uniforms in the
 canonical positive-photon row order using the request's original
@@ -58,11 +58,27 @@ not treat isolated completion-only gains as whole-request gains. If a CPU
 baseline is needed, run the benchmark's `run` and `compare` commands under
 `PYRITE_MC_BACKEND=cpu` on the CPU core with a distinct evidence directory.
 
-## Validation status
+## Lab results
 
-The patch changes implementation and adds synthetic Si/W mixed-element,
-zero-photon, single-photon, cutoff/endpoint, multi-chunk and validation tests.
-Its performance and CUDA bitwise gates are **not complete** until the above
-remote measurements and focused CPU/CUDA tests are attached to the issue.
-The physical `bremslib-radiative-partition` ledger status is unchanged. This
-is not evidence of a physics accuracy improvement or completed #611 streaming.
+Job 2668 compared baseline `42931cbb2b5fe71a2a8afd3fd00a69033a92c9ad`
+with candidate `7df6092b13b9899a44727285b73df627b02a773f` on the lab GPU,
+using the protocol above. Three independent warm repetitions used seeds
+79501–79503. All 12 paired requests matched bitwise for photon row indices,
+directions, target momenta, and per-primary source scores. Focused CPU tests
+(37), CUDA tests (20), and the complexity check passed. The other CPU job
+shared the node at submission; its possible timing effect is not quantified.
+
+| Material, histories | Median photons | Completion baseline → candidate (s) | Completion µs/photon baseline → candidate | Request baseline → candidate (s) | Maximum candidate RSS / CuPy pool (MiB) |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Si, 5000 | 89 | 0.270 → 0.102 | 3069 → 1139 | 2.778 → 2.591 | 1654 / 6212 |
+| Si, 20000 | 325 | 1.017 → 0.414 | 3140 → 1274 | 10.950 → 10.377 | 1659 / 7375 |
+| W, 5000 | 383 | 0.943 → 0.231 | 2461 → 598 | 9.361 → 8.553 | 2590 / 12402 |
+| W, 20000 | 1513 | 3.853 → 0.943 | 2523 → 623 | 37.242 → 33.982 | 2590 / 19594 |
+
+RSS and pool values are maxima across repetitions; the CuPy allocator high
+water is not a direct hardware VRAM peak. Per-photon costs are medians of
+individual request ratios. The [machine-readable summary](../check-records/equal-precision/completion-795-summary.json)
+includes baseline memory and unrounded timings. Full individual results and
+parity records remain in the isolated job evidence directory. The physical
+`bremslib-radiative-partition` ledger status is unchanged; these results do
+not establish a physics accuracy improvement or completed #611 streaming.

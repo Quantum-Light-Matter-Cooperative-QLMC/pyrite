@@ -924,7 +924,7 @@ reassembly. The table supports five conclusions:
 - Hard-photon completion and the per-round host loop, not PCIe bandwidth, are
   the next host-side targets.
 
-Issue [#795](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/795) targets the former with bounded per-element DDCS angle batching. Its [benchmark protocol](completion-795.md) compares the unmodified scalar completion and candidate with warm, independent Si/W 5000/20000-history requests, photon-vector bitwise checks, and memory reporting. These #789 profiles are the **pre-batching baseline**, not measurements of #795's speedup; that evidence remains pending lab execution.
+Issue [#795](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/795) targets the former with bounded per-element DDCS angle batching. Its [benchmark results](completion-795.md) compare the unmodified scalar completion and candidate with warm, independent Si/W 5000/20000-history requests, photon-vector bitwise checks, and memory reporting. Job 2668 measured 2.45–4.09× completion speedups and bitwise parity on all 12 paired requests. These #789 profiles are the **pre-batching baseline**, not measurements of that speedup.
 
 **Track lengths and survivors.** Per-history returned rows have a long tail:
 W has median 1396, p90 3718, p99 9616 and a maximum of 9874; Si has median
