@@ -28,13 +28,11 @@ PyRITE is especially useful for investigating **tunable, crystal-based X-ray sou
 
 ## Why Python?
 
-Python keeps scientific models **readable, accessible, and easy to extend**.
-Its broad open-source ecosystem provides mature tools for numerical methods,
-data analysis, visualization, and reproducible research. **Numba** JIT-compiles
-performance-critical CPU code to native machine code, while **CuPy and CUDA**
-make GPU acceleration practical without rewriting the entire application in
-C++ or Fortran. This combines a flexible research interface with optimized
-computational kernels.
+Python makes simulation models **readable, accessible, and easy to modify or extend** when compared with simulations written in FORTRAN, C++, or other compiled languages. Its broad open-source ecosystem provides mature tools for numerical methods, data analysis, visualization, and reproducible research.
+
+While base Python is far slower than its compiled colleagues, it acts primarily as a more intelligible wrapper around libraries which are far faster. **[Numba](https://numba.pydata.org/)** is used to JIT-compile performance-critical CPU code to native machine code, while **[CUDA](https://developer.nvidia.com/cuda/toolkit) and [CuPy](https://cupy.dev/)** allow us to write practical, high performance GPU acceleration code without rewriting large portions of PyRITE in C++ or Fortran. This combines a flexible research interface with highly optimized computational kernels, which are ideal given the [embarrassingly parallel](https://en.wikipedia.org/wiki/Embarrassingly_parallel) nature of Monte Carlo simulations.
+
+Altogether, this makes for a far more accessible software to the uninitiated (especially given the ever-increasing popularity of Python) while retaining the raw performance of traditional compiled transport codes such as geant4.
 
 ## Try it in your browser
 
