@@ -4,6 +4,8 @@
 Use [From X-rays to detector counts](../notebooks/designing/06-detector-counts.ipynb)
 for the guided, editable example, its complete public-API source and captured
 images. This recipe assumes a physical beam and target are already configured.
+For filter attenuation, Timepix response and band signal-to-background estimates,
+continue with [Will the PXR line survive my detector?](../notebooks/designing/15-pxr-signal-background.ipynb).
 
 ## Configure and acquire
 
