@@ -27,13 +27,15 @@ core are rejected.
 
 from __future__ import annotations
 
+import logging
 import time
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
 import numpy as np
 
+from ..._env import env_value
 from .cores import (
     EXIT_BACKSCATTERED,
     EXIT_CUTOFF_STOPPED,
@@ -54,6 +56,18 @@ _TALLIED = (EXIT_BACKSCATTERED, EXIT_TRANSMITTED, EXIT_SIDE, EXIT_CUTOFF_STOPPED
 _GATHER_INDEX_BYTES = 3 * 8
 # Per-lane round arrays: int32 slot, int64 row count, int8 exit code.
 _LANE_BYTES = 4 + 8 + 1
+
+logger = logging.getLogger(__name__)
+
+# ``PerElectronTransportConfig.schedule`` values (#799). None of them changes
+# results: continuation output is bitwise the full-history output.
+TRANSPORT_SCHEDULES = ("full-history", "continuation", "auto")
+# Below this many histories ``auto`` keeps full-history. At 5000 histories a
+# full-history launch already holds every Si history and continuation's
+# per-round host work made it 12-27% slower end to end, while W and every
+# 20000-history scene gained (#789, equal-precision pilot). Larger populations
+# need several sparse full-history launches, which continuation refills.
+CONTINUATION_AUTO_MIN_HISTORIES = 5000
 
 
 @dataclass(frozen=True)
@@ -110,6 +124,72 @@ def active_population(Ne, row_bytes, config, cont):
     if cont.active_histories is not None:
         limit = min(limit, int(cont.active_histories))
     return max(1, min(fit, limit, int(Ne))), per_lane
+
+
+def check_schedule(schedule):
+    """Validate a schedule name; ``None`` defers to the config's continuation."""
+    if schedule is not None and schedule not in TRANSPORT_SCHEDULES:
+        raise ValueError(
+            f"transport schedule must be one of {TRANSPORT_SCHEDULES}, got {schedule!r}"
+        )
+    return schedule
+
+
+def schedule_from_env():
+    """Process default schedule from ``PYRITE_MC_TRANSPORT_SCHEDULE``, or None."""
+    raw = env_value("PYRITE_MC_TRANSPORT_SCHEDULE", "").strip()
+    if not raw:
+        return None
+    if raw not in TRANSPORT_SCHEDULES:
+        raise ValueError(f"PYRITE_MC_TRANSPORT_SCHEDULE must be one of {TRANSPORT_SCHEDULES}")
+    return raw
+
+
+def effective_schedule(config):
+    """The schedule a config asks for; an explicit ``continuation`` implies it."""
+    if config.schedule is not None:
+        return config.schedule
+    return "full-history" if config.continuation is None else "continuation"
+
+
+def _auto_fallback_reason(Ne, *, cuda, lut, launched, gdf):
+    """Why ``auto`` keeps full-history for this pass, or None to continue."""
+    if not cuda:
+        return "the transport core is not 'cuda'"
+    if lut:
+        return "the CUDA transport LUT core has no continuation"
+    if launched:
+        # Cascade generations are covered (#797); the channeling handoff is not.
+        return "launched passes (cascade generations, channeling handoff) stay full-history"
+    if gdf:
+        return "GDF beams have no continuation regression"
+    if Ne < CONTINUATION_AUTO_MIN_HISTORIES:
+        return f"Ne={Ne} is below {CONTINUATION_AUTO_MIN_HISTORIES} histories"
+    return None
+
+
+def resolve_schedule(config, Ne, **support):
+    """Lower ``config.schedule`` to the driver's ``continuation`` field.
+
+    ``full-history`` clears continuation, ``continuation`` keeps or creates it
+    (unsupported modes then raise in the driver, as before), and ``auto``
+    continues only on a supported pass of at least
+    :data:`CONTINUATION_AUTO_MIN_HISTORIES` histories, logging why otherwise.
+    ``support`` holds the keyword flags of :func:`_auto_fallback_reason`.
+    Results are identical under every choice.
+    """
+    schedule = effective_schedule(config)
+    if schedule == "continuation":
+        cont = config.continuation or TransportContinuationConfig()
+        return replace(config, schedule=schedule, continuation=cont)
+    if schedule == "auto":
+        reason = _auto_fallback_reason(int(Ne), **support)
+        if reason is None:
+            cont = config.continuation or TransportContinuationConfig()
+            logger.info("transport schedule auto: continuation for %d histories", Ne)
+            return replace(config, schedule="continuation", continuation=cont)
+        logger.info("transport schedule auto: full-history because %s", reason)
+    return replace(config, schedule="full-history", continuation=None)
 
 
 def _gather_index(xp, counts, quantum):

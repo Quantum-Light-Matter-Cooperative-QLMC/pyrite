@@ -675,12 +675,14 @@ def test_queue_script_no_flags_when_unset():
     ("name", "value", "invalid"),
     [
         ("PYRITE_MC_TRANSPORT_CORE", "cuda", "gpu"),
+        ("PYRITE_MC_TRANSPORT_SCHEDULE", "auto", "streaming"),
         ("PYRITE_MC_RESOURCE_POLICY", "throughput", "max"),
         ("PYRITE_MC_MIN_CHUNK", "100", "0"),
     ],
 )
 def test_queue_scripts_forward_local_runtime_pins(monkeypatch, build, name, value, invalid):
     monkeypatch.delenv("PYRITE_MC_TRANSPORT_CORE", raising=False)
+    monkeypatch.delenv("PYRITE_MC_TRANSPORT_SCHEDULE", raising=False)
     monkeypatch.delenv("PYRITE_MC_RESOURCE_POLICY", raising=False)
     monkeypatch.delenv("PYRITE_MC_MIN_CHUNK", raising=False)
     assert name not in build()
