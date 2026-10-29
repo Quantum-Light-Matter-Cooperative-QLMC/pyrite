@@ -22,6 +22,8 @@ from pathlib import Path
 _VERSION = re.compile(r"(\d+)\.(\d+)\.(\d+)\Z")
 _PYPROJECT_VERSION = re.compile(r'^(version\s*=\s*)"([^"]*)"', re.MULTILINE)
 _INIT_VERSION = re.compile(r'^(__version__\s*=\s*)"([^"]*)"', re.MULTILINE)
+# PEP 723 dependency pins in tutorial sources, e.g. `#     "pyrite-mc[optimization]==0.23.0",`.
+_TUTORIAL_PIN = re.compile(r'^(#\s+"pyrite-mc(?:\[[^\]]*\])?==)[^"]*(")', re.MULTILINE)
 _RELEASE_SUBJECT = "chore(release): bump version to"
 _CONVENTIONAL = re.compile(
     r"(?P<type>[a-z]+)(?:\((?P<scope>[^)]*)\))?(?P<bang>!)?:\s*(?P<desc>.+)\Z"
@@ -104,7 +106,10 @@ def due_removals(target: str, targets: Mapping[str, str] | None = None) -> dict[
 
 
 def bump_versions(root: Path, new: str) -> tuple[str, str]:
-    """Rewrite ``pyproject.toml`` and ``src/pyrite/__init__.py``; return ``(old, new)``."""
+    """Rewrite ``pyproject.toml``, ``src/pyrite/__init__.py`` and tutorial ``pyrite-mc`` pins.
+
+    Returns ``(old, new)``.
+    """
     parse_version(new)
     pyproject = root / "pyproject.toml"
     init = root / "src" / "pyrite" / "__init__.py"
@@ -120,6 +125,11 @@ def bump_versions(root: Path, new: str) -> tuple[str, str]:
         raise ReleaseError(f"target {new} must be greater than the current version {old}")
     pyproject.write_text(_PYPROJECT_VERSION.sub(rf'\g<1>"{new}"', py_text, count=1), "utf-8")
     init.write_text(_INIT_VERSION.sub(rf'\g<1>"{new}"', init_text, count=1), "utf-8")
+    for tutorial in sorted((root / "docs" / "notebooks").glob("*.py")):
+        text = tutorial.read_text(encoding="utf-8")
+        pinned = _TUTORIAL_PIN.sub(rf"\g<1>{new}\g<2>", text)
+        if pinned != text:
+            tutorial.write_text(pinned, "utf-8")
     return old, new
 
 

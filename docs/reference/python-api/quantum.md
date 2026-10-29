@@ -4,7 +4,7 @@ Use `pyrite.quantum` for portable source specifications, quantum configuration,
 nonportable runtime states, and state factories. The API contract is distinct
 from scientific validation: most direct channeling solvers are **experimental**,
 and only the bounded planar Bloch density-matrix recipe is admitted by
-`simulate`. See the [quantum API map](../quantum-api.md) for details.
+`simulate`. See the [quantum API contracts](../quantum-api.md) for details.
 
 Learn the interfaces in [Constructing transverse quantum states](../../notebooks/quantum/12-transverse-quantum-states.ipynb),
 then continue to the planar and axial diagnostics.
@@ -83,7 +83,7 @@ These legacy leaf-module paths retain their generated object pages and link to
 existing code owners. The same axial objects can be imported from the
 `pyrite.quantum` facade; new experimental examples should use
 `pyrite.experimental.quantum`, as described in the
-[quantum API map](../quantum-api.md#imports-and-contracts).
+[quantum API contracts](../quantum-api.md#imports-and-contracts).
 
 ```{eval-rst}
 .. autosummary::
@@ -110,7 +110,7 @@ integral equals the surviving solver trace. The recorded array has shape
 into one period in the instantaneous basis after energy reprojection. Without
 position sampling, both the grid and density are `None`. See the
 [spatial-density derivation](../../validation/channeling/cr-planar-spatial-density-reconstruction.md)
-and [channeling demo](../../reference/results-and-apps.md#planar-channeling-demo).
+and [channeling demo](../../reference/results-and-apps.md#channeling-app).
 The [experimental axial diagnostic](../../guides/experimental-axial-channeling.md) runs independently
 of `simulate`.
 

@@ -13,8 +13,48 @@ def _toc_targets(page: Path) -> set[Path]:
             entry = line.strip()
             if not entry or entry.startswith(":"):
                 continue
-            targets.add((page.parent / f"{entry}.md").resolve())
+            match = re.fullmatch(r"[^<>]+<([^<>]+)>", entry)
+            entry = match.group(1) if match else entry
+            base = page.parent / entry
+            notebook = base.with_name(f"{base.name}.ipynb")
+            targets.add(
+                (notebook if notebook.is_file() else base.with_name(f"{base.name}.md")).resolve()
+            )
     return targets
+
+
+def _published_pages() -> list[Path]:
+    skipped = {"_build", "_autosummary", "_templates", "_static", ".ipynb_checkpoints"}
+    return [
+        page
+        for page in sorted(DOCS.rglob("*"))
+        if page.suffix in {".md", ".ipynb"} and not skipped & set(page.relative_to(DOCS).parts)
+    ]
+
+
+def _is_orphan(page: Path) -> bool:
+    if page.suffix != ".md":
+        return False
+    head = page.read_text()[:200]
+    return (
+        head.startswith(":orphan:") or re.match(r"---\n(?:.*\n)*?orphan: true\n", head) is not None
+    )
+
+
+def test_every_page_has_one_navigation_owner_or_is_orphan():
+    owners: dict[Path, list[Path]] = {}
+    for page in _published_pages():
+        if page.suffix == ".md":
+            for target in _toc_targets(page):
+                assert target.is_file(), (page, target)
+                owners.setdefault(target, []).append(page)
+    for page in _published_pages():
+        if page == DOCS / "index.md":
+            continue
+        parents = owners.get(page.resolve(), [])
+        name = page.relative_to(DOCS)
+        assert len(parents) <= 1, (name, parents)
+        assert bool(parents) != _is_orphan(page), (name, parents)
 
 
 def test_computation_pages_have_one_navigation_owner():

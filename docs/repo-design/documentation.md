@@ -73,17 +73,46 @@ their audience, rather than additional tutorials or interface specifications.
 | `notebooks/fundamentals/`, `notebooks/designing/`, `notebooks/specialized/`, `notebooks/quantum/` | Tutorial; learners | [Interactive Tutorials](../notebooks/index.md); canonical Marimo sources own the tutorial; commit generated native MyST-NB snapshots with their sources. HTML is disposable build output. |
 | `guides/getting-started.md` | Entry point; new users | [Getting Started](../guides/getting-started.md) is a single top-level page without child pages; link to the first notebook for guided Python learning. |
 | `guides/configuration-cookbook.md`, `guides/configuration-notebook.md` | How-to; campaign authors | [How-to Guides](../guides/index.md); fields and editor behavior belong in [configuration reference](../reference/configuration/index.md). |
-| `guides/directional-source-heatmap.md`, `guides/detector-observations.md`, `guides/working-with-results.md` | How-to; simulation and analysis users | [How-to Guides](../guides/index.md); link to notebooks for learning and reference for complete contracts. |
+| `guides/directional-source-heatmap.md`, `guides/detector-observations.md`, `guides/working-with-results.md`, `guides/saved-trajectories.md` | How-to; simulation and analysis users | [How-to Guides](../guides/index.md); link to notebooks for learning and reference for complete contracts. |
+| `reference/python-scene-recipes.md` | How-to; Python API users composing scenes, observations and sweeps | [How-to Guides](../guides/index.md) owns its navigation; keep the published URL and recipe anchors. Signatures stay in the namespace reference. |
 | `guides/adding-materials.md`, `guides/gpt-gdf-beams.md`, `guides/optimization-studies.md` | How-to; users with specialized inputs or studies | [How-to Guides](../guides/index.md); schemas and restrictions remain in reference. |
 | `guides/running-on-a-cluster.md`, `guides/performance-profile-analysis.md`, `guides/batch-chunk-tuning.md` | How-to; cluster users and performance investigators | [Execution guides](../guides/index.md); runtime contracts and developer benchmarks have separate owners. |
-| `guides/experimental-planar-channeling.md`, `guides/experimental-axial-channeling.md`, `guides/transition-radiation-demo.md`, `guides/radiation-diagnostics.md` | How-to; specialist users | [Specialized workflows](../guides/index.md); retain experimental boundaries and evidence links. These app recipes do not own the progressive notebook curriculum. |
+| `guides/experimental-planar-channeling.md`, `guides/experimental-axial-channeling.md`, `guides/transition-radiation-demo.md`, `guides/radiation-diagnostics.md` | How-to; specialist users | [Specialist recipes](../guides/index.md); retain experimental boundaries and evidence links. These app recipes do not own the progressive notebook curriculum. |
 | `guides/troubleshooting.md` | How-to; users diagnosing failures | [How-to Guides](../guides/index.md). |
-| `reference/`, `api.md` | Reference; API and CLI users | [Reference](../reference/index.md); generated signatures and the governed API inventory own interface details. |
-| `physics/`, `computation/statistical-methods.md` | Explanation; researchers assessing models and estimators | [Physics](../physics/index.md), including [numerical methods](../physics/numerical-methods/index.md). |
+| Other `reference/` pages, `api.md`, `references.md` | Reference; API, CLI and citation users | [Reference](../reference/index.md); generated signatures and the governed API inventory own interface details. |
+| `repo-design/result-storage-contracts.md`, `physics/beam-transport/transport-outputs.md` | Reference; result, persistence and trajectory API users | [Results and storage](../reference/results/index.md); retain the existing URLs, units, schema anchors and evidence links. Developer storage pages link here for shared contracts. |
+| Remaining `physics/` pages, `computation/statistical-methods.md` | Explanation; researchers assessing models and estimators | [Physics](../physics/index.md), including [numerical methods](../physics/numerical-methods/index.md). |
 | `computation/execution-and-acceleration.md`, `memory-and-scheduling.md`, `precision-and-tolerances.md`, `random-streams.md` (all under `computation/`) | Reference; users configuring execution | [Configuration and execution](../reference/configuration/index.md); preserve these published paths. |
 | `validation/` | Evidence/reference; researchers and validators | [Validation](../validation/index.md); domain indexes own detailed records, and the ledger owns claim status. |
 | `development/`, `repo-design/` | Contributor how-to, implementation reference or architecture explanation, according to the page's stated purpose | [Development](../development/index.md); [repository design](index.md) groups current internals. Public field contracts linked from Reference remain authoritative at their existing URLs. |
+| `index.md`, section `index.md` pages, `project-readme.md` | Discovery; all readers | The homepage and section indexes route readers to their mode and own only navigation. `project-readme.md` renders `README.md`, which owns its content. |
+| `examples/` | Reproduction artifacts; guide readers | The page that downloads or links the script/data owns its context; these files are not a separate learning path. |
+| `repo_map.md` | Contributor reference; agents and maintainers | Repository navigation aid; `pyrite-dev repo-map` checks its generated region. |
 | `adr/`, `research/` | Decision rationale and proposals; contributors | [ADRs](../adr/index.md) and [Research](../research/index.md); label proposed behavior explicitly. |
+
+Every page except the homepage has exactly one toctree parent or is an explicit
+orphan compatibility/artifact page; `tests/dev/test_docs_computation_navigation.py`
+enforces this. Use a titled toctree entry (`Title <../reference/page>`) to place a
+page under its mode's section without moving its published URL.
+
+### Published URLs are frozen
+
+The toctree parent, not the directory, states a page's mode. Several pages
+predate this organization and live outside their mode's directory:
+`reference/python-scene-recipes.md` (how-to), `computation/` runtime contracts
+(reference), and `repo-design/profile-settings.md`,
+`repo-design/configuration-resolution.md`, `repo-design/result-storage-contracts.md`
+and `repo-design/cli/` (user reference). Keep these URLs: external citations,
+issue links, CLI help and generated pages reference them, and a move adds a
+redirect page without helping readers, who navigate by sidebar.
+
+Do not move a page only to match its directory to its mode. When a page mixes
+modes, split it: write the extracted content as a new page in its mode's
+directory, leave the remaining content at the original URL, and keep inbound
+anchors working. Saved-trajectory recipes, for example, moved to
+`guides/saved-trajectories.md`, while their contracts stayed at
+`reference/trajectory-workflows.md`. New pages always go in their mode's
+directory.
 
 Compatibility pages preserve URLs and anchors and direct readers to their
 canonical owner. Do not expand them into competing guides. This applies to
@@ -295,7 +324,12 @@ Before review, run:
 pyrite-dev docs
 ```
 
-This removes generated doctrees and autosummary stubs and performs the canonical warnings-as-errors documentation build. The HTML build executes the tutorial notebooks on CPU and may fetch missing reference tables; install the tables beforehand for an offline build.
+This removes generated doctrees and autosummary stubs and performs the canonical
+warnings-as-errors documentation build. It validates and renders committed
+tutorial captures without executing notebooks or fetching reference tables.
+Changed tutorials require the separate explicit regeneration workflow in
+[Interactive notebook builds](#interactive-notebook-builds). The browser results
+demo is exported to WASM during the build; it runs only when opened in a browser.
 
 To additionally check external links, run:
 
@@ -497,7 +531,7 @@ evidence. Only the `.py` is an authored executable notebook.
 
 A regular Sphinx/RTD build **never executes any tutorial**. The `_notebooks`
 extension verifies a format-insensitive Python AST/script-metadata fingerprint,
-capture PyRITE version, Molab badge, captured
+Molab badge, captured
 figures and the absence of execution errors; `nb_execution_mode = "off"` tells
 MyST-NB to use the committed outputs. Builds fail on missing or stale captures.
 Expensive execution, reference-table fetching and required CPU memory belong to
@@ -536,12 +570,22 @@ uv run --group docs python docs/_notebooks.py --check
 uv run marimo edit docs/notebooks/01-first-spectrum.py
 ```
 
+Regeneration Ruff-formats each capture's code cells before promotion, so
+regenerated pages pass `ruff format --check` without a manual follow-up.
+
 Formatting and ordinary Python comments do not invalidate capture fingerprints.
 Executable statements, literal prose, cell decorators and inline script dependency
 metadata remain part of the fingerprint. The original byte SHA-256 is retained
 as capture provenance; freshness uses the explicitly versioned fingerprint.
 
-Upgrade existing byte-hash captures without execution using:
+A release alone never stales captures. `pyrite_version` records the PyRITE
+version that executed a capture but is not checked, and the fingerprint ignores
+the version of the tutorials' own `pyrite-mc[...]==X.Y.Z` pin, which
+`pyrite-dev release` rewrites. Captures can therefore show older numerics after
+a release. A PR that changes default numerical output regenerates the
+tutorials it affects.
+
+Upgrade existing byte-hash or v1-fingerprint captures without execution using:
 
 ```bash
 uv run --group docs python docs/_notebooks.py --migrate-hashes
@@ -549,6 +593,8 @@ uv run --group docs python docs/_notebooks.py --migrate-hashes
 
 Migration requires the exact captured source, recovered by its byte digest from
 the current file or Git history, and accepts only an equal normalized fingerprint.
+A v1 capture, whose fingerprint hashed the PyRITE pin, migrates only when its
+v1 fingerprint equals that of the current source.
 It reports changed tutorials without altering their captures. It does not make
 changed code, prose or dependencies fresh.
 

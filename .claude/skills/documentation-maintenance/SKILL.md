@@ -12,7 +12,7 @@ Classify the reader's *primary need* before editing (Diátaxis):
 | --- | --- |
 | Learn by doing | `docs/notebooks/`; use `tutorial-authoring` and #758 |
 | Solve a specific user task | `docs/guides/` (How-to Guides) |
-| Look up a public interface | Public docstring, `docs/reference/python-api/` and the transitional `docs/api.md` |
+| Look up a public interface | Public docstring and `docs/reference/python-api/` (`docs/api.md` holds only compatibility links) |
 | Understand physical or numerical behavior | `docs/physics/` |
 | Inspect independent evidence | `docs/validation/` |
 | Read contributor workflow/current architecture | `docs/development/`, `docs/repo-design/` |
@@ -24,9 +24,10 @@ Classify the reader's *primary need* before editing (Diátaxis):
 1. Find the existing canonical owner and current source, tests, and evidence.
 2. Shorten, consolidate, or cross-link before creating another page. Tutorials
    teach; how-tos solve; reference specifies; explanation motivates.
-3. Add one primary toctree owner with appropriate nested index. When moving a
-   page, preserve its published URL via an alias/redirect and update inbound
-   links, explicit labels and source references.
+3. Add exactly one toctree owner with appropriate nested index (enforced by
+   `tests/dev/test_docs_computation_navigation.py`). To re-home a page, keep its
+   source path and use a titled toctree entry, or leave an orphan compatibility
+   page; update inbound links, explicit labels and source references.
 4. Preserve public API stability, model assumptions, quantities and units,
    provenance, validation state, and current-versus-proposed distinctions.
 5. Keep disposable plans in `agentdocs/`, not public docs.
@@ -40,7 +41,8 @@ signature belongs in generated Python API reference, and response physics in
 - CLI edits: regenerate and check `pyrite-dev cli-reference` and
   `pyrite-dev cli-deprecations` as applicable.
 - Ownership edits: `pyrite-dev repo-map --check`.
-- MyST, Sphinx and navigation: `uv run pyrite-dev docs`.
+- MyST, Sphinx and navigation: `uv run pyrite-dev docs` and
+  `pyrite-dev test tests/dev/test_docs_*.py`.
 - Skill edits: `uv run pyrite-dev sync-skills`, then
   `uv run pyrite-dev check-skills`.
 

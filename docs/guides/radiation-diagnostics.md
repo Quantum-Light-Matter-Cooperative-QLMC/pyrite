@@ -1,12 +1,12 @@
 (radiation-diagnostics)=
 # Fit a synthetic bunch duration from an interferogram
 
-Explore when a far-IR interferogram constrains a Gaussian bunch duration.
-These are **synthetic model outputs**, using the optical diagnostics app's
-ideal instrument and response; they are not measured data or a validated
-bunch-length diagnostic.
+Fit a Gaussian bunch duration to a synthetic far-IR interferogram and check
+whether the detector band identifies it. These are **synthetic model outputs**,
+using the optical diagnostics app's ideal instrument and response; they are not
+measured data or a validated bunch-length diagnostic.
 
-## Interferograms and conditional inference
+## Compute the interferogram and fit
 
 From a source checkout:
 
@@ -36,7 +36,12 @@ added. Synthetic flat photon templates, 45° linear polarization, 25% absorptanc
 and a 10¹² V/J pulse gain set the signal. Population and acceptance are already
 in the templates; no further charge scaling applies.
 
-Change **Detector band low** to **0.02 eV** and submit again:
+## Check that the band identifies the duration
+
+A fit always returns a numerical minimum; the duration is identified only if
+the band contains the spectral turnover of the form factor. Compare the
+conditional profile with a band that excludes it: set **Detector band low** to
+**0.02 eV** and submit again.
 
 ```{eval-rst}
 .. plot::
@@ -53,9 +58,8 @@ Change **Detector band low** to **0.02 eV** and submit again:
 | 0.0005–0.025 eV | 200.00 fs | 198.63–201.38 fs |
 | 0.02–0.025 eV | 200.46 fs | Both endpoints open within 20–3000 fs search |
 
-The 200 fs turnover is near **0.0033 eV**. Removing it from the band leaves the
-duration unidentified: the profile is multimodal with open endpoints, even
-though a numerical minimum still exists. The fit profiles a source scale with calibration fixed. Its interval assumes independent
+The 200 fs turnover is near **0.0033 eV**. Without it the profile is multimodal
+with open interval endpoints: reject such a fit even though a minimum exists. The fit profiles a source scale with calibration fixed. Its interval assumes independent
 Gaussian voltage errors; it excludes systematic covariance and response
 uncertainty and implies no unique bunch-profile or phase reconstruction.
 Refine spectral integration and delay step/range independently before interpreting
@@ -76,20 +80,13 @@ documentation builds only render these arrays. The maintained notebook is
 Existing NPZ inspection and launch modes are described in the
 [app reference](../reference/optical-diagnostics-app.md#saved-outputs).
 
-## Optical source and collection
+## Related app views
 
-The separate **Source and collection** exercise computes finite PEC TR/DR fields
-and collected spectra. It does not supply the synthetic templates above.
-See [settings, units and convergence limits](../reference/optical-diagnostics-app.md#optical-source-and-collection).
-
-## Cherenkov cone
-
-The separate **Cherenkov cone** view plots an internal bulk source in a lossless
-medium. It does not predict escaped light or detector counts; see
-[the source restrictions](../reference/optical-diagnostics-app.md#cherenkov-cone).
-
-## Checkpoint components and DTR
-
-For saved TR/CTR selection, signed source-band metrics and the **experimental,
-unverified** DTR view, see the
+The app's separate **Source and collection** view computes finite PEC TR/DR
+fields and collected spectra; it does not supply the synthetic templates above
+([settings and limits](../reference/optical-diagnostics-app.md#optical-source-and-collection)).
+The **Cherenkov cone** view plots an internal bulk source in a lossless medium
+and predicts neither escaped light nor detector counts
+([restrictions](../reference/optical-diagnostics-app.md#cherenkov-cone)).
+Saved TR/CTR components and the **experimental, unverified** DTR view are in the
 [TR/CTR app reference](../reference/tr-ctr-app.md#checkpoint-components-and-dtr).

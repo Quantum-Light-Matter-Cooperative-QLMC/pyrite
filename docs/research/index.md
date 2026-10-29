@@ -1,4 +1,4 @@
-# Writeups
+# Research
 
 Exploratory models, proposed extensions, and design investigations that do not describe current production behavior.
 

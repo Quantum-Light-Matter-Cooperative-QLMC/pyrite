@@ -2,7 +2,7 @@
 
 PyRITE exposes one deliberately governed Python API. A name being importable
 from an internal module does **not** make it supported. The supported contract
-is described by [the API reference](../api.md) and its package-root and
+is described by [the API reference](../reference/python-api/index.md) and its package-root and
 canonical-facade inventory in `api-surface.toml`. This page is the review policy for new APIs.
 
 The [experimental API lifecycle](../reference/experimental-api.md) defines the

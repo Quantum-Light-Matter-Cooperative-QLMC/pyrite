@@ -1,6 +1,6 @@
 # Optical diagnostics app controls and artifacts
 
-Use the [radiation diagnostics tutorial](../guides/radiation-diagnostics.md) for a
+Use the [radiation diagnostics guide](../guides/radiation-diagnostics.md) for a
 worked far-IR example. Install the apps extra, then launch the Plotly optical
 diagnostic:
 

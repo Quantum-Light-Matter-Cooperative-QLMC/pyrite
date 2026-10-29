@@ -56,10 +56,10 @@ owns field definitions and legacy-read compatibility.
 Planar channeling sources include bound lines and tracked free-to-bound capture.
 They retain the diagnostic model's constant mean electron energy and laterally
 infinite photon-attenuation slab. Measured linewidth reproduction remains
-incomplete. See [planar runs and refused paths](../guides/experimental-planar-channeling.md)
-for selection, photon-grid requirements, replay and limitations.
+incomplete. See [planar runs](../guides/experimental-planar-channeling.md#add-planar-channeling-to-a-transport-run)
+and [refused paths](quantum-api.md#supported-and-refused-paths) for selection, photon-grid requirements, replay and limitations.
 
-## Analyze or export
+## Analysis and comparison apps
 
 ```bash
 pyrite app analysis launch hopg
@@ -119,7 +119,7 @@ build can take tens of seconds. Static export fixes the centre-pixel selection;
 interactive selection needs `launch`. Remote observations remain on the remote
 host until observation transfer is implemented.
 
-## Planar channeling demo
+## Channeling app
 
 ```bash
 pyrite app channeling launch
@@ -144,12 +144,12 @@ Display controls reuse solver output and use each depth's current basis. See
 
 The app also offers an [experimental axial mode](../guides/experimental-axial-channeling.md)
 with an explicit Run action, 2-D maps, coherent phase and optional string-centred
-OAM. [Quantum API recipes](quantum-api.md) cover shaped entry states.
+OAM. [Quantum API contracts](quantum-api.md) cover shaped entry states.
 The [planar entrance-state reference](quantum-api.md#specify-and-inspect-quantum-entrance-states)
 distinguishes runtime diagnostic factories from the restricted experimental
 `Beam(state=...)` source admitted in production scenes.
 
-## Preserve or reduce data
+## Archive and reduction commands
 
 Use checkpoint commands rather than editing dataset directories:
 

@@ -6,7 +6,7 @@
 * **Supersedes:** nothing
 * **Expected outcome:** one ADR per accepted section (see {ref}`sec-core-arch-adrs`)
 
-This RFC records the changes implemented in PyRITE's object model, simulation entry point, result persistence, and command surface. It preserves the original state evidence, interface sketches, migration rationale, and review decisions. Where an original sketch differs from the implemented interface, the current [Python API reference](../api.md) and [scene recipes](../reference/python-scene-recipes.md) are authoritative.
+This RFC records the changes implemented in PyRITE's object model, simulation entry point, result persistence, and command surface. It preserves the original state evidence, interface sketches, migration rationale, and review decisions. Where an original sketch differs from the implemented interface, the current [Python API reference](../reference/python-api/index.md) and [scene recipes](../reference/python-scene-recipes.md) are authoritative.
 
 The changes are motivated by a comparison against codes solving a similar problem — Monte Carlo transport of a configurable beam into a configurable target, observed by a configurable detector. The relevant comparison set is [OpenMC](https://docs.openmc.org/), [abTEM](https://abtem.readthedocs.io/), [xrt](https://xrt.readthedocs.io/), [TOPAS](https://topas.readthedocs.io/), [EGSnrc/egs++](https://nrc-cnrc.github.io/EGSnrc/doc/pirs898/), PENELOPE/PENGEOM, and McStas/McXtrace.
 

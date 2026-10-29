@@ -27,6 +27,24 @@ def test_bump_versions_rewrites_both_sources(tmp_path: Path) -> None:
     assert (root / "src/pyrite/__init__.py").read_text() == '__version__ = "0.5.0"\n'
 
 
+def test_bump_versions_rewrites_tutorial_pins(tmp_path: Path) -> None:
+    root = _tree(tmp_path)
+    notebooks = root / "docs" / "notebooks"
+    notebooks.mkdir(parents=True)
+    header = '# /// script\n# dependencies = [\n#     "{}",\n#     "numpy==2.0.0",\n# ]\n# ///\n'
+    (notebooks / "01-a.py").write_text(
+        header.format("pyrite-mc==0.4.0") + 'x = "pyrite-mc==0.4.0"\n'
+    )
+    (notebooks / "11-b.py").write_text(header.format("pyrite-mc[optimization]==0.4.0"))
+
+    release.bump_versions(root, "0.5.0")
+
+    assert (notebooks / "01-a.py").read_text() == (
+        header.format("pyrite-mc==0.5.0") + 'x = "pyrite-mc==0.4.0"\n'
+    )
+    assert (notebooks / "11-b.py").read_text() == header.format("pyrite-mc[optimization]==0.5.0")
+
+
 @pytest.mark.parametrize("bad", ["0.4.0", "0.3.9", "0.5", "0.5.0rc1", "v0.5.0"])
 def test_bump_versions_rejects_non_increasing_or_malformed(tmp_path: Path, bad: str) -> None:
     root = _tree(tmp_path)

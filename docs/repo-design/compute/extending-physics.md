@@ -9,7 +9,7 @@ registry, or per-collision Python callback.
 
 ## Select existing implementations
 
-Use `Physics` through the [Python API](../../api.md), or the existing physics
+Use `Physics` through the [Python API](../../reference/python-api/core.md), or the existing physics
 fields in [profile settings](../profile-settings.md). `Numerics` owns grids,
 trial counts, precision and execution controls. Deprecated physics inputs on
 `Numerics` still lower through the existing compatibility path.

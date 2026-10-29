@@ -21,10 +21,14 @@ CPU suite; ordinary feature work follows `AGENTS.md` "Choose tests by impact".
 1. `--check` lists deprecation removals due at or before X.Y. Remove each
    (shim, call sites, tests, docs) in earlier commits; no release while due.
 2. Run without `--check`: bumps `pyproject.toml`, `src/pyrite/__init__.py`,
-   and `uv.lock`, regenerates CLI reference/deprecations, prints notes since
+   tutorial `pyrite-mc[...]==X.Y.Z` pins in `docs/notebooks/*.py`, and
+   `uv.lock`, regenerates CLI reference/deprecations, prints notes since
    last `v*` tag (else last release commit; `--base REV` overrides).
+   Tutorial captures need no regeneration: `pyrite_version` is provenance
+   only and fingerprints ignore the PyRITE pin version.
 3. Review notes: breaking and physics-changing sections are heuristic.
-4. Commit only those paths as the release commit; notes go in PR body.
+4. Commit only those paths (tutorial sources included) as the release commit;
+   notes go in PR body.
 
 After merge, an authorized human (or agent with explicit authorization) tags
 `vX.Y.Z` on the merge commit and pushes the tag; `.github/workflows/release.yml`

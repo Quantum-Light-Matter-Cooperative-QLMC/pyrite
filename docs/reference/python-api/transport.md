@@ -50,6 +50,12 @@ and table-column names are literal: angstroms, keV and radians. Optional model
 controls should be passed by keyword. The linked function docstrings define
 full defaults, supported combinations and exceptions.
 
+The [transport-output contract](../../physics/beam-transport/transport-outputs.md)
+defines returned segment fields, event codes, units and normalization. For
+stored trajectories, see the
+[saved-capture observables](../../physics/beam-transport/transport-outputs.md#saved-capture-observables)
+and [capture workflow](../trajectory-workflows.md).
+
 | Canonical import (`pyrite.transport.`) | Previous import | Input/output and effects |
 | --- | --- | --- |
 | `Case` | `pyrite.montecarlo.Case` | Validated lowered simulation/configuration record; field-specific units, frozen mapping serialization. Invalid fields raise validation errors; no transport on construction. |

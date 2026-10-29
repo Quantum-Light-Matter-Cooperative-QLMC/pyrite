@@ -8,6 +8,8 @@ application contracts. For walkthroughs, see
 :maxdepth: 1
 
 ../results-and-apps
+../../repo-design/result-storage-contracts
+../../physics/beam-transport/transport-outputs
 ../trajectory-workflows
 ../distributed-artifacts
 ../tr-ctr-app

@@ -20,7 +20,7 @@ pyrite beam gdf times beam.gdf
 ```
 
 For an input that needs no proprietary software, use the
-[synthetic distribution tutorial](../guides/gpt-gdf-beams.md). It imports
+[synthetic distribution guide](../guides/gpt-gdf-beams.md). It imports
 through the supported `pyrite.Beam.from_gdf` constructor. Raw parsing and
 sampling implementations are internal; the CLI inspection commands are the
 supported way to inspect arbitrary inputs.

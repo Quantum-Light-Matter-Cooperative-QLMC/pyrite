@@ -147,7 +147,8 @@ def test_export_migrates_wrapper_and_retains_hidden_input(tmp_path, monkeypatch)
     assert "image/png" in outputs[2].data
     assert "02-second.ipynb" in nb.cells[-1].source
     assert nb.metadata["pyrite_docs"]["source_sha256"] == module.digest(sources / "first.py")
-    assert len(calls) == 2  # marimo check, then a single captured ipynb export
+    # marimo check, a single captured ipynb export, then ruff format of the capture
+    assert len(calls) == 3 and calls[-1][1:4] == ["-m", "ruff", "format"]
     module.check_notebooks()
 
 
@@ -251,6 +252,124 @@ def test_fingerprint_ignores_formatting_but_preserves_script_metadata():
     assert module.source_fingerprint(prose) != module.source_fingerprint(
         prose.replace("numpy", "scipy")
     )
+
+
+def test_release_pin_alone_never_stales_a_capture():
+    module = _notebook_extension()
+    header = '# /// script\n# dependencies = ["{}", "numpy==2.0"]\n# ///\nvalue = 1\n'
+    before = header.format("pyrite-mc==0.22.5")
+    assert module.source_fingerprint(before) == module.source_fingerprint(
+        header.format("pyrite-mc==0.23.0")
+    )
+    for changed in (
+        header.format("pyrite-mc[optimization]==0.22.5"),
+        header.format("pyrite-mc>=0.22"),
+        before.replace("numpy==2.0", "numpy==2.1"),
+    ):
+        assert module.source_fingerprint(before) != module.source_fingerprint(changed)
+    # The v1 fingerprint hashed the pin, so v1 captures need a proven migration.
+    assert module.source_fingerprint(before, legacy=True) != module.source_fingerprint(
+        header.format("pyrite-mc==0.23.0"), legacy=True
+    )
+
+
+def test_v1_fingerprint_migrates_only_for_the_exact_hashed_source(tmp_path, monkeypatch):
+    module = _notebook_extension()
+    sources = tmp_path / "notebooks"
+    (sources / "fundamentals").mkdir(parents=True)
+    source = sources / "first.py"
+    pinned = '# /// script\n# dependencies = ["pyrite-mc==0.23.0"]\n# ///\nvalue = 1\n'
+    source.write_text(pinned)
+    page = sources / "fundamentals/first.ipynb"
+    captured = nbformat.v4.new_notebook(
+        metadata={
+            "pyrite_docs": {
+                "schema": module.SCHEMA,
+                "source_fingerprint": module.LEGACY_FINGERPRINT,
+                "source_fingerprint_sha256": module.source_fingerprint(pinned, legacy=True),
+                "pyrite_version": "0.23.0",
+            }
+        }
+    )
+    nbformat.write(captured, page)
+    monkeypatch.setattr(module, "NOTEBOOKS", sources)
+    monkeypatch.setattr(module.subprocess, "run", lambda *args, **kw: pytest.fail("executed"))
+    with pytest.raises(ValueError, match="--migrate-hashes"):
+        module.check_notebooks()
+    assert module.migrate_hashes()
+    migrated = nbformat.read(page, as_version=4).metadata.pyrite_docs
+    assert migrated.source_fingerprint == module.FINGERPRINT
+    assert migrated.source_fingerprint_sha256 == module.fingerprint(source)
+    nbformat.write(captured, page)
+    source.write_text(pinned.replace("value = 1", "value = 2"))
+    before = page.read_bytes()
+    assert not module.migrate_hashes()
+    assert page.read_bytes() == before
+
+
+def test_regenerate_command_declares_tutorial_extras(tmp_path):
+    module = _notebook_extension()
+    plain = tmp_path / "01-plain.py"
+    plain.write_text('# /// script\n# dependencies = ["pyrite-mc==0.23.0"]\n# ///\n')
+    optimized = tmp_path / "11-optimized.py"
+    optimized.write_text(
+        '# /// script\n# dependencies = ["pyrite-mc[optimization]==0.23.0"]\n# ///\n'
+    )
+    assert module.regenerate_command([plain]) == (
+        "uv run --group docs python docs/_notebooks.py --regenerate 01-plain"
+    )
+    assert module.regenerate_command([plain, optimized]) == (
+        "uv run --group docs --extra optimization python docs/_notebooks.py --regenerate-all"
+    )
+
+
+def test_regenerated_capture_is_ruff_format_clean(tmp_path, monkeypatch):
+    import subprocess
+    import sys
+
+    module = _notebook_extension()
+    docs = tmp_path / "docs"
+    sources = docs / "notebooks"
+    (sources / "fundamentals").mkdir(parents=True)
+    (tmp_path / "pyproject.toml").write_text(
+        '[project]\nversion = "0.23.0"\n[tool.ruff]\nline-length = 100\n'
+    )
+    (sources / "first.py").write_text("# marimo source\n")
+    nbformat.write(
+        nbformat.v4.new_notebook(metadata={"pyrite_docs": {"title": "First", "footer": "Next"}}),
+        sources / "fundamentals/first.ipynb",
+    )
+    monkeypatch.setattr(module, "DOCS", docs)
+    monkeypatch.setattr(module, "NOTEBOOKS", sources)
+    monkeypatch.setattr(module, "validate_source", lambda source: None)
+    run = subprocess.run
+
+    def mock_run(command, **kwargs):
+        if "ruff" in command:
+            return run(command, **kwargs)
+        if "export" in command:
+            # marimo exports cell code in a layout Ruff reformats (#780).
+            figure = nbformat.v4.new_output("display_data", data={"image/png": "iVBORw0KGgo="})
+            nbformat.write(
+                nbformat.v4.new_notebook(
+                    cells=[
+                        nbformat.v4.new_markdown_cell("# First"),
+                        nbformat.v4.new_code_cell(
+                            "values=[ x for x in range( 3 ) ]\nlabel=', '.join( map(str,values) )",
+                            outputs=[figure],
+                        ),
+                    ]
+                ),
+                command[command.index("-o") + 1],
+            )
+
+    monkeypatch.setattr(module.subprocess, "run", mock_run)
+    module.regenerate(["first"])
+    page = sources / "fundamentals/first.ipynb"
+    check = [sys.executable, "-m", "ruff", "format", "--check", "--config"]
+    run([*check, str(tmp_path / "pyproject.toml"), str(page)], check=True)
+    assert nbformat.read(page, as_version=4).cells[1].outputs[0].data["image/png"]
+    module.check_notebooks()
 
 
 def test_hash_migration_never_blesses_changed_source(tmp_path, monkeypatch):

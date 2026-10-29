@@ -52,7 +52,6 @@ Legacy section links <../../api>
 
 ../quantum-api
 ../experimental-api
-../python-scene-recipes
 ../directional-sources
 ../gdf-beams
 ```
