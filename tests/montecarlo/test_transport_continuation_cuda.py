@@ -131,10 +131,15 @@ def radiative_reference():
 
 
 @pytest.mark.parametrize(
-    ("rows_per_round", "active"), [(1, None), (7, None), (7, 37), (64, 5), (4096, None)]
+    ("rows_per_round", "active", "staging"),
+    [(1, None, False), (7, None, False), (7, 37, True), (64, 5, False), (4096, None, True)],
 )
-def test_coupled_radiative_rows_match_full_history(radiative_reference, rows_per_round, active):
-    result = _radiative(_continued(rows_per_round, active))
+def test_coupled_radiative_rows_match_full_history(
+    radiative_reference, rows_per_round, active, staging
+):
+    config = _continued(rows_per_round, active)
+    config = replace(config, continuation=replace(config.continuation, device_staging=staging))
+    result = _radiative(config)
     _assert_identical(radiative_reference, result)
     assert np.count_nonzero(result["event_kind"] == EVENT_HARD_RADIATIVE) > 0
     check_segment_event_contract(result)

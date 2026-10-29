@@ -17,7 +17,8 @@ Policies (``--policies``, comma-separated):
   track, carried from warmup) with 32-thread blocks.
 - ``reference-B<n>`` / ``learned32-B<n>``: the same with ``max_batch=n``, a
   full-history arm at the concurrency of a continuation population.
-- ``cont-Q<rows>-A<active|all>-T<threads>``: continuation rounds.
+- ``cont-Q<rows>-A<active|all>-T<threads>[-D]``: continuation rounds; ``-D``
+  stages retained rows on the device.
 
 Run on the lab box from a synced checkout after ``prepare_stopping.py``; the
 continuation policies need a branch that provides
@@ -76,7 +77,7 @@ def parse_policy(name):
         threads = 128 if kind == "reference" else 32
         return {"name": name, "kind": kind, "threads": threads, "max_batch": int(limit or 0)}
     fields = {part[:1]: part[1:] for part in name.split("-")[1:]}
-    if not name.startswith("cont-") or set(fields) != {"Q", "A", "T"}:
+    if not name.startswith("cont-") or set(fields) - {"D"} != {"Q", "A", "T"}:
         raise SystemExit(f"unknown policy {name!r}")
     return {
         "name": name,
@@ -84,6 +85,7 @@ def parse_policy(name):
         "rows_per_round": int(fields["Q"]),
         "active": None if fields["A"] == "all" else int(fields["A"]),
         "threads": int(fields["T"]),
+        "device_staging": "D" in fields,
     }
 
 
@@ -184,6 +186,7 @@ def run_policy(policy, base, seed, hook, original_factory):
                 continuation=TransportContinuationConfig(
                     rows_per_round=policy["rows_per_round"],
                     active_histories=policy["active"],
+                    device_staging=policy["device_staging"],
                     on_round=rounds.append,
                 ),
             )

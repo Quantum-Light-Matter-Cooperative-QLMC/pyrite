@@ -173,6 +173,15 @@ def test_device_resident_join_matches_host_rows():
         np.testing.assert_array_equal(host_rows[column], device_rows[column])
 
 
+def test_device_staging_matches_host_rows():
+    cont = TransportContinuationConfig(rows_per_round=5, active_histories=3)
+    _counts, host_rows, _, _ = _drive(cont)
+    counts, staged_rows, _, _ = _drive(replace(cont, device_staging=True))
+    assert counts[6] is None
+    for column in WRITTEN:
+        np.testing.assert_array_equal(host_rows[column], staged_rows[column])
+
+
 def test_scratch_respects_budget_with_staging_and_event_columns():
     row_bytes = continuation_row_bytes(_alloc(1))
     # Midpoint schema plus the photon pair: 7 base + 5 end fields + 2 photon.

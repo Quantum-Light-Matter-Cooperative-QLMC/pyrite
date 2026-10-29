@@ -65,6 +65,11 @@ class TransportContinuationConfig:
     enabled row schema. Ne-sized per-history state and retained output are
     outside it: bounded scratch does not bound total trajectory storage.
 
+    ``device_staging`` keeps each round's retained rows on the device and
+    downloads the reassembled columns once, trading up to twice the retained
+    output in device memory for fewer, contiguous host copies. Off, rows move
+    to the host every round and are reassembled there.
+
     ``on_round`` (diagnostics only) receives one ``phase="round"`` dict per
     launch with the launched population, rows, finished/refilled counts and
     scratch bytes, then one ``phase="assembly"`` dict timing the reassembly.
@@ -72,6 +77,7 @@ class TransportContinuationConfig:
 
     rows_per_round: int = 256
     active_histories: int | None = None
+    device_staging: bool = False
     on_round: Callable[[dict[str, Any]], None] | None = None
 
     def __post_init__(self):
@@ -189,6 +195,7 @@ def _drive_continuation_rounds(
     scratch = alloc_scratch(n_active * quantum)
     # Frozen rows keep seven columns; the kernel still takes the empty end fields.
     columns = scratch[: len(out_bufs)]
+    on_device = keep_on_device or cont.device_staging
     seg_count = xp.zeros(n_active, dtype=xp.int64)
     exit_code = xp.zeros(n_active, dtype=xp.int8)
     state = tuple(xp.zeros((Ne, _STATE_WORDS), dtype=t) for t in (xp.int32, xp.uint64, xp.float64))
@@ -216,7 +223,7 @@ def _drive_continuation_rounds(
             raise RuntimeError("segment buffer exhausted")
         gathered = tuple(a[index] if a.shape[0] else a for a in columns)
         del index
-        retained.append(gathered if keep_on_device else tuple(to_host(a) for a in gathered))
+        retained.append(gathered if on_device else tuple(to_host(a) for a in gathered))
         del gathered
         counts = to_host(seg_count[:m]).astype(np.int64)
         codes = to_host(exit_code[:m])
@@ -249,7 +256,12 @@ def _drive_continuation_rounds(
             on_batch(int(next_pending - active.size), Ne)
 
     assembly = time.perf_counter()
-    joined = _assemble(xp, chunks, rows_total, retained, columns, out_bufs, nseg, keep_on_device)
+    joined = _assemble(xp, chunks, rows_total, retained, columns, out_bufs, nseg, on_device)
+    if on_device and not keep_on_device:
+        for buf, column in zip(out_bufs, joined, strict=True):
+            if column.shape[0]:
+                buf[:nseg] = to_host(column)
+        joined = None
     if cont.on_round is not None:
         cont.on_round({"phase": "assembly", "rows": nseg, "wall_s": time.perf_counter() - assembly})
     return (nseg, *(tallies[code] for code in _TALLIED), joined, to_host(d_stragg))
