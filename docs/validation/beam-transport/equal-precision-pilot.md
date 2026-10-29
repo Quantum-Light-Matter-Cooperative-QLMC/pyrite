@@ -769,3 +769,93 @@ The benchmark loads the old completion routine under an isolated module name
 for the baseline and uses the production routine for the candidate; it keeps
 all other current transport preparation intact. The existing diagnostic
 analyzer checks paired trajectory hashes and summarizes its evidence folder.
+
+## Bounded continuation scheduling, 2026-10-29
+
+[#789](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/789)
+prototypes opt-in bounded continuation for the exact CUDA core: a fixed active
+population, a per-launch row quantum `Q`, refill of finished lanes, and
+canonical reassembly. The [design contract](../../repo-design/compute/gpu-transport-rawkernel.md#bounded-continuation-opt-in-prototype)
+covers its resumable state and memory accounting. Scenes and controls are this
+page's frozen continuous-loss Si/W 300-keV anchors plus the W 100-keV, 75°
+scene as a mixed-length stress case. Each run uses 4096 MiB nominal scratch, no
+probe, and a complete same-policy warmup at seed +1000000. Policies are
+interleaved within one process per scene and seed. Default physics, precision
+and output are unchanged.
+
+`learned32` is #786's request-local capacity hint with 32-thread blocks;
+`-B5000` caps it at 5000 histories per launch. `cont-Q<rows>-A<active>` uses
+32-thread blocks. Job 2640 compares branch revision `2316a5bd` with `main`
+`a1d15d01`; job 2642 runs `ee1b1809`. The
+[machine-readable summary](../check-records/equal-precision/continuation-789.json)
+retains every group's spread and kernel resources. The benchmark and analyzer
+are `checks/equal_precision/benchmark_continuation.py` and
+`analyze_continuation.py`; the job scripts are `continuation-786.sbatch` and
+`continuation-sustained.sbatch`.
+
+**Exactness.** Within every process, every policy's warmup and measured
+trajectory arrays hash identically. Branch `reference` hashes equal `main` in
+all seven compared scene/seed pairs. Separate CUDA regressions (jobs 2638–2641)
+require bitwise-identical arrays across quanta 1–4096, populations 5–all,
+permuted refill, layered and side-exit geometry, frozen and midpoint rows,
+coupled hard photons, device-resident output and step-limit errors.
+
+**Default kernel cost.** Compiled registers per thread rise from 200 to 204
+(40 local bytes in both). Default 128-thread launch times are unchanged:
+Si 2.173 vs 2.176 s and W 7.470 vs 7.485 s (branch vs `main`, medians of
+three).
+
+Matched #786 workload: 5000 histories, seeds 78601–78603, median [min,max] s:
+
+| Policy | Si request | Si launches | W request | W launches | Peak pool (Si / W) |
+| --- | --- | --- | --- | --- | --- |
+| reference | 2.675 [2.568,2.700] | 2.173 | 9.094 [8.953,9.240] | 7.470 | 3582 / 7417 MiB |
+| learned32 | 1.343 [1.342,1.353] | 0.830 | 5.263 [5.220,5.331] | 3.814 | 3570 / 7416 MiB |
+| cont-Q64-Aall | 1.766 [1.607,1.837] | 0.971 | 4.444 [4.326,4.461] | 2.448 | 80 / 80 MiB |
+| cont-Q256-Aall | 1.509 [1.496,1.721] | 0.922 | 4.102 [3.921,4.123] | 2.321 | 316 / 315 MiB |
+| cont-Q1024-Aall | 1.543 [1.453,1.573] | 0.886 | 3.959 [3.930,4.023] | 2.232 | 1099 / 1216 MiB |
+| cont-Q256-A2500 | 1.894 [1.886,1.965] | 1.241 | 4.592 [4.547,4.875] | 2.828 | 159 / 158 MiB |
+
+"Launches" is summed synchronized launch time. "Peak pool" is CuPy pool
+allocation above the pre-request level, not a driver-reported VRAM peak. The
+full-history policies exceed the nominal 4096 MiB because `_batch_size` budgets
+82 bytes per row while the coupled midpoint schema allocates 125 (#611). Every
+continuation request respects its budget. For W, continuation keeps all 5000
+histories in one population, whereas `learned32` still runs a sparse 759-history
+second launch. For Si, `learned32` already runs one launch, and continuation's
+extra host work makes it 12% slower end to end.
+
+Sustained 20000-history requests (seeds 78601–78602 for the sustained rows;
+78601 only for the budget-bound rows), median s:
+
+| Scene, policy | Launches | Request | Peak pool |
+| --- | --- | --- | --- |
+| Si, learned32-B5000 | 3.365 | 5.258 | 6329 MiB |
+| Si, cont-Q256-A5000 | 1.857 | 5.092 | 318 MiB |
+| W, learned32-B5000 | 9.855 | 16.648 | 12589 MiB |
+| W, cont-Q256-A5000 | 3.989 | 12.269 | 317 MiB |
+| W 100 keV 75°, learned32-B5000 | 2.788 | 5.258 | 4890 MiB |
+| W 100 keV 75°, cont-Q256-A5000 | 1.635 | 5.347 | 309 MiB |
+| Si, 256 MiB budget, learned32 | 25.577 | 28.153 | 789 MiB |
+| Si, 256 MiB budget, cont-Q64-Aall | 1.348 | 4.033 | 244 MiB |
+| W, 256 MiB budget, learned32 | 138.539 | 146.374 | 789 MiB |
+| W, 256 MiB budget, cont-Q64-Aall | 3.095 | 11.030 | 244 MiB |
+
+At matched 5000-lane concurrency, refilling finished lanes cuts launch time by
+45% (Si), 60% (W) and 41% (stress). With a binding 256 MiB budget the
+continuation peak stays below it, including compaction staging, and the
+full-history driver's scratch-limited 626-history batches are 7–13× slower.
+This is evidence for scheduling, not occupancy: no profiler counters were
+collected. `lane_step_efficiency` in the summary is a schedule proxy only.
+
+**Remaining bottleneck.** Once launches are efficient, retaining complete
+trajectories on the host dominates both schedules: about 3–8 s of each
+20000-history request is outside the launches. Continuation adds per-round
+device-to-host copies and a host-side canonical scatter. The stress case
+regresses slightly end to end (5.258 → 5.347 s); at 5000 histories it is
+1.270 s for `learned32` against 1.526 s. Unbounded `learned32` remains fastest
+there when memory is plentiful (4.391 s at 20000, 9.8 GiB peak). Bounded live
+scratch does not bound total trajectory storage; streaming consumption belongs
+to [#611](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/611).
+Transfers and synchronization are not yet attributed separately, and the stress
+rows have one or two samples.
