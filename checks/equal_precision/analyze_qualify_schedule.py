@@ -1,8 +1,8 @@
 """Summarize ``qualify_schedule.py`` records (#799).
 
 Groups samples by (scene, histories, schedule), reports median [min, max]
-end-to-end and transport seconds, peak pool and RSS, the resolved schedule,
-and whether every returned array hashes identically across schedules for each
+transport-request and runner transport seconds, peak pool and RSS, the resolved
+schedule, and whether trajectory arrays and exit tallies match across schedules for each
 (scene, histories, seed). Writes a JSON summary and prints a Markdown table.
 """
 
@@ -40,7 +40,13 @@ def main():
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
 
-    records = [json.loads(p.read_text()) for p in sorted(args.evidence.glob("*.json"))]
+    records = [
+        json.loads(p.read_text())
+        for p in sorted(args.evidence.glob("*.json"))
+        if p.resolve() != args.output.resolve()
+    ]
+    if not records or any(r.get("measurement_scope") != "runner-transport-only" for r in records):
+        raise ValueError("expected transport-only samples; do not mix spectral request evidence")
     groups = defaultdict(list)
     digests = defaultdict(dict)
     for r in records:
@@ -68,11 +74,20 @@ def main():
                 "schedule_log": sorted({m for r in rs for m in r["measured"]["schedule_log"]}),
             }
         )
-    args.output.write_text(json.dumps({"groups": summary, "identical": identical}, indent=1))
+    args.output.write_text(
+        json.dumps(
+            {
+                "measurement_scope": "runner-transport-only",
+                "groups": summary,
+                "identical": identical,
+            },
+            indent=1,
+        )
+    )
 
     mib, gib = 1024.0**2, 1024.0**3
     print(
-        "| Scene | Histories | Schedule | Request (s) | Transport (s) | Peak pool (MiB) | Peak RSS (GiB) |"
+        "| Scene | Histories | Schedule | Transport request (s) | Runner transport (s) | Peak pool (MiB) | Peak RSS (GiB) |"
     )
     print("| --- | --- | --- | --- | --- | --- | --- |")
     for g in summary:

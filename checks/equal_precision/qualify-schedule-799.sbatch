@@ -6,7 +6,8 @@
 #SBATCH --mem=28G
 #SBATCH --time=05:00:00
 #SBATCH --output=qualify-schedule-799-%j.log
-# #799: production-default runner cases under full-history vs auto schedules.
+# #799: production-default runner transport, without spectral scoring.
+# Full-history vs auto, including coupled photon completion in both arms.
 # One process per sample; schedules interleaved, order reversed on even seeds.
 set -euo pipefail
 cd "$SLURM_SUBMIT_DIR"
