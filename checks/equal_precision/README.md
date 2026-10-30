@@ -505,3 +505,37 @@ pairs need equal trajectory digests. LUT and moment pairs get a paired
 per-primary screen: the 95% interval of the difference is compared with
 `--rel-tol` (default 1e-3) and classed as equivalent, different or unresolved.
 The screen is not a qualification gate.
+
+### Component attribution (#803)
+
+`probe_components_803.py COMPONENT K AUDIT_DIR <baseline_803.py args>`
+generalizes the #792 flight-rate probe. It rewrites an isolated copy of
+`cores.py` (CPU) or `_jit_kernel.py` (CUDA) so that one component is evaluated
+`K` extra times at its own site, with inputs perturbed downward by `(k + 1)·1e-13`
+relative. The extra results feed only a comparison with an impossible value,
+so trajectories must stay bitwise identical to `K = 0`. The components are:
+
+- `rate`: the per-step ELSEPA rate sum;
+- `moments`: the soft and hard radiative moments at step start;
+- `stopping`: SBETHE stopping at step start;
+- `cutoff`: stopping plus the soft moment at the midpoint cutoff energy;
+- `midpoint`: the same at the RK2 midpoint;
+- `clock`: `beta` for the transport clock;
+- `select`: the element-selection rate recomputation;
+- `angle`: ELSEPA polar inversion with its grid lookup.
+
+The run is `baseline_803.py`, so records keep CUDA-event kernel time and the
+NVTX stage split. `--precision mixed|mixed_math` (CUDA only) also applies the
+#831 FP32 text rewrite. It is a timing proxy for #838, not validated physics.
+
+`run_probe_803.py OUT --core per-electron|cuda` expands `probe-803.json`. For
+each scene, configuration and seed it runs `K = 0` first, then rotates the
+component order by seed. It resumes like the baseline driver. On the lab box,
+submit `probe-803-cpu.sbatch` or `probe-803-gpu.sbatch`.
+
+`analyze_probe_803.py DIR... --output PATH` checks every amplified digest
+against its `K = 0` reference and reports the cost of one evaluation,
+`(T_K − T_0)/K`. `T` is warm kernel time on CUDA and warm request wall on CPU.
+The cost is given as a share of kernel and of request time. It is a ceiling
+for a zero-cost replacement at that site, and the marginal costs are not
+additive. The leftover `unattributed` share is therefore a rough remainder.

@@ -1,0 +1,66 @@
+{
+  "schema": "pyrite.lut-probe-803.protocol.v1",
+  "issue": 803,
+  "purpose": "Component amplification on the production-default detailed configuration (ELSEPA, coupled BremsLib, table moments; CUDA auto schedule, CPU full-history). Scenes and common controls come from baseline-803.json. The mixed_math config composes the #831 FP32 timing rewrite (CUDA only; not validated physics).",
+  "configs": [
+    {
+      "core": "cuda",
+      "inelastic": "continuous",
+      "schedule": "auto"
+    },
+    {
+      "core": "cuda",
+      "inelastic": "shell-soft-hard",
+      "schedule": "auto"
+    },
+    {
+      "core": "per-electron",
+      "inelastic": "continuous",
+      "schedule": "full-history"
+    },
+    {
+      "core": "per-electron",
+      "inelastic": "shell-soft-hard",
+      "schedule": "full-history"
+    },
+    {
+      "core": "cuda",
+      "inelastic": "continuous",
+      "schedule": "auto",
+      "precision": "mixed_math",
+      "amplifications": [
+        4
+      ],
+      "note": "#831 mixed_math text rewrite as a timing proxy for #838: component costs once FP32 tables and transcendentals are in place."
+    }
+  ],
+  "fixed": {
+    "elastic": "elsepa",
+    "radiative": "bremslib-soft-hard",
+    "lut": "off",
+    "moments": "table"
+  },
+  "components": [
+    "rate",
+    "moments",
+    "stopping",
+    "cutoff",
+    "midpoint",
+    "clock",
+    "select",
+    "angle"
+  ],
+  "amplifications": [
+    1,
+    4
+  ],
+  "seeds": [
+    80301,
+    80302
+  ],
+  "histories": {
+    "per-electron": 2048,
+    "cuda": 16384
+  },
+  "warm_repeats": 3
+}
