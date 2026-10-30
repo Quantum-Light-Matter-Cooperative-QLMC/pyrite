@@ -536,6 +536,18 @@ def _elsepa_invert_row(cdf, pdf, mu, n_mu, guide, guide_cells, row, xi):
 
 
 @jit.rawkernel(device=True)
+def _elsepa_quantile_mu(cdf, pdf, mu, n_mu, guide, guide_cells, row, fraction, xi):
+    """``ln E`` quantile mix of the inversions on rows ``row`` and ``row + 1``.
+
+    The ``mu`` that :func:`pyrite.montecarlo.transport.scattering._sample_cos_theta_elsepa`
+    maps to ``cos(theta) = 1 - 2 mu``.
+    """
+    mu0 = _elsepa_invert_row(cdf, pdf, mu, n_mu, guide, guide_cells, row, xi)
+    mu1 = _elsepa_invert_row(cdf, pdf, mu, n_mu, guide, guide_cells, row + I32_ONE, xi)
+    return (F64_ONE - fraction) * mu0 + fraction * mu1
+
+
+@jit.rawkernel(device=True)
 def _searchsorted_right(bounds, x, n):
     lower_idx = I32_ZERO
     upper_idx = n

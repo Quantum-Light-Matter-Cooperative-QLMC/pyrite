@@ -79,7 +79,7 @@ from ._jit_device import (
     _beta_from_keV,
     _dEds_packed,
     _dEds_sbethe,
-    _elsepa_invert_row,
+    _elsepa_quantile_mu,
     _interp_mott_log_alpha,
     _rate_mott,
     _rate_sr,
@@ -1157,7 +1157,7 @@ def _transport_kernel(
                                 log_E_sel,
                                 elastic_lower_index,
                             )
-                            mu0 = _elsepa_invert_row(
+                            cos_theta = F64_ONE - F64_TWO * _elsepa_quantile_mu(
                                 el_cdf,
                                 el_pdf,
                                 el_mu,
@@ -1165,20 +1165,8 @@ def _transport_kernel(
                                 el_guide,
                                 el_guide_cells,
                                 el_row + elastic_lower_index,
+                                elastic_fraction,
                                 R_ang,
-                            )
-                            mu1 = _elsepa_invert_row(
-                                el_cdf,
-                                el_pdf,
-                                el_mu,
-                                el_n_mu,
-                                el_guide,
-                                el_guide_cells,
-                                el_row + elastic_lower_index + I32_ONE,
-                                R_ang,
-                            )
-                            cos_theta = F64_ONE - F64_TWO * (
-                                (F64_ONE - elastic_fraction) * mu0 + elastic_fraction * mu1
                             )
                         else:
                             cos_theta = F64_ONE - F64_TWO * alpha * R_ang / (
