@@ -326,7 +326,6 @@ def run_transport_kernel(
                 sbethe_on=bool(sbethe_on),
                 straggle_on=bool(straggle_on),
                 inelastic_on=inelastic_on,
-                sec_on=shell_arguments[_SHELL_SEC_ON],
                 rad_on=radiative_arguments[0],
                 cont_on=continuation is not None,
             )
@@ -431,10 +430,6 @@ def _continuation_kernel_args(continuation):
         state_u64.reshape(-1),
         state_f64.reshape(-1),
     )
-
-
-# Position of the int32 ``sec_on`` switch in ``_shell_kernel_args``'s tuple.
-_SHELL_SEC_ON = 17
 
 
 def _shell_kernel_args(inelastic_args, hard_segments):

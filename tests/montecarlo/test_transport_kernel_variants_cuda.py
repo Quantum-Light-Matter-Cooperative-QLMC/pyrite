@@ -40,6 +40,8 @@ SWITCHES = (
     "rad_on",
     "cont_on",
 )
+# Secondary directions stay runtime-switched: see `TransportKernelSwitches`.
+SPECIALIZED = tuple(name for name in SWITCHES if name != "sec_on")
 
 
 def _module_tree(name):
@@ -72,7 +74,7 @@ def test_switches_are_module_globals_not_kernel_parameters():
         if isinstance(node, ast.ClassDef) and node.name == "TransportKernelSwitches"
     )
     fields = [node.target.id for node in switches.body if isinstance(node, ast.AnnAssign)]
-    assert tuple(fields) == SWITCHES
+    assert tuple(fields) == SPECIALIZED
 
 
 def _paired(run, monkeypatch, *args, **kwargs):
@@ -138,17 +140,15 @@ def test_specialized_kernel_matches_monolithic(run, kw, schedule, monkeypatch):
 
 @pytest.mark.hardware
 @requires_cuda
-def test_variants_are_cached_per_normalized_switches():
+def test_variants_are_cached_per_switch_tuple():
     from pyrite.montecarlo.transport._jit_kernel_variants import (
         TransportKernelSwitches,
         transport_kernel_variant,
     )
 
-    off = dict.fromkeys(SWITCHES, 0)
-    plain = TransportKernelSwitches.normalized(**off)
-    # Secondary directions exist only in shell mode: no separate compile.
-    assert TransportKernelSwitches.normalized(**(off | {"sec_on": True})) == plain
-    shell = TransportKernelSwitches.normalized(**(off | {"inelastic_on": 1, "sec_on": 1}))
-    assert shell.sec_on == 1
+    off = dict.fromkeys(SPECIALIZED, 0)
+    plain = TransportKernelSwitches.normalized(**(off | {"straggle_on": np.bool_(False)}))
+    assert plain == TransportKernelSwitches(*([0] * len(SPECIALIZED)))
+    shell = TransportKernelSwitches.normalized(**(off | {"inelastic_on": True}))
     assert transport_kernel_variant(plain) is transport_kernel_variant(plain)
     assert transport_kernel_variant(plain) is not transport_kernel_variant(shell)
