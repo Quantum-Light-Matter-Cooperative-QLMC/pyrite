@@ -113,6 +113,8 @@ def test_brem_oom_halves_only_brem_and_preserves_original_case(monkeypatch):
     assert case == {"spec_chunk": 30_000, "brem_chunk": 100_000}
     assert out["_attempted_brem_chunk"] == 100_000
     assert out["_effective_brem_chunk"] == 50_000
+    # Photon-grid blocking is a diagnostic beside the chunk; this grid fits (#819).
+    assert out["_brem_photon_block"] == 2000
     assert out["_brem_gpu_oom_retries"] == 1
     assert out["_line_gpu_oom_retries"] == 0
 

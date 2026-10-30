@@ -78,6 +78,11 @@ def _uncoupled_brem_from_segments(
     if electron_band_weights is not None:
         model_kwargs["electron_band_weights"] = electron_band_weights
 
+    model = model_kwargs["cross_section_model"]
+
+    def photon_block(composition):
+        return runner._brem_photon_block(E_brem.size, composition, model, n_layers=n_lay)
+
     if n_lay == 1:
         return runner.mc_brem_spectrum(
             segs_b,
@@ -85,6 +90,7 @@ def _uncoupled_brem_from_segments(
             composition=case["composition"],
             n_hat=n_hat,
             chunk=brem_chunk,
+            photon_block=photon_block(case["composition"]),
             layers=abs_layers,
             groove=groove,
             electron_limit=Ne,
@@ -105,6 +111,7 @@ def _uncoupled_brem_from_segments(
             composition=abs_layers[L][2],
             n_hat=n_hat,
             chunk=brem_chunk,
+            photon_block=photon_block(abs_layers[L][2]),
             layers=abs_layers,
             groove=groove,
             electron_limit=Ne,
@@ -163,6 +170,9 @@ def _coupled_brem_from_segments(
             composition=composition,
             n_hat=n_hat,
             chunk=brem_chunk,
+            photon_block=runner._brem_photon_block(
+                E_brem.size, composition, "bremslib", n_layers=n_lay
+            ),
             layers=abs_layers,
             electron_limit=Ne,
             cutoff_eV=cutoff_eV,
