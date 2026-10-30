@@ -12,9 +12,8 @@ Resolution order, per element:
    ``pyrite tables fetch bremslib``, not a fallback: the fix is one command.
 2. Any other element resolves to a locally generated table, generating it
    from a BremsLib checkout when none is stored yet.
-3. With no release entry and no checkout, the element is left out with a
-   ``RuntimeWarning``; :func:`~pyrite.montecarlo.spectrum.mc_brem_spectrum`
-   then treats its emission as isotropic EEDL, the documented fallback.
+3. With no release entry and no checkout, raise by default. Only explicit
+   ``allow_fallback=True`` permits the isotropic EEDL substitute.
 """
 
 import warnings
@@ -26,6 +25,7 @@ from typing import Literal, cast
 import numpy as np
 
 from ..._bremslib_table import BremsLibBremsstrahlungTable, prepare_bremslib_table
+from ..._physics_fallback import PhysicsFallbackWarning
 from ...materials.atomic import Z_TABLE
 from .._errors import SourceUnavailableError, TableNotFoundError
 from ..store import StoredTable
@@ -62,6 +62,7 @@ def load_bremsstrahlung_tables(
     elements: Iterable[str],
     *,
     source_path: str | Path | None = None,
+    allow_fallback: bool = False,
 ) -> dict[str, BremsLibBremsstrahlungTable]:
     """Return staged BremsLib tables for ``elements``, keyed by symbol.
 
@@ -75,6 +76,10 @@ def load_bremsstrahlung_tables(
         Element symbols, for example a composition's first column.
     source_path
         BremsLib checkout for elements outside the release.
+    allow_fallback
+        Allow unresolvable elements to be omitted, with a
+        :class:`pyrite._physics_fallback.PhysicsFallbackWarning`. By default
+        every requested element requires a table.
 
     Raises
     ------
@@ -93,11 +98,17 @@ def load_bremsstrahlung_tables(
             raise ValueError(f"unknown element {element!r}") from exc
         try:
             stored = resolve_element_table(z, source_path=source_path)
-        except SourceUnavailableError as exc:
+        except (SourceUnavailableError, TableNotFoundError) as exc:
+            message = (
+                f"no BremsLib table for {element} (Z={z}): {exc}. Install it with "
+                "`pyrite tables fetch bremslib`, or explicitly select "
+                "bremsstrahlung_model='eedl'."
+            )
+            if not allow_fallback:
+                raise TableNotFoundError(message) from exc
             warnings.warn(
-                f"no BremsLib table for {element} (Z={z}): {exc}; its bremsstrahlung "
-                "falls back to isotropic EEDL emission",
-                RuntimeWarning,
+                message + " Falling back to isotropic EEDL emission for this element.",
+                PhysicsFallbackWarning,
                 stacklevel=2,
             )
             continue
@@ -115,35 +126,33 @@ def table_identity(tables: Mapping[str, BremsLibBremsstrahlungTable]) -> dict[st
 
 
 def resolve_bremsstrahlung_model(
-    model: str, elements: Iterable[str]
+    model: str, elements: Iterable[str], *, allow_fallback: bool = False
 ) -> Literal["eedl", "bremslib"]:
-    """Resolve a run's ``bremsstrahlung_model`` to the source it will actually use.
+    """Resolve a run's continuum source *before* computing any trajectories.
 
-    ``"eedl"`` and ``"bremslib"`` pass through (an explicit ``"bremslib"``
-    keeps its strict behaviour: a missing released table raises when the
-    tables load). ``"auto"`` is BremsLib when a table resolves for every
-    element and EEDL, with a ``RuntimeWarning`` naming the fix, otherwise, so
-    the case and run identity record what the run really used.
+    ``auto`` requires every BremsLib table by default. Opting into fallback
+    selects EEDL for the *whole* run, not just the missing elements. An
+    explicit ``eedl`` request never probes BremsLib and needs no opt-in.
     """
     if model != "auto":
         return cast(Literal["eedl", "bremslib"], model)
     unique = tuple(dict.fromkeys(elements))
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", RuntimeWarning)
-        try:
-            available = len(load_bremsstrahlung_tables(unique)) == len(unique)
-        except TableNotFoundError:
-            available = False
-    if available:
-        return "bremslib"
-    warnings.warn(
-        f"BremsLib tables for {', '.join(unique)} are not all installed; bremsstrahlung falls "
-        "back to EEDL with an isotropic photon angle. Install them with "
-        "`pyrite tables fetch bremslib` or select bremsstrahlung_model='eedl' to silence this.",
-        RuntimeWarning,
-        stacklevel=2,
-    )
-    return "eedl"
+    try:
+        load_bremsstrahlung_tables(unique)
+    except TableNotFoundError as exc:
+        if not allow_fallback:
+            raise TableNotFoundError(
+                f"BremsLib is required for bremsstrahlung_model='auto' "
+                f"({', '.join(unique)}): {exc}"
+            ) from exc
+        warnings.warn(
+            f"BremsLib tables for {', '.join(unique)} are not all installed: {exc}. "
+            "Falling back to EEDL with isotropic photon angles for the entire run.",
+            PhysicsFallbackWarning,
+            stacklevel=2,
+        )
+        return "eedl"
+    return "bremslib"
 
 
 __all__ = [

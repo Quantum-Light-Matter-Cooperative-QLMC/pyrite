@@ -11,6 +11,7 @@ Validation: bremslib-angular-model
 import numpy as np
 import pytest
 
+from pyrite._physics_fallback import PhysicsFallbackWarning
 from pyrite.montecarlo.spectrum import brem
 from pyrite.montecarlo.spectrum.brem_bremslib import (
     bremslib_segment_state,
@@ -56,6 +57,10 @@ def test_released_but_unfetched_table_is_an_error_not_a_fallback(monkeypatch):
     monkeypatch.setattr(bremslib_tables, "catalogue_table", missing)
     with pytest.raises(TableNotFoundError, match="fetch bremslib"):
         bremslib_tables.load_bremsstrahlung_tables(["C"])
+    with pytest.warns(PhysicsFallbackWarning, match="isotropic EEDL"):
+        assert bremslib_tables.load_bremsstrahlung_tables(
+            ["C"], allow_fallback=True
+        ) == {}
 
 
 def test_unreleased_element_generates_from_a_checkout(monkeypatch, stored):
@@ -76,16 +81,25 @@ def test_unreleased_element_generates_from_a_checkout(monkeypatch, stored):
     assert tables["Au"].atomic_number == 79
 
 
-def test_unreleased_element_without_checkout_warns_and_is_left_out(monkeypatch):
+def test_unreleased_element_without_checkout_requires_explicit_fallback(monkeypatch):
     monkeypatch.setattr(bremslib_tables, "load_release_index", lambda: None)
 
     def unavailable(z, *, source_path=None):
         raise SourceUnavailableError("no BremsLib checkout")
 
     monkeypatch.setattr(bremslib_tables, "generate_element", unavailable)
-    with pytest.warns(RuntimeWarning, match="isotropic EEDL"):
-        tables = bremslib_tables.load_bremsstrahlung_tables(["Au"])
+    with pytest.raises(TableNotFoundError, match="pyrite tables fetch bremslib"):
+        bremslib_tables.load_bremsstrahlung_tables(["Au"])
+    with pytest.warns(PhysicsFallbackWarning, match="isotropic EEDL"):
+        tables = bremslib_tables.load_bremsstrahlung_tables(["Au"], allow_fallback=True)
     assert tables == {}
+    with pytest.raises(TableNotFoundError, match="pyrite tables fetch bremslib"):
+        bremslib_tables.resolve_bremsstrahlung_model("auto", ["Au"])
+    with pytest.warns(PhysicsFallbackWarning, match="entire run"):
+        assert bremslib_tables.resolve_bremsstrahlung_model(
+            "auto", ["Au"], allow_fallback=True
+        ) == "eedl"
+    assert bremslib_tables.resolve_bremsstrahlung_model("eedl", ["Au"]) == "eedl"
 
 
 def test_unknown_element_is_rejected():

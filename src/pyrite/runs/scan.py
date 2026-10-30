@@ -727,12 +727,14 @@ def _resolved_run(args, material):
     from ..xsgen.elsepa.catalog import catalog_composition
 
     elements = [element for key in table_keys for element, _ in catalog_composition(key)]
-    # Resolve "auto" once, here, so the settings a run executes with, its
-    # dataset identity, and its table markers all name the same source.
-    settings = replace(
-        settings,
-        bremsstrahlung_model=resolve_bremsstrahlung_model(settings.bremsstrahlung_model, elements),
+    # Resolve "auto" once, before any transport or checkpoint I/O. Opting in
+    # to fallback selects EEDL for the entire run, not per element.
+    requested_brem_model = settings.bremsstrahlung_model
+    resolved_brem_model = resolve_bremsstrahlung_model(
+        requested_brem_model, elements,
+        allow_fallback=getattr(args, "allow_physics_fallback", False),
     )
+    settings = replace(settings, bremsstrahlung_model=resolved_brem_model)
     xsgen_tables = identity_markers(tables)
     if settings.bremsstrahlung_model == "bremslib":
         xsgen_tables |= {
@@ -758,6 +760,19 @@ def _resolved_run(args, material):
         identity["detector_id"] = detector_id
     # Unhashed label: names and definition digests of the resolved presets.
     identity.update(identity_labels(CATALOG, catalog_profile))
+    if requested_brem_model == "auto" and resolved_brem_model == "eedl":
+        # Fallback provenance is descriptive: case/dataset physics identity is
+        # already keyed by the executed EEDL model. Segment energies and their
+        # affected fraction are not known during preflight, so do not invent them.
+        identity["physics_fallbacks"] = [{
+            "model_requested": "auto (BremsLib)",
+            "model_used": "eedl",
+            "elements": sorted(set(elements)),
+            "energy_span_keV": None,
+            "fraction_segments_affected": None,
+            "scope": "entire continuum source",
+            "reason": "BremsLib tables unavailable",
+        }]
     canonical_full = (
         fidelity == "full"
         and not overrides

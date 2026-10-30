@@ -17,6 +17,7 @@ For an existing script or session, use [the one-scene recipe](../reference/pytho
 Python scene recipes <../reference/python-scene-recipes>
 configuration-cookbook
 configuration-notebook
+physics-fallbacks
 directional-source-heatmap
 detector-observations
 physical-quantities

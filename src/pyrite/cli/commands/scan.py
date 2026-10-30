@@ -260,6 +260,11 @@ def _reproduce_zhai(ne, ne_brem, ne_supp, tmd_azimuth, refresh):
     ),
 )
 @click.option(
+    "--allow-physics-fallback",
+    is_flag=True,
+    help="Allow missing BremsLib tables to select EEDL for a local sweep; record the substitution.",
+)
+@click.option(
     "--no-cache",
     is_flag=True,
     help=(
@@ -458,6 +463,7 @@ _NORMAL_RUN_PARAMETER_FLAGS = {
     "cpu_only": "--cpu-only",
     "chunk_minutes": "--chunk-minutes",
     "no_cache": "--no-cache",
+    "allow_physics_fallback": "--allow-physics-fallback",
     "recompute": "--recompute",
     "trajectories": "--trajectories",
     "overwrite_trajectories": "--overwrite-trajectories",
@@ -469,6 +475,7 @@ _NORMAL_RUN_PARAMETER_FLAGS = {
     "verbose": "--verbose",
 }
 _LOCAL_ONLY_PARAMETER_FLAGS = {
+    "allow_physics_fallback": "--allow-physics-fallback",
     "n_families": "--n-families",
     "checkpoint_dir": "--checkpoint-dir",
     "max_minutes": "--max-minutes",
@@ -703,6 +710,7 @@ _PROFILER_REEXEC_PARAMETER_NAMES = (
     "recompute",
 )
 _LOCAL_RUN_PARAMETER_NAMES = (
+    "allow_physics_fallback",
     "material",
     "workers",
     "catalog_profile",
@@ -719,6 +727,10 @@ _LOCAL_RUN_PARAMETER_NAMES = (
 
 def _run_local(options):
     """Local sweep, optionally re-executed under Nsight Systems or py-spy."""
+    if options["allow_physics_fallback"] and (options["nsys"] or options["py_spy"]):
+        raise click.UsageError(
+            "--allow-physics-fallback cannot be combined with --nsys/--py-spy yet"
+        )
     performance_profile = _local_performance_profile(options)
     cache_read, cache_write = _cache_gates(
         options["no_cache"], options["recompute"], performance_profile
