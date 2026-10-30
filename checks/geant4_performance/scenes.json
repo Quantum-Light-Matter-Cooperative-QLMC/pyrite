@@ -1,0 +1,28 @@
+{
+  "schema": "pyrite.geant4-performance.scenes.v1",
+  "issue": 821,
+  "bounds": {
+    "electron_cutoff_keV": 10,
+    "hard_photon_cutoff_eV": 1000,
+    "width_mm": 10,
+    "termination": "first slab exit or electron cutoff",
+    "delta_rays": false,
+    "energy_loss_fluctuations": false,
+    "fluorescence_auger_pixe": false,
+    "secondary_transport": false,
+    "pxr": false,
+    "cbs": false
+  },
+  "materials": {
+    "Si": {"catalog_key": "silicon", "density_g_cm3": 2.3291534103942357, "atomic_weight": 28.085, "number_density_ang3": 0.049942993373787194},
+    "W": {"catalog_key": "W", "density_g_cm3": 19.3, "atomic_weight": 183.84, "number_density_ang3": 0.06322199557658834}
+  },
+  "scenes": [
+    {"id": "si-300keV-100um", "material": "Si", "energy_keV": 300, "thickness_um": 100},
+    {"id": "w-300keV-10um", "material": "W", "energy_keV": 300, "thickness_um": 10},
+    {"id": "si-1MeV-1mm", "material": "Si", "energy_keV": 1000, "thickness_um": 1000},
+    {"id": "w-1MeV-100um", "material": "W", "energy_keV": 1000, "thickness_um": 100},
+    {"id": "si-3MeV-1mm", "material": "Si", "energy_keV": 3000, "thickness_um": 1000},
+    {"id": "w-3MeV-100um", "material": "W", "energy_keV": 3000, "thickness_um": 100}
+  ]
+}
