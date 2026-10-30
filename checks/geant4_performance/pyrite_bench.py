@@ -156,6 +156,36 @@ def continuous_cone_scores(r, n, cone, ctx):
     return out
 
 
+def electron_groups(r, n, max_rows):
+    """Split a block's rows into contiguous electron ranges of at most ``max_rows`` rows.
+
+    Yields ``(first, count, segments)`` with ``elec_id`` rebased to the range and
+    every per-row field restricted to it, so the continuous estimator's whole-block
+    temporaries stay inside VRAM independently of the transport block size.
+    """
+    import numpy as np
+
+    eid = np.asarray(r["elec_id"])
+    rows = eid.size
+    order = None if np.all(eid[1:] >= eid[:-1]) else np.argsort(eid, kind="stable")
+    sorted_eid = eid if order is None else eid[order]
+    starts = np.searchsorted(sorted_eid, np.arange(n + 1))
+    first = 0
+    while first < n:
+        last = int(np.searchsorted(starts, starts[first] + max_rows, side="right")) - 1
+        last = min(max(last, first + 1), n)
+        lo, hi = int(starts[first]), int(starts[last])
+        pick = slice(lo, hi) if order is None else order[lo:hi]
+        sub = {
+            k: (np.asarray(v)[pick] if getattr(v, "shape", ()) and v.shape[0] == rows else v)
+            for k, v in r.items()
+        }
+        sub["elec_id"] = sorted_eid[lo:hi] - first
+        sub["Ne"] = last - first
+        yield first, last - first, sub
+        first = last
+
+
 def block_scores(r, n):
     """Per-primary observables and work counts for one block."""
     import numpy as np
@@ -230,6 +260,18 @@ def main():
     parser.add_argument("--cone-rtol", type=float, default=1e-3)
     parser.add_argument("--chunk", type=int, default=20000, help="segments per estimator chunk")
     parser.add_argument(
+        "--score-rows",
+        type=int,
+        default=20_000_000,
+        help="continuous estimator: max rows per electron group",
+    )
+    parser.add_argument(
+        "--kernel",
+        choices=["default", "specialized", "monolithic"],
+        default="default",
+        help="CUDA transport kernel selection where the build supports it (#827)",
+    )
+    parser.add_argument(
         "--pool-fraction", type=float, default=0.85, help="CuPy pool limit, fraction of VRAM"
     )
     parser.add_argument("--output", type=Path, required=True)
@@ -246,6 +288,12 @@ def main():
     # WSL2/WDDM pages device memory to host instead of failing an allocation
     # past physical VRAM, which silently slows scoring several-fold. Keep the
     # pool below VRAM so CuPy recycles its cache first.
+    if args.kernel != "default":
+        from pyrite.montecarlo.transport import _jit_launch
+
+        if not hasattr(_jit_launch, "_SPECIALIZE_TRANSPORT_KERNEL"):
+            raise RuntimeError("--kernel needs a build with per-configuration kernels (#827)")
+        _jit_launch._SPECIALIZE_TRANSPORT_KERNEL = args.kernel == "specialized"
     pool = cp.get_default_memory_pool()
     pool.set_limit(fraction=args.pool_fraction)
     import numpy as np
@@ -352,7 +400,15 @@ def main():
             pool.free_all_blocks()
             block = block_scores(r, n)
             if args.estimator == "continuous":
-                block |= continuous_cone_scores(r, n, cone, ctx)
+                parts = [
+                    (first, continuous_cone_scores(sub, count, cone, ctx))
+                    for first, count, sub in electron_groups(r, n, args.score_rows)
+                ]
+                for key in parts[0][1]:
+                    v = np.empty(n)
+                    for first, part in parts:
+                        v[first : first + part[key].size] = part[key]
+                    block[key] = v
             else:
                 block |= discrete_cone_scores(r, n, cone)
             cp.cuda.Device().synchronize()
@@ -424,6 +480,8 @@ def main():
             device_staging=args.device_staging,
             radiative_moments="table",
             pool_fraction=args.pool_fraction,
+            score_rows=args.score_rows,
+            kernel=args.kernel,
         ),
         timings_s=dict(
             imports_and_tables=tables_s,
