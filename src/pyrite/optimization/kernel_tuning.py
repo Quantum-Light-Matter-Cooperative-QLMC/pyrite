@@ -20,10 +20,12 @@ import statistics
 import subprocess
 import sys
 import tempfile
+from collections.abc import Callable
 from dataclasses import asdict, dataclass, field, replace
+from functools import partial
 from pathlib import Path
 from time import perf_counter
-from typing import Any, Callable, Literal
+from typing import Any, Literal
 
 import numpy as np
 
@@ -196,24 +198,32 @@ def _worker(payload_path: Path, output_path: Path, result_path: Path) -> None:
             # explicit synchronization before/after its work. The stage wrappers
             # are local to this single worker and restored after the call.
             from unittest.mock import patch
+
             from ..montecarlo import runner
 
             transport = runner._transport_case
             spectrum = runner._spectrum_with_recovery
 
-            def timed(stage, function):
+            def timed(stage, function, seconds):
                 def wrapped(*args, **kwargs):
                     BACKEND.synchronize()
                     started = perf_counter()
                     value = function(*args, **kwargs)
                     BACKEND.synchronize()
-                    stage_seconds[stage] = stage_seconds.get(stage, 0.0) + perf_counter() - started
+                    seconds[stage] = seconds.get(stage, 0.0) + perf_counter() - started
                     return value
+
                 return wrapped
 
             with (
-                patch.object(runner, "_transport_case", timed("transport", transport)),
-                patch.object(runner, "_spectrum_with_recovery", timed("spectrum", spectrum)),
+                patch.object(
+                    runner, "_transport_case", timed("transport", transport, stage_seconds)
+                ),
+                patch.object(
+                    runner,
+                    "_spectrum_with_recovery",
+                    timed("spectrum", spectrum, stage_seconds),
+                ),
             ):
                 result = pyrite.simulate(scene, numerics=numerics)
         BACKEND.synchronize()
@@ -250,13 +260,19 @@ def _equivalent(candidate: Path, reference: Path, *, rtol: float, atol: float) -
     return None
 
 
-def _measure(scene, tuning, *, warmups, repeats, timeout, workdir: Path, label: str,
-             objective: str = "total"):
+def _measure(
+    scene, tuning, *, warmups, repeats, timeout, workdir: Path, label: str, objective: str = "total"
+):
     payload, output, record = (workdir / f"{label}.{ext}" for ext in ("pkl", "npz", "json"))
     payload.write_bytes(
         pickle.dumps(
-            {"scene": scene, "tuning": _tuning_dict(tuning), "warmups": warmups,
-             "repeats": repeats, "objective": objective}
+            {
+                "scene": scene,
+                "tuning": _tuning_dict(tuning),
+                "warmups": warmups,
+                "repeats": repeats,
+                "objective": objective,
+            }
         )
     )
     env = os.environ | {"PYRITE_MC_BACKEND": "cuda"}  # no hidden CPU fallback in timings
@@ -268,8 +284,9 @@ def _measure(scene, tuning, *, warmups, repeats, timeout, workdir: Path, label: 
     return output, json.loads(record.read_text())
 
 
-def _study_identity(scene, base, lattice, *, warmups, repeats, rtol, atol,
-                    environment, objective="total") -> str:
+def _study_identity(
+    scene, base, lattice, *, warmups, repeats, rtol, atol, environment, objective="total"
+) -> str:
     from ..campaign.lowering import build_case
     from ..campaign.profiles import case_content_key
 
@@ -282,6 +299,32 @@ def _study_identity(scene, base, lattice, *, warmups, repeats, rtol, atol,
         "environment": environment,
     }
     return hashlib.sha256(json.dumps(payload, sort_keys=True, default=str).encode()).hexdigest()
+
+
+def _check_request(
+    scene, lattice, *, trials, warmups, repeats, timeout, objective, rtol, atol
+) -> None:
+    """Refuse a malformed :func:`tune_kernels` request before any worker runs."""
+    from ..campaign.model import Scene
+
+    if not isinstance(scene, Scene):
+        raise TypeError("scene must be a pyrite.Scene")
+    if not isinstance(lattice, KernelLattice):
+        raise TypeError("lattice must be a KernelLattice")
+    if min(trials, warmups + 1, repeats) < 1 or timeout <= 0:
+        raise ValueError("trials and repeats must be positive, warmups non-negative")
+    if objective not in ("total", "transport", "spectrum"):
+        raise ValueError("objective must be total, transport, or spectrum")
+    if objective == "transport" and (lattice.cxr_chunk or lattice.brem_chunk):
+        raise ValueError("transport objective accepts only transport dimensions")
+    if objective == "spectrum" and (
+        lattice.electron_batch or lattice.schedule or lattice.continuation_rows
+    ):
+        raise ValueError("spectrum objective accepts only spectral chunk dimensions")
+    if rtol < 0 or atol < 0 or not np.isfinite([rtol, atol]).all():
+        raise ValueError("rtol and atol must be finite and non-negative")
+    if scene.numerics.kernel_tuning.transport_core not in ("auto", "cuda"):
+        raise ValueError("tune_kernels times the CUDA transport core; use transport_core='auto'")
 
 
 def tune_kernels(
@@ -320,37 +363,29 @@ def tune_kernels(
 
     Requires the ``optimization`` extra and a CUDA device.
     """
-    from ..campaign.model import Scene
-
-    if not isinstance(scene, Scene):
-        raise TypeError("scene must be a pyrite.Scene")
-    if not isinstance(lattice, KernelLattice):
-        raise TypeError("lattice must be a KernelLattice")
-    if min(trials, warmups + 1, repeats) < 1 or timeout <= 0:
-        raise ValueError("trials and repeats must be positive, warmups non-negative")
-    if objective not in ("total", "transport", "spectrum"):
-        raise ValueError("objective must be total, transport, or spectrum")
-    if objective == "transport" and (lattice.cxr_chunk or lattice.brem_chunk):
-        raise ValueError("transport objective accepts only transport dimensions")
-    if objective == "spectrum" and (
-        lattice.electron_batch or lattice.schedule or lattice.continuation_rows
-    ):
-        raise ValueError("spectrum objective accepts only spectral chunk dimensions")
-    if rtol < 0 or atol < 0 or not np.isfinite([rtol, atol]).all():
-        raise ValueError("rtol and atol must be finite and non-negative")
-    base = scene.numerics.kernel_tuning
-    if base.transport_core not in ("auto", "cuda"):
-        raise ValueError("tune_kernels times the CUDA transport core; use transport_core='auto'")
-    base = replace(base, transport_core="cuda")
+    _check_request(
+        scene,
+        lattice,
+        trials=trials,
+        warmups=warmups,
+        repeats=repeats,
+        timeout=timeout,
+        objective=objective,
+        rtol=rtol,
+        atol=atol,
+    )
+    base = replace(scene.numerics.kernel_tuning, transport_core="cuda")
     try:
         import optuna
     except ImportError as exc:
         raise ImportError("install pyrite-mc[optimization] / uv sync --extra optimization") from exc
 
-    measure = dict(warmups=warmups, repeats=repeats, timeout=timeout, objective=objective)
+    measure = partial(
+        _measure, warmups=warmups, repeats=repeats, timeout=timeout, objective=objective
+    )
     with tempfile.TemporaryDirectory(prefix="pyrite-kernel-tuning-") as tmp:
         workdir = Path(tmp)
-        reference, record = _measure(scene, base, workdir=workdir, label="baseline", **measure)
+        reference, record = measure(scene, base, workdir=workdir, label="baseline")
         environment = record["environment"]
         baseline = KernelTrial(
             -1, base, "complete", statistics.median(record["samples_s"]), tuple(record["samples_s"])
@@ -399,8 +434,8 @@ def tune_kernels(
                 trial.set_user_attr("samples_s", earlier.user_attrs["samples_s"])
                 return float(earlier.value)
             try:
-                output, measured = _measure(
-                    scene, tuning, workdir=workdir, label=f"trial-{trial.number}", **measure
+                output, measured = measure(
+                    scene, tuning, workdir=workdir, label=f"trial-{trial.number}"
                 )
             except (RuntimeError, subprocess.TimeoutExpired) as exc:
                 return _reject(trial, tuning, str(exc))
@@ -418,6 +453,7 @@ def tune_kernels(
 
         remaining = max(0, trials - len(study.trials))
         if remaining:
+
             def report_progress(study, trial):
                 if on_progress is not None:
                     on_progress(1 + len(study.trials), trials + 1, trial.state.name.lower())
