@@ -134,14 +134,24 @@ def _function_attributes(function):
 
 
 def _sass_counts(cached, scratch):
-    """SASS statistics of a CuPy cache entry (a hash prefix, then the cubin)."""
+    """SASS statistics of a CuPy cache entry (a hash prefix, then the cubin).
+
+    The stored cubin can end short of its program headers; it is padded so
+    the disassembler accepts it. ``CUOBJDUMP`` names a ``cuobjdump`` at least
+    as new as the NVRTC that compiled it.
+    """
     payload = cached.read_bytes()
+    cubin = bytearray(payload[payload.index(b"\x7fELF") :])
+    phoff = int.from_bytes(cubin[32:40], "little")
+    phentsize = int.from_bytes(cubin[54:56], "little")
+    phnum = int.from_bytes(cubin[56:58], "little")
+    cubin.extend(bytes(max(0, phoff + phentsize * phnum - len(cubin))))
     elf = scratch / (cached.stem + ".elf.cubin")
-    elf.write_bytes(payload[payload.index(b"\x7fELF") :])
-    tool = shutil.which("cuobjdump") or "/usr/local/cuda/bin/cuobjdump"
+    elf.write_bytes(bytes(cubin))
+    tool = os.environ.get("CUOBJDUMP") or shutil.which("cuobjdump") or "cuobjdump"
     sass = subprocess.run([tool, "-sass", str(elf)], capture_output=True, text=True).stdout
     elf.unlink()
-    lines = [line for line in sass.splitlines() if re.search(r"/\*[0-9a-f]{4}\*/", line)]
+    lines = [line for line in sass.splitlines() if re.search(r"/\*[0-9a-f]{4,}\*/", line)]
 
     def count(pattern):
         return sum(1 for line in lines if re.search(pattern, line))
@@ -149,7 +159,7 @@ def _sass_counts(cached, scratch):
     return dict(
         instructions=len(lines),
         ldg=count(r"\bLDG\."),
-        ldg_constant=count(r"\bLDG\.E[.\w]*\.CONSTANT"),
+        ldg_constant=count(r"\bLDG\.E[.\w]*CONSTANT"),
         ldl=count(r"\bLDL\b"),
         stl=count(r"\bSTL\b"),
     )
