@@ -164,7 +164,9 @@ with open("flux.units.json", "w") as stream:
 Each entry holds a Pint-parsable `unit` and a separate `basis`. The basis
 records counts that Pint cannot express, such as photons per incident
 electron: the electron in that phrase is a particle count, not Pint's charge
-unit.
+unit. Saved-array downloads from `pyrite app configuration` embed the same
+`units` map in their NPZ `metadata_json` or CSV header line, covering each
+component, its energy axis and the record's `scale` factor.
 
 ## Load saved results
 
@@ -188,8 +190,9 @@ script to quantities.
 | Quantum setup and recipes | `step_ang`, `zone_max_ang`, `waist_ang`, `kinetic_energy_eV`, … | `step_length`, `zone_max_length`, `waist`, `kinetic_energy`, … | Both supported |
 | `Numerics.channeling_*` lengths | `channeling_dz_ang`, `channeling_zone_max_ang` | Set through `QuantumNumerics` / `QuantumRegion` | Numeric only |
 | Experimental axial diagnostic, real-space solvers, response grids | `*_eV`, `*_ang`, `*_rad` | — | Numeric only; quantities raise `TypeError` |
+| Material schema values, `pyrite.materials.crystal` constants, deterministic scientific helpers | `lattice` (Å, deg), `V_cell`, `B_ang2`, `*_eV`, `*_ang`, `*_inv_mm` | — | Numeric contract; quantity interfaces tracked separately |
 | CLI options, profile TOML | Option-name and key units; TOML also takes unit strings | — | Numeric CLI; unit-string CLI input is tracked separately |
-| `cxr_metrics` peak keys | `peak_flux`, `peak_flux_per_na` | `peak_spectral_flux_density`, `peak_spectral_flux_density_per_na` | Deprecated since 0.23.1; removal planned for 0.25.0 |
+| `cxr_metrics` peak keys | `peak_flux`, `peak_flux_per_na` | `peak_spectral_flux_density`, `peak_spectral_flux_density_per_na` | Deprecated since 0.24.0; removal planned for 0.26.0 |
 
 A future deprecation of a numeric spelling follows the
 [release policy](../repo-design/releasing.md): it is announced in a shipping

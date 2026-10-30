@@ -27,9 +27,9 @@ def _api_entry(spelling: str, replacement: str, *, since: str) -> ApiDeprecation
 ROOT_API_REPLACEMENTS = {}
 
 #: Returned-dictionary keys cannot warn at runtime; these rows schedule their
-#: removal and are documented in the owning docstring. The announcement version
-#: is the first release after tagged 0.23.0; the release PR must confirm it.
-_RESULT_KEY_DEPRECATED_IN = "0.23.1"
+#: removal and are documented in the owning docstring. They first shipped in
+#: tagged 0.24.0 (no 0.23.1 was tagged).
+_RESULT_KEY_DEPRECATED_IN = "0.24.0"
 
 API_DEPRECATIONS = {
     spelling: _api_entry(spelling, replacement, since=_RESULT_KEY_DEPRECATED_IN)

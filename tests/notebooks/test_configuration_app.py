@@ -13,6 +13,7 @@ from pyrite.apps.configuration_controls import calculation_defaults, field_value
 from pyrite.apps.configuration_exports import available_components, export_record
 from pyrite.campaign.configuration_editor import ConfigurationEditor, run_command
 from pyrite.catalog_edit import CatalogDraft
+from pyrite.units import ureg
 
 
 @pytest.fixture
@@ -475,7 +476,20 @@ def test_selected_source_exports_retain_distinct_axes_and_metadata():
             "metadata_json",
         }
         np.testing.assert_array_equal(data["spec_characteristic"], record["spec_characteristic"])
-    assert "spec_characteristic" not in export_record(record, ["spec"], "csv").decode()
+        units = json.loads(str(data["metadata_json"]))["units"]
+    density = {"unit": "1 / eV / sr", "basis": "photons_per_incident_electron"}
+    assert units == {
+        "spec_characteristic": density,
+        "brem_wide": density,
+        "E_grid": {"unit": "eV", "basis": None},
+        "E_grid_brem": {"unit": "eV", "basis": None},
+        "scale": {"unit": "sr / s / nA", "basis": "incident_electrons"},
+    }
+    for entry in units.values():
+        ureg.parse_units(entry["unit"])
+    csv_text = export_record(record, ["spec"], "csv").decode()
+    assert "spec_characteristic" not in csv_text
+    assert json.loads(csv_text.splitlines()[0].removeprefix("# "))["units"]["spec"] == density
     with pytest.raises(ValueError, match="available"):
         export_record(record, ["pxr"], "npz")
 
