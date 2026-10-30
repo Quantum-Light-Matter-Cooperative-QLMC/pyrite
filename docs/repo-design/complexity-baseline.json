@@ -24,7 +24,7 @@
     {
       "path": "src/pyrite/_numerics.py",
       "name": "Numerics.__post_init__",
-      "cc": 24,
+      "cc": 25,
       "exception": "#709: normalize the existing Physics/Numerics fields at construction while preserving their established units and validation order. Keep all config invariants at the boundary; unit conversion itself is delegated to _units.normalize_unit."
     },
     {
