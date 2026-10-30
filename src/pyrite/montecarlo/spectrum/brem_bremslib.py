@@ -56,6 +56,7 @@ class _StagedBremsLib:
     table: BremsLibBremsstrahlungTable
     log_incident_energy: Any
     inner_reduced_energy: Any
+    nominal_reduced_energy: Any
     top_reduced_energy: Any
     scaled_sdcs_mb: Any
     theta_rad: Any
@@ -83,6 +84,7 @@ def stage_bremslib_table(
         log_incident_energy=staged(np.log(table.incident_energy_keV)),
         # Interior breakpoints searched for the lower node; node 0 is k/T = 0.
         inner_reduced_energy=staged(table.nominal_reduced_energy[1:-1]),
+        nominal_reduced_energy=staged(table.nominal_reduced_energy),
         top_reduced_energy=staged(table.top_reduced_energy),
         scaled_sdcs_mb=staged(table.scaled_sdcs_mb),
         theta_rad=staged(table.theta_rad),
@@ -174,13 +176,13 @@ def _along_reduced_energy(staged, values, top, reduced):
     """
     xp, REAL = _table_namespace(staged)
     inner = staged.inner_reduced_energy
-    nominal = staged.table.nominal_reduced_energy
+    nominal = staged.nominal_reduced_energy
     lower = xp.searchsorted(inner, reduced, side="right")  # 0..16
-    x0 = xp.asarray(nominal, dtype=REAL)[lower]
+    x0 = nominal[lower]
     x1 = xp.where(
         lower == STAGED_RATIO_COUNT - 2,
         top[:, None],
-        xp.asarray(nominal, dtype=REAL)[xp.minimum(lower + 1, STAGED_RATIO_COUNT - 1)],
+        nominal[xp.minimum(lower + 1, STAGED_RATIO_COUNT - 1)],
     )
     fraction = xp.clip((reduced - x0) / (x1 - x0), REAL(0.0), REAL(1.0))
     rows = xp.arange(values.shape[0])[:, None]

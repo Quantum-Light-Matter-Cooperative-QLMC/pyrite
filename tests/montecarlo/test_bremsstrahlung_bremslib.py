@@ -337,3 +337,26 @@ def test_angle_integrated_selector_returns_the_bremslib_sdcs(carbon_table):
         )
     )
     np.testing.assert_allclose(got, _evaluate(carbon_table, T_keV, photon_eV), rtol=1e-12)
+
+
+def test_nominal_reduced_energy_is_staged_once_not_uploaded_per_evaluation(
+    carbon_table, monkeypatch
+):
+    # #832: the interpolation read the nominal nodes through ``xp.asarray`` on
+    # every chunk; they are staged with the table, so evaluation uploads nothing.
+    staged = stage_bremslib_table(carbon_table)
+    np.testing.assert_array_equal(
+        to_host(staged.nominal_reduced_energy), carbon_table.nominal_reduced_energy
+    )
+    assert staged.nominal_reduced_energy.dtype == staged.inner_reduced_energy.dtype
+    energy = np.array([20.0, 50.0])
+    state = bremslib_segment_state(staged, energy)
+    grid = np.linspace(1.0e3, 1.9e4, 7)
+    expected = to_host(evaluate_bremslib(staged, state, grid))
+    uploads = []
+    real_asarray = xp.asarray
+    monkeypatch.setattr(
+        xp, "asarray", lambda a, *args, **kw: uploads.append(a) or real_asarray(a, *args, **kw)
+    )
+    np.testing.assert_array_equal(to_host(evaluate_bremslib(staged, state, grid)), expected)
+    assert not any(a is carbon_table.nominal_reduced_energy for a in uploads)
