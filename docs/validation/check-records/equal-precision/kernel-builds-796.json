@@ -10,7 +10,7 @@
   "code_revision": {
     "attributes_and_tests": "0d7a7a1e803f8cc2e461aec76ec8e9a639a8d610",
     "timing": "52d6c4fcf8804e3bf2210ca6c8730db24f0de754",
-    "note": "kernel source identical; only checks/transport_kernel_builds.py differs"
+    "note": "pre-rebase SHAs of a7fe08b0 and 3c36cbe2 (same transport sources); only checks/transport_kernel_builds.py differs between them"
   },
   "jobs": {
     "attributes": 2856,

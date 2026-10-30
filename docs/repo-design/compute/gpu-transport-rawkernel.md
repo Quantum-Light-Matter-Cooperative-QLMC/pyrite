@@ -248,7 +248,7 @@ Medians with [min, max] over the three seeds. The gain does not come from occupa
 
 Read-only parameters are transpiled as `CArray<const T, ...>`. `cupyx.jit` compares array types by their C++ spelling, so device helpers that receive them are instantiated separately, and a write to one of them fails to compile. A prepended partial specialization of `CArray<const T, ...>` with the same layout reads each element through `__ldg`. Launch geometry, argument conversion and stream are the JIT's. With the default build the source and options equal the JIT's, so the CuPy cache key is the same and the JIT's cubin is reloaded; job 2856 compiled no new cubin. The path reads private CuPy state (`_JitRawKernel._func`, `_mode`, `_cached_codes`, `cupyx.jit._compile.transpile`) and is used only by `checks/transport_kernel_builds.py` and `tests/montecarlo/test_transport_kernel_builds_cuda.py`.
 
-**Resources.** RTX 5080, driver 610.47, CuPy 14.2.0, NVRTC 13.4. Kernel source at revision `0d7a7a1e` for attributes and tests and `52d6c4fc` for timing; the two differ only in the check script.
+**Resources.** RTX 5080, driver 610.47, CuPy 14.2.0, NVRTC 13.4. The jobs ran revisions `0d7a7a1e` (attributes, tests) and `52d6c4fc` (timing). These are pre-rebase SHAs of `a7fe08b0` and `3c36cbe2`, with the same transport sources, and the two differ only in the check script.
 
 - Registers, local memory and occupancy come from the function attributes and the occupancy API (job 2856; `r96` from job 2855).
 - Spill bytes come from `--ptxas-options=-v` (job 2861).
