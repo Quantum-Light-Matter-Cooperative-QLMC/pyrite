@@ -526,25 +526,24 @@ def _prepare_eedl_grid(
     # mixture continuous for lower-endpoint < k <= T instead of dropping the
     # lower share there; the segment normalization adds that probability.
     extension_end = np.append(panels.photon_max_eV[1:], panels.photon_max_eV[-1])
-    panel_probability_host = np.stack(
-        [
-            np.where(
-                (photon_energy_host > low + span) & (photon_energy_host <= end),
-                tip,
-                np.interp((photon_energy_host - low) / span, panels.x, scaled, left=0.0, right=0.0)
-                / span,
-            )
-            for low, span, end, tip, scaled in zip(
-                panels.photon_min_eV,
-                width,
-                extension_end,
-                tip_density,
-                panels.scaled_density,
-                strict=True,
-            )
-        ],
-        axis=0,
-    )
+    # Rows are written in place: a row list plus its stacked copy doubled the
+    # (panel, photon) peak, the dominant staging cost on broad grids (#819).
+    panel_probability_host = np.empty((width.size, photon_energy_host.size), dtype=float)
+    for row, low, span, end, tip, scaled in zip(
+        panel_probability_host,
+        panels.photon_min_eV,
+        width,
+        extension_end,
+        tip_density,
+        panels.scaled_density,
+        strict=True,
+    ):
+        row[:] = np.where(
+            (photon_energy_host > low + span) & (photon_energy_host <= end),
+            tip,
+            np.interp((photon_energy_host - low) / span, panels.x, scaled, left=0.0, right=0.0)
+            / span,
+        )
 
     def staged(values):
         return xp.ascontiguousarray(xp.asarray(values, dtype=REAL))
@@ -855,6 +854,7 @@ def mc_brem_spectrum(
     bremslib_tables: Mapping[str, BremsLibBremsstrahlungTable] | None = None,
     electron_band_weights=None,
     dielectric_plasma_eV: float = 0.0,
+    photon_block: int | None = None,
 ):
     """Return the incoherent bremsstrahlung density from transport segments.
 
@@ -915,6 +915,16 @@ def mc_brem_spectrum(
         mean over electrons is the band integral of the returned density. It
         always takes the chunked path, so on a device the reduction order
         differs from the fused kernels; it feeds stopping statistics only.
+    photon_block
+        Optional maximum photon-grid nodes scored per pass (#819). ``None``
+        (default) or a value covering the grid scores it in one pass. A
+        smaller value stages and scores contiguous grid blocks, so staging
+        memory scales with the block, not the grid. Every node is scored
+        independently, so blocks agree with one pass to rounding: the
+        per-node segment sum is a BLAS matrix-vector product whose order
+        depends on the block width, the BremsLib route caps the segment chunk
+        by ``(segment, photon)`` cells per pass, and per-electron band
+        integrals add per-block partial sums.
 
     Returns
     -------
@@ -935,6 +945,11 @@ def mc_brem_spectrum(
     Validation: substep-radiation-invariance
     Validation: adaptive-sample-size-stopping
     """
+    if photon_block is not None:
+        arguments = dict(locals())  # every parameter, so blocks rescore exactly this call
+        from .brem_blocks import blocked_brem_spectrum
+
+        return blocked_brem_spectrum(mc_brem_spectrum, arguments)
     if segments.get("radiative", {}).get("model") == "bremslib-soft-hard":
         raise ValueError(
             "coupled radiative tracks require mc_coupled_brem_spectrum (or the soft and hard "

@@ -14,6 +14,7 @@ from .chunking import (
     _RESOURCE_POLICY,
     _adaptive_chunk,
     _admit_chunk,
+    _brem_photon_block,
 )
 
 
@@ -67,6 +68,23 @@ def _effective_brem_chunk(case, tp):
         or _adaptive_chunk(tp["E_brem"].size, intermediates=_EEDL_BREM_DENSE_INTERMEDIATES),
         tp["E_brem"].size,
         intermediates=_EEDL_BREM_DENSE_INTERMEDIATES,
+    )
+
+
+def _effective_brem_photon_block(case, tp):
+    """Narrowest photon block any emitting layer scores this case's brem grid in.
+
+    Equal to the grid size when no layer needs blocking; diagnostic only.
+    """
+    layers = case.get("abs_layers")
+    compositions = [case.get("composition", ())] if not layers else [layer[2] for layer in layers]
+    # The continuum route as ``emission_adapters.select_continuum`` picks it.
+    coupled = case.get("radiative_model") is not None
+    model = "bremslib" if coupled else case.get("bremsstrahlung_model", "eedl")
+    n_layers = len(layers) if layers else 1
+    return min(
+        _brem_photon_block(tp["E_brem"].size, composition, model, n_layers=n_layers)
+        for composition in compositions
     )
 
 

@@ -111,6 +111,7 @@ from .chunking import (
     _adaptive_chunk,
     _admit_chunk,
 )
+from .chunking import _brem_photon_block as _brem_photon_block
 from .chunking import _cpu_spectrum_backend as _cpu_spectrum_backend
 from .chunking import (
     _env_chunk as _env_chunk,
@@ -893,6 +894,9 @@ def _cxr_pair_for_case(
 
 from .stage_chunks import (
     _effective_brem_chunk as _effective_brem_chunk,
+)
+from .stage_chunks import (
+    _effective_brem_photon_block as _effective_brem_photon_block,
 )
 from .stage_chunks import (
     _effective_spec_chunk as _effective_spec_chunk,

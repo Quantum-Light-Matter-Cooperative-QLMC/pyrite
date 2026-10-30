@@ -406,6 +406,7 @@ _RECOVERY_KEYS = (
     "_effective_spec_chunk",
     "_attempted_brem_chunk",
     "_effective_brem_chunk",
+    "_brem_photon_block",
 )
 
 

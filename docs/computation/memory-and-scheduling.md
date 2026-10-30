@@ -82,6 +82,25 @@ As the number of bins grows, the chunk shrinks to stay within the same byte budg
 
 Precedence runs: an explicit per-case `spec_chunk` / `brem_chunk` wins, then a pinned `PYRITE_MC_CXR_CHUNK` / `PYRITE_MC_BREM_CHUNK`, then the adaptive size. Whichever wins is capped by device admission.
 
+### Blocking the bremsstrahlung photon grid
+
+Segment chunking leaves one cost proportional to the full grid: each pass stages state that does not depend on the segments. For EEDL that is one unit-base panel row per photon node, about 327 binary64 panels per element, plus a REAL device copy on an accelerator. The BremsLib route stages the same rows as its fallback. A 1 keV–3 MeV grid at 10 eV spacing has 299,901 nodes, which is 0.8 GB per element.
+
+The runner therefore scores a broad continuum grid in contiguous photon blocks. Each block's staging, together with one `mu(E)` per absorbing layer and the grid/output vectors, must fit `PYRITE_MC_CXR_BUDGET_MB`. This budget is separate from the chunk transients above, which are already sized for the whole grid and only shrink inside a block. Bethe–Heitler stages no panels. A grid that fits is scored in one block, so its result is unchanged.
+
+Measured host costs (CPU fp64, #819) agree with that split:
+
+| Cost | Measured | Assumed by |
+|---|---|---|
+| EEDL staging (C, 327 panels) | 2640 B/node | block width: 8 B/panel + 40 B/node |
+| Bethe–Heitler staging | 16 B/node | block width: 40 B/node |
+| Dense transient, EEDL and Bethe–Heitler | 81 B/(segment·node) | chunk admission: 8 × 8 B = 64 B |
+| Dense transient, BremsLib and coupled | 88 B/(segment·node) | chunk admission: 64 B, plus the BremsLib $2^{21}$-cell cap |
+
+The block estimate holds. The chunk admission's eight dense intermediates undercount the host transient by about a third. Correcting that changes default chunk sizes, and with them the summation order of default outputs, so it is left to a separate change.
+
+Every photon node is scored independently: attenuation, cross sections and dielectric suppression are pointwise in photon energy, and the EEDL cutoff normalization and escape paths depend on segments only. Blocking is therefore exact in the same sense as segment chunking: a per-node segment sum is a BLAS matrix-vector product whose summation order depends on the block width, so blocked and one-pass spectra agree to rounding (#819). The block width is not a user knob. It is reported as the run diagnostic `brem_photon_block` beside `effective_brem_chunk` and does not enter identity. Direct `mc_brem_spectrum` calls score in one pass unless they pass `photon_block`.
+
 ### Admission
 
 Before allocation, admission computes how many segments fit from the bin count, item size, and device budget. It returns the smaller of that count and the requested chunk.

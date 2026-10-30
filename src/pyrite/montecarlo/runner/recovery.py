@@ -14,6 +14,7 @@ RECOVERY_KEYS = (
     "_transport_gpu_oom_retries",
     "_recovery_events",
     "_recovery_path",
+    "_brem_photon_block",
 )
 
 
@@ -76,6 +77,7 @@ def _retry_metrics(counts, events, initial, work, tp):
         "_attempted_brem_chunk": initial[1],
         "_effective_spec_chunk": runner._effective_spec_chunk(work, tp),
         "_effective_brem_chunk": runner._effective_brem_chunk(work, tp),
+        "_brem_photon_block": runner._effective_brem_photon_block(work, tp),
         "_recovery_events": [*tp.get("_recovery_events", []), *events],
         "_recovery_path": tp.get("_recovery_path", "device_spectrum"),
     }

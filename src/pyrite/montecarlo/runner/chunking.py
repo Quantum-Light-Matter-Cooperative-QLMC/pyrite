@@ -11,6 +11,7 @@ from ..._backend import _GPU, BACKEND
 from ..._env import env_value
 from .. import spectrum as _spectrum_mod
 from .._resources import admitted_chunk, resolve_resource_policy
+from ..spectrum.brem_blocks import eedl_staged_panel_count
 
 
 def _env_chunk(name, default):
@@ -151,6 +152,32 @@ def _adaptive_chunk(nbins, *, intermediates=3):
         budget_bytes=(_RESOURCE_POLICY.device_budget_bytes if _RESOURCE_POLICY.gpu else None),
         intermediates=int(intermediates),
     )
+
+
+def _brem_photon_block(nbins, composition, model, *, n_layers=1):
+    """Photon nodes per ``mc_brem_spectrum`` pass so its grid staging fits the budget.
+
+    Per photon node one pass stages each EEDL element's unit-base panel row
+    (binary64 on the host, plus a REAL copy on a device; the BremsLib route
+    stages EEDL too as its fallback), one ``mu(E)`` per absorbing layer and
+    the grid/output vectors; Bethe--Heitler stages no panels. This
+    grid-invariant staging gets its own ``spec_budget_mb``: the
+    ``(chunk, node)`` transients are already bounded by ``_adaptive_chunk``
+    and ``_admit_chunk`` on the whole grid and only shrink inside a block.
+
+    A grid that fits returns ``nbins``, so its path is unchanged. Blocking is
+    exact (#819), like segment chunking, so the width is a run diagnostic, not
+    identity.
+    """
+    nbins = int(nbins)
+    panels = (
+        0
+        if model == "bethe-heitler"
+        else sum(eedl_staged_panel_count(element) for element, _ in composition)
+    )
+    device_copy = _real_itemsize() if _RESOURCE_POLICY.gpu else 0
+    per_node = panels * (8 + device_copy) + (int(n_layers) + 4) * 8
+    return max(1, min(nbins, 1_000_000 * _RESOURCE_POLICY.spec_budget_mb // per_node))
 
 
 def _admit_chunk(chunk, bins, *, intermediates=3):
