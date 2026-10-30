@@ -78,9 +78,13 @@ step-integration schemes. `analyze.py` reports the agreement of each observable.
   Geant4, the measured `BeamOn` after initialization and a warmup run.
 - **Cold**: PyRITE imports/tables plus the first request; Geant4
   initialization, warmup run and measured run.
-- **Figure of merit**: 1 / (RSE² · T_warm) for the ≥ 10 keV 4π yield (discrete
-  arms) and the ≥ 10 keV cone yield (all arms). An arm's FOM ratio is its
-  equal-precision speed ratio, independent of history count.
+- **Time to precision (headline)**: #510 `T(ε)`, the warm request time of a
+  held-out run at the history count the arm needs for every headline observable
+  of a set to reach RSE ε. See "Time to precision" below.
+- **Figure of merit (diagnostic)**: 1 / (RSE² · T_warm) for the ≥ 10 keV 4π
+  yield (discrete arms) and the ≥ 10 keV cone yield (all arms), from
+  equal-history samples. It predicts the `T(ε)` ratio only in the
+  1/√N regime with fixed costs negligible, so it is not reported as a speed ratio.
 - PyRITE warm/cold times include block score reduction and, in the continuous
   arm, the estimator. `work.*.scoring_s` separates scoring from transport.
 
@@ -89,6 +93,49 @@ replays a history. The full-history fallback is also replay-free: initial
 segment capacity 16384 (above the longest observed track), no probe batch,
 per-scene `max_steps` (block × max_steps ≤ 5×10⁸ host rows; well above the longest track), 4 GiB scratch. The arm fails if launched and retained rows
 differ.
+
+## Time to precision
+
+`scenes.json` `precision` freezes the protocol: targets ε = 5% and 2% (1%
+optional), held-out seeds 101–103, and three observable sets:
+
+- `transport`: transmitted, backscattered and stopped fractions, and
+  transmitted energy per primary;
+- `source_4pi`: ≥ 10 keV photons per primary and the 10–50, 50–100 and
+  ≥ 100 keV bands;
+- `cone`: ≥ 10 keV photons per primary into the 90°/10° cone.
+
+Every Geant4 configuration and PyRITE discrete run all three sets. PyRITE
+continuous runs only `cone`: its transport is the discrete arm's, and it counts
+no 4π photons. Fractions below 2%, transmitted energy when transmission is
+below 2%, 4π bands below 10⁻³ photons per primary, and bands at or above the
+beam energy are diagnostics. The cone yield is always headline: it is rare by
+design, and its cost is the point of the comparison.
+
+1. **Variance pilot** (any fixed-history evidence: `run.sbatch`,
+   `pilot3.sbatch`, `pilot4.sbatch`). `precision_plan.py` estimates each
+   observable's per-primary CV per engine arm (Geant4 thread counts pooled) and
+   freezes `N(ε) = ⌈(CV/ε)²⌉` (at least 2000) per (scene, configuration, set,
+   ε), the largest over the set's headline observables binding. Predicted warm
+   time scales the pilot's warm seconds per primary. Items above `--max-run-s`
+   are kept as `over-budget` and not run.
+2. **Held-out runs** (`precision.sbatch`, whole node held). Each planned
+   (scene, configuration, N) runs once per held-out seed in a rotated order.
+   PyRITE warms up on one block (`--warmup-histories`) instead of a
+   full-size request; Geant4 warms up on N/100 (at least 100).
+3. **Verification** (`analyze.py --plan`). A run counts only if every headline
+   observable of its set achieved RSE ≤ ε. Otherwise the item is
+   `precision-unmet`; it is never extrapolated. `T(ε)` speed ratios against
+   each Geant4 thread count (median and range over all seed pairs) are given
+   only between met items. PyRITE rows also carry the transport/scoring
+   split.
+
+```bash
+uv run python checks/geant4_performance/precision_plan.py evidence/run/2835 \
+    evidence/pilot3/2864 evidence/pilot4/JOB --output precision-plan.json
+hold=$(sbatch --parsable checks/geant4_performance/hold.sbatch)
+sbatch --dependency=after:$hold checks/geant4_performance/precision.sbatch $hold precision-plan.json
+```
 
 ## Running
 

@@ -13,7 +13,16 @@ cone observable only). Per scene it reports
   initialization, warmup run and measured run; PyRITE: imports/tables and the
   first, cold request);
 * figures of merit FOM = 1 / (RSE^2 T_warm) for the >= 10 keV 4π yield and the
-  >= 10 keV cone yield; ratios are equal-precision speed ratios.
+  >= 10 keV cone yield (diagnostic: equal-history samples).
+
+With ``--plan`` (a ``precision_plan.py`` plan, evidence from
+``precision.sbatch``) it also reports the #510 headline: per (scene, set,
+target) and configuration, the held-out runs at the planned history count,
+whether every headline observable of the set met the target RSE in each run,
+``T(eps)`` (warm request seconds, median and range over seeds), the PyRITE
+transport/scoring split, and T(eps) speed ratios against each Geant4 thread
+count (median and range over all seed pairs). Over-budget or unmet targets are
+listed as such and give no ratio.
 """
 
 import argparse
@@ -182,15 +191,87 @@ def summarize(samples):
     return out
 
 
+def rse(values):
+    m, se = mean_se(values)
+    return se / abs(m) if m and se > 0 else math.inf
+
+
+def time_to_precision(samples, plan):
+    runs = defaultdict(list)
+    for rec in samples:
+        runs[(rec["scene"]["id"], config_name(rec), rec["histories"])].append(rec)
+    rows = []
+    for item in plan["items"]:
+        row = {k: item[k] for k in ("scene", "config", "set", "target_rse", "histories", "status")}
+        recs = runs.get((item["scene"], item["config"], item["histories"]), [])
+        if item["status"] != "planned" or not recs:
+            row["status"] = item["status"] if item["status"] != "planned" else "missing"
+            rows.append(row)
+            continue
+        achieved = []
+        for r in recs:
+            scores = dict(r["scores"])
+            if GE10[0] in scores:
+                scores["photons_ge10keV"] = sum(scores[k] for k in GE10)
+            achieved.append({name: rse(scores[name]) for name in item["per_observable_histories"]})
+        met = [all(v <= item["target_rse"] for v in a.values()) for a in achieved]
+        warm = [r["timings_s"]["warm_request"] for r in recs]
+        row.update(
+            status="met" if all(met) else "precision-unmet",
+            seeds=sorted(r["seed"] for r in recs),
+            met_per_seed=met,
+            worst_rse=max(max(a.values()) for a in achieved),
+            T_s=warm,
+            T_s_median=statistics.median(warm),
+        )
+        if recs[0]["engine"] != "geant4":
+            row["transport_s_median"] = statistics.median(
+                r["timings_s"]["warm_transport"] for r in recs
+            )
+            row["scoring_s_median"] = median(r["work"]["warm"].get("scoring_s") for r in recs)
+        rows.append(row)
+    met = {
+        (r["scene"], r["set"], r["target_rse"], r["config"]): r
+        for r in rows
+        if r["status"] == "met"
+    }
+    ratios = []
+    for (scene, name_set, eps, config), py in sorted(met.items()):
+        if not config.startswith("pyrite"):
+            continue
+        for (s2, set2, eps2, g4name), g4 in met.items():
+            if (s2, set2, eps2) != (scene, name_set, eps) or not g4name.startswith("geant4"):
+                continue
+            pairs = [g / p for g in g4["T_s"] for p in py["T_s"]]
+            ratios.append(
+                dict(
+                    scene=scene,
+                    set=name_set,
+                    target_rse=eps,
+                    pyrite=config,
+                    geant4=g4name,
+                    speedup_median=statistics.median(pairs),
+                    speedup_range=[min(pairs), max(pairs)],
+                )
+            )
+    return dict(runs=rows, speedup=ratios)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("evidence", nargs="+", type=Path)
+    parser.add_argument("--plan", type=Path, help="precision_plan.py plan: report T(eps)")
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
-    summary = summarize(load(args.evidence))
+    samples = load(args.evidence)
+    summary = summarize(samples)
+    if args.plan:
+        summary["time_to_precision"] = time_to_precision(samples, json.loads(args.plan.read_text()))
     if args.output:
         args.output.write_text(json.dumps(summary, indent=1, allow_nan=False) + "\n")
     for scene, row in summary.items():
+        if scene == "time_to_precision":
+            continue
         print(f"\n== {scene}")
         for name, t in row["timing"].items():
             print(
@@ -207,6 +288,22 @@ def main():
             )
         if row.get("work"):
             print("  work", json.dumps(row["work"]))
+    if args.plan:
+        ttp = summary["time_to_precision"]
+        print("\n== T(eps)")
+        for r in ttp["runs"]:
+            extra = (
+                f" T {r['T_s_median']:.3f}s worst RSE {r['worst_rse']:.4f}" if "T_s" in r else ""
+            )
+            print(
+                f"  {r['scene']} {r['set']} eps={r['target_rse']:g} {r['config']} "
+                f"N={r['histories']}: {r['status']}{extra}"
+            )
+        for r in ttp["speedup"]:
+            print(
+                f"  speedup {r['scene']} {r['set']} eps={r['target_rse']:g} "
+                f"{r['pyrite']} vs {r['geant4']}: {r['speedup_median']:.3g} {r['speedup_range']}"
+            )
 
 
 if __name__ == "__main__":

@@ -14,8 +14,9 @@ track and the probe batch is disabled, so no capacity overflow recomputes a
 history. Launched versus retained rows are recorded to prove it.
 
 One process measures one (scene, seed): imports and tables, a complete
-same-workload warmup at ``seed + 1000000`` (the first, cold request) and the
-measured request. Each request runs fixed history blocks and reduces each block
+same-workload warmup at ``seed + 1000000`` (the first, cold request; full size
+unless ``--warmup-histories`` shortens it, as time-to-precision runs do, to at
+least one block) and the measured request. Each request runs fixed history blocks and reduces each block
 to per-primary scores inside the timer, as the Geant4 app scores in its event
 loop. CUDA is synchronized at both ends of every timed request.
 """
@@ -245,6 +246,9 @@ def main():
     parser.add_argument("--rows-per-round", type=int, default=256)
     parser.add_argument("--device-staging", action="store_true")
     parser.add_argument("--seed", type=int, required=True)
+    parser.add_argument(
+        "--warmup-histories", type=int, default=0, help="cold warmup request size; 0: --histories"
+    )
     parser.add_argument("--max-de-frac", type=float, default=0.05)
     parser.add_argument("--scratch-mib", type=int, default=4096)
     parser.add_argument("--seg-capacity", type=int, default=16384)
@@ -426,7 +430,8 @@ def main():
         )
         return scores, wall, transport_s, work
 
-    _, cold_s, cold_transport_s, cold_work = request(args.seed + 1_000_000, args.histories)
+    warmup = args.warmup_histories or args.histories
+    _, cold_s, cold_transport_s, cold_work = request(args.seed + 1_000_000, warmup)
     # Untimed audit request: fail on any PXR/CBS or line-scorer computation.
     calls = set()
 
@@ -467,6 +472,7 @@ def main():
         audit=dict(forbidden="pyrite.montecarlo.spectrum.{cxr,lines} computations", calls=[]),
         scene=scene,
         histories=args.histories,
+        warmup_histories=warmup,
         block=args.block,
         seed=args.seed,
         controls=dict(

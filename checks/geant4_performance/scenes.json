@@ -96,6 +96,28 @@
       ]
     ]
   },
+  "precision": {
+    "protocol": "#510 time-to-precision T(eps): warm wall time at which every headline observable of a set meets its target RSE, at each arm's own history count, verified on held-out seeds",
+    "targets_rse": [0.05, 0.02],
+    "optional_targets_rse": [0.01],
+    "held_out_seeds": [101, 102, 103],
+    "sets": {
+      "transport": ["transmitted", "backscattered", "stopped", "transmitted_energy_keV"],
+      "source_4pi": ["photons_ge10keV", "photons_10_50keV", "photons_50_100keV", "photons_ge100keV"],
+      "cone": ["cone_source_photons_ge10kev"]
+    },
+    "arm_sets": {
+      "geant4": ["transport", "source_4pi", "cone"],
+      "pyrite-discrete": ["transport", "source_4pi", "cone"],
+      "pyrite-continuous": ["cone"]
+    },
+    "headline_floor": {
+      "fraction_mean": 0.02,
+      "photons_per_primary": 0.001,
+      "note": "terminal fractions (and transmitted energy, gated on the transmitted fraction) below fraction_mean, and 4pi photon bands below photons_per_primary in the variance pilot, are diagnostics; the cone yield is always headline (rare by design: its cost is what the comparison measures, bounded by the run budget); bands whose lower edge is at or above the beam energy are excluded"
+    },
+    "min_histories": 2000
+  },
   "block_note": "histories per PyRITE block: about 25-40 M retained rows (pilot 2805), floor 5000 so auto selects continuation",
   "max_steps_note": "per-history step limit (exceeding it raises, never truncates or replays); host_pass sizes Ne*max_steps host row buffers, so block*max_steps <= 5e8. Longest pilot-2805 tracks: Si 300 keV 4213, W 300 keV 9874 rows"
 }
