@@ -10,6 +10,7 @@ from dataclasses import dataclass, replace
 import numpy as np
 
 from ..._backend import BACKEND
+from ..._physics_fallback import PhysicsFallbackWarning
 from ...materials._transport_data import TRANSPORT_ELEMENTS
 from ..spectrum.brem_bremslib import (
     BremsLibBremsstrahlungTable,
@@ -628,7 +629,7 @@ def validate_radiative_args(
         warnings.warn(
             "coupled BremsLib radiative transport is unavailable for grooves; "
             "using uncoupled scoring",
-            UserWarning,
+            PhysicsFallbackWarning,
             stacklevel=2,
         )
         return False

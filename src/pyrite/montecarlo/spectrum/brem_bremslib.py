@@ -44,6 +44,7 @@ from ..._bremslib_table import (
     solid_angle_integral,
     top_reduced_energy,
 )
+from ..._physics_fallback import PhysicsFallbackWarning
 
 #: One millibarn in square centimetres.
 _MB_CM2 = 1.0e-27
@@ -245,7 +246,7 @@ def _warn_bremslib_element_missing(element: str, stacklevel: int) -> None:
     warnings.warn(
         f"no BremsLib table supplied for {element}; its bremsstrahlung falls back to "
         "isotropic EEDL emission",
-        RuntimeWarning,
+        PhysicsFallbackWarning,
         stacklevel=stacklevel + 1,
     )
 
@@ -255,7 +256,7 @@ def _warn_bremslib_out_of_range(table: BremsLibBremsstrahlungTable, stacklevel: 
         f"Z={table.atomic_number} incident energy is outside the BremsLib range "
         f"[{table.minimum_incident_energy_keV:g}, {table.maximum_incident_energy_keV:g}] keV; "
         "falling back to isotropic EEDL emission for those segments",
-        RuntimeWarning,
+        PhysicsFallbackWarning,
         stacklevel=stacklevel + 1,
     )
 
@@ -329,7 +330,7 @@ def resolve_auto_model(segments, comp, bremslib_tables):
         warnings.warn(
             "bremsstrahlung_model 'auto': the supplied BremsLib tables do not cover "
             f"{', '.join(elements)}; using EEDL with an isotropic photon angle",
-            RuntimeWarning,
+            PhysicsFallbackWarning,
             stacklevel=3,
         )
         return "eedl", None
