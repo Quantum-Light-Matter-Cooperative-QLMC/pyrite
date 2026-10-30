@@ -941,6 +941,11 @@ theoretical occupancy of 16.7% for the compiled kernel (204 registers, 256
 resident threads per SM) at every block size from 32 to 256. The scheduling
 gains above are launch-population and tail effects; no occupancy improvement is
 claimed.
+#796 later raised the theoretical occupancy of the #827 benchmark variant from
+16.7% up to 41.7% with register caps. It also moved table reads to
+`LDG.E.CONSTANT`. Neither gave a warm-time gain on the Si/W anchors. See the
+[check record](../check-records/equal-precision/kernel-builds-796.json) and
+"Register cap and read-only loads" in the GPU transport RawKernel design note.
 
 **Shell soft/hard and straggling (#797).** [#797](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/797)
 extends continuation to `inelastic_model="shell-soft-hard"` and straggling.

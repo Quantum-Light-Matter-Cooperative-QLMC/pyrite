@@ -1,0 +1,782 @@
+{
+  "schema": "pyrite.transport-kernel-builds.summary.v1",
+  "issue": 796,
+  "date": "2026-10-30",
+  "title": "Exact CUDA kernel: register cap and read-only loads",
+  "device": "NVIDIA GeForce RTX 5080",
+  "cupy": "14.2.0",
+  "nvrtc": "13.4",
+  "driver": "610.47",
+  "code_revision": {
+    "attributes_and_tests": "0d7a7a1e803f8cc2e461aec76ec8e9a639a8d610",
+    "timing": "52d6c4fcf8804e3bf2210ca6c8730db24f0de754",
+    "note": "pre-rebase SHAs of a7fe08b0 and 3c36cbe2 (same transport sources); only checks/transport_kernel_builds.py differs between them"
+  },
+  "jobs": {
+    "attributes": 2856,
+    "attributes_r96": 2855,
+    "ptxas_report": 2861,
+    "timing": 2859,
+    "hardware_tests": 2856,
+    "ncu_probe": 2855
+  },
+  "script": "checks/transport_kernel_builds.py",
+  "ncu": "refused: ERR_NVGPUCTRPERM (job 2855); no achieved-occupancy or stall claim",
+  "physics": "#821 benchmark: ELSEPA + Kawrakow deflection, midpoint SBETHE, no straggling, coupled BremsLib 1 keV with table moments, 10 keV cutoff, 10 x 10 mm slab",
+  "histories": {
+    "si-300keV-100um": 10000,
+    "w-300keV-10um": 10000,
+    "w-1MeV-100um": 1250,
+    "si-3MeV-1mm": 1000
+  },
+  "seeds": [
+    1,
+    2,
+    3
+  ],
+  "ptx_fp64": {
+    "mul.f64 (no rounding modifier)": 812,
+    "add.f64": 572,
+    "sub.f64": 696,
+    "fma.rn.f64": 2523,
+    "mul.rn.f64": 8,
+    "add.rn.f64": 49
+  },
+  "builds": {
+    "jit": {
+      "registers": 186,
+      "local_bytes": 40,
+      "theoretical_occupancy": {
+        "64": 0.16666666666666666,
+        "128": 0.16666666666666666,
+        "256": 0.16666666666666666
+      },
+      "source_sha256": "3d1645d3528c64c801de51a3fc56a615c74fa3f7b47c1749ab06116d923cd658",
+      "new_cubin": true,
+      "sass": {
+        "instructions": 21768,
+        "ldg": 477,
+        "ldg_constant": 7,
+        "ldl": 3,
+        "stl": 2
+      },
+      "ptxas": {
+        "stack_bytes": 40,
+        "spill_store_bytes": 0,
+        "spill_load_bytes": 0,
+        "registers": 186
+      },
+      "sass_fp64_ops": "1384 DADD, 3892 DFMA, 1003 DMUL"
+    },
+    "raw": {
+      "registers": 186,
+      "local_bytes": 40,
+      "theoretical_occupancy": {
+        "64": 0.16666666666666666,
+        "128": 0.16666666666666666,
+        "256": 0.16666666666666666
+      },
+      "source_sha256": "3d1645d3528c64c801de51a3fc56a615c74fa3f7b47c1749ab06116d923cd658",
+      "new_cubin": false,
+      "sass": null,
+      "ptxas": null,
+      "sass_fp64_ops": null
+    },
+    "ro": {
+      "registers": 186,
+      "local_bytes": 40,
+      "theoretical_occupancy": {
+        "64": 0.16666666666666666,
+        "128": 0.16666666666666666,
+        "256": 0.16666666666666666
+      },
+      "source_sha256": "38114a422575f943e9228125c2b5dcdf9ce1a983e6c16733a0454f47febe2eeb",
+      "new_cubin": true,
+      "sass": {
+        "instructions": 21744,
+        "ldg": 478,
+        "ldg_constant": 460,
+        "ldl": 3,
+        "stl": 2
+      },
+      "ptxas": {
+        "stack_bytes": 40,
+        "spill_store_bytes": 0,
+        "spill_load_bytes": 0,
+        "registers": 186
+      },
+      "sass_fp64_ops": "1384 DADD, 3892 DFMA, 1003 DMUL"
+    },
+    "r168": {
+      "registers": 168,
+      "local_bytes": 56,
+      "theoretical_occupancy": {
+        "64": 0.25,
+        "128": 0.25,
+        "256": 0.16666666666666666
+      },
+      "source_sha256": "3d1645d3528c64c801de51a3fc56a615c74fa3f7b47c1749ab06116d923cd658",
+      "new_cubin": true,
+      "sass": {
+        "instructions": 21880,
+        "ldg": 477,
+        "ldg_constant": 7,
+        "ldl": 9,
+        "stl": 6
+      },
+      "ptxas": {
+        "stack_bytes": 56,
+        "spill_store_bytes": 20,
+        "spill_load_bytes": 36,
+        "registers": 168
+      },
+      "sass_fp64_ops": "1384 DADD, 3892 DFMA, 1003 DMUL"
+    },
+    "ro+r168": {
+      "registers": 168,
+      "local_bytes": 64,
+      "theoretical_occupancy": {
+        "64": 0.25,
+        "128": 0.25,
+        "256": 0.16666666666666666
+      },
+      "source_sha256": "38114a422575f943e9228125c2b5dcdf9ce1a983e6c16733a0454f47febe2eeb",
+      "new_cubin": true,
+      "sass": {
+        "instructions": 21872,
+        "ldg": 478,
+        "ldg_constant": 460,
+        "ldl": 11,
+        "stl": 8
+      },
+      "ptxas": {
+        "stack_bytes": 64,
+        "spill_store_bytes": 28,
+        "spill_load_bytes": 44,
+        "registers": 168
+      },
+      "sass_fp64_ops": null
+    },
+    "r128": {
+      "registers": 128,
+      "local_bytes": 160,
+      "theoretical_occupancy": {
+        "64": 0.3333333333333333,
+        "128": 0.3333333333333333,
+        "256": 0.3333333333333333
+      },
+      "source_sha256": "3d1645d3528c64c801de51a3fc56a615c74fa3f7b47c1749ab06116d923cd658",
+      "new_cubin": true,
+      "sass": {
+        "instructions": 22704,
+        "ldg": 477,
+        "ldg_constant": 7,
+        "ldl": 53,
+        "stl": 42
+      },
+      "ptxas": {
+        "stack_bytes": 160,
+        "spill_store_bytes": 220,
+        "spill_load_bytes": 316,
+        "registers": 128
+      },
+      "sass_fp64_ops": "1395 DADD, 3900 DFMA, 1064 DMUL"
+    },
+    "ro+r128": {
+      "registers": 128,
+      "local_bytes": 152,
+      "theoretical_occupancy": {
+        "64": 0.3333333333333333,
+        "128": 0.3333333333333333,
+        "256": 0.3333333333333333
+      },
+      "source_sha256": "38114a422575f943e9228125c2b5dcdf9ce1a983e6c16733a0454f47febe2eeb",
+      "new_cubin": true,
+      "sass": {
+        "instructions": 22648,
+        "ldg": 478,
+        "ldg_constant": 460,
+        "ldl": 50,
+        "stl": 40
+      },
+      "ptxas": {
+        "stack_bytes": 152,
+        "spill_store_bytes": 198,
+        "spill_load_bytes": 288,
+        "registers": 128
+      },
+      "sass_fp64_ops": null
+    },
+    "lb128x3": {
+      "registers": 168,
+      "local_bytes": 56,
+      "theoretical_occupancy": {
+        "64": 0.25,
+        "128": 0.25,
+        "256": 0.16666666666666666
+      },
+      "source_sha256": "82f9a2790b400d98e518fa88249f3b852a8019581d7da0a03e09bec11437a30e",
+      "new_cubin": true,
+      "sass": null,
+      "ptxas": null,
+      "sass_fp64_ops": null
+    },
+    "r96": {
+      "registers": 96,
+      "local_bytes": 280,
+      "theoretical_occupancy": {
+        "64": 0.4167,
+        "128": 0.4167,
+        "256": 0.3333
+      },
+      "ptxas": {
+        "stack_bytes": 280,
+        "spill_store_bytes": 678,
+        "spill_load_bytes": 804,
+        "registers": 96
+      },
+      "sass_fp64_ops": "1392 DADD, 3914 DFMA, 1111 DMUL",
+      "note": "attributes from job 2855"
+    }
+  },
+  "timing": {
+    "si-300keV-100um/full-history": {
+      "jit": {
+        "seconds_median": 1.7667,
+        "speedup_median": 1.0,
+        "speedup_range": [
+          1.0,
+          1.0
+        ],
+        "all_identical": true
+      },
+      "ro": {
+        "seconds_median": 1.7937,
+        "speedup_median": 0.9834,
+        "speedup_range": [
+          0.9483,
+          1.0524
+        ],
+        "all_identical": true
+      },
+      "r168": {
+        "seconds_median": 1.754,
+        "speedup_median": 1.0073,
+        "speedup_range": [
+          0.9944,
+          1.0114
+        ],
+        "all_identical": true
+      },
+      "ro+r168": {
+        "seconds_median": 1.7799,
+        "speedup_median": 0.9926,
+        "speedup_range": [
+          0.9526,
+          1.0038
+        ],
+        "all_identical": true
+      },
+      "r128": {
+        "seconds_median": 1.7844,
+        "speedup_median": 0.9695,
+        "speedup_range": [
+          0.9556,
+          0.9901
+        ],
+        "all_identical": true
+      },
+      "ro+r128": {
+        "seconds_median": 1.8044,
+        "speedup_median": 0.9879,
+        "speedup_range": [
+          0.9238,
+          1.0455
+        ],
+        "all_identical": true
+      },
+      "r96": {
+        "seconds_median": 1.8258,
+        "speedup_median": 0.9677,
+        "speedup_range": [
+          0.9253,
+          0.9982
+        ],
+        "all_identical": true
+      }
+    },
+    "si-300keV-100um/continuation": {
+      "jit": {
+        "seconds_median": 1.176,
+        "speedup_median": 1.0,
+        "speedup_range": [
+          1.0,
+          1.0
+        ],
+        "all_identical": true
+      },
+      "ro": {
+        "seconds_median": 1.1681,
+        "speedup_median": 1.0046,
+        "speedup_range": [
+          0.9997,
+          1.0068
+        ],
+        "all_identical": true
+      },
+      "r168": {
+        "seconds_median": 1.1657,
+        "speedup_median": 1.0089,
+        "speedup_range": [
+          1.0002,
+          1.0554
+        ],
+        "all_identical": true
+      },
+      "ro+r168": {
+        "seconds_median": 1.1615,
+        "speedup_median": 1.0125,
+        "speedup_range": [
+          1.002,
+          1.0624
+        ],
+        "all_identical": true
+      },
+      "r128": {
+        "seconds_median": 1.218,
+        "speedup_median": 0.9536,
+        "speedup_range": [
+          0.9445,
+          1.0548
+        ],
+        "all_identical": true
+      },
+      "ro+r128": {
+        "seconds_median": 1.2326,
+        "speedup_median": 0.9834,
+        "speedup_range": [
+          0.9333,
+          1.0021
+        ],
+        "all_identical": true
+      },
+      "r96": {
+        "seconds_median": 1.1944,
+        "speedup_median": 0.9865,
+        "speedup_range": [
+          0.9631,
+          1.0152
+        ],
+        "all_identical": true
+      }
+    },
+    "w-300keV-10um/full-history": {
+      "jit": {
+        "seconds_median": 6.8656,
+        "speedup_median": 1.0,
+        "speedup_range": [
+          1.0,
+          1.0
+        ],
+        "all_identical": true
+      },
+      "ro": {
+        "seconds_median": 6.8741,
+        "speedup_median": 0.9975,
+        "speedup_range": [
+          0.9876,
+          1.0066
+        ],
+        "all_identical": true
+      },
+      "r168": {
+        "seconds_median": 6.8707,
+        "speedup_median": 0.9993,
+        "speedup_range": [
+          0.9894,
+          0.9999
+        ],
+        "all_identical": true
+      },
+      "ro+r168": {
+        "seconds_median": 6.911,
+        "speedup_median": 0.9928,
+        "speedup_range": [
+          0.9894,
+          0.9999
+        ],
+        "all_identical": true
+      },
+      "r128": {
+        "seconds_median": 7.0444,
+        "speedup_median": 0.9746,
+        "speedup_range": [
+          0.9623,
+          0.9937
+        ],
+        "all_identical": true
+      },
+      "ro+r128": {
+        "seconds_median": 7.0105,
+        "speedup_median": 0.9776,
+        "speedup_range": [
+          0.9684,
+          0.9924
+        ],
+        "all_identical": true
+      },
+      "r96": {
+        "seconds_median": 7.1108,
+        "speedup_median": 0.9637,
+        "speedup_range": [
+          0.9547,
+          0.9675
+        ],
+        "all_identical": false
+      }
+    },
+    "w-300keV-10um/continuation": {
+      "jit": {
+        "seconds_median": 1.9363,
+        "speedup_median": 1.0,
+        "speedup_range": [
+          1.0,
+          1.0
+        ],
+        "all_identical": true
+      },
+      "ro": {
+        "seconds_median": 2.0591,
+        "speedup_median": 0.9381,
+        "speedup_range": [
+          0.9078,
+          1.1036
+        ],
+        "all_identical": true
+      },
+      "r168": {
+        "seconds_median": 2.0317,
+        "speedup_median": 0.9279,
+        "speedup_range": [
+          0.9216,
+          0.953
+        ],
+        "all_identical": true
+      },
+      "ro+r168": {
+        "seconds_median": 2.0513,
+        "speedup_median": 0.9439,
+        "speedup_range": [
+          0.9017,
+          1.0073
+        ],
+        "all_identical": true
+      },
+      "r128": {
+        "seconds_median": 1.9879,
+        "speedup_median": 0.9595,
+        "speedup_range": [
+          0.8987,
+          1.025
+        ],
+        "all_identical": false
+      },
+      "ro+r128": {
+        "seconds_median": 2.0572,
+        "speedup_median": 0.9412,
+        "speedup_range": [
+          0.9015,
+          1.0974
+        ],
+        "all_identical": false
+      },
+      "r96": {
+        "seconds_median": 2.0324,
+        "speedup_median": 0.9508,
+        "speedup_range": [
+          0.9197,
+          1.0825
+        ],
+        "all_identical": false
+      }
+    },
+    "w-1MeV-100um/full-history": {
+      "jit": {
+        "seconds_median": 9.7013,
+        "speedup_median": 1.0,
+        "speedup_range": [
+          1.0,
+          1.0
+        ],
+        "all_identical": true
+      },
+      "ro": {
+        "seconds_median": 9.7161,
+        "speedup_median": 1.0024,
+        "speedup_range": [
+          0.9985,
+          1.0035
+        ],
+        "all_identical": true
+      },
+      "r168": {
+        "seconds_median": 9.6854,
+        "speedup_median": 1.0017,
+        "speedup_range": [
+          1.0009,
+          1.0071
+        ],
+        "all_identical": true
+      },
+      "ro+r168": {
+        "seconds_median": 9.7165,
+        "speedup_median": 0.9989,
+        "speedup_range": [
+          0.9977,
+          1.0006
+        ],
+        "all_identical": true
+      },
+      "r128": {
+        "seconds_median": 9.9292,
+        "speedup_median": 0.977,
+        "speedup_range": [
+          0.9765,
+          0.9779
+        ],
+        "all_identical": true
+      },
+      "ro+r128": {
+        "seconds_median": 9.9334,
+        "speedup_median": 0.977,
+        "speedup_range": [
+          0.9766,
+          0.9804
+        ],
+        "all_identical": true
+      },
+      "r96": {
+        "seconds_median": 10.1903,
+        "speedup_median": 0.9571,
+        "speedup_range": [
+          0.9489,
+          0.9574
+        ],
+        "all_identical": true
+      }
+    },
+    "w-1MeV-100um/continuation": {
+      "jit": {
+        "seconds_median": 2.7646,
+        "speedup_median": 1.0,
+        "speedup_range": [
+          1.0,
+          1.0
+        ],
+        "all_identical": true
+      },
+      "ro": {
+        "seconds_median": 2.9687,
+        "speedup_median": 0.9371,
+        "speedup_range": [
+          0.9179,
+          0.9874
+        ],
+        "all_identical": true
+      },
+      "r168": {
+        "seconds_median": 2.7715,
+        "speedup_median": 0.9925,
+        "speedup_range": [
+          0.974,
+          1.0038
+        ],
+        "all_identical": true
+      },
+      "ro+r168": {
+        "seconds_median": 2.8095,
+        "speedup_median": 0.9843,
+        "speedup_range": [
+          0.9731,
+          0.9902
+        ],
+        "all_identical": true
+      },
+      "r128": {
+        "seconds_median": 2.8462,
+        "speedup_median": 0.9714,
+        "speedup_range": [
+          0.9646,
+          0.9756
+        ],
+        "all_identical": true
+      },
+      "ro+r128": {
+        "seconds_median": 2.8384,
+        "speedup_median": 0.9801,
+        "speedup_range": [
+          0.9046,
+          0.9907
+        ],
+        "all_identical": false
+      },
+      "r96": {
+        "seconds_median": 2.8955,
+        "speedup_median": 0.9546,
+        "speedup_range": [
+          0.895,
+          0.9608
+        ],
+        "all_identical": true
+      }
+    },
+    "si-3MeV-1mm/full-history": {
+      "jit": {
+        "seconds_median": 4.5065,
+        "speedup_median": 1.0,
+        "speedup_range": [
+          1.0,
+          1.0
+        ],
+        "all_identical": true
+      },
+      "ro": {
+        "seconds_median": 4.5482,
+        "speedup_median": 0.9976,
+        "speedup_range": [
+          0.9908,
+          1.0002
+        ],
+        "all_identical": true
+      },
+      "r168": {
+        "seconds_median": 4.5035,
+        "speedup_median": 1.0007,
+        "speedup_range": [
+          0.9996,
+          1.0011
+        ],
+        "all_identical": true
+      },
+      "ro+r168": {
+        "seconds_median": 4.5124,
+        "speedup_median": 0.9984,
+        "speedup_range": [
+          0.9921,
+          0.9987
+        ],
+        "all_identical": true
+      },
+      "r128": {
+        "seconds_median": 4.5835,
+        "speedup_median": 0.9808,
+        "speedup_range": [
+          0.9769,
+          0.9832
+        ],
+        "all_identical": true
+      },
+      "ro+r128": {
+        "seconds_median": 4.6122,
+        "speedup_median": 0.9786,
+        "speedup_range": [
+          0.9771,
+          0.9805
+        ],
+        "all_identical": true
+      },
+      "r96": {
+        "seconds_median": 4.7248,
+        "speedup_median": 0.9538,
+        "speedup_range": [
+          0.9497,
+          0.9628
+        ],
+        "all_identical": true
+      }
+    },
+    "si-3MeV-1mm/continuation": {
+      "jit": {
+        "seconds_median": 1.4321,
+        "speedup_median": 1.0,
+        "speedup_range": [
+          1.0,
+          1.0
+        ],
+        "all_identical": true
+      },
+      "ro": {
+        "seconds_median": 1.5165,
+        "speedup_median": 0.995,
+        "speedup_range": [
+          0.9444,
+          0.9973
+        ],
+        "all_identical": true
+      },
+      "r168": {
+        "seconds_median": 1.5202,
+        "speedup_median": 0.947,
+        "speedup_range": [
+          0.9421,
+          1.0032
+        ],
+        "all_identical": true
+      },
+      "ro+r168": {
+        "seconds_median": 1.5262,
+        "speedup_median": 0.9456,
+        "speedup_range": [
+          0.9383,
+          0.9984
+        ],
+        "all_identical": true
+      },
+      "r128": {
+        "seconds_median": 1.4585,
+        "speedup_median": 0.9838,
+        "speedup_range": [
+          0.9819,
+          0.9945
+        ],
+        "all_identical": true
+      },
+      "ro+r128": {
+        "seconds_median": 1.5516,
+        "speedup_median": 0.9819,
+        "speedup_range": [
+          0.923,
+          0.9901
+        ],
+        "all_identical": true
+      },
+      "r96": {
+        "seconds_median": 1.4863,
+        "speedup_median": 0.9636,
+        "speedup_range": [
+          0.9074,
+          0.9674
+        ],
+        "all_identical": true
+      }
+    }
+  },
+  "digest_mismatches_vs_jit": {
+    "r96": [
+      "w-300keV-10um/full-history/seed 2",
+      "w-300keV-10um/full-history/seed 3",
+      "w-300keV-10um/continuation/seed 2",
+      "w-300keV-10um/continuation/seed 3"
+    ],
+    "ro+r128": [
+      "w-300keV-10um/continuation/seed 1",
+      "w-300keV-10um/continuation/seed 2",
+      "w-300keV-10um/continuation/seed 3",
+      "w-1MeV-100um/continuation/seed 1"
+    ],
+    "r128": [
+      "w-300keV-10um/continuation/seed 2"
+    ]
+  },
+  "decision": "No build adopted: none is faster than the JIT kernel on both Si and W; caps at or below 128 registers change trajectory bits through ptxas contraction of unrounded PTX mul/add/sub."
+}
