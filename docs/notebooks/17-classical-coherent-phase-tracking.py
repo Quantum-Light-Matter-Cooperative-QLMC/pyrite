@@ -72,7 +72,7 @@ def _(np, tables_ready):
     from pyrite.beams import Beam, BunchLength, LongitudinalDistribution, PointSpot, TransverseSpot
     from pyrite.config import CxrReflections, FixedSampling, Numerics, Physics
     from pyrite.detectors import Detector, EnergyBins
-    from pyrite.geometry import Footprint, Slab
+    from pyrite.geometry import Slab
     from pyrite.units import ureg
 
     # Keep this workload modest. Re-measure CPU time before increasing M or grid size.
@@ -172,12 +172,16 @@ def _(
     assert all(
         item.cxr.coherent is not None and item.temporal is not None for item in samples.values()
     )
-    runtime_table = mo.md(
+    return elapsed, samples
+
+
+@app.cell(hide_code=True)
+def _(elapsed, mo):
+    mo.md(
         "**Measured local wall times** (including any first-run compilation): "
         + ", ".join(f"{name}: {seconds:.1f} s" for name, seconds in elapsed.items())
     )
-    runtime_table
-    return elapsed, samples
+    return
 
 
 @app.cell
@@ -211,7 +215,7 @@ def _(samples, np, plt, physical_electrons):
     for _ax in (ax_s, ax_r):
         _ax.grid(alpha=0.2)
         _ax.legend(fontsize=7)
-    fig_spectra
+    fig_spectra  # noqa: B018
     return
 
 
@@ -262,7 +266,7 @@ def _(np, plt, samples):
     _ax.legend(fontsize=8)
     # Inspect the physical arrival window, rather than the entire FFT period.
     _ax.set_xlim(-2.5, 2.5)
-    fig_time
+    fig_time  # noqa: B018
     return
 
 
@@ -283,7 +287,7 @@ def _(charge_pc, hbar_eV_fs, np, physical_electrons, plt, samples):
     )
     _ax.grid(alpha=0.2)
     _ax.legend(fontsize=8)
-    fig_form
+    fig_form  # noqa: B018
     return
 
 
@@ -317,7 +321,7 @@ def _(samples, physical_electrons, charge_pc, np, plt):
     )
     _ax.grid(alpha=0.2)
     _ax.legend(fontsize=8)
-    fig_charge
+    fig_charge  # noqa: B018
     return
 
 

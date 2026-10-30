@@ -135,82 +135,106 @@ def run_sweep(
 ):
     """Run ``cases`` into ``results`` (mutated in place).
 
-    cases : list of typed cases from sweep.build_cases.
-    results : the dict to fill ({name: {E0: record}}).
-    retain_results : defaults to True, preserving in-memory spectra. False
+    Parameters
+    ----------
+    cases
+        list of typed cases from sweep.build_cases.
+    results
+        the dict to fill ({name: {E0: record}}).
+    retain_results
+        defaults to True, preserving in-memory spectra. False
         requires an empty results mapping and a component checkpoint path;
         completed records become {"case": case, "checkpoint_path": path} after
         successful persistence. Use checkpoint loading for spectra, including
         in on_chunk callbacks. Resume and consolidation keep only case metadata
         plus one config's arrays resident (legacy input files may fully decode).
-    executor : optional object implementing ``execute(cases, callback=..., **options)``.
+    executor
+        optional object implementing ``execute(cases, callback=..., **options)``.
         When omitted, use ``montecarlo.run_cases`` exactly as before. When
         supplied, callbacks must execute in this coordinator process so the
         existing sweep remains sole owner of manifests and consolidation.
-    artifact_store : optional pyrite.execution.CaseArtifactStore.
+    artifact_store
+        optional pyrite.execution.CaseArtifactStore.
         A shared-filesystem inbox for independently published worker results.
         A worker may return a CaseArtifactRef instead of bulk result arrays;
         the coordinator verifies its physics key and digest, then performs the
         established checkpoint writes. With resume and cache_read enabled,
         completed but uncommitted worker artifacts are recovered on restart.
-    checkpoint_dir : directory for the per-material checkpoints (default
+    checkpoint_dir
+        directory for the per-material checkpoints (default
         ``pyrite-output/checkpoints`` in the workspace). A sweep is
         single-material, so each writes ``<checkpoint_dir>/<material>/``
         holding only that material's configs. ``results`` can hold several
         materials in one kernel without them clobbering each other on disk.
         Completed configs are sharded until the sweep completes; consolidation
         then publishes component files and a manifest before removing shards.
-    checkpoint_path : explicit override for the checkpoint path; None (default)
+    checkpoint_path
+        explicit override for the checkpoint path; None (default)
         derives the per-material path above. An explicit ``.pkl`` path retains
         whole-store saves. Resume skips stored ``(name, E0_keV)`` pairs.
-    max_workers : forwarded to run_cases. None sizes the GPU transport pool or
+    max_workers
+        forwarded to run_cases. None sizes the GPU transport pool or
         the full-case CPU pool automatically; 0 forces serial execution. CPU
         full-case pools are also capped by available memory.
-    progress : forwarded to run_cases (the per-case tqdm bar).
-    group_key : case -> hashable. Configs sharing a key form one group;
+    progress
+        forwarded to run_cases (the per-case tqdm bar).
+    group_key
+        case -> hashable. Configs sharing a key form one group;
         on_chunk fires once the WHOLE group has finished. Default groups by
         (material, thickness, polar tilt, finite footprint), so the azimuth
         sweep at one tilt and footprint is one group -- on_chunk gets every
         azimuth at once.
-    on_chunk : optional callback(list_of_config_names) fired once per completed
+    on_chunk
+        optional callback(list_of_config_names) fired once per completed
         group, with all of that group's config names (cached + freshly run).
-    on_progress : optional callback(completed_new_cases, total_cases, cached_cases)
+    on_progress
+        optional callback(completed_new_cases, total_cases, cached_cases)
         fired once after resume filtering and after every newly completed case.
-    on_case : optional callback(case) fired with each case as it finishes,
+    on_case
+        optional callback(case) fired with each case as it finishes,
         just before ``on_progress`` -- the frontier the sweep is working through.
         Lets a live viewer surface which crystal case (energy, tilts, thickness)
         is currently under test without threading it through ``on_progress``'s
         fixed count signature.
-    on_runtime : optional callback(dict) fired once after resume filtering with
+    on_runtime
+        optional callback(dict) fired once after resume filtering with
         resolved engine, effective worker count, memory policy, representative
         energy-grid widths, and spectrum/brem chunk sizing.
-    on_timing : optional callback(dict) receiving rolling per-case transport,
+    on_timing
+        optional callback(dict) receiving rolling per-case transport,
         spectrum, GPU feed-wait, retry, CuPy-pool, and checkpoint timings.
-    on_activity : optional callback(dict) receiving current driver phase,
+    on_activity
+        optional callback(dict) receiving current driver phase,
         case index, and in-flight work counts. A multi-batch in-process
         transport also reports ``transport_electrons_done``/
         ``transport_electrons_total`` for the active case (see ``run_cases``).
-    max_seconds : optional soft wall-clock budget, measured from just before
+    max_seconds
+        optional soft wall-clock budget, measured from just before
         ``run_cases`` starts. None (default) means unbounded. When set, a
         deadline of ``time_fn() + max_seconds`` is checked (via ``run_cases``'s
         ``should_stop`` hook) before each new case starts; once it passes, no
         new case begins but in-flight work still drains and is still stored.
         Unstarted configs are simply left for the next call to pick up --
         resume filtering is per ``(name, E0_keV)`` (see checkpoint_path).
-    time_fn : clock used for the deadline; defaults to ``time.monotonic``.
+    time_fn
+        clock used for the deadline; defaults to ``time.monotonic``.
         Override for deterministic tests.
-    dataset_identity : optional JSON-serializable resolved-profile identity,
+    dataset_identity
+        optional JSON-serializable resolved-profile identity,
         persisted in ``meta.json``. Variant-aware callers use this to prove
         exactly which settings and sweep produced the component artifacts.
-    case_cost_fn : optional callable(case) -> float (e.g. sweep.case_cost).
+    case_cost_fn
+        optional callable(case) -> float (e.g. sweep.case_cost).
         When given, enables compute-weighted progress: relative cost is summed
         over ``cases`` for the total and over the exact cached/completed case
         set for what's done, so a live viewer can show a compute-aware percent
         instead of a flat case count. None (default) disables ``on_cost``.
-    on_cost : optional callback(done_cost, total_cost), fired alongside
+    on_cost
+        optional callback(done_cost, total_cost), fired alongside
         ``on_progress`` (after resume filtering and after every newly completed
         case) whenever ``case_cost_fn`` is set; otherwise never called.
-    content_key_fn : optional callable(case) -> hex str (``profiles.case_content_key``).
+    content_key_fn
+        optional callable(case) -> hex str (``profiles.case_content_key``).
         When given, enables the shared per-material content-addressable case store
         (CAS): each finished case's transport ``out`` is written once under its
         content key (``cache_write``), and on resume any case still to run whose
@@ -221,20 +245,24 @@ def run_sweep(
         the pre-CAS per-stem-only path. Reuse replays through ``store_result`` with
         the REQUESTED case, so the reconstructed record is bit-identical to a fresh
         compute (including the requester's own detector/flux scalars).
-    cache_read : consult the CAS on resume for cross-profile reuse (default True;
+    cache_read
+        consult the CAS on resume for cross-profile reuse (default True;
         ignored when ``content_key_fn`` is None). Set False by ``--no-cache`` /
         ``--recompute`` / ``-p`` so a run recomputes rather than reuses.
-    cache_write : write each finished case into the CAS (default True; ignored
+    cache_write
+        write each finished case into the CAS (default True; ignored
         when ``content_key_fn`` is None). Set False by ``--no-cache`` / ``-p`` so
         an ephemeral or measurement run never populates the shared store.
-    trajectory_capture : optional ``montecarlo.trajectories.TrajectoryCapture``.
+    trajectory_capture
+        optional ``montecarlo.trajectories.TrajectoryCapture``.
         When given, every case this call transports writes its transport result
         to one HDF5 artifact before its spectrum runs. Resumed or cache-replayed
         cases are not re-transported and get no new artifact. Existing artifacts
         are checked before any transport (see ``preflight_capture``), and the
         metadata-only completion shortcut is skipped. None (default) captures
         nothing and leaves the run unchanged.
-    observation : optional :class:`~pyrite.observations.SweepObservation`. Every
+    observation
+        optional :class:`~pyrite.observations.SweepObservation`. Every
         case then also needs its counting observation in ``observation.store``.
         A stored observation with matching true-spatial factors is reused and
         only rescored; otherwise the case's physical-detector directions are
@@ -244,11 +272,14 @@ def run_sweep(
         arrays never enter the scalar record or the CAS blob. Ignored with
         ``transport_only``.
 
-    Returns True iff every requested ``(name, E0_keV)`` pair ended up in
-    ``results`` (i.e. the sweep ran to completion, budget or not); False if
-    ``max_seconds`` cut it short. Incomplete component checkpoints retain their
-    completed-config shards for resume. Legacy ``.pkl`` paths receive a final
-    whole-store save on an incomplete return, including partial configs.
+    Returns
+    -------
+    bool
+        True iff every requested ``(name, E0_keV)`` pair ended up in
+        ``results`` (i.e. the sweep ran to completion, budget or not); False if
+        ``max_seconds`` cut it short. Incomplete component checkpoints retain their
+        completed-config shards for resume. Legacy ``.pkl`` paths receive a final
+        whole-store save on an incomplete return, including partial configs.
     """
     refuse_axial_channeling_cases(cases)
     if artifact_store is not None and content_key_fn is None:

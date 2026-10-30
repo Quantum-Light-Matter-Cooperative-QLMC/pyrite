@@ -18,6 +18,7 @@ The entries below use generated docstrings, signatures, and source links. API su
    pyrite.Provenance
    pyrite.CxrSpectra
    pyrite.SpectralDensity
+   pyrite.results.TemporalIntensity
    pyrite.results.QuantifiedSpectrum
    pyrite.results.QuantifiedDirectionalSpectrum
    pyrite.results.QuantifiedApertureSpectrum
@@ -28,6 +29,7 @@ The entries below use generated docstrings, signatures, and source links. API su
    pyrite.results.records
    pyrite.results.filter_results
    pyrite.results.select_results
+   pyrite.results.sweep_values
    pyrite.results.best_azimuth
    pyrite.results.cxr_metrics
    pyrite.results.radiation.radiation_band_metrics

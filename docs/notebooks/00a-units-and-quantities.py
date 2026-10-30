@@ -17,7 +17,7 @@ app = marimo.App(width="medium")
 
 @app.cell
 def _():
-    import marimo as mo
+    import marimo as mo  # noqa: F401
     import matplotlib.pyplot as plt
     import numpy as np
 

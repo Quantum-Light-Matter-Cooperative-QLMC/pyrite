@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from pyrite.runs.run import run_sweep as run_sweep
+
     from .artifacts import (
         ArtifactIntegrityError as ArtifactIntegrityError,
     )

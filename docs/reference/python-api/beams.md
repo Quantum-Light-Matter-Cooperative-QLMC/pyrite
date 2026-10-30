@@ -14,6 +14,7 @@ The entries below use generated docstrings, signatures, and source links. API su
    pyrite.beams.PointSpot
    pyrite.beams.PointBunch
    pyrite.beams.BunchLength
+   pyrite.beams.LongitudinalDistribution
    pyrite.beams.Offsets
    pyrite.beams.GdfSource
    pyrite.campaign.beam_metrics.capture_beam_metrics
