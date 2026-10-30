@@ -76,8 +76,8 @@ audits record which signatures normalize Pint values and which are numeric-only.
 The entries in this section were checked against the concrete definitions,
 not inferred from a module's helper imports. `pyrite.materials` schema/authoring
 objects and the registered atomic/crystal/attenuation functions are
-**advanced-stable**. Their existing numeric representation remains supported;
-quantity interfaces below are **pending**, not approved numeric exceptions.
+**advanced-stable**. Their unit-suffixed numeric representation is the **explicit numeric
+contract** for #755; opt-in quantity interfaces are deferred to #816.
 No new scientific API or stability promotion follows from this inventory.
 
 For these rows, dimensional Python inputs and read-back are numeric; there is
@@ -119,9 +119,9 @@ migration side effect.
 
 | Existing constant (`pyrite.materials.crystal`) | Numeric unit / physical meaning | Evidence / disposition |
 | --- | --- | --- |
-| `HC_EV_ANG`, `HBARC_EV_ANG` | eV·Å; h c and ħ c | `tests/materials/test_emission.py`, `test_crystallography.py`; quantity read-back pending. |
+| `HC_EV_ANG`, `HBARC_EV_ANG` | eV·Å; h c and ħ c | `tests/materials/test_emission.py`, `test_crystallography.py`; numeric contract, quantity read-back deferred to #816. |
 | `M_E_EV` | eV; electron **rest energy**, not mass in kg | Transport/line-kinematics consumers; `tests/materials/test_emission.py`; semantic quantity must state rest energy. |
-| `R_E_ANG` | Å; classical electron radius | Absorption/susceptibility; `tests/materials/test_crystallography.py`; length quantity pending. |
+| `R_E_ANG` | Å; classical electron radius | Absorption/susceptibility; `tests/materials/test_crystallography.py`; numeric contract, length quantity deferred to #816. |
 | `E2_EV_ANG` | eV·Å; Gaussian electrostatic coupling, not SI charge squared | `U_g` / coupling tables; `tests/materials/test_crystallography.py`; retain convention explicitly. |
 | `ALPHA_FS` | Dimensionless fine-structure constant | `E2_EV_ANG` and coupling consumers; justified numeric physical constant, no dimensional conversion needed. |
 
@@ -131,7 +131,8 @@ These registered helpers are **advanced-stable**. They currently expose numeric
 coordinates/results, with no explicit quantity normalization or quantity-aware
 replacement API. Outputs are not serialized Pint objects. Pure deterministic
 helpers have no independent persisted quantity state; their consumers save the
-existing numeric arrays/tables. The pending adapters must specify copies,
+existing numeric arrays/tables. Their numeric signatures are the explicit
+contract for #755; quantity adapters (#816) must specify copies,
 complex values, shapes and unsupported regions at each owner. Electron-unit
 form factors represent scattering amplitudes relative to one electron; Pint's
 `electron` charge unit would give them the wrong physical meaning.
@@ -188,7 +189,7 @@ contracts).
 
 | Canonical surface · status — owner | Inputs: meaning, internal unit, accepted forms | Outputs: read-back, shape/axes, normalization | Evidence; disposition |
 | --- | --- | --- | --- |
-| `gaussian`, `hermite_gauss`, `laguerre_gauss`, `donut`, `bessel_gauss`, `airy`, `aperture_probe`, `from_array`, `translate` · advanced-stable — `montecarlo/channeling/states.py` | waist/scale/centre/spacing/origin/offset Å; `k_radial_inv_ang` Å⁻¹; `kinetic_energy_eV` eV; aperture semi-angles rad with the angle guard; aberration `C*` Å, `phi*` rad. Mode orders `m`, `n`, `ell`, `p`, `dimension` and Airy `truncation` are dimensionless selectors. **Q input** (scalar, array or tuple components) → numeric | Frozen state objects with numeric fields: `ApertureProbe.momentum`/`k_inner`/`k_outer` Å⁻¹, `center` Å, `SampledState.axes` Å, `SampledState.kinetic_energy_eV` eV metadata or `None`, `Translated.offset` Å. No semantic read-back or replacement | `tests/scan/test_quantum_runtime_units.py`, `tests/montecarlo/test_channeling_states.py`; Q input implemented, read-back pending |
+| `gaussian`, `hermite_gauss`, `laguerre_gauss`, `donut`, `bessel_gauss`, `airy`, `aperture_probe`, `from_array`, `translate` · advanced-stable — `montecarlo/channeling/states.py` | waist/scale/centre/spacing/origin/offset Å; `k_radial_inv_ang` Å⁻¹; `kinetic_energy_eV` eV; aperture semi-angles rad with the angle guard; aberration `C*` Å, `phi*` rad. Mode orders `m`, `n`, `ell`, `p`, `dimension` and Airy `truncation` are dimensionless selectors. **Q input** (scalar, array or tuple components) → numeric | Frozen state objects with numeric fields: `ApertureProbe.momentum`/`k_inner`/`k_outer` Å⁻¹, `center` Å, `SampledState.axes` Å, `SampledState.kinetic_energy_eV` eV metadata or `None`, `Translated.offset` Å. No semantic read-back or replacement | `tests/scan/test_quantum_runtime_units.py`, `tests/montecarlo/test_channeling_states.py`; Q input implemented; numeric read-back is the contract, quantity read-back deferred to #816 |
 | `from_abtem` · advanced-stable | Reads abTEM `Waves.sampling` (Å) and `.energy` (eV) as floats by abTEM's own convention; `origin_ang` normalizes through `from_array`. Leading ensemble axes become an equal-weight mixture | `SampledState` or `MixedState` | `tests/montecarlo/test_channeling_states.py`; external convention, numeric exception |
 | `TransverseState.amplitude(kx, ky)`, `.wavefunction(x, y)`, `.centre`, `.k_extent`, `.k_resolution`; `SampledState`, `Superposition`, `Translated`, `MixedState`, `EntryState`; `superpose`, `mixture` · advanced-stable | Numeric-only tensor axes: `kx`, `ky` Å⁻¹; `x`, `y` Å. Superposition coefficients are complex dimensionless; mixture weights are nonnegative dimensionless and renormalized to sum 1 | `amplitude`: complex ψ̃ on the tensor grid `(nkx[, nky])` with `∫|ψ̃|² dᵈk/(2π)ᵈ = 1`, so dimension length^(d/2). `wavefunction`: ψ, length^(−d/2), copy of samples on matching axes. `centre` Å; `k_extent`/`k_resolution` Å⁻¹ per axis. `Superposition.norm` and mixture weights dimensionless | `tests/montecarlo/test_channeling_states.py`; future views must carry `d` and the `dᵈk/(2π)ᵈ` versus `dᵈx` measure, never infer dimension from array rank |
 | `DensityMatrixSolver(profile, kinetic_energy_eV, kernel, margin_eV, n_grid)`, `.entry_lattice`, `.entry_state`, `.entry_from_plane`, `.propagate(...)` · experimental — `density.py` | Numeric-only: eV, eV margin; incidence/divergence rad; `thickness_ang`, `dz_ang`, `spatial_x_ang` Å; `stopping_eV_per_ang` eV/Å; `energy_edges_eV` transverse-energy edges eV; `record_every`, `n_grid` counts. Crystal temperature enters only through the numeric K argument of the planar profile builder | `DensityMatrixResult`: `z_ang` `(n_z,)` Å; `kinetic_energy_eV` `(n_z,)` eV; `band_populations` `(n_z, n_bands)`, `bound_population`, `trace`, cumulative `free/overflow/reprojection_flux` `(n_z,)` and scalar `entry_flux` are dimensionless fractions **per incident electron**; `free_flux_by_energy` is cumulative population per transverse-energy **bin** with out-of-range weight **clipped into the end bins**; `barrier_eV`, `cutoff_eV` eV; `final_density` `(n_cells, N, N)` complex dimensionless; optional `spatial_density_per_ang` `(n_z, n_x)` Å⁻¹, unconditioned, cell integral equals `trace` | `tests/montecarlo/test_channeling_density.py`, `test_channeling_spatial.py`; numeric exception for experimental solver; a binned view must flag clipped end bins |
@@ -263,7 +264,7 @@ Canonical imports: `pyrite.experimental.observations` (experimental) and
 | CLI options — `cli/commands/_beam_shared.py`, `_detector_shared.py`, `_pixel_detector_shared.py`, `_filter_shared.py`, `_profile_filters.py`, `_profile_precision.py`, `profile.py`, `energy_grid.py`, `blaze.py`, `tables.py`, `material_add.py`, `beam.py` | Bare numbers only (Click `float`/`FloatRange`); the unit is fixed by the option name or help: `-mm`, `-deg`, `-ev`, `-um`, `-v`, `-s`, `-m`, `-fs`, `-pc`, `-hz`, `-ang`, `--solid-angle` sr, `--energy` keV (profile/energy-grid) or eV (`tables`), `--t1-max` MeV, `--density` g/cm³, `--emittance` mm·mrad, `--twiss-beta` m, `blaze --spacing` m (converted to Å). No Pint or unit strings on the command line | Values are written to profile TOML in the canonical suffixed key or passed numerically; `docs/repo-design/cli/cli-reference.md` documents help | `tests/cli/`; numeric CLI exception for #755 — unit-string CLI input is follow-up #810 |
 | Profile/catalog TOML — `materials/_catalog_decode.py`, `materials/_beam_detector_parse.py`, `_config_presets.py` | Numbers in the key's unit, or explicit unit strings through `normalize_unit_input` → canonical magnitudes | Numeric profile records and digests | `tests/materials/test_unit_profile_inputs.py`; implemented (catalog/profile input row) |
 | Plots — `pyrite.plots` (public domain, **unregistered** in `api-surface.toml`), `plots/_frames.py`, `_pixel_frames.py`, `_common.py` | Numeric record arrays and `Settings` | Units only in axis/legend label strings (e.g. `[mm]`, `[deg]`, `[sr]`, `[Phs/eV/s/nA]`); constants `C_ANG_PER_FS`, `SI_K_EDGE_EV` are unregistered numeric exports | `tests/plots/`; presentation-only numeric exception; labels follow the owning reducer |
-| Exports — `Result.to_dataframe`, `aperture_dataframe`, `apps/configuration_exports.py`, `pyrite app analysis export` | Numeric tables with unit-suffixed column names; HTML export renders the app | Table schemas unchanged (unit-suffixed names; `aperture_dataframe` keeps its `density_units`/`count_units` columns). `Result.dataframe_units()` and `Result.spectral_flux_units(units=, mode=)` return JSON-ready `{column: {"unit", "basis"}}` with Pint-parsable units and a separate count basis (photons vs photons per incident electron); app CSV/NPZ metadata keeps `energy_unit` | `tests/results/test_cxr_api.py`, `test_export_units.py`, `test_quantity_aperture.py`, `tests/notebooks/test_configuration_app.py`; Python export metadata implemented |
+| Exports — `Result.to_dataframe`, `aperture_dataframe`, `apps/configuration_exports.py`, `pyrite app analysis export` | Numeric tables with unit-suffixed column names; HTML export renders the app | Table schemas unchanged (unit-suffixed names; `aperture_dataframe` keeps its `density_units`/`count_units` columns). `Result.dataframe_units()` and `Result.spectral_flux_units(units=, mode=)` return JSON-ready `{column: {"unit", "basis"}}` with Pint-parsable units and a separate count basis (photons vs photons per incident electron); app CSV/NPZ metadata keeps `energy_unit` and adds the same `units` map for every exported array, axis and `scale` (`sr / s / nA`, basis incident electrons) | `tests/results/test_cxr_api.py`, `test_export_units.py`, `test_quantity_aperture.py`, `tests/notebooks/test_configuration_app.py`; Python and app export metadata implemented |
 | `CalibratedPulseEnergyDetector(energy_eV, efficiency, pulse_gain_v_per_j, calibration_id, noise_rms_v, saturation_v)`; `predict`, `predict_batch(energy_eV, collected_photons_per_eV_per_pulse, repetition_hz)` · provisional, unregistered — `detectors/optical_energy.py` | Numeric-only: knots eV (increasing), `efficiency` dimensionless **energy-absorption fraction** in [0, 1] (not photon QE), gain V/J, noise/saturation V, repetition Hz; photon density photons/(eV pulse) already collected | `OpticalPulseReading` host scalars / `OpticalPulseBatchReading` arrays on the input backend with shape `density.shape[:-1]`: incident/absorbed J per pulse, expected/reported V, noise RMS V, saturation flag, average W (only with repetition), `response_sha256` | `tests/detectors/test_optical_energy.py`, `tests/montecarlo/test_optical_cuda_parity.py`; numeric inputs (provisional, not promoted); readings and calibration expose fresh J/V/W/eV quantities on the value's own backend (batch quantities wrap device copies, no host transfer) |
 | `OpticalResponse`, `gold_rakic_response`, `gold_johnson_christy_response`, `fused_silica_franta_response` · provisional — `materials/optical.py`; `optical_elements`, `optical_interferometer`, `optical_ctr_inference` module APIs | eV segments, dimensionless relative permittivity, `temperature_K` absolute K or `None`; Jones transfers dimensionless; coherency photons/(eV pulse); CTR RMS duration | Numeric records with digests (`to_record`/`from_record`) | `tests/detectors/test_optical_*.py`; numeric; provisional, not promoted |
 
@@ -342,9 +343,11 @@ physical input and output in `api-surface.toml` and the experimental API
 reference has an owner row above or an explicit, justified numeric exception,
 and unregistered numeric exports are named as such. B1–B6 are **resolved**
 (decisions and tests above). Optimization parameter paths now use their
-owning semantic quantity properties for units and replacement. Remaining Plan
-work (semantic read-back/replacement, output views, consumer metadata) is
-migration, not inventory.
+owning semantic quantity properties for units and replacement. The #755
+migration is **complete**: every row is migrated or carries an explicit numeric
+contract. Deferred work is tracked separately: unit-string CLI input (#810) and
+quantity interfaces for material schema values, constants, deterministic
+scientific helpers and channeling-state read-back (#816).
 
 ## Existing output contracts (not all convertible by the same rule)
 
@@ -400,8 +403,9 @@ loading; they must not enter a checkpoint, CAS payload, worker record or hash.
    **implemented** as distinct views. Selected-pixel geometry read-back is
    **implemented** directly on `PixelMetadata`; raw `PixelRayMap` scoring
    buffers remain numeric. Quantum and optical outputs remain separate.
-4. Update CLI, plots, marimo and exports only with declared metadata and
-   explicit backward-compatibility tests; schedule deprecations separately.
+4. Consumers: Python and app exports carry declared `units` metadata with
+   unchanged table schemas; plots keep presentation labels from their owning
+   reducer; CLI unit strings are #810. Deprecations follow release policy.
 
 Any newly discovered ambiguity in units, probability measure or normalization
 is a **blocking review item**, not an invitation to guess a Pint dimension.

@@ -85,7 +85,8 @@ def _(np, tables_ready):
                 repetition_rate=5 * ureg.kHz,
             ),
             Slab(
-                "silicon", thickness=thickness_nm * ureg.nm,
+                "silicon",
+                thickness=thickness_nm * ureg.nm,
                 tilt=5 * ureg.degree,
                 footprint=Footprint(width=5 * ureg.mm, height=5 * ureg.mm),
             ),

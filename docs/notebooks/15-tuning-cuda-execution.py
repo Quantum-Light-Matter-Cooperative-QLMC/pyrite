@@ -79,7 +79,7 @@ def _(cp, np, subprocess):
             "hopg",
             thickness=5 * ureg.um,
             tilt=45 * ureg.degree,
-            footprint=Footprint(width=5 * ureg.mm, height=5 * ureg.mm)
+            footprint=Footprint(width=5 * ureg.mm, height=5 * ureg.mm),
         ),
         Detector(observation_angle=90 * ureg.degree),
         numerics=Numerics(
@@ -106,8 +106,7 @@ def _(cp, np, subprocess):
         _result = subprocess.run(
             [
                 "nvidia-smi",
-                "--query-gpu=name,memory.total,memory.used,"
-                "utilization.gpu,utilization.memory",
+                "--query-gpu=name,memory.total,memory.used,utilization.gpu,utilization.memory",
                 "--format=csv,noheader",
             ],
             capture_output=True,
@@ -121,8 +120,9 @@ def _(cp, np, subprocess):
 
 @app.cell
 def _(check_gpu_util, mo, scene, tables_ready):
-    from pyrite.optimization import KernelLattice, tune_kernels
     import inspect
+
+    from pyrite.optimization import KernelLattice, tune_kernels
 
     assert tables_ready
     phase_objectives_active = "objective" in inspect.signature(tune_kernels).parameters
@@ -138,8 +138,11 @@ def _(check_gpu_util, mo, scene, tables_ready):
                 return tune_kernels(stage_scene, lattice, **options)
 
         with mo.status.progress_bar(
-            total=trials + 1, title=title, show_eta=True,
+            total=trials + 1,
+            title=title,
+            show_eta=True,
         ) as _progress:
+
             def advance(done, total, state):
                 _progress.update(
                     increment=1,
@@ -155,9 +158,7 @@ def _(check_gpu_util, mo, scene, tables_ready):
         electron_batch=(None, 2_048, 4_096, 8_192, 16_384),
         schedule=("full-history", "auto"),
     )
-    transport_tuning = measure_stage(
-        scene, transport_lattice, phase="transport", trials=5, seed=11
-    )
+    transport_tuning = measure_stage(scene, transport_lattice, phase="transport", trials=5, seed=11)
     return (
         KernelLattice,
         measure_stage,
@@ -171,17 +172,9 @@ def _(KernelLattice, measure_stage, scene, transport_tuning):
     from dataclasses import replace
 
     # Carry the selected transport settings into the spectral study.
-    _scene = replace(
-        scene,
-        numerics=scene.numerics.with_kernel_tuning(transport_tuning.best)
-
-    )
-    spectral_lattice = KernelLattice(
-        cxr_chunk=(None, 8_192, 16_284, 32_768, 65_536)
-    )
-    spectral_tuning = measure_stage(
-        _scene, spectral_lattice, phase="spectrum", trials=5, seed=12
-    )
+    _scene = replace(scene, numerics=scene.numerics.with_kernel_tuning(transport_tuning.best))
+    spectral_lattice = KernelLattice(cxr_chunk=(None, 8_192, 16_284, 32_768, 65_536))
+    spectral_tuning = measure_stage(_scene, spectral_lattice, phase="spectrum", trials=5, seed=12)
 
     tuning = spectral_tuning  # Includes the winning transport settings.
     return spectral_tuning, tuning
@@ -200,6 +193,7 @@ def _(mo, phase_objectives_active, spectral_tuning, transport_tuning):
         return ", ".join(f"{k} {'default' if v is None else v}" for k, v in values.items())
 
     metric_label = "synchronized phase" if phase_objectives_active else "whole-simulation"
+
     def table(label, study):
         _rows = [
             f"### {label}: {metric_label} seconds",
@@ -213,19 +207,27 @@ def _(mo, phase_objectives_active, spectral_tuning, transport_tuning):
             _time = "—" if _trial.median_s is None else f"{_trial.median_s:.3f}"
             _outcome = "accepted" if _trial.state == "complete" else f"rejected: {_trial.reason}"
             _rows.append(f"| {_trial.number} | {describe(_trial)} | {_time} | {_outcome} |")
-        _rows.append(f"**Chosen:** {describe(study.chosen)}; "
-                     f"**{study.speedup:.2f}×** this phase's baseline median.")
+        _rows.append(
+            f"**Chosen:** {describe(study.chosen)}; "
+            f"**{study.speedup:.2f}×** this phase's baseline median."
+        )
         return "\n".join(_rows)
 
     _env = ", ".join(f"{k} `{v}`" for k, v in spectral_tuning.environment.items())
-    mo.md(f"Measured on {_env}.\n\n" + table("Transport", transport_tuning)
-          + "\n\n" + table("Spectrum", spectral_tuning))
+    mo.md(
+        f"Measured on {_env}.\n\n"
+        + table("Transport", transport_tuning)
+        + "\n\n"
+        + table("Spectrum", spectral_tuning)
+    )
     return
 
 
 @app.cell
 def _(np, phase_objectives_active, plt, spectral_tuning):
-    _done = sorted((t for t in spectral_tuning.trials if t.state == "complete"), key=lambda t: t.median_s)
+    _done = sorted(
+        (t for t in spectral_tuning.trials if t.state == "complete"), key=lambda t: t.median_s
+    )
     _shown = [spectral_tuning.baseline, *_done[:8]]
     fig_timing, _ax = plt.subplots(figsize=(7, 3.8), layout="constrained")
     for _i, _trial in enumerate(_shown):
@@ -248,7 +250,9 @@ def _(mo, np, plt, pyrite, scene, tuning):
     with mo.status.progress_bar(total=2, title="Checking spectra after tuning") as _progress:
         baseline_result = pyrite.simulate(scene)
         _progress.update(subtitle="Original configuration")
-        tuned_result = pyrite.simulate(scene, numerics=scene.numerics.with_kernel_tuning(tuning.best))
+        tuned_result = pyrite.simulate(
+            scene, numerics=scene.numerics.with_kernel_tuning(tuning.best)
+        )
         _progress.update(subtitle="Transport + spectrum winners")
     _energy = baseline_result.cxr.incoherent.photon_energy_eV
     _base = baseline_result.cxr.incoherent.density
@@ -273,17 +277,16 @@ def _(mo, np, plt, pyrite, scene, tuning):
 
 @app.cell(hide_code=True)
 def _(mo, phase_objectives_active):
-    if phase_objectives_active:
-        mo.md(
-            "Transport and spectrum studies report their **synchronized phase time**. "
-            "This is not total wall time; increase repeats for production tuning."
-        )
-    else:
-        mo.md(
-            "PyRITE v0.24.0 fallback: transport and spectrum settings are tuned "
-            "**separately**, but both use **whole-simulation wall time**. "
-            "Upgrade PyRITE for per-phase timings and per-trial progress."
-        )
+    _phase_note = (
+        "Transport and spectrum studies report their **synchronized phase time**. "
+        "This is not total wall time; increase repeats for production tuning."
+    )
+    _fallback_note = (
+        "PyRITE v0.24.0 fallback: transport and spectrum settings are tuned "
+        "**separately**, but both use **whole-simulation wall time**. "
+        "Upgrade PyRITE for per-phase timings and per-trial progress."
+    )
+    mo.md(_phase_note if phase_objectives_active else _fallback_note)
     return
 
 

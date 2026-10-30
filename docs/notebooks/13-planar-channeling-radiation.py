@@ -25,7 +25,6 @@ def _():
     import numpy as np
 
     from pyrite.experimental.quantum import propagate_planar_source, score_planar_source
-    from pyrite.units import ureg
     from pyrite.quantum import (
         QuantumDynamics,
         QuantumNumerics,
@@ -33,6 +32,7 @@ def _():
         QuantumSetup,
         TransverseStateSpec,
     )
+    from pyrite.units import ureg
 
     return (
         QuantumDynamics,

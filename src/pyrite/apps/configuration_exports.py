@@ -11,6 +11,11 @@ import numpy as np
 from pyrite._spectral_components import LINE_COMPONENT_KEYS
 from pyrite.campaign.configuration_editor import plain
 
+#: Every stored emission component is a source density per incident electron.
+_DENSITY_UNIT = {"unit": "1 / eV / sr", "basis": "photons_per_incident_electron"}
+#: ``record["scale"]`` (acceptance sr x electrons/s per nA) turns a density into flux per nA.
+_SCALE_UNIT = {"unit": "sr / s / nA", "basis": "incident_electrons"}
+
 
 def available_components(record: Mapping[str, Any]) -> dict[str, str]:
     """Stored components only; do not manufacture independent PXR/CBS channels."""
@@ -28,6 +33,8 @@ def export_record(
 
     No detector response or bin conversion is applied. NPZ embeds each original
     axis and optional JSON provenance; CSV uses long rows with the source key.
+    Metadata ``units`` follows :meth:`pyrite.Result.dataframe_units`: Pint-parsable
+    ``unit`` plus a separate count ``basis`` for every exported array and ``scale``.
     """
     axes = available_components(record)
     if (
@@ -45,10 +52,14 @@ def export_record(
             raise ValueError(f"{key}: export requires matching one-dimensional node arrays")
         arrays[axis] = energy
         arrays[key] = density
+    units = {key: dict(_DENSITY_UNIT) for key in selected}
+    units.update({axes[key]: {"unit": "eV", "basis": None} for key in selected})
+    units["scale"] = dict(_SCALE_UNIT)
     info = {
         "components": list(selected),
         "representation": "stored source arrays; no detector response applied",
         "energy_unit": "eV",
+        "units": units,
         "case": plain(record.get("case", {})),
         "scale": plain(record.get("scale")),
     }

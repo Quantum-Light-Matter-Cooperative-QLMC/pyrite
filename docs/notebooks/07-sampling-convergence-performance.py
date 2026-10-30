@@ -64,7 +64,9 @@ def _(np, tables_ready):
 
     beam = Beam(kinetic_energy=30 * ureg.keV, transverse=PointSpot(), longitudinal=PointBunch())
     target = Slab(
-        "hopg", thickness=100 * ureg.nm, tilt=30 * ureg.degree,
+        "hopg",
+        thickness=100 * ureg.nm,
+        tilt=30 * ureg.degree,
         footprint=Footprint(width=5 * ureg.mm, height=5 * ureg.mm),
     )
     detector = Detector(observation_angle=135 * ureg.degree)
@@ -147,7 +149,9 @@ def _(AdaptiveSampling, band_eV, band_yield, mo, run, tables_ready):
         observables=("cxr",),
         band_eV=band_eV,
     )
-    with mo.status.spinner(title="Adaptive sampling", subtitle="Stopping rule checks after each block"):
+    with mo.status.spinner(
+        title="Adaptive sampling", subtitle="Stopping rule checks after each block"
+    ):
         adaptive_result, adaptive_seconds = run(policy, seed=99)
     _stop = adaptive_result.provenance["adaptive_sampling"]
     adaptive = {

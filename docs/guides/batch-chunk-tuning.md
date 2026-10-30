@@ -51,15 +51,21 @@ from dataclasses import replace
 from pyrite.optimization import KernelLattice, tune_kernels
 
 transport = tune_kernels(
-    scene, KernelLattice(electron_batch=(2048, 8192), schedule=("full-history", "auto")),
-    objective="transport", trials=4, warmups=1, repeats=1,
+    scene,
+    KernelLattice(electron_batch=(2048, 8192), schedule=("full-history", "auto")),
+    objective="transport",
+    trials=4,
+    warmups=1,
+    repeats=1,
 )
-spectral_scene = replace(
-    scene, numerics=scene.numerics.with_kernel_tuning(transport.best)
-)
+spectral_scene = replace(scene, numerics=scene.numerics.with_kernel_tuning(transport.best))
 spectral = tune_kernels(
-    spectral_scene, KernelLattice(cxr_chunk=(None, 8192, 32768)),
-    objective="spectrum", trials=3, warmups=1, repeats=1,
+    spectral_scene,
+    KernelLattice(cxr_chunk=(None, 8192, 32768)),
+    objective="spectrum",
+    trials=3,
+    warmups=1,
+    repeats=1,
 )
 # The second winner retains the first stage's transport settings.
 final = spectral.best

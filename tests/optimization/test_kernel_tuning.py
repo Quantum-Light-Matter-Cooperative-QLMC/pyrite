@@ -129,10 +129,11 @@ def test_phase_objectives_and_progress(fake):
     pytest.importorskip("optuna")
     observed = []
     result = tune_kernels(
-        _scene(), KernelLattice(electron_batch=(2048,)), trials=1,
-        objective="transport", on_progress=lambda done, total, state: observed.append(
-            (done, total, state)
-        ),
+        _scene(),
+        KernelLattice(electron_batch=(2048,)),
+        trials=1,
+        objective="transport",
+        on_progress=lambda done, total, state: observed.append((done, total, state)),
     )
     assert result.trials and observed[0] == (1, 2, "baseline")
     assert observed[-1][:2] == (2, 2)
