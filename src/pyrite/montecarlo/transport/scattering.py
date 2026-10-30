@@ -357,9 +357,9 @@ def elsepa_angular_pdf(mu, dcs):
 
 
 #: Equal-probability guide cells per ELSEPA angular row. A power of two makes
-#: ``xi * cells`` exact, so a cell's bounds ``j / cells`` are exact too; 1024
-#: (about 2 ``N_mu`` on the production 606-node grid) was the measured choice
-#: of issue #826.
+#: ``xi * cells`` exact, so a cell's bounds ``j / cells`` are exact too. 1024
+#: (about 2 ``N_mu`` on the production 606-node grid) is the knee of the #826
+#: device microbenchmark; see docs/repo-design/compute/gpu-transport-rawkernel.md.
 ELSEPA_GUIDE_CELLS = 1024
 
 
