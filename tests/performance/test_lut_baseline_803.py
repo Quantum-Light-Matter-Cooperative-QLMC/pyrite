@@ -64,3 +64,55 @@ def test_head_from_git_dir_resolves_loose_and_packed_refs(tmp_path):
     assert harness["head_from_git_dir"](tmp_path) == "a" * 40
     (git / "refs/heads/topic").write_text("b" * 40 + "\n")
     assert harness["head_from_git_dir"](tmp_path) == "b" * 40
+
+
+def _record(tmp_path, stem, *, wall, digest="d", scores=None, **controls):
+    import numpy as np
+
+    base = dict(
+        core="cuda",
+        elastic="elsepa",
+        radiative="bremslib-soft-hard",
+        inelastic="continuous",
+        lut_requested="off",
+        moments_requested="table",
+        schedule_requested="full-history",
+    )
+    record = {
+        "schema": "pyrite.lut-baseline-803.sample.v1",
+        "status": "ok",
+        "scene": {"id": "s"},
+        "seed": 1,
+        "controls": base | controls,
+        "resolved": {},
+        "trajectory_sha256": digest,
+        "segments": 1,
+        "timings_s": {
+            "warm_median": wall,
+            "warm_per_history": wall,
+            "cold_request": wall,
+            "warm_requests": [wall],
+        },
+        "observed_warm": [[{"site": "radiative_core_args", "wall_s": wall / 4}]],
+        "memory": {"peak_rss_kib": 1, "device_pool_reserved_bytes_after_warm": None},
+        "source": {"sha": "x"},
+    }
+    (tmp_path / f"{stem}.json").write_text(json.dumps(record))
+    np.savez(tmp_path / f"{stem}.npz", **(scores or {"t": np.ones(4)}))
+
+
+def test_analysis_pairs_one_control_and_screens_against_tolerance(tmp_path):
+    import numpy as np
+
+    analyze = runpy.run_path(str(ROOT / "checks/equal_precision/analyze_baseline_803.py"))
+    rng = np.random.default_rng(0)
+    base = rng.normal(100.0, 1.0, 400)
+    _record(tmp_path, "exact", wall=2.0, moments_requested="exact", scores={"e": base})
+    _record(tmp_path, "table", wall=1.0, scores={"e": base + 1e-6})
+    _record(tmp_path, "cont", wall=0.5, digest="other", schedule_requested="continuation")
+    records, _ = analyze["load"](tmp_path)
+    by_name = {c["comparison"]: c for c in analyze["compare"](records, 1e-3)}
+    assert by_name["moments"]["speedup_geomean"] == pytest.approx(2.0)
+    assert by_name["moments"]["screen"] == {"equivalent": ["e"]}
+    assert by_name["continuation"]["bitwise_equal"] is False
+    assert analyze["preparation"](records)[0]["warm_moment_prep_fraction"] == pytest.approx(0.25)

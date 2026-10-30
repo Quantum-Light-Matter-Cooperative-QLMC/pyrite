@@ -489,3 +489,11 @@ the plan. On the lab box, submit `baseline-803-cpu.sbatch` (one thread, array
 over scenes) and `baseline-803-gpu.sbatch` (scenes serialized on one GPU).
 Re-submit with the same `LUT803_OUT` to resume. Local runs are plumbing smokes
 only.
+
+`analyze_baseline_803.py DIR... --output PATH` pairs records that differ in one
+control at the same scene, core and seed. It reports per-seed warm speedups,
+cold costs, the warm share of moment and LUT preparation, and memory. Schedule
+pairs need equal trajectory digests. LUT and moment pairs get a paired
+per-primary screen: the 95% interval of the difference is compared with
+`--rel-tol` (default 1e-3) and classed as equivalent, different or unresolved.
+The screen is not a qualification gate.
