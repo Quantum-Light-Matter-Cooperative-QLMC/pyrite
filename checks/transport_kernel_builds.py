@@ -22,7 +22,8 @@ arrays the kernel never writes. Builds are named on the command line, e.g.
     Warm transport time of the #821 benchmark physics on its Si/W anchors.
     For every (scene, schedule, seed) all arms run back to back in rotating
     order after an untimed warmup of each, and every returned array is
-    hashed; every arm must match ``jit`` bitwise.
+    hashed; every arm must match ``jit`` bitwise. A full-size untimed call
+    precedes the first seed so that no arm pays for memory-pool growth.
 
 Needs a CUDA device and the catalog (ELSEPA, SBETHE and BremsLib tables); run
 it through ``pyrite remote`` in a bounded GPU allocation. No validation claim.
@@ -254,6 +255,9 @@ def timing(args):
             for name in names:  # warm: transpile, compile, tables
                 arms.select(name)
                 run(args.seeds[0] + 1_000_000, min(histories, 2000))
+            # One full-size call grows the memory pool to the measured size;
+            # otherwise the first arm of the first seed pays for it.
+            run(args.seeds[0] + 1_000_000, histories)
             for index, seed in enumerate(args.seeds):
                 shift = index % len(names)
                 order = names[shift:] + names[:shift]
