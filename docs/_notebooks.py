@@ -210,10 +210,17 @@ def checks_freshness(source):
     return fresh
 
 
+def has_cuda(env):
+    """True when a CUDA device is visible to cupy."""
+    probe = "import cupy; assert cupy.cuda.runtime.getDeviceCount() > 0"
+    return not subprocess.run(
+        [sys.executable, "-c", probe], env=env, capture_output=True
+    ).returncode
+
+
 def require_cuda(env):
     """Fail before any export when a CUDA tutorial has no device to run on."""
-    probe = "import cupy; assert cupy.cuda.runtime.getDeviceCount() > 0"
-    if subprocess.run([sys.executable, "-c", probe], env=env, capture_output=True).returncode:
+    if not has_cuda(env):
         raise RuntimeError(
             "CUDA tutorial capture needs a CUDA device and the nvidia extra; run it on the "
             "lab GPU with checks/tutorial_capture_cuda.sbatch"
@@ -604,6 +611,16 @@ if __name__ == "__main__":
     elif args.check:
         check_notebooks()
     elif args.regenerate_all:
-        regenerate([source.stem for source in sorted(NOTEBOOKS.glob("*.py"))])
+        names = [source.stem for source in sorted(NOTEBOOKS.glob("*.py"))]
+        cuda_names = [name for name in names if capture_backend(NOTEBOOKS / f"{name}.py") == "cuda"]
+        if cuda_names and not has_cuda(dict(os.environ, PYRITE_MC_BACKEND="cuda")):
+            print(
+                "warning: no CUDA device; skipping CUDA tutorial(s) "
+                + ", ".join(cuda_names)
+                + " (keeping their existing captures)",
+                file=sys.stderr,
+            )
+            names = [name for name in names if name not in cuda_names]
+        regenerate(names)
     else:
         regenerate([args.regenerate])

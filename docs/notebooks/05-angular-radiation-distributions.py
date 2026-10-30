@@ -51,42 +51,44 @@ def _():
     from pyrite.config import CxrReflections, FixedSampling, Numerics
     from pyrite.geometry import Footprint, Slab
     from pyrite.radiation import directional_source
+    from pyrite.units import ureg
 
     beam = Beam(
-        energy_keV=30.0,
+        kinetic_energy=30 * ureg.keV,
         transverse=PointSpot(),
         longitudinal=PointBunch(),
-        bunch_charge_pc=1.0,
-        rep_rate_hz=50_000.0,
+        bunch_charge=1 * ureg.pC,
+        repetition_rate=50 * ureg.kHz,
     )
     target = Slab(
         "silicon",
-        thickness_ang=1_000.0,
-        tilt_deg=30.0,
-        footprint=Footprint(5.0, 5.0),
+        thickness=100 * ureg.nm,
+        tilt=30 * ureg.degree,
+        footprint=Footprint(width=5 * ureg.mm, height=5 * ureg.mm),
     )
     numerics = Numerics(
         sampling=FixedSampling(cxr_electrons=512, brem_electrons=512),
         cxr_reflections=CxrReflections(n_families=1),
     )
-    return beam, directional_source, numerics, target
+    return beam, directional_source, numerics, target, ureg
 
 
 @app.cell
-def _(beam, directional_source, np, numerics, tables_ready, target):
+def _(beam, directional_source, np, numerics, tables_ready, target, ureg):
     assert tables_ready  # Wait for reference-table installation before transport.
-    angles_deg = np.linspace(-180.0, 180.0, 48, endpoint=False)
-    energies_eV = np.linspace(100.0, 2_000.0, 257)
+    angles = np.linspace(-180.0, 180.0, 48, endpoint=False) * ureg.degree
+    energies = np.linspace(100.0, 2_000.0, 257) * ureg.eV
     source = directional_source(
         beam,
         target,
-        energy_eV=energies_eV,
-        angle_deg=angles_deg,
+        # The experimental directional helper still takes numeric eV/degree grids.
+        energy_eV=energies.to("eV").magnitude,
+        angle_deg=angles.to("degree").magnitude,
         numerics=numerics,
         direction_batch=12,
         seed=1,
     )
-    assert source.density.shape == (angles_deg.size, energies_eV.size)
+    assert source.density.shape == (angles.magnitude.size, energies.magnitude.size)
     return (source,)
 
 

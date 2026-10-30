@@ -32,7 +32,8 @@ def _():
     import pyrite
 
     optuna.logging.set_verbosity(optuna.logging.WARNING)
-    _ = pyrite.fetch_tables()
+    with mo.status.spinner(title="Preparing PyRITE reference tables"):
+        _ = pyrite.fetch_tables()
     tables_ready = True
     checkpoint_directory = TemporaryDirectory(prefix="pyrite-optimization-tutorial-")
     return (
@@ -86,24 +87,29 @@ def _(np):
         PyriteEvaluator,
     )
     from pyrite.results import records
+    from pyrite.units import ureg
 
     search_numerics = Numerics(
         sampling=FixedSampling(cxr_electrons=16, brem_electrons=16),
         transport_core="per-electron",
-        energy_bins=EnergyBins(cxr=np.linspace(750, 1_000, 126), brem=np.array([750.0, 1_000.0])),
+        energy_bins=(
+            EnergyBins()
+            .with_cxr_energies(np.linspace(750, 1_000, 126) * ureg.eV)
+            .with_brem_energies(np.array([750.0, 1_000.0]) * ureg.eV)
+        ),
         cxr_reflections=CxrReflections(n_families=1),
     )
     base = Scene(
-        Beam(energy_keV=30, transverse=PointSpot(), longitudinal=PointBunch()),
+        Beam(kinetic_energy=30 * ureg.keV, transverse=PointSpot(), longitudinal=PointBunch()),
         Slab(
             "hopg",
-            thickness_ang=500,
-            tilt_deg=45,
-            tilt_azim_deg=180,
-            footprint=Footprint(5, 5),
+            thickness=50 * ureg.nm,
+            tilt=45 * ureg.degree,
+            tilt_azimuth=180 * ureg.degree,
+            footprint=Footprint(width=5 * ureg.mm, height=5 * ureg.mm),
             mosaic=False,
         ),
-        Detector(observation_angle_deg=90),
+        Detector(observation_angle=90 * ureg.degree),
         physics=Physics(
             brem_source=None,
             inelastic_model="continuous",
@@ -112,13 +118,13 @@ def _(np):
         ),
         numerics=search_numerics,
     )
-    score = FixedWindowYield(820, 900)
+    score = FixedWindowYield(820 * ureg.eV, 900 * ureg.eV)
     definition = OptimizationStudy(
         base,
         ParameterSpace(
             {
-                "target.tilt_deg": Integer(35, 55, step=1),
-                "target.thickness_ang": Integer(100, 750, step=50),
+                "target.tilt": Integer(35 * ureg.degree, 55 * ureg.degree, step=1),
+                "target.thickness": Integer(100 * ureg.angstrom, 750 * ureg.angstrom, step=50),
             }
         ),
         (Objective(score.name, "maximize", score.units),),
@@ -135,6 +141,7 @@ def _(np):
         records,
         score,
         search_numerics,
+        ureg,
     )
 
 
@@ -174,8 +181,12 @@ def _(
             constraints=definition.constraints,
             seed=21,
         )
-    with mo.capture_stdout():
-        search_result = definition.run(evaluator, optimizer, max_trials=30)
+    with mo.status.spinner(
+        title="Searching X-ray source designs",
+        subtitle="Up to 30 evaluations (internal progress not available)",
+    ):
+        with mo.capture_stdout():
+            search_result = definition.run(evaluator, optimizer, max_trials=30)
     assert len(search_result.trials) == 30
     assert all(_trial.state.value != "failed" for _trial in search_result.trials)
     finalist = search_result.best_trial
@@ -220,13 +231,18 @@ def _(
     run_options,
     search_numerics,
     tables_ready,
+    ureg,
 ):
     assert tables_ready
     validation_numerics = Numerics(
         transport_core="per-electron",
         cxr_reflections=search_numerics.cxr_reflections,
         sampling=FixedSampling(cxr_electrons=128, brem_electrons=128),
-        energy_bins=EnergyBins(cxr=np.linspace(750, 1_000, 251), brem=np.array([750.0, 1_000.0])),
+        energy_bins=(
+            EnergyBins()
+            .with_cxr_energies(np.linspace(750, 1_000, 251) * ureg.eV)
+            .with_brem_energies(np.array([750.0, 1_000.0]) * ureg.eV)
+        ),
     )
     validation_scene = replace(
         definition.scene(finalist.parameters),
@@ -241,13 +257,15 @@ def _(
             "checkpoint_path": run_options["checkpoint_path"].replace("search.h5", "validation.h5"),
         },
     )
-    with mo.capture_stdout():
-        independent_yields = np.array(
-            [
-                validation_evaluator(validation_scene, _replicate)[definition.objectives[0].name]
-                for _replicate in range(3)
-            ]
-        )
+    _independent = []
+    with mo.status.progress_bar(total=3, title="Validating the winning design") as _progress:
+        with mo.capture_stdout():
+            for _replicate in range(3):
+                _independent.append(
+                    validation_evaluator(validation_scene, _replicate)[definition.objectives[0].name]
+                )
+                _progress.update(subtitle=f"Independent seed {_replicate + 1}/3")
+    independent_yields = np.array(_independent)
     assert np.isfinite(independent_yields).all() and np.all(independent_yields >= 0)
     return (independent_yields,)
 
@@ -269,8 +287,8 @@ def _(finalist, independent_yields, np, plt, score):
         xticklabels=("Search (16 histories)", "Independent (3 × 128 histories)"),
         ylabel="Yield (photons / incident electron / sr)",
         xlim=(-0.5, 1.5),
-        title=f"Finalist: {finalist.parameters['target.tilt_deg']:g}° tilt, "
-        f"{finalist.parameters['target.thickness_ang'] / 10:g} nm graphite",
+        title=f"Finalist: {finalist.parameters['target.tilt']:g}° tilt, "
+        f"{finalist.parameters['target.thickness'] / 10:g} nm graphite",
     )
     _ax.legend()
     fig_validation  # noqa: B018

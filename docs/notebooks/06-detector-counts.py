@@ -55,20 +55,20 @@ def _():
         kinetic_energy=30 * ureg.keV,
         transverse=PointSpot(),
         longitudinal=PointBunch(),
-        bunch_charge_pc=0.01 * ureg.pC,
-        rep_rate_hz=1 * ureg.MHz,
+        bunch_charge=0.01 * ureg.pC,
+        repetition_rate=1 * ureg.MHz,
     )
     panel = PlanarDetector(
-        PlanarPose.from_observation(distance_mm=100 * ureg.mm, polar_deg=135 * ureg.degree),
-        pixels=PixelGrid(shape=(16, 16), pitch_mm=(1 * ureg.mm, 1 * ureg.mm)),
+        PlanarPose.from_observation(distance=100 * ureg.mm, polar=135 * ureg.degree),
+        pixels=PixelGrid(shape=(16, 16), pitch=ureg.Quantity([1, 1], "mm")),
     )
     scene = Scene(
         beam,
         Slab(
             "hopg",
-            100 * ureg.nm,
-            tilt_deg=30 * ureg.degree,
-            footprint=Footprint(5 * ureg.mm, 5 * ureg.mm),
+            thickness=100 * ureg.nm,
+            tilt=30 * ureg.degree,
+            footprint=Footprint(width=5 * ureg.mm, height=5 * ureg.mm),
         ),
         panel,
     )
@@ -96,8 +96,8 @@ def _(ureg):
     from pyrite.observations import Acquisition, Observation
 
     acquisition = Acquisition(
-        exposure_s=1 * ureg.s,
-        measured_edges_eV=(0.5 * ureg.keV, 4 * ureg.keV),
+        exposure=1 * ureg.s,
+        measured_edges=ureg.Quantity([0.5, 4.0], "keV"),
         mode="poisson",
         seed=23,
     )
@@ -170,7 +170,7 @@ def _(mo):
     realization. The shared color scale exposes counting noise, but does not
     include Monte Carlo uncertainty or calibration effects.
 
-    Try changing only `acquisition.seed`, then doubling `exposure_s`.
+    Try changing only `acquisition.seed`, then doubling `exposure`.
     Counts vary with the seed; expectations scale with exposure.
     See the [detector how-to](https://pyrite.readthedocs.io/en/latest/guides/detector-observations.html)
     and [response physics](https://pyrite.readthedocs.io/en/latest/physics/detectors/detector-response.html).

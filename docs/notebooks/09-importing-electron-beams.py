@@ -102,23 +102,29 @@ def _(beam_path, mean_energy_keV, tables_ready):
     from pyrite.config import CxrReflections, FixedSampling, Numerics, Physics
     from pyrite.detectors import Detector
     from pyrite.geometry import Footprint, Slab
+    from pyrite.units import ureg
 
     # Select the 1 ns snapshot and project it relative to lab z = 0.1 m.
     imported_beam = Beam.from_gdf(
         str(beam_path),
-        time_s=1e-9,
-        z_origin_m=0.1,
-        energy_keV=30.0,  # scene placeholder; records supply each electron's energy
+        time_s=1 * ureg.ns,
+        z_origin_m=10 * ureg.cm,
+        energy_keV=30 * ureg.keV,  # GDF factory retains the legacy keyword
         normalization="gdf_charge",
-        rep_rate_hz=1_000_000.0,
+        rep_rate_hz=1 * ureg.MHz,
     )
     # Same mean energy, but no spread, size, divergence or correlation.
     pencil_beam = Beam(
-        energy_keV=mean_energy_keV, transverse=PointSpot(), longitudinal=PointBunch()
+        kinetic_energy=mean_energy_keV * ureg.keV,
+        transverse=PointSpot(),
+        longitudinal=PointBunch(),
     )
 
-    target = Slab("hopg", thickness_ang=1_000.0, tilt_deg=30.0, footprint=Footprint(1, 1))
-    detector = Detector(observation_angle_deg=135.0)
+    target = Slab(
+        "hopg", thickness=100 * ureg.nm, tilt=30 * ureg.degree,
+        footprint=Footprint(width=1 * ureg.mm, height=1 * ureg.mm),
+    )
+    detector = Detector(observation_angle=135 * ureg.degree)
     numerics = Numerics(
         sampling=FixedSampling(cxr_electrons=2_048, brem_electrons=2_048),
         cxr_reflections=CxrReflections(n_families=2),

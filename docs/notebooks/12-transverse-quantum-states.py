@@ -25,6 +25,7 @@ def _():
     import numpy as np
 
     from pyrite.quantum import gaussian, hermite_gauss, laguerre_gauss, mixture, superpose
+    from pyrite.units import ureg
 
     return (
         gaussian,
@@ -35,6 +36,7 @@ def _():
         np,
         plt,
         superpose,
+        ureg,
     )
 
 
@@ -51,13 +53,15 @@ def _(mo):
 
 
 @app.cell
-def _(gaussian, hermite_gauss, laguerre_gauss, np):
+def _(gaussian, hermite_gauss, laguerre_gauss, np, ureg):
     coordinates_ang = np.linspace(-5.0, 5.0, 101)
-    ground = gaussian(waist_ang=1.5, dimension=2)
-    hermite_32 = hermite_gauss(3, 2, waist_ang=1.5)
-    positive = laguerre_gauss(ell=1, waist_ang=1.5)
-    negative = laguerre_gauss(ell=-1, waist_ang=1.5)
-    positive_lg_32 = laguerre_gauss(ell=3, p=2, waist_ang=1.5)
+    # Runtime state factories use the historical `waist_ang` keyword but accept lengths.
+    waist = 1.5 * ureg.angstrom
+    ground = gaussian(waist_ang=waist, dimension=2)
+    hermite_32 = hermite_gauss(3, 2, waist_ang=waist)
+    positive = laguerre_gauss(ell=1, waist_ang=waist)
+    negative = laguerre_gauss(ell=-1, waist_ang=waist)
+    positive_lg_32 = laguerre_gauss(ell=3, p=2, waist_ang=waist)
     return (
         coordinates_ang,
         ground,

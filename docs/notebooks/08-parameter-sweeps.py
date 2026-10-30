@@ -27,7 +27,8 @@ def _():
 
     import pyrite
 
-    _ = pyrite.fetch_tables()  # Installed pins are reused without downloading again.
+    with mo.status.spinner(title="Preparing PyRITE reference tables"):
+        _ = pyrite.fetch_tables()  # Installed pins are reused without downloading again.
 
     tables_ready = True
     return mo, np, plt, pyrite, tables_ready
@@ -51,11 +52,12 @@ def _(np):
     from pyrite.config import CxrReflections, FixedSampling, Numerics, Physics
     from pyrite.detectors import Detector
     from pyrite.geometry import Footprint, Slab
+    from pyrite.units import ureg
 
     energies_keV = np.array([20.0, 25.0, 30.0, 35.0, 40.0])
     thicknesses_nm = np.array([25.0, 50.0, 75.0, 100.0, 125.0])
     band_eV = (600.0, 2_000.0)
-    detector = Detector(observation_angle_deg=135.0)
+    detector = Detector(observation_angle=135 * ureg.degree)
     physics = Physics(brem_source="none")
     numerics = Numerics(
         sampling=FixedSampling(cxr_electrons=2_048, brem_electrons=2_048),
@@ -74,6 +76,7 @@ def _(np):
         physics,
         simulate,
         thicknesses_nm,
+        ureg,
     )
 
 
@@ -87,50 +90,60 @@ def _(
     band_eV,
     detector,
     energies_keV,
+    mo,
     np,
     numerics,
     physics,
     simulate,
     tables_ready,
     thicknesses_nm,
+    ureg,
 ):
     assert tables_ready
     # Rows are thicknesses; columns are beam energies.
     band_yield = np.zeros((len(thicknesses_nm), len(energies_keV)))
     runs = []
-    for _row, _thickness_nm in enumerate(thicknesses_nm):
-        for _col, _energy_keV in enumerate(energies_keV):
-            _result = simulate(
-                Beam(
-                    energy_keV=float(_energy_keV), transverse=PointSpot(), longitudinal=PointBunch()
-                ),
-                Slab(
-                    "hopg",
-                    thickness_ang=float(_thickness_nm * 10),
-                    tilt_deg=30.0,
-                    footprint=Footprint(5, 5),
-                ),
-                detector,
-                physics=physics,
-                numerics=numerics,
-            )
-            _spectrum = _result.cxr.incoherent
-            _grid = _spectrum.photon_energy_eV
-            _lo, _hi = band_eV
-            assert _grid[0] <= _lo < _hi <= _grid[-1]
-            # Include interpolated band edges on each result's native grid.
-            _nodes = np.r_[_lo, _grid[(_grid > _lo) & (_grid < _hi)], _hi]
-            band_yield[_row, _col] = np.trapezoid(
-                np.interp(_nodes, _grid, _spectrum.density), _nodes
-            )
-            runs.append(
-                {
-                    "energy_keV": float(_energy_keV),
-                    "thickness_nm": float(_thickness_nm),
-                    "seed": int(_result.case["seed"]),
-                    "source_identity": _result.provenance["identity_digest"],
-                }
-            )
+    with mo.status.progress_bar(
+        total=len(thicknesses_nm) * len(energies_keV),
+        title="Computing the parameter sweep",
+        show_eta=True,
+    ) as _progress:
+        for _row, _thickness_nm in enumerate(thicknesses_nm):
+            for _col, _energy_keV in enumerate(energies_keV):
+                _result = simulate(
+                    Beam(
+                        kinetic_energy=float(_energy_keV) * ureg.keV,
+                        transverse=PointSpot(),
+                        longitudinal=PointBunch(),
+                    ),
+                    Slab(
+                        "hopg",
+                        thickness=float(_thickness_nm) * ureg.nm,
+                        tilt=30 * ureg.degree,
+                        footprint=Footprint(width=5 * ureg.mm, height=5 * ureg.mm),
+                    ),
+                    detector,
+                    physics=physics,
+                    numerics=numerics,
+                )
+                _spectrum = _result.cxr.incoherent
+                _grid = _spectrum.photon_energy_eV
+                _lo, _hi = band_eV
+                assert _grid[0] <= _lo < _hi <= _grid[-1]
+                # Include interpolated band edges on each result's native grid.
+                _nodes = np.r_[_lo, _grid[(_grid > _lo) & (_grid < _hi)], _hi]
+                band_yield[_row, _col] = np.trapezoid(
+                    np.interp(_nodes, _grid, _spectrum.density), _nodes
+                )
+                runs.append(
+                    {
+                        "energy_keV": float(_energy_keV),
+                        "thickness_nm": float(_thickness_nm),
+                        "seed": int(_result.case["seed"]),
+                        "source_identity": _result.provenance["identity_digest"],
+                    }
+                )
+                _progress.update(subtitle=f"{_energy_keV:g} keV / {_thickness_nm:g} nm")
     assert np.isfinite(band_yield).all() and np.all(band_yield >= 0)
     sweep_result = _result
     sweep_yield = band_yield.copy()

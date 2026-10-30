@@ -44,8 +44,8 @@ def _(mo):
     radiation each incident electron produces.
 
     `TransverseSpot` sets a round Gaussian entrance spot by its **FWHM** in mm;
-    `Slab` takes thickness in Å, footprint widths in mm and the lab tilt in
-    degrees. `CrystalCut` fixes which lattice axis is normal to the surface.
+    `Slab` uses explicit Pint lengths and angles at the public boundary.
+    `CrystalCut` fixes which lattice axis is normal to the surface.
     """)
     return
 
@@ -58,22 +58,23 @@ def _(np, tables_ready):
     from pyrite.config import CxrReflections, FixedSampling, Numerics, Physics
     from pyrite.detectors import Detector
     from pyrite.geometry import CrystalCut, Footprint, Slab
+    from pyrite.units import ureg
 
-    detector = Detector(observation_angle_deg=135.0)
+    detector = Detector(observation_angle=135 * ureg.degree)
     band_eV = (600.0, 2_000.0)
 
     def source(*, tilt_deg=30.0, thickness_nm=100.0, spot_fwhm_mm=0.45, histories=2_048):
         """PXR/CBS source for a 30 keV beam on a 2 mm × 2 mm HOPG (002) slab."""
         beam = Beam(
-            energy_keV=30.0,
-            transverse=TransverseSpot(fwhm_x_mm=spot_fwhm_mm),
+            kinetic_energy=30 * ureg.keV,
+            transverse=TransverseSpot(fwhm_x=spot_fwhm_mm * ureg.mm),
             longitudinal=PointBunch(),
         )
         target = Slab(
             "hopg",
-            thickness_ang=10 * thickness_nm,
-            tilt_deg=tilt_deg,
-            footprint=Footprint(width_mm=2.0, height_mm=2.0),
+            thickness=thickness_nm * ureg.nm,
+            tilt=tilt_deg * ureg.degree,
+            footprint=Footprint(width=2 * ureg.mm, height=2 * ureg.mm),
             cut=CrystalCut(beam_uvw=(0, 0, 2)),
         )
         result = simulate(

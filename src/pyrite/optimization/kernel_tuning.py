@@ -5,7 +5,9 @@ scene under candidate :class:`~pyrite.config.KernelTuning` values, each in a
 fresh worker process, and accepts a candidate only when its spectra match the
 baseline's. The controls are execution choices, not physical parameters, so
 this is separate from :class:`OptimizationStudy`. Results are specific to the
-GPU, driver, precision and workload that produced them.
+GPU, driver, precision and workload that produced them. Use objective="transport"
+or objective="spectrum" to minimize the corresponding synchronized runner
+phase, while still validating full spectra at every candidate.
 """
 
 from __future__ import annotations
@@ -21,7 +23,7 @@ import tempfile
 from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
 from time import perf_counter
-from typing import Any, Literal
+from typing import Any, Callable, Literal
 
 import numpy as np
 
@@ -180,14 +182,47 @@ def _worker(payload_path: Path, output_path: Path, result_path: Path) -> None:
         raise RuntimeError(f"CUDA required, resolved backend={BACKEND.name!r}")
     scene = payload["scene"]
     numerics = scene.numerics.with_kernel_tuning(_tuning_from_dict(payload["tuning"]))
+    objective = payload.get("objective", "total")
     samples, result = [], None
     for index in range(payload["warmups"] + payload["repeats"]):
         BACKEND.synchronize()
         start = perf_counter()
-        result = pyrite.simulate(scene, numerics=numerics)
+        stage_seconds = {}
+        if objective == "total":
+            result = pyrite.simulate(scene, numerics=numerics)
+        else:
+            # The public simulate() path still builds the same case and the
+            # complete result. Time only the selected internal phase, with
+            # explicit synchronization before/after its work. The stage wrappers
+            # are local to this single worker and restored after the call.
+            from unittest.mock import patch
+            from ..montecarlo import runner
+
+            transport = runner._transport_case
+            spectrum = runner._spectrum_with_recovery
+
+            def timed(stage, function):
+                def wrapped(*args, **kwargs):
+                    BACKEND.synchronize()
+                    started = perf_counter()
+                    value = function(*args, **kwargs)
+                    BACKEND.synchronize()
+                    stage_seconds[stage] = stage_seconds.get(stage, 0.0) + perf_counter() - started
+                    return value
+                return wrapped
+
+            with (
+                patch.object(runner, "_transport_case", timed("transport", transport)),
+                patch.object(runner, "_spectrum_with_recovery", timed("spectrum", spectrum)),
+            ):
+                result = pyrite.simulate(scene, numerics=numerics)
         BACKEND.synchronize()
         if index >= payload["warmups"]:
-            samples.append(perf_counter() - start)
+            if objective != "total" and objective not in stage_seconds:
+                raise RuntimeError(f"runner did not report {objective} phase")
+            samples.append(
+                perf_counter() - start if objective == "total" else stage_seconds[objective]
+            )
     arrays = {}
     for path in _FAMILIES:
         density = _family(result, path)
@@ -215,11 +250,13 @@ def _equivalent(candidate: Path, reference: Path, *, rtol: float, atol: float) -
     return None
 
 
-def _measure(scene, tuning, *, warmups, repeats, timeout, workdir: Path, label: str):
+def _measure(scene, tuning, *, warmups, repeats, timeout, workdir: Path, label: str,
+             objective: str = "total"):
     payload, output, record = (workdir / f"{label}.{ext}" for ext in ("pkl", "npz", "json"))
     payload.write_bytes(
         pickle.dumps(
-            {"scene": scene, "tuning": _tuning_dict(tuning), "warmups": warmups, "repeats": repeats}
+            {"scene": scene, "tuning": _tuning_dict(tuning), "warmups": warmups,
+             "repeats": repeats, "objective": objective}
         )
     )
     env = os.environ | {"PYRITE_MC_BACKEND": "cuda"}  # no hidden CPU fallback in timings
@@ -231,7 +268,8 @@ def _measure(scene, tuning, *, warmups, repeats, timeout, workdir: Path, label: 
     return output, json.loads(record.read_text())
 
 
-def _study_identity(scene, base, lattice, *, warmups, repeats, rtol, atol, environment) -> str:
+def _study_identity(scene, base, lattice, *, warmups, repeats, rtol, atol,
+                    environment, objective="total") -> str:
     from ..campaign.lowering import build_case
     from ..campaign.profiles import case_content_key
 
@@ -240,7 +278,7 @@ def _study_identity(scene, base, lattice, *, warmups, repeats, rtol, atol, envir
         "case": case_content_key(build_case(scene)),
         "baseline": _tuning_dict(base),
         "lattice": asdict(lattice),
-        "protocol": [warmups, repeats, rtol, atol],
+        "protocol": [warmups, repeats, rtol, atol, objective],
         "environment": environment,
     }
     return hashlib.sha256(json.dumps(payload, sort_keys=True, default=str).encode()).hexdigest()
@@ -259,6 +297,8 @@ def tune_kernels(
     study_name: str = "kernel-tuning",
     timeout: float = 1800.0,
     seed: int = 42,
+    objective: Literal["total", "transport", "spectrum"] = "total",
+    on_progress: Callable[[int, int, str], None] | None = None,
 ) -> KernelTuningResult:
     """Tune ``scene``'s CUDA execution controls over ``lattice`` with Optuna.
 
@@ -266,7 +306,12 @@ def tune_kernels(
     ``transport_core="cuda"``; every candidate changes only ``lattice``
     dimensions. Each run is a fresh process with an explicit CUDA backend:
     ``warmups`` untimed calls absorb compilation, then the median of
-    ``repeats`` synchronized ``simulate`` wall times is the objective.
+    ``repeats`` synchronized ``simulate`` wall times is the default objective.
+    ``objective="transport"`` or ``"spectrum"`` instead times just the named
+    runner phase with synchronization. The other phase is still evaluated so
+    spectra are compared against the baseline. ``on_progress(done, total, state)``
+    runs in the coordinator after baseline and each finished/pruned trial; no
+    updates occur while one blocking worker is still computing.
     Candidates whose spectral grids differ, or whose densities differ beyond
     ``rtol``/``atol`` from the baseline, are rejected rather than timed
     favorably; the tolerance is a tuning guard, not scientific validation.
@@ -283,6 +328,14 @@ def tune_kernels(
         raise TypeError("lattice must be a KernelLattice")
     if min(trials, warmups + 1, repeats) < 1 or timeout <= 0:
         raise ValueError("trials and repeats must be positive, warmups non-negative")
+    if objective not in ("total", "transport", "spectrum"):
+        raise ValueError("objective must be total, transport, or spectrum")
+    if objective == "transport" and (lattice.cxr_chunk or lattice.brem_chunk):
+        raise ValueError("transport objective accepts only transport dimensions")
+    if objective == "spectrum" and (
+        lattice.electron_batch or lattice.schedule or lattice.continuation_rows
+    ):
+        raise ValueError("spectrum objective accepts only spectral chunk dimensions")
     if rtol < 0 or atol < 0 or not np.isfinite([rtol, atol]).all():
         raise ValueError("rtol and atol must be finite and non-negative")
     base = scene.numerics.kernel_tuning
@@ -294,7 +347,7 @@ def tune_kernels(
     except ImportError as exc:
         raise ImportError("install pyrite-mc[optimization] / uv sync --extra optimization") from exc
 
-    measure = dict(warmups=warmups, repeats=repeats, timeout=timeout)
+    measure = dict(warmups=warmups, repeats=repeats, timeout=timeout, objective=objective)
     with tempfile.TemporaryDirectory(prefix="pyrite-kernel-tuning-") as tmp:
         workdir = Path(tmp)
         reference, record = _measure(scene, base, workdir=workdir, label="baseline", **measure)
@@ -302,6 +355,8 @@ def tune_kernels(
         baseline = KernelTrial(
             -1, base, "complete", statistics.median(record["samples_s"]), tuple(record["samples_s"])
         )
+        if on_progress is not None:
+            on_progress(1, trials + 1, "baseline")
         identity = _study_identity(
             scene,
             base,
@@ -311,6 +366,7 @@ def tune_kernels(
             rtol=rtol,
             atol=atol,
             environment=environment,
+            objective=objective,
         )
         study = optuna.create_study(
             direction="minimize",
@@ -324,7 +380,7 @@ def tune_kernels(
             raise ValueError("stored study differs in workload, lattice, protocol or device")
         study.set_user_attr(_SCHEMA, identity)
 
-        def objective(trial: Any) -> float:
+        def objective_fn(trial: Any) -> float:
             choice = {
                 name: trial.suggest_categorical(name, list(getattr(lattice, name)))
                 for name in _DIMENSIONS
@@ -362,7 +418,11 @@ def tune_kernels(
 
         remaining = max(0, trials - len(study.trials))
         if remaining:
-            study.optimize(objective, n_trials=remaining)
+            def report_progress(study, trial):
+                if on_progress is not None:
+                    on_progress(1 + len(study.trials), trials + 1, trial.state.name.lower())
+
+            study.optimize(objective_fn, n_trials=remaining, callbacks=[report_progress])
     return _summarize(study, baseline, environment, optuna)
 
 

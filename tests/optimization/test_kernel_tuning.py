@@ -125,6 +125,23 @@ def test_resampled_candidates_reuse_their_first_measurement(fake):
         )
 
 
+def test_phase_objectives_and_progress(fake):
+    pytest.importorskip("optuna")
+    observed = []
+    result = tune_kernels(
+        _scene(), KernelLattice(electron_batch=(2048,)), trials=1,
+        objective="transport", on_progress=lambda done, total, state: observed.append(
+            (done, total, state)
+        ),
+    )
+    assert result.trials and observed[0] == (1, 2, "baseline")
+    assert observed[-1][:2] == (2, 2)
+    with pytest.raises(ValueError, match="transport objective"):
+        tune_kernels(_scene(), KernelLattice(cxr_chunk=(4096,)), objective="transport")
+    with pytest.raises(ValueError, match="spectrum objective"):
+        tune_kernels(_scene(), KernelLattice(electron_batch=(2048,)), objective="spectrum")
+
+
 def test_no_faster_candidate_keeps_baseline(fake):
     pytest.importorskip("optuna")
     result = tune_kernels(_scene(), KernelLattice(electron_batch=(256,)), trials=1)

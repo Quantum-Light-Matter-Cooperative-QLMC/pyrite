@@ -27,7 +27,8 @@ def _():
 
     import pyrite
 
-    _ = pyrite.fetch_tables()  # Reuse the installed tables without network access.
+    with mo.status.spinner(title="Preparing PyRITE reference tables"):
+        _ = pyrite.fetch_tables()  # Reuse the installed tables without network access.
     tables_ready = True
     return mo, np, plt, tables_ready
 
@@ -59,10 +60,14 @@ def _(np, tables_ready):
     from pyrite.config import AdaptiveSampling, CxrReflections, FixedSampling, Numerics, Physics
     from pyrite.detectors import Detector
     from pyrite.geometry import Footprint, Slab
+    from pyrite.units import ureg
 
-    beam = Beam(energy_keV=30.0, transverse=PointSpot(), longitudinal=PointBunch())
-    target = Slab("hopg", thickness_ang=1_000.0, tilt_deg=30.0, footprint=Footprint(5, 5))
-    detector = Detector(observation_angle_deg=135.0)
+    beam = Beam(kinetic_energy=30 * ureg.keV, transverse=PointSpot(), longitudinal=PointBunch())
+    target = Slab(
+        "hopg", thickness=100 * ureg.nm, tilt=30 * ureg.degree,
+        footprint=Footprint(width=5 * ureg.mm, height=5 * ureg.mm),
+    )
+    detector = Detector(observation_angle=135 * ureg.degree)
     physics = Physics(brem_source="none")
     band_eV = (600.0, 2_000.0)
     budgets = (256, 512, 1_024, 2_048, 4_096, 8_192)
@@ -91,18 +96,25 @@ def _(np, tables_ready):
 
 
 @app.cell
-def _(FixedSampling, band_yield, budgets, np, replicates, run, tables_ready):
+def _(FixedSampling, band_yield, budgets, mo, np, replicates, run, tables_ready):
     assert tables_ready  # Wait for reference tables before executing transport.
-    _ = run(FixedSampling(cxr_electrons=16, brem_electrons=16), seed=1)  # untimed warmup
+    with mo.status.spinner(title="Compiling the sampling workload"):
+        _ = run(FixedSampling(cxr_electrons=16, brem_electrons=16), seed=1)  # untimed warmup
     yields = np.zeros((len(budgets), replicates))
     seconds = np.zeros_like(yields)
-    for _i, _n in enumerate(budgets):
-        for _k in range(replicates):
-            # A distinct seed per (budget, replicate) makes every run independent.
-            _result, seconds[_i, _k] = run(
-                FixedSampling(cxr_electrons=_n, brem_electrons=_n), seed=1_000 * _i + _k + 1
-            )
-            yields[_i, _k] = band_yield(_result)
+    with mo.status.progress_bar(
+        total=len(budgets) * replicates,
+        title="Sampling independent histories",
+        show_eta=True,
+    ) as _progress:
+        for _i, _n in enumerate(budgets):
+            for _k in range(replicates):
+                # A distinct seed per (budget, replicate) makes every run independent.
+                _result, seconds[_i, _k] = run(
+                    FixedSampling(cxr_electrons=_n, brem_electrons=_n), seed=1_000 * _i + _k + 1
+                )
+                yields[_i, _k] = band_yield(_result)
+                _progress.update(subtitle=f"N={_n:,}, replicate {_k + 1}/{replicates}")
     assert np.isfinite(yields).all() and (yields > 0).all()
     mean = yields.mean(axis=1)
     rse = yields.std(axis=1, ddof=1) / mean  # empirical relative standard error of one run
@@ -126,7 +138,7 @@ def _(mo):
 
 
 @app.cell
-def _(AdaptiveSampling, band_eV, band_yield, run, tables_ready):
+def _(AdaptiveSampling, band_eV, band_yield, mo, run, tables_ready):
     assert tables_ready
     policy = AdaptiveSampling(
         target_rse=5e-4,
@@ -135,7 +147,8 @@ def _(AdaptiveSampling, band_eV, band_yield, run, tables_ready):
         observables=("cxr",),
         band_eV=band_eV,
     )
-    adaptive_result, adaptive_seconds = run(policy, seed=99)
+    with mo.status.spinner(title="Adaptive sampling", subtitle="Stopping rule checks after each block"):
+        adaptive_result, adaptive_seconds = run(policy, seed=99)
     _stop = adaptive_result.provenance["adaptive_sampling"]
     adaptive = {
         "histories": int(_stop["realized_electrons"]),

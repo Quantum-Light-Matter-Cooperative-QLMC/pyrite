@@ -26,8 +26,9 @@ def _():
 
     from pyrite.experimental.quantum import AxialDiagnosticConfig, axial_diagnostic
     from pyrite.quantum import gaussian
+    from pyrite.units import ureg
 
-    return AxialDiagnosticConfig, axial_diagnostic, gaussian, mo, np, plt
+    return AxialDiagnosticConfig, axial_diagnostic, gaussian, mo, np, plt, ureg
 
 
 @app.cell(hide_code=True)
@@ -44,19 +45,24 @@ def _(mo):
 
 
 @app.cell
-def _(AxialDiagnosticConfig, gaussian, np):
+def _(AxialDiagnosticConfig, gaussian, np, ureg):
+    # This experimental config is numeric-only; lower quantities explicitly.
     config = AxialDiagnosticConfig(
         crystal="silicon",
         axis=(0, 0, 1),
-        kinetic_energy_eV=5e6,
+        kinetic_energy_eV=(5 * ureg.MeV).to("eV").magnitude,
         cells=(2, 2),
         shape=(64, 64),
-        depths_ang=tuple(np.linspace(0.0, 500.0, 51)),
-        step_ang=2.0,
+        depths_ang=tuple((np.linspace(0.0, 50.0, 51) * ureg.nm).to("angstrom").magnitude),
+        step_ang=(2 * ureg.angstrom).magnitude,
         mode="coherent",
         backend="cpu",
     )
-    entry = gaussian(waist_ang=0.5, dimension=2, center_ang=(1.0, 1.0))
+    entry = gaussian(
+        waist_ang=0.5 * ureg.angstrom,
+        dimension=2,
+        center_ang=np.array([1.0, 1.0]) * ureg.angstrom,
+    )
     return config, entry
 
 

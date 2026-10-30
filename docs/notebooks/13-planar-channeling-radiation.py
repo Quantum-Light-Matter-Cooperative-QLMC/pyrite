@@ -25,6 +25,7 @@ def _():
     import numpy as np
 
     from pyrite.experimental.quantum import propagate_planar_source, score_planar_source
+    from pyrite.units import ureg
     from pyrite.quantum import (
         QuantumDynamics,
         QuantumNumerics,
@@ -44,6 +45,7 @@ def _():
         plt,
         propagate_planar_source,
         score_planar_source,
+        ureg,
     )
 
 
@@ -61,27 +63,27 @@ def _(mo):
 
 
 @app.cell
-def _(QuantumDynamics, QuantumNumerics, QuantumRegion, QuantumSetup, TransverseStateSpec):
-    source = TransverseStateSpec.recipe("gaussian", waist_ang=1.0, dimension=1)
+def _(QuantumDynamics, QuantumNumerics, QuantumRegion, QuantumSetup, TransverseStateSpec, ureg):
+    source = TransverseStateSpec.recipe("gaussian", waist=1 * ureg.angstrom, dimension=1)
     setup = QuantumSetup(
         region=QuantumRegion(kind="planar", plane_hkl=(1, 1, 0)),
         dynamics=QuantumDynamics(kind="channeling"),
-        numerics=QuantumNumerics(basis_size=8, bloch_cells=4, step_ang=20.0),
+        numerics=QuantumNumerics(basis_size=8, bloch_cells=4, step_length=2 * ureg.nm),
     )
     entry = setup.project_state(
         source,
         crystal="silicon",
-        kinetic_energy_eV=17e6,
-        incidence_rad=0.0,
+        kinetic_energy_eV=17 * ureg.MeV,
+        incidence_rad=0 * ureg.mrad,
         impact="fixed",
     )
-    depth_ang = 2_000.0
-    return depth_ang, entry
+    depth = 0.2 * ureg.um
+    return depth, entry
 
 
 @app.cell
-def _(depth_ang, entry, propagate_planar_source):
-    history = propagate_planar_source(entry, depth_ang=depth_ang)
+def _(depth, entry, propagate_planar_source):
+    history = propagate_planar_source(entry, depth_ang=depth)
     return (history,)
 
 
@@ -100,13 +102,13 @@ def _(history, plt):
 
 
 @app.cell
-def _(depth_ang, entry, np, score_planar_source):
+def _(depth, entry, np, score_planar_source, ureg):
     radiation = score_planar_source(
         entry,
-        depth_ang=depth_ang,
-        photon_energy_eV=np.linspace(1_000.0, 50_000.0, 1_025),
-        theta_rad=0.0,
-        sample_ang=100.0,
+        depth_ang=depth,
+        photon_energy_eV=np.linspace(1_000.0, 50_000.0, 1_025) * ureg.eV,
+        theta_rad=0 * ureg.mrad,
+        sample_ang=10 * ureg.nm,
         absorption=False,
     )
     return (radiation,)

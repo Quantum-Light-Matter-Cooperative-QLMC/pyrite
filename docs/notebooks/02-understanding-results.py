@@ -59,16 +59,16 @@ def _(tables_ready):
         kinetic_energy=30 * ureg.keV,
         transverse=PointSpot(),
         longitudinal=PointBunch(),
-        bunch_charge_pc=0.5 * ureg.pC,
-        rep_rate_hz=100 * ureg.kHz,
+        bunch_charge=0.5 * ureg.pC,
+        repetition_rate=100 * ureg.kHz,
     )
     target = Slab(
         "hopg",
-        thickness_ang=100 * ureg.nm,
-        tilt_deg=30 * ureg.degree,
-        footprint=Footprint(5 * ureg.mm, 5 * ureg.mm),
+        thickness=100 * ureg.nm,
+        tilt=30 * ureg.degree,
+        footprint=Footprint(width=5 * ureg.mm, height=5 * ureg.mm),
     )
-    detector = Detector(observation_angle_deg=135 * ureg.degree)
+    detector = Detector(observation_angle=135 * ureg.degree)
     numerics = Numerics(
         sampling=FixedSampling(cxr_electrons=8_192, brem_electrons=128),
         cxr_reflections=CxrReflections(n_families=1),

@@ -58,20 +58,21 @@ def _(mo):
 @app.cell
 def _(tables_ready):
     from pyrite.transport import simulate_trajectories
+    from pyrite.units import ureg
 
     histories = 16_384
     seed = 1
-    thickness_nm = 4_000.0
+    thickness_nm = (4 * ureg.um).to("nm").magnitude
     assert tables_ready  # Finish reference-table setup before transport.
     transport_result = simulate_trajectories(
-        E0_keV=30.0,
+        E0_keV=(30 * ureg.keV).magnitude,
         Ne=histories,
-        thickness_ang=thickness_nm * 10.0,  # 1 nm = 10 Å
+        thickness_ang=(thickness_nm * ureg.nm).to("angstrom").magnitude,
         composition=[("C", 0.11363677327755675)],  # HOPG carbon atoms / Å³
         elastic_model="sr",
         transport_core="lockstep",
         energy_model="midpoint",
-        E_cut_keV=5.0,
+        E_cut_keV=(5 * ureg.keV).magnitude,
         max_steps=20_000,
         seed=seed,
     )

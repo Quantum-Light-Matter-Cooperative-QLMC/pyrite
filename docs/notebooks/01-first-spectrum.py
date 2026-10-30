@@ -26,7 +26,8 @@ def _():
 
     import pyrite
 
-    _ = pyrite.fetch_tables()  # Fetch missing pinned tables once; reuse installed data.
+    with mo.status.spinner(title="Preparing PyRITE reference tables"):
+        _ = pyrite.fetch_tables()  # Fetch missing pinned tables once; reuse installed data.
 
     tables_ready = True
     return mo, os, plt, pyrite, tables_ready
@@ -71,7 +72,7 @@ def _(mo):
 
 
 @app.cell
-def _(tables_ready):
+def _(mo, tables_ready):
     from pyrite import simulate
     from pyrite.beams import Beam, PointBunch, PointSpot
     from pyrite.config import CxrReflections, FixedSampling, Numerics
@@ -83,11 +84,11 @@ def _(tables_ready):
     beam = Beam(kinetic_energy=30 * ureg.keV, transverse=PointSpot(), longitudinal=PointBunch())
     target = Slab(
         "hopg",
-        thickness_ang=100 * ureg.nm,
-        tilt_deg=30 * ureg.degree,
-        footprint=Footprint(5 * ureg.mm, 5 * ureg.mm),
+        thickness=100 * ureg.nm,
+        tilt=30 * ureg.degree,
+        footprint=Footprint(width=5 * ureg.mm, height=5 * ureg.mm),
     )
-    detector = Detector(observation_angle_deg=135 * ureg.degree)
+    detector = Detector(observation_angle=135 * ureg.degree)
 
     numerics = Numerics(
         sampling=FixedSampling(cxr_electrons=32_768, brem_electrons=128),
@@ -95,7 +96,8 @@ def _(tables_ready):
     )
 
     assert tables_ready  # Wait for reference-table installation before transport.
-    result = simulate(beam, target, detector, numerics=numerics)
+    with mo.status.spinner(title="Simulating electron transport and X-ray spectrum"):
+        result = simulate(beam, target, detector, numerics=numerics)
 
     cxr = result.cxr.incoherent
     brem = result.brem

@@ -55,6 +55,7 @@ def _(np, tables_ready):
     from pyrite.config import CxrReflections, FixedSampling, Numerics, Physics
     from pyrite.detectors import Detector, EnergyBins
     from pyrite.geometry import Footprint, Slab
+    from pyrite.units import ureg
 
     beam_keV, observation_deg = 30.0, 150.0
     bunch_charge_pc = 1e-4  # about 624 physical electrons per bunch
@@ -66,23 +67,29 @@ def _(np, tables_ready):
         cxr_reflections=CxrReflections(n_families=1),
         energy_model="midpoint",
         seed=1,
-        energy_bins=EnergyBins(cxr=photon_grid_eV, brem=np.array([200.0, 600.0])),
+        energy_bins=(
+            EnergyBins()
+            .with_cxr_energies(photon_grid_eV * ureg.eV)
+            .with_brem_energies(np.array([200.0, 600.0]) * ureg.eV)
+        ),
     )
 
     def transition(thickness_nm, *, coherence="history", rms_as=1.0):
         """TR spectrum per incident electron for one film and bunch duration."""
         result = simulate(
             Beam(
-                energy_keV=beam_keV,
-                transverse=TransverseSpot(fwhm_x_mm=1e-6),
-                longitudinal=BunchLength(rms_fs=rms_as / 1_000),
-                bunch_charge_pc=bunch_charge_pc,
-                rep_rate_hz=5_000.0,
+                kinetic_energy=beam_keV * ureg.keV,
+                transverse=TransverseSpot(fwhm_x=1 * ureg.nm),
+                longitudinal=BunchLength(rms_duration=rms_as * ureg.attosecond),
+                bunch_charge=bunch_charge_pc * ureg.pC,
+                repetition_rate=5 * ureg.kHz,
             ),
             Slab(
-                "silicon", thickness_ang=10 * thickness_nm, tilt_deg=5.0, footprint=Footprint(5, 5)
+                "silicon", thickness=thickness_nm * ureg.nm,
+                tilt=5 * ureg.degree,
+                footprint=Footprint(width=5 * ureg.mm, height=5 * ureg.mm),
             ),
-            Detector(observation_angle_deg=observation_deg),
+            Detector(observation_angle=observation_deg * ureg.degree),
             physics=Physics(
                 transition_radiation=coherence,
                 radiative_model="uncoupled",

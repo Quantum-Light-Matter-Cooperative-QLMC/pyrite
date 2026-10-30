@@ -43,6 +43,37 @@ paired with `full-history` is an invalid combination and is skipped. The
 winners do not transfer between devices. Persistent studies refuse to resume
 with a different workload, lattice, protocol or device.
 
+To tune transport and spectral execution separately, use independent studies:
+
+<!-- verify: skip (requires a CUDA device and the optimization extra) -->
+```python
+from dataclasses import replace
+from pyrite.optimization import KernelLattice, tune_kernels
+
+transport = tune_kernels(
+    scene, KernelLattice(electron_batch=(2048, 8192), schedule=("full-history", "auto")),
+    objective="transport", trials=4, warmups=1, repeats=1,
+)
+spectral_scene = replace(
+    scene, numerics=scene.numerics.with_kernel_tuning(transport.best)
+)
+spectral = tune_kernels(
+    spectral_scene, KernelLattice(cxr_chunk=(None, 8192, 32768)),
+    objective="spectrum", trials=3, warmups=1, repeats=1,
+)
+# The second winner retains the first stage's transport settings.
+final = spectral.best
+```
+
+`objective="transport"` minimizes synchronized transport-phase wall time,
+including trajectory setup and automatic line-grid resolution.
+`objective="spectrum"` minimizes synchronized spectrum-phase wall time,
+including CXR/background scoring. Both still run the complete simulation
+for numerical equivalence checks. The default `objective="total"`
+retains end-to-end timing. `on_progress(done, total, state)` receives the
+baseline and each finished Optuna trial on the coordinating process.
+It cannot report progress inside an individual CUDA launch.
+
 ## MoLab example
 
 The older command-line tool tunes two parameters, through environment

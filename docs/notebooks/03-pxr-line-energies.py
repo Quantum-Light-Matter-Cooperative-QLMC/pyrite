@@ -70,9 +70,12 @@ def _(mo):
 
 @app.cell
 def _(catalog, energy_keV, np, observation_deg, photon_energies, reflection, tilt_deg):
+    from pyrite.units import ureg
+
     angles_deg = np.linspace(30, 160, 131)
     reference_keV = np.array([60.0, 100.0, 200.0])
-    beam_energies_eV = np.r_[reference_keV, energy_keV.value] * 1_000
+    # The analytic API takes numeric eV/degree magnitudes, not Pint objects.
+    beam_energies_eV = (np.r_[reference_keV, energy_keV.value] * ureg.keV).to("eV").magnitude
     lines_eV = photon_energies(
         "hopg",
         beam_energies_eV[:, None],
@@ -84,7 +87,7 @@ def _(catalog, energy_keV, np, observation_deg, photon_energies, reflection, til
     selected_eV = float(
         photon_energies(
             "hopg",
-            energy_keV.value * 1_000,
+            (energy_keV.value * ureg.keV).to("eV").magnitude,
             tilt_deg=tilt_deg.value,
             theta_obs_deg=observation_deg.value,
             hkl=reflection.value,
