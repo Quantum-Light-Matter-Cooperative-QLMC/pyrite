@@ -161,6 +161,9 @@ PixelRayMap = { target = "pyrite.results.model:PixelRayMap", status = "advanced-
 # PixelMetadata also owns copied semantic geometry quantities; numeric fields persist.
 PixelMetadata = { target = "pyrite.results.model:PixelMetadata", status = "advanced-stable" }
 
+[package_exports."pyrite.execution"]
+run_sweep = { target = "pyrite.runs.run:run_sweep", status = "advanced-stable" }
+
 [package_exports."pyrite.storage"]
 checkpoint_manifest = { target = "pyrite.checkpoints.persistence:checkpoint_manifest", status = "advanced-stable" }
 checkpoint_path_for = { target = "pyrite.checkpoints.persistence:checkpoint_path_for", status = "advanced-stable" }

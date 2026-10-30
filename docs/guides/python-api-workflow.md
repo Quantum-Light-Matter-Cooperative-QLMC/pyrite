@@ -24,7 +24,9 @@ marimo edit 01-first-spectrum.py
 For a script or existing Python session, use the
 [one-scene recipe](../reference/python-scene-recipes.md#run-one-scene-in-memory).
 `simulate` returns an in-memory `Result`; it does not write a campaign checkpoint.
-To persist a campaign run, follow the [CLI quickstart](getting-started.md).
+For a Python-driven multi-case checkpoint, follow
+[Persisted parameter studies](../notebooks/designing/18-persisted-parameter-studies.ipynb);
+for named profiles, follow the [CLI quickstart](getting-started.md).
 
 ## Inspect the source result
 

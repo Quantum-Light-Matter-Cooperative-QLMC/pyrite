@@ -4,6 +4,8 @@ For an editable introduction to source-spectrum components, integrated yields
 and photon rates, use [Understanding results](../notebooks/fundamentals/02-understanding-results.ipynb).
 This guide instead works with an existing **saved checkpoint**, not an
 in-memory `Result`.
+For a self-contained Python example that creates and resumes a checkpoint,
+see [Persisted parameter studies](../notebooks/designing/18-persisted-parameter-studies.ipynb).
 
 Reopen the saved [quickstart run](getting-started.md), separate its radiation
 components, and integrate a fixed photon-energy band. Loading and plotting a

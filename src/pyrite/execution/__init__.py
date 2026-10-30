@@ -12,6 +12,7 @@ from importlib import import_module
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from pyrite.runs.run import run_sweep as run_sweep
     from .artifacts import (
         ArtifactIntegrityError as ArtifactIntegrityError,
     )
@@ -70,6 +71,7 @@ _EXPORTS = {
     "inspect_execution": ("pyrite.execution.inspection", "inspect_execution"),
     "build_executor": ("pyrite.execution.profiles", "build_executor"),
     "resolve_execution_profile": ("pyrite.execution.profiles", "resolve_execution_profile"),
+    "run_sweep": ("pyrite.runs.run", "run_sweep"),
 }
 
 __all__ = [
@@ -95,6 +97,7 @@ __all__ = [
     "inspect_execution",
     "build_executor",
     "resolve_execution_profile",
+    "run_sweep",
 ]
 
 
