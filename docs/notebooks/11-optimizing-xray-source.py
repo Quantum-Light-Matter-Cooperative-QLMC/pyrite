@@ -262,7 +262,9 @@ def _(
         with mo.capture_stdout():
             for _replicate in range(3):
                 _independent.append(
-                    validation_evaluator(validation_scene, _replicate)[definition.objectives[0].name]
+                    validation_evaluator(validation_scene, _replicate)[
+                        definition.objectives[0].name
+                    ]
                 )
                 _progress.update(subtitle=f"Independent seed {_replicate + 1}/3")
     independent_yields = np.array(_independent)

@@ -121,7 +121,9 @@ def _(beam_path, mean_energy_keV, tables_ready):
     )
 
     target = Slab(
-        "hopg", thickness=100 * ureg.nm, tilt=30 * ureg.degree,
+        "hopg",
+        thickness=100 * ureg.nm,
+        tilt=30 * ureg.degree,
         footprint=Footprint(width=1 * ureg.mm, height=1 * ureg.mm),
     )
     detector = Detector(observation_angle=135 * ureg.degree)
