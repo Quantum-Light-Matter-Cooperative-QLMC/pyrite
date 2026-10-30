@@ -1,8 +1,9 @@
 # Interactive Tutorials
 
 Learn PyRITE through short, executable scientific notebooks. Start with
-Fundamentals: inspect individual electron trajectories, simulate a spectrum,
-interpret its results and predict line energies using the public Python API.
+Fundamentals: inspect individual electron trajectories, practice with physical
+units, simulate a spectrum, interpret its results and predict line energies
+using the public Python API.
 
 To change parameters and rerun a tutorial, use **Open in Molab** or open its
 downloadable Marimo source locally.
