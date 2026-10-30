@@ -147,8 +147,8 @@ failures are reflected W at 300 keV in the 1–10 keV band:
 | Redistributed fraction | 0.34205 | 0.30737 | 0.00905 | 0.02715 |
 
 The redistributed yield is 19.6% high (5.5 combined SE); the fraction is
-0.03468 high (3.8 combined SE). The cause remains unresolved. The claim is
-`discrepancy`, not `anchored`. The v1 uniform-proposal job 2048 passed only
+0.03468 high (3.8 combined SE). The complete-cascade reference below
+resolves both; the historical result alone does not anchor the claim. The v1 uniform-proposal job 2048 passed only
 with broad, heavy-tailed errors and is not anchoring evidence; its reductions
 remain in `results-v1-uniform/` on the box. In the gated redistributed-yield
 bands of v2, PyRITE SE / Geant4 SE ranges from 0.36 to 1.42.
@@ -263,8 +263,7 @@ unchanged PyRITE result, reflected 1–10 keV redistributed yield is
 0.3420517 / 0.3488889. Both historical W failures clear without changing
 tolerances or production models. `cascade-results/` retains compact blocks,
 the report including historical comparisons, and provenance for tested
-checkpoint `981c1141`. The historical matrix still reports 98/100; the other
-seven cases have not yet been rerun with complete cascades. See the canonical
+checkpoint `981c1141`. The historical matrix still reports 98/100. See the canonical
 [W rerun evidence](../../docs/validation/radiation-physics/photon-full-track-thick-brem.md#matched-cascade-w-full-track-rerun-2026-10-27).
 
 The remaining seven complete-cascade cases were collected on 2026-10-27:
@@ -272,6 +271,6 @@ array **2568** (49 million-primary shards), reduction **2577**, exit zero.
 All **89/89** additional gates pass with no lost coverage; including W
 300 keV, the corrected eight-case matrix passes **100/100**. Compact blocks,
 reports and provenance are under `cascade-matrix-results/`. Historical
-references and the 98/100 regression remain intact. Independent adjudication
-is pending; the ledger remains `discrepancy`. See the canonical
+references and the 98/100 regression remain intact. After fresh-context
+adjudication the ledger claim is `anchored` (2026-10-29). See the canonical
 [corrected matrix evidence](../../docs/validation/radiation-physics/photon-full-track-thick-brem.md#complete-cascade-eight-case-matrix-2026-10-27).
