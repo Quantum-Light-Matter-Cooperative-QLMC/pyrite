@@ -142,6 +142,18 @@ def test_dataset_identity_dispatches_through_recorded_v1():
         dataset_identity("hopg", "full", default_settings(), sweep, identity_version=2)
 
 
+def test_explicit_uniform_brem_grid_does_not_share_catalog_band_identity():
+    """Same nodes, different case grid (exact vs stop at E0): digests must differ (#815)."""
+    band = material_sweep("hopg")
+    explicit = replace(band, brem_band=False)
+    band_identity = dataset_identity("hopg", "full", default_settings(), band)
+    explicit_identity = dataset_identity("hopg", "full", default_settings(), explicit)
+
+    assert "brem_grid_exact" not in band_identity["resolved_parameters"]["sweep"]
+    assert explicit_identity["resolved_parameters"]["sweep"]["brem_grid_exact"] is True
+    assert explicit_identity["parameter_sha256"] != band_identity["parameter_sha256"]
+
+
 def test_high_energy_profile_range_is_part_of_dataset_identity():
     sweep = material_sweep("hbn", catalog_profile="high_energy")
     identity = named_profile_identity("hbn", catalog_profile="high_energy")

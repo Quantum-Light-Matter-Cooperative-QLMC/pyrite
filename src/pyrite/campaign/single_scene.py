@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any, Literal, cast
 
 import numpy as np
 
+from .._energy_grid_encoding import encode_energy_grid
 from .._numerics import _emission_selection
 from .observation import filter_from_config, physical_detector_from_config
 
@@ -23,6 +24,19 @@ def _one(values, label, command_name):
             "use a profile with singleton thickness, energy, polar, and azimuth grids"
         )
     return float(values.item())
+
+
+def _band_at_energy(grid, energy_keV):
+    """Stop a uniform catalog band one step past the beam energy (#256).
+
+    The public ``EnergyBins.brem`` this scene carries is exact (#815), so the
+    catalog band is resolved against its single beam energy here.
+    """
+    encoded = encode_energy_grid(grid)
+    if not isinstance(encoded, tuple):
+        return grid
+    start, _, step = encoded
+    return np.arange(start, float(energy_keV) * 1e3 + step, step)
 
 
 def resolve_pixel_scene(
@@ -139,7 +153,7 @@ def resolve_pixel_scene(
             energy_bins=EnergyBins(
                 cxr=scan.E_grid_line,
                 cxr_by_energy=scan.E_grid_line_by_energy,
-                brem=scan.E_grid_brem,
+                brem=_band_at_energy(scan.E_grid_brem, energy),
             ),
             cxr_trials=n_electrons,
             brem_trials=n_electrons_brem,

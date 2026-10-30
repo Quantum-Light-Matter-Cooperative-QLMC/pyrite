@@ -320,6 +320,7 @@ def material_sweep(
         material=spec.crystal_key,
         detector=resolved_detector,
         energy_bins=bins,
+        brem_band=brem_override is missing,
         beam=beam,
         # The catalog speaks the flat geometry vocabulary, so the scan grid is
         # projected onto the target here rather than handed to Sweep's retired
@@ -425,6 +426,7 @@ def trajectory_sweep(
             cxr_by_energy=scan.E_grid_line_by_energy,
             brem=scan.E_grid_brem,
         ),
+        brem_band=True,
         target=target_from_flat(
             spec.crystal_key,
             thickness_ang=thick,

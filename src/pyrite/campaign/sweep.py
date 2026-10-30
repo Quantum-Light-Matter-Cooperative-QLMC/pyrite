@@ -481,6 +481,10 @@ class Sweep:
     # Canonical detector owner. Kept after existing fields so legacy positional
     # Sweep construction retains its historical argument order.
     energy_bins: EnergyBins = field(default_factory=EnergyBins, kw_only=True)
+    # True only when ``energy_bins.brem`` is a catalog/profile uniform band: its
+    # start floors to the medium and its stop follows each case's beam energy
+    # (issue #256). An explicit grid stays exact (issue #815).
+    brem_band: bool = field(default=False, kw_only=True)
     detector: Detector | SourceDirection | None = None
     # Canonical geometry owner. Every flat geometry input above is an InitVar
     # that normalizes onto this field, so the target is the only geometry state
@@ -774,8 +778,9 @@ def _case_energies(sweep: Sweep, gdf: GDFBeam | None) -> np.ndarray:
 def _brem_grid(sweep: Sweep, energies: np.ndarray, cxr_grids: tuple[np.ndarray, ...]) -> np.ndarray:
     """Return the continuum grid before encoding.
 
-    An explicit ``EnergyBins.brem`` is exact. Otherwise a 50 eV lattice starts
-    where the line grids do and extends past the highest beam energy.
+    An explicit ``EnergyBins.brem`` keeps its nodes (a catalog band marked
+    ``Sweep.brem_band`` stops per case instead). Otherwise a 50 eV lattice
+    starts where the line grids do and extends past the highest beam energy.
     """
     bins = sweep.energy_bins
     if bins.brem is not None:
@@ -813,9 +818,13 @@ def _floored_brem_case_grid(sweep: Sweep, brem_grid: np.ndarray) -> Any:
     return brem_case_grid
 
 
-def _case_brem_grid(brem_case_grid: Any, energy_keV: float) -> Any:
-    """A uniform band stops one step past this case's beam energy; others stay exact."""
-    if not isinstance(brem_case_grid, tuple):
+def _case_brem_grid(brem_case_grid: Any, energy_keV: float, *, band: bool) -> Any:
+    """A uniform band stops one step past this case's beam energy; others stay exact.
+
+    ``band`` is False for an explicit ``EnergyBins.brem``: a uniform explicit
+    grid is the requested nodes, not a step to extend to E0 (issue #815).
+    """
+    if not band or not isinstance(brem_case_grid, tuple):
         return brem_case_grid
     start, _, step = brem_case_grid
     return (start, energy_keV * 1e3 + step, step)
@@ -1066,6 +1075,7 @@ def build_cases(
     name_stem = material_spec.key if material_spec is not None else target.material
     mosaic_analytic_rad, mosaic_mc_rad = _mosaic_case_keys(sweep, cp)
     brem_case_grid = _floored_brem_case_grid(sweep, brem_grid)
+    brem_band = sweep.brem_band or sweep.energy_bins.brem is None
     ne_pairs = list(
         product(
             _electron_counts(sweep.n_electrons, n_electrons, "n_electrons"),
@@ -1133,7 +1143,7 @@ def build_cases(
                         **beam_case,
                         **distribution_keys,
                         **line_grid_keys,
-                        E_grid_brem=_case_brem_grid(brem_case_grid, float(E0)),
+                        E_grid_brem=_case_brem_grid(brem_case_grid, float(E0), band=brem_band),
                         theta_obs_rad=np.deg2rad(sweep.detector.observation_angle_deg),
                         **model_keys,
                         beam_uvw=beam_uvw,

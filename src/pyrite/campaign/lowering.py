@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import TYPE_CHECKING
 
+import numpy as np
+
 from .._energy_bins import EnergyBins
 from .._numerics import Numerics, Physics
 from ..instrument import PlanarDetector
@@ -107,6 +109,14 @@ def lower_simulation(request: ResolvedSimulation) -> Case:
     return resolve_photon_transport(scene, case, numerics)
 
 
+def _kept_brem_band(old_sweep: LegacySweep, energy_bins: EnergyBins) -> bool:
+    """True while the replacement bins still carry the catalog's own brem band."""
+    new, old = energy_bins.brem, old_sweep.energy_bins.brem
+    if not old_sweep.brem_band or new is None or old is None:
+        return old_sweep.brem_band and new is old
+    return bool(np.array_equal(new, old))
+
+
 def build_sweep_cases(
     sweep: Sweep,
     numerics: Numerics | None = None,
@@ -150,9 +160,13 @@ def build_sweep_cases(
             )
         if numerics is not None:
             convergence = resolved_numerics.cxr_reflections
+            energy_bins = resolved_numerics.energy_bins or EnergyBins()
             old_sweep = replace(
                 old_sweep,
-                energy_bins=resolved_numerics.energy_bins or EnergyBins(),
+                energy_bins=energy_bins,
+                # A replacement brem grid is explicit; only the catalog's own
+                # band keeps stopping at each case's beam energy (#815).
+                brem_band=_kept_brem_band(old_sweep, energy_bins),
                 n_families=convergence.n_families,
                 max_reflections=convergence.max_reflections,
                 mosaic_nodes=convergence.mosaic_nodes,

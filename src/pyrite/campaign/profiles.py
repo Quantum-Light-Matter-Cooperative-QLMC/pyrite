@@ -21,6 +21,7 @@ from typing import Any, Literal
 
 import numpy as np
 
+from .._energy_grid_encoding import encode_energy_grid
 from .._numerics import (
     CHANNELING_KEYS,
     PHYSICS_FIELDS,
@@ -472,6 +473,15 @@ def _project_target_detector_and_bins(sweep_payload: dict[str, Any], sweep: Swee
     sweep_payload["E_grid_line"] = energy_bins["cxr"]
     sweep_payload["E_grid_line_by_energy"] = energy_bins["cxr_by_energy"]
     sweep_payload["E_grid_brem"] = energy_bins["brem"]
+    # A catalog band keeps its historical identity. An explicit uniform grid now
+    # stays exact instead of extending to E0, so it must not share that digest (#815).
+    brem_band = sweep_payload.pop("brem_band", False)
+    if (
+        not brem_band
+        and sweep.energy_bins.brem is not None
+        and isinstance(encode_energy_grid(sweep.energy_bins.brem), tuple)
+    ):
+        sweep_payload["brem_grid_exact"] = True
     sweep_payload["e_grid_eV"] = None
     # Response is applied only to response-free source arrays at read time. It must not
     # fork transport/checkpoint identity, which is deliberately reusable by
