@@ -461,3 +461,31 @@ four-scene straggling-on screen for one engine with per-run timeouts, and
 z-score summary. `pyrite_adapter.py --straggling on|off` overrides a scene's
 straggling switch, keeps the scene value as `straggling_scene` in the record,
 and never writes the legacy pilot record.
+
+## Energy-lookup baseline (#803)
+
+`baseline-803.json` freezes four scenes (Si and W at 300 keV, SiO2 at 800 keV,
+and 2 µm W on 100 µm Si at 800 keV), three seeds and three arms:
+screened-Rutherford exact versus the combined transport LUT (uncoupled), detailed
+ELSEPA with coupled BremsLib under continuous or shell soft/hard loss with
+radiative moments `table` or `exact`, and CUDA `continuation`/`auto` schedules,
+which pair with the detailed arm's `full-history` samples for bitwise checks.
+
+`baseline_803.py` runs one sample with every control explicit, including
+`--schedule`. A separately constructed transport config otherwise means
+full-history, while the process default is `auto`. Transport may bypass a
+request: the combined LUT excludes ELSEPA and coupled radiation. The record
+therefore stores what transport resolved: whether a LUT was built and its
+achieved error, the resolved schedule, and the moment model and packed-table
+hash. It also stores the wall time of LUT construction and radiative-moment
+preparation in the cold request and every warm request. Warm repeats of one
+seed must share a trajectory digest. A refused control combination is recorded
+as `unsupported`, not dropped.
+
+`run_baseline_803.py OUT --core per-electron|cuda` expands the protocol into
+fresh processes and reverses arm order on even seeds. It skips samples whose
+records exist and keeps failures as `*.failed.json`. Use `--dry-run` to list
+the plan. On the lab box, submit `baseline-803-cpu.sbatch` (one thread, array
+over scenes) and `baseline-803-gpu.sbatch` (scenes serialized on one GPU).
+Re-submit with the same `LUT803_OUT` to resume. Local runs are plumbing smokes
+only.

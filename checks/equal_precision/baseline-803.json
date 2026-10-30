@@ -1,0 +1,81 @@
+{
+  "schema": "pyrite.lut-baseline-803.protocol.v1",
+  "issue": 803,
+  "purpose": "Pinned current-source CPU/CUDA baseline for energy-lookup attribution. Every arm names all resolved controls; the harness records what transport actually resolved.",
+  "common": {
+    "electron_cutoff_keV": 10,
+    "hard_photon_cutoff_eV": 1000,
+    "inelastic_cutoff_eV": 50,
+    "width_mm": 10,
+    "angle_deg": 0,
+    "energy_model": "midpoint",
+    "max_dE_frac": 0.05,
+    "max_steps": 20000,
+    "atomic_electron_deflection": "kawrakow",
+    "straggling": false
+  },
+  "scenes": [
+    {
+      "id": "si-300-100um",
+      "energy_keV": 300,
+      "layers": [["silicon", 100]],
+      "note": "Matches #792/#510 si-300-100um-0deg."
+    },
+    {
+      "id": "w-300-10um",
+      "energy_keV": 300,
+      "layers": [["tungsten", 10]],
+      "note": "Matches #792/#510 w-300-10um-0deg."
+    },
+    {
+      "id": "sio2-800-tr0.3",
+      "energy_keV": 800,
+      "layers": [["sio2", 539.1984300411641]],
+      "note": "Matches matrix sio2-800kev-tr0.3-0deg-compound used by #792."
+    },
+    {
+      "id": "w2um-on-si100um-800",
+      "energy_keV": 800,
+      "layers": [["tungsten", 2], ["silicon", 100]],
+      "note": "High-Z film on low-Z substrate: layer switching and per-layer selection."
+    }
+  ],
+  "histories": {"per-electron": 2048, "cuda": 16384},
+  "seeds": [80301, 80302, 80303],
+  "warm_repeats": 3,
+  "arms": [
+    {
+      "id": "sr-lut",
+      "question": "(a) matched screened-Rutherford exact kernel versus existing combined LUT",
+      "cores": ["per-electron", "cuda"],
+      "elastic": "sr",
+      "radiative": "uncoupled",
+      "inelastic": ["continuous"],
+      "lut": ["off", "on"],
+      "moments": ["exact"],
+      "schedule": ["full-history"]
+    },
+    {
+      "id": "detailed",
+      "question": "(b) ELSEPA + coupled BremsLib, continuous or shell soft/hard, moments explicitly table or exact",
+      "cores": ["per-electron", "cuda"],
+      "elastic": "elsepa",
+      "radiative": "bremslib-soft-hard",
+      "inelastic": ["continuous", "shell-soft-hard"],
+      "lut": ["off"],
+      "moments": ["table", "exact"],
+      "schedule": ["full-history"]
+    },
+    {
+      "id": "schedule",
+      "question": "(c) matched CUDA schedules; results must be bitwise identical",
+      "cores": ["cuda"],
+      "elastic": "elsepa",
+      "radiative": "bremslib-soft-hard",
+      "inelastic": ["continuous", "shell-soft-hard"],
+      "lut": ["off"],
+      "moments": ["table"],
+      "schedule": ["continuation", "auto"]
+    }
+  ]
+}
