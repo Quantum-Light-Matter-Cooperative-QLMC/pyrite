@@ -15,3 +15,11 @@ independently after the introductory
 15-tuning-cuda-execution
 16-classical-mev-radiation
 ```
+
+## Classical coherent phase tracking (source preview)
+
+The {download}`coherent phase-tracking Marimo source <17-classical-coherent-phase-tracking.py>`
+uses the experimental public microtrain and temporal-profile interfaces.
+This is **source only** until CPU timing, a reproducible execution capture, and
+strict docs validation are completed. It is deliberately not yet in the
+published tutorial toctree (issue #777).

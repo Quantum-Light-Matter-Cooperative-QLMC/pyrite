@@ -100,6 +100,7 @@ from .tables import (
     show_summary,
     summary_table,
 )
+from .temporal import TemporalIntensity
 
 # Compatibility identity: public result spelling without changing pickle module paths.
 PixelCountResult = AcquisitionBatch
@@ -116,6 +117,7 @@ __all__ = [
     "detected_background",
     "Result",
     "SpectralDensity",
+    "TemporalIntensity",
     "QuantifiedSpectrum",
     "QuantifiedAcquisitionBatch",
     "QuantifiedApertureSpectrum",

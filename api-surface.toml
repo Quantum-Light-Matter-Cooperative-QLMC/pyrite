@@ -147,6 +147,7 @@ summary_table = { target = "pyrite.results.tables:summary_table", status = "adva
 Result = { target = "pyrite.results.model:Result", status = "stable" }
 Provenance = { target = "pyrite.results.provenance:Provenance", status = "advanced-stable" }
 SpectralDensity = { target = "pyrite.results.model:SpectralDensity", status = "advanced-stable" }
+TemporalIntensity = { target = "pyrite.results.temporal:TemporalIntensity", status = "experimental" }
 QuantifiedApertureSpectrum = { target = "pyrite.results.quantified_aperture:QuantifiedApertureSpectrum", status = "experimental" }
 QuantifiedAcquisitionBatch = { target = "pyrite.instrument.quantified_acquisition:QuantifiedAcquisitionBatch", status = "experimental" }
 QuantifiedDirectionalSpectrum = { target = "pyrite.results.quantified_directional:QuantifiedDirectionalSpectrum", status = "experimental" }
@@ -409,6 +410,7 @@ BunchFrontTilt = { target = "pyrite.campaign.beam:BunchFrontTilt", status = "adv
 # their numeric dataclass fields and transport records remain unchanged.
 BunchLength = { target = "pyrite.campaign.beam:BunchLength", status = "advanced-stable" }
 GdfSource = { target = "pyrite.campaign.beam:GdfSource", status = "advanced-stable" }
+LongitudinalDistribution = { target = "pyrite.campaign.longitudinal:LongitudinalDistribution", status = "experimental" }
 Offsets = { target = "pyrite.campaign.beam:Offsets", status = "advanced-stable" }
 PointBunch = { target = "pyrite.campaign.beam:PointBunch", status = "advanced-stable" }
 PointSpot = { target = "pyrite.campaign.beam:PointSpot", status = "advanced-stable" }

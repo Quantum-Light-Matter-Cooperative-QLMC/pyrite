@@ -52,6 +52,7 @@ from .observations.plan import ObservationPlan, PixelSampling
 from .observations.spec import Observation
 from .quantum import QuantumSetup
 from .results.model import CxrSpectra, Result, SpectralDensity
+from .results.temporal import TemporalIntensity
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -328,6 +329,8 @@ def simulate(
     scene, resolved_numerics = request.scene, request.numerics
     case, xsgen_tables = _source_case(request)
     if isinstance(scene.detector, PlanarDetector):
+        if resolved_numerics.temporal_profile:
+            raise ValueError("temporal_profile currently requires a scalar Detector")
         with run_progress(progress):
             return _simulate_planar(request, case, xsgen_tables)
     if request.executor is None:
@@ -369,6 +372,15 @@ def _scalar_result(
         ),
         channeling=(None if channeling is None else SpectralDensity(output["E_grid"], channeling)),
         transition=(None if transition is None else SpectralDensity(output["E_grid"], transition)),
+        temporal=(
+            None
+            if "temporal_t_fs" not in output
+            else TemporalIntensity(
+                time_fs=output["temporal_t_fs"],
+                incoherent=output["temporal_intensity"],
+                coherent=output.get("temporal_intensity_coherent"),
+            )
+        ),
         case=case,
         provenance={
             **request.composition_provenance,

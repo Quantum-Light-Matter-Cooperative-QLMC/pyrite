@@ -550,6 +550,8 @@ class Numerics:
     sampling: SamplingPolicy | None = field(default=None, kw_only=True)
     seed: int | None = field(default=None, kw_only=True)
     energy_bins: EnergyBins | None = field(default=None, kw_only=True)
+    # Opt-in output diagnostic; False must not add a key to a Case identity.
+    temporal_profile: bool = field(default=False, kw_only=True)
     transport: "TransportNumerics | None" = field(default=None, kw_only=True)
     radiation: "RadiationNumerics | None" = field(default=None, kw_only=True)
     execution: "ExecutionConfig | None" = field(default=None, kw_only=True)
@@ -603,6 +605,8 @@ class Numerics:
                 raise ValueError(f"{name} must be a positive integer or None")
         if self.seed is not None and type(self.seed) is not int:
             raise ValueError("seed must be an integer or None")
+        if type(self.temporal_profile) is not bool:
+            raise TypeError("temporal_profile must be a bool")
         if not isinstance(self.cxr_reflections, CxrReflections):
             raise TypeError("cxr_reflections must be a CxrReflections")
         if self.energy_bins is not None and not isinstance(self.energy_bins, EnergyBins):

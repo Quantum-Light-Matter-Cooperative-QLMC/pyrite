@@ -78,6 +78,7 @@ def lower_simulation(request: ResolvedSimulation) -> Case:
         n_electrons=numerics.cxr_trials,
         n_electrons_brem=numerics.brem_trials,
         coherent_emission=physics.coherent_emission,
+        temporal_profile=numerics.temporal_profile,
         straggling=physics.straggling,
         energy_model=numerics.energy_model,
         max_dE_frac=numerics.max_dE_frac,

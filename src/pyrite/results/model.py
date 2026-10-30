@@ -21,6 +21,7 @@ from .spatial import (
     SpatialResult,
     SpectralFactors,
 )
+from .temporal import TemporalIntensity
 
 FluxUnits = Literal["detector", "nA", "sr", "electron"]
 
@@ -166,6 +167,8 @@ class Result:
     """Planar channeling radiation on the CXR grid (ADR-0018), or ``None`` when off."""
     transition: SpectralDensity | None
     """Planar-stack transition radiation on the CXR grid (#103), or ``None`` when off."""
+    temporal: TemporalIntensity | None
+    """Opt-in, response-free PXR/CBS intensity-versus-arrival-time diagnostic."""
     case: Case
     """Fully resolved low-level transport input; prefer :attr:`scene` for inputs."""
     provenance: Provenance
@@ -184,6 +187,7 @@ class Result:
         characteristic: SpectralDensity | None = None,
         channeling: SpectralDensity | None = None,
         transition: SpectralDensity | None = None,
+        temporal: TemporalIntensity | None = None,
         case: Case,
         provenance: Mapping[str, Any],
         spatial: SpatialResult | None = None,
@@ -207,6 +211,8 @@ class Result:
                 raise ValueError(f"{label} and CXR normalization must match")
         if spatial is not None and not isinstance(spatial, SpatialResult):
             raise TypeError("spatial must be a SpatialResult or None")
+        if temporal is not None and not isinstance(temporal, TemporalIntensity):
+            raise TypeError("temporal must be a TemporalIntensity or None")
         if aperture is not None:
             from ..photon_event_observation import PhotonEventTally
             from ..photon_observation import PhotonContinuumTally
@@ -221,6 +227,7 @@ class Result:
             ("characteristic", characteristic),
             ("channeling", channeling),
             ("transition", transition),
+            ("temporal", temporal),
             ("case", case),
             (
                 "provenance",
@@ -481,6 +488,11 @@ class Result:
             ("characteristic", grid(self.characteristic), "atomic lines, CXR grid"),
             ("channeling", grid(self.channeling), "planar channeling radiation, CXR grid"),
             ("transition", grid(self.transition), "transition radiation, CXR grid"),
+            (
+                "temporal",
+                "—" if self.temporal is None else f"{self.temporal.time_fs.size} time samples",
+                "response-free PXR/CBS intensity in photons / (electron sr fs)",
+            ),
             ("brem", grid(self.brem), "bremsstrahlung continuum"),
             (
                 "scene",

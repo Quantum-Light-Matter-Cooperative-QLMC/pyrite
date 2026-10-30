@@ -37,12 +37,14 @@ if TYPE_CHECKING:
     from pyrite.campaign.beam import (
         TransverseSpot as TransverseSpot,
     )
+    from pyrite.campaign.longitudinal import LongitudinalDistribution as LongitudinalDistribution
 
 _EXPORTS = {
     "Beam": ("pyrite.campaign.beam", "Beam"),
     "BunchFrontTilt": ("pyrite.campaign.beam", "BunchFrontTilt"),
     "BunchLength": ("pyrite.campaign.beam", "BunchLength"),
     "GdfSource": ("pyrite.campaign.beam", "GdfSource"),
+    "LongitudinalDistribution": ("pyrite.campaign.longitudinal", "LongitudinalDistribution"),
     "Offsets": ("pyrite.campaign.beam", "Offsets"),
     "PointBunch": ("pyrite.campaign.beam", "PointBunch"),
     "PointSpot": ("pyrite.campaign.beam", "PointSpot"),
@@ -55,6 +57,7 @@ __all__ = [
     "BunchFrontTilt",
     "BunchLength",
     "GdfSource",
+    "LongitudinalDistribution",
     "Offsets",
     "PointBunch",
     "PointSpot",
