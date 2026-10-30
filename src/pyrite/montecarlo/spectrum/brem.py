@@ -11,6 +11,7 @@ import numpy as np
 from endf_parserpy import EndfFile
 
 from ..._backend import BACKEND, REAL, _to_cpu, xp
+from ..._physics_fallback import PhysicsFallbackWarning
 from ...materials.atomic import Z_TABLE
 from ...materials.attenuation import (
     _finite_mu_or_raise,
@@ -773,7 +774,7 @@ def _bremsstrahlung_dsigma_dk(
     except EEDLBremsstrahlungDataUnavailable as exc:
         warnings.warn(
             f"{exc}; falling back to Bethe-Heitler for {element}",
-            RuntimeWarning,
+            PhysicsFallbackWarning,
             stacklevel=2,
         )
         return _brem_dsigma_dk(atomic_number, T_keV, k_eV)
@@ -788,7 +789,7 @@ def _bremsstrahlung_dsigma_dk(
             f"[{prepared.minimum_incident_energy_eV:g}, "
             f"{prepared.maximum_incident_energy_eV:g}] eV; falling back to "
             "Bethe-Heitler for those segments",
-            RuntimeWarning,
+            PhysicsFallbackWarning,
             stacklevel=2,
         )
     eedl = _evaluate_prepared_eedl(prepared, state, k_eV)
@@ -811,7 +812,7 @@ def _prepare_mc_eedl_contexts(
         except EEDLBremsstrahlungDataUnavailable as exc:
             warnings.warn(
                 f"{exc}; falling back to Bethe-Heitler for {element}",
-                RuntimeWarning,
+                PhysicsFallbackWarning,
                 stacklevel=3,
             )
             contexts[element] = None
@@ -826,7 +827,7 @@ def _prepare_mc_eedl_contexts(
                 f"[{prepared.minimum_incident_energy_eV:g}, "
                 f"{prepared.maximum_incident_energy_eV:g}] eV; falling back to "
                 "Bethe-Heitler for those segments",
-                RuntimeWarning,
+                PhysicsFallbackWarning,
                 stacklevel=3,
             )
         contexts[element] = _ResolvedEEDLContext(
