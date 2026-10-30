@@ -356,6 +356,45 @@ def elsepa_angular_pdf(mu, dcs):
     return pdf, cdf
 
 
+#: Equal-probability guide cells per ELSEPA angular row. A power of two makes
+#: ``xi * cells`` exact, so a cell's bounds ``j / cells`` are exact too; 1024
+#: (about 2 ``N_mu`` on the production 606-node grid) was the measured choice
+#: of issue #826.
+ELSEPA_GUIDE_CELLS = 1024
+
+
+def elsepa_guide_table(cdf, cells=ELSEPA_GUIDE_CELLS):
+    """Per-row guide table bounding the panel search of :func:`_elsepa_invert_row`.
+
+    ``guide[r, j]`` is the last panel ``k`` in ``[0, n_mu - 2]`` with
+    ``cdf[r, k] <= j / cells`` (``0`` for ``j = 0``, ``n_mu - 2`` for
+    ``j = cells``). For ``xi`` in cell ``j`` the panel the full bisection
+    selects -- the last ``k`` with ``cdf[r, k] <= xi`` -- lies in
+    ``[guide[r, j], guide[r, j + 1]]``, and the bisection restricted to that
+    window returns the same panel, zero-mass panels and ties included. The
+    proof needs the predicate ``cdf[r, k] <= xi`` monotone in ``k``, so a
+    row whose interior CDF decreases is rejected. The guide changes which
+    CDF entries are read, never the sampled ``mu``.
+
+    Validation: elsepa-elastic-sampling
+    """
+    cdf = np.atleast_2d(np.asarray(cdf, dtype=np.float64))
+    if cells < 1 or cells & (cells - 1):
+        raise ValueError("ELSEPA guide cells must be a positive power of two")
+    n_mu = cdf.shape[1]
+    interior = cdf[:, : n_mu - 1]
+    if np.any(np.diff(interior, axis=1) < 0.0):
+        raise ValueError("ELSEPA angular CDF rows must be non-decreasing")
+    bounds = np.arange(cells + 1, dtype=np.float64) / cells
+    guide = np.empty((cdf.shape[0], cells + 1), dtype=np.int32)
+    for r in range(cdf.shape[0]):
+        guide[r] = np.searchsorted(interior[r], bounds, side="right") - 1
+    np.clip(guide, 0, n_mu - 2, out=guide)
+    guide[:, 0] = 0
+    guide[:, cells] = n_mu - 2
+    return guide
+
+
 def pack_elsepa_tables(elastic_tables, L_ncm3, rate_scales=None):
     """Flatten per-layer, per-element ELSEPA tables into the cores' group.
 
@@ -364,9 +403,11 @@ def pack_elsepa_tables(elastic_tables, L_ncm3, rate_scales=None):
     layer ``L`` in composition order. ``None`` packs an empty group, which the
     cores never read unless ``elastic_model="elsepa"``.
 
-    Returns ``(has, start, length, logE, log_rate, cdf, pdf, mu)``: rates are
-    stored as ``ln(n_cm3 * sigma_el)`` [1/cm] so energy interpolation is
-    log-log in the macroscopic cross section. ``rate_scales[L][i]``, when
+    Returns ``(has, start, length, logE, log_rate, cdf, pdf, mu, guide)``:
+    rates are stored as ``ln(n_cm3 * sigma_el)`` [1/cm] so energy
+    interpolation is log-log in the macroscopic cross section; ``guide`` is
+    :func:`elsepa_guide_table` of ``cdf``, which only accelerates the panel
+    search of :func:`_elsepa_invert_row`. ``rate_scales[L][i]``, when
     given, multiplies that element's rate node by node (atomic-electron
     deflection); the angular density is unchanged.
 
@@ -384,6 +425,7 @@ def pack_elsepa_tables(elastic_tables, L_ncm3, rate_scales=None):
             empty2,
             empty2,
             np.zeros(1, dtype=np.float64),
+            np.zeros((1, 2), dtype=np.int32),
         )
     n_layers = len(elastic_tables)
     if n_layers != len(L_ncm3):
@@ -420,15 +462,17 @@ def pack_elsepa_tables(elastic_tables, L_ncm3, rate_scales=None):
             cdf.append(row_cdf)
             pdf.append(row_pdf)
             offset += energy.size
+    cdf_flat = np.vstack(cdf)
     return (
         has,
         start,
         length,
         np.concatenate(logE),
         np.concatenate(log_rate),
-        np.vstack(cdf),
+        cdf_flat,
         np.vstack(pdf),
         np.ascontiguousarray(mu_ref),
+        elsepa_guide_table(cdf_flat),
     )
 
 
@@ -503,26 +547,50 @@ def _elsepa_rate_scalar(E_keV, logE_flat, log_rate_flat, start, length):
 
 
 @njit(cache=True)
-def _elsepa_invert_row(cdf, pdf, mu, row, xi):
-    """Invert one piecewise-linear angular density exactly at ``xi``.
+def _elsepa_panel(cdf, guide, row, xi):
+    """Last panel ``k`` in ``[0, n_mu - 2]`` with ``cdf[row, k] <= xi`` (else 0).
 
-    Within ``[mu_k, mu_k+1]`` the density is linear, so the CDF is quadratic
-    in ``t = (mu - mu_k)/dmu``:
-    ``F = F_k + dmu*(p_k*t + (p_k+1 - p_k)*t^2/2)``. The root is taken in the
-    cancellation-free form ``t = 2r / (b + sqrt(b^2 + 2*dmu*(p_k+1 - p_k)*r))``
-    with ``b = dmu*p_k`` and ``r = xi - F_k``.
+    Bisection over the guide window of ``xi``'s cell
+    (:func:`elsepa_guide_table`): the same comparisons as a bisection over
+    the whole row, on a window of about two panels instead of ``n_mu``.
+    ``xi * cells`` is exact for the power-of-two cell count; out-of-range or
+    NaN ``xi`` falls in an end cell, whose window still holds the answer.
 
     Validation: elsepa-elastic-sampling
     """
-    n = mu.size
-    lo = 0
-    hi = n - 1
+    cells = guide.shape[1] - 1
+    scaled = xi * cells
+    if scaled >= cells:
+        cell = cells - 1
+    elif scaled > 0.0:
+        cell = int(scaled)
+    else:
+        cell = 0
+    lo = guide[row, cell]
+    hi = guide[row, cell + 1] + 1
     while hi - lo > 1:
         mid = (lo + hi) // 2
         if cdf[row, mid] <= xi:
             lo = mid
         else:
             hi = mid
+    return lo
+
+
+@njit(cache=True)
+def _elsepa_invert_row(cdf, pdf, mu, guide, row, xi):
+    """Invert one piecewise-linear angular density exactly at ``xi``.
+
+    Within ``[mu_k, mu_k+1]`` the density is linear, so the CDF is quadratic
+    in ``t = (mu - mu_k)/dmu``:
+    ``F = F_k + dmu*(p_k*t + (p_k+1 - p_k)*t^2/2)``. The root is taken in the
+    cancellation-free form ``t = 2r / (b + sqrt(b^2 + 2*dmu*(p_k+1 - p_k)*r))``
+    with ``b = dmu*p_k`` and ``r = xi - F_k``. The panel ``k`` comes from the
+    guided search :func:`_elsepa_panel`.
+
+    Validation: elsepa-elastic-sampling
+    """
+    lo = _elsepa_panel(cdf, guide, row, xi)
     dmu = mu[lo + 1] - mu[lo]
     p0 = pdf[row, lo]
     p1 = pdf[row, lo + 1]
@@ -541,7 +609,7 @@ def _elsepa_invert_row(cdf, pdf, mu, row, xi):
 
 
 @njit(cache=True)
-def _sample_cos_theta_elsepa(E_keV, xi, logE_flat, cdf, pdf, mu, start, length):
+def _sample_cos_theta_elsepa(E_keV, xi, logE_flat, cdf, pdf, mu, guide, start, length):
     """Polar deflection cosine from tabulated ELSEPA angular distributions.
 
     One uniform ``xi`` is inverted on the two bracketing energy nodes and the
@@ -553,6 +621,6 @@ def _sample_cos_theta_elsepa(E_keV, xi, logE_flat, cdf, pdf, mu, start, length):
     Validation: elsepa-elastic-sampling
     """
     row, f = _elsepa_bracket(np.log(E_keV * 1e3), logE_flat, start, length)
-    mu0 = _elsepa_invert_row(cdf, pdf, mu, row, xi)
-    mu1 = _elsepa_invert_row(cdf, pdf, mu, row + 1, xi)
+    mu0 = _elsepa_invert_row(cdf, pdf, mu, guide, row, xi)
+    mu1 = _elsepa_invert_row(cdf, pdf, mu, guide, row + 1, xi)
     return 1.0 - 2.0 * ((1.0 - f) * mu0 + f * mu1)

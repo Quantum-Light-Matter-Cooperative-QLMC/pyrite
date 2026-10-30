@@ -3,16 +3,20 @@
 Validation: elsepa-elastic-sampling
 """
 
+import json
 from pathlib import Path
 
 import numpy as np
 import pytest
+from numba import njit
 
 from pyrite.montecarlo.transport import simulate_trajectories
 from pyrite.montecarlo.transport.scattering import (
+    _elsepa_invert_row,
     _elsepa_rate_scalar,
     _sample_cos_theta_elsepa,
     elsepa_angular_pdf,
+    elsepa_guide_table,
     pack_elsepa_tables,
 )
 from pyrite.xsgen.elsepa import parse_dcs, table_arrays
@@ -89,7 +93,7 @@ def test_rate_is_log_log_between_nodes_and_exact_at_them(reference):
 def test_inversion_reproduces_the_tabulated_cdf(reference):
     """Kolmogorov distance of exact inversion is at the sampling noise floor."""
     group = _group(_two_node_table(reference))
-    _, start, length, logE, _, cdf, pdf, mu = group
+    _, start, length, logE, _, cdf, pdf, mu, guide = group
     rng = np.random.default_rng(89)
     xi = rng.random(200_000)
 
@@ -98,7 +102,9 @@ def test_inversion_reproduces_the_tabulated_cdf(reference):
             0.5
             * (
                 1.0
-                - _sample_cos_theta_elsepa(1.0, x, logE, cdf, pdf, mu, start[0, 0], length[0, 0])
+                - _sample_cos_theta_elsepa(
+                    1.0, x, logE, cdf, pdf, mu, guide, start[0, 0], length[0, 0]
+                )
             )
             for x in xi
         ]
@@ -110,12 +116,12 @@ def test_inversion_reproduces_the_tabulated_cdf(reference):
 
 
 def test_sampling_is_monotone_in_the_uniform_and_exact_at_the_endpoints(reference):
-    _, start, length, logE, _, cdf, pdf, mu = _group(_two_node_table(reference))
+    _, start, length, logE, _, cdf, pdf, mu, guide = _group(_two_node_table(reference))
     xi = np.linspace(0.0, 1.0 - 1e-12, 4001)
 
     cos_t = np.array(
         [
-            _sample_cos_theta_elsepa(1.5, x, logE, cdf, pdf, mu, start[0, 0], length[0, 0])
+            _sample_cos_theta_elsepa(1.5, x, logE, cdf, pdf, mu, guide, start[0, 0], length[0, 0])
             for x in xi
         ]
     )
@@ -129,14 +135,17 @@ def test_first_moment_matches_the_analytic_screened_rutherford_value(reference):
     """Limiting case: an SR DCS table reproduces 2a[(1+a)ln(1+1/a) - 1]."""
     Z, E_keV = 14.0, 30.0
     table = _sr_table(Z, [E_keV, 2 * E_keV], reference.mu)
-    _, start, length, logE, _, cdf, pdf, mu = _group(table)
+    _, start, length, logE, _, cdf, pdf, mu, guide = _group(table)
     alpha = 3.4e-3 * Z**0.67 / E_keV
     expected = 2.0 * alpha * ((1.0 + alpha) * np.log1p(1.0 / alpha) - 1.0)
     xi = (np.arange(400_000) + 0.5) / 400_000  # stratified: deterministic quadrature
 
     one_minus_cos = np.array(
         [
-            1.0 - _sample_cos_theta_elsepa(E_keV, x, logE, cdf, pdf, mu, start[0, 0], length[0, 0])
+            1.0
+            - _sample_cos_theta_elsepa(
+                E_keV, x, logE, cdf, pdf, mu, guide, start[0, 0], length[0, 0]
+            )
             for x in xi
         ]
     ).mean()
@@ -152,14 +161,16 @@ def test_sampled_moments_reproduce_elsepas_own_transport_cross_sections(referenc
     ``6 mu (1 - mu)``. Stratified draws make this a deterministic quadrature;
     the Hg 1 keV panel agrees to about 2e-5, the native-grid trapezoid floor.
     """
-    _, start, length, logE, _, cdf, pdf, mu = _group(_two_node_table(reference))
+    _, start, length, logE, _, cdf, pdf, mu, guide = _group(_two_node_table(reference))
     xi = (np.arange(100_000) + 0.5) / 100_000
     sampled_mu = np.array(
         [
             0.5
             * (
                 1.0
-                - _sample_cos_theta_elsepa(1.0, x, logE, cdf, pdf, mu, start[0, 0], length[0, 0])
+                - _sample_cos_theta_elsepa(
+                    1.0, x, logE, cdf, pdf, mu, guide, start[0, 0], length[0, 0]
+                )
             )
             for x in xi
         ]
@@ -180,6 +191,125 @@ def test_packing_rejects_mismatched_grids_and_layers(reference):
         pack_elsepa_tables([[table, other]], [np.array([1.0, 1.0])])
     with pytest.raises(ValueError, match="one table per element"):
         pack_elsepa_tables([[table]], [np.array([1.0, 1.0])])
+
+
+@njit(cache=False)
+def _bisect_invert_row(cdf, pdf, mu, row, xi):
+    """Pre-#826 full-row bisection inversion, kept verbatim as the exactness oracle."""
+    n = mu.size
+    lo = 0
+    hi = n - 1
+    while hi - lo > 1:
+        mid = (lo + hi) // 2
+        if cdf[row, mid] <= xi:
+            lo = mid
+        else:
+            hi = mid
+    dmu = mu[lo + 1] - mu[lo]
+    p0 = pdf[row, lo]
+    p1 = pdf[row, lo + 1]
+    r = xi - cdf[row, lo]
+    b = dmu * p0
+    disc = b * b + 2.0 * dmu * (p1 - p0) * r
+    if disc < 0.0:
+        disc = 0.0
+    denom = b + np.sqrt(disc)
+    t = 2.0 * r / denom if denom > 0.0 else 0.0
+    if t < 0.0:
+        t = 0.0
+    elif t > 1.0:
+        t = 1.0
+    return mu[lo] + t * dmu
+
+
+@njit(cache=False)
+def _count_guided_mismatches(cdf, pdf, mu, guide, xi_rows):
+    """Rows x draws where the guided and full bisections differ in any bit."""
+    bad = 0
+    for row in range(cdf.shape[0]):
+        for xi in xi_rows[row]:
+            a = _elsepa_invert_row(cdf, pdf, mu, guide, row, xi)
+            b = _bisect_invert_row(cdf, pdf, mu, row, xi)
+            if a != b and not (np.isnan(a) and np.isnan(b)):
+                bad += 1
+    return bad
+
+
+def _exactness_draws(cdf, n_dense=1 << 14, seed=826):
+    """Per-row draws: a dyadic grid hitting every guide-cell bound, uniforms,
+    every CDF node value with both float neighbours, and the 0/1 edges."""
+    edges = np.array([0.0, 5e-324, 2.0**-53, 2.0**-30, 0.5, np.nextafter(1.0, 0.0), 1.0 - 2.0**-30])
+    dense = np.arange(n_dense) / n_dense
+    uniform = np.random.default_rng(seed).random(n_dense)
+    rows = []
+    for row in cdf:
+        nodes = np.concatenate([row, np.nextafter(row, -1.0), np.nextafter(row, 2.0)])
+        draws = np.concatenate([edges, dense, uniform, nodes])
+        rows.append(draws[(draws >= 0.0) & (draws < 1.0)])
+    width = max(r.size for r in rows)
+    return np.vstack([np.pad(r, (0, width - r.size), constant_values=0.5) for r in rows])
+
+
+def _assert_guided_inversion_is_exact(cdf, pdf, mu, cells=None):
+    guide = elsepa_guide_table(cdf) if cells is None else elsepa_guide_table(cdf, cells)
+    xi_rows = _exactness_draws(cdf)
+    assert _count_guided_mismatches(cdf, pdf, mu, guide, xi_rows) == 0
+
+
+@pytest.mark.parametrize("cells", [1, 2, 64, 1024, 4096])
+def test_guided_inversion_is_bitwise_the_full_bisection(reference, cells):
+    """Ties, zero-mass panels and a flat tail select the bisection's panel."""
+    dcs = np.vstack([reference.dcs_cm2_sr, reference.dcs_cm2_sr])
+    dcs[1, 40:90] = 0.0  # zero-mass panels: repeated CDF values
+    dcs[1, -60:] = 0.0  # zero-mass tail: CDF reaches 1 before the last node
+    pdf, cdf = elsepa_angular_pdf(reference.mu, dcs)
+    assert np.any(np.diff(cdf[1]) == 0.0)
+
+    _assert_guided_inversion_is_exact(cdf, pdf, reference.mu, cells)
+
+
+def test_guided_search_handles_out_of_range_draws(reference):
+    pdf, cdf = elsepa_angular_pdf(reference.mu, reference.dcs_cm2_sr)
+    guide = elsepa_guide_table(cdf)
+    for xi in (-0.25, -0.0, 1.0, 1.5, np.inf, -np.inf, np.nan):
+        guided = _elsepa_invert_row(cdf, pdf, reference.mu, guide, 0, xi)
+        full = _bisect_invert_row(cdf, pdf, reference.mu, 0, xi)
+        assert np.array_equal([guided], [full], equal_nan=True), xi
+
+
+def test_guide_table_rejects_bad_cell_counts_and_decreasing_cdfs(reference):
+    _, cdf = elsepa_angular_pdf(reference.mu, reference.dcs_cm2_sr)
+    with pytest.raises(ValueError, match="power of two"):
+        elsepa_guide_table(cdf, 1000)
+    broken = cdf.copy()
+    broken[0, 10] = broken[0, 12]
+    with pytest.raises(ValueError, match="non-decreasing"):
+        elsepa_guide_table(broken)
+
+
+def _released_tables():
+    from pyrite.xsgen.elsepa.release import release_index_path
+    from pyrite.xsgen.store import resolve
+
+    tables = []
+    for projectile in ("electron", "positron"):
+        index = json.loads(release_index_path(projectile=projectile).read_text())
+        for entry in index["tables"]:
+            stored = resolve(entry["key"])
+            if stored is None:
+                pytest.skip(f"released {projectile} ELSEPA tables are not installed")
+            tables.append(stored)
+    return tables
+
+
+@pytest.mark.slow
+def test_guided_inversion_is_exact_on_every_released_table():
+    """Acceptance of #826 on the CPU: every row of every released table."""
+    tables = _released_tables()
+    for stored in tables:
+        arrays = stored.arrays()
+        pdf, cdf = elsepa_angular_pdf(arrays["mu"], arrays["dcs_cm2_sr"])
+        _assert_guided_inversion_is_exact(cdf, pdf, np.ascontiguousarray(arrays["mu"]))
 
 
 _SI_N = 0.04994
@@ -281,6 +411,101 @@ def test_cuda_elsepa_agrees_statistically_with_the_cpu_core(reference):
     sigma = np.sqrt(p_cpu * (1 - p_cpu) / n + p_gpu * (1 - p_gpu) / n)
     assert abs(p_cpu - p_gpu) < 4.0 * sigma
     assert gpu["L_ang"].sum() / n == pytest.approx(cpu["L_ang"].sum() / n, rel=0.03)
+
+
+def _cuda_guided_and_bisected(cdf, pdf, mu, xi_rows):
+    """Device guided inversion and the pre-#826 device bisection, per (row, draw)."""
+    import cupy
+
+    from pyrite.montecarlo._cupy_jit import jit
+    from pyrite.montecarlo.transport import _jit_device as dev
+
+    @jit.rawkernel(device=True)
+    def bisect(cdf, pdf, mu, n_mu, row, xi):
+        base = row * n_mu
+        lower_idx = dev.I32_ZERO
+        upper_idx = n_mu - dev.I32_ONE
+        while upper_idx - lower_idx > dev.I32_ONE:
+            mid_idx = (lower_idx + upper_idx) // dev.I32_TWO
+            if cdf[base + mid_idx] <= xi:
+                lower_idx = mid_idx
+            else:
+                upper_idx = mid_idx
+        mu_width = mu[lower_idx + dev.I32_ONE] - mu[lower_idx]
+        lower_pdf = pdf[base + lower_idx]
+        upper_pdf = pdf[base + lower_idx + dev.I32_ONE]
+        interval_probability = xi - cdf[base + lower_idx]
+        scaled_lower_pdf = mu_width * lower_pdf
+        discriminant = (
+            scaled_lower_pdf * scaled_lower_pdf
+            + dev.F64_TWO * mu_width * (upper_pdf - lower_pdf) * interval_probability
+        )
+        if discriminant < dev.F64_ZERO:
+            discriminant = dev.F64_ZERO
+        inversion_denominator = scaled_lower_pdf + cupy.sqrt(discriminant)
+        interval_fraction = dev.F64_ZERO
+        if inversion_denominator > dev.F64_ZERO:
+            interval_fraction = dev.F64_TWO * interval_probability / inversion_denominator
+        if interval_fraction < dev.F64_ZERO:
+            interval_fraction = dev.F64_ZERO
+        if interval_fraction > dev.F64_ONE:
+            interval_fraction = dev.F64_ONE
+        return mu[lower_idx] + interval_fraction * mu_width
+
+    @jit.rawkernel()
+    def probe(cdf, pdf, mu, n_mu, guide, cells, xi, n_xi, n_total, guided, full):
+        i = np.int32(jit.blockIdx.x * jit.blockDim.x + jit.threadIdx.x)
+        if i < n_total:
+            row = i // n_xi
+            guided[i] = dev._elsepa_invert_row(cdf, pdf, mu, n_mu, guide, cells, row, xi[i])
+            full[i] = bisect(cdf, pdf, mu, n_mu, row, xi[i])
+
+    guide = elsepa_guide_table(cdf)
+    n_total = xi_rows.size
+    guided = cupy.empty(n_total, dtype=cupy.float64)
+    full = cupy.empty(n_total, dtype=cupy.float64)
+    probe(
+        ((n_total + 127) // 128,),
+        (128,),
+        (
+            cupy.asarray(cdf.reshape(-1)),
+            cupy.asarray(pdf.reshape(-1)),
+            cupy.asarray(mu),
+            np.int32(mu.size),
+            cupy.asarray(guide.reshape(-1)),
+            np.int32(guide.shape[1] - 1),
+            cupy.asarray(xi_rows.reshape(-1)),
+            np.int32(xi_rows.shape[1]),
+            np.int32(n_total),
+            guided,
+            full,
+        ),
+    )
+    return guided.get(), full.get()
+
+
+@pytest.mark.hardware
+def test_cuda_guided_inversion_is_bitwise_the_device_bisection(reference):
+    """#826 on the device: synthetic ties and zero-mass panels, then every
+    released table when installed."""
+    _require_cuda()
+    dcs = np.vstack([reference.dcs_cm2_sr, reference.dcs_cm2_sr])
+    dcs[1, 40:90] = 0.0
+    dcs[1, -60:] = 0.0
+    pdf, cdf = elsepa_angular_pdf(reference.mu, dcs)
+    cases = [(cdf, pdf, reference.mu)]
+    try:
+        released = _released_tables()
+    except pytest.skip.Exception:
+        released = []
+    for stored in released:
+        arrays = stored.arrays()
+        pdf, cdf = elsepa_angular_pdf(arrays["mu"], arrays["dcs_cm2_sr"])
+        cases.append((cdf, pdf, np.ascontiguousarray(arrays["mu"])))
+
+    for cdf, pdf, mu in cases:
+        guided, full = _cuda_guided_and_bisected(cdf, pdf, mu, _exactness_draws(cdf))
+        assert np.array_equal(guided.view(np.uint64), full.view(np.uint64))
 
 
 def test_pre_adapter_seeded_elsepa_baseline(reference):

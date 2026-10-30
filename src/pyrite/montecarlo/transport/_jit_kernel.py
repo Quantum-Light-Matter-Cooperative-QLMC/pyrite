@@ -178,6 +178,8 @@ def _transport_kernel(
     el_pdf,
     el_mu,
     el_n_mu,
+    el_guide,
+    el_guide_cells,
     E_keV,
     seg_dir,
     seg_mid,
@@ -1156,13 +1158,22 @@ def _transport_kernel(
                                 elastic_lower_index,
                             )
                             mu0 = _elsepa_invert_row(
-                                el_cdf, el_pdf, el_mu, el_n_mu, el_row + elastic_lower_index, R_ang
+                                el_cdf,
+                                el_pdf,
+                                el_mu,
+                                el_n_mu,
+                                el_guide,
+                                el_guide_cells,
+                                el_row + elastic_lower_index,
+                                R_ang,
                             )
                             mu1 = _elsepa_invert_row(
                                 el_cdf,
                                 el_pdf,
                                 el_mu,
                                 el_n_mu,
+                                el_guide,
+                                el_guide_cells,
                                 el_row + elastic_lower_index + I32_ONE,
                                 R_ang,
                             )
