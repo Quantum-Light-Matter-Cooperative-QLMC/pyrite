@@ -70,7 +70,7 @@ One deliberate measure-zero difference is documented in the code: the elastic el
 
 One thread per electron; the outer lockstep loop is gone. Control flow uses only `while` with an explicit `running` flag, so nothing depends on `break` / `continue` support in the `cupyx.jit` transpiler. Device helpers return a single scalar each; `_first_prism_exit_scalar` and `_rotate_direction_scalar` return tuples on the CPU and are therefore inlined.
 
-Arithmetic is fp64 and textually identical to the CPU core, so any divergence is attributable to libm alone. fp32 would roughly double throughput on consumer cards but would change trajectories qualitatively rather than at rounding scale; it is not offered.
+Arithmetic is fp64 and textually identical to the CPU core, so any divergence is attributable to libm alone. FP32 would change every trajectory at rounding scale and above, and it is not offered; its measured speed-of-light gain is in "Mixed precision (#831)" below.
 
 Arrays are flattened to 1-D and indexed manually, matching the house style set by `line_prologue_jit_kernel`. Per-layer element data is padded to `(n_layers, max_elements)` with live lengths in `L_nel`.
 
@@ -298,6 +298,45 @@ The full-history rows, which are the steadier ones, put `ro`, `r168` and `ro+r16
 The cause of those differences is FMA contraction in ptxas. The NVRTC PTX has 812 `mul.f64`, 572 `add.f64` and 696 `sub.f64` without a rounding modifier, next to 2523 `fma.rn.f64`. PTX allows the code generator to fuse unrounded multiplies and adds. Under a tight register budget ptxas schedules and fuses differently: the SASS has 3892 `DFMA`/1003 `DMUL` for `jit` and `r168`, 3900/1064 for `r128` and 3914/1111 for `r96`. The rounding of a fused product then changes, and transport amplifies it, as with `sec_on` in #827. The read-only rewrite changes no arithmetic instruction (identical FP64 PTX and SASS counts). A register cap can change results, so any future adoption would have to put the compile options in the case identity and would need its own bitwise or statistical review. The `r168` agreement shows only that this kernel was not affected at that cap.
 
 **Next.** The resident-warp and load-path levers are closed for this kernel on this device. What remains is the arithmetic itself: #788's tabulated radiative moments and #831's precision probe. A counter-backed profile would also help once the host allows one.
+
+## Mixed precision (#831)
+
+[#831](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/831) measured what FP64 costs this kernel on the RTX 5080 (FP32:FP64 = 64). It is a timing experiment only. No precision option, default or model identity changed, and no variant below is validated physics.
+
+**Mechanism.** `checks/fp32_speed_of_light/precision_variants.py` wraps `_jit_launch.transport_kernel_variant`, rewrites the #827 specialized variant's generated source as text, and compiles it through `compile_with_cache`, the same entry point as the #796 builds. CUDA events around each launch give kernel-only time. The #821 harness (`checks/geant4_performance/pyrite_bench.py`) then runs unchanged with `--kernel specialized`, `--rows-per-round 1024` and device staging. There are four variants:
+
+- `exact`: the generated source unchanged, so it is the production kernel.
+- `fp32`: the upper bound. Every `double` and floating literal becomes `float`, and read-only tables are passed as float32 copies. The state and row-output arrays stay float64 in memory, with one conversion per load and store, so the host pipeline is unchanged. The physics is wrong by construction.
+- `mixed`: the device functions for energy-grid lookup and interpolation (ELSEPA grid, SBETHE stopping, Mott screening, BremsLib moments and photon sampling) and ELSEPA polar-angle inversion run in FP32, and so do their tables. Position, direction, energy, path and clock accumulation, boundary distances and rotation stay FP64.
+- `mixed_math`: `mixed`, plus every `log`/`exp`/`sqrt`/`sin`/`cos`/`pow` left in the kernel body evaluated in FP32. These are the inline ELSEPA rate `exp`, the free-path `log`, the azimuth `sincos` and the rotation `sqrt`. Body arithmetic and accumulation stay FP64.
+
+**Run.** Job 2862, at revision `13f4e57b` (the harness is byte-identical to the committed one, and `pyrite_bench.py` is #821's `5c046888`). The four #821 anchors were run at 36000 (Si 300 keV/100 µm), 20000 (W 300 keV/10 µm), 5000 (W 1 MeV/100 µm) and 7000 (Si 3 MeV/1 mm) histories, 37–76 M rows, with seeds 1–3. The variant order was rotated per seed. The 300 keV anchors resolved to the continuation schedule (204 registers for `exact`), the others to full-history (186). Job 2863 repeated the 300 keV anchors at 2000 histories, all full-history. Evidence: `qlmc:~/pyrite-831b/evidence/fp32sol831/{2862,2863}`; summarize with `analyze.py`.
+
+Speedups over `exact` are the median [min, max] of the per-seed ratios. "Kernel" is CUDA-event time. "Warm" is the harness's warm transport time, which includes host staging, compaction and scoring. The second column is the share of warm time spent in the kernel for `exact`.
+
+| anchor | `exact` kernel / warm s (kernel share) | `fp32` kernel | `fp32` warm | `mixed` kernel | `mixed` warm | `mixed_math` kernel | `mixed_math` warm |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Si 300 keV | 0.40 / 2.34 (17%) | 2.68 [2.67, 2.68] | 1.15 [1.15, 1.30] | 1.45 [1.45, 1.45] | 1.07 [0.99, 1.08] | 1.72 [1.72, 1.72] | 1.12 [1.05, 1.14] |
+| W 300 keV | 0.70 / 3.18 (22%) | 2.70 [2.68, 2.72] | 1.26 [1.14, 1.31] | 1.46 [1.45, 1.46] | 1.06 [1.06, 1.18] | 1.72 [1.71, 1.73] | 1.15 [1.01, 1.20] |
+| W 1 MeV | 7.86 / 12.52 (63%) | 3.11 [3.08, 3.12] | 1.99 [1.98, 1.99] | 1.49 [1.49, 1.49] | 1.27 [1.26, 1.30] | 1.81 [1.80, 1.81] | 1.44 [1.41, 1.44] |
+| Si 3 MeV | 7.14 / 10.03 (71%) | 2.52 [2.33, 2.57] | 1.92 [1.76, 1.93] | 1.42 [1.27, 1.49] | 1.19 [0.99, 1.30] | 1.70 [1.51, 1.77] | 1.46 [1.28, 1.52] |
+
+Kernel time per retained row matches the kernel column to within 0.01. In job 2863 (full-history, 2000 histories) the 300 keV kernel gains were larger: `fp32` 3.28–3.32×, `mixed` 1.53–1.54× and `mixed_math` 1.89×.
+
+**Resources.** `fp32` uses 106–112 registers (4 blocks of 128 per SM) and 32 B of stack. `mixed` uses 140–164 registers and `mixed_math` 140–162 (3 blocks per SM), against 186–204 (2 blocks) for `exact`. This means the variants also raise occupancy. #796 showed that occupancy alone buys this kernel nothing: a 168-register cap was within 1% and caps of 128 registers or below were slower. So the gain is attributed to the FP32 arithmetic and transcendental pipes, not to residency. That attribution is still an inference, because Nsight Compute is refused on the host.
+
+**Deviation preview.** This compares paired per-primary observables of the #821 harness against `exact` at the same seed, pooled over three seeds. It previews what the #510 gates would face and is not a validation.
+
+- No variant leaves any primary's path length bitwise unchanged, so every trajectory diverges.
+- Categorical outcomes are still mostly identical. Transmitted, backscattered and stopped agree for 99.7–99.9% of primaries at 300 keV and for 91–99% on W 1 MeV.
+- No mean observable (transmitted, backscattered and stopped fractions, transmitted energy, path, rows, 4π ≥10 keV photon energy, cone photons) resolves a shift beyond |z| = 2.2 at these history counts. The largest relative shifts with |z| > 1.5 are `fp32` Si 3 MeV path +0.23% (z = +2.2), `fp32` W 1 MeV transmitted energy −1.2% (z = −1.7) and `mixed_math` W 300 keV backscatter +0.06% (z = +1.8).
+- At these counts the paired standard errors are about 0.1% on path and energy. A real FP32 bias smaller than that is not excluded.
+
+**Decision.** The all-FP32 upper bound is 2.5–3.1× on the kernel, and 1.15–2.0× on warm transport. Both are above the issue's 1.3× threshold, so mixed precision stays open on #825 as a gated implementation issue rather than closing. `mixed_math` keeps every accumulation in FP64 and recovers 1.7–1.8× of the kernel, which is 1.12–1.46× warm. That makes it the first candidate, with most of its gain on the MeV anchors, where the kernel dominates. At 300 keV the host remainder (78–83% of warm time; #807, #611) caps any precision gain near 1.2×. Adoption requires:
+
+- the #510 FP32–FP64 refinement gates at resolved precision;
+- ledger claims for every FP32 table and transcendental;
+- a model-identity bump, because the results change at rounding scale and above.
 
 ## Selecting the core
 
