@@ -174,3 +174,31 @@ def test_result_formatting_uses_independent_configuration():
     }
     result.provenance["acquisition"] = None
     assert _simulation._acquisition_summary(result) is None
+
+
+def test_pixel_profile_brem_band_still_stops_one_step_past_beam_energy(profile_parts):
+    """The catalog band keeps its #256 per-case stop through exact public bins (#815)."""
+    from pyrite.campaign.single_scene import _band_at_energy
+    from pyrite.energy_grid.floor import floored_lattice_start_eV
+    from pyrite.materials import load_material_catalog
+
+    beam, target, detector, filters, _, acquisition, numerics, physics, _ = profile_parts
+    scan = load_material_catalog(profile="pixelated_detector_demo").material("hopg").scan
+    step = float(scan.E_grid_brem[1] - scan.E_grid_brem[0])
+    energy_keV = float(scan.energy_keV[0])
+    case = api.build_case(
+        Scene(
+            beam,
+            target,
+            detector,
+            filters,
+            acquisition=acquisition,
+            physics=physics,
+            numerics=numerics,
+        )
+    ).to_dict()
+    start = max(float(scan.E_grid_brem[0]), floored_lattice_start_eV("hopg", step))
+    assert case["E_grid_brem"] == (start, energy_keV * 1e3 + step, step)
+    # An already-exact (non-uniform) grid passes through unchanged.
+    sparse = scan.E_grid_brem[[0, 1, 3]]
+    assert _band_at_energy(sparse, energy_keV) is sparse

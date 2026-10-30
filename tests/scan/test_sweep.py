@@ -428,11 +428,54 @@ def test_build_cases_keeps_legacy_triples_for_uniform_energy_grids():
 
     assert case["E_grid_line"] == (50.0, 100.0, 5.0)
     assert case["E_grid"] == (50.0, 100.0, 5.0)
-    # Still a triple, and still re-spanned to the beam energy; only the start
-    # moves, off 0 eV and onto the lattice multiple at or above mose2's derived
-    # photon-continuum floor (issue #100).
-    assert case["E_grid_brem"] == (floored_lattice_start_eV("mose2", 100.0), 30100.0, 100.0)
+    # Still a triple; the start moves off 0 eV onto the lattice multiple at or
+    # above mose2's derived photon-continuum floor (issue #100). An explicit
+    # grid keeps its stop rather than re-spanning to the beam energy (#815).
+    assert case["E_grid_brem"] == (floored_lattice_start_eV("mose2", 100.0), 1000.0, 100.0)
     assert case["E_grid_brem"][0] == 100.0
+
+
+def test_catalog_brem_band_stops_one_step_past_each_beam_energy():
+    """A catalog/profile band is a step, not a grid: each case spans to its E0 (#256)."""
+    cases = build_cases(
+        Sweep(
+            material="mose2",
+            thickness_ang=100.0,
+            beam=BeamSpec(energy_keV=[20.0, 30.0]),
+            tilt_deg=5.0,
+            energy_bins=_bins(
+                line=np.arange(50.0, 100.0, 5.0),
+                brem=np.arange(0.0, 1000.0, 100.0),
+            ),
+            brem_band=True,
+        )
+    )
+    start = floored_lattice_start_eV("mose2", 100.0)
+    assert {case["E0_keV"]: case["E_grid_brem"] for case in cases} == {
+        20.0: (start, 20100.0, 100.0),
+        30.0: (start, 30100.0, 100.0),
+    }
+
+
+def test_explicit_uniform_brem_grid_is_exact_at_mev_beam_energy():
+    """A 1-3 keV request at 3 MeV must not become a 1 keV-3 MeV grid (#815)."""
+    requested = np.linspace(1_000.0, 3_000.0, 201)
+    case = build_cases(
+        Sweep(
+            material="silicon",
+            thickness_ang=1_000.0,
+            beam=BeamSpec(energy_keV=3_000.0),
+            tilt_deg=5.0,
+            energy_bins=_bins(line=requested, brem=requested),
+        )
+    )[0]
+    np.testing.assert_array_equal(decode_energy_grid(case["E_grid_brem"]), requested)
+
+
+def test_material_sweep_marks_catalog_brem_band_and_override_as_exact():
+    assert material_sweep("mose2").brem_band
+    override = material_sweep("mose2", E_grid_brem=np.arange(100.0, 1000.0, 100.0))
+    assert not override.brem_band
 
 
 def test_uniform_linspace_endpoint_grid_roundtrips_through_legacy_triple(monkeypatch):
@@ -607,6 +650,7 @@ def test_brem_grid_upper_limit_tracks_case_beam_energy():
             line=np.arange(50.0, 100.0, 5.0),
             brem=np.arange(0.0, 60000.0, 5000.0),
         ),
+        brem_band=True,
     )
 
     cases = build_cases(sw)
