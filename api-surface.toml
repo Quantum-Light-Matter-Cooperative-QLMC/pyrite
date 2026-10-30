@@ -46,6 +46,8 @@ simulate = { target = "pyrite.api:simulate", status = "stable", domain = "simula
 # Supported subpackage spellings are opt-in. Unlisted legacy package imports
 # remain importable but are not automatically classified as stable.
 [package_exports."pyrite.materials"]
+# #816: schema numeric records persist; quantities are detached, computed
+# properties on CrystalInfo/CrystalSpec/MediumSpec, not new exports.
 MaterialCatalog = { target = "pyrite.materials.catalog:MaterialCatalog", status = "advanced-stable" }
 MaterialConfigError = { target = "pyrite.materials.catalog:MaterialConfigError", status = "advanced-stable" }
 MaterialIdentity = { target = "pyrite.materials._identity:MaterialIdentity", status = "advanced-stable" }
@@ -102,6 +104,8 @@ AxialMCWF = { target = "pyrite.montecarlo.channeling.axial_mcwf:AxialMCWF", stat
 AxialMCWFResult = { target = "pyrite.montecarlo.channeling.axial_mcwf:AxialMCWFResult", status = "experimental" }
 DensityMatrixResult = { target = "pyrite.montecarlo.channeling.density:DensityMatrixResult", status = "experimental" }
 DensityMatrixSolver = { target = "pyrite.montecarlo.channeling.density:DensityMatrixSolver", status = "experimental" }
+# #816: TransverseState and concrete entry states keep numeric solver fields;
+# opt-in read-back properties construct fresh quantities without new exports.
 EntryState = { target = "pyrite.montecarlo.channeling.states:EntryState", status = "advanced-stable" }
 MCWFResult = { target = "pyrite.montecarlo.channeling.mcwf:MCWFResult", status = "experimental" }
 MCWFSolver = { target = "pyrite.montecarlo.channeling.mcwf:MCWFSolver", status = "experimental" }
@@ -232,6 +236,21 @@ dominant_reflections = { target = "pyrite.materials.crystal:dominant_reflections
 [package_exports."pyrite.materials.attenuation"]
 linear_attenuation_inv_mm = { target = "pyrite.materials.attenuation:linear_attenuation_inv_mm", status = "advanced-stable" }
 
+# #816: opt-in quantity adapters; existing numeric exports are unchanged.
+[package_exports."pyrite.materials.quantities"]
+crystal_constants = { target = "pyrite.materials.quantities:crystal_constants", status = "advanced-stable" }
+cromer_mann_f0_q = { target = "pyrite.materials.quantities:cromer_mann_f0_q", status = "advanced-stable" }
+henke_dispersion_q = { target = "pyrite.materials.quantities:henke_dispersion_q", status = "advanced-stable" }
+atomic_form_factor_q = { target = "pyrite.materials.quantities:atomic_form_factor_q", status = "advanced-stable" }
+reciprocal_g_vector_q = { target = "pyrite.materials.quantities:reciprocal_g_vector_q", status = "advanced-stable" }
+structure_factor_q = { target = "pyrite.materials.quantities:structure_factor_q", status = "advanced-stable" }
+chi_g_q = { target = "pyrite.materials.quantities:chi_g_q", status = "advanced-stable" }
+U_g_q = { target = "pyrite.materials.quantities:U_g_q", status = "advanced-stable" }
+absorption_length_q = { target = "pyrite.materials.quantities:absorption_length_q", status = "advanced-stable" }
+dominant_reflections_q = { target = "pyrite.materials.quantities:dominant_reflections_q", status = "advanced-stable" }
+linear_attenuation_q = { target = "pyrite.materials.quantities:linear_attenuation_q", status = "advanced-stable" }
+photon_energies_q = { target = "pyrite.materials.quantities:photon_energies_q", status = "advanced-stable" }
+
 [package_exports."pyrite.montecarlo"]
 Case = { target = "pyrite.montecarlo.case:Case", status = "advanced-stable" }
 
@@ -246,6 +265,30 @@ mc_brem_spectrum = { target = "pyrite.montecarlo.spectrum:mc_brem_spectrum", sta
 [package_exports."pyrite.detectors.response"]
 detector_efficiency = { target = "pyrite.detectors.response:detector_efficiency", status = "advanced-stable" }
 convolve_detector = { target = "pyrite.detectors.response:convolve_detector", status = "advanced-stable" }
+
+# #816: opt-in quantity adapters; existing numeric exports are unchanged.
+[package_exports."pyrite.detectors.quantities"]
+detector_efficiency_q = { target = "pyrite.detectors.quantities:detector_efficiency_q", status = "advanced-stable" }
+convolve_detector_q = { target = "pyrite.detectors.quantities:convolve_detector_q", status = "advanced-stable" }
+grating_q = { target = "pyrite.detectors.quantities:grating_q", status = "advanced-stable" }
+grating_parameters = { target = "pyrite.detectors.quantities:grating_parameters", status = "advanced-stable" }
+ccd_q = { target = "pyrite.detectors.quantities:ccd_q", status = "advanced-stable" }
+ccd_parameters = { target = "pyrite.detectors.quantities:ccd_parameters", status = "advanced-stable" }
+wavelength_q = { target = "pyrite.detectors.quantities:wavelength_q", status = "advanced-stable" }
+groove_spacing_q = { target = "pyrite.detectors.quantities:groove_spacing_q", status = "advanced-stable" }
+diffraction_angle_q = { target = "pyrite.detectors.quantities:diffraction_angle_q", status = "advanced-stable" }
+angular_dispersion_q = { target = "pyrite.detectors.quantities:angular_dispersion_q", status = "advanced-stable" }
+grating_throughput_q = { target = "pyrite.detectors.quantities:grating_throughput_q", status = "advanced-stable" }
+grating_reflectivity_q = { target = "pyrite.detectors.quantities:grating_reflectivity_q", status = "advanced-stable" }
+detector_position_q = { target = "pyrite.detectors.quantities:detector_position_q", status = "advanced-stable" }
+resolving_power_q = { target = "pyrite.detectors.quantities:resolving_power_q", status = "advanced-stable" }
+disperse_spectrum_q = { target = "pyrite.detectors.quantities:disperse_spectrum_q", status = "advanced-stable" }
+bin_to_pixels_q = { target = "pyrite.detectors.quantities:bin_to_pixels_q", status = "advanced-stable" }
+detected_image_q = { target = "pyrite.detectors.quantities:detected_image_q", status = "advanced-stable" }
+coating_number_density_q = { target = "pyrite.detectors.quantities:coating_number_density_q", status = "advanced-stable" }
+qe_absorption_q = { target = "pyrite.detectors.quantities:qe_absorption_q", status = "advanced-stable" }
+charge_cloud_sigma_q = { target = "pyrite.detectors.quantities:charge_cloud_sigma_q", status = "advanced-stable" }
+energy_fwhm_q = { target = "pyrite.detectors.quantities:energy_fwhm_q", status = "advanced-stable" }
 
 [package_exports."pyrite.montecarlo.trajectory_summary"]
 summarize_trajectories = { target = "pyrite.montecarlo.trajectory_summary:summarize_trajectories", status = "advanced-stable" }

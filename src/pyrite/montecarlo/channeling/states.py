@@ -126,6 +126,30 @@ class TransverseState:
         """Representative position per axis [angstrom]; sets superposition fringe sampling."""
         return (0.0,) * self.dimension
 
+    @property
+    def centre_position(self):
+        """Fresh angstrom quantity for the representative centre of each axis.
+
+        This is a quadrature/fringe hint, not an invertible preset definition.
+        """
+        from ...units import Q_
+
+        return Q_(np.asarray(self.centre, dtype=float).copy(), "angstrom")
+
+    @property
+    def momentum_extent(self):
+        """Fresh per-axis momentum-extent quantity in inverse angstroms."""
+        from ...units import Q_
+
+        return Q_(np.asarray(self.k_extent, dtype=float).copy(), "1/angstrom")
+
+    @property
+    def momentum_resolution(self):
+        """Fresh per-axis quadrature-resolution quantity in inverse angstroms."""
+        from ...units import Q_
+
+        return Q_(np.asarray(self.k_resolution, dtype=float).copy(), "1/angstrom")
+
 
 #: Largest uniform momentum quadrature per axis; finer requests raise.
 MAX_NODES = 65537
@@ -269,6 +293,20 @@ class SampledState(TransverseState):
     def centre(self) -> tuple[float, ...]:
         return tuple(float(0.5 * (a[0] + a[-1])) for a in self.axes)
 
+    @property
+    def sample_positions(self):
+        """Detached position-axis quantities (one per transverse dimension)."""
+        from ...units import Q_
+
+        return tuple(Q_(axis.copy(), "angstrom") for axis in self.axes)
+
+    @property
+    def kinetic_energy(self):
+        """Optional kinetic-energy metadata, in eV; not a solver control."""
+        from ...units import Q_
+
+        return None if self.kinetic_energy_eV is None else Q_(self.kinetic_energy_eV, "eV")
+
     def amplitude(self, kx, ky=None) -> np.ndarray:
         """Band-limited transform: zero beyond the Nyquist momentum ``pi / spacing``."""
         ks = [np.asarray(kx, dtype=float)] + ([] if ky is None else [np.asarray(ky, float)])
@@ -353,6 +391,13 @@ class Translated(TransverseState):
     @property
     def centre(self) -> tuple[float, ...]:
         return tuple(c + o for c, o in zip(self.state.centre, self.offset, strict=True))
+
+    @property
+    def displacement(self):
+        """A fresh angstrom quantity for the applied translation vector."""
+        from ...units import Q_
+
+        return Q_(np.asarray(self.offset, dtype=float).copy(), "angstrom")
 
     def amplitude(self, kx, ky=None) -> np.ndarray:
         phase = _center_phase(np.asarray(kx, float), self.offset[0])
@@ -601,6 +646,40 @@ class ApertureProbe(TransverseState):
     @property
     def centre(self) -> tuple[float, ...]:
         return self.center
+
+    @property
+    def kinetic_energy(self):
+        """Kinetic energy recovered from the stored relativistic momentum (eV)."""
+        from ...units import Q_
+
+        ratio = self.momentum * HBARC_EV_ANG / M_E_EV
+        # (gamma - 1) * mc², evaluated without cancellation at low energy.
+        energy = M_E_EV * ratio**2 / (math.hypot(1.0, ratio) + 1.0)
+        return Q_(energy, "eV")
+
+    @property
+    def semiangle(self):
+        """Outer aperture semi-angle as a fresh angular quantity."""
+        from ...units import Q_
+
+        return Q_(self.k_outer / self.momentum, "radian")
+
+    @property
+    def inner_semiangle(self):
+        """Inner aperture semi-angle as a fresh angular quantity."""
+        from ...units import Q_
+
+        return Q_(self.k_inner / self.momentum, "radian")
+
+    @property
+    def aberration_quantities(self):
+        """Copy of the polar aberration coefficients (Å) and phase angles (rad)."""
+        from ...units import Q_
+
+        return {
+            key: Q_(value, "radian" if key.startswith("phi") else "angstrom")
+            for key, value in self.aberrations.items()
+        }
 
     def amplitude(self, kx, ky=None) -> np.ndarray:
         if ky is None:
