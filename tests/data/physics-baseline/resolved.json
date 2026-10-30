@@ -279,7 +279,7 @@
       ],
       "E_grid_brem": [
         5000.0,
-        45000.0,
+        20000.0,
         5000.0
       ],
       "theta_obs_rad": 1.5707963267948966,
@@ -307,8 +307,8 @@
       "dtheta_obs_rad": 0.0351963661580141,
       "domega_sr": 0.0012390399999999998
     },
-    "case_content_key": "cb2f70d2ca194ac8ab09e4c694c579c4ffb18c54bbcda56ca0d17aac9e54c01b",
-    "parameter_sha256": "bd20f259739e71fc9c149926c38499d9bae57935ab23f4bd5300bcebc7835555"
+    "case_content_key": "aa7e25f7b5db0defa487fbaa71110d431592ec726e8c048ef0dedca57ee04b64",
+    "parameter_sha256": "8bad824151bd1030cce0b6bbef43b58929bcae60e02232b28f75a902e5689d60"
   },
   "elsepa": {
     "case": {
@@ -590,7 +590,7 @@
       ],
       "E_grid_brem": [
         5000.0,
-        45000.0,
+        20000.0,
         5000.0
       ],
       "theta_obs_rad": 1.5707963267948966,
@@ -619,8 +619,8 @@
       "dtheta_obs_rad": 0.0351963661580141,
       "domega_sr": 0.0012390399999999998
     },
-    "case_content_key": "43e9a76be27b23aec238eb63ef6f1c4c1613093a1a92c2149a902ee731ac9894",
-    "parameter_sha256": "bdda3ac4dd721d3bb691f699cfea0fc8611cce5ca5787573849a9654117a254a"
+    "case_content_key": "2c39988f084e6120fad63e4e25a7a6ca53cbc9d7505262bf54b4d2c86604a1d7",
+    "parameter_sha256": "db2f8c622adf3eda1634d74778d57b9000d01fc8b563e359debe8ad3dbb95128"
   },
   "eedl-fallback": {
     "case": {
@@ -902,7 +902,7 @@
       ],
       "E_grid_brem": [
         5000.0,
-        45000.0,
+        20000.0,
         5000.0
       ],
       "theta_obs_rad": 1.5707963267948966,
@@ -930,8 +930,8 @@
       "dtheta_obs_rad": 0.0351963661580141,
       "domega_sr": 0.0012390399999999998
     },
-    "case_content_key": "cb2f70d2ca194ac8ab09e4c694c579c4ffb18c54bbcda56ca0d17aac9e54c01b",
-    "parameter_sha256": "bd20f259739e71fc9c149926c38499d9bae57935ab23f4bd5300bcebc7835555"
+    "case_content_key": "aa7e25f7b5db0defa487fbaa71110d431592ec726e8c048ef0dedca57ee04b64",
+    "parameter_sha256": "8bad824151bd1030cce0b6bbef43b58929bcae60e02232b28f75a902e5689d60"
   },
   "coupled": {
     "case": {
@@ -1213,7 +1213,7 @@
       ],
       "E_grid_brem": [
         5000.0,
-        45000.0,
+        20000.0,
         5000.0
       ],
       "theta_obs_rad": 1.5707963267948966,
@@ -1245,8 +1245,8 @@
       "dtheta_obs_rad": 0.0351963661580141,
       "domega_sr": 0.0012390399999999998
     },
-    "case_content_key": "5582909f365fa04d82a8ebfec6642252e087229d1492309e300c0ba483f9c984",
-    "parameter_sha256": "e602abb882980096fb284e1924f80e8bb27318aa8a5d59fce8bdee2d73b2d0d5"
+    "case_content_key": "bf5cf9934eb54912bec1a0ae4c5afab8ef8eed60fc06e47c6cb6ea1b2e43e748",
+    "parameter_sha256": "69c74a4ea5b77ab600d661a1ad2c811cd5337791da52df9c4142ba6cc7a82d03"
   },
   "multilayer": {
     "case": {
@@ -1528,7 +1528,7 @@
       ],
       "E_grid_brem": [
         5000.0,
-        45000.0,
+        20000.0,
         5000.0
       ],
       "theta_obs_rad": 1.5707963267948966,
@@ -1846,8 +1846,8 @@
       "dtheta_obs_rad": 0.0351963661580141,
       "domega_sr": 0.0012390399999999998
     },
-    "case_content_key": "8e547df30ee955d8b6ec20e388dc914dcfb6c34c9788ccd5bc2776cde8f2a403",
-    "parameter_sha256": "c2b997ebbb885bd827681109be3f3f11ff02f387a5a79e866f769976cc9417eb"
+    "case_content_key": "080401a3117679f3ae6f3ee53f93b5abb836ff2f7cf48df1db60d9ab84ee2d90",
+    "parameter_sha256": "358efe285dc046ef11bd5751efb5890b86db1cbeb6b1c08b1781744943a673eb"
   },
   "coherent": {
     "case": {
@@ -2131,7 +2131,7 @@
       ],
       "E_grid_brem": [
         5000.0,
-        45000.0,
+        20000.0,
         5000.0
       ],
       "theta_obs_rad": 1.5707963267948966,
@@ -2160,8 +2160,8 @@
       "dtheta_obs_rad": 0.0351963661580141,
       "domega_sr": 0.0012390399999999998
     },
-    "case_content_key": "2af0a3edfcee46a5857d126cb3d421102bd170b0c29976c80c6e90133795aca1",
-    "parameter_sha256": "41ce810058827c93a748697f50ac5caf5e28e4534600a8f55aad1ceef7d12bcf"
+    "case_content_key": "b75d9f45d97f4ae1eb76fbad1fca3a96c350d2a614530833553891aa838c15d3",
+    "parameter_sha256": "9b7e728b43836189c1b7f3e0dc6a2e171aa97398aee22cec35e9764cd5abb968"
   },
   "cascade": {
     "case": {
@@ -2443,7 +2443,7 @@
       ],
       "E_grid_brem": [
         5000.0,
-        45000.0,
+        20000.0,
         5000.0
       ],
       "theta_obs_rad": 1.5707963267948966,
@@ -2479,7 +2479,7 @@
       "dtheta_obs_rad": 0.0351963661580141,
       "domega_sr": 0.0012390399999999998
     },
-    "case_content_key": "f8461e8706c03c2389bbc7136cc0ca626711dad35841a3d144f8c3d160b01e16",
-    "parameter_sha256": "90779a7ef032a31f2f404537e4905b9980c29285d15f2bb57bf8d93be395753a"
+    "case_content_key": "fa78a171cfb2224e645a7f2a938f4481ed4a18e5b97a517c1e859967580de70d",
+    "parameter_sha256": "398d0172f545cf8025b88e708b0153ba910cb74611c6c36f52fe840a80c4e5aa"
   }
 }

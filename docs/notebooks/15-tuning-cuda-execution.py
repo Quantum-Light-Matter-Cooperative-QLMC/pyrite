@@ -133,11 +133,16 @@ def _(mo, scene, tables_ready):
         _bar.update(increment=50)
         spectrum_s = perf_counter() - _started
     del transported  # releases the kept segments on the device
+    return spectrum_s, transport_s
+
+
+@app.cell(hide_code=True)
+def _(mo, spectrum_s, transport_s):
     mo.md(
         f"Transport **{transport_s:.2f} s**, spectrum **{spectrum_s:.2f} s** "
         f"({spectrum_s / (transport_s + spectrum_s):.0%} of the run)."
     )
-    return spectrum_s, transport_s
+    return
 
 
 @app.cell

@@ -50,14 +50,16 @@ def test_all_notebooks_bootstrap_tables_before_simulation():
                 for dec in node.decorator_list
             )
         )
+        # The fetch may sit inside a progress context (``with mo.status.spinner``).
+        statements = [node for node in ast.walk(first_cell) if isinstance(node, ast.stmt)]
         imports = [
             stmt
-            for stmt in first_cell.body
+            for stmt in statements
             if isinstance(stmt, ast.Import) and any(alias.name == "pyrite" for alias in stmt.names)
         ]
         fetches = [
             stmt
-            for stmt in first_cell.body
+            for stmt in statements
             if isinstance(stmt, (ast.Expr, ast.Assign))
             and isinstance(stmt.value, ast.Call)
             and isinstance(stmt.value.func, ast.Attribute)

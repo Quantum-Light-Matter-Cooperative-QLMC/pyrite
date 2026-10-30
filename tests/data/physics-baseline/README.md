@@ -84,6 +84,25 @@ tracks. Other output families and all tolerances remain unchanged. This
 isolates the inherited corrected-stopping change; it is not independent
 physics validation.
 
+## Exact explicit brem grids (#815)
+
+Commit `00f659ea` keeps an explicit uniform `EnergyBins.brem` grid exact
+instead of stretching its stop to `E0 + step`. Every fixture requests
+`brem=[5000, 10000, 15000]` eV, so `E_grid_brem` changes from
+`[5000, E0 + 5000, 5000]` (45 keV for the 40 keV families, 5.005 MeV for
+channeling) to `[5000, 20000, 5000]`. Every resolved case payload is
+otherwise unchanged. Re-pinned (2026-10-30, #819, CPU/NumPy fp64, Python
+3.14): `E_grid_brem`, `case_content_key` and `parameter_sha256` in
+`resolved.json`; `E_grid_brem` and `case_content_key` in `channeling.json`;
+and `brem_wide` in `outputs.json` for legacy, eedl-fallback, multilayer and
+coherent.
+
+Each `brem_wide` shrinks from 8 nodes (5--40 keV) to the 3 requested nodes.
+The new values equal the first three old nodes to at most 8.4e-16 relative,
+as photon-node independence requires (#819). Transport signatures and the
+line, characteristic, coherent and detected `brem` arrays keep their
+expectations. All tolerances are unchanged.
+
 ## Fixture inputs
 
 `resolved.json` stores full resolved case mappings, `case_content_key` and
