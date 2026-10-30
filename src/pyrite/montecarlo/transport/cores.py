@@ -169,7 +169,8 @@ def make_cpu_transport_core(
             ) = materials[5:11]
             sbethe_on, L_sbethe_n, L_sbethe_logE, L_sbethe_logS = materials[11:]
             (mott_has_table, mott_start, mott_len, mott_logE_flat, mott_logA_flat) = mott[:5]
-            (el_has, el_start, el_len, el_logE, el_log_rate, el_cdf, el_pdf, el_mu) = mott[5:]
+            (el_has, el_start, el_len, el_logE, el_log_rate) = mott[5:10]
+            (el_cdf, el_pdf, el_mu, el_guide) = mott[10:]
         else:
             (
                 lut_log_E_min,
@@ -1033,6 +1034,7 @@ def make_cpu_transport_core(
                         el_cdf,
                         el_pdf,
                         el_mu,
+                        el_guide,
                         el_start[L, i_el],
                         el_len[L, i_el],
                     )

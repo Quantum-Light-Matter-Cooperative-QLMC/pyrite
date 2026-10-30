@@ -31,14 +31,16 @@ def _node(arrays, energy_eV):
 
 
 def _sampled_mu(arrays, energy_eV, xi):
-    _, start, length, logE, _, cdf, pdf, mu = pack_elsepa_tables([[arrays]], [np.array([1.0])])
+    _, start, length, logE, _, cdf, pdf, mu, guide = pack_elsepa_tables(
+        [[arrays]], [np.array([1.0])]
+    )
     return np.array(
         [
             0.5
             * (
                 1.0
                 - _sample_cos_theta_elsepa(
-                    energy_eV * 1e-3, x, logE, cdf, pdf, mu, start[0, 0], length[0, 0]
+                    energy_eV * 1e-3, x, logE, cdf, pdf, mu, guide, start[0, 0], length[0, 0]
                 )
             )
             for x in xi

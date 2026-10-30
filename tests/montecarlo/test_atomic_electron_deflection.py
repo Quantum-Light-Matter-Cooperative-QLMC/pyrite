@@ -168,7 +168,7 @@ def test_off_leaves_every_rate_coefficient_bit_for_bit():
     plain = pack_elsepa_tables([[_table()]], [np.array([_SI_N * 1e24])])
     np.testing.assert_array_equal(
         plain[4],
-        build_layer_tables(_layers(), "elsepa", [[_table()]])[-1][-8 + 4],
+        build_layer_tables(_layers(), "elsepa", [[_table()]])[-1][5 + 4],
     )
 
 
@@ -193,8 +193,8 @@ def test_elsepa_nodes_carry_the_energy_dependent_factor():
         _layers(), "elsepa", [[table]], atomic_electron_deflection="kawrakow", hard_cutoff_eV=50.0
     )[-1]
     xi = atomic_electron_xi(table["energy_eV"], _SI, 50.0)
-    np.testing.assert_allclose(on[-4] - off[-4], np.log1p(xi / 14.0), rtol=1e-12)
-    np.testing.assert_array_equal(on[-3], off[-3])  # angular CDF unchanged
+    np.testing.assert_allclose(on[5 + 4] - off[5 + 4], np.log1p(xi / 14.0), rtol=1e-12)
+    np.testing.assert_array_equal(on[5 + 5], off[5 + 5])  # angular CDF unchanged
 
 
 def test_shell_mode_needs_tabulated_elastic():
