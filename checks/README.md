@@ -102,6 +102,7 @@ run through the collector.
 | `pxr_optimization.py` | Bounded fixed-window PXR/CBS optimizer comparison and independent finalist checks (#682). Study diagnostic; no independent physics-validation verdict. Run on the lab worker. |
 | `sinc_bin_integration.py` | Bin-mean line quadrature on one transport: yield against an exact node reference, and CPU/CuPy/fused-CUDA agreement (remote only at 300 keV). |
 | `substep_invariance.py` | Measures emitted-radiation invariance under numerical transport substepping. |
+| `fp32_speed_of_light/` | Timing-only FP32 and mixed-precision rewrites of the exact CUDA transport kernel's generated source, run through the #821 benchmark harness on the lab GPU (#831). `run.sbatch` runs the variants, `analyze.py` gives speedups and the observable deviation preview. Not a production option; no physics-validation claim. Results: "Mixed precision" in `docs/repo-design/compute/gpu-transport-rawkernel.md`. |
 | `transport_core_goldens.py` | Verifies bit-for-bit CPU transport-core golden outputs. |
 | `xraylib_cascade_oracle.py` | Pinned xraylib Kissel full-cascade comparison of EADL vacancy propagation and K/L/M line cross sections for Si, Cu and Au from shared photoionization primaries; gates vacancy enhancement and K-alpha/Au L3 lines (#91). |
 | `feranchuk_analysis.ipynb`, `feranchuk_analysis.md` | Legacy paired notebook retained for historical Feranchuk analysis; it emits no records. Keep output-free. |
