@@ -86,11 +86,33 @@ def _digest(result):
     return digest.hexdigest()
 
 
+def _stopping_table(key, composition):
+    """The scene's SBETHE table, generated into the user catalog when absent (W)."""
+    from pyrite.xsgen._errors import TableNotFoundError
+    from pyrite.xsgen.sbethe.catalog import (
+        material_inputs_from_composition,
+        resolve_composition_table,
+    )
+    from pyrite.xsgen.sbethe.generate import generate_material
+
+    try:
+        return resolve_composition_table(key, composition)
+    except TableNotFoundError:
+        material = material_inputs_from_composition(key, composition)
+        generate_material(
+            material.key,
+            material.composition,
+            density_g_cm3=material.density_g_cm3,
+            mean_excitation_eV=material.mean_excitation_eV,
+            band_gap_eV=material.band_gap_eV,
+        )
+        return resolve_composition_table(key, composition)
+
+
 def _scene_kwargs(scene):
     from pyrite.montecarlo.transport import TransportLUTConfig
     from pyrite.xsgen.bremslib.tables import load_bremsstrahlung_tables
     from pyrite.xsgen.elsepa.catalog import resolve_layer_tables
-    from pyrite.xsgen.sbethe.catalog import resolve_composition_table
 
     element, catalog_key, density, energy_keV, thickness_um = SCENES[scene]
     composition = [(element, density)]
@@ -107,7 +129,7 @@ def _scene_kwargs(scene):
         max_steps=200_000,
         elastic_model="elsepa",
         elastic_tables=[[dict(e.arrays) for e in resolve_layer_tables(composition)]],
-        stopping_tables=[resolve_composition_table(catalog_key, composition).arrays()],
+        stopping_tables=[_stopping_table(catalog_key, composition).arrays()],
         atomic_electron_deflection="kawrakow",
         straggling=False,
         radiative_model="bremslib-soft-hard",
