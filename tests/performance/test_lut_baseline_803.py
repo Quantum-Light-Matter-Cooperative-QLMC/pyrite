@@ -116,3 +116,42 @@ def test_analysis_pairs_one_control_and_screens_against_tolerance(tmp_path):
     assert by_name["moments"]["screen"] == {"equivalent": ["e"]}
     assert by_name["continuation"]["bitwise_equal"] is False
     assert analyze["preparation"](records)[0]["warm_moment_prep_fraction"] == pytest.approx(0.25)
+
+
+def test_stage_timer_splits_nested_ranges_exclusively(monkeypatch):
+    harness = runpy.run_path(str(HARNESS))
+    clock = iter([0.0, 1.0, 3.0, 6.0])
+    timer = harness["StageTimer"]()
+    with monkeypatch.context() as patch:
+        patch.setattr(harness["time"], "perf_counter", lambda: next(clock))
+        timer.push("outer")
+        timer.push("inner")
+        timer.pop()
+        timer.pop()
+    totals = timer.take()
+    assert totals["inner"] == {"calls": 1, "inclusive_s": 2.0, "exclusive_s": 2.0}
+    assert totals["outer"] == {"calls": 1, "inclusive_s": 6.0, "exclusive_s": 4.0}
+    timer.push("open")
+    with pytest.raises(RuntimeError, match="unbalanced"):
+        timer.take()
+
+
+def test_stage_timer_hooks_the_production_range_entry_points():
+    from pyrite.montecarlo import runner
+
+    assert callable(runner._nsys_push) and callable(runner._nsys_pop)
+
+
+def test_stage_split_shares_sum_to_one_with_unranged_remainder(tmp_path):
+    analyze = runpy.run_path(str(ROOT / "checks/equal_precision/analyze_baseline_803.py"))
+    record = {
+        "split_stage_synchronized": {
+            "wall_s": 4.0,
+            "stages": {"a": {"exclusive_s": 1.0}, "b": {"exclusive_s": 2.0}},
+            "kernel": {"kernel_s": 1.0, "launches": 3},
+        }
+    }
+    split = analyze["stage_split"](record)
+    assert split["exclusive_share"] == {"a": 0.25, "b": 0.5, "unranged": 0.25}
+    assert split["kernel_share"] == 0.25 and split["launches"] == 3
+    assert analyze["stage_split"]({}) is None

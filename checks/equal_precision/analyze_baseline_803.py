@@ -32,6 +32,8 @@ COMPARISONS = (
     ("auto", "schedule_requested", "full-history", "auto", {}),
 )
 BITWISE = {"continuation", "auto"}
+# v2 adds the kernel-event and NVTX stage split; v1 records still compare.
+SAMPLE_SCHEMAS = ("pyrite.lut-baseline-803.sample.v1", "pyrite.lut-baseline-803.sample.v2")
 # A model change: cost only; equal observables are not expected.
 COST_ONLY = {"shell-cost"}
 KEY_CONTROLS = (
@@ -52,7 +54,7 @@ def load(directory):
             failures.append(json.loads(path.read_text()))
             continue
         record = json.loads(path.read_text())
-        if record.get("schema") == "pyrite.lut-baseline-803.sample.v1":
+        if record.get("schema") in SAMPLE_SCHEMAS:
             record["_path"] = path
             records.append(record)
     return records, failures
@@ -74,6 +76,37 @@ def warm_fraction(record, site):
         )
     ]
     return float(np.median(shares))
+
+
+def kernel_share(record):
+    """Median warm CUDA-event kernel time over request wall (None off CUDA/v1)."""
+    splits = record.get("split_warm")
+    if not splits:
+        return None
+    shares = [
+        s["kernel"]["kernel_s"] / wall
+        for s, wall in zip(splits, record["timings_s"]["warm_requests"], strict=True)
+        if "kernel" in s
+    ]
+    return float(np.median(shares)) if shares else None
+
+
+def stage_split(record):
+    """Exclusive host seconds per NVTX range in the stage-synchronized request.
+
+    Shares are of that request's own wall, so stages plus ``unranged`` sum to 1.
+    """
+    synced = record.get("split_stage_synchronized")
+    if not synced:
+        return None
+    wall = synced["wall_s"]
+    stages = {name: v["exclusive_s"] / wall for name, v in sorted(synced["stages"].items())}
+    stages["unranged"] = 1.0 - sum(stages.values())
+    out = {"wall_s": wall, "exclusive_share": stages}
+    if "kernel" in synced:
+        out["kernel_share"] = synced["kernel"]["kernel_s"] / wall
+        out["launches"] = synced["kernel"]["launches"]
+    return out
 
 
 def paired_screen(ref, cand, rel_tol):
@@ -180,6 +213,9 @@ def preparation(records):
                 "cold_request_s": r["timings_s"]["cold_request"],
                 "warm_moment_prep_fraction": warm_fraction(r, "radiative_core_args"),
                 "warm_lut_build_fraction": warm_fraction(r, "_transport_lut"),
+                "warm_kernel_share": kernel_share(r),
+                "stage_synchronized": stage_split(r),
+                "retained_output_bytes": r["memory"].get("retained_output_bytes"),
                 "peak_rss_kib": r["memory"]["peak_rss_kib"],
                 "device_pool_bytes": r["memory"]["device_pool_reserved_bytes_after_warm"],
                 "segments": r["segments"],

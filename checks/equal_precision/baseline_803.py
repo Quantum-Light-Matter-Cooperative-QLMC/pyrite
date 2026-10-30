@@ -111,6 +111,103 @@ class Observed:
         return calls
 
 
+class StageTimer:
+    """Host time per production NVTX range, inclusive and exclusive of children.
+
+    Replaces ``runner._nsys_push``/``_nsys_pop`` (every transport site imports
+    them at call time). Unsynchronized, a range absorbs whatever asynchronous
+    device work it waits on; ``sync=True`` drains the device at every boundary
+    so device work lands in the range that queued it, at some cost to the total.
+    """
+
+    def __init__(self, sync=None):
+        self.sync = sync
+        self.stack, self.totals = [], {}
+
+    def push(self, name):
+        if self.sync is not None:
+            self.sync()
+        self.stack.append([name, time.perf_counter(), 0.0])
+
+    def pop(self):
+        if self.sync is not None:
+            self.sync()
+        name, start, children = self.stack.pop()
+        wall = time.perf_counter() - start
+        entry = self.totals.setdefault(name, {"calls": 0, "inclusive_s": 0.0, "exclusive_s": 0.0})
+        entry["calls"] += 1
+        entry["inclusive_s"] += wall
+        entry["exclusive_s"] += wall - children
+        if self.stack:
+            self.stack[-1][2] += wall
+
+    def take(self):
+        if self.stack:
+            raise RuntimeError(f"unbalanced NVTX ranges: {[s[0] for s in self.stack]}")
+        totals, self.totals = self.totals, {}
+        return totals
+
+
+def install_stage_timer(timer):
+    from pyrite.montecarlo import runner
+
+    runner._nsys_push, runner._nsys_pop = timer.push, timer.pop
+
+
+class KernelEvents:
+    """CUDA-event time of every exact transport kernel launch.
+
+    Wraps the #827 per-configuration variant the launcher selects (as the #831
+    harness does); the wrapped kernel and its arguments are unchanged.
+    """
+
+    def __init__(self):
+        self.events, self.variants = [], {}
+
+    def install(self):
+        from pyrite.montecarlo.transport import _jit_launch
+
+        original = _jit_launch.transport_kernel_variant
+
+        def variant(switches):
+            if switches not in self.variants:
+                self.variants[switches] = self._timed(original(switches))
+            return self.variants[switches]
+
+        _jit_launch.transport_kernel_variant = variant
+
+    def _timed(self, kernel):
+        import cupy as cp
+
+        def launch(grid, block, args, *rest, **kw):
+            start, stop = cp.cuda.Event(), cp.cuda.Event()
+            start.record()
+            kernel(grid, block, args, *rest, **kw)
+            stop.record()
+            self.events.append((start, stop))
+
+        return launch
+
+    def take(self):
+        import cupy as cp
+
+        events, self.events = self.events, []
+        if events:
+            events[-1][1].synchronize()
+        times = [cp.cuda.get_elapsed_time(a, b) / 1e3 for a, b in events]
+        return {"launches": len(times), "kernel_s": float(sum(times))}
+
+    def switches(self):
+        return [s._asdict() for s in self.variants]
+
+
+def result_bytes(result):
+    """Host bytes held by the returned top-level arrays (retained output)."""
+    import numpy as np
+
+    return int(sum(v.nbytes for v in result.values() if isinstance(v, np.ndarray)))
+
+
 def describe_lut(lut):
     if lut is None:
         return {"built": False}
@@ -309,7 +406,7 @@ def device_pool_bytes(core):
 
 def write_unsupported(args, scene, controls, error):
     record = {
-        "schema": "pyrite.lut-baseline-803.sample.v1",
+        "schema": "pyrite.lut-baseline-803.sample.v2",
         "status": "unsupported",
         "scene": scene,
         "controls": controls,
@@ -336,16 +433,20 @@ def main(argv=None):
     observed = install_observers()
     kw, tables, controls = transport_arguments(args, protocol, scene, adapter)
 
-    device = None
+    device, kernels = None, None
     if args.core == "cuda":
         import cupy as cp
 
         device = cp.cuda.Device()
+        kernels = KernelEvents()
+        kernels.install()
 
     def sync():
         if device is not None:
             device.synchronize()
 
+    stages = StageTimer()
+    install_stage_timer(stages)
     sync()
     tables_s = time.perf_counter() - setup
 
@@ -354,11 +455,15 @@ def main(argv=None):
         start = time.perf_counter()
         result = simulate_trajectories(Ne=args.histories, seed=seed, **kw)
         sync()
-        return result, time.perf_counter() - start
+        wall = time.perf_counter() - start
+        split = {"stages": stages.take()}
+        if kernels is not None:
+            split["kernel"] = kernels.take()
+        return result, wall, split
 
     # A documented refusal of a control combination is a result, not a crash.
     try:
-        cold, cold_s = request(args.seed + 1_000_000)
+        cold, cold_s, cold_split = request(args.seed + 1_000_000)
     except (ValueError, NotImplementedError) as error:
         write_unsupported(args, scene, controls, error)
         return
@@ -367,10 +472,11 @@ def main(argv=None):
     cold_pool = device_pool_bytes(args.core)
     warm, digests, scores = [], [], None
     for _ in range(args.repeats):
-        result, wall = request(args.seed)
-        warm.append({"wall_s": wall, "observed": observed.take()})
+        result, wall, split = request(args.seed)
+        warm.append({"wall_s": wall, "observed": observed.take()} | split)
         digests.append(trajectory_digest(result))
         if scores is None:
+            retained = result_bytes(result)
             coupled = args.radiative == "bremslib-soft-hard"
             scorer = adapter["score_segments" if coupled else "transport_scores"]
             scores = scorer(result, args.histories)
@@ -384,6 +490,16 @@ def main(argv=None):
         del result
     if len(set(digests)) != 1:
         raise RuntimeError(f"warm repeats of one seed diverged: {sorted(set(digests))}")
+    # One extra request with the device drained at every range boundary, so
+    # queued device work is charged to the stage that issued it. Not a timing
+    # sample; its trajectory must match the unsynchronized repeats.
+    stages.sync = sync if device is not None else None
+    result, synced_wall, synced_split = request(args.seed)
+    observed.take()
+    stages.sync = None
+    if trajectory_digest(result) != digests[0]:
+        raise RuntimeError("stage-synchronized request changed the trajectory")
+    del result
     resolved = {
         "lut_built": any(c.get("built") for c in cold_calls if c["site"] == "_transport_lut"),
         "schedules": sorted({c["schedule"] for c in cold_calls if c["site"] == "resolve_schedule"}),
@@ -394,7 +510,7 @@ def main(argv=None):
     np.savez_compressed(raw, **scores)
     walls = np.array([w["wall_s"] for w in warm])
     record = {
-        "schema": "pyrite.lut-baseline-803.sample.v1",
+        "schema": "pyrite.lut-baseline-803.sample.v2",
         "status": "ok",
         "scene": scene,
         "controls": controls,
@@ -415,7 +531,12 @@ def main(argv=None):
         },
         "observed_cold": cold_calls,
         "observed_warm": [w["observed"] for w in warm],
+        "split_cold": cold_split,
+        "split_warm": [{k: w[k] for k in w if k not in ("wall_s", "observed")} for w in warm],
+        "split_stage_synchronized": {"wall_s": synced_wall} | synced_split,
+        "kernel_variants": None if kernels is None else kernels.switches(),
         "memory": {
+            "retained_output_bytes": retained,
             "peak_rss_kib": resource.getrusage(resource.RUSAGE_SELF).ru_maxrss,
             "device_pool_reserved_bytes_after_cold": cold_pool,
             "device_pool_reserved_bytes_after_warm": device_pool_bytes(args.core),

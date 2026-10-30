@@ -482,6 +482,14 @@ preparation in the cold request and every warm request. Warm repeats of one
 seed must share a trajectory digest. A refused control combination is recorded
 as `unsupported`, not dropped.
 
+Sample schema v2 adds a request split. Every request records host time per
+production NVTX range (`pyrite.transport.*`, inclusive and exclusive of nested
+ranges) and, on CUDA, the CUDA-event time of each exact transport kernel launch.
+One extra request then drains the device at every range boundary, so queued
+device work is charged to the stage that issued it. It is not a timing sample,
+and its trajectory digest must match the warm repeats. The record also keeps
+the retained output bytes and the #827 kernel variants that were launched.
+
 `run_baseline_803.py OUT --core per-electron|cuda` expands the protocol into
 fresh processes and reverses arm order on even seeds. It skips samples whose
 records exist and keeps failures as `*.failed.json`. Use `--dry-run` to list
