@@ -1,10 +1,12 @@
 # Thick-target photon transport against Geant4
 
-Claim: `photon-full-track-thick-brem`. Status: **discrepancy**.
+Claim: `photon-full-track-thick-brem`. Status: **anchored** (2026-10-29).
 
-The historical eight-case matrix retains that status. The matched-cascade
-W 300 keV rerun below clears its two prior failures; the other seven cases
-have not yet been rerun with complete Geant4 vacancy cascades.
+The historical Auger-off reference passes 98/100 revised gates. With complete
+Geant4 vacancy cascades, the corrected eight-case matrix passes **100/100**
+under unchanged gates and PyRITE outputs. Fresh-context adjudication below
+rederived the estimators and decisions; the corrected-matrix regression pins
+all 100 gates. The historical two-failure regression is retained separately.
 
 This external comparison measures the complete primary-electron source plus
 photon-only transport chain. It does not independently rederive its constituent
@@ -185,8 +187,8 @@ under `~/.local/opt/pyrite-341-cascade-981c1141/matrix`.
 The regression recomputes all seven reports, requires all 100 gates including
 the prior W case, and checks unchanged PyRITE input hashes.
 
-The claim remains **discrepancy** pending fresh-context independent
-adjudication of this corrected matrix. This evidence covers the bounded
+The fresh-context adjudication below rederives this corrected matrix; the
+claim is now **anchored** by its regression. This evidence covers the bounded
 photon-only thick-target comparison; alloy fluorescence, 511 keV escape
 and charged-feedback validation remain separate.
 
@@ -326,7 +328,7 @@ BremsLib/PenBrem angular and Compton-vacancy differences remain.
 corrected matrix clears the historical discrepancy under the unchanged revised
 gates. Existing regressions pin all corrected reports, historical failures,
 covariance cancellations, input hashes, complete-run checks and missing-gate
-refusal; they support the task owner's advancement to **anchored** after this
+refusal; the task owner advanced the claim to **anchored** on 2026-10-29 on this
 adjudication. No constituent sampler, CUDA backend, alloy, annihilation line,
 charged feedback or general shower validation is implied. Human sign-off
 remains separate.
