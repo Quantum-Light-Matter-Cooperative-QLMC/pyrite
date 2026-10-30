@@ -90,7 +90,7 @@ def _(np, tables_ready):
         "hopg",
         thickness=100 * ureg.nm,
         tilt=30 * ureg.degree,
-        footprint=Footprint(width=5 * ureg.mm, height=5 * ureg.mm),
+        footprint=None,
     )
     detector = Detector(observation_angle=135 * ureg.degree)
     charge_pc = 1e-5
@@ -141,11 +141,11 @@ def _(mo, charge_pc, perf_counter, simulate_case, tables_ready, train, long_gaus
         ),
     }
     with mo.status.progress_bar(total=len(configurations), title="Scoring coherent CXR") as progress:
-        for label, options in configurations.items():
+        for _label, options in configurations.items():
             t0 = perf_counter()
-            samples[label] = simulate_case(**options)
-            elapsed[label] = perf_counter() - t0
-            progress.update(subtitle=f"{label}: {elapsed[label]:.1f} s")
+            samples[_label] = simulate_case(**options)
+            elapsed[_label] = perf_counter() - t0
+            progress.update(subtitle=f"{_label}: {elapsed[_label]:.1f} s")
     assert all(item.cxr.coherent is not None and item.temporal is not None for item in samples.values())
     runtime_table = mo.md(
         "**Measured local wall times** (including any first-run compilation): "
@@ -163,24 +163,24 @@ def _(samples, np, plt, physical_electrons):
     for label, result in samples.items():
         incoherent = result.cxr.incoherent
         coherent = result.cxr.coherent
-        energy = incoherent.photon_energy_eV
+        _energy = incoherent.photon_energy_eV
         assert coherent is not None
-        ax_s.plot(energy, coherent.density, label=f"coherent: {label}")
+        ax_s.plot(_energy, coherent.density, label=f"coherent: {label}")
         # Compare only at valid spectral bins; do not hide signed estimator errors.
         ratio = np.divide(
             coherent.density, incoherent.density,
             out=np.full_like(coherent.density, np.nan),
             where=incoherent.density > 0,
         )
-        ax_r.plot(energy, ratio, label=label)
+        ax_r.plot(_energy, ratio, label=label)
     base = samples["train / point"].cxr.incoherent
     ax_s.plot(base.photon_energy_eV, base.density, "k--", label="incoherent (same histories)")
     ax_s.set(yscale="log", xlabel="Photon energy (eV)", ylabel="Photons / (electron eV sr)")
     ax_r.set(xlabel="Photon energy (eV)", ylabel="coherent / incoherent")
     ax_r.axhline(physical_electrons, color="0.4", ls="--", lw=1, label="N (reference, not a bound on this ratio)")
-    for ax in (ax_s, ax_r):
-        ax.grid(alpha=0.2)
-        ax.legend(fontsize=7)
+    for _ax in (ax_s, ax_r):
+        _ax.grid(alpha=0.2)
+        _ax.legend(fontsize=7)
     fig_spectra
     return
 
@@ -210,18 +210,18 @@ def _(mo):
 
 @app.cell
 def _(np, plt, samples):
-    fig_time, ax = plt.subplots(figsize=(8.4, 3.8), layout="constrained")
-    for label in ("train / point", "Gaussian / point"):
-        temporal = samples[label].temporal
+    fig_time, _ax = plt.subplots(figsize=(8.4, 3.8), layout="constrained")
+    for _label in ("train / point", "Gaussian / point"):
+        temporal = samples[_label].temporal
         assert temporal is not None
-        ax.plot(temporal.time_fs, temporal.incoherent, ls="--", alpha=0.7, label=f"{label}: I(t) incoherent")
+        _ax. plot(temporal.time_fs, temporal.incoherent, ls="--", alpha=0.7, label=f"{_label}: I(t) incoherent")
         if temporal.coherent is not None:
-            ax.plot(temporal.time_fs, temporal.coherent, label=f"{label}: I(t) coherent")
-    ax.set(xlabel="Arrival time (fs)", ylabel="Photons / (electron sr fs)", title="Response-free PXR/CBS temporal profiles")
-    ax.grid(alpha=0.2)
-    ax.legend(fontsize=8)
+            _ax. plot(temporal.time_fs, temporal.coherent, label=f"{_label}: I(t) coherent")
+    _ax. set(xlabel="Arrival time (fs)", ylabel="Photons / (electron sr fs)", title="Response-free PXR/CBS temporal profiles")
+    _ax. grid(alpha=0.2)
+    _ax. legend(fontsize=8)
     # Inspect the physical arrival window, rather than the entire FFT period.
-    ax.set_xlim(-2.5, 2.5)
+    _ax. set_xlim(-2.5, 2.5)
     fig_time
     return
 
@@ -230,17 +230,17 @@ def _(np, plt, samples):
 def _(charge_pc, hbar_eV_fs, np, physical_electrons, plt, samples):
     # An analytic reference for identical emitters (not a bound on CXR mode ratios).
     # It must not be interpreted as the Monte Carlo spectrum of a microtrain.
-    energy = samples["train / point"].cxr.incoherent.photon_energy_eV
-    fig_form, ax = plt.subplots(figsize=(8.0, 3.5), layout="constrained")
+    _energy = samples["train / point"].cxr.incoherent.photon_energy_eV
+    fig_form, _ax = plt.subplots(figsize=(8.0, 3.5), layout="constrained")
     for sigma_fs in (0.0001, 0.001, 0.01, 1.0):
-        fz = np.exp(-((energy * sigma_fs / hbar_eV_fs) ** 2))
-        ax.plot(energy, 1 + (physical_electrons - 1) * fz, label=f"Gaussian {sigma_fs:g} fs")
-    ax.set(
+        fz = np.exp(-((_energy * sigma_fs / hbar_eV_fs) ** 2))
+        _ax. plot(_energy, 1 + (physical_electrons - 1) * fz, label=f"Gaussian {sigma_fs:g} fs")
+    _ax. set(
         xlabel="Photon energy (eV)", ylabel="Ideal per-electron enhancement",
         yscale="log", title=f"Rigid-bunch bound at Q={charge_pc:g} pC",
     )
-    ax.grid(alpha=0.2)
-    ax.legend(fontsize=8)
+    _ax. grid(alpha=0.2)
+    _ax. legend(fontsize=8)
     fig_form
     return
 
@@ -258,17 +258,17 @@ def _(samples, physical_electrons, charge_pc, np, plt):
         low.cxr.coherent.density[index] / low.cxr.incoherent.density[index],
         high.cxr.coherent.density[index] / high.cxr.incoherent.density[index],
     ])
-    fig_charge, ax = plt.subplots(figsize=(6.8, 3.5), layout="constrained")
-    ax.plot(n_physical, measured, "o-", label="mode ratio at maximum incoherent bin")
-    ax.plot(n_physical, 1 + (n_physical - 1) * 0.9, "--",
+    fig_charge, _ax = plt.subplots(figsize=(6.8, 3.5), layout="constrained")
+    _ax. plot(n_physical, measured, "o-", label="mode ratio at maximum incoherent bin")
+    _ax. plot(n_physical, 1 + (n_physical - 1) * 0.9, "--",
             label=r"identical-emitter train reference ($\eta=0.9$)")
-    ax.set(
+    _ax. set(
         xlabel="Physical electrons per bunch (Q/e)",
         ylabel="Coherent / segment-incoherent yield",
         title=f"Charge scan at {energy[index]:.0f} eV (M fixed)",
     )
-    ax.grid(alpha=0.2)
-    ax.legend(fontsize=8)
+    _ax. grid(alpha=0.2)
+    _ax. legend(fontsize=8)
     fig_charge
     return
 
