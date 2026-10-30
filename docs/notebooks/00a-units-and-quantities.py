@@ -84,7 +84,7 @@ def _(Q_, np, ureg):
         "target thickness": f"{target_thickness:~P} = {target_thickness.to('angstrom'):~P}",
         "observation angle": f"{observation_angle:~P} = {observation_angle.to('degree'):~P}",
     }
-    conversions  # noqa: B018 - display unit conversions
+    print(*(f"{k}: {v}" for k, v in conversions.items()), sep="\n")  # display unit conversions
     return electron_energy, target_thickness
 
 
@@ -120,7 +120,9 @@ def _(Q_, np, ureg):
         "repetition rate": str(pulse_rate),
         "average current": str(average_current),
     }
-    array_and_current  # noqa: B018 - display calculated values
+    print(
+        *(f"{k}: {v}" for k, v in array_and_current.items()), sep="\n"
+    )  # display calculated values
     return average_current, energy_nodes_eV
 
 
@@ -187,7 +189,9 @@ def _(np, ureg):
         "footprint width_mm": target.footprint.width_mm,
         "observation_angle_deg": detector.observation_angle_deg,
     }
-    canonical_fields  # noqa: B018 - inspect the numeric representation
+    print(
+        *(f"{k}: {v}" for k, v in canonical_fields.items()), sep="\n"
+    )  # inspect the numeric representation
     return beam, detector, target
 
 
@@ -223,7 +227,9 @@ def _(beam, detector, np, target, ureg):
         "new thickness (nm)": thicker.thickness.to("nm").magnitude,
         "new polar angle (degree)": rotated.observation_angle_deg,
     }
-    replacements  # noqa: B018 - display immutable replacements
+    print(
+        *(f"{k}: {v}" for k, v in replacements.items()), sep="\n"
+    )  # display immutable replacements
     return
 
 
@@ -263,7 +269,9 @@ def _(beam, detector, target, ureg):
             rejected[mistake] = type(error).__name__
         else:
             raise AssertionError(f"PyRITE unexpectedly accepted {mistake}")
-    rejected  # noqa: B018 - all four configuration mistakes are rejected
+    print(
+        *(f"{k}: {v}" for k, v in rejected.items()), sep="\n"
+    )  # all four configuration mistakes are rejected
     return
 
 
@@ -293,7 +301,9 @@ def _(np, ureg):
         "E0_keV": float(transport_energy_keV),
         "thickness_ang": float(transport_thickness_ang),
     }
-    numeric_arguments  # noqa: B018 - these are plain floats in documented units
+    print(
+        *(f"{k}: {v}" for k, v in numeric_arguments.items()), sep="\n"
+    )  # these are plain floats in documented units
     return
 
 
@@ -399,7 +409,9 @@ def _(average_current, integral_per_keV, np, ureg):
         "physical electrons/s": electrons_per_s,
         "synthetic photon rate/(s sr)": toy_rate_per_sr,
     }
-    physical_scaling  # noqa: B018 - display physically scaled illustrative rates
+    print(
+        *(f"{k}: {v}" for k, v in physical_scaling.items()), sep="\n"
+    )  # display physically scaled illustrative rates
     return
 
 

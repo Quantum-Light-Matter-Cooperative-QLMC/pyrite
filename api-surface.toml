@@ -141,6 +141,7 @@ Settings = { target = "pyrite.results.store:Settings", status = "advanced-stable
 records = { target = "pyrite.results.selection:records", status = "advanced-stable" }
 filter_results = { target = "pyrite.results.selection:filter_results", status = "advanced-stable" }
 select_results = { target = "pyrite.results.selection:select_results", status = "advanced-stable" }
+sweep_values = { target = "pyrite.results.selection:sweep_values", status = "advanced-stable" }
 best_azimuth = { target = "pyrite.results.selection:best_azimuth", status = "advanced-stable" }
 cxr_metrics = { target = "pyrite.results.metrics:cxr_metrics", status = "advanced-stable" }
 summary_table = { target = "pyrite.results.tables:summary_table", status = "advanced-stable" }

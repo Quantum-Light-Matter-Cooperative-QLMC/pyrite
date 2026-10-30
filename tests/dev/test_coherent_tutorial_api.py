@@ -46,8 +46,8 @@ def test_temporal_opt_in_validates_bool_and_keeps_default_off():
 def test_result_accepts_opt_in_profile_without_changing_spectral_contract():
     from pyrite.results import CxrSpectra, Result, SpectralDensity, TemporalIntensity
 
-    spectrum = SpectralDensity(np.array([100., 200.]), np.array([1., 2.]))
-    profile = TemporalIntensity(np.array([0., 1.]), np.array([1., 2.]))
+    spectrum = SpectralDensity(np.array([100.0, 200.0]), np.array([1.0, 2.0]))
+    profile = TemporalIntensity(np.array([0.0, 1.0]), np.array([1.0, 2.0]))
     kwargs = dict(cxr=CxrSpectra(spectrum), brem=spectrum, case={}, provenance={})
     assert Result(**kwargs).temporal is None
     assert Result(**kwargs, temporal=profile).temporal is profile
