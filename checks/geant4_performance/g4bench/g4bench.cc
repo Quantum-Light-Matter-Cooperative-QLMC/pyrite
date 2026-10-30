@@ -34,6 +34,7 @@
 #include "G4Step.hh"
 #include "G4SystemOfUnits.hh"
 #include "G4Threading.hh"
+#include "G4ThreeVector.hh"
 #include "G4Track.hh"
 #include "G4UserEventAction.hh"
 #include "G4UserRunAction.hh"
@@ -79,6 +80,9 @@ struct Config
   // eIoni step function; <= 0 keeps the Geant4 default (0.2, 1 mm).
   double step_dr = 0.;
   double step_final_um = 0.;
+  // Detector cone (polar centre from +z in the x-z plane, half-angle).
+  double cone_center_deg = 90.;
+  double cone_half_deg = 10.;
 };
 Config gConfig;
 
@@ -96,6 +100,7 @@ struct Record
   int32_t steps_ioni;
   int32_t steps_brem;
   int32_t steps_other;
+  int32_t cone_photons[3];  // at creation into the cone: [10,50), [50,100), [100,inf) keV
 };
 #pragma pack(pop)
 
@@ -216,7 +221,11 @@ class Gun : public G4VUserPrimaryGeneratorAction
 class Stepping : public G4UserSteppingAction
 {
  public:
-  explicit Stepping(Recorder* r) : fRec(r) {}
+  explicit Stepping(Recorder* r)
+    : fRec(r),
+      fAxis(std::sin(gConfig.cone_center_deg * deg), 0., std::cos(gConfig.cone_center_deg * deg)),
+      fCosHalf(std::cos(gConfig.cone_half_deg * deg))
+  {}
   void UserSteppingAction(const G4Step* step) override
   {
     auto* track = step->GetTrack();
@@ -237,7 +246,10 @@ class Stepping : public G4UserSteppingAction
       const double k = s->GetKineticEnergy() / keV;
       const int band = k < 10. ? 0 : k < 50. ? 1 : k < 100. ? 2 : 3;
       ++r.photons[band];
-      if (k >= 10.) r.photon_keV_ge10 += k;
+      if (k >= 10.) {
+        r.photon_keV_ge10 += k;
+        if (s->GetMomentumDirection().dot(fAxis) >= fCosHalf) ++r.cone_photons[band - 1];
+      }
     }
     const bool exit = post->GetStepStatus() == fGeomBoundary;
     const bool stopped = track->GetTrackStatus() == fStopAndKill
@@ -258,6 +270,8 @@ class Stepping : public G4UserSteppingAction
 
  private:
   Recorder* fRec;
+  G4ThreeVector fAxis;
+  double fCosHalf;
 };
 
 class Stacking : public G4UserStackingAction
@@ -348,6 +362,8 @@ int main(int argc, char** argv)
     else if (k == "--seed") gConfig.seed = std::stol(v);
     else if (k == "--threads") gConfig.threads = std::stoi(v);
     else if (k == "--output") gConfig.output = v;
+    else if (k == "--cone-center-deg") gConfig.cone_center_deg = std::stod(v);
+    else if (k == "--cone-half-deg") gConfig.cone_half_deg = std::stod(v);
     else if (k == "--step-dr") gConfig.step_dr = std::stod(v);
     else if (k == "--step-final-um") gConfig.step_final_um = std::stod(v);
     else {

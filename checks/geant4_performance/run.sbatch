@@ -25,13 +25,18 @@ warm=$((histories / 100))
 for seed in "${seeds[@]}"; do
     for s in "${scenes[@]}"; do
         # Engine order alternates with the seed to spread any thermal drift.
-        arms=(py g4-32 g4-16 g4-1)
-        (( seed % 2 )) && arms=(g4-1 g4-16 g4-32 py)
+        arms=(py pyc g4-32 g4-16 g4-1)
+        (( seed % 2 )) && arms=(g4-1 g4-16 g4-32 pyc py)
         for arm in "${arms[@]}"; do
             stem="$out/$arm-$s-$seed"
-            if [[ $arm == py ]]; then
+            if [[ $arm == py* ]]; then
+                # Pilot 2828: Q1024 + device staging fastest; continuous point cone with
+                # 1e6-segment chunks is 40-80x faster than adaptive (bias <= 0.4%, < 1 SE).
+                extra=()
+                [[ $arm == pyc ]] && extra=(--estimator continuous --cone-mode point --chunk 1000000)
                 PYRITE_MC_BACKEND=cuda uv run --no-sync python checks/geant4_performance/pyrite_bench.py \
-                    "$s" --histories "$histories" --seed "$seed" --output "$stem.json" > "$stem.log" 2>&1 \
+                    "$s" --histories "$histories" --seed "$seed" --rows-per-round 1024 \
+                    --device-staging "${extra[@]}" --output "$stem.json" > "$stem.log" 2>&1 \
                     || echo "FAIL $arm $s $seed"
             else
                 uv run --no-sync python checks/geant4_performance/geant4_bench.py "$s" \

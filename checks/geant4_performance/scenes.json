@@ -14,15 +14,88 @@
     "cbs": false
   },
   "materials": {
-    "Si": {"catalog_key": "silicon", "density_g_cm3": 2.3291534103942357, "atomic_weight": 28.085, "number_density_ang3": 0.049942993373787194},
-    "W": {"catalog_key": "W", "density_g_cm3": 19.3, "atomic_weight": 183.84, "number_density_ang3": 0.06322199557658834}
+    "Si": {
+      "catalog_key": "silicon",
+      "density_g_cm3": 2.3291534103942357,
+      "atomic_weight": 28.085,
+      "number_density_ang3": 0.049942993373787194
+    },
+    "W": {
+      "catalog_key": "W",
+      "density_g_cm3": 19.3,
+      "atomic_weight": 183.84,
+      "number_density_ang3": 0.06322199557658834
+    }
   },
   "scenes": [
-    {"id": "si-300keV-100um", "material": "Si", "energy_keV": 300, "thickness_um": 100},
-    {"id": "w-300keV-10um", "material": "W", "energy_keV": 300, "thickness_um": 10},
-    {"id": "si-1MeV-1mm", "material": "Si", "energy_keV": 1000, "thickness_um": 1000},
-    {"id": "w-1MeV-100um", "material": "W", "energy_keV": 1000, "thickness_um": 100},
-    {"id": "si-3MeV-1mm", "material": "Si", "energy_keV": 3000, "thickness_um": 1000},
-    {"id": "w-3MeV-100um", "material": "W", "energy_keV": 3000, "thickness_um": 100}
-  ]
+    {
+      "id": "si-300keV-100um",
+      "material": "Si",
+      "energy_keV": 300,
+      "thickness_um": 100,
+      "block": 25000,
+      "max_steps": 20000
+    },
+    {
+      "id": "w-300keV-10um",
+      "material": "W",
+      "energy_keV": 300,
+      "thickness_um": 10,
+      "block": 20000,
+      "max_steps": 25000
+    },
+    {
+      "id": "si-1MeV-1mm",
+      "material": "Si",
+      "energy_keV": 1000,
+      "thickness_um": 1000,
+      "block": 5000,
+      "max_steps": 100000
+    },
+    {
+      "id": "w-1MeV-100um",
+      "material": "W",
+      "energy_keV": 1000,
+      "thickness_um": 100,
+      "block": 5000,
+      "max_steps": 100000
+    },
+    {
+      "id": "si-3MeV-1mm",
+      "material": "Si",
+      "energy_keV": 3000,
+      "thickness_um": 1000,
+      "block": 5000,
+      "max_steps": 100000
+    },
+    {
+      "id": "w-3MeV-100um",
+      "material": "W",
+      "energy_keV": 3000,
+      "thickness_um": 100,
+      "block": 5000,
+      "max_steps": 100000
+    }
+  ],
+  "cone": {
+    "center_deg": 90.0,
+    "half_angle_deg": 10.0,
+    "stage": "source: photons at creation, unit transmission",
+    "bands_keV": [
+      [
+        10,
+        50
+      ],
+      [
+        50,
+        100
+      ],
+      [
+        100,
+        null
+      ]
+    ]
+  },
+  "block_note": "histories per PyRITE block: about 25-40 M retained rows (pilot 2805), floor 5000 so auto selects continuation",
+  "max_steps_note": "per-history step limit (exceeding it raises, never truncates or replays); host_pass sizes Ne*max_steps host row buffers, so block*max_steps <= 5e8. Longest pilot-2805 tracks: Si 300 keV 4213, W 300 keV 9874 rows"
 }

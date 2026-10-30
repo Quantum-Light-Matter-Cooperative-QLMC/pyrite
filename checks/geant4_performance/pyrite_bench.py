@@ -27,6 +27,7 @@ import logging
 import math
 import os
 import resource
+import sys
 import time
 from pathlib import Path
 
@@ -38,6 +39,121 @@ BANDS = (
     ("photons_50_100keV", 5e4, 1e5),
     ("photons_ge100keV", 1e5, math.inf),
 )
+
+
+CONE_BANDS = ("10_50kev", "50_100kev", "ge100kev")
+# Only these CXR-package helpers may run: segment clipping/orientation geometry
+# the bremsstrahlung estimator imports. They compute no PXR/CBS amplitude or line.
+SHARED_GEOMETRY = {
+    "pyrite.montecarlo.spectrum.cxr._kernels." + name
+    for name in (
+        "_clip_segments_to_cutoff",
+        "_observation_direction",
+        "_validate_groove_escape_direction",
+    )
+}
+
+
+def forbidden(module, name):
+    """True for a PXR/CBS or line-scorer computation (import scaffolding excluded)."""
+    if name.startswith("<") or name[:1].isupper() or name in {"__annotate__", "__create_fn__"}:
+        return False
+    crystal = module.startswith(
+        ("pyrite.montecarlo.spectrum.cxr", "pyrite.montecarlo.spectrum.lines")
+    )
+    return crystal and f"{module}.{name}" not in SHARED_GEOMETRY
+
+
+def cone_axis(cone):
+    import numpy as np
+
+    c = math.radians(cone["center_deg"])
+    return np.array([math.sin(c), 0.0, math.cos(c)])
+
+
+def discrete_cone_scores(r, n, cone):
+    """Sampled hard photons >= 10 keV entering the cone at creation, per primary."""
+    import numpy as np
+
+    from pyrite.perf.precision import grouped_scores
+
+    ids = np.asarray(r["electron_id"], dtype=np.int64)
+    k = np.asarray(r["hard_radiative_k_eV"], dtype=np.float64)
+    hit = np.zeros(k.size, dtype=bool)
+    m = k >= 1e4
+    d = np.asarray(r["hard_radiative_direction"], dtype=np.float64)[m]
+    hit[m] = d @ cone_axis(cone) >= math.cos(math.radians(cone["half_angle_deg"]))
+    out = {}
+    for name, lo, hi in zip(CONE_BANDS, (1e4, 5e4, 1e5), (5e4, 1e5, math.inf), strict=True):
+        sel = hit & (k >= lo) & (k < hi)
+        out[f"cone_source_photons_{name}"] = grouped_scores(ids[sel], np.ones(sel.sum()), n)
+    out["cone_source_photons_ge10kev"] = sum(out[f"cone_source_photons_{b}"] for b in CONE_BANDS)
+    return out
+
+
+def continuous_cone_scores(r, n, cone, ctx):
+    """Production weighted per-segment estimator integrated over the cone.
+
+    Every value is :func:`mc_coupled_brem_spectrum` (BremsLib DDCS by track
+    length, per-electron band weights) toward each quadrature direction, with
+    unit transmission (photons at creation, as the discrete arms score them).
+    ``ctx["mode"]``: ``adaptive`` refines the angular/energy order until the
+    primary sums and sums of squares change by ``rtol``; ``fixed`` evaluates
+    once at ``ctx["order"]``; ``point`` evaluates the cone axis only, times
+    the cone solid angle (production point-detector convention).
+    """
+    import numpy as np
+
+    from pyrite.montecarlo.spectrum.brem_events import mc_coupled_brem_spectrum
+    from pyrite.perf.comparison import cone_rule, cone_solid_angle, converged_cone_scores
+    from pyrite.perf.detector_scoring import ENERGY_NODES_PER_ORDER, band_panels, band_rule
+
+    comp, e0 = ctx["composition"], ctx["energy_keV"]
+    layers = [(0.0, ctx["thickness_ang"], [(el, 0.0) for el, _ in comp])]
+    bands = [
+        band_panels(lo, min(hi, e0), ctx["edges"]) if lo < e0 else None
+        for lo, hi in ((10.0, 50.0), (50.0, 100.0), (100.0, math.inf))
+    ]
+
+    def f(directions, order):
+        out = np.zeros((directions.shape[0], n, len(bands)))
+        rules = [None if p is None else band_rule(p, ENERGY_NODES_PER_ORDER * order) for p in bands]
+        for i, n_hat in enumerate(directions):
+            for b, rule in enumerate(rules):
+                if rule is None:
+                    continue
+                v = mc_coupled_brem_spectrum(
+                    r,
+                    rule[0],
+                    cutoff_eV=ctx["cutoff_eV"],
+                    bremslib_tables=ctx["brem"],
+                    composition=comp,
+                    n_hat=n_hat,
+                    layers=layers,
+                    electron_band_weights=rule[1],
+                    chunk=ctx["chunk"],
+                )
+                out[i, :, b] = v.get() if hasattr(v, "get") else np.asarray(v)
+        return out
+
+    axis = cone_axis(cone)
+    half = math.radians(cone["half_angle_deg"])
+    if ctx["mode"] == "adaptive":
+        res = converged_cone_scores(
+            f, axis, half, rtol=ctx["rtol"], exact_zero=[p is None for p in bands], max_order=32
+        )
+        if not res["converged"]:
+            raise RuntimeError(f"cone quadrature unconverged at order {res['order']}")
+        ctx["orders"].append(res["order"])
+        values = res["scores"]
+    elif ctx["mode"] == "fixed":
+        dirs, weights = cone_rule(axis, half, ctx["order"], 2 * ctx["order"])
+        values = np.tensordot(weights, f(dirs, ctx["order"]), axes=1)
+    else:
+        values = f(axis[None, :], ctx["order"])[0] * cone_solid_angle(half)
+    out = {f"cone_source_photons_{b}": values[:, j] for j, b in enumerate(CONE_BANDS)}
+    out["cone_source_photons_ge10kev"] = values.sum(axis=1)
+    return out
 
 
 def block_scores(r, n):
@@ -95,20 +211,43 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("scene")
     parser.add_argument("--histories", type=int, required=True)
-    parser.add_argument("--block", type=int, default=25000)
+    parser.add_argument("--block", type=int, default=0, help="histories per block; 0: scene's")
+    parser.add_argument("--rows-per-round", type=int, default=256)
+    parser.add_argument("--device-staging", action="store_true")
     parser.add_argument("--seed", type=int, required=True)
     parser.add_argument("--max-de-frac", type=float, default=0.05)
     parser.add_argument("--scratch-mib", type=int, default=4096)
     parser.add_argument("--seg-capacity", type=int, default=16384)
-    parser.add_argument("--max-steps", type=int, default=200000)
+    parser.add_argument("--max-steps", type=int, default=0, help="0: scene's")
+    parser.add_argument(
+        "--estimator",
+        choices=["discrete", "continuous"],
+        default="discrete",
+        help="cone yield from sampled hard photons, or the weighted per-segment estimator",
+    )
+    parser.add_argument("--cone-mode", choices=["adaptive", "fixed", "point"], default="adaptive")
+    parser.add_argument("--cone-order", type=int, default=8)
+    parser.add_argument("--cone-rtol", type=float, default=1e-3)
+    parser.add_argument("--chunk", type=int, default=20000, help="segments per estimator chunk")
+    parser.add_argument(
+        "--pool-fraction", type=float, default=0.85, help="CuPy pool limit, fraction of VRAM"
+    )
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     spec = json.loads((HERE / "scenes.json").read_text())
     scene = next(s for s in spec["scenes"] if s["id"] == args.scene)
     mat = spec["materials"][scene["material"]]
     bounds = spec["bounds"]
+    args.block = args.block or scene["block"]
+    args.max_steps = args.max_steps or scene["max_steps"]
 
     import cupy as cp
+
+    # WSL2/WDDM pages device memory to host instead of failing an allocation
+    # past physical VRAM, which silently slows scoring several-fold. Keep the
+    # pool below VRAM so CuPy recycles its cache first.
+    pool = cp.get_default_memory_pool()
+    pool.set_limit(fraction=args.pool_fraction)
     import numpy as np
 
     from pyrite.montecarlo.transport import TransportLUTConfig, simulate_trajectories
@@ -141,7 +280,11 @@ def main():
         probe_electrons=0,
         max_batch=default.max_batch,
         schedule=default.schedule or "auto",
-        continuation=TransportContinuationConfig(on_round=on_round),
+        continuation=TransportContinuationConfig(
+            rows_per_round=args.rows_per_round,
+            device_staging=args.device_staging,
+            on_round=on_round,
+        ),
     )
     log = Messages()
     for name in ("pyrite.montecarlo.transport.continuation",):
@@ -172,37 +315,79 @@ def main():
         # ELSEPA bypasses the LUT anyway; explicit so `auto` cannot fall back on it.
         transport_lut_config=TransportLUTConfig(enabled=False),
     )
+    from pyrite.perf.detector_scoring import absorption_edges_keV
+
+    cone = spec["cone"]
+    ctx = dict(
+        mode=args.cone_mode,
+        order=args.cone_order,
+        rtol=args.cone_rtol,
+        chunk=args.chunk,
+        composition=comp,
+        energy_keV=float(scene["energy_keV"]),
+        thickness_ang=scene["thickness_um"] * 1e4,
+        cutoff_eV=float(bounds["hard_photon_cutoff_eV"]),
+        brem=brem,
+        edges=absorption_edges_keV(comp),
+        orders=[],
+    )
     tables_s = time.perf_counter() - START
 
-    def request(seed):
+    def request(seed, histories):
         scores = {}
         retained = 0
         rounds.update(launched_rows=0, launches=0)
         log.messages.clear()
         cp.cuda.Device().synchronize()
         t0 = time.perf_counter()
-        transport_s = 0.0
-        for offset in range(0, args.histories, args.block):
-            n = min(args.block, args.histories - offset)
+        transport_s = scoring_s = 0.0
+        for offset in range(0, histories, args.block):
+            n = min(args.block, histories - offset)
             t1 = time.perf_counter()
             r = simulate_trajectories(**kwargs, Ne=n, seed=seed, _electron_start=offset)
             cp.cuda.Device().synchronize()
             transport_s += time.perf_counter() - t1
             retained += int(np.asarray(r["event_kind"]).size)
-            for key, v in block_scores(r, n).items():
-                scores.setdefault(key, np.empty(args.histories))[offset : offset + n] = v
+            t2 = time.perf_counter()
+            pool.free_all_blocks()
+            block = block_scores(r, n)
+            if args.estimator == "continuous":
+                block |= continuous_cone_scores(r, n, cone, ctx)
+            else:
+                block |= discrete_cone_scores(r, n, cone)
+            cp.cuda.Device().synchronize()
+            scoring_s += time.perf_counter() - t2
+            for key, v in block.items():
+                scores.setdefault(key, np.empty(histories))[offset : offset + n] = v
             del r
         cp.cuda.Device().synchronize()
         wall = time.perf_counter() - t0
         work = dict(
             rounds,
             retained_rows=retained,
+            scoring_s=scoring_s,
             schedule=sorted({m for m in log.messages if "schedule" in m}),
         )
         return scores, wall, transport_s, work
 
-    _, cold_s, cold_transport_s, cold_work = request(args.seed + 1_000_000)
-    scores, warm_s, warm_transport_s, work = request(args.seed)
+    _, cold_s, cold_transport_s, cold_work = request(args.seed + 1_000_000, args.histories)
+    # Untimed audit request: fail on any PXR/CBS or line-scorer computation.
+    calls = set()
+
+    def audit(frame, event, _arg):
+        if event == "call":
+            module = frame.f_globals.get("__name__", "") or ""
+            if forbidden(module, frame.f_code.co_name):
+                calls.add(f"{module}.{frame.f_code.co_name}")
+
+    sys.setprofile(audit)
+    try:
+        request(args.seed + 2_000_000, min(args.histories, 5000))
+    finally:
+        sys.setprofile(None)
+    if calls:
+        raise RuntimeError(f"PXR/CBS or line computation executed: {sorted(calls)}")
+    scores, warm_s, warm_transport_s, work = request(args.seed, args.histories)
     if work["launches"] and work["launched_rows"] != work["retained_rows"]:
         raise RuntimeError(f"replayed rows detected: {work}")
     args.output.parent.mkdir(parents=True, exist_ok=True)
@@ -214,6 +399,16 @@ def main():
     record = dict(
         schema="pyrite.geant4-performance.sample.v1",
         engine="pyrite-cuda",
+        estimator=args.estimator,
+        cone=cone,
+        cone_scoring=dict(
+            mode=args.cone_mode if args.estimator == "continuous" else "sampled-photons",
+            order=args.cone_order,
+            rtol=args.cone_rtol,
+            chunk=args.chunk,
+            adaptive_orders=ctx["orders"],
+        ),
+        audit=dict(forbidden="pyrite.montecarlo.spectrum.{cxr,lines} computations", calls=[]),
         scene=scene,
         histories=args.histories,
         block=args.block,
@@ -225,7 +420,10 @@ def main():
             probe_electrons=0,
             max_steps=args.max_steps,
             schedule=config.schedule,
+            rows_per_round=args.rows_per_round,
+            device_staging=args.device_staging,
             radiative_moments="table",
+            pool_fraction=args.pool_fraction,
         ),
         timings_s=dict(
             imports_and_tables=tables_s,

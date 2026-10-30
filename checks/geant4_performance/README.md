@@ -6,26 +6,46 @@ work the other skips.
 
 ## What is compared
 
-**Electron transport plus discrete bremsstrahlung photon emission, in both
-engines.** Specifically:
+Three arms share one transport problem; they differ only in how bremsstrahlung
+photons are produced and scored.
 
-| | PyRITE CUDA | Geant4 (`g4bench`) |
-|---|---|---|
-| Radiative loss below 1 keV | continuous BremsLib soft loss | continuous eBremSB loss below the 1 keV photon cut |
-| Photons ≥ 1 keV | discrete hard events sampled in transport (`bremslib-soft-hard`), photon energy and direction completed per event | discrete eBremSB secondaries, energy and direction sampled per event |
-| Photon scoring | each hard photon counted per primary at creation, then dropped | each secondary photon counted per primary at creation, then killed |
+| Arm | Transport | Photons ≥ 1 keV | Scored observable |
+|---|---|---|---|
+| **Geant4 discrete** | DPWA single scattering, eIoni, eBremSB | sampled discrete eBremSB secondaries | counted per primary at creation, then killed |
+| **PyRITE discrete** | ELSEPA single scattering, SBETHE, coupled BremsLib soft/hard | sampled discrete hard events (energy and direction) | counted per primary at creation, then dropped |
+| **PyRITE continuous** | identical to PyRITE discrete (the hard events still debit energy) | not counted | production weighted per-segment estimator: expected photons from the BremsLib DDCS by track length along every segment (`mc_coupled_brem_spectrum`) |
 
-This is **not**:
+In every arm, radiative loss below 1 keV is a continuous energy loss.
 
-- transport alone (radiative loss and photon sampling are on in both); or
-- PyRITE's weighted per-segment continuous emission estimator (the production
-  detector-spectrum scorer). That estimator integrates emission along every
-  segment rather than sampling photons, has a different variance, and is not
-  run here. Comparing it with Geant4 discrete photons needs an
-  equal-precision study of the detector observable itself.
+Two observables:
 
-No PXR/CBS, characteristic, coherent or detector-response computation runs in
-either engine. No photon or secondary electron is transported.
+1. **4π yields** (photons ≥ 10 keV per primary in bands, emitted energy):
+   discrete arms only. Transport plus discrete brem in both programs.
+2. **Detector-cone yield**: ≥ 10 keV photons emitted at creation into a cone
+   centred 90° from the beam (x-z plane), 10° half-angle, unit transmission
+   (`scenes.json` `cone`). All three arms. Comparing Geant4 discrete with
+   PyRITE continuous is the "transport + discrete brem in Geant4 versus
+   transport + continuous per-segment brem in PyRITE" comparison. Its fair
+   metric is the figure of merit, because the estimators have different
+   variance for the same mean.
+
+The continuous arm integrates the cone with one of three paths of existing
+code, chosen by measured speed (`--cone-mode`):
+
+- `adaptive`: angular/energy Gauss rule refined until per-primary sums and
+  sums of squares change by `rtol` (1e-3);
+- `fixed`: one evaluation at the order the adaptive rule converged at;
+- `point`: the cone axis only, times the cone solid angle (the production
+  point-detector convention). Its bias against `adaptive` on identical
+  trajectories is measured and reported.
+
+No PXR/CBS, characteristic, coherent, line or detector-response computation
+runs in any arm, and no photon or secondary electron is transported. Each
+PyRITE process runs one extra untimed request under a call profiler and fails
+if any `pyrite.montecarlo.spectrum.cxr` or `.lines` computation executes. The
+only exceptions are three segment-geometry helpers the brem estimator imports
+(`_clip_segments_to_cutoff`, `_observation_direction`,
+`_validate_groove_escape_direction`).
 
 ## Matched bounds
 
@@ -58,13 +78,16 @@ step-integration schemes. `analyze.py` reports the agreement of each observable.
   Geant4, the measured `BeamOn` after initialization and a warmup run.
 - **Cold**: PyRITE imports/tables plus the first request; Geant4
   initialization, warmup run and measured run.
-- **Figure of merit**: 1 / (RSE² · T_warm) for the ≥ 10 keV photon yield per
-  primary. The PyRITE/Geant4 FOM ratio is the equal-precision speed ratio.
+- **Figure of merit**: 1 / (RSE² · T_warm) for the ≥ 10 keV 4π yield (discrete
+  arms) and the ≥ 10 keV cone yield (all arms). An arm's FOM ratio is its
+  equal-precision speed ratio, independent of history count.
+- PyRITE warm/cold times include block score reduction and, in the continuous
+  arm, the estimator. `work.*.scoring_s` separates scoring from transport.
 
 PyRITE runs the production `auto` (bounded continuation) schedule, which never
 replays a history. The full-history fallback is also replay-free: initial
 segment capacity 16384 (above the longest observed track), no probe batch,
-`max_steps=200000`, 4 GiB scratch. The arm fails if launched and retained rows
+per-scene `max_steps` (block × max_steps ≤ 5×10⁸ host rows; well above the longest track), 4 GiB scratch. The arm fails if launched and retained rows
 differ.
 
 ## Running

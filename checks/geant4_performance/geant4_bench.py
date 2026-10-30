@@ -34,9 +34,11 @@ RECORD = np.dtype(
         ("steps_ioni", "<i4"),
         ("steps_brem", "<i4"),
         ("steps_other", "<i4"),
+        ("cone_photons", "<i4", (3,)),
     ]
 )
 EXPECTED_PROCESSES = {"Transportation", "eIoni", "eBrem", "CoulombScat"}
+CONE_BANDS = tuple(f"cone_source_photons_{b}" for b in ("10_50kev", "50_100kev", "ge100kev"))
 BANDS = ("photons_1_10keV", "photons_10_50keV", "photons_50_100keV", "photons_ge100keV")
 
 
@@ -103,6 +105,10 @@ def main():
         str(args.threads),
         "--output",
         str(work / "rec"),
+        "--cone-center-deg",
+        str(spec["cone"]["center_deg"]),
+        "--cone-half-deg",
+        str(spec["cone"]["half_angle_deg"]),
     ]
     if args.step_dr > 0:
         cmd += ["--step-dr", str(args.step_dr), "--step-final-um", str(args.step_final_um)]
@@ -137,6 +143,9 @@ def main():
     }
     for i, name in enumerate(BANDS):
         scores[name] = rec["photons"][:, i].astype(float)
+    for i, name in enumerate(CONE_BANDS):
+        scores[name] = rec["cone_photons"][:, i].astype(float)
+    scores["cone_source_photons_ge10kev"] = rec["cone_photons"].sum(axis=1).astype(float)
     npz = args.output.with_suffix(".npz")
     np.savez_compressed(npz, **scores)
     for p in work.glob("rec.t*.bin"):
@@ -149,6 +158,7 @@ def main():
         warmup_histories=args.warmup,
         seed=args.seed,
         threads=args.threads,
+        cone=spec["cone"],
         bounds=bounds,
         timings_s=dict(
             init=timing["init_s"],
