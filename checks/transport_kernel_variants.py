@@ -255,7 +255,7 @@ def _max_threads_per_sm():
 
 
 def attributes(args):
-    from pyrite.montecarlo.transport import _jit_kernel, simulate_trajectories
+    from pyrite.montecarlo.transport import _jit_kernel_variants, simulate_trajectories
     from pyrite.montecarlo.transport.batching import PerElectronTransportConfig
 
     launch = _launch_module()
@@ -285,7 +285,7 @@ def attributes(args):
                 _sync()
                 times.append(time.perf_counter() - start)
             kernel = (
-                _jit_kernel.monolithic_transport_kernel
+                _jit_kernel_variants.monolithic_transport_kernel
                 if arm == "monolithic"
                 else original(selected[0])
             )

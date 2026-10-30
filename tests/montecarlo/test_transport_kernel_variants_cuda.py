@@ -42,9 +42,13 @@ SWITCHES = (
 )
 
 
+def _module_tree(name):
+    package = resources.files("pyrite.montecarlo.transport")
+    return ast.parse(package.joinpath(f"{name}.py").read_text())
+
+
 def test_switches_are_module_globals_not_kernel_parameters():
-    source = resources.files("pyrite.montecarlo.transport").joinpath("_jit_kernel.py").read_text()
-    tree = ast.parse(source)
+    tree = _module_tree("_jit_kernel")
     kernel = next(
         node
         for node in tree.body
@@ -61,14 +65,14 @@ def test_switches_are_module_globals_not_kernel_parameters():
         assert name not in parameters
         assert f"{name}_arg" in parameters
         assert name in bound
+    assert not kernel.decorator_list
     switches = next(
         node
-        for node in tree.body
+        for node in _module_tree("_jit_kernel_variants").body
         if isinstance(node, ast.ClassDef) and node.name == "TransportKernelSwitches"
     )
     fields = [node.target.id for node in switches.body if isinstance(node, ast.AnnAssign)]
     assert tuple(fields) == SWITCHES
-    assert not kernel.decorator_list
 
 
 def _paired(run, monkeypatch, *args, **kwargs):
@@ -135,7 +139,7 @@ def test_specialized_kernel_matches_monolithic(run, kw, schedule, monkeypatch):
 @pytest.mark.hardware
 @requires_cuda
 def test_variants_are_cached_per_normalized_switches():
-    from pyrite.montecarlo.transport._jit_kernel import (
+    from pyrite.montecarlo.transport._jit_kernel_variants import (
         TransportKernelSwitches,
         transport_kernel_variant,
     )

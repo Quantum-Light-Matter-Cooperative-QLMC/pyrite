@@ -6,38 +6,23 @@ two are maintained as one algorithm -- same draw order, same branch structure,
 same output addressing -- so the port is checkable against a CPU run instead of
 only against aggregate physics.
 
-Why a per-electron core exists at all: the production
-``_transport_core_ungrooved`` walks electrons in lockstep so that a single NumPy
-``Generator`` can serve them all, and that stream order cannot be reproduced by
-threads running independently. Randomness here is addressed instead by
-``(stream key, draw index)`` through a SplitMix64 counter hash, which is pure
-integer arithmetic and therefore identical on host and device. A GPU run is
-reproducible across launch geometry, batch size, and capacity replays.
-
-What is *not* bit-for-bit is everything downstream of a transcendental. CUDA's
-``log``/``exp``/``pow``/``sin``/``cos`` are accurate to a few ulp but are not the
-same implementations as the host libm, and transport amplifies a last-bit
-difference over hundreds of scattering events. The verifiable claims are:
-identical RNG streams, identical control flow and addressing, few-ulp agreement
-on a single step from identical inputs, and statistical agreement in aggregate.
-See ``docs/repo-design/compute/gpu-transport-rawkernel.md``.
+Lockstep stream order cannot be reproduced by independent threads, so draws
+are addressed by ``(stream key, draw index)`` through a SplitMix64 counter hash:
+integer-only, identical on host and device, and independent of launch
+geometry, batch size and capacity replays. Results downstream of a
+transcendental are not bit-for-bit with the host (CUDA ``log``/``exp``/...
+differ from libm by a few ulp, and transport amplifies them); the claims are
+identical RNG streams, control flow and addressing, few-ulp single-step
+agreement and statistical agreement. See
+``docs/repo-design/compute/gpu-transport-rawkernel.md``.
 
 Grooved transport, and any path needing the lockstep core's exact stream, stay
 on the CPU.
 
-The exact kernel is compiled per feature configuration (#827): its switches
-are compile-time constants in each variant, so unused paths are not emitted
-and stop holding registers. ``transport_kernel_variant`` builds and caches the
-variants; ``monolithic_transport_kernel`` is the runtime-switched reference.
-See "Kernel specialization" in the design document above.
-
-The module is split purely so each file stays readable -- the arithmetic, the
-draw order, and the launch parameters are unchanged by the split.
-``_jit_device.py`` holds the scalar constants and the ``device=True`` helpers,
-``_jit_shell_device.py`` those of the opt-in shell soft/hard inelastic mode;
-this file holds the exact ``__global__`` kernel and ``_jit_lut_kernel.py`` the
-LUT one; ``_jit_launch.py`` holds the host-side launchers and the launch
-geometry.
+The files split only for readability: ``_jit_device.py`` (constants and
+helpers), ``_jit_shell_device.py`` (shell mode), this file (the exact kernel
+template), ``_jit_kernel_variants.py`` (its per-configuration compiles, #827),
+``_jit_lut_kernel.py`` (LUT kernel) and ``_jit_launch.py`` (host launchers).
 
 Validation: energy-controlled-propagation
 Validation: energy-loss-straggling
@@ -47,10 +32,6 @@ Validation: sbethe-corrected-stopping
 Validation: shell-secondary-transport
 Validation: shell-soft-hard-transport
 """
-
-import types
-from functools import cache
-from typing import NamedTuple
 
 import cupy as xp
 import numpy as np
@@ -134,42 +115,7 @@ from .events import (
 F64_EV_PER_KEV = np.float64(1e3)
 
 
-class TransportKernelSwitches(NamedTuple):
-    """Feature switches the exact kernel can take as compile-time constants.
-
-    Each field names a global the kernel template reads. A variant binds every
-    field to an ``np.int32`` constant, so ``cupyx.jit`` folds each ``if`` on it
-    and never emits the disabled paths; :func:`transport_kernel_variant`
-    compiles and caches one kernel per distinct tuple. Values are
-    ``elastic_model_code`` 0/1/2 (screened Rutherford, Mott, ELSEPA),
-    ``energy_model_code`` 0/1 (frozen, midpoint) and 0/1 for the rest.
-    """
-
-    elastic_model_code: int
-    energy_model_code: int
-    finite_footprint: int
-    sbethe_on: int
-    straggle_on: int
-    inelastic_on: int
-    sec_on: int
-    rad_on: int
-    cont_on: int
-
-    @classmethod
-    def normalized(cls, **switches):
-        """Integer switches, with ``sec_on`` cleared when shell mode is off.
-
-        Secondary directions are read only on hard inelastic rows, so the
-        cleared switch selects the same code and avoids a duplicate compile.
-        """
-        values = {name: int(switches[name]) for name in cls._fields}
-        values["sec_on"] = values["sec_on"] if values["inelastic_on"] else 0
-        return cls(**values)
-
-
-# Runtime bindings of the switch globals: the template, compiled as is, reads
-# each switch from the kernel argument of the same name plus ``_arg``. This is
-# the monolithic kernel; variants rebind the names to constants.
+# Switch globals bound to the `*_arg` parameters; see `_jit_kernel_variants`.
 elastic_model_code = kernel_parameter("elastic_model_code_arg", np.int32)
 energy_model_code = kernel_parameter("energy_model_code_arg", np.int32)
 finite_footprint = kernel_parameter("finite_footprint_arg", np.int32)
@@ -303,31 +249,22 @@ def _transport_kernel(
     explicit ``running`` flag so nothing depends on ``break``/``continue``
     support in the transpiler.
 
-    ``inelastic_on`` selects the opt-in shell soft/hard mode of
-    ``make_cpu_transport_core(per_electron=True, inelastic=True)``: the SBETHE
-    tables are then the soft tables, a hard optical depth on the ``il_keys``
-    stream schedules hard events, and the two-moment soft sampler replaces
-    Urban's. ``il_*`` are its tables flattened C-order (rows of ``il_width``
-    energy nodes, ``il_max_ch`` channels per layer); off, they and the two
-    hard row columns are never read.
+    ``inelastic_on`` selects the shell soft/hard mode of the CPU core: SBETHE
+    tables are the soft tables, a hard optical depth on ``il_keys`` schedules
+    hard events, and the two-moment soft sampler replaces Urban's. ``il_*``
+    (rows of ``il_width`` nodes, ``il_max_ch`` channels per layer) and the two
+    hard row columns are read only then.
 
-    ``rad_on`` selects the opt-in coupled radiative mode of
-    ``make_cpu_transport_core(per_electron=True, radiative=True)``: soft
-    BremsLib loss joins the continuous stopping, and a radiative optical depth
-    on the ``rad_keys`` stream schedules hard photons, which debit energy
-    without deflecting the electron. ``rad_*`` are the packed radiative tables
-    flattened C-order (see ``_jit_radiative_device``); off, they and the two
-    photon row columns are never read. With straggling the soft radiative
-    loss is added to the sampled collision loss as its mean.
+    ``rad_on`` selects the coupled radiative mode of the CPU core: soft
+    BremsLib loss joins the stopping (added as its mean to a straggled loss),
+    and a radiative optical depth on ``rad_keys`` schedules hard photons that
+    debit energy without deflection. ``rad_*`` (``_jit_radiative_device``) and
+    the two photon row columns are read only then.
 
     ``cont_on`` selects bounded continuation; ``_jit_launch.run_transport_kernel``
     documents its slot and state contract.
 
-    This function is a template and is never launched itself. The switches
-    above (the ``TransportKernelSwitches`` fields) are read as module globals,
-    not parameters: ``monolithic_transport_kernel`` binds each to its ``*_arg``
-    parameter, and ``transport_kernel_variant`` to a constant that compiles the
-    disabled paths out. One body therefore serves both.
+    A template, never launched: switches are globals (``_jit_kernel_variants``).
     """
     # The launch indices are uint32, and every other index here is int32. In
     # CUDA mode the transpiler promotes a mixed int32/uint32 expression to
@@ -1309,33 +1246,3 @@ def _transport_kernel(
             cont_f64[electron_offset + I32_TWO] = radiative_optical_depth
 
     seg_count[local_electron_index] = local_segment_count
-
-
-# The runtime-switched kernel: one compile serves every configuration, and its
-# register allocation covers the union of all paths (#827). Kept as the
-# reference the variants are compared against bitwise, and as the fallback
-# `_jit_launch._SPECIALIZE_TRANSPORT_KERNEL = False` selects.
-monolithic_transport_kernel = jit.rawkernel()(_transport_kernel)
-
-
-@cache
-def transport_kernel_variant(switches: TransportKernelSwitches):
-    """Return the exact kernel compiled for ``switches``, built once per tuple.
-
-    The variant shares ``_transport_kernel``'s code object, and so its one
-    Python source, under a copy of this module's globals in which every switch
-    name is an ``np.int32`` constant. Its ``*_arg`` parameters are then never
-    read. Transpilation happens on first launch; CuPy's on-disk kernel cache
-    keys the NVRTC compile by the generated source, so a later process
-    recompiles nothing.
-    """
-    constants = {name: np.int32(value) for name, value in switches._asdict().items()}
-    template = _transport_kernel
-    variant = types.FunctionType(
-        template.__code__,
-        {**template.__globals__, **constants},
-        template.__name__,
-        template.__defaults__,
-        template.__closure__,
-    )
-    return jit.rawkernel()(variant)

@@ -43,6 +43,7 @@ def test_public_scene_construction_does_not_initialize_execution() -> None:
     [
         "pyrite.montecarlo.transport._jit_device",
         "pyrite.montecarlo.transport._jit_kernel",
+        "pyrite.montecarlo.transport._jit_kernel_variants",
         "pyrite.montecarlo.transport._jit_launch",
         "pyrite.montecarlo.transport._jit_lut_kernel",
         "pyrite.montecarlo.transport._jit_shell_device",
@@ -132,6 +133,7 @@ def test_cpu_import_path_does_not_require_cupy() -> None:
         cuda_modules = {
             "pyrite.montecarlo.transport._jit_device",
             "pyrite.montecarlo.transport._jit_kernel",
+            "pyrite.montecarlo.transport._jit_kernel_variants",
             "pyrite.montecarlo.transport._jit_launch",
             "pyrite.montecarlo.transport._jit_lut_kernel",
             "pyrite.montecarlo.transport._jit_shell_device",

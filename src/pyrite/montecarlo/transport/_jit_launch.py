@@ -18,7 +18,7 @@ from dataclasses import dataclass
 import cupy as xp
 import numpy as np
 
-from ._jit_kernel import (
+from ._jit_kernel_variants import (
     TransportKernelSwitches,
     monolithic_transport_kernel,
     transport_kernel_variant,
