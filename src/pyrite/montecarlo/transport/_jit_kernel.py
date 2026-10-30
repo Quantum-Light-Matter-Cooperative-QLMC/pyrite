@@ -6,32 +6,23 @@ two are maintained as one algorithm -- same draw order, same branch structure,
 same output addressing -- so the port is checkable against a CPU run instead of
 only against aggregate physics.
 
-Why a per-electron core exists at all: the production
-``_transport_core_ungrooved`` walks electrons in lockstep so that a single NumPy
-``Generator`` can serve them all, and that stream order cannot be reproduced by
-threads running independently. Randomness here is addressed instead by
-``(stream key, draw index)`` through a SplitMix64 counter hash, which is pure
-integer arithmetic and therefore identical on host and device. A GPU run is
-reproducible across launch geometry, batch size, and capacity replays.
-
-What is *not* bit-for-bit is everything downstream of a transcendental. CUDA's
-``log``/``exp``/``pow``/``sin``/``cos`` are accurate to a few ulp but are not the
-same implementations as the host libm, and transport amplifies a last-bit
-difference over hundreds of scattering events. The verifiable claims are:
-identical RNG streams, identical control flow and addressing, few-ulp agreement
-on a single step from identical inputs, and statistical agreement in aggregate.
-See ``docs/repo-design/compute/gpu-transport-rawkernel.md``.
+Lockstep stream order cannot be reproduced by independent threads, so draws
+are addressed by ``(stream key, draw index)`` through a SplitMix64 counter hash:
+integer-only, identical on host and device, and independent of launch
+geometry, batch size and capacity replays. Results downstream of a
+transcendental are not bit-for-bit with the host (CUDA ``log``/``exp``/...
+differ from libm by a few ulp, and transport amplifies them); the claims are
+identical RNG streams, control flow and addressing, few-ulp single-step
+agreement and statistical agreement. See
+``docs/repo-design/compute/gpu-transport-rawkernel.md``.
 
 Grooved transport, and any path needing the lockstep core's exact stream, stay
 on the CPU.
 
-The module is split purely so each file stays readable -- the arithmetic, the
-draw order, and the launch parameters are unchanged by the split.
-``_jit_device.py`` holds the scalar constants and the ``device=True`` helpers,
-``_jit_shell_device.py`` those of the opt-in shell soft/hard inelastic mode;
-this file holds the exact ``__global__`` kernel and ``_jit_lut_kernel.py`` the
-LUT one; ``_jit_launch.py`` holds the host-side launchers and the launch
-geometry.
+The files split only for readability: ``_jit_device.py`` (constants and
+helpers), ``_jit_shell_device.py`` (shell mode), this file (the exact kernel
+template), ``_jit_kernel_variants.py`` (its per-configuration compiles, #827),
+``_jit_lut_kernel.py`` (LUT kernel) and ``_jit_launch.py`` (host launchers).
 
 Validation: energy-controlled-propagation
 Validation: energy-loss-straggling
@@ -45,7 +36,7 @@ Validation: shell-soft-hard-transport
 import cupy as xp
 import numpy as np
 
-from .._cupy_jit import jit
+from .._cupy_jit import jit, kernel_parameter
 from ._jit_device import (
     F64_EPS,
     F64_HALF,
@@ -124,7 +115,18 @@ from .events import (
 F64_EV_PER_KEV = np.float64(1e3)
 
 
-@jit.rawkernel()
+# Switch globals bound to the `*_arg` parameters; see `_jit_kernel_variants`.
+elastic_model_code = kernel_parameter("elastic_model_code_arg", np.int32)
+energy_model_code = kernel_parameter("energy_model_code_arg", np.int32)
+finite_footprint = kernel_parameter("finite_footprint_arg", np.int32)
+sbethe_on = kernel_parameter("sbethe_on_arg", np.int32)
+straggle_on = kernel_parameter("straggle_on_arg", np.int32)
+inelastic_on = kernel_parameter("inelastic_on_arg", np.int32)
+sec_on = kernel_parameter("sec_on_arg", np.int32)
+rad_on = kernel_parameter("rad_on_arg", np.int32)
+cont_on = kernel_parameter("cont_on_arg", np.int32)
+
+
 def _transport_kernel(
     e_start,
     e_count,
@@ -134,11 +136,11 @@ def _transport_kernel(
     max_steps,
     n_layers,
     internal_bounds,
-    elastic_model_code,
-    energy_model_code,
+    elastic_model_code_arg,
+    energy_model_code_arg,
     max_dE_frac,
     z_total,
-    finite_footprint,
+    finite_footprint_arg,
     width_ang,
     height_ang,
     clock,
@@ -156,7 +158,7 @@ def _transport_kernel(
     L_mott_denom1,
     L_mott_denom2,
     L_sr_joy_numer,
-    sbethe_on,
+    sbethe_on_arg,
     L_sbethe_n,
     L_sbethe_logE,
     L_sbethe_logS,
@@ -195,9 +197,9 @@ def _transport_kernel(
     seg_event,
     seg_count,
     exit_code,
-    straggle_on,
+    straggle_on_arg,
     stragg_dE,
-    inelastic_on,
+    inelastic_on_arg,
     il_keys,
     il_cutoff_eV,
     il_n,
@@ -214,9 +216,9 @@ def _transport_kernel(
     il_ch_code,
     seg_hard_W,
     seg_hard_ch,
-    sec_on,
+    sec_on_arg,
     seg_hard_dir,
-    rad_on,
+    rad_on_arg,
     rad_keys,
     rad_cutoff_eV,
     rad_nel,
@@ -233,7 +235,7 @@ def _transport_kernel(
     rad_n_red,
     seg_rad_k,
     seg_rad_Z,
-    cont_on,
+    cont_on_arg,
     cont_slots,
     cont_i32,
     cont_u64,
@@ -247,25 +249,22 @@ def _transport_kernel(
     explicit ``running`` flag so nothing depends on ``break``/``continue``
     support in the transpiler.
 
-    ``inelastic_on`` selects the opt-in shell soft/hard mode of
-    ``make_cpu_transport_core(per_electron=True, inelastic=True)``: the SBETHE
-    tables are then the soft tables, a hard optical depth on the ``il_keys``
-    stream schedules hard events, and the two-moment soft sampler replaces
-    Urban's. ``il_*`` are its tables flattened C-order (rows of ``il_width``
-    energy nodes, ``il_max_ch`` channels per layer); off, they and the two
-    hard row columns are never read.
+    ``inelastic_on`` selects the shell soft/hard mode of the CPU core: SBETHE
+    tables are the soft tables, a hard optical depth on ``il_keys`` schedules
+    hard events, and the two-moment soft sampler replaces Urban's. ``il_*``
+    (rows of ``il_width`` nodes, ``il_max_ch`` channels per layer) and the two
+    hard row columns are read only then.
 
-    ``rad_on`` selects the opt-in coupled radiative mode of
-    ``make_cpu_transport_core(per_electron=True, radiative=True)``: soft
-    BremsLib loss joins the continuous stopping, and a radiative optical depth
-    on the ``rad_keys`` stream schedules hard photons, which debit energy
-    without deflecting the electron. ``rad_*`` are the packed radiative tables
-    flattened C-order (see ``_jit_radiative_device``); off, they and the two
-    photon row columns are never read. With straggling the soft radiative
-    loss is added to the sampled collision loss as its mean.
+    ``rad_on`` selects the coupled radiative mode of the CPU core: soft
+    BremsLib loss joins the stopping (added as its mean to a straggled loss),
+    and a radiative optical depth on ``rad_keys`` schedules hard photons that
+    debit energy without deflection. ``rad_*`` (``_jit_radiative_device``) and
+    the two photon row columns are read only then.
 
     ``cont_on`` selects bounded continuation; ``_jit_launch.run_transport_kernel``
     documents its slot and state contract.
+
+    A template, never launched: switches are globals (``_jit_kernel_variants``).
     """
     # The launch indices are uint32, and every other index here is int32. In
     # CUDA mode the transpiler promotes a mixed int32/uint32 expression to
