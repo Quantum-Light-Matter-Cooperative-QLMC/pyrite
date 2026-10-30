@@ -25,6 +25,12 @@ See ``docs/repo-design/compute/gpu-transport-rawkernel.md``.
 Grooved transport, and any path needing the lockstep core's exact stream, stay
 on the CPU.
 
+The exact kernel is compiled per feature configuration (#827): its switches
+are compile-time constants in each variant, so unused paths are not emitted
+and stop holding registers. ``transport_kernel_variant`` builds and caches the
+variants; ``monolithic_transport_kernel`` is the runtime-switched reference.
+See "Kernel specialization" in the design document above.
+
 The module is split purely so each file stays readable -- the arithmetic, the
 draw order, and the launch parameters are unchanged by the split.
 ``_jit_device.py`` holds the scalar constants and the ``device=True`` helpers,
@@ -42,10 +48,14 @@ Validation: shell-secondary-transport
 Validation: shell-soft-hard-transport
 """
 
+import types
+from functools import cache
+from typing import NamedTuple
+
 import cupy as xp
 import numpy as np
 
-from .._cupy_jit import jit
+from .._cupy_jit import jit, kernel_parameter
 from ._jit_device import (
     F64_EPS,
     F64_HALF,
@@ -124,7 +134,53 @@ from .events import (
 F64_EV_PER_KEV = np.float64(1e3)
 
 
-@jit.rawkernel()
+class TransportKernelSwitches(NamedTuple):
+    """Feature switches the exact kernel can take as compile-time constants.
+
+    Each field names a global the kernel template reads. A variant binds every
+    field to an ``np.int32`` constant, so ``cupyx.jit`` folds each ``if`` on it
+    and never emits the disabled paths; :func:`transport_kernel_variant`
+    compiles and caches one kernel per distinct tuple. Values are
+    ``elastic_model_code`` 0/1/2 (screened Rutherford, Mott, ELSEPA),
+    ``energy_model_code`` 0/1 (frozen, midpoint) and 0/1 for the rest.
+    """
+
+    elastic_model_code: int
+    energy_model_code: int
+    finite_footprint: int
+    sbethe_on: int
+    straggle_on: int
+    inelastic_on: int
+    sec_on: int
+    rad_on: int
+    cont_on: int
+
+    @classmethod
+    def normalized(cls, **switches):
+        """Integer switches, with ``sec_on`` cleared when shell mode is off.
+
+        Secondary directions are read only on hard inelastic rows, so the
+        cleared switch selects the same code and avoids a duplicate compile.
+        """
+        values = {name: int(switches[name]) for name in cls._fields}
+        values["sec_on"] = values["sec_on"] if values["inelastic_on"] else 0
+        return cls(**values)
+
+
+# Runtime bindings of the switch globals: the template, compiled as is, reads
+# each switch from the kernel argument of the same name plus ``_arg``. This is
+# the monolithic kernel; variants rebind the names to constants.
+elastic_model_code = kernel_parameter("elastic_model_code_arg", np.int32)
+energy_model_code = kernel_parameter("energy_model_code_arg", np.int32)
+finite_footprint = kernel_parameter("finite_footprint_arg", np.int32)
+sbethe_on = kernel_parameter("sbethe_on_arg", np.int32)
+straggle_on = kernel_parameter("straggle_on_arg", np.int32)
+inelastic_on = kernel_parameter("inelastic_on_arg", np.int32)
+sec_on = kernel_parameter("sec_on_arg", np.int32)
+rad_on = kernel_parameter("rad_on_arg", np.int32)
+cont_on = kernel_parameter("cont_on_arg", np.int32)
+
+
 def _transport_kernel(
     e_start,
     e_count,
@@ -134,11 +190,11 @@ def _transport_kernel(
     max_steps,
     n_layers,
     internal_bounds,
-    elastic_model_code,
-    energy_model_code,
+    elastic_model_code_arg,
+    energy_model_code_arg,
     max_dE_frac,
     z_total,
-    finite_footprint,
+    finite_footprint_arg,
     width_ang,
     height_ang,
     clock,
@@ -156,7 +212,7 @@ def _transport_kernel(
     L_mott_denom1,
     L_mott_denom2,
     L_sr_joy_numer,
-    sbethe_on,
+    sbethe_on_arg,
     L_sbethe_n,
     L_sbethe_logE,
     L_sbethe_logS,
@@ -195,9 +251,9 @@ def _transport_kernel(
     seg_event,
     seg_count,
     exit_code,
-    straggle_on,
+    straggle_on_arg,
     stragg_dE,
-    inelastic_on,
+    inelastic_on_arg,
     il_keys,
     il_cutoff_eV,
     il_n,
@@ -214,9 +270,9 @@ def _transport_kernel(
     il_ch_code,
     seg_hard_W,
     seg_hard_ch,
-    sec_on,
+    sec_on_arg,
     seg_hard_dir,
-    rad_on,
+    rad_on_arg,
     rad_keys,
     rad_cutoff_eV,
     rad_nel,
@@ -233,7 +289,7 @@ def _transport_kernel(
     rad_n_red,
     seg_rad_k,
     seg_rad_Z,
-    cont_on,
+    cont_on_arg,
     cont_slots,
     cont_i32,
     cont_u64,
@@ -266,6 +322,12 @@ def _transport_kernel(
 
     ``cont_on`` selects bounded continuation; ``_jit_launch.run_transport_kernel``
     documents its slot and state contract.
+
+    This function is a template and is never launched itself. The switches
+    above (the ``TransportKernelSwitches`` fields) are read as module globals,
+    not parameters: ``monolithic_transport_kernel`` binds each to its ``*_arg``
+    parameter, and ``transport_kernel_variant`` to a constant that compiles the
+    disabled paths out. One body therefore serves both.
     """
     # The launch indices are uint32, and every other index here is int32. In
     # CUDA mode the transpiler promotes a mixed int32/uint32 expression to
@@ -1247,3 +1309,33 @@ def _transport_kernel(
             cont_f64[electron_offset + I32_TWO] = radiative_optical_depth
 
     seg_count[local_electron_index] = local_segment_count
+
+
+# The runtime-switched kernel: one compile serves every configuration, and its
+# register allocation covers the union of all paths (#827). Kept as the
+# reference the variants are compared against bitwise, and as the fallback
+# `_jit_launch._SPECIALIZE_TRANSPORT_KERNEL = False` selects.
+monolithic_transport_kernel = jit.rawkernel()(_transport_kernel)
+
+
+@cache
+def transport_kernel_variant(switches: TransportKernelSwitches):
+    """Return the exact kernel compiled for ``switches``, built once per tuple.
+
+    The variant shares ``_transport_kernel``'s code object, and so its one
+    Python source, under a copy of this module's globals in which every switch
+    name is an ``np.int32`` constant. Its ``*_arg`` parameters are then never
+    read. Transpilation happens on first launch; CuPy's on-disk kernel cache
+    keys the NVRTC compile by the generated source, so a later process
+    recompiles nothing.
+    """
+    constants = {name: np.int32(value) for name, value in switches._asdict().items()}
+    template = _transport_kernel
+    variant = types.FunctionType(
+        template.__code__,
+        {**template.__globals__, **constants},
+        template.__name__,
+        template.__defaults__,
+        template.__closure__,
+    )
+    return jit.rawkernel()(variant)

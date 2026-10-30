@@ -18,7 +18,11 @@ from dataclasses import dataclass
 import cupy as xp
 import numpy as np
 
-from ._jit_kernel import _transport_kernel
+from ._jit_kernel import (
+    TransportKernelSwitches,
+    monolithic_transport_kernel,
+    transport_kernel_variant,
+)
 from ._jit_lut_kernel import _transport_lut_kernel
 
 
@@ -31,6 +35,11 @@ class TransportKernelConfig:
 
 
 DEFAULT_TRANSPORT_KERNEL_CONFIG = TransportKernelConfig()
+
+# Launch the exact kernel compiled for the case's feature switches (#827). Off,
+# every launch uses the runtime-switched monolithic kernel; results are bitwise
+# identical either way, so this is a bisection and benchmarking switch only.
+_SPECIALIZE_TRANSPORT_KERNEL = True
 
 
 def run_transport_lut_kernel(
@@ -307,7 +316,22 @@ def run_transport_kernel(
     max_el = int(L_Zs.shape[1])
     sbethe_width = int(L_sbethe_logE.shape[1])
     n_blocks = (e_count + n_threads - 1) // n_threads
-    _transport_kernel(
+    kernel = monolithic_transport_kernel
+    if _SPECIALIZE_TRANSPORT_KERNEL:
+        kernel = transport_kernel_variant(
+            TransportKernelSwitches.normalized(
+                elastic_model_code=elastic_model_code,
+                energy_model_code=energy_model_code,
+                finite_footprint=bool(finite_footprint),
+                sbethe_on=bool(sbethe_on),
+                straggle_on=bool(straggle_on),
+                inelastic_on=inelastic_on,
+                sec_on=shell_arguments[_SHELL_SEC_ON],
+                rad_on=radiative_arguments[0],
+                cont_on=continuation is not None,
+            )
+        )
+    kernel(
         (n_blocks,),
         (n_threads,),
         (
@@ -407,6 +431,10 @@ def _continuation_kernel_args(continuation):
         state_u64.reshape(-1),
         state_f64.reshape(-1),
     )
+
+
+# Position of the int32 ``sec_on`` switch in ``_shell_kernel_args``'s tuple.
+_SHELL_SEC_ON = 17
 
 
 def _shell_kernel_args(inelastic_args, hard_segments):
