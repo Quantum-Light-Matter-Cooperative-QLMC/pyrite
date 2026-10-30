@@ -289,6 +289,10 @@ def _assemble(xp, chunks, rows_total, retained, columns, out_bufs, nseg, keep_on
     """Scatter retained rounds into canonical rows; the joined device rows or None."""
     joined = None
     targets = out_bufs
+    if not keep_on_device and targets and hasattr(targets[0], "reserve"):
+        # Assembly must hold all staged rounds *and* their final canonical
+        # columns; use the actual row count rather than Ne * max_steps.
+        targets[0].reserve(nseg)
     if keep_on_device:
         joined = tuple(
             xp.empty((nseg,) + a.shape[1:], dtype=a.dtype) if a.shape[0] else a for a in columns
@@ -367,7 +371,15 @@ def _drive_continuation_rounds(
         gathered = tuple(a[index] if a.shape[0] else a for a in columns)
         nseg += int(index.size)
         del index
-        retained.append(gathered)
+        if not on_device:
+            from .host_memory import admit_host_allocation
+
+            # The gather is still device-resident here; its host copy must
+            # fit alongside every previously retained round.
+            admit_host_allocation(
+                sum(int(a.nbytes) for a in gathered), "continuation retained round download"
+            )
+        retained.append(gathered if on_device else tuple(to_host(a) for a in gathered))
         del gathered
         counts = to_host(seg_count[:m]).astype(np.int64)
         codes = to_host(exit_code[:m])
@@ -407,8 +419,11 @@ def _drive_continuation_rounds(
     on_device = retained.on_device
     joined = _assemble(xp, chunks, rows_total, retained.chunks, columns, out_bufs, nseg, on_device)
     if on_device and not keep_on_device:
+        from .host_memory import admit_host_allocation
+
         for buf, column in zip(out_bufs, joined, strict=True):
             if column.shape[0]:
+                admit_host_allocation(int(column.nbytes), "continuation final host download")
                 buf[:nseg] = to_host(column)
         joined = None
     _nsys_pop()

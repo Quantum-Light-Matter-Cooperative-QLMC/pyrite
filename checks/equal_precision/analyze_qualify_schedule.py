@@ -9,6 +9,7 @@ schedule, and whether trajectory arrays and exit tallies match across schedules 
 import argparse
 import json
 import statistics
+import sys
 from collections import defaultdict
 from pathlib import Path
 
@@ -40,13 +41,60 @@ def main():
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
 
-    records = [
-        json.loads(p.read_text())
-        for p in sorted(args.evidence.glob("*.json"))
-        if p.resolve() != args.output.resolve()
-    ]
-    if not records or any(r.get("measurement_scope") != "runner-transport-only" for r in records):
-        raise ValueError("expected transport-only samples; do not mix spectral request evidence")
+    # Exact factorial design of qualify-schedule-799.sbatch: 30 samples.
+    # Do not infer the expected denominator from successful output files.
+    expected = {
+        (scene, histories, seed, schedule)
+        for histories in (5000, 20000, 100000)
+        for seed in ((79901,) if histories == 100000 else (79901, 79902))
+        for scene in ("silicon", "tungsten", "pbwo4")
+        for schedule in ("full-history", "auto")
+    }
+    records = []
+    failures = []
+    seen = set()
+    for scene, histories, seed, schedule in sorted(expected):
+        stem = f"{scene}-{histories}-{seed}-{schedule}"
+        sample_path = args.evidence / f"{stem}.json"
+        status_path = args.evidence / f"{stem}.status.json"
+        if not status_path.exists():
+            failures.append(f"{stem}: missing status marker")
+            continue
+        try:
+            status = json.loads(status_path.read_text())
+        except (ValueError, OSError) as exc:
+            failures.append(f"{stem}: unreadable status ({exc})")
+            continue
+        if status.get("status") != "ok" or status.get("exit_code") != 0:
+            failures.append(
+                f"{stem}: {status.get('status', 'invalid')} rc={status.get('exit_code')}"
+            )
+            continue
+        try:
+            r = json.loads(sample_path.read_text())
+            if r.get("measurement_scope") != "runner-transport-only":
+                raise ValueError("wrong measurement scope")
+            if (r.get("scene"), r.get("histories"), r.get("seed"), r.get("schedule")) != (
+                scene,
+                histories,
+                seed,
+                schedule,
+            ):
+                raise ValueError("sample identity disagrees with requested design")
+            if not r.get("measured", {}).get("digest") or r.get("warmup_wall_s") is None:
+                raise ValueError("incomplete warmup/measured output")
+            if not (r["measured"]["wall_s"] > 0):
+                raise ValueError("invalid measured wall time")
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            failures.append(f"{stem}: missing/invalid result ({exc})")
+            continue
+        records.append(r)
+        seen.add((scene, histories, seed, schedule))
+    # Files not belonging to the declared experimental design are not evidence.
+    for path in args.evidence.glob("*.json"):
+        if path.resolve() != args.output.resolve() and not path.name.endswith(".status.json"):
+            if path.stem not in {f"{sc}-{h}-{sd}-{sch}" for sc, h, sd, sch in expected}:
+                failures.append(f"unexpected result: {path.name}")
     groups = defaultdict(list)
     digests = defaultdict(dict)
     for r in records:
@@ -59,6 +107,10 @@ def main():
         and len(by) > 1
         for (scene, histories, seed), by in sorted(digests.items())
     }
+    for key, equal in identical.items():
+        if not equal:
+            failures.append(f"{key}: missing/mismatched schedule digest")
+    qualified = not failures and len(seen) == len(expected)
     summary = []
     for (scene, histories, schedule), rs in sorted(groups.items()):
         summary.append(
@@ -78,6 +130,11 @@ def main():
         json.dumps(
             {
                 "measurement_scope": "runner-transport-only",
+                "status": "qualified" if qualified else "incomplete_or_failed",
+                "qualified": qualified,
+                "expected_samples": len(expected),
+                "valid_samples": len(records),
+                "failed_samples": failures,
                 "groups": summary,
                 "identical": identical,
             },
@@ -98,6 +155,12 @@ def main():
         )
     print()
     print("Identical outputs across schedules:", identical)
+    print(
+        f"Qualification: {'PASS' if qualified else 'FAIL'} ({len(records)}/{len(expected)} valid)"
+    )
+    if failures:
+        print("Failed or missing samples:", *failures, sep="\n  - ")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

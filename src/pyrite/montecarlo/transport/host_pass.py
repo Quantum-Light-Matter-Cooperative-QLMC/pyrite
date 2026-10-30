@@ -17,6 +17,7 @@ import numpy as np
 from ..._numerics import DEFAULT_RADIATIVE_CUTOFF_EV
 from ..geometry import validate_transverse_dimensions
 from .arguments import TransportInputs, resolve_cutoffs_by_electron, resolve_layers_and_elastic
+from .host_memory import GrowingHostRows, admit_host_allocation
 from .batching import (
     _flight_diagnostic_summary,
     _run_per_electron_transport,
@@ -590,39 +591,53 @@ _ELASTIC_CODES = {"sr": 0, "mott": 1, "elsepa": 2}
 
 
 def _row_buffers(p, c, sec_on):
-    """Preallocate fixed-capacity output buffers.
+    """Allocate lockstep rows eagerly; grow per-electron rows as emitted.
 
-    ``max_steps`` is already a conservative safety bound in ordinary runs;
-    groove re-entry events can add material segments without consuming it, so
-    the compiled core raises a clear buffer error if a pathological case
-    exceeds this capacity. A device-resident run fills none of them -- its
-    batches are joined on the device instead -- so it reserves no rows.
+    ``max_steps`` is a termination guard, not a forecast of retained rows.
+    Reserving ``Ne * max_steps`` on CUDA silently overcommits enormous host
+    arrays, even though batches/continuation only fill their actual rows.
+    The growable destination preserves identical output array types and order.
     """
     n_rows = 0 if p.keep_segments_on_device else p.Ne * p.max_steps
-    # Flight end state exists only under the controlled propagator; the frozen
-    # rule keeps the historical seven-field row exactly.
     n_end_rows = n_rows if p.energy_model == "midpoint" else 0
     n_hard_rows = n_end_rows if c.shell_mode else 0
     n_rad_rows = n_end_rows if c.radiative_mode else 0
-    return {
-        "seg_mid": np.empty((n_rows, 3), dtype=float),
-        "seg_dir": np.empty((n_rows, 3), dtype=float),
-        "seg_len": np.empty(n_rows, dtype=float),
-        "seg_E": np.empty(n_rows, dtype=float),
-        "seg_t0": np.empty(n_rows, dtype=float),
-        "seg_id": np.empty(n_rows, dtype=np.int64),
-        "seg_lay": np.empty(n_rows, dtype=np.int16),
-        "seg_E_end": np.empty(n_end_rows, dtype=float),
-        "seg_t_end": np.empty(n_end_rows, dtype=float),
-        "seg_flight": np.empty(n_end_rows, dtype=np.int64),
-        "seg_substep": np.empty(n_end_rows, dtype=np.int64),
-        "seg_event": np.empty(n_end_rows, dtype=np.int8),
-        "seg_hard_W": np.empty(n_hard_rows, dtype=float),
-        "seg_hard_ch": np.empty(n_hard_rows, dtype=np.int16),
-        "seg_hard_dir": np.empty((n_hard_rows if sec_on else 0, 3), dtype=float),
-        "seg_rad_k": np.empty(n_rad_rows, dtype=float),
-        "seg_rad_Z": np.empty(n_rad_rows, dtype=np.int16),
+    schema = {
+        "seg_mid": (n_rows, (3,), float),
+        "seg_dir": (n_rows, (3,), float),
+        "seg_len": (n_rows, (), float),
+        "seg_E": (n_rows, (), float),
+        "seg_t0": (n_rows, (), float),
+        "seg_id": (n_rows, (), np.int64),
+        "seg_lay": (n_rows, (), np.int16),
+        "seg_E_end": (n_end_rows, (), float),
+        "seg_t_end": (n_end_rows, (), float),
+        "seg_flight": (n_end_rows, (), np.int64),
+        "seg_substep": (n_end_rows, (), np.int64),
+        "seg_event": (n_end_rows, (), np.int8),
+        "seg_hard_W": (n_hard_rows, (), float),
+        "seg_hard_ch": (n_hard_rows, (), np.int16),
+        "seg_hard_dir": (n_hard_rows if sec_on else 0, (3,), float),
+        "seg_rad_k": (n_rad_rows, (), float),
+        "seg_rad_Z": (n_rad_rows, (), np.int16),
     }
+    if c.transport_core != "lockstep" and p.groove is None and not p.keep_segments_on_device:
+        grow = GrowingHostRows(
+            {name: (tail, dtype) for name, (n, tail, dtype) in schema.items() if n}
+        )
+        return {
+            name: grow.column(name) if n else np.empty((0, *tail), dtype=dtype)
+            for name, (n, tail, dtype) in schema.items()
+        }
+    # Lockstep/grooved kernels require fixed-size NumPy arrays in their JIT
+    # signatures; account for their entire maximum before the first np.empty.
+    admit_host_allocation(
+        sum(
+            n * int(np.prod(tail)) * np.dtype(dtype).itemsize for n, tail, dtype in schema.values()
+        ),
+        "lockstep retained transport output",
+    )
+    return {name: np.empty((n, *tail), dtype=dtype) for name, (n, tail, dtype) in schema.items()}
 
 
 def _dispatch_core(t):
@@ -841,6 +856,7 @@ def _run_lockstep_exact(t):
 def _run_grooved(t):
     p, groove = t.inputs, t.inputs.groove
     max_vac = p.Ne * p.max_steps
+    admit_host_allocation(max_vac * (8 * 9), "grooved vacuum trajectory output")
     vac_start_buf = np.empty((max_vac, 3), dtype=float)
     vac_end_buf = np.empty((max_vac, 3), dtype=float)
     vac_E_buf = np.empty(max_vac, dtype=float)
@@ -904,6 +920,8 @@ def _assemble_result(t, o):
     # Ne-sized upload of `t0_electron` and saves an nseg-sized download.
     seg_xp, t0_electron = o.seg_xp, e.t0_electron
     t0_by_electron = t0_electron if seg_xp is np else seg_xp.asarray(t0_electron)
+    if seg_xp is np:
+        admit_host_allocation(int(elec_id.size) * 8, "trajectory time-offset gather")
     t0_ang = t0_by_electron[elec_id] if elec_id.size else seg_xp.empty(0, dtype=float)
     vacuum_t0_ang = t0_electron[vacuum_elec_id] if vacuum_elec_id.size else np.empty(0, dtype=float)
     _nsys_pop()
@@ -973,6 +991,8 @@ def _add_optional_fields(t, o, rows, result):
         result["t_end_ang"] = rows["seg_t_end"]
         # Representative energy used by the clock and radiation quadrature.
         # The explicit RK2 stopping update itself uses (E_start + E_pred)/2.
+        if o.seg_xp is np:
+            admit_host_allocation(2 * int(E_end.nbytes), "representative-energy temporary/output")
         result["E_repr_keV"] = 0.5 * (rows["seg_E"] + E_end)
         # `(electron_id, flight_id)` is the stable physical key; `substep_id`
         # indexes numerical rows inside one flight and is integration detail.

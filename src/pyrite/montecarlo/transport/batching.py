@@ -514,6 +514,20 @@ def _drive_per_electron_batches(
                 tuple(a[keep] if a is not None else b for a, b in zip(slots, scratch, strict=False))
             )
         else:
+            from .host_memory import admit_host_allocation
+
+            # The compacted selection/download is another live copy beyond
+            # the destination arrays. Admit it before any host transfer.
+            if out_bufs and hasattr(out_bufs[0], "reserve"):
+                out_bufs[0].reserve(nseg + total)
+            admit_host_allocation(
+                sum(
+                    total * a.dtype.itemsize * int(np.prod(a.shape[2:]))
+                    for a in slots
+                    if a is not None
+                ),
+                "transport batch compact/download",
+            )
             dst = slice(nseg, nseg + total)
             for buf, a in zip(out_bufs, slots, strict=True):
                 if a is not None:
