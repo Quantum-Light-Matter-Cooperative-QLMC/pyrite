@@ -235,6 +235,70 @@ Medians with [min, max] over the three seeds. The gain does not come from occupa
 
 **Checks.** The CUDA comparison file (28 tests) and the surrounding CUDA transport tests (continuation, per-electron, ELSEPA, shell soft/hard, secondaries, straggling, hard radiative, SBETHE, kernel tuning, radiative moments: 155 passed, 8 slow skipped) pass on the RTX 5080 with specialization on (job 2838).
 
+(register-cap-readonly)=
+## Register cap and read-only loads (#796)
+
+[#796](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/796) asked whether the exact kernel is held back by its registers or by its table loads. At this revision the full-history #821 benchmark variant uses 186 registers per thread (16.7% theoretical occupancy at every block size). That is the `bench821` configuration of `checks/transport_kernel_variants.py`; the continuation variant was not attributed separately. It also reads its tables through ordinary `LDG`, because `cupyx.jit` passes arrays as `CArray` structs and the compiler cannot prove that they do not alias the output arrays. Neither change helped. No build is adopted, and production still launches the `cupyx.jit` variant unchanged.
+
+**Mechanism.** `cupyx.jit.rawkernel` takes no compile options. `_jit_rawmodule.RawModuleKernel` reuses the variant's generated C++ source, rewrites it if a build asks for that, and compiles it through `cupy._core.core.compile_with_cache` with the JIT's options plus the build's. That is the JIT's own compile entry point. `cupy.RawModule` itself cannot compile this source: it leaves out the CuPy kernel header that defines `CUDART_INF`. A `KernelBuild` has three fields:
+
+- `maxrregcount` sets NVRTC `--maxrregcount`;
+- `launch_bounds` emits `__launch_bounds__(threads, blocks)`;
+- `readonly` lists array parameters (`TRANSPORT_READONLY`: tables, stream keys and per-history inputs).
+
+Read-only parameters are transpiled as `CArray<const T, ...>`. `cupyx.jit` compares array types by their C++ spelling, so device helpers that receive them are instantiated separately, and a write to one of them fails to compile. A prepended partial specialization of `CArray<const T, ...>` with the same layout reads each element through `__ldg`. Launch geometry, argument conversion and stream are the JIT's. With the default build the source and options equal the JIT's, so the CuPy cache key is the same and the JIT's cubin is reloaded; job 2856 compiled no new cubin. The path reads private CuPy state (`_JitRawKernel._func`, `_mode`, `_cached_codes`, `cupyx.jit._compile.transpile`) and is used only by `checks/transport_kernel_builds.py` and `tests/montecarlo/test_transport_kernel_builds_cuda.py`.
+
+**Resources.** RTX 5080, driver 610.47, CuPy 14.2.0, NVRTC 13.4. Kernel source at revision `0d7a7a1e` for attributes and tests and `52d6c4fc` for timing; the two differ only in the check script.
+
+- Registers, local memory and occupancy come from the function attributes and the occupancy API (job 2856; `r96` from job 2855).
+- Spill bytes come from `--ptxas-options=-v` (job 2861).
+- SASS counts come from `cuobjdump -sass` of the cached cubins. The toolkit's CUDA 13.2 `cuobjdump` rejects NVRTC 13.4 cubins, so the 13.4 `nvidia-cuda-cuobjdump` wheel was used. CuPy's cache entry also ends one byte short of the ELF program headers, so the check pads it before disassembling.
+
+| build | registers | stack / spill store / spill load (B) | occupancy at 128 threads | SASS LDG (constant) | LDL / STL |
+| --- | --- | --- | --- | --- | --- |
+| `jit` (production) | 186 | 40 / 0 / 0 | 16.7% | 477 (7) | 3 / 2 |
+| `ro` (`__ldg` reads) | 186 | 40 / 0 / 0 | 16.7% | 478 (460) | 3 / 2 |
+| `r168` | 168 | 56 / 20 / 36 | 25.0% | 477 (7) | 9 / 6 |
+| `ro+r168` | 168 | 64 / 28 / 44 | 25.0% | 478 (460) | 11 / 8 |
+| `r128` | 128 | 160 / 220 / 316 | 33.3% | 477 (7) | 53 / 42 |
+| `ro+r128` | 128 | 152 / 198 / 288 | 33.3% | 478 (460) | 50 / 40 |
+| `r96` | 96 | 280 / 678 / 804 | 41.7% | — | — |
+
+`__launch_bounds__(128, 3)` gives the same allocation as `r168` (168 registers, 56 B). The read-only build changes 460 of the 478 global loads to `LDG.E.*.CONSTANT` (`ld.global.nc` in the PTX), and it does so without costing a register.
+
+**Paired warm timing.** This uses the #821 benchmark physics on its four anchors (job 2859, `checks/transport_kernel_builds.py timing`):
+
+- histories: 10000 for Si 300 keV/100 µm and W 300 keV/10 µm, 1250 for W 1 MeV/100 µm and 1000 for Si 3 MeV/1 mm (5.4–19.8 M rows);
+- seeds 1–3, with the full-history and continuation schedules;
+- each build is warmed first, then one full-size untimed call grows the memory pool, then all seven arms run back to back in an order rotated per seed.
+
+An earlier ordering without the full-size warmup (job 2857, cancelled) charged the first arm of each seed for pool growth.
+
+The table gives the speedup over `jit` as the median [min, max] of the per-seed ratios. A value above 1 is faster.
+
+| anchor | schedule | `jit` s | `ro` | `r168` | `ro+r168` | `r128` | `r96` |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Si 300 keV | full-history | 1.767 | 0.98 [0.95, 1.05] | 1.01 [0.99, 1.01] | 0.99 [0.95, 1.00] | 0.97 [0.96, 0.99] | 0.97 [0.93, 1.00] |
+| Si 300 keV | continuation | 1.176 | 1.00 [1.00, 1.01] | 1.01 [1.00, 1.06] | 1.01 [1.00, 1.06] | 0.95 [0.94, 1.05] | 0.99 [0.96, 1.02] |
+| W 300 keV | full-history | 6.866 | 1.00 [0.99, 1.01] | 1.00 [0.99, 1.00] | 0.99 [0.99, 1.00] | 0.97 [0.96, 0.99] | 0.96 [0.95, 0.97] |
+| W 300 keV | continuation | 1.936 | 0.94 [0.91, 1.10] | 0.93 [0.92, 0.95] | 0.94 [0.90, 1.01] | 0.96 [0.90, 1.03] | 0.95 [0.92, 1.08] |
+| W 1 MeV | full-history | 9.701 | 1.00 [1.00, 1.00] | 1.00 [1.00, 1.01] | 1.00 [1.00, 1.00] | 0.98 [0.98, 0.98] | 0.96 [0.95, 0.96] |
+| W 1 MeV | continuation | 2.765 | 0.94 [0.92, 0.99] | 0.99 [0.97, 1.00] | 0.98 [0.97, 0.99] | 0.97 [0.96, 0.98] | 0.95 [0.90, 0.96] |
+| Si 3 MeV | full-history | 4.506 | 1.00 [0.99, 1.00] | 1.00 [1.00, 1.00] | 1.00 [0.99, 1.00] | 0.98 [0.98, 0.98] | 0.95 [0.95, 0.96] |
+| Si 3 MeV | continuation | 1.432 | 1.00 [0.94, 1.00] | 0.95 [0.94, 1.00] | 0.95 [0.94, 1.00] | 0.98 [0.98, 0.99] | 0.96 [0.91, 0.97] |
+
+The full-history rows, which are the steadier ones, put `ro`, `r168` and `ro+r168` within 1% of `jit`. Every cap at 128 registers or below is 2–5% slower, and `ro+r128` (not shown) tracks `r128`. The continuation rows spread by about ±5%, and none is a resolved gain. Raising theoretical occupancy from 16.7% to 41.7% bought nothing. Neither did turning almost every table load into a non-coherent cached load. The kernel is therefore not limited by resident warps or by its load path at these launch sizes. The FP64 pipe (FP32:FP64 = 64 on this device) and the long dependent chains per step are the remaining suspects. Without counters this cannot be confirmed. Nsight Compute is still refused (`ERR_NVGPUCTRPERM`, job 2855), so no achieved-occupancy or stall claim is made.
+
+**Exactness.** Results by build:
+
+- `ro`, `r168`, `ro+r168`: every returned array was bitwise equal to `jit` in all 24 (anchor, schedule, seed) runs.
+- `raw` (default build) and `ro`: equal to the JIT kernel in `test_transport_kernel_builds_cuda.py`, 52 tests: every case of the #827 variant matrix under both schedules (job 2856).
+- `r128`, `ro+r128`, `r96`: differ from `jit` in 1, 4 and 4 of the 24 runs, always on W (300 keV both schedules, 1 MeV continuation).
+
+The cause of those differences is FMA contraction in ptxas. The NVRTC PTX has 812 `mul.f64`, 572 `add.f64` and 696 `sub.f64` without a rounding modifier, next to 2523 `fma.rn.f64`. PTX allows the code generator to fuse unrounded multiplies and adds. Under a tight register budget ptxas schedules and fuses differently: the SASS has 3892 `DFMA`/1003 `DMUL` for `jit` and `r168`, 3900/1064 for `r128` and 3914/1111 for `r96`. The rounding of a fused product then changes, and transport amplifies it, as with `sec_on` in #827. The read-only rewrite changes no arithmetic instruction (identical FP64 PTX and SASS counts). A register cap can change results, so any future adoption would have to put the compile options in the case identity and would need its own bitwise or statistical review. The `r168` agreement shows only that this kernel was not affected at that cap.
+
+**Next.** The resident-warp and load-path levers are closed for this kernel on this device. What remains is the arithmetic itself: #788's tabulated radiative moments and #831's precision probe. A counter-backed profile would also help once the host allows one.
+
 ## Selecting the core
 
 `transport_core="auto"` is the default, and `resolve_transport_core` decides: the CUDA core when the process has a CUDA device, the run is ungrooved, and `Ne > CUDA_TRANSPORT_MIN_ELECTRONS` (1000); the lockstep CPU core otherwise. The count is the transport's own, `max(Ne, Ne_brem)` — one transport serves both populations. Every explicit `transport_core=` is honored verbatim, so a caller that names a core gets that core or an error, never a substitution; `PYRITE_MC_TRANSPORT_CORE` pins the choice for a whole process, which is how a run reproduces a pre-threshold result or bisects a host/device difference.
