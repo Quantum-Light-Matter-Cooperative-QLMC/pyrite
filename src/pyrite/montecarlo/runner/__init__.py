@@ -66,6 +66,16 @@ _WORKER_INHERITED_CORE: str | None = None
 # call shapes unchanged and never reaches pool workers, whose transports report
 # only per case.
 _TRANSPORT_PROGRESS: ContextVar[Any] = ContextVar("pyrite_transport_progress", default=None)
+# Per-stage spectrum progress sink (#776): ``callable(stage, stages_done, stages)``
+# after each of ``SPECTRUM_STAGES`` in ``_spectrum_case``; same scoping as above.
+_SPECTRUM_PROGRESS: ContextVar[Any] = ContextVar("pyrite_spectrum_progress", default=None)
+SPECTRUM_STAGES = ("lines", "characteristic", "brem")
+
+
+def _spectrum_stage_done(stage):
+    sink = _SPECTRUM_PROGRESS.get()
+    if sink is not None:
+        sink(stage, SPECTRUM_STAGES.index(stage) + 1, len(SPECTRUM_STAGES))
 
 
 from .artifacts import _case_geometry
@@ -1011,6 +1021,7 @@ def _spectrum_case_impl(case, tp, record_timing=False):
             if not _is_gpu_oom(error):
                 raise
             raise _SpectrumPhaseOOM("line", error) from error
+    _spectrum_stage_done("lines")
     # Refuse a truncating measured bandwidth before the other components run.
     truncation_record = (
         None if truncation_audit is None else check_cxr_truncation(case, truncation_audit)
@@ -1033,6 +1044,7 @@ def _spectrum_case_impl(case, tp, record_timing=False):
             if not _is_gpu_oom(error):
                 raise
             raise _SpectrumPhaseOOM("characteristic", error) from error
+    _spectrum_stage_done("characteristic")
 
     # BREM: EVERY layer radiates with its OWN composition (each Z^2 cross
     # section); each layer's brem self-absorbs through the whole stack, summed
@@ -1048,6 +1060,7 @@ def _spectrum_case_impl(case, tp, record_timing=False):
             if not _is_gpu_oom(error):
                 raise
             raise _SpectrumPhaseOOM("brem", error) from error
+    _spectrum_stage_done("brem")
     with _nsys_range("pyrite.interpolate"):
         brem = np.interp(E_grid, E_brem, brem_wide)  # brem under the lines (line grid)
     # Return this case's GPU scratch on the A2 cadence so the CuPy memory pool

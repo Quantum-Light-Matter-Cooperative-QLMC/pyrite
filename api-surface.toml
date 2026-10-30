@@ -40,6 +40,7 @@ fetch_tables = { target = "pyrite.xsgen.install:fetch_tables", status = "advance
 photon_energies = { target = "pyrite.materials.emission:photon_energies", status = "advanced-stable", domain = "radiation", root_role = "specialized" }
 # simulate composes independent models, observations and executor= scheduling;
 # no public request-wrapper export or change to serialized Case identity.
+# progress= (#776) is an additive, experimental keyword; it never changes results.
 simulate = { target = "pyrite.api:simulate", status = "stable", domain = "simulation", root_role = "core" }
 
 # Supported subpackage spellings are opt-in. Unlisted legacy package imports
@@ -427,3 +428,12 @@ KernelLattice = { target = "pyrite.optimization.kernel_tuning:KernelLattice", st
 KernelTrial = { target = "pyrite.optimization.kernel_tuning:KernelTrial", status = "experimental" }
 KernelTuningResult = { target = "pyrite.optimization.kernel_tuning:KernelTuningResult", status = "experimental" }
 tune_kernels = { target = "pyrite.optimization.kernel_tuning:tune_kernels", status = "experimental" }
+KernelPhaseResult = { target = "pyrite.optimization.kernel_tuning:KernelPhaseResult", status = "experimental" }
+TuningProgress = { target = "pyrite.optimization.kernel_tuning:TuningProgress", status = "experimental" }
+
+# Scalar transport/spectrum phases run separately (#776); scoring never transports.
+[package_exports."pyrite.phases"]
+simulate_transport = { target = "pyrite.phases:simulate_transport", status = "experimental" }
+score_spectra = { target = "pyrite.phases:score_spectra", status = "experimental" }
+TransportedScene = { target = "pyrite.phases:TransportedScene", status = "experimental" }
+SimulationProgress = { target = "pyrite._simulation_progress:SimulationProgress", status = "experimental" }

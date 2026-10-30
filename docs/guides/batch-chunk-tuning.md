@@ -1,8 +1,7 @@
 (optuna-batch-cxr-chunk-tuning-experimental-682)=
 # Tune CUDA execution controls (experimental)
 
-Tune CUDA execution controls against the median duration of an **uncached
-full simulation** (transport and spectra). None of them is a physical
+Tune CUDA execution controls for one fixed scene. None of them is a physical
 optimization variable. The tuner uses Optuna directly, separately from
 `OptimizationStudy`'s scene-parameter API.
 
@@ -10,8 +9,8 @@ optimization variable. The tuner uses Optuna directly, separately from
 
 `pyrite.optimization.tune_kernels` tunes any subset of the transport
 `electron_batch`, continuation `schedule` and `continuation_rows`, and the
-spectral `cxr_chunk`/`brem_chunk`, for one fixed scene, and returns a
-`KernelTuning` to apply through ordinary `Numerics`:
+spectral `cxr_chunk`/`brem_chunk`, and returns a `KernelTuning` to apply
+through ordinary `Numerics`:
 
 <!-- verify: skip (requires a CUDA device and the optimization extra) -->
 ```python
@@ -21,64 +20,72 @@ from pyrite.optimization import KernelLattice, tune_kernels
 result = tune_kernels(
     scene,  # a pr.Scene whose numerics leave transport_core="auto"
     KernelLattice(
-        electron_batch=(2048, 4096, 8192),
+        electron_batch=(None, 4096, 16384),
         schedule=("full-history", "continuation"),
         continuation_rows=(None, 128, 512),
-        cxr_chunk=(512, 1024, 2048),
+        cxr_chunk=(None, 8192, 32768),
+        brem_chunk=(None, 1024),
     ),
-    trials=24,
     storage="sqlite:///kernel-tuning.sqlite3",
 )
-print(result.environment, result.speedup)
+print(result.environment)
+print(result.transport.speedup, result.spectrum.speedup)
 tuned = scene.numerics.with_kernel_tuning(result.best)  # use in a fresh process
 ```
 
-The baseline is the scene's own `KernelTuning` on the CUDA core. Each trial
-runs `simulate` in a fresh process. Its spectral grids must equal the
-baseline's and its densities agree within `rtol`/`atol`, or it is rejected.
-`result.trials` keeps every candidate, its timings and any rejection reason.
-`result.best` is the baseline unless a candidate was faster. A row quantum
-paired with `full-history` is an invalid combination and is skipped. The
-`environment` field records GPU, driver, CUDA/CuPy versions and precision;
-winners do not transfer between devices. Persistent studies refuse to resume
-with a different workload, lattice, protocol or device.
+The two groups are **separate studies**. Transport candidates run only
+electron transport ({func}`pyrite.phases.simulate_transport`) and must
+reproduce the baseline's transported arrays bit for bit. Spectrum candidates
+rescore one kept baseline transport ({func}`pyrite.phases.score_spectra`):
+no transport is repeated, and their spectral grids must equal the baseline's
+and densities agree within `rtol`/`atol`. Transport controls do not change
+the transport, so neither study depends on the other's winner; the searches
+cost the sum of the two lattices, not their product. `result.best` joins
+both winners. `result.transport` and `result.spectrum` keep every trial,
+its timings and any rejection reason. `objective="total"` instead times
+whole `simulate` calls over all dimensions jointly.
 
-To tune transport and spectral execution separately, use independent studies:
+The baseline is the scene's own `KernelTuning` on the CUDA core. By default
+each phase tries every valid combination (a row quantum paired with
+`full-history` is skipped); `trials=` smaller than that searches with TPE.
+Each candidate gets `warmups` untimed then `repeats` synchronized runs. The
+fastest is re-timed against the baseline in `repeats` interleaved pairs and
+replaces it only when that confirms `min_speedup` (default 1.02), so noise
+alone does not pick a "winner". A candidate whose spectrum needed
+allocation-retry chunk halving is rejected rather than timed favorably.
 
-<!-- verify: skip (requires a CUDA device and the optimization extra) -->
+All measurements run in a CUDA worker process. With `isolate="phase"`
+(default) the worker serves every candidate of the tuning, so imports, table
+loading and kernel compilation are paid once; the device memory pool is
+released before each candidate. `isolate="candidate"` starts a fresh worker
+per candidate, which is colder and much slower. `on_progress` receives a
+`TuningProgress` per candidate and, while one runs, each transport batch and
+spectrum stage. The `environment` field records GPU, driver, CUDA/CuPy
+versions and precision; winners do not transfer between devices. Persistent
+studies refuse to resume with a different workload, lattice, protocol or
+device.
+
+## Run the phases yourself
+
+The phase functions are ordinary experimental API, independent of tuning:
+
+<!-- verify: skip (requires a CUDA device) -->
 ```python
-from dataclasses import replace
-from pyrite.optimization import KernelLattice, tune_kernels
+from pyrite.config import KernelTuning
+from pyrite.phases import score_spectra, simulate_transport
 
-transport = tune_kernels(
-    scene,
-    KernelLattice(electron_batch=(2048, 8192), schedule=("full-history", "auto")),
-    objective="transport",
-    trials=4,
-    warmups=1,
-    repeats=1,
-)
-spectral_scene = replace(scene, numerics=scene.numerics.with_kernel_tuning(transport.best))
-spectral = tune_kernels(
-    spectral_scene,
-    KernelLattice(cxr_chunk=(None, 8192, 32768)),
-    objective="spectrum",
-    trials=3,
-    warmups=1,
-    repeats=1,
-)
-# The second winner retains the first stage's transport settings.
-final = spectral.best
+transported = simulate_transport(scene, progress=print)  # no spectra
+first = score_spectra(transported)  # equals pr.simulate(scene)
+again = score_spectra(transported, kernel_tuning=KernelTuning(cxr_chunk=32768))
 ```
 
-`objective="transport"` minimizes synchronized transport-phase wall time,
-including trajectory setup and automatic line-grid resolution.
-`objective="spectrum"` minimizes synchronized spectrum-phase wall time,
-including CXR/background scoring. Both still run the complete simulation
-for numerical equivalence checks. The default `objective="total"`
-retains end-to-end timing. `on_progress(done, total, state)` receives the
-baseline and each finished Optuna trial on the coordinating process.
-It cannot report progress inside an individual CUDA launch.
+`score_spectra` never transports; it changes only spectral chunks. The kept
+transport holds every segment, on the device for CUDA, until released. To
+persist a transport and rescore it later from disk, use
+`pyrite run --trajectories` and `pyrite trajectories score`.
+`pyrite.simulate(..., progress=callback)` reports the same
+`SimulationProgress` events (transport batches, then spectrum stages) for any
+in-process run.
 
 ## MoLab example
 

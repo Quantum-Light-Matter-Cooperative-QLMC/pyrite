@@ -87,13 +87,13 @@ def test_progress_does_not_change_transport(elastic_model):
     assert _identical(off, on)
 
 
-def test_lockstep_core_reports_nothing():
+def test_lockstep_core_reports_once_on_completion():
     reports = []
     simulate_trajectories(
         **dict(BASE_CASE, transport_core="lockstep", Ne=8),
         transport_progress=lambda *a: reports.append(a),
     )
-    assert reports == []
+    assert reports == [(8, 8)]  # no batches; the finished call (#776)
 
 
 @pytest.fixture(scope="module")

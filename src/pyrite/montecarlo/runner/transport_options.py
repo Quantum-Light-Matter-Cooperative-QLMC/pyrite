@@ -103,3 +103,31 @@ def _check_opt_in_transport(
     if block_electrons is not None:
         refuse_channeling(case, "electron-block transport")
         refuse_transition_radiation(case, "electron-block transport")
+
+
+@contextmanager
+def run_progress(progress):
+    """Route in-process transport batches and spectrum stages to ``progress``.
+
+    ``progress`` receives :class:`pyrite.phases.SimulationProgress` events;
+    ``None`` installs nothing, so progress-free runs keep their call shapes.
+    Pool and executor workers never see the sink.
+    """
+    if progress is None:
+        yield
+        return
+    from ..._simulation_progress import SimulationProgress
+    from . import _SPECTRUM_PROGRESS, _TRANSPORT_PROGRESS
+
+    def transport(done, total):
+        progress(SimulationProgress("transport", "electrons", int(done), int(total)))
+
+    def spectrum(stage, done, total):
+        progress(SimulationProgress("spectrum", stage, int(done), int(total)))
+
+    tokens = _TRANSPORT_PROGRESS.set(transport), _SPECTRUM_PROGRESS.set(spectrum)
+    try:
+        yield
+    finally:
+        _SPECTRUM_PROGRESS.reset(tokens[1])
+        _TRANSPORT_PROGRESS.reset(tokens[0])

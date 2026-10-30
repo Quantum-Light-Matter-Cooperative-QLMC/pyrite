@@ -121,3 +121,30 @@ def test_tune_kernels_accepts_exact_quanta_on_a_real_device():
     assert result.environment["backend"] == "cuda"
     assert all(t.state == "complete" for t in result.trials), result.trials
     assert result.best.transport_core == "cuda"
+
+
+def test_phases_reproduce_simulate_on_the_device():
+    """Resident CUDA segments rescored by score_spectra equal simulate bit for bit."""
+    from pyrite.phases import score_spectra, simulate_transport
+
+    scene = _scene(cfg.TransportKernelTuning())
+    expected = pr.simulate(scene)
+    transported = simulate_transport(scene)
+    for result in (score_spectra(transported), score_spectra(transported)):
+        _bitwise(expected.cxr.incoherent.density, result.cxr.incoherent.density, "cxr")
+        _bitwise(expected.brem.density, result.brem.density, "brem")
+
+
+@pytest.mark.slow
+def test_phased_tune_kernels_runs_both_studies_on_a_real_device():
+    """One worker serves both studies; spectrum candidates never re-transport."""
+    pytest.importorskip("optuna")
+    from pyrite.optimization import KernelLattice, tune_kernels
+
+    scene = _scene(cfg.TransportKernelTuning())
+    lattice = KernelLattice(schedule=("full-history", "auto"), cxr_chunk=(None, 4096))
+    result = tune_kernels(scene, lattice, warmups=1, repeats=1)
+    assert [p.phase for p in result.phases] == ["transport", "spectrum"]
+    for study in result.phases:
+        assert all(t.state == "complete" for t in study.trials), study.trials
+    assert result.best.transport_core == "cuda"

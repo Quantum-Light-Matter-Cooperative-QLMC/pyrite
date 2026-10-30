@@ -258,7 +258,8 @@ def simulate_trajectories(
     budget only bound memory and replay behavior; neither changes results.
 
     transport_progress: optional ``callable(electrons_done, Ne)`` per completed
-    per-electron/CUDA batch, excluding capacity replays; lockstep reports nothing.
+    per-electron/CUDA batch, excluding capacity replays; lockstep and grooved
+    cores report once, on completion.
     Each cascade generation reports its own ``Ne``. Host counters only: no extra
     device sync or draws; results stay BIT-FOR-BIT identical. None reports nothing.
 

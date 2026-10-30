@@ -42,6 +42,27 @@ parameters, and is separate from `OptimizationStudy`. See
    pyrite.optimization.KernelLattice
    pyrite.optimization.KernelTrial
    pyrite.optimization.KernelTuningResult
+   pyrite.optimization.KernelPhaseResult
+   pyrite.optimization.TuningProgress
+```
+
+### Separate transport and spectrum phases
+
+`simulate_transport` runs only electron transport of a scalar-detector scene;
+`score_spectra` scores its kept segments, as often as needed, without
+transporting again. `SimulationProgress` is the event type of their
+`progress=` callbacks and of `pyrite.simulate(..., progress=...)`. See
+[run the phases yourself](../../guides/batch-chunk-tuning.md#run-the-phases-yourself).
+
+```{eval-rst}
+.. autosummary::
+   :toctree: ../../_autosummary
+   :nosignatures:
+
+   pyrite.phases.simulate_transport
+   pyrite.phases.score_spectra
+   pyrite.phases.TransportedScene
+   pyrite.phases.SimulationProgress
 ```
 
 ## Photon aperture interfaces

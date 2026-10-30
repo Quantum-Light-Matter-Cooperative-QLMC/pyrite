@@ -779,6 +779,9 @@ def _ragged_n_el(s):
 
 
 def _lockstep_outcome(t, counts, vacuum=_NO_VACUUM):
+    # Lockstep and grooved cores have no batches: report the finished call once.
+    if t.inputs.transport_progress is not None:
+        t.inputs.transport_progress(t.inputs.Ne, t.inputs.Ne)
     return _CoreOutcome(*counts, None, t.stragg_dE, np, vacuum)
 
 

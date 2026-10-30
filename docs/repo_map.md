@@ -190,6 +190,19 @@ it refuses bin means and joint-field corrections. `checks/pxr_optimization.py`
 is the bounded TPE/random/grid demonstration and independent-finalist protocol.
 Tests: `tests/optimization/`. Guide: `docs/guides/optimization-studies.md`.
 
+`kernel_tuning.py::tune_kernels` (#776) tunes CUDA execution controls, not
+physics: transport (`electron_batch`, `schedule`, `continuation_rows`) and
+spectrum (`cxr_chunk`, `brem_chunk`) dimensions are independent Optuna studies
+(exhaustive for small lattices), measured by one persistent
+`_kernel_worker.py` process per tuning (JSON lines over stdin/stdout).
+Transport candidates time `phases.simulate_transport` and compare a digest of
+the transported arrays; spectrum candidates rescore one kept transport with
+`phases.score_spectra`. The fastest candidate must survive interleaved
+re-timing against the baseline (`min_speedup`). Tests:
+`tests/optimization/test_kernel_tuning.py` (fake worker),
+`tests/montecarlo/test_transport_kernel_tuning_cuda.py` (device). Guide:
+`docs/guides/batch-chunk-tuning.md`; tutorial 15.
+
 ## Entry points
 
 - **`pyrite.quantum`** remains a module and owns quantum configuration plus a curated lazy facade for portable `TransverseStateSpec`, nonportable runtime factories, planar projection, and selected experimental planar/axial solvers and diagnostics. Definitions remain in `quantum_state`, `planar_source`, and `montecarlo.channeling` leaves; aliases preserve object/pickle identity and production admission. `api-surface.toml` governs this module through `package_exports`; the [quantum API contracts](reference/quantum-api.md) lists status, units, and bounded examples.
@@ -587,8 +600,12 @@ The CLI singleton-profile resolver lives in `campaign/single_scene.py`, which lo
 
 Filesystem-free simulation seam. `simulate` combines scalar beam, target, and detector components into a `Scene` and lowers exactly one typed `Case`. Scalar detectors call the unchanged `montecarlo.run_case`; physical detectors reuse one transport across coarse angular tiles, then attach exact pixel rays and finite-filter attenuation as a factorized `SpatialResult`. Source-case and observation identities remain separate. Combined line totals include atomic characteristic radiation, with the component exposed as `Result.characteristic` and in spatial factors. The API never reads or writes campaign checkpoints. `build_case`, `build_sweep_cases`, and legacy lowering helpers are implementation/compatibility seams rather than the root supported surface.
 
-- Public: root-lazy `simulate`.
+- Public: root-lazy `simulate`, whose experimental `progress=` routes `SimulationProgress` (`_simulation_progress.py`) from per-batch transport and per-stage spectrum sinks (`runner._TRANSPORT_PROGRESS`/`_SPECTRUM_PROGRESS`, installed by `runner.transport_options.run_progress`) for in-process runs.
 - Deps: `campaign.model`, `campaign.sweep`, `campaign.profiles`, `detectors`, `montecarlo`, `results`.
+
+### `phases.py`
+
+Experimental scalar-detector phase split (#776): `simulate_transport` runs `runner._transport_case` (segments kept on the device for CUDA) into a `TransportedScene`; `score_spectra` runs only `_spectrum_with_recovery` on it, any number of times, with optional spectral chunk changes, and builds the same `Result` as `simulate` through `api._scalar_result`. Disk-backed replay stays `pyrite trajectories score`.
 
 ### `campaign/sweep.py`
 Turn `Sweep` definition into Cartesian product of `run_case` dicts.

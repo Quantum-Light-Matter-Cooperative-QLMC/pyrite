@@ -43,7 +43,7 @@ from .materials._composition import resolve_composition
 from .materials.photon_cross_sections import ATTENUATION_MODEL
 from .montecarlo import Case, run_case
 from .montecarlo.runner import cached_case_table_markers, case_table_markers, run_case_directions
-from .montecarlo.runner.transport_options import transport_tuning
+from .montecarlo.runner.transport_options import run_progress, transport_tuning
 from .montecarlo.spectrum import (
     BREM_ENDF_PARSERPY_VERSION,
 )
@@ -54,6 +54,9 @@ from .quantum import QuantumSetup
 from .results.model import CxrSpectra, Result, SpectralDensity
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from ._simulation_progress import SimulationProgress
     from .execution.protocol import Executor
 
 
@@ -240,6 +243,7 @@ def simulate(
     quantum: QuantumSetup | None | _Unset = UNSET,
     observation: Observation | None = None,
     executor: "Executor | None" = None,
+    progress: "Callable[[SimulationProgress], None] | None" = None,
 ) -> Result:
     """Simulate one scene without reading or writing a checkpoint.
 
@@ -286,6 +290,11 @@ def simulate(
         selection; distributed executors may write their configured worker
         artifacts, but never simulation checkpoints. Scheduler selection is
         recorded separately from scientific identity.
+    progress
+        Optional experimental callback receiving
+        :class:`~pyrite.phases.SimulationProgress` after each transport batch
+        and spectrum stage of an in-process run; executor workers send none.
+        It never changes results.
 
     Returns
     -------
@@ -319,14 +328,28 @@ def simulate(
     scene, resolved_numerics = request.scene, request.numerics
     case, xsgen_tables = _source_case(request)
     if isinstance(scene.detector, PlanarDetector):
-        return _simulate_planar(request, case, xsgen_tables)
+        with run_progress(progress):
+            return _simulate_planar(request, case, xsgen_tables)
     if request.executor is None:
-        with transport_tuning(resolved_numerics):
+        with transport_tuning(resolved_numerics), run_progress(progress):
             output = run_case(case, transport_core=resolved_numerics.transport_core)
     else:
         from .execution._simulation import execute_simulation
 
         output = execute_simulation(request.executor, case, xsgen_tables)
+    return _scalar_result(request, case, xsgen_tables, output)
+
+
+def _scalar_result(
+    request: ResolvedSimulation,
+    case: Case,
+    xsgen_tables: dict[str, str],
+    output: Mapping[str, Any],
+    numerics: Numerics | None = None,
+) -> Result:
+    """``Result`` of one scalar-detector ``run_case`` output; shared with :mod:`pyrite.phases`."""
+    scene = request.scene
+    resolved_numerics = request.numerics if numerics is None else numerics
     background_energy = output.get("E_grid_brem", output["E_grid"])
     background = output.get("brem_wide", output["brem"])
     if scene.physics.brem_source != "mc":
@@ -361,11 +384,29 @@ def simulate(
                 if "adaptive_sampling" in output
                 else {}
             ),
+            # Allocation retries ran smaller chunks than requested; absent when none.
+            **(
+                {"spectrum_recovery": {k: output[k] for k in _RECOVERY_KEYS if k in output}}
+                if output.get("_gpu_oom_retries")
+                or "_recovery_path" in output
+                and output["_recovery_path"] != "device_spectrum"
+                else {}
+            ),
             # Channeling-zone fates and angles (#506); absent when off.
             **({"channeling": output["channeling"]} if "channeling" in output else {}),
             **run_provenance(case, xsgen_tables),
         },
     )
+
+
+_RECOVERY_KEYS = (
+    "_gpu_oom_retries",
+    "_recovery_path",
+    "_attempted_spec_chunk",
+    "_effective_spec_chunk",
+    "_attempted_brem_chunk",
+    "_effective_brem_chunk",
+)
 
 
 def _source_case(request: ResolvedSimulation) -> tuple[Case, dict[str, str]]:

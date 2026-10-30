@@ -24,9 +24,6 @@ def _():
     import os
 
     os.environ.setdefault("PYRITE_MC_BACKEND", "cuda")
-    import subprocess
-
-    import cupy as cp
     import marimo as mo
     import matplotlib.pyplot as plt
     import numpy as np
@@ -38,7 +35,7 @@ def _():
     with mo.status.spinner(title="Preparing PyRITE reference tables"):
         _ = pyrite.fetch_tables()
     tables_ready = True
-    return cp, mo, np, plt, pyrite, subprocess, tables_ready
+    return mo, np, plt, pyrite, tables_ready
 
 
 @app.cell(hide_code=True)
@@ -46,18 +43,24 @@ def _(mo):
     mo.md(r"""
     # Tuning CUDA execution
 
-    Tune **transport kernels first**, then **spectral reduction kernels**. The
-    first study minimizes synchronized electron-transport time by changing
-    electron batch and continuation schedule. The second holds the chosen
-    transport configuration fixed and minimizes synchronized spectrum time by
-    changing only the CXR segment chunk. Both studies run complete simulations
-    and reject candidates whose spectral densities differ from their baseline.
+    A simulation has two phases: **electron transport**, then **spectrum
+    scoring** of the transported segments. Their execution controls are
+    independent, so PyRITE tunes them as two separate studies:
 
-    This is a short demonstration, not an exhaustive GPU benchmark. Increase
-    trial counts and history counts for a representative production workload.
+    - **Transport** candidates (electron batch, continuation schedule) run
+      *only* transport and must reproduce the baseline's transported arrays
+      bit for bit.
+    - **Spectrum** candidates (CXR segment chunk) rescore *one* kept transport
+      without transporting again, and must reproduce its spectra.
+
+    Each study tries every valid combination of its own controls, then re-times
+    the fastest against the baseline before accepting it. On this workload the
+    whole tuning takes a few minutes; the spectrum phase dominates the run, and
+    its default chunk is already at its cap, so expect the transport study to
+    find more than the spectrum study.
 
     This tutorial **needs an NVIDIA GPU**; on Molab, choose a GPU runtime. The
-    tuner, `TransportKernelTuning` and `KernelLattice` are experimental.
+    tuner, `pyrite.phases` and `TransportKernelTuning` are experimental.
     Timings depend on the device, driver, precision and the other work on the
     machine.
     """)
@@ -65,7 +68,7 @@ def _(mo):
 
 
 @app.cell
-def _(cp, np, subprocess):
+def _(np):
     from pyrite import Scene
     from pyrite.beams import Beam, PointBunch, PointSpot
     from pyrite.config import CxrReflections, FixedSampling, Numerics
@@ -83,165 +86,177 @@ def _(cp, np, subprocess):
         ),
         Detector(observation_angle=90 * ureg.degree),
         numerics=Numerics(
-            sampling=FixedSampling(cxr_electrons=65_536, brem_electrons=1_024),
+            sampling=FixedSampling(cxr_electrons=16_384, brem_electrons=1_024),
             seed=7,
             energy_bins=EnergyBins().with_cxr_energies(np.linspace(750, 1_000, 251) * ureg.eV),
             cxr_reflections=CxrReflections(n_families=1),
         ),
     )
-
-    def check_gpu_util():
-        _pool = cp.get_default_memory_pool()
-        _free, _total = cp.cuda.runtime.memGetInfo()
-
-        _MiB = 1024**2
-
-        print(f"GPU total:        {_total / _MiB:.1f} MiB")
-        print(f"GPU free:         {_free / _MiB:.1f} MiB")
-        print(f"GPU driver used:  {(_total - _free) / _MiB:.1f} MiB")
-        print(f"CuPy pool used:   {_pool.used_bytes() / _MiB:.1f} MiB")
-        print(f"CuPy reserved:    {_pool.total_bytes() / _MiB:.1f} MiB")
-        print(f"CuPy pool limit:  {_pool.get_limit() / _MiB:.1f} MiB")
-
-        _result = subprocess.run(
-            [
-                "nvidia-smi",
-                "--query-gpu=name,memory.total,memory.used,utilization.gpu,utilization.memory",
-                "--format=csv,noheader",
-            ],
-            capture_output=True,
-            text=True,
-        )
-
-        print(_result.stdout or _result.stderr)
-
-    return check_gpu_util, scene
-
-
-@app.cell
-def _(check_gpu_util, mo, scene, tables_ready):
-    import inspect
-
-    from pyrite.optimization import KernelLattice, tune_kernels
-
-    assert tables_ready
-    phase_objectives_active = "objective" in inspect.signature(tune_kernels).parameters
-
-    def measure_stage(stage_scene, lattice, *, phase, trials, seed):
-        options = dict(trials=trials, warmups=1, repeats=1, rtol=1e-4, seed=seed)
-        title = f"{phase.capitalize()} kernel tuning"
-        if not phase_objectives_active:
-            with mo.status.spinner(
-                title=title,
-                subtitle="Running whole-simulation benchmarks",
-            ):
-                return tune_kernels(stage_scene, lattice, **options)
-
-        with mo.status.progress_bar(
-            total=trials + 1,
-            title=title,
-            show_eta=True,
-        ) as _progress:
-
-            def advance(done, total, state):
-                _progress.update(
-                    increment=1,
-                    subtitle=f"{done}/{total} completed ({state})",
-                )
-
-            return tune_kernels(
-                stage_scene, lattice, objective=phase, on_progress=advance, **options
-            )
-            check_gpu_util()
-
-    transport_lattice = KernelLattice(
-        electron_batch=(None, 2_048, 4_096, 8_192, 16_384),
-        schedule=("full-history", "auto"),
-    )
-    transport_tuning = measure_stage(scene, transport_lattice, phase="transport", trials=5, seed=11)
-    return (
-        KernelLattice,
-        measure_stage,
-        phase_objectives_active,
-        transport_tuning,
-    )
-
-
-@app.cell
-def _(KernelLattice, measure_stage, scene, transport_tuning):
-    from dataclasses import replace
-
-    # Carry the selected transport settings into the spectral study.
-    _scene = replace(scene, numerics=scene.numerics.with_kernel_tuning(transport_tuning.best))
-    spectral_lattice = KernelLattice(cxr_chunk=(None, 8_192, 16_284, 32_768, 65_536))
-    spectral_tuning = measure_stage(_scene, spectral_lattice, phase="spectrum", trials=5, seed=12)
-
-    tuning = spectral_tuning  # Includes the winning transport settings.
-    return spectral_tuning, tuning
+    return (scene,)
 
 
 @app.cell(hide_code=True)
-def _(mo, phase_objectives_active, spectral_tuning, transport_tuning):
-    def describe(trial):
-        t = trial.tuning.transport
-        values = {
-            "batch": t.electron_batch,
-            "schedule": t.schedule,
-            "rows": t.continuation_rows,
-            "cxr chunk": trial.tuning.cxr_chunk,
-        }
+def _(mo):
+    mo.md(r"""
+    ## Where the time goes
+
+    `simulate_transport` stops after transport; `score_spectra` scores the
+    kept segments. Timing them separately shows which phase is worth tuning.
+    Both report progress after every transport batch and spectrum stage; the
+    same `progress=` callback works on `pyrite.simulate`.
+    """)
+    return
+
+
+@app.cell
+def _(mo, scene, tables_ready):
+    from time import perf_counter
+
+    from pyrite.phases import score_spectra, simulate_transport
+
+    assert tables_ready
+    with mo.status.progress_bar(total=100, title="One untimed run, then timed phases") as _bar:
+
+        def show(event):
+            _bar.update(
+                increment=0,
+                subtitle=f"{event.phase}: {event.stage} {event.done:,}/{event.total:,}",
+            )
+
+        score_spectra(simulate_transport(scene))  # compile kernels first
+        _started = perf_counter()
+        transported = simulate_transport(scene, progress=show)
+        _bar.update(increment=50)
+        transport_s = perf_counter() - _started
+        _started = perf_counter()
+        _ = score_spectra(transported, progress=show)
+        _bar.update(increment=50)
+        spectrum_s = perf_counter() - _started
+    del transported  # releases the kept segments on the device
+    mo.md(
+        f"Transport **{transport_s:.2f} s**, spectrum **{spectrum_s:.2f} s** "
+        f"({spectrum_s / (transport_s + spectrum_s):.0%} of the run)."
+    )
+    return spectrum_s, transport_s
+
+
+@app.cell
+def _(mo, scene):
+    from pyrite.optimization import KernelLattice, tune_kernels
+
+    lattice = KernelLattice(
+        electron_batch=(None, 4_096, 16_384),
+        schedule=("full-history", "auto"),
+        cxr_chunk=(16_384, 65_536, 262_144),
+    )
+    _candidates = sum(
+        len(lattice.choices(scene.numerics.kernel_tuning, p)) for p in ("transport", "spectrum")
+    )
+    with mo.status.progress_bar(
+        total=_candidates + 2, title="Tuning transport, then spectrum", show_eta=True
+    ) as _bar:
+
+        def advance(update):
+            if update.simulation is not None:
+                _sim = update.simulation
+                _detail = (
+                    f"run {update.run}/{update.runs}: {_sim.stage} {_sim.done:,}/{_sim.total:,}"
+                )
+            else:
+                _detail = update.state
+            _finished = update.state in ("baseline", "complete", "rejected")
+            _bar.update(
+                increment=1 if _finished else 0,
+                subtitle=f"{update.phase} {update.trial}/{update.trials} — {_detail}",
+            )
+
+        tuning = tune_kernels(scene, lattice, warmups=1, repeats=3, on_progress=advance)
+    return (tuning,)
+
+
+@app.cell(hide_code=True)
+def _(mo, spectrum_s, transport_s, tuning):
+    def describe(trial, phase):
+        if phase == "transport":
+            t = trial.tuning.transport
+            values = {"batch": t.electron_batch, "schedule": t.schedule}
+        else:
+            values = {"cxr chunk": trial.tuning.cxr_chunk}
         return ", ".join(f"{k} {'default' if v is None else v}" for k, v in values.items())
 
-    metric_label = "synchronized phase" if phase_objectives_active else "whole-simulation"
-
-    def table(label, study):
+    def table(study):
         _rows = [
-            f"### {label}: {metric_label} seconds",
+            f"### {study.phase.capitalize()}: synchronized phase seconds",
             "| Trial | Settings | Median (s) | Outcome |",
             "|---:|---|---:|---|",
-            f"| baseline | {describe(study.baseline)} | {study.baseline.median_s:.3f} | reference |",
+            f"| baseline | {describe(study.baseline, study.phase)} "
+            f"| {study.baseline.median_s:.3f} | reference |",
         ]
         for _trial in study.trials:
             if _trial.tuning is None or _trial.repeat_of is not None:
                 continue
             _time = "—" if _trial.median_s is None else f"{_trial.median_s:.3f}"
             _outcome = "accepted" if _trial.state == "complete" else f"rejected: {_trial.reason}"
-            _rows.append(f"| {_trial.number} | {describe(_trial)} | {_time} | {_outcome} |")
+            _rows.append(
+                f"| {_trial.number} | {describe(_trial, study.phase)} | {_time} | {_outcome} |"
+            )
+        _verdict = "confirmed" if study.improved else "kept the baseline"
         _rows.append(
-            f"**Chosen:** {describe(study.chosen)}; "
-            f"**{study.speedup:.2f}×** this phase's baseline median."
+            f"\n**Chosen:** {describe(study.chosen, study.phase)} ({_verdict}); "
+            f"**{study.speedup:.2f}×** the baseline phase median."
         )
         return "\n".join(_rows)
 
-    _env = ", ".join(f"{k} `{v}`" for k, v in spectral_tuning.environment.items())
+    # Each phase's speedup weighted by its share of the run timed above.
+    _whole = (transport_s + spectrum_s) / (
+        transport_s / tuning.transport.speedup + spectrum_s / tuning.spectrum.speedup
+    )
+    _env = ", ".join(f"{k} `{v}`" for k, v in tuning.environment.items())
     mo.md(
         f"Measured on {_env}.\n\n"
-        + table("Transport", transport_tuning)
-        + "\n\n"
-        + table("Spectrum", spectral_tuning)
+        + "\n\n".join(table(_study) for _study in tuning.phases)
+        + f"\n\n**Estimated whole-run speedup: {_whole:.2f}×** — a phase's gain counts "
+        "only in proportion to its share of the run."
     )
     return
 
 
 @app.cell
-def _(np, phase_objectives_active, plt, spectral_tuning):
-    _done = sorted(
-        (t for t in spectral_tuning.trials if t.state == "complete"), key=lambda t: t.median_s
+def _(np, plt, tuning):
+    fig_timing, _axes = plt.subplots(
+        1, len(tuning.phases), figsize=(8, 3.6), layout="constrained", squeeze=False
     )
-    _shown = [spectral_tuning.baseline, *_done[:8]]
-    fig_timing, _ax = plt.subplots(figsize=(7, 3.8), layout="constrained")
-    for _i, _trial in enumerate(_shown):
-        _samples = np.asarray(_trial.samples_s)
-        _ax.scatter(np.full(_samples.size, _i), _samples, color="0.6", s=12)
-        _ax.scatter(_i, np.median(_samples), color="C3" if _i == 0 else "C0", marker="_", s=400)
-    _ax.set(
-        xticks=range(len(_shown)),
-        xticklabels=["baseline", *(str(t.number) for t in _shown[1:])],
-        xlabel="Trial (accepted, fastest first)",
-        ylabel="Spectrum time (s)" if phase_objectives_active else "Full run time (s)",
-        title=f"{spectral_tuning.environment.get('device', 'GPU')}: spectral configurations",
-    )
+    for _ax, _study in zip(_axes[0], tuning.phases, strict=True):
+        _done = [t for t in _study.trials if t.state == "complete" and t.repeat_of is None]
+        _shown = [_study.baseline, *sorted(_done, key=lambda t: t.median_s)]
+        for _i, _trial in enumerate(_shown):
+            _samples = np.asarray(_trial.samples_s)
+            _ax.scatter(np.full(_samples.size, _i), _samples, color="0.6", s=12)
+            _colour = "C3" if _i == 0 else ("C2" if _trial is _study.chosen else "C0")
+            _ax.scatter(_i, np.median(_samples), color=_colour, marker="_", s=400)
+        _ax.set(
+            xticks=range(len(_shown)),
+            xticklabels=["base", *(str(t.number) for t in _shown[1:])],
+            xlabel="Trial (fastest first)",
+            ylabel="Phase time (s)",
+            title=_study.phase,
+        )
+        _ax.set_ylim(bottom=0)
+    fig_timing.suptitle(tuning.environment.get("device", "GPU"))
     fig_timing  # noqa: B018
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Apply and check the joined winner
+
+    `tuning.best` joins the transport winner's controls with the spectrum
+    winner's chunk. Applying it through ordinary `Numerics` must leave the
+    spectrum unchanged up to the summation-order differences a chunk change
+    can introduce.
+    """)
     return
 
 
@@ -253,7 +268,7 @@ def _(mo, np, plt, pyrite, scene, tuning):
         tuned_result = pyrite.simulate(
             scene, numerics=scene.numerics.with_kernel_tuning(tuning.best)
         )
-        _progress.update(subtitle="Transport + spectrum winners")
+        _progress.update(subtitle="Joined transport + spectrum winners")
     _energy = baseline_result.cxr.incoherent.photon_energy_eV
     _base = baseline_result.cxr.incoherent.density
     _tuned = tuned_result.cxr.incoherent.density
@@ -276,47 +291,26 @@ def _(mo, np, plt, pyrite, scene, tuning):
 
 
 @app.cell(hide_code=True)
-def _(mo, phase_objectives_active):
-    _phase_note = (
-        "Transport and spectrum studies report their **synchronized phase time**. "
-        "This is not total wall time; increase repeats for production tuning."
-    )
-    _fallback_note = (
-        "PyRITE v0.24.0 fallback: transport and spectrum settings are tuned "
-        "**separately**, but both use **whole-simulation wall time**. "
-        "Upgrade PyRITE for per-phase timings and per-trial progress."
-    )
-    mo.md(_phase_note if phase_objectives_active else _fallback_note)
-    return
-
-
-@app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    Each trial runs a full CUDA simulation in its **own process**. The first
-    (untimed) call absorbs compilation; one synchronized repeat measures the
-    selected phase. The transport phase includes its trajectory setup and
-    pre-spectral line-grid work. The spectrum phase includes CXR and background
-    scoring. The phase timer does **not** isolate one CUDA kernel launch.
+    ## What the numbers mean
 
-    **Transport controls:** electron batch and schedule only. **Spectrum
-    controls:** CXR segment chunk only (bremsstrahlung chunk is also available
-    in `KernelLattice`). For the second stage, the first stage's winner is held
-    fixed. Every candidate's complete spectrum is checked for agreement with
-    the stage baseline at `rtol=1e-4`; numerical equivalence is a guard, not a
-    claim of scientific validation.
+    Every candidate runs in one CUDA **worker process** that compiles kernels
+    and loads tables once and releases the device memory pool before each
+    candidate; `isolate="candidate"` restarts it per candidate instead, at a
+    large cost. A candidate gets one untimed warm-up and three synchronized
+    timed runs of its phase. The fastest accepted candidate is then re-timed
+    in three interleaved pairs with the baseline, and replaces it only for at
+    least a 2% confirmed gain (`min_speedup`). A "kept the baseline" verdict
+    means the defaults were already as fast on this workload, not that tuning
+    failed.
 
-    The default experiment uses four transport candidates and three spectrum
-    candidates, instead of one 16-trial mixed search. A slow configuration can
-    still take time; the progress display updates **between** complete worker
-    processes, not inside a single CUDA launch. Increase `repeats` to 3 or more
-    for stable medians, and enlarge the electron count for production tuning.
-    You can then apply `scene.numerics.with_kernel_tuning(tuning.best)` in a
-    new process. Winners are GPU-, driver- and workload-specific.
-
-    On v0.24.0, the two parameter groups are tuned separately using complete
-    simulation wall times; after upgrading to the phase-timing API, each
-    study targets the named synchronized phase.
+    The transport timer includes trajectory setup and automatic line-grid
+    resolution; the spectrum timer includes CXR, characteristic and
+    bremsstrahlung scoring. Neither isolates one kernel launch. The equality
+    checks are a tuning guard, not scientific validation. Winners are GPU-,
+    driver- and workload-specific: re-tune for a production workload, and
+    apply `scene.numerics.with_kernel_tuning(tuning.best)` in a new process.
     """)
     return
 
