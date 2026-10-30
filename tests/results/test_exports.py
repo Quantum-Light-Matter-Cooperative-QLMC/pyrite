@@ -124,6 +124,7 @@ FROZEN_EXPORTS = FROZEN_EXPORTS | frozenset(
         "SELECTION_MODES",
         "filter_results",
         "EmissionMode",
+        "TemporalIntensity",
     }
 )
 

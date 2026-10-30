@@ -12,17 +12,18 @@ import pytest
 
 from pyrite.devtools import api_surface
 
-_BEAM_NAMES = (
-    "Beam",
-    "BunchFrontTilt",
-    "BunchLength",
-    "GdfSource",
-    "Offsets",
-    "PointBunch",
-    "PointSpot",
-    "Spot",
-    "TransverseSpot",
-)
+_BEAM_OWNERS = {
+    "Beam": "pyrite.campaign.beam",
+    "BunchFrontTilt": "pyrite.campaign.beam",
+    "BunchLength": "pyrite.campaign.beam",
+    "GdfSource": "pyrite.campaign.beam",
+    "LongitudinalDistribution": "pyrite.campaign.longitudinal",
+    "Offsets": "pyrite.campaign.beam",
+    "PointBunch": "pyrite.campaign.beam",
+    "PointSpot": "pyrite.campaign.beam",
+    "Spot": "pyrite.campaign.beam",
+    "TransverseSpot": "pyrite.campaign.beam",
+}
 _GEOMETRY_OWNERS = {
     "BlazedGrooves": "pyrite.campaign.geometry",
     "CrystalCut": "pyrite.campaign.geometry",
@@ -40,7 +41,7 @@ _GEOMETRY_OWNERS = {
 
 @pytest.mark.parametrize(
     ("domain", "name", "owner"),
-    [("beams", name, "pyrite.campaign.beam") for name in _BEAM_NAMES]
+    [("beams", name, owner) for name, owner in _BEAM_OWNERS.items()]
     + [("geometry", name, owner) for name, owner in _GEOMETRY_OWNERS.items()],
 )
 def test_physical_facades_preserve_implementation_and_pickle_identity(domain, name, owner):
@@ -61,7 +62,7 @@ def test_physical_facades_preserve_implementation_and_pickle_identity(domain, na
 
 @pytest.mark.parametrize(
     ("domain", "names"),
-    [("beams", _BEAM_NAMES), ("geometry", tuple(_GEOMETRY_OWNERS))],
+    [("beams", tuple(_BEAM_OWNERS)), ("geometry", tuple(_GEOMETRY_OWNERS))],
 )
 def test_physical_facade_inventories_are_deliberate(domain, names):
     facade = importlib.import_module(f"pyrite.{domain}")

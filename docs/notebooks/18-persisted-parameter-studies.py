@@ -225,7 +225,7 @@ def _(Settings, records, saved_store, select_results, summary_table, sweep_value
     # summary_table reports current-scaled photon rates and selected geometry.
     selected_summary = summary_table(records(selected), Settings())
     assert len(selected_summary) == 2
-    selected_summary
+    selected_summary  # noqa: B018
     return available, selected_summary
 
 
