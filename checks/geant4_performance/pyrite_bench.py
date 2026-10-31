@@ -378,6 +378,12 @@ def main():
         help="CUDA transport kernel selection where the build supports it (#827)",
     )
     parser.add_argument(
+        "--transport-precision",
+        choices=["fp64", "mixed"],
+        default="fp64",
+        help="exact CUDA kernel precision (#838); mixed is FP32 tables/sampling",
+    )
+    parser.add_argument(
         "--pool-fraction", type=float, default=0.85, help="CuPy pool limit, fraction of VRAM"
     )
     parser.add_argument(
@@ -494,6 +500,7 @@ def main():
         bremslib_tables=brem,
         radiative_moments="table",
         transport_core="cuda",
+        transport_precision=args.transport_precision,
         per_electron_config=config,
         # ELSEPA bypasses the LUT anyway; explicit so `auto` cannot fall back on it.
         transport_lut_config=TransportLUTConfig(enabled=False),
@@ -662,6 +669,7 @@ def main():
             pool_fraction=args.pool_fraction,
             score_rows=args.score_rows,
             kernel=args.kernel,
+            transport_precision=args.transport_precision,
             spectrum_step_eV=args.spectrum_step_ev,
             spectrum_geometric_nodes=args.spectrum_geometric_nodes,
         ),
