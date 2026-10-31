@@ -34,9 +34,9 @@ from dataclasses import dataclass, replace
 from typing import Any
 
 import numpy as np
-from numba import njit, prange
 
 from ..._env import env_value
+from ._continuation_join import RUN_BYTES, _copy_runs, join_rounds
 from .cores import (
     EXIT_BACKSCATTERED,
     EXIT_CUTOFF_STOPPED,
@@ -89,13 +89,15 @@ class TransportContinuationConfig:
     outside it: bounded scratch does not bound total trajectory storage.
 
     ``device_staging`` (default off since #825) keeps each round's retained
-    rows on the device and downloads the reassembled columns once, for up to
-    twice the retained output in device memory. Staging is bounded: while
-    twice the staged bytes fit ``staging_budget_bytes`` rounds stay on the
-    device; past it the staged rounds spill to the host and the run finishes
-    with host reassembly. ``None`` derives the budget from free device memory
-    (driver free plus the memory pool's cached blocks) after the round
-    scratch is allocated, less ``STAGING_HEADROOM``. Off, rows move to the
+    rows on the device, joins them there column by column with a run-copy
+    kernel and downloads each joined column through pinned chunks (#866).
+    Device memory peaks at the staged rows plus their largest joined column
+    and the run table. Staging is bounded: while that peak fits
+    ``staging_budget_bytes`` rounds stay on the device; past it the staged
+    rounds spill to the host and the run finishes with host reassembly.
+    ``None`` derives the budget from free device memory (driver free plus the
+    memory pool's cached blocks) after the round scratch is allocated, less
+    ``STAGING_HEADROOM``. Off, rows move to the
     host every round and are reassembled there with the parallel run copy,
     which since #825 is as fast or faster on every measured scene (job 3000)
     and needs no device staging memory. Results are bitwise the same in
@@ -219,7 +221,7 @@ def _free_device_bytes(xp):
 
 
 def staging_budget(xp, cont):
-    """Device bytes staged rounds plus their joined copy may hold; None = unbounded."""
+    """Device bytes staged rounds, a joined column and run table may hold; None = unbounded."""
     if cont.staging_budget_bytes is not None:
         return int(cont.staging_budget_bytes)
     free = _free_device_bytes(xp)
@@ -241,13 +243,27 @@ class _Retained:
         self.arena = None
         self.chunks = []
         self.staged_bytes = 0
+        self.column_bytes = None
+        self.run_bytes = 0
         self.spilled_round = None
 
-    def append(self, gathered):
+    def peak_bytes(self):
+        """Device peak of the column-by-column join of the staged rounds (#866)."""
+        largest = max(self.column_bytes) if self.column_bytes else 0
+        return self.staged_bytes + largest + self.run_bytes
+
+    def append(self, gathered, lanes=0):
         if self.on_device and self.budget is not None:
             self.staged_bytes += _chunk_bytes(gathered)
-            # Assembly holds the staged rounds and their joined copy at once.
-            if 2 * self.staged_bytes > self.budget:
+            sizes = [int(a.nbytes) for a in gathered]
+            if self.column_bytes is None:
+                self.column_bytes = sizes
+            else:
+                self.column_bytes = [a + b for a, b in zip(self.column_bytes, sizes, strict=True)]
+            self.run_bytes += RUN_BYTES * int(lanes)
+            # The join holds the staged rounds, one joined column (each column
+            # frees its round slices once joined) and the run table.
+            if self.peak_bytes() > self.budget:
                 # Spilling copies every staged round plus this one to the host.
                 admit_host_allocation(self.staged_bytes, "continuation staged-round spill")
                 self.chunks = [self._host(c) for c in self.chunks]
@@ -338,20 +354,6 @@ def _canonical_runs(chunks, rows_total):
         yield base, starts, counts
 
 
-def _canonical_destinations(chunks, rows_total):
-    """Destination row of every retained row, chunk by chunk (device join)."""
-    for base, starts, counts in _canonical_runs(chunks, rows_total):
-        yield np.repeat(base - starts, counts) + np.arange(int(counts.sum()), dtype=np.int64)
-
-
-@njit(parallel=True, cache=True)
-def _copy_runs(dst, src, dst_start, src_start, length):  # pragma: no cover - compiled
-    """``dst[d:d+n] = src[s:s+n]`` for every run; runs never overlap in ``dst``."""
-    for r in prange(dst_start.size):
-        d, s, n = dst_start[r], src_start[r], length[r]
-        dst[d : d + n] = src[s : s + n]
-
-
 def _host_rows(target, nseg):
     """The reserved host ndarray behind ``target``, as ``(nseg, width)``."""
     rows = target[:nseg]
@@ -398,28 +400,32 @@ def _pending_order(Ne, history_order):
     return pending
 
 
-def _assemble(xp, chunks, rows_total, retained, columns, out_bufs, nseg, keep_on_device):
-    """Scatter retained rounds into canonical rows; the joined device rows or None.
+def _reserve(out_bufs, nseg):
+    if out_bufs and hasattr(out_bufs[0], "reserve"):
+        # Assembly must hold all staged rounds *and* their final canonical
+        # columns; use the actual row count rather than Ne * max_steps.
+        out_bufs[0].reserve(nseg)
 
-    ``keep_on_device`` means the rounds are device-resident and are joined there;
-    otherwise they are host arrays copied into ``out_bufs``.
+
+def _assemble(xp, chunks, rows_total, retained, columns, out_bufs, nseg, staged, keep_on_device):
+    """Place retained rounds in canonical rows; the joined device rows or None.
+
+    Host-retained rounds are run-copied into ``out_bufs``. Staged rounds are
+    joined on the device column by column; unless ``keep_on_device`` each
+    joined column is downloaded straight into ``out_bufs``.
     """
-    if not keep_on_device:
-        if out_bufs and hasattr(out_bufs[0], "reserve"):
-            # Assembly must hold all staged rounds *and* their final canonical
-            # columns; use the actual row count rather than Ne * max_steps.
-            out_bufs[0].reserve(nseg)
+    runs = _canonical_runs(chunks, rows_total)
+    if staged and keep_on_device:
+        return join_rounds(xp, runs, retained, columns, nseg)
+    _reserve(out_bufs, nseg)
+    if not staged:
         _scatter_host(chunks, rows_total, retained, out_bufs, nseg)
         return None
-    joined = tuple(
-        xp.empty((nseg,) + a.shape[1:], dtype=a.dtype) if a.shape[0] else a for a in columns
-    )
-    for dest, chunk in zip(_canonical_destinations(chunks, rows_total), retained, strict=True):
-        dest = xp.asarray(dest)
-        for target, column in zip(joined, chunk, strict=True):
-            if column.shape[0]:
-                target[dest] = column
-    return joined
+    targets = [
+        _host_rows(t, nseg) if a.shape[0] else None for t, a in zip(out_bufs, columns, strict=True)
+    ]
+    join_rounds(xp, runs, retained, columns, nseg, targets)
+    return None
 
 
 def _drive_continuation_rounds(
@@ -487,7 +493,7 @@ def _drive_continuation_rounds(
         gathered = tuple(a[index] if a.shape[0] else a for a in columns)
         nseg += int(index.size)
         del index
-        retained.append(gathered)
+        retained.append(gathered, lanes=m)
         del gathered
         counts = to_host(seg_count[:m]).astype(np.int64)
         codes = to_host(exit_code[:m])
@@ -526,13 +532,9 @@ def _drive_continuation_rounds(
     _nsys_push("pyrite.transport.continuation.assemble")
     on_device = retained.on_device
     retained.close()
-    joined = _assemble(xp, chunks, rows_total, retained.chunks, columns, out_bufs, nseg, on_device)
-    if on_device and not keep_on_device:
-        for buf, column in zip(out_bufs, joined, strict=True):
-            if column.shape[0]:
-                admit_host_allocation(int(column.nbytes), "continuation final host download")
-                buf[:nseg] = to_host(column)
-        joined = None
+    joined = _assemble(
+        xp, chunks, rows_total, retained.chunks, columns, out_bufs, nseg, on_device, keep_on_device
+    )
     _nsys_pop()
     if cont.on_round is not None:
         cont.on_round(
