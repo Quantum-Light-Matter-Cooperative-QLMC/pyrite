@@ -13,6 +13,7 @@ from pyrite.campaign.sweep import BeamSpec, Sweep, build_cases
 from pyrite.materials import CATALOG
 from pyrite.materials.crystal import HBARC_EV_ANG, beta_from_Ee, reciprocal_g_vector
 from pyrite.montecarlo.geometry import _orientation_R
+from tests.helpers.case_compare import assert_same_case
 
 HOPG = CATALOG.crystal("hopg")  # hexagonal (gamma = 120 deg): a nonorthogonal cell
 CUT = pr.geometry.CrystalCut(
@@ -64,7 +65,7 @@ def _independent_lattice_rotation(cut):
     "cut", [pr.geometry.CrystalCut(), pr.geometry.CrystalCut(surface_hkl=HOPG.surface_hkl)]
 )
 def test_noop_cuts_preserve_the_catalog_case_payload(cut):
-    assert build_case(_scene(cut)).to_dict() == build_case(_scene()).to_dict()
+    assert_same_case(build_case(_scene(cut)).to_dict(), build_case(_scene()).to_dict())
 
 
 def test_explicit_cut_reaches_the_case_without_touching_the_catalog():

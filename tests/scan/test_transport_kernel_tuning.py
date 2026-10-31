@@ -18,6 +18,7 @@ from pyrite.execution import LocalExecutor
 from pyrite.montecarlo import runner
 from pyrite.montecarlo import transport as transport_module
 from pyrite.montecarlo.runner.transport_options import _TRANSPORT_TUNING, transport_tuning
+from tests.helpers.case_compare import assert_same_case
 
 
 def _scene(numerics=None):
@@ -109,7 +110,7 @@ def test_scheduling_stays_out_of_case_identity_and_pickles():
     plain = build_case(_scene(pr.Numerics()))
     tuned_numerics = pr.Numerics(execution=_tuned())
     tuned = build_case(_scene(tuned_numerics))
-    assert plain.to_dict() == tuned.to_dict()
+    assert_same_case(plain.to_dict(), tuned.to_dict())
     assert case_content_key(plain) == case_content_key(tuned)
     assert pickle.loads(pickle.dumps(tuned_numerics)) == tuned_numerics
 

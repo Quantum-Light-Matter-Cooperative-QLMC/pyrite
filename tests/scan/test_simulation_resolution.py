@@ -11,6 +11,7 @@ from pyrite.config import Numerics, Physics
 from pyrite.detectors import Detector, EnergyBins
 from pyrite.geometry import Footprint, Slab
 from pyrite.quantum import QuantumDynamics, QuantumNumerics, QuantumRegion, QuantumSetup
+from tests.helpers.case_compare import assert_same_case
 
 
 @pytest.fixture
@@ -199,7 +200,7 @@ def test_configured_observation_changes_direction_and_source_identity():
     changed = sweep.cases(observation=Observation(detector=Detector(45.0)))[0]
     assert changed["theta_obs_rad"] == pytest.approx(np.pi / 4)
     assert case_content_key(changed) != case_content_key(original)
-    assert sweep.cases()[0].to_dict() == original.to_dict()
+    assert_same_case(sweep.cases()[0].to_dict(), original.to_dict())
 
 
 def test_result_records_independent_effective_configuration(scene, numerics, transport):

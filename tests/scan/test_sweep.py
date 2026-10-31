@@ -32,7 +32,7 @@ from pyrite.campaign.sweep import (
 )
 from pyrite.detectors import AngularAcceptance, Detector, EnergyBins, Timepix3
 from pyrite.energy_grid.encoding import decode_energy_grid
-from pyrite.energy_grid.floor import floored_lattice_start_eV
+from pyrite.energy_grid.floor import floored_lattice_start_eV, photon_continuum_floor_eV
 from pyrite.materials import (
     CATALOG,
     LayerSpec,
@@ -321,14 +321,12 @@ def test_empty_per_beam_line_grid_resolves_automatically():
     assert case["line_grid_policy"]["resolution"]["policy"] == "sinc-nyquist"
 
 
-def test_implicit_brem_grid_starts_at_lowest_per_beam_line_grid_start():
-    """The lowest per-beam line-grid start picks the band; the medium sets its floor.
+def test_automatic_brem_grid_starts_at_the_medium_floor_for_every_beam_energy():
+    """An undeclared continuum grid starts at the medium floor, whatever the beam (#278).
 
-    The implicit choice here is 10 eV, which is below mose2's derived
-    photon-continuum floor, so ``build_cases`` raises it onto the grid's own
-    step lattice (issue #100). What the implicit rule still owns is that one
-    band is shared by every beam energy, and that it is derived from the
-    *lowest* per-beam start rather than per case.
+    The per-beam line-grid starts no longer pick a shared uniform band: each case
+    resolves the automatic refined grid, whose first node is the derived
+    photon-continuum floor of the medium.
     """
     cases = build_cases(
         Sweep(
@@ -342,13 +340,8 @@ def test_implicit_brem_grid_starts_at_lowest_per_beam_line_grid_start():
             ),
         )
     )
-    steps = {case["E_grid_brem"][2] for case in cases}
-    assert len(steps) == 1
-    step = steps.pop()
-
-    assert {case["E_grid_brem"][0] for case in cases} == {
-        max(10.0, floored_lattice_start_eV("mose2", step))
-    }
+    starts = {float(case["E_grid_brem"][0]) for case in cases}
+    assert starts == {photon_continuum_floor_eV("mose2")}
 
 
 def test_build_cases_preserves_continuous_angles_and_removes_exact_duplicates():

@@ -110,8 +110,10 @@ def test_inverted_window_falls_back_to_the_full_range_with_a_warning(tmp_path) -
 
 
 def test_poisson_observation_defaults_to_its_labelled_realization(tmp_path) -> None:
+    # The exposure is short enough that the labelled realization is empty for any
+    # sensible continuum grid; at 1 ns the seed-1 draw depended on the grid (#278).
     inventory, digest = _inventory(
-        tmp_path, acquisition=_acquisition(exposure_s=1.0e-9, mode="poisson", seed=1)
+        tmp_path, acquisition=_acquisition(exposure_s=1.0e-12, mode="poisson", seed=1)
     )
     observation = inventory.load(digest)
     controls = make_pixel_image_controls(mo, observation)

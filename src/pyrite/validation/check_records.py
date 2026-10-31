@@ -15,6 +15,11 @@ Verdict = Literal["pass", "fail", "skip"]
 CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
     # Optimization comparison is a study diagnostic, not an independent physics claim.
     "checks/pxr_optimization.py": (),
+    # #278 / #286 measurement diagnostics: they record grid error, accuracy vs electron
+    # count and per-flush cost as study evidence, not as an independent physics claim.
+    "checks/continuum_grid_convergence.py": (),
+    "checks/electron_count_accuracy.py": (),
+    "checks/line_cost_286.py": (),
     "checks/brem_source_comparison.py": ("brem-source-comparison",),
     "checks/sb85_eta_small_kappa_fit.py": ("bremslib-electron-electron",),
     "checks/coherent_flat_omission.py": ("coherent-flat-term-omission",),

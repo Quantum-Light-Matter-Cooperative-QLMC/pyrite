@@ -135,7 +135,7 @@ def _(
         xlabel="Lab observation angle (°)",
         ylabel="Vacuum line energy (keV)",
         title=f"HOPG {reflection.selected_key}, sample tilt {tilt_deg.value:g}°",
-        yscale="log"
+        yscale="log",
     )
     axis.grid(alpha=0.25)
     axis.legend(title="Electron energy", fontsize=8)

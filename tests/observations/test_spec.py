@@ -13,6 +13,7 @@ from pyrite.detectors import Detector, IdealPhotonCounter, PixelGrid, PlanarDete
 from pyrite.geometry import Footprint, Slab
 from pyrite.observations import Acquisition, Observation, ObservationStore, PixelScorer
 from pyrite.runs.observe import produce_observation
+from tests.helpers.case_compare import assert_same_case
 
 ENERGY = np.linspace(500.0, 3000.0, 6)
 CONTROLS = Numerics(cxr_trials=1, brem_trials=1)
@@ -124,7 +125,7 @@ def test_request_matches_legacy_values_and_all_identity_layers(
             numerics=CONTROLS,
             observation=observation,
         )
-    assert actual.case.to_dict() == expected.case.to_dict()
+    assert_same_case(actual.case.to_dict(), expected.case.to_dict())
     for key in (
         "identity_digest",
         "true_spatial_digest",
@@ -218,7 +219,7 @@ def test_virtual_angular_observation_needs_no_physical_detector(scene, transport
         physics=source.physics,
         numerics=CONTROLS,
     )
-    assert observed.case.to_dict() == reference.case.to_dict()
+    assert_same_case(observed.case.to_dict(), reference.case.to_dict())
     assert observed.provenance.identity_digest == reference.provenance.identity_digest
     assert source.detector is None
 
@@ -375,7 +376,7 @@ def test_quantity_scene_and_observation_preserve_values_and_identity(
     )
     expected = api.simulate(scene, numerics=CONTROLS, observation=observation)
     actual = api.simulate(quantity_scene, numerics=CONTROLS, observation=quantity_observation)
-    assert actual.case.to_dict() == expected.case.to_dict()
+    assert_same_case(actual.case.to_dict(), expected.case.to_dict())
     for key in (
         "identity_digest",
         "true_spatial_digest",
