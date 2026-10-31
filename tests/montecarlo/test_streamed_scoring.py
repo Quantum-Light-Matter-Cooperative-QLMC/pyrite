@@ -106,3 +106,26 @@ def test_consumed_blocks_are_released_before_the_next_block():
     )
     assert seen == [3, 7, 9]  # globalized indices
     assert counts["Ne"] == 10 and counts["n_backscattered"] == 3
+
+
+def test_capacity_hint_reaches_later_blocks_and_changes_nothing(monkeypatch, case):
+    from pyrite.montecarlo.runner.transport_options import _TRANSPORT_TUNING
+
+    plain = run_case_streamed(case, 13, transport_core="per-electron")
+    configs = []
+    simulate = runner.simulate_trajectories
+
+    def spy(*args, **kwargs):
+        configs.append(kwargs.get("per_electron_config"))
+        return simulate(*args, **kwargs)
+
+    monkeypatch.setattr(runner, "simulate_trajectories", spy)
+    hinted = run_case_streamed(case, 13, transport_core="per-electron", capacity_hint=True)
+
+    for key in (*SPECTRA, "eta", "hit_frac", "n_segments"):
+        np.testing.assert_array_equal(hinted[key], plain[key], err_msg=key)
+    assert configs[0] is None  # the first block learns from the default guess
+    hinted_configs = [c for c in configs[1:] if c is not None]
+    assert hinted_configs, "no later block received the hint"
+    assert all(c.probe_electrons == 0 and c.seg_capacity > 1 for c in hinted_configs)
+    assert _TRANSPORT_TUNING.get() is None  # override restored
