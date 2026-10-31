@@ -328,6 +328,15 @@ class InstrumentedKernel:
             total = int(grid[0]) * int(block[0])
             grid, block = ((total + int(nt) - 1) // int(nt),), (int(nt),)
         self.stats.setdefault("launch_geometry", []).append([int(grid[0]), int(block[0])])
+        occ = self.stats.setdefault("blocks_per_sm", {})
+        occ_key = f"{kern.ptr}@{int(block[0])}"
+        if occ_key not in occ:
+            # #825: resident blocks per SM at the launched block size.
+            from cupy.cuda import driver
+
+            occ[occ_key] = driver.occupancyMaxActiveBlocksPerMultiprocessor(
+                kern.ptr, int(block[0]), 0
+            )
         start, stop = cupy.cuda.Event(), cupy.cuda.Event()
         start.record(stream)
         kern(grid, block, tuple(new_args), shared_mem, stream, enable_cg)
