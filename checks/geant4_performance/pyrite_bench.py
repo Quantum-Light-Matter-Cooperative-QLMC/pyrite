@@ -157,21 +157,43 @@ def continuous_cone_scores(r, n, cone, ctx):
     return out
 
 
-def grid_spectrum(r, step_eV, cone, ctx):
-    """Production continuum toward the cone axis on a uniform ``step_eV`` grid.
+def spectrum_grids(args, mat, composition, energy_keV):
+    """Diagnostic continuum grids by label: uniform steps and refined geometric counts.
+
+    ``uniform-<step>eV`` is ``step, 2 step, ... < E0`` (production ``E_grid_brem``
+    uses 25 eV). ``geometric-<n>`` is :func:`refined_continuum_grid`: ``n``
+    log-spaced nodes from the medium's continuum floor to ``E0``, plus the
+    anchor pairs at absorption edges and the kinematic endpoint
+    (``Validation: continuum-node-refinement``).
+    """
+    import numpy as np
+
+    from pyrite.energy_grid.refine import refined_continuum_grid
+    from pyrite.materials import MediumSpec
+
+    e0 = 1e3 * energy_keV
+    medium = MediumSpec(mat["catalog_key"], tuple(composition))
+    grids = {f"uniform-{s:g}eV": np.arange(s, e0, s) for s in args.spectrum_step_ev}
+    for n in args.spectrum_geometric_nodes:
+        grids[f"geometric-{n}"] = np.asarray(
+            refined_continuum_grid(medium, e0, n, endpoint_eV=e0), dtype=float
+        )
+    return grids
+
+
+def grid_spectrum(r, grid, cone, ctx):
+    """Production continuum toward the cone axis on ``grid`` [eV].
 
     Spectral-grid sensitivity diagnostic (#821 -> #278): the same
     :func:`mc_coupled_brem_spectrum` call and runner chunk policy a production
-    case uses for ``E_grid_brem`` (default step 25 eV), on nodes ``step, 2 step,
-    ... < E0``, with unit transmission like the cone arms. Returns the density
-    [photons / eV / sr / electron], the nodes [eV] and the segment chunk.
+    case uses for ``E_grid_brem``, with unit transmission like the cone arms.
+    Returns the density [photons / eV / sr / electron] and the segment chunk.
     """
     import numpy as np
 
     from pyrite.montecarlo import runner
     from pyrite.montecarlo.spectrum.brem_events import mc_coupled_brem_spectrum
 
-    grid = np.arange(step_eV, 1e3 * ctx["energy_keV"], step_eV)
     dense = runner._EEDL_BREM_DENSE_INTERMEDIATES
     chunk = runner._admit_chunk(
         runner._RESOURCE_POLICY.brem_chunk
@@ -189,32 +211,45 @@ def grid_spectrum(r, step_eV, cone, ctx):
         layers=[(0.0, ctx["thickness_ang"], [(el, 0.0) for el, _ in ctx["composition"]])],
         chunk=chunk,
     )
-    return (v.get() if hasattr(v, "get") else np.asarray(v)), grid, chunk
+    return (v.get() if hasattr(v, "get") else np.asarray(v)), chunk
 
 
-def grid_summary(g, histories, cone):
-    """Time, size and cone-band yields (point convention) of one grid diagnostic."""
+def band_integral(nodes, density, lo, hi, weight=None):
+    """Piecewise-linear integral of ``density`` (times ``weight``) over ``[lo, hi]``."""
     import numpy as np
 
+    hi = min(hi, nodes[-1])
+    if hi <= lo:
+        return 0.0
+    inner = (nodes > lo) & (nodes < hi)
+    x = np.concatenate([[lo], nodes[inner], [hi]])
+    y = np.interp(x, nodes, density)
+    return float(np.trapezoid(y * (x if weight == "energy" else 1.0), x))
+
+
+def grid_summary(g, nodes, histories, cone):
+    """Time, size, cone-band yields and >=10 keV centroid (point convention)."""
     from pyrite.perf.comparison import cone_solid_angle
 
     density = g["density_sum"] / histories
-    nodes = g["nodes"]
     omega = cone_solid_angle(math.radians(cone["half_angle_deg"]))
-    bands = {}
-    for name, lo, hi in (
-        ("10_50kev", 1e4, 5e4),
-        ("50_100kev", 5e4, 1e5),
-        ("ge100kev", 1e5, math.inf),
-    ):
-        m = (nodes >= lo) & (nodes <= hi)
-        bands[name] = float(np.trapezoid(density[m], nodes[m]) * omega) if m.sum() > 1 else 0.0
+    bands = {
+        name: band_integral(nodes, density, lo, hi) * omega
+        for name, lo, hi in (
+            ("10_50kev", 1e4, 5e4),
+            ("50_100kev", 5e4, 1e5),
+            ("ge100kev", 1e5, math.inf),
+        )
+    }
+    total = sum(bands.values())
+    first = band_integral(nodes, density, 1e4, math.inf, weight="energy") * omega
     return dict(
         seconds=g["seconds"],
         nodes=int(nodes.size),
         chunks=sorted(g["chunks"]),
         cone_point_yield_per_primary=bands,
-        cone_point_yield_ge10kev_per_primary=sum(bands.values()),
+        cone_point_yield_ge10kev_per_primary=total,
+        centroid_ge10kev_eV=first / total if total else None,
     )
 
 
@@ -347,6 +382,14 @@ def main():
         help="also time the production continuum on this uniform grid step (repeatable; "
         "excluded from the request timings)",
     )
+    parser.add_argument(
+        "--spectrum-geometric-nodes",
+        type=int,
+        action="append",
+        default=[],
+        help="also time the production continuum on the refined geometric grid with this "
+        "baseline node count (repeatable; excluded from the request timings)",
+    )
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     spec = json.loads((HERE / "scenes.json").read_text())
@@ -455,6 +498,7 @@ def main():
     tables_s = time.perf_counter() - START
 
     last_grids = {}
+    grid_nodes = spectrum_grids(args, mat, comp, float(scene["energy_keV"]))
 
     def request(seed, histories):
         scores = {}
@@ -464,10 +508,7 @@ def main():
         cp.cuda.Device().synchronize()
         t0 = time.perf_counter()
         transport_s = scoring_s = 0.0
-        grids = {
-            step: dict(seconds=0.0, density_sum=None, nodes=None, chunks=set())
-            for step in args.spectrum_step_ev
-        }
+        grids = {label: dict(seconds=0.0, density_sum=None, chunks=set()) for label in grid_nodes}
         for offset in range(0, histories, args.block):
             n = min(args.block, histories - offset)
             t1 = time.perf_counter()
@@ -492,17 +533,16 @@ def main():
                 block |= discrete_cone_scores(r, n, cone)
             cp.cuda.Device().synchronize()
             scoring_s += time.perf_counter() - t2
-            for step, g in grids.items():
+            for label, g in grids.items():
                 pool.free_all_blocks()
                 t3 = time.perf_counter()
-                density, nodes, chunk = grid_spectrum(r, step, cone, ctx)
+                density, chunk = grid_spectrum(r, grid_nodes[label], cone, ctx)
                 cp.cuda.Device().synchronize()
                 g["seconds"] += time.perf_counter() - t3
                 weighted = n * density
                 g["density_sum"] = (
                     weighted if g["density_sum"] is None else g["density_sum"] + weighted
                 )
-                g["nodes"] = nodes
                 g["chunks"].add(int(chunk))
             for key, v in block.items():
                 scores.setdefault(key, np.empty(histories))[offset : offset + n] = v
@@ -519,13 +559,13 @@ def main():
         )
         if grids:
             work["grid_spectra"] = {
-                f"{step:g}": grid_summary(g, histories, cone) for step, g in grids.items()
+                label: grid_summary(g, grid_nodes[label], histories, cone)
+                for label, g in grids.items()
             }
             last_grids.clear()
-            last_grids.update(
-                {f"density_step_{s:g}eV": g["density_sum"] / histories for s, g in grids.items()}
-                | {f"nodes_step_{s:g}eV": g["nodes"] for s, g in grids.items()}
-            )
+            for label, g in grids.items():
+                last_grids[f"density_{label}"] = g["density_sum"] / histories
+                last_grids[f"nodes_{label}"] = grid_nodes[label]
         return scores, wall, transport_s, work
 
     warmup = args.warmup_histories or args.histories
@@ -589,6 +629,7 @@ def main():
             score_rows=args.score_rows,
             kernel=args.kernel,
             spectrum_step_eV=args.spectrum_step_ev,
+            spectrum_geometric_nodes=args.spectrum_geometric_nodes,
         ),
         timings_s=dict(
             imports_and_tables=tables_s,
