@@ -19,6 +19,8 @@ from . import _policy
 from ._attribution import record_cxr_attribution
 from ._batched_finalize import _batched_coherent_finalize as _batched_coherent_finalize
 from ._bin_quadrature import run_bin_mean_reduction_kernel, sincsq_bin_lineshape
+from ._cpu_reduce import accumulate_sincsq
+from ._cpu_reduce import numpy_backend as _numpy_backend
 from ._formation import formation_coefficients
 from ._kernels import (
     _PREF_C1,
@@ -750,6 +752,15 @@ def _batched_incoherent_block(st, bt, blk, cxr_batch):
         if components:
             targets.append((pref * A2_pxr * WM, spec_pxr))
             targets.append((pref * A2_cbs * WM, spec_cbs))
+        if st.bin_edges is None and _numpy_backend():
+            accumulate_sincsq(
+                E_r_f,
+                aw_f,
+                [w.reshape(-1)[gm_idx] for w, _ in targets],
+                E_grid,
+                [tgt for _, tgt in targets],
+            )
+            targets = []
         for w, tgt in targets:
             w_f = w.reshape(-1)[gm_idx]
             for j0 in range(0, E_r_f.size, chunk):

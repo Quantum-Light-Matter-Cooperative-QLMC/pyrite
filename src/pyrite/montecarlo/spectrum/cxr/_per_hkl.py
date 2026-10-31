@@ -20,6 +20,7 @@ from ..coherent_transverse import transverse_envelope, transverse_form_factor
 from ..segment_escape import piece_mean_transmission
 from . import _policy
 from ._bin_quadrature import sincsq_bin_lineshape
+from ._cpu_reduce import accumulate_sincsq, numpy_backend
 from ._formation import (
     formation_coefficients,
     formation_profile,
@@ -836,7 +837,6 @@ def _accumulate_reflection(
 
     req = st.request
     chunk = req.chunk
-    sinc_cutoff = req.sinc_cutoff
     components = req.components
     layers = req.layers
     groove = req.groove
@@ -1095,21 +1095,38 @@ def _accumulate_reflection(
             weight[good] * xp.pi / a_width[good],
         )
 
+    _reduce_lineshapes(st, targets, E_r, a_width, good)
+    _nsys_pop()
+
+
+def _reduce_lineshapes(st, targets, E_r, a_width, good):
+    """Step 7 reduction: add each ``(w, tgt)`` pair's ``w @ sinc^2`` for the
+    ``good`` rows, under bin-mean, full-axis node, or ``sinc_cutoff``-windowed
+    quadrature. On NumPy the node path takes the fused CPU kernel.
+    """
+    chunk = st.request.chunk
+    sinc_cutoff = st.request.sinc_cutoff
+    E_grid = st.E_grid
+    n_rows = E_r.size
     if st.bin_edges is not None:
         # Bin-mean quadrature (setup refused sinc_cutoff): each row's profile
         # integrated over each node's bin, written as the bin mean.
         # Validation: sinc-bin-integration
-        for j0 in range(0, idx.size, chunk):
-            sl = slice(j0, min(j0 + chunk, idx.size))
+        for j0 in range(0, n_rows, chunk):
+            sl = slice(j0, min(j0 + chunk, n_rows))
             m = good[sl]
             if not m.any():
                 continue
             S = sincsq_bin_lineshape(a_width[sl][m], E_r[sl][m], st.bin_edges, st.bin_inv_width)
             for w, tgt in targets:
                 tgt += w[sl][m] @ S
+    elif sinc_cutoff is None and numpy_backend():
+        accumulate_sincsq(
+            E_r[good], a_width[good], [w[good] for w, _ in targets], E_grid, [t for _, t in targets]
+        )
     elif sinc_cutoff is None:
-        for j0 in range(0, idx.size, chunk):
-            sl = slice(j0, min(j0 + chunk, idx.size))
+        for j0 in range(0, n_rows, chunk):
+            sl = slice(j0, min(j0 + chunk, n_rows))
             m = good[sl]
             if not m.any():
                 continue
@@ -1133,7 +1150,6 @@ def _accumulate_reflection(
             S = _sincsq_lineshape(a_width[sel][:, None], E_grid[None, i0:i1], E_r[sel][:, None])
             for w, tgt in targets:
                 tgt[i0:i1] += w[sel] @ S
-    _nsys_pop()
 
 
 def _accumulate_per_hkl(st):
