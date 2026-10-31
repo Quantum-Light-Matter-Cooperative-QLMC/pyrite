@@ -608,6 +608,30 @@ def _select_quick_energies(by_energy, e_grid_cxr, *, nominal=(30, 50), count=2):
     return chosen[:count]
 
 
+def _physics_fallback_identity(requested, resolved, elements):
+    """Descriptive fallback provenance for a run that opted into EEDL.
+
+    Case/dataset physics identity is already keyed by the executed EEDL model.
+    Segment energies and their affected fraction are not known during
+    preflight, so they are reported as ``None`` rather than invented.
+    """
+    if requested != "auto" or resolved != "eedl":
+        return {}
+    return {
+        "physics_fallbacks": [
+            {
+                "model_requested": "auto (BremsLib)",
+                "model_used": "eedl",
+                "elements": sorted(set(elements)),
+                "energy_span_keV": None,
+                "fraction_segments_affected": None,
+                "scope": "entire continuum source",
+                "reason": "BremsLib tables unavailable",
+            }
+        ]
+    }
+
+
 def _resolved_run(args, material):
     """Resolve settings, sweep, identity, and collision-free checkpoint stem."""
     import numpy as np
@@ -761,21 +785,7 @@ def _resolved_run(args, material):
         identity["detector_id"] = detector_id
     # Unhashed label: names and definition digests of the resolved presets.
     identity.update(identity_labels(CATALOG, catalog_profile))
-    if requested_brem_model == "auto" and resolved_brem_model == "eedl":
-        # Fallback provenance is descriptive: case/dataset physics identity is
-        # already keyed by the executed EEDL model. Segment energies and their
-        # affected fraction are not known during preflight, so do not invent them.
-        identity["physics_fallbacks"] = [
-            {
-                "model_requested": "auto (BremsLib)",
-                "model_used": "eedl",
-                "elements": sorted(set(elements)),
-                "energy_span_keV": None,
-                "fraction_segments_affected": None,
-                "scope": "entire continuum source",
-                "reason": "BremsLib tables unavailable",
-            }
-        ]
+    identity.update(_physics_fallback_identity(requested_brem_model, resolved_brem_model, elements))
     canonical_full = (
         fidelity == "full"
         and not overrides
