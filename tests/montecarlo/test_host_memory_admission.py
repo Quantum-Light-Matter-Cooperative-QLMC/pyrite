@@ -157,3 +157,17 @@ def test_continuation_admitted_request_is_unchanged(monkeypatch):
     _c, rows, _l, _p = _continuation_drive(cont=replace(cont, device_staging=False))
     for column in (0, 2, 5, 7, 12):  # the stand-in core leaves other scratch unset
         np.testing.assert_array_equal(base[column], rows[column])
+
+
+def test_lockstep_lazy_reservation_is_not_charged_as_resident(monkeypatch):
+    """`Ne * max_steps` np.empty rows are lazy; zero headroom must not reject them."""
+    monkeypatch.setattr(host_memory, "host_headroom_bytes", lambda: 0)
+    p = SimpleNamespace(
+        keep_segments_on_device=False,
+        Ne=1000,
+        max_steps=1000,
+        energy_model="midpoint",
+        groove=None,
+    )
+    c = SimpleNamespace(transport_core="lockstep", shell_mode=False, radiative_mode=False)
+    assert _row_buffers(p, c, False)["seg_mid"].shape == (p.Ne * p.max_steps, 3)

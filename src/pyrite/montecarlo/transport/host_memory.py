@@ -8,6 +8,7 @@ allocation size. Grow physical host output from emitted rows instead of reservin
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
@@ -102,6 +103,15 @@ def admit_host_allocation(required_bytes: int, phase: str) -> None:
     available = host_headroom_bytes()
     if required > available:
         raise HostMemoryResourceError(phase, required, available)
+
+
+@contextmanager
+def reserve_or_raise(phase: str):
+    """Turn a failed lazy ``np.empty`` reservation into the typed resource error."""
+    try:
+        yield
+    except MemoryError as error:
+        raise HostMemoryResourceError(phase, 0, host_headroom_bytes()) from error
 
 
 def admit_batch_download(out_bufs, slots, nseg: int, total: int) -> None:

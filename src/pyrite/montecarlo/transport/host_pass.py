@@ -44,7 +44,7 @@ from .cores import (
 from .events import TransportStepLimitError
 from .hard_inelastic import hard_keys_from_stream_keys, validate_inelastic_args
 from .hard_radiative import validate_radiative_args
-from .host_memory import GrowingHostRows, admit_host_allocation
+from .host_memory import GrowingHostRows, admit_host_allocation, reserve_or_raise
 from .kinematics import _sample_bunch_offsets, stream_keys
 from .layer_tables import build_layer_tables
 from .lut import build_transport_energy_lut
@@ -630,14 +630,13 @@ def _row_buffers(p, c, sec_on):
             for name, (n, tail, dtype) in schema.items()
         }
     # Lockstep/grooved kernels require fixed-size NumPy arrays in their JIT
-    # signatures; account for their entire maximum before the first np.empty.
-    admit_host_allocation(
-        sum(
-            n * int(np.prod(tail)) * np.dtype(dtype).itemsize for n, tail, dtype in schema.values()
-        ),
-        "lockstep retained transport output",
-    )
-    return {name: np.empty((n, *tail), dtype=dtype) for name, (n, tail, dtype) in schema.items()}
+    # signatures. ``np.empty`` is a lazy reservation (only written rows become
+    # resident), so charging the whole maximum would reject runs that fit; only
+    # a failed reservation (strict overcommit) becomes the typed error.
+    with reserve_or_raise("lockstep retained transport output"):
+        return {
+            name: np.empty((n, *tail), dtype=dtype) for name, (n, tail, dtype) in schema.items()
+        }
 
 
 def _dispatch_core(t):
@@ -856,12 +855,12 @@ def _run_lockstep_exact(t):
 def _run_grooved(t):
     p, groove = t.inputs, t.inputs.groove
     max_vac = p.Ne * p.max_steps
-    admit_host_allocation(max_vac * (8 * 9), "grooved vacuum trajectory output")
-    vac_start_buf = np.empty((max_vac, 3), dtype=float)
-    vac_end_buf = np.empty((max_vac, 3), dtype=float)
-    vac_E_buf = np.empty(max_vac, dtype=float)
-    vac_t0_buf = np.empty(max_vac, dtype=float)
-    vac_id_buf = np.empty(max_vac, dtype=np.int64)
+    with reserve_or_raise("grooved vacuum trajectory output"):
+        vac_start_buf = np.empty((max_vac, 3), dtype=float)
+        vac_end_buf = np.empty((max_vac, 3), dtype=float)
+        vac_E_buf = np.empty(max_vac, dtype=float)
+        vac_t0_buf = np.empty(max_vac, dtype=float)
+        vac_id_buf = np.empty(max_vac, dtype=np.int64)
 
     tp = float(groove.tilt_polar_rad)
     control, state, segments, straggling = _lockstep_args(t)
