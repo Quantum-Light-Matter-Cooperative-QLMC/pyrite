@@ -367,8 +367,9 @@ def run_cases(
         still sees the live ``out``; only the retained list is dropped.
 
     Crawl protections: workers run BELOW_NORMAL priority (_worker_init) and get
-    single-threaded BLAS (OMP/OPENBLAS/MKL_NUM_THREADS=1, inherited) -- N workers
-    x M BLAS threads is the classic oversubscription freeze.
+    single-threaded BLAS (OMP/OPENBLAS/MKL_NUM_THREADS=1, inherited) and one
+    numba thread (_worker_init) -- N workers x M threads is the classic
+    oversubscription freeze.
     """
     if engine not in ("auto", "gpu", "cpu"):
         raise ValueError(f"engine must be one of 'auto', 'gpu', 'cpu'; got {engine!r}")

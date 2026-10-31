@@ -1182,6 +1182,11 @@ def _worker_init(force_cpu=False):
         _RESOURCE_POLICY.gpu = False
         _spectrum_mod.xp = np
         _spectrum_mod.REAL = np.float64
+    # Same crawl protection as the single-threaded BLAS: N pool workers each
+    # running a full-width numba ``prange`` (CPU line reduction) oversubscribe.
+    import numba
+
+    numba.set_num_threads(1)
     try:
         import ctypes
 
