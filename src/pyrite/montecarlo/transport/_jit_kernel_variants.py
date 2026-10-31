@@ -24,6 +24,7 @@ import numpy as np
 
 from .._cupy_jit import jit
 from ._jit_kernel import _transport_kernel
+from ._jit_precision import precision_globals
 
 
 class TransportKernelSwitches(NamedTuple):
@@ -60,13 +61,17 @@ monolithic_transport_kernel = jit.rawkernel()(_transport_kernel)
 
 
 @cache
-def transport_kernel_variant(switches: TransportKernelSwitches):
-    """Return the exact kernel compiled for ``switches``, built once per tuple.
+def transport_kernel_variant(switches: TransportKernelSwitches, precision: str = "fp64"):
+    """Return the exact kernel compiled for ``switches``, built once per pair.
 
     The variant shares the template's code object, and so its one Python
     source, under a copy of its module globals in which every switch name is
     an ``np.int32`` constant; only ``sec_on_arg`` of its switch parameters is
-    then read.
+    then read. ``precision`` ``"mixed"`` (#838) also rebinds the precision
+    globals and FP32 helper twins of :mod:`._jit_precision`; ``"fp64"`` leaves
+    the generated source unchanged. It is a separate key, not a switch field:
+    switches mirror the case's physics features, while precision is a numerics
+    choice the case carries in its identity because it changes results.
     Transpilation happens on first launch in each process. CuPy's on-disk
     kernel cache keys the NVRTC compile by the generated source, so a later
     process with the same cache directory compiles nothing.
@@ -74,7 +79,7 @@ def transport_kernel_variant(switches: TransportKernelSwitches):
     constants = {name: np.int32(value) for name, value in switches._asdict().items()}
     variant = types.FunctionType(
         _transport_kernel.__code__,
-        {**_transport_kernel.__globals__, **constants},
+        {**_transport_kernel.__globals__, **constants, **precision_globals(precision)},
         _transport_kernel.__name__,
         _transport_kernel.__defaults__,
         _transport_kernel.__closure__,
