@@ -1,6 +1,10 @@
 # Live streamed scoring
 
-Opt-in, internal (#611). `pyrite.montecarlo.runner.streamed_scoring.run_case_streamed(case, block_electrons, transport_core=...)`
+Opt-in (#611). The public, experimental switch is
+`KernelTuning.stream_block_electrons` on `pyrite.simulate` (#865; how-to:
+[Stream spectra in electron blocks](../../guides/streamed-scoring.md)); every
+other `transport_tuning` caller and batch executors refuse it. Internally,
+`pyrite.montecarlo.runner.streamed_scoring.run_case_streamed(case, block_electrons, transport_core=...)`
 transports a case in electron blocks, scores each block as soon as it finishes,
 and releases it. No joined trajectory is ever held, so peak memory follows the
 block size rather than the electron count. `run_case` (full trajectory, then
