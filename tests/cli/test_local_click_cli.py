@@ -53,6 +53,13 @@ def _capture(monkeypatch, module, handler_name):
     return seen
 
 
+def test_run_click_forwards_allow_physics_fallback(monkeypatch):
+    seen = _capture(monkeypatch, scan, "run")
+    result = invoke(scan_cli.command, ["standard", "-m", "hopg", "--allow-physics-fallback"])
+    assert_clean_result(result)
+    assert seen["allow_physics_fallback"] is True
+
+
 def test_run_click_dispatches_profile_material_and_zero_workers(monkeypatch, tmp_path):
     seen = _capture(monkeypatch, scan, "run")
     result = invoke(
@@ -61,6 +68,7 @@ def test_run_click_dispatches_profile_material_and_zero_workers(monkeypatch, tmp
     )
     assert_clean_result(result)
     assert seen == {
+        "allow_physics_fallback": False,
         "material": "hopg",
         "all": False,
         "actually_all": False,

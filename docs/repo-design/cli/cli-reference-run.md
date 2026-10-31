@@ -48,6 +48,8 @@ Options:
                                   [default: (pyrite-output/checkpoints)]
   --max-minutes MINUTES           Soft wall-clock budget in minutes; exit 75 if
                                   resumable work remains.
+  --allow-physics-fallback        Allow missing BremsLib tables to select EEDL for a
+                                  local sweep; record the substitution.
   --no-cache                      Neither read nor write the shared per-case checkpoint
                                   cache: a run that recomputes every case but still
                                   writes campaign checkpoints. Use --ephemeral for no
