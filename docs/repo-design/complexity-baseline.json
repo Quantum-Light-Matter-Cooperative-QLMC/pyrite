@@ -603,7 +603,7 @@
     {
       "path": "src/pyrite/montecarlo/transport/batching.py",
       "name": "_drive_per_electron_batches",
-      "cc": 27
+      "cc": 23
     },
     {
       "path": "src/pyrite/montecarlo/transport/cores.py",

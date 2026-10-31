@@ -48,6 +48,8 @@ Segment `s` of local electron `i` is written to slot `i * cap + s` — a pure fu
 
 `PerElectronTransportConfig` sets `seg_capacity` and a `scratch_budget_bytes` that bounds the dense `(batch, cap)` grid; neither changes results.
 
+The batch size costs each slot at the enabled schema's allocated columns: 82 bytes frozen, 115 midpoint, 125 midpoint with coupled photons or shell hard events, 135 with both, and 24 more for transported secondary directions, plus 9 bytes of per-history count and exit code. Before [#611](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/611) every schema was costed at 82 bytes, so wider schemas overran the budget by up to 1.8×. The budget covers that scratch grid only; the per-column compaction copy is transient and the retained output is outside it. If one history's capacity exceeds the budget, the driver still runs it alone, which it must do to make progress, and logs one warning per request.
+
 ## What is and is not bit-for-bit
 
 | Property | Status | How it is checked |
