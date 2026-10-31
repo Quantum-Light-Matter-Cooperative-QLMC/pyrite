@@ -25,6 +25,11 @@ def encode_energy_grid(grid: object) -> EnergyGridEncoding:
             # reproduces every declared float exactly; near-uniform grids must
             # remain explicit rather than being silently rounded.
             for stop in (float(values[-1]) + step, float(values[-1]) + 0.5 * step):
+                # np.arange length is ceil((stop - start) / step); a mismatch cannot
+                # reproduce ``values``, and skipping it avoids materialising a huge
+                # uniform grid for a geometric one (step = first spacing).
+                if int(np.ceil((stop - start) / step)) != values.size:
+                    continue
                 reconstructed = np.arange(start, stop, step, dtype=float)
                 if np.array_equal(reconstructed, values):
                     return (start, stop, step)
