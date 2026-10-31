@@ -245,16 +245,25 @@ def install_observers():
 
 
 def head_from_git_dir(root):
-    """HEAD commit read from ``root/.git`` for nodes without a git binary."""
+    """HEAD commit read from ``root/.git`` for nodes without a git binary.
+
+    A linked worktree's ``.git`` is a ``gitdir:`` file; its HEAD lives there and
+    its branch refs in the shared ``commondir``.
+    """
     git_dir = root / ".git"
+    if git_dir.is_file():
+        git_dir = (root / git_dir.read_text().strip().removeprefix("gitdir: ")).resolve()
+    common = git_dir
+    if (git_dir / "commondir").exists():
+        common = (git_dir / (git_dir / "commondir").read_text().strip()).resolve()
     head = (git_dir / "HEAD").read_text().strip()
     if not head.startswith("ref: "):
         return head
     ref = head.removeprefix("ref: ")
-    loose = git_dir / ref
-    if loose.exists():
-        return loose.read_text().strip()
-    for line in (git_dir / "packed-refs").read_text().splitlines():
+    for base in (git_dir, common):
+        if (base / ref).exists():
+            return (base / ref).read_text().strip()
+    for line in (common / "packed-refs").read_text().splitlines():
         if line.endswith(" " + ref):
             return line.split()[0]
     raise RuntimeError(f"cannot resolve {ref} in {git_dir}")

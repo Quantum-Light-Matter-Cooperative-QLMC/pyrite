@@ -20,7 +20,7 @@ unset PYRITE_MC_TRANSPORT_SCHEDULE PYRITE_MC_ELECTRON_BATCH_MAX
 scenes=(si-300-100um w-300-10um sio2-800-tr0.3 w2um-on-si100um-800)
 scene="${scenes[$SLURM_ARRAY_TASK_ID]}"
 out="${LUT803_OUT:-$BR/evidence/lut803/gpu-$SLURM_ARRAY_JOB_ID}"; mkdir -p "$out"
-{ git rev-parse HEAD 2>/dev/null || cat .git/HEAD; } > "$out/head-$scene.txt"
+{ git rev-parse HEAD 2>/dev/null || uv run --no-sync python -c "import pathlib, runpy; print(runpy.run_path('checks/equal_precision/baseline_803.py')['head_from_git_dir'](pathlib.Path.cwd()))"; } > "$out/head-$scene.txt"
 scontrol show job "$SLURM_JOB_ID" > "$out/job-$scene.txt"; nvidia-smi -q > "$out/gpu-$scene.txt"
 uv run --no-sync python checks/equal_precision/run_baseline_803.py "$out" \
     --core cuda --scene "$scene" --timeout-s 2400

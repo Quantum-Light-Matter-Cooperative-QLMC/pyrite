@@ -155,3 +155,20 @@ def test_stage_split_shares_sum_to_one_with_unranged_remainder(tmp_path):
     assert split["exclusive_share"] == {"a": 0.25, "b": 0.5, "unranged": 0.25}
     assert split["kernel_share"] == 0.25 and split["launches"] == 3
     assert analyze["stage_split"]({}) is None
+
+
+def test_head_from_git_dir_follows_a_linked_worktree(tmp_path):
+    harness = runpy.run_path(str(HARNESS))
+    common = tmp_path / "main/.git"
+    (common / "refs/heads").mkdir(parents=True)
+    (common / "refs/heads/topic").write_text("c" * 40 + "\n")
+    linked = common / "worktrees/wt"
+    linked.mkdir(parents=True)
+    (linked / "commondir").write_text("../..\n")
+    (linked / "HEAD").write_text("ref: refs/heads/topic\n")
+    tree = tmp_path / "wt"
+    tree.mkdir()
+    (tree / ".git").write_text(f"gitdir: {linked}\n")
+    assert harness["head_from_git_dir"](tree) == "c" * 40
+    (linked / "HEAD").write_text("d" * 40 + "\n")
+    assert harness["head_from_git_dir"](tree) == "d" * 40
