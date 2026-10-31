@@ -34,6 +34,10 @@ def per_electron_config(tuning):
     config = DEFAULT_PER_ELECTRON_TRANSPORT_CONFIG
     if tuning.electron_batch is not None:
         config = replace(config, max_batch=tuning.electron_batch)
+    if tuning.scratch_mib is not None:
+        config = replace(config, scratch_budget_bytes=tuning.scratch_mib * 1024**2)
+    if tuning.kernel_threads is not None:
+        config = replace(config, kernel_threads=tuning.kernel_threads)
     if tuning.schedule is not None:
         rows = tuning.continuation_rows
         config = replace(

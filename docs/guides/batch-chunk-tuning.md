@@ -8,7 +8,8 @@ optimization variable. The tuner uses Optuna directly, separately from
 ## Python API
 
 `pyrite.optimization.tune_kernels` tunes any subset of the transport
-`electron_batch`, continuation `schedule` and `continuation_rows`, and the
+`electron_batch`, continuation `schedule` and `continuation_rows`, device
+scratch budget `scratch_mib` and launch `kernel_threads`, and the
 spectral `cxr_chunk`/`brem_chunk`, and returns a `KernelTuning` to apply
 through ordinary `Numerics`:
 
@@ -23,6 +24,8 @@ result = tune_kernels(
         electron_batch=(None, 4096, 16384),
         schedule=("full-history", "continuation"),
         continuation_rows=(None, 128, 512),
+        scratch_mib=(None, 4096),
+        kernel_threads=(None, 32, 64),
         cxr_chunk=(None, 8192, 32768),
         brem_chunk=(None, 1024),
     ),

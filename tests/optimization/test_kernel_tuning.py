@@ -97,6 +97,12 @@ def test_candidate_changes_only_lattice_dimensions():
     )
     with pytest.raises(ValueError, match="requires schedule"):
         lattice.candidate(base, {"schedule": "full-history", "continuation_rows": 64})
+    launch = KernelLattice(scratch_mib=(None, 4096), kernel_threads=(32, 128))
+    assert launch.dimensions("transport") == ("scratch_mib", "kernel_threads")
+    assert len(launch.choices(base, "transport")) == 4
+    assert launch.candidate(base, {"scratch_mib": 4096, "kernel_threads": 32}).transport == (
+        cfg.TransportKernelTuning(scratch_mib=4096, kernel_threads=32)
+    )
 
 
 def test_equivalence_requires_exact_grids_and_close_densities(tmp_path):

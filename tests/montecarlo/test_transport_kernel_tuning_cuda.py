@@ -34,6 +34,9 @@ SCHEDULES = (
     cfg.TransportKernelTuning("full-history"),
     cfg.TransportKernelTuning("continuation", 64),
     cfg.TransportKernelTuning("continuation", 256),
+    # Launch geometry and scratch budget (#825): batch width and block shape only.
+    cfg.TransportKernelTuning("full-history", kernel_threads=32, scratch_mib=64),
+    cfg.TransportKernelTuning("continuation", 64, kernel_threads=256),
 )
 
 

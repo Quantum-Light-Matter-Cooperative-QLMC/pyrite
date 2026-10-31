@@ -220,6 +220,10 @@ def _flight_diagnostic_summary(
     }
 
 
+#: CUDA transport launch sizes accepted by ``TransportKernelConfig``.
+KERNEL_THREADS = (32, 64, 128, 256, 512, 1024)
+
+
 @dataclass(frozen=True)
 class PerElectronTransportConfig:
     """Host-side batching policy for the per-electron cores.
@@ -259,6 +263,10 @@ class PerElectronTransportConfig:
     ``continuation`` or the default :class:`.continuation.TransportContinuationConfig`.
     The process default is ``auto``; ``PYRITE_MC_TRANSPORT_SCHEDULE`` overrides it.
     Separately constructed configs retain the ``None`` compatibility rule above.
+
+    ``kernel_threads`` is the CUDA transport launch's threads per block (#825).
+    Output slots and RNG streams are addressed by electron index, so it changes
+    launch geometry only; CPU cores ignore it.
     """
 
     seg_capacity: int = 512
@@ -268,9 +276,12 @@ class PerElectronTransportConfig:
     probe_electrons: int = 1024
     continuation: TransportContinuationConfig | None = None
     schedule: str | None = None
+    kernel_threads: int = 128
 
     def __post_init__(self):
         check_schedule(self.schedule)
+        if self.kernel_threads not in KERNEL_THREADS:
+            raise ValueError(f"kernel_threads must be one of {KERNEL_THREADS}")
 
 
 def _default_batch_limit_from_env() -> int:

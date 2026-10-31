@@ -35,7 +35,13 @@ from ._kernel_worker import tuning_from_dict
 
 _SCHEMA = "pyrite-kernel-tuning-v2"
 _PHASE_DIMENSIONS = {
-    "transport": ("electron_batch", "schedule", "continuation_rows"),
+    "transport": (
+        "electron_batch",
+        "schedule",
+        "continuation_rows",
+        "scratch_mib",
+        "kernel_threads",
+    ),
     "spectrum": ("cxr_chunk", "brem_chunk"),
 }
 _DIMENSIONS = _PHASE_DIMENSIONS["transport"] + _PHASE_DIMENSIONS["spectrum"]
@@ -46,8 +52,9 @@ Phase = Literal["transport", "spectrum", "total"]
 class KernelLattice:
     """Candidate values per execution control; an empty tuple keeps the scene's value.
 
-    ``electron_batch``, ``schedule`` and ``continuation_rows`` set
-    :class:`~pyrite.config.TransportKernelTuning` (the transport phase);
+    ``electron_batch``, ``schedule``, ``continuation_rows``, ``scratch_mib``
+    and ``kernel_threads`` set :class:`~pyrite.config.TransportKernelTuning`
+    (the transport phase);
     ``cxr_chunk`` and ``brem_chunk`` set the spectrum segment chunks (the
     spectrum phase). ``None`` in a tuple selects the process default.
     Combinations the config rejects (a row quantum with full-history) are
@@ -59,6 +66,8 @@ class KernelLattice:
     brem_chunk: tuple[int | None, ...] = ()
     schedule: tuple[Literal["full-history", "continuation", "auto"] | None, ...] = ()
     continuation_rows: tuple[int | None, ...] = ()
+    scratch_mib: tuple[int | None, ...] = ()
+    kernel_threads: tuple[int | None, ...] = ()
 
     def __post_init__(self) -> None:
         for name in _DIMENSIONS:

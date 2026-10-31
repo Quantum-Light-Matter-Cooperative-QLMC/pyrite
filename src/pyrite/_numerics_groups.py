@@ -62,6 +62,8 @@ class RadiationNumerics:
 
 
 TRANSPORT_SCHEDULES = ("full-history", "continuation", "auto")
+#: CUDA transport threads per block (mirrors ``TransportKernelConfig``).
+KERNEL_THREADS = (32, 64, 128, 256, 512, 1024)
 
 
 @dataclass(frozen=True)
@@ -78,18 +80,28 @@ class TransportKernelTuning:
     ``electron_batch`` caps the electrons (or concurrent continuation
     histories) per transport launch and takes precedence over
     ``PYRITE_MC_ELECTRON_BATCH_MAX`` (``None``: that variable, then 65536).
-    No field enters case identity: transport is bitwise-identical under every
+    ``scratch_mib`` is the device scratch budget, in MiB, that full-history
+    batches and continuation lanes are sized from (``None``: 512); it, not
+    ``electron_batch``, usually sets how many histories share one launch.
+    ``kernel_threads`` is the CUDA transport launch's threads per block, one of
+    32, 64, 128, 256, 512 or 1024 (``None``: 128). Both are per scene and GPU
+    tuning knobs (#825). No field enters case identity: transport is bitwise-identical under every
     value. Batch executors reject non-default values and use the variables.
     """
 
     schedule: Literal["full-history", "continuation", "auto"] | None = None
     continuation_rows: int | None = None
     electron_batch: int | None = None
+    scratch_mib: int | None = None
+    kernel_threads: int | None = None
 
     def __post_init__(self) -> None:
         if self.schedule is not None and self.schedule not in TRANSPORT_SCHEDULES:
             raise ValueError(f"schedule must be one of {TRANSPORT_SCHEDULES} or None")
-        for name in ("continuation_rows", "electron_batch"):
+        threads = self.kernel_threads
+        if threads is not None and (type(threads) is not int or threads not in KERNEL_THREADS):
+            raise ValueError(f"kernel_threads must be one of {KERNEL_THREADS} or None")
+        for name in ("continuation_rows", "electron_batch", "scratch_mib"):
             value = getattr(self, name)
             if value is not None and (type(value) is not int or value <= 0):
                 raise ValueError(f"{name} must be a positive integer or None")
