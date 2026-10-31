@@ -12,7 +12,14 @@ from numba import njit
 
 from ..geometry import X_MIN, Y_MAX, Z_MAX, Z_MIN
 from ..groove import _first_surface_event_scalar_numba
-from ._jit_moment_lookup import transport_layer_moments
+from ._jit_cutoff_bound import (
+    add_soft_moment_bound,
+    cutoff_solve_idle,
+    lut_cutoff_bound,
+    sbethe_cutoff_bound,
+    widen_cutoff_bound,
+)
+from ._jit_moment_lookup import build_moment_guide, guided_layer_moments
 from ._jit_radiative import (
     radiative_layer_moments_scalar,
     sample_hard_photon_energy_scalar,
@@ -78,7 +85,14 @@ EXIT_NOT_ENTERED = np.int8(5)
 
 
 def make_cpu_transport_core(
-    *, grooved=False, per_electron=False, lut=False, inelastic=False, radiative=False
+    *,
+    grooved=False,
+    per_electron=False,
+    lut=False,
+    inelastic=False,
+    radiative=False,
+    lazy_cutoff=True,
+    indexed_moments=True,
 ):
     """Generate one CPU specialization with compile-time-frozen axis flags.
 
@@ -103,6 +117,9 @@ def make_cpu_transport_core(
     specialization, so the ``inelastic=False`` cores are the unchanged
     historical ones; it requires the midpoint row schema and is not
     available for grooved transport.
+
+    ``lazy_cutoff`` and ``indexed_moments`` (#841) are output-identical lookup
+    shortcuts; ``False`` compiles the original evaluation for equality tests.
 
     Validation: gpu-transport-core
     Validation: shell-secondary-transport
@@ -261,6 +278,19 @@ def make_cpu_transport_core(
             rad_draws = np.zeros(Ne, dtype=np.uint64)
             rad_element_rates = np.empty(rad_Z.shape[1], dtype=np.float64)
             rad_scratch_rates = np.empty(rad_Z.shape[1], dtype=np.float64)
+            rad_guide = build_moment_guide(rad_nel, rad_plasma, indexed_moments)
+        # Lazy midpoint cutoff (#841); the skip proof is in _jit_cutoff_bound.
+        cut_lazy, cut_bound = False, np.zeros(n_layers)
+        if lazy_cutoff and energy_model_code == 1 and not straggle_on:
+            if lut:
+                cut_lazy = lut_cutoff_bound(cut_bound, lut_dEds)
+            else:
+                cut_lazy = sbethe_cutoff_bound(cut_bound, sbethe_on, L_sbethe_n, L_sbethe_logS)
+            if radiative:
+                cut_lazy = add_soft_moment_bound(
+                    cut_lazy, cut_bound, rad_nel, rad_plasma, E_cut_by_electrons
+                )
+            cut_lazy = widen_cutoff_bound(cut_lazy, cut_bound)
         nseg = nvac = n_back = n_trans = n_side = n_cutoff = 0
         n_alive = int(alive.sum())
         n_eligible = n_alive
@@ -370,20 +400,8 @@ def make_cpu_transport_core(
                     step_j, hard_j = tau_h[e] / mu_hard, True
             rad_j = False
             if radiative:
-                rad_soft, mu_rad = transport_layer_moments(
-                    rad_nel,
-                    rad_nT,
-                    rad_Z,
-                    rad_ncm3,
-                    rad_incident,
-                    rad_nominal,
-                    rad_top,
-                    rad_chi,
-                    L,
-                    E_j * 1e3,
-                    rad_cutoff_eV,
-                    rad_element_rates,
-                    rad_plasma,
+                rad_soft, mu_rad = guided_layer_moments(
+                    rad_guide, radiative_args, L, E_j * 1e3, rad_element_rates
                 )
                 if tau_rad[e] < 0.0:
                     tau_rad[e] = -np.log(_stream_uniform_scalar(rad_keys[e], rad_draws[e]))
@@ -563,7 +581,9 @@ def make_cpu_transport_core(
                     )
                     t_end_j = clock[e] + step_j / beta_j
             else:
-                if energy_model_code == 1:
+                if cutoff_solve_idle(cut_lazy, cut_bound[L], E_j, E_cut_e, step_j):
+                    cutoff_distance = np.inf  # provably > step_j; no truncation
+                elif energy_model_code == 1:
                     if lut:
                         cut_i, cut_f = _lut_index_frac_scalar(
                             0.5 * (E_j + E_cut_e), lut_log_E_min, lut_inv_dlogE, lut_n_energy
@@ -586,20 +606,12 @@ def make_cpu_transport_core(
                             J_arr, k_arr, coeff_arr, E_cross_arr, 0.0, 0.5 * (E_j + E_cut_e)
                         )
                     if radiative:
-                        rad_cut_soft, _ = transport_layer_moments(
-                            rad_nel,
-                            rad_nT,
-                            rad_Z,
-                            rad_ncm3,
-                            rad_incident,
-                            rad_nominal,
-                            rad_top,
-                            rad_chi,
+                        rad_cut_soft, _ = guided_layer_moments(
+                            rad_guide,
+                            radiative_args,
                             L,
                             0.5 * (E_j + E_cut_e) * 1e3,
-                            rad_cutoff_eV,
                             rad_scratch_rates,
-                            rad_plasma,
                         )
                         cutoff_rate -= rad_cut_soft * 1e-3
                     cutoff_distance = (E_cut_e - E_j) / cutoff_rate
@@ -642,20 +654,12 @@ def make_cpu_transport_core(
                                 J_arr, k_arr, coeff_arr, E_cross_arr, 0.0, 0.5 * (E_j + E_pred)
                             )
                         if radiative:
-                            rad_mid_soft, _ = transport_layer_moments(
-                                rad_nel,
-                                rad_nT,
-                                rad_Z,
-                                rad_ncm3,
-                                rad_incident,
-                                rad_nominal,
-                                rad_top,
-                                rad_chi,
+                            rad_mid_soft, _ = guided_layer_moments(
+                                rad_guide,
+                                radiative_args,
                                 L,
                                 0.5 * (E_j + E_pred) * 1e3,
-                                rad_cutoff_eV,
                                 rad_scratch_rates,
-                                rad_plasma,
                             )
                             mid_rate -= rad_mid_soft * 1e-3
                         E_end_j = E_j + step_j * mid_rate
