@@ -200,8 +200,8 @@ def run_case_streamed(
     from ..._backend import BACKEND
     from ..spectrum.cxr._coverage import collect_line_data_coverage
     from . import _transport_case
-    from .oom import _ensure_pool_limit
     from .artifacts import _case_geometry
+    from .oom import _ensure_pool_limit
 
     reason = streaming_refusal(case, live=True)
     if reason is not None:
