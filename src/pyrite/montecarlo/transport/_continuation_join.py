@@ -259,11 +259,13 @@ def _join_cuda(cp, table, chunks, columns, enabled, nseg, targets, stats):
 
     # Join column i+1 while column i downloads; peak device memory stays the
     # payload plus one column, as each join frees its rounds' slices.
-    current = launch(enabled[0]) if enabled else None
+    if not enabled:
+        return None
+    current = launch(enabled[0])
     for i, c in enumerate(enabled):
-        following = launch(enabled[i + 1]) if i + 1 < len(enabled) else None
         joined, ready = current
+        if i + 1 < len(enabled):
+            current = launch(enabled[i + 1])
         ring.download(joined, targets[c], ready)
         del joined
-        current = following
     return None
