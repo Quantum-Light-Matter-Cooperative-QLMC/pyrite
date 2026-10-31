@@ -7,7 +7,9 @@ Usage:
 MODE: ``joined`` (``run_case``: full trajectory downloaded, then spectra;
 BLOCK ignored), ``joined-device`` (the same with ``keep_segments_on_device``,
 as ``pyrite.phases`` runs it), ``streamed`` (``run_case_streamed`` with
-BLOCK electrons per block). ``PYRITE_MC_TRANSPORT_SCHEDULE`` is recorded.
+BLOCK electrons per block), ``streamed-complete`` (the same with each block's
+hard-photon completion forced back on, the pre-#864 cost; spectra must match
+``streamed`` bitwise). ``PYRITE_MC_TRANSPORT_SCHEDULE`` is recorded.
 CORE (default ``per-electron``; ``cuda`` on the GPU box) is pinned for both
 arms, because ``auto`` can resolve to the block-incapable lockstep core.
 One arm per process, so ``ru_maxrss`` is that arm's host peak. Device peak is
@@ -221,6 +223,14 @@ def run(
         elif mode == "joined-device":
             out = runner.run_case(case, transport_core=core, keep_segments_on_device=True)
         elif mode == "streamed":
+            out = run_case_streamed(case, int(block), transport_core=core)
+        elif mode == "streamed-complete":
+            from pyrite.montecarlo.transport import hard_radiative
+
+            add_fields = hard_radiative.add_radiative_result_fields
+            hard_radiative.add_radiative_result_fields = lambda *a, complete=True, **k: add_fields(
+                *a, complete=True, **k
+            )
             out = run_case_streamed(case, int(block), transport_core=core)
         else:
             raise SystemExit(f"unknown mode {mode!r}")
