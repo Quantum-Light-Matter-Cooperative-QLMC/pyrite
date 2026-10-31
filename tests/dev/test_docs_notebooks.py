@@ -171,9 +171,9 @@ def test_line_energy_notebook_cpu_smoke(monkeypatch):
 
     monkeypatch.setattr(pyrite, "fetch_tables", lambda: [])
     _, definitions = notebook.app.run()
-    # Three reference beam energies plus the slider-selected one.
+    # Five reference beam energies plus the slider-selected one.
     energies = definitions["lines_eV"]
-    assert energies.shape == (4, 131)
+    assert energies.shape == (6, 171)
     assert np.isfinite(energies).all() and np.all(energies > 0)
     # Same basal Friedel pair: doubling Miller order doubles the vacuum resonance.
     line = definitions["photon_energies"]

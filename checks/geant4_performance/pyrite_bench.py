@@ -348,6 +348,12 @@ def main():
     parser.add_argument("--max-de-frac", type=float, default=0.05)
     parser.add_argument("--scratch-mib", type=int, default=4096)
     parser.add_argument("--seg-capacity", type=int, default=16384)
+    parser.add_argument(
+        "--probe-electrons",
+        type=int,
+        default=0,
+        help="full-history first-batch probe; production default is 1024 (#825)",
+    )
     parser.add_argument("--max-steps", type=int, default=0, help="0: scene's")
     parser.add_argument(
         "--estimator",
@@ -389,6 +395,11 @@ def main():
         default=[],
         help="also time the production continuum on the refined geometric grid with this "
         "baseline node count (repeatable; excluded from the request timings)",
+    )
+    parser.add_argument(
+        "--no-audit",
+        action="store_true",
+        help="skip the untimed PXR/CBS call-profiler request (timing sweeps only)",
     )
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
@@ -441,7 +452,7 @@ def main():
     config = PerElectronTransportConfig(
         seg_capacity=args.seg_capacity,
         scratch_budget_bytes=args.scratch_mib * 1024**2,
-        probe_electrons=0,
+        probe_electrons=args.probe_electrons,
         max_batch=default.max_batch,
         schedule=default.schedule or "auto",
         continuation=TransportContinuationConfig(
@@ -579,11 +590,12 @@ def main():
             if forbidden(module, frame.f_code.co_name):
                 calls.add(f"{module}.{frame.f_code.co_name}")
 
-    sys.setprofile(audit)
-    try:
-        request(args.seed + 2_000_000, min(args.histories, 5000))
-    finally:
-        sys.setprofile(None)
+    if not args.no_audit:
+        sys.setprofile(audit)
+        try:
+            request(args.seed + 2_000_000, min(args.histories, 5000))
+        finally:
+            sys.setprofile(None)
     if calls:
         raise RuntimeError(f"PXR/CBS or line computation executed: {sorted(calls)}")
     scores, warm_s, warm_transport_s, work = request(args.seed, args.histories)
@@ -609,7 +621,11 @@ def main():
             chunk=args.chunk,
             adaptive_orders=ctx["orders"],
         ),
-        audit=dict(forbidden="pyrite.montecarlo.spectrum.{cxr,lines} computations", calls=[]),
+        audit=dict(
+            forbidden="pyrite.montecarlo.spectrum.{cxr,lines} computations",
+            calls=[],
+            skipped=bool(args.no_audit),
+        ),
         scene=scene,
         histories=args.histories,
         warmup_histories=warmup,
@@ -619,7 +635,7 @@ def main():
             max_dE_frac=args.max_de_frac,
             scratch_mib=args.scratch_mib,
             seg_capacity=args.seg_capacity,
-            probe_electrons=0,
+            probe_electrons=args.probe_electrons,
             max_steps=args.max_steps,
             schedule=config.schedule,
             rows_per_round=args.rows_per_round,

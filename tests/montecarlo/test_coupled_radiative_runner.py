@@ -317,17 +317,21 @@ def test_coupled_cuda_factory_bypasses_lut_with_cpu_stub(synthetic_si_tables, mo
     class ExactFactoryReached(Exception):
         pass
 
-    def exact():
+    def exact(_config=None):
         raise ExactFactoryReached
 
-    def lut():
+    def lut(_config=None):
         pytest.fail("coupled transport must not reach the CUDA LUT factory")
 
     monkeypatch.delenv("PYRITE_MC_TRANSPORT_CORE", raising=False)
     monkeypatch.setitem(
         sys.modules,
         "pyrite.montecarlo.transport._jit_launch",
-        SimpleNamespace(make_cuda_transport_core=exact, make_cuda_transport_lut_core=lut),
+        SimpleNamespace(
+            make_cuda_transport_core=exact,
+            make_cuda_transport_lut_core=lut,
+            TransportKernelConfig=lambda nthreads: nthreads,
+        ),
     )
     with pytest.raises(ExactFactoryReached):
         runner._transport_case(_coupled_case(), transport_core="cuda")

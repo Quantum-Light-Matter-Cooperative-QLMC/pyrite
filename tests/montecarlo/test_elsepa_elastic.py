@@ -542,7 +542,7 @@ def test_cuda_elastic_factory_selection_with_cpu_stubs(reference, monkeypatch, m
         pass
 
     def factory(route):
-        def launch():
+        def launch(_config=None):
             raise ReachedFactory(route)
 
         return launch
@@ -554,6 +554,7 @@ def test_cuda_elastic_factory_selection_with_cpu_stubs(reference, monkeypatch, m
         SimpleNamespace(
             make_cuda_transport_core=factory("exact"),
             make_cuda_transport_lut_core=factory("lut"),
+            TransportKernelConfig=lambda nthreads: nthreads,
         ),
     )
     table = _sr_table(14.0, np.geomspace(4.0, 40.0, 41), reference.mu)
