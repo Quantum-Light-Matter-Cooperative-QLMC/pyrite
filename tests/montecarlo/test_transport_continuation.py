@@ -199,9 +199,9 @@ def test_device_resident_join_matches_host_rows():
 
 def test_device_staging_matches_host_rows():
     cont = TransportContinuationConfig(rows_per_round=5, active_histories=3)
-    assert not cont.device_staging  # host reassembly is the default (#825)
-    _counts, host_rows, _, _ = _drive(cont)
-    counts, staged_rows, _, _ = _drive(replace(cont, device_staging=True))
+    assert cont.device_staging  # staging is the default again (#866)
+    _counts, host_rows, _, _ = _drive(replace(cont, device_staging=False))
+    counts, staged_rows, _, _ = _drive(cont)
     assert counts[6] is None
     for column in WRITTEN:
         np.testing.assert_array_equal(host_rows[column], staged_rows[column])
@@ -243,6 +243,65 @@ def test_spill_releases_the_device_pool_once():
     retained.append((np.zeros(50),))  # already host-side
     assert not retained.on_device and retained.spilled_round == 1
     assert released == [True]
+
+
+def test_staging_bound_is_payload_plus_largest_column():
+    """The column-by-column join peaks at payload + one column (#866)."""
+    from pyrite.montecarlo.transport.continuation import _Retained
+
+    cont = TransportContinuationConfig(device_staging=True, staging_budget_bytes=700)
+    retained = _Retained(np, cont, keep_on_device=False, to_host=np.array)
+    # 3 x 150 B: 450 staged + one 150 B column fits; twice the payload would not.
+    retained.append(tuple(np.zeros(150, np.uint8) for _ in range(3)))
+    assert retained.on_device and retained.peak_bytes() == 600
+    retained.append(tuple(np.zeros(150, np.uint8) for _ in range(3)), lanes=1)
+    assert not retained.on_device and retained.spilled_round == 1
+
+
+@pytest.mark.parametrize(("limit", "budget"), [(0, 900), (500, 270)])
+def test_derived_staging_budget_respects_the_pool_limit(limit, budget):
+    """A pool limit caps staging below driver-free memory, so it spills, not OOMs."""
+    from types import SimpleNamespace
+
+    from pyrite.montecarlo.transport.continuation import staging_budget
+
+    pool = SimpleNamespace(free_bytes=lambda: 200, get_limit=lambda: limit, used_bytes=lambda: 200)
+    runtime = SimpleNamespace(memGetInfo=lambda: (800, 2000))
+    xp = SimpleNamespace(
+        cuda=SimpleNamespace(runtime=runtime), get_default_memory_pool=lambda: pool
+    )
+    # Driver free 800 + cached 200; a 500 B limit with 200 B in use leaves 300.
+    assert staging_budget(xp, TransportContinuationConfig()) == budget
+
+
+@pytest.mark.parametrize("keep", [False, True])
+def test_join_rounds_places_runs_column_by_column(keep):
+    from pyrite.montecarlo.transport._continuation_join import join_rounds
+    from pyrite.montecarlo.transport.continuation import _canonical_runs
+
+    rows_total = np.array([3, 0, 2], dtype=np.int64)
+    # Round 0: history 0 rows 0-1, history 2 row 0; round 1: rest.
+    chunks = [
+        (np.array([0, 1, 2]), np.array([2, 0, 1])),
+        (np.array([2, 0]), np.array([1, 1])),
+    ]
+    order = [(0, 0), (0, 1), (2, 0), (2, 1), (0, 2)]
+    values = np.array([10 * h + k for h, k in order], dtype=np.float64)
+    wide = np.stack([values, -values], axis=1)
+    retained = [(values[:3].copy(), wide[:3].copy()), (values[3:].copy(), wide[3:].copy())]
+    columns = (np.zeros(1), np.zeros((1, 2)), np.zeros(0))
+    retained = [(*chunk, np.zeros(0)) for chunk in retained]
+    want = np.array([0, 1, 2, 20, 21], dtype=np.float64)
+    runs = _canonical_runs(chunks, rows_total)
+    if keep:
+        out = join_rounds(np, runs, retained, columns, 5)
+    else:
+        out = (np.full(5, -1.0), np.full((5, 2), -1.0), np.zeros(0))
+        assert join_rounds(np, runs, retained, columns, 5, [out[0], out[1], None]) is None
+    np.testing.assert_array_equal(out[0], want)
+    np.testing.assert_array_equal(out[1], np.stack([want, -want], axis=1))
+    assert out[2] is columns[2] or out[2].size == 0
+    assert retained == []
 
 
 class _DeviceLike:
