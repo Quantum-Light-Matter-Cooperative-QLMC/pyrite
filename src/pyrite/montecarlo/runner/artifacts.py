@@ -23,6 +23,8 @@ from ..trajectories import (
     iter_electron_row_blocks,
     read_trajectory_artifact,
 )
+from .streamed_scoring import STREAM_REFUSED_KEYS as STREAM_REFUSED_KEYS
+from .streamed_scoring import BlockSpectrumScorer, streaming_refusal
 
 #: Default segment rows one streamed block holds. Measured on CPU for a 7.1 M
 #: segment hopg shell + coupled-radiative artifact (#186): peak host memory
@@ -30,9 +32,6 @@ from ..trajectories import (
 #: 2**16 (a ~0.3 GiB fixed cost plus the block), against ~4.9 GiB for the
 #: whole-artifact read. Smaller blocks were not slower on CPU.
 STREAM_MAX_SEGMENTS = 1 << 20
-
-#: Case keys whose spectra need every segment at once, so they never stream.
-STREAM_REFUSED_KEYS = ("coherent_emission", "temporal_profile", "photon_transport")
 
 
 def _case_geometry(case):
@@ -102,18 +101,9 @@ def spectrum_from_artifact(
 
 def _check_streamable(case, path) -> None:
     """Refuse a case whose spectra need every segment or history at once."""
-    for key in STREAM_REFUSED_KEYS:
-        if case.get(key):
-            raise TrajectoryArtifactError(
-                f"{key} needs every segment at once; score {path} with "
-                "spectrum_from_artifact instead"
-            )
-    transition = case.get("transition_radiation")
-    if transition is not None and transition["coherence"] == "bunch":
-        raise TrajectoryArtifactError(
-            "bunch transition radiation needs every history at once; score "
-            f"{path} with spectrum_from_artifact instead"
-        )
+    reason = streaming_refusal(case)
+    if reason is not None:
+        raise TrajectoryArtifactError(f"{reason}; score {path} with spectrum_from_artifact instead")
 
 
 def stream_spectrum_from_artifact(
@@ -138,106 +128,28 @@ def stream_spectrum_from_artifact(
         As :func:`spectrum_from_artifact`, or a case that needs every segment
         at once (coherent emission, temporal profile, bunch transition radiation).
     """
-    from dataclasses import replace
-
-    from . import _segments_on_device
-    from .cxr_grid import check_cxr_truncation, cxr_truncation_audit
-    from .emission_adapters import EmissionBatch, select_emission
-    from .transition_emission import block_transition_spectrum
+    from ..spectrum.cxr._coverage import collect_line_data_coverage
 
     artifact = read_trajectory_artifact(path, load_transport=False)
     case, inputs = _checked_case_and_inputs(artifact, case)
     _check_streamable(case, artifact.path)
-    transition = case.get("transition_radiation") is not None
-    emission = select_emission(case)
     try:
-        emission.preflight(case, streaming=True)
+        scorer = BlockSpectrumScorer(case, inputs)
     except ValueError as error:
         raise TrajectoryArtifactError(str(error)) from error
-    E_grid, E_brem, n_hat = inputs["E_grid"], inputs["E_brem"], inputs["n_hat"]
-    groove, abs_layers = inputs["groove"], case.get("abs_layers")
-    Ne_lines, Ne_brem = inputs["Ne_lines"], inputs["Ne_brem"]
-    audit = cxr_truncation_audit(case, E_grid, n_electrons=Ne_lines)
-    table_cache: dict = {}
-    spec = spec_characteristic = brem_wide = spec_transition = None
-    n_segments = 0
     segs = {}
-    from ..spectrum.cxr._coverage import collect_line_data_coverage
-
     with collect_line_data_coverage() as line_coverage:
         for segs in iter_electron_row_blocks(path, max_segments):
-            n_segments += int(segs["L_ang"].shape[0])
-            if segs["L_ang"].shape[0] == 0:
-                continue
-            block = _segments_on_device(segs)
-            batch = EmissionBatch(
-                block,
-                E_grid,
-                case,
-                n_hat,
-                abs_layers,
-                groove,
-                electron_limit=Ne_lines,
-                table_cache=table_cache,
-                truncation_audit=audit,
-            )
-            parts = (
-                emission.cxr.evaluate(batch, "spec").values,
-                emission.characteristic.evaluate(
-                    replace(batch, electron_limit=Ne_brem), "spec_characteristic"
-                ).values,
-                emission.continuum.evaluate(
-                    replace(batch, energy_eV=E_brem, electron_limit=Ne_brem), "brem_wide"
-                ).values,
-                # Per-history TR over whole-electron blocks, normalized by Ne_brem.
-                block_transition_spectrum(case, segs, E_grid, n_hat, Ne_brem),
-            )
-            if spec is None:
-                spec, spec_characteristic, brem_wide, spec_transition = parts
-            else:
-                totals = (spec, spec_characteristic, brem_wide, spec_transition)
-                spec, spec_characteristic, brem_wide, spec_transition = (
-                    total + part for total, part in zip(totals, parts, strict=True)
-                )
-    if n_segments != int(artifact.attrs["segment_count"]):
+            scorer.add(segs)
+    if scorer.n_segments != int(artifact.attrs["segment_count"]):
         raise TrajectoryArtifactError(f"trajectory artifact {artifact.path} segments are truncated")
-    if spec is None:  # no segment at all: every estimator is zero
-        spec = np.zeros(E_grid.shape)
-        spec_characteristic = np.zeros(E_grid.shape)
-        brem_wide = np.zeros(E_brem.shape)
-    assert spec_characteristic is not None and brem_wide is not None
-    truncation = None if audit is None else check_cxr_truncation(case, audit)
-    out = dict(
-        line_data_coverage=line_coverage,
-        E_grid=E_grid,
-        spec=spec,
-        spec_characteristic=spec_characteristic,
-        brem=np.interp(E_grid, E_brem, brem_wide),
-        E_grid_brem=E_brem,
-        brem_wide=brem_wide,
-        eta=segs["n_backscattered"] / segs["Ne"],
-        hit_frac=1.0 - segs["n_missed"] / segs["Ne"],
-        n_segments=n_segments,
-        crystal=case["crystal"],
-        E0_keV=case["E0_keV"],
+    return scorer.result(
+        Ne=segs["Ne"],
+        n_backscattered=segs["n_backscattered"],
+        n_missed=segs["n_missed"],
+        line_coverage=line_coverage,
+        diagnostic_grid=inputs.get("diagnostic_grid"),
     )
-    if case.get("channeling") is not None:
-        from .channeling_emission import rescore_channeling_spectrum
-
-        # CR is one deterministic ensemble source per case, never a block sum.
-        out["spec_channeling"] = rescore_channeling_spectrum(case, E_grid, n_hat)
-    if transition:
-        out["spec_transition"] = (
-            np.zeros(E_grid.shape) if spec_transition is None else spec_transition
-        )
-    diagnostic = inputs.get("diagnostic_grid")
-    if diagnostic is not None:
-        out["line_grid_diagnostic"] = diagnostic
-        if case.get("line_grid_policy") is not None:
-            out["line_grid_resolved"] = (
-                diagnostic if truncation is None else {**diagnostic, "truncation_audit": truncation}
-            )
-    return out
 
 
 def _checked_case_and_inputs(artifact, case):

@@ -87,7 +87,13 @@ def _beam_kwargs(case):
 
 
 def _check_opt_in_transport(
-    case, trajectory_capture, block_electrons, *, transport_core="auto", block_monitor=None
+    case,
+    trajectory_capture,
+    block_electrons,
+    *,
+    transport_core="auto",
+    block_monitor=None,
+    block_consumer=None,
 ):
     """Refuse transport options an opt-in component lacks, before any work (ADR-0017 tier 3)."""
     if case.get("photon_transport") is not None:
@@ -103,6 +109,8 @@ def _check_opt_in_transport(
     if block_electrons is not None:
         refuse_channeling(case, "electron-block transport")
         refuse_transition_radiation(case, "electron-block transport")
+    if block_consumer is not None and (block_electrons is None or block_monitor is not None):
+        raise ValueError("a block consumer needs electron blocks and no block monitor")
 
 
 @contextmanager
