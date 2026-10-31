@@ -182,11 +182,53 @@ class BlockSpectrumScorer:
         return out
 
 
+class _CapacityHint:
+    """Carry a case's learned segment capacity across its transport blocks.
+
+    Sets the in-process transport override that ``_transport_case`` reads per
+    block call (see :mod:`.transport_options`), starting from whatever override
+    was active, and restores it on :meth:`reset`.
+    """
+
+    def __init__(self):
+        from ..transport import DEFAULT_PER_ELECTRON_TRANSPORT_CONFIG
+        from .transport_options import _TRANSPORT_TUNING
+
+        self._var = _TRANSPORT_TUNING
+        self._base = _TRANSPORT_TUNING.get() or DEFAULT_PER_ELECTRON_TRANSPORT_CONFIG
+        self._token = None
+        self.seen_max = 0
+
+    def observe(self, block) -> None:
+        """Update the hint from one block's per-electron row counts."""
+        from ..transport.batching import _capacity_for
+
+        ids = np.asarray(block["elec_id"])
+        if ids.size == 0:
+            return
+        seen = int(np.bincount(ids - ids.min()).max())
+        if seen <= self.seen_max:
+            return
+        self.seen_max = seen
+        config = replace(
+            self._base, seg_capacity=_capacity_for(seen, self._base), probe_electrons=0
+        )
+        if self._token is not None:
+            self._var.reset(self._token)
+        self._token = self._var.set(config)
+
+    def reset(self) -> None:
+        if self._token is not None:
+            self._var.reset(self._token)
+            self._token = None
+
+
 def run_case_streamed(
     case,
     block_electrons: int,
     *,
     transport_core: str = "auto",
+    capacity_hint: bool = False,
 ) -> dict[str, Any]:
     """Opt-in live streamed form of :func:`.run_case` for additive spectra (#611).
 
@@ -196,6 +238,12 @@ def run_case_streamed(
     floating-point summation order; transport counts are exact. Cases outside
     :func:`streaming_refusal` (``live=True``) raise ``ValueError`` before any
     transport.
+
+    ``capacity_hint`` (prototype) carries the largest per-electron segment
+    count seen so far into later blocks as their full-history
+    ``seg_capacity``, without a probe batch, instead of letting every block
+    relearn it from the default guess. Like every batching field it changes
+    only launches and replays, never results.
     """
     from ..._backend import BACKEND
     from ..spectrum.cxr._coverage import collect_line_data_coverage
@@ -219,20 +267,28 @@ def run_case_streamed(
     # Same allocator cap as the joined spectrum phase.
     _ensure_pool_limit()
 
+    hint = _CapacityHint() if capacity_hint else None
+
     def consume(block):
+        if hint is not None:
+            hint.observe(block)
         scorer.add(block)
         # Return the finished block's cached device blocks: per-block staging
         # and scoring sizes vary, so a caching pool would otherwise ratchet
         # reserved VRAM with the electron count (#611, job 2937).
         BACKEND.release_memory()
 
-    with collect_line_data_coverage() as line_coverage:
-        tp = _transport_case(
-            case,
-            transport_core=transport_core,
-            block_electrons=block_electrons,
-            block_consumer=consume,
-        )
+    try:
+        with collect_line_data_coverage() as line_coverage:
+            tp = _transport_case(
+                case,
+                transport_core=transport_core,
+                block_electrons=block_electrons,
+                block_consumer=consume,
+            )
+    finally:
+        if hint is not None:
+            hint.reset()
     counts = tp["segs"]
     return scorer.result(
         Ne=int(counts["Ne"]),

@@ -6,8 +6,9 @@ Usage:
 
 MODE: ``joined`` (``run_case``: full trajectory downloaded, then spectra;
 BLOCK ignored), ``joined-device`` (the same with ``keep_segments_on_device``,
-as ``pyrite.phases`` runs it) or ``streamed`` (``run_case_streamed`` with
-BLOCK electrons per block).
+as ``pyrite.phases`` runs it), ``streamed`` (``run_case_streamed`` with
+BLOCK electrons per block) or ``streamed-hint`` (the same with the prototype
+``capacity_hint``). ``PYRITE_MC_TRANSPORT_SCHEDULE`` is recorded.
 CORE (default ``per-electron``; ``cuda`` on the GPU box) is pinned for both
 arms, because ``auto`` can resolve to the block-incapable lockstep core.
 One arm per process, so ``ru_maxrss`` is that arm's host peak. Device peak is
@@ -198,19 +199,21 @@ def run(
             out = runner.run_case(case, transport_core=core)
         elif mode == "joined-device":
             out = runner.run_case(case, transport_core=core, keep_segments_on_device=True)
-        elif mode == "streamed":
-            out = run_case_streamed(case, int(block), transport_core=core)
+        elif mode in ("streamed", "streamed-hint"):
+            hint = mode == "streamed-hint"
+            out = run_case_streamed(case, int(block), transport_core=core, capacity_hint=hint)
         else:
             raise SystemExit(f"unknown mode {mode!r}")
     wall = time.perf_counter() - t0
-    if mode == "streamed":
+    if mode.startswith("streamed"):
         accounted = phases.seconds.get("score", 0.0) + phases.seconds.get("release", 0.0)
         phases.seconds["transport"] = wall - accounted
     rss_peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
     record = {
         "mode": mode,
         "Ne": int(ne),
-        "block": int(block) if mode == "streamed" else None,
+        "block": int(block) if mode.startswith("streamed") else None,
+        "schedule": os.environ.get("PYRITE_MC_TRANSPORT_SCHEDULE", "default"),
         "material": material,
         "E0_keV": float(e0_kev),
         "core": core,
