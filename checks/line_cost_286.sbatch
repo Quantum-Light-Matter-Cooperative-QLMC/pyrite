@@ -19,7 +19,7 @@ out="evidence/line286/$SLURM_JOB_ID"; mkdir -p "$out"
 cp .pyrite-sync "$out/sync.json"
 uv sync --extra nvidia --locked -q
 py=(uv run --no-sync python -W ignore checks/line_cost_286.py)
-"${py[@]}" --energy-kev 300 --counts 100 400 --repeat 1 --output "$out/hopg-300.json"
+"${py[@]}" --energy-kev 300 --counts 400 1600 6400 --repeat 1 --output "$out/hopg-300.json"
 echo "rc=$?"
 "${py[@]}" --energy-kev 29999 --counts 100 --repeat 1 --output "$out/hopg-29999.json"
 echo "rc=$?"

@@ -201,8 +201,10 @@ def _recoil_count(st, block, positive, g_row):
     selected = np.asarray(_to_cpu(positive), dtype=bool)
     segments = st.segments
     field = "E_repr_keV" if segments.get("E_repr_keV") is not None else "E_keV"
-    kinetic = 1.0e3 * np.asarray(_to_cpu(xp.asarray(segments[field])), dtype=np.float64)[block]
-    direction = np.asarray(_to_cpu(xp.asarray(segments["v_hat"])), dtype=np.float64)[block]
+    # Slice on the device before the host copy: copying whole segment arrays per
+    # block made this screen O(segments^2) (#286; 109 of 111 s at 1600 e-).
+    kinetic = 1.0e3 * np.asarray(_to_cpu(xp.asarray(segments[field])[block]), dtype=np.float64)
+    direction = np.asarray(_to_cpu(xp.asarray(segments["v_hat"])[block]), dtype=np.float64)
     norm = np.linalg.norm(direction, axis=1)
     # The reference raises on degenerate input; such rows are not screened.
     selected &= np.isfinite(kinetic) & (kinetic > 0) & np.isfinite(norm) & (norm > 0)
