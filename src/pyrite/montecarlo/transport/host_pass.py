@@ -1022,6 +1022,7 @@ def _add_optional_fields(t, o, rows, result):
             c.radiative_cutoff_eV,
             p.seed if p._secondary is None else p._secondary.photon_seed,
             t.radiative_args[-1][: len(c.layers)],
+            complete=p._complete_hard_photons,
         )
         from .radiative_moment_transport import add_moment_identity
 

@@ -354,3 +354,68 @@ def test_streamed_scoring_matches_the_joined_coupled_run(synthetic_si_tables, bl
     assert np.any(streamed["brem_wide"] > 0.0)
     for key in ("eta", "hit_frac", "n_segments"):
         assert streamed[key] == reference[key], key
+
+
+def test_streamed_blocks_skip_completion_bitwise(synthetic_si_tables, monkeypatch):
+    # #864: blocks of a live streamed run skip hard-photon completion. Its own
+    # generator leaves transport untouched, so outputs match bit for bit.
+    from pyrite.montecarlo.runner.streamed_scoring import run_case_streamed
+    from pyrite.montecarlo.transport import hard_radiative
+
+    case = _coupled_case(straggling=True)
+    calls = []
+    complete = hard_radiative.complete_hard_radiative_events
+
+    def counted(*args):
+        calls.append(1)
+        return complete(*args)
+
+    monkeypatch.setattr(hard_radiative, "complete_hard_radiative_events", counted)
+    skipped = run_case_streamed(case, 5, transport_core="per-electron")
+    assert not calls
+    add_fields = hard_radiative.add_radiative_result_fields
+    monkeypatch.setattr(
+        hard_radiative,
+        "add_radiative_result_fields",
+        lambda *args, complete=True, **kw: add_fields(*args, complete=True, **kw),
+    )
+    completed = run_case_streamed(case, 5, transport_core="per-electron")
+    assert calls
+    assert np.any(skipped["brem_wide"] > 0.0)
+    for key in ("spec", "spec_characteristic", "brem_wide", "eta", "hit_frac", "n_segments"):
+        np.testing.assert_array_equal(skipped[key], completed[key], err_msg=key)
+
+
+def test_skipped_completion_leaves_transport_rows_bitwise(synthetic_si_tables):
+    from pyrite.montecarlo.transport.api import simulate_trajectories
+
+    case = _coupled_case()
+    kwargs = dict(
+        E_cut_keV=case["E_cut_brem_keV"],
+        composition=case["composition"],
+        seed=case["seed"],
+        energy_model="midpoint",
+        transport_core="per-electron",
+        radiative_model=case["radiative_model"],
+        radiative_cutoff_eV=case["radiative_cutoff_eV"],
+        bremslib_tables=synthetic_si_tables,
+    )
+    full = simulate_trajectories(case["E0_keV"], 6, case["thickness_ang"], **kwargs)
+    bare = simulate_trajectories(
+        case["E0_keV"], 6, case["thickness_ang"], _complete_hard_photons=False, **kwargs
+    )
+    fields = ("hard_radiative_direction", "hard_radiative_target_momentum_eV_c")
+    assert np.any(np.asarray(full["hard_radiative_k_eV"]) > 0.0)
+    assert set(full) - set(bare) == set(fields)
+    for key, value in bare.items():
+        if isinstance(value, np.ndarray):
+            np.testing.assert_array_equal(value, full[key], err_msg=key)
+    with pytest.raises(ValueError, match="secondary cascades need completed"):
+        simulate_trajectories(
+            case["E0_keV"],
+            2,
+            case["thickness_ang"],
+            secondary_threshold_eV=50.0,
+            _complete_hard_photons=False,
+            **kwargs,
+        )
