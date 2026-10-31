@@ -77,6 +77,10 @@ def _xp_of(value):
     return np if isinstance(value, np.ndarray) else BACKEND.xp
 
 
+# Population-wide hard-photon vectors; finalize_population_fields rebuilds them.
+_RECOMPLETED_FIELDS = ("hard_radiative_direction", "hard_radiative_target_momentum_eV_c")
+
+
 def _globalize(block: dict[str, Any], start: int) -> dict[str, Any]:
     """Shift a block result's electron indices by ``start``, keeping aliases."""
     if not start:
@@ -202,6 +206,10 @@ def transport_electron_blocks(
             on_block(start, stop, block)
         block = _globalize(block, start)
         if consume is None:
+            # The join re-completes these over its own rows; holding and
+            # concatenating every block's dense copy would only add peak RSS.
+            if "hard_radiative_k_eV" in block:
+                block.update(dict.fromkeys(_RECOMPLETED_FIELDS))
             blocks.append(block)
         else:
             for key in counts:
@@ -213,6 +221,7 @@ def transport_electron_blocks(
     if consume is not None:
         return counts
     merged = merge_electron_blocks(blocks)
+    blocks.clear()  # the join owns copies; release the blocks before finalizing
     return finalize_population_fields(
         merged, seed=seed, bunch=bunch, bremslib_tables=bremslib_tables
     )

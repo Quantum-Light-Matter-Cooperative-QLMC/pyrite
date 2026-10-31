@@ -3,6 +3,7 @@
 Validation: bremslib-radiative-partition
 """
 
+import mmap
 import warnings
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
@@ -23,6 +24,8 @@ from .dielectric_radiative import dielectric_cell_moments, dielectric_scale_eV
 
 _MB_CM2 = 1.0e-27
 _ELECTRON_REST_EV = 510998.95
+# Per-row photon vectors at least this large are mapped lazily (#825).
+_LAZY_ZERO_BYTES = 64 << 20
 
 
 def _cell_moments(
@@ -415,6 +418,26 @@ def _complete_hard_radiative_chunk(staged, incident, energy, incoming, uniforms)
     return photon_direction, target_momentum
 
 
+def _lazy_zeros(rows: int) -> np.ndarray:
+    """A writable ``(rows, 3)`` float64 zero array whose untouched pages stay unbacked.
+
+    Photon vectors are nonzero on few rows. ``np.zeros`` is hugepage-advised
+    by NumPy, so sparse row writes back nearly every 2 MiB page, and
+    ``np.zeros_like`` writes every page. A private anonymous mapping without
+    hugepages backs only the 4 KiB pages actually written (#825); reads of the
+    rest map the shared zero page. Small arrays, and platforms without
+    ``MAP_PRIVATE``, use ``np.zeros``.
+    """
+    nbytes = int(rows) * 3 * np.dtype(float).itemsize
+    private = getattr(mmap, "MAP_PRIVATE", None)
+    if nbytes == 0 or nbytes < _LAZY_ZERO_BYTES or private is None:
+        return np.zeros((rows, 3), dtype=float)
+    buffer = mmap.mmap(-1, nbytes, flags=private)
+    if hasattr(mmap, "MADV_NOHUGEPAGE"):
+        buffer.madvise(mmap.MADV_NOHUGEPAGE)
+    return np.frombuffer(buffer, dtype=float).reshape(rows, 3)
+
+
 def complete_hard_radiative_events(segments, tables, seed: int) -> None:
     """Attach photon directions and recoil momenta without changing RNG order.
 
@@ -425,18 +448,20 @@ def complete_hard_radiative_events(segments, tables, seed: int) -> None:
     Validation: bremslib-radiative-partition
     """
     energies = np.asarray(segments["hard_radiative_k_eV"])
-    directions = np.zeros((energies.size, 3), dtype=float)
-    momenta = np.zeros_like(directions)
+    directions = _lazy_zeros(energies.size)
+    momenta = _lazy_zeros(energies.size)
     photon_rows = np.flatnonzero(energies > 0.0)
     rng = np.random.default_rng(int(seed) ^ 0xD6023FEA38B57C29)
     # Shape (N, 2) consumes exactly the same consecutive MT/PCG uniform words
     # as the former two scalar random() calls per photon (even for N=0).
     uniforms = rng.random((photon_rows.size, 2))
     by_z = {table.atomic_number: table for table in tables.values()}
+    # Gather the photon rows before any float cast: a cast of a narrower
+    # per-segment field would otherwise copy every row.
     element = np.asarray(segments["hard_radiative_Z"])[photon_rows]
-    incident = np.asarray(segments["E_end_keV"], dtype=float)[photon_rows] * 1e3
-    photon_energy = np.asarray(energies, dtype=float)[photon_rows]
-    incoming = np.asarray(segments["v_hat"], dtype=float)[photon_rows]
+    incident = np.asarray(segments["E_end_keV"])[photon_rows].astype(float, copy=False) * 1e3
+    photon_energy = energies[photon_rows].astype(float, copy=False)
+    incoming = np.asarray(segments["v_hat"])[photon_rows].astype(float, copy=False)
     for z in dict.fromkeys(element.tolist()):
         staged = stage_bremslib_table(by_z[int(z)])
         selected = np.flatnonzero(element == z)

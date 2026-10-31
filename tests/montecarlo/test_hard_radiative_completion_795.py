@@ -6,6 +6,7 @@ angular shapes; the optional released-table test covers physical tables.
 Validation: bremslib-radiative-partition.
 """
 
+import mmap
 from dataclasses import replace
 
 import numpy as np
@@ -82,6 +83,33 @@ def test_batch_completion_is_bitwise_scalar_reference(elements, monkeypatch):
         assert staged == list(dict.fromkeys(elements))
         np.testing.assert_array_equal(segments["hard_radiative_direction"], expected[0])
         np.testing.assert_array_equal(segments["hard_radiative_target_momentum_eV_c"], expected[1])
+
+
+@pytest.mark.parametrize("layout", ["none", "sparse", "all"])
+def test_lazily_mapped_photon_vectors_match_dense_zeros(layout, monkeypatch):
+    """#825: mapped photon vectors equal the ``np.zeros`` result bit for bit."""
+    tables = _tables()
+    segments = _case([14, 74] * 20)
+    if layout == "none":
+        segments["hard_radiative_k_eV"][:] = 0.0
+        segments["hard_radiative_Z"][:] = 0
+    elif layout == "all":
+        segments = {k: v[1:-1] for k, v in segments.items()}
+    # Narrow inputs are gathered before the float cast, never cast whole.
+    segments["v_hat"] = segments["v_hat"].astype(np.float32)
+    expected = _scalar_reference(segments | {"v_hat": segments["v_hat"].astype(float)}, tables, 795)
+    monkeypatch.setattr(rad, "_LAZY_ZERO_BYTES", 0)
+    rad.complete_hard_radiative_events(segments, tables, 795)
+    assert rad._lazy_zeros(0).shape == (0, 3)
+    for key, want in zip(
+        ("hard_radiative_direction", "hard_radiative_target_momentum_eV_c"), expected, strict=True
+    ):
+        got = segments[key]
+        assert got.dtype == np.float64 and got.shape == want.shape and got.flags.writeable
+        assert got.flags.c_contiguous
+        assert not got.flags.owndata or not hasattr(mmap, "MAP_PRIVATE")
+        np.testing.assert_array_equal(got, want)
+        assert not np.signbit(got[segments["hard_radiative_k_eV"] == 0.0]).any()
 
 
 def test_batch_completion_caps_interpolation_rows(monkeypatch):
