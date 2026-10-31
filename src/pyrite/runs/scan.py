@@ -731,7 +731,8 @@ def _resolved_run(args, material):
     # to fallback selects EEDL for the entire run, not per element.
     requested_brem_model = settings.bremsstrahlung_model
     resolved_brem_model = resolve_bremsstrahlung_model(
-        requested_brem_model, elements,
+        requested_brem_model,
+        elements,
         allow_fallback=getattr(args, "allow_physics_fallback", False),
     )
     settings = replace(settings, bremsstrahlung_model=resolved_brem_model)
@@ -764,15 +765,17 @@ def _resolved_run(args, material):
         # Fallback provenance is descriptive: case/dataset physics identity is
         # already keyed by the executed EEDL model. Segment energies and their
         # affected fraction are not known during preflight, so do not invent them.
-        identity["physics_fallbacks"] = [{
-            "model_requested": "auto (BremsLib)",
-            "model_used": "eedl",
-            "elements": sorted(set(elements)),
-            "energy_span_keV": None,
-            "fraction_segments_affected": None,
-            "scope": "entire continuum source",
-            "reason": "BremsLib tables unavailable",
-        }]
+        identity["physics_fallbacks"] = [
+            {
+                "model_requested": "auto (BremsLib)",
+                "model_used": "eedl",
+                "elements": sorted(set(elements)),
+                "energy_span_keV": None,
+                "fraction_segments_affected": None,
+                "scope": "entire continuum source",
+                "reason": "BremsLib tables unavailable",
+            }
+        ]
     canonical_full = (
         fidelity == "full"
         and not overrides
