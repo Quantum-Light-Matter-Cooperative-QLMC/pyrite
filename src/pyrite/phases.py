@@ -93,15 +93,15 @@ def score_spectra(
 ) -> Result:
     """Score the spectra of an existing transport; never transports.
 
-    ``kernel_tuning`` may change only the spectral execution chunks
-    (``cxr_chunk``, ``brem_chunk``); its transport fields must equal the ones
+    ``kernel_tuning`` may change only the spectral execution controls
+    (``cxr_chunk``, ``brem_chunk``, ``cxr_threads``, ``cxr_energies_per_block``); its transport fields must equal the ones
     that produced ``transported``. Chunks change memory use and speed, not the
     physics: ``Result.case`` and its identity digest are those of the transport.
     Repeated calls reuse the same segments. ``progress`` receives one
     :class:`SimulationProgress` per completed spectrum stage.
     """
     from .montecarlo.runner import _spectrum_with_recovery
-    from .montecarlo.runner.transport_options import run_progress
+    from .montecarlo.runner.transport_options import run_progress, spectrum_launch
 
     if not isinstance(transported, TransportedScene):
         raise TypeError("transported must come from simulate_transport")
@@ -111,12 +111,12 @@ def score_spectra(
         raise TypeError("kernel_tuning must be a KernelTuning")
     if (tuning.transport_core, tuning.transport) != (fixed.transport_core, fixed.transport):
         raise ValueError(
-            "score_spectra may change only cxr_chunk and brem_chunk; "
+            "score_spectra may change only the spectral chunks and CXR launch; "
             "transport settings were fixed by simulate_transport"
         )
     case = replace(transported.case, spec_chunk=tuning.cxr_chunk, brem_chunk=tuning.brem_chunk)
     # The spectrum phase may replace entries (host fallback); keep ours intact.
-    with run_progress(progress):
+    with run_progress(progress), spectrum_launch(tuning):
         output = _spectrum_with_recovery(case, dict(transported._transport))
     if transported.case.get("channeling") is not None:
         output["channeling"] = transported._transport["segs"]["channeling"]

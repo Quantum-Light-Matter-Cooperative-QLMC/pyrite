@@ -147,15 +147,15 @@ def _(mo, spectrum_s, transport_s):
 
 @app.cell
 def _(mo, scene):
-    from pyrite.optimization import KernelLattice, tune_kernels
+    from pyrite.optimization import KernelSearchSpace, tune_kernels
 
-    lattice = KernelLattice(
+    space = KernelSearchSpace(
         electron_batch=(None, 4_096, 16_384),
         schedule=("full-history", "auto"),
         cxr_chunk=(16_384, 65_536, 262_144),
     )
     _candidates = sum(
-        len(lattice.choices(scene.numerics.kernel_tuning, p)) for p in ("transport", "spectrum")
+        len(space.choices(scene.numerics.kernel_tuning, p)) for p in ("transport", "spectrum")
     )
     with mo.status.progress_bar(
         total=_candidates + 2, title="Tuning transport, then spectrum", show_eta=True
@@ -175,7 +175,7 @@ def _(mo, scene):
                 subtitle=f"{update.phase} {update.trial}/{update.trials} — {_detail}",
             )
 
-        tuning = tune_kernels(scene, lattice, warmups=1, repeats=3, on_progress=advance)
+        tuning = tune_kernels(scene, space, warmups=1, repeats=3, on_progress=advance)
     return (tuning,)
 
 

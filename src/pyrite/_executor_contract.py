@@ -20,6 +20,11 @@ def validate_executor(executor: Executor, numerics: Numerics) -> None:
             "batch executors cannot preserve an explicit transport-core override"
         )
     execution = getattr(numerics, "resolved_execution", None)
+    if execution is not None and not execution.spectrum_launch_default():
+        raise ValueError(
+            "executor requires the default KernelTuning CXR launch (cxr_threads, "
+            "cxr_energies_per_block); batch executors use the built-in launch"
+        )
     if execution is not None and execution.transport != type(execution.transport)():
         raise ValueError(
             "executor requires the default KernelTuning.transport; batch executors take "

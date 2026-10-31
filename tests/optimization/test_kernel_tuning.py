@@ -7,7 +7,7 @@ import pytest
 
 import pyrite as pr
 import pyrite.config as cfg
-from pyrite.optimization import KernelLattice, KernelTuningResult, TuningProgress, tune_kernels
+from pyrite.optimization import KernelSearchSpace, KernelTuningResult, TuningProgress, tune_kernels
 from pyrite.optimization import kernel_tuning as kt
 from pyrite.phases import SimulationProgress
 
@@ -75,19 +75,19 @@ def fake(monkeypatch):
     return FakeWorker.runs
 
 
-def test_lattice_validation():
+def test_search_space_validation():
     with pytest.raises(ValueError, match="at least one"):
-        KernelLattice()
+        KernelSearchSpace()
     with pytest.raises(ValueError, match="distinct"):
-        KernelLattice(cxr_chunk=(256, 256))
+        KernelSearchSpace(cxr_chunk=(256, 256))
     with pytest.raises(ValueError, match="distinct"):
-        KernelLattice(cxr_chunk=[256])
+        KernelSearchSpace(cxr_chunk=[256])
 
 
-def test_candidate_changes_only_lattice_dimensions():
+def test_candidate_changes_only_search_space_dimensions():
     base = cfg.KernelTuning(transport_core="cuda", brem_chunk=8)
-    lattice = KernelLattice(electron_batch=(512,), schedule=("auto",), continuation_rows=(64,))
-    got = lattice.candidate(
+    space = KernelSearchSpace(electron_batch=(512,), schedule=("auto",), continuation_rows=(64,))
+    got = space.candidate(
         base, {"electron_batch": 512, "schedule": "auto", "continuation_rows": 64}
     )
     assert got == cfg.KernelTuning(
@@ -96,13 +96,17 @@ def test_candidate_changes_only_lattice_dimensions():
         transport=cfg.TransportKernelTuning("auto", 64, 512),
     )
     with pytest.raises(ValueError, match="requires schedule"):
-        lattice.candidate(base, {"schedule": "full-history", "continuation_rows": 64})
-    launch = KernelLattice(scratch_mib=(None, 4096), kernel_threads=(32, 128))
+        space.candidate(base, {"schedule": "full-history", "continuation_rows": 64})
+    launch = KernelSearchSpace(scratch_mib=(None, 4096), kernel_threads=(32, 128))
     assert launch.dimensions("transport") == ("scratch_mib", "kernel_threads")
     assert len(launch.choices(base, "transport")) == 4
     assert launch.candidate(base, {"scratch_mib": 4096, "kernel_threads": 32}).transport == (
         cfg.TransportKernelTuning(scratch_mib=4096, kernel_threads=32)
     )
+    cxr = KernelSearchSpace(cxr_threads=(None, 256), cxr_energies_per_block=(3, 4))
+    assert cxr.dimensions("spectrum") == ("cxr_threads", "cxr_energies_per_block")
+    got = cxr.candidate(base, {"cxr_threads": 256, "cxr_energies_per_block": 4})
+    assert (got.cxr_threads, got.cxr_energies_per_block, got.brem_chunk) == (256, 4, 8)
 
 
 def test_equivalence_requires_exact_grids_and_close_densities(tmp_path):
@@ -117,13 +121,13 @@ def test_equivalence_requires_exact_grids_and_close_densities(tmp_path):
 
 def test_phases_tune_independently_and_join_winners(fake):
     pytest.importorskip("optuna")
-    lattice = KernelLattice(
+    space = KernelSearchSpace(
         electron_batch=(2048, 4096),
         schedule=("full-history", "continuation"),
         continuation_rows=(None, 7),
         cxr_chunk=(None, 3, 4096),
     )
-    result = tune_kernels(_scene(), lattice, seed=3)
+    result = tune_kernels(_scene(), space, seed=3)
     assert isinstance(result, KernelTuningResult)
     assert result.environment == ENV
     transport, spectrum = result.transport, result.spectrum
@@ -152,8 +156,8 @@ def test_phases_tune_independently_and_join_winners(fake):
 
 def test_tpe_resamples_reuse_their_first_measurement(fake):
     pytest.importorskip("optuna")
-    lattice = KernelLattice(electron_batch=(2048, 4096, 8192, 16384))
-    result = tune_kernels(_scene(), lattice, trials=3, seed=1)
+    space = KernelSearchSpace(electron_batch=(2048, 4096, 8192, 16384))
+    result = tune_kernels(_scene(), space, trials=3, seed=1)
     assert len(result.trials) == 3  # fewer trials than candidates: TPE, not exhaustive
     by_number = {t.number: t for t in result.trials}
     for trial in result.trials:
@@ -169,7 +173,7 @@ def test_total_objective_and_progress(fake):
     observed = []
     result = tune_kernels(
         _scene(),
-        KernelLattice(electron_batch=(2048,), cxr_chunk=(4096,)),
+        KernelSearchSpace(electron_batch=(2048,), cxr_chunk=(4096,)),
         objective="total",
         on_progress=observed.append,
     )
@@ -185,7 +189,7 @@ def test_total_objective_and_progress(fake):
 
 def test_baseline_candidate_reuses_the_baseline_timing(fake):
     pytest.importorskip("optuna")
-    result = tune_kernels(_scene(), KernelLattice(cxr_chunk=(None, 4096)))
+    result = tune_kernels(_scene(), KernelSearchSpace(cxr_chunk=(None, 4096)))
     same = next(t for t in result.trials if t.tuning.cxr_chunk is None)
     assert same.repeat_of == -1 and same.samples_s == result.baseline.samples_s
     # Baseline once plus its three confirmation halves; the equal candidate is never re-run.
@@ -197,7 +201,7 @@ def test_progress_counts_finished_trials(fake):
     pytest.importorskip("optuna")
     observed = []
     tune_kernels(
-        _scene(), KernelLattice(electron_batch=(2048, 4096, 8192)), on_progress=observed.append
+        _scene(), KernelSearchSpace(electron_batch=(2048, 4096, 8192)), on_progress=observed.append
     )
     running = [p.trial for p in observed if p.state == "running" and p.simulation is None]
     assert running[:4] == [0, 1, 2, 3]
@@ -205,7 +209,7 @@ def test_progress_counts_finished_trials(fake):
 
 def test_no_faster_candidate_keeps_baseline(fake):
     pytest.importorskip("optuna")
-    result = tune_kernels(_scene(), KernelLattice(electron_batch=(256,)))
+    result = tune_kernels(_scene(), KernelSearchSpace(electron_batch=(256,)))
     assert not result.improved
     assert result.best == result.baseline.tuning
     assert result.speedup == 1.0
@@ -213,7 +217,7 @@ def test_no_faster_candidate_keeps_baseline(fake):
 
 def test_unconfirmed_speedup_keeps_baseline(fake, monkeypatch):
     pytest.importorskip("optuna")
-    result = tune_kernels(_scene(), KernelLattice(electron_batch=(1025,)), min_speedup=1.5)
+    result = tune_kernels(_scene(), KernelSearchSpace(electron_batch=(1025,)), min_speedup=1.5)
     assert result.trials[0].median_s < result.baseline.median_s
     assert not result.improved and result.chosen is result.baseline
     assert result.transport.confirmation_s is not None
@@ -222,22 +226,29 @@ def test_unconfirmed_speedup_keeps_baseline(fake, monkeypatch):
 def test_persistent_study_resumes_and_rejects_another_workload(fake, tmp_path):
     pytest.importorskip("optuna")
     storage = f"sqlite:///{tmp_path / 'study.db'}"
-    lattice = KernelLattice(electron_batch=(2048, 4096))
-    tune_kernels(_scene(), lattice, storage=storage)
+    space = KernelSearchSpace(electron_batch=(2048, 4096))
+    tune_kernels(_scene(), space, storage=storage)
     runs = len(fake)
-    resumed = tune_kernels(_scene(), lattice, storage=storage)
+    resumed = tune_kernels(_scene(), space, storage=storage)
     assert len(resumed.trials) == 2
     # Only the baseline and the confirmation pairs run again; no candidate.
     assert {t.transport.electron_batch for _, t in fake[runs:]} == {None, 4096}
     assert len(fake) - runs == 1 + 2 * 3
     with pytest.raises(ValueError, match="stored study differs"):
-        tune_kernels(_scene(), KernelLattice(electron_batch=(512,)), storage=storage)
+        tune_kernels(_scene(), KernelSearchSpace(electron_batch=(512,)), storage=storage)
 
 
 def test_rejects_non_cuda_baseline_and_bad_inputs():
     with pytest.raises(ValueError, match="CUDA transport core"):
-        tune_kernels(_scene(transport_core="lockstep"), KernelLattice(cxr_chunk=(256,)))
+        tune_kernels(_scene(transport_core="lockstep"), KernelSearchSpace(cxr_chunk=(256,)))
     with pytest.raises(TypeError, match="Scene"):
-        tune_kernels(object(), KernelLattice(cxr_chunk=(256,)))
+        tune_kernels(object(), KernelSearchSpace(cxr_chunk=(256,)))
     with pytest.raises(ValueError, match="rtol"):
-        tune_kernels(_scene(), KernelLattice(cxr_chunk=(256,)), rtol=-1)
+        tune_kernels(_scene(), KernelSearchSpace(cxr_chunk=(256,)), rtol=-1)
+
+
+def test_kernel_lattice_is_a_deprecated_alias():
+    import pyrite.optimization as opt
+
+    with pytest.warns(DeprecationWarning, match="KernelSearchSpace"):
+        assert opt.KernelLattice is KernelSearchSpace

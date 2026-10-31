@@ -64,6 +64,8 @@ class RadiationNumerics:
 TRANSPORT_SCHEDULES = ("full-history", "continuation", "auto")
 #: CUDA transport threads per block (mirrors ``TransportKernelConfig``).
 KERNEL_THREADS = (32, 64, 128, 256, 512, 1024)
+#: CXR reduction kernel variants (``cxr_jit_kernel._kernel_<k>e``).
+CXR_ENERGIES_PER_BLOCK = (1, 2, 3, 4)
 
 
 @dataclass(frozen=True)
@@ -121,12 +123,20 @@ class ExecutionConfig:
     **not** changed or presumed invariant in this compatibility slice.
     ``transport`` holds the experimental CUDA transport schedule
     (:class:`TransportKernelTuning`), which never enters case identity.
+    ``cxr_threads`` (32-1024, ``None``: 512) and ``cxr_energies_per_block``
+    (1-4, ``None``: 3) set the CUDA CXR line-reduction launch on the
+    node-quadrature route: threads per block and how many energy nodes one
+    block reduces (#825). They change summation grouping only (float
+    rounding), never case identity, and their best values depend on the scene
+    and GPU.
     """
 
     transport_core: str = "auto"
     cxr_chunk: int | None = None
     brem_chunk: int | None = None
     transport: TransportKernelTuning = field(default_factory=TransportKernelTuning)
+    cxr_threads: int | None = None
+    cxr_energies_per_block: int | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.transport_core, str) or not self.transport_core:
@@ -137,10 +147,24 @@ class ExecutionConfig:
                 raise ValueError(f"{name} must be a positive integer or None")
         if not isinstance(self.transport, TransportKernelTuning):
             raise TypeError("transport must be a TransportKernelTuning")
+        for name, allowed in (
+            ("cxr_threads", KERNEL_THREADS),
+            ("cxr_energies_per_block", CXR_ENERGIES_PER_BLOCK),
+        ):
+            value = getattr(self, name)
+            if value is not None and (type(value) is not int or value not in allowed):
+                raise ValueError(f"{name} must be one of {allowed} or None")
+
+    def spectrum_launch_default(self) -> bool:
+        """True when both CXR launch controls keep the built-in default."""
+        return self.cxr_threads is None and self.cxr_energies_per_block is None
 
     def __setstate__(self, state: dict[str, object]) -> None:
-        # Pickles from before #776 carry no ``transport`` entry.
+        # Pickles from before #776 carry no ``transport`` entry, before #825 no
+        # CXR launch controls.
         state.setdefault("transport", TransportKernelTuning())
+        state.setdefault("cxr_threads", None)
+        state.setdefault("cxr_energies_per_block", None)
         self.__dict__.update(state)
 
 

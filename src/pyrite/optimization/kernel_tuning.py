@@ -42,20 +42,21 @@ _PHASE_DIMENSIONS = {
         "scratch_mib",
         "kernel_threads",
     ),
-    "spectrum": ("cxr_chunk", "brem_chunk"),
+    "spectrum": ("cxr_chunk", "brem_chunk", "cxr_threads", "cxr_energies_per_block"),
 }
 _DIMENSIONS = _PHASE_DIMENSIONS["transport"] + _PHASE_DIMENSIONS["spectrum"]
 Phase = Literal["transport", "spectrum", "total"]
 
 
 @dataclass(frozen=True)
-class KernelLattice:
+class KernelSearchSpace:
     """Candidate values per execution control; an empty tuple keeps the scene's value.
 
     ``electron_batch``, ``schedule``, ``continuation_rows``, ``scratch_mib``
     and ``kernel_threads`` set :class:`~pyrite.config.TransportKernelTuning`
     (the transport phase);
-    ``cxr_chunk`` and ``brem_chunk`` set the spectrum segment chunks (the
+    ``cxr_chunk``, ``brem_chunk``, ``cxr_threads`` and ``cxr_energies_per_block``
+    set the spectrum segment chunks and CXR reduction launch (the
     spectrum phase). ``None`` in a tuple selects the process default.
     Combinations the config rejects (a row quantum with full-history) are
     never run.
@@ -68,6 +69,8 @@ class KernelLattice:
     continuation_rows: tuple[int | None, ...] = ()
     scratch_mib: tuple[int | None, ...] = ()
     kernel_threads: tuple[int | None, ...] = ()
+    cxr_threads: tuple[int | None, ...] = ()
+    cxr_energies_per_block: tuple[int | None, ...] = ()
 
     def __post_init__(self) -> None:
         for name in _DIMENSIONS:
@@ -75,7 +78,7 @@ class KernelLattice:
             if not isinstance(values, tuple) or len(set(values)) != len(values):
                 raise ValueError(f"{name} must be a tuple of distinct values")
         if not any(getattr(self, name) for name in _DIMENSIONS):
-            raise ValueError("KernelLattice needs at least one tuned dimension")
+            raise ValueError("KernelSearchSpace needs at least one tuned dimension")
 
     def candidate(self, base: Any, choice: dict[str, Any]) -> Any:
         """``base`` KernelTuning with ``choice`` applied; raises if inconsistent."""
@@ -91,7 +94,7 @@ class KernelLattice:
         return tuple(name for name in names if getattr(self, name))
 
     def choices(self, base: Any, phase: Phase) -> list[dict[str, Any]]:
-        """Every valid combination of ``phase``'s dimensions, in lattice order."""
+        """Every valid combination of ``phase``'s dimensions, in search-space order."""
         names = self.dimensions(phase)
         valid = []
         for values in itertools.product(*(getattr(self, name) for name in names)):
@@ -320,7 +323,7 @@ def _mismatch(check: dict[str, Any], reference: dict[str, Any], rtol: float, ato
     return _equivalent(Path(check["spectra"]), Path(reference["spectra"]), rtol=rtol, atol=atol)
 
 
-def _study_identity(scene, base, lattice, phase, protocol, environment) -> str:
+def _study_identity(scene, base, space, phase, protocol, environment) -> str:
     from ..campaign.lowering import build_case
     from ..campaign.profiles import case_content_key
 
@@ -329,7 +332,8 @@ def _study_identity(scene, base, lattice, phase, protocol, environment) -> str:
         "phase": phase,
         "case": case_content_key(build_case(scene)),
         "baseline": asdict(base),
-        "lattice": {name: getattr(lattice, name) for name in lattice.dimensions(phase)},
+        # Key kept as "lattice" so studies stored before the #825 rename still resume.
+        "lattice": {name: getattr(space, name) for name in space.dimensions(phase)},
         "protocol": protocol,
         "environment": environment,
     }
@@ -341,7 +345,7 @@ class _PhaseRun:
     """State one phase study shares between its Optuna objective and summary."""
 
     phase: Phase
-    lattice: KernelLattice
+    space: KernelSearchSpace
     base: Any
     measure: Callable[..., tuple[list[float], dict[str, Any]]]
     report: Callable[..., None]
@@ -352,11 +356,11 @@ class _PhaseRun:
 
     def objective(self, trial: Any, optuna: Any, study: Any, total: int) -> float:
         choice = {
-            name: trial.suggest_categorical(name, list(getattr(self.lattice, name)))
-            for name in self.lattice.dimensions(self.phase)
+            name: trial.suggest_categorical(name, list(getattr(self.space, name)))
+            for name in self.space.dimensions(self.phase)
         }
         try:
-            tuning = self.lattice.candidate(self.base, choice)
+            tuning = self.space.candidate(self.base, choice)
         except ValueError as exc:
             return self._reject(trial, optuna, f"invalid combination: {exc}")
         trial.set_user_attr("tuning", asdict(tuning))
@@ -392,7 +396,7 @@ class _PhaseRun:
 
 def tune_kernels(
     scene: Any,
-    lattice: KernelLattice,
+    space: KernelSearchSpace,
     *,
     trials: int | None = None,
     warmups: int = 1,
@@ -408,10 +412,10 @@ def tune_kernels(
     isolate: Literal["phase", "candidate"] = "phase",
     on_progress: Callable[[TuningProgress], None] | None = None,
 ) -> KernelTuningResult:
-    """Tune ``scene``'s CUDA execution controls over ``lattice`` with Optuna.
+    """Tune ``scene``'s CUDA execution controls over ``space`` with Optuna.
 
     The baseline is the scene's own ``numerics.kernel_tuning`` with
-    ``transport_core="cuda"``; every candidate changes only ``lattice``
+    ``transport_core="cuda"``; every candidate changes only ``space``
     dimensions.
 
     With ``objective="phases"`` (default) the transport and spectrum
@@ -421,7 +425,7 @@ def tune_kernels(
     :func:`~pyrite.phases.score_spectra` on one kept baseline transport, and
     their spectra must match the baseline's within ``rtol``/``atol``. Each
     phase searches only its own dimensions, so the work is the sum of the two
-    lattices, not their product, and ``best`` joins both winners.
+    search spaces, not their product, and ``best`` joins both winners.
     ``objective="total"`` instead times whole :func:`pyrite.simulate` calls
     over every dimension jointly.
 
@@ -440,12 +444,12 @@ def tune_kernels(
     candidate, as cold as a new run but much slower. ``on_progress`` receives
     :class:`TuningProgress` per candidate and, while one runs, per transport
     batch and spectrum stage. ``trials`` counts across resumes of a persistent
-    ``storage`` study, which refuses a different workload, lattice or device.
+    ``storage`` study, which refuses a different workload, space or device.
 
     Requires the ``optimization`` extra and a CUDA device.
     """
     base = _checked_baseline(
-        scene, lattice, trials, warmups, repeats, timeout, objective, isolate, rtol, atol,
+        scene, space, trials, warmups, repeats, timeout, objective, isolate, rtol, atol,
         min_speedup,
     )  # fmt: skip
     try:
@@ -456,7 +460,7 @@ def tune_kernels(
     phases: tuple[Phase, ...] = (
         ("total",)
         if objective == "total"
-        else tuple(p for p in ("transport", "spectrum") if lattice.dimensions(p))
+        else tuple(p for p in ("transport", "spectrum") if space.dimensions(p))
     )
     protocol = [warmups, repeats, rtol, atol, min_speedup, isolate]
     with tempfile.TemporaryDirectory(prefix="pyrite-kernel-tuning-") as tmp:
@@ -474,7 +478,7 @@ def tune_kernels(
                 tuner.run_phase(
                     phase,
                     scene,
-                    lattice,
+                    space,
                     base,
                     optuna,
                     trials=trials,
@@ -498,15 +502,15 @@ def tune_kernels(
 
 
 def _checked_baseline(
-    scene, lattice, trials, warmups, repeats, timeout, objective, isolate, rtol, atol, min_speedup
+    scene, space, trials, warmups, repeats, timeout, objective, isolate, rtol, atol, min_speedup
 ) -> Any:
     """Validate ``tune_kernels`` arguments; the scene's tuning on the CUDA core."""
     from ..campaign.model import Scene
 
     if not isinstance(scene, Scene):
         raise TypeError("scene must be a pyrite.Scene")
-    if not isinstance(lattice, KernelLattice):
-        raise TypeError("lattice must be a KernelLattice")
+    if not isinstance(space, KernelSearchSpace):
+        raise TypeError("space must be a KernelSearchSpace")
     if (trials is not None and trials < 1) or warmups < 0 or repeats < 1 or timeout <= 0:
         raise ValueError("trials and repeats must be positive, warmups non-negative")
     if objective not in ("phases", "total") or isolate not in ("phase", "candidate"):
@@ -570,17 +574,17 @@ class _Tuner:
         self._worker.close()
 
     def run_phase(
-        self, phase, scene, lattice, base, optuna, *, trials, seed, rtol, atol, repeats,
+        self, phase, scene, space, base, optuna, *, trials, seed, rtol, atol, repeats,
         min_speedup, storage, study_name, protocol,
     ) -> KernelPhaseResult:  # fmt: skip
-        valid = lattice.choices(base, phase)
+        valid = space.choices(base, phase)
         exhaustive = trials is None or trials >= len(valid)
         total = len(valid) if exhaustive else int(trials)
         self.report(phase, 0, total, "running")
         samples, reference = self.measure(phase, base, f"{phase}-baseline", 0, total)
         baseline = KernelTrial(-1, base, "complete", statistics.median(samples), tuple(samples))
         self.report(phase, 0, total, "baseline")
-        identity = _study_identity(scene, base, lattice, phase, protocol, self.environment)
+        identity = _study_identity(scene, base, space, phase, protocol, self.environment)
         # Exhaustive studies enqueue every valid combination; TPE otherwise.
         sampler = optuna.samplers.TPESampler(seed=seed)
         study = optuna.create_study(
@@ -592,7 +596,7 @@ class _Tuner:
         )
         stored = study.user_attrs.get(_SCHEMA)
         if stored not in (None, identity) or (stored is None and study.trials):
-            raise ValueError("stored study differs in workload, lattice, protocol or device")
+            raise ValueError("stored study differs in workload, space, protocol or device")
         study.set_user_attr(_SCHEMA, identity)
         if exhaustive:
             done = {json.dumps(t.params, sort_keys=True) for t in study.trials}
@@ -604,7 +608,7 @@ class _Tuner:
             remaining = max(0, total - len(study.trials))
         run = _PhaseRun(
             phase,
-            lattice,
+            space,
             base,
             self.measure,
             self.report,

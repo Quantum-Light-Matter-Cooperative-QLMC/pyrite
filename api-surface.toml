@@ -474,7 +474,7 @@ ParameterSpace = { target = "pyrite.optimization.space:ParameterSpace", status =
 Objective = { target = "pyrite.optimization.study:Objective", status = "experimental" }
 Constraint = { target = "pyrite.optimization.study:Constraint", status = "experimental" }
 OptunaOptimizer = { target = "pyrite.optimization.optuna_adapter:OptunaOptimizer", status = "experimental" }
-KernelLattice = { target = "pyrite.optimization.kernel_tuning:KernelLattice", status = "experimental" }
+KernelSearchSpace = { target = "pyrite.optimization.kernel_tuning:KernelSearchSpace", status = "experimental" }
 KernelTrial = { target = "pyrite.optimization.kernel_tuning:KernelTrial", status = "experimental" }
 KernelTuningResult = { target = "pyrite.optimization.kernel_tuning:KernelTuningResult", status = "experimental" }
 tune_kernels = { target = "pyrite.optimization.kernel_tuning:tune_kernels", status = "experimental" }

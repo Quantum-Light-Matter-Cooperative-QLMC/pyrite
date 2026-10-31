@@ -169,3 +169,49 @@ def test_batch_executors_reject_a_per_call_schedule():
             numerics=scene.numerics,
             executor=LocalExecutor(),
         )
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "match"),
+    [
+        ({"cxr_threads": 48}, "cxr_threads must be one of"),
+        ({"cxr_energies_per_block": 5}, "cxr_energies_per_block must be one of"),
+        ({"cxr_energies_per_block": True}, "cxr_energies_per_block must be one of"),
+    ],
+)
+def test_invalid_cxr_launch_is_rejected(kwargs, match):
+    with pytest.raises(ValueError, match=match):
+        cfg.KernelTuning(**kwargs)
+
+
+def test_cxr_launch_lowers_onto_the_reduction_config():
+    from pyrite.montecarlo.runner.transport_options import (
+        spectrum_launch,
+        spectrum_launch_overrides,
+    )
+
+    assert spectrum_launch_overrides() == {}
+    tuned = cfg.KernelTuning(cxr_energies_per_block=4)
+    with transport_tuning(pr.Numerics(execution=tuned)):
+        assert spectrum_launch_overrides() == {"energies_per_block": 4}
+        assert _TRANSPORT_TUNING.get() is None  # transport untouched
+    with spectrum_launch(cfg.KernelTuning(cxr_threads=256)):
+        assert spectrum_launch_overrides() == {"nthreads": 256}
+    assert spectrum_launch_overrides() == {}
+    old = pickle.loads(pickle.dumps(cfg.KernelTuning()))
+    old.__dict__.pop("cxr_threads")
+    old.__setstate__(dict(old.__dict__))
+    assert old.cxr_threads is None
+
+
+def test_cxr_launch_stays_out_of_case_identity_and_batch_executors():
+    plain, tuned = _scene(), _scene(pr.Numerics(execution=cfg.KernelTuning(cxr_threads=256)))
+    assert case_content_key(build_case(plain)) == case_content_key(build_case(tuned))
+    with pytest.raises(ValueError, match="default KernelTuning CXR launch"):
+        pr.simulate(
+            tuned.beam,
+            tuned.target,
+            tuned.detector,
+            numerics=tuned.numerics,
+            executor=LocalExecutor(),
+        )

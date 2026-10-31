@@ -5,8 +5,8 @@ explicitly requested. No change to existing sweeping or execution defaults.
 """
 
 from .kernel_tuning import (
-    KernelLattice,
     KernelPhaseResult,
+    KernelSearchSpace,
     KernelTrial,
     KernelTuningResult,
     TuningProgress,
@@ -33,7 +33,7 @@ __all__ = [
     "Integer",
     "ParameterSpace",
     "FixedWindowYield",
-    "KernelLattice",
+    "KernelSearchSpace",
     "KernelPhaseResult",
     "KernelTrial",
     "KernelTuningResult",
@@ -51,3 +51,18 @@ __all__ = [
     "TuningProgress",
     "tune_kernels",
 ]
+
+
+def __getattr__(name: str):
+    # ``KernelLattice`` was renamed to ``KernelSearchSpace`` (#825); experimental
+    # API, kept as a warning alias for migration.
+    if name == "KernelLattice":
+        import warnings
+
+        warnings.warn(
+            "pyrite.optimization.KernelLattice is renamed KernelSearchSpace",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return KernelSearchSpace
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

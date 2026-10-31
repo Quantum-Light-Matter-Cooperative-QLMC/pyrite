@@ -39,7 +39,7 @@ parameters, and is separate from `OptimizationStudy`. See
    :nosignatures:
 
    pyrite.optimization.tune_kernels
-   pyrite.optimization.KernelLattice
+   pyrite.optimization.KernelSearchSpace
    pyrite.optimization.KernelTrial
    pyrite.optimization.KernelTuningResult
    pyrite.optimization.KernelPhaseResult

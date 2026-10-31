@@ -12,6 +12,15 @@ from ..case import refuse_axial_channeling, refuse_channeling, refuse_transition
 # Like the progress sink, it keeps case payloads and call shapes unchanged, so
 # these controls stay out of case identity; it never reaches pool workers.
 _TRANSPORT_TUNING: ContextVar[Any] = ContextVar("pyrite_transport_tuning", default=None)
+# KernelTuning CXR launch override (#825): ``SpectrumKernelConfig`` field overrides
+# read by the batched line reduction; same scope and identity rules as the
+# transport override.
+_SPECTRUM_LAUNCH: ContextVar[Any] = ContextVar("pyrite_spectrum_launch", default=None)
+
+
+def spectrum_launch_overrides() -> dict[str, int]:
+    """Active ``SpectrumKernelConfig`` field overrides (empty: built-in launch)."""
+    return dict(_SPECTRUM_LAUNCH.get() or {})
 
 
 def tuned_transport_kwargs():
@@ -57,14 +66,46 @@ def transport_tuning(numerics):
     (``PYRITE_MC_TRANSPORT_SCHEDULE``, ``PYRITE_MC_ELECTRON_BATCH_MAX``).
     """
     tuning = transport_kernel_tuning(numerics)
-    if tuning is None or tuning == type(tuning)():
+    launch = _spectrum_launch(getattr(numerics, "resolved_execution", None))
+    transport = None if tuning is None or tuning == type(tuning)() else per_electron_config(tuning)
+    if transport is None and launch is None:
         yield
         return
-    token = _TRANSPORT_TUNING.set(per_electron_config(tuning))
+    tokens = [
+        (var, var.set(value))
+        for var, value in ((_TRANSPORT_TUNING, transport), (_SPECTRUM_LAUNCH, launch))
+        if value is not None
+    ]
     try:
         yield
     finally:
-        _TRANSPORT_TUNING.reset(token)
+        for var, token in reversed(tokens):
+            var.reset(token)
+
+
+@contextmanager
+def spectrum_launch(execution):
+    """Apply ``execution``'s CXR launch controls alone (spectrum-only rescoring)."""
+    launch = _spectrum_launch(execution)
+    if launch is None:
+        yield
+        return
+    token = _SPECTRUM_LAUNCH.set(launch)
+    try:
+        yield
+    finally:
+        _SPECTRUM_LAUNCH.reset(token)
+
+
+def _spectrum_launch(execution):
+    """``SpectrumKernelConfig`` overrides for ``execution``'s CXR launch, if any."""
+    if execution is None or execution.spectrum_launch_default():
+        return None
+    fields = (
+        ("nthreads", execution.cxr_threads),
+        ("energies_per_block", execution.cxr_energies_per_block),
+    )
+    return {name: value for name, value in fields if value is not None}
 
 
 def _beam_kwargs(case):

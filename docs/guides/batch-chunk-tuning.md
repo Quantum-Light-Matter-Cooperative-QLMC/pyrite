@@ -10,17 +10,20 @@ optimization variable. The tuner uses Optuna directly, separately from
 `pyrite.optimization.tune_kernels` tunes any subset of the transport
 `electron_batch`, continuation `schedule` and `continuation_rows`, device
 scratch budget `scratch_mib` and launch `kernel_threads`, and the
-spectral `cxr_chunk`/`brem_chunk`, and returns a `KernelTuning` to apply
-through ordinary `Numerics`:
+spectral `cxr_chunk`/`brem_chunk` and CXR line-reduction launch
+(`cxr_threads`, `cxr_energies_per_block`), and returns a `KernelTuning` to
+apply through ordinary `Numerics`. `KernelSearchSpace` holds the candidate
+values per control (named `KernelLattice` through 0.24.1; the old name
+still resolves with a `DeprecationWarning`):
 
 <!-- verify: skip (requires a CUDA device and the optimization extra) -->
 ```python
 import pyrite as pr
-from pyrite.optimization import KernelLattice, tune_kernels
+from pyrite.optimization import KernelSearchSpace, tune_kernels
 
 result = tune_kernels(
     scene,  # a pr.Scene whose numerics leave transport_core="auto"
-    KernelLattice(
+    KernelSearchSpace(
         electron_batch=(None, 4096, 16384),
         schedule=("full-history", "continuation"),
         continuation_rows=(None, 128, 512),
@@ -28,6 +31,7 @@ result = tune_kernels(
         kernel_threads=(None, 32, 64),
         cxr_chunk=(None, 8192, 32768),
         brem_chunk=(None, 1024),
+        cxr_energies_per_block=(None, 4),
     ),
     storage="sqlite:///kernel-tuning.sqlite3",
 )
@@ -43,9 +47,14 @@ rescore one kept baseline transport ({func}`pyrite.phases.score_spectra`):
 no transport is repeated, and their spectral grids must equal the baseline's
 and densities agree within `rtol`/`atol`. Transport controls do not change
 the transport, so neither study depends on the other's winner; the searches
-cost the sum of the two lattices, not their product. `result.best` joins
+cost the sum of the two search spaces, not their product. `result.best` joins
 both winners. `result.transport` and `result.spectrum` keep every trial,
-its timings and any rejection reason. `objective="total"` instead times
+its timings and any rejection reason. `scratch_mib` sets how many histories
+share a transport launch (below the `electron_batch` cap) and
+`kernel_threads` the transport launch's threads per block; `cxr_threads` and
+`cxr_energies_per_block` select the CXR reduction launch and kernel variant
+on the node-quadrature line route. Their best values depend on the scene and
+GPU, so tune them per workload and device rather than copying them across. `objective="total"` instead times
 whole `simulate` calls over all dimensions jointly.
 
 The baseline is the scene's own `KernelTuning` on the CUDA core. By default
@@ -65,7 +74,7 @@ per candidate, which is colder and much slower. `on_progress` receives a
 `TuningProgress` per candidate and, while one runs, each transport batch and
 spectrum stage. The `environment` field records GPU, driver, CUDA/CuPy
 versions and precision; winners do not transfer between devices. Persistent
-studies refuse to resume with a different workload, lattice, protocol or
+studies refuse to resume with a different workload, space, protocol or
 device.
 
 ## Run the phases yourself
@@ -137,7 +146,7 @@ The baseline is `(electron_batch=1024, cxr_chunk=1024)` unless changed using
 The study's database remembers every trial. `--trials` means **total** trials;
 raising it continues the study without repeating completed candidates. Study
 identity includes the workload file content, GPU name, precision, candidate
-lattices, reference, tolerances and PyRITE version; changes require a new study
+search spaces, reference, tolerances and PyRITE version; changes require a new study
 name or SQLite database. Only run one tuning coordinator per SQLite study.
 
 Afterward apply the suggested values to a **new** PyRITE process:
