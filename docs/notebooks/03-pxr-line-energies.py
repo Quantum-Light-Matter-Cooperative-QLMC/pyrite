@@ -15,7 +15,7 @@ __generated_with = "0.25.2"
 app = marimo.App(width="medium")
 
 
-@app.cell(hide_code=False)
+@app.cell
 def _():
     import os
 
@@ -56,9 +56,9 @@ def _():
 @app.cell
 def _(mo):
     # Live in Molab or a local marimo session; the static page shows the defaults.
-    energy_keV = mo.ui.slider(10, 200, step=5, value=30, label="Electron energy (keV)")
-    tilt_deg = mo.ui.slider(0, 75, step=5, value=30, label="Sample tilt (°)")
-    observation_deg = mo.ui.slider(30, 160, step=5, value=135, label="Observation angle (°)")
+    energy_keV = mo.ui.slider(30, 1000, step=10, value=30, label="Electron energy (keV)")
+    tilt_deg = mo.ui.slider(0, 89, step=5, value=30, label="Sample tilt (°)")
+    observation_deg = mo.ui.slider(5, 180, step=5, value=135, label="Observation angle (°)")
     reflection = mo.ui.dropdown(
         {"(002)": (0, 0, 2), "(004)": (0, 0, 4), "(006)": (0, 0, 6)},
         value="(002)",
@@ -69,11 +69,19 @@ def _(mo):
 
 
 @app.cell
-def _(catalog, energy_keV, np, observation_deg, photon_energies, reflection, tilt_deg):
+def _(
+    catalog,
+    energy_keV,
+    np,
+    observation_deg,
+    photon_energies,
+    reflection,
+    tilt_deg,
+):
     from pyrite.units import ureg
 
-    angles_deg = np.linspace(30, 160, 131)
-    reference_keV = np.array([60.0, 100.0, 200.0])
+    angles_deg = np.linspace(5, 175, 171)
+    reference_keV = np.array([30.0, 100.0, 200.0, 1_000.0, 30_000.0])
     # The analytic API takes numeric eV/degree magnitudes, not Pint objects.
     beam_energies_eV = (np.r_[reference_keV, energy_keV.value] * ureg.keV).to("eV").magnitude
     lines_eV = photon_energies(
@@ -127,6 +135,7 @@ def _(
         xlabel="Lab observation angle (°)",
         ylabel="Vacuum line energy (keV)",
         title=f"HOPG {reflection.selected_key}, sample tilt {tilt_deg.value:g}°",
+        yscale="log"
     )
     axis.grid(alpha=0.25)
     axis.legend(title="Electron energy", fontsize=8)
@@ -139,7 +148,8 @@ def _(mo):
     mo.md(r"""
     ## Interpretation
 
-    These are **vacuum line centers**, not intensities or counts. Faster
+    Shallower observation angles (near the beam axis) see the highest
+    energy photons. Faster
     electrons raise every line, most strongly near forward observation, because
     the resonance energy scales as $\mathbf v\cdot\mathbf g/(1-\hat{\mathbf n}\cdot\mathbf v)$.
     Tilting the sample rotates $\mathbf g$ relative to the beam and slides the
@@ -147,8 +157,8 @@ def _(mo):
     integer multiples of the (002) energy.
 
     The model assumes straight electrons at their entrance energy and an ideal
-    lattice; it excludes transport, mosaic spread, in-medium dispersion and
-    response. A kinematically allowed line need not have measurable intensity.
+    lattice; it excludes transport, mosaic spread, and in-medium dispersion.
+
     Compare the selected point with notebook 01's spectrum, then see the
     [physics and validation](https://pyrite.readthedocs.io/en/latest/physics/index.html)
     documentation.

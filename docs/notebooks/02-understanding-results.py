@@ -15,7 +15,7 @@ __generated_with = "0.25.2"
 app = marimo.App(width="medium")
 
 
-@app.cell(hide_code=False)
+@app.cell
 def _():
     import os
 
@@ -30,7 +30,7 @@ def _():
     _ = pyrite.fetch_tables()  # Fetch missing pinned tables once; reuse installed data.
 
     tables_ready = True
-    return mo, np, plt, pyrite, tables_ready
+    return mo, np, plt, tables_ready
 
 
 @app.cell(hide_code=True)
@@ -118,7 +118,7 @@ def _(plt, result):
     ax_source.set(
         xlabel="Photon energy (keV)",
         ylabel="Photons / (incident electron · eV · sr)",
-        title="Response-free source components on native grids",
+        title="Raw source components on native grids",
         xlim=(0.3, 3.7),
         yscale="log",
     )
@@ -140,12 +140,12 @@ def _(mo):
 
     `units` chooses the normalization of **every component and `total`**:
 
-    | `units=` | Spectral values | Scaling from `"electron"` |
-    | --- | --- | --- |
-    | `"electron"` | photons / (incident electron · eV · sr) | None |
-    | `"sr"` | photons / (s · eV · sr) | Multiply by physical electrons / s |
-    | `"detector"` (default) | photons / (s · eV) into acceptance | Also multiply by accepted sr |
-    | `"nA"` | photons / (s · nA · eV) into acceptance | Accepted rate per 1 nA of current |
+    | `units=`               | Spectral values                         | Scaling from `"electron"`          |
+    | ---------------------- | --------------------------------------- | ---------------------------------- |
+    | `"electron"`           | photons / (incident electron · eV · sr) | None                               |
+    | `"sr"`                 | photons / (s · eV · sr)                 | Multiply by physical electrons / s |
+    | `"detector"` (default) | photons / (s · eV) into acceptance      | Also multiply by accepted sr       |
+    | `"nA"`                 | photons / (s · nA · eV) into acceptance | Accepted rate per 1 nA of current  |
 
     The energy columns remain in eV and keV; selecting `photon_energy_keV`
     does **not** change a density from per eV to per keV (that needs ×1,000).
@@ -200,13 +200,7 @@ def _(beam, cxr, into_acceptance, np, per_sr, result):
     acceptance_sr = result.accepted_solid_angle_sr()
     assert np.isclose(cxr_rate_sr, cxr_yield_per_electron_sr * electrons_per_second, rtol=1e-10)
     assert np.array_equal(into_acceptance.get_column("photon_energy_eV").to_numpy(), flux_sr_grid)
-    return (
-        acceptance_sr,
-        band_eV,
-        current_nA,
-        cxr_rate_sr,
-        cxr_yield_per_electron_sr,
-    )
+    return
 
 
 @app.cell(hide_code=True)
@@ -250,7 +244,7 @@ def _(mo):
     rate, and `"detector"` also multiplies by accepted solid angle.
 
     The **600–2,000 eV** band integral uses CXR only; the photon-rate plot
-    includes all computed components. These are *expected source rates*,
+    includes all computed components. These are _expected source rates_,
     not measured counts: no exposure, efficiency or Poisson noise is applied.
     The scalar acceptance assumes locally uniform angular density.
 

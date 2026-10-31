@@ -37,16 +37,28 @@ def _(mo):
     mo.md(r"""
     # Electron trajectories: where X-rays come from
 
-    Before calculating a spectrum, PyRITE follows sampled _electron histories_
-    through the target. Each straight flight, or _segment_, has a position,
-    direction, path length and changing kinetic energy. Elastic scattering
-    changes the next flight's direction, while the material's _stopping power_
-    reduces the energy as the electron moves.
+    Before calculating a spectrum, PyRITE follows sampled electron histories
+    through the target. Each straight electron's straight flight _segments_
+    between scattering events has a defined position, direction, path length
+    and changing kinetic energy. Elastic scattering changes the next flight's
+    direction, while the material's _stopping power_ reduces the energy as
+    the electron moves.
 
-    Here **16,384 sampled 30 keV electrons** enter a **4 µm HOPG slab** normally.
-    We use a point beam, an infinite lateral slab and the lightweight analytic
-    screened-Rutherford elastic model (`"sr"`) to keep the example CPU-friendly.
-    Production calculations may instead use the tabulated ELSEPA model.
+    Depending on the simulation mode, this stopping
+    power is either treated as purely `continuous` (the "Continuously
+    Slowing Down Approximation", or CSDA), or, if `shell-soft-hard` is enabled,
+    the inelastic collisions are split between continuous low-energy stopping,
+    while above some cutoff, discrete inelastic events are sampled directly
+    via inelastic scattering cross sections from _BremsLib_. In this case,
+    discrete inelastic events case electrons to both lose energy and change
+    direction.
+
+    Here **16,384 sampled 30 keV electrons** enter a **4 µm HOPG slab** at
+    normal incidence. We use a point beam, an infinite lateral slab and the
+    lightweight analytic screened-Rutherford elastic model (`"sr"`) to keep
+    the example CPU-friendly. Production calculations may instead use the
+    tabulated ELSEPA model, which is more accurate, especially at higher
+    energies.
 
     This is the _transport_ part of a simulation, so no spectral calculations
     are conducted yet. The fixed `seed = 1` makes runs repeatable, but only
@@ -70,6 +82,7 @@ def _(tables_ready):
         thickness_ang=(thickness_nm * ureg.nm).to("angstrom").magnitude,
         composition=[("C", 0.11363677327755675)],  # HOPG carbon atoms / Å³
         elastic_model="sr",
+        inelastic_model="continuous",
         transport_core="lockstep",
         energy_model="midpoint",
         E_cut_keV=(5 * ureg.keV).magnitude,
@@ -208,19 +221,10 @@ def _(mo):
     mo.md(r"""
     ## Depth, energy and exit outcomes
 
-    To avoid confusing the **number of saved segments** with the electron
-    population, we use the final `event_kind` of each primary history for its
-    fate. `EXIT_TOP=4` means backscattered, `EXIT_BOTTOM=5` transmitted,
-    `EXIT_SIDE=6` escaped laterally, and `CUTOFF=7` stopped at the 5 keV
-    tracking threshold. The exit-energy histogram includes only escaped
-    primaries; cutoff-stopped histories are counted in the fate plot instead.
-
-    The depth profile attributes the continuous loss
-    `E_start_keV - E_end_keV` across the depth span of each straight segment,
-    then divides by the number of **incident sampled electrons** and bin
-    width. This is a **continuous energy-loss profile**, _not_ a PXR,
-    bremsstrahlung, photon-emission or absorbed-dose profile. An electron can
-    traverse the same depth bin more than once after scattering.
+    We can see each individual electron's fate via the final `event_kind`
+    of each primary history. `EXIT_TOP=4` means backscattered,
+    `EXIT_BOTTOM=5` transmitted, `EXIT_SIDE=6` escaped laterally, and
+    `CUTOFF=7` stopped at the 5 keV tracking threshold.
     """)
     return
 
@@ -331,6 +335,20 @@ def _(
     axes[2].tick_params(axis="x", labelrotation=35)
     fig_summary.suptitle(f"30 keV HOPG · N={histories} histories · seed={seed}")
     fig_summary  # noqa: B018 - display the figure in marimo
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Measuring energy loss and outcomes
+
+    The depth profile attributes the continuous loss `E_start_keV - E_end_keV`
+    across the depth span of each straight segment,
+    then divides by the number of **incident sampled electrons** and bin
+    width. This is a **continuous energy-loss profile**. An electron can
+    traverse the same depth bin more than once after scattering.
+    """)
     return
 
 
