@@ -32,6 +32,27 @@ The entries below use generated docstrings, signatures, and source links. API su
    pyrite.detectors.grating.SimpleCCD
    pyrite.detectors.grating.disperse_spectrum
    pyrite.detectors.grating.detected_image
+   pyrite.detectors.quantities.detector_efficiency_q
+   pyrite.detectors.quantities.convolve_detector_q
+   pyrite.detectors.quantities.grating_q
+   pyrite.detectors.quantities.grating_parameters
+   pyrite.detectors.quantities.ccd_q
+   pyrite.detectors.quantities.ccd_parameters
+   pyrite.detectors.quantities.wavelength_q
+   pyrite.detectors.quantities.groove_spacing_q
+   pyrite.detectors.quantities.diffraction_angle_q
+   pyrite.detectors.quantities.angular_dispersion_q
+   pyrite.detectors.quantities.grating_throughput_q
+   pyrite.detectors.quantities.grating_reflectivity_q
+   pyrite.detectors.quantities.detector_position_q
+   pyrite.detectors.quantities.resolving_power_q
+   pyrite.detectors.quantities.disperse_spectrum_q
+   pyrite.detectors.quantities.bin_to_pixels_q
+   pyrite.detectors.quantities.detected_image_q
+   pyrite.detectors.quantities.coating_number_density_q
+   pyrite.detectors.quantities.qe_absorption_q
+   pyrite.detectors.quantities.charge_cloud_sigma_q
+   pyrite.detectors.quantities.energy_fwhm_q
    pyrite.detectors.NativeBinnedResponse
 ```
 
