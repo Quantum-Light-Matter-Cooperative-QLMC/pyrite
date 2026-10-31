@@ -22,7 +22,7 @@ from numba import njit, prange
 # Device bytes of one run-table row: int32 round, int64 dest/source/length.
 RUN_BYTES = 4 + 3 * 8
 # Pinned ring: two chunks, so one D2H overlaps the previous chunk's host copy.
-CHUNK_BYTES = 32 << 20
+CHUNK_BYTES = 8 << 20
 _WARP = 32
 _THREADS = 256
 
