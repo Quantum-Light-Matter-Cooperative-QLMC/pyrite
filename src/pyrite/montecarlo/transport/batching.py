@@ -233,6 +233,9 @@ class PerElectronTransportConfig:
     ``scratch_budget_bytes`` only sets how many electrons share one launch.
     Both exist because the CUDA path materializes a dense ``(batch, capacity)``
     scratch grid, and that grid must fit in VRAM alongside the case's tables.
+    The budget counts every column the enabled schema allocates
+    (:func:`_scratch_row_bytes`); a history whose capacity alone exceeds it runs
+    in a single-history batch with a logged warning.
 
     ``seg_capacity`` is only the *initial* guess, and the driver stops trusting it
     as soon as it has a measurement. The cores report the true segment count even
@@ -375,14 +378,60 @@ def resolve_transport_core(requested, Ne, groove=None):
     return "cuda" if _cuda_transport_available() else "lockstep"
 
 
-# float64 mid(3) + dir(3) + len + E + t0 = 9, int64 id, int16 layer.
+# Frozen schema only: float64 mid(3) + dir(3) + len + E + t0 = 9, int64 id,
+# int16 layer. Wider schemas are costed by :func:`_scratch_row_bytes`.
 _SEG_SCRATCH_BYTES = 9 * 8 + 8 + 2
+# Per-electron int64 segment count and int8 exit code allocated with each batch.
+_ELECTRON_STATUS_BYTES = 8 + 1
 
 
-def _batch_size(cap, config):
-    per_electron = cap * _SEG_SCRATCH_BYTES
-    n = int(config.scratch_budget_bytes // max(per_electron, 1))
+# Midpoint flight end state: float64 E_end, t_end; int64 flight, substep; int8 event.
+_MIDPOINT_END_BYTES = 8 + 8 + 8 + 8 + 1
+# One hard-event pair (float64 value, int16 code); secondary directions are float64(3).
+_HARD_PAIR_BYTES = 8 + 2
+_SECONDARY_DIR_BYTES = 3 * 8
+
+
+def _scratch_row_bytes(midpoint=False, inelastic=False, radiative=False, secondaries=None):
+    """Bytes of one scratch slot across the enabled schema's columns (#611).
+
+    Mirrors :func:`_alloc_batch_scratch` column for column (tests compare it
+    with allocated ``nbytes``): 82 bytes frozen, 125 midpoint with coupled
+    photons, plus hard-inelastic and secondary-direction columns when enabled.
+    """
+    row = _SEG_SCRATCH_BYTES + (_MIDPOINT_END_BYTES if midpoint else 0)
+    if inelastic:
+        row += _HARD_PAIR_BYTES + (_SECONDARY_DIR_BYTES if secondaries else 0)
+    if radiative:
+        row += _HARD_PAIR_BYTES
+    return row
+
+
+def _batch_size(cap, config, row_bytes=_SEG_SCRATCH_BYTES):
+    """Electrons whose ``(batch, cap)`` scratch grid fits ``scratch_budget_bytes``.
+
+    Always at least one: a single history must run whatever its capacity, so
+    the caller reports when even one exceeds the budget (:func:`_warn_over_budget`).
+    """
+    per_electron = cap * int(row_bytes) + _ELECTRON_STATUS_BYTES
+    n = int(config.scratch_budget_bytes // per_electron)
     return max(1, min(n, int(config.max_batch)))
+
+
+def _warn_over_budget(cap, config, row_bytes, warned):
+    """Log once per request when one history's scratch exceeds the budget."""
+    need = cap * int(row_bytes) + _ELECTRON_STATUS_BYTES
+    if warned or need <= int(config.scratch_budget_bytes):
+        return warned
+    logger.warning(
+        "one transport history needs %d scratch bytes (%d slots of %d bytes), above "
+        "scratch_budget_bytes=%d; running single-history batches over budget",
+        need,
+        cap,
+        int(row_bytes),
+        int(config.scratch_budget_bytes),
+    )
+    return True
 
 
 def _capacity_for(seen_max, config):
@@ -394,13 +443,13 @@ def _capacity_for(seen_max, config):
     return max(1, seen_max, int(np.ceil(seen_max * config.capacity_headroom)))
 
 
-def _batch_electrons(e, cap, Ne, config):
+def _batch_electrons(e, cap, Ne, config, row_bytes=_SEG_SCRATCH_BYTES):
     """How many electrons the batch starting at ``e`` covers.
 
     Non-increasing in ``cap``, which a capacity replay relies on: the retry must
     never need more electrons than the snapshot it restores.
     """
-    n = min(_batch_size(cap, config), Ne - e)
+    n = min(_batch_size(cap, config, row_bytes), Ne - e)
     if e == 0 and config.probe_electrons > 0:
         n = min(n, int(config.probe_electrons))
     return n
@@ -455,13 +504,16 @@ def _drive_per_electron_batches(
     if radiative:
         extra_args = (inelastic_args if inelastic else (), radiative_args)
     batches = []
+    row_bytes = _scratch_row_bytes(midpoint, inelastic, radiative, secondaries)
+    warned = False
     cap = max(1, int(config.seg_capacity))
     seen_max = 0
     nseg = 0
     n_back = n_trans = n_side = n_cutoff = n_step_limited = 0
     e = 0
     while e < Ne:
-        m = _batch_electrons(e, cap, Ne, config)
+        m = _batch_electrons(e, cap, Ne, config, row_bytes)
+        warned = _warn_over_budget(cap, config, row_bytes, warned)
         sl = slice(e, e + m)
         # The core mutates these arrays in place. Counter-addressed streams make
         # restoring this snapshot sufficient for an exact capacity replay.
@@ -469,11 +521,7 @@ def _drive_per_electron_batches(
 
         while True:
             _nsys_push("pyrite.transport.scratch")
-            scratch = _alloc_scratch(xp, m, cap, midpoint)
-            if inelastic:
-                scratch += _alloc_hard_scratch(xp, m, cap, secondaries)
-            if radiative:
-                scratch += _alloc_hard_scratch(xp, m, cap)
+            scratch = _alloc_batch_scratch(xp, m, cap, midpoint, inelastic, radiative, secondaries)
             seg_count = xp.zeros(m, dtype=xp.int64)
             exit_code = xp.zeros(m, dtype=xp.int8)
             _nsys_pop()
@@ -497,7 +545,8 @@ def _drive_per_electron_batches(
                 break
             cap = _capacity_for(seen_max, config)
             d_pos[sl], d_dirs[sl], d_E[sl], d_clock[sl] = snap
-            m = _batch_electrons(e, cap, Ne, config)
+            m = _batch_electrons(e, cap, Ne, config, row_bytes)
+            warned = _warn_over_budget(cap, config, row_bytes, warned)
             sl = slice(e, e + m)
             snap = tuple(a[:m] for a in snap)
 
@@ -550,11 +599,7 @@ def _drive_per_electron_batches(
     joined = None
     if keep_on_device:
         _nsys_push("pyrite.transport.join")
-        empty = _alloc_scratch(xp, 0, 1, midpoint)
-        if inelastic:
-            empty += _alloc_hard_scratch(xp, 0, 1, secondaries)
-        if radiative:
-            empty += _alloc_hard_scratch(xp, 0, 1)
+        empty = _alloc_batch_scratch(xp, 0, 1, midpoint, inelastic, radiative, secondaries)
         joined = tuple(
             xp.concatenate([b[i] for b in batches]) if batches else empty[i]
             for i in range(len(out_bufs))
@@ -865,12 +910,15 @@ def _run_per_electron_transport(
         secondaries = None if inelastic is None else bool(inelastic[4])
 
         def alloc_rows(rows):
-            scratch = _alloc_scratch(xp, rows, 1, midpoint)
-            if inelastic_args is not None:
-                scratch += _alloc_hard_scratch(xp, rows, 1, secondaries)
-            if radiative_args is not None:
-                scratch += _alloc_hard_scratch(xp, rows, 1)
-            return scratch
+            return _alloc_batch_scratch(
+                xp,
+                rows,
+                1,
+                midpoint,
+                inelastic is not None,
+                radiative_args is not None,
+                secondaries,
+            )
 
         extra = (inelastic_args,) if inelastic_args is not None else ()
         if radiative_args is not None:
@@ -915,6 +963,16 @@ def _run_per_electron_transport(
         secondaries=None if inelastic is None else bool(inelastic[4]),
         on_batch=on_batch,
     )
+
+
+def _alloc_batch_scratch(xp, m, cap, midpoint, inelastic, radiative, secondaries=None):
+    """Every scratch column of the enabled schema, in core argument order."""
+    scratch = _alloc_scratch(xp, m, cap, midpoint)
+    if inelastic:
+        scratch += _alloc_hard_scratch(xp, m, cap, secondaries)
+    if radiative:
+        scratch += _alloc_hard_scratch(xp, m, cap)
+    return scratch
 
 
 def _alloc_hard_scratch(xp, m, cap, secondaries=None):

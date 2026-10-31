@@ -315,6 +315,7 @@ def _transport_case(
     trajectory_capture=None,
     block_electrons=None,
     block_monitor=None,
+    block_consumer=None,
 ):
     """Transport phase of run_case: the line + brem trajectories. Returns the
     segments + geometry + grids the spectrum phase consumes.
@@ -343,6 +344,11 @@ def _transport_case(
     freeze brem at a prefix (:mod:`.independent`); the case then continues as
     the fixed-count case at the realized pair, including cutoffs and grids.
 
+    block_consumer: internal (#611), with ``block_electrons`` and no monitor.
+    Each globalized block goes to ``block_consumer(block)`` and is released;
+    ``segs`` then holds only the additive transport counts. Used by
+    :func:`.streamed_scoring.run_case_streamed`.
+
     Validation: grazing-beam-projection
     """
     from .emission_adapters import select_emission
@@ -356,6 +362,7 @@ def _transport_case(
         block_electrons,
         transport_core=transport_core,
         block_monitor=block_monitor,
+        block_consumer=block_consumer,
     )
     select_emission(case)
     if case.get("adaptive_precision") is not None:
@@ -509,6 +516,7 @@ def _transport_case(
             beam_kw=beam_kw,
             progress=transport_progress,
             monitor=block_monitor,
+            consume=block_consumer,
         )
     segs_all, transport_recovery = transport_with_recovery(transport, resident)
     if block_monitor is not None:

@@ -174,6 +174,7 @@ def transport_electron_blocks(
     bremslib_tables=None,
     on_block: Callable[[int, int, dict[str, Any]], None] | None = None,
     should_stop: Callable[[int], bool] | None = None,
+    consume: Callable[[dict[str, Any]], None] | None = None,
 ) -> dict[str, Any]:
     """Transport ``[0, n_electrons)`` block by block and join the blocks.
 
@@ -188,15 +189,29 @@ def transport_electron_blocks(
 
     Returns the result a single ``[0, n)`` call returns, bit for bit, where
     ``n`` is ``n_electrons`` or the earlier stop.
+
+    ``consume`` (optional, #611) takes each globalized block instead of the
+    join: no block is retained, the population-wide host steps are skipped,
+    and only the additive counts are returned (see :mod:`.streamed_scoring`).
     """
     blocks = []
+    counts = dict.fromkeys(_ADDITIVE_COUNTS, 0)
     for start, stop in electron_blocks(n_electrons, block_electrons):
         block = simulate_block(start, stop)
         if on_block is not None:
             on_block(start, stop, block)
-        blocks.append(_globalize(block, start))
+        block = _globalize(block, start)
+        if consume is None:
+            blocks.append(block)
+        else:
+            for key in counts:
+                counts[key] += int(block.get(key, 0))
+            consume(block)
+        del block
         if should_stop is not None and should_stop(stop):
             break
+    if consume is not None:
+        return counts
     merged = merge_electron_blocks(blocks)
     return finalize_population_fields(
         merged, seed=seed, bunch=bunch, bremslib_tables=bremslib_tables
@@ -213,6 +228,7 @@ def transport_case_blocks(
     beam_kw,
     progress=None,
     monitor=None,
+    consume=None,
 ):
     """The runner's block path: ``_transport_case``'s transport in electron blocks.
 
@@ -230,6 +246,9 @@ def transport_case_blocks(
     counter-addressed, so the replay is the fixed-``n`` transport -- and the
     monitor recomputes its statistics. If the replay fails the stopping rule,
     grow by one block and replay again until convergence or the maximum.
+
+    ``consume`` (optional, no ``monitor``) streams blocks without joining them;
+    see :func:`transport_electron_blocks`.
 
     Validation: adaptive-sample-size-stopping
     """
@@ -265,7 +284,7 @@ def transport_case_blocks(
         bremslib_tables=_case_radiative_kwargs(case).get("bremslib_tables"),
     )
     if monitor is None:
-        return run(n_electrons)
+        return run(n_electrons, consume=consume)
     result = run(n_electrons, on_block=monitor.on_block, should_stop=monitor.should_stop)
     realized = int(result["Ne"])
 
