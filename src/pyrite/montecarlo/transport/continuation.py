@@ -34,6 +34,7 @@ from dataclasses import dataclass, replace
 from typing import Any
 
 import numpy as np
+from numba import njit, prange
 
 from ..._env import env_value
 from .cores import (
@@ -87,17 +88,18 @@ class TransportContinuationConfig:
     enabled row schema. Ne-sized per-history state and retained output are
     outside it: bounded scratch does not bound total trajectory storage.
 
-    ``device_staging`` (default on, #842) keeps each round's retained rows on
-    the device and downloads the reassembled columns once: fewer, contiguous
-    host copies for up to twice the retained output in device memory. Staging
-    is bounded: while twice the staged bytes fit ``staging_budget_bytes``
-    rounds stay on the device; past it the staged rounds spill to the host
-    and the run finishes with host reassembly, as with staging off. ``None``
-    derives the budget from free device memory (driver free plus the memory
-    pool's cached blocks) after the round scratch is allocated, less
-    ``STAGING_HEADROOM``. Off, rows move to the host every round. Results are
-    bitwise the same in every mode; runs that keep segments on the device
-    never spill.
+    ``device_staging`` (default off since #825) keeps each round's retained
+    rows on the device and downloads the reassembled columns once, for up to
+    twice the retained output in device memory. Staging is bounded: while
+    twice the staged bytes fit ``staging_budget_bytes`` rounds stay on the
+    device; past it the staged rounds spill to the host and the run finishes
+    with host reassembly. ``None`` derives the budget from free device memory
+    (driver free plus the memory pool's cached blocks) after the round
+    scratch is allocated, less ``STAGING_HEADROOM``. Off, rows move to the
+    host every round and are reassembled there with the parallel run copy,
+    which since #825 is as fast or faster on every measured scene (job 3000)
+    and needs no device staging memory. Results are bitwise the same in
+    every mode; runs that keep segments on the device never spill.
 
     ``on_round`` (diagnostics only) receives one ``phase="round"`` dict per
     launch with the launched population, rows, finished/refilled counts and
@@ -106,7 +108,7 @@ class TransportContinuationConfig:
 
     rows_per_round: int = 256
     active_histories: int | None = None
-    device_staging: bool = True
+    device_staging: bool = False
     staging_budget_bytes: int | None = None
     on_round: Callable[[dict[str, Any]], None] | None = None
 
@@ -234,7 +236,9 @@ class _Retained:
     def __init__(self, xp, cont, keep_on_device, to_host):
         self.on_device = keep_on_device or cont.device_staging
         self.budget = None if keep_on_device or not self.on_device else staging_budget(xp, cont)
+        self.xp = xp
         self.to_host = to_host
+        self.arena = None
         self.chunks = []
         self.staged_bytes = 0
         self.spilled_round = None
@@ -248,6 +252,13 @@ class _Retained:
                 admit_host_allocation(self.staged_bytes, "continuation staged-round spill")
                 self.chunks = [self._host(c) for c in self.chunks]
                 self.on_device, self.spilled_round = False, len(self.chunks)
+                # Hand the staged rounds' cached blocks back to the driver:
+                # pageable D2H runs up to ~2x slower while the pool holds most
+                # of the card, which slowed every later round's download
+                # (#825, jobs 2990-2995).
+                pool = getattr(self.xp, "get_default_memory_pool", None)
+                if pool is not None:
+                    pool().free_all_blocks()
         if not self.on_device:
             # The gather is still device-resident; its host copy must fit
             # alongside every previously retained round.
@@ -255,7 +266,48 @@ class _Retained:
         self.chunks.append(gathered if self.on_device else self._host(gathered))
 
     def _host(self, chunk):
-        return tuple(self.to_host(a) for a in chunk)
+        return tuple(self._download(c, a) for c, a in enumerate(chunk))
+
+    def _download(self, column, array):
+        if not hasattr(array, "get"):
+            return self.to_host(array)
+        if self.arena is None:
+            self.arena = _ColumnArena()
+        out = self.arena.empty(column, array.shape, array.dtype)
+        array.get(out=out)
+        return out
+
+    def close(self):
+        """Drop the arena's open blocks; each frees once its views are released."""
+        self.arena = None
+
+
+class _ColumnArena:
+    """Per-column host blocks that round downloads are packed into.
+
+    Assembly copies one column at a time and releases it (``_scatter_host``),
+    so a column's rounds must free their memory together. Small per-round
+    arrays from the C heap stayed resident after release (#825 job 3001), and
+    small private mappings fault in slowly (job 3008). Blocks of at least
+    ``BLOCK_BYTES`` take the allocator's mmap path, are hugepage-advised by
+    NumPy, and return to the OS once every view into them is gone.
+    """
+
+    BLOCK_BYTES = 64 << 20
+    ALIGN = 64
+
+    def __init__(self):
+        self.blocks = {}
+
+    def empty(self, column, shape, dtype):
+        dtype = np.dtype(dtype)
+        nbytes = int(np.prod(shape, dtype=np.int64)) * dtype.itemsize
+        block, offset = self.blocks.get(column, (None, 0))
+        if block is None or offset + nbytes > block.size:
+            block, offset = np.empty(max(self.BLOCK_BYTES, nbytes), dtype=np.uint8), 0
+        view = block[offset : offset + nbytes].view(dtype).reshape(shape)
+        self.blocks[column] = (block, offset + -(-nbytes // self.ALIGN) * self.ALIGN)
+        return view
 
 
 def _gather_index(xp, counts, quantum):
@@ -269,12 +321,12 @@ def _gather_index(xp, counts, quantum):
     return rows
 
 
-def _canonical_destinations(chunks, rows_total):
-    """Destination rows of every retained chunk in canonical order.
+def _canonical_runs(chunks, rows_total):
+    """``(destination, source, length)`` of every lane run, chunk by chunk.
 
     Chunks are in launch order and each holds, lane by lane, a contiguous run
     of one history's next rows, so a per-history cursor starting at that
-    history's exclusive prefix places every row exactly once.
+    history's exclusive prefix places every run exactly once.
     """
     cursor = np.cumsum(rows_total) - rows_total
     for histories, counts in chunks:
@@ -283,7 +335,59 @@ def _canonical_destinations(chunks, rows_total):
         starts = np.cumsum(counts) - counts
         base = cursor[histories]
         cursor[histories] += counts
+        yield base, starts, counts
+
+
+def _canonical_destinations(chunks, rows_total):
+    """Destination row of every retained row, chunk by chunk (device join)."""
+    for base, starts, counts in _canonical_runs(chunks, rows_total):
         yield np.repeat(base - starts, counts) + np.arange(int(counts.sum()), dtype=np.int64)
+
+
+@njit(parallel=True, cache=True)
+def _copy_runs(dst, src, dst_start, src_start, length):  # pragma: no cover - compiled
+    """``dst[d:d+n] = src[s:s+n]`` for every run; runs never overlap in ``dst``."""
+    for r in prange(dst_start.size):
+        d, s, n = dst_start[r], src_start[r], length[r]
+        dst[d : d + n] = src[s : s + n]
+
+
+def _host_rows(target, nseg):
+    """The reserved host ndarray behind ``target``, as ``(nseg, width)``."""
+    rows = target[:nseg]
+    if not rows.flags.c_contiguous:
+        # reshape would copy, and the run copies would miss the output.
+        raise ValueError("continuation output columns must be C-contiguous")
+    return rows.reshape(nseg, -1)
+
+
+def _scatter_host(chunks, rows_total, retained, targets, nseg):
+    """Copy host-retained rounds into canonical rows, one parallel copy per run.
+
+    Pure data movement: the same bytes land in the same rows as an indexed
+    scatter, without materializing a per-row destination index. Every round
+    holds rows of every active history, so copying round by round faults in
+    the whole output while all rounds are still resident (twice the payload,
+    #825 job 3006). Copy column by column instead and release each round's
+    column once copied: resident memory stays near one payload plus a column.
+    """
+    dst = [_host_rows(t, nseg) if t.shape[0] else None for t in targets]
+    if len(retained) != len(chunks):
+        raise ValueError("retained rounds and chunk records disagree")
+    runs = list(_canonical_runs(chunks, rows_total))
+    for i, chunk in enumerate(retained):
+        if len(chunk) != len(dst):
+            raise ValueError("retained round columns and output columns disagree")
+        retained[i] = list(chunk)
+    for c, rows in enumerate(dst):
+        for i, (base, starts, counts) in enumerate(runs):
+            column, retained[i][c] = retained[i][c], None
+            if rows is not None and column.shape[0]:
+                flat = np.ascontiguousarray(column).reshape(column.shape[0], -1)
+                _copy_runs(rows, flat, base, starts, counts)
+                del flat
+            del column
+    retained.clear()
 
 
 def _pending_order(Ne, history_order):
@@ -295,21 +399,24 @@ def _pending_order(Ne, history_order):
 
 
 def _assemble(xp, chunks, rows_total, retained, columns, out_bufs, nseg, keep_on_device):
-    """Scatter retained rounds into canonical rows; the joined device rows or None."""
-    joined = None
-    targets = out_bufs
-    if not keep_on_device and targets and hasattr(targets[0], "reserve"):
-        # Assembly must hold all staged rounds *and* their final canonical
-        # columns; use the actual row count rather than Ne * max_steps.
-        targets[0].reserve(nseg)
-    if keep_on_device:
-        joined = tuple(
-            xp.empty((nseg,) + a.shape[1:], dtype=a.dtype) if a.shape[0] else a for a in columns
-        )
-        targets = joined
+    """Scatter retained rounds into canonical rows; the joined device rows or None.
+
+    ``keep_on_device`` means the rounds are device-resident and are joined there;
+    otherwise they are host arrays copied into ``out_bufs``.
+    """
+    if not keep_on_device:
+        if out_bufs and hasattr(out_bufs[0], "reserve"):
+            # Assembly must hold all staged rounds *and* their final canonical
+            # columns; use the actual row count rather than Ne * max_steps.
+            out_bufs[0].reserve(nseg)
+        _scatter_host(chunks, rows_total, retained, out_bufs, nseg)
+        return None
+    joined = tuple(
+        xp.empty((nseg,) + a.shape[1:], dtype=a.dtype) if a.shape[0] else a for a in columns
+    )
     for dest, chunk in zip(_canonical_destinations(chunks, rows_total), retained, strict=True):
-        dest = xp.asarray(dest) if keep_on_device else dest
-        for target, column in zip(targets, chunk, strict=True):
+        dest = xp.asarray(dest)
+        for target, column in zip(joined, chunk, strict=True):
             if column.shape[0]:
                 target[dest] = column
     return joined
@@ -418,6 +525,7 @@ def _drive_continuation_rounds(
     assembly = time.perf_counter()
     _nsys_push("pyrite.transport.continuation.assemble")
     on_device = retained.on_device
+    retained.close()
     joined = _assemble(xp, chunks, rows_total, retained.chunks, columns, out_bufs, nseg, on_device)
     if on_device and not keep_on_device:
         for buf, column in zip(out_bufs, joined, strict=True):

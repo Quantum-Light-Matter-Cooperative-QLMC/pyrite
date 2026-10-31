@@ -401,6 +401,12 @@ def main():
         action="store_true",
         help="skip the untimed PXR/CBS call-profiler request (timing sweeps only)",
     )
+    parser.add_argument(
+        "--cprofile",
+        type=Path,
+        default=None,
+        help="write a cProfile dump of the warm request (#825 host-phase attribution)",
+    )
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     spec = json.loads((HERE / "scenes.json").read_text())
@@ -439,12 +445,14 @@ def main():
     entries = resolve_layer_tables(comp)
     stopping = resolve_composition_table(mat["catalog_key"], comp)
     brem = load_bremsstrahlung_tables([scene["material"]])
-    rounds = {"launched_rows": 0, "launches": 0}
+    rounds = {"launched_rows": 0, "launches": 0, "assembly": []}
 
     def on_round(info):
         if info.get("phase") == "round":
             rounds["launches"] += 1
             rounds["launched_rows"] += int(info.get("rows", 0))
+        elif info.get("phase") == "assembly":
+            rounds["assembly"].append(dict(info))
 
     default = DEFAULT_PER_ELECTRON_TRANSPORT_CONFIG
     from pyrite.montecarlo.transport.continuation import TransportContinuationConfig
@@ -514,7 +522,7 @@ def main():
     def request(seed, histories):
         scores = {}
         retained = 0
-        rounds.update(launched_rows=0, launches=0)
+        rounds.update(launched_rows=0, launches=0, assembly=[])
         log.messages.clear()
         cp.cuda.Device().synchronize()
         t0 = time.perf_counter()
@@ -598,7 +606,17 @@ def main():
             sys.setprofile(None)
     if calls:
         raise RuntimeError(f"PXR/CBS or line computation executed: {sorted(calls)}")
+    profiler = None
+    if args.cprofile is not None:
+        import cProfile
+
+        profiler = cProfile.Profile()
+        profiler.enable()
     scores, warm_s, warm_transport_s, work = request(args.seed, args.histories)
+    if profiler is not None:
+        profiler.disable()
+        args.cprofile.parent.mkdir(parents=True, exist_ok=True)
+        profiler.dump_stats(args.cprofile)
     if work["launches"] and work["launched_rows"] != work["retained_rows"]:
         raise RuntimeError(f"replayed rows detected: {work}")
     args.output.parent.mkdir(parents=True, exist_ok=True)
