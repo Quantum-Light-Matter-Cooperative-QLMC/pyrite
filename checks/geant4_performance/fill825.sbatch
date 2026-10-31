@@ -44,9 +44,21 @@ arms=(
   si-300keV-100um:continuation:4096:512:1024:32:mixed_math
   si-300keV-100um:full-history:8192:512:1024:32:exact
 )
+if [[ ${FILL_SET:-grid} == threshold ]]; then
+    # `auto` threshold (CONTINUATION_AUTO_MIN_HISTORIES): production defaults at small N.
+    arms=()
+    for n in 1000 2000 4000; do
+        for s in si-300keV-100um w-1MeV-100um; do
+            for sch in full-history continuation; do
+                arms+=("$s:$sch:512:512:1024:128:exact:$n")
+            done
+        done
+    done
+fi
 for a in "${arms[@]}"; do
-    IFS=: read -r s sch mib cap probe nt v <<< "$a"
-    stem="$out/$s-$sch-m$mib-t$nt-$v"
+    IFS=: read -r s sch mib cap probe nt v n <<< "$a"
+    N=${n:-$N}
+    stem="$out/$s-$sch-m$mib-t$nt-$v-n$N"
     PYRITE_MC_TRANSPORT_SCHEDULE=$sch PV_NTHREADS=$nt timeout 420 uv run --no-sync python \
         checks/fp32_speed_of_light/precision_variants.py \
         --variant "$v" --bench checks/geant4_performance/pyrite_bench.py --stats "$stem.stats.json" \

@@ -24,6 +24,7 @@ def row(sample_path):
     c = sample["controls"]
     return dict(
         scene=sample["scene"]["id"],
+        histories=sample["histories"],
         schedule=c["schedule"],
         scratch=c["scratch_mib"],
         threads=(stats.get("launch_geometry") or [[0, 0]])[-1][1],
@@ -42,8 +43,8 @@ def row(sample_path):
 
 def main():
     root = Path(sys.argv[1])
-    rows = [row(p) for p in sorted(root.glob("*.json")) if not p.name.endswith(".stats.json")]
-    rows = [r for r in rows if r]
+    samples = sorted(root.glob("*.json"))
+    rows = [row(p) for p in samples if not p.name.endswith(".stats.json") and p.name != "sync.json"]
     exact = {}
     for r in rows:
         if r["variant"] == "exact":
@@ -53,10 +54,12 @@ def main():
         "| launches | median blocks | regs | blocks/SM | RSS GiB | digest |"
     )
     print("|" + "---|" * 14)
-    for r in sorted(rows, key=lambda r: (r["scene"], r["schedule"], r["scratch"], r["threads"])):
+    for r in sorted(
+        rows, key=lambda r: (r["scene"], r["histories"], r["schedule"], r["scratch"], r["threads"])
+    ):
         flag = " MISMATCH" if r["variant"] == "exact" and len(exact[r["scene"]]) > 1 else ""
         print(
-            f"| {r['scene']} | {r['schedule']} | {r['scratch']} | {r['threads']} | {r['variant']} "
+            f"| {r['scene']} n={r['histories']} | {r['schedule']} | {r['scratch']} | {r['threads']} | {r['variant']} "
             f"| {r['warm']:.2f} | {r['transport']:.2f} | {r['kernel']:.2f} | {r['launches']} "
             f"| {r['blocks']:.0f} | {r['regs']} | {r['occ']} | {r['rss']:.1f} "
             f"| {r['digest']}{flag} |"
