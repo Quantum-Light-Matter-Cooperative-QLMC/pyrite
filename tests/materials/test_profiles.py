@@ -10,6 +10,12 @@ import pytest
 import tomlkit
 
 from pyrite import DATA_DIR
+from pyrite._continuum_grid import (
+    CONTINUUM_GRID_MODEL,
+    CONTINUUM_LOG_STEP,
+    automatic_continuum_grid,
+)
+from pyrite._photon_continuum_floor import continuum_medium_key
 from pyrite.campaign import profile_lifecycle, profile_summary, profiles
 from pyrite.campaign.config import default_settings, material_sweep
 from pyrite.campaign.profiles import (
@@ -28,7 +34,6 @@ from pyrite.campaign.profiles import (
 from pyrite.campaign.sweep import BeamSpec, build_cases, target_flat_fields
 from pyrite.checkpoints import _checkpoint_store
 from pyrite.detectors import AngularAcceptance, Detector, Timepix3
-from pyrite.energy_grid.floor import floored_lattice_start_eV
 from pyrite.materials import CATALOG
 from pyrite.montecarlo.spectrum import (
     BREMSSTRAHLUNG_MODEL,
@@ -124,8 +129,9 @@ def test_typed_case_content_key_matches_pre_case_golden():
     # #513: static CBS potential U_g bumps the line-escape marker to v4.
     # #439: cancellation-free line kinematics bump the line-escape marker to v5.
     # #788: the default radiative-moment policy now participates in identity.
+    # #278: an undeclared continuum grid resolves the refined geometric grid.
     assert case_content_key(case) == (
-        "3432292002c181c6d0b88b3c28722aa8162e1e840bb9e8deebb0597d2adf52cf"
+        "b3d463fea099e89cbdf904e913105c5f6f781158f0ae2ad5c5667e9fded26861"
     )
 
 
@@ -136,7 +142,7 @@ def test_dataset_identity_dispatches_through_recorded_v1():
     assert set(IDENTITY_MIGRATIONS) == {1}
     assert identity["identity_version"] == 1
     assert identity["parameter_sha256"] == (
-        "3d9e9473643b9dca75d37437c8ae4722011f8816d443a7180806f5a19a8fa413"
+        "cf7c41418a3670367b7e8d35a2c5413e812f5342bda8d629db85b82b584a02e4"
     )
     with pytest.raises(ValueError, match="unsupported dataset identity version"):
         dataset_identity("hopg", "full", default_settings(), sweep, identity_version=2)
@@ -144,7 +150,9 @@ def test_dataset_identity_dispatches_through_recorded_v1():
 
 def test_explicit_uniform_brem_grid_does_not_share_catalog_band_identity():
     """Same nodes, different case grid (exact vs stop at E0): digests must differ (#815)."""
-    band = material_sweep("hopg")
+    automatic = material_sweep("hopg")
+    uniform = replace(automatic.energy_bins, brem=np.arange(0.0, 30000.0, 25.0))
+    band = replace(automatic, energy_bins=uniform, brem_band=True)
     explicit = replace(band, brem_band=False)
     band_identity = dataset_identity("hopg", "full", default_settings(), band)
     explicit_identity = dataset_identity("hopg", "full", default_settings(), explicit)
@@ -152,6 +160,16 @@ def test_explicit_uniform_brem_grid_does_not_share_catalog_band_identity():
     assert "brem_grid_exact" not in band_identity["resolved_parameters"]["sweep"]
     assert explicit_identity["resolved_parameters"]["sweep"]["brem_grid_exact"] is True
     assert explicit_identity["parameter_sha256"] != band_identity["parameter_sha256"]
+    # The automatic continuum grid (#278) forks from both declared spellings.
+    automatic_identity = dataset_identity("hopg", "full", default_settings(), automatic)
+    assert automatic_identity["resolved_parameters"]["sweep"]["continuum_grid_model"] == (
+        CONTINUUM_GRID_MODEL
+    )
+    assert "continuum_grid_model" not in band_identity["resolved_parameters"]["sweep"]
+    assert automatic_identity["parameter_sha256"] not in {
+        band_identity["parameter_sha256"],
+        explicit_identity["parameter_sha256"],
+    }
 
 
 def test_high_energy_profile_range_is_part_of_dataset_identity():
@@ -382,7 +400,9 @@ def test_survey_profile_reduces_configured_expensive_sweep_dimensions():
     assert len(np.atleast_1d(survey_geometry["tilt_deg"])) <= 5
     assert len(np.atleast_1d(survey_geometry["tilt_azim_deg"])) <= 2
     assert survey.n_families == 2
-    assert len(survey.energy_bins.brem) < len(full.energy_bins.brem)
+    # Both fidelities resolve the automatic continuum grid per case (#278); it is
+    # already O(10^3) nodes, so survey does not coarsen it.
+    assert survey.energy_bins.brem is None and full.energy_bins.brem is None
     assert not survey.energy_bins.cxr_by_energy
     assert not full.energy_bins.cxr_by_energy
     cases = build_cases(survey, settings.n_electrons, settings.n_electrons_brem)
@@ -566,7 +586,7 @@ def test_standard_detector_keeps_current_payload_and_digest_bit_for_bit():
     sweep_payload = identity["resolved_parameters"]["sweep"]
 
     assert identity["parameter_sha256"] == (
-        "3d9e9473643b9dca75d37437c8ae4722011f8816d443a7180806f5a19a8fa413"
+        "cf7c41418a3670367b7e8d35a2c5413e812f5342bda8d629db85b82b584a02e4"
     )
     assert "detector" not in sweep_payload
     assert sweep_payload["theta_obs_deg"] == 90.0
@@ -580,43 +600,43 @@ def test_standard_detector_keeps_current_payload_and_digest_bit_for_bit():
         (
             "hopg_hbn_gaussian_200fs",
             "hopg",
-            "3695b0b24a0c6803c7201f42d6c5e4c921c24412b1944122fa009bbb76c8dae1",
+            "37b71d9c3d670d9d7ef88c953c69fb4977440239ac6e40c8b4279179f214b0aa",
         ),
         (
             "hopg_hbn_gaussian_200fs",
             "hbn",
-            "69c8b22cc49df3a13b96835939b45f0435c62a7b94ffd9bf2560aa3226ac7778",
+            "b53a342b4adc968be8a217d9bc47a8700da0f8402b6ce62ff157e0909aba5e79",
         ),
         (
             "hopg_hbn_microtrain_200fs",
             "hopg",
-            "7cdf308b0dd61a9a737979a3feb4ae9f498d48a518021335b4c6e75937d2a17d",
+            "4839a0de9c5eca9a21fd87523b0dd47759857b96ac3f70baa8f5cf1aeead7dc2",
         ),
         (
             "hopg_hbn_microtrain_200fs",
             "hbn",
-            "62ffba8ac2f47a7adc6ec1fb6ec736574a7d0769ea4d6ab0bd29c4ea7d63bdf2",
+            "3c3279a3697db8e7a49b9333eb3ca008a0923d1c8fec40489ded1dfdedf244ec",
         ),
         (
             "hopg_hbn_compressed_microbunch",
             "hopg",
-            "e23706a80e290ef80a5b33cfe48f15ba96eaf831b1a7a7fa8b3e75bedbf8122d",
+            "424aa8be13846bc4b5696d8704dcb00254366481ee4765bcbfdc65ad51b980e8",
         ),
         (
             "hopg_hbn_compressed_microbunch",
             "hbn",
-            "27c166984077a0af0ccbc571c06a09434b3a8917b50e3ad4fb33171cd4e47317",
+            "3e9f8e7415711faebe8a755d14c139b7ff7f3c57c176940961cf4b0dccb130ed",
         ),
         (
             "hopg_emittance_demo",
             "hopg",
-            "2d35946d2b05579f3869b00a862314aaf294dbbf99aef8c5e8384b001825e804",
+            "8d72719e18c29062e956d2f68578266e91f6dc66d4f91f4544e8ff6969719c5f",
         ),
         (
             "promising_low_ne",
             "hopg",
             # #465: coherent operator identity advanced to physical-distinct-pairs-v4.
-            "28d465050705451286460a63f270742ee41ca442b87378528f1fdb94d38f629f",
+            "e3b2968f6819e6ef0c945950cafa5173f96f1547d1a8cfc6301ecff7828b00a4",
         ),
     ],
 )
@@ -652,6 +672,10 @@ def test_named_beam_migration_keeps_shipped_profile_digests_bit_for_bit(
     Issue #439 re-minted every pin for the ``segment-mean-v5-precise-kinematics``
     line-escape marker and the BremsLib
     ``…/lin-x18-geo4-ln-t-lin-theta-v2/tm-coupled-v2/ee-sb85-v1`` marker.
+
+    Issue #278 re-minted every pin: a profile that declares no ``E_grid_brem``
+    now carries ``continuum_grid_model`` (``refined-geometric-v1/dlnE=0.0025``),
+    so results on the earlier uniform 25 eV default never share a dataset.
 
     Issue #100's derived photon-continuum floor deliberately did NOT move these:
     it raises a brem grid's ``start`` where the band meets the material, in
@@ -813,7 +837,7 @@ def test_emission_modes_yield_three_distinct_digests_incoherent_unchanged():
     # issue #256's dropped uniform E_grid_brem override, which the sweep-level
     # payload hashes although no case grid changed) must stay bit-for-bit.
     assert incoherent["parameter_sha256"] == (
-        "3d9e9473643b9dca75d37437c8ae4722011f8816d443a7180806f5a19a8fa413"
+        "cf7c41418a3670367b7e8d35a2c5413e812f5342bda8d629db85b82b584a02e4"
     )
     survey_incoherent = dataset_identity(
         "mose2", "survey", default_settings("survey"), material_sweep("mose2", fidelity="survey")
@@ -830,7 +854,7 @@ def test_emission_modes_yield_three_distinct_digests_incoherent_unchanged():
     # issue #218: mose2 gained conduction-band data, so the default "auto"
     # inelastic model now resolves to shell-soft-hard (50 eV cutoff).
     assert survey_incoherent["parameter_sha256"] == (
-        "0c0a32bba743be39437f033693d2f0c9c5daa28dc9e9221d573126cf25d15fa2"
+        "52cab9773deb7d589ce2ce854a168cec498344bbf18e8b9f2f00a0789c3da115"
     )
 
 
@@ -1038,14 +1062,14 @@ def test_atomic_electron_deflection_forks_identity_and_none_restores_it():
     # The pre-#317 pins of test_dataset_identity_dispatches_through_recorded_v1
     # and test_typed_case_content_key_matches_pre_case_golden.
     assert dataset_identity("hopg", "full", off, sweep)["parameter_sha256"] == (
-        "10299308ae72c41af7852d59d8978f7f6039420b1d6a74015b1a91f41a8b31ea"
+        "63d0a76322031e53effd50fe82d3adaeae531b5b27600f17297f3a932c730f13"
     )
     case = build_cases(
         sweep, n_electrons=300, n_electrons_brem=150, atomic_electron_deflection="none"
     )[0]
     assert "atomic_electron_deflection" not in case
     assert case_content_key(case) == (
-        "9308956e794fb1676331ee684ddc3636fc10e8b32e6bbd20cd707e2c4163caeb"
+        "80e8be3fd3d33ef4e974dfebbdb1c9a75d0800318c7a2fbaa464f5c275b95e5c"
     )
     with pytest.raises(ValueError, match="atomic_electron_deflection"):
         build_cases(sweep, 4, 4, atomic_electron_deflection="z1")
@@ -1071,12 +1095,11 @@ _PACKAGED_PROFILES = sorted(
 
 
 @pytest.mark.parametrize("catalog_profile", _PACKAGED_PROFILES)
-def test_uniform_case_brem_grid_is_medium_floor_to_e0_at_25_ev(catalog_profile):
-    """Issue #256: per-material uniform ``E_grid_brem`` overrides were dropped
-    because a case grid keeps only their step -- start is the medium floor and
-    stop is E0 + step. Pin the case grid every packaged profile resolved while
-    those overrides still existed (all at 25 eV), so removing them cannot
-    silently change a step, start, or stop."""
+def test_undeclared_case_brem_grid_is_automatic_refined_geometric(catalog_profile):
+    """Issue #278: a profile that declares no ``E_grid_brem`` resolves the
+    automatic refined geometric continuum grid per case (medium floor to just
+    past E0, ``dlnE = CONTINUUM_LOG_STEP`` plus edge/endpoint anchors) instead
+    of the historical uniform 25 eV band."""
     for material in CATALOG.material_keys:
         sweep = material_sweep(
             material,
@@ -1085,12 +1108,17 @@ def test_uniform_case_brem_grid_is_medium_floor_to_e0_at_25_ev(catalog_profile):
             tilt_deg=45.0,
             tilt_azim_deg=135.0,
         )
-        start = floored_lattice_start_eV(sweep.material, 25.0)
+        assert sweep.energy_bins.brem is None, (catalog_profile, material)
+        medium = continuum_medium_key(sweep.material)
         for case in build_cases(sweep, n_electrons=300, n_electrons_brem=150):
-            assert case["E_grid_brem"] == (start, case["E0_keV"] * 1e3 + 25.0, 25.0), (
-                catalog_profile,
-                material,
-            )
+            endpoint = case["E0_keV"] * 1e3
+            grid = np.asarray(case["E_grid_brem"], dtype=float)
+            np.testing.assert_array_equal(grid, automatic_continuum_grid(medium, endpoint))
+            assert np.all(np.diff(grid) > 0.0)
+            assert grid[-1] > endpoint
+            # Anchor merging drops samples near an anchor, widening a neighbour
+            # interval by a fraction of a step; it never doubles one.
+            assert np.max(np.diff(np.log(grid))) < 2.0 * CONTINUUM_LOG_STEP
 
 
 @pytest.mark.parametrize("catalog_profile", _PACKAGED_PROFILES)
@@ -1182,17 +1210,30 @@ def test_bundled_profile_display_has_explicit_detector_acceptance():
 
 
 @pytest.mark.parametrize("material", ["hopg", "mos2", "mote2_product"])
-def test_implicit_brem_default_preserves_case_keys_and_dataset_identity(material):
+def test_explicit_brem_grid_keeps_its_nodes_and_forks_from_automatic(material):
     sweep = material_sweep(material, thickness_ang=1e4, tilt_deg=45.0, tilt_azim_deg=135.0)
     explicit = replace(
         sweep, energy_bins=replace(sweep.energy_bins, brem=np.arange(0.0, 30000.0, 25.0))
     )
     settings = default_settings()
-    assert dataset_identity(material, "full", settings, sweep) == dataset_identity(
-        material, "full", settings, explicit
-    )
+    implicit_identity = dataset_identity(material, "full", settings, sweep)
+    explicit_identity = dataset_identity(material, "full", settings, explicit)
+    assert implicit_identity["parameter_sha256"] != explicit_identity["parameter_sha256"]
+    assert "continuum_grid_model" not in explicit_identity["resolved_parameters"]["sweep"]
     implicit_cases = build_cases(sweep, n_electrons=1, n_electrons_brem=1)
     explicit_cases = build_cases(explicit, n_electrons=1, n_electrons_brem=1)
-    assert [case_content_key(case) for case in implicit_cases] == [
-        case_content_key(case) for case in explicit_cases
-    ]
+    for implicit_case, explicit_case in zip(implicit_cases, explicit_cases, strict=True):
+        # A declared uniform grid keeps its tuple spelling; the automatic one is exact nodes.
+        assert isinstance(explicit_case["E_grid_brem"], tuple)
+        assert isinstance(implicit_case["E_grid_brem"], np.ndarray)
+        assert case_content_key(implicit_case) != case_content_key(explicit_case)
+
+
+def test_declared_brem_keeps_declared_grid_and_drops_builtin_default():
+    from pyrite.campaign.config import _material_spec, declared_brem
+
+    scan = _material_spec("hopg").scan
+    assert not scan.E_grid_brem_declared
+    assert declared_brem(scan) is None
+    declared = replace(scan, E_grid_brem_declared=True)
+    np.testing.assert_array_equal(declared_brem(declared), scan.E_grid_brem)

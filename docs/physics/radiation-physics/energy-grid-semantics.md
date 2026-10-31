@@ -184,7 +184,7 @@ So a detector whose channel physically starts at 0 eV keeps its own boundary rat
 
 ### Continuum-node refinement
 
-The floor fixes where a continuum grid *starts*. Where its nodes go between floor and ceiling is a second derived choice, and `energy_grid/refine.py::refined_continuum_grid` makes it.
+The floor fixes where a continuum grid *starts*. Where its nodes go between floor and ceiling is a second derived choice, and `_continuum_grid.py::refined_continuum_grid` (re-exported from `pyrite.energy_grid.refine`) makes it.
 
 **Geometric baseline.** Multiplying a density by its local midpoint width {eq}`eq-grid-midpoint-edges` approximates midpoint quadrature for sufficiently fine cells. Its error on an interval of width $h$ is $(h^3/24)\,|n''|$, so the *relative* error contributed by that interval is
 
@@ -209,6 +209,8 @@ On a fine grid uniform in $u = \ln E$, the local spacing is approximately $h_i =
 *Assumptions.* The medium is the absorber whose edges enter the escape factor (detector-path edges act through the response instead, not through $\ell$); the emitted $S$ is smooth across an absorber edge; the edge locator uses the native Chantler tabulation; and the modelled cutoff at $E^\ast$ is sharp — which it is in EEDL, where the photon spectrum is tabulated to $k = T$ and is zero above.
 
 *Limiting case.* A band containing no located edge and no interior kinematic endpoint returns the geometric baseline **identically, node for node**. Adding structure adds nodes; adding none changes nothing. Equally, an edge whose jump falls outside $[E_\mathrm{floor}, E_\mathrm{stop}]$ is reported and dropped, never refused: it places no requirement on a grid over a band it is not in.
+
+**Production default (#278).** A profile that declares no `E_grid_brem` leaves the sweep's continuum bins empty, and each case resolves `automatic_continuum_grid(medium, E0)`: this refinement on a geometric baseline of fixed step $\rho = 0.0025$ from the medium floor to $E_0 e^{\rho}$, so the kinematic endpoint is always interior and anchored. The node count grows only logarithmically with $E_0$ (about 2.8k nodes at 30 keV and 5.5k at 30 MeV for HOPG, against 1.2 M for the former uniform 25 eV band at 30 MeV). A declared grid, uniform or exact, is used as declared. The policy string `CONTINUUM_GRID_MODEL` enters the dataset identity only for automatic sweeps, so declared-grid digests are unchanged.
 
 Refinement preserves the band endpoints and concentrates nodes around the located features. The derivation, assumptions, and checks are recorded in [Validation: `continuum-node-refinement`](../../validation/physics-validation-ledger.md).
 

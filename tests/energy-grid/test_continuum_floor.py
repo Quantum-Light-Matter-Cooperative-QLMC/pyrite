@@ -319,10 +319,14 @@ def test_built_cases_start_inside_the_modelled_band_in_every_profile(material):
             sweep = material_sweep(material, catalog_profile=profile_name)
         except (KeyError, ValueError):
             continue  # profile does not carry this material
-        start, _, step = build_cases(sweep)[0]["E_grid_brem"]
-        assert start == floored_lattice_start_eV(material, step)
+        grid = build_cases(sweep)[0]["E_grid_brem"]
+        # Declared uniform bands encode as (start, stop, step); the automatic
+        # refined grid (#278) is exact nodes whose first node is the floor.
+        start = float(grid[0])
+        if len(grid) == 3 and np.ndim(grid) == 1 and not isinstance(grid, np.ndarray):
+            assert start == floored_lattice_start_eV(material, float(grid[2]))
         assert start >= photon_continuum_floor_eV(material)
-        resolved.add((start, step))
+        resolved.add(start)
 
     # One medium, one answer: the floor cannot depend on which profile asked.
     assert len(resolved) == 1
