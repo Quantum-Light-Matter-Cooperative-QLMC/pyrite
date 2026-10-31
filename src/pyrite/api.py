@@ -43,7 +43,11 @@ from .materials._composition import resolve_composition
 from .materials.photon_cross_sections import ATTENUATION_MODEL
 from .montecarlo import Case, run_case
 from .montecarlo.runner import cached_case_table_markers, case_table_markers, run_case_directions
-from .montecarlo.runner.transport_options import run_progress, transport_tuning
+from .montecarlo.runner.transport_options import (
+    run_progress,
+    stream_block_electrons,
+    transport_tuning,
+)
 from .montecarlo.spectrum import (
     BREM_ENDF_PARSERPY_VERSION,
 )
@@ -334,8 +338,16 @@ def simulate(
         with run_progress(progress):
             return _simulate_planar(request, case, xsgen_tables)
     if request.executor is None:
-        with transport_tuning(resolved_numerics), run_progress(progress):
-            output = run_case(case, transport_core=resolved_numerics.transport_core)
+        block = stream_block_electrons(resolved_numerics)
+        with transport_tuning(resolved_numerics, streaming=True), run_progress(progress):
+            if block is None:
+                output = run_case(case, transport_core=resolved_numerics.transport_core)
+            else:
+                from .montecarlo.runner.streamed_scoring import run_case_streamed
+
+                output = run_case_streamed(
+                    case, block, transport_core=resolved_numerics.transport_core
+                )
     else:
         from .execution._simulation import execute_simulation
 

@@ -57,14 +57,30 @@ def per_electron_config(tuning):
     return config
 
 
+def stream_block_electrons(numerics) -> int | None:
+    """``numerics``' ``KernelTuning.stream_block_electrons`` (#865), or None."""
+    execution = getattr(numerics, "resolved_execution", None)
+    return None if execution is None else execution.stream_block_electrons
+
+
+STREAMING_ENTRY_ERROR = (
+    "KernelTuning.stream_block_electrons is supported only by pyrite.simulate "
+    "with a scalar detector and no executor"
+)
+
+
 @contextmanager
-def transport_tuning(numerics):
+def transport_tuning(numerics, *, streaming=False):
     """Apply ``KernelTuning.transport`` to in-process runs.
 
     ``numerics`` is a ``Numerics``; internal stand-ins carrying only
     ``transport_core``, and unset fields, keep the process defaults
     (``PYRITE_MC_TRANSPORT_SCHEDULE``, ``PYRITE_MC_ELECTRON_BATCH_MAX``).
+    Callers that do not run live streamed scoring leave ``streaming`` False,
+    so a requested ``stream_block_electrons`` fails before transport (#865).
     """
+    if not streaming and stream_block_electrons(numerics) is not None:
+        raise ValueError(STREAMING_ENTRY_ERROR)
     tuning = transport_kernel_tuning(numerics)
     launch = _spectrum_launch(getattr(numerics, "resolved_execution", None))
     transport = None if tuning is None or tuning == type(tuning)() else per_electron_config(tuning)

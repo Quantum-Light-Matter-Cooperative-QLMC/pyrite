@@ -129,6 +129,15 @@ class ExecutionConfig:
     block reduces (#825). They change summation grouping only (float
     rounding), never case identity, and their best values depend on the scene
     and GPU.
+    ``stream_block_electrons`` (experimental, #865; ``None``: off) opts
+    :func:`pyrite.simulate` into live streamed scoring: transport runs in
+    whole-electron blocks of this many electrons, each block is scored and
+    released, and peak memory follows the block size times the segments per
+    electron instead of the electron count. Spectra equal the default path up
+    to floating-point summation order; transport counts are exact; it never
+    enters case identity. Only scalar-detector, in-process runs of additive
+    spectra are supported; other cases and entry points raise ``ValueError``
+    before transport. Where the joined run fits in memory it is faster.
     """
 
     transport_core: str = "auto"
@@ -137,11 +146,12 @@ class ExecutionConfig:
     transport: TransportKernelTuning = field(default_factory=TransportKernelTuning)
     cxr_threads: int | None = None
     cxr_energies_per_block: int | None = None
+    stream_block_electrons: int | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.transport_core, str) or not self.transport_core:
             raise ValueError("transport_core must be a nonempty string")
-        for name in ("cxr_chunk", "brem_chunk"):
+        for name in ("cxr_chunk", "brem_chunk", "stream_block_electrons"):
             value = getattr(self, name)
             if value is not None and (type(value) is not int or value <= 0):
                 raise ValueError(f"{name} must be a positive integer or None")
@@ -161,10 +171,11 @@ class ExecutionConfig:
 
     def __setstate__(self, state: dict[str, object]) -> None:
         # Pickles from before #776 carry no ``transport`` entry, before #825 no
-        # CXR launch controls.
+        # CXR launch controls, before #865 no streaming block.
         state.setdefault("transport", TransportKernelTuning())
         state.setdefault("cxr_threads", None)
         state.setdefault("cxr_energies_per_block", None)
+        state.setdefault("stream_block_electrons", None)
         self.__dict__.update(state)
 
 

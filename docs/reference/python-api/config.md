@@ -42,6 +42,10 @@ for in-process runs. It takes precedence over `PYRITE_MC_TRANSPORT_SCHEDULE` and
 (experimental) select the CUDA CXR line-reduction launch: threads per block
 and energy nodes per block. They regroup the float sum only and never enter
 case identity.
+`KernelTuning.stream_block_electrons` (experimental, positive integer or
+`None`) opts `pyrite.simulate` into live streamed scoring in whole-electron
+blocks; see [Stream spectra in electron blocks](../../guides/streamed-scoring.md).
+It never enters case identity; spectra agree with the default path to rounding.
 
 ```{eval-rst}
 .. autosummary::

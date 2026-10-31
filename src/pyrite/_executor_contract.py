@@ -25,6 +25,11 @@ def validate_executor(executor: Executor, numerics: Numerics) -> None:
             "executor requires the default KernelTuning CXR launch (cxr_threads, "
             "cxr_energies_per_block); batch executors use the built-in launch"
         )
+    if execution is not None and execution.stream_block_electrons is not None:
+        raise ValueError(
+            "executor does not support KernelTuning.stream_block_electrons; "
+            "live streamed scoring runs in-process only"
+        )
     if execution is not None and execution.transport != type(execution.transport)():
         raise ValueError(
             "executor requires the default KernelTuning.transport; batch executors take "

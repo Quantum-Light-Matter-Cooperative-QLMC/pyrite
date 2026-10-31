@@ -47,6 +47,7 @@ optimization-studies
 running-on-a-cluster
 performance-profile-analysis
 batch-chunk-tuning
+streamed-scoring
 ```
 
 ```{toctree}
