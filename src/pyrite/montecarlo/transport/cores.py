@@ -86,7 +86,6 @@ def make_cpu_transport_core(
     inelastic=False,
     radiative=False,
     lazy_cutoff=True,
-    indexed_moments=True,
 ):
     """Generate one CPU specialization with compile-time-frozen axis flags.
 
@@ -112,8 +111,8 @@ def make_cpu_transport_core(
     historical ones; it requires the midpoint row schema and is not
     available for grooved transport.
 
-    ``lazy_cutoff`` and ``indexed_moments`` (#841) are output-identical lookup
-    shortcuts; ``False`` compiles the original evaluation for equality tests.
+    ``lazy_cutoff`` (#841) skips provably idle midpoint cutoff solves; it is
+    output-identical, and ``False`` compiles the original for equality tests.
 
     Validation: gpu-transport-core
     Validation: shell-secondary-transport
@@ -272,7 +271,6 @@ def make_cpu_transport_core(
             rad_draws = np.zeros(Ne, dtype=np.uint64)
             rad_element_rates = np.empty(rad_Z.shape[1], dtype=np.float64)
             rad_scratch_rates = np.empty(rad_Z.shape[1], dtype=np.float64)
-            rad_guide = _moments.build_moment_guide(rad_nel, rad_plasma, indexed_moments)
             # Table lookups stay inline; exact quadrature stays out of line (#841).
             rad_table = rad_plasma.size != n_layers
         # Lazy midpoint cutoff (#841); the skip proof is in _jit_cutoff_bound.
@@ -399,7 +397,7 @@ def make_cpu_transport_core(
             rad_j = False
             if radiative:
                 if rad_table:
-                    rad_soft, mu_rad = _moments.table_moments(rad_plasma, rad_guide, L, E_j * 1e3)
+                    rad_soft, mu_rad = _moments.table_moments(rad_plasma, n_layers, L, E_j * 1e3)
                 else:
                     rad_soft, mu_rad = _moments.exact_moments(
                         radiative_args, L, E_j * 1e3, rad_element_rates
@@ -606,7 +604,7 @@ def make_cpu_transport_core(
                     if radiative:
                         if rad_table:
                             rad_cut_soft, _ = _moments.table_moments(
-                                rad_plasma, rad_guide, L, E_mid * 1e3
+                                rad_plasma, n_layers, L, E_mid * 1e3
                             )
                         else:
                             rad_cut_soft, _ = _moments.exact_moments(
@@ -652,7 +650,7 @@ def make_cpu_transport_core(
                         if radiative:
                             if rad_table:
                                 rad_mid_soft, _ = _moments.table_moments(
-                                    rad_plasma, rad_guide, L, E_mid * 1e3
+                                    rad_plasma, n_layers, L, E_mid * 1e3
                                 )
                             else:
                                 rad_mid_soft, _ = _moments.exact_moments(

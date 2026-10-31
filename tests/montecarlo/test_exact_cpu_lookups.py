@@ -1,4 +1,4 @@
-"""Output-identical CPU lookup shortcuts: lazy midpoint cutoff, indexed moments (#841)."""
+"""Output-identical CPU core lookups: lazy midpoint cutoff, inline table moments (#841)."""
 
 from dataclasses import replace
 
@@ -15,7 +15,7 @@ from pyrite.montecarlo.transport._jit_cutoff_bound import (
     widen_cutoff_bound,
 )
 from pyrite.montecarlo.transport._jit_moment_lookup import (
-    build_moment_guide,
+    exact_moments,
     table_moments,
     transport_layer_moments,
 )
@@ -75,62 +75,53 @@ def _layer_nodes(packed, layer):
     return plasma[3 * n_layers + start : 3 * n_layers + start + count]
 
 
-def test_indexed_moment_search_is_bitwise_the_bisection_on_dense_sweeps():
+def _bisection_oracle(plasma, n_layers, layer, energy_eV):
+    """Main's table lookup (d5bcd957) in NumPy scalars, frozen as the oracle."""
+    start = int(plasma[n_layers + layer])
+    total = (plasma.size - 3 * n_layers) // 5
+    energy, logs = plasma[3 * n_layers :], plasma[3 * n_layers + total :]
+    values = plasma[3 * n_layers + 2 * total :]
+    lo, hi = start, start + int(plasma[2 * n_layers + layer]) - 1
+    if energy_eV == energy[lo]:
+        return values[3 * lo], values[3 * lo + 1]
+    if energy_eV == energy[hi]:
+        return values[3 * hi], values[3 * hi + 1]
+    x = np.log(energy_eV)
+    while hi - lo > 1:
+        mid = (lo + hi) // 2
+        lo, hi = (mid, hi) if logs[mid] <= x else (lo, mid)
+    f = (x - logs[lo]) / (logs[hi] - logs[lo])
+    f = min(max(f, 0.0), 1.0)
+    soft = (1.0 - f) * values[3 * lo] + f * values[3 * hi]
+    return soft, (1.0 - f) * values[3 * lo + 1] + f * values[3 * hi + 1]
+
+
+def test_inline_table_moments_are_bitwise_the_original_lookup_on_dense_sweeps():
     packed = _packed_two_layer()
     plasma = packed[-1]
-    guide = build_moment_guide(packed[2], plasma)
-    assert guide[5]
     scratch = np.empty(packed[4].shape[1])
     for layer in range(2):
         for energy_eV in _query_energies(_layer_nodes(packed, layer)):
-            expected = transport_layer_moments(
-                *packed[2:-1], layer, energy_eV, 1000.0, scratch, plasma
-            )
-            actual = table_moments(plasma, guide, layer, energy_eV)
-            assert np.array(actual).tobytes() == np.array(expected).tobytes(), energy_eV
+            expected = np.array(_bisection_oracle(plasma, 2, layer, energy_eV)).tobytes()
+            assert np.array(table_moments(plasma, 2, layer, energy_eV)).tobytes() == expected
+            assert np.array(exact_moments(packed, layer, energy_eV, scratch)).tobytes() == expected
     for bad in [np.nextafter(_layer_nodes(packed, 1)[0], -np.inf), np.inf, np.nan]:
         with pytest.raises(ValueError, match="outside prepared"):
-            table_moments(plasma, guide, 1, bad)
+            table_moments(plasma, 2, 1, bad)
 
 
-def _synthetic_buffer(rows):
-    """Packed buffer with arbitrary nondecreasing log rows (ties and clusters)."""
-    n = len(rows)
-    counts = np.array([r.size for r in rows], dtype=float)
-    starts = np.r_[0.0, np.cumsum(counts[:-1])]
-    energies = np.concatenate([np.exp(r) for r in rows])
-    logs = np.concatenate(rows)
-    moments = np.random.default_rng(3).uniform(0.0, 1.0, 3 * logs.size)
-    return np.r_[np.zeros(n), starts, counts, energies, logs, moments]
-
-
-def test_guided_walk_reproduces_bisection_on_clustered_and_tied_rows():
-    # Two-layer quadrature arguments only fix the call types; table mode ignores them.
-    quadrature = _packed_two_layer()[2:-1]
-    rng = np.random.default_rng(11)
-    clustered = np.sort(np.r_[np.log(1e4), rng.normal(10.0, 1e-3, 400), np.log(1e6)])
-    tied = np.r_[np.log(1e4), np.repeat(np.log(5e4), 5), np.log(2e5), np.log(1e6)]
-    two = np.log(np.array([1e4, 1e6]))
-    for rows in [(clustered, tied), (two, clustered)]:
-        plasma = _synthetic_buffer(rows)
-        guide = build_moment_guide(quadrature[0], plasma)
-        assert guide[5]
-        for layer, row in enumerate(rows):
-            x = np.r_[np.linspace(row[0], row[-1], 5001), row, rng.uniform(row[0], row[-1], 2000)]
-            for energy_eV in np.clip(np.exp(x), np.exp(row[0]), np.exp(row[-1])):
-                expected = transport_layer_moments(
-                    *quadrature, layer, energy_eV, 1.0, np.empty(1), plasma
-                )
-                actual = table_moments(plasma, guide, layer, energy_eV)
-                assert np.array(actual).tobytes() == np.array(expected).tobytes()
-    decreasing = _synthetic_buffer([np.r_[two[0], 11.0, 10.0, two[1]], two])
-    refused = build_moment_guide(quadrature[0], decreasing)
-    assert not refused[5]
-    for energy_eV in np.exp(np.linspace(two[0], two[1], 101)):
-        expected = transport_layer_moments(*quadrature, 0, energy_eV, 1.0, np.empty(1), decreasing)
-        actual = table_moments(decreasing, refused, 0, energy_eV)
+def test_exact_moments_route_quadrature_buffers_to_the_exact_reference():
+    exact = radiative_core_args(
+        [SI, W], BREMSLIB, 1000.0, np.array([10.0]), np.array([150.0]), 7, 1
+    )
+    rates, expected_rates = np.empty(exact[4].shape[1]), np.empty(exact[4].shape[1])
+    for energy_eV in [1.2e4, 5.5e4, 1.4e5]:
+        actual = exact_moments(exact, 1, energy_eV, rates)
+        expected = transport_layer_moments(
+            *exact[2:-1], 1, energy_eV, 1000.0, expected_rates, exact[-1]
+        )
         assert np.array(actual).tobytes() == np.array(expected).tobytes()
-    assert not build_moment_guide(quadrature[0], np.zeros(2))[5]  # exact quadrature buffer
+        assert rates.tobytes() == expected_rates.tobytes()
 
 
 def test_cutoff_bounds_dominate_every_evaluated_rate_and_refuse_unproven_tables():
@@ -142,10 +133,9 @@ def test_cutoff_bounds_dominate_every_evaluated_rate_and_refuse_unproven_tables(
     cutoffs = np.array([12.0, 10.0])
     assert add_soft_moment_bound(True, bound, packed[2], packed[-1], cutoffs)
     assert widen_cutoff_bound(True, bound)
-    guide = build_moment_guide(packed[2], packed[-1])
     for layer in range(2):
         for energy in np.geomspace(10.0, 150.0, 4001):
-            soft, _ = table_moments(packed[-1], guide, layer, energy * 1e3)
+            soft, _ = table_moments(packed[-1], 2, layer, energy * 1e3)
             rate = _dEds_sbethe_packed_scalar(
                 log_energy, log_stopping, layer, counts[layer], energy
             )
@@ -188,9 +178,7 @@ _LUT = {
 
 def _reference_core(monkeypatch, per_electron, inelastic, radiative, lut):
     flags = dict(per_electron=per_electron, inelastic=inelastic, radiative=radiative)
-    reference = cores.make_cpu_transport_core(
-        **flags, lut=lut, lazy_cutoff=False, indexed_moments=False
-    )
+    reference = cores.make_cpu_transport_core(**flags, lut=lut, lazy_cutoff=False)
     if lut:
         monkeypatch.setattr(host_pass, _LUT[(per_electron, inelastic)], reference)
     else:
