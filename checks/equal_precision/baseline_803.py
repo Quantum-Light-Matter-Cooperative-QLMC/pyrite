@@ -48,12 +48,23 @@ def parse_args(argv=None):
     parser.add_argument("--histories", type=int, required=True)
     parser.add_argument("--seed", type=int, required=True)
     parser.add_argument("--repeats", type=int, default=3)
+    # Result-neutral CUDA scheduling/handoff knobs (defaults = production).
+    parser.add_argument("--rows-per-round", type=int, help="continuation row quantum")
+    parser.add_argument("--device-staging", action="store_true", help="stage rounds on device")
+    parser.add_argument(
+        "--keep-on-device",
+        action="store_true",
+        help="return segments as device arrays, as production spectral runs do",
+    )
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args(argv)
     if args.histories < 2 or args.repeats < 1:
         parser.error("need at least two histories and one warm repeat")
     if args.schedule != "full-history" and args.core != "cuda":
         parser.error("continuation and auto schedules are CUDA comparisons")
+    cuda_only = args.rows_per_round is not None or args.device_staging or args.keep_on_device
+    if cuda_only and args.core != "cuda":
+        parser.error("--rows-per-round, --device-staging and --keep-on-device are CUDA knobs")
     return args
 
 
@@ -355,7 +366,10 @@ def transport_arguments(args, protocol, scene, adapter):
         radiative_moments=args.moments,
         # Explicit schedule: a separately built config otherwise means
         # full-history implicitly, while the process default is ``auto``.
-        per_electron_config=PerElectronTransportConfig(schedule=args.schedule),
+        per_electron_config=PerElectronTransportConfig(
+            schedule=args.schedule, continuation=continuation_config(args)
+        ),
+        keep_segments_on_device=args.keep_on_device,
     )
     tables = {
         "sbethe": [
@@ -401,8 +415,34 @@ def transport_arguments(args, protocol, scene, adapter):
         "lut_config": asdict(lut),
         "moments_requested": args.moments,
         "schedule_requested": args.schedule,
+        "rows_per_round_requested": args.rows_per_round,
+        "device_staging": args.device_staging,
+        "keep_on_device": args.keep_on_device,
     } | {k: common[k] for k in sorted(common)}
     return kw, tables, controls
+
+
+def continuation_config(args):
+    """An explicit continuation config, or ``None`` for the production default."""
+    if args.rows_per_round is None and not args.device_staging:
+        return None
+    from pyrite.montecarlo.transport.continuation import TransportContinuationConfig
+
+    default = TransportContinuationConfig()
+    return TransportContinuationConfig(
+        rows_per_round=args.rows_per_round or default.rows_per_round,
+        device_staging=args.device_staging,
+    )
+
+
+def to_host(result):
+    """``result`` with device arrays copied to NumPy (after timing, for digests)."""
+    import numpy as np
+
+    return {
+        k: v.get() if hasattr(v, "get") and not isinstance(v, (dict, np.ndarray)) else v
+        for k, v in result.items()
+    }
 
 
 def device_pool_bytes(core):
@@ -482,6 +522,7 @@ def main(argv=None):
     warm, digests, scores = [], [], None
     for _ in range(args.repeats):
         result, wall, split = request(args.seed)
+        result = to_host(result)
         warm.append({"wall_s": wall, "observed": observed.take()} | split)
         digests.append(trajectory_digest(result))
         if scores is None:
@@ -504,6 +545,7 @@ def main(argv=None):
     # sample; its trajectory must match the unsynchronized repeats.
     stages.sync = sync if device is not None else None
     result, synced_wall, synced_split = request(args.seed)
+    result = to_host(result)
     observed.take()
     stages.sync = None
     if trajectory_digest(result) != digests[0]:
