@@ -20,6 +20,20 @@ from pyrite.montecarlo.spectrum.cxr._coverage import (
 )
 
 
+@pytest.fixture(autouse=True)
+def _screen_enabled(monkeypatch):
+    monkeypatch.setenv("PYRITE_LINE_DATA_COVERAGE", "1")
+
+
+def test_screen_is_opt_in(monkeypatch):
+    monkeypatch.delenv("PYRITE_LINE_DATA_COVERAGE")
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", LineOpticalDataWarning)
+        with collect_line_data_coverage() as records:
+            _spectrum()
+    assert records == []
+
+
 def _segments(energy_keV):
     energy = np.atleast_1d(energy_keV)
     count = energy.size

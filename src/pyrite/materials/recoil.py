@@ -49,12 +49,17 @@ def _state(kinetic_eV, electron_direction, g_ang_inv, photon_direction):
     direction = _vector(electron_direction, "electron_direction", unit=True)
     reciprocal = _vector(g_ang_inv, "g_ang_inv")
     normal = _vector(photon_direction, "photon_direction", unit=True)
-    energy_rows, direction, reciprocal, normal = np.broadcast_arrays(
+    return _kinematics(np, kinetic, direction, reciprocal, normal)
+
+
+def _kinematics(xp, kinetic, direction, reciprocal, normal):
+    """Broadcast validated float64 inputs with array module ``xp``."""
+    energy_rows, direction, reciprocal, normal = xp.broadcast_arrays(
         kinetic[..., None], direction, reciprocal, normal
     )
     kinetic = energy_rows[..., 0]
     total = kinetic + M_E_EV
-    momentum = np.sqrt(kinetic) * np.sqrt(kinetic + 2 * M_E_EV)
+    momentum = xp.sqrt(kinetic) * xp.sqrt(kinetic + 2 * M_E_EV)
     return kinetic, total, momentum / total, direction, HBARC_EV_ANG * reciprocal, normal
 
 
@@ -69,11 +74,11 @@ def _coefficients(total, beta, direction, transfer, normal):
 
     Validation: line-recoil-resonance
     """
-    numerator = beta * np.sum(direction * transfer, axis=-1)
-    numerator -= np.sum(transfer * transfer, axis=-1) / (2 * total)
+    numerator = beta * (direction * transfer).sum(axis=-1)
+    numerator -= (transfer * transfer).sum(axis=-1) / (2 * total)
     denominator = (M_E_EV / total) ** 2 / (1 + beta)
-    denominator += 0.5 * beta * np.sum((direction - normal) ** 2, axis=-1)
-    denominator += np.sum(transfer * normal, axis=-1) / total
+    denominator += 0.5 * beta * ((direction - normal) ** 2).sum(axis=-1)
+    denominator += (transfer * normal).sum(axis=-1) / total
     return numerator, denominator
 
 
@@ -123,9 +128,11 @@ def recoil_resonance_eV(
 
     Validation: line-recoil-resonance
     """
-    kinetic, total, beta, direction, transfer, normal = _state(
-        kinetic_eV, electron_direction, g_ang_inv, photon_direction
-    )
+    state = _state(kinetic_eV, electron_direction, g_ang_inv, photon_direction)
+    return np.asarray(_exact_root(np, *state))
+
+
+def _exact_root(xp, kinetic, total, beta, direction, transfer, normal):
     numerator, denominator = _coefficients(total, beta, direction, transfer, normal)
     with np.errstate(divide="ignore", invalid="ignore"):
         root = numerator / denominator
@@ -133,9 +140,9 @@ def recoil_resonance_eV(
     # this tolerance is an extraneous negative-energy branch of the squared
     # mass-shell equation, never a photon to clip down to the beam energy.
     endpoint_tolerance = 8 * np.finfo(np.float64).eps * kinetic
-    valid = (numerator > 0) & (denominator > 0) & np.isfinite(root) & (root > 0)
+    valid = (numerator > 0) & (denominator > 0) & xp.isfinite(root) & (root > 0)
     valid &= root <= kinetic + endpoint_tolerance
-    return np.asarray(np.where(valid, np.minimum(root, kinetic), np.nan))
+    return xp.where(valid, xp.minimum(root, kinetic), xp.nan)
 
 
 def recoil_shift_fraction(
@@ -159,17 +166,34 @@ def recoil_shift_fraction(
 
     Validation: line-recoil-validity-screen
     """
-    exact = recoil_resonance_eV(kinetic_eV, electron_direction, g_ang_inv, photon_direction)
-    _kinetic, total, beta, direction, transfer, normal = _state(
-        kinetic_eV, electron_direction, g_ang_inv, photon_direction
-    )
-    numerator = beta * np.sum(direction * transfer, axis=-1)
+    state = _state(kinetic_eV, electron_direction, g_ang_inv, photon_direction)
+    return np.asarray(_shift_fraction(np, *state))
+
+
+def _recoil_shift_fraction_unchecked(xp, kinetic_eV, electron_direction, g_ang_inv, normal):
+    """:func:`recoil_shift_fraction` with array module ``xp`` and no input checks.
+
+    The caller guarantees float64, finite, strictly positive ``kinetic_eV`` and
+    finite, nonzero direction rows; the directions are normalized here exactly
+    as the checked reference normalizes them, so NumPy inputs give bitwise
+    the reference result. Used by the device line-recoil screen.
+
+    Validation: line-recoil-validity-screen
+    """
+    direction = electron_direction / xp.linalg.norm(electron_direction, axis=-1)[..., None]
+    normal = normal / xp.linalg.norm(normal, axis=-1)[..., None]
+    return _shift_fraction(xp, *_kinematics(xp, kinetic_eV, direction, g_ang_inv, normal))
+
+
+def _shift_fraction(xp, kinetic, total, beta, direction, transfer, normal):
+    exact = _exact_root(xp, kinetic, total, beta, direction, transfer, normal)
+    numerator = beta * (direction * transfer).sum(axis=-1)
     denominator = (M_E_EV / total) ** 2 / (1 + beta)
-    denominator += 0.5 * beta * np.sum((direction - normal) ** 2, axis=-1)
+    denominator += 0.5 * beta * ((direction - normal) ** 2).sum(axis=-1)
     classical = numerator / denominator
     with np.errstate(divide="ignore", invalid="ignore"):
-        fraction = np.where(np.isfinite(exact), exact / classical - 1, np.inf)
-    return np.asarray(np.where(classical > 0, fraction, np.nan))
+        fraction = xp.where(xp.isfinite(exact), exact / classical - 1, xp.inf)
+    return xp.where(classical > 0, fraction, xp.nan)
 
 
 def _photon(photon_eV, kinetic):

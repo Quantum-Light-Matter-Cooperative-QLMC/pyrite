@@ -12,7 +12,11 @@ from ...._backend import REAL, _to_cpu, xp
 from ..coherent_population import require_resolved_power
 from . import _policy
 from ._batched import _accumulate_batched
-from ._coverage import line_data_coverage, publish_line_data_coverage
+from ._coverage import (
+    line_data_coverage,
+    line_data_coverage_enabled,
+    publish_line_data_coverage,
+)
 from ._per_hkl import _accumulate_per_hkl
 from ._setup import SpectrumRequest, _prepare_spectrum
 
@@ -319,13 +323,14 @@ def _needs_per_hkl_route(st):
 def _mc_spectrum(request):
     """Run the three spectrum phases for a bound request."""
     st = _prepare_spectrum(request)
-    coverage = line_data_coverage(st)
+    coverage = line_data_coverage(st) if line_data_coverage_enabled() else None
     if _needs_per_hkl_route(st):
         _accumulate_per_hkl(st)
     else:
         _accumulate_batched(st)
     result = _finalize_spectrum(st)
-    publish_line_data_coverage(coverage)
+    if coverage is not None:
+        publish_line_data_coverage(coverage)
     return result
 
 

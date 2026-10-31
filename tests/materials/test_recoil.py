@@ -7,6 +7,7 @@ import pytest
 
 from pyrite.materials.crystal import HBARC_EV_ANG, M_E_EV
 from pyrite.materials.recoil import (
+    _recoil_shift_fraction_unchecked,
     recoil_mismatch_inv_ang,
     recoil_mismatch_slope,
     recoil_resonance_eV,
@@ -245,3 +246,17 @@ def test_shift_fraction_branches_and_broadcasting():
     assert np.all(np.diff(np.abs(actual)) > 0)
     # Finite where beta itself rounds to one in float64.
     assert np.isfinite(recoil_shift_fraction(1e15, [0, 0, 1], [0, 0, 2e-8], [0, 0, 1]))
+
+
+def test_unchecked_shift_fraction_is_bitwise_the_reference():
+    """The screen's namespace-generic path reproduces the checked reference (#286)."""
+    rng = np.random.default_rng(286)
+    kinetic = 10.0 ** rng.uniform(3, 10, 4096)
+    direction = rng.normal(size=(4096, 3)).astype(np.float32).astype(np.float64)
+    direction /= np.linalg.norm(direction, axis=1)[:, None]
+    g = np.array([0.0, 0.3, 1.9])
+    normal = np.array([0.6, 0.0, 0.8])
+    expected = recoil_shift_fraction(kinetic, direction, g, normal)
+    actual = _recoil_shift_fraction_unchecked(np, kinetic, direction, g, normal)
+    np.testing.assert_array_equal(actual, expected)
+    assert np.isnan(expected).any() and np.isfinite(expected).any()

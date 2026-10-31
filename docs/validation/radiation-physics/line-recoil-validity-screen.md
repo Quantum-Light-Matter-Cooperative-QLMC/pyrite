@@ -153,6 +153,7 @@ exact shifts 0.01, -0.01, the next floating-point number above 0.01,
 positive infinity and NaN: exactly two were counted. This checks comparison
 semantics; it is separate from the physical reference-value probes.
 
+The screen runs only when `PYRITE_LINE_DATA_COVERAGE` is set (#286).
 The parent `line_data_coverage` loop selects CXR electrons with finite
 positive escape-piece duration, each requested reflection, and each mosaic
 orientation of positive quadrature weight. It next requires the production
@@ -160,7 +161,13 @@ vacuum seed to be finite and strictly positive in the active backend
 precision. The recoil evaluator further requires finite positive kinetic
 energy and a finite nonzero direction norm. It uses `E_repr_keV` when
 present, otherwise `E_keV`, converts keV to eV, normalizes directions and
-evaluates the recoil ratio on the host in float64.
+evaluates the recoil ratio in float64 in place on the active array backend
+(#286). It runs the same formula code as the checked NumPy reference
+(`_recoil_shift_fraction_unchecked`, bitwise-equal to
+`recoil_shift_fraction` for NumPy inputs; regression in
+`tests/materials/test_recoil.py`). On CUDA, compiler contraction can move
+a ratio by a few ulp, so a pair within roundoff of the 1 % limit may be
+counted differently from the host evaluation.
 
 Consequently the count is an unweighted number of eligible
 escape-piece/reflection/mosaic pairs that survive the production seed gate.

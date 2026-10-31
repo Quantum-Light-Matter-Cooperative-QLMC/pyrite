@@ -416,7 +416,6 @@ def test_directional_map_renders_native_grids_without_transport(tutorials, monke
     assert data["seed"] == data["case"]["seed"] == 1
     assert data["case"]["Ne"] == data["case"]["Ne_brem"] == 4_096
     assert data["provenance"]["backend"] == "cpu"
-    assert any("LineOpticalDataWarning" in warning for warning in data["warnings"])
     try:
         tutorials.directional_source_heatmap()
         figure = plt.gcf()
