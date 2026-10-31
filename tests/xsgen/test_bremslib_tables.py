@@ -58,9 +58,7 @@ def test_released_but_unfetched_table_is_an_error_not_a_fallback(monkeypatch):
     with pytest.raises(TableNotFoundError, match="fetch bremslib"):
         bremslib_tables.load_bremsstrahlung_tables(["C"])
     with pytest.warns(PhysicsFallbackWarning, match="isotropic EEDL"):
-        assert bremslib_tables.load_bremsstrahlung_tables(
-            ["C"], allow_fallback=True
-        ) == {}
+        assert bremslib_tables.load_bremsstrahlung_tables(["C"], allow_fallback=True) == {}
 
 
 def test_unreleased_element_generates_from_a_checkout(monkeypatch, stored):
@@ -96,9 +94,10 @@ def test_unreleased_element_without_checkout_requires_explicit_fallback(monkeypa
     with pytest.raises(TableNotFoundError, match="pyrite tables fetch bremslib"):
         bremslib_tables.resolve_bremsstrahlung_model("auto", ["Au"])
     with pytest.warns(PhysicsFallbackWarning, match="entire run"):
-        assert bremslib_tables.resolve_bremsstrahlung_model(
-            "auto", ["Au"], allow_fallback=True
-        ) == "eedl"
+        assert (
+            bremslib_tables.resolve_bremsstrahlung_model("auto", ["Au"], allow_fallback=True)
+            == "eedl"
+        )
     assert bremslib_tables.resolve_bremsstrahlung_model("eedl", ["Au"]) == "eedl"
 
 
