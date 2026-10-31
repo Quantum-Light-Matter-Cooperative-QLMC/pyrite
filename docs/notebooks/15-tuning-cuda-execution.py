@@ -72,7 +72,7 @@ def _(mo):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo):
     import cupy
 
@@ -182,7 +182,7 @@ def _(mo):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo, scene, tables_ready):
     from time import perf_counter
 
@@ -237,7 +237,7 @@ def _(mo):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(electrons, free_bytes, mo, resident_threads, scene, trial_budget):
     from pyrite.optimization import KernelSearchSpace
 
