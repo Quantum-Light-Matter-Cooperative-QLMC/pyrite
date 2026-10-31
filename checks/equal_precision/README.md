@@ -461,3 +461,140 @@ four-scene straggling-on screen for one engine with per-run timeouts, and
 z-score summary. `pyrite_adapter.py --straggling on|off` overrides a scene's
 straggling switch, keeps the scene value as `straggling_scene` in the record,
 and never writes the legacy pilot record.
+
+## Energy-lookup baseline (#803)
+
+`baseline-803.json` freezes four scenes (Si and W at 300 keV, SiO2 at 800 keV,
+and 2 µm W on 100 µm Si at 800 keV), three seeds and three arms:
+screened-Rutherford exact versus the combined transport LUT (uncoupled), detailed
+ELSEPA with coupled BremsLib under continuous or shell soft/hard loss with
+radiative moments `table` or `exact`, and CUDA `continuation`/`auto` schedules,
+which pair with the detailed arm's `full-history` samples for bitwise checks.
+
+`baseline_803.py` runs one sample with every control explicit, including
+`--schedule`. A separately constructed transport config otherwise means
+full-history, while the process default is `auto`. Transport may bypass a
+request: the combined LUT excludes ELSEPA and coupled radiation. The record
+therefore stores what transport resolved: whether a LUT was built and its
+achieved error, the resolved schedule, and the moment model and packed-table
+hash. It also stores the wall time of LUT construction and radiative-moment
+preparation in the cold request and every warm request. Warm repeats of one
+seed must share a trajectory digest. A refused control combination is recorded
+as `unsupported`, not dropped.
+
+Sample schema v2 adds a request split. Every request records host time per
+production NVTX range (`pyrite.transport.*`, inclusive and exclusive of nested
+ranges) and, on CUDA, the CUDA-event time of each exact transport kernel launch.
+One extra request then drains the device at every range boundary, so queued
+device work is charged to the stage that issued it. It is not a timing sample,
+and its trajectory digest must match the warm repeats. The record also keeps
+the retained output bytes and the #827 kernel variants that were launched.
+
+`run_baseline_803.py OUT --core per-electron|cuda` expands the protocol into
+fresh processes and reverses arm order on even seeds. It skips samples whose
+records exist and keeps failures as `*.failed.json`. Use `--dry-run` to list
+the plan. On the lab box, submit `baseline-803-cpu.sbatch` (one thread, array
+over scenes) and `baseline-803-gpu.sbatch` (scenes serialized on one GPU).
+Re-submit with the same `LUT803_OUT` to resume. Local runs are plumbing smokes
+only.
+
+`analyze_baseline_803.py DIR... --output PATH` pairs records that differ in one
+control at the same scene, core and seed. It reports per-seed warm speedups,
+cold costs, the warm share of moment and LUT preparation, and memory. Schedule
+pairs need equal trajectory digests. LUT and moment pairs get a paired
+per-primary screen: the 95% interval of the difference is compared with
+`--rel-tol` (default 1e-3) and classed as equivalent, different or unresolved.
+The screen is not a qualification gate.
+
+### Component attribution (#803)
+
+`probe_components_803.py COMPONENT K AUDIT_DIR <baseline_803.py args>`
+generalizes the #792 flight-rate probe. It rewrites an isolated copy of
+`cores.py` (CPU) or `_jit_kernel.py` (CUDA) so that one component is evaluated
+`K` extra times at its own site, with inputs perturbed downward by `(k + 1)·1e-13`
+relative. The extra results feed only a comparison with an impossible value,
+so trajectories must stay bitwise identical to `K = 0`. The components are:
+
+- `rate`: the per-step ELSEPA rate sum;
+- `moments`: the soft and hard radiative moments at step start;
+- `stopping`: SBETHE stopping at step start;
+- `cutoff`: stopping plus the soft moment at the midpoint cutoff energy;
+- `midpoint`: the same at the RK2 midpoint;
+- `clock`: `beta` for the transport clock;
+- `select`: the element-selection rate recomputation;
+- `angle`: ELSEPA polar inversion with its grid lookup.
+
+The run is `baseline_803.py`, so records keep CUDA-event kernel time and the
+NVTX stage split. `--precision mixed|mixed_math` (CUDA only) also applies the
+#831 FP32 text rewrite. It is a timing proxy for #838, not validated physics.
+
+`run_probe_803.py OUT --core per-electron|cuda` expands `probe-803.json`. For
+each scene, configuration and seed it runs `K = 0` first, then rotates the
+component order by seed. It resumes like the baseline driver. On the lab box,
+submit `probe-803-cpu.sbatch` or `probe-803-gpu.sbatch`.
+
+`analyze_probe_803.py DIR... --output PATH` checks every amplified digest
+against its `K = 0` reference and reports the cost of one evaluation,
+`(T_K − T_0)/K`. `T` is warm kernel time on CUDA and warm request wall on CPU.
+The cost is given as a share of kernel and of request time. It is a ceiling
+for a zero-cost replacement at that site, and the marginal costs are not
+additive. The leftover `unattributed` share is therefore a rough remainder.
+
+### Result and recommendation (#803)
+
+Evidence: CPU baseline 2867 and probe 2880 (qlmc-queen, 9950X3D); CUDA
+baseline 2868, probe 2875 and staging sweep 2885 (RTX 5080). Harness `a0a6cdcf`
+on source `f9ccffb0`. Every probe and schedule arm kept the reference
+trajectory digest: 344 CUDA probe records, none broken.
+
+Kernel share of one evaluation at `K = 4`, exact precision, two seeds. CPU is
+from #841's attribution; CUDA is from 2875:
+
+| component | CPU continuous / shell | CUDA continuous | CUDA shell | CUDA share of request |
+|---|---|---|---|---|
+| midpoint cutoff loss | 15.4–17.9 / 11.6–14.5 | 7.0–11.1 | 2.2–2.8 | ≤ 2.8 |
+| cutoff solve | 15.5–17.7 / 12–14.4 | 7.0–11.0 | 2.2–2.8 | ≤ 2.8 |
+| radiative moments | 11.8–14.0 / 9.4–11.2 | 7.7–10.8 | 2.1–2.8 | ≤ 2.7 |
+| ELSEPA angle | 6.6–7.7 / 3.9–5.7 | 7.1–9.2 | 2.0–2.4 | ≤ 2.3 |
+| element select | 2.9–5.1 | ≈ 0, SiO2 6.0 | ≤ 1.3 | ≤ 0.8 |
+| ELSEPA rate | 3.2–7.2 | 1.8–5.2 | 0.7–1.3 | ≤ 0.9 |
+| stopping | 3.5–4.1 | 3.3–5.8 | 1.1–1.5 | ≤ 1.4 |
+| clock (FP64 `pow`) | ≈ 0 | 4.0–5.9 | 1.3–1.5 | ≤ 1.5 |
+
+The CUDA unattributed remainder is 42–62% of the continuous kernel and
+85–88% of the shell kernel, which is the shell event code.
+
+Remaining gaps:
+
+- **Cold cost.** With the kernel cache warm, a first request costs at most
+  3 s more than a warm one on either core. Table loading is 1.0–1.1 s on CUDA
+  and 3.1–7.3 s on CPU.
+- **Memory.** CUDA continuation scratch peaks at 0.5–0.9 GB of the device pool.
+  Host RSS is set by retained output: up to 24.5 GB for SiO2 at 16384
+  histories. That belongs to #807 and #611, not to a lookup.
+
+Ranked recommendation:
+
+1. **CPU exact lookups: go, done.** The lazy midpoint cutoff and inlined moment
+   lookup landed in #841 (#843) at 1.40–1.67× with bitwise-equal output. A
+   guide-table moment index was measured slower than inlined bisection and
+   dropped.
+2. **CUDA host staging: go, done.** The kernel is 12.5–20% of a continuous
+   request and 33–53% of a shell request; row staging and assembly are
+   39–74%. Device staging (sweep 2885: 1.22–1.66×) landed as the default in
+   #842 (#844). Larger `rows_per_round` was slower: 0.21–0.50× at 4096.
+3. **CUDA in-kernel energy LUT: no-go.** Each lookup is at most 2.8% of a
+   request even as a zero-cost ceiling, and all lookups combined, clock included, are
+   at most about 14%, on the multilayer. A LUT is not zero-cost and needs its own
+   interpolation gates, so the break-even is not met. The kernel share roughly
+   rises by the #842 factor; re-probe only if a later change makes the kernel
+   dominate requests.
+4. **Owned elsewhere.** The CUDA shell event code (the 85–88% remainder) and
+   device photon completion go to #825; it needs GPU profiling counters.
+   FP32 tables and transcendentals go to #838. #831's `mixed_math` rewrite
+   moves the leading leftover to the FP64 clock `pow` (7.6–9.4%). A shared
+   ELSEPA energy grid across a compound's elements (SiO2 select, 6%) is a small,
+   compound-only candidate; it is not worth its own slice.
+
+No lookup in this issue needs new interpolation or coverage gates, because no
+new lookup is recommended. The CPU changes in #841 are exact.
