@@ -137,6 +137,19 @@ hold=$(sbatch --parsable checks/geant4_performance/hold.sbatch)
 sbatch --dependency=after:$hold checks/geant4_performance/precision.sbatch $hold precision-plan.json
 ```
 
+## Spectral-grid sensitivity
+
+`--spectrum-step-ev STEP` (repeatable) additionally scores every transported
+block with the production continuum, `mc_coupled_brem_spectrum`, using the
+runner's brem chunk policy and unit transmission. It scores toward the cone
+axis on the uniform grid `STEP, 2·STEP, … < E0`; the production `E_grid_brem`
+step is 25 eV. The scoring is timed per step and excluded from the request
+timings. `work.<request>.grid_spectra` records the seconds, node count, chunk,
+and the cone-band yields in the point convention. These yields check the grid
+against the arm's quadrature. The densities go to `<output>.grid.npz`.
+`gridsens.sbatch` runs W 1 MeV at 25/100/400 eV. If the time scales with the
+node count, continuum scoring is bin-bound (#278).
+
 ## Running
 
 From a synced lab checkout (`PYRITE_REMOTE_DIR=~/pyrite-821/repo uv run pyrite remote sync`):
