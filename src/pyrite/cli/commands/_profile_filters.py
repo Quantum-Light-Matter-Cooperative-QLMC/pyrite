@@ -54,11 +54,28 @@ def filter_add_command(profile_name, dry_run, **values):
 def _filter_payload(document, profile_name):
     profile = existing_profile(document, profile_name)
     rows = _profile_edit.filter_rows(profile)
+    raw = [dict(row.unwrap() if hasattr(row, "unwrap") else row) for row in rows]
+    if not any("ref" in row for row in raw):
+        # Preserve the exact legacy list/show payload for existing profiles.
+        return {
+            "profile": profile_name,
+            "filters": [{"index": index, **row} for index, row in enumerate(raw, start=1)],
+        }
+    catalog = _catalog_io.validated_catalog(
+        _catalog_io.active_catalog_path(),
+        _catalog_io.render_catalog(document),
+        profile=profile_name,
+    )
+    resolved = catalog.profile_filters.get(profile_name, ())
     return {
         "profile": profile_name,
         "filters": [
-            {"index": index, **dict(row.unwrap() if hasattr(row, "unwrap") else row)}
-            for index, row in enumerate(rows, start=1)
+            {
+                "index": index,
+                **(dict(plate) if "ref" in row else row),
+                **({"ref": row["ref"]} if "ref" in row else {}),
+            }
+            for index, (row, plate) in enumerate(zip(raw, resolved, strict=True), start=1)
         ],
     }
 
@@ -175,7 +192,8 @@ def filter_set_command(profile_name, identifier, dry_run, **values):
         raise CLIError(str(exc)) from None
     try:
         updated = _profile_edit.update_filter(document, profile_name, identifier, changes)
-        filter_from_row(updated)
+        if "ref" not in updated:
+            filter_from_row(updated)
         _catalog_io.validate(_catalog_io.active_catalog_path(), tomlkit.dumps(document))
     except (ValueError, TypeError) as exc:
         raise click.UsageError(str(exc)) from None

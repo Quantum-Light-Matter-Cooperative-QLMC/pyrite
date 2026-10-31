@@ -23,6 +23,7 @@ _COMMANDS = {
     "material": "pyrite.cli.commands.material.command",
     "beam": "pyrite.cli.commands.beam.command",
     "detector": "pyrite.cli.commands.detector.command",
+    "filter": "pyrite.cli.commands.filter.command",
     "tables": "pyrite.cli.commands.tables.command",
 }
 
@@ -39,6 +40,7 @@ _COMMAND_HELP = {
     "material": "Inspect, validate, edit, and blaze individual materials.",
     "beam": "Manage named beams, attachable to profiles by name.",
     "detector": "Manage named detector geometries.",
+    "filter": "Manage named reusable downstream filter plates.",
     "tables": "Inspect generated cross-section tables and external code trees.",
 }
 

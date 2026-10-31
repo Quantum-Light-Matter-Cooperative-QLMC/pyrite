@@ -73,6 +73,7 @@ Filter = { target = "pyrite.instrument:Filter", status = "advanced-stable" }
 FilterPlate = { target = "pyrite.instrument:FilterPlate", status = "advanced-stable" }
 Footprint = { target = "pyrite.campaign.geometry:Footprint", status = "advanced-stable" }
 Layer = { target = "pyrite.campaign.geometry:Layer", status = "advanced-stable" }
+load_filter = { target = "pyrite.materials._named_filters:load_filter", status = "experimental" }
 # Quantity size/thickness preserve scalar numeric body and sweep fields.
 RectangularBody = { target = "pyrite.bodies:RectangularBody", status = "advanced-stable" }
 Slab = { target = "pyrite.campaign.geometry:Slab", status = "advanced-stable" }

@@ -592,6 +592,11 @@ class MaterialCatalog:
     #: They intentionally remain plain schema data here: importing instrument
     #: objects would invert the materials -> instrument dependency boundary.
     profile_filters: Mapping[str, tuple[Mapping[str, object], ...]] = MappingProxyType({})
+    #: Reusable downstream plate definitions; no catalog name or display metadata
+    #: is carried into resolved ``profile_filters`` (issue #665).
+    named_filters: Mapping[str, Mapping[str, object]] = MappingProxyType({})
+    #: Optional filter preset references by position, for inspection only.
+    profile_filter_refs: Mapping[str, tuple[str | None, ...]] = MappingProxyType({})
     #: Declarative planar-pixel detector geometry for ``run --ephemeral``.
     profile_physical_detectors: Mapping[str, Mapping[str, object]] = MappingProxyType({})
     #: Named per-profile detector collection rows. Each mapping value combines

@@ -10,8 +10,8 @@ are maintained in [configuration resolution](../repo-design/configuration-resolu
 With no complete external catalog selected, user additions from `catalog.user`
 (or `PYRITE_USER_CATALOG`, defaulting to the platform configuration directory)
 are read over the bundled catalog. The layer holds profiles, beams, detectors,
-crystals, media, materials, energy grids, and physics/numerics presets. Bundled
-names are read-only and cannot be reused, including case-only differences.
+crystals, media, materials, energy grids, physics/numerics presets and reusable
+filter plates. Bundled names are read-only and cannot be reused, including case-only differences.
 Create editable copies, for example:
 
 ```bash
