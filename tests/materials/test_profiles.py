@@ -600,32 +600,32 @@ def test_standard_detector_keeps_current_payload_and_digest_bit_for_bit():
         (
             "hopg_hbn_gaussian_200fs",
             "hopg",
-            "3695b0b24a0c6803c7201f42d6c5e4c921c24412b1944122fa009bbb76c8dae1",
+            "37b71d9c3d670d9d7ef88c953c69fb4977440239ac6e40c8b4279179f214b0aa",
         ),
         (
             "hopg_hbn_gaussian_200fs",
             "hbn",
-            "69c8b22cc49df3a13b96835939b45f0435c62a7b94ffd9bf2560aa3226ac7778",
+            "b53a342b4adc968be8a217d9bc47a8700da0f8402b6ce62ff157e0909aba5e79",
         ),
         (
             "hopg_hbn_microtrain_200fs",
             "hopg",
-            "7cdf308b0dd61a9a737979a3feb4ae9f498d48a518021335b4c6e75937d2a17d",
+            "4839a0de9c5eca9a21fd87523b0dd47759857b96ac3f70baa8f5cf1aeead7dc2",
         ),
         (
             "hopg_hbn_microtrain_200fs",
             "hbn",
-            "62ffba8ac2f47a7adc6ec1fb6ec736574a7d0769ea4d6ab0bd29c4ea7d63bdf2",
+            "3c3279a3697db8e7a49b9333eb3ca008a0923d1c8fec40489ded1dfdedf244ec",
         ),
         (
             "hopg_hbn_compressed_microbunch",
             "hopg",
-            "e23706a80e290ef80a5b33cfe48f15ba96eaf831b1a7a7fa8b3e75bedbf8122d",
+            "424aa8be13846bc4b5696d8704dcb00254366481ee4765bcbfdc65ad51b980e8",
         ),
         (
             "hopg_hbn_compressed_microbunch",
             "hbn",
-            "27c166984077a0af0ccbc571c06a09434b3a8917b50e3ad4fb33171cd4e47317",
+            "3e9f8e7415711faebe8a755d14c139b7ff7f3c57c176940961cf4b0dccb130ed",
         ),
         (
             "hopg_emittance_demo",
@@ -636,7 +636,7 @@ def test_standard_detector_keeps_current_payload_and_digest_bit_for_bit():
             "promising_low_ne",
             "hopg",
             # #465: coherent operator identity advanced to physical-distinct-pairs-v4.
-            "28d465050705451286460a63f270742ee41ca442b87378528f1fdb94d38f629f",
+            "e3b2968f6819e6ef0c945950cafa5173f96f1547d1a8cfc6301ecff7828b00a4",
         ),
     ],
 )
@@ -672,6 +672,10 @@ def test_named_beam_migration_keeps_shipped_profile_digests_bit_for_bit(
     Issue #439 re-minted every pin for the ``segment-mean-v5-precise-kinematics``
     line-escape marker and the BremsLib
     ``…/lin-x18-geo4-ln-t-lin-theta-v2/tm-coupled-v2/ee-sb85-v1`` marker.
+
+    Issue #278 re-minted every pin: a profile that declares no ``E_grid_brem``
+    now carries ``continuum_grid_model`` (``refined-geometric-v1/dlnE=0.0025``),
+    so results on the earlier uniform 25 eV default never share a dataset.
 
     Issue #100's derived photon-continuum floor deliberately did NOT move these:
     it raises a brem grid's ``start`` where the band meets the material, in

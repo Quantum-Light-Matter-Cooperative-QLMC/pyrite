@@ -36,7 +36,10 @@ def test_case_process_pickle_preserves_absent_keys():
     restored = pickle.loads(pickle.dumps(case, protocol=5))
 
     assert restored.to_dict().keys() == case.to_dict().keys()
-    assert pickle.dumps(restored.to_dict(), protocol=5) == pickle.dumps(case.to_dict(), protocol=5)
+    # Per value: a whole-dict pickle also records memo sharing (e.g. one dtype object
+    # across arrays and numpy scalars) that a round trip legitimately changes.
+    for key, value in case.to_dict().items():
+        assert pickle.dumps(restored.to_dict()[key], protocol=5) == pickle.dumps(value, protocol=5)
 
 
 def test_case_round_trips_conditional_divergence_keys_in_legacy_order():

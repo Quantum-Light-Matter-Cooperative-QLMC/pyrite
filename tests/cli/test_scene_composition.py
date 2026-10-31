@@ -2,6 +2,7 @@
 
 from dataclasses import asdict, replace
 
+import numpy as np
 import pytest
 
 from pyrite import api
@@ -14,6 +15,16 @@ from pyrite.campaign.single_scene import (
 from pyrite.cli.commands import _simulation
 from pyrite.materials import load_material_catalog
 from pyrite.observations import Observation
+
+
+def _assert_same_case(actual, expected):
+    """Case dictionaries compare key by key; grids may be exact arrays (#278)."""
+    assert actual.keys() == expected.keys()
+    for key, value in expected.items():
+        if isinstance(value, np.ndarray):
+            np.testing.assert_array_equal(actual[key], value, err_msg=key)
+        else:
+            assert actual[key] == value, key
 
 
 @pytest.fixture
@@ -64,7 +75,7 @@ def test_profile_case_and_identity_survive_independent_composition(profile_parts
         physics=configured.physics,
         observation=configured.observation,
     )
-    assert actual.to_dict() == expected.to_dict()
+    _assert_same_case(actual.to_dict(), expected.to_dict())
     assert case_content_key(actual) == case_content_key(expected)
 
 
@@ -74,19 +85,19 @@ def test_profile_observation_label_is_not_scientific_identity(profile_parts):
         original,
         observation=replace(original.observation, name="other-observation"),
     )
-    assert (
+    _assert_same_case(
         api.build_case(
             original.scene,
             numerics=original.numerics,
             physics=original.physics,
             observation=original.observation,
-        ).to_dict()
-        == api.build_case(
+        ).to_dict(),
+        api.build_case(
             changed.scene,
             numerics=changed.numerics,
             physics=changed.physics,
             observation=changed.observation,
-        ).to_dict()
+        ).to_dict(),
     )
 
 
@@ -127,19 +138,19 @@ def test_pixel_composition_normalizes_unit_values_before_case_lowering(profile_p
     composed = compose_pixel_scene(tuple(parts))
     original = compose_pixel_scene(profile_parts)
     assert composed.scene.beam.energy_keV == original.scene.beam.energy_keV
-    assert (
+    _assert_same_case(
         api.build_case(
             composed.scene,
             numerics=composed.numerics,
             physics=composed.physics,
             observation=composed.observation,
-        ).to_dict()
-        == api.build_case(
+        ).to_dict(),
+        api.build_case(
             original.scene,
             numerics=original.numerics,
             physics=original.physics,
             observation=original.observation,
-        ).to_dict()
+        ).to_dict(),
     )
 
 
@@ -176,15 +187,14 @@ def test_result_formatting_uses_independent_configuration():
     assert _simulation._acquisition_summary(result) is None
 
 
-def test_pixel_profile_brem_band_still_stops_one_step_past_beam_energy(profile_parts):
-    """The catalog band keeps its #256 per-case stop through exact public bins (#815)."""
-    from pyrite.campaign.single_scene import _band_at_energy
-    from pyrite.energy_grid.floor import floored_lattice_start_eV
+def test_pixel_profile_without_declared_brem_resolves_the_automatic_continuum_grid(profile_parts):
+    """An undeclared profile band resolves the refined grid to just past E0 (#278)."""
+    from pyrite._continuum_grid import automatic_continuum_grid
     from pyrite.materials import load_material_catalog
 
     beam, target, detector, filters, _, acquisition, numerics, physics, _ = profile_parts
     scan = load_material_catalog(profile="pixelated_detector_demo").material("hopg").scan
-    step = float(scan.E_grid_brem[1] - scan.E_grid_brem[0])
+    assert not scan.E_grid_brem_declared
     energy_keV = float(scan.energy_keV[0])
     case = api.build_case(
         Scene(
@@ -197,8 +207,20 @@ def test_pixel_profile_brem_band_still_stops_one_step_past_beam_energy(profile_p
             numerics=numerics,
         )
     ).to_dict()
-    start = max(float(scan.E_grid_brem[0]), floored_lattice_start_eV("hopg", step))
-    assert case["E_grid_brem"] == (start, energy_keV * 1e3 + step, step)
+    np.testing.assert_array_equal(
+        case["E_grid_brem"], automatic_continuum_grid("hopg", energy_keV * 1e3)
+    )
+
+
+def test_declared_uniform_brem_band_still_stops_one_step_past_beam_energy():
+    """A declared uniform band keeps its #256 per-case stop through exact bins (#815)."""
+    from pyrite.campaign.single_scene import _band_at_energy
+
+    step = 25.0
+    declared = (100.0, 40000.0, step)
+    energy_keV = 30.0
+    band = _band_at_energy(np.arange(declared[0], declared[1] + step, step), energy_keV)
+    np.testing.assert_array_equal(band, np.arange(declared[0], energy_keV * 1e3 + step, step))
     # An already-exact (non-uniform) grid passes through unchanged.
-    sparse = scan.E_grid_brem[[0, 1, 3]]
+    sparse = np.array([100.0, 125.0, 200.0])
     assert _band_at_energy(sparse, energy_keV) is sparse
