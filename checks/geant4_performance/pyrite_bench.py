@@ -157,6 +157,67 @@ def continuous_cone_scores(r, n, cone, ctx):
     return out
 
 
+def grid_spectrum(r, step_eV, cone, ctx):
+    """Production continuum toward the cone axis on a uniform ``step_eV`` grid.
+
+    Spectral-grid sensitivity diagnostic (#821 -> #278): the same
+    :func:`mc_coupled_brem_spectrum` call and runner chunk policy a production
+    case uses for ``E_grid_brem`` (default step 25 eV), on nodes ``step, 2 step,
+    ... < E0``, with unit transmission like the cone arms. Returns the density
+    [photons / eV / sr / electron], the nodes [eV] and the segment chunk.
+    """
+    import numpy as np
+
+    from pyrite.montecarlo import runner
+    from pyrite.montecarlo.spectrum.brem_events import mc_coupled_brem_spectrum
+
+    grid = np.arange(step_eV, 1e3 * ctx["energy_keV"], step_eV)
+    dense = runner._EEDL_BREM_DENSE_INTERMEDIATES
+    chunk = runner._admit_chunk(
+        runner._RESOURCE_POLICY.brem_chunk
+        or runner._adaptive_chunk(grid.size, intermediates=dense),
+        grid.size,
+        intermediates=dense,
+    )
+    v = mc_coupled_brem_spectrum(
+        r,
+        grid,
+        cutoff_eV=ctx["cutoff_eV"],
+        bremslib_tables=ctx["brem"],
+        composition=ctx["composition"],
+        n_hat=cone_axis(cone),
+        layers=[(0.0, ctx["thickness_ang"], [(el, 0.0) for el, _ in ctx["composition"]])],
+        chunk=chunk,
+    )
+    return (v.get() if hasattr(v, "get") else np.asarray(v)), grid, chunk
+
+
+def grid_summary(g, histories, cone):
+    """Time, size and cone-band yields (point convention) of one grid diagnostic."""
+    import numpy as np
+
+    from pyrite.perf.comparison import cone_solid_angle
+
+    density = g["density_sum"] / histories
+    nodes = g["nodes"]
+    omega = cone_solid_angle(math.radians(cone["half_angle_deg"]))
+    bands = {}
+    for name, lo, hi in (
+        ("10_50kev", 1e4, 5e4),
+        ("50_100kev", 5e4, 1e5),
+        ("ge100kev", 1e5, math.inf),
+    ):
+        m = (nodes >= lo) & (nodes <= hi)
+        bands[name] = float(np.trapezoid(density[m], nodes[m]) * omega) if m.sum() > 1 else 0.0
+    return dict(
+        seconds=g["seconds"],
+        nodes=int(nodes.size),
+        chunks=sorted(g["chunks"]),
+        cone_point_yield_per_primary=bands,
+        cone_point_yield_ge10kev_per_primary=sum(bands.values()),
+    )
+
+
 def electron_groups(r, n, max_rows):
     """Split a block's rows into contiguous electron ranges of at most ``max_rows`` rows.
 
@@ -278,6 +339,14 @@ def main():
     parser.add_argument(
         "--pool-fraction", type=float, default=0.85, help="CuPy pool limit, fraction of VRAM"
     )
+    parser.add_argument(
+        "--spectrum-step-ev",
+        type=float,
+        action="append",
+        default=[],
+        help="also time the production continuum on this uniform grid step (repeatable; "
+        "excluded from the request timings)",
+    )
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     spec = json.loads((HERE / "scenes.json").read_text())
@@ -385,6 +454,8 @@ def main():
     )
     tables_s = time.perf_counter() - START
 
+    last_grids = {}
+
     def request(seed, histories):
         scores = {}
         retained = 0
@@ -393,6 +464,10 @@ def main():
         cp.cuda.Device().synchronize()
         t0 = time.perf_counter()
         transport_s = scoring_s = 0.0
+        grids = {
+            step: dict(seconds=0.0, density_sum=None, nodes=None, chunks=set())
+            for step in args.spectrum_step_ev
+        }
         for offset in range(0, histories, args.block):
             n = min(args.block, histories - offset)
             t1 = time.perf_counter()
@@ -417,17 +492,40 @@ def main():
                 block |= discrete_cone_scores(r, n, cone)
             cp.cuda.Device().synchronize()
             scoring_s += time.perf_counter() - t2
+            for step, g in grids.items():
+                pool.free_all_blocks()
+                t3 = time.perf_counter()
+                density, nodes, chunk = grid_spectrum(r, step, cone, ctx)
+                cp.cuda.Device().synchronize()
+                g["seconds"] += time.perf_counter() - t3
+                weighted = n * density
+                g["density_sum"] = (
+                    weighted if g["density_sum"] is None else g["density_sum"] + weighted
+                )
+                g["nodes"] = nodes
+                g["chunks"].add(int(chunk))
             for key, v in block.items():
                 scores.setdefault(key, np.empty(histories))[offset : offset + n] = v
             del r
         cp.cuda.Device().synchronize()
-        wall = time.perf_counter() - t0
+        grid_s = sum(g["seconds"] for g in grids.values())
+        # The grid diagnostic stays outside the arm's request time.
+        wall = time.perf_counter() - t0 - grid_s
         work = dict(
             rounds,
             retained_rows=retained,
             scoring_s=scoring_s,
             schedule=sorted({m for m in log.messages if "schedule" in m}),
         )
+        if grids:
+            work["grid_spectra"] = {
+                f"{step:g}": grid_summary(g, histories, cone) for step, g in grids.items()
+            }
+            last_grids.clear()
+            last_grids.update(
+                {f"density_step_{s:g}eV": g["density_sum"] / histories for s, g in grids.items()}
+                | {f"nodes_step_{s:g}eV": g["nodes"] for s, g in grids.items()}
+            )
         return scores, wall, transport_s, work
 
     warmup = args.warmup_histories or args.histories
@@ -454,6 +552,8 @@ def main():
     args.output.parent.mkdir(parents=True, exist_ok=True)
     npz = args.output.with_suffix(".npz")
     np.savez_compressed(npz, **scores)
+    if last_grids:
+        np.savez_compressed(args.output.with_suffix(".grid.npz"), **last_grids)
     import cupy
 
     dev = cupy.cuda.runtime.getDeviceProperties(0)
@@ -488,6 +588,7 @@ def main():
             pool_fraction=args.pool_fraction,
             score_rows=args.score_rows,
             kernel=args.kernel,
+            spectrum_step_eV=args.spectrum_step_ev,
         ),
         timings_s=dict(
             imports_and_tables=tables_s,
