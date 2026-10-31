@@ -48,6 +48,7 @@ class TransportInputs:
     transport_core: Any
     per_electron_config: Any
     keep_segments_on_device: Any
+    transport_precision: Any
     transport_lut_config: Any
     collect_diagnostics: Any
     energy_model: Any

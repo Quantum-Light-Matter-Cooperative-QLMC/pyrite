@@ -66,6 +66,7 @@ def simulate_trajectories(
     pair_production_model=None,
     positron_transport=False,
     atomic_electron_deflection=None,
+    transport_precision="fp64",
     transport_progress=None,
     _secondary=None,
     _electron_start=0,
@@ -217,6 +218,16 @@ def simulate_trajectories(
 
     atomic_electron_deflection: None (default, BIT-FOR-BIT) or "kawrakow" (Numerics
       default): elastic rate Z^2 -> Z(Z + xi). Validation: inelastic-angular-deflection
+
+    transport_precision: "fp64" (default, BIT-FOR-BIT) or "mixed" (#838,
+      opt-in): the exact CUDA kernel reads its energy-grid, ELSEPA, SBETHE,
+      Mott and BremsLib tables as float32 and evaluates their lookups,
+      interpolation, angle and photon sampling in FP32, while position,
+      direction, energy, path, clock, optical depths and every rate sum stay
+      FP64. Needs ``transport_core="cuda"`` and the exact core (no transport
+      LUT); results change at rounding scale, so it is case identity. See
+      ``_jit_precision``. Validation: gpu-mixed-precision-tables,
+      gpu-mixed-precision-math
 
     radiative_moments: "table" (default) uses prepared float64 log-energy
       interpolation for frequent soft/rate totals; "exact" retains quadrature.
@@ -470,6 +481,7 @@ def simulate_trajectories(
         transport_core=transport_core,
         per_electron_config=per_electron_config,
         keep_segments_on_device=keep_segments_on_device,
+        transport_precision=transport_precision,
         transport_lut_config=transport_lut_config,
         collect_diagnostics=collect_diagnostics,
         energy_model=energy_model,

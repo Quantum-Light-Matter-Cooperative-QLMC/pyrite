@@ -125,6 +125,8 @@ inelastic_on = kernel_parameter("inelastic_on_arg", np.int32)
 sec_on = kernel_parameter("sec_on_arg", np.int32)
 rad_on = kernel_parameter("rad_on_arg", np.int32)
 cont_on = kernel_parameter("cont_on_arg", np.int32)
+# Precision globals (#838): identity casts here, rebound by `_jit_precision`.
+table_real = math_real = np.float64
 
 
 def _transport_kernel(
@@ -343,7 +345,7 @@ def _transport_kernel(
         # 1. Sample the next elastic-collision distance.
         total_rate = F64_ZERO
         element_index = I32_ZERO
-        log_E_eV = xp.log(energy_keV * np.float64(1e3))
+        log_E_eV = xp.log(table_real(energy_keV * np.float64(1e3)))
         while element_index < n_elements:
             if elastic_model_code == I32_TWO:
                 el_row = el_start[element_row_offset + element_index]
@@ -389,7 +391,7 @@ def _transport_kernel(
         inelastic_fraction = F64_ZERO
         if inelastic_on == I32_ONE:
             il_row = layer_index * il_width
-            log_E_j = xp.log(energy_keV)
+            log_E_j = xp.log(table_real(energy_keV))
             inelastic_lower_index = _log_grid_lower(il_logE, il_row, il_n[layer_index], log_E_j)
             inelastic_fraction = _log_grid_fraction(
                 il_logE, il_row, il_n[layer_index], log_E_j, inelastic_lower_index
@@ -422,8 +424,8 @@ def _transport_kernel(
                 rad_max_el,
                 rad_max_t,
                 rad_n_red,
-                energy_keV * F64_EV_PER_KEV,
-                rad_cutoff_eV,
+                table_real(energy_keV * F64_EV_PER_KEV),
+                table_real(rad_cutoff_eV),
                 rad_plasma,
             )
             mu_rad = _rad_transport_moment(
@@ -440,8 +442,8 @@ def _transport_kernel(
                 rad_max_el,
                 rad_max_t,
                 rad_n_red,
-                energy_keV * F64_EV_PER_KEV,
-                rad_cutoff_eV,
+                table_real(energy_keV * F64_EV_PER_KEV),
+                table_real(rad_cutoff_eV),
                 rad_plasma,
             )
             if radiative_optical_depth < F64_ZERO:
@@ -536,7 +538,7 @@ def _transport_kernel(
                 L_sbethe_logS,
                 sbethe_row,
                 L_sbethe_n[layer_index],
-                energy_keV,
+                table_real(energy_keV),
             )
             stopping_scale = dEds / reference_dEds
         # Soft radiative stopping joins after the collision-only scale; a
@@ -692,7 +694,7 @@ def _transport_kernel(
                         L_sbethe_logS,
                         layer_index * sbethe_width,
                         L_sbethe_n[layer_index],
-                        cutoff_energy,
+                        table_real(cutoff_energy),
                     )
                 if rad_on == I32_ONE:
                     cutoff_rate -= (
@@ -710,8 +712,8 @@ def _transport_kernel(
                             rad_max_el,
                             rad_max_t,
                             rad_n_red,
-                            cutoff_energy * F64_EV_PER_KEV,
-                            rad_cutoff_eV,
+                            table_real(cutoff_energy * F64_EV_PER_KEV),
+                            table_real(rad_cutoff_eV),
                             rad_plasma,
                         )
                         * F64_KEV_PER_EV
@@ -764,7 +766,7 @@ def _transport_kernel(
                             L_sbethe_logS,
                             layer_index * sbethe_width,
                             L_sbethe_n[layer_index],
-                            midpoint_energy,
+                            table_real(midpoint_energy),
                         )
                     if rad_on == I32_ONE:
                         midpoint_rate -= (
@@ -782,8 +784,8 @@ def _transport_kernel(
                                 rad_max_el,
                                 rad_max_t,
                                 rad_n_red,
-                                midpoint_energy * F64_EV_PER_KEV,
-                                rad_cutoff_eV,
+                                table_real(midpoint_energy * F64_EV_PER_KEV),
+                                table_real(rad_cutoff_eV),
                                 rad_plasma,
                             )
                             * F64_KEV_PER_EV
@@ -893,8 +895,8 @@ def _transport_kernel(
                 rad_max_el,
                 rad_max_t,
                 rad_n_red,
-                E_end_eV,
-                rad_cutoff_eV,
+                table_real(E_end_eV),
+                table_real(rad_cutoff_eV),
                 rad_plasma,
             )
             u_el = _stream_uniform(rad_key, radiative_draw_counter)
@@ -921,9 +923,9 @@ def _transport_kernel(
                         rad_max_t,
                         rad_n_red,
                         rad_nt[rad_slot],
-                        np.float64(rad_z[rad_slot]),
-                        E_end_eV,
-                        rad_cutoff_eV,
+                        table_real(rad_z[rad_slot]),
+                        table_real(E_end_eV),
+                        table_real(rad_cutoff_eV),
                         rad_plasma[layer_index],
                     )
                 )
@@ -941,10 +943,10 @@ def _transport_kernel(
                 rad_max_t,
                 rad_n_red,
                 rad_nt[rad_slot],
-                np.float64(rad_z[rad_slot]),
-                E_end_eV,
-                rad_cutoff_eV,
-                u_k,
+                table_real(rad_z[rad_slot]),
+                table_real(E_end_eV),
+                table_real(rad_cutoff_eV),
+                table_real(u_k),
                 rad_plasma[layer_index],
             )
             rad_event_Z = np.int16(rad_z[rad_slot])
@@ -1126,13 +1128,13 @@ def _transport_kernel(
                             element_row_offset + sel
                         ] == np.uint8(1):
                             log_alpha = _interp_mott_log_alpha(
-                                xp.log10(E_keV[electron_index] * np.float64(1e3)),
+                                xp.log10(table_real(E_keV[electron_index] * np.float64(1e3))),
                                 mott_logE_flat,
                                 mott_logA_flat,
                                 mott_start[element_row_offset + sel],
                                 mott_len[element_row_offset + sel],
                             )
-                            alpha = F64_TEN**log_alpha
+                            alpha = math_real(F64_TEN) ** log_alpha
                         else:
                             alpha = _alpha_sr_joy(
                                 L_sr_joy_numer[element_row_offset + sel], E_keV[electron_index]
@@ -1145,7 +1147,7 @@ def _transport_kernel(
                             # `_sample_cos_theta_elsepa`.
                             el_row = el_start[element_row_offset + sel]
                             elastic_energy_count = el_len[element_row_offset + sel]
-                            log_E_sel = xp.log(E_keV[electron_index] * np.float64(1e3))
+                            log_E_sel = xp.log(table_real(E_keV[electron_index] * np.float64(1e3)))
                             elastic_lower_index = _log_grid_lower(
                                 el_logE, el_row, elastic_energy_count, log_E_sel
                             )
@@ -1165,7 +1167,7 @@ def _transport_kernel(
                                 el_guide_cells,
                                 el_row + elastic_lower_index,
                                 elastic_fraction,
-                                R_ang,
+                                table_real(R_ang),
                             )
                         else:
                             cos_theta = F64_ONE - F64_TWO * alpha * R_ang / (
@@ -1186,9 +1188,9 @@ def _transport_kernel(
                     sin_theta_squared = F64_ONE - cos_theta * cos_theta
                     if sin_theta_squared < F64_ZERO:
                         sin_theta_squared = F64_ZERO
-                    sin_theta = xp.sqrt(sin_theta_squared)
-                    cos_phi = xp.cos(phi)
-                    sin_phi = xp.sin(phi)
+                    sin_theta = np.float64(xp.sqrt(math_real(sin_theta_squared)))
+                    cos_phi = np.float64(xp.cos(math_real(phi)))
+                    sin_phi = np.float64(xp.sin(math_real(phi)))
                     if xp.abs(old_direction_x) < np.float64(0.9):
                         reference_x = F64_ONE
                         reference_y = F64_ZERO
