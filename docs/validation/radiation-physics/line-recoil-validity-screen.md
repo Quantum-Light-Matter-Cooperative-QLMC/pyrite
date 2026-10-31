@@ -160,7 +160,13 @@ vacuum seed to be finite and strictly positive in the active backend
 precision. The recoil evaluator further requires finite positive kinetic
 energy and a finite nonzero direction norm. It uses `E_repr_keV` when
 present, otherwise `E_keV`, converts keV to eV, normalizes directions and
-evaluates the recoil ratio on the host in float64.
+evaluates the recoil ratio in float64 in place on the active array backend
+(#286). It runs the same formula code as the checked NumPy reference
+(`_recoil_shift_fraction_unchecked`, bitwise-equal to
+`recoil_shift_fraction` for NumPy inputs; regression in
+`tests/materials/test_recoil.py`). On CUDA, compiler contraction can move
+a ratio by a few ulp, so a pair within roundoff of the 1 % limit may be
+counted differently from the host evaluation.
 
 Consequently the count is an unweighted number of eligible
 escape-piece/reflection/mosaic pairs that survive the production seed gate.
