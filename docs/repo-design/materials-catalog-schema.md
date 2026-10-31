@@ -26,6 +26,7 @@ catalog/
   detectors/<name>.toml
   physics/<name>.toml     # named physics presets (ADR-0021)
   numerics/<name>.toml    # named numerics presets (ADR-0021)
+  filters/<name>.toml     # named finite downstream plates (issue #665)
   profiles/<name>.toml    # profile fields plus its [overrides.MATERIAL] tables
   energy-grid-artifacts/  # immutable line-grid artifacts, not catalog source
 ```
@@ -44,6 +45,7 @@ schema_version = 1
 [detectors.NAME]     # reusable detector geometry
 [physics.NAME]       # reusable physics models and cutoffs
 [numerics.NAME]      # reusable sampling, integration and grid policy
+[filters.NAME]       # reusable downstream finite plate definition
 [crystals.NAME]      # CIF-backed crystalline phase
 [media.NAME]         # amorphous composition
 [materials.NAME]     # runnable film or stack

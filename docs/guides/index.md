@@ -20,6 +20,7 @@ configuration-notebook
 physics-fallbacks
 directional-source-heatmap
 detector-observations
+named-filters
 physical-quantities
 issue-816-scientific-quantities
 ```

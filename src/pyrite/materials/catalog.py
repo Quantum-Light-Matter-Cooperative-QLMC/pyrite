@@ -18,6 +18,7 @@ from .._catalog_layout import read_sources as _read_sources
 from .._cxr_vocabulary import translate_catalog_fields
 from ._beam_detector_parse import _parse_beams, _parse_detectors
 from ._catalog_decode import CxrGridByEnergy, _Errors, _grid
+from ._named_filters import resolve_named_filters
 from ._parse import (
     _load_profile_artifacts,
     _parse_crystals,
@@ -128,6 +129,7 @@ def _load_material_catalog_cached(
             "energy_grids",
             "beams",
             "detectors",
+            "filters",
             *_config_presets.TABLES,
         },
     )
@@ -138,6 +140,9 @@ def _load_material_catalog_cached(
         if key not in raw:
             errors.add(key, "missing required table")
     preset_tables, profile_rows, profile_preset_refs = _resolve_presets(raw, errors)
+    named_filters, profile_rows, profile_filter_refs = resolve_named_filters(
+        raw.get("filters"), profile_rows, errors
+    )
     profiles = _parse_profiles(profile_rows, errors)
     beams = _parse_beams(raw.get("beams", {}), errors)
     detectors, detector_labels = _parse_detectors(raw.get("detectors", {}), errors)
@@ -290,6 +295,8 @@ def _load_material_catalog_cached(
         profile_transport_numerics=MappingProxyType(profile_transport_numerics),
         profile_cxr_grid_policies=MappingProxyType(profile_cxr_grid_policies),
         profile_filters=MappingProxyType(profile_filters),
+        named_filters=named_filters,
+        profile_filter_refs=profile_filter_refs,
         profile_physical_detectors=MappingProxyType(profile_physical_detectors),
         profile_detector_sets=MappingProxyType(profile_detector_sets),
         profile_energy_grid_refs=MappingProxyType(profile_energy_grid_refs),
