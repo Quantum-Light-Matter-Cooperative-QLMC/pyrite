@@ -142,8 +142,7 @@ def resolve_bremsstrahlung_model(
     except TableNotFoundError as exc:
         if not allow_fallback:
             raise TableNotFoundError(
-                f"BremsLib is required for bremsstrahlung_model='auto' "
-                f"({', '.join(unique)}): {exc}"
+                f"BremsLib is required for bremsstrahlung_model='auto' ({', '.join(unique)}): {exc}"
             ) from exc
         warnings.warn(
             f"BremsLib tables for {', '.join(unique)} are not all installed: {exc}. "
