@@ -151,7 +151,7 @@ def _guided_index(plasma, log_base, start, last, lo, x):
     return lo
 
 
-@njit(cache=True)
+@njit(cache=True, inline="always")
 def table_layer_moments_indexed(plasma, n_layers, layer, energy_eV, guide):
     """Table-mode lookup bit-identical to ``transport_layer_moments``.
 
@@ -195,7 +195,7 @@ def table_layer_moments_indexed(plasma, n_layers, layer, energy_eV, guide):
     return soft, hard
 
 
-@njit(cache=True)
+@njit(cache=True, inline="always")
 def guided_layer_moments(guide, radiative_args, layer, energy_eV, element_rates):
     """Indexed table search when ``guide`` allows it, else the unchanged lookup.
 
