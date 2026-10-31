@@ -1,0 +1,123 @@
+{
+  "schema": "pyrite.geant4-performance.scenes.v1",
+  "issue": 821,
+  "bounds": {
+    "electron_cutoff_keV": 10,
+    "hard_photon_cutoff_eV": 1000,
+    "width_mm": 10,
+    "termination": "first slab exit or electron cutoff",
+    "delta_rays": false,
+    "energy_loss_fluctuations": false,
+    "fluorescence_auger_pixe": false,
+    "secondary_transport": false,
+    "pxr": false,
+    "cbs": false
+  },
+  "materials": {
+    "Si": {
+      "catalog_key": "silicon",
+      "density_g_cm3": 2.3291534103942357,
+      "atomic_weight": 28.085,
+      "number_density_ang3": 0.049942993373787194
+    },
+    "W": {
+      "catalog_key": "W",
+      "density_g_cm3": 19.3,
+      "atomic_weight": 183.84,
+      "number_density_ang3": 0.06322199557658834
+    }
+  },
+  "scenes": [
+    {
+      "id": "si-300keV-100um",
+      "material": "Si",
+      "energy_keV": 300,
+      "thickness_um": 100,
+      "block": 18000,
+      "max_steps": 20000
+    },
+    {
+      "id": "w-300keV-10um",
+      "material": "W",
+      "energy_keV": 300,
+      "thickness_um": 10,
+      "block": 10000,
+      "max_steps": 25000
+    },
+    {
+      "id": "si-1MeV-1mm",
+      "material": "Si",
+      "energy_keV": 1000,
+      "thickness_um": 1000,
+      "block": 2500,
+      "max_steps": 100000
+    },
+    {
+      "id": "w-1MeV-100um",
+      "material": "W",
+      "energy_keV": 1000,
+      "thickness_um": 100,
+      "block": 1250,
+      "max_steps": 100000
+    },
+    {
+      "id": "si-3MeV-1mm",
+      "material": "Si",
+      "energy_keV": 3000,
+      "thickness_um": 1000,
+      "block": 3500,
+      "max_steps": 100000
+    },
+    {
+      "id": "w-3MeV-100um",
+      "material": "W",
+      "energy_keV": 3000,
+      "thickness_um": 100,
+      "block": 2400,
+      "max_steps": 100000
+    }
+  ],
+  "cone": {
+    "center_deg": 90.0,
+    "half_angle_deg": 10.0,
+    "stage": "source: photons at creation, unit transmission",
+    "bands_keV": [
+      [
+        10,
+        50
+      ],
+      [
+        50,
+        100
+      ],
+      [
+        100,
+        null
+      ]
+    ]
+  },
+  "precision": {
+    "protocol": "#510 time-to-precision T(eps): warm wall time at which every headline observable of a set meets its target RSE, at each arm's own history count, verified on held-out seeds",
+    "targets_rse": [0.05, 0.02],
+    "optional_targets_rse": [0.01],
+    "held_out_seeds": [101, 102, 103],
+    "sets": {
+      "transport": ["transmitted", "backscattered", "stopped", "transmitted_energy_keV"],
+      "source_4pi": ["photons_ge10keV", "photons_10_50keV", "photons_50_100keV", "photons_ge100keV"],
+      "cone": ["cone_source_photons_ge10kev"]
+    },
+    "arm_sets": {
+      "geant4": ["transport", "source_4pi", "cone"],
+      "pyrite-discrete": ["transport", "source_4pi", "cone"],
+      "pyrite-continuous": ["cone"]
+    },
+    "headline_floor": {
+      "fraction_mean": 0.02,
+      "photons_per_primary": 0.001,
+      "note": "terminal fractions (and transmitted energy, gated on the transmitted fraction) below fraction_mean, and 4pi photon bands below photons_per_primary in the variance pilot, are diagnostics; the cone yield is always headline (rare by design: its cost is what the comparison measures, bounded by the run budget); bands whose lower edge is at or above the beam energy are excluded"
+    },
+    "min_histories": 2000
+  },
+  "block_note": "histories per PyRITE block: about 25-40 M retained rows (pilot 2805), floor 5000 so auto selects continuation",
+  "max_steps_note": "per-history step limit (exceeding it raises, never truncates or replays); host_pass sizes Ne*max_steps host row buffers, so block*max_steps <= 5e8. Longest pilot-2805 tracks: Si 300 keV 4213, W 300 keV 9874 rows"
+}

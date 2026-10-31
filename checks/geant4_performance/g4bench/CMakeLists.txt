@@ -1,0 +1,6 @@
+cmake_minimum_required(VERSION 3.16)
+project(g4bench CXX)
+find_package(Geant4 REQUIRED)
+add_executable(g4bench g4bench.cc)
+target_compile_features(g4bench PRIVATE cxx_std_17)
+target_link_libraries(g4bench PRIVATE ${Geant4_LIBRARIES})
