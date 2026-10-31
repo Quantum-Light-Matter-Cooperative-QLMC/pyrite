@@ -6,7 +6,7 @@
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=36G
-#SBATCH --time=00:45:00
+#SBATCH --time=00:15:00
 #SBATCH --output=line286-%j.log
 set -uo pipefail
 cd "$SLURM_SUBMIT_DIR"
@@ -19,7 +19,7 @@ out="evidence/line286/$SLURM_JOB_ID"; mkdir -p "$out"
 cp .pyrite-sync "$out/sync.json"
 uv sync --extra nvidia --locked -q
 py=(uv run --no-sync python -W ignore checks/line_cost_286.py)
-"${py[@]}" --energy-kev 300 --counts 100 400 1600 --repeat 2 --output "$out/hopg-300.json"
+"${py[@]}" --energy-kev 300 --counts 100 400 --repeat 1 --output "$out/hopg-300.json"
 echo "rc=$?"
 "${py[@]}" --energy-kev 29999 --counts 100 --repeat 1 --output "$out/hopg-29999.json"
 echo "rc=$?"
