@@ -199,9 +199,9 @@ def test_device_resident_join_matches_host_rows():
 
 def test_device_staging_matches_host_rows():
     cont = TransportContinuationConfig(rows_per_round=5, active_histories=3)
-    assert cont.device_staging  # bounded staging is the default (#842)
-    _counts, host_rows, _, _ = _drive(replace(cont, device_staging=False))
-    counts, staged_rows, _, _ = _drive(cont)
+    assert not cont.device_staging  # host reassembly is the default (#825)
+    _counts, host_rows, _, _ = _drive(cont)
+    counts, staged_rows, _, _ = _drive(replace(cont, device_staging=True))
     assert counts[6] is None
     for column in WRITTEN:
         np.testing.assert_array_equal(host_rows[column], staged_rows[column])
@@ -212,7 +212,9 @@ def test_staging_spill_matches_host_rows(budget, spills):
     cont = TransportContinuationConfig(rows_per_round=5, active_histories=3)
     _counts, host_rows, _, _ = _drive(replace(cont, device_staging=False))
     records = []
-    staged = replace(cont, staging_budget_bytes=budget, on_round=records.append)
+    staged = replace(
+        cont, device_staging=True, staging_budget_bytes=budget, on_round=records.append
+    )
     counts, rows, _, _ = _drive(staged)
     assert counts[6] is None
     for column in WRITTEN:
@@ -222,6 +224,65 @@ def test_staging_spill_matches_host_rows(budget, spills):
     assert assembly["staged"] is not spills
     if budget == 4000:
         assert assembly["spilled_round"] > 0  # spills mid-run, not at once
+
+
+def test_spill_releases_the_device_pool_once():
+    """Spilled rounds' cached pool blocks go back to the driver (#825)."""
+    from types import SimpleNamespace
+
+    from pyrite.montecarlo.transport.continuation import _Retained
+
+    released = []
+    pool = SimpleNamespace(free_all_blocks=lambda: released.append(True))
+    xp = SimpleNamespace(get_default_memory_pool=lambda: pool)
+    cont = TransportContinuationConfig(device_staging=True, staging_budget_bytes=1000)
+    retained = _Retained(xp, cont, keep_on_device=False, to_host=np.array)
+    retained.append((np.zeros(50),))  # 400 B staged; 2x fits
+    assert retained.on_device and not released
+    retained.append((np.zeros(50),))  # 800 B staged; 2x exceeds: spill
+    retained.append((np.zeros(50),))  # already host-side
+    assert not retained.on_device and retained.spilled_round == 1
+    assert released == [True]
+
+
+class _DeviceLike:
+    """Minimal device array: ``get(out=...)`` copies into a host array."""
+
+    def __init__(self, values):
+        self.values = values
+        self.shape, self.dtype, self.nbytes = values.shape, values.dtype, values.nbytes
+
+    def get(self, out):
+        out[...] = self.values
+        return out
+
+
+def test_round_downloads_pack_into_column_blocks():
+    """Device rounds download into per-column arena blocks, values unchanged (#825)."""
+    from pyrite.montecarlo.transport.continuation import _Retained
+
+    cont = TransportContinuationConfig(device_staging=False)
+    retained = _Retained(np, cont, keep_on_device=False, to_host=np.asarray)
+    rounds = [
+        (
+            np.arange(12.0).reshape(4, 3) + 100 * r,
+            np.arange(4, dtype=np.int32) + r,
+            np.empty((0, 3)),
+        )
+        for r in range(3)
+    ]
+    for chunk in rounds:
+        retained.append(tuple(_DeviceLike(a) for a in chunk))
+    for chunk, got in zip(rounds, retained.chunks, strict=True):
+        for want, have in zip(chunk, got, strict=True):
+            np.testing.assert_array_equal(have, want)
+            assert have.dtype == want.dtype and have.flags.c_contiguous
+    # One block per column: rounds of a column share it, columns never do.
+    first, second = retained.chunks[0], retained.chunks[1]
+    assert first[0].base is second[0].base  # NumPy collapses views to the block
+    assert first[0].base is not first[1].base
+    retained.close()
+    assert retained.arena is None
 
 
 def test_device_resident_rows_never_spill():

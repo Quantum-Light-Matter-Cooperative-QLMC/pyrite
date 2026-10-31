@@ -521,6 +521,7 @@ def test_bounded_staging_spill_matches_full_history(radiative_reference, mode, b
     cont = TransportContinuationConfig(
         rows_per_round=7,
         active_histories=37,
+        device_staging=True,
         staging_budget_bytes=budget,
         on_round=records.append,
     )
