@@ -7,7 +7,7 @@ reductions whenever :mod:`._policy` disables a CUDA fast path or the backend is
 not CuPy.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
 import numpy as np
@@ -154,6 +154,7 @@ class _CxrBatch:
         # _CxrBatch at all. NVTX sub-ranges are a no-op off the profiled GPU
         # path; runner imports this module, so both imports stay lazy.
         from ...runner import _nsys_pop, _nsys_push
+        from ...runner.transport_options import spectrum_launch_overrides
         from ..cxr_jit_kernel import DEFAULT_SPECTRUM_KERNEL_CONFIG, run_reduction_kernel
 
         if len(self.E_r) == 1:
@@ -183,7 +184,7 @@ class _CxrBatch:
                 w_batch,
                 self.E_grid,
                 out=self.spec,
-                config=DEFAULT_SPECTRUM_KERNEL_CONFIG,
+                config=replace(DEFAULT_SPECTRUM_KERNEL_CONFIG, **spectrum_launch_overrides()),
             )
 
         _nsys_pop()

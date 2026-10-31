@@ -44,31 +44,98 @@ def _(mo):
     # Tuning CUDA execution
 
     A simulation has two phases: **electron transport**, then **spectrum
-    scoring** of the transported segments. Their execution controls are
-    independent, so PyRITE tunes them as two separate studies:
+    scoring** of the transported segments. PyRITE tunes their execution
+    controls as two independent Optuna studies:
 
-    - **Transport** candidates (electron batch, continuation schedule) run
-      *only* transport and must reproduce the baseline's transported arrays
-      bit for bit.
-    - **Spectrum** candidates (CXR segment chunk) rescore *one* kept transport
-      without transporting again, and must reproduce its spectra.
+    - **Transport** candidates change how histories are launched: histories
+      per launch (`electron_batch` cap and `scratch_mib` device budget), the
+      `schedule` (whole histories or bounded continuation rounds), the
+      continuation row quantum and the CUDA threads per block. Each must
+      reproduce the baseline's transported arrays **bit for bit**.
+    - **Spectrum** candidates change how kept segments are scored: the CXR and
+      bremsstrahlung segment chunks and the CXR line-reduction launch (threads
+      and energy nodes per block). They rescore *one* kept transport and must
+      reproduce its spectra to rounding.
 
-    Each study tries every valid combination of its own controls, then re-times
-    the fastest against the baseline before accepting it. On this workload the
-    whole tuning takes a few minutes; the spectrum phase dominates the run, and
-    its default chunk is already at its cap, so expect the transport study to
-    find more than the spectrum study.
+    None of these controls changes the physics or the result's identity, only
+    how the work is laid onto the GPU. Their best values depend on the scene
+    and the device, so this tutorial reads the GPU first and scales the search
+    ranges to it. A large GPU such as Molab's **RTX Pro 6000** (96 GB) can
+    hold far more concurrent histories than the defaults, which were chosen
+    for 16 GB cards.
 
     This tutorial **needs an NVIDIA GPU**; on Molab, choose a GPU runtime. The
-    tuner, `pyrite.phases` and `TransportKernelTuning` are experimental.
-    Timings depend on the device, driver, precision and the other work on the
+    tuner, `pyrite.phases` and the kernel-tuning fields are experimental.
+    Timings depend on the device, driver, precision and other work on the
     machine.
     """)
     return
 
 
 @app.cell
-def _(np):
+def _(mo):
+    import cupy
+
+    _device = cupy.cuda.Device()
+    _props = cupy.cuda.runtime.getDeviceProperties(_device.id)
+    free_bytes, total_bytes = cupy.cuda.runtime.memGetInfo()
+    gpu = {
+        "name": _props["name"].decode(),
+        "sms": int(_props["multiProcessorCount"]),
+        "threads_per_sm": int(_props["maxThreadsPerMultiProcessor"]),
+        "compute_capability": f"{_props['major']}.{_props['minor']}",
+        "total_GiB": total_bytes / 2**30,
+        "free_GiB": free_bytes / 2**30,
+    }
+    resident_threads = gpu["sms"] * gpu["threads_per_sm"]
+    mo.md(
+        f"**{gpu['name']}** (compute {gpu['compute_capability']}): {gpu['sms']} SMs, "
+        f"{resident_threads:,} resident threads at full occupancy, "
+        f"{gpu['free_GiB']:.1f} of {gpu['total_GiB']:.1f} GiB free."
+    )
+    return free_bytes, gpu, resident_threads
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Choose a workload and a budget
+
+    Two workloads stress different phases. The **spectrum-heavy** case is a
+    thin HOPG crystal at 30 keV, where scoring the CXR lines dominates. The
+    **transport-heavy** case is 100 µm of HOPG at 1 MeV, where each electron
+    makes many more steps. More Monte Carlo electrons fill a large GPU better
+    and make timings more stable, but every candidate runs the phase
+    `1 + repeats` times. The trial budget is per phase; a budget smaller than
+    the grid searches it with TPE instead of trying every combination.
+    """)
+    return
+
+
+@app.cell
+def _(mo):
+    workload = mo.ui.dropdown(
+        options={
+            "Spectrum-heavy: HOPG 5 µm, 30 keV": "spectrum",
+            "Transport-heavy: HOPG 100 µm, 1 MeV": "transport",
+        },
+        value="Spectrum-heavy: HOPG 5 µm, 30 keV",
+        label="Workload",
+    )
+    electrons = mo.ui.dropdown(
+        options={f"{n:,}": n for n in (4_096, 16_384, 65_536, 262_144)},
+        value="16,384",
+        label="Monte Carlo electrons (CXR)",
+    )
+    trial_budget = mo.ui.slider(8, 200, value=40, step=4, label="Trials per phase")
+    repeats = mo.ui.slider(2, 7, value=3, label="Timed repeats per trial")
+    timeout_min = mo.ui.slider(5, 80, value=30, step=5, label="Time limit per phase (min)")
+    mo.vstack([workload, electrons, trial_budget, repeats, timeout_min])
+    return electrons, repeats, timeout_min, trial_budget, workload
+
+
+@app.cell
+def _(electrons, np, workload):
     from pyrite import Scene
     from pyrite.beams import Beam, PointBunch, PointSpot
     from pyrite.config import CxrReflections, FixedSampling, Numerics
@@ -76,18 +143,26 @@ def _(np):
     from pyrite.geometry import Footprint, Slab
     from pyrite.units import ureg
 
+    _kinetic, _thickness = {
+        "spectrum": (30 * ureg.keV, 5 * ureg.um),
+        "transport": (1 * ureg.MeV, 100 * ureg.um),
+    }[workload.value]
     scene = Scene(
-        Beam(kinetic_energy=30 * ureg.keV, transverse=PointSpot(), longitudinal=PointBunch()),
+        Beam(kinetic_energy=_kinetic, transverse=PointSpot(), longitudinal=PointBunch()),
         Slab(
             "hopg",
-            thickness=5 * ureg.um,
+            thickness=_thickness,
             tilt=45 * ureg.degree,
             footprint=Footprint(width=5 * ureg.mm, height=5 * ureg.mm),
         ),
         Detector(observation_angle=90 * ureg.degree),
         numerics=Numerics(
-            sampling=FixedSampling(cxr_electrons=16_384, brem_electrons=1_024),
+            sampling=FixedSampling(
+                cxr_electrons=electrons.value, brem_electrons=max(1_024, electrons.value // 16)
+            ),
             seed=7,
+            # A fixed 1 eV window around the HOPG (002) line keeps the spectrum
+            # grid the same for every candidate and every electron count.
             energy_bins=EnergyBins().with_cxr_energies(np.linspace(750, 1_000, 251) * ureg.eV),
             cxr_reflections=CxrReflections(n_families=1),
         ),
@@ -102,8 +177,7 @@ def _(mo):
 
     `simulate_transport` stops after transport; `score_spectra` scores the
     kept segments. Timing them separately shows which phase is worth tuning.
-    Both report progress after every transport batch and spectrum stage; the
-    same `progress=` callback works on `pyrite.simulate`.
+    The first, untimed run compiles the kernels.
     """)
     return
 
@@ -133,32 +207,106 @@ def _(mo, scene, tables_ready):
         _bar.update(increment=50)
         spectrum_s = perf_counter() - _started
     del transported  # releases the kept segments on the device
-    return spectrum_s, transport_s
-
-
-@app.cell(hide_code=True)
-def _(mo, spectrum_s, transport_s):
     mo.md(
         f"Transport **{transport_s:.2f} s**, spectrum **{spectrum_s:.2f} s** "
         f"({spectrum_s / (transport_s + spectrum_s):.0%} of the run)."
     )
+    return spectrum_s, transport_s
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## A search space scaled to this GPU
+
+    Each control lists its candidate values; `None` keeps the built-in
+    default. The ranges below are derived from the device read above:
+
+    - `scratch_mib` runs from the 512 MiB default up to half of the free
+      memory, because the scratch budget, not `electron_batch`, usually sets
+      how many histories share one launch.
+    - `electron_batch` caps histories per launch from a few thousand up to
+      several times the GPU's resident-thread capacity.
+    - `kernel_threads` and `cxr_threads` are threads per block. Small blocks
+      spread a short launch over more SMs; large blocks amortize scheduling.
+    - `continuation_rows` is the rows each history may emit per continuation
+      round; `"full-history"` ignores it, so those pairs are skipped.
+
+    Widen or narrow any tuple; an empty tuple leaves that control untuned.
+    """)
     return
 
 
 @app.cell
-def _(mo, scene):
-    from pyrite.optimization import KernelLattice, tune_kernels
+def _(electrons, free_bytes, mo, resident_threads, scene, trial_budget):
+    from pyrite.optimization import KernelSearchSpace
 
-    lattice = KernelLattice(
-        electron_batch=(None, 4_096, 16_384),
-        schedule=("full-history", "auto"),
-        cxr_chunk=(16_384, 65_536, 262_144),
+    def doubling(start, stop):
+        values, value = [], start
+        while value <= stop:
+            values.append(value)
+            value *= 2
+        return tuple(values)
+
+    _scratch_cap = max(1_024, int(0.5 * free_bytes / 2**20))
+    _batch_cap = max(4 * resident_threads, electrons.value)
+    space = KernelSearchSpace(
+        # Transport phase
+        electron_batch=(None, *doubling(4_096, _batch_cap)),
+        schedule=("full-history", "continuation", "auto"),
+        continuation_rows=(None, 64, 128, 512, 1_024),
+        scratch_mib=(None, *doubling(1_024, _scratch_cap)),
+        kernel_threads=(None, 32, 64, 256),
+        # Spectrum phase
+        cxr_chunk=(None, *doubling(16_384, 1_048_576)),
+        brem_chunk=(None, 1_024, 4_096, 16_384),
+        cxr_threads=(None, 128, 256, 1_024),
+        cxr_energies_per_block=(None, 1, 2, 4),
     )
-    _candidates = sum(
-        len(lattice.choices(scene.numerics.kernel_tuning, p)) for p in ("transport", "spectrum")
+    _base = scene.numerics.kernel_tuning
+    grid = {_p: len(space.choices(_base, _p)) for _p in ("transport", "spectrum")}
+    # tune_kernels tries every combination when the budget covers the grid.
+    trials = {_p: min(n, trial_budget.value) for _p, n in grid.items()}
+    _rows = [
+        f"| {_p} | {grid[_p]:,} | {trials[_p]}"
+        f"{' (every combination)' if trials[_p] == grid[_p] else ' (TPE)'} |"
+        for _p in grid
+    ]
+    _dims = "\n".join(
+        f"- `{_name}`: {', '.join('default' if v is None else f'{v:,}' if isinstance(v, int) else v for v in getattr(space, _name))}"
+        for _p in ("transport", "spectrum")
+        for _name in space.dimensions(_p)
     )
+    mo.md(
+        "| Phase | Valid combinations | Trials run |\n|---|---:|---|\n"
+        + "\n".join(_rows)
+        + "\n\n"
+        + _dims
+    )
+    return space, trials
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Run the studies
+
+    Trials go to an SQLite file next to the notebook. If the session drops,
+    for instance at Molab's idle shutdown, rerunning this cell resumes the
+    same study: finished trials are kept, and only the remaining budget runs.
+    A changed workload, space or device starts a new study under a new name.
+    """)
+    return
+
+
+@app.cell
+def _(electrons, mo, repeats, scene, space, timeout_min, trial_budget, trials, workload):
+    from pyrite.optimization import tune_kernels
+
+    _total = sum(trials.values())
+    _name = f"tutorial-15-{workload.value}-{electrons.value}"
     with mo.status.progress_bar(
-        total=_candidates + 2, title="Tuning transport, then spectrum", show_eta=True
+        total=_total + 2, title="Tuning transport, then spectrum", show_eta=True
     ) as _bar:
 
         def advance(update):
@@ -172,47 +320,89 @@ def _(mo, scene):
             _finished = update.state in ("baseline", "complete", "rejected")
             _bar.update(
                 increment=1 if _finished else 0,
-                subtitle=f"{update.phase} {update.trial}/{update.trials} — {_detail}",
+                subtitle=f"{update.phase} {update.trial}/{update.trials}: {_detail}",
             )
 
-        tuning = tune_kernels(scene, lattice, warmups=1, repeats=3, on_progress=advance)
+        tuning = tune_kernels(
+            scene,
+            space,
+            trials=trial_budget.value,
+            warmups=1,
+            repeats=repeats.value,
+            timeout=60.0 * timeout_min.value,
+            storage="sqlite:///pyrite-kernel-tuning.sqlite3",
+            study_name=_name,
+            on_progress=advance,
+        )
     return (tuning,)
 
 
 @app.cell(hide_code=True)
 def _(mo, spectrum_s, transport_s, tuning):
-    def describe(trial, phase):
-        if phase == "transport":
-            t = trial.tuning.transport
-            values = {"batch": t.electron_batch, "schedule": t.schedule}
-        else:
-            values = {"cxr chunk": trial.tuning.cxr_chunk}
-        return ", ".join(f"{k} {'default' if v is None else v}" for k, v in values.items())
+    _DEFAULT = {
+        "electron_batch": 65_536,
+        "schedule": "auto",
+        "continuation_rows": 256,
+        "scratch_mib": 512,
+        "kernel_threads": 128,
+        "cxr_chunk": "case",
+        "brem_chunk": "case",
+        "cxr_threads": 512,
+        "cxr_energies_per_block": 3,
+    }
 
-    def table(study):
+    def settings(tuning_config, phase):
+        t = tuning_config.transport
+        if phase == "transport":
+            values = {
+                "batch": t.electron_batch,
+                "schedule": t.schedule,
+                "rows": t.continuation_rows,
+                "scratch MiB": t.scratch_mib,
+                "threads": t.kernel_threads,
+            }
+        else:
+            values = {
+                "cxr chunk": tuning_config.cxr_chunk,
+                "brem chunk": tuning_config.brem_chunk,
+                "cxr threads": tuning_config.cxr_threads,
+                "energies/block": tuning_config.cxr_energies_per_block,
+            }
+        return (
+            ", ".join(
+                f"{k} {v:,}" if isinstance(v, int) else f"{k} {v}"
+                for k, v in values.items()
+                if v is not None
+            )
+            or "defaults"
+        )
+
+    def table(study, top=12):
+        _done = sorted(
+            (t for t in study.trials if t.state == "complete" and t.repeat_of is None),
+            key=lambda t: t.median_s,
+        )
+        _rejected = sum(t.state == "rejected" for t in study.trials)
         _rows = [
-            f"### {study.phase.capitalize()}: synchronized phase seconds",
-            "| Trial | Settings | Median (s) | Outcome |",
-            "|---:|---|---:|---|",
-            f"| baseline | {describe(study.baseline, study.phase)} "
-            f"| {study.baseline.median_s:.3f} | reference |",
+            f"### {study.phase.capitalize()}: fastest {min(top, len(_done))} of {len(_done)} "
+            f"completed trials ({_rejected} rejected)",
+            "| Trial | Settings | Median (s) | vs baseline |",
+            "|---:|---|---:|---:|",
+            f"| baseline | {settings(study.baseline.tuning, study.phase)} "
+            f"| {study.baseline.median_s:.3f} | 1.00× |",
         ]
-        for _trial in study.trials:
-            if _trial.tuning is None or _trial.repeat_of is not None:
-                continue
-            _time = "—" if _trial.median_s is None else f"{_trial.median_s:.3f}"
-            _outcome = "accepted" if _trial.state == "complete" else f"rejected: {_trial.reason}"
+        for _trial in _done[:top]:
             _rows.append(
-                f"| {_trial.number} | {describe(_trial, study.phase)} | {_time} | {_outcome} |"
+                f"| {_trial.number} | {settings(_trial.tuning, study.phase)} "
+                f"| {_trial.median_s:.3f} | {study.baseline.median_s / _trial.median_s:.2f}× |"
             )
         _verdict = "confirmed" if study.improved else "kept the baseline"
         _rows.append(
-            f"\n**Chosen:** {describe(study.chosen, study.phase)} ({_verdict}); "
-            f"**{study.speedup:.2f}×** the baseline phase median."
+            f"\n**Chosen:** {settings(study.chosen.tuning, study.phase)} ({_verdict}); "
+            f"**{study.speedup:.2f}×** the baseline phase median in the interleaved re-timing."
         )
         return "\n".join(_rows)
 
-    # Each phase's speedup weighted by its share of the run timed above.
     _whole = (transport_s + spectrum_s) / (
         transport_s / tuning.transport.speedup + spectrum_s / tuning.spectrum.speedup
     )
@@ -220,35 +410,64 @@ def _(mo, spectrum_s, transport_s, tuning):
     mo.md(
         f"Measured on {_env}.\n\n"
         + "\n\n".join(table(_study) for _study in tuning.phases)
-        + f"\n\n**Estimated whole-run speedup: {_whole:.2f}×** — a phase's gain counts "
-        "only in proportion to its share of the run."
+        + f"\n\n**Estimated whole-run speedup: {_whole:.2f}×**. A phase's gain counts "
+        "only in proportion to its share of the run. Built-in defaults: "
+        + ", ".join(f"`{k}` {v}" for k, v in _DEFAULT.items())
+        + "."
     )
     return
 
 
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Which controls matter
+
+    Each panel plots every completed trial's phase time against one control's
+    value, with the baseline as a dashed line. A control whose points sit at
+    the same height for every value barely matters on this workload and GPU;
+    one with a clear trend is worth tuning per device.
+    """)
+    return
+
+
 @app.cell
-def _(np, plt, tuning):
-    fig_timing, _axes = plt.subplots(
-        1, len(tuning.phases), figsize=(8, 3.6), layout="constrained", squeeze=False
+def _(np, plt, space, tuning):
+    _panels = [
+        (_study, _name) for _study in tuning.phases for _name in space.dimensions(_study.phase)
+    ]
+    _cols = 3
+    fig_controls, _axes = plt.subplots(
+        -(-len(_panels) // _cols),
+        _cols,
+        figsize=(10, 2.6 * -(-len(_panels) // _cols)),
+        layout="constrained",
+        squeeze=False,
     )
-    for _ax, _study in zip(_axes[0], tuning.phases, strict=True):
-        _done = [t for t in _study.trials if t.state == "complete" and t.repeat_of is None]
-        _shown = [_study.baseline, *sorted(_done, key=lambda t: t.median_s)]
-        for _i, _trial in enumerate(_shown):
-            _samples = np.asarray(_trial.samples_s)
-            _ax.scatter(np.full(_samples.size, _i), _samples, color="0.6", s=12)
-            _colour = "C3" if _i == 0 else ("C2" if _trial is _study.chosen else "C0")
-            _ax.scatter(_i, np.median(_samples), color=_colour, marker="_", s=400)
-        _ax.set(
-            xticks=range(len(_shown)),
-            xticklabels=["base", *(str(t.number) for t in _shown[1:])],
-            xlabel="Trial (fastest first)",
-            ylabel="Phase time (s)",
-            title=_study.phase,
-        )
+    for _ax, (_study, _name) in zip(_axes.flat, _panels, strict=False):
+        _labels = ["default" if v is None else str(v) for v in getattr(space, _name)]
+        for _trial in _study.trials:
+            if _trial.state != "complete" or _trial.repeat_of is not None:
+                continue
+            _holder = _trial.tuning.transport if _study.phase == "transport" else _trial.tuning
+            _value = getattr(_holder, _name)
+            _x = _labels.index("default" if _value is None else str(_value))
+            _ax.scatter(
+                _x + np.random.default_rng(_trial.number).uniform(-0.15, 0.15),
+                _trial.median_s,
+                s=14,
+                color="C0",
+                alpha=0.7,
+            )
+        _ax.axhline(_study.baseline.median_s, color="C3", ls="--", lw=1)
+        _ax.set_xticks(range(len(_labels)), _labels, rotation=30, fontsize=7)
+        _ax.set_title(f"{_study.phase}: {_name}", fontsize=9)
+        _ax.set_ylabel("phase time (s)", fontsize=8)
         _ax.set_ylim(bottom=0)
-    fig_timing.suptitle(tuning.environment.get("device", "GPU"))
-    fig_timing  # noqa: B018
+    for _ax in list(_axes.flat)[len(_panels) :]:
+        _ax.set_visible(False)
+    fig_controls.suptitle(tuning.environment.get("device", "GPU"))
+    fig_controls  # noqa: B018
     return
 
 
@@ -257,10 +476,10 @@ def _(mo):
     mo.md(r"""
     ## Apply and check the joined winner
 
-    `tuning.best` joins the transport winner's controls with the spectrum
-    winner's chunk. Applying it through ordinary `Numerics` must leave the
-    spectrum unchanged up to the summation-order differences a chunk change
-    can introduce.
+    `tuning.best` joins the transport winner with the spectrum winner.
+    Applying it through ordinary `Numerics` must leave the spectrum unchanged
+    up to the summation-order differences that chunking and the reduction
+    launch can introduce.
     """)
     return
 
@@ -295,6 +514,25 @@ def _(mo, np, plt, pyrite, scene, tuning):
     return
 
 
+@app.cell
+def _(gpu, mo, tuning):
+    import json
+    from dataclasses import asdict
+
+    _record = {
+        "gpu": gpu,
+        "environment": tuning.environment,
+        "best": asdict(tuning.best),
+        "phases": [asdict(_study) for _study in tuning.phases],
+    }
+    mo.download(
+        data=json.dumps(_record, indent=1, default=str).encode(),
+        filename="pyrite-kernel-tuning.json",
+        label="Download the tuning record (JSON)",
+    )
+    return
+
+
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
@@ -303,19 +541,24 @@ def _(mo):
     Every candidate runs in one CUDA **worker process** that compiles kernels
     and loads tables once and releases the device memory pool before each
     candidate; `isolate="candidate"` restarts it per candidate instead, at a
-    large cost. A candidate gets one untimed warm-up and three synchronized
-    timed runs of its phase. The fastest accepted candidate is then re-timed
-    in three interleaved pairs with the baseline, and replaces it only for at
-    least a 2% confirmed gain (`min_speedup`). A "kept the baseline" verdict
-    means the defaults were already as fast on this workload, not that tuning
-    failed.
+    large cost. A candidate gets one untimed warm-up and the chosen number of
+    synchronized timed runs of its phase. The fastest accepted candidate is
+    then re-timed in interleaved pairs with the baseline, and replaces it only
+    for at least a 2% confirmed gain (`min_speedup`). "Kept the baseline"
+    means the defaults were already as fast here, not that tuning failed.
 
-    The transport timer includes trajectory setup and automatic line-grid
-    resolution; the spectrum timer includes CXR, characteristic and
-    bremsstrahlung scoring. Neither isolates one kernel launch. The equality
-    checks are a tuning guard, not scientific validation. Winners are GPU-,
-    driver- and workload-specific: re-tune for a production workload, and
-    apply `scene.numerics.with_kernel_tuning(tuning.best)` in a new process.
+    A candidate is **rejected**, not timed, when its transport differs by a
+    single bit, its spectrum leaves the tolerance, or it needs the
+    out-of-memory chunk-halving retry. A large `scratch_mib` that does not fit
+    beside the tables is therefore reported, not silently slowed.
+
+    The transport timer includes trajectory setup and line-grid resolution;
+    the spectrum timer includes CXR, characteristic and bremsstrahlung
+    scoring. Neither isolates one kernel launch. The equality checks are a
+    tuning guard, not scientific validation. Winners are GPU-, driver- and
+    workload-specific: keep the downloaded record with its device, re-tune for
+    a production workload, and apply
+    `scene.numerics.with_kernel_tuning(tuning.best)` in a new process.
     """)
     return
 

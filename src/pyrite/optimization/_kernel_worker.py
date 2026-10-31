@@ -43,6 +43,8 @@ def tuning_from_dict(data: dict[str, Any]) -> Any:
         cxr_chunk=data["cxr_chunk"],
         brem_chunk=data["brem_chunk"],
         transport=TransportKernelTuning(**data["transport"]),
+        cxr_threads=data.get("cxr_threads"),
+        cxr_energies_per_block=data.get("cxr_energies_per_block"),
     )
 
 

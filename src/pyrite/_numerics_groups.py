@@ -62,6 +62,10 @@ class RadiationNumerics:
 
 
 TRANSPORT_SCHEDULES = ("full-history", "continuation", "auto")
+#: CUDA transport threads per block (mirrors ``TransportKernelConfig``).
+KERNEL_THREADS = (32, 64, 128, 256, 512, 1024)
+#: CXR reduction kernel variants (``cxr_jit_kernel._kernel_<k>e``).
+CXR_ENERGIES_PER_BLOCK = (1, 2, 3, 4)
 
 
 @dataclass(frozen=True)
@@ -78,18 +82,28 @@ class TransportKernelTuning:
     ``electron_batch`` caps the electrons (or concurrent continuation
     histories) per transport launch and takes precedence over
     ``PYRITE_MC_ELECTRON_BATCH_MAX`` (``None``: that variable, then 65536).
-    No field enters case identity: transport is bitwise-identical under every
+    ``scratch_mib`` is the device scratch budget, in MiB, that full-history
+    batches and continuation lanes are sized from (``None``: 512); it, not
+    ``electron_batch``, usually sets how many histories share one launch.
+    ``kernel_threads`` is the CUDA transport launch's threads per block, one of
+    32, 64, 128, 256, 512 or 1024 (``None``: 128). Both are per scene and GPU
+    tuning knobs (#825). No field enters case identity: transport is bitwise-identical under every
     value. Batch executors reject non-default values and use the variables.
     """
 
     schedule: Literal["full-history", "continuation", "auto"] | None = None
     continuation_rows: int | None = None
     electron_batch: int | None = None
+    scratch_mib: int | None = None
+    kernel_threads: int | None = None
 
     def __post_init__(self) -> None:
         if self.schedule is not None and self.schedule not in TRANSPORT_SCHEDULES:
             raise ValueError(f"schedule must be one of {TRANSPORT_SCHEDULES} or None")
-        for name in ("continuation_rows", "electron_batch"):
+        threads = self.kernel_threads
+        if threads is not None and (type(threads) is not int or threads not in KERNEL_THREADS):
+            raise ValueError(f"kernel_threads must be one of {KERNEL_THREADS} or None")
+        for name in ("continuation_rows", "electron_batch", "scratch_mib"):
             value = getattr(self, name)
             if value is not None and (type(value) is not int or value <= 0):
                 raise ValueError(f"{name} must be a positive integer or None")
@@ -109,12 +123,20 @@ class ExecutionConfig:
     **not** changed or presumed invariant in this compatibility slice.
     ``transport`` holds the experimental CUDA transport schedule
     (:class:`TransportKernelTuning`), which never enters case identity.
+    ``cxr_threads`` (32-1024, ``None``: 512) and ``cxr_energies_per_block``
+    (1-4, ``None``: 3) set the CUDA CXR line-reduction launch on the
+    node-quadrature route: threads per block and how many energy nodes one
+    block reduces (#825). They change summation grouping only (float
+    rounding), never case identity, and their best values depend on the scene
+    and GPU.
     """
 
     transport_core: str = "auto"
     cxr_chunk: int | None = None
     brem_chunk: int | None = None
     transport: TransportKernelTuning = field(default_factory=TransportKernelTuning)
+    cxr_threads: int | None = None
+    cxr_energies_per_block: int | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.transport_core, str) or not self.transport_core:
@@ -125,10 +147,24 @@ class ExecutionConfig:
                 raise ValueError(f"{name} must be a positive integer or None")
         if not isinstance(self.transport, TransportKernelTuning):
             raise TypeError("transport must be a TransportKernelTuning")
+        for name, allowed in (
+            ("cxr_threads", KERNEL_THREADS),
+            ("cxr_energies_per_block", CXR_ENERGIES_PER_BLOCK),
+        ):
+            value = getattr(self, name)
+            if value is not None and (type(value) is not int or value not in allowed):
+                raise ValueError(f"{name} must be one of {allowed} or None")
+
+    def spectrum_launch_default(self) -> bool:
+        """True when both CXR launch controls keep the built-in default."""
+        return self.cxr_threads is None and self.cxr_energies_per_block is None
 
     def __setstate__(self, state: dict[str, object]) -> None:
-        # Pickles from before #776 carry no ``transport`` entry.
+        # Pickles from before #776 carry no ``transport`` entry, before #825 no
+        # CXR launch controls.
         state.setdefault("transport", TransportKernelTuning())
+        state.setdefault("cxr_threads", None)
+        state.setdefault("cxr_energies_per_block", None)
         self.__dict__.update(state)
 
 

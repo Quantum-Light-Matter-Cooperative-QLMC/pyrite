@@ -71,7 +71,7 @@ def test_spectral_chunks_rescore_without_transport(transported, monkeypatch):
 
 def test_transport_settings_are_fixed_by_the_transport(transported):
     changed = cfg.KernelTuning(transport=cfg.TransportKernelTuning(electron_batch=64))
-    with pytest.raises(ValueError, match="only cxr_chunk and brem_chunk"):
+    with pytest.raises(ValueError, match="only the spectral chunks and CXR launch"):
         score_spectra(transported, kernel_tuning=changed)
     with pytest.raises(TypeError, match="simulate_transport"):
         score_spectra(object())

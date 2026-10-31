@@ -655,6 +655,13 @@ def _dispatch_core(t):
     return _run_grooved(t)
 
 
+def _launch_config(t):
+    """CUDA launch geometry from the pass's ``PerElectronTransportConfig`` (#825)."""
+    from ._jit_launch import TransportKernelConfig
+
+    return TransportKernelConfig(nthreads=int(t.inputs.per_electron_config.kernel_threads))
+
+
 def _per_electron_core(t, lut):
     """Per-electron core and its array module; CUDA imports stay lazy."""
     shell_mode = t.controls.shell_mode
@@ -667,7 +674,7 @@ def _per_electron_core(t, lut):
             )
         from ._jit_launch import make_cuda_transport_lut_core
 
-        return make_cuda_transport_lut_core()
+        return make_cuda_transport_lut_core(_launch_config(t))
     if lut:
         if shell_mode:
             return _transport_core_ungrooved_perelectron_lut_inelastic, np
@@ -675,7 +682,7 @@ def _per_electron_core(t, lut):
     if cuda:
         from ._jit_launch import make_cuda_transport_core
 
-        return make_cuda_transport_core()
+        return make_cuda_transport_core(_launch_config(t))
     core = exact_ungrooved_core(
         per_electron=True, inelastic=shell_mode, radiative=t.controls.radiative_mode
     )

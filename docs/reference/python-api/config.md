@@ -34,9 +34,14 @@ is documented in [execution and scheduling](execution.md).
 ```
 
 `TransportKernelTuning` (experimental) is `KernelTuning.transport`: the CUDA
-transport schedule, continuation row quantum and electron launch batch for
-in-process runs. It takes precedence over `PYRITE_MC_TRANSPORT_SCHEDULE` and
+transport schedule, continuation row quantum, electron launch batch, device
+scratch budget (`scratch_mib`) and launch threads per block (`kernel_threads`)
+for in-process runs. It takes precedence over `PYRITE_MC_TRANSPORT_SCHEDULE` and
 `PYRITE_MC_ELECTRON_BATCH_MAX` and never changes case identity or results.
+`KernelTuning.cxr_threads` and `KernelTuning.cxr_energies_per_block`
+(experimental) select the CUDA CXR line-reduction launch: threads per block
+and energy nodes per block. They regroup the float sum only and never enter
+case identity.
 
 ```{eval-rst}
 .. autosummary::

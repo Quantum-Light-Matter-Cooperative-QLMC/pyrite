@@ -268,6 +268,9 @@ class InstrumentedKernel:
         options = result.options
         if result.backend == "nvcc":
             options += ("-DCUPY_JIT_NVCC",)
+        if maxrreg := os.environ.get("PV_MAXRREG"):
+            # #838: matched register caps separate FP32 arithmetic from occupancy.
+            options += (f"--maxrregcount={int(maxrreg)}",)
         module = core.compile_with_cache(
             source=code, options=options, backend=result.backend, jitify=result.jitify
         )
@@ -279,6 +282,7 @@ class InstrumentedKernel:
             for name in ("num_regs", "local_size_bytes", "const_size_bytes", "binary_version")
         }
         attrs["func_name"] = result.func_name
+        attrs["maxrregcount"] = int(maxrreg) if maxrreg else None
         attrs["blocks_per_sm_at_128"] = driver.occupancyMaxActiveBlocksPerMultiprocessor(
             kern.ptr, 128, 0
         )
@@ -318,6 +322,12 @@ class InstrumentedKernel:
                     cache[key] = a.astype(cupy.float32)
                 a = cache[key]
             new_args.append(a)
+        if nt := os.environ.get("PV_NTHREADS"):
+            # #825: launch geometry only; slots are addressed by electron index and the
+            # kernel bounds-checks the electron count, so results do not change.
+            total = int(grid[0]) * int(block[0])
+            grid, block = ((total + int(nt) - 1) // int(nt),), (int(nt),)
+        self.stats.setdefault("launch_geometry", []).append([int(grid[0]), int(block[0])])
         start, stop = cupy.cuda.Event(), cupy.cuda.Event()
         start.record(stream)
         kern(grid, block, tuple(new_args), shared_mem, stream, enable_cg)
