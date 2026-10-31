@@ -3,7 +3,7 @@
 # dependencies = [
 #     "endf-parserpy==0.17.0",
 #     "marimo>=0.23.3",
-#     "pyrite-mc==0.24.0",
+#     "pyrite-mc==0.24.1",
 #     "matplotlib>=3.11",
 #     "numpy>=2",
 # ]
@@ -49,18 +49,21 @@ def _(pyrite):
     import hashlib
     from pathlib import Path
     from tempfile import TemporaryDirectory
+    from urllib.error import HTTPError
     from urllib.request import urlretrieve
 
     import easygdf
 
-    # Fetch the input from the release tag matching the installed PyRITE, and verify it.
+    # Fetch the input from the release tag matching the installed PyRITE (falling back
+    # to main before that tag exists, e.g. while a release PR is open), and verify it.
     beam_directory = TemporaryDirectory(prefix="pyrite-gdf-tutorial-")
     beam_path = Path(beam_directory.name) / "synthetic_beam.gdf"
-    _ = urlretrieve(
-        "https://raw.githubusercontent.com/Quantum-Light-Matter-Cooperative-QLMC/"
-        f"pyrite/v{pyrite.__version__}/docs/examples/data/synthetic_beam.gdf",
-        beam_path,
-    )
+    _base = "https://raw.githubusercontent.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/"
+    _path = "docs/examples/data/synthetic_beam.gdf"
+    try:
+        _ = urlretrieve(f"{_base}v{pyrite.__version__}/{_path}", beam_path)
+    except HTTPError:
+        _ = urlretrieve(f"{_base}main/{_path}", beam_path)
     expected_sha256 = "d7fc5b72db0d4416a4aff1a188ad7fa3ff4cca269f67cdf863726e35e6a3159a"
     assert hashlib.sha256(beam_path.read_bytes()).hexdigest() == expected_sha256
     fields = {
