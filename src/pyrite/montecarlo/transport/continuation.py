@@ -43,6 +43,7 @@ from .cores import (
     EXIT_STEP_LIMITED,
     EXIT_TRANSMITTED,
 )
+from .host_memory import admit_host_allocation
 
 # Kernel exit code of a history that reached its launch's row quantum.
 EXIT_SUSPENDED = np.int8(6)
@@ -241,8 +242,14 @@ class _Retained:
             self.staged_bytes += _chunk_bytes(gathered)
             # Assembly holds the staged rounds and their joined copy at once.
             if 2 * self.staged_bytes > self.budget:
+                # Spilling copies every staged round plus this one to the host.
+                admit_host_allocation(self.staged_bytes, "continuation staged-round spill")
                 self.chunks = [self._host(c) for c in self.chunks]
                 self.on_device, self.spilled_round = False, len(self.chunks)
+        if not self.on_device:
+            # The gather is still device-resident; its host copy must fit
+            # alongside every previously retained round.
+            admit_host_allocation(_chunk_bytes(gathered), "continuation retained round download")
         self.chunks.append(gathered if self.on_device else self._host(gathered))
 
     def _host(self, chunk):
@@ -289,6 +296,10 @@ def _assemble(xp, chunks, rows_total, retained, columns, out_bufs, nseg, keep_on
     """Scatter retained rounds into canonical rows; the joined device rows or None."""
     joined = None
     targets = out_bufs
+    if not keep_on_device and targets and hasattr(targets[0], "reserve"):
+        # Assembly must hold all staged rounds *and* their final canonical
+        # columns; use the actual row count rather than Ne * max_steps.
+        targets[0].reserve(nseg)
     if keep_on_device:
         joined = tuple(
             xp.empty((nseg,) + a.shape[1:], dtype=a.dtype) if a.shape[0] else a for a in columns
@@ -409,6 +420,7 @@ def _drive_continuation_rounds(
     if on_device and not keep_on_device:
         for buf, column in zip(out_bufs, joined, strict=True):
             if column.shape[0]:
+                admit_host_allocation(int(column.nbytes), "continuation final host download")
                 buf[:nseg] = to_host(column)
         joined = None
     _nsys_pop()
