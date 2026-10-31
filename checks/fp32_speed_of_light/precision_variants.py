@@ -322,6 +322,12 @@ class InstrumentedKernel:
                     cache[key] = a.astype(cupy.float32)
                 a = cache[key]
             new_args.append(a)
+        if nt := os.environ.get("PV_NTHREADS"):
+            # #825: launch geometry only; slots are addressed by electron index and the
+            # kernel bounds-checks the electron count, so results do not change.
+            total = int(grid[0]) * int(block[0])
+            grid, block = ((total + int(nt) - 1) // int(nt),), (int(nt),)
+        self.stats.setdefault("launch_geometry", []).append([int(grid[0]), int(block[0])])
         start, stop = cupy.cuda.Event(), cupy.cuda.Event()
         start.record(stream)
         kern(grid, block, tuple(new_args), shared_mem, stream, enable_cg)
