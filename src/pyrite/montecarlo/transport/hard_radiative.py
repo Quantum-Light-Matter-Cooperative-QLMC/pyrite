@@ -713,12 +713,26 @@ def radiative_core_args(
 
 
 def add_radiative_result_fields(
-    result, photon_k_eV, photon_Z, tables, cutoff_eV, seed, plasma_energy_eV_by_layer=None
+    result,
+    photon_k_eV,
+    photon_Z,
+    tables,
+    cutoff_eV,
+    seed,
+    plasma_energy_eV_by_layer=None,
+    *,
+    complete=True,
 ) -> None:
-    """Attach photon rows, their completed kinematics, and the mode's identity."""
+    """Attach photon rows, their completed kinematics, and the mode's identity.
+
+    ``complete=False`` (#864, live streamed scoring) omits the completed
+    direction/recoil fields; completion's own generator leaves every other
+    field unchanged.
+    """
     result["hard_radiative_k_eV"] = photon_k_eV
     result["hard_radiative_Z"] = photon_Z
-    complete_hard_radiative_events(result, tables, seed)
+    if complete:
+        complete_hard_radiative_events(result, tables, seed)
     plasma = np.asarray(
         [] if plasma_energy_eV_by_layer is None else plasma_energy_eV_by_layer, dtype=float
     )

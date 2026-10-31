@@ -29,7 +29,10 @@ spectra) remains the default and the reference.
   phase within one electron's flight groups. Hard-photon direction
   re-completion is skipped because the coupled BremsLib continuum scores
   expected values on the tracks and never reads completed photon directions.
-  If a future consumer needs them, the completion generator can be carried
+  Each block's own completion is skipped too (#864): blocks run with the
+  internal `_complete_hard_photons=False`, which omits the direction and recoil
+  fields. Completion draws from its own generator, so transport rows and
+  counts are unchanged bit for bit. If a future consumer needs them, the completion generator can be carried
   across ordered blocks, or `advance()`d by twice the earlier photon count;
   both reproduce the single-call draws exactly.
 

@@ -276,6 +276,9 @@ def transport_case_blocks(
     def simulate_block(start, stop):
         block_kw: dict[str, Any] = {"_electron_start": start, "_energy_range_keV": energy_range}
         block_kw |= no_bunch
+        if consume is not None:
+            # Streamed estimators never read completed photon directions (#864).
+            block_kw["_complete_hard_photons"] = False
         if progress is not None:
 
             def block_progress(done, _n, start=start):

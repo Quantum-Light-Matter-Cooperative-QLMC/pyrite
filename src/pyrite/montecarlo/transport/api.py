@@ -71,6 +71,7 @@ def simulate_trajectories(
     _electron_start=0,
     _energy_range_keV=None,
     bunch_front_tilt=None,
+    _complete_hard_photons=True,
 ):
     """
     Transport Ne electrons of energy E0_keV [keV] into a slab 0<=z<=thickness.
@@ -399,6 +400,12 @@ def simulate_trajectories(
         stream takes global indices ``[start, start + Ne)``; ``electron_id``
         stays block-local. See ``runner/block_transport.py`` and
         :func:`.beam_entry.check_electron_block`.
+    _complete_hard_photons
+        Internal (#864). ``False`` skips hard-photon direction completion and
+        omits ``hard_radiative_direction``/``hard_radiative_target_momentum_eV_c``
+        for live streamed scoring, whose estimators never read them. Completion
+        draws from its own generator, so transport rows are unchanged bit for
+        bit. Refused with secondary cascades, which consume the directions.
 
     Returns
     -------
@@ -425,6 +432,12 @@ def simulate_trajectories(
         (secondary_threshold_eV, pair_production_model, positron_transport, _secondary, groove),
         (gdf_source, bunch_length_fs, long_offsets_fs, longitudinal_distribution),
     )
+    if not _complete_hard_photons and (
+        secondary_threshold_eV,
+        pair_production_model,
+        positron_transport,
+    ) != (None, None, False):
+        raise ValueError("secondary cascades need completed hard-photon directions")
     # Every parameter, named once: the cascade re-enters this function with
     # exactly these inputs, never host-side locals.
     inputs = TransportInputs(
@@ -483,6 +496,7 @@ def simulate_trajectories(
         _electron_start=_electron_start,
         _energy_range_keV=_energy_range_keV,
         bunch_front_tilt=bunch_front_tilt,
+        _complete_hard_photons=_complete_hard_photons,
     )
     if (secondary_threshold_eV, pair_production_model, positron_transport) != (None, None, False):
         from .secondaries import transport_secondary_cascade
