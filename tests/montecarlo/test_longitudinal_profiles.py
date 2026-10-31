@@ -198,3 +198,88 @@ def test_policy_validation_smoke(policy, message):
         return
     with pytest.raises(ValueError, match=message):
         LongitudinalDistribution("microtrain")
+
+
+def _resolved_gaussian(policy: LongitudinalDistribution) -> dict:
+    from dataclasses import asdict
+
+    from pyrite.campaign.longitudinal import resolve_longitudinal_distribution
+
+    return asdict(
+        resolve_longitudinal_distribution(
+            policy,
+            material="hopg",
+            crystal="hopg",
+            lattice={},
+            hkl_list=[],
+            surface_hkl=None,
+            beam_uvw=None,
+            energy_keV=30.0,
+            theta_obs_deg=135.0,
+            tilt_deg=0.0,
+        )
+    )
+
+
+@pytest.mark.parametrize("shape", ["gaussian", "uniform"])
+def test_gaussian_policy_matches_deprecated_bunch_length_bit_for_bit(shape):
+    from pyrite.units import Q_
+
+    with pytest.warns(DeprecationWarning, match="BunchLength"):
+        from pyrite.beams import BunchLength
+
+        legacy = BunchLength(137.0, shape)
+    flat = _sample_bunch_offsets(257, 137.0, shape, None, 11)
+    for policy in (
+        LongitudinalDistribution("gaussian", 137.0, shape=shape),
+        LongitudinalDistribution("gaussian", rms_duration=Q_(0.137, "ps"), shape=shape),
+        LongitudinalDistribution("gaussian", envelope_rms=Q_(137.0, "fs"), shape=shape),
+    ):
+        np.testing.assert_array_equal(
+            _sample_bunch_offsets(257, None, "gaussian", None, 11, _resolved_gaussian(policy)),
+            flat,
+        )
+    from pyrite.beams import Beam
+
+    beam = Beam(30.0, transverse=pr_spot(), longitudinal=legacy)
+    assert beam.to_spec().longitudinal == LongitudinalDistribution("gaussian", 137.0, shape=shape)
+    if shape == "uniform":
+        assert np.max(np.abs(flat)) <= np.sqrt(3.0) * 137.0 * C_ANG_PER_FS * 2.0
+
+
+def pr_spot():
+    from pyrite.beams import PointSpot
+
+    return PointSpot()
+
+
+def test_bunch_length_construction_warns_once_naming_replacement():
+    import warnings
+
+    from pyrite.beams import BunchLength
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        BunchLength(rms_fs=10.0)
+    messages = [str(w.message) for w in caught if w.category is DeprecationWarning]
+    assert len(messages) == 1
+    assert "LongitudinalDistribution" in messages[0]
+
+
+def test_policy_quantity_inputs_validate_and_read_back():
+    from pyrite.units import Q_
+
+    policy = LongitudinalDistribution("gaussian", rms_duration=Q_(0.25, "ps"))
+    assert policy.envelope_rms_fs == pytest.approx(250.0, rel=1e-15)
+    assert policy.rms_duration.units == Q_(1, "fs").units
+    assert replace(policy) == policy
+    with pytest.raises(TypeError, match="mutually exclusive"):
+        LongitudinalDistribution("gaussian", 1.0, rms_duration=Q_(1, "fs"))
+    with pytest.raises(TypeError, match="Pint quantity"):
+        LongitudinalDistribution("gaussian", rms_duration=1.0)
+    with pytest.raises(TypeError, match="only valid for kind='gaussian'"):
+        LongitudinalDistribution("microtrain", rms_duration=Q_(1, "fs"))
+    with pytest.raises(ValueError, match="positive"):
+        LongitudinalDistribution("gaussian", rms_duration=Q_(-1, "fs"))
+    with pytest.raises(ValueError, match="uniform"):
+        LongitudinalDistribution("microtrain", 200.0, shape="uniform")

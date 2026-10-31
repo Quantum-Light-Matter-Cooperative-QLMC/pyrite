@@ -66,7 +66,7 @@ def test_timing_beam_lowering_and_pickle_stay_numeric(quantity, numeric) -> None
     beam = Beam(60, transverse=Spot(), longitudinal=quantity)
     legacy = replace(beam, longitudinal=numeric)
     assert beam.to_spec() == legacy.to_spec()
-    assert Beam.from_spec(beam.to_spec()) == legacy
+    assert Beam.from_spec(beam.to_spec()).to_spec() == legacy.to_spec()
     assert pickle.loads(pickle.dumps(beam)) == legacy
     assert asdict(beam) == asdict(legacy)
 
@@ -91,7 +91,7 @@ def test_alternate_time_units_keep_conversion_roundoff_and_legacy_lowering() -> 
     assert offsets == Offsets(Q_([-0.125, 0.25], "ps"))
     for timing in (duration, offsets):
         beam = Beam(60, transverse=Spot(), longitudinal=timing)
-        assert Beam.from_spec(beam.to_spec()) == beam
+        assert Beam.from_spec(beam.to_spec()).to_spec() == beam.to_spec()
 
 
 @pytest.mark.parametrize(
@@ -195,7 +195,7 @@ from dataclasses import replace
 from pyrite.beams import Beam, BunchLength, Offsets, Spot
 for timing in (BunchLength(250), Offsets((-125, 250))):
     beam = Beam(60, transverse=Spot(), longitudinal=replace(timing))
-    assert Beam.from_spec(beam.to_spec()) == beam
+    assert Beam.from_spec(beam.to_spec()).to_spec() == beam.to_spec()
 assert 'pint' not in sys.modules
 """
     process = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)

@@ -165,7 +165,7 @@ def require_resolved_power(
                     "trials), so its sampling noise swamps a near-zero coherent excess; "
                     "remove sampled offsets (transverse=PointSpot(), "
                     "longitudinal=PointBunch()), lower bunch_charge_pc until N <= M, use a "
-                    "finite Slab footprint with BunchLength so offsets are averaged "
+                    "finite Slab footprint with a Gaussian LongitudinalDistribution so offsets are averaged "
                     "analytically, or raise --cxr-trials toward N"
                 )
     if not nonfinite_count:

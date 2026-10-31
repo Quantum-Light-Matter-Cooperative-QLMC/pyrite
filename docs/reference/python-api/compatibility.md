@@ -28,7 +28,7 @@ from their owning domains. The package-root aliases remain supported and are
 changes when choosing these imports.
 
 ```python
-from pyrite.beams import Beam, TransverseSpot, BunchLength
+from pyrite.beams import Beam, TransverseSpot, LongitudinalDistribution
 from pyrite.geometry import Target, Slab, CrystalCut, RectangularBody, FilterPlate
 from pyrite.config import Physics, Numerics, AngularSampling, load_physics
 from pyrite.detectors import AngularDetector, PlanarDetector, PixelGrid, PlanarPose
@@ -79,6 +79,12 @@ the historical lowering. This is not a scheduler profile
 [configuration ownership policy](../../repo-design/configuration-resolution.md#physics-numerics-and-kernel-tuning-702).
 `pyrite.config.PhotonTransport` is experimental. See the
 [API namespace policy](../../development/api-policy.md) for ownership and stability.
+
+## Deprecated spellings
+
+| Deprecated | Replacement | Notes |
+| --- | --- | --- |
+| `pyrite.beams.BunchLength(rms_fs=σ, shape=s)` | `LongitudinalDistribution("gaussian", σ, shape=s)` | `shape="uniform"` is the flat top of the same RMS. `rms_duration=` keeps its meaning. `Beam` lowers both to the same `longitudinal` record, so sampled offsets and case keys agree; existing pickles still load. Removal date: `pyrite._api_deprecations`. |
 
 ## Root import compatibility
 

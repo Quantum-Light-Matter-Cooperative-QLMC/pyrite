@@ -7,10 +7,12 @@ case-specific timing/provenance; sampled electron offsets remain runtime data.
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 import numpy as np
 
+from .._spec_defaults import UNSET as _UNSET
+from .._units import _is_pint_quantity, normalize_unit
 from ..materials.crystal import (
     HBARC_EV_ANG,
     HC_EV_ANG,
@@ -19,6 +21,9 @@ from ..materials.crystal import (
     reciprocal_g_vector,
 )
 
+if TYPE_CHECKING:
+    from pint import Quantity
+
 LongitudinalKind = Literal["gaussian", "microtrain", "compressed"]
 
 # h = hc/c in the units used by BeamSpec's transport clock.
@@ -26,16 +31,109 @@ C_ANG_PER_FS = 2997.924580
 H_EV_FS = HC_EV_ANG / C_ANG_PER_FS
 
 
-@dataclass(frozen=True)
-class LongitudinalDistribution:
-    """Serializable longitudinal bunch policy.
+def _timing_quantity_fs(value: object, *, field: str, ndim: int) -> np.ndarray:
+    """Own a real explicit-time quantity representable in numeric fs storage."""
+    if not _is_pint_quantity(value):
+        raise TypeError(f"{field} requires a Pint quantity with time units")
+    magnitude = normalize_unit(value, "fs", field=field, expected="time")
+    array = np.asarray(magnitude)
+    if array.dtype.kind not in "iuf" or array.ndim != ndim:
+        shape = "scalar" if ndim == 0 else "one-dimensional array"
+        raise TypeError(f"{field} must be a real {shape}")
+    if array.size == 0 or not np.all(np.isfinite(array)):
+        raise ValueError(f"{field} must contain nonempty finite times")
+    with np.errstate(over="ignore", under="ignore"):
+        stored = array.astype(float)
+    if not np.all(np.isfinite(stored)) or np.any((array != 0) & (stored == 0)):
+        raise ValueError(
+            f"{field} must be representable in numeric fs storage without overflow or underflow"
+        )
+    return stored
 
-    ``gaussian`` uses ``envelope_rms_fs`` as its bunch RMS duration.
-    ``microtrain`` uses it as the Gaussian train-envelope RMS duration and
-    derives the width/spacing of its microbunches from the target line.
-    ``compressed`` is one Gaussian whose RMS duration is the same derived
-    microbunch width. Targeted modes use the catalog-pinned dominant basal
-    reflection unless ``target_reflection`` pins one explicitly.
+
+@dataclass(frozen=True, init=False)
+class LongitudinalDistribution:
+    """Serializable longitudinal bunch policy: the one public smooth-bunch spelling.
+
+    All durations are RMS durations in fs (RMS, not FWHM). Policies are physical
+    inputs, independent of the macro-particle count; sampled offsets are runtime
+    data and never enter case identity.
+
+    Parameters
+    ----------
+    kind
+        ``"gaussian"``, ``"microtrain"`` or ``"compressed"``.
+    envelope_rms_fs
+        Bunch RMS duration for ``gaussian``; Gaussian train-envelope RMS for
+        ``microtrain``; omitted for ``compressed``. Mutually exclusive with the
+        keyword-only quantity inputs below.
+    retained_coherence
+        ``eta`` in ``(0, 1]``: intensity form factor retained at the target
+        photon frequency by one microbunch (targeted kinds only).
+    target_reflection
+        Miller triple of the basal reflection to target; default is the first
+        catalog-pinned positive basal reflection parallel to the surface normal.
+    spacing_periods
+        Positive integer number of optical periods between microbunch slots.
+    modulation_depth
+        Fraction in ``[0, 1]`` of electrons placed on the microbunch comb.
+    timing_jitter_fs
+        Non-negative RMS shot-to-shot jitter of each microbunch [fs].
+    shape
+        ``gaussian`` kind only: ``"gaussian"`` (default) or ``"uniform"``, a
+        flat top of the same RMS (half-width ``sqrt(3) * sigma``).
+    rms_duration
+        Keyword-only real scalar Pint time quantity (``gaussian`` kind only):
+        alternative to ``envelope_rms_fs``. Read back as a fresh fs quantity.
+    envelope_rms
+        Keyword-only Pint time quantity alternative to ``envelope_rms_fs`` for
+        ``gaussian`` and ``microtrain``. Numeric storage stays in fs.
+
+    Notes
+    -----
+    ``gaussian`` draws ``dt = sigma * z`` with ``z ~ N(0, 1)`` (or a flat top
+    for ``shape="uniform"``) and subtracts the realized centroid. It draws the
+    same per-electron offsets, bit for bit, as the deprecated
+    ``BunchLength(rms_fs=sigma, shape=...)`` for the same seed. Setting
+    ``modulation_depth=0`` in ``microtrain`` likewise reduces to a plain
+    Gaussian of RMS ``envelope_rms_fs``.
+
+    ``microtrain`` is a comb of short microbunches under a Gaussian envelope.
+    It is resolved per sweep case (every case re-resolves the spacing from its
+    own detector angle) and sampled as follows:
+
+    1. Target line: the dominant positive basal reflection ``g`` (or
+       ``target_reflection``) parallel to the surface normal gives the photon
+       wavenumber ``k = beta |g| cos(tilt) / (1 - beta cos(theta_obs))`` from
+       the beam energy, crystal tilt and ``Detector.observation_angle``, and
+       the target energy ``E = hbar c k``.
+    2. Optical period ``T = h / E`` [fs].
+    3. Microbunch spacing ``spacing_fs = spacing_periods * T``.
+    4. Microbunch RMS ``sigma_mb = sqrt(-ln eta) / Omega`` with
+       ``Omega = 2 pi / T`` (a Gaussian has form factor
+       ``exp[-(Omega sigma)^2]``).
+    5. Centre variance ``sigma_c^2 = envelope^2 - sigma_mb^2 - jitter^2``; it
+       must be positive or the case raises ``ValueError``.
+    6. Each electron draws a slot index ``rint(sigma_c / spacing * z0)``, then
+       a microbunch Gaussian ``sigma_mb * z1`` and a jitter Gaussian
+       ``jitter * z2``; train time is ``index * spacing + sigma_mb z1 +
+       jitter z2``.
+    7. ``modulation_depth`` is the fraction of electrons on the comb; the rest
+       are drawn from the unmodulated Gaussian envelope ``envelope * z3``
+       (selected by an independent uniform per electron).
+    8. The realized centroid is subtracted from all offsets.
+
+    Worked example: HOPG, 30 keV, 135 degrees, tilt 0: the target is about
+    850 eV, ``T = h/E`` is about 4.9 as (0.0049 fs), so microbunches sit 4.9 as
+    apart; ``eta = 0.9`` gives ``sigma_mb`` of roughly 0.25 as.
+
+    ``compressed`` is a single Gaussian whose RMS duration equals the derived
+    microbunch width ``sigma_mb`` of steps 1-4.
+
+    Limiting cases: ``eta -> 1`` gives zero-width microbunches;
+    ``modulation_depth=0`` gives a plain Gaussian envelope.
+
+    Validation: longitudinal-bunch-sampling
     """
 
     kind: LongitudinalKind
@@ -45,10 +143,71 @@ class LongitudinalDistribution:
     spacing_periods: int = 1
     modulation_depth: float = 1.0
     timing_jitter_fs: float = 0.0
+    shape: str = "gaussian"
+
+    def __init__(
+        self,
+        kind: LongitudinalKind,
+        envelope_rms_fs: float | None = None,
+        retained_coherence: float = 0.9,
+        target_reflection: tuple[int, int, int] | None = None,
+        spacing_periods: int = 1,
+        modulation_depth: float = 1.0,
+        timing_jitter_fs: float = 0.0,
+        shape: str = "gaussian",
+        *,
+        rms_duration: object = _UNSET,
+        envelope_rms: object = _UNSET,
+    ) -> None:
+        quantities = {
+            name: value
+            for name, value in (("rms_duration", rms_duration), ("envelope_rms", envelope_rms))
+            if value is not _UNSET
+        }
+        if len(quantities) > 1:
+            raise TypeError("rms_duration and envelope_rms are mutually exclusive")
+        if quantities:
+            name, value = next(iter(quantities.items()))
+            if envelope_rms_fs is not None:
+                raise TypeError(f"envelope_rms_fs and {name} are mutually exclusive")
+            if name == "rms_duration" and kind != "gaussian":
+                raise TypeError("rms_duration is only valid for kind='gaussian'; use envelope_rms")
+            if kind == "compressed":
+                raise ValueError("compressed derives its RMS duration; omit envelope_rms")
+            envelope_rms_fs = float(
+                _timing_quantity_fs(value, field=f"LongitudinalDistribution.{name}", ndim=0)
+            )
+        for field_name, value in (
+            ("kind", kind),
+            ("envelope_rms_fs", envelope_rms_fs),
+            ("retained_coherence", retained_coherence),
+            ("target_reflection", target_reflection),
+            ("spacing_periods", spacing_periods),
+            ("modulation_depth", modulation_depth),
+            ("timing_jitter_fs", timing_jitter_fs),
+            ("shape", shape),
+        ):
+            object.__setattr__(self, field_name, value)
+        self.__post_init__()
+
+    @property
+    def rms_duration(self) -> "Quantity":
+        """Bunch/envelope RMS as a fresh scalar fs quantity; no sampling occurs."""
+        from ..units import Q_
+
+        if self.envelope_rms_fs is None:
+            raise ValueError(f"{self.kind} has no explicit RMS duration")
+        return Q_(float(self.envelope_rms_fs), "fs")
+
+    @property
+    def envelope_rms(self) -> "Quantity":
+        """Alias of :attr:`rms_duration` for the train-envelope reading."""
+        return self.rms_duration
 
     def __post_init__(self) -> None:
         if self.kind not in ("gaussian", "microtrain", "compressed"):
             raise ValueError(f"unknown longitudinal kind {self.kind!r}")
+        self._validate_shape()
         if self.kind in ("gaussian", "microtrain"):
             if self.envelope_rms_fs is None:
                 raise ValueError(f"{self.kind} requires envelope_rms_fs")
@@ -69,16 +228,23 @@ class LongitudinalDistribution:
         if self.target_reflection is not None:
             if len(self.target_reflection) != 3 or not any(self.target_reflection):
                 raise ValueError("target_reflection must be a nonzero Miller-index triple")
-        if self.kind == "gaussian":
-            targeted = (
-                self.target_reflection is not None
-                or self.retained_coherence != 0.9
-                or self.spacing_periods != 1
-                or self.modulation_depth != 1.0
-                or self.timing_jitter_fs != 0.0
-            )
-            if targeted:
-                raise ValueError("gaussian does not accept target-line or modulation controls")
+        if self.kind == "gaussian" and self._has_targeted_controls():
+            raise ValueError("gaussian does not accept target-line or modulation controls")
+
+    def _validate_shape(self) -> None:
+        if self.shape not in ("gaussian", "uniform"):
+            raise ValueError("shape must be 'gaussian' or 'uniform'")
+        if self.shape != "gaussian" and self.kind != "gaussian":
+            raise ValueError("shape='uniform' is only valid for kind='gaussian'")
+
+    def _has_targeted_controls(self) -> bool:
+        return (
+            self.target_reflection is not None
+            or self.retained_coherence != 0.9
+            or self.spacing_periods != 1
+            or self.modulation_depth != 1.0
+            or self.timing_jitter_fs != 0.0
+        )
 
 
 @dataclass(frozen=True)
@@ -100,6 +266,7 @@ class ResolvedLongitudinalDistribution:
     target_wavelength_ang: float | None
     target_period_fs: float | None
     provenance: str
+    shape: str = "gaussian"
 
 
 def _dominant_basal_reflection(
@@ -169,7 +336,10 @@ def resolve_longitudinal_distribution(
             target_energy_eV=None,
             target_wavelength_ang=None,
             target_period_fs=None,
-            provenance="explicit Gaussian RMS duration",
+            provenance="explicit Gaussian RMS duration"
+            if policy.shape == "gaussian"
+            else "explicit flat-top RMS duration",
+            shape=policy.shape,
         )
     if surface_hkl is not None:
         surface_axis, _ = reciprocal_g_vector(surface_hkl, lattice)

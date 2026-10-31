@@ -603,7 +603,7 @@ def _prepare_spectrum(request):
                     raise ValueError(
                         "analytic coherent averaging of sampled "
                         "bunch offsets needs a Gaussian bunch length to average them "
-                        "analytically: set Beam(longitudinal=BunchLength(rms_fs=...)), "
+                        "analytically: set Beam(longitudinal=LongitudinalDistribution('gaussian', ...)), "
                         "or use Slab(footprint=None) for a laterally infinite crystal"
                     )
                 sigma_z_ang = longitudinal_rms_fs * C_ANG_PER_FS

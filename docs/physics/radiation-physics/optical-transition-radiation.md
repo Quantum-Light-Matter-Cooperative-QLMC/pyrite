@@ -123,7 +123,7 @@ a resolved microbunched profile has its harmonic at $E=2\pi\hbar c/\lambda_m$.
 
 ## RMS duration convention and coherent window
 
-Catalog `envelope_rms_fs` and `BunchLength.rms_fs` are RMS (standard
+Catalog `envelope_rms_fs` (and the deprecated `BunchLength.rms_fs`) are RMS (standard
 deviation) durations, not FWHM; at normal incidence they are the crossing-time
 RMS $\sigma_t$ of the `gaussian` law. Then
 $|F_t|^2=e^{-(E\sigma_t/\hbar)^2}$, $E_{1/e}=\hbar/\sigma_t$, and the pair term

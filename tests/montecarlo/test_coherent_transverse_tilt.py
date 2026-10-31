@@ -231,7 +231,7 @@ def test_tilted_finite_footprint_reducer_applies_the_analytic_transverse_factor(
 def test_finite_footprint_without_bunch_length_names_user_facing_fixes():
     segments, _ = _tilted_identical_tracks(4, 2.0)
     segments.update(crystal_width_ang=1e6, crystal_height_ang=1e6)
-    with pytest.raises(ValueError, match="BunchLength") as caught:
+    with pytest.raises(ValueError, match="LongitudinalDistribution") as caught:
         mc_cxr_spectrum(
             segments,
             np.arange(700.0, 1500.0, 2.0),

@@ -63,8 +63,10 @@ def test_api_contracts_have_canonical_owners_and_legacy_anchors():
     root_table = "| Root name | Classification | Recommended import | Reason |"
     assert root_table in compatibility
     assert root_table not in legacy
-    assert "from pyrite.beams import Beam, TransverseSpot, BunchLength" in compatibility
-    assert "from pyrite.beams import Beam, TransverseSpot, BunchLength" not in legacy
+    assert (
+        "from pyrite.beams import Beam, TransverseSpot, LongitudinalDistribution" in compatibility
+    )
+    assert "from pyrite.beams import Beam, TransverseSpot, LongitudinalDistribution" not in legacy
 
 
 def test_legacy_api_sections_link_to_namespace_contracts():

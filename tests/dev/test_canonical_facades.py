@@ -77,13 +77,17 @@ def test_canonical_physical_inputs_compose_layered_scenes_and_sweeps(gdf):
     from dataclasses import asdict
 
     from pyrite import Scene, Sweep
-    from pyrite.beams import Beam, BunchLength, GdfSource, PointBunch, PointSpot
+    from pyrite.beams import Beam, GdfSource, LongitudinalDistribution, PointBunch, PointSpot
     from pyrite.geometry import Footprint, Layer, Stack
 
     beam = (
         Beam.from_gdf("source.gdf", z_origin_m=0.0, time_s=1e-9, energy_keV=30.0)
         if gdf
-        else Beam(energy_keV=30.0, transverse=PointSpot(), longitudinal=BunchLength(100.0))
+        else Beam(
+            energy_keV=30.0,
+            transverse=PointSpot(),
+            longitudinal=LongitudinalDistribution("gaussian", 100.0),
+        )
     )
     target = Stack(
         layers=(Layer("hopg", 1e4), Layer("sio2", 2850.0), Layer("silicon", 5e6)),

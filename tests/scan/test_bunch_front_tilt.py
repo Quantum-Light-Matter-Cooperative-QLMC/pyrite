@@ -1,6 +1,6 @@
 """Public beam-front descriptor, canonical spot name and case identity."""
 
-from dataclasses import asdict
+from dataclasses import fields
 
 import numpy as np
 import pytest
@@ -15,7 +15,7 @@ def _beam(front=None, **kwargs):
     return pr.Beam(
         energy_keV=30.0,
         transverse=pr.beams.TransverseSpot(0.001),
-        longitudinal=pr.beams.BunchLength(0.001),
+        longitudinal=pr.beams.LongitudinalDistribution("gaussian", 0.001),
         bunch_front_tilt=front,
         **kwargs,
     )
@@ -36,7 +36,8 @@ def test_tilt_rejects_singular_or_nonfinite_angles(angle):
 def test_tilt_round_trip_and_zero_canonicalization():
     beam = _beam(pr.beams.BunchFrontTilt(25.0, 90.0))
     assert pr.Beam.from_spec(beam.to_spec()) == beam
-    assert BeamSpec(**asdict(beam.to_spec())) == beam.to_spec()
+    spec = beam.to_spec()
+    assert BeamSpec(**{f.name: getattr(spec, f.name) for f in fields(spec)}) == spec
     assert _beam(pr.beams.BunchFrontTilt(0.0, 90.0)) == _beam()
     with pytest.raises(ValueError, match="azimuth"):
         pr.beams.BunchFrontTilt(10, np.nan)
@@ -114,7 +115,7 @@ def test_unsupported_source_combinations_fail_explicitly(kind):
     elif kind == "offsets":
         fields["longitudinal"] = pr.beams.Offsets((0.0, 1.0))
     elif kind == "uniform":
-        fields["longitudinal"] = pr.beams.BunchLength(1.0, shape="uniform")
+        fields["longitudinal"] = pr.beams.LongitudinalDistribution("gaussian", 1.0, shape="uniform")
     elif kind == "twiss":
         from pyrite.montecarlo.transverse import TransverseDistribution
 

@@ -68,11 +68,6 @@
       "cc": 24
     },
     {
-      "path": "src/pyrite/campaign/longitudinal.py",
-      "name": "LongitudinalDistribution.__post_init__",
-      "cc": 23
-    },
-    {
       "path": "src/pyrite/campaign/lowering.py",
       "name": "build_sweep_cases",
       "cc": 21

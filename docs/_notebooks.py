@@ -284,10 +284,15 @@ def output_contains_figure(notebook):
 
 
 def suppress_model_warnings(notebook):
-    """Omit known model-warning tracebacks explained in the tutorial prose."""
+    """Omit known model-warning tracebacks and matplotlib font-fallback noise.
+
+    ``findfont`` lines come from the capture host lacking STIX/Computer Modern
+    fonts; they say nothing about the tutorial.
+    """
     pattern = re.compile(
         r"^[^\n]*:\d+: (?:LineOpticalDataWarning|CoherentSamplingWarning):"
-        r"[^\n]*(?:\n[ \t]+[^\n]*)?\n?",
+        r"[^\n]*(?:\n[ \t]+[^\n]*)?\n?"
+        r"|^findfont: [^\n]*\n?",
         re.MULTILINE,
     )
     for cell in notebook["cells"]:

@@ -7,8 +7,9 @@ invalid mix cannot be constructed and the type hints list what is allowed:
 * transverse -- :class:`TransverseSpot` (Gaussian entrance spot), :class:`PointSpot`, or a
   :class:`~pyrite.montecarlo.transverse.TransverseDistribution`
   (Courant--Snyder);
-* longitudinal -- :class:`PointBunch`, :class:`BunchLength`, :class:`Offsets`,
-  or a :class:`~pyrite.campaign.longitudinal.LongitudinalDistribution` policy;
+* longitudinal -- :class:`PointBunch`, :class:`Offsets`, or a
+  :class:`~pyrite.campaign.longitudinal.LongitudinalDistribution` policy
+  (:class:`BunchLength` is a deprecated spelling of its Gaussian kind);
 * source -- analytic by default, or :class:`GdfSource` through
   :meth:`Beam.from_gdf`.
 
@@ -22,13 +23,14 @@ from typing import TYPE_CHECKING, Any, Self
 
 import numpy as np
 
+from .._api_deprecations import warn_api
 from .._spec_defaults import UNSET as _UNSET
 from .._spec_defaults import _Unset
 from .._units import _is_pint_quantity, _scalar_quantity, normalize_unit
 from ..montecarlo.bunch_front import BunchFrontTilt, validate_front_source
 from ..montecarlo.transverse import TransverseDistribution
 from ..quantum_state import TransverseStateSpec
-from .longitudinal import LongitudinalDistribution
+from .longitudinal import LongitudinalDistribution, _timing_quantity_fs
 from .sweep import BeamSpec
 
 if TYPE_CHECKING:
@@ -55,26 +57,6 @@ def _positive(name: str, value: float) -> float:
     if not np.isfinite(value) or value <= 0.0:
         raise ValueError(f"{name} must be finite and positive")
     return value
-
-
-def _timing_quantity_fs(value: object, *, field: str, ndim: int) -> np.ndarray:
-    """Own a real explicit-time quantity representable in numeric fs storage."""
-    if not _is_pint_quantity(value):
-        raise TypeError(f"{field} requires a Pint quantity with time units")
-    magnitude = normalize_unit(value, "fs", field=field, expected="time")
-    array = np.asarray(magnitude)
-    if array.dtype.kind not in "iuf" or array.ndim != ndim:
-        shape = "scalar" if ndim == 0 else "one-dimensional array"
-        raise TypeError(f"{field} must be a real {shape}")
-    if array.size == 0 or not np.all(np.isfinite(array)):
-        raise ValueError(f"{field} must contain nonempty finite times")
-    with np.errstate(over="ignore", under="ignore"):
-        stored = array.astype(float)
-    if not np.all(np.isfinite(stored)) or np.any((array != 0) & (stored == 0)):
-        raise ValueError(
-            f"{field} must be representable in numeric fs storage without overflow or underflow"
-        )
-    return stored
 
 
 def _spot_width_mm(value: object, *, field: str) -> float:
@@ -217,6 +199,12 @@ class PointBunch:
 class BunchLength:
     """Sampled arrival times with an RMS duration.
 
+    .. deprecated:: 0.25.0
+        Use :class:`~pyrite.beams.LongitudinalDistribution` with
+        ``kind="gaussian"`` (``shape="uniform"`` for a flat top). ``Beam`` lowers
+        both spellings to the same canonical form, so case identity and sampled
+        offsets are unchanged.
+
     Parameters
     ----------
     rms_fs
@@ -238,6 +226,7 @@ class BunchLength:
         *,
         rms_duration: object = _UNSET,
     ) -> None:
+        warn_api("BunchLength")
         if rms_duration is not _UNSET:
             if rms_fs is not _UNSET:
                 raise TypeError("BunchLength.rms_fs and rms_duration are mutually exclusive")
@@ -425,7 +414,7 @@ class Beam:
 
     >>> Beam(energy_keV=30.0, transverse=TransverseSpot(fwhm_x_mm=0.5), longitudinal=PointBunch())  # doctest: +SKIP
     >>> Beam(  # doctest: +SKIP
-    ...     energy_keV=30.0, transverse=PointSpot(), longitudinal=BunchLength(rms_fs=100.0)
+    ...     energy_keV=30.0, transverse=PointSpot(), longitudinal=LongitudinalDistribution("gaussian", 100.0)
     ... )
     >>> Beam.from_gdf("beam.gdf", z_origin_m=0.0, time_s=1e-9)  # doctest: +SKIP
 
@@ -444,8 +433,10 @@ class Beam:
         Required: :class:`TransverseSpot`, :class:`PointSpot`, or a Courant--Snyder
         :class:`~pyrite.montecarlo.transverse.TransverseDistribution`.
     longitudinal
-        Required: :class:`PointBunch`, :class:`BunchLength`, :class:`Offsets`, or a
+        Required: :class:`PointBunch`, :class:`Offsets`, or a
         :class:`~pyrite.campaign.longitudinal.LongitudinalDistribution` policy.
+        A deprecated :class:`BunchLength` is still stored as given but lowers to
+        the equivalent Gaussian ``LongitudinalDistribution`` record.
     energy_spread_frac
         RMS fractional kinetic-energy spread; ``None`` is monoenergetic.
     rep_rate_hz
@@ -721,8 +712,10 @@ class Beam:
             fields["transverse"] = transverse
         longitudinal = self.longitudinal
         if isinstance(longitudinal, BunchLength):
-            fields["bunch_length_fs"] = float(longitudinal.rms_fs)
-            fields["long_shape"] = longitudinal.shape
+            # Canonical smooth-bunch form: equal beams share case keys.
+            fields["longitudinal"] = LongitudinalDistribution(
+                "gaussian", float(longitudinal.rms_fs), shape=longitudinal.shape
+            )
         elif isinstance(longitudinal, Offsets):
             fields["long_offsets_fs"] = longitudinal.offsets_fs
             fields["long_shape"] = longitudinal.shape
@@ -816,7 +809,9 @@ class Beam:
         elif spec.long_offsets_fs is not None:
             longitudinal = Offsets(tuple(spec.long_offsets_fs), spec.long_shape)
         elif spec.bunch_length_fs is not None:
-            longitudinal = BunchLength(spec.bunch_length_fs, spec.long_shape)
+            longitudinal = LongitudinalDistribution(
+                "gaussian", float(spec.bunch_length_fs), shape=spec.long_shape
+            )
         elif flat_bunch:
             raise ValueError("long_shape needs bunch_length_fs or long_offsets_fs")
         else:

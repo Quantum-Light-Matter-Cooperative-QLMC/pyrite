@@ -13,8 +13,8 @@ The entries below use generated docstrings, signatures, and source links. API su
    pyrite.beams.BunchFrontTilt
    pyrite.beams.PointSpot
    pyrite.beams.PointBunch
-   pyrite.beams.BunchLength
    pyrite.beams.LongitudinalDistribution
+   pyrite.beams.BunchLength
    pyrite.beams.Offsets
    pyrite.beams.GdfSource
    pyrite.campaign.beam_metrics.capture_beam_metrics
@@ -68,24 +68,30 @@ See [front timing, supported sources and examples](../../reference/python-scene-
 
 ## Bunch timing with units
 
-Construct `BunchLength(rms_duration=quantity)` with a finite positive scalar
-time quantity. Construct `Offsets(arrival_offsets=quantity)` with a nonempty
+`BunchLength` is deprecated; use `LongitudinalDistribution("gaussian", ...)`
+(see the [migration table](compatibility.md#deprecated-spellings)).
+
+Construct `LongitudinalDistribution("gaussian", rms_duration=quantity)` (or
+`envelope_rms=quantity`) with a finite positive scalar time quantity; add
+`shape="uniform"` for a flat top of the same RMS. Construct `Offsets(arrival_offsets=quantity)` with a nonempty
 one-dimensional time array; signed offsets and zero are valid.
 
 ```python
-from pyrite.beams import BunchLength, Offsets
+from dataclasses import replace
+
+from pyrite.beams import LongitudinalDistribution, Offsets
 from pyrite.units import Q_
 
-bunch = BunchLength(rms_duration=Q_(0.25, "ps"))
+bunch = LongitudinalDistribution("gaussian", rms_duration=Q_(0.25, "ps"))
 duration_ps = bunch.rms_duration.to("ps")
-longer = bunch.with_rms_duration(Q_(500, "fs"))
+longer = replace(bunch, envelope_rms_fs=500.0)
 timed = Offsets(arrival_offsets=Q_([-125, 0, 250], "fs"))
 offsets_ps = timed.arrival_offsets.to("ps")
 retimed = timed.with_arrival_offsets(Q_([-250, 0, 500], "fs"))
 ```
 
 Read-back uses the shared Pint registry and canonical fs; offset magnitudes
-are fresh arrays. The legacy `rms_fs` and `offsets_fs` fields, positional
+are fresh arrays. The legacy `envelope_rms_fs` and `offsets_fs` fields, positional
 constructors and `shape` labels remain supported. Passing both numeric and
 semantic spellings raises `TypeError`, including with equivalent values.
 `dataclasses.replace` and nested numeric sweep paths continue to use the

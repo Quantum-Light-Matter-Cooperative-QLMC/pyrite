@@ -453,11 +453,12 @@ SplitStepPropagator = { target = "pyrite.montecarlo.channeling.realspace:SplitSt
 
 [package_exports."pyrite.beams"]
 BunchFrontTilt = { target = "pyrite.campaign.beam:BunchFrontTilt", status = "advanced-stable" }
-# BunchLength/Offsets own additive semantic time inputs, read-back and replacement;
-# their numeric dataclass fields and transport records remain unchanged.
+# Offsets owns additive semantic time inputs, read-back and replacement; its numeric
+# dataclass fields and transport records remain unchanged. BunchLength is deprecated
+# (schedule: pyrite._api_deprecations) in favour of LongitudinalDistribution("gaussian").
 BunchLength = { target = "pyrite.campaign.beam:BunchLength", status = "advanced-stable" }
 GdfSource = { target = "pyrite.campaign.beam:GdfSource", status = "advanced-stable" }
-LongitudinalDistribution = { target = "pyrite.campaign.longitudinal:LongitudinalDistribution", status = "experimental" }
+LongitudinalDistribution = { target = "pyrite.campaign.longitudinal:LongitudinalDistribution", status = "advanced-stable" }
 Offsets = { target = "pyrite.campaign.beam:Offsets", status = "advanced-stable" }
 PointBunch = { target = "pyrite.campaign.beam:PointBunch", status = "advanced-stable" }
 PointSpot = { target = "pyrite.campaign.beam:PointSpot", status = "advanced-stable" }

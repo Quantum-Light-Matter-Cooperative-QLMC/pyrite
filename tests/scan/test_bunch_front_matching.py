@@ -16,7 +16,7 @@ def _scene(tilt=84.5, azimuth=0.0):
         beam=pr.Beam(
             energy_keV=30.0,
             transverse=pr.beams.TransverseSpot(0.001, 0.002),
-            longitudinal=pr.beams.BunchLength(0.001),
+            longitudinal=pr.beams.LongitudinalDistribution("gaussian", 0.001),
         ),
         target=pr.geometry.Slab(
             "hopg", 500.0, tilt_deg=tilt, tilt_azim_deg=azimuth, footprint=None

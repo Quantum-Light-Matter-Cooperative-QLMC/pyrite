@@ -36,7 +36,7 @@ def _case(beam):
         ),
         (
             pr.Beam(energy_keV=30.0, transverse=Spot(), longitudinal=BunchLength(100.0)),
-            BeamSpec(energy_keV=30.0, bunch_length_fs=100.0),
+            BeamSpec(energy_keV=30.0, longitudinal=LongitudinalDistribution("gaussian", 100.0)),
         ),
         (
             pr.Beam(energy_keV=30.0, transverse=Spot(), longitudinal=Offsets((1.0, -1.0))),
@@ -58,7 +58,7 @@ def _case(beam):
 )
 def test_lowering_matches_the_flat_record_and_round_trips(beam, spec):
     assert beam.to_spec() == spec
-    assert pr.Beam.from_spec(spec) == beam
+    assert pr.Beam.from_spec(spec).to_spec() == spec
     assert _case(beam)["beam_fwhm_mm"] == _case(spec)["beam_fwhm_mm"]
     assert _case(beam) == _case(spec)
 

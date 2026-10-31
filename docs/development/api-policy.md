@@ -135,7 +135,7 @@ The physical-input facades have these complete `__all__` inventories:
 
 | Namespace | Public names |
 | --- | --- |
-| `pyrite.beams` | `Beam`, `BunchFrontTilt`, `BunchLength`, `GdfSource`, `Offsets`, `PointBunch`, `PointSpot`, `Spot`, `TransverseSpot` |
+| `pyrite.beams` | `Beam`, `BunchFrontTilt`, `BunchLength` (deprecated), `GdfSource`, `LongitudinalDistribution`, `Offsets`, `PointBunch`, `PointSpot`, `Spot`, `TransverseSpot` |
 | `pyrite.geometry` | `BlazedGrooves`, `CrystalCut`, `Filter`, `Footprint`, `Layer`, `RectangularBody`, `Slab`, `Stack`, `SubstanceRef`, `Target` |
 
 `Spot` remains an alias of `TransverseSpot`. These facades lazily re-export

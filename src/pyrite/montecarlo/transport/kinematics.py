@@ -15,6 +15,25 @@ from scipy.special import ndtri
 C_ANG_PER_FS = 2997.924580
 
 
+def _centered_gaussian_policy_offsets(root, Ne, sigma_fs, shape, kind):
+    """Centered ``gaussian``/``compressed`` offsets [Angstrom]; ``gaussian`` is bit-identical to ``bunch_length_fs``.
+
+    Uses the same operation order as the legacy flat ``bunch_length_fs`` path
+    (``sigma [Ang] * draw``), so equal policies draw equal offsets.
+    ``shape="uniform"`` is a flat top of the same RMS (half-width ``sqrt(3) sigma``).
+    """
+    if kind == "compressed":
+        dt = (sigma_fs * counter_normals(root, Ne, 1)[:, 0]) * C_ANG_PER_FS
+        return dt - dt.mean()
+    sigma_ang = sigma_fs * C_ANG_PER_FS
+    if shape == "uniform":
+        half_width = np.sqrt(3.0) * sigma_ang
+        dt = half_width * (2.0 * counter_uniforms(root, Ne, 1)[:, 0] - 1.0)
+    else:
+        dt = sigma_ang * counter_normals(root, Ne, 1)[:, 0]
+    return dt - dt.mean()
+
+
 def _sample_bunch_offsets(
     Ne,
     bunch_length_fs,
@@ -62,7 +81,9 @@ def _sample_bunch_offsets(
             sigma_fs = longitudinal_distribution.get("rms_duration_fs")
             if sigma_fs is None:
                 raise ValueError(f"{kind} resolution requires rms_duration_fs")
-            dt = float(sigma_fs) * counter_normals(root, Ne, 1)[:, 0]
+            return _centered_gaussian_policy_offsets(
+                root, Ne, float(sigma_fs), longitudinal_distribution.get("shape", "gaussian"), kind
+            )
         elif kind == "microtrain":
             envelope_fs = float(longitudinal_distribution["envelope_rms_fs"])
             microbunch_fs = float(longitudinal_distribution["microbunch_rms_fs"])

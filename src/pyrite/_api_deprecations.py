@@ -44,6 +44,12 @@ API_DEPRECATIONS = {
         ),
     )
 }
+API_DEPRECATIONS["BunchLength"] = _api_entry(
+    "BunchLength",
+    "LongitudinalDistribution(kind='gaussian', ...) "
+    "(shape='uniform' for a flat top; rms_duration= for a Pint time)",
+    since="0.25.0",
+)
 
 
 def warn_api(spelling: str, *, stacklevel: int = 3) -> None:

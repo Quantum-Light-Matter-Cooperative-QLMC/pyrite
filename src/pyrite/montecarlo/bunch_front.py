@@ -20,8 +20,9 @@ class BunchFrontTilt:
     selected by ``azimuth_deg`` (0 is +x, 90 is +y). The mean direction is
     unchanged. At the beam-normal plane through the target origin,
     ``c*t0 = c*epsilon + tan(theta) * (x*cos(phi)+y*sin(phi))/beta0``.
-    ``BunchLength.rms_fs`` describes the independent residual epsilon at
-    fixed position, not the duration of the whole tilted envelope.
+    The Gaussian ``LongitudinalDistribution`` RMS describes the independent
+    residual epsilon at fixed position, not the duration of the whole tilted
+    envelope.
     Matching this tilt and azimuth to the target's tilt and azimuth makes
     the front parallel to the entrance face: its imposed timing gradient
     cancels the vacuum flight-delay gradient at entry.
@@ -104,6 +105,17 @@ def validate_front_source(
 ):
     """Refuse sources outside the monoenergetic Gaussian parallel-ray model."""
     front = resolve_front_tilt(front)
+    # A Gaussian/flat-top policy is the canonical smooth-bunch spelling (what the
+    # deprecated BunchLength lowers to); targeted kinds stay unsupported.
+    if isinstance(longitudinal, Mapping):
+        kind, policy_shape = longitudinal.get("kind"), longitudinal.get("shape", "gaussian")
+    else:
+        kind, policy_shape = (
+            getattr(longitudinal, "kind", None),
+            getattr(longitudinal, "shape", None),
+        )
+    if kind == "gaussian":
+        longitudinal, shape = None, policy_shape
     if front is not None and (
         transverse is not None
         or energy_spread is not None
@@ -115,6 +127,6 @@ def validate_front_source(
     ):
         raise ValueError(
             "nonzero bunch-front tilt supports only monoenergetic analytic point or "
-            "Gaussian spots with PointBunch or Gaussian BunchLength on a flat face"
+            "Gaussian spots with PointBunch or Gaussian LongitudinalDistribution on a flat face"
         )
     return front

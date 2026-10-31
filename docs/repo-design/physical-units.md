@@ -334,12 +334,14 @@ independent of this beam pilot.
 
 ## Bunch timing quantity interfaces
 
-`pyrite.beams.BunchLength` and `Offsets` extend the beam-energy naming pattern
+`pyrite.beams.LongitudinalDistribution` (Gaussian kind; replaces the deprecated
+`BunchLength`) and `Offsets` extend the beam-energy naming pattern
 at their existing owners in `campaign/beam.py`:
 
 | Descriptor | Quantity constructor/read-back | Quantity replacement | Numeric field retained |
 | --- | --- | --- | --- |
-| `BunchLength` | `rms_duration` | `with_rms_duration(quantity)` | `rms_fs` |
+| `LongitudinalDistribution` (Gaussian) | `rms_duration` / `envelope_rms` | `dataclasses.replace(policy, envelope_rms_fs=...)` | `envelope_rms_fs` |
+| `BunchLength` (deprecated) | `rms_duration` | `with_rms_duration(quantity)` | `rms_fs` |
 | `Offsets` | `arrival_offsets` | `with_arrival_offsets(quantity)` | `offsets_fs` |
 
 The semantic constructor arguments are keyword-only and require explicit Pint

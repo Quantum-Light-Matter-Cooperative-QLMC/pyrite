@@ -51,7 +51,7 @@ def _(np, tables_ready):
     from scipy.constants import physical_constants
 
     from pyrite import simulate
-    from pyrite.beams import Beam, BunchLength, TransverseSpot
+    from pyrite.beams import Beam, LongitudinalDistribution, TransverseSpot
     from pyrite.config import CxrReflections, FixedSampling, Numerics, Physics
     from pyrite.detectors import Detector, EnergyBins
     from pyrite.geometry import Footprint, Slab
@@ -80,7 +80,9 @@ def _(np, tables_ready):
             Beam(
                 kinetic_energy=beam_keV * ureg.keV,
                 transverse=TransverseSpot(fwhm_x=1 * ureg.nm),
-                longitudinal=BunchLength(rms_duration=rms_as * ureg.attosecond),
+                longitudinal=LongitudinalDistribution(
+                    "gaussian", rms_duration=rms_as * ureg.attosecond
+                ),
                 bunch_charge=bunch_charge_pc * ureg.pC,
                 repetition_rate=5 * ureg.kHz,
             ),

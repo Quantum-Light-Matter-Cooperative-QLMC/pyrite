@@ -124,7 +124,7 @@ def _(np, tables_ready):
     from scipy.constants import elementary_charge, hbar, physical_constants
 
     from pyrite import simulate
-    from pyrite.beams import Beam, BunchLength, LongitudinalDistribution, PointSpot, TransverseSpot
+    from pyrite.beams import Beam, LongitudinalDistribution, PointSpot, TransverseSpot
     from pyrite.config import CxrReflections, FixedSampling, Numerics, Physics
     from pyrite.detectors import Detector, EnergyBins
     from pyrite.geometry import Slab
@@ -175,7 +175,7 @@ def _(np, tables_ready):
 
     train = make_train(10.0)
     # Plain Gaussian bunch for comparison. It has no target-line controls.
-    long_gaussian = BunchLength(rms_duration=1.0 * ureg.fs)
+    long_gaussian = LongitudinalDistribution("gaussian", rms_duration=1.0 * ureg.fs)
 
     def make_beam(longitudinal, *, charge=charge_pc, spot=None):
         return Beam(
