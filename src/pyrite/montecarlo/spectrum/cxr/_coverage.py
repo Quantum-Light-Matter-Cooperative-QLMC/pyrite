@@ -15,7 +15,7 @@ from ...._backend import REAL, _to_cpu, xp
 from ....materials.atomic import _chantler_bounds
 from ....materials.crystal import _EDGE_PRONE, HBARC_EV_ANG, reciprocal_g_vector
 from ....materials.photon_cross_sections import EPDL_E_MIN_EV
-from ....materials.recoil import recoil_shift_fraction
+from ....materials.recoil import _recoil_shift_fraction_unchecked
 from ..reflection_rows import MIN_RESONANCE_EV
 from ._kernels import _cxr_emission_ceiling, _in_medium_kinematics
 
@@ -121,6 +121,8 @@ def line_data_coverage(st):
     grid = np.asarray(_to_cpu(st.E_grid))
     orientations = st.mosaic_quad or [(None, 1.0)]
     chunk = max(1, min(40000, int(req.chunk)))
+    normal = np.asarray(_to_cpu(st.n_hat), dtype=np.float64)
+    normal = xp.asarray(normal / np.linalg.norm(normal))
     for hkl in req.hkl_list:
         g, _ = reciprocal_g_vector(hkl, st.info["lattice"])
         if st.R_orient is not None:
@@ -172,7 +174,7 @@ def line_data_coverage(st):
                 )
                 counts += xp.stack(
                     [xp.count_nonzero(mask) for mask in masks]
-                    + [_recoil_count(st, block, positive, g_row)]
+                    + [_recoil_count(st, block, positive, g_row, normal)]
                 )
     return {
         "schema": "line-data-coverage.v2",
@@ -186,33 +188,33 @@ def line_data_coverage(st):
     }
 
 
-def _recoil_count(st, block, positive, g_row):
+def _recoil_count(st, block, positive, g_row, normal):
     """Positive vacuum seeds whose exact vacuum recoil shift exceeds the limit.
 
-    Float64 host evaluation of the exact/classical vacuum roots for each
-    positive seed, from the transported kinetic energy and direction rather
-    than the float32 speed, which rounds to one near 1.5 GeV. The energy field
-    is the one the line kernels use. A segment whose classical root is not
-    positive in float64 is not counted. Optical data are not needed, so seeds
-    outside the optical domain are screened too.
+    Float64 evaluation of the exact/classical vacuum roots for each positive
+    seed, from the transported kinetic energy and direction rather than the
+    float32 speed, which rounds to one near 1.5 GeV. The energy field is the
+    one the line kernels use. A segment whose classical root is not positive in
+    float64 is not counted. Optical data are not needed, so seeds outside the
+    optical domain are screened too. Rows are evaluated in place on the array
+    backend (no host copy or row compaction, which made this screen dominate
+    the line phase, #286); unselected rows get placeholder inputs and are
+    masked out of the count.
 
     Validation: line-recoil-validity-screen
     """
-    selected = np.asarray(_to_cpu(positive), dtype=bool)
     segments = st.segments
     field = "E_repr_keV" if segments.get("E_repr_keV") is not None else "E_keV"
-    # Slice on the device before the host copy: copying whole segment arrays per
-    # block made this screen O(segments^2) (#286; 109 of 111 s at 1600 e-).
-    kinetic = 1.0e3 * np.asarray(_to_cpu(xp.asarray(segments[field])[block]), dtype=np.float64)
-    direction = np.asarray(_to_cpu(xp.asarray(segments["v_hat"])[block]), dtype=np.float64)
-    norm = np.linalg.norm(direction, axis=1)
+    kinetic = 1.0e3 * xp.asarray(segments[field])[block].astype(xp.float64)
+    direction = xp.asarray(segments["v_hat"])[block].astype(xp.float64)
+    norm = xp.linalg.norm(direction, axis=1)
     # The reference raises on degenerate input; such rows are not screened.
-    selected &= np.isfinite(kinetic) & (kinetic > 0) & np.isfinite(norm) & (norm > 0)
-    if not selected.any():
-        return xp.asarray(0, dtype=xp.int64)
-    kinetic = kinetic[selected]
-    direction = direction[selected] / norm[selected, None]
-    normal = np.asarray(_to_cpu(st.n_hat), dtype=np.float64)
-    normal = normal / np.linalg.norm(normal)
-    fraction = recoil_shift_fraction(kinetic, direction, g_row, normal)
-    return xp.asarray(np.count_nonzero(np.abs(fraction) > RECOIL_SHIFT_LIMIT), dtype=xp.int64)
+    selected = positive & xp.isfinite(kinetic) & (kinetic > 0) & xp.isfinite(norm) & (norm > 0)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        kinetic = xp.where(selected, kinetic, 1.0)
+        direction = xp.where(selected[:, None], direction / norm[:, None], normal)
+        fraction = _recoil_shift_fraction_unchecked(
+            xp, kinetic, direction, xp.asarray(g_row, dtype=xp.float64), normal
+        )
+    exceeds = selected & (xp.abs(fraction) > RECOIL_SHIFT_LIMIT)
+    return xp.asarray(xp.count_nonzero(exceeds), dtype=xp.int64)
