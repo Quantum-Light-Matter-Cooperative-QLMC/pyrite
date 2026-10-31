@@ -3,7 +3,8 @@
 import numpy as np
 import pytest
 
-from pyrite.materials import atomic as a, crystal as c
+from pyrite.materials import atomic as a
+from pyrite.materials import crystal as c
 from pyrite.materials import quantities as q
 from pyrite.units import Q_, ureg
 
