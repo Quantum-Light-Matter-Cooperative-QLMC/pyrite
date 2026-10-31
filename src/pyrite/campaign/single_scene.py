@@ -153,7 +153,7 @@ def resolve_pixel_scene(
             energy_bins=EnergyBins(
                 cxr=scan.E_grid_line,
                 cxr_by_energy=scan.E_grid_line_by_energy,
-                brem=_band_at_energy(scan.E_grid_brem, energy),
+                brem=_declared_brem_band(scan, energy),
             ),
             cxr_trials=n_electrons,
             brem_trials=n_electrons_brem,
@@ -256,3 +256,8 @@ def compose_pixel_scene(components: tuple[Any, ...]) -> ProfileSimulation:
         ),
         detector_id=detector_id,
     )
+
+
+def _declared_brem_band(scan: Any, energy: float) -> Any:
+    """The declared continuum band at ``energy``; ``None`` resolves the automatic grid (#278)."""
+    return _band_at_energy(scan.E_grid_brem, energy) if scan.E_grid_brem_declared else None

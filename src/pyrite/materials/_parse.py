@@ -319,6 +319,7 @@ def _scan(
         errors.add(path, "requires exactly one of thickness_ang or thickness_layers")
     has_cxr = "E_grid_line" in values
     grids: dict[str, np.ndarray | None] = {}
+    brem_declared = "E_grid_brem" in values
     for key in ("energy_keV", "tilt_deg", "tilt_azim_deg", "E_grid_brem"):
         if key == "E_grid_brem" and key not in values:
             grids[key] = _readonly(np.arange(*DEFAULT_BREM_GRID))
@@ -425,6 +426,7 @@ def _scan(
         E_grid_brem=E_grid_brem,
         n_electrons=electron_grids["n_electrons"],
         n_electrons_brem=electron_grids["n_electrons_brem"],
+        E_grid_brem_declared=brem_declared,
     )
 
 

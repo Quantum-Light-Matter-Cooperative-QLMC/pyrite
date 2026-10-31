@@ -214,9 +214,10 @@ def test_set_brem_geometric_rejects_an_unknown_material(writable_catalog):
 
 def test_set_brem_geometric_first_node_is_the_derived_floor(writable_catalog, monkeypatch):
     """Not a step multiple: a geometric grid can sit exactly on the floor."""
-    from pyrite.energy_grid import floor
+    from pyrite import _continuum_grid
 
-    monkeypatch.setattr(floor, "photon_continuum_floor_eV", lambda *a, **k: 30.6614)
+    # The builder reads the floor in its package-root leaf; the facade only re-exports.
+    monkeypatch.setattr(_continuum_grid, "photon_continuum_floor_eV", lambda *a, **k: 30.6614)
     band = apply.set_brem_geometric("graded", 40000.0, 12, catalog_path=writable_catalog)
     assert band.startswith("[30.6614, 40000] eV x 12 pts")
 

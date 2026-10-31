@@ -30,13 +30,15 @@ from __future__ import annotations
 
 import math
 import warnings
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import InitVar, dataclass, field, replace
+from functools import lru_cache, partial
 from itertools import product
 from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 
+from .._continuum_grid import automatic_continuum_grid
 from .._cxr_grid_policy import (
     AUTOMATIC_BANDWIDTH_POLICY,
     RESONANCE_BANDWIDTH_POLICY,
@@ -58,10 +60,10 @@ from .._numerics import (
     validate_elastic_model,
     validate_inelastic_numerics,
 )
-from .._photon_continuum_floor import floored_lattice_start_eV
+from .._photon_continuum_floor import continuum_medium_key, floored_lattice_start_eV
 from .._precision import Precision
 from ..detectors import Detector
-from ..materials import CATALOG, LayerSpec
+from ..materials import CATALOG, LayerSpec, MediumSpec
 from ..materials.crystal import reciprocal_g_vector
 from ..montecarlo.bunch_front import BunchFrontTilt, resolve_front_tilt
 from ..montecarlo.case import Case
@@ -818,6 +820,41 @@ def _floored_brem_case_grid(sweep: Sweep, brem_grid: np.ndarray) -> Any:
     return brem_case_grid
 
 
+def automatic_continuum_medium(sweep: Sweep) -> str | MediumSpec | None:
+    """The medium whose automatic continuum grid every case uses, or ``None``.
+
+    Cases resolve :func:`~pyrite._continuum_grid.automatic_continuum_grid` when
+    no continuum grid is declared (``energy_bins.brem is None``: a profile with
+    no ``E_grid_brem``, or a sweep built without one) and the sweep names a
+    catalog material whose floor and absorption edges the grid is built from.
+    Declared bands and explicit grids keep their own nodes.
+    """
+    if sweep.energy_bins.brem is not None or sweep.material is None:
+        return None
+    return continuum_medium_key(sweep.material)
+
+
+@lru_cache(maxsize=256)
+def _automatic_grid_nodes(medium: str | MediumSpec, endpoint_eV: float) -> np.ndarray:
+    nodes = automatic_continuum_grid(medium, endpoint_eV)
+    nodes.setflags(write=False)
+    return nodes
+
+
+def _automatic_case_brem_grid(medium: str | MediumSpec, energy_keV: float) -> Any:
+    """Exact refined geometric nodes from the medium floor to just past ``E0`` (#278)."""
+    return encode_energy_grid(_automatic_grid_nodes(medium, energy_keV * 1e3))
+
+
+def _case_brem_resolver(sweep: Sweep, brem_case_grid: Any) -> Callable[[float], Any]:
+    """Per-``E0`` (keV) case continuum grid: automatic for an undeclared one (#278)."""
+    medium = automatic_continuum_medium(sweep)
+    if medium is not None:
+        return partial(_automatic_case_brem_grid, medium)
+    band = sweep.brem_band or sweep.energy_bins.brem is None
+    return partial(_case_brem_grid, brem_case_grid, band=band)
+
+
 def _case_brem_grid(brem_case_grid: Any, energy_keV: float, *, band: bool) -> Any:
     """A uniform band stops one step past this case's beam energy; others stay exact.
 
@@ -1075,7 +1112,7 @@ def build_cases(
     name_stem = material_spec.key if material_spec is not None else target.material
     mosaic_analytic_rad, mosaic_mc_rad = _mosaic_case_keys(sweep, cp)
     brem_case_grid = _floored_brem_case_grid(sweep, brem_grid)
-    brem_band = sweep.brem_band or sweep.energy_bins.brem is None
+    case_brem = _case_brem_resolver(sweep, brem_case_grid)
     ne_pairs = list(
         product(
             _electron_counts(sweep.n_electrons, n_electrons, "n_electrons"),
@@ -1143,7 +1180,7 @@ def build_cases(
                         **beam_case,
                         **distribution_keys,
                         **line_grid_keys,
-                        E_grid_brem=_case_brem_grid(brem_case_grid, float(E0), band=brem_band),
+                        E_grid_brem=case_brem(float(E0)),
                         theta_obs_rad=np.deg2rad(sweep.detector.observation_angle_deg),
                         **model_keys,
                         beam_uvw=beam_uvw,

@@ -21,6 +21,7 @@ from typing import Any, Literal
 
 import numpy as np
 
+from .._continuum_grid import CONTINUUM_GRID_MODEL
 from .._energy_grid_encoding import encode_energy_grid
 from .._numerics import (
     CHANNELING_KEYS,
@@ -63,6 +64,7 @@ from .sweep import (
     TIMEPIX3_DOMEGA_SR,
     TIMEPIX3_DTHETA_OBS_DEG,
     Sweep,
+    automatic_continuum_medium,
     beam_replace,
     build_cases,
     crystal_params,
@@ -482,6 +484,11 @@ def _project_target_detector_and_bins(sweep_payload: dict[str, Any], sweep: Swee
         and isinstance(encode_energy_grid(sweep.energy_bins.brem), tuple)
     ):
         sweep_payload["brem_grid_exact"] = True
+    # The automatic continuum grid replaces the band's nodes per case, so its
+    # policy is part of the dataset identity (#278); sweeps with a declared grid
+    # keep their historical digest.
+    if automatic_continuum_medium(sweep) is not None:
+        sweep_payload["continuum_grid_model"] = CONTINUUM_GRID_MODEL
     sweep_payload["e_grid_eV"] = None
     # Response is applied only to response-free source arrays at read time. It must not
     # fork transport/checkpoint identity, which is deliberately reusable by
