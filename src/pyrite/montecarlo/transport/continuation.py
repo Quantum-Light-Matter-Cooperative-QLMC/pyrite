@@ -88,7 +88,7 @@ class TransportContinuationConfig:
     enabled row schema. Ne-sized per-history state and retained output are
     outside it: bounded scratch does not bound total trajectory storage.
 
-    ``device_staging`` (default off since #825) keeps each round's retained
+    ``device_staging`` (default on again since #866; off in #825) keeps each round's retained
     rows on the device, joins them there column by column with a run-copy
     kernel and downloads each joined column through pinned chunks (#866).
     Device memory peaks at the staged rows plus their largest joined column
@@ -97,11 +97,12 @@ class TransportContinuationConfig:
     rounds spill to the host and the run finishes with host reassembly.
     ``None`` derives the budget from free device memory (driver free plus the
     memory pool's cached blocks) after the round scratch is allocated, less
-    ``STAGING_HEADROOM``. Off, rows move to the
-    host every round and are reassembled there with the parallel run copy,
-    which since #825 is as fast or faster on every measured scene (job 3000)
-    and needs no device staging memory. Results are bitwise the same in
-    every mode; runs that keep segments on the device never spill.
+    ``STAGING_HEADROOM``. Staged transport ran at 0.47-0.80x host
+    reassembly where the rows fit and tied it after a spill (#866, job
+    3018). Off, rows move to the host every round and are reassembled there
+    with the parallel run copy; that needs no device staging memory. Results
+    are bitwise the same in every mode; runs that keep segments on the device
+    never spill.
 
     ``on_round`` (diagnostics only) receives one ``phase="round"`` dict per
     launch with the launched population, rows, finished/refilled counts and
@@ -110,7 +111,7 @@ class TransportContinuationConfig:
 
     rows_per_round: int = 256
     active_histories: int | None = None
-    device_staging: bool = False
+    device_staging: bool = True
     staging_budget_bytes: int | None = None
     on_round: Callable[[dict[str, Any]], None] | None = None
 
@@ -426,6 +427,9 @@ def _assemble(
     _reserve(out_bufs, nseg)
     if not staged:
         _scatter_host(chunks, rows_total, retained, out_bufs, nseg)
+        return None
+    if not nseg:  # no rows to place; an empty output has no (0, width) view
+        retained.clear()
         return None
     targets = [
         _host_rows(t, nseg) if a.shape[0] else None for t, a in zip(out_bufs, columns, strict=True)

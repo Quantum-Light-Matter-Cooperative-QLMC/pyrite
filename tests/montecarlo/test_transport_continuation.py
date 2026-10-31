@@ -199,9 +199,9 @@ def test_device_resident_join_matches_host_rows():
 
 def test_device_staging_matches_host_rows():
     cont = TransportContinuationConfig(rows_per_round=5, active_histories=3)
-    assert not cont.device_staging  # host reassembly is the default (#825)
-    _counts, host_rows, _, _ = _drive(cont)
-    counts, staged_rows, _, _ = _drive(replace(cont, device_staging=True))
+    assert cont.device_staging  # staging is the default again (#866)
+    _counts, host_rows, _, _ = _drive(replace(cont, device_staging=False))
+    counts, staged_rows, _, _ = _drive(cont)
     assert counts[6] is None
     for column in WRITTEN:
         np.testing.assert_array_equal(host_rows[column], staged_rows[column])
