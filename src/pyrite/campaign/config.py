@@ -159,6 +159,16 @@ def _material_spec(material: str, catalog_profile: str = "standard") -> Material
         ) from None
 
 
+def declared_brem(scan: Any) -> np.ndarray | None:
+    """The profile's continuum grid, or ``None`` when it declares none (#278).
+
+    An undeclared continuum grid leaves ``EnergyBins.brem`` empty so each case
+    resolves the automatic refined geometric grid for its own medium and beam
+    energy instead of the built-in uniform band.
+    """
+    return scan.E_grid_brem if scan.E_grid_brem_declared else None
+
+
 def material_grid(material: str) -> dict[str, object]:
     """Return a mapping-style projection of a catalog material's scan grid."""
     spec = _material_spec(material)
@@ -313,7 +323,7 @@ def material_sweep(
             if brem_override is not missing
             else current_bins.brem
             if current_bins.brem is not None
-            else scan.E_grid_brem
+            else declared_brem(scan)
         ),
     )
     sweep = Sweep(
@@ -424,7 +434,7 @@ def trajectory_sweep(
         energy_bins=EnergyBins(
             cxr=scan.E_grid_line,
             cxr_by_energy=scan.E_grid_line_by_energy,
-            brem=scan.E_grid_brem,
+            brem=declared_brem(scan),
         ),
         brem_band=True,
         target=target_from_flat(
