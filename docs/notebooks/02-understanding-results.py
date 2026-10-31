@@ -197,7 +197,7 @@ def _(beam, cxr, into_acceptance, np, per_sr, result):
     cxr_rate_sr = float(np.trapezoid(np.interp(nodes, flux_sr_grid, flux_sr_cxr), nodes))
 
     # For a scalar detector, the accepted rate assumes locally uniform intensity.
-    acceptance_sr = result.accepted_solid_angle_sr()
+    result.accepted_solid_angle_sr()
     assert np.isclose(cxr_rate_sr, cxr_yield_per_electron_sr * electrons_per_second, rtol=1e-10)
     assert np.array_equal(into_acceptance.get_column("photon_energy_eV").to_numpy(), flux_sr_grid)
     return
