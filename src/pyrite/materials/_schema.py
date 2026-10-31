@@ -370,6 +370,10 @@ class ScanSpec:
         case-local policy. ``None`` accompanies an explicit fixed line grid.
     E_grid_brem
         Bremsstrahlung photon-energy grid in eV.
+    E_grid_brem_declared
+        False when the profile declares no continuum grid and ``E_grid_brem`` is
+        the built-in default band; cases then resolve the automatic refined
+        geometric grid (``pyrite._continuum_grid.automatic_continuum_grid``).
     thickness_layers
         Optional film-thickness grid in crystal layers.
     n_electrons, n_electrons_brem
@@ -389,6 +393,7 @@ class ScanSpec:
     #: multiple values sweep transport statistics (see ``Sweep.n_electrons``).
     n_electrons: np.ndarray | None = None
     n_electrons_brem: np.ndarray | None = None
+    E_grid_brem_declared: bool = True
 
 
 @dataclass(frozen=True)

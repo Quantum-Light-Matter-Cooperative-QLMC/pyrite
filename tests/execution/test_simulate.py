@@ -55,6 +55,16 @@ def directional_output(directions):
     }
 
 
+def _assert_same_case(actual, expected):
+    """Case dictionaries compare key by key; grids may be exact arrays (#278)."""
+    assert actual.keys() == expected.keys()
+    for key, value in expected.items():
+        if isinstance(value, np.ndarray):
+            np.testing.assert_array_equal(actual[key], value, err_msg=key)
+        else:
+            assert actual[key] == value, key
+
+
 def test_scalar_executor_matches_default_and_component_calls(scene, controls, monkeypatch):
     monkeypatch.setattr(api, "run_case", lambda *a, **kw: scalar_output())
     calls = []
@@ -76,7 +86,7 @@ def test_scalar_executor_matches_default_and_component_calls(scene, controls, mo
         executor=executor,
     )
     for result in (actual, components):
-        assert result.case.to_dict() == expected.case.to_dict()
+        _assert_same_case(result.case.to_dict(), expected.case.to_dict())
         assert result.provenance.identity_digest == expected.provenance.identity_digest
         np.testing.assert_array_equal(
             result.cxr.incoherent.density, expected.cxr.incoherent.density

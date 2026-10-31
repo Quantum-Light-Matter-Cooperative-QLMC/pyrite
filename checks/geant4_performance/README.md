@@ -137,6 +137,32 @@ hold=$(sbatch --parsable checks/geant4_performance/hold.sbatch)
 sbatch --dependency=after:$hold checks/geant4_performance/precision.sbatch $hold precision-plan.json
 ```
 
+## Spectral-grid sensitivity (#278)
+
+The continuous arm's cone scoring does not use a photon grid. For each
+≥10 keV band it splits the band at the slab's EPDL absorption edges, cuts
+panels wider than 100 keV into equal pieces, and places `2 × --cone-order`
+Gauss–Legendre nodes per panel. For W at 1 MeV this gives 15 panels and 240
+nodes at order 8. Each band is one `mc_coupled_brem_spectrum` call with
+per-electron band weights.
+
+Two repeatable flags also score every transported block with the production
+continuum, `mc_coupled_brem_spectrum`, toward the cone axis with unit
+transmission and the runner's brem chunk policy:
+
+- `--spectrum-step-ev STEP`: the uniform grid `STEP, 2·STEP, … < E0`. The
+  production `E_grid_brem` step is 25 eV.
+- `--spectrum-geometric-nodes N`: `refined_continuum_grid`, `N` log-spaced
+  nodes from the medium's continuum floor to `E0`. The grid is refined at
+  absorption edges and at the endpoint (`continuum-node-refinement`).
+
+Each grid is timed separately and excluded from the request timings.
+`work.<request>.grid_spectra.<label>` records the seconds, node count and
+chunk. It also records the cone-band yields and the ≥10 keV centroid in the
+point convention, piecewise-linear in energy, which check each grid against
+the arm's quadrature and the 25 eV grid. The densities go to
+`<output>.grid.npz`. `gridsens.sbatch` runs W 1 MeV.
+
 ## Running
 
 From a synced lab checkout (`PYRITE_REMOTE_DIR=~/pyrite-821/repo uv run pyrite remote sync`):
