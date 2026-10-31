@@ -136,9 +136,9 @@ migration side effect.
 
 | Existing constant (`pyrite.materials.crystal`) | Numeric unit / physical meaning | Evidence / disposition |
 | --- | --- | --- |
-| `HC_EV_ANG`, `HBARC_EV_ANG` | eV·Å; h c and ħ c | `tests/materials/test_emission.py`, `test_crystallography.py`; numeric contract, quantity read-back deferred to #816. |
+| `HC_EV_ANG`, `HBARC_EV_ANG` | eV·Å; h c and ħ c | `tests/materials/test_emission.py`, `test_crystallography.py`; numeric contract retained; quantity read-back via `pyrite.materials.quantities.crystal_constants()` (#816). |
 | `M_E_EV` | eV; electron **rest energy**, not mass in kg | Transport/line-kinematics consumers; `tests/materials/test_emission.py`; semantic quantity must state rest energy. |
-| `R_E_ANG` | Å; classical electron radius | Absorption/susceptibility; `tests/materials/test_crystallography.py`; numeric contract, length quantity deferred to #816. |
+| `R_E_ANG` | Å; classical electron radius | Absorption/susceptibility; `tests/materials/test_crystallography.py`; numeric contract retained; length quantity via `crystal_constants()` (#816). |
 | `E2_EV_ANG` | eV·Å; Gaussian electrostatic coupling, not SI charge squared | `U_g` / coupling tables; `tests/materials/test_crystallography.py`; retain convention explicitly. |
 | `ALPHA_FS` | Dimensionless fine-structure constant | `E2_EV_ANG` and coupling consumers; justified numeric physical constant, no dimensional conversion needed. |
 
@@ -362,9 +362,9 @@ and unregistered numeric exports are named as such. B1–B6 are **resolved**
 (decisions and tests above). Optimization parameter paths now use their
 owning semantic quantity properties for units and replacement. The #755
 migration is **complete**: every row is migrated or carries an explicit numeric
-contract. Deferred work is tracked separately: unit-string CLI input (#810) and
-quantity interfaces for material schema values, constants, deterministic
-scientific helpers and channeling-state read-back (#816).
+contract. Quantity interfaces for material schema values, constants, deterministic
+scientific helpers and channeling-state read-back landed under #816. Deferred
+work is tracked separately: unit-string CLI input (#810).
 
 ## Existing output contracts (not all convertible by the same rule)
 

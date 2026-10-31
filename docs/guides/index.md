@@ -20,6 +20,7 @@ configuration-notebook
 directional-source-heatmap
 detector-observations
 physical-quantities
+issue-816-scientific-quantities
 ```
 
 ```{toctree}
