@@ -4,6 +4,7 @@ from dataclasses import replace
 
 import numpy as np
 import pytest
+from numba import njit
 
 from pyrite.materials import CATALOG
 from pyrite.montecarlo.spectrum.brem_bremslib import prepare_bremslib_table
@@ -75,8 +76,14 @@ def _layer_nodes(packed, layer):
     return plasma[3 * n_layers + start : 3 * n_layers + start + count]
 
 
+@njit(cache=False)
 def _bisection_oracle(plasma, n_layers, layer, energy_eV):
-    """Main's table lookup (d5bcd957) in NumPy scalars, frozen as the oracle."""
+    """Main's table lookup (d5bcd957), frozen as the oracle.
+
+    Compiled like the core: NumPy's ``np.log`` ufunc loop may differ from the
+    libm ``log`` Numba calls by an ulp on x86 SIMD builds, so a NumPy oracle
+    disagrees with the unchanged lookup on a few queries per 400k.
+    """
     start = int(plasma[n_layers + layer])
     total = (plasma.size - 3 * n_layers) // 5
     energy, logs = plasma[3 * n_layers :], plasma[3 * n_layers + total :]

@@ -338,6 +338,44 @@ Kernel time per retained row matches the kernel column to within 0.01. In job 28
 - ledger claims for every FP32 table and transcendental;
 - a model-identity bump, because the results change at rounding scale and above.
 
+## Exact CPU lookup shortcuts (#841)
+
+[#841](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/841) targeted the two most expensive per-step lookups in the CPU exact core (`make_cpu_transport_core`). #803 attributed them at roughly 40–50% of kernel time. Each change had to leave every output bit unchanged. No model identity, packed-buffer layout or `moment_table_sha256` changed.
+
+**Lazy midpoint cutoff.** The unstraggled midpoint row evaluates `cutoff_rate` at `(E + E_cut)/2` only to decide whether the step truncates at `E_cut`. `_jit_cutoff_bound.py` builds a per-layer bound on `|cutoff_rate|` when the core is constructed. The bound is the node maximum of the table the core interpolates (SBETHE log-log stopping or the LUT row, plus the table soft-moment nodes), widened by `CUTOFF_BOUND_MARGIN = 1e-6`. The row then skips the evaluation when `delta = E - E_cut > 0` and `delta / bound > step`. Float rounding is monotone, so the core's own distance `fl(delta / |cutoff_rate|)` would also exceed `step`, and neither the truncation branch nor the tie branch can be taken. The module docstring holds the full argument, including the SBETHE rounding (below `1e-12` relative, against the `1e-6` margin). The bound is refused, so the cutoff is evaluated on every row as before, in these cases:
+
+- the spliced Joy-Luo/Berger-Seltzer stopping and the exact radiative quadrature, which have no node maximum;
+- straggled transport;
+- a sign failure or excessive LUT dynamic range;
+- moment coverage that does not reach the least electron cutoff.
+
+`lazy_cutoff=False` on the factory restores the unconditional evaluation, which the equality test uses as its reference. On the #803 scenes the evaluated rate never exceeded 0.21–0.31 of the bound (sweep jobs 2891, 2906).
+
+**Moment lookup: the guide table is a negative result.** A guide table over `log E` was implemented first. It fixed the starting node, then a walk of mean 0.25 and at most 2 nodes reached the same bracket as the bisection. It matched the bisection bitwise on 400k-point sweeps of every layer, plus nodes, ±1 ulp and midpoints (jobs 2891, 2906). It was not faster. On 243–310-node layers the bisection takes about 8 iterations from cached data, and the guide's extra loads cost as much as they saved: the guided core ran at 0.96–0.99× (per-scene medians) the speed of the same core with the inline bisection (jobs 2907, 2911). It was removed.
+
+**Moment lookup: inlining is the gain.** The measured cost was the call, not the search. `transport_layer_moments` takes thirteen arguments and keeps the exact-quadrature branch in the same function. Calling it out of line, or through a wrapper that keeps both branches beside each other, slowed the core 1.2–2×. The core now branches at each of the three call sites. Table buffers go to `table_moments` (`inline="always"`), which is main's bisection verbatim. Quadrature buffers go to an out-of-line `exact_moments`. `transport_layer_moments` keeps its signature and behaviour for other callers.
+
+**Equality.**
+
+- `tests/montecarlo/test_exact_cpu_lookups.py` compares `table_moments` and `exact_moments` against a frozen copy of main's lookup on dense sweeps.
+- The same file checks that each bound dominates every evaluated rate.
+- A slow test runs nine transport configurations with and without both shortcuts and compares every result array bitwise. The configurations cover per-electron and lockstep; continuous and shell soft/hard; coupled and uncoupled radiative; single layer and W/Si; midpoint and frozen; and LUT.
+- That test failed under a mutation that shrinks the bound 100×, in 8 of the 9 cases.
+- In every timing sample below, `trajectory_sha256` equals main's.
+
+**Timing.** The runs used the #803 harness (`baseline_803.py --core per-electron --elastic elsepa --radiative bremslib-soft-hard --lut off --moments table --schedule full-history --histories 2048 --repeats 5`) on qlmc-queen, CPU partition, one thread, seeds 80301–80303. Each sample ran in a fresh process with a fresh Numba cache, and the arm order was reversed on alternate seeds. Job 2915 timed the shipped revision `710a39c1` (`both`) and the same revision with `lazy_cutoff=False` (`inline`) against main `d5bcd957`. Speedup is main's warm median over the arm's, as the median [min, max] over seeds. In all 72 samples, `trajectory_sha256` equals main's.
+
+| scene | main warm s (continuous / shell) | `inline` continuous | `both` continuous | `inline` shell | `both` shell |
+| --- | --- | --- | --- | --- | --- |
+| Si 300 keV / 100 µm | 2.12 / 2.91 | 1.49 [1.39, 1.51] | 1.63 [1.51, 1.71] | 1.40 [1.36, 1.41] | 1.47 [1.46, 1.50] |
+| W 300 keV / 10 µm | 3.57 / 4.64 | 1.52 [1.42, 1.52] | 1.67 [1.66, 1.71] | 1.40 [1.33, 1.40] | 1.51 [1.49, 1.51] |
+| SiO2 800 keV | 8.05 / 9.46 | 1.49 [1.41, 1.51] | 1.63 [1.62, 1.66] | 1.40 [1.39, 1.43] | 1.51 [1.50, 1.51] |
+| W 2 µm on Si 100 µm, 800 keV | 1.32 / 1.84 | 1.40 [1.27, 1.45] | 1.47 [1.43, 1.62] | 1.34 [1.26, 1.35] | 1.40 [1.38, 1.44] |
+
+Per seed, the lazy cutoff adds 1.08–1.12× continuous and 1.07–1.08× shell on top of the inline lookup (`inline` time over `both` time). The attribution depends on code layout. Job 2911 timed text-edited variants of `ca68aabe` that kept the unused guide code in place. Against main they gave 1.40–1.46× continuous and 1.30–1.34× shell for both changes. The inline lookup alone gave 1.22× continuous and 0.99–1.08× shell, and the lazy cutoff 1.14–1.34×. The shipped revision is faster than those variants, and the gain now comes mostly from the inline lookup.
+
+Evidence: `qlmc:~/pyrite-841-evidence/` (`timing3/` for job 2915, `timing2/` for 2911, `sweep-*.json`, `diag841-2921.log`); summarize with `analyze_841.py`. Job 2921 also checked the lookup on x86: the final `transport_layer_moments` and `table_moments` are bitwise identical to main's compiled lookup on 2.0M queries. On x86, a pure-NumPy copy of main's lookup differs from main's own compiled lookup on 23–46 queries per scene, because the `np.log` ufunc loop and libm `log` can differ by an ulp. The test oracle is therefore compiled with Numba.
+
 ## Selecting the core
 
 `transport_core="auto"` is the default, and `resolve_transport_core` decides: the CUDA core when the process has a CUDA device, the run is ungrooved, and `Ne > CUDA_TRANSPORT_MIN_ELECTRONS` (1000); the lockstep CPU core otherwise. The count is the transport's own, `max(Ne, Ne_brem)` — one transport serves both populations. Every explicit `transport_core=` is honored verbatim, so a caller that names a core gets that core or an error, never a substitution; `PYRITE_MC_TRANSPORT_CORE` pins the choice for a whole process, which is how a run reproduces a pre-threshold result or bisects a host/device difference.
