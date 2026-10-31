@@ -58,40 +58,85 @@ compare streamed and joined spectra at `rtol=1e-12` over several block sizes,
 with unequal line and continuum populations and with coupled BremsLib straggled
 transport. Transport counts and segment totals agree exactly.
 
-On CUDA, scoring runs in float32 unless `PYRITE_FP64=1`, so block sums
-differ from the joined sum at float32 rounding. On the benchmark scene
-below, the largest per-bin difference relative to each spectrum's peak was
-5.3e-6 (continuum) and 3.0e-7 (lines), and spectrum totals agreed to 4e-7.
-With `PYRITE_FP64=1` the same comparison agrees to 1.75e-15 (job 2937),
-which confirms that the float32 differences come from summation order only.
-
 ## Memory and wall time
 
 `checks/streamed_scoring_memory.py` runs one arm per process on the lab GPU
-box (RTX 5080, 16 GiB): Si 300 keV, 10 µm slab, coupled BremsLib midpoint
-transport, CUDA core, 400 line and 299 continuum bins, one seed. Host peak is
-`ru_maxrss` (about 600 MiB before the run). Device figures are CuPy pool bytes
-above the pre-run level: *reserved* includes cached free blocks, *used* is
-live arrays. Joined arms are `run_case` (job 2932); streamed arms release
-cached pool blocks after each block (job 2940, code `d6fed1bca`; joined arms code `2d4125d08`).
+box (RTX 5080, 16 GiB): 300 keV electrons on a 10 µm slab tilted 30°, coupled
+BremsLib midpoint transport, CUDA core, float32 scoring, 400 line and 299
+continuum bins, seed 1. Host peak is `ru_maxrss` (about 600 MiB before the
+run). Device figures are CuPy pool bytes above the pre-run level: *reserved*
+includes cached free blocks, *used* is live arrays. Streamed arms release
+cached pool blocks after each block. Jobs 2991 (Si) and 2992 (W), code
+`300eb90ba`; single runs.
 
-| Arm | N | Block | Segments | Host peak (MiB) | Reserved VRAM (MiB) | Wall (s) |
-|---|---|---|---|---|---|---|
-| joined | 4,000 | | 0.30 M | 1582 | 940 | 37.8 (cold JIT) |
-| joined | 16,000 | | 1.18 M | 1483 | 3182 | 20.2 |
-| joined | 64,000 | | 4.74 M | 2240 | 6301 | 264.7 |
-| streamed | 4,000 | 4,000 | 0.30 M | 1217 | 940 | 4.2 |
-| streamed | 16,000 | 4,000 | 1.18 M | 1243 | 940 | 12.7 |
-| streamed | 64,000 | 4,000 | 4.74 M | 1247 | 1101 | 47.5 |
-| streamed | 64,000 | 1,000 | 4.74 M | 1195 | 261 | 51.7 |
-| streamed | 64,000 | 16,000 | 4.74 M | 1501 | 3236 | 61.3 |
+**Si** (about 74 segments per electron):
 
-At a fixed block size, host peak stays flat and reserved VRAM rises only 17% as N grows 16-fold;
-at fixed N they follow the block size. Before the per-block release, reserved
-VRAM grew with N (1925 MiB at 64,000 electrons in 4,000-electron blocks) and
-reached 10 GiB at 16,000-electron blocks while live arrays stayed near
-0.6 GiB (job 2937): per-block staging and scoring sizes vary, and the caching
-pool kept every freed size. Wall times are single runs; the joined 64,000
-run's 265 s was not investigated, and transfers, synchronization and reduction
-overhead were not profiled separately. CPU-transport/GPU-scoring overlap is
-not implemented.
+| Arm | N | Block | Segments | Host peak (MiB) | Reserved / used VRAM (MiB) | Wall (s) | Transport / scoring (s) |
+|---|---|---|---|---|---|---|---|
+| joined | 16,000 | | 1.18 M | 1391 | 3182 / 622 | 1.6 | 0.8 / 0.8 |
+| joined | 64,000 | | 4.74 M | 2220 | 6193 / 2901 | 3.4 | 1.4 / 2.0 |
+| streamed | 16,000 | 4,000 | 1.18 M | 1219 | 458 / 237 | 1.9 | 1.0 / 0.8 |
+| streamed | 64,000 | 4,000 | 4.74 M | 1221 | 472 / 317 | 4.8 | 2.6 / 2.0 |
+| streamed | 64,000 | 1,000 | 4.74 M | 1165 | 256 / 180 | 11.6 | 6.9 / 4.2 |
+| streamed | 64,000 | 16,000 | 4.74 M | 1465 | 3236 / 730 | 3.5 | 1.5 / 1.9 |
+
+**W** (about 1950 segments per electron):
+
+| Arm | N | Block | Segments | Host peak (MiB) | Reserved / used VRAM (MiB) | Wall (s) | Transport / scoring (s) |
+|---|---|---|---|---|---|---|---|
+| joined | 4,000 | | 7.76 M | 2902 | 9364 / 4602 | 8.2 | 3.0 / 5.2 |
+| joined | 16,000 / 32,000 | | | | out of device memory | | |
+| streamed | 16,000 | 4,000 | 31.3 M | 3282 | 9599 / 4706 | 28.8 | 9.8 / 18.6 |
+| streamed | 32,000 | 4,000 | 62.3 M | 3282 | 9967 / 5075 | 56.1 | 18.3 / 37.1 |
+| streamed | 64,000 | 4,000 | 124.6 M | 3284 | 10263 / 4965 | 109.8 | 35.3 / 72.9 |
+| streamed | 64,000 | 1,000 | 124.6 M | 1702 | 5690 / 1342 | 170.9 | 91.8 / 75.6 |
+| streamed | 64,000 | 16,000 | | | out of device memory | | |
+
+At a fixed block size, host and device peaks stay flat as N grows 16-fold.
+The joined W run cannot score 16,000 electrons on this card: characteristic
+scoring exhausts the spectrum-phase OOM recovery. Streaming scores
+64,000. The peak follows block size × segments per electron, so an electron
+block is not a fixed memory budget across materials: 16,000-electron W blocks
+also run out of device memory. Reserved pool bytes run about twice the live
+bytes in every arm.
+
+Where the joined path fits, it is now faster. Small blocks underfill the GPU
+during transport (Si 1,000-electron blocks: 6.9 s against 1.4 s joined), and
+each block adds a fixed scoring and release overhead (about 0.13 s for Si).
+Scoring itself is linear in segments. Before #286 removed an O(segments²)
+coverage copy and #859 made the line optical-data screen opt-in, the joined
+scoring phase grew superlinearly, so older streamed-vs-joined wall-time
+comparisons (jobs 2932–2945) overstate streaming.
+
+Carrying a learned `seg_capacity` across blocks (a prototype `capacity_hint`)
+gave identical wall times and bitwise-identical output on Si and W at
+1,000- and 4,000-electron blocks, and was removed: since #860, blocks of
+1,000 histories or more already take bounded continuation.
+
+## Transport/scoring overlap
+
+Overlapping CPU transport with GPU scoring is not implemented. Job 3010 timed
+CPU per-electron transport alone on the same cases (Ryzen 9950X3D, one
+thread). An ideal pipeline is bounded below by the larger of CPU transport
+and GPU scoring:
+
+| Case | CPU transport (s) | GPU scoring (s) | GPU-only streamed wall (s) | Ideal overlap (s) |
+|---|---|---|---|---|
+| Si 64,000 | 4.6 | 2.0 | 4.8 | ≥ 4.6 |
+| W 16,000 | 18.1 | 18.6 | 28.8 | ≥ 18.6 |
+
+Si gains nothing. For scoring-heavy W cases overlap could save up to about a third
+of the wall time. It needs a producer process or a `nogil` per-electron core
+(the current core is `@njit` without `nogil`) and bounded staging buffers.
+Overlapping GPU transport with GPU scoring on separate streams has the same
+lower bound.
+
+## Equivalence on CUDA
+
+On CUDA, scoring runs in float32 unless `PYRITE_FP64=1`, so block sums
+differ from the joined sum at float32 rounding. Relative to each spectrum's
+peak, streamed and joined differ by at most 3.1e-6 for Si at 64,000 electrons
+and 1.9e-5 across the Si block sizes. For W across block sizes, lines and
+characteristic agree to 4e-7 and the continuum to 2.9e-5. With
+`PYRITE_FP64=1` an earlier Si comparison agreed to 1.75e-15 (job 2937), which
+confirms that the float32 differences come from summation order only.

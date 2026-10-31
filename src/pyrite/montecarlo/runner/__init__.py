@@ -435,6 +435,7 @@ def _transport_case(
     # Passed only when a caller asked, so progress-free calls keep their shape.
     transport_progress = _TRANSPORT_PROGRESS.get()
     progress_kw = {} if transport_progress is None else {"transport_progress": transport_progress}
+    schedule_kw = tuned_transport_kwargs()  # KernelTuning override (#776)
 
     if block_electrons is not None and core == "lockstep":
         raise ValueError(
@@ -451,9 +452,7 @@ def _transport_case(
         call_kw = {
             **beam_kw,
             **progress_kw,
-            # KernelTuning override (#776), read per call so a block consumer
-            # can carry a learned capacity hint into later blocks (#611).
-            **tuned_transport_kwargs(),
+            **schedule_kw,
             **({} if block_kw is None else block_kw),
         }
         if block_monitor is not None:
