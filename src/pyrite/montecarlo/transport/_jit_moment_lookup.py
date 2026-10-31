@@ -152,13 +152,16 @@ def _guided_index(plasma, log_base, start, last, lo, x):
 
 
 @njit(cache=True, inline="always")
-def table_layer_moments_indexed(plasma, n_layers, layer, energy_eV, guide):
+def table_moments(plasma, guide, layer, energy_eV):
     """Table-mode lookup bit-identical to ``transport_layer_moments``.
 
-    ``guide`` is the tuple returned by :func:`build_moment_guide` with
-    ``indexed`` True. Errors and endpoint returns match the bisection path.
+    ``guide`` is the tuple returned by :func:`build_moment_guide`; when its
+    ``indexed`` flag is False the bracket comes from the original bisection.
+    Errors and endpoint returns match the bisection path. Inlined: in the CPU
+    core the out-of-line call cost more than the search itself (#841).
     """
-    guide_index, guide_start, guide_bins, x0, scale, _ = guide
+    guide_index, guide_start, guide_bins, x0, scale, indexed = guide
+    n_layers = guide_start.size
     offset = n_layers
     start = np.int64(plasma[offset + layer])
     count = np.int64(plasma[offset + n_layers + layer])
@@ -178,16 +181,25 @@ def table_layer_moments_indexed(plasma, n_layers, layer, energy_eV, guide):
     if energy_eV == plasma[energy_base + last]:
         return plasma[value_base + 3 * last], plasma[value_base + 3 * last + 1]
     x = np.log(energy_eV)
-    t = (x - x0[layer]) * scale[layer]
-    bins = guide_bins[layer]
-    if t >= bins - 1:
-        b = bins - 1
-    elif t > 0.0:
-        b = np.int64(t)
+    if indexed:
+        t = (x - x0[layer]) * scale[layer]
+        bins = guide_bins[layer]
+        if t >= bins - 1:
+            b = bins - 1
+        elif t > 0.0:
+            b = np.int64(t)
+        else:
+            b = np.int64(0)
+        lo = _guided_index(plasma, log_base, start, last, guide_index[guide_start[layer] + b], x)
+        hi = lo + 1
     else:
-        b = np.int64(0)
-    lo = _guided_index(plasma, log_base, start, last, guide_index[guide_start[layer] + b], x)
-    hi = lo + 1
+        lo, hi = start, last
+        while hi - lo > 1:
+            mid = (lo + hi) // 2
+            if plasma[log_base + mid] <= x:
+                lo = mid
+            else:
+                hi = mid
     f = (x - plasma[log_base + lo]) / (plasma[log_base + hi] - plasma[log_base + lo])
     f = min(max(f, 0.0), 1.0)
     soft = (1.0 - f) * plasma[value_base + 3 * lo] + f * plasma[value_base + 3 * hi]
@@ -195,28 +207,20 @@ def table_layer_moments_indexed(plasma, n_layers, layer, energy_eV, guide):
     return soft, hard
 
 
-@njit(cache=True, inline="always")
-def guided_layer_moments(guide, radiative_args, layer, energy_eV, element_rates):
-    """Indexed table search when ``guide`` allows it, else the unchanged lookup.
+@njit(cache=True)
+def exact_moments(radiative_args, layer, energy_eV, element_rates):
+    """``transport_layer_moments`` on the transport tuple ``radiative_args``.
 
-    ``radiative_args`` is the transport tuple ``(keys, cutoff_eV, nel, nt, z,
-    density, incident, nominal, top, chi, plasma)``.
+    ``radiative_args`` is ``(keys, cutoff_eV, nel, nt, z, density, incident,
+    nominal, top, chi, plasma)``. Out of line on purpose: unpacking the tuple
+    or keeping quadrature beside the inline table path in one wrapper made the
+    CPU core 1.2-2x slower end to end (#841, SLURM 2896/2902/2903).
     """
-    nel, plasma = radiative_args[2], radiative_args[10]
-    if guide[5]:
-        return table_layer_moments_indexed(plasma, nel.size, layer, energy_eV, guide)
     return transport_layer_moments(
-        nel,
-        radiative_args[3],
-        radiative_args[4],
-        radiative_args[5],
-        radiative_args[6],
-        radiative_args[7],
-        radiative_args[8],
-        radiative_args[9],
+        *radiative_args[2:10],
         layer,
         energy_eV,
         radiative_args[1],
         element_rates,
-        plasma,
+        radiative_args[10],
     )

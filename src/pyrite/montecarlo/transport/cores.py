@@ -12,14 +12,8 @@ from numba import njit
 
 from ..geometry import X_MIN, Y_MAX, Z_MAX, Z_MIN
 from ..groove import _first_surface_event_scalar_numba
-from ._jit_cutoff_bound import (
-    add_soft_moment_bound,
-    cutoff_solve_idle,
-    lut_cutoff_bound,
-    sbethe_cutoff_bound,
-    widen_cutoff_bound,
-)
-from ._jit_moment_lookup import build_moment_guide, guided_layer_moments
+from . import _jit_cutoff_bound as _cutoff
+from . import _jit_moment_lookup as _moments
 from ._jit_radiative import (
     radiative_layer_moments_scalar,
     sample_hard_photon_energy_scalar,
@@ -278,19 +272,23 @@ def make_cpu_transport_core(
             rad_draws = np.zeros(Ne, dtype=np.uint64)
             rad_element_rates = np.empty(rad_Z.shape[1], dtype=np.float64)
             rad_scratch_rates = np.empty(rad_Z.shape[1], dtype=np.float64)
-            rad_guide = build_moment_guide(rad_nel, rad_plasma, indexed_moments)
+            rad_guide = _moments.build_moment_guide(rad_nel, rad_plasma, indexed_moments)
+            # Table lookups stay inline; exact quadrature stays out of line (#841).
+            rad_table = rad_plasma.size != n_layers
         # Lazy midpoint cutoff (#841); the skip proof is in _jit_cutoff_bound.
         cut_lazy, cut_bound = False, np.zeros(n_layers)
         if lazy_cutoff and energy_model_code == 1 and not straggle_on:
             if lut:
-                cut_lazy = lut_cutoff_bound(cut_bound, lut_dEds)
+                cut_lazy = _cutoff.lut_cutoff_bound(cut_bound, lut_dEds)
             else:
-                cut_lazy = sbethe_cutoff_bound(cut_bound, sbethe_on, L_sbethe_n, L_sbethe_logS)
+                cut_lazy = _cutoff.sbethe_cutoff_bound(
+                    cut_bound, sbethe_on, L_sbethe_n, L_sbethe_logS
+                )
             if radiative:
-                cut_lazy = add_soft_moment_bound(
+                cut_lazy = _cutoff.add_soft_moment_bound(
                     cut_lazy, cut_bound, rad_nel, rad_plasma, E_cut_by_electrons
                 )
-            cut_lazy = widen_cutoff_bound(cut_lazy, cut_bound)
+            cut_lazy = _cutoff.widen_cutoff_bound(cut_lazy, cut_bound)
         nseg = nvac = n_back = n_trans = n_side = n_cutoff = 0
         n_alive = int(alive.sum())
         n_eligible = n_alive
@@ -400,9 +398,12 @@ def make_cpu_transport_core(
                     step_j, hard_j = tau_h[e] / mu_hard, True
             rad_j = False
             if radiative:
-                rad_soft, mu_rad = guided_layer_moments(
-                    rad_guide, radiative_args, L, E_j * 1e3, rad_element_rates
-                )
+                if rad_table:
+                    rad_soft, mu_rad = _moments.table_moments(rad_plasma, rad_guide, L, E_j * 1e3)
+                else:
+                    rad_soft, mu_rad = _moments.exact_moments(
+                        radiative_args, L, E_j * 1e3, rad_element_rates
+                    )
                 if tau_rad[e] < 0.0:
                     tau_rad[e] = -np.log(_stream_uniform_scalar(rad_keys[e], rad_draws[e]))
                     rad_draws[e] += _SM64_ONE
@@ -581,38 +582,36 @@ def make_cpu_transport_core(
                     )
                     t_end_j = clock[e] + step_j / beta_j
             else:
-                if cutoff_solve_idle(cut_lazy, cut_bound[L], E_j, E_cut_e, step_j):
+                if _cutoff.cutoff_solve_idle(cut_lazy, cut_bound[L], E_j, E_cut_e, step_j):
                     cutoff_distance = np.inf  # provably > step_j; no truncation
                 elif energy_model_code == 1:
+                    E_mid = 0.5 * (E_j + E_cut_e)
                     if lut:
                         cut_i, cut_f = _lut_index_frac_scalar(
-                            0.5 * (E_j + E_cut_e), lut_log_E_min, lut_inv_dlogE, lut_n_energy
+                            E_mid, lut_log_E_min, lut_inv_dlogE, lut_n_energy
                         )
                         cutoff_rate = _lut_lerp_2d(lut_dEds, L, cut_i, cut_f)
                     elif sbethe_on:
                         cutoff_rate = _dEds_sbethe_packed_scalar(
-                            L_sbethe_logE,
-                            L_sbethe_logS,
-                            L,
-                            L_sbethe_n[L],
-                            0.5 * (E_j + E_cut_e),
+                            L_sbethe_logE, L_sbethe_logS, L, L_sbethe_n[L], E_mid
                         )
                     elif per_electron:
                         cutoff_rate = _dEds_spliced_packed_scalar(
-                            L_Js, L_ks, L_coeffs, L_E_cross, 0.0, L, n_el, 0.5 * (E_j + E_cut_e)
+                            L_Js, L_ks, L_coeffs, L_E_cross, 0.0, L, n_el, E_mid
                         )
                     else:
                         cutoff_rate = _dEds_spliced_compound_scalar(
-                            J_arr, k_arr, coeff_arr, E_cross_arr, 0.0, 0.5 * (E_j + E_cut_e)
+                            J_arr, k_arr, coeff_arr, E_cross_arr, 0.0, E_mid
                         )
                     if radiative:
-                        rad_cut_soft, _ = guided_layer_moments(
-                            rad_guide,
-                            radiative_args,
-                            L,
-                            0.5 * (E_j + E_cut_e) * 1e3,
-                            rad_scratch_rates,
-                        )
+                        if rad_table:
+                            rad_cut_soft, _ = _moments.table_moments(
+                                rad_plasma, rad_guide, L, E_mid * 1e3
+                            )
+                        else:
+                            rad_cut_soft, _ = _moments.exact_moments(
+                                radiative_args, L, E_mid * 1e3, rad_scratch_rates
+                            )
                         cutoff_rate -= rad_cut_soft * 1e-3
                     cutoff_distance = (E_cut_e - E_j) / cutoff_rate
                 else:
@@ -632,35 +631,33 @@ def make_cpu_transport_core(
                         E_end_j = E_cut_e
                     else:
                         E_pred = E_j + dEds * step_j
+                        E_mid = 0.5 * (E_j + E_pred)
                         if lut:
                             mid_i, mid_f = _lut_index_frac_scalar(
-                                0.5 * (E_j + E_pred), lut_log_E_min, lut_inv_dlogE, lut_n_energy
+                                E_mid, lut_log_E_min, lut_inv_dlogE, lut_n_energy
                             )
                             mid_rate = _lut_lerp_2d(lut_dEds, L, mid_i, mid_f)
                         elif sbethe_on:
                             mid_rate = _dEds_sbethe_packed_scalar(
-                                L_sbethe_logE,
-                                L_sbethe_logS,
-                                L,
-                                L_sbethe_n[L],
-                                0.5 * (E_j + E_pred),
+                                L_sbethe_logE, L_sbethe_logS, L, L_sbethe_n[L], E_mid
                             )
                         elif per_electron:
                             mid_rate = _dEds_spliced_packed_scalar(
-                                L_Js, L_ks, L_coeffs, L_E_cross, 0.0, L, n_el, 0.5 * (E_j + E_pred)
+                                L_Js, L_ks, L_coeffs, L_E_cross, 0.0, L, n_el, E_mid
                             )
                         else:
                             mid_rate = _dEds_spliced_compound_scalar(
-                                J_arr, k_arr, coeff_arr, E_cross_arr, 0.0, 0.5 * (E_j + E_pred)
+                                J_arr, k_arr, coeff_arr, E_cross_arr, 0.0, E_mid
                             )
                         if radiative:
-                            rad_mid_soft, _ = guided_layer_moments(
-                                rad_guide,
-                                radiative_args,
-                                L,
-                                0.5 * (E_j + E_pred) * 1e3,
-                                rad_scratch_rates,
-                            )
+                            if rad_table:
+                                rad_mid_soft, _ = _moments.table_moments(
+                                    rad_plasma, rad_guide, L, E_mid * 1e3
+                                )
+                            else:
+                                rad_mid_soft, _ = _moments.exact_moments(
+                                    radiative_args, L, E_mid * 1e3, rad_scratch_rates
+                                )
                             mid_rate -= rad_mid_soft * 1e-3
                         E_end_j = E_j + step_j * mid_rate
                     if lut:

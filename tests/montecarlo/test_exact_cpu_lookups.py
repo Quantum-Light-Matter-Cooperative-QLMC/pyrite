@@ -16,7 +16,7 @@ from pyrite.montecarlo.transport._jit_cutoff_bound import (
 )
 from pyrite.montecarlo.transport._jit_moment_lookup import (
     build_moment_guide,
-    table_layer_moments_indexed,
+    table_moments,
     transport_layer_moments,
 )
 from pyrite.montecarlo.transport.hard_radiative import radiative_core_args
@@ -86,11 +86,11 @@ def test_indexed_moment_search_is_bitwise_the_bisection_on_dense_sweeps():
             expected = transport_layer_moments(
                 *packed[2:-1], layer, energy_eV, 1000.0, scratch, plasma
             )
-            actual = table_layer_moments_indexed(plasma, 2, layer, energy_eV, guide)
+            actual = table_moments(plasma, guide, layer, energy_eV)
             assert np.array(actual).tobytes() == np.array(expected).tobytes(), energy_eV
     for bad in [np.nextafter(_layer_nodes(packed, 1)[0], -np.inf), np.inf, np.nan]:
         with pytest.raises(ValueError, match="outside prepared"):
-            table_layer_moments_indexed(plasma, 2, 1, bad, guide)
+            table_moments(plasma, guide, 1, bad)
 
 
 def _synthetic_buffer(rows):
@@ -121,10 +121,15 @@ def test_guided_walk_reproduces_bisection_on_clustered_and_tied_rows():
                 expected = transport_layer_moments(
                     *quadrature, layer, energy_eV, 1.0, np.empty(1), plasma
                 )
-                actual = table_layer_moments_indexed(plasma, 2, layer, energy_eV, guide)
+                actual = table_moments(plasma, guide, layer, energy_eV)
                 assert np.array(actual).tobytes() == np.array(expected).tobytes()
     decreasing = _synthetic_buffer([np.r_[two[0], 11.0, 10.0, two[1]], two])
-    assert not build_moment_guide(quadrature[0], decreasing)[5]
+    refused = build_moment_guide(quadrature[0], decreasing)
+    assert not refused[5]
+    for energy_eV in np.exp(np.linspace(two[0], two[1], 101)):
+        expected = transport_layer_moments(*quadrature, 0, energy_eV, 1.0, np.empty(1), decreasing)
+        actual = table_moments(decreasing, refused, 0, energy_eV)
+        assert np.array(actual).tobytes() == np.array(expected).tobytes()
     assert not build_moment_guide(quadrature[0], np.zeros(2))[5]  # exact quadrature buffer
 
 
@@ -140,7 +145,7 @@ def test_cutoff_bounds_dominate_every_evaluated_rate_and_refuse_unproven_tables(
     guide = build_moment_guide(packed[2], packed[-1])
     for layer in range(2):
         for energy in np.geomspace(10.0, 150.0, 4001):
-            soft, _ = table_layer_moments_indexed(packed[-1], 2, layer, energy * 1e3, guide)
+            soft, _ = table_moments(packed[-1], guide, layer, energy * 1e3)
             rate = _dEds_sbethe_packed_scalar(
                 log_energy, log_stopping, layer, counts[layer], energy
             )
