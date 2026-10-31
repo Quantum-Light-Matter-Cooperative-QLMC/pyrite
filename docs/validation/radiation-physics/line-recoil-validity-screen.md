@@ -153,6 +153,7 @@ exact shifts 0.01, -0.01, the next floating-point number above 0.01,
 positive infinity and NaN: exactly two were counted. This checks comparison
 semantics; it is separate from the physical reference-value probes.
 
+The screen runs only when `PYRITE_LINE_DATA_COVERAGE` is set (#286).
 The parent `line_data_coverage` loop selects CXR electrons with finite
 positive escape-piece duration, each requested reflection, and each mosaic
 orientation of positive quadrature weight. It next requires the production

@@ -73,7 +73,8 @@ and check reflection convergence before interpreting fine structure or peak
 heights. The finite energy window is not a total yield. A brighter region alone
 does not establish statistical significance.
 
-This run emits `LineOpticalDataWarning`: some line contributions encounter
+The stored run was made with the opt-in coverage screen enabled
+(`PYRITE_LINE_DATA_COVERAGE=1`) and emits `LineOpticalDataWarning`: some line contributions encounter
 unavailable optical data and may be omitted. The stored fixed-run output records these
 warnings; their pair counts are not a missing-yield estimate. See the
 [runtime coverage screen](../physics/radiation-physics/coherent-radiation.md#runtime-kinematic-screen)

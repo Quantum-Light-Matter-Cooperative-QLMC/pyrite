@@ -12,6 +12,7 @@ from contextvars import ContextVar
 import numpy as np
 
 from ...._backend import REAL, _to_cpu, xp
+from ...._env import env_value
 from ....materials.atomic import _chantler_bounds
 from ....materials.crystal import _EDGE_PRONE, HBARC_EV_ANG, reciprocal_g_vector
 from ....materials.photon_cross_sections import EPDL_E_MIN_EV
@@ -30,6 +31,19 @@ class LineOpticalDataWarning(UserWarning):
 # longitudinal lattice-recoil term, so a warning would fire on routine cases
 # before the in-crystal applicability is settled (issues #249, #527).
 RECOIL_SHIFT_LIMIT = 0.01
+
+
+#: Opt-in switch for the screen: any nonempty value other than ``0`` enables it.
+LINE_DATA_COVERAGE_ENV = "PYRITE_LINE_DATA_COVERAGE"
+
+
+def line_data_coverage_enabled():
+    """Whether this process runs the opt-in line optical-data/recoil screen.
+
+    Off by default: the screen is diagnostic only (counts, never yield) and
+    cost up to 95 % of the line phase before #286 vectorized it.
+    """
+    return env_value(LINE_DATA_COVERAGE_ENV, "") not in ("", "0")
 
 
 _COLLECTOR: ContextVar[list | None] = ContextVar("line_data_coverage", default=None)

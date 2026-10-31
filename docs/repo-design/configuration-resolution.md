@@ -120,6 +120,7 @@ chunking or a backend can alter floating-point reduction order.
 | `PYRITE_MC_GPU_OOM_RETRIES` | Positive retry count after GPU allocation failure; unset comes from the resource policy. | `runner.chunking` |
 | `PYRITE_MC_WORKER_MEM_MB` | Positive per-worker MiB budget for CPU full-case workers; unset `6144`. | `runner.chunking` |
 | `PYRITE_MC_PIPELINE_WORKER_MEM_MB` | Positive per-worker MiB budget for CPU transport workers behind the GPU pipeline; unset `1536`. | `runner.chunking` |
+| `PYRITE_LINE_DATA_COVERAGE` | Any nonempty value other than `0` runs the CXR line optical-data/recoil screen (`LineOpticalDataWarning`, `line_data_coverage` provenance); unset skips it. | `spectrum.cxr._coverage` | diagnostics |
 | `PYRITE_MC_TIMING` | Any nonempty value other than `0` enables phase-timing reports; unset disables them. | `runner` | profiling |
 | `PYRITE_MC_DEBUG` | Any nonempty value enables PyRITE debug logging; unset is silent. | package initialization | diagnostics |
 | `PYRITE_MC_NSYS_PYSTACK` | Any nonempty value asks generated Nsight scripts for Python stacks/backtraces; unset omits them. Use only with a supported Python/Nsight pair. | `remote._queue_scripts` | profiling |

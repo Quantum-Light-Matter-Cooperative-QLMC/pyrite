@@ -216,8 +216,9 @@ limit when transverse reciprocal momentum is significant.
 
 ## Runtime kinematic screen
 
-The line scorer also screens the transported population for optical-data
-coverage before output-axis masks. `LineOpticalDataWarning` reports positive
+With `PYRITE_LINE_DATA_COVERAGE=1` (off by default; the screen is diagnostic
+and does not change any spectrum), the line scorer also screens the
+transported population for optical-data coverage before output-axis masks. `LineOpticalDataWarning` reports positive
 vacuum seeds outside the available optical domain and in-domain seeds whose
 production root lookup encounters missing optical data. This remains visible
 when an automatic axis ends below the missing lines. It does not extrapolate
