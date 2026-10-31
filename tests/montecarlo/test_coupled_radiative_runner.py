@@ -335,3 +335,22 @@ def test_coupled_cuda_factory_bypasses_lut_with_cpu_stub(synthetic_si_tables, mo
     )
     with pytest.raises(ExactFactoryReached):
         runner._transport_case(_coupled_case(), transport_core="cuda")
+
+
+@pytest.mark.parametrize("block", [5, 7])
+def test_streamed_scoring_matches_the_joined_coupled_run(synthetic_si_tables, block):
+    # #611: streaming skips the population-wide photon re-completion; the
+    # coupled continuum never reads completed directions, so spectra still agree.
+    from pyrite.montecarlo.runner.streamed_scoring import run_case_streamed
+
+    case = _coupled_case(straggling=True)
+    assert case.get("line_grid_policy") is None
+    reference = runner._spectrum_case(
+        case, runner._transport_case(case, transport_core="per-electron")
+    )
+    streamed = run_case_streamed(case, block, transport_core="per-electron")
+    for key in ("spec", "spec_characteristic", "brem_wide"):
+        np.testing.assert_allclose(streamed[key], reference[key], rtol=1e-12, atol=0.0, err_msg=key)
+    assert np.any(streamed["brem_wide"] > 0.0)
+    for key in ("eta", "hit_frac", "n_segments"):
+        assert streamed[key] == reference[key], key

@@ -16,6 +16,7 @@ coherent-streaming-rawkernel
 straggled-transport-integration
 physics-preparation-adapters
 emission-batch-adapters
+streamed-scoring
 extending-physics
 photon-aperture
 ```
