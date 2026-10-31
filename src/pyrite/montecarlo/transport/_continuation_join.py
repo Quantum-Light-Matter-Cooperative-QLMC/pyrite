@@ -161,8 +161,14 @@ class _PinnedRing:
 
     def __init__(self, cp, stream):
         self.cp, self.stream = cp, stream
+        # Not from the pinned pool: its cached pages would stay resident
+        # (and count toward peak RSS) after assembly; these free with the ring.
         self.buffers = [
-            np.frombuffer(cp.cuda.alloc_pinned_memory(CHUNK_BYTES), np.uint8, CHUNK_BYTES)
+            np.frombuffer(
+                cp.cuda.PinnedMemoryPointer(cp.cuda.PinnedMemory(CHUNK_BYTES), 0),
+                np.uint8,
+                CHUNK_BYTES,
+            )
             for _ in range(2)
         ]
         self.events = [None, None]
