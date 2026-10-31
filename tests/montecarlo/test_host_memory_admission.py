@@ -114,3 +114,46 @@ def test_qualification_missing_sample_fails_closed_and_keeps_partial(tmp_path, m
     assert summary["qualified"] is False
     assert summary["valid_samples"] == 29
     assert any("missing status" in reason for reason in summary["failed_samples"])
+
+
+def _continuation_drive(**kwargs):
+    from tests.montecarlo.test_transport_continuation import _drive  # noqa: PLC0415
+
+    return _drive(**kwargs)
+
+
+@pytest.mark.parametrize(
+    ("staging", "phase"),
+    [
+        (False, "continuation retained round download"),
+        (True, "continuation staged-round spill"),
+    ],
+)
+def test_continuation_admission_fails_cleanly_when_host_budget_is_exhausted(
+    monkeypatch, staging, phase
+):
+    from dataclasses import replace  # noqa: PLC0415
+
+    from pyrite.montecarlo.transport.continuation import TransportContinuationConfig  # noqa: PLC0415
+
+    monkeypatch.setattr(host_memory, "host_headroom_bytes", lambda: 0)
+    cont = TransportContinuationConfig(rows_per_round=5, active_histories=3)
+    # staging=True with a zero staging budget forces an immediate spill to host.
+    cont = replace(cont, device_staging=staging, staging_budget_bytes=0 if staging else None)
+    with pytest.raises(host_memory.HostMemoryResourceError) as caught:
+        _continuation_drive(cont=cont)
+    assert caught.value.phase == phase
+    assert caught.value.required_bytes > caught.value.available_bytes == 0
+
+
+def test_continuation_admitted_request_is_unchanged(monkeypatch):
+    from dataclasses import replace  # noqa: PLC0415
+
+    from pyrite.montecarlo.transport.continuation import TransportContinuationConfig  # noqa: PLC0415
+
+    cont = TransportContinuationConfig(rows_per_round=5, active_histories=3)
+    _c, base, _l, _p = _continuation_drive(cont=replace(cont, device_staging=False))
+    monkeypatch.setattr(host_memory, "host_headroom_bytes", lambda: 1 << 30)
+    _c, rows, _l, _p = _continuation_drive(cont=replace(cont, device_staging=False))
+    for column in (0, 2, 5, 7, 12):  # the stand-in core leaves other scratch unset
+        np.testing.assert_array_equal(base[column], rows[column])

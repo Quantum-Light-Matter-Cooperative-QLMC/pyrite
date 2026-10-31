@@ -17,7 +17,6 @@ import numpy as np
 from ..._numerics import DEFAULT_RADIATIVE_CUTOFF_EV
 from ..geometry import validate_transverse_dimensions
 from .arguments import TransportInputs, resolve_cutoffs_by_electron, resolve_layers_and_elastic
-from .host_memory import GrowingHostRows, admit_host_allocation
 from .batching import (
     _flight_diagnostic_summary,
     _run_per_electron_transport,
@@ -45,6 +44,7 @@ from .cores import (
 from .events import TransportStepLimitError
 from .hard_inelastic import hard_keys_from_stream_keys, validate_inelastic_args
 from .hard_radiative import validate_radiative_args
+from .host_memory import GrowingHostRows, admit_host_allocation
 from .kinematics import _sample_bunch_offsets, stream_keys
 from .layer_tables import build_layer_tables
 from .lut import build_transport_energy_lut

@@ -43,6 +43,7 @@ from .cores import (
     EXIT_STEP_LIMITED,
     EXIT_TRANSMITTED,
 )
+from .host_memory import admit_host_allocation
 
 # Kernel exit code of a history that reached its launch's row quantum.
 EXIT_SUSPENDED = np.int8(6)
@@ -241,8 +242,14 @@ class _Retained:
             self.staged_bytes += _chunk_bytes(gathered)
             # Assembly holds the staged rounds and their joined copy at once.
             if 2 * self.staged_bytes > self.budget:
+                # Spilling copies every staged round plus this one to the host.
+                admit_host_allocation(self.staged_bytes, "continuation staged-round spill")
                 self.chunks = [self._host(c) for c in self.chunks]
                 self.on_device, self.spilled_round = False, len(self.chunks)
+        if not self.on_device:
+            # The gather is still device-resident; its host copy must fit
+            # alongside every previously retained round.
+            admit_host_allocation(_chunk_bytes(gathered), "continuation retained round download")
         self.chunks.append(gathered if self.on_device else self._host(gathered))
 
     def _host(self, chunk):
@@ -371,15 +378,7 @@ def _drive_continuation_rounds(
         gathered = tuple(a[index] if a.shape[0] else a for a in columns)
         nseg += int(index.size)
         del index
-        if not on_device:
-            from .host_memory import admit_host_allocation
-
-            # The gather is still device-resident here; its host copy must
-            # fit alongside every previously retained round.
-            admit_host_allocation(
-                sum(int(a.nbytes) for a in gathered), "continuation retained round download"
-            )
-        retained.append(gathered if on_device else tuple(to_host(a) for a in gathered))
+        retained.append(gathered)
         del gathered
         counts = to_host(seg_count[:m]).astype(np.int64)
         codes = to_host(exit_code[:m])
@@ -419,8 +418,6 @@ def _drive_continuation_rounds(
     on_device = retained.on_device
     joined = _assemble(xp, chunks, rows_total, retained.chunks, columns, out_bufs, nseg, on_device)
     if on_device and not keep_on_device:
-        from .host_memory import admit_host_allocation
-
         for buf, column in zip(out_bufs, joined, strict=True):
             if column.shape[0]:
                 admit_host_allocation(int(column.nbytes), "continuation final host download")

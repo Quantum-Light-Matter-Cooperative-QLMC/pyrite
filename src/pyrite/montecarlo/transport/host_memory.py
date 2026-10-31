@@ -104,6 +104,20 @@ def admit_host_allocation(required_bytes: int, phase: str) -> None:
         raise HostMemoryResourceError(phase, required, available)
 
 
+def admit_batch_download(out_bufs, slots, nseg: int, total: int) -> None:
+    """Admit a per-electron batch's compact/download copy before any transfer.
+
+    The compacted selection is another live copy beyond the destination arrays,
+    so grow the destination first, then charge the copy itself.
+    """
+    if out_bufs and hasattr(out_bufs[0], "reserve"):
+        out_bufs[0].reserve(nseg + total)
+    admit_host_allocation(
+        sum(total * a.dtype.itemsize * int(np.prod(a.shape[2:])) for a in slots if a is not None),
+        "transport batch compact/download",
+    )
+
+
 class _GrowingColumn:
     """Minimal ndarray-like destination used only by the per-electron drivers."""
 
