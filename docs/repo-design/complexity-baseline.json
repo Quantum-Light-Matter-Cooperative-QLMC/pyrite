@@ -613,7 +613,7 @@
     {
       "path": "src/pyrite/montecarlo/transport/cores.py",
       "name": "make_cpu_transport_core.body",
-      "cc": 227,
+      "cc": 236,
       "exception": "Numerical transport kernel: a split or rewrite needs RNG-stream, event-order, CPU/GPU parity and performance evidence (#567, #344); never refactor for the metric alone."
     },
     {

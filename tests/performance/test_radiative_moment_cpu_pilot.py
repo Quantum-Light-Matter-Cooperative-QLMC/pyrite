@@ -79,9 +79,10 @@ def test_cpu_wrapper_rejects_invalid_core_and_arm(monkeypatch):
 def test_cpu_kernel_call_inventory_is_exactly_three_plus_one():
     source = (Path(__file__).parents[2] / "src/pyrite/montecarlo/transport/cores.py").read_text()
     assert source.count("radiative_layer_moments_scalar(") == 1
-    assert source.count("transport_layer_moments(") == 3
-    transformed = source.replace("transport_layer_moments(", "lookup_layer_moment_cpu(", 3)
-    assert transformed.count("lookup_layer_moment_cpu(") == 3
+    # Each of the three sites: inline table lookup + out-of-line exact quadrature (#841).
+    assert source.count("_moments.table_moments(") == 3
+    assert source.count("_moments.exact_moments(") == 3
+    transformed = source
     assert transformed.count("radiative_layer_moments_scalar(") == 1
     # The retained exact call is the physical row-end sampler prerequisite.
     assert transformed.index("radiative_layer_moments_scalar(") > transformed.index(

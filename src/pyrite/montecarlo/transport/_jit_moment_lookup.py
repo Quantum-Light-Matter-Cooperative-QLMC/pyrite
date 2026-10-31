@@ -44,7 +44,18 @@ def transport_layer_moments(
             element_rates,
             plasma,
         )
-    n_layers = nel.size
+    return table_moments(plasma, nel.size, layer, energy_eV)
+
+
+@njit(cache=True, inline="always")
+def table_moments(plasma, n_layers, layer, energy_eV):
+    """Table-mode body of :func:`transport_layer_moments` (bisection bracket).
+
+    Inlined so the CPU core can call it without the out-of-line call, which
+    cost more than the search itself (#841). A guide-table search returning
+    the same bracket was 0-6% slower than this inline bisection on the #803
+    scenes (~250-310 nodes per layer), so the bisection stays.
+    """
     offset = n_layers
     start = np.int64(plasma[offset + layer])
     count = np.int64(plasma[offset + n_layers + layer])
@@ -76,3 +87,22 @@ def transport_layer_moments(
     soft = (1.0 - f) * plasma[value_base + 3 * lo] + f * plasma[value_base + 3 * hi]
     hard = (1.0 - f) * plasma[value_base + 3 * lo + 1] + f * plasma[value_base + 3 * hi + 1]
     return soft, hard
+
+
+@njit(cache=True)
+def exact_moments(radiative_args, layer, energy_eV, element_rates):
+    """``transport_layer_moments`` on the transport tuple ``radiative_args``.
+
+    ``radiative_args`` is ``(keys, cutoff_eV, nel, nt, z, density, incident,
+    nominal, top, chi, plasma)``. Out of line on purpose: unpacking the tuple
+    or keeping quadrature beside the inline table path in one wrapper made the
+    CPU core 1.2-2x slower end to end (#841, SLURM 2896/2902/2903).
+    """
+    return transport_layer_moments(
+        *radiative_args[2:10],
+        layer,
+        energy_eV,
+        radiative_args[1],
+        element_rates,
+        radiative_args[10],
+    )
