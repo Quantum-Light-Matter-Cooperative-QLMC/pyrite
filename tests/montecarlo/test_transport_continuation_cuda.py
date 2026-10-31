@@ -511,3 +511,28 @@ def test_runner_retry_and_block_monitor_match_full_history(monkeypatch):
     assert max(budgets) > 1
     assert blocks == ref_blocks and [b[:2] for b in blocks] == [(0, 20), (20, 40)]
     _assert_identical(reference["segs"], candidate["segs"])
+
+
+@pytest.mark.parametrize("budget", [0, 1 << 16, None])
+@pytest.mark.parametrize("mode", ["radiative", "shell-all"])
+def test_bounded_staging_spill_matches_full_history(radiative_reference, mode, budget):
+    """Forced spill (#842): staged rounds move to the host; rows stay bitwise."""
+    records = []
+    cont = TransportContinuationConfig(
+        rows_per_round=7,
+        active_histories=37,
+        staging_budget_bytes=budget,
+        on_round=records.append,
+    )
+    config = replace(REFERENCE, continuation=cont)
+    if mode == "radiative":
+        reference, result = radiative_reference, _radiative(config)
+    else:
+        shell = {"secondaries": True, "straggling": True, "radiative": True}
+        reference, result = _shell(REFERENCE, **shell), _shell(config, **shell)
+    _assert_identical(reference, result)
+    assembly = [r for r in records if r["phase"] == "assembly"]
+    if budget == 0:
+        assert all(r["spilled_round"] == 0 for r in assembly)
+    elif budget is None:
+        assert all(r["staged"] for r in assembly)
