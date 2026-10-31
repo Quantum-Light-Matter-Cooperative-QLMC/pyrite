@@ -56,6 +56,8 @@ _TALLIED = (EXIT_BACKSCATTERED, EXIT_TRANSMITTED, EXIT_SIDE, EXIT_CUTOFF_STOPPED
 _GATHER_INDEX_BYTES = 3 * 8
 # Per-lane round arrays: int32 slot, int64 row count, int8 exit code.
 _LANE_BYTES = 4 + 8 + 1
+# Fraction of free device memory the derived staging budget leaves unused.
+STAGING_HEADROOM = 0.1
 
 logger = logging.getLogger(__name__)
 
@@ -82,10 +84,17 @@ class TransportContinuationConfig:
     enabled row schema. Ne-sized per-history state and retained output are
     outside it: bounded scratch does not bound total trajectory storage.
 
-    ``device_staging`` keeps each round's retained rows on the device and
-    downloads the reassembled columns once, trading up to twice the retained
-    output in device memory for fewer, contiguous host copies. Off, rows move
-    to the host every round and are reassembled there.
+    ``device_staging`` (default on, #842) keeps each round's retained rows on
+    the device and downloads the reassembled columns once: fewer, contiguous
+    host copies for up to twice the retained output in device memory. Staging
+    is bounded: while twice the staged bytes fit ``staging_budget_bytes``
+    rounds stay on the device; past it the staged rounds spill to the host
+    and the run finishes with host reassembly, as with staging off. ``None``
+    derives the budget from free device memory (driver free plus the memory
+    pool's cached blocks) after the round scratch is allocated, less
+    ``STAGING_HEADROOM``. Off, rows move to the host every round. Results are
+    bitwise the same in every mode; runs that keep segments on the device
+    never spill.
 
     ``on_round`` (diagnostics only) receives one ``phase="round"`` dict per
     launch with the launched population, rows, finished/refilled counts and
@@ -94,7 +103,8 @@ class TransportContinuationConfig:
 
     rows_per_round: int = 256
     active_histories: int | None = None
-    device_staging: bool = False
+    device_staging: bool = True
+    staging_budget_bytes: int | None = None
     on_round: Callable[[dict[str, Any]], None] | None = None
 
     def __post_init__(self):
@@ -102,6 +112,8 @@ class TransportContinuationConfig:
             raise ValueError("rows_per_round must be a positive integer")
         if self.active_histories is not None and int(self.active_histories) < 1:
             raise ValueError("active_histories must be a positive integer or None")
+        if self.staging_budget_bytes is not None and int(self.staging_budget_bytes) < 0:
+            raise ValueError("staging_budget_bytes must be non-negative or None")
 
 
 def continuation_row_bytes(scratch_row):
@@ -192,6 +204,51 @@ def resolve_schedule(config, Ne, **support):
     return replace(config, schedule="full-history", continuation=None)
 
 
+def _free_device_bytes(xp):
+    """Free device bytes including the memory pool's cache; None off-CUDA."""
+    cuda = getattr(xp, "cuda", None)
+    if cuda is None:
+        return None
+    free, _total = cuda.runtime.memGetInfo()
+    return int(free) + int(xp.get_default_memory_pool().free_bytes())
+
+
+def staging_budget(xp, cont):
+    """Device bytes staged rounds plus their joined copy may hold; None = unbounded."""
+    if cont.staging_budget_bytes is not None:
+        return int(cont.staging_budget_bytes)
+    free = _free_device_bytes(xp)
+    return None if free is None else int(free * (1.0 - STAGING_HEADROOM))
+
+
+def _chunk_bytes(chunk):
+    return sum(int(a.nbytes) for a in chunk)
+
+
+class _Retained:
+    """Retained rounds, staged on the device within a budget, else on the host."""
+
+    def __init__(self, xp, cont, keep_on_device, to_host):
+        self.on_device = keep_on_device or cont.device_staging
+        self.budget = None if keep_on_device or not self.on_device else staging_budget(xp, cont)
+        self.to_host = to_host
+        self.chunks = []
+        self.staged_bytes = 0
+        self.spilled_round = None
+
+    def append(self, gathered):
+        if self.on_device and self.budget is not None:
+            self.staged_bytes += _chunk_bytes(gathered)
+            # Assembly holds the staged rounds and their joined copy at once.
+            if 2 * self.staged_bytes > self.budget:
+                self.chunks = [self._host(c) for c in self.chunks]
+                self.on_device, self.spilled_round = False, len(self.chunks)
+        self.chunks.append(gathered if self.on_device else self._host(gathered))
+
+    def _host(self, chunk):
+        return tuple(self.to_host(a) for a in chunk)
+
+
 def _gather_index(xp, counts, quantum):
     """Flat scratch slot of each retained row, slot-major and step-minor."""
     ends = xp.cumsum(counts)
@@ -278,13 +335,13 @@ def _drive_continuation_rounds(
     scratch = alloc_scratch(n_active * quantum)
     # Frozen rows keep seven columns; the kernel still takes the empty end fields.
     columns = scratch[: len(out_bufs)]
-    on_device = keep_on_device or cont.device_staging
+    retained = _Retained(xp, cont, keep_on_device, to_host)
     seg_count = xp.zeros(n_active, dtype=xp.int64)
     exit_code = xp.zeros(n_active, dtype=xp.int8)
     state = tuple(xp.zeros((Ne, _STATE_WORDS), dtype=t) for t in (xp.int32, xp.uint64, xp.float64))
     pending = _pending_order(Ne, history_order)
     rows_total = np.zeros(Ne, dtype=np.int64)
-    chunks, retained = [], []
+    chunks = []
     tallies = dict.fromkeys(_TALLIED, 0)
     active = pending[:n_active]
     next_pending = active.size
@@ -310,7 +367,7 @@ def _drive_continuation_rounds(
         gathered = tuple(a[index] if a.shape[0] else a for a in columns)
         nseg += int(index.size)
         del index
-        retained.append(gathered if on_device else tuple(to_host(a) for a in gathered))
+        retained.append(gathered)
         del gathered
         counts = to_host(seg_count[:m]).astype(np.int64)
         codes = to_host(exit_code[:m])
@@ -347,7 +404,8 @@ def _drive_continuation_rounds(
 
     assembly = time.perf_counter()
     _nsys_push("pyrite.transport.continuation.assemble")
-    joined = _assemble(xp, chunks, rows_total, retained, columns, out_bufs, nseg, on_device)
+    on_device = retained.on_device
+    joined = _assemble(xp, chunks, rows_total, retained.chunks, columns, out_bufs, nseg, on_device)
     if on_device and not keep_on_device:
         for buf, column in zip(out_bufs, joined, strict=True):
             if column.shape[0]:
@@ -355,5 +413,14 @@ def _drive_continuation_rounds(
         joined = None
     _nsys_pop()
     if cont.on_round is not None:
-        cont.on_round({"phase": "assembly", "rows": nseg, "wall_s": time.perf_counter() - assembly})
+        cont.on_round(
+            {
+                "phase": "assembly",
+                "rows": nseg,
+                "wall_s": time.perf_counter() - assembly,
+                "staged": on_device,
+                "staging_budget_bytes": retained.budget,
+                "spilled_round": retained.spilled_round,
+            }
+        )
     return (nseg, *(tallies[code] for code in _TALLIED), joined, to_host(d_stragg))

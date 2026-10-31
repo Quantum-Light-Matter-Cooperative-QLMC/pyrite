@@ -199,11 +199,41 @@ def test_device_resident_join_matches_host_rows():
 
 def test_device_staging_matches_host_rows():
     cont = TransportContinuationConfig(rows_per_round=5, active_histories=3)
-    _counts, host_rows, _, _ = _drive(cont)
-    counts, staged_rows, _, _ = _drive(replace(cont, device_staging=True))
+    assert cont.device_staging  # bounded staging is the default (#842)
+    _counts, host_rows, _, _ = _drive(replace(cont, device_staging=False))
+    counts, staged_rows, _, _ = _drive(cont)
     assert counts[6] is None
     for column in WRITTEN:
         np.testing.assert_array_equal(host_rows[column], staged_rows[column])
+
+
+@pytest.mark.parametrize(("budget", "spills"), [(0, True), (4000, True), (None, False)])
+def test_staging_spill_matches_host_rows(budget, spills):
+    cont = TransportContinuationConfig(rows_per_round=5, active_histories=3)
+    _counts, host_rows, _, _ = _drive(replace(cont, device_staging=False))
+    records = []
+    staged = replace(cont, staging_budget_bytes=budget, on_round=records.append)
+    counts, rows, _, _ = _drive(staged)
+    assert counts[6] is None
+    for column in WRITTEN:
+        np.testing.assert_array_equal(host_rows[column], rows[column])
+    assembly = records[-1]
+    assert assembly["phase"] == "assembly"
+    assert assembly["staged"] is not spills
+    if budget == 4000:
+        assert assembly["spilled_round"] > 0  # spills mid-run, not at once
+
+
+def test_device_resident_rows_never_spill():
+    cont = TransportContinuationConfig(rows_per_round=5, active_histories=3)
+    records = []
+    _drive(replace(cont, staging_budget_bytes=0, on_round=records.append), keep_on_device=True)
+    assert records[-1]["spilled_round"] is None
+
+
+def test_negative_staging_budget_is_rejected():
+    with pytest.raises(ValueError, match="staging_budget_bytes"):
+        TransportContinuationConfig(staging_budget_bytes=-1)
 
 
 def test_scratch_respects_budget_with_staging_and_event_columns():
