@@ -1,5 +1,9 @@
 # Migrate scripts to physical quantities
 
+Scientific deterministic helpers and grating/detector operations have separate
+opt-in adapters, described in the [scientific quantities guide](issue-816-scientific-quantities.md).
+They do not alter the numeric solver or catalog contracts.
+
 Use this guide to move an existing numeric script to explicit Pint quantities.
 You do not have to migrate: every numeric spelling keeps its meaning, raises no
 warning and has no scheduled removal. Exact fields and units are listed in the
@@ -92,6 +96,49 @@ probe = TransverseStateSpec.recipe(
 narrower = probe.with_parameters(semiangle=10 * ureg.mrad)
 narrower.parameter_quantities["semiangle"]  # <Quantity(0.01, 'radian')>
 ```
+
+## Inspect advanced material and transverse-state quantities
+
+CIF-derived catalog data stays numeric. Use the material schema's detached
+read-back properties when you want cell parameters or densities with units;
+material authoring already accepts semantic `density`, `b_factor` and
+`mosaic_fwhm` quantities. The lattice mapping is mixed-unit: `system` remains
+a string, lengths are in Å, and angles are in degrees. Number densities count
+**atoms per Å³**, not electric charge.
+
+```python
+from pyrite.materials.catalog import load_material_catalog
+
+catalog = load_material_catalog()
+crystal = catalog.crystals["silicon"]
+crystal.lattice_parameters["a"].to("nm")
+crystal.cell_volume.to("nm**3")
+crystal.number_densities  # ordered (element, 1/Å³) quantities
+crystal.b_factor  # isotropic Debye-Waller B, Å²
+```
+
+Transverse-state preset functions accept Pint inputs and retain numeric
+solver-facing states. The corresponding read-back exposes **derived geometry
+and quadrature hints**, not an exact reconstruction of each original preset:
+
+```python
+from pyrite.montecarlo.channeling.states import gaussian, translate, aperture_probe
+
+state = gaussian(waist_ang=2 * ureg.nm, dimension=1)
+state.centre_position  # array quantity in Å
+state.momentum_extent  # per-axis inverse Å; sampling hint, not mean momentum
+shifted = translate(state, offset_ang=3 * ureg.nm)
+shifted.displacement.to("nm")
+probe = aperture_probe(60 * ureg.keV, semiangle_rad=20 * ureg.mrad)
+probe.kinetic_energy.to("keV")
+probe.semiangle.to("mrad")
+```
+
+`SampledState.sample_positions` returns copied position axes and its optional
+`kinetic_energy` is metadata. `ApertureProbe.aberration_quantities` returns a
+new mapping of length and angle quantities. Mutating read-back values never
+changes numeric state data or identity. `amplitude` and `wavefunction` still
+take and return numeric arrays; no Pint objects enter the solvers.
 
 ## Sweep and optimize semantic fields
 
@@ -190,7 +237,9 @@ script to quantities.
 | Quantum setup and recipes | `step_ang`, `zone_max_ang`, `waist_ang`, `kinetic_energy_eV`, … | `step_length`, `zone_max_length`, `waist`, `kinetic_energy`, … | Both supported |
 | `Numerics.channeling_*` lengths | `channeling_dz_ang`, `channeling_zone_max_ang` | Set through `QuantumNumerics` / `QuantumRegion` | Numeric only |
 | Experimental axial diagnostic, real-space solvers, response grids | `*_eV`, `*_ang`, `*_rad` | — | Numeric only; quantities raise `TypeError` |
-| Material schema values, `pyrite.materials.crystal` constants, deterministic scientific helpers | `lattice` (Å, deg), `V_cell`, `B_ang2`, `*_eV`, `*_ang`, `*_inv_mm` | — | Numeric contract; quantity interfaces tracked separately |
+| Material schema values | `lattice` (Å, deg), `V_cell`, `B_ang2`, composition | `lattice_parameters`, `cell_volume`, `b_factor`, `number_densities`, `mosaic_fwhm` | Numeric records; detached quantity read-back |
+| Channeling transverse states | `centre`, `k_extent`, `k_resolution`, `axes`, `offset` | `centre_position`, `momentum_extent`, `momentum_resolution`, `sample_positions`, `displacement` | Numeric solver contracts; quantity read-back |
+| Crystal constants and deterministic scientific helpers | `*_eV`, `*_ang`, `*_inv_mm` | — | Numeric contract; follow-up in #816 |
 | CLI options, profile TOML | Option-name and key units; TOML also takes unit strings | — | Numeric CLI; unit-string CLI input is tracked separately |
 | `cxr_metrics` peak keys | `peak_flux`, `peak_flux_per_na` | `peak_spectral_flux_density`, `peak_spectral_flux_density_per_na` | Deprecated since 0.24.0; removal planned for 0.26.0 |
 

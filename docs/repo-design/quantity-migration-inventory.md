@@ -1,5 +1,9 @@
 # Physical-quantity migration inventory (#755)
 
+**#816 scientific helper follow-up:** opt-in interfaces are now available in
+`pyrite.materials.quantities` and `pyrite.detectors.quantities`. See
+[the quantity adapter guide](../guides/issue-816-scientific-quantities.md).
+
 This is the **review checkpoint** and is supplemented by node-sampled
 `SpectralDensity.quantify()`, directional views, binned aperture views,
 selected-pixel `SpatialResult.quantify_spectra()` and integrated
@@ -77,16 +81,18 @@ The entries in this section were checked against the concrete definitions,
 not inferred from a module's helper imports. `pyrite.materials` schema/authoring
 objects and the registered atomic/crystal/attenuation functions are
 **advanced-stable**. Their unit-suffixed numeric representation is the **explicit numeric
-contract** for #755; opt-in quantity interfaces are deferred to #816.
+contract** for #755; #816 adds detached read-back to catalog material values,
+while direct CIF/schema construction and the deterministic helpers remain numeric.
 No new scientific API or stability promotion follows from this inventory.
 
-For these rows, dimensional Python inputs and read-back are numeric; there is
-no explicit semantic quantity interface. Catalog unit-string parsing does not
-imply that direct schema constructors or scientific helpers normalize Pint
-inputs. Accidental NumPy coercion of a quantity is not supported unit conversion.
-Existing dataclass replacement uses stored fields. Catalog records, CIF-derived
-arrays and authoring hashes remain numeric; adapters must copy read-back and
-preserve those identities rather than serialize registries.
+Direct CIF/schema constructor arguments and deterministic helper inputs in
+these rows remain numeric-only unless a specific semantic entry point is
+listed. Catalog unit-string parsing does not imply direct schema constructors
+normalize Pint inputs; accidental NumPy coercion is not unit conversion.
+Selected schema properties provide fresh quantity read-back under #816.
+Existing dataclass replacement uses stored numeric fields. Catalog records,
+CIF-derived arrays and authoring hashes remain numeric; do not serialize Pint
+registries into them.
 
 | Canonical value / concrete owner | Physical dimension, shape and meaning | Consumer / evidence; migration obligation |
 | --- | --- | --- |
@@ -97,6 +103,17 @@ preserve those identities rather than serialize registries.
 | `CrystalInfo.mosaic_fwhm_deg`; `CrystalSpec.mosaic_fwhm_deg` | Optional scalar angular FWHM in degrees. | Catalog defaults and mosaic transport; `tests/materials/test_material_catalog.py`. Missing width stays `None`; not zero and not arbitrary dimensionless input. |
 | `CrystalSpec.B_ang2` | Scalar isotropic Debye–Waller B in Å². | Structure/coupling calculations; `tests/materials/test_crystallography.py`. Do not confuse B with an RMS displacement or temperature. |
 | `CrystalSpec.hkl_families`, `hkl_list`, `surface_hkl`, `beam_uvw`, `cut`; `MaterialIdentity` | Integer indices, identity and cut/phase labels; no dimensional values. | Catalog orientation/identity; `tests/materials/test_material_catalog.py`. Numeric indices and semantic labels are justified exceptions, not Q inputs. |
+
+**#816 material-schema read-back:** `CrystalInfo`/`CrystalSpec` expose
+`lattice_parameters` (mixed Å/degree, selector preserved), `cell_volume` (Å³),
+`number_densities` (element-ordered inverse Å³, atom count not charge) and
+`mosaic_fwhm` (optional degrees). `CrystalSpec.b_factor` is Å² and
+`MediumSpec.number_densities` is inverse Å³. These allocate detached Pint
+quantities on access. Direct schema/CIF constructors remain numeric-only:
+composition and lattice atom identifiers, arrays and saved catalog identities
+are not rewritten. `build_medium`/`build_crystal` remain the quantity-input
+entry points for authoring; this patch does not add semantic CIF overrides.
+
 | `ScanSpec` — `materials/_schema.py` | 1D `thickness_ang` Å, `energy_keV` keV, `tilt_deg`/`tilt_azim_deg` degrees, `E_grid_line`/`E_grid_brem` eV. `E_grid_line_by_energy` has **keV keys and eV grid values**. Optional layer counts and particle counts are dimensionless counts. | Material/profile resolution, Cartesian sweeps; `tests/materials/test_unit_profile_inputs.py`, `test_line_grid_isolation.py`. Preserve optional grids, exact node ordering and both key/value units. |
 | `LayerSpec.thickness_ang`, `azimuth_deg` | Scalar Å thickness and degree rotation; `beam_uvw` is an integer direction. | Stack serialization/lowering; `tests/scan/test_target_geometry.py`. Numeric record stays distinct from the quantity-aware public `Layer`. |
 | `MaterialSpec`, `MaterialCatalog`, `CATALOG`, `load_material_catalog`, `save_material` | Containers/selectors for the physical records above; no additional scalar unit for the container. `MaterialValidationSpec` and `MaterialConfigError` carry status/errors, not physical quantities. | `tests/materials/test_material_catalog.py`, `test_material_authoring.py`. Reconstruct quantities from each physical record after loading; no quantity-valued catalog pickle state. |
@@ -119,9 +136,9 @@ migration side effect.
 
 | Existing constant (`pyrite.materials.crystal`) | Numeric unit / physical meaning | Evidence / disposition |
 | --- | --- | --- |
-| `HC_EV_ANG`, `HBARC_EV_ANG` | eV·Å; h c and ħ c | `tests/materials/test_emission.py`, `test_crystallography.py`; numeric contract, quantity read-back deferred to #816. |
+| `HC_EV_ANG`, `HBARC_EV_ANG` | eV·Å; h c and ħ c | `tests/materials/test_emission.py`, `test_crystallography.py`; numeric contract retained; quantity read-back via `pyrite.materials.quantities.crystal_constants()` (#816). |
 | `M_E_EV` | eV; electron **rest energy**, not mass in kg | Transport/line-kinematics consumers; `tests/materials/test_emission.py`; semantic quantity must state rest energy. |
-| `R_E_ANG` | Å; classical electron radius | Absorption/susceptibility; `tests/materials/test_crystallography.py`; numeric contract, length quantity deferred to #816. |
+| `R_E_ANG` | Å; classical electron radius | Absorption/susceptibility; `tests/materials/test_crystallography.py`; numeric contract retained; length quantity via `crystal_constants()` (#816). |
 | `E2_EV_ANG` | eV·Å; Gaussian electrostatic coupling, not SI charge squared | `U_g` / coupling tables; `tests/materials/test_crystallography.py`; retain convention explicitly. |
 | `ALPHA_FS` | Dimensionless fine-structure constant | `E2_EV_ANG` and coupling consumers; justified numeric physical constant, no dimensional conversion needed. |
 
@@ -189,7 +206,7 @@ contracts).
 
 | Canonical surface · status — owner | Inputs: meaning, internal unit, accepted forms | Outputs: read-back, shape/axes, normalization | Evidence; disposition |
 | --- | --- | --- | --- |
-| `gaussian`, `hermite_gauss`, `laguerre_gauss`, `donut`, `bessel_gauss`, `airy`, `aperture_probe`, `from_array`, `translate` · advanced-stable — `montecarlo/channeling/states.py` | waist/scale/centre/spacing/origin/offset Å; `k_radial_inv_ang` Å⁻¹; `kinetic_energy_eV` eV; aperture semi-angles rad with the angle guard; aberration `C*` Å, `phi*` rad. Mode orders `m`, `n`, `ell`, `p`, `dimension` and Airy `truncation` are dimensionless selectors. **Q input** (scalar, array or tuple components) → numeric | Frozen state objects with numeric fields: `ApertureProbe.momentum`/`k_inner`/`k_outer` Å⁻¹, `center` Å, `SampledState.axes` Å, `SampledState.kinetic_energy_eV` eV metadata or `None`, `Translated.offset` Å. No semantic read-back or replacement | `tests/scan/test_quantum_runtime_units.py`, `tests/montecarlo/test_channeling_states.py`; Q input implemented; numeric read-back is the contract, quantity read-back deferred to #816 |
+| `gaussian`, `hermite_gauss`, `laguerre_gauss`, `donut`, `bessel_gauss`, `airy`, `aperture_probe`, `from_array`, `translate` · advanced-stable — `montecarlo/channeling/states.py` | waist/scale/centre/spacing/origin/offset Å; `k_radial_inv_ang` Å⁻¹; `kinetic_energy_eV` eV; aperture semi-angles rad with the angle guard; aberration `C*` Å, `phi*` rad. Mode orders `m`, `n`, `ell`, `p`, `dimension` and Airy `truncation` are dimensionless selectors. **Q input** (scalar, array or tuple components) → numeric | Frozen numeric states preserved. Fresh Q read-back: `centre_position` Å, `momentum_extent`/`momentum_resolution` Å⁻¹, `SampledState.sample_positions` Å, `kinetic_energy` eV or `None`; `Translated.displacement` Å; `ApertureProbe.kinetic_energy` eV, `semiangle`/`inner_semiangle` rad and `aberration_quantities` mixed Å/rad | `tests/scan/test_quantum_runtime_units.py`, `tests/montecarlo/test_channeling_state_quantity_readback.py`; #816 read-back implemented; inverse reconstruction of closure presets deliberately not promised |
 | `from_abtem` · advanced-stable | Reads abTEM `Waves.sampling` (Å) and `.energy` (eV) as floats by abTEM's own convention; `origin_ang` normalizes through `from_array`. Leading ensemble axes become an equal-weight mixture | `SampledState` or `MixedState` | `tests/montecarlo/test_channeling_states.py`; external convention, numeric exception |
 | `TransverseState.amplitude(kx, ky)`, `.wavefunction(x, y)`, `.centre`, `.k_extent`, `.k_resolution`; `SampledState`, `Superposition`, `Translated`, `MixedState`, `EntryState`; `superpose`, `mixture` · advanced-stable | Numeric-only tensor axes: `kx`, `ky` Å⁻¹; `x`, `y` Å. Superposition coefficients are complex dimensionless; mixture weights are nonnegative dimensionless and renormalized to sum 1 | `amplitude`: complex ψ̃ on the tensor grid `(nkx[, nky])` with `∫|ψ̃|² dᵈk/(2π)ᵈ = 1`, so dimension length^(d/2). `wavefunction`: ψ, length^(−d/2), copy of samples on matching axes. `centre` Å; `k_extent`/`k_resolution` Å⁻¹ per axis. `Superposition.norm` and mixture weights dimensionless | `tests/montecarlo/test_channeling_states.py`; future views must carry `d` and the `dᵈk/(2π)ᵈ` versus `dᵈx` measure, never infer dimension from array rank |
 | `DensityMatrixSolver(profile, kinetic_energy_eV, kernel, margin_eV, n_grid)`, `.entry_lattice`, `.entry_state`, `.entry_from_plane`, `.propagate(...)` · experimental — `density.py` | Numeric-only: eV, eV margin; incidence/divergence rad; `thickness_ang`, `dz_ang`, `spatial_x_ang` Å; `stopping_eV_per_ang` eV/Å; `energy_edges_eV` transverse-energy edges eV; `record_every`, `n_grid` counts. Crystal temperature enters only through the numeric K argument of the planar profile builder | `DensityMatrixResult`: `z_ang` `(n_z,)` Å; `kinetic_energy_eV` `(n_z,)` eV; `band_populations` `(n_z, n_bands)`, `bound_population`, `trace`, cumulative `free/overflow/reprojection_flux` `(n_z,)` and scalar `entry_flux` are dimensionless fractions **per incident electron**; `free_flux_by_energy` is cumulative population per transverse-energy **bin** with out-of-range weight **clipped into the end bins**; `barrier_eV`, `cutoff_eV` eV; `final_density` `(n_cells, N, N)` complex dimensionless; optional `spatial_density_per_ang` `(n_z, n_x)` Å⁻¹, unconditioned, cell integral equals `trace` | `tests/montecarlo/test_channeling_density.py`, `test_channeling_spatial.py`; numeric exception for experimental solver; a binned view must flag clipped end bins |
@@ -345,9 +362,9 @@ and unregistered numeric exports are named as such. B1–B6 are **resolved**
 (decisions and tests above). Optimization parameter paths now use their
 owning semantic quantity properties for units and replacement. The #755
 migration is **complete**: every row is migrated or carries an explicit numeric
-contract. Deferred work is tracked separately: unit-string CLI input (#810) and
-quantity interfaces for material schema values, constants, deterministic
-scientific helpers and channeling-state read-back (#816).
+contract. Quantity interfaces for material schema values, constants, deterministic
+scientific helpers and channeling-state read-back landed under #816. Deferred
+work is tracked separately: unit-string CLI input (#810).
 
 ## Existing output contracts (not all convertible by the same rule)
 

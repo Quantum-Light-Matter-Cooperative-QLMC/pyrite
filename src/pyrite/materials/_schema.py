@@ -10,6 +10,7 @@ import numpy as np
 
 from .._numerics import CONVERGENCE_KEYS, TRANSPORT_KEYS
 from .._precision import Precision
+from .._units import reject_quantity
 from ._catalog_decode import CxrGridByEnergy, _number
 from ._identity import CutFrame, MaterialIdentity, hexagonal_setting, reduce_indices
 
@@ -117,6 +118,63 @@ class CrystalInfo:
     composition: tuple[tuple[str, float], ...]
     mosaic_fwhm_deg: float | None
 
+    def __post_init__(self) -> None:
+        # CIF-derived records remain bare numeric data, not registry-bearing
+        # payloads. Only explicit read-back properties construct quantities.
+        for key, value in self.lattice.items():
+            if key in {"a", "b", "c", "alpha", "beta", "gamma"}:
+                unit = "angstrom" if key in {"a", "b", "c"} else "degree"
+                reject_quantity(value, field=f"CrystalInfo.lattice[{key}]", unit=unit)
+        reject_quantity(self.V_cell, field="CrystalInfo.V_cell", unit="angstrom**3")
+        for element, density in self.composition:
+            reject_quantity(
+                density, field=f"CrystalInfo.composition[{element}]", unit="1/angstrom**3"
+            )
+        if self.mosaic_fwhm_deg is not None:
+            reject_quantity(
+                self.mosaic_fwhm_deg, field="CrystalInfo.mosaic_fwhm_deg", unit="degree"
+            )
+
+    @property
+    def lattice_parameters(self) -> dict[str, object]:
+        """Detached quantities for present CIF cell lengths and angles.
+
+        The ``system`` selector remains a string. Missing parameters are not
+        synthesized: their meanings depend on the crystallographic system.
+        """
+        from ..units import Q_
+
+        parameters: dict[str, object] = {}
+        for key, value in self.lattice.items():
+            if key in {"a", "b", "c"}:
+                parameters[key] = Q_(value, "angstrom")
+            elif key in {"alpha", "beta", "gamma"}:
+                parameters[key] = Q_(value, "degree")
+            else:
+                parameters[key] = value
+        return parameters
+
+    @property
+    def cell_volume(self):
+        """Unit-cell volume as a fresh cubic-angstrom quantity."""
+        from ..units import Q_
+
+        return Q_(self.V_cell, "angstrom**3")
+
+    @property
+    def number_densities(self):
+        """Element-ordered number densities (atoms per Å³, not charge)."""
+        from ..units import Q_
+
+        return tuple((element, Q_(n, "1/angstrom**3")) for element, n in self.composition)
+
+    @property
+    def mosaic_fwhm(self):
+        """Optional mosaic width as an angle rather than a bare ratio."""
+        from ..units import Q_
+
+        return None if self.mosaic_fwhm_deg is None else Q_(self.mosaic_fwhm_deg, "degree")
+
 
 @dataclass(frozen=True)
 class CrystalSpec:
@@ -167,6 +225,36 @@ class CrystalSpec:
     layers_per_cell: int | None
     info: CrystalInfo
     surface_hkl: tuple[int, int, int] | None
+
+    def __post_init__(self) -> None:
+        reject_quantity(self.B_ang2, field="CrystalSpec.B_ang2", unit="angstrom**2")
+
+    @property
+    def b_factor(self):
+        """Isotropic Debye-Waller B as a fresh area quantity."""
+        from ..units import Q_
+
+        return Q_(self.B_ang2, "angstrom**2")
+
+    @property
+    def lattice_parameters(self) -> dict[str, object]:
+        """Detached mixed-unit CIF cell parameters."""
+        return self.info.lattice_parameters
+
+    @property
+    def cell_volume(self):
+        """Unit-cell volume in cubic angstroms."""
+        return self.info.cell_volume
+
+    @property
+    def number_densities(self):
+        """Element-ordered number densities in inverse cubic angstroms."""
+        return self.info.number_densities
+
+    @property
+    def mosaic_fwhm(self):
+        """Optional mosaic angular FWHM."""
+        return self.info.mosaic_fwhm
 
     @property
     def hkl_list(self) -> tuple[tuple[int, int, int], ...]:
@@ -246,6 +334,19 @@ class MediumSpec:
 
     key: str
     composition: tuple[tuple[str, float], ...]
+
+    def __post_init__(self) -> None:
+        for element, density in self.composition:
+            reject_quantity(
+                density, field=f"MediumSpec.composition[{element}]", unit="1/angstrom**3"
+            )
+
+    @property
+    def number_densities(self):
+        """Element-ordered atomic number densities; fresh Pint quantities."""
+        from ..units import Q_
+
+        return tuple((element, Q_(n, "1/angstrom**3")) for element, n in self.composition)
 
 
 @dataclass(frozen=True)

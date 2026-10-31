@@ -31,6 +31,18 @@ The entries below use generated docstrings, signatures, and source links. API su
    pyrite.materials.crystal.absorption_length_ang
    pyrite.materials.crystal.dominant_reflections
    pyrite.materials.attenuation.linear_attenuation_inv_mm
+   pyrite.materials.quantities.crystal_constants
+   pyrite.materials.quantities.cromer_mann_f0_q
+   pyrite.materials.quantities.henke_dispersion_q
+   pyrite.materials.quantities.atomic_form_factor_q
+   pyrite.materials.quantities.reciprocal_g_vector_q
+   pyrite.materials.quantities.structure_factor_q
+   pyrite.materials.quantities.chi_g_q
+   pyrite.materials.quantities.U_g_q
+   pyrite.materials.quantities.absorption_length_q
+   pyrite.materials.quantities.dominant_reflections_q
+   pyrite.materials.quantities.linear_attenuation_q
+   pyrite.materials.quantities.photon_energies_q
    pyrite.materials.MaterialDefinition
    pyrite.materials.build_medium
    pyrite.materials.build_crystal
