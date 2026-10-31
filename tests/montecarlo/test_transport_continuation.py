@@ -258,6 +258,22 @@ def test_staging_bound_is_payload_plus_largest_column():
     assert not retained.on_device and retained.spilled_round == 1
 
 
+@pytest.mark.parametrize(("limit", "budget"), [(0, 900), (500, 270)])
+def test_derived_staging_budget_respects_the_pool_limit(limit, budget):
+    """A pool limit caps staging below driver-free memory, so it spills, not OOMs."""
+    from types import SimpleNamespace
+
+    from pyrite.montecarlo.transport.continuation import staging_budget
+
+    pool = SimpleNamespace(free_bytes=lambda: 200, get_limit=lambda: limit, used_bytes=lambda: 200)
+    runtime = SimpleNamespace(memGetInfo=lambda: (800, 2000))
+    xp = SimpleNamespace(
+        cuda=SimpleNamespace(runtime=runtime), get_default_memory_pool=lambda: pool
+    )
+    # Driver free 800 + cached 200; a 500 B limit with 200 B in use leaves 300.
+    assert staging_budget(xp, TransportContinuationConfig()) == budget
+
+
 @pytest.mark.parametrize("keep", [False, True])
 def test_join_rounds_places_runs_column_by_column(keep):
     from pyrite.montecarlo.transport._continuation_join import join_rounds

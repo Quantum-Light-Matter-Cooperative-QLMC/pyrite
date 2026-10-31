@@ -212,12 +212,16 @@ def resolve_schedule(config, Ne, **support):
 
 
 def _free_device_bytes(xp):
-    """Free device bytes including the memory pool's cache; None off-CUDA."""
+    """Free device bytes including the pool's cache, within its limit; None off-CUDA."""
     cuda = getattr(xp, "cuda", None)
     if cuda is None:
         return None
     free, _total = cuda.runtime.memGetInfo()
-    return int(free) + int(xp.get_default_memory_pool().free_bytes())
+    pool = xp.get_default_memory_pool()
+    free = int(free) + int(pool.free_bytes())
+    limit = int(pool.get_limit())
+    # A pool limit (0 = none) caps allocations below what the driver offers.
+    return free if not limit else min(free, limit - int(pool.used_bytes()))
 
 
 def staging_budget(xp, cont):
@@ -407,7 +411,9 @@ def _reserve(out_bufs, nseg):
         out_bufs[0].reserve(nseg)
 
 
-def _assemble(xp, chunks, rows_total, retained, columns, out_bufs, nseg, staged, keep_on_device):
+def _assemble(
+    xp, chunks, rows_total, retained, columns, out_bufs, nseg, staged, keep_on_device, stats=None
+):
     """Place retained rounds in canonical rows; the joined device rows or None.
 
     Host-retained rounds are run-copied into ``out_bufs``. Staged rounds are
@@ -416,7 +422,7 @@ def _assemble(xp, chunks, rows_total, retained, columns, out_bufs, nseg, staged,
     """
     runs = _canonical_runs(chunks, rows_total)
     if staged and keep_on_device:
-        return join_rounds(xp, runs, retained, columns, nseg)
+        return join_rounds(xp, runs, retained, columns, nseg, None, stats)
     _reserve(out_bufs, nseg)
     if not staged:
         _scatter_host(chunks, rows_total, retained, out_bufs, nseg)
@@ -424,7 +430,7 @@ def _assemble(xp, chunks, rows_total, retained, columns, out_bufs, nseg, staged,
     targets = [
         _host_rows(t, nseg) if a.shape[0] else None for t, a in zip(out_bufs, columns, strict=True)
     ]
-    join_rounds(xp, runs, retained, columns, nseg, targets)
+    join_rounds(xp, runs, retained, columns, nseg, targets, stats)
     return None
 
 
@@ -532,8 +538,18 @@ def _drive_continuation_rounds(
     _nsys_push("pyrite.transport.continuation.assemble")
     on_device = retained.on_device
     retained.close()
+    join_stats = {}
     joined = _assemble(
-        xp, chunks, rows_total, retained.chunks, columns, out_bufs, nseg, on_device, keep_on_device
+        xp,
+        chunks,
+        rows_total,
+        retained.chunks,
+        columns,
+        out_bufs,
+        nseg,
+        on_device,
+        keep_on_device,
+        join_stats,
     )
     _nsys_pop()
     if cont.on_round is not None:
@@ -545,6 +561,8 @@ def _drive_continuation_rounds(
                 "staged": on_device,
                 "staging_budget_bytes": retained.budget,
                 "spilled_round": retained.spilled_round,
+                "staged_peak_bytes": retained.peak_bytes() if on_device else None,
+                "pool_peak_bytes": join_stats.get("pool_peak_bytes"),
             }
         )
     return (nseg, *(tallies[code] for code in _TALLIED), joined, to_host(d_stragg))

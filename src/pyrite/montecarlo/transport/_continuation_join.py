@@ -201,13 +201,15 @@ class _PinnedRing:
         self._drain(1)
 
 
-def join_rounds(xp, runs, retained, columns, nseg, targets=None):
+def join_rounds(xp, runs, retained, columns, nseg, targets=None, stats=None):
     """Join staged ``retained`` rounds into canonical rows, column by column.
 
     ``targets`` None keeps the joined columns on the device and returns them
     (disabled columns pass through as ``columns`` entries); otherwise each
     joined column is written into the matching C-contiguous host ``targets``
     array of ``nseg`` rows and None is returned. ``retained`` is consumed.
+    ``stats`` (diagnostics) receives ``pool_peak_bytes`` on CUDA: the largest
+    memory-pool footprint sampled after each column's join is enqueued.
     """
     table = RunTable(runs)
     if len(retained) != table.rounds:
@@ -226,23 +228,33 @@ def join_rounds(xp, runs, retained, columns, nseg, targets=None):
             _join_host(table, chunks, c, target)
             out[c] = target
         return tuple(out) if targets is None else None
-    return _join_cuda(xp, table, chunks, columns, enabled, nseg, targets)
+    return _join_cuda(xp, table, chunks, columns, enabled, nseg, targets, stats)
 
 
-def _join_cuda(cp, table, chunks, columns, enabled, nseg, targets):
+def _join_cuda(cp, table, chunks, columns, enabled, nseg, targets, stats):
     device_table = table.upload(cp)
     compute = cp.cuda.get_current_stream()
+    pool = cp.get_default_memory_pool()
+    peak = [int(pool.total_bytes())]
+
+    def sample():
+        peak[0] = max(peak[0], int(pool.total_bytes()))
+        if stats is not None:
+            stats["pool_peak_bytes"] = peak[0]
+
     out = list(columns)
     if targets is None:
         for c in enabled:
             out[c] = cp.empty((nseg,) + columns[c].shape[1:], columns[c].dtype)
             _join_device(cp, table, device_table, chunks, c, out[c])
+            sample()
         return tuple(out)
     ring = _PinnedRing(cp, cp.cuda.Stream(non_blocking=True))
 
     def launch(c):
         joined = cp.empty((nseg,) + columns[c].shape[1:], columns[c].dtype)
         _join_device(cp, table, device_table, chunks, c, joined)
+        sample()
         return joined, compute.record()
 
     # Join column i+1 while column i downloads; peak device memory stays the
