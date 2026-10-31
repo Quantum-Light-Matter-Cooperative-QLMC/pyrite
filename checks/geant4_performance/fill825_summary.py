@@ -48,7 +48,7 @@ def main():
     exact = {}
     for r in rows:
         if r["variant"] == "exact":
-            exact.setdefault(r["scene"], set()).add(r["digest"])
+            exact.setdefault((r["scene"], r["histories"]), set()).add(r["digest"])
     print(
         "| scene | schedule | scratch MiB | thr | variant | warm s | transport s | kernel s "
         "| launches | median blocks | regs | blocks/SM | RSS GiB | digest |"
@@ -57,7 +57,11 @@ def main():
     for r in sorted(
         rows, key=lambda r: (r["scene"], r["histories"], r["schedule"], r["scratch"], r["threads"])
     ):
-        flag = " MISMATCH" if r["variant"] == "exact" and len(exact[r["scene"]]) > 1 else ""
+        flag = (
+            " MISMATCH"
+            if r["variant"] == "exact" and len(exact[(r["scene"], r["histories"])]) > 1
+            else ""
+        )
         print(
             f"| {r['scene']} n={r['histories']} | {r['schedule']} | {r['scratch']} | {r['threads']} | {r['variant']} "
             f"| {r['warm']:.2f} | {r['transport']:.2f} | {r['kernel']:.2f} | {r['launches']} "

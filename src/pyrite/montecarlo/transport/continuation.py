@@ -65,12 +65,14 @@ logger = logging.getLogger(__name__)
 # ``PerElectronTransportConfig.schedule`` values (#799). None of them changes
 # results: continuation output is bitwise the full-history output.
 TRANSPORT_SCHEDULES = ("full-history", "continuation", "auto")
-# Below this many histories ``auto`` keeps full-history. At 5000 histories a
-# full-history launch already holds every Si history and continuation's
-# per-round host work made it 12-27% slower end to end, while W and every
-# 20000-history scene gained (#789, equal-precision pilot). Larger populations
-# need several sparse full-history launches, which continuation refills.
-CONTINUATION_AUTO_MIN_HISTORIES = 5000
+# Below this many histories ``auto`` keeps full-history. #789 set 5000 when
+# host-staged rounds made Si 12-27% slower at 5000. With device staging
+# (#842), continuation is faster at every measured size (#825 jobs 2982/2983,
+# 1000-8000 histories, Si 300 keV and W 1 MeV: 1.4-5.3x request time). A
+# full-history batch is sized by the longest track, so long-track scenes
+# launch about 256 histories at a time. 1000 matches the CUDA crossover
+# (``batching.CUDA_TRANSPORT_MIN_ELECTRONS``); smaller passes are unmeasured.
+CONTINUATION_AUTO_MIN_HISTORIES = 1000
 
 
 @dataclass(frozen=True)
