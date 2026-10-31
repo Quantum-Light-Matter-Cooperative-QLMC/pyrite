@@ -197,8 +197,10 @@ def run_case_streamed(
     :func:`streaming_refusal` (``live=True``) raise ``ValueError`` before any
     transport.
     """
+    from ..._backend import BACKEND
     from ..spectrum.cxr._coverage import collect_line_data_coverage
     from . import _transport_case
+    from .oom import _ensure_pool_limit
     from .artifacts import _case_geometry
 
     reason = streaming_refusal(case, live=True)
@@ -214,12 +216,22 @@ def run_case_streamed(
         Ne_brem=case["Ne_brem"],
     )
     scorer = BlockSpectrumScorer(case, inputs)
+    # Same allocator cap as the joined spectrum phase.
+    _ensure_pool_limit()
+
+    def consume(block):
+        scorer.add(block)
+        # Return the finished block's cached device blocks: per-block staging
+        # and scoring sizes vary, so a caching pool would otherwise ratchet
+        # reserved VRAM with the electron count (#611, job 2937).
+        BACKEND.release_memory()
+
     with collect_line_data_coverage() as line_coverage:
         tp = _transport_case(
             case,
             transport_core=transport_core,
             block_electrons=block_electrons,
-            block_consumer=scorer.add,
+            block_consumer=consume,
         )
     counts = tp["segs"]
     return scorer.result(
