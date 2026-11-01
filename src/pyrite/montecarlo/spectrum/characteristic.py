@@ -761,6 +761,53 @@ def _interpolate_shell_cross_sections(
     return xp.stack(columns, axis=1)
 
 
+#: Elements of the (segments, lines) transmission matrix per batched line group.
+_LINE_BATCH_ELEMENTS = 1 << 22
+
+
+def _accumulate_line_yields(
+    table,
+    cxr_work,
+    seg_E,
+    seg_L,
+    path_start,
+    path_end,
+    *,
+    chunk,
+    layered,
+    number_density_ang3,
+):
+    """Segment-summed yield of every characteristic line (#872).
+
+    Lines are scored in groups against each chunk, so one set of array kernels
+    serves many lines instead of one launch set per (chunk, line). Per-element
+    arithmetic is that of the former per-line loop; only the matmul and
+    segment-sum reduction orders regroup (float rounding).
+    """
+    n_lines = len(cxr_work)
+    line_yields = xp.zeros(n_lines, dtype=REAL)
+    response = xp.stack([work[1] for work in cxr_work], axis=1)
+    if layered:
+        mu_by_line = xp.stack([xp.asarray(work[3], dtype=REAL) for work in cxr_work], axis=1)
+    else:
+        mu_by_line = xp.stack([xp.asarray(work[2], dtype=REAL) for work in cxr_work])[None, :]
+    for start in range(0, int(seg_E.size), chunk):
+        sl = slice(start, min(start + chunk, int(seg_E.size)))
+        rows = int(sl.stop - sl.start)
+        shell_sigma_cm2 = _interpolate_shell_cross_sections(table, seg_E[sl])
+        path_cm = number_density_ang3 * 1.0e24 * (seg_L[sl] * 1.0e-8)
+        group = max(1, _LINE_BATCH_ELEMENTS // max(rows, 1))
+        for first in range(0, n_lines, group):
+            lines = slice(first, min(first + group, n_lines))
+            mu = mu_by_line[:, lines]
+            transmission = mean_transmission(path_start[sl] @ mu, path_end[sl] @ mu, xp=xp)
+            effective_line_sigma_cm2 = shell_sigma_cm2 @ response[:, lines]
+            line_yields[lines] += xp.sum(
+                path_cm[:, None] * effective_line_sigma_cm2 * transmission, axis=0
+            )
+    return line_yields
+
+
 def mc_characteristic_spectrum(
     segments,
     E_grid_eV,
@@ -942,20 +989,17 @@ def mc_characteristic_spectrum(
 
         if not cxr_work:
             continue
-        line_yields = xp.zeros(len(cxr_work), dtype=REAL)
-        for start in range(0, int(seg_E.size), chunk):
-            sl = slice(start, min(start + chunk, int(seg_E.size)))
-            shell_sigma_cm2 = _interpolate_shell_cross_sections(table, seg_E[sl])
-            path_cm = seg_L[sl] * 1.0e-8
-            for work_index, (_profile, response, mu, layer_mu) in enumerate(cxr_work):
-                mu_by_layer = xp.asarray([mu] if layers is None else layer_mu, dtype=REAL)
-                transmission = mean_transmission(
-                    path_start[sl] @ mu_by_layer, path_end[sl] @ mu_by_layer, xp=xp
-                )
-                effective_line_sigma_cm2 = shell_sigma_cm2 @ response
-                line_yields[work_index] += xp.sum(
-                    number_density_ang3 * 1.0e24 * path_cm * effective_line_sigma_cm2 * transmission
-                )
+        line_yields = _accumulate_line_yields(
+            table,
+            cxr_work,
+            seg_E,
+            seg_L,
+            path_start,
+            path_end,
+            chunk=chunk,
+            layered=layers is not None,
+            number_density_ang3=number_density_ang3,
+        )
         for (profile, _response, _mu, _layer_mu), line_yield in zip(
             cxr_work,
             line_yields,
