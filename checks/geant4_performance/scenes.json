@@ -33,7 +33,7 @@
       "material": "Si",
       "energy_keV": 300,
       "thickness_um": 100,
-      "block": 18000,
+      "rows_per_history": 1035,
       "max_steps": 20000
     },
     {
@@ -41,7 +41,7 @@
       "material": "W",
       "energy_keV": 300,
       "thickness_um": 10,
-      "block": 10000,
+      "rows_per_history": 1980,
       "max_steps": 25000
     },
     {
@@ -49,7 +49,7 @@
       "material": "Si",
       "energy_keV": 1000,
       "thickness_um": 1000,
-      "block": 2500,
+      "rows_per_history": 7880,
       "max_steps": 100000
     },
     {
@@ -57,7 +57,7 @@
       "material": "W",
       "energy_keV": 1000,
       "thickness_um": 100,
-      "block": 1250,
+      "rows_per_history": 15200,
       "max_steps": 100000
     },
     {
@@ -65,7 +65,7 @@
       "material": "Si",
       "energy_keV": 3000,
       "thickness_um": 1000,
-      "block": 3500,
+      "rows_per_history": 5490,
       "max_steps": 100000
     },
     {
@@ -73,7 +73,7 @@
       "material": "W",
       "energy_keV": 3000,
       "thickness_um": 100,
-      "block": 2400,
+      "rows_per_history": 8320,
       "max_steps": 100000
     }
   ],
@@ -118,6 +118,8 @@
     },
     "min_histories": 2000
   },
-  "block_note": "histories per PyRITE block: about 25-40 M retained rows (pilot 2805), floor 5000 so auto selects continuation",
+  "block_rows": 64000000,
+  "max_block_histories": 20000,
+  "block_note": "histories per PyRITE block = min(max_block_histories, block_rows / rows_per_history), split into near-equal blocks (pyrite_bench.scene_block/balanced_blocks). rows_per_history is the mean from job 3039. block_rows is the retained-row memory bound (device staging, then host RAM); larger blocks fill more continuation lanes and shorten each block's sparse tail. Calibration job 3592 (mixed, t32, Q1024): W 1 MeV transport 63/52/40 ns/row at 1250/2500/5000 histories, W 3 MeV 93/75/68 at 2400/4800/9600; light scenes gain nothing past ~20000 histories, and ~80 M rows (pool ~13 GB) spills to host reassembly at 2.3x transport, so 64 M rows keeps margin. Before 2026-11-01 blocks were fixed at about 20 M rows (1250 histories at W 1 MeV).",
   "max_steps_note": "per-history step limit (exceeding it raises, never truncates or replays); host_pass sizes Ne*max_steps host row buffers, so block*max_steps <= 5e8. Longest pilot-2805 tracks: Si 300 keV 4213, W 300 keV 9874 rows"
 }

@@ -253,6 +253,33 @@ def grid_summary(g, nodes, histories, cone):
     )
 
 
+def scene_block(scene, block_rows, max_block):
+    """Histories per block from a retained-row budget (GPU fill vs memory).
+
+    Larger blocks keep more continuation lanes busy and shorten each block's
+    sparse tail; the retained rows of one block stay on the device (staging)
+    and then in host RAM, so the row budget is the memory bound.
+    """
+    return max(1, min(int(max_block), int(block_rows) // int(scene["rows_per_history"])))
+
+
+def balanced_blocks(histories, block):
+    """``(offset, n)`` for near-equal blocks of at most ``block`` histories.
+
+    Avoids a small trailing block: a short pass underfills the GPU (and, before
+    #889, ``auto`` sent passes under 1000 histories to full-history). Per-
+    electron random streams follow the global electron index, so the split
+    does not change results.
+    """
+    count = -(-int(histories) // int(block))
+    base, extra = divmod(int(histories), count)
+    offset = 0
+    for i in range(count):
+        n = base + (i < extra)
+        yield offset, n
+        offset += n
+
+
 def electron_groups(r, n, max_rows):
     """Split a block's rows into contiguous electron ranges of at most ``max_rows`` rows.
 
@@ -338,12 +365,24 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("scene")
     parser.add_argument("--histories", type=int, required=True)
-    parser.add_argument("--block", type=int, default=0, help="histories per block; 0: scene's")
+    parser.add_argument(
+        "--block",
+        type=int,
+        default=0,
+        help="histories per block; 0: block_rows / the scene's rows_per_history, capped at "
+        "max_block_histories (scenes.json)",
+    )
+    parser.add_argument(
+        "--block-rows", type=int, default=0, help="retained-row budget per block; 0: scenes.json"
+    )
     parser.add_argument("--rows-per-round", type=int, default=256)
     parser.add_argument("--device-staging", action="store_true")
     parser.add_argument("--seed", type=int, required=True)
     parser.add_argument(
-        "--warmup-histories", type=int, default=0, help="cold warmup request size; 0: --histories"
+        "--warmup-histories",
+        type=int,
+        default=0,
+        help="cold warmup request size; 0: --histories, -1: one block",
     )
     parser.add_argument("--max-de-frac", type=float, default=0.05)
     parser.add_argument("--scratch-mib", type=int, default=4096)
@@ -380,8 +419,9 @@ def main():
     parser.add_argument(
         "--transport-precision",
         choices=["fp64", "mixed"],
-        default="fp64",
-        help="exact CUDA kernel precision (#838); mixed is FP32 tables/sampling",
+        default="mixed",
+        help="exact CUDA kernel precision (#838); mixed (the library default since #873) is "
+        "FP32 tables/sampling",
     )
     parser.add_argument(
         "--pool-fraction", type=float, default=0.85, help="CuPy pool limit, fraction of VRAM"
@@ -419,7 +459,8 @@ def main():
     scene = next(s for s in spec["scenes"] if s["id"] == args.scene)
     mat = spec["materials"][scene["material"]]
     bounds = spec["bounds"]
-    args.block = args.block or scene["block"]
+    args.block_rows = args.block_rows or spec["block_rows"]
+    args.block = args.block or scene_block(scene, args.block_rows, spec["max_block_histories"])
     args.max_steps = args.max_steps or scene["max_steps"]
 
     import cupy as cp
@@ -535,8 +576,7 @@ def main():
         t0 = time.perf_counter()
         transport_s = scoring_s = 0.0
         grids = {label: dict(seconds=0.0, density_sum=None, chunks=set()) for label in grid_nodes}
-        for offset in range(0, histories, args.block):
-            n = min(args.block, histories - offset)
+        for offset, n in balanced_blocks(histories, args.block):
             t1 = time.perf_counter()
             r = simulate_trajectories(**kwargs, Ne=n, seed=seed, _electron_start=offset)
             cp.cuda.Device().synchronize()
@@ -595,6 +635,8 @@ def main():
         return scores, wall, transport_s, work
 
     warmup = args.warmup_histories or args.histories
+    if warmup < 0:
+        warmup = min(args.histories, args.block)
     _, cold_s, cold_transport_s, cold_work = request(args.seed + 1_000_000, warmup)
     # Untimed audit request: fail on any PXR/CBS or line-scorer computation.
     calls = set()
@@ -624,7 +666,12 @@ def main():
         profiler.disable()
         args.cprofile.parent.mkdir(parents=True, exist_ok=True)
         profiler.dump_stats(args.cprofile)
-    if work["launches"] and work["launched_rows"] != work["retained_rows"]:
+    # Only continuation rounds report rows; an auto full-history tail pass
+    # (Ne below the continuation minimum) retains rows no round launched.
+    # A replay launches more rows than are retained, so the bound still holds.
+    full_tail = any("full-history" in m for m in work["schedule"])
+    launched, retained = work["launched_rows"], work["retained_rows"]
+    if work["launches"] and (launched > retained or (not full_tail and launched != retained)):
         raise RuntimeError(f"replayed rows detected: {work}")
     args.output.parent.mkdir(parents=True, exist_ok=True)
     npz = args.output.with_suffix(".npz")
@@ -655,6 +702,7 @@ def main():
         histories=args.histories,
         warmup_histories=warmup,
         block=args.block,
+        block_rows=args.block_rows,
         seed=args.seed,
         controls=dict(
             max_dE_frac=args.max_de_frac,
@@ -670,6 +718,7 @@ def main():
             score_rows=args.score_rows,
             kernel=args.kernel,
             transport_precision=args.transport_precision,
+            kernel_threads=config.kernel_threads,
             spectrum_step_eV=args.spectrum_step_ev,
             spectrum_geometric_nodes=args.spectrum_geometric_nodes,
         ),

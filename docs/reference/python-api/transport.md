@@ -108,8 +108,8 @@ for passed component/replay checks and the remaining scope of issue #788.
 
 ## Transport scheduling
 
-The production process defaults to the `auto` transport schedule. Supported
-exact-CUDA passes of at least 1000 histories use bounded continuation with
+The production process defaults to the `auto` transport schedule. Every
+supported exact-CUDA pass, whatever its size, uses bounded continuation with
 256 rows per round. Other passes retain full-history with an INFO-level
 reason. Set `PYRITE_MC_TRANSPORT_SCHEDULE=full-history` before importing
 PyRITE to force the reference schedule; `continuation` forces continuation
