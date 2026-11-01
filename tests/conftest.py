@@ -173,3 +173,13 @@ def lab_catalog(_lab_catalog_dir, monkeypatch):
     monkeypatch.setenv("PYRITE_CATALOG", str(_lab_catalog_dir))
     monkeypatch.setattr(materials, "CATALOG", catalog)
     return catalog
+
+
+@pytest.fixture
+def fp64_transport(monkeypatch):
+    """Pin the exact CUDA kernel to FP64 (#838).
+
+    CPU parity, monolithic-kernel and exact-arithmetic anchors compare against
+    FP64 references bit for bit; the mixed default moves them at rounding scale.
+    """
+    monkeypatch.setenv("PYRITE_MC_TRANSPORT_PRECISION", "fp64")

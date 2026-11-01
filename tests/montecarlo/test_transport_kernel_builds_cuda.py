@@ -77,10 +77,10 @@ def _with_build(run, monkeypatch, build, *args, **kwargs):
     reference = run(*args, **kwargs)
     kernels = {}
 
-    def variant(switches):
-        if switches not in kernels:
-            kernels[switches] = RawModuleKernel(original(switches), build)
-        return kernels[switches]
+    def variant(*key):
+        if key not in kernels:
+            kernels[key] = RawModuleKernel(original(*key), build)
+        return kernels[key]
 
     monkeypatch.setattr(_jit_launch, "transport_kernel_variant", variant)
     candidate = run(*args, **kwargs)

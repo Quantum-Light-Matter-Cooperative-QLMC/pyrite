@@ -7,6 +7,7 @@ from pyrite.montecarlo.transport import TransportLUTConfig, simulate_trajectorie
 
 
 @pytest.mark.hardware
+@pytest.mark.usefixtures("fp64_transport")
 @pytest.mark.parametrize("use_lut", [False, True], ids=["exact", "lut"])
 def test_cuda_sbethe_constant_stopping_reaches_the_cutoff_at_50_angstrom(use_lut):
     cupy = pytest.importorskip("cupy")

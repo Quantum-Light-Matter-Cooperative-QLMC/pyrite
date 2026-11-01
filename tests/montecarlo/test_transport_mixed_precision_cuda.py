@@ -188,13 +188,16 @@ def test_mixed_tracks_fp64_at_rounding_scale(case):
     from tests.montecarlo.test_transport_continuation_cuda import REFERENCE
 
     run, kw = _cases()[case]
-    fp64 = run(REFERENCE, **kw)
+    fp64 = run(REFERENCE, transport_precision="fp64", **kw)
     mixed = run(REFERENCE, transport_precision="mixed", **kw)
     for name in ("L_ang", "E_end_keV"):
         values = _host(mixed[name])
         assert np.isfinite(values).all(), name
-    # The mixed kernel ran: trajectories diverge at rounding scale.
-    assert not np.array_equal(_host(fp64["L_ang"])[:64], _host(mixed["L_ang"])[:64])
+    # The mixed kernel ran: trajectories diverge at rounding scale. Path length
+    # alone can stay bitwise (Mott: FP64 rates and stopping, histories ending
+    # at the cutoff), so look for a difference in any returned array.
+    arrays = [k for k, v in fp64.items() if isinstance(_host(v), np.ndarray)]
+    assert any(not np.array_equal(_host(fp64[k]), _host(mixed[k])) for k in arrays)
     ne = kw.get("Ne", 200)
     for name in ("n_transmitted", "n_backscattered"):
         # A few histories may change outcome; a gross bias would move many.

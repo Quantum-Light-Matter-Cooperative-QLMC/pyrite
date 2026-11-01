@@ -71,10 +71,12 @@ def transport_kernel_variant(switches: TransportKernelSwitches, precision: str =
     globals and FP32 helper twins of :mod:`._jit_precision`; ``"fp64"`` leaves
     the generated source unchanged. It is a separate key, not a switch field:
     switches mirror the case's physics features, while precision is a numerics
-    choice the case carries in its identity because it changes results.
+    choice recorded in run provenance (its model marker enters case identity).
     Transpilation happens on first launch in each process. CuPy's on-disk
     kernel cache keys the NVRTC compile by the generated source, so a later
     process with the same cache directory compiles nothing.
+
+    Validation: gpu-mixed-precision-tables
     """
     constants = {name: np.int32(value) for name, value in switches._asdict().items()}
     variant = types.FunctionType(

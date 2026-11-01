@@ -33,6 +33,7 @@ except Exception:
 pytestmark = [
     pytest.mark.hardware,
     pytest.mark.skipif(not _HAS_CUDA, reason="no CUDA device"),
+    pytest.mark.usefixtures("fp64_transport"),
 ]
 
 HARD = int(SegmentEvent.HARD_INELASTIC)

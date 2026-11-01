@@ -121,6 +121,8 @@ def fp32_twins() -> dict[str, Any]:
     ``np.float64`` constant to ``np.float32``, resolve ``np.float64(...)`` to
     ``np.float32(...)`` and bind the other listed helpers to their twins, so a
     twin never calls an FP64 helper of the set.
+
+    Validation: gpu-mixed-precision-tables
     """
     helpers = _helpers()
     twins: dict[str, Any] = {}
@@ -143,7 +145,11 @@ def fp32_twins() -> dict[str, Any]:
 
 
 def precision_globals(precision: str) -> dict[str, Any]:
-    """Kernel-template globals that select ``precision`` (empty for ``fp64``)."""
+    """Kernel-template globals that select ``precision`` (empty for ``fp64``).
+
+    Validation: gpu-mixed-precision-tables
+    Validation: gpu-mixed-precision-math
+    """
     if precision == "fp64":
         return {}
     if precision != "mixed":

@@ -542,7 +542,7 @@ def test_cuda_elastic_factory_selection_with_cpu_stubs(reference, monkeypatch, m
         pass
 
     def factory(route):
-        def launch(_config=None):
+        def launch(_config=None, _precision="fp64"):
             raise ReachedFactory(route)
 
         return launch

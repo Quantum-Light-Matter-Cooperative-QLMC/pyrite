@@ -48,7 +48,6 @@ class TransportInputs:
     transport_core: Any
     per_electron_config: Any
     keep_segments_on_device: Any
-    transport_precision: Any
     transport_lut_config: Any
     collect_diagnostics: Any
     energy_model: Any
@@ -70,6 +69,7 @@ class TransportInputs:
     pair_production_model: Any
     positron_transport: Any
     atomic_electron_deflection: Any
+    transport_precision: Any
     transport_progress: Any
     _secondary: Any
     _electron_start: Any

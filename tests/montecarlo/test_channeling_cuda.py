@@ -24,7 +24,7 @@ try:
 except Exception:
     HAS_CUDA = False
 
-pytestmark = pytest.mark.slow
+pytestmark = [pytest.mark.slow, pytest.mark.usefixtures("fp64_transport")]
 cuda = pytest.mark.skipif(not HAS_CUDA, reason="no CUDA device")
 
 
@@ -108,9 +108,9 @@ def test_cuda_zone_handoff_matches_cpu_and_preserves_seeded_rows(monkeypatch, el
     )
     original = getattr(_jit_launch, factory_name)
 
-    def factory():
+    def factory(*args):
         calls.append(True)
-        return original()
+        return original(*args)
 
     monkeypatch.setattr(_jit_launch, factory_name, factory)
     gpu = runner._transport_case(case, transport_core="cuda", keep_segments_on_device=True)

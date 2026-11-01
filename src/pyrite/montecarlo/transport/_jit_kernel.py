@@ -263,10 +263,10 @@ def _transport_kernel(
     debit energy without deflection. ``rad_*`` (``_jit_radiative_device``) and
     the two photon row columns are read only then.
 
-    ``cont_on`` selects bounded continuation; ``_jit_launch.run_transport_kernel``
-    documents its slot and state contract.
-
+    ``cont_on`` selects bounded continuation (contract: ``run_transport_kernel``).
     A template, never launched: switches are globals (``_jit_kernel_variants``).
+
+    Validation: gpu-mixed-precision-math
     """
     # The launch indices are uint32, and every other index here is int32. In
     # CUDA mode the transpiler promotes a mixed int32/uint32 expression to
