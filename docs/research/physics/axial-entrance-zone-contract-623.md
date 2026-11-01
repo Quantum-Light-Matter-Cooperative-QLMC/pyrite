@@ -40,6 +40,28 @@ the joint $(x,y,k_x,k_y)$ law using the existing per-incident Philox stream.
 This retains position/momentum correlations; drawing marginals independently
 would not.
 
+Scattering-channel averaging generally produces a mixed outgoing density,
+not a single wavefunction. The research helpers
+`axial_phase_space.density_phase_space_weights` and
+`sample_density_phase_space` accept that density directly in the discrete
+position basis. For a normalized window and $M$ grid sites they evaluate
+
+$$q_{ab}=M^{-1}\langle g_{ab}|\rho_{out}|g_{ab}\rangle,\qquad
+\sum_{ab}q_{ab}=\operatorname{tr}\rho_{out}.$$
+
+The sampler draws position from the window-smoothed density diagonal, then
+momentum from the full localized density, retaining off-diagonal coherence.
+It uses the same incident-addressed generator and two conditional draws;
+no random pure-state decomposition is needed. A supplied coordinate-space
+density must first be multiplied by `grid.cell_area_ang2`; a momentum-space
+gain must first be transformed to the discrete position basis without
+wrapping omitted modes. A gain density per angstrom yields measurement
+weights per angstrom, which still require a physical depth/event law.
+The dense reference refuses inputs exceeding its working-memory budget.
+It does not select the outgoing instrument, resolve periodic images, supply
+stopping/clocks, or connect to native launch/scoring/persistence. Standard
+axial runs remain refused under #624.
+
 For a sampled periodic pixel $(i,j)$ and FFT order $(m,n)$, supplied unwrapped
 transverse origin $(x_0,y_0)$ and carrier $\mathbf{k}_t$,
 

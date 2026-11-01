@@ -990,6 +990,9 @@ There is no standard-run axial integration. Research helpers
 independently anchored finite-grid measurement and two-time correlation algebra,
 with explicit allocation limits; physical escape and a persisted axial photon
 source remain separate unimplemented contracts.
+The phase-space reference accepts both pure states and mixed outgoing densities;
+its mixed-state conditional sampler keeps coherences and incident trace without
+constructing all joint outcomes or drawing a pure-state decomposition.
 `channeling/axial_projection.py` provides the CPU research full/retained
 no-jump matrix-exponential reference with native jump draws and step-resolved
 jump times, used only by the opt-in return-flux comparison. It does not admit

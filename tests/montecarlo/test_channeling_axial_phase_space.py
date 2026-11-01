@@ -135,3 +135,120 @@ def test_invalid_window_and_nonfinite_state():
         phase_space_weights(phi * np.nan, window)
     with pytest.raises(ValueError, match="same nonempty"):
         phase_space_weights(phi, window[:1])
+
+
+def _direct_density_weights(rho, window):
+    """Dense POVM oracle using explicit carrier phases, no FFTs."""
+    x, y = np.indices(window.shape)
+    result = np.empty((*window.shape, *window.shape))
+    for a in np.ndindex(window.shape):
+        shifted = window[(x - a[0]) % window.shape[0], (y - a[1]) % window.shape[1]]
+        for b in np.ndindex(window.shape):
+            mode = (
+                shifted
+                * np.exp(2j * np.pi * (b[0] * x / window.shape[0] + b[1] * y / window.shape[1]))
+            ).ravel()
+            result[(*a, *b)] = np.vdot(mode, rho @ mode).real / window.size
+    return result
+
+
+def test_mixed_density_matches_direct_povm_and_is_linear():
+    from pyrite.montecarlo.channeling.axial_phase_space import density_phase_space_weights
+
+    phi, window = _case()
+    rho = np.outer(phi.ravel(), phi.ravel().conj())
+    diagonal = np.diag(np.linspace(0.01, 0.05, phi.size))
+    mixed = 0.4 * rho + 0.6 * diagonal
+    q = density_phase_space_weights(mixed, window)
+    np.testing.assert_allclose(q, _direct_density_weights(mixed, window), atol=2e-16)
+    np.testing.assert_allclose(
+        q,
+        0.4 * phase_space_weights(phi, window)
+        + 0.6 * density_phase_space_weights(diagonal, window),
+        atol=2e-16,
+    )
+    assert q.sum() == pytest.approx(np.trace(mixed).real, abs=2e-15)
+    assert q.min() >= 0
+    assert np.max(np.abs(q - density_phase_space_weights(np.diag(np.diag(mixed)), window))) > 1e-4
+
+
+def test_mixed_sampler_conditionals_match_direct_joint_at_every_position():
+    from pyrite.montecarlo.channeling.axial_phase_space import sample_density_phase_space
+
+    phi, window = _case()
+    rho = np.outer(phi.ravel(), phi.ravel().conj()) + np.eye(phi.size) * 0.02
+    q = _direct_density_weights(rho, window)
+
+    class Choices:
+        def __init__(self, index):
+            self.index = index
+            self.probabilities = []
+
+        def choice(self, size, p):
+            self.probabilities.append(p)
+            return self.index if len(self.probabilities) == 1 else size - 1
+
+    for index in np.ndindex(phi.shape):
+        choices = Choices(np.ravel_multi_index(index, phi.shape))
+        outcome = sample_density_phase_space(rho, window, choices)
+        assert len(choices.probabilities) == 2
+        np.testing.assert_allclose(choices.probabilities[0], q.sum(axis=(2, 3)).ravel() / q.sum())
+        np.testing.assert_allclose(choices.probabilities[1], q[index].ravel() / q[index].sum())
+        assert outcome.position_index == index
+        assert outcome.momentum_index == (2, 3)
+        assert outcome.state_weight == pytest.approx(np.trace(rho).real)
+
+
+def test_density_delta_identity_zero_limits_and_incident_streams():
+    from pyrite.montecarlo.channeling.axial_phase_space import (
+        density_phase_space_weights,
+        sample_density_phase_space,
+    )
+
+    phi, window = _case()
+    rho = np.outer(phi.ravel(), phi.ravel().conj())
+    delta = np.zeros_like(window)
+    delta[0, 0] = 1
+    q = density_phase_space_weights(rho, delta)
+    np.testing.assert_allclose(q, phase_space_weights(phi, delta), atol=1e-16)
+    np.testing.assert_allclose(density_phase_space_weights(np.eye(phi.size), window), 1 / phi.size)
+    assert density_phase_space_weights(np.zeros_like(rho), window).sum() == 0
+    first = {
+        i: sample_density_phase_space(rho, window, phase_space_stream(623, i)) for i in range(5)
+    }
+    reordered = {
+        i: sample_density_phase_space(rho, window, phase_space_stream(623, i))
+        for i in (4, 2, 0, 3, 1)
+    }
+    assert first == reordered
+
+
+def test_density_refusals_precede_allocations_and_random_draws(monkeypatch):
+    from pyrite.montecarlo.channeling.axial_phase_space import (
+        density_phase_space_weights,
+        sample_density_phase_space,
+    )
+
+    phi, window = _case()
+    rho = np.outer(phi.ravel(), phi.ravel().conj())
+    for bad in (rho[:1], rho * np.nan, rho + 1j * np.eye(phi.size), -np.eye(phi.size)):
+        with pytest.raises(ValueError, match="density"):
+            sample_density_phase_space(bad, window, None)
+    with pytest.raises(ValueError, match="zero-weight"):
+        sample_density_phase_space(np.zeros_like(rho), window, None)
+    with pytest.raises(ValueError, match="unit discrete"):
+        density_phase_space_weights(rho, window * 2)
+    with pytest.raises(ValueError, match="max_outcomes"):
+        density_phase_space_weights(rho, window, max_outcomes=phi.size**2 - 1)
+    for bad in (True, 0, 1.5):
+        with pytest.raises(ValueError, match="max_working_bytes"):
+            sample_density_phase_space(rho, window, None, max_working_bytes=bad)
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("eigensolver must not run before admission")
+
+    monkeypatch.setattr(np.linalg, "eigvalsh", forbidden)
+    with pytest.raises(ValueError, match="working-memory"):
+        density_phase_space_weights(rho, window, max_working_bytes=1)
+    with pytest.raises(ValueError, match="working-memory"):
+        sample_density_phase_space(rho, window, None, max_working_bytes=1)

@@ -5,11 +5,12 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `cr-axial-phase-space-instrument`
 
 - **Claim:** normalized finite-grid Weyl translations of any unit discrete window resolve the identity with factor `1/M`. Applying that positive joint position/momentum measurement to a selected outgoing state preserves its squared norm and position/momentum correlations. Together with complementary orthogonal retained/outgoing projectors the instrument is trace preserving. This is measurement algebra, not a physical escape or native-launch model.
-- **Code:** `montecarlo/channeling/axial_phase_space.py::{phase_space_weights,sample_phase_space}`
+- **Code:** `montecarlo/channeling/axial_phase_space.py::{phase_space_weights,sample_phase_space,density_phase_space_weights,sample_density_phase_space,_density_momentum_weights}`
 - **Source:** finite Weyl orthogonality; continuous coherent-state POVM analogue in Brody, Graefe & Melanathuru, Phys. Rev. Lett. 134, 120201 (2025).
 - **Status:** anchored
 - **Checks:** direct complex-exponential Weyl overlaps on a rectangular grid; complementary-projector mixed-state closure; joint conditional probabilities; delta-window and uniform-wave limits; zero state and recording-budget refusals.
 - **Anchor:** `tests/montecarlo/test_channeling_axial_phase_space.py`
+- **Mixed-density extension (2026-10-26):** fresh-context derivation in the same write-up matches `q_ab = <g_ab|rho|g_ab>/M`, forward-row/inverse-column FFT conventions, incident trace and joint conditional sampling. Direct complex-mode quadratic forms anchor mixed-state linearity and off-diagonal coherence; every-position conditional tests, delta/identity/zero limits and memory refusals pass. This extends the anchored finite measurement algebra only; no outgoing matching, physical handoff or production eligibility is established.
 - **Notes:** Research prerequisite for #620. No physical dechanneling interpretation, frame/energy-shell prescription, stopping or native transport continuation. Phase-space smoothing and return-flux convergence remain required under `cr-axial-zone-handoff-accounting`. **2026-10-21 fresh-context verdict `rederived`** ([write-up](channeling/cr-axial-phase-space-instrument.md)): finite Fourier orthogonality, complex window conjugation, forward FFT sign, mixed-state closure and correlated conditional sampling independently verified before code inspection. All ten independent direct-mode and limiting-case regressions pass. This scoped measurement claim is `anchored`; the physical handoff claim remains unverified. Human sign-off remains in #277.
 
 ## `cr-quantum-regression-correlation`
