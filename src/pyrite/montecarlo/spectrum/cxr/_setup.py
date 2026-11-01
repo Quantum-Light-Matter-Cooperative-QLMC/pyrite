@@ -190,6 +190,61 @@ class _SpectrumSetup:
     capture_transverse_envelope: Any = None
 
 
+def _flight_groups(segments):
+    """Physical-flight group ids of the rows: ``(grouped, gid_all)``.
+
+    Groups are keyed by ``(owner, flight_id)`` value, the owner being the
+    track under secondary transport (#94) and the electron otherwise.
+    ``grouped`` is False when every group is a single row; ``gid_all`` then
+    stays None. A device backend has no grouped reduction (the caller refuses
+    ``grouped``), so it only needs the flag: it is decided on the device by
+    sorting one packed key, instead of downloading both key columns and
+    lexsorting them on the host, which cost ~0.5 s per call at 2e7 rows.
+    Validation: substep-radiation-invariance
+    """
+    track = segments.get("track_id")
+    owner = segments["elec_id"] if track is None else track
+    if getattr(xp, "__name__", "") != "numpy":
+        return _device_rows_share_flight(xp.asarray(segments["flight_id"]), xp.asarray(owner)), None
+    flight_key = _to_cpu(xp.asarray(segments["flight_id"]))
+    electron_key = _to_cpu(xp.asarray(owner))
+    order = np.lexsort((flight_key, electron_key))
+    new_group = np.empty(flight_key.size, dtype=bool)
+    new_group[0] = True
+    new_group[1:] = (flight_key[order][1:] != flight_key[order][:-1]) | (
+        electron_key[order][1:] != electron_key[order][:-1]
+    )
+    # All-singleton groups are the one-row-per-flight case, whose grouped
+    # reduction is algebraically the incoherent one; keep the proven path.
+    if new_group.all():
+        return False, None
+    gid_all = np.empty(flight_key.size, dtype=np.int64)
+    gid_all[order] = np.cumsum(new_group) - 1
+    return True, gid_all
+
+
+def _device_rows_share_flight(flight, owner):
+    """Whether two rows share one ``(owner, flight)`` key, decided on the device.
+
+    Packs both keys into one int64 offset from their minima, sorts it, and
+    compares neighbours: two host scalar readbacks instead of two full-column
+    downloads. Falls back to a stable two-key sort when the packed key would
+    not fit in int64.
+    """
+    flight = flight.astype(np.int64, copy=False)
+    owner = owner.astype(np.int64, copy=False)
+    f_lo, f_hi, o_lo, o_hi = (
+        int(v) for v in _to_cpu(xp.stack([flight.min(), flight.max(), owner.min(), owner.max()]))
+    )
+    span = f_hi - f_lo + 1
+    if (o_hi - o_lo + 1) * span < 2**63:
+        key = xp.sort((owner - o_lo) * span + (flight - f_lo))
+        return bool(_to_cpu(xp.any(key[1:] == key[:-1])))
+    order = xp.lexsort(xp.stack([flight, owner]))
+    flight, owner = flight[order], owner[order]
+    return bool(_to_cpu(xp.any((flight[1:] == flight[:-1]) & (owner[1:] == owner[:-1]))))
+
+
 def _prepare_spectrum(request):
     """Phase 1: validate the request and build every quantity that depends on
     neither the reflection nor the crystallite orientation.
@@ -334,23 +389,7 @@ def _prepare_spectrum(request):
     gid_all = None
     grouped = False
     if not coherent and segments.get("flight_id") is not None and n_rows:
-        flight_key = _to_cpu(xp.asarray(segments["flight_id"]))
-        # A secondary-transport shower shares one electron_id; its flights
-        # belong to separate tracks (#94).
-        track = segments.get("track_id")
-        electron_key = _to_cpu(xp.asarray(segments["elec_id"] if track is None else track))
-        order = np.lexsort((flight_key, electron_key))
-        new_group = np.empty(flight_key.size, dtype=bool)
-        new_group[0] = True
-        new_group[1:] = (flight_key[order][1:] != flight_key[order][:-1]) | (
-            electron_key[order][1:] != electron_key[order][:-1]
-        )
-        # All-singleton groups are the one-row-per-flight case, whose grouped
-        # reduction is algebraically the incoherent one; keep the proven path.
-        grouped = not bool(new_group.all())
-        if grouped:
-            gid_all = np.empty(flight_key.size, dtype=np.int64)
-            gid_all[order] = np.cumsum(new_group) - 1
+        grouped, gid_all = _flight_groups(segments)
     if grouped and getattr(xp, "__name__", "") != "numpy":
         raise ValueError(
             "flight-grouped incoherent CXR is host-only: the segmented complex "

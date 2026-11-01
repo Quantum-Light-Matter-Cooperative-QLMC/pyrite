@@ -15,7 +15,7 @@ import numpy as np
 from ...._backend import REAL, _to_cpu, xp
 from ....materials.crystal import ALPHA_FS, HBARC_EV_ANG, reciprocal_g_vector
 from ..segment_escape import piece_mean_transmission
-from . import _policy
+from . import _fused, _policy
 from ._attribution import record_cxr_attribution
 from ._batched_finalize import _batched_coherent_finalize as _batched_coherent_finalize
 from ._bin_quadrature import run_bin_mean_reduction_kernel, sincsq_bin_lineshape
@@ -400,6 +400,32 @@ def _batched_tables(st):
     )
 
 
+def _line_bracket(omega_res, delta, grad2, cxr_electron, E_tab_g, lo_keep, hi_keep):
+    """Refracted ``|k|``, ``E_res``, the keep mask and the shared bracket.
+
+    Returns ``(k_mag, E_res, keep, idx, frac, log_frac, below, above)``; on
+    CuPy float32 one launch replays the chain bit for bit (#906).
+    """
+    fused = _fused.line_bracket(
+        omega_res,
+        delta,
+        grad2,
+        cxr_electron,
+        E_tab_g,
+        hbarc=HBARC_EV_ANG,
+        lo_keep=lo_keep,
+        hi_keep=hi_keep,
+    )
+    if fused is not None:
+        return fused
+    k_mag = omega_res * xp.sqrt(xp.where(grad2 == 0.0, 1.0, 1.0 - 2.0 * delta + delta**2 * grad2))
+    E_res = HBARC_EV_ANG * omega_res
+    keep = cxr_electron & (E_res > lo_keep) & (E_res > 10.0) & (E_res < hi_keep)
+    idx, frac, below, above = _interp_index(E_res, E_tab_g)
+    log_frac = _log_interp_fraction(E_res, E_tab_g, idx)
+    return k_mag, E_res, keep, idx, frac, log_frac, below, above
+
+
 def _batched_block(st, bt, sb):
     """Solve each piece/reflection's Snell root and gather frozen couplings."""
     cxr_electron = st.cxr_electron
@@ -425,6 +451,8 @@ def _batched_block(st, bt, sb):
     vx = v_all[sb, 0][:, None]  # (nb, 1)F
     vy = v_all[sb, 1][:, None]
     vz = v_all[sb, 2][:, None]
+    # |grad L|^2 per row; the same reduction feeds the Snell guard and |k|.
+    grad2 = (st.escape_gradient[sb] ** 2).sum(axis=1)[:, None]
     # Refraction makes the denominator and k.g piece/reflection dependent.
     denom, delta = _in_medium_kinematics(
         st.denom_all[sb][:, None],
@@ -432,7 +460,7 @@ def _batched_block(st, bt, sb):
         delta_tab_g,
         E_tab_g,
         (v_all[sb] * st.escape_gradient[sb]).sum(axis=1)[:, None],
-        (st.escape_gradient[sb] ** 2).sum(axis=1)[:, None],
+        grad2,
     )
     grad = st.escape_gradient[sb]
     grad_dot_g = grad[:, 0, None] * gx + grad[:, 1, None] * gy + grad[:, 2, None] * gz
@@ -448,20 +476,13 @@ def _batched_block(st, bt, sb):
         vx, vy, vz, gx, gy, gz, denom, g2, n_dot_g_blk
     )
     vdg = v_dot_g
-    grad2 = (grad**2).sum(axis=1)[:, None]
-    k_mag = omega_res * xp.sqrt(xp.where(grad2 == 0.0, 1.0, 1.0 - 2.0 * delta + delta**2 * grad2))
-    E_res = HBARC_EV_ANG * omega_res
-
-    cxr_electron_block = cxr_electron[sb][:, None]
-
-    keep = cxr_electron_block & (E_res > lo_keep) & (E_res > 10.0) & (E_res < hi_keep)
-
     # -- 3. couplings at each resonance energy (shared interp index) -----
     # chi/U real+imag all sample the SAME E_res on the SAME E_tab_g grid,
     # so bracket ONCE (_interp_index) and gather per table -- kills the
     # fourfold-redundant searchsorted/clip. Bit-for-bit vs _batch_interp.
-    _ix, _fr, _blw, _abv = _interp_index(E_res, E_tab_g)
-    _log_fr = _log_interp_fraction(E_res, E_tab_g, _ix)
+    k_mag, E_res, keep, _ix, _fr, _log_fr, _blw, _abv = _line_bracket(
+        omega_res, delta, grad2, cxr_electron[sb][:, None], E_tab_g, lo_keep, hi_keep
+    )
     chi_re, chi_im, u_re, u_im, mu = _interp_gather_cxr_tables(
         _ix,
         _fr,
@@ -620,6 +641,104 @@ def _batched_coherent_block(st, bt, blk, coh_blocks, coh_counts):
     coh_counts.append(good.sum(axis=0))  # (N_g,), still on device
 
 
+def _polarization_terms(st, blk, ex, ey, ez):
+    """``(v.e, k_eff.e)`` over the block for one polarization ``e``.
+
+    External e is transverse to n_hat, not to the refracted k_eff; the
+    Maxwell inverse numerator uses (k+g).e, including k_eff.e.
+    """
+    grad = st.escape_gradient[blk.sb]
+    g0, g1, g2 = grad[:, 0, None], grad[:, 1, None], grad[:, 2, None]
+    vx, vy, vz, omega_res, delta = blk.vx, blk.vy, blk.vz, blk.omega_res, blk.delta
+    fused = _fused.polarization_terms(vx, vy, vz, ex, ey, ez, g0, g1, g2, omega_res, delta)
+    if fused is not None:
+        return fused
+    v_dot_e = vx * ex + vy * ey + vz * ez  # (nb, N_g)
+    return v_dot_e, omega_res * delta * (g0 * ex + g1 * ey + g2 * ez)
+
+
+def _escape_weights(st, blk, A2, WM):
+    """Steps 6+7: ``(T_abs, pref, a_width, weight, good)`` for the block.
+
+    mu(E_res) reuses the step-3 interp bracket (no fresh searchsorted).
+    T_abs is the segment mean of exp(-L_esc(s) mu) over the linear escape
+    pieces, not its midpoint value: exact integrated line yield, sinc^2
+    shape kept (issue #181). Validation: segment-escape-average
+    """
+    frac, path_start, path_end = (a[blk.sb] for a in st.escape_pieces)
+    piece_fraction = st.piece_fraction[blk.sb][:, None]
+    T_abs = _fused.piece_transmission(frac, path_start, path_end, blk.mu, piece_fraction)
+    if T_abs is None:
+        T_abs = piece_mean_transmission(frac, path_start, path_end, blk.mu[..., None], xp=xp)
+        T_abs *= piece_fraction
+    denom, t_L, keep = blk.denom, blk.t_L, blk.keep
+    pref = _cxr_weight_core(blk.omega_res, t_L, T_abs, ALPHA_FS, _PREF_C1)
+    fused = _fused.line_weights(denom, t_L, pref, A2, WM, keep, two_hbarc=2.0 * HBARC_EV_ANG)
+    if fused is not None:
+        return (T_abs, pref, *fused)
+    a_width = denom * t_L / (2.0 * HBARC_EV_ANG) * xp.ones_like(blk.omega_res)
+    weight = pref * A2 * WM
+    return T_abs, pref, a_width, weight, keep & xp.isfinite(weight) & (weight > 0)
+
+
+def _launch_rows(bt, cxr_batch, coherent, audit):
+    """Segment rows per launch of the incoherent fused-reduction path.
+
+    ``bt.seg_block`` rows are the reduction unit: the line batch is cut at
+    unit boundaries, which fixes the order of every float sum in the spectrum.
+    The per-unit work is elementwise, so one launch over several whole units
+    gives every pair the same value bit for bit, and
+    :func:`_reduction_unit_cuts` restores the unit boundaries for the batch.
+    Each CuPy call costs ~10 us of host time over ~200 calls per launch, so
+    on a fast GPU the unit-sized launches were host-bound (#906). The group
+    takes at most ``_JIT_CXR_LAUNCH_HEADROOM_SHARE`` of the device headroom
+    left after setup, so it cannot push a case into the out-of-memory retry
+    that re-blocks electrons. Line attribution ranks per launch, so it and
+    every other route keep unit-sized launches.
+    """
+    if cxr_batch is None or coherent or (audit is not None and "attribute" in audit):
+        return bt.seg_block
+    from ...runner.electron_blocks import device_headroom_bytes
+
+    unit_pairs = bt.seg_block * bt.N_g
+    budget = (device_headroom_bytes() or 0) * _policy._JIT_CXR_LAUNCH_HEADROOM_SHARE
+    units = min(
+        budget // (unit_pairs * _policy._JIT_CXR_LAUNCH_BYTES_PER_PAIR),
+        _policy._JIT_CXR_LAUNCH_PAIR_TARGET // unit_pairs,
+    )
+    return bt.seg_block * max(1, int(units))
+
+
+def _reduction_unit_cuts(bt, blk, gm_idx):
+    """``(start, stop)`` survivor ranges of each reduction unit in ``blk``.
+
+    ``gm_idx`` indexes the block's row-major ``(rows, N_g)`` pairs in ascending
+    order, so unit ``u`` owns the survivors below ``(u + 1) * seg_block * N_g``;
+    one small readback locates every boundary. Empty units are dropped, as the
+    unit-sized loop skipped them.
+    """
+    n_rows = blk.sb.stop - blk.sb.start
+    cuts = [0, int(gm_idx.size)]
+    if n_rows > bt.seg_block:
+        edges = xp.arange(bt.seg_block, n_rows, bt.seg_block, dtype=gm_idx.dtype) * bt.N_g
+        cuts[1:1] = (int(c) for c in _to_cpu(xp.searchsorted(gm_idx, edges)))
+    return [(lo, hi) for lo, hi in zip(cuts[:-1], cuts[1:], strict=True) if hi > lo]
+
+
+def _queue_unit_lines(audit, cxr_batch, bt, blk, gm_idx, lines, electron):
+    """Audit and queue a launch group's surviving ``lines`` unit by unit.
+
+    A launch group spans whole reduction units; handing each unit's lines on
+    separately gives the audit and the batch the unit-sized sequence.
+    """
+    for lo, hi in _reduction_unit_cuts(bt, blk, gm_idx):
+        unit = slice(lo, hi)
+        E_r, aw, w = (a[unit] for a in lines)
+        _accumulate_edge_truncation(audit, E_r, aw, w, None if electron is None else electron[unit])
+        if audit is None or "collect" not in audit:
+            cxr_batch.append(E_r, aw, w)
+
+
 def _batched_incoherent_block(st, bt, blk, cxr_batch):
     """Steps 5, 6 and 7: ``|A|^2`` over both polarizations, the fused
     Beer-Lambert prefactor, and the surviving lines' contribution to the
@@ -647,12 +766,7 @@ def _batched_incoherent_block(st, bt, blk, cxr_batch):
     WM = bt.WM
     G_DOT_ES = bt.G_DOT_ES
     G_DOT_EP = bt.G_DOT_EP
-    vx = blk.vx
-    vy = blk.vy
-    vz = blk.vz
-    denom = blk.denom
     gamma = blk.gamma
-    t_L = blk.t_L
     omega_res = blk.omega_res
     detuning = blk.detuning
     k_dot_g = blk.k_dot_g
@@ -661,12 +775,10 @@ def _batched_incoherent_block(st, bt, blk, cxr_batch):
     vdg = blk.vdg
     k_mag = blk.k_mag
     E_res = blk.E_res
-    keep = blk.keep
     chi_re = blk.chi_re
     chi_im = blk.chi_im
     u_re = blk.u_re
     u_im = blk.u_im
-    mu = blk.mu
 
     # -- 5. |A|^2 summed over both polarizations ------------------------
     A2 = xp.zeros_like(omega_res)
@@ -674,16 +786,7 @@ def _batched_incoherent_block(st, bt, blk, cxr_batch):
     A2_cbs = xp.zeros_like(omega_res)
     for E_pol, g_dot_e in ((ES, G_DOT_ES[None, :]), (EP, G_DOT_EP[None, :])):
         ex, ey, ez = E_pol[:, 0][None, :], E_pol[:, 1][None, :], E_pol[:, 2][None, :]
-        v_dot_e = vx * ex + vy * ey + vz * ez  # (nb, N_g)
-        grad = st.escape_gradient[blk.sb]
-        # External e is transverse to n_hat, not to the refracted k_eff.
-        # Maxwell inverse numerator uses (k+g).e, including k_eff.e.
-        delta = blk.delta
-        k_dot_e = (
-            omega_res
-            * delta
-            * (grad[:, 0, None] * ex + grad[:, 1, None] * ey + grad[:, 2, None] * ez)
-        )
+        v_dot_e, k_dot_e = _polarization_terms(st, blk, ex, ey, ez)
         a2, a2p, a2c = _cxr_amp_sq_core(
             chi_re,
             chi_im,
@@ -705,17 +808,7 @@ def _batched_incoherent_block(st, bt, blk, cxr_batch):
         A2_cbs = A2_cbs + a2c
 
     # -- 6+7. Beer-Lambert escape factor + weights (fused prefactor) -----
-    # mu(E_res) reuses the step-3 interp bracket (no fresh searchsorted).
-    # T_abs is the segment mean of exp(-L_esc(s) mu) over the linear escape
-    # pieces, not its midpoint value: exact integrated line yield, sinc^2
-    # shape kept (issue #181). Validation: segment-escape-average
-    frac, path_start, path_end = (a[blk.sb] for a in st.escape_pieces)
-    T_abs = piece_mean_transmission(frac, path_start, path_end, mu[..., None], xp=xp)
-    T_abs *= st.piece_fraction[blk.sb][:, None]
-    pref = _cxr_weight_core(omega_res, t_L, T_abs, ALPHA_FS, _PREF_C1)
-    a_width = denom * t_L / (2.0 * HBARC_EV_ANG) * xp.ones_like(omega_res)
-    weight = pref * A2 * WM
-    good = keep & xp.isfinite(weight) & (weight > 0)
+    T_abs, pref, a_width, weight, good = _escape_weights(st, blk, A2, WM)
     # Resolve the mask once. CuPy otherwise performs one blocking
     # survivor-count readback for ``any`` and one for every boolean
     # gather below. Integer gathers preserve the same flattened order.
@@ -725,8 +818,9 @@ def _batched_incoherent_block(st, bt, blk, cxr_batch):
     E_r_f = E_res.reshape(-1)[gm_idx]
     aw_f = a_width.reshape(-1)[gm_idx]
     w_f = weight.reshape(-1)[gm_idx]
+    audit = req.truncation_audit
     record_cxr_attribution(
-        req.truncation_audit,
+        audit,
         st,
         bt,
         blk,
@@ -736,40 +830,39 @@ def _batched_incoherent_block(st, bt, blk, cxr_batch):
         w_f,
         {"T_abs": T_abs, "A2": A2, "A2_pxr": A2_pxr, "A2_cbs": A2_cbs},
     )
-    _accumulate_edge_truncation(
-        req.truncation_audit, E_r_f, aw_f, w_f, st.seg_elec_id[blk.sb][gm_idx // bt.N_g]
-    )
-    if req.truncation_audit is not None and "collect" in req.truncation_audit:
+    electron = None if audit is None else st.seg_elec_id[blk.sb][gm_idx // bt.N_g]
+    if cxr_batch is not None:
+        _queue_unit_lines(audit, cxr_batch, bt, blk, gm_idx, (E_r_f, aw_f, w_f), electron)
+        return
+    _accumulate_edge_truncation(audit, E_r_f, aw_f, w_f, electron)
+    if audit is not None and "collect" in audit:
         return
 
     _nsys_push("pyrite.lines.accum")
 
-    if cxr_batch is not None:
-        cxr_batch.append(E_r_f, aw_f, w_f)
-    else:
-        # Existing accumulation retained as the CPU / compatibility fallback.
-        targets = [(weight, spec)]
-        if components:
-            targets.append((pref * A2_pxr * WM, spec_pxr))
-            targets.append((pref * A2_cbs * WM, spec_cbs))
-        if st.bin_edges is None and _numpy_backend():
-            accumulate_sincsq(
-                E_r_f,
-                aw_f,
-                [w.reshape(-1)[gm_idx] for w, _ in targets],
-                E_grid,
-                [tgt for _, tgt in targets],
-            )
-            targets = []
-        for w, tgt in targets:
-            w_f = w.reshape(-1)[gm_idx]
-            for j0 in range(0, E_r_f.size, chunk):
-                sl2 = slice(j0, min(j0 + chunk, E_r_f.size))
-                if st.bin_edges is not None:  # Validation: sinc-bin-integration
-                    S = sincsq_bin_lineshape(aw_f[sl2], E_r_f[sl2], st.bin_edges, st.bin_inv_width)
-                else:
-                    S = _sincsq_lineshape(aw_f[sl2][:, None], E_grid[None, :], E_r_f[sl2][:, None])
-                tgt += w_f[sl2] @ S
+    # Existing accumulation retained as the CPU / compatibility fallback.
+    targets = [(weight, spec)]
+    if components:
+        targets.append((pref * A2_pxr * WM, spec_pxr))
+        targets.append((pref * A2_cbs * WM, spec_cbs))
+    if st.bin_edges is None and _numpy_backend():
+        accumulate_sincsq(
+            E_r_f,
+            aw_f,
+            [w.reshape(-1)[gm_idx] for w, _ in targets],
+            E_grid,
+            [tgt for _, tgt in targets],
+        )
+        targets = []
+    for w, tgt in targets:
+        w_f = w.reshape(-1)[gm_idx]
+        for j0 in range(0, E_r_f.size, chunk):
+            sl2 = slice(j0, min(j0 + chunk, E_r_f.size))
+            if st.bin_edges is not None:  # Validation: sinc-bin-integration
+                S = sincsq_bin_lineshape(aw_f[sl2], E_r_f[sl2], st.bin_edges, st.bin_inv_width)
+            else:
+                S = _sincsq_lineshape(aw_f[sl2][:, None], E_grid[None, :], E_r_f[sl2][:, None])
+            tgt += w_f[sl2] @ S
     _nsys_pop()
 
 
@@ -829,7 +922,6 @@ def _accumulate_batched(st):
     gamma_full = bt.gamma_full
     t_L_full = bt.t_L_full
     n_seg = bt.n_seg
-    seg_block = bt.seg_block
     G = bt.G
     ES = bt.ES
     EP = bt.EP
@@ -1035,8 +1127,9 @@ def _accumulate_batched(st):
         _CxrBatch(spec, E_grid, st.bin_edges, st.bin_inv_width) if _use_jit_cxr_reduction else None
     )
 
-    for s0 in range(0, n_seg, seg_block):
-        sb = slice(s0, min(s0 + seg_block, n_seg))
+    step = _launch_rows(bt, cxr_batch, coherent, req.truncation_audit)
+    for s0 in range(0, n_seg, step):
+        sb = slice(s0, min(s0 + step, n_seg))
 
         if _use_jit_coherent_stream:
             if any(plane.size for plane in coherent_fields):  # no energies: nothing to stream
