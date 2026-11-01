@@ -163,7 +163,7 @@ The payload is 82 bytes per recorded segment — 0.46 GB for hopg, 1.15 GB for M
 
 ## Occupancy and divergence
 
-`ncu` could not be used — GPU performance counters are admin-only on the box (`ERR_NVGPUCTRPERM`) and there is no passwordless sudo. Both quantities were obtained without counters instead.
+`ncu` could not be used at the time — GPU performance counters were admin-only on the box (`ERR_NVGPUCTRPERM`). Both quantities were obtained without counters instead. Counter access has since been granted (2026-11-01), so the counter-free inferences on this page (here, #796 and #831) can now be checked with Nsight Compute; see #821's follow-ups.
 
 Occupancy comes from the CUDA occupancy API against the compiled module. The kernel uses **92 registers per thread** and 40 B of local memory, so it is register-limited to 640 of the 1536 threads an SM can hold — **41.7% theoretical occupancy**, flat for `nthreads` ≤ 128 and falling to 33.3% above it. Wall time tracks that exactly (MoSe2, medians: 1.08 s at 64, 1.12 s at 128, 1.27 s at 256, 1.64 s at 512), so the default of 128 looked optimal. #875 later re-timed it on the FP64 and mixed kernels and moved the default to 32 (see below).
 
@@ -312,7 +312,7 @@ The table gives the speedup over `jit` as the median [min, max] of the per-seed 
 | Si 3 MeV | full-history | 4.506 | 1.00 [0.99, 1.00] | 1.00 [1.00, 1.00] | 1.00 [0.99, 1.00] | 0.98 [0.98, 0.98] | 0.95 [0.95, 0.96] |
 | Si 3 MeV | continuation | 1.432 | 1.00 [0.94, 1.00] | 0.95 [0.94, 1.00] | 0.95 [0.94, 1.00] | 0.98 [0.98, 0.99] | 0.96 [0.91, 0.97] |
 
-The full-history rows, which are the steadier ones, put `ro`, `r168` and `ro+r168` within 1% of `jit`. Every cap at 128 registers or below is 2–5% slower, and `ro+r128` (not shown) tracks `r128`. The continuation rows spread by about ±5%, and none is a resolved gain. Raising theoretical occupancy from 16.7% to 41.7% bought nothing. Neither did turning almost every table load into a non-coherent cached load. The kernel is therefore not limited by resident warps or by its load path at these launch sizes. The FP64 pipe (FP32:FP64 = 64 on this device) and the long dependent chains per step are the remaining suspects. Without counters this cannot be confirmed. Nsight Compute is still refused (`ERR_NVGPUCTRPERM`, job 2855), so no achieved-occupancy or stall claim is made.
+The full-history rows, which are the steadier ones, put `ro`, `r168` and `ro+r168` within 1% of `jit`. Every cap at 128 registers or below is 2–5% slower, and `ro+r128` (not shown) tracks `r128`. The continuation rows spread by about ±5%, and none is a resolved gain. Raising theoretical occupancy from 16.7% to 41.7% bought nothing. Neither did turning almost every table load into a non-coherent cached load. The kernel is therefore not limited by resident warps or by its load path at these launch sizes. The FP64 pipe (FP32:FP64 = 64 on this device) and the long dependent chains per step are the remaining suspects. Without counters this could not be confirmed: Nsight Compute was refused then (`ERR_NVGPUCTRPERM`, job 2855), so no achieved-occupancy or stall claim is made. Counters are available since 2026-11-01.
 
 **Exactness.** Results by build:
 
@@ -348,7 +348,7 @@ Speedups over `exact` are the median [min, max] of the per-seed ratios. "Kernel"
 
 Kernel time per retained row matches the kernel column to within 0.01. In job 2863 (full-history, 2000 histories) the 300 keV kernel gains were larger: `fp32` 3.28–3.32×, `mixed` 1.53–1.54× and `mixed_math` 1.89×.
 
-**Resources.** `fp32` uses 106–112 registers (4 blocks of 128 per SM) and 32 B of stack. `mixed` uses 140–164 registers and `mixed_math` 140–162 (3 blocks per SM), against 186–204 (2 blocks) for `exact`. This means the variants also raise occupancy. #796 showed that occupancy alone buys this kernel nothing: a 168-register cap was within 1% and caps of 128 registers or below were slower. So the gain is attributed to the FP32 arithmetic and transcendental pipes, not to residency. That attribution is still an inference, because Nsight Compute is refused on the host.
+**Resources.** `fp32` uses 106–112 registers (4 blocks of 128 per SM) and 32 B of stack. `mixed` uses 140–164 registers and `mixed_math` 140–162 (3 blocks per SM), against 186–204 (2 blocks) for `exact`. This means the variants also raise occupancy. #796 showed that occupancy alone buys this kernel nothing: a 168-register cap was within 1% and caps of 128 registers or below were slower. So the gain is attributed to the FP32 arithmetic and transcendental pipes, not to residency. That attribution is an inference: Nsight Compute was refused on the host when it was measured (counters are available since 2026-11-01).
 
 **Deviation preview.** This compares paired per-primary observables of the #821 harness against `exact` at the same seed, pooled over three seeds. It previews what the #510 gates would face and is not a validation.
 
