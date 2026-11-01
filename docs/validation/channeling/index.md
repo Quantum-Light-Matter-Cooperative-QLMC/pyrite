@@ -44,6 +44,7 @@ cr-entry-state-projection
 cr-axial-2d-eigenproblem
 cr-axial-zone-handoff-accounting
 cr-axial-phase-space-instrument
+cr-axial-absorbing-jump-instrument
 cr-quantum-regression-correlation
 cr-axial-qrt-source-normalization
 cr-axial-cuda-backend

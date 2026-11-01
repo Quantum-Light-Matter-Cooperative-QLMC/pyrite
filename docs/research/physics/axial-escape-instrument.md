@@ -864,6 +864,51 @@ Evidence: {download}`summary <../../validation/check-records/axial-zone/matching
 Scheduler runtimes were 6 min 40 s (16 CPUs), 13 min 17 s (8 CPUs) and
 2 min 6 s (12 CPUs).
 
+## Material TDS jump maps for the absorbing instrument
+
+`checks/axial_outgoing_maps.py` turns the Kraus factorization of
+{eq}`eq-axial-coherent-transfer-covariance` into the inputs of
+`axial_jump_instrument.absorbing_axial_model` for a complete Bloch eigenbasis
+on a rectangular order window $R$ and an energy cut $P$ (so $[H,P]=0$):
+$A_j=PL_jP$, $B_j=(R-P)L_jP$ mapped to the window's discrete position basis,
+and $E_O=P(\Gamma-\sum_jL_j^\dagger RL_j)P$. Here $\Gamma$ is the lattice-sum
+loss of the same periodic finite-transfer model, so
+$E_O=\sum_jPL_j^\dagger(1-R)L_jP\ge0$ up to the order tail and Kraus rank
+truncation; the builder reports its smallest eigenvalue and refuses a
+materially negative one. These are differential maps from the material
+covariance, not a relabelled grid sink.
+
+Focused tests check the operator closure
+$\sum A^\dagger A+\sum B^\dagger B+E_O=P\Gamma P$, agreement of the diagonal
+with the Pauli rate matrix of `periodic_tds_rates`, and, as an independent
+off-diagonal oracle, equality of $\sum_jB_j\rho B_j^\dagger$ with the
+literal-sum `coherent_tds_gain` of a mixed retained state projected on
+$R-P$, plus zero-rate limits and refusals.
+
+Bounded example (Si [001], 5 MeV, one cell, Γ point, TDS only, orders
+$|n|\le4$, cut 29.39 eV, 24 retained states, 183 Kraus jumps, entrance
+weight 0.99999; 34 s, 0.5 GB RSS):
+
+| Depth (Å) | Retained | Represented outgoing | Unresolved |
+| ---: | ---: | ---: | ---: |
+| 1,000 | 0.8716 | 0.0214 | 0.1071 |
+| 10,000 | 0.3952 | 0.1057 | 0.4991 |
+| 30,000 | 0.0945 | 0.1637 | 0.7418 |
+
+Closure defects are below $1.5\times10^{-14}$ and the smallest unresolved
+eigenvalue is $+1.2\times10^{-11}$ Å$^{-1}$. The unresolved column is
+dominated by transfers leaving the $9\times9$ window. It is window
+accounting, not a physical escape fraction. A sampled event returns a
+correlated depth/position/momentum index on that window.
+
+**Scaling limit.** The dense instrument costs $(2n^2)^2$. The provisional
+~95 eV rule retains 77 Γ-point states in one cell (about 2 GiB per dense
+matrix, more for supercells and Bloch sampling), so the dense form is a
+small-$n$ oracle only. Material-scale use needs the trajectory unraveling:
+apply $B_j$ to the MCWF state at an outgoing jump and measure that state,
+which `run_spectral_mcwf` can host. Electronic jumps, continuum (rather than
+lattice) transfers and the physical matching remain open.
+
 ## Matching prescription still to establish
 
 **Provisional numerical matching rule (research, from 1651–1656).** At each

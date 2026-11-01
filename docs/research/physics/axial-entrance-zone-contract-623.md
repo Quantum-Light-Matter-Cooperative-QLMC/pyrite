@@ -84,6 +84,74 @@ actual surface must come from an independently validated propagation; neither
 is guessed from depth here. No `LaunchState` conversion is provided, because
 nothing here establishes that the outgoing state was selected physically.
 
+## Depth-resolved supplied jump instrument
+
+`axial_jump_instrument.absorbing_axial_model` is a bounded CPU reference for
+a **supplied**, constant finite absorbing model. It accepts a retained
+Hamiltonian $H$, retained recycling jumps $A_a$, represented outgoing jumps
+$B_b$, and a positive unresolved effect $E_O$. The outgoing jump rows must
+already use the C-order discrete position basis of the chosen measurement
+grid. These differential maps contain information absent from a total loss
+effect; they cannot be reconstructed by relabelling the production grid sink.
+
+The retained generator uses the loss from those same maps:
+
+$$
+\Gamma=\sum_a A_a^\dagger A_a+\sum_b B_b^\dagger B_b+E_O,
+\qquad
+\partial_z\rho=-\frac{i}{\hbar v}[H,\rho]
++\sum_a A_a\rho A_a^\dagger-\frac12\{\Gamma,\rho\}.
+$$
+
+`model.at_depth(z)` computes retained density, instantaneous outgoing gain
+$\sigma_F(z)=\sum_b B_b\rho(z)B_b^\dagger$, integrated outgoing density
+$Q_F(z)=\int_0^z\sigma_F(s)ds$, and integrated unresolved weight
+$U_O(z)=\int_0^z\operatorname{tr}[E_O\rho(s)]ds$. An augmented matrix
+exponential propagates $\rho(z)$ together with the occupation integral
+$X(z)=\int_0^z\rho(s)ds$, without depth quadrature or an inverse of the
+possibly singular retained generator; then $Q_F=\sum_b B_bXB_b^\dagger$ and
+$U_O=\operatorname{tr}(E_OX)$. Dense work therefore scales with the retained
+dimension $n$ as $(2n^2)^2$, not with the outgoing grid size $m$; only the
+returned $m\times m$ snapshots grow with $m$. The occupation block is scaled
+by $\kappa=\lVert\Gamma\rVert_2$ so its absolute exponential error does not
+grow with depth for weak losses. Densities are Hermitized, and eigenvalues
+within the propagator error bound $\sim64\,\epsilon\,n
+(1+\lVert\mathcal L\rVert_1 z)$ times the incident weight are clipped to
+zero; larger negative eigenvalues refuse. Without this, physical phases
+$\lVert H\rVert z/\hbar v\sim10^4$ made the sampler refuse on roundoff. It preserves
+$\operatorname{tr}\rho(z)+\operatorname{tr}Q_F(z)+U_O(z)
+=\operatorname{tr}\rho(0)$, including a subunit entrance weight.
+Retained recycling is retained gain, never an outgoing tally.
+
+`sample_absorbing_outgoing(model, window, max_depth_ang, rng)` conditions on
+an outgoing event within the depth window. It samples depth from the
+cumulative outgoing trace and then measures the **instantaneous** mixed gain
+at that depth. The correlated law is
+
+$$
+\Pr(dz,a,b\mid F\text{ by }Z)
+=\frac{M^{-1}\langle g_{ab}|\sigma_F(z)|g_{ab}\rangle}
+{\operatorname{tr}Q_F(Z)}\,dz.
+$$
+
+Sampling depth independently of the integrated outgoing density would lose
+correlations. One depth draw and two conditional phase-space draws use the
+caller-retained incident-addressed `phase_space_stream(seed, incident_id)`.
+The returned `outgoing_weight` is the dimensionless incident weight in the
+depth window; `rate_inv_ang` is the local outgoing rate, not another event
+weight. A zero outgoing weight refuses before any draw. The absolute root
+tolerance requires convergence for rapidly varying models. A local rate below
+$10^{-10}$ of the window-mean rate at the sampled root refuses rather than
+measuring propagator noise. Dense memory,
+nonpositive inputs and nonfinite assembled operators are refused.
+
+The [independent finite-model derivation](../../validation/channeling/cr-axial-absorbing-jump-instrument.md)
+and analytic/ODE regressions validate this specified absorbing algebra. They
+do not establish the material jump maps, completeness of the unresolved
+effect, a physical retained surface, omitted-return bounds, stopping energy,
+clock continuity or periodic-image choice. No native launch, photon scoring
+or #624 production admission is provided.
+
 ## Incident-normalized photons and radiation ownership
 
 `axial_source_assembly.integrate_incident_axial_source` accepts a *supplied*
