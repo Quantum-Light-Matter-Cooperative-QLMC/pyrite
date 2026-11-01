@@ -87,12 +87,10 @@ def _radiative(config, *, Ne=300, seed=42, **kw):
         energy_model="midpoint",
         max_dE_frac=0.05,
         radiative_model="bremslib-soft-hard",
-        radiative_cutoff_eV=1_000.0,
-        bremslib_tables={"C": _table(1e5)},
         transport_core="cuda",
         transport_lut_config=NO_LUT,
         per_electron_config=config,
-        **kw,
+        **({"radiative_cutoff_eV": 1_000.0, "bremslib_tables": {"C": _table(1e5)}} | kw),
     )
 
 
@@ -196,6 +194,48 @@ def test_device_resident_rows_match_full_history():
     reference = _layered(REFERENCE, keep_segments_on_device=True)
     candidate = _layered(_continued(9, 64), keep_segments_on_device=True)
     _assert_identical(reference, candidate)
+
+
+_PHOTON_FIELDS = (
+    "hard_radiative_k_eV",
+    "hard_radiative_Z",
+    "hard_radiative_direction",
+    "hard_radiative_target_momentum_eV_c",
+)
+
+
+def _assert_resident(result):
+    for key in ("L_ang", "E_end_keV", "event_kind", *_PHOTON_FIELDS):
+        assert isinstance(result[key], cupy.ndarray), key
+
+
+@pytest.mark.parametrize(
+    "config", [REFERENCE, _continued(7, 37), _continued(4096)], ids=["batch", "cont", "cont-wide"]
+)
+def test_coupled_radiative_resident_rows_match_host_rows(radiative_reference, config):
+    """#905: resident coupled rows, photon completion included, equal host rows."""
+    resident = _radiative(config, keep_segments_on_device=True)
+    _assert_resident(resident)
+    _assert_identical(radiative_reference, resident)
+    assert np.count_nonzero(_host(resident["hard_radiative_k_eV"]) > 0.0) > 0
+
+
+def test_shell_radiative_resident_rows_match_host_rows():
+    mode = {"straggling": True, "radiative": True}
+    reference = _shell(REFERENCE, **mode)
+    resident = _shell(_continued(7, 37), keep_segments_on_device=True, **mode)
+    _assert_resident(resident)
+    _assert_identical(reference, resident)
+
+
+def test_resident_completion_without_photons_matches_host():
+    # A negligible cross section leaves the coupled rows without photons.
+    kw = {"Ne": 4, "seed": 3, "bremslib_tables": {"C": _table(1e-12)}}
+    reference = _radiative(REFERENCE, **kw)
+    assert not np.any(reference["hard_radiative_k_eV"] > 0.0)
+    resident = _radiative(REFERENCE, keep_segments_on_device=True, **kw)
+    _assert_resident(resident)
+    _assert_identical(reference, resident)
 
 
 def test_step_limit_is_reported_identically():
