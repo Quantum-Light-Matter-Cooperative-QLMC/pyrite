@@ -202,6 +202,8 @@ With `keep_segments_on_device=True`, the per-segment arrays remain on the CUDA d
 
 Residency requires `transport_core="cuda"`. Incident phase-space diagnostics, groove-gap arrays, and scalar counts remain on the host; the spectrum kernels do not read them.
 
+Coupled radiative transport (`radiative_model="bremslib-soft-hard"`, the MeV default) stays resident too ([#905](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/905)). Hard-photon direction completion downloads only the photon rows' energy, element, pre-event energy and direction. Its host random draws and arithmetic are unchanged, and the completed rows are scattered into device zero columns, so the arrays are bitwise those of the host path. Channeling and coupled radiative cascades (secondary, pair or positron launches) still return host segments.
+
 Resident segments increase peak device memory use and retain an allocation after transport returns. If the device cannot hold the payload, the driver catches the out-of-memory error and replays the same seed with segments downloaded to the host. Counter-addressed streams make that replay exact.
 
 (what-acceleration-does-not-change)=
