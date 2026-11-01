@@ -31,7 +31,7 @@ A run makes these separate choices:
 
 In Python, `KernelTuning(transport=TransportKernelTuning(schedule=..., continuation_rows=..., electron_batch=...))` (experimental) selects the schedule and the continuation row quantum for one `simulate` call and takes precedence over `PYRITE_MC_TRANSPORT_SCHEDULE`; `schedule=None` defers to the variable. The row quantum (default 256) counts trajectory rows each active history may emit per launch, not a time interval, and requires `continuation` or `auto`. `electron_batch` caps electrons per transport launch and overrides `PYRITE_MC_ELECTRON_BATCH_MAX`. `scratch_mib` (default 512) is the device scratch budget that full-history batches and continuation lanes are sized from; below the `electron_batch` cap it is what sets how many histories share a launch. `kernel_threads` (default 32 since #875) is the CUDA transport launch's threads per block. Both change launch geometry only, never results, and their best values depend on the scene and GPU. `precision` (`"fp64"`, `"mixed"` or `None` for `PYRITE_MC_TRANSPORT_PRECISION`) selects the exact CUDA kernel's arithmetic, as that variable does; unlike the other fields it changes trajectories at rounding scale. `KernelTuning(cxr_threads=..., cxr_energies_per_block=...)` likewise selects the CUDA CXR line-reduction launch (default 512 threads, 3 energies per block); it regroups the float sum, so spectra agree to rounding rather than bitwise. Batch executors reject these per-call values and use the variables.
 
-The CUDA transport core requires a CUDA array backend for its `cupyx.jit` kernel. A ROCm or SYCL backend runs its spectrum kernels on the device and its transport on the CPU.
+The CUDA transport core requires a CuPy array backend for its `cupyx.jit` kernel: CUDA, or ROCm, where CuPy's HIP build compiles the same kernel source (see [ROCm](#rocm)). A SYCL backend runs its spectrum kernels on the device and its transport on the CPU.
 
 ### Backend resolution
 
@@ -43,11 +43,55 @@ A device without native `float64` is refused even though `REAL` would be `float3
 
 Selection happens once at import and applies to the whole process: the module-level `xp`, `REAL`, and `_GPU` bindings are read by every kernel, so a mid-run switch would leave arrays from two backends in the same reduction. A different backend requires a separate process. Worker pools select their backend this way (see [memory, chunking, and scheduling](memory-and-scheduling.md)).
 
+### ROCm
+
+On AMD GPUs PyRITE runs through a ROCm/HIP build of CuPy (`pyrite-mc[amd]`, built from source with `CUPY_INSTALL_USE_HIP=1`). The kernels are the CUDA ones: CuPy transpiles the same `cupyx.jit` and `RawKernel` sources for HIP, so every path documented here as "CUDA" — transport core, photon transport, axial MCWF, spectrum reductions — takes either vendor. `PYRITE_MC_BACKEND=rocm` names the backend; `cuda` on a HIP build still raises.
+
+Status: evaluated on one device, the Radeon 8060S (gfx1151, RDNA 3.5 APU) with Ubuntu's ROCm 7.1 packages (#888). On it, the exact-transport hardware suite passes as on CUDA (jobs 3605 and 3604 at the same commit), and the #838 `mixed` refinement gate passes every headline observable at ε = 2% on the four ≤ 1 MeV #821 anchors (job 3603; MeV distributions unresolved, as on CUDA). Warm transport time per history at commit `6e7bfe36a` (jobs 3599 and 3601, median of 3 seeds):
+
+```{list-table} Warm transport, µs per history, #821 scenes ≤ 1 MeV.
+:name: tbl-rocm-vs-cuda-transport
+:header-rows: 1
+
+* - Scene
+  - Radeon 8060S FP64
+  - Radeon 8060S mixed
+  - RTX 5080 FP64
+  - RTX 5080 mixed
+* - si-300keV-100um
+  - 47.2
+  - 37.9
+  - 41.4
+  - 29.4
+* - w-300keV-10um
+  - 97.8
+  - 78.6
+  - 79.2
+  - 68.6
+* - si-1MeV-1mm
+  - 408
+  - 330
+  - 369
+  - 304
+* - w-1MeV-100um
+  - 1347
+  - 1021
+  - 1512
+  - 1021
+```
+
+`mixed` is 1.24–1.32× faster than FP64 on the APU and 1.15–1.48× on the RTX 5080: the transport kernel is not FP64-throughput bound on either part. The 52 `test_transport_kernel_builds_cuda.py` tests skip on ROCm, because that check-only tooling recompiles through NVRTC-only CuPy state.
+
+Known gaps:
+
+- Profiler hooks are inert where the distribution lacks roctx or roctracer: the [remote AMD prelude](../guides/running-on-a-cluster.md#amd-rocm-nodes) links no-op stubs for whichever is missing, so `cupy.cuda.nvtx` ranges (roctx) or `cudaProfilerStart/Stop` (roctracer) do nothing. Compute is unaffected.
+- `nsys` capture, the kernel and batch-chunk tuners, and the optical-diagnostics app remain CUDA-only.
+
 ### Transport-core resolution
 
 `auto` is the default. It selects the CUDA core when all three conditions hold:
 
-1. the process has a CUDA device and the kernel module imports;
+1. the process has a CuPy device (CUDA or ROCm) and the kernel module imports;
 2. the run is ungrooved, since the CUDA core does not support periodic facet exit and re-entry;
 3. the electron count exceeds `CUDA_TRANSPORT_MIN_ELECTRONS`, currently 1000.
 

@@ -121,11 +121,16 @@ def _amd_prelude() -> str:
     extras install different CuPy builds, so AMD jobs keep a separate project
     environment instead of rebuilding the shared ``.venv`` on every switch.
     Pinning the backend makes a missing HIP stack fail instead of running on CPU.
+    ``rocm_build_env.sh`` (synced with ``src``) fills the CuPy HIP build gaps
+    a distribution ROCm leaves -- ROCm root, compiler, header layout, and
+    roctracer -- and leaves a complete ROCm install untouched (#888).
     """
     venv = config.shell_word(config.remote_path(".venv-amd"))
+    checkout = config.shell_word(config.remote_dir())
+    env_script = config.shell_word(config.remote_path("src/pyrite/remote/rocm_build_env.sh"))
     return (
         f"export UV_PROJECT_ENVIRONMENT={venv}\n"
-        'export ROCM_HOME="${ROCM_HOME:-/opt/rocm}"\n'
+        f". {env_script} && _pyrite_rocm_env {checkout}\n"
         "export PYRITE_MC_BACKEND=rocm"
     )
 

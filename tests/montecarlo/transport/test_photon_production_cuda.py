@@ -17,7 +17,7 @@ import numpy as np
 import pytest
 
 import pyrite as pr
-from pyrite import api
+from pyrite import api, beams, detectors, geometry
 from pyrite.montecarlo import runner
 from pyrite.results.aperture import aperture_from_payload
 
@@ -61,15 +61,15 @@ def _scene(component="brem", feedback=False):
         ),
     )
     return pr.Scene(
-        pr.Beam(energy_keV=40, transverse=pr.PointSpot(), longitudinal=pr.PointBunch()),
-        pr.Slab("silicon", thickness_ang=1000, tilt_deg=5, footprint=None),
-        pr.PlanarDetector(pr.PlanarPose((0, 0, 1)), size_mm=(2, 2)),
+        pr.Beam(energy_keV=40, transverse=beams.PointSpot(), longitudinal=beams.PointBunch()),
+        geometry.Slab("silicon", thickness_ang=1000, tilt_deg=5, footprint=None),
+        detectors.PlanarDetector(detectors.PlanarPose((0, 0, 1)), size_mm=(2, 2)),
         physics=physics,
         numerics=pr.Numerics(
             cxr_trials=4,
             brem_trials=4,
             transport_core="cuda",
-            energy_bins=pr.EnergyBins(
+            energy_bins=detectors.EnergyBins(
                 cxr=np.linspace(1500, 2000, 8), brem=np.arange(1000, 40001, 1000)
             ),
         ),
@@ -203,7 +203,9 @@ def test_cuda_pair_electron_positron_feedback_closes_rest_reservoir(cuda, monkey
     )
 
     scene = _scene(feedback=True)
-    scene = replace(scene, target=pr.Slab("silicon", thickness_ang=1e5, tilt_deg=5, footprint=None))
+    scene = replace(
+        scene, target=geometry.Slab("silicon", thickness_ang=1e5, tilt_deg=5, footprint=None)
+    )
     context = prepare_photon_case(api.build_case(scene))
     assert context["stage"].base.transport["transport_core"] == "cuda"
 

@@ -98,4 +98,6 @@ extern "C" __global__ void photon_pair(
 
 @cache
 def pair_kernel(cp):
-    return cp.RawKernel(SOURCE, "photon_pair", options=("--std=c++17", "--fmad=false"))
+    from ..._backend import exact_rawkernel_options
+
+    return cp.RawKernel(SOURCE, "photon_pair", options=exact_rawkernel_options(cp))

@@ -274,6 +274,16 @@ def test_select_cupy_backend_never_falls_back(monkeypatch):
         _backend.select_cupy_backend()
 
 
+@pytest.mark.parametrize(
+    ("is_hip", "expected"),
+    [(False, ("--std=c++17", "--fmad=false")), (True, ("-std=c++17", "-ffp-contract=off"))],
+)
+def test_exact_rawkernel_options_disable_contraction_per_compiler(is_hip, expected):
+    module, _, _ = _fake_cupy_module(is_hip=is_hip)
+
+    assert _backend.exact_rawkernel_options(module) == expected
+
+
 def test_cupy_backend_rejects_mismatched_expected_target():
     module, _, _ = _fake_cupy_module(is_hip=False)
 

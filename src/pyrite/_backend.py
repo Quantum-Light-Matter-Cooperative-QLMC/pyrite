@@ -370,6 +370,19 @@ def select_cupy_backend() -> CuPyBackend:
     return _load_cupy()
 
 
+def exact_rawkernel_options(module: ModuleType) -> tuple[str, ...]:
+    """C++17 with floating-point contraction off, spelled for the module's compiler.
+
+    Exact kernels compare bitwise with their host references, so ``a * b + c``
+    must not fuse into an FMA. NVRTC spells that ``--fmad=false``; hipRTC
+    rejects that flag and takes clang's ``-ffp-contract=off`` (#888).
+    """
+
+    if getattr(module.cuda.runtime, "is_hip", False):
+        return ("-std=c++17", "-ffp-contract=off")
+    return ("--std=c++17", "--fmad=false")
+
+
 BACKEND = select_backend()
 xp = BACKEND.xp
 cp: ModuleType | None = BACKEND.cp if isinstance(BACKEND, CuPyBackend) else None

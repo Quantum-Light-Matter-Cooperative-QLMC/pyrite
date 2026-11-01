@@ -5,8 +5,7 @@ from dataclasses import replace
 import numpy as np
 import pytest
 
-import pyrite as pr
-from pyrite import api
+from pyrite import api, detectors, geometry
 from pyrite.montecarlo import runner
 from pyrite.montecarlo.runner.photon_aperture import prepare_photon_case
 from pyrite.montecarlo.transport.photon_reentry import scene_feedback_stage
@@ -22,7 +21,11 @@ def _filtered_scene(component="brem", feedback=True, material="silicon"):
     scene = _scene(component, feedback)
     return replace(
         scene,
-        filters=(pr.FilterPlate(material, 0.0005, (1.0, 1.0), pr.PlanarPose((0.0, 0.0, 0.2))),),
+        filters=(
+            geometry.FilterPlate(
+                material, 0.0005, (1.0, 1.0), detectors.PlanarPose((0.0, 0.0, 0.2))
+            ),
+        ),
     )
 
 

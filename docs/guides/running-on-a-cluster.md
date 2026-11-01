@@ -72,6 +72,30 @@ jobs; **do not combine `--remote` with `--execution`**. Remote trajectory captur
 need a separate [trajectory transfer](../reference/trajectory-workflows.md),
 rather than a checkpoint pull.
 
+(amd-rocm-nodes)=
+### AMD (ROCm) nodes
+
+Point the SLURM target profile at the AMD partition:
+
+```bash
+pyrite config set remote.gpu_vendor amd
+pyrite config set remote.partition gpu-amd
+pyrite config set remote.nodelist qlmc-ace          # or any
+pyrite config set remote.gres gpu:radeon8060s:1
+```
+
+AMD jobs keep their own `.venv-amd`, build CuPy for HIP on the first sync (about
+9 minutes on `qlmc-ace`), and pin `PYRITE_MC_BACKEND=rocm` so a broken HIP stack fails
+instead of running on the CPU. The prelude finds the ROCm root and the GPU
+architecture itself. On a distribution ROCm without a host C++ compiler it
+builds with the HIP toolchain's clang. Where profiler libraries are missing it
+adds header wrappers and no-op roctx/roctracer stubs under
+`<remote dir>/.rocm-shim`, and the job's stderr names each one. A stubbed
+roctx disables `cupy.cuda.nvtx` markers; a stubbed roctracer disables
+`cudaProfilerStart/Stop`. On Ubuntu, `sudo apt install libroctx-dev` provides
+the real roctx, which the prelude then uses. Ubuntu does not package roctracer,
+and AMD's `roctracer-dev` is built only for Ubuntu 22.04 and 24.04.
+
 (validation-and-limitations)=
 Execution profiles currently refuse trajectory capture, transport-only dispatch,
 wall-clock-bounded sweeps and performance wrappers. Neither successful execution

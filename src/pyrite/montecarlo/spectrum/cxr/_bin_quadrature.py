@@ -495,7 +495,12 @@ extern "C" __global__ void pyrite_sincsq_bin_mean_reduce(
                 }
             }
         }
+#if defined(__HIP_PLATFORM_AMD__)
+        /* HIP ballots return a 64-bit wavefront mask; keep this 32-lane group's half. */
+        const unsigned int mask = (unsigned int)(__ballot(is_near) >> (__lane_id() & 32u));
+#else
         const unsigned int mask = __ballot_sync(0xffffffffu, is_near);
+#endif
         if (lane == 0) {
             warp_offset[warp] = __popc(mask);
         }

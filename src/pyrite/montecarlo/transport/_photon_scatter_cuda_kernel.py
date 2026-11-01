@@ -156,4 +156,6 @@ extern "C" __global__ void photon_scatter(
 
 @cache
 def scatter_kernel(cp):
-    return cp.RawKernel(SOURCE, "photon_scatter", options=("--std=c++17", "--fmad=false"))
+    from ..._backend import exact_rawkernel_options
+
+    return cp.RawKernel(SOURCE, "photon_scatter", options=exact_rawkernel_options(cp))
