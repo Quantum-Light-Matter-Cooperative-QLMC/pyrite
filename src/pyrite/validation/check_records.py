@@ -20,6 +20,8 @@ CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
     "checks/continuum_grid_convergence.py": (),
     "checks/electron_count_accuracy.py": (),
     "checks/line_cost_286.py": (),
+    # #875 launch-shape timing diagnostic: bitwise-identity and timing, no physics claim.
+    "checks/launch_retune_875.py": (),
     "checks/brem_source_comparison.py": ("brem-source-comparison",),
     "checks/sb85_eta_small_kappa_fit.py": ("bremslib-electron-electron",),
     "checks/coherent_flat_omission.py": ("coherent-flat-term-omission",),
@@ -37,6 +39,8 @@ CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
     # as physical validation verdicts.
     "checks/axial_escape_accounting.py": (),
     "checks/axial_matching_study.py": (),
+    "checks/axial_outgoing_convergence.py": ("cr-axial-fiber-return-deficit",),
+    "checks/axial_outgoing_maps.py": ("cr-axial-zone-handoff-accounting",),
     # Hardware performance evidence accompanies the CUDA backend validation;
     # it does not add a separate pass/fail ledger claim.
     "checks/axial_mcwf_cuda.py": (),
