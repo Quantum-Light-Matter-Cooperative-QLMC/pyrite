@@ -329,15 +329,16 @@ CUDA_TRANSPORT_MIN_ELECTRONS = 1000
 def _cuda_transport_available():
     """Whether this process can transport on the device.
 
-    Requires the resolved spectrum backend to BE the CUDA device (a ROCm or SYCL
-    backend has no `cupyx.jit` transport kernel, and a CPU backend has nowhere to
-    run one) and the kernel module to import. Cached: the backend is fixed at
+    Requires the resolved spectrum backend to be a CuPy device -- CUDA, or ROCm,
+    where CuPy's HIP build compiles the same `cupyx.jit` kernel (#888); SYCL has
+    no such kernel and a CPU backend has nowhere to run one -- and the kernel
+    module to import. Cached: the backend is fixed at
     import and a failed import will not start succeeding.
     """
 
-    from ..._backend import BACKEND
+    from ..._backend import BACKEND, CUPY_BACKENDS
 
-    if BACKEND.name != "cuda":
+    if BACKEND.name not in CUPY_BACKENDS:
         return False
     try:
         from ._jit_launch import make_cuda_transport_core  # noqa: F401

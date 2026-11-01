@@ -251,6 +251,39 @@ def test_cupy_backend_hip_reports_rocm_vendor():
     assert backend.device.name == "Fake AMD GPU"
 
 
+@pytest.mark.parametrize("is_hip", [False, True])
+def test_select_cupy_backend_admits_either_cupy_target(monkeypatch, is_hip):
+    import sys
+
+    module, _, _ = _fake_cupy_module(is_hip=is_hip)
+    monkeypatch.setitem(sys.modules, "cupy", module)
+
+    backend = _backend.select_cupy_backend()
+
+    assert backend.name == ("rocm" if is_hip else "cuda")
+    assert backend.name in _backend.CUPY_BACKENDS
+
+
+def test_select_cupy_backend_never_falls_back(monkeypatch):
+    def unavailable(expected=None):
+        raise _backend.BackendUnavailableError("missing")
+
+    monkeypatch.setattr(_backend, "_load_cupy", unavailable)
+
+    with pytest.raises(_backend.BackendUnavailableError, match="missing"):
+        _backend.select_cupy_backend()
+
+
+@pytest.mark.parametrize(
+    ("is_hip", "expected"),
+    [(False, ("--std=c++17", "--fmad=false")), (True, ("-std=c++17", "-ffp-contract=off"))],
+)
+def test_exact_rawkernel_options_disable_contraction_per_compiler(is_hip, expected):
+    module, _, _ = _fake_cupy_module(is_hip=is_hip)
+
+    assert _backend.exact_rawkernel_options(module) == expected
+
+
 def test_cupy_backend_rejects_mismatched_expected_target():
     module, _, _ = _fake_cupy_module(is_hip=False)
 

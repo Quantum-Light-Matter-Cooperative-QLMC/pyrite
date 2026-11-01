@@ -139,6 +139,10 @@ def test_amd_slurm_batch_script_selects_rocm_target_without_nvidia_modules(monke
     assert "module" not in script
     assert "export PYRITE_MC_BACKEND=rocm" in script
     assert 'export UV_PROJECT_ENVIRONMENT="/path/to/pyrite/.venv-amd"' in script
+    assert (
+        '. "/path/to/pyrite/src/pyrite/remote/rocm_build_env.sh" && _pyrite_rocm_env "/path/to/pyrite"'
+        in script
+    )
     assert 'echo "partition: gpu-amd"' in script
     assert "rocminfo" in script
     assert "rocm-smi" in script

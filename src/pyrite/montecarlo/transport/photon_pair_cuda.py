@@ -42,9 +42,9 @@ def sample_pairs_cuda(energy_eV, direction, uniforms, *, atomic_number, require_
         raise ValueError("atomic_number must be an integer in 1..99")
     z = int(atomic_number)
     radius, coulomb = _screening_radius(z), _coulomb_correction(z)
-    from ..._backend import select_backend
+    from ..._backend import select_cupy_backend
 
-    cp = select_backend("cuda").xp
+    cp = select_cupy_backend().xp
     n = len(energy)
     packed, used, status = (
         cp.empty((n, 8)),

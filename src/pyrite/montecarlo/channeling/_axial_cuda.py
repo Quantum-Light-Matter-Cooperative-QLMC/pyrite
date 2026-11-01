@@ -13,7 +13,7 @@ from functools import cache
 
 import numpy as np
 
-from ..._backend import BackendResourceError, select_backend
+from ..._backend import BackendResourceError, select_cupy_backend
 from .._resources import admitted_chunk, resolve_resource_policy
 from .axial_mcwf import (
     BATCH,
@@ -156,7 +156,7 @@ def run_cuda(
     """Execute CUDA MCWF; returned result owns NumPy arrays only."""
     _callback_check(observable, jump_hook)
     steps = _depth_steps(depths_ang, n_electrons, step_ang)
-    backend = select_backend("cuda")
+    backend = select_cupy_backend()
     cp = backend.xp
     components = _sample_components(solver.grid, entry)
     size_limit = _admit(

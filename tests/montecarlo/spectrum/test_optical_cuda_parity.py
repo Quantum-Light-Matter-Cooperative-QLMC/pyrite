@@ -9,7 +9,7 @@ from dataclasses import replace
 import numpy as np
 import pytest
 
-from pyrite._backend import BACKEND
+from pyrite._backend import BACKEND, CUPY_BACKENDS
 from pyrite.detectors.optical_elements import CalibratedJonesElement, apply_optical_elements
 from pyrite.detectors.optical_energy import CalibratedPulseEnergyDetector
 from pyrite.detectors.optical_interferometer import (
@@ -51,7 +51,9 @@ except Exception:  # pragma: no cover - depends on CUDA runtime presence
 
 pytestmark = [
     pytest.mark.skipif(_NDEV < 1, reason="CUDA device required"),
-    pytest.mark.skipif(BACKEND.name != "cuda", reason="run with PYRITE_TEST_BACKEND=cuda"),
+    pytest.mark.skipif(
+        BACKEND.name not in CUPY_BACKENDS, reason="run with PYRITE_TEST_BACKEND=cuda or rocm"
+    ),
 ]
 
 _SCREEN = PECCircularScreen(outer_radius_m=2e-6, beta_z=-0.95)

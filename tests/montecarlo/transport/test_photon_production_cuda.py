@@ -1,6 +1,6 @@
 """Real CUDA production selection, source components, persistence and replay.
 
-Run with PYRITE_MC_BACKEND=cuda, PYRITE_TEST_BACKEND=cuda and --slow remotely.
+Run with PYRITE_TEST_BACKEND=cuda (or rocm) and --slow remotely.
 Canonical physical tables are required. Public API tests never replace primary
 transport or conditional samplers; one pair-feedback closure test controls only
 the first-flight rate to exercise a rare branch. CPU processes skip before runs.
@@ -17,7 +17,7 @@ import numpy as np
 import pytest
 
 import pyrite as pr
-from pyrite import api
+from pyrite import api, beams, detectors, geometry
 from pyrite.montecarlo import runner
 from pyrite.results.aperture import aperture_from_payload
 
@@ -26,10 +26,10 @@ pytestmark = pytest.mark.slow
 
 @pytest.fixture
 def cuda(monkeypatch):
-    from pyrite._backend import BACKEND
+    from pyrite._backend import BACKEND, CUPY_BACKENDS
 
-    if BACKEND.name != "cuda":
-        pytest.skip("production test requires PYRITE_MC_BACKEND=cuda before import")
+    if BACKEND.name not in CUPY_BACKENDS:
+        pytest.skip("production test requires PYRITE_MC_BACKEND=cuda or rocm before import")
     # conftest isolates ordinary tests from user workspaces. This explicit
     # hardware-only run reads the synchronized canonical tables; all actual
     # checkpoint/capture writes still receive tmp_path destinations below.
@@ -61,15 +61,15 @@ def _scene(component="brem", feedback=False):
         ),
     )
     return pr.Scene(
-        pr.Beam(energy_keV=40, transverse=pr.PointSpot(), longitudinal=pr.PointBunch()),
-        pr.Slab("silicon", thickness_ang=1000, tilt_deg=5, footprint=None),
-        pr.PlanarDetector(pr.PlanarPose((0, 0, 1)), size_mm=(2, 2)),
+        pr.Beam(energy_keV=40, transverse=beams.PointSpot(), longitudinal=beams.PointBunch()),
+        geometry.Slab("silicon", thickness_ang=1000, tilt_deg=5, footprint=None),
+        detectors.PlanarDetector(detectors.PlanarPose((0, 0, 1)), size_mm=(2, 2)),
         physics=physics,
         numerics=pr.Numerics(
             cxr_trials=4,
             brem_trials=4,
             transport_core="cuda",
-            energy_bins=pr.EnergyBins(
+            energy_bins=detectors.EnergyBins(
                 cxr=np.linspace(1500, 2000, 8), brem=np.arange(1000, 40001, 1000)
             ),
         ),
@@ -154,7 +154,7 @@ from pyrite import _backend, datasets
 assert _backend.BACKEND.name == 'cpu'
 def forbidden(*args, **kwargs):
     raise AssertionError('finished observation reader requested hardware/scientific tables')
-_backend.select_backend = datasets.require_dataset = forbidden
+_backend.select_backend = _backend.select_cupy_backend = datasets.require_dataset = forbidden
 from pyrite.results.aperture import aperture_from_payload
 with np.load(sys.argv[1]) as archive:
     value = aperture_from_payload(dict(metadata=json.loads(str(archive['metadata'])),
@@ -203,7 +203,9 @@ def test_cuda_pair_electron_positron_feedback_closes_rest_reservoir(cuda, monkey
     )
 
     scene = _scene(feedback=True)
-    scene = replace(scene, target=pr.Slab("silicon", thickness_ang=1e5, tilt_deg=5, footprint=None))
+    scene = replace(
+        scene, target=geometry.Slab("silicon", thickness_ang=1e5, tilt_deg=5, footprint=None)
+    )
     context = prepare_photon_case(api.build_case(scene))
     assert context["stage"].base.transport["transport_core"] == "cuda"
 

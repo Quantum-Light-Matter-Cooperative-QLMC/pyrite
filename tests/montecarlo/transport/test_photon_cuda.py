@@ -9,10 +9,10 @@ from pyrite.montecarlo.transport.photon_cuda import scene_first_interactions_cud
 
 @pytest.fixture
 def cp():
-    from pyrite._backend import BackendUnavailableError, select_backend
+    from pyrite._backend import BackendUnavailableError, select_cupy_backend
 
     try:
-        return select_backend("cuda").xp
+        return select_cupy_backend().xp
     except BackendUnavailableError as error:
         pytest.skip(str(error))
 
@@ -58,11 +58,10 @@ def _compare(cp, origins, directions, energies, uniforms, layers, boxes=(), **kw
 def test_explicit_cuda_never_falls_back(monkeypatch):
     from pyrite import _backend
 
-    def unavailable(requested):
-        assert requested == "cuda"
+    def unavailable():
         raise _backend.BackendUnavailableError("test: CUDA unavailable")
 
-    monkeypatch.setattr(_backend, "select_backend", unavailable)
+    monkeypatch.setattr(_backend, "select_cupy_backend", unavailable)
     with pytest.raises(_backend.BackendUnavailableError, match="CUDA unavailable"):
         scene_first_interactions_cuda(np.empty((0, 3)), np.empty((0, 3)), [], np.empty((0, 2)), [])
 
@@ -73,7 +72,7 @@ def test_invalid_inputs_fail_before_device_selection(monkeypatch):
     def unexpected(*args, **kwargs):
         pytest.fail("invalid inputs must fail before CUDA selection")
 
-    monkeypatch.setattr(_backend, "select_backend", unexpected)
+    monkeypatch.setattr(_backend, "select_cupy_backend", unexpected)
     with pytest.raises(ValueError, match="unit vectors"):
         scene_first_interactions_cuda([[0, 0, 0]], [[0, 0, 2]], [1e5], [[0, 0]], [])
     with pytest.raises(ValueError, match="uniforms"):

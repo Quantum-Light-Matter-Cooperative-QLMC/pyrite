@@ -15,6 +15,7 @@ from importlib import resources
 import numpy as np
 import pytest
 
+from tests.helpers.backend import cupy_device_backend
 from tests.montecarlo.transport.test_transport_continuation_cuda import (
     _HAS_CUDA,
     REFERENCE,
@@ -24,6 +25,11 @@ from tests.montecarlo.transport.test_transport_continuation_cuda import (
 from tests.montecarlo.transport.test_transport_kernel_variants_cuda import CASES
 
 requires_cuda = pytest.mark.skipif(not _HAS_CUDA, reason="no CUDA device")
+# The build path (checks only) recompiles through private NVRTC-only CuPy
+# state; a HIP build of CuPy transpiles for hipRTC, which it refuses (#888).
+nvrtc_only = pytest.mark.skipif(
+    cupy_device_backend() == "rocm", reason="NVRTC-only check tooling; not supported on ROCm"
+)
 
 
 def _kernel_parameters():
@@ -90,6 +96,7 @@ def _with_build(run, monkeypatch, build, *args, **kwargs):
 
 @pytest.mark.hardware
 @requires_cuda
+@nvrtc_only
 @pytest.mark.parametrize("build", ["raw", "readonly"])
 @pytest.mark.parametrize(("run", "kw"), CASES)
 @pytest.mark.parametrize("schedule", ["full-history", "continuation"])

@@ -115,4 +115,6 @@ extern "C" __global__ void photon_photoelectric(
 
 @cache
 def photoelectric_kernel(cp):
-    return cp.RawKernel(SOURCE, "photon_photoelectric", options=("--std=c++17", "--fmad=false"))
+    from ..._backend import exact_rawkernel_options
+
+    return cp.RawKernel(SOURCE, "photon_photoelectric", options=exact_rawkernel_options(cp))

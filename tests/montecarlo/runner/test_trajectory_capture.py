@@ -289,8 +289,8 @@ def test_cuda_resident_run_captures_device_segments(tmp_path):
     """GPU-path check: resident CUDA segments are captured without a host copy."""
     from pyrite import _backend
 
-    if _backend.BACKEND.name != "cuda":
-        pytest.skip("selected backend is not CUDA")
+    if _backend.BACKEND.name not in _backend.CUPY_BACKENDS:
+        pytest.skip("selected backend is not a CuPy device")
     pytest.importorskip("cupy")
     case = _case()
     capture = TrajectoryCapture(root=str(tmp_path))

@@ -3,6 +3,8 @@
 # #821 anchors, paired by seed; gate838.py evaluates the #510 one-third bound.
 # Usage (from the synced checkout root):
 #   sbatch checks/fp32_speed_of_light/gate838.sbatch "<scene:histories ...>" "<seeds>" "<estimators>"
+# ROCm (#888): add -p gpu-amd -w qlmc-ace --gres=gpu:radeon8060s:1; checks/rocm/env.sh
+# picks the vendor, venv and CuPy-HIP build environment from the node.
 #SBATCH --job-name=gate838
 #SBATCH --partition=gpu
 #SBATCH --gres=gpu:1
@@ -12,17 +14,13 @@
 #SBATCH --output=gate838-%j.log
 set -euo pipefail
 cd "$SLURM_SUBMIT_DIR"
-export PATH="$HOME/.local/bin:$PATH"
-export PYRITE_HOME="$PWD" PYRITE_CATALOG="$PWD/src/pyrite/data/catalog"
-export PYRITE_USER_CATALOG="$PWD/user-catalog" XDG_CONFIG_HOME="$PWD/.xdg-config"
+. checks/rocm/env.sh
 export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 NUMBA_NUM_THREADS=1
-export UV_CACHE_DIR=$HOME/.cache/uv PYRITE_MC_BACKEND=cuda
-mkdir -p "$XDG_CONFIG_HOME" "$PYRITE_USER_CATALOG"
 scenes=${1:?scene:histories list}; seeds=${2:-"201 202 203"}; estimators=${3:-discrete}
-uv sync --extra nvidia --locked -q
+pyrite_gpu_sync -q
 uv run --no-sync python checks/equal_precision/prepare_stopping.py > /dev/null
 out="evidence/gate838/$SLURM_JOB_ID"; mkdir -p "$out"
-cp .pyrite-sync "$out/sync.json"; nvidia-smi > "$out/gpu.txt"
+cp .pyrite-sync "$out/sync.json"; pyrite_gpu_info > "$out/gpu.txt" 2>&1
 for spec in $scenes; do
     s=${spec%%:*} h=${spec##*:}
     for est in $estimators; do

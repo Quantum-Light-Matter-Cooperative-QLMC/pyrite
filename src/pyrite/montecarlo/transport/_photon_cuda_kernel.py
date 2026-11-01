@@ -111,7 +111,9 @@ extern "C" __global__ void photon_sample(
 
 @cache
 def _kernels(cp):
-    module = cp.RawModule(code=SOURCE, options=("--std=c++17", "--fmad=false"))
+    from ..._backend import exact_rawkernel_options
+
+    module = cp.RawModule(code=SOURCE, options=exact_rawkernel_options(cp))
     return module.get_function("photon_intervals"), module.get_function("photon_sample")
 
 

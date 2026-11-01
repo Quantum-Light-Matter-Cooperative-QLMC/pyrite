@@ -466,10 +466,10 @@ def _execution(backend, relaxation, batch_size):
         return None
     if relaxation is not load_eadl_relaxation:
         raise ValueError("CUDA photon histories require canonical pinned EADL relaxation")
-    from ..._backend import select_backend
+    from ..._backend import select_cupy_backend
     from . import photon_cuda_events
 
-    select_backend("cuda")  # fail closed even for empty/all-unresolved batches
+    select_cupy_backend()  # fail closed even for empty/all-unresolved batches
     return photon_cuda_events
 
 

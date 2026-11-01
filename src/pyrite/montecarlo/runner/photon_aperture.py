@@ -28,20 +28,20 @@ MODEL = CPU_MODEL  # historical CPU record; CUDA records have their own enabled-
 
 
 def _backend_for_core(transport_core):
-    from ..._backend import BACKEND
+    from ..._backend import BACKEND, CUPY_BACKENDS
 
     if xp is np:
         if transport_core not in ("auto", "lockstep", "per-electron"):
             raise ValueError("photon transport requires a CPU backend and CPU transport core")
         return "cpu"
-    if BACKEND.name != "cuda" or transport_core not in (
+    if BACKEND.name not in CUPY_BACKENDS or transport_core not in (
         "auto",
         "lockstep",
         "per-electron",
         "cuda",
     ):
         raise ValueError(
-            "photon transport requires a CPU or CUDA backend and an exact transport core"
+            "photon transport requires a CPU or CuPy (CUDA/ROCm) backend and an exact transport core"
         )
     return "cuda"
 
