@@ -2,7 +2,8 @@
 # #821 held-out time-to-precision runs (#510 T(eps)). Each arm runs the history
 # count precision_plan.py froze for it, on the plan's held-out seeds; analyze.py
 # --plan then verifies achieved RSE and reports T(eps).
-# Usage: sbatch --dependency=after:<hold> precision.sbatch <hold-job-id> <plan.json>
+# Usage: sbatch --dependency=after:<hold> precision.sbatch <hold-job-id> <plan.json> [seed ...]
+# Seeds default to scenes.json held_out_seeds; a subset runs one repeat at a time.
 #SBATCH --job-name=g4bench821-prec
 #SBATCH --partition=gpu
 #SBATCH --nodelist=DESKTOP-QNIHO3D
@@ -13,7 +14,7 @@
 #SBATCH --output=precision-%j.log
 set -euo pipefail
 cd "$SLURM_SUBMIT_DIR"
-hold=$1 plan=$2
+hold=$1 plan=$2; shift 2
 trap 'touch "evidence/hold-release-$hold"' EXIT
 source checks/geant4_performance/env.sh
 uv sync --extra nvidia --locked -q
@@ -24,7 +25,8 @@ lscpu > "$out/cpu.txt"; nvidia-smi > "$out/gpu.txt"
 squeue -w DESKTOP-QNIHO3D > "$out/node-jobs.txt"; free -g > "$out/memory.txt"
 sha256sum "$G4BENCH" checks/geant4_performance/*.py checks/geant4_performance/g4bench/* > "$out/code.txt"
 uv run --no-sync python checks/equal_precision/prepare_stopping.py > "$out/tables.json"
-mapfile -t seeds < <(python3 -c "import json;print(*json.load(open('checks/geant4_performance/scenes.json'))['precision']['held_out_seeds'],sep='\n')")
+seeds=("$@")
+(( ${#seeds[@]} )) || mapfile -t seeds < <(python3 -c "import json;print(*json.load(open('checks/geant4_performance/scenes.json'))['precision']['held_out_seeds'],sep='\n')")
 mapfile -t runs < <(python3 -c "import json;[print(r['scene'],r['config'],r['histories']) for r in json.load(open('$out/plan.json'))['runs']]")
 for seed in "${seeds[@]}"; do
     # Rotate the run order per seed so drift cannot favour one arm.
