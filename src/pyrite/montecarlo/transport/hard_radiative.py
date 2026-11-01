@@ -438,6 +438,15 @@ def _lazy_zeros(rows: int) -> np.ndarray:
     return np.frombuffer(buffer, dtype=float).reshape(rows, 3)
 
 
+def _device_module(array):
+    """CuPy for a CUDA array, else ``None`` (CuPy is imported only then)."""
+    if getattr(array, "__cuda_array_interface__", None) is None:
+        return None
+    import cupy
+
+    return cupy
+
+
 def complete_hard_radiative_events(segments, tables, seed: int) -> None:
     """Attach photon directions and recoil momenta without changing RNG order.
 
@@ -445,23 +454,44 @@ def complete_hard_radiative_events(segments, tables, seed: int) -> None:
     by element. Each call owns its element stages; no global device cache.
     Non-photon rows retain the two zero-vector result fields.
 
+    Device-resident rows (#905) gather and download only the photon rows'
+    four input fields; the draws and the completion arithmetic run on the
+    host exactly as for host rows, and the completed photon rows are
+    scattered into device zero columns. The result fields are therefore
+    bitwise those of the host path, resident on the device.
+
     Validation: bremslib-radiative-partition
     """
-    energies = np.asarray(segments["hard_radiative_k_eV"])
-    directions = _lazy_zeros(energies.size)
-    momenta = _lazy_zeros(energies.size)
-    photon_rows = np.flatnonzero(energies > 0.0)
+    cupy = _device_module(segments["hard_radiative_k_eV"])
+    xp = np if cupy is None else cupy
+    energies = xp.asarray(segments["hard_radiative_k_eV"])
+    rows_xp = xp.flatnonzero(energies > 0.0)
+    photon_rows = rows_xp if cupy is None else cupy.asnumpy(rows_xp)
+
+    def gathered(name):
+        # Gather the photon rows before any float cast: a cast of a narrower
+        # per-segment field would otherwise copy every row.
+        values = xp.asarray(segments[name])[rows_xp]
+        return values if cupy is None else cupy.asnumpy(values)
+
+    if cupy is None:
+        directions = _lazy_zeros(energies.size)
+        momenta = _lazy_zeros(energies.size)
+        destination = photon_rows
+    else:
+        # Host staging for the photon rows only, scattered once at the end.
+        directions = np.zeros((photon_rows.size, 3), dtype=float)
+        momenta = np.zeros((photon_rows.size, 3), dtype=float)
+        destination = np.arange(photon_rows.size)
     rng = np.random.default_rng(int(seed) ^ 0xD6023FEA38B57C29)
     # Shape (N, 2) consumes exactly the same consecutive MT/PCG uniform words
     # as the former two scalar random() calls per photon (even for N=0).
     uniforms = rng.random((photon_rows.size, 2))
     by_z = {table.atomic_number: table for table in tables.values()}
-    # Gather the photon rows before any float cast: a cast of a narrower
-    # per-segment field would otherwise copy every row.
-    element = np.asarray(segments["hard_radiative_Z"])[photon_rows]
-    incident = np.asarray(segments["E_end_keV"])[photon_rows].astype(float, copy=False) * 1e3
-    photon_energy = energies[photon_rows].astype(float, copy=False)
-    incoming = np.asarray(segments["v_hat"])[photon_rows].astype(float, copy=False)
+    element = gathered("hard_radiative_Z")
+    incident = gathered("E_end_keV").astype(float, copy=False) * 1e3
+    photon_energy = gathered("hard_radiative_k_eV").astype(float, copy=False)
+    incoming = gathered("v_hat").astype(float, copy=False)
     for z in dict.fromkeys(element.tolist()):
         staged = stage_bremslib_table(by_z[int(z)])
         selected = np.flatnonzero(element == z)
@@ -478,11 +508,22 @@ def complete_hard_radiative_events(segments, tables, seed: int) -> None:
                 incoming[offsets],
                 uniforms[offsets],
             )
-            rows = photon_rows[offsets]
+            rows = destination[offsets]
             directions[rows] = completed
             momenta[rows] = target
+    if cupy is not None:
+        directions = _scatter_photon_rows(cupy, energies.size, rows_xp, directions)
+        momenta = _scatter_photon_rows(cupy, energies.size, rows_xp, momenta)
     segments["hard_radiative_direction"] = directions
     segments["hard_radiative_target_momentum_eV_c"] = momenta
+
+
+def _scatter_photon_rows(cupy, n_rows, rows, values):
+    """Device ``(n_rows, 3)`` zeros holding ``values`` at ``rows`` (#905)."""
+    out = cupy.zeros((int(n_rows), 3), dtype=float)
+    if rows.size:
+        out[rows] = cupy.asarray(values)
+    return out
 
 
 # PENELOPE-2024 Eq. 3.154 polynomial coefficients of t, t^2, ..., t^7.
@@ -638,6 +679,7 @@ def validate_radiative_args(
     energy_model,
     groove,
     keep_segments_on_device,
+    cascade=False,
 ) -> bool:
     """Check ``simulate_trajectories``' radiative arguments; True in coupled mode."""
     if radiative_model not in ("auto", "uncoupled", "bremslib-soft-hard"):
@@ -667,8 +709,10 @@ def validate_radiative_args(
         raise ValueError("radiative_cutoff_eV must be positive and finite")
     if energy_model != "midpoint" or groove is not None:
         raise ValueError("bremslib-soft-hard requires midpoint, ungrooved transport")
-    if keep_segments_on_device:
-        raise ValueError("bremslib-soft-hard completes photon rows on the host")
+    if keep_segments_on_device and cascade:
+        # Cascade joins, pair conversion and positron launches read photon
+        # rows as host arrays; only the single-pass result stays resident.
+        raise ValueError("bremslib-soft-hard secondary cascades join photon rows on the host")
     return True
 
 

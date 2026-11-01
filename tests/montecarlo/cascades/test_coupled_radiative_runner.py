@@ -21,6 +21,7 @@ from pyrite.campaign.profiles import dataset_identity
 from pyrite.campaign.sweep import BeamSpec, Sweep, build_cases
 from pyrite.detectors import EnergyBins
 from pyrite.montecarlo import runner
+from pyrite.montecarlo.runner import case_driver
 from pyrite.montecarlo.spectrum.brem import mc_brem_spectrum
 from pyrite.montecarlo.spectrum.brem_bremslib import prepare_bremslib_table
 from pyrite.montecarlo.spectrum.brem_events import mc_coupled_brem_spectrum, mc_soft_brem_spectrum
@@ -419,3 +420,39 @@ def test_skipped_completion_leaves_transport_rows_bitwise(synthetic_si_tables):
             _complete_hard_photons=False,
             **kwargs,
         )
+
+
+@pytest.mark.parametrize(
+    ("extra", "resident"),
+    [
+        ({}, True),
+        ({"pair_production_model": "bethe-heitler"}, False),
+        ({"positron_transport": True}, False),
+        ({"secondary_threshold_eV": 0.0}, False),
+    ],
+)
+def test_coupled_cuda_segments_stay_resident_outside_cascades(
+    synthetic_si_tables, monkeypatch, extra, resident
+):
+    """#905: single-pass coupled rows stay on the device; cascades join on the host."""
+    seen = []
+
+    def stop(_transport, keep):
+        seen.append(keep)
+        raise RuntimeError("stop")
+
+    monkeypatch.setattr(runner, "_case_transport_core", lambda *_args: "cuda")
+    monkeypatch.setattr(case_driver, "transport_with_recovery", stop)
+    with pytest.raises(RuntimeError, match="stop"):
+        runner._transport_case({**_coupled_case(), **extra}, keep_segments_on_device=True)
+    assert seen == [resident]
+
+
+def test_resident_coupled_cascade_passes_are_refused():
+    from pyrite.montecarlo.transport.hard_radiative import validate_radiative_args
+
+    args = ("bremslib-soft-hard", 1000.0, {"Si": object()})
+    shared = dict(energy_model="midpoint", groove=None, keep_segments_on_device=True)
+    assert validate_radiative_args(*args, **shared)
+    with pytest.raises(ValueError, match="cascades join photon rows on the host"):
+        validate_radiative_args(*args, **shared, cascade=True)
