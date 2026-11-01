@@ -456,7 +456,7 @@
     {
       "path": "src/pyrite/montecarlo/spectrum/characteristic.py",
       "name": "mc_characteristic_spectrum",
-      "cc": 30
+      "cc": 27
     },
     {
       "path": "src/pyrite/montecarlo/spectrum/coherent_band_audit.py",
