@@ -14,7 +14,8 @@ when it lies wholly outside (``|rel| - resolution > eps / 3``), and
 ``unresolved`` otherwise, which needs more histories, not a verdict.
 The verdict passes only with every test ``pass``.
 Headline membership follows ``scenes.json`` ``precision`` (sets, floors,
-bands below the beam energy). Distributions: the transmitted-energy spectrum
+bands below the beam energy); cone yields gate on the continuous estimator
+only. Distributions: the transmitted-energy spectrum
 (20 bins over [0, E0]) and the path-length distribution (20 equal-width bins
 up to the longest path), as per-primary bin indicators. Each bin with
 probability >= the fraction floor gets the same bound, and a paired Hotelling
@@ -64,7 +65,7 @@ def observables(scores):
     return out
 
 
-def headline(name, mean, scene):
+def headline(name, mean, scene, est):
     floor = SPEC["precision"]["headline_floor"]
     if name in BANDS_LOWER_KEV and BANDS_LOWER_KEV[name] >= scene["energy_keV"]:
         return False
@@ -72,7 +73,9 @@ def headline(name, mean, scene):
         return mean >= floor["fraction_mean"]
     if name.startswith("photons_"):
         return mean >= floor["photons_per_primary"]
-    return name.startswith("cone_")
+    # The cone gates on the production continuous estimator only: discrete
+    # sampled-photon cone yields (~1e-4/primary) cannot resolve eps/3.
+    return name.startswith("cone_") and est == "continuous"
 
 
 def bound(a, b, z_crit=Z95):
@@ -168,7 +171,7 @@ def main():
         for name in names:
             a = np.concatenate([x[name] for x in fa])
             b = np.concatenate([y[name] for y in fb])
-            if not headline(name, a.mean(), scene):
+            if not headline(name, a.mean(), scene, est):
                 continue
             r = bound(a, b) | dict(estimator=est, scene=sid, observable=name, n=int(a.size))
             r["pass"] = {str(eps): outcome(r, eps) for eps in TARGETS}
