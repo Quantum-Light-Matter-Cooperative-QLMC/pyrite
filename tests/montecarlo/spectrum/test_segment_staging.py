@@ -292,3 +292,65 @@ def test_device_resident_transport_feeds_the_kernels_the_same_spectra():
         want = kernel(_segments_on_device(host), grid, **kwargs)
         got = kernel(_segments_on_device(device), grid, **kwargs)
         np.testing.assert_array_equal(_to_cpu(got), _to_cpu(want))
+
+
+def _adversarial_f64():
+    rng = np.random.default_rng(3)
+    f32_min = float(np.finfo(np.float32).tiny)
+    f32_max = float(np.finfo(np.float32).max)
+    special = np.array(
+        [
+            0.0,
+            -0.0,
+            np.inf,
+            -np.inf,
+            f32_min,
+            np.nextafter(f32_min, 0),
+            f32_min / 2,
+            -f32_min / 3,
+            1e-45,
+            1e-46,
+            7e-46,
+            f32_max,
+            np.nextafter(f32_max, np.inf),
+            3.5e38,
+            -3.5e38,
+            1e300,
+            -1e300,
+            5e-324,
+        ]
+    )
+    nans = np.array(
+        [
+            0x7FF8000000000000,
+            0xFFF8000000000001,
+            0x7FF0000000000001,
+            0x7FFFFFFFFFFFFFFF,
+            0x7FF123456789ABCD,
+        ],
+        dtype=np.uint64,
+    ).view(np.float64)
+    sub = rng.uniform(-1.2e-38, 1.2e-38, 4096)
+    normal = rng.standard_normal(4096) * 10.0 ** rng.integers(-37, 38, 4096)
+    return np.concatenate([special, nans, sub, normal])
+
+
+@pytest.mark.parametrize("repeat", [1, 3_000_000 // 4000])
+def test_float_row_staging_is_bitwise_the_host_cast(repeat):
+    """Staged float rows equal ``astype(float32)`` bit for bit (incl. subnormals,
+    overflow to inf, NaN payloads); repeat>1 exercises the multi-chunk path."""
+    from pyrite._backend import xp
+
+    if not hasattr(xp, "cuda") or REAL is not xp.float32:
+        pytest.skip("CuPy float32 staging path only")
+    from pyrite.montecarlo.spectrum.cxr._kernels import _stage_row
+
+    base = _adversarial_f64()
+    a = np.tile(base, repeat)
+    got = _to_cpu(_stage_row(a))
+    want = a.astype(np.float32)
+    assert got.dtype == np.float32
+    np.testing.assert_array_equal(got.view(np.uint32), want.view(np.uint32))
+    two_d = a[: (a.size // 3) * 3].reshape(-1, 3)
+    got2 = _to_cpu(_stage_row(two_d))
+    np.testing.assert_array_equal(got2.view(np.uint32), two_d.astype(np.float32).view(np.uint32))
