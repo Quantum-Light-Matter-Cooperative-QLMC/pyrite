@@ -39,14 +39,16 @@ pytestmark = [
 ]
 
 
-def _scene(electrons=512):
+def _scene(electrons=1024):
     """The #905 benchmark scene (W 1 MeV / 10 um) at a test electron count."""
     numerics = Numerics(
         sampling=FixedSampling(cxr_electrons=electrons, brem_electrons=electrons // 4),
         seed=7,
         energy_bins=EnergyBins().with_cxr_energies(np.linspace(750, 1_000, 51) * ureg.eV),
         cxr_reflections=CxrReflections(n_families=1),
-    ).with_kernel_tuning(ExecutionConfig(transport=TransportKernelTuning(kernel_threads=32)))
+    ).with_kernel_tuning(
+        ExecutionConfig(transport_core="cuda", transport=TransportKernelTuning(kernel_threads=32))
+    )
     return Scene(
         Beam(kinetic_energy=1 * ureg.MeV, transverse=PointSpot(), longitudinal=PointBunch()),
         Slab(
@@ -78,9 +80,7 @@ def _assert_identical(reference, candidate, path=""):
             ), name
         elif isinstance(expected, dict):
             _assert_identical(expected, actual, name)
-        elif isinstance(expected, (list, tuple)) and any(
-            isinstance(item, (np.ndarray, dict)) for item in expected
-        ):
+        elif isinstance(expected, (list, tuple)):
             assert len(actual) == len(expected), name
             _assert_identical(dict(enumerate(expected)), dict(enumerate(actual)), name)
         else:
