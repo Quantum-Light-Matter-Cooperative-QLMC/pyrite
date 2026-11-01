@@ -149,7 +149,7 @@ M2 grouped-parameter refactor is applied everywhere:
 - `api.py`: shared `control`/`state`/`segments`/`materials_ragged`/
   `mott_group`/`straggling_lockstep`/`geometry` tuples built once before the
   core dispatch; LUT geometry swaps in `transport_lut.n_el`.
-- `tests/montecarlo/test_groove.py`: direct `_transport_core_grooved` call
+- `tests/montecarlo/transport/test_groove.py`: direct `_transport_core_grooved` call
   regrouped.
 - `batching.py`: exact and LUT entry points retain their distinct upload/table
   preparation, then pass prebuilt kernel groups through one

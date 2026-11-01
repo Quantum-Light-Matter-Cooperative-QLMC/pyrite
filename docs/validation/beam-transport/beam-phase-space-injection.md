@@ -118,7 +118,7 @@ Read after the derivation above (`montecarlo/transverse.py` lines 101–219; `mo
 
 ## 4. Numeric spot-check
 
-Independent NumPy Monte Carlo (N=2×10⁷, arbitrary `ε_g, β_T, α` — not values drawn from the code or its tests) reproduces the three target second moments to Monte-Carlo precision (§2.2), and `tests/montecarlo/test_transverse.py` (23 parametrized cases, including `test_geometric_emittance_scales_inversely_with_beta_gamma`, `test_sampled_correlation_sign_follows_alpha`, `test_sampled_moments_round_trip_through_beam_metrics`, `test_zero_emittance_transport_converges_to_the_collimated_run`, `test_beam_frame_basis_is_identity_on_axis_and_maps_z_onto_the_beam`) all pass against the current worktree (`feature/beam-phase-space`).
+Independent NumPy Monte Carlo (N=2×10⁷, arbitrary `ε_g, β_T, α` — not values drawn from the code or its tests) reproduces the three target second moments to Monte-Carlo precision (§2.2), and `tests/montecarlo/transport/test_transverse.py` (23 parametrized cases, including `test_geometric_emittance_scales_inversely_with_beta_gamma`, `test_sampled_correlation_sign_follows_alpha`, `test_sampled_moments_round_trip_through_beam_metrics`, `test_zero_emittance_transport_converges_to_the_collimated_run`, `test_beam_frame_basis_is_identity_on_axis_and_maps_z_onto_the_beam`) all pass against the current worktree (`feature/beam-phase-space`).
 
 ## 5. Result
 

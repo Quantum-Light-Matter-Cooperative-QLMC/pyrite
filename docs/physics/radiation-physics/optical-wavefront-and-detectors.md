@@ -492,7 +492,7 @@ propagator and transfer/acceptance model.
 
 The transported handoff is covered by synthetic field/phase/kinematics,
 history-index, wrong-face, incidence-acceptance, aperture and source-law tests.
-`tests/montecarlo/test_optical_finite_case.py` additionally lowers a public
+`tests/montecarlo/spectrum/test_optical_finite_case.py` additionally lowers a public
 `Scene` to a real `Case` and transports 12 primaries at 30 keV (seed 11),
 selecting the first eight for optical scoring. The normally incident
 `PointSpot`/`PointBunch` launch gives identical entrance states: the realized
@@ -505,7 +505,7 @@ Run this transport acceptance check explicitly:
 
 ```bash
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test --slow \
-  tests/montecarlo/test_optical_finite_case.py --durations=0
+  tests/montecarlo/spectrum/test_optical_finite_case.py --durations=0
 ```
 
 This verifies the opt-in diagnostic handoff and population/unit contracts.
@@ -933,7 +933,7 @@ uniform $\phi$. Because $d^2k=k_0^2\,u\,du\,d\phi$, the integrand is smooth;
 it is exactly window-independent for a compact source and agrees with the
 infinite-PEC Ginzburg–Frank hemisphere yield for a 5 µm disc with the charge
 on a pixel corner at 0.1 µm pitch: $\sim10^{-5}$ observed, pinned at
-$10^{-4}$ in `tests/montecarlo/test_optical_finite_screen.py`. An off-corner
+$10^{-4}$ in `tests/montecarlo/spectrum/test_optical_finite_screen.py`. An off-corner
 charge adds a pitch²-convergent sampling error (1.6 % at 0.1 µm for a
 partial-pixel offset in the independent check).
 
@@ -1054,7 +1054,7 @@ on the host and are staged at operator entry. CPU optimization/inference
 control is unchanged; these forward reductions do not add a production source
 dispatcher.
 
-`tests/montecarlo/test_optical_cuda_parity.py` checks normal-disc and oblique
+`tests/montecarlo/spectrum/test_optical_cuda_parity.py` checks normal-disc and oblique
 annulus propagation, complex direct Green fields, FFT angular yields,
 hemisphere energy, polarized finite-plane flux, monochromatic power, and
 collected two-port voltages from paraxial device fields. Additional checks
@@ -1077,12 +1077,12 @@ staging the test (tests are not included in `pyrite remote sync`):
 
 ```bash
 PYRITE_TEST_BACKEND=cuda uv run --extra nvidia pyrite-dev test \
-  tests/montecarlo/test_optical_cuda_parity.py --durations=0
+  tests/montecarlo/spectrum/test_optical_cuda_parity.py --durations=0
 ```
 
 [Native-source hardware evidence](../../validation/check-records/optical-source-cuda.json)
 records 15 passing tests (SLURM 2279): eight source checks and the seven retained
-device-operator checks. `tests/montecarlo/test_optical_source_cuda.py` generates
+device-operator checks. `tests/montecarlo/spectrum/test_optical_source_cuda.py` generates
 normal-disc, oblique-annulus and displaced/arrival-phased fields directly on
 device with CPU Bessel calls disabled. It compares weighted sampled, temporal
 Gaussian and realized bunch moments, finite-plane flux and device pulse output;
@@ -1093,8 +1093,8 @@ Run it explicitly with the retained forward checks:
 
 ```bash
 PYRITE_TEST_BACKEND=cuda uv run --extra nvidia pyrite-dev test --slow \
-  tests/montecarlo/test_optical_source_cuda.py \
-  tests/montecarlo/test_optical_cuda_parity.py --durations=0
+  tests/montecarlo/spectrum/test_optical_source_cuda.py \
+  tests/montecarlo/spectrum/test_optical_cuda_parity.py --durations=0
 ```
 
 Source comparisons allow relative $10^{-10}$ and a peak-scaled $10^{-12}$

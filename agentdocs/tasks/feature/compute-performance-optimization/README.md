@@ -293,7 +293,7 @@ while implementing. No test references `_USE_JIT_LINE_PROLOGUE` or
       All bins are "significant" (>1e-3 of peak) in both cases. For scale, the
       repo's own accepted cross-path latitude for the batched line path is
       `BATCH_RTOL = 500 * eps_f32 = 5.96e-5`
-      (`tests/montecarlo/test_coherent_emission.py`); the measured
+      (`tests/montecarlo/coherent/test_coherent_emission.py`); the measured
       significant-bin error is ~170x tighter than that already-accepted bound.
       **Determinism: 3 consecutive prologue runs on identical inputs were
       bitwise identical (max repeat diff exactly 0.0)** for both materials —
@@ -695,7 +695,7 @@ Landed (CPU-verified only; no GPU was available in the authoring session):
 - [x] `simulate_trajectories(transport_core=...)`, default `"lockstep"`.
       Default path is unchanged and still bit-for-bit — asserted by test.
 - [x] 34 CPU tests + 10 CUDA-gated tests in
-      `tests/montecarlo/test_transport_per_electron.py`. Core suite: 1113
+      `tests/montecarlo/transport/test_transport_per_electron.py`. Core suite: 1113
       passed, 51 skipped.
 
 Measured on CPU: per-electron core vs lockstep core agree on backscatter
@@ -878,7 +878,7 @@ Open — needs a GPU session, in this order:
       to be worth making the helper case-aware. The 16 remaining copies are
       energy tabulations, not segments.
 
-      Gated by 9 tests in `tests/montecarlo/test_segment_staging.py`: identical
+      Gated by 9 tests in `tests/montecarlo/spectrum/test_segment_staging.py`: identical
       spectra from staged vs host segments (lines both coherences, and brem),
       dtypes and scalar fields carried through, staging idempotent, layer
       masking identical, and a case staging exactly once with all three kernels
@@ -1018,7 +1018,7 @@ Open — needs a GPU session, in this order:
       and invariance evidence, and stating plainly that any pinned spectrum
       above the threshold on a CUDA box must be regenerated.
 
-      23 new tests in `tests/montecarlo/test_transport_core_default.py`, none
+      23 new tests in `tests/montecarlo/runner/test_transport_core_default.py`, none
       needing a GPU — they patch the device probe, because what is under test is
       the decision, not the kernel: threshold behavior including both boundary
       sides, groove and no-device fallback, explicit values never substituted,

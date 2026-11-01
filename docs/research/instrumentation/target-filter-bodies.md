@@ -402,7 +402,7 @@ They are not blockers for the resolver/description study.
 | `tests/materials/test_material_catalog.py`, `test_external_catalog_identity.py`, `test_catalog_layout.py` | Namespace ambiguity, stack resolution, explicit selected-catalog behavior, no path-dependent physical identity, schema/pickle compatibility |
 | `tests/cli/test_profile.py`, `test_profile_user_layer.py` | Filter CRUD/JSON/order, recipe/profile vocabulary, complete external catalogs and user-layer writes preserved |
 | `tests/observations/test_store.py`, `test_produce.py`, `test_sweep.py` | Old schema reads, unchanged observation reuse, source reuse after filter-only edits |
-| `tests/montecarlo/test_trajectory_scene.py`, `tests/plots/test_trajectory_builders.py` | Stored scene reference/transform, old scene-less capture reads, historical geometry preserved after catalog edits |
+| `tests/montecarlo/runner/test_trajectory_scene.py`, `tests/plots/test_trajectory_builders.py` | Stored scene reference/transform, old scene-less capture reads, historical geometry preserved after catalog edits |
 
 Design review has approved the component boundary, initial adapter limits and
 parity gates. Follow-up dispatch must specify the implementation slice and

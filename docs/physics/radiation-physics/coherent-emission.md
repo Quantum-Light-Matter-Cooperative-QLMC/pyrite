@@ -83,7 +83,7 @@ Finite crystal footprints (`crystal_width_mm`/`crystal_height_mm`) need one extr
 
 ## Validation boundary
 
-The `coherent-emission` and `coherent-segment-midpoint-time` rows are `rederived`: fresh-context derivations reproduced the phase, the midpoint pairing, and the decoherent limits with no divergent sign, factor, or unit, and the limits above are anchored in `tests/montecarlo/test_coherent_emission.py`. The batched evaluation route `coherent-line-hkl-batch` is only `filtered`. The combined longitudinal/transverse decoherence blend is its own `rederived` row, `coherent-inter-electron-decoherence`.
+The `coherent-emission` and `coherent-segment-midpoint-time` rows are `rederived`: fresh-context derivations reproduced the phase, the midpoint pairing, and the decoherent limits with no divergent sign, factor, or unit, and the limits above are anchored in `tests/montecarlo/coherent/test_coherent_emission.py`. The batched evaluation route `coherent-line-hkl-batch` is only `filtered`. The combined longitudinal/transverse decoherence blend is its own `rederived` row, `coherent-inter-electron-decoherence`.
 
 **Human sign-off is still pending on all of them**, and the following remain open before scientific use:
 

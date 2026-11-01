@@ -221,9 +221,9 @@ The ledger row `gpu-transport-core` records the core-selection and reproducibili
 
 ```bash
 pyrite-dev test \
-  tests/montecarlo/test_transport_per_electron.py \
-  tests/montecarlo/test_transport_core_default.py \
-  tests/montecarlo/test_segment_staging.py
+  tests/montecarlo/transport/test_transport_per_electron.py \
+  tests/montecarlo/runner/test_transport_core_default.py \
+  tests/montecarlo/spectrum/test_segment_staging.py
 ```
 
 `test_transport_per_electron.py` checks the transport kernel's properties. `test_transport_core_default.py` checks selection and routing with a patched device probe, so those checks need no GPU.

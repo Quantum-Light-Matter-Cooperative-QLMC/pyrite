@@ -218,7 +218,7 @@ $\operatorname{tr}Q_F(Z)$ to $10^{-16}$.
   `_eigen` returned `None` and `evolve` equaled `expm` exactly. On the main
   model ($\kappa(R)=2.65$), the eigen form agreed with `expm` to
   $2\times10^{-16}$, and the no-jump norm was monotone over 300 Å.
-- `pyrite-dev test tests/montecarlo/test_channeling_axial_jump_unraveling.py`:
+- `pyrite-dev test tests/montecarlo/quantum/test_channeling_axial_jump_unraveling.py`:
   11 passed.
 
 Verdict: `rederived`. The regression file satisfies the anchor requirement for

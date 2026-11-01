@@ -124,7 +124,7 @@ The scratch scripts were run against the installed release tables. They used an 
 - **Measure invariance.** On a synthetic four-row table, replacing `schiff_density` by $(\sin\theta + 10^{-3})(1 + 7x + T)\,B$ changes the raw filled shapes by up to 12.8 %. After the $d\Omega$ renormalization the change is $1.1\times10^{-15}$. This confirms that the result depends only on the final normalization measure.
 - **Synthetic limits and refusal.** The $x = 0$ column and the complete rows are returned bit-identical. A NaN or a zero in an extension row's $x \le 0.95$ SDCS, or `complete_rows = 0`, each raises `ValueError`.
 - **$x \to 0^+$ of 2BS** (W, 100 MeV, $\theta \in [0,\pi]$): $\max\lvert R-1\rvert$ is 0.37, 0.067 and $2.3\times10^{-5}$ at $x = 10^{-2}$, $10^{-4}$ and $10^{-6}$. The limit is pointwise and non-uniform at large $\theta$, as derived. Staging never evaluates $R$ below $x = 0.1$.
-- **Anchors.** `tests/montecarlo/test_bremsstrahlung_extension.py` and the `build_table` extension test in `tests/xsgen/test_bremslib.py`: 15 passed.
+- **Anchors.** `tests/montecarlo/brem/test_bremsstrahlung_extension.py` and the `build_table` extension test in `tests/xsgen/test_bremslib.py`: 15 passed.
 
 ## Verdict
 

@@ -138,7 +138,7 @@ post-collision pixels/filters, and remote benchmarks are separate slices.
 
 ## Evidence and status
 
-`tests/montecarlo/test_photon_sources.py` exercises constant-rate analytic
+`tests/montecarlo/transport/test_photon_sources.py` exercises constant-rate analytic
 normalization, full-sphere directions, sampled segment positions, an explicit
 energy–angle correlation, deterministic replay, empty/invalid input, a
 BremsLib synthetic-table check against its angle-integrated SDCS, and the

@@ -107,7 +107,7 @@ scaled the gain with maximum error $5.56\times10^{-17}$ Å$^{-1}$.
 Zero variance and zero string density both returned exact zero.
 
 The project runner passed all 12 tests in
-`tests/montecarlo/test_channeling_axial_escape_accounting.py`, including its
+`tests/montecarlo/quantum/test_channeling_axial_escape_accounting.py`, including its
 separate 16-by-16 Gaussian quadrature, coherent interference, plane-wave
 rate reduction and zero-limit checks. All eight `tests/dev/test_docs.py`
 checks passed.
@@ -321,7 +321,7 @@ note names both causes. This is a wording nuance outside the function's scope;
 it does not affect the closure.
 
 The project runner passed all 17 tests in
-`tests/montecarlo/test_channeling_axial_escape_accounting.py`.
+`tests/montecarlo/quantum/test_channeling_axial_escape_accounting.py`.
 
 Out-of-scope aside: the `_tds_transform` docstring labels its result
 [eV² Å⁶]. Its quadrature is $\int d^2q\,v^2$ with $v$ in eV Å$^3$, which gives
@@ -548,7 +548,7 @@ Si [001] at 5 MeV, $\pm10$ orders (441 states), $\hbar v=1964.77$ eV Å:
   rounding nit: the 175.3 eV, $3\times10^4$ Å entry is 0.020549, printed as
   0.0205.
 - **Tests.** The project runner passed all 6 tests in
-  `tests/montecarlo/test_channeling_axial_matching_study.py`.
+  `tests/montecarlo/quantum/test_channeling_axial_matching_study.py`.
 
 ## Characterisation discrepancies
 
@@ -780,7 +780,7 @@ correct. An area of $c^2A$ would scale $W$ by $1/c^2$, and the agreement rules
 that out. $\Gamma_a-\sum_bW_{ba}\ge1.9\times10^{-4}$ for every state.
 
 **Tests.** The project runner passed all 8 tests in
-`tests/montecarlo/test_channeling_axial_matching_study.py`. The new $2\times2$
+`tests/montecarlo/quantum/test_channeling_axial_matching_study.py`. The new $2\times2$
 test sums `periodic_tds_rates` over four image strings on the fine lattice. That
 is a different route, but it shares `_kraus`. The real-space check above is
 independent of it.
@@ -1261,7 +1261,7 @@ old projector would refuse it at tolerance $10^{-9}$. The run accepts it
 A post-jump state in $F(\mathbf q')$ is refused. An unprojected, normalized
 entry state with a finite cut is refused.
 
-The eight tests in `tests/montecarlo/test_channeling_axial_projection.py`
+The eight tests in `tests/montecarlo/quantum/test_channeling_axial_projection.py`
 pass in 0.82 s. `checks/axial_mcwf_return_flux.py --smoke --projected-no-jump`
 completes in 6 s and emits `spectral_comparison`
 (`finite-grid-spectral-expm-v1`).
@@ -1497,7 +1497,7 @@ identity.
 Read after the derivation above: `GridProjector.cross_cut_loss`,
 `MatchingDiagnostics`, `projective_hook` and `_setup`/`_job` in
 `checks/axial_mcwf_return_flux.py`, and the matching tests in
-`tests/montecarlo/test_channeling_axial_mcwf_return_flux.py`.
+`tests/montecarlo/quantum/test_channeling_axial_mcwf_return_flux.py`.
 
 ### What should be computed
 

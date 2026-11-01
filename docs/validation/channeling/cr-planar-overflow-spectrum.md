@@ -134,7 +134,7 @@ particle band, and refusal of an unresolved tail. In particular the
 incoming amplitudes $(1,i)/\sqrt2$ and transfer amplitudes $(1,i)$ yield
 total gain 3, rather than the diagonal-only value 2; this distinguishes the
 required coherence convention. All six tests in
-`tests/montecarlo/test_channeling_overflow.py` passed independently (0.73 s).
+`tests/montecarlo/channeling/test_channeling_overflow.py` passed independently (0.73 s).
 
 - **Claim:** `cr-planar-overflow-spectrum` —
   `montecarlo/channeling/overflow.py::{overflow_spectrum,_outgoing_diagonal,OverflowSpectrum.sample_angles}`

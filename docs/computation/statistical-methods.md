@@ -196,7 +196,7 @@ So $r_n \le \varepsilon$ already implies $\mathrm{ESS}_n \gtrsim 1/\varepsilon^2
 
 **Per-bin errors.** Optionally, after the final reduction, each equal block of the realized run is reduced as one batch on the final grids. The per-bin batch-means standard error $s(\{\bar{S}_b\})/\sqrt{K}$ over $K$ batches is reported for `spec` and `brem_wide` in a requested band. It never drives the stop, because the line grid is unknown while transport runs.
 
-**Measured behaviour.** These are the regression tests in `tests/montecarlo/test_adaptive_stopping.py`:
+**Measured behaviour.** These are the regression tests in `tests/montecarlo/runner/test_adaptive_stopping.py`:
 
 * A Gaussian population $\mathcal{N}(1, 0.5^2)$ at $\varepsilon = 5\,\%$ over 1000 seeds stops at about 100 electrons. The interval $\pm 1.96\, r_N$ covers the mean in 93.4 % of seeds with no guards and 94.3 % with the defaults, at 95 % nominal. The stopping bias is $+0.11\varepsilon$ without guards and $+0.03\varepsilon$ with them. Chow and Robbins show that this coverage tends to nominal as $\varepsilon \to 0$. The small positive bias is the sequential effect of stopping when $\bar{m}$ is high, because the denominator of $r_n$ is then large.
 * The light real case is hopg at 30 keV, 1 µm thick, with the line mass watched. Its per-electron distribution has skewness about 8 and CV about 1. At $\varepsilon = 10\,\%$ with $n_{\min} = 200$, 20 seeds stop at 200–440 electrons. All 20 lie within $1.96\varepsilon$ of the pooled 16 000-electron mean. The paired stopping bias is $+0.06\,\% \pm 1.5\,\%$, below every reported error.

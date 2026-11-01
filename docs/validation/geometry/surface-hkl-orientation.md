@@ -529,7 +529,7 @@ HOPG is $a=b=2.461$, $c=6.711$ Å, $\gamma=120^\circ$. The check used `surface_h
 
 ### 9.4 Anchor tests
 
-`PYRITE_MC_BACKEND=cpu UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test tests/scan/test_crystal_cut.py tests/montecarlo/test_surface_orientation.py`: 41 passed in 2.4 s. No heavy Monte Carlo was run.
+`PYRITE_MC_BACKEND=cpu UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test tests/scan/test_crystal_cut.py tests/montecarlo/transport/test_surface_orientation.py`: 41 passed in 2.4 s. No heavy Monte Carlo was run.
 
 ### 9.5 Verdict
 

@@ -30,7 +30,7 @@ E_end  = E_start + (dE/ds)((E_start + E_pred)/2) · s
 Dt     = s / beta((E_start + E_end)/2)                    [Ang, c = 1]
 ```
 
-with the Joy--Luo CSDA `dE/ds` ledgered under `electron-transport`. The check script re-implements exactly this pair in `_advance` so that both rules can be applied to one fixed set of physical flights; the lockstep core is the authority and `tests/montecarlo/test_transport_energy_model.py` pins the two against each other.
+with the Joy--Luo CSDA `dE/ds` ledgered under `electron-transport`. The check script re-implements exactly this pair in `_advance` so that both rules can be applied to one fixed set of physical flights; the lockstep core is the authority and `tests/montecarlo/transport/test_transport_energy_model.py` pins the two against each other.
 
 The convergence criterion for the coherent kernel comes from the kernel's own weight. `mc_cxr_spectrum(coherent=True)` forms
 

@@ -126,7 +126,7 @@ These match the README table. `water_p_below` has $\beta n\le0.7399\times1.33=0.
 
 ## Tests run
 
-`UV_CACHE_DIR=~/.cache/pyrite-uv-cache uv run pyrite-dev test tests/montecarlo/test_cherenkov.py tests/montecarlo/test_cherenkov_geant4_reference.py` gave 41 passed and 2 skipped. The two skips are the energy and angle checks of the zero-yield proton case, which are skipped by design. Its zero-yield total check passes.
+`UV_CACHE_DIR=~/.cache/pyrite-uv-cache uv run pyrite-dev test tests/montecarlo/spectrum/test_cherenkov.py tests/montecarlo/spectrum/test_cherenkov_geant4_reference.py` gave 41 passed and 2 skipped. The two skips are the energy and angle checks of the zero-yield proton case, which are skipped by design. Its zero-yield total check passes.
 
 ## Findings
 

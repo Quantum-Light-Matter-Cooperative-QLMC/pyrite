@@ -145,7 +145,7 @@ Si ⟨001⟩ (one string per $1.920\times1.920$ Å cell, $\lambda=0.18413$ Å⁻
 
 The sampler follows $p\,g$, not the prior $p$. Cost: about 25 ms per TDS jump on this 24² grid.
 
-**6. Anchor tests.** `pyrite-dev test --slow tests/montecarlo/test_channeling_axial_dissipator.py`: 9 passed (31 s), including the MCWF-against-Strang-Lindblad comparison (TDS only, 12²).
+**6. Anchor tests.** `pyrite-dev test --slow tests/montecarlo/quantum/test_channeling_axial_dissipator.py`: 9 passed (31 s), including the MCWF-against-Strang-Lindblad comparison (TDS only, 12²).
 
 ## Findings
 
@@ -161,7 +161,7 @@ The sampler follows $p\,g$, not the prior $p$. Cost: about 25 ms per TDS jump on
 
 The implementation follow-up adds
 `test_electronic_mcwf_matches_homogeneous_lindblad` in
-`tests/montecarlo/test_channeling_axial_dissipator.py`. This is an analytic
+`tests/montecarlo/quantum/test_channeling_axial_dissipator.py`. This is an analytic
 regression oracle, not an extension of the fresh-context verdict above.
 
 Keep the silicon electronic transfer nodes and weights, but set the electron

@@ -100,7 +100,7 @@ was found.
   reduction with the generic chunked CUDA fallback on identical segments.
 - Local collection passes with the CUDA test skipped because this worktree has
   no CuPy/CUDA device. Run it on the lab box with:
-  `PYRITE_TEST_BACKEND=cuda UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test tests/montecarlo/test_spectrum_cuda_cheap_hoists.py -k nonuniform_eedl_continuum_matches_chunked_cuda_fallback`.
+  `PYRITE_TEST_BACKEND=cuda UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test tests/montecarlo/spectrum/test_spectrum_cuda_cheap_hoists.py -k nonuniform_eedl_continuum_matches_chunked_cuda_fallback`.
 
 ## Derived photon-continuum floor and the detector's own zero edge
 

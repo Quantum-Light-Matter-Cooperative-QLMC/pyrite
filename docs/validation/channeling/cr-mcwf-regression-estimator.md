@@ -313,7 +313,7 @@ subnormalized parent with $\|\phi\|^2=0.37$:
   $\phi=|e\rangle$: the estimator reproduces $e^{-i\omega\tau-\gamma\tau/2}$ to
   printed precision (eight digits), including the negative phase.
 
-The anchor module `tests/montecarlo/test_axial_mcwf_regression.py` passes
+The anchor module `tests/montecarlo/quantum/test_axial_mcwf_regression.py` passes
 (13 tests).
 
 ### Zero-scattering axial adapter oracle

@@ -50,11 +50,11 @@ fi
 if command -v nvidia-smi >/dev/null; then nvidia-smi -q > "$OUT/gpu.txt"; fi
 # Validation gates before timing; each backend is selected in a fresh process.
 PYRITE_MC_BACKEND=cpu "$UV" run --no-sync pyrite-dev test \
-    tests/montecarlo/test_hard_radiative_completion_795.py \
-    tests/montecarlo/test_hard_radiative.py > "$OUT/tests-cpu.log" 2>&1
+    tests/montecarlo/cascades/test_hard_radiative_completion_795.py \
+    tests/montecarlo/cascades/test_hard_radiative.py > "$OUT/tests-cpu.log" 2>&1
 PYRITE_MC_BACKEND=cuda "$UV" run --no-sync pyrite-dev test \
-    tests/montecarlo/test_hard_radiative_completion_795.py \
-    tests/montecarlo/test_hard_radiative_cuda.py > "$OUT/tests-cuda.log" 2>&1
+    tests/montecarlo/cascades/test_hard_radiative_completion_795.py \
+    tests/montecarlo/cascades/test_hard_radiative_cuda.py > "$OUT/tests-cuda.log" 2>&1
 "$UV" run --no-sync pyrite-dev complexity --check > "$OUT/complexity.log" 2>&1
 SCRIPT=checks/equal_precision/benchmark_completion_795.py
 # Interleave variants and reverse order for alternating seeds to reduce time drift.

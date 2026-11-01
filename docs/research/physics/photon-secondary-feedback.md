@@ -340,7 +340,7 @@ experimental analysis artifact, not a production checkpoint or source replay.
 
 ## Evidence and remaining validation
 
-`tests/montecarlo/test_photon_feedback.py` checks annihilation energy and
+`tests/montecarlo/transport/test_photon_feedback.py` checks annihilation energy and
 momentum, sampled impact-vacancy emission, real silicon electron/positron
 energy closure, escaped rest energy, Auger feedback/caps, source population
 and cutoff bookkeeping, and removal of pending pair rest energy in the

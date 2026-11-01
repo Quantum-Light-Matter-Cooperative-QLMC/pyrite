@@ -53,7 +53,7 @@ full-stack attenuation and population kwargs as before. Descriptor selection
 uses case model strings; it neither constructs a full resolved view nor loads a
 whole identity/table inventory merely to dispatch. EEDL loads no BremsLib tables.
 
-`tests/montecarlo/test_emission_adapters.py` registers a test-only constant CXR
+`tests/montecarlo/spectrum/test_emission_adapters.py` registers a test-only constant CXR
 producer in a local catalog and exercises the existing `spec` slot through live
 scoring without a new branch in `_spectrum_case_impl`. It also checks shared
 staging, different populations, native interpolation, CXR accumulator references,

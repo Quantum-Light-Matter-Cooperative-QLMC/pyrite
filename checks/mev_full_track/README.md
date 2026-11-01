@@ -136,7 +136,7 @@ so their ratios carry large errors. All of them pass within 3σ.
   is why `ks_loss` is about 0.5 there. The mean losses differ by less than
   0.5 %.
 
-`tests/montecarlo/test_mev_full_track.py` pins these reductions and the
+`tests/montecarlo/transport/test_mev_full_track.py` pins these reductions and the
 control. It also reruns Si 30 MeV and W 10 MeV at 300 primaries against the
 Geant4 gates; these runs are marked slow.
 

@@ -19,7 +19,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 - **Source:** `docs/physics/materials/crystal-mosaicity.md`
 - **Status:** rederived
 - **Checks:** `1/π` normalization, positive symmetric weights, radial variance, proper rotations, η→0, constant-spectrum preservation, and incoherent intensity average checked
-- **Anchor:** `checks/mosaic_mc_check.py`; `tests/montecarlo/test_mosaic_mc.py`
+- **Anchor:** `checks/mosaic_mc_check.py`; `tests/montecarlo/spectrum/test_mosaic_mc.py`
 - **Notes:** broadens PXR+CBS; no grazing divergence; [validation write-up](materials/mosaic-mc.md)
 
 ## `multilayer-stack`

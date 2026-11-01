@@ -347,7 +347,7 @@ amplitude, and temporal-characteristic-function comparisons passed at
 relative tolerance $10^{-14}$; interval and future-frequency upper bounds
 enclosed the directly computed factors.
 
-`tests/montecarlo/test_bunch_front_tilt.py`: 19 passed in 0.93 s, including
+`tests/montecarlo/transport/test_bunch_front_tilt.py`: 19 passed in 0.93 s, including
 the matching-face contract, independent ray-phase/Gaussian comparison,
 brute-force averaging, signed slopes, conditional/marginal variance, and
 unchanged zero-tilt/random-stream behavior.

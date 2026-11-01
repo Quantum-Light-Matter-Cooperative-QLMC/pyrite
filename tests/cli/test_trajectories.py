@@ -11,7 +11,7 @@ from pyrite.montecarlo import trajectory_inventory
 from pyrite.montecarlo.trajectories import write_trajectory_artifact
 from tests.helpers.cli import invoke
 from tests.helpers.trajectory_schema import downgrade
-from tests.montecarlo.test_trajectory_selection import _CASE, _secondaries
+from tests.montecarlo.runner.test_trajectory_selection import _CASE, _secondaries
 
 _PROVENANCE = {"checkpoint_stem": "hopg@demo", "profile": "demo", "fidelity": "quick"}
 

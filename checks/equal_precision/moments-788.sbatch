@@ -21,6 +21,6 @@ mkdir -p "$out"
 cp .pyrite-sync "$out/sync.json"
 scontrol show job "$SLURM_JOB_ID" > "$out/job.txt"
 nvidia-smi -q > "$out/gpu.txt"
-uv run --no-sync pyrite-dev test tests/montecarlo/test_radiative_moments_cuda.py \
+uv run --no-sync pyrite-dev test tests/montecarlo/cascades/test_radiative_moments_cuda.py \
     --durations=0 > "$out/cuda-tests.log" 2>&1
 uv run --no-sync python checks/equal_precision/qualify_moments.py "$out/components.json"

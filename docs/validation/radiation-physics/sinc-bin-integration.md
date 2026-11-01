@@ -61,7 +61,7 @@ and the bracket is $1$ exactly when $x_i < 0 \le x_{i+1}$ and $0$ otherwise. Wit
 | Tail accuracy | $R(x)\cdot(-2\pi^2 x) - 1 \le 1/x$ at $x = 10^4, 10^7, 10^{10}$ |
 | Sign | a bin mass is non-negative (up to rounding) because the integrand is; bins wholly on one side of the resonance never receive the whole-line term |
 
-Anchor: `tests/montecarlo/test_sinc_bin_integration.py`, `tests/montecarlo/test_sinc_bin_integration_cuda.py`, `tests/energy-grid/test_line_grid_quadrature.py`.
+Anchor: `tests/montecarlo/spectrum/test_sinc_bin_integration.py`, `tests/montecarlo/spectrum/test_sinc_bin_integration_cuda.py`, `tests/energy-grid/test_line_grid_quadrature.py`.
 
 ## Si evaluators
 

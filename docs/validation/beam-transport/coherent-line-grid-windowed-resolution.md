@@ -3777,7 +3777,7 @@ These stubbed primitive checks validate composition and accounting only.
 Maintained checks: **104 passed** across
 `tests/energy-grid/test_coherent_band_audit.py`,
 `tests/energy-grid/test_coherent_spectrum_audit.py`,
-`tests/montecarlo/test_coherent_physical_population.py` and
+`tests/montecarlo/coherent/test_coherent_physical_population.py` and
 `tests/dev/test_docs.py`. They include aligned and opposed analytic fields,
 variable coefficients crossing one, exact-zero fields, initialization refusal,
 full-axis signed yield and centroid refusal, and capture of physical pair

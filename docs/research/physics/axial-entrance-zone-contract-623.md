@@ -194,9 +194,9 @@ This is not proof that a user-defined process partition is physically complete.
 
 ```sh
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test \
-  tests/montecarlo/test_channeling_axial_zone_handoff.py \
-  tests/montecarlo/test_channeling_axial_source_assembly.py \
-  tests/montecarlo/test_channeling_axial_phase_space.py
+  tests/montecarlo/quantum/test_channeling_axial_zone_handoff.py \
+  tests/montecarlo/quantum/test_channeling_axial_source_assembly.py \
+  tests/montecarlo/quantum/test_channeling_axial_phase_space.py
 ```
 
 The first two cover the accounting, candidate conversion and supplied-source

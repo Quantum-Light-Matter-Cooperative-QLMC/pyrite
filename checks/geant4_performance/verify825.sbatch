@@ -21,7 +21,7 @@ out="evidence/verify825/$SLURM_JOB_ID"; mkdir -p "$out"
 cp CODE_SHA "$out/" 2>/dev/null || true
 uv sync --package pyrite-mc --no-default-groups --group test --extra nvidia --locked -q
 PYRITE_SLOW_TESTS=1 uv run --no-sync python -m pytest -q -p no:cacheprovider \
-    tests/montecarlo/test_transport_continuation_cuda.py tests/montecarlo/test_transport_continuation.py \
+    tests/montecarlo/transport/test_transport_continuation_cuda.py tests/montecarlo/transport/test_transport_continuation.py \
     > "$out/tests.log" 2>&1
 echo "rc=$? tests"
 uv run --no-sync python checks/equal_precision/prepare_stopping.py > /dev/null

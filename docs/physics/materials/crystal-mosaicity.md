@@ -28,7 +28,7 @@ added **in quadrature** with the energy-dispersive spectrometer (EDS) resolution
 - `data/catalog/crystals/<key>.toml` — optional per-crystal `mosaic_fwhm_deg`; the immutable `materials.CATALOG` and `materials.crystal.load_crystals` surface it.
 - `Scene(target=Slab(…, mosaic=True), …)` → public case lowering → `case["mosaic_fwhm_rad"]`. `mosaic` is target state; the width comes from the catalog crystal. Route and quadrature controls live under `Numerics.convergence`.
 - `plots.plot_mosaic_comparison` — overlay grades from one record.
-- Tests: `tests/montecarlo/test_mosaic.py`.
+- Tests: `tests/montecarlo/spectrum/test_mosaic.py`.
 
 ### Model Limitations
 
@@ -66,7 +66,7 @@ The **detailed lineshape converges slowly when the mosaic spread ≫ the unbroad
 - `montecarlo.mc_cxr_spectrum(..., mosaic_fwhm_rad, mosaic_nodes)` — the orientation loop.
 - `montecarlo.run_case` / `_spectrum_case` — read `case["mosaic_mc_fwhm_rad"]` / `case["mosaic_mc_nodes"]`.
 - `Scene(target=Slab(…, mosaic=True), …)` with `Numerics(cxr_reflections=CxrReflections(mosaic_route="mc", mosaic_nodes=…))` sets the `mosaic_mc_*` case keys **and turns the analyti `store_result` term off** — the two routes are mutually exclusive (applying both double-counts the broadening).
-- Checks: `checks/mosaic_mc_check.py`; synthetic unit tests (quadrature + wiring): `tests/montecarlo/test_mosaic_mc.py`.
+- Checks: `checks/mosaic_mc_check.py`; synthetic unit tests (quadrature + wiring): `tests/montecarlo/spectrum/test_mosaic_mc.py`.
 
 ```python
 import pyrite as pr

@@ -307,11 +307,11 @@ an escape (`test_photon_outside_epdl_domain_is_refused`).
 ## Anchoring (2026-10-02)
 
 The ledger row moved from `rederived` to `anchored` after the verdict above.
-`tests/montecarlo/test_pair_production.py::test_first_interaction_depth_follows_layered_optical_depth`
+`tests/montecarlo/cascades/test_pair_production.py::test_first_interaction_depth_follows_layered_optical_depth`
 pins the escape probability, the piecewise optical-depth CDF and the per-layer
 pair share for an oblique ray through three layers. The pins sit beside the
 single-slab, backward-crossing and finite-footprint tests already listed.
-`tests/montecarlo/test_pair_production_cuda.py` passed on an RTX 5080. The
+`tests/montecarlo/cascades/test_pair_production_cuda.py` passed on an RTX 5080. The
 pair cascade on the CUDA core is deterministic, and its generation-0 events
 replay exactly through the host step. It also closes the energy balance per
 history, and its pair counts agree with the per-electron core. Mode-off

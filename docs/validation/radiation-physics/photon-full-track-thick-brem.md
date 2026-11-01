@@ -60,7 +60,7 @@ correlations from common electron histories. The earlier reducer ignored
 denominator fluctuations and line-window covariance; repairing these errors
 leaves the same two failures. Tolerances have not been changed.
 
-`tests/montecarlo/test_photon_full_track.py` tests exact cancellation for
+`tests/montecarlo/transport/test_photon_full_track.py` tests exact cancellation for
 correlated synthetic blocks, verifies compact projections, and pins all
 eight cases with exactly the two unresolved failures. This is a regression
 of the discrepancy, not a successful physics anchor. Running the standalone
@@ -334,7 +334,7 @@ charged feedback or general shower validation is implied. Human sign-off
 remains separate.
 
 Verification: `UV_CACHE_DIR=/tmp/pyrite-uv-cache PYRITE_MC_BACKEND=cpu uv run
-pyrite-dev test tests/montecarlo/test_photon_full_track.py tests/dev/test_docs.py`
+pyrite-dev test tests/montecarlo/transport/test_photon_full_track.py tests/dev/test_docs.py`
 passed **32 tests**. The documentation build with writable uv tool directories
 passed, including the marimo demo export; rendered mathematics was inspected
 in the generated validation page.

@@ -1,5 +1,6 @@
 """Tests for the repository developer command runner."""
 
+import fnmatch
 from argparse import Namespace
 from types import SimpleNamespace
 
@@ -369,40 +370,40 @@ def test_formatter_regenerates_and_commits_cli_reference(dev_module) -> None:
 @pytest.mark.parametrize(
     ("path", "owner"),
     [
-        ("montecarlo/test_transport_per_electron.py", "transport"),
-        ("montecarlo/test_coupled_radiative_runner.py", "transport-cascades"),
-        ("montecarlo/test_radiative_moments.py", "transport-cascades"),
-        ("montecarlo/test_radiative_moments_cuda.py", "transport-cascades"),
-        ("montecarlo/test_shell_secondary_transport.py", "transport-cascades"),
-        ("montecarlo/test_pair_production.py", "transport-cascades"),
-        ("montecarlo/test_shell_partition.py", "transport-collisions"),
-        ("montecarlo/test_straggling_surface.py", "transport-collisions"),
-        ("montecarlo/test_trajectory_capture.py", "transport-runner"),
-        ("montecarlo/test_gpu_oom_retry.py", "transport-runner"),
-        ("montecarlo/test_brem_events.py", "spectrum-brem"),
-        ("montecarlo/test_positron_brems.py", "spectrum-brem"),
-        ("montecarlo/test_beam_energy_spread_grid.py", "spectrum"),
-        ("montecarlo/test_coherent_emission.py", "spectrum-coherent"),
-        ("montecarlo/test_temporal_profile.py", "spectrum-coherent"),
-        ("montecarlo/test_transition_radiation.py", "spectrum"),
-        ("montecarlo/test_optical_finite_screen.py", "spectrum"),
-        ("montecarlo/test_optical_cuda_parity.py", "spectrum"),
-        ("montecarlo/test_dtr_history.py", "spectrum"),
-        ("montecarlo/test_dtr_production.py", "spectrum"),
-        ("montecarlo/test_dielectric_suppression.py", "spectrum-brem"),
-        ("montecarlo/test_dielectric_radiative.py", "transport-cascades"),
-        ("montecarlo/test_dielectric_radiative_cuda.py", "transport-cascades"),
-        ("montecarlo/test_dielectric_runner_scorer.py", "transport-cascades"),
-        ("montecarlo/test_dielectric_loss.py", "transport-collisions"),
-        ("montecarlo/test_channeling_handoff.py", "channeling"),
-        ("montecarlo/test_channeling_replay.py", "channeling"),
-        ("montecarlo/test_channeling_emission.py", "quantum"),
-        ("montecarlo/test_channeling_density.py", "quantum"),
-        ("montecarlo/test_channeling_axial.py", "quantum"),
-        ("montecarlo/test_channeling_axial_dissipator.py", "quantum"),
-        ("montecarlo/test_channeling_axial_emission.py", "quantum"),
-        ("montecarlo/test_channeling_states.py", "quantum"),
-        ("montecarlo/test_channeling_vortex.py", "quantum"),
+        ("montecarlo/transport/test_transport_per_electron.py", "transport"),
+        ("montecarlo/cascades/test_coupled_radiative_runner.py", "transport-cascades"),
+        ("montecarlo/cascades/test_radiative_moments.py", "transport-cascades"),
+        ("montecarlo/cascades/test_radiative_moments_cuda.py", "transport-cascades"),
+        ("montecarlo/cascades/test_shell_secondary_transport.py", "transport-cascades"),
+        ("montecarlo/cascades/test_pair_production.py", "transport-cascades"),
+        ("montecarlo/collisions/test_shell_partition.py", "transport-collisions"),
+        ("montecarlo/collisions/test_straggling_surface.py", "transport-collisions"),
+        ("montecarlo/runner/test_trajectory_capture.py", "transport-runner"),
+        ("montecarlo/runner/test_gpu_oom_retry.py", "transport-runner"),
+        ("montecarlo/brem/test_brem_events.py", "spectrum-brem"),
+        ("montecarlo/brem/test_positron_brems.py", "spectrum-brem"),
+        ("montecarlo/spectrum/test_beam_energy_spread_grid.py", "spectrum"),
+        ("montecarlo/coherent/test_coherent_emission.py", "spectrum-coherent"),
+        ("montecarlo/coherent/test_temporal_profile.py", "spectrum-coherent"),
+        ("montecarlo/spectrum/test_transition_radiation.py", "spectrum"),
+        ("montecarlo/spectrum/test_optical_finite_screen.py", "spectrum"),
+        ("montecarlo/spectrum/test_optical_cuda_parity.py", "spectrum"),
+        ("montecarlo/spectrum/test_dtr_history.py", "spectrum"),
+        ("montecarlo/spectrum/test_dtr_production.py", "spectrum"),
+        ("montecarlo/brem/test_dielectric_suppression.py", "spectrum-brem"),
+        ("montecarlo/cascades/test_dielectric_radiative.py", "transport-cascades"),
+        ("montecarlo/cascades/test_dielectric_radiative_cuda.py", "transport-cascades"),
+        ("montecarlo/cascades/test_dielectric_runner_scorer.py", "transport-cascades"),
+        ("montecarlo/collisions/test_dielectric_loss.py", "transport-collisions"),
+        ("montecarlo/channeling/test_channeling_handoff.py", "channeling"),
+        ("montecarlo/channeling/test_channeling_replay.py", "channeling"),
+        ("montecarlo/quantum/test_channeling_emission.py", "quantum"),
+        ("montecarlo/quantum/test_channeling_density.py", "quantum"),
+        ("montecarlo/quantum/test_channeling_axial.py", "quantum"),
+        ("montecarlo/quantum/test_channeling_axial_dissipator.py", "quantum"),
+        ("montecarlo/quantum/test_channeling_axial_emission.py", "quantum"),
+        ("montecarlo/quantum/test_channeling_states.py", "quantum"),
+        ("montecarlo/quantum/test_channeling_vortex.py", "quantum"),
         ("materials/test_channeling_profile.py", "quantum"),
         ("energy-grid/test_coherent_line_grid.py", "energy-grid"),
         ("materials/test_crystallography.py", "materials"),
@@ -419,17 +420,58 @@ def test_domain_suite_ownership(dev_module, path, owner) -> None:
 
 
 def test_new_modules_join_their_domain_or_core(dev_module, tmp_path) -> None:
-    for relative in ("montecarlo/test_new_transport.py", "test_new_shared.py"):
+    for relative in ("montecarlo/transport/test_new_transport.py", "test_new_shared.py"):
         path = tmp_path / "tests" / relative
         path.parent.mkdir(parents=True, exist_ok=True)
         path.touch()
 
     assert dev_module.test_files_for_suite("transport", tmp_path) == [
-        tmp_path / "tests/montecarlo/test_new_transport.py"
+        tmp_path / "tests/montecarlo/transport/test_new_transport.py"
     ]
     assert dev_module.test_files_for_suite("core", tmp_path) == [
         tmp_path / "tests/test_new_shared.py"
     ]
+
+
+def test_directory_suites_name_primary_suites(dev_module) -> None:
+    owners = list(dev_module.TEST_SUITE_DIRECTORIES.values())
+
+    assert set(owners) <= set(dev_module.PRIMARY_TEST_SUITE_NAMES)
+    assert len(owners) == len(set(owners))
+
+
+def test_every_primary_suite_has_an_owner_rule(dev_module) -> None:
+    owners = {*dev_module.TEST_SUITE_PATTERNS, *dev_module.TEST_SUITE_DIRECTORIES.values()}
+
+    assert owners == set(dev_module.PRIMARY_TEST_SUITE_NAMES) - {"core"}
+
+
+def test_montecarlo_root_holds_only_listed_exceptions(dev_module) -> None:
+    """Monte Carlo modules live in suite directories; the root is for exceptions."""
+    root = dev_module.ROOT / "tests" / "montecarlo"
+    unlisted = [
+        path.name
+        for path in root.glob("test_*.py")
+        if not any(
+            fnmatch.fnmatchcase(f"montecarlo/{path.name}", pattern)
+            for patterns in dev_module.TEST_SUITE_PATTERNS.values()
+            for pattern in patterns
+        )
+    ]
+
+    assert unlisted == []
+
+
+@pytest.mark.parametrize("directory", sorted(dev_cli.TEST_SUITE_DIRECTORIES))
+def test_new_module_in_suite_directory_routes_without_edits(
+    dev_module, tmp_path, directory
+) -> None:
+    path = tmp_path / "tests" / directory / "test_brand_new_unlisted.py"
+    path.parent.mkdir(parents=True)
+    path.touch()
+
+    owner = dev_module.TEST_SUITE_DIRECTORIES[directory]
+    assert dev_module.test_files_for_suite(owner, tmp_path) == [path]
 
 
 def test_empty_suite_never_falls_back_to_all_tests(dev_module, monkeypatch) -> None:

@@ -145,7 +145,7 @@ energy 41 eV, terminal binding 60 eV, and defect $-1$ eV. This also confirms the
 inclusive cutoff boundary. These are algorithm checks with independently
 chosen synthetic data, not an external EADL experimental anchor.
 
-The focused `tests/montecarlo/test_sampled_relaxation.py` run passed all 32 tests
+The focused `tests/montecarlo/transport/test_sampled_relaxation.py` run passed all 32 tests
 (1.63 s). Its Si/Cu/Au ensembles provide additional implementation evidence.
 The historical `vacancy_cascade` builds its daughter matrix from printed weights,
 whereas this sampler divides each decaying row by its printed sum. Thus their

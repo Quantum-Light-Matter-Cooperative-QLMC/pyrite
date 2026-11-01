@@ -116,7 +116,7 @@ All routes reach it through `_flat_energy_keep` with their row vectors.
 
 ## Anchors
 
-`tests/montecarlo/test_coherent_transverse_omission.py`:
+`tests/montecarlo/coherent/test_coherent_transverse_omission.py`:
 
 - The directed bound encloses an independent 60-digit evaluation and the
   production value, stays tight up to rounding, and the interval form bounds

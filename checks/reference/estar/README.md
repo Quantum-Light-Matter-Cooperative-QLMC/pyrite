@@ -38,5 +38,5 @@ reference values, never as PyRITE inputs.
 
 Consumers: the #510 benchmark matrix (`checks/equal_precision/matrix-spec.json`)
 takes CSDA ranges for silicon, tungsten, diamond and SiO₂ from here.
-`tests/montecarlo/test_hard_radiative.py` pins graphite, silicon, molybdenum
+`tests/montecarlo/cascades/test_hard_radiative.py` pins graphite, silicon, molybdenum
 and tungsten collision, radiative and total stopping to 100 MeV (#439).

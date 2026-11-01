@@ -59,8 +59,8 @@ to lockstep at small electron counts).
 
 ## Equivalence evidence
 
-`tests/montecarlo/test_streamed_scoring.py` and
-`tests/montecarlo/test_coupled_radiative_runner.py::test_streamed_scoring_matches_the_joined_coupled_run`
+`tests/montecarlo/transport/test_streamed_scoring.py` and
+`tests/montecarlo/cascades/test_coupled_radiative_runner.py::test_streamed_scoring_matches_the_joined_coupled_run`
 compare streamed and joined spectra at `rtol=1e-12` over several block sizes,
 with unequal line and continuum populations and with coupled BremsLib straggled
 transport. Transport counts and segment totals agree exactly.

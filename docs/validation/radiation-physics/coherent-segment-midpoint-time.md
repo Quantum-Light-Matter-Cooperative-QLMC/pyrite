@@ -138,14 +138,14 @@ evidence with stated tolerances, not a proof of unconditional equality.
   {source}`src/pyrite/montecarlo/spectrum/cxr/_formation.py::formation_factor`
   implement the independently derived $w$ and $F$; batched and per-reflection
   consumers are listed in [coherent-formation-absorption](coherent-formation-absorption.md).
-- {source}`tests/montecarlo/test_coherent_emission.py::test_straight_flight_is_invariant_to_two_half_segments`
+- {source}`tests/montecarlo/coherent/test_coherent_emission.py::test_straight_flight_is_invariant_to_two_half_segments`
   compares one flight with two halves and a fixed reference emitter. Both
   routes passed in the 2026-10-20 verifier run (2 passed, 18 deselected).
-- {source}`tests/montecarlo/test_coherent_emission.py::test_single_segment_coherent_equals_incoherent_self_term`
+- {source}`tests/montecarlo/coherent/test_coherent_emission.py::test_single_segment_coherent_equals_incoherent_self_term`
   is a tolerance-based comparison; its name does not establish absorbed
   pointwise equality. The formation tests separately cover independent
   quadrature, Parseval, geometry breakpoints and subdivision.
-- {source}`tests/montecarlo/test_xray_dispersion.py::test_dispersive_formation_integral_has_the_derivative_jacobian`
+- {source}`tests/montecarlo/spectrum/test_xray_dispersion.py::test_dispersive_formation_integral_has_the_derivative_jacobian`
   pins the derivative-Jacobian distinction.
 
 ## Historical evidence and adjudication

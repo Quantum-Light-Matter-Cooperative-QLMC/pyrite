@@ -678,7 +678,7 @@ def test_single_scene_named_gdf_clears_default_spot(tmp_path, monkeypatch):
     import tomlkit
 
     from pyrite.campaign.beam import PointSpot
-    from tests.montecarlo.test_gdf import write_gdf
+    from tests.montecarlo.transport.test_gdf import write_gdf
 
     document = _single_scene_catalog(tmp_path, monkeypatch)
     path = write_gdf(tmp_path / "beam.gdf")

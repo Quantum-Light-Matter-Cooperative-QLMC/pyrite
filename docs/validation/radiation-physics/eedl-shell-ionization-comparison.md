@@ -35,7 +35,7 @@ The transcription and local interpolation gates pass. The EEDL/Bote–Salvat dis
 
 Bote–Salvat is a theoretical reference, not an independent measured-data validation for all shells. The calculation uses free-atom cross sections, EEDL binding energies for shape isolation, and PyRITE's existing relaxation model. M/N relaxation incompleteness and secondary-vacancy cascades remain outside this comparison. The initial implementation-context status was `filtered`; the fresh-context review below supports `rederived`. Only a human can mark it signed off.
 
-Run `PYRITE_MC_BACKEND=cpu uv run python checks/shell_ionization_comparison.py --download --output report.json`. The fast anchors are in `tests/montecarlo/test_shell_ionization_comparison.py`.
+Run `PYRITE_MC_BACKEND=cpu uv run python checks/shell_ionization_comparison.py --download --output report.json`. The fast anchors are in `tests/montecarlo/collisions/test_shell_ionization_comparison.py`.
 
 ## Fresh-context derivation and adjudication (2026-09-25)
 

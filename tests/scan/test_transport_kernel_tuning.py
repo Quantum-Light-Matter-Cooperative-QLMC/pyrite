@@ -1,7 +1,7 @@
 """Public CUDA transport schedule controls on KernelTuning (#776).
 
 Lowering and precedence only; schedule exactness on a device is covered by
-``tests/montecarlo/test_transport_kernel_tuning_cuda.py``.
+``tests/montecarlo/transport/test_transport_kernel_tuning_cuda.py``.
 """
 
 import pickle

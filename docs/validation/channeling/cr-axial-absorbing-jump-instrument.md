@@ -162,7 +162,7 @@ to supplied per-depth jumps is an explicit assumption, not a fitted parameter.
 ## Regression evidence reviewed
 
 The verifier independently inspected
-`tests/montecarlo/test_channeling_axial_jump_instrument.py`. Its competing-loss
+`tests/montecarlo/quantum/test_channeling_axial_jump_instrument.py`. Its competing-loss
 exponential pins incident normalization and separate unresolved accounting.
 The retained decay/recycling example would fail if retained jumps were treated
 as escape. The coherent analytic integral pins the commutator sign and
@@ -340,7 +340,7 @@ implementation. Sampling 400 events per case with a delta window gave depth
 Kolmogorov–Smirnov $p=0.81$ and $0.81$, and position-marginal $\chi^2$
 $p=0.22$ and $0.15$, against $\operatorname{tr}(\Gamma_FX(z))$ and
 $\operatorname{diag}Q_F(Z)$ from the eigen reference. The focused file
-`tests/montecarlo/test_channeling_axial_jump_instrument.py` passed 29/29.
+`tests/montecarlo/quantum/test_channeling_axial_jump_instrument.py` passed 29/29.
 
 - **Claim**: `cr-axial-absorbing-jump-instrument` —
   `src/pyrite/montecarlo/channeling/axial_jump_instrument.py::{absorbing_axial_model,AbsorbingAxialModel.at_depth,sample_absorbing_outgoing}` —

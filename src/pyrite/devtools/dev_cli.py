@@ -16,7 +16,7 @@ import shutil
 import subprocess
 import sys
 import time
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 import yaml
 
@@ -75,101 +75,27 @@ TEST_SUITE_PATTERNS = {
         "scan/test_scan_*.py",
         "checkpoint/test_slim.py",
     ),
-    # First match owns a module. Keep public-boundary suites above these
-    # domains; keep specialized physics before each family catch-all.
-    "quantum": (
-        "materials/test_channeling_profile.py",
-        "montecarlo/test_axial_*.py",
-        "montecarlo/test_channeling_axial*.py",
-        "montecarlo/test_channeling_density.py",
-        "montecarlo/test_channeling_emission.py",
-        "montecarlo/test_channeling_metrics.py",
-        "montecarlo/test_channeling_mcwf.py",
-        "montecarlo/test_channeling_operators.py",
-        "montecarlo/test_channeling_quantum_regression.py",
-        "montecarlo/test_channeling_states.py",
-        "montecarlo/test_channeling_vortex.py",
-    ),
-    "channeling": (
-        "montecarlo/test_channeling_*.py",
-        "materials/test_channeling_*.py",
-    ),
-    "spectrum-coherent": (
-        "montecarlo/test_coherent_*.py",
-        "montecarlo/test_temporal_profile.py",
-    ),
-    "spectrum-brem": (
-        "montecarlo/test_brem_*.py",
-        "montecarlo/test_bremsstrahlung_*.py",
-        "montecarlo/test_dielectric_suppression.py",
-        "montecarlo/test_positron_brems.py",
-    ),
-    "spectrum": (
-        "montecarlo/test_beam_energy_spread_grid.py",
-        "montecarlo/test_characteristic.py",
-        "montecarlo/test_cherenkov*.py",
-        "montecarlo/test_chunk_invariance.py",
-        "montecarlo/test_dtr_*.py",
-        "montecarlo/test_electron_blocks.py",
-        "montecarlo/test_emission_adapters.py",
-        "montecarlo/test_line_*.py",
-        "montecarlo/test_mosaic.py",
-        "montecarlo/test_mosaic_mc.py",
-        "montecarlo/test_optical_*.py",
-        "montecarlo/test_radiation_error_estimators.py",
-        "montecarlo/test_segment_escape.py",
-        "montecarlo/test_segment_staging.py",
-        "montecarlo/test_sinc_*.py",
-        "montecarlo/test_spectrum_*.py",
-        "montecarlo/test_substep_invariance.py",
-        "montecarlo/test_transition_radiation*.py",
-        "montecarlo/test_xray_dispersion*.py",
-    ),
-    "transport-cascades": (
-        "montecarlo/test_annihilation_cuda.py",
-        "montecarlo/test_coupled_radiative_runner.py",
-        "montecarlo/test_dielectric_radiative*.py",
-        "montecarlo/test_dielectric_runner_scorer.py",
-        "montecarlo/test_hard_radiative*.py",
-        "montecarlo/test_pair_production*.py",
-        "montecarlo/test_positron_*.py",
-        "montecarlo/test_radiative_moments*.py",
-        "montecarlo/test_shell_secondary*.py",
-    ),
-    "transport-collisions": (
-        "montecarlo/test_atomic_electron_deflection.py",
-        "montecarlo/test_dielectric_loss.py",
-        "montecarlo/test_eadl_relaxation.py",
-        "montecarlo/test_eedl_ionization_consistency.py",
-        "montecarlo/test_elastic_model_case.py",
-        "montecarlo/test_elsepa_*.py",
-        "montecarlo/test_energy_loss_straggling.py",
-        "montecarlo/test_inelastic_partition.py",
-        "montecarlo/test_mott_coverage.py",
-        "montecarlo/test_sbethe_*.py",
-        "montecarlo/test_shell_*.py",
-        "montecarlo/test_stopping_*.py",
-        "montecarlo/test_straggling_*.py",
-    ),
-    "transport-runner": (
-        "montecarlo/test_adaptive_stopping.py",
-        "montecarlo/test_block_transport.py",
-        "montecarlo/test_case.py",
-        "montecarlo/test_gpu_oom_retry.py",
-        "montecarlo/test_imports.py",
-        "montecarlo/test_paraview_preset.py",
-        "montecarlo/test_physics_baseline.py",
-        "montecarlo/test_pool_cadence.py",
-        "montecarlo/test_stage_counters.py",
-        "montecarlo/test_trajectory_*.py",
-        "montecarlo/test_transport_batch_progress.py",
-        "montecarlo/test_transport_core_default.py",
-    ),
-    # Flight integration, geometry, beam entry and event contracts remain here.
-    "transport": ("montecarlo/test_*.py",),
-    "energy-grid": ("energy-grid/test_*.py",),
-    "materials": ("materials/test_*.py",),
-    "xsgen": ("xsgen/test_*.py",),
+    # Genuine cross-directory exceptions to TEST_SUITE_DIRECTORIES.
+    "quantum": ("materials/test_channeling_profile.py",),
+    "channeling": ("materials/test_channeling_*.py",),
+}
+
+# Directory-owned suites (#854): every module below one of these directories
+# belongs to its suite, so a new module needs no edit here. TEST_SUITE_PATTERNS
+# entries (first match) win over directories; ``core`` owns the rest.
+TEST_SUITE_DIRECTORIES = {
+    "montecarlo/transport": "transport",
+    "montecarlo/collisions": "transport-collisions",
+    "montecarlo/cascades": "transport-cascades",
+    "montecarlo/runner": "transport-runner",
+    "montecarlo/spectrum": "spectrum",
+    "montecarlo/coherent": "spectrum-coherent",
+    "montecarlo/brem": "spectrum-brem",
+    "montecarlo/channeling": "channeling",
+    "montecarlo/quantum": "quantum",
+    "energy-grid": "energy-grid",
+    "materials": "materials",
+    "xsgen": "xsgen",
 }
 
 INTEGRATION_TESTS = (
@@ -182,7 +108,24 @@ INTEGRATION_TESTS = (
     "scan/test_run.py",
     "scan/test_sweep.py",
 )
-PRIMARY_TEST_SUITE_NAMES = ("core", *TEST_SUITE_PATTERNS)
+PRIMARY_TEST_SUITE_NAMES = (
+    "core",
+    "packaging",
+    "apps",
+    "cli",
+    "quantum",
+    "channeling",
+    "spectrum-coherent",
+    "spectrum-brem",
+    "spectrum",
+    "transport-cascades",
+    "transport-collisions",
+    "transport-runner",
+    "transport",
+    "energy-grid",
+    "materials",
+    "xsgen",
+)
 TEST_SUITE_NAMES = (*PRIMARY_TEST_SUITE_NAMES, "integration")
 
 
@@ -439,20 +382,26 @@ def test_files_for_suite(name: str, root: Path = ROOT) -> list[Path]:
         if missing:
             raise AgentToolingError("missing integration tests: " + ", ".join(missing))
         return selected
-    if name not in {"core", *TEST_SUITE_PATTERNS}:
+    if name not in PRIMARY_TEST_SUITE_NAMES:
         raise AgentToolingError(f"unknown test suite {name!r}")
 
-    selected = []
-    for path in files:
-        owner = "core"
-        for candidate, patterns in TEST_SUITE_PATTERNS.items():
-            relative = path.relative_to(tests_dir).as_posix()
-            if any(fnmatch.fnmatchcase(relative, pattern) for pattern in patterns):
-                owner = candidate
-                break
-        if owner == name:
-            selected.append(path)
-    return selected
+    return [path for path in files if test_suite_owner(path.relative_to(tests_dir)) == name]
+
+
+def test_suite_owner(relative: str | Path) -> str:
+    """Return the primary suite owning one ``tests/``-relative module path.
+
+    Explicit patterns win (first match), then the deepest owning directory,
+    then ``core``.
+    """
+    posix = Path(relative).as_posix()
+    for candidate, patterns in TEST_SUITE_PATTERNS.items():
+        if any(fnmatch.fnmatchcase(posix, pattern) for pattern in patterns):
+            return candidate
+    for parent in PurePosixPath(posix).parents:
+        if (owner := TEST_SUITE_DIRECTORIES.get(parent.as_posix())) is not None:
+            return owner
+    return "core"
 
 
 def cmd_test_suite(args: argparse.Namespace) -> None:

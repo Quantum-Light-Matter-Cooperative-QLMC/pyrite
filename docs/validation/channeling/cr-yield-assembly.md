@@ -78,7 +78,7 @@ Here $F_m$ is the complex Voigt at lab centre $\varepsilon_m/D$ and half width $
 
 - Capture is 0.26 of the energy-integrated spectrum at this direction.
 - With absorption off, $\int dE$ over the 3–60 keV grid is 0.949 of $P\times$(line + capture yields). The rest lies in the Lorentzian tails of mode widths of about 0.7 keV in the lab, outside the grid. The full-range mode weights sum to the yields to $10^{-6}$ (`cr-line-shape`).
-- Margin 0 gives zero capture. The zero-bound-state test is green, and all 31 tests of `tests/montecarlo/test_channeling_emission.py` pass (`--slow`).
+- Margin 0 gives zero capture. The zero-bound-state test is green, and all 31 tests of `tests/montecarlo/quantum/test_channeling_emission.py` pass (`--slow`).
 
 **Verdict:** `rederived`. The quadrature-order caveat recorded earlier stands.
 

@@ -47,7 +47,7 @@ def test_linspace_and_arange_grids_read_as_uniform():
 def test_fine_step_at_high_energy_stays_uniform():
     """A 2.5e-5 eV step at 1600 eV is only ~1e8 float64 ulp wide, so its
     unavoidable rounding jitter is ~1e-8 relative. The representation floor is
-    what keeps that real line-window grid (tests/montecarlo/test_xray_dispersion)
+    what keeps that real line-window grid (tests/montecarlo/spectrum/test_xray_dispersion)
     on the uniform side of the guard."""
     fine = np.linspace(1599.0, 1601.5, 100_001)
     assert is_uniform_grid(fine)

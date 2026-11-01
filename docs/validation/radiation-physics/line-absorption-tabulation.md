@@ -185,7 +185,7 @@ in transmission even over a very narrow energy interval.
 
 Focused checks, using the canonical runner and isolated environment:
 
-- `pyrite-dev test tests/montecarlo/test_line_absorption_tabulation.py`: 10 passed.
+- `pyrite-dev test tests/montecarlo/spectrum/test_line_absorption_tabulation.py`: 10 passed.
   Covers processed-EPDL midpoint tolerance, float32 host arithmetic, node
   identity, positivity, explicit Si absorbers, endpoint clamps, zero-path
   transmission, and neighboring table-ceiling behavior.

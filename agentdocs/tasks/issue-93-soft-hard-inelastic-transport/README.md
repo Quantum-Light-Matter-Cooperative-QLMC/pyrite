@@ -641,7 +641,7 @@ rejects the mode, and the runner disables the LUT for shell cases on CUDA
 offline (no device on the authoring machine).
 On the remote box (NVIDIA GeForce RTX 5080, CuPy 14.2.0, SLURM `gpu` partition, a
 separate `~/dev/pyrite-issue93-cuda-76d41af0` checkout so the shared tree was
-untouched) `tests/montecarlo/test_shell_soft_hard_cuda.py` passes 7/7: replay,
+untouched) `tests/montecarlo/collisions/test_shell_soft_hard_cuda.py` passes 7/7: replay,
 first-row CPU parity at `rtol=1e-12` for Si and MoS₂ with and without soft
 straggling, bookkeeping, and five-sigma ensemble agreement at 4000 electrons.
 The full `-m hardware` suite is 69 passed, 2 skipped (Intel SYCL opt-in and

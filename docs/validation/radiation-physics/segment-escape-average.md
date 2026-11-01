@@ -89,7 +89,7 @@ by Parseval. The route's lineshape $t_L^2\,\mathrm{sinc}^2(\cdot)\,T$ integrates
 
 ## Evidence
 
-- `tests/montecarlo/test_segment_escape.py`:
+- `tests/montecarlo/spectrum/test_segment_escape.py`:
   - quadrature agreement to $10^{-9}$ across the series/direct switch and at $\tau$ up to 800;
   - endpoint symmetry;
   - split invariance at $10^{-6}$ for characteristic slab, layered-stack and bremsstrahlung yields;
@@ -97,9 +97,9 @@ by Parseval. The route's lineshape $t_L^2\,\mathrm{sinc}^2(\cdot)\,T$ integrates
   - a track starting on the entrance face of a finite box (single slab and layered), escaping back through it, against quadrature at $10^{-10}$;
   - groove split invariance at $10^{-10}$ and agreement with dense midpoint quadrature at $2\times10^{-4}$;
   - an absorbed-to-transparent ratio equal to the segment mean, which exceeds twice the midpoint factor in the issue's regime.
-- `tests/montecarlo/test_spectrum_cuda_cheap_hoists.py` pins the float32 CUDA reduction against the NumPy `mean_transmission` reference for distinct endpoint paths. This is CUDA-gated.
+- `tests/montecarlo/spectrum/test_spectrum_cuda_cheap_hoists.py` pins the float32 CUDA reduction against the NumPy `mean_transmission` reference for distinct endpoint paths. This is CUDA-gated.
 - Model markers fork on the change: characteristic `l-shell-ck-lorentzian-segment-escape-v6`, bremsstrahlung `...-v3-unit-base-segment-escape`.
-- `tests/montecarlo/test_line_segment_escape.py` (issue #181): the incoherent line spectrum's absorbed-to-transparent ratio is split invariant to $10^{-9}$ (measured $\sim10^{-15}$) on the batched slab (ratio 0.56), the batched finite box whose exit face switches along the segment (0.72) and the per-hkl Cu-film-on-crystal stack crossing the interface (0.23); absorption rescales the single line without reshaping it; the padded piece layout reproduces the flat `owner` sum.
+- `tests/montecarlo/spectrum/test_line_segment_escape.py` (issue #181): the incoherent line spectrum's absorbed-to-transparent ratio is split invariant to $10^{-9}$ (measured $\sim10^{-15}$) on the batched slab (ratio 0.56), the batched finite box whose exit face switches along the segment (0.72) and the per-hkl Cu-film-on-crystal stack crossing the interface (0.23); absorption rescales the single line without reshaping it; the padded piece layout reproduces the flat `owner` sum.
 
 ## Fresh-context re-derivation
 
@@ -146,7 +146,7 @@ The stack's outer boundaries are $z=0$ and $z=T$. On a piece where the $z$ face 
 | laterally infinite layered and single slab, 40 cases | $3.7\times10^{-9}$ |
 | groove (12 cases) against a dense midpoint rule over `escape_distance_ang`, with $N=10^5,10^6,10^7$ | $1.1\times10^{-4}$, $5.8\times10^{-6}$, $4.6\times10^{-7}$, converging as $1/N$ as the jumps require |
 
-`pyrite-dev test tests/montecarlo/test_segment_escape.py tests/montecarlo/test_spectrum_cuda_cheap_hoists.py` gives 15 passed and 1 skipped (CUDA).
+`pyrite-dev test tests/montecarlo/spectrum/test_segment_escape.py tests/montecarlo/spectrum/test_spectrum_cuda_cheap_hoists.py` gives 15 passed and 1 skipped (CUDA).
 
 **Observations (not discrepancies).**
 
@@ -180,7 +180,7 @@ A separate context that did not write the implementation verified the extension.
 | finite box with face switch, batched, 1 and 5 pieces | 0.7208540402 | 0.7208540402 | $3\times10^{-15}$ | $4\times10^{-16}$ |
 | Cu film on hopg, crossing the interface, per-hkl, 1 and 5 pieces | 0.2262001498 | 0.2262001498 | $2\times10^{-13}$ | $4\times10^{-16}$ |
 
-`tests/montecarlo/test_line_segment_escape.py` and `test_segment_escape.py` pass.
+`tests/montecarlo/spectrum/test_line_segment_escape.py` and `test_segment_escape.py` pass.
 
 **Observation.** With the coherent slice, single-segment coherent and incoherent spectra agree in $v$-integral but not in energy integral: they differ by $1-O(\delta)$ through the two routes' different $dv/dE$ (measured $0.99977$ at hopg 002, 100 keV). They also differ by the $O(\delta)$ line-centre offset. See `coherent-formation-absorption`.
 

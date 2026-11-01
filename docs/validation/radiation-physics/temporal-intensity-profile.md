@@ -121,7 +121,7 @@ There is no factor, sign, unit, or convention divergence.
 - `add_boxes` conserves mass to $10^{-14}$.
 - The offset blend from `add_coherent_row` with an empirical $\chi$ integrates to the spectrum-side $(1-|\chi|^2)G+|\chi|^2\,\text{Flat}$ to $5\times10^{-14}$.
 - With Gaussian $t_0$ ($\sigma=400$ Å, 3000 realizations), the kernel's mean $I(t)$ matches the brute-force ensemble mean of $|\sum_eS_e(t)|^2$ to 2.4% of peak (Monte Carlo noise of the brute force), and the integrals agree to $10^{-3}$.
-- `tests/montecarlo/test_temporal_profile.py`: 13 passed.
+- `tests/montecarlo/coherent/test_temporal_profile.py`: 13 passed.
 
 ### Minor notes (no change required)
 

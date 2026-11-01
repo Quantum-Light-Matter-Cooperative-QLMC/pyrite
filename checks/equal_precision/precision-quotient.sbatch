@@ -25,7 +25,7 @@ cp checks/equal_precision/{precision_source.py,precision_checks.py,benchmark_pre
 cp src/pyrite/montecarlo/transport/{_jit_kernel.py,_jit_launch.py,_jit_radiative_device.py,_jit_device.py,api.py,kinematics.py,_jit_radiative.py,hard_radiative.py,batching.py} "$out/source/"
 cp -r tests/performance "$out/source/performance-tests"
 if [ "$1" = preflight ]; then
-    PYRITE_TEST_BACKEND=cuda "$HOME/.local/bin/uv" run --no-sync pyrite-dev test tests/montecarlo/test_hard_radiative_cuda.py --durations=0 > "$out/reference-tests.log" 2>&1
+    PYRITE_TEST_BACKEND=cuda "$HOME/.local/bin/uv" run --no-sync pyrite-dev test tests/montecarlo/cascades/test_hard_radiative_cuda.py --durations=0 > "$out/reference-tests.log" 2>&1
     "$HOME/.local/bin/uv" run --no-sync pyrite-dev test tests/performance --durations=0 > "$out/harness-tests.log" 2>&1
 fi
 extra=()

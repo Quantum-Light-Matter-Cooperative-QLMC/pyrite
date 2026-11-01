@@ -2,7 +2,7 @@
 
 ## Fresh re-review (2026-07-25)
 
-A new pre-implementation derivation reproduced the reciprocal normal `g_hkl = 2 pi A^-T h`, proper minimal rotation, and composition `R = Rz(phi) R0` below without a divergent factor, sign, transpose, or convention. Focused current-tree verification passed: `tests/montecarlo/test_surface_orientation.py` plus the catalog golden, `11 passed`. Verdict remains `rederived`; human ledger update still pending.
+A new pre-implementation derivation reproduced the reciprocal normal `g_hkl = 2 pi A^-T h`, proper minimal rotation, and composition `R = Rz(phi) R0` below without a divergent factor, sign, transpose, or convention. Focused current-tree verification passed: `tests/montecarlo/transport/test_surface_orientation.py` plus the catalog golden, `11 passed`. Verdict remains `rederived`; human ledger update still pending.
 
 ## Scope and pre-implementation record
 
@@ -123,7 +123,7 @@ An independent NumPy calculation, constructing $A$, $2\pi A^{-T}$, and the refer
 Catalog parsing enforces exactly one of `beam_uvw` and `surface_hkl`, requires three integer components, and rejects the zero index triple.  The private orientation function also rejects simultaneous direct and reciprocal inputs. The focused command
 
 ```text
-uv run python scripts/dev.py test tests/montecarlo/test_surface_orientation.py tests/materials/test_material_catalog.py -k 'surface or orientation'
+uv run python scripts/dev.py test tests/montecarlo/transport/test_surface_orientation.py tests/materials/test_material_catalog.py -k 'surface or orientation'
 ```
 
 passed: `11 passed, 27 deselected`.

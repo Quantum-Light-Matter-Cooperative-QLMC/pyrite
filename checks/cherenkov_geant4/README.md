@@ -48,7 +48,7 @@ everywhere.
 `compare.py reduce RAW_DIR` writes `reference/<case>.json`: the histograms,
 the RINDEX table, and the primary path length grouped by step-mean beta in
 1e-6 bins. The raw step files are not committed.
-`tests/montecarlo/test_cherenkov_geant4_reference.py` sums `frank_tamm_yield`
+`tests/montecarlo/spectrum/test_cherenkov_geant4_reference.py` sums `frank_tamm_yield`
 over the recorded steps with the same linearly interpolated index and
 compares totals (Poisson), the energy spectrum and the angle histogram
 (reduced chi-square over bins with at least 10 expected photons).

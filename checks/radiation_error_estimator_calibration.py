@@ -35,7 +35,7 @@ CARBON = [("C", 0.1136)]
 TUNGSTEN = [("W", 0.06305)]
 
 BREM_GRID = np.linspace(1.0e3, 3.0e4, 501)
-# hopg (0,0,2) line window, mirroring tests/montecarlo/test_coherent_emission.py.
+# hopg (0,0,2) line window, mirroring tests/montecarlo/coherent/test_coherent_emission.py.
 CXR_GRID = np.arange(700.0, 1500.0)
 CXR_KWARGS = {
     "crystal": "hopg",

@@ -251,7 +251,7 @@ helpers.
   kick-count tension is therefore unattributed: chance, the reference
   sampler's 0.05 Å fixed-step bracket, or a continuous-only effect. It is
   recorded as an open low-weight concern, not a discrepancy.
-- `pyrite-dev test tests/montecarlo/test_channeling_axial_fiber_unraveling.py tests/dev/test_validation_ledger.py`:
+- `pyrite-dev test tests/montecarlo/quantum/test_channeling_axial_fiber_unraveling.py tests/dev/test_validation_ledger.py`:
   24 passed.
 
 **Verdict: `rederived`.** Human sign-off remains in #277.
@@ -486,7 +486,7 @@ and position marginals pass in every run ($p\ge0.05$).
 
   Indefiniteness is therefore a worst-case property. The output-exactness
   failure is generic.
-- `pyrite-dev test tests/montecarlo/test_channeling_axial_fiber_unraveling.py tests/dev/test_validation_ledger.py`:
+- `pyrite-dev test tests/montecarlo/quantum/test_channeling_axial_fiber_unraveling.py tests/dev/test_validation_ledger.py`:
   34 passed.
 
 ### Findings (no physics divergence)

@@ -68,9 +68,9 @@ Required before sign-off:
 - golden regeneration (`regen-golden` skill),
 - fresh-context verification; only a human marks `signed-off`.
 
-Limiting cases to keep green: `tests/montecarlo/test_coherent_emission.py`
+Limiting cases to keep green: `tests/montecarlo/coherent/test_coherent_emission.py`
 (single-segment coherent == incoherent self-term, N^2 in-phase limit,
-on-resonance phase cancellation) and `tests/montecarlo/test_chunk_invariance.py`.
+on-resonance phase cancellation) and `tests/montecarlo/spectrum/test_chunk_invariance.py`.
 
 ## Related, already landed
 

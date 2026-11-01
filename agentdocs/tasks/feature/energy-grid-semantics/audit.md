@@ -17,7 +17,7 @@ own floating dtype before dividing by the median spacing. Without that floor the
 real fine line-window grid `linspace(1599.0, 1601.5, 100_001)` (step 2.5e-5 eV at
 1600 eV ≈ 1e8 float64 ulp) reports ~9e-9 relative jitter and a naive 1e-9
 tolerance rejects it — observed as a failure of
-`tests/montecarlo/test_xray_dispersion.py::test_interference_phase_matches_the_in_medium_closed_form[per_hkl]`
+`tests/montecarlo/spectrum/test_xray_dispersion.py::test_interference_phase_matches_the_in_medium_closed_form[per_hkl]`
 during development, now pinned by
 `tests/energy-grid/test_grid_semantics.py::test_fine_step_at_high_energy_stays_uniform`.
 
@@ -25,7 +25,7 @@ during development, now pinned by
 
 | Owner | Evidence | Assumption | Verdict | Guard / test |
 | --- | --- | --- | --- | --- |
-| `montecarlo/spectrum/lines/_per_hkl.py` (coherent sinc window) | `_per_hkl.py:287,298-301` | `dE = E_grid[1] - E_grid[0]`, then `i0/i1 = (E - E_grid[0]) // dE` — an energy half-width converted to a node index by one global spacing | **guarded** | guard hoisted to `_setup.py:243-258`, gated on `request.sinc_cutoff is not None`; `tests/montecarlo/test_spectrum_phases.py::test_prepare_refuses_sinc_windowing_on_a_nonuniform_grid` |
+| `montecarlo/spectrum/lines/_per_hkl.py` (coherent sinc window) | `_per_hkl.py:287,298-301` | `dE = E_grid[1] - E_grid[0]`, then `i0/i1 = (E - E_grid[0]) // dE` — an energy half-width converted to a node index by one global spacing | **guarded** | guard hoisted to `_setup.py:243-258`, gated on `request.sinc_cutoff is not None`; `tests/montecarlo/spectrum/test_spectrum_phases.py::test_prepare_refuses_sinc_windowing_on_a_nonuniform_grid` |
 | `montecarlo/spectrum/lines/_per_hkl.py` (incoherent sinc² window) | `_per_hkl.py:593,604-607` | identical index arithmetic on the incoherent route | **guarded** | same guard (one chokepoint covers both routes); same test |
 | `montecarlo/spectrum/lines/_per_hkl.py` (unwindowed routes) | `_per_hkl.py:273-285,583-591`, `_kernels.py:51-63` | none — `sinc(a_width*(E_grid - E_r)/pi)` evaluates the profile at the nodes themselves | **nonuniform-safe** | positive assertion in the same test (log grid with `sinc_cutoff=None` prepares fine) |
 | `montecarlo/spectrum/lines/_kernels.py::_line_tabulation_grid` | `_kernels.py:262-278` | builds `np.arange(lo, hi+1.0, 1.0)` unioned with native Henke nodes; the *result* is already nonuniform and is consumed by `_interp_index` (`_kernels.py:189-212`, `searchsorted`) | **nonuniform-safe** (correctness) | none needed; the defect is a scaling ceiling, recorded below |

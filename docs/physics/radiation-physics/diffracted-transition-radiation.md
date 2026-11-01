@@ -117,7 +117,7 @@ integral. A separate test differentiates the existing full Maxwell solve for
 $\varepsilon(z)=\varepsilon_0+h e^{-ig_z z}$, represented by a fine staircase:
 the complex derivative equals $(\mathbf a_{\rm PXR}+\mathbf a_{\rm DTR})/
 \chi_{\rm tr}$. This is internal solver consistency, not a published-result
-reproduction. Tests live in `tests/montecarlo/test_transition_radiation_dtr.py`.
+reproduction. Tests live in `tests/montecarlo/spectrum/test_transition_radiation_dtr.py`.
 
 ## Alternating reference target and profile
 

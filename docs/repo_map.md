@@ -200,7 +200,7 @@ the transported arrays; spectrum candidates rescore one kept transport with
 `phases.score_spectra`. The fastest candidate must survive interleaved
 re-timing against the baseline (`min_speedup`). Tests:
 `tests/optimization/test_kernel_tuning.py` (fake worker),
-`tests/montecarlo/test_transport_kernel_tuning_cuda.py` (device). Guide:
+`tests/montecarlo/transport/test_transport_kernel_tuning_cuda.py` (device). Guide:
 `docs/guides/batch-chunk-tuning.md`; tutorial 15.
 
 ## Entry points
@@ -1119,7 +1119,7 @@ diffraction source-row densities, their signed cross term and the difference
 from the Born total, with a separate model digest. No production case, CBS,
 validated dynamical extinction or
 validated high-energy transport is implied. Checks:
-`tests/montecarlo/test_transition_radiation_dtr*.py`. Derivation:
+`tests/montecarlo/spectrum/test_transition_radiation_dtr*.py`. Derivation:
 [experimental DTR](physics/radiation-physics/diffracted-transition-radiation.md).
 
 ### Saved trajectory analysis

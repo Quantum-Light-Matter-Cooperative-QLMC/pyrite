@@ -192,7 +192,7 @@ longitudinal offset by the identical mechanism:
       regenerated consistently. Human sign-off still pending on all of them.
 - [x] Run focused + coherent-path regression suites, lint, typecheck; confirm
       no unrelated checkpoint-identity behavior changed. `lint`/`typecheck`
-      clean; `tests/montecarlo/test_coherent_emission.py` 16/16 passed.
+      clean; `tests/montecarlo/coherent/test_coherent_emission.py` 16/16 passed.
       `parameter_sha256`/`CURRENT_IDENTITY_VERSION` confirmed untouched —
       this changes only how the already-`coherent_emission`-gated output is
       computed, not any profile input.

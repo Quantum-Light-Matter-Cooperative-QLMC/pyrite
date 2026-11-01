@@ -86,7 +86,7 @@ The scratch script `ctr_check.py` (session scratchpad, not committed) used:
 
    The mean deviation over 200 seeds is within $1.2$ s.e. of zero at every energy, so the estimator is unbiased. The test's $\sigma$ is larger than the true one by $1/\sqrt{1-F}$ (2.2, 1.5 and 1.1 times). Its "three standard deviations" band is therefore 6.7, 4.4 and 3.4 true standard deviations. The seeded realization sits at 1.3, 1.5 and 2.1 true standard deviations.
 
-Existing suites: `tests/montecarlo/test_transition_radiation_ctr.py` and `tests/montecarlo/test_transition_radiation_crossings.py` pass (19 tests). The bunch chunk-invariance check on transported bilayer histories is `test_transition_radiation_crossings.py::test_transported_yield_is_substep_and_chunk_invariant` (rtol $10^{-12}$).
+Existing suites: `tests/montecarlo/spectrum/test_transition_radiation_ctr.py` and `tests/montecarlo/spectrum/test_transition_radiation_crossings.py` pass (19 tests). The bunch chunk-invariance check on transported bilayer histories is `test_transition_radiation_crossings.py::test_transported_yield_is_substep_and_chunk_invariant` (rtol $10^{-12}$).
 
 ## Adjudication
 

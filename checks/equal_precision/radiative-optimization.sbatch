@@ -19,10 +19,10 @@ scontrol show job "$SLURM_JOB_ID" > "$OUT/job.txt"
 nvidia-smi -q > "$OUT/gpu.txt"
 cp checks/equal_precision/{benchmark_radiative.py,diagnose_kernel.py,pyrite_adapter.py,manifest.json,radiative-optimization.sbatch,radiative_baseline.py} "$OUT/source/"
 cp src/pyrite/montecarlo/transport/_jit_radiative_device.py "$OUT/source/candidate.py"
-cp tests/montecarlo/test_hard_radiative_cuda.py "$OUT/source/"
+cp tests/montecarlo/cascades/test_hard_radiative_cuda.py "$OUT/source/"
 sha256sum "$OUT"/source/* > "$OUT/code.txt"
 "$HOME/.local/bin/uv" run --no-sync pyrite-dev test \
-    tests/montecarlo/test_hard_radiative_cuda.py --durations=0 > "$OUT/tests.log" 2>&1
+    tests/montecarlo/cascades/test_hard_radiative_cuda.py --durations=0 > "$OUT/tests.log" 2>&1
 for seed in 56001 56002 56003; do
     for scene in si-300-100um-0deg w-300-10um-0deg; do
         for variant in baseline candidate; do

@@ -169,11 +169,11 @@ Run only these additions (including the slow cascade fixture):
 
 ```bash
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test --slow \
-  tests/montecarlo/test_case.py \
-  tests/montecarlo/test_trajectory_capture.py \
-  tests/montecarlo/test_elsepa_elastic.py \
-  tests/montecarlo/test_coupled_radiative_runner.py \
-  tests/montecarlo/test_pair_production.py -k pre_adapter --durations=0
+  tests/montecarlo/runner/test_case.py \
+  tests/montecarlo/runner/test_trajectory_capture.py \
+  tests/montecarlo/collisions/test_elsepa_elastic.py \
+  tests/montecarlo/cascades/test_coupled_radiative_runner.py \
+  tests/montecarlo/cascades/test_pair_production.py -k pre_adapter --durations=0
 ```
 
 Existing supporting evidence remains in the elastic/continuum case-resolution,

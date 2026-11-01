@@ -130,7 +130,7 @@ These were run on 2026-10-04 with scratch scripts that do not import PyRITE for 
 - **Si, $W_c=50$ eV:** $\xi=1$ at $T\le100$ eV, 0.360 at 150 eV, 0.164 at 200 eV, 0.012 at 300 eV, and 0 from **315 eV** up to at least 1 MeV ($g_M/g_R=1.05$–$1.12$).
 - **Si, $W_c\ge1$ keV, 2.5 keV–1 MeV:** $\xi\in[0.288,0.925]$ at 1 keV, and the minimum rises with the cutoff (0.36, 0.47 and 0.54 at 2, 5 and 10 keV). This is consistent with the page's "between 0.29 and 1".
 - **Example factors:** Si at 300 keV, $T_c=1$ keV: $\xi=0.352$, factor 1.0252. The printed Eq. 4.7.20 would give $\xi=0.957$. W at 300 keV, $T_c=1$ keV: $\xi=0.155$, factor 1.0021.
-- **Anchors:** `tests/montecarlo/test_atomic_electron_deflection.py` gives 28 passed. `tests/materials/test_profiles.py` with `-k "atomic_electron_deflection_forks or mott_shell_cases_keep"` gives 2 passed.
+- **Anchors:** `tests/montecarlo/collisions/test_atomic_electron_deflection.py` gives 28 passed. `tests/materials/test_profiles.py` with `-k "atomic_electron_deflection_forks or mott_shell_cases_keep"` gives 2 passed.
 
 ## Findings in the prose (not the code)
 

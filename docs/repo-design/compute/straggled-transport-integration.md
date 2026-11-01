@@ -88,7 +88,7 @@ Cov(X_1, X_2) = h_2 Cov(X_1, C(E - X_1)),
 
 and the law of total variance also contributes `E[h_2 V(E - X_1)]` and `Var(h_2 C(E - X_1))`. So the evolving-energy variance is not `sum_m s_m V(E^(m))` with cross terms discarded. `max_dE_frac` refines a state-dependent jump-process discretization; convergence cannot be reduced to deterministic stopping-power quadrature alone.
 
-**(iv) Measured.** `tests/montecarlo/test_straggling_transport_integration.py`, graphite, `E = 25 keV`, `s = 1e4 Ang` (`DeltaE/E = 0.09`), 20000 repetitions:
+**(iv) Measured.** `tests/montecarlo/collisions/test_straggling_transport_integration.py`, graphite, `E = 25 keV`, `s = 1e4 Ang` (`DeltaE/E = 0.09`), 20000 repetitions:
 
 | case | result |
 | --- | --- |

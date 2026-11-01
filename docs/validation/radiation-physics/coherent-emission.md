@@ -171,7 +171,7 @@ not $\sum_{e,j}|B_{ej}|^2$. This is now exactly the docstring's stated limit: cr
 Focused CPU result after the midpoint-time regression:
 
 ```text
-tests/montecarlo/test_coherent_emission.py: 13 passed
+tests/montecarlo/coherent/test_coherent_emission.py: 13 passed
 ```
 
 The tests anchor the self-term, coincident-electron scaling, corrected straight-trajectory phase and subdivision invariance for both sinc routes, and invalid component split. They do not numerically anchor the qualified decoherent limit above; its analytic characteristic-function limit matches the corrected claim.

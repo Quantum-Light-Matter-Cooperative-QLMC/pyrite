@@ -150,9 +150,9 @@ Symbolically, every factor, sign and conjugation agrees with the independent res
 
 ## Anchors
 
-Run with `PYRITE_MC_BACKEND=cpu pyrite-dev test tests/montecarlo/test_line_friedel_pairing.py tests/materials/test_crystallography.py -k "friedel or emission_coupling"`: **7 passed**.
+Run with `PYRITE_MC_BACKEND=cpu pyrite-dev test tests/montecarlo/spectrum/test_line_friedel_pairing.py tests/materials/test_crystallography.py -k "friedel or emission_coupling"`: **7 passed**.
 
-- `tests/montecarlo/test_line_friedel_pairing.py` point-reflects one 4H-SiC $(102)$ segment ($\mathbf v,\hat{\mathbf n},hkl\to-\mathbf v,-\hat{\mathbf n},-hkl$) at tilts $-12^\circ,0^\circ,+12^\circ$, with a vacuum index and line energies 2531, 2883 and 3182 eV near the Si K edge. It checks the closed-form peak, CBS invariance, and $\sum{\rm PXR}_-/\sum{\rm PXR}_+=|\chi(hkl)|^2/|\chi(-hkl)|^2$.
+- `tests/montecarlo/spectrum/test_line_friedel_pairing.py` point-reflects one 4H-SiC $(102)$ segment ($\mathbf v,\hat{\mathbf n},hkl\to-\mathbf v,-\hat{\mathbf n},-hkl$) at tilts $-12^\circ,0^\circ,+12^\circ$, with a vacuum index and line energies 2531, 2883 and 3182 eV near the Si K edge. It checks the closed-form peak, CBS invariance, and $\sum{\rm PXR}_-/\sum{\rm PXR}_+=|\chi(hkl)|^2/|\chi(-hkl)|^2$.
   - **Discriminating.** The new code gives ratios 0.66986, 0.73434 and 0.77384, matching the expected values to $10^{-7}$. With `emission_coupling_tables` swapped back to `reflection_coupling_tables` (the old $\chi(+hkl)$ pairing), the ratios are 1.4928, 1.3618 and 1.2923, the inverses. The test fails by 50–120%, well outside its `rtol=2e-3`.
   - **Independent?** Partly. The expected ratio uses the module's `chi_g`. That is legitimate here because the claim is about which index is paired, not the value of $\chi$, and the expectation is taken from the derivation rather than the kernel. The line-energy check is an independent closed form.
   - **Blind spot.** The test compares PXR and CBS components only, not the PXR–CBS interference. It cannot detect a *mixed* conjugation, for example $\{\chi(-hkl),U(hkl)\}$. A scratch run with that mixed table left PXR and CBS bit-identical but cut the total line yield by a factor of 3.4 (e.g. $3.35\times10^{-9}\to9.96\times10^{-10}$ at $-12^\circ$). The jointly unconjugated $\{\chi(-hkl),U(-hkl)\}$ reproduced the total bit-for-bit, as derived.
@@ -174,7 +174,7 @@ Run with `PYRITE_MC_BACKEND=cpu pyrite-dev test tests/montecarlo/test_line_fried
 
 Added by the task owner, not the verifier.
 
-- Finding 1 is closed by `tests/montecarlo/test_line_friedel_pairing.py::test_total_yield_matches_the_unconjugated_native_pairing`. It feeds the kernel the jointly unconjugated native pair $\{\chi(-hkl),U(-hkl)\}$ and requires the production total at `rtol=1e-9`. A mutant returning the mixed $\{\overline{\chi(-hkl)},U(-hkl)\}$ fails it.
+- Finding 1 is closed by `tests/montecarlo/spectrum/test_line_friedel_pairing.py::test_total_yield_matches_the_unconjugated_native_pairing`. It feeds the kernel the jointly unconjugated native pair $\{\chi(-hkl),U(-hkl)\}$ and requires the production total at `rtol=1e-9`. A mutant returning the mixed $\{\overline{\chi(-hkl)},U(-hkl)\}$ fails it.
 - Finding 2 is fixed: the `line_energy_eV` docstring and the dependent notes now state only the momentum transfer $-\mathbf g$.
 
 ## Deterministic photon-energy API: independent derivation (#469)
@@ -308,7 +308,7 @@ Relocation check: AST comparison against the worktree's pre-change `HEAD`
 confirmed the executable body of `_orientation_R` is identical after moving
 from `montecarlo.geometry` to `materials.crystal` (docstrings excluded).
 `pyrite-dev test tests/dev/test_docs.py`: **6 passed**.
-`pyrite-dev test tests/montecarlo/test_surface_orientation.py
+`pyrite-dev test tests/montecarlo/transport/test_surface_orientation.py
  tests/materials/test_emission.py`: **53 passed** (three existing detector
 argument deprecation warnings). Direct basis-sum probes confirm selected
 HOPG/hBN $(002)$ and silicon $(220)$ have normalized per-element amplitude 1;

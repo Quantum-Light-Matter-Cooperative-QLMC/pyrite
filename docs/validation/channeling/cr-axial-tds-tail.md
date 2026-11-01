@@ -130,7 +130,7 @@ when $M+H+1\le B$), string outputs beyond $K_c$, and every string tail when
 
 ## Evidence
 
-All in `tests/montecarlo/test_channeling_axial_tds_continuum.py`:
+All in `tests/montecarlo/quantum/test_channeling_axial_tds_continuum.py`:
 
 - **Large-$Q$ law.** Random 9-order state, off-centre string, non-square
   cell, $\varphi=1/(1+0.05q^2)$ ($|\varphi|^2\sim q^{-4}$). The exact tail
@@ -292,7 +292,7 @@ Scripts are in the session scratchpad (`val_tail_*.py`) and were not committed.
 | Si [001] square-box law | Production `_potential` (local slope $-1.92$ at 30–60, $-2.00$ at $\ge278$ Å$^{-1}$), $a^2=0.0061$ Å$^2$, $Q_B=60.54$, $K_c=278.08$ Å$^{-1}$ | $P(\lvert K\rvert>K_c\mid\notin\mathcal B)=0.0589$ (owner's $(Q_B/K_c)^2=0.0474$; ratio 1.24) |
 | Si [001] TDS + electronic unresolved by origin | `fiber_report(4000, seed=0, electronic=True, B=18, strings, θ≤0.1)` with `_jump` wrapped to log the terminal branch | reproduces the record (tail 0.04525, unresolved 0.0045 = 18). 181 string tails; 9 string outputs beyond $K_c$ (law: $190\times0.0589=11.2$); 9 kick remainders (`_split` choice 2); 0 lattice |
 
-Anchor tests: `pyrite-dev test --slow tests/montecarlo/test_channeling_axial_tds_continuum.py tests/montecarlo/test_channeling_axial_fiber_unraveling.py`,
+Anchor tests: `pyrite-dev test --slow tests/montecarlo/quantum/test_channeling_axial_tds_continuum.py tests/montecarlo/quantum/test_channeling_axial_fiber_unraveling.py`,
 33 passed.
 
 ### Findings

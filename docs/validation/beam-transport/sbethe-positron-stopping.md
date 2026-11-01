@@ -88,7 +88,7 @@ once a value-pinning test exists.
 
 ## Anchor
 
-`tests/montecarlo/test_sbethe_positron_stopping.py` pins the
+`tests/montecarlo/collisions/test_sbethe_positron_stopping.py` pins the
 recommended test: Si, MoS₂ and WS₂ SBETHE positron stopping lies within 1%
 of Eq. 3.120 with $f^{(+)}$ at 1–100 MeV, and the positron/electron ratio
 lies within 1% of the Bethe ratio. On that basis the row is `anchored`

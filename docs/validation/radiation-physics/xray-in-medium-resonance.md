@@ -493,6 +493,6 @@ The perturbative expansion has genuinely failed on such samples, by `cbs-amplitu
 
 Measured: the traced seed falls from 7602 to 8.03e-07, inside the healthy population (6.6e-07–1.05e-06), and healthy seeds are bit-identical. At the catalog's 1000 Å production thickness the guard rejects **zero** pairs (hopg 30 keV, hopg 300 keV, silicon 100 keV); at 1e6 Å it rejects 0.233%. No golden moved.
 
-New anchors, all in `tests/montecarlo/test_xray_dispersion.py`: `test_the_two_cycle_root_is_rejected_rather_than_returned`, `test_the_rejected_root_would_otherwise_have_passed_the_energy_window` (which pins that the 10 eV cut cannot serve as the guard), `test_a_converged_root_is_untouched_by_the_guard`, and `test_the_guard_is_inert_across_the_xray_regime`.
+New anchors, all in `tests/montecarlo/spectrum/test_xray_dispersion.py`: `test_the_two_cycle_root_is_rejected_rather_than_returned`, `test_the_rejected_root_would_otherwise_have_passed_the_energy_window` (which pins that the 10 eV cut cannot serve as the guard), `test_a_converged_root_is_untouched_by_the_guard`, and `test_the_guard_is_inert_across_the_xray_regime`.
 
 **Still owed on this row.** Section 2 above still presents the contraction rate as unconditional; it wants rewriting to state the domain in which it holds, and the `rederived` verdict wants re-confirming in fresh context at the same time. That belongs to whoever owns this validation, not to the branch that found the defect. `cbs-amplitude` carries the matching correction for its `v·g → 0` row.

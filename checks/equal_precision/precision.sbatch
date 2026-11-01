@@ -23,7 +23,7 @@ cp .pyrite-sync "$out/code.txt"
 cp checks/equal_precision/{precision_source.py,precision_checks.py,benchmark_precision.py,probe_precision.py,run_precision.py,precision-experiment.json,manifest.json,pyrite_adapter.py,precision.sbatch} "$out/source/"
 cp src/pyrite/montecarlo/transport/{_jit_kernel.py,_jit_launch.py,_jit_radiative_device.py,_jit_device.py} "$out/source/"
 if [ "$1" = preflight ]; then
-    PYRITE_TEST_BACKEND=cuda "$HOME/.local/bin/uv" run --no-sync pyrite-dev test tests/montecarlo/test_hard_radiative_cuda.py --durations=0 > "$out/reference-tests.log" 2>&1
+    PYRITE_TEST_BACKEND=cuda "$HOME/.local/bin/uv" run --no-sync pyrite-dev test tests/montecarlo/cascades/test_hard_radiative_cuda.py --durations=0 > "$out/reference-tests.log" 2>&1
     "$HOME/.local/bin/uv" run --no-sync pyrite-dev test tests/performance/test_precision_experiment.py --durations=0 > "$out/harness-tests.log" 2>&1
 fi
 extra=()

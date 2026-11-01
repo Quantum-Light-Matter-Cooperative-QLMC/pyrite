@@ -212,7 +212,7 @@ The 6,000-ray independent comparison and exact counterexample also repeated
 with the same results. Focused command:
 
 ```bash
-uv run pyrite-dev test tests/montecarlo/test_photon_scene.py tests/dev/test_docs.py --durations=5
+uv run pyrite-dev test tests/montecarlo/transport/test_photon_scene.py tests/dev/test_docs.py --durations=5
 ```
 
 The passing existing tests do not cover the coincident-box counterexample

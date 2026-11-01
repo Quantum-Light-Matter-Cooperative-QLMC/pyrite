@@ -121,13 +121,13 @@ continuum strings, electronic kicks and moving carriers.
 
 ## Checks (task owner)
 
-- `tests/montecarlo/test_channeling_axial_fiber_unraveling.py::test_observation_draws_no_random_numbers_and_tracks_survival`:
+- `tests/montecarlo/quantum/test_channeling_axial_fiber_unraveling.py::test_observation_draws_no_random_numbers_and_tracks_survival`:
   events identical with and without observation; checkpoints reported exactly
   for surviving incidents; normalized amplitudes; retained energies.
 - `...::test_observed_states_reproduce_the_dense_retained_density`: ensemble
   populations vs the independent dense `absorbing_axial_model` with lattice and
   uniform-azimuth kicks (3,000 incidents, 4.5σ).
-- `tests/montecarlo/test_channeling_axial_outgoing_convergence.py`: bound
+- `tests/montecarlo/quantum/test_channeling_axial_outgoing_convergence.py`: bound
   weight, terminal tallies, trapezoid exposure, paired SEM, proportional limit,
   seed/ID and chunk-gap refusals, observed-vs-event survival refusal.
 

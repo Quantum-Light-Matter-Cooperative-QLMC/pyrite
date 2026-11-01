@@ -77,7 +77,7 @@ A single natural-width Lorentzian is used per transition. The empirical multi-Lo
 - Splitting a constant-energy segment preserves total yield when its attenuation weight is also fixed (in particular, with zero attenuation). Changing midpoint escape depth changes attenuation quadrature.
 - Increasing optical depth suppresses the line monotonically through $\exp(-\tau)$.
 
-`tests/montecarlo/test_characteristic.py` anchors the packaged carbon K-shell EEDL value and natural carbon K-alpha width, exact Lorentzian bin integration, finite-window mass, off-grid tails, the 1 keV floor, segment-subdivision invariance, absorber/emitter separation, and runner composition into both emission modes. Checkpoint/reline tests cover independent `characteristic.h5` persistence, missing-component compatibility, and identity boundaries. A small end-to-end HOPG simulation also exercises ENDF parsing, electron transport, self-absorption, line profiles, and result assembly.
+`tests/montecarlo/spectrum/test_characteristic.py` anchors the packaged carbon K-shell EEDL value and natural carbon K-alpha width, exact Lorentzian bin integration, finite-window mass, off-grid tails, the 1 keV floor, segment-subdivision invariance, absorber/emitter separation, and runner composition into both emission modes. Checkpoint/reline tests cover independent `characteristic.h5` persistence, missing-component compatibility, and identity boundaries. A small end-to-end HOPG simulation also exercises ENDF parsing, electron transport, self-absorption, line profiles, and result assembly.
 
 ## Issue #88 implementation-context review, 2026-09-14
 
@@ -199,7 +199,7 @@ All computations below used the project runner with `PYRITE_MC_BACKEND=cpu`. No 
 - For a 1000 eV line, FWHM 2 eV and bin edges 998 through 1002 eV, direct analytic integration captures 0.7048327646991335 of the full Lorentzian. The implementation sums to 1, exactly as the declared conditional model requires; its retained-bin density is larger by 1.4187762687605225. The independently computed conditional bin vector matches at relative tolerance $10^{-14}$ with zero absolute tolerance.
 - For carbon at 30 keV, density $0.1\,\mathrm{\mathring A}^{-3}$, one 100 angstrom track, two incident electrons and zero attenuation, direct multiplication of the raw EEDL cross section and XrayDB API yields predicts $3.0156786314065755\times10^{-7}$ photons per sr per incident electron. The integrated output is $3.0156786314065765\times10^{-7}$, agreeing to $4.44\times10^{-16}$ relatively. This also checks that the electron with no segment remains in the normalization.
 - Carbon's API branch intensities sum to 1.0000000972. Using the idealized sum of exactly one initially produced a relative difference of $9.72\times10^{-8}$; retaining the rounded source intensities resolves it. The implementation accepts source sums within 0.99 to 1.01 and does not renormalize them. Thus photon-yield preservation is exact relative to the supplied branch sum, and only approximate relative to $\omega_i$ alone. Carbon K-alpha-1 has API widths $0.0868+0.0045=0.0913$ eV, matching the constructed transition width.
-- The focused command `PYRITE_MC_BACKEND=cpu pyrite-dev test tests/montecarlo/test_characteristic.py` passed **7 tests**. These cover parsing/provenance, relaxation joining, line integration, transparent-track subdivision, absorber separation and addition to both emission modes.
+- The focused command `PYRITE_MC_BACKEND=cpu pyrite-dev test tests/montecarlo/spectrum/test_characteristic.py` passed **7 tests**. These cover parsing/provenance, relaxation joining, line integration, transparent-track subdivision, absorber separation and addition to both emission modes.
 
 The existing carbon cross-section assertion uses `np.isclose` with its default absolute tolerance $10^{-8}\,\mathrm{cm}^2$. That tolerance is much larger than the reference value: even zero passes this particular assertion. It is therefore a weak regression anchor for the numerical cross section. The independent zero-absolute-tolerance check above verifies today's value; it does not repair the persistent test. A separate test improvement is recommended before treating that reference as a strong CI anchor.
 
@@ -246,7 +246,7 @@ Checks that do not use the implementation to construct their expected values:
 
 - **Row normalization.** Each row of $T^a$ sums to one by inspection of {eq}`eq-characteristic-ck-transfer`. Sampled across $3\leq Z\leq98$, the L-shell outflow $f_{12}+f_{13}$ never exceeds one — the tightest case is Mn at 0.997, leaving $T^a_{L_1L_1}=0.003$ — so the diagonal never goes negative and the matrix is a vacancy distribution, not a rescale. A source table that violated this fails closed with a `ValueError`.
 - **Triangularity.** Decay fills a hole from a less-bound subshell, so vacancies only move to higher indices and $T^a$ is upper triangular. This is the property that will let the full EADL cascade of #91 be solved exactly by a finite Neumann series rather than an iteration with a cutoff.
-- **Limiting case.** xraydb tabulates no L Coster--Kronig for $Z\leq11$, so $T^a=\mathbb{1}$ there and the estimator reduces to the pre-cascade product exactly. The carbon anchors in `tests/montecarlo/test_characteristic.py` are unchanged, which is the regression evidence for that limit.
+- **Limiting case.** xraydb tabulates no L Coster--Kronig for $Z\leq11$, so $T^a=\mathbb{1}$ there and the estimator reduces to the pre-cascade product exactly. The carbon anchors in `tests/montecarlo/spectrum/test_characteristic.py` are unchanged, which is the regression evidence for that limit.
 - **Magnitude, computed from the source tables alone.** With $n=T^{a\mathsf T}N$ from the Elam $f_{ij}$ and the EEDL primary populations, total L emission $\sum_i n_i\omega_i$ over $\sum_i N_i\omega_i$ is 1.235 (Cu, 30 keV), 1.232 (Cu, 15 keV), 1.114 (Mo, 60 keV), 1.079 (Au, 100 keV), 1.064 (Au, 30 keV) and 1.033 (Ta, 30 keV). The sign is forced: $\omega_{L_3}>\omega_{L_2}>\omega_{L_1}$ for every element with tabulated CK, and transfer only moves holes outward, so redistribution can only raise total L emission. Per-line ratios move much further than totals — Cu's L1-origin share of L photons falls from 0.031 to 0.0005, so Lβ3,4/Lα was previously wrong by more than 10x.
 - **No double counting.** $T^a_{L_1L_3}=f_{13}$ is asserted to differ from $f_{13}+f_{12}f_{23}$, which is what the total-vs-direct confusion would produce.
 
@@ -373,7 +373,7 @@ Minor, not a defect:
 
 ### Test run
 
-`pyrite-dev test tests/montecarlo/test_eadl_relaxation.py tests/montecarlo/test_characteristic.py tests/montecarlo/test_eedl_ionization_consistency.py`: 60 passed.
+`pyrite-dev test tests/montecarlo/collisions/test_eadl_relaxation.py tests/montecarlo/spectrum/test_characteristic.py tests/montecarlo/collisions/test_eedl_ionization_consistency.py`: 60 passed.
 
 ### Verdict
 

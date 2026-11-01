@@ -51,4 +51,4 @@ continuum change. Existing uniform-grid results stay bit-for-bit identical.
   graph is unchanged) with the facade `src/pyrite/energy_grid/semantics.py`.
 - Audit record: `audit.md` in this directory.
 - Tests: `tests/energy-grid/test_grid_semantics.py` and one case added to
-  `tests/montecarlo/test_spectrum_phases.py`.
+  `tests/montecarlo/spectrum/test_spectrum_phases.py`.

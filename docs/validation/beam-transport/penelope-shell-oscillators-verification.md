@@ -194,7 +194,7 @@ oscillator build and the bisection root (300 iterations) are my own code.
   7.002% and not "within 7%". The statement is in
   `docs/validation/beam-transport/penelope-shell-oscillators.md:53`. The
   ledger check (`docs/validation/ledger-transport-background.md:116`) and
-  `tests/montecarlo/test_shell_oscillators.py:109` use 10%. This is
+  `tests/montecarlo/collisions/test_shell_oscillators.py:109` use 10%. This is
   cosmetic; it does not affect the physics.
 - **Caveat: Bragg-additive $I$ for SiO₂.** SiO₂'s $I=125.66$ eV is
   Bragg-additive with O at 95 eV (the gas-phase value). ICRU-37's tabulated
@@ -266,7 +266,7 @@ curl -sSL -A Mozilla/5.0 https://pmc.ncbi.nlm.nih.gov/articles/PMC11957257/
 curl -sSL https://export.arxiv.org/pdf/2012.09924v1; pdftotext moy.pdf
 PYRITE_MC_BACKEND=cpu UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run python ver.py   # own build + bisection
 PYRITE_MC_BACKEND=cpu UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run python <compare/edge-case probes>
-PYRITE_MC_BACKEND=cpu pyrite-dev test tests/montecarlo/test_shell_oscillators.py   # 10 passed
+PYRITE_MC_BACKEND=cpu pyrite-dev test tests/montecarlo/collisions/test_shell_oscillators.py   # 10 passed
 ```
 
 ## Recommended fixes
@@ -400,7 +400,7 @@ I computed these with my own script; no repository helper went into them.
   already uses. The smallest bound $W_k$ is 74.2 eV, above its $U_k$.
 - Cutoff: $W_{cb}=22<50$ eV. `validate_shell_cutoff` requires
   cutoff $>W_{cb}$, so it passes.
-- `pyrite-dev test tests/montecarlo/test_shell_oscillators.py`
+- `pyrite-dev test tests/montecarlo/collisions/test_shell_oscillators.py`
   gave 20 passed, 0 skipped. The pinned data were present.
 
 ### Doc and ledger findings
@@ -526,7 +526,7 @@ stoichiometry × occupation:
 
 Every count lands on a whole-shell boundary and consumes each equal-$U$
 group whole. The sets equal the test parametrization in
-`tests/montecarlo/test_shell_oscillators.py`. The metal valences in
+`tests/montecarlo/collisions/test_shell_oscillators.py`. The metal valences in
 pdatconf are Mo 6, W 6, Nb 5, Ta 5 and Zr 4; with $2\times6$ chalcogen
 electrons they give Bell & Liang's 18, 17 and 16. The consumption
 paragraph's list (metal outer $d$+$s$, chalcogen outer $s$+$p$, Te 5s at
@@ -574,7 +574,7 @@ I compared the results with the catalog density, `mean_excitation_eV` and
 - The test tolerance went from 9% to 12%; ZrSe₂ (11.76%) leaves 0.24%
   margin. This is acceptable for literature inputs, but any re-read of a
   catalog density for `zrse2` could trip it.
-- `env -u PYRITE_ONLINE_TESTS pyrite-dev test tests/montecarlo/test_shell_oscillators.py`
+- `env -u PYRITE_ONLINE_TESTS pyrite-dev test tests/montecarlo/collisions/test_shell_oscillators.py`
   gave 30 passed, 0 skipped. The pinned data were present, so the
   hafnium test ran.
 

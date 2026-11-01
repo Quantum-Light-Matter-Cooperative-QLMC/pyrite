@@ -95,7 +95,7 @@ not simulation tests.
 
 | Changed surface | Smallest useful coverage; widen only if affected |
 |---|---|
-| Flight integration, beam/RNG, geometry | Matching `tests/montecarlo/test_*.py`; add affected runner/segment/spectrum consumers when event or trajectory contracts change. Broader: `transport`. |
+| Flight integration, beam/RNG, geometry | Matching `tests/montecarlo/transport/` modules; add affected runner/segment/spectrum consumers when event or trajectory contracts change. Broader: `transport`. |
 | Collision/stopping/straggling physics | Matching atomic, shell, elastic or stopping tests. Broader: `transport-collisions`; radiative flights, secondaries, pair/positron cascades: `transport-cascades`. |
 | Runner/resource/trajectory plumbing | Matching adaptive/block/dispatch/artifact tests. Broader: `transport-runner`. |
 | Radiation scoring/reduction | Matching spectrum tests; add affected grid/result consumers for changed grid/shape/normalization contracts. Broader: `spectrum` for shared/incoherent CXR, `spectrum-coherent` for coherent/temporal, `spectrum-brem` for bremsstrahlung. These are disjoint, not aggregates. |

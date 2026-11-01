@@ -454,6 +454,6 @@ Spliced-model ranges from `E_cut_keV` = 5 keV, in μm, for that comparison:
   - 160.1
 ```
 
-`tests/montecarlo/test_stopping_csda_range.py` pins these alongside the
+`tests/montecarlo/collisions/test_stopping_csda_range.py` pins these alongside the
 unspliced Joy–Luo values, so a regression that moved both together is still
 caught.

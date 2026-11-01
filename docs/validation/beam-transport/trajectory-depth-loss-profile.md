@@ -41,7 +41,7 @@ from the symmetric nonzero-span limit.
 
 The independent verifier compared the implementation and returned `rederived`:
 overlap, sign, units, layer grouping and endpoint conventions match.
-`tests/montecarlo/test_trajectory_summary.py::test_depth_loss_analytic_and_transverse`
+`tests/montecarlo/runner/test_trajectory_summary.py::test_depth_loss_analytic_and_transverse`
 pins a 12 keV segment over depths $[-1,3]$ Å with edges $[-1,0,2,3]$ Å to
 $[3,6,3]$ keV in either direction. Partial coverage $[0,2]$ receives 6 keV.
 Transverse internal/final-edge cases pin the point-bin rule.

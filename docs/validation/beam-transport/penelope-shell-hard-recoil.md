@@ -48,7 +48,7 @@ recorded separately in [secondary emission direction](penelope-shell-secondary-d
 Longitudinal $\xi=0$ gives $Q_-$ and $\cos\theta=1$ up to floating-point
 roundoff. The close cosine approaches 1 as $W/E\to0$ and is finite over the
 bound-shell interval $W\le(E+U_k)/2$. The transverse cosine is exactly 1.
-In `tests/montecarlo/test_shell_partition.py`, every nonzero fixture branch
+In `tests/montecarlo/collisions/test_shell_partition.py`, every nonzero fixture branch
 at 10 keV is checked at four recoil quantiles. Longitudinal samples match
 direct quadrature of $g(Q)$ within $10^{-9}$; close and longitudinal cosines
 match their source equations, and invalid uniforms raise.

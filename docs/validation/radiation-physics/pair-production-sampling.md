@@ -208,7 +208,7 @@ analytic CDF $(1-\beta)(1+c)/[2(1-\beta c)]$ gives $p=0.38$ at each of five
 kinetic energies from 0 to 50 MeV. Over 3000 `sample_pair` events,
 $\lvert E_-+E_++2m_ec^2-E\rvert/E\le2.2\times10^{-16}$, no energy is negative,
 and $\lvert\lVert\hat{\mathbf d}\rVert-1\rvert\le2.2\times10^{-16}$.
-`tests/montecarlo/test_pair_production.py`: 22 passed.
+`tests/montecarlo/cascades/test_pair_production.py`: 22 passed.
 
 ## Findings
 
@@ -250,7 +250,7 @@ $Z=99$, so a $Z=100$ layer raises; no catalog material is affected.
 ## Anchoring (2026-10-02)
 
 The ledger row moved from `rederived` to `anchored` after the verdict above.
-`tests/montecarlo/test_pair_production.py` now also pins:
+`tests/montecarlo/cascades/test_pair_production.py` now also pins:
 
 - `sample_pair` end to end at 1.5, 4 and 10 MeV for Z = 6 and 82. Energy
   closes to two ulp. Each particle's cosine follows Eq. 2.99 at its own
@@ -261,7 +261,7 @@ The ledger row moved from `rederived` to `anchored` after the verdict above.
 
 ## Extension to 100 MeV (2026-10-22, issue #439)
 
-`tests/montecarlo/test_pair_production.py` now also pins:
+`tests/montecarlo/cascades/test_pair_production.py` now also pins:
 
 - The Eq. 2.85 total (η = 0, $C_r$ = 1.0093) against EPDL2025
   $\sigma_{\rm pair,nuc}$ at 20, 30, 50 and 100 MeV, within 2 % for Z = 6, 14,

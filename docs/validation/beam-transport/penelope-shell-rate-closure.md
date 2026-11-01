@@ -461,7 +461,7 @@ with IMFP or straggling measurements.
 
 ## Checks
 
-`tests/montecarlo/test_shell_rates.py` covers the following:
+`tests/montecarlo/collisions/test_shell_rates.py` covers the following:
 
 - exact closure $\sum\sigma^{(1)}=S_{\rm stp}$ ($10^{-12}$, `abs=0`), with
   finite positive $\mathcal N$ for three materials at eleven energies from

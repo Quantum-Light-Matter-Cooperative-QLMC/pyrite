@@ -124,7 +124,7 @@ No divergent term, sign, exponent, or convention found between the independent d
 - **Re-derivation**: `matches` — the closed form for `S`, the sampling law `E_i = E₀(1+δ_i)`, and the RNG-stream independence argument for `⟨t δ⟩ = 0` all reproduce the implementation exactly; no divergent term found.
 - **Verdict**: `filtered` (re-derivation corroborates; ledger status unchanged pending anchoring/human sign-off — this write-up does not itself flip the ledger).
 - **Write-up**: `docs/validation/beam-transport/beam-energy-spread-injection.md`.
-- **Suggested ledger change**: none required by this re-derivation; existing `filtered` status and cited anchor tests (`tests/montecarlo/test_transverse.py`, `tests/energy-grid/test_bounds.py`, `tests/montecarlo/test_beam_energy_spread_grid.py`, all green locally) are consistent with promotion to `anchored` if a human wants to formalize that the cited tests already pin the reference values used above (`S(30 keV, cos θ_obs=0) ≈ 0.4588`, `γ→1 ⇒ S→0.5`). Sign-off remains a human action.
+- **Suggested ledger change**: none required by this re-derivation; existing `filtered` status and cited anchor tests (`tests/montecarlo/transport/test_transverse.py`, `tests/energy-grid/test_bounds.py`, `tests/montecarlo/spectrum/test_beam_energy_spread_grid.py`, all green locally) are consistent with promotion to `anchored` if a human wants to formalize that the cited tests already pin the reference values used above (`S(30 keV, cos θ_obs=0) ≈ 0.4588`, `γ→1 ⇒ S→0.5`). Sign-off remains a human action.
 
 ## Counter-addressed energy draws (#361 re-verification, 2026-10-07)
 

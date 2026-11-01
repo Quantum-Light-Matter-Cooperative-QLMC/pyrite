@@ -617,7 +617,7 @@ cost, so use the flag explicitly in lab-box studies.
 
 Independent dense real-space operator regressions, constant-loss/trivial-sector
 limits and exact enabled/disabled RNG and worker-result comparisons are in
-`tests/montecarlo/test_channeling_axial_mcwf_return_flux.py`. They check the
+`tests/montecarlo/quantum/test_channeling_axial_mcwf_return_flux.py`. They check the
 represented-grid algebra, not physical eligibility; fresh-context review and
 the coherent projected-evolution comparison remain required.
 
@@ -756,7 +756,7 @@ zero/full subspace. If $[P,W]=0$, no-jump evolution starting in $P$ stays in
 $P$ in the full reference as well. Independent real-space DOP853 integration,
 analytic constant-loss/semigroup checks, seeded native sink waiting times and
 carrier-update regressions are in
-`tests/montecarlo/test_channeling_axial_projection.py`. These are numerical
+`tests/montecarlo/quantum/test_channeling_axial_projection.py`. These are numerical
 implementation checks; fresh-context source-to-code verification remains open.
 
 ### Projected comparison results (SLURM 1648–1650)

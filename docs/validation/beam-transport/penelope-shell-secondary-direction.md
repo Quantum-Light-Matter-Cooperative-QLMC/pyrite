@@ -64,7 +64,7 @@ rejects nonunit or nonfinite input directions. The two directions are not yet
 consumed by a transport scheduler, so no flight segment or secondary track is
 created here.
 
-`tests/montecarlo/test_shell_partition.py` checks every nonzero fixture
+`tests/montecarlo/collisions/test_shell_partition.py` checks every nonzero fixture
 branch at three recoil quantiles, the momentum-triangle expression, close
 limit, opposite azimuth, transverse convention, and suppression above the
 production threshold. The shell loss sampler's distant-triangle source

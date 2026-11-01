@@ -273,7 +273,7 @@ low-energy branch rather than being invalidated.
       because in a target thinner than the range the depth distribution is
       truncated by geometry, not set by the range.
 
-      **Durable artifact:** `tests/montecarlo/test_stopping_csda_range.py` pins
+      **Durable artifact:** `tests/montecarlo/collisions/test_stopping_csda_range.py` pins
       the new ranges *and* the retired model's ranges beside them, so a
       regression that moved both together is still caught, plus the catalog-wide
       band. `docs/physics/beam-transport/stopping-power.md` gained
@@ -309,7 +309,7 @@ low-energy branch rather than being invalidated.
       compare `R(E0) - R(5 keV)`; use the collision-only column, since radiative
       stopping is out of scope here and is not negligible for W or Bi).
 
-      **Durable artifact:** `tests/montecarlo/test_stopping_csda_range.py` pins
+      **Durable artifact:** `tests/montecarlo/collisions/test_stopping_csda_range.py` pins
       the new ranges *and* the retired model's ranges beside them, so a
       regression that moved both together is still caught, plus the catalog-wide
       band. `docs/physics/beam-transport/stopping-power.md` gained
@@ -496,7 +496,7 @@ Measured:
   none moved), and the GPU `-m hardware` suite unchanged at 49 passed / 1
   skipped, so no golden moved.
 
-Regression coverage: four tests in `tests/montecarlo/test_xray_dispersion.py` --
+Regression coverage: four tests in `tests/montecarlo/spectrum/test_xray_dispersion.py` --
 the 2-cycle is rejected, the unguarded iteration is shown to clear the 10 eV
 window (so that cut cannot be the guard), a converged X-ray root is untouched,
 and the guard is inert across the whole sphere of directions with the

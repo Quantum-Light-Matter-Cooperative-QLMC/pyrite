@@ -34,7 +34,7 @@ No new physics enters. `E_res` is the kernel's own resonance condition (`mc_cxr_
 ## Limiting cases
 
 - Lossless flight (`E_end = E_start`): both estimators are exactly zero.
-- Small loss: the brem integrated error is first order in the flight's fractional energy loss (`dsigma/dk` is smooth in `T` away from the grid endpoint); halving the loss halves the error. Pinned by `tests/montecarlo/test_radiation_error_estimators.py::test_brem_quadrature_error_scales_linearly_with_energy_loss`.
+- Small loss: the brem integrated error is first order in the flight's fractional energy loss (`dsigma/dk` is smooth in `T` away from the grid endpoint); halving the loss halves the error. Pinned by `tests/montecarlo/spectrum/test_radiation_error_estimators.py::test_brem_quadrature_error_scales_linearly_with_energy_loss`.
 - `segments` carrying a transported `E_end_keV` and the composition-predicted end state give identical estimators when the two end states agree, pinned by `::test_cxr_drift_predicts_the_frozen_end_state_from_composition`.
 
 ## Threshold calibration

@@ -196,7 +196,7 @@ after the derivation above.
     18 MeV incident.
   - Repeated runs are bit-identical.
 
-  `tests/montecarlo/test_positron_annihilation.py` and
+  `tests/montecarlo/cascades/test_positron_annihilation.py` and
   `test_positron_cascade.py` pass (26 tests).
 - **Hazard not double counted.** The positron transport overrides only
   stopping, elastic and BremsLib tables. No transport kernel references

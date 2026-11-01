@@ -173,7 +173,7 @@ Use the checked `source` role for repository files and private Python owners:
 ```markdown
 {source}`src/pyrite/materials/atomic.py`
 {source}`src/pyrite/montecarlo/spectrum/cxr/_formation.py::formation_factor`
-{source}`tests/montecarlo/test_coherent_emission.py`
+{source}`tests/montecarlo/coherent/test_coherent_emission.py`
 ```
 
 Paths start at the repository root. An optional `::` suffix names a definition
