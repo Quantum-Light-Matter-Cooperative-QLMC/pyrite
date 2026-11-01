@@ -168,12 +168,21 @@ def _nsys_pop():
 
 
 def _process_pool_kwargs():
-    """Use exec-based workers under Nsight; forkserver can deadlock its injection."""
-    if not _RESOURCE_POLICY.nsys:
-        return {}
+    """Never ``fork`` worker pools: the parent may already own an OpenMP/numba thread pool.
+
+    Fork after a parallel numba kernel ran (GNU OpenMP threading layer) aborts
+    the child ("fork() called from a process already using GNU OpenMP"), which
+    surfaces as ``BrokenProcessPool``. Python 3.14 already defaults to
+    ``forkserver`` on Linux; select it explicitly so 3.13 matches. Under Nsight
+    use exec-based ``spawn`` workers: forkserver can deadlock its injection.
+    """
     import multiprocessing
 
-    return {"mp_context": multiprocessing.get_context("spawn")}
+    if _RESOURCE_POLICY.nsys:
+        return {"mp_context": multiprocessing.get_context("spawn")}
+    if "forkserver" in multiprocessing.get_all_start_methods():
+        return {"mp_context": multiprocessing.get_context("forkserver")}
+    return {}
 
 
 from .block_transport import transport_case_blocks
