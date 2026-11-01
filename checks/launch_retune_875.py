@@ -109,7 +109,9 @@ class Arms:
         self.launch.transport_kernel_variant = variant
 
     def kernel_ms(self):
-        total = sum(float(start.elapsed_time(stop)) for start, stop in self.events)
+        import cupy
+
+        total = sum(float(cupy.cuda.get_elapsed_time(start, stop)) for start, stop in self.events)
         launches = len(self.events)
         self.events.clear()
         return total, launches
