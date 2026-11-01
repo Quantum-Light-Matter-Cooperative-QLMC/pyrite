@@ -1,0 +1,733 @@
+{
+ "status": "research-only remote CPU evidence; Si [110] 5 MeV, four independent strings per cell (continuum TDS) +/- electronic kicks, absorbing no-return fibred model, reach-matched rectangular order windows, outgoing box B=(30,42), cut target 139.25 eV (provisional rule U_max + (U_max - U_min)); window accounting, not a physical escape fraction, depth budget or admission",
+ "source_commit": "7acda7ba0b55189fd9e54cadbedb60b01d23c6a7",
+ "command": "SLURM array 3158 on qlmc cpu partition (1 CPU, 6G per task): python checks/axial_outgoing_maps.py fiber-chunk '<arm kwargs>' <start> <count> <out>; then fiber-merge per arm. Arm kwargs: tds='strings', axis=(1,1,0), outgoing_order_max=(30,42), target_eV=139.25, seed=0; r17/r21/r25 = max_order (13,17)/(15,21)/(18,25) = matched_extents((1,1,0), 17|21|25, 42)",
+ "environment": {
+  "python": "3.14.4",
+  "host": "qlmc cpu partition (qlmc-ace / qlmc-queen)",
+  "OPENBLAS_NUM_THREADS": "1",
+  "isolated_checkout": "~/pyrite-880 (rsync of the worktree at source_commit)"
+ },
+ "gamma_retained_states": {
+  "square M=12": 535,
+  "(13,17)": 655,
+  "(15,21)": 655,
+  "(18,25)": 655,
+  "square M=17": 655,
+  "(13,16)": 647
+ },
+ "window_convergence_z": {
+  "tds-r21_vs_tds-r17": {
+   "outgoing_z": [
+    -1.39,
+    -1.87,
+    -1.05
+   ],
+   "unresolved_z": [
+    0.0,
+    0.88,
+    0.97
+   ]
+  },
+  "tds-r25_vs_tds-r17": {
+   "outgoing_z": [
+    -1.39,
+    -1.97,
+    -0.83
+   ],
+   "unresolved_z": [
+    0.54,
+    1.19,
+    1.44
+   ]
+  },
+  "tds-r25_vs_tds-r21": {
+   "outgoing_z": [
+    0.0,
+    -0.09,
+    0.23
+   ],
+   "unresolved_z": [
+    0.54,
+    0.31,
+    0.46
+   ]
+  },
+  "el-r21_vs_el-r17": {
+   "outgoing_z": [
+    1.44,
+    0.72,
+    -0.26
+   ],
+   "unresolved_z": [
+    -0.2,
+    0.37,
+    1.4
+   ]
+  }
+ },
+ "resources": {
+  "el-r17": {
+   "tasks": 40,
+   "max_rss_kB": 908892,
+   "task_wall_s_mean": 264.5,
+   "task_wall_s_max": 354.3,
+   "cpu_hours_total": 2.94
+  },
+  "tds-r21": {
+   "tasks": 25,
+   "max_rss_kB": 1164412,
+   "task_wall_s_mean": 350.3,
+   "task_wall_s_max": 749.0,
+   "cpu_hours_total": 2.43
+  },
+  "tds-r25": {
+   "tasks": 50,
+   "max_rss_kB": 1596760,
+   "task_wall_s_mean": 641.7,
+   "task_wall_s_max": 1468.9,
+   "cpu_hours_total": 8.91
+  },
+  "tds-r17": {
+   "tasks": 20,
+   "max_rss_kB": 869044,
+   "task_wall_s_mean": 101.4,
+   "task_wall_s_max": 125.5,
+   "cpu_hours_total": 0.56
+  },
+  "el-r21": {
+   "tasks": 25,
+   "max_rss_kB": 1198312,
+   "task_wall_s_mean": 766.3,
+   "task_wall_s_max": 1465.0,
+   "cpu_hours_total": 5.32
+  }
+ },
+ "result": {
+  "tds-r17": {
+   "status": "research-only; one cell, absorbing model, fibred carrier",
+   "max_order": [
+    13,
+    17
+   ],
+   "window_orders": 945,
+   "target_eV": 139.25,
+   "electronic": false,
+   "kick_nodes": 1,
+   "harmonic_max": 4,
+   "kick_truncation": 0.0,
+   "lattice_kraus": 0,
+   "outgoing_order_max": [
+    30,
+    42
+   ],
+   "box_orders": 5185,
+   "tds": "strings",
+   "axis": [
+    1,
+    1,
+    0
+   ],
+   "strings": 4,
+   "seed": 0,
+   "entrance_weight": 0.9999999896898171,
+   "depths_ang": [
+    1000.0,
+    10000.0,
+    30000.0
+   ],
+   "incidents": 1000,
+   "outgoing": [
+    0.06099999937107884,
+    0.3749999961336814,
+    0.6199999936076865
+   ],
+   "outgoing_sem": [
+    0.0075682890284981905,
+    0.015309310734553067,
+    0.015349266925226163
+   ],
+   "unresolved": [
+    0.005999999938138902,
+    0.03899999959790287,
+    0.07699999920611592
+   ],
+   "unresolved_sem": [
+    0.002442130192479537,
+    0.006122009410901727,
+    0.008430361708401958
+   ],
+   "retained": [
+    0.9329999903805993,
+    0.5859999939582328,
+    0.30299999687601464
+   ],
+   "beyond_window": 0.8338709677419355,
+   "mean_lattice_jumps": 1.844,
+   "mean_kick_jumps": 0.0,
+   "chunks": 20,
+   "seconds": [
+    96.80237949220464,
+    85.20094981510192,
+    75.6552800629288,
+    96.87286787619814,
+    91.6107204281725,
+    83.0708925910294,
+    96.882954869885,
+    87.60453125275671,
+    87.72232153499499,
+    100.51005491102114,
+    98.61833725310862,
+    85.79798022238538,
+    90.10903260484338,
+    113.55805027717724,
+    104.03920705989003,
+    104.93285486660898,
+    93.72253335639834,
+    73.89421326806769,
+    99.42739833286032,
+    118.96905254991725
+   ]
+  },
+  "tds-r21": {
+   "status": "research-only; one cell, absorbing model, fibred carrier",
+   "max_order": [
+    15,
+    21
+   ],
+   "window_orders": 1333,
+   "target_eV": 139.25,
+   "electronic": false,
+   "kick_nodes": 1,
+   "harmonic_max": 4,
+   "kick_truncation": 0.0,
+   "lattice_kraus": 0,
+   "outgoing_order_max": [
+    30,
+    42
+   ],
+   "box_orders": 5185,
+   "tds": "strings",
+   "axis": [
+    1,
+    1,
+    0
+   ],
+   "strings": 4,
+   "seed": 0,
+   "entrance_weight": 0.9999999940723944,
+   "depths_ang": [
+    1000.0,
+    10000.0,
+    30000.0
+   ],
+   "incidents": 1000,
+   "outgoing": [
+    0.046999999721402536,
+    0.3349999980142521,
+    0.5969999964612194
+   ],
+   "outgoing_sem": [
+    0.006692607822739447,
+    0.014925648976140213,
+    0.015510996007598702
+   ],
+   "unresolved": [
+    0.005999999964434366,
+    0.046999999721402536,
+    0.0889999994724431
+   ],
+   "unresolved_sem": [
+    0.0024421302031823614,
+    0.006692607822739447,
+    0.00900438776590565
+   ],
+   "retained": [
+    0.9469999943865575,
+    0.6179999963367397,
+    0.3139999981387319
+   ],
+   "beyond_window": 0.7001675041876047,
+   "mean_lattice_jumps": 1.931,
+   "mean_kick_jumps": 0.0,
+   "chunks": 25,
+   "seconds": [
+    434.78753103083,
+    212.41674228198826,
+    418.7648651469499,
+    214.07420510612428,
+    231.60825919825584,
+    194.99669186817482,
+    194.809023139067,
+    216.39741945406422,
+    533.9349329010583,
+    187.42602019803599,
+    206.72848922992125,
+    242.38814795482904,
+    243.21654001669958,
+    580.9783993731253,
+    726.9970746701583,
+    662.2861527530476,
+    576.4037994649261,
+    215.07139555364847,
+    228.895020455122,
+    440.644047150854,
+    233.28280516387895,
+    595.6975451540202,
+    208.71290469402447,
+    221.78274279320613,
+    234.56200294895098
+   ]
+  },
+  "tds-r25": {
+   "status": "research-only; one cell, absorbing model, fibred carrier",
+   "max_order": [
+    18,
+    25
+   ],
+   "window_orders": 1887,
+   "target_eV": 139.25,
+   "electronic": false,
+   "kick_nodes": 1,
+   "harmonic_max": 4,
+   "kick_truncation": 0.0,
+   "lattice_kraus": 0,
+   "outgoing_order_max": [
+    30,
+    42
+   ],
+   "box_orders": 5185,
+   "tds": "strings",
+   "axis": [
+    1,
+    1,
+    0
+   ],
+   "strings": 4,
+   "seed": 0,
+   "entrance_weight": 0.9999999981761667,
+   "depths_ang": [
+    1000.0,
+    10000.0,
+    30000.0
+   ],
+   "incidents": 1000,
+   "outgoing": [
+    0.04699999991427983,
+    0.3329999993926635,
+    0.6019999989020524
+   ],
+   "outgoing_sem": [
+    0.006692607850204385,
+    0.014903388849178335,
+    0.01547888882077889
+   ],
+   "unresolved": [
+    0.007999999985409333,
+    0.04999999990880834,
+    0.09499999982673583
+   ],
+   "unresolved_sem": [
+    0.0028170906927275376,
+    0.0068920243634752075,
+    0.009272270470946795
+   ],
+   "retained": [
+    0.9449999982764775,
+    0.6169999988746948,
+    0.3029999994473785
+   ],
+   "beyond_window": 0.46179401993355484,
+   "mean_lattice_jumps": 2.08,
+   "mean_kick_jumps": 0.0,
+   "chunks": 50,
+   "seconds": [
+    449.6218380271457,
+    1024.6707698819228,
+    1121.9783288426697,
+    1378.4118023240007,
+    1008.7204770799726,
+    1357.6718873959035,
+    473.002340531908,
+    419.7318860432133,
+    269.29614818887785,
+    532.8150933738798,
+    448.64335253695026,
+    399.5784019129351,
+    335.22261049365625,
+    310.9582258653827,
+    441.5863994201645,
+    478.08754091430455,
+    470.251393601764,
+    489.60456063132733,
+    427.3443787940778,
+    438.48305323906243,
+    1062.3257439141162,
+    1090.0837474330328,
+    1188.986335718073,
+    386.79928758973256,
+    471.9160856916569,
+    389.39417522214353,
+    397.66465329611674,
+    345.0191468829289,
+    479.4071016279049,
+    1430.1410768530332,
+    1258.7735340017825,
+    388.4539611460641,
+    412.06112734088674,
+    420.1174465608783,
+    562.134744361043,
+    415.8401654008776,
+    408.97200171276927,
+    1217.1181786879897,
+    667.5657805679366,
+    444.9502679146826,
+    457.75741845322773,
+    510.4630199847743,
+    1008.5321418307722,
+    371.0111510925926,
+    984.188009290956,
+    248.7464245860465,
+    524.4519616449252,
+    407.3716663848609,
+    306.25748042436317,
+    425.169076690916
+   ]
+  },
+  "el-r17": {
+   "status": "research-only; one cell, absorbing model, fibred carrier",
+   "max_order": [
+    13,
+    17
+   ],
+   "window_orders": 945,
+   "target_eV": 139.25,
+   "electronic": true,
+   "kick_nodes": 680,
+   "harmonic_max": 4,
+   "kick_truncation": 0.06588486528693926,
+   "lattice_kraus": 0,
+   "outgoing_order_max": [
+    30,
+    42
+   ],
+   "box_orders": 5185,
+   "tds": "strings",
+   "axis": [
+    1,
+    1,
+    0
+   ],
+   "strings": 4,
+   "seed": 0,
+   "entrance_weight": 0.9999999896898171,
+   "depths_ang": [
+    1000.0,
+    10000.0,
+    30000.0
+   ],
+   "incidents": 1000,
+   "outgoing": [
+    0.05599999942262976,
+    0.3529999963605054,
+    0.6329999934736542
+   ],
+   "outgoing_sem": [
+    0.007270763296238228,
+    0.015112610472399996,
+    0.015241751710668371
+   ],
+   "unresolved": [
+    0.008999999907208353,
+    0.06299999935045848,
+    0.08499999912363446
+   ],
+   "unresolved_sem": [
+    0.0029864694567477094,
+    0.007683163331776775,
+    0.008819013459353094
+   ],
+   "retained": [
+    0.9349999903599789,
+    0.5839999939788532,
+    0.28199999709252843
+   ],
+   "beyond_window": 0.7835703001579779,
+   "mean_lattice_jumps": 1.732,
+   "mean_kick_jumps": 6.806,
+   "chunks": 40,
+   "seconds": [
+    221.83140184311196,
+    181.20275244582444,
+    259.73693156335503,
+    271.406973157078,
+    246.74221576564014,
+    212.7037002579309,
+    257.4691818067804,
+    183.7560095032677,
+    265.4984893728979,
+    272.22776420693845,
+    284.4959722859785,
+    239.04404586693272,
+    284.5537440748885,
+    288.71636611176655,
+    241.786662759725,
+    224.94918947014958,
+    209.21604562504217,
+    194.31704773614183,
+    241.70425974205136,
+    253.09536151587963,
+    230.82615425623953,
+    211.38243427174166,
+    276.8635064130649,
+    317.0031990390271,
+    253.57209193799645,
+    257.46869839914143,
+    262.3385860831477,
+    256.69514805218205,
+    250.66129714995623,
+    252.82664064504206,
+    298.40330695174634,
+    253.75562822585925,
+    213.37267508590594,
+    344.2209897870198,
+    265.47936428012326,
+    284.6631824108772,
+    302.3286874066107,
+    318.56575031625107,
+    254.86814800277352,
+    270.77900602994487
+   ]
+  },
+  "el-r21": {
+   "status": "research-only; one cell, absorbing model, fibred carrier",
+   "max_order": [
+    15,
+    21
+   ],
+   "window_orders": 1333,
+   "target_eV": 139.25,
+   "electronic": true,
+   "kick_nodes": 680,
+   "harmonic_max": 4,
+   "kick_truncation": 0.06588486528693926,
+   "lattice_kraus": 0,
+   "outgoing_order_max": [
+    30,
+    42
+   ],
+   "box_orders": 5185,
+   "tds": "strings",
+   "axis": [
+    1,
+    1,
+    0
+   ],
+   "strings": 4,
+   "seed": 0,
+   "entrance_weight": 0.9999999940723944,
+   "depths_ang": [
+    1000.0,
+    10000.0,
+    30000.0
+   ],
+   "incidents": 500,
+   "outgoing": [
+    0.07599999954950197,
+    0.3719999977949307,
+    0.6259999962893189
+   ],
+   "outgoing_sem": [
+    0.011851075830276307,
+    0.021615549830177022,
+    0.021639038667390496
+   ],
+   "unresolved": [
+    0.007999999952579155,
+    0.06799999959692282,
+    0.10799999935981859
+   ],
+   "unresolved_sem": [
+    0.003983967847741005,
+    0.011258419005230186,
+    0.01388063390900548
+   ],
+   "retained": [
+    0.9159999945703132,
+    0.5599999966805408,
+    0.2659999984232569
+   ],
+   "beyond_window": 0.6293929712460063,
+   "mean_lattice_jumps": 1.838,
+   "mean_kick_jumps": 6.512,
+   "chunks": 25,
+   "seconds": [
+    464.63682939717546,
+    1202.1788278422318,
+    495.7261383002624,
+    1366.7970480639488,
+    566.8466064040549,
+    1393.730139683932,
+    470.3603189252317,
+    567.7964533171616,
+    548.9821738870814,
+    735.2458055089228,
+    575.338980639819,
+    764.6537380795926,
+    1303.457705738023,
+    542.3012002371252,
+    599.2444204990752,
+    604.0423505040817,
+    1003.6081133871339,
+    968.312463125214,
+    460.85574556095526,
+    422.09085660241544,
+    762.5065201320685,
+    332.15304657490924,
+    731.1560805481859,
+    542.0774725549854,
+    1452.1634831679985
+   ]
+  }
+ },
+ "source_sha256": {
+  "src/pyrite/montecarlo/channeling/axial_tds_continuum.py": "0ad31d387bbb4b6d81d775df6c8884f736e73e19300c2b5131d9941e032aa9f3",
+  "src/pyrite/montecarlo/channeling/axial_fiber_unraveling.py": "3dc66ffc3e218f8212c4b12fc4eb54a4df47d312f92889a68847de3183bfda11",
+  "checks/axial_outgoing_maps.py": "01cda16a95dc813c4cd7746afdb47b89c9004a33021ac6a90662837c84b280e7"
+ },
+ "lattice_jumps_mean_sem": {
+  "tds-r17": [
+   1.844,
+   0.044
+  ],
+  "tds-r21": [
+   1.931,
+   0.045
+  ],
+  "tds-r25": [
+   2.08,
+   0.049
+  ],
+  "el-r17": [
+   1.732,
+   0.043
+  ]
+ },
+ "caveats": [
+  "arms share seed 0 and incident ids; a different window changes the state space, so draws decorrelate only partially; z combines the binomial SEMs as if independent",
+  "TDS window convergence: r21 vs r25 |z| <= 0.54 on every tally; r17 sits 1-2 sigma high in outgoing at 1e3/1e4 A, so r21 = (15,21) is the converged choice at this precision",
+  "mean TDS jump count still rises r21 -> r25 (1.93 -> 2.08, 2.3 sigma without the correlation correction) while every terminal tally is unchanged; open",
+  "electronic arms: r17 (1,000) vs r21 (500) |z| <= 1.44; electronic kick harmonics |n| <= 4 truncate rho_q (see kick_truncation); the truncated columns define the model's electronic loss",
+  "box (30,42) fixed (reach ~49 A^-1 per axis); box convergence and the out-of-box tail are #882 / #881",
+  "the SLURM memory request was lowered from 6G to 4500M for tasks 31-159 while pending (scheduling only; peak RSS <= 1.6 GB)",
+  "Gamma retained-state counts from axial_states + gap_cut at the 139.25 eV target; the square M=12 window (y reach 13.9 A^-1) is unconverged (535 vs 655)"
+ ],
+ "job": {
+  "slurm_array": "3158_[0-159%16], partition cpu, 1 CPU/task",
+  "sbatch": "#!/bin/bash\n#SBATCH --job-name=fib880\n#SBATCH --partition=cpu\n#SBATCH --ntasks=1\n#SBATCH --cpus-per-task=1\n#SBATCH --mem=6G\n#SBATCH --time=06:00:00\n#SBATCH --output=/home/aamador/pyrite-880/runs/logs/%A_%a.log\nset -euo pipefail\ncd \"$HOME/pyrite-880\"\nexport PATH=\"$HOME/.local/bin:$PATH\"\nexport PYRITE_HOME=\"$HOME/pyrite\" PYRITE_CATALOG=\"$PWD/src/pyrite/data/catalog\"\nexport PYRITE_USER_CATALOG=\"$(mktemp -d)/catalog\" XDG_CONFIG_HOME=\"$(mktemp -d)\"\nexport OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1\nread -r arm start count < <(sed -n \"$((SLURM_ARRAY_TASK_ID + 1))p\" runs/tasks.txt)\nout=\"runs/out/${arm}-${start}.json\"\n[ -s \"$out\" ] && { echo \"exists $out\"; exit 0; }\nkwargs=$(uv run --no-sync python -c \"import json,sys; print(json.dumps(json.load(open('runs/arms.json'))[sys.argv[1]]))\" \"$arm\")\necho \"sha=$(cat SOURCE_SHA) arm=$arm start=$start count=$count host=$(hostname) kwargs=$kwargs\"\n/usr/bin/time -v uv run --no-sync python checks/axial_outgoing_maps.py fiber-chunk \"$kwargs\" \"$start\" \"$count\" \"$out.tmp\"\nmv \"$out.tmp\" \"$out\"\n",
+  "arms": {
+   "tds-r17": {
+    "electronic": false,
+    "tds": "strings",
+    "axis": [
+     1,
+     1,
+     0
+    ],
+    "max_order": [
+     13,
+     17
+    ],
+    "outgoing_order_max": [
+     30,
+     42
+    ],
+    "target_eV": 139.25,
+    "seed": 0
+   },
+   "tds-r21": {
+    "electronic": false,
+    "tds": "strings",
+    "axis": [
+     1,
+     1,
+     0
+    ],
+    "max_order": [
+     15,
+     21
+    ],
+    "outgoing_order_max": [
+     30,
+     42
+    ],
+    "target_eV": 139.25,
+    "seed": 0
+   },
+   "tds-r25": {
+    "electronic": false,
+    "tds": "strings",
+    "axis": [
+     1,
+     1,
+     0
+    ],
+    "max_order": [
+     18,
+     25
+    ],
+    "outgoing_order_max": [
+     30,
+     42
+    ],
+    "target_eV": 139.25,
+    "seed": 0
+   },
+   "el-r17": {
+    "electronic": true,
+    "tds": "strings",
+    "axis": [
+     1,
+     1,
+     0
+    ],
+    "max_order": [
+     13,
+     17
+    ],
+    "outgoing_order_max": [
+     30,
+     42
+    ],
+    "target_eV": 139.25,
+    "seed": 0
+   },
+   "el-r21": {
+    "electronic": true,
+    "tds": "strings",
+    "axis": [
+     1,
+     1,
+     0
+    ],
+    "max_order": [
+     15,
+     21
+    ],
+    "outgoing_order_max": [
+     30,
+     42
+    ],
+    "target_eV": 139.25,
+    "seed": 0
+   }
+  },
+  "chunks": {
+   "tds-r17": "20 x 50",
+   "tds-r21": "25 x 40",
+   "tds-r25": "50 x 20",
+   "el-r17": "40 x 25",
+   "el-r21": "25 x 20"
+  }
+ }
+}

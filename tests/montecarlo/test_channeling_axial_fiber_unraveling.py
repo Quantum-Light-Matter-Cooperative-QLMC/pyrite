@@ -230,8 +230,8 @@ def test_zone_boundary_ties_fold_to_the_half_open_zone():
         ({"lattice_loss": np.zeros((4, 4))}, "order window"),
         ({"outgoing_order_max": 0}, "outgoing_order_max"),
         ({"outgoing_order_max": 2}, "D >= outgoing_order_max"),
-        ({"lattice_columns": np.zeros((1, 5, 4))}, "centred square"),
-        ({"kick_columns": np.zeros((1, 4, 4))}, "centred square"),
+        ({"lattice_columns": np.zeros((1, 5, 4))}, "centred odd"),
+        ({"kick_columns": np.zeros((1, 4, 4))}, "centred odd"),
     ],
 )
 def test_inconsistent_channels_refuse(checks, change, message):
@@ -371,3 +371,182 @@ def test_outgoing_box_moves_window_fold_outs_from_unresolved_to_outgoing(checks)
     count = lambda events, kind: sum(e.kind == kind for e in events)  # noqa: E731
     assert count(large, "unresolved") < count(small, "unresolved")
     assert count(large, "outgoing") > count(small, "outgoing")
+
+
+# Rectangular window on a cell with unequal g (matched reach |g_i| M_i = 2.2).
+RG = np.array([1.1, 2.2])  # q = 2.2 kicks shift (2, 0) at azimuth 0 and (0, 1) at pi/2
+RM, RB, RH = (2, 1), (5, 4), (1, 2)  # box holds every kick output: M + H + shift
+RD = tuple(b + m for b, m in zip(RB, RM, strict=True))
+R_SHIFTS = [(2, 0), (0, 1)]
+
+
+def _grid(extents):
+    axes = [np.arange(-e, e + 1) for e in extents]
+    return np.stack(np.meshgrid(*axes, indexing="ij"), -1).reshape(-1, 2)
+
+
+R_ORDERS, R_BOX_ORDERS = _grid(RM), _grid(RB)
+R_WINDOW = np.zeros((2 * RB[0] + 1, 2 * RB[1] + 1), dtype=complex)
+R_WINDOW[0, 0], R_WINDOW[1, 0], R_WINDOW[0, 1] = 0.7, 0.5j, 0.5
+R_WINDOW /= np.linalg.norm(R_WINDOW)
+
+
+def _rect_spectrum():
+    rng = np.random.default_rng(11)
+    k = len(R_ORDERS)
+    vectors = np.linalg.qr(rng.normal(size=(k, k)) + 1j * rng.normal(size=(k, k)))[0]
+    return np.linspace(0.0, 6.0, k), vectors
+
+
+def _rect_kick():
+    rng = np.random.default_rng(12)
+    shape = (1, 2 * RH[0] + 1, 2 * RH[1] + 1)
+    return 0.3 * (rng.normal(size=shape) + 1j * rng.normal(size=shape))
+
+
+def _rect_channels(checks, kick_scale):
+    _, study = checks
+    span = np.array(RD)
+    kraus = study["_kraus"](
+        -span, span, RG, (0.0, 0.0), _phase, np.array(POSITION), A2, RATE, AREA, 1e-14
+    )
+    energies, vectors = _rect_spectrum()
+    return FiberChannels(
+        order_max=RM,
+        reciprocal_inv_ang=tuple(RG),
+        spectrum=lambda kappa: (energies, vectors),
+        cut=lambda e: 2.5,
+        lattice_columns=kraus.T.reshape(-1, 2 * RD[0] + 1, 2 * RD[1] + 1),
+        lattice_loss=study["loss_operator"](
+            R_ORDERS, RG, _phase, np.array(POSITION), A2, RATE, AREA, 40
+        ),
+        kick_columns=kick_scale * _rect_kick(),
+        kick_q_inv_ang=np.array([2.2]),
+        kick_azimuths=(0.0, np.pi / 2),
+        outgoing_order_max=RB,
+    )
+
+
+def _rect_convolution(column):
+    """Explicit (box, window) matrix of a centred rectangular convolution column."""
+    half = np.array(column.shape) // 2
+    out = np.zeros((len(R_BOX_ORDERS), len(R_ORDERS)), dtype=complex)
+    for a, o in enumerate(R_BOX_ORDERS):
+        for b, p in enumerate(R_ORDERS):
+            t = o - p
+            if np.all(np.abs(t) <= half):
+                out[a, b] = column[t[0] + half[0], t[1] + half[1]]
+    return out
+
+
+def _rect_dense(checks, kick_scale):
+    """Independent explicit-matrix model on the rectangular box (no map builder)."""
+    builder, _ = checks
+    channels = _rect_channels(checks, kick_scale)
+    energies, vectors = _rect_spectrum()
+    keep = energies < 2.5
+    v = vectors[:, keep]
+    index = {tuple(o): i for i, o in enumerate(R_BOX_ORDERS)}
+    embed = np.zeros((len(R_BOX_ORDERS), len(R_ORDERS)))
+    for b, p in enumerate(R_ORDERS):
+        embed[index[tuple(p)], b] = 1.0
+    u = builder["position_basis"](R_BOX_ORDERS)
+    jumps = [_rect_convolution(c) for c in channels.lattice_columns]
+    kick = _rect_convolution(channels.kick_columns[0])
+    kicks = []
+    for shift in R_SHIFTS:
+        moved = np.zeros_like(kick)
+        for a, o in enumerate(R_BOX_ORDERS):
+            if np.any(kick[a]):
+                moved[index[tuple(o + np.array(shift))]] = kick[a] / np.sqrt(len(R_SHIFTS))
+        kicks.append(moved)
+    retained, outgoing = [], []
+    for op in jumps + kicks:
+        a = v.conj().T @ embed.T @ op @ v
+        retained.append(a)
+        outgoing.append(u @ (op @ v - embed @ v @ a))
+    unresolved = v.conj().T @ (channels.lattice_loss - sum(j.conj().T @ j for j in jumps)) @ v
+    entry = np.zeros(len(R_ORDERS), dtype=complex)
+    entry[len(R_ORDERS) // 2] = 1.0
+    c = v.conj().T @ entry
+    model = absorbing_axial_model(
+        np.diag(energies[keep]),
+        np.outer(c, c.conj()),
+        retained_jumps_per_sqrt_ang=tuple(retained),
+        outgoing_jumps_per_sqrt_ang=tuple(outgoing),
+        unresolved_effect_inv_ang=0.5 * (unresolved + unresolved.conj().T),
+        outgoing_shape=R_WINDOW.shape,
+        hbar_v_eV_ang=HBAR_V,
+    )
+    return model, entry, channels
+
+
+@pytest.mark.parametrize("kick_scale", [0.0, 1.0], ids=["lattice", "one-sided-kicks"])
+def test_rectangular_window_matches_dense_box_oracle(checks, kick_scale):
+    model, entry, channels = _rect_dense(checks, kick_scale)
+    events = unravel_fiber_outgoing(
+        channels,
+        entry,
+        hbar_v_eV_ang=HBAR_V,
+        window=R_WINDOW,
+        max_depth_ang=12.0,
+        incident_ids=range(3000),
+        seed=13,
+        search_step_ang=2.0,
+    )
+    if kick_scale:
+        assert any(e.kick_jumps > 0 for e in events)
+    _compare(model, events, window=R_WINDOW)
+
+
+def test_square_pair_extents_are_bitwise_the_integer_extents(checks):
+    from dataclasses import replace
+
+    _, entry = _dense(checks, 0.35)
+    square = replace(_channels(checks, 0.35, azimuths=None, half=BOX + 1), outgoing_order_max=BOX)
+    pair = replace(square, order_max=(1, 1), outgoing_order_max=(BOX, BOX))
+    kwargs = dict(hbar_v_eV_ang=HBAR_V, window=BOX_WINDOW, max_depth_ang=12.0, seed=4)
+    a = unravel_fiber_outgoing(square, entry, **kwargs, incident_ids=range(60))
+    b = unravel_fiber_outgoing(pair, entry, **kwargs, incident_ids=range(60))
+    assert a == b
+
+
+def test_matched_order_extents_match_reciprocal_reach():
+    from pyrite.montecarlo.channeling.axial_fiber_unraveling import matched_order_extents
+
+    assert matched_order_extents((1.1, 1.1), 12 * 1.1) == (12, 12)
+    assert matched_order_extents((1.636, 2.834), 12 * 1.636) == (12, 7)
+    assert matched_order_extents((1.636, 2.834), 30 * 1.636) == (30, 18)
+    with pytest.raises(ValueError, match="spacings"):
+        matched_order_extents((1.0, 0.0), 3.0)
+    with pytest.raises(ValueError, match="reach"):
+        matched_order_extents((1.0, 1.0), -1.0)
+
+
+@pytest.mark.parametrize(
+    ("change", "message"),
+    [
+        ({"order_max": (2,)}, "order_max must be an integer or a pair"),
+        ({"order_max": (2, -1)}, "order_max must be nonnegative"),
+        ({"order_max": (True, 1)}, "order_max must be an integer or a pair"),
+        ({"outgoing_order_max": (5, 0)}, "outgoing_order_max must be integer extents"),
+        ({"outgoing_order_max": (5, 2.5)}, "outgoing_order_max must be integer extents"),
+        ({"outgoing_order_max": (5, 5)}, "D >= outgoing_order_max"),
+        ({"lattice_columns": np.zeros((1, 2 * RD[0] + 1, 2 * RD[1] - 1))}, "D >= outgoing"),
+        ({"lattice_columns": np.zeros((1, 2 * RD[0] + 1, 2 * RD[1]))}, "centred odd"),
+        ({"lattice_loss": np.zeros((25, 25))}, "order window"),
+    ],
+)
+def test_inconsistent_rectangular_extents_refuse(checks, change, message):
+    from dataclasses import replace
+
+    channels = replace(_rect_channels(checks, 1.0), **change)
+    with pytest.raises(ValueError, match=message):
+        unravel_fiber_outgoing(
+            channels,
+            np.zeros(len(R_ORDERS), dtype=complex),
+            hbar_v_eV_ang=HBAR_V,
+            window=R_WINDOW,
+            max_depth_ang=1.0,
+            incident_ids=[0],
+        )

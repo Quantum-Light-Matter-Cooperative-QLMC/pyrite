@@ -281,7 +281,7 @@ Material cross-check: at the Γ point with TDS only, the fibre engine's retained
 
 These three parts are orthogonal and sum to $\phi$. Lattice channels are $\mathcal BL_j$. The unresolved lattice remainder is $\Gamma_{\rm lat}-\sum_jL_j^\dagger\mathcal BL_j$. A kick's unresolved part is $\lVert S_i\chi\rVert^2-\lVert\mathcal B\,\mathrm{relabel}(S_i\chi)\rVert^2$.
 
-**Exactness condition $D\ge B+M$** (sufficient for every covariance, and necessary for some; see the re-verification below). Write $K(\mathbf t,\mathbf t')$ for the full transfer covariance and $K_D$ for its restriction to $\lvert\mathbf t\rvert_\infty,\lvert\mathbf t'\rvert_\infty\le D$, which the Kraus columns factor as $K_D=\sum_js_js_j^\dagger$. For window inputs $\mathbf p,\mathbf p'$:
+**Exactness condition $D\ge B+M$** (sufficient for every covariance, per axis; necessary for output exactness on every axis, and for remainder positivity on axes with $M_i\ge1$; with $M_i=0$ the remainder stays PSD at any $D_i$ but in-box transfers beyond $D_i$ would be miscounted as unresolved, so the refusal still applies; see the re-verifications below). Write $K(\mathbf t,\mathbf t')$ for the full transfer covariance and $K_D$ for its restriction to $\lvert\mathbf t\rvert_\infty,\lvert\mathbf t'\rvert_\infty\le D$, which the Kraus columns factor as $K_D=\sum_js_js_j^\dagger$. For window inputs $\mathbf p,\mathbf p'$:
 
 $$
 (\Gamma_{\rm lat})_{\mathbf p\mathbf p'}=\sum_{\mathbf o}K(\mathbf o-\mathbf p,\mathbf o-\mathbf p'),\qquad
@@ -517,3 +517,184 @@ and position marginals pass in every run ($p\ge0.05$).
 1. `_check_channels` now refuses lattice or kick column arrays that are not `(n, 2D+1, 2D+1)`, i.e. not square with odd width, so the FFT can no longer silently crop or pad an axis (`test_inconsistent_channels_refuse`). Zero-padded columns from a narrower factorization cannot be detected from their shape. The `FiberChannels` docstring now says that columns must factor the covariance truncated at their full width, and that the runtime complement refusal is the only backstop for violations.
 2. The wording now reads: $D\ge B+M$ is sufficient for every covariance and necessary for some.
 3. Default $B=M$ now refuses $D<2M$. This is intended: as finding (a) shows, such columns were already inexact on the window.
+
+## Implementation change: per-axis order window and box (2026-11-01, rederived)
+
+**Change (#880).** `FiberChannels.order_max` and `outgoing_order_max` accept per-axis extents $(M_x,M_y)$ and $(B_x,B_y)$; an integer still means a square extent. The retained window is $R=[-M_x,M_x]\times[-M_y,M_y]$ in C order (x outer), the box is $\mathcal B=[-B_x,B_x]\times[-B_y,B_y]$ with $B_i\ge M_i$, and lattice or kick columns may be $(2D_x+1)\times(2D_y+1)$. `matched_order_extents(g, reach)` returns the smallest $M_i$ with $\lvert g_i\rvert M_i\ge$ reach. On a rectangular cell with unequal $\lvert g\rvert$ it gives a nearly isotropic plane-wave momentum cut, instead of the square window's excess reach along the larger-$\lvert g\rvert$ axis.
+
+**Why the derivation carries over.** Every set above is a product of intervals, and every offset is a per-axis sum.
+
+- *Exactness condition.* Over $\mathbf o\in\mathcal B$, $\mathbf p\in R$, the largest $\lvert o_i-p_i\rvert$ is $B_i+M_i$, independently per axis. So $K_D=K$ on every box term iff $D_i\ge B_i+M_i$ for both axes. Under that condition the represented outputs are exact and the remainder $\sum_{\mathbf o\notin\mathcal B}M^{\mathbf o}$ is PSD, by the same argument as the square box. `_check_channels` refuses $D_i<B_i+M_i$ on either axis.
+- *Convolutions.* Full linear-convolution order $p_i$ sits at index $p_i+M_i+D_i$ (lattice) or $p_i+M_i+H_i$ (kick), so the crop $p_i+M_i+D_i\to p_i+B_i$ and the kick source $a_i-B_i-n_{0,i}+M_i+H_i$ are taken per axis. FFT sizes are $2M_i+1+2D_i$ and $2M_i+1+2H_i$ per axis, with no wrap.
+- *Kick loss.* The lags of $C(\mathbf d)$ are nonzero for $\lvert d_i\rvert\le2H_i$ and read for $\lvert d_i\rvert\le2M_i$. The per-axis size $\max(2H_i+2M_i+1,4H_i+1)$ keeps both free of aliasing.
+- *Split and measurement.* `window_in_box` embeds $R$ at offsets $B_i-M_i$; the Weyl grid is $(2B_x+1)\times(2B_y+1)$ in FFT layout. The split $P$, $\mathcal B-P$, $1-\mathcal B$ and its closure are unchanged.
+- *Continuum strings.* "$\mathbf Q$ lands in the box" is the per-axis test $\lvert\mathrm{fold}(\mathbf Q)_i\rvert\le B_i$, and the column half-width is $B_i+M_i$ per axis.
+
+**Square inputs.** Integer (or equal-pair) extents give the same arrays, FFT sizes and draws. Pickled events of five square configurations (window, box, box with strings and kicks, a free strings cell, raw `string_jump` outputs) are bitwise identical to `a259d557e`. `test_square_pair_extents_are_bitwise_the_integer_extents` pins integer versus pair extents. The driver's square `fiber_report` output (lattice and strings) is also identical.
+
+**Evidence.**
+
+- `test_rectangular_window_matches_dense_box_oracle`: unequal $g=(1.1,2.2)$, $M=(2,1)$ (matched reach 2.2 Å⁻¹), $B=(5,4)$, $D=(7,5)$, rectangular kick column $H=(1,2)$ with $q=2.2$ at azimuths 0 and $\pi/2$ (one-sided shifts $(2,0)$ and $(0,1)$). The dense model is built from explicit convolution matrices; it passes the 4.5σ tallies and the χ² joint Weyl law on the 11×9 box for lattice-only and lattice + kicks (3,000 incidents).
+- Injected fault: swapping the axes of the kick relabel shift fails the kick case.
+- `test_inconsistent_rectangular_extents_refuse`: malformed, negative or boolean extents, $B_y<M_y$, non-integer box, $D_y<B_y+M_y$ (by box or by columns), even column widths and a window-mismatched loss.
+
+**Memory (no law change).** `_waiting` now passes `brentq` a closure over a list that is cleared after the root find. SciPy's wrapper keeps the callable in a reference cycle, and the old closure pinned the fibre's eigenbasis until a full GC pass (Si [111] electronic: 5.75 → 0.37 GB peak). Draws and outputs are bitwise unchanged.
+
+## Fresh-context re-verification (2026-11-01, #880)
+
+Fresh verification context, commit `f5108dccc` (change `a259d557e..f5108dccc`).
+The per-axis conditions and offsets below were derived from the ledger row,
+the change summary and the square-box derivation above before the changed
+function bodies were read.
+
+**Verdict: `rederived`.** The status stays `anchored`. Human sign-off remains in #277.
+
+- **Claim**: `cr-axial-fiber-unraveling`, `montecarlo/channeling/axial_fiber_unraveling.py::{_extents,_check_channels,_autocorrelation_loss,_Engine,_Engine.lattice_outputs,_Engine.kick_rates,_Engine.kick_output,_measure,_jump,_waiting,matched_order_extents}`. Source: Castin, Dalibard and Mølmer, arXiv:0805.4002, Eqs. (4) and (8), with the box split of the re-verification above.
+- **Filters**: units pass (unchanged: rates Å$^{-1}$, columns Å$^{-1/2}$, the Parseval norm divides by $N_xN_y$); limits pass (integer or equal-pair extents reduce to the square box, bitwise; $B_i=M_i$ on both axes is the window-only model); signs and conventions pass (relabel $+\mathbf n_0$ per axis, C order with $x$ outer for the window, the box and the Weyl grid).
+- **Re-derivation**: `matches`.
+
+### Derivation
+
+**(a) Exactness and positivity on product boxes.** Take $R=\prod_i[-M_i,M_i]$,
+$\mathcal B=\prod_i[-B_i,B_i]$ with $B_i\ge M_i$, and Kraus columns that
+factor the principal block of the covariance $K$ on
+$\prod_i[-D_i,D_i]$. For $\mathbf o\in\mathcal B$ and $\mathbf p\in R$, the
+transfer $\mathbf o-\mathbf p$ ranges over exactly
+$\prod_i[-(B_i+M_i),B_i+M_i]$, and the range factorizes by axis. Hence
+$K_D(\mathbf o-\mathbf p,\mathbf o-\mathbf p')=K(\mathbf o-\mathbf p,\mathbf o-\mathbf p')$
+on every box term, for every $K$, if and only if
+
+$$
+D_i\ge B_i+M_i\quad\text{for } i=x,y.
+$$
+
+Under this condition every $S_{\mathbf o}=\{\mathbf p\in R:\lvert o_i-p_i\rvert\le D_i\ \forall i\}$
+equals $R$. The remainder decomposition of the square proof then reads
+
+$$
+\Gamma_{\rm lat}-\sum_jL_j^\dagger\mathcal BL_j=\sum_{\mathbf o\notin\mathcal B}M^{\mathbf o}\succeq0,
+$$
+
+and the represented outputs are the exact $\mathcal BL_j\chi$. Below the
+condition on axis $i$, the box output is wrong for a generic covariance. The
+rank-one edge covariance (amplitude $a$ at $D_i\hat{\mathbf e}_i$ and $b$ at
+$(D_i+1)\hat{\mathbf e}_i$, $\lvert a\rvert>\lvert b\rvert$) makes the
+remainder indefinite, but only if two window orders are adjacent along axis $i$,
+that is $M_i\ge1$. If $M_i=0$ on the deficient axis, every $S_{\mathbf o}$ is
+all or nothing along that axis. The truncated term is then a principal block,
+and the remainder stays PSD at any $D_i$, while the outputs are still inexact.
+So $D_i\ge B_i+M_i$ is necessary and sufficient for output exactness over
+all covariances on every axis. For positivity it is necessary on the axes with
+$M_i\ge1$.
+
+**(b) Per-axis index offsets.** Store window orders at $p_i+M_i$, lattice
+transfers at $t_i+D_i$ and kick transfers at $t_i+H_i$. The linear convolution
+puts output order $o_i$ at $o_i+M_i+D_i$ in an array of size
+$2M_i+2D_i+1$, which does not wrap. The box crop therefore copies source
+$o_i+M_i+D_i$ to target $o_i+B_i$ for $\lvert o_i\rvert\le B_i$. That needs
+$M_i+D_i\ge B_i$, which (a) implies. A kick output $u_i$ sits at
+$u_i+M_i+H_i$. After the fold it is order $u_i+n_{0,i}$, at box index
+$a_i=u_i+n_{0,i}+B_i$, so box index $a_i$ reads source
+$a_i-B_i-n_{0,i}+M_i+H_i$, with zero outside $[0,2M_i+2H_i]$. The
+autocorrelation $C(\mathbf d)$ is nonzero for $\lvert d_i\rvert\le2H_i$ and is
+read for $\lvert d_i\rvert\le2M_i$. On axis $i$, a circular FFT of size $N_i$
+aliases neither if $N_i\ge4H_i+1$ (no self-overlap of the support) and
+$N_i\ge2H_i+2M_i+1$ (no read lag meets an image of the support). The size is
+$N_i=\max(2H_i+2M_i+1,4H_i+1)$. Parseval for the kick rate on the
+$(2M_x+2H_x+1)\times(2M_y+2H_y+1)$ array divides by the product of the two
+sizes. The window sits in the box at offsets $B_i-M_i$, and the Weyl layout
+puts box order $\mathbf o$ at $(o_x\bmod(2B_x+1),\,o_y\bmod(2B_y+1))$.
+
+**(c) Continuum strings.** The box is a product, so $\mathbf Q$ lands in it
+iff its fold shift satisfies $\lvert s_i\rvert\le B_i$ on both axes. The
+column must cover $\lvert o_i-p_i\rvert\le B_i+M_i$, so its half-width is
+$B_i+M_i$. Output $o_i$ sits at $o_i+M_i+(B_i+M_i)$, and the crop starts at
+$M_i+(B_i+M_i)-B_i=2M_i$.
+
+**(d) Closure, split and waiting law.** These are unchanged. The projectors
+$P\le\mathcal B\le1$ are diagonal or spectral in orders for any product sets.
+The `_waiting` change only moves the root-finder's captured state into a list
+that is cleared after `brentq` returns. It evaluates the same expression on the
+same arguments.
+
+### Source-to-code comparison
+
+`src/pyrite/montecarlo/channeling/axial_fiber_unraveling.py` and
+`axial_tds_continuum.py` at `f5108dccc`:
+
+| Derivation | Code | Agreement |
+|---|---|---|
+| refuse unless $D_i\ge B_i+M_i$ on both axes; $B_i\ge M_i$; odd column widths per axis | `_check_channels`, `_extents`, `order_extents` | match |
+| crop source $o_i+M_i+D_i$ to target $o_i+B_i$ | `lattice_crop = _crop(m_i + d_i, b_i)` per axis; `lattice_outputs` `out[:, tx, ty.T] = full[:, sx, sy.T]` | match |
+| lattice FFT size $2M_i+1+2D_i$ | `lattice_size` | match |
+| kick source $a_i-B_i-n_{0,i}+M_i+H_i$, zero outside size $2M_i+1+2H_i$ | `kick_output`, `kick_size` | match |
+| Parseval divides by $N_xN_y$ | `kick_rates` | match |
+| $N_i=\max(2H_i+2M_i+1,4H_i+1)$, lag $C(\mathbf p-\mathbf p')$ | `_autocorrelation_loss` | match |
+| window at box offsets $B_i-M_i$, C order | `window_in_box` | match |
+| Weyl layout $o_i\bmod(2B_i+1)$, grid $(2B_x+1)\times(2B_y+1)$ | `_measure`, `unravel_fiber_outgoing` window check | match; `sample_phase_space` is shape-generic |
+| string box test $\lvert s_i\rvert\le B_i$, half-width $B_i+M_i$, crop start $2M_i$ | `string_jump`: `np.any(np.abs(shift) > b)`, `half = b + m`, `lo = m + half - b` | match |
+| per-axis extents passed to strings | `_jump`: `tuple(engine.m)`, `tuple(engine.box)` | match |
+| `_waiting` evaluates the same function | closure over `held = [fiber, current]`, cleared after `brentq` | match |
+| smallest $M_i$ with $\lvert g_i\rvert M_i\ge$ reach | `matched_order_extents` (relative slack $10^{-9}$) | match; window-selection policy, not a law |
+
+### Independent numerical evidence
+
+Scripts are in the session scratchpad: `val_rect_psd.py`, `val_rect_model.py`,
+`val_rect_oracle.py`, `val_rect_chunks.py`, `val_rect_square.py` and
+`val_rect_waiting.py`. The model is my own and uses none of the implementation's
+map builders or the tests' helpers.
+
+**Model.** The cell has $\mathbf g=(0.95,1.6)$ Å$^{-1}$ and an off-centre carrier
+$\boldsymbol\kappa_0=(0.13,-0.29)$ Å$^{-1}$. The Hamiltonian is
+$H=0.8\lvert\boldsymbol\kappa+\mathbf g_{\mathbf p}\rvert^2$ plus a random
+Hermitian periodic potential, keeping the 6 or 7 lowest states, with
+$\hbar v=20$ eV Å. Three correlated complex lattice columns sit on
+$\prod_i[-D_i,D_i]$, and $\Gamma_{\rm lat}$ is their exact all-output sum plus a
+random PSD extra. There are two kick nodes with rectangular columns. The kicks
+are commensurate and non-axis: $q_1=\lvert(2g_x,g_y)\rvert$ and $q_2=2q_1$ at
+the azimuths $\arctan2(g_y,\pm2g_x)$. They fold back to $\boldsymbol\kappa_0$
+with shifts $(\pm2,1)$ and $(\pm4,2)$. The shift set has neither inversion nor
+axis-swap symmetry. The oracle integrates the single-fibre GKSL equation by an
+exact matrix exponential of the Liouvillian, augmented with $\int\rho\,dz$.
+Every output is built from explicit dense convolution matrices with an explicit
+order relabel. Cumulative tallies are read at 4, 12 and 40 Å. The joint Weyl
+law on the box grid is computed from the accumulated outgoing density with the
+sampler's documented law.
+
+| Check | Result |
+|---|---|
+| Per-axis exactness/PSD, own covariances, $(M,B)\in\{((1,2),(1,3)),((2,1),(4,1)),((0,2),(2,2)),((1,0),(3,1))\}$, $D$ at, one below on each axis, and one above | $D_i\ge B_i+M_i$: box-output error 0 and remainder PSD for edge, rank-2 and full-rank covariances. One below on an axis with $M_i\ge1$: edge remainder $-0.35$ to $-0.37$ and output error $O(1)$. One below on an $M_i=0$ axis: remainder PSD but output error 0.36 |
+| Components vs own direct matrices, cases A and B | `lattice_outputs` $\le5.6\times10^{-16}$; `kick_output` at 9 shifts incl. partial and empty overlap $\le4.5\times10^{-16}$; `kick_rates` $\le4.6\times10^{-16}$; `self.loss` $\le2.3\times10^{-16}$; `window_in_box` exact |
+| Oracle closure and probability sum | $\lVert\Gamma_P-(\text{out}+\text{unres}+\text{ret})\rVert\le9\times10^{-17}$; sum $=1$ to $10^{-12}$ |
+| A2: $M=(1,2)$, $B=(1,3)$ ($B_x=M_x$), $D=(3,5)$ ($D_y=B_y+M_y$), $H=(2,1)$; 40k incidents | 7 tallies $\lvert z\rvert\le1.19$; joint Weyl $\chi^2=370.9/436$ ($p=0.99$); position $p=0.27$, momentum $p=0.82$ |
+| B2: $M=(2,1)$, $B=(4,1)$ ($B_y=M_y$), $D=(6,2)$, $H=(1,2)$; 40k | $\lvert z\rvert\le1.16$; joint $\chi^2=735.2/726$ ($p=0.40$); position $p=0.13$, momentum $p=0.73$ |
+| A, higher rates, 40k | $\lvert z\rvert\le1.75$; joint $p=0.76$; marginals $p\ge0.75$ |
+| A2, lattice only (A_lat), 3k | $\lvert z\rvert\le1.64$ |
+| Power: oracle relabel axis swap ($\mathbf n_0\to(n_{0,y},n_{0,x})$), A2 40k | outgoing $z=-13.1$, momentum $p<10^{-300}$ |
+| Power: oracle relabel sign flip, A2 40k | outgoing $z=+29.5$, joint $p<10^{-300}$ |
+| Square inputs vs `a259d557e` (detached temporary worktree, removed afterwards): 5 configurations × 300 incidents (window-only with uniform azimuth; box with discrete azimuths; $M=2$ box; box with two strings and kicks; free strings), with `search_step_ang` 7 Å so that `_waiting` brackets across several spans; 400 raw `string_jump` draws; one `column` | pickled event tuples and arrays byte-identical (`cmp`) |
+| `_waiting` lifetime, `gc` disabled | same depth and norm bitwise; new code frees the fibre on `del`, old code keeps it until a GC pass |
+| Anchors: `pyrite-dev test` on both test modules and `tests/dev/test_validation_ledger.py` | 60 passed |
+
+The first exploratory run (case A, 500 incidents) gave $z=-3.8$ for the
+unresolved tally at 4 Å. It did not recur. Split into 80 chunks of 500, the
+same 40k-incident stream gives chunk $z$ with mean $+0.11$ and standard
+deviation $1.14$. That first chunk is the minimum, and the pooled 40k tally is
+$z=+1.0$.
+
+### Findings (no physics divergence)
+
+1. *Wording, $M_i=0$ axes.* The statement "sufficient for every covariance
+   and necessary for some" holds for output exactness on every axis. For
+   remainder positivity, it holds only on axes with $M_i\ge1$. A deficient
+   $D_i$ on an $M_i=0$ axis leaves the remainder PSD, but transfers beyond
+   $D_i$ that land in the box are miscounted as unresolved. The refusal is
+   still correct, because the outputs are inexact.
+2. *Ledger coverage.* `matched_order_extents` and `order_extents` carry no
+   `Validation:` marker and are not in the Code field. That is acceptable for
+   input-parsing and window-selection policy, but the window choice now
+   affects material results. `matched_order_extents` is a candidate for
+   listing under this claim if it is meant to be pinned.
+3. *Error-message masking.* `_extents` maps every `order_extents` error on
+   `outgoing_order_max` (wrong length, non-integer, negative) to one generic
+   message. The behaviour is correct; only the diagnostic is less specific.

@@ -342,3 +342,49 @@ rectangular, with 1, 4 and 2 sources, as the cell assumption requires.
    $K$, and the 1e6-trial budget raises instead of biasing. Each string jump
    lands on a fresh continuous carrier, so every such jump misses the fibre
    cache. Both are performance issues only.
+
+## Implementation change: per-axis window and box (2026-11-01, rederived)
+
+`string_jump` and `StringChannel.column` take per-axis extents $(M_x,M_y)$ and $(B_x,B_y)$ (an integer still means square), for the rectangular windows of #880. The box is a product of intervals, so the unresolved decision is $\lvert\mathrm{fold}(\mathbf Q)_i\rvert>B_i$ on either axis. The column half-width is $B_i+M_i$, the FFT size is $2M_i+1+2(B_i+M_i)$, and output order $o_i$ sits at index $o_i+M_i+(B_i+M_i)$, per axis. The sampler and $\Gamma$ already took arbitrary order lists and are unchanged. Square inputs are bitwise unchanged (`string_jump` outputs and string unravelings vs `a259d557e`).
+
+Evidence: `test_single_jump_outcomes_match_factorized_reference[rectangular]` (window $(1,0)$, box $(2,1)$, $g=(1.3,0.9)$: unresolved fraction and full box density matrix within 5σ; swapping the window extents in the crop offset fails it). `test_loss_is_the_zone_integral_of_shifted_lattice_factorizations[rectangular]` (window $(2,1)$, 1e-9). `test_rectangular_window_supercell_reproduces_the_cell_retained_law` ($g=(1.1,2.2)$, window $(2,1)$, box $(3,2)$ vs a 2×1 supercell with window $(4,1)$, box $(6,2)$).
+
+## Fresh-context re-verification (2026-11-01, #880)
+
+Fresh verification context, commit `f5108dccc` (change `a259d557e..f5108dccc`).
+The per-axis box test, half-width and crop were derived before the changed
+bodies were read; the derivation is (c) of the
+[fibre re-verification](cr-axial-fiber-unraveling.md#fresh-context-re-verification-2026-11-01-880).
+
+**Verdict: `rederived`.** The status stays `anchored`. Human sign-off remains in #277.
+
+- **Claim**: `cr-axial-continuum-tds-jumps`, `montecarlo/channeling/axial_tds_continuum.py::{StringChannel.column,string_jump}` (the per-axis extents; `order_extents` parses them).
+- **Filters**: units pass (unchanged); limits pass (integer or equal-pair extents are bitwise the square path); signs and conventions pass (C order with $x$ outer; fold shift per axis).
+- **Re-derivation**: `matches`. The box is $\prod_i[-B_i,B_i]$ about the folded carrier, so the jump is unresolved iff $\lvert s_i\rvert>B_i$ on either axis. Box outputs need transfers $\lvert o_i-p_i\rvert\le B_i+M_i$, so the column half-width is $B_i+M_i$. The wrap-free FFT size is $2M_i+1+2(B_i+M_i)$, output $o_i$ sits at $o_i+M_i+(B_i+M_i)$, and the crop starts at $2M_i$. Code: `np.any(np.abs(shift) > b)`, `half = b + m`, `size = width + 2 * half`, `lo = m + half - b`. Match.
+
+### Independent numerical evidence
+
+Scripts: `val_rect_string.py` and `val_rect_string_direct.py` in the session
+scratchpad. The model is my own: $\mathbf g=(1.05,0.7)$ Å$^{-1}$, string at
+$(0.37,-0.52)$ Å, $a^2=0.15$ Å$^2$, $\lambda=0.9$ Å$^{-1}$, Gaussian phase
+$\varphi=1.8e^{-q^2/(2\cdot1.2^2)}$ and carrier $(0.21,-0.11)$ Å$^{-1}$.
+
+| Check | Result |
+|---|---|
+| `string_jump` at fixed $(\mathbf Q,u)$ vs own direct sum $\psi_{\mathbf o}=\sum_{\mathbf p}\chi_{\mathbf p}\,\varphi\,e^{-i\mathbf t\cdot\mathbf r}w_{\mathbf t}(u)$, $\mathbf t=\Delta+\mathbf g_{\mathbf o-\mathbf p}$; $(M,B)\in\{((2,1),(2,3)),((1,3),(4,3)),((0,2),(3,2)),((3,0),(3,4))\}$, 1,200 draws | every unresolved decision and $\boldsymbol\kappa'$ agree; 540 box outputs, max rel. diff $1.5\times10^{-15}$ |
+| Own reference: $40\times40$ midpoint grid over $\boldsymbol\kappa'$ in the first zone, analytic $\mathbb E_u$ of $w_{\mathbf t}\overline{w_{\mathbf t'}}$, wide order sum for the total | total rate equals `StringChannel.rate` to $4\times10^{-13}$ |
+| $M=(2,1)$, $B=(2,3)$ ($B_x=M_x$), 20k jumps | unresolved 0.27685 vs 0.27374 ($z=+0.99$); normalized box density, 1,225 entries: max $\lvert z\rvert$ 3.35 (real) and 2.60 (imag); mean $\boldsymbol\kappa'$ $z=(-1.77,+0.90)$ |
+| same, 2k jumps, other seed | unresolved $z=-0.17$; max $\lvert z\rvert$ 3.77 and 2.59; mean $\boldsymbol\kappa'$ $z=(+2.25,+0.07)$ |
+| $M=(1,3)$, $B=(4,3)$ ($B_y=M_y$), 20k | unresolved $z=-0.77$; 3,969 entries: max $\lvert z\rvert$ 3.02 and 3.17; mean $\boldsymbol\kappa'$ $z=(-0.20,-0.57)$ |
+| Square `string_jump` (400 draws) and `column` vs `a259d557e`; string unravelings (strings + kicks, free strings) | byte-identical (see the fibre write-up) |
+| Anchors (both test modules + ledger test) | 60 passed |
+
+The largest entry pulls are consistent with the maximum of about $10^3$
+correlated normal deviates ($\approx3.3$). The fixed-$(\mathbf Q,u)$ identity
+is exact, so the per-axis crop is pinned independently of sampling noise.
+
+### Findings
+
+None blocking. `StringChannel.column` now accepts a pair, and `order_extents`
+refuses negative or non-integer halves. That validation is new and
+behaviour-neutral for valid inputs.

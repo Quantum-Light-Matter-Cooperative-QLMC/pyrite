@@ -28,7 +28,7 @@ import numpy as np
 from scipy.optimize import brentq
 
 from .axial_phase_space import phase_space_stream, sample_phase_space
-from .axial_tds_continuum import StringChannel, TdsString, string_jump
+from .axial_tds_continuum import StringChannel, TdsString, order_extents, string_jump
 
 _FIBER_DOMAIN = 0x6230002
 _MAX_CONDITION = 1e8
@@ -61,9 +61,14 @@ class FiberEvent:
 class FiberChannels:
     r"""Window-order operators shared by every carrier.
 
-    ``order_max`` = M gives a centred (2M+1)^2 window in C order; spectra
-    returned by ``spectrum(kappa)`` use that order. ``lattice_columns``
-    (J, 2D+1, 2D+1) are Kraus columns over transfer orders [-D, D]^2 [Å^-1/2];
+    ``order_max`` = M gives a centred (2M+1)^2 window in C order; a pair
+    (M_x, M_y) gives the rectangular window [-M_x, M_x] x [-M_y, M_y] with
+    (2M_x+1)(2M_y+1) orders (x outer). Spectra returned by
+    ``spectrum(kappa)`` use that order. Choose per-axis extents by reciprocal
+    reach (:func:`matched_order_extents`): on a cell with unequal ``|g|`` a
+    square window reaches farther in momentum along the larger-``|g|`` axis.
+    ``lattice_columns`` (J, 2D_x+1, 2D_y+1) are Kraus columns over transfer
+    orders [-D_x, D_x] x [-D_y, D_y] [Å^-1/2];
     ``lattice_loss`` (K, K) is the full lattice loss effect on window inputs,
     including transfers beyond D [Å^-1], so that
     ``lattice_loss - sum_j L_j^dagger R L_j >= 0``. ``kick_columns``
@@ -71,13 +76,17 @@ class FiberChannels:
     magnitudes ``kick_q_inv_ang`` (I,). ``kick_azimuths`` = None draws a
     uniform azimuth; a sequence selects uniformly among those angles (for
     commensurate oracle tests). ``cut(energies)`` returns the retained cut [eV].
-    ``outgoing_order_max`` = B >= M (default M) sets the centred outgoing box
-    [-B, B]^2 on which jump outputs are represented and measured; the retained
-    window stays [-M, M]^2. Lattice columns must cover ``D >= B + M``: a box
+    Kick columns may be rectangular (2H_x+1, 2H_y+1).
+    ``outgoing_order_max`` = B >= M (default M; integer or per-axis pair,
+    B_i >= M_i) sets the centred outgoing box [-B_x, B_x] x [-B_y, B_y] on
+    which jump outputs are represented and measured; the retained window
+    stays [-M_x, M_x] x [-M_y, M_y]. Lattice columns must cover
+    ``D_i >= B_i + M_i`` on each axis: a box
     order then receives every transfer from every window order, so the
     represented outputs are exact and ``lattice_loss - sum_j L_j^dagger B L_j``
     is the PSD sum over outputs outside the box (sufficient for any
-    covariance; necessary for some). Columns must factor the covariance
+    covariance, per axis; necessary for output exactness on every axis and,
+    on axes with ``M_i >= 1``, for remainder positivity). Columns must factor the covariance
     truncated at their full width: zero-padding a narrower factorization
     defeats the check and is caught only by the runtime complement refusal.
     Kick columns define their own model and need no such condition.
@@ -89,7 +98,7 @@ class FiberChannels:
     ``[-g/2, g/2)`` per axis.
     """
 
-    order_max: int
+    order_max: int | tuple[int, int]
     reciprocal_inv_ang: tuple[float, float]
     spectrum: Callable[[tuple[float, float]], tuple[np.ndarray, np.ndarray]]
     cut: Callable[[np.ndarray], float]
@@ -98,7 +107,7 @@ class FiberChannels:
     kick_columns: np.ndarray
     kick_q_inv_ang: np.ndarray
     kick_azimuths: Sequence[float] | None = None
-    outgoing_order_max: int | None = None
+    outgoing_order_max: int | tuple[int, int] | None = None
     tds_strings: Sequence[TdsString] = ()
 
 
@@ -114,22 +123,43 @@ def fiber_stream(seed: int, incident_id: int) -> np.random.Generator:
     return np.random.Generator(np.random.Philox(key))
 
 
-def _autocorrelation_loss(columns: np.ndarray, order_max: int) -> np.ndarray:
-    """``sum_i S_i^dagger S_i`` on window inputs, all outputs: ``C_i(p - p')``.
+def matched_order_extents(
+    reciprocal_inv_ang: tuple[float, float], reach_inv_ang: float
+) -> tuple[int, int]:
+    """Smallest per-axis extents ``(M_x, M_y)`` with ``|g_i| M_i >= reach`` [Å^-1].
 
-    ``C(d) = sum_t conj(s[t]) s[t + d]`` is the inverse FFT of ``|S^|^2``. Lags
-    are nonzero for ``|d| <= 2H`` and read for ``|d| <= 2M``; the FFT size
-    ``max(2H + 2M + 1, 4H + 1)`` keeps both free of aliasing.
+    Matching the reciprocal reach per axis keeps the plane-wave momentum cut
+    (approximately) isotropic on a rectangular cell; ``reach = |g_x| M`` on a
+    square cell returns ``(M, M)``. A relative ``1e-9`` slack absorbs roundoff.
 
     Validation: cr-axial-fiber-unraveling
     """
-    half = columns.shape[-1] // 2
-    size = max(2 * half + 2 * order_max + 1, 4 * half + 1)
-    spectrum = np.fft.fft2(columns, s=(size, size))
+    g = np.abs(np.asarray(reciprocal_inv_ang, dtype=float))
+    if g.shape != (2,) or not np.all(np.isfinite(g) & (g > 0)):
+        raise ValueError("reciprocal_inv_ang must be two finite nonzero spacings")
+    if not np.isfinite(reach_inv_ang) or reach_inv_ang < 0:
+        raise ValueError("reach_inv_ang must be finite and nonnegative")
+    m = np.ceil(reach_inv_ang / g * (1.0 - 1e-9))
+    return int(m[0]), int(m[1])
+
+
+def _autocorrelation_loss(columns: np.ndarray, order_max: tuple[int, int]) -> np.ndarray:
+    """``sum_i S_i^dagger S_i`` on window inputs, all outputs: ``C_i(p - p')``.
+
+    ``C(d) = sum_t conj(s[t]) s[t + d]`` is the inverse FFT of ``|S^|^2``. Lags
+    are nonzero for ``|d_i| <= 2H_i`` and read for ``|d_i| <= 2M_i``; the
+    per-axis FFT size ``max(2H_i + 2M_i + 1, 4H_i + 1)`` keeps both free of
+    aliasing.
+
+    Validation: cr-axial-fiber-unraveling
+    """
+    halves = (columns.shape[1] // 2, columns.shape[2] // 2)
+    size = tuple(max(2 * h + 2 * m + 1, 4 * h + 1) for h, m in zip(halves, order_max, strict=True))
+    spectrum = np.fft.fft2(columns, s=size)
     corr = np.fft.ifft2(np.sum(np.abs(spectrum) ** 2, axis=0))
-    n = np.arange(-order_max, order_max + 1)
-    px, py = (a.ravel() for a in np.meshgrid(n, n, indexing="ij"))
-    return corr[(px[:, None] - px[None, :]) % size, (py[:, None] - py[None, :]) % size]
+    nx, ny = (np.arange(-m, m + 1) for m in order_max)
+    px, py = (a.ravel() for a in np.meshgrid(nx, ny, indexing="ij"))
+    return corr[(px[:, None] - px[None, :]) % size[0], (py[:, None] - py[None, :]) % size[1]]
 
 
 def _crop(full_half: int, box: int) -> tuple[np.ndarray, np.ndarray]:
@@ -139,24 +169,46 @@ def _crop(full_half: int, box: int) -> tuple[np.ndarray, np.ndarray]:
     return (orders + full_half)[:, None], (orders + box)[:, None]
 
 
+def _extents(channels: FiberChannels) -> tuple[tuple[int, int], tuple[int, int]]:
+    """Validated per-axis window ``(M_x, M_y)`` and outgoing box ``(B_x, B_y)``.
+
+    Validation: cr-axial-fiber-unraveling
+    """
+    m = order_extents(channels.order_max, "order_max")
+    box = channels.outgoing_order_max
+    if box is None:
+        return m, m
+    try:
+        b = order_extents(box, "outgoing_order_max")
+    except ValueError:
+        b = (-1, -1)
+    if b[0] < m[0] or b[1] < m[1]:
+        raise ValueError("outgoing_order_max must be integer extents >= order_max per axis")
+    return m, b
+
+
 def _check_channels(channels: FiberChannels, k: int) -> None:
+    """Refuse malformed channels; lattice exactness needs ``D_i >= B_i + M_i`` per axis.
+
+    Validation: cr-axial-fiber-unraveling
+    """
     columns, q = np.asarray(channels.kick_columns), np.asarray(channels.kick_q_inv_ang)
     for name, array in (("lattice_columns", channels.lattice_columns), ("kick_columns", columns)):
         shape = np.shape(array)
-        if len(shape) != 3 or shape[1] != shape[2] or shape[1] % 2 == 0:
-            raise ValueError(f"{name} must be (n, 2D+1, 2D+1) centred square columns")
+        if len(shape) != 3 or shape[1] % 2 == 0 or shape[2] % 2 == 0:
+            raise ValueError(f"{name} must be (n, 2D_x+1, 2D_y+1) centred odd columns")
     if columns.ndim != 3 or q.shape != (len(columns),):
         raise ValueError("kick_q_inv_ang must give one magnitude per kick column")
     if np.asarray(channels.lattice_loss).shape != (k, k):
         raise ValueError("lattice_loss must act on the order window")
     if channels.kick_azimuths is not None and len(channels.kick_azimuths) == 0:
         raise ValueError("kick_azimuths must be None or non-empty")
-    box = channels.outgoing_order_max
-    m = channels.order_max
-    if box is not None and (isinstance(box, bool) or not isinstance(box, Integral) or box < m):
-        raise ValueError("outgoing_order_max must be an integer >= order_max")
-    if np.asarray(channels.lattice_columns).shape[-1] // 2 < (m if box is None else box) + m:
-        raise ValueError("lattice columns must span transfers D >= outgoing_order_max + order_max")
+    m, b = _extents(channels)
+    d = np.array(np.shape(channels.lattice_columns)[1:]) // 2
+    if np.any(d < np.add(b, m)):
+        raise ValueError(
+            "lattice columns must span transfers D >= outgoing_order_max + order_max per axis"
+        )
 
 
 def _fold(moved: np.ndarray, g: np.ndarray) -> np.ndarray:
@@ -181,33 +233,30 @@ class _Fiber:
 class _Engine:
     def __init__(self, channels: FiberChannels, hbar_v: float, cache_size: int = 16):
         self.ch, self.hbar_v = channels, float(hbar_v)
-        m = channels.order_max
-        self.width = 2 * m + 1
-        self.k = self.width**2
+        m, b = _extents(channels)
+        self.m, self.box = np.array(m), np.array(b)
+        self.shape = tuple(int(x) for x in 2 * self.m + 1)
+        self.k = self.shape[0] * self.shape[1]
         self.g = np.asarray(channels.reciprocal_inv_ang, dtype=float)
         _check_channels(channels, self.k)
         self.loss = channels.lattice_loss + _autocorrelation_loss(channels.kick_columns, m)
-        d = channels.lattice_columns.shape[-1] // 2
-        self.lattice_size = self.width + 2 * d
-        self.lattice_offset = d
-        self.lattice_fft = np.fft.fft2(
-            channels.lattice_columns, s=(self.lattice_size, self.lattice_size)
-        )
-        h = channels.kick_columns.shape[-1] // 2
-        self.kick_size = self.width + 2 * h
-        self.kick_half = h
-        box = channels.outgoing_order_max
-        self.box = m if box is None else int(box)
-        self.box_width = 2 * self.box + 1
-        inner = np.arange(self.box - m, self.box + m + 1)
+        d = np.array(channels.lattice_columns.shape[1:]) // 2
+        self.lattice_size = tuple(int(x) for x in np.array(self.shape) + 2 * d)
+        self.lattice_fft = np.fft.fft2(channels.lattice_columns, s=self.lattice_size)
+        self.kick_half = np.array(channels.kick_columns.shape[1:]) // 2
+        self.kick_size = tuple(int(x) for x in np.array(self.shape) + 2 * self.kick_half)
+        self.box_shape = tuple(int(x) for x in 2 * self.box + 1)
+        inner = [np.arange(bi - mi, bi + mi + 1) for bi, mi in zip(b, m, strict=True)]
         self.window_in_box = np.ravel_multi_index(
-            np.meshgrid(inner, inner, indexing="ij"), (self.box_width,) * 2
+            np.meshgrid(*inner, indexing="ij"), self.box_shape
         ).ravel()
-        self.lattice_crop = _crop(m + d, self.box)
-        self.kick_fft = np.fft.fft2(channels.kick_columns, s=(self.kick_size, self.kick_size))
+        self.lattice_crop = tuple(
+            _crop(int(mi + di), bi) for mi, di, bi in zip(m, d, b, strict=True)
+        )
+        self.kick_fft = np.fft.fft2(channels.kick_columns, s=self.kick_size)
         self.kick_power = np.abs(self.kick_fft) ** 2
-        n = np.arange(-m, m + 1)
-        orders = np.stack(np.meshgrid(n, n, indexing="ij"), -1).reshape(-1, 2)
+        nx, ny = (np.arange(-mi, mi + 1) for mi in m)
+        orders = np.stack(np.meshgrid(nx, ny, indexing="ij"), -1).reshape(-1, 2)
         self.strings = [StringChannel(t, self.g, orders) for t in channels.tds_strings]
         for channel in self.strings:
             self.loss = self.loss + channel.loss
@@ -233,14 +282,15 @@ class _Engine:
     def lattice_outputs(self, chi: np.ndarray) -> np.ndarray:
         """``B L_j chi`` on the outgoing box for every Kraus column, shape (J, Kb).
 
-        Full linear-convolution orders [-(M+D), M+D] sit at index ``p + M + D``.
+        Full linear-convolution orders [-(M_i+D_i), M_i+D_i] sit at index
+        ``p_i + M_i + D_i`` per axis.
         Validation: cr-axial-fiber-unraveling
         """
-        padded = np.fft.fft2(chi.reshape(self.width, self.width), s=(self.lattice_size,) * 2)
+        padded = np.fft.fft2(chi.reshape(self.shape), s=self.lattice_size)
         full = np.fft.ifft2(self.lattice_fft * padded)
-        source, target = self.lattice_crop
-        out = np.zeros((len(full), self.box_width, self.box_width), dtype=complex)
-        out[:, target, target.T] = full[:, source, source.T]
+        (source_x, target_x), (source_y, target_y) = self.lattice_crop
+        out = np.zeros((len(full), *self.box_shape), dtype=complex)
+        out[:, target_x, target_y.T] = full[:, source_x, source_y.T]
         return out.reshape(len(full), -1)
 
     def kick_rates(self, chi: np.ndarray) -> np.ndarray:
@@ -248,32 +298,34 @@ class _Engine:
 
         Validation: cr-axial-fiber-unraveling
         """
-        padded = np.fft.fft2(chi.reshape(self.width, self.width), s=(self.kick_size,) * 2)
-        return np.einsum("ixy,xy->i", self.kick_power, np.abs(padded) ** 2) / self.kick_size**2
+        padded = np.fft.fft2(chi.reshape(self.shape), s=self.kick_size)
+        norm = self.kick_size[0] * self.kick_size[1]
+        return np.einsum("ixy,xy->i", self.kick_power, np.abs(padded) ** 2) / norm
 
     def kick_output(self, i: int, chi: np.ndarray, shift: np.ndarray) -> np.ndarray:
         """Outgoing-box part of ``S_i chi`` after relabelling orders by ``shift``.
 
         Box order p' reads unrelabelled order p' - shift at full index
-        ``p' - shift + M + H``.
+        ``p' - shift + M + H`` (per axis).
         Validation: cr-axial-fiber-unraveling
         """
-        padded = np.fft.fft2(chi.reshape(self.width, self.width), s=(self.kick_size,) * 2)
+        padded = np.fft.fft2(chi.reshape(self.shape), s=self.kick_size)
         full = np.fft.ifft2(self.kick_fft[i] * padded)  # output order p at index p + M + H
-        m, h, b = self.ch.order_max, self.kick_half, self.box
-        out = np.zeros((self.box_width, self.box_width), dtype=complex)
+        m, h, b = self.m, self.kick_half, self.box
+        size = np.array(self.kick_size)
+        out = np.zeros(self.box_shape, dtype=complex)
         for axis_index in np.ndindex(out.shape):
             source = np.array(axis_index) - b - shift + m + h
-            if np.all(source >= 0) and np.all(source < self.kick_size):
+            if np.all(source >= 0) and np.all(source < size):
                 out[axis_index] = full[source[0], source[1]]
         return out.ravel()
 
 
 def _measure(engine, phi_orders, window, seed, incident):
-    shape = (engine.box_width, engine.box_width)
+    shape = engine.box_shape
     layout = np.zeros(shape, dtype=complex)
-    n = np.arange(-engine.box, engine.box + 1)
-    layout[np.ix_(n % engine.box_width, n % engine.box_width)] = phi_orders.reshape(shape)
+    nx, ny = (np.arange(-b, b + 1) for b in engine.box)
+    layout[np.ix_(nx % shape[0], ny % shape[1])] = phi_orders.reshape(shape)
     phi = np.fft.ifft2(layout, norm="ortho")
     return sample_phase_space(phi, window, phase_space_stream(seed, incident))
 
@@ -338,8 +390,8 @@ def _jump(engine, fiber, chi, kappa, rng):
             engine.strings[group - 1],
             chi,
             kappa,
-            engine.ch.order_max,
-            engine.box,
+            tuple(engine.m),
+            tuple(engine.box),
             rng,
             lambda moved: _fold(moved, engine.g),
         )
@@ -371,12 +423,17 @@ def _waiting(fiber, c, threshold, start, stop, step, tolerance):
         span = min(step, stop - depth)
         trial = fiber.evolve(current, span)
         if float(np.vdot(trial, trial).real) <= threshold:
+            # SciPy's root-finder wrapper keeps the callable in a reference
+            # cycle; hold the fibre in a list emptied afterwards so that cyclic
+            # garbage does not pin MB-sized eigenbases between GC passes.
+            held = [fiber, current]
 
-            def excess(s, base=current):
-                state = fiber.evolve(base, s)
+            def excess(s, held=held):
+                state = held[0].evolve(held[1], s)
                 return float(np.vdot(state, state).real) - threshold
 
             offset = brentq(excess, 0.0, span, xtol=tolerance)
+            held.clear()
             return depth + offset, fiber.evolve(current, offset)
         depth, current = depth + span, trial
     return None, current
@@ -454,8 +511,8 @@ def unravel_fiber_outgoing(
 
     ``entry_orders`` (K,) is the entrance amplitude in the window order basis
     at ``carrier_inv_ang``; its projection on P gives the incident ``weight``.
-    ``window`` is the unit-norm Weyl window on the (2B+1)^2 outgoing box grid;
-    outgoing indices refer to that grid.
+    ``window`` is the unit-norm Weyl window on the (2B_x+1, 2B_y+1) outgoing
+    box grid; outgoing indices refer to that grid.
     Units: eV, Å, jumps Å^-1/2. Zero channels leave every incident retained.
     Each incident uses :func:`fiber_stream` for jumps and
     :func:`.phase_space_stream` for its one measurement. No event is a
@@ -476,7 +533,7 @@ def unravel_fiber_outgoing(
     if entry.shape != (engine.k,) or not np.all(np.isfinite(entry)):
         raise ValueError("entry_orders must be finite on the order window")
     g = np.asarray(window, dtype=complex)
-    if g.shape != (engine.box_width,) * 2 or not np.isclose(np.vdot(g, g).real, 1.0):
+    if g.shape != engine.box_shape or not np.isclose(np.vdot(g, g).real, 1.0):
         raise ValueError("window must be a unit-norm array on the outgoing box shape")
     kappa = (float(carrier_inv_ang[0]), float(carrier_inv_ang[1]))
     return [

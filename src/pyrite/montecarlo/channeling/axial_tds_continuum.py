@@ -34,12 +34,23 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from numbers import Integral
 
 import numpy as np
 
 _GL_RADIAL = np.polynomial.legendre.leggauss(32)
 _GL_ANGULAR = np.polynomial.legendre.leggauss(192)
 _MAX_TRIALS = 1_000_000
+
+
+def order_extents(value, name: str) -> tuple[int, int]:
+    """Per-axis nonnegative order extents ``(M_x, M_y)``; an integer means ``(M, M)``."""
+    pair = (value, value) if isinstance(value, Integral) else tuple(value)
+    if len(pair) != 2 or any(isinstance(v, bool) or not isinstance(v, Integral) for v in pair):
+        raise ValueError(f"{name} must be an integer or a pair of integers")
+    if min(pair) < 0:
+        raise ValueError(f"{name} must be nonnegative")
+    return int(pair[0]), int(pair[1])
 
 
 @dataclass(frozen=True)
@@ -193,44 +204,48 @@ class StringChannel:
                 return q_rel, u
         raise FloatingPointError("TDS rejection sampler exceeded its trial budget")
 
-    def column(self, delta: np.ndarray, u: np.ndarray, half: int) -> np.ndarray:
-        """Harmonics ``phi(|t|) e^{-it.r} w_t(u)`` at ``t = delta + g n``, ``|n| <= half``.
+    def column(self, delta: np.ndarray, u: np.ndarray, half) -> np.ndarray:
+        """Harmonics ``phi(|t|) e^{-it.r} w_t(u)`` at ``t = delta + g n``, ``|n_i| <= half_i``.
 
+        ``half`` is an integer or per-axis ``(h_x, h_y)``; the column is (2h_x+1, 2h_y+1).
         Validation: cr-axial-continuum-tds-jumps
         """
-        n = np.arange(-half, half + 1)
-        tx = delta[0] + n[:, None] * self.g[0] + 0.0 * n[None, :]
-        ty = delta[1] + n[None, :] * self.g[1] + 0.0 * n[:, None]
+        hx, hy = order_extents(half, "half")
+        nx, ny = np.arange(-hx, hx + 1), np.arange(-hy, hy + 1)
+        tx = delta[0] + nx[:, None] * self.g[0] + 0.0 * ny[None, :]
+        ty = delta[1] + ny[None, :] * self.g[1] + 0.0 * nx[:, None]
         size = np.hypot(tx, ty)
         phi = np.where(size <= self.q_max, self.s.phase(np.minimum(size, self.q_max)), 0.0)
         w = np.exp(-1j * (tx * u[0] + ty * u[1])) - np.exp(-0.5 * self.a2 * size**2)
         return phi * np.exp(-1j * (tx * self.r[0] + ty * self.r[1])) * w
 
 
-def string_jump(channel: StringChannel, chi, kappa, order_max: int, box: int, rng, fold):
+def string_jump(channel: StringChannel, chi, kappa, order_max, box, rng, fold):
     """One continuum TDS jump from window state ``chi`` at carrier ``kappa``.
 
-    Returns ``None`` when the sampled output momentum lies outside the box
-    (unresolved), else ``(kappa', box_output)`` with the box output in centred
-    C order. ``fold(moved)`` returns the integer shift into the zone. Given
-    ``(Q, u)``, ``P(Q in box) = ||B J chi||^2 / ||J chi||^2``, so deciding by
-    where ``Q`` lands is exact.
+    ``order_max`` = (M_x, M_y) and ``box`` = (B_x, B_y) are per-axis extents
+    (an integer means square). Returns ``None`` when the sampled output
+    momentum lies outside the box (unresolved), else ``(kappa', box_output)``
+    with the (2B_x+1)(2B_y+1) box output in centred C order. ``fold(moved)``
+    returns the integer shift into the zone. Given ``(Q, u)``,
+    ``P(Q in box) = ||B J chi||^2 / ||J chi||^2``, so deciding by where ``Q``
+    lands is exact.
     Validation: cr-axial-continuum-tds-jumps
     """
+    m = np.array(order_extents(order_max, "order_max"))
+    b = np.array(order_extents(box, "box"))
     q_rel, u = channel.sample(chi, rng)
     moved = np.asarray(kappa, dtype=float) + q_rel
     shift = fold(moved)
-    if np.max(np.abs(shift)) > box:
+    if np.any(np.abs(shift) > b):
         return None
     new_kappa = moved - shift * channel.g
-    half = box + order_max
-    column = channel.column(new_kappa - np.asarray(kappa, dtype=float), u, half)
-    width = 2 * order_max + 1
-    size = width + 2 * half
-    full = np.fft.ifft2(
-        np.fft.fft2(chi.reshape(width, width), s=(size, size)) * np.fft.fft2(column, s=(size, size))
-    )
-    # Output order o sits at index o + M + half; the box is |o| <= B.
-    lo = order_max + half - box
-    out = full[lo : lo + 2 * box + 1, lo : lo + 2 * box + 1]
+    half = b + m
+    column = channel.column(new_kappa - np.asarray(kappa, dtype=float), u, tuple(half))
+    width = tuple(2 * m + 1)
+    size = tuple(np.array(width) + 2 * half)
+    full = np.fft.ifft2(np.fft.fft2(chi.reshape(width), s=size) * np.fft.fft2(column, s=size))
+    # Output order o sits at index o + M + half per axis; the box is |o_i| <= B_i.
+    lo = m + half - b
+    out = full[lo[0] : lo[0] + 2 * b[0] + 1, lo[1] : lo[1] + 2 * b[1] + 1]
     return (float(new_kappa[0]), float(new_kappa[1])), out.ravel()

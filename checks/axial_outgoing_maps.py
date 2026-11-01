@@ -351,20 +351,22 @@ def unraveled_report(
 
 
 def material_fiber_channels(
-    max_order: int = 6,
+    max_order: int | tuple[int, int] = 6,
     target_eV: float = 95.0,
     window_eV: float = 2.0,
     *,
     electronic: bool = True,
     harmonic_max: int = 4,
     grid_points: int = 32,
-    outgoing_order_max: int | None = None,
+    outgoing_order_max: int | tuple[int, int] | None = None,
     tds: str = "lattice",
     axis: tuple[int, int, int] = (0, 0, 1),
 ):
     """Si, 5 MeV, one-cell fiber channels: TDS + electronic kicks.
 
-    ``outgoing_order_max`` = B (default ``max_order``) is the outgoing box.
+    ``max_order`` = M or (M_x, M_y) is the retained order window and
+    ``outgoing_order_max`` = B or (B_x, B_y) (default ``max_order``) the
+    outgoing box; see :func:`matched_extents` for reach-matched pairs.
     ``tds="lattice"``: one-cell (image-correlated) Kraus columns spanning
     ``B + max_order`` so box outputs are exact; one string per cell only.
     ``tds="strings"``: independent-string continuum jumps, one
@@ -395,9 +397,11 @@ def material_fiber_channels(
     )
     hbar_v = dissipator.hbar_v_eV_ang
     g = np.asarray(profile.g_inv_ang, dtype=float)
-    box = max_order if outgoing_order_max is None else outgoing_order_max
-    span = np.array([box + max_order, box + max_order])
-    zero = axial_states(profile, gamma, (0.0, 0.0), max_order)
+    m = np.broadcast_to(np.asarray(max_order, dtype=int), (2,))
+    box = m if outgoing_order_max is None else np.broadcast_to(np.asarray(outgoing_order_max), (2,))
+    span = box + m
+    window = (int(m[0]), int(m[1]))
+    zero = axial_states(profile, gamma, (0.0, 0.0), window)
 
     def phase_of(element):
         return lambda q: -_potential(element, q) / hbar_v
@@ -437,11 +441,15 @@ def material_fiber_channels(
         columns, nodes = [np.zeros((2 * h + 1, 2 * h + 1))], [0.0]
 
     def spectrum(kappa):
-        states = axial_states(profile, gamma, kappa, max_order)
+        states = axial_states(profile, gamma, kappa, window)
         return states.energies_eV, states.coefficients
 
+    square = isinstance(max_order, int) and (
+        outgoing_order_max is None or isinstance(outgoing_order_max, int)
+    )
+    box_extents = (int(box[0]), int(box[1]))
     channels = FiberChannels(
-        order_max=max_order,
+        order_max=max_order if square else window,
         reciprocal_inv_ang=(float(g[0]), float(g[1])),
         spectrum=spectrum,
         cut=lambda energies: gap_cut(energies, target_eV, window_eV),
@@ -449,19 +457,21 @@ def material_fiber_channels(
         lattice_loss=lattice_loss,
         kick_columns=np.array(columns),
         kick_q_inv_ang=np.array(nodes),
-        outgoing_order_max=box,
+        outgoing_order_max=int(box[0]) if square else box_extents,
         tds_strings=strings,
     )
     entry = (np.all(zero.orders == 0, axis=1)).astype(complex)
     info = {
-        "max_order": max_order,
+        "max_order": max_order if square else list(window),
+        "window_orders": len(zero.orders),
         "target_eV": target_eV,
         "electronic": electronic,
         "kick_nodes": len(nodes),
         "harmonic_max": h,
         "kick_truncation": truncation,
         "lattice_kraus": int(kraus.shape[1]) if tds == "lattice" else 0,
-        "outgoing_order_max": box,
+        "outgoing_order_max": int(box[0]) if square else list(box_extents),
+        "box_orders": int(np.prod(2 * box + 1)),
         "tds": tds,
         "axis": list(axis),
         "strings": len(dissipator.tds_sources),
@@ -469,16 +479,38 @@ def material_fiber_channels(
     return channels, entry, hbar_v, info
 
 
-def balanced_window(width: int) -> np.ndarray:
+def matched_extents(
+    axis: tuple[int, int, int], reach_orders: int, box_orders: int
+) -> tuple[tuple[int, int], tuple[int, int]]:
+    """Reach-matched ``(M_x, M_y)`` and ``(B_x, B_y)`` for a Si axis.
+
+    ``reach_orders`` and ``box_orders`` count orders along the smaller-``|g|``
+    axis; the other axis gets the fewest orders reaching the same momentum.
+    """
+    from pyrite.materials.channeling.axial import axial_profile
+    from pyrite.montecarlo.channeling.axial_fiber_unraveling import matched_order_extents
+
+    g = np.asarray(axial_profile("silicon", axis).g_inv_ang, dtype=float)
+    g_min = float(np.min(np.abs(g)))
+    return (
+        matched_order_extents(tuple(g), reach_orders * g_min),
+        matched_order_extents(tuple(g), box_orders * g_min),
+    )
+
+
+def balanced_window(width) -> np.ndarray:
     """Unit-norm periodic Gaussian Weyl window with equal position/momentum spread.
 
-    Width ``sqrt(N / 2 pi)`` grid points on an N-point axis balances the two
-    resolutions in units of the grid and the order spacing.
+    ``width`` is N or a per-axis shape (N_x, N_y). Width ``sqrt(N / 2 pi)``
+    grid points on an N-point axis balances the two resolutions in units of
+    the grid and the order spacing.
     """
-    sigma = np.sqrt(width / (2 * np.pi))
-    d = np.minimum(np.arange(width), width - np.arange(width))
-    axis = np.exp(-(d**2) / (4 * sigma**2))
-    window = np.outer(axis, axis).astype(complex)
+    axes = []
+    for n in np.broadcast_to(np.asarray(width, dtype=int), (2,)):
+        sigma = np.sqrt(n / (2 * np.pi))
+        d = np.minimum(np.arange(n), n - np.arange(n))
+        axes.append(np.exp(-(d**2) / (4 * sigma**2)))
+    window = np.outer(*axes).astype(complex)
     return window / np.linalg.norm(window)
 
 
@@ -488,16 +520,22 @@ def fiber_report(
     *,
     seed: int = 0,
     electronic: bool = True,
-    outgoing_order_max: int | None = None,
+    outgoing_order_max: int | tuple[int, int] | None = None,
     tds: str = "lattice",
     axis: tuple[int, int, int] = (0, 0, 1),
-    max_order: int = 6,
+    max_order: int | tuple[int, int] = 6,
     target_eV: float = 95.0,
+    incident_start: int = 0,
+    keep_events: bool = False,
 ) -> dict:
     """Fiber unraveling of Si 5 MeV with TDS (+ electronic) jumps. Research only.
 
     ``beyond_window`` is the fraction of outgoing events whose measured order
-    lies outside the retained window ``|n| <= max_order``.
+    lies outside the retained window ``|n_i| <= M_i``. Extents may be
+    per-axis pairs (rectangular window and box). Incidents are
+    ``incident_start + range(n_incidents)``; events depend only on their
+    identity, so chunks run in separate processes and ``keep_events`` chunks
+    combine exactly with :func:`merge_fiber_reports`.
 
     Validation: cr-axial-zone-handoff-accounting
     """
@@ -513,8 +551,8 @@ def fiber_report(
         tds=tds,
         axis=axis,
     )
-    box = info["outgoing_order_max"]
-    window = balanced_window(2 * box + 1)
+    box = np.broadcast_to(np.asarray(info["outgoing_order_max"]), (2,))
+    window = balanced_window(tuple(2 * box + 1))
     depths = np.asarray(depths_ang, dtype=float)
     clock = time.perf_counter()
     events = unravel_fiber_outgoing(
@@ -523,41 +561,77 @@ def fiber_report(
         hbar_v_eV_ang=hbar_v,
         window=window,
         max_depth_ang=float(depths.max()),
-        incident_ids=range(n_incidents),
+        incident_ids=range(incident_start, incident_start + n_incidents),
         seed=seed,
         search_step_ang=200.0,
     )
     info["seconds"] = time.perf_counter() - clock
-    weight = events[0].weight
-    rows = {}
+    compact = [
+        [
+            e.incident_id,
+            e.kind,
+            e.depth_ang,
+            e.lattice_jumps,
+            e.kick_jumps,
+            None if e.momentum_index is None else list(e.momentum_index),
+        ]
+        for e in events
+    ]
+    info.update(seed=seed, entrance_weight=events[0].weight, depths_ang=depths.tolist())
+    info.update(_fiber_tallies(compact, info))
+    if keep_events:
+        info["events"] = compact
+    return {"status": "research-only; one cell, absorbing model, fibred carrier", **info}
+
+
+def _fiber_tallies(events, info) -> dict:
+    """Weighted terminal tallies, binomial SEMs and mean jump counts of compact events."""
+    n, weight = len(events), info["entrance_weight"]
+    depths = np.asarray(info["depths_ang"], dtype=float)
+    box = np.broadcast_to(np.asarray(info["outgoing_order_max"]), (2,))
+    m = np.broadcast_to(np.asarray(info["max_order"]), (2,))
+    rows = {"incidents": n}
     for kind in ("outgoing", "unresolved"):
-        hits = np.array([sum(e.kind == kind and e.depth_ang <= z for e in events) for z in depths])
-        p = hits / n_incidents
+        hits = np.array([sum(e[1] == kind and e[2] <= z for e in events) for z in depths])
+        p = hits / n
         rows[kind] = (weight * p).tolist()
-        rows[kind + "_sem"] = (weight * np.sqrt(p * (1 - p) / n_incidents)).tolist()
+        rows[kind + "_sem"] = (weight * np.sqrt(p * (1 - p) / n)).tolist()
     rows["retained"] = (weight - np.array(rows["outgoing"]) - np.array(rows["unresolved"])).tolist()
     orders = [
-        np.where(
-            np.array(e.momentum_index) > box,
-            np.array(e.momentum_index) - 2 * box - 1,
-            e.momentum_index,
-        )
+        np.where(np.array(e[5]) > box, np.array(e[5]) - 2 * box - 1, e[5])
         for e in events
-        if e.kind == "outgoing"
+        if e[1] == "outgoing"
     ]
     rows["beyond_window"] = float(
-        np.mean([np.max(np.abs(o)) > channels.order_max for o in orders]) if orders else 0.0
+        np.mean([np.any(np.abs(o) > m) for o in orders]) if orders else 0.0
     )
-    info.update(
-        incidents=n_incidents,
-        seed=seed,
-        entrance_weight=weight,
-        depths_ang=depths.tolist(),
-        mean_lattice_jumps=float(np.mean([e.lattice_jumps for e in events])),
-        mean_kick_jumps=float(np.mean([e.kick_jumps for e in events])),
-        **rows,
-    )
-    return {"status": "research-only; one cell, absorbing model, fibred carrier", **info}
+    rows["mean_lattice_jumps"] = float(np.mean([e[3] for e in events]))
+    rows["mean_kick_jumps"] = float(np.mean([e[4] for e in events]))
+    return rows
+
+
+def merge_fiber_reports(parts) -> dict:
+    """Combine ``keep_events`` chunks of one configuration (disjoint incidents).
+
+    Refuses chunks whose configuration differs or whose incidents overlap.
+    Validation: cr-axial-zone-handoff-accounting
+    """
+    parts = list(parts)
+    variable = {"events", "seconds", "incidents", "outgoing", "outgoing_sem", "unresolved"}
+    variable |= {"unresolved_sem", "retained", "beyond_window", "mean_lattice_jumps"}
+    variable |= {"mean_kick_jumps"}
+    head = {k: v for k, v in parts[0].items() if k not in variable}
+    for part in parts[1:]:
+        if {k: v for k, v in part.items() if k not in variable} != head:
+            raise ValueError("chunks differ in configuration")
+    events = [e for part in parts for e in part["events"]]
+    if len({e[0] for e in events}) != len(events):
+        raise ValueError("chunks overlap in incident identity")
+    events.sort(key=lambda e: e[0])
+    merged = {**head, **_fiber_tallies(events, head)}
+    merged["chunks"] = len(parts)
+    merged["seconds"] = [part["seconds"] for part in parts]
+    return merged
 
 
 if __name__ == "__main__":
@@ -568,6 +642,21 @@ if __name__ == "__main__":
         result = unraveled_report()
     elif mode == ["fiber"]:
         result = fiber_report(int(sys.argv[2]) if len(sys.argv) > 2 else 1000)
+    elif mode == ["fiber-chunk"]:
+        # fiber-chunk '<json fiber_report kwargs>' <incident_start> <n> <out.json>
+        kwargs = json.loads(sys.argv[2])
+        for key in ("max_order", "outgoing_order_max", "axis"):
+            if isinstance(kwargs.get(key), list):
+                kwargs[key] = tuple(kwargs[key])
+        result = fiber_report(
+            int(sys.argv[4]), incident_start=int(sys.argv[3]), keep_events=True, **kwargs
+        )
+        Path(sys.argv[5]).write_text(json.dumps(result))
+        result = {k: v for k, v in result.items() if k != "events"}
+    elif mode == ["fiber-merge"]:
+        # fiber-merge <out.json> <chunk.json>...
+        result = merge_fiber_reports(json.loads(Path(p).read_text()) for p in sys.argv[3:])
+        Path(sys.argv[2]).write_text(json.dumps(result, indent=1))
     else:
         result = report()
     print(json.dumps(result, indent=2))

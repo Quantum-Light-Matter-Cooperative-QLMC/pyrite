@@ -1080,8 +1080,58 @@ gives retained 0.226 ± 0.019, outgoing 0.736 ± 0.020 and unresolved
 - The electronic run peaked at 8.05 GB, at the local memory cap.
 - The square order window makes the $x$ reach the binding box edge.
 
-Si [110] (four strings, more than 540 retained states, not converged at
-M = 12) needs a rectangular order window or a remote run.
+**Reach-matched rectangular window (#880).** On a rectangular cell the
+window and box extents can be chosen per axis, so that $|g_i|M_i$ is about
+the same on both axes (`matched_order_extents`). For Si [111]
+($g=(1.636, 2.834)$ Å⁻¹) the square $M=12$, $B=30$ becomes $M=(12,7)$,
+$B=(30,18)$: 375 instead of 625 window orders and 2,257 instead of 3,721 box
+orders. The Γ-point count below the cut stays 195
+([record](../../validation/check-records/axial-zone/fiber-continuum-111-rect-local.json)).
+At 3e4 Å:
+
+| Si [111] | Window | Retained | Outgoing | Unresolved | Wall | Peak RSS |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| TDS (1,000) | square | 0.261 ± 0.014 | 0.668 ± 0.015 | 0.071 ± 0.008 | 8:56 | 2.66 GB |
+| TDS (1,000) | rectangular | 0.253 ± 0.014 | 0.670 ± 0.015 | 0.077 ± 0.008 | 2:31 | 0.37 GB |
+| TDS + el. (500) | square | 0.226 ± 0.019 | 0.736 ± 0.020 | 0.038 ± 0.009 | 17:11 | 8.05 GB |
+| TDS + el. (500) | rectangular | 0.210 ± 0.018 | 0.732 ± 0.020 | 0.058 ± 0.010 | 5:43 | 0.37 GB |
+
+All tallies at the three depths agree within $|z|\le1.9$ (the largest is the
+electronic unresolved fraction). The rectangular run takes about a third of
+the wall time. Most of the old peak memory was cyclic garbage, not live
+state. SciPy's `brentq` wrapper kept each waiting-time root's closure in a
+reference cycle, and that closure held a fibre eigenbasis. Electronic runs
+grew by about 18 MB per incident until a full GC pass. With the closure
+holding only a cleared list, the same runs peak at 0.37 GB, with bitwise
+identical results (rectangular rows above; the square rows predate the
+fix).
+
+Si [110] has four strings per cell, $g=(1.636, 1.157)$ Å⁻¹, and a cut target
+of 139.25 eV (same provisional rule). Its Γ count below the cut is 535 for
+the square $M=12$, whose $y$ reach is only 13.9 Å⁻¹. It converges to 655
+once both axes reach about 20 Å⁻¹, for example $M=(13,17)$ with 945 orders;
+a square window needs $M=17$ (1,225 orders).
+
+Si [110] window convergence (box $B=(30,42)$, remote CPU array 3158;
+[record](../../validation/check-records/axial-zone/fiber-continuum-110-remote-3158.json)).
+At 3e4 Å:
+
+| Si [110] | Window (orders) | Retained | Outgoing | Unresolved | TDS jumps |
+| --- | --- | ---: | ---: | ---: | ---: |
+| TDS (1,000) | (13,17) (945) | 0.303 ± 0.015 | 0.620 ± 0.015 | 0.077 ± 0.008 | 1.84 |
+| TDS (1,000) | (15,21) (1,333) | 0.314 ± 0.015 | 0.597 ± 0.016 | 0.089 ± 0.009 | 1.93 |
+| TDS (1,000) | (18,25) (1,887) | 0.303 ± 0.015 | 0.602 ± 0.015 | 0.095 ± 0.009 | 2.08 |
+| TDS + el. (1,000) | (13,17) (945) | 0.282 ± 0.014 | 0.633 ± 0.015 | 0.085 ± 0.009 | 1.73 |
+| TDS + el. (500) | (15,21) (1,333) | 0.266 ± 0.020 | 0.626 ± 0.022 | 0.108 ± 0.014 | 1.84 |
+
+The (15,21) and (18,25) TDS windows agree on every tally to $|z|\le0.54$.
+(13,17) sits 1–2σ high in outgoing at 1e3–1e4 Å, so (15,21) is the
+converged choice at this precision. The mean TDS jump count still rises from
+(15,21) to (18,25), by 2.3σ, while the terminal tallies stay the same; that
+is open. Electronic kicks change the [110] tallies by at most about 1σ. The
+fraction unresolved at the $B=(30,42)$ box is about 0.09–0.11, above [111]'s
+0.06–0.08; box and tail convergence belong to #881/#882. Each task peaked
+below 1.6 GB.
 
 ## Matching prescription still to establish
 
