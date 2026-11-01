@@ -244,6 +244,8 @@ def test_cuda_resident_transport_recovery(monkeypatch, failure):
         expected += ["release", "admit"]
     if failure not in ("bug", "admission"):
         expected += [(False, 42, "cuda")]
+    if failure == "exhausted":
+        expected += ["release"]  # #900: terminal OOM releases the pool before re-raising
     assert calls == expected
 
 
