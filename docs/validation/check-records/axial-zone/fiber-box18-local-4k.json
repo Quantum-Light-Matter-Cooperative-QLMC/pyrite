@@ -1,0 +1,127 @@
+{
+ "status": "research-only local CPU evidence; Si [001] 5 MeV, one string per cell (lattice-correlated TDS), absorbing no-return model, fibred Bloch carrier, outgoing box B=18; window accounting, not a physical escape fraction, depth budget or admission",
+ "parent_commit": "dfe9dc9d1288f126a8e9be769614746ab5540382",
+ "command": "runpy checks/axial_outgoing_maps.py :: fiber_report(4000, seed=0, electronic=False|True, outgoing_order_max=18); two concurrent single-thread processes",
+ "environment": {
+  "python": "3.14.4",
+  "host": "local laptop (WSL)",
+  "OPENBLAS_NUM_THREADS": "1",
+  "memory_cap": "systemd-run MemoryMax=8G"
+ },
+ "resources_gnu_time": {
+  "tds_only": [
+   "Elapsed (wall clock) time (h:mm:ss or m:ss): 16:03.87",
+   "Maximum resident set size (kbytes): 726768"
+  ],
+  "tds_electronic": [
+   "Elapsed (wall clock) time (h:mm:ss or m:ss): 20:23.86",
+   "Maximum resident set size (kbytes): 5655624"
+  ]
+ },
+ "resource_note": "The ~5.6 GB peak of the electronic run matches the earlier B=6 run (5.45 GB) and comes from the electronic channel setup, not the box.",
+ "method": "unravel_fiber_outgoing (fiber_stream version 2, two-stage draw) with Kraus span D=B+M=24 (872 columns); balanced Gaussian Weyl window on the 37x37 box; incident-weighted fractions with binomial SEM; beyond_window = fraction of outgoing events measured at |n|>6. Commit fe18f351a adds only input-shape refusals and docs, so it changes no event.",
+ "reference_b6": "check-records/axial-zone/fiber-local-4k.json (same physics, outgoing box = retained window)",
+ "result": {
+  "tds_only": {
+   "status": "research-only; one cell, absorbing model, fibred carrier",
+   "max_order": 6,
+   "target_eV": 95.0,
+   "electronic": false,
+   "kick_nodes": 1,
+   "harmonic_max": 4,
+   "kick_truncation": 0.0,
+   "lattice_kraus": 872,
+   "outgoing_order_max": 18,
+   "seconds": 945.6886732249986,
+   "incidents": 4000,
+   "seed": 0,
+   "entrance_weight": 0.9999994948884976,
+   "depths_ang": [
+    1000.0,
+    10000.0,
+    30000.0
+   ],
+   "mean_lattice_jumps": 1.759,
+   "mean_kick_jumps": 0.0,
+   "outgoing": [
+    0.08974995466624265,
+    0.48074975716764523,
+    0.7754996082860298
+   ],
+   "outgoing_sem": [
+    0.004519260309218633,
+    0.00789982887977112,
+    0.0065973398828708205
+   ],
+   "unresolved": [
+    0.008749995580274355,
+    0.03574998194226379,
+    0.05624997158747799
+   ],
+   "unresolved_sem": [
+    0.0014725342727672011,
+    0.002935638885986512,
+    0.0036430030150748655
+   ],
+   "retained": [
+    0.9014995446419806,
+    0.48349975577858856,
+    0.1682499150149898
+   ],
+   "beyond_window": 0.721792392005158
+  },
+  "tds_electronic": {
+   "status": "research-only; one cell, absorbing model, fibred carrier",
+   "max_order": 6,
+   "target_eV": 95.0,
+   "electronic": true,
+   "kick_nodes": 680,
+   "harmonic_max": 4,
+   "kick_truncation": 0.0013143225931991909,
+   "lattice_kraus": 872,
+   "outgoing_order_max": 18,
+   "seconds": 1205.6352849550021,
+   "incidents": 4000,
+   "seed": 0,
+   "entrance_weight": 0.9999994948884976,
+   "depths_ang": [
+    1000.0,
+    10000.0,
+    30000.0
+   ],
+   "mean_lattice_jumps": 1.57925,
+   "mean_kick_jumps": 5.579,
+   "outgoing": [
+    0.0912499539085754,
+    0.48424975539975496,
+    0.7622496149787573
+   ],
+   "outgoing_sem": [
+    0.004553113048477299,
+    0.00790176697319832,
+    0.00673098719398658
+   ],
+   "unresolved": [
+    0.00849999570655223,
+    0.03749998105831866,
+    0.052249973607923994
+   ],
+   "unresolved_sem": [
+    0.0014515286326916895,
+    0.0030039021928681625,
+    0.003518518419513836
+   ],
+   "retained": [
+    0.90024954527337,
+    0.47824975843042405,
+    0.1854999063018163
+   ],
+   "beyond_window": 0.6608724171859626
+  }
+ },
+ "source_sha256_at_parent": {
+  "src/pyrite/montecarlo/channeling/axial_fiber_unraveling.py": "60aa70a7bcebe60a80729fb3d666d6c7b8c6f379c192c93848a947448221a82f",
+  "checks/axial_outgoing_maps.py": "ac84a5da7ff0e7e4b6b93d3637bfbeaad0eb2319463cddb9788a13c825f4d41f",
+  "checks/axial_matching_study.py": "0cc86494dc31fbfdb0afd6d2a8094bf16a713fbecfcd26b5582aeffc85110287"
+ }
+}

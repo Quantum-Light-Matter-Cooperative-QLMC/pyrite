@@ -350,8 +350,208 @@ def unraveled_report(
     }
 
 
+def material_fiber_channels(
+    max_order: int = 6,
+    target_eV: float = 95.0,
+    window_eV: float = 2.0,
+    *,
+    electronic: bool = True,
+    harmonic_max: int = 4,
+    grid_points: int = 32,
+    outgoing_order_max: int | None = None,
+):
+    """Si [001], 5 MeV, one-cell fiber channels: TDS lattice + electronic kicks.
+
+    ``outgoing_order_max`` = B (default ``max_order``) is the outgoing box;
+    Kraus columns span ``B + max_order`` so box outputs are exact.
+
+    Kick columns are ``sqrt(c_i) sqrt(rho_{q_i})`` harmonics on the cell
+    lattice truncated at ``|n| <= harmonic_max``; the dropped fraction of
+    ``int rho_q`` is returned as ``kick_truncation`` (max over nodes). The
+    truncated columns define the model's electronic loss consistently.
+    Returns ``(channels, entry_orders, hbar_v, info)``.
+    Validation: cr-axial-zone-handoff-accounting
+    """
+    from pyrite.materials.channeling.axial import axial_profile, axial_states
+    from pyrite.materials.channeling.transverse import longitudinal_kinematics
+    from pyrite.montecarlo.channeling.axial_dissipator import axial_dissipator
+    from pyrite.montecarlo.channeling.axial_fiber_unraveling import FiberChannels
+    from pyrite.montecarlo.channeling.operators import _potential
+
+    energy = 5e6
+    profile = axial_profile("silicon", (0, 0, 1))
+    gamma, _ = longitudinal_kinematics(energy)
+    mechanisms = ("tds", "electronic") if electronic else ("tds",)
+    dissipator = axial_dissipator(
+        profile, energy, (1, 1), (grid_points, grid_points), mechanisms=mechanisms
+    )
+    (source,) = dissipator.tds_sources
+    hbar_v = dissipator.hbar_v_eV_ang
+    g = np.asarray(profile.g_inv_ang, dtype=float)
+    r = np.asarray(source.position_ang, dtype=float)
+
+    def phase(q):
+        return -_potential(source.element, q) / hbar_v
+
+    box = max_order if outgoing_order_max is None else outgoing_order_max
+    span = np.array([box + max_order, box + max_order])
+    kraus = _kraus(
+        -span,
+        span,
+        g,
+        (0.0, 0.0),
+        phase,
+        r,
+        source.displacement_ang2,
+        source.linear_density,
+        profile.area_ang2,
+        1e-14,
+    )
+    zero = axial_states(profile, gamma, (0.0, 0.0), max_order)
+    lattice_loss = loss_operator(
+        zero.orders,
+        g,
+        phase,
+        r,
+        source.displacement_ang2,
+        source.linear_density,
+        profile.area_ang2,
+        300,
+    )
+    h = harmonic_max
+    columns, nodes, truncation = [], [], 0.0
+    for q, c in zip(dissipator.electronic_q_inv_ang, dissipator.electronic_weights, strict=True):
+        rho = dissipator.smoothed_density(float(q))
+        harmonics = np.fft.fft2(np.sqrt(rho)) / rho.size
+        column = harmonics[
+            np.ix_(np.arange(-h, h + 1) % grid_points, np.arange(-h, h + 1) % grid_points)
+        ]
+        kept = float(np.sum(np.abs(column) ** 2))
+        truncation = max(truncation, 1.0 - kept / float(np.sum(np.abs(harmonics) ** 2)))
+        columns.append(np.sqrt(c) * column)
+        nodes.append(float(q))
+    if not columns:
+        columns, nodes = [np.zeros((2 * h + 1, 2 * h + 1))], [0.0]
+
+    def spectrum(kappa):
+        states = axial_states(profile, gamma, kappa, max_order)
+        return states.energies_eV, states.coefficients
+
+    channels = FiberChannels(
+        order_max=max_order,
+        reciprocal_inv_ang=(float(g[0]), float(g[1])),
+        spectrum=spectrum,
+        cut=lambda energies: gap_cut(energies, target_eV, window_eV),
+        lattice_columns=kraus.T.reshape(-1, 2 * span[0] + 1, 2 * span[1] + 1),
+        lattice_loss=lattice_loss,
+        kick_columns=np.array(columns),
+        kick_q_inv_ang=np.array(nodes),
+        outgoing_order_max=box,
+    )
+    entry = (np.all(zero.orders == 0, axis=1)).astype(complex)
+    info = {
+        "max_order": max_order,
+        "target_eV": target_eV,
+        "electronic": electronic,
+        "kick_nodes": len(nodes),
+        "harmonic_max": h,
+        "kick_truncation": truncation,
+        "lattice_kraus": int(kraus.shape[1]),
+        "outgoing_order_max": box,
+    }
+    return channels, entry, hbar_v, info
+
+
+def balanced_window(width: int) -> np.ndarray:
+    """Unit-norm periodic Gaussian Weyl window with equal position/momentum spread.
+
+    Width ``sqrt(N / 2 pi)`` grid points on an N-point axis balances the two
+    resolutions in units of the grid and the order spacing.
+    """
+    sigma = np.sqrt(width / (2 * np.pi))
+    d = np.minimum(np.arange(width), width - np.arange(width))
+    axis = np.exp(-(d**2) / (4 * sigma**2))
+    window = np.outer(axis, axis).astype(complex)
+    return window / np.linalg.norm(window)
+
+
+def fiber_report(
+    n_incidents: int = 1000,
+    depths_ang=(1e3, 1e4, 3e4),
+    *,
+    seed: int = 0,
+    electronic: bool = True,
+    outgoing_order_max: int | None = None,
+) -> dict:
+    """Fiber unraveling of Si [001] 5 MeV with TDS (+ electronic) jumps. Research only.
+
+    ``beyond_window`` is the fraction of outgoing events whose measured order
+    lies outside the retained window ``|n| <= max_order``.
+
+    Validation: cr-axial-zone-handoff-accounting
+    """
+    import time
+
+    from pyrite.montecarlo.channeling.axial_fiber_unraveling import unravel_fiber_outgoing
+
+    channels, entry, hbar_v, info = material_fiber_channels(
+        electronic=electronic, outgoing_order_max=outgoing_order_max
+    )
+    box = info["outgoing_order_max"]
+    window = balanced_window(2 * box + 1)
+    depths = np.asarray(depths_ang, dtype=float)
+    clock = time.perf_counter()
+    events = unravel_fiber_outgoing(
+        channels,
+        entry,
+        hbar_v_eV_ang=hbar_v,
+        window=window,
+        max_depth_ang=float(depths.max()),
+        incident_ids=range(n_incidents),
+        seed=seed,
+        search_step_ang=200.0,
+    )
+    info["seconds"] = time.perf_counter() - clock
+    weight = events[0].weight
+    rows = {}
+    for kind in ("outgoing", "unresolved"):
+        hits = np.array([sum(e.kind == kind and e.depth_ang <= z for e in events) for z in depths])
+        p = hits / n_incidents
+        rows[kind] = (weight * p).tolist()
+        rows[kind + "_sem"] = (weight * np.sqrt(p * (1 - p) / n_incidents)).tolist()
+    rows["retained"] = (weight - np.array(rows["outgoing"]) - np.array(rows["unresolved"])).tolist()
+    orders = [
+        np.where(
+            np.array(e.momentum_index) > box,
+            np.array(e.momentum_index) - 2 * box - 1,
+            e.momentum_index,
+        )
+        for e in events
+        if e.kind == "outgoing"
+    ]
+    rows["beyond_window"] = float(
+        np.mean([np.max(np.abs(o)) > channels.order_max for o in orders]) if orders else 0.0
+    )
+    info.update(
+        incidents=n_incidents,
+        seed=seed,
+        entrance_weight=weight,
+        depths_ang=depths.tolist(),
+        mean_lattice_jumps=float(np.mean([e.lattice_jumps for e in events])),
+        mean_kick_jumps=float(np.mean([e.kick_jumps for e in events])),
+        **rows,
+    )
+    return {"status": "research-only; one cell, absorbing model, fibred carrier", **info}
+
+
 if __name__ == "__main__":
     import sys
 
-    result = unraveled_report() if sys.argv[1:] == ["unravel"] else report()
+    mode = sys.argv[1:2]
+    if mode == ["unravel"]:
+        result = unraveled_report()
+    elif mode == ["fiber"]:
+        result = fiber_report(int(sys.argv[2]) if len(sys.argv) > 2 else 1000)
+    else:
+        result = report()
     print(json.dumps(result, indent=2))

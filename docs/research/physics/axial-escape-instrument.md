@@ -945,6 +945,102 @@ bound-exposure deficits above. The model omits electronic jumps, Bloch
 sampling and supercells, continuum transfers and return flux. It is not a
 dechanneling fraction or depth budget.
 
+**Electronic kicks on carrier fibres.** An electronic jump
+$\sqrt{c_q\rho_q(\mathbf r)}\,e^{i\mathbf q\cdot\mathbf r}$ moves the Bloch
+carrier by $\mathbf q$. The density matrix stays block diagonal in the
+carrier, so a classical folded carrier label is exact.
+`axial_fiber_unraveling.unravel_fiber_outgoing`
+([derivation and review](../../validation/channeling/cr-axial-fiber-unraveling.md))
+keeps one retained state per history on fibre $P(\boldsymbol\kappa)$. The
+algorithm, step by step:
+
+- Between jumps the state evolves under that fibre's no-jump generator.
+- At each jump it draws a TDS Kraus column, the lattice unresolved remainder
+  or a kick node.
+- A kick then draws a uniform azimuth.
+- The kicked carrier folds into $[-g/2,g/2)$ and the orders are relabelled.
+- The output is split into retained (continue), represented outgoing (Weyl
+  measurement, end) or outside the window (unresolved, end).
+
+At the Γ point with TDS only, the fibre engine's rate operators equal the
+`tds_outgoing_maps` operators above to about $10^{-15}$.
+
+Local study (Si [001], 5 MeV, orders $|n|\le6$, ~95 eV cut, entry at Γ;
+[record](../../validation/check-records/axial-zone/fiber-local-4k.json)).
+The electronic model uses 680 kick nodes on a $32^2$ density grid, with
+harmonics $|n|\le4$ dropping at most $1.3\times10^{-3}$ of $\int\rho_q$. The
+electronic run took 13.5 min for 4,000 incidents.
+
+| Depth (Å) | TDS outgoing | TDS unresolved | TDS + electronic outgoing | TDS + electronic unresolved |
+| ---: | ---: | ---: | ---: | ---: |
+| 1,000 | 0.030 ± 0.003 | 0.078 ± 0.004 | 0.024 ± 0.002 | 0.074 ± 0.004 |
+| 10,000 | 0.133 ± 0.005 | 0.384 ± 0.008 | 0.148 ± 0.006 | 0.371 ± 0.008 |
+| 30,000 | 0.207 ± 0.006 | 0.617 ± 0.008 | 0.259 ± 0.007 | 0.555 ± 0.008 |
+
+The table uses seed 0 with 4,000 incidents for each column. A repeat of the
+TDS-only run (seed 1, 8,000 incidents) gives outgoing 0.024, 0.130 and 0.211.
+That agrees with the 20k Γ-point unraveling within 2σ at every depth. At
+1e3 Å the seed-0 value sits 3.3σ high, which is a fluctuation.
+
+Each electronic history makes about 5.6 kicks and 1.6 TDS jumps, yet
+retained weight is unchanged within errors (0.186 vs 0.175 at 3e4 Å). Kicks
+mostly recycle inside the retained subspace across fibres. Their net effect
+in this window is to move about 6% of the weight at 3e4 Å from unresolved to
+represented outgoing. This is still window accounting for one string per
+cell with an absorbing no-return model: no supercells, continuum transfers,
+return flux or matching-energy convergence.
+
+**Outgoing order box.** Most of the unresolved weight above is not
+unrepresentable. It is TDS output that lands just outside the 13×13 retained
+window. `FiberChannels.outgoing_order_max` = B now represents and measures
+jump outputs on a box $[-B,B]^2 \supseteq R$. Retained weight is still
+$P(\boldsymbol\kappa')$, outgoing is box $-P$, and only weight outside the box
+is unresolved. The box is exact when the Kraus columns span $D\ge B+M$. Then
+every box order receives every transfer, and the remainder is a sum of PSD
+terms over outputs outside the box
+([derivation and re-verification](../../validation/channeling/cr-axial-fiber-unraveling.md#implementation-change-outgoing-order-box-2026-10-31-awaiting-re-verification)).
+In the Γ fibre the TDS remainder falls as $B^{-2}$, the $Q^{-2}$ single-nuclear
+tail: 2.85e-5, 5.9e-6, 2.5e-6 and 1.4e-6 Å$^{-1}$ at B = 6, 12, 18 and 24.
+
+Repeating the study at B = 18 (D = 24, 872 Kraus columns, balanced Gaussian
+Weyl window on the 37×37 box; 4,000 incidents, seed 0;
+[record](../../validation/check-records/axial-zone/fiber-box18-local-4k.json))
+gives:
+
+| Depth (Å) | TDS outgoing | TDS unresolved | TDS + electronic outgoing | TDS + electronic unresolved |
+| ---: | ---: | ---: | ---: | ---: |
+| 1,000 | 0.090 ± 0.005 | 0.009 ± 0.001 | 0.091 ± 0.005 | 0.008 ± 0.001 |
+| 10,000 | 0.481 ± 0.008 | 0.036 ± 0.003 | 0.484 ± 0.008 | 0.037 ± 0.003 |
+| 30,000 | 0.775 ± 0.007 | 0.056 ± 0.004 | 0.762 ± 0.007 | 0.052 ± 0.004 |
+
+What changes and what doesn't:
+
+- **Retained weight is unchanged** from the B = 6 runs (0.168 and 0.185 at
+  3e4 Å, against 0.175 and 0.186). It should be: the box changes only how
+  terminal weight is labelled.
+- **Unresolved weight falls** from 0.62 to 0.06 at 3e4 Å.
+- **Most outgoing events are measured outside the retained window**: 72%
+  (TDS) and 66% (TDS + electronic) have order $|n|>6$.
+- **Electronic kicks no longer move weight between the terminal labels at B = 18.** The earlier
+  difference between the two runs was electronic kicks recycling weight that
+  TDS would otherwise have sent just outside the window, and the box now
+  represents that weight directly.
+
+The remaining unresolved weight is the TDS tail beyond 18 orders
+(transverse energy ≳ 1.2 keV). It can be bounded by its $B^{-2}$ law, or
+sampled as single large-angle nuclear scattering.
+
+The model still has one string per cell. All strings vibrate together, so
+TDS transfers are confined to the reciprocal lattice and TDS never changes
+the carrier. Independent strings give
+$\sum_R L_R\rho L_R^\dagger=\int_{\rm BZ}d^2k\,J_k\rho J_k^\dagger$ with
+$J_k=e^{i\mathbf k\cdot\mathbf r}\varphi_k(\mathbf r)$, where $\varphi_k$ is
+cell periodic with harmonics $\hat f(\mathbf k+\mathbf G)$. That is the same
+carrier-moving structure as the electronic kicks, but with a column that
+depends on the full vector $\mathbf k$. Tabulating $\mathbf k$ on an
+$N\times N$ grid is equivalent to an $N\times N$ TDS supercell. This is the
+next model gap.
+
 ## Matching prescription still to establish
 
 **Provisional numerical matching rule (research, from 1651–1656).** At each

@@ -999,7 +999,10 @@ occupation integral retains recycling and separates outgoing and unresolved
 tallies; a conditional sampler couples outgoing depth to the instantaneous
 mixed phase-space gain. `channeling/axial_jump_unraveling.py` samples the same
 law by terminal-event trajectories at retained-dimension cost. Both accept
-supplied finite jump maps (`checks/axial_outgoing_maps.py` builds TDS maps),
+supplied finite jump maps (`checks/axial_outgoing_maps.py` builds TDS maps).
+`channeling/axial_fiber_unraveling.py` adds a classical Bloch-carrier label so
+electronic kicks move trajectories between carrier fibres without wrapping;
+all of these work
 without establishing a physical matching surface or native run admission.
 `channeling/axial_projection.py` provides the CPU research full/retained
 no-jump matrix-exponential reference with native jump draws and step-resolved

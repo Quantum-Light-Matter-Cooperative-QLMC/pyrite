@@ -1,0 +1,162 @@
+{
+ "status": "research-only local CPU evidence; Si [001] 5 MeV, one string per cell, absorbing no-return model, fibred Bloch carrier; window accounting, not a physical escape fraction, depth budget or admission",
+ "parent_commit": "6925c8cf218ebc14a702abeab1558f5818672db4",
+ "command": "runpy checks/axial_outgoing_maps.py :: fiber_report(4000, seed=0, electronic=False|True); repeat fiber_report(8000, seed=1, electronic=False)",
+ "environment": {
+  "python": "3.14.4",
+  "host": "local laptop (WSL), single process",
+  "OPENBLAS_NUM_THREADS": "1",
+  "memory_cap": "systemd-run MemoryMax=8G"
+ },
+ "resources_gnu_time_both_seed0_runs": [
+  "Elapsed (wall clock) time (h:mm:ss or m:ss): 14:44.26",
+  "Maximum resident set size (kbytes): 5452300"
+ ],
+ "method": "unravel_fiber_outgoing terminal events; incident-weighted fractions with binomial SEM. Code at parent commit clipped the lattice complement at 0 and used np.rint for the fold; the follow-up refusal and half-open fold change no event for these inputs (no complement violation; boundary ties have measure zero under uniform azimuth).",
+ "reference_gamma_point_20k": "check-records/axial-zone/unravel-local-20k.json (max_order 6 row): outgoing 0.0207/0.1214/0.2047 at 1e3/1e4/3e4 A",
+ "result": {
+  "tds_only_seed0": {
+   "status": "research-only; one cell, absorbing model, fibred carrier",
+   "max_order": 6,
+   "target_eV": 95.0,
+   "electronic": false,
+   "kick_nodes": 1,
+   "harmonic_max": 4,
+   "kick_truncation": 0.0,
+   "lattice_kraus": 309,
+   "seconds": 72.53472621100082,
+   "incidents": 4000,
+   "seed": 0,
+   "entrance_weight": 0.9999994948884976,
+   "depths_ang": [
+    1000.0,
+    10000.0,
+    30000.0
+   ],
+   "mean_lattice_jumps": 1.7105,
+   "mean_kick_jumps": 0.0,
+   "outgoing": [
+    0.03024998472037705,
+    0.1329999328201702,
+    0.20724989531564111
+   ],
+   "outgoing_sem": [
+    0.002708085479872209,
+    0.005369145265081876,
+    0.006408924861530811
+   ],
+   "unresolved": [
+    0.0779999606013028,
+    0.38374980616346094,
+    0.6174996880936473
+   ],
+   "unresolved_sem": [
+    0.004240162949369421,
+    0.007689045756732853,
+    0.00768429423225875
+   ],
+   "retained": [
+    0.8917495495668177,
+    0.48324975590486646,
+    0.1752499114792092
+   ]
+  },
+  "tds_electronic_seed0": {
+   "status": "research-only; one cell, absorbing model, fibred carrier",
+   "max_order": 6,
+   "target_eV": 95.0,
+   "electronic": true,
+   "kick_nodes": 680,
+   "harmonic_max": 4,
+   "kick_truncation": 0.0013143225931991909,
+   "lattice_kraus": 309,
+   "seconds": 808.8794337090003,
+   "incidents": 4000,
+   "seed": 0,
+   "entrance_weight": 0.9999994948884976,
+   "depths_ang": [
+    1000.0,
+    10000.0,
+    30000.0
+   ],
+   "mean_lattice_jumps": 1.60625,
+   "mean_kick_jumps": 5.55975,
+   "outgoing": [
+    0.024249987751046066,
+    0.1484999249909419,
+    0.2589998691761209
+   ],
+   "outgoing_sem": [
+    0.0024321756513547925,
+    0.005622446581773951,
+    0.0069267381594633
+   ],
+   "unresolved": [
+    0.0737499627480267,
+    0.37099981260363263,
+    0.5552497195368383
+   ],
+   "unresolved_sem": [
+    0.00413251946428377,
+    0.007638042358082164,
+    0.0078572766915147
+   ],
+   "retained": [
+    0.9019995443894249,
+    0.4804997572939231,
+    0.18574990617553844
+   ]
+  },
+  "tds_only_seed1": {
+   "status": "research-only; one cell, absorbing model, fibred carrier",
+   "max_order": 6,
+   "target_eV": 95.0,
+   "electronic": false,
+   "kick_nodes": 1,
+   "harmonic_max": 4,
+   "kick_truncation": 0.0,
+   "lattice_kraus": 309,
+   "seconds": 172.7029804089998,
+   "incidents": 8000,
+   "seed": 1,
+   "entrance_weight": 0.9999994948884976,
+   "depths_ang": [
+    1000.0,
+    10000.0,
+    30000.0
+   ],
+   "mean_lattice_jumps": 1.761875,
+   "mean_kick_jumps": 0.0,
+   "outgoing": [
+    0.023999987877323943,
+    0.13049993408294894,
+    0.210999893421473
+   ],
+   "outgoing_sem": [
+    0.0017111391065801136,
+    0.0037661259168122146,
+    0.004561781886214076
+   ],
+   "unresolved": [
+    0.06787496571555678,
+    0.3797498081839069,
+    0.6096246920714004
+   ],
+   "unresolved_sem": [
+    0.002812203772405257,
+    0.005426090898982857,
+    0.0054541511594358855
+   ],
+   "retained": [
+    0.9081245412956169,
+    0.4897497526216418,
+    0.17937490939562428
+   ]
+  }
+ },
+ "source_sha256_at_parent": {
+  "src/pyrite/montecarlo/channeling/axial_fiber_unraveling.py": "6a0f0819cb7ef897dc024a51b313c6016ca0b63b41a64bb5bf6fe276539898bf",
+  "checks/axial_outgoing_maps.py": "202e25c66728d336c1d9e8820c0777d1376a1f22ff542bf347cf5fe221f1d070",
+  "checks/axial_matching_study.py": "0cc86494dc31fbfdb0afd6d2a8094bf16a713fbecfcd26b5582aeffc85110287"
+ }
+}
