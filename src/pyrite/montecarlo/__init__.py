@@ -1,54 +1,43 @@
 """
 montecarlo (package)
 
-Monte Carlo CXR (PXR + CBS) from scattered electrons in thick crystals,
-following Zhai et al., Nat. Commun. 16, 11218 (2025), SI Sections S1-S5:
+Coupled electron/photon Monte Carlo transport and radiation scoring in layered
+and crystalline targets. Transport produces trajectory segments and events;
+spectrum kernels score radiation from them (CXR = PXR + CBS, bremsstrahlung,
+characteristic lines, transition/diffracted-transition radiation, coherent
+emission); the runner drives cases through both phases on CPU or GPU.
 
-  1. Electron transport (SI S2): single-scattering Monte Carlo with
-     Joy-Luo continuous slowing-down. Elastic scattering ("mott", deprecated):
-     free paths from the Browning fit to the Mott total cross sections, and
-     scattering angles from a screened-Rutherford form whose screening
-     parameter alpha(E) is calibrated, per element, to reproduce the NIST
-     SRD 64 relativistic Mott TRANSPORT cross sections
-     (mott_transport_cross_sections/) -- so both the collision rate and the
-     momentum-transfer rate match Mott data. Same architecture as CASINO.
-     A purely analytic screened-Rutherford fallback is kept ("sr"). Runs
-     built from the default Numerics instead select "elsepa": full ELSEPA
-     differential cross sections from the released tables (issue #89).
-  2. Radiation (SI S1): each straight trajectory segment between elastic
-     collisions radiates independently (incoherent across segments, coherent
-     across reciprocal vectors within a segment) with the finite-interaction-
-     time factor |Q|^2 = t_L^2 sinc^2(P t_L), P = [w - v.(k+g)]/2, replacing
-     the absorption-limited delta-function limit of Feranchuk Eq. (9).
-     Amplitudes are the same Eqs. (13)/(14) as src/pyrite/validation/feranchuk_spence.py, with
-     arbitrary segment velocity direction.
-  3. Self-absorption (SI S5): Beer-Lambert along the observation direction
-     from each segment midpoint (slab geometry).
-  4. Detector (SI S3/S4): Gaussian convolution with
-     FWHM^2 = FWHM_EDS^2 + FWHM_dtheta^2.
+Physics, assumptions and validation live in ``docs/physics/`` (start at
+``docs/physics/how-pyrite-works.md``) and the validation ledger, not here.
+Elastic-model choices and their defaults are documented on
+:class:`pyrite.Numerics` and in ``docs/physics/beam-transport/elastic-scattering.md``;
+sample tilt follows ``docs/physics/geometry/tilt-convention.md``.
 
-Conventions: lab frame with the incident beam along +z; the sample is a slab
-occupying 0 <= z <= thickness (surface normal -z toward vacuum), surface
-perpendicular to the beam (no tilt). The crystal construction frame is used
-as-is, so for graphite the c-axis (g(00l)) lies along the beam -- the HOPG
-fiber-texture geometry of the paper. Only (00l)-type reflections are coherent
-in HOPG (random in-plane grain azimuths), so pass (00l) reflections only.
+Conventions: lab frame with the incident beam along +z; the sample occupies
+0 <= z <= thickness with its entrance surface facing -z. Units are carried by
+name suffix (``_ang`` Angstrom, ``_eV``/``_keV``, ``_rad``/``_deg``).
 
-Nonrelativistic amplitudes (no gamma corrections): fine at <~30 keV; the
-paper's gamma factors matter toward 100-300 keV.
+Legacy flat names remain importable as ``from pyrite.montecarlo import X``;
+they resolve lazily so schema imports do not initialize kernels. Submodules:
+  case        -- typed, validated input record for one simulation case
+  transport   -- electron, positron and photon transport: elastic, inelastic,
+                 shell, radiative and pair interactions; CPU and CUDA kernels
+  spectrum    -- radiation scoring: CXR, bremsstrahlung, characteristic,
+                 transition/optical/DTR, Cherenkov, coherent emission
+  channeling  -- planar/axial channeling and open-system quantum transport
+  runner      -- per-case driver, scheduling, chunking and streamed scoring
+  geometry    -- tilted-sample, detector-direction and orientation rotations
+  detector    -- detector efficiency, line widths and convolution
+  groove, bunch_front, transverse
+              -- entrance-face grooves, bunch-front tilt, transverse beam
+                 phase-space policies
+  shell_*, eedl_ionization, eadl_relaxation, bote_salvat_ionization
+              -- atomic shell data, ionization and relaxation
+  trajectories, trajectory_*
+              -- trajectory capture, inventory, selection, export and scenes
+  gdf         -- GPT time-output/screen adapter (CPU only)
 
-Lengths in Angstrom, energies in eV (electron energies in keV where noted).
-
-This module was split from a single montecarlo.py into a package; every public
-and internal name remains importable as ``from pyrite.montecarlo import X`` for
-backward compatibility. The submodules are:
-  pyrite._backend -- GPU/CPU array backend (xp, cp, REAL, _to_cpu, _GPU)
-  pyrite.materials.attenuation -- composition normalization + X-ray self-absorption
-  transport -- electron transport, scattering, stopping power
-  geometry  -- tilted-sample / detector / orientation rotations
-  spectrum  -- CXR CXR spectrum, solid-angle integral, bremsstrahlung
-  detector  -- detector efficiency, line widths, convolution
-  runner    -- per-case driver and the pipelined run_cases sweep
+See ``docs/repo_map.md`` for ownership and entry points.
 """
 
 from importlib import import_module
