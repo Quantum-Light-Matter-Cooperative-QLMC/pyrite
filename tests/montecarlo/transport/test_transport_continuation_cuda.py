@@ -196,17 +196,15 @@ def test_device_resident_rows_match_full_history():
     _assert_identical(reference, candidate)
 
 
-_PHOTON_FIELDS = (
-    "hard_radiative_k_eV",
-    "hard_radiative_Z",
-    "hard_radiative_direction",
-    "hard_radiative_target_momentum_eV_c",
-)
+# Completed photon kinematics stay host arrays: mixed residency (#905).
+_HOST_PHOTON_FIELDS = ("hard_radiative_direction", "hard_radiative_target_momentum_eV_c")
 
 
 def _assert_resident(result):
-    for key in ("L_ang", "E_end_keV", "event_kind", *_PHOTON_FIELDS):
+    for key in ("L_ang", "E_end_keV", "event_kind", "hard_radiative_k_eV", "hard_radiative_Z"):
         assert isinstance(result[key], cupy.ndarray), key
+    for key in _HOST_PHOTON_FIELDS:
+        assert isinstance(result[key], np.ndarray), key
 
 
 @pytest.mark.parametrize(

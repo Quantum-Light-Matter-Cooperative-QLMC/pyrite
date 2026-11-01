@@ -456,9 +456,9 @@ def complete_hard_radiative_events(segments, tables, seed: int) -> None:
 
     Device-resident rows (#905) gather and download only the photon rows'
     four input fields; the draws and the completion arithmetic run on the
-    host exactly as for host rows, and the completed photon rows are
-    scattered into device zero columns. The result fields are therefore
-    bitwise those of the host path, resident on the device.
+    host exactly as for host rows. The two completed fields stay host arrays
+    (mixed residency): no spectrum kernel reads them, and the sparse lazy
+    zeros cost no device memory. They are bitwise those of the host path.
 
     Validation: bremslib-radiative-partition
     """
@@ -474,15 +474,8 @@ def complete_hard_radiative_events(segments, tables, seed: int) -> None:
         values = xp.asarray(segments[name])[rows_xp]
         return values if cupy is None else cupy.asnumpy(values)
 
-    if cupy is None:
-        directions = _lazy_zeros(energies.size)
-        momenta = _lazy_zeros(energies.size)
-        destination = photon_rows
-    else:
-        # Host staging for the photon rows only, scattered once at the end.
-        directions = np.zeros((photon_rows.size, 3), dtype=float)
-        momenta = np.zeros((photon_rows.size, 3), dtype=float)
-        destination = np.arange(photon_rows.size)
+    directions = _lazy_zeros(energies.size)
+    momenta = _lazy_zeros(energies.size)
     rng = np.random.default_rng(int(seed) ^ 0xD6023FEA38B57C29)
     # Shape (N, 2) consumes exactly the same consecutive MT/PCG uniform words
     # as the former two scalar random() calls per photon (even for N=0).
@@ -508,22 +501,11 @@ def complete_hard_radiative_events(segments, tables, seed: int) -> None:
                 incoming[offsets],
                 uniforms[offsets],
             )
-            rows = destination[offsets]
+            rows = photon_rows[offsets]
             directions[rows] = completed
             momenta[rows] = target
-    if cupy is not None:
-        directions = _scatter_photon_rows(cupy, energies.size, rows_xp, directions)
-        momenta = _scatter_photon_rows(cupy, energies.size, rows_xp, momenta)
     segments["hard_radiative_direction"] = directions
     segments["hard_radiative_target_momentum_eV_c"] = momenta
-
-
-def _scatter_photon_rows(cupy, n_rows, rows, values):
-    """Device ``(n_rows, 3)`` zeros holding ``values`` at ``rows`` (#905)."""
-    out = cupy.zeros((int(n_rows), 3), dtype=float)
-    if rows.size:
-        out[rows] = cupy.asarray(values)
-    return out
 
 
 # PENELOPE-2024 Eq. 3.154 polynomial coefficients of t, t^2, ..., t^7.

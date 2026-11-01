@@ -106,8 +106,11 @@ def test_radiative_segments_stay_resident(transports):
     resident, host = transports
     segs = resident._transport["segs"]
     assert segs["radiative"]["model"] == "bremslib-soft-hard"
-    for key in ("r_mid", "E_end_keV", "hard_radiative_k_eV", "hard_radiative_direction"):
+    for key in ("r_mid", "E_end_keV", "hard_radiative_k_eV", "hard_radiative_Z"):
         assert isinstance(segs[key], cupy.ndarray), key
+    # Mixed residency: completed photon kinematics stay on the host.
+    for key in ("hard_radiative_direction", "hard_radiative_target_momentum_eV_c"):
+        assert isinstance(segs[key], np.ndarray), key
     assert isinstance(host._transport["segs"]["r_mid"], np.ndarray)
     assert np.count_nonzero(cupy.asnumpy(segs["hard_radiative_k_eV"]) > 0.0) > 0
 
