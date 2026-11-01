@@ -25,7 +25,6 @@ from pyrite.montecarlo.transport.batching import (
     _alloc_scratch,
 )
 from pyrite.montecarlo.transport.continuation import (
-    CONTINUATION_AUTO_MIN_HISTORIES,
     EXIT_SUSPENDED,
     TransportContinuationConfig,
     _drive_continuation_rounds,
@@ -497,12 +496,15 @@ def test_explicit_continuation_keeps_or_creates_its_config():
     assert resolve_schedule(kept, 1, **(SUPPORTED | {"lut": True})).continuation is cont
 
 
-def test_auto_continues_a_supported_large_pass(caplog):
+@pytest.mark.parametrize("Ne", [1, 999, 1000, 100_000])
+def test_auto_continues_every_supported_pass(Ne, caplog):
+    # No history-count floor (#889): small passes would otherwise launch
+    # full-history batches sized by the longest track.
     caplog.set_level("INFO", logger="pyrite.montecarlo.transport.continuation")
-    resolved = resolve_schedule(AUTO, CONTINUATION_AUTO_MIN_HISTORIES, **SUPPORTED)
+    resolved = resolve_schedule(AUTO, Ne, **SUPPORTED)
     assert resolved.schedule == "continuation"
     assert resolved.continuation == TransportContinuationConfig()
-    assert "continuation for" in caplog.text
+    assert f"continuation for {Ne} histories" in caplog.text
 
 
 @pytest.mark.parametrize(
@@ -517,16 +519,9 @@ def test_auto_continues_a_supported_large_pass(caplog):
 def test_auto_falls_back_with_a_stated_reason(flag, reason, caplog):
     caplog.set_level("INFO", logger="pyrite.montecarlo.transport.continuation")
     support = SUPPORTED | {flag: not SUPPORTED[flag]}
-    resolved = resolve_schedule(AUTO, 10 * CONTINUATION_AUTO_MIN_HISTORIES, **support)
+    resolved = resolve_schedule(AUTO, 10_000, **support)
     assert (resolved.schedule, resolved.continuation) == ("full-history", None)
     assert reason in caplog.text
-
-
-def test_auto_keeps_full_history_below_the_history_threshold(caplog):
-    caplog.set_level("INFO", logger="pyrite.montecarlo.transport.continuation")
-    resolved = resolve_schedule(AUTO, CONTINUATION_AUTO_MIN_HISTORIES - 1, **SUPPORTED)
-    assert resolved.continuation is None
-    assert "below" in caplog.text
 
 
 def test_unknown_schedule_is_rejected(monkeypatch):
