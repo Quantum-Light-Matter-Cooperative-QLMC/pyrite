@@ -165,7 +165,10 @@ def crystal_to_lab_frame(frame_lab) -> np.ndarray:
 
 
 def momentum_inv_ang(kinetic_energy_eV: float) -> float:
-    """On-shell electron momentum ``sqrt(E(E + 2 m c^2)) / (hbar c)`` [Å^-1]."""
+    """On-shell electron momentum ``sqrt(E(E + 2 m c^2)) / (hbar c)`` [Å^-1].
+
+    Validation: cr-axial-zone-handoff-physical
+    """
     return float(np.sqrt(kinetic_energy_eV * (kinetic_energy_eV + 2 * _M_E_EV)) / _HBARC_EV_ANG)
 
 

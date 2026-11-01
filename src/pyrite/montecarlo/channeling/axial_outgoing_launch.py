@@ -83,6 +83,8 @@ class AxialMatchingDeclaration:
     ``window_eV`` of ``target_cut_eV >= U_max + (U_max - U_min)``; energies
     share the spectrum's reference. Every cut the unraveling selects is
     checked against it. A declaration is not calibration evidence.
+
+    Validation: cr-axial-zone-handoff-physical
     """
 
     target_cut_eV: float
@@ -185,7 +187,10 @@ def _check_zone(zone: AxialZoneKinematics, max_depth_ang: float) -> np.ndarray:
 
 
 class _Mapper:
-    """Event-to-lab kinematics for one zone and outgoing box."""
+    """Event-to-lab kinematics for one zone and outgoing box.
+
+    Validation: cr-axial-zone-handoff-physical
+    """
 
     def __init__(self, engine, zone, frame, channels: FiberChannels):
         self.zone, self.frame = zone, frame
@@ -244,6 +249,11 @@ class _Mapper:
 
 
 def _checked_cut(channels: FiberChannels, matching: AxialMatchingDeclaration):
+    """Wrap the cut so every selected value must lie in the declared window.
+
+    Validation: cr-axial-zone-handoff-physical
+    """
+
     def cut(energies):
         value = float(channels.cut(energies))
         if abs(value - matching.target_cut_eV) > matching.window_eV:
@@ -254,7 +264,10 @@ def _checked_cut(channels: FiberChannels, matching: AxialMatchingDeclaration):
 
 
 def _check_tail_reach(channels, engine, zone, matching) -> None:
-    """Every classified tail must be above every admitted cut: floor + U_min >= target + window."""
+    """Every classified tail must be above every admitted cut: floor + U_min >= target + window.
+
+    Validation: cr-axial-zone-handoff-physical
+    """
     if channels.tail_q_max_inv_ang is None or not channels.tds_strings:
         return
     k_min = float(np.min((engine.box + 0.5) * engine.g))
