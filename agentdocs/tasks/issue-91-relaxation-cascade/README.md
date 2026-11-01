@@ -175,7 +175,7 @@ split into its own issue if it is dispatched separately from the EADL work.
 
 - [x] Add the MT=522 sum rule (`sum MT 534-572 / MT 522 == 1`, Z = 6/29/79,
       1 keV-1 MeV) and a Bethe-ratio band as independent internal-consistency
-      tests. `tests/montecarlo/test_characteristic.py:71` currently pins carbon
+      tests. `tests/montecarlo/spectrum/test_characteristic.py:71` currently pins carbon
       `sigma_K` to `rtol=1e-13` against the implementation — a regression pin,
       not independent evidence, and it cannot catch a designator-map or unit
       error.

@@ -120,7 +120,7 @@ Independent strings add: $\Gamma=\sum_s\Gamma_s$, and the group weights in
 
 ## Evidence
 
-All of it is in `tests/montecarlo/test_channeling_axial_tds_continuum.py`.
+All of it is in `tests/montecarlo/quantum/test_channeling_axial_tds_continuum.py`.
 
 - **$D(G)$** matches the Gaussian closed form to 1e-10.
 - **$\Gamma$ equals the zone integral** of the independent shifted

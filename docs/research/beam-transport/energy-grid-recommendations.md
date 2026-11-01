@@ -79,7 +79,7 @@ The derivation default of 95% integrated coverage is a bandwidth policy, not a 1
 3. Enable nonuniform continua with conservative detector scoring and cache keys.
 4. Add local line windows and adaptive refinement, then revise derivation defaults.
 
-Validate LUTs against direct physics at off-grid points sampled throughout every decade, with targeted points near cutoffs and joins. Preserve existing tested accuracy where applicable: `tests/montecarlo/test_transport_lut.py` checks roughly 1e-5 relative agreement for selected quantities over 5–30 keV. That test does not certify a six-decade interval or high-energy model validity.
+Validate LUTs against direct physics at off-grid points sampled throughout every decade, with targeted points near cutoffs and joins. Preserve existing tested accuracy where applicable: `tests/montecarlo/transport/test_transport_lut.py` checks roughly 1e-5 relative agreement for selected quantities over 5–30 keV. That test does not certify a six-decade interval or high-energy model validity.
 
 For spectra, reuse identical trajectories to isolate grid error. Compare yield, centroid, FWHM, detected counts, and line/background ratios under refinement. An initial target is below 1% observable change, tightened for precision work; allocate the total error budget across bandwidth, quadrature, interpolation, transport, and Monte Carlo statistics. Cover near-zero spectra with absolute tolerances. Record wall time, memory, and accuracy together. Heavy sweeps and GPU measurements belong on the remote compute path.
 

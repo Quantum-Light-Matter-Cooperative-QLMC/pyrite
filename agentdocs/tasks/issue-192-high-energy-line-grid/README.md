@@ -235,7 +235,7 @@ take this path.
 
 Focused tests: 17 bandwidth tests pass, including a two-electron 5 MeV h-BN
 transport case. Scoped Ruff passes; Sphinx builds. Full lint stops at the
-pre-existing import-order error in `tests/montecarlo/test_multilayer.py`; full
+pre-existing import-order error in `tests/montecarlo/transport/test_multilayer.py`; full
 typecheck reports missing optional app dependencies. The ledger rows and two
 unverified derivation pages now describe the production-weight selector and
 local spacing rule.

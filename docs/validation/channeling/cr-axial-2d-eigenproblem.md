@@ -82,11 +82,11 @@ $U_{(1,0)},U_{(1,1)},U_{(2,0)}$: independent $-4.315893,\ -2.563743,\ -1.473438$
 - `axial_states`: $H_{ij}=U[m_i-m_j,n_i-n_j]+\hbar^2\lvert\mathbf k+\mathbf G_i\rvert^2/(2\gamma m)$, with `HBAR2_2M_EV_ANG2 = (ħc)²/(2 m_e c²)`. `eigh` gives orthonormal columns, and `wavefunction` divides by $\sqrt A$ for normalization per cell. This matches.
 - `_strings`: the centring images of the projected lattice times the basis, folded and merged, with weight $A/(V N_{\rm centring})$. The string densities sum to $N_{\rm basis}/V$.
 
-Tests: `uv run pyrite-dev test --slow tests/montecarlo/test_channeling_axial.py` gives 17 passed (155 s), including the five anchors listed in the row.
+Tests: `uv run pyrite-dev test --slow tests/montecarlo/quantum/test_channeling_axial.py` gives 17 passed (155 s), including the five anchors listed in the row.
 
 ## Peak-order acceptance (historical, 2026-10-16)
 
-Issue #508 acceptance reads "`cr-axial-2d-eigenproblem` reaches `anchored` (peak ordering only; experimental tier)", and the checklist item "Peak-order anchors: Watson axial Si lines; Gouanère" is open. The existing Watson/Gouanère tests (`tests/materials/test_channeling_profile.py`, `tests/montecarlo/test_channeling_emission.py::test_diamond_peaks_match_gouanere`) are planar. No axial peak-order anchor exists yet. The five listed anchors are internal consistency checks (planar limit, cell, symmetry, norm), not reference values, so the claim is not yet `anchored` in the acceptance sense.
+Issue #508 acceptance reads "`cr-axial-2d-eigenproblem` reaches `anchored` (peak ordering only; experimental tier)", and the checklist item "Peak-order anchors: Watson axial Si lines; Gouanère" is open. The existing Watson/Gouanère tests (`tests/materials/test_channeling_profile.py`, `tests/montecarlo/quantum/test_channeling_emission.py::test_diamond_peaks_match_gouanere`) are planar. No axial peak-order anchor exists yet. The five listed anchors are internal consistency checks (planar limit, cell, symmetry, norm), not reference values, so the claim is not yet `anchored` in the acceptance sense.
 
 ## Adjudication
 

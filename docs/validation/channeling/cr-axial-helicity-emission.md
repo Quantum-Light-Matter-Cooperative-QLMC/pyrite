@@ -180,4 +180,4 @@ The Notes' "1.00 â†’ 0.80" is plausible. At 50 nm, though, it rests on about 2â€
 
 ## Tests
 
-`OPENBLAS_NUM_THREADS=1 uv run pyrite-dev test --slow tests/montecarlo/test_channeling_axial_emission.py`: 8 passed. The slow MCWF test takes 1.5 s.
+`OPENBLAS_NUM_THREADS=1 uv run pyrite-dev test --slow tests/montecarlo/quantum/test_channeling_axial_emission.py`: 8 passed. The slow MCWF test takes 1.5 s.

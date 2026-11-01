@@ -143,7 +143,7 @@ Standalone script (`indep_bethe.py`, no `pyrite` import — literature constants
 | carbon crossover | $2.662$ keV | ledger's stated range 2.66 keV (B) – 10.46 keV (Bi); carbon should fall inside | matches (inside range) |
 | Bi crossover (approx. literature $I=823$ eV) | $10.42$ keV | ledger's $10.46$ keV | matches to $0.4\%$ (input-$I$-precision limited, not a formula divergence) |
 | $P\,m_ec^2$ | $7.8457\times10^{-4}$ | Joy–Luo constant $7.85\times10^{-4}$, ledger's stated $0.08\%$ | matches |
-| Joy–Luo/Berger–Seltzer ratio, carbon, 10/25/50/100/200/300 keV | $0.976/0.937/0.879/0.778/0.627/0.521$ | `tests/montecarlo/test_stopping_berger_seltzer.py::test_matches_the_documented_validity_ceiling_table` (`{10:0.98,25:0.94,50:0.88,100:0.78,200:0.63,300:0.52}`, tol $\pm0.005$), also reproduced in `electron-transport.md` §5 | matches within stated tolerance at every point (max deviation $0.0041$, at 10 keV) |
+| Joy–Luo/Berger–Seltzer ratio, carbon, 10/25/50/100/200/300 keV | $0.976/0.937/0.879/0.778/0.627/0.521$ | `tests/montecarlo/collisions/test_stopping_berger_seltzer.py::test_matches_the_documented_validity_ceiling_table` (`{10:0.98,25:0.94,50:0.88,100:0.78,200:0.63,300:0.52}`, tol $\pm0.005$), also reproduced in `electron-transport.md` §5 | matches within stated tolerance at every point (max deviation $0.0041$, at 10 keV) |
 
 The validity-ceiling row is the one point where an existing repository anchor (`test_stopping_berger_seltzer.py`) was consulted for its *reference numbers*, per the methodology's allowance for `checks/`/`tests/` anchors in step 4 — the numbers being checked were produced by the independent script, not by importing the anchor's helpers.
 

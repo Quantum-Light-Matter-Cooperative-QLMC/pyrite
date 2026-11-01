@@ -40,7 +40,7 @@ sharp, flat interfaces; local isotropic ``eps(omega)``, here
 scattering factor and therefore crude near and below the plasma energy. No
 diffracted transition radiation: the layers have no lattice periodicity.
 
-Limits (checked in ``tests/montecarlo/test_transition_radiation.py``): a matched
+Limits (checked in ``tests/montecarlo/spectrum/test_transition_radiation.py``): a matched
 medium or a vanishing film radiates nothing; a single interface at normal
 incidence reproduces the closed Ginzburg--Frank form
 :func:`ginzburg_frank_interface` in both directions; a conductor

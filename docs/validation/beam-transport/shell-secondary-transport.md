@@ -176,6 +176,6 @@ beyond it.
 
 ## Outstanding empirical checks
 
-- Run the CUDA anchors (`tests/montecarlo/test_shell_secondary_cuda.py`) on a
+- Run the CUDA anchors (`tests/montecarlo/cascades/test_shell_secondary_cuda.py`) on a
   device and compare CPU/CUDA aggregate observables. The CUDA implementation
   was inspected here, but not executed by the verifier.

@@ -98,11 +98,11 @@ Out of scope, and owned elsewhere:
 
 ## Validation
 
-Analytic checks (`tests/montecarlo/test_cherenkov.py`): prefactor,
+Analytic checks (`tests/montecarlo/spectrum/test_cherenkov.py`): prefactor,
 nondispersive closed form and cone, $z^2$ scaling, threshold and linear
 onset, vacuum and $n<1$, $\beta\to1$ cone, a dispersive closed-form band
 integral, per-energy threshold, weak-loss continuity, and refusals.
 Independent Monte Carlo reference: Geant4 11.4.2 `G4Cerenkov`
 (`checks/cherenkov_geant4`, compared in
-`tests/montecarlo/test_cherenkov_geant4_reference.py`). Ledger:
+`tests/montecarlo/spectrum/test_cherenkov_geant4_reference.py`). Ledger:
 [`frank-tamm-homogeneous-dielectric`](../../validation/ledger-core-coherent-physics.md#frank-tamm-homogeneous-dielectric).

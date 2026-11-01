@@ -3,7 +3,7 @@
 Derivation and implementation-context evidence for issue #506. Fresh-context verdict `rederived`: the declared population partition and continuous launch state match the independent derivation below. Existing implementation-context evidence and validity limits are retained.
 
 - **Code:** `montecarlo/channeling/handoff.py` (ensemble solve, keyed sampling, directions) and `montecarlo/runner/channeling.py::transport_channeling_case` (zone rows, launch, join).
-- **Anchors:** `tests/montecarlo/test_channeling_handoff.py`; `checks/channeling_handoff.py`.
+- **Anchors:** `tests/montecarlo/channeling/test_channeling_handoff.py`; `checks/channeling_handoff.py`.
 - **Design:** [ADR-0018](../../adr/0018-quantum-channeling-zone.md), one-way handoff (D4-A, collapse at incoherent jumps D4(i)); zone segments scored as straight mean segments (D6-A).
 
 ## Population
@@ -240,7 +240,7 @@ physical angular distribution.
 Verification command:
 
 ```bash
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test tests/montecarlo/test_channeling_handoff.py tests/dev/test_docs.py --durations=0
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test tests/montecarlo/channeling/test_channeling_handoff.py tests/dev/test_docs.py --durations=0
 ```
 
 Result: 17 passed in 12.12 s; longest fixture setup 4.23 s, longest test call

@@ -12,7 +12,7 @@ Fresh-context verification for issue #102. The derivation in Sections 1–5 was 
   $$
 
   with a photon roll-off scale of order $\gamma\hbar\omega_p$. This is PDG 2020, *Passage of particles through matter*, Eq. (34.45), for unit charge.
-- Location: research claim, `docs/research/physics/transition-radiation-recommendations.md`, label `eq-research-tr-interface-energy`. There is no production implementation. The ledger anchor is `tests/montecarlo/test_transition_radiation.py::test_interface_energy_scale_from_the_exact_solution`.
+- Location: research claim, `docs/research/physics/transition-radiation-recommendations.md`, label `eq-research-tr-interface-energy`. There is no production implementation. The ledger anchor is `tests/montecarlo/spectrum/test_transition_radiation.py::test_interface_energy_scale_from_the_exact_solution`.
 - Assumptions: a single planar interface at normal incidence; uniform straight motion with no recoil; a plasma (Drude) dielectric $\varepsilon(\omega)=1-\omega_p^2/\omega^2$ for the material; vacuum on the other side; forward hemisphere; all photon energies and angles; no absorption, no foil interference, no detector response.
 
 ## 2. Exact single-interface emission (Ginzburg–Frank)

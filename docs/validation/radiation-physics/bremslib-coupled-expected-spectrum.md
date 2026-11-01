@@ -138,7 +138,7 @@ For variance, the Si run gives $\operatorname{Var}(\nu_e)/E[\nu_e]$ between $2\t
 
 ### Anchors
 
-`PYRITE_MC_BACKEND=cpu ... pyrite-dev test tests/montecarlo/test_hard_radiative_transport.py tests/montecarlo/test_coupled_radiative_runner.py -q` passed (32 tests, 2026-09-27). The expected-versus-analog anchor allows $4/\sqrt{N_{\rm events}}\approx21\,\%$. It therefore guards against gross factor errors, such as $4\pi$, $Z^2$, $N_e$ or double counting. It cannot resolve the $10^{-3}$-level quadrature term above.
+`PYRITE_MC_BACKEND=cpu ... pyrite-dev test tests/montecarlo/cascades/test_hard_radiative_transport.py tests/montecarlo/cascades/test_coupled_radiative_runner.py -q` passed (32 tests, 2026-09-27). The expected-versus-analog anchor allows $4/\sqrt{N_{\rm events}}\approx21\,\%$. It therefore guards against gross factor errors, such as $4\pi$, $Z^2$, $N_e$ or double counting. It cannot resolve the $10^{-3}$-level quadrature term above.
 
 ## Findings
 

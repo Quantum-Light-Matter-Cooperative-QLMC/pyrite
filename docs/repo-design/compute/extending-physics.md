@@ -88,7 +88,7 @@ per-electron normalization. It needs no tables, supports no precision observable
 and must not be used as a physical production selection.
 
 The following block runs as written through the project environment. The
-regression in `tests/montecarlo/test_emission_adapters.py` executes this exact
+regression in `tests/montecarlo/spectrum/test_emission_adapters.py` executes this exact
 block and checks that its selection reaches ordinary scoring.
 
 <!-- executable-example: existing-slot -->

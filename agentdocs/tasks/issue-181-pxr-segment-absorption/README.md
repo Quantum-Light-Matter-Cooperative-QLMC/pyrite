@@ -29,7 +29,7 @@ the ledger notes of `xray-in-medium-resonance` as an open question.
 
 ## Verification done (slice 2)
 
-- CPU: `tests/montecarlo/test_coherent_formation_absorption.py` (quadrature,
+- CPU: `tests/montecarlo/coherent/test_coherent_formation_absorption.py` (quadrature,
   Parseval, split invariance under absorption+refraction on three routes,
   coherent = incoherent integrated yield); two-half split residual now
   1.8e-15 of peak; escape-path root test; substep ladder ~30x tighter.

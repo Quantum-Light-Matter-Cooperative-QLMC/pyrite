@@ -149,7 +149,7 @@ The checks used a script with CODATA $\hbar$, $c$, $\mu_0$, $e$ and $Z_0=\mu_0c$
 8. $TJT^\dagger$ with three random contractions on a 3-node grid, evaluated at 7 energies: max deviation from manual linear-interpolated $TJT^\dagger$ is $8\times10^{-17}$. Output minimum eigenvalue is $>0$, the maximum trace ratio is 0.22, and the maximum interpolant $\sigma_{\max}$ is 0.66.
 9. Paraxial Gaussian ($w=6\lambda$, $z=3\lambda$): handoff $J_{xx}$ and $J_{xy}$ against the independent $(\pi\hbar Z_0E)^{-1}\int\widetilde E_i\widetilde E_j^*dA$: $1+1.4\times10^{-10}$. The trace against the full-vector flux differs by $7\times10^{-7}$ (expected paraxial residual).
 
-The implementation-context tests `tests/montecarlo/test_optical_wavefront.py`, `test_optical_finite_collection.py`, `test_optical_interferometer_handoff.py`, `test_optical_finite_convergence.py` and `tests/detectors/test_optical_elements.py`: 35 passed at the frozen revision.
+The implementation-context tests `tests/montecarlo/spectrum/test_optical_wavefront.py`, `test_optical_finite_collection.py`, `test_optical_interferometer_handoff.py`, `test_optical_finite_convergence.py` and `tests/detectors/test_optical_elements.py`: 35 passed at the frozen revision.
 
 ## Adjudication
 

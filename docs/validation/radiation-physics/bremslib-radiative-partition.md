@@ -131,7 +131,7 @@ maintainer decision (2026-10-22) gates each part separately: collision within
 target fails for W above 30 MeV and is not claimed. The CSDA range, integrated from 10 keV over SBETHE collision plus coupled
 radiative stopping with ESTAR's 10 keV range added, is 0.989–0.996 of ESTAR
 for Si and 0.978–0.992 for W from 1 to 100 MeV. It is pinned within 3 %. Both tests are in
-`tests/montecarlo/test_hard_radiative.py`. This section is a moment and
+`tests/montecarlo/cascades/test_hard_radiative.py`. This section is a moment and
 stopping-power anchor only, not a full-track benchmark.
 
 ## Verdict

@@ -190,7 +190,7 @@ Final verdict: **rederived**, conditional on the separately ledgered charged
 component laws. Units, limits and signs/conventions pass after the author's
 boundary repair. No remaining divergent term was found in this claim.
 Suggested ledger change: `unverified` to `rederived`, cite this independent
-write-up and retain `tests/montecarlo/test_photon_reentry.py` as the anchor;
+write-up and retain `tests/montecarlo/transport/test_photon_reentry.py` as the anchor;
 `anchored` becomes appropriate when that regression evidence is green in CI.
 Human sign-off remains separate.
 

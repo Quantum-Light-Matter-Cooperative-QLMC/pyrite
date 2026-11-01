@@ -69,8 +69,8 @@ All distances below are Å ray parameters; supplied directions are unit vectors 
 
 The following focused selections passed:
 
-* `tests/montecarlo/test_finite_transverse_geometry.py`, `tests/montecarlo/test_spectrum_escape_helpers.py`, `tests/montecarlo/test_multilayer.py`, and `tests/montecarlo/test_chunk_invariance.py` with the finite/prism/layer selection: 22 passed.
-* `tests/montecarlo/test_montecarlo.py` finite-footprint/all-missed/omitted-footprint selection: 8 passed.
+* `tests/montecarlo/transport/test_finite_transverse_geometry.py`, `tests/montecarlo/spectrum/test_spectrum_escape_helpers.py`, `tests/montecarlo/transport/test_multilayer.py`, and `tests/montecarlo/spectrum/test_chunk_invariance.py` with the finite/prism/layer selection: 22 passed.
+* `tests/montecarlo/transport/test_montecarlo.py` finite-footprint/all-missed/omitted-footprint selection: 8 passed.
 * `tests/scan/test_sweep.py -k footprint`: 8 passed; and `tests/scan/test_run.py -k finite_footprint`: 3 passed.
 
 - **Filters**: units **pass**; limits **pass** (all-`None` legacy recovery, misses, lateral residence, and capped z-layer crossings); signs/conventions **pass** (forward minimum over exit-side faces, 0 on the exit face (#298), parallel-face exclusion, deterministic lowest-constant ties, and `exp(-tau)`).

@@ -180,7 +180,7 @@ def groove_profile_z(x_ang, spec):
 
     Apexes (``z = 0``) sit at ``x = k * spacing``; the valley floor is at the
     groove depth ``spec.depth_ang``. This is the SAME closed-form profile the
-    ``_z_surf`` helper in ``tests/montecarlo/test_groove.py`` evaluates (single geometric
+    ``_z_surf`` helper in ``tests/montecarlo/transport/test_groove.py`` evaluates (single geometric
     source: :mod:`pyrite.montecarlo.groove`), reused here only to DRAW the
     surface -- it introduces no new physics. numpy ufuncs only, so array input
     works elementwise."""

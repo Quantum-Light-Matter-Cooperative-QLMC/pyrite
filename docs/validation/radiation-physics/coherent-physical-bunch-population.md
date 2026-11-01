@@ -114,7 +114,7 @@ reference/thick runs must be repeated before production acceptance.
 ## Checks and status
 
 Status: **rederived**, following the independent review below.
-`tests/montecarlo/test_coherent_physical_population.py` checks the exact aligned
+`tests/montecarlo/coherent/test_coherent_physical_population.py` checks the exact aligned
 limit at fixed charge, unequal geometric and offset phases, the exact expectation
 of iid zero-mean fields by enumerating all small samples, missed entries,
 one-electron and insufficient-sample limits, refusal of negative power, detector

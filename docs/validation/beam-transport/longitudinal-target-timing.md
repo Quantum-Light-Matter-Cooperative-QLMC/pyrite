@@ -109,6 +109,6 @@ The implementation now names the inverse-angstrom quantity `k_gamma_inv_ang` and
 
 ## Anchor and verdict
 
-Anchor: `tests/montecarlo/test_longitudinal_profiles.py::test_target_timing_uses_pinned_basal_reflection_and_h_over_e`. Its four parameterized cases pass. The test pins reflection selection, independent absolute-energy values, $T=h/E_\gamma$, the `eta=0.9` form factor, and one-period spacing.
+Anchor: `tests/montecarlo/transport/test_longitudinal_profiles.py::test_target_timing_uses_pinned_basal_reflection_and_h_over_e`. Its four parameterized cases pass. The test pins reflection selection, independent absolute-energy values, $T=h/E_\gamma$, the `eta=0.9` form factor, and one-period spacing.
 
 **Verdict:** `rederived`. The implementation matches the independent derivation and four numeric campaign points, conditional on the approved positive reciprocal-harmonic branch. This verdict does not clear the upstream `line-energy-dispersion` sign discrepancy.

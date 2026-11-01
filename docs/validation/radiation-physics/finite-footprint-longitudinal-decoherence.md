@@ -123,12 +123,12 @@ policy or a transverse ensemble average.
 ## Numerical evidence and anchors
 
 - Existing CPU anchor:
-  `tests/montecarlo/test_coherent_emission.py::test_finite_footprint_partially_coherent_longitudinal_blend`.
+  `tests/montecarlo/coherent/test_coherent_emission.py::test_finite_footprint_partially_coherent_longitudinal_blend`.
   Passed independently (one selected test). It constructs flat and grouped
   reference spectra from decoherence-inactive calls retaining original finite
   positions and computes the Gaussian weight outside the implementation.
 - Existing CUDA anchor:
-  `tests/montecarlo/test_xray_dispersion_cuda.py::test_coherent_decoherence_gaussian_bunch_finite_footprint_uses_jit_blend`.
+  `tests/montecarlo/spectrum/test_xray_dispersion_cuda.py::test_coherent_decoherence_gaussian_bunch_finite_footprint_uses_jit_blend`.
   Inspected; not run. GPU evidence remains the owning task's responsibility.
 - An independent product Gauss-Hermite integral with 28 nodes per timing
   dimension checks three unequal complex fields against the closed expression

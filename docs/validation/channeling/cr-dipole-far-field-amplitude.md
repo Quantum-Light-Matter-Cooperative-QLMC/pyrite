@@ -84,7 +84,7 @@ Scratch oracle using SciPy quadrature and a direct boost of the rest-frame dipol
 | `far_field_maps` vs explicit $\sum_j\lvert\mathbf d_j\rvert^2\lvert E_s(\mathbf d_j)\rvert^2/(\gamma^2\operatorname{tr}C)$, 4 random complex $\mathbf d_j$, $\gamma=1.6,10.8,50$ | max difference $6.3\times10^{-16}$ of the peak; purity equals $\lambda_{\max}/\operatorname{tr}C$; phase equals that of `eigh`'s last eigenvector |
 | Pure $C=\mathbf d\mathbf d^\dagger$ | purity 1; phase map equals that of $\mathbf d$ up to a constant offset (spread $1.9\times10^{-14}$, offset 2.68 rad from the eigenvector gauge) |
 
-Anchor run: `uv run pyrite-dev test tests/montecarlo/test_channeling_axial_emission.py`, 10 passed and 1 slow test skipped.
+Anchor run: `uv run pyrite-dev test tests/montecarlo/quantum/test_channeling_axial_emission.py`, 10 passed and 1 slow test skipped.
 
 ## Diff against the implementation
 

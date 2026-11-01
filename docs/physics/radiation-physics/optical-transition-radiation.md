@@ -36,7 +36,7 @@ sharp interfaces, local isotropic nonmagnetic passive media
 $d^2N/dE\,d\Omega=E\,n_z^2|\sum_c\mathbf a_c|^2/(16\pi^4)$ photons/eV/sr per
 electron, summed over polarization.
 
-Limits pinned in `tests/montecarlo/test_transition_radiation_optical.py`: a
+Limits pinned in `tests/montecarlo/spectrum/test_transition_radiation_optical.py`: a
 matched medium ($\varepsilon=1$) and a vanishing film radiate nothing; a
 conductor $|\varepsilon|\to\infty$ at normal incidence gives the backward
 Ginzburg–Frank form
@@ -51,7 +51,7 @@ hemisphere-integrated TR probability of 30 keV electrons on gold with
 Johnson–Christy constants (their Fig. 3). With the pinned Johnson–Christy
 record (`gold_johnson_christy_response`), the normalized spectral shape agrees
 within 0.006 over 600–900 nm and within 0.04 over the 375–550 nm interband
-region, with the dip at 485 nm (`tests/montecarlo/test_transition_radiation_optical_anchor.py`).
+region, with the dip at 485 nm (`tests/montecarlo/spectrum/test_transition_radiation_optical_anchor.py`).
 The published absolute curve is a constant $0.696\pm0.003$ of this hemisphere
 integral over 600–900 nm. That factor is unresolved: it is not a kinematic or
 optics difference that changes shape; it may be a collection or
@@ -114,7 +114,7 @@ except as an explicit realization. Microbunched sources enter as `empirical`
 profiles with their modulation resolved, or as `sampled` histories drawn from
 the modulated density; a smooth Gaussian is not evidence of microbunching.
 
-**Limits** (`tests/montecarlo/test_transition_radiation_optical.py`): $N=1$
+**Limits** (`tests/montecarlo/spectrum/test_transition_radiation_optical.py`): $N=1$
 keeps the self term only; $F\to0$ gives $I_1$ and $F=1$ (in-phase histories)
 $N I_1$ per electron; the yield at fixed charge is the same for $M=2,5,17$;
 sampled Gaussian offsets reproduce the analytic law within the pair-estimate

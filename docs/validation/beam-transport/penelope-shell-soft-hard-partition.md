@@ -104,7 +104,7 @@ cutoff condenses losses above $U_i$.
 - Catalog Si, SiO₂ and MoS₂ at 1, 10 and 100 keV with $W_c=10$, 50 and
   1000 eV reproduce `stp.dat` ($10^{-12}$). At each cutoff, explicit and
   condensed inner rates sum to the EEDL-substituted rates.
-- Tests: `tests/montecarlo/test_shell_partition.py`.
+- Tests: `tests/montecarlo/collisions/test_shell_partition.py`.
 
 ## Diagnostics
 

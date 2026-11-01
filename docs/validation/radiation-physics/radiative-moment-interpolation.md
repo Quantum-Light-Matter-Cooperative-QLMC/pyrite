@@ -403,7 +403,7 @@ component module passes in 8.56 s. The analytic constant-SDCS calculation
 above is retained as a regression anchor.
 
 Final focused rerun, explicitly including the four slow parametrizations:
-`pyrite-dev test --slow tests/montecarlo/test_radiative_moments.py tests/dev/test_docs.py`:
+`pyrite-dev test --slow tests/montecarlo/cascades/test_radiative_moments.py tests/dev/test_docs.py`:
 19 passed in 7.17 s. This includes the retained
 `test_constant_sdcs_against_analytic_moments` anchor for both suppression
 settings. The author owns the complete docs build and rendered-math check.

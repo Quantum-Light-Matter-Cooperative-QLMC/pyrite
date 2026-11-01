@@ -1,6 +1,6 @@
 # `energy-loss-straggling`
 
-Ledger row: [`energy-loss-straggling`](../ledger-transport-background.md#energy-loss-straggling). Code: `montecarlo/transport/straggling.py::_urban_levels_scalar`, `::_urban_channels_scalar`, `::_urban_moments_element_scalar`, `::_urban_poisson_scalar`, `::_urban_ionisation_keV`, `::_urban_sample_element_keV`, `::_urban_sample_compound_keV`, `::urban_element_table`, `::urban_loss_moments_keV`; `montecarlo/transport/api.py::simulate_trajectories`. Anchors: `tests/montecarlo/test_energy_loss_straggling.py` (134 cases), the straggling transport/RNG/core tests, and `checks/energy_loss_straggling_observables.py`. Source: Geant4 Physics Reference Manual, *Energy loss fluctuations* (Urban model, `G4UniversalFluctuation`), after Bichsel's thin-detector treatment{cite:p}`geant4prm,bichsel1988`.
+Ledger row: [`energy-loss-straggling`](../ledger-transport-background.md#energy-loss-straggling). Code: `montecarlo/transport/straggling.py::_urban_levels_scalar`, `::_urban_channels_scalar`, `::_urban_moments_element_scalar`, `::_urban_poisson_scalar`, `::_urban_ionisation_keV`, `::_urban_sample_element_keV`, `::_urban_sample_compound_keV`, `::urban_element_table`, `::urban_loss_moments_keV`; `montecarlo/transport/api.py::simulate_trajectories`. Anchors: `tests/montecarlo/collisions/test_energy_loss_straggling.py` (134 cases), the straggling transport/RNG/core tests, and `checks/energy_loss_straggling_observables.py`. Source: Geant4 Physics Reference Manual, *Energy loss fluctuations* (Urban model, `G4UniversalFluctuation`), after Bichsel's thin-detector treatment{cite:p}`geant4prm,bichsel1988`.
 
 `Validation: energy-loss-straggling`
 
@@ -328,14 +328,14 @@ Limits:
 
 **Guards (item 6).** `api.py` still raises `NotImplementedError` for `transport_core="cuda"` with the LUT enabled and `shell_mode`. The runner sets `exact_only = inelastic_model is not None` and still forces `TransportLUTConfig(enabled=False)` for shell runs. `test_straggling_surface.py::test_runner_falls_back_from_cuda_lut_to_exact_for_straggled_shell_mode` covers this, and `test_straggling_cuda.py::test_straggled_production_case_keeps_the_cuda_lut` covers the converse. Both pass on CPU.
 
-**LUT error separation (item 5).** The ledger note, `electron-transport.md` and the walkthrough all state the same thing: LUT interpolation enters only the cap, clock, hazard and, under SBETHE, the stopping scale. They state it is bounded separately from substep convergence. This matches the code: the sampled law reads exact tables and only $\kappa$ reads the LUT. `tests/montecarlo/test_transport_lut.py` exists and bounds `dEds` at `rtol=5e-5` and the rate and $\beta^{-1}$ at $10^{-5}$.
+**LUT error separation (item 5).** The ledger note, `electron-transport.md` and the walkthrough all state the same thing: LUT interpolation enters only the cap, clock, hazard and, under SBETHE, the stopping scale. They state it is bounded separately from substep convergence. This matches the code: the sampled law reads exact tables and only $\kappa$ reads the LUT. `tests/montecarlo/transport/test_transport_lut.py` exists and bounds `dEds` at `rtol=5e-5` and the rate and $\beta^{-1}$ at $10^{-5}$.
 
 ### Findings (#280 scope)
 
 | # | finding | severity |
 |---|---|---|
 | L1 | Under non-SBETHE stopping, the cap uses $S_{\rm LUT}$ while the sampled mean uses $\sum_iC_i$, so `max_dE_frac` bounds the LUT mean, not the realized mean. The relative mismatch is at most $5\times10^{-5}$, and the CPU LUT core behaves the same way. | informational |
-| L2 | The ledger note says the LUT error is "bounded separately by the transport-LUT tests" but does not name `tests/montecarlo/test_transport_lut.py`, and the Anchor field omits that file. | anchor citation gap |
+| L2 | The ledger note says the LUT error is "bounded separately by the transport-LUT tests" but does not name `tests/montecarlo/transport/test_transport_lut.py`, and the Anchor field omits that file. | anchor citation gap |
 | L3 | "`straggling=False` LUT output digests are identical to the pre-change kernel" is a one-off hardware observation. The committed `test_cuda_lut_straggling_off_is_bit_for_bit` compares default with explicit-off on the same build, not with the pre-change kernel. Likewise, no committed test asserts bit-identity of the exact kernel's straggled path across the extraction. Code reading shows both are behaviour-preserving. | anchor gap, minor |
 | L4 | The LUT first-row parity test compares `E_end_keV` for the two midpoint cases, which anchors the applied straggled loss on the LUT kernel. The frozen case still compares only the row-start `E_keV`. | partial closure of finding 11 for the LUT kernel |
 | L5 | The hardware tests (`@pytest.mark.hardware`) were not run in this context because no CUDA device is available. The verdict relies on code comparison and the recorded RTX 5080 run. | provenance note |

@@ -89,7 +89,7 @@ The scripts live in the session scratchpad (`validate-splitstep/{check,bigtilt,p
 | Strang with a tilt of $(4,-2.5)$ mrad, a non-separable $U$, and non-uniform $W$ on a $16^2$ grid, against $\exp(-iHz/\hbar v)$ (dense `expm`) at $z=1000$ Å | $L^2$ error $8.5\times10^{-4}$, $2.1\times10^{-4}$, $5.2\times10^{-5}$, $1.3\times10^{-5}$ for $\Delta z=10,5,2.5,1.25$ Å (ratios 4.04, 4.01, 4.00) |
 | $W=0$ norm after 5000 Å | $1+1.3\times10^{-13}$ |
 | $dN/dz$ for non-uniform $W$, against $-\frac2{\hbar v}\int W\lvert\phi\rvert^2$ | $-3.137876\times10^{-4}$ against $-3.137876\times10^{-4}$ Å⁻¹ |
-| Ledger anchor suite (`pyrite-dev test --slow tests/montecarlo/test_channeling_axial.py`) | 17 passed (35.5 s) |
+| Ledger anchor suite (`pyrite-dev test --slow tests/montecarlo/quantum/test_channeling_axial.py`) | 17 passed (35.5 s) |
 
 The anchor tests independently reproduce the §4 closed forms. The Airy test uses $\xi=z/kx_0^2$ and eq. 4 as derived above. The LG test uses the curvature $+kr^2z/2(z^2+z_R^2)$ and the Gouy phase $-(2p+\lvert\ell\rvert+1)\arctan(z/z_R)$. Both are single free-space steps. Since $V=1$ there, they exercise only the kinetic symbol at $\mathbf k_t=0$. The tilted-Gaussian check above covers $\mathbf k_t\neq0$.
 

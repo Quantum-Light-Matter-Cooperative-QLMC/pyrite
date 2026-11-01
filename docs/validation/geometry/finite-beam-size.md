@@ -53,7 +53,7 @@ This is now an explicit model boundary. A finite footprint consumes transverse p
 
 ## 3. Limiting case: `beam_fwhm_mm = None` vs `0.0`
 
-`if beam_fwhm_mm:` — Python falsiness: `None` is falsy, `0.0` is falsy (`bool(0.0) is False`), any nonzero float is truthy. So both `None` and `0.0` skip the block entirely — no RNG draw happens for either (not even a zero-variance draw that would still advance `beam_rng`, which doesn't matter here since `beam_rng` is independent, but it does mean the falsy-zero case is truly a no-op path, not a "draw with σ=0" path). Confirmed by inspection and by `tests/montecarlo/test_montecarlo.py::test_beam_fwhm_mm_zero_and_none_are_equivalent`, which asserts `np.array_equal(none_segs["r_mid"], zero_segs["r_mid"])` — this is a real bit-for-bit check on the actual output array, not just a code-path inspection, and it passed.
+`if beam_fwhm_mm:` — Python falsiness: `None` is falsy, `0.0` is falsy (`bool(0.0) is False`), any nonzero float is truthy. So both `None` and `0.0` skip the block entirely — no RNG draw happens for either (not even a zero-variance draw that would still advance `beam_rng`, which doesn't matter here since `beam_rng` is independent, but it does mean the falsy-zero case is truly a no-op path, not a "draw with σ=0" path). Confirmed by inspection and by `tests/montecarlo/transport/test_montecarlo.py::test_beam_fwhm_mm_zero_and_none_are_equivalent`, which asserts `np.array_equal(none_segs["r_mid"], zero_segs["r_mid"])` — this is a real bit-for-bit check on the actual output array, not just a code-path inspection, and it passed.
 
 Design judgment: falsy-zero is a deliberate and reasonable choice here (0 mm FWHM is physically a point source, so identifying it with `None` is correct), not an oversight — though it is worth noting for the record that this means a caller cannot pass a distinct sentinel to force "draw with σ=0" vs "skip the branch"; the two are indistinguishable, but since they're mathematically identical (delta function either way) this has no physical consequence.
 
@@ -103,11 +103,11 @@ Matches the formula to <0.5% at N=100,000 (independent draw, different seed and 
 Ran on `feature/finite-electron-beam-size` (already checked out, matches described branch):
 
 ```
-pyrite-dev test tests/montecarlo/test_montecarlo.py -k beam_fwhm -v
+pyrite-dev test tests/montecarlo/transport/test_montecarlo.py -k beam_fwhm -v
 ...4 passed in 1.50s
 ```
 
-Read all four test bodies (`tests/montecarlo/test_montecarlo.py` lines 69–137):
+Read all four test bodies (`tests/montecarlo/transport/test_montecarlo.py` lines 69–137):
 
 - `test_beam_fwhm_mm_zero_and_none_are_equivalent` — asserts `np.array_equal(none_segs["r_mid"], zero_segs["r_mid"])`. Directly tests the falsy-zero claim on the real output array. ✓ does what it says.
 - `test_beam_fwhm_mm_offsets_transverse_position_only` — asserts every non-positional output (`E_keV`, `v_hat`, `L_ang`, `t_ang`, `elec_id`, `layer`, backscatter/transmit/stopped counts) is bit-for-bit identical between `beam_fwhm_mm=None` and `beam_fwhm_mm=1.0` runs at the same seed, that `r_mid[:, 2]` (depth) is untouched, and that the `r_mid[:, :2]` difference is a single constant vector per `elec_id` (not just per electron's first segment — checked across every segment that electron emits, via the per-electron-offset dict built while iterating all segments). This is exactly the RNG-independence + rigid-translation claim, tested against the real code path (not a toy reimplementation). ✓ does what it says.
@@ -126,7 +126,7 @@ All four tests pass and are not misleadingly named — they test what their name
 
 ## Adjudication
 
-No discrepancy was found for the beam-size claim in its corrected scope: the unit/FWHM conversions are correct, the falsy-zero limiting case is intentional and verified bit-for-bit, and the RNG-independence design is correctly implemented and independently confirmed (spawned `SeedSequence` child ⇒ genuinely uncorrelated, non-state-sharing `Generator`). For an all-`None` footprint, a nonzero `beam_fwhm_mm` remains a no-op on the emitted spectrum by construction. The existing regression tests (`tests/montecarlo/test_montecarlo.py::test_beam_fwhm_mm_*`, 4/4 passing) genuinely exercise these beam-size claims against the real code path, not a reimplementation.
+No discrepancy was found for the beam-size claim in its corrected scope: the unit/FWHM conversions are correct, the falsy-zero limiting case is intentional and verified bit-for-bit, and the RNG-independence design is correctly implemented and independently confirmed (spawned `SeedSequence` child ⇒ genuinely uncorrelated, non-state-sharing `Generator`). For an all-`None` footprint, a nonzero `beam_fwhm_mm` remains a no-op on the emitted spectrum by construction. The existing regression tests (`tests/montecarlo/transport/test_montecarlo.py::test_beam_fwhm_mm_*`, 4/4 passing) genuinely exercise these beam-size claims against the real code path, not a reimplementation.
 
 This adjudication does **not** extend to finite transverse dimensions. In that model, beam position changes missed incidence and lateral transport, while the spectra use the nearest of six escape faces; those claims remain `unverified` under `finite-transverse-crystal` pending an independent fresh context write-up.
 

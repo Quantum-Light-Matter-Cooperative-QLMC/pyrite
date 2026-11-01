@@ -128,7 +128,7 @@ LADDER_REFERENCE = 1.25e-3
 
 BREM_GRID = np.linspace(1.0e3, 3.0e4, 501)
 # hopg (0,0,2) at the kernel's DEFAULT 119 deg take-off, not the near-grazing
-# ``n_hat=(1,0,0.01)`` of tests/montecarlo/test_coherent_emission.py.  At
+# ``n_hat=(1,0,0.01)`` of tests/montecarlo/coherent/test_coherent_emission.py.  At
 # n_z = 0.01 the Beer--Lambert escape path is 100x the depth, so a flight's own
 # escape factor swings by ~2x between its endpoints and merely SPLITTING rows
 # (at frozen energy, where the coherent sum is an exact identity) moves the

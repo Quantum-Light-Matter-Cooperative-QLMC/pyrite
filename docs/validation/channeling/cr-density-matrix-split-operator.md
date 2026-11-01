@@ -118,7 +118,7 @@ The solver converges at second order to an independently integrated sink model. 
 
 **5. Pauli rates.** `rate_matrix` agrees with $W$ and $\Gamma$ from my dense $J$ and $D$ on the 17 $S$ states to $2.6\times10^{-15}$ relative. Every column satisfies $\sum_{n'}W_{n'n}\le\Gamma_n$; the minimum slack is 3.8%, which is overflow plus free. For the dephasing-limit trend I integrated $dP/dz=(W-\Gamma)P$ with my own matrices from the diagonal of a $\sigma=1$ mrad entry. I compared it with the solver at a fixed scattering dose ($z=5000\ {\rm \AA}/s$). The maximum population error relative to $\max P$ is $2.4\times10^{-3}$, $3.0\times10^{-4}$ and $4.8\times10^{-5}$ for kernel scales $s=1$, $0.1$ and $0.03$. It vanishes as the scattering weakens relative to dephasing.
 
-**6. Repository tests.** `tests/montecarlo/test_channeling_density.py` and `test_channeling_mcwf.py`: 13 passed.
+**6. Repository tests.** `tests/montecarlo/quantum/test_channeling_density.py` and `test_channeling_mcwf.py`: 13 passed.
 
 ## Findings
 

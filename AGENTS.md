@@ -95,7 +95,7 @@ not simulation tests.
 
 | Changed surface | Smallest useful coverage; widen only if affected |
 |---|---|
-| Flight integration, beam/RNG, geometry | Matching `tests/montecarlo/test_*.py`; add affected runner/segment/spectrum consumers when event or trajectory contracts change. Broader: `transport`. |
+| Flight integration, beam/RNG, geometry | Matching `tests/montecarlo/transport/` modules; add affected runner/segment/spectrum consumers when event or trajectory contracts change. Broader: `transport`. |
 | Collision/stopping/straggling physics | Matching atomic, shell, elastic or stopping tests. Broader: `transport-collisions`; radiative flights, secondaries, pair/positron cascades: `transport-cascades`. |
 | Runner/resource/trajectory plumbing | Matching adaptive/block/dispatch/artifact tests. Broader: `transport-runner`. |
 | Radiation scoring/reduction | Matching spectrum tests; add affected grid/result consumers for changed grid/shape/normalization contracts. Broader: `spectrum` for shared/incoherent CXR, `spectrum-coherent` for coherent/temporal, `spectrum-brem` for bremsstrahlung. These are disjoint, not aggregates. |
@@ -104,7 +104,7 @@ not simulation tests.
 | Energy-grid policy/artifacts | Matching `tests/energy-grid/` modules and affected spectrum consumers. Broader: `energy-grid`; CLI wiring stays in `cli`. |
 | Catalog/materials/tables | Matching `tests/materials/` or `tests/xsgen/` modules; use `regen-golden` only for authorized catalog changes and check affected grid/transport consumers. Broader: `materials`/`xsgen`. |
 | CLI or app | Affected command/app module, plus owning domain tests only if underlying behavior changed. Broader: `cli`/`apps`. |
-| Checkpoints/results/instrument/API | Matching modules under `tests/checkpoint/`, `results/`, `observations/`, `detectors/`, `instrument/`, or `scan/`; add concrete serialization/public callers, not all of `core`. |
+| Checkpoints/results/instrument/API | Matching modules under `tests/checkpoint/`, `results/`, `observations/`, `detectors/`, `instrument/`, `campaign/`, or `scan/`; add concrete serialization/public callers, not all of `core`. |
 | Developer runner/suite ownership | `tests/dev/test_dev_cli.py`; packaging/import changes add corresponding public export/package tests. Broader: `packaging`. |
 
 Select slow tests explicitly by node ID, or put `--slow` before test paths;

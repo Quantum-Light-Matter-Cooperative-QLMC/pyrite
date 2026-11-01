@@ -69,7 +69,7 @@ Each own-field term varies as $e^{iqz}$ with $q=(\omega-\mathbf k_\parallel\cdot
 4. Hypotheses for the 0.696 factor that change the shape and are therefore excluded: polar caps at 60–85°; $\cos\theta$ weighting; non-relativistic $\beta$ (ratio 0.637); 15–25 keV beams (ratio drifts by 5% across the band). The paper's own band integral (about $10^{-4}$) and its measured photon rate (3.9e6/s against about 4e6/s expected) are consistent with its lower scale, within loose mirror/reflection/QE estimates.
 5. Angular peaks: per steradian 54.8° (400 nm) and 65.8° (900 nm); $\sin\theta$-weighted 59.6° and 68.7°. A rough re-digitization of the measured Fig. 4c lobes gives about 58.5° and 65.5°, consistent with neither convention at both wavelengths.
 
-`tests/montecarlo/test_transition_radiation_optical.py` and `test_transition_radiation_optical_anchor.py`: 23 passed at the frozen revision.
+`tests/montecarlo/spectrum/test_transition_radiation_optical.py` and `test_transition_radiation_optical_anchor.py`: 23 passed at the frozen revision.
 
 ## Adjudication
 

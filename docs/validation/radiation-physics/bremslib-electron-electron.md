@@ -117,7 +117,7 @@ All match. Two printed values for $Z=47$ are misprints. At 5 MeV, $x=0.10$ is pr
 
 `prepare_bremslib_table` calls the factor after both refinements, evaluated at the staged nodes with the last node at `top_reduced_energy`. It multiplies the SDCS by `factor` and the DDCS by `factor[..., None]`. A per-node scalar preserves the angular normalization. With `electron_electron=False` the product is skipped.
 
-Symbolic comparison: every term matches. The factor is $1+\eta/Z$ with $Z$ to the first power, $\eta$ is used rather than $\bar\eta$ at each node, and the $g$ shape is identical. The interpolation axes ($\ln Z$, $\ln T$, linear $x$) match the ledger. The anchor tests `tests/montecarlo/test_bremsstrahlung_electron_electron.py` and the electron/sub-node nodes in `test_bremsstrahlung_bremslib.py` pass locally (8 passed).
+Symbolic comparison: every term matches. The factor is $1+\eta/Z$ with $Z$ to the first power, $\eta$ is used rather than $\bar\eta$ at each node, and the $g$ shape is identical. The interpolation axes ($\ln Z$, $\ln T$, linear $x$) match the ledger. The anchor tests `tests/montecarlo/brem/test_bremsstrahlung_electron_electron.py` and the electron/sub-node nodes in `test_bremsstrahlung_bremslib.py` pass locally (8 passed).
 
 ## Findings (wording only; no divergent factor)
 

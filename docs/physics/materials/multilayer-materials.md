@@ -103,9 +103,9 @@ The material run key is the CLI/checkpoint name; the film crystal key drives cry
 
 ## Invariants
 
-- A one-layer stack reproduces the single-material `spec`/`brem` bit-for-bit; mosaic, tilt, and checkpoint paths are unchanged (`checks/multilayer_check.py`, `tests/montecarlo/test_multilayer.py`).
+- A one-layer stack reproduces the single-material `spec`/`brem` bit-for-bit; mosaic, tilt, and checkpoint paths are unchanged (`checks/multilayer_check.py`, `tests/montecarlo/transport/test_multilayer.py`).
 - An amorphous substrate adds no lines. On a front (high-flux) exit it does not attenuate film segments, so the result equals the film-only spectrum bit-for-bit (`checks/multilayer_slice3_check.py`, `checks/multilayer_check.py`).
 - With a crystalline substrate, the pipeline spectrum equals the per-layer incoherent sum exactly.
-- The integrated film-line flux ratio with versus without substrate equals `exp(−μ_sub(E)·t_sub/|n̂_z|)` evaluated at the line's resonance energy `E_res`. The per-segment identity `τ_stack − τ_film = μ_sub·t_sub/|n̂_z|` is pinned in `tests/montecarlo/test_multilayer.py::test_stack_tau_back_exit_substrate_closed_form`.
+- The integrated film-line flux ratio with versus without substrate equals `exp(−μ_sub(E)·t_sub/|n̂_z|)` evaluated at the line's resonance energy `E_res`. The per-segment identity `τ_stack − τ_film = μ_sub·t_sub/|n̂_z|` is pinned in `tests/montecarlo/transport/test_multilayer.py::test_stack_tau_back_exit_substrate_closed_form`.
 - The depth-dose centroid and maximum penetration follow Kanaya–Okayama scaling: `z_max ≈ R_KO`, `E^1.67` with energy, and `A/(Z^0.889 ρ)` with material (`checks/multilayer_validation_check.py`).
 - Positive tilt points the entrance-face normal toward the detector (front exit), leaving film lines unattenuated by the substrate. Negative tilt is the back-exit geometry, where the substrate attenuates film lines more as the exit path lengthens.

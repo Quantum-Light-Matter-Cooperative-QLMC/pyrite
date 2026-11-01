@@ -9,7 +9,7 @@ This is an EVALUATION-ORDER claim, not a new equation. What you must independent
 1. The complex amplitude built in step 5c on the (n_block, N_g) grid is term-for-term the same expression the per-hkl coherent path builds in the `_accumulate` loop (the legacy path, reached when groove/layers/sinc_cutoff are set). Compare the two expression trees directly.
 2. `|Sum_j|^2` is taken PER (reflection, mosaic orientation) row in step 7c, so reflections and mosaic orientations remain INCOHERENT while the segment sum inside a row keeps its phase. Confirm no g-mixing occurs before the square. Pay attention to the g-major flatten/compaction (`gm`, `coh_counts`, `starts`) — confirm each row's slice really contains only that row's segments.
 3. The phase, escape/absorption factor, sinc width, and mosaic weight applied in 7c match the legacy path's.
-4. Limiting cases: single segment coherent == incoherent self-term; N^2 in-phase build-up; on-resonance phase cancellation. tests/montecarlo/test_coherent_emission.py.
+4. Limiting cases: single segment coherent == incoherent self-term; N^2 in-phase build-up; on-resonance phase cancellation. tests/montecarlo/coherent/test_coherent_emission.py.
 
 Do NOT modify the implementation. Do not mark the row signed-off (human only). Report: whether the claim holds, any discrepancy, and the status you think it warrants.
 

@@ -321,7 +321,7 @@ dominant oscillator at $(q_x,q_y)=(0.03,0.02)$ Å⁻¹ equals
 $\text{radial}_k\cdot f_k(t)/\bar f_k$, with $t$ computed independently from
 $(\hat{\mathbf c}\cdot\mathbf q)^2/q^2$, to machine precision.
 
-`pyrite-dev test tests/montecarlo/test_channeling_directional.py`: 14 passed.
+`pyrite-dev test tests/montecarlo/channeling/test_channeling_directional.py`: 14 passed.
 
 ## Findings
 

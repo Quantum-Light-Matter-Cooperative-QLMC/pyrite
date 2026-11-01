@@ -77,8 +77,8 @@ These should stay at float-rounding scale and are covered by the existing `coher
 Run at minimum:
 
 ```text
-pyrite-dev test tests/montecarlo/test_coherent_emission.py
-pyrite-dev test tests/montecarlo/test_chunk_invariance.py
+pyrite-dev test tests/montecarlo/coherent/test_coherent_emission.py
+pyrite-dev test tests/montecarlo/spectrum/test_chunk_invariance.py
 ```
 
 The updated coherent tests include:

@@ -83,4 +83,4 @@ The verifier made two findings, now fixed. The physics page understated the fit-
 
 Status `rederived`. The measured-data comparison completes #92 plan item 3 within the thin-target scope above; it does not validate thick-target transport or remove the stated experimental discrepancies. Only a human may mark this row signed off.
 
-Anchors: `tests/montecarlo/test_bote_salvat_backend.py`, `tests/montecarlo/test_shell_ionization_model_selection.py`, `tests/montecarlo/test_inner_shell_experiment.py`; report `checks/inner_shell_experiment_comparison.py`.
+Anchors: `tests/montecarlo/transport/test_bote_salvat_backend.py`, `tests/montecarlo/collisions/test_shell_ionization_model_selection.py`, `tests/montecarlo/transport/test_inner_shell_experiment.py`; report `checks/inner_shell_experiment_comparison.py`.

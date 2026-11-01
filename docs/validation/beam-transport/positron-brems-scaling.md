@@ -52,7 +52,7 @@ s_iZ_i^2/\sum_is_i$ (`ZBR2`, line 2793).
   integrated field, so the radiative stopping, straggling, hard rate and
   photon/angle shapes derived from these arrays are all $F_p$-scaled
   consistently. The `+positron-fp` key suffix keeps run identity distinct.
-- **Tests.** `tests/montecarlo/test_positron_brems.py` passes.
+- **Tests.** `tests/montecarlo/brem/test_positron_brems.py` passes.
 
 ## Documented deviations (accepted, not discrepancies)
 

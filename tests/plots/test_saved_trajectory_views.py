@@ -10,7 +10,7 @@ from pyrite.plots import _frames
 from pyrite.plots.altair.trajectories import penetration_survival_chart, trajectory_chart
 from pyrite.plots.altair.trajectory_summary import summary_charts
 from pyrite.plots.plotly.trajectories import trajectory_volume_data, trajectory_volume_figure
-from tests.montecarlo.test_trajectory_summary import CASE, summary, transport
+from tests.montecarlo.runner.test_trajectory_summary import CASE, summary, transport
 
 
 @pytest.fixture

@@ -16,7 +16,7 @@ from pyrite.cli.commands import scan as scan_cli
 from pyrite.materials import MaterialConfigError, load_material_catalog
 from pyrite.runs import scan
 from tests.materials.test_material_catalog import _minimal_catalog
-from tests.montecarlo.test_gdf import fields, write_gdf
+from tests.montecarlo.transport.test_gdf import fields, write_gdf
 
 
 @pytest.fixture

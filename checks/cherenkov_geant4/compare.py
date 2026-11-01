@@ -5,7 +5,7 @@
 reduce DIR`` turns the raw ``*.steps``/``*.hist`` outputs into
 ``reference/<case>.json``: the photon energy and polar-angle histograms and
 the primary path length grouped by step-mean beta. The comparison with
-``frank_tamm_yield`` is ``tests/montecarlo/test_cherenkov_geant4_reference.py``.
+``frank_tamm_yield`` is ``tests/montecarlo/spectrum/test_cherenkov_geant4_reference.py``.
 """
 
 import json

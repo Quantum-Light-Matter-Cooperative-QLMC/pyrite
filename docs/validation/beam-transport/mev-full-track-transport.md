@@ -95,7 +95,7 @@ Units, limits and conventions pass.
 `_mean_se` (with `ddof=1`), the delta-method rms error `se_sq / (2 rms)`,
 `np.hypot` for the combined σ, and the gate `max(0.05 |b|, 3 sigma)`.
 Photon sums use `np.bincount(..., minlength=n)`, so primaries without photons
-count as zero. `tests/montecarlo/test_mev_full_track.py::_gate` is the same
+count as zero. `tests/montecarlo/transport/test_mev_full_track.py::_gate` is the same
 expression.
 
 Sameness of the two sides:
@@ -131,7 +131,7 @@ observables pass. The two failures are θ_rms for W 50 MeV
 **16 of 16** pass (θ_rms 0.981, $z=-1.3$, and 0.988, $z=-0.5$; θ_mean 0.998
 and 0.999). Every ratio quoted in the ledger and README agrees to the printed
 precision; the W 3 MeV transmitted loss is 1.0265, which rounds to 1.026 or
-1.027. Running `pyrite-dev test --slow tests/montecarlo/test_mev_full_track.py`
+1.027. Running `pyrite-dev test --slow tests/montecarlo/transport/test_mev_full_track.py`
 (capped at 8 GB) gave 14 passed in 43 s: the 10 committed-reduction cases,
 2 control cases, and the 2 slow 300-primary reruns at 22 s each.
 

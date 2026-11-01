@@ -112,11 +112,11 @@ matches `Phi_j = omega(E) d_j - g.r_j - delta(E) omega(E) L_esc,j` term for term
 
 The GPU raw-kernel routes reproduce the same term: `coherent_jit_kernel.py::run_coherent_reduction_kernel` and `coherent_stream_jit_kernel.py::run_coherent_field_accumulation_kernel` both take an optional `(L_esc, delta_omega)` pair and apply `phase = phase_slope*E - g_phase - L_esc[seg]*delta_omega[E]` (see `coherent_stream_jit_kernel.py` around lines 347-357, 464-475), i.e. the same per-segment-scalar times per-energy-table product derived above, gated identically to `None` under the vacuum model so that model stays bit-for-bit.
 
-Numerically: `tests/montecarlo/test_xray_dispersion.py` (hopg 002, 100 keV, theta_obs=119 deg) reports the two-segment relative phase `-delta(E) omega(E)(z1-z2)/(-n_hat_z) = +1.588643 rad`, matching the derived closed form to 5.7e-13 rad (float64 rounding) — reran locally:
+Numerically: `tests/montecarlo/spectrum/test_xray_dispersion.py` (hopg 002, 100 keV, theta_obs=119 deg) reports the two-segment relative phase `-delta(E) omega(E)(z1-z2)/(-n_hat_z) = +1.588643 rad`, matching the derived closed form to 5.7e-13 rad (float64 rounding) — reran locally:
 
 ```
 pyrite-dev test \
-    tests/montecarlo/test_xray_dispersion.py -k "phase or escape or coherent"
+    tests/montecarlo/spectrum/test_xray_dispersion.py -k "phase or escape or coherent"
 # 6 passed, 10 deselected
 ```
 
@@ -136,7 +136,7 @@ _use_jit_coherent_stream = (
 )
 ```
 
-no longer excludes `xray_dispersion="refractive"`; when active it passes `n_re_tab=n_re_tab_g` (`None` under vacuum) into the prologue kernel and `L_esc=...`, `delta_omega=delta_omega_grid` into `run_coherent_field_accumulation_kernel` unconditionally alongside the non-streaming reduction path. `tests/montecarlo/test_xray_dispersion_cuda.py` carries CUDA-gated tests exercising exactly this (`test_prologue_solves_the_in_medium_resonance`, `test_stream_field_kernel_carries_the_in_medium_phase`). So as of this verification, **both** GPU coherent routes (`coherent_jit_kernel.py`'s reduction kernel and `coherent_stream_jit_kernel.py`'s streaming kernel) carry the propagation phase under `xray_dispersion="refractive"`; only the prose in this ledger row's notes column needs updating (the physics term itself is unaffected by which kernel launches it).
+no longer excludes `xray_dispersion="refractive"`; when active it passes `n_re_tab=n_re_tab_g` (`None` under vacuum) into the prologue kernel and `L_esc=...`, `delta_omega=delta_omega_grid` into `run_coherent_field_accumulation_kernel` unconditionally alongside the non-streaming reduction path. `tests/montecarlo/spectrum/test_xray_dispersion_cuda.py` carries CUDA-gated tests exercising exactly this (`test_prologue_solves_the_in_medium_resonance`, `test_stream_field_kernel_carries_the_in_medium_phase`). So as of this verification, **both** GPU coherent routes (`coherent_jit_kernel.py`'s reduction kernel and `coherent_stream_jit_kernel.py`'s streaming kernel) carry the propagation phase under `xray_dispersion="refractive"`; only the prose in this ledger row's notes column needs updating (the physics term itself is unaffected by which kernel launches it).
 
 ## Verdict
 

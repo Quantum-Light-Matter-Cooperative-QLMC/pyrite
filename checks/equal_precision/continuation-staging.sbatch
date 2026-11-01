@@ -26,8 +26,8 @@ run_in() {  # dir stem args...
 }
 for dir in "$BR" "$MAIN"; do ( cd "$dir" && PYRITE_HOME="$dir" PYRITE_CATALOG="$dir/src/pyrite/data/catalog" PYRITE_USER_CATALOG="$dir/user-catalog" uv run --no-sync python "$BR/checks/equal_precision/prepare_stopping.py" > "$out/tables-$(basename $dir).json" ); done
 ( export PYRITE_HOME="$BR" PYRITE_CATALOG="$BR/src/pyrite/data/catalog" PYRITE_USER_CATALOG="$BR/user-catalog" &&
-  uv run --no-sync pyrite-dev test tests/montecarlo/test_transport_continuation_cuda.py \
-  tests/montecarlo/test_transport_continuation.py ) > "$out/tests.log" 2>&1 && echo "DONE tests" || echo "FAILED tests"
+  uv run --no-sync pyrite-dev test tests/montecarlo/transport/test_transport_continuation_cuda.py \
+  tests/montecarlo/transport/test_transport_continuation.py ) > "$out/tests.log" 2>&1 && echo "DONE tests" || echo "FAILED tests"
 # Host vs device staging of retained rows, matched and sustained populations.
 P20=learned32-B5000,cont-Q256-A5000-T32,cont-Q256-A5000-T32-D,cont-Q256-Aall-T32-D
 R20=cont-Q256-Aall-T32-D,cont-Q256-A5000-T32-D,cont-Q256-A5000-T32,learned32-B5000

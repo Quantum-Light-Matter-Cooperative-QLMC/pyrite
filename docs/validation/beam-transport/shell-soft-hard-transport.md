@@ -33,7 +33,7 @@ In `cores.py`, independent negative logarithms initiate elastic and hard optical
 
 In `hard_inelastic.py` and `_jit_shell_device.py`, the soft sampler's case boundaries are $m^2>9v$ and $m^2>3v$. Its uniform half-width is $\sqrt{3v}$; its final branch has `weight` $=(3v-m^2)/(3v+3m^2)=a$ and `top` $=3(v+m^2)/(2m)=w_0$. Both implementations return $m$ when $v=0$ and zero when $m\leq0$. The symmetric Gaussian branch uses the documented width correction and rejects draws beyond three target standard deviations. There is no divergent factor, sign, or exponent in these inspected terms.
 
-The focused CPU anchor `tests/montecarlo/test_shell_soft_hard_transport.py` passed 19/19 tests on 2026-09-27. It includes node closure, all three sampler regimes, the bitwise all-soft limit, hard event bookkeeping, and per-electron energy conservation. The pre-existing macroscopic anchor on this page supplies additional numerical evidence across 5, 20, and 100 keV. I did not rerun its heavy sweep or the hardware-gated CUDA suite. The local official report was inspected on printed pp. 131–134 (PDF pp. 151–154) and 169–171 (PDF pp. 189–191). Its Eq. 3.124 selects a hard channel by restricted zeroth-moment weight, Eqs. 4.44–4.47 define the restricted hazard and soft moments, and Eqs. 4.59–4.63 confirm the precise $1.015387$ Gaussian width, truncation at $3\sqrt v$, and the two non-Gaussian branches. PENELOPE samples its truncated Gaussian by RITA with aliasing; PyRITE uses Box–Muller rejection for the same density. The code assigns equality at $m^2=9v$ to the uniform branch and at $m^2=3v$ to the delta-plus-uniform branch, conventions the report leaves open; all assigned branches retain the target mean and variance.
+The focused CPU anchor `tests/montecarlo/collisions/test_shell_soft_hard_transport.py` passed 19/19 tests on 2026-09-27. It includes node closure, all three sampler regimes, the bitwise all-soft limit, hard event bookkeeping, and per-electron energy conservation. The pre-existing macroscopic anchor on this page supplies additional numerical evidence across 5, 20, and 100 keV. I did not rerun its heavy sweep or the hardware-gated CUDA suite. The local official report was inspected on printed pp. 131–134 (PDF pp. 151–154) and 169–171 (PDF pp. 189–191). Its Eq. 3.124 selects a hard channel by restricted zeroth-moment weight, Eqs. 4.44–4.47 define the restricted hazard and soft moments, and Eqs. 4.59–4.63 confirm the precise $1.015387$ Gaussian width, truncation at $3\sqrt v$, and the two non-Gaussian branches. PENELOPE samples its truncated Gaussian by RITA with aliasing; PyRITE uses Box–Muller rejection for the same density. The code assigns equality at $m^2=9v$ to the uniform branch and at $m^2=3v$ to the delta-plus-uniform branch, conventions the report leaves open; all assigned branches retain the target mean and variance.
 
 **Verdict:** `rederived` for the stopping closure, hard hazard, event energy update, and soft-loss law; no source-to-code discrepancy identified. This does not independently certify hard-transfer and recoil distributions, which have separate ledger claims, or imply human sign-off. The full docs build succeeded. The generated HTML for this page renders its math spans and display blocks, and contains no literal dollar delimiter.
 
@@ -49,7 +49,7 @@ recoil and closure rows it builds on keep their own records.
 
 ## Unit anchors
 
-`tests/montecarlo/test_shell_soft_hard_transport.py`:
+`tests/montecarlo/collisions/test_shell_soft_hard_transport.py`:
 
 - **Kernel parity.** For every active Si and MoS₂ hard channel at 6 and 30 keV
   and three uniform pairs, the Numba transfer inverse and primary cosine equal
@@ -78,7 +78,7 @@ recoil and closure rows it builds on keep their own records.
   CUDA LUT core, missing stopping tables, stray cutoff/material arguments and
   unknown models all raise. On CUDA the runner disables the LUT so shell
   cases reach the exact kernel.
-- **CUDA (hardware-gated).** `tests/montecarlo/test_shell_soft_hard_cuda.py`
+- **CUDA (hardware-gated).** `tests/montecarlo/collisions/test_shell_soft_hard_cuda.py`
   checks replay determinism, first-row agreement with the per-electron CPU
   core (`rtol=1e-12`, with and without soft straggling, Si and MoS₂), the event
   contract and energy bookkeeping, and ensemble agreement of backscatter,

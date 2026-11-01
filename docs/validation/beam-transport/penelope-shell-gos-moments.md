@@ -298,7 +298,7 @@ Neither comparison is asserted.
 
 ## Checks
 
-`tests/montecarlo/test_shell_gos.py`: finiteness and non-negativity at
+`tests/montecarlo/collisions/test_shell_gos.py`: finiteness and non-negativity at
 40 eV–1 GeV; channel and shell partition; the $N\sigma$ conversion; close
 quadrature; the triangle mean; the one-shell closed form; threshold and
 Eq. 3.78 continuity; conduction-band cutoff and $W_{cb}$ sensitivity; the

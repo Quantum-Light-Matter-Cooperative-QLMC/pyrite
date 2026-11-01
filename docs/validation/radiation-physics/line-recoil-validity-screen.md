@@ -204,7 +204,7 @@ bitwise unchanged without warning, both scoring routes and documentation
 math-delimiter checks.
 
 ```text
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test tests/materials/test_recoil.py tests/montecarlo/test_line_data_coverage.py tests/dev/test_docs.py --durations=0
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test tests/materials/test_recoil.py tests/montecarlo/spectrum/test_line_data_coverage.py tests/dev/test_docs.py --durations=0
 ```
 
 Verdict: **rederived**, restricted to the stated vacuum ratio and record-only

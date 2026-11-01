@@ -324,7 +324,7 @@ Interactions that need explicit design rather than incremental patching:
       `_urban_sample_element_keV`, `_dEds_spliced_element_scalar`,
       `_urban_sample_compound_keV`, `urban_element_table`,
       `urban_loss_moments_keV`) and
-      `tests/montecarlo/test_energy_loss_straggling.py` (134 cases).
+      `tests/montecarlo/collisions/test_energy_loss_straggling.py` (134 cases).
 
       **Source.** Geant4 PRM, "Energy loss fluctuations", Urban model
       (`G4UniversalFluctuation`), after Bichsel, *Rev. Mod. Phys.* **60**, 663
@@ -446,7 +446,7 @@ Interactions that need explicit design rather than incremental patching:
       `montecarlo/transport_jit_kernel.py` (`_urban_stream_key`,
       `_urban_flight_key`, `_urban_ionisation`, `_dEds_spliced_element`,
       `_transport_kernel`/`run_transport_kernel`), and
-      `tests/montecarlo/test_straggling_rng_plumbing.py` (17 cases).
+      `tests/montecarlo/collisions/test_straggling_rng_plumbing.py` (17 cases).
 
       **Key scheme, exactly as C recommended and confirming its salt
       constant.** `urban_key = _urban_stream_key_scalar(stream_key)` once per
@@ -520,7 +520,7 @@ Interactions that need explicit design rather than incremental patching:
       **Acceptance run:** `pyrite-dev test-suite core` (1761 passed),
       `pyrite-dev test --numba tests/montecarlo/` (681 passed), `lint`,
       `typecheck` — all clean. No existing test was weakened;
-      `tests/montecarlo/test_groove.py`'s `_run_grooved` helper was updated
+      `tests/montecarlo/transport/test_groove.py`'s `_run_grooved` helper was updated
       for the grooved core's three new trailing parameters (mechanical, no
       behavior change since it passes `straggle_on=False`).
 - [x] E — CPU integration on the ungrooved lockstep core, including the
@@ -529,7 +529,7 @@ Interactions that need explicit design rather than incremental patching:
       core); every other core stays diagnostic-only until F. Owners:
       `montecarlo/transport.py` (`_transport_core_ungrooved` and a ~215-line
       derivation block above it; `simulate_trajectories`'s `straggling`
-      docstring) and `tests/montecarlo/test_straggling_transport_integration.py`
+      docstring) and `tests/montecarlo/collisions/test_straggling_transport_integration.py`
       (9 cases), plus a narrowing of slice D's property-2 test.
 
       **The loss is applied.** When `straggle_on`, `E_end = E_start - dE` with
@@ -689,8 +689,8 @@ Interactions that need explicit design rather than incremental patching:
       `simulate_trajectories`'s CUDA-LUT raise),
       `montecarlo/transport_jit_kernel.py` (`_transport_kernel`,
       `run_transport_kernel`'s docstring), and
-      `tests/montecarlo/test_straggling_remaining_cores.py` (29 cases),
-      `tests/montecarlo/test_straggling_cuda.py` (7 cases, 5 hardware-gated),
+      `tests/montecarlo/collisions/test_straggling_remaining_cores.py` (29 cases),
+      `tests/montecarlo/collisions/test_straggling_cuda.py` (7 cases, 5 hardware-gated),
       plus a narrowing of slice D's property-2 test to match slice E's.
 
       **E's rule is ported, not revised.** The crossing indicator stays the
@@ -797,7 +797,7 @@ Interactions that need explicit design rather than incremental patching:
       UNVERIFIED, now including the applied loss and not merely the
       diagnostic.** That is a real escalation of D's caveat: a transcription
       error used to corrupt a diagnostic and now corrupts physics.
-      `tests/montecarlo/test_straggling_cuda.py` carries five
+      `tests/montecarlo/collisions/test_straggling_cuda.py` carries five
       `@pytest.mark.hardware` tests written to close it the moment a GPU is
       available (off-path bit-for-bit, determinism, energy conservation with an
       explicit finite-`r_mid` check for the NaN guard, first-row host parity at

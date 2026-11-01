@@ -80,7 +80,7 @@ Scratch scripts are in the session scratchpad (`validate-vortex/check{1,2,3}.py`
 
 | check | result |
 | --- | --- |
-| `pyrite-dev test tests/montecarlo/test_channeling_vortex.py` | 9 passed (3.1 s) |
+| `pyrite-dev test tests/montecarlo/quantum/test_channeling_vortex.py` | 9 passed (3.1 s) |
 | Independent Bessel oracle versus `project`: random complex $\phi$ on $16\times20$ ($10\times12$ Å), $\mathbf c=(4.3,6.1)$, $R=3$, tilt $(0.7,-1.1)$, $\lvert\ell\rvert\le10$, $k_{\max}R=25.6$ | max $\lvert\Delta P_\ell\rvert/\sum P=4.5\times10^{-15}$ |
 | $n_\theta$ doubled ($512\to1024$), white noise on $64^2$ / 20 Å, $R=9.5$, $\ell_{\max}=8$ | $9\times10^{-17}$ relative |
 | $n_\theta=128$, below the bound | $1.3\times10^{-3}$ relative; the bound is load-bearing |
@@ -197,7 +197,7 @@ discrepancy. The published coherent phase/selectivity anchors cannot
 establish the dissipative population lifetime.
 
 - **Claim:** `cr-vortex-string-coupling` — population follow-up in
-  `tests/montecarlo/test_channeling_axial_dissipator.py::test_tungsten_two_p_population_decay`.
+  `tests/montecarlo/quantum/test_channeling_axial_dissipator.py::test_tungsten_two_p_population_decay`.
 - **Filters:** units pass; zero-tilt limit passes; carrier-representation
   invariance fails when electronic kicks create nonzero tilt.
 - **Re-derivation:** differs by the missing carrier phase in the projector.

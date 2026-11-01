@@ -111,7 +111,7 @@ a fully coupled validated MeV cascade.
 
 ## Validation and outstanding production work
 
-`tests/montecarlo/test_photon_continuous_scoring.py` checks energy-bin/primary
+`tests/montecarlo/transport/test_photon_continuous_scoring.py` checks energy-bin/primary
 normalization, disjoint detection categories, coupled-round reclassification,
 source-to-tracker parameter/identity handoff, and fail-closed options without
 requiring released atomic archives. Fresh-context verification independently

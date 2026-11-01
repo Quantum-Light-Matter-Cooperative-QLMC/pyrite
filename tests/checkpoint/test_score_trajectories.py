@@ -27,7 +27,7 @@ from pyrite.montecarlo.trajectories import (
 from pyrite.montecarlo.trajectory_inventory import discover_artifacts
 from pyrite.runs.run import run_sweep
 from tests.helpers.cli import invoke
-from tests.montecarlo.test_trajectory_capture import _case
+from tests.montecarlo.runner.test_trajectory_capture import _case
 
 _IDENTITY = {"catalog_profile": "test", "parameter_sha256": "p" * 64}
 _KEYS = ("spec", "spec_characteristic", "brem", "brem_wide")

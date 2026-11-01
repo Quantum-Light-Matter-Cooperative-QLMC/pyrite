@@ -40,7 +40,7 @@ tables.
   to both the free-atom and the muffin-tin requests; electron and positron
   keys are disjoint. `secondaries._positron_overrides` puts the positron
   `elastic_tables` into positron steps only.
-- **Sampler.** `tests/montecarlo/test_elsepa_positron_elastic.py` (Si and W
+- **Sampler.** `tests/montecarlo/collisions/test_elsepa_positron_elastic.py` (Si and W
   at nodes near 1 keV, 100 keV and 10 MeV) passes against the installed
   positron tables. The KS distance of 50 000 draws is below the 99% critical
   value, the first moment is within 1% of ELSEPA's $\sigma_1/\sigma$, and W

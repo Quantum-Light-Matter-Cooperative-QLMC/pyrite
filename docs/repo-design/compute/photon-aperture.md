@@ -183,7 +183,7 @@ at ambiguous geometric/CDF boundaries is not guaranteed.
 This low-level boundary has no random-number generator or history queue;
 `photon_cuda_events` and `photon_histories` supply the production orchestration
 described above. Device parity tests cover navigation, conditional samplers and
-whole histories. `tests/montecarlo/test_photon_production_cuda.py` exercises real
+whole histories. `tests/montecarlo/transport/test_photon_production_cuda.py` exercises real
 public simulations, feedback, capture/replay, checkpoint/CAS portability and
 mode-off stability. These hardware tests skip when CUDA is absent. An evidence
 job must set `PYRITE_TEST_BACKEND=cuda` as well as `PYRITE_MC_BACKEND=cuda` and
@@ -246,7 +246,7 @@ parity results and compact Nsight reductions are retained in
 ## Charged scene re-entry evidence
 
 The named-filter production path and its CUDA implementation are checked by
-`tests/montecarlo/test_photon_reentry_production.py`,
+`tests/montecarlo/transport/test_photon_reentry_production.py`,
 `test_photon_reentry_cuda.py` and `test_photon_reentry_pair_cuda.py`.
 RTX 5080 jobs **2528** and **2529** each pass **22 tests, zero skips** under
 `PYRITE_FP64=1` and the default `PYRITE_FP64=0`, respectively. Coverage includes

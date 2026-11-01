@@ -72,7 +72,7 @@ ensemble density and angular quadrature, so phase-space correlations beyond
 the shared mean-field approximation are not reconstructed. These restrictions
 are not claims of measured linewidth agreement.
 
-Anchors: `tests/montecarlo/test_channeling_producer.py` (analytic integration,
+Anchors: `tests/montecarlo/channeling/test_channeling_producer.py` (analytic integration,
 frame covariance, public producer and real checkpoint round trip),
 `test_tilted_surface_absorbs_over_the_physical_normal_depth` in the emission
 tests (independent Beer–Lambert path), and the existing `test_spec_channeling`

@@ -336,12 +336,12 @@ describes the required integration contract; issue checklists own scheduling.
 
 | Current seam | Required migration and focused evidence |
 | --- | --- |
-| `campaign/model.py::Scene`, `campaign/resolution.py::resolve_simulation` | Extract compatibility settings, retain constructor/access behavior and override semantics; `tests/scan/test_scene_model.py`, `test_simulation_resolution.py`. |
+| `campaign/model.py::Scene`, `campaign/resolution.py::resolve_simulation` | Extract compatibility settings, retain constructor/access behavior and override semantics; `tests/campaign/test_scene_model.py`, `test_simulation_resolution.py`. |
 | `campaign/lowering.py::build_case` and `build_sweep_cases` | Consume resolved inputs once; preserve case payloads, seed order and legacy sweep handling. |
 | `Sweep` and optimization parameter paths | Keep physical axes on scene; route run axes to run settings. Preserve legacy `physics.*`/`numerics.*` paths, label order, Cartesian expansion and override-before-axis precedence through adapters. |
 | `campaign/legacy.py` and profile/settings adapters | Map existing profiles into the same resolver; preserve their schema defaults and named-preset layering under ADR-0021. |
 | `api.py::observation_plan`, `observations/plan.py`, `runs/observe.py` | Build plans from independent observation specs; preserve native bins and reuse checks; `tests/observations/test_produce.py`, `test_sweep.py`. |
-| `quantum.py` and channeling lowering | Move composition without changing versioned records; `tests/scan/test_quantum_configuration.py`, `test_quantum_state_spec.py`. |
+| `quantum.py` and channeling lowering | Move composition without changing versioned records; `tests/campaign/test_quantum_configuration.py`, `test_quantum_state_spec.py`. |
 | Directional, photon-event and photon-continuum entry points | Use shared source/model validation while retaining each pathway's capability refusals and distinct tally identities. |
 | Result provenance and reconstruction | Record physical scene and resolved run settings separately; retain legacy `Result.scene` access and historical artifact reconstruction. |
 | Apps, notebooks, CLI examples | Teach the independent composition after runtime support exists; regenerate CLI references only if CLI contracts change. |

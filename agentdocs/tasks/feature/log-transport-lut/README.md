@@ -18,7 +18,7 @@ interval in ~1,390 points (arithmetic scaling, not an error guarantee).
 `cores.py` (`_lut_index_frac_scalar`, midpoint/cutoff lookups),
 `_jit_device.py::_lut_lerp_at`, `_jit_kernel.py` (inline `lut_x`/`alpha_x`
 forms), `_jit_launch.py`, `api.py`, `batching.py`, `__init__.py` re-exports,
-`tests/montecarlo/test_transport_lut.py`. Photon grids and detectors are owned
+`tests/montecarlo/transport/test_transport_lut.py`. Photon grids and detectors are owned
 by #100/#101.
 
 ## Checklist
@@ -45,7 +45,7 @@ by #100/#101.
 - [x] CPU and CUDA endpoint behavior identical.
 - [x] Off-grid validation against direct physics throughout every decade, plus
       targeted points near cutoffs and model joins.
-- [x] `tests/montecarlo/test_transport_lut.py` ~1e-5 relative accuracy over
+- [x] `tests/montecarlo/transport/test_transport_lut.py` ~1e-5 relative accuracy over
       5–30 keV preserved; that test does not certify six decades.
 - [x] Wall time, memory, accuracy recorded together (CPU build; no GPU sweep needed); GPU numbers via
       `pyrite remote`.

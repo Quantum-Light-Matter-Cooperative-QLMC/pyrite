@@ -104,7 +104,7 @@ Probe script (fresh formulas `M_ref` and own Rodrigues `R`, not implementation h
 - Wiring probe (`simulate_trajectories`, Si slab, 30 keV, `Ne=4000`, 1 mm-FWHM beam, 1 mm × 1 mm footprint, `max_steps=1`, seed 7): at `θ=85°, φ=0` the analytic lab-frame acceptance `P(miss) = 1 − erf(w·cosθ/(σ√2))·erf(w/(σ√2))` (w = 0.5 mm, σ = FWHM/2.3548) predicts `0.9378`; measured `n_missed/Ne = 0.93775`. Untilted control: predicted `0.4209`, measured `0.42825` (binomial σ ≈ 0.008 at N=4000; within ~1σ). The miss fraction is quantitatively the `cosθ`-shrunken acceptance window. Pass.
 - `θ=85°, φ=90°` on the square footprint: `0.93525` — statistically identical by symmetry. Pass.
 - `Ne` bookkeeping: `segs["Ne"] == 4000` (requested) with `n_missed = 3751` at 85°; spectra divide by `segments["Ne"]`, so misses stay in the normalization. Pass.
-- Repo anchors (corroboration only): `tests/montecarlo/test_finite_transverse_geometry.py -k project_beam_entry` (5 passed) and `tests/montecarlo/test_montecarlo.py -k grazing` (2 passed).
+- Repo anchors (corroboration only): `tests/montecarlo/transport/test_finite_transverse_geometry.py -k project_beam_entry` (5 passed) and `tests/montecarlo/transport/test_montecarlo.py -k grazing` (2 passed).
 
 ## 6. Verdict
 

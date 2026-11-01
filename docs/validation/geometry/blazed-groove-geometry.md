@@ -204,7 +204,7 @@ They explicitly identify `O(Λ/W)` as only the periodic-phase correction and ret
 
 - Current-tree focused CPU re-check: three endpoint/reference tests passed (`3 passed, 30 deselected`).
 - Independent numeric probe confirms the exact one-ulp valley event and materially out-of-band rejection described in §4.1.
-- Supplied remote evidence for the exact fix snapshot: `tests/montecarlo/test_groove.py + tests/plots/test_trajectories.py` — 34 passed; broader suite — 192 passed; typecheck and scoped Ruff clean.
+- Supplied remote evidence for the exact fix snapshot: `tests/montecarlo/transport/test_groove.py + tests/plots/test_trajectories.py` — 34 passed; broader suite — 192 passed; typecheck and scoped Ruff clean.
 - No heavy Monte Carlo, GPU job, or external comparison was run.
 
 ## 5. Adjudication

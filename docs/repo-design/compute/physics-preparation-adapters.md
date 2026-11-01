@@ -54,7 +54,7 @@ limitations; it does not add a kernel or replace runtime validation.
 | Grooves | Lockstep route; explicit unsupported shell/coupled requests retain their existing refusal or campaign warning/fallback contract. |
 | Pair/positron cascade | Requires shell transport, secondary threshold and coupled hard photons. Positron mode has no Mott implementation and retains species-specific tables and host annihilation completion. |
 
-`tests/montecarlo/test_elsepa_elastic.py` exercises CUDA factory selection with
+`tests/montecarlo/collisions/test_elsepa_elastic.py` exercises CUDA factory selection with
 CPU stubs that stop at the factory. `test_shell_soft_hard_config.py` distinguishes
 the direct native refusal from runner exact-core selection;
 `test_coupled_radiative_runner.py` proves coupled selection bypasses the LUT

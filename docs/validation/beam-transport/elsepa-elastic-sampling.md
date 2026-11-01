@@ -148,7 +148,7 @@ The following were run on 2026-09-25 with scratch scripts that do not use the im
 
 For the 4 muffin-tin tables, the largest $\lvert4\pi\int D\,d\mu/\sigma-1\rvert$ is 0.39 %.
 
-- **Anchors:** `tests/montecarlo/test_elsepa_elastic.py`: 11 passed, 2 skipped. The skips are the CUDA-gated tests; no GPU was used here.
+- **Anchors:** `tests/montecarlo/collisions/test_elsepa_elastic.py`: 11 passed, 2 skipped. The skips are the CUDA-gated tests; no GPU was used here.
 
 ## Finding in the ledger prose (not the code)
 

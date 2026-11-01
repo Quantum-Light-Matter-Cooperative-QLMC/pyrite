@@ -80,7 +80,7 @@ The target $r_n\le\varepsilon$ therefore implies $\mathrm{ESS}_n\ge 1/(\varepsil
 
 ## Anchors
 
-`tests/montecarlo/test_adaptive_stopping.py`:
+`tests/montecarlo/runner/test_adaptive_stopping.py`:
 
 - `test_running_moments_equal_direct_formulas` checks the moments, share and ESS against NumPy, and the identity {eq}`eq-adaptive-ess-identity`.
 - `test_gaussian_population_has_near_nominal_coverage` covers the Gaussian limit above.
@@ -155,7 +155,7 @@ so $r\gtrsim\sigma$ whether or not $h^2$ dominates $S_2$. The record's conclusio
 
 ### Numeric reproduction
 
-The anchor file `tests/montecarlo/test_adaptive_stopping.py` passed: 45 tests in 33 s. The tests assert bounds, not the quoted numbers, so I reproduced the numbers with the independent rule:
+The anchor file `tests/montecarlo/runner/test_adaptive_stopping.py` passed: 45 tests in 33 s. The tests assert bounds, not the quoted numbers, so I reproduced the numbers with the independent rule:
 
 | Quoted | Reproduced |
 | --- | --- |
@@ -283,7 +283,7 @@ and two stability blocks with fraction 0.5. All 100 realized count pairs and
 both component RSEs matched; 80 pairs had unequal counts. Equal fixed bounds
 80–80 returned exactly 80 line and 80 brem electrons.
 
-The focused `tests/montecarlo/test_independent_stopping.py` anchors additionally
+The focused `tests/montecarlo/transport/test_independent_stopping.py` anchors additionally
 cover late line failure after an earlier pass, a frozen prefix, retry reset,
 brem statistics limitation, invalid policies, absent-policy compatibility, and
 bitwise equality of final spectra with fixed realized count pairs using different

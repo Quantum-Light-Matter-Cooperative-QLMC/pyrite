@@ -262,7 +262,7 @@ def joy_luo_only(on: bool) -> None:
     ``_element_crossover_keV`` is the single seam the host helper consults, so
     pushing it to ``inf`` degenerates the spliced form to Joy--Luo bit-for-bit
     rather than approximately (the mechanism
-    ``tests/montecarlo/test_stopping_csda_range.py`` already relies on).
+    ``tests/montecarlo/collisions/test_stopping_csda_range.py`` already relies on).
     """
     if on:
         joy_luo_only._saved = transport._element_crossover_keV  # type: ignore[attr-defined]

@@ -23,8 +23,8 @@ from pyrite.montecarlo.trajectories import (
 from pyrite.remote import _queue_scripts, config, jobs, trajectories, viewer
 from pyrite.runs._trajectory_capture import CaptureSizeReport
 from tests.helpers.cli import invoke
-from tests.montecarlo.test_trajectory_capture import _read_vtp
-from tests.montecarlo.test_trajectory_selection import _CASE, _secondaries
+from tests.montecarlo.runner.test_trajectory_capture import _read_vtp
+from tests.montecarlo.runner.test_trajectory_selection import _CASE, _secondaries
 
 
 @pytest.fixture

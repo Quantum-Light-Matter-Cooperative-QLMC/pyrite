@@ -25,10 +25,10 @@ scontrol show job "$SLURM_JOB_ID" > "$out/job.txt"
 nvidia-smi -q > "$out/gpu.txt"
 uv run --no-sync python checks/equal_precision/prepare_stopping.py > "$out/tables.json"
 uv run --no-sync pyrite-dev test \
-    tests/montecarlo/test_hard_radiative.py -k completion_stages \
+    tests/montecarlo/cascades/test_hard_radiative.py -k completion_stages \
     --durations=5 > "$out/cache-tests.log" 2>&1
 uv run --no-sync pyrite-dev test \
-    tests/montecarlo/test_hard_radiative_cuda.py --durations=5 > "$out/cuda-tests.log" 2>&1
+    tests/montecarlo/cascades/test_hard_radiative_cuda.py --durations=5 > "$out/cuda-tests.log" 2>&1
 deadline=$((SECONDS + 420))
 for seed in 78611 78612 78613; do
     variants=(baseline candidate)

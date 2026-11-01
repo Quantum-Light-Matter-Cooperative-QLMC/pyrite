@@ -4,7 +4,7 @@ This is a hardware test record for the existing planar-stack TR/CTR component,
 not an independent physics derivation or a DTR device-validation claim.
 
 On 2026-10-18, SLURM job **1592** ran
-`tests/montecarlo/test_transition_radiation_cuda.py` on an NVIDIA GeForce
+`tests/montecarlo/spectrum/test_transition_radiation_cuda.py` on an NVIDIA GeForce
 RTX 5080 (16303 MiB), driver 610.47, CuPy 14.2.0, Python 3.14.6.
 The isolated checkout was `/home/user/pyrite-issue-103` on the configured
 `cluster-head` host. Source was clean revision
@@ -45,7 +45,7 @@ and explicit transfer of tests, was:
 
 ```bash
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run --frozen --extra nvidia --group test \
-  pyrite-dev test tests/montecarlo/test_transition_radiation_cuda.py \
+  pyrite-dev test tests/montecarlo/spectrum/test_transition_radiation_cuda.py \
   -ra --durations=0 --junitxml=cuda-test-results.xml
 ```
 

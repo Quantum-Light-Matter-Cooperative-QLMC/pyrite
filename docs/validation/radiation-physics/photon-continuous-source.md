@@ -278,7 +278,7 @@ and densities.
    $1-\beta$ rounding to 0, near $\gamma\gtrsim10^{8}$. That would make
    $q_\Omega$ infinite at $\mu=1$, but it is far outside BremsLib table
    coverage, which fails closed.
-4. `uv run pyrite-dev test tests/montecarlo/test_photon_sources.py` passed
+4. `uv run pyrite-dev test tests/montecarlo/transport/test_photon_sources.py` passed
    all 16 tests.
 
 ### Verdict (mixture proposal)

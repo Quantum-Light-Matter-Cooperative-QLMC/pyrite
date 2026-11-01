@@ -130,7 +130,7 @@ The checks use Si(110) at 17 MeV with `n_cells = 4`, `max_order = 8` (as in the 
 - **2D reduction.** A separable 2D Gaussian with a 5 Å $y$-offset equals the 1D result to $5\times10^{-16}$. Off-centre $\mathrm{LG}_1^{\pm2}$ agree to $8\times10^{-17}$. An aperture with $\ell=\pm1$ agrees to $3\times10^{-17}$ without aberrations, but differs by $2.3\times10^{-3}$ with $C_{12}=30$ Å, $\phi_{12}=0.5$; this is mirror breaking, as expected.
 - **MCWF.** The test drew $2\times10^5$ samples from `_entry_from_mixture`, using a mixture of a fixed Gaussian and an Airy state with margin 5 eV. In fixed mode, the bound population is 0.8807 against 0.8797 ($\sigma\approx0.0011$), free 0.0753 against 0.0764 ($1.9\sigma$), $\max\lvert E[\rho]-\rho_S\rvert=6\times10^{-4}$, and per-state free weights agree within $5\times10^{-4}$. In averaged mode the corresponding figures are 0.7186 against 0.7181 and free 0.0604 against 0.0606.
 - **Hard edges.** The projected trace of a full-band aperture is 0.99966, 0.99981 and 0.99989 at 0.1, 0.3 and 1 mrad, and the `wavefunction()` Airy-disk error is $5\times10^{-4}$ of the peak.
-- **Test file.** `tests/montecarlo/test_channeling_states.py` gives 26 passed, abTEM test included.
+- **Test file.** `tests/montecarlo/quantum/test_channeling_states.py` gives 26 passed, abTEM test included.
 
 ### Findings
 
@@ -178,7 +178,7 @@ Human sign-off remains separate.
 
 ## Implementation response to the fresh-context review
 
-Both numerical findings are fixed in `states.py::planar_entry_density`, `Superposition` and `SampledState`. Each fix is pinned by a regression test in `tests/montecarlo/test_channeling_states.py`.
+Both numerical findings are fixed in `states.py::planar_entry_density`, `Superposition` and `SampledState`. Each fix is pinned by a regression test in `tests/montecarlo/quantum/test_channeling_states.py`.
 
 1. **Narrow-momentum states.**
    - The per-bin sub-interval count `M = ⌈4Δ/k_resolution⌉` has no cap, and only sub-intervals inside the state's momentum support are evaluated.
