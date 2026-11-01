@@ -403,9 +403,8 @@ def test_electron_block_with_beam_spot_matches_full_history():
     _assert_identical(reference, _elsepa(_continued(7, 19), Ne=90, **kw))
 
 
-def test_auto_schedule_continues_and_matches(monkeypatch, caplog):
+def test_auto_schedule_continues_and_matches(caplog):
     caplog.set_level("INFO", logger=continuation_module.__name__)
-    monkeypatch.setattr(continuation_module, "CONTINUATION_AUTO_MIN_HISTORIES", 100)
     reference = _elsepa(REFERENCE)
     auto = replace(REFERENCE, schedule="auto")
     _assert_identical(reference, _elsepa(auto))

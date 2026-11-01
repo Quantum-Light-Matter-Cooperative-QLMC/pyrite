@@ -66,14 +66,10 @@ logger = logging.getLogger(__name__)
 # ``PerElectronTransportConfig.schedule`` values (#799). None of them changes
 # results: continuation output is bitwise the full-history output.
 TRANSPORT_SCHEDULES = ("full-history", "continuation", "auto")
-# Below this many histories ``auto`` keeps full-history. #789 set 5000 when
-# host-staged rounds made Si 12-27% slower at 5000. With device staging
-# (#842), continuation is faster at every measured size (#825 jobs 2982/2983,
-# 1000-8000 histories, Si 300 keV and W 1 MeV: 1.4-5.3x request time). A
-# full-history batch is sized by the longest track, so long-track scenes
-# launch about 256 histories at a time. 1000 matches the CUDA crossover
-# (``batching.CUDA_TRANSPORT_MIN_ELECTRONS``); smaller passes are unmeasured.
-CONTINUATION_AUTO_MIN_HISTORIES = 1000
+# ``auto`` has no history-count floor (#889). The 1000-history floor of #825
+# sent small passes, including benchmark and streamed tail blocks, to
+# full-history, whose batch is sized by the longest track: at W 1 MeV that is
+# ~108 histories per launch and 334 vs 13 ns of kernel per row (#875 job 3579).
 
 
 @dataclass(frozen=True)
@@ -172,7 +168,7 @@ def effective_schedule(config):
     return "full-history" if config.continuation is None else "continuation"
 
 
-def _auto_fallback_reason(Ne, *, cuda, lut, launched, gdf):
+def _auto_fallback_reason(*, cuda, lut, launched, gdf):
     """Why ``auto`` keeps full-history for this pass, or None to continue."""
     if not cuda:
         return "the transport core is not 'cuda'"
@@ -183,8 +179,6 @@ def _auto_fallback_reason(Ne, *, cuda, lut, launched, gdf):
         return "launched passes (cascade generations, channeling handoff) stay full-history"
     if gdf:
         return "GDF beams have no continuation regression"
-    if Ne < CONTINUATION_AUTO_MIN_HISTORIES:
-        return f"Ne={Ne} is below {CONTINUATION_AUTO_MIN_HISTORIES} histories"
     return None
 
 
@@ -193,8 +187,8 @@ def resolve_schedule(config, Ne, **support):
 
     ``full-history`` clears continuation, ``continuation`` keeps or creates it
     (unsupported modes then raise in the driver, as before), and ``auto``
-    continues only on a supported pass of at least
-    :data:`CONTINUATION_AUTO_MIN_HISTORIES` histories, logging why otherwise.
+    continues on every supported pass, whatever its size, logging why
+    otherwise.
     ``support`` holds the keyword flags of :func:`_auto_fallback_reason`.
     Results are identical under every choice.
     """
@@ -203,7 +197,7 @@ def resolve_schedule(config, Ne, **support):
         cont = config.continuation or TransportContinuationConfig()
         return replace(config, schedule=schedule, continuation=cont)
     if schedule == "auto":
-        reason = _auto_fallback_reason(int(Ne), **support)
+        reason = _auto_fallback_reason(**support)
         if reason is None:
             cont = config.continuation or TransportContinuationConfig()
             logger.info("transport schedule auto: continuation for %d histories", Ne)
