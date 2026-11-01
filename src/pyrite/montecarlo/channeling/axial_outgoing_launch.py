@@ -103,14 +103,15 @@ class AxialMatchingDeclaration:
 
 @dataclass(frozen=True)
 class AxialLaunch:
-    """One physical outgoing launch (research record, not a ``LaunchState``).
+    r"""One physical outgoing launch (research record, not a ``LaunchState``).
 
     ``source`` is ``"entry"`` (surface complement), ``"outgoing"`` (box,
     Weyl measured) or ``"tail"`` (out-of-box string output, exact momentum).
     ``r_ang``/``v_hat`` are lab frame; ``k_perp_inv_ang`` is the crystal-frame
-    transverse wavevector. ``lateral_bound_ang`` bounds the unresolved lattice
-    image (retained drift); ``clock_bound_ang`` bounds the omitted
-    transverse path-length delay.
+    transverse wavevector. With $\sin\theta_b$ = box reach / $p(E_1)$,
+    ``lateral_bound_ang`` $= z\tan\theta_b$ bounds the unresolved lattice
+    image (retained drift) and ``clock_bound_ang`` $= z(\sec\theta_b-1)/\beta_1$
+    the omitted transverse path-length delay.
     """
 
     incident_id: int
@@ -193,9 +194,8 @@ class _Mapper:
         self.n = np.array(engine.box_shape)
         self.cell = 2 * np.pi / self.g
         self.strings = list(channels.tds_strings)
-        p = momentum_inv_ang(zone.kinetic_energy_eV)
-        # Any retained or box state has |k_perp| below the box reach.
-        self.theta = float(np.hypot(*((self.box + 1) * self.g))) / p
+        # Any retained or box state at a folded carrier has |k_perp| < box reach.
+        self.reach = float(np.hypot(*((self.box + 1) * self.g)))
 
     def box_kinematics(self, carrier, position_index, momentum_index):
         """In-cell position x_a = a L / N and wavevector kappa + m g (FFT order m)."""
@@ -205,6 +205,11 @@ class _Mapper:
 
     def launch(self, incident: AxialIncident, source, depth, in_cell, k_perp) -> AxialLaunch:
         energy, flight = zone_energy_and_clock(self.zone, depth)
+        sin_b = self.reach / momentum_inv_ang(energy)
+        if sin_b >= 1.0:
+            raise ValueError("outgoing box reach exceeds the on-shell momentum")
+        cos_b = np.sqrt(1.0 - sin_b * sin_b)
+        beta = momentum_inv_ang(energy) * _HBARC_EV_ANG / (energy + _M_E_EV)
         direction = on_shell_direction(k_perp, energy, self.zone.max_angle_rad)
         impact = np.asarray(incident.impact_ang, dtype=float)
         lateral = np.floor(impact / self.cell) * self.cell + np.asarray(in_cell, dtype=float)
@@ -220,8 +225,8 @@ class _Mapper:
             t0_ang=float(incident.t0_ang),
             stream_key=int(incident.stream_key),
             k_perp_inv_ang=(float(k_perp[0]), float(k_perp[1])),
-            lateral_bound_ang=float(depth) * self.theta,
-            clock_bound_ang=0.5 * float(depth) * self.theta**2,
+            lateral_bound_ang=float(depth) * sin_b / cos_b,
+            clock_bound_ang=float(depth) * (1.0 / cos_b - 1.0) / beta,
         )
 
     def event_launch(self, incident: AxialIncident, event: FiberEvent) -> AxialLaunch:
@@ -249,13 +254,13 @@ def _checked_cut(channels: FiberChannels, matching: AxialMatchingDeclaration):
 
 
 def _check_tail_reach(channels, engine, zone, matching) -> None:
-    """Every classified tail must be above the cut: kinetic floor + U_min >= target."""
+    """Every classified tail must be above every admitted cut: floor + U_min >= target + window."""
     if channels.tail_q_max_inv_ang is None or not channels.tds_strings:
         return
     k_min = float(np.min((engine.box + 0.5) * engine.g))
     total = zone.kinetic_energy_eV + _M_E_EV
     kinetic = (_HBARC_EV_ANG * k_min) ** 2 / (2 * total)
-    if kinetic + matching.potential_min_eV < matching.target_cut_eV:
+    if kinetic + matching.potential_min_eV < matching.target_cut_eV + matching.window_eV:
         raise ValueError("outgoing box too small: tail outputs may lie below the matching cut")
 
 
@@ -316,10 +321,14 @@ def sample_physical_handoff(
     entry = np.asarray(entry_orders, dtype=complex)
     if entry.shape != (engine.k,) or not np.all(np.isfinite(entry)):
         raise ValueError("entry_orders must be finite on the order window")
+    if not np.isclose(np.vdot(entry, entry).real, 1.0, rtol=1e-12, atol=0):
+        raise ValueError("entry_orders must be a unit incident state")
     g = np.asarray(window, dtype=complex)
     if g.shape != engine.box_shape or not np.isclose(np.vdot(g, g).real, 1.0):
         raise ValueError("window must be a unit-norm array on the outgoing box shape")
     kappa = (float(carrier_inv_ang[0]), float(carrier_inv_ang[1]))
+    if np.any(np.abs(kappa) > engine.g / 2) or np.any(np.isclose(kappa, engine.g / 2)):
+        raise ValueError("carrier_inv_ang must lie in the half-open zone [-g/2, g/2)")
     fiber = engine.fiber(kappa)
     c = fiber.vectors.conj().T @ entry
     entered_weight = float(np.vdot(c, c).real)

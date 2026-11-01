@@ -1,6 +1,6 @@
 # Issue #623 — axial entrance-zone contract scaffolding
 
-**Status: research-only; `cr-axial-zone-handoff-physical` remains unverified.**
+**Status: research-only. `cr-axial-zone-handoff-physical` is `anchored` only for the #883 outgoing instrument ([`axial_outgoing_launch`](axial-escape-instrument.md#physical-outgoing-instrument-883)); depth budget, photon source and admission remain open.**
 The associated code does not enable axial channeling in standard PyRITE runs.
 It adds fail-closed, testable numerical contracts for physical outgoing-flux
 accounting, candidate lab-frame launch conversion and positive expected-value

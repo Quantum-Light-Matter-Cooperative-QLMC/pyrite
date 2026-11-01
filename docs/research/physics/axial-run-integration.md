@@ -276,8 +276,9 @@ joint launch distribution, flux balance and continuity. Reserve
 `cr-axial-persisted-channel` for the new source estimator, line shape,
 normalization, frame/absorption mapping and exactly-once persistence.
 The handoff accounting row `cr-axial-zone-handoff-accounting` is `rederived`
-with a diagnostic counterexample; the physical row is `unverified`, with no
-production implementation or physical verdict.
+with a diagnostic counterexample. The physical row is `anchored` only for the
+research outgoing instrument (#883); it has no production implementation, and
+the depth budget (#884) is not claimed.
 Register the source claim when its model is selected; attach source derivations
 and in-code markers before physics code lands. Both must
 reach `anchored` through fresh-context review and independent regression

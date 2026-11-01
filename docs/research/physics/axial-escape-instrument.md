@@ -6,7 +6,7 @@ on 2026-10-17. This note derives the accounting that an escape model must
 satisfy and gives a numerical counterexample to identifying the current grid
 sink with outgoing population. It does **not** select or validate a physical
 matching threshold, rechanneling approximation, or native launch distribution.
-The accounting claim `cr-axial-zone-handoff-accounting` is `rederived`; the physical outgoing instrument, `cr-axial-zone-handoff-physical`, is scoped to [#883](#physical-outgoing-instrument-883) and awaits fresh-context verification.
+The accounting claim `cr-axial-zone-handoff-accounting` is `rederived`; the physical outgoing instrument, `cr-axial-zone-handoff-physical`, is `anchored` for the [#883 instrument scope](#physical-outgoing-instrument-883).
 
 ## Three subspaces, not two loss labels
 
@@ -1258,8 +1258,8 @@ holds the derivation; the key choices are listed here.
   against the cut. Over-angle momenta refuse.
 - **Position.** In-cell Weyl position (or struck string $\mathbf s+\mathbf u$
   for a tail), placed in the cell of the native impact point. The reduced
-  fibre state carries no cell index; `lateral_bound_ang` $=z\theta_b$ bounds
-  the omitted drift.
+  fibre state carries no cell index; `lateral_bound_ang` $=z\tan\theta_b$
+  bounds the omitted drift, with $\sin\theta_b$ the box reach over $p$.
 - **Energy and clock.** Declared CSDA at constant stopping, refused if the
   zone loses more than $10^{-3}$ of $E_0$, with closed-form flight time
   $z(E_0+E_1+2mc^2)/(p_0c+p_1c)$. Straggling is omitted, and

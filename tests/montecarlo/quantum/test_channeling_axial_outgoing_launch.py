@@ -80,6 +80,7 @@ def _box_case(checks, n, *, seed=11, **kwargs):
         search_step_ang=2.0,
     )
     defaults.update(kwargs)
+    entry = defaults.pop("entry", entry)
     return model, entry, channels, sample_physical_handoff(channels, entry, **defaults)
 
 
@@ -371,3 +372,29 @@ def test_tail_launch_is_the_struck_string_with_its_exact_momentum():
 def test_tail_below_the_matching_cut_refuses():
     with pytest.raises(ValueError, match="box too small"):
         _tail_handoff(AxialMatchingDeclaration(100.0, 0.0, 0.0, window_eV=200.0), n=2)
+
+
+def test_non_unit_entry_and_unfolded_carrier_refuse(checks):
+    _, entry = FIBER["_dense_box"](checks, 0.35, SHIFTS[:2])
+    with pytest.raises(ValueError, match="unit incident"):
+        _box_case(checks, 2, entry=2 * entry)
+    with pytest.raises(ValueError, match="half-open zone"):
+        _box_case(checks, 2, carrier_inv_ang=(float(G[0]) / 2, 0.0))
+
+
+def test_reported_bounds_are_the_exact_box_reach_geometry(checks):
+    _, _, _, records = _box_case(checks, 300, zone=_zone(stopping=2.0))
+    reach = np.hypot(*((BOX + 1) * G))
+    for r in records:
+        la = r.launch
+        if la is None:
+            continue
+        e1 = la.E_keV * 1000
+        theta = np.arcsin(reach / momentum_inv_ang(e1))
+        beta = np.sqrt(e1 * (e1 + 2 * M_E)) / (e1 + M_E)
+        assert la.lateral_bound_ang == pytest.approx(la.depth_ang * np.tan(theta), rel=1e-12)
+        exact = la.depth_ang * (1 / np.cos(theta) - 1) / beta
+        assert la.clock_bound_ang == pytest.approx(exact, rel=1e-9, abs=1e-300)
+        # Any represented |k_perp| moves no farther, nor later, than the bound.
+        k = np.hypot(*la.k_perp_inv_ang)
+        assert k < reach
