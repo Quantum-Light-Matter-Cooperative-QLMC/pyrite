@@ -1,0 +1,134 @@
+{
+ "status": "research-only local CPU evidence; TDS, one string, Gamma point of one cell, absorbing no-return model; not a physical escape fraction, depth budget or admission",
+ "parent_commit": "bdb7fab710af4ef1f99ed3400854f2381ba08ccd",
+ "source_sha256": {
+  "src/pyrite/montecarlo/channeling/axial_jump_unraveling.py": "0051246879abb9cf45991b07aa2990ae054f8d340aaf72d58d69e5e842f8827b",
+  "checks/axial_outgoing_maps.py": "14c4c70678aa28af2dfcb7fd60cc1f95d02f2b72ef3ace786dd5183c75cfe689",
+  "checks/axial_matching_study.py": "0cc86494dc31fbfdb0afd6d2a8094bf16a713fbecfcd26b5582aeffc85110287",
+  "src/pyrite/montecarlo/channeling/axial_jump_instrument.py": "07984d4c4844e6857ace6b36fd174a958a86d62bd8445707e6845b10c6cb4cca",
+  "src/pyrite/montecarlo/channeling/axial_phase_space.py": "96d50455cf84d25ea870f56799bd6ba4e1a521e752af236a985d379f9ef61670"
+ },
+ "command": "runpy checks/axial_outgoing_maps.py :: unraveled_report(n_incidents=20000) (seed 0)",
+ "environment": {
+  "python": "3.14.4",
+  "host": "local laptop (WSL), single process",
+  "OPENBLAS_NUM_THREADS": "1",
+  "memory_cap": "systemd-run MemoryMax=8G"
+ },
+ "resources_gnu_time": [
+  "Elapsed (wall clock) time (h:mm:ss or m:ss): 3:19.63",
+  "Maximum resident set size (kbytes): 684516"
+ ],
+ "method": "Terminal-event unraveling (unravel_absorbing_outgoing); tallies are incident-weighted fractions with binomial SEM; order-4 case also evaluated by the dense absorbing_axial_model oracle.",
+ "result": {
+  "status": "research-only; TDS, one string, Gamma point of one cell, absorbing model",
+  "seed": 0,
+  "rows": [
+   {
+    "max_order": 4,
+    "cut_eV": 29.39331948469011,
+    "retained_states": 24,
+    "kraus_jumps": 183,
+    "entrance_weight": 0.9999869117884598,
+    "incidents": 20000,
+    "seconds": 12.527318784001181,
+    "mean_retained_jumps": 0.4056,
+    "depths_ang": [
+     1000.0,
+     10000.0,
+     30000.0
+    ],
+    "outgoing": [
+     0.021499718603451883,
+     0.10859857862022673,
+     0.16329786269505547
+    ],
+    "outgoing_sem": [
+     0.0010256022452822325,
+     0.0022000398403292975,
+     0.0026137093703902056
+    ],
+    "unresolved": [
+     0.10644860675988155,
+     0.5000434552398193,
+     0.7426402800396996
+    ],
+    "unresolved_sem": [
+     0.0021807786184855882,
+     0.003535487614439631,
+     0.0030912454987364942
+    ],
+    "retained": [
+     0.8720385864251263,
+     0.39134487792841377,
+     0.09404876905370463
+    ],
+    "retained_sem": [
+     0.002361947044128037,
+     0.0034510066824266013,
+     0.0020640054162114384
+    ],
+    "dense_outgoing": [
+     0.021373254787155578,
+     0.10569072435674842,
+     0.16373346378852166
+    ],
+    "dense_unresolved": [
+     0.1070505892836806,
+     0.4990739719899798,
+     0.7417915622222843
+    ],
+    "dense_retained": [
+     0.8715630677176232,
+     0.3952222154417466,
+     0.09446188577766702
+    ]
+   },
+   {
+    "max_order": 6,
+    "cut_eV": 94.9718232883803,
+    "retained_states": 77,
+    "kraus_jumps": 309,
+    "entrance_weight": 0.9999994948884983,
+    "incidents": 20000,
+    "seconds": 175.25894850499935,
+    "mean_retained_jumps": 0.9404,
+    "depths_ang": [
+     1000.0,
+     10000.0,
+     30000.0
+    ],
+    "outgoing": [
+     0.02074998951893634,
+     0.12139993867946368,
+     0.2046998966036756
+    ],
+    "outgoing_sem": [
+     0.0010079537929102206,
+     0.0023093498245997813,
+     0.0028530487687546454
+    ],
+    "unresolved": [
+     0.07489996216714852,
+     0.388549803738926,
+     0.6181996877400696
+    ],
+    "unresolved_sem": [
+     0.0018613156637399776,
+     0.003446582782209019,
+     0.0034353203748586345
+    ],
+    "retained": [
+     0.9043495432024133,
+     0.4900497524701086,
+     0.17709991054475305
+    ],
+    "retained_sem": [
+     0.002079675336616797,
+     0.00353483199773573,
+     0.0026994021817301674
+    ]
+   }
+  ]
+ }
+}

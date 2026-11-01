@@ -901,13 +901,49 @@ dominated by transfers leaving the $9\times9$ window. It is window
 accounting, not a physical escape fraction. A sampled event returns a
 correlated depth/position/momentum index on that window.
 
-**Scaling limit.** The dense instrument costs $(2n^2)^2$. The provisional
-~95 eV rule retains 77 Γ-point states in one cell (about 2 GiB per dense
-matrix, more for supercells and Bloch sampling), so the dense form is a
-small-$n$ oracle only. Material-scale use needs the trajectory unraveling:
-apply $B_j$ to the MCWF state at an outgoing jump and measure that state,
-which `run_spectral_mcwf` can host. Electronic jumps, continuum (rather than
-lattice) transfers and the physical matching remain open.
+**Scaling limit and trajectory unraveling.** The dense instrument costs
+$(2n^2)^2$. The provisional ~95 eV rule retains 77 Γ-point states in one cell
+(about 2 GiB per dense matrix, more for supercells and Bloch sampling), so the
+dense form is a small-$n$ oracle only.
+`axial_jump_unraveling.unravel_absorbing_outgoing` samples the same law with
+terminal events: between jumps $\psi$ evolves under $H-i\hbar v\Gamma/2$; the
+jump depth solves $\lVert\psi(z)\rVert^2=u$ by root finding (not step
+quantized); the channel is drawn with weights $\lVert A_a\psi\rVert^2$,
+$\lVert B_b\psi\rVert^2$, $\langle\psi|E_O|\psi\rangle$. Retained jumps
+continue; an outgoing jump measures $B_b\psi$ with the Weyl instrument and
+ends; the unresolved channel ends. Incident-weighted event fractions estimate
+$\operatorname{tr}Q_F(z)$ and $U_O(z)$. Propagation uses one
+eigendecomposition of the non-Hermitian $H_\mathrm{eff}$, with an `expm`
+fallback when its eigenvectors are ill conditioned. Each incident has its own
+versioned jump stream plus the existing measurement stream.
+
+Focused tests compare 3,000 incidents of a mixed three-state model, with
+about four coherent recycling jumps per incident, against the dense oracle
+tallies (4.5σ binomial) and the joint Weyl outcome law ($\chi^2$). They also
+check the scalar exponential depth law (KS), zero jumps, processing-order
+independence, equality of the fallback path and refusals. Injected faults are
+detected: a wrong no-jump loss factor fails the tally and depth-law tests,
+and discarding recycling phases shifts the outgoing tally by about 8σ.
+
+Material run, 20,000 incidents, seed 0
+([record](../../validation/check-records/axial-zone/unravel-local-20k.json);
+local CPU, 3 min 20 s, 0.68 GB RSS). At the 29.39 eV cut (orders $|n|\le4$,
+24 states) every unraveled tally agrees with the dense oracle within 1.3σ.
+At the provisional 94.97 eV cut (orders $|n|\le6$, 77 states, 175 s), the
+values are below, with binomial standard errors:
+
+| Depth (Å) | Retained | Represented outgoing | Unresolved |
+| ---: | ---: | ---: | ---: |
+| 1,000 | 0.904 ± 0.002 | 0.021 ± 0.001 | 0.075 ± 0.002 |
+| 10,000 | 0.490 ± 0.004 | 0.121 ± 0.002 | 0.389 ± 0.003 |
+| 30,000 | 0.177 ± 0.003 | 0.205 ± 0.003 | 0.618 ± 0.003 |
+
+"Retained" counts every state below the cut, not bound exposure. Unresolved
+weight is mostly TDS transfer out of the 13×13 order window. These numbers
+are therefore window accounting and are not comparable with the MCWF
+bound-exposure deficits above. The model omits electronic jumps, Bloch
+sampling and supercells, continuum transfers and return flux. It is not a
+dechanneling fraction or depth budget.
 
 ## Matching prescription still to establish
 

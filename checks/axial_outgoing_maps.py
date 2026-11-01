@@ -171,24 +171,17 @@ def gap_cut(energies: np.ndarray, target_eV: float, window_eV: float) -> float:
     return float(0.5 * (below[i] + above[i]))
 
 
-def report(max_order: int = 4, target_eV: float = 30.0, window_eV: float = 2.0) -> dict:
-    """Bounded Si [001], 5 MeV, one-cell Gamma-point example (TDS only).
+def material_case(max_order: int, target_eV: float, window_eV: float = 2.0) -> dict:
+    """Si [001], 5 MeV, one cell, Gamma point: TDS maps and model inputs.
 
-    Not a converged material prediction: one cell, small window, no electronic
-    jumps, absorbing no-return model. The default 30 eV cut (24 retained
-    states) keeps the dense (2n^2)^2 Liouvillian near 20 MiB per matrix; the
-    provisional ~95 eV rule retains 77 states (about 2 GiB per matrix), which
-    needs the trajectory unraveling rather than this dense oracle.
+    Returns keyword arguments shared by ``absorbing_axial_model`` and
+    ``unravel_absorbing_outgoing`` plus ``cut_eV`` and ``retained_states``.
+    The entrance is the zero-tilt plane wave projected on P (subunit trace).
     Validation: cr-axial-zone-handoff-accounting
     """
     from pyrite.materials.channeling.axial import axial_profile, axial_states
     from pyrite.materials.channeling.transverse import longitudinal_kinematics
     from pyrite.montecarlo.channeling.axial_dissipator import axial_dissipator
-    from pyrite.montecarlo.channeling.axial_jump_instrument import (
-        absorbing_axial_model,
-        sample_absorbing_outgoing,
-    )
-    from pyrite.montecarlo.channeling.axial_phase_space import phase_space_stream
     from pyrite.montecarlo.channeling.operators import _potential
 
     energy = 5e6
@@ -216,16 +209,41 @@ def report(max_order: int = 4, target_eV: float = 30.0, window_eV: float = 2.0) 
         profile.area_ang2,
     )
     entrance = states.coefficients[np.all(states.orders == 0, axis=1)][0].conj()[retained]
-    model = absorbing_axial_model(
-        np.diag(states.energies_eV[retained]),
-        np.outer(entrance, entrance.conj()),
-        retained_jumps_per_sqrt_ang=tuple(maps.retained_jumps),
-        outgoing_jumps_per_sqrt_ang=tuple(maps.outgoing_jumps),
-        unresolved_effect_inv_ang=maps.unresolved_effect,
-        outgoing_shape=maps.outgoing_shape,
-        hbar_v_eV_ang=hbar_v,
-        max_working_bytes=1024**3,
+    return {
+        "model": dict(
+            hamiltonian_eV=np.diag(states.energies_eV[retained]),
+            initial_density=np.outer(entrance, entrance.conj()),
+            retained_jumps_per_sqrt_ang=tuple(maps.retained_jumps),
+            outgoing_jumps_per_sqrt_ang=tuple(maps.outgoing_jumps),
+            unresolved_effect_inv_ang=maps.unresolved_effect,
+            outgoing_shape=maps.outgoing_shape,
+            hbar_v_eV_ang=hbar_v,
+        ),
+        "cut_eV": cut,
+        "retained_states": int(retained.sum()),
+        "kraus_jumps": int(maps.retained_jumps.shape[0]),
+        "unresolved_min_eigenvalue_inv_ang": maps.unresolved_min_eigenvalue,
+    }
+
+
+def report(max_order: int = 4, target_eV: float = 30.0, window_eV: float = 2.0) -> dict:
+    """Bounded Si [001], 5 MeV, one-cell Gamma-point example (TDS only).
+
+    Not a converged material prediction: one cell, small window, no electronic
+    jumps, absorbing no-return model. The default 30 eV cut (24 retained
+    states) keeps the dense (2n^2)^2 Liouvillian near 20 MiB per matrix; the
+    provisional ~95 eV rule retains 77 states (about 2 GiB per matrix), which
+    needs the trajectory unraveling (:func:`unraveled_report`).
+    Validation: cr-axial-zone-handoff-accounting
+    """
+    from pyrite.montecarlo.channeling.axial_jump_instrument import (
+        absorbing_axial_model,
+        sample_absorbing_outgoing,
     )
+    from pyrite.montecarlo.channeling.axial_phase_space import phase_space_stream
+
+    case = material_case(max_order, target_eV, window_eV)
+    model = absorbing_axial_model(**case["model"], max_working_bytes=1024**3)
     rows = []
     for depth in (1e3, 1e4, 3e4):
         snap = model.at_depth(depth)
@@ -240,20 +258,19 @@ def report(max_order: int = 4, target_eV: float = 30.0, window_eV: float = 2.0) 
                 "closure_defect": kept + out + snap.unresolved_weight - model.initial_weight,
             }
         )
-    window = np.zeros(maps.outgoing_shape, dtype=complex)
+    shape = case["model"]["outgoing_shape"]
+    window = np.zeros(shape, dtype=complex)
     window[0, 0] = 1.0
     event = sample_absorbing_outgoing(model, window, 1e4, phase_space_stream(0, 0))
     return {
         "status": "research-only; TDS, one string, Gamma point of one cell, absorbing model",
         "crystal": "silicon",
         "axis": [0, 0, 1],
-        "energy_eV": energy,
+        "energy_eV": 5e6,
         "max_order": max_order,
-        "cut_eV": cut,
-        "retained_states": int(retained.sum()),
-        "kraus_jumps": int(maps.retained_jumps.shape[0]),
+        **{k: case[k] for k in ("cut_eV", "retained_states", "kraus_jumps")},
+        "unresolved_min_eigenvalue_inv_ang": case["unresolved_min_eigenvalue_inv_ang"],
         "entrance_weight": model.initial_weight,
-        "unresolved_min_eigenvalue_inv_ang": maps.unresolved_min_eigenvalue,
         "rows": rows,
         "example_event": {
             "depth_ang": event.depth_ang,
@@ -264,5 +281,77 @@ def report(max_order: int = 4, target_eV: float = 30.0, window_eV: float = 2.0) 
     }
 
 
+def unraveled_report(
+    n_incidents: int = 2000,
+    depths_ang=(1e3, 1e4, 3e4),
+    *,
+    seed: int = 0,
+    cases=((4, 30.0, True), (6, 95.0, False)),
+) -> dict:
+    """Trajectory unraveling of the material maps, with the dense oracle where it fits.
+
+    Each case is ``(max_order, target_eV, dense)``. Errors are binomial
+    standard errors of incident-weighted tallies. Research only.
+    Validation: cr-axial-zone-handoff-accounting
+    """
+    import time
+
+    from pyrite.montecarlo.channeling.axial_jump_instrument import absorbing_axial_model
+    from pyrite.montecarlo.channeling.axial_jump_unraveling import (
+        event_tallies,
+        unravel_absorbing_outgoing,
+    )
+
+    depths = np.asarray(depths_ang, dtype=float)
+    out = []
+    for max_order, target, dense in cases:
+        case = material_case(max_order, target)
+        shape = case["model"]["outgoing_shape"]
+        window = np.zeros(shape, dtype=complex)
+        window[0, 0] = 1.0
+        clock = time.perf_counter()
+        events = unravel_absorbing_outgoing(
+            **case["model"],
+            window=window,
+            max_depth_ang=float(depths.max()),
+            incident_ids=range(n_incidents),
+            seed=seed,
+            search_step_ang=200.0,
+        )
+        elapsed = time.perf_counter() - clock
+        tallies = event_tallies(events, depths)
+        weight = events[0].weight
+        row = {
+            "max_order": max_order,
+            "cut_eV": case["cut_eV"],
+            "retained_states": case["retained_states"],
+            "kraus_jumps": case["kraus_jumps"],
+            "entrance_weight": weight,
+            "incidents": n_incidents,
+            "seconds": elapsed,
+            "mean_retained_jumps": float(np.mean([e.retained_jumps for e in events])),
+            "depths_ang": depths.tolist(),
+        }
+        for kind, values in tallies.items():
+            p = np.clip(values / weight, 0, 1)
+            row[kind] = values.tolist()
+            row[kind + "_sem"] = (weight * np.sqrt(p * (1 - p) / n_incidents)).tolist()
+        if dense:
+            model = absorbing_axial_model(**case["model"], max_working_bytes=1024**3)
+            snaps = [model.at_depth(z) for z in depths]
+            row["dense_outgoing"] = [float(np.trace(s.outgoing_density).real) for s in snaps]
+            row["dense_unresolved"] = [s.unresolved_weight for s in snaps]
+            row["dense_retained"] = [float(np.trace(s.retained_density).real) for s in snaps]
+        out.append(row)
+    return {
+        "status": "research-only; TDS, one string, Gamma point of one cell, absorbing model",
+        "seed": seed,
+        "rows": out,
+    }
+
+
 if __name__ == "__main__":
-    print(json.dumps(report(), indent=2))
+    import sys
+
+    result = unraveled_report() if sys.argv[1:] == ["unravel"] else report()
+    print(json.dumps(result, indent=2))

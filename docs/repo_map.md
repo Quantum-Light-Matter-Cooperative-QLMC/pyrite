@@ -994,9 +994,12 @@ The phase-space reference accepts both pure states and mixed outgoing densities;
 its mixed-state conditional sampler keeps coherences and incident trace without
 constructing all joint outcomes or drawing a pure-state decomposition.
 `channeling/axial_jump_instrument.py` supplies a bounded CPU absorbing-model
-reference: one augmented exponential retains recycling and separates outgoing
-and unresolved tallies; a conditional sampler couples outgoing depth to the
-instantaneous mixed phase-space gain. It accepts supplied finite jump maps,
+reference: one augmented exponential of the retained density and its
+occupation integral retains recycling and separates outgoing and unresolved
+tallies; a conditional sampler couples outgoing depth to the instantaneous
+mixed phase-space gain. `channeling/axial_jump_unraveling.py` samples the same
+law by terminal-event trajectories at retained-dimension cost. Both accept
+supplied finite jump maps (`checks/axial_outgoing_maps.py` builds TDS maps),
 without establishing a physical matching surface or native run admission.
 `channeling/axial_projection.py` provides the CPU research full/retained
 no-jump matrix-exponential reference with native jump draws and step-resolved
