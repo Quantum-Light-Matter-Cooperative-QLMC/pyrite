@@ -47,9 +47,8 @@ for seed in "${seeds[@]}"; do
                     mode=${config#pyrite-cuda-continuous-}; chunk=${mode##*-c}; mode=${mode%-c*}
                     extra=(--estimator continuous --cone-mode "$mode" --chunk "$chunk")
                 fi
-                block=$(python3 -c "import json;print(next(x['block'] for x in json.load(open('checks/geant4_performance/scenes.json'))['scenes'] if x['id']=='$s'))")
                 PYRITE_MC_BACKEND=cuda uv run --no-sync python checks/geant4_performance/pyrite_bench.py \
-                    "$s" --histories "$n" --warmup-histories $(( n < block ? n : block )) --seed "$seed" \
+                    "$s" --histories "$n" --warmup-histories -1 --seed "$seed" \
                     --rows-per-round 1024 --device-staging "${extra[@]}" --output "$stem.json" \
                     > "$stem.log" 2>&1 || echo "FAIL $config $s $n $seed" ;;
         esac
