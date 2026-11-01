@@ -624,7 +624,12 @@ def main():
         profiler.disable()
         args.cprofile.parent.mkdir(parents=True, exist_ok=True)
         profiler.dump_stats(args.cprofile)
-    if work["launches"] and work["launched_rows"] != work["retained_rows"]:
+    # Only continuation rounds report rows; an auto full-history tail pass
+    # (Ne below the continuation minimum) retains rows no round launched.
+    # A replay launches more rows than are retained, so the bound still holds.
+    full_tail = any("full-history" in m for m in work["schedule"])
+    launched, retained = work["launched_rows"], work["retained_rows"]
+    if work["launches"] and (launched > retained or (not full_tail and launched != retained)):
         raise RuntimeError(f"replayed rows detected: {work}")
     args.output.parent.mkdir(parents=True, exist_ok=True)
     npz = args.output.with_suffix(".npz")
