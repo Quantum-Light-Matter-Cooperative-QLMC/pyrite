@@ -87,8 +87,16 @@ class TransportKernelTuning:
     ``electron_batch``, usually sets how many histories share one launch.
     ``kernel_threads`` is the CUDA transport launch's threads per block, one of
     32, 64, 128, 256, 512 or 1024 (``None``: 128). Both are per scene and GPU
-    tuning knobs (#825). No field enters case identity: transport is bitwise-identical under every
-    value. Batch executors reject non-default values and use the variables.
+    tuning knobs (#825). These fields leave transport bitwise-identical.
+    ``precision`` is the exact CUDA kernel's arithmetic (#838): ``"mixed"``
+    (FP32 table lookups and sampling, FP64 accumulation), ``"fp64"``, or
+    ``None`` for ``PYRITE_MC_TRANSPORT_PRECISION``, then the default
+    (``montecarlo.transport.precision.DEFAULT_TRANSPORT_PRECISION``); other
+    cores always run FP64. It changes trajectories at rounding scale and moves
+    observables by less than one third of the #510 statistical budget, so,
+    like the backend, it is recorded in run provenance rather than case
+    identity. No field enters case identity. Batch executors reject
+    non-default values and use the variables.
     """
 
     schedule: Literal["full-history", "continuation", "auto"] | None = None
@@ -96,8 +104,11 @@ class TransportKernelTuning:
     electron_batch: int | None = None
     scratch_mib: int | None = None
     kernel_threads: int | None = None
+    precision: Literal["fp64", "mixed"] | None = None
 
     def __post_init__(self) -> None:
+        if self.precision is not None and self.precision not in ("fp64", "mixed"):
+            raise ValueError("precision must be 'fp64', 'mixed' or None")
         if self.schedule is not None and self.schedule not in TRANSPORT_SCHEDULES:
             raise ValueError(f"schedule must be one of {TRANSPORT_SCHEDULES} or None")
         threads = self.kernel_threads

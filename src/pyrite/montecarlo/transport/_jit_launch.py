@@ -13,17 +13,20 @@ Validation: shell-secondary-transport
 Validation: shell-soft-hard-transport
 """
 
+from collections import OrderedDict
 from dataclasses import dataclass
 
 import cupy as xp
 import numpy as np
 
+from ._jit_kernel import _transport_kernel
 from ._jit_kernel_variants import (
     TransportKernelSwitches,
     monolithic_transport_kernel,
     transport_kernel_variant,
 )
 from ._jit_lut_kernel import _transport_lut_kernel
+from ._jit_precision import MIXED_TABLES
 
 
 @dataclass(frozen=True)
@@ -40,6 +43,40 @@ DEFAULT_TRANSPORT_KERNEL_CONFIG = TransportKernelConfig()
 # every launch uses the runtime-switched monolithic kernel; results are bitwise
 # identical either way, so this is a bisection and benchmarking switch only.
 _SPECIALIZE_TRANSPORT_KERNEL = True
+
+_KERNEL_PARAMETERS = _transport_kernel.__code__.co_varnames[
+    : _transport_kernel.__code__.co_argcount
+]
+_MIXED_TABLE_INDICES = tuple(_KERNEL_PARAMETERS.index(name) for name in MIXED_TABLES)
+# float32 copies of the mixed build's tables (#838), keyed by the source's
+# device pointer, size and dtype. Each entry holds its source, so a cached
+# pointer cannot be freed and reused by another array while it is a key.
+_FLOAT32_TABLES: OrderedDict = OrderedDict()
+_FLOAT32_TABLE_SLOTS = 64
+
+
+def _float32_table(table):
+    """``table`` as a float32 device array, converted once while it is cached."""
+    key = (int(table.data.ptr), int(table.size), table.dtype.str)
+    entry = _FLOAT32_TABLES.get(key)
+    if entry is None:
+        entry = (table, table.astype(xp.float32))
+        _FLOAT32_TABLES[key] = entry
+        if len(_FLOAT32_TABLES) > _FLOAT32_TABLE_SLOTS:
+            _FLOAT32_TABLES.popitem(last=False)
+    else:
+        _FLOAT32_TABLES.move_to_end(key)
+    return entry[1]
+
+
+def _precision_args(args, precision):
+    """Kernel arguments with the mixed build's tables as float32 copies."""
+    if precision == "fp64":
+        return args
+    args = list(args)
+    for index in _MIXED_TABLE_INDICES:
+        args[index] = _float32_table(args[index])
+    return tuple(args)
 
 
 def run_transport_lut_kernel(
@@ -200,6 +237,7 @@ def run_transport_kernel(
     config=DEFAULT_TRANSPORT_KERNEL_CONFIG,
     *,
     continuation=None,
+    precision="fp64",
 ):
     """Launch one thread per electron over ``[e_start, e_start + e_count)``.
 
@@ -251,7 +289,12 @@ def run_transport_kernel(
     at ``i * cap`` plus their index within the launch, and ``seg_count``
     counts this launch's rows only.
 
+    ``precision`` (#838) is ``"fp64"`` or ``"mixed"``; see
+    :mod:`._jit_precision`. ``"mixed"`` needs the specialized kernel and passes
+    the :data:`~._jit_precision.MIXED_TABLES` as float32 copies.
+
     Validation: gpu-transport-core
+    Validation: gpu-mixed-precision-tables
     """
     (e_start, e_count, cap, stream_key) = run
     (max_steps, _max_segments, elastic_model_code, energy_model_code, max_dE_frac) = control
@@ -317,6 +360,8 @@ def run_transport_kernel(
     sbethe_width = int(L_sbethe_logE.shape[1])
     n_blocks = (e_count + n_threads - 1) // n_threads
     kernel = monolithic_transport_kernel
+    if precision != "fp64" and not _SPECIALIZE_TRANSPORT_KERNEL:
+        raise ValueError(f"transport precision {precision!r} needs the specialized kernel")
     if _SPECIALIZE_TRANSPORT_KERNEL:
         kernel = transport_kernel_variant(
             TransportKernelSwitches.normalized(
@@ -328,86 +373,90 @@ def run_transport_kernel(
                 inelastic_on=inelastic_on,
                 rad_on=radiative_arguments[0],
                 cont_on=continuation is not None,
-            )
+            ),
+            precision,
         )
     kernel(
         (n_blocks,),
         (n_threads,),
-        (
-            np.int32(e_start),
-            np.int32(e_count),
-            np.int32(cap),
-            stream_key,
-            alive.astype(xp.uint8, copy=False),
-            np.int32(max_steps),
-            np.int32(n_layers),
-            internal_bounds,
-            np.int32(elastic_model_code),
-            np.int32(energy_model_code),
-            np.float64(max_dE_frac),
-            np.float64(z_total),
-            np.int32(1 if finite_footprint else 0),
-            np.float64(width_ang),
-            np.float64(height_ang),
-            clock,
-            pos.reshape(-1),
-            dirs.reshape(-1),
-            E_cut_by_electrons,
-            L_Js.reshape(-1),
-            L_Zs.reshape(-1),
-            L_ks.reshape(-1),
-            L_coeffs.reshape(-1),
-            L_E_cross.reshape(-1),
-            L_ncm3.reshape(-1),
-            L_sr_rate_numer.reshape(-1),
-            L_mott_numer.reshape(-1),
-            L_mott_denom1.reshape(-1),
-            L_mott_denom2.reshape(-1),
-            L_sr_joy_numer.reshape(-1),
-            np.int32(1 if sbethe_on else 0),
-            L_sbethe_n.astype(xp.int32, copy=False),
-            L_sbethe_logE.reshape(-1),
-            L_sbethe_logS.reshape(-1),
-            np.int32(sbethe_width),
-            L_nel.astype(xp.int32, copy=False),
-            np.int32(max_el),
-            L_top,
-            L_bot,
-            mott_has_table.reshape(-1).astype(xp.uint8, copy=False),
-            mott_start.reshape(-1).astype(xp.int32, copy=False),
-            mott_len.reshape(-1).astype(xp.int32, copy=False),
-            mott_logE_flat,
-            mott_logA_flat,
-            el_start.reshape(-1).astype(xp.int32, copy=False),
-            el_len.reshape(-1).astype(xp.int32, copy=False),
-            el_logE,
-            el_log_rate,
-            el_cdf.reshape(-1),
-            el_pdf.reshape(-1),
-            el_mu,
-            np.int32(el_mu.size),
-            el_guide.reshape(-1).astype(xp.int32, copy=False),
-            np.int32(el_guide.shape[1] - 1),
-            E_keV,
-            seg_dir.reshape(-1),
-            seg_mid.reshape(-1),
-            seg_len,
-            seg_E,
-            seg_t0,
-            seg_id,
-            seg_lay,
-            seg_E_end,
-            seg_t_end,
-            seg_flight,
-            seg_substep,
-            seg_event,
-            seg_count,
-            exit_code,
-            np.int32(1 if straggle_on else 0),
-            stragg_dE,
-            *shell_arguments,
-            *radiative_arguments,
-            *_continuation_kernel_args(continuation),
+        _precision_args(
+            (
+                np.int32(e_start),
+                np.int32(e_count),
+                np.int32(cap),
+                stream_key,
+                alive.astype(xp.uint8, copy=False),
+                np.int32(max_steps),
+                np.int32(n_layers),
+                internal_bounds,
+                np.int32(elastic_model_code),
+                np.int32(energy_model_code),
+                np.float64(max_dE_frac),
+                np.float64(z_total),
+                np.int32(1 if finite_footprint else 0),
+                np.float64(width_ang),
+                np.float64(height_ang),
+                clock,
+                pos.reshape(-1),
+                dirs.reshape(-1),
+                E_cut_by_electrons,
+                L_Js.reshape(-1),
+                L_Zs.reshape(-1),
+                L_ks.reshape(-1),
+                L_coeffs.reshape(-1),
+                L_E_cross.reshape(-1),
+                L_ncm3.reshape(-1),
+                L_sr_rate_numer.reshape(-1),
+                L_mott_numer.reshape(-1),
+                L_mott_denom1.reshape(-1),
+                L_mott_denom2.reshape(-1),
+                L_sr_joy_numer.reshape(-1),
+                np.int32(1 if sbethe_on else 0),
+                L_sbethe_n.astype(xp.int32, copy=False),
+                L_sbethe_logE.reshape(-1),
+                L_sbethe_logS.reshape(-1),
+                np.int32(sbethe_width),
+                L_nel.astype(xp.int32, copy=False),
+                np.int32(max_el),
+                L_top,
+                L_bot,
+                mott_has_table.reshape(-1).astype(xp.uint8, copy=False),
+                mott_start.reshape(-1).astype(xp.int32, copy=False),
+                mott_len.reshape(-1).astype(xp.int32, copy=False),
+                mott_logE_flat,
+                mott_logA_flat,
+                el_start.reshape(-1).astype(xp.int32, copy=False),
+                el_len.reshape(-1).astype(xp.int32, copy=False),
+                el_logE,
+                el_log_rate,
+                el_cdf.reshape(-1),
+                el_pdf.reshape(-1),
+                el_mu,
+                np.int32(el_mu.size),
+                el_guide.reshape(-1).astype(xp.int32, copy=False),
+                np.int32(el_guide.shape[1] - 1),
+                E_keV,
+                seg_dir.reshape(-1),
+                seg_mid.reshape(-1),
+                seg_len,
+                seg_E,
+                seg_t0,
+                seg_id,
+                seg_lay,
+                seg_E_end,
+                seg_t_end,
+                seg_flight,
+                seg_substep,
+                seg_event,
+                seg_count,
+                exit_code,
+                np.int32(1 if straggle_on else 0),
+                stragg_dE,
+                *shell_arguments,
+                *radiative_arguments,
+                *_continuation_kernel_args(continuation),
+            ),
+            precision,
         ),
     )
 
@@ -557,10 +606,10 @@ def _radiative_kernel_args(radiative_args, photon_segments):
     )
 
 
-def make_cuda_transport_core(config=DEFAULT_TRANSPORT_KERNEL_CONFIG):
+def make_cuda_transport_core(config=DEFAULT_TRANSPORT_KERNEL_CONFIG, precision="fp64"):
     """Return ``(core, array_module)`` for ``_run_per_electron_transport``."""
 
     def core(*args, **kwargs):
-        run_transport_kernel(*args, config=config, **kwargs)
+        run_transport_kernel(*args, config=config, precision=precision, **kwargs)
 
     return core, xp

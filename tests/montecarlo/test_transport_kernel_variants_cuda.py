@@ -28,6 +28,8 @@ from tests.montecarlo.test_transport_continuation_cuda import (
 )
 
 requires_cuda = pytest.mark.skipif(not _HAS_CUDA, reason="no CUDA device")
+# The monolithic reference kernel is FP64 only.
+pytestmark = pytest.mark.usefixtures("fp64_transport")
 
 SWITCHES = (
     "elastic_model_code",

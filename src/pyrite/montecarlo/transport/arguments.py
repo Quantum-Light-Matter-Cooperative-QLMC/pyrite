@@ -69,6 +69,7 @@ class TransportInputs:
     pair_production_model: Any
     positron_transport: Any
     atomic_electron_deflection: Any
+    transport_precision: Any
     transport_progress: Any
     _secondary: Any
     _electron_start: Any

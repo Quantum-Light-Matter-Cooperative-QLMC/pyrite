@@ -66,6 +66,7 @@ def simulate_trajectories(
     pair_production_model=None,
     positron_transport=False,
     atomic_electron_deflection=None,
+    transport_precision="auto",
     transport_progress=None,
     _secondary=None,
     _electron_start=0,
@@ -217,6 +218,19 @@ def simulate_trajectories(
 
     atomic_electron_deflection: None (default, BIT-FOR-BIT) or "kawrakow" (Numerics
       default): elastic rate Z^2 -> Z(Z + xi). Validation: inelastic-angular-deflection
+
+    transport_precision: "auto" (default), "fp64" or "mixed" (#838). The
+      exact CUDA kernel's "mixed" build reads its energy-grid, ELSEPA, SBETHE,
+      Mott and BremsLib tables as float32 and evaluates their lookups,
+      interpolation, angle and photon sampling in FP32, while position,
+      direction, energy, path, clock, optical depths and every rate sum stay
+      FP64. "auto" selects ``PYRITE_MC_TRANSPORT_PRECISION``, else
+      ``transport.precision.DEFAULT_TRANSPORT_PRECISION``, on the exact CUDA core, and "fp64" on every other core; explicit
+      "mixed" needs ``transport_core="cuda"`` without the transport LUT.
+      "fp64" is BIT-FOR-BIT the pre-#838 kernel. Changes stay below one third
+      of the #510 statistical budget (refinement gate); see
+      ``transport.precision``. Validation: gpu-mixed-precision-tables,
+      gpu-mixed-precision-math
 
     radiative_moments: "table" (default) uses prepared float64 log-energy
       interpolation for frequent soft/rate totals; "exact" retains quadrature.
@@ -470,6 +484,7 @@ def simulate_trajectories(
         transport_core=transport_core,
         per_electron_config=per_electron_config,
         keep_segments_on_device=keep_segments_on_device,
+        transport_precision=transport_precision,
         transport_lut_config=transport_lut_config,
         collect_diagnostics=collect_diagnostics,
         energy_model=energy_model,

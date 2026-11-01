@@ -230,3 +230,12 @@ electronic-kernel input. Its resolved case payload and all seven
 channeling-off family snapshots remain unchanged. The new CR component is
 covered by public-producer/checkpoint/totals tests; the PXR/CBS, characteristic
 and continuum arrays retain their separate meanings.
+
+## Mixed-precision CUDA default (#838)
+
+The exact CUDA kernel's default arithmetic became mixed FP32/FP64 after the
+#838 refinement gate, and `TRANSPORT_PRECISION_MODEL`
+(`cuda-exact-mixed-fp32-tables-v1`) joined the dataset markers and the case
+content key. Only the generation-dependent identity hash in `resolved.json`
+was re-pinned. These fixtures are CPU/NumPy fp64, which always runs FP64, so
+every recorded output keeps its expectation.
