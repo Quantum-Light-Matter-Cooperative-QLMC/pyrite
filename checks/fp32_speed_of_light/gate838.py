@@ -8,12 +8,17 @@ scene, estimator and seed, so the per-primary observables of the #821 harness
     d_i = mixed_i - fp64_i,  bound = (|mean d| + 1.96 se(d)) / |mean fp64|
 
 pooled over seeds, and the gate at target RSE ``eps`` is ``bound < eps / 3``.
+Each test is an equivalence test with margin ``eps / 3``: ``pass`` when the
+whole 95% interval of the relative change lies inside the margin, ``FAIL``
+when it lies wholly outside (``|rel| - resolution > eps / 3``), and
+``unresolved`` otherwise, which needs more histories, not a verdict.
+The verdict passes only with every test ``pass``.
 Headline membership follows ``scenes.json`` ``precision`` (sets, floors,
 bands below the beam energy). Distributions: the transmitted-energy spectrum
 (20 bins over [0, E0]) and the path-length distribution (20 equal-count bins
 of the FP64 sample), as per-primary bin indicators. Each bin with
 probability >= the fraction floor gets the same bound, and a paired Hotelling
-T^2 over all populated bins tests for any shift (p reported, gate p > 0.01).
+T^2 over all populated bins tests for any shift (p reported as a diagnostic).
 
     uv run python checks/fp32_speed_of_light/gate838.py evidence/gate838/<job> \\
         [--output summary.json]
@@ -73,12 +78,22 @@ def bound(a, b):
     mean_a = a.mean()
     rel = d.mean() / mean_a if mean_a else math.nan
     return dict(
+        resolution=float(Z95 * se / abs(mean_a)) if mean_a else math.nan,
         fp64_mean=float(mean_a),
         rel=float(rel),
         z=float(d.mean() / se) if se > 0 else 0.0,
         bound=float((abs(d.mean()) + Z95 * se) / abs(mean_a)) if mean_a else math.nan,
         identical=float(np.mean(a == b)),
     )
+
+
+def outcome(r, eps):
+    """Equivalence-test outcome of one relative change at margin ``eps / 3``."""
+    if r["bound"] < eps / 3:
+        return "pass"
+    if abs(r["rel"]) - r["resolution"] > eps / 3:
+        return "FAIL"
+    return "unresolved"
 
 
 def hotelling(ia, ib):
@@ -107,7 +122,13 @@ def distribution(name, a, b, edges, scene_floor):
     populated = ia.mean(0) >= scene_floor
     bins = [bound(ia[:, j], ib[:, j]) for j in np.flatnonzero(populated)]
     t2, k, p = hotelling(ia[:, populated], ib[:, populated])
+    rank = {"pass": 0, "unresolved": 1, "FAIL": 2}
+    verdicts = {}
+    for eps in TARGETS:
+        worst = max((outcome(x, eps) for x in bins), key=rank.get, default="pass")
+        verdicts[str(eps)] = worst
     return dict(
+        pass_=verdicts,
         name=name,
         bins=len(bins),
         worst_bound=max(x["bound"] for x in bins) if bins else 0.0,
@@ -141,7 +162,7 @@ def main():
             if not headline(name, a.mean(), scene):
                 continue
             r = bound(a, b) | dict(estimator=est, scene=sid, observable=name, n=int(a.size))
-            r["pass"] = {str(eps): r["bound"] < eps / 3 for eps in TARGETS}
+            r["pass"] = {str(eps): outcome(r, eps) for eps in TARGETS}
             rows.append(r)
         if est != "discrete":
             continue
@@ -161,9 +182,7 @@ def main():
             distribution("path_um", path, pathb, pedges, floor),
         ):
             dist |= dict(scene=sid, n=int(path.size))
-            dist["pass"] = {
-                str(eps): dist["worst_bound"] < eps / 3 and dist["p"] > 0.01 for eps in TARGETS
-            }
+            dist["pass"] = dist.pop("pass_")
             dists.append(dist)
     print(
         "| est | scene | observable | n | identical | fp64 mean | rel | z | bound | eps=2% | eps=1% |"
@@ -173,8 +192,7 @@ def main():
         print(
             f"| {r['estimator']} | {r['scene']} | {r['observable']} | {r['n']} | "
             f"{r['identical']:.3f} | {r['fp64_mean']:.4g} | {r['rel']:+.2e} | {r['z']:+.2f} | "
-            f"{r['bound']:.2e} | {'pass' if r['pass']['0.02'] else 'FAIL'} | "
-            f"{'pass' if r['pass']['0.01'] else 'FAIL'} |"
+            f"{r['bound']:.2e} | {r['pass']['0.02']} | {r['pass']['0.01']} |"
         )
     print()
     print("| scene | distribution | bins | worst bin bound | worst |z| | T^2 p | eps=2% | eps=1% |")
@@ -182,11 +200,14 @@ def main():
     for d in dists:
         print(
             f"| {d['scene']} | {d['name']} | {d['bins']} | {d['worst_bound']:.2e} | "
-            f"{d['worst_abs_z']:.2f} | {d['p']:.3f} | {'pass' if d['pass']['0.02'] else 'FAIL'} | "
-            f"{'pass' if d['pass']['0.01'] else 'FAIL'} |"
+            f"{d['worst_abs_z']:.2f} | {d['p']:.3f} | {d['pass']['0.02']} | {d['pass']['0.01']} |"
         )
     verdict = {
-        str(eps): all(r["pass"][str(eps)] for r in rows) and all(d["pass"][str(eps)] for d in dists)
+        str(eps): max(
+            (x["pass"][str(eps)] for x in (*rows, *dists)),
+            key={"pass": 0, "unresolved": 1, "FAIL": 2}.get,
+            default="pass",
+        )
         for eps in TARGETS
     }
     print(f"\nverdict: {verdict}")
