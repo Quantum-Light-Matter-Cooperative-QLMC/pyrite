@@ -99,36 +99,97 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## Choose a workload and a budget
+    ## Choose a card preset, a workload and a budget
 
-    Two workloads stress different phases. The **spectrum-heavy** case is a
-    thin HOPG crystal at 30 keV, where scoring the CXR lines dominates. The
+    A **card preset** sets the default electron count and the candidate
+    ranges searched below. Two are provided, and the notebook picks the one
+    matching the memory it just read:
+
+    - **16 GB** (RTX 5080 class): scratch budgets up to 4 GiB, which is
+      already several times the 7,131 concurrent W histories the 512 MiB
+      default fits at 256 continuation rows.
+    - **96 GB** (Molab's RTX Pro 6000): scratch budgets up to 32 GiB and
+      `electron_batch` above its 65,536 default, so the whole
+      65,536-electron batch can run as one continuation population.
+
+    Workloads stress different phases. The **spectrum-heavy** case is a thin
+    HOPG crystal at 30 keV, where scoring the CXR lines dominates. The
     **transport-heavy** case is 100 µm of HOPG at 1 MeV, where each electron
-    makes many more steps. More Monte Carlo electrons fill a large GPU better
-    and make timings more stable, but every candidate runs the phase
-    `1 + repeats` times. The trial budget is per phase; a budget smaller than
-    the grid searches it with TPE instead of trying every combination.
+    makes many more steps. The **continuation-heavy** case is 10 µm of
+    tungsten at 1 MeV: each history keeps about a thousand trajectory rows,
+    so how many histories share a continuation round matters most. Its kept
+    segments grow with the electron count; 65,536 W electrons need the 96 GB
+    card for spectrum scoring.
+
+    More Monte Carlo electrons fill a large GPU better and make timings more
+    stable, but every candidate runs the phase `1 + repeats` times. The trial
+    budget is per phase; a budget smaller than the grid searches it with TPE
+    instead of trying every combination.
     """)
     return
 
 
 @app.cell
-def _(mo):
+def _(gpu, mo):
+    # Candidate ranges per card class. `None` keeps the built-in default;
+    # edit a tuple to widen or narrow it, or use () to leave a control untuned.
+    card_presets = {
+        "16 GB (RTX 5080 class)": {
+            "electrons": 16_384,
+            "electron_batch": (None, 8_192, 16_384, 32_768),
+            "schedule": ("auto", "full-history"),
+            "continuation_rows": (None, 64, 128, 512, 1_024),
+            "scratch_mib": (None, 1_024, 2_048, 4_096),
+            "kernel_threads": (None, 64, 128, 256),
+            "cxr_chunk": (None, 16_384, 65_536, 262_144),
+            "brem_chunk": (None, 1_024, 4_096, 16_384),
+            "cxr_threads": (None, 128, 256, 1_024),
+            "cxr_energies_per_block": (None, 1, 2, 4),
+        },
+        # Narrowed from a 2026-11-01 Molab run (W 10 µm, 65,536 electrons):
+        # >= 8 GiB scratch (the whole batch in one population), 64 threads and
+        # 128-512 rows won transport by 1.29x; 1,024 rows and 256 threads lost.
+        # The spectrum controls moved its 16 s phase by at most 5%.
+        "96 GB (RTX Pro 6000, Molab)": {
+            "electrons": 65_536,
+            "electron_batch": (None, 131_072, 262_144),
+            "schedule": ("auto",),
+            "continuation_rows": (None, 128, 512),
+            "scratch_mib": (None, 8_192, 16_384, 32_768),
+            "kernel_threads": (None, 64, 128),
+            "cxr_chunk": (None, 262_144),
+            "brem_chunk": (None, 16_384),
+            "cxr_threads": (None, 256, 1_024),
+            "cxr_energies_per_block": (None, 4),
+        },
+    }
+    card = mo.ui.dropdown(
+        options=list(card_presets),
+        value=list(card_presets)[gpu["total_GiB"] >= 48],
+        label="Card preset",
+    )
+    card  # noqa: B018
+    return card, card_presets
+
+
+@app.cell
+def _(card, card_presets, mo):
     workload = mo.ui.dropdown(
         options={
             "Spectrum-heavy: HOPG 5 µm, 30 keV": "spectrum",
             "Transport-heavy: HOPG 100 µm, 1 MeV": "transport",
+            "Continuation-heavy: W 10 µm, 1 MeV": "tungsten",
         },
-        value="Spectrum-heavy: HOPG 5 µm, 30 keV",
+        value="Continuation-heavy: W 10 µm, 1 MeV",
         label="Workload",
     )
     electrons = mo.ui.dropdown(
         options={f"{n:,}": n for n in (4_096, 16_384, 65_536, 262_144)},
-        value="16,384",
+        value=f"{card_presets[card.value]['electrons']:,}",
         label="Monte Carlo electrons (CXR)",
     )
-    trial_budget = mo.ui.slider(8, 200, value=40, step=4, label="Trials per phase")
-    repeats = mo.ui.slider(2, 7, value=3, label="Timed repeats per trial")
+    trial_budget = mo.ui.slider(8, 200, value=32, step=4, label="Trials per phase")
+    repeats = mo.ui.slider(2, 7, value=2, label="Timed repeats per trial")
     timeout_min = mo.ui.slider(5, 80, value=30, step=5, label="Time limit per phase (min)")
     mo.vstack([workload, electrons, trial_budget, repeats, timeout_min])
     return electrons, repeats, timeout_min, trial_budget, workload
@@ -143,14 +204,15 @@ def _(electrons, np, workload):
     from pyrite.geometry import Footprint, Slab
     from pyrite.units import ureg
 
-    _kinetic, _thickness = {
-        "spectrum": (30 * ureg.keV, 5 * ureg.um),
-        "transport": (1 * ureg.MeV, 100 * ureg.um),
+    _material, _kinetic, _thickness = {
+        "spectrum": ("hopg", 30 * ureg.keV, 5 * ureg.um),
+        "transport": ("hopg", 1 * ureg.MeV, 100 * ureg.um),
+        "tungsten": ("tungsten", 1 * ureg.MeV, 10 * ureg.um),
     }[workload.value]
     scene = Scene(
         Beam(kinetic_energy=_kinetic, transverse=PointSpot(), longitudinal=PointBunch()),
         Slab(
-            "hopg",
+            _material,
             thickness=_thickness,
             tilt=45 * ureg.degree,
             footprint=Footprint(width=5 * ureg.mm, height=5 * ureg.mm),
@@ -161,8 +223,8 @@ def _(electrons, np, workload):
                 cxr_electrons=electrons.value, brem_electrons=max(1_024, electrons.value // 16)
             ),
             seed=7,
-            # A fixed 1 eV window around the HOPG (002) line keeps the spectrum
-            # grid the same for every candidate and every electron count.
+            # A fixed 1 eV window (around the HOPG (002) line) keeps the
+            # spectrum grid the same for every candidate and electron count.
             energy_bins=EnergyBins().with_cxr_energies(np.linspace(750, 1_000, 251) * ureg.eV),
             cxr_reflections=CxrReflections(n_families=1),
         ),
@@ -217,16 +279,18 @@ def _(mo, scene, tables_ready):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## A search space scaled to this GPU
+    ## The card preset's search space
 
     Each control lists its candidate values; `None` keeps the built-in
-    default. The ranges below are derived from the device read above:
+    default. The ranges come from the card preset chosen above:
 
-    - `scratch_mib` runs from the 512 MiB default up to half of the free
-      memory, because the scratch budget, not `electron_batch`, usually sets
-      how many histories share one launch.
-    - `electron_batch` caps histories per launch from a few thousand up to
-      several times the GPU's resident-thread capacity.
+    - `scratch_mib` usually sets how many histories share one continuation
+      round: each history holds `continuation_rows` rows of scratch, so the
+      512 MiB default fits about 7,000 at 256 rows. Values above half of the
+      free memory read above are dropped, so a preset never asks for more
+      than this GPU has.
+    - `electron_batch` caps histories per launch on top of that; the 65,536
+      default matters only once the scratch budget fits more.
     - `kernel_threads` and `cxr_threads` are threads per block. Small blocks
       spread a short launch over more SMs; large blocks amortize scheduling.
     - `continuation_rows` is the rows each history may emit per continuation
@@ -238,31 +302,15 @@ def _(mo):
 
 
 @app.cell(hide_code=True)
-def _(electrons, free_bytes, mo, resident_threads, scene, trial_budget):
+def _(card, card_presets, free_bytes, mo, scene, trial_budget):
     from pyrite.optimization import KernelSearchSpace
 
-    def doubling(start, stop):
-        values, value = [], start
-        while value <= stop:
-            values.append(value)
-            value *= 2
-        return tuple(values)
-
+    _preset = {k: v for k, v in card_presets[card.value].items() if k != "electrons"}
     _scratch_cap = max(1_024, int(0.5 * free_bytes / 2**20))
-    _batch_cap = max(4 * resident_threads, electrons.value)
-    space = KernelSearchSpace(
-        # Transport phase
-        electron_batch=(None, *doubling(4_096, _batch_cap)),
-        schedule=("full-history", "continuation", "auto"),
-        continuation_rows=(None, 64, 128, 512, 1_024),
-        scratch_mib=(None, *doubling(1_024, _scratch_cap)),
-        kernel_threads=(None, 32, 64, 256),
-        # Spectrum phase
-        cxr_chunk=(None, *doubling(16_384, 1_048_576)),
-        brem_chunk=(None, 1_024, 4_096, 16_384),
-        cxr_threads=(None, 128, 256, 1_024),
-        cxr_energies_per_block=(None, 1, 2, 4),
+    _preset["scratch_mib"] = tuple(
+        v for v in _preset["scratch_mib"] if v is None or v <= _scratch_cap
     )
+    space = KernelSearchSpace(**_preset)
     _base = scene.numerics.kernel_tuning
     grid = {_p: len(space.choices(_base, _p)) for _p in ("transport", "spectrum")}
     # tune_kernels tries every combination when the budget covers the grid.
@@ -300,11 +348,24 @@ def _(mo):
 
 
 @app.cell
-def _(electrons, mo, repeats, scene, space, timeout_min, trial_budget, trials, workload):
+def _(
+    card,
+    card_presets,
+    electrons,
+    mo,
+    repeats,
+    scene,
+    space,
+    timeout_min,
+    trial_budget,
+    trials,
+    workload,
+):
     from pyrite.optimization import tune_kernels
 
     _total = sum(trials.values())
-    _name = f"tutorial-15-{workload.value}-{electrons.value}"
+    _card = list(card_presets).index(card.value)
+    _name = f"tutorial-15-card{_card}-{workload.value}-{electrons.value}"
     with mo.status.progress_bar(
         total=_total + 2, title="Tuning transport, then spectrum", show_eta=True
     ) as _bar:
