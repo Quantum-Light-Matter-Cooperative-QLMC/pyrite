@@ -170,7 +170,7 @@ def plasma_energy_eV(material: str | MediumSpec) -> float:
     electron_density_per_m3 = (
         sum(float(n) * Z_TABLE[element] for element, n in composition) * 1.0e30
     )
-    omega_p = np.sqrt(electron_density_per_m3 * _E_CHARGE**2 / (_EPS_0 * _M_E))
+    omega_p = np.sqrt(electron_density_per_m3 * _E_CHARGE * _E_CHARGE / (_EPS_0 * _M_E))
     return float(_HBAR * omega_p / _E_CHARGE)
 
 

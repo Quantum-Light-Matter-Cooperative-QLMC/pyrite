@@ -396,10 +396,24 @@ def refined_continuum_grid(
     Validation: continuum-node-refinement
     """
     baseline = geometric_continuum_grid(material, stop_eV, num, floor_eV=floor_eV)
-    floor, stop = float(baseline[0]), float(baseline[-1])
     # The baseline's own log step is what a geometric grid would place at the
     # endpoint, so the endpoint anchors match the local resolution there.
-    log_step = np.log(stop / floor) / (baseline.size - 1)
+    log_step = np.log(float(baseline[-1]) / float(baseline[0])) / (baseline.size - 1)
+    nodes, summary = _refine_baseline(
+        material, baseline, log_step, endpoint_eV=endpoint_eV, path_elements=path_elements
+    )
+    return (nodes, summary) if return_summary else nodes
+
+
+def _refine_baseline(
+    material: str | MediumSpec,
+    baseline: np.ndarray,
+    log_step: float,
+    *,
+    endpoint_eV: float | None,
+    path_elements: Iterable[str],
+) -> tuple[np.ndarray, dict[str, Any]]:
+    floor, stop = float(baseline[0]), float(baseline[-1])
     marks, summary = continuum_refinement_marks(
         material,
         floor,
@@ -413,9 +427,7 @@ def refined_continuum_grid(
         ),
     )
     nodes, cost = refine_continuum_nodes(baseline, marks)
-    if return_summary:
-        return nodes, {**summary, **cost, "marks": len(marks)}
-    return nodes
+    return nodes, {**summary, **cost, "marks": len(marks)}
 
 
 def geometric_continuum_grid(
@@ -481,11 +493,52 @@ def geometric_continuum_grid(
 #: 9e-4 here against their 1e-2 budget; that is what sets the step.
 CONTINUUM_LOG_STEP = 0.0025
 
+
+def _exp_series(x: float, terms: int = 14) -> float:
+    """``exp(x)`` by a fixed-length Taylor sum in correctly rounded IEEE basic ops.
+
+    Libm and NumPy's CPU-dispatched SIMD transcendentals differ by an ulp or two
+    between machines; ``+``, ``*`` and ``/`` on float64 do not. The automatic
+    continuum grid is part of case identity, so it may use nothing else.
+    """
+    term = total = 1.0
+    for k in range(1, terms + 1):
+        term = term * x / k
+        total = total + term
+    return total
+
+
+#: Per-node ratio of the default continuum grid, ``exp(CONTINUUM_LOG_STEP)``
+#: evaluated once by :func:`_exp_series`, so every machine builds the same bits.
+CONTINUUM_RATIO = _exp_series(CONTINUUM_LOG_STEP)
+
 #: Identity of the default continuum-grid policy. It joins a sweep's hashed
 #: payload whenever a case's continuum grid comes from
 #: :func:`automatic_continuum_grid`, so results on the earlier uniform 25 eV
-#: default never share a dataset with it.
-CONTINUUM_GRID_MODEL = f"refined-geometric-v1/dlnE={CONTINUUM_LOG_STEP:g}"
+#: default never share a dataset with it. ``v2`` builds the nodes from
+#: correctly rounded basic operations only (no ``log``/``exp``/``geomspace``),
+#: so node bits, and therefore case content keys, are machine-independent.
+CONTINUUM_GRID_MODEL = f"refined-geometric-v2/dlnE={CONTINUUM_LOG_STEP:g}"
+
+
+def _deterministic_geometric_nodes(floor: float, stop: float, ratio: float) -> np.ndarray:
+    """``floor * ratio**k`` by repeated multiplication, closed exactly at ``stop``.
+
+    ``E[0]`` is exactly ``floor`` and the last node exactly ``stop``. A final
+    interval narrower than half a step is absorbed by dropping the last lattice
+    node, so no interval is finer than half the baseline spacing.
+    """
+    nodes = [floor]
+    value = floor
+    while True:
+        value = value * ratio
+        if value >= stop:
+            break
+        nodes.append(value)
+    if len(nodes) > 1 and stop <= nodes[-1] * (1.0 + 0.5 * (ratio - 1.0)):
+        nodes.pop()
+    nodes.append(stop)
+    return np.asarray(nodes, dtype=float)
 
 
 def automatic_continuum_grid(
@@ -513,12 +566,14 @@ def automatic_continuum_grid(
     if not np.isfinite(step) or step <= 0.0:
         raise ValueError("log_step must be a finite positive number")
     floor = photon_continuum_floor_eV(material) if floor_eV is None else float(floor_eV)
-    stop = endpoint * float(np.exp(step))
+    ratio = CONTINUUM_RATIO if step == CONTINUUM_LOG_STEP else _exp_series(step)
+    stop = endpoint * ratio
     if stop <= floor:
         raise ValueError(
             f"endpoint {endpoint:.6g} eV is not above the continuum floor {floor:.6g} eV"
         )
-    num = int(np.ceil(np.log(stop / floor) / step)) + 1
-    return refined_continuum_grid(
-        material, stop, max(num, 2), floor_eV=floor_eV, endpoint_eV=endpoint
+    baseline = _deterministic_geometric_nodes(floor, stop, ratio)
+    nodes, _ = _refine_baseline(
+        material, baseline, step, endpoint_eV=endpoint, path_elements=DETECTOR_PATH_ELEMENTS
     )
+    return nodes

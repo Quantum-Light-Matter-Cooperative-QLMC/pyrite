@@ -58,6 +58,8 @@ def accumulate_sincsq(E_r, a_width, weights, E_grid, targets):
     ``E_r``, ``a_width`` are 1-D line arrays; ``weights`` is a sequence of
     1-D per-line weights, one per 1-D ``targets`` spectrum on ``E_grid``.
     NumPy arrays only; callers keep the array-API path for other backends.
+
+    Validation: line-hkl-batch
     """
     if E_r.size == 0 or E_grid.size == 0:
         return
