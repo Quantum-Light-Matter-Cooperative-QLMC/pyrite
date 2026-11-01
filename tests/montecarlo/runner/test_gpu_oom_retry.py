@@ -1,10 +1,12 @@
+import traceback
+import weakref
 from contextlib import contextmanager
 
 import numpy as np
 import pytest
 
 import pyrite.montecarlo.runner as runner
-from pyrite.montecarlo.runner import scheduling
+from pyrite.montecarlo.runner import recovery, scheduling
 
 
 class DummyOOM(Exception):
@@ -559,3 +561,82 @@ def test_oom_halving_never_raises_a_chunk_below_the_old_1000_floor():
     case = {"spec_chunk": 1, "brem_chunk": 1}
     runner._halve_case_chunks(case, tp)
     assert (case["spec_chunk"], case["brem_chunk"]) == (1, 1)
+
+
+class _Pinned:
+    """Stands in for a device array held by a callee frame."""
+
+
+def _holder_frame(sink):
+    held = _Pinned()
+    sink.append(weakref.ref(held))
+    gen = (x for x in range(3))
+    next(gen)
+    raise DummyOOM("out of memory")
+
+
+def _outer_raiser(sink):
+    _holder_frame(sink)
+
+
+def _assert_released(sink, error):
+    import gc
+
+    gc.collect()
+    assert sink[0]() is None
+    text = "".join(traceback.format_exception(error))
+    assert "_holder_frame" in text
+    assert "_outer_raiser" in text
+    assert 'raise DummyOOM("out of memory")' in text
+
+
+def test_exhausted_spectrum_oom_releases_traceback_locals(monkeypatch):
+    sink, released = [], []
+    monkeypatch.setattr(runner, "_is_gpu_oom", lambda e: isinstance(e, DummyOOM))
+    monkeypatch.setattr(runner.BACKEND, "release_memory", lambda: released.append(1))
+    monkeypatch.setattr(
+        runner, "_spectrum_case", lambda case, tp, record_timing=False: _outer_raiser(sink)
+    )
+    with pytest.raises(DummyOOM) as info:
+        runner._spectrum_case_retry({}, _tp(), max_retries=0)
+    assert released
+    _assert_released(sink, info.value)
+
+
+def test_explicit_backend_spectrum_oom_releases_traceback_locals(monkeypatch):
+    sink, released = [], []
+    monkeypatch.setattr(runner._RESOURCE_POLICY, "gpu", True)
+    monkeypatch.setattr(runner, "_is_gpu_oom", lambda e: isinstance(e, DummyOOM))
+    monkeypatch.setattr(runner, "_ensure_pool_limit", lambda: None)
+    monkeypatch.setattr(runner.BACKEND, "release_memory", lambda: released.append(1))
+    monkeypatch.setattr(
+        runner, "_spectrum_case", lambda case, tp, record_timing=False: _outer_raiser(sink)
+    )
+    with pytest.raises(DummyOOM) as info:
+        runner._spectrum_with_recovery({}, _tp(), engine="cuda")
+    assert released
+    _assert_released(sink, info.value)
+
+
+def test_transport_oom_without_resident_releases_traceback_locals(monkeypatch):
+    sink, released = [], []
+    monkeypatch.setattr(runner, "_is_gpu_oom", lambda e: isinstance(e, DummyOOM))
+    monkeypatch.setattr(runner.BACKEND, "release_memory", lambda: released.append(1))
+    with pytest.raises(DummyOOM) as info:
+        recovery.transport_with_recovery(lambda resident: _outer_raiser(sink), False)
+    assert released
+    _assert_released(sink, info.value)
+
+
+def test_transport_oom_after_host_replay_releases_traceback_locals(monkeypatch):
+    from pyrite.montecarlo.runner import pool
+
+    sink, released = [], []
+    monkeypatch.setattr(runner, "_is_gpu_oom", lambda e: isinstance(e, DummyOOM))
+    monkeypatch.setattr(runner.BACKEND, "release_memory", lambda: released.append(1))
+    monkeypatch.setattr(pool, "_admit_host_segments", lambda: None)
+    with pytest.raises(DummyOOM) as info:
+        recovery.transport_with_recovery(lambda resident: _outer_raiser(sink), True)
+    assert released
+    gc_sink = sink[-1:]
+    _assert_released(gc_sink, info.value)

@@ -46,19 +46,30 @@ def _host_arrays(value):
 def transport_with_recovery(transport, resident):
     """Replay resident CUDA transport once with host segments; retain its core."""
     from .. import runner
+    from .oom import _drop_traceback_locals
     from .pool import _admit_host_segments
 
     try:
         return transport(resident), {}
     except Exception as error:
-        if not resident or not runner._is_gpu_oom(error):
+        if not runner._is_gpu_oom(error):
+            raise
+        if not resident:
+            _drop_traceback_locals(error)
+            runner.BACKEND.release_memory()
             raise
         error.add_note("CUDA resident transport failed; attempting host-resident segments")
         error.__traceback__ = None
         runner.BACKEND.release_memory()
         _admit_host_segments()
     # Outside the handler: failed device temporaries are no longer referenced.
-    segments = transport(False)
+    try:
+        segments = transport(False)
+    except Exception as error:
+        if runner._is_gpu_oom(error):
+            _drop_traceback_locals(error)
+            runner.BACKEND.release_memory()
+        raise
     return segments, {
         "_transport_gpu_oom_retries": 1,
         "_recovery_path": "host_segments",
@@ -90,7 +101,7 @@ def _spectrum_case_retry(case, tp, max_retries=None, record_timing=False, spec_c
     Resource admission and unrelated runtime failures propagate immediately.
     """
     from .. import runner
-    from .oom import _SpectrumPhaseOOM
+    from .oom import _drop_traceback_locals, _SpectrumPhaseOOM
 
     timed = runner._TIMING or record_timing
     t0 = perf_counter() if timed else 0.0
@@ -118,6 +129,9 @@ def _spectrum_case_retry(case, tp, max_retries=None, record_timing=False, spec_c
                 error.__dict__["_pyrite_recovery"] = _retry_metrics(
                     counts, events, initial, work, tp
                 )
+                _drop_traceback_locals(caught)
+                _drop_traceback_locals(error)
+                runner.BACKEND.release_memory()
                 raise error from caught if error is not caught else None
             # Tracebacks retain device scratch until cleared, defeating pool release.
             error.__traceback__ = None
@@ -145,6 +159,7 @@ def _spectrum_case_retry(case, tp, max_retries=None, record_timing=False, spec_c
 def _spectrum_with_recovery(case, tp, record_timing=False, spec_chunk_cap=None, engine=None):
     """Apply the same retry/admitted CPU policy in every execution topology."""
     from .. import runner
+    from .oom import _drop_traceback_locals
 
     if not runner._RESOURCE_POLICY.gpu:
         return runner._spectrum_case(case, tp, record_timing)
@@ -163,6 +178,8 @@ def _spectrum_with_recovery(case, tp, record_timing=False, spec_chunk_cap=None, 
         if (engine or _ENGINE.get()) != "auto" or env_value(
             "PYRITE_MC_BACKEND", "auto"
         ).lower() != "auto":
+            _drop_traceback_locals(error)
+            runner.BACKEND.release_memory()
             raise
         metrics = getattr(error, "_pyrite_recovery", {})
         reason = f"{'device_budget_infeasible' if admission else 'accelerator_oom_retries_exhausted'}: {error}"

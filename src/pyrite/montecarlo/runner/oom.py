@@ -13,6 +13,42 @@ class _SpectrumPhaseOOM(Exception):
         self.error = error
 
 
+def _drop_traceback_locals(exc):
+    """Release frame locals pinned by ``exc``'s traceback chain, keeping the text.
+
+    A terminal OOM propagates with every callee frame (device arrays, suspended
+    generators) alive through ``__traceback__``, so the pool cannot be returned
+    until the exception dies. Clear finished frames and close pyrite generators
+    they hold; traceback objects stay, so file/line/function still format.
+    Still-executing frames (the raiser itself) raise RuntimeError and are skipped."""
+    import inspect
+
+    seen = set()
+    stack = [exc]
+    while stack:
+        err = stack.pop()
+        if err is None or id(err) in seen:
+            continue
+        seen.add(id(err))
+        stack.extend((err.__cause__, err.__context__))
+        tb = err.__traceback__
+        while tb is not None:
+            frame = tb.tb_frame
+            for value in list(frame.f_locals.values()):
+                if inspect.isgenerator(value) and str(
+                    value.gi_frame.f_globals.get("__name__", "") if value.gi_frame else ""
+                ).startswith("pyrite"):
+                    try:
+                        value.close()
+                    except (RuntimeError, ValueError):
+                        pass
+            try:
+                frame.clear()
+            except RuntimeError:
+                pass
+            tb = tb.tb_next
+
+
 def _should_free(cases_since, every, reserved_bytes, watermark_mb):
     """A2 free-cadence predicate (pure, no CuPy so it unit-tests without a GPU).
 
