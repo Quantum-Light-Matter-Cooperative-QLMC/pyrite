@@ -120,6 +120,34 @@ gave identical wall times and bitwise-identical output on Si and W at
 1,000- and 4,000-electron blocks, and was removed: since #860, blocks of
 1,000 histories or more already take bounded continuation.
 
+## Per-estimator scoring split (#872)
+
+`checks/streamed_scoring_memory.py` times each estimator inside
+`BlockSpectrumScorer.add` with device synchronizations (`score.*` phases).
+Same setup as above, 20,000 electrons in 4,096-electron blocks, 1e5 Å slab
+(10 µm), seed 1; jobs 3035 (before) and 3041 (after), RTX 5080, two reps each,
+seconds:
+
+| Case | Upload | Lines (`spec`) | Characteristic | Continuum | `add` total | Wall |
+|---|---|---|---|---|---|---|
+| W before (3035) | 0.73 | 9.25 | 14.6-14.8 | 2.1 | 25.7-25.9 | 37.6 |
+| W after (3041) | 0.82 | 9.2-9.4 | 3.85 | 2.1 | 14.9-15.2 | 26.5-26.9 |
+| Si before (3035) | 0.03 | 0.61 | 0.2-0.22 | 0.5 | 1.1 | 2.4 |
+| Si after (3041) | 0.03 | 0.6 | 0.13-0.14 | 0.5 | 1.04-1.05 | 2.3-2.4 |
+
+Joined W at 4,000 electrons: characteristic 3.09 s before, 0.85 s after (spectrum
+phase 5.69 s to 3.59 s, wall 8.6 s to 6.4 s).
+
+Characteristic scoring dominated W (57% of `add`) because it ran one set of
+small array kernels per (chunk, line): about 90 lines per chunk, launch bound.
+It now scores lines in groups against each chunk (bounded to 4 Mi matrix
+elements per group). Per-element arithmetic is unchanged; the matmul and
+segment-sum reduction orders are regrouped. In practice streamed spectra
+before and after were bitwise identical on W and Si (`compare`, max relative
+difference 0), so no tolerance change. The remaining W cost is the incoherent
+line reduction (`spec`, 36%), owned by #286; the BremsLib continuum is 8%, the
+host-to-device upload 3% and the per-block pool release about 2%.
+
 ## Transport/scoring overlap
 
 Overlapping CPU transport with GPU scoring is not implemented. Job 3010 timed
