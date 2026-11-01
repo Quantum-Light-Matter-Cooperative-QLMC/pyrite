@@ -149,6 +149,44 @@ def _positive_integer(name: str, value: int, *, max_value: int | None = None) ->
     return int(value)
 
 
+def crystal_to_lab_frame(frame_lab) -> np.ndarray:
+    """Validate an orthonormal right-handed crystal-to-lab matrix (columns: crystal x, y, z).
+
+    Validation: cr-axial-zone-handoff-physical
+    """
+    frame = np.asarray(frame_lab, dtype=float)
+    if frame.shape != (3, 3) or not np.all(np.isfinite(frame)):
+        raise ValueError("frame_lab needs a finite 3x3 matrix")
+    if not np.allclose(frame.T @ frame, np.eye(3), atol=1e-10, rtol=0) or not np.isclose(
+        np.linalg.det(frame), 1.0, atol=1e-10, rtol=0
+    ):
+        raise ValueError("frame_lab must be an orthonormal right-handed crystal-to-lab frame")
+    return frame
+
+
+def momentum_inv_ang(kinetic_energy_eV: float) -> float:
+    """On-shell electron momentum ``sqrt(E(E + 2 m c^2)) / (hbar c)`` [Å^-1].
+
+    Validation: cr-axial-zone-handoff-physical
+    """
+    return float(np.sqrt(kinetic_energy_eV * (kinetic_energy_eV + 2 * _M_E_EV)) / _HBARC_EV_ANG)
+
+
+def on_shell_direction(k_perp_inv_ang, kinetic_energy_eV: float, max_angle_rad: float):
+    r"""Crystal-frame unit direction $(k_x/p, k_y/p, \sqrt{1-k_\perp^2/p^2})$.
+
+    Refuses rather than clips a transverse wavevector at or beyond
+    ``p sin(max_angle_rad)`` (paraxial/on-shell budget).
+    Validation: cr-axial-zone-handoff-physical
+    """
+    kx, ky = (float(k) for k in k_perp_inv_ang)
+    p = momentum_inv_ang(kinetic_energy_eV)
+    perpendicular2 = (kx * kx + ky * ky) / (p * p)
+    if not np.isfinite(perpendicular2) or perpendicular2 >= np.sin(max_angle_rad) ** 2:
+        raise ValueError("sampled transverse momentum violates on-shell/paraxial angle budget")
+    return np.array([kx / p, ky / p, np.sqrt(1.0 - perpendicular2)])
+
+
 def propose_correlated_outgoing(
     state_per_ang: np.ndarray,
     window: np.ndarray,
@@ -198,13 +236,7 @@ def propose_correlated_outgoing(
     origin = _finite_vector("entrance_origin_lab_ang", entrance_origin_lab_ang, 3)
     offset = _finite_vector("transverse_origin_ang", transverse_origin_ang, 2)
     carrier = _finite_vector("carrier_inv_ang", carrier_inv_ang, 2)
-    frame = np.asarray(frame_lab, dtype=float)
-    if frame.shape != (3, 3) or not np.all(np.isfinite(frame)):
-        raise ValueError("frame_lab needs a finite 3x3 matrix")
-    if not np.allclose(frame.T @ frame, np.eye(3), atol=1e-10, rtol=0) or not np.isclose(
-        np.linalg.det(frame), 1.0, atol=1e-10, rtol=0
-    ):
-        raise ValueError("frame_lab must be an orthonormal right-handed crystal-to-lab frame")
+    frame = crystal_to_lab_frame(frame_lab)
     state = np.asarray(state_per_ang, dtype=complex)
     if state.shape != grid.shape or not np.all(np.isfinite(state)):
         raise ValueError("state_per_ang must be finite and match grid.shape")
@@ -218,13 +250,8 @@ def propose_correlated_outgoing(
     )
     ix, iy = outcome.position_index
     jx, jy = outcome.momentum_index
-    px = float(grid.kx[jx] + carrier[0])
-    py = float(grid.ky[jy] + carrier[1])
-    p = float(np.sqrt(kinetic_energy_eV * (kinetic_energy_eV + 2 * _M_E_EV)) / _HBARC_EV_ANG)
-    perpendicular2 = (px * px + py * py) / (p * p)
-    if perpendicular2 >= np.sin(max_angle_rad) ** 2:
-        raise ValueError("sampled transverse momentum violates on-shell/paraxial angle budget")
-    direction_crystal = np.array([px / p, py / p, np.sqrt(1.0 - perpendicular2)])
+    k_perp = (float(grid.kx[jx] + carrier[0]), float(grid.ky[jy] + carrier[1]))
+    direction_crystal = on_shell_direction(k_perp, kinetic_energy_eV, max_angle_rad)
     point_crystal = np.array(
         [float(grid.x[ix]) + offset[0], float(grid.y[iy]) + offset[1], depth_ang]
     )

@@ -185,6 +185,11 @@ with jump outputs measured on an outgoing order box;
 (continuous carrier-moving transfers per string, exact displacement-mixture
 rejection sampler, continuum loss); all of these work
 without establishing a physical matching surface or native run admission.
+`channeling/axial_outgoing_launch.py` maps fibre events (plus the surface
+complement) under a declared matching cut to correlated research lab launches
+(depth, position, CSDA energy, direction, clock, stream key) and per-incident
+retained/physical-outgoing/unresolved fates; it is not a native `LaunchState`
+adapter and does not supply the depth budget.
 `channeling/axial_projection.py` provides the CPU research full/retained
 no-jump matrix-exponential reference with native jump draws and step-resolved
 jump times, used only by the opt-in return-flux comparison. It does not admit
