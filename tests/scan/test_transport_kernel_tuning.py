@@ -101,7 +101,7 @@ def test_scratch_and_launch_threads_lower_onto_the_transport_config():
     default = transport_module.DEFAULT_PER_ELECTRON_TRANSPORT_CONFIG
     assert (config.scratch_budget_bytes, config.kernel_threads) == (2048 * 1024**2, 32)
     assert (config.max_batch, config.schedule) == (default.max_batch, default.schedule)
-    assert default.kernel_threads == 128
+    assert default.kernel_threads == 32
     with pytest.raises(ValueError, match="kernel_threads must be one of"):
         replace(default, kernel_threads=48)
 

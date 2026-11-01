@@ -269,7 +269,9 @@ class PerElectronTransportConfig:
 
     ``kernel_threads`` is the CUDA transport launch's threads per block (#825).
     Output slots and RNG streams are addressed by electron index, so it changes
-    launch geometry only; CPU cores ignore it.
+    launch geometry only; CPU cores ignore it. The default is 32 (#875): faster
+    than 128 on the exact kernel at both precisions with bitwise-identical
+    results; see ``docs/repo-design/compute/gpu-transport-rawkernel.md``.
     """
 
     seg_capacity: int = 512
@@ -279,7 +281,7 @@ class PerElectronTransportConfig:
     probe_electrons: int = 1024
     continuation: TransportContinuationConfig | None = None
     schedule: str | None = None
-    kernel_threads: int = 128
+    kernel_threads: int = 32
 
     def __post_init__(self):
         check_schedule(self.schedule)

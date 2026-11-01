@@ -344,7 +344,7 @@ def _(mo, spectrum_s, transport_s, tuning):
         "schedule": "auto",
         "continuation_rows": 256,
         "scratch_mib": 512,
-        "kernel_threads": 128,
+        "kernel_threads": 32,
         "cxr_chunk": "case",
         "brem_chunk": "case",
         "cxr_threads": 512,

@@ -34,7 +34,7 @@ class TransportKernelConfig:
     """Launch geometry. Does not affect results -- output slots are addressed by
     electron index, not by thread or block index."""
 
-    nthreads: int = 128
+    nthreads: int = 32
 
 
 DEFAULT_TRANSPORT_KERNEL_CONFIG = TransportKernelConfig()

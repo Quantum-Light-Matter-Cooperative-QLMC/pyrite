@@ -165,7 +165,7 @@ The payload is 82 bytes per recorded segment — 0.46 GB for hopg, 1.15 GB for M
 
 `ncu` could not be used — GPU performance counters are admin-only on the box (`ERR_NVGPUCTRPERM`) and there is no passwordless sudo. Both quantities were obtained without counters instead.
 
-Occupancy comes from the CUDA occupancy API against the compiled module. The kernel uses **92 registers per thread** and 40 B of local memory, so it is register-limited to 640 of the 1536 threads an SM can hold — **41.7% theoretical occupancy**, flat for `nthreads` ≤ 128 and falling to 33.3% above it. Wall time tracks that exactly (MoSe2, medians: 1.08 s at 64, 1.12 s at 128, 1.27 s at 256, 1.64 s at 512), so the default of 128 is already at the optimum.
+Occupancy comes from the CUDA occupancy API against the compiled module. The kernel uses **92 registers per thread** and 40 B of local memory, so it is register-limited to 640 of the 1536 threads an SM can hold — **41.7% theoretical occupancy**, flat for `nthreads` ≤ 128 and falling to 33.3% above it. Wall time tracks that exactly (MoSe2, medians: 1.08 s at 64, 1.12 s at 128, 1.27 s at 256, 1.64 s at 512), so the default of 128 looked optimal. #875 later re-timed it on the FP64 and mixed kernels and moved the default to 32 (see below).
 
 Divergence is computed exactly rather than sampled. Thread `i` owns electron `e_start + i`, so a warp covers a contiguous block of 32 electrons and costs its longest-lived member; the wasted fraction is `1 - sum(n) / (32 * max(n))` over each block, where `n` is the per-electron segment count the run already reports.
 
@@ -177,6 +177,29 @@ Divergence is computed exactly rather than sampled. Thread `i` owns electron `e_
 **This closes the persistent-thread work queue as an option.** Perfect load balancing would recover 27.4% of a kernel that is 24% of MoSe2's wall time — about 7% end to end, and half that for hopg — in exchange for a work-queue scheme that would break the index-addressed output slots the reproducibility guarantees rest on. Electron lifetimes are simply not spread widely enough: transport at fixed energy into a stopping slab has a fairly tight range distribution, so 32 neighbouring electrons finish at similar times.
 
 The ranking that followed was: keep segments on the device, which attacks the D2H, most of the host remainder, and the spectrum phase's re-upload at once. That is done — see the handoff section. Pinned host memory was *not* the cheap partial it looked like, and is now moot.
+
+## Launch shape and compile options retune (#875)
+
+Harness `checks/launch_retune_875.py`, RTX 5080 (CuPy 14.2.0). Arms alternate in rotating order per seed after an untimed warmup; wall is warm `simulate_trajectories`, kernel is the sum of CUDA-event times of the transport launches; every returned array is hashed against the same-precision `kernel_threads=128` arm. Schedules are explicit `full-history` and `continuation`. Jobs 3036 (attributes), 3040 (sweep, seeds 1-3), 3580 (continuation repeat, seeds 11-17), 3579 (caps, seeds 1-3).
+
+**Resources** (cupyx.jit kernel; blocks per SM at 32/64/128 threads): FP64 186 registers, 40 B local, 8/4/2. Mixed 140 registers, 32 B local, 12/6/3. `__ldg` leaves mixed at 140; `--maxrregcount=168` gives 138; r128 gives 114 registers, 16/8/4.
+
+**`kernel_threads`**, median speedup of 128 over the arm (t128 time / arm time), kernel time, seeds 1-3 (continuation: 10 seeds):
+
+| scene | schedule | fp64 t64 | fp64 t32 | mixed t64 | mixed t32 |
+| --- | --- | --- | --- | --- | --- |
+| Si 300 keV | full-history | 1.23 | 1.29 | 1.14 | 1.19 |
+| W 300 keV | full-history | 1.18 | 1.22 | 1.12 | 1.15 |
+| Si 1 MeV | full-history | 1.26 | 1.34 | 1.22 | 1.31 |
+| W 1 MeV | full-history | 1.24 | 1.31 | 1.16 | 1.22 |
+| Si 300 keV | continuation | 1.17 | 1.26 | 1.14 | 1.24 |
+| W 300 keV | continuation | 1.01-1.15 | 1.16-1.24 | 0.90-0.96 | 1.14-1.23 |
+| Si 1 MeV | continuation | 1.09-1.21 | 1.24-1.26 | 1.11-1.27 | 1.23-1.24 |
+| W 1 MeV | continuation | 1.17-1.20 | 1.22-1.23 | 1.13-1.17 | 1.20-1.21 |
+
+Warm wall time follows: full-history t32 is 1.09-1.23x faster than t128 on Si and W for both precisions. Under continuation the runs are 0.4-4 s and host-bound, so wall medians are 1.0-1.2x with wide seed-to-seed spread (some single seeds below 1); two 3-seed continuation wall medians at t32 were below 1 (Si 300 keV mixed 0.94, W 300 keV FP64 0.89) and both reverse in the 7-seed repeat (1.07, 1.07), where no t32 wall median is below 1. Every launch shape was bitwise identical to t128 at each precision in every scene, schedule and seed. The default `kernel_threads` is now 32.
+
+**Register cap and `__ldg` on the mixed kernel** at t32: kernel time is within about 1% of plain mixed t32 for `ro`, r168, `ro`+r168 and r128 on all full-history scenes (1.00x), all bitwise identical to mixed t128 (unlike the FP64 kernel's r128 in #796). r128 raises occupancy to 16 blocks per SM without a measurable gain. Negative result: no cap or read-only build is adopted. The LUT core shares the launch default; it was not measured.
 
 ## ELSEPA guide-table panel search (#826)
 
