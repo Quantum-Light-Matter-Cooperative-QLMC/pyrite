@@ -184,14 +184,22 @@ def source_git_state() -> tuple[str | None, bool | None]:
     return sha, bool(status)
 
 
-def run_provenance(case: Case | Mapping[str, Any], xsgen_tables: Mapping[str, str] | None):
+def run_provenance(
+    case: Case | Mapping[str, Any],
+    xsgen_tables: Mapping[str, str] | None,
+    numerics: Numerics | None = None,
+):
     """Software, backend, and physics-model provenance of one transport case.
 
     Shared by :func:`simulate` results and persisted observations, so every
     producer records the same keys. ``git_sha``/``git_dirty`` identify the
     source checkout and are ``None`` outside one (for example an installed wheel).
+    ``transport_precision`` (#838) records the CUDA kernel precision policy,
+    from ``numerics``' ``KernelTuning.transport.precision`` when given.
     """
     from .campaign.physics_view import resolved_physics_view
+    from .montecarlo.runner.transport_options import transport_kernel_tuning
+    from .montecarlo.transport.precision import precision_provenance
 
     git_sha, git_dirty = source_git_state()
     return {
@@ -206,6 +214,9 @@ def run_provenance(case: Case | Mapping[str, Any], xsgen_tables: Mapping[str, st
         "bremsstrahlung_model": case_bremsstrahlung_marker(case),
         "backend": BACKEND.name,
         "device": BACKEND.device,
+        "transport_precision": precision_provenance(
+            BACKEND.name, getattr(transport_kernel_tuning(numerics), "precision", None)
+        ),
         "git_sha": git_sha,
         "git_dirty": git_dirty,
         "versions": {
@@ -418,7 +429,7 @@ def _scalar_result(
             ),
             # Channeling-zone fates and angles (#506); absent when off.
             **({"channeling": output["channeling"]} if "channeling" in output else {}),
-            **run_provenance(case, xsgen_tables),
+            **run_provenance(case, xsgen_tables, resolved_numerics),
         },
     )
 
@@ -635,7 +646,7 @@ def _simulate_planar(
                 if "photon_aperture" in output
                 else {}
             ),
-            **run_provenance(case, xsgen_tables),
+            **run_provenance(case, xsgen_tables, request.numerics),
         },
         spatial=(spatial if detector.pixels is not None or scene.acquisition is not None else None),
         aperture=_aperture_result(output),

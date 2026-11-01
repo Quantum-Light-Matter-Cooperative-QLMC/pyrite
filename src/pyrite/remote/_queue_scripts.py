@@ -25,6 +25,7 @@ _LEGACY_HIGH_ENERGY_MATERIALS = frozenset({"tise2", "gep", "ges", "rese2"})
 _FORWARDED_ENV = (
     "PYRITE_MC_TRANSPORT_CORE",
     "PYRITE_MC_TRANSPORT_SCHEDULE",
+    "PYRITE_MC_TRANSPORT_PRECISION",
     "PYRITE_MC_RESOURCE_POLICY",
     "PYRITE_MC_MIN_CHUNK",
 )
@@ -41,6 +42,10 @@ def _forwarded_env_choices(name):
         from ..montecarlo.transport.continuation import TRANSPORT_SCHEDULES
 
         return TRANSPORT_SCHEDULES
+    if name == "PYRITE_MC_TRANSPORT_PRECISION":
+        from .._numerics import TRANSPORT_PRECISIONS
+
+        return TRANSPORT_PRECISIONS
     from ..montecarlo._resources import _VALID_POLICIES
 
     return _VALID_POLICIES

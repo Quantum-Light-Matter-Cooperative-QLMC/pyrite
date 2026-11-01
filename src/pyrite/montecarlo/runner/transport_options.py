@@ -16,6 +16,16 @@ _TRANSPORT_TUNING: ContextVar[Any] = ContextVar("pyrite_transport_tuning", defau
 # read by the batched line reduction; same scope and identity rules as the
 # transport override.
 _SPECTRUM_LAUNCH: ContextVar[Any] = ContextVar("pyrite_spectrum_launch", default=None)
+# KernelTuning.transport.precision (#838): the exact CUDA kernel's arithmetic.
+# Same scope as the transport override; recorded in run provenance, not identity.
+_TRANSPORT_PRECISION: ContextVar[str | None] = ContextVar(
+    "pyrite_transport_precision", default=None
+)
+
+
+def transport_precision_override() -> str | None:
+    """Active ``KernelTuning.transport.precision``, or None (process default)."""
+    return _TRANSPORT_PRECISION.get()
 
 
 def spectrum_launch_overrides() -> dict[str, int]:
@@ -26,7 +36,11 @@ def spectrum_launch_overrides() -> dict[str, int]:
 def tuned_transport_kwargs():
     """``simulate_trajectories`` kwargs of the active override, if any."""
     config = _TRANSPORT_TUNING.get()
-    return {} if config is None else {"per_electron_config": config}
+    precision = _TRANSPORT_PRECISION.get()
+    return {
+        **({} if config is None else {"per_electron_config": config}),
+        **({} if precision is None else {"transport_precision": precision}),
+    }
 
 
 def transport_kernel_tuning(numerics):
@@ -83,15 +97,20 @@ def transport_tuning(numerics, *, streaming=False):
         raise ValueError(STREAMING_ENTRY_ERROR)
     tuning = transport_kernel_tuning(numerics)
     launch = _spectrum_launch(getattr(numerics, "resolved_execution", None))
-    transport = None if tuning is None or tuning == type(tuning)() else per_electron_config(tuning)
-    if transport is None and launch is None:
+    precision = None if tuning is None else tuning.precision
+    batching = None if tuning is None else replace(tuning, precision=None)
+    transport = (
+        None if batching is None or batching == type(batching)() else per_electron_config(batching)
+    )
+    overrides = (
+        (_TRANSPORT_TUNING, transport),
+        (_SPECTRUM_LAUNCH, launch),
+        (_TRANSPORT_PRECISION, precision),
+    )
+    if all(value is None for _, value in overrides):
         yield
         return
-    tokens = [
-        (var, var.set(value))
-        for var, value in ((_TRANSPORT_TUNING, transport), (_SPECTRUM_LAUNCH, launch))
-        if value is not None
-    ]
+    tokens = [(var, var.set(value)) for var, value in overrides if value is not None]
     try:
         yield
     finally:

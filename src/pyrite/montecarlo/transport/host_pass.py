@@ -14,7 +14,7 @@ from typing import Any
 
 import numpy as np
 
-from ..._numerics import DEFAULT_RADIATIVE_CUTOFF_EV, TRANSPORT_PRECISIONS
+from ..._numerics import DEFAULT_RADIATIVE_CUTOFF_EV
 from ..geometry import validate_transverse_dimensions
 from .arguments import TransportInputs, resolve_cutoffs_by_electron, resolve_layers_and_elastic
 from .batching import (
@@ -48,6 +48,7 @@ from .host_memory import GrowingHostRows, admit_host_allocation, reserve_or_rais
 from .kinematics import _sample_bunch_offsets, stream_keys
 from .layer_tables import build_layer_tables
 from .lut import build_transport_energy_lut
+from .precision import resolve_transport_precision, validate_transport_precision
 from .scattering import check_elsepa_coverage, check_mott_coverage
 from .stopping import (
     pack_sbethe_stopping_tables,
@@ -360,9 +361,8 @@ def _checked_core(p, launch, electron_start):
         resolve_schedule(
             p.per_electron_config, p.Ne, cuda=False, lut=False, launched=False, gdf=False
         )
-    if p.transport_precision not in TRANSPORT_PRECISIONS:
-        raise ValueError(f"transport_precision must be one of {TRANSPORT_PRECISIONS}")
-    if p.transport_precision != "fp64" and transport_core != "cuda":
+    validate_transport_precision(p.transport_precision)
+    if p.transport_precision == "mixed" and transport_core != "cuda":
         raise ValueError(
             f"transport_precision={p.transport_precision!r} requires transport_core='cuda'; "
             f"{p.transport_core!r} resolved to {transport_core!r}"
@@ -673,11 +673,9 @@ def _per_electron_core(t, lut):
     """Per-electron core and its array module; CUDA imports stay lazy."""
     shell_mode = t.controls.shell_mode
     cuda = t.controls.transport_core == "cuda"
-    if lut and t.inputs.transport_precision != "fp64":
-        raise ValueError(
-            f"transport_precision={t.inputs.transport_precision!r} needs the exact CUDA "
-            "core; disable the transport LUT"
-        )
+    precision = resolve_transport_precision(
+        t.inputs.transport_precision, exact_cuda=cuda and not lut
+    )
     if lut and cuda:
         if shell_mode:
             raise NotImplementedError(
@@ -694,7 +692,7 @@ def _per_electron_core(t, lut):
     if cuda:
         from ._jit_launch import make_cuda_transport_core
 
-        return make_cuda_transport_core(_launch_config(t), t.inputs.transport_precision)
+        return make_cuda_transport_core(_launch_config(t), precision)
     core = exact_ungrooved_core(
         per_electron=True, inelastic=shell_mode, radiative=t.controls.radiative_mode
     )
