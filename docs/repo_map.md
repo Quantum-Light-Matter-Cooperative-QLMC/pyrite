@@ -990,6 +990,23 @@ There is no standard-run axial integration. Research helpers
 independently anchored finite-grid measurement and two-time correlation algebra,
 with explicit allocation limits; physical escape and a persisted axial photon
 source remain separate unimplemented contracts.
+The phase-space reference accepts both pure states and mixed outgoing densities;
+its mixed-state conditional sampler keeps coherences and incident trace without
+constructing all joint outcomes or drawing a pure-state decomposition.
+`channeling/axial_jump_instrument.py` supplies a bounded CPU absorbing-model
+reference: one augmented exponential of the retained density and its
+occupation integral retains recycling and separates outgoing and unresolved
+tallies; a conditional sampler couples outgoing depth to the instantaneous
+mixed phase-space gain. `channeling/axial_jump_unraveling.py` samples the same
+law by terminal-event trajectories at retained-dimension cost. Both accept
+supplied finite jump maps (`checks/axial_outgoing_maps.py` builds TDS maps).
+`channeling/axial_fiber_unraveling.py` adds a classical Bloch-carrier label so
+electronic kicks move trajectories between carrier fibres without wrapping,
+with jump outputs measured on an outgoing order box;
+`channeling/axial_tds_continuum.py` supplies its independent-string TDS jumps
+(continuous carrier-moving transfers per string, exact displacement-mixture
+rejection sampler, continuum loss); all of these work
+without establishing a physical matching surface or native run admission.
 `channeling/axial_projection.py` provides the CPU research full/retained
 no-jump matrix-exponential reference with native jump draws and step-resolved
 jump times, used only by the opt-in return-flux comparison. It does not admit

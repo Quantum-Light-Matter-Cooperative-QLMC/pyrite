@@ -222,6 +222,16 @@ def vectors_loss(orders, vectors, g, phase_transform, r, a2, lam, area, tail_ord
     ``G`` beyond the represented differences are not needed.
     Validation: cr-axial-zone-handoff-accounting
     """
+    loss = loss_operator(orders, g, phase_transform, r, a2, lam, area, tail_orders)
+    return np.einsum("pa,pq,qa->a", vectors.conj(), loss, vectors).real
+
+
+def loss_operator(orders, g, phase_transform, r, a2, lam, area, tail_orders):
+    """Full TDS loss effect ``<p|Γ|p'> = Γ_{p-p'}`` in the plane-wave order basis [1/Å].
+
+    Same harmonics as :func:`vectors_loss`, before contracting with states.
+    Validation: cr-axial-zone-handoff-accounting
+    """
     n = np.arange(-tail_orders, tail_orders + 1)
     qx, qy = n[:, None] * g[0], n[None, :] * g[1]
     c = phase_transform(np.hypot(qx, qy)) / area * np.exp(-1j * (qx * r[0] + qy * r[1]))
@@ -240,8 +250,7 @@ def vectors_loss(orders, vectors, g, phase_transform, r, a2, lam, area, tail_ord
     gg = (gx[:, None] * g[0]) ** 2 + (gy[None, :] * g[1]) ** 2
     harmonic = lam * (np.exp(-0.5 * a2 * gg) * first - second)
     diff = orders[:, None, :] - orders[None, :, :] + span
-    loss = harmonic[diff[..., 0], diff[..., 1]]
-    return np.einsum("pa,pq,qa->a", vectors.conj(), loss, vectors).real
+    return harmonic[diff[..., 0], diff[..., 1]]
 
 
 def retained_populations(rates, total, initial, retained, depths_ang) -> dict[str, np.ndarray]:

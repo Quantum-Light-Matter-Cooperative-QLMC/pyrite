@@ -864,6 +864,374 @@ Evidence: {download}`summary <../../validation/check-records/axial-zone/matching
 Scheduler runtimes were 6 min 40 s (16 CPUs), 13 min 17 s (8 CPUs) and
 2 min 6 s (12 CPUs).
 
+## Material TDS jump maps for the absorbing instrument
+
+`checks/axial_outgoing_maps.py` turns the Kraus factorization of
+{eq}`eq-axial-coherent-transfer-covariance` into the inputs of
+`axial_jump_instrument.absorbing_axial_model` for a complete Bloch eigenbasis
+on a rectangular order window $R$ and an energy cut $P$ (so $[H,P]=0$):
+$A_j=PL_jP$, $B_j=(R-P)L_jP$ mapped to the window's discrete position basis,
+and $E_O=P(\Gamma-\sum_jL_j^\dagger RL_j)P$. Here $\Gamma$ is the lattice-sum
+loss of the same periodic finite-transfer model, so
+$E_O=\sum_jPL_j^\dagger(1-R)L_jP\ge0$ up to the order tail and Kraus rank
+truncation; the builder reports its smallest eigenvalue and refuses a
+materially negative one. These are differential maps from the material
+covariance, not a relabelled grid sink.
+
+Focused tests check the operator closure
+$\sum A^\dagger A+\sum B^\dagger B+E_O=P\Gamma P$, agreement of the diagonal
+with the Pauli rate matrix of `periodic_tds_rates`, and, as an independent
+off-diagonal oracle, equality of $\sum_jB_j\rho B_j^\dagger$ with the
+literal-sum `coherent_tds_gain` of a mixed retained state projected on
+$R-P$, plus zero-rate limits and refusals.
+
+Bounded example (Si [001], 5 MeV, one cell, Γ point, TDS only, orders
+$|n|\le4$, cut 29.39 eV, 24 retained states, 183 Kraus jumps, entrance
+weight 0.99999; 34 s, 0.5 GB RSS):
+
+| Depth (Å) | Retained | Represented outgoing | Unresolved |
+| ---: | ---: | ---: | ---: |
+| 1,000 | 0.8716 | 0.0214 | 0.1071 |
+| 10,000 | 0.3952 | 0.1057 | 0.4991 |
+| 30,000 | 0.0945 | 0.1637 | 0.7418 |
+
+Closure defects are below $1.5\times10^{-14}$ and the smallest unresolved
+eigenvalue is $+1.2\times10^{-11}$ Å$^{-1}$. The unresolved column is
+dominated by transfers leaving the $9\times9$ window. It is window
+accounting, not a physical escape fraction. A sampled event returns a
+correlated depth/position/momentum index on that window.
+
+**Scaling limit and trajectory unraveling.** The dense instrument costs
+$(2n^2)^2$. The provisional ~95 eV rule retains 77 Γ-point states in one cell
+(about 2 GiB per dense matrix, more for supercells and Bloch sampling), so the
+dense form is a small-$n$ oracle only.
+`axial_jump_unraveling.unravel_absorbing_outgoing` samples the same law with
+terminal events: between jumps $\psi$ evolves under $H-i\hbar v\Gamma/2$; the
+jump depth solves $\lVert\psi(z)\rVert^2=u$ by root finding (not step
+quantized); the channel is drawn with weights $\lVert A_a\psi\rVert^2$,
+$\lVert B_b\psi\rVert^2$, $\langle\psi|E_O|\psi\rangle$. Retained jumps
+continue; an outgoing jump measures $B_b\psi$ with the Weyl instrument and
+ends; the unresolved channel ends. Incident-weighted event fractions estimate
+$\operatorname{tr}Q_F(z)$ and $U_O(z)$. Propagation uses one
+eigendecomposition of the non-Hermitian $H_\mathrm{eff}$, with an `expm`
+fallback when its eigenvectors are ill conditioned. Each incident has its own
+versioned jump stream plus the existing measurement stream.
+
+Focused tests compare 3,000 incidents of a mixed three-state model, with
+about four coherent recycling jumps per incident, against the dense oracle
+tallies (4.5σ binomial) and the joint Weyl outcome law ($\chi^2$). They also
+check the scalar exponential depth law (KS), zero jumps, processing-order
+independence, equality of the fallback path and refusals. Injected faults are
+detected: a wrong no-jump loss factor fails the tally and depth-law tests,
+and discarding recycling phases shifts the outgoing tally by about 8σ.
+
+Material run, 20,000 incidents, seed 0
+([record](../../validation/check-records/axial-zone/unravel-local-20k.json);
+local CPU, 3 min 20 s, 0.68 GB RSS). At the 29.39 eV cut (orders $|n|\le4$,
+24 states) every unraveled tally agrees with the dense oracle within 1.3σ.
+At the provisional 94.97 eV cut (orders $|n|\le6$, 77 states, 175 s), the
+values are below, with binomial standard errors:
+
+| Depth (Å) | Retained | Represented outgoing | Unresolved |
+| ---: | ---: | ---: | ---: |
+| 1,000 | 0.904 ± 0.002 | 0.021 ± 0.001 | 0.075 ± 0.002 |
+| 10,000 | 0.490 ± 0.004 | 0.121 ± 0.002 | 0.389 ± 0.003 |
+| 30,000 | 0.177 ± 0.003 | 0.205 ± 0.003 | 0.618 ± 0.003 |
+
+"Retained" counts every state below the cut, not bound exposure. Unresolved
+weight is mostly TDS transfer out of the 13×13 order window. These numbers
+are therefore window accounting and are not comparable with the MCWF
+bound-exposure deficits above. The model omits electronic jumps, Bloch
+sampling and supercells, continuum transfers and return flux. It is not a
+dechanneling fraction or depth budget.
+
+**Electronic kicks on carrier fibres.** An electronic jump
+$\sqrt{c_q\rho_q(\mathbf r)}\,e^{i\mathbf q\cdot\mathbf r}$ moves the Bloch
+carrier by $\mathbf q$. The density matrix stays block diagonal in the
+carrier, so a classical folded carrier label is exact.
+`axial_fiber_unraveling.unravel_fiber_outgoing`
+([derivation and review](../../validation/channeling/cr-axial-fiber-unraveling.md))
+keeps one retained state per history on fibre $P(\boldsymbol\kappa)$. The
+algorithm, step by step:
+
+- Between jumps the state evolves under that fibre's no-jump generator.
+- At each jump it draws a TDS Kraus column, the lattice unresolved remainder
+  or a kick node.
+- A kick then draws a uniform azimuth.
+- The kicked carrier folds into $[-g/2,g/2)$ and the orders are relabelled.
+- The output is split into retained (continue), represented outgoing (Weyl
+  measurement, end) or outside the window (unresolved, end).
+
+At the Γ point with TDS only, the fibre engine's rate operators equal the
+`tds_outgoing_maps` operators above to about $10^{-15}$.
+
+Local study (Si [001], 5 MeV, orders $|n|\le6$, ~95 eV cut, entry at Γ;
+[record](../../validation/check-records/axial-zone/fiber-local-4k.json)).
+The electronic model uses 680 kick nodes on a $32^2$ density grid, with
+harmonics $|n|\le4$ dropping at most $1.3\times10^{-3}$ of $\int\rho_q$. The
+electronic run took 13.5 min for 4,000 incidents.
+
+| Depth (Å) | TDS outgoing | TDS unresolved | TDS + electronic outgoing | TDS + electronic unresolved |
+| ---: | ---: | ---: | ---: | ---: |
+| 1,000 | 0.030 ± 0.003 | 0.078 ± 0.004 | 0.024 ± 0.002 | 0.074 ± 0.004 |
+| 10,000 | 0.133 ± 0.005 | 0.384 ± 0.008 | 0.148 ± 0.006 | 0.371 ± 0.008 |
+| 30,000 | 0.207 ± 0.006 | 0.617 ± 0.008 | 0.259 ± 0.007 | 0.555 ± 0.008 |
+
+The table uses seed 0 with 4,000 incidents for each column. A repeat of the
+TDS-only run (seed 1, 8,000 incidents) gives outgoing 0.024, 0.130 and 0.211.
+That agrees with the 20k Γ-point unraveling within 2σ at every depth. At
+1e3 Å the seed-0 value sits 3.3σ high, which is a fluctuation.
+
+Each electronic history makes about 5.6 kicks and 1.6 TDS jumps, yet
+retained weight is unchanged within errors (0.186 vs 0.175 at 3e4 Å). Kicks
+mostly recycle inside the retained subspace across fibres. Their net effect
+in this window is to move about 6% of the weight at 3e4 Å from unresolved to
+represented outgoing. This is still window accounting for one string per
+cell with an absorbing no-return model: no supercells, continuum transfers,
+return flux or matching-energy convergence.
+
+**Outgoing order box.** Most of the unresolved weight above is not
+unrepresentable. It is TDS output that lands just outside the 13×13 retained
+window. `FiberChannels.outgoing_order_max` = B now represents and measures
+jump outputs on a box $[-B,B]^2 \supseteq R$. Retained weight is still
+$P(\boldsymbol\kappa')$, outgoing is box $-P$, and only weight outside the box
+is unresolved. The box is exact when the Kraus columns span $D\ge B+M$. Then
+every box order receives every transfer, and the remainder is a sum of PSD
+terms over outputs outside the box
+([derivation and re-verification](../../validation/channeling/cr-axial-fiber-unraveling.md#implementation-change-outgoing-order-box-2026-10-31-awaiting-re-verification)).
+In the Γ fibre the TDS remainder falls as $B^{-2}$, the $Q^{-2}$ single-nuclear
+tail: 2.85e-5, 5.9e-6, 2.5e-6 and 1.4e-6 Å$^{-1}$ at B = 6, 12, 18 and 24.
+
+Repeating the study at B = 18 (D = 24, 872 Kraus columns, balanced Gaussian
+Weyl window on the 37×37 box; 4,000 incidents, seed 0;
+[record](../../validation/check-records/axial-zone/fiber-box18-local-4k.json))
+gives:
+
+| Depth (Å) | TDS outgoing | TDS unresolved | TDS + electronic outgoing | TDS + electronic unresolved |
+| ---: | ---: | ---: | ---: | ---: |
+| 1,000 | 0.090 ± 0.005 | 0.009 ± 0.001 | 0.091 ± 0.005 | 0.008 ± 0.001 |
+| 10,000 | 0.481 ± 0.008 | 0.036 ± 0.003 | 0.484 ± 0.008 | 0.037 ± 0.003 |
+| 30,000 | 0.775 ± 0.007 | 0.056 ± 0.004 | 0.762 ± 0.007 | 0.052 ± 0.004 |
+
+What changes and what doesn't:
+
+- **Retained weight is unchanged** from the B = 6 runs (0.168 and 0.185 at
+  3e4 Å, against 0.175 and 0.186). It should be: the box changes only how
+  terminal weight is labelled.
+- **Unresolved weight falls** from 0.62 to 0.06 at 3e4 Å.
+- **Most outgoing events are measured outside the retained window**: 72%
+  (TDS) and 66% (TDS + electronic) have order $|n|>6$.
+- **Electronic kicks no longer move weight between the terminal labels at B = 18.** The earlier
+  difference between the two runs was electronic kicks recycling weight that
+  TDS would otherwise have sent just outside the window, and the box now
+  represents that weight directly.
+
+The remaining unresolved weight is the TDS tail beyond 18 orders
+(transverse energy ≳ 1.2 keV). It can be bounded by its $B^{-2}$ law, or
+sampled as single large-angle nuclear scattering.
+
+The model still has one string per cell. All strings vibrate together, so
+TDS transfers are confined to the reciprocal lattice and TDS never changes
+the carrier. Independent strings give
+$\sum_R L_R\rho L_R^\dagger=\int_{\rm BZ}d^2k\,J_k\rho J_k^\dagger$ with
+$J_k=e^{i\mathbf k\cdot\mathbf r}\varphi_k(\mathbf r)$, where $\varphi_k$ is
+cell periodic with harmonics $\hat f(\mathbf k+\mathbf G)$. That is the same
+carrier-moving structure as the electronic kicks, but with a column that
+depends on the full vector $\mathbf k$. Tabulating $\mathbf k$ on an
+$N\times N$ grid is equivalent to an $N\times N$ TDS supercell.
+
+**Independent-string (continuum) TDS.** `axial_tds_continuum` implements
+that family. Each Kraus label is the pair (carrier shift $\Delta$, struck-string
+displacement $u$), because the thermal average over $u$ already is the
+factorization. Each TDS jump draws (output momentum, $u$) by exact rejection
+from the single-atom incoherent bound, at 0.1–2.5 ms per draw. The jump moves
+the carrier, and it is unresolved exactly when the sampled momentum leaves
+the box. No eigendecomposition, transfer truncation or $D\ge B+M$ condition
+is needed
+([derivation](../../validation/channeling/cr-axial-continuum-tds-jumps.md)).
+Any number of strings per cell is supported. For Si [001] there is one
+string per cell, so this removes the image correlation completely and a
+supercell adds nothing. Si [111] has 2 strings per cell and [110] has 4.
+
+Si [001], B = 18, 4,000 incidents
+([record](../../validation/check-records/axial-zone/fiber-continuum-001-local-4k.json)).
+The TDS-only run takes 92 s, about 10× faster than the lattice model at the
+same box. At 3e4 Å:
+
+| Model | Retained | Outgoing | Unresolved |
+| --- | ---: | ---: | ---: |
+| TDS, one-cell lattice | 0.168 ± 0.006 | 0.775 ± 0.007 | 0.056 ± 0.004 |
+| TDS, independent strings | 0.186 ± 0.006 | 0.762 ± 0.007 | 0.051 ± 0.003 |
+| TDS + electronic, lattice | 0.185 ± 0.006 | 0.762 ± 0.007 | 0.052 ± 0.004 |
+| TDS + electronic, strings | 0.192 ± 0.006 | 0.758 ± 0.007 | 0.050 ± 0.003 |
+
+The one-cell model's 1.7% lower mean TDS rate and its carrier-conserving
+transfers shift these window tallies by only 1–2σ.
+
+**Tail beyond the box (#881).** The unresolved string weight above is the
+sampled single-nuclear tail: its momentum is already drawn, so it is now
+recorded as a `"tail"` event (absolute $K$, string displacement, depth)
+within a paraxial cap $|K|\le0.1k$
+([derivation](../../validation/channeling/cr-axial-tds-tail.md)). Draws are
+unchanged. At 3e4 Å the tail is 0.049 (TDS) and 0.045 (TDS + electronic) and
+unresolved falls to 0.0025 and 0.0045
+([record](../../validation/check-records/axial-zone/fiber-tail-001-local-4k.json)).
+The TDS-only residual is the tail beyond the cap, about 6% of the
+out-of-box weight as the large-$Q$ law predicts for the square box (12
+expected, 10 observed). In the electronic run, half of the 18 unresolved
+events are unclassified large-$q$ kick remainders. A tail is a model record, not a physical escape.
+
+Si [111] has two strings per cell (cut target 106.1 eV by the provisional
+rule, 199 retained states at Γ, square window M = 12, box B = 30;
+[record](../../validation/check-records/axial-zone/fiber-continuum-111-local.json)).
+At 3e4 Å, TDS alone (1,000 incidents) gives retained 0.261 ± 0.014, outgoing
+0.668 ± 0.015 and unresolved 0.071 ± 0.008. TDS + electronic (500 incidents)
+gives retained 0.226 ± 0.019, outgoing 0.736 ± 0.020 and unresolved
+0.038 ± 0.009. Caveats for [111]:
+
+- The electronic harmonics drop up to 1.8% of $\int\rho_q$ on this cell.
+- The electronic run peaked at 8.05 GB, at the local memory cap.
+- The square order window makes the $x$ reach the binding box edge.
+
+**Reach-matched rectangular window (#880).** On a rectangular cell the
+window and box extents can be chosen per axis, so that $|g_i|M_i$ is about
+the same on both axes (`matched_order_extents`). For Si [111]
+($g=(1.636, 2.834)$ Å⁻¹) the square $M=12$, $B=30$ becomes $M=(12,7)$,
+$B=(30,18)$: 375 instead of 625 window orders and 2,257 instead of 3,721 box
+orders. The Γ-point count below the cut stays 195
+([record](../../validation/check-records/axial-zone/fiber-continuum-111-rect-local.json)).
+At 3e4 Å:
+
+| Si [111] | Window | Retained | Outgoing | Unresolved | Wall | Peak RSS |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| TDS (1,000) | square | 0.261 ± 0.014 | 0.668 ± 0.015 | 0.071 ± 0.008 | 8:56 | 2.66 GB |
+| TDS (1,000) | rectangular | 0.253 ± 0.014 | 0.670 ± 0.015 | 0.077 ± 0.008 | 2:31 | 0.37 GB |
+| TDS + el. (500) | square | 0.226 ± 0.019 | 0.736 ± 0.020 | 0.038 ± 0.009 | 17:11 | 8.05 GB |
+| TDS + el. (500) | rectangular | 0.210 ± 0.018 | 0.732 ± 0.020 | 0.058 ± 0.010 | 5:43 | 0.37 GB |
+
+All tallies at the three depths agree within $|z|\le1.9$ (the largest is the
+electronic unresolved fraction). The rectangular run takes about a third of
+the wall time. Most of the old peak memory was cyclic garbage, not live
+state. SciPy's `brentq` wrapper kept each waiting-time root's closure in a
+reference cycle, and that closure held a fibre eigenbasis. Electronic runs
+grew by about 18 MB per incident until a full GC pass. With the closure
+holding only a cleared list, the same runs peak at 0.37 GB, with bitwise
+identical results (rectangular rows above; the square rows predate the
+fix).
+
+Si [110] has four strings per cell, $g=(1.636, 1.157)$ Å⁻¹, and a cut target
+of 139.25 eV (same provisional rule). Its Γ count below the cut is 535 for
+the square $M=12$, whose $y$ reach is only 13.9 Å⁻¹. It converges to 655
+once both axes reach about 20 Å⁻¹, for example $M=(13,17)$ with 945 orders;
+a square window needs $M=17$ (1,225 orders).
+
+Si [110] window convergence (box $B=(30,42)$, remote CPU array 3158;
+[record](../../validation/check-records/axial-zone/fiber-continuum-110-remote-3158.json)).
+At 3e4 Å:
+
+| Si [110] | Window (orders) | Retained | Outgoing | Unresolved | TDS jumps |
+| --- | --- | ---: | ---: | ---: | ---: |
+| TDS (1,000) | (13,17) (945) | 0.303 ± 0.015 | 0.620 ± 0.015 | 0.077 ± 0.008 | 1.84 |
+| TDS (1,000) | (15,21) (1,333) | 0.314 ± 0.015 | 0.597 ± 0.016 | 0.089 ± 0.009 | 1.93 |
+| TDS (1,000) | (18,25) (1,887) | 0.303 ± 0.015 | 0.602 ± 0.015 | 0.095 ± 0.009 | 2.08 |
+| TDS + el. (1,000) | (13,17) (945) | 0.282 ± 0.014 | 0.633 ± 0.015 | 0.085 ± 0.009 | 1.73 |
+| TDS + el. (500) | (15,21) (1,333) | 0.266 ± 0.020 | 0.626 ± 0.022 | 0.108 ± 0.014 | 1.84 |
+
+The (15,21) and (18,25) TDS windows agree on every tally to $|z|\le0.54$.
+(13,17) sits 1–2σ high in outgoing at 1e3–1e4 Å, so (15,21) is the
+converged choice at this precision. The mean TDS jump count still rises from
+(15,21) to (18,25), by 2.3σ, while the terminal tallies stay the same; that
+is open. Electronic kicks change the [110] tallies by at most about 1σ. The
+fraction unresolved at the $B=(30,42)$ box is about 0.09–0.11, above [111]'s
+0.06–0.08; box and tail convergence belong to #881/#882. Each task peaked
+below 1.6 GB.
+
+## Paired numerical convergence and return deficit of the fibre model (#882)
+
+`checks/axial_outgoing_convergence.py` runs one-change arms of the fibre
+unraveling (Si [001], 5 MeV, continuum TDS + electronic kicks, seed 0) around
+the control M = 6, nominal 95 eV cut, box B = 18 and 200 Å search step. All
+arms share incident IDs, so every difference is paired per incident.
+`unravel_fiber_outgoing(observe=...)` reports each surviving incident's
+normalized retained amplitude at 61 checkpoints (0–3 µm), and the study
+tallies the below-$U_{\max}$ population $N_B$ and its exposure $X_B$
+([derivation](../../validation/channeling/cr-axial-fiber-return-deficit.md)).
+The return deficit compares the absorbing control with the $P=R$ reference
+(cut removed, same window and box), as in the secular study above. It
+includes return through jumps plus two sign-indefinite terms: the coherent
+no-jump coupling across the cut and jump interference of $P$–$Q$
+coherences recycled into $P$. It is accounting at a fixed window, not a physical
+escape fraction.
+
+**Results (SLURM 3050;
+[record](../../validation/check-records/axial-zone/outgoing-convergence-3050.json)).**
+16,000 incidents per arm (4,000 for the step arms, paired against the same
+control IDs). Paired differences from the control, mean ± SEM. Relative
+exposure is $1-X_B(\text{arm})/X_B(\text{control})$, so a positive value
+means the arm has less bound exposure:
+
+| Arm | ΔR at 1 µm | ΔR at 3 µm | Rel. $X_B$ at 1 µm | Rel. $X_B$ at 3 µm |
+| --- | ---: | ---: | ---: | ---: |
+| step 100 Å / 400 Å | 0 (identical) | 0 | 0 | 0 |
+| B = 24 | −0.0005 ± 0.0008 | −0.0005 ± 0.0006 | +0.01% ± 0.03% | +0.04% ± 0.05% |
+| B = 12 | +0.0026 ± 0.0013 | +0.0009 ± 0.0011 | −0.09% ± 0.05% | −0.13% ± 0.09% |
+| M = 5 | −0.0022 ± 0.0031 | +0.0024 ± 0.0033 | −2.88% ± 0.18% | −3.54% ± 0.31% |
+| M = 7 | +0.0047 ± 0.0027 | −0.0039 ± 0.0031 | +0.78% ± 0.13% | +0.91% ± 0.23% |
+| M = 8 | +0.0070 ± 0.0029 | −0.0064 ± 0.0031 | +0.94% ± 0.14% | +1.22% ± 0.25% |
+| target 50 eV | −0.110 ± 0.003 | −0.091 ± 0.003 | +0.40% ± 0.15% | +1.77% ± 0.26% |
+| target 140 eV (136.8) | +0.075 ± 0.003 | +0.071 ± 0.003 | −0.28% ± 0.10% | −1.12% ± 0.20% |
+| target 180 eV | +0.109 ± 0.003 | +0.114 ± 0.004 | −0.26% ± 0.11% | −1.40% ± 0.21% |
+
+Control tallies at 1 and 3 µm: retained 0.476 ± 0.004 and 0.194 ± 0.003,
+outgoing 0.489 and 0.755, unresolved 0.035 and 0.050; $N_B$ = 0.1503 and
+0.0247; $X_B$ = 3502 ± 17 and 4729 ± 30 Å.
+
+- **Search step.** It does not enter. The no-jump norm is monotone, so the
+  step only changes where the root bracket starts; events are identical.
+- **Box.** B = 18 is converged: against B = 24 the exposure changes by
+  ≤0.04% ± 0.05%; only the terminal labels move (unresolved 0.050 → 0.027
+  at 3 µm). B = 12 changes exposure by ≤0.13% but raises unresolved to
+  0.117.
+- **Window M.** Exposure falls by 0.9% (M = 7) and 1.2% (M = 8) at 3 µm, and
+  0.8–0.9% at 1 µm; M = 5 is 2.9–3.5% high. Convergence in M at the 1% level
+  holds to about 1 µm, not to 3 µm.
+- **Cut target.** Retained weight counts everything below the cut, so it
+  moves with the cut by construction and is not a convergence observable.
+  Bound exposure gains 1.1% (137 eV) and 1.4% (180 eV) at 3 µm, and
+  0.3% at 1 µm. At 180 eV it equals the $P=R$ reference within errors
+  (4795 vs 4794 Å).
+
+Return deficit, $1-X_B(\text{absorbing})/X_B(P=R)$ at the provisional 95 eV
+cut (paired, mean ± SEM):
+
+| Window | 0.1 µm | 1 µm | 3 µm |
+| --- | ---: | ---: | ---: |
+| M = 6 | 0.01% ± 0.03% | 0.20% ± 0.11% | 1.37% ± 0.20% |
+| M = 8 | 0.05% ± 0.04% | 0.50% ± 0.13% | 2.51% ± 0.22% |
+
+The deficit in the below-barrier population itself, $1-N_B/N_B^{\rm ref}$,
+is 1.2% ± 0.4% (M = 6) and 1.8% ± 0.4% (M = 8) at 1 µm, and 10% ± 2% and
+19% ± 2% at 3 µm. The $P=R$ reference exposure is 0.45% ± 0.04%,
+0.64% ± 0.14% and 0.06% ± 0.23% lower at M = 8 than at M = 6 at 0.1, 1 and
+3 µm (paired).
+
+**What this establishes (numerical accounting only).** With 95% confidence
+(±2 SEM), for Si [001] 5 MeV in this model:
+
+- step and box (B ≥ 18) are converged to well below 0.1% of bound exposure;
+- to 1 µm, window (M = 6 → 8) and cut (95 → 180 eV) each change bound
+  exposure by at most about 1.2%, and the return deficit is below 0.8%
+  (M ≤ 8);
+- to 3 µm, the return deficit is 1.0–3.0% and grows with M, as in the
+  secular study, so it is not converged in the window; the cut target and
+  M each move exposure by about 1–1.8%.
+
+The 95 eV rule therefore keeps return-deficit and cut errors near the 1%
+level to about 1 µm. Beyond that the deficit grows with depth and window,
+consistent with the depth-budget conclusion above. The first 1,500 incidents
+of the same array, recorded earlier as a preliminary result, overstated the
+M = 6 deficit (2.6% ± 0.6% at 3 µm); that partial record is superseded.
+
 ## Matching prescription still to establish
 
 **Provisional numerical matching rule (research, from 1651–1656).** At each
