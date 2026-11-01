@@ -11,6 +11,18 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
 ]
+keywords = [
+    "monte carlo",
+    "electron transport",
+    "radiation transport",
+    "x-ray simulation",
+    "parametric x-ray radiation",
+    "coherent bremsstrahlung",
+    "electron scattering",
+    "accelerator physics",
+    "crystallography",
+    "scientific computing",
+]
 
 requires-python = ">=3.13"
 dependencies = [
