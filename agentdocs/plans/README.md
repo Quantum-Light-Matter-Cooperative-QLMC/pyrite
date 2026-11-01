@@ -1,8 +1,7 @@
 # Cross-task plans (tracked, ephemeral)
 
-Sequencing plans that coordinate multiple branch tasks and therefore cannot
-belong under one `agentdocs/tasks/<branch-name>/`. Single-task plans and
-handoffs stay with their task. Superseded material moves to `agentdocs/archive/`.
+Sequencing plans that coordinate multiple issues and therefore cannot belong in
+one GitHub issue body. Single-task plans and handoffs stay in their issue. Superseded material moves to `agentdocs/archive/`.
 
 For current behavior use generated and durable material in
 [`../../docs/`](../../docs/). Accepted decisions live in

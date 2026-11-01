@@ -2,7 +2,7 @@
 
 Slice C of ``feature/energy-loss-straggling``. The model, its source and its
 selection are recorded in ``pyrite.montecarlo.transport`` next to the code and in
-``agentdocs/tasks/feature/energy-loss-straggling/README.md`` (slice B).
+``docs/validation/beam-transport/energy-loss-straggling.md``.
 
 What is pinned here, and why each pin exists:
 
