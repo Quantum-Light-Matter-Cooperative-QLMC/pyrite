@@ -1,5 +1,5 @@
-"""Pixel-detector angular-reconstruction oracle (issue #23, task
-`agentdocs/tasks/feature/timepix-pixel-spectra/`, Slice 1).
+"""Pixel-detector angular-reconstruction oracle (issue #23, Slice 1; archived
+evidence summary in `agentdocs/archive/pixel-reconstruction-oracle/`).
 
 `SpatialResult` reconstructs each fine pixel's intrinsic spectrum by
 inheriting its coarse angular tile's spectrum unchanged (nearest-tile), then
@@ -98,7 +98,7 @@ FILTER_SIZE_MM = (6.0, 13.5)
 FILTER_OFFSET_MM = (3.0, 0.0)
 
 OUTPUT_PATH = Path(__file__).resolve().parent.parent / (
-    "agentdocs/tasks/feature/timepix-pixel-spectra/evidence/oracle-report.json"
+    "scratch/pixel-reconstruction-oracle/oracle-report.json"
 )
 
 

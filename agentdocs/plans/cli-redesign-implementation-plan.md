@@ -14,7 +14,7 @@ The RFCs each hold the *why* for one layer; each only sees its own slice. This
 plan is the *order* — the linearized cross-cutting sequence with gates and
 acceptance criteria, so an agent starts in the right place and never lands a
 slice before its prerequisite. Ephemeral: update it as slices land, retire it
-when the last one does. Each slice is an `agentdocs/tasks/<branch>/` record via the normal
+when the last one does. Each slice is a GitHub issue via the normal
 triage → dispatch flow; GitHub Issues stay authoritative for status.
 
 ## Sequence
@@ -49,10 +49,9 @@ Do not start the dependent slice until its decision is pinned:
    `profile` is fixed as the
    campaign term; no `context` rename. The overload was fidelity (`full`/`survey`)
    squatting on "profile" — moved onto its own `fidelity` namespace in branch
-   `refactor/fidelity-namespace`. See `agentdocs/tasks/refactor/fidelity-namespace/README.md`
-   for the full five-sense taxonomy (A fidelity renamed; B campaign keeps
-   `profile`; C performance-profile, D named_profile/dataset-identity, E
-   line-shape all distinct and kept).
+   `refactor/fidelity-namespace`. Its five-sense taxonomy: A fidelity renamed;
+   B campaign keeps `profile`; C performance-profile, D
+   named_profile/dataset-identity, E line-shape all distinct and kept.
 
 ## Slices
 

@@ -59,7 +59,7 @@ task docs, commit, or push. `dispatch-task` owns routing to a worker.
    parent/sub-issue) when they express real dependencies; do not duplicate
    dependency state in prose.
 5. Create/update the issue with `gh issue create` or `gh issue edit`. The issue
-   body is the only task record; do not create `agentdocs/tasks/` files.
+   body is the only task record; do not create task-record files under `agentdocs/`.
 6. Stop for review. Report the issue number/link, key assumptions, unresolved
    material decisions, and whether it is ready for dispatch. Review feedback
    returns through `triage` as an issue-body edit.

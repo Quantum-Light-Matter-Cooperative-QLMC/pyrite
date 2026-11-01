@@ -8,13 +8,11 @@ Use ignored `scratch/` or `/tmp` for disposable notes; do not create parallel
 `docs/plans`, `docs/temp`, root `tasks`, `.remember`, or untracked `agentdocs`
 surfaces.
 
-- `tasks/` — legacy branch-scoped records; no new ones. The GitHub issue body is the task record.
 - `plans/` — cross-task sequencing that cannot belong to one branch.
 - `archive/` — retained historical handoffs only; never an active authority.
 
 Promote durable outcomes to `README.md`, `docs/`, an ADR, source documentation,
-or tests. Delete a legacy `tasks/` directory once its issue and durable docs
-are correct.
+or tests.
 
 ## Invariant
 

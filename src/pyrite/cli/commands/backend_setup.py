@@ -21,7 +21,7 @@ from ...console import output as _cli_core
 _ENV_KEY = "PYRITE_MC_BACKEND"
 
 # Matches README.md's install table; printed as a follow-up instruction, never
-# run automatically (see agentdocs/tasks/feature/backend-autodetect/README.md decision 2).
+# run automatically: backend setup must not mutate the user's environment.
 _VENDOR_EXTRA_INSTALL = {
     "cuda": "uv sync --extra nvidia",
     "rocm": "CUPY_INSTALL_USE_HIP=1 uv sync --extra amd",
