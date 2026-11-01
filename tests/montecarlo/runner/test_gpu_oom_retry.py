@@ -640,3 +640,17 @@ def test_transport_oom_after_host_replay_releases_traceback_locals(monkeypatch):
     assert released
     gc_sink = sink[-1:]
     _assert_released(gc_sink, info.value)
+
+
+def test_keep_oom_frames_flag_preserves_traceback_locals(monkeypatch):
+    sink = []
+    monkeypatch.setenv("PYRITE_KEEP_OOM_FRAMES", "1")
+    monkeypatch.setattr(runner, "_is_gpu_oom", lambda e: isinstance(e, DummyOOM))
+    monkeypatch.setattr(runner.BACKEND, "release_memory", lambda: None)
+    with pytest.raises(DummyOOM) as info:
+        recovery.transport_with_recovery(lambda resident: _outer_raiser(sink), False)
+    tb = info.value.__traceback__
+    while tb.tb_frame.f_code.co_name != "_holder_frame":
+        tb = tb.tb_next
+    assert isinstance(tb.tb_frame.f_locals["held"], _Pinned)
+    assert sink[0]() is not None

@@ -3,6 +3,10 @@
 from ..._backend import BACKEND
 from .chunking import _RESOURCE_POLICY
 
+#: Set to ``1`` to keep terminal-OOM traceback frames (and the device memory
+#: their locals pin) for post-mortem debugging. Default off.
+KEEP_OOM_FRAMES_ENV = "PYRITE_KEEP_OOM_FRAMES"
+
 
 class _SpectrumPhaseOOM(Exception):
     """Tag a catchable OOM with its owning spectrum phase."""
@@ -20,9 +24,16 @@ def _drop_traceback_locals(exc):
     generators) alive through ``__traceback__``, so the pool cannot be returned
     until the exception dies. Clear finished frames and close pyrite generators
     they hold; traceback objects stay, so file/line/function still format.
-    Still-executing frames (the raiser itself) raise RuntimeError and are skipped."""
+    Still-executing frames (the raiser itself) raise RuntimeError and are skipped.
+
+    ``PYRITE_KEEP_OOM_FRAMES=1`` keeps every frame intact for post-mortem
+    debugging (``pdb.pm()``), at the cost of the device memory they pin."""
     import inspect
 
+    from ..._env import env_value
+
+    if env_value(KEEP_OOM_FRAMES_ENV) == "1":
+        return
     seen = set()
     stack = [exc]
     while stack:

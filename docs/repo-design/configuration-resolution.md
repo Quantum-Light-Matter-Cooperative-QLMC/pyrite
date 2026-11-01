@@ -66,6 +66,7 @@ change scheduling, memory, or profiling only.
 | `PYRITE_FP64` | Set to `1` for float64 accelerator calculations; any other or unset value retains the normal CPU float64/GPU float32 behavior. | Process-wide; `_backend`. | **numerics**, resources |
 | `PYRITE_MC_TRANSPORT_CORE` | `lockstep`, `per-electron`, `cuda`, or `auto`; unset leaves the requested/automatic core selection in force. | Process-wide transport pin; `montecarlo.transport.batching`. | **numerics**, resources |
 | `PYRITE_MC_RESOURCE_POLICY` | `auto`, `conservative`, `balanced`, or `throughput`; unset is `auto` (`conservative` below 8 GiB, otherwise `balanced`). | Process-wide resource policy; `montecarlo._resources`. | **resources** |
+| `PYRITE_KEEP_OOM_FRAMES` | Set to `1` to keep every frame of a terminal accelerator out-of-memory traceback for post-mortem debugging (`pdb.pm()`); unset or any other value clears the finished frames' locals so the device pool can be released while the traceback text stays intact. | Process-wide; `montecarlo.runner.oom`. | debugging, resources |
 | `PYRITE_ANALYZE_INITIAL` | Initial material key for the analysis app; unset falls through to the persisted app default, then `hopg`. | CLI argument > environment > persisted default > `hopg`; `apps.analyze`. | app startup |
 | `PYRITE_VIEWER_INITIAL` | Initial material key for the viewer app; same unset behavior as analysis. | CLI argument > environment > persisted default > `hopg`; `apps.viewer`. | app startup |
 
