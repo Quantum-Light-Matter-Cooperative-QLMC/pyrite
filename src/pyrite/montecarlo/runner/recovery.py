@@ -5,6 +5,8 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from time import perf_counter
 
+import numpy as np
+
 from ..._backend import BackendResourceError
 from ..._env import env_value
 
@@ -90,15 +92,24 @@ def _retry_metrics(counts, events, initial, work, tp):
         "_effective_brem_chunk": runner._effective_brem_chunk(work, tp),
         "_brem_photon_block": runner._effective_brem_photon_block(work, tp),
         "_recovery_events": [*tp.get("_recovery_events", []), *events],
-        "_recovery_path": tp.get("_recovery_path", "device_spectrum"),
+        "_recovery_path": (
+            "host_segments"
+            if any(event["mitigation"] == "host_segments" for event in events)
+            else tp.get("_recovery_path", "device_spectrum")
+        ),
     }
 
 
-def _spectrum_case_retry(case, tp, max_retries=None, record_timing=False, spec_chunk_cap=None):
+def _spectrum_case_retry(
+    case, tp, max_retries=None, record_timing=False, spec_chunk_cap=None, segs_owner=None
+):
     """Retry allocator OOMs with smaller execution chunks on the same transport.
 
     Characteristic scoring shares brem tuning but has its own failure counter.
     Resource admission and unrelated runtime failures propagate immediately.
+    The first allocator OOM on device-resident rows first moves the rows to
+    admitted host memory (``host_segments``, #905; see :func:`_rows_to_host`)
+    and retries at the same chunks, without spending a retry.
     """
     from .. import runner
     from .oom import _drop_traceback_locals, _SpectrumPhaseOOM
@@ -113,7 +124,8 @@ def _spectrum_case_retry(case, tp, max_retries=None, record_timing=False, spec_c
     initial = initial_spec, runner._effective_brem_chunk(work, tp)
     counts = dict.fromkeys(("line", "characteristic", "brem", "generic"), 0)
     events = []
-    for attempt in range(max_retries + 1):
+    attempt = 0
+    while True:
         try:
             out = runner._spectrum_case(work, tp, record_timing)
         except Exception as caught:
@@ -121,6 +133,9 @@ def _spectrum_case_retry(case, tp, max_retries=None, record_timing=False, spec_c
             error = caught.error if isinstance(caught, _SpectrumPhaseOOM) else caught
             if not isinstance(caught, _SpectrumPhaseOOM) and not runner._is_gpu_oom(error):
                 raise
+            if _resident_rows(tp) and _rows_to_host(tp, segs_owner, caught, error):
+                events.append({"phase": phase, "mitigation": "host_segments"})
+                continue
             if attempt == max_retries:
                 events.append({"phase": phase, "mitigation": "exhausted"})
                 error.add_note(
@@ -153,10 +168,48 @@ def _spectrum_case_retry(case, tp, max_retries=None, record_timing=False, spec_c
                 out["_t_spectrum"] = perf_counter() - t0
             out.update(_retry_metrics(counts, events, initial, work, tp))
             return out
+        attempt += 1
         runner.BACKEND.release_memory()
 
 
-def _spectrum_with_recovery(case, tp, record_timing=False, spec_chunk_cap=None, engine=None):
+def _resident_rows(tp):
+    segs = tp.get("segs")
+    return isinstance(segs, dict) and not isinstance(segs.get("L_ang", np.empty(0)), np.ndarray)
+
+
+def _rows_to_host(tp, owner, caught, error):
+    """Replace device-resident rows by an admitted host copy; False if refused.
+
+    The spectrum kernels then stage the host rows exactly as the host-segment
+    transport path does, so spectra are unchanged. ``owner`` (the
+    :class:`~pyrite.phases.TransportedScene` transport) gets the same host
+    rows, else its reference would keep the device rows alive.
+    """
+    from .. import runner
+    from .oom import _drop_traceback_locals
+    from .pool import _admit_host_segments
+
+    try:
+        _admit_host_segments()
+    except BackendResourceError:
+        return False
+    # Tracebacks pin device scratch; drop it before downloading the rows.
+    _drop_traceback_locals(caught)
+    _drop_traceback_locals(error)
+    error.__traceback__ = None
+    caught.__traceback__ = None
+    runner.BACKEND.release_memory()
+    host = _host_arrays(tp["segs"])
+    tp["segs"] = host
+    if owner is not None:
+        owner["segs"] = host
+    runner.BACKEND.release_memory()
+    return True
+
+
+def _spectrum_with_recovery(
+    case, tp, record_timing=False, spec_chunk_cap=None, engine=None, segs_owner=None
+):
     """Apply the same retry/admitted CPU policy in every execution topology."""
     from .. import runner
     from .oom import _drop_traceback_locals
@@ -169,7 +222,11 @@ def _spectrum_with_recovery(case, tp, record_timing=False, spec_chunk_cap=None, 
     try:
         runner._ensure_pool_limit()
         return runner._spectrum_case_retry(
-            case, tp, record_timing=record_timing, spec_chunk_cap=spec_chunk_cap
+            case,
+            tp,
+            record_timing=record_timing,
+            spec_chunk_cap=spec_chunk_cap,
+            segs_owner=segs_owner,
         )
     except Exception as error:
         admission = isinstance(error, BackendResourceError)
