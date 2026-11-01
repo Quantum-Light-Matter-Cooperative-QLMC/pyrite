@@ -38,6 +38,10 @@ transport schedule, continuation row quantum, electron launch batch, device
 scratch budget (`scratch_mib`) and launch threads per block (`kernel_threads`)
 for in-process runs. It takes precedence over `PYRITE_MC_TRANSPORT_SCHEDULE` and
 `PYRITE_MC_ELECTRON_BATCH_MAX` and never changes case identity or results.
+Its `precision` field (`"fp64"`, `"mixed"`, or `None` for
+`PYRITE_MC_TRANSPORT_PRECISION`; #838) selects the exact CUDA kernel's
+arithmetic. It changes trajectories at rounding scale, is recorded in run
+provenance as `transport_precision`, and stays out of case identity.
 `KernelTuning.cxr_threads` and `KernelTuning.cxr_energies_per_block`
 (experimental) select the CUDA CXR line-reduction launch: threads per block
 and energy nodes per block. They regroup the float sum only and never enter

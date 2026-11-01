@@ -244,7 +244,7 @@ def directional_sources(
         "identity_digest": case_content_key(case, xsgen_tables=tables),
         "energy_grid": "explicit point samples; no automatic window",
         "line_window_ceiling_eV": line_window_ceiling_eV(case),
-        **run_provenance(case, tables),
+        **run_provenance(case, tables, controls),
     }
     return {
         name: DirectionalSpectrum(

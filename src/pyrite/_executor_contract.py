@@ -33,7 +33,8 @@ def validate_executor(executor: Executor, numerics: Numerics) -> None:
     if execution is not None and execution.transport != type(execution.transport)():
         raise ValueError(
             "executor requires the default KernelTuning.transport; batch executors take "
-            "PYRITE_MC_TRANSPORT_SCHEDULE and PYRITE_MC_ELECTRON_BATCH_MAX instead"
+            "PYRITE_MC_TRANSPORT_SCHEDULE, PYRITE_MC_ELECTRON_BATCH_MAX and "
+            "PYRITE_MC_TRANSPORT_PRECISION instead"
         )
 
 

@@ -112,8 +112,9 @@ SHELL_IONIZATION_MODELS = ("eedl", "bote-salvat")
 #: The default resolves coupling when BremsLib tables are available.
 RADIATIVE_MODELS = ("auto", "uncoupled", "bremslib-soft-hard")
 DEFAULT_RADIATIVE_CUTOFF_EV = 1000.0
-#: Exact CUDA transport kernel precisions (#838); ``mixed`` is opt-in, case identity.
-TRANSPORT_PRECISIONS = ("fp64", "mixed")
+#: Exact CUDA transport kernel precisions (#838). ``auto`` resolves through
+#: ``montecarlo.transport.precision.resolve_transport_precision``.
+TRANSPORT_PRECISIONS = ("auto", "fp64", "mixed")
 #: Quantum channeling-zone selectors (ADR-0018, issue #506). ``"off"`` (the
 #: default) leaves every case, identity and RNG stream unchanged; ``"planar"``
 #: runs the planar density-matrix entrance zone with a one-way handoff.
