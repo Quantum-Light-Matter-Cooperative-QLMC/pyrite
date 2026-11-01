@@ -1038,8 +1038,50 @@ $J_k=e^{i\mathbf k\cdot\mathbf r}\varphi_k(\mathbf r)$, where $\varphi_k$ is
 cell periodic with harmonics $\hat f(\mathbf k+\mathbf G)$. That is the same
 carrier-moving structure as the electronic kicks, but with a column that
 depends on the full vector $\mathbf k$. Tabulating $\mathbf k$ on an
-$N\times N$ grid is equivalent to an $N\times N$ TDS supercell. This is the
-next model gap.
+$N\times N$ grid is equivalent to an $N\times N$ TDS supercell.
+
+**Independent-string (continuum) TDS.** `axial_tds_continuum` implements
+that family. Each Kraus label is the pair (carrier shift $\Delta$, struck-string
+displacement $u$), because the thermal average over $u$ already is the
+factorization. Each TDS jump draws (output momentum, $u$) by exact rejection
+from the single-atom incoherent bound, at 0.1–2.5 ms per draw. The jump moves
+the carrier, and it is unresolved exactly when the sampled momentum leaves
+the box. No eigendecomposition, transfer truncation or $D\ge B+M$ condition
+is needed
+([derivation](../../validation/channeling/cr-axial-continuum-tds-jumps.md)).
+Any number of strings per cell is supported. For Si [001] there is one
+string per cell, so this removes the image correlation completely and a
+supercell adds nothing. Si [111] has 2 strings per cell and [110] has 4.
+
+Si [001], B = 18, 4,000 incidents
+([record](../../validation/check-records/axial-zone/fiber-continuum-001-local-4k.json)).
+The TDS-only run takes 92 s, about 10× faster than the lattice model at the
+same box. At 3e4 Å:
+
+| Model | Retained | Outgoing | Unresolved |
+| --- | ---: | ---: | ---: |
+| TDS, one-cell lattice | 0.168 ± 0.006 | 0.775 ± 0.007 | 0.056 ± 0.004 |
+| TDS, independent strings | 0.186 ± 0.006 | 0.762 ± 0.007 | 0.051 ± 0.003 |
+| TDS + electronic, lattice | 0.185 ± 0.006 | 0.762 ± 0.007 | 0.052 ± 0.004 |
+| TDS + electronic, strings | 0.192 ± 0.006 | 0.758 ± 0.007 | 0.050 ± 0.003 |
+
+The one-cell model's 1.7% lower mean TDS rate and its carrier-conserving
+transfers shift these window tallies by only 1–2σ.
+
+Si [111] has two strings per cell (cut target 106.1 eV by the provisional
+rule, 199 retained states at Γ, square window M = 12, box B = 30;
+[record](../../validation/check-records/axial-zone/fiber-continuum-111-local.json)).
+At 3e4 Å, TDS alone (1,000 incidents) gives retained 0.261 ± 0.014, outgoing
+0.668 ± 0.015 and unresolved 0.071 ± 0.008. TDS + electronic (500 incidents)
+gives retained 0.226 ± 0.019, outgoing 0.736 ± 0.020 and unresolved
+0.038 ± 0.009. Caveats for [111]:
+
+- The electronic harmonics drop up to 1.8% of $\int\rho_q$ on this cell.
+- The electronic run peaked at 8.05 GB, at the local memory cap.
+- The square order window makes the $x$ reach the binding box edge.
+
+Si [110] (four strings, more than 540 retained states, not converged at
+M = 12) needs a rectangular order window or a remote run.
 
 ## Matching prescription still to establish
 

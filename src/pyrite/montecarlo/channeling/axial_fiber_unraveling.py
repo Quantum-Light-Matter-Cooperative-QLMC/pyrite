@@ -28,6 +28,7 @@ import numpy as np
 from scipy.optimize import brentq
 
 from .axial_phase_space import phase_space_stream, sample_phase_space
+from .axial_tds_continuum import StringChannel, TdsString, string_jump
 
 _FIBER_DOMAIN = 0x6230002
 _MAX_CONDITION = 1e8
@@ -41,6 +42,8 @@ class FiberEvent:
     ``carrier_inv_ang`` is the folded Bloch carrier of the final state; the
     Weyl momentum index is an FFT-layout order index relative to it, with
     reciprocal spacing ``reciprocal_inv_ang`` of the provider.
+    ``lattice_jumps`` counts every TDS jump (lattice columns or continuum
+    strings); ``kick_jumps`` counts electronic kicks.
     """
 
     incident_id: int
@@ -76,8 +79,11 @@ class FiberChannels:
     is the PSD sum over outputs outside the box (sufficient for any
     covariance; necessary for some). Columns must factor the covariance
     truncated at their full width: zero-padding a narrower factorization
-    defeats the check and is caught only by the runtime complement refusal. Kick columns define their own model and need
-    no such condition.
+    defeats the check and is caught only by the runtime complement refusal.
+    Kick columns define their own model and need no such condition.
+    ``tds_strings`` adds independent-string (continuum) TDS jumps
+    (:mod:`.axial_tds_continuum`): carrier-moving, no transfer truncation
+    and no D condition. Use them instead of, or alongside, lattice columns.
     The cell is rectangular: ``reciprocal_inv_ang`` are the axis-aligned
     primitive vectors and carriers fold into the half-open zone
     ``[-g/2, g/2)`` per axis.
@@ -93,6 +99,7 @@ class FiberChannels:
     kick_q_inv_ang: np.ndarray
     kick_azimuths: Sequence[float] | None = None
     outgoing_order_max: int | None = None
+    tds_strings: Sequence[TdsString] = ()
 
 
 def fiber_stream(seed: int, incident_id: int) -> np.random.Generator:
@@ -199,6 +206,11 @@ class _Engine:
         self.lattice_crop = _crop(m + d, self.box)
         self.kick_fft = np.fft.fft2(channels.kick_columns, s=(self.kick_size, self.kick_size))
         self.kick_power = np.abs(self.kick_fft) ** 2
+        n = np.arange(-m, m + 1)
+        orders = np.stack(np.meshgrid(n, n, indexing="ij"), -1).reshape(-1, 2)
+        self.strings = [StringChannel(t, self.g, orders) for t in channels.tds_strings]
+        for channel in self.strings:
+            self.loss = self.loss + channel.loss
         self.cache: OrderedDict[tuple[float, float], _Fiber] = OrderedDict()
         self.cache_size = cache_size
 
@@ -300,6 +312,59 @@ def _lattice_channel(engine, chi, lattice_total, rng):
     return None if j == len(represented) else outs[j]
 
 
+def _jump(engine, fiber, chi, kappa, rng):
+    """Draw one jump from ``chi``: group, channel, fold and split.
+
+    Groups: lattice columns ``<chi|Gamma_lat|chi>``, each continuum string
+    ``<chi|Gamma_s|chi>``, each kick node ``||S_i chi||^2``. Returns
+    ``(kind, kappa, fiber, choice, c_new, f)``; ``choice`` None is unresolved.
+    Validation: cr-axial-fiber-unraveling
+    """
+    lattice_total = float(np.vdot(chi, engine.ch.lattice_loss @ chi).real)
+    strings = [channel.rate(chi) for channel in engine.strings]
+    kick = engine.kick_rates(chi)
+    rates = np.maximum(np.concatenate([[lattice_total], strings, kick]), 0.0)
+    total = float(rates.sum())
+    if not np.isfinite(total) or total <= 0:
+        raise FloatingPointError("jump at a state with no finite jump rate")
+    group = int(rng.choice(rates.size, p=rates / total))
+    if group == 0:
+        out = _lattice_channel(engine, chi, lattice_total, rng)
+        if out is None:
+            return "tds", kappa, fiber, None, None, None
+        return ("tds", kappa, fiber, *_split(fiber, out, 0.0, rng, engine.window_in_box))
+    if group <= len(strings):
+        result = string_jump(
+            engine.strings[group - 1],
+            chi,
+            kappa,
+            engine.ch.order_max,
+            engine.box,
+            rng,
+            lambda moved: _fold(moved, engine.g),
+        )
+        if result is None:
+            return "tds", kappa, fiber, None, None, None
+        kappa, out = result
+        fiber = engine.fiber(kappa)
+        return ("tds", kappa, fiber, *_split(fiber, out, 0.0, rng, engine.window_in_box))
+    i = group - 1 - len(strings)
+    q = float(engine.ch.kick_q_inv_ang[i])
+    azimuths = engine.ch.kick_azimuths
+    theta = (
+        2 * np.pi * rng.random()
+        if azimuths is None
+        else float(azimuths[rng.integers(len(azimuths))])
+    )
+    moved = np.array(kappa) + q * np.array([np.cos(theta), np.sin(theta)])
+    shift = _fold(moved, engine.g)
+    kappa = tuple(float(x) for x in moved - shift * engine.g)
+    fiber = engine.fiber(kappa)
+    out = engine.kick_output(i, chi, shift).ravel()
+    outside = float(kick[i]) - float(np.vdot(out, out).real)
+    return ("kick", kappa, fiber, *_split(fiber, out, outside, rng, engine.window_in_box))
+
+
 def _waiting(fiber, c, threshold, start, stop, step, tolerance):
     depth, current = start, c
     while depth < stop:
@@ -329,10 +394,10 @@ def _trajectory(engine, entry, kappa, window, max_depth, seed, incident, step, t
     if weight <= 0:
         raise ValueError("entry state has no retained weight")
     c = c / np.sqrt(weight)
-    depth, lattice, kicks = 0.0, 0, 0
+    depth, counts = 0.0, {"tds": 0, "kick": 0}
 
     def event(kind, at, **extra):
-        return FiberEvent(incident, kind, at, weight, lattice, kicks, (kappa[0], kappa[1]), **extra)
+        return FiberEvent(incident, kind, at, weight, counts["tds"], counts["kick"], kappa, **extra)
 
     def outgoing(f, at):
         o = _measure(engine, f, window, seed, incident)
@@ -345,36 +410,10 @@ def _trajectory(engine, entry, kappa, window, max_depth, seed, incident, step, t
         if depth is None:
             return event("retained", max_depth)
         chi = fiber.vectors @ (state / np.linalg.norm(state))
-        lattice_total = float(np.vdot(chi, engine.ch.lattice_loss @ chi).real)
-        kick = engine.kick_rates(chi)
-        rates = np.concatenate([[max(lattice_total, 0.0)], kick])
-        total = float(rates.sum())
-        if not np.isfinite(total) or total <= 0:
-            raise FloatingPointError("jump at a state with no finite jump rate")
-        group = int(rng.choice(rates.size, p=rates / total))
-        if group == 0:
-            lattice += 1
-            out = _lattice_channel(engine, chi, lattice_total, rng)
-            if out is None:
-                return event("unresolved", depth)
-            choice, c_new, f = _split(fiber, out, 0.0, rng, engine.window_in_box)
-        else:
-            kicks += 1
-            i = group - 1
-            q = float(engine.ch.kick_q_inv_ang[i])
-            azimuths = engine.ch.kick_azimuths
-            theta = (
-                2 * np.pi * rng.random()
-                if azimuths is None
-                else float(azimuths[rng.integers(len(azimuths))])
-            )
-            moved = np.array(kappa) + q * np.array([np.cos(theta), np.sin(theta)])
-            shift = _fold(moved, engine.g)
-            kappa = tuple(float(x) for x in moved - shift * engine.g)
-            fiber = engine.fiber(kappa)
-            out = engine.kick_output(i, chi, shift)
-            outside = float(kick[i]) - float(np.vdot(out, out).real)
-            choice, c_new, f = _split(fiber, out.ravel(), outside, rng, engine.window_in_box)
+        kind, kappa, fiber, choice, c_new, f = _jump(engine, fiber, chi, kappa, rng)
+        counts[kind] += 1
+        if choice is None:
+            return event("unresolved", depth)
         if choice == 0:
             c = c_new / np.linalg.norm(c_new)
         elif choice == 1:

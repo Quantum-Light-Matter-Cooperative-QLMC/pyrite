@@ -1,0 +1,143 @@
+{
+ "status": "research-only local CPU evidence; Si [111] 5 MeV, two independent strings per cell (continuum TDS) + electronic kicks, absorbing no-return fibred model, square order window M=12, outgoing box B=30, cut target 106.1 eV (provisional rule U_max + (U_max - U_min)); window accounting, not a physical escape fraction, depth budget or admission",
+ "parent_commit": "8d6de11ea9c5e33a4de5a0077b5807472e5baea4",
+ "command": "runpy checks/axial_outgoing_maps.py :: fiber_report(N, seed=0, electronic=False|True, outgoing_order_max=30, tds='strings', axis=(1,1,1), max_order=12, target_eV=106.1); N=1000 (TDS) and 500 (TDS+electronic)",
+ "environment": {
+  "python": "3.14.4",
+  "host": "local laptop (WSL)",
+  "OPENBLAS_NUM_THREADS": "1",
+  "memory_cap": "systemd-run MemoryMax=8G"
+ },
+ "resources_gnu_time": {
+  "tds_only_1000": [
+   "Elapsed (wall clock) time (h:mm:ss or m:ss): 8:56.15",
+   "Maximum resident set size (kbytes): 2664308"
+  ],
+  "tds_electronic_500": [
+   "Elapsed (wall clock) time (h:mm:ss or m:ss): 17:10.86",
+   "Maximum resident set size (kbytes): 8049280"
+  ]
+ },
+ "caveats": [
+  "electronic kick harmonics |n|<=4 drop up to 1.8% of int rho_q on this cell (0.13% for [001]); the truncated columns define the model's electronic loss",
+  "electronic run peaked at 8.05 GB RSS, at the local 8G cap: larger [111] electronic runs must go remote",
+  "square order window: the x reach (g_x=1.64/A) is the binding box edge; a rectangular window would be more economical"
+ ],
+ "result": {
+  "tds_only_1000": {
+   "status": "research-only; one cell, absorbing model, fibred carrier",
+   "max_order": 12,
+   "target_eV": 106.1,
+   "electronic": false,
+   "kick_nodes": 1,
+   "harmonic_max": 4,
+   "kick_truncation": 0.0,
+   "lattice_kraus": 0,
+   "outgoing_order_max": 30,
+   "tds": "strings",
+   "axis": [
+    1,
+    1,
+    1
+   ],
+   "strings": 2,
+   "seconds": 534.4568921659993,
+   "incidents": 1000,
+   "seed": 0,
+   "entrance_weight": 0.999999831165891,
+   "depths_ang": [
+    1000.0,
+    10000.0,
+    30000.0
+   ],
+   "mean_lattice_jumps": 1.779,
+   "mean_kick_jumps": 0.0,
+   "outgoing": [
+    0.07999998649327128,
+    0.4189999292585083,
+    0.6679998872188152
+   ],
+   "outgoing_sem": [
+    0.008579042787375597,
+    0.015602529211585973,
+    0.014892143066506566
+   ],
+   "unresolved": [
+    0.004999999155829455,
+    0.046999992064796874,
+    0.07099998801277825
+   ],
+   "unresolved_sem": [
+    0.002230470425739996,
+    0.0066926067324701004,
+    0.008121513265872555
+   ],
+   "retained": [
+    0.9149998455167901,
+    0.5339999098425857,
+    0.26099995593429753
+   ],
+   "beyond_window": 0.5389221556886228
+  },
+  "tds_electronic_500": {
+   "status": "research-only; one cell, absorbing model, fibred carrier",
+   "max_order": 12,
+   "target_eV": 106.1,
+   "electronic": true,
+   "kick_nodes": 680,
+   "harmonic_max": 4,
+   "kick_truncation": 0.01823515163594336,
+   "lattice_kraus": 0,
+   "outgoing_order_max": 30,
+   "tds": "strings",
+   "axis": [
+    1,
+    1,
+    1
+   ],
+   "strings": 2,
+   "seconds": 1028.9168927280007,
+   "incidents": 500,
+   "seed": 0,
+   "entrance_weight": 0.999999831165891,
+   "depths_ang": [
+    1000.0,
+    10000.0,
+    30000.0
+   ],
+   "mean_lattice_jumps": 1.762,
+   "mean_kick_jumps": 6.012,
+   "outgoing": [
+    0.09599998379192554,
+    0.4519999236869827,
+    0.7359998757380958
+   ],
+   "outgoing_sem": [
+    0.013174518639844405,
+    0.022257399504926004,
+    0.01971313949576374
+   ],
+   "unresolved": [
+    0.003999999324663564,
+    0.023999995947981384,
+    0.03799999358430386
+   ],
+   "unresolved_sem": [
+    0.0028227641257214295,
+    0.0068445587279912104,
+    0.008550554093882064
+   ],
+   "retained": [
+    0.8999998480493019,
+    0.5239999115309268,
+    0.22599996184349133
+   ],
+   "beyond_window": 0.49184782608695654
+  }
+ },
+ "source_sha256_at_parent": {
+  "src/pyrite/montecarlo/channeling/axial_tds_continuum.py": "0534fe3c68905469eae47ba570cb7d594e6ac429feca7427df9c6e7a03ee7a79",
+  "src/pyrite/montecarlo/channeling/axial_fiber_unraveling.py": "024d747933468a9925c2d0183a070eef9fbadb4a4507d3b4d8ad0f749f20de59",
+  "checks/axial_outgoing_maps.py": "05f6bee4c2318c1f9c0df593316bc5eec4446b708ec6d03a1dd21df1213201d0"
+ }
+}

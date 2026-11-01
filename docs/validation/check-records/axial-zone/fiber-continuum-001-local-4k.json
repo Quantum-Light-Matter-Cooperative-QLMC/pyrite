@@ -1,0 +1,140 @@
+{
+ "status": "research-only local CPU evidence; Si [001] 5 MeV, independent-string continuum TDS (+ electronic kicks), absorbing no-return fibred model, outgoing box B=18; window accounting, not a physical escape fraction, depth budget or admission",
+ "parent_commit": "8d6de11ea9c5e33a4de5a0077b5807472e5baea4",
+ "command": "runpy checks/axial_outgoing_maps.py :: fiber_report(4000, seed=0, electronic=False|True, outgoing_order_max=18, tds='strings'); two concurrent single-thread processes",
+ "environment": {
+  "python": "3.14.4",
+  "host": "local laptop (WSL)",
+  "OPENBLAS_NUM_THREADS": "1",
+  "memory_cap": "systemd-run MemoryMax=8G"
+ },
+ "resources_gnu_time": {
+  "tds_only": [
+   "Elapsed (wall clock) time (h:mm:ss or m:ss): 1:33.03",
+   "Maximum resident set size (kbytes): 1080588"
+  ],
+  "tds_electronic": [
+   "Elapsed (wall clock) time (h:mm:ss or m:ss): 9:42.97",
+   "Maximum resident set size (kbytes): 6296372"
+  ]
+ },
+ "method": "unravel_fiber_outgoing with FiberChannels.tds_strings (StringChannel rejection sampler, continuum loss D(G) at 32x192 Gauss-Legendre); balanced Gaussian Weyl window on the 37x37 box; binomial SEM. Code at the parent commit differs from the run only in a docstring marker.",
+ "reference_lattice_b18": "check-records/axial-zone/fiber-box18-local-4k.json",
+ "result": {
+  "tds_only": {
+   "status": "research-only; one cell, absorbing model, fibred carrier",
+   "max_order": 6,
+   "target_eV": 95.0,
+   "electronic": false,
+   "kick_nodes": 1,
+   "harmonic_max": 4,
+   "kick_truncation": 0.0,
+   "lattice_kraus": 0,
+   "outgoing_order_max": 18,
+   "tds": "strings",
+   "axis": [
+    0,
+    0,
+    1
+   ],
+   "strings": 1,
+   "seconds": 91.74109540599966,
+   "incidents": 4000,
+   "seed": 0,
+   "entrance_weight": 0.9999994948884976,
+   "depths_ang": [
+    1000.0,
+    10000.0,
+    30000.0
+   ],
+   "mean_lattice_jumps": 1.7095,
+   "mean_kick_jumps": 0.0,
+   "outgoing": [
+    0.09149995378229753,
+    0.48574975464208775,
+    0.7622496149787573
+   ],
+   "outgoing_sem": [
+    0.004558718735084888,
+    0.007902478806511458,
+    0.00673098719398658
+   ],
+   "unresolved": [
+    0.005499997221886737,
+    0.03574998194226379,
+    0.0512499741130355
+   ],
+   "unresolved_sem": [
+    0.0011693742423123268,
+    0.002935638885986512,
+    0.003486523640372214
+   ],
+   "retained": [
+    0.9029995438843132,
+    0.4784997583041461,
+    0.18649990579670478
+   ],
+   "beyond_window": 0.6907182682846835
+  },
+  "tds_electronic": {
+   "status": "research-only; one cell, absorbing model, fibred carrier",
+   "max_order": 6,
+   "target_eV": 95.0,
+   "electronic": true,
+   "kick_nodes": 680,
+   "harmonic_max": 4,
+   "kick_truncation": 0.0013143225931991909,
+   "lattice_kraus": 0,
+   "outgoing_order_max": 18,
+   "tds": "strings",
+   "axis": [
+    0,
+    0,
+    1
+   ],
+   "strings": 1,
+   "seconds": 581.4486209409988,
+   "incidents": 4000,
+   "seed": 0,
+   "entrance_weight": 0.9999994948884976,
+   "depths_ang": [
+    1000.0,
+    10000.0,
+    30000.0
+   ],
+   "mean_lattice_jumps": 1.58575,
+   "mean_kick_jumps": 5.59675,
+   "outgoing": [
+    0.1002499493625719,
+    0.49424975034863994,
+    0.757749617251759
+   ],
+   "outgoing_sem": [
+    0.004748679984426491,
+    0.007905167376117237,
+    0.006774303507714355
+   ],
+   "unresolved": [
+    0.00849999570655223,
+    0.031999983836431926,
+    0.049749974870702755
+   ],
+   "unresolved_sem": [
+    0.0014515286326916895,
+    0.0027828029353216925,
+    0.0034378368831935093
+   ],
+   "retained": [
+    0.8912495498193734,
+    0.4737497607034257,
+    0.1924999027660358
+   ],
+   "beyond_window": 0.6690861101946552
+  }
+ },
+ "source_sha256_at_parent": {
+  "src/pyrite/montecarlo/channeling/axial_tds_continuum.py": "0534fe3c68905469eae47ba570cb7d594e6ac429feca7427df9c6e7a03ee7a79",
+  "src/pyrite/montecarlo/channeling/axial_fiber_unraveling.py": "024d747933468a9925c2d0183a070eef9fbadb4a4507d3b4d8ad0f749f20de59",
+  "checks/axial_outgoing_maps.py": "05f6bee4c2318c1f9c0df593316bc5eec4446b708ec6d03a1dd21df1213201d0"
+ }
+}

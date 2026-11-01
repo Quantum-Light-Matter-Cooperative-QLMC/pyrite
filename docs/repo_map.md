@@ -1001,8 +1001,11 @@ mixed phase-space gain. `channeling/axial_jump_unraveling.py` samples the same
 law by terminal-event trajectories at retained-dimension cost. Both accept
 supplied finite jump maps (`checks/axial_outgoing_maps.py` builds TDS maps).
 `channeling/axial_fiber_unraveling.py` adds a classical Bloch-carrier label so
-electronic kicks move trajectories between carrier fibres without wrapping;
-all of these work
+electronic kicks move trajectories between carrier fibres without wrapping,
+with jump outputs measured on an outgoing order box;
+`channeling/axial_tds_continuum.py` supplies its independent-string TDS jumps
+(continuous carrier-moving transfers per string, exact displacement-mixture
+rejection sampler, continuum loss); all of these work
 without establishing a physical matching surface or native run admission.
 `channeling/axial_projection.py` provides the CPU research full/retained
 no-jump matrix-exponential reference with native jump draws and step-resolved

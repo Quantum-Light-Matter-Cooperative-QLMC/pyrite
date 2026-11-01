@@ -359,11 +359,16 @@ def material_fiber_channels(
     harmonic_max: int = 4,
     grid_points: int = 32,
     outgoing_order_max: int | None = None,
+    tds: str = "lattice",
+    axis: tuple[int, int, int] = (0, 0, 1),
 ):
-    """Si [001], 5 MeV, one-cell fiber channels: TDS lattice + electronic kicks.
+    """Si, 5 MeV, one-cell fiber channels: TDS + electronic kicks.
 
-    ``outgoing_order_max`` = B (default ``max_order``) is the outgoing box;
-    Kraus columns span ``B + max_order`` so box outputs are exact.
+    ``outgoing_order_max`` = B (default ``max_order``) is the outgoing box.
+    ``tds="lattice"``: one-cell (image-correlated) Kraus columns spanning
+    ``B + max_order`` so box outputs are exact; one string per cell only.
+    ``tds="strings"``: independent-string continuum jumps, one
+    :class:`TdsString` per dissipator source (any number of strings per cell).
 
     Kick columns are ``sqrt(c_i) sqrt(rho_{q_i})`` harmonics on the cell
     lattice truncated at ``|n| <= harmonic_max``; the dropped fraction of
@@ -376,48 +381,46 @@ def material_fiber_channels(
     from pyrite.materials.channeling.transverse import longitudinal_kinematics
     from pyrite.montecarlo.channeling.axial_dissipator import axial_dissipator
     from pyrite.montecarlo.channeling.axial_fiber_unraveling import FiberChannels
+    from pyrite.montecarlo.channeling.axial_tds_continuum import TdsString
     from pyrite.montecarlo.channeling.operators import _potential
 
+    if tds not in ("lattice", "strings"):
+        raise ValueError("tds must be 'lattice' or 'strings'")
     energy = 5e6
-    profile = axial_profile("silicon", (0, 0, 1))
+    profile = axial_profile("silicon", axis)
     gamma, _ = longitudinal_kinematics(energy)
     mechanisms = ("tds", "electronic") if electronic else ("tds",)
     dissipator = axial_dissipator(
         profile, energy, (1, 1), (grid_points, grid_points), mechanisms=mechanisms
     )
-    (source,) = dissipator.tds_sources
     hbar_v = dissipator.hbar_v_eV_ang
     g = np.asarray(profile.g_inv_ang, dtype=float)
-    r = np.asarray(source.position_ang, dtype=float)
-
-    def phase(q):
-        return -_potential(source.element, q) / hbar_v
-
     box = max_order if outgoing_order_max is None else outgoing_order_max
     span = np.array([box + max_order, box + max_order])
-    kraus = _kraus(
-        -span,
-        span,
-        g,
-        (0.0, 0.0),
-        phase,
-        r,
-        source.displacement_ang2,
-        source.linear_density,
-        profile.area_ang2,
-        1e-14,
-    )
     zero = axial_states(profile, gamma, (0.0, 0.0), max_order)
-    lattice_loss = loss_operator(
-        zero.orders,
-        g,
-        phase,
-        r,
-        source.displacement_ang2,
-        source.linear_density,
-        profile.area_ang2,
-        300,
-    )
+
+    def phase_of(element):
+        return lambda q: -_potential(element, q) / hbar_v
+
+    strings = ()
+    if tds == "strings":
+        strings = tuple(
+            TdsString(
+                tuple(src.position_ang),
+                src.displacement_ang2,
+                src.linear_density,
+                phase_of(src.element),
+            )
+            for src in dissipator.tds_sources
+        )
+        kraus = np.zeros((int(np.prod(2 * span + 1)), 1))
+        lattice_loss = np.zeros((len(zero.orders),) * 2)
+    else:
+        (source,) = dissipator.tds_sources
+        r = np.asarray(source.position_ang, dtype=float)
+        args = (phase_of(source.element), r, source.displacement_ang2, source.linear_density)
+        kraus = _kraus(-span, span, g, (0.0, 0.0), *args, profile.area_ang2, 1e-14)
+        lattice_loss = loss_operator(zero.orders, g, *args, profile.area_ang2, 300)
     h = harmonic_max
     columns, nodes, truncation = [], [], 0.0
     for q, c in zip(dissipator.electronic_q_inv_ang, dissipator.electronic_weights, strict=True):
@@ -447,6 +450,7 @@ def material_fiber_channels(
         kick_columns=np.array(columns),
         kick_q_inv_ang=np.array(nodes),
         outgoing_order_max=box,
+        tds_strings=strings,
     )
     entry = (np.all(zero.orders == 0, axis=1)).astype(complex)
     info = {
@@ -456,8 +460,11 @@ def material_fiber_channels(
         "kick_nodes": len(nodes),
         "harmonic_max": h,
         "kick_truncation": truncation,
-        "lattice_kraus": int(kraus.shape[1]),
+        "lattice_kraus": int(kraus.shape[1]) if tds == "lattice" else 0,
         "outgoing_order_max": box,
+        "tds": tds,
+        "axis": list(axis),
+        "strings": len(dissipator.tds_sources),
     }
     return channels, entry, hbar_v, info
 
@@ -482,8 +489,12 @@ def fiber_report(
     seed: int = 0,
     electronic: bool = True,
     outgoing_order_max: int | None = None,
+    tds: str = "lattice",
+    axis: tuple[int, int, int] = (0, 0, 1),
+    max_order: int = 6,
+    target_eV: float = 95.0,
 ) -> dict:
-    """Fiber unraveling of Si [001] 5 MeV with TDS (+ electronic) jumps. Research only.
+    """Fiber unraveling of Si 5 MeV with TDS (+ electronic) jumps. Research only.
 
     ``beyond_window`` is the fraction of outgoing events whose measured order
     lies outside the retained window ``|n| <= max_order``.
@@ -495,7 +506,12 @@ def fiber_report(
     from pyrite.montecarlo.channeling.axial_fiber_unraveling import unravel_fiber_outgoing
 
     channels, entry, hbar_v, info = material_fiber_channels(
-        electronic=electronic, outgoing_order_max=outgoing_order_max
+        max_order,
+        target_eV,
+        electronic=electronic,
+        outgoing_order_max=outgoing_order_max,
+        tds=tds,
+        axis=axis,
     )
     box = info["outgoing_order_max"]
     window = balanced_window(2 * box + 1)
