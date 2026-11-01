@@ -50,5 +50,5 @@ for s in w-1MeV-100um si-300keV-100um; do
     done
 done
 PYRITE_TEST_BACKEND=cuda PYRITE_MC_BACKEND=cuda uv run --no-sync pyrite-dev test --slow \
-    tests/montecarlo/test_transport_continuation_cuda.py > "$out/cuda-tests.log" 2>&1
+    tests/montecarlo/transport/test_transport_continuation_cuda.py > "$out/cuda-tests.log" 2>&1
 echo "cuda tests rc=$?"
