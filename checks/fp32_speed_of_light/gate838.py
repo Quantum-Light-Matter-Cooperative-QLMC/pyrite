@@ -15,10 +15,13 @@ when it lies wholly outside (``|rel| - resolution > eps / 3``), and
 The verdict passes only with every test ``pass``.
 Headline membership follows ``scenes.json`` ``precision`` (sets, floors,
 bands below the beam energy). Distributions: the transmitted-energy spectrum
-(20 bins over [0, E0]) and the path-length distribution (20 equal-count bins
-of the FP64 sample), as per-primary bin indicators. Each bin with
+(20 bins over [0, E0]) and the path-length distribution (20 equal-width bins
+up to the longest path), as per-primary bin indicators. Each bin with
 probability >= the fraction floor gets the same bound, and a paired Hotelling
 T^2 over all populated bins tests for any shift (p reported as a diagnostic).
+Bin intervals are Bonferroni-adjusted over a distribution's populated bins
+(the declared #510 multiple-comparison policy); headline observables each use
+the plain 95% interval.
 
     uv run python checks/fp32_speed_of_light/gate838.py evidence/gate838/<job> \\
         [--output summary.json]
@@ -72,17 +75,17 @@ def headline(name, mean, scene):
     return name.startswith("cone_")
 
 
-def bound(a, b):
+def bound(a, b, z_crit=Z95):
     d = b - a
     se = d.std(ddof=1) / math.sqrt(d.size)
     mean_a = a.mean()
     rel = d.mean() / mean_a if mean_a else math.nan
     return dict(
-        resolution=float(Z95 * se / abs(mean_a)) if mean_a else math.nan,
+        resolution=float(z_crit * se / abs(mean_a)) if mean_a else math.nan,
         fp64_mean=float(mean_a),
         rel=float(rel),
         z=float(d.mean() / se) if se > 0 else 0.0,
-        bound=float((abs(d.mean()) + Z95 * se) / abs(mean_a)) if mean_a else math.nan,
+        bound=float((abs(d.mean()) + z_crit * se) / abs(mean_a)) if mean_a else math.nan,
         identical=float(np.mean(a == b)),
     )
 
@@ -120,7 +123,13 @@ def distribution(name, a, b, edges, scene_floor):
     ib = np.stack([(b >= lo) & (b < hi) for lo, hi in zip(edges[:-1], edges[1:], strict=True)], 1)
     ia, ib = ia.astype(float), ib.astype(float)
     populated = ia.mean(0) >= scene_floor
-    bins = [bound(ia[:, j], ib[:, j]) for j in np.flatnonzero(populated)]
+    # Bonferroni over the populated bins: each bin's interval is at
+    # 1 - 0.05 / k, so the family of k bins keeps 95% simultaneous coverage.
+    from scipy import stats
+
+    k_bins = max(int(populated.sum()), 1)
+    z_crit = float(stats.norm.isf(0.025 / k_bins))
+    bins = [bound(ia[:, j], ib[:, j], z_crit) for j in np.flatnonzero(populated)]
     t2, k, p = hotelling(ia[:, populated], ib[:, populated])
     rank = {"pass": 0, "unresolved": 1, "FAIL": 2}
     verdicts = {}
@@ -175,8 +184,10 @@ def main():
         edges = np.linspace(0.0, scene["energy_keV"] * (1 + 1e-9), 21)
         path = np.concatenate([x["path_um"] for x in fa])
         pathb = np.concatenate([y["path_um"] for y in fb])
-        pedges = np.quantile(path, np.linspace(0, 1, 21))
-        pedges[-1] = np.inf
+        # Equal-width, not equal-count: with straggling off, stopped primaries
+        # share the CSDA range to ~1e-7 relative, and quantile edges inside that
+        # spike would resolve its rounding-scale shift instead of a distribution.
+        pedges = np.linspace(0.0, 1.001 * max(path.max(), pathb.max()), 21)
         for dist in (
             distribution("transmitted_energy", e, eb, edges, floor),
             distribution("path_um", path, pathb, pedges, floor),
