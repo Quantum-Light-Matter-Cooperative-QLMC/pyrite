@@ -118,6 +118,21 @@ def test_check_guide_lists_each_mapped_check() -> None:
     assert all(f"`{Path(check).name}`" in guide for check in CHECK_LEDGER_IDS)
 
 
+def test_readmes_name_every_checks_and_scripts_entry() -> None:
+    root = Path(__file__).parents[2]
+    for name in ("checks", "scripts"):
+        directory = root / name
+        guide = (directory / "README.md").read_text(encoding="utf-8")
+        entries = {
+            path.name
+            for path in directory.iterdir()
+            if path.name not in {"README.md", "__pycache__"} and not path.name.startswith(".")
+        }
+        missing = {entry for entry in entries if entry not in guide}
+
+        assert not missing, f"{name}/README.md omits {sorted(missing)}"
+
+
 def test_validation_records_command_writes_mapped_result(tmp_path, monkeypatch) -> None:
     from pyrite.devtools import dev_cli
 
