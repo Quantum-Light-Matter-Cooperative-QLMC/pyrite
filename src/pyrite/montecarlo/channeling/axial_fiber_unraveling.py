@@ -250,6 +250,7 @@ class _Fiber:
     vectors: np.ndarray  # (K, n) retained columns
     eigen: tuple[np.ndarray, np.ndarray, np.ndarray]
     hbar_v: float
+    energies: np.ndarray  # (n,) retained H(kappa) eigenvalues [eV]
 
     def evolve(self, c: np.ndarray, depth: float) -> np.ndarray:
         lam, right, inverse = self.eigen
@@ -299,7 +300,8 @@ class _Engine:
             lam, right = np.linalg.eig(h_eff)
             if np.linalg.cond(right) > _MAX_CONDITION:
                 raise FloatingPointError("no-jump generator eigenvectors are ill conditioned")
-            self.cache[key] = _Fiber(v, (lam, right, np.linalg.inv(right)), self.hbar_v)
+            eigen = (lam, right, np.linalg.inv(right))
+            self.cache[key] = _Fiber(v, eigen, self.hbar_v, np.asarray(energies)[keep])
             if len(self.cache) > self.cache_size:
                 self.cache.popitem(last=False)
         self.cache.move_to_end(key)
@@ -470,7 +472,32 @@ def _waiting(fiber, c, threshold, start, stop, step, tolerance):
     return None, current
 
 
-def _trajectory(engine, entry, kappa, window, max_depth, seed, incident, step, tolerance):
+def _observe_segment(observe, incident, fiber, c, kappa, start, stop, checkpoints, final):
+    """Report the normalized no-jump state at checkpoints in ``[start, stop)``.
+
+    ``final`` closes the interval at ``stop`` (no further jump). Read-only:
+    deterministic evolution, no random draws.
+    Validation: cr-axial-fiber-return-deficit
+    """
+    for z in checkpoints:
+        if start <= z < stop or (final and z == stop):
+            state = fiber.evolve(c, z - start)
+            observe(incident, float(z), kappa, fiber.energies, state / np.linalg.norm(state))
+
+
+def _trajectory(
+    engine,
+    entry,
+    kappa,
+    window,
+    max_depth,
+    seed,
+    incident,
+    step,
+    tolerance,
+    observe=None,
+    checkpoints=(),
+):
     """One terminal-event history; law in :func:`unravel_fiber_outgoing`.
 
     Validation: cr-axial-fiber-unraveling
@@ -495,7 +522,13 @@ def _trajectory(engine, entry, kappa, window, max_depth, seed, incident, step, t
         )
 
     while True:
+        start = depth
         depth, state = _waiting(fiber, c, rng.random(), depth, max_depth, step, tolerance)
+        if observe is not None:
+            stop = max_depth if depth is None else depth
+            _observe_segment(
+                observe, incident, fiber, c, kappa, start, stop, checkpoints, depth is None
+            )
         if depth is None:
             return event("retained", max_depth)
         chi = fiber.vectors @ (state / np.linalg.norm(state))
@@ -532,6 +565,8 @@ def unravel_fiber_outgoing(
     seed: int = 0,
     search_step_ang: float = 100.0,
     depth_tolerance_ang: float = 1e-6,
+    observe: Callable | None = None,
+    checkpoints_ang: Sequence[float] = (),
 ) -> list[FiberEvent]:
     r"""Unravel the carrier-fibred absorbing model into terminal events.
 
@@ -561,7 +596,15 @@ def unravel_fiber_outgoing(
     :func:`.phase_space_stream` for its one measurement. No event is a
     physical escape or native launch.
 
+    ``observe(incident_id, depth_ang, carrier, energies_eV, c)``, if given, is
+    called for every surviving incident at each depth of ``checkpoints_ang``
+    in ``[0, max_depth_ang]``, with ``c`` the normalized retained amplitude in
+    the eigenbasis of ``H(carrier)`` (energies ``energies_eV``). The ensemble
+    mean of ``weight * 1(alive) * c c^dagger`` is the retained density at that
+    depth. Observation draws no random numbers.
+
     Validation: cr-axial-fiber-unraveling
+    Validation: cr-axial-fiber-return-deficit
     """
     for name, value in (
         ("hbar_v_eV_ang", hbar_v_eV_ang),
@@ -590,6 +633,8 @@ def unravel_fiber_outgoing(
             int(i),
             search_step_ang,
             depth_tolerance_ang,
+            observe,
+            tuple(float(z) for z in checkpoints_ang),
         )
         for i in incident_ids
     ]

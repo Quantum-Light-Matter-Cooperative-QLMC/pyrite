@@ -1146,6 +1146,92 @@ fraction unresolved at the $B=(30,42)$ box is about 0.09–0.11, above [111]'s
 0.06–0.08; box and tail convergence belong to #881/#882. Each task peaked
 below 1.6 GB.
 
+## Paired numerical convergence and return deficit of the fibre model (#882)
+
+`checks/axial_outgoing_convergence.py` runs one-change arms of the fibre
+unraveling (Si [001], 5 MeV, continuum TDS + electronic kicks, seed 0) around
+the control M = 6, nominal 95 eV cut, box B = 18 and 200 Å search step. All
+arms share incident IDs, so every difference is paired per incident.
+`unravel_fiber_outgoing(observe=...)` reports each surviving incident's
+normalized retained amplitude at 61 checkpoints (0–3 µm), and the study
+tallies the below-$U_{\max}$ population $N_B$ and its exposure $X_B$
+([derivation](../../validation/channeling/cr-axial-fiber-return-deficit.md)).
+The return deficit compares the absorbing control with the $P=R$ reference
+(cut removed, same window and box), as in the secular study above. It
+includes return through jumps plus two sign-indefinite terms: the coherent
+no-jump coupling across the cut and jump interference of $P$–$Q$
+coherences recycled into $P$. It is accounting at a fixed window, not a physical
+escape fraction.
+
+**Results (SLURM 3050;
+[record](../../validation/check-records/axial-zone/outgoing-convergence-3050.json)).**
+16,000 incidents per arm (4,000 for the step arms, paired against the same
+control IDs). Paired differences from the control, mean ± SEM. Relative
+exposure is $1-X_B(\text{arm})/X_B(\text{control})$, so a positive value
+means the arm has less bound exposure:
+
+| Arm | ΔR at 1 µm | ΔR at 3 µm | Rel. $X_B$ at 1 µm | Rel. $X_B$ at 3 µm |
+| --- | ---: | ---: | ---: | ---: |
+| step 100 Å / 400 Å | 0 (identical) | 0 | 0 | 0 |
+| B = 24 | −0.0005 ± 0.0008 | −0.0005 ± 0.0006 | +0.01% ± 0.03% | +0.04% ± 0.05% |
+| B = 12 | +0.0026 ± 0.0013 | +0.0009 ± 0.0011 | −0.09% ± 0.05% | −0.13% ± 0.09% |
+| M = 5 | −0.0022 ± 0.0031 | +0.0024 ± 0.0033 | −2.88% ± 0.18% | −3.54% ± 0.31% |
+| M = 7 | +0.0047 ± 0.0027 | −0.0039 ± 0.0031 | +0.78% ± 0.13% | +0.91% ± 0.23% |
+| M = 8 | +0.0070 ± 0.0029 | −0.0064 ± 0.0031 | +0.94% ± 0.14% | +1.22% ± 0.25% |
+| target 50 eV | −0.110 ± 0.003 | −0.091 ± 0.003 | +0.40% ± 0.15% | +1.77% ± 0.26% |
+| target 140 eV (136.8) | +0.075 ± 0.003 | +0.071 ± 0.003 | −0.28% ± 0.10% | −1.12% ± 0.20% |
+| target 180 eV | +0.109 ± 0.003 | +0.114 ± 0.004 | −0.26% ± 0.11% | −1.40% ± 0.21% |
+
+Control tallies at 1 and 3 µm: retained 0.476 ± 0.004 and 0.194 ± 0.003,
+outgoing 0.489 and 0.755, unresolved 0.035 and 0.050; $N_B$ = 0.1503 and
+0.0247; $X_B$ = 3502 ± 17 and 4729 ± 30 Å.
+
+- **Search step.** It does not enter. The no-jump norm is monotone, so the
+  step only changes where the root bracket starts; events are identical.
+- **Box.** B = 18 is converged: against B = 24 the exposure changes by
+  ≤0.04% ± 0.05%; only the terminal labels move (unresolved 0.050 → 0.027
+  at 3 µm). B = 12 changes exposure by ≤0.13% but raises unresolved to
+  0.117.
+- **Window M.** Exposure falls by 0.9% (M = 7) and 1.2% (M = 8) at 3 µm, and
+  0.8–0.9% at 1 µm; M = 5 is 2.9–3.5% high. Convergence in M at the 1% level
+  holds to about 1 µm, not to 3 µm.
+- **Cut target.** Retained weight counts everything below the cut, so it
+  moves with the cut by construction and is not a convergence observable.
+  Bound exposure gains 1.1% (137 eV) and 1.4% (180 eV) at 3 µm, and
+  0.3% at 1 µm. At 180 eV it equals the $P=R$ reference within errors
+  (4795 vs 4794 Å).
+
+Return deficit, $1-X_B(\text{absorbing})/X_B(P=R)$ at the provisional 95 eV
+cut (paired, mean ± SEM):
+
+| Window | 0.1 µm | 1 µm | 3 µm |
+| --- | ---: | ---: | ---: |
+| M = 6 | 0.01% ± 0.03% | 0.20% ± 0.11% | 1.37% ± 0.20% |
+| M = 8 | 0.05% ± 0.04% | 0.50% ± 0.13% | 2.51% ± 0.22% |
+
+The deficit in the below-barrier population itself, $1-N_B/N_B^{\rm ref}$,
+is 1.2% ± 0.4% (M = 6) and 1.8% ± 0.4% (M = 8) at 1 µm, and 10% ± 2% and
+19% ± 2% at 3 µm. The $P=R$ reference exposure is 0.45% ± 0.04%,
+0.64% ± 0.14% and 0.06% ± 0.23% lower at M = 8 than at M = 6 at 0.1, 1 and
+3 µm (paired).
+
+**What this establishes (numerical accounting only).** With 95% confidence
+(±2 SEM), for Si [001] 5 MeV in this model:
+
+- step and box (B ≥ 18) are converged to well below 0.1% of bound exposure;
+- to 1 µm, window (M = 6 → 8) and cut (95 → 180 eV) each change bound
+  exposure by at most about 1.2%, and the return deficit is below 0.8%
+  (M ≤ 8);
+- to 3 µm, the return deficit is 1.0–3.0% and grows with M, as in the
+  secular study, so it is not converged in the window; the cut target and
+  M each move exposure by about 1–1.8%.
+
+The 95 eV rule therefore keeps return-deficit and cut errors near the 1%
+level to about 1 µm. Beyond that the deficit grows with depth and window,
+consistent with the depth-budget conclusion above. The first 1,500 incidents
+of the same array, recorded earlier as a preliminary result, overstated the
+M = 6 deficit (2.6% ± 0.6% at 3 µm); that partial record is superseded.
+
 ## Matching prescription still to establish
 
 **Provisional numerical matching rule (research, from 1651–1656).** At each

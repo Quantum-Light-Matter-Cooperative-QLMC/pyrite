@@ -550,3 +550,59 @@ def test_inconsistent_rectangular_extents_refuse(checks, change, message):
             max_depth_ang=1.0,
             incident_ids=[0],
         )
+
+
+def _observed(checks, n, checkpoints, observe_kwargs=True):
+    _, entry = _dense(checks, 0.35)
+    records = []
+
+    def observe(incident, depth, kappa, energies, c):
+        records.append((incident, depth, np.array(energies), np.array(c)))
+
+    events = unravel_fiber_outgoing(
+        _channels(checks, 0.35, azimuths=None),
+        entry,
+        hbar_v_eV_ang=HBAR_V,
+        window=WINDOW,
+        max_depth_ang=12.0,
+        incident_ids=range(n),
+        seed=5,
+        search_step_ang=2.0,
+        **(dict(observe=observe, checkpoints_ang=checkpoints) if observe_kwargs else {}),
+    )
+    return events, records
+
+
+def test_observation_draws_no_random_numbers_and_tracks_survival(checks):
+    checkpoints = (0.0, 1.0, 4.0, 12.0)
+    observed, records = _observed(checks, 300, checkpoints)
+    plain, _ = _observed(checks, 300, checkpoints, observe_kwargs=False)
+    assert observed == plain
+    seen = {(i, z) for i, z, _, _ in records}
+    assert len(seen) == len(records)
+    for e in observed:
+        for z in checkpoints:
+            alive = e.kind == "retained" or e.depth_ang > z
+            assert ((e.incident_id, z) in seen) == alive
+    energies, _ = _spectrum()
+    for _, _, observed_energies, c in records:
+        np.testing.assert_allclose(observed_energies, energies[energies < 2.2])
+        assert np.vdot(c, c).real == pytest.approx(1.0, rel=1e-12)
+
+
+def test_observed_states_reproduce_the_dense_retained_density(checks):
+    # Ensemble mean of weight * 1(alive) * |c|^2 per eigenstate = diag(rho_P(z)).
+    model, _ = _dense(checks, 0.35)
+    checkpoints = (1.0, 4.0, 12.0)
+    n = 3000
+    events, records = _observed(checks, n, checkpoints)
+    weight = events[0].weight
+    for z in checkpoints:
+        populations = np.zeros((n, int(np.sum(_spectrum()[0] < 2.2))))
+        for i, depth, _, c in records:
+            if depth == z:
+                populations[i] = weight * np.abs(c) ** 2
+        expected = np.diag(model.at_depth(z).retained_density).real
+        mean = populations.mean(axis=0)
+        sem = np.maximum(populations.std(axis=0, ddof=1) / np.sqrt(n), 1e-3)
+        assert np.all(np.abs(mean - expected) < 4.5 * sem), z
