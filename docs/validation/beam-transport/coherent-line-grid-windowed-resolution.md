@@ -3484,7 +3484,7 @@ Runner: `coherent_audit.py:74-104` selects the centroid audit only when
 `centroid_relative_tolerance` is present. It raises
 `CxrGridToleranceError` if the yield fails, then if the centroid fails.
 Refusals propagate as `ValueError`. Provenance is returned only after both
-checks pass. The call site `runner/__init__.py:1011-1013` (unchanged since
+checks pass. The call site `runner/case_driver.py::_spectrum_case_impl` (unchanged since
 `de828003`) runs before characteristic and bremsstrahlung evaluation, on
 the actual captured rows, `E_grid`, `spec_coherent` and `Ne_lines`. The
 yield-only path calls the same function with the same options as before.

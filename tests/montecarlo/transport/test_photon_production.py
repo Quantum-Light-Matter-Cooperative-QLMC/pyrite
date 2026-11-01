@@ -190,7 +190,7 @@ def test_public_simulate_returns_separate_aperture_after_one_primary_pass(
         )
 
     monkeypatch.setattr(runner, "_transport_case", transport)
-    monkeypatch.setattr(runner, "_spectrum_case_impl", spectrum)
+    monkeypatch.setattr(runner.case_driver, "_spectrum_case_impl", spectrum)
     # An analytic hit reference isolates public orchestration from sampler tests.
     built_case = api.build_case(scene)
     selected = SimpleNamespace(case=built_case, config=scene.physics.photon_transport)
@@ -227,7 +227,7 @@ def test_invalid_execution_is_rejected_before_primary_transport(
     def forbidden(*args, **kwargs):
         pytest.fail("invalid selection reached primary transport")
 
-    monkeypatch.setattr(runner, "simulate_trajectories", forbidden)
+    monkeypatch.setattr(runner.case_driver, "simulate_trajectories", forbidden)
     core = change.pop("transport_core", "lockstep")
     case = replace(selected.case, **change)
     with pytest.raises(ValueError, match=match):

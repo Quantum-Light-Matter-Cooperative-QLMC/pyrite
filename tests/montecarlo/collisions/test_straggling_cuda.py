@@ -89,7 +89,7 @@ def test_straggled_production_case_keeps_the_cuda_lut(monkeypatch):
         seen.update(kwargs)
         raise Launched
 
-    monkeypatch.setattr(runner, "simulate_trajectories", launch)
+    monkeypatch.setattr(runner.case_driver, "simulate_trajectories", launch)
     with pytest.raises(Launched):
         runner._transport_case(case)
     assert seen["transport_core"] == "cuda"

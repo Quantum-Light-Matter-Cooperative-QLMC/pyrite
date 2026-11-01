@@ -127,10 +127,10 @@ def test_block_oom_doubles_blocks_and_restores_the_audit(monkeypatch, small_tran
         return _once(case, tp, segments)
 
     monkeypatch.setattr(runner._RESOURCE_POLICY, "gpu", True)
-    monkeypatch.setattr(runner, "device_headroom_bytes", lambda: 1)
-    monkeypatch.setattr(runner, "electron_block_count", lambda n, headroom: 2)
+    monkeypatch.setattr(runner.case_driver, "device_headroom_bytes", lambda: 1)
+    monkeypatch.setattr(runner.case_driver, "electron_block_count", lambda n, headroom: 2)
     monkeypatch.setattr(runner, "_is_gpu_oom", lambda error: isinstance(error, FakeOOM))
-    monkeypatch.setattr(runner, "_cxr_for_segments_once", once)
+    monkeypatch.setattr(runner.case_driver, "_cxr_for_segments_once", once)
     audit = {"start_eV": 50.0}
     spec = runner._cxr_for_segments(
         tp["segs"],
@@ -153,14 +153,14 @@ def test_cpu_and_coherent_sums_are_never_split(monkeypatch, small_transport):
     case, tp = small_transport
     seen = []
     monkeypatch.setattr(
-        runner, "_cxr_for_segments_once", lambda segments, **kw: seen.append(segments)
+        runner.case_driver, "_cxr_for_segments_once", lambda segments, **kw: seen.append(segments)
     )
-    monkeypatch.setattr(runner, "electron_block_count", lambda n, headroom: 4)
+    monkeypatch.setattr(runner.case_driver, "electron_block_count", lambda n, headroom: 4)
     runner._cxr_for_segments(
         tp["segs"], tp["E_grid"], case, tp["n_hat"], None, None, coherent=False
     )
     monkeypatch.setattr(runner._RESOURCE_POLICY, "gpu", True)
-    monkeypatch.setattr(runner, "device_headroom_bytes", lambda: 1)
+    monkeypatch.setattr(runner.case_driver, "device_headroom_bytes", lambda: 1)
     runner._cxr_for_segments(tp["segs"], tp["E_grid"], case, tp["n_hat"], None, None, coherent=True)
     assert seen == [tp["segs"], tp["segs"]]
 

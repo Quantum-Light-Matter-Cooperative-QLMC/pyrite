@@ -148,7 +148,7 @@ def test_runner_forwards_the_case_quadrature(monkeypatch):
         seen.append(kwargs["line_quadrature"])
         return np.zeros(len(E_grid))
 
-    monkeypatch.setattr(runner, "mc_cxr_spectrum", fake_spectrum)
+    monkeypatch.setattr(runner.case_driver, "mc_cxr_spectrum", fake_spectrum)
     grid = np.linspace(100.0, 200.0, 11)
     for case, expected in (
         (build_cases(_sweep(), n_electrons=2, n_electrons_brem=2)[0], "node"),

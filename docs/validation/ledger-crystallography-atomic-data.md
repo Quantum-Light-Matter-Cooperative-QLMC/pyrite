@@ -25,7 +25,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `surface-hkl-orientation`
 
 - **Claim:** reciprocal cleavage-plane normal `g_hkl = h b1 + k b2 + l b3` is mapped to sample `+z` by a proper minimal rotation, followed by the configured right-handed azimuth about `+z`, then (when set) the minimal rotation `+z -> (sinθcosφ, sinθsinφ, cosθ)` of a lattice miscut
-- **Code:** `materials/crystal.py::_orientation_R`, `materials/emission.py::photon_energies`, `montecarlo/geometry.py::_orientation_R` (compatibility forwarder), `campaign/geometry.py::CrystalCut`, `::resolve_crystal_cut`; plumbing through `campaign/sweep.py`, `campaign/front_matching.py`, `montecarlo/spectrum/cxr/`, `montecarlo/detector.py`, and `montecarlo/runner/__init__.py`
+- **Code:** `materials/crystal.py::_orientation_R`, `materials/emission.py::photon_energies`, `montecarlo/geometry.py::_orientation_R` (compatibility forwarder), `campaign/geometry.py::CrystalCut`, `::resolve_crystal_cut`; plumbing through `campaign/sweep.py`, `campaign/front_matching.py`, `montecarlo/spectrum/cxr/`, `montecarlo/detector.py`, and `montecarlo/runner/case_driver.py`
 - **Source:** standard reciprocal-lattice geometry and Rodrigues rotation
 - **Status:** anchored
 - **Checks:** reciprocal/direct equivalence for orthogonal one-axis cuts; nonorthogonal reciprocal-normal alignment; determinant/azimuth handedness; mutually exclusive parser/API inputs; legacy direct-axis matrix frozen bit-for-bit

@@ -78,7 +78,7 @@ def test_cuda_selection_keeps_launch_streams_and_downloads_before_zone_join(monk
         return original(*args, **{**kwargs, "transport_core": "per-electron"})
 
     monkeypatch.setattr(runner, "_case_transport_core", lambda *_: "cuda")
-    monkeypatch.setattr(runner, "simulate_trajectories", native)
+    monkeypatch.setattr(runner.case_driver, "simulate_trajectories", native)
     actual = runner._transport_case(case, transport_core=requested, keep_segments_on_device=True)[
         "segs"
     ]

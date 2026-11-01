@@ -112,7 +112,7 @@ def test_shell_case_runs_on_the_exact_cuda_core(monkeypatch):
         seen.update(kwargs)
         raise Launched
 
-    monkeypatch.setattr(runner, "simulate_trajectories", launch)
+    monkeypatch.setattr(runner.case_driver, "simulate_trajectories", launch)
     with pytest.raises(Launched):
         runner._transport_case(shell)
     # The CUDA LUT kernel has no shell mode, so the runner takes the exact one.

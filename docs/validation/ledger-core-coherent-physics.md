@@ -256,7 +256,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `temporal-intensity-profile`
 
 - **Claim:** the opt-in line temporal profile is `I(t) = Σ_rows w |E_row(t)|²` with the unitary transform `E(t) = (2πħc)^{-1/2} ∫ E(E) e^{−iEt/ħc} dE`, so `∫ I dt = ∫ d²N/dE dΩ dE`; incoherent lines are boxes of duration `D t_L = 2ħc a` centred on `d = t_abs − n̂·r` carrying their sinc² mass `wπ/a`; coherent rows are FFT'd on a conjugate uniform energy grid, with bunch offsets averaged as `Σ_e|S_e|² + |F⁻¹[χ Σ S^geo]|² − Σ_e|F⁻¹[χ S^geo_e]|²`
-- **Code:** `montecarlo/spectrum/cxr/_temporal.py`; hooks in `montecarlo/spectrum/cxr/_per_hkl.py::{_accumulate_reflection,_temporal_coherent_row}`; `montecarlo/runner/__init__.py::_spectrum_case_impl`
+- **Code:** `montecarlo/spectrum/cxr/_temporal.py`; hooks in `montecarlo/spectrum/cxr/_per_hkl.py::{_accumulate_reflection,_temporal_coherent_row}`; `montecarlo/runner/case_driver.py::_spectrum_case_impl`
 - **Source:** Fourier transform of the `coherent-emission` field (Feranchuk–Spence 2000 Eqs. (8), (10), (12)–(14) finite-time factor); Parseval/Plancherel; `coherent-formation-absorption` piece Parseval; `coherent-inter-electron-decoherence` offset characteristic function
 - **Status:** anchored
 - **Checks:** units; Parseval against the stored spectrum for both policies; single flight is a box at the arrival time with rms `D t_L/√12` from both routes; two flights give two separated equal pulses; a long bunch adds its arrival variance and makes the policies agree; exact box quadrature; option off leaves spectra and identity unchanged

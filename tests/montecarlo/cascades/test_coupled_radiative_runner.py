@@ -269,7 +269,7 @@ def test_uncoupled_case_transport_passes_no_radiative_arguments(monkeypatch):
         seen.update(kwargs)
         raise RuntimeError("stop")
 
-    monkeypatch.setattr(runner, "simulate_trajectories", fake)
+    monkeypatch.setattr(runner.case_driver, "simulate_trajectories", fake)
     with pytest.raises(RuntimeError, match="stop"):
         runner._transport_case(case)
     assert "radiative_model" not in seen and "bremslib_tables" not in seen

@@ -111,14 +111,65 @@ variables:
   processing (this is *not* the electron count). The VRAM admission policy can
   clamp it to a smaller effective value.
 
+Save this scene factory as `batch_chunk_scene.py`. Keep its physical and
+numerical setup fixed throughout a study; electron and spectrum batch sizes are
+configured separately via the environment variables above.
+
+```python
+import numpy as np
+
+from pyrite import (
+    Beam,
+    CxrReflections,
+    Detector,
+    EnergyBins,
+    Footprint,
+    Numerics,
+    Physics,
+    PointBunch,
+    PointSpot,
+    Scene,
+    SensorAcceptance,
+    Slab,
+)
+
+
+def make_scene() -> Scene:
+    return Scene(
+        beam=Beam(
+            energy_keV=50.0,
+            transverse=PointSpot(),
+            longitudinal=PointBunch(),
+        ),
+        target=Slab(
+            "hopg",
+            thickness_ang=2000.0,
+            tilt_deg=30.0,
+            footprint=Footprint(5.0, 5.0),
+        ),
+        detector=Detector(
+            observation_angle_deg=90.0,
+            acceptance=SensorAcceptance(1000.0, 35.0, 35.0),
+        ),
+        physics=Physics(emission="incoherent", brem_source="mc"),
+        numerics=Numerics(
+            cxr_trials=8192,
+            brem_trials=2048,
+            cxr_reflections=CxrReflections(n_families=2),
+            energy_bins=EnergyBins(cxr=np.linspace(250.0, 1250.0, 1001)),
+            # Do not specify cxr_chunk: the tuner controls it with an env var.
+        ),
+    )
+```
+
 Run on an allocated GPU worker through the
-[cluster workflow](running-on-a-cluster.md), from the repository root after
-`uv sync --extra nvidia --extra optimization`:
+[cluster workflow](running-on-a-cluster.md), from the repository root (where
+`batch_chunk_scene.py` is saved) after `uv sync --extra nvidia --extra optimization`:
 
 <!-- verify: skip (external shell tools or downloadable Python example) -->
 ```bash
 PYRITE_FP64=1 uv run --no-sync python -m pyrite.perf.batch_chunk_tuner \
-  --scene examples/molab_batch_chunk_scene.py \
+  --scene batch_chunk_scene.py \
   --batches 512,1024,2048,4096,8192 \
   --chunks 256,512,1024,2048,4096 \
   --trials 20 --warmups 1 --repeats 3 \

@@ -2,10 +2,10 @@
 """Benchmark PyRITE issue #610 capture policies on an SSH CUDA host.
 
 Local (streams this script over SSH, no scp needed):
-    uv run python scripts/pyrite_issue610_overlap_benchmark.py --host qlmc --ne 8000 --repeats 3
+    uv run python checks/pyrite_issue610_overlap_benchmark.py --host qlmc --ne 8000 --repeats 3
 
 Already on a GPU host in a PyRITE checkout:
-    PYRITE_MC_BACKEND=cuda uv run python scripts/pyrite_issue610_overlap_benchmark.py --local
+    PYRITE_MC_BACKEND=cuda uv run python checks/pyrite_issue610_overlap_benchmark.py --local
 
 Benchmark source: identical, seeded CUDA-transport result for every write.
 Run GPU work in a scheduler allocation after the remote-gpu-jobs pre-flight.

@@ -268,7 +268,7 @@ def test_transport_case_forwards_finite_footprint_to_shared_transport(monkeypatc
         captured.append((args, kwargs))
         return {"transport": len(captured)}
 
-    monkeypatch.setattr(runner, "simulate_trajectories", _transport)
+    monkeypatch.setattr(runner.case_driver, "simulate_trajectories", _transport)
 
     tp = runner._transport_case(case)
 
@@ -301,7 +301,7 @@ def test_transport_case_combines_line_and_brem_cutoffs(monkeypatch):
         captured["kwargs"] = kwargs
         return {"segments": True}
 
-    monkeypatch.setattr(runner, "simulate_trajectories", _transport)
+    monkeypatch.setattr(runner.case_driver, "simulate_trajectories", _transport)
 
     runner._transport_case(case)
 
@@ -335,7 +335,7 @@ def test_transport_case_handles_brem_only_electrons(monkeypatch):
         captured["kwargs"] = kwargs
         return {}
 
-    monkeypatch.setattr(runner, "simulate_trajectories", _transport)
+    monkeypatch.setattr(runner.case_driver, "simulate_trajectories", _transport)
 
     runner._transport_case(case)
 

@@ -109,7 +109,7 @@ def test_run_level_progress_is_bitwise_neutral(monkeypatch, case):
     def batched(*args, **kwargs):
         return real(*args, per_electron_config=REPLAY_CONFIG, **kwargs)
 
-    monkeypatch.setattr(runner, "simulate_trajectories", batched)
+    monkeypatch.setattr(runner.case_driver, "simulate_trajectories", batched)
     off = runner._transport_case(case, transport_core="per-electron")
     reports = []
     token = runner._TRANSPORT_PROGRESS.set(lambda done, total: reports.append((done, total)))
@@ -130,7 +130,7 @@ def test_real_single_case_transport_advances_terminal_and_activity(monkeypatch, 
         kwargs.update(transport_core="per-electron", per_electron_config=REPLAY_CONFIG)
         return real(*args, **kwargs)
 
-    monkeypatch.setattr(runner, "simulate_trajectories", batched)
+    monkeypatch.setattr(runner.case_driver, "simulate_trajectories", batched)
     monkeypatch.delenv("PYRITE_LOCAL_DASHBOARD", raising=False)
     activity = []
     runner.run_cases([case], max_workers=0, transport_only=True, on_activity=activity.append)

@@ -29,7 +29,7 @@ def _budget_limited(monkeypatch, fail_below):
             raise TransportStepLimitError(1, args[1], max_steps)
         return real(*args, max_steps=max_steps, **kwargs)
 
-    monkeypatch.setattr(runner, "simulate_trajectories", simulate)
+    monkeypatch.setattr(runner.case_driver, "simulate_trajectories", simulate)
     return budgets
 
 

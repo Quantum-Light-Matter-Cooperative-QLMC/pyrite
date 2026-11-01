@@ -73,7 +73,7 @@ def test_spectrum_only_ladder_never_reruns_transport(ladder, monkeypatch):
     def forbidden(*args, **kwargs):
         raise AssertionError("a ladder rung re-ran transport")
 
-    monkeypatch.setattr(runner, "simulate_trajectories", forbidden)
+    monkeypatch.setattr(runner.case_driver, "simulate_trajectories", forbidden)
     monkeypatch.setattr(runner, "_transport_case", forbidden)
     grids = cc.ladder_grids(*ladder.bandwidth_eV, SPACINGS)
 

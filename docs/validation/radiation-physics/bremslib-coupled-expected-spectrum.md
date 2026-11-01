@@ -134,7 +134,7 @@ For variance, the Si run gives $\operatorname{Var}(\nu_e)/E[\nu_e]$ between $2\t
 
 ### Double counting
 
-`_coupled_brem_from_segments` returns only the per-layer sum of `mc_coupled_brem_spectrum` (`emission.py:96-141`). `mc_hard_brem_event_spectrum` and `mc_soft_brem_spectrum` have no production caller left in `src/`, `checks/` or `apps/`. The live runner (`runner/__init__.py:1177`), the brem repair `_brem_for_case` (`emission.py:266`), and `energy_grid/convergence_case.py:178` all route through `_brem_wide_from_segments`, which dispatches coupled cases only to `_coupled_brem_from_segments`. The `event_segments` argument was removed at all three call sites. `mc_brem_spectrum` still rejects rows that carry the coupled marker. No path adds the sampled photons as well.
+`_coupled_brem_from_segments` returns only the per-layer sum of `mc_coupled_brem_spectrum` (`emission.py:96-141`). `mc_hard_brem_event_spectrum` and `mc_soft_brem_spectrum` have no production caller left in `src/`, `checks/` or `apps/`. The live runner (`runner/case_driver.py::_spectrum_case_impl`), the brem repair `_brem_for_case` (`emission.py:266`), and `energy_grid/convergence_case.py:178` all route through `_brem_wide_from_segments`, which dispatches coupled cases only to `_coupled_brem_from_segments`. The `event_segments` argument was removed at all three call sites. `mc_brem_spectrum` still rejects rows that carry the coupled marker. No path adds the sampled photons as well.
 
 ### Anchors
 

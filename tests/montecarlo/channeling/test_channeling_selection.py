@@ -203,7 +203,7 @@ def test_transport_options_refuse_before_work(planar_case, monkeypatch, options,
     def forbidden(*_args, **_kwargs):
         raise AssertionError("transport started")
 
-    monkeypatch.setattr(runner, "simulate_trajectories", forbidden)
+    monkeypatch.setattr(runner.case_driver, "simulate_trajectories", forbidden)
     monkeypatch.setattr(runner, "_case_transport_core", lambda case, core: core)
     with pytest.raises(ValueError, match=message):
         runner._transport_case(planar_case, **options)

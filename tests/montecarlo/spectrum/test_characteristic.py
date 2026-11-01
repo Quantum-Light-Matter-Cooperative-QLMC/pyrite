@@ -395,7 +395,7 @@ def test_runner_keeps_characteristic_separate_from_both_line_modes(monkeypatch):
         "n_backscattered": 0,
         "n_missed": 0,
     }
-    monkeypatch.setattr(runner, "_segments_on_device", lambda value: value)
+    monkeypatch.setattr(runner.case_driver, "_segments_on_device", lambda value: value)
     monkeypatch.setattr(
         runner,
         "_cxr_for_segments",
