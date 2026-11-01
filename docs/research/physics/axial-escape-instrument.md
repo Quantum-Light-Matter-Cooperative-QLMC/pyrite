@@ -6,7 +6,7 @@ on 2026-10-17. This note derives the accounting that an escape model must
 satisfy and gives a numerical counterexample to identifying the current grid
 sink with outgoing population. It does **not** select or validate a physical
 matching threshold, rechanneling approximation, or native launch distribution.
-The accounting claim `cr-axial-zone-handoff-accounting` is `rederived`; the physical handoff, `cr-axial-zone-handoff-physical`, remains `unverified`.
+The accounting claim `cr-axial-zone-handoff-accounting` is `rederived`; the physical outgoing instrument, `cr-axial-zone-handoff-physical`, is scoped to [#883](#physical-outgoing-instrument-883) and awaits fresh-context verification.
 
 ## Three subspaces, not two loss labels
 
@@ -1231,6 +1231,44 @@ level to about 1 µm. Beyond that the deficit grows with depth and window,
 consistent with the depth-budget conclusion above. The first 1,500 incidents
 of the same array, recorded earlier as a preliminary result, overstated the
 M = 6 deficit (2.6% ± 0.6% at 3 µm); that partial record is superseded.
+
+## Physical outgoing instrument (#883)
+
+`channeling.axial_outgoing_launch.sample_physical_handoff` turns the fibre
+model into one record per incident, with fate `retained`,
+`physical_outgoing` or `unresolved`. A physical outgoing record carries a lab
+launch: incident ID, depth, lab position, kinetic energy, unit lab direction,
+clock and the unchanged native stream key.
+[The claim page](../../validation/channeling/cr-axial-zone-handoff-physical.md)
+holds the derivation; the key choices are listed here.
+
+- **Surface branch.** With probability $1-\lVert P(\kappa_0)\psi_0\rVert^2$
+  the incident is outgoing at $z=0$. The box complement
+  $B\psi_0-P\psi_0$ is Weyl-measured on a dedicated per-incident stream.
+  Otherwise the fibre draws are used unchanged.
+- **What counts as physical.** Box outgoing and tails, and only under a
+  declared matching cut: the target meets the rule above, every cut the
+  unraveling selects lies within the declared window, and the tail kinetic
+  floor is above the cut. Lattice, kick and beyond-cap remainders stay
+  unresolved and are never launched.
+- **Momentum and direction.** $\mathbf k_\perp=\kappa+m\mathbf g$ (signed FFT
+  order), or $\kappa+\mathbf Q$ for a tail. This is the kinetic momentum
+  native transport continues with, mapped on shell through the crystal-to-lab
+  frame. The neglected potential energy is at most the well depth, small
+  against the cut. Over-angle momenta refuse.
+- **Position.** In-cell Weyl position (or struck string $\mathbf s+\mathbf u$
+  for a tail), placed in the cell of the native impact point. The reduced
+  fibre state carries no cell index; `lateral_bound_ang` $=z\theta_b$ bounds
+  the omitted drift.
+- **Energy and clock.** Declared CSDA at constant stopping, refused if the
+  zone loses more than $10^{-3}$ of $E_0$, with closed-form flight time
+  $z(E_0+E_1+2mc^2)/(p_0c+p_1c)$. Straggling is omitted, and
+  `clock_bound_ang` bounds the transverse path delay.
+
+The instrument changes no fibre draw and refuses when the matching or
+kinematic budgets fail. It is a research reference, not a native launch: the
+depth budget and return-flux bound (#884), the photon source (#885) and native
+admission (#886) remain open, and standard axial runs remain refused.
 
 ## Matching prescription still to establish
 
