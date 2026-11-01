@@ -21,7 +21,7 @@ from ..._env import env_value
 from ..._numerics import TRANSPORT_PRECISIONS
 
 #: Precision ``auto`` selects on the exact CUDA core.
-DEFAULT_TRANSPORT_PRECISION = "fp64"
+DEFAULT_TRANSPORT_PRECISION = "mixed"
 #: Identity marker of the default precision policy.
 TRANSPORT_PRECISION_MODEL = "cuda-exact-mixed-fp32-tables-v1"
 

@@ -204,7 +204,7 @@ def test_equal_acceptance_preserves_lowered_case_and_both_identities():
     # #278: the automatic continuum grid is the refined geometric grid.
     assert (
         case_content_key(cases[1])
-        == "2aadb3a21cfbb7fa213e6b4c100553adde763c81bdc00010989348dd10fafbac"
+        == "8de2ccd87f925df42855372005700b4af83e42bd537df0b9ff73532347937072"
     )
     sweeps = [
         LegacySweep(material="hopg", beam=beam.to_spec(), target=target, detector=d)
@@ -214,7 +214,7 @@ def test_equal_acceptance_preserves_lowered_case_and_both_identities():
     assert identities[0] == identities[1]
     assert (
         identities[1]["parameter_sha256"]
-        == "8d26701ca0d908dc0a5292271421dbc11995334ac5423662dca8dc187dea2205"
+        == "3d47e6fd6acccb09ba5d403d848cef38240c0cde406387858956ad06844ee9d1"
     )
     # Pin to the pre-object payload vocabulary; no acceptance metadata enters identity.
     assert "detector" not in identities[0]["resolved_parameters"]["sweep"]

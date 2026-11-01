@@ -317,7 +317,7 @@ def test_coupled_cuda_factory_bypasses_lut_with_cpu_stub(synthetic_si_tables, mo
     class ExactFactoryReached(Exception):
         pass
 
-    def exact(_config=None):
+    def exact(_config=None, _precision="fp64"):
         raise ExactFactoryReached
 
     def lut(_config=None):

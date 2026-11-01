@@ -50,6 +50,7 @@ from ..montecarlo.spectrum.coherent_population import (
 )
 from ..montecarlo.spectrum.transition_radiation_crossings import TRANSITION_MODEL
 from ..montecarlo.transport import STOPPING_MODEL
+from ..montecarlo.transport.precision import TRANSPORT_PRECISION_MODEL
 from ..results import EmissionMode, Settings
 from ..xsgen.bremslib.tables import resolve_bremsstrahlung_model
 from .axial_spec import AXIAL_MODEL_MARKER, resolve_axial_spec
@@ -598,6 +599,9 @@ def _model_generation_markers(emission: str) -> dict[str, Any]:
     # Every photon-escape factor reads the narrow-beam mu, sourced from
     # EPDL2025 since issue #274 (was Chantler f2 + Elam).
     markers["attenuation_model"] = ATTENUATION_MODEL
+    # The exact CUDA kernel's default arithmetic (#838): mixed FP32/FP64 since
+    # the refinement gate; precision itself stays in run provenance.
+    markers["transport_precision_model"] = TRANSPORT_PRECISION_MODEL
     return markers
 
 
@@ -813,7 +817,8 @@ def case_content_key(
     case whose seed differs simply gets a distinct key and recomputes; the store
     never serves a mismatched-seed result.
 
-    The stopping, characteristic-radiation, line-escape and attenuation markers,
+    The stopping, characteristic-radiation, line-escape, attenuation and
+    transport-precision markers,
     plus the selected bremsstrahlung model marker, join the payload alongside
     the case. Without
     them a blob from an earlier physics/data generation could be served silently.
@@ -835,6 +840,7 @@ def case_content_key(
         "characteristic_model": case_characteristic_marker(case),
         "line_escape_model": CXR_ESCAPE_MODEL,
         "attenuation_model": ATTENUATION_MODEL,
+        "transport_precision_model": TRANSPORT_PRECISION_MODEL,
         "bremsstrahlung_model": (
             case_bremsstrahlung_marker(case)
             if bremsstrahlung_model is None
