@@ -86,7 +86,7 @@ class TransportKernelTuning:
     batches and continuation lanes are sized from (``None``: 512); it, not
     ``electron_batch``, usually sets how many histories share one launch.
     ``kernel_threads`` is the CUDA transport launch's threads per block, one of
-    32, 64, 128, 256, 512 or 1024 (``None``: 128). Both are per scene and GPU
+    32, 64, 128, 256, 512 or 1024 (``None``: 32, #875). Both are per scene and GPU
     tuning knobs (#825). These fields leave transport bitwise-identical.
     ``precision`` is the exact CUDA kernel's arithmetic (#838): ``"mixed"``
     (FP32 table lookups and sampling, FP64 accumulation), ``"fp64"``, or
