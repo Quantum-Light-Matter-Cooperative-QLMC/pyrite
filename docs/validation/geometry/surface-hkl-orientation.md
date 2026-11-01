@@ -454,7 +454,7 @@ on the beam-facing hemisphere.
   catalog-spaced grid.
 
 **Anchors.**
-`tests/scan/test_crystal_cut.py::test_case_rotation_matches_an_independent_construction`
+`tests/campaign/test_crystal_cut.py::test_case_rotation_matches_an_independent_construction`
 covers nonorthogonal HOPG with `surface_hkl=(1,0,1)`, roll and miscut: the
 runtime matrix built from the case keys matches an independent Rodrigues
 construction to $10^{-13}$, and the cut axis lands on $\hat{\mathbf m}$.
@@ -529,7 +529,7 @@ HOPG is $a=b=2.461$, $c=6.711$ Å, $\gamma=120^\circ$. The check used `surface_h
 
 ### 9.4 Anchor tests
 
-`PYRITE_MC_BACKEND=cpu UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test tests/scan/test_crystal_cut.py tests/montecarlo/transport/test_surface_orientation.py`: 41 passed in 2.4 s. No heavy Monte Carlo was run.
+`PYRITE_MC_BACKEND=cpu UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test tests/campaign/test_crystal_cut.py tests/montecarlo/transport/test_surface_orientation.py`: 41 passed in 2.4 s. No heavy Monte Carlo was run.
 
 ### 9.5 Verdict
 

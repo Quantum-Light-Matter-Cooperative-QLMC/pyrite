@@ -59,7 +59,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 - **Source:** Y.-S. Tsai, Rev. Mod. Phys. 46, 815 (1974), Eq. (3.66) and Table B.2; PDG RPP "Passage of particles through matter", Eqs. (34.26)–(34.28) and Table 34.2
 - **Status:** filtered
 - **Checks:** units (`n` in Å⁻³, `r_e` in Å, `X0` in Å); reproduces PDG atomic-property `X0` for H, Be, C, Si, W, Pb within 4e-4 (test tolerance 2e-3); compound inverse lengths add by number density; screen depth sums layers and scales `1/cos(tilt)`; no warning below the pair threshold or under 0.05 X0.
-- **Anchor:** `tests/scan/test_thick_target.py::test_radiation_length_reproduces_the_pdg_table`, `::test_compound_inverse_lengths_add_by_number_density`, `::test_stack_depth_sums_layers_and_lengthens_with_tilt`, `::test_thick_tungsten_at_mev_warns_and_names_the_photon_transport_issue`, `::test_thin_targets_and_sub_threshold_beams_stay_quiet`
+- **Anchor:** `tests/campaign/test_thick_target.py::test_radiation_length_reproduces_the_pdg_table`, `::test_compound_inverse_lengths_add_by_number_density`, `::test_stack_depth_sums_layers_and_lengthens_with_tilt`, `::test_thick_tungsten_at_mev_warns_and_names_the_photon_transport_issue`, `::test_thin_targets_and_sub_threshold_beams_stay_quiet`
 - **Notes:** Issue #439 thick-target guard. Warning only; no case key, identity or output changes. The 0.05 X0 threshold is a policy choice: a high-energy photon converts with probability ≈ 1 − exp(−7/9 · 0.05) ≈ 4% there. PDG's mass-fraction rule and this number-density sum are the same additivity. Fresh-context verification pending.
 
 ## `bremslib-library-reference`
@@ -1038,7 +1038,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 - **Source:** equal-time plane equation and constant-velocity ray-plane kinematics; Gaussian characteristic function; Artru & Ispirian, *Bunch coherence in parametric X-ray radiation*, arXiv:physics/0208018 Eq. (11); Tadenuma et al., PRAB **25**, 110102 (2022), electron bunch tilt terminology
 - **Status:** anchored
 - **Checks:** degrees/sign/azimuth, dimensionless c*time/position slope, conditional versus marginal RMS; exact matching-face cancellation at signed and grazing angles; zero-front stream compatibility; joint Gaussian factor versus independent ray phases and brute-force averaging; matched/reversed fronts and conservative interval/window bounds
-- **Anchor:** `tests/montecarlo/transport/test_bunch_front_tilt.py`; `tests/scan/test_bunch_front_tilt.py`; `tests/scan/test_bunch_front_matching.py`
+- **Anchor:** `tests/montecarlo/transport/test_bunch_front_tilt.py`; `tests/campaign/test_bunch_front_tilt.py`; `tests/campaign/test_bunch_front_matching.py`
 - **Notes:** Monoenergetic parallel Gaussian/point analytic sources, residual Gaussian timing or PointBunch. Front tilt changes timing, not the mean beam direction or target orientation. Fresh-context verifier independently derived the source geometry before inspecting implementation; equations, sign, amplitude/intensity factors and matching-face convention agree. Synthetic complete-reducer tests cover finite and infinite slabs at fixed physical population, and temporal amplitude filtering. No human sign-off claimed. [derivation](beam-transport/linear-bunch-front-tilt.md)
 
 ## `trajectory-depth-loss-profile`

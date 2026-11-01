@@ -312,9 +312,9 @@ or change these guards as a naming side effect.
 | Stage | Owner and deliverable | Required evidence |
 | --- | --- | --- |
 | Quantity boundary | `campaign/beam.py` | `tests/instrument/test_unit_inputs.py`: scalar/array equivalence, wrong dimensions, required units, conflicts, external registry, copied read-back arrays and blocked-Pint numeric subprocesses |
-| Numeric consumers | `campaign/model.py`, `campaign/sweep.py`, `campaign/beam_cases.py`, `observations/spec.py` | Focused cases in `tests/scan/test_beam_objects.py`, `test_scene_model.py`, `test_sweep.py` and `tests/observations/test_spec.py`: replacement, unchanged defaults, numeric spec/record round-trips and existing identity fixtures |
+| Numeric consumers | `campaign/model.py`, `campaign/sweep.py`, `campaign/beam_cases.py`, `observations/spec.py` | Focused cases in `tests/campaign/test_beam_objects.py`, `test_scene_model.py`, `test_sweep.py` and `tests/observations/test_spec.py`: replacement, unchanged defaults, numeric spec/record round-trips and existing identity fixtures |
 | Dependency and public API | `pyproject.toml`, `uv.lock`, `docs/api.md`, beam docstrings, `api-surface.toml` | Core metadata in `tests/test_package_structure.py`; `pyrite-dev api check`, `api check --imports`, API tests in `tests/dev/test_api_surface.py`, and `pyrite-dev docs` |
-| Further fields (future work) | Their existing geometry/observation/config/quantum owners | Review each new quantity-valued contract separately; quantum examples already have `tests/scan/test_quantum_runtime_units.py` and portable JSON checks |
+| Further fields (future work) | Their existing geometry/observation/config/quantum owners | Review each new quantity-valued contract separately; quantum examples already have `tests/campaign/test_quantum_runtime_units.py` and portable JSON checks |
 
 The pilot keeps legacy numeric constructor arguments, properties, TOML keys and
 sweep paths without warnings. It does not schedule their removal. If a later
@@ -375,7 +375,7 @@ remain Pint-lazy. No sampled GPT/GDF crossing times or longitudinal distribution
 policies are changed by these interfaces.
 
 Focused evidence: `tests/instrument/test_beam_timing_quantities.py`,
-`tests/instrument/test_unit_inputs.py` and `tests/scan/test_beam_objects.py`.
+`tests/instrument/test_unit_inputs.py` and `tests/campaign/test_beam_objects.py`.
 The [beam reference](../reference/python-api/beams.md#bunch-timing-with-units)
 contains migration examples. Legacy fields remain supported without warnings;
 any removal belongs to the existing release/deprecation policy.

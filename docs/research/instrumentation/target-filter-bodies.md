@@ -395,7 +395,7 @@ They are not blockers for the resolver/description study.
 
 | Owner/tests | Required evidence for later implementation |
 | --- | --- |
-| `tests/scan/test_target_geometry.py`, `test_scene_model.py` | Equal legacy lowering, scalar rejection, sweep product order/seeds, layers/radiators, angle/groove constraints and adapter unit/frame parity |
+| `tests/campaign/test_target_geometry.py`, `test_scene_model.py` | Equal legacy lowering, scalar rejection, sweep product order/seeds, layers/radiators, angle/groove constraints and adapter unit/frame parity |
 | `tests/instrument/test_model.py` | Explicit/cross-catalog material resolution, unsupported policies, full downstream volume, overlapping versus touching plates, off-centre validity |
 | `tests/instrument/test_geometry.py`, `test_attenuation.py` | Equal normal/oblique/side-escape chords, partial shadows, zero-filter identity, multilayer collection parity; retain existing numerical oracles |
 | `tests/instrument/test_observation.py` | Frozen identity fixtures unchanged, names ignored, order preserved, invalidation confined to owning layers |

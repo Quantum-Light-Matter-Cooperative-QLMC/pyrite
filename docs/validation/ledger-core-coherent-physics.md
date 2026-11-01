@@ -662,7 +662,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 - **Source:** Feranchuk et al., Phys. Rev. E 62, 4225 (2000), photon eigenmode, reproduced in Zhai et al. (2025), SI Eq. (3); resonant scalar two-beam coupled-wave rate $\omega\lvert\chi_g\rvert/2$.
 - **Status:** anchored
 - **Checks:** units; zero coupling and thickness; exact Bragg detuning; no absorption; sign symmetry. Case adapter retains the offline audit's positive-g resonance and plus-g detuning; tests cover orientation and crystalline layers.
-- **Anchor:** `tests/materials/test_kinematic_validity.py::test_reference_parameters`, `::test_thick_silicon_and_thin_hopg`; `tests/scan/test_kinematic_validity.py`
+- **Anchor:** `tests/materials/test_kinematic_validity.py::test_reference_parameters`, `::test_thick_silicon_and_thin_hopg`; `tests/campaign/test_kinematic_validity.py`
 - **Notes:** Issue #342. Fresh-context verifier rederived the scalar parameters and source-to-code agreement; analytic and Si/HOPG anchors pass. Central incident ray and scalar detector direction, vacuum optical kinematics. No certification over scattering, mosaic domains, energy spread or detector acceptance; the extinction flag only says that a Bragg exchange length is reachable. Optical-data misses are recorded explicitly. Thresholds are project policy. [Independent derivation](radiation-physics/kinematic-validity-envelope.md). Human sign-off belongs to #277.
 
 ## `coherent-physical-bunch-population`

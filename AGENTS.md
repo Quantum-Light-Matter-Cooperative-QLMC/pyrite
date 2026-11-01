@@ -104,7 +104,7 @@ not simulation tests.
 | Energy-grid policy/artifacts | Matching `tests/energy-grid/` modules and affected spectrum consumers. Broader: `energy-grid`; CLI wiring stays in `cli`. |
 | Catalog/materials/tables | Matching `tests/materials/` or `tests/xsgen/` modules; use `regen-golden` only for authorized catalog changes and check affected grid/transport consumers. Broader: `materials`/`xsgen`. |
 | CLI or app | Affected command/app module, plus owning domain tests only if underlying behavior changed. Broader: `cli`/`apps`. |
-| Checkpoints/results/instrument/API | Matching modules under `tests/checkpoint/`, `results/`, `observations/`, `detectors/`, `instrument/`, or `scan/`; add concrete serialization/public callers, not all of `core`. |
+| Checkpoints/results/instrument/API | Matching modules under `tests/checkpoint/`, `results/`, `observations/`, `detectors/`, `instrument/`, `campaign/`, or `scan/`; add concrete serialization/public callers, not all of `core`. |
 | Developer runner/suite ownership | `tests/dev/test_dev_cli.py`; packaging/import changes add corresponding public export/package tests. Broader: `packaging`. |
 
 Select slow tests explicitly by node ID, or put `--slow` before test paths;

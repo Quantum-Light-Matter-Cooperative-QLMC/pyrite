@@ -453,7 +453,7 @@ returned angles are $(67.18681170626635^\circ,-83.16404834735738^\circ)$
 and direct phase residuals are at most $2.23\times10^{-15}$.
 
 Scalar/explicit central-ray equivalence and invalid input/source guards
-also passed. `tests/scan/test_bunch_front_matching.py`: 23 checks passed;
+also passed. `tests/campaign/test_bunch_front_matching.py`: 23 checks passed;
 the combined helper and documentation checks passed 29 tests in 1.34 s.
 These include signed/grazing off-axis ray phases, the planar ray contract,
 and actual scene-to-case checks for off-grid target angles.
