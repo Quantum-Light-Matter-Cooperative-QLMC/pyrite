@@ -101,6 +101,7 @@ TEST_SUITE_PATTERNS = {
     "spectrum-brem": (
         "montecarlo/test_brem_*.py",
         "montecarlo/test_bremsstrahlung_*.py",
+        "montecarlo/test_dielectric_suppression.py",
         "montecarlo/test_positron_brems.py",
     ),
     "spectrum": (
@@ -108,11 +109,13 @@ TEST_SUITE_PATTERNS = {
         "montecarlo/test_characteristic.py",
         "montecarlo/test_cherenkov*.py",
         "montecarlo/test_chunk_invariance.py",
+        "montecarlo/test_dtr_*.py",
         "montecarlo/test_electron_blocks.py",
         "montecarlo/test_emission_adapters.py",
         "montecarlo/test_line_*.py",
         "montecarlo/test_mosaic.py",
         "montecarlo/test_mosaic_mc.py",
+        "montecarlo/test_optical_*.py",
         "montecarlo/test_radiation_error_estimators.py",
         "montecarlo/test_segment_escape.py",
         "montecarlo/test_segment_staging.py",
@@ -125,6 +128,8 @@ TEST_SUITE_PATTERNS = {
     "transport-cascades": (
         "montecarlo/test_annihilation_cuda.py",
         "montecarlo/test_coupled_radiative_runner.py",
+        "montecarlo/test_dielectric_radiative*.py",
+        "montecarlo/test_dielectric_runner_scorer.py",
         "montecarlo/test_hard_radiative*.py",
         "montecarlo/test_pair_production*.py",
         "montecarlo/test_positron_*.py",
