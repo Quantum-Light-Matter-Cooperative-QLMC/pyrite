@@ -1979,7 +1979,7 @@ crystal = "mos2"
     case = sweep_module.build_cases(
         config.material_sweep("sample"), n_electrons=1, n_electrons_brem=1
     )[0]
-    monkeypatch.setattr(runner, "simulate_trajectories", lambda *args, **kwargs: {})
+    monkeypatch.setattr(runner.case_driver, "simulate_trajectories", lambda *args, **kwargs: {})
 
     transport = runner._transport_case(case)
 

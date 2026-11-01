@@ -66,7 +66,7 @@ def test_runner_falls_back_from_cuda_lut_to_exact_for_straggled_shell_mode():
     with (
         mock.patch("pyrite.montecarlo.runner._case_transport_core", return_value="cuda"),
         mock.patch(
-            "pyrite.montecarlo.runner.simulate_trajectories", return_value=segments
+            "pyrite.montecarlo.runner.case_driver.simulate_trajectories", return_value=segments
         ) as simulate,
     ):
         result = _transport_case(case, transport_core="cuda")

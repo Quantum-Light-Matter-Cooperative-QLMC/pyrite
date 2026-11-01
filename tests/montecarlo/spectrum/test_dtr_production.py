@@ -55,7 +55,7 @@ def test_live_two_beam_path_bypasses_the_legacy_line_amplitude(monkeypatch):
     def forbidden(*args, **kwargs):
         raise AssertionError("the opt-in model must replace the legacy PXR/CBS scorer")
 
-    monkeypatch.setattr(runner, "mc_cxr_spectrum", forbidden)
+    monkeypatch.setattr(runner.case_driver, "mc_cxr_spectrum", forbidden)
     output = runner._spectrum_case(case, transport)
     total = output["spec"] + output["spec_transition"]
     assert np.all(np.isfinite(total))

@@ -466,7 +466,9 @@ def test_diagnostic_transport_resolves_grid_before_spectrum(monkeypatch):
         "v_hat": np.array([[0.0, 0.0, 1.0]]),
         "elec_id": np.array([0]),
     }
-    monkeypatch.setattr(runner, "simulate_trajectories", lambda *args, **kwargs: segments)
+    monkeypatch.setattr(
+        runner.case_driver, "simulate_trajectories", lambda *args, **kwargs: segments
+    )
 
     transport = runner._transport_case(case, transport_core="lockstep")
 

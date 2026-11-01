@@ -496,7 +496,7 @@ def test_runner_retry_and_block_monitor_match_full_history(monkeypatch):
             kwargs["transport_lut_config"] = NO_LUT
             return real_simulate(*args, max_steps=max_steps, per_electron_config=config, **kwargs)
 
-        monkeypatch.setattr(runner, "simulate_trajectories", simulate)
+        monkeypatch.setattr(runner.case_driver, "simulate_trajectories", simulate)
         monitor = Monitor()
         result = runner._transport_case(
             case, transport_core="cuda", block_electrons=20, block_monitor=monitor

@@ -6,7 +6,7 @@
 > does not independently revalidate those equations or extend their evidence.
 
 - **id**: `grazing-beam-projection`
-- **anchor**: `montecarlo/geometry.py::project_beam_entry`; wired through `montecarlo/transport/api.py::simulate_trajectories` (`tilt_polar_rad`/`tilt_azim_rad`) and `montecarlo/runner/__init__.py::{_transport_case,_brem_for_case}`
+- **anchor**: `montecarlo/geometry.py::project_beam_entry`; wired through `montecarlo/transport/api.py::simulate_trajectories` (`tilt_polar_rad`/`tilt_azim_rad`) and `montecarlo/runner/case_driver.py::_transport_case`, `montecarlo/runner/emission.py::_brem_for_case`
 - **source**: elementary rectangular ray–plane intersection (no literature equation)
 - **verifier**: fresh context (did not write the implementation)
 

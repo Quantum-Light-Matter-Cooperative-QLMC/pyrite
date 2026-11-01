@@ -122,7 +122,7 @@ The attenuation that the kernels apply is $\mu=2r_e\lambda\sum_in_if_{2,i}$, wit
 | energy field | `E_repr_keV` else `E_keV` (l. 159) | same (`montecarlo/spectrum/cxr/_setup.py:255`) | yes |
 | velocity | `beta_from_keV(E)[:,None]*v_hat` (l. 166–167) | `beta_all[:, None] * seg_v` (`_setup.py:262–263`) | yes |
 | electron subset | `elec_id < electron_limit` (l. 163–165); runner passes `Ne` (`runner/cxr_grid.py:95`) | `seg_elec_id < Ne` (`_setup.py:261`) | yes |
-| orientation | `_orientation_R(lattice, beam_uvw, azimuth_rad, recip_miscut_rad, surface_hkl=)` (l. 187–189); same case/radiator fallbacks (l. 439–444) | same call (`_setup.py:203–209`); runner keys (`runner/__init__.py:651–655, 672–692`) | yes |
+| orientation | `_orientation_R(lattice, beam_uvw, azimuth_rad, recip_miscut_rad, surface_hkl=)` (l. 187–189); same case/radiator fallbacks (l. 439–444) | same call (`_setup.py:203–209`); runner keys (`runner/case_driver.py::_cxr_for_segments_once`) | yes |
 | row order | `mosaic_rotation @ (rotation @ g_hkl)`, weight `mosaic_weight` (l. 194–204) | `R_m @ (R_orient @ g_vec)`, `wm` (`_per_hkl.py:661–673`; `_batched.py:231–243`) | yes |
 | mosaic quadrature | `_mosaic_quadrature(case["mosaic_mc_fwhm_rad"], case["mosaic_mc_nodes"])` | same helper and keys (`_setup.py:466`) | yes |
 | resonance | $\hbar c\,(\mathbf v\cdot\mathbf g)/(1-\mathbf v\cdot\hat{\mathbf n})$, vacuum (l. 168, 201) | same, then in-medium fixed point (`_per_hkl.py:387–390`; `_kernels.py:460–520`) | vacuum by design; see check 2 |

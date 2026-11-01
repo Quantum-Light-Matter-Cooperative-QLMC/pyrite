@@ -82,7 +82,7 @@ Because a field is swept by being typed `ScalarOrSeq`, only fields that were dec
 
 ### The case dict is the real contract and it is untyped
 
-`build_cases` emits plain dicts of roughly forty keys. That dict is simultaneously the transport input, the spectrum-kernel input, the checkpoint resume key, and the CAS content key. Its schema exists only in the `run_case` docstring ({file}`src/pyrite/montecarlo/runner/__init__.py` line 453).
+`build_cases` emits plain dicts of roughly forty keys. That dict is simultaneously the transport input, the spectrum-kernel input, the checkpoint resume key, and the CAS content key. Its schema exists only in the `run_case` docstring ({file}`src/pyrite/montecarlo/runner/case_driver.py` (`run_case`)).
 
 The **divergence-only key rule** compounds this. A run-affecting key is *omitted* from the payload when it holds its historical default, so that previously computed digests stay valid — see the `coherent_emission` block in `build_cases`. (The `xray_dispersion` key that used to sit beside it is gone: the in-medium dispersion became unconditional physics, and the payload now hashes a constant `line_kinematics` marker instead.) The consequence is that the payload schema is a function of the project's commit history rather than of the physical configuration, and each new option adds another permanent conditional.
 

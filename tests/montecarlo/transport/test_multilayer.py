@@ -390,7 +390,7 @@ def test_spectrum_case_passes_per_layer_azimuth(monkeypatch):
         calls.append(kw)
         return np.zeros_like(E_grid)
 
-    monkeypatch.setattr(runner, "mc_cxr_spectrum", fake_spec)
+    monkeypatch.setattr(runner.case_driver, "mc_cxr_spectrum", fake_spec)
     monkeypatch.setattr(runner, "mc_brem_spectrum", lambda *a, **k: np.zeros(3))
     monkeypatch.setattr(
         runner,

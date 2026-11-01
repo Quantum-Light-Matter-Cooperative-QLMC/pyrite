@@ -397,7 +397,7 @@ def test_build_cases_and_runner_preserve_exact_nonuniform_and_scalar_energy_grid
 
     assert isinstance(case["E_grid_line"], np.ndarray)
     assert isinstance(case["E_grid_brem"], np.ndarray)
-    monkeypatch.setattr(runner, "simulate_trajectories", lambda *args, **kwargs: {})
+    monkeypatch.setattr(runner.case_driver, "simulate_trajectories", lambda *args, **kwargs: {})
 
     transport = runner._transport_case(case)
 
@@ -486,7 +486,7 @@ def test_uniform_linspace_endpoint_grid_roundtrips_through_legacy_triple(monkeyp
     )[0]
 
     assert isinstance(case["E_grid_line"], tuple)
-    monkeypatch.setattr(runner, "simulate_trajectories", lambda *args, **kwargs: {})
+    monkeypatch.setattr(runner.case_driver, "simulate_trajectories", lambda *args, **kwargs: {})
 
     transport = runner._transport_case(case)
 
@@ -522,7 +522,7 @@ def test_scalar_constant_and_near_uniform_energy_grids_stay_exact(monkeypatch, c
     with pytest.raises(ValueError):
         case["E_grid_line"][0] = -1.0
 
-    monkeypatch.setattr(runner, "simulate_trajectories", lambda *args, **kwargs: {})
+    monkeypatch.setattr(runner.case_driver, "simulate_trajectories", lambda *args, **kwargs: {})
     transport = runner._transport_case(case)
     np.testing.assert_array_equal(transport["E_grid"], expected)
     np.testing.assert_array_equal(transport["E_brem"], [75.0])

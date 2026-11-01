@@ -87,7 +87,7 @@ def test_test_only_registered_producer_reaches_live_existing_slot(monkeypatch):
         lambda *args, **kwargs: pytest.fail("registered producer bypasses old CXR scorer"),
     )
     monkeypatch.setattr(
-        runner, "_segments_on_device", lambda value: uploaded.append(value) or staged
+        runner.case_driver, "_segments_on_device", lambda value: uploaded.append(value) or staged
     )
     other = []
 
@@ -274,12 +274,12 @@ def test_recompute_pair_uses_selected_producer_with_shared_segments(monkeypatch)
     batch = _batch()
     seen = _custom_selection(monkeypatch)
     monkeypatch.setattr(
-        runner,
+        runner.case_driver,
         "_transport_cxr_for_case",
         lambda *a: (batch.segments, None, batch.n_hat, None, None),
     )
     uploads = []
-    monkeypatch.setattr(runner, "_segments_on_device", lambda s: uploads.append(s) or s)
+    monkeypatch.setattr(runner.case_driver, "_segments_on_device", lambda s: uploads.append(s) or s)
     monkeypatch.setattr(
         runner, "_characteristic_from_segments", lambda s, E, *a, **kw: np.zeros(E.shape)
     )
@@ -321,7 +321,9 @@ def test_adaptive_observable_uses_selected_producer_and_refuses_unsupported(monk
 
 
 def test_invalid_continuum_is_refused_before_transport_or_capture(monkeypatch):
-    monkeypatch.setattr(runner, "_case_geometry", lambda case: pytest.fail("must preflight first"))
+    monkeypatch.setattr(
+        runner.case_driver, "_case_geometry", lambda case: pytest.fail("must preflight first")
+    )
     with pytest.raises(ValueError, match="coupled radiative scoring requires"):
         runner._transport_case({"radiative_model": "bremslib-soft-hard"})
 

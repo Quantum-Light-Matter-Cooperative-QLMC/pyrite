@@ -193,7 +193,7 @@ def test_runner_forwards_surface_hkl_to_spectrum(monkeypatch):
 
     captured = {}
     monkeypatch.setattr(
-        runner,
+        runner.case_driver,
         "mc_cxr_spectrum",
         lambda *_args, **kwargs: captured.update(kwargs) or np.zeros(1),
     )

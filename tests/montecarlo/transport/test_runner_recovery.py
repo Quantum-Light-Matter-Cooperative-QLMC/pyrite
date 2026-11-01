@@ -190,7 +190,7 @@ def test_cuda_resident_transport_recovery(monkeypatch, failure):
 
     monkeypatch.setattr(pool, "_admit_host_segments", admit)
     monkeypatch.setattr(
-        runner,
+        runner.case_driver,
         "_case_geometry",
         lambda case: (
             np.arange(2),
@@ -201,8 +201,8 @@ def test_cuda_resident_transport_recovery(monkeypatch, failure):
         ),
     )
     monkeypatch.setattr(runner, "_case_transport_core", lambda *_: "cuda")
-    monkeypatch.setattr(runner, "_case_stopping_tables", lambda case: None)
-    monkeypatch.setattr(runner, "resolve_cxr_grid", lambda *args: (np.arange(2), None))
+    monkeypatch.setattr(runner.case_driver, "_case_stopping_tables", lambda case: None)
+    monkeypatch.setattr(runner.case_driver, "resolve_cxr_grid", lambda *args: (np.arange(2), None))
 
     def simulate(*args, **kwargs):
         resident = kwargs["keep_segments_on_device"]
@@ -217,7 +217,7 @@ def test_cuda_resident_transport_recovery(monkeypatch, failure):
             )
         return segments
 
-    monkeypatch.setattr(runner, "simulate_trajectories", simulate)
+    monkeypatch.setattr(runner.case_driver, "simulate_trajectories", simulate)
     case = {
         "Ne": 2,
         "Ne_brem": 2,

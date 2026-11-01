@@ -990,7 +990,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `grazing-beam-projection`
 
 - **Claim:** collimated lab beam-spot Gaussian projected onto the tilted sample entrance face by ray–plane intersection, stretching the incident footprint by `1/cos(tilt_polar)` along the tilt azimuth so grazing-incidence overlap loss registers as `n_missed`
-- **Code:** `montecarlo/geometry.py::project_beam_entry`; wired through `montecarlo/transport/api.py::simulate_trajectories` (`tilt_polar_rad`/`tilt_azim_rad`) and `montecarlo/runner/__init__.py::_transport_case` and `montecarlo/runner/emission.py::_brem_for_case`; face-arrival delay `montecarlo/geometry.py::{face_arrival_path_ang,beam_entry_jacobian}`, `montecarlo/transport/beam_entry.py::face_arrival_delay_ang`
+- **Code:** `montecarlo/geometry.py::project_beam_entry`; wired through `montecarlo/transport/api.py::simulate_trajectories` (`tilt_polar_rad`/`tilt_azim_rad`) and `montecarlo/runner/case_driver.py::_transport_case` and `montecarlo/runner/emission.py::_brem_for_case`; face-arrival delay `montecarlo/geometry.py::{face_arrival_path_ang,beam_entry_jacobian}`, `montecarlo/transport/beam_entry.py::face_arrival_delay_ang`
 - **Source:** elementary rectangular ray–plane intersection (no literature equation)
 - **Status:** rederived
 - **Checks:** tilt=0 identity bit-for-bit; in-plane `1/cos` stretch vs out-of-plane invariance at azimuth 0°/90°; grazing tilt overfills a finite footprint with misses kept in `Ne`
@@ -1010,7 +1010,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `blazed-groove-geometry`
 
 - **Claim:** blazed sawtooth entrance-face profile (period Λ, depth h = Λ sin(tp)cos(tp); working facet ⊥ n̂, relief facet ⊥ beam) with exact periodic material/vacuum crossings for electron entry, exit, and later-facet re-entry plus coherent and bremsstrahlung photon escape; restricted to θ_obs = 90°, tilt_azim = 180°, 0 < tilt_polar < 90°
-- **Code:** `montecarlo/groove.py::{blazed_groove_spec,surface_depth_ang,in_material,first_surface_event,escape_distance_ang,entry_points}`; wired via `montecarlo/transport/api.py::simulate_trajectories` (`groove=`), `montecarlo/spectrum/cxr/_spectrum.py::mc_cxr_spectrum`; `montecarlo/spectrum/brem.py::mc_brem_spectrum` (`groove=`), `montecarlo/runner/__init__.py`, `campaign/sweep.py::Sweep.groove_spacing_ang`
+- **Code:** `montecarlo/groove.py::{blazed_groove_spec,surface_depth_ang,in_material,first_surface_event,escape_distance_ang,entry_points}`; wired via `montecarlo/transport/api.py::simulate_trajectories` (`groove=`), `montecarlo/spectrum/cxr/_spectrum.py::mc_cxr_spectrum`; `montecarlo/spectrum/brem.py::mc_brem_spectrum` (`groove=`), `montecarlo/runner/case_driver.py`, `campaign/sweep.py::Sweep.groove_spacing_ang`
 - **Source:** elementary periodic ray–plane intersection (no literature equation); implementation and correction history recorded in this ledger row
 - **Status:** unverified
 - **Checks:** closed form vs brute-force ray march; h→0 flat-face limit; entry and every radiating segment inside profile; exact material→vacuum→material sequence; vacuum energy/direction invariance and clock advance; permanent exit; coherent no-re-entry proof; analytic Beer--Lambert gain for line and brem; `groove=None` bit-for-bit

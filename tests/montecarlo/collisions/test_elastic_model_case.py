@@ -112,6 +112,8 @@ def test_every_transport_call_site_names_the_case_elastic_model(monkeypatch, mod
         seen.append(kwargs.get("elastic_model"))
         return {"n_transmitted": Ne}
 
+    # _transport_case reads case_driver's binding; _brem_for_case reads the package's.
+    monkeypatch.setattr(runner.case_driver, "simulate_trajectories", stop)
     monkeypatch.setattr(runner, "simulate_trajectories", stop)
     monkeypatch.setattr(config, "simulate_trajectories", transmit)
     with pytest.raises(RuntimeError, match="stop"):
@@ -148,7 +150,7 @@ def test_live_transport_uses_the_selected_preparation_adapter(monkeypatch, model
         assert kwargs["elastic_model"] == model
         raise RuntimeError("native dispatch reached")
 
-    monkeypatch.setattr(runner, "simulate_trajectories", stop)
+    monkeypatch.setattr(runner.case_driver, "simulate_trajectories", stop)
     with pytest.raises(RuntimeError, match="native dispatch reached"):
         runner._transport_case(case)
     assert selected == [model]

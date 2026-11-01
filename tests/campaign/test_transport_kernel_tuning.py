@@ -133,7 +133,7 @@ def test_transport_case_receives_the_scheduled_config(monkeypatch):
         seen.update(kwargs)
         raise _Stop
 
-    monkeypatch.setattr(runner, "simulate_trajectories", capture)
+    monkeypatch.setattr(runner.case_driver, "simulate_trajectories", capture)
     case = build_case(_scene(pr.Numerics()))
     with pytest.raises(_Stop):
         runner._transport_case(case, transport_core="per-electron")

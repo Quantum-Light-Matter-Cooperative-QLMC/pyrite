@@ -158,7 +158,7 @@ def test_a_case_stages_once_and_every_kernel_reads_that_copy(monkeypatch):
         return out
 
     seen = []
-    monkeypatch.setattr(runner, "_segments_on_device", counting_stage)
+    monkeypatch.setattr(runner.case_driver, "_segments_on_device", counting_stage)
     monkeypatch.setattr(
         runner,
         "_cxr_for_segments",
