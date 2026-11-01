@@ -254,3 +254,37 @@ def test_refined_continuum_observables_stay_within_budget(ladder):
         for name, allowed in budget.items():
             relative = abs(after[name] - before[name]) / abs(before[name])
             assert relative < allowed, f"{name} moved {relative:.3e} at num={count}"
+
+
+@pytest.mark.parametrize(
+    ("medium", "endpoint_eV", "size", "digest"),
+    [
+        (
+            "hopg",
+            30.0e3,
+            2772,
+            "e1691b83137a135ae70d351746ef071be880eaa6a097af9350a2856a324b3f84",
+        ),
+        (
+            "tungsten",
+            30.0e3,
+            2406,
+            "c8ee638b465c2ff506aa189ca93a0b1b3f59176ad464b2603e13a964ec061871",
+        ),
+    ],
+)
+def test_automatic_continuum_grid_bits_are_machine_independent(medium, endpoint_eV, size, digest):
+    """Case identity hashes these node bits, so they may use only correctly rounded ops.
+
+    The digest was verified bit-identical on two CPUs (x86 laptop and a Ryzen 9
+    9950X3D). A change that routes the nodes through ``log``/``exp``/``geomspace``
+    makes them CPU-dependent and fails this pin on some machines.
+    """
+    import hashlib
+
+    from pyrite._continuum_grid import automatic_continuum_grid
+
+    nodes = np.ascontiguousarray(automatic_continuum_grid(medium, endpoint_eV), dtype="<f8")
+    assert nodes.size == size
+    assert np.all(np.diff(nodes) > 0.0)
+    assert hashlib.sha256(nodes.tobytes()).hexdigest() == digest
