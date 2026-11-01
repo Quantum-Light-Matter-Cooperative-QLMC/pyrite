@@ -7,7 +7,8 @@ prose keep required format.
 
 ## Start here
 
-- Read `docs/repo_map.md` before source exploration.
+- Read the `docs/repo_map.md` front page before source exploration; open the
+  `docs/repo-map/` detail page for the area you touch.
 - Use Serena for symbol-level navigation: definitions, references, callers, and
   call sites across the CLI/domain boundary. Use `rg` or direct reads for exact
   text, non-code, generated files, and targeted searches. `src/` is ~128k LOC;

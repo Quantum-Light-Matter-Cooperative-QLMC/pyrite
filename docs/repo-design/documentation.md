@@ -87,7 +87,7 @@ their audience, rather than additional tutorials or interface specifications.
 | `development/`, `repo-design/` | Contributor how-to, implementation reference or architecture explanation, according to the page's stated purpose | [Development](../development/index.md); [repository design](index.md) groups current internals. Public field contracts linked from Reference remain authoritative at their existing URLs. |
 | `index.md`, section `index.md` pages, `project-readme.md` | Discovery; all readers | The homepage and section indexes route readers to their mode and own only navigation. `project-readme.md` renders `README.md`, which owns its content. |
 | `examples/` | Reproduction artifacts; guide readers | The page that downloads or links the script/data owns its context; these files are not a separate learning path. |
-| `repo_map.md` | Contributor reference; agents and maintainers | Repository navigation aid; `pyrite-dev repo-map` checks its generated region. |
+| `repo_map.md`, `repo-map/` | Contributor reference; agents and maintainers | Repository navigation aid: `repo_map.md` is the short front page (package index, task pointers, generated DAG) and owns the `repo-map/` detail pages through its toctree; `pyrite-dev repo-map` checks the front page's generated region. |
 | `adr/`, `research/` | Decision rationale and proposals; contributors | [ADRs](../adr/index.md) and [Research](../research/index.md); label proposed behavior explicitly. |
 
 Every page except the homepage has exactly one toctree parent or is an explicit

@@ -18,7 +18,7 @@ Classify the reader's *primary need* before editing (Diátaxis):
 | Read contributor workflow/current architecture | `docs/development/`, `docs/repo-design/` |
 | Understand design decisions or proposals | `docs/adr/`, explicitly labeled `docs/research/` |
 | Find CLI options, settings, results contracts | Generated CLI help and `docs/reference/` |
-| Locate package owners | `docs/repo_map.md`; use `repo-orientation` |
+| Locate package owners | `docs/repo_map.md` front page and `docs/repo-map/` detail pages; use `repo-orientation` |
 | Track implementation work | GitHub Issues, not public docs |
 
 1. Find the existing canonical owner and current source, tests, and evidence.

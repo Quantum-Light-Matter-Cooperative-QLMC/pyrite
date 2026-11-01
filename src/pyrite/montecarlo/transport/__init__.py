@@ -14,7 +14,7 @@ scattering, stopping power, straggling, energy LUT, transport cores,
 batching/dispatch, public API); this package re-exports every one of their
 names so ``pyrite.montecarlo.transport.<name>`` (and
 ``from .transport import <name>``) keeps resolving exactly as it did when
-this was one file. See docs/repo_map.md for the submodule breakdown.
+this was one file. See docs/repo-map/core-physics.md for the submodule breakdown.
 """
 
 from .kinematics import (
