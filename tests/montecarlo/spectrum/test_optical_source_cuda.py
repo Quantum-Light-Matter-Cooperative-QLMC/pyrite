@@ -9,7 +9,7 @@ from dataclasses import replace
 import numpy as np
 import pytest
 
-from pyrite._backend import BACKEND
+from pyrite._backend import BACKEND, CUPY_BACKENDS
 from pyrite.detectors.optical_energy import CalibratedPulseEnergyDetector
 from pyrite.montecarlo.spectrum.optical_finite_bunch import (
     finite_screen_bunch_angular,
@@ -35,7 +35,9 @@ except Exception:  # pragma: no cover - runtime dependent
     _NDEV = 0
 pytestmark = [
     pytest.mark.skipif(_NDEV < 1, reason="CUDA device required"),
-    pytest.mark.skipif(BACKEND.name != "cuda", reason="run with PYRITE_TEST_BACKEND=cuda"),
+    pytest.mark.skipif(
+        BACKEND.name not in CUPY_BACKENDS, reason="run with PYRITE_TEST_BACKEND=cuda or rocm"
+    ),
 ]
 
 _GRID = dict(nx=64, ny=64, dx_m=0.1e-6, dy_m=0.1e-6)

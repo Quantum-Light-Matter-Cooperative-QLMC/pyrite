@@ -172,7 +172,7 @@ from pyrite import _backend, datasets
 assert _backend.BACKEND.name == 'cpu'
 def forbidden(*a, **kw):
     raise AssertionError('CPU reader requested accelerator or scientific tables')
-_backend.select_backend = datasets.require_dataset = forbidden
+_backend.select_backend = _backend.select_cupy_backend = datasets.require_dataset = forbidden
 from pyrite.results.aperture import aperture_from_payload
 with np.load(sys.argv[1]) as z:
     tally=aperture_from_payload(dict(metadata=json.loads(str(z['metadata'])),

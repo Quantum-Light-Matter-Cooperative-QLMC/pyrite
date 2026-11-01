@@ -243,3 +243,17 @@ def test_transport_only_device_run_does_not_ask_for_residency(cuda, monkeypatch)
     monkeypatch.setattr(scheduling, "_transport_case", fake_transport_case)
     runner.run_cases([_case()], max_workers=8, progress=False, transport_only=True)
     assert seen == [False]
+
+
+@pytest.mark.parametrize(("backend", "admitted"), [("cuda", True), ("rocm", True), ("sycl", False)])
+def test_device_core_is_admitted_on_cupy_backends_only(monkeypatch, backend, admitted):
+    import sys
+    from types import SimpleNamespace
+
+    from pyrite import _backend
+    from pyrite.montecarlo.transport import batching
+
+    monkeypatch.setattr(_backend, "BACKEND", SimpleNamespace(name=backend))
+    kernel = SimpleNamespace(make_cuda_transport_core=None)  # no device needed
+    monkeypatch.setitem(sys.modules, "pyrite.montecarlo.transport._jit_launch", kernel)
+    assert batching._cuda_transport_available.__wrapped__() is admitted

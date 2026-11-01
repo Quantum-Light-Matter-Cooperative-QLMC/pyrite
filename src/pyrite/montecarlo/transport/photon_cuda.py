@@ -68,9 +68,9 @@ def scene_first_interactions_cuda(
     ):
         raise ValueError("threads must be one of 32, 64, 128, 256 or 512")
 
-    from ..._backend import select_backend
+    from ..._backend import select_cupy_backend
 
-    cp = select_backend("cuda").xp
+    cp = select_cupy_backend().xp
     if implementation == "fused":
         from ._photon_cuda_kernel import fused_first_interactions
 

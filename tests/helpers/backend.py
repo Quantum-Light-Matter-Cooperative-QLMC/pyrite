@@ -17,15 +17,42 @@ Nothing here relaxes a CPU assertion: every tolerance helper reproduces the
 historical fp64 bound exactly when ``REAL`` is float64.
 """
 
+import os
+from functools import cache
 from typing import Any
 
 import numpy as np
 import pytest
 
-from pyrite._backend import BACKEND, REAL, xp
+from pyrite._backend import BACKEND, CUPY_BACKENDS, REAL, xp
 
 #: True when the session runs on an accelerator rather than host NumPy.
 ON_DEVICE = BACKEND.name != "cpu"
+
+#: True when ``PYRITE_TEST_BACKEND`` names a CuPy device (``cuda`` or ``rocm``):
+#: this is a device child session spawned by a hardware driver test.
+CUPY_DEVICE_SESSION = os.environ.get("PYRITE_TEST_BACKEND") in CUPY_BACKENDS
+
+
+@cache
+def cupy_device_backend() -> str | None:
+    """Name the CuPy device this host could select (``cuda``/``rocm``), else None.
+
+    Probes the installed CuPy directly, because the session itself is pinned to
+    CPU; hardware driver tests pass the result as ``PYRITE_TEST_BACKEND`` or
+    ``PYRITE_MC_BACKEND`` to the child they spawn, so one test body covers both
+    vendors (#888).
+    """
+
+    try:
+        import cupy
+
+        if cupy.cuda.runtime.getDeviceCount() < 1:
+            return None
+        return "rocm" if getattr(cupy.cuda.runtime, "is_hip", False) else "cuda"
+    except Exception:
+        return None
+
 
 #: True when the selected backend's working precision is float32.
 IS_FLOAT32 = np.dtype(REAL) == np.dtype(np.float32)

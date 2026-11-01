@@ -10,7 +10,7 @@ from typing import Any, Literal, cast
 import numpy as np
 from endf_parserpy import EndfFile
 
-from ..._backend import BACKEND, REAL, _to_cpu, xp
+from ..._backend import BACKEND, CUPY_BACKENDS, REAL, _to_cpu, xp
 from ...materials.atomic import Z_TABLE
 from ...materials.attenuation import (
     _finite_mu_or_raise,
@@ -1041,13 +1041,13 @@ def mc_brem_spectrum(
     _use_eedl_jit = (
         _USE_JIT_BREM_REDUCTION
         and cross_section_model == "eedl"
-        and BACKEND.name == "cuda"
+        and BACKEND.name in CUPY_BACKENDS
         and np.dtype(REAL) == np.dtype(np.float32)
     )
     _use_bremslib_jit = (
         _USE_JIT_BREM_REDUCTION
         and cross_section_model == "bremslib"
-        and BACKEND.name == "cuda"
+        and BACKEND.name in CUPY_BACKENDS
         and np.dtype(REAL) == np.dtype(np.float32)
     )
     per_electron = electron_band_weights is not None

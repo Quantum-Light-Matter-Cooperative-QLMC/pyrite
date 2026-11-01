@@ -100,12 +100,14 @@ def _run(tmp_path, name, **env_overrides):
 
 @pytest.mark.slow
 def test_coherent_spectrum_matches_across_backends(tmp_path):
+    from tests.helpers.backend import cupy_device_backend
+
     host = _run(tmp_path, "cpu", PYRITE_MC_BACKEND="cpu")
     peak = np.max(np.abs(host))
     assert peak > 0.0
-    fp64 = _run(tmp_path, "cuda64", PYRITE_MC_BACKEND="cuda", PYRITE_FP64="1")
+    fp64 = _run(tmp_path, "cuda64", PYRITE_MC_BACKEND=cupy_device_backend(), PYRITE_FP64="1")
     assert np.max(np.abs(fp64 - host)) / peak <= FP64_PEAK_TOL
-    fp32 = _run(tmp_path, "cuda32", PYRITE_MC_BACKEND="cuda")
+    fp32 = _run(tmp_path, "cuda32", PYRITE_MC_BACKEND=cupy_device_backend())
     assert np.max(np.abs(fp32 - host)) / peak <= FP32_PEAK_TOL
 
 

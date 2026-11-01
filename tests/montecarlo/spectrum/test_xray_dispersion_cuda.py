@@ -20,6 +20,7 @@ import numpy as np
 import pytest
 
 from pyrite.montecarlo.spectrum.cxr import _RESONANCE_ROOT_RTOL
+from tests.helpers.backend import CUPY_DEVICE_SESSION, cupy_device_backend
 
 cp = pytest.importorskip("cupy")
 
@@ -559,7 +560,7 @@ def _run_prologue_raw(d, *, delta_tab, aw_seg):
 # the bodies still execute under an ordinary ``pyrite-dev test`` on a CUDA box.
 # ---------------------------------------------------------------------------
 
-_DEVICE_SESSION = os.environ.get("PYRITE_TEST_BACKEND") == "cuda"
+_DEVICE_SESSION = CUPY_DEVICE_SESSION
 _device_only = pytest.mark.skipif(
     not _DEVICE_SESSION,
     reason="end-to-end mc_spectrum on the CUDA backend; driven by the device-suite test",
@@ -904,7 +905,7 @@ def test_coherent_decoherence_device_suite():
     # "decoherence" -- the child re-selected the driver and spawned a child of
     # its own, recursing until the box ran out of memory. Deselecting the
     # driver by name below makes that unreachable even if the pin is lost.)
-    env["PYRITE_TEST_BACKEND"] = "cuda"
+    env["PYRITE_TEST_BACKEND"] = cupy_device_backend()
     # The parent conftest pins PYRITE_MC_BACKEND=cpu.  Remove that inherited
     # implementation-level pin while retaining the test-only CUDA override
     # above.  Popping PYRITE_TEST_BACKEND here makes the child identify as

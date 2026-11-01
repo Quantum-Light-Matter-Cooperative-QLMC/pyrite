@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from pyrite._backend import BACKEND
+from pyrite._backend import BACKEND, CUPY_BACKENDS
 from pyrite.montecarlo.spectrum.cxr import _RESONANCE_ROOT_RTOL
 from pyrite.montecarlo.spectrum.segment_escape import mean_transmission
 
@@ -17,7 +17,9 @@ except Exception:  # pragma: no cover - depends on CUDA runtime presence
 pytestmark = pytest.mark.skipif(_NDEV < 1, reason="CUDA device required")
 
 
-@pytest.mark.skipif(BACKEND.name != "cuda", reason="run with PYRITE_TEST_BACKEND=cuda")
+@pytest.mark.skipif(
+    BACKEND.name not in CUPY_BACKENDS, reason="run with PYRITE_TEST_BACKEND=cuda or rocm"
+)
 def test_nonuniform_eedl_continuum_matches_chunked_cuda_fallback(monkeypatch):
     """#100: the fused and generic CUDA routes consume the same graded nodes."""
     from pyrite.montecarlo.spectrum import brem
@@ -61,7 +63,9 @@ def test_nonuniform_eedl_continuum_matches_chunked_cuda_fallback(monkeypatch):
     np.testing.assert_allclose(fused, fallback, rtol=3e-4, atol=1e-20)
 
 
-@pytest.mark.skipif(BACKEND.name != "cuda", reason="run with PYRITE_TEST_BACKEND=cuda")
+@pytest.mark.skipif(
+    BACKEND.name not in CUPY_BACKENDS, reason="run with PYRITE_TEST_BACKEND=cuda or rocm"
+)
 def test_directional_bremslib_kernel_matches_chunked_cuda_fallback(monkeypatch):
     from pyrite.montecarlo.spectrum import brem
     from pyrite.montecarlo.spectrum.brem_bremslib import prepare_bremslib_table
@@ -113,7 +117,9 @@ def test_directional_bremslib_kernel_matches_chunked_cuda_fallback(monkeypatch):
     np.testing.assert_allclose(fused, fallback, rtol=5e-4, atol=1e-20)
 
 
-@pytest.mark.skipif(BACKEND.name != "cuda", reason="run with PYRITE_TEST_BACKEND=cuda")
+@pytest.mark.skipif(
+    BACKEND.name not in CUPY_BACKENDS, reason="run with PYRITE_TEST_BACKEND=cuda or rocm"
+)
 def test_dielectric_bremslib_kernel_matches_chunked_cuda_scorer(monkeypatch):
     """#439: the fused reducer applies the same Ter--Mikaelian factor as the portable path."""
     from pyrite.montecarlo.spectrum import brem

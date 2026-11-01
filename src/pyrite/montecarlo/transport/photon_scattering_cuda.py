@@ -65,9 +65,9 @@ def sample_photon_scattering_cuda(
     if type(require_complete) is not bool:
         raise TypeError("require_complete must be a bool")
     energy, ray, draws = validate_event_inputs(energy_eV, direction, uniforms)
-    from ..._backend import select_backend
+    from ..._backend import select_cupy_backend
 
-    cp = select_backend("cuda").xp
+    cp = select_cupy_backend().xp
     n = energy.size
     packed, used, status = (
         cp.empty((n, 9)),

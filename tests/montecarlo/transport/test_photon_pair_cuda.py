@@ -9,10 +9,10 @@ from pyrite.montecarlo.transport.photon_pair_cuda import sample_pairs_cuda
 
 @pytest.fixture
 def cp():
-    from pyrite._backend import BackendUnavailableError, select_backend
+    from pyrite._backend import BackendUnavailableError, select_cupy_backend
 
     try:
-        return select_backend("cuda").xp
+        return select_cupy_backend().xp
     except BackendUnavailableError as error:
         pytest.skip(str(error))
 
@@ -85,7 +85,9 @@ def test_pair_prefix_refill_and_zero_kinetic_threshold(cp):
 def test_pair_domain_fails_before_device_probe(monkeypatch):
     from pyrite import _backend
 
-    monkeypatch.setattr(_backend, "select_backend", lambda *args: pytest.fail("unexpected probe"))
+    monkeypatch.setattr(
+        _backend, "select_cupy_backend", lambda *args: pytest.fail("unexpected probe")
+    )
     with pytest.raises(ValueError, match="above 2"):
         sample_pairs_cuda([PAIR_THRESHOLD_EV], [[0, 0, 1]], [[0.1]], atomic_number=74)
     with pytest.raises(ValueError, match="Z=1..99"):

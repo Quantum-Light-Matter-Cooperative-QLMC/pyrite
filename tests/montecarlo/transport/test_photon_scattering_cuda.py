@@ -9,10 +9,10 @@ from pyrite.montecarlo.transport import photon_scattering_cuda as device
 
 @pytest.fixture
 def cp():
-    from pyrite._backend import BackendUnavailableError, select_backend
+    from pyrite._backend import BackendUnavailableError, select_cupy_backend
 
     try:
-        return select_backend("cuda").xp
+        return select_cupy_backend().xp
     except BackendUnavailableError as error:
         pytest.skip(str(error))
 
@@ -77,7 +77,7 @@ def test_invalid_scatter_inputs_fail_before_device_probe(monkeypatch):
     from pyrite import _backend
 
     monkeypatch.setattr(
-        _backend, "select_backend", lambda *args: pytest.fail("unexpected GPU probe")
+        _backend, "select_cupy_backend", lambda *args: pytest.fail("unexpected GPU probe")
     )
     with pytest.raises(ValueError, match="unit vectors"):
         device.sample_photon_scattering_cuda("Si", [1e5], [[0, 0, 0]], [[0.1]], channel="coherent")

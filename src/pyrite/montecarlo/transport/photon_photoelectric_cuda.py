@@ -81,9 +81,9 @@ def sample_photoelectric_cuda(
         raise ValueError("capacity must be a positive int32-sized integer")
     if type(require_complete) is not bool:
         raise TypeError("require_complete must be a bool")
-    from ..._backend import select_backend
+    from ..._backend import select_cupy_backend
 
-    cp = select_backend("cuda").xp
+    cp = select_cupy_backend().xp
     n, capacity = len(energy), int(capacity)
     electron, primary = cp.empty((n, 4)), cp.empty(n, dtype=cp.int32)
     transitions = cp.empty((n, capacity), dtype=cp.int32)

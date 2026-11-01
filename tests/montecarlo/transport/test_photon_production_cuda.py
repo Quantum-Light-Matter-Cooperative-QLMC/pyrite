@@ -1,6 +1,6 @@
 """Real CUDA production selection, source components, persistence and replay.
 
-Run with PYRITE_MC_BACKEND=cuda, PYRITE_TEST_BACKEND=cuda and --slow remotely.
+Run with PYRITE_TEST_BACKEND=cuda (or rocm) and --slow remotely.
 Canonical physical tables are required. Public API tests never replace primary
 transport or conditional samplers; one pair-feedback closure test controls only
 the first-flight rate to exercise a rare branch. CPU processes skip before runs.
@@ -26,10 +26,10 @@ pytestmark = pytest.mark.slow
 
 @pytest.fixture
 def cuda(monkeypatch):
-    from pyrite._backend import BACKEND
+    from pyrite._backend import BACKEND, CUPY_BACKENDS
 
-    if BACKEND.name != "cuda":
-        pytest.skip("production test requires PYRITE_MC_BACKEND=cuda before import")
+    if BACKEND.name not in CUPY_BACKENDS:
+        pytest.skip("production test requires PYRITE_MC_BACKEND=cuda or rocm before import")
     # conftest isolates ordinary tests from user workspaces. This explicit
     # hardware-only run reads the synchronized canonical tables; all actual
     # checkpoint/capture writes still receive tmp_path destinations below.
@@ -154,7 +154,7 @@ from pyrite import _backend, datasets
 assert _backend.BACKEND.name == 'cpu'
 def forbidden(*args, **kwargs):
     raise AssertionError('finished observation reader requested hardware/scientific tables')
-_backend.select_backend = datasets.require_dataset = forbidden
+_backend.select_backend = _backend.select_cupy_backend = datasets.require_dataset = forbidden
 from pyrite.results.aperture import aperture_from_payload
 with np.load(sys.argv[1]) as archive:
     value = aperture_from_payload(dict(metadata=json.loads(str(archive['metadata'])),

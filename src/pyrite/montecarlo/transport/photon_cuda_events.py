@@ -55,9 +55,9 @@ def cuda_first_flights(
     origins, directions, energies, uniforms, layers, boxes, *, batch_size, **footprint
 ):
     """Bound navigation storage; retain input order and the original two draws."""
-    from ..._backend import select_backend
+    from ..._backend import select_cupy_backend
 
-    backend = select_backend("cuda")
+    backend = select_cupy_backend()
     n = len(energies)
     output = {"distance_ang": np.full(n, np.inf)}
     output.update({name: np.full(n, -1, np.int64) for name in ("layer", "channel", "element")})
@@ -213,9 +213,9 @@ def _retry_group(backend, indices, active, rngs, element, channel, cutoff, batch
 
 def cuda_collision_products(active, flight, collided, compositions, rngs, *, cutoff_eV, batch_size):
     """Group independent collisions by element/channel while preserving labels."""
-    from ..._backend import select_backend
+    from ..._backend import select_cupy_backend
 
-    backend = select_backend("cuda")
+    backend = select_cupy_backend()
     groups = defaultdict(list)
     for i in np.flatnonzero(collided):
         region, atom = int(flight["layer"][i]), int(flight["element"][i])

@@ -43,6 +43,7 @@ from pyrite.montecarlo import (
     mc_cxr_spectrum,
     simulate_trajectories,
 )
+from tests.helpers.backend import CUPY_DEVICE_SESSION, cupy_device_backend
 
 try:
     import cupy as cp
@@ -51,7 +52,7 @@ try:
 except Exception:  # pragma: no cover - depends on CUDA runtime presence
     _HAS_CUDA = False
 
-_DEVICE_SESSION = os.environ.get("PYRITE_TEST_BACKEND") == "cuda"
+_DEVICE_SESSION = CUPY_DEVICE_SESSION
 
 
 def test_layer_dz_back_exit():
@@ -559,7 +560,7 @@ def test_cuda_multilayer_spectrum_case_device_suite():
     passed so a missing backend cannot turn this regression into a silent skip.
     """
     env = dict(os.environ)
-    env["PYRITE_TEST_BACKEND"] = "cuda"
+    env["PYRITE_TEST_BACKEND"] = cupy_device_backend()
     env.pop("PYRITE_MC_BACKEND", None)
     completed = subprocess.run(  # noqa: S603
         [

@@ -8,10 +8,10 @@ from pyrite.montecarlo.transport import photon_histories as histories
 
 @pytest.fixture
 def cp():
-    from pyrite._backend import BackendUnavailableError, select_backend
+    from pyrite._backend import BackendUnavailableError, select_cupy_backend
 
     try:
-        return select_backend("cuda").xp
+        return select_cupy_backend().xp
     except BackendUnavailableError as error:
         pytest.skip(str(error))
 
@@ -110,11 +110,10 @@ def test_device_queue_refill_and_batch_controls_preserve_histories(cp, monkeypat
 def test_cuda_history_backend_is_explicit_even_for_empty_batches(monkeypatch):
     from pyrite import _backend
 
-    def unavailable(requested):
-        assert requested == "cuda"
+    def unavailable():
         raise _backend.BackendUnavailableError("test: unavailable")
 
-    monkeypatch.setattr(_backend, "select_backend", unavailable)
+    monkeypatch.setattr(_backend, "select_cupy_backend", unavailable)
     with pytest.raises(_backend.BackendUnavailableError, match="unavailable"):
         _run(_batch(0, 1e5), [], backend="cuda")
     with pytest.raises(ValueError, match="backend"):

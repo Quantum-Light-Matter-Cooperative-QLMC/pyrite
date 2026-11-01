@@ -354,6 +354,22 @@ def select_backend(requested: str | None = None) -> ArrayBackend:
     return backend
 
 
+CUPY_BACKENDS = ("cuda", "rocm")
+"""Backend names served by CuPy, whose ``cupyx.jit`` device kernels run unchanged on both."""
+
+
+def select_cupy_backend() -> CuPyBackend:
+    """Resolve the CuPy device for a path that explicitly requests ``"cuda"``.
+
+    Device paths name their option ``"cuda"`` for history, but they are written
+    against CuPy, and a ROCm/HIP build of CuPy compiles the same ``cupyx.jit``
+    and ``RawKernel`` sources (#888). This admits either vendor and, like any
+    explicit request, never falls back to NumPy.
+    """
+
+    return _load_cupy()
+
+
 BACKEND = select_backend()
 xp = BACKEND.xp
 cp: ModuleType | None = BACKEND.cp if isinstance(BACKEND, CuPyBackend) else None

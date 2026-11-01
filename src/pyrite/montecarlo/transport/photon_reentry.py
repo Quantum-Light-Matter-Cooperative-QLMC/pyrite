@@ -103,9 +103,9 @@ class SceneFeedbackStage:
     def _next(self, rows, previous=None):
         xp = np
         if self.backend == "cuda":
-            from ..._backend import select_backend
+            from ..._backend import select_cupy_backend
 
-            xp = select_backend("cuda").xp
+            xp = select_cupy_backend().xp
         position, direction = xp.asarray(rows["position_ang"]), xp.asarray(rows["direction"])
         lo, hi = _layer_intervals(
             position, direction, self.layers, self.width_ang, self.height_ang, xp=xp
@@ -292,9 +292,9 @@ def _admit_scene_backend(backend, transport):
     if backend not in ("cpu", "cuda"):
         raise ValueError("charged scene backend must be cpu or cuda")
     if backend == "cuda":
-        from ..._backend import select_backend
+        from ..._backend import select_cupy_backend
 
-        select_backend("cuda")  # explicit admission, including an empty input population
+        select_cupy_backend()  # explicit admission, including an empty input population
         transport["transport_core"] = "cuda"
     elif transport.get("transport_core") == "cuda":
         raise ValueError("CUDA charged core requires backend='cuda'")

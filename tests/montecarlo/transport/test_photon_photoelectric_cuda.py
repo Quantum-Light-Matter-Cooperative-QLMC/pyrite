@@ -14,10 +14,10 @@ from pyrite.montecarlo.transport.photon_photoelectric_cuda import sample_photoel
 
 @pytest.fixture
 def cp():
-    from pyrite._backend import BackendUnavailableError, select_backend
+    from pyrite._backend import BackendUnavailableError, select_cupy_backend
 
     try:
-        return select_backend("cuda").xp
+        return select_cupy_backend().xp
     except BackendUnavailableError as error:
         pytest.skip(str(error))
 
@@ -118,7 +118,9 @@ def test_terminal_primary_consumes_no_relaxation_or_isotropic_draws(cp):
 def test_photoelectric_inputs_fail_before_device_probe(monkeypatch):
     from pyrite import _backend
 
-    monkeypatch.setattr(_backend, "select_backend", lambda *args: pytest.fail("unexpected probe"))
+    monkeypatch.setattr(
+        _backend, "select_cupy_backend", lambda *args: pytest.fail("unexpected probe")
+    )
     with pytest.raises(ValueError, match="cutoff"):
         sample_photoelectric_cuda("Si", [1e5], [[0, 0, 1]], [[0.1]], cutoff_eV=0)
     with pytest.raises(ValueError, match="capacity"):
