@@ -157,6 +157,17 @@ def _instrument(mode, phases):
     else:
         scorer = streamed_scoring.BlockSpectrumScorer
         scorer.add = phases.wrap("score", scorer.add, block_arg=True)
+        # Per-estimator split inside ``add`` (#872); nested in ``score``.
+        runner._segments_on_device = phases.wrap("score.upload", runner._segments_on_device)
+        from pyrite.montecarlo.runner.emission_adapters import EmissionAdapter
+
+        real_evaluate = EmissionAdapter.evaluate
+
+        def evaluate(self, batch, slot, **kwargs):
+            timed = phases.wrap(f"score.{slot}", real_evaluate)
+            return timed(self, batch, slot, **kwargs)
+
+        EmissionAdapter.evaluate = evaluate
         backend = _backend.BACKEND
         backend.release_memory = phases.wrap("release", backend.release_memory)
 
