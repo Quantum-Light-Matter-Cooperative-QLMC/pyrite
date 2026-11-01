@@ -48,6 +48,7 @@ cr-axial-absorbing-jump-instrument
 cr-axial-absorbing-jump-unraveling
 cr-axial-fiber-unraveling
 cr-axial-continuum-tds-jumps
+cr-axial-tds-tail
 cr-quantum-regression-correlation
 cr-axial-qrt-source-normalization
 cr-axial-cuda-backend

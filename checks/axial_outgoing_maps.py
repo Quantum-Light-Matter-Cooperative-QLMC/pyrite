@@ -361,6 +361,7 @@ def material_fiber_channels(
     outgoing_order_max: int | tuple[int, int] | None = None,
     tds: str = "lattice",
     axis: tuple[int, int, int] = (0, 0, 1),
+    tail_theta_max_rad: float | None = None,
 ):
     """Si, 5 MeV, one-cell fiber channels: TDS + electronic kicks.
 
@@ -371,6 +372,9 @@ def material_fiber_channels(
     ``B + max_order`` so box outputs are exact; one string per cell only.
     ``tds="strings"``: independent-string continuum jumps, one
     :class:`TdsString` per dissipator source (any number of strings per cell).
+    ``tail_theta_max_rad`` classifies string outputs beyond the box with
+    ``|K| <= k theta_max`` as ``"tail"`` records (``cr-axial-tds-tail``); None
+    keeps them unresolved.
 
     Kick columns are ``sqrt(c_i) sqrt(rho_{q_i})`` harmonics on the cell
     lattice truncated at ``|n| <= harmonic_max``; the dropped fraction of
@@ -381,6 +385,7 @@ def material_fiber_channels(
     """
     from pyrite.materials.channeling.axial import axial_profile, axial_states
     from pyrite.materials.channeling.transverse import longitudinal_kinematics
+    from pyrite.materials.crystal import HBARC_EV_ANG, M_E_EV
     from pyrite.montecarlo.channeling.axial_dissipator import axial_dissipator
     from pyrite.montecarlo.channeling.axial_fiber_unraveling import FiberChannels
     from pyrite.montecarlo.channeling.axial_tds_continuum import TdsString
@@ -390,7 +395,8 @@ def material_fiber_channels(
         raise ValueError("tds must be 'lattice' or 'strings'")
     energy = 5e6
     profile = axial_profile("silicon", axis)
-    gamma, _ = longitudinal_kinematics(energy)
+    gamma, beta = longitudinal_kinematics(energy)
+    k_inv_ang = gamma * beta * M_E_EV / HBARC_EV_ANG  # p / hbar
     mechanisms = ("tds", "electronic") if electronic else ("tds",)
     dissipator = axial_dissipator(
         profile, energy, (1, 1), (grid_points, grid_points), mechanisms=mechanisms
@@ -459,6 +465,7 @@ def material_fiber_channels(
         kick_q_inv_ang=np.array(nodes),
         outgoing_order_max=int(box[0]) if square else box_extents,
         tds_strings=strings,
+        tail_q_max_inv_ang=None if tail_theta_max_rad is None else k_inv_ang * tail_theta_max_rad,
     )
     entry = (np.all(zero.orders == 0, axis=1)).astype(complex)
     info = {
@@ -475,6 +482,8 @@ def material_fiber_channels(
         "tds": tds,
         "axis": list(axis),
         "strings": len(dissipator.tds_sources),
+        "k_inv_ang": k_inv_ang,
+        "tail_q_max_inv_ang": channels.tail_q_max_inv_ang,
     }
     return channels, entry, hbar_v, info
 
@@ -527,6 +536,7 @@ def fiber_report(
     target_eV: float = 95.0,
     incident_start: int = 0,
     keep_events: bool = False,
+    tail_theta_max_rad: float | None = None,
 ) -> dict:
     """Fiber unraveling of Si 5 MeV with TDS (+ electronic) jumps. Research only.
 
@@ -550,6 +560,7 @@ def fiber_report(
         outgoing_order_max=outgoing_order_max,
         tds=tds,
         axis=axis,
+        tail_theta_max_rad=tail_theta_max_rad,
     )
     box = np.broadcast_to(np.asarray(info["outgoing_order_max"]), (2,))
     window = balanced_window(tuple(2 * box + 1))
@@ -574,6 +585,7 @@ def fiber_report(
             e.lattice_jumps,
             e.kick_jumps,
             None if e.momentum_index is None else list(e.momentum_index),
+            None if e.tail_momentum_inv_ang is None else float(np.hypot(*e.tail_momentum_inv_ang)),
         ]
         for e in events
     ]
@@ -591,12 +603,16 @@ def _fiber_tallies(events, info) -> dict:
     box = np.broadcast_to(np.asarray(info["outgoing_order_max"]), (2,))
     m = np.broadcast_to(np.asarray(info["max_order"]), (2,))
     rows = {"incidents": n}
-    for kind in ("outgoing", "unresolved"):
+    for kind in ("outgoing", "tail", "unresolved"):
         hits = np.array([sum(e[1] == kind and e[2] <= z for e in events) for z in depths])
         p = hits / n
         rows[kind] = (weight * p).tolist()
         rows[kind + "_sem"] = (weight * np.sqrt(p * (1 - p) / n)).tolist()
-    rows["retained"] = (weight - np.array(rows["outgoing"]) - np.array(rows["unresolved"])).tolist()
+    terminal = sum(np.array(rows[k]) for k in ("outgoing", "tail", "unresolved"))
+    rows["retained"] = (weight - terminal).tolist()
+    tails = [e[6] for e in events if e[1] == "tail"]
+    if tails:
+        rows["tail_k_quantiles_inv_ang"] = np.quantile(tails, [0.0, 0.5, 0.9, 0.99, 1.0]).tolist()
     orders = [
         np.where(np.array(e[5]) > box, np.array(e[5]) - 2 * box - 1, e[5])
         for e in events
@@ -619,7 +635,7 @@ def merge_fiber_reports(parts) -> dict:
     parts = list(parts)
     variable = {"events", "seconds", "incidents", "outgoing", "outgoing_sem", "unresolved"}
     variable |= {"unresolved_sem", "retained", "beyond_window", "mean_lattice_jumps"}
-    variable |= {"mean_kick_jumps"}
+    variable |= {"mean_kick_jumps", "tail", "tail_sem", "tail_k_quantiles_inv_ang"}
     head = {k: v for k, v in parts[0].items() if k not in variable}
     for part in parts[1:]:
         if {k: v for k, v in part.items() if k not in variable} != head:

@@ -28,11 +28,18 @@ import numpy as np
 from scipy.optimize import brentq
 
 from .axial_phase_space import phase_space_stream, sample_phase_space
-from .axial_tds_continuum import StringChannel, TdsString, order_extents, string_jump
+from .axial_tds_continuum import (
+    StringChannel,
+    TailRecord,
+    TdsString,
+    order_extents,
+    string_jump,
+)
 
 _FIBER_DOMAIN = 0x6230002
 _MAX_CONDITION = 1e8
 _COMPLEMENT_RTOL = 1e-9  # relative roundoff allowed in lattice_loss - sum L^dagger R L
+_TAIL = 3  # _jump choice: classified out-of-box string output (TailRecord in c_new)
 
 
 @dataclass(frozen=True)
@@ -43,7 +50,12 @@ class FiberEvent:
     Weyl momentum index is an FFT-layout order index relative to it, with
     reciprocal spacing ``reciprocal_inv_ang`` of the provider.
     ``lattice_jumps`` counts every TDS jump (lattice columns or continuum
-    strings); ``kick_jumps`` counts electronic kicks.
+    strings); ``kick_jumps`` counts electronic kicks. Kind ``"tail"`` is a
+    classified out-of-box string output (``FiberChannels.tail_q_max_inv_ang``):
+    ``tail_momentum_inv_ang`` is its absolute transverse wavevector,
+    ``tail_displacement_ang`` the struck string's displacement and
+    ``tail_string`` its index; the carrier is the pre-jump one. A tail is a
+    terminal model record, not a physical escape.
     """
 
     incident_id: int
@@ -55,6 +67,9 @@ class FiberEvent:
     carrier_inv_ang: tuple[float, float]
     position_index: tuple[int, int] | None = None
     momentum_index: tuple[int, int] | None = None
+    tail_momentum_inv_ang: tuple[float, float] | None = None
+    tail_displacement_ang: tuple[float, float] | None = None
+    tail_string: int | None = None
 
 
 @dataclass(frozen=True)
@@ -93,9 +108,16 @@ class FiberChannels:
     ``tds_strings`` adds independent-string (continuum) TDS jumps
     (:mod:`.axial_tds_continuum`): carrier-moving, no transfer truncation
     and no D condition. Use them instead of, or alongside, lattice columns.
+    ``tail_q_max_inv_ang`` = None (default) leaves string outputs outside the
+    box unresolved; a value classifies those with absolute transverse
+    wavevector ``|kappa + Q| <= tail_q_max_inv_ang`` as ``"tail"`` records
+    (paraxial cap, ``Q << k``, set by the caller) and leaves the rest
+    unresolved. It changes labels only, never the draws.
     The cell is rectangular: ``reciprocal_inv_ang`` are the axis-aligned
     primitive vectors and carriers fold into the half-open zone
     ``[-g/2, g/2)`` per axis.
+
+    Validation: cr-axial-tds-tail
     """
 
     order_max: int | tuple[int, int]
@@ -109,6 +131,7 @@ class FiberChannels:
     kick_azimuths: Sequence[float] | None = None
     outgoing_order_max: int | tuple[int, int] | None = None
     tds_strings: Sequence[TdsString] = ()
+    tail_q_max_inv_ang: float | None = None
 
 
 def fiber_stream(seed: int, incident_id: int) -> np.random.Generator:
@@ -209,6 +232,9 @@ def _check_channels(channels: FiberChannels, k: int) -> None:
         raise ValueError(
             "lattice columns must span transfers D >= outgoing_order_max + order_max per axis"
         )
+    cap = channels.tail_q_max_inv_ang
+    if cap is not None and not (np.isfinite(cap) and cap > 0):
+        raise ValueError("tail_q_max_inv_ang must be None or finite and positive")
 
 
 def _fold(moved: np.ndarray, g: np.ndarray) -> np.ndarray:
@@ -369,8 +395,10 @@ def _jump(engine, fiber, chi, kappa, rng):
 
     Groups: lattice columns ``<chi|Gamma_lat|chi>``, each continuum string
     ``<chi|Gamma_s|chi>``, each kick node ``||S_i chi||^2``. Returns
-    ``(kind, kappa, fiber, choice, c_new, f)``; ``choice`` None is unresolved.
+    ``(kind, kappa, fiber, choice, c_new, f)``; ``choice`` None is unresolved,
+    ``_TAIL`` a classified string tail with ``(record, string)`` in ``c_new``.
     Validation: cr-axial-fiber-unraveling
+    Validation: cr-axial-tds-tail
     """
     lattice_total = float(np.vdot(chi, engine.ch.lattice_loss @ chi).real)
     strings = [channel.rate(chi) for channel in engine.strings]
@@ -395,8 +423,11 @@ def _jump(engine, fiber, chi, kappa, rng):
             rng,
             lambda moved: _fold(moved, engine.g),
         )
-        if result is None:
-            return "tds", kappa, fiber, None, None, None
+        if isinstance(result, TailRecord):
+            cap = engine.ch.tail_q_max_inv_ang
+            if cap is None or np.hypot(*result.momentum_inv_ang) > cap:
+                return "tds", kappa, fiber, None, None, None
+            return "tds", kappa, fiber, _TAIL, (result, group - 1), None
         kappa, out = result
         fiber = engine.fiber(kappa)
         return ("tds", kappa, fiber, *_split(fiber, out, 0.0, rng, engine.window_in_box))
@@ -443,6 +474,7 @@ def _trajectory(engine, entry, kappa, window, max_depth, seed, incident, step, t
     """One terminal-event history; law in :func:`unravel_fiber_outgoing`.
 
     Validation: cr-axial-fiber-unraveling
+    Validation: cr-axial-tds-tail
     """
     rng = fiber_stream(seed, incident)
     fiber = engine.fiber(kappa)
@@ -471,6 +503,15 @@ def _trajectory(engine, entry, kappa, window, max_depth, seed, incident, step, t
         counts[kind] += 1
         if choice is None:
             return event("unresolved", depth)
+        if choice == _TAIL:
+            record, string = c_new
+            return event(
+                "tail",
+                depth,
+                tail_momentum_inv_ang=record.momentum_inv_ang,
+                tail_displacement_ang=record.displacement_ang,
+                tail_string=string,
+            )
         if choice == 0:
             c = c_new / np.linalg.norm(c_new)
         elif choice == 1:
@@ -505,7 +546,9 @@ def unravel_fiber_outgoing(
     $\kappa+q\hat e$ into the first zone and relabels orders; every output is
     split into retained $P(\kappa')$ (continue), represented outgoing
     $B-P(\kappa')$ (Weyl-measured, terminate) and outside the box
-    (unresolved, terminate). A kick's rate does not depend on the
+    (unresolved, terminate). A continuum-string output outside the box
+    within ``tail_q_max_inv_ang`` instead terminates as a ``"tail"`` record of
+    its sampled momentum and displacement. A kick's rate does not depend on the
     azimuth because $e^{i\mathbf q\cdot\mathbf r}$ is unitary and commutes
     with $S_i$, so drawing the azimuth after the node is exact.
 

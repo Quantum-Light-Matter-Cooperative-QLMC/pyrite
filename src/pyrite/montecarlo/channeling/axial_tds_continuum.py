@@ -220,17 +220,33 @@ class StringChannel:
         return phi * np.exp(-1j * (tx * self.r[0] + ty * self.r[1])) * w
 
 
+@dataclass(frozen=True)
+class TailRecord:
+    """Sampled out-of-box TDS output: the momentum-basis record of the tail.
+
+    ``momentum_inv_ang`` is the absolute transverse output wavevector
+    ``kappa + Q`` (relative to the axis, not folded) and ``displacement_ang``
+    the struck string's in-plane displacement ``u``; both come from the exact
+    joint ``(Q, u)`` draw. Elastic: the energy is unchanged.
+    Validation: cr-axial-tds-tail
+    """
+
+    momentum_inv_ang: tuple[float, float]
+    displacement_ang: tuple[float, float]
+
+
 def string_jump(channel: StringChannel, chi, kappa, order_max, box, rng, fold):
     """One continuum TDS jump from window state ``chi`` at carrier ``kappa``.
 
     ``order_max`` = (M_x, M_y) and ``box`` = (B_x, B_y) are per-axis extents
-    (an integer means square). Returns ``None`` when the sampled output
-    momentum lies outside the box (unresolved), else ``(kappa', box_output)``
-    with the (2B_x+1)(2B_y+1) box output in centred C order. ``fold(moved)``
-    returns the integer shift into the zone. Given ``(Q, u)``,
-    ``P(Q in box) = ||B J chi||^2 / ||J chi||^2``, so deciding by where ``Q``
-    lands is exact.
+    (an integer means square). Returns a :class:`TailRecord` when the
+    sampled output momentum lies outside the box on either axis, else
+    ``(kappa', box_output)`` with the (2B_x+1)(2B_y+1) box output in centred
+    C order. ``fold(moved)`` returns the integer shift into the zone. Given
+    ``(Q, u)``, ``P(Q in box) = ||B J chi||^2 / ||J chi||^2``, so deciding by
+    where ``Q`` lands is exact; the tail record makes no further draw.
     Validation: cr-axial-continuum-tds-jumps
+    Validation: cr-axial-tds-tail
     """
     m = np.array(order_extents(order_max, "order_max"))
     b = np.array(order_extents(box, "box"))
@@ -238,7 +254,7 @@ def string_jump(channel: StringChannel, chi, kappa, order_max, box, rng, fold):
     moved = np.asarray(kappa, dtype=float) + q_rel
     shift = fold(moved)
     if np.any(np.abs(shift) > b):
-        return None
+        return TailRecord((float(moved[0]), float(moved[1])), (float(u[0]), float(u[1])))
     new_kappa = moved - shift * channel.g
     half = b + m
     column = channel.column(new_kappa - np.asarray(kappa, dtype=float), u, tuple(half))

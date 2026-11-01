@@ -1068,6 +1068,19 @@ same box. At 3e4 Å:
 The one-cell model's 1.7% lower mean TDS rate and its carrier-conserving
 transfers shift these window tallies by only 1–2σ.
 
+**Tail beyond the box (#881).** The unresolved string weight above is the
+sampled single-nuclear tail: its momentum is already drawn, so it is now
+recorded as a `"tail"` event (absolute $K$, string displacement, depth)
+within a paraxial cap $|K|\le0.1k$
+([derivation](../../validation/channeling/cr-axial-tds-tail.md)). Draws are
+unchanged. At 3e4 Å the tail is 0.049 (TDS) and 0.045 (TDS + electronic) and
+unresolved falls to 0.0025 and 0.0045
+([record](../../validation/check-records/axial-zone/fiber-tail-001-local-4k.json)).
+The TDS-only residual is the tail beyond the cap, about 6% of the
+out-of-box weight as the large-$Q$ law predicts for the square box (12
+expected, 10 observed). In the electronic run, half of the 18 unresolved
+events are unclassified large-$q$ kick remainders. A tail is a model record, not a physical escape.
+
 Si [111] has two strings per cell (cut target 106.1 eV by the provisional
 rule, 199 retained states at Γ, square window M = 12, box B = 30;
 [record](../../validation/check-records/axial-zone/fiber-continuum-111-local.json)).
