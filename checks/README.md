@@ -6,6 +6,13 @@ ledger remains authoritative; a successful check is evidence, not human
 sign-off.
 
 The canonical check-to-ledger mapping is `pyrite.validation.check_records.CHECK_LEDGER_IDS`.
+The `refresh_validation_evidence.py` driver runs a small scheduled CPU manifest
+of explicit pass/fail checks (not report-only diagnostics),
+collects isolated JSONL records, and writes a preview summary + manifest for review.
+The `scheduled_cuda_parity.py` probe compares line, bremsstrahlung, characteristic,
+and coherent spectra on three identical seeded segment records, across CPU FP64,
+CUDA FP64 and CUDA FP32. Run it via `scheduled_cuda_parity.sbatch` on the lab box.
+These two orchestration probes have no independent ledger-claim mapping.
 Use the collector to preserve normal output and write dated JSONL evidence:
 
 ```bash

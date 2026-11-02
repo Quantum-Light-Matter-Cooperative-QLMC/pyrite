@@ -17,6 +17,47 @@ Agreement with Zhai/Feranchuk is necessary but not sufficient — it can hide **
 - **Re-derivation write-ups** — `docs/validation/<domain>/<id>.md` holds each independent derivation, its diff against the implementation, and the adjudication. Domain directories mirror the physics hierarchy where practical; the ledger is the location authority. Write and format the math per the [LaTeX/MyST style rules](formatting-style.md).
 - **Anchors** — regression tests (mostly under `checks/`) that pin a claim to a reference value with a tolerance.
 
+### Scheduled validation evidence and CPU/CUDA parity (#344)
+
+The main CI workflow runs on PRs, pushes to `main`, and weekly on Sundays at
+06:53 UTC. CPU tests with compiled JIT remain enabled in the regular matrix.
+Pushes to `main` and the weekly run also execute `pyrite-dev test --numba --slow`
+with `PYRITE_ONLINE_TESTS=1`. **`--numba` sets `NUMBA_DISABLE_JIT=1`** for
+tracer coverage: this job supplements, rather than replaces, compiled tests.
+GitHub-hosted runners never run CUDA. The independent Monday 07:17 UTC
+`validation-evidence.yml` workflow collects a bounded CPU-only evidence set,
+including its manifest and a regenerated *preview* of the ledger status summary.
+The run uploads the records and output for 90 days; failures turn the job red.
+
+In a repository checkout, run or extend the manifest explicitly:
+
+```bash
+uv run python checks/refresh_validation_evidence.py \
+  --output-dir /tmp/pyrite-evidence-344 --check checks/cross_reflection_coherence.py
+```
+
+Some `checks/` producers require external oracles, reviewed golden artifacts,
+or expensive GPU jobs. `--all-mapped` is an operator-only exhaustive attempt;
+it is not appropriate for the GitHub CPU runner. A skipped check is never
+recorded as a pass. Neither artifacts nor automated records grant human
+sign-off, and **the checked-in status summary is not modified by cron**.
+After reviewing recorded provenance, a maintainer may run the collector with
+`--publish`, which copies its records into `docs/validation/check-records/`
+and regenerates `status-summary.md` locally; that change requires ordinary
+code review before reaching `main`.
+
+For GPU parity, first run `pyrite remote sync` from a clean checkout. On the lab
+host, submit `sbatch -p gpu --gres=gpu:1 checks/scheduled_cuda_parity.sbatch`.
+`pyrite remote sync` ships `checks/` but not `tests/`. Each SLURM allocation
+writes `evidence/validation-344/<job-id>/report.json`, the per-case spectrum
+snapshots and subprocess logs; copy these records back and review the results
+before closing the issue. This is a **hardware-gated**, same-trajectory parity
+check (line, brem, characteristic, coherent; three seeds and energy settings),
+not an independent statistical or cross-code validation. The provisional FP32
+peak/yield tolerance is 3% to allow the discrepancy reported in #298 to be
+measured, while FP64 is initially guarded at `1e-5`; these must be calibrated
+against real hardware evidence, rather than asserted as established accuracy.
+
 ### Optional external crystallography oracle
 
 Run the pinned, validation-only `Dans_Diffraction` backend with:
