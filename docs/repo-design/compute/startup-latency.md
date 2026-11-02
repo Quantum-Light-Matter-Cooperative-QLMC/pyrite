@@ -260,8 +260,8 @@ redundant dtype or layout specialization: the continuous/shell and
 coupled/uncoupled transport cores encode different physics. Keep those cores
 separate. No boundary conversion or inlining change is justified by these
 measurements; either needs a measured candidate and steady-state comparison.
-PCH tuning remains unmeasured and optional. Native cache reuse already removes
-NVRTC compilation in the measured warm CUDA workload.
+PCH remains optional; the comparison below measures its cold-cache benefit.
+Native cache reuse already removes NVRTC compilation in the measured warm CUDA workload.
 
 `cache status` reports source/version freshness, rather than observed runtime
 hits. A current Numba index does not guarantee a hit for a new signature or CPU
@@ -272,3 +272,54 @@ configurations, and an unrepresented configuration may compile on first use.
 Unsupported warm profile names fail before any case runs. The regression tests
 separate FP32/FP64 Numba disk-cache entries across processes; CUDA variant tests
 separate precision and switch keys, but require a CUDA-enabled test environment.
+
+### NVRTC precompiled-header comparison
+
+SLURM job 3690, revision `be5668d7a`, RTX 5080, driver 610.47, Python 3.14.6,
+Numba 0.68.0, CuPy 14.2.0, NVRTC 13.4. Same README HOPG workload as above:
+30 keV, 450 line / 100 continuum histories, seed 1; `OPENBLAS_NUM_THREADS=1`.
+GPU allocation: one GPU, eight CPU cores, 32 GiB memory. Three fresh processes
+per arm, interleaved PCH settings `0,1,1,0,0,1`, each with empty Numba/CuPy
+caches and its own temporary directory. Header creation is included in the
+PCH-on timing; no prebuilt header is supplied.
+
+Run each cold sample with the chosen `CUPY_NVRTC_USE_PCH=0` or `1`:
+
+```bash
+CUPY_NVRTC_USE_PCH=1 uv run pyrite-dev startup --backend cuda --cache cold --repeats 1 --json
+```
+
+For warm controls use separate empty Numba/CuPy cache directories per arm and
+`--cache warm --repeats 3`; the command primes each arm before measurement.
+Values below are medians (min–max), seconds unless stated otherwise.
+
+| Metric | PCH off | PCH on |
+|---|---:|---:|
+| Cold first simulation | 30.900 (30.852–31.834) | 27.617 (27.574–27.634) |
+| Cold NVRTC compilation | 14.635 (14.561–14.902) | 11.260 (11.248–11.309) |
+| Cold Numba compilation | 14.302 (14.211–14.409) | 14.301 (14.269–14.328) |
+| Second simulation, same cold-start process | 0.137 (0.136–0.140) | 0.138 (0.137–0.139) |
+| Warm-cache first simulation | 1.898 (1.888–1.942) | 1.870 (1.867–1.888) |
+| Cold peak process RSS (MiB) | 1644.2 (1640.3–1644.8) | 1653.9 (1652.7–1654.7) |
+
+All twelve samples have identical identity digest
+`04d1bb570fc917017a7d6a721cfffa9bd5e564ccb6b44a9665f78119364158a4`
+and identical hashes for every returned spectrum array. The two CUDA switch
+and precision cache regressions also passed on this allocation.
+
+Both warm arms compile zero Numba/NVRTC kernels and report 158 CuPy disk hits;
+the small wall-time difference does not demonstrate a compilation benefit.
+Both cold arms compile 158 NVRTC kernels with zero disk hits. PCH reduces
+NVRTC time by 23.1% and first-simulation time by 10.6% (3.28 s) in this workload.
+The Numba compile time and steady-state execution show no material change.
+PCH is useful for rebuilding an empty CUDA cache or exploring new kernel
+specializations; keep the default unchanged and offer the environment setting
+as an opt-in on compatible installations. This measurement does not establish
+a benefit for other GPU architectures or workloads.
+
+[CuPy's environment reference](https://docs.cupy.dev/en/stable/reference/environment.html)
+documents `CUPY_NVRTC_USE_PCH=1` for CUDA 12.8 or later.
+[NVRTC automatic PCH](https://docs.nvidia.com/cuda/nvrtc/index.html#automatic-pch)
+uses process-specific temporary headers and removes them when the library
+unloads. This accelerates compilation within a process; native CuPy disk
+caching provides reuse across processes.
