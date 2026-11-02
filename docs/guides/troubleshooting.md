@@ -70,6 +70,18 @@ entries beside the PyRITE sources and CuPy's `~/.cupy/kernel_cache` are not
 used by default; `pyrite cache status` still reports the in-tree location as
 legacy and `pyrite cache clear` removes its PyRITE entries.
 
+To pay the compile cost once, before a job or on a new node, run
+`pyrite cache warm`. It simulates one-electron cases and discards the results;
+only the kernel caches change. `--profile minimal` (the default) covers the
+default physics of the README case in about 20 s on a laptop CPU; `--profile
+standard` adds the other CPU transport-core variants (continuous stopping,
+uncoupled continuum, secondary transport) and takes about 40 s. A target
+without shell data uses continuous stopping, so warm `standard` for such
+materials. Cache entries are specific to the CPU instruction set (Numba) and
+GPU architecture (CuPy); warm on the node type that runs the job. See
+[startup latency](../repo-design/compute/startup-latency.md) for measured
+costs.
+
 ## The GPU is unavailable or runs out of memory
 
 Inspect `pyrite config setup --help` and the active backend environment. CPU is the safe base installation. Do not solve memory pressure by changing scientific inputs invisibly: use documented resource/chunk controls, record them for performance work, and route heavy GPU sweeps through the [cluster workflow](running-on-a-cluster.md).
