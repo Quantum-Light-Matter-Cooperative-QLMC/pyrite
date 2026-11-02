@@ -10,6 +10,7 @@ Validation: sbethe-corrected-stopping
 import numpy as np
 from numba import njit
 
+from ..._jit_cache import stabilize_closure_cache
 from ..geometry import X_MIN, Y_MAX, Z_MAX, Z_MIN
 from ..groove import _first_surface_event_scalar_numba
 from . import _jit_cutoff_bound as _cutoff
@@ -1200,6 +1201,9 @@ def make_cpu_transport_core(
                 radiative_args,
             )
 
+    # ``core`` captures ``body``, whose pickle varies per process (#910).
+    flags = (grooved, per_electron, lut, inelastic, radiative, lazy_cutoff)
+    stabilize_closure_cache(core, body, f"{__name__}.make_cpu_transport_core{flags}")
     return core
 
 

@@ -1024,7 +1024,7 @@ def build_parser(prog_name: str = "pyrite-dev") -> argparse.ArgumentParser:
     perf.add_argument("command_args", nargs=argparse.REMAINDER)
     perf.set_defaults(func=cmd_perf)
     startup = sub.add_parser(
-        "startup", help="benchmark fresh-process CPU imports and the README simulation"
+        "startup", help="benchmark fresh-process imports and the README simulation"
     )
     startup.add_argument(
         "--repeats",
@@ -1036,7 +1036,13 @@ def build_parser(prog_name: str = "pyrite-dev") -> argparse.ArgumentParser:
         "--cache",
         choices=("warm", "cold"),
         default="warm",
-        help="Numba cache: prime first, or use an empty temporary cache per sample (default: warm)",
+        help="JIT caches: prime first, or use empty temporary caches per sample (default: warm)",
+    )
+    startup.add_argument(
+        "--backend",
+        choices=("cpu", "cuda"),
+        default="cpu",
+        help="simulation backend; cuda also isolates CuPy caches in cold mode (default: cpu)",
     )
     startup.add_argument("--json", action="store_true", help="emit one JSON benchmark report")
     startup.add_argument(

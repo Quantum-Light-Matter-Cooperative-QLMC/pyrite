@@ -24,6 +24,7 @@ _COMMANDS = {
     "beam": "pyrite.cli.commands.beam.command",
     "detector": "pyrite.cli.commands.detector.command",
     "tables": "pyrite.cli.commands.tables.command",
+    "cache": "pyrite.cli.commands.cache.command",
 }
 
 _COMMAND_HELP = {
@@ -40,6 +41,7 @@ _COMMAND_HELP = {
     "beam": "Manage named beams, attachable to profiles by name.",
     "detector": "Manage named detector geometries.",
     "tables": "Inspect generated cross-section tables and external code trees.",
+    "cache": "Inspect and clear compiled CPU/GPU kernel caches.",
 }
 
 
@@ -111,7 +113,14 @@ def command() -> None:
 
 
 def main(argv: Sequence[str] | None = None):
-    """Run canonical ``pyrite`` preserving exit-code and stream contracts."""
+    """Run canonical ``pyrite`` preserving exit-code and stream contracts.
+
+    Before any kernel module loads, unset ``NUMBA_CACHE_DIR``/``CUPY_CACHE_DIR``
+    point at PyRITE's managed cache so compiled kernels persist across runs.
+    """
+    from .._jit_cache import apply_managed_cache_env
+
+    apply_managed_cache_env()
     result = run(command, argv, prog_name="pyrite")
     if isinstance(result, int):
         raise SystemExit(result)

@@ -1,7 +1,8 @@
-"""Fresh-process CPU startup benchmark for the README scalar simulation.
+"""Fresh-process startup benchmark for the README scalar simulation.
 
-Warm mode primes Numba in an unmeasured process. Cold mode gives every sample
-an empty temporary Numba cache, without deleting the user's cache. Fetched
+Runs on the CPU backend, or CUDA with ``backend="cuda"``. Warm mode primes the
+JIT caches in an unmeasured process. Cold mode gives every sample empty
+temporary Numba and CuPy caches, without deleting the user's caches. Fetched
 physics tables must already be installed; their filesystem cache is not cleared.
 """
 
@@ -32,13 +33,21 @@ detector = pr.Detector()
 numerics = pr.Numerics(cxr_trials=450, brem_trials=100)
 setup_s = time.perf_counter() - start
 start = time.perf_counter()
-result = pr.simulate(beam, target, detector, numerics=numerics)
+from contextlib import nullcontext
+from pyrite._jit_cache import CupyCompileRecorder, NumbaCompileRecorder, numba_dispatcher_stats
+cuda = os.environ["PYRITE_MC_BACKEND"] == "cuda"
+first_cupy = CupyCompileRecorder() if cuda else nullcontext()
+with NumbaCompileRecorder() as first_compiles, first_cupy:
+    result = pr.simulate(beam, target, detector, numerics=numerics)
 first_s = time.perf_counter() - start
+first_kernels = numba_dispatcher_stats()
 if profiler:
     profiler.disable()
     profiler.dump_stats(os.environ["PYRITE_STARTUP_PROFILE"])
 start = time.perf_counter()
-pr.simulate(beam, target, detector, numerics=numerics)
+repeat_cupy = CupyCompileRecorder() if cuda else nullcontext()
+with NumbaCompileRecorder() as repeat_compiles, repeat_cupy:
+    pr.simulate(beam, target, detector, numerics=numerics)
 repeat_s = time.perf_counter() - start
 import hashlib
 import json
@@ -68,15 +77,41 @@ print(json.dumps({"beam_s": beam_s, "setup_s": setup_s, "first_s": first_s,
                  "repeat_s": repeat_s, "total_first_s": beam_s + setup_s + first_s,
                  "identity_digest": result.provenance["identity_digest"],
                  "array_sha256": arrays, "peak_memory_bytes": peak_bytes,
-                 "numpy": np.__version__, "numba": numba.__version__}))
+                 "numpy": np.__version__, "numba": numba.__version__,
+                 "numba_jit": {
+                     "first_compile_s": first_compiles.total_s,
+                     "first_compiles": len(first_compiles.records),
+                     "repeat_compile_s": repeat_compiles.total_s,
+                     "repeat_compiles": len(repeat_compiles.records),
+                     "cache_hits": sum(k["hits"] for k in first_kernels),
+                     "cache_misses": sum(k["misses"] for k in first_kernels),
+                     "uncached_kernels": sum(not k["cached"] for k in first_kernels),
+                     "compile_by_kernel": first_compiles.by_kernel(),
+                     "kernels": first_kernels,
+                 },
+                 "cupy_jit": {"first": first_cupy.summary(), "repeat": repeat_cupy.summary()}
+                 if cuda else None}))
 """
 
 
-def benchmark(*, repeats: int = 3, cache: str = "warm", profile: Path | None = None) -> dict:
-    """Measure identical fresh processes; return samples and median/range seconds."""
-    if repeats < 1 or cache not in {"warm", "cold"}:
-        raise ValueError("repeats must be positive and cache must be warm or cold")
-    env = {**os.environ, "PYRITE_MC_BACKEND": "cpu"}
+def _spread(values: list[float]) -> dict:
+    return {"median": statistics.median(values), "min": min(values), "max": max(values)}
+
+
+def benchmark(
+    *,
+    repeats: int = 3,
+    cache: str = "warm",
+    profile: Path | None = None,
+    backend: str = "cpu",
+) -> dict:
+    """Measure identical fresh processes; return samples and median/range seconds.
+
+    Cold mode isolates the Numba cache and, on CUDA, the CuPy kernel cache.
+    """
+    if repeats < 1 or cache not in {"warm", "cold"} or backend not in {"cpu", "cuda"}:
+        raise ValueError("repeats must be positive, cache warm or cold, and backend cpu or cuda")
+    env = {**os.environ, "PYRITE_MC_BACKEND": backend}
     env.pop("NUMBA_DISABLE_JIT", None)
     env.pop("PYRITE_STARTUP_PROFILE", None)
 
@@ -100,13 +135,15 @@ def benchmark(*, repeats: int = 3, cache: str = "warm", profile: Path | None = N
         sample_env = dict(env)
         with tempfile.TemporaryDirectory(prefix="pyrite-startup-") as temporary:
             if cache == "cold":
-                sample_env["NUMBA_CACHE_DIR"] = temporary
+                sample_env["NUMBA_CACHE_DIR"] = os.path.join(temporary, "numba")
+                sample_env["CUPY_CACHE_DIR"] = os.path.join(temporary, "cupy")
             samples.append(sample(sample_env))
     if profile is not None:
         profile_env = {**env, "PYRITE_STARTUP_PROFILE": str(profile.resolve())}
         with tempfile.TemporaryDirectory(prefix="pyrite-startup-profile-") as temporary:
             if cache == "cold":
-                profile_env["NUMBA_CACHE_DIR"] = temporary
+                profile_env["NUMBA_CACHE_DIR"] = os.path.join(temporary, "numba")
+                profile_env["CUPY_CACHE_DIR"] = os.path.join(temporary, "cupy")
             sample(profile_env)
     identities = {(s["identity_digest"], json.dumps(s["array_sha256"])) for s in samples}
     if len(identities) != 1:
@@ -114,15 +151,15 @@ def benchmark(*, repeats: int = 3, cache: str = "warm", profile: Path | None = N
     timings = {}
     for name in ("beam_s", "setup_s", "first_s", "repeat_s", "total_first_s"):
         values = [s[name] for s in samples]
-        timings[name] = {
-            "median": statistics.median(values),
-            "min": min(values),
-            "max": max(values),
-        }
+        timings[name] = _spread(values)
+    for name in ("first_compile_s", "repeat_compile_s"):
+        values = [s["numba_jit"][name] for s in samples if "numba_jit" in s]
+        if values:
+            timings[f"numba_{name}"] = _spread(values)
     return {
         "schema": "pyrite.startup-benchmark.v1",
         "workload": "README HOPG, 30 keV, 450 line / 100 brem electrons, seed 1",
-        "backend": "cpu",
+        "backend": backend,
         "numba_cache": cache,
         "profile": str(profile) if profile else None,
         "python": platform.python_version(),
@@ -135,7 +172,12 @@ def benchmark(*, repeats: int = 3, cache: str = "warm", profile: Path | None = N
 def run(args) -> None:
     """Render the developer benchmark as a table or one JSON value."""
     try:
-        report = benchmark(repeats=args.repeats, cache=args.cache, profile=args.profile)
+        report = benchmark(
+            repeats=args.repeats,
+            cache=args.cache,
+            profile=args.profile,
+            backend=getattr(args, "backend", "cpu"),
+        )
     except subprocess.CalledProcessError as exc:
         if exc.stderr:
             print(exc.stderr, end="", file=sys.stderr)
@@ -148,7 +190,10 @@ def run(args) -> None:
     if args.json:
         print(json.dumps(report))
         return
-    print(f"CPU startup; Numba cache {args.cache}; {args.repeats} fresh processes")
+    print(
+        f"{report['backend'].upper()} startup; JIT caches {args.cache}; "
+        f"{args.repeats} fresh processes"
+    )
     for name, timing in report["timings_s"].items():
-        print(f"{name:16} {timing['median']:.3f} s (range {timing['min']:.3f}–{timing['max']:.3f})")
+        print(f"{name:26} {timing['median']:.3f} s (range {timing['min']:.3f}–{timing['max']:.3f})")
     print(f"identity_digest: {report['samples'][0]['identity_digest']}")
