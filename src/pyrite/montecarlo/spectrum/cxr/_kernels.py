@@ -23,6 +23,7 @@ from ...transport import (
     _element_crossover_keV,
     beta_from_keV,
 )
+from ...transport._continuation_join import _copy_bytes
 from . import _fused
 
 # ---- segment-sum CXR spectrum ------------------------------------------------
@@ -844,9 +845,10 @@ def _clip_segments_to_cutoff(segments, E_cut_keV, composition, layers=None):
     # derives below (E_end/E_repr/t_end) are consistent with the rows it emits
     # instead of mixing transport fp64 with a REAL solve.
     out = dict(segments)
-    for key in _SEG_ARRAYS:
-        if key in out:
-            out[key] = _stage_row(out[key])[keep_idx]
+    with _RowStager() as stage:
+        for key in _SEG_ARRAYS:
+            if key in out:
+                out[key] = stage(out[key])[keep_idx]
 
     E = xp.asarray(out["E_keV"], dtype=REAL)
     old_L = xp.asarray(out["L_ang"], dtype=REAL)
@@ -924,11 +926,12 @@ def _segments_on_device(segments):
     On the CPU backend `xp` is NumPy and the arrays already carry the kernels'
     dtype, so nothing is copied at all."""
     out = dict(segments)
-    for k in _SEG_ARRAYS:
-        a = out.get(k)
-        if a is None:
-            continue
-        out[k] = _stage_row(a)
+    with _RowStager() as stage:
+        for k in _SEG_ARRAYS:
+            a = out.get(k)
+            if a is None:
+                continue
+            out[k] = stage(a)
     return out
 
 
@@ -940,8 +943,129 @@ def _stage_row(a):
     and by the cutoff clip, which runs before staging and so must apply the
     same rule rather than leave the rows it emits at the transport's dtype.
     """
+    with _RowStager() as stage:
+        return stage(a)
 
-    return xp.asarray(a, dtype=REAL) if a.dtype.kind == "f" else xp.asarray(a)
+
+# float64 -> float32 on the device, bitwise equal to ``ndarray.astype(float32)``
+# on x86: round-to-nearest-even with subnormals kept (CuPy's own ``astype``
+# flushes float32 subnormals to zero), and a NaN becomes a quiet NaN keeping the
+# sign and the top 22 payload bits, as cvtsd2ss does. CuPy compiles every
+# kernel with ``-ftz=true`` (``cupy/cuda/compiler.py``), which turns
+# ``__double2float_rn`` into the flushing ``cvt.rn.ftz.f32.f64``; the inline PTX
+# names the non-flushing ``cvt.rn.f32.f64`` explicitly. That instruction would
+# canonicalise a NaN payload, hence the separate NaN branch.
+_CAST_F32_SRC = """
+long long b = __double_as_longlong(x);
+if (x != x) {
+    unsigned int sign = (unsigned int)((unsigned long long)b >> 63) << 31;
+    unsigned int pay = (unsigned int)(((unsigned long long)b >> 29) & 0x3FFFFFu);
+    y = __uint_as_float(sign | 0x7FC00000u | pay);
+} else {
+    float r;
+    asm("cvt.rn.f32.f64 %0, %1;" : "=f"(r) : "d"(x));
+    y = r;
+}
+"""
+_cast_kernel = None
+# Pinned ring for host-row uploads: two 16 MiB chunks, so the host copy into one
+# overlaps the upload (and device cast) of the other. Measured on qlmc (#904):
+# 16 MiB x 2 beat 8/32/64 MiB and deeper rings; the host copy, not PCIe, bounds it.
+_STAGE_CHUNK_BYTES = 16 << 20
+_STAGE_DEPTH = 2
+
+
+def _f64_to_f32_kernel():
+    global _cast_kernel
+    if _cast_kernel is None:
+        _cast_kernel = xp.ElementwiseKernel(
+            "float64 x", "float32 y", _CAST_F32_SRC, "pyrite_stage_f64_to_f32"
+        )
+    return _cast_kernel
+
+
+class _RowStager:
+    """Stage host rows onto the backend; a context manager owning a pinned ring.
+
+    On CuPy, a host row larger than one chunk is copied (Numba, in parallel)
+    into one of two pinned chunks and uploaded from there, so the host copy of
+    the next chunk overlaps the DMA of the previous one. A float64 chunk lands
+    in a device scratch chunk and is narrowed to float32 by the non-flushing
+    cast kernel; any other dtype is uploaded byte for byte. Smaller float64
+    rows upload pageable and are cast by the same kernel. The ring (2 x 16 MiB
+    pinned, not from CuPy's pinned pool) is allocated on first use and freed by
+    ``__exit__`` after the last upload has drained, so no pinned memory stays
+    resident. NumPy backend, FP64 builds and device-resident inputs take the
+    plain ``asarray`` path.
+    """
+
+    def __init__(self):
+        self._host = self._dev = None
+        self._events = [None] * _STAGE_DEPTH
+        self._slot = 0
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        for event in self._events:
+            if event is not None:
+                event.synchronize()
+        self._host = self._dev = None
+        self._events = [None] * _STAGE_DEPTH
+
+    def __call__(self, a):
+        if (
+            not hasattr(xp, "cuda")
+            or REAL is not xp.float32
+            or not isinstance(a, np.ndarray)
+            or a.size == 0
+        ):
+            return xp.asarray(a, dtype=REAL) if a.dtype.kind == "f" else xp.asarray(a)
+        if a.dtype.kind == "f" and a.dtype != np.float64:
+            return xp.asarray(a, dtype=REAL)
+        cast = a.dtype == np.float64
+        flat = np.ascontiguousarray(a).reshape(-1)
+        out = xp.empty(flat.size, xp.float32 if cast else a.dtype)
+        if flat.nbytes <= _STAGE_CHUNK_BYTES:
+            if cast:
+                _f64_to_f32_kernel()(xp.asarray(flat), out)
+            else:
+                out.set(flat)
+            return out.reshape(a.shape)
+        self._upload(flat.view(np.uint8), out, cast)
+        return out.reshape(a.shape)
+
+    def _upload(self, src, out, cast):
+        """Push ``src`` bytes through the ring into ``out`` (cast if float64)."""
+        host, dev = self._host, self._dev
+        if host is None or dev is None:
+            host = [
+                np.frombuffer(
+                    xp.cuda.PinnedMemoryPointer(xp.cuda.PinnedMemory(_STAGE_CHUNK_BYTES), 0),
+                    np.uint8,
+                    _STAGE_CHUNK_BYTES,
+                )
+                for _ in range(_STAGE_DEPTH)
+            ]
+            dev = [xp.empty(_STAGE_CHUNK_BYTES, xp.uint8) for _ in range(_STAGE_DEPTH)]
+            self._host, self._dev = host, dev
+        kernel = _f64_to_f32_kernel()
+        stream = xp.cuda.get_current_stream()
+        h2d = xp.cuda.runtime.memcpyHostToDevice
+        for off in range(0, src.size, _STAGE_CHUNK_BYTES):
+            n = min(_STAGE_CHUNK_BYTES, src.size - off)
+            s = self._slot
+            self._slot = (s + 1) % _STAGE_DEPTH
+            event = self._events[s]
+            if event is not None:
+                event.synchronize()
+            _copy_bytes(host[s][:n], src[off : off + n])
+            dst = dev[s].data.ptr if cast else out.data.ptr + off
+            xp.cuda.runtime.memcpyAsync(dst, host[s].ctypes.data, n, h2d, stream.ptr)
+            if cast:
+                kernel(dev[s][:n].view(xp.float64), out[off // 8 : (off + n) // 8])
+            self._events[s] = stream.record()
 
 
 def _polarization_pair(k_hat, g_vec):
