@@ -150,8 +150,11 @@ To use a destination without storing it in config:
 
 ```python
 destination = RemoteTarget(
-    host="MY_SSH_ALIAS", remote_dir="/srv/pyrite", uv="uv",
-    gpu_vendor="amd", partition="gpu-amd",
+    host="MY_SSH_ALIAS",
+    remote_dir="/srv/pyrite",
+    uv="uv",
+    gpu_vendor="amd",
+    partition="gpu-amd",
 )
 preview = submit("quickstart", target=destination, dry_run=True)
 print(preview.script)
