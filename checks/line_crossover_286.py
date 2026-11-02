@@ -20,7 +20,7 @@ import numpy as np
 from checks.electron_count_accuracy import explicit_line_grid
 from pyrite._cxr_grid_policy import CxrGridToleranceError
 from pyrite.energy_grid import convergence_case as cc
-from pyrite.montecarlo.spectrum.cxr import _batched, _bin_quadrature
+from pyrite.montecarlo.spectrum.cxr import _batched, _bin_quadrature, _bin_tree
 
 
 def capture(case):
@@ -41,15 +41,18 @@ def capture(case):
     return taken[0]
 
 
-def run(method, E_r, aw, w, edges, inv_w):
+def run(method, E_r, aw, w, edges, inv_w, dense_limit=None):
     out = cupy.zeros(int(inv_w.size))
     for timed in (False, True):
         out[:] = 0
         cupy.cuda.Device().synchronize()
         t0 = time.perf_counter()
-        _bin_quadrature.run_bin_mean_reduction_kernel(
-            E_r, aw, w, edges, inv_w, out=out, method=method
-        )
+        if method == "split":
+            _bin_tree.run_tree_reduction(E_r, aw, w, edges, inv_w, out=out, dense_limit=dense_limit)
+        else:
+            _bin_quadrature.run_bin_mean_reduction_kernel(
+                E_r, aw, w, edges, inv_w, out=out, method=method
+            )
         cupy.cuda.Device().synchronize()
         if timed:
             return out, time.perf_counter() - t0
@@ -62,6 +65,7 @@ def main():
     ap.add_argument("--electrons", type=int, default=100)
     ap.add_argument("--strides", type=int, nargs="+", default=[1, 4, 16, 64])
     ap.add_argument("--line-divs", type=int, nargs="+", default=[1, 8])
+    ap.add_argument("--dense-limits", type=int, nargs="*", default=[256, 1024, 4096, 16384])
     ap.add_argument("--line-points", type=int, default=600_000)
     ap.add_argument("--output", type=Path, required=True)
     a = ap.parse_args()
@@ -92,6 +96,10 @@ def main():
                 mean_bin_eV=width, est_near_pairs=near, pairs_s=t_pairs, tree_s=t_tree,
                 tree_diff_over_peak=float(cupy.abs(out - ref).max() / cupy.abs(ref).max()),
             )  # fmt: skip
+            for lim in a.dense_limits:
+                sp, t_sp = run("split", *args, dense_limit=lim)
+                row[f"split{lim}_s"] = t_sp
+                row[f"split{lim}_diff"] = float(cupy.abs(sp - ref).max() / cupy.abs(ref).max())
             rows.append(row)
             print(json.dumps(row), flush=True)
     a.output.parent.mkdir(parents=True, exist_ok=True)
