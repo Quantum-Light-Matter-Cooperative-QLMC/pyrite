@@ -120,9 +120,29 @@ def test_resident_rows_equal_host_rows(transports):
     _assert_identical(host._transport["segs"], resident._transport["segs"], "segs")
 
 
-def test_resident_result_equals_host_result(transports):
+@pytest.mark.parametrize("headroom_mib", [64 * 1024, 384])
+def test_resident_result_equals_host_result(transports, monkeypatch, headroom_mib):
+    """Equal at equal electron blocking, single- and multi-block.
+
+    The incoherent sum's electron-block count follows device headroom
+    (#192), and resident rows occupy headroom; a different block count
+    regroups the float32 block sum. Pin the headroom so both paths block
+    alike: residency itself must change nothing.
+    """
+    from pyrite.montecarlo.runner import case_driver, electron_blocks
+
+    counts = []
+    count = case_driver.electron_block_count
+    monkeypatch.setattr(
+        case_driver, "electron_block_count", lambda *a: counts.append(count(*a)) or counts[-1]
+    )
+    pinned = headroom_mib * 2**20
+    monkeypatch.setattr(case_driver, "device_headroom_bytes", lambda: pinned)
+    monkeypatch.setattr(electron_blocks, "device_headroom_bytes", lambda: pinned)
     resident, host = transports
     expected, actual = score_spectra(host), score_spectra(resident)
+    assert counts and len(set(counts)) == 1, counts
+    assert (counts[0] > 1) == (headroom_mib < 1024), counts
     assert actual.provenance["identity_digest"] == expected.provenance["identity_digest"]
     for family in ("brem", "characteristic"):
         reference, candidate = getattr(expected, family), getattr(actual, family)
