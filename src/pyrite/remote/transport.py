@@ -19,6 +19,7 @@ from pathlib import Path, PurePosixPath
 from .._env import env_value
 from ..console import dashboard as presentation
 from . import config
+from .reporting import is_quiet, report
 
 _TRACE_ARG_LIMIT = 100
 _VERBOSE = False
@@ -52,9 +53,12 @@ def _run(cmd, *, label=None, **kw):
             a if len(a) <= _TRACE_ARG_LIMIT else a[:_TRACE_ARG_LIMIT] + "...<truncated>"
             for a in cmd
         ]
-        print("+", " ".join(parts), flush=True, file=sys.stderr)
+        report("+", " ".join(parts), flush=True, file=sys.stderr)
     elif label is not None:
-        print(label, flush=True, file=sys.stderr)
+        report(label, flush=True, file=sys.stderr)
+    if is_quiet():
+        kw.setdefault("stdout", subprocess.DEVNULL)
+        kw.setdefault("stderr", subprocess.PIPE)
     subprocess.run(cmd, check=True, **kw)
 
 
@@ -74,8 +78,9 @@ def _ssh_capture(remote_cmd):
         errors="replace",
     )
     if r.returncode != 0:
-        sys.stderr.write(r.stderr)
-        raise SystemExit(f"ssh command failed (exit {r.returncode})")
+        report(r.stderr, end="", file=sys.stderr)
+        detail = f": {r.stderr.strip()}" if is_quiet() else ""
+        raise SystemExit(f"ssh command failed (exit {r.returncode}){detail}")
     return r.stdout
 
 
@@ -742,7 +747,7 @@ def _refuse_conflicting_live_jobs(digest: str, *, force: bool) -> None:
         elif recorded != digest:
             conflicts.append((jobid, recorded, revision or "unknown"))
     if unstamped:
-        print(
+        report(
             "note: live job(s) "
             + ", ".join(sorted(unstamped))
             + " recorded no code digest (submitted before code stamping); "
@@ -757,7 +762,7 @@ def _refuse_conflicting_live_jobs(digest: str, *, force: bool) -> None:
         for jobid, recorded, revision in sorted(conflicts)
     )
     if force:
-        print(
+        report(
             f"WARNING: --force syncing payload {digest[:12]} over "
             f"{config.remote_dir()} while {len(conflicts)} live job(s) run other "
             "code; their remaining steps may import a different revision than "
@@ -795,10 +800,16 @@ def _remote_sync_lock():
     )
     argv = config.ssh_argv(config.remote_host(), remote)
     if _VERBOSE:
-        print("+", " ".join(argv[:-1]), "<remote sync lock>", flush=True, file=sys.stderr)
+        report("+", " ".join(argv[:-1]), "<remote sync lock>", flush=True, file=sys.stderr)
     else:
-        print("Waiting for remote sync lock...", flush=True, file=sys.stderr)
-    proc = subprocess.Popen(argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
+        report("Waiting for remote sync lock...", flush=True, file=sys.stderr)
+    proc = subprocess.Popen(
+        argv,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL if is_quiet() else None,
+        text=True,
+    )
     assert proc.stdin is not None and proc.stdout is not None  # PIPE requested above
     try:
         if proc.stdout.readline().strip() != "LOCKED":
@@ -1044,7 +1055,7 @@ def _sync_code_locked(entries, digest, *, force):
     use_rsync = blocker is None
     if _VERBOSE:
         chosen = "rsync" if use_rsync else f"tar ({blocker})"
-        print(f"sync transport: {chosen}", flush=True, file=sys.stderr)
+        report(f"sync transport: {chosen}", flush=True, file=sys.stderr)
     table_files = _xsgen_to_ship(local_tables, local_table_digests, remote_tables)
     dataset_files = _datasets_to_ship(local_datasets, local_dataset_digests, remote_datasets)
     sdbase_files = _datasets_to_ship(local_sdbase, local_sdbase_digests, remote_sdbase)
@@ -1076,7 +1087,7 @@ def _sync_code_locked(entries, digest, *, force):
             shipped_any = bool(t.getmembers())
         if local_datasets:
             shipped = sum(f.stat().st_size for _, f in dataset_files)
-            print(
+            report(
                 f"datasets: shipping {len(dataset_files)} of {len(local_datasets)} "
                 f"({shipped / 1e6:.1f} MB)",
                 flush=True,
@@ -1084,7 +1095,7 @@ def _sync_code_locked(entries, digest, *, force):
             )
         if local_sdbase:
             shipped = sum(f.stat().st_size for _, f in sdbase_files)
-            print(
+            report(
                 f"sdbase: shipping {len(sdbase_files)} of {len(local_sdbase)} files "
                 f"({shipped / 1e6:.1f} MB)",
                 flush=True,
@@ -1092,7 +1103,7 @@ def _sync_code_locked(entries, digest, *, force):
             )
         if local_tables:
             shipped = sum(f.stat().st_size for _, f in table_files)
-            print(
+            report(
                 f"xsgen tables: shipping {len(table_files) // 2} of "
                 f"{len(local_tables) // 2} ({shipped / 1e6:.1f} MB)",
                 flush=True,

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import os
 import re
 from contextlib import contextmanager
@@ -79,7 +80,11 @@ def resolve_target(target: str | RemoteTarget | None = None) -> RemoteTarget:
             raise ValueError(
                 f"unknown remote target {name!r}; use pyrite remote target list"
             ) from exc
-    return RemoteTarget(host=config._legacy_remote_host(), **_fallback_values())
+    try:
+        host = config._legacy_remote_host()
+    except SystemExit as exc:
+        raise ValueError(str(exc)) from exc
+    return RemoteTarget(host=host, **_fallback_values())
 
 
 def _fallback_values(exclude=()):
@@ -140,7 +145,8 @@ def remember_job(jobid: str) -> None:
         return
     document = store._load_document()
     records = document.setdefault("remote_jobs", {}).setdefault(jobid, {})
-    key = target.name or "_explicit"
+    # Different explicit destinations can use the same profile-based job ID.
+    key = hashlib.sha256(f"{target.host}\0{target.remote_dir}".encode()).hexdigest()[:16]
     records[key] = {k: v for k, v in asdict(target).items() if v is not None}
     store._write_document(document)
 

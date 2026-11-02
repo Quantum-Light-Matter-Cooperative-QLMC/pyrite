@@ -126,3 +126,39 @@ wall-clock-bounded sweeps and performance wrappers. Neither successful execution
 nor an execution plan demonstrates physical accuracy or cluster scaling. Use
 [connectivity checks and limitations](../reference/cluster-execution.md#validation-and-limitations)
 before submitting a large workload.
+
+
+## Submit and follow a remote profile from Python
+
+The [experimental remote client](../reference/python-api/remote.md) uses the same
+named destinations and batch scripts as `pyrite run --remote --target NAME`:
+
+```python
+from pyrite.remote import RemoteTarget, submit
+
+job = submit("quickstart", target="lab-amd", materials=["hopg"])
+print(job.jobid, job.status().state)
+finished = job.wait(timeout=3600, poll_interval=10)
+if finished.succeeded:
+    pulled = job.pull()
+    print(pulled.paths)
+else:
+    print(job.logs())
+```
+
+To use a destination without storing it in config:
+
+```python
+destination = RemoteTarget(
+    host="MY_SSH_ALIAS", remote_dir="/srv/pyrite", uv="uv",
+    gpu_vendor="amd", partition="gpu-amd",
+)
+preview = submit("quickstart", target=destination, dry_run=True)
+print(preview.script)
+```
+
+The client returns values without terminal output. `job.stop()` explicitly
+cancels the job; a `wait()` timeout leaves it running. Catch `RemoteError` for
+remote failures and inspect `error.result` for partial checkpoint pulls. Keep the
+returned handle: it retains the target and checkpoint identities used at submit
+time. Target selection does not enter physics or case identity.

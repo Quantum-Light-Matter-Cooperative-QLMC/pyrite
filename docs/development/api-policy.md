@@ -32,7 +32,7 @@ alias is deprecated. All existing imports keep working during the support window
 
 The **public** domains are `beams`, `geometry`, `materials`, `detectors`,
 `observations`, `units`, `config`, `quantum`, `transport`, `radiation`, `campaign`,
-`execution`, `optimization`, `results`, `storage`, `plots`, `experimental`,
+`execution`, `remote`, `optimization`, `results`, `storage`, `plots`, `experimental`,
 `simulation`, and `datasets`.
 These are target API domains, not a claim that every facade exists today.
 

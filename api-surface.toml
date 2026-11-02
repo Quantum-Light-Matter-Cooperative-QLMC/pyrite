@@ -487,3 +487,13 @@ simulate_transport = { target = "pyrite.phases:simulate_transport", status = "ex
 score_spectra = { target = "pyrite.phases:score_spectra", status = "experimental" }
 TransportedScene = { target = "pyrite.phases:TransportedScene", status = "experimental" }
 SimulationProgress = { target = "pyrite._simulation_progress:SimulationProgress", status = "experimental" }
+
+# Explicit remote I/O; experimental synchronous job-handle lifecycle (#899).
+[package_exports."pyrite.remote"]
+RemoteTarget = { target = "pyrite.remote.config:RemoteTarget", status = "experimental" }
+resolve_target = { target = "pyrite.remote.targets:resolve_target", status = "experimental" }
+RemoteJob = { target = "pyrite.remote.client:RemoteJob", status = "experimental" }
+RemoteStatus = { target = "pyrite.remote.client:RemoteStatus", status = "experimental" }
+PullResult = { target = "pyrite.remote.client:PullResult", status = "experimental" }
+RemoteError = { target = "pyrite.remote.client:RemoteError", status = "experimental" }
+submit = { target = "pyrite.remote.client:submit", status = "experimental" }

@@ -185,3 +185,15 @@ render_frame = viewer.render_frame
 _attach_header = viewer._attach_header
 _live_status = viewer._live_status
 attach = viewer.attach
+
+
+# Governed experimental client. Historical orchestration aliases above remain internal.
+from .client import (  # noqa: E402, F401
+    PullResult,
+    RemoteError,
+    RemoteJob,
+    RemoteStatus,
+    submit,
+)
+from .config import RemoteTarget  # noqa: E402, F401
+from .targets import resolve_target  # noqa: E402, F401

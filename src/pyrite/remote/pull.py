@@ -8,6 +8,7 @@ from pathlib import Path
 from ..checkpoints import archive
 from ..console.outputs import output_dir
 from . import config, scripts, transport
+from .reporting import report
 
 
 def _resolve_survey_stems(stems):
@@ -43,7 +44,7 @@ def _resolve_survey_stems(stems):
         if name in resolved:
             continue
         resolved.append(name)
-        print(
+        report(
             f"also pulling identity-qualified survey checkpoint -> pyrite-output/checkpoints/{name}/"
         )
     return resolved
@@ -168,7 +169,7 @@ def resolve_profile_stem(
     matches.sort(key=lambda item: item[4], reverse=True)
     if len(matches) > 1 and hash_prefix is None:
         alternates = ", ".join(item[3][:12] for item in matches[1:])
-        print(
+        report(
             f"{material}@{catalog_profile}: {len(matches)} hashes found on the box; "
             f"pulling newest ({matches[0][3][:12]}); pin another with "
             f"--hash (alternates: {alternates})"
@@ -227,6 +228,14 @@ def resolve_job_stems(jobid, materials):
     return sorted(written), sorted(unwritten)
 
 
+def _pull_selection(stems, dataset, expand_surveys):
+    """Component merges and job handles use exact stems; ordinary pulls expand surveys."""
+    if dataset is None and expand_surveys:
+        stems = _resolve_survey_stems(stems)
+        transport._check_shell_tokens(stems)
+    return stems
+
+
 def pull(
     stems,
     grid=False,
@@ -238,6 +247,7 @@ def pull(
     force=False,
     summary=None,
     hash_prefix=None,
+    _expand_surveys=True,
 ):
     """Fetch checkpoints/<stem>.pkl back from the box for each stem (stem =
     material, or material_quick for a --quick run).
@@ -287,9 +297,7 @@ def pull(
             resolved_stems.extend(resolve_profile_stems(material, profile))
         stems = resolved_stems
     transport._check_shell_tokens(stems)
-    if dataset is None:
-        stems = _resolve_survey_stems(stems)
-        transport._check_shell_tokens(stems)
+    stems = _pull_selection(stems, dataset, _expand_surveys)
     dest = output_dir("checkpoints")
     dest.mkdir(parents=True, exist_ok=True)
     use_slim = True  # component directories are projected to one transfer pickle
@@ -362,7 +370,7 @@ def pull(
             )
             elapsed = max(time.monotonic() - started, 1e-9)
             transferred = incoming_local.stat().st_size / 1e6
-            print(
+            report(
                 f"transferred {transferred:.1f} MB in {elapsed:.1f}s ({transferred / elapsed:.1f} MB/s)"
             )
 
@@ -383,7 +391,7 @@ def pull(
                 )
                 _checkpoint_store.save(stem, dest, base, components=components)
                 _manifest_save(str(local), base, resolved_identity)
-                print(
+                report(
                     f"merged {dataset} ({n_merged} rec, skipped {n_skipped}) -> pyrite-output/checkpoints/{stem}/"
                 )
             else:
@@ -391,13 +399,13 @@ def pull(
                 _manifest_save(str(local), incoming, resolved_identity)
                 label = "+".join(filter(None, ["grid" if grid else "", "level9" if level9 else ""]))
                 detail = f" ({label})" if label else ""
-                print(f"pulled{detail} -> pyrite-output/checkpoints/{stem}/")
+                report(f"pulled{detail} -> pyrite-output/checkpoints/{stem}/")
             completed.append(stem)
         except (Exception, SystemExit) as exc:
             failed.append(stem)
             detail = str(exc) or type(exc).__name__
             failure_errors[stem] = detail
-            print(
+            report(
                 f"warning: could not pull checkpoint {stem!r}: {detail}; continuing",
                 file=sys.stderr,
             )
