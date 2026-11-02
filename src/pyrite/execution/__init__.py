@@ -32,6 +32,7 @@ if TYPE_CHECKING:
     from .artifacts import (
         load_directional_result as load_directional_result,
     )
+    from .cache import warm_cache as warm_cache
     from .dask import DaskConfig as DaskConfig
     from .dask import DaskExecutor as DaskExecutor
     from .inspection import inspect_execution as inspect_execution
@@ -73,6 +74,7 @@ _EXPORTS = {
     "build_executor": ("pyrite.execution.profiles", "build_executor"),
     "resolve_execution_profile": ("pyrite.execution.profiles", "resolve_execution_profile"),
     "run_sweep": ("pyrite.runs.run", "run_sweep"),
+    "warm_cache": ("pyrite.execution.cache", "warm_cache"),
 }
 
 __all__ = [
@@ -99,6 +101,7 @@ __all__ = [
     "build_executor",
     "resolve_execution_profile",
     "run_sweep",
+    "warm_cache",
 ]
 
 

@@ -17,9 +17,22 @@ API support and scientific validation remain separate contracts.
    :nosignatures:
 
    pyrite.execution.run_sweep
+   pyrite.execution.warm_cache
 ```
 
 The [native SLURM Python interface](../cluster-execution.md#native-slurm-python-api)
 and [retry/cancellation contracts](../cluster-execution.md#retry-cancellation-and-resumption)
 cover experimental array orchestration. Worker persistence belongs to
 [`pyrite.storage`](storage.md).
+
+`warm_cache()` optionally prepares compiled kernels before a simulation. It uses
+the configured backend and cache directories, reports failures per case, and
+does not promise coverage of every later specialization.
+
+```python
+from pyrite.execution import warm_cache
+
+report = warm_cache("minimal")
+for case in report["cases"]:
+    print(case["case"], case["status"])
+```

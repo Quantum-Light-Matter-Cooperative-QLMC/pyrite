@@ -167,6 +167,7 @@ PixelRayMap = { target = "pyrite.results.model:PixelRayMap", status = "advanced-
 PixelMetadata = { target = "pyrite.results.model:PixelMetadata", status = "advanced-stable" }
 
 [package_exports."pyrite.execution"]
+warm_cache = { target = "pyrite.execution.cache:warm_cache", status = "advanced-stable" }
 run_sweep = { target = "pyrite.runs.run:run_sweep", status = "advanced-stable" }
 
 [package_exports."pyrite.storage"]
