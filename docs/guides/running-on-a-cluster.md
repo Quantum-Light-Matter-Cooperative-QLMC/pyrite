@@ -85,6 +85,36 @@ jobs; **do not combine `--remote` with `--execution`**. Remote trajectory captur
 need a separate [trajectory transfer](../reference/trajectory-workflows.md),
 rather than a checkpoint pull.
 
+### Authenticated remote marimo apps (experimental)
+
+Install the `apps` extra in the **remote** checkout's virtual environment
+(`uv sync --package pyrite-mc --no-default-groups --extra apps`, together with
+any GPU extra needed by your existing environment). The login node must support
+SLURM, and compute nodes must be SSH-reachable through the login host for
+port forwarding. The node must share the remote checkout and job directories.
+
+```bash
+pyrite remote app analysis --material hopg
+pyrite remote app viewer --gpu --time 02:00:00
+pyrite remote app validation --edit
+pyrite remote app attach JOBID
+pyrite remote job list --kind app --json
+pyrite remote job stop JOBID --yes
+```
+
+The client waits for marimo to listen on **127.0.0.1** on the allocated node,
+then sets up a local SSH port forward and opens the tokenized URL. If it is a
+separate compute node, SSH uses the login host as a jump host. **Ctrl-C only
+closes the tunnel**; the job keeps running until cancelled or its SLURM
+walltime expires. Remote apps never accept `--no-token`.
+
+For a static export, use `pyrite remote app analysis --batch`. This executes
+marimo in the allocation and pulls the completed HTML into the local
+`pyrite-output/results/` directory. A pending export can be retrieved later via
+`pyrite remote app attach JOBID`. Remote app jobs reuse the existing synced
+checkout and require `marimo` to already be installed in its `.venv`; the app
+launcher does not modify a shared virtual environment while other jobs run.
+
 (amd-rocm-nodes)=
 ### AMD (ROCm) nodes
 

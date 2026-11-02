@@ -108,6 +108,8 @@ def job_kind(command: str | None) -> str | None:
         return "recompute"
     if command in {"check", "validate", "zhai"}:
         return "validate"
+    if command == "app":
+        return "app"
     return command
 
 

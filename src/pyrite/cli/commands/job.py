@@ -18,7 +18,7 @@ def command() -> None:
 @command.command("list", help="List jobs with scheduler IDs, kinds, materials, and states.")
 @click.option(
     "--kind",
-    type=click.Choice(("run", "grid", "recompute", "validate")),
+    type=click.Choice(("run", "grid", "recompute", "validate", "app")),
     default=None,
     help="Show only one submission kind.",
 )

@@ -92,10 +92,12 @@ def _reject_all_with_values(command_name, all_, values):
     "remote",
     cls=LazyGroup,
     lazy_commands={
+        "app": "pyrite.cli.commands.remote_app.command",
         "job": "pyrite.cli.commands.job.command",
         "target": "pyrite.cli.commands.remote_targets.command",
     },
     lazy_help={
+        "app": "Run authenticated marimo apps in remote SLURM jobs.",
         "job": "List, inspect, follow, or stop remote jobs.",
         "target": "Configure named remote compute targets.",
     },
