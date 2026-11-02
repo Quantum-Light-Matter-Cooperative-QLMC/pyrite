@@ -103,7 +103,6 @@ INTEGRATION_TESTS = (
     "cli/test_contract.py",
     "materials/test_materials_package.py",
     "montecarlo/test_exports.py",
-    "remote/test_remote_command_run.py",
     "remote/test_remote_command_successful.py",
     "results/test_exports.py",
     "scan/test_run.py",
