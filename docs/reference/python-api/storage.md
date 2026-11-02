@@ -43,7 +43,7 @@ Persist measurement observations separately from simulation results.
    pyrite.storage.observation_from_result
 ```
 
-## Worker artifacts
+## Advanced worker artifacts
 
 Publish and verify immutable worker artifacts and load directional reductions.
 

@@ -195,3 +195,40 @@ domain-import migrations.
 `ExecutionConfig` and `QuantumSetup` remain supported at root pending these
 decisions; curation does not introduce a simulation request type or endorse a
 future composition model.
+
+## Choose an interface by responsibility
+
+Use immutable **specifications** for caller intent that must be compared,
+validated or serialized: `Observation`, `Acquisition` and `TransverseStateSpec`
+are examples. Keep resolved grids, sampled rays and device state out of the
+request. Advanced-stable `ObservationPlan`, `PixelSampling` and
+`ResolvedObservation` remain supported for advanced callers; their availability
+does not make them the preferred construction interface.
+
+Use a **method** when the operation depends on an object's invariant or
+returns a related value, such as `SpatialResult.pixel_metadata()` or a
+quantity-aware `with_width()` replacement. Use a **stateless function** when
+explicit arguments define the calculation, such as
+`pyrite.materials.crystal.structure_factor`. Preserve numeric units and
+normalization; opt-in quantity wrappers remain distinct from numeric kernels.
+
+Use a **factory** when construction requires a choice of representation or
+preparation, such as `pyrite.quantum.gaussian` or the detector-specific
+`timepix_response.get_response` and `eaglexo_response.get_response` factories.
+A **prepared operator** such as `TimepixResponse` or `EagleResponse` holds a
+grid-dependent response for repeated application; it is distinct from the
+`Timepix3Response` or `EagleXOResponse` specification used in an observation.
+Document preparation inputs, reuse constraints, side effects and RNG behavior.
+
+Use a **protocol** for a concrete extension boundary with interchangeable
+implementations, such as the existing detector response capability contracts.
+Do not require unrelated capabilities or introduce a generic pipeline merely
+to wrap one operation. An implementation protocol is not automatically a
+supported public import: `api-surface.toml` remains the authority.
+
+Reference inventories must use governed imports, distinguish canonical owners
+from compatibility paths, and retain published generated URLs. The existing
+`test_api_reference_covers_every_governed_target` checks both registered paths
+and target coverage, allowing aliases without a second registry. When grouping
+reference entries, audit canonical paths as well as target identity: an alias
+can cover an object while leaving its conceptual owner undiscoverable.

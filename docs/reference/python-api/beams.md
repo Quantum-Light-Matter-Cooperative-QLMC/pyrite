@@ -4,6 +4,10 @@ Describe incident beams, particle distributions, and bunch-front tilt. The publi
 
 The entries below use generated docstrings, signatures, and source links. API support and scientific validation are separate contracts.
 
+## Beam descriptions
+
+Use `pyrite.beams.Beam` with these transverse and longitudinal descriptions. Its existing generated page is linked from [core simulation](core.md).
+
 ```{eval-rst}
 .. autosummary::
    :toctree: ../../_autosummary
@@ -14,11 +18,35 @@ The entries below use generated docstrings, signatures, and source links. API su
    pyrite.beams.PointSpot
    pyrite.beams.PointBunch
    pyrite.beams.LongitudinalDistribution
-   pyrite.beams.BunchLength
    pyrite.beams.Offsets
    pyrite.beams.GdfSource
+```
+
+## Advanced saved diagnostics
+
+This individually governed implementation path is advanced-stable; it does not promote other beam-metrics leaf exports.
+
+```{eval-rst}
+.. autosummary::
+   :toctree: ../../_autosummary
+   :nosignatures:
+
    pyrite.campaign.beam_metrics.capture_beam_metrics
 ```
+
+## Deprecated bunch length spelling
+
+`BunchLength` retains its governed deprecated import. Prefer `LongitudinalDistribution` as described [below](#bunch-timing-with-units).
+
+```{eval-rst}
+.. autosummary::
+   :toctree: ../../_autosummary
+   :nosignatures:
+
+   pyrite.beams.BunchLength
+```
+
+## Compatibility spellings
 
 `Spot` is the supported compatibility alias for `TransverseSpot`.
 

@@ -1,8 +1,12 @@
 # Results and analysis
 
-Inspect computed spectra, provenance, acquired counts and analysis reductions. Historical root aliases remain supported while canonical ownership moves into `pyrite.results`.
+Inspect computed spectra, provenance, acquired counts and analysis reductions. `pyrite.results` is the canonical conceptual owner; historical root aliases remain supported.
 
 The entries below use generated docstrings, signatures, and source links. API support and scientific validation are separate contracts.
+
+## Computed outputs
+
+Use `pyrite.results` for computed values. Historical root object pages remain linked here to preserve their published URLs; those root spellings retain compatibility. See [core simulation](core.md) for `Result` creation.
 
 ```{eval-rst}
 .. autosummary::
@@ -13,18 +17,34 @@ The entries below use generated docstrings, signatures, and source links. API su
    pyrite.PixelRayMap
    pyrite.SpectralFactors
    pyrite.SpatialResult
-   pyrite.Analysis
    pyrite.Result
    pyrite.Provenance
    pyrite.CxrSpectra
    pyrite.SpectralDensity
    pyrite.results.TemporalIntensity
-   pyrite.results.QuantifiedSpectrum
-   pyrite.results.QuantifiedDirectionalSpectrum
-   pyrite.results.QuantifiedApertureSpectrum
-   pyrite.results.QuantifiedSpatialSpectrum
-   pyrite.results.QuantifiedSpatialImage
-   pyrite.results.QuantifiedAcquisitionBatch
+   pyrite.results.directional.DirectionalSpectrum
+```
+
+## Acquired counts
+
+`AcquisitionBatch` holds computed expected/realized counts; it is not an
+acquisition request. Use `pyrite.results.AcquisitionBatch`. The root and
+`pyrite.observations` compatibility imports remain identical and advanced-stable.
+Quantity acquisition views below remain experimental and opt-in.
+
+See the [generated acquisition result reference](../../_autosummary/pyrite.observations.AcquisitionBatch.rst).
+
+
+## Advanced reductions and compatibility analysis
+
+These advanced-stable operations inspect computed results. `Analysis` and `Settings` retain the compatibility presentation and dictionary-analysis contracts described [below](#result-analysis); persistence services belong to [storage](storage.md).
+
+```{eval-rst}
+.. autosummary::
+   :toctree: ../../_autosummary
+   :nosignatures:
+
+   pyrite.Analysis
    pyrite.results.Settings
    pyrite.results.records
    pyrite.results.filter_results
@@ -34,7 +54,24 @@ The entries below use generated docstrings, signatures, and source links. API su
    pyrite.results.cxr_metrics
    pyrite.results.radiation.radiation_band_metrics
    pyrite.results.summary_table
-   pyrite.results.directional.DirectionalSpectrum
+```
+
+## Experimental quantity views
+
+`DirectionalSpectrum` above and these explicit quantity views are experimental.
+Quantity views leave numeric arrays and persisted records unchanged. Their experimental status does not change the support of the source result types.
+
+```{eval-rst}
+.. autosummary::
+   :toctree: ../../_autosummary
+   :nosignatures:
+
+   pyrite.results.QuantifiedSpectrum
+   pyrite.results.QuantifiedDirectionalSpectrum
+   pyrite.results.QuantifiedApertureSpectrum
+   pyrite.results.QuantifiedSpatialSpectrum
+   pyrite.results.QuantifiedSpatialImage
+   pyrite.results.QuantifiedAcquisitionBatch
 ```
 
 ## Result analysis
