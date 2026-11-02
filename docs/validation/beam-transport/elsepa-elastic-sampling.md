@@ -82,6 +82,12 @@ $$
 
 Each $\mu_k(\xi)$ is non-decreasing in $\xi$, and the weights lie in $[0,1]$. The mixture is therefore non-decreasing in $\xi$. At $f=0$ it is exactly node $k$'s inverse CDF. At $\xi=0$, every node gives $\mu=0$, so $\cos\theta=1$. Finally $\cos\theta=1-2\mu$.
 
+This is a weighted combination of quantiles, distinct from randomly choosing
+one node. The proposed alternative's first- and second-moment comparison is
+ledgered separately as
+[`elsepa-energy-mixture-moments`](elsepa-energy-mixture-moments.md); that
+candidate analysis does not change the production law validated here.
+
 ### Limiting case: screened-Rutherford shape
 
 For $d\sigma/d\Omega\propto(1-\cos\theta+2a)^{-2}\propto(\mu+a)^{-2}$,
