@@ -1038,8 +1038,9 @@ class _RowStager:
 
     def _upload(self, src, out, cast):
         """Push ``src`` bytes through the ring into ``out`` (cast if float64)."""
-        if self._host is None:
-            self._host = [
+        host, dev = self._host, self._dev
+        if host is None or dev is None:
+            host = [
                 np.frombuffer(
                     xp.cuda.PinnedMemoryPointer(xp.cuda.PinnedMemory(_STAGE_CHUNK_BYTES), 0),
                     np.uint8,
@@ -1047,21 +1048,23 @@ class _RowStager:
                 )
                 for _ in range(_STAGE_DEPTH)
             ]
-            self._dev = [xp.empty(_STAGE_CHUNK_BYTES, xp.uint8) for _ in range(_STAGE_DEPTH)]
-        kernel = _f64_to_f32_kernel() if cast else None
+            dev = [xp.empty(_STAGE_CHUNK_BYTES, xp.uint8) for _ in range(_STAGE_DEPTH)]
+            self._host, self._dev = host, dev
+        kernel = _f64_to_f32_kernel()
         stream = xp.cuda.get_current_stream()
         h2d = xp.cuda.runtime.memcpyHostToDevice
         for off in range(0, src.size, _STAGE_CHUNK_BYTES):
             n = min(_STAGE_CHUNK_BYTES, src.size - off)
             s = self._slot
             self._slot = (s + 1) % _STAGE_DEPTH
-            if self._events[s] is not None:
-                self._events[s].synchronize()
-            _copy_bytes(self._host[s][:n], src[off : off + n])
-            dst = self._dev[s].data.ptr if cast else out.data.ptr + off
-            xp.cuda.runtime.memcpyAsync(dst, self._host[s].ctypes.data, n, h2d, stream.ptr)
+            event = self._events[s]
+            if event is not None:
+                event.synchronize()
+            _copy_bytes(host[s][:n], src[off : off + n])
+            dst = dev[s].data.ptr if cast else out.data.ptr + off
+            xp.cuda.runtime.memcpyAsync(dst, host[s].ctypes.data, n, h2d, stream.ptr)
             if cast:
-                kernel(self._dev[s][:n].view(xp.float64), out[off // 8 : (off + n) // 8])
+                kernel(dev[s][:n].view(xp.float64), out[off // 8 : (off + n) // 8])
             self._events[s] = stream.record()
 
 
