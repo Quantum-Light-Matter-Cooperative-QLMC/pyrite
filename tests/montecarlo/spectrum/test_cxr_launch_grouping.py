@@ -11,7 +11,10 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
+from pyrite._backend import xp
 from pyrite.montecarlo.spectrum.cxr import _batched, _setup
+
+_HOST = getattr(xp, "__name__", "") == "numpy"
 
 
 @pytest.mark.parametrize("duplicate", [False, True])
@@ -24,19 +27,20 @@ def test_device_flight_flag_matches_host_grouping(duplicate, stride):
     if duplicate:
         flight[17] = flight[301]
         owner[17] = owner[301]
-    segments = {"flight_id": flight, "elec_id": owner}
+    segments = {"flight_id": xp.asarray(flight), "elec_id": xp.asarray(owner)}
     grouped, gid = _setup._flight_groups(segments)
     assert grouped is duplicate
-    assert (gid is None) is (not duplicate)
-    assert _setup._device_rows_share_flight(flight, owner) is duplicate
+    # Only the host backend builds group ids; a device backend refuses grouped.
+    assert (gid is None) is (not (duplicate and _HOST))
+    assert _setup._device_rows_share_flight(xp.asarray(flight), xp.asarray(owner)) is duplicate
 
 
 def test_device_flight_flag_overflow_fallback():
-    owner = np.array([0, 2**62, 2**62, 5])
+    owner = xp.asarray(np.array([0, 2**62, 2**62, 5]))
     flight = np.array([-(2**62), 2**62, 2**62, 0])
-    assert _setup._device_rows_share_flight(flight, owner) is True
+    assert _setup._device_rows_share_flight(xp.asarray(flight), owner) is True
     flight[2] = 1
-    assert _setup._device_rows_share_flight(flight, owner) is False
+    assert _setup._device_rows_share_flight(xp.asarray(flight), owner) is False
 
 
 @pytest.mark.parametrize("n_rows", [7, 12, 30, 31])
@@ -53,9 +57,10 @@ def test_reduction_unit_cuts_match_unit_loop(n_rows):
         unit = np.flatnonzero(good[start : start + seg_block].reshape(-1)) + start * n_g
         if unit.size:
             expected.append(unit)
-    cuts = _batched._reduction_unit_cuts(bt, blk, gm_idx)
+    cuts = _batched._reduction_unit_cuts(bt, blk, xp.asarray(gm_idx))
     assert len(cuts) == len(expected)
     for (lo, hi), unit in zip(cuts, expected, strict=True):
+        assert isinstance(lo, int) and isinstance(hi, int)
         np.testing.assert_array_equal(gm_idx[lo:hi], unit)
 
 
