@@ -43,27 +43,6 @@ def test_near_far_tree_matches_host_and_all_pairs_on_irregular_bins():
     np.testing.assert_allclose(cp.asnumpy(tree), cp.asnumpy(pairs), rtol=2e-6, atol=1e-9)
 
 
-@pytest.mark.parametrize("limit", [0, 20, 100_000])
-def test_dense_limit_tree_matches_plain_tree_and_all_pairs(limit):
-    from pyrite.montecarlo.spectrum.cxr._bin_tree import run_tree_reduction
-
-    rng = np.random.default_rng(31)
-    edges = np.r_[np.linspace(900.0, 1000.0, 301), np.linspace(1000.2, 1300.0, 320)]
-    inv_width = 1.0 / np.diff(edges)
-    e = np.r_[rng.normal(1000.0, 4.0, 400), rng.uniform(850, 1350, 100)].astype(np.float32)
-    a = (np.pi / rng.uniform(0.02, 5.0, len(e))).astype(np.float32)
-    w = rng.uniform(0.01, 1.0, len(e)).astype(np.float32)
-    args = (cp.asarray(e), cp.asarray(a), cp.asarray(w), cp.asarray(edges), cp.asarray(inv_width))
-    plain = cp.zeros(len(inv_width), dtype=cp.float64)
-    split = cp.zeros_like(plain)
-    pairs = cp.zeros_like(plain)
-    run_tree_reduction(*args, out=plain)
-    run_tree_reduction(*args, out=split, dense_limit=limit)
-    bq.run_bin_mean_reduction_kernel(*args, out=pairs, method="pairs")
-    np.testing.assert_allclose(cp.asnumpy(split), cp.asnumpy(plain), rtol=2e-6, atol=1e-9)
-    np.testing.assert_allclose(cp.asnumpy(split), cp.asnumpy(pairs), rtol=2e-6, atol=1e-9)
-
-
 def _lines(count=400, seed=11):
     """Widths spanning every Si branch: t = 2 pi |x| from ~0 to ~1e7."""
     rng = np.random.default_rng(seed)

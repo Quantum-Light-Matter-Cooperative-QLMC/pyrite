@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from pyrite.montecarlo.spectrum.cxr._bin_quadrature import _host_bin_mean
-from pyrite.montecarlo.spectrum.cxr._bin_tree import dense_bin_hull, reduce_host
+from pyrite.montecarlo.spectrum.cxr._bin_tree import near_line_counts, reduce_host, tree_is_faster
 
 
 @pytest.mark.parametrize("seed", [4, 19])
@@ -71,21 +71,29 @@ def test_tree_does_not_accept_a_float32_near_pair_at_the_64_width_boundary(side)
     np.testing.assert_allclose(tree, baseline, rtol=1e-8, atol=1e-14)
 
 
-@pytest.mark.parametrize("limit", [0, 3, 40, 10_000])
-def test_dense_bin_hull_matches_brute_force_near_counts(limit):
+def test_near_line_counts_match_brute_force_overlaps():
     rng = np.random.default_rng(7)
     edges = np.sort(np.r_[np.linspace(900.0, 1100.0, 400), rng.uniform(1100.0, 1300.0, 50)])
     e = np.r_[rng.normal(1000.0, 5.0, 200), rng.uniform(900.0, 1300.0, 60)].astype(np.float32)
     a = (np.pi / 10.0 ** rng.uniform(-1.0, 1.5, len(e))).astype(np.float32)
     radius = 64.0 * np.pi / a.astype(np.float64) * (1.0 + 2.0e-6)
     lo, hi = edges[:-1], edges[1:]
-    count = ((hi[None, :] > (e - radius)[:, None]) & (lo[None, :] < (e + radius)[:, None])).sum(0)
-    dense = np.flatnonzero(count > limit)
-    hull = dense_bin_hull(e, a, edges, limit, 64.0)
-    if dense.size == 0:
-        assert hull is None
-    else:
-        # The difference array counts a line over bins whose index range it spans, which
-        # may include one boundary bin more than the strict-overlap brute force.
-        assert hull[0] <= dense[0] and hull[1] >= dense[-1] + 1
-        assert hull[0] >= dense[0] - 1 and hull[1] <= dense[-1] + 2
+    strict = ((hi[None, :] > (e - radius)[:, None]) & (lo[None, :] < (e + radius)[:, None])).sum(0)
+    counts = near_line_counts(e, a, edges, 64.0)
+    assert np.all(counts >= strict)
+    # Each line may be charged to at most one boundary bin beyond strict overlap.
+    assert counts.sum() <= strict.sum() + 2 * len(e)
+
+
+def test_tree_selector_picks_all_pairs_for_a_tight_cluster_and_tree_for_spread_lines():
+    rng = np.random.default_rng(3)
+    edges = np.linspace(0.0, 1.0e6, 20_001)
+    n = 40_000
+    cluster = rng.uniform(5.0e5, 5.0e5 + 2.0e3, n).astype(np.float32)
+    spread = rng.uniform(0.0, 1.0e6, n).astype(np.float32)
+    # 64-width window = 64*pi/a. A 4 keV window leaves ~160 bins holding every clustered
+    # line and the rest empty: the one-thread-per-bin tree is bound by those few bins.
+    a_wide = np.full(n, 64.0 * np.pi / 4.0e3, dtype=np.float32)
+    assert not tree_is_faster(cluster, a_wide, edges, 64.0)
+    a_narrow = np.full(n, 64.0 * np.pi / 1.0e3, dtype=np.float32)
+    assert tree_is_faster(spread, a_narrow, edges, 64.0)

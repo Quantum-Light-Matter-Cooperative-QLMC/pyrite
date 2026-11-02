@@ -659,10 +659,17 @@ def run_bin_mean_reduction_kernel(
     if method not in ("auto", "pairs", "tree"):
         raise ValueError("method must be 'auto', 'pairs', or 'tree'")
     # The host tree setup is O(lines) (~0.09 s for 400k synthetic lines on
-    # the development CPU). The #192 all-pairs kernel measured ~19B pairs/s
-    # on the lab GPU; use a conservative crossover until matched case timing
-    # establishes a better one. An infinite exact window has no far nodes.
-    use_tree = method == "tree" or (method == "auto" and n_bins * n_cxr_rows >= 5_000_000_000)
+    # the development CPU). Below 5e9 pairs the all-pairs kernel is cheap. Above
+    # it, a host cost model picks the faster kernel from the per-bin near-line
+    # counts (#286): a tight line cluster makes the one-thread-per-bin tree
+    # 3-60x slower than all-pairs. An infinite exact window has no far nodes.
+    use_tree = method == "tree"
+    if method == "auto" and exact_widths is not None and n_bins * n_cxr_rows >= 5_000_000_000:
+        from ._bin_tree import tree_is_faster
+
+        use_tree = tree_is_faster(
+            cupy.asnumpy(E_r), cupy.asnumpy(aw), cupy.asnumpy(edges), exact_widths
+        )
     if use_tree and exact_widths is not None:
         from ._bin_tree import run_tree_reduction
 

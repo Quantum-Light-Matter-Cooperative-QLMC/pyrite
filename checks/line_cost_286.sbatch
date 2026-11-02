@@ -18,6 +18,8 @@ mkdir -p "$XDG_CONFIG_HOME" "$PYRITE_USER_CATALOG"
 out="evidence/line286/$SLURM_JOB_ID"; mkdir -p "$out"
 cp .pyrite-sync "$out/sync.json"
 uv sync --extra nvidia --locked -q
+uv run --no-sync pytest -q -p no:cacheprovider tests/montecarlo/spectrum/test_sinc_bin_integration_cuda.py tests/montecarlo/spectrum/test_sinc_bin_near_far.py > "$out/tests.log" 2>&1
+echo "pytest rc=$?"
 py=(uv run --no-sync python -W ignore checks/line_cost_286.py --quadrature bin-mean)
 "${py[@]}" --energy-kev 300 --counts 100 400 --repeat 2 --output "$out/hopg-300.json"
 echo "rc=$?"

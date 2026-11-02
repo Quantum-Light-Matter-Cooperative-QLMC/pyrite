@@ -138,6 +138,52 @@ def _next_node(node, size):
     return node + 1 if node > 1 else size
 
 
+#: Measured cost constants for choosing between the tree and the all-pairs
+#: kernel (#286, jobs 3725/3732, RTX 5080, HOPG 1 mm, 300 keV and 29,999 keV
+#: flushes). The tree runs one thread per bin, so its wall time follows the
+#: busiest bin's near-line count (~4e-5 to 1.1e-4 s per line); the all-pairs
+#: kernel's follows the total near pairs (~9.2e-9 s each).
+_TREE_SECONDS_PER_BUSIEST_LINE = 7.0e-5
+_PAIRS_SECONDS_PER_NEAR_PAIR = 9.2e-9
+
+
+def near_line_counts(E_r, aw, edges, exact_widths):
+    """Number of lines whose near window overlaps each bin (``O(lines log bins)``).
+
+    The count comes from one difference array over the sorted bin edges, so a
+    line is charged to every bin its index range spans (at most one boundary
+    bin more than strict overlap).
+
+    Validation: sinc-bin-near-far
+    """
+    e = np.asarray(E_r, dtype=np.float64)
+    radius = float(exact_widths) * np.pi / np.asarray(aw, dtype=np.float64)
+    radius = radius * (1.0 + 2.0e-6)
+    n_bins = len(edges) - 1
+    first = np.clip(np.searchsorted(edges, e - radius, side="right") - 1, 0, n_bins)
+    stop = np.clip(np.searchsorted(edges, e + radius, side="left"), 0, n_bins)
+    delta = np.zeros(n_bins + 1, dtype=np.int64)
+    np.add.at(delta, first, 1)
+    np.add.at(delta, np.maximum(stop, first), -1)
+    return np.cumsum(delta[:n_bins])
+
+
+def tree_is_faster(E_r, aw, edges, exact_widths):
+    """True when the modelled tree time beats the all-pairs time for this flush.
+
+    Both kernels give the same bin means; only the cost differs. A line cluster
+    much narrower than the near windows puts hundreds of thousands of near
+    lines on a few bins, which the one-thread-per-bin tree walks serially.
+
+    Validation: sinc-bin-near-far
+    """
+    counts = near_line_counts(E_r, aw, edges, exact_widths)
+    if counts.size == 0:
+        return False
+    tree_s = _TREE_SECONDS_PER_BUSIEST_LINE * float(counts.max())
+    return tree_s < _PAIRS_SECONDS_PER_NEAR_PAIR * float(counts.sum())
+
+
 def reduce_host(E_r, aw, w, edges, *, exact_widths=BIN_MEAN_EXACT_WIDTHS):
     """Reference near/far tree reduction; useful for numerical validation.
 
@@ -244,99 +290,45 @@ extern "C" __global__ void pyrite_bin_tree_reduce(
 """
 
 
-def near_line_counts(E_r, aw, edges, exact_widths):
-    """Number of lines whose near window overlaps each bin (``O(lines log bins)``).
-
-    The count comes from one difference array over the sorted bin edges, so a
-    line is charged to every bin its index range spans (at most one boundary
-    bin more than strict overlap).
-
-    Validation: sinc-bin-near-far
-    """
-    e = np.asarray(E_r, dtype=np.float64)
-    radius = float(exact_widths) * np.pi / np.asarray(aw, dtype=np.float64)
-    radius = radius * (1.0 + 2.0e-6)
-    n_bins = len(edges) - 1
-    first = np.clip(np.searchsorted(edges, e - radius, side="right") - 1, 0, n_bins)
-    stop = np.clip(np.searchsorted(edges, e + radius, side="left"), 0, n_bins)
-    delta = np.zeros(n_bins + 1, dtype=np.int64)
-    np.add.at(delta, first, 1)
-    np.add.at(delta, np.maximum(stop, first), -1)
-    return np.cumsum(delta[:n_bins])
-
-
-def dense_bin_hull(E_r, aw, edges, limit, exact_widths):
-    """Half-open bin range ``[i0, i1)`` holding every bin with more than ``limit`` near lines.
-
-    The tree kernel runs one thread per bin, so a bin inside the line cluster
-    walks all of its near lines serially while neighbours finish early. Those
-    bins are cheaper on the block-per-bin all-pairs kernel. Returns ``None``
-    when no bin exceeds ``limit``.
-
-    Validation: sinc-bin-near-far
-    """
-    dense = np.flatnonzero(near_line_counts(E_r, aw, edges, exact_widths) > limit)
-    return None if dense.size == 0 else (int(dense[0]), int(dense[-1]) + 1)
-
-
-def run_tree_reduction(
-    E_r, aw, w, edges, inv_width, *, out, exact_widths=BIN_MEAN_EXACT_WIDTHS, dense_limit=None
-):
+def run_tree_reduction(E_r, aw, w, edges, inv_width, *, out, exact_widths=BIN_MEAN_EXACT_WIDTHS):
     """Add a scalable near/far bin-mean reduction to a CuPy spectrum.
-
-    ``dense_limit`` routes the contiguous bin range whose bins each have more
-    than that many near lines through the all-pairs kernel; ``None`` keeps the
-    whole axis on the tree.
 
     Validation: sinc-bin-near-far
     """
     import cupy
 
     global _TREE_KERNEL
-    hull = None
-    if dense_limit is not None:
-        hull = dense_bin_hull(
-            cupy.asnumpy(E_r), cupy.asnumpy(aw), cupy.asnumpy(edges), dense_limit, exact_widths
-        )
-    n_bins = int(inv_width.size)
-    ranges = [(0, n_bins)]
-    if hull is not None:
-        from ._bin_quadrature import run_bin_mean_reduction_kernel
-
-        run_bin_mean_reduction_kernel(
-            E_r, aw, w, edges[hull[0] : hull[1] + 1], inv_width[hull[0] : hull[1]],
-            out=out[hull[0] : hull[1]], exact_widths=exact_widths, method="pairs",
-        )  # fmt: skip
-        ranges = [r for r in ((0, hull[0]), (hull[1], n_bins)) if r[1] > r[0]]
-    if not ranges:
-        return out
+    # This explicit CUDA entry point may run while the global backend is CPU.
+    # Transfer through CuPy rather than the selected backend's array converter.
     tree = build_cxr_tree(
         cupy.asnumpy(E_r), cupy.asnumpy(aw), cupy.asnumpy(w), exact_widths=exact_widths
     )
     e, a, wt, first, last, center, half, radius, moments = tree
     if _TREE_KERNEL is None:
         _TREE_KERNEL = cupy.RawKernel(SINCSQ_BIN_PREAMBLE + _TREE_SOURCE, "pyrite_bin_tree_reduce")
-    device = [
-        cupy.asarray(x) for x in (e, a, wt, first, last, center, half, radius, moments)
-    ]  # fmt: skip
-    edges64 = cupy.ascontiguousarray(edges, dtype=cupy.float64)
-    inv64 = cupy.ascontiguousarray(inv_width, dtype=cupy.float64)
-    for lo, hi in ranges:
-        count = hi - lo
-        per_bin = cupy.empty(count, dtype=cupy.float64)
-        _TREE_KERNEL(
-            ((count + 127) // 128,),
-            (128,),
-            (
-                *device,
-                edges64[lo : hi + 1],
-                inv64[lo:hi],
-                per_bin,
-                np.int32(count),
-                np.int32(len(first)),
-                np.int32(len(first) // 2),
-                np.float32(exact_widths),
-            ),
-        )
-        out[lo:hi] += per_bin.astype(out.dtype)
+    n_bins = int(inv_width.size)
+    per_bin = cupy.empty(n_bins, dtype=cupy.float64)
+    _TREE_KERNEL(
+        ((n_bins + 127) // 128,),
+        (128,),
+        (
+            cupy.asarray(e),
+            cupy.asarray(a),
+            cupy.asarray(wt),
+            cupy.asarray(first),
+            cupy.asarray(last),
+            cupy.asarray(center),
+            cupy.asarray(half),
+            cupy.asarray(radius),
+            cupy.asarray(moments),
+            cupy.ascontiguousarray(edges, dtype=cupy.float64),
+            cupy.ascontiguousarray(inv_width, dtype=cupy.float64),
+            per_bin,
+            np.int32(n_bins),
+            np.int32(len(first)),
+            np.int32(len(first) // 2),
+            np.float32(exact_widths),
+        ),
+    )
+    out += per_bin.astype(out.dtype)
     return out
