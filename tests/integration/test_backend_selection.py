@@ -178,6 +178,7 @@ def _fake_cupy_module(*, is_hip=False, device_count=1, name=b"Fake GPU", total_m
     )
     cuda = types.SimpleNamespace(
         runtime=runtime,
+        compiler=types.SimpleNamespace(_use_pch=False),
         memory=types.SimpleNamespace(OutOfMemoryError=MemoryError),
         get_current_stream=lambda: FakeStream(),
     )
@@ -684,3 +685,57 @@ def test_startup_plan_targets_the_widest_later_case():
 
     assert _most_demanding_cases([narrow, wide]) == [wide]
     assert _most_demanding_cases([wide, narrow]) == [wide]
+
+
+@pytest.mark.parametrize(
+    ("is_hip", "version", "override", "expected"),
+    [
+        (False, (12, 8), None, "1"),
+        (False, (13, 4), None, "1"),
+        (False, (12, 7), None, None),
+        (True, (13, 4), None, None),
+        (False, (13, 4), "0", "0"),
+        (False, (13, 4), "1", "1"),
+        (False, (13, 4), "", ""),
+    ],
+)
+def test_cupy_backend_configures_pch_only_when_supported(
+    monkeypatch, is_hip, version, override, expected
+):
+    monkeypatch.delenv("CUPY_NVRTC_USE_PCH", raising=False)
+    if override is not None:
+        monkeypatch.setenv("CUPY_NVRTC_USE_PCH", override)
+    module, _, _ = _fake_cupy_module(is_hip=is_hip)
+    calls = []
+
+    def get_version():
+        calls.append(True)
+        return version
+
+    module.cuda.nvrtc = types.SimpleNamespace(getVersion=get_version)
+    _backend.CuPyBackend(module)
+    assert _backend.os.environ.get("CUPY_NVRTC_USE_PCH") == expected
+    assert bool(calls) == (not is_hip and override is None)
+    assert module.cuda.compiler._use_pch == (expected == "1" and override is None)
+
+
+def test_cupy_backend_missing_nvrtc_keeps_backend_usable(monkeypatch):
+    monkeypatch.delenv("CUPY_NVRTC_USE_PCH", raising=False)
+    module, _, _ = _fake_cupy_module()
+
+    def unavailable():
+        raise RuntimeError("NVRTC library unavailable")
+
+    module.cuda.nvrtc = types.SimpleNamespace(getVersion=unavailable)
+    backend = _backend.CuPyBackend(module)
+    assert backend.name == "cuda"
+    assert "CUPY_NVRTC_USE_PCH" not in _backend.os.environ
+
+
+def test_cupy_backend_without_native_pch_flag_keeps_policy(monkeypatch):
+    monkeypatch.delenv("CUPY_NVRTC_USE_PCH", raising=False)
+    module, _, _ = _fake_cupy_module()
+    module.cuda.compiler = types.SimpleNamespace()
+    module.cuda.nvrtc = types.SimpleNamespace(getVersion=lambda: (13, 4))
+    _backend.CuPyBackend(module)
+    assert "CUPY_NVRTC_USE_PCH" not in _backend.os.environ

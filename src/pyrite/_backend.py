@@ -14,6 +14,7 @@ that needs a device.
 """
 
 import logging
+import os
 import warnings
 from dataclasses import dataclass
 from importlib import import_module
@@ -102,6 +103,28 @@ class NumPyBackend(ArrayBackend):
         )
 
 
+def _configure_cuda_pch(module: ModuleType) -> None:
+    """Enable native NVRTC PCH on CUDA 12.8+, preserving explicit overrides.
+
+    Called only after selecting a usable CuPy device. A missing NVRTC library
+    or an older/ROCm installation keeps its existing compilation policy.
+    """
+    if "CUPY_NVRTC_USE_PCH" in os.environ or module.cuda.runtime.is_hip:
+        return
+    try:
+        version = module.cuda.nvrtc.getVersion()
+    except Exception:  # noqa: BLE001 - optional optimization must not disable the backend
+        logger.debug("NVRTC PCH version probe unavailable", exc_info=True)
+        return
+    if version >= (12, 8):
+        # CuPy 14 captures this flag when its compiler module imports, before
+        # device selection. Keep that native flag in sync with our late default.
+        compiler = getattr(module.cuda, "compiler", None)
+        if compiler is not None and hasattr(compiler, "_use_pch"):
+            compiler._use_pch = True
+            os.environ.setdefault("CUPY_NVRTC_USE_PCH", "1")
+
+
 class CuPyBackend(ArrayBackend):
     """CuPy adapter for either CUDA or a ROCm/HIP build."""
 
@@ -137,6 +160,7 @@ class CuPyBackend(ArrayBackend):
         self.oom_exceptions = (module.cuda.memory.OutOfMemoryError,)
         self._runtime_memory_status = getattr(module.cuda.runtime, "errorMemoryAllocation", 2)
         self._peak_bytes = 0
+        _configure_cuda_pch(module)
 
     def to_cpu(self, value: Any) -> np.ndarray:
         return self.cp.asnumpy(value) if self.is_array(value) else np.asarray(value)

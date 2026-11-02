@@ -154,3 +154,22 @@ def test_variants_are_cached_per_switch_tuple():
     shell = TransportKernelSwitches.normalized(**(off | {"inelastic_on": True}))
     assert transport_kernel_variant(plain) is transport_kernel_variant(plain)
     assert transport_kernel_variant(plain) is not transport_kernel_variant(shell)
+
+
+@pytest.mark.hardware
+@requires_cuda
+def test_variants_separate_precision_and_reject_unknown_precision():
+    from pyrite.montecarlo.transport._jit_kernel_variants import (
+        TransportKernelSwitches,
+        transport_kernel_variant,
+    )
+
+    switches = TransportKernelSwitches(*([0] * len(SPECIALIZED)))
+    fp64 = transport_kernel_variant(switches, "fp64")
+    mixed = transport_kernel_variant(switches, "mixed")
+    assert fp64 is not mixed
+    assert mixed is transport_kernel_variant(switches, "mixed")
+    before = transport_kernel_variant.cache_info().currsize
+    with pytest.raises(ValueError):
+        transport_kernel_variant(switches, "fp32")
+    assert transport_kernel_variant.cache_info().currsize == before
