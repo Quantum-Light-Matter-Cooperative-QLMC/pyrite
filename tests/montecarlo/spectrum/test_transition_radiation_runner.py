@@ -20,6 +20,7 @@ from pyrite.montecarlo.spectrum.transition_radiation_crossings import (
     boundary_crossings,
     crossing_transition_radiation,
 )
+from tests.helpers import ON_DEVICE
 
 _GRID = (100.0, 2000.0, 20.0)
 _HISTORY = {"model": "planar-stack", "coherence": "history"}
@@ -68,6 +69,10 @@ def test_directional_tr_preflights_geometry_and_dielectric_before_transport(
         source_outputs(low_band, [[0, 0, 1]], components=("transition",))
 
 
+#: Repeat-scoring agreement: exact on the host, order-of-summation rounding on a device.
+_REPEAT_RTOL = 1e-10 if ON_DEVICE else 0.0
+
+
 def _case(**overrides):
     fields = dict(
         name="hopg tr", crystal="hopg", composition=CATALOG.crystal("hopg").composition,
@@ -101,7 +106,9 @@ def test_spectrum_phase_scores_the_crossings_of_the_continuum_population(transpo
         mine, energy, tp["n_hat"], [composition_dielectric(case.composition, energy)],
         n_electrons=case.Ne_brem,
     )  # fmt: skip
-    np.testing.assert_array_equal(out["spec_transition"], expected)
+    # The same crossings scored twice: host runs agree bitwise, a device sums its
+    # complex crossing fields in a non-fixed order (observed 3e-12 relative, fp64).
+    np.testing.assert_allclose(out["spec_transition"], expected, rtol=_REPEAT_RTOL, atol=0.0)
     assert np.all(expected > 0.0) and expected[0] > expected[-1]
     # Additive with the other line-grid components; deselectable.
     total = cxr_spectrum(out)
@@ -147,7 +154,7 @@ def test_bunch_coherence_uses_the_physical_population(transported):
         mine, energy, tp["n_hat"], [composition_dielectric(case.composition, energy)],
         n_electrons=case.Ne_brem, coherence="bunch", physical_electrons=None,
     )  # fmt: skip
-    np.testing.assert_allclose(ctr, expected, rtol=1e-12)
+    np.testing.assert_allclose(ctr, expected, rtol=max(1e-12, _REPEAT_RTOL))
     assert np.all(ctr >= 0.0)
 
 

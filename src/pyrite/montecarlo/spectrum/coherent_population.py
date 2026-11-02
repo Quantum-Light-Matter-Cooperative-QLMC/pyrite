@@ -123,6 +123,8 @@ def require_resolved_power(
     certificate.
     Validation: coherent-physical-bunch-population
     """
+    # Host callers (the two-beam DTR path is NumPy) reach this on a device session.
+    power = xp.asarray(power)
     finite = xp.isfinite(power)
     negative = finite & (power < 0)
     invalid = ~finite | negative

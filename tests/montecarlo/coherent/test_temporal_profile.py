@@ -15,11 +15,23 @@ from pyrite.montecarlo.spectrum.cxr._temporal import (
     segment_arrival_times,
 )
 from pyrite.montecarlo.transport import C_ANG_PER_FS
+from tests.helpers import scaled_rtol, to_device, to_host
 
 E_GRID = np.arange(700.0, 1500.0, 0.25)
 N_HAT = np.array([1.0, 0.0, 0.01])
 KWARGS = {"crystal": "hopg", "hkl_list": [(0, 0, 2)], "B_ang2": 0.8, "n_hat": N_HAT}
 BETA = float(beta_from_Ee(30e3))
+
+
+# The temporal run takes the per-hkl route and the plain run the batched one, so
+# on a float32 device the two differ by REAL rounding of the same line sum
+# (measured on CUDA: 2.8e-7 of the peak = 2.4 eps; the tails are small values
+# on that absolute scale, so they need a peak-relative floor). fp64 is unchanged.
+_TEMPORAL_RTOL = scaled_rtol(1e-6, eps_multiple=16)
+
+
+def _peak_atol(spec):
+    return scaled_rtol(1e-12, eps_multiple=16) * float(np.max(np.abs(to_host(spec))))
 
 
 def _segments(starts, length=2000.0, *, elec_id=None, t0=None, Ne=None):
@@ -65,10 +77,11 @@ def test_add_boxes_conserves_mass_and_support():
     add_boxes(
         profile,
         buf,
-        np.array([10.3, 20.0, 30.0]),
-        np.array([2.6, 0.2, 0.0]),
-        np.array([1.0, 2.0, 3.0]),
+        to_device(np.array([10.3, 20.0, 30.0])),
+        to_device(np.array([2.6, 0.2, 0.0])),
+        to_device(np.array([1.0, 2.0, 3.0])),
     )
+    buf = to_host(buf)
     assert buf.sum() * profile.dt_ang == pytest.approx(6.0, rel=1e-12)
     # The wide box spans [7.7, 12.9]: interior bins at height 1 / 5.2.
     np.testing.assert_allclose(buf[9:12], 1.0 / 5.2, rtol=1e-12)
@@ -90,7 +103,7 @@ def test_parseval_matches_spectrum(coherent):
 def test_single_flight_is_doppler_compressed_box_at_arrival_time():
     segments = _segments([0.0])
     n_hat = N_HAT / np.linalg.norm(N_HAT)
-    d, t_L = segment_arrival_times(segments, n_hat)
+    d, t_L = (to_host(x) for x in segment_arrival_times(segments, n_hat))
     D = 1.0 - BETA * n_hat[2]
     duration_fs = D * t_L[0] / C_ANG_PER_FS
     _, t, box = _run(segments, coherent=False)
@@ -109,7 +122,7 @@ def test_two_flights_give_two_separated_pulses():
     _, t, coh = _run(segments, coherent=True)
     _, _, box = _run(segments, coherent=False)
     n_hat = N_HAT / np.linalg.norm(N_HAT)
-    d, _ = segment_arrival_times(segments, n_hat)
+    d = to_host(segment_arrival_times(segments, n_hat)[0])
     for intensity in (coh, box):
         early = intensity[t < d.mean() / C_ANG_PER_FS].sum()
         late = intensity[t >= d.mean() / C_ANG_PER_FS].sum()
@@ -141,7 +154,9 @@ def test_temporal_does_not_change_the_spectrum():
     for coherent in (False, True):
         plain = mc_cxr_spectrum(segments, E_GRID, coherent=coherent, **KWARGS)
         with_t, _, _ = _run(segments, coherent=coherent)
-        np.testing.assert_allclose(with_t, plain, rtol=1e-6, atol=1e-12 * plain.max())
+        np.testing.assert_allclose(
+            to_host(with_t), to_host(plain), rtol=_TEMPORAL_RTOL, atol=_peak_atol(plain)
+        )
 
 
 def test_window_cap_refuses_oversized_grid():
@@ -198,8 +213,10 @@ def test_runner_attaches_profiles_only_when_opted_in(monkeypatch):
 
     case, tp = _runner_inputs(coherent=True, temporal=True)
     out = runner._spectrum_case_impl(case, tp)
-    np.testing.assert_allclose(out["spec"], off["spec"], rtol=1e-6)
-    np.testing.assert_allclose(out["spec_coherent"], off["spec_coherent"], rtol=1e-6)
+    for key in ("spec", "spec_coherent"):
+        np.testing.assert_allclose(
+            out[key], off[key], rtol=_TEMPORAL_RTOL, atol=_peak_atol(off[key])
+        )
     t = out["temporal_t_fs"]
     assert t.shape == out["temporal_intensity"].shape == out["temporal_intensity_coherent"].shape
     dE = E_GRID[1] - E_GRID[0]

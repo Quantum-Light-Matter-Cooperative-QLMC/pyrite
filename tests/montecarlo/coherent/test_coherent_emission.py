@@ -324,7 +324,10 @@ def test_long_gaussian_bunch_supports_finite_footprint():
         )
         for position in positions
     )
-    np.testing.assert_allclose(actual, grouped_raw / 2.0, rtol=1e-12, atol=0.0)
+    # Same phase-magnitude amplification as BATCH_RTOL (observed 4e-6 on CUDA-fp32).
+    np.testing.assert_allclose(
+        actual, grouped_raw / 2.0, rtol=scaled_rtol(1e-12, eps_multiple=500), atol=0.0
+    )
 
 
 def test_finite_footprint_partially_coherent_longitudinal_blend():

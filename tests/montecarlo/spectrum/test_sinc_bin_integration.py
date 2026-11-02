@@ -25,7 +25,7 @@ from pyrite.montecarlo.spectrum.cxr import (
     _prepare_spectrum,
 )
 from pyrite.montecarlo.spectrum.cxr import _bin_quadrature as bq
-from tests.helpers import host_backend_only, scaled_rtol, to_device, to_host
+from tests.helpers import host_backend_only, real_eps, scaled_rtol, to_device, to_host
 from tests.helpers.backend import IS_FLOAT32
 from tests.montecarlo.spectrum.test_spectrum_phases import B_ANG2, CRYSTAL, HKL, N_HAT, _segments
 
@@ -306,12 +306,18 @@ def test_production_lineshape_defaults_to_the_far_envelope():
     grid = np.arange(0.0, 2000.0, 0.5)
     edges, inv_width = bq.bin_axis(grid)
     a, e_r = np.array([np.pi / 2.0]), np.array([1000.3])
-    default = np.asarray(bq.sincsq_bin_lineshape(a, e_r, edges, inv_width))
+    # The production kernel takes device line arrays; the host reference takes host ones.
+    a_dev, e_dev = to_device(a), to_device(e_r)
+    default = to_host(bq.sincsq_bin_lineshape(a_dev, e_dev, edges, inv_width))
     hybrid = bq._host_bin_mean(
-        a, e_r, np.asarray(edges), np.asarray(inv_width), exact_widths=bq.BIN_MEAN_EXACT_WIDTHS
+        a, e_r, to_host(edges), to_host(inv_width), exact_widths=bq.BIN_MEAN_EXACT_WIDTHS
     )
-    exact = np.asarray(bq.sincsq_bin_lineshape(a, e_r, edges, inv_width, exact_widths=None))
-    np.testing.assert_allclose(default, hybrid.astype(default.dtype), rtol=1e-6)
+    exact = to_host(bq.sincsq_bin_lineshape(a_dev, e_dev, edges, inv_width, exact_widths=None))
+    # The kernel takes the bin edges in REAL: rounding E ~ 1 keV to float32 moves an
+    # edge by eps*E_res eV, i.e. eps*E_res/2 half-widths of this line (x = dE/2),
+    # an absolute error of that size on the unit-scale lineshape (observed 1e-5).
+    atol = 1.0 * real_eps() * float(e_r[0]) / 2.0 * float(default.max()) if IS_FLOAT32 else 0.0
+    np.testing.assert_allclose(default, hybrid.astype(default.dtype), rtol=1e-6, atol=atol)
     assert not np.array_equal(default, exact)
 
 

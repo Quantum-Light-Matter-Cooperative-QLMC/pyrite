@@ -19,6 +19,7 @@ from pyrite.montecarlo import mc_cxr_spectrum
 from pyrite.montecarlo.case import Case
 from pyrite.montecarlo.runner.cxr_grid import coherent_flat_omission_limit
 from pyrite.montecarlo.transport import C_ANG_PER_FS
+from tests.helpers import scaled_rtol
 
 ENERGY_GRID = np.arange(700.0, 1500.0, 2.0)
 KWARGS = {
@@ -419,7 +420,9 @@ def test_bunch_spread_policy_preserves_the_correct_coherence_sector(
     assert peak > 0
     factor = np.exp(-((ENERGY_GRID / HBARC_EV_ANG * rms_fs * C_ANG_PER_FS) ** 2))
     reference = (1.0 + factor * (population - 1)) * floor
-    np.testing.assert_allclose(full, reference, rtol=SUBGRID_RTOL)
+    # Two-flight interference minima amplify the phase rounding like BATCH_RTOL
+    # (500 eps; observed ~240 eps on CUDA-fp32); fp64 keeps SUBGRID_RTOL.
+    np.testing.assert_allclose(full, reference, rtol=scaled_rtol(SUBGRID_RTOL, eps_multiple=500))
     if rms_fs < 1.0:
         np.testing.assert_array_equal(reduced, full)
         assert decisions and all(not d.simplify and d.skipped == 0 for d in decisions)

@@ -10,6 +10,17 @@ from pyrite.montecarlo.spectrum.coherent_population import (
     CoherentSamplingError,
     CoherentSamplingWarning,
 )
+from tests.helpers import scaled_rtol
+
+
+def _rtol(host_rtol):
+    """Host bound, widened on a float32 device to a few tens of eps.
+
+    These identities compare the same N^2 / form-factor algebra evaluated by
+    two reductions of the same REAL-precision pair terms, so the device
+    mismatch is reduction-order rounding (observed up to ~4 eps).
+    """
+    return scaled_rtol(host_rtol, eps_multiple=32)
 
 
 def _straight_bunch(samples):
@@ -60,14 +71,14 @@ def test_fixed_charge_identical_tracks_have_physical_n_squared_power(samples):
     single = _source(1, 1)
     source = _source(samples, physical_electrons)
     assert np.max(single) > 0.0
-    np.testing.assert_allclose(source, physical_electrons * single, rtol=1e-11)
+    np.testing.assert_allclose(source, physical_electrons * single, rtol=_rtol(1e-11))
     np.testing.assert_allclose(
-        physical_electrons * source, physical_electrons**2 * single, rtol=1e-11
+        physical_electrons * source, physical_electrons**2 * single, rtol=_rtol(1e-11)
     )
     np.testing.assert_allclose(
         physical_electrons * (source - single),
         physical_electrons * (physical_electrons - 1) * single,
-        rtol=1e-11,
+        rtol=_rtol(1e-11),
     )
 
 
@@ -99,7 +110,7 @@ def test_distinct_pair_power_matches_two_delayed_fields():
     single = _direct(_straight_bunch(1), 1)
     expected = single * (1 + 11 * np.cos(np.arange(700.0, 1500.0, 2.0) * delay / HBARC_EV_ANG))
     for controls in ({}, {"coefficient_capture": lambda *args: None}):
-        np.testing.assert_allclose(_direct(segments, 12, **controls), expected, rtol=1e-10)
+        np.testing.assert_allclose(_direct(segments, 12, **controls), expected, rtol=_rtol(1e-10))
 
 
 def test_unresolved_negative_pairs_warn_without_clipping():
@@ -119,7 +130,7 @@ def test_empirical_form_factor_excludes_self_pairs():
     segments["t0_ang"][1] = delay
     single = _direct(_straight_bunch(1), 1)
     expected = single * (1 + np.cos(np.arange(700.0, 1500.0, 2.0) * delay / HBARC_EV_ANG))
-    np.testing.assert_allclose(_direct(segments, 2), expected, rtol=1e-10)
+    np.testing.assert_allclose(_direct(segments, 2), expected, rtol=_rtol(1e-10))
 
 
 def _offset_bunch(samples, rms_fs, seed=3):
@@ -157,7 +168,9 @@ def test_gaussian_arrival_spread_blends_by_the_longitudinal_form_factor(samples,
     assert 1e-3 < form_factor.min() < form_factor.max() < 1 - 1e-3
     source = _direct(_offset_bunch(samples, rms_fs), physical_electrons, longitudinal_rms_fs=rms_fs)
     expected = _footprint_single() * (1 + (physical_electrons - 1) * form_factor)
-    np.testing.assert_allclose(source, expected, rtol=1e-10)
+    # The (N-1) = 11 amplified form-factor weight carries the REAL phase
+    # rounding of the sampled arrivals (observed ~85 eps on CUDA-fp32).
+    np.testing.assert_allclose(source, expected, rtol=scaled_rtol(1e-10, eps_multiple=256))
 
 
 @pytest.mark.parametrize("samples", [2, 5, 9])
@@ -173,11 +186,11 @@ def test_long_bunch_reduces_to_the_incoherent_sum(samples):
         source = _direct(
             _offset_bunch(samples, rms_fs), physical_electrons, longitudinal_rms_fs=rms_fs
         )
-        np.testing.assert_allclose(source, single, rtol=1e-11)
+        np.testing.assert_allclose(source, single, rtol=_rtol(1e-11))
 
 
 def test_one_physical_electron_keeps_self_power_with_many_samples():
-    np.testing.assert_allclose(_source(7, 1), _source(1, 1), rtol=1e-11)
+    np.testing.assert_allclose(_source(7, 1), _source(1, 1), rtol=_rtol(1e-11))
 
 
 def test_detected_counts_apply_charge_once_after_per_electron_normalization():
@@ -190,12 +203,12 @@ def test_detected_counts_apply_charge_once_after_per_electron_normalization():
     charge = physical * elementary_charge * 1e12
     incident = electron_count(acquisition, rep_rate_hz=5.0, bunch_charge_pc=charge)
     np.testing.assert_allclose(
-        incident * _source(3, physical), 5 * physical**2 * single, rtol=1e-11
+        incident * _source(3, physical), 5 * physical**2 * single, rtol=_rtol(1e-11)
     )
     # Doubling bunch charge quadruples aligned power per second; cadence stays linear.
     twice = electron_count(acquisition, rep_rate_hz=5.0, bunch_charge_pc=2 * charge)
     np.testing.assert_allclose(
-        twice * _source(3, 2 * physical), 4 * incident * _source(3, physical), rtol=1e-11
+        twice * _source(3, 2 * physical), 4 * incident * _source(3, physical), rtol=_rtol(1e-11)
     )
 
 
@@ -224,7 +237,7 @@ def test_missed_entries_stay_in_pair_and_self_normalization():
     single = _direct(_straight_bunch(1), 1)
     # Two nonzero fields and two zeros: G=2s, P-G=2s, M=4, N=12.
     expected = single * (2 + 11 * 2 / 3) / 4
-    np.testing.assert_allclose(_direct(segments, 12), expected, rtol=1e-11)
+    np.testing.assert_allclose(_direct(segments, 12), expected, rtol=_rtol(1e-11))
 
 
 def test_population_model_revision_invalidates_only_coherent_caches(monkeypatch):
@@ -261,8 +274,8 @@ def test_temporal_aligned_fields_have_the_same_physical_enhancement():
         profile = temporal_profile_for(segments, np.arange(700.0, 1500.0, 2.0), n_hat)
         spectra.append(_direct(segments, population, temporal=profile))
         profiles.append(profile.result()["intensity"])
-    np.testing.assert_allclose(spectra[1], 12 * spectra[0], rtol=1e-10)
-    np.testing.assert_allclose(profiles[1], 12 * profiles[0], rtol=1e-10, atol=1e-22)
+    np.testing.assert_allclose(spectra[1], 12 * spectra[0], rtol=_rtol(1e-10))
+    np.testing.assert_allclose(profiles[1], 12 * profiles[0], rtol=_rtol(1e-10), atol=1e-22)
 
 
 def test_coherent_content_keys_include_charge_but_not_repetition_rate():
@@ -442,3 +455,12 @@ def test_resolved_population_warning_keeps_generic_trial_remedy():
         require_resolved_power(xp.asarray([-1.0]), incident_samples=100, physical_electrons=50.0)
     assert "PointSpot" not in str(caught[0].message)
     assert caught[0].message.diagnostics["pair_weight"] < 1.0
+
+
+def test_resolved_power_check_accepts_host_arrays_on_any_backend():
+    """The two-beam DTR power is a NumPy array even on a device session (#906)."""
+    from pyrite.montecarlo.spectrum.coherent_population import require_resolved_power
+
+    require_resolved_power(np.array([0.0, 1.0, 2.0]), quantity="host power")
+    with pytest.warns(CoherentSamplingWarning):
+        require_resolved_power(np.array([1.0, -1.0]), quantity="host power")
