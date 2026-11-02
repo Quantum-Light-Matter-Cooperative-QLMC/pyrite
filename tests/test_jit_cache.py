@@ -257,3 +257,61 @@ def test_import_pyrite_keeps_user_cache_dirs(tmp_path, mode):
     out = _import_probe(mode, tmp_path / "xdg", **mine)
     assert (out["numba"], out["cupy"]) == (mine["NUMBA_CACHE_DIR"], mine["CUPY_CACHE_DIR"])
     assert out["config"] in (None, mine["NUMBA_CACHE_DIR"])
+
+
+def _fake_cupy(monkeypatch, *, nvrtc_names):
+    """Install a fake ``cupy.cuda.compiler`` mirroring CuPy's call structure."""
+    import types
+
+    compiler = types.ModuleType("cupy.cuda.compiler")
+    store: dict[str, bytes] = {}
+
+    class Backend:
+        def load(self, name):
+            return store.get(name)
+
+        def save(self, name, payload, source):
+            store[name] = payload
+
+    compiler._kernel_cache_backend = Backend()
+    internal = nvrtc_names[0]
+
+    def nvrtc(*args, **kwargs):
+        return b"cubin"
+
+    def compile_with_cache(name):
+        payload = compiler._kernel_cache_backend.load(name)
+        if payload is None:
+            getattr(compiler, internal)()
+            compiler._kernel_cache_backend.save(name, b"cubin", "")
+        return name
+
+    for name in nvrtc_names:
+        setattr(compiler, name, nvrtc)
+    if len(nvrtc_names) == 2:  # CuPy 14: the public name wraps the private one
+        compiler.compile_using_nvrtc = lambda: compiler._compile_using_nvrtc_no_warning()
+    compiler._compile_with_cache_cuda = compile_with_cache
+    cuda = types.ModuleType("cupy.cuda")
+    cuda.compiler = compiler
+    cupy = types.ModuleType("cupy")
+    cupy.cuda = cuda
+    monkeypatch.setitem(sys.modules, "cupy", cupy)
+    monkeypatch.setitem(sys.modules, "cupy.cuda", cuda)
+    monkeypatch.setitem(sys.modules, "cupy.cuda.compiler", compiler)
+    return compiler
+
+
+@pytest.mark.parametrize(
+    "names", [("_compile_using_nvrtc_no_warning", "compile_using_nvrtc"), ("compile_using_nvrtc",)]
+)
+def test_cupy_recorder_counts_nvrtc_compiles_and_disk_hits(monkeypatch, names):
+    compiler = _fake_cupy(monkeypatch, nvrtc_names=names)
+    originals = {n: getattr(compiler, n) for n in names}
+    with _jit_cache.CupyCompileRecorder() as cold:
+        compiler._compile_with_cache_cuda("k1")
+        compiler._compile_with_cache_cuda("k2")
+    with _jit_cache.CupyCompileRecorder() as warm:
+        compiler._compile_with_cache_cuda("k1")
+    assert (cold.lookups, cold.disk_hits, cold.nvrtc_compiles) == (2, 0, 2)
+    assert (warm.lookups, warm.disk_hits, warm.nvrtc_compiles) == (1, 1, 0)
+    assert {n: getattr(compiler, n) for n in names} == originals

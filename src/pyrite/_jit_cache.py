@@ -493,7 +493,8 @@ class CupyCompileRecorder:
     Wraps CuPy's private ``cupy.cuda.compiler`` entry points for diagnostics
     only: ``_compile_with_cache_cuda`` (reached once per kernel and process,
     after CuPy's in-memory caches miss), its disk-cache ``load`` (a hit returns
-    a payload), and ``compile_using_nvrtc`` (the actual NVRTC compile). Restores
+    a payload), and the NVRTC compile (``_compile_using_nvrtc_no_warning`` on
+    CuPy 14, ``compile_using_nvrtc`` before). Restores
     them on exit. A no-op when those names are absent.
     """
 
@@ -542,7 +543,15 @@ class CupyCompileRecorder:
             return load
 
         self._wrap(compiler, "_compile_with_cache_cuda", timed("compile_with_cache_s", "lookups"))
-        self._wrap(compiler, "compile_using_nvrtc", timed("nvrtc_s", "nvrtc_compiles"))
+        # CuPy >= 14 compiles through the private ``_compile_using_nvrtc_no_warning``
+        # (the public ``compile_using_nvrtc`` only wraps it for external callers);
+        # older releases call the public name. Wrap one so a compile counts once.
+        nvrtc_entry = (
+            "_compile_using_nvrtc_no_warning"
+            if hasattr(compiler, "_compile_using_nvrtc_no_warning")
+            else "compile_using_nvrtc"
+        )
+        self._wrap(compiler, nvrtc_entry, timed("nvrtc_s", "nvrtc_compiles"))
         backend = getattr(compiler, "_kernel_cache_backend", None)
         if backend is not None:
             self._wrap(backend, "load", counted_load)
