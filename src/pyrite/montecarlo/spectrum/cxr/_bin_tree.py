@@ -244,14 +244,12 @@ extern "C" __global__ void pyrite_bin_tree_reduce(
 """
 
 
-def dense_bin_hull(E_r, aw, edges, limit, exact_widths):
-    """Half-open bin range ``[i0, i1)`` holding every bin with more than ``limit`` near lines.
+def near_line_counts(E_r, aw, edges, exact_widths):
+    """Number of lines whose near window overlaps each bin (``O(lines log bins)``).
 
-    The tree kernel runs one thread per bin, so a bin inside the line cluster
-    walks all of its near lines serially while neighbours finish early. Those
-    bins are cheaper on the block-per-bin all-pairs kernel. Near counts come
-    from one difference array over the sorted bin edges (``O(lines log bins)``).
-    Returns ``None`` when no bin exceeds ``limit``.
+    The count comes from one difference array over the sorted bin edges, so a
+    line is charged to every bin its index range spans (at most one boundary
+    bin more than strict overlap).
 
     Validation: sinc-bin-near-far
     """
@@ -264,7 +262,20 @@ def dense_bin_hull(E_r, aw, edges, limit, exact_widths):
     delta = np.zeros(n_bins + 1, dtype=np.int64)
     np.add.at(delta, first, 1)
     np.add.at(delta, np.maximum(stop, first), -1)
-    dense = np.flatnonzero(np.cumsum(delta[:n_bins]) > limit)
+    return np.cumsum(delta[:n_bins])
+
+
+def dense_bin_hull(E_r, aw, edges, limit, exact_widths):
+    """Half-open bin range ``[i0, i1)`` holding every bin with more than ``limit`` near lines.
+
+    The tree kernel runs one thread per bin, so a bin inside the line cluster
+    walks all of its near lines serially while neighbours finish early. Those
+    bins are cheaper on the block-per-bin all-pairs kernel. Returns ``None``
+    when no bin exceeds ``limit``.
+
+    Validation: sinc-bin-near-far
+    """
+    dense = np.flatnonzero(near_line_counts(E_r, aw, edges, exact_widths) > limit)
     return None if dense.size == 0 else (int(dense[0]), int(dense[-1]) + 1)
 
 

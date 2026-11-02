@@ -65,7 +65,12 @@ def main():
     ap.add_argument("--electrons", type=int, default=100)
     ap.add_argument("--strides", type=int, nargs="+", default=[1, 4, 16, 64])
     ap.add_argument("--line-divs", type=int, nargs="+", default=[1, 8])
-    ap.add_argument("--dense-limits", type=int, nargs="*", default=[256, 1024, 4096, 16384])
+    ap.add_argument(
+        "--dense-limits",
+        type=int,
+        nargs="*",
+        default=[1024, 4096, 16384, 32768, 65536, 131072, 262144],
+    )
     ap.add_argument("--line-points", type=int, default=600_000)
     ap.add_argument("--output", type=Path, required=True)
     a = ap.parse_args()
@@ -89,6 +94,16 @@ def main():
             r = radius[::div]
             near = float(np.minimum(2 * r / width, inv.size).sum())
             args = (E_r[sl], aw[sl], w[sl], e, inv)
+            counts = _bin_tree.near_line_counts(
+                cupy.asnumpy(args[0]), cupy.asnumpy(args[1]), cupy.asnumpy(e), 64.0
+            )
+            row_counts = dict(
+                near_total=int(counts.sum()),
+                near_max=int(counts.max()),
+                near_p99=float(np.quantile(counts, 0.99)),
+                near_p90=float(np.quantile(counts, 0.9)),
+                bins_gt={str(t): int((counts > t).sum()) for t in a.dense_limits},
+            )
             ref, t_pairs = run("pairs", *args)
             out, t_tree = run("tree", *args)
             row = dict(
@@ -100,6 +115,7 @@ def main():
                 sp, t_sp = run("split", *args, dense_limit=lim)
                 row[f"split{lim}_s"] = t_sp
                 row[f"split{lim}_diff"] = float(cupy.abs(sp - ref).max() / cupy.abs(ref).max())
+            row |= row_counts
             rows.append(row)
             print(json.dumps(row), flush=True)
     a.output.parent.mkdir(parents=True, exist_ok=True)
