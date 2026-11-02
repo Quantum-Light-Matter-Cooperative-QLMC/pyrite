@@ -371,6 +371,7 @@ def test_formatter_regenerates_and_commits_cli_reference(dev_module) -> None:
     ("path", "owner"),
     [
         ("montecarlo/transport/test_transport_per_electron.py", "transport"),
+        ("montecarlo/test_cone_split.py", "transport"),
         ("montecarlo/cascades/test_coupled_radiative_runner.py", "transport-cascades"),
         ("montecarlo/cascades/test_radiative_moments.py", "transport-cascades"),
         ("montecarlo/cascades/test_radiative_moments_cuda.py", "transport-cascades"),
