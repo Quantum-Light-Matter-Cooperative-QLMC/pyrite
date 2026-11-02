@@ -192,7 +192,7 @@ def test_cuda_streamed_residency_and_replay(case, monkeypatch, oom_phase):
     attempts, residency, failed = [], [], []
 
     def transport(*args, **kwargs):
-        start, keep = kwargs["_electron_start"], kwargs["keep_segments_on_device"]
+        start, keep = kwargs.get("_electron_start", 0), kwargs["keep_segments_on_device"]
         attempts.append((start, keep))
         if oom_phase == "transport" and start == 20 and keep and not failed:
             failed.append(True)
