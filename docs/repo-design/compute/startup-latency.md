@@ -260,7 +260,8 @@ redundant dtype or layout specialization: the continuous/shell and
 coupled/uncoupled transport cores encode different physics. Keep those cores
 separate. No boundary conversion or inlining change is justified by these
 measurements; either needs a measured candidate and steady-state comparison.
-PCH remains optional; the comparison below measures its cold-cache benefit.
+PCH defaults on for selected CUDA backends with NVRTC 12.8+; the comparison
+below measures its cold-cache benefit. Explicit environment overrides win.
 Native cache reuse already removes NVRTC compilation in the measured warm CUDA workload.
 
 `cache status` reports source/version freshness, rather than observed runtime
@@ -313,8 +314,10 @@ Both cold arms compile 158 NVRTC kernels with zero disk hits. PCH reduces
 NVRTC time by 23.1% and first-simulation time by 10.6% (3.28 s) in this workload.
 The Numba compile time and steady-state execution show no material change.
 PCH is useful for rebuilding an empty CUDA cache or exploring new kernel
-specializations; keep the default unchanged and offer the environment setting
-as an opt-in on compatible installations. This measurement does not establish
+specializations. PyRITE enables it when selecting a usable CUDA device with
+NVRTC 12.8 or later, unless `CUPY_NVRTC_USE_PCH` is already set. Set it to `0`
+to opt out. ROCm, older NVRTC, and unavailable NVRTC version probes retain
+their existing policy. CPU-only imports neither load CUDA nor set this variable. This measurement does not establish
 a benefit for other GPU architectures or workloads.
 
 [CuPy's environment reference](https://docs.cupy.dev/en/stable/reference/environment.html)

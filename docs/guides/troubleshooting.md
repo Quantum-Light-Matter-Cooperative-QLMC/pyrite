@@ -82,6 +82,13 @@ GPU architecture (CuPy); warm on the node type that runs the job. See
 [startup latency](../repo-design/compute/startup-latency.md) for measured
 costs.
 
+CUDA backend selection enables NVRTC precompiled headers on NVRTC 12.8+ to
+reduce cold compilation time. Set `CUPY_NVRTC_USE_PCH=0` before starting Python
+or `pyrite` to opt out (for example, when temporary storage is constrained).
+Any explicitly set value is preserved; ROCm and older NVRTC are unchanged.
+Headers use temporary storage; the native CuPy kernel cache provides reuse
+across sessions. CPU-only imports do not probe NVRTC.
+
 ## The GPU is unavailable or runs out of memory
 
 Inspect `pyrite config setup --help` and the active backend environment. CPU is the safe base installation. Do not solve memory pressure by changing scientific inputs invisibly: use documented resource/chunk controls, record them for performance work, and route heavy GPU sweeps through the [cluster workflow](running-on-a-cluster.md).
