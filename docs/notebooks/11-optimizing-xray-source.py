@@ -57,14 +57,23 @@ def _(mo):
     mo.md(r"""
     # Optimizing an X-ray source
 
-    Search graphite tilt (35–55°) and thickness (10–75 nm) for PXR/CBS yield
-    in **820–900 eV**, subject to a **50 nm** thickness limit. The 294-point
-    design space is larger than the 30-evaluation budget, so the optimizer must
-    choose where to look. Then evaluate the selected design with independent
-    seeds. The optimization API is experimental.
+    **Design question:** which graphite tilt and thickness maximize incoherent
+    PXR/CBS emission between **820 and 900 eV**, observed at 90° from a 30 keV
+    beam? We hold the material, beam and observation direction fixed.
 
-    If run locally rather than on Molab, first install `Optuna` alongside `pyrite` with
+    Search **30–60° tilt (1° increments)** and **10–50 nm thickness (5 nm
+    increments)**: 279 feasible designs, respecting the **50 nm fabrication
+    limit**. Unlike a search that evaluates slabs *above* that limit,
+    every trial here is eligible.
+    We compare against a clearly identified **45° / 50 nm reference design**.
+    The 48-trial budget samples only part of the grid; untested locations are
+    never interpolated or presented as measured values.
 
+    Maximizing yield alone can push thickness to the allowed upper boundary:
+    this is not an optimization of fabrication cost, signal-to-background, or
+    detector-accepted photon rate. The optimization API is experimental.
+
+    For local execution, install the optional optimizer:
     ```bash
     uv tool install "pyrite-mc[optimization]"
     ```
@@ -80,7 +89,6 @@ def _(np):
     from pyrite.detectors import Detector, EnergyBins
     from pyrite.geometry import Footprint, Slab
     from pyrite.optimization import (
-        Constraint,
         FixedWindowYield,
         Integer,
         Objective,
@@ -89,15 +97,14 @@ def _(np):
         ParameterSpace,
         PyriteEvaluator,
     )
-    from pyrite.results import records
     from pyrite.units import ureg
 
     search_numerics = Numerics(
-        sampling=FixedSampling(cxr_electrons=16, brem_electrons=16),
+        sampling=FixedSampling(cxr_electrons=32, brem_electrons=32),
         transport_core="per-electron",
         energy_bins=(
             EnergyBins()
-            .with_cxr_energies(np.linspace(750, 1_000, 126) * ureg.eV)
+            .with_cxr_energies(np.linspace(750, 1_000, 251) * ureg.eV)
             .with_brem_energies(np.array([750.0, 1_000.0]) * ureg.eV)
         ),
         cxr_reflections=CxrReflections(n_families=1),
@@ -126,12 +133,11 @@ def _(np):
         base,
         ParameterSpace(
             {
-                "target.tilt": Integer(35 * ureg.degree, 55 * ureg.degree, step=1),
-                "target.thickness": Integer(100 * ureg.angstrom, 750 * ureg.angstrom, step=50),
+                "target.tilt": Integer(30 * ureg.degree, 60 * ureg.degree, step=1),
+                "target.thickness": Integer(100 * ureg.angstrom, 500 * ureg.angstrom, step=50),
             }
         ),
         (Objective(score.name, "maximize", score.units),),
-        (Constraint("thickness_ang", "<=", 500, "angstrom"),),
     )
     return (
         EnergyBins,
@@ -141,7 +147,6 @@ def _(np):
         PyriteEvaluator,
         base,
         definition,
-        records,
         score,
         search_numerics,
         ureg,
@@ -149,9 +154,9 @@ def _(np):
 
 
 @app.cell
-def _(records, score):
+def _(score):
     def candidate_metrics(store):
-        return {**score(store), "thickness_ang": records(store)[0]["case"]["thickness_ang"]}
+        return score(store)
 
     return (candidate_metrics,)
 
@@ -186,11 +191,11 @@ def _(
         )
     with mo.status.spinner(
         title="Searching X-ray source designs",
-        subtitle="Up to 30 evaluations (internal progress not available)",
+        subtitle="48 sampled geometries (32 histories each)",
     ):
         with mo.capture_stdout():
-            search_result = definition.run(evaluator, optimizer, max_trials=30)
-    assert len(search_result.trials) == 30
+            search_result = definition.run(evaluator, optimizer, max_trials=48)
+    assert len(search_result.trials) == 48
     assert all(_trial.state.value != "failed" for _trial in search_result.trials)
     finalist = search_result.best_trial
     assert finalist is not None
@@ -198,22 +203,66 @@ def _(
 
 
 @app.cell
-def _(np, plt, score, search_result):
-    fig_search, _ax = plt.subplots(figsize=(7, 3.8), layout="constrained")
-    _trials = search_result.trials
-    _numbers = np.array([_trial.number + 1 for _trial in _trials])
-    _yields = np.array([_trial.objectives[score.name] for _trial in _trials])
-    _feasible = np.array([_trial.state.value == "completed" for _trial in _trials])
-    _ax.scatter(_numbers[_feasible], _yields[_feasible], label="Feasible")
-    _ax.scatter(_numbers[~_feasible], _yields[~_feasible], marker="x", label="Above 50 nm")
-    _best = np.maximum.accumulate(np.where(_feasible, _yields, -np.inf))
-    _best[_best == -np.inf] = np.nan
-    _ax.plot(_numbers, _best, "--", label="Best feasible so far")
-    _ax.set(
-        xlabel="Search evaluation",
-        ylabel="Yield (photons / incident electron / sr)",
+def _(finalist, np, plt, score, search_result):
+    # Every point is an *evaluated* geometry; no contour interpolation of sparse data.
+    _trials = sorted(search_result.trials, key=lambda trial: trial.number)
+    _numbers = np.array([trial.number + 1 for trial in _trials])
+    _yields = np.array([trial.objectives[score.name] for trial in _trials])
+    _tilts = np.array([trial.parameters["target.tilt"] for trial in _trials])
+    _thicknesses = np.array([trial.parameters["target.thickness"] / 10 for trial in _trials])
+    _best = np.maximum.accumulate(_yields)
+
+    fig_search, (_map, _history) = plt.subplots(1, 2, figsize=(11.5, 4.4), layout="constrained")
+    _points = _map.scatter(
+        _tilts,
+        _thicknesses,
+        c=_yields,
+        cmap="viridis",
+        s=65,
+        edgecolors="black",
+        linewidths=0.35,
     )
-    _ax.legend()
+    fig_search.colorbar(_points, ax=_map, label="820–900 eV yield (photons / electron / sr)")
+    _map.plot(
+        45,
+        50,
+        marker="D",
+        ms=9,
+        mfc="none",
+        mec="C3",
+        mew=1.8,
+        linestyle="none",
+        label="Reference: 45°, 50 nm",
+    )
+    _map.plot(
+        finalist.parameters["target.tilt"],
+        finalist.parameters["target.thickness"] / 10,
+        marker="*",
+        ms=17,
+        mfc="none",
+        mec="black",
+        mew=1.5,
+        linestyle="none",
+        label="Selected design",
+    )
+    _map.set(
+        xlabel="Graphite tilt (degrees)",
+        ylabel="Thickness (nm)",
+        title="Where the optimizer actually sampled",
+        xlim=(29, 61),
+        ylim=(5, 55),
+    )
+    _map.legend(fontsize=8, loc="upper left")
+
+    _history.scatter(_numbers, _yields, s=18, alpha=0.55, label="Individual trial")
+    _history.step(_numbers, _best, where="post", color="C3", label="Best observed so far")
+    _history.set(
+        xlabel="Evaluation number",
+        title="How the search progressed",
+        ylabel="820–900 eV yield (photons / electron / sr)",
+        xlim=(1, len(_numbers)),
+    )
+    _history.legend(fontsize=8)
     fig_search  # noqa: B018
     return
 
@@ -233,6 +282,7 @@ def _(
     replace,
     run_options,
     search_numerics,
+    score,
     tables_ready,
     ureg,
 ):
@@ -240,7 +290,7 @@ def _(
     validation_numerics = Numerics(
         transport_core="per-electron",
         cxr_reflections=search_numerics.cxr_reflections,
-        sampling=FixedSampling(cxr_electrons=128, brem_electrons=128),
+        sampling=FixedSampling(cxr_electrons=256, brem_electrons=256),
         energy_bins=(
             EnergyBins()
             .with_cxr_energies(np.linspace(750, 1_000, 251) * ureg.eV)
@@ -252,6 +302,7 @@ def _(
         numerics=validation_numerics,
         physics=base.physics,
     )
+    reference_scene = replace(base, numerics=validation_numerics)
     validation_evaluator = PyriteEvaluator(
         candidate_metrics,
         base_seed=1_001,
@@ -260,70 +311,90 @@ def _(
             "checkpoint_path": run_options["checkpoint_path"].replace("search.h5", "validation.h5"),
         },
     )
+    _reference = []
     _independent = []
-    with mo.status.progress_bar(total=3, title="Validating the winning design") as _progress:
+    with mo.status.progress_bar(total=8, title="Comparing reference and winner") as _progress:
         with mo.capture_stdout():
-            for _replicate in range(3):
-                _independent.append(
-                    validation_evaluator(validation_scene, _replicate)[
-                        definition.objectives[0].name
-                    ]
-                )
-                _progress.update(subtitle=f"Independent seed {_replicate + 1}/3")
+            for _replicate in range(4):
+                # Same held-out seed for both geometries; never reuse search seeds.
+                _reference.append(validation_evaluator(reference_scene, _replicate)[score.name])
+                _progress.update(subtitle=f"Reference, seed {_replicate + 1}/4")
+                _independent.append(validation_evaluator(validation_scene, _replicate)[score.name])
+                _progress.update(subtitle=f"Finalist, seed {_replicate + 1}/4")
+    reference_yields = np.array(_reference)
     independent_yields = np.array(_independent)
+    assert np.isfinite(reference_yields).all() and np.all(reference_yields >= 0)
     assert np.isfinite(independent_yields).all() and np.all(independent_yields >= 0)
-    return (independent_yields,)
+    return independent_yields, reference_yields
 
 
 @app.cell
-def _(finalist, independent_yields, np, plt, score):
-    fig_validation, _ax = plt.subplots(figsize=(7, 3.8), layout="constrained")
-    _ax.scatter(0, finalist.objectives[score.name], label="Selected search estimate")
-    _ax.errorbar(
-        1,
-        independent_yields.mean(),
-        yerr=independent_yields.std(ddof=1) / np.sqrt(3),
-        fmt="o",
-        capsize=5,
-        label="Independent mean ± SEM",
-    )
+def _(finalist, independent_yields, np, plt, reference_yields):
+    fig_validation, _ax = plt.subplots(figsize=(7.5, 4.5), layout="constrained")
+    # Grey connections denote evaluations made with the same held-out seed.
+    for _ref, _winner in zip(reference_yields, independent_yields, strict=True):
+        _ax.plot((0, 1), (_ref, _winner), color="0.7", alpha=0.6, zorder=1)
+    for _index, _values, _label in (
+        (0, reference_yields, "Reference"),
+        (1, independent_yields, "Selected design"),
+    ):
+        _ax.scatter(np.full(len(_values), _index), _values, color="0.5", s=20, zorder=2)
+        _ax.errorbar(
+            _index,
+            _values.mean(),
+            yerr=_values.std(ddof=1) / np.sqrt(len(_values)),
+            fmt="D",
+            color=f"C{_index}",
+            markersize=8,
+            capsize=6,
+            zorder=3,
+            label=f"{_label}: mean ± SEM",
+        )
     _ax.set(
         xticks=(0, 1),
-        xticklabels=("Search (16 histories)", "Independent (3 × 128 histories)"),
-        ylabel="Yield (photons / incident electron / sr)",
-        xlim=(-0.5, 1.5),
-        title=f"Finalist: {finalist.parameters['target.tilt']:g}° tilt, "
-        f"{finalist.parameters['target.thickness'] / 10:g} nm graphite",
+        xticklabels=("Reference: 45°, 50 nm", "Selected geometry"),
+        ylabel="820–900 eV yield (photons / electron / sr)",
+        xlim=(-0.35, 1.35),
+        title=f"Independent seeds · finalist {finalist.parameters['target.tilt']:g}° / "
+        f"{finalist.parameters['target.thickness'] / 10:g} nm",
     )
-    _ax.legend()
+    _ax.legend(fontsize=8)
     fig_validation  # noqa: B018
     return
 
 
 @app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""
-    The objective integrates the incoherent PXR/CBS source density at **90°**,
-    before detector response or angular acceptance. The physical beam energy
-    and material model stay fixed while the optimizer selects geometry.
+def _(finalist, independent_yields, mo, reference_yields):
+    _gain = (
+        independent_yields.mean() / reference_yields.mean()
+        if reference_yields.mean() > 0
+        else float("nan")
+    )
+    mo.md(f"""
+    ## Interpretation
 
-    Thirty search evaluations use 16 histories per population and seeds 21–50.
-    Optuna's TPE sampler draws its first ten proposals at random, then
-    concentrates later proposals near the best feasible designs. Thicknesses
-    above the constraint are evaluated but can never be selected.
+    The selected design is **{finalist.parameters["target.tilt"]:g}° tilt**, **{finalist.parameters["target.thickness"] / 10:g} nm**.
+    Independent mean yield is **{independent_yields.mean():.3g} photons/electron/sr**,
+    versus **{reference_yields.mean():.3g}** for the 45°/50 nm reference
+    (**{_gain:.2f}×** their mean ratio, when defined). Grey lines in the plot
+    connect the four *paired* held-out seeds (1,001–1,004); diamonds show means
+    and **SEM**. This comparison uses 256 electron histories per sample and the
+    same **1 eV** photon grid for search, reference and finalist.
 
-    **Report the independent estimate, not the search value.** Picking the best
-    of many noisy evaluations biases the search value upward (the "winner's
-    curse"); the bias matters when competing designs differ by less than the
-    per-evaluation noise. Here the designs differ by much more than the
-    16-history noise, so that bias is small, and the gap between the two points
-    mostly reflects sampling noise and the change from a **2 eV** to a **1 eV**
-    grid. The re-evaluation uses three new seeds, 1,001–1,003, and 128 histories;
-    its error bar describes sampling only, not grid or model uncertainty.
+    Only actual evaluated geometries appear in the design map. Repeated trials
+    at the same position overlap; color is a noisy search estimate, not a
+    smooth physical response surface. The staircase in the right panel is
+    selection progress, **not** a plot of yield versus tilt or thickness.
 
-    Try tightening the thickness constraint or narrowing the tilt range so the
-    candidates become similar, then compare the search and independent values
-    again. A selected maximum does not establish a global optimum.
+    The score is the integrated *incoherent PXR/CBS directional source yield*
+    at 90°, **not** detector counts or accepted flux. Picking the maximum of
+    48 noisy 32-history trials biases its search estimate upward (the winner's
+    curse); rely on the independent comparison above. The error bars reflect
+    Monte Carlo variation only, not grid, atomic-model or experimental errors.
+    If the winner sits at the **50 nm fabrication limit**, that may mean more
+    material simply emits more photons under this objective: for a meaningful
+    engineering optimum, add cost or signal-to-background objectives rather
+    than raising the fabrication limit without justification. A sampled maximum is not a global optimum.
     """)
     return
 

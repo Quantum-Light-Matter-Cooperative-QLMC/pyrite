@@ -283,8 +283,11 @@ def _(mo):
     mo.md(r"""
     ## The card preset's search space
 
-    Each control lists its candidate values; `None` keeps the built-in
-    default. The ranges come from the card preset chosen above:
+    Each control lists its candidate values; `None` **inherits the built-in
+    setting**. The table below spells out its actual value for *every* control,
+    including those not modified by a trial. `cxr_chunk`/`brem_chunk` use
+    **adaptive, case-dependent** defaults (resolved from photon grid, precision
+    and device-memory constraints), not one universal number of segments. The ranges come from the card preset chosen above:
 
     - `scratch_mib` usually sets how many histories share one continuation
       round: each history holds `continuation_rows` rows of scratch, so the
@@ -307,6 +310,19 @@ def _(mo):
 def _(card, card_presets, free_bytes, mo, scene, trial_budget):
     from pyrite.optimization import KernelSearchSpace
 
+    # Built-ins for this PyRITE release. None means inherit the scene's value;
+    # chunks are case-dependent, not a universal fixed segment count.
+    defaults = {
+        "electron_batch": 65_536,
+        "schedule": "auto",
+        "continuation_rows": 256,
+        "scratch_mib": 512,
+        "kernel_threads": 32,
+        "cxr_chunk": "case-dependent",
+        "brem_chunk": "case-dependent",
+        "cxr_threads": 512,
+        "cxr_energies_per_block": 3,
+    }
     _preset = {k: v for k, v in card_presets[card.value].items() if k != "electrons"}
     _scratch_cap = max(1_024, int(0.5 * free_bytes / 2**20))
     _preset["scratch_mib"] = tuple(
@@ -323,7 +339,7 @@ def _(card, card_presets, free_bytes, mo, scene, trial_budget):
         for _p in grid
     ]
     _dims = "\n".join(
-        f"- `{_name}`: {', '.join('default' if v is None else f'{v:,}' if isinstance(v, int) else v for v in getattr(space, _name))}"
+        f"- `{_name}`: {', '.join(f'default ({defaults[_name]})' if v is None else f'{v:,}' if isinstance(v, int) else v for v in getattr(space, _name))}"
         for _p in ("transport", "spectrum")
         for _name in space.dimensions(_p)
     )
@@ -333,7 +349,7 @@ def _(card, card_presets, free_bytes, mo, scene, trial_budget):
         + "\n\n"
         + _dims
     )
-    return space, trials
+    return defaults, space, trials
 
 
 @app.cell(hide_code=True)
@@ -401,18 +417,7 @@ def _(
 
 
 @app.cell(hide_code=True)
-def _(mo, spectrum_s, transport_s, tuning):
-    _DEFAULT = {
-        "electron_batch": 65_536,
-        "schedule": "auto",
-        "continuation_rows": 256,
-        "scratch_mib": 512,
-        "kernel_threads": 32,
-        "cxr_chunk": "case",
-        "brem_chunk": "case",
-        "cxr_threads": 512,
-        "cxr_energies_per_block": 3,
-    }
+def _(defaults, mo, spectrum_s, transport_s, tuning):
 
     def settings(tuning_config, phase):
         t = tuning_config.transport
@@ -437,7 +442,7 @@ def _(mo, spectrum_s, transport_s, tuning):
                 for k, v in values.items()
                 if v is not None
             )
-            or "defaults"
+            or "all built-in defaults (see values below)"
         )
 
     def table(study, top=12):
@@ -474,9 +479,10 @@ def _(mo, spectrum_s, transport_s, tuning):
         f"Measured on {_env}.\n\n"
         + "\n\n".join(table(_study) for _study in tuning.phases)
         + f"\n\n**Estimated whole-run speedup: {_whole:.2f}×**. A phase's gain counts "
-        "only in proportion to its share of the run. Built-in defaults: "
-        + ", ".join(f"`{k}` {v}" for k, v in _DEFAULT.items())
-        + "."
+        "only in proportion to its share of the run. **Built-in defaults** "
+        "(case-dependent chunks are adaptive segment counts): "
+        + ", ".join(f"`{k}` = **{v}**" for k, v in defaults.items())
+        + ". In the table, a missing setting inherits this value."
     )
     return
 
@@ -484,52 +490,93 @@ def _(mo, spectrum_s, transport_s, tuning):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## Which controls matter
+    ## What the tuning trials say about each control
 
-    Each panel plots every completed trial's phase time against one control's
-    value, with the baseline as a dashed line. A control whose points sit at
-    the same height for every value barely matters on this workload and GPU;
-    one with a clear trend is worth tuning per device.
+    Each row below is a **literal candidate setting**, not a randomly displaced
+    x-coordinate. The diamond marks the **median speedup** relative to the
+    complete phase baseline, and the horizontal segment spans the fastest and
+    slowest tested combinations with that setting. **Higher is faster**; the
+    dashed vertical line at **1×** means the untuned *whole configuration*.
+    `default (value)` means that dimension inherited its built-in setting;
+    for chunk sizes, the default is workload-dependent, not a fixed number.
+
+    A category may have only a few observations (`n`); other controls changed
+    between trials. These are **marginal summaries of combinations**, not
+    isolated one-factor benchmarks or evidence of causation. Empty categories
+    were not sampled. Read phase times and confirmed winners in the table above.
     """)
     return
 
 
 @app.cell
-def _(np, plt, space, tuning):
+def _(defaults, np, plt, space, tuning):
     _panels = [
         (_study, _name) for _study in tuning.phases for _name in space.dimensions(_study.phase)
     ]
-    _cols = 3
+    _cols = 2
     fig_controls, _axes = plt.subplots(
         -(-len(_panels) // _cols),
         _cols,
-        figsize=(10, 2.6 * -(-len(_panels) // _cols)),
+        figsize=(12, 3.0 * -(-len(_panels) // _cols)),
         layout="constrained",
         squeeze=False,
     )
     for _ax, (_study, _name) in zip(_axes.flat, _panels, strict=False):
-        _labels = ["default" if v is None else str(v) for v in getattr(space, _name)]
-        for _trial in _study.trials:
-            if _trial.state != "complete" or _trial.repeat_of is not None:
-                continue
-            _holder = _trial.tuning.transport if _study.phase == "transport" else _trial.tuning
-            _value = getattr(_holder, _name)
-            _x = _labels.index("default" if _value is None else str(_value))
-            _ax.scatter(
-                _x + np.random.default_rng(_trial.number).uniform(-0.15, 0.15),
-                _trial.median_s,
-                s=14,
-                color="C0",
-                alpha=0.7,
+        _values = list(getattr(space, _name))
+        _labels = [
+            f"default ({defaults[_name]})"
+            if value is None
+            else f"{value:,}"
+            if isinstance(value, int)
+            else str(value)
+            for value in _values
+        ]
+        _done = [
+            trial
+            for trial in _study.trials
+            if trial.state == "complete" and trial.repeat_of is None and trial.median_s > 0
+        ]
+        _baseline_s = _study.baseline.median_s
+        _ax.axvline(1.0, color="C3", ls="--", lw=1.4, label="Whole baseline = 1×")
+        for _row, (_value, _label) in enumerate(zip(_values, _labels, strict=True)):
+            _times = np.array(
+                [
+                    trial.median_s
+                    for trial in _done
+                    if getattr(
+                        trial.tuning.transport if _study.phase == "transport" else trial.tuning,
+                        _name,
+                    )
+                    == _value
+                ]
             )
-        _ax.axhline(_study.baseline.median_s, color="C3", ls="--", lw=1)
-        _ax.set_xticks(range(len(_labels)), _labels, rotation=30, fontsize=7)
-        _ax.set_title(f"{_study.phase}: {_name}", fontsize=9)
-        _ax.set_ylabel("phase time (s)", fontsize=8)
-        _ax.set_ylim(bottom=0)
+            if not len(_times):
+                _ax.text(1, _row, "not sampled", color="0.5", fontsize=8, va="center", ha="left")
+                continue
+            _speedups = _baseline_s / _times
+            _median = float(np.median(_speedups))
+            _ax.hlines(_row, _speedups.min(), _speedups.max(), color="C0", lw=2)
+            _ax.plot(_median, _row, marker="D", color="C0", ms=6)
+            _ax.annotate(
+                f"n={len(_times)}",
+                (_speedups.max(), _row),
+                xytext=(5, 0),
+                textcoords="offset points",
+                va="center",
+                fontsize=8,
+            )
+        _ax.set_yticks(range(len(_labels)), _labels, fontsize=8)
+        _ax.invert_yaxis()
+        _ax.set_title(f"{_study.phase}: {_name}", fontsize=10)
+        _ax.set_xlabel("Speedup vs whole phase baseline (×)", fontsize=9)
+        _ax.grid(axis="x", alpha=0.2)
+        _ax.margins(x=0.25, y=0.18)
     for _ax in list(_axes.flat)[len(_panels) :]:
         _ax.set_visible(False)
-    fig_controls.suptitle(tuning.environment.get("device", "GPU"))
+    fig_controls.suptitle(
+        f"Candidate category medians and ranges · {tuning.environment.get('device', 'GPU')}",
+        fontsize=12,
+    )
     fig_controls  # noqa: B018
     return
 
