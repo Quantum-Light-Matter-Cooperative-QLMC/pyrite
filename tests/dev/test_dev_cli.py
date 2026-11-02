@@ -410,6 +410,8 @@ def test_formatter_regenerates_and_commits_cli_reference(dev_module) -> None:
         ("xsgen/test_sbethe.py", "xsgen"),
         ("checkpoint/test_io.py", "core"),
         ("energy-grid/test_cli.py", "cli"),
+        ("remote/test_remote_command_run.py", "cli"),
+        ("remote/test_remote_command_sync.py", "cli"),
         ("montecarlo/test_output_noise.py", "cli"),
         ("materials/test_validation_background.py", "apps"),
         ("montecarlo/test_exports.py", "packaging"),
@@ -417,6 +419,13 @@ def test_formatter_regenerates_and_commits_cli_reference(dev_module) -> None:
 )
 def test_domain_suite_ownership(dev_module, path, owner) -> None:
     assert dev_module.ROOT / "tests" / path in dev_module.test_files_for_suite(owner)
+
+
+def test_remote_command_modules_belong_to_cli(dev_module) -> None:
+    paths = sorted((dev_module.ROOT / "tests/remote").glob("test_remote_command_*.py"))
+    assert paths
+    for path in paths:
+        assert dev_module.test_suite_owner(path.relative_to(dev_module.ROOT / "tests")) == "cli"
 
 
 def test_new_modules_join_their_domain_or_core(dev_module, tmp_path) -> None:
