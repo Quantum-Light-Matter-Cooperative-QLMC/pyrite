@@ -153,16 +153,7 @@ def _spectrum_case_retry(
             caught.__traceback__ = None
             counts[phase] += 1
             events.append({"phase": phase, "mitigation": "halve_chunks"})
-            if phase == "line":
-                runner._halve_case_spec_chunk(work, tp)
-            elif phase == "characteristic":
-                from .stage_chunks import _halve_case_characteristic_chunk
-
-                _halve_case_characteristic_chunk(work, tp)
-            elif phase == "brem":
-                runner._halve_case_brem_chunk(work, tp)
-            else:
-                runner._halve_case_chunks(work, tp)
+            _halve_phase_chunks(phase, work, tp)
         else:
             if timed:
                 out["_t_spectrum"] = perf_counter() - t0
@@ -170,6 +161,22 @@ def _spectrum_case_retry(
             return out
         attempt += 1
         runner.BACKEND.release_memory()
+
+
+def _halve_phase_chunks(phase, work, tp):
+    """Halve the execution chunk owned by the spectrum phase that hit OOM."""
+    from .. import runner
+
+    if phase == "line":
+        runner._halve_case_spec_chunk(work, tp)
+    elif phase == "characteristic":
+        from .stage_chunks import _halve_case_characteristic_chunk
+
+        _halve_case_characteristic_chunk(work, tp)
+    elif phase == "brem":
+        runner._halve_case_brem_chunk(work, tp)
+    else:
+        runner._halve_case_chunks(work, tp)
 
 
 def _resident_rows(tp):
