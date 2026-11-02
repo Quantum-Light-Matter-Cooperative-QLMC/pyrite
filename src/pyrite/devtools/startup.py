@@ -2,7 +2,9 @@
 
 Runs on the CPU backend, or CUDA with ``backend="cuda"``. Warm mode primes the
 JIT caches in an unmeasured process. Cold mode gives every sample empty
-temporary Numba and CuPy caches, without deleting the user's caches. Fetched
+temporary Numba and CuPy caches, without deleting the user's caches. Warmed
+mode fills each sample's empty temporary caches with the ``minimal`` profile of
+``pyrite cache warm`` in an unmeasured process first. Fetched
 physics tables must already be installed; their filesystem cache is not cleared.
 """
 
@@ -94,8 +96,54 @@ print(json.dumps({"beam_s": beam_s, "setup_s": setup_s, "first_s": first_s,
 """
 
 
+_CACHE_MODES = ("warm", "cold", "warmed")
+_WARM = "from pyrite._jit_warm import warm; import json; print(json.dumps(warm('minimal')))"
+
+
 def _spread(values: list[float]) -> dict:
     return {"median": statistics.median(values), "min": min(values), "max": max(values)}
+
+
+def _sample(env: dict[str, str], code: str = _WORKER) -> dict:
+    completed = subprocess.run(
+        [sys.executable, "-c", code],
+        env=env,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    # Keep diagnostics off machine-output stdout, including Numba warnings.
+    if completed.stderr:
+        print(completed.stderr, end="", file=sys.stderr)
+    return json.loads(completed.stdout)
+
+
+def _isolated_sample(env: dict[str, str], cache: str, prefix: str) -> tuple[dict | None, dict]:
+    """Run one measured process; cold/warmed modes get fresh temporary caches."""
+    with tempfile.TemporaryDirectory(prefix=prefix) as temporary:
+        sample_env = dict(env)
+        if cache != "warm":
+            sample_env["NUMBA_CACHE_DIR"] = os.path.join(temporary, "numba")
+            sample_env["CUPY_CACHE_DIR"] = os.path.join(temporary, "cupy")
+        warm_report = _sample(sample_env, _WARM) if cache == "warmed" else None
+        if warm_report and any(c["status"] != "ok" for c in warm_report["cases"]):
+            raise RuntimeError("pyrite cache warm failed before a warmed sample")
+        return warm_report, _sample(sample_env)
+
+
+def _timings(samples: list[dict], warm_reports: list[dict]) -> dict:
+    timings = {}
+    for name in ("beam_s", "setup_s", "first_s", "repeat_s", "total_first_s"):
+        timings[name] = _spread([s[name] for s in samples])
+    for name in ("first_compile_s", "repeat_compile_s"):
+        values = [s["numba_jit"][name] for s in samples if "numba_jit" in s]
+        if values:
+            timings[f"numba_{name}"] = _spread(values)
+    if warm_reports:
+        timings["cache_warm_s"] = _spread(
+            [sum(c["seconds"] for c in report["cases"]) for report in warm_reports]
+        )
+    return timings
 
 
 def benchmark(
@@ -107,55 +155,28 @@ def benchmark(
 ) -> dict:
     """Measure identical fresh processes; return samples and median/range seconds.
 
-    Cold mode isolates the Numba cache and, on CUDA, the CuPy kernel cache.
+    Cold mode isolates the Numba cache and, on CUDA, the CuPy kernel cache;
+    warmed mode isolates them too and fills them with ``pyrite cache warm``.
     """
-    if repeats < 1 or cache not in {"warm", "cold"} or backend not in {"cpu", "cuda"}:
-        raise ValueError("repeats must be positive, cache warm or cold, and backend cpu or cuda")
+    if repeats < 1 or cache not in _CACHE_MODES or backend not in {"cpu", "cuda"}:
+        raise ValueError(
+            "repeats must be positive, cache warm, cold or warmed, and backend cpu or cuda"
+        )
     env = {**os.environ, "PYRITE_MC_BACKEND": backend}
     env.pop("NUMBA_DISABLE_JIT", None)
     env.pop("PYRITE_STARTUP_PROFILE", None)
-
-    def sample(sample_env: dict[str, str]) -> dict:
-        completed = subprocess.run(
-            [sys.executable, "-c", _WORKER],
-            env=sample_env,
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-        # Keep diagnostics off machine-output stdout, including Numba warnings.
-        if completed.stderr:
-            print(completed.stderr, end="", file=sys.stderr)
-        return json.loads(completed.stdout)
-
     if cache == "warm":
-        sample(env)
-    samples = []
-    for _ in range(repeats):
-        sample_env = dict(env)
-        with tempfile.TemporaryDirectory(prefix="pyrite-startup-") as temporary:
-            if cache == "cold":
-                sample_env["NUMBA_CACHE_DIR"] = os.path.join(temporary, "numba")
-                sample_env["CUPY_CACHE_DIR"] = os.path.join(temporary, "cupy")
-            samples.append(sample(sample_env))
+        _sample(env)
+    runs = [_isolated_sample(env, cache, "pyrite-startup-") for _ in range(repeats)]
+    warm_reports = [report for report, _ in runs if report is not None]
+    samples = [sample for _, sample in runs]
     if profile is not None:
         profile_env = {**env, "PYRITE_STARTUP_PROFILE": str(profile.resolve())}
-        with tempfile.TemporaryDirectory(prefix="pyrite-startup-profile-") as temporary:
-            if cache == "cold":
-                profile_env["NUMBA_CACHE_DIR"] = os.path.join(temporary, "numba")
-                profile_env["CUPY_CACHE_DIR"] = os.path.join(temporary, "cupy")
-            sample(profile_env)
+        _isolated_sample(profile_env, cache, "pyrite-startup-profile-")
     identities = {(s["identity_digest"], json.dumps(s["array_sha256"])) for s in samples}
     if len(identities) != 1:
         raise RuntimeError("startup samples produced different identities or spectra")
-    timings = {}
-    for name in ("beam_s", "setup_s", "first_s", "repeat_s", "total_first_s"):
-        values = [s[name] for s in samples]
-        timings[name] = _spread(values)
-    for name in ("first_compile_s", "repeat_compile_s"):
-        values = [s["numba_jit"][name] for s in samples if "numba_jit" in s]
-        if values:
-            timings[f"numba_{name}"] = _spread(values)
+    timings = _timings(samples, warm_reports)
     return {
         "schema": "pyrite.startup-benchmark.v1",
         "workload": "README HOPG, 30 keV, 450 line / 100 brem electrons, seed 1",

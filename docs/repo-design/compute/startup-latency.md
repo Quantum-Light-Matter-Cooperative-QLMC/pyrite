@@ -171,12 +171,83 @@ alters no generated code; it only lets `core` be found on disk.
 
 ### Cache locations
 
-The `pyrite` command and the remote `python -m pyrite._entry.scan` shim point
-unset `NUMBA_CACHE_DIR` and `CUPY_CACHE_DIR` at `<user cache>/pyrite/numba` and
-`<user cache>/pyrite/cupy` before any kernel module is imported; non-empty user
-values win, and `import pyrite` never changes the environment. `pyrite cache
+`import pyrite` (and so the `pyrite` command and the remote
+`python -m pyrite._entry.scan` shim) points unset or empty `NUMBA_CACHE_DIR` and
+`CUPY_CACHE_DIR` at `<user cache>/pyrite/numba` and `<user cache>/pyrite/cupy`
+before any kernel module is decorated; non-empty user values win. It imports
+neither Numba nor CuPy; if Numba is already imported, `numba.config.CACHE_DIR`
+is set as well, which is early enough because each dispatcher reads it when it
+enables caching. CuPy reads the variable at each kernel compile. The in-tree
+`__pycache__` location is a reported, clearable legacy location. `pyrite cache
 status` reports each location, its size and, per Numba kernel family, how many
 indexes are current (source digest and Numba version match) or stale; `pyrite
 cache clear` deletes only PyRITE-owned entries. Numba 0.68 stamps sources by
 content digest, so an mtime-only change such as a remote sync keeps hits;
 `tests/test_jit_cache.py` pins hit, source-edit and directory-change behaviour.
+
+### Warming and the benchmark matrix
+
+`pyrite cache warm --profile minimal|standard` compiles kernels ahead of use by
+simulating fixed one-electron cases and discarding the results; only the Numba
+and CuPy caches change, and nothing runs on import or install. Compiled
+specializations depend on argument types and compile-time flags, not on history
+counts, so a one-electron case compiles what a full-size case with the same
+physics flags needs.
+
+| Profile | Cases | Covers |
+|---|---|---|
+| `minimal` (default) | `default` | README-case physics: shell soft/hard collisions with coupled radiative loss |
+| `standard` | `default`, `continuous`, `uncoupled`, `continuous-uncoupled`, `secondaries` | Adds continuous stopping (materials without shell data), uncoupled continuum, and secondary transport above 1 keV |
+
+A Cu target (no shell data) compiled nothing after `standard`. Detector,
+numerics and beam settings that change only array sizes or values do not change
+the compiled set. A first `simulate` after `minimal` can still compile a few
+GPU kernels reached only by other options (below, 4 of 158 CuPy kernels).
+
+Cache modes of `pyrite-dev startup --cache`: `cold` (empty per-process caches),
+`warm` (one full priming run, then fresh processes), `warmed` (empty caches
+filled with `pyrite cache warm --profile minimal` first; `cache_warm_s` is that
+cost, paid once). "Compile" is Numba compilation attributed to the first
+`simulate` (`numba_first_compile_s`); for CUDA, NVRTC time is separate and
+listed as CuPy.
+
+| Host, backend | Mode | `import pyrite; Beam` (s) | First `simulate` (s) | Numba compile (s) | CuPy NVRTC compiles / disk hits (s) | Second `simulate` (s) | One-time warm (s) |
+|---|---|---:|---:|---:|---|---:|---:|
+| i7-13620H, CPU | cold | 0.86 | 32.34 | 28.28 | | 1.52 | |
+| i7-13620H, CPU | warm | 0.86 | 3.89 | 0 | | 1.50 | |
+| i7-13620H, CPU | warmed | 0.53 | 2.35 | 0 | | 0.98 | 17.6 |
+| RTX 5080 host, CPU | cold | 0.41 | 16.61 | 14.83 | | 0.59 | |
+| RTX 5080 host, CPU | warm | 0.41 | 1.77 | 0 | | 0.59 | |
+| RTX 5080 host, CPU | warmed | 0.40 | 1.76 | 0 | | 0.58 | 16.1 |
+| RTX 5080, CUDA | cold | 0.40 | 30.86 | 14.30 | 158 / 0 (14.58) | 0.14 | |
+| RTX 5080, CUDA | warm | 0.41 | 1.85 | 0 | 0 / 158 (0.11 lookup) | 0.13 | |
+| RTX 5080, CUDA | warmed | 0.40 | 2.17 | 0 | 4 / 154 (0.29) | 0.13 | 30.6 |
+
+Medians of three fresh processes; Python 3.14, Numba 0.68.0, CuPy 14.2.0. The
+local rows come from the samples above (laptop, revisions through `bc4e97443`
+for the warmed row; the `warm` and `cold` rows precede the closure-key fix's
+final form but compile and hit the same kernels) and the RTX 5080 rows from SLURM job 3684 at
+revision `2efcb9918` on the same node as job 3683 (same cold/warm values within
+0.2 s). Every sample, in every mode and backend, has identity digest
+`04d1bb570fc917017a7d6a721cfffa9bd5e564ccb6b44a9665f78119364158a4`: caching
+changes where kernels come from, not the result. The benchmark's own
+`numba_first_compile_s` excludes NVRTC, so a cold CUDA first call is roughly
+the Numba compile plus the NVRTC time plus about 2 s of execution and table
+construction; a warm one is execution plus loading (0.1 s of CuPy lookups, 158
+cubins).
+
+Job 3683 (revision `f77a1930b`) reported 0 NVRTC compiles on the cold CUDA run
+even though all 158 lookups missed: CuPy 14 compiles through the private
+`_compile_using_nvrtc_no_warning`, not the public `compile_using_nvrtc` the
+recorder wrapped. The recorder now wraps whichever exists
+(`tests/test_jit_cache.py` covers both with a fake module); job 3684 shows 158
+compiles in 14.58 s.
+
+### Shared caches on clusters
+
+Numba entries are keyed on the target CPU name and feature set, CuPy entries on
+the GPU architecture and toolkit version. A cache directory shared across nodes
+therefore helps only nodes of the same CPU ISA and GPU architecture; a
+heterogeneous pool keeps one entry per kind and grows. Warm on each node type
+(a one-case job before submitting an array) and, for read-only shared caches,
+warm once per node type from a writable copy.

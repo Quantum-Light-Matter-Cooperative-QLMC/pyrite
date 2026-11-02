@@ -1,16 +1,20 @@
 """PyRITE-managed JIT compilation caches for Numba and CuPy.
 
-Numba writes ``@njit(cache=True)`` overloads under ``NUMBA_CACHE_DIR`` (or next
-to the source when it is unset); CuPy writes NVRTC output under
-``CUPY_CACHE_DIR`` (default ``~/.cupy/kernel_cache``). Both caches are native:
-this module never compiles, never builds a binary layer on top of them, and
-never mutates the environment on import.
+Numba writes ``@njit(cache=True)`` overloads under ``NUMBA_CACHE_DIR``; CuPy
+writes NVRTC output under ``CUPY_CACHE_DIR``. Both caches are native: this
+module never compiles and never builds a binary layer on top of them.
 
-:func:`apply_managed_cache_env` points *unset* cache variables at
-:func:`pyrite.paths.cache_dir` subdirectories. Only explicit process entry
-points (the ``pyrite`` CLI and remote ``python -m`` shims) call it, before any
-kernel module is imported, because Numba reads ``NUMBA_CACHE_DIR`` once when
-it is imported. A non-empty user value always wins.
+:func:`apply_managed_cache_env` points *unset* (or empty) cache variables at
+:func:`pyrite.paths.cache_dir` subdirectories (``~/.cache/pyrite/numba`` and
+``~/.cache/pyrite/cupy`` on Linux). ``import pyrite`` calls it, as do the
+``pyrite`` CLI and remote ``python -m`` shims, before any PyRITE kernel module
+is decorated. Numba reads ``NUMBA_CACHE_DIR`` into ``numba.config.CACHE_DIR``
+when it is first imported, so when Numba is already loaded the config value is
+set too; each dispatcher consults ``config.CACHE_DIR`` when it enables caching,
+so this is early enough for every PyRITE kernel. CuPy reads ``CUPY_CACHE_DIR``
+lazily at each kernel compile. A non-empty user value always wins. The
+in-tree ``__pycache__`` Numba location and CuPy's ``~/.cupy`` default are
+legacy locations: still reported and (for in-tree PyRITE entries) clearable.
 
 The inspection half (:func:`cache_locations`, :func:`numba_index_entries`,
 :func:`clear_plan`) reads cache files without importing CuPy; Numba is imported
@@ -24,8 +28,6 @@ from __future__ import annotations
 import gc
 import hashlib
 import os
-import pickle
-import shutil
 import sys
 import time
 from collections.abc import Iterator, MutableMapping
@@ -53,9 +55,10 @@ def apply_managed_cache_env(
 ) -> dict[str, str]:
     """Point unset JIT cache variables at PyRITE's managed directories.
 
-    Call before Numba or any PyRITE kernel module is imported; Numba ignores
-    later changes in the same process. Existing non-empty values are kept.
-    Returns the variables this call set.
+    Call before any PyRITE kernel module is decorated. Existing non-empty
+    values are kept. When writing ``os.environ`` and Numba is already imported
+    (its config froze the old value), ``numba.config.CACHE_DIR`` is updated too;
+    Numba is never imported here. Returns the variables this call set.
     """
     env = os.environ if environ is None else environ
     applied: dict[str, str] = {}
@@ -63,6 +66,10 @@ def apply_managed_cache_env(
         if env.get(name):
             continue
         applied[name] = env[name] = str(managed_dir(backend))
+    numba_config = sys.modules.get("numba.core.config")
+    if env is os.environ and NUMBA_ENV in applied and numba_config is not None:
+        if not getattr(numba_config, "CACHE_DIR", ""):
+            setattr(numba_config, "CACHE_DIR", applied[NUMBA_ENV])  # noqa: B010
     return applied
 
 
@@ -74,8 +81,8 @@ class CacheLocation:
     """One directory a JIT backend reads and writes compiled kernels in.
 
     ``source`` is ``managed`` (PyRITE's directory), ``environment`` (a user's
-    variable), ``in-tree`` (Numba's ``__pycache__`` beside PyRITE sources, used
-    by Python sessions without ``NUMBA_CACHE_DIR``) or ``default`` (CuPy's own
+    variable), ``in-tree`` (legacy: Numba's ``__pycache__`` beside PyRITE sources,
+    used before managed defaults or when the variable is unset) or ``default`` (CuPy's own
     home-directory default). ``owned`` means every file under ``path`` is
     PyRITE's to delete; otherwise only PyRITE-attributable entries are.
     """
@@ -182,6 +189,8 @@ def numba_index_entries(index: Path) -> tuple[object, int] | None:
     ``None`` means the index is unreadable or was written by another Numba
     version, so Numba itself would ignore it (a guaranteed miss).
     """
+    import pickle
+
     import numba
 
     try:
@@ -309,6 +318,8 @@ def clear_plan(locations: list[CacheLocation]) -> list[ClearTarget]:
 
 def execute_clear(targets: list[ClearTarget]) -> list[ClearTarget]:
     """Delete non-skip targets; return those that were removed."""
+    import shutil
+
     removed = []
     for target in targets:
         if target.kind == "tree" and target.path.is_dir():
@@ -482,7 +493,8 @@ class CupyCompileRecorder:
     Wraps CuPy's private ``cupy.cuda.compiler`` entry points for diagnostics
     only: ``_compile_with_cache_cuda`` (reached once per kernel and process,
     after CuPy's in-memory caches miss), its disk-cache ``load`` (a hit returns
-    a payload), and ``compile_using_nvrtc`` (the actual NVRTC compile). Restores
+    a payload), and the NVRTC compile (``_compile_using_nvrtc_no_warning`` on
+    CuPy 14, ``compile_using_nvrtc`` before). Restores
     them on exit. A no-op when those names are absent.
     """
 
@@ -531,7 +543,15 @@ class CupyCompileRecorder:
             return load
 
         self._wrap(compiler, "_compile_with_cache_cuda", timed("compile_with_cache_s", "lookups"))
-        self._wrap(compiler, "compile_using_nvrtc", timed("nvrtc_s", "nvrtc_compiles"))
+        # CuPy >= 14 compiles through the private ``_compile_using_nvrtc_no_warning``
+        # (the public ``compile_using_nvrtc`` only wraps it for external callers);
+        # older releases call the public name. Wrap one so a compile counts once.
+        nvrtc_entry = (
+            "_compile_using_nvrtc_no_warning"
+            if hasattr(compiler, "_compile_using_nvrtc_no_warning")
+            else "compile_using_nvrtc"
+        )
+        self._wrap(compiler, nvrtc_entry, timed("nvrtc_s", "nvrtc_compiles"))
         backend = getattr(compiler, "_kernel_cache_backend", None)
         if backend is not None:
             self._wrap(backend, "load", counted_load)

@@ -62,12 +62,25 @@ for example after upgrading PyRITE or Numba). `pyrite cache clear` previews, and
 with `--yes` deletes, only PyRITE-owned entries; results never depend on the
 cache.
 
-The `pyrite` command stores kernels under the PyRITE user cache directory unless
-`NUMBA_CACHE_DIR` or `CUPY_CACHE_DIR` is already set. Python sessions and
-notebooks use those variables when set and otherwise Numba's `__pycache__`
-beside the PyRITE sources and CuPy's `~/.cupy/kernel_cache`; set the variables
-before importing PyRITE to share one cache with the command line. Numba reads
-`NUMBA_CACHE_DIR` once, when it is first imported.
+The `pyrite` command, Python sessions and notebooks (`import pyrite`) all store
+kernels under the PyRITE user cache directory (`~/.cache/pyrite/numba` and
+`~/.cache/pyrite/cupy` on Linux) unless `NUMBA_CACHE_DIR` or `CUPY_CACHE_DIR` is
+already set to a non-empty value, which always wins. Older in-tree `__pycache__`
+entries beside the PyRITE sources and CuPy's `~/.cupy/kernel_cache` are not
+used by default; `pyrite cache status` still reports the in-tree location as
+legacy and `pyrite cache clear` removes its PyRITE entries.
+
+To pay the compile cost once, before a job or on a new node, run
+`pyrite cache warm`. It simulates one-electron cases and discards the results;
+only the kernel caches change. `--profile minimal` (the default) covers the
+default physics of the README case in about 20 s on a laptop CPU; `--profile
+standard` adds the other CPU transport-core variants (continuous stopping,
+uncoupled continuum, secondary transport) and takes about 40 s. A target
+without shell data uses continuous stopping, so warm `standard` for such
+materials. Cache entries are specific to the CPU instruction set (Numba) and
+GPU architecture (CuPy); warm on the node type that runs the job. See
+[startup latency](../repo-design/compute/startup-latency.md) for measured
+costs.
 
 ## The GPU is unavailable or runs out of memory
 

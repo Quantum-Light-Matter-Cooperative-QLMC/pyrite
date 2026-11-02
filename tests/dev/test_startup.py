@@ -119,4 +119,4 @@ def test_startup_help_keeps_execution_unloaded(capsys):
     with pytest.raises(SystemExit) as error:
         dev_cli.main(["startup", "--help"])
     assert error.value.code == 0
-    assert "--cache {warm,cold}" in capsys.readouterr().out
+    assert "--cache {warm,cold,warmed}" in capsys.readouterr().out
