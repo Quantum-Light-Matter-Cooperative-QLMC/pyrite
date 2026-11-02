@@ -314,6 +314,7 @@ def _validated_controls(p, launch, electron_start):
         energy_model=p.energy_model,
         groove=p.groove,
         keep_segments_on_device=p.keep_segments_on_device,
+        cascade=p._secondary is not None,
     )
     radiative_cutoff_eV = p.radiative_cutoff_eV
     if radiative_mode and radiative_cutoff_eV is None:
@@ -923,6 +924,11 @@ def _segment_rows(t, o):
     if t.controls.shell_mode:
         hard = ("seg_hard_W", "seg_hard_ch", "seg_hard_dir")
         rows.update(zip(hard, o.dev_segs[12:15], strict=True))
+    if t.controls.radiative_mode:
+        # Photon columns follow any hard-inelastic ones (`_alloc_batch_scratch`).
+        start = 15 if t.controls.shell_mode else 12
+        photon = ("seg_rad_k", "seg_rad_Z")
+        rows.update(zip(photon, o.dev_segs[start : start + 2], strict=True))
     return rows
 
 

@@ -170,6 +170,14 @@ def run_case_directions(
     return _directional_outputs(case, transport, directions)
 
 
+def _resident_transport(case, core, channeling):
+    """Whether CUDA rows may stay on the device (#905): not for the channeling
+    zone/native join or coupled radiative cascades, which read rows on the host."""
+    cascade_keys = ("secondary_threshold_eV", "pair_production_model", "positron_transport")
+    cascade = any((v := case.get(key)) is not None and v is not False for key in cascade_keys)
+    return core == "cuda" and not channeling and not ("radiative_model" in case and cascade)
+
+
 def _transport_case(
     case,
     record_timing=False,
@@ -274,13 +282,7 @@ def _transport_case(
     channeling = case.get("channeling") is not None
     if channeling and core != "cuda":  # launches need counter-addressed streams
         core = "per-electron"
-    # The zone/native join and coupled radiative completion run on the host.
-    resident = (
-        keep_segments_on_device
-        and core == "cuda"
-        and "radiative_model" not in case
-        and not channeling
-    )
+    resident = keep_segments_on_device and _resident_transport(case, core, channeling)
     straggling = bool(case.get("straggling", False))
     # The CUDA LUT kernel has no shell soft/hard mode, so production shell runs
     # select the exact CUDA kernel rather than failing. Direct

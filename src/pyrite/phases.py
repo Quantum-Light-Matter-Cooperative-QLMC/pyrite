@@ -36,7 +36,8 @@ class TransportedScene:
     Returned by :func:`simulate_transport`; pass it to :func:`score_spectra`.
     It holds every transported segment, so its memory is that of the
     transport. CUDA segments stay resident on the device until the object is
-    released.
+    released, or until a spectrum-phase device OOM moves them, unchanged, to
+    host memory.
     """
 
     scene: Scene
@@ -115,9 +116,13 @@ def score_spectra(
             "transport settings were fixed by simulate_transport"
         )
     case = replace(transported.case, spec_chunk=tuning.cxr_chunk, brem_chunk=tuning.brem_chunk)
-    # The spectrum phase may replace entries (host fallback); keep ours intact.
+    # The spectrum phase may replace entries (CPU fallback); keep ours intact,
+    # except that a device-OOM move of the rows to host memory (#905) also
+    # applies here, or this object would keep the device rows alive.
     with run_progress(progress), spectrum_launch(tuning):
-        output = _spectrum_with_recovery(case, dict(transported._transport))
+        output = _spectrum_with_recovery(
+            case, dict(transported._transport), segs_owner=transported._transport
+        )
     if transported.case.get("channeling") is not None:
         output["channeling"] = transported._transport["segs"]["channeling"]
     numerics = transported.numerics.with_kernel_tuning(tuning)
