@@ -244,51 +244,14 @@ extern "C" __global__ void pyrite_bin_tree_reduce(
 """
 
 
-def split_wide_lines(aw, wide_fraction, exact_widths):
-    """Boolean mask of the ``wide_fraction`` of lines with the widest near windows.
-
-    A node is accepted only outside its largest member's near window, so a few
-    lines with windows far wider than the line cluster make every ancestor
-    unacceptable and force each bin to the leaves. Those lines are summed
-    exactly instead; the rest keep a tight tree.
-    """
-    a = np.asarray(aw, dtype=np.float64)
-    n_wide = int(np.ceil(float(wide_fraction) * a.size))
-    mask = np.zeros(a.size, dtype=bool)
-    if n_wide > 0:
-        # Widest near window = smallest ``a`` (radius is exact_widths*pi/a).
-        mask[np.argpartition(a, min(n_wide, a.size) - 1)[:n_wide]] = True
-    return mask
-
-
-def run_tree_reduction(
-    E_r, aw, w, edges, inv_width, *, out, exact_widths=BIN_MEAN_EXACT_WIDTHS, wide_fraction=0.0
-):
+def run_tree_reduction(E_r, aw, w, edges, inv_width, *, out, exact_widths=BIN_MEAN_EXACT_WIDTHS):
     """Add a scalable near/far bin-mean reduction to a CuPy spectrum.
-
-    ``wide_fraction`` routes that share of lines with the widest near windows
-    through the exact all-pairs kernel instead of the tree. Zero keeps the
-    single-tree route.
 
     Validation: sinc-bin-near-far
     """
     import cupy
 
     global _TREE_KERNEL
-    if wide_fraction > 0.0:
-        from ._bin_quadrature import run_bin_mean_reduction_kernel
-
-        wide = split_wide_lines(cupy.asnumpy(aw), wide_fraction, exact_widths)
-        if wide.any():
-            idx = cupy.asarray(np.flatnonzero(wide))
-            keep = cupy.asarray(np.flatnonzero(~wide))
-            run_bin_mean_reduction_kernel(
-                E_r[idx], aw[idx], w[idx], edges, inv_width,
-                out=out, exact_widths=exact_widths, method="pairs",
-            )  # fmt: skip
-            if keep.size == 0:
-                return out
-            E_r, aw, w = E_r[keep], aw[keep], w[keep]
     # This explicit CUDA entry point may run while the global backend is CPU.
     # Transfer through CuPy rather than the selected backend's array converter.
     tree = build_cxr_tree(
