@@ -1,5 +1,6 @@
 """Primary identities and FP64 moments for fused band quadrature (#938)."""
 
+import os
 import warnings
 
 import numpy as np
@@ -16,6 +17,15 @@ from tests.montecarlo.brem.test_brem_photon_blocking import _LAYERS, _segments
 # 128 eps bounds < 500 positive quadrature terms with tree reduction; moments
 # double the relative score perturbation. FP64 primary accumulation is required.
 _RTOL = 128 * np.finfo(np.float32).eps
+
+
+def test_requested_backend_precision():
+    requested = os.environ.get("PYRITE_TEST_BACKEND", "cpu")
+    assert BACKEND.name == requested
+    if requested == "cuda":
+        expected = np.float64 if os.environ.get("PYRITE_FP64") == "1" else np.float32
+        assert np.dtype(REAL) == np.dtype(expected)
+    print(f"band-test backend={BACKEND.name} REAL={np.dtype(REAL)}")
 
 
 @pytest.fixture

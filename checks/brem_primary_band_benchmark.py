@@ -15,6 +15,7 @@ only; they do not establish angular/energy quadrature convergence.
 """
 
 import argparse
+import cProfile
 import hashlib
 import importlib.util
 import json
@@ -39,10 +40,10 @@ def write_json(path, value):
 def source_pin():
     stamp = Path(".pyrite-sync")
     if stamp.exists():
-        value = json.loads(stamp.read_text())
-        if value["dirty"]:
+        value = dict(line.split(": ", 1) for line in stamp.read_text().splitlines() if ": " in line)
+        if value["code_dirty"] != "False":
             raise RuntimeError("benchmark requires a clean committed sync")
-        return value["revision"]
+        return value["code_revision"]
     return subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
 
 
@@ -236,6 +237,12 @@ def replay(args):
                 memory[arm] = dict(
                     pool_reserved_bytes=pool.total_bytes(), pool_used_bytes=pool.used_bytes()
                 )
+        if args.profile and nodes == "production-point-order8":
+            for arm in arms:
+                select(arm)
+                profile = cProfile.Profile()
+                profile.runcall(score)
+                profile.dump_stats(str(args.output) + f"-{arm}.prof")
         a, b = scores["baseline"], scores["candidate"]
         reference_moments = moments(a)
         errors = {}
@@ -309,6 +316,7 @@ def main():
     rep = sub.add_parser("replay")
     rep.add_argument("capture", type=Path)
     rep.add_argument("--repeats", type=int, default=5)
+    rep.add_argument("--profile", action="store_true")
     rep.add_argument("--nodes", nargs="+", type=int, default=[64, 176, 496])
     for child in (cap, rep):
         child.add_argument("--output", type=Path, required=True)
