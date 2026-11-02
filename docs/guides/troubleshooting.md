@@ -52,6 +52,23 @@ Confirm the effective `workspace.root`, any `PYRITE_HOME`, and any `--checkpoint
 
 Interrupted runs and component recomputation can leave line or brem alone. Use `pyrite checkpoint recompute cxr|brem MATERIAL` for the missing component. Check identity before merging or restoring data; incompatible identities are correctly rejected.
 
+## The first run of a configuration is slow
+
+PyRITE compiles its CPU (Numba) and GPU (CuPy) kernels on first use, which can
+take tens of seconds; later processes load them from disk. `pyrite cache status`
+shows where compiled kernels live, their size, and whether each Numba kernel
+family is current (loads without compiling) or stale (recompiles on next use,
+for example after upgrading PyRITE or Numba). `pyrite cache clear` previews, and
+with `--yes` deletes, only PyRITE-owned entries; results never depend on the
+cache.
+
+The `pyrite` command stores kernels under the PyRITE user cache directory unless
+`NUMBA_CACHE_DIR` or `CUPY_CACHE_DIR` is already set. Python sessions and
+notebooks use those variables when set and otherwise Numba's `__pycache__`
+beside the PyRITE sources and CuPy's `~/.cupy/kernel_cache`; set the variables
+before importing PyRITE to share one cache with the command line. Numba reads
+`NUMBA_CACHE_DIR` once, when it is first imported.
+
 ## The GPU is unavailable or runs out of memory
 
 Inspect `pyrite config setup --help` and the active backend environment. CPU is the safe base installation. Do not solve memory pressure by changing scientific inputs invisibly: use documented resource/chunk controls, record them for performance work, and route heavy GPU sweeps through the [cluster workflow](running-on-a-cluster.md).

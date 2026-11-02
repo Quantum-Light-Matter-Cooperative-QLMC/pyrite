@@ -9,7 +9,12 @@ Entry shims are drivers, so binding the two together here is what keeps
 Prefer the installed CLI: ``pyrite run [PROFILE] -m <material>``.
 """
 
-from pyrite.materials import MaterialConfigError
+from pyrite._jit_cache import apply_managed_cache_env
+
+# Numba reads NUMBA_CACHE_DIR once on import; set it before kernel modules load.
+apply_managed_cache_env()
+
+from pyrite.materials import MaterialConfigError  # noqa: E402
 
 try:
     from pyrite.cli.commands.scan import _command as command

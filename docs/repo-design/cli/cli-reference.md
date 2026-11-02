@@ -72,6 +72,7 @@ Choose a family for its complete help, options, defaults, and examples.
 - [`pyrite beam`](cli-reference-beam.md) — Manage named beams (``[beams.*]``), attachable to profiles by name.
 - [`pyrite detector`](cli-reference-detector.md) — Manage named detector geometries, attachable to profiles by name.
 - [`pyrite tables`](cli-reference-tables.md) — Inspect generated cross-section tables and external code trees.
+- [`pyrite cache`](cli-reference-cache.md) — Inspect and clear compiled CPU (Numba) and GPU (CuPy) kernel caches.
 
 ```{toctree}
 :hidden:
@@ -89,6 +90,7 @@ cli-reference-material
 cli-reference-beam
 cli-reference-detector
 cli-reference-tables
+cli-reference-cache
 ```
 
 ## Command tree
@@ -136,6 +138,7 @@ Commands:
   beam          Manage named beams, attachable to profiles by name.
   detector      Manage named detector geometries.
   tables        Inspect generated cross-section tables and external code trees.
+  cache         Inspect and clear compiled CPU/GPU kernel caches.
 ```
 
 ## Command compatibility links
@@ -345,3 +348,6 @@ Existing command fragments remain available below; each link opens the full fami
 - <span id="pyrite-tables-sources-list"></span>[`pyrite tables sources list`](cli-reference-tables.md#pyrite-tables-sources-list)
 - <span id="pyrite-tables-sources-set"></span>[`pyrite tables sources set`](cli-reference-tables.md#pyrite-tables-sources-set)
 - <span id="pyrite-tables-verify"></span>[`pyrite tables verify`](cli-reference-tables.md#pyrite-tables-verify)
+- <span id="pyrite-cache"></span>[`pyrite cache`](cli-reference-cache.md#pyrite-cache)
+- <span id="pyrite-cache-clear"></span>[`pyrite cache clear`](cli-reference-cache.md#pyrite-cache-clear)
+- <span id="pyrite-cache-status"></span>[`pyrite cache status`](cli-reference-cache.md#pyrite-cache-status)

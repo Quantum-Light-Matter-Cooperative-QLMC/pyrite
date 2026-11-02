@@ -3,6 +3,7 @@
 import json
 import subprocess
 from argparse import Namespace
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -46,9 +47,13 @@ def test_startup_uses_fresh_processes_and_isolates_cold_caches(
     assert all("PYRITE_STARTUP_PROFILE" not in env for _, env in calls[:-1])
     assert calls[-1][1]["PYRITE_STARTUP_PROFILE"] == str(tmp_path / "first.prof")
     caches = [env["NUMBA_CACHE_DIR"] for _, env in calls]
+    cupy = [env.get("CUPY_CACHE_DIR") for _, env in calls]
     if cache == "cold":
         assert len(set(caches)) == len(caches)
         assert str(tmp_path / "user-cache") not in caches
+        assert all(
+            c and Path(c).parent == Path(n).parent for c, n in zip(cupy, caches, strict=True)
+        )
     else:
         assert set(caches) == {str(tmp_path / "user-cache")}
 

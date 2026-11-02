@@ -21,6 +21,19 @@ uv sync --extra dask
 uv run pyrite tables verify
 ```
 
+### Reuse compiled kernels across jobs
+
+Kernels compile once per cache directory and are reused by later jobs. By
+default each user's cache is under the PyRITE user cache directory on the node
+running `pyrite`; `pyrite cache status` prints it. To share one cache across
+SLURM jobs, export the same `NUMBA_CACHE_DIR` (and, for GPU jobs,
+`CUPY_CACHE_DIR`) on a shared filesystem before starting `pyrite`. Numba stores
+entries per CPU model and feature set, and CuPy per GPU architecture and
+toolkit, so mixed-node pools keep one entry per kind rather than reusing an
+incompatible one; a shared directory therefore grows with node heterogeneity.
+Warm the cache with one small job before submitting an array, so the array's
+tasks do not all compile concurrently.
+
 (run-and-inspect-a-profile)=
 (native-slurm-array-cpu)=
 (dask-with-slurm-provisioned-cpu-workers)=

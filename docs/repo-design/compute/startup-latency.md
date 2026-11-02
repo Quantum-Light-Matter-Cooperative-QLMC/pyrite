@@ -33,7 +33,13 @@ and must not be compared directly to the unprofiled samples.
 JSON stdout contains one `pyrite.startup-benchmark.v1` report: workload, backend,
 cache policy, Python/platform metadata, per-stage median/minimum/maximum seconds,
 and each sample's timings, dependency versions, peak resident memory, identity
-digest, and spectrum-array SHA-256 hashes. Peak memory covers both simulations
+digest, and spectrum-array SHA-256 hashes. Each sample's `numba_jit` record
+attributes compilation: wall time spent compiling during the first and the
+repeated simulation, compilation counts, disk-cache hits and misses of every
+PyRITE Numba kernel, and exclusive compile time per kernel (callee compilation
+is not double counted). It comes from Numba's `numba:compile` event, which fires
+only on a cache miss, and from each dispatcher's hit/miss counters
+(`pyrite._jit_cache`). Peak memory covers both simulations
 within the child process. Diagnostics use stderr; runtime failures exit 1,
 invalid arguments exit 2, and interruptions exit 130. Samples with inconsistent
 identities or spectrum hashes fail the benchmark.
@@ -117,3 +123,60 @@ All 12 warm and cold samples across both revisions have identity digest
 The SHA-256 hashes of `energy_eV`, `spectrum`, `background_energy_eV`, `background`,
 and `characteristic_spectrum` also match exactly. `coherent_spectrum` is absent
 for this incoherent workload.
+
+## Compilation attribution and persistent kernels (2026-11-01, #910)
+
+Harness: `pyrite-dev startup` with the `numba_jit` attribution above. Hardware:
+Intel Core i7-13620H, 16 logical CPUs, Linux 7.0.0, glibc 2.43; Python 3.14.4,
+NumPy 2.5.4, Numba 0.68.0. Backend: CPU. Base revision `abd601ae8`. Three
+cold processes, then one priming and three warm processes sharing one
+`NUMBA_CACHE_DIR`, plus a separate profile process. Values are median
+(minimum–maximum) in seconds:
+
+| Stage | Cold cache | Warm cache |
+|---|---:|---:|
+| `import pyrite; pyrite.Beam` | 0.861 (0.850–0.945) | 0.857 (0.820–0.879) |
+| First `simulate` | 32.341 (32.217–32.931) | 3.892 (3.855–3.962) |
+| of which Numba compilation | 28.279 (28.127–28.918) | 0 |
+| Second `simulate` in the same process | 1.525 (1.510–1.561) | 1.504 (1.499–1.522) |
+| Compilations / cache hits / misses (first call) | 117 / 0 / 62 | 0 / 11 / 0 |
+
+A cold first call compiles 62 PyRITE kernel signatures (117 compilations
+including Numba's own array helpers). Two specializations of the CPU transport
+body dominate: `make_cpu_transport_core.<locals>.body` (10.6 s exclusive) and
+`.core` (3.3 s), then `radiative_moments._exact_layer` (1.3 s). Every other
+kernel compiles in under 0.8 s.
+
+**Closure cache key fix.** Before this change a warm process still recompiled
+`core` (one sample: 3.39 s of compilation, first `simulate` 7.60 s, 11 hits
+and 1 miss). Numba keys a closure's disk cache on its pickled closure cells;
+`core` captures the `body` dispatcher, which pickles by value with random
+per-process UUIDs (its own and those of the ~30 dispatchers its globals reach).
+`make_cpu_transport_core` now replaces that cell pickle in `core`'s index key
+with the specialization flags plus SHA-256 digests of the sources of `body`'s
+module and of every module defining a dispatcher `body` calls
+(`pyrite._jit_cache.stabilize_closure_cache`). Bytecode, signature, target CPU
+and Numba's own source stamp stay in the key. A warm first `simulate` now
+compiles nothing.
+
+The separately profiled warm process (instrumented, overlapping cumulative
+times) spends 0.45 s loading 11 cached overloads, 0.27 s importing Numba and
+1.12 s building shell inelastic tables, the persistent-table cost deferred in
+#346.
+
+All cold and warm samples, before and after the fix, have identity digest
+`04d1bb570fc917017a7d6a721cfffa9bd5e564ccb6b44a9665f78119364158a4` and
+identical SHA-256 hashes of every returned spectrum array. The cache key change
+alters no generated code; it only lets `core` be found on disk.
+
+### Cache locations
+
+The `pyrite` command and the remote `python -m pyrite._entry.scan` shim point
+unset `NUMBA_CACHE_DIR` and `CUPY_CACHE_DIR` at `<user cache>/pyrite/numba` and
+`<user cache>/pyrite/cupy` before any kernel module is imported; non-empty user
+values win, and `import pyrite` never changes the environment. `pyrite cache
+status` reports each location, its size and, per Numba kernel family, how many
+indexes are current (source digest and Numba version match) or stale; `pyrite
+cache clear` deletes only PyRITE-owned entries. Numba 0.68 stamps sources by
+content digest, so an mtime-only change such as a remote sync keeps hits;
+`tests/test_jit_cache.py` pins hit, source-edit and directory-change behaviour.
