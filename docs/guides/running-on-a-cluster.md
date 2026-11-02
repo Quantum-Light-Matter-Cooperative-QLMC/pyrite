@@ -88,14 +88,25 @@ rather than a checkpoint pull.
 (amd-rocm-nodes)=
 ### AMD (ROCm) nodes
 
-Point the SLURM target profile at the AMD partition:
+Create separate named targets for the two partitions:
 
 ```bash
-pyrite config set remote.gpu_vendor amd
-pyrite config set remote.partition gpu-amd
-pyrite config set remote.nodelist qlmc-ace          # or any
-pyrite config set remote.gres gpu:radeon8060s:1
+pyrite remote target add lab-gpu --host MY_SSH_ALIAS --remote-dir '~/pyrite-gpu'
+pyrite remote target add lab-amd --host MY_SSH_ALIAS --remote-dir '~/pyrite-amd' \
+  --gpu-vendor amd --partition gpu-amd --nodelist amd-node --gres gpu:radeon8060s:1
+pyrite remote target use lab-gpu
+pyrite run quickstart --remote --target lab-amd --dry-run
 ```
+
+Use `target list`, `show NAME`, `edit NAME --FIELD VALUE`, or `remove NAME --yes`
+to manage targets. `--target NAME` selects a target on remote-contacting commands;
+`PYRITE_REMOTE_TARGET` overrides the stored default. Named targets use their own
+stored fields ahead of per-field environment variables; omitted fields fall back
+to environment, flat settings, then defaults. Without a named
+selection, existing flat `remote.*` settings and environment overrides still apply.
+Use distinct remote directories when GPU vendors differ; shared directories also
+share job bookkeeping. New jobs record their target remotely and locally; job
+commands recover it by ID. If an ID exists on multiple targets, pass `--target`.
 
 AMD jobs keep their own `.venv-amd`, build CuPy for HIP on the first sync (about
 9 minutes on `qlmc-ace`), and pin `PYRITE_MC_BACKEND=rocm` so a broken HIP stack fails
@@ -115,3 +126,42 @@ wall-clock-bounded sweeps and performance wrappers. Neither successful execution
 nor an execution plan demonstrates physical accuracy or cluster scaling. Use
 [connectivity checks and limitations](../reference/cluster-execution.md#validation-and-limitations)
 before submitting a large workload.
+
+
+## Submit and follow a remote profile from Python
+
+The [experimental remote client](../reference/python-api/remote.md) uses the same
+named destinations and batch scripts as `pyrite run --remote --target NAME`:
+
+```python
+from pyrite.remote import RemoteTarget, submit
+
+job = submit("quickstart", target="lab-amd", materials=["hopg"])
+print(job.jobid, job.status().state)
+finished = job.wait(timeout=3600, poll_interval=10)
+if finished.succeeded:
+    pulled = job.pull()
+    print(pulled.paths)
+else:
+    print(job.logs())
+```
+
+To use a destination without storing it in config:
+
+```python
+destination = RemoteTarget(
+    host="MY_SSH_ALIAS",
+    remote_dir="/srv/pyrite",
+    uv="uv",
+    gpu_vendor="amd",
+    partition="gpu-amd",
+)
+preview = submit("quickstart", target=destination, dry_run=True)
+print(preview.script)
+```
+
+The client returns values without terminal output. `job.stop()` explicitly
+cancels the job; a `wait()` timeout leaves it running. Catch `RemoteError` for
+remote failures and inspect `error.result` for partial checkpoint pulls. Keep the
+returned handle: it retains the target and checkpoint identities used at submit
+time. Target selection does not enter physics or case identity.

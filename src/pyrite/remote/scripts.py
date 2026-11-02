@@ -308,6 +308,9 @@ def _write_job_script_command(jobdir, metadata):
     (predating code stamping) records no ``code_`` lines, which ``sync`` reads as
     unverifiable rather than as a conflict.
     """
+    selected = config._selected_target()
+    if selected is not None:
+        metadata += f"target: {selected.name or '(explicit)'}\n"
     jobdir_word = config.shell_single_word(jobdir)
     run_script_word = config.shell_single_word(f"{jobdir}/run.sh")
     metadata_word = config.shell_single_word(f"{jobdir}/meta")

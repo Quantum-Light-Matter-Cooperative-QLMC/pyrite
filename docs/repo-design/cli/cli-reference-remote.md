@@ -35,6 +35,7 @@ Commands:
   sync          Push current code to remote box.
   trajectories  Inspect remote captures, pull selected...
   job           List, inspect, follow, or stop remote jobs.
+  target        Configure named remote compute targets.
 ```
 
 ## `pyrite remote gc`
@@ -54,6 +55,7 @@ Options:
   --min-age-minutes NUMBER  Only release reservations at least this old.  [default: 5.0]
   -y, --yes                 Reclaim exactly what was previewed.
   -v, --verbose             Print raw ssh/scp/rsync commands instead of a status line.
+  --target NAME             Use named remote compute target NAME.
   -h, --help                Show this message and exit.
 ```
 
@@ -81,7 +83,8 @@ Usage: pyrite remote performance list [OPTIONS]
   List remote performance artifact directories.
 
 Options:
-  -h, --help  Show this message and exit.
+  --target NAME  Use named remote compute target NAME.
+  -h, --help     Show this message and exit.
 ```
 
 ## `pyrite remote performance pull`
@@ -93,6 +96,7 @@ Usage: pyrite remote performance pull [OPTIONS] PERFORMANCE_PROFILE
 
 Options:
   -v, --verbose  Print raw ssh/scp/rsync commands instead of a status line.
+  --target NAME  Use named remote compute target NAME.
   -h, --help     Show this message and exit.
 ```
 
@@ -107,6 +111,7 @@ Options:
   --all          Select every remote profile.
   -y, --yes      Delete exact previewed directories.
   -v, --verbose  Print raw ssh/scp/rsync commands instead of a status line.
+  --target NAME  Use named remote compute target NAME.
   -h, --help     Show this message and exit.
 ```
 
@@ -123,6 +128,7 @@ Options:
   --profile NAME  Prune the NAME / NAME-N job-directory family only.
   -y, --yes       Delete exact previewed directories.
   -v, --verbose   Print raw ssh/scp/rsync commands instead of a status line.
+  --target NAME   Use named remote compute target NAME.
   -h, --help      Show this message and exit.
 ```
 
@@ -163,6 +169,7 @@ Options:
   -o, --output [table|json]  Output format; only json is a stable automation contract.
                              [default: table]
   -v, --verbose              Print raw ssh/scp/rsync commands instead of a status line.
+  --target NAME              Use named remote compute target NAME.
   -h, --help                 Show this message and exit.
 ```
 
@@ -178,6 +185,7 @@ Options:
   --profile NAME  Delete checkpoints belonging to catalog profile NAME.
   -y, --yes       Delete exact previewed targets; otherwise preview.
   -v, --verbose   Print raw ssh/scp/rsync commands instead of a status line.
+  --target NAME   Use named remote compute target NAME.
   -h, --help      Show this message and exit.
 ```
 
@@ -191,6 +199,7 @@ Usage: pyrite remote sync [OPTIONS]
 Options:
   --force        Sync even while a live job is running different code.
   -v, --verbose  Print raw ssh/scp/rsync commands instead of a status line.
+  --target NAME  Use named remote compute target NAME.
   -h, --help     Show this message and exit.
 ```
 
@@ -233,6 +242,7 @@ Options:
   --seed S       [x>=0]
   --out-dir DIR  Local VTK root (default: pyrite-output/trajectories-exports).
   --overwrite    Replace differing local VTK files after verification.
+  --target NAME  Use named remote compute target NAME.
   -h, --help     Show this message and exit.
 ```
 
@@ -244,9 +254,10 @@ Usage: pyrite remote trajectories info [OPTIONS] [STEM]
   Show capture headers and sizes as JSON; reads no segment arrays.
 
 Options:
-  --case NAME   Select exact case name; repeatable.
-  --energy KEV  Select exact incident energy in keV; repeatable.
-  -h, --help    Show this message and exit.
+  --case NAME    Select exact case name; repeatable.
+  --energy KEV   Select exact incident energy in keV; repeatable.
+  --target NAME  Use named remote compute target NAME.
+  -h, --help     Show this message and exit.
 ```
 
 ## `pyrite remote trajectories ls`
@@ -257,9 +268,10 @@ Usage: pyrite remote trajectories ls [OPTIONS] [STEM]
   List complete capture files and sizes per stem; reads headers only.
 
 Options:
-  --case NAME   Select exact case name; repeatable.
-  --energy KEV  Select exact incident energy in keV; repeatable.
-  -h, --help    Show this message and exit.
+  --case NAME    Select exact case name; repeatable.
+  --energy KEV   Select exact incident energy in keV; repeatable.
+  --target NAME  Use named remote compute target NAME.
+  -h, --help     Show this message and exit.
 ```
 
 ## `pyrite remote trajectories pull`
@@ -276,6 +288,7 @@ Options:
   --out-dir DIR  Local capture root (default: pyrite-output/trajectories).
   -y, --yes      Transfer the selected files; without this flag only preview.
   --overwrite    Replace differing local files after successful verification.
+  --target NAME  Use named remote compute target NAME.
   -h, --help     Show this message and exit.
 ```
 
@@ -292,6 +305,7 @@ Options:
   --energy KEV      Select exact incident energy in keV; repeatable.
   --max-segments N  Segment rows per scoring block; whole histories stay together.
   --overwrite       Re-score existing checkpoint records.
+  --target NAME     Use named remote compute target NAME.
   -h, --help        Show this message and exit.
 ```
 
@@ -323,6 +337,7 @@ Usage: pyrite remote job attach [OPTIONS] [JOBID]
 
 Options:
   -v, --verbose  Add allocation detail; repeat for case progress and recent logs.
+  --target NAME  Use named remote compute target NAME.
   -h, --help     Show this message and exit.
 ```
 
@@ -338,6 +353,7 @@ Options:
                                   Show only one submission kind.
   -o, --output [table|json]       Output format; only json is a stable automation
                                   contract.  [default: table]
+  --target NAME                   Use named remote compute target NAME.
   -h, --help                      Show this message and exit.
 ```
 
@@ -349,8 +365,9 @@ Usage: pyrite remote job logs [OPTIONS] [JOBID]
   Show a job diagnostic log; JOBID defaults to latest.
 
 Options:
-  -f, --follow  Stream until interrupted.
-  -h, --help    Show this message and exit.
+  -f, --follow   Stream until interrupted.
+  --target NAME  Use named remote compute target NAME.
+  -h, --help     Show this message and exit.
 ```
 
 ## `pyrite remote job stack`
@@ -365,6 +382,7 @@ Usage: pyrite remote job stack [OPTIONS] [JOBID]
 Options:
   --wait SECONDS  Seconds to let the dump reach the job log before reading it.
                   [default: 2.0; x>=0.0]
+  --target NAME   Use named remote compute target NAME.
   -h, --help      Show this message and exit.
 ```
 
@@ -380,6 +398,7 @@ Options:
                              logs.
   -o, --output [table|json]  Output format; only json is a stable automation contract.
                              [default: table]
+  --target NAME              Use named remote compute target NAME.
   -h, --help                 Show this message and exit.
 ```
 
@@ -394,5 +413,112 @@ Options:
   -a, --all       Stop every live job.
   --profile NAME  Stop live jobs submitted for profile NAME.
   -y, --yes       Stop exact previewed jobs.
+  --target NAME   Use named remote compute target NAME.
   -h, --help      Show this message and exit.
+```
+
+## `pyrite remote target`
+
+```text
+Usage: pyrite remote target [OPTIONS] COMMAND [ARGS]...
+
+  Configure named SSH/SLURM destinations in your user config.
+
+Options:
+  -h, --help  Show this message and exit.
+
+Commands:
+  add     Add a target; --host is required.
+  edit    Update only the supplied fields of an existing target.
+  list    List configured targets.
+  remove  Preview or remove a target; removing the default clears its selection.
+  show    Show one resolved named target.
+  use     Select the default named target.
+```
+
+## `pyrite remote target add`
+
+```text
+Usage: pyrite remote target add [OPTIONS] NAME
+
+  Add a target; --host is required. Other fields use built-in defaults.
+
+Options:
+  --host TEXT
+  --remote-dir TEXT
+  --uv TEXT
+  --gpu-vendor TEXT
+  --partition TEXT
+  --nodelist TEXT
+  --gres TEXT
+  --description TEXT
+  -h, --help          Show this message and exit.
+```
+
+## `pyrite remote target edit`
+
+```text
+Usage: pyrite remote target edit [OPTIONS] NAME
+
+  Update only the supplied fields of an existing target.
+
+Options:
+  --host TEXT
+  --remote-dir TEXT
+  --uv TEXT
+  --gpu-vendor TEXT
+  --partition TEXT
+  --nodelist TEXT
+  --gres TEXT
+  --description TEXT
+  -h, --help          Show this message and exit.
+```
+
+## `pyrite remote target list`
+
+```text
+Usage: pyrite remote target list [OPTIONS]
+
+  List configured targets.
+
+Options:
+  -o, --output [table|json]  Output format; only json is a stable automation contract.
+                             [default: table]
+  -h, --help                 Show this message and exit.
+```
+
+## `pyrite remote target remove`
+
+```text
+Usage: pyrite remote target remove [OPTIONS] NAME
+
+  Preview or remove a target; removing the default clears its selection.
+
+Options:
+  -y, --yes   Delete the previewed target.
+  -h, --help  Show this message and exit.
+```
+
+## `pyrite remote target show`
+
+```text
+Usage: pyrite remote target show [OPTIONS] NAME
+
+  Show one resolved named target.
+
+Options:
+  -o, --output [table|json]  Output format; only json is a stable automation contract.
+                             [default: table]
+  -h, --help                 Show this message and exit.
+```
+
+## `pyrite remote target use`
+
+```text
+Usage: pyrite remote target use [OPTIONS] NAME
+
+  Select the default named target.
+
+Options:
+  -h, --help  Show this message and exit.
 ```

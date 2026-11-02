@@ -91,8 +91,14 @@ def _reject_all_with_values(command_name, all_, values):
 @click.group(
     "remote",
     cls=LazyGroup,
-    lazy_commands={"job": "pyrite.cli.commands.job.command"},
-    lazy_help={"job": "List, inspect, follow, or stop remote jobs."},
+    lazy_commands={
+        "job": "pyrite.cli.commands.job.command",
+        "target": "pyrite.cli.commands.remote_targets.command",
+    },
+    lazy_help={
+        "job": "List, inspect, follow, or stop remote jobs.",
+        "target": "Configure named remote compute targets.",
+    },
     help=(
         "[dev] Push code and run or manage MC sweeps on a remote GPU box over SSH.\n\n"
         "Host, remote directory, and executable come from PYRITE_REMOTE_HOST, "
@@ -1106,6 +1112,10 @@ def check_command(ctx, ne, ne_brem, ne_supp, tmd_azimuth, refresh, no_sync, deta
 from . import remote_trajectories  # noqa: E402
 
 command.add_command(remote_trajectories.command)
+
+from .._options import target_commands  # noqa: E402
+
+target_commands(command)
 
 
 def main(argv=None):

@@ -95,6 +95,7 @@ Options:
                              [default: (pyrite-output/checkpoints)]
   --save-every N             Atomically save after every N recomputed records.
                              [default: 100]
+  --target NAME              Use named remote compute target NAME.
   -R, --remote [TARGET]      Run remotely; bare uses the configured target, =TARGET
                              overrides it.
   --detach                   Return after remote submission.
@@ -131,6 +132,7 @@ Options:
                              [default: (pyrite-output/checkpoints)]
   --save-every N             Atomically save after every N recomputed records.
                              [default: 100]
+  --target NAME              Use named remote compute target NAME.
   -R, --remote [TARGET]      Run remotely; bare uses the configured target, =TARGET
                              overrides it.
   --detach                   Return after remote submission.

@@ -146,3 +146,8 @@ def stop_command(jobid: str | None, all_: bool, profile: str | None, yes: bool):
         lifecycle._stop_jobid(jobid)
         return
     lifecycle.stop_jobs(all_jobs=all_, profile=profile, yes=yes)
+
+
+from .._options import target_commands  # noqa: E402
+
+target_commands(command)

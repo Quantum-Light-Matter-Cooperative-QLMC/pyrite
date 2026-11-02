@@ -19,6 +19,7 @@ Public API stability is governed by `api-surface.toml`. It is **not** equivalent
 | [Radiation sources](radiation.md) | Source spectra, units and normalization |
 | [Experimental and provisional interfaces](experimental.md) | Provisional optimization, photon and optical interfaces |
 | [Execution and scheduling](execution.md) | Executors and scheduling policies |
+| [Remote compute targets](remote.md) | Experimental SSH/SLURM submission and job handles |
 | [Units and quantities](units.md) | Pint and canonical units |
 | [Persistence and storage](storage.md) | `pyrite.storage` |
 | [Compatibility](compatibility.md) | Root aliases and migration paths |
@@ -39,6 +40,7 @@ transport
 radiation
 experimental
 execution
+remote
 units
 storage
 compatibility

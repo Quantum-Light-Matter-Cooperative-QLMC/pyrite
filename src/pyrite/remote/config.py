@@ -5,6 +5,8 @@ import re
 import shlex
 import subprocess
 from contextlib import contextmanager
+from contextvars import ContextVar
+from dataclasses import dataclass, replace
 from functools import cache
 from pathlib import Path, PurePosixPath
 
@@ -160,7 +162,7 @@ def validate_remote_target(value: str) -> str:
     return value
 
 
-def remote_host() -> str:
+def _legacy_remote_host() -> str:
     """Return the validated effective SSH-config host alias."""
     from ..console import config as cli_config
 
@@ -186,8 +188,13 @@ def override_remote_host(value: str | None):
     previous = HOST
     HOST = value
     try:
-        remote_host()
-        yield
+        validate_remote_target(value)
+        selected = _selected_target()
+        if selected is None:
+            yield
+        else:
+            with use_target(replace(selected, host=value)):
+                yield
     finally:
         HOST = previous
 
@@ -271,7 +278,7 @@ def _expand_remote_home(value: str) -> str:
 
 def remote_dir() -> str:
     """Return validated absolute POSIX checkout path (``~/`` expanded remotely)."""
-    value = REMOTE_DIR
+    value = _target_field("remote_dir", REMOTE_DIR)
     if not isinstance(value, str):
         raise SystemExit(f"invalid PYRITE_REMOTE_DIR={value!r}: expected absolute POSIX path")
     _reject_controls("PYRITE_REMOTE_DIR", value)
@@ -286,7 +293,7 @@ def remote_dir() -> str:
 
 def remote_uv() -> str:
     """Return validated executable name or absolute POSIX path (``~/`` expanded remotely)."""
-    value = REMOTE_UV
+    value = _target_field("uv", REMOTE_UV)
     if not isinstance(value, str):
         raise SystemExit(
             f"invalid PYRITE_REMOTE_UV={value!r}: expected executable name or absolute POSIX path"
@@ -343,6 +350,10 @@ def validate_slurm_setting(key: str, value: str) -> str:
 def _slurm_setting(key: str, override: str | None) -> str:
     from ..console import config as cli_config
 
+    selected = _selected_target()
+    if selected is not None:
+        value = getattr(selected, key.split(".")[1])
+        return "" if key == "remote.nodelist" and value == NODELIST_ANY else value
     env_name = _SLURM_SETTINGS[key][0]
     try:
         value = validate_slurm_setting(key, cli_config.resolve(key, override).value)
@@ -483,3 +494,87 @@ def scp_remote_path(path: str) -> str:
     if not PurePosixPath(path).is_absolute():
         raise SystemExit(f"invalid remote SCP path={path!r}: expected absolute POSIX path")
     return f"{remote_host()}:{shell_arg(path)}"
+
+
+# Invocation-local selection keeps concurrent callers and nested commands isolated.
+_TARGET: ContextVar[object] = ContextVar("pyrite_remote_target", default=None)
+
+
+def _selected_target():
+    from .targets import resolve_target, selected_name
+
+    selected = _TARGET.get()
+    if selected is not None:
+        return selected
+    name = selected_name()
+    return resolve_target(name) if name else None
+
+
+def _target_field(name, fallback):
+    selected = _selected_target()
+    return getattr(selected, name) if selected is not None else fallback
+
+
+def remote_host() -> str:
+    selected = _selected_target()
+    return selected.host if selected is not None else _legacy_remote_host()
+
+
+@contextmanager
+def use_target(target=None):
+    """Bind one resolved target for the lifetime of an invocation."""
+    from .targets import resolve_target
+
+    token = _TARGET.set(resolve_target(target))
+    try:
+        yield _TARGET.get()
+    finally:
+        _TARGET.reset(token)
+
+
+@dataclass(frozen=True)
+class RemoteTarget:
+    """Immutable SSH/SLURM destination. Paths use the remote host's POSIX home.
+
+    Construction validates without network I/O. ``~/`` paths expand when used.
+    ``nodelist='any'`` lets SLURM choose. Targets do not enter physics identities.
+    """
+
+    host: str
+    remote_dir: str = "~/pyrite"
+    uv: str = "~/.local/bin/uv"
+    gpu_vendor: str = "nvidia"
+    partition: str = "gpu"
+    nodelist: str = "any"
+    gres: str = "gpu:1"
+    description: str = ""
+    name: str | None = None
+
+    def __post_init__(self):
+        from .targets import validate_name
+
+        for field in (
+            "host",
+            "remote_dir",
+            "uv",
+            "gpu_vendor",
+            "partition",
+            "nodelist",
+            "gres",
+            "description",
+        ):
+            value = getattr(self, field)
+            if not isinstance(value, str) or any(ord(c) < 32 or ord(c) == 127 for c in value):
+                raise ValueError(f"invalid target {field}: expected printable string")
+        validate_remote_target(self.host)
+        if self.name is not None:
+            validate_name(self.name)
+        if not (PurePosixPath(self.remote_dir).is_absolute() or self.remote_dir.startswith("~/")):
+            raise ValueError("remote_dir must be an absolute POSIX path or ~/path")
+        uv = self.uv[1:] if self.uv.startswith("~/") else self.uv
+        if not (_EXECUTABLE_RE.fullmatch(uv) or _ABS_EXECUTABLE_RE.fullmatch(uv)):
+            raise ValueError("uv must be an executable name, absolute POSIX path or ~/path")
+        for field in ("gpu_vendor", "partition", "nodelist", "gres"):
+            object.__setattr__(
+                self, field, validate_slurm_setting(f"remote.{field}", getattr(self, field))
+            )

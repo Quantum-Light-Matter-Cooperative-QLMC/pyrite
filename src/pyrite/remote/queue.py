@@ -7,6 +7,7 @@ from ..console import dashboard as presentation
 from . import config, scripts, state, transport
 from .cleanup import _refuse_if_busy
 from .jobs import _stage_job_script, _submit_staged_job
+from .reporting import report
 
 
 def _refuse_if_profile_live(catalog_profile):
@@ -191,6 +192,14 @@ def _queue_jobid(catalog_profile, dry_run):
     return _profile_jobid(catalog_profile)
 
 
+@dataclass(frozen=True)
+class _Submission:
+    jobid: str
+    script: str
+    stems: tuple[str, ...]
+    scheduler_id: str | None = None
+
+
 def start_queue(
     materials,
     quick=False,
@@ -216,6 +225,7 @@ def start_queue(
     trajectories=None,
     overwrite_trajectories=False,
     trajectory_storage=None,
+    _return_submission=False,
 ):
     """Submit a material queue to SLURM. Returns its job id.
 
@@ -370,11 +380,11 @@ def start_queue(
     submit = scripts._submit_slurm_command(jobid, stems, nice=chunked)
 
     if dry_run:
-        print(f"# job {jobid}: {' '.join(materials)}{' (quick)' if quick else ''}")
-        print(f"# --- ssh {config.remote_host()}: {upload} <<\n")
-        print(script)
-        print(f"# --- ssh {config.remote_host()}: {submit}")
-        return jobid
+        report(f"# job {jobid}: {' '.join(materials)}{' (quick)' if quick else ''}")
+        report(f"# --- ssh {config.remote_host()}: {upload} <<\n")
+        report(script)
+        report(f"# --- ssh {config.remote_host()}: {submit}")
+        return _Submission(jobid, script, tuple(stems)) if _return_submission else jobid
 
     if not no_sync:
         transport.sync_code()
@@ -383,7 +393,7 @@ def start_queue(
     # which produces a CRLF run.sh that bash silently refuses to execute.
     _stage_job_script(jobid, stems, upload, script)
     scheduler_id = _submit_staged_job(jobid, stems, nice=chunked)
-    print(
+    report(
         f"\nJOB {jobid} · SUBMITTED\n"
         + presentation.format_fields(
             _submission_fields(
@@ -398,7 +408,7 @@ def start_queue(
             )
         )
     )
-    return jobid
+    return _Submission(jobid, script, tuple(stems), scheduler_id) if _return_submission else jobid
 
 
 def _submission_fields(

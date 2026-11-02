@@ -244,7 +244,8 @@ Canonical maintained Zhai detector geometry and cache-schema provenance shared b
 Optional SSH/SLURM orchestration for a configured remote host: sync, bounded and chunked submissions, progress/status/log viewers, checkpoint pulls, safe stop and clear, remote validation jobs.
 - Public CLI: `add_subparser`, `main`.
 - The public package contains the former facade and implementation modules (acyclic: `config` ◄ `transport` ◄ `scripts` ◄ `state` ◄ `lifecycle`/`viewer`; the Click wiring lives in `cli/commands/remote.py` and the frame rendering in `console/dashboard/`):
-  - `config.py` — env-driven hosts/paths/SLURM constants.
+  - `config.py` — immutable remote target values and invocation-scoped host/path/SLURM resolution. `targets.py` owns named user-config storage and local job provenance.
+  - `client.py` — experimental `submit` and typed job handles; synchronous status/logs/stop/wait/pull with silent library results. `reporting.py` keeps presentation invocation-local; `selection.py` shares profile membership with CLI submission.
   - `transport.py` — ssh/scp primitives, streamed downloads, hashing, code sync (per-sync-path rsync mirror when both ends have rsync, else generated-cache-filtered tar+scp; `PYRITE_SYNC_TRANSPORT`), selected external-catalog staging, material checks; one-round-trip immutable energy-grid hash inventory skips remote objects already present with matching content.
   - `scripts.py` — pure SLURM/shell string + command builders, job-id minting, per-allocation dependency-sync timing.
   - `state.py` — read-only job/reservation state queries over ssh; live-job discovery joins metadata against one scheduler snapshot.

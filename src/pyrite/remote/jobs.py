@@ -4,6 +4,7 @@ import subprocess
 
 from ..console import output as _cli_core
 from . import config, scripts, state, transport
+from .reporting import is_quiet
 
 
 def _stage_job_script(jobid: str, stems: list[str], upload: str, script: str) -> None:
@@ -16,11 +17,12 @@ def _stage_job_script(jobid: str, stems: list[str], upload: str, script: str) ->
         )
     )
     try:
-        subprocess.run(
-            config.ssh_argv(config.remote_host(), upload),
-            input=script.replace("\r\n", "\n").encode(),
-            check=True,
-        )
+        command = config.ssh_argv(config.remote_host(), upload)
+        payload = script.replace("\r\n", "\n").encode()
+        if is_quiet():
+            transport._run(command, input=payload)
+        else:
+            subprocess.run(command, input=payload, check=True)
     except BaseException:
         transport._run(
             config.ssh_argv(
@@ -68,6 +70,10 @@ def _release_if_submission_definitely_failed(jobid: str, stems: list[str]) -> No
 
 def _submit_staged_job(jobid: str, stems: list[str], *, nice: bool = False) -> str:
     """Submit an uploaded script without freeing locks after an ambiguous SSH loss."""
+    from .targets import remember_job
+
+    # Record provenance before sbatch: an SSH loss can hide an accepted job.
+    remember_job(jobid)
     try:
         scheduler_id = transport._ssh_capture(
             scripts._submit_slurm_command(jobid, stems, nice=nice)
@@ -106,6 +112,7 @@ def _stop_jobid(jobid):
     transport._run(
         config.ssh_argv("-n", config.remote_host(), remote), label=f"Cancelling job {jobid}..."
     )
+    return scheduler_id
 
 
 def _stop_jobids(jobids):

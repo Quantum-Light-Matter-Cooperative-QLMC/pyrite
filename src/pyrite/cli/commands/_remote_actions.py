@@ -134,10 +134,13 @@ def _profile_selected_materials(catalog_profile, materials):
 
 
 def _start_selected(materials, catalog_profile):
-    """Validate the profile-owned material selection prepared by ``remote run``."""
-    from ...runs.scan import validate_catalog_profile
+    """Resolve the shared library profile selection under the CLI error contract."""
+    from ...remote.selection import select_materials
 
-    return validate_catalog_profile(catalog_profile, list(materials or []), intersect=False), None
+    try:
+        return select_materials(catalog_profile, materials or None), None
+    except ValueError as exc:
+        raise click.UsageError(str(exc)) from exc
 
 
 def _cli_rebrem(

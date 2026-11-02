@@ -668,6 +668,7 @@ Options:
   --detach                  Return after remote submission.
   --profile NAME            Install derived grids for profile NAME; precedence: flag >
                             configuration > standard.
+  --target NAME             Use named remote compute target NAME.
   -R, --remote [TARGET]     Run remotely; bare uses the configured target, =TARGET
                             overrides it.
   -h, --help                Show this message and exit.

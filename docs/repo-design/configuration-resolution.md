@@ -266,3 +266,26 @@ comparing deterministic runs. Do not infer that a shared case hash
 guarantees bitwise equality. Changing content-key semantics or schema
 defaults requires a separate versioned identity decision and numerical
 parity evidence.
+
+
+## Named remote destinations
+
+`pyrite remote target add|edit|remove|list|show|use` owns `[remote.targets.NAME]`
+and `remote.default_target` in the user config store. Each entry has `host`,
+`remote_dir`, `uv`, `gpu_vendor`, `partition`, `nodelist`, `gres`, and optional
+`description`. Names follow execution-profile identifiers (letter first, at most
+64 letters/digits/underscores/dots/hyphens). Values are validated before storage.
+
+Selection: explicit `--target NAME` > `PYRITE_REMOTE_TARGET` >
+`remote.default_target` > implicit unnamed target. Stored named fields outrank per-field
+environment overrides; omitted fields fall back through environment > flat keys >
+defaults. `--remote=HOST` remains the legacy per-call host override; use
+`--remote --target NAME` for named destinations. Paths with `~/` resolve against
+the remote login home when used. Separate directories avoid cross-vendor job
+bookkeeping collisions; configuring a shared directory emits a warning.
+
+New named submissions also persist a resolved target under `[remote_jobs]` in
+user config, and its name in remote metadata. Job commands use this record
+without searching hosts; duplicate IDs across targets require explicit selection.
+A recorded target survives default changes or removal of its named configuration.
+Remote destination settings never enter scientific identities.
