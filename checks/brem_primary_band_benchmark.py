@@ -33,8 +33,36 @@ def ignored(path):
     subprocess.run(["git", "check-ignore", "--quiet", str(path)], check=True)
 
 
+def metadata_encode(value):
+    """Encode nested transport metadata without discarding array/tuple types."""
+    if isinstance(value, np.ndarray):
+        return {"__array__": value.tolist(), "dtype": value.dtype.str}
+    if isinstance(value, np.generic):
+        return value.item()
+    if isinstance(value, tuple):
+        return {"__tuple__": [metadata_encode(item) for item in value]}
+    if isinstance(value, list):
+        return [metadata_encode(item) for item in value]
+    if isinstance(value, dict):
+        return {key: metadata_encode(item) for key, item in value.items()}
+    return value
+
+
+def metadata_decode(value):
+    """Restore arrays and coupled table identity tuples on captured inputs."""
+    if isinstance(value, dict):
+        if "__array__" in value:
+            return np.asarray(value["__array__"], dtype=value["dtype"])
+        if "__tuple__" in value:
+            return tuple(metadata_decode(item) for item in value["__tuple__"])
+        return {key: metadata_decode(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [metadata_decode(item) for item in value]
+    return value
+
+
 def write_json(path, value):
-    path.write_text(json.dumps(value, indent=2) + "\n")
+    path.write_text(json.dumps(metadata_encode(value), indent=2) + "\n")
 
 
 def source_pin():
@@ -123,7 +151,7 @@ def replay(args):
     from pyrite.montecarlo.spectrum.brem_events import mc_coupled_brem_spectrum
     from pyrite.xsgen.bremslib.tables import load_bremsstrahlung_tables
 
-    metadata = json.loads(args.capture.with_suffix(".json").read_text())
+    metadata = metadata_decode(json.loads(args.capture.with_suffix(".json").read_text()))
     data_path = args.capture.with_suffix(".npz")
     assert hashlib.sha256(data_path.read_bytes()).hexdigest() == metadata["capture_sha256"]
     segments = dict(np.load(data_path))
@@ -140,7 +168,11 @@ def replay(args):
     tables = load_bremsstrahlung_tables([element])
     report = dict(
         source_sha=source_pin(),
-        capture=metadata,
+        capture={
+            key: value
+            for key, value in metadata.items()
+            if key in {"scene", "source_sha", "seed", "histories", "rows", "capture_sha256"}
+        },
         cupy=cp.__version__,
         gpu=str(cp.cuda.runtime.getDeviceProperties(0)["name"]),
         cuda_runtime=cp.cuda.runtime.runtimeGetVersion(),
@@ -303,6 +335,80 @@ def replay(args):
     report["peak_host_rss_kib"] = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
     np.savez(args.output.with_suffix(".npz"), **scores_to_save)
     write_json(args.output.with_suffix(".json"), report)
+    print(json.dumps(metadata_encode(report)), flush=True)
+
+
+def stress(args):
+    """Isolate original-ID accumulation over long histories with known FP64 sums."""
+    import cupy as cp
+
+    from pyrite.montecarlo.spectrum.brem_band_jit import _group_rows
+
+    n = 100003
+    ids = np.repeat(np.array([0, 2, 4], dtype=np.int64), n)
+    values = np.tile(np.geomspace(1e-12, 1e-3, n).astype(np.float32), 3)
+    reference = np.bincount(ids, weights=values.astype(np.float64), minlength=6)
+    arrays = dict(primary_ids=ids, partials=values, reference=reference)
+    rng = np.random.default_rng(938)
+    report = dict(
+        source_sha=source_pin(),
+        rows_per_primary=n,
+        rows=int(ids.size),
+        description="synthetic positive scoring partials; numerical stress, not independent physical histories",
+        experiments=[],
+    )
+    for order, indices in (
+        ("forward", np.arange(ids.size)),
+        ("reverse", np.arange(ids.size)[::-1]),
+        ("shuffled", rng.permutation(ids.size)),
+    ):
+        device_ids = cp.asarray(ids[indices])
+        for dtype in (np.float64, np.float32):
+            device_values = cp.asarray(values[indices], dtype=dtype)
+            output = cp.zeros(6, dtype=dtype)
+
+            def launch(device_values=device_values, device_ids=device_ids, output=output):
+                _group_rows(
+                    ((ids.size + 255) // 256,),
+                    (256,),
+                    (device_values, device_ids, output, np.uint32(ids.size)),
+                )
+
+            launch()
+            cp.cuda.get_current_stream().synchronize()
+            times, scores = [], []
+            for _repeat in range(5):
+                output.fill(0)
+                cp.cuda.get_current_stream().synchronize()
+                start = time.perf_counter()
+                launch()
+                cp.cuda.get_current_stream().synchronize()
+                times.append(time.perf_counter() - start)
+                scores.append(cp.asnumpy(output).astype(np.float64))
+            scores = np.asarray(scores)
+            label = f"{order}-{np.dtype(dtype).name}"
+            arrays[label] = scores
+            report["experiments"].append(
+                dict(
+                    order=order,
+                    dtype=np.dtype(dtype).name,
+                    wall_s=times,
+                    max_relative=float(
+                        (np.abs(scores - reference) / np.maximum(reference, 1e-300)).max()
+                    ),
+                    repeat_max_relative=float(
+                        (np.ptp(scores, axis=0) / np.maximum(reference, 1e-300)).max()
+                    ),
+                    values_bytes=int(device_values.nbytes + output.nbytes),
+                )
+            )
+            if dtype == np.float64:
+                np.testing.assert_allclose(
+                    scores, np.broadcast_to(reference, scores.shape), rtol=1e-11
+                )
+            np.testing.assert_array_equal(scores[:, [1, 3, 5]], 0)
+    np.savez(args.output.with_suffix(".npz"), **arrays)
+    write_json(args.output.with_suffix(".json"), report)
     print(json.dumps(report), flush=True)
 
 
@@ -318,12 +424,13 @@ def main():
     rep.add_argument("--repeats", type=int, default=5)
     rep.add_argument("--profile", action="store_true")
     rep.add_argument("--nodes", nargs="+", type=int, default=[64, 176, 496])
-    for child in (cap, rep):
+    accumulation = sub.add_parser("stress")
+    for child in (cap, rep, accumulation):
         child.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     ignored(args.output.with_suffix(".json"))
     ignored(args.output.with_suffix(".npz"))
-    (capture if args.mode == "capture" else replay)(args)
+    {"capture": capture, "replay": replay, "stress": stress}[args.mode](args)
 
 
 if __name__ == "__main__":

@@ -178,6 +178,25 @@ Each row contributes one evaluation of the integrand rather than a quadrature al
 
 The continuum needs no coherent flight grouping. Its contribution is linear in segment length when energy and attenuation are held fixed. Subdivision of an evolving, absorbing track changes the quadrature and is not exactly invariant.
 
+## Per-primary band reduction
+
+On CUDA with the FP32 array backend, the per-primary band scorer fuses the
+existing FP32 cross-section and attenuation cells with FP64 photon quadrature
+partials and FP64 accumulation into original primary IDs. A partial belongs to
+one transport segment; this precision choice does not narrow stored trajectory
+positions, times or phases, or change coherent/incoherent CXR arithmetic. Empty
+primary histories retain zero scores. Angular-table staging is capped at 65,536
+escaped rows and never allocates a full segment × photon matrix. CPU, global
+`PYRITE_FP64=1`, and unsupported model/table combinations retain portable scoring.
+
+The reduction order differs from the portable FP32 matrix reduction, so parity
+is within rounding tolerance rather than bitwise. Such changes can move an
+adaptive stopping decision at a threshold. Adaptive BremsLib policies that
+monitor bremsstrahlung therefore carry `brem_band_reduction_model` in dataset
+identity, case content keys and resolved provenance; fixed counts, CXR-only
+policies and other continuum models omit it. Benchmark-only FP32 accumulator
+variants do not change production defaults or the source-table model identity.
+
 ## External backgrounds
 
 `load_external_brem` interpolates a two-column external background (energy [eV], intensity) onto the spectral grid, for comparison against or subtraction from an independently simulated continuum — e.g. a NIST DTSA-II simulation. The file is treated as an **as-detected** spectrum: window efficiency and detector resolution are not re-applied, and energies outside the file's range interpolate to zero. The intensity must already be in the detected units of the plot it joins.

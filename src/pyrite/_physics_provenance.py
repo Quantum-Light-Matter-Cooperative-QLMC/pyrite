@@ -42,6 +42,7 @@ def resolved_physics_view(
     Descriptor requirements do not certify energy coverage or physical validity.
     """
     from ._numerics import Physics
+    from ._precision import _brem_band_reduction_markers
     from .materials.photon_cross_sections import ATTENUATION_MODEL
     from .montecarlo.spectrum import (
         BREMSSTRAHLUNG_MODEL,
@@ -121,6 +122,11 @@ def resolved_physics_view(
             else BREMSSTRAHLUNG_MODEL
         ),
     }
+    markers.update(
+        _brem_band_reduction_markers(
+            resolved.get("adaptive_precision"), selections["emission.continuum"]
+        )
+    )
     if resolved.get("photon_transport") is not None:
         markers["photon_transport_model"] = resolved["photon_transport"]["model"]
     if resolved.get("coherent_emission", False):
