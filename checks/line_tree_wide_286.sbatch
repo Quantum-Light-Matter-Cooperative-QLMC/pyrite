@@ -13,7 +13,7 @@ cd "$SLURM_SUBMIT_DIR"
 export PATH="$HOME/.local/bin:$PATH"
 export PYRITE_HOME="$PWD" PYRITE_CATALOG="$PWD/src/pyrite/data/catalog"
 export PYRITE_USER_CATALOG="$PWD/user-catalog" XDG_CONFIG_HOME="$PWD/.xdg-config"
-export UV_CACHE_DIR=/tmp/pyrite-uv-cache PYRITE_MC_BACKEND=cuda
+export PYTHONPATH="$PWD" UV_CACHE_DIR=/tmp/pyrite-uv-cache PYRITE_MC_BACKEND=cuda
 mkdir -p "$XDG_CONFIG_HOME" "$PYRITE_USER_CATALOG"
 out="evidence/wide286/$SLURM_JOB_ID"; mkdir -p "$out"
 cp .pyrite-sync "$out/sync.json"
