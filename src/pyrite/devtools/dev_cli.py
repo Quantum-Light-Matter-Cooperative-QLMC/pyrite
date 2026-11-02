@@ -70,12 +70,13 @@ TEST_SUITE_PATTERNS = {
         "energy-grid/test_cli.py",
         "scan/test_local_dashboard.py",
         "montecarlo/test_output_noise.py",
-        "remote/test_remote.py",
+        "remote/test_remote_command_*.py",
         "remote/test_click.py",
         "scan/test_scan_*.py",
         "checkpoint/test_slim.py",
     ),
     # Genuine cross-directory exceptions to TEST_SUITE_DIRECTORIES.
+    "transport": ("montecarlo/test_cone_split.py",),
     "quantum": ("materials/test_channeling_profile.py",),
     "channeling": ("materials/test_channeling_*.py",),
 }
@@ -103,7 +104,7 @@ INTEGRATION_TESTS = (
     "cli/test_contract.py",
     "materials/test_materials_package.py",
     "montecarlo/test_exports.py",
-    "remote/test_remote.py",
+    "remote/test_remote_command_successful.py",
     "results/test_exports.py",
     "scan/test_run.py",
     "scan/test_sweep.py",

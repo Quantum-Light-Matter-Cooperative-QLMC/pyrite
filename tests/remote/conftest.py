@@ -8,6 +8,7 @@ the ``_materials_needing_pull`` call added in #119 shipped with
 """
 
 import contextlib
+import shutil
 import subprocess
 
 import pytest
@@ -63,3 +64,25 @@ def empty_user_catalog(monkeypatch, tmp_path_factory):
     layer = tmp_path_factory.mktemp("empty-user-catalog")
     monkeypatch.setenv("PYRITE_USER_CATALOG", str(layer))
     return layer
+
+
+@pytest.fixture
+def multi_detector_standard(tmp_path, monkeypatch):
+    """Bundled-catalog copy whose ``standard`` profile also declares a physical
+    detector, so it resolves the two detector IDs ``physical`` and ``default``."""
+    from pyrite import DATA_DIR, materials
+    from pyrite.campaign import config as campaign_config
+    from pyrite.materials import load_material_catalog
+
+    root = tmp_path / "catalog"
+    shutil.copytree(DATA_DIR / "catalog", root)
+    profile = root / "profiles" / "standard.toml"
+    with profile.open("a") as handle:
+        handle.write("\n[physical_detector]\ndistance_mm = 300.0\nshape = [2, 3]\n")
+        handle.write("pitch_mm = [0.1, 0.2]\n")
+    catalog = load_material_catalog(root)
+    monkeypatch.setenv("PYRITE_CATALOG", str(root))
+    monkeypatch.setattr(materials, "CATALOG", catalog)
+    monkeypatch.setattr(campaign_config, "CATALOG", catalog)
+    assert len(catalog.profile_detector_set("standard")) == 2
+    return catalog
