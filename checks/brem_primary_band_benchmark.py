@@ -1,0 +1,322 @@
+"""Capture a bounded #821 production population and replay identical band inputs.
+
+All output must be gitignored. Example (CUDA allocation, configured catalogs):
+uv run python checks/brem_primary_band_benchmark.py capture si-3MeV-1mm \
+    --histories 128 --output scratch/issue938/si3
+uv run python checks/brem_primary_band_benchmark.py replay scratch/issue938/si3 \
+    --output scratch/issue938/si3-replay --repeats 5
+
+Capture reuses the pinned in-tree #821 production setup, aborting after its first
+transport call. Replay alternates warmed baseline/candidate scoring on that same
+saved population; compilation is excluded. No Geant4 arm is run. Arrays, row
+counts, source/table pins, sums/squares, mean/RSE, wall/device time and memory
+remain in scratch for subsequent analyses. Node-count sweeps measure this band
+only; they do not establish angular/energy quadrature convergence.
+"""
+
+import argparse
+import hashlib
+import importlib.util
+import json
+import resource
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+import numpy as np
+
+
+def ignored(path):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    subprocess.run(["git", "check-ignore", "--quiet", str(path)], check=True)
+
+
+def write_json(path, value):
+    path.write_text(json.dumps(value, indent=2) + "\n")
+
+
+def source_pin():
+    stamp = Path(".pyrite-sync")
+    if stamp.exists():
+        value = json.loads(stamp.read_text())
+        if value["dirty"]:
+            raise RuntimeError("benchmark requires a clean committed sync")
+        return value["revision"]
+    return subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+
+
+def capture(args):
+    import cupy as cp
+
+    from pyrite.montecarlo import transport
+
+    filename = Path(__file__).parent / "geant4_performance/pyrite_bench.py"
+    spec = importlib.util.spec_from_file_location("benchmark821", filename)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    original = transport.simulate_trajectories
+
+    class Captured(Exception):
+        pass
+
+    def save(**kwargs):
+        result = original(**kwargs)
+        arrays, metadata = {}, {}
+        for name, value in result.items():
+            if hasattr(value, "shape"):
+                arrays[name] = cp.asnumpy(value) if isinstance(value, cp.ndarray) else value
+            else:
+                metadata[name] = value
+        np.savez(args.output.with_suffix(".npz"), **arrays)
+        metadata.update(
+            scene=args.scene,
+            source_sha=source_pin(),
+            seed=kwargs["seed"],
+            histories=kwargs["Ne"],
+            rows=int(arrays["L_ang"].size),
+            capture_sha256=hashlib.sha256(args.output.with_suffix(".npz").read_bytes()).hexdigest(),
+        )
+        write_json(args.output.with_suffix(".json"), metadata)
+        raise Captured
+
+    transport.simulate_trajectories = save
+    sys.argv = [
+        str(filename),
+        args.scene,
+        "--histories",
+        str(args.histories),
+        "--warmup-histories",
+        str(args.histories),
+        "--seed",
+        str(args.seed),
+        "--rows-per-round",
+        "1024",
+        "--device-staging",
+        "--output",
+        str(args.output),
+    ]
+    try:
+        module.main()
+    except Captured:
+        pass
+    finally:
+        transport.simulate_trajectories = original
+
+
+def moments(scores):
+    scores = np.asarray(scores, dtype=np.float64)
+    mean = scores.mean()
+    return dict(
+        sum=float(scores.sum()),
+        sum_squares=float(scores @ scores),
+        mean=float(mean),
+        rse=float(scores.std(ddof=1) / np.sqrt(scores.size) / mean),
+    )
+
+
+def replay(args):
+    import cupy as cp
+
+    from pyrite.montecarlo.spectrum import brem, brem_band_jit
+    from pyrite.montecarlo.spectrum.brem_events import mc_coupled_brem_spectrum
+    from pyrite.xsgen.bremslib.tables import load_bremsstrahlung_tables
+
+    metadata = json.loads(args.capture.with_suffix(".json").read_text())
+    data_path = args.capture.with_suffix(".npz")
+    assert hashlib.sha256(data_path.read_bytes()).hexdigest() == metadata["capture_sha256"]
+    segments = dict(np.load(data_path))
+    for name, value in metadata.items():
+        if name not in {"scene", "source_sha", "seed", "histories", "rows", "capture_sha256"}:
+            segments[name] = value
+    segments["radiative"]["bremslib_tables"] = tuple(
+        tuple(item) for item in segments["radiative"]["bremslib_tables"]
+    )
+    scenes = json.loads((Path(__file__).parent / "geant4_performance/scenes.json").read_text())
+    scene = next(s for s in scenes["scenes"] if s["id"] == metadata["scene"])
+    element = scene["material"]
+    comp = [(element, scenes["materials"][element]["number_density_ang3"])]
+    tables = load_bremsstrahlung_tables([element])
+    report = dict(
+        source_sha=source_pin(),
+        capture=metadata,
+        cupy=cp.__version__,
+        gpu=str(cp.cuda.runtime.getDeviceProperties(0)["name"]),
+        cuda_runtime=cp.cuda.runtime.runtimeGetVersion(),
+        repeats=args.repeats,
+        protocol="one warmup each, alternating arm order; synchronized wall and CUDA events",
+        table_pins=segments["radiative"],
+        workloads=[],
+    )
+    scores_to_save = {
+        "primary_row_counts": np.bincount(segments["elec_id"], minlength=int(segments["Ne"]))
+    }
+    pool = cp.get_default_memory_pool()
+    pool.set_limit(fraction=0.8)
+    arms = ("baseline", "candidate", "row32", "primary32")
+
+    def select(arm):
+        brem._USE_JIT_BREM_REDUCTION = arm != "baseline"
+        brem_band_jit.ROW_ACCUMULATION_DTYPE = (
+            np.float32 if arm in {"row32", "primary32"} else np.float64
+        )
+        brem._BAND_PRIMARY_DTYPE = np.float32 if arm == "primary32" else np.float64
+
+    from pyrite.perf.comparison import cone_solid_angle
+    from pyrite.perf.detector_scoring import absorption_edges_keV, band_panels, band_rule
+
+    production_rules = [
+        band_rule(band_panels(lo, min(hi, scene["energy_keV"]), absorption_edges_keV(comp)), 16)
+        for lo, hi in ((10.0, 50.0), (50.0, 100.0), (100.0, float("inf")))
+    ]
+    workloads = [
+        (
+            f"stress-{n}",
+            [
+                (
+                    np.geomspace(1e4, scene["energy_keV"] * 1e3, n),
+                    np.gradient(np.geomspace(1e4, scene["energy_keV"] * 1e3, n)),
+                )
+            ],
+        )
+        for n in args.nodes
+    ]
+    workloads.append(("production-point-order8", production_rules))
+    for nodes, rules in workloads:
+        grid, weights = rules[0]
+        band_scores = {}
+        latest_bands = []
+        kwargs = dict(
+            cutoff_eV=1000,
+            composition=comp,
+            bremslib_tables=tables,
+            n_hat=np.array([1.0, 0.0, 0.0]),
+            electron_band_weights=weights,
+            layers=[(0.0, segments["thickness_ang"], [(element, 0.0)])],
+            chunk=1000000,
+        )
+
+        def score(latest_bands=latest_bands, rules=rules, kwargs=kwargs, nodes=nodes):
+            latest_bands.clear()
+            for energy, quadrature in rules:
+                options = dict(kwargs, electron_band_weights=quadrature)
+                latest_bands.append(mc_coupled_brem_spectrum(segments, energy, **options))
+            if nodes == "production-point-order8":
+                solid_angle = cone_solid_angle(np.deg2rad(scenes["cone"]["half_angle_deg"]))
+                return np.sum(latest_bands, axis=0, dtype=np.float64) * solid_angle
+            return latest_bands[0]
+
+        scores, times, warmup, memory = {}, {arm: [] for arm in arms}, {}, {}
+        for arm in arms:
+            select(arm)
+            start = time.perf_counter()
+            scores[arm] = score()
+            band_scores[arm] = np.asarray(latest_bands, dtype=np.float64).copy()
+            cp.cuda.get_current_stream().synchronize()
+            warmup[arm] = time.perf_counter() - start
+        for repeat in range(args.repeats):
+            for arm in arms if repeat % 2 == 0 else arms[::-1]:
+                select(arm)
+                pool.free_all_blocks()
+                cp.cuda.get_current_stream().synchronize()
+                start_event, stop_event = cp.cuda.Event(), cp.cuda.Event()
+                start = time.perf_counter()
+                start_event.record()
+                scores[arm] = score()
+                band_scores[arm] = np.asarray(latest_bands, dtype=np.float64).copy()
+                stop_event.record()
+                stop_event.synchronize()
+                times[arm].append(
+                    dict(
+                        wall_s=time.perf_counter() - start,
+                        device_s=cp.cuda.get_elapsed_time(start_event, stop_event) / 1000,
+                    )
+                )
+                scores_to_save[f"{arm}_{nodes}_repeat{repeat}"] = scores[arm].copy()
+                memory[arm] = dict(
+                    pool_reserved_bytes=pool.total_bytes(), pool_used_bytes=pool.used_bytes()
+                )
+        a, b = scores["baseline"], scores["candidate"]
+        reference_moments = moments(a)
+        errors = {}
+        for arm, values in scores.items():
+            diff = np.asarray(values, dtype=np.float64) - a
+            relative = np.abs(diff) / np.maximum(np.abs(a), 1e-300)
+            stats = moments(values)
+            repeated = np.stack(
+                [scores_to_save[f"{arm}_{nodes}_repeat{r}"] for r in range(args.repeats)]
+            ).astype(np.float64)
+            spread = np.ptp(repeated, axis=0)
+            errors[arm] = dict(
+                repeat_max_absolute=float(spread.max()),
+                repeat_max_relative=float((spread / np.maximum(np.abs(a), 1e-300)).max()),
+                max_absolute=float(np.abs(diff).max()),
+                max_relative=float(relative.max()),
+                relative_quantiles=np.quantile(relative, [0.5, 0.95, 0.99]).tolist(),
+                moment_relative={
+                    key: float(abs(stats[key] - value) / max(abs(value), 1e-300))
+                    for key, value in reference_moments.items()
+                },
+                target_2pct_pass=bool(stats["rse"] <= 0.02),
+                target_2pct_matches=bool(
+                    (stats["rse"] <= 0.02) == (reference_moments["rse"] <= 0.02)
+                ),
+            )
+        np.testing.assert_allclose(b, a, rtol=128 * np.finfo(np.float32).eps)
+        for arm, values in scores.items():
+            scores_to_save[f"{arm}_{nodes}"] = values
+            scores_to_save[f"{arm}_{nodes}_bands"] = band_scores[arm]
+        scores_to_save[f"grid_{nodes}"] = grid
+        scores_to_save[f"weights_{nodes}"] = weights
+        report["workloads"].append(
+            dict(
+                nodes=nodes,
+                precision_errors=errors,
+                band_nodes=[len(rule[0]) for rule in rules],
+                band_moments={
+                    arm: [moments(band) for band in bands] for arm, bands in band_scores.items()
+                },
+                band_max_relative={
+                    arm: float(
+                        np.max(
+                            np.abs(values - band_scores["baseline"])
+                            / np.maximum(np.abs(band_scores["baseline"]), 1e-300)
+                        )
+                    )
+                    for arm, values in band_scores.items()
+                },
+                timing=times,
+                warmup_s=warmup,
+                memory=memory,
+                chunk=1000000,
+                moments={arm: moments(values) for arm, values in scores.items()},
+                max_relative_error=float(np.max(np.abs(b - a) / np.maximum(np.abs(a), 1e-300))),
+            )
+        )
+    report["peak_host_rss_kib"] = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    np.savez(args.output.with_suffix(".npz"), **scores_to_save)
+    write_json(args.output.with_suffix(".json"), report)
+    print(json.dumps(report), flush=True)
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    sub = parser.add_subparsers(dest="mode", required=True)
+    cap = sub.add_parser("capture")
+    cap.add_argument("scene")
+    cap.add_argument("--histories", type=int, default=128)
+    cap.add_argument("--seed", type=int, default=938)
+    rep = sub.add_parser("replay")
+    rep.add_argument("capture", type=Path)
+    rep.add_argument("--repeats", type=int, default=5)
+    rep.add_argument("--nodes", nargs="+", type=int, default=[64, 176, 496])
+    for child in (cap, rep):
+        child.add_argument("--output", type=Path, required=True)
+    args = parser.parse_args()
+    ignored(args.output.with_suffix(".json"))
+    ignored(args.output.with_suffix(".npz"))
+    (capture if args.mode == "capture" else replay)(args)
+
+
+if __name__ == "__main__":
+    main()
