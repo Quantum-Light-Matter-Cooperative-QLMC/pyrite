@@ -31,7 +31,6 @@ def _():
         _ = pyrite.fetch_tables()  # Fetch data tables
         _ = pyrite.execution.warm_cache()
 
-    tables_ready = True
     return mo, np, plt
 
 

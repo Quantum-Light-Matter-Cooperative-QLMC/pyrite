@@ -146,7 +146,6 @@ def _(
                 )
                 _progress.update(subtitle=f"{_energy_keV:g} keV / {_thickness_nm:g} nm")
     assert np.isfinite(band_yield).all() and np.all(band_yield >= 0)
-    sweep_result = _result
     sweep_yield = band_yield.copy()
     return (sweep_yield,)
 

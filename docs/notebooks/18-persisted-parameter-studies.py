@@ -125,7 +125,7 @@ def _(TemporaryDirectory, cases, mo, run_sweep, tables_ready):
     workspace = TemporaryDirectory(prefix="pyrite-persisted-sweep-")
     first_store = {}
     with mo.status.spinner(title="Running and checkpointing four cases"):
-        with mo.persistent_cache(name='run-sweep-cache'):
+        with mo.persistent_cache(name="run-sweep-cache"):
             completed = run_sweep(
                 cases,
                 first_store,
@@ -227,7 +227,7 @@ def _(
     summary_table,
     sweep_values,
 ):
-    available = sweep_values(saved_store, fields=("E0_keV", "thickness_ang"))
+    sweep_values(saved_store, fields=("E0_keV", "thickness_ang"))
     selected = select_results(saved_store, E0_keV=30.0)
     assert len(records(selected)) == 2
     # Saved checkpoint records are dictionaries, not simulate() Result objects.
