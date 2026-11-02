@@ -79,3 +79,10 @@ FOM improvement or method-selection verdict is asserted here. Complete those
 measurements through the remote workflow, compare the alternative angular
 importance sampler, and independently verify the estimator before advancing
 the ledger to `rederived`. Human sign-off remains separate in #277.
+
+The comparison pilot scores full analytic line mass and a continuum band per
+primary, including weighted copies. It bypasses grid resolution in both arms;
+it does not measure full-spectrum runtime or characteristic-yield agreement.
+The separate baseline retains production grid resolution and spectrum scoring.
+The AMD batch driver is `checks/detector_cone_203_amd.sbatch`. Independent
+verification is deferred; these runs do not promote the ledger status.

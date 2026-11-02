@@ -147,10 +147,10 @@ def _row_cdf_at(cdf, pdf, mu, row, m):
 
 
 @njit(cache=True)
-def _mu_of_xi(row, f, xi, cdf, pdf, mu):
+def _mu_of_xi(row, f, xi, cdf, pdf, mu, guide):
     """``mu`` the analog ELSEPA sampler returns for uniform ``xi`` (quantile interpolation)."""
-    return (1.0 - f) * _elsepa_invert_row(cdf, pdf, mu, row, xi) + f * _elsepa_invert_row(
-        cdf, pdf, mu, row + 1, xi
+    return (1.0 - f) * _elsepa_invert_row(cdf, pdf, mu, guide, row, xi) + f * _elsepa_invert_row(
+        cdf, pdf, mu, guide, row + 1, xi
     )
 
 
@@ -170,7 +170,7 @@ def _arc_half_width(cos_t, sin_t, cos_dn, sin_dn, cos_c):
 @njit(cache=True)
 def cone_split_event(
     dx, dy, dz, nx, ny, nz, cos_c, sin_c, target_weight, event_key,
-    E_keV, logE_flat, cdf, pdf, mu, start, length,
+    E_keV, logE_flat, cdf, pdf, mu, guide, start, length,
 ):  # fmt: skip
     """One elastic event's in-cone copy: ``(made, ox, oy, oz, weight)``.
 
@@ -212,24 +212,24 @@ def cone_split_event(
     if _stream_uniform_scalar(event_key, np.uint64(0)) >= keep:
         return False, 0.0, 0.0, 0.0, 0.0
     # Exact uniform interval mapping into the band, by bisection on mu(xi).
-    if _mu_of_xi(row, f, 0.0, cdf, pdf, mu) >= mu_lo:
+    if _mu_of_xi(row, f, 0.0, cdf, pdf, mu, guide) >= mu_lo:
         xi_a = 0.0
     else:
         lo, hi = 0.0, 1.0
         for _ in range(_BISECTION_STEPS):
             mid = 0.5 * (lo + hi)
-            if _mu_of_xi(row, f, mid, cdf, pdf, mu) >= mu_lo:
+            if _mu_of_xi(row, f, mid, cdf, pdf, mu, guide) >= mu_lo:
                 hi = mid
             else:
                 lo = mid
         xi_a = hi
-    if _mu_of_xi(row, f, 1.0, cdf, pdf, mu) <= mu_hi:
+    if _mu_of_xi(row, f, 1.0, cdf, pdf, mu, guide) <= mu_hi:
         xi_b = 1.0
     else:
         lo, hi = 0.0, 1.0
         for _ in range(_BISECTION_STEPS):
             mid = 0.5 * (lo + hi)
-            if _mu_of_xi(row, f, mid, cdf, pdf, mu) <= mu_hi:
+            if _mu_of_xi(row, f, mid, cdf, pdf, mu, guide) <= mu_hi:
                 lo = mid
             else:
                 hi = mid
@@ -238,7 +238,7 @@ def cone_split_event(
     if p_band <= 0.0:
         return False, 0.0, 0.0, 0.0, 0.0
     xi = xi_a + _stream_uniform_scalar(event_key, np.uint64(1)) * p_band
-    mu_t = _mu_of_xi(row, f, xi, cdf, pdf, mu)
+    mu_t = _mu_of_xi(row, f, xi, cdf, pdf, mu, guide)
     cos_t = 1.0 - 2.0 * mu_t
     sin_t = np.sqrt(max(0.0, 1.0 - cos_t * cos_t))
     half = _arc_half_width(cos_t, sin_t, cos_dn, sin_dn, cos_c)

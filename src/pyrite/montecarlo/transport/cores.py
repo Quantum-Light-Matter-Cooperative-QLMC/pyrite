@@ -1086,7 +1086,7 @@ def make_cpu_transport_core(
                         dirs[e, 0], dirs[e, 1], dirs[e, 2], sp_nx, sp_ny, sp_nz,
                         sp_cos_c, sp_sin_c, sp_target,
                         _event_key(sp_keys[e], flight_id[e] - 1),
-                        E_keV[e], el_logE, el_cdf, el_pdf, el_mu,
+                        E_keV[e], el_logE, el_cdf, el_pdf, el_mu, el_guide,
                         el_start[L, i_el], el_len[L, i_el],
                     )  # fmt: skip
                     if made:
@@ -1167,7 +1167,10 @@ _transport_core_ungrooved_perelectron_inelastic_radiative = make_cpu_transport_c
 
 @cache
 def cone_split_core(*, inelastic, radiative):
-    """The exact per-electron CPU core with detector-cone splitting (#203 prototype)."""
+    """The exact per-electron CPU core with detector-cone splitting (#203 prototype).
+
+    Validation: detector-cone-variance-reduction
+    """
     return make_cpu_transport_core(
         per_electron=True, inelastic=inelastic, radiative=radiative, cone_split=True
     )

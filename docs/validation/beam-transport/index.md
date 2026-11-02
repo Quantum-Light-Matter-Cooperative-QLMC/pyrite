@@ -9,6 +9,7 @@ for sources, criteria and limitations, follow each record or the
 :maxdepth: 1
 
 adaptive-sample-size-stopping
+detector-cone-variance-reduction
 mev-full-track-transport
 beam-energy-spread-injection
 beam-phase-space-injection

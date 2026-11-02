@@ -8,9 +8,10 @@ then the per-electron CPU core on a smaller count. It records per-electron line
 mass so the analog relative standard error (RSE) can be reported.
 
 ``compare`` runs the per-electron CPU core analog and with detector-cone
-splitting on identical seeds, scores weighted per-history line mass,
-bremsstrahlung band integral and characteristic yield, and reports means,
-RSEs, wall times and the figure of merit ``FOM = 1/(RSE^2 T)``.
+splitting on identical seeds, scores weighted per-history full line mass and
+bremsstrahlung band integral, and reports means, RSEs and wall times. These
+support pilot ``FOM = 1/(RSE^2 T)`` comparisons; characteristic validation
+remains pending. First-call/JIT overhead remains included in the timings.
 
     python checks/detector_cone_variance_reduction.py baseline --out B.json
     python checks/detector_cone_variance_reduction.py compare --out C.json
@@ -26,7 +27,7 @@ import numpy as np
 MATERIAL = "hbn"
 
 
-def build(energy_keV, thickness_ang, tilt, azimuth, ne, seed):
+def build(energy_keV, thickness_ang, tilt, azimuth, ne, seed, material=MATERIAL):
     from pyrite.energy_grid.bandwidth_check import build_case
 
     config = {
@@ -35,7 +36,7 @@ def build(energy_keV, thickness_ang, tilt, azimuth, ne, seed):
         "tilt_azim_deg": float(azimuth),
         "n_electrons": int(ne),
     }
-    return build_case(MATERIAL, float(energy_keV), config, seed=int(seed), resolution="local")
+    return build_case(material, float(energy_keV), config, seed=int(seed), resolution="local")
 
 
 def _settings(ne):
@@ -43,7 +44,7 @@ def _settings(ne):
 
     return Precision(
         target_rse=0.1, min_electrons=ne, max_electrons=ne, block_electrons=ne,
-        observables=("line", "brem"),
+        observables=("cxr", "brem"),
     )  # fmt: skip
 
 
@@ -78,12 +79,14 @@ def baseline(args):
 
     report = {"args": vars(args), "real": np.dtype(REAL).name, "device": BACKEND.device.name}
     for label, core, ne in (
-        ("cuda", "auto", args.ne),
+        ("accelerator", "cuda", args.ne),
         ("cpu_per_electron", "per-electron", args.ne_cpu),
     ):
         if ne <= 0:
             continue
-        case = build(args.energy, args.thickness, args.tilt, args.azimuth, ne, args.seed)
+        case = build(
+            args.energy, args.thickness, args.tilt, args.azimuth, ne, args.seed, args.material
+        )
         row = {"core": core, "ne": ne}
         started = time.perf_counter()
         tp = runner._transport_case(case, transport_core=core)
@@ -92,10 +95,10 @@ def baseline(args):
         started = time.perf_counter()
         values = case_measure(case, _settings(ne))(0, ne, tp["segs"])
         row["measure_s"] = time.perf_counter() - started
-        row["line"] = _stats(_host(values["line"]))
+        row["line"] = _stats(_host(values["cxr"]))
         row["brem"] = _stats(_host(values["brem"]))
-        row["line_values"] = _host(values["line"]).tolist()
-        if label == "cuda" and not args.skip_spectrum:
+        row["line_values"] = _host(values["cxr"]).tolist()
+        if label == "accelerator" and not args.skip_spectrum:
             started = time.perf_counter()
             out = runner._spectrum_case(case, tp)
             row["spectrum_s"] = time.perf_counter() - started
@@ -107,6 +110,75 @@ def baseline(args):
             json.dumps({k: v for k, v in row.items() if k != "line_values"}, default=str),
             flush=True,
         )
+        del tp
+        BACKEND.release_memory()
+    Path(args.out).write_text(json.dumps(report, indent=2, default=str))
+
+
+def compare(args):
+    """Pilot weighted line-mass and continuum statistics; characteristic remains pending.
+
+    Uses full analytic line mass, not a restricted energy-grid integral. Grid
+    resolution is bypassed in both arms because it does not enter these tallies.
+    This is experimental evidence, not an independently verified estimator.
+    """
+    from unittest.mock import patch
+
+    from pyrite._backend import BACKEND
+    from pyrite.montecarlo import runner
+    from pyrite.montecarlo.runner import case_driver
+    from pyrite.montecarlo.runner.adaptive import case_measure
+    from pyrite.montecarlo.transport.cone_split import ConeSplit, history_sums
+
+    case = build(
+        args.energy, args.thickness, args.tilt, args.azimuth, args.ne, args.seed, args.material
+    )
+    n_hat = runner._case_geometry(case)[3]
+    cone = ConeSplit(
+        tuple(n_hat), args.cone_factor / (1.0 + args.energy / 511.0), args.target_weight
+    )
+    original = case_driver.simulate_trajectories
+    report = {"args": vars(args), "device": BACKEND.device.name, "arms": {}}
+    for label in ("analog", "split"):
+
+        def transport(*a, label=label, **kw):
+            return original(*a, **kw, **({"_cone_split": cone} if label == "split" else {}))
+
+        started = time.perf_counter()
+        with (
+            patch.object(case_driver, "simulate_trajectories", transport),
+            patch.object(
+                case_driver, "resolve_cxr_grid", lambda c, s, n, ne, grid, *a: (grid, None)
+            ),
+        ):
+            tp = runner._transport_case(case, transport_core="per-electron")
+        transport_s = time.perf_counter() - started
+        started = time.perf_counter()
+        measure = case_measure(case, _settings(args.ne))
+        values = {k: _host(v) for k, v in measure(0, args.ne, tp["segs"]).items()}
+        record = tp["segs"].get("cone_split")
+        copies = 0 if record is None else record["parent"].size
+        if copies:
+            copy_values = case_measure(case, _settings(copies))(0, copies, record["copies"])
+            for key in values:
+                values[key] = history_sums(
+                    values[key],
+                    _host(copy_values[key]),
+                    record["parent"],
+                    record["weight"],
+                    args.ne,
+                )
+        measure_s = time.perf_counter() - started
+        row = {
+            "transport_s": transport_s,
+            "measure_s": measure_s,
+            "wall_s": transport_s + measure_s,
+            "copies": int(copies),
+            "observables": {k: _stats(v) for k, v in values.items()},
+            "history_values": {k: v.tolist() for k, v in values.items()},
+        }
+        report["arms"][label] = row
+        print(json.dumps({k: v for k, v in row.items() if k != "history_values"}), flush=True)
         del tp
         BACKEND.release_memory()
     Path(args.out).write_text(json.dumps(report, indent=2, default=str))
@@ -181,7 +253,9 @@ def main():
     sub_pull.add_argument("names", nargs="+")
     sub_pull.add_argument("--dest", default=".")
     base = sub.add_parser("baseline")
-    for p in (base,):
+    comparison = sub.add_parser("compare")
+    for p in (base, comparison):
+        p.add_argument("--material", default=MATERIAL)
         p.add_argument("--energy", type=float, default=5000.0)
         p.add_argument("--thickness", type=float, default=1.0e7)
         p.add_argument("--tilt", type=float, default=10.0)
@@ -191,8 +265,11 @@ def main():
     base.add_argument("--ne", type=int, default=2000)
     base.add_argument("--ne-cpu", type=int, default=100)
     base.add_argument("--skip-spectrum", action="store_true")
+    comparison.add_argument("--ne", type=int, default=2000)
+    comparison.add_argument("--target-weight", type=float, default=0.001)
+    comparison.add_argument("--cone-factor", type=float, default=1.0)
     args = parser.parse_args()
-    {"baseline": baseline, "submit": submit, "pull": pull}[args.command](args)
+    {"baseline": baseline, "compare": compare, "submit": submit, "pull": pull}[args.command](args)
 
 
 if __name__ == "__main__":
