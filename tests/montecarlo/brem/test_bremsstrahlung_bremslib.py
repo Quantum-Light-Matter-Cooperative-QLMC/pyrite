@@ -346,7 +346,7 @@ def test_nominal_reduced_energy_is_staged_once_not_uploaded_per_evaluation(
     # every chunk; they are staged with the table, so evaluation uploads nothing.
     staged = stage_bremslib_table(carbon_table)
     np.testing.assert_array_equal(
-        to_host(staged.nominal_reduced_energy), carbon_table.nominal_reduced_energy
+        to_host(staged.nominal_reduced_energy), carbon_table.nominal_reduced_energy.astype(REAL)
     )
     assert staged.nominal_reduced_energy.dtype == staged.inner_reduced_energy.dtype
     energy = np.array([20.0, 50.0])
