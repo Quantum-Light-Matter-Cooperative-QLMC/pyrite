@@ -178,10 +178,19 @@ def test_streamed_oom_replays_only_failed_block(case, monkeypatch, phase):
     monkeypatch.setattr(pool, "_admit_host_segments", lambda: None)
     monkeypatch.setattr(EmissionAdapter, "evaluate", score)
     actual = run_case_streamed(case, 20, transport_core="cuda")
-    assert calls == [(0, True), (20, True), (20, False), (40, True)]
-    assert actual["_transport_gpu_oom_retries"] == 1
-    assert actual["_recovery_path"] == "host_segments"
-    for key in (*SPECTRA, "eta", "hit_frac", "n_segments", "line_data_coverage"):
+    assert calls == (
+        [(0, True), (20, True), (20, False), (40, True)]
+        if phase == "transport"
+        else [(0, True), (20, True), (40, True)]
+    )
+    if phase == "transport":
+        assert actual["_transport_gpu_oom_retries"] == 1
+        assert actual["_recovery_path"] == "host_segments"
+    for key in SPECTRA:
+        np.testing.assert_allclose(
+            actual[key], expected[key], rtol=16 * np.finfo(np.float32).eps, atol=0, err_msg=key
+        )
+    for key in ("eta", "hit_frac", "n_segments", "line_data_coverage"):
         np.testing.assert_equal(actual[key], expected[key], err_msg=key)
 
 
@@ -248,17 +257,17 @@ def test_cuda_streamed_residency_and_replay(case, monkeypatch, oom_phase):
     assert residency and all(residency)
     assert attempts == (
         [(0, True), (20, True), (40, True)]
-        if oom_phase is None
+        if oom_phase != "transport"
         else [(0, True), (20, True), (20, False), (40, True)]
     )
     assert raw_residency == (
-        [True, True, True]
-        if oom_phase is None
-        else [True, False, True]
-        if oom_phase == "transport"
-        else [True, True, False, True]
+        [True, True, True] if oom_phase != "transport" else [True, False, True]
     )
-    for key in (*SPECTRA, "eta", "hit_frac", "n_segments", "line_data_coverage"):
+    for key in SPECTRA:
+        np.testing.assert_allclose(
+            actual[key], expected[key], rtol=16 * np.finfo(np.float32).eps, atol=0, err_msg=key
+        )
+    for key in ("eta", "hit_frac", "n_segments", "line_data_coverage"):
         np.testing.assert_equal(actual[key], expected[key], err_msg=key)
     if oom_phase is None:
         joined = runner._spectrum_case(case, original_transport(case, transport_core="cuda"))
@@ -269,3 +278,44 @@ def test_cuda_streamed_residency_and_replay(case, monkeypatch, oom_phase):
             )
         for key in ("eta", "hit_frac", "n_segments"):
             assert actual[key] == joined[key], key
+
+
+@pytest.mark.parametrize("component", ["characteristic", "brem"])
+def test_escape_oom_chunks_rows_without_replaying_transport(case, monkeypatch, component):
+    """Scoring scratch must shrink even when transport's entire block fits (#915)."""
+    from pyrite.montecarlo.runner import case_driver
+    from pyrite.montecarlo.spectrum import brem, characteristic
+
+    expected = run_case_streamed(case, 20, transport_core="per-electron")
+    module = characteristic if component == "characteristic" else brem
+    escape = module.segment_escape_paths
+    simulate = case_driver.simulate_trajectories
+    starts, failures = [], []
+    row_budget = []
+
+    class AllocatorOOM(RuntimeError):
+        pass
+
+    def transport(*args, **kwargs):
+        starts.append(kwargs["_electron_start"])
+        return simulate(*args, **kwargs)
+
+    def bounded_escape(segments, index, *args, **kwargs):
+        if not row_budget:
+            row_budget.append(max(1, int(index.size) // 4))
+        if index.size > row_budget[0]:
+            failures.append(int(index.size))
+            raise AllocatorOOM("escape scratch exceeds available memory")
+        return escape(segments, index, *args, **kwargs)
+
+    monkeypatch.setattr(case_driver, "simulate_trajectories", transport)
+    monkeypatch.setattr(runner, "_is_gpu_oom", lambda e: isinstance(e, AllocatorOOM))
+    monkeypatch.setattr(module, "segment_escape_paths", bounded_escape)
+    actual = run_case_streamed(case, 20, transport_core="per-electron")
+    assert failures
+    assert starts == [0, 20, 40]
+    assert np.any(expected["spec_characteristic"] > 0)
+    for key in SPECTRA:
+        np.testing.assert_allclose(actual[key], expected[key], rtol=1e-12, atol=0, err_msg=key)
+    for key in ("eta", "hit_frac", "n_segments", "line_data_coverage"):
+        assert actual[key] == expected[key], key

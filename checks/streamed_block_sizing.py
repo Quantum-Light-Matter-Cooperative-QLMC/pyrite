@@ -27,6 +27,8 @@ reassembly) and ``transport.consume`` (the whole block consumer). The
 synchronizations serialize work that otherwise overlaps, so split arms are
 not timing-comparable with unsplit ones; compare split arms with each other.
 Env PROBE_HOST_SEGMENTS=1 forces host blocks for a matched residency baseline (#914).
+Env PROBE_ESCAPE=1 samples characteristic/continuum escape scratch per call
+(including failed allocations); synchronized, so compare only matched arms.
 Env PROBE_PROFILE=1 also runs the measured call under cProfile, writes
 OUT_PREFIX.prof and prints the top 40 functions by cumulative time.
 """
@@ -193,6 +195,8 @@ class Memory:
         self.res_peak = self.used_peak = 0
         self.phase = "transport"
         self.by_phase = {}
+        self.escape_calls = []
+        self.escape_active = None
         self._stop = threading.Event()
 
     def _run(self):
@@ -203,7 +207,11 @@ class Memory:
         free, _ = cupy.cuda.runtime.memGetInfo()
         self.dev_peak = max(self.dev_peak, self.total - free)
         self.res_peak = max(self.res_peak, self.pool.total_bytes())
-        self.used_peak = max(self.used_peak, self.pool.used_bytes())
+        used = self.pool.used_bytes()
+        self.used_peak = max(self.used_peak, used)
+        active = self.escape_active
+        if active is not None:
+            active["peak_used_bytes"] = max(active["peak_used_bytes"], used)
         prev = self.by_phase.get(self.phase, 0)
         self.by_phase[self.phase] = max(prev, self.total - free - self.dev_base)
 
@@ -217,6 +225,45 @@ class Memory:
         self._stop.set()
         self._thread.join()
         self._sample()
+
+
+def install_escape_probe(memory):
+    """Measure 5 ms sampled live scratch relative to each escape call's entry."""
+    from pyrite.montecarlo.spectrum import brem, characteristic
+
+    def wrap(component, function):
+        def measured(segments, index, *args, **kwargs):
+            cupy.cuda.Device().synchronize()
+            mem = memory[0]
+            used = mem.pool.used_bytes()
+            record = dict(
+                component=component,
+                rows=int(index.size),
+                entry_used_bytes=used,
+                peak_used_bytes=used,
+                oom=False,
+            )
+            mem.escape_active = record
+            try:
+                return function(segments, index, *args, **kwargs)
+            except cupy.cuda.memory.OutOfMemoryError:
+                record["oom"] = True
+                raise
+            finally:
+                cupy.cuda.Device().synchronize()
+                mem._sample()
+                mem.escape_active = None
+                record["scratch_bytes_per_row"] = (record["peak_used_bytes"] - used) / max(
+                    1, int(index.size)
+                )
+                mem.escape_calls.append(record)
+
+        return measured
+
+    for module in (characteristic, brem):
+        module.segment_escape_paths = wrap(
+            module.__name__.rsplit(".", 1)[-1], module.segment_escape_paths
+        )
 
 
 def transport_only(scene, block):
@@ -284,6 +331,8 @@ def main():
         score["max_rows"] = max(score["max_rows"], rows)
 
     memory = [None]
+    if os.environ.get("PROBE_ESCAPE") == "1":
+        install_escape_probe(memory)
     streamed_scoring.BlockSpectrumScorer.add = add
     host_segments = os.environ.get("PROBE_HOST_SEGMENTS") == "1"
     if host_segments:
@@ -361,6 +410,7 @@ def main():
         "split_s": splits.seconds,
         "split_calls": splits.calls,
         "profiled": profiler is not None,
+        "escape_calls": mem.escape_calls,
     }
     if mode != "transport":
         spectra = ("spec", "spec_characteristic", "brem_wide")

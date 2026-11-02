@@ -72,8 +72,10 @@ class BlockSpectrumScorer:
     def __init__(self, case: Mapping[str, Any], inputs: Mapping[str, Any]):
         from .cxr_grid import cxr_truncation_audit
         from .emission_adapters import select_emission
+        from .streamed_recovery import RowScoringRecovery
 
         self.case = case
+        self.row_recovery = RowScoringRecovery()
         self.emission = select_emission(case)
         self.emission.preflight(case, streaming=True)
         self.E_grid, self.E_brem = inputs["E_grid"], inputs["E_brem"]
@@ -108,10 +110,14 @@ class BlockSpectrumScorer:
         brem_batch = replace(batch, electron_limit=self.Ne_brem)
         parts = (
             self.emission.cxr.evaluate(batch, "spec").values,
-            self.emission.characteristic.evaluate(brem_batch, "spec_characteristic").values,
-            self.emission.continuum.evaluate(
-                replace(brem_batch, energy_eV=self.E_brem), "brem_wide"
-            ).values,
+            self.row_recovery.evaluate(
+                self.emission.characteristic, brem_batch, "spec_characteristic"
+            ),
+            self.row_recovery.evaluate(
+                self.emission.continuum,
+                replace(brem_batch, energy_eV=self.E_brem),
+                "brem_wide",
+            ),
             self._transition(segs),
         )
         if self.totals is None:
