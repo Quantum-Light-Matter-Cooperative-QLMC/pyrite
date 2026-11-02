@@ -228,7 +228,7 @@ class Memory:
 
 
 def install_escape_probe(memory):
-    """Measure 5 ms sampled live scratch relative to each escape call's entry."""
+    """Sample live scratch per input row at 5 ms; selection may be empty."""
     from pyrite.montecarlo.spectrum import brem, characteristic
 
     def wrap(component, function):
@@ -239,6 +239,7 @@ def install_escape_probe(memory):
             record = dict(
                 component=component,
                 rows=int(index.size),
+                input_rows=int(segments["L_ang"].shape[0]),
                 entry_used_bytes=used,
                 peak_used_bytes=used,
                 oom=False,
@@ -246,15 +247,16 @@ def install_escape_probe(memory):
             mem.escape_active = record
             try:
                 return function(segments, index, *args, **kwargs)
-            except cupy.cuda.memory.OutOfMemoryError:
+            except cupy.cuda.memory.OutOfMemoryError as error:
                 record["oom"] = True
+                record["allocation_error"] = str(error)
                 raise
             finally:
                 cupy.cuda.Device().synchronize()
                 mem._sample()
                 mem.escape_active = None
                 record["scratch_bytes_per_row"] = (record["peak_used_bytes"] - used) / max(
-                    1, int(index.size)
+                    1, record["input_rows"]
                 )
                 mem.escape_calls.append(record)
 
@@ -329,6 +331,8 @@ def main():
         score["s"] += time.perf_counter() - t
         score["blocks"] += 1
         score["max_rows"] = max(score["max_rows"], rows)
+        score["row_limits"] = dict(self.row_recovery.row_limits)
+        score["escape_row_limit"] = self.escape_recovery.row_limit
 
     memory = [None]
     if os.environ.get("PROBE_ESCAPE") == "1":
@@ -395,6 +399,8 @@ def main():
         "score_s": score["s"],
         "score_blocks": score["blocks"],
         "max_block_rows": score["max_rows"],
+        "row_limits": score.get("row_limits", {}),
+        "escape_row_limit": score.get("escape_row_limit"),
         **k,
         "kernel_ns_per_row": k["kernel_s"] / max(rows, 1) * 1e9,
         "lanes_per_sm_max": k["pop_max"] / sms,

@@ -21,6 +21,7 @@ from pyrite.montecarlo.runner.streamed_scoring import (
     run_case_streamed,
     streaming_refusal,
 )
+from tests.helpers import scaled_rtol
 
 SPECTRA = ("spec", "spec_characteristic", "brem_wide", "brem")
 
@@ -180,15 +181,19 @@ def test_streamed_oom_replays_only_failed_block(case, monkeypatch, phase):
     actual = run_case_streamed(case, 20, transport_core="cuda")
     assert calls == (
         [(0, True), (20, True), (20, False), (40, True)]
-        if phase == "transport"
+        if phase != "spec_characteristic"
         else [(0, True), (20, True), (40, True)]
     )
-    if phase == "transport":
+    if phase != "spec_characteristic":
         assert actual["_transport_gpu_oom_retries"] == 1
         assert actual["_recovery_path"] == "host_segments"
     for key in SPECTRA:
         np.testing.assert_allclose(
-            actual[key], expected[key], rtol=16 * np.finfo(np.float32).eps, atol=0, err_msg=key
+            actual[key],
+            expected[key],
+            rtol=scaled_rtol(1e-12, eps_multiple=16),
+            atol=0,
+            err_msg=key,
         )
     for key in ("eta", "hit_frac", "n_segments", "line_data_coverage"):
         np.testing.assert_equal(actual[key], expected[key], err_msg=key)
@@ -257,7 +262,7 @@ def test_cuda_streamed_residency_and_replay(case, monkeypatch, oom_phase):
     assert residency and all(residency)
     assert attempts == (
         [(0, True), (20, True), (40, True)]
-        if oom_phase != "transport"
+        if oom_phase in (None, "spec_characteristic")
         else [(0, True), (20, True), (20, False), (40, True)]
     )
     assert raw_residency == (
@@ -265,10 +270,20 @@ def test_cuda_streamed_residency_and_replay(case, monkeypatch, oom_phase):
     )
     for key in SPECTRA:
         np.testing.assert_allclose(
-            actual[key], expected[key], rtol=16 * np.finfo(np.float32).eps, atol=0, err_msg=key
+            actual[key],
+            expected[key],
+            rtol=scaled_rtol(1e-12, eps_multiple=16),
+            atol=0,
+            err_msg=key,
         )
     for key in ("eta", "hit_frac", "n_segments", "line_data_coverage"):
         np.testing.assert_equal(actual[key], expected[key], err_msg=key)
+    regrouped = {
+        "spec_characteristic": {"spec_characteristic"},
+        "brem_wide": {"brem", "brem_wide"},
+    }.get(oom_phase, set())
+    for key in set(SPECTRA) - regrouped:
+        np.testing.assert_array_equal(actual[key], expected[key], err_msg=key)
     if oom_phase is None:
         joined = runner._spectrum_case(case, original_transport(case, transport_core="cuda"))
         # Whole-electron regrouping in fp32: the #611 16-epsilon sum allowance.
@@ -280,15 +295,18 @@ def test_cuda_streamed_residency_and_replay(case, monkeypatch, oom_phase):
             assert actual[key] == joined[key], key
 
 
-@pytest.mark.parametrize("component", ["characteristic", "brem"])
+@pytest.mark.parametrize("component", ["characteristic", "brem", "brem-eedl"])
 def test_escape_oom_chunks_rows_without_replaying_transport(case, monkeypatch, component):
     """Scoring scratch must shrink even when transport's entire block fits (#915)."""
     from pyrite.montecarlo.runner import case_driver
-    from pyrite.montecarlo.spectrum import brem, characteristic
+    from pyrite.montecarlo.spectrum import characteristic, segment_escape
 
+    if component == "brem-eedl":
+        case = {**case, "radiative_model": None, "bremsstrahlung_model": "eedl"}
     expected = run_case_streamed(case, 20, transport_core="per-electron")
-    module = characteristic if component == "characteristic" else brem
-    escape = module.segment_escape_paths
+    module = characteristic if component == "characteristic" else segment_escape
+    target = "segment_escape_paths" if component == "characteristic" else "_segment_escape_paths"
+    escape = getattr(module, target)
     simulate = case_driver.simulate_trajectories
     starts, failures = [], []
     row_budget = []
@@ -301,6 +319,8 @@ def test_escape_oom_chunks_rows_without_replaying_transport(case, monkeypatch, c
         return simulate(*args, **kwargs)
 
     def bounded_escape(segments, index, *args, **kwargs):
+        if component != "characteristic" and "_stream_escape_recovery" not in segments:
+            return escape(segments, index, *args, **kwargs)
         if not row_budget:
             row_budget.append(max(1, int(index.size) // 4))
         if index.size > row_budget[0]:
@@ -310,12 +330,20 @@ def test_escape_oom_chunks_rows_without_replaying_transport(case, monkeypatch, c
 
     monkeypatch.setattr(case_driver, "simulate_trajectories", transport)
     monkeypatch.setattr(runner, "_is_gpu_oom", lambda e: isinstance(e, AllocatorOOM))
-    monkeypatch.setattr(module, "segment_escape_paths", bounded_escape)
+    monkeypatch.setattr(module, target, bounded_escape)
     actual = run_case_streamed(case, 20, transport_core="per-electron")
     assert failures
     assert starts == [0, 20, 40]
     assert np.any(expected["spec_characteristic"] > 0)
     for key in SPECTRA:
-        np.testing.assert_allclose(actual[key], expected[key], rtol=1e-12, atol=0, err_msg=key)
+        np.testing.assert_allclose(
+            actual[key],
+            expected[key],
+            rtol=scaled_rtol(1e-12, eps_multiple=16),
+            atol=0,
+            err_msg=key,
+        )
+    if component != "characteristic":
+        np.testing.assert_array_equal(actual["brem_wide"], expected["brem_wide"])
     for key in ("eta", "hit_frac", "n_segments", "line_data_coverage"):
         assert actual[key] == expected[key], key

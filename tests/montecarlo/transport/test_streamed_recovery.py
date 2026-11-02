@@ -89,3 +89,41 @@ def test_terminal_oom_is_bounded_by_retry_budget_or_one_row(batch, monkeypatch, 
         RowScoringRecovery().evaluate(SimpleNamespace(evaluate=evaluate), batch, "brem_wide")
     assert len(calls) == attempts
     assert "recovery exhausted" in caught.value.__notes__[0]
+
+
+@pytest.mark.parametrize("layered", [False, True])
+def test_escape_chunks_preserve_geometry_and_selected_row_order(monkeypatch, layered):
+    from pyrite.montecarlo.runner.streamed_recovery import EscapeScoringRecovery
+    from pyrite.montecarlo.spectrum import segment_escape
+
+    segments = {
+        "r_mid": np.column_stack((np.linspace(-40, 40, 9), np.zeros(9), np.linspace(10, 90, 9))),
+        "v_hat": np.tile([1.0, 0.0, 0.0], (9, 1)),
+        "L_ang": np.full(9, 15.0),
+        "thickness_ang": 100.0,
+        "crystal_width_ang": 100.0,
+        "crystal_height_ang": 100.0,
+    }
+    index = np.array([8, 4, 5, 2, 0])
+    direction = np.array([1.0, 0.0, 1.0]) / np.sqrt(2)
+    layers = [(0.0, 50.0, []), (50.0, 100.0, [])] if layered else None
+    expected = segment_escape.segment_escape_paths(segments, index, direction, layers=layers)
+    core = segment_escape._segment_escape_paths
+    calls = []
+
+    def bounded(rows, selected, *args, **kwargs):
+        calls.append(int(selected.size))
+        if selected.size > 2:
+            raise AllocatorOOM()
+        return core(rows, selected, *args, **kwargs)
+
+    monkeypatch.setattr(segment_escape, "_segment_escape_paths", bounded)
+    monkeypatch.setattr(runner, "_is_gpu_oom", lambda e: isinstance(e, AllocatorOOM))
+    recovery = EscapeScoringRecovery()
+    for _ in range(2):
+        actual = segment_escape.segment_escape_paths(
+            {**segments, "_stream_escape_recovery": recovery}, index, direction, layers=layers
+        )
+        for observed, reference in zip(actual, expected, strict=True):
+            np.testing.assert_array_equal(observed, reference)
+    assert calls == [5, 2, 2, 1, 2, 2, 1]

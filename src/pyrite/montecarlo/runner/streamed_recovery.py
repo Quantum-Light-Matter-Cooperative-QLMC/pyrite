@@ -8,8 +8,9 @@ from ..spectrum.cxr._kernels import _SEG_ARRAYS
 class RowScoringRecovery:
     """Learn a row ceiling per slot after allocator OOM, preserving normalization.
 
-    These two built-in estimators add independent segment yields. CXR and TR
-    require complete histories and must never pass through this row splitter.
+    Characteristic scoring adds independent segment yields. Continuum uses
+    geometry-only recovery below to preserve its fused reduction order. CXR
+    and TR require complete histories and must never use this row splitter.
     Slices retain global electron IDs, fixed electron limits, geometry and
     scalar metadata; no transport or already successful slice is replayed.
     """
@@ -54,3 +55,66 @@ class RowScoringRecovery:
         if total is None:
             return adapter.evaluate(batch, slot).values
         return total
+
+
+class EscapeScoringRecovery:
+    """Bound geometry scratch while preserving the continuum reduction order."""
+
+    def __init__(self):
+        self.row_limit: int | None = None
+
+    def __call__(self, segments, index, n_hat, *, layers=None, groove=None, xp):
+        from .. import runner
+        from ..spectrum.segment_escape import _segment_escape_paths
+        from .oom import _drop_traceback_locals
+
+        rows = int(index.size)
+        limit = min(rows, self.row_limit or rows)
+        start, retries, parts = 0, 0, []
+        while start < rows:
+            stop = min(start + limit, rows)
+            view = None
+            try:
+                if start == 0 and stop == rows:
+                    result = _segment_escape_paths(
+                        segments, index, n_hat, layers=layers, groove=groove, xp=xp
+                    )
+                else:
+                    # Gather before the float64 geometry cast, so even source
+                    # arrays larger than this selection cannot exhaust scratch.
+                    view = dict(segments)
+                    for key in ("r_mid", "v_hat", "L_ang"):
+                        view[key] = xp.asarray(segments[key])[index[start:stop]]
+                    result = _segment_escape_paths(
+                        view, xp.arange(stop - start), n_hat, layers=layers, groove=groove, xp=xp
+                    )
+            except Exception as error:
+                if not runner._is_gpu_oom(error):
+                    raise
+                _drop_traceback_locals(error)
+                view = None
+                if stop - start == 1 or retries >= runner._RESOURCE_POLICY.gpu_oom_retries:
+                    error.add_note("Streamed escape-geometry allocation recovery exhausted")
+                    runner.BACKEND.release_memory()
+                    raise
+                error.__traceback__ = None
+                limit = max(1, (stop - start) // 2)
+                self.row_limit = limit
+                retries += 1
+            else:
+                if start == 0 and stop == rows:
+                    return result
+                owner, fraction, path0, path1 = result
+                parts.append((owner + start, fraction, path0, path1))
+                start = stop
+                continue
+            runner.BACKEND.release_memory()
+        if not parts:
+            view = {
+                **segments,
+                **{key: xp.asarray(segments[key])[:0] for key in ("r_mid", "v_hat", "L_ang")},
+            }
+            return _segment_escape_paths(view, index, n_hat, layers=layers, groove=groove, xp=xp)
+        if len(parts) == 1:
+            return parts[0]
+        return tuple(xp.concatenate(items) for items in zip(*parts, strict=True))

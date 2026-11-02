@@ -188,7 +188,7 @@ def _groove_segment_paths(r0, r1, groove, xp):
     return out_owner, t_end - t_start, path_start[:, None], path_end[:, None]
 
 
-def segment_escape_paths(segments, index, n_hat, *, layers=None, groove=None, xp=np):
+def _segment_escape_paths(segments, index, n_hat, *, layers=None, groove=None, xp=np):
     """Split segments where a slab/box escape optical depth changes slope.
 
     Return ``(owner, fraction, path_start, path_end)``. Each output row is one
@@ -275,6 +275,17 @@ def segment_escape_paths(segments, index, n_hat, *, layers=None, groove=None, xp
     path0 = xp.maximum(1.5 * quarter - 0.5 * three_quarter, 0.0)
     path1 = xp.maximum(1.5 * three_quarter - 0.5 * quarter, 0.0)
     return owner, fraction, path0, path1
+
+
+def segment_escape_paths(segments, index, n_hat, *, layers=None, groove=None, xp=np):
+    """Escape pieces, optionally using the streamed caller's scratch recovery.
+
+    The private runtime callback returns the same ordered geometry arrays;
+    spectral reductions still see the complete population in its original order.
+    Validation: segment-escape-average
+    """
+    evaluate = segments.get("_stream_escape_recovery", _segment_escape_paths)
+    return evaluate(segments, index, n_hat, layers=layers, groove=groove, xp=xp)
 
 
 def mean_transmission(tau_start, tau_end, xp=np):
