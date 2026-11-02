@@ -171,10 +171,14 @@ alters no generated code; it only lets `core` be found on disk.
 
 ### Cache locations
 
-The `pyrite` command and the remote `python -m pyrite._entry.scan` shim point
-unset `NUMBA_CACHE_DIR` and `CUPY_CACHE_DIR` at `<user cache>/pyrite/numba` and
-`<user cache>/pyrite/cupy` before any kernel module is imported; non-empty user
-values win, and `import pyrite` never changes the environment. `pyrite cache
+`import pyrite` (and so the `pyrite` command and the remote
+`python -m pyrite._entry.scan` shim) points unset or empty `NUMBA_CACHE_DIR` and
+`CUPY_CACHE_DIR` at `<user cache>/pyrite/numba` and `<user cache>/pyrite/cupy`
+before any kernel module is decorated; non-empty user values win. It imports
+neither Numba nor CuPy; if Numba is already imported, `numba.config.CACHE_DIR`
+is set as well, which is early enough because each dispatcher reads it when it
+enables caching. CuPy reads the variable at each kernel compile. The in-tree
+`__pycache__` location is a reported, clearable legacy location. `pyrite cache
 status` reports each location, its size and, per Numba kernel family, how many
 indexes are current (source digest and Numba version match) or stale; `pyrite
 cache clear` deletes only PyRITE-owned entries. Numba 0.68 stamps sources by

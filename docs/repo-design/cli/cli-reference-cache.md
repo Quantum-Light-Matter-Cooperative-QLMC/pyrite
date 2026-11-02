@@ -14,9 +14,10 @@ Usage: pyrite cache [OPTIONS] COMMAND [ARGS]...
   Inspect, warm, and clear compiled CPU (Numba) and GPU (CuPy) kernel caches.
 
   PyRITE compiles its kernels on first use and the native Numba and CuPy caches reuse
-  them in later processes. The pyrite command stores them under the PyRITE user cache
-  directory unless NUMBA_CACHE_DIR or CUPY_CACHE_DIR is already set; Python sessions
-  without NUMBA_CACHE_DIR use Numba's in-tree __pycache__ beside the PyRITE sources.
+  them in later processes. The pyrite command and the Python API (import pyrite) store
+  them under the PyRITE user cache directory unless NUMBA_CACHE_DIR or CUPY_CACHE_DIR is
+  already set to a non-empty value. The older in-tree __pycache__ location beside the
+  PyRITE sources is reported as a legacy location.
 
   Examples:
     pyrite cache status
@@ -43,8 +44,8 @@ Usage: pyrite cache clear [OPTIONS]
   Delete PyRITE-owned compiled kernels; preview unless --yes.
 
   Removes the managed cache directories whole, and only PyRITE package entries from a
-  user-set NUMBA_CACHE_DIR or the in-tree __pycache__. A user-set or default CuPy cache
-  is never touched. Kernels recompile on next use; results do not change.
+  user-set NUMBA_CACHE_DIR or the legacy in-tree __pycache__. A user-set or default CuPy
+  cache is never touched. Kernels recompile on next use; results do not change.
 
 Options:
   --backend [all|numba|cupy]  Caches to clear.  [default: all]

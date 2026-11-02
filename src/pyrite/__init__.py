@@ -15,9 +15,15 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from ._env import env_value
+from ._jit_cache import apply_managed_cache_env
 from .paths import data_dir
 
 __version__ = "0.25.0"
+
+# Default the Numba/CuPy kernel caches to PyRITE's managed user-cache
+# directories (a non-empty NUMBA_CACHE_DIR / CUPY_CACHE_DIR always wins). This
+# runs before any kernel module is decorated; it imports neither backend.
+apply_managed_cache_env()
 
 # Packaged data (catalog/, cifs/,
 # eaglexo_qe.csv, and the other entries ADR-0014 classifies as in-wheel).

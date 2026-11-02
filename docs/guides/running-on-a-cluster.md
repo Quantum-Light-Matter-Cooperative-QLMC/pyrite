@@ -25,7 +25,7 @@ uv run pyrite tables verify
 
 Kernels compile once per cache directory and are reused by later jobs. By
 default each user's cache is under the PyRITE user cache directory on the node
-running `pyrite`; `pyrite cache status` prints it. To share one cache across
+running `pyrite` or importing `pyrite`; `pyrite cache status` prints it. To share one cache across
 SLURM jobs, export the same `NUMBA_CACHE_DIR` (and, for GPU jobs,
 `CUPY_CACHE_DIR`) on a shared filesystem before starting `pyrite`. Numba stores
 entries per CPU model and feature set, and CuPy per GPU architecture and

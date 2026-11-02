@@ -149,7 +149,7 @@ def test_native_numba_cache_hits_and_invalidates_across_processes(tmp_path):
     assert _probe(module_dir, cache) == hit
 
 
-def test_entry_points_respect_overrides_and_import_has_no_side_effects(tmp_path):
+def test_cli_entry_respects_overrides_after_import_defaults(tmp_path):
     script = textwrap.dedent(
         """
         import json, os, sys
@@ -172,7 +172,11 @@ def test_entry_points_respect_overrides_and_import_has_no_side_effects(tmp_path)
         [sys.executable, "-c", script], env=env, capture_output=True, text=True, check=True
     )
     report = json.loads(done.stderr.strip().splitlines()[-1])
-    assert report["before"] == {"NUMBA_CACHE_DIR": None, "CUPY_CACHE_DIR": str(tmp_path / "mine")}
+    managed_numba = str(tmp_path / "xdg" / "pyrite" / "numba")
+    assert report["before"] == {
+        "NUMBA_CACHE_DIR": managed_numba,
+        "CUPY_CACHE_DIR": str(tmp_path / "mine"),
+    }
     assert report["loaded"] == {"numba": False, "cupy": False}
     assert report["after"]["CUPY_CACHE_DIR"] == str(tmp_path / "mine")
     assert Path(report["after"]["NUMBA_CACHE_DIR"]).parts[-2:] == ("pyrite", "numba")
@@ -207,3 +211,49 @@ def test_transport_core_cache_key_is_stable_across_processes():
     first = key("default")
     assert first == key("default")
     assert first != key("radiative")
+
+
+_IMPORT_PROBE = textwrap.dedent(
+    """
+    import json, os, sys
+    pre = sys.argv[1] == "numba-first"
+    if pre:
+        import numba
+    import pyrite
+    from numba.core import config
+    print(json.dumps({
+        "numba": os.environ.get("NUMBA_CACHE_DIR"),
+        "cupy": os.environ.get("CUPY_CACHE_DIR"),
+        "config": config.CACHE_DIR if pre else None,
+        "cupy_imported": "cupy" in sys.modules,
+    }))
+    """
+)
+
+
+def _import_probe(mode: str, cache_root: Path, **overrides: str) -> dict:
+    env = {k: v for k, v in os.environ.items() if k not in ("NUMBA_CACHE_DIR", "CUPY_CACHE_DIR")}
+    env["XDG_CACHE_HOME"] = str(cache_root)
+    env.update(overrides)
+    done = subprocess.run(
+        [sys.executable, "-c", _IMPORT_PROBE, mode], env=env, capture_output=True, text=True
+    )
+    assert done.returncode == 0, done.stderr
+    return json.loads(done.stdout)
+
+
+@pytest.mark.parametrize("mode", ["plain", "numba-first"])
+def test_import_pyrite_sets_managed_defaults(tmp_path, mode):
+    out = _import_probe(mode, tmp_path)
+    assert out["numba"] == str(tmp_path / "pyrite" / "numba")
+    assert out["cupy"] == str(tmp_path / "pyrite" / "cupy")
+    assert out["config"] in (None, out["numba"])
+    assert not out["cupy_imported"]
+
+
+@pytest.mark.parametrize("mode", ["plain", "numba-first"])
+def test_import_pyrite_keeps_user_cache_dirs(tmp_path, mode):
+    mine = {"NUMBA_CACHE_DIR": str(tmp_path / "n"), "CUPY_CACHE_DIR": str(tmp_path / "c")}
+    out = _import_probe(mode, tmp_path / "xdg", **mine)
+    assert (out["numba"], out["cupy"]) == (mine["NUMBA_CACHE_DIR"], mine["CUPY_CACHE_DIR"])
+    assert out["config"] in (None, mine["NUMBA_CACHE_DIR"])

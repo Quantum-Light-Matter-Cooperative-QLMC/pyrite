@@ -62,12 +62,13 @@ for example after upgrading PyRITE or Numba). `pyrite cache clear` previews, and
 with `--yes` deletes, only PyRITE-owned entries; results never depend on the
 cache.
 
-The `pyrite` command stores kernels under the PyRITE user cache directory unless
-`NUMBA_CACHE_DIR` or `CUPY_CACHE_DIR` is already set. Python sessions and
-notebooks use those variables when set and otherwise Numba's `__pycache__`
-beside the PyRITE sources and CuPy's `~/.cupy/kernel_cache`; set the variables
-before importing PyRITE to share one cache with the command line. Numba reads
-`NUMBA_CACHE_DIR` once, when it is first imported.
+The `pyrite` command, Python sessions and notebooks (`import pyrite`) all store
+kernels under the PyRITE user cache directory (`~/.cache/pyrite/numba` and
+`~/.cache/pyrite/cupy` on Linux) unless `NUMBA_CACHE_DIR` or `CUPY_CACHE_DIR` is
+already set to a non-empty value, which always wins. Older in-tree `__pycache__`
+entries beside the PyRITE sources and CuPy's `~/.cupy/kernel_cache` are not
+used by default; `pyrite cache status` still reports the in-tree location as
+legacy and `pyrite cache clear` removes its PyRITE entries.
 
 ## The GPU is unavailable or runs out of memory
 
