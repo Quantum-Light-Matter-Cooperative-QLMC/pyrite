@@ -29,6 +29,7 @@ coherent-transverse-flat-omission
 dielectric-bulk-loss
 eedl-material-shell-rates
 elsepa-elastic-sampling
+elsepa-energy-mixture-moments
 elsepa-positron-elastic-sampling
 bhabha-close
 sbethe-positron-stopping
