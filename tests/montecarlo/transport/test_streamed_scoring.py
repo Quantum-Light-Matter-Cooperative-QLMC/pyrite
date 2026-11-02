@@ -266,7 +266,11 @@ def test_cuda_streamed_residency_and_replay(case, monkeypatch, oom_phase):
         else [(0, True), (20, True), (20, False), (40, True)]
     )
     assert raw_residency == (
-        [True, True, True] if oom_phase != "transport" else [True, False, True]
+        [True, True, True]
+        if oom_phase in (None, "spec_characteristic")
+        else [True, False, True]
+        if oom_phase == "transport"
+        else [True, True, False, True]
     )
     for key in SPECTRA:
         np.testing.assert_allclose(

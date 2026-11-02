@@ -118,3 +118,37 @@ class EscapeScoringRecovery:
         if len(parts) == 1:
             return parts[0]
         return tuple(xp.concatenate(items) for items in zip(*parts, strict=True))
+
+
+_CONTINUUM_ROWS = {
+    "r_mid",
+    "v_hat",
+    "L_ang",
+    "E_keV",
+    "E_start_keV",
+    "E_end_keV",
+    "E_repr_keV",
+    "elec_id",
+    "electron_id",
+    "layer",
+}
+
+
+def stage_continuum_rows(segments, electron_limit):
+    """Stage only continuum consumers' fields and global background population."""
+    import numpy as np
+
+    from .. import runner
+
+    ids = segments["elec_id"]
+    xp = np if isinstance(ids, np.ndarray) else runner.BACKEND.xp
+    index = xp.flatnonzero(ids < electron_limit)
+    view = {
+        key: value
+        for key, value in segments.items()
+        if key not in _SEG_ARRAYS or key in _CONTINUUM_ROWS
+    }
+    for key in _CONTINUUM_ROWS:
+        if view.get(key) is not None:
+            view[key] = view[key][index]
+    return runner._segments_on_device(view)

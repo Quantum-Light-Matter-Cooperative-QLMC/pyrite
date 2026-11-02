@@ -91,6 +91,7 @@ class BlockSpectrumScorer:
         """Score one whole-electron block and add it to the running totals."""
         from . import _segments_on_device
         from .emission_adapters import EmissionBatch
+        from .streamed_recovery import stage_continuum_rows
 
         rows = int(segs["L_ang"].shape[0])
         if rows == 0:
@@ -109,19 +110,29 @@ class BlockSpectrumScorer:
             truncation_audit=self.audit,
         )
         brem_batch = replace(batch, electron_limit=self.Ne_brem)
+        spec = self.emission.cxr.evaluate(batch, "spec").values
+        characteristic = self.row_recovery.evaluate(
+            self.emission.characteristic, brem_batch, "spec_characteristic"
+        )
+        # The staged line population and its unused row fields would otherwise
+        # overlap BremsLib's full-background interpolation state at peak memory.
+        del batch, brem_batch, block
+        continuum = EmissionBatch(
+            {
+                **stage_continuum_rows(segs, self.Ne_brem),
+                "_stream_escape_recovery": self.escape_recovery,
+            },
+            self.E_brem,
+            case,
+            self.n_hat,
+            case.get("abs_layers"),
+            self.groove,
+            electron_limit=self.Ne_brem,
+        )
         parts = (
-            self.emission.cxr.evaluate(batch, "spec").values,
-            self.row_recovery.evaluate(
-                self.emission.characteristic, brem_batch, "spec_characteristic"
-            ),
-            self.emission.continuum.evaluate(
-                replace(
-                    brem_batch,
-                    energy_eV=self.E_brem,
-                    segments={**block, "_stream_escape_recovery": self.escape_recovery},
-                ),
-                "brem_wide",
-            ).values,
+            spec,
+            characteristic,
+            self.emission.continuum.evaluate(continuum, "brem_wide").values,
             self._transition(segs),
         )
         if self.totals is None:
