@@ -181,10 +181,10 @@ def test_streamed_oom_replays_only_failed_block(case, monkeypatch, phase):
     actual = run_case_streamed(case, 20, transport_core="cuda")
     assert calls == (
         [(0, True), (20, True), (20, False), (40, True)]
-        if phase != "spec_characteristic"
+        if phase == "transport"
         else [(0, True), (20, True), (40, True)]
     )
-    if phase != "spec_characteristic":
+    if phase == "transport":
         assert actual["_transport_gpu_oom_retries"] == 1
         assert actual["_recovery_path"] == "host_segments"
     for key in SPECTRA:
@@ -262,15 +262,11 @@ def test_cuda_streamed_residency_and_replay(case, monkeypatch, oom_phase):
     assert residency and all(residency)
     assert attempts == (
         [(0, True), (20, True), (40, True)]
-        if oom_phase in (None, "spec_characteristic")
+        if oom_phase != "transport"
         else [(0, True), (20, True), (20, False), (40, True)]
     )
     assert raw_residency == (
-        [True, True, True]
-        if oom_phase in (None, "spec_characteristic")
-        else [True, False, True]
-        if oom_phase == "transport"
-        else [True, True, False, True]
+        [True, True, True] if oom_phase != "transport" else [True, False, True]
     )
     for key in SPECTRA:
         np.testing.assert_allclose(
