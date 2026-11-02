@@ -46,6 +46,7 @@ from ..campaign.config import material_sweep
 from ..campaign.sweep import build_cases
 from ..materials import CATALOG
 from ..montecarlo import runner
+from ..montecarlo.runner.oom import _ensure_pool_limit
 from ..montecarlo.spectrum.cxr_seeds import (
     DEFAULT_SEED_PROVIDERS,
     DEFAULT_TAIL_WIDTHS,
@@ -130,6 +131,11 @@ class CaseLadder:
         # serves both routes, so a coherent and an incoherent ladder built
         # from the same injected transport compare on identical trajectories.
         self.coherent = bool(coherent)
+        # Production caps the CuPy pool in the case driver. This ladder calls the
+        # transport and scoring entry points directly, so without the cap the pool
+        # grows past VRAM and WSL pages the overflow to host memory (#278: a
+        # continuum pass took 28 s instead of 1 s after a larger case).
+        _ensure_pool_limit()
         started = time.perf_counter()
         if transport is None:
             self.transport = runner._transport_case(case, transport_core=transport_core)

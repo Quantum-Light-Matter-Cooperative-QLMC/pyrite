@@ -138,6 +138,52 @@ def _next_node(node, size):
     return node + 1 if node > 1 else size
 
 
+#: Measured cost constants for choosing between the tree and the all-pairs
+#: kernel (#286, jobs 3725/3732, RTX 5080, HOPG 1 mm, 300 keV and 29,999 keV
+#: flushes). The tree runs one thread per bin, so its wall time follows the
+#: busiest bin's near-line count (~4e-5 to 1.1e-4 s per line); the all-pairs
+#: kernel's follows the total near pairs (~9.2e-9 s each).
+_TREE_SECONDS_PER_BUSIEST_LINE = 7.0e-5
+_PAIRS_SECONDS_PER_NEAR_PAIR = 9.2e-9
+
+
+def near_line_counts(E_r, aw, edges, exact_widths):
+    """Number of lines whose near window overlaps each bin (``O(lines log bins)``).
+
+    The count comes from one difference array over the sorted bin edges, so a
+    line is charged to every bin its index range spans (at most one boundary
+    bin more than strict overlap).
+
+    Validation: sinc-bin-near-far
+    """
+    e = np.asarray(E_r, dtype=np.float64)
+    radius = float(exact_widths) * np.pi / np.asarray(aw, dtype=np.float64)
+    radius = radius * (1.0 + 2.0e-6)
+    n_bins = len(edges) - 1
+    first = np.clip(np.searchsorted(edges, e - radius, side="right") - 1, 0, n_bins)
+    stop = np.clip(np.searchsorted(edges, e + radius, side="left"), 0, n_bins)
+    delta = np.zeros(n_bins + 1, dtype=np.int64)
+    np.add.at(delta, first, 1)
+    np.add.at(delta, np.maximum(stop, first), -1)
+    return np.cumsum(delta[:n_bins])
+
+
+def tree_is_faster(E_r, aw, edges, exact_widths):
+    """True when the modelled tree time beats the all-pairs time for this flush.
+
+    Both kernels give the same bin means; only the cost differs. A line cluster
+    much narrower than the near windows puts hundreds of thousands of near
+    lines on a few bins, which the one-thread-per-bin tree walks serially.
+
+    Validation: sinc-bin-near-far
+    """
+    counts = near_line_counts(E_r, aw, edges, exact_widths)
+    if counts.size == 0:
+        return False
+    tree_s = _TREE_SECONDS_PER_BUSIEST_LINE * float(counts.max())
+    return tree_s < _PAIRS_SECONDS_PER_NEAR_PAIR * float(counts.sum())
+
+
 def reduce_host(E_r, aw, w, edges, *, exact_widths=BIN_MEAN_EXACT_WIDTHS):
     """Reference near/far tree reduction; useful for numerical validation.
 

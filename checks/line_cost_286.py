@@ -117,6 +117,7 @@ def main():
     parser.add_argument("--thickness-ang", type=float, default=1.0e7)
     parser.add_argument("--counts", type=int, nargs="+", default=[100, 400, 1600])
     parser.add_argument("--seed", type=int, default=1)
+    parser.add_argument("--quadrature", choices=("node", "bin-mean"), default="bin-mean")
     parser.add_argument("--repeat", type=int, default=2, help="line evaluations per transport")
     parser.add_argument("--line-points-fallback", type=int, default=600_000)
     parser.add_argument("--output", type=Path, required=True)
@@ -134,6 +135,7 @@ def main():
             n_electrons=n,
             seed=args.seed,
         )
+        case = dict(case, line_quadrature=args.quadrature)
         line_grid = "automatic"
         try:
             ladder = cc.CaseLadder(case)
