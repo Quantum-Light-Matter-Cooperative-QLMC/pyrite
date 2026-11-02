@@ -315,3 +315,38 @@ def test_cupy_recorder_counts_nvrtc_compiles_and_disk_hits(monkeypatch, names):
     assert (cold.lookups, cold.disk_hits, cold.nvrtc_compiles) == (2, 0, 2)
     assert (warm.lookups, warm.disk_hits, warm.nvrtc_compiles) == (1, 1, 0)
     assert {n: getattr(compiler, n) for n in names} == originals
+
+
+def test_native_cache_separates_precision_signatures(tmp_path):
+    """FP32 and FP64 must miss independently, then both hit in a fresh process."""
+    source = tmp_path / "kernels.py"
+    source.write_text(
+        "from numba import njit\n@njit(cache=True)\ndef scale(x):\n    return x + x\n"
+    )
+    script = """
+import json, sys
+import numpy as np
+sys.path.insert(0, sys.argv[1])
+import kernels
+from pyrite._jit_cache import numba_dispatcher_stats
+x = getattr(np, sys.argv[2])(1.25)
+assert kernels.scale(x) == 2.5
+print(json.dumps(numba_dispatcher_stats(prefix="kernels")))
+"""
+    env = {**os.environ, "NUMBA_CACHE_DIR": str(tmp_path / "cache")}
+    env.pop("NUMBA_DISABLE_JIT", None)
+    for dtype, hits, misses in (
+        ("float64", 0, 1),
+        ("float32", 0, 1),
+        ("float64", 1, 0),
+        ("float32", 1, 0),
+    ):
+        done = subprocess.run(
+            [sys.executable, "-c", script, str(tmp_path), dtype],
+            env=env,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        (record,) = json.loads(done.stdout)
+        assert (record["hits"], record["misses"]) == (hits, misses)

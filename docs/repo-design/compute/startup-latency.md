@@ -251,3 +251,24 @@ therefore helps only nodes of the same CPU ISA and GPU architecture; a
 heterogeneous pool keeps one entry per kind and grows. Warm on each node type
 (a one-case job before submitting an array) and, for read-only shared caches,
 warm once per node type from a writable copy.
+
+### Specialization audit and remaining limits
+
+The measurements above identify unstable closure keys as the avoidable CPU
+recompilation, resolved by the closure cache key fix. They do not establish a
+redundant dtype or layout specialization: the continuous/shell and
+coupled/uncoupled transport cores encode different physics. Keep those cores
+separate. No boundary conversion or inlining change is justified by these
+measurements; either needs a measured candidate and steady-state comparison.
+PCH tuning remains unmeasured and optional. Native cache reuse already removes
+NVRTC compilation in the measured warm CUDA workload.
+
+`cache status` reports source/version freshness, rather than observed runtime
+hits. A current Numba index does not guarantee a hit for a new signature or CPU
+architecture. CuPy's hash-named cache exposes aggregate sizes, not per-family
+hit/miss counts; startup instrumentation reports observed aggregate CUDA hits.
+Warming representative profiles is not a compile-free guarantee for arbitrary
+configurations, and an unrepresented configuration may compile on first use.
+Unsupported warm profile names fail before any case runs. The regression tests
+separate FP32/FP64 Numba disk-cache entries across processes; CUDA variant tests
+separate precision and switch keys, but require a CUDA-enabled test environment.

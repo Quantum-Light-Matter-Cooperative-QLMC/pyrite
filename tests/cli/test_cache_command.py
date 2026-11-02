@@ -126,3 +126,19 @@ def test_warm_profiles_pin_distinct_physics():
     standard = _jit_warm.PROFILES["standard"]
     assert _jit_warm.PROFILES["minimal"] == standard[:1]
     assert len({tuple(sorted(c.physics.items())) for c in standard}) == len(standard)
+
+
+@pytest.mark.parametrize("profile", ["full", "custom", "typo"])
+def test_unsupported_warm_profile_never_runs_a_case(monkeypatch, profile):
+    from pyrite import _jit_warm
+
+    def unexpected(*args, **kwargs):
+        pytest.fail("invalid profile reached compilation")
+
+    monkeypatch.setattr(_jit_warm, "_run_case", unexpected)
+    result = invoke(cache_command.command, ["warm", "--profile", profile])
+    assert result.exit_code == 2
+    assert "Invalid value" in result.stderr
+    assert profile in result.stderr
+    with pytest.raises(ValueError, match="unknown warm profile"):
+        _jit_warm.warm(profile)
