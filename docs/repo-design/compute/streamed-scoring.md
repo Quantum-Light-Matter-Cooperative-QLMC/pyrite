@@ -33,7 +33,17 @@ spectra) remains the default and the reference.
   table range. Spectra, row counts and line-coverage records commit only on
   success, so a late scoring failure cannot double-count earlier blocks.
   Host-memory admission precedes replay; a failed host attempt propagates.
-  This does not shrink characteristic-scoring chunks or add CPU fallback.
+  Characteristic scoring additionally recovers allocator OOMs within the
+  current block (#915): halve the failed segment-row range, retain successful
+  partial sums, and reuse the learned row ceiling for later blocks. Continuum
+  recovery splits only escape-geometry evaluation, then concatenates the
+  ordered geometry arrays before the original full-population reduction. This
+  preserves its fused float32 summation order. Global electron IDs and the
+  original population denominator stay fixed.
+  Retry count follows the existing GPU OOM policy; exhaustion propagates to
+  the host-block replay above. CXR retains complete electron histories and its
+  existing spectrum chunks; TR also retains complete histories. Neither goes
+  through the row splitter. There is no streamed CPU fallback.
 - Streaming skips the two population-wide host steps that the joined block path
   redoes after the join. Bunch-centroid timing is skipped because the eligible
   estimators are invariant to a per-electron time offset, which is a common

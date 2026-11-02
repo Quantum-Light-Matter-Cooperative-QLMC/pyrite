@@ -72,8 +72,12 @@ class BlockSpectrumScorer:
     def __init__(self, case: Mapping[str, Any], inputs: Mapping[str, Any]):
         from .cxr_grid import cxr_truncation_audit
         from .emission_adapters import select_emission
+        from .streamed_recovery import EscapeScoringRecovery, RowScoringRecovery
 
         self.case = case
+        self.row_recovery = RowScoringRecovery()
+        self.escape_recovery = EscapeScoringRecovery()
+        self._restage_continuum = False
         self.emission = select_emission(case)
         self.emission.preflight(case, streaming=True)
         self.E_grid, self.E_brem = inputs["E_grid"], inputs["E_brem"]
@@ -88,6 +92,7 @@ class BlockSpectrumScorer:
         """Score one whole-electron block and add it to the running totals."""
         from . import _segments_on_device
         from .emission_adapters import EmissionBatch
+        from .streamed_recovery import stage_continuum_rows
 
         rows = int(segs["L_ang"].shape[0])
         if rows == 0:
@@ -106,14 +111,51 @@ class BlockSpectrumScorer:
             truncation_audit=self.audit,
         )
         brem_batch = replace(batch, electron_limit=self.Ne_brem)
-        parts = (
-            self.emission.cxr.evaluate(batch, "spec").values,
-            self.emission.characteristic.evaluate(brem_batch, "spec_characteristic").values,
-            self.emission.continuum.evaluate(
-                replace(brem_batch, energy_eV=self.E_brem), "brem_wide"
-            ).values,
-            self._transition(segs),
+        spec = self.emission.cxr.evaluate(batch, "spec").values
+        characteristic = self.row_recovery.evaluate(
+            self.emission.characteristic, brem_batch, "spec_characteristic"
         )
+        brem = None
+        if not self._restage_continuum:
+            from .. import runner
+            from .oom import _drop_traceback_locals
+
+            try:
+                brem = self.emission.continuum.evaluate(
+                    replace(
+                        brem_batch,
+                        energy_eV=self.E_brem,
+                        segments={**block, "_stream_escape_recovery": self.escape_recovery},
+                    ),
+                    "brem_wide",
+                ).values
+            except Exception as error:
+                if not runner._is_gpu_oom(error):
+                    raise
+                _drop_traceback_locals(error)
+                error.__traceback__ = None
+                self._restage_continuum = True
+        if self._restage_continuum:
+            # Drop line staging before retrying BremsLib's full-background
+            # interpolation state; do not change the continuum reduction order.
+            from .. import runner
+
+            del batch, brem_batch, block
+            runner.BACKEND.release_memory()
+            continuum = EmissionBatch(
+                {
+                    **stage_continuum_rows(segs, self.Ne_brem),
+                    "_stream_escape_recovery": self.escape_recovery,
+                },
+                self.E_brem,
+                case,
+                self.n_hat,
+                case.get("abs_layers"),
+                self.groove,
+                electron_limit=self.Ne_brem,
+            )
+            brem = self.emission.continuum.evaluate(continuum, "brem_wide").values
+        parts = (spec, characteristic, brem, self._transition(segs))
         if self.totals is None:
             self.totals = parts
         else:
