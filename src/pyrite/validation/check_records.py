@@ -35,6 +35,9 @@ CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
     "checks/line_crossover_286.py": (),
     "checks/continuum_grid_end_to_end.py": (),
     "checks/detector_cone_variance_reduction.py": (),
+    # #879 fixed-population spectral/timing diagnostics, not a physics claim.
+    "checks/line_roulette_spectral_gate_879.py": (),
+    "checks/roulette879_analysis.py": (),
     # #875 launch-shape timing diagnostic: bitwise-identity and timing, no physics claim.
     "checks/launch_retune_875.py": (),
     "checks/brem_source_comparison.py": ("brem-source-comparison",),
