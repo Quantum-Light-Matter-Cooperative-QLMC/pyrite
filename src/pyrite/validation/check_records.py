@@ -147,6 +147,7 @@ CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
         "detector-line-broadening",
     ),
     "checks/elsepa_line_sensitivity.py": ("elsepa-elastic-sampling",),
+    "checks/elsepa_interpolation_moments.py": ("elsepa-energy-mixture-moments",),
     "checks/energy_loss_straggling_observables.py": ("energy-loss-straggling",),
     "checks/energy_step_convergence_matrix.py": ("energy-step-convergence",),
     "checks/feranchuk_check_script.py": ("closed-form-flux", "pxr-amplitude", "cbs-amplitude"),

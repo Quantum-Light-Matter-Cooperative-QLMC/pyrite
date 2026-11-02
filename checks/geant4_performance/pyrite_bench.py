@@ -639,6 +639,11 @@ def main():
     grid_nodes = spectrum_grids(args, mat, comp, float(scene["energy_keV"]))
 
     def request(seed, histories):
+        # Optional study instrumentation supplied by a runpy caller (#895).
+        # The ordinary benchmark creates no events or timing proxies.
+        kernel_events = globals().get("STUDY_KERNEL_EVENTS")
+        if kernel_events is not None:
+            kernel_events.clear()
         scores = {}
         retained = 0
         rounds.update(launched_rows=0, launches=0, assembly=[])
@@ -694,6 +699,8 @@ def main():
             scoring_s=scoring_s,
             schedule=sorted({m for m in log.messages if "schedule" in m}),
         )
+        if kernel_events is not None:
+            work.update(kernel_events.summary())
         if grids:
             work["grid_spectra"] = {
                 label: grid_summary(g, grid_nodes[label], histories, cone)
