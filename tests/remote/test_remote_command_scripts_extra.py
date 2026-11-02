@@ -5,14 +5,14 @@ import shutil
 import subprocess
 
 import pytest
-from tests.remote._remote_test_helpers import (
-    _bash_or_skip,
-    _use_amd_target,
-)
 
 from pyrite import remote
 from pyrite.remote import config, scripts, transport
 from pyrite.remote import queue as lifecycle_queue
+from tests.remote._remote_test_helpers import (
+    _bash_or_skip,
+    _use_amd_target,
+)
 
 
 @pytest.mark.parametrize(
