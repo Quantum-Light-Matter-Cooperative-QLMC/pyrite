@@ -34,7 +34,7 @@ def _():
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    # Transition and coherent transition radiation
+    # Transition Radiation and CTR
 
     An electron crossing a thin film radiates transition radiation (TR) at both
     faces. Show that the two contributions interfere with a fringe period set by

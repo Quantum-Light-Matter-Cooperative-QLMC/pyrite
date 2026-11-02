@@ -6,7 +6,7 @@
 
 **Simulate how electrons travel through matter—and the X-rays they produce.**
 
-PyRITE (**Py**thon toolkit for **R**adiation from **I**nteractions and **T**ransport of **E**lectrons) is a Python-based Monte Carlo simulation toolkit for electron transport and radiation in solids. It is designed for researchers studying electron–matter interactions, crystal-based X-ray sources, and related experiments.
+PyRITE (**Py**thon-based **R**adiative **I**nteraction and **T**ransport **E**ngine) is a Python-native Monte Carlo simulation toolkit for electron transport and radiation in solids. It is designed for researchers studying electron–matter interactions, crystal-based X-ray sources, and related experiments.
 
 Its particular focus is **parametric X-ray radiation (PXR)** and **coherent bremsstrahlung (CBS)**: radiation produced when electrons interact with the ordered structure of a crystal. PyRITE brings these specialized calculations together with electron transport and other X-ray emission processes in one workflow.
 
