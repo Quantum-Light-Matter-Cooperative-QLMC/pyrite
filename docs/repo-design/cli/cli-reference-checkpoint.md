@@ -11,7 +11,7 @@ Version: `0.25.0`
 ```text
 Usage: pyrite checkpoint [OPTIONS] COMMAND [ARGS]...
 
-  Inspect, transform, recompute, archive, and reclaim local checkpoints.
+  Inspect and manipulate local simulation checkpoints.
 
   Examples:
     pyrite checkpoint list

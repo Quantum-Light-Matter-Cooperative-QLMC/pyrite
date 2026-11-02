@@ -61,7 +61,7 @@ Choose a family for its complete help, options, defaults, and examples.
 
 - [`pyrite run`](cli-reference-run.md) — Run a catalog profile's MC sweeps or one ephemeral pixel scene.
 - [`pyrite app`](cli-reference-app.md) — Launch or export interactive analysis notebooks.
-- [`pyrite checkpoint`](cli-reference-checkpoint.md) — Inspect, transform, recompute, archive, and reclaim local checkpoints.
+- [`pyrite checkpoint`](cli-reference-checkpoint.md) — Inspect and manipulate local simulation checkpoints.
 - [`pyrite trajectories`](cli-reference-trajectories.md) — List, describe, export, and score saved trajectory captures.
 - [`pyrite config`](cli-reference-config.md) — Set and inspect environment-scoped CLI defaults.
 - [`pyrite remote`](cli-reference-remote.md) — [dev] Push code and run or manage MC sweeps on a remote GPU box over SSH.
@@ -127,7 +127,7 @@ Options:
 Commands:
   run           Run a profile's MC sweeps and write checkpoints.
   app           Launch or export interactive analysis notebooks.
-  checkpoint    Inspect, transform, recompute, archive, and reclaim checkpoints.
+  checkpoint    Inspect and manipulate local simulation checkpoints.
   trajectories  List, describe, export, and score saved trajectory captures.
   config        Set profile, catalog, workspace, and remote defaults.
   remote        Run and manage MC sweeps on a remote GPU host.
@@ -223,6 +223,11 @@ Existing command fragments remain available below; each link opens the full fami
 - <span id="pyrite-remote-trajectories-ls"></span>[`pyrite remote trajectories ls`](cli-reference-remote.md#pyrite-remote-trajectories-ls)
 - <span id="pyrite-remote-trajectories-pull"></span>[`pyrite remote trajectories pull`](cli-reference-remote.md#pyrite-remote-trajectories-pull)
 - <span id="pyrite-remote-trajectories-score"></span>[`pyrite remote trajectories score`](cli-reference-remote.md#pyrite-remote-trajectories-score)
+- <span id="pyrite-remote-app"></span>[`pyrite remote app`](cli-reference-remote.md#pyrite-remote-app)
+- <span id="pyrite-remote-app-analysis"></span>[`pyrite remote app analysis`](cli-reference-remote.md#pyrite-remote-app-analysis)
+- <span id="pyrite-remote-app-attach"></span>[`pyrite remote app attach`](cli-reference-remote.md#pyrite-remote-app-attach)
+- <span id="pyrite-remote-app-validation"></span>[`pyrite remote app validation`](cli-reference-remote.md#pyrite-remote-app-validation)
+- <span id="pyrite-remote-app-viewer"></span>[`pyrite remote app viewer`](cli-reference-remote.md#pyrite-remote-app-viewer)
 - <span id="pyrite-remote-job"></span>[`pyrite remote job`](cli-reference-remote.md#pyrite-remote-job)
 - <span id="pyrite-remote-job-attach"></span>[`pyrite remote job attach`](cli-reference-remote.md#pyrite-remote-job-attach)
 - <span id="pyrite-remote-job-list"></span>[`pyrite remote job list`](cli-reference-remote.md#pyrite-remote-job-list)

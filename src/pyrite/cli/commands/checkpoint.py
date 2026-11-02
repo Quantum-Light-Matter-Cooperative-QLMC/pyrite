@@ -53,7 +53,7 @@ def recompute_command() -> None:
     no_args_is_help=True,
 )
 def command() -> None:
-    """Inspect, transform, recompute, archive, and reclaim local checkpoints.
+    """Inspect and manipulate local simulation checkpoints.
 
     \b
     Examples:

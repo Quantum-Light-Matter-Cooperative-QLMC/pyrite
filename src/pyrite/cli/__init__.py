@@ -30,7 +30,7 @@ _COMMANDS = {
 _COMMAND_HELP = {
     "run": "Run a profile's MC sweeps and write checkpoints.",
     "app": "Launch or export interactive analysis notebooks.",
-    "checkpoint": "Inspect, transform, recompute, archive, and reclaim checkpoints.",
+    "checkpoint": "Inspect and manipulate local simulation checkpoints.",
     "trajectories": "List, describe, export, and score saved trajectory captures.",
     "config": "Set profile, catalog, workspace, and remote defaults.",
     "remote": "Run and manage MC sweeps on a remote GPU host.",
