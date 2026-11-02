@@ -1,6 +1,6 @@
 # Electron transport
 
-Reviewed trajectory and capture operations. For everyday simulations prefer the high-level `simulate` entry point.
+Advanced-stable trajectory and capture operations. For everyday simulations prefer the high-level `simulate` entry point.
 
 The entries below use generated docstrings, signatures, and source links. API support and scientific validation are separate contracts.
 
@@ -15,6 +15,19 @@ The entries below use generated docstrings, signatures, and source links. API su
    pyrite.transport.iter_primary_summaries
    pyrite.transport.depth_loss_profile
    pyrite.transport.capture_secondary_energy_balance
+```
+
+## Advanced runner compatibility paths
+
+These individually governed runner imports remain supported. Their presence
+does not make other implementation-module exports supported. Prefer
+`pyrite.simulate` for scene workflows and `pyrite.transport` for capture work.
+
+```{eval-rst}
+.. autosummary::
+   :toctree: ../../_autosummary
+   :nosignatures:
+
    pyrite.montecarlo.runner.run_case
    pyrite.montecarlo.runner.run_cases
 ```
@@ -81,7 +94,6 @@ See [detector response contracts](detectors.md#response-contracts),
 [saved beam diagnostics](beams.md#saved-beam-diagnostics), and
 [quantum solver diagnostics](quantum.md#solver-diagnostic-contracts) for
 other reviewed engine operations.
-
 
 ## Coupled radiative moment evaluation
 

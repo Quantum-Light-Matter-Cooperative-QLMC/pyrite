@@ -350,8 +350,18 @@ COMPONENTS = {
             _cuda_loop(CUDA_ANGLE_BODY, "cos_theta = F64_ONE", "elastic_model_code == I32_TWO"),
         ),
         "per-electron": (
-            "                    cos_t = _sample_cos_theta_from_alpha(alpha, cos_u)\n",
-            "                dirs[e, 0], dirs[e, 1], dirs[e, 2] = _rotate_direction_scalar(\n",
+            "                    cos_t = _sample_cos_theta_elsepa(\n"
+            "                        E_keV[e],\n"
+            "                        cos_u,\n"
+            "                        el_logE,\n"
+            "                        el_cdf,\n"
+            "                        el_pdf,\n"
+            "                        el_mu,\n"
+            "                        el_guide,\n"
+            "                        el_start[L, i_el],\n"
+            "                        el_len[L, i_el],\n"
+            "                    )\n",
+            "                else:\n                    cos_t = _sample_cos_theta_from_alpha(alpha, cos_u)\n",
             16,
             _cpu_loop(
                 "probe_sum += _sample_cos_theta_elsepa(\n"

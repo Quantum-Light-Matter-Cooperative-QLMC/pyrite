@@ -20,6 +20,24 @@ The entries below use generated docstrings, signatures, and source links. API su
    pyrite.config.Timepix3ResponseNumerics
 ```
 
+(angular-sampling-and-legacy-kernel-controls)=
+## Angular sampling
+
+`AngularSampling` is the advanced-stable semantic alias for `PixelScorer`;
+it controls angular quadrature, independently of physical detector geometry.
+See the [observation request](observations.md#measurement-requests) for composition.
+
+```{eval-rst}
+.. autosummary::
+   :toctree: ../../_autosummary
+   :template: autosummary/public-alias.rst
+   :nosignatures:
+
+   pyrite.config.AngularSampling
+```
+
+## Advanced local kernel controls
+
 `KernelTuning` is the preferred public spelling of the existing
 `ExecutionConfig` class. It selects local kernel controls; executor scheduling
 is documented in [execution and scheduling](execution.md).
@@ -59,12 +77,11 @@ It never enters case identity; spectra agree with the default path to rounding.
    pyrite.config.TransportKernelTuning
 ```
 
-## Angular sampling and legacy kernel controls
+## Compatibility kernel controls
 
-`AngularSampling` is the advanced-stable semantic alias for `PixelScorer`;
-it controls angular quadrature, independently of physical detector geometry.
-`ExecutionConfig` retains its root compatibility import; prefer
-`pyrite.config.KernelTuning` for the same local kernel controls.
+`ExecutionConfig` retains its advanced-stable root compatibility import and
+identity with `pyrite.config.KernelTuning`. Prefer the configuration spelling
+for new code; executor scheduling belongs to [execution](execution.md).
 
 ```{eval-rst}
 .. autosummary::
@@ -72,6 +89,5 @@ it controls angular quadrature, independently of physical detector geometry.
    :template: autosummary/public-alias.rst
    :nosignatures:
 
-   pyrite.config.AngularSampling
    pyrite.ExecutionConfig
 ```

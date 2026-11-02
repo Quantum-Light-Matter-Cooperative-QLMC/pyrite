@@ -22,6 +22,9 @@ CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
     "checks/continuum_grid_convergence.py": (),
     "checks/electron_count_accuracy.py": (),
     "checks/line_cost_286.py": (),
+    "checks/line_crossover_286.py": (),
+    "checks/continuum_grid_end_to_end.py": (),
+    "checks/detector_cone_variance_reduction.py": (),
     # #875 launch-shape timing diagnostic: bitwise-identity and timing, no physics claim.
     "checks/launch_retune_875.py": (),
     "checks/brem_source_comparison.py": ("brem-source-comparison",),

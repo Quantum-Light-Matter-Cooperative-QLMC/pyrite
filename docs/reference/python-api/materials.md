@@ -4,6 +4,10 @@ Work with material catalogs, authoring, atomic form factors, crystallography and
 
 The entries below use generated docstrings, signatures, and source links. API support and scientific validation are separate contracts.
 
+## Catalogs and material specifications
+
+Use these advanced-stable interfaces to select, describe and author materials. The immutable bundled catalog is listed [below](#bundled-catalog-data).
+
 ```{eval-rst}
 .. autosummary::
    :toctree: ../../_autosummary
@@ -21,6 +25,21 @@ The entries below use generated docstrings, signatures, and source links. API su
    pyrite.materials.ScanSpec
    pyrite.materials.LayerSpec
    pyrite.materials.load_material_catalog
+   pyrite.materials.MaterialDefinition
+   pyrite.materials.build_medium
+   pyrite.materials.build_crystal
+   pyrite.materials.save_material
+```
+
+## Advanced numeric scientific functions
+
+These advanced-stable functions evaluate atomic, crystal and attenuation quantities with their documented numeric units.
+
+```{eval-rst}
+.. autosummary::
+   :toctree: ../../_autosummary
+   :nosignatures:
+
    pyrite.materials.atomic.cromer_mann_f0
    pyrite.materials.atomic.henke_dispersion
    pyrite.materials.atomic.atomic_form_factor
@@ -31,6 +50,17 @@ The entries below use generated docstrings, signatures, and source links. API su
    pyrite.materials.crystal.absorption_length_ang
    pyrite.materials.crystal.dominant_reflections
    pyrite.materials.attenuation.linear_attenuation_inv_mm
+```
+
+## Advanced opt-in quantity helpers
+
+Quantity wrappers are explicit alternatives to the numeric functions above; numeric catalog records and scientific identity remain unchanged. See [units](units.md).
+
+```{eval-rst}
+.. autosummary::
+   :toctree: ../../_autosummary
+   :nosignatures:
+
    pyrite.materials.quantities.crystal_constants
    pyrite.materials.quantities.cromer_mann_f0_q
    pyrite.materials.quantities.henke_dispersion_q
@@ -43,10 +73,6 @@ The entries below use generated docstrings, signatures, and source links. API su
    pyrite.materials.quantities.dominant_reflections_q
    pyrite.materials.quantities.linear_attenuation_q
    pyrite.materials.quantities.photon_energies_q
-   pyrite.materials.MaterialDefinition
-   pyrite.materials.build_medium
-   pyrite.materials.build_crystal
-   pyrite.materials.save_material
 ```
 
 ## Material authoring

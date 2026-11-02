@@ -9,6 +9,8 @@ the governed supported API inventory in `api-surface.toml`. See the
 [cluster execution](../cluster-execution.md) for executor usage and limitations.
 API support and scientific validation remain separate contracts.
 
+## Governed sweep execution and cache preparation
+
 `run_sweep` is the governed entry point for running and persisting a sweep.
 
 ```{eval-rst}

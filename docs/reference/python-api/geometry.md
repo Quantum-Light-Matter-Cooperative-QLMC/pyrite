@@ -20,6 +20,11 @@ The entries below use generated docstrings, signatures, and source links. API su
    pyrite.geometry.CrystalCut
 ```
 
+`pyrite.geometry.FilterPlate` is the supported passive plate owner; see its
+[generated class reference](../../_autosummary/pyrite.detectors.FilterPlate.rst). Its
+`pyrite.detectors.FilterPlate` compatibility import retains identity and
+advanced-stable status; neither spelling is a response or acquisition request.
+
 ## Shared bodies and explicit roles
 
 `RectangularBody` describes a solid; `Target` and `Filter` assign its scene role.

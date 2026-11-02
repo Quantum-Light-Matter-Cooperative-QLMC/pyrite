@@ -74,9 +74,9 @@ class TransportInputs:
     _secondary: Any
     _electron_start: Any
     _energy_range_keV: Any
-    _cone_split: Any
     bunch_front_tilt: Any
     _complete_hard_photons: Any = True
+    _cone_split: Any = None
 
     def as_kwargs(self):
         """Shallow ``{parameter: value}`` mapping; arrays and tables are shared."""

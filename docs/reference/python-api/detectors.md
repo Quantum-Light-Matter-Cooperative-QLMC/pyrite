@@ -4,6 +4,10 @@ Separate angular acceptance, physical detector geometry, and instrument response
 
 The entries below use generated docstrings, signatures, and source links. API support and scientific validation are separate contracts.
 
+## Physical detector geometry
+
+`PlanarPose`, `PixelGrid` and `PlanarDetector` describe the physical sensor. Passive plates belong to [geometry](geometry.md); numerical angular scoring belongs to [configuration](config.md#angular-sampling).
+
 ```{eval-rst}
 .. autosummary::
    :toctree: ../../_autosummary
@@ -11,27 +15,95 @@ The entries below use generated docstrings, signatures, and source links. API su
 
    pyrite.detectors.PlanarPose
    pyrite.detectors.PixelGrid
-   pyrite.detectors.FilterPlate
-   pyrite.detectors.IdealPhotonCounter
    pyrite.detectors.PlanarDetector
-   pyrite.detectors.response.detector_efficiency
-   pyrite.detectors.response.convolve_detector
+```
+
+## Angular acceptance and energy selection
+
+`Detector` is the established scalar angular observation interface; see the [semantic aliases](#semantic-response-aliases). `EnergyBins` is detector-facing energy selection, not passive geometry.
+
+```{eval-rst}
+.. autosummary::
+   :toctree: ../../_autosummary
+   :nosignatures:
+
    pyrite.detectors.Detector
    pyrite.detectors.AngularAcceptance
    pyrite.detectors.SensorAcceptance
    pyrite.detectors.EnergyBins
+```
+
+## Response specifications
+
+Use `Timepix3Response` and `EagleXOResponse` in new observation configurations (see [semantic aliases](#semantic-response-aliases)). `NativeSpectrum` is a detector response value and `NativeBinnedResponse` is the native-bin capability protocol; acquired count batches belong to [results](results.md#acquired-counts).
+
+```{eval-rst}
+.. autosummary::
+   :toctree: ../../_autosummary
+   :nosignatures:
+
+   pyrite.detectors.IdealPhotonCounter
    pyrite.detectors.NativeSpectrum
-   pyrite.detectors.Timepix3
-   pyrite.detectors.EagleXO
-   pyrite.detectors.LegacyEDS
+   pyrite.detectors.NativeBinnedResponse
+```
+
+## Semantic response aliases
+
+These advanced-stable spellings preserve the identity and behavior of
+`Detector`, `Timepix3`, and `EagleXO`, respectively.
+
+```{eval-rst}
+.. autosummary::
+   :toctree: ../../_autosummary
+   :template: autosummary/public-alias.rst
+   :nosignatures:
+
+   pyrite.detectors.AngularDetector
+   pyrite.detectors.Timepix3Response
+   pyrite.detectors.EagleXOResponse
+```
+
+## Advanced numeric response and prepared operators
+
+These advanced-stable numeric functions and grid-dependent operators implement response application. The Timepix factory is `pyrite.detectors.timepix_response.get_response`; the Eagle XO factory is `pyrite.detectors.eaglexo_response.get_response`. They prepare operators from grids and response settings, rather than define physical pixel geometry.
+
+```{eval-rst}
+.. autosummary::
+   :toctree: ../../_autosummary
+   :nosignatures:
+
+   pyrite.detectors.response.detector_efficiency
+   pyrite.detectors.response.convolve_detector
    pyrite.detectors.eaglexo_response.EagleResponse
    pyrite.detectors.eaglexo_response.get_response
    pyrite.detectors.timepix_response.TimepixResponse
    pyrite.detectors.timepix_response.get_response
+```
+
+## Advanced grating scientific API
+
+`Grating` remains detector scientific API at `pyrite.detectors.grating`, alongside CCD and spectral image operations. Its exploratory scientific applicability is separate from its advanced-stable import contract.
+
+```{eval-rst}
+.. autosummary::
+   :toctree: ../../_autosummary
+   :nosignatures:
+
    pyrite.detectors.grating.Grating
    pyrite.detectors.grating.SimpleCCD
    pyrite.detectors.grating.disperse_spectrum
    pyrite.detectors.grating.detected_image
+```
+
+## Advanced opt-in quantity helpers
+
+These supported wrappers accept explicit quantities around the numeric scientific interfaces. They do not replace numeric records, defaults or persisted arrays. See [units](units.md).
+
+```{eval-rst}
+.. autosummary::
+   :toctree: ../../_autosummary
+   :nosignatures:
+
    pyrite.detectors.quantities.detector_efficiency_q
    pyrite.detectors.quantities.convolve_detector_q
    pyrite.detectors.quantities.grating_q
@@ -53,7 +125,21 @@ The entries below use generated docstrings, signatures, and source links. API su
    pyrite.detectors.quantities.qe_absorption_q
    pyrite.detectors.quantities.charge_cloud_sigma_q
    pyrite.detectors.quantities.energy_fwhm_q
-   pyrite.detectors.NativeBinnedResponse
+```
+
+## Compatibility spellings
+
+`Timepix3` and `EagleXO` retain object identity with their semantic response aliases. `LegacyEDS` remains supported. The detector import of `FilterPlate` is retained; prefer `pyrite.geometry.FilterPlate` for passive geometry.
+
+```{eval-rst}
+.. autosummary::
+   :toctree: ../../_autosummary
+   :nosignatures:
+
+   pyrite.detectors.FilterPlate
+   pyrite.detectors.Timepix3
+   pyrite.detectors.EagleXO
+   pyrite.detectors.LegacyEDS
 ```
 
 ## Detector response
@@ -122,19 +208,3 @@ and saved records retain their existing numeric representation.
 | Entry | Owner / status | Scientific contract and effects |
 | --- | --- | --- |
 | `detector_efficiency`, `convolve_detector` | Detectors, advanced-stable | Photon grid (eV), window thicknesses (nm) to dimensionless efficiency; Gaussian FWHM (eV) convolution preserves spectral-density units. Optional outside mass has density × eV units. Reads attenuation tables when efficiency is evaluated; invalid grid/array inputs propagate numerical errors. Neither function applies an exposure. |
-
-## Semantic response aliases
-
-These advanced-stable spellings preserve the identity and behavior of
-`Detector`, `Timepix3`, and `EagleXO`, respectively.
-
-```{eval-rst}
-.. autosummary::
-   :toctree: ../../_autosummary
-   :template: autosummary/public-alias.rst
-   :nosignatures:
-
-   pyrite.detectors.AngularDetector
-   pyrite.detectors.Timepix3Response
-   pyrite.detectors.EagleXOResponse
-```
