@@ -83,6 +83,7 @@ Options:
   --refresh                       With --preset zhai, recompute matching cache.
   --no-sync                       With -R/--remote, skip code upload.
   --dry-run                       With -R/--remote, print submission preview only.
+  --target NAME                   Use named remote compute target NAME.
   -R, --remote [TARGET]           Run remotely; bare uses the configured target, =TARGET
                                   overrides it.
   --wait                          Wait for remote completion and pull results.

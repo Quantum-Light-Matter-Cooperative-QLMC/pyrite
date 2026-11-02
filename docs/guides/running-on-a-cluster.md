@@ -88,14 +88,25 @@ rather than a checkpoint pull.
 (amd-rocm-nodes)=
 ### AMD (ROCm) nodes
 
-Point the SLURM target profile at the AMD partition:
+Create separate named targets for the two partitions:
 
 ```bash
-pyrite config set remote.gpu_vendor amd
-pyrite config set remote.partition gpu-amd
-pyrite config set remote.nodelist qlmc-ace          # or any
-pyrite config set remote.gres gpu:radeon8060s:1
+pyrite remote target add lab-gpu --host MY_SSH_ALIAS --remote-dir '~/pyrite-gpu'
+pyrite remote target add lab-amd --host MY_SSH_ALIAS --remote-dir '~/pyrite-amd' \
+  --gpu-vendor amd --partition gpu-amd --nodelist amd-node --gres gpu:radeon8060s:1
+pyrite remote target use lab-gpu
+pyrite run quickstart --remote --target lab-amd --dry-run
 ```
+
+Use `target list`, `show NAME`, `edit NAME --FIELD VALUE`, or `remove NAME --yes`
+to manage targets. `--target NAME` selects a target on remote-contacting commands;
+`PYRITE_REMOTE_TARGET` overrides the stored default. Named targets use their own
+stored fields ahead of per-field environment variables; omitted fields fall back
+to environment, flat settings, then defaults. Without a named
+selection, existing flat `remote.*` settings and environment overrides still apply.
+Use distinct remote directories when GPU vendors differ; shared directories also
+share job bookkeeping. New jobs record their target remotely and locally; job
+commands recover it by ID. If an ID exists on multiple targets, pass `--target`.
 
 AMD jobs keep their own `.venv-amd`, build CuPy for HIP on the first sync (about
 9 minutes on `qlmc-ace`), and pin `PYRITE_MC_BACKEND=rocm` so a broken HIP stack fails

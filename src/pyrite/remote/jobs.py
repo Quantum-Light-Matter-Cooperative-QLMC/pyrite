@@ -78,6 +78,9 @@ def _submit_staged_job(jobid: str, stems: list[str], *, nice: bool = False) -> s
     if not scheduler_id.isdigit():
         _release_if_submission_definitely_failed(jobid, stems)
         raise SystemExit(f"SLURM submission for job {jobid} returned no scheduler ID")
+    from .targets import remember_job
+
+    remember_job(jobid)
     return scheduler_id
 
 
