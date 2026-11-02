@@ -62,11 +62,49 @@ or CUDA core, with a fixed electron count and a final line grid.
 | `adaptive_precision` | The electron count, and hence the normalization, is decided during the run. |
 | `transition_radiation` | Electron-block transport refuses it; artifact replay still streams per-history TR. |
 | `channeling`, `gdf_source` | Refused by electron-block transport. |
-| `secondary_threshold_eV`, `pair_production_model`, `positron_transport` | Cascade block locality not yet confirmed. |
+| `secondary_threshold_eV`, `pair_production_model`, `positron_transport` | Cascade RNG uses population-local parent track IDs; splitting the primary population changes descendant streams. |
 
 The lockstep core shares one generator across electrons and cannot run in
 blocks; pin `transport_core="per-electron"` or `"cuda"` (`"auto"` can resolve
 to lockstep at small electron counts).
+
+### Cascade locality
+
+Cascade rows belong to their primary history, but their random streams are
+not invariant under electron-block transport. In `transport/secondaries.py`,
+`transport_secondary_cascade` numbers primaries from zero in each call and
+assigns subsequent track IDs after that call's primary and earlier-generation
+populations. `secondary_stream_keys` hashes the seed, parent track ID and hard
+event ordinal. A primary in a later block therefore receives a different
+parent address; even in the first block, a second-generation particle's parent
+ID depends on the number of primaries and earlier launches in that call.
+The explicit `LaunchState.stream_keys` feeds both the per-electron and CUDA
+cores through `host_pass`; changing the core does not fix these addresses.
+Pair conversion, pair electrons, positrons and annihilation also key their
+streams by parent track ID.
+
+There is a second dependency for coupled pair cascades:
+`complete_hard_radiative_events` samples photon directions from one sequential
+generator per generation/species call. Pair conversion reads those directions
+before launching charged particles. Live streaming skips completion, and
+`simulate_trajectories` rejects that combination. Completing each block
+independently would restart the generator and would not reproduce the joined
+population. The transport API also rejects cascades with a nonzero
+`_electron_start`.
+
+Normalization itself is compatible: `_join` maps every cascade row's
+`electron_id` to its primary, retains generation-zero `Ne` and exit counts,
+and keeps descendant counts in `secondaries`. The block driver's `_globalize`
+shifts row `electron_id`/`elec_id`, so the scorer's population masks and fixed
+`Ne`/`Ne_brem` denominators would include descendants without counting them as
+primaries. It does not globalize nested `secondary_tracks` or `pair_production`
+metadata, or track/parent IDs, and cannot repair RNG addresses after transport.
+
+All three cascade options remain refused before transport. Supporting them
+requires block-invariant lineage and photon-direction addressing first; this
+would change sampling and is outside the eligibility-only change. The refusal
+tests cover each option at multiple block sizes. No cascade streamed/joined
+spectral equivalence is claimed.
 
 ## Equivalence evidence
 

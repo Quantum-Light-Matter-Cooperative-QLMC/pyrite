@@ -19,6 +19,7 @@ from pyrite.montecarlo.runner.streamed_scoring import (
     LIVE_STREAM_REFUSED_KEYS,
     STREAM_REFUSED_KEYS,
     run_case_streamed,
+    streaming_refusal,
 )
 
 SPECTRA = ("spec", "spec_characteristic", "brem_wide", "brem")
@@ -76,6 +77,31 @@ def test_bunch_transition_radiation_is_refused(monkeypatch, case):
     monkeypatch.setattr(runner, "_transport_case", None)
     with pytest.raises(ValueError, match="bunch transition radiation"):
         run_case_streamed({**case, "transition_radiation": {"coherence": "bunch"}}, 10)
+
+
+@pytest.mark.parametrize("block", [1, 3, 8, 100])
+@pytest.mark.parametrize(
+    ("key", "value"),
+    [
+        ("secondary_threshold_eV", 1000.0),
+        ("pair_production_model", "penelope-2024"),
+        ("positron_transport", True),
+    ],
+)
+def test_cascades_fail_before_transport_with_the_locality_reason(monkeypatch, block, key, value):
+    def no_transport(*args, **kwargs):
+        raise AssertionError("transport ran")
+
+    monkeypatch.setattr(runner, "_transport_case", no_transport)
+    # Isolate each gate, including pair/positron options whose valid cases also
+    # set secondary_threshold_eV and therefore encounter its gate first.
+    case = {key: value}
+    reason = f"{key}: cascade RNG uses population-local parent track IDs"
+    assert streaming_refusal(case, live=True) == reason
+    # Saved complete histories can still be scored in whole-electron blocks.
+    assert streaming_refusal(case) is None
+    with pytest.raises(ValueError, match=reason):
+        run_case_streamed(case, block, transport_core="per-electron")
 
 
 def test_lockstep_core_is_refused(case):

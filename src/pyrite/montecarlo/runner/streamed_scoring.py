@@ -25,6 +25,8 @@ import numpy as np
 #: Case keys whose spectra need every segment at once.
 STREAM_REFUSED_KEYS = ("coherent_emission", "temporal_profile", "photon_transport")
 
+_CASCADE_KEYS = ("secondary_threshold_eV", "pair_production_model", "positron_transport")
+
 #: Further case keys live streaming refuses in its first version (#611): a
 #: population-resolved line grid, adaptive electron counts, the channeling zone
 #: join, GDF beams, secondary/pair/positron cascades, and transition radiation
@@ -36,9 +38,7 @@ LIVE_STREAM_REFUSED_KEYS = (
     "adaptive_precision",
     "channeling",
     "gdf_source",
-    "secondary_threshold_eV",
-    "pair_production_model",
-    "positron_transport",
+    *_CASCADE_KEYS,
 )
 
 
@@ -53,6 +53,8 @@ def streaming_refusal(case: Mapping[str, Any], *, live: bool = False) -> str | N
     if live:
         for key in LIVE_STREAM_REFUSED_KEYS:
             if case.get(key) is not None:
+                if key in _CASCADE_KEYS:
+                    return f"{key}: cascade RNG uses population-local parent track IDs"
                 return f"{key} is not supported by live streamed scoring"
     return None
 
