@@ -168,6 +168,47 @@ def finalize_population_fields(
     return result
 
 
+def _stream_electron_blocks(
+    simulate_block, n_electrons, block_electrons, consume, replay_block, on_block, should_stop
+):
+    """Commit each scored block once; replay only its failed resident attempt."""
+    from ..spectrum.cxr._coverage import collect_line_data_coverage
+    from .recovery import transport_with_recovery
+
+    counts: dict[str, Any] = dict.fromkeys(_ADDITIVE_COUNTS, 0)
+    retries, events = 0, []
+    for start, stop in electron_blocks(n_electrons, block_electrons):
+
+        def score_block(resident, start=start, stop=stop):
+            simulate = simulate_block if resident or replay_block is None else replay_block
+            block = simulate(start, stop)
+            if on_block is not None:
+                on_block(start, stop, block)
+            block = _globalize(block, start)
+            with collect_line_data_coverage():
+                consume(block)
+            return {key: int(block.get(key, 0)) for key in _ADDITIVE_COUNTS}
+
+        try:
+            block_counts, recovery = transport_with_recovery(score_block, replay_block is not None)
+            for key in counts:
+                counts[key] += block_counts[key]
+            retries += recovery.get("_transport_gpu_oom_retries", 0)
+            events.extend(recovery.get("_recovery_events", []))
+        finally:
+            # score_block has returned: both raw rows and staged rows are dead.
+            BACKEND.release_memory()
+        if should_stop is not None and should_stop(stop):
+            break
+    if retries:
+        counts.update(
+            _transport_gpu_oom_retries=retries,
+            _recovery_path="host_segments",
+            _recovery_events=events,
+        )
+    return counts
+
+
 def transport_electron_blocks(
     simulate_block: Callable[[int, int], dict[str, Any]],
     n_electrons: int,
@@ -179,6 +220,7 @@ def transport_electron_blocks(
     on_block: Callable[[int, int, dict[str, Any]], None] | None = None,
     should_stop: Callable[[int], bool] | None = None,
     consume: Callable[[dict[str, Any]], None] | None = None,
+    replay_block: Callable[[int, int], dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Transport ``[0, n_electrons)`` block by block and join the blocks.
 
@@ -197,29 +239,32 @@ def transport_electron_blocks(
     ``consume`` (optional, #611) takes each globalized block instead of the
     join: no block is retained, the population-wide host steps are skipped,
     and only the additive counts are returned (see :mod:`.streamed_scoring`).
+    With ``replay_block``, an allocator OOM replays only the failed block with
+    host rows. The consumer must commit its state only after successful scoring.
     """
+    if consume is not None:
+        return _stream_electron_blocks(
+            simulate_block,
+            n_electrons,
+            block_electrons,
+            consume,
+            replay_block,
+            on_block,
+            should_stop,
+        )
     blocks = []
-    counts = dict.fromkeys(_ADDITIVE_COUNTS, 0)
     for start, stop in electron_blocks(n_electrons, block_electrons):
         block = simulate_block(start, stop)
         if on_block is not None:
             on_block(start, stop, block)
         block = _globalize(block, start)
-        if consume is None:
-            # The join re-completes these over its own rows; holding and
-            # concatenating every block's dense copy would only add peak RSS.
-            if "hard_radiative_k_eV" in block:
-                block.update(dict.fromkeys(_RECOMPLETED_FIELDS))
-            blocks.append(block)
-        else:
-            for key in counts:
-                counts[key] += int(block.get(key, 0))
-            consume(block)
+        # The join re-completes these over its own rows.
+        if "hard_radiative_k_eV" in block:
+            block.update(dict.fromkeys(_RECOMPLETED_FIELDS))
+        blocks.append(block)
         del block
         if should_stop is not None and should_stop(stop):
             break
-    if consume is not None:
-        return counts
     merged = merge_electron_blocks(blocks)
     blocks.clear()  # the join owns copies; release the blocks before finalizing
     return finalize_population_fields(
@@ -273,7 +318,7 @@ def transport_case_blocks(
 
     energy_range = energy_range_of(n_electrons)
 
-    def simulate_block(start, stop):
+    def simulate_block(start, stop, keep=keep):
         block_kw: dict[str, Any] = {"_electron_start": start, "_energy_range_keV": energy_range}
         block_kw |= no_bunch
         if consume is not None:
@@ -296,7 +341,11 @@ def transport_case_blocks(
         bremslib_tables=_case_radiative_kwargs(case).get("bremslib_tables"),
     )
     if monitor is None:
-        return run(n_electrons, consume=consume)
+        return run(
+            n_electrons,
+            consume=consume,
+            replay_block=partial(simulate_block, keep=False) if keep and consume else None,
+        )
     result = run(n_electrons, on_block=monitor.on_block, should_stop=monitor.should_stop)
     realized = int(result["Ne"])
 

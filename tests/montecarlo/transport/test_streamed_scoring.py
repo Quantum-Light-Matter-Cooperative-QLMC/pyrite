@@ -106,3 +106,121 @@ def test_consumed_blocks_are_released_before_the_next_block():
     )
     assert seen == [3, 7, 9]  # globalized indices
     assert counts["Ne"] == 10 and counts["n_backscattered"] == 3
+
+
+@pytest.mark.parametrize("phase", ["transport", "spec_characteristic", "brem_wide"])
+def test_streamed_oom_replays_only_failed_block(case, monkeypatch, phase):
+    """A late OOM must neither re-score earlier blocks nor count failed rows."""
+    from pyrite.montecarlo.runner import case_driver, pool
+    from pyrite.montecarlo.runner.emission_adapters import EmissionAdapter
+
+    expected = run_case_streamed(case, 20, transport_core="per-electron")
+    simulate, evaluate = case_driver.simulate_trajectories, EmissionAdapter.evaluate
+    calls, failed = [], []
+
+    class AllocatorOOM(RuntimeError):
+        pass
+
+    def transport(*args, **kwargs):
+        start, resident = kwargs["_electron_start"], kwargs["keep_segments_on_device"]
+        calls.append((start, resident))
+        if phase == "transport" and start == 20 and resident and not failed:
+            failed.append(True)
+            raise AllocatorOOM()
+        # Exercise the exact driver/recovery path without requiring hardware.
+        kwargs.update(transport_core="per-electron", keep_segments_on_device=False)
+        return simulate(*args, **kwargs)
+
+    def score(self, batch, slot, **kwargs):
+        if slot == phase and int(batch.segments["electron_id"].min()) == 20 and not failed:
+            failed.append(True)
+            raise AllocatorOOM()
+        return evaluate(self, batch, slot, **kwargs)
+
+    monkeypatch.setattr(runner, "_case_transport_core", lambda *_: "cuda")
+    monkeypatch.setattr(case_driver, "simulate_trajectories", transport)
+    monkeypatch.setattr(runner, "_is_gpu_oom", lambda e: isinstance(e, AllocatorOOM))
+    monkeypatch.setattr(pool, "_admit_host_segments", lambda: None)
+    monkeypatch.setattr(EmissionAdapter, "evaluate", score)
+    actual = run_case_streamed(case, 20, transport_core="cuda")
+    assert calls == [(0, True), (20, True), (20, False), (40, True)]
+    assert actual["_transport_gpu_oom_retries"] == 1
+    assert actual["_recovery_path"] == "host_segments"
+    for key in (*SPECTRA, "eta", "hit_frac", "n_segments", "line_data_coverage"):
+        np.testing.assert_equal(actual[key], expected[key], err_msg=key)
+
+
+def _cuda_available():
+    try:
+        import cupy
+
+        return cupy.cuda.runtime.getDeviceCount() > 0
+    except Exception:
+        return False
+
+
+@pytest.mark.hardware
+@pytest.mark.skipif(not _cuda_available(), reason="no CUDA device")
+@pytest.mark.parametrize("oom_phase", [None, "transport", "spec_characteristic", "brem_wide"])
+def test_cuda_streamed_residency_and_replay(case, monkeypatch, oom_phase):
+    """Resident, host and recovered CUDA blocks have identical spectra (#914)."""
+    import cupy
+
+    from pyrite.montecarlo.runner import case_driver
+    from pyrite.montecarlo.runner.emission_adapters import EmissionAdapter
+
+    original_transport = runner._transport_case
+
+    def host_transport(*args, **kwargs):
+        return original_transport(*args, **{**kwargs, "keep_segments_on_device": False})
+
+    with monkeypatch.context() as patch:
+        patch.setattr(runner, "_transport_case", host_transport)
+        expected = run_case_streamed(case, 20, transport_core="cuda")
+
+    simulate, evaluate = case_driver.simulate_trajectories, EmissionAdapter.evaluate
+    attempts, residency, failed = [], [], []
+
+    def transport(*args, **kwargs):
+        start, keep = kwargs["_electron_start"], kwargs["keep_segments_on_device"]
+        attempts.append((start, keep))
+        if oom_phase == "transport" and start == 20 and keep and not failed:
+            failed.append(True)
+            raise cupy.cuda.memory.OutOfMemoryError(1, 1)
+        return simulate(*args, **kwargs)
+
+    def score(self, batch, slot, **kwargs):
+        start = int(batch.segments["electron_id"].min())
+        resident = isinstance(batch.segments["r_mid"], cupy.ndarray)
+        residency.append(resident)
+        if slot == oom_phase and start == 20 and not failed:
+            failed.append(True)
+            raise cupy.cuda.memory.OutOfMemoryError(1, 1)
+        return evaluate(self, batch, slot, **kwargs)
+
+    raw_residency = []
+    original_add = runner.streamed_scoring.BlockSpectrumScorer.add
+
+    def add(self, block):
+        raw_residency.append(isinstance(block["r_mid"], cupy.ndarray))
+        return original_add(self, block)
+
+    monkeypatch.setattr(case_driver, "simulate_trajectories", transport)
+    monkeypatch.setattr(EmissionAdapter, "evaluate", score)
+    monkeypatch.setattr(runner.streamed_scoring.BlockSpectrumScorer, "add", add)
+    actual = run_case_streamed(case, 20, transport_core="cuda")
+    assert residency and all(residency)
+    assert attempts == (
+        [(0, True), (20, True), (40, True)]
+        if oom_phase is None
+        else [(0, True), (20, True), (20, False), (40, True)]
+    )
+    assert raw_residency == (
+        [True, True, True]
+        if oom_phase is None
+        else [True, False, True]
+        if oom_phase == "transport"
+        else [True, True, False, True]
+    )
+    for key in (*SPECTRA, "eta", "hit_frac", "n_segments", "line_data_coverage"):
+        np.testing.assert_equal(actual[key], expected[key], err_msg=key)
