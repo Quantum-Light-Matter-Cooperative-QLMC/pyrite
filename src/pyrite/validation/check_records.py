@@ -63,6 +63,10 @@ CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
     # Hardware performance evidence accompanies the CUDA backend validation;
     # it does not add a separate pass/fail ledger claim.
     "checks/axial_mcwf_cuda.py": (),
+    # #344: scheduled orchestration and CPU/CUDA parity are engineering checks,
+    # not independent physics evidence eligible for claim promotion.
+    "checks/refresh_validation_evidence.py": (),
+    "checks/scheduled_cuda_parity.py": (),
     # First-flight CUDA parity/timing is backend evidence, not a physics verdict.
     "checks/photon_first_flight_cuda.py": (),
     # Live streamed scoring memory/wall benchmark (#611): engineering evidence.
