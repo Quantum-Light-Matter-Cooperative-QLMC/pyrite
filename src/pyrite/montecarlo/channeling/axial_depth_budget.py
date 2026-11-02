@@ -22,13 +22,13 @@ if TYPE_CHECKING:
 
     import numpy as np
 
+    from .axial_fiber_unraveling import FiberChannels
     from .axial_outgoing_launch import (
         AxialHandoffRecord,
         AxialIncident,
         AxialMatchingDeclaration,
         AxialZoneKinematics,
     )
-    from .axial_fiber_unraveling import FiberChannels
 
 
 def _nonnegative_finite(name: str, value: float) -> None:

@@ -14,7 +14,6 @@ from pyrite.montecarlo.channeling.axial_depth_budget import (
     sample_budgeted_physical_handoff,
 )
 
-
 CASE = "si-001/5MeV/tds-electronic/2x2-32grid/95ev-cut/solver-v1"
 OBS = "photon/energy-70-90ev/polar-20-25deg/s-pol/partition-v1"
 MODEL = "research-source-v1"
