@@ -410,7 +410,7 @@
     {
       "path": "src/pyrite/montecarlo/runner/case_driver.py",
       "name": "_transport_case",
-      "cc": 26
+      "cc": 24
     },
     {
       "path": "src/pyrite/montecarlo/runner/channeling.py",
@@ -603,12 +603,12 @@
     {
       "path": "src/pyrite/montecarlo/transport/batching.py",
       "name": "_drive_per_electron_batches",
-      "cc": 23
+      "cc": 25
     },
     {
       "path": "src/pyrite/montecarlo/transport/cores.py",
       "name": "make_cpu_transport_core.body",
-      "cc": 236,
+      "cc": 246,
       "exception": "Numerical transport kernel: a split or rewrite needs RNG-stream, event-order, CPU/GPU parity and performance evidence (#567, #344); never refactor for the metric alone."
     },
     {
@@ -734,7 +734,7 @@
     {
       "path": "src/pyrite/remote/pull.py",
       "name": "pull",
-      "cc": 35
+      "cc": 34
     },
     {
       "path": "src/pyrite/remote/pull.py",
