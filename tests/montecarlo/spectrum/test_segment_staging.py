@@ -338,7 +338,8 @@ def _adversarial_f64():
 @pytest.mark.parametrize("repeat", [1, 3_000_000 // 4000])
 def test_float_row_staging_is_bitwise_the_host_cast(repeat):
     """Staged float rows equal ``astype(float32)`` bit for bit (incl. subnormals,
-    overflow to inf, NaN payloads); repeat>1 exercises the multi-chunk path."""
+    overflow to inf, NaN payloads) and integer rows upload unchanged; repeat>1
+    exercises the pinned-ring path."""
     from pyrite._backend import xp
 
     if not hasattr(xp, "cuda") or REAL is not xp.float32:
@@ -354,3 +355,7 @@ def test_float_row_staging_is_bitwise_the_host_cast(repeat):
     two_d = a[: (a.size // 3) * 3].reshape(-1, 3)
     got2 = _to_cpu(_stage_row(two_d))
     np.testing.assert_array_equal(got2.view(np.uint32), two_d.astype(np.float32).view(np.uint32))
+    ids = np.arange(a.size, dtype=np.int64) * 7919
+    got_ids = _to_cpu(_stage_row(ids))
+    assert got_ids.dtype == np.int64
+    np.testing.assert_array_equal(got_ids, ids)

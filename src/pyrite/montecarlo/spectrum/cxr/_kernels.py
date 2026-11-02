@@ -7,8 +7,6 @@ and the batched route can share them and the focused kernel tests can call them
 directly.
 """
 
-from concurrent.futures import ThreadPoolExecutor
-
 import numpy as np
 
 from ...._backend import REAL, _to_cpu, array_namespace, xp
@@ -25,6 +23,7 @@ from ...transport import (
     _element_crossover_keV,
     beta_from_keV,
 )
+from ...transport._continuation_join import _copy_bytes
 from . import _fused
 
 # ---- segment-sum CXR spectrum ------------------------------------------------
@@ -951,8 +950,11 @@ def _stage_row(a):
 # float64 -> float32 on the device, bitwise equal to ``ndarray.astype(float32)``
 # on x86: round-to-nearest-even with subnormals kept (CuPy's own ``astype``
 # flushes float32 subnormals to zero), and a NaN becomes a quiet NaN keeping the
-# sign and the top 22 payload bits, as cvtsd2ss does. ``__double2float_rn``
-# alone would canonicalise the NaN payload.
+# sign and the top 22 payload bits, as cvtsd2ss does. CuPy compiles every
+# kernel with ``-ftz=true`` (``cupy/cuda/compiler.py``), which turns
+# ``__double2float_rn`` into the flushing ``cvt.rn.ftz.f32.f64``; the inline PTX
+# names the non-flushing ``cvt.rn.f32.f64`` explicitly. That instruction would
+# canonicalise a NaN payload, hence the separate NaN branch.
 _CAST_F32_SRC = """
 long long b = __double_as_longlong(x);
 if (x != x) {
@@ -960,12 +962,17 @@ if (x != x) {
     unsigned int pay = (unsigned int)(((unsigned long long)b >> 29) & 0x3FFFFFu);
     y = __uint_as_float(sign | 0x7FC00000u | pay);
 } else {
-    y = __double2float_rn(x);
+    float r;
+    asm("cvt.rn.f32.f64 %0, %1;" : "=f"(r) : "d"(x));
+    y = r;
 }
 """
 _cast_kernel = None
-# Device scratch chunk for the float64 upload that the cast kernel then narrows.
-_STAGE_CHUNK_BYTES = 32 << 20
+# Pinned ring for host-row uploads: two 16 MiB chunks, so the host copy into one
+# overlaps the upload (and device cast) of the other. Measured on qlmc (#904):
+# 16 MiB x 2 beat 8/32/64 MiB and deeper rings; the host copy, not PCIe, bounds it.
+_STAGE_CHUNK_BYTES = 16 << 20
+_STAGE_DEPTH = 2
 
 
 def _f64_to_f32_kernel():
@@ -977,106 +984,85 @@ def _f64_to_f32_kernel():
     return _cast_kernel
 
 
-def _unregister(device_id, host):
-    """Release the page-lock on ``host`` (its uploads have completed)."""
-    with xp.cuda.Device(device_id):
-        xp.cuda.runtime.hostUnregister(host.ctypes.data)
-
-
 class _RowStager:
-    """Stage host rows onto the backend; a context manager owning transient pins.
+    """Stage host rows onto the backend; a context manager owning a pinned ring.
 
-    On CuPy, a float64 host row is page-locked in place (``cudaHostRegister``,
-    no host copy), uploaded in chunks at pinned-DMA speed, and narrowed on the
-    device with a non-flushing cast kernel. The pin is released by a helper
-    thread as soon as that row's upload is done, so pinned memory is bounded by
-    the rows in flight rather than kept in CuPy's pinned pool. A row that cannot
-    be registered (overlapping/already registered pages) is uploaded pageable
-    and cast on the device. Everything else (NumPy backend, FP64 builds,
-    device-resident or non-float64 inputs) takes the plain ``asarray`` path.
-    ``__exit__`` returns only after every upload has consumed its host memory.
+    On CuPy, a host row larger than one chunk is copied (Numba, in parallel)
+    into one of two pinned chunks and uploaded from there, so the host copy of
+    the next chunk overlaps the DMA of the previous one. A float64 chunk lands
+    in a device scratch chunk and is narrowed to float32 by the non-flushing
+    cast kernel; any other dtype is uploaded byte for byte. Smaller float64
+    rows upload pageable and are cast by the same kernel. The ring (2 x 16 MiB
+    pinned, not from CuPy's pinned pool) is allocated on first use and freed by
+    ``__exit__`` after the last upload has drained, so no pinned memory stays
+    resident. NumPy backend, FP64 builds and device-resident inputs take the
+    plain ``asarray`` path.
     """
 
     def __init__(self):
-        self._scratch = None
-        self._events = []
-        self._pinned = []
-        self._pool = None
+        self._host = self._dev = None
+        self._events = [None] * _STAGE_DEPTH
+        self._slot = 0
 
     def __enter__(self):
         return self
 
     def __exit__(self, *exc):
-        if self._events:
-            self._events[-1].synchronize()
-        if self._pool is not None:
-            dev = xp.cuda.Device().id
-            for host in self._pinned:
-                self._pool.submit(_unregister, dev, host)
-            self._pool.shutdown(wait=False)
-        self._scratch = self._pool = None
-        self._events = []
-        self._pinned = []
+        for event in self._events:
+            if event is not None:
+                event.synchronize()
+        self._host = self._dev = None
+        self._events = [None] * _STAGE_DEPTH
 
     def __call__(self, a):
-        if a.dtype.kind != "f":
-            return self._plain(a)
         if (
             not hasattr(xp, "cuda")
             or REAL is not xp.float32
             or not isinstance(a, np.ndarray)
-            or a.dtype != np.float64
             or a.size == 0
         ):
+            return xp.asarray(a, dtype=REAL) if a.dtype.kind == "f" else xp.asarray(a)
+        if a.dtype.kind == "f" and a.dtype != np.float64:
             return xp.asarray(a, dtype=REAL)
+        cast = a.dtype == np.float64
         flat = np.ascontiguousarray(a).reshape(-1)
-        out = xp.empty(flat.size, xp.float32)
-        kernel = _f64_to_f32_kernel()
-        n_chunk = _STAGE_CHUNK_BYTES // 8
-        if flat.size <= n_chunk // 4 or not self._register(flat):
-            kernel(xp.asarray(flat), out)
+        out = xp.empty(flat.size, xp.float32 if cast else a.dtype)
+        if flat.nbytes <= _STAGE_CHUNK_BYTES:
+            if cast:
+                _f64_to_f32_kernel()(xp.asarray(flat), out)
+            else:
+                out.set(flat)
             return out.reshape(a.shape)
-        if self._scratch is None:
-            self._scratch = xp.empty(n_chunk, xp.float64)
-        stream = xp.cuda.get_current_stream()
-        kind = xp.cuda.runtime.memcpyHostToDevice
-        for start in range(0, flat.size, n_chunk):
-            n = min(n_chunk, flat.size - start)
-            src = flat.ctypes.data + start * 8
-            # Same stream throughout: the scratch is reused in order.
-            xp.cuda.runtime.memcpyAsync(self._scratch.data.ptr, src, n * 8, kind, stream.ptr)
-            kernel(self._scratch[:n], out[start : start + n])
-        self._events.append(stream.record())
-        self._pinned.append(flat)
+        self._upload(flat.view(np.uint8), out, cast)
         return out.reshape(a.shape)
 
-    def _plain(self, a):
-        """Integer rows: upload unchanged, page-locked in place when large."""
-        flat = np.ascontiguousarray(a).reshape(-1) if isinstance(a, np.ndarray) else None
-        if (
-            flat is None
-            or not hasattr(xp, "cuda")
-            or flat.nbytes < _STAGE_CHUNK_BYTES // 4
-            or a.dtype.kind not in "iub"
-            or not self._register(flat)
-        ):
-            return xp.asarray(a)
-        out = xp.empty(a.shape, a.dtype)
-        kind = xp.cuda.runtime.memcpyHostToDevice
+    def _upload(self, src, out, cast):
+        """Push ``src`` bytes through the ring into ``out`` (cast if float64)."""
+        if self._host is None:
+            self._host = [
+                np.frombuffer(
+                    xp.cuda.PinnedMemoryPointer(xp.cuda.PinnedMemory(_STAGE_CHUNK_BYTES), 0),
+                    np.uint8,
+                    _STAGE_CHUNK_BYTES,
+                )
+                for _ in range(_STAGE_DEPTH)
+            ]
+            self._dev = [xp.empty(_STAGE_CHUNK_BYTES, xp.uint8) for _ in range(_STAGE_DEPTH)]
+        kernel = _f64_to_f32_kernel() if cast else None
         stream = xp.cuda.get_current_stream()
-        xp.cuda.runtime.memcpyAsync(out.data.ptr, flat.ctypes.data, flat.nbytes, kind, stream.ptr)
-        self._events.append(stream.record())
-        self._pinned.append(flat)
-        return out
-
-    def _register(self, flat):
-        try:
-            xp.cuda.runtime.hostRegister(flat.ctypes.data, flat.nbytes, 0)
-        except xp.cuda.runtime.CUDARuntimeError:
-            return False
-        if self._pool is None:
-            self._pool = ThreadPoolExecutor(1)
-        return True
+        h2d = xp.cuda.runtime.memcpyHostToDevice
+        for off in range(0, src.size, _STAGE_CHUNK_BYTES):
+            n = min(_STAGE_CHUNK_BYTES, src.size - off)
+            s = self._slot
+            self._slot = (s + 1) % _STAGE_DEPTH
+            if self._events[s] is not None:
+                self._events[s].synchronize()
+            _copy_bytes(self._host[s][:n], src[off : off + n])
+            dst = self._dev[s].data.ptr if cast else out.data.ptr + off
+            xp.cuda.runtime.memcpyAsync(dst, self._host[s].ctypes.data, n, h2d, stream.ptr)
+            if cast:
+                kernel(self._dev[s][:n].view(xp.float64), out[off // 8 : (off + n) // 8])
+            self._events[s] = stream.record()
 
 
 def _polarization_pair(k_hat, g_vec):
