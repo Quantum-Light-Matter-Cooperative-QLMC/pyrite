@@ -117,7 +117,12 @@ def _configure_cuda_pch(module: ModuleType) -> None:
         logger.debug("NVRTC PCH version probe unavailable", exc_info=True)
         return
     if version >= (12, 8):
-        os.environ.setdefault("CUPY_NVRTC_USE_PCH", "1")
+        # CuPy 14 captures this flag when its compiler module imports, before
+        # device selection. Keep that native flag in sync with our late default.
+        compiler = getattr(module.cuda, "compiler", None)
+        if compiler is not None and hasattr(compiler, "_use_pch"):
+            compiler._use_pch = True
+            os.environ.setdefault("CUPY_NVRTC_USE_PCH", "1")
 
 
 class CuPyBackend(ArrayBackend):
