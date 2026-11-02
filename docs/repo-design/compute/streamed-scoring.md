@@ -120,6 +120,93 @@ gave identical wall times and bitwise-identical output on Si and W at
 1,000- and 4,000-electron blocks, and was removed: since #860, blocks of
 1,000 histories or more already take bounded continuation.
 
+## Block sizing on large-memory GPUs (#907)
+
+`checks/streamed_block_sizing.py` (one arm per process; sbatch:
+`checks/streamed_block_sizing.sbatch`, `checks/streamed_block_sizing_ncu.sbatch`)
+measures how block size, scratch budget and `electron_batch` set the
+continuation population, and what that does to kernel time and memory. Scene: W
+1 MeV, 10 µm slab tilted 45°, scalar detector at 90°, 251-bin CXR window, one
+reflection family, seed 7, `brem_electrons = N // 16`, CUDA core, default
+mixed precision, `kernel_threads=32`, 256 continuation rows. W keeps 1,121.6
+rows per electron (294.0 M rows at 262,144 electrons). Kernel time is the sum
+of CUDA-event brackets around every continuation launch. Each block's
+`scratch_mib` and `electron_batch` were sized so the first round holds the
+whole block. Devices: Molab RTX PRO 6000 Blackwell Server Edition (188 SMs,
+96 GB, 160 GB host) and the lab RTX 5080 (84 SMs, 16 GB; jobs 3680–3681).
+
+**Kernel throughput saturates at about six warps per SM.** Time per history
+per round in the first, full-population launch:
+
+| Histories | 4,096 | 8,192 | 16,384 | 32,768 | 65,536 | 131,072 | 262,144 |
+|---|---|---|---|---|---|---|---|
+| RTX 5080 (µs) | 7.8 | 4.8 | 3.98 | 4.09 | 3.86 | | |
+| RTX PRO 6000 (µs) | | | 2.55 | 2.09 | 1.87 | 2.01 | 1.98 |
+
+Below saturation every launch costs a floor of about 28 ms (5080) or 35 ms
+(6000), however few histories it holds. Nsight Compute on a full-population
+16,384-history launch on the 5080 shows why throughput stops there: the FP64
+pipe is 86.5% busy on average (100% on the busiest SM), while only 4% of issue
+slots are used. Occupancy is limited by registers (168 per thread, 12 warps
+per SM, 25% theoretical); the launch achieves 5.9 warps per SM. Warps have
+9.5 of 32 threads active per instruction, and the stalls are short-scoreboard
+waits. More resident warps cannot help once the FP64 pipe is saturated. The
+saturated rate scales with SM count (6000/5080 ≈ 2.0 against an SM ratio of
+2.24), so the population that fills a card is about 6 × 32 × SMs: about
+16,000 histories on the 5080 and 36,000 on the 6000, not the 1,536-thread
+resident ceiling (129k and 290k).
+
+**Past saturation, larger blocks still cut kernel time by removing pass
+tails.** Each pass ends in 25–30 nearly empty rounds at the launch floor, so
+kernel time falls with the number of passes. At 262,144 electrons:
+
+| Block | Passes | 6000 kernel (s) | 5080 kernel (s) |
+|---|---|---|---|
+| 4,096 | 64 | | 43.8 |
+| 8,192 | 32 | | 25.0 |
+| 16,384 | 16 | 16.4 | 15.0 |
+| 32,768 | 8 | 9.6 | 10.2 |
+| 65,536 | 4 | 6.0 | 7.4 |
+| 131,072 | 2 | 4.4 | |
+| 262,144 | 1 | 3.45 | |
+
+A 524,288-history population on the 6000 (one pass, 64 GiB scratch) was
+slower: 10.4 s of kernel, with a 5.7 s first launch, and a 92 GiB host peak.
+64 threads per block and 1,024 continuation rows changed kernel time by less
+than 5%.
+
+**Wall time at code `67d54de6c` (after #904).** RTX PRO 6000, 262,144 electrons;
+the split arm adds device synchronizations at every seam:
+
+| Block | Wall (s) | Scoring (s) | Kernel (s) | Host peak (GiB) | VRAM peak (GiB) |
+|---|---|---|---|---|---|
+| 65,536 | 32.7 | 11.0 | 6.0 | 12.5 | 50.2 |
+| 131,072 | 30.7 | 11.1 | 4.4 | 23.4 | 66.7 |
+
+At the 65,536 block, `transport.assemble` (each block's device join and its
+download to host) takes 9.6 s, more than the kernel. Scoring then uploads the
+same rows again (1.2 s), and estimators take 7.0 s (lines), 2.8 s (continuum)
+and 1.4 s (characteristic). cProfile puts 8.1 s in `_continuation_join._drain`.
+Before #904, scoring took 62–69 s at every block size and hid the transport
+gain: wall was 84–99 s for blocks of 16,384–131,072.
+
+**Memory follows the block, not N.** Host peak is about 150 B per retained row
+(about 168 KB per W 1 MeV electron in the block) on both cards: 43 GiB for a
+262,144 block at both 262,144 and 524,288 electrons. Transport-only VRAM is
+mostly the scratch budget (5080: 3.8, 7.5 and 9.2 GiB at 16k, 32k and 65k
+blocks). Streamed scoring is the binding device limit: on the 5080, blocks of
+16,384 or more electrons run out of memory in characteristic scoring
+(`segment_escape_paths`, 12 GB pool cap), which has no block-level OOM
+recovery. 8,192 fits at 11.3 GiB. The joined path at 262,144 electrons runs out
+of memory on the 6000 in characteristic scoring (71 GB pool cap), at every
+measured code version; streaming scores it.
+
+**Equivalence.** Streamed vs joined at 32,768 electrons: lines within 2.3e-7
+per bin relative on both cards; characteristic bitwise identical on the 6000
+and within 1.8e-7 on the 5080; continuum bitwise identical. Streamed arms at 262,144 agree with each other to the same
+bound across block sizes, threads and row quanta, and are bitwise identical
+across the three measured code versions.
+
 ## Per-estimator scoring split (#872)
 
 `checks/streamed_scoring_memory.py` times each estimator inside

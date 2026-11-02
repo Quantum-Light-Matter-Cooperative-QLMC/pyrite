@@ -50,6 +50,8 @@ CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
     "checks/photon_first_flight_cuda.py": (),
     # Live streamed scoring memory/wall benchmark (#611): engineering evidence.
     "checks/streamed_scoring_memory.py": (),
+    # Streamed-block sizing sweep (#907): engineering evidence.
+    "checks/streamed_block_sizing.py": (),
     "checks/axial_mcwf_precision_cuda.py": (),
     "checks/axial_recording_performance.py": (),
     "checks/axial_split_step_precision_cuda.py": (),
