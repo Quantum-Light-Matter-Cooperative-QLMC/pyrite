@@ -40,7 +40,7 @@ def _selected(backend: str):
 
 @click.group("cache")
 def command() -> None:
-    """Inspect and clear compiled CPU (Numba) and GPU (CuPy) kernel caches.
+    """Inspect, warm, and clear compiled CPU (Numba) and GPU (CuPy) kernel caches.
 
     PyRITE compiles its kernels on first use and the native Numba and CuPy
     caches reuse them in later processes. The pyrite command stores them under
@@ -52,6 +52,8 @@ def command() -> None:
     Examples:
       pyrite cache status
       pyrite cache status --backend numba -o json
+      pyrite cache warm
+      pyrite cache warm --profile standard -o json
       pyrite cache clear
       pyrite cache clear --backend numba --yes
     """
@@ -139,3 +141,56 @@ def clear_command(backend: str, yes: bool) -> None:
     except OSError as exc:
         raise CLIError(f"cache clear failed: {exc}") from exc
     emit_result(f"removed {len(removed)} cache path(s)")
+
+
+@command.command("warm")
+@click.option(
+    "--profile",
+    type=click.Choice(("minimal", "standard")),
+    default="minimal",
+    show_default=True,
+    help="Representative cases to compile: minimal (default physics) or standard "
+    "(adds continuous stopping, uncoupled continuum, and secondary transport).",
+)
+@output_option
+def warm_command(profile: str, json_output: bool) -> None:
+    """Compile and cache common kernels ahead of the first simulation.
+
+    Runs each profile case once with one electron on the backend that
+    PYRITE_MC_BACKEND selects and discards the result, so later processes
+    sharing these caches load the kernels instead of compiling them. Takes
+    tens of seconds per case on a cold cache and about a second when already
+    warm. Uses the cache locations `pyrite cache status` reports; physics
+    tables the cases need must already be installed. Exits 1 if any case
+    fails; the remaining cases still run.
+    """
+    from ... import _jit_warm
+
+    report = _jit_warm.warm(
+        profile, progress=lambda case: emit_diagnostic(f"warming {case.name}: {case.covers}")
+    )
+    failed = [case for case in report["cases"] if case["status"] != "ok"]
+    if json_output:
+        errors = [{"case": case["case"], "message": case["error"]} for case in failed]
+        emit_json("pyrite.cache.warm.v1", report, errors=errors)
+    else:
+        cupy = report["backend"] in ("cuda", "rocm")
+        headers = ("CASE", "STATUS", "SECONDS", "NUMBA_COMPILES", "NUMBA_S")
+        rows = []
+        for case in report["cases"]:
+            ok = case["status"] == "ok"
+            row = [
+                case["case"],
+                case["status"],
+                f"{case['seconds']:.1f}",
+                case["numba_compiles"] if ok else "-",
+                f"{case['numba_compile_s']:.1f}" if ok else "-",
+            ]
+            if cupy:
+                row.append(case["cupy"]["nvrtc_compiles"] if ok else "-")
+            rows.append(tuple(row))
+        emit_table((*headers, "NVRTC_COMPILES") if cupy else headers, rows)
+        for case in failed:
+            emit_diagnostic(f"{case['case']} failed: {case['error']}")
+    if failed:
+        raise click.exceptions.Exit(1)

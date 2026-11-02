@@ -1034,9 +1034,10 @@ def build_parser(prog_name: str = "pyrite-dev") -> argparse.ArgumentParser:
     )
     startup.add_argument(
         "--cache",
-        choices=("warm", "cold"),
+        choices=("warm", "cold", "warmed"),
         default="warm",
-        help="JIT caches: prime first, or use empty temporary caches per sample (default: warm)",
+        help="JIT caches: prime with one full run, use empty temporary caches per sample, "
+        "or fill empty per-sample caches with `pyrite cache warm` first (default: warm)",
     )
     startup.add_argument(
         "--backend",

@@ -75,3 +75,54 @@ def test_clear_skips_user_cupy_cache_on_stderr(managed, monkeypatch, tmp_path):
     assert f"skip cupy {user}: not PyRITE-owned" in result.stderr
     assert result.stdout == "no PyRITE-owned compiled kernels to clear\n"
     assert user.exists()
+
+
+def _fake_warm(statuses):
+    def warm(profile, *, progress=None):
+        cases = []
+        for name, status in statuses:
+            if progress is not None:
+                progress(type("Case", (), {"name": name, "covers": "test"})())
+            case = {"case": name, "covers": "test", "status": status, "seconds": 0.5}
+            if status == "ok":
+                case |= {"numba_compiles": 3, "numba_compile_s": 0.25, "warnings": []}
+            else:
+                case["error"] = "TableUnavailable: missing"
+            cases.append(case)
+        return {"profile": profile, "backend": "cpu", "cases": cases}
+
+    return warm
+
+
+def test_warm_json_reports_cases_and_progress_on_stderr(monkeypatch):
+    from pyrite import _jit_warm
+
+    monkeypatch.setattr(_jit_warm, "warm", _fake_warm([("default", "ok")]))
+    result = invoke(cache_command.command, ["warm", "-o", "json"])
+    assert result.exit_code == 0
+    envelope = json.loads(result.stdout)
+    assert envelope["schema"] == "pyrite.cache.warm.v1"
+    assert envelope["ok"] is True
+    assert envelope["payload"]["cases"][0]["numba_compiles"] == 3
+    assert "warming default" in result.stderr
+
+
+def test_warm_partial_failure_exits_one_and_keeps_table(monkeypatch):
+    from pyrite import _jit_warm
+
+    monkeypatch.setattr(
+        _jit_warm, "warm", _fake_warm([("default", "ok"), ("secondaries", "failed")])
+    )
+    result = invoke(cache_command.command, ["warm", "--profile", "standard"])
+    assert result.exit_code == 1
+    rows = [line.split()[:2] for line in result.stdout.splitlines()[1:]]
+    assert rows == [["default", "ok"], ["secondaries", "failed"]]
+    assert "secondaries failed: TableUnavailable" in result.stderr
+
+
+def test_warm_profiles_pin_distinct_physics():
+    from pyrite import _jit_warm
+
+    standard = _jit_warm.PROFILES["standard"]
+    assert _jit_warm.PROFILES["minimal"] == standard[:1]
+    assert len({tuple(sorted(c.physics.items())) for c in standard}) == len(standard)

@@ -11,7 +11,7 @@ Version: `0.25.0`
 ```text
 Usage: pyrite cache [OPTIONS] COMMAND [ARGS]...
 
-  Inspect and clear compiled CPU (Numba) and GPU (CuPy) kernel caches.
+  Inspect, warm, and clear compiled CPU (Numba) and GPU (CuPy) kernel caches.
 
   PyRITE compiles its kernels on first use and the native Numba and CuPy caches reuse
   them in later processes. The pyrite command stores them under the PyRITE user cache
@@ -21,6 +21,8 @@ Usage: pyrite cache [OPTIONS] COMMAND [ARGS]...
   Examples:
     pyrite cache status
     pyrite cache status --backend numba -o json
+    pyrite cache warm
+    pyrite cache warm --profile standard -o json
     pyrite cache clear
     pyrite cache clear --backend numba --yes
 
@@ -30,6 +32,7 @@ Options:
 Commands:
   clear   Delete PyRITE-owned compiled kernels; preview unless --yes.
   status  Report cache locations, sizes, and per-family Numba freshness.
+  warm    Compile and cache common kernels ahead of the first simulation.
 ```
 
 ## `pyrite cache clear`
@@ -66,4 +69,28 @@ Options:
   -o, --output [table|json]   Output format; only json is a stable automation contract.
                               [default: table]
   -h, --help                  Show this message and exit.
+```
+
+## `pyrite cache warm`
+
+```text
+Usage: pyrite cache warm [OPTIONS]
+
+  Compile and cache common kernels ahead of the first simulation.
+
+  Runs each profile case once with one electron on the backend that PYRITE_MC_BACKEND
+  selects and discards the result, so later processes sharing these caches load the
+  kernels instead of compiling them. Takes tens of seconds per case on a cold cache and
+  about a second when already warm. Uses the cache locations `pyrite cache status`
+  reports; physics tables the cases need must already be installed. Exits 1 if any case
+  fails; the remaining cases still run.
+
+Options:
+  --profile [minimal|standard]  Representative cases to compile: minimal (default
+                                physics) or standard (adds continuous stopping,
+                                uncoupled continuum, and secondary transport).
+                                [default: minimal]
+  -o, --output [table|json]     Output format; only json is a stable automation
+                                contract.  [default: table]
+  -h, --help                    Show this message and exit.
 ```
