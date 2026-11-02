@@ -34,7 +34,6 @@ Commands:
   rm            Delete remote checkpoints; preview unless...
   sync          Push current code to remote box.
   trajectories  Inspect remote captures, pull selected...
-  app           Run authenticated marimo apps in remote SLURM jobs.
   job           List, inspect, follow, or stop remote jobs.
   target        Configure named remote compute targets.
 ```
@@ -310,88 +309,6 @@ Options:
   -h, --help        Show this message and exit.
 ```
 
-## `pyrite remote app`
-
-```text
-Usage: pyrite remote app [OPTIONS] COMMAND [ARGS]...
-
-  Submit analysis/viewer/validation as SLURM apps, or reattach.
-
-Options:
-  -h, --help  Show this message and exit.
-
-Commands:
-  analysis    Run the analysis app remotely.
-  attach      Reopen an app tunnel, or pull a completed batch export.
-  validation  Run the validation app remotely.
-  viewer      Run the 3D viewer remotely.
-```
-
-## `pyrite remote app analysis`
-
-```text
-Usage: pyrite remote app analysis [OPTIONS]
-
-  Run the analysis app remotely.
-
-Options:
-  -m, --material TEXT  Initial material.  [default: hopg]
-  --edit               Use marimo edit, not run.
-  --gpu                Request the configured GPU gres.
-  --time TEXT          SLURM walltime (HH:MM:SS).  [default: 04:00:00]
-  --batch              Export HTML and pull it locally.
-  --no-token           Forbidden in remote mode.
-  --target NAME        Use named remote compute target NAME.
-  -h, --help           Show this message and exit.
-```
-
-## `pyrite remote app attach`
-
-```text
-Usage: pyrite remote app attach [OPTIONS] JOBID
-
-  Reopen an app tunnel, or pull a completed batch export.
-
-Options:
-  --target NAME  Use named remote compute target NAME.
-  -h, --help     Show this message and exit.
-```
-
-## `pyrite remote app validation`
-
-```text
-Usage: pyrite remote app validation [OPTIONS]
-
-  Run the validation app remotely.
-
-Options:
-  --edit         Use marimo edit, not run.
-  --gpu          Request the configured GPU gres.
-  --time TEXT    SLURM walltime (HH:MM:SS).  [default: 04:00:00]
-  --batch        Export HTML and pull it locally.
-  --no-token     Forbidden in remote mode.
-  --target NAME  Use named remote compute target NAME.
-  -h, --help     Show this message and exit.
-```
-
-## `pyrite remote app viewer`
-
-```text
-Usage: pyrite remote app viewer [OPTIONS]
-
-  Run the 3D viewer remotely.
-
-Options:
-  -m, --material TEXT  Initial material.  [default: hopg]
-  --edit               Use marimo edit, not run.
-  --gpu                Request the configured GPU gres.
-  --time TEXT          SLURM walltime (HH:MM:SS).  [default: 04:00:00]
-  --batch              Export HTML and pull it locally.
-  --no-token           Forbidden in remote mode.
-  --target NAME        Use named remote compute target NAME.
-  -h, --help           Show this message and exit.
-```
-
 ## `pyrite remote job`
 
 ```text
@@ -432,7 +349,7 @@ Usage: pyrite remote job list [OPTIONS]
   List jobs with scheduler IDs, kinds, materials, and states.
 
 Options:
-  --kind [run|grid|recompute|validate|app]
+  --kind [run|grid|recompute|validate]
                                   Show only one submission kind.
   -o, --output [table|json]       Output format; only json is a stable automation
                                   contract.  [default: table]
