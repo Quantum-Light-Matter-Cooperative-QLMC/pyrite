@@ -10,6 +10,7 @@ from pyrite.campaign.sweep import build_cases
 from pyrite.montecarlo import runner
 from pyrite.montecarlo.runner import electron_blocks as blocks
 from pyrite.montecarlo.spectrum.cxr._attribution import merge_cxr_attribution
+from tests.helpers import scaled_rtol
 
 
 def _segments(ids):
@@ -108,7 +109,11 @@ def test_electron_blocks_add_to_the_whole_line_sum(small_transport):
     split = sum(
         np.asarray(_once(case, tp, part)) for part in blocks.iter_electron_blocks(tp["segs"], 3)
     )
-    np.testing.assert_allclose(split, whole, rtol=1e-10, atol=1e-12 * whole.max())
+    # Splitting only reorders the per-bin sum of line contributions: a few
+    # REAL-precision adds per bin (observed on CUDA-fp32: ~2 eps).
+    np.testing.assert_allclose(
+        split, whole, rtol=scaled_rtol(1e-10, eps_multiple=16), atol=1e-12 * whole.max()
+    )
 
 
 def test_block_oom_doubles_blocks_and_restores_the_audit(monkeypatch, small_transport):
@@ -143,7 +148,10 @@ def test_block_oom_doubles_blocks_and_restores_the_audit(monkeypatch, small_tran
         Ne=tp["Ne_lines"],
         truncation_audit=audit,
     )
-    np.testing.assert_allclose(spec, expected, rtol=1e-10, atol=1e-12 * expected.max())
+    # Same reordering argument as the whole-line sum above.
+    np.testing.assert_allclose(
+        spec, expected, rtol=scaled_rtol(1e-10, eps_multiple=16), atol=1e-12 * expected.max()
+    )
     n_blocks = len(calls) - 1
     assert 2 < n_blocks <= 4  # first block failed at 2, retried at 4
     assert audit["line_mass"] == n_blocks  # the failed attempt was undone
@@ -156,13 +164,16 @@ def test_cpu_and_coherent_sums_are_never_split(monkeypatch, small_transport):
         runner.case_driver, "_cxr_for_segments_once", lambda segments, **kw: seen.append(segments)
     )
     monkeypatch.setattr(runner.case_driver, "electron_block_count", lambda n, headroom: 4)
+    # Pin the CPU policy: a device session would otherwise split this call.
+    monkeypatch.setattr(runner._RESOURCE_POLICY, "gpu", False)
     runner._cxr_for_segments(
         tp["segs"], tp["E_grid"], case, tp["n_hat"], None, None, coherent=False
     )
     monkeypatch.setattr(runner._RESOURCE_POLICY, "gpu", True)
     monkeypatch.setattr(runner.case_driver, "device_headroom_bytes", lambda: 1)
     runner._cxr_for_segments(tp["segs"], tp["E_grid"], case, tp["n_hat"], None, None, coherent=True)
-    assert seen == [tp["segs"], tp["segs"]]
+    # A device session stages a copy of the rows, so compare sizes, not identity.
+    assert [part["L_ang"].size for part in seen] == [tp["segs"]["L_ang"].size] * 2
 
 
 def test_line_attribution_accounts_for_the_whole_line_mass(small_transport):
@@ -180,11 +191,24 @@ def test_line_attribution_accounts_for_the_whole_line_mass(small_transport):
     spec = np.asarray(_once(case, tp, tp["segs"], audit))
     np.testing.assert_array_equal(spec, np.asarray(_once(case, tp, tp["segs"])))
     merged = merge_cxr_attribution(audit["attribution"], 5)
-    np.testing.assert_allclose(merged["electron_mass"].sum(), float(audit["line_mass"]), rtol=1e-9)
-    np.testing.assert_allclose(merged["electron_tail"].sum(), float(audit["mass_above"]), rtol=1e-9)
+    np.testing.assert_allclose(
+        merged["electron_mass"].sum(),
+        float(audit["line_mass"]),
+        rtol=scaled_rtol(1e-9, eps_multiple=16),
+    )
+    np.testing.assert_allclose(
+        merged["electron_tail"].sum(),
+        float(audit["mass_above"]),
+        rtol=scaled_rtol(1e-9, eps_multiple=16),
+    )
     assert set(merged["electron_ids"]) <= set(range(tp["Ne_lines"]))
     for rank in ("mass", "tail"):
         lines = merged[f"lines_by_{rank}"]
         assert lines[rank].size == 5 and np.all(np.diff(lines[rank]) <= 0)
-        np.testing.assert_allclose(lines["mass"], lines["weight"] * lines["width_eV"], rtol=1e-12)
+        # One REAL-precision product per line.
+        np.testing.assert_allclose(
+            lines["mass"],
+            lines["weight"] * lines["width_eV"],
+            rtol=scaled_rtol(1e-12, eps_multiple=4),
+        )
         assert np.all(lines["A2"] > 0) and np.all(lines["T_abs"] <= 1.0)

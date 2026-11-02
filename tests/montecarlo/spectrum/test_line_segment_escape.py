@@ -23,6 +23,7 @@ from pyrite.montecarlo.spectrum.segment_escape import (
     segment_escape_pieces,
 )
 from pyrite.montecarlo.transport import beta_from_keV
+from tests.helpers import scaled_rtol
 
 CRYSTAL = "hopg"
 HKL = (0, 0, 2)
@@ -89,7 +90,10 @@ def _escape_ratio(monkeypatch, segments, **kwargs):
     assert peak > 0.0
     ratio = float(absorbed.sum() / clear.sum())
     # One resonance energy: absorption rescales the line, never reshapes it.
-    np.testing.assert_allclose(absorbed, ratio * clear, rtol=1e-9, atol=1e-12 * peak)
+    # Observed CUDA-fp32 deviation ~2 eps: two independent REAL evaluations.
+    np.testing.assert_allclose(
+        absorbed, ratio * clear, rtol=scaled_rtol(1e-9, eps_multiple=16), atol=1e-12 * peak
+    )
     return ratio
 
 
@@ -129,7 +133,7 @@ def test_incoherent_line_escape_is_invariant_under_segment_splitting(monkeypatch
     ratios = [_escape_ratio(monkeypatch, _track(k, **geometry), **kwargs) for k in SPLITS]
 
     assert 0.0 < ratios[0] < 0.8  # strongly absorbed, so the check has teeth
-    np.testing.assert_allclose(ratios, ratios[0], rtol=1e-9)
+    np.testing.assert_allclose(ratios, ratios[0], rtol=scaled_rtol(1e-9, eps_multiple=16))
 
 
 def test_midpoint_escape_would_drift_under_splitting(monkeypatch):

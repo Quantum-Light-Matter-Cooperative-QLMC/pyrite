@@ -23,6 +23,7 @@ from ...transport import (
     _element_crossover_keV,
     beta_from_keV,
 )
+from . import _fused
 
 # ---- segment-sum CXR spectrum ------------------------------------------------
 # Owning registry for every per-row transform: layer filtering, population
@@ -677,6 +678,19 @@ def _in_medium_kinematics(denom_vac, v_dot_g, delta_tab, E_tab, v_dot_grad=None,
     _xp = array_namespace(denom_vac, v_dot_g, delta_tab, E_tab)
     if v_dot_grad is None:
         v_dot_grad = denom_vac - 1.0  # bulk: grad L = -n_hat
+    # One launch for the ~47-call chain below on the CuPy float32 path (#906).
+    fused = _fused.in_medium_root(
+        denom_vac,
+        v_dot_g,
+        v_dot_grad,
+        grad2,
+        delta_tab,
+        E_tab,
+        hbarc=HBARC_EV_ANG,
+        rtol=_RESONANCE_ROOT_RTOL,
+    )
+    if fused is not None:
+        return fused
     denom = denom_vac
     delta = None
     previous = denom

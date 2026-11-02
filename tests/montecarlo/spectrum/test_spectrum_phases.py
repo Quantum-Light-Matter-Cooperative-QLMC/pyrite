@@ -11,7 +11,8 @@ import numpy as np
 import pytest
 
 import pyrite.montecarlo.spectrum.cxr._per_hkl as per_hkl_module
-from pyrite._backend import REAL
+import pyrite.montecarlo.spectrum.cxr._policy as _policy
+from pyrite._backend import REAL, xp
 from pyrite.materials.crystal import (
     CRYSTALS,
     HBARC_EV_ANG,
@@ -286,13 +287,22 @@ def test_per_hkl_windowing_supports_a_nonuniform_grid(coherent):
 # --------------------------------------------------------------------------
 
 
+_STREAM_HANDLES_CUTOFF = (
+    _policy._USE_JIT_COHERENT_STREAM
+    and getattr(xp, "__name__", "") == "cupy"
+    and np.dtype(REAL) == np.dtype(np.float32)
+)
+
+
 @pytest.mark.parametrize(
     "over, expected",
     [
         ({}, False),
         ({"segments": _segments(footprint=True)}, False),
         ({"layers": [(0.0, 4000.0, [("C", 0.1136)])]}, True),
-        ({"coherent": True, "sinc_cutoff": 3.0}, True),
+        # The CUDA-fp32 streaming kernel applies the sinc cutoff itself (see
+        # ``_needs_per_hkl_route``), so only there the batched route is kept.
+        ({"coherent": True, "sinc_cutoff": 3.0}, not _STREAM_HANDLES_CUTOFF),
         pytest.param({"segments": _segments(flights=True)}, True, marks=_grouped_is_host_only),
         ({"coherent": True}, False),
         ({"sinc_cutoff": 3.0}, False),

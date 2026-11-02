@@ -725,6 +725,7 @@ def _cxr_pair_for_case(
     segs, _E_brem, n_hat, abs_layers, groove = _transport_cxr_for_case(case, E_grid)
     # Both kernels read the same segments; stage one device copy as the live
     # sweep does rather than uploading the pair separately.
+    host_segs = segs
     segs = _segments_on_device(segs)
     Ne_lines = case["Ne"]
     table_cache = {}
@@ -753,7 +754,9 @@ def _cxr_pair_for_case(
         return spec, spec_coherent, characteristic
     from .transition_emission import case_transition_spectrum
 
-    transport = dict(segs=segs, E_grid=E_grid, n_hat=n_hat, Ne_brem=case["Ne_brem"])
+    # TR scores boundary crossings against z = 0 at ~1e-5 Ang; score the
+    # transport's own rows, not the REAL-cast device copy (float32 rounds ~1e-3 Ang).
+    transport = dict(segs=host_segs, E_grid=E_grid, n_hat=n_hat, Ne_brem=case["Ne_brem"])
     return spec, spec_coherent, characteristic, case_transition_spectrum(case, transport)
 
 
