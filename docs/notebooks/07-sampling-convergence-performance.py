@@ -15,7 +15,7 @@ __generated_with = "0.25.2"
 app = marimo.App(width="medium")
 
 
-@app.cell(hide_code=False)
+@app.cell
 def _():
     import os
 
@@ -27,8 +27,10 @@ def _():
 
     import pyrite
 
-    with mo.status.spinner(title="Preparing PyRITE reference tables"):
-        _ = pyrite.fetch_tables()  # Reuse the installed tables without network access.
+    with mo.status.spinner(title="Preparing PyRITE reference tables, warming JIT caches"):
+        _ = pyrite.fetch_tables()  # Fetch data tables
+        _ = pyrite.execution.warm_cache()
+
     tables_ready = True
     return mo, np, plt, tables_ready
 
@@ -94,11 +96,28 @@ def _(np, tables_ready):
         nodes = np.r_[lo, grid[(grid > lo) & (grid < hi)], hi]
         return float(np.trapezoid(np.interp(nodes, grid, spectrum.density), nodes))
 
-    return AdaptiveSampling, FixedSampling, band_eV, band_yield, budgets, replicates, run
+    return (
+        AdaptiveSampling,
+        FixedSampling,
+        band_eV,
+        band_yield,
+        budgets,
+        replicates,
+        run,
+    )
 
 
 @app.cell
-def _(FixedSampling, band_yield, budgets, mo, np, replicates, run, tables_ready):
+def _(
+    FixedSampling,
+    band_yield,
+    budgets,
+    mo,
+    np,
+    replicates,
+    run,
+    tables_ready,
+):
     assert tables_ready  # Wait for reference tables before executing transport.
     with mo.status.spinner(title="Compiling the sampling workload"):
         _ = run(FixedSampling(cxr_electrons=16, brem_electrons=16), seed=1)  # untimed warmup
@@ -166,7 +185,18 @@ def _(AdaptiveSampling, band_eV, band_yield, mo, run, tables_ready):
 
 
 @app.cell
-def _(adaptive, budgets, mean, np, plt, policy, replicates, rse, rse_scale, yields):
+def _(
+    adaptive,
+    budgets,
+    mean,
+    np,
+    plt,
+    policy,
+    replicates,
+    rse,
+    rse_scale,
+    yields,
+):
     from matplotlib.ticker import NullFormatter
 
     _n = np.array(budgets, dtype=float)
@@ -244,7 +274,7 @@ def _(mo):
 
     Independent runs scatter about a common mean, and their spread falls as
     $1/\sqrt{N}$: halving the uncertainty costs four times the histories, and
-    wall time grows linearly with $N$. The adaptive run estimates its *own*
+    wall time grows linearly with $N$. The adaptive run estimates its _own_
     RSE from the spread of per-electron contributions, without replicates; a
     ratio near one means a single run can report its own error bar. Six seeds
     estimate an RSE only to roughly ±30 %, and extrapolating the fit adds more

@@ -26,7 +26,10 @@ def _():
 
     import pyrite
 
-    _ = pyrite.fetch_tables()
+    with mo.status.spinner(title="Preparing PyRITE reference tables, warming JIT caches"):
+        _ = pyrite.fetch_tables()  # Fetch data tables
+        _ = pyrite.execution.warm_cache()
+
     tables_ready = True
     return mo, np, plt, tables_ready
 
@@ -110,13 +113,7 @@ def _(np, tables_ready):
     )
     gamma = 1 + beam_keV / electron_rest_keV
     beta = np.sqrt(1 - gamma**-2)
-    return (
-        beta,
-        bunch_charge_pc,
-        hc_eV_nm,
-        observation_deg,
-        transition,
-    )
+    return beta, bunch_charge_pc, hc_eV_nm, observation_deg, transition
 
 
 @app.cell

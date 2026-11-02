@@ -15,7 +15,7 @@ __generated_with = "0.25.2"
 app = marimo.App(width="medium")
 
 
-@app.cell(hide_code=False)
+@app.cell
 def _():
     import os
 
@@ -26,11 +26,12 @@ def _():
 
     import pyrite
 
-    with mo.status.spinner(title="Preparing PyRITE reference tables"):
-        _ = pyrite.fetch_tables()  # Fetch missing pinned tables once; reuse installed data.
+    with mo.status.spinner(title="Preparing PyRITE reference tables, warming JIT caches"):
+        _ = pyrite.fetch_tables()  # Fetch data tables
+        _ = pyrite.execution.warm_cache()
 
     tables_ready = True
-    return mo, os, plt, pyrite, tables_ready
+    return mo, plt, tables_ready
 
 
 @app.cell(hide_code=True)
@@ -101,7 +102,7 @@ def _(mo, tables_ready):
 
     cxr = result.cxr.incoherent
     brem = result.brem
-    return brem, cxr, result
+    return brem, cxr
 
 
 @app.cell(hide_code=True)

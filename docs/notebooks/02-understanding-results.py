@@ -27,7 +27,9 @@ def _():
 
     import pyrite
 
-    _ = pyrite.fetch_tables()  # Fetch missing pinned tables once; reuse installed data.
+    with mo.status.spinner(title="Preparing PyRITE reference tables, warming JIT caches"):
+        _ = pyrite.fetch_tables()  # Fetch data tables
+        _ = pyrite.execution.warm_cache()
 
     tables_ready = True
     return mo, np, plt, tables_ready

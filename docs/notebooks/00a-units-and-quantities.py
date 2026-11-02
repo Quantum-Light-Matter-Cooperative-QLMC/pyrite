@@ -40,8 +40,8 @@ def _(mo):
     1. Construct and convert scalar and array quantities.
     2. Configure a beam, crystal and detector using several different units.
     3. Read back quantities, update immutable objects, and catch unit errors.
-    4. Distinguish *energy-coordinate units* from *spectral-density units*, and
-       *beam current* from *sampled Monte Carlo histories*.
+    4. Distinguish _energy-coordinate units_ from _spectral-density units_, and
+       _beam current_ from _sampled Monte Carlo histories_.
 
     No simulation is run. The spectrum below is **synthetic**, solely to
     illustrate the units of a real PyRITE result interface. The notebook runs
@@ -85,7 +85,7 @@ def _(Q_, np, ureg):
         "observation angle": f"{observation_angle:~P} = {observation_angle.to('degree'):~P}",
     }
     print(*(f"{k}: {v}" for k, v in conversions.items()), sep="\n")  # display unit conversions
-    return electron_energy, target_thickness
+    return
 
 
 @app.cell(hide_code=True)
@@ -123,7 +123,7 @@ def _(Q_, np, ureg):
     print(
         *(f"{k}: {v}" for k, v in array_and_current.items()), sep="\n"
     )  # display calculated values
-    return average_current, energy_nodes_eV
+    return (average_current,)
 
 
 @app.cell(hide_code=True)
@@ -139,16 +139,16 @@ def _(mo):
 
     Keep the two naming styles distinct:
 
-    | Quantity-aware spelling | Existing numeric field | Canonical numeric unit |
-    | --- | --- | --- |
-    | `Beam.kinetic_energy` | `Beam.energy_keV` | keV |
-    | `Slab.thickness` | `Slab.thickness_ang` | Å |
-    | `Slab.tilt` | `Slab.tilt_deg` | degree |
-    | `Footprint.width` | `Footprint.width_mm` | mm |
-    | `Detector.observation_angle` | `Detector.observation_angle_deg` | degree |
+    | Quantity-aware spelling      | Existing numeric field           | Canonical numeric unit |
+    | ---------------------------- | -------------------------------- | ---------------------- |
+    | `Beam.kinetic_energy`        | `Beam.energy_keV`                | keV                    |
+    | `Slab.thickness`             | `Slab.thickness_ang`             | Å                      |
+    | `Slab.tilt`                  | `Slab.tilt_deg`                  | degree                 |
+    | `Footprint.width`            | `Footprint.width_mm`             | mm                     |
+    | `Detector.observation_angle` | `Detector.observation_angle_deg` | degree                 |
 
     `Slab.thickness` is a **physical thickness**, not an electron transport
-    step length. `Footprint.width` is the *full* transverse width, not a half
+    step length. `Footprint.width` is the _full_ transverse width, not a half
     width or standard deviation. Detector polar angle is measured from the
     beam axis; it is not a solid-angle acceptance.
     """)
@@ -205,7 +205,7 @@ def _(mo):
     quantity-aware replacement. The old object is unchanged. A legacy numeric
     spelling such as `energy_keV=30` also remains supported, **but its number
     means exactly 30 keV**; a bare `30000` would mean 30,000 keV, not 30,000 eV.
-    Never provide both spellings of the *same* field in one constructor.
+    Never provide both spellings of the _same_ field in one constructor.
     """)
     return
 
@@ -239,8 +239,8 @@ def _(mo):
     ## 5. Catch dimensional mistakes before simulating
 
     Invalid dimensions, dimensionless "angles", and contradictory numeric and
-    semantic inputs fail **at construction**, rather than producing a subtly
-    wrong result. PyRITE does not assume a unit for `kinetic_energy=30` or
+    semantic inputs fail **at construction**, rather than silently producing
+    a faulty result. PyRITE does not assume a unit for `kinetic_energy=30` or
     `thickness=100`: those semantic forms require actual quantities.
     """)
     return
@@ -320,7 +320,7 @@ def _(mo):
     electron per sr) stays unchanged.
 
     The public `SpectralDensity.quantify().to_energy("keV")` does this
-    *coupled conversion* for you. It does **not** change the spectrum's
+    _coupled conversion_ for you. It does **not** change the spectrum's
     per-electron normalization, multiply by acceptance, or predict a photon
     rate. `Result.spectral_flux(units="detector")` uses a different sort of
     `units` argument: it selects **physical normalization**, not eV vs keV.
@@ -385,14 +385,14 @@ def _(mo):
     With a 0.5 pC bunch at 100 kHz, the current is 50 nA, or approximately
     $3.12\times 10^{11}$ physical electrons/s. Multiplying a **source** yield
     by electrons/s yields photons/(s·sr), and multiplying by an accepted
-    solid angle in sr yields photons/s. Neither conversion is an energy-unit
-    change. An exposure or detector response is another *physical* operation.
+    solid angle in sr yields photons/s.
+
+    Scaling the yield by a detector's energy response/QE requires a separate
+    operation.
 
     **Do not confuse:** a simulation with `FixedSampling(cxr_electrons=8192)`
     samples **8,192 numerical histories**, not 8,192 physical electrons per
-    bunch. When converting density and counts, also distinguish node-sampled
-    **per-energy density** from bin-integrated **event counts**: changing an
-    energy bin's units does not multiply its photon count.
+    bunch.
     """)
     return
 
@@ -420,13 +420,12 @@ def _(mo):
     mo.md(r"""
     ## What to remember
 
-    **At configuration boundaries:** prefer the semantic quantity API, e.g.
-    `Beam(kinetic_energy=30 * ureg.keV, ...)`. **At legacy numeric boundaries:**
-    respect explicit field units, e.g. `energy_keV=30` or
-    `thickness_ang=1000`. **For read-back:** semantic quantity properties and
-    `SpectralDensity.quantify()` are opt-in; ordinary result arrays and saved
-    records remain numeric. `to_energy()` changes *both* energy nodes and
-    density; flux-normalization choices such as `"detector"` do something else.
+    - **Prefer the semantic quantity API,** e.g.
+      `Beam(kinetic_energy=30 * ureg.keV, ...)`.
+
+    - **For read-back:** semantic quantity properties and
+      `SpectralDensity.quantify()` are opt-in; ordinary result arrays and saved
+      records remain numeric.
 
     **Try:** switch the beam's input energy to `30_000 * ureg.eV`; switch the
     target from `100 * ureg.nm` to `1_000 * ureg.angstrom`; and convert the

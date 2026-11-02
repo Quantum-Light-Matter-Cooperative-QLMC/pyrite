@@ -32,8 +32,10 @@ def _():
     import pyrite
 
     optuna.logging.set_verbosity(optuna.logging.WARNING)
-    with mo.status.spinner(title="Preparing PyRITE reference tables"):
-        _ = pyrite.fetch_tables()
+    with mo.status.spinner(title="Preparing PyRITE reference tables, warming JIT caches"):
+        _ = pyrite.fetch_tables()  # Fetch data tables
+        _ = pyrite.execution.warm_cache()
+
     tables_ready = True
     return mo, np, plt, pyrite, tables_ready
 
@@ -54,7 +56,7 @@ def _(mo):
       reproduce the baseline's transported arrays **bit for bit**.
     - **Spectrum** candidates change how kept segments are scored: the CXR and
       bremsstrahlung segment chunks and the CXR line-reduction launch (threads
-      and energy nodes per block). They rescore *one* kept transport and must
+      and energy nodes per block). They rescore _one_ kept transport and must
       reproduce its spectra to rounding.
 
     None of these controls changes the physics or the result's identity, only
@@ -93,7 +95,7 @@ def _(mo):
         f"{resident_threads:,} resident threads at full occupancy, "
         f"{gpu['free_GiB']:.1f} of {gpu['total_GiB']:.1f} GiB free."
     )
-    return free_bytes, gpu, resident_threads
+    return free_bytes, gpu
 
 
 @app.cell(hide_code=True)

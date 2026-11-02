@@ -26,7 +26,10 @@ def _():
 
     import pyrite
 
-    _ = pyrite.fetch_tables()
+    with mo.status.spinner(title="Preparing PyRITE reference tables, warming JIT caches"):
+        _ = pyrite.fetch_tables()  # Fetch data tables
+        _ = pyrite.execution.warm_cache()
+
     tables_ready = True
     return mo, np, plt, tables_ready
 
@@ -158,7 +161,7 @@ def _(
 
 
 @app.cell
-def _(angles_deg, energies_MeV, np, plt, runs):
+def _(angles_deg, np, plt, runs):
     components = {
         "PXR + CBS": lambda result: result.cxr.incoherent,
         "Bremsstrahlung": lambda result: result.brem,
@@ -221,7 +224,7 @@ def _(angles_deg, components, energies_MeV, np, plt, runs):
         _ax.grid(alpha=0.2)
     _axes[0].set_ylabel("Photons / (incident electron · sr)")
     fig_yield  # noqa: B018
-    return (band_yields,)
+    return
 
 
 @app.cell(hide_code=True)

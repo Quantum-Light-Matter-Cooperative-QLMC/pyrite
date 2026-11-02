@@ -27,7 +27,10 @@ def _():
 
     import pyrite
 
-    _ = pyrite.fetch_tables()  # Install missing pinned reference tables once.
+    with mo.status.spinner(title="Preparing PyRITE reference tables, warming JIT caches"):
+        _ = pyrite.fetch_tables()  # Fetch data tables
+        _ = pyrite.execution.warm_cache()
+
     tables_ready = True
     return mo, np, plt, tables_ready
 
@@ -68,27 +71,30 @@ def _(mo):
 
 
 @app.cell
-def _(tables_ready):
+def _(mo, tables_ready):
     from pyrite.transport import simulate_trajectories
     from pyrite.units import ureg
 
-    histories = 16_384
+    histories = 65_536  # 16_384
     seed = 1
     thickness_nm = (4 * ureg.um).to("nm").magnitude
     assert tables_ready  # Finish reference-table setup before transport.
-    transport_result = simulate_trajectories(
-        E0_keV=(30 * ureg.keV).magnitude,
-        Ne=histories,
-        thickness_ang=(thickness_nm * ureg.nm).to("angstrom").magnitude,
-        composition=[("C", 0.11363677327755675)],  # HOPG carbon atoms / Å³
-        elastic_model="sr",
-        inelastic_model="continuous",
-        transport_core="lockstep",
-        energy_model="midpoint",
-        E_cut_keV=(5 * ureg.keV).magnitude,
-        max_steps=20_000,
-        seed=seed,
-    )
+
+    # cache the results of expensive simulate_trajectories calls
+    with mo.persistent_cache(name="simulate_trajectories_cache"):
+        transport_result = simulate_trajectories(
+            E0_keV=(30 * ureg.keV).magnitude,
+            Ne=histories,
+            thickness_ang=(thickness_nm * ureg.nm).to("angstrom").magnitude,
+            composition=[("C", 0.11363677327755675)],  # HOPG carbon atoms / Å³
+            elastic_model="sr",
+            inelastic_model="continuous",
+            transport_core="lockstep",
+            energy_model="midpoint",
+            E_cut_keV=(5 * ureg.keV).magnitude,
+            max_steps=20_000,
+            seed=seed,
+        )
     return histories, seed, thickness_nm, transport_result
 
 
@@ -296,7 +302,7 @@ def _(
     plt,
     seed,
 ):
-    fig_summary, axes = plt.subplots(1, 3, figsize=(11, 3.6), layout="constrained")
+    fig_summary, axes = plt.subplots(3, 1, figsize=(4, 11), layout="constrained")
     centers = 0.5 * (depth_edges_nm[1:] + depth_edges_nm[:-1])
     axes[0].step(centers, depth_loss_per_electron_nm, where="mid")
     axes[0].set(

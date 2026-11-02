@@ -30,8 +30,10 @@ def _():
 
     import pyrite
 
-    with mo.status.spinner(title="Preparing pinned reference tables"):
-        _ = pyrite.fetch_tables()
+    with mo.status.spinner(title="Preparing PyRITE reference tables, warming JIT caches"):
+        _ = pyrite.fetch_tables()  # Fetch data tables
+        _ = pyrite.execution.warm_cache()
+
     tables_ready = True
     return mo, np, perf_counter, plt, tables_ready
 
@@ -265,7 +267,7 @@ def _(
         )
 
     def plot_spectra(results, title):
-        fig, (ax_s, ax_r) = plt.subplots(1, 2, figsize=(10, 3.9), layout="constrained")
+        fig, (ax_s, ax_r) = plt.subplots(2, 1, figsize=(4, 8), layout="constrained")
         for label, result in results.items():
             energy = result.cxr.incoherent.photon_energy_eV
             ax_s.plot(energy, result.cxr.coherent.density, label=f"coherent: {label}")

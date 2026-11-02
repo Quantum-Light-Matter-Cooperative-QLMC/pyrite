@@ -32,9 +32,12 @@ def _():
     import pyrite
 
     optuna.logging.set_verbosity(optuna.logging.WARNING)
-    with mo.status.spinner(title="Preparing PyRITE reference tables"):
-        _ = pyrite.fetch_tables()
+    with mo.status.spinner(title="Preparing PyRITE reference tables, warming JIT caches"):
+        _ = pyrite.fetch_tables()  # Fetch data tables
+        _ = pyrite.execution.warm_cache()
+
     tables_ready = True
+
     checkpoint_directory = TemporaryDirectory(prefix="pyrite-optimization-tutorial-")
     return (
         Path,

@@ -15,7 +15,7 @@ __generated_with = "0.25.2"
 app = marimo.App(width="medium")
 
 
-@app.cell(hide_code=False)
+@app.cell
 def _():
     import os
 
@@ -27,11 +27,12 @@ def _():
 
     import pyrite
 
-    with mo.status.spinner(title="Preparing PyRITE reference tables"):
-        _ = pyrite.fetch_tables()
+    with mo.status.spinner(title="Preparing PyRITE reference tables, warming JIT caches"):
+        _ = pyrite.fetch_tables()  # Fetch data tables
+        _ = pyrite.execution.warm_cache()
 
     tables_ready = True
-    return mo, np, plt, pyrite, tables_ready
+    return mo, np, plt, tables_ready
 
 
 @app.cell(hide_code=True)
@@ -124,14 +125,15 @@ def _(TemporaryDirectory, cases, mo, run_sweep, tables_ready):
     workspace = TemporaryDirectory(prefix="pyrite-persisted-sweep-")
     first_store = {}
     with mo.status.spinner(title="Running and checkpointing four cases"):
-        completed = run_sweep(
-            cases,
-            first_store,
-            checkpoint_dir=workspace.name,
-            resume=True,
-            max_workers=0,
-            progress=False,
-        )
+        with mo.persistent_cache(name='run-sweep-cache'):
+            completed = run_sweep(
+                cases,
+                first_store,
+                checkpoint_dir=workspace.name,
+                resume=True,
+                max_workers=0,
+                progress=False,
+            )
     assert completed
     assert sum(map(len, first_store.values())) == len(cases)
     return first_store, workspace
@@ -194,7 +196,7 @@ def _(cases, first_store, load_checkpoint, np, records, run_sweep, workspace):
             saved_store[_key][_energy]["spec"],
             resumed_store[_key][_energy]["spec"],
         )
-    return resume_events, saved_store
+    return (saved_store,)
 
 
 @app.cell(hide_code=True)
@@ -217,7 +219,14 @@ def _(cases, checkpoint_manifest, mo, workspace):
 
 
 @app.cell
-def _(Settings, records, saved_store, select_results, summary_table, sweep_values):
+def _(
+    Settings,
+    records,
+    saved_store,
+    select_results,
+    summary_table,
+    sweep_values,
+):
     available = sweep_values(saved_store, fields=("E0_keV", "thickness_ang"))
     selected = select_results(saved_store, E0_keV=30.0)
     assert len(records(selected)) == 2
@@ -226,7 +235,7 @@ def _(Settings, records, saved_store, select_results, summary_table, sweep_value
     selected_summary = summary_table(records(selected), Settings())
     assert len(selected_summary) == 2
     selected_summary  # noqa: B018
-    return available, selected_summary
+    return
 
 
 @app.cell

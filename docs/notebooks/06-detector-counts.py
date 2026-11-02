@@ -15,7 +15,7 @@ __generated_with = "0.25.2"
 app = marimo.App(width="medium")
 
 
-@app.cell(hide_code=False)
+@app.cell
 def _():
     import os
 
@@ -26,9 +26,12 @@ def _():
 
     import pyrite
 
-    _ = pyrite.fetch_tables()  # Complete installed tables need no download.
+    with mo.status.spinner(title="Preparing PyRITE reference tables, warming JIT caches"):
+        _ = pyrite.fetch_tables()  # Fetch data tables
+        _ = pyrite.execution.warm_cache()
+
     tables_ready = True
-    return mo, plt, pyrite, tables_ready
+    return mo, plt, tables_ready
 
 
 @app.cell(hide_code=True)
@@ -72,7 +75,7 @@ def _():
         ),
         panel,
     )
-    return beam, panel, scene, simulate, ureg
+    return panel, scene, simulate, ureg
 
 
 @app.cell(hide_code=True)
@@ -107,7 +110,7 @@ def _(ureg):
         sampling=AngularSampling((4, 4)),
         acquisition=acquisition,
     )
-    return acquisition, observation
+    return (observation,)
 
 
 @app.cell
@@ -134,7 +137,7 @@ def _(panel, result):
     )
     expected_image = batch.expected.sum(axis=-1).reshape(panel.pixels.shape)
     count_image = batch.total_counts.reshape(panel.pixels.shape)
-    return batch, count_image, expected_image
+    return count_image, expected_image
 
 
 @app.cell
@@ -166,7 +169,7 @@ def _(mo):
     bremsstrahlung and characteristic photons within the reporting window;
     no downstream filter or background is modeled.
 
-    The left panel is an *expected* count image; the right is one Poisson
+    The left panel is an _expected_ count image; the right is one Poisson
     realization. The shared color scale exposes counting noise, but does not
     include Monte Carlo uncertainty or calibration effects.
 

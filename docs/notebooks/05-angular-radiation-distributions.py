@@ -15,7 +15,7 @@ __generated_with = "0.25.2"
 app = marimo.App(width="medium")
 
 
-@app.cell(hide_code=False)
+@app.cell
 def _():
     import os
 
@@ -27,9 +27,12 @@ def _():
 
     import pyrite
 
-    _ = pyrite.fetch_tables()  # Complete installed tables require no network access.
+    with mo.status.spinner(title="Preparing PyRITE reference tables, warming JIT caches"):
+        _ = pyrite.fetch_tables()  # Fetch data tables
+        _ = pyrite.execution.warm_cache()
+
     tables_ready = True
-    return mo, np, plt, pyrite, tables_ready
+    return mo, np, plt, tables_ready
 
 
 @app.cell(hide_code=True)
