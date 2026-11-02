@@ -83,7 +83,7 @@ def test_lockstep_core_is_refused(case):
         run_case_streamed(case, 10, transport_core="lockstep")
 
 
-def test_consumed_blocks_are_released_before_the_next_block():
+def test_consumed_blocks_are_released_before_the_next_block(monkeypatch):
     live = []
 
     def simulate_block(start, stop):
@@ -95,6 +95,14 @@ def test_consumed_blocks_are_released_before_the_next_block():
         ids = np.repeat(np.arange(stop - start), 3)
         return {"L_ang": L, "electron_id": ids, "Ne": stop - start, "n_backscattered": 1}
 
+    released = []
+
+    def release():
+        gc.collect()
+        assert all(ref() is None for ref in live)
+        released.append(True)
+
+    monkeypatch.setattr(block_transport.BACKEND, "release_memory", release)
     seen = []
     counts = block_transport.transport_electron_blocks(
         simulate_block,
@@ -104,6 +112,7 @@ def test_consumed_blocks_are_released_before_the_next_block():
         bunch={},
         consume=lambda block: seen.append(int(block["electron_id"].max())),
     )
+    assert len(released) == 3
     assert seen == [3, 7, 9]  # globalized indices
     assert counts["Ne"] == 10 and counts["n_backscattered"] == 3
 
@@ -159,6 +168,7 @@ def _cuda_available():
         return False
 
 
+@pytest.mark.slow
 @pytest.mark.hardware
 @pytest.mark.skipif(not _cuda_available(), reason="no CUDA device")
 @pytest.mark.parametrize("oom_phase", [None, "transport", "spec_characteristic", "brem_wide"])
@@ -224,3 +234,12 @@ def test_cuda_streamed_residency_and_replay(case, monkeypatch, oom_phase):
     )
     for key in (*SPECTRA, "eta", "hit_frac", "n_segments", "line_data_coverage"):
         np.testing.assert_equal(actual[key], expected[key], err_msg=key)
+    if oom_phase is None:
+        joined = runner._spectrum_case(case, original_transport(case, transport_core="cuda"))
+        # Whole-electron regrouping in fp32: the #611 16-epsilon sum allowance.
+        for key in SPECTRA:
+            np.testing.assert_allclose(
+                actual[key], joined[key], rtol=16 * np.finfo(np.float32).eps, atol=0, err_msg=key
+            )
+        for key in ("eta", "hit_frac", "n_segments"):
+            assert actual[key] == joined[key], key
