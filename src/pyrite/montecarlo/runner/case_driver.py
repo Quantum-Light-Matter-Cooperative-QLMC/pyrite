@@ -383,7 +383,9 @@ def _transport_case(
             monitor=block_monitor,
             consume=block_consumer,
         )
-    segs_all, transport_recovery = transport_with_recovery(transport, resident)
+    segs_all, transport_recovery = transport_with_recovery(
+        transport, resident, blockwise=block_consumer is not None
+    )
     if block_monitor is not None:
         # From here on this is the fixed-count case at the realized pair.
         Ne = Ne_transport = int(segs_all["Ne"])

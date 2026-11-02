@@ -26,6 +26,7 @@ retention, including host downloads), ``transport.assemble`` (canonical
 reassembly) and ``transport.consume`` (the whole block consumer). The
 synchronizations serialize work that otherwise overlaps, so split arms are
 not timing-comparable with unsplit ones; compare split arms with each other.
+Env PROBE_HOST_SEGMENTS=1 forces host blocks for a matched residency baseline (#914).
 Env PROBE_PROFILE=1 also runs the measured call under cProfile, writes
 OUT_PREFIX.prof and prints the top 40 functions by cumulative time.
 """
@@ -284,6 +285,16 @@ def main():
 
     memory = [None]
     streamed_scoring.BlockSpectrumScorer.add = add
+    host_segments = os.environ.get("PROBE_HOST_SEGMENTS") == "1"
+    if host_segments:
+        from pyrite.montecarlo import runner
+
+        real_transport = runner._transport_case
+
+        def host_transport(*args, **kwargs):
+            return real_transport(*args, **{**kwargs, "keep_segments_on_device": False})
+
+        runner._transport_case = host_transport
     launches = Launches()
     launches.install()
     splits = Splits()
@@ -321,6 +332,7 @@ def main():
     rows = int(out["n_segments"])
     rec = {
         "mode": mode,
+        "host_segments": host_segments,
         "N": n,
         "block": block if mode == "streamed" else None,
         "scratch_mib": scratch,

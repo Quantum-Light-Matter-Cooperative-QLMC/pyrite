@@ -23,6 +23,17 @@ spectra) remains the default and the reference.
   electron counts (`Ne` for lines, `Ne_brem` for characteristic and continuum),
   so block sums add. Only the floating-point summation order differs from the
   joined path.
+- Live CUDA transport requests resident segment rows wherever
+  `case_driver._resident_transport` admits them (#914). Continuation rounds
+  join on the device, and the shared staging helper accepts device arrays
+  directly. The block driver releases the pool after scoring returns and the
+  raw rows go out of scope.
+- A resident allocator OOM during transport or scoring replays only that
+  electron block with host rows, using the same counter-addressed streams and
+  table range. Spectra, row counts and line-coverage records commit only on
+  success, so a late scoring failure cannot double-count earlier blocks.
+  Host-memory admission precedes replay; a failed host attempt propagates.
+  This does not shrink characteristic-scoring chunks or add CPU fallback.
 - Streaming skips the two population-wide host steps that the joined block path
   redoes after the join. Bunch-centroid timing is skipped because the eligible
   estimators are invariant to a per-electron time offset, which is a common
@@ -206,6 +217,54 @@ per bin relative on both cards; characteristic bitwise identical on the 6000
 and within 1.8e-7 on the 5080; continuum bitwise identical. Streamed arms at 262,144 agree with each other to the same
 bound across block sizes, threads and row quanta, and are bitwise identical
 across the three measured code versions.
+
+## Resident live CUDA blocks (#914)
+
+Lab RTX 5080, implementation `16db8150c`, job 3686; the #907 W scene above
+at 65,536 electrons (`Ne_brem=4,096`), seed 7, 8,192-electron blocks,
+2,048 MiB transport scratch, 32 kernel threads and 256 continuation rows.
+Each arm runs in a fresh process, warms the same 4,096-electron scene first,
+and enables `PROBE_SPLIT=1`. Three host and three resident repetitions ran
+in the order host/resident/resident/host/host/resident. Driver VRAM is sampled every 5 ms. Values below are
+medians with observed ranges, not confidence intervals; split timings add
+synchronizations and should only be compared with other split arms.
+
+| Metric | Host blocks | Resident blocks |
+|---|---|---|
+| Wall (s) | 14.387 (14.366–14.532) | 11.887 (11.859–11.940) |
+| Assembly (s) | 1.289 (1.235–1.312) | 0.117 (0.116–0.119) |
+| Staging, `score.upload` (s) | 0.771 (0.766–0.846) | 0.039 (0.039–0.039) |
+| Host peak (GiB) | 2.563 (2.563–2.602) | 1.184 (1.184–1.184) |
+| Driver VRAM peak above warm baseline (GiB) | 9.117 (8.910–9.188) | 10.234 (10.168–10.234) |
+
+Median wall time falls 17.4%. Device assembly avoids the block download;
+the remaining staging time includes device casts to scoring precision.
+Resident rows consume more VRAM while removing the large host block.
+All six saved line, characteristic and continuum arrays are bitwise identical.
+Job 3688 repeated the same protocol with 4,096-electron blocks on
+`3edb0cc54` (identical implementation payload; added test coverage). Host vs
+resident median wall time was 20.992 vs 18.026 s, a 14.1% reduction; observed
+ranges were 20.851–21.070 and 17.851–18.052 s. Assembly was 1.492 vs 0.137 s,
+and staging 0.974 vs 0.042 s. Median host peak was 1.855 vs 1.184 GiB and
+VRAM peak 6.561 vs 6.957 GiB. These six spectra were also bitwise identical
+at the same block size. Resident host peak stayed 1.182–1.184 GiB across
+both block sizes, whereas host-block peaks rose from 1.855 to 2.563–2.602 GiB
+when the block doubled. This establishes the removed row-dependent host
+allocation over the measured range, not a bound for arbitrary scenes.
+
+The probe supports a matched host baseline via `PROBE_HOST_SEGMENTS=1`:
+
+```bash
+PROBE_SPLIT=1 PROBE_HOST_SEGMENTS=1 uv run python checks/streamed_block_sizing.py streamed 65536 8192 2048 32 0 scratch/host
+PROBE_SPLIT=1 uv run python checks/streamed_block_sizing.py streamed 65536 8192 2048 32 0 scratch/resident
+```
+
+Run each arm on an allocated remote GPU; the arguments fix the workload and
+launch shape. Tests in `test_streamed_scoring.py` check resident CUDA blocks,
+bitwise parity with host blocks, joined parity within the 16-float32-epsilon
+summation allowance, and block-local replay after injected transport,
+characteristic or continuum allocator OOMs. CPU tests exercise the same
+recovery decisions and verify that raw rows are dead before pool release.
 
 ## Per-estimator scoring split (#872)
 

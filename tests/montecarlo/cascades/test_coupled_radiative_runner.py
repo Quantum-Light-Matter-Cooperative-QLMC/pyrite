@@ -437,7 +437,8 @@ def test_coupled_cuda_segments_stay_resident_outside_cascades(
     """#905: single-pass coupled rows stay on the device; cascades join on the host."""
     seen = []
 
-    def stop(_transport, keep):
+    def stop(_transport, keep, *, blockwise=False):
+        assert not blockwise
         seen.append(keep)
         raise RuntimeError("stop")
 

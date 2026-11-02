@@ -45,12 +45,19 @@ def _host_arrays(value):
     return value
 
 
-def transport_with_recovery(transport, resident):
-    """Replay resident CUDA transport once with host segments; retain its core."""
+def transport_with_recovery(transport, resident, *, blockwise=False):
+    """Replay resident CUDA transport once with host segments; retain its core.
+
+    A streaming driver owns per-block recovery: earlier blocks are committed
+    and must never replay. Extract its recovery metrics without a case retry.
+    """
     from .. import runner
     from .oom import _drop_traceback_locals
     from .pool import _admit_host_segments
 
+    if blockwise:
+        counts = transport(resident)
+        return counts, {key: counts.pop(key) for key in RECOVERY_KEYS if key in counts}
     try:
         return transport(resident), {}
     except Exception as error:
