@@ -18,6 +18,16 @@ Sweep driver (one subprocess per arm, so each arm's ru_maxrss is its own):
   python stream907.py sweep rtx6000 OUTDIR   built-in RTX PRO 6000 arm list
   python stream907.py sweep ARMFILE OUTDIR   lines "MODE N BLOCK SCRATCH THREADS BATCH [K=V...]"
 Env PROBE_ROWS sets continuation_rows (with schedule="auto").
+Env PROBE_SPLIT=1 adds device-synchronized timers on the scoring and
+transport seams (``split_s``): ``score.upload`` (host block to device),
+``score.<slot>`` (each estimator's ``EmissionAdapter.evaluate``),
+``release`` (per-block pool release), ``transport.retain`` (per-round
+retention, including host downloads), ``transport.assemble`` (canonical
+reassembly) and ``transport.consume`` (the whole block consumer). The
+synchronizations serialize work that otherwise overlaps, so split arms are
+not timing-comparable with unsplit ones; compare split arms with each other.
+Env PROBE_PROFILE=1 also runs the measured call under cProfile, writes
+OUT_PREFIX.prof and prints the top 40 functions by cumulative time.
 """
 
 import json
@@ -125,6 +135,55 @@ class Launches:
         }
 
 
+class Splits:
+    """Device-synchronized wall totals of wrapped seams, by name (PROBE_SPLIT)."""
+
+    def __init__(self):
+        self.seconds: dict[str, float] = {}
+        self.calls: dict[str, int] = {}
+
+    def wrap(self, name, fn):
+        def timed(*args, **kwargs):
+            cupy.cuda.Device().synchronize()
+            t0 = time.perf_counter()
+            try:
+                return fn(*args, **kwargs)
+            finally:
+                cupy.cuda.Device().synchronize()
+                self.seconds[name] = self.seconds.get(name, 0.0) + time.perf_counter() - t0
+                self.calls[name] = self.calls.get(name, 0) + 1
+
+        return timed
+
+    def install(self):
+        from pyrite import _backend
+        from pyrite.montecarlo import runner
+        from pyrite.montecarlo.runner.emission_adapters import EmissionAdapter
+        from pyrite.montecarlo.transport import continuation
+
+        runner._segments_on_device = self.wrap("score.upload", runner._segments_on_device)
+        real_evaluate = EmissionAdapter.evaluate
+        splits = self
+
+        def evaluate(self, batch, slot, **kwargs):
+            return splits.wrap(f"score.{slot}", real_evaluate)(self, batch, slot, **kwargs)
+
+        EmissionAdapter.evaluate = evaluate
+        backend = _backend.BACKEND
+        backend.release_memory = self.wrap("release", backend.release_memory)
+        retained = continuation._Retained
+        retained.append = self.wrap("transport.retain", retained.append)
+        continuation._assemble = self.wrap("transport.assemble", continuation._assemble)
+        real_transport = runner._transport_case
+
+        def transport_case(*args, block_consumer=None, **kwargs):
+            if block_consumer is not None:
+                block_consumer = self.wrap("transport.consume", block_consumer)
+            return real_transport(*args, block_consumer=block_consumer, **kwargs)
+
+        runner._transport_case = transport_case
+
+
 class Memory:
     def __init__(self):
         self.pool = cupy.get_default_memory_pool()
@@ -227,17 +286,34 @@ def main():
     streamed_scoring.BlockSpectrumScorer.add = add
     launches = Launches()
     launches.install()
+    splits = Splits()
+    if os.environ.get("PROBE_SPLIT") == "1":
+        splits.install()
+    profiler = None
+    if os.environ.get("PROBE_PROFILE") == "1":
+        import cProfile
+
+        profiler = cProfile.Profile()
     scene = scene_for(n, None if mode == "joined" else block, scratch, threads, batch)
     rss0 = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
     t0 = time.perf_counter()
     with Memory() as mem:
         memory[0] = mem
+        if profiler is not None:
+            profiler.enable()
         if mode == "transport":
             captured["out"] = transport_only(scene, block)
         else:
             pyrite.simulate(scene)
         cupy.cuda.Device().synchronize()
+        if profiler is not None:
+            profiler.disable()
     wall = time.perf_counter() - t0
+    if profiler is not None:
+        import pstats
+
+        profiler.dump_stats(prefix + ".prof")
+        pstats.Stats(profiler).sort_stats("cumulative").print_stats(40)
     out = captured["out"]
     k = launches.summary()
     if mode == "transport":
@@ -270,6 +346,9 @@ def main():
         "vram_pool_used_peak_GiB": mem.used_peak / 2**30,
         "vram_driver_peak_by_phase_GiB": {k: v / 2**30 for k, v in mem.by_phase.items()},
         "sha": os.environ.get("PROBE_SHA", "?"),
+        "split_s": splits.seconds,
+        "split_calls": splits.calls,
+        "profiled": profiler is not None,
     }
     if mode != "transport":
         spectra = ("spec", "spec_characteristic", "brem_wide")
@@ -311,7 +390,9 @@ def sweep(arms, outdir):
         with open(os.path.join(outdir, tag + ".log"), "w") as log:
             rc = subprocess.run(cmd, env=env, stdout=log, stderr=subprocess.STDOUT).returncode
         tail = open(os.path.join(outdir, tag + ".log")).read().splitlines()[-3:]
-        print(f"rc={rc}", *(t for t in tail if t.startswith(("RESULT", "cupy", "Error"))), flush=True)
+        print(
+            f"rc={rc}", *(t for t in tail if t.startswith(("RESULT", "cupy", "Error"))), flush=True
+        )
         print(shlex.join(cmd), flush=True)
 
 
