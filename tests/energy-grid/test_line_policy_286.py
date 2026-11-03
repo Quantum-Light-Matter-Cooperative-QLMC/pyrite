@@ -177,3 +177,40 @@ def test_profile_restores_reducer_hooks_and_preserves_score(monkeypatch, fail):
         cost._bin_tree.build_cxr_tree,
         cost._bin_tree.run_tree_reduction,
     ) == originals
+
+
+def test_forced_route_replay_uses_independent_outputs(monkeypatch):
+    import sys
+
+    from checks import line_cost_286 as cost
+
+    calls = []
+
+    def reduce(*args, out, method="auto", **kw):
+        calls.append((method, out.copy()))
+        out += np.array([2.0, 3.0]) + (1e-12 if method == "tree" else 0)
+        return out
+
+    monkeypatch.setattr(cost._batched, "run_bin_mean_reduction_kernel", reduce)
+    monkeypatch.setitem(
+        sys.modules,
+        "cupy",
+        SimpleNamespace(
+            cuda=SimpleNamespace(Device=lambda: SimpleNamespace(synchronize=lambda: None)),
+            zeros_like=np.zeros_like,
+            asnumpy=np.copy,
+        ),
+    )
+    live = np.array([10.0, 20.0])
+    with cost.Recorder(compare_routes=True) as recorder:
+        result = recorder.reduce(np.ones(3), None, None, None, np.ones(2), out=live)
+    np.testing.assert_array_equal(result, [12.0, 23.0])
+    assert [c[0] for c in calls] == ["auto", "pairs", "tree"]
+    np.testing.assert_array_equal(calls[1][1], [0, 0])
+    np.testing.assert_array_equal(calls[2][1], [0, 0])
+    forced = recorder.flushes[0]["forced_routes"]
+    assert forced["max_error_over_peak"] == pytest.approx(1e-12 / 3, abs=1e-16)
+    summary = cost.summarize(recorder.flushes, 100.0)
+    assert summary["outside_reduce_s"] == pytest.approx(
+        100 - summary["reduce_s"] - summary["route_replay_s"]
+    )

@@ -129,7 +129,11 @@ def score(ladder, case, grid, repeats):
         started = time.perf_counter()
         audit = cxr_truncation_audit(case, grid, n_electrons=tp["Ne_lines"])
         audit_prepare_s = time.perf_counter() - started
-        recorder = Recorder() if case.get("_profile_line_reducers") else None
+        recorder = (
+            Recorder(compare_routes=case.get("_compare_line_reducer_routes", False))
+            if case.get("_profile_line_reducers")
+            else None
+        )
         with recorder if recorder is not None else nullcontext():
             score_started = time.perf_counter()
             density = runner._cxr_for_segments(
@@ -245,8 +249,9 @@ def run_case(args, material, energy, seed, save):
 
     def measure(label, case, grid, setup=None):
         nonlocal reference_shape
-        if getattr(args, "profile_reducers", False):
-            case = dict(case, _profile_line_reducers=True)
+        compare = getattr(args, "compare_reducer_routes", False)
+        if getattr(args, "profile_reducers", False) or compare:
+            case = dict(case, _profile_line_reducers=True, _compare_line_reducer_routes=compare)
         density, timing = score(ladder, case, grid, args.repeats)
         quadrature = case.get("line_quadrature", "node")
         values, shape, native = summarize(
@@ -336,6 +341,11 @@ def main():
         "--profile-reducers",
         action="store_true",
         help="record synchronized per-flush reducer routes; adds profiling overhead",
+    )
+    parser.add_argument(
+        "--compare-reducer-routes",
+        action="store_true",
+        help="replay each flush with pairs and tree on separate outputs; adds substantial overhead",
     )
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
