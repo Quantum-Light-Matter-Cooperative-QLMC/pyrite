@@ -119,6 +119,7 @@ run through the collector.
 | `continuum_grid_end_to_end.py` | End-to-end continuum grid accuracy and runtime comparison (#278); study diagnostic, no independent physics-validation verdict. |
 | `electron_count_accuracy.py` | Accuracy of line and continuum observables versus electron count `Ne` for one production case (#278). Study diagnostic; no independent physics-validation verdict. |
 | `line_grid_candidates_286.py` | Fixed-track bin-mean line-grid coarsening study with two finer references, shared band edges, warm timing, cell-mass observables and fixed detector channels (#286). Submit `line_grid_candidates_286.sbatch` from a synced checkout; study evidence, no independent physics-validation verdict. |
+| `line_policy_286.py` | Same-track production uniform/adaptive policy pilot (#286): resolver/cache costs, refusals, audited scoring, common-band controls and refined references. Submit `line_policy_286.sbatch`; remote CUDA, measurement only, no adoption or ledger claim. |
 | `line_cost_286.py` | Per-flush attribution of the incoherent line phase: counts, reducer path, tree-build and kernel time (#286). Measurement only; no independent physics-validation verdict. |
 | `line_crossover_286.py` | End-to-end line crossover measurement for issue #286; engineering evidence, no independent physics-validation verdict. |
 | `detector_cone_variance_reduction.py` | Detector-cone variance-reduction baseline and comparison; engineering evidence, no separate physics-validation verdict. |

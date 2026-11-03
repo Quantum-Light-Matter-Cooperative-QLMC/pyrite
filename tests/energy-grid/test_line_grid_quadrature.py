@@ -106,6 +106,23 @@ def test_schema_three_cache_records_are_readable():
     assert cached_coordinates("ab" * 16) == {"schema": QUADRATURE_CXR_GRID_POLICY_SCHEMA, "num": 3}
 
 
+@pytest.mark.parametrize(
+    "resolution,quadrature",
+    [
+        ("sinc-nyquist", "node"),
+        ("sinc-nyquist", "bin-mean"),
+        ("resonance-local", "bin-mean"),
+    ],
+)
+def test_population_cache_accepts_the_schema_emitted_by_its_policy(resolution, quadrature):
+    payload = _policy(
+        bandwidth="resonance-population", resolution=resolution, quadrature=quadrature
+    ).payload()
+    record = {"schema": payload["schema"], "start_eV": 10.0, "stop_eV": 100.0, "num": 31}
+    store_coordinates("cd" * 16, record)
+    assert cached_coordinates("cd" * 16) == record
+
+
 # ---- case identity ------------------------------------------------------------
 def test_bin_mean_sets_the_case_key_and_changes_identity():
     node = build_cases(_sweep(), n_electrons=2, n_electrons_brem=2)[0]

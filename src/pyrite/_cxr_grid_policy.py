@@ -960,6 +960,7 @@ def cached_coordinates(key: str) -> dict[str, Any] | None:
         CXR_GRID_POLICY_SCHEMA,
         WINDOWED_CXR_GRID_POLICY_SCHEMA,
         QUADRATURE_CXR_GRID_POLICY_SCHEMA,
+        RESONANCE_CXR_GRID_POLICY_SCHEMA,
     ):
         return None
     return record
