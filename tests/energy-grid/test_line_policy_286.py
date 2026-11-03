@@ -179,7 +179,7 @@ def test_profile_restores_reducer_hooks_and_preserves_score(monkeypatch, fail):
     ) == originals
 
 
-def test_forced_route_replay_uses_independent_outputs(monkeypatch):
+def test_forced_route_replay_uses_independent_outputs(monkeypatch, tmp_path):
     import sys
 
     from checks import line_cost_286 as cost
@@ -202,13 +202,20 @@ def test_forced_route_replay_uses_independent_outputs(monkeypatch):
         ),
     )
     live = np.array([10.0, 20.0])
-    with cost.Recorder(compare_routes=True) as recorder:
-        result = recorder.reduce(np.ones(3), None, None, None, np.ones(2), out=live)
+    with cost.Recorder(compare_routes=True, capture_root=tmp_path) as recorder:
+        result = recorder.reduce(
+            np.ones(3), np.ones(3), np.ones(3), np.arange(3.0), np.ones(2), out=live
+        )
     np.testing.assert_array_equal(result, [12.0, 23.0])
     assert [c[0] for c in calls] == ["auto", "pairs", "tree"]
     np.testing.assert_array_equal(calls[1][1], [0, 0])
     np.testing.assert_array_equal(calls[2][1], [0, 0])
     forced = recorder.flushes[0]["forced_routes"]
+    with np.load(forced["input_artifact"]) as saved:
+        np.testing.assert_array_equal(saved["E_r"], np.ones(3))
+        assert saved["out_dtype"].item() == str(live.dtype)
+    assert isinstance(forced["cost_model_tree"], bool)
+    assert forced["near_pairs"] >= forced["busiest_bin_lines"]
     assert forced["max_error_over_peak"] == pytest.approx(1e-12 / 3, abs=1e-16)
     summary = cost.summarize(recorder.flushes, 100.0)
     assert summary["outside_reduce_s"] == pytest.approx(

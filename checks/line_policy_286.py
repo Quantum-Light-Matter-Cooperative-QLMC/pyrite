@@ -130,7 +130,10 @@ def score(ladder, case, grid, repeats):
         audit = cxr_truncation_audit(case, grid, n_electrons=tp["Ne_lines"])
         audit_prepare_s = time.perf_counter() - started
         recorder = (
-            Recorder(compare_routes=case.get("_compare_line_reducer_routes", False))
+            Recorder(
+                compare_routes=case.get("_compare_line_reducer_routes", False),
+                capture_root=case.get("_reducer_capture_root"),
+            )
             if case.get("_profile_line_reducers")
             else None
         )
@@ -251,7 +254,12 @@ def run_case(args, material, energy, seed, save):
         nonlocal reference_shape
         compare = getattr(args, "compare_reducer_routes", False)
         if getattr(args, "profile_reducers", False) or compare:
-            case = dict(case, _profile_line_reducers=True, _compare_line_reducer_routes=compare)
+            case = dict(
+                case,
+                _profile_line_reducers=True,
+                _compare_line_reducer_routes=compare,
+                _reducer_capture_root=str(args.output.with_suffix(".flushes")) if compare else None,
+            )
         density, timing = score(ladder, case, grid, args.repeats)
         quadrature = case.get("line_quadrature", "node")
         values, shape, native = summarize(
@@ -345,7 +353,7 @@ def main():
     parser.add_argument(
         "--compare-reducer-routes",
         action="store_true",
-        help="replay each flush with pairs and tree on separate outputs; adds substantial overhead",
+        help="replay pairs/tree and save flush inputs/model predictions; adds substantial overhead",
     )
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
