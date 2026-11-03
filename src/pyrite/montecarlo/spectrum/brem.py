@@ -46,6 +46,7 @@ from .cxr import (
 from .segment_escape import mean_transmission, segment_escape_paths
 
 _USE_JIT_BREM_REDUCTION = True
+_BAND_PRIMARY_DTYPE = np.float64  # private benchmark override; production FP64
 _BREMSLIB_CHUNK_CELLS = 1 << 21
 
 BremsstrahlungModel = Literal["eedl", "bethe-heitler", "bremslib"]
@@ -913,8 +914,9 @@ def mc_brem_spectrum(
         given, the call instead returns each of the ``Ne`` electrons' own
         in-band integral ``sum_E q_E dN_e/dE dOmega`` (photons per sr), whose
         mean over electrons is the band integral of the returned density. It
-        always takes the chunked path, so on a device the reduction order
-        differs from the fused kernels; it feeds stopping statistics only.
+        uses fused CUDA FP32 cells/photon partials and FP64 primary sums for staged BremsLib
+        elements. Other backends/models retain the chunked path. Reduction
+        order differs at floating-point rounding level.
     photon_block
         Optional maximum photon-grid nodes scored per pass (#819). ``None``
         (default) or a value covering the grid scores it in one pass. A
@@ -1032,24 +1034,12 @@ def mc_brem_spectrum(
     # pass only O(Nsegment) interpolation/geometry state and small staged EEDL
     # panels. The EEDL reducer is CUDA-only; other accelerators retain the
     # conservative chunked path below.
-    _use_bethe_heitler_jit = (
+    _use_jit = (
         _USE_JIT_BREM_REDUCTION
-        and cross_section_model == "bethe-heitler"
-        and getattr(xp, "__name__", "") == "cupy"
-        and np.dtype(REAL) == np.dtype(np.float32)
-    )
-    _use_eedl_jit = (
-        _USE_JIT_BREM_REDUCTION
-        and cross_section_model == "eedl"
         and BACKEND.name in CUPY_BACKENDS
         and np.dtype(REAL) == np.dtype(np.float32)
     )
-    _use_bremslib_jit = (
-        _USE_JIT_BREM_REDUCTION
-        and cross_section_model == "bremslib"
-        and BACKEND.name in CUPY_BACKENDS
-        and np.dtype(REAL) == np.dtype(np.float32)
-    )
+    _use_bremslib_jit = _use_jit and cross_section_model == "bremslib"
     per_electron = electron_band_weights is not None
     band_q = row_electron = None
     if per_electron:
@@ -1057,7 +1047,7 @@ def mc_brem_spectrum(
         if band_q.shape != E_grid.shape:
             raise ValueError("electron_band_weights must match E_grid_eV")
         row_electron = seg_elec_id[brem_idx][owner]
-    electron_sum = xp.zeros(int(Ne) if per_electron else 0, dtype=xp.float64)
+    electron_sum = xp.zeros(int(Ne) if per_electron else 0, dtype=_BAND_PRIMARY_DTYPE)
 
     def _accumulate(row_weight, density, rows):
         nonlocal spec, electron_sum
@@ -1067,7 +1057,15 @@ def mc_brem_spectrum(
         contribution = (row_weight * (density @ band_q)).astype(xp.float64)
         electron_sum += xp.bincount(row_electron[rows], weights=contribution, minlength=int(Ne))
 
-    if not per_electron and (_use_bethe_heitler_jit or _use_eedl_jit or _use_bremslib_jit):
+    # Missing elemental tables retain the portable fallback. Per-row missing
+    # energy coverage uses the same EEDL/BH device scalar as the spectrum path.
+    fused_band = (
+        per_electron
+        and _use_bremslib_jit
+        and BACKEND.name == "cuda"
+        and len(bremslib_staged) == len(comp)
+    )
+    if fused_band or (not per_electron and _use_jit):
         from .brem_jit_kernel import (
             DEFAULT_BREM_KERNEL_CONFIG,
             run_brem_reduction_kernel,
@@ -1117,7 +1115,9 @@ def mc_brem_spectrum(
                     Z=Z_i,
                     number_density_ang3=n_i,
                     n_layers=n_abs_layers,
-                    out=spec,
+                    out=electron_sum if fused_band else spec,
+                    band_weights=band_q if fused_band else None,
+                    row_electron=row_electron,
                     plasma_eV=plasma_eV,
                 )
             elif cross_section_model in {"eedl", "bremslib"} and context is not None:
@@ -1157,6 +1157,8 @@ def mc_brem_spectrum(
                     out=spec,
                     config=DEFAULT_BREM_KERNEL_CONFIG,
                 )
+        if fused_band:
+            return _to_cpu(electron_sum / (4.0 * np.pi))
         return _to_cpu(spec / (4.0 * xp.pi) / Ne)
 
     M = seg_E.size

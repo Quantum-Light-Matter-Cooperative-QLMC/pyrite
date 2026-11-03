@@ -231,6 +231,25 @@ class Precision:
                 raise ValueError(f"adaptive precision does not support {key}; use fixed counts")
 
 
+_BREM_BAND_REDUCTION_MODEL = "cuda-fused-fp32-row-fp64-primary-band-v2"
+
+
+def _brem_band_reduction_markers(policy, model) -> dict[str, str]:
+    """Re-key adaptive BremsLib brem stops when reduction arithmetic changes.
+
+    Fixed counts, CXR-only stopping and other continuum models keep their
+    identity. This generation is backend-independent, like the other default
+    numerics markers; it never changes source-table or interpolation identity.
+    """
+    if (
+        model == "bremslib"
+        and isinstance(policy, Mapping)
+        and "brem" in policy.get("observables", ())
+    ):
+        return {"brem_band_reduction_model": _BREM_BAND_REDUCTION_MODEL}
+    return {}
+
+
 #: Policy for a profile that sets neither fixed electron counts nor a
 #: ``precision`` table (#361 user decision, 2026-10-08).
 DEFAULT_PRECISION = Precision(

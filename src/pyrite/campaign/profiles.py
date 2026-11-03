@@ -36,7 +36,7 @@ from .._numerics import (
     validate_bremsstrahlung_model,
     validate_profile_numerics,
 )
-from .._precision import Precision
+from .._precision import Precision, _brem_band_reduction_markers
 from ..detectors import EnergyBins
 from ..materials.photon_cross_sections import ATTENUATION_MODEL
 from ..montecarlo.case import Case
@@ -702,14 +702,13 @@ def _identity_v1(
         resolved["transport_numerics"] = transport_numerics
     resolved.update(_model_generation_markers(options.emission))
     resolved.update(shell_ionization)
-    # The continuum now defaults to evaluated EEDL MF=23/527 + MF=26/527
-    # instead of the historical analytic Bethe--Heitler approximation.
     requested = (
         options.bremsstrahlung_model if bremsstrahlung_model is None else bremsstrahlung_model
     )
     validate_bremsstrahlung_model(requested)
     resolved_brem_model = resolve_bremsstrahlung_model(requested, _target_elements(sweep.target))
     resolved["bremsstrahlung_model"] = _bremsstrahlung_identity_marker(resolved_brem_model)
+    resolved.update(_brem_band_reduction_markers(precision_payload, resolved_brem_model))
     radiative = radiative_numerics_payload(options, resolved_brem_model, grooved=grooved)
     if radiative:
         transport_numerics.update(radiative)
@@ -817,11 +816,8 @@ def case_content_key(
     case whose seed differs simply gets a distinct key and recomputes; the store
     never serves a mismatched-seed result.
 
-    The stopping, characteristic-radiation, line-escape, attenuation and
-    transport-precision markers,
-    plus the selected bremsstrahlung model marker, join the payload alongside
-    the case. Without
-    them a blob from an earlier physics/data generation could be served silently.
+    Model-generation markers join the case payload so cached blobs from an
+    earlier physics or numerical generation cannot be served silently.
 
     ``xsgen_tables`` is the same thing for externally generated cross-section
     tables (issue #161), and has to be here as well as in
@@ -829,8 +825,7 @@ def case_content_key(
     caches. The dataset identity gates the checkpoint *stem*, while this key
     gates the content-addressable blob store, and a run whose stem moved would
     otherwise still be served a blob computed from the superseded table. Unlike
-    the three constants it is conditional, so a run reading no xsgen table
-    keeps its existing content key and every stored blob stays reachable.
+    unconditional markers, it is omitted for runs reading no xsgen tables.
 
     Validation: bote-salvat-ionization-backend
     """
@@ -850,6 +845,14 @@ def case_content_key(
             {key: value for key, value in case.items() if key not in _CONTENT_KEY_DENYLIST}
         ),
     }
+    payload.update(
+        _brem_band_reduction_markers(
+            case.get("adaptive_precision"),
+            "bremslib"
+            if payload["bremsstrahlung_model"] == BREMSSTRAHLUNG_BREMSLIB_MODEL
+            else "eedl",
+        )
+    )
     if case.get("coherent_emission", False):
         payload["coherent_population_model"] = COHERENT_POPULATION_MODEL
         payload["physical_bunch_electrons"] = physical_bunch_electrons(case)

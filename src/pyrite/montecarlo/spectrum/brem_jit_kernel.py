@@ -937,6 +937,8 @@ def run_bremslib_brem_reduction_kernel(
     plasma_eV=0.0,
     out=None,
     config=DEFAULT_BREM_KERNEL_CONFIG,
+    band_weights=None,
+    row_electron=None,
 ):
     """Accumulate staged direction-resolved BremsLib bremsstrahlung.
 
@@ -959,36 +961,41 @@ def run_bremslib_brem_reduction_kernel(
     if n_energies == 0 or T_keV.size == 0:
         return out
 
+    arguments = (
+        T_keV,
+        p_i,
+        bethe_heitler_prefactor,
+        eedl_weight,
+        eedl_lower_panel,
+        eedl_panel_fraction,
+        eedl_available,
+        path_flat,
+        mu_flat,
+        E_grid,
+        panel_probability,
+        bremslib_weight,
+        bremslib_lower_top,
+        bremslib_upper_top,
+        bremslib_energy_fraction,
+        bremslib_available,
+        bremslib_lower_values,
+        bremslib_upper_values,
+        nominal_ratio,
+        out,
+        np.float32(Z),
+        np.float32(plasma_eV),
+        np.uint32(T_keV.size),
+        np.uint32(n_energies),
+        np.uint32(n_layers),
+    )
+    if band_weights is not None:
+        from .brem_band_jit import run_bremslib_band_kernel
+
+        return run_bremslib_band_kernel(arguments, band_weights, row_electron, out, n_threads)
     _bremslib_kernel_1e(
         (n_energies,),
         (n_threads,),
-        (
-            T_keV,
-            p_i,
-            bethe_heitler_prefactor,
-            eedl_weight,
-            eedl_lower_panel,
-            eedl_panel_fraction,
-            eedl_available,
-            path_flat,
-            mu_flat,
-            E_grid,
-            panel_probability,
-            bremslib_weight,
-            bremslib_lower_top,
-            bremslib_upper_top,
-            bremslib_energy_fraction,
-            bremslib_available,
-            bremslib_lower_values,
-            bremslib_upper_values,
-            nominal_ratio,
-            out,
-            np.float32(Z),
-            np.float32(plasma_eV),
-            np.uint32(T_keV.size),
-            np.uint32(n_energies),
-            np.uint32(n_layers),
-        ),
+        arguments,
         shared_mem=n_threads * np.dtype(np.float32).itemsize,
     )
     return out
@@ -1011,12 +1018,47 @@ def run_bremslib_element_reduction(
     n_layers,
     out,
     plasma_eV=0.0,
+    band_weights=None,
+    row_electron=None,
 ):
     """Stage one element's segment state and launch the BremsLib reducer.
 
     Validation: bremslib-angular-model
     """
     from .brem_bremslib import bremslib_segment_state
+
+    # Bound angle-interpolated table state independently of the photon grid.
+    if band_weights is not None and T_keV.size > 65536:
+        from dataclasses import replace
+
+        from .brem import _slice_eedl_state
+
+        assert row_electron is not None
+        for first in range(0, int(T_keV.size), 65536):
+            rows = slice(first, first + 65536)
+            context = eedl_context
+            if context is not None:
+                context = replace(context, state=_slice_eedl_state(context.state, rows))
+            run_bremslib_element_reduction(
+                T_keV[rows],
+                L_ang[rows],
+                p_i[rows],
+                bethe_heitler_prefactor[rows],
+                path_flat.reshape(-1, 2 * n_layers)[rows].reshape(-1),
+                mu_flat,
+                E_grid,
+                staged,
+                cos_theta[rows],
+                context,
+                Z=Z,
+                number_density_ang3=number_density_ang3,
+                n_layers=n_layers,
+                out=out,
+                plasma_eV=plasma_eV,
+                band_weights=band_weights,
+                row_electron=row_electron[rows],
+            )
+        return out
 
     state = bremslib_segment_state(staged, T_keV, cos_theta)
     if eedl_context is None:
@@ -1067,4 +1109,6 @@ def run_bremslib_element_reduction(
         n_layers=n_layers,
         plasma_eV=plasma_eV,
         out=out,
+        band_weights=band_weights,
+        row_electron=row_electron,
     )
