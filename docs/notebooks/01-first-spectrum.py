@@ -20,7 +20,7 @@ def _():
     import os
 
     # Change to "cuda" before the first PyRITE import; restart an existing kernel.
-    os.environ.setdefault("PYRITE_MC_BACKEND", "cpu")
+    _ = os.environ.setdefault("PYRITE_MC_BACKEND", "cpu")
     import marimo as mo  # noqa: F401
     import matplotlib.pyplot as plt
 
@@ -29,15 +29,13 @@ def _():
     with mo.status.spinner(title="Preparing PyRITE reference tables, warming JIT caches"):
         _ = pyrite.fetch_tables()  # Fetch data tables
         _ = pyrite.execution.warm_cache()
-
-    tables_ready = True
-    return mo, plt, tables_ready
+    return mo, plt
 
 
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    # Your first X-ray spectrum
+    # Make Some Radiation
 
     Set up PyRITE, simulate a small crystalline target, and plot its X-ray spectrum.
 
@@ -62,56 +60,10 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## Simulate a crystalline target
-
-    This example uses 30 keV electrons incident upon a 100 nm HOPG slab.
-    The sampled electron histories do not represent a physical bunch population.
-    Use Pint quantities from `pyrite.units.ureg` for dimensional inputs.
-    PyRITE validates and normalizes them before numerical transport.
-    """)
-    return
-
-
-@app.cell
-def _(mo, tables_ready):
-    from pyrite import simulate
-    from pyrite.beams import Beam, PointBunch, PointSpot
-    from pyrite.config import CxrReflections, FixedSampling, Numerics
-    from pyrite.detectors import Detector
-    from pyrite.geometry import Footprint, Slab
-    from pyrite.units import ureg
-
-    # Quantities are checked at the API boundary; the simulation stays numeric.
-    beam = Beam(kinetic_energy=30 * ureg.keV, transverse=PointSpot(), longitudinal=PointBunch())
-    target = Slab(
-        "hopg",
-        thickness=100 * ureg.nm,
-        tilt=30 * ureg.degree,
-        footprint=Footprint(width=5 * ureg.mm, height=5 * ureg.mm),
-    )
-    detector = Detector(observation_angle=135 * ureg.degree)
-
-    numerics = Numerics(
-        sampling=FixedSampling(cxr_electrons=32_768, brem_electrons=128),
-        cxr_reflections=CxrReflections(n_families=2),
-    )
-
-    assert tables_ready  # Wait for reference-table installation before transport.
-    with mo.status.spinner(title="Simulating electron transport and X-ray spectrum"):
-        result = simulate(beam, target, detector, numerics=numerics)
-
-    cxr = result.cxr.incoherent
-    brem = result.brem
-    return brem, cxr
-
-
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""
     ## Crystals and Reciprocal Lattice Vectors
 
     In general, crystals are defined by planes of symmetry known as lattice planes.
-    Lattice planes are generally defined by [miller indices](https://en.wikipedia.org/wiki/Miller_index) $(hkl)$,
+    Lattice planes are generally defined by their [miller indices](https://en.wikipedia.org/wiki/Miller_index) $(hkl)$,
     which describe their orientation in the unit cell. Taking the spatial Fourier Transform of the lattice leads
     to the concept of a 'reciprocal lattice vector' $\mathbf{g}_{hkl}$, which is orthogonal in real space to its
     associated $(hkl)$ lattice plane and has magnitude
@@ -126,7 +78,7 @@ def _(mo):
     interactions which are fundamentally mediated by these reciprocal lattice vectors, as the lattice
     vectors define the momentum exchange which can occur between electrons and atoms in the lattice.
     For a given reciprocal lattice vector $\mathbf{g}_{hkl}$ and an incident electron with velocity $\mathbf{v}$,
-    at an emission (or "observation") angle $\hat{n}$, both PXR and CBS produce photon with energy
+    at an emission (or "observation") angle $\hat{n}$, both PXR and CBS produce photons with energy
 
     $$
     E_p = \hbar \frac{\mathbf{v} \cdot \mathbf{g}_{hkl}}{1 - (\mathbf{v} \cdot \hat{n})/c}
@@ -135,18 +87,86 @@ def _(mo):
     A lattice which can exchange momentum $\mathbf{g}_{hkl}$ is also capable of exchanging $n\mathbf{g}_{hkl}$,
     meaning that photons can also be emitted at $nE_p$ for integer $n$
 
+    While an ideal crystal has an infinite number of reciprocal lattice vectors, not all contribute
+    equally to X-ray emission. The strength of each contribution depends in part on the crystal's
+    periodic structure, described by the Fourier coefficients of the X-ray dielectric susceptibility
+    $\chi_{\mathbf{g}}$ for PXR, and the screened electrostatic crystal potential $U_{\mathbf{g}}$ for CBS.
+    These coefficients depend on the arrangement of atoms within the unit cell: some reciprocal lattice vectors
+    produce strong radiation amplitudes, while others are suppressed or even forbidden by destructive interference.
 
-    While all ideal lattices have an infinite number of reciprocal lattice vectors of varying orientations and strengths,
-    "2D" or layered materials exhibit strong periodicity and, hence, strong low-order Fourier components on the $C$-axis,
-    or 'Basal' axis (that which is normal to the layers/sheets) when compared to other lattice planes, meaning that these
-    materials emit much more strongly from the set of $\{00l\}$ planes, and preferentially the low order planes $(001)$,
-    $(002)$, etc.
+    Layered materials such as graphite, hexagonal boron nitride (hBN), and transition metal dichalcogenides (TMDs)
+    are particularly interesting because of their pronounced structural anisotropy. In highly oriented pyrolytic graphite (HOPG),
+    for example, the crystallites are preferentially aligned along the crystallographic $c$-axis (perpendicular to
+    the basal planes), even though their in-plane orientations may vary. This makes reflections from the basal
+    $\{00l\}$ planes particularly useful for generating well-defined X-ray spectral lines. Moreover, graphite's
+    ABAB stacking produces systematic extinctions: the contributions from successive layers cancel for odd $l$,
+    leaving $(002)$, $(004)$, etc., as the only allowed basal reflections.
 
-    This makes layered 2D materials like Graphite (Highly-Oriented Pyrolytic Graphite, or HOPG), hexagonal Boron Nitride (hBN),
-    and Transition Metal Dichalcogenides [die-chal-KAH-gen-ides] (TMDs) especially desirable for creating narrow-linewidth
-    soft-xray sources. This is why we choose HOPG as our material, and only simulate the lowest two reciprocal $\{00l\}$ vectors.
+    The resulting spectral intensity depends not only on the magnitudes of $\chi_{\mathbf{g}}$ and $U_{\mathbf{g}}$,
+    but also on the emission geometry and interference between PXR and CBS. The linewidth additionally depends on
+    factors such as crystal thickness, mosaic spread, electron-beam properties, and detector acceptance.
+    These properties make suitably oriented layered crystals attractive candidates for tunable, narrow-linewidth soft-X-ray sources.
+
+    For this introductory example, we use HOPG and retain only two automatically selected reflection families to keep the simulation inexpensive.
+
+    This example uses 30 keV electrons incident upon a 400 nm HOPG slab.
+    It's important to note that the sampled electron histories do *not* represent
+    a physical number of electrons in a bunch -- rather, they are simply the number
+    of Monte Carlo trials that are simulated to produce these plots. The more histories,
+    the less noisy the spectrum, with the statistical noise generally going down as $1/\sqrt{N}$.
+
+    We use Pint quantities from `pyrite.units.ureg` for dimensional inputs,
+    as we just learned in [Units and Quantities](00a-units-and-quantities.py).
     """)
     return
+
+
+@app.cell
+def _(mo):
+    from pyrite import simulate
+    from pyrite.beams import Beam, PointBunch, PointSpot
+    from pyrite.config import CxrReflections, FixedSampling, Numerics
+    from pyrite.detectors import Detector
+    from pyrite.geometry import Footprint, Slab
+    from pyrite.units import ureg
+
+    # First, we define our electron beam:
+    beam = Beam(
+        kinetic_energy=30 * ureg.keV,  # 30 keV beam energy
+        transverse=PointSpot(),  # point-like bunch (nonrealistic, of course),
+        longitudinal=PointBunch(),
+        repetition_rate=5.0 * ureg.kHz,
+        bunch_charge=1.0 * ureg.pC,
+    )
+
+    # Next, our crystalline target: a 400 nm thick slab of Highly-Ordered Pyrolytic Graphite
+    target = Slab(
+        "hopg",
+        thickness=400 * ureg.nm,
+        tilt=30 * ureg.degree,
+        footprint=Footprint(width=5 * ureg.mm, height=5 * ureg.mm),
+    )
+
+    # Our detector: in this case, an ideal point-like detector sampling per sterradian
+    detector = Detector(observation_angle=135 * ureg.degree)
+
+    # Numerical settings for the simulation: how many trials to score for PXR/CBS spectra,
+    # and how many for the brem spectrum. Note that these spectra reuse the same electron trajectories,
+    # so the total number of transported electrons is simply MAX(cxr_electrons, brem_electrons)
+    numerics = Numerics(
+        sampling=FixedSampling(cxr_electrons=32_768, brem_electrons=128),
+        cxr_reflections=CxrReflections(
+            n_families=2
+        ),  # Here we only consider the first two Basal plane reflections
+    )
+
+    with mo.status.spinner(title="Simulating electron transport and X-ray spectrum"):
+        result = simulate(beam, target, detector, numerics=numerics)
+
+    cxr = result.cxr.incoherent
+    brem = result.brem
+    characteristic = result.characteristic
+    return brem, characteristic, cxr, result
 
 
 @app.cell(hide_code=True)
@@ -158,21 +178,86 @@ def _(mo):
 
 
 @app.cell
-def _(brem, cxr, plt):
-    figure, axis = plt.subplots(figsize=(7, 3.8), layout="constrained")
-    axis.plot(cxr.photon_energy_eV / 1_000, cxr.density, label="PXR + CBS")
-    axis.plot(brem.photon_energy_eV / 1_000, brem.density, label="Bremsstrahlung")
-    axis.set(
+def _(brem, characteristic, cxr, plt):
+    _figure, _axis = plt.subplots(figsize=(7, 3.8), layout="constrained")
+    _axis.plot(cxr.photon_energy_eV / 1_000, cxr.density, label="PXR + CBS", color="blue")
+    _axis.plot(brem.photon_energy_eV / 1_000, brem.density, label="Bremsstrahlung", color="orange")
+    _axis.plot(
+        characteristic.photon_energy_eV / 1_000,
+        characteristic.density,
+        label="Characteristic Radiation",
+        color="green",
+    )
+    _axis.set(
         xlabel="Photon energy (keV)",
-        ylabel="Photons / (electron · eV · sr)",
-        title="30 keV electrons → 100 nm HOPG",
-        xlim=(0.3, 3.7),
+        ylabel=r"Photons / (electron $\cdot$ eV $\cdot$ sr)",
+        title=r"30 keV electrons $\rightarrow$ 400 nm HOPG",
+        xlim=(0.1, 3.7),
         yscale="log",
         ylim=(1e-14, 1e-7),
     )
-    axis.grid(alpha=0.25)
-    axis.legend()
-    figure  # noqa: B018 - marimo renders the final expression
+    _axis.grid(alpha=0.25)
+    _axis.legend()
+    _figure  # noqa: B018 - marimo renders the final expression
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Interpreting the spectrum
+
+    In blue, we see our desired result! The pair of spectral lines corresponding to $(002)$ and $(004)$, with the second line looking to be ~2x the photon energy of the first.
+
+    In green, we see the *extremely* dominant characteristic radiation line from the Carbon atoms in the HOPG, at ~277 eV. Luckily, these
+    characteristic xrays are absorbed by a slight breeze (literally), so it shouldn't be too hard to filter out and leave our
+    soft-xray lines of interest.
+
+    Lastly, in orange, we see our incoherent bremsstrahlung background, and, interestingly, we notice that it has a sharp drop right at the same energy
+    as the characteristic line. This is because the absorption $K$-edge of Carbon (i.e. the photon energy required to strip an inner-shell electron
+    from the atom) is directly tied to the characteristic xray emission line, as this line is caused by excited conduction-band electrons decaying down
+    into empty inner-shell states and emitting photons of very similar energy.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Now, together, and linear
+
+    To put the spectra together onto the same axes, we must interpolate their grids onto one another's,
+    as they do not generally share native photon grids in order to maximize simulation performance.
+
+    We then convert from the average yield *per electron* into the average yield *per second* based on our
+    average beam current (if you wanted average yield per bunch, just leave off the `beam.repetition_rate` below)
+    """)
+    return
+
+
+@app.cell
+def _(plt, result):
+    flux = result.spectral_flux(units="sr")
+
+    energy_eV = flux["photon_energy_eV"].to_numpy()
+    total_flux = flux["total"].to_numpy()
+
+    xmin, xmax = 300, 3700
+    mask = (energy_eV >= 300) & (energy_eV <= 3700)
+
+    _figure, _axis = plt.subplots(figsize=(7, 3.8), layout="constrained")
+    _axis.plot(energy_eV[mask] / 1000, total_flux[mask])
+    _axis.set(
+        xlabel="Photon energy (keV)",
+        ylabel=r"Photons / (s $\cdot$ eV $\cdot$ sr)",
+        title=r"30 keV electrons $\rightarrow$ 400 nm HOPG",
+        xlim=(xmin / 1000, xmax / 1000),
+        yscale="linear",
+    )
+    _axis.set_ylim(bottom=0)
+    _axis.grid(alpha=0.25)
+    _axis.legend()
+    _figure  # noqa: B018 - marimo renders the final expression
     return
 
 
@@ -181,20 +266,22 @@ def _(mo):
     mo.md(r"""
     ## Interpretation
 
-    PXR and CBS are combined here because their amplitudes interfere. Their line
-    structure differs from the broad bremsstrahlung continuum. Each component is plotted
-    on its **native photon-energy grid**; adding array entries by index would mix
-    different energies. The vertical axis is source spectral density per incident
-    electron, per eV, per steradian. Integrating over photon energy gives
-    photons / (electron · sr). Multiplying by the electron rate and accepted
-    solid angle gives an expected photon rate in photons / s.
+    PXR and CBS are combined here because their amplitudes interfere. The electron bunch duration
+    is, however, generally far longer than the wavelength of interest, meaning the interference
+    is generally between many incoherent emitters which averages to the spectrum above. Integrating
+    the spectrum over photon energy gives photons / (s · sr), i.e., a sample of a single $(\theta, \phi)$ direction,
+    with no solid-angular span. So, multiplying by a hypothetical detector's acceptance solid angle
+    gives an expected photon rate in photons / s (assuming the detector is small enough that the
+    spectrum is uniform across it, of course).
 
-    Try doubling the history counts, then change only the target thickness. Keep a
-    record of the resolved seed when comparing configurations; different backends need not produce
-    identical random trajectories. Continue to notebook 02 to separate source
-    yields from beam-current-scaled photon rates. Notebook 03 predicts vacuum line
+    Try halving or doubling the history counts; see what happens to the spectrum, especially the CXR spectrum
+    in the log plot. Then, change only the target thickness, or just the observation angle -- watch how the lines change.
+
+    Keep a record of the resolved seed when comparing
+    configurations; different backends need not produce identical random trajectories. Continue to notebook 02
+    to dive deeper into dissecting simulation results. Notebook 03 discusses how to predict CXR line
     energies; the [results how-to](https://pyrite.readthedocs.io/en/latest/guides/working-with-results.html)
-    covers saved checkpoints. See
+    covers saved checkpoints, to keep from rerunning expensive simulations over and over. See
     [model limitations](https://pyrite.readthedocs.io/en/latest/physics/capabilities.html)
     and [validation status](https://pyrite.readthedocs.io/en/latest/validation/status-summary.html)
     before interpreting these small-sample results quantitatively.

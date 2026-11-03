@@ -58,8 +58,7 @@ def _(mo):
     Always construct quantities using `pyrite.units.ureg` (or its `Q_` alias).
     A quantity combines a **magnitude** with a **unit**. `.to(...)` returns a
     converted quantity; `.magnitude` strips the units and should be used only
-    when an API explicitly requires a plain number. Do not alter the shared
-    registry's unit definitions.
+    when an API explicitly requires a plain number.
 
     **Common units:** electron kinetic and photon energy: eV, keV, MeV;
     crystal thickness and lattice lengths: Å (`angstrom`), nm, µm; transverse

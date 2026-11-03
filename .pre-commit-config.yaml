@@ -20,12 +20,6 @@ repos:
       - id: nbqa-ruff
         args: [--fix, "--extend-ignore=F821"]  # F821 is always a false positive across notebook cells
 
-  # Strip notebook outputs
-  - repo: https://github.com/kynan/nbstripout
-    rev: 0.9.1
-    hooks:
-      - id: nbstripout
-
   # Mirror canonical .agents/skills -> generated .claude/skills, staging the
   # churn so both trees land in the same commit. Runs only when a staged path
   # touches either skill tree.
