@@ -133,3 +133,47 @@ def test_gpu_exhaustion_is_recorded_and_later_policy_arms_continue(tmp_path, mon
     assert row["arms"]["population_node"]["exception_type"] == "GPUOutOfMemory"
     assert "refused" not in row["arms"]["adaptive_12"]
     assert "common_adaptive_12_uniform_12" in row["arms"]
+
+
+@pytest.mark.parametrize("fail", [False, True])
+def test_profile_restores_reducer_hooks_and_preserves_score(monkeypatch, fail):
+    import sys
+
+    from checks import line_cost_286 as cost
+    from checks import line_policy_286 as pilot
+    from pyrite.montecarlo import runner
+    from pyrite.montecarlo.runner import cxr_grid
+
+    monkeypatch.setitem(sys.modules, "cupy", SimpleNamespace())
+    monkeypatch.setattr(pilot, "synchronize", lambda: None)
+    monkeypatch.setattr("pyrite._backend._to_cpu", lambda x: x)
+    monkeypatch.setattr(cxr_grid, "cxr_truncation_audit", lambda *a, **kw: {})
+    monkeypatch.setattr(cxr_grid, "check_cxr_truncation", lambda *a: {"passed": True})
+    originals = (
+        cost._batched.run_bin_mean_reduction_kernel,
+        cost._bin_tree.build_cxr_tree,
+        cost._bin_tree.run_tree_reduction,
+    )
+
+    def calculate(*args, **kwargs):
+        assert cost._batched.run_bin_mean_reduction_kernel != originals[0]
+        if fail:
+            raise RuntimeError("scoring failure")
+        return np.array([1.0, 2.0, 3.0])
+
+    monkeypatch.setattr(runner, "_cxr_for_segments", calculate)
+    ladder = SimpleNamespace(transport={"Ne_lines": 20, "n_hat": [0, 0, 1]}, _segments_device={})
+    if fail:
+        with pytest.raises(RuntimeError, match="scoring failure"):
+            pilot.score(ladder, {"_profile_line_reducers": True}, np.arange(3), 1)
+    else:
+        density, timing = pilot.score(ladder, {"_profile_line_reducers": True}, np.arange(3), 1)
+        np.testing.assert_array_equal(density, [1, 2, 3])
+        assert timing["audit"] == {"passed": True}
+        assert len(timing["reducer_profiles"]) == 2
+        assert all(p["reduce_s"] == 0 for p in timing["reducer_profiles"])
+    assert (
+        cost._batched.run_bin_mean_reduction_kernel,
+        cost._bin_tree.build_cxr_tree,
+        cost._bin_tree.run_tree_reduction,
+    ) == originals

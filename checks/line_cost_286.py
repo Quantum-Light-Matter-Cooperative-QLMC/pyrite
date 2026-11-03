@@ -50,6 +50,14 @@ class Recorder:
         _bin_tree.build_cxr_tree = self.build
         _bin_tree.run_tree_reduction = self.tree
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        _batched.run_bin_mean_reduction_kernel = self._orig_reduce
+        _bin_tree.build_cxr_tree = self._orig_build
+        _bin_tree.run_tree_reduction = self._orig_tree
+
     def reduce(self, E_r, aw, w, edges, inv_width, **kw):
         sync = self.cupy.cuda.Device().synchronize
         sync()

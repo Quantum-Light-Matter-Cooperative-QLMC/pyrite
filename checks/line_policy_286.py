@@ -14,6 +14,7 @@ import json
 import resource
 import tempfile
 import time
+from contextlib import nullcontext
 from pathlib import Path
 from unittest.mock import patch
 
@@ -116,32 +117,57 @@ def mass_bins(grid, density, edges, quadrature):
 
 def score(ladder, case, grid, repeats):
     """Include the production bandwidth audit in every measured scoring pass."""
+    from checks.line_cost_286 import Recorder
+    from checks.line_cost_286 import summarize as reducer_summary
     from pyrite._backend import _to_cpu
     from pyrite.montecarlo import runner
     from pyrite.montecarlo.runner.cxr_grid import check_cxr_truncation, cxr_truncation_audit
 
-    tp, walls = ladder.transport, []
+    tp, walls, profiles = ladder.transport, [], []
     for _ in range(repeats + 1):
         synchronize()
         started = time.perf_counter()
         audit = cxr_truncation_audit(case, grid, n_electrons=tp["Ne_lines"])
-        density = runner._cxr_for_segments(
-            ladder._segments_device,
-            grid,
-            case,
-            tp["n_hat"],
-            case.get("abs_layers"),
-            tp.get("groove"),
-            coherent=False,
-            Ne=tp["Ne_lines"],
-            table_cache={},
-            truncation_audit=audit,
-        )
-        audit_record = None if audit is None else check_cxr_truncation(case, audit)
-        density = np.asarray(_to_cpu(density), dtype=float)
-        synchronize()
-        walls.append(time.perf_counter() - started)
-    return density, {"first_s": walls[0], "warm_s": walls[1:], "audit": audit_record}
+        audit_prepare_s = time.perf_counter() - started
+        recorder = Recorder() if case.get("_profile_line_reducers") else None
+        with recorder if recorder is not None else nullcontext():
+            score_started = time.perf_counter()
+            density = runner._cxr_for_segments(
+                ladder._segments_device,
+                grid,
+                case,
+                tp["n_hat"],
+                case.get("abs_layers"),
+                tp.get("groove"),
+                coherent=False,
+                Ne=tp["Ne_lines"],
+                table_cache={},
+                truncation_audit=audit,
+            )
+            if recorder is not None:
+                synchronize()
+            scoring_s = time.perf_counter() - score_started
+            audit_started = time.perf_counter()
+            audit_record = None if audit is None else check_cxr_truncation(case, audit)
+            if recorder is not None:
+                synchronize()
+            audit_check_s = time.perf_counter() - audit_started
+            density = np.asarray(_to_cpu(density), dtype=float)
+            synchronize()
+            walls.append(time.perf_counter() - started)
+        if recorder is not None:
+            profiles.append(
+                {
+                    **reducer_summary(recorder.flushes, scoring_s),
+                    "audit_prepare_s": audit_prepare_s,
+                    "audit_check_s": audit_check_s,
+                    "flushes": recorder.flushes,
+                }
+            )
+    timing = {"first_s": walls[0], "warm_s": walls[1:], "audit": audit_record}
+    if profiles:
+        timing["reducer_profiles"] = profiles
+    return density, timing
 
 
 def summarize(grid, density, quadrature, detector_grid, detectors, shape_edges):
@@ -219,6 +245,8 @@ def run_case(args, material, energy, seed, save):
 
     def measure(label, case, grid, setup=None):
         nonlocal reference_shape
+        if getattr(args, "profile_reducers", False):
+            case = dict(case, _profile_line_reducers=True)
         density, timing = score(ladder, case, grid, args.repeats)
         quadrature = case.get("line_quadrature", "node")
         values, shape, native = summarize(
@@ -304,6 +332,11 @@ def main():
     parser.add_argument("--reference-spacing-ev", type=float, default=3)
     parser.add_argument("--repeats", type=int, default=2)
     parser.add_argument("--detector-max-ev", type=float, default=100_000)
+    parser.add_argument(
+        "--profile-reducers",
+        action="store_true",
+        help="record synchronized per-flush reducer routes; adds profiling overhead",
+    )
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     if (
