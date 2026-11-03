@@ -29,7 +29,8 @@ def _():
     with mo.status.spinner(title="Preparing PyRITE reference tables, warming JIT caches"):
         _ = pyrite.fetch_tables()  # Fetch data tables
         _ = pyrite.execution.warm_cache()
-    return mo, plt
+    tables_ready = True
+    return mo, plt, tables_ready
 
 
 @app.cell(hide_code=True)
@@ -122,7 +123,8 @@ def _(mo):
 
 
 @app.cell
-def _(mo):
+def _(mo, tables_ready):
+    assert tables_ready
     from pyrite import simulate
     from pyrite.beams import Beam, PointBunch, PointSpot
     from pyrite.config import CxrReflections, FixedSampling, Numerics
