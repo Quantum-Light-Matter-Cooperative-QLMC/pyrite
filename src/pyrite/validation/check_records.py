@@ -28,6 +28,10 @@ CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
     # #875 launch-shape timing diagnostic: bitwise-identity and timing, no physics claim.
     "checks/launch_retune_875.py": (),
     "checks/brem_source_comparison.py": ("brem-source-comparison",),
+    # Fused band scoring diagnostics (#938): performance/parity evidence only.
+    "checks/brem_primary_band_benchmark.py": (),
+    "checks/brem_band_request_confirmation.py": (),
+    "checks/brem_band_kernel_diagnostic.py": (),
     "checks/sb85_eta_small_kappa_fit.py": ("bremslib-electron-electron",),
     "checks/coherent_flat_omission.py": ("coherent-flat-term-omission",),
     "checks/coherent_physical_population_remote.py": ("coherent-physical-bunch-population",),
