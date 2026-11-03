@@ -116,7 +116,7 @@ def _(mo):
     the less noisy the spectrum, with the statistical noise generally going down as $1/\sqrt{N}$.
 
     We use Pint quantities from `pyrite.units.ureg` for dimensional inputs,
-    as we just learned in [Units and Quantities](00a-units-and-quantities.py).
+    as we just learned in [Units and Quantities](https://pyrite.readthedocs.io/en/latest/notebooks/fundamentals/00a-units-and-quantities.html).
     """)
     return
 
