@@ -287,6 +287,11 @@ def _measure_policy(args, out, name, case, tp, f, p, rows, widths, screen=None, 
 
 def run(args):
     from pyrite._backend import BACKEND, REAL, _to_cpu
+    from pyrite._continuum_grid import (
+        CONTINUUM_GRID_MODEL,
+        CONTINUUM_LOG_STEP,
+        automatic_continuum_grid,
+    )
     from pyrite.montecarlo.runner.oom import _ensure_pool_limit
     from pyrite.montecarlo.spectrum.cxr._bin_quadrature import bin_axis
 
@@ -322,11 +327,29 @@ def run(args):
     grid = np.asarray(tp["E_grid"], dtype=float)
     edges = np.asarray(_to_cpu(bin_axis(grid)[0]), dtype=float)
     widths = np.diff(edges)
+    continuum = np.asarray(tp["E_brem"], dtype=float)
+    automatic = np.array_equal(
+        continuum, automatic_continuum_grid(args.material, args.energy * 1000)
+    )
     np.save(out / "grid_eV.npy", grid)
     state.update(
         grid_nodes=grid.size,
         grid_cell_band_eV=[float(edges[0]), float(edges[-1])],
         grid_sha256=hashlib.sha256(grid.tobytes()).hexdigest(),
+        cxr_line_grid=dict(
+            nodes=grid.size,
+            node_range_eV=[float(grid[0]), float(grid[-1])],
+            bin_cell_range_eV=[float(edges[0]), float(edges[-1])],
+            bandwidth="resonance-population",
+            resolution="resonance-local",
+            quadrature="bin-mean",
+        ),
+        bremsstrahlung_continuum_grid=dict(
+            nodes=continuum.size,
+            node_range_eV=[float(continuum[0]), float(continuum[-1])],
+            policy=CONTINUUM_GRID_MODEL if automatic else "explicit case grid",
+            baseline_dlnE=CONTINUUM_LOG_STEP if automatic else None,
+        ),
         line_grid_resolved=tp.get("diagnostic_grid"),
         n_segments=int(tp["segs"]["L_ang"].size),
     )
@@ -449,12 +472,65 @@ def run(args):
             np.median(all_times) / np.median(kept_times)
         )
         if start:
-            report["one_use_time_ratio_charging_pilot_capture"] = float(
+            report["one_use_heldout_time_ratio_charging_pilot_setup"] = float(
                 np.median(all_times)
-                / (np.median(kept_times) + report["pilot_reference_capture_s"] + fit_seconds)
+                / (
+                    np.median(kept_times)
+                    + report["pilot_reference_capture_s"]
+                    + feature_seconds
+                    + fit_seconds
+                )
             )
         reports[name] = report
         _json(out / "conditional-errors.json", reports)
+    # A held-out timing ratio is not a whole-request ratio. Use the measured
+    # all-512 comparator, and include the analog pilot output/cost exactly once.
+    cheap = reports["frozen-cheap-heldout"]
+    all_primaries = reports["posthoc-spectral-reference"]["timings"]
+    all_line = float(
+        np.median(
+            [
+                r["wall_s_including_screen_selection_gather_upload_setup"]
+                for r in all_primaries
+                if r["arm"] == "all"
+            ]
+        )
+    )
+    candidate_line = (
+        float(
+            np.median(
+                [
+                    r["wall_s_including_screen_selection_gather_upload_setup"]
+                    for r in cheap["timings"]
+                    if r["arm"] == "retained"
+                ]
+            )
+        )
+        + cheap["pilot_reference_capture_s"]
+    )
+    candidate_line += feature_seconds + fit_seconds
+    common = state["transport_excluding_grid_and_capture_s"] + state["grid_resolution_s"]
+    common += float(np.median([p["spectrum_s"] - p["estimator_s"]["spec"] for p in phases]))
+    state["one_use_full_population_cost"] = dict(
+        constructed_from_separately_measured_stages=True,
+        directly_timed_whole_request=False,
+        analog_primaries=args.ne,
+        pilot_scored_analog=pilot,
+        analog_line_s=all_line,
+        candidate_line_s=candidate_line,
+        common_transport_grid_other_spectrum_s=common,
+        analog_request_s=common + all_line,
+        candidate_request_s=common + candidate_line,
+        request_ratio=(common + all_line) / (common + candidate_line),
+        backend=BACKEND.name,
+        dtype=np.dtype(REAL).name,
+        continuum_route=(
+            "portable fallback under global FP64"
+            if BACKEND.name == "cuda" and np.dtype(REAL) == np.dtype(np.float64)
+            else "configured production dispatch"
+        ),
+        artifact_capture_instrument_s_excluded=state["artifact_capture_s"],
+    )
     state.update(
         complete=True,
         production_phases=phases,
