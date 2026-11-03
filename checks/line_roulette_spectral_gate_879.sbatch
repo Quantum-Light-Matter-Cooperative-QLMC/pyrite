@@ -26,7 +26,11 @@ nvidia-smi
 # omits that dependency. Keep the project runner available in a fresh checkout.
 uv sync -q --locked --no-default-groups --extra nvidia --group dev
 uv run --no-sync pyrite-dev test tests/performance/test_line_roulette_gate_879.py -s --durations=0
+# First argument selects the output root; remaining arguments override gate
+# defaults (for example, --floor 0.75). Preserve each argument verbatim.
+output_root="${1:-scratch/roulette879/full-spectrum}"
+if (( $# )); then shift; fi
 uv run --no-sync python checks/line_roulette_spectral_gate_879.py \
-    --out "${1:-scratch/roulette879/full-spectrum}" \
+    --out "$output_root" \
     --ne 512 --pilot 128 --seed 0 --core per-electron \
-    --max-nodes 600000 --max-array-gib 3 --capture-minutes 40
+    --max-nodes 600000 --max-array-gib 3 --capture-minutes 40 "$@"
