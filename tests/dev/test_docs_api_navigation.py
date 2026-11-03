@@ -4,6 +4,8 @@ import re
 import tomllib
 from pathlib import Path
 
+import pytest
+
 DOCS = Path(__file__).resolve().parents[2] / "docs"
 REFERENCE = DOCS / "reference" / "python-api"
 
@@ -126,6 +128,7 @@ def test_api_reference_covers_every_governed_target():
     assert not missing, missing
 
 
+@pytest.mark.slow
 def test_generated_api_titles_preserve_canonical_links(tmp_path):
     """Build real stubs: short navigation must preserve old URLs and anchors."""
     import os
@@ -157,7 +160,15 @@ def test_generated_api_titles_preserve_canonical_links(tmp_path):
         ("public-alias.rst", ("pyrite.detectors.Timepix3Response",)),
         ("public-data.rst", ("pyrite.materials.CATALOG",)),
     )
-    blocks = ["API navigation\n==============\n"]
+    blocks = [
+        "API navigation\n==============\n",
+        "Canonical cross references: :py:class:`pyrite.Beam`, "
+        ":py:func:`pyrite.simulate`, "
+        ":py:func:`pyrite.detectors.timepix_response.get_response`, "
+        ":py:func:`pyrite.detectors.eaglexo_response.get_response`, "
+        ":py:class:`pyrite.detectors.Timepix3Response`, "
+        ":py:data:`pyrite.materials.CATALOG`.",
+    ]
     for template, names in groups:
         block = ".. autosummary::\n   :toctree: generated\n   :nosignatures:\n"
         if template:
@@ -178,6 +189,7 @@ def test_generated_api_titles_preserve_canonical_links(tmp_path):
         for name in names:
             path = f"generated/{name}.html"
             assert index.find("a", href=path), name
+            assert index.find("a", href=f"{path}#{name}"), name
             page = BeautifulSoup((output / path).read_text(), "html.parser")
             title = name.rsplit(".", 1)[-1]
             if title == "get_response":
