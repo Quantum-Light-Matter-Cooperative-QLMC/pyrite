@@ -98,6 +98,11 @@ def test_unreleased_element_without_checkout_requires_explicit_fallback(monkeypa
             bremslib_tables.resolve_bremsstrahlung_model("auto", ["Au"], allow_fallback=True)
             == "eedl"
         )
+    with pytest.warns(PhysicsFallbackWarning, match="entire run"):
+        assert (
+            bremslib_tables.resolve_bremsstrahlung_model("bremslib", ["Au"], allow_fallback=True)
+            == "eedl"
+        )
     assert bremslib_tables.resolve_bremsstrahlung_model("eedl", ["Au"]) == "eedl"
 
 

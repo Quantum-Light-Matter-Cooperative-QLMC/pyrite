@@ -475,7 +475,6 @@ _NORMAL_RUN_PARAMETER_FLAGS = {
     "verbose": "--verbose",
 }
 _LOCAL_ONLY_PARAMETER_FLAGS = {
-    "allow_physics_fallback": "--allow-physics-fallback",
     "n_families": "--n-families",
     "checkpoint_dir": "--checkpoint-dir",
     "max_minutes": "--max-minutes",
@@ -614,6 +613,7 @@ def _refuse_unstaged_gdf_beam(catalog_profile):
 
 
 _REMOTE_START_PARAMETER_NAMES = (
+    "allow_physics_fallback",
     "catalog_profile",
     "material",
     "quick",

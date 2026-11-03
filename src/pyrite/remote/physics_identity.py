@@ -17,6 +17,7 @@ def resolve_inventory(request: dict) -> dict:
     for material in request["materials"]:
         for detector_id in CATALOG.profile_detector_set(request["catalog_profile"]):
             args = Namespace(
+                allow_physics_fallback=request.get("allow_physics_fallback", False),
                 quick=request["quick"],
                 fidelity=request["fidelity"],
                 catalog_profile=request["catalog_profile"],
@@ -35,11 +36,20 @@ def resolve_inventory(request: dict) -> dict:
     return inventory
 
 
-def expected_inventory(materials, quick, fidelity, catalog_profile, high_energy_min_kev=None):
+def expected_inventory(
+    materials,
+    quick,
+    fidelity,
+    catalog_profile,
+    high_energy_min_kev=None,
+    *,
+    allow_physics_fallback=False,
+):
     """Data-only job input, reconstructed from the selected staged catalog."""
     from ._queue_scripts import _LEGACY_HIGH_ENERGY_MATERIALS
 
     request = {
+        "allow_physics_fallback": allow_physics_fallback,
         "materials": list(materials),
         "quick": bool(quick),
         "fidelity": fidelity,

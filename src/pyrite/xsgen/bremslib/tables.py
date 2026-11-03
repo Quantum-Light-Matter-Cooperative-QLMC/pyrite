@@ -132,9 +132,10 @@ def resolve_bremsstrahlung_model(
 
     ``auto`` requires every BremsLib table by default. Opting into fallback
     selects EEDL for the *whole* run, not just the missing elements. An
-    explicit ``eedl`` request never probes BremsLib and needs no opt-in.
+    explicit ``bremslib`` request also resolves to EEDL when fallback is enabled.
+    An explicit ``eedl`` request never probes BremsLib and needs no opt-in.
     """
-    if model != "auto":
+    if model != "auto" and not (model == "bremslib" and allow_fallback):
         return cast(Literal["eedl", "bremslib"], model)
     unique = tuple(dict.fromkeys(elements))
     try:

@@ -348,6 +348,7 @@ def _cli_start(
     trajectories=None,
     overwrite_trajectories=False,
     trajectory_storage=None,
+    allow_physics_fallback=False,
 ):
     materials, high_energy_min_kev = _start_selected(materials, catalog_profile)
     if nsys and len(materials) != 1:
@@ -373,6 +374,7 @@ def _cli_start(
         no_cache=no_cache,
         recompute=recompute,
         py_spy=py_spy,
+        allow_physics_fallback=allow_physics_fallback,
         **(
             {
                 "trajectories": trajectories,

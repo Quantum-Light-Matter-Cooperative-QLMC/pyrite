@@ -615,12 +615,12 @@ def _physics_fallback_identity(requested, resolved, elements):
     Segment energies and their affected fraction are not known during
     preflight, so they are reported as ``None`` rather than invented.
     """
-    if requested != "auto" or resolved != "eedl":
+    if requested not in ("auto", "bremslib") or resolved != "eedl":
         return {}
     return {
         "physics_fallbacks": [
             {
-                "model_requested": "auto (BremsLib)",
+                "model_requested": "auto (BremsLib)" if requested == "auto" else "bremslib",
                 "model_used": "eedl",
                 "elements": sorted(set(elements)),
                 "energy_span_keV": None,

@@ -5,6 +5,13 @@ The presence of this warning means the requested and executed physics differ;
 selecting EEDL or another model *explicitly* is not a fallback.
 """
 
+import os
+import warnings
+
 
 class PhysicsFallbackWarning(RuntimeWarning):
     """A requested physics model was replaced by a lower-fidelity surrogate."""
+
+
+if os.environ.get("PYRITE_STRICT_PHYSICS_FALLBACK") == "1":
+    warnings.filterwarnings("error", category=PhysicsFallbackWarning)

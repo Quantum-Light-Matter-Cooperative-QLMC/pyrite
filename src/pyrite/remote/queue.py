@@ -225,6 +225,7 @@ def start_queue(
     trajectories=None,
     overwrite_trajectories=False,
     trajectory_storage=None,
+    allow_physics_fallback=False,
     _return_submission=False,
 ):
     """Submit a material queue to SLURM. Returns its job id.
@@ -282,7 +283,12 @@ def start_queue(
     # Resolve local run admission before any SSH probe, sync, or reservation.
     physics_options = {
         "expected_physics": expected_inventory(
-            materials, quick, fidelity, catalog_profile, high_energy_min_kev
+            materials,
+            quick,
+            fidelity,
+            catalog_profile,
+            high_energy_min_kev,
+            allow_physics_fallback=allow_physics_fallback,
         )
     }
     if not dry_run and not cpu_only:
@@ -312,6 +318,7 @@ def start_queue(
             no_cache,
             recompute,
             **capture_options,
+            allow_physics_fallback=allow_physics_fallback,
             **physics_options,
         )
         time_limit = str(max(1, math.ceil(chunk_minutes * 3)))  # minutes: hard backstop
@@ -340,6 +347,7 @@ def start_queue(
             recompute,
             py_spy=py_spy,
             **capture_options,
+            allow_physics_fallback=allow_physics_fallback,
             **physics_options,
         )
         time_limit = config.SLURM_TIME

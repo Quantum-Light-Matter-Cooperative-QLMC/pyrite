@@ -13,6 +13,7 @@ from ..perf.py_spy import (
 )
 from ..validation._zhai import ZHAI_CACHE_SCHEMA, ZHAI_DETECTOR
 from . import config
+from ._table_preflight import _tables_preflight_block
 
 # Private compatibility classification for legacy queue records that stored a
 # high-energy floor instead of a catalog profile identity. New submissions use
@@ -182,25 +183,6 @@ def _validate_parallel_materials(parallel_materials):
     return parallel_materials
 
 
-def _tables_preflight_block() -> str:
-    """Bash that fails the job fast when pinned tables, datasets or sdbase are missing.
-
-    Runs ``pyrite tables verify`` (table manifest and payload digests; the EEDL, EADL and EPDL
-    files hashed in full; SBETHE's ``sdbase/``) once per chain, guarded like
-    the dependency sync by ``$JOBDIR/.tables_ok``, before any transport runs. A miss records
-    ``FAILED (tables)`` and exits 1; the verify output, which names the fix,
-    lands in the job log."""
-    verify = f"{config.remote_runtime_env()} {config.shell_remote_uv()} run --no-sync pyrite tables verify --require bremslib,elsepa,sbethe-tables,eedl,eadl,epdl,sbethe"
-    return f"""if [ ! -f "$JOBDIR/.tables_ok" ]; then
-  if {verify} >> "$JOBDIR/log" 2>&1; then
-    : > "$JOBDIR/.tables_ok"
-  else
-    echo "FAILED (tables) $(date -Is)" > "$JOBDIR/state"
-    exit 1
-  fi
-fi"""
-
-
 def _physics_preflight_block(expected) -> str:
     """Compare staged resolution on every allocation before checkpoint reuse."""
     if expected is None:
@@ -300,6 +282,13 @@ def _trajectory_flags(trajectories, overwrite_trajectories, trajectory_storage):
     return flags
 
 
+def _fallback_runtime(allow):
+    """Return CLI and environment policy for scan fallback handling."""
+    if allow:
+        return " --allow-physics-fallback", ""
+    return "", "\nexport PYRITE_STRICT_PHYSICS_FALLBACK=1"
+
+
 def _queue_script(
     jobid,
     materials,
@@ -324,6 +313,7 @@ def _queue_script(
     overwrite_trajectories=False,
     trajectory_storage=None,
     expected_physics=None,
+    allow_physics_fallback=False,
 ):
     """CXR payload for one bounded-concurrency queue in a SLURM allocation."""
     parallel_materials = _validate_parallel_materials(parallel_materials)
@@ -340,6 +330,8 @@ def _queue_script(
     if no_cache and recompute:
         raise ValueError("no_cache and recompute are mutually exclusive")
     flags = _trajectory_flags(trajectories, overwrite_trajectories, trajectory_storage)
+    fallback_flag, fallback_env = _fallback_runtime(allow_physics_fallback)
+    flags += fallback_flag
     if quick:
         flags += " --quick"
     if workers is not None:
@@ -373,6 +365,7 @@ def _queue_script(
         runtime_exports += f"\nexport PYRITE_MC_CXR_CHUNK={spec_chunk}"
     if brem_chunk is not None:
         runtime_exports += f"\nexport PYRITE_MC_BREM_CHUNK={brem_chunk}"
+    runtime_exports += fallback_env
     runtime_exports += _forwarded_env_exports()
     mats = " ".join(materials)  # safe: each token matched _SHELL_TOKEN_RE
     jobdir = config.remote_path(config.JOBS_SUBDIR, jobid)
@@ -388,7 +381,7 @@ cd {config.shell_remote_dir()} || exit 1
 mkdir -p "$JOBDIR/progress"
 echo "started: $(date -Is)" >> "$JOBDIR/meta"
 {_uv_sync_block(once=True)}
-{_tables_preflight_block()}
+{_tables_preflight_block(allow_physics_fallback)}
 {_physics_preflight_block(expected_physics)}
 mats=({mats})
 total=${{#mats[@]}}
@@ -693,6 +686,7 @@ def _chunked_queue_script(
     overwrite_trajectories=False,
     trajectory_storage=None,
     expected_physics=None,
+    allow_physics_fallback=False,
 ):
     """One SLURM slice of a self-resubmitting chain (spec: chunked remote jobs).
 
@@ -704,6 +698,8 @@ def _chunked_queue_script(
     the next slice is already pending (spec Component 2 step 4).
     """
     flags = _trajectory_flags(trajectories, overwrite_trajectories, trajectory_storage)
+    fallback_flag, fallback_env = _fallback_runtime(allow_physics_fallback)
+    flags += fallback_flag
     if quick:
         flags += " --quick"
     if workers is not None:
@@ -723,6 +719,7 @@ def _chunked_queue_script(
         runtime_exports += f"\nexport PYRITE_MC_CXR_CHUNK={spec_chunk}"
     if brem_chunk is not None:
         runtime_exports += f"\nexport PYRITE_MC_BREM_CHUNK={brem_chunk}"
+    runtime_exports += fallback_env
     runtime_exports += _forwarded_env_exports()
     mats = " ".join(materials)  # safe: each token matched _SHELL_TOKEN_RE
     jobdir = config.remote_path(config.JOBS_SUBDIR, jobid)
@@ -734,7 +731,7 @@ cd {config.shell_remote_dir()} || exit 1
 mkdir -p "$JOBDIR/progress"
 echo "started: $(date -Is)" >> "$JOBDIR/meta"
 {_uv_sync_block(once=True)}
-{_tables_preflight_block()}
+{_tables_preflight_block(allow_physics_fallback)}
 {_physics_preflight_block(expected_physics)}
 mats=({mats})
 total=${{#mats[@]}}

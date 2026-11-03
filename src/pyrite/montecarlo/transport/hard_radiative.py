@@ -683,6 +683,13 @@ def validate_radiative_args(
         )
         return False
     if radiative_model == "auto" and bremslib_tables is None:
+        warnings.warn(
+            "BremsLib tables are unavailable; using uncoupled radiative scoring. "
+            "Install tables with `pyrite tables fetch bremslib` or explicitly select "
+            "radiative_model='uncoupled'.",
+            PhysicsFallbackWarning,
+            stacklevel=2,
+        )
         return False
     if bremslib_tables is None:
         raise ValueError("bremslib-soft-hard requires bremslib_tables")
