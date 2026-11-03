@@ -108,6 +108,50 @@ def _(mo, tables_ready):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
+    ## Crystals and Reciprocal Lattice Vectors
+
+    In general, crystals are defined by planes of symmetry known as lattice planes.
+    Lattice planes are generally defined by [miller indices](https://en.wikipedia.org/wiki/Miller_index) $(hkl)$,
+    which describe their orientation in the unit cell. Taking the spatial Fourier Transform of the lattice leads
+    to the concept of a 'reciprocal lattice vector' $\mathbf{g}_{hkl}$, which is orthogonal in real space to its
+    associated $(hkl)$ lattice plane and has magnitude
+
+    $$
+    d = \frac{2 \pi}{|\mathbf{g}_{hkl}|}
+    $$
+
+    where $d$ is the spacing between two parallel $(hkl)$ lattice planes.
+
+    Parametric X-ray Radiation (PXR) and Coherent Bremsstrahlung (CBS) are both generated through
+    interactions which are fundamentally mediated by these reciprocal lattice vectors, as the lattice
+    vectors define the momentum exchange which can occur between electrons and atoms in the lattice.
+    For a given reciprocal lattice vector $\mathbf{g}_{hkl}$ and an incident electron with velocity $\mathbf{v}$,
+    at an emission (or "observation") angle $\hat{n}$, both PXR and CBS produce photon with energy
+
+    $$
+    E_p = \hbar \frac{\mathbf{v} \cdot \mathbf{g}_{hkl}}{1 - (\mathbf{v} \cdot \hat{n})/c}
+    $$
+
+    A lattice which can exchange momentum $\mathbf{g}_{hkl}$ is also capable of exchanging $n\mathbf{g}_{hkl}$,
+    meaning that photons can also be emitted at $nE_p$ for integer $n$
+
+
+    While all ideal lattices have an infinite number of reciprocal lattice vectors of varying orientations and strengths,
+    "2D" or layered materials exhibit strong periodicity and, hence, strong low-order Fourier components on the $C$-axis,
+    or 'Basal' axis (that which is normal to the layers/sheets) when compared to other lattice planes, meaning that these
+    materials emit much more strongly from the set of $\{00l\}$ planes, and preferentially the low order planes $(001)$,
+    $(002)$, etc.
+
+    This makes layered 2D materials like Graphite (Highly-Oriented Pyrolytic Graphite, or HOPG), hexagonal Boron Nitride (hBN),
+    and Transition Metal Dichalcogenides [die-chal-KAH-gen-ides] (TMDs) especially desirable for creating narrow-linewidth
+    soft-xray sources. This is why we choose HOPG as our material, and only simulate the lowest two reciprocal $\{00l\}$ vectors.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
     ## Plot the results
     """)
     return
