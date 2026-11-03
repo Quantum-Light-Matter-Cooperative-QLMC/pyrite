@@ -97,3 +97,62 @@ def test_tree_selector_picks_all_pairs_for_a_tight_cluster_and_tree_for_spread_l
     assert not tree_is_faster(cluster, a_wide, edges, 64.0)
     a_narrow = np.full(n, 64.0 * np.pi / 1.0e3, dtype=np.float32)
     assert tree_is_faster(spread, a_narrow, edges, 64.0)
+
+
+@pytest.mark.parametrize("predicted", [True, False])
+def test_auto_consults_near_count_model_below_old_gate(monkeypatch, predicted):
+    import sys
+    from types import SimpleNamespace
+
+    from pyrite.montecarlo.spectrum.cxr import _bin_quadrature as reducer
+    from pyrite.montecarlo.spectrum.cxr import _bin_tree
+
+    calls = []
+    monkeypatch.setitem(
+        sys.modules,
+        "cupy",
+        SimpleNamespace(
+            asnumpy=lambda a: a,
+            empty=lambda *a, **k: np.zeros(1),
+            float32=np.float32,
+            float64=np.float64,
+            ascontiguousarray=lambda a, **k: a,
+        ),
+    )
+    monkeypatch.setattr(
+        _bin_tree, "tree_is_faster", lambda *args: calls.append("model") or predicted
+    )
+    monkeypatch.setattr(
+        _bin_tree, "run_tree_reduction", lambda *a, out, **k: calls.append("tree") or out
+    )
+    monkeypatch.setattr(
+        reducer, "_bin_reduce_kernel", lambda: lambda *a, **k: calls.append("pairs")
+    )
+    reducer.run_bin_mean_reduction_kernel(
+        SimpleNamespace(size=20_000),
+        None,
+        None,
+        None,
+        SimpleNamespace(shape=(60_000,)),
+        out=np.zeros(1),
+    )
+    assert calls == ["model", "tree" if predicted else "pairs"]
+
+
+def test_bin_mean_reduction_generation_is_conditional_in_physics_identity():
+    from pyrite._physics_provenance import resolved_physics_view
+    from pyrite.montecarlo.spectrum.cxr._bin_quadrature import CXR_BIN_REDUCTION_MODEL
+
+    node = dict(resolved_physics_view({}, table_markers={}).model_markers)
+    bins = dict(
+        resolved_physics_view({"line_quadrature": "bin-mean"}, table_markers={}).model_markers
+    )
+    assert "line_reduction_model" not in node
+    policy_only = dict(
+        resolved_physics_view(
+            {"line_grid_policy": {"quadrature": "bin-mean"}}, table_markers={}
+        ).model_markers
+    )
+    assert policy_only == bins
+    assert bins.pop("line_reduction_model") == CXR_BIN_REDUCTION_MODEL
+    assert bins == node

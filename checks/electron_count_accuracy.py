@@ -1,8 +1,8 @@
 """Accuracy vs electron count for ``Ne`` (lines) and ``Ne_brem`` (#278 plan item 5).
 
-For one production case (catalog default grids: the automatic line grid and
-the 25 eV ``E_grid_brem``), run independently seeded replicas at each count
-in ``--counts`` plus one higher-count reference, each a full production
+For one production case (the automatic line grid and resolved continuum
+grid), run independently seeded replicas at each count
+in ``--counts`` plus higher-count references, each a full production
 transport and spectrum reduction (:class:`CaseLadder`). ``Ne == Ne_brem == N``
 per run; line observables come from the line spectrum only and continuum
 observables from the bremsstrahlung continuum only, so each depends on its own
@@ -12,11 +12,14 @@ Observables (per incident electron per sr):
 
 * ``Ne_brem``: intrinsic continuum yield and centroid, Timepix3/EagleXO
   detected continuum counts.
-* ``Ne``: line yield, Timepix3/EagleXO detected line counts.
+* ``Ne``: line yield and centroid, Timepix3/EagleXO detected line counts.
 
 The JSON is checkpointed after every run and resumes; ``--summarize`` prints
-per-count relative SE across replicas, bias against the reference, and the
-fitted exponent of RSE ~ N^p.
+per-count relative SE of a single N-electron run (replica sample standard
+deviation / mean), SE of the replica mean, difference against the reference,
+and the fitted exponent of RSE ~ N^p. Reference replicas estimate reference
+uncertainty; a single reference cannot establish systematic bias. Old rows
+missing line centroid are replaced on resume, using their original seeds.
 """
 
 import argparse
@@ -32,7 +35,7 @@ from pyrite.detectors.spec import EagleXO, Timepix3
 from pyrite.energy_grid import convergence_case as cc
 from pyrite.energy_grid.convergence import spectrum_observables
 
-LINE = ("yield", "timepix3_counts", "eaglexo_counts")
+LINE = ("yield", "centroid_eV", "timepix3_counts", "eaglexo_counts")
 #: Energies whose automatic line grid was refused once; later runs go explicit.
 REFUSED: set[float] = set()
 CONTINUUM = (
@@ -126,7 +129,10 @@ def one_run(args, energy_keV, n, seed):
 def plan(args):
     runs = []
     for energy in args.energy_kev:
-        runs.append((energy, args.reference_count, args.reference_seed))
+        runs += [
+            (energy, args.reference_count, args.reference_seed - r)
+            for r in range(args.reference_replicas)
+        ]
         for i, n in enumerate(args.counts):
             # Distinct seeds per (count, replica): no electron is shared between runs.
             runs += [(energy, n, args.seed0 + 1000 * i + r) for r in range(args.replicas)]
@@ -140,12 +146,28 @@ def summarize(state):
         ref = [r for r in runs if r["n"] == state["reference_count"]]
         if not ref:
             continue
-        ref = ref[0]["observables"]
         table = {}
         for name in LINE + CONTINUUM:
+            reference_values = np.array(
+                [r["observables"][name] for r in ref if name in r["observables"]]
+            )
+            if not reference_values.size:
+                continue  # Older checkpoints did not record line centroid.
+            reference_mean = float(reference_values.mean())
+            reference_se = (
+                float(reference_values.std(ddof=1) / np.sqrt(reference_values.size))
+                if reference_values.size > 1
+                else None
+            )
             rows = []
             for n in sorted({r["n"] for r in runs if r["n"] != state["reference_count"]}):
-                vals = np.array([r["observables"][name] for r in runs if r["n"] == n])
+                vals = np.array(
+                    [
+                        r["observables"][name]
+                        for r in runs
+                        if r["n"] == n and name in r["observables"]
+                    ]
+                )
                 if vals.size < 2:
                     continue
                 mean = float(vals.mean())
@@ -156,7 +178,15 @@ def summarize(state):
                         replicas=int(vals.size),
                         mean=mean,
                         relative_se=rse,
-                        bias_vs_reference=(mean - ref[name]) / ref[name] if ref[name] else None,
+                        relative_mean_se=rse / np.sqrt(vals.size),
+                        bias_vs_reference=(mean - reference_mean) / reference_mean
+                        if reference_mean
+                        else None,
+                        difference_se=(
+                            float(np.hypot(vals.std(ddof=1) / np.sqrt(vals.size), reference_se))
+                            if reference_se is not None
+                            else None
+                        ),
                     )
                 )
             good = [(r["n"], r["relative_se"]) for r in rows if r["relative_se"] > 0]
@@ -167,9 +197,19 @@ def summarize(state):
             )
             table[name] = dict(
                 population="Ne" if name in LINE else "Ne_brem",
-                reference=ref[name],
+                reference=reference_mean,
+                reference_replicas=int(reference_values.size),
+                reference_relative_se=reference_se / abs(reference_mean)
+                if reference_se is not None and reference_mean
+                else None,
                 rows=rows,
                 fitted_exponent=slope,
+                # Fixed -1/2 trend, fitted in log space; projections are diagnostics.
+                inverse_sqrt_coefficient=(
+                    float(np.exp(np.mean([np.log(rse * np.sqrt(n)) for n, rse in good])))
+                    if good
+                    else None
+                ),
             )
         out[f"{energy:g}keV"] = table
     return out
@@ -186,6 +226,7 @@ def main():
     parser.add_argument("--replicas", type=int, default=5)
     parser.add_argument("--seed0", type=int, default=1000)
     parser.add_argument("--reference-count", type=int, default=6400)
+    parser.add_argument("--reference-replicas", type=int, default=1)
     parser.add_argument("--reference-seed", type=int, default=999)
     parser.add_argument(
         "--line-points-fallback",
@@ -205,15 +246,35 @@ def main():
         else dict(reference_count=args.reference_count, runs=[])
     )
     if not args.summarize:
+        state["args"] = vars(args) | {"output": str(args.output)}
+        if state["reference_count"] != args.reference_count:
+            parser.error("checkpoint reference_count differs from --reference-count")
+        if args.reference_count <= max(args.counts):
+            parser.error("--reference-count must exceed all --counts")
+        if args.replicas < 2 or args.reference_replicas < 1:
+            parser.error("require at least two replicas and one reference replica")
+        planned = plan(args)
+        if len(planned) != len(set(planned)) or any(
+            len(seeds := [seed for e, _n, seed in planned if e == energy]) != len(set(seeds))
+            for energy in args.energy_kev
+        ):
+            parser.error("count/seed combinations overlap; choose disjoint reference seeds")
         start = time.perf_counter()
-        done = {(r["energy_keV"], r["n"], r["seed"]) for r in state["runs"]}
-        for key in plan(args):
+        done = {
+            (r["energy_keV"], r["n"], r["seed"])
+            for r in state["runs"]
+            if all(name in r["observables"] for name in LINE + CONTINUUM)
+        }
+        for key in planned:
             if key in done:
                 continue
             if time.perf_counter() - start > 3600 * args.max_hours:
                 print("out of time", flush=True)
                 break
             run = one_run(args, *key)
+            state["runs"] = [
+                r for r in state["runs"] if (r["energy_keV"], r["n"], r["seed"]) != key
+            ]
             state["runs"].append(run)
             args.output.write_text(json.dumps(state, indent=1) + "\n")
             print(

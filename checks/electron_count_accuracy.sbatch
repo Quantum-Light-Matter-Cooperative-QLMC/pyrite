@@ -1,7 +1,8 @@
 #!/bin/bash
 # #278 plan item 5: accuracy vs electron count, Ne (lines) and Ne_brem
 # (continuum), on the production default grids. HOPG 1 mm at 45/180 deg,
-# 300 keV and 29,999 keV; 5 replicas at 100/400/1600 and one 6400 reference.
+# 300 keV and 29,999 keV; 5 replicas at 100/400/1600, plus three
+# independently seeded 3200-electron references.
 # Resumable: resubmit to continue from the checkpoint JSON.
 #SBATCH --job-name=eca278
 #SBATCH --partition=gpu
@@ -21,4 +22,5 @@ uv sync --extra nvidia --locked -q
 cp .pyrite-sync "evidence/eca278/sync-$SLURM_JOB_ID.json"
 uv run --no-sync python -W ignore checks/electron_count_accuracy.py \
     --energy-kev 300 --energy-kev 29999 --max-hours 7.5 \
-    --output evidence/eca278/hopg.json > "evidence/eca278/hopg-$SLURM_JOB_ID.log" 2>&1
+    --reference-count 3200 --reference-replicas 3 \
+    --output evidence/eca278/hopg-replicated.json > "evidence/eca278/hopg-$SLURM_JOB_ID.log" 2>&1

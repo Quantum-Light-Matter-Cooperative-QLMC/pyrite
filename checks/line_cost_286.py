@@ -16,6 +16,7 @@ Measurement only: production code is wrapped, never changed.
 import argparse
 import json
 import time
+import uuid
 from pathlib import Path
 
 import numpy as np
@@ -37,11 +38,13 @@ def explicit_line_grid(case, points):
 class Recorder:
     """Wraps the reducer entry points; one record per flush."""
 
-    def __init__(self):
+    def __init__(self, *, compare_routes=False, capture_root=None):
         import cupy
 
         self.cupy = cupy
         self.flushes = []
+        self.compare_routes = compare_routes
+        self.capture_root = capture_root
         self._current = None
         self._orig_reduce = _batched.run_bin_mean_reduction_kernel
         self._orig_build = _bin_tree.build_cxr_tree
@@ -49,6 +52,14 @@ class Recorder:
         _batched.run_bin_mean_reduction_kernel = self.reduce
         _bin_tree.build_cxr_tree = self.build
         _bin_tree.run_tree_reduction = self.tree
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        _batched.run_bin_mean_reduction_kernel = self._orig_reduce
+        _bin_tree.build_cxr_tree = self._orig_build
+        _bin_tree.run_tree_reduction = self._orig_tree
 
     def reduce(self, E_r, aw, w, edges, inv_width, **kw):
         sync = self.cupy.cuda.Device().synchronize
@@ -61,7 +72,70 @@ class Recorder:
         rec["wall_s"] = time.perf_counter() - t0
         self.flushes.append(rec)
         self._current = None
+        if self.compare_routes:
+            replay_started = time.perf_counter()
+            rec["forced_routes"] = self.replay_routes(E_r, aw, w, edges, inv_width, **kw)
+            rec["replay_wall_s"] = time.perf_counter() - replay_started
         return out
+
+    def replay_routes(self, *args, **kw):
+        """Compare independent zeroed outputs; never mutate the live accumulator."""
+        results, timings = {}, {}
+        sync = self.cupy.cuda.Device().synchronize
+        for method in ("pairs", "tree"):
+            target = self.cupy.zeros_like(kw["out"])
+            options = {**kw, "out": target, "method": method}
+            sync()
+            started = time.perf_counter()
+            self._orig_reduce(*args, **options)
+            sync()
+            timings[method] = time.perf_counter() - started
+            results[method] = self.cupy.asnumpy(target)
+        peak = float(np.max(np.abs(results["pairs"]), initial=0.0))
+        error = float(np.max(np.abs(results["pairs"] - results["tree"]), initial=0.0))
+        metadata = {}
+        if self.capture_root is not None:
+            root = Path(self.capture_root)
+            root.mkdir(parents=True, exist_ok=True)
+            arrays = [self.cupy.asnumpy(a) for a in args]
+            artifact = root / f"flush-{uuid.uuid4().hex}.npz"
+            np.savez_compressed(
+                artifact,
+                E_r=arrays[0],
+                aw=arrays[1],
+                w=arrays[2],
+                edges=arrays[3],
+                inv_width=arrays[4],
+                out_dtype=str(kw["out"].dtype),
+                exact_widths=kw.get("exact_widths", _bin_quadrature.BIN_MEAN_EXACT_WIDTHS),
+            )
+            counts = _bin_tree.near_line_counts(
+                arrays[0],
+                arrays[1],
+                arrays[3],
+                kw.get("exact_widths", _bin_quadrature.BIN_MEAN_EXACT_WIDTHS),
+            )
+            started = time.perf_counter()
+            predicted = _bin_tree.tree_is_faster(
+                arrays[0],
+                arrays[1],
+                arrays[3],
+                kw.get("exact_widths", _bin_quadrature.BIN_MEAN_EXACT_WIDTHS),
+            )
+            metadata = {
+                "input_artifact": str(artifact),
+                "cost_model_tree": bool(predicted),
+                "cost_model_s": time.perf_counter() - started,
+                "near_pairs": int(counts.sum()),
+                "busiest_bin_lines": int(counts.max(initial=0)),
+            }
+        return {
+            **metadata,
+            "wall_s": timings,
+            "pairs_peak": peak,
+            "max_abs_error": error,
+            "max_error_over_peak": error / peak if peak else (0.0 if error == 0 else None),
+        }
 
     def tree(self, *a, **kw):
         if self._current is not None:
@@ -92,6 +166,7 @@ class Recorder:
 
 def summarize(flushes, lines_s):
     reduce_s = sum(f["wall_s"] for f in flushes)
+    replay_s = sum(f.get("replay_wall_s", 0.0) for f in flushes)
     by_path = {}
     for f in flushes:
         p = by_path.setdefault(f["path"], {"flushes": 0, "lines": 0, "wall_s": 0.0, "build_s": 0.0})
@@ -102,7 +177,8 @@ def summarize(flushes, lines_s):
     return {
         "lines_s": lines_s,
         "reduce_s": reduce_s,
-        "outside_reduce_s": lines_s - reduce_s,
+        "route_replay_s": replay_s,
+        "outside_reduce_s": lines_s - reduce_s - replay_s,
         "total_lines": sum(f["lines"] for f in flushes),
         "by_path": by_path,
     }

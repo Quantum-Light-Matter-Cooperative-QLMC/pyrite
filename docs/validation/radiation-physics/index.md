@@ -64,6 +64,7 @@ external-brem-subtraction
 finite-footprint-longitudinal-decoherence
 finite-time-lineshape
 line-absorption-tabulation
+line-tabulation-root-support
 kinematic-validity-envelope
 line-energy-dispersion
 line-recoil-formation

@@ -426,6 +426,24 @@ def _cxr_table_nan_ceiling(crystal_info, composition, use_henke):
     return max(_cxr_table_nan_onsets(crystal_info, composition, use_henke))
 
 
+def _cxr_setup_ceiling(crystal_info, composition, use_henke):
+    """Bound shared setup by the root's finite refraction support, in eV.
+
+    With anomalous refraction, every fixed-point iterate at or beyond the
+    basis Chantler endpoint reads NaN delta and is rejected. Retain the mesh
+    prefix through its first NaN node, preserving the root recurrence. A
+    final iterate may cross the endpoint without another delta read; its
+    anomalous coupling is NaN on either mesh. Static coupling/attenuation
+    suffixes need not agree. Without
+    anomalous refraction delta stays finite, so retain the all-table bound.
+    Limiting case: use_henke=False keeps the original mesh unchanged.
+
+    Validation: line-tabulation-nan-ceiling
+    """
+    onsets = _cxr_table_nan_onsets(crystal_info, composition, use_henke)
+    return min(max(onsets), onsets[1]) if use_henke else max(onsets)
+
+
 def _cxr_emission_ceiling(crystal_info, composition, use_henke=True):
     """Energy at and above which no line can emit, in eV.
 

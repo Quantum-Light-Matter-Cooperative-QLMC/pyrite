@@ -174,3 +174,80 @@ def test_nan_ceiling_is_inactive_without_anomalous_refraction():
     """Validation: line-tabulation-nan-ceiling"""
     info = CRYSTALS["hopg"]
     assert _cxr_table_nan_ceiling(info, _composition("hopg"), False) == np.inf
+
+
+@pytest.mark.parametrize("use_henke", [False, True])
+@pytest.mark.parametrize("above", [False, True])
+@pytest.mark.parametrize("gradient", [None, 1.0, -2.0])
+@pytest.mark.parametrize("composition", [[("C", 0.1)], [("Si", 0.05)]])
+def test_setup_bound_preserves_root_support_and_native_mesh_prefix(
+    use_henke, composition, above, gradient
+):
+    """Validation: line-tabulation-nan-ceiling"""
+    from pyrite.materials.atomic import _chantler_bounds
+    from pyrite.materials.crystal import HBARC_EV_ANG
+    from pyrite.montecarlo.spectrum.cxr._kernels import (
+        _cxr_setup_ceiling,
+        _in_medium_kinematics,
+    )
+
+    info = CRYSTALS["hopg"]
+    lo, hi = (970_000.125 if above else 950_000.125), 980_000.125
+    bound = _cxr_setup_ceiling(info, composition, use_henke)
+    expected = _chantler_bounds("C")[1] if use_henke else np.inf
+    assert bound == expected
+    original = _cxr_tabulation_grid(info, composition, lo, hi)
+    limited = _cxr_tabulation_grid(info, composition, lo, min(hi, max(bound, lo + 1)))
+    np.testing.assert_array_equal(
+        original[original <= min(bound, hi)], limited[limited <= min(bound, hi)]
+    )
+    query = np.r_[
+        np.linspace(lo, hi, 300),
+        _chantler_bounds("C")[1] + np.array([-2.0, -1.0, -0.01, 0.0, 0.01, 1.0, 2.0]),
+    ]
+    denom = np.full(query.size, 0.25)
+    v_dot_g = query * denom / HBARC_EV_ANG
+    outputs = []
+    for grid in [original, limited]:
+        delta = 1 - np.asarray(refractive_index("hopg", grid, use_henke).real)
+        outputs.append(
+            _in_medium_kinematics(
+                denom,
+                v_dot_g,
+                delta,
+                grid,
+                v_dot_grad=None if gradient is None else np.full(query.size, gradient),
+                grad2=None if gradient is None else np.full(query.size, gradient**2),
+            )
+        )
+    for old, new in zip(*outputs, strict=True):
+        np.testing.assert_array_equal(old, new)
+    if use_henke:
+        assert len(limited) < len(original)
+        assert np.isnan(outputs[1][0][query >= bound]).all()
+    else:
+        np.testing.assert_array_equal(original, limited)
+
+
+def test_last_root_update_can_cross_support_without_changing_on_shortened_mesh():
+    """Validation: line-tabulation-nan-ceiling
+
+    The third update is not followed by another delta read. Preserve this
+    root recurrence; do not replace support bounding with a new root mask.
+    """
+    from pyrite.materials.crystal import HBARC_EV_ANG
+    from pyrite.montecarlo.spectrum.cxr._kernels import _in_medium_kinematics
+
+    ceiling = 966300.0
+    grid = ceiling + np.arange(-6.0, 4.0)
+    numerator = 0.25 * (ceiling - 5.0)
+    delta = 0.25 - numerator / (grid + 1.0)
+    delta[3] = 0.25 - numerator / (grid[3] + 3.1)
+    delta[6:] = np.nan
+    args = (np.array([0.25]), np.array([numerator / HBARC_EV_ANG]))
+    full = _in_medium_kinematics(*args, delta, grid, v_dot_grad=np.ones(1))
+    short = _in_medium_kinematics(*args, delta[:7], grid[:7], v_dot_grad=np.ones(1))
+    np.testing.assert_array_equal(full[0], short[0])
+    np.testing.assert_array_equal(full[1], short[1])
+    assert np.isfinite(short[0]).all()
+    assert (numerator / short[0] > ceiling).all()
