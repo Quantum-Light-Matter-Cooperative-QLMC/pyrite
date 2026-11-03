@@ -100,9 +100,7 @@ def _sum_positive(label: str, values: np.ndarray) -> float:
     return result
 
 
-def _probe_upper(
-    probe: AxialPhotonPairedProbe, reference: np.ndarray, label: str
-) -> float:
+def _probe_upper(probe: AxialPhotonPairedProbe, reference: np.ndarray, label: str) -> float:
     if not isinstance(probe, AxialPhotonPairedProbe):
         raise TypeError(f"{label} requires an AxialPhotonPairedProbe")
     candidate = _bins(f"{label}.candidate_yield_bins", probe.candidate_yield_bins, reference.size)
@@ -137,11 +135,13 @@ def source_interval_bounds(
         raise ValueError("first source interval must start at positive depth")
     reference = _bins("reference_yield_bins", measurement.reference_yield_bins)
     ref_stat = _bins(
-        "reference_stat_error_upper_bins", measurement.reference_stat_error_upper_bins,
+        "reference_stat_error_upper_bins",
+        measurement.reference_stat_error_upper_bins,
         reference.size,
     )
     ref_drift = _bins(
-        "reference_depth_drift_upper_bins", measurement.reference_depth_drift_upper_bins,
+        "reference_depth_drift_upper_bins",
+        measurement.reference_depth_drift_upper_bins,
         reference.size,
     )
     lower = _sum_positive("reference", reference) - _sum_positive(

@@ -41,11 +41,11 @@ def measurement(start=100.0, stop=200.0, **changes):
         reference_yield_bins=REFERENCE,
         reference_stat_error_upper_bins=(0.01, 0.0),
         reference_depth_drift_upper_bins=(0.01, 0.0),
-        return_flux=probe("return", (.001, -.001), (.0001, 0), (.0001, 0)),
-        unresolved=probe("unresolved", (.001, 0)),
-        matching_surface=probe("matching", (.0005, 0)),
-        grid_supercell=probe("grid", (.0007, 0)),
-        source_model=probe("source", (.0008, 0)),
+        return_flux=probe("return", (0.001, -0.001), (0.0001, 0), (0.0001, 0)),
+        unresolved=probe("unresolved", (0.001, 0)),
+        matching_surface=probe("matching", (0.0005, 0)),
+        grid_supercell=probe("grid", (0.0007, 0)),
+        source_model=probe("source", (0.0008, 0)),
         evidence_id=f"interval-{start:g}-{stop:g}",
         simultaneous_confidence=0.99,
     )
@@ -79,38 +79,38 @@ def test_compiles_absolute_source_errors_without_spectral_cancellation():
     assert bound.reference_lower == pytest.approx(1.48)
     # The first paired probe changes +.001 in bin A and -.001 in bin B.
     # Its *signed* integral is zero, but its conservative L1 error is .0022.
-    assert bound.return_upper == pytest.approx(.0022)
-    assert bound.unresolved_upper == pytest.approx(.001)
-    assert bound.grid_supercell_upper == pytest.approx(.0012)  # includes matching
-    assert bound.source_model_upper == pytest.approx(.0008)
-    assert bound.absolute_error_upper == pytest.approx(.0052)
-    assert bound.relative_error_upper == pytest.approx(.0052 / 1.48)
+    assert bound.return_upper == pytest.approx(0.0022)
+    assert bound.unresolved_upper == pytest.approx(0.001)
+    assert bound.grid_supercell_upper == pytest.approx(0.0012)  # includes matching
+    assert bound.source_model_upper == pytest.approx(0.0008)
+    assert bound.absolute_error_upper == pytest.approx(0.0052)
+    assert bound.relative_error_upper == pytest.approx(0.0052 / 1.48)
     assert len(bound.evidence_ids) == 6
     assert require(compile_rows(measurement())) == bound
 
 
 def test_reference_lower_not_central_estimate_or_population_probability():
     row = measurement(
-        reference_yield_bins=(.01, .001),
-        reference_stat_error_upper_bins=(.001, .0001),
-        reference_depth_drift_upper_bins=(.001, .0001),
+        reference_yield_bins=(0.01, 0.001),
+        reference_stat_error_upper_bins=(0.001, 0.0001),
+        reference_depth_drift_upper_bins=(0.001, 0.0001),
     )
     # Paired probes must share the new reference. Otherwise a spurious large
     # difference correctly fails the strict 1% source guard.
     ev = compile_rows(row)
-    assert ev.intervals[0].reference_lower == pytest.approx(.0088)
+    assert ev.intervals[0].reference_lower == pytest.approx(0.0088)
     with pytest.raises(ValueError, match="photon-source error"):
         require(ev)
-    assert ev.intervals[0].relative_error_upper > .01
+    assert ev.intervals[0].relative_error_upper > 0.01
 
 
 def test_uses_union_bound_for_confidence_across_intervals():
     ev = compile_rows(measurement(), measurement(200.0, 300.0))
-    assert ev.simultaneous_confidence == pytest.approx(.98)
+    assert ev.simultaneous_confidence == pytest.approx(0.98)
     assert require(ev, 200.0) is ev.intervals[0]
     assert require(ev, 200.01) is ev.intervals[1]
     with pytest.raises(ValueError, match="joint confidence"):
-        require(ev, min_confidence=.985)
+        require(ev, min_confidence=0.985)
     with pytest.raises(ValueError, match="outside certified"):
         require(ev, 350.0)
     with pytest.raises(ValueError, match="outside certified"):
@@ -120,7 +120,7 @@ def test_uses_union_bound_for_confidence_across_intervals():
 
 
 def test_gaps_and_independent_overbudget_intervals_remain_fail_closed():
-    weak = measurement(300, 400, source_model=probe("source", (.1, 0)))
+    weak = measurement(300, 400, source_model=probe("source", (0.1, 0)))
     ev = compile_rows(measurement(), weak)
     assert require(ev, 150) is ev.intervals[0]
     with pytest.raises(ValueError, match="outside certified"):
@@ -145,11 +145,11 @@ def test_rejects_invalid_inputs_and_zero_reference_lower():
     with pytest.raises(ValueError, match="numeric"):
         source_interval_bounds(measurement(reference_yield_bins=(1 + 2j, 0)))
     with pytest.raises(ValueError, match="nonfinite"):
-        source_interval_bounds(measurement(reference_yield_bins=(np.nan, .1)))
+        source_interval_bounds(measurement(reference_yield_bins=(np.nan, 0.1)))
     with pytest.raises(ValueError, match="shape mismatch"):
         source_interval_bounds(measurement(unresolved=probe("unresolved", stat=(0, 0, 0))))
     with pytest.raises(ValueError, match="nonnegative"):
-        source_interval_bounds(measurement(return_flux=probe("return", drift=(-.1, 0))))
+        source_interval_bounds(measurement(return_flux=probe("return", drift=(-0.1, 0))))
     with pytest.raises(ValueError, match="evidence IDs must be distinct"):
         source_interval_bounds(
             measurement(source_model=replace(probe("source"), evidence_id="paired-return"))
@@ -160,8 +160,8 @@ def test_rejects_invalid_inputs_and_zero_reference_lower():
         compile_rows(measurement(simultaneous_confidence=1.0))
     with pytest.raises(ValueError, match="joint confidence"):
         compile_rows(
-            measurement(simultaneous_confidence=.1),
-            measurement(200, 300, simultaneous_confidence=.1),
+            measurement(simultaneous_confidence=0.1),
+            measurement(200, 300, simultaneous_confidence=0.1),
         )
 
 
