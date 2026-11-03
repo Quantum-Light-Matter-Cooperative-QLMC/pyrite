@@ -231,7 +231,7 @@ class Precision:
                 raise ValueError(f"adaptive precision does not support {key}; use fixed counts")
 
 
-_BREM_BAND_REDUCTION_MODEL = "cuda-fused-fp64-band-v1"
+_BREM_BAND_REDUCTION_MODEL = "cuda-fused-fp32-row-fp64-primary-band-v2"
 
 
 def _brem_band_reduction_markers(policy, model) -> dict[str, str]:

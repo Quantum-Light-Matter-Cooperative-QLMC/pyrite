@@ -600,37 +600,37 @@ def test_standard_detector_keeps_current_payload_and_digest_bit_for_bit():
         (
             "hopg_hbn_gaussian_200fs",
             "hopg",
-            "f5f998eac9f40ada708cf70c943bb86e1ccd88892c7b1c4665abf5feb804c64e",
+            "8b202081c42963835cd2615e3fbee1dc86c3f2c766d2fdfcb8aedcdd295e0a61",
         ),
         (
             "hopg_hbn_gaussian_200fs",
             "hbn",
-            "0890e5d8f7250b340803aa402ec146076153de6c1bcdfd43765173f70bdb26ba",
+            "b72ba65d16ddae213120752a7923a612da1cd07c0e20085a97f81b155c8abdad",
         ),
         (
             "hopg_hbn_microtrain_200fs",
             "hopg",
-            "ae73bb11c491dff00cdaa2dab44454660af3567fd80e60b2528036cff04ee654",
+            "3b0352f96b075184a52b864900a347eb5602a580ea14208057215af5fe231b6f",
         ),
         (
             "hopg_hbn_microtrain_200fs",
             "hbn",
-            "eeb246174347d1f77e23bde127d7c4b221ad8db7d01ed4cbdb737e2c3f15b010",
+            "8f7fdce1a193cd16e17396cfb6725caefa2ebfe9a6c74ba4a1b18595101f2b40",
         ),
         (
             "hopg_hbn_compressed_microbunch",
             "hopg",
-            "0ddc53e008a1d81d7566755d26362f384d7f2d0a07ca6ff2ca65ed025468512a",
+            "6ac6ec34b2e50af026576c3fed4d7b77754634a494652ca9aa41fbadea62e729",
         ),
         (
             "hopg_hbn_compressed_microbunch",
             "hbn",
-            "5b644952d3763bc5da07ba07167f7c5787c4c8d051c10942acb7da2a8889912d",
+            "0a1a1e225f9eea154c9ad1d72ee3155ebe26593b06ba9f57e0b0676553346115",
         ),
         (
             "hopg_emittance_demo",
             "hopg",
-            "753fdfaa1947d88e9032a0a98c3ed6c06629b40c52073e5958132c644d09ba04",
+            "57b2679c5cba0b40233cb5eef93e580f942bdffe60d43d1a59708ae3057afa86",
         ),
         (
             "promising_low_ne",

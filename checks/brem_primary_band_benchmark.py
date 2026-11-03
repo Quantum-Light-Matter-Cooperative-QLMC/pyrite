@@ -177,6 +177,12 @@ def replay(args):
         gpu=str(cp.cuda.runtime.getDeviceProperties(0)["name"]),
         cuda_runtime=cp.cuda.runtime.runtimeGetVersion(),
         repeats=args.repeats,
+        precision_arms={
+            "baseline": "portable scoring",
+            "candidate": "FP64 photon partials / FP64 primary sums (reference control)",
+            "row32": "FP32 photon partials / FP64 primary sums (production)",
+            "primary32": "FP32 photon partials / FP32 primary sums (diagnostic)",
+        },
         protocol="one warmup each, alternating arm order; synchronized wall and CUDA events",
         table_pins=segments["radiative"],
         workloads=[],

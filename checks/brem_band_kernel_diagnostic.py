@@ -27,12 +27,35 @@ def main():
     import cupy as cp
 
     from pyrite._backend import _GPU, REAL
+    from pyrite.montecarlo.spectrum import brem, brem_events
     from pyrite.montecarlo.spectrum import brem_band_jit as kernels
 
     assert _GPU and REAL == np.float32
     original_factory = kernels._band_kernel
     original_group = kernels._group_rows
+    original_score = brem_events.mc_coupled_brem_spectrum
     pending, panels, compiled = [], {}, {}
+    score_calls = []
+
+    def score(*positional, **keywords):
+        arm = (
+            "baseline"
+            if not brem._USE_JIT_BREM_REDUCTION
+            else (
+                "fp64"
+                if kernels.ROW_ACCUMULATION_DTYPE == np.float64
+                else ("hybrid" if brem._BAND_PRIMARY_DTYPE == np.float64 else "fp32")
+            )
+        )
+        phase = "cold" if len(score_calls) < 12 else "warm"
+        label = f"score-{phase}-{arm}"
+        cp.cuda.nvtx.RangePush(label)
+        start = time.perf_counter()
+        try:
+            return original_score(*positional, **keywords)
+        finally:
+            score_calls.append(dict(label=label, wall_s=time.perf_counter() - start))
+            cp.cuda.nvtx.RangePop()
 
     class TimedKernel:
         def __init__(self, kernel, kind, dtype):
@@ -64,6 +87,7 @@ def main():
 
     kernels._band_kernel = factory
     kernels._group_rows = group
+    brem_events.mc_coupled_brem_spectrum = score
     replay_start = time.perf_counter()
     try:
         benchmark.replay(
@@ -78,6 +102,7 @@ def main():
     finally:
         kernels._band_kernel = original_factory
         kernels._group_rows = original_group
+        brem_events.mc_coupled_brem_spectrum = original_score
     cp.cuda.get_current_stream().synchronize()
     natural = [
         dict(kind=kind, device_ms=cp.cuda.get_elapsed_time(start, stop))
@@ -114,6 +139,7 @@ def main():
         cupy=cp.__version__,
         replay_wall_s=time.perf_counter() - replay_start,
         natural_launches=natural,
+        score_calls=score_calls,
         raw_panels=raw,
         sources=sources,
         limitations="natural launch events include launch starvation; raw panels exclude staging; "

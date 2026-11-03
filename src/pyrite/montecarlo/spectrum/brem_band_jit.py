@@ -1,7 +1,7 @@
 """CUDA per-primary band scoring, without segment × photon matrices.
 
-Cell physics remains the existing FP32 scalar. Quadrature and row/primary
-accumulation use FP64; reduction order differs from the portable FP32 GEMV.
+Cell physics and per-row photon quadrature use FP32; original-ID primary
+accumulation uses FP64. Reduction order differs from the portable FP32 GEMV.
 Memory is linear in escaped rows plus staged EEDL panels and layer paths.
 """
 
@@ -19,7 +19,7 @@ from .brem_jit_kernel import (
     _transmission_scalar,
 )
 
-ROW_ACCUMULATION_DTYPE = np.float64
+ROW_ACCUMULATION_DTYPE = np.float32
 _ACCUM_REAL = np.float64
 
 
@@ -51,7 +51,7 @@ def _bremslib_band_template(
     n_energies,
     n_layers,
 ):
-    """One block per escaped row; FP64 photon quadrature and shared reduction.
+    """One block per escaped row; configurable photon/shared reduction dtype.
 
     Validation: bremslib-angular-model
     """
@@ -130,9 +130,10 @@ def _group_rows(row_sum, row_electron, out, n_rows):
 def run_bremslib_band_kernel(arguments, band_weights, row_electron, out, n_threads):
     """Reduce rows to original primary IDs, including histories with no rows.
 
-    ``arguments`` has the spectrum kernel's array/scalar layout. Production photon-quadrature partials
-    and original-ID primary atomics are FP64. Private benchmark overrides
-    select FP32 scoring buffers; trajectory fields and CXR never change.
+    ``arguments`` has the spectrum kernel's array/scalar layout. Production
+    photon quadrature is FP32 and original-ID primary atomics are FP64.
+    Private benchmark overrides select other scoring buffers; trajectory
+    fields and CXR never change.
     """
     n_rows = int(row_electron.size)
     row_sum = xp.empty(n_rows, dtype=ROW_ACCUMULATION_DTYPE)

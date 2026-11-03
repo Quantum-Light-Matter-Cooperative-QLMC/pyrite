@@ -914,7 +914,7 @@ def mc_brem_spectrum(
         given, the call instead returns each of the ``Ne`` electrons' own
         in-band integral ``sum_E q_E dN_e/dE dOmega`` (photons per sr), whose
         mean over electrons is the band integral of the returned density. It
-        uses a fused CUDA FP32-cell/FP64-reduction path for staged BremsLib
+        uses fused CUDA FP32 cells/photon partials and FP64 primary sums for staged BremsLib
         elements. Other backends/models retain the chunked path. Reduction
         order differs at floating-point rounding level.
     photon_block

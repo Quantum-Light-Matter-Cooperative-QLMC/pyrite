@@ -181,7 +181,7 @@ The continuum needs no coherent flight grouping. Its contribution is linear in s
 ## Per-primary band reduction
 
 On CUDA with the FP32 array backend, the per-primary band scorer fuses the
-existing FP32 cross-section and attenuation cells with FP64 photon quadrature
+existing FP32 cross-section and attenuation cells with FP32 photon quadrature
 partials and FP64 accumulation into original primary IDs. A partial belongs to
 one transport segment; this precision choice does not narrow stored trajectory
 positions, times or phases, or change coherent/incoherent CXR arithmetic. Empty
@@ -194,8 +194,11 @@ is within rounding tolerance rather than bitwise. Such changes can move an
 adaptive stopping decision at a threshold. Adaptive BremsLib policies that
 monitor bremsstrahlung therefore carry `brem_band_reduction_model` in dataset
 identity, case content keys and resolved provenance; fixed counts, CXR-only
-policies and other continuum models omit it. Benchmark-only FP32 accumulator
-variants do not change production defaults or the source-table model identity.
+policies and other continuum models omit it. The current generation is
+`cuda-fused-fp32-row-fp64-primary-band-v2`. FP32 row partials cover only the
+photon quadrature for one segment; FP64 primary sums avoid accumulating
+roundoff over long histories. Benchmark controls also compare FP64 photon
+partials and FP32 primary sums without changing the source-table model identity.
 
 ## External backgrounds
 

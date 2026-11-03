@@ -25,6 +25,10 @@ def test_requested_backend_precision():
     if requested == "cuda":
         expected = np.float64 if os.environ.get("PYRITE_FP64") == "1" else np.float32
         assert np.dtype(REAL) == np.dtype(expected)
+        from pyrite.montecarlo.spectrum import brem_band_jit
+
+        assert brem_band_jit.ROW_ACCUMULATION_DTYPE == np.float32
+        assert brem._BAND_PRIMARY_DTYPE == np.float64
     print(f"band-test backend={BACKEND.name} REAL={np.dtype(REAL)}")
 
 
