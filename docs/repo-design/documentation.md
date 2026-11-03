@@ -165,6 +165,12 @@ Alias pages link to their documented class; data exports use `autodata` without
 expanded values. Do not add private helpers to the public API inventory solely
 to obtain links.
 
+Generated object pages use concise titles in navigation and display the full
+canonical import in their content. Qualify repeated names with readable context
+(for example, `get_response (Timepix)`). Keep the fully qualified
+generated filenames, former heading anchors, and Python-domain targets stable;
+the domain landing pages remain the primary API reference navigation.
+
 ### Current and historical source references
 
 Use the checked `source` role for repository files and private Python owners:

@@ -4,6 +4,8 @@ import re
 import tomllib
 from pathlib import Path
 
+import pytest
+
 DOCS = Path(__file__).resolve().parents[2] / "docs"
 REFERENCE = DOCS / "reference" / "python-api"
 
@@ -124,3 +126,76 @@ def test_api_reference_covers_every_governed_target():
     covered = {exports[name]["target"] for name in documented}
     missing = {name: row["target"] for name, row in exports.items() if row["target"] not in covered}
     assert not missing, missing
+
+
+@pytest.mark.slow
+def test_generated_api_titles_preserve_canonical_links(tmp_path):
+    """Build real stubs: short navigation must preserve old URLs and anchors."""
+    import os
+    import subprocess
+    import sys
+
+    from bs4 import BeautifulSoup
+
+    source = tmp_path / "docs"
+    source.mkdir()
+    (source / "conf.py").write_text(
+        "extensions = ['sphinx.ext.autodoc', 'sphinx.ext.autosummary', "
+        "'sphinx.ext.napoleon']\n"
+        "autosummary_generate = True\n"
+        f"templates_path = [{str(DOCS / '_templates')!r}]\n"
+        "autodoc_typehints = 'description'\n"
+        "autodoc_mock_imports = ['cupy', 'cupyx']\n"
+    )
+    groups = (
+        (
+            None,
+            (
+                "pyrite.Beam",
+                "pyrite.simulate",
+                "pyrite.detectors.timepix_response.get_response",
+                "pyrite.detectors.eaglexo_response.get_response",
+            ),
+        ),
+        ("public-alias.rst", ("pyrite.detectors.Timepix3Response",)),
+        ("public-data.rst", ("pyrite.materials.CATALOG",)),
+    )
+    blocks = [
+        "API navigation\n==============\n",
+        "Canonical cross references: :py:class:`pyrite.Beam`, "
+        ":py:func:`pyrite.simulate`, "
+        ":py:func:`pyrite.detectors.timepix_response.get_response`, "
+        ":py:func:`pyrite.detectors.eaglexo_response.get_response`, "
+        ":py:class:`pyrite.detectors.Timepix3Response`, "
+        ":py:data:`pyrite.materials.CATALOG`.",
+    ]
+    for template, names in groups:
+        block = ".. autosummary::\n   :toctree: generated\n   :nosignatures:\n"
+        if template:
+            block += f"   :template: autosummary/{template}\n"
+        blocks.append(block + "\n" + "\n".join(f"   {name}" for name in names))
+    (source / "index.rst").write_text("\n\n".join(blocks))
+    output = tmp_path / "html"
+    result = subprocess.run(
+        [sys.executable, "-m", "sphinx", "-W", "-b", "html", str(source), str(output)],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        env={**os.environ, "NO_COLOR": "1"},
+    )
+    assert result.returncode == 0, result.stdout
+    index = BeautifulSoup((output / "index.html").read_text(), "html.parser")
+    for _, names in groups:
+        for name in names:
+            path = f"generated/{name}.html"
+            assert index.find("a", href=path), name
+            assert index.find("a", href=f"{path}#{name}"), name
+            page = BeautifulSoup((output / path).read_text(), "html.parser")
+            title = name.rsplit(".", 1)[-1]
+            if title == "get_response":
+                detector = "Timepix" if ".timepix_response." in name else "Eagle XO"
+                title = f"get_response ({detector})"
+            assert page.h1.get_text().rstrip("¶#") == title
+            assert page.find(id=name.lower().replace(".", "-").replace("_", "-"))
+            assert page.find(id=name), name
+            assert f"Canonical import: {name}." in page.get_text()
