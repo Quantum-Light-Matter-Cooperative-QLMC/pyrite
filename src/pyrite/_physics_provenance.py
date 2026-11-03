@@ -122,6 +122,9 @@ def resolved_physics_view(
             else BREMSSTRAHLUNG_MODEL
         ),
     }
+    from .montecarlo.spectrum.cxr._bin_quadrature import _bin_reduction_markers
+
+    markers.update(_bin_reduction_markers(resolved))
     markers.update(
         _brem_band_reduction_markers(
             resolved.get("adaptive_precision"), selections["emission.continuum"]

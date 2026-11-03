@@ -48,6 +48,7 @@ from ..montecarlo.spectrum.coherent_population import (
     COHERENT_POPULATION_MODEL,
     physical_bunch_electrons,
 )
+from ..montecarlo.spectrum.cxr._bin_quadrature import _bin_reduction_markers
 from ..montecarlo.spectrum.transition_radiation_crossings import TRANSITION_MODEL
 from ..montecarlo.transport import STOPPING_MODEL
 from ..montecarlo.transport.precision import TRANSPORT_PRECISION_MODEL
@@ -574,10 +575,7 @@ def _project_beam_tail(sweep_payload: dict[str, Any], beam_payload: Mapping[str,
 def _model_generation_markers(emission: str) -> dict[str, Any]:
     """Unconditional physics-generation constants carried by every digest.
 
-    Each is a CONSTANT, not a selector: it perturbed every digest exactly once
-    when the physics it names changed, orphaning older checkpoints
-    (rev-and-re-run) instead of letting them resume into a run that computes
-    different numbers.
+    Constants separate generations so old checkpoints cannot resume with changed numbers.
     """
     # The in-medium photon dispersion is unconditional physics now, not an
     # opt-in model; digests minted before it used the retired vacuum
@@ -701,6 +699,7 @@ def _identity_v1(
     if transport_numerics:
         resolved["transport_numerics"] = transport_numerics
     resolved.update(_model_generation_markers(options.emission))
+    resolved.update(_bin_reduction_markers(sweep_payload))
     resolved.update(shell_ionization)
     requested = (
         options.bremsstrahlung_model if bremsstrahlung_model is None else bremsstrahlung_model
@@ -845,6 +844,7 @@ def case_content_key(
             {key: value for key, value in case.items() if key not in _CONTENT_KEY_DENYLIST}
         ),
     }
+    payload.update(_bin_reduction_markers(case))
     payload.update(
         _brem_band_reduction_markers(
             case.get("adaptive_precision"),

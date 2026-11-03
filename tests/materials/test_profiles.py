@@ -1292,3 +1292,19 @@ def test_brem_band_reduction_generation_forks_only_adaptive_bremslib(monkeypatch
         ]
         == "test-next-generation"
     )
+
+
+def test_bin_mean_reduction_generation_moves_dataset_and_case_keys_only_for_bins():
+    sweep = replace(material_sweep("hopg"), cxr_grid_policy={"quadrature": "bin-mean"})
+    settings = default_settings()
+    current = dataset_identity("hopg", "full", settings, sweep)
+    case = {"line_quadrature": "bin-mean", "seed": 1}
+    current_case = case_content_key(case)
+    node_case = {"seed": 1}
+    node_before = case_content_key(node_case)
+    with mock.patch.object(profiles, "_bin_reduction_markers", return_value={}):
+        previous = dataset_identity("hopg", "full", settings, sweep)
+        previous_case = case_content_key(case)
+        assert case_content_key(node_case) == node_before
+    assert current["parameter_sha256"] != previous["parameter_sha256"]
+    assert current_case != previous_case

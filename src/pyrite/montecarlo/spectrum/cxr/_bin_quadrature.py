@@ -627,6 +627,16 @@ def sincsq_bin_lineshape(
     return xp.asarray(host, dtype=REAL)
 
 
+CXR_BIN_REDUCTION_MODEL = "near-count-auto-v2-gate1e9"
+
+
+def _bin_reduction_markers(resolved):
+    """Numerical generation for bin-mean cases, including policy-only identities."""
+    policy = resolved.get("line_grid_policy") or {}
+    quadrature = resolved.get("line_quadrature", policy.get("quadrature", "node"))
+    return {"line_reduction_model": CXR_BIN_REDUCTION_MODEL} if quadrature == "bin-mean" else {}
+
+
 def run_bin_mean_reduction_kernel(
     E_r,
     aw,
@@ -659,12 +669,13 @@ def run_bin_mean_reduction_kernel(
     if method not in ("auto", "pairs", "tree"):
         raise ValueError("method must be 'auto', 'pairs', or 'tree'")
     # The host tree setup is O(lines) (~0.09 s for 400k synthetic lines on
-    # the development CPU). Below 5e9 pairs the all-pairs kernel is cheap. Above
+    # the development CPU). Jobs 3766/3767 show missed tree wins below 5e9.
+    # Consult the near-count model from 1e9 pairs; retain cheap small flushes. Above
     # it, a host cost model picks the faster kernel from the per-bin near-line
     # counts (#286): a tight line cluster makes the one-thread-per-bin tree
     # 3-60x slower than all-pairs. An infinite exact window has no far nodes.
     use_tree = method == "tree"
-    if method == "auto" and exact_widths is not None and n_bins * n_cxr_rows >= 5_000_000_000:
+    if method == "auto" and exact_widths is not None and n_bins * n_cxr_rows >= 1_000_000_000:
         from ._bin_tree import tree_is_faster
 
         use_tree = tree_is_faster(

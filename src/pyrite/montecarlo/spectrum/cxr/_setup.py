@@ -25,7 +25,7 @@ from ._bin_quadrature import BIN_MEAN_QUADRATURE, bin_axis, validate_cxr_quadrat
 from ._formation import expand_escape_pieces
 from ._kernels import (
     _clip_segments_to_cutoff,
-    _cxr_table_nan_ceiling,
+    _cxr_setup_ceiling,
     _cxr_tabulation_grid,
     _elemental_log_mu_table,
     _matvec3,
@@ -486,13 +486,13 @@ def _prepare_spectrum(request):
     _pad = 0.2 * (float(E_grid_eV[-1]) - float(E_grid_eV[0]))
     _lo, _hi = float(E_grid_eV[0]) - _pad, float(E_grid_eV[-1]) + _pad
     _lo = max(_lo, 1.0)  # keep tabulation energies positive: chi_g/U_g need lambda = HC_EV_ANG / E
-    # Above the atomic tables' end every coupling table is NaN, and a line
-    # there interpolates NaN whichever NaN nodes bracket it. Stop the mesh at
-    # its first node at or above that ceiling: nodes below it are unchanged,
-    # and E_res past the last node clamps to a NaN value, as before. At MeV
-    # beam energies this cuts E_tab from ~1e7-1e8 nodes to ~1e6.
+    # Root iteration reads NaN refraction past its support when use_henke is
+    # enabled. Keep the finite prefix and NaN boundary to preserve all delta
+    # reads. Static coupling/attenuation suffixes can differ; final-root
+    # susceptibility remains NaN there, preserving existing score NaN masks.
+    # Without anomalous refraction retain the original all-table bound.
     # Validation: line-tabulation-nan-ceiling
-    _ceiling = _cxr_table_nan_ceiling(info, abs_comp, use_henke)
+    _ceiling = _cxr_setup_ceiling(info, abs_comp, use_henke)
     if _ceiling < _hi:
         _hi = max(_ceiling, _lo + 1.0)
     E_tab = _cxr_tabulation_grid(info, abs_comp, _lo, _hi)
