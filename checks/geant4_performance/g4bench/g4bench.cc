@@ -68,6 +68,7 @@ namespace
 {
 struct Config
 {
+  bool spectral = false;
   std::string material = "Si";
   double energy_keV = 300.;
   double thickness_um = 100.;
@@ -104,16 +105,24 @@ struct Record
 };
 #pragma pack(pop)
 
+struct SpectrumRecord { int32_t event; int32_t counts[2][24]; };
+
 class Recorder
 {
  public:
   std::vector<Record> records;
   Record current{};
+  SpectrumRecord spectrum{};
+  std::vector<SpectrumRecord> spectra;
   bool done = false;
   void Reset(int event)
   {
     std::memset(&current, 0, sizeof current);
     current.event = event;
+    if (gConfig.spectral) {
+      std::memset(&spectrum, 0, sizeof spectrum);
+      spectrum.event = event;
+    }
     current.terminal = -1;
     done = false;
   }
@@ -129,6 +138,9 @@ class Detector : public G4VUserDetectorConstruction
                          ? new G4Material("BenchSi", 14., 28.085 * g / mole,
                                           2.3291534103942357 * g / cm3)
                          : new G4Material("BenchW", 74., 183.84 * g / mole, 19.3 * g / cm3);
+    if (gConfig.material == "C")
+      slab = new G4Material("BenchC", 6., 12.011 * g / mole,
+                            (0.11363677327755675 * 1.e24 / 6.02214076e23 * 12.011) * g / cm3);
     G4Material* vacuum = G4NistManager::Instance()->FindOrBuildMaterial("G4_Galactic");
     const double half_z = 0.5 * gConfig.thickness_um * um;
     auto* world_box = new G4Box("World", 1. * cm, 1. * cm, half_z + 1. * mm);
@@ -246,6 +258,13 @@ class Stepping : public G4UserSteppingAction
       const double k = s->GetKineticEnergy() / keV;
       const int band = k < 10. ? 0 : k < 50. ? 1 : k < 100. ? 2 : 3;
       ++r.photons[band];
+      if (gConfig.spectral && k >= 10. && k <= gConfig.energy_keV) {
+        const int bin = std::min(23, static_cast<int>(24. * std::log(k / 10.) /
+                                                     std::log(gConfig.energy_keV / 10.)));
+        ++fRec->spectrum.counts[0][bin];
+        if (s->GetMomentumDirection().dot(fAxis) >= fCosHalf)
+          ++fRec->spectrum.counts[1][bin];
+      }
       if (k >= 10.) {
         r.photon_keV_ge10 += k;
         if (s->GetMomentumDirection().dot(fAxis) >= fCosHalf) ++r.cone_photons[band - 1];
@@ -288,7 +307,10 @@ class Events : public G4UserEventAction
  public:
   explicit Events(Recorder* r) : fRec(r) {}
   void BeginOfEventAction(const G4Event* e) override { fRec->Reset(e->GetEventID()); }
-  void EndOfEventAction(const G4Event*) override { fRec->records.push_back(fRec->current); }
+  void EndOfEventAction(const G4Event*) override {
+    fRec->records.push_back(fRec->current);
+    if (gConfig.spectral) fRec->spectra.push_back(fRec->spectrum);
+  }
 
  private:
   Recorder* fRec;
@@ -304,6 +326,7 @@ class Runs : public G4UserRunAction
   {
     if (!fRec) return;
     fRec->records.clear();
+    fRec->spectra.clear();
     fRec->records.reserve(static_cast<std::size_t>(gConfig.histories));
   }
   void EndOfRunAction(const G4Run* run) override
@@ -316,6 +339,11 @@ class Runs : public G4UserRunAction
     std::ofstream out(path, std::ios::binary);
     out.write(reinterpret_cast<const char*>(fRec->records.data()),
               static_cast<std::streamsize>(fRec->records.size() * sizeof(Record)));
+    if (gConfig.spectral) {
+      std::ofstream spectral(path + ".spectrum", std::ios::binary);
+      spectral.write(reinterpret_cast<const char*>(fRec->spectra.data()),
+                     static_cast<std::streamsize>(fRec->spectra.size() * sizeof(SpectrumRecord)));
+    }
   }
 
  private:
@@ -353,7 +381,8 @@ int main(int argc, char** argv)
 {
   for (int i = 1; i + 1 < argc; i += 2) {
     const std::string k = argv[i], v = argv[i + 1];
-    if (k == "--material") gConfig.material = v;
+    if (k == "--spectral") gConfig.spectral = std::stoi(v) != 0;
+    else if (k == "--material") gConfig.material = v;
     else if (k == "--energy-kev") gConfig.energy_keV = std::stod(v);
     else if (k == "--thickness-um") gConfig.thickness_um = std::stod(v);
     else if (k == "--angle-deg") gConfig.angle_deg = std::stod(v);
@@ -371,7 +400,7 @@ int main(int argc, char** argv)
       return 2;
     }
   }
-  if (gConfig.material != "Si" && gConfig.material != "W") return 2;
+  if (gConfig.material != "Si" && gConfig.material != "W" && gConfig.material != "C") return 2;
   const auto t0 = std::chrono::steady_clock::now();
   auto type = gConfig.threads > 1 ? G4RunManagerType::MTOnly : G4RunManagerType::SerialOnly;
   auto* rm = G4RunManagerFactory::CreateRunManager(type, gConfig.threads);
