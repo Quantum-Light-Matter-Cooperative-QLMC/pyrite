@@ -478,7 +478,8 @@ def main():
     pool.set_limit(fraction=args.pool_fraction)
     import numpy as np
 
-    from pyrite.montecarlo.transport import TransportLUTConfig, simulate_trajectories
+    from pyrite.montecarlo.transport import TransportLUTConfig
+    from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
     from pyrite.montecarlo.transport.batching import (
         DEFAULT_PER_ELECTRON_TRANSPORT_CONFIG,
         PerElectronTransportConfig,

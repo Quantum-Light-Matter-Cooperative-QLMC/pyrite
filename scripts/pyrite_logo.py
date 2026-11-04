@@ -189,7 +189,7 @@ def simulate_y(
     The apparent beam entering upward in the logo is a *layout transformation*.
     """
     from pyrite.materials import CATALOG
-    from pyrite.transport import simulate_trajectories
+    from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
 
     composition = CATALOG.crystal(material).composition
     raw = simulate_trajectories(

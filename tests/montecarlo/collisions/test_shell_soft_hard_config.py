@@ -193,7 +193,7 @@ def test_direct_shell_cuda_lut_refusal_is_not_runner_exact_fallback(monkeypatch)
     import sys
     from types import SimpleNamespace
 
-    from pyrite.montecarlo.transport import simulate_trajectories
+    from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
 
     def forbidden():
         pytest.fail("unsupported CUDA-LUT shell route must refuse before device construction")

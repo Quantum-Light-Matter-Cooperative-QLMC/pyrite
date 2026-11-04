@@ -389,7 +389,7 @@ def test_streamed_blocks_skip_completion_bitwise(synthetic_si_tables, monkeypatc
 
 
 def test_skipped_completion_leaves_transport_rows_bitwise(synthetic_si_tables):
-    from pyrite.montecarlo.transport.api import simulate_trajectories
+    from pyrite.montecarlo.transport.api import _simulate_trajectories as simulate_trajectories
 
     case = _coupled_case()
     kwargs = dict(

@@ -47,14 +47,8 @@ _HERE = Path(__file__).resolve().parent
 _PACKAGE_ROOT = _HERE.parent
 from pyrite.detectors import Detector, LegacyEDS  # noqa: E402, I001
 from pyrite.materials.crystal import crystal_absorption_length_ang  # noqa: E402
-from pyrite.montecarlo import (  # noqa: E402
-    aperture_fwhm_eV,
-    beta_from_keV,
-    eds_fwhm_eV,
-    mc_brem_spectrum,
-    mc_cxr_spectrum,
-    simulate_trajectories,
-)
+from pyrite.montecarlo import aperture_fwhm_eV, beta_from_keV, eds_fwhm_eV, mc_brem_spectrum, mc_cxr_spectrum
+from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
 from pyrite.montecarlo.geometry import tilted_geometry  # noqa: E402
 from pyrite.console.outputs import output_dir  # noqa: E402
 from pyrite.validation._anchor_conditions import (  # noqa: E402, F401, I001

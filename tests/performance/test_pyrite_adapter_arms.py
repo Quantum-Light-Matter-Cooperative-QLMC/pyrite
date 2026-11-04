@@ -115,7 +115,7 @@ def test_transport_arm_writes_comparison_record_without_emission_work(
     entry = types.SimpleNamespace(tables=[_Table()], arrays={})
     stopping = types.SimpleNamespace(key="s", digest="d", manifest={"arrays_sha256": "a"})
     stopping.arrays = dict
-    monkeypatch.setattr("pyrite.montecarlo.transport.simulate_trajectories", simulate)
+    monkeypatch.setattr("pyrite.montecarlo.transport._simulate_trajectories", simulate)
     monkeypatch.setattr("pyrite.xsgen.elsepa.catalog.resolve_layer_tables", lambda c: [entry])
     monkeypatch.setattr(
         "pyrite.xsgen.sbethe.catalog.resolve_composition_table", lambda k, c: stopping

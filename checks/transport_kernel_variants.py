@@ -148,7 +148,7 @@ def _schedule_config(schedule):
 
 
 def timing(args):
-    from pyrite.montecarlo.transport import simulate_trajectories
+    from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
 
     arms = _arms()
     rows = []
@@ -277,7 +277,8 @@ def _max_threads_per_sm():
 
 
 def attributes(args):
-    from pyrite.montecarlo.transport import _jit_kernel_variants, simulate_trajectories
+    from pyrite.montecarlo.transport import _jit_kernel_variants
+    from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
     from pyrite.montecarlo.transport.batching import PerElectronTransportConfig
 
     launch = _launch_module()

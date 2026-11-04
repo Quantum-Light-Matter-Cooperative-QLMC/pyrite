@@ -29,9 +29,9 @@ import numpy as np
 from .._numerics import CONVERGENCE_KEYS
 from ..detectors import Detector, EnergyBins
 from ..materials import CATALOG, MaterialSpec, load_material_catalog
-from ..montecarlo import simulate_trajectories
 from ..montecarlo.runner.case_tables import _case_elastic_kwargs
 from ..montecarlo.runner.step_budget import retry_step_budget
+from ..montecarlo.transport import _simulate_trajectories as simulate_trajectories
 from ..montecarlo.transverse import TransverseDistribution
 from ..results import Settings
 from .longitudinal import LongitudinalDistribution

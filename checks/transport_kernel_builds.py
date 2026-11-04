@@ -167,7 +167,7 @@ def _sass_counts(cached, scratch):
 
 
 def attributes(args):
-    from pyrite.montecarlo.transport import simulate_trajectories
+    from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
 
     cache = Path(os.environ["CUPY_CACHE_DIR"])
     kwargs = _configurations()["bench821"]
@@ -231,7 +231,7 @@ def _scene_kwargs(scene):
 
 
 def timing(args):
-    from pyrite.montecarlo.transport import simulate_trajectories
+    from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
     from pyrite.montecarlo.transport.batching import DEFAULT_PER_ELECTRON_TRANSPORT_CONFIG
 
     names = args.builds

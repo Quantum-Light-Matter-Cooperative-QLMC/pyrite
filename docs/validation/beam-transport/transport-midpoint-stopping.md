@@ -1,6 +1,6 @@
 # `transport-midpoint-stopping`
 
-Ledger row: [`transport-midpoint-stopping`](../physics-validation-ledger.md). Code: `montecarlo/transport/api.py::simulate_trajectories` (`energy_model`); host cores in `montecarlo/transport/cores.py`; exact CUDA core in `montecarlo/transport/_jit_kernel.py`.
+Ledger row: [`transport-midpoint-stopping`](../physics-validation-ledger.md). Code: `montecarlo/transport/api.py::_simulate_trajectories` (`energy_model`); host cores in `montecarlo/transport/cores.py`; exact CUDA core in `montecarlo/transport/_jit_kernel.py`.
 
 ## Claim
 

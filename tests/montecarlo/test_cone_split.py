@@ -6,7 +6,7 @@ Validation: detector-cone-variance-reduction
 import numpy as np
 import pytest
 
-from pyrite.montecarlo.transport import simulate_trajectories
+from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
 from pyrite.montecarlo.transport.cone_split import (
     ConeSplit,
     history_sums,

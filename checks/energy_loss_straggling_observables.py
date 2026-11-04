@@ -43,7 +43,8 @@ import numpy as np
 
 from pyrite.materials.crystal import CRYSTALS, HBARC_EV_ANG, reciprocal_g_vector
 from pyrite.montecarlo.spectrum import mc_brem_spectrum, mc_cxr_spectrum
-from pyrite.montecarlo.transport import beta_from_keV, simulate_trajectories
+from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
+from pyrite.montecarlo.transport import beta_from_keV
 
 E0_KEV = 25.0
 E_CUT_KEV = 1.0

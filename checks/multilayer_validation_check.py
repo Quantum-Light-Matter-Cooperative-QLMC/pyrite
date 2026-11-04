@@ -40,13 +40,13 @@ import numpy as np
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src"))
 
 from pyrite.campaign.sweep import crystal_params, substrate_composition  # noqa: E402
-from pyrite.montecarlo import (  # noqa: E402
+from pyrite.montecarlo import (
     TRANSPORT_ELEMENTS,
     _mu_total_inv_ang,
     mc_cxr_spectrum,
-    simulate_trajectories,
     tilted_geometry,
 )
+from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
 from pyrite.montecarlo.transport import spliced_stopping_keV_per_ang  # noqa: E402
 
 _N_A = 6.02214076e23  # rho[g/cm^3] = n[1/Ang^3] * A[g/mol] * 1e24 / N_A

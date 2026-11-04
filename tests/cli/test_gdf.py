@@ -408,7 +408,7 @@ def test_profile_run_persists_imported_normalization(catalog, monkeypatch):
 
     import pyrite.materials
     from pyrite.checkpoints.persistence import load_checkpoint
-    from pyrite.montecarlo.transport import simulate_trajectories
+    from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
     from pyrite.runs import run as run_driver
 
     path = write_gdf(catalog.parent / "beam.gdf")

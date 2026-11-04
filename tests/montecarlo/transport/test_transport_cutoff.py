@@ -13,8 +13,10 @@ from pyrite.montecarlo.spectrum.cxr import _prepare_spectrum
 from pyrite.montecarlo.transport import (
     TransportLUTConfig,
     prepare_sbethe_stopping_table,
-    simulate_trajectories,
     spliced_stopping_keV_per_ang,
+)
+from pyrite.montecarlo.transport import (
+    _simulate_trajectories as simulate_trajectories,
 )
 from tests.helpers import scaled_rtol, to_host
 

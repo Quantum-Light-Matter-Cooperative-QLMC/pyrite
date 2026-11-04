@@ -36,9 +36,9 @@ does not make other implementation-module exports supported. Prefer
 
 Use `pyrite.transport` for trajectory simulation and saved-capture reductions;
 use `pyrite.radiation` for source-level spectra. These lazy facades resolve to
-exactly the existing implementation objects: signatures, errors, numerical
-outputs, RNG streams, provenance, serialization and scientific identities are
-unchanged. Importing either namespace loads no engines or material datasets;
+the same implementation objects. The trajectory function now takes typed
+inputs; equivalent resolved engine inputs preserve numerical outputs, RNG
+streams, provenance, serialization and scientific identities. Importing either namespace loads no engines or material datasets;
 resolving a function loads its implementation, and calling it may read tables,
 select an accelerator or perform the documented artifact I/O.
 
@@ -72,7 +72,7 @@ and [capture workflow](../trajectory-workflows.md).
 | Canonical import (`pyrite.transport.`) | Previous import | Input/output and effects |
 | --- | --- | --- |
 | `Case` | `pyrite.montecarlo.Case` | Validated lowered simulation/configuration record; field-specific units, frozen mapping serialization. Invalid fields raise validation errors; no transport on construction. |
-| `simulate_trajectories` | `pyrite.montecarlo.transport.simulate_trajectories` | Incident energy/cutoff in keV, thickness/segment positions and lengths in angstroms; returns segment arrays and incident `Ne`/fate metadata. Samples transport with the supplied seed; may resolve elastic/stopping tables and backend. Unsupported model combinations/table coverage raise errors; incomplete step-limited histories raise. No detector response or photon tally. |
+| `simulate_trajectories` | `pyrite.montecarlo.transport.simulate_trajectories` | Typed Beam/Target/Physics/Numerics inputs, explicit electron cutoff in keV; segment positions and lengths in angstroms; returns segment arrays and incident `Ne`/fate metadata. Samples transport with the supplied seed; may resolve elastic/stopping tables and backend. Unsupported model combinations/table coverage raise errors; incomplete step-limited histories raise. No detector response or photon tally. |
 | `summarize_trajectories` | `pyrite.montecarlo.trajectory_summary.summarize_trajectories` | Reads a saved capture and explicit depth/energy/angle edges; returns histogram DataFrames. Fate fractions divide by stored incident `Ne`, including missed entries. Depth loss is keV/bin without primary, mass or volume normalization. Invalid edges/missing row fields raise. |
 | `iter_primary_summaries` | `pyrite.montecarlo.trajectory_summary.iter_primary_summaries` | Streams capture DataFrames: primary fate, depth/range (angstrom), terminal pre-event energy (keV), angle (rad). Descendants do not determine primary fate; missed entries have no material rows. Artifact validation and file errors propagate. |
 | `depth_loss_profile` | `pyrite.montecarlo.trajectory_summary.depth_loss_profile` | Stored segment mapping plus depth edges (angstrom) to continuous-loss keV/bin by layer. Excludes cutoff residuals/hard transfers; no primary normalization or file I/O. Invalid edges raise. |
@@ -95,16 +95,57 @@ See [detector response contracts](detectors.md#response-contracts),
 [quantum solver diagnostics](quantum.md#solver-diagnostic-contracts) for
 other reviewed engine operations.
 
+## Typed trajectory inputs
+
+`simulate_trajectories(beam, target, *, physics=None, numerics=None, ...)`
+replaces the former scalar argument surface (#936). Use the same `Beam`,
+`Target`/`Slab`/`Stack`, `Physics`, and `Numerics` objects as `pyrite.simulate`.
+Scene lowering resolves target composition, layer geometry, phase space, and
+identity-matched SBETHE/ELSEPA/BremsLib tables. No spectrum or detector response
+is evaluated. Omitted policies use their constructor defaults, including
+production automatic interaction-model resolution; these differ from the
+former direct function's analytic-stopping/continuous-inelastic defaults.
+
+```python
+from pyrite.beams import Beam, PointBunch, PointSpot
+from pyrite.config import FixedSampling, Numerics, Physics
+from pyrite.geometry import Slab
+from pyrite.transport import simulate_trajectories
+
+segments = simulate_trajectories(
+    Beam(30.0, transverse=PointSpot(), longitudinal=PointBunch()),
+    Slab("silicon", 1000.0, tilt_deg=30.0, footprint=None),
+    physics=Physics(inelastic_model="continuous", radiative_model="uncoupled",
+                    bremsstrahlung_model="eedl"),
+    numerics=Numerics(sampling=FixedSampling(100, 100), seed=4,
+                      transport_core="per-electron"),
+    E_cut_keV=5.0,
+)
+```
+
+The incident population is the larger of the two fixed sampling counts.
+`E_cut_keV` remains an explicit positive termination energy for every primary,
+independent of scoring grids. `max_steps`, `keep_segments_on_device`,
+`collect_diagnostics`, and `transport_progress` remain output/execution controls.
+An optional scalar `detector` supplies observation geometry for target-dependent
+bunch timing; omission uses the canonical detector-free source direction.
+Adaptive sampling, channeling/quantum entry states, streamed scoring and photon
+aperture tallies require `pyrite.simulate`. Spectral policies do not produce any
+spectral output here. Old flat arguments, prepared table injection, and internal
+electron-block/cascade controls are no longer public inputs. Repository engine
+probes use the private `_simulate_trajectories` boundary; it is not a migration
+API for applications. Analytic `"sr"` elastic reference runs remain private;
+public `Physics` selects ELSEPA or the deprecated Mott model.
+
 ## Coupled radiative moment evaluation
 
-`simulate_trajectories(..., radiative_moments="table")` is the default for
-coupled BremsLib transport on CPU and CUDA. Prepared float64 tables interpolate
-soft stopping in eV/Å and hard-event rate in Å⁻¹ using linear weights in log
-kinetic energy, with relative budget `2e-4` and explicit coverage checks.
-Use `radiative_moments="exact"` for reference quadrature. This keyword-only
-switch preserves the existing positional call interface. It has no effect on
-uncoupled radiation. Exact conditional photon sampling and the sampled photon
-energy debit remain in both modes.
+Coupled BremsLib transport uses the case's radiative moment policy, resolved by
+canonical scene lowering. Prepared float64 tables interpolate soft stopping in
+eV/Å and hard-event rate in Å⁻¹ using linear weights in log kinetic energy,
+with relative budget `2e-4` and explicit coverage checks. Exact conditional
+photon sampling and the sampled photon energy debit remain in both modes.
+The former `radiative_moments` transport keyword is private; the case replay
+policy retains its existing contract.
 
 New coupled cases include `radiative_moment_model` in content/replay identity;
 legacy cases without that field retain exact evaluation. Advanced callers can
@@ -127,8 +168,9 @@ reason. Set `PYRITE_MC_TRANSPORT_SCHEDULE=full-history` before importing
 PyRITE to force the reference schedule; `continuation` forces continuation
 and rejects unsupported modes. `pyrite remote` forwards this override.
 
-Advanced callers can pass `PerElectronTransportConfig` to
-`simulate_trajectories`; separately constructed configs keep the existing
+Advanced callers configure scheduling with
+`Numerics(execution=ExecutionConfig(transport=TransportKernelTuning(...)))`.
+Internal `PerElectronTransportConfig` values keep the existing
 `schedule=None` rule (continuation exactly when a continuation config is
 provided). Scheduling does not change scientific case/checkpoint identity.
 Live scratch is bounded; retained trajectories still scale with total rows

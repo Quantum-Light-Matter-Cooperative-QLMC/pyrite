@@ -51,7 +51,8 @@ from pyrite.materials.crystal import (
     beta_from_Ee,
     reciprocal_g_vector,
 )
-from pyrite.montecarlo import mc_cxr_spectrum, simulate_trajectories
+from pyrite.montecarlo import mc_cxr_spectrum
+from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
 
 THETA_OBS_DEG = 119.0
 

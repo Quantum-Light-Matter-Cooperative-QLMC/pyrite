@@ -6,7 +6,7 @@
 > does not independently revalidate those equations or extend their evidence.
 
 - **id**: `multilayer-stack`
-- **anchor**: `montecarlo/transport/api.py::simulate_trajectories` (`layers=`)
+- **anchor**: `montecarlo/transport/api.py::_simulate_trajectories` (`layers=`)
 - **source**: [Multilayer film-on-substrate materials](../../physics/materials/multilayer-materials.md) §(3) option A — CASINO-style boundary-aware multilayer transport
 - **verifier**: fresh context (did not write the implementation)
 
@@ -14,7 +14,7 @@ Scope note: this row covers the **transport** side of a layered target. The cros
 
 ## 1. Intended quantity
 
-A stack is an ordered list of layers, entrance first, with contiguous boundaries $0 = z_0 < z_1 < \dots < z_N$; layer $i$ occupies $[z_{i-1}, z_i]$ and carries its own composition. The claim is that `simulate_trajectories(layers=…)` performs *exact* per-layer transport: at each step the free path, stopping power, and scattering element are taken from the layer containing the electron, flights truncate at internal boundaries without a collision there, each emitted segment records its layer, and a one-layer stack reproduces the single-material path bit-for-bit.
+A stack is an ordered list of layers, entrance first, with contiguous boundaries $0 = z_0 < z_1 < \dots < z_N$; layer $i$ occupies $[z_{i-1}, z_i]$ and carries its own composition. The claim is that `simulate_trajectories(beam, Stack(...))` performs *exact* per-layer transport: at each step the free path, stopping power, and scattering element are taken from the layer containing the electron, flights truncate at internal boundaries without a collision there, each emitted segment records its layer, and a one-layer stack reproduces the single-material path bit-for-bit.
 
 ## 2. Independent derivation
 
@@ -108,7 +108,7 @@ The two-layer carbon control reproduces bulk carbon, and the silicon substrate r
 
 ## 6. Verdict
 
-- **Claim**: `multilayer-stack` — `montecarlo/transport/api.py::simulate_trajectories` (`layers=`) — film-on-substrate transport.
+- **Claim**: `multilayer-stack` — `montecarlo/transport/api.py::_simulate_trajectories` (`layers=`) — film-on-substrate transport.
 - **Filters**: units **pass**; limits **pass**; signs/conventions **pass**.
 - **Re-derivation**: **matches** — the boundary-truncation algorithm is the exact sampler for the inhomogeneous collision density by memorylessness, and the implementation realizes it term-for-term. No divergent factor, sign, exponent, unit, or convention found.
 - **Verdict**: `rederived`.

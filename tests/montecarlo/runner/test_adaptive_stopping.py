@@ -41,7 +41,7 @@ from pyrite.montecarlo.runner.adaptive import (
     run_stopping_rule,
 )
 from pyrite.montecarlo.spectrum.brem import mc_brem_spectrum
-from pyrite.montecarlo.transport import simulate_trajectories
+from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
 
 #: Guards disabled: the bare relative-standard-error rule.
 _RULE_ONLY = dict(max_electron_share=1.0, min_effective_electrons=0.0, stability_blocks=0)

@@ -20,7 +20,8 @@ from pyrite.materials import CATALOG
 from pyrite.materials.photon_cross_sections import photon_cross_sections_ang2
 from pyrite.montecarlo import shell_configuration as config
 from pyrite.montecarlo.spectrum.brem_bremslib import prepare_bremslib_table
-from pyrite.montecarlo.transport import TransportLUTConfig, pair_production, simulate_trajectories
+from pyrite.montecarlo.transport import TransportLUTConfig, pair_production
+from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
 from pyrite.montecarlo.transport.secondaries import secondary_energy_balance
 from pyrite.xsgen.sbethe.catalog import resolve_catalog_table
 from tests.helpers.bremslib import synthetic_bremslib_arrays

@@ -14,7 +14,8 @@ from pyrite.campaign.config import material_sweep
 from pyrite.campaign.sweep import build_cases
 from pyrite.montecarlo import runner
 from pyrite.montecarlo.runner import scheduling
-from pyrite.montecarlo.transport import PerElectronTransportConfig, simulate_trajectories
+from pyrite.montecarlo.transport import PerElectronTransportConfig
+from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
 
 BASE_CASE = dict(
     E0_keV=30.0,

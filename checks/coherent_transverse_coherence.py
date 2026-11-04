@@ -54,12 +54,8 @@ import time
 import numpy as np
 
 from pyrite.materials.crystal import CRYSTALS, reciprocal_g_vector
-from pyrite.montecarlo import (
-    beta_from_keV,
-    detector_directions,
-    mc_cxr_spectrum,
-    simulate_trajectories,
-)
+from pyrite.montecarlo import beta_from_keV, detector_directions, mc_cxr_spectrum
+from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
 
 THETA_OBS_RAD = np.deg2rad(119.0)
 E0_KEV = 25.0

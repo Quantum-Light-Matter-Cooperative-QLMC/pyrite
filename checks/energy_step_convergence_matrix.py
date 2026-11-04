@@ -81,7 +81,8 @@ from pyrite.montecarlo.spectrum.diagnostics import (
     _host,
     _stopping_keV_per_ang,
 )
-from pyrite.montecarlo.transport import beta_from_keV, simulate_trajectories
+from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
+from pyrite.montecarlo.transport import beta_from_keV
 
 CARBON = [("C", 0.1136)]
 TUNGSTEN = [("W", 0.06305)]

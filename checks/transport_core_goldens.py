@@ -23,7 +23,7 @@ from pathlib import Path
 import numpy as np
 
 from pyrite.montecarlo.groove import blazed_groove_spec
-from pyrite.montecarlo.transport.api import simulate_trajectories
+from pyrite.montecarlo.transport.api import _simulate_trajectories as simulate_trajectories
 from pyrite.montecarlo.transport.lut import TransportLUTConfig
 
 CARBON = [("C", 0.1136)]

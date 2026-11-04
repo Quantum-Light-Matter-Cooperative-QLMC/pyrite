@@ -167,6 +167,7 @@ from .batching import (
 )
 
 from .api import (
+    _simulate_trajectories,
     simulate_trajectories,
 )
 

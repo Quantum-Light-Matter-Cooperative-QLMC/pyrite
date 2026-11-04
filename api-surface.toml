@@ -2,7 +2,8 @@
 # target is the *current* concrete binding; domain is the intended public owner.
 # root_role records ownership/stability; root_policy separately classifies root compatibility.
 # canonical_facades lists active domain imports; other domains retain existing paths.
-# simulate_trajectories adds keyword-only radiative_moments="table"|"exact" (#788);
+# simulate_trajectories takes Beam/Target/Physics/Numerics (#936); flat engine
+# controls are private. Canonical and implementation aliases retain identity.
 # Case.radiative_moment_model persists approximation identity; absence replays exact.
 # Settings.allow_fallback and Case.allow_physics_fallback add explicit campaign
 # admission (#262); Case.physics_fallbacks carries preflight provenance to workers.

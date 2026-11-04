@@ -8,7 +8,7 @@ import pytest
 from pyrite._radiative_moment_policy import RADIATIVE_MOMENT_MODEL
 from pyrite.montecarlo.runner import case_tables
 from pyrite.montecarlo.spectrum.brem_bremslib import prepare_bremslib_table
-from pyrite.montecarlo.transport import simulate_trajectories
+from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
 from tests.helpers.bremslib import synthetic_bremslib_arrays
 
 

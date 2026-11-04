@@ -4,8 +4,10 @@ import pytest
 from pyrite._backend import REAL
 from pyrite.montecarlo.transport import (
     TransportLUTConfig,
-    simulate_trajectories,
     spliced_stopping_keV_per_ang,
+)
+from pyrite.montecarlo.transport import (
+    _simulate_trajectories as simulate_trajectories,
 )
 from tests.helpers import scaled_rtol, to_host
 

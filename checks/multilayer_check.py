@@ -28,13 +28,8 @@ from pyrite.campaign.sweep import (
     crystal_params,
     film_on_substrate_layers,
 )
-from pyrite.montecarlo import (
-    mc_brem_spectrum,
-    mc_cxr_spectrum,
-    run_case,
-    simulate_trajectories,
-    tilted_geometry,
-)
+from pyrite.montecarlo import mc_brem_spectrum, mc_cxr_spectrum, run_case, tilted_geometry
+from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
 
 cp = crystal_params("mose2")
 COMP = cp["composition"]

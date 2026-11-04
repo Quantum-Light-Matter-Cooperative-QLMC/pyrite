@@ -17,7 +17,7 @@ import re
 import numpy as np
 import pytest
 
-from pyrite.montecarlo.transport import simulate_trajectories
+from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
 
 try:  # pragma: no cover - depends on the machine, not the branch
     import cupy

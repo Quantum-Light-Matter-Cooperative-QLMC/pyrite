@@ -3,18 +3,118 @@
 Validation: sbethe-corrected-stopping
 """
 
+from __future__ import annotations
+
 import logging
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
 
 from .arguments import TransportInputs
 from .batching import DEFAULT_PER_ELECTRON_TRANSPORT_CONFIG
 from .beam_entry import check_electron_block
 from .host_pass import run_transport_pass
-from .lut import DEFAULT_TRANSPORT_LUT_CONFIG
+from .lut import DEFAULT_TRANSPORT_LUT_CONFIG, TransportLUTConfig
+
+if TYPE_CHECKING:
+    from ..._numerics import Numerics, Physics
+    from ...campaign.beam import Beam
+    from ...campaign.geometry import Slab, Stack
+    from ...campaign.target import Target
+    from ...detectors import Detector
 
 logger = logging.getLogger(__name__)
 
 
 def simulate_trajectories(
+    beam: Beam,
+    target: Target | Slab | Stack,
+    *,
+    physics: Physics | None = None,
+    numerics: Numerics | None = None,
+    detector: Detector | None = None,
+    E_cut_keV: float = 5.0,
+    max_steps: int = 20000,
+    keep_segments_on_device: bool = False,
+    collect_diagnostics: bool = False,
+    transport_progress: Callable[[int, int], None] | None = None,
+) -> dict[str, Any]:
+    """Transport a fixed population from typed physical and numerical inputs.
+
+    Parameters
+    ----------
+    beam, target
+        Scalar :class:`pyrite.Beam` and :class:`pyrite.geometry.Target`,
+        :class:`pyrite.geometry.Slab`, or :class:`pyrite.geometry.Stack`.
+        Energies are in keV; target lengths follow their constructor units.
+    physics, numerics
+        Existing :class:`pyrite.Physics` and :class:`pyrite.Numerics` policies;
+        omitted values use their constructor defaults. The population is
+        ``max(numerics.cxr_trials, numerics.brem_trials)``. ``Numerics.seed``
+        uses the canonical case seed when omitted. Integration, transport core,
+        precision and kernel tuning come from Numerics. Models and source
+        policies resolve through the same scene lowering as ``pyrite.simulate``.
+        Adaptive sampling, channeling, quantum entry states, streaming scoring
+        and photon aperture tallies require ``pyrite.simulate`` instead.
+    detector
+        Optional scalar observation geometry for target-dependent longitudinal
+        timing. None uses canonical detector-free source lowering; no detector
+        response or spectrum is evaluated.
+    E_cut_keV
+        Positive electron termination energy in keV, applied to all primaries
+        (default 5). Independent of spectral scoring cutoffs.
+    max_steps
+        Maximum steps per electron (default 20000); incomplete histories raise.
+    keep_segments_on_device, collect_diagnostics, transport_progress
+        Device-resident segment output, fixed-size post-transport diagnostics,
+        and an optional ``callback(electrons_done, total)``. Default off.
+        Device output requires the CUDA core.
+
+    Returns
+    -------
+    dict
+        Segment arrays, incident phase space, vacuum diagnostics and fate counts;
+        see the transport-output contract. Tables may be resolved from storage.
+        Equivalent resolved engine inputs preserve seeded arrays and RNG streams.
+
+    Raises
+    ------
+    TypeError
+        Inputs have the wrong types or use removed flat transport keywords.
+    ValueError
+        Policies, geometry, table coverage or execution options are unsupported.
+    RuntimeError
+        Any history remains incomplete at the step limit.
+
+    Notes
+    -----
+    This replaces the former flat transport arguments (#936). Material tables,
+    beam phase space, target geometry and model controls belong to their typed
+    owners; internal cascade and electron-block controls are private.
+
+    Validation: electron-transport
+    """
+    from ..runner.transport_options import per_electron_config
+    from .typed_inputs import case_transport_kwargs, trajectory_case
+
+    case, numerics = trajectory_case(beam, target, physics, numerics, detector)
+    tuning = numerics.resolved_execution.transport
+    kwargs = case_transport_kwargs(case)
+    if kwargs.get("inelastic_model") == "shell-soft-hard":
+        kwargs["transport_lut_config"] = TransportLUTConfig(enabled=False)
+    return _simulate_trajectories(
+        **kwargs,
+        E_cut_keV=E_cut_keV,
+        max_steps=max_steps,
+        transport_core=numerics.transport_core,
+        per_electron_config=per_electron_config(tuning),
+        transport_precision=tuning.precision or "auto",
+        keep_segments_on_device=keep_segments_on_device,
+        collect_diagnostics=collect_diagnostics,
+        transport_progress=transport_progress,
+    )
+
+
+def _simulate_trajectories(
     E0_keV,
     Ne,
     thickness_ang,
@@ -520,9 +620,9 @@ def simulate_trajectories(
     if isinstance(_cone_split, ConeSplit):
         from .cone_split import transport_cone_split
 
-        return transport_cone_split(simulate_trajectories, inputs.as_kwargs())
+        return transport_cone_split(_simulate_trajectories, inputs.as_kwargs())
     if (secondary_threshold_eV, pair_production_model, positron_transport) != (None, None, False):
         from .secondaries import transport_secondary_cascade
 
-        return transport_secondary_cascade(simulate_trajectories, inputs.as_kwargs())
+        return transport_secondary_cascade(_simulate_trajectories, inputs.as_kwargs())
     return run_transport_pass(inputs)

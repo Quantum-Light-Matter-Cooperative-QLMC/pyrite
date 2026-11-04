@@ -1,6 +1,6 @@
 # Shell soft/hard inelastic transport
 
-Continuous stopping removes the whole corrected collision stopping continuously (see [Stopping power](stopping-power.md)). `simulate_trajectories(inelastic_model="shell-soft-hard")` instead follows PENELOPE's mixed scheme{cite:p}`salvat2024penelope`: energy losses $W\le W_c$ stay continuous, and losses $W>W_c$ become discrete hard collisions that lower the primary energy by $W$ and deflect it by the sampled recoil. Both parts come from one stopping-closed shell generalized-oscillator-strength (GOS) model, so neither is added on top of the other. The mode requires `energy_model="midpoint"`. Production runs select it by default (see [Configuration](#configuration)); direct `simulate_trajectories` calls default to `inelastic_model="continuous"`, which is bit-for-bit unchanged.
+Continuous stopping removes the whole corrected collision stopping continuously (see [Stopping power](stopping-power.md)). `simulate_trajectories(..., physics=Physics(inelastic_model="shell-soft-hard"))` instead follows PENELOPE's mixed scheme{cite:p}`salvat2024penelope`: energy losses $W\le W_c$ stay continuous, and losses $W>W_c$ become discrete hard collisions that lower the primary energy by $W$ and deflect it by the sampled recoil. Both parts come from one stopping-closed shell generalized-oscillator-strength (GOS) model, so neither is added on top of the other. The mode requires `energy_model="midpoint"`. Production runs select it by default (see [Configuration](#configuration)); public `simulate_trajectories` calls use the same `Physics` defaults. Private reference-engine calls retain continuous stopping by default.
 
 ## Model
 
@@ -35,7 +35,7 @@ $S_s$ (keV Å$^{-1}$) is interpolated log-log like the full table; the hard rate
 
 ## Secondary electron transport
 
-`simulate_trajectories(secondary_threshold_eV=T_s)` transports the electrons that hard collisions emit. It needs `inelastic_model="shell-soft-hard"`, the only mode with hard collisions, and is rejected otherwise. The default `None` transports no secondaries, and the run is then bit-for-bit the primary-only transport: no launch field is allocated and no random number is drawn.
+`simulate_trajectories(..., physics=Physics(secondary_threshold_eV=T_s, ...))` transports the electrons that hard collisions emit. It needs `inelastic_model="shell-soft-hard"`, the only mode with hard collisions, and is rejected otherwise. The default `None` transports no secondaries, and the run is then bit-for-bit the primary-only transport: no launch field is allocated and no random number is drawn.
 
 **One threshold.** $T_s$ is both the production cut and the tracking cutoff of every secondary. A hard row with transfer $W$ gives the secondary kinetic energy $T=W-U_k$ for an EEDL-substituted inner shell and $T=W$ for an outer shell or the conduction band, following the host sampler (`penelope-shell-hard-loss-sampling`). The secondary is launched when $T>T_s$. Otherwise $T$ is deposited at the collision point, as `hard_event_energy_accounting` already does. Every launched electron is tracked until it leaves the target or its energy reaches $T_s$, which replaces `E_cut_keV` for all secondaries. Primaries keep their own `E_cut_keV`. Launched secondaries emit their own secondaries under the same rule.
 

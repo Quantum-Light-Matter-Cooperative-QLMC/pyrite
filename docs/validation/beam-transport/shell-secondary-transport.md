@@ -10,7 +10,7 @@ Source: [PENELOPE-2024, NEA/MBDAV/R(2024)1](https://www.oecd-nea.org/upload/docs
 (mixed transport). The ledger also depends on
 `penelope-shell-secondary-direction` and `penelope-shell-hard-loss-sampling`.
 The intended quantity is the full electron shower returned by
-`simulate_trajectories(secondary_threshold_eV=...)`, starting with one or more
+`simulate_trajectories(..., physics=Physics(secondary_threshold_eV=..., ...))`, starting with one or more
 primaries in shell soft/hard mode. The cutoff $T_s$ is a kinetic energy in eV;
 row energies are in keV, positions and clocks in Å (with $c=1$). Shell
 vacancies reserve binding energy without relaxation; hard bremsstrahlung is

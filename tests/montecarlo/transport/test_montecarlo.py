@@ -14,13 +14,9 @@ import pytest
 
 import pyrite.montecarlo.transport as transport
 from pyrite.campaign.sweep import BeamSpec, crystal_params
-from pyrite.montecarlo import (
-    TRANSPORT_ELEMENTS,
-    _normalize_composition,
-    mc_cxr_spectrum,
-    simulate_trajectories,
-)
+from pyrite.montecarlo import TRANSPORT_ELEMENTS, _normalize_composition, mc_cxr_spectrum
 from pyrite.montecarlo.runner import scheduling
+from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
 
 
 def test_normalize_requires_material():

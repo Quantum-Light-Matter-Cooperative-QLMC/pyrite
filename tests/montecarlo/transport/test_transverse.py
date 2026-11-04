@@ -12,7 +12,7 @@ import pytest
 from pyrite.campaign.beam_metrics import sampled_beam_metrics
 from pyrite.campaign.sweep import BeamSpec, Sweep, build_cases
 from pyrite.montecarlo.geometry import beam_frame_basis
-from pyrite.montecarlo.transport import simulate_trajectories
+from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
 from pyrite.montecarlo.transverse import (
     TransverseDistribution,
     resolve_transverse_distribution,

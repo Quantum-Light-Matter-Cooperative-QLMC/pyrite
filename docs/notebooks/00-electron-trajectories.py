@@ -56,12 +56,11 @@ def _(mo):
     discrete inelastic events case electrons to both lose energy and change
     direction.
 
-    Here **16,384 sampled 30 keV electrons** enter a **4 µm HOPG slab** at
+    Here **65,536 sampled 30 keV electrons** enter a **4 µm HOPG slab** at
     normal incidence. We use a point beam, an infinite lateral slab and the
-    lightweight analytic screened-Rutherford elastic model (`"sr"`) to keep
-    the example CPU-friendly. Production calculations may instead use the
-    tabulated ELSEPA model, which is more accurate, especially at higher
-    energies.
+    tabulated ELSEPA elastic model. Collision stopping is continuous here;
+    coupled radiative losses and atomic-electron deflection are disabled so
+    the example isolates elastic scattering and continuous slowing down.
 
     This is the _transport_ part of a simulation, so no spectral calculations
     are conducted yet. The fixed `seed = 1` makes runs repeatable, but only
@@ -72,6 +71,9 @@ def _(mo):
 
 @app.cell
 def _(mo, tables_ready):
+    from pyrite.beams import Beam, PointBunch, PointSpot
+    from pyrite.config import FixedSampling, Numerics, Physics
+    from pyrite.geometry import Slab
     from pyrite.transport import simulate_trajectories
     from pyrite.units import ureg
 
@@ -83,17 +85,17 @@ def _(mo, tables_ready):
     # cache the results of expensive simulate_trajectories calls
     with mo.persistent_cache(name="simulate_trajectories_cache"):
         transport_result = simulate_trajectories(
-            E0_keV=(30 * ureg.keV).magnitude,
-            Ne=histories,
-            thickness_ang=(thickness_nm * ureg.nm).to("angstrom").magnitude,
-            composition=[("C", 0.11363677327755675)],  # HOPG carbon atoms / Å³
-            elastic_model="sr",
-            inelastic_model="continuous",
-            transport_core="lockstep",
-            energy_model="midpoint",
+            Beam(kinetic_energy=30 * ureg.keV,
+                 transverse=PointSpot(), longitudinal=PointBunch()),
+            Slab("hopg", thickness_nm * 10, tilt_deg=0.0,
+                 footprint=None, allow_normal_incidence=True),
+            physics=Physics(inelastic_model="continuous", elastic_model="elsepa",
+                            bremsstrahlung_model="eedl", radiative_model="uncoupled",
+                            atomic_electron_deflection="none"),
+            numerics=Numerics(sampling=FixedSampling(histories, histories),
+                              seed=seed, transport_core="lockstep"),
             E_cut_keV=(5 * ureg.keV).magnitude,
             max_steps=20_000,
-            seed=seed,
         )
     return histories, seed, thickness_nm, transport_result
 

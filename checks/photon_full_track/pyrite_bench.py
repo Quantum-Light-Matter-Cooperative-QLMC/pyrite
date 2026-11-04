@@ -27,7 +27,8 @@ from cases import CASES, DENSITY, LATERAL_MM, MM, apertures, edges_eV
 
 from pyrite.materials import CATALOG
 from pyrite.montecarlo.runner.photon_emission import score_bremslib_continuum
-from pyrite.montecarlo.transport import TransportLUTConfig, simulate_trajectories
+from pyrite.montecarlo.transport import TransportLUTConfig
+from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
 from pyrite.montecarlo.transport.photon_histories import PhotonAperture
 from pyrite.xsgen.bremslib.tables import load_bremsstrahlung_tables
 from pyrite.xsgen.elsepa.catalog import resolve_layer_tables

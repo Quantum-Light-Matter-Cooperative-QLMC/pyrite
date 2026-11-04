@@ -19,9 +19,11 @@ from pyrite.montecarlo.transport import (
     _splitmix64,
     _stream_key_scalar,
     _stream_uniform_scalar,
-    simulate_trajectories,
     spliced_stopping_keV_per_ang,
     stream_keys,
+)
+from pyrite.montecarlo.transport import (
+    _simulate_trajectories as simulate_trajectories,
 )
 
 SEGMENT_KEYS = ("r_mid", "v_hat", "L_ang", "E_keV", "t_ang", "t0_ang", "elec_id", "layer")

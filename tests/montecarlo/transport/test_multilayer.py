@@ -41,8 +41,8 @@ from pyrite.montecarlo import (
     _transport_case,
     mc_characteristic_spectrum,
     mc_cxr_spectrum,
-    simulate_trajectories,
 )
+from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
 from tests.helpers.backend import CUPY_DEVICE_SESSION, cupy_device_backend
 
 try:

@@ -65,9 +65,11 @@ from pyrite.montecarlo.transport import (
     _urban_flight_key_scalar,
     _urban_sample_compound_keV,
     _urban_stream_key_scalar,
-    simulate_trajectories,
     stream_keys,
     urban_element_table,
+)
+from pyrite.montecarlo.transport import (
+    _simulate_trajectories as simulate_trajectories,
 )
 
 NO_LUT = TransportLUTConfig(enabled=False)

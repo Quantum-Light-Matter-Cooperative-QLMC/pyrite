@@ -281,7 +281,6 @@ def _(mo):
 
     Some lower-level public functions intentionally take plain magnitudes,
     with their unit **in the parameter name** (for example
-    `simulate_trajectories(E0_keV=..., thickness_ang=...)` and
     `photon_energies(..., E_eV, tilt_deg=..., theta_obs_deg=...)`).
     Only at these boundaries, convert then extract `.magnitude`. Do not hand
     such a function a Pint quantity and hope it will guess.
@@ -291,7 +290,8 @@ def _(mo):
 
 @app.cell
 def _(np, ureg):
-    # Numeric arguments for a low-level transport function, not a simulation.
+    # Explicit conversion for a numeric-only boundary; typed Beam and Slab
+    # accept quantities directly.
     transport_energy_keV = (30_000 * ureg.eV).to("keV").magnitude
     transport_thickness_ang = (100 * ureg.nm).to("angstrom").magnitude
     assert np.isclose(transport_energy_keV, 30)

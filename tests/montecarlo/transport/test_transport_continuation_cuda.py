@@ -28,7 +28,9 @@ from pyrite.montecarlo.transport import (
     TransportLUTConfig,
     batching,
     check_segment_event_contract,
-    simulate_trajectories,
+)
+from pyrite.montecarlo.transport import (
+    _simulate_trajectories as simulate_trajectories,
 )
 from pyrite.montecarlo.transport import continuation as continuation_module
 from pyrite.montecarlo.transport.batching import PerElectronTransportConfig

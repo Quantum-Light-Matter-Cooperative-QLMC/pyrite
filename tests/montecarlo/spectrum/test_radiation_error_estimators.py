@@ -18,7 +18,8 @@ from pyrite.montecarlo.spectrum import (
     brem_endpoint_quadrature_error,
     cxr_endpoint_resonance_drift,
 )
-from pyrite.montecarlo.transport import simulate_trajectories, spliced_stopping_keV_per_ang
+from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
+from pyrite.montecarlo.transport import spliced_stopping_keV_per_ang
 from tests.helpers import scaled_rtol, to_host
 
 CARBON = [("C", 0.1136)]

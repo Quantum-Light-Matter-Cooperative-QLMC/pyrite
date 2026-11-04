@@ -8,7 +8,8 @@ from numba import njit
 
 from pyrite.materials import CATALOG
 from pyrite.montecarlo.spectrum.brem_bremslib import prepare_bremslib_table
-from pyrite.montecarlo.transport import TransportLUTConfig, cores, host_pass, simulate_trajectories
+from pyrite.montecarlo.transport import TransportLUTConfig, cores, host_pass
+from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
 from pyrite.montecarlo.transport._jit_cutoff_bound import (
     add_soft_moment_bound,
     lut_cutoff_bound,

@@ -476,7 +476,7 @@ def main(argv=None):
     setup = time.perf_counter()
     import numpy as np
 
-    from pyrite.montecarlo.transport import simulate_trajectories
+    from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
     from pyrite.perf.precision import primary_moments
 
     observed = install_observers()

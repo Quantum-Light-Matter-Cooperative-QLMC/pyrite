@@ -18,8 +18,10 @@ from pyrite.montecarlo.transport import (
     TRANSPORT_ELEMENTS,
     _element_crossover_keV,
     beta_from_keV,
-    simulate_trajectories,
     spliced_stopping_keV_per_ang,
+)
+from pyrite.montecarlo.transport import (
+    _simulate_trajectories as simulate_trajectories,
 )
 from pyrite.montecarlo.transport.scattering import pack_elsepa_tables
 from tests.helpers import scaled_rtol

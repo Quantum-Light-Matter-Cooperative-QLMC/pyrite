@@ -3,7 +3,8 @@
 import numpy as np
 import pytest
 
-from pyrite.montecarlo.transport import TransportLUTConfig, simulate_trajectories
+from pyrite.montecarlo.transport import TransportLUTConfig
+from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
 
 
 @pytest.mark.hardware

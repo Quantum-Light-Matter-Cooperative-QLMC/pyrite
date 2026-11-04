@@ -165,7 +165,7 @@ def main():
 
     # A caller-owned learned capacity, identical policy for baseline/candidate.
     capacity = 512
-    simulate = transport.simulate_trajectories
+    simulate = transport._simulate_trajectories
 
     def simulated(**kwargs):
         kwargs["per_electron_config"] = replace(
@@ -173,7 +173,7 @@ def main():
         )
         return simulate(**kwargs)
 
-    transport.simulate_trajectories = simulated
+    transport._simulate_trajectories = simulated
     factory_original = _jit_launch.make_cuda_transport_core
     launches = []
 

@@ -14,7 +14,8 @@ from pyrite.montecarlo.spectrum.transition_radiation_crossings import (
     crossing_amplitudes,
     crossing_transition_radiation,
 )
-from pyrite.montecarlo.transport import SegmentEvent, simulate_trajectories
+from pyrite.montecarlo.transport import SegmentEvent
+from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
 from tests.helpers import to_host
 
 CARBON = [("C", 0.1136)]

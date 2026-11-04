@@ -10,7 +10,8 @@ import logging
 import numpy as np
 import pytest
 
-from pyrite.montecarlo.transport import PerElectronTransportConfig, simulate_trajectories
+from pyrite.montecarlo.transport import PerElectronTransportConfig
+from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
 from pyrite.montecarlo.transport.batching import (
     _ELECTRON_STATUS_BYTES,
     _SEG_SCRATCH_BYTES,

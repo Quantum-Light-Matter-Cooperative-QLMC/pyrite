@@ -96,7 +96,8 @@ def _observables(E0_eV, fate, E_exit_eV, cos_exit, photon_primary, photon_k_eV):
 def _run(case, n, batch=50):
     """The ``pyrite_bench.py`` production stack for ``n`` primaries."""
     from pyrite.materials import CATALOG
-    from pyrite.montecarlo.transport import TransportLUTConfig, simulate_trajectories
+    from pyrite.montecarlo.transport import TransportLUTConfig
+    from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
     from pyrite.montecarlo.transport.events import (
         EVENT_CUTOFF,
         EVENT_EXIT_BOTTOM,

@@ -21,7 +21,9 @@ from pyrite.montecarlo.spectrum.brem_bremslib import prepare_bremslib_table
 from pyrite.montecarlo.transport import (
     TransportLUTConfig,
     check_segment_event_contract,
-    simulate_trajectories,
+)
+from pyrite.montecarlo.transport import (
+    _simulate_trajectories as simulate_trajectories,
 )
 from pyrite.montecarlo.transport.events import EVENT_CUTOFF, EVENT_HARD_RADIATIVE
 from tests.helpers.bremslib import synthetic_bremslib_arrays

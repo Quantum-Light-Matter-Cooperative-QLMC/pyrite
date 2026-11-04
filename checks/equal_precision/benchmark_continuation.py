@@ -47,7 +47,8 @@ import cupy as cp
 import numpy as np
 
 from pyrite._numerics import DEFAULT_INELASTIC_CUTOFF_EV
-from pyrite.montecarlo.transport import TransportLUTConfig, _jit_launch, simulate_trajectories
+from pyrite.montecarlo.transport import TransportLUTConfig, _jit_launch
+from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
 from pyrite.montecarlo.transport.batching import PerElectronTransportConfig
 from pyrite.xsgen.bremslib.tables import load_bremsstrahlung_tables
 from pyrite.xsgen.elsepa.catalog import resolve_layer_tables

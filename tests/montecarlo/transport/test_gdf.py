@@ -11,7 +11,7 @@ from pyrite.campaign.config import material_sweep
 from pyrite.campaign.sweep import build_cases
 from pyrite.materials import MaterialConfigError
 from pyrite.montecarlo.gdf import list_gdf_times, load_gdf_beam
-from pyrite.montecarlo.transport import simulate_trajectories
+from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
 
 
 def fields():
