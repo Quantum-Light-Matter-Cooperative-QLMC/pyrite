@@ -482,8 +482,11 @@ def run(args):
                 except Exception as error:
                     from ..montecarlo.case import AxialAdmissionError
                     from ..montecarlo.trajectories import TrajectoryArtifactError
+                    from ..xsgen._errors import TableNotFoundError
 
-                    if not isinstance(error, (AxialAdmissionError, TrajectoryArtifactError)):
+                    if not isinstance(
+                        error, (AxialAdmissionError, TrajectoryArtifactError, TableNotFoundError)
+                    ):
                         raise
                     raise SystemExit(str(error)) from None
                 if not complete:
