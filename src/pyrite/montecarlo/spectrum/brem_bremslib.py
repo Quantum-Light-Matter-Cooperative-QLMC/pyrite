@@ -150,7 +150,10 @@ def bremslib_segment_state(staged: _StagedBremsLib, T_keV, cos_theta=None):
         upper = staged.scaled_sdcs_mb[row + 1]
     else:
         theta_grid = staged.theta_rad
-        theta = xp.arccos(xp.clip(xp.asarray(cos_theta, dtype=REAL), REAL(-1.0), REAL(1.0)))
+        # Near the forward peak, FP32 rounds cos(theta) to one for angles
+        # below about 0.24 mrad. Recover the angle before table-precision casts.
+        cosine = xp.asarray(cos_theta, dtype=xp.float64)
+        theta = xp.asarray(xp.arccos(xp.clip(cosine, -1.0, 1.0)), dtype=REAL)
         cell = xp.clip(xp.searchsorted(theta_grid, theta, side="right") - 1, 0, theta_grid.size - 2)
         weight = (theta - theta_grid[cell]) / (theta_grid[cell + 1] - theta_grid[cell])
         weight = xp.clip(weight, REAL(0.0), REAL(1.0))[:, None]

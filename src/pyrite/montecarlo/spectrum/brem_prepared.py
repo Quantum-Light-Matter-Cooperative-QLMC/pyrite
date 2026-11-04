@@ -114,7 +114,7 @@ class _PreparedBandTracks:
         field = "E_repr_keV" if segments.get("E_repr_keV") is not None else "E_keV"
         self.energy = xp.asarray(segments[field], dtype=REAL)[self.index]
         self.length = xp.asarray(segments["L_ang"], dtype=REAL)[self.index]
-        self.velocity = xp.asarray(segments["v_hat"], dtype=REAL)[self.index]
+        self.velocity = xp.asarray(segments["v_hat"], dtype=xp.float64)[self.index]
         if self.energy.size:
             low, high = float(_to_cpu(self.energy.min())), float(_to_cpu(self.energy.max()))
             for staged in recipe.staged.values():
@@ -156,7 +156,7 @@ class _PreparedBandTracks:
         )
         length = self.length[owner] * fraction
         energy = self.energy[owner]
-        cosine = self.velocity[owner] @ xp.asarray(direction, dtype=REAL)
+        cosine = self.velocity[owner] @ xp.asarray(direction, dtype=xp.float64)
         ids = self.ids[owner]
         cuda = BACKEND.name == "cuda" and np.dtype(REAL) == np.dtype(np.float32)
         chunk = min(recipe.row_chunk, 65536 if cuda else max(1, (1 << 21) // recipe.energy.size))

@@ -982,8 +982,8 @@ def mc_brem_spectrum(
         bremslib_staged, bremslib_covers = stage_bremslib_elements(
             comp, supplied_bremslib, seg_E, strict=bool(plasma_eV)
         )
-        v_hat = xp.asarray(segments["v_hat"], dtype=REAL)[brem_idx][owner]
-        seg_cos_theta = v_hat @ xp.asarray(n_hat, dtype=REAL)
+        v_hat = xp.asarray(segments["v_hat"], dtype=xp.float64)[brem_idx][owner]
+        seg_cos_theta = v_hat @ xp.asarray(n_hat, dtype=xp.float64)
 
     eedl_contexts = (
         _prepare_mc_eedl_contexts(comp, seg_E, E_grid, supplied_bremslib)

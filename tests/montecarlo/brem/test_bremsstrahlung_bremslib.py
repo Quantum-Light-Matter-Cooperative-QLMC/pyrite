@@ -72,6 +72,48 @@ def test_top_reduced_energy_follows_the_manual():
     )
 
 
+def test_forward_angle_survives_float32_table_staging(monkeypatch, carbon_table):
+    """A 0.1 mrad ray must not become exactly forward on FP32 backends."""
+    from pyrite.montecarlo.spectrum import brem_bremslib as module
+
+    # Exercise accelerator table precision without requiring accelerator hardware.
+    monkeypatch.setattr(module, "xp", np)
+    monkeypatch.setattr(module, "REAL", np.float32)
+    staged = module.stage_bremslib_table(carbon_table)
+    theta = 1.0e-4
+    assert np.float32(np.cos(theta)) == 1.0
+    state = module.bremslib_segment_state(staged, [100.0], [np.cos(theta)])
+    row = int(state.lower_row[0])
+    left, right = staged.scaled_ddcs_mb_sr[row, :2]
+    expected = left + np.float32(theta / staged.theta_rad[1]) * (right - left)
+    np.testing.assert_allclose(state.lower_values[0], expected, rtol=2 * np.finfo(np.float32).eps)
+    assert np.all(state.lower_values[0] > left)
+
+
+def test_forward_track_spectrum_retains_sub_milliradian_angle(monkeypatch, carbon_table):
+    """Check the complete direction staging path, including the CUDA scorer."""
+    monkeypatch.setattr(brem, "_mu_total_inv_ang", _zero_mu)
+    theta = 1.0e-4
+    values = []
+    for angle in (0.0, theta):
+        segments = _segments(100.0, [np.sin(angle), 0.0, np.cos(angle)])
+        value = brem.mc_brem_spectrum(
+            segments,
+            [10000.0],
+            composition=[("C", 0.1)],
+            n_hat=[0.0, 0.0, 1.0],
+            cross_section_model="bremslib",
+            bremslib_tables={"C": carbon_table},
+        )
+        values.append(float(to_host(value)[0]))
+    # The synthetic shape is independent of photon energy. Its first angular
+    # cell gives an independent ratio; all path/density/unit factors cancel.
+    row = np.argmin(abs(carbon_table.incident_energy_keV - 100.0))
+    left, right = carbon_table.scaled_ddcs_mb_sr[row, 0, :2]
+    expected = 1 + (theta / carbon_table.theta_rad[1]) * (right / left - 1)
+    assert values[1] / values[0] == pytest.approx(expected, rel=2e-6)
+
+
 def test_every_staged_node_integrates_to_its_sdcs(carbon_table):
     integral = solid_angle_integral(carbon_table.theta_rad, carbon_table.scaled_ddcs_mb_sr)
     np.testing.assert_allclose(integral, carbon_table.scaled_sdcs_mb, rtol=1.0e-12)

@@ -79,6 +79,7 @@ def main():
     ap.add_argument("--cpu", action="store_true")
     ap.add_argument("--histories", type=int, default=8)
     ap.add_argument("--repeats", type=int, default=4)
+    ap.add_argument("--reuse-tracks", action="store_true", help="Replay existing saved populations")
     args = ap.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
     if args.cpu:
@@ -93,14 +94,23 @@ def main():
         warm = transport(tables, 3000, 1, seed=980278)
         recipe(tables, 3000, 16).bind(warm).integrate(*angular(0, 2))
         del warm
-    report = dict(source_sha=source_pin(), backend="cpu" if args.cpu else "cuda", cases=[])
+    from pyrite._bremslib_table import BREMSSTRAHLUNG_BREMSLIB_MODEL
+
+    report = dict(
+        source_sha=source_pin(),
+        model=BREMSSTRAHLUNG_BREMSLIB_MODEL,
+        backend="cpu" if args.cpu else "cuda",
+        complete=False,
+        reused_tracks=args.cpu or args.reuse_tracks,
+        cases=[],
+    )
     for energy, order in ((3000, 2), (30000, 4), (100000, 16)):
         for center in (0, 15):
             # CPU checks the same real tracks/nodes at the central direction;
             # full-cone CUDA parity below covers every production angular node.
             selected_order = 0 if args.cpu else order
             path = args.output / f"tracks-{energy}-{center}"
-            if args.cpu:
+            if args.cpu or args.reuse_tracks:
                 segments = load(path)
             else:
                 segments = transport(tables, energy, args.histories, seed=971278 + energy + center)
@@ -156,6 +166,8 @@ def main():
             write_json(args.output / ("cpu.json" if args.cpu else "cuda.json"), report)
             print(json.dumps(item), flush=True)
             del segments, scorer, operations
+    report["complete"] = True
+    write_json(args.output / ("cpu.json" if args.cpu else "cuda.json"), report)
 
 
 if __name__ == "__main__":
