@@ -15,6 +15,7 @@ import tomllib
 import numpy as np
 import pytest
 
+from pyrite import _energy_grid_artifacts as artifacts
 from pyrite._catalog_layout import read_raw, read_text
 from pyrite._grid_semantics import (
     node_bin_edges_and_widths,
@@ -35,6 +36,7 @@ from pyrite.energy_grid.floor import (
 )
 from pyrite.materials import MediumSpec
 from pyrite.materials.attenuation import plasma_energy_eV
+from tests.helpers.energy_grid_catalog import BASE_TOML
 
 
 def _catalog_profiles() -> list[str]:
@@ -339,15 +341,35 @@ def test_a_declared_start_above_the_floor_is_a_bandwidth_choice_and_is_kept():
     assert build_cases(narrow)[0]["E_grid_brem"][0] == 5_000.0
 
 
-def test_artifact_resolved_brem_grids_start_inside_the_modelled_band():
-    """Artifact-backed materials resolve their grid from the store, not the row."""
-    _, _, brem_by_material, refs = resolved_show_inputs()
-    if not refs:
-        pytest.skip("the bundled catalog intentionally ships no artifact references")
+@pytest.mark.parametrize("declared_start", [0.0, 5000.0], ids=["below-floor", "above-floor"])
+def test_artifact_resolved_brem_grids_start_inside_the_modelled_band(tmp_path, declared_start):
+    """Resolve a real stored band, raising only starts below the medium floor."""
+    identity = artifacts.artifact_identity(
+        "hopg",
+        [],
+        {"start_eV": declared_start, "stop_eV": 30000.0, "step_eV": 25.0},
+        [30.0],
+    )
+    stored = artifacts.write_artifact(tmp_path / "energy-grid-artifacts", identity)
+    catalog = tmp_path / "materials.toml"
+    catalog.write_text(
+        BASE_TOML.replace(
+            "[profiles.standard]\n",
+            f'[profiles.standard]\nenergy_grid_refs = {{ hopg = "{stored.digest}" }}\n',
+        )
+    )
 
-    for material in refs:
-        brem = brem_by_material[material]
-        assert float(brem["start"]) == floored_lattice_start_eV(material, float(brem["step"]))
+    _, _, brem_by_material, refs = resolved_show_inputs(catalog_path=catalog)
+
+    assert refs == {"hopg": stored.digest}
+    floor = floored_lattice_start_eV("hopg", 25.0)
+    assert 0.0 < floor < 5000.0
+    assert brem_by_material["hopg"] == {
+        "kind": "arange",
+        "start": floor if declared_start == 0.0 else 5000.0,
+        "stop": 30000.0,
+        "step": 25.0,
+    }
 
 
 def test_derived_brem_band_is_not_written_as_a_uniform_override():
