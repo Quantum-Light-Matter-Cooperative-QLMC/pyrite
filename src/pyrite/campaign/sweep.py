@@ -56,6 +56,7 @@ from .._energy_grid_encoding import encode_energy_grid
 from .._grid_semantics import resolution_num
 from .._numerics import (
     DEFAULT_INELASTIC_CUTOFF_EV,
+    default_inelastic_cutoff,
     validate_bremsstrahlung_model,
     validate_elastic_model,
     validate_inelastic_numerics,
@@ -114,7 +115,11 @@ from .geometry import (  # noqa: F401  (re-exported: pyrite.campaign.sweep is th
     substrate_composition,
     substrate_radiator,
 )
-from .inelastic_cases import resolve_atomic_electron_deflection, resolve_auto_inelastic
+from .inelastic_cases import (
+    resolve_atomic_electron_deflection,
+    resolve_auto_inelastic,
+    validate_explicit_shell_cases,
+)
 from .longitudinal import LongitudinalDistribution
 
 MATERIAL_LABELS = {key: material.label for key, material in CATALOG.materials.items()}
@@ -1016,6 +1021,8 @@ def _resolve_case_models(
             else float(inelastic_cutoff_eV),
             energy_model,
         )
+    if inelastic_model == "shell-soft-hard":
+        validate_explicit_shell_cases(cases, float(cast(float, inelastic_cutoff_eV)), energy_model)
     cases = resolve_atomic_electron_deflection(cases, atomic_electron_deflection)
     if bremsstrahlung_model == "auto":
         cases = resolve_auto_bremsstrahlung(cases, radiative)
@@ -1039,7 +1046,7 @@ def build_cases(
     straggling=False,
     energy_model="midpoint",
     max_dE_frac=0.0,
-    inelastic_model="auto",
+    inelastic_model="shell-soft-hard",
     inelastic_cutoff_eV=None,
     elastic_model="elsepa",
     bremsstrahlung_model="auto",
@@ -1079,6 +1086,7 @@ def build_cases(
     n_electrons, n_electrons_brem = _electron_budget(
         sweep, precision, n_electrons, n_electrons_brem
     )
+    inelastic_cutoff_eV = default_inelastic_cutoff(inelastic_model, inelastic_cutoff_eV)
     validate_inelastic_numerics(
         inelastic_model, inelastic_cutoff_eV, energy_model, secondary_threshold_eV
     )

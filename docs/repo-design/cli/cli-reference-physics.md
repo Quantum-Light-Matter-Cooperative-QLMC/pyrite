@@ -70,17 +70,18 @@ Usage: pyrite physics set [OPTIONS] NAME
   Set PROFILE fields; validate and atomically save, or preview with --dry-run.
 
 Options:
-  --straggling / --no-straggling  Enable or disable Urban energy-loss straggling.
+  --straggling / --no-straggling  Enable or disable collision energy-loss straggling
+                                  (restricted soft loss in shell mode).
   --inelastic-model [auto|continuous|shell-soft-hard]
-                                  Collision energy-loss scheme: auto (default; shell-
-                                  soft-hard hard inelastic collisions where every layer
-                                  has shell data, otherwise continuous with a warning),
-                                  continuous stopping, or shell-soft-hard (requires
-                                  midpoint and --inelastic-cutoff-ev).
-  --inelastic-cutoff-ev EV        Soft/hard energy-loss cutoff W_c in eV (default 50
-                                  under auto); must exceed each material's conduction-
-                                  band resonance (Si 16.7, SiO2 22, MoS2 23 eV).
-                                  [x>0.0]
+                                  Collision energy-loss scheme: shell-soft-hard
+                                  (default; midpoint, ungrooved, shell data for every
+                                  layer), continuous stopping (explicit approximation),
+                                  or auto (legacy conditional shell selection with
+                                  warned continuous fallback).
+  --inelastic-cutoff-ev EV        Soft/hard energy-loss cutoff W_c in eV (default 50 for
+                                  shell-soft-hard or auto); must exceed each material's
+                                  conduction-band resonance (Si 16.7, SiO2 22, MoS2 23
+                                  eV).  [x>0.0]
   --secondary-threshold-ev EV     Transport hard-collision secondaries above this energy
                                   in eV (production cut and tracking cutoff; requires
                                   shell-soft-hard and SBETHE coverage, >= 1000 eV).
@@ -223,17 +224,18 @@ Usage: pyrite physics preset create [OPTIONS] NAME
 
 Options:
   --from SOURCE                   Clone SOURCE's fields; options then override them.
-  --straggling / --no-straggling  Enable or disable Urban energy-loss straggling.
+  --straggling / --no-straggling  Enable or disable collision energy-loss straggling
+                                  (restricted soft loss in shell mode).
   --inelastic-model [auto|continuous|shell-soft-hard]
-                                  Collision energy-loss scheme: auto (default; shell-
-                                  soft-hard hard inelastic collisions where every layer
-                                  has shell data, otherwise continuous with a warning),
-                                  continuous stopping, or shell-soft-hard (requires
-                                  midpoint and --inelastic-cutoff-ev).
-  --inelastic-cutoff-ev EV        Soft/hard energy-loss cutoff W_c in eV (default 50
-                                  under auto); must exceed each material's conduction-
-                                  band resonance (Si 16.7, SiO2 22, MoS2 23 eV).
-                                  [x>0.0]
+                                  Collision energy-loss scheme: shell-soft-hard
+                                  (default; midpoint, ungrooved, shell data for every
+                                  layer), continuous stopping (explicit approximation),
+                                  or auto (legacy conditional shell selection with
+                                  warned continuous fallback).
+  --inelastic-cutoff-ev EV        Soft/hard energy-loss cutoff W_c in eV (default 50 for
+                                  shell-soft-hard or auto); must exceed each material's
+                                  conduction-band resonance (Si 16.7, SiO2 22, MoS2 23
+                                  eV).  [x>0.0]
   --secondary-threshold-ev EV     Transport hard-collision secondaries above this energy
                                   in eV (production cut and tracking cutoff; requires
                                   shell-soft-hard and SBETHE coverage, >= 1000 eV).
@@ -357,17 +359,18 @@ Usage: pyrite physics preset set [OPTIONS] NAME
   referencing profiles before saving.
 
 Options:
-  --straggling / --no-straggling  Enable or disable Urban energy-loss straggling.
+  --straggling / --no-straggling  Enable or disable collision energy-loss straggling
+                                  (restricted soft loss in shell mode).
   --inelastic-model [auto|continuous|shell-soft-hard]
-                                  Collision energy-loss scheme: auto (default; shell-
-                                  soft-hard hard inelastic collisions where every layer
-                                  has shell data, otherwise continuous with a warning),
-                                  continuous stopping, or shell-soft-hard (requires
-                                  midpoint and --inelastic-cutoff-ev).
-  --inelastic-cutoff-ev EV        Soft/hard energy-loss cutoff W_c in eV (default 50
-                                  under auto); must exceed each material's conduction-
-                                  band resonance (Si 16.7, SiO2 22, MoS2 23 eV).
-                                  [x>0.0]
+                                  Collision energy-loss scheme: shell-soft-hard
+                                  (default; midpoint, ungrooved, shell data for every
+                                  layer), continuous stopping (explicit approximation),
+                                  or auto (legacy conditional shell selection with
+                                  warned continuous fallback).
+  --inelastic-cutoff-ev EV        Soft/hard energy-loss cutoff W_c in eV (default 50 for
+                                  shell-soft-hard or auto); must exceed each material's
+                                  conduction-band resonance (Si 16.7, SiO2 22, MoS2 23
+                                  eV).  [x>0.0]
   --secondary-threshold-ev EV     Transport hard-collision secondaries above this energy
                                   in eV (production cut and tracking cutoff; requires
                                   shell-soft-hard and SBETHE coverage, >= 1000 eV).

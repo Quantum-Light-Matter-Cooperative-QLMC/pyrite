@@ -9,6 +9,8 @@ materials = ["hopg"]
 cxr_trials = {values = [500]}
 brem_trials = {values = [100]}
 beam = "example"
+# Preserve the singleton adapter's historical frozen/continuous transport.
+inelastic_model = "continuous"
 
 [detectors]
 camera = "pixelated_reference"

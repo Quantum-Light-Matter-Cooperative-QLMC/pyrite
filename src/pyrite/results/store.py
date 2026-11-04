@@ -22,6 +22,7 @@ from .._numerics import (
     PHYSICS_FIELDS,
     Physics,
     _emission_selection,
+    default_inelastic_cutoff,
     validate_atomic_electron_deflection,
     validate_bremsstrahlung_model,
     validate_channeling_numerics,
@@ -112,10 +113,10 @@ class Settings:
     energy_model, max_dE_frac
         Flight integration rule and optional fractional-loss substep cap.
     inelastic_model, inelastic_cutoff_eV
-        Collision-loss scheme: ``"auto"`` (default) runs shell soft/hard hard
-        inelastic collisions where every layer has shell data and otherwise
-        warns and keeps ``"continuous"``; and the shell cutoff ``W_c`` in eV
-        (50 eV under ``"auto"`` when ``None``).
+        ``"shell-soft-hard"`` (default) with a 50 eV cutoff when omitted;
+        requires midpoint integration, ungrooved geometry and covered layers.
+        Choose ``"continuous"`` explicitly for unsupported scenes. ``"auto"``
+        retains the legacy conditional selection with warned continuous fallback.
     secondary_threshold_eV
         Opt-in secondary transport threshold in eV (shell mode only).
     elastic_model
@@ -165,7 +166,7 @@ class Settings:
     straggling: bool = False
     energy_model: Literal["frozen", "midpoint"] = "midpoint"
     max_dE_frac: float = 0.0
-    inelastic_model: Literal["auto", "continuous", "shell-soft-hard"] = "auto"
+    inelastic_model: Literal["auto", "continuous", "shell-soft-hard"] = "shell-soft-hard"
     inelastic_cutoff_eV: float | None = None
     secondary_threshold_eV: float | None = None
     elastic_model: Literal["mott", "elsepa"] = "elsepa"
@@ -197,7 +198,14 @@ class Settings:
     precision: Precision | None = None
     allow_fallback: bool = False
 
+    def __setstate__(self, state: dict[str, Any]) -> None:
+        """Keep omitted historical inelastic selectors on their original auto policy."""
+        self.__dict__.update({"inelastic_model": "auto", "inelastic_cutoff_eV": None, **state})
+
     def __post_init__(self) -> None:
+        self.inelastic_cutoff_eV = default_inelastic_cutoff(
+            self.inelastic_model, self.inelastic_cutoff_eV
+        )
         if not isinstance(self.allow_fallback, bool):
             raise TypeError("allow_fallback must be a bool")
         if self.precision is not None and not isinstance(self.precision, Precision):

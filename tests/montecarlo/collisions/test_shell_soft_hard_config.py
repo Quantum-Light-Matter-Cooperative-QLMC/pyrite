@@ -1,4 +1,4 @@
-"""Configuration threading of the shell soft/hard inelastic mode and its ``auto`` default.
+"""Configuration threading of the shell soft/hard inelastic mode and its explicit shell default.
 
 Validation: shell-soft-hard-transport
 """
@@ -28,7 +28,8 @@ def test_inelastic_settings_validate_coupling(owner):
             return resolve_physics(Physics(**kwargs), Numerics(energy_model=energy_model))
         return owner(energy_model=energy_model, **kwargs)
 
-    assert owner().inelastic_model == "auto"
+    assert owner().inelastic_model == "shell-soft-hard"
+    assert owner().inelastic_cutoff_eV == 50.0
     owner(inelastic_cutoff_eV=60.0)
     configured(energy_model="midpoint", inelastic_model="shell-soft-hard", inelastic_cutoff_eV=50.0)
     with pytest.raises(ValueError, match="requires energy_model='midpoint'"):
@@ -38,12 +39,11 @@ def test_inelastic_settings_validate_coupling(owner):
             inelastic_model="shell-soft-hard",
             inelastic_cutoff_eV=50.0,
         )
-    with pytest.raises(ValueError, match="finite positive inelastic_cutoff_eV"):
-        configured(energy_model="midpoint", inelastic_model="shell-soft-hard")
+    configured(energy_model="midpoint", inelastic_model="shell-soft-hard")
     with pytest.raises(ValueError, match="requires inelastic_model"):
         owner(inelastic_model="continuous", inelastic_cutoff_eV=50.0)
     with pytest.raises(ValueError, match="requires inelastic_model"):
-        owner(secondary_threshold_eV=100.0)
+        owner(inelastic_model="continuous", secondary_threshold_eV=100.0)
     with pytest.raises(ValueError, match="inelastic_model must be one of"):
         owner(inelastic_model="dielectric")
 
@@ -74,9 +74,8 @@ def test_case_schema_and_runner_kwargs():
     assert runner._case_inelastic_kwargs(stacked)["inelastic_materials"] == ["silicon", "mos2"]
 
 
-def test_build_cases_rejects_shell_mode_without_cutoff():
-    with pytest.raises(ValueError, match="finite positive inelastic_cutoff_eV"):
-        _case(inelastic_model="shell-soft-hard")
+def test_build_cases_defaults_shell_cutoff():
+    assert _case(inelastic_model="shell-soft-hard")["inelastic_cutoff_eV"] == 50.0
 
 
 def test_shell_tables_accept_one_material_key():
@@ -144,6 +143,7 @@ def test_auto_falls_back_to_continuous_with_a_warning(material, energy_model, re
             4,
             4,
             energy_model=energy_model,
+            inelastic_model="auto",
             radiative_model="uncoupled",
         )
     assert all(case.get("inelastic_model") is None for case in cases)
@@ -155,7 +155,7 @@ def test_auto_identity_records_the_resolved_model(material, shell):
     from pyrite.campaign.config import default_settings
     from pyrite.campaign.profiles import dataset_identity
 
-    settings = default_settings()
+    settings = replace(default_settings(), inelastic_model="auto", inelastic_cutoff_eV=None)
     identity = dataset_identity(material, "full", settings, material_sweep(material))
     numerics = identity["resolved_parameters"]["transport_numerics"]
     if shell:

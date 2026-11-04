@@ -146,9 +146,26 @@ def test_adoption_and_unused_presets_keep_identity(_isolate_user_catalog):
 
 def test_invalid_combinations_and_references_write_nothing(_isolate_user_catalog):
     ok("profile", "create", "campaign", "--from", "quickstart")
-    ok("physics", "set", "campaign", "--radiative-model", "uncoupled")
+    ok(
+        "physics",
+        "set",
+        "campaign",
+        "--radiative-model",
+        "uncoupled",
+        "--inelastic-model",
+        "continuous",
+    )
     ok("numerics", "set", "campaign", "--energy-model", "frozen")
-    ok("physics", "preset", "create", "coupled", "--radiative-model", "uncoupled")
+    ok(
+        "physics",
+        "preset",
+        "create",
+        "coupled",
+        "--radiative-model",
+        "uncoupled",
+        "--inelastic-model",
+        "continuous",
+    )
     before = snapshot(_isolate_user_catalog)
 
     rejected = invoke(
@@ -167,6 +184,8 @@ def test_invalid_combinations_and_references_write_nothing(_isolate_user_catalog
     assert rejected.exit_code == 1
     # A valid preset that conflicts with a referencing profile's numerics.
     ok("profile", "set", "campaign", "--physics", "coupled")
+    reset = invoke(command, ["physics", "reset", "campaign", "inelastic-model", "--yes"])
+    assert reset.exit_code == 0, reset.stderr
     conflict = invoke(
         command,
         [

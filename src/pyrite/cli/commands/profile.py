@@ -154,7 +154,7 @@ def _transport_cli_options(function):
     function = click.option(
         "--straggling/--no-straggling",
         default=None,
-        help="Enable or disable Urban energy-loss straggling.",
+        help="Enable or disable collision energy-loss straggling (restricted soft loss in shell mode).",
     )(function)
     return function
 
@@ -370,7 +370,7 @@ def numerics_show_command(name, json_output):
 @click.option(
     "--straggling/--no-straggling",
     default=None,
-    help="Enable or disable Urban energy-loss straggling.",
+    help="Enable or disable collision energy-loss straggling (restricted soft loss in shell mode).",
 )
 @click.option(
     "--energy-model", type=click.Choice(_ENERGY_MODEL_VALUES), help="Transport clock model."
@@ -385,9 +385,9 @@ def numerics_show_command(name, json_output):
     "--inelastic-model",
     type=click.Choice(_INELASTIC_MODEL_VALUES),
     help=(
-        "Collision energy-loss scheme: auto (default; shell-soft-hard hard inelastic "
-        "collisions where every layer has shell data, otherwise continuous with a warning), "
-        "continuous stopping, or shell-soft-hard (requires midpoint and --inelastic-cutoff-ev)."
+        "Collision energy-loss scheme: shell-soft-hard (default; midpoint, ungrooved, "
+        "shell data for every layer), continuous stopping (explicit approximation), or auto "
+        "(legacy conditional shell selection with warned continuous fallback)."
     ),
 )
 @click.option(
@@ -395,7 +395,7 @@ def numerics_show_command(name, json_output):
     type=click.FloatRange(min=0.0, min_open=True),
     metavar="EV",
     help=(
-        "Soft/hard energy-loss cutoff W_c in eV (default 50 under auto); must exceed each "
+        "Soft/hard energy-loss cutoff W_c in eV (default 50 for shell-soft-hard or auto); must exceed each "
         "material's conduction-band resonance (Si 16.7, SiO2 22, MoS2 23 eV)."
     ),
 )

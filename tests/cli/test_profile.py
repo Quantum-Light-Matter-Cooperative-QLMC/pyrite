@@ -1587,8 +1587,7 @@ def test_numerics_set_shell_inelastic_mode_validates_and_resets(tmp_path, monkey
             "shell-soft-hard",
         ],
     )
-    assert missing_cutoff.exit_code == 1
-    assert "requires a finite positive inelastic_cutoff_eV" in missing_cutoff.stderr
+    assert_clean_result(missing_cutoff, stdout="updated numerics for profile sub_100keV\n")
 
     frozen = invoke(
         profile.command,

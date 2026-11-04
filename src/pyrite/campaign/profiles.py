@@ -32,6 +32,7 @@ from .._numerics import (
     CxrReflections,
     Numerics,
     Physics,
+    default_inelastic_cutoff,
     electron_counts,
     validate_bremsstrahlung_model,
     validate_profile_numerics,
@@ -277,9 +278,7 @@ def resolve_numerics(
 ) -> NumericsResolution:
     """Resolve run overrides over profile, presets, fidelity, then built-in numerics.
 
-    ``named`` holds referenced named presets' numerics-key values (ADR-0021)
-    and ``named_sources`` each field's source label, kept unless the profile
-    or run overrides the field.
+    ``named`` and ``named_sources`` carry preset values/provenance beneath profile/run overrides.
     """
     preset = get_fidelity_preset(fidelity)
     convergence = CxrReflections()
@@ -338,11 +337,14 @@ def resolve_numerics(
         effective[key] = value
         sources[key] = "profile"
     run_overrides = dict(overrides or {})
-    validate_profile_numerics({**normalized, **run_overrides})
     for key, value in run_overrides.items():
         if key in PROFILE_NUMERICS_KEYS:
             effective[key] = value
             sources[key] = "run"
+    effective["inelastic_cutoff_eV"] = {
+        "built-in": default_inelastic_cutoff(effective["inelastic_model"], None)
+    }.get(sources["inelastic_cutoff_eV"], effective["inelastic_cutoff_eV"])
+    validate_profile_numerics({**effective, **run_overrides})
     return NumericsResolution(
         fidelity=fidelity,
         explicit=normalized,
@@ -1004,9 +1006,7 @@ def profile_precision_source(
 def canonical_settings(settings: Settings, *, resolved_bremsstrahlung: bool = True) -> bool:
     """Whether profile-applied ``settings`` keep the bare ``<material>`` stem.
 
-    The runner checks the resolved ``bremsstrahlung_model`` (``"bremslib"``).
-    Predictors that cannot load tables pass ``resolved_bremsstrahlung=False``,
-    which accepts ``"auto"`` as the production install's BremsLib resolution.
+    Table-free predictors pass ``resolved_bremsstrahlung=False`` to accept ``"auto"``.
     """
     bremsstrahlung = ("bremslib",) if resolved_bremsstrahlung else ("bremslib", "auto")
     return (
@@ -1015,8 +1015,8 @@ def canonical_settings(settings: Settings, *, resolved_bremsstrahlung: bool = Tr
         and settings.precision is None
         and settings.energy_model == "midpoint"
         and settings.max_dE_frac == 0.0
-        and settings.inelastic_model == "auto"
-        and settings.inelastic_cutoff_eV is None
+        and (settings.inelastic_model, settings.inelastic_cutoff_eV)
+        in {("auto", None), ("shell-soft-hard", 50.0)}
         and settings.elastic_model == "elsepa"
         and settings.bremsstrahlung_model in bremsstrahlung
         and settings.radiative_model in ("auto", "bremslib-soft-hard")

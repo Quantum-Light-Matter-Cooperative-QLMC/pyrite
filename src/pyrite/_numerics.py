@@ -79,7 +79,7 @@ TRANSPORT_KEYS = (
     "transition_lattice_origin_ang",
     "shell_ionization_model",
 )
-#: Collision-loss schemes a run may select: ``"auto"`` (the default) plus the
+#: Collision-loss schemes a run may select: legacy ``"auto"`` plus the
 #: ``simulate_trajectories`` schemes of
 #: ``montecarlo.transport.hard_inelastic.INELASTIC_MODELS`` (a test keeps the
 #: two in step) without importing the transport package here. ``"auto"``
@@ -214,13 +214,11 @@ class Physics:
     straggling
         Enable stochastic per-flight energy-loss straggling.
     inelastic_model, inelastic_cutoff_eV
-        ``"auto"`` (default) uses the ``"shell-soft-hard"`` mixed scheme with
-        explicit hard inelastic collisions for each case whose layers all have
-        shell data, when ungrooved and ``energy_model="midpoint"``, and
-        otherwise warns and keeps ``"continuous"`` stopping. ``W_c`` is the
-        energy-loss cutoff in eV (default 50 under ``"auto"``; required by
-        explicit ``"shell-soft-hard"``, which also requires
-        ``energy_model="midpoint"``; invalid with ``"continuous"``).
+        ``"shell-soft-hard"`` (default) uses explicit hard inelastic collisions
+        with a 50 eV cutoff when omitted. Requires shell data for every layer,
+        ungrooved geometry and ``energy_model="midpoint"``. Unsupported scenes
+        must select ``"continuous"`` explicitly (no cutoff). ``"auto"`` retains
+        the legacy conditional selection with warned continuous fallback.
     secondary_threshold_eV
         Opt-in transport of hard-collision secondaries (shell-soft-hard only):
         one threshold in eV is both production cut and secondary tracking
@@ -311,7 +309,7 @@ class Physics:
     emission: EmissionSelection = "incoherent"
     brem_source: Literal["mc", "external", "none"] | None = "mc"
     straggling: bool = False
-    inelastic_model: Literal["auto", "continuous", "shell-soft-hard"] = "auto"
+    inelastic_model: Literal["auto", "continuous", "shell-soft-hard"] = "shell-soft-hard"
     inelastic_cutoff_eV: float | None = None
     secondary_threshold_eV: float | None = None
     elastic_model: Literal["mott", "elsepa"] = "elsepa"
@@ -334,7 +332,7 @@ class Physics:
         emission: EmissionSelection = "incoherent",
         brem_source: Literal["mc", "external", "none"] | None = "mc",
         straggling: bool = False,
-        inelastic_model: Literal["auto", "continuous", "shell-soft-hard"] = "auto",
+        inelastic_model: Literal["auto", "continuous", "shell-soft-hard"] = "shell-soft-hard",
         inelastic_cutoff_eV: float | None | _Unset = UNSET,
         secondary_threshold_eV: float | None | _Unset = UNSET,
         elastic_model: Literal["mott", "elsepa"] = "elsepa",
@@ -362,6 +360,7 @@ class Physics:
             name: values.pop(name) for name in (*_PHYSICS_ENERGIES, "transition_lattice_origin")
         }
         del values["self"]
+        quantity_defaults = {"inelastic_cutoff_eV": default_inelastic_cutoff(inelastic_model, None)}
         for name, numeric in (
             *_PHYSICS_ENERGIES.items(),
             ("transition_lattice_origin", "transition_lattice_origin_ang"),
@@ -374,10 +373,16 @@ class Physics:
             resolved = _quantity_spelling(
                 "Physics", numeric, values[numeric], name, semantic[name], convert
             )
-            values[numeric] = None if resolved is UNSET else resolved
+            values[numeric] = quantity_defaults.get(numeric) if resolved is UNSET else resolved
         for name, value in values.items():
             object.__setattr__(self, name, value)
         self.__post_init__()
+
+    def __setstate__(self, state: dict[str, Any]) -> None:
+        """Restore historical selector omissions independently of constructor defaults."""
+        restored = {"inelastic_model": "auto", "inelastic_cutoff_eV": None, **state}
+        for name, value in restored.items():
+            object.__setattr__(self, name, value)
 
     @property
     def inelastic_cutoff(self) -> "Quantity | None":
@@ -1066,6 +1071,13 @@ def validate_radiative_numerics(
         raise ValueError("radiative_model='bremslib-soft-hard' requires BremsLib, not 'eedl'")
 
 
+def default_inelastic_cutoff(model: object, cutoff_eV: float | None) -> float | None:
+    """Fill an omitted new-run cutoff only for the explicit shell model."""
+    if cutoff_eV is None and model == "shell-soft-hard":
+        return DEFAULT_INELASTIC_CUTOFF_EV
+    return cutoff_eV
+
+
 def validate_inelastic_numerics(
     model: object, cutoff_eV: object, energy_model: object, secondary_threshold_eV: object = None
 ) -> None:
@@ -1141,6 +1153,13 @@ def validate_profile_numerics(values: Mapping[str, object]) -> None:
     }
     transport_values: dict[str, Any] = {key: values[key] for key in TRANSPORT_KEYS if key in values}
     reflections = CxrReflections(**convergence_values)
+    # Partial frozen overrides may inherit an explicit continuous/auto preset.
+    # Full effective combinations are validated after preset/profile resolution.
+    if (
+        "inelastic_model" not in transport_values
+        and transport_values.get("energy_model") == "frozen"
+    ):
+        transport_values["inelastic_model"] = "auto"
     physics = Physics(
         **{key: value for key, value in transport_values.items() if key in PHYSICS_FIELDS}
     )

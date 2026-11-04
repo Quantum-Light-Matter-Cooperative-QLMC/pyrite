@@ -96,6 +96,38 @@ Hard draws use a counter-addressed SplitMix64 stream keyed by the electron's str
 
 ## Configuration
 
-Profiles, `Numerics` and `Settings` carry `inelastic_model` and `inelastic_cutoff_eV`. The default `inelastic_model="auto"` (issue #281) resolves each case to `shell-soft-hard` with $W_c=50$ eV, or the given `inelastic_cutoff_eV`, when the run uses `energy_model="midpoint"`, is ungrooved, and every transport layer names a catalog crystal with packaged conduction-band shell data. Today that means silicon, SiO₂, MoS₂, HOPG and hBN. An amorphous absorber layer names no crystal. Any other case keeps continuous stopping, and one warning names the materials and the reason. Missing installable reference data is not a fallback: absent `pdatconf.p14` raises with `pyrite tables fetch sbethe`, and a cutoff at or below a layer's $W_{cb}$ raises. `pyrite profile numerics set --inelastic-model continuous` opts out; `--inelastic-model shell-soft-hard --inelastic-cutoff-ev 50` requires the mode, so an uncovered material raises. Cases and dataset identities carry the keys only when the mode resolves on, so continuous runs keep their content keys and digests.
+`Physics`, profile settings and `Settings` default to
+`inelastic_model="shell-soft-hard"` with $W_c=50$ eV. The run requires
+`energy_model="midpoint"`, ungrooved geometry, and a catalog crystal with
+packaged conduction-band shell data for every transport layer. Coverage is
+listed in `src/pyrite/data/conduction_band.toml` (16 records); an amorphous
+absorber layer has no crystal key. Unsupported scenes raise before transport.
+Missing installable reference data also raises: absent `pdatconf.p14` names
+`pyrite tables fetch sbethe`. Every layer requires $W_c>W_{cb}$.
 
-`Validation: shell-soft-hard-transport` (unverified). See [shell soft/hard transport validation](../../validation/beam-transport/shell-soft-hard-transport.md).
+### Migrating conditional selection
+
+For uncovered materials, amorphous layers, grooves or frozen integration,
+choose `Physics(inelastic_model="continuous")` explicitly, or set
+`pyrite profile numerics set PROFILE --inelastic-model continuous`.
+Continuous stopping omits hard inelastic events; this is an explicit physical
+approximation without a general accuracy bound. It takes no inelastic cutoff.
+When replacing an existing shell configuration, clear its inherited cutoff too:
+`replace(physics, inelastic_model="continuous", inelastic_cutoff_eV=None)`.
+
+Explicit `inelastic_model="auto"` retains the historical selection: shell at
+50 eV for supported scenes, otherwise continuous with a warning. Existing
+serialized omissions and `auto` records retain their historical meanings.
+Covered scenes have the same resolved cases, dataset identities and content
+keys as legacy `auto` at 50 eV; stored continuous cases retain omitted shell
+keys. The low-level `simulate_trajectories` default remains continuous.
+The singleton pixel-profile adapter retains its historical frozen integration;
+`pixelated_detector_demo` explicitly selects continuous stopping to preserve
+its resolved model and identities. Other frozen adapter profiles must explicitly
+choose continuous stopping, or choose midpoint integration to use the shell model.
+`straggling=False` remains the default: hard events fluctuate, while the soft
+loss stays deterministic until the separate qualification gates pass. This
+selector migration changes admission of unsupported scenes, not the shell
+transport equations or their model marker.
+
+`Validation: shell-soft-hard-transport` (rederived). See [shell soft/hard transport validation](../../validation/beam-transport/shell-soft-hard-transport.md).

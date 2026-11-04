@@ -2,11 +2,12 @@
 # stated explicitly. Attaching it to a profile changes no effective value,
 # identity, or result. Clone it to start a custom preset:
 #   pyrite physics preset create my-physics --from electron-standard
-description = "Built-in defaults: ELSEPA elastic, auto shell soft/hard inelastic, auto BremsLib coupling, Kawrakow atomic-electron deflection, incoherent CXR"
+description = "Built-in defaults: ELSEPA elastic, shell soft/hard inelastic at 50 eV, auto BremsLib coupling, Kawrakow atomic-electron deflection, incoherent CXR"
 emission = "incoherent"
 straggling = false
 elastic_model = "elsepa"
-inelastic_model = "auto"
+inelastic_model = "shell-soft-hard"
+inelastic_cutoff_eV = 50.0
 bremsstrahlung_model = "auto"
 radiative_model = "auto"
 atomic_electron_deflection = "kawrakow"

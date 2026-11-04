@@ -946,7 +946,7 @@ def test_identity_from_stem_reads_sidecar_when_profile_edited_after_run(tmp_path
 @pytest.mark.slow
 def test_shell_inelastic_mode_forks_identity_and_case_payload_only_when_on():
     default = replace(default_settings(), energy_model="midpoint")
-    settings = replace(default, inelastic_model="continuous")
+    settings = replace(default, inelastic_model="continuous", inelastic_cutoff_eV=None)
     sweep = material_sweep("silicon")
     base = dataset_identity("silicon", "full", settings, sweep)
     shell = replace(settings, inelastic_model="shell-soft-hard", inelastic_cutoff_eV=50.0)
@@ -1020,9 +1020,14 @@ def test_secondary_threshold_forks_identity_and_case_payload_only_when_set():
     assert secondary["secondary_threshold_eV"] == 1000.0
     assert profiles.case_content_key(secondary) != profiles.case_content_key(plain)
     with pytest.raises(ValueError, match="requires inelastic_model='shell-soft-hard'"):
-        build_cases(sweep, 4, 4, secondary_threshold_eV=1000.0)
+        build_cases(sweep, 4, 4, inelastic_model="continuous", secondary_threshold_eV=1000.0)
     with pytest.raises(ValueError, match="requires inelastic_model='shell-soft-hard'"):
-        replace(default_settings(), secondary_threshold_eV=1000.0)
+        replace(
+            default_settings(),
+            inelastic_model="continuous",
+            inelastic_cutoff_eV=None,
+            secondary_threshold_eV=1000.0,
+        )
 
 
 def test_default_elsepa_model_forks_identity_and_case_payload_from_mott():
@@ -1117,7 +1122,9 @@ def test_undeclared_case_brem_grid_is_automatic_refined_geometric(catalog_profil
         )
         assert sweep.energy_bins.brem is None, (catalog_profile, material)
         medium = continuum_medium_key(sweep.material)
-        for case in build_cases(sweep, n_electrons=300, n_electrons_brem=150):
+        for case in build_cases(
+            sweep, n_electrons=300, n_electrons_brem=150, inelastic_model="auto"
+        ):
             endpoint = case["E0_keV"] * 1e3
             grid = np.asarray(case["E_grid_brem"], dtype=float)
             np.testing.assert_array_equal(grid, automatic_continuum_grid(medium, endpoint))
@@ -1227,8 +1234,10 @@ def test_explicit_brem_grid_keeps_its_nodes_and_forks_from_automatic(material):
     explicit_identity = dataset_identity(material, "full", settings, explicit)
     assert implicit_identity["parameter_sha256"] != explicit_identity["parameter_sha256"]
     assert "continuum_grid_model" not in explicit_identity["resolved_parameters"]["sweep"]
-    implicit_cases = build_cases(sweep, n_electrons=1, n_electrons_brem=1)
-    explicit_cases = build_cases(explicit, n_electrons=1, n_electrons_brem=1)
+    implicit_cases = build_cases(sweep, n_electrons=1, n_electrons_brem=1, inelastic_model="auto")
+    explicit_cases = build_cases(
+        explicit, n_electrons=1, n_electrons_brem=1, inelastic_model="auto"
+    )
     for implicit_case, explicit_case in zip(implicit_cases, explicit_cases, strict=True):
         # A declared uniform grid keeps its tuple spelling; the automatic one is exact nodes.
         assert isinstance(explicit_case["E_grid_brem"], tuple)

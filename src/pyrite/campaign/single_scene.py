@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any, Literal, cast
 import numpy as np
 
 from .._energy_grid_encoding import encode_energy_grid
-from .._numerics import _emission_selection
+from .._numerics import _emission_selection, default_inelastic_cutoff
 from .observation import filter_from_config, physical_detector_from_config
 
 if TYPE_CHECKING:
@@ -170,9 +170,12 @@ def resolve_pixel_scene(
             straggling=straggling,
             inelastic_model=cast(
                 Literal["auto", "continuous", "shell-soft-hard"],
-                transport.get("inelastic_model", "auto"),
+                transport.get("inelastic_model", "shell-soft-hard"),
             ),
-            inelastic_cutoff_eV=cast(float | None, transport.get("inelastic_cutoff_eV")),
+            inelastic_cutoff_eV=default_inelastic_cutoff(
+                transport.get("inelastic_model", "shell-soft-hard"),
+                cast(float | None, transport.get("inelastic_cutoff_eV")),
+            ),
             secondary_threshold_eV=cast(float | None, transport.get("secondary_threshold_eV")),
             elastic_model=cast(Literal["mott", "elsepa"], transport.get("elastic_model", "elsepa")),
             bremsstrahlung_model=cast(

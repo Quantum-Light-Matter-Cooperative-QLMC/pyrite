@@ -1,4 +1,4 @@
-"""Per-case resolution of ``inelastic_model="auto"`` (issue #281).
+"""Explicit shell admission and legacy ``inelastic_model="auto"`` resolution.
 
 ``build_cases`` records only the resolved collision-loss scheme on each case,
 so identity and content keys of a case that stays on continuous stopping are
@@ -101,6 +101,32 @@ def resolve_auto_inelastic(cases: list[Case], cutoff_eV: float, energy_model: st
             stacklevel=3,
         )
     return out
+
+
+def validate_explicit_shell_cases(cases: list[Case], cutoff_eV: float, energy_model: str) -> None:
+    """Reject unsupported explicit shell scenes before transport or checkpoint reuse."""
+    from ..montecarlo.runner.case_tables import case_shell_materials
+    from ..montecarlo.transport.shell_transport import validate_shell_cutoff
+
+    covered = covered_shell_materials()
+    checked: set[tuple[str, ...]] = set()
+    for case in cases:
+        materials = case_shell_materials(case)
+        reason = shell_fallback_reason(
+            materials,
+            grooved=case.get("groove_spacing_ang") is not None,
+            energy_model=energy_model,
+            covered=covered,
+        )
+        if reason is not None:
+            raise ValueError(
+                f"inelastic_model='shell-soft-hard' cannot run {case['crystal']!r}: {reason}; "
+                "choose inelastic_model='continuous' explicitly for continuous stopping"
+            )
+        keys = tuple(cast(list[str], materials))
+        if keys not in checked:
+            validate_shell_cutoff(keys, cutoff_eV)
+            checked.add(keys)
 
 
 def resolve_atomic_electron_deflection(cases: list[Case], model: object) -> list[Case]:
