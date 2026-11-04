@@ -268,7 +268,7 @@ def facet_metric(
     settings,
     *,
     x="thickness_ang",
-    y="peak_flux",
+    y="peak_spectral_flux_density",
     row=None,
     col=None,
     hue="E0_keV",

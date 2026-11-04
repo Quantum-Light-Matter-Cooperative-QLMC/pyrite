@@ -56,21 +56,24 @@ def test_dataframe_has_knobs_and_metrics_one_row_per_record():
         "E0_keV",
         "E_pk",
         "eta",
-        "peak_flux",
+        "peak_spectral_flux_density",
         "coherent_flux",
         "line_flux",
         "line_quality",
     }
     assert needed <= set(df.columns)
-    # peak_flux tracks the amplitude we scaled with thickness
+    # peak_spectral_flux_density tracks the amplitude we scaled with thickness
     thick_rows = df[df["thickness_ang"] == 1e4]
     thin_rows = df[df["thickness_ang"] == 1e3]
-    assert thick_rows["peak_flux"].mean() > thin_rows["peak_flux"].mean()
+    assert (
+        thick_rows["peak_spectral_flux_density"].mean()
+        > thin_rows["peak_spectral_flux_density"].mean()
+    )
 
 
 def test_dataframe_metrics_false_skips_peak_finding():
     df = results_dataframe(_results(), metrics=False)
-    assert "peak_flux" not in df.columns
+    assert "peak_spectral_flux_density" not in df.columns
     assert {"crystal", "thickness_ang", "E_pk", "eta"} <= set(df.columns)
     assert len(df) == 8
 
@@ -84,7 +87,7 @@ def test_facet_metric_grid_shape():
         _results(),
         Settings(),
         x="thickness_ang",
-        y="peak_flux",
+        y="peak_spectral_flux_density",
         row="crystal",
         col="tilt_deg",
         hue="E0_keV",

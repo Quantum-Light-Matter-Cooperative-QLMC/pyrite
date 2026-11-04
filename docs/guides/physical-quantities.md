@@ -241,7 +241,7 @@ script to quantities.
 | Channeling transverse states | `centre`, `k_extent`, `k_resolution`, `axes`, `offset` | `centre_position`, `momentum_extent`, `momentum_resolution`, `sample_positions`, `displacement` | Numeric solver contracts; quantity read-back |
 | Crystal constants and deterministic scientific helpers | `*_eV`, `*_ang`, `*_inv_mm` | — | Numeric contract; follow-up in #816 |
 | CLI options, profile TOML | Option-name and key units; TOML also takes unit strings | — | Numeric CLI; unit-string CLI input is tracked separately |
-| `cxr_metrics` peak keys | `peak_flux`, `peak_flux_per_na` | `peak_spectral_flux_density`, `peak_spectral_flux_density_per_na` | Deprecated since 0.24.0; removal planned for 0.26.0 |
+| `cxr_metrics` peak keys | `peak_flux`, `peak_flux_per_na` | `peak_spectral_flux_density`, `peak_spectral_flux_density_per_na` | Removed in 0.26.0 (deprecated since 0.24.0) |
 
 A future deprecation of a numeric spelling follows the
 [release policy](../repo-design/releasing.md): it is announced in a shipping

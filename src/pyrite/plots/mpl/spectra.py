@@ -431,7 +431,7 @@ def material_comparison_summary(
             "line_eV": m["line_eV"],
             "line_flux": m["line_flux"],
             "line_quality": m["line_quality"],
-            "peak_flux": m["peak_flux"],
+            "peak_flux": m["peak_spectral_flux_density"],
             "coherent_flux": m["coherent_flux"],
             "line_brem_ratio": m["line_brem_ratio"],
         }

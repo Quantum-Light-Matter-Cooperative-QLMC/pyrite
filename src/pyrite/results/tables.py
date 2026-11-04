@@ -38,7 +38,7 @@ def results_dataframe(
     plotly over ANY subset of knobs, instead of the heatmap/line auto-pick. See
     :func:`plots.facet_metric` for a small-multiples view built on it.
 
-    metrics : include the line metrics (``peak_flux``, ``coherent_flux``,
+    metrics : include the line metrics (``peak_spectral_flux_density``, ``coherent_flux``,
         ``line_eV``, ``fwhm_eV``, ``line_flux``, ``line_frac``, ``total_flux``,
         ``coherent_brem_ratio``, ``cxr_quality``); needs a :class:`Settings`
         (defaults to ``Settings()``). False -> just the case knobs + the cheap
