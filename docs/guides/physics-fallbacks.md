@@ -45,4 +45,4 @@ Explicit `uncoupled` scores photons after collision-only transport, omitting
 radiative energy-loss feedback. Use it only when that approximation is
 appropriate to the intended diagnostic; it has no general quantitative accuracy
 guarantee. See the [radiative transport explanation](../physics/radiation-physics/hard-bremsstrahlung-events.md)
-and [coverage review](../validation/radiation-physics/brem-spectrum.md#physics-fallback-coverage-review).
+and [coverage review](../validation/radiation-physics/brem-spectrum.md#coverage-policy-verification-issue-262-2026-11-04).

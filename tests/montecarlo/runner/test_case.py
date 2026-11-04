@@ -154,8 +154,9 @@ def test_pre_adapter_case_and_identity_baseline(monkeypatch, kind):
     monkeypatch.setattr("pyrite.xsgen.bremslib.tables.load_bremsstrahlung_tables", missing)
     exercise_photon_reference()
     if kind == "eedl-fallback":
-        with pytest.warns(RuntimeWarning, match="bremslib"):
-            actual = resolved_baseline(kind)
+        with pytest.raises(TableNotFoundError, match="BremsLib"):
+            resolved_baseline(kind)
+        return
     else:
         actual = resolved_baseline(kind)
     expected = json.loads(

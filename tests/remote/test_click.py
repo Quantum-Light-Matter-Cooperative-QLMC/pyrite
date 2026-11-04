@@ -119,6 +119,7 @@ def test_run_click_defaults_and_zero_meanings(monkeypatch):
                 "no_cache": False,
                 "recompute": False,
                 "py_spy": False,
+                "allow_physics_fallback": False,
             },
         )
     ]
