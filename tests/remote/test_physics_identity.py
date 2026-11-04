@@ -91,7 +91,12 @@ def test_submission_embeds_expected_inventory_in_staged_script(monkeypatch):
     from pyrite.remote import queue, transport
 
     expected = {"request": {}, "inventory": {"hopg/default": {"dataset_digest": "same"}}}
-    monkeypatch.setattr(parity, "expected_inventory", lambda *args: expected)
+
+    def inventory(*args, **kwargs):
+        assert kwargs == {"allow_physics_fallback": False}
+        return expected
+
+    monkeypatch.setattr(parity, "expected_inventory", inventory)
     monkeypatch.setattr(transport, "_check_materials", lambda materials: None)
     monkeypatch.setattr(queue, "_refuse_if_busy", lambda *args: None)
     monkeypatch.setattr(scripts, "_stems", lambda *args: ["hopg"])

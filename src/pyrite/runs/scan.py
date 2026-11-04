@@ -608,15 +608,16 @@ def _select_quick_energies(by_energy, e_grid_cxr, *, nominal=(30, 50), count=2):
     return chosen[:count]
 
 
-def _physics_fallback_identity(requested, resolved, elements):
-    """Descriptive fallback provenance for a run that opted into EEDL.
+def _physics_fallback_identity(requested, resolved, elements, radiative_fallbacks=()):
+    """Descriptive provenance for continuum and radiative model fallbacks.
 
-    Case/dataset physics identity is already keyed by the executed EEDL model.
+    Case/dataset physics identity is already keyed by the executed models.
     Segment energies and their affected fraction are not known during
     preflight, so they are reported as ``None`` rather than invented.
     """
+    events = [{**event, "elements": sorted(set(elements))} for event in radiative_fallbacks]
     if requested not in ("auto", "bremslib") or resolved != "eedl":
-        return {}
+        return {"physics_fallbacks": events} if events else {}
     return {
         "physics_fallbacks": [
             {
@@ -627,7 +628,8 @@ def _physics_fallback_identity(requested, resolved, elements):
                 "fraction_segments_affected": None,
                 "scope": "entire continuum source",
                 "reason": "BremsLib tables unavailable",
-            }
+            },
+            *events,
         ]
     }
 
@@ -759,7 +761,21 @@ def _resolved_run(args, material):
         elements,
         allow_fallback=getattr(args, "allow_physics_fallback", False),
     )
-    settings = replace(settings, bremsstrahlung_model=resolved_brem_model)
+    from ..campaign.bremsstrahlung_cases import resolve_run_radiative_model
+
+    resolved_radiative, radiative_cutoff, radiative_fallbacks = resolve_run_radiative_model(
+        settings.radiative_model,
+        resolved_brem_model,
+        cutoff_eV=settings.radiative_cutoff_eV,
+        grooved=getattr(target, "entrance_face", None) is not None,
+        allow_fallback=getattr(args, "allow_physics_fallback", False),
+    )
+    settings = replace(
+        settings,
+        bremsstrahlung_model=resolved_brem_model,
+        radiative_model=resolved_radiative,
+        radiative_cutoff_eV=radiative_cutoff,
+    )
     xsgen_tables = identity_markers(tables)
     if settings.bremsstrahlung_model == "bremslib":
         xsgen_tables |= {
@@ -785,7 +801,11 @@ def _resolved_run(args, material):
         identity["detector_id"] = detector_id
     # Unhashed label: names and definition digests of the resolved presets.
     identity.update(identity_labels(CATALOG, catalog_profile))
-    identity.update(_physics_fallback_identity(requested_brem_model, resolved_brem_model, elements))
+    identity.update(
+        _physics_fallback_identity(
+            requested_brem_model, resolved_brem_model, elements, radiative_fallbacks
+        )
+    )
     canonical_full = (
         fidelity == "full"
         and not overrides
