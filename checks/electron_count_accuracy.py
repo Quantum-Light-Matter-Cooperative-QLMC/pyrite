@@ -107,7 +107,42 @@ def one_run(args, energy_keV, n, seed):
     t3 = time.perf_counter()
     line_obs = windowed_observables(E, lines, np.zeros_like(lines), detectors, args)
     brem_obs = windowed_observables(Eb, np.zeros_like(brem), brem, detectors, args)
+    grid_checks = []
+    if args.grid_check and n == args.reference_count and seed == args.reference_seed:
+        from pyrite._continuum_grid import CONTINUUM_LOG_STEP, automatic_continuum_grid
+
+        previous = {key: brem_obs[key] for key in CONTINUUM}
+        for divisor in (2, 4):
+            refined = automatic_continuum_grid(
+                args.material, energy_keV * 1000, log_step=CONTINUUM_LOG_STEP / divisor
+            )
+            refined_density = ladder.continuum(refined)
+            observed = windowed_observables(
+                refined, np.zeros_like(refined_density), refined_density, detectors, args
+            )
+            current = {key: observed[key] for key in CONTINUUM}
+            grid_checks.append(
+                dict(
+                    log_step_divisor=divisor,
+                    nodes=int(refined.size),
+                    observables=current,
+                    relative_change={
+                        key: abs(current[key] - previous[key]) / abs(current[key])
+                        if current[key]
+                        else None
+                        for key in CONTINUUM
+                    },
+                    production_relative_difference={
+                        key: abs(current[key] - brem_obs[key]) / abs(current[key])
+                        if current[key]
+                        else None
+                        for key in CONTINUUM
+                    },
+                )
+            )
+            previous = current
     return dict(
+        grid_checks=grid_checks,
         energy_keV=energy_keV,
         n=n,
         seed=seed,
@@ -215,6 +250,97 @@ def summarize(state):
     return out
 
 
+def markdown_report(state):
+    """Replica uncertainty and conditional count projections; no truth/bias claim."""
+    lines = [
+        "# Electron-count accuracy (#278)",
+        "",
+        "Independent replicas; RSE is sample SD / |mean| for one N-electron run.",
+        "Mean RSE divides this by sqrt(replicas). Difference is signed versus the",
+        "finite reference, not established systematic bias. Units: photons per",
+        "incident electron per sr; centroids in eV. Detector band ends at 100 keV.",
+        "",
+        "Count projections assume RSE = C / sqrt(N); they are not measured precision.",
+        "The source budget is 0.1%; the detector-count budget is 1%.",
+        "",
+    ]
+
+    def fmt(value):
+        return "unresolved" if value is None or not math.isfinite(value) else f"{value:.6g}"
+
+    for energy, table in summarize(state).items():
+        lines += [f"## {energy}", ""]
+        for name, item in table.items():
+            lines += [
+                f"### {item['population']}: {name}",
+                "",
+                f"Reference N={state['reference_count']}, replicas={item['reference_replicas']}, "
+                f"mean={fmt(item['reference'])}, relative SE of mean="
+                f"{fmt(item['reference_relative_se'])}.",
+                "",
+                "| N | replicas | mean | single-run RSE | mean RSE | relative difference | difference SE (absolute) |",
+                "|---:|---:|---:|---:|---:|---:|---:|",
+            ]
+            for row in item["rows"]:
+                lines.append(
+                    "| "
+                    + " | ".join(
+                        fmt(row[key])
+                        for key in (
+                            "n",
+                            "replicas",
+                            "mean",
+                            "relative_se",
+                            "relative_mean_se",
+                            "bias_vs_reference",
+                            "difference_se",
+                        )
+                    )
+                    + " |"
+                )
+            lines += ["", f"Fitted exponent: {fmt(item['fitted_exponent'])} (ideal -0.5)."]
+            coefficient = item["inverse_sqrt_coefficient"]
+            if name in CONTINUUM and coefficient is not None:
+                budget = 1e-2 if name.endswith("counts") else 1e-3
+                projected = math.ceil((coefficient / budget) ** 2)
+                lines += [
+                    f"Conditional N for budget {budget:g}: {projected}; "
+                    f"projected single-run RSE at N=20000: {fmt(coefficient / math.sqrt(20000))}.",
+                ]
+            lines.append("")
+        lines += [
+            "### Fixed-track grid checks",
+            "",
+            "Production versus refined coordinates on one reference population;",
+            "successive differences are convergence diagnostics, not exact error bounds.",
+            "",
+        ]
+        for run in state["runs"]:
+            if f"{run['energy_keV']:g}keV" != energy:
+                continue
+            for check in run.get("grid_checks", []):
+                lines.append(
+                    f"Seed {run['seed']}, N={run['n']}, step /{check['log_step_divisor']}, "
+                    f"{check['nodes']} nodes:"
+                )
+                for name in CONTINUUM:
+                    lines.append(
+                        f"- {name}: production difference "
+                        f"{fmt(check['production_relative_difference'][name])}; "
+                        f"successive change {fmt(check['relative_change'][name])}"
+                    )
+                lines.append("")
+    return "\n".join(lines) + "\n"
+
+
+def save_state(path, state):
+    state["summary"] = summarize(state)
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary.write_text(json.dumps(state, indent=1) + "\n")
+    temporary.replace(path)
+    path.with_suffix(".md").write_text(markdown_report(state))
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--material", default="hopg")
@@ -237,6 +363,11 @@ def main():
     )
     parser.add_argument("--detector-max-ev", type=float, default=100e3)
     parser.add_argument("--max-hours", type=float, default=math.inf)
+    parser.add_argument(
+        "--grid-check",
+        action="store_true",
+        help="refine first reference continuum at half/quarter step",
+    )
     parser.add_argument("--summarize", action="store_true")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
@@ -246,7 +377,26 @@ def main():
         else dict(reference_count=args.reference_count, runs=[])
     )
     if not args.summarize:
-        state["args"] = vars(args) | {"output": str(args.output)}
+        configuration = vars(args) | {"output": str(args.output)}
+        prior = state.get("args")
+        scientific_keys = (
+            "material",
+            "energy_kev",
+            "tilt_deg",
+            "tilt_azim_deg",
+            "thickness_ang",
+            "detector_max_ev",
+            "line_points_fallback",
+        )
+        if prior and any(prior[key] != configuration[key] for key in scientific_keys):
+            parser.error("checkpoint scientific configuration differs from this run")
+        state["args"] = configuration
+        sync = Path(".pyrite-sync")
+        if sync.exists():
+            provenance = sync.read_text()
+            if state.get("source_sync", provenance) != provenance:
+                parser.error("checkpoint source provenance differs from synced source")
+            state["source_sync"] = provenance
         if state["reference_count"] != args.reference_count:
             parser.error("checkpoint reference_count differs from --reference-count")
         if args.reference_count <= max(args.counts):
@@ -276,12 +426,11 @@ def main():
                 r for r in state["runs"] if (r["energy_keV"], r["n"], r["seed"]) != key
             ]
             state["runs"].append(run)
-            args.output.write_text(json.dumps(state, indent=1) + "\n")
+            save_state(args.output, state)
             print(
                 json.dumps({k: run[k] for k in ("energy_keV", "n", "seed", "seconds")}), flush=True
             )
-    state["summary"] = summarize(state)
-    args.output.write_text(json.dumps(state, indent=1) + "\n")
+    save_state(args.output, state)
     print(json.dumps(state["summary"], indent=1))
 
 
