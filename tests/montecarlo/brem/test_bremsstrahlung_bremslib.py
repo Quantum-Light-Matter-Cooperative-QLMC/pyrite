@@ -347,7 +347,8 @@ def test_segments_outside_the_table_warn_and_emit_isotropic_eedl(monkeypatch, ca
     )
 
 
-def test_bremslib_spectrum_is_chunk_invariant(monkeypatch, carbon_table):
+@pytest.mark.parametrize("nonuniform", [False, True])
+def test_bremslib_spectrum_is_chunk_invariant(monkeypatch, carbon_table, nonuniform):
     monkeypatch.setattr(brem, "_mu_total_inv_ang", _zero_mu)
     rng = np.random.default_rng(87)
     n = 37
@@ -356,6 +357,11 @@ def test_bremslib_spectrum_is_chunk_invariant(monkeypatch, carbon_table):
     segments = _segments(60.0, v)
     segments["E_keV"] = rng.uniform(12.0, 190.0, n)
     photon_eV = np.linspace(0.5e3, 150.0e3, 23)
+    if nonuniform:
+        # Resolve the adopted policy, including segment endpoints inside the band.
+        from pyrite._continuum_grid import automatic_continuum_grid
+
+        photon_eV = automatic_continuum_grid("hopg", 190.0e3)
     kwargs = dict(
         composition=[("C", 0.1)],
         cross_section_model="bremslib",
