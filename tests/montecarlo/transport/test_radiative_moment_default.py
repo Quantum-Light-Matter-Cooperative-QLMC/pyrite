@@ -107,3 +107,7 @@ def test_production_endpoint_admission_matches_exact_without_relaxing_query_boun
     # Nor may a physically unsupported source range be admitted by preparation.
     with pytest.raises(ValueError, match="outside the BremsLib table"):
         radiative_core_args(*(args[:3] + (np.array([9.0]),) + args[4:]), moment_mode="table")
+
+
+def test_uncoupled_case_explicitly_disables_automatic_radiative_fallback():
+    assert case_tables._case_radiative_kwargs({}) == {"radiative_model": "uncoupled"}

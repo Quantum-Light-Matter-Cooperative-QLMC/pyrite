@@ -24,6 +24,7 @@ CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
     "checks/line_cost_286.py": (),
     "checks/line_grid_candidates_286.py": (),
     "checks/line_policy_286.py": (),
+    "checks/line_setup_support_286.py": ("line-tabulation-nan-ceiling",),
     "checks/line_crossover_286.py": (),
     "checks/continuum_grid_end_to_end.py": (),
     "checks/detector_cone_variance_reduction.py": (),

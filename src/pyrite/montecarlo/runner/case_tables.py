@@ -178,7 +178,8 @@ def _case_bremslib_tables(case):
 def _case_radiative_kwargs(case):
     """``simulate_trajectories`` kwargs for a coupled radiative case.
 
-    Empty for uncoupled scoring. The coupled mode reads the same BremsLib
+    Explicitly selects uncoupled scoring when the case has no coupled model.
+    The coupled mode reads the same BremsLib
     tables as the continuum scorer, so transport and spectrum agree on the
     table identity recorded on the rows.
     """
@@ -186,7 +187,7 @@ def _case_radiative_kwargs(case):
 
     model = case.get("radiative_model")
     if model is None:
-        return {}
+        return {"radiative_model": "uncoupled"}
     return dict(
         radiative_model=model,
         radiative_moments=radiative_moment_mode(case.get("radiative_moment_model", "exact")),

@@ -476,7 +476,12 @@ def select_material_comparison(
         ]
         if not candidates:
             return None, "nonfinite_ratio"
-    best = max(candidates, key=lambda candidate: selection_score(candidate, select))
+    best = max(
+        candidates,
+        key=lambda candidate: selection_score(
+            {**candidate, "peak_spectral_flux_density": candidate["peak_flux"]}, select
+        ),
+    )
     return (
         best["line_eV"],
         best["line_flux"],
