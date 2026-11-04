@@ -46,10 +46,10 @@ def selection_score(m, mode="quality_line"):
         val = m["line_brem_ratio"]
     else:
         val = {
-            "peak": m["peak_flux"],
+            "peak": m["peak_spectral_flux_density"],
             "line_flux": m["line_flux"],
             "coherent_flux": m["coherent_flux"],
-            "quality_peak": m["peak_flux"] * q,
+            "quality_peak": m["peak_spectral_flux_density"] * q,
             "quality_line": m["line_flux"] * q,
         }.get(mode)
     if val is None:
@@ -96,7 +96,7 @@ def top_geometries(
                 "E [keV]": c["E0_keV"],
                 "line [eV]": round(m["line_eV"]),
                 "quality": round(m["line_quality"], 2),
-                "peak density [Phs/eV/s]": float(f"{m['peak_flux']:.3g}"),
+                "peak density [Phs/eV/s]": float(f"{m['peak_spectral_flux_density']:.3g}"),
                 "peak spacing [eV]": float(f"{m['peak_sample_spacing_eV']:.3g}"),
                 "coherent [Phs/s]": float(f"{m['coherent_flux']:.3g}"),
                 "line/tot": (round(m["line_frac"], 2) if np.isfinite(m["line_frac"]) else np.nan),

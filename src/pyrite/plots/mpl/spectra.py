@@ -431,7 +431,7 @@ def material_comparison_summary(
             "line_eV": m["line_eV"],
             "line_flux": m["line_flux"],
             "line_quality": m["line_quality"],
-            "peak_flux": m["peak_flux"],
+            "peak_flux": m["peak_spectral_flux_density"],
             "coherent_flux": m["coherent_flux"],
             "line_brem_ratio": m["line_brem_ratio"],
         }
@@ -476,7 +476,12 @@ def select_material_comparison(
         ]
         if not candidates:
             return None, "nonfinite_ratio"
-    best = max(candidates, key=lambda candidate: selection_score(candidate, select))
+    best = max(
+        candidates,
+        key=lambda candidate: selection_score(
+            {**candidate, "peak_spectral_flux_density": candidate["peak_flux"]}, select
+        ),
+    )
     return (
         best["line_eV"],
         best["line_flux"],

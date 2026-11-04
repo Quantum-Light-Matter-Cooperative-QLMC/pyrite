@@ -261,9 +261,9 @@ def test_runner_transport_and_scoring_use_the_coupled_mode(synthetic_si_tables, 
     np.testing.assert_allclose(runner._brem_for_case(case, E_brem), brem, rtol=1e-10, atol=0.0)
 
 
-def test_uncoupled_case_transport_passes_no_radiative_arguments(monkeypatch):
+def test_uncoupled_case_transport_explicitly_selects_uncoupled_radiation(monkeypatch):
     case = build_cases(material_sweep("silicon"), 4, 4, bremsstrahlung_model="eedl")[0]
-    assert runner._case_radiative_kwargs(case) == {}
+    assert runner._case_radiative_kwargs(case) == {"radiative_model": "uncoupled"}
     seen = {}
 
     def fake(*_args, **kwargs):
@@ -273,7 +273,8 @@ def test_uncoupled_case_transport_passes_no_radiative_arguments(monkeypatch):
     monkeypatch.setattr(runner.case_driver, "simulate_trajectories", fake)
     with pytest.raises(RuntimeError, match="stop"):
         runner._transport_case(case)
-    assert "radiative_model" not in seen and "bremslib_tables" not in seen
+    assert seen["radiative_model"] == "uncoupled"
+    assert "bremslib_tables" not in seen
 
 
 def test_layered_stack_scores_each_layer_with_its_own_composition(synthetic_si_tables):

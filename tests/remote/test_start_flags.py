@@ -29,6 +29,7 @@ DEFAULT_FLAGS = {
     "cpu_only": False,
     "no_cache": False,
     "recompute": False,
+    "allow_physics_fallback": False,
     "no_sync": False,
     "dry_run": False,
     "headless": False,

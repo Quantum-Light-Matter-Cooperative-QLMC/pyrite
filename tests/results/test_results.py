@@ -84,7 +84,7 @@ def test_default_pulse_rate_preserves_existing_count_rates_and_reports_per_na():
     pulsed_record["case"] = {"bunch_charge_pc": 1.0, "rep_rate_hz": 5000.0}
     pulsed = cxr_metrics(pulsed_record, Settings(beam_current_na=123.0))
 
-    for name in ("peak_flux", "coherent_flux", "line_flux", "total_flux"):
+    for name in ("peak_spectral_flux_density", "coherent_flux", "line_flux", "total_flux"):
         assert pulsed[name] == legacy[name]
         assert pulsed[f"{name}_per_na"] * 5.0 == pulsed[name]
 
@@ -191,7 +191,7 @@ def test_line_brem_ratio_is_a_selection_mode():
 def test_default_selection_uses_grid_independent_line_flux():
     metrics = {
         "line_flux": 4.0,
-        "peak_flux": 100.0,
+        "peak_spectral_flux_density": 100.0,
         "coherent_flux": 7.0,
         "line_quality": 0.5,
     }
@@ -204,8 +204,10 @@ def test_peak_density_is_explicit_and_records_local_sample_spacing():
 
     metrics = cxr_metrics(_record(E, spec, np.zeros_like(E)), default_settings())
 
-    assert metrics["peak_spectral_flux_density"] == metrics["peak_flux"]
-    assert metrics["peak_spectral_flux_density_per_na"] == metrics["peak_flux_per_na"]
+    assert "peak_flux" not in metrics
+    assert metrics["peak_spectral_flux_density"] > 0
+    assert "peak_flux_per_na" not in metrics
+    assert metrics["peak_spectral_flux_density_per_na"] > 0
     assert metrics["peak_sample_spacing_eV"] == 2.5
 
 

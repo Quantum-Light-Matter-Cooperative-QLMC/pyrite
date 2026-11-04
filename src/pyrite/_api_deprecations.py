@@ -26,24 +26,7 @@ def _api_entry(spelling: str, replacement: str, *, since: str) -> ApiDeprecation
 # announcement version (and recalculate the window if bundled in a later minor).
 ROOT_API_REPLACEMENTS = {}
 
-#: Returned-dictionary keys cannot warn at runtime; these rows schedule their
-#: removal and are documented in the owning docstring. They first shipped in
-#: tagged 0.24.0 (no 0.23.1 was tagged).
-_RESULT_KEY_DEPRECATED_IN = "0.24.0"
-
-API_DEPRECATIONS = {
-    spelling: _api_entry(spelling, replacement, since=_RESULT_KEY_DEPRECATED_IN)
-    for spelling, replacement in (
-        (
-            "cxr_metrics()['peak_flux']",
-            "cxr_metrics()['peak_spectral_flux_density']",
-        ),
-        (
-            "cxr_metrics()['peak_flux_per_na']",
-            "cxr_metrics()['peak_spectral_flux_density_per_na']",
-        ),
-    )
-}
+API_DEPRECATIONS: dict[str, ApiDeprecation] = {}
 API_DEPRECATIONS["BunchLength"] = _api_entry(
     "BunchLength",
     "LongitudinalDistribution(kind='gaussian', ...) "

@@ -210,7 +210,11 @@ def metric_vs_frame(
             rows.append(
                 {
                     "x": float(xv) / div_x,
-                    "metric": float(metrics[id(best)][metric]),
+                    "metric": float(
+                        metrics[id(best)][
+                            "peak_spectral_flux_density" if metric == "peak_flux" else metric
+                        ]
+                    ),
                     "hue": _value_label(hue, hv),
                 }
             )
@@ -273,7 +277,9 @@ def heatmap_frame(
                     "x": _axis_disp(x, [xv])[0],
                     "y": _axis_disp(y, [yv])[0],
                     "panel": _value_label(panel, pv),
-                    "value": float(m[quantity]),
+                    "value": float(
+                        m["peak_spectral_flux_density" if quantity == "peak_flux" else quantity]
+                    ),
                     "name": r["case"]["name"],
                     "panel_raw": float(pv),
                 }

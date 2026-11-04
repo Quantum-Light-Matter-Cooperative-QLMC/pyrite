@@ -266,10 +266,7 @@ def test_local_tables_skip_packaged_tier_and_unpaired_files(tmp_path, monkeypatc
 
 def test_job_script_preflights_tables_and_fails_fast_before_the_sweep():
     block = _queue_scripts._tables_preflight_block()
-    assert (
-        "pyrite tables verify --require bremslib,elsepa,sbethe-tables,eedl,eadl,epdl,sbethe"
-        in block
-    )
+    assert "pyrite tables verify --require elsepa,sbethe-tables,eedl,eadl,epdl,sbethe" in block
     assert 'echo "FAILED (tables)' in block
     assert "exit 1" in block
     assert "PYRITE_HOME=" in block
