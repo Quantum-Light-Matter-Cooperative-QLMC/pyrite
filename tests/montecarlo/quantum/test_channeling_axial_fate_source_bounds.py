@@ -213,6 +213,7 @@ def test_rejects_invalid_caps_and_interval_support(change, message):
         ([AxialHandoffRecord(True, "retained", 300)], "unique"),
         ([AxialHandoffRecord(1, "retained", float("inf"))], "record depth"),
         ([AxialHandoffRecord(1, "retained", 301)], "record depth"),
+        ([AxialHandoffRecord(1, "retained", 200)], "retained.*sampled maximum depth"),
         ([AxialHandoffRecord(1, "other", 300)], "invalid physical outgoing fate"),
         ([], "no independently sampled"),
     ],
@@ -220,6 +221,21 @@ def test_rejects_invalid_caps_and_interval_support(change, message):
 def test_refuses_invalid_terminal_fates(bad, message):
     with pytest.raises(ValueError, match=message):
         run_bounds(bad)
+
+
+def test_composition_refuses_a_censored_incident_census():
+    rows = records()
+    # This incident was observed only to 200 Å. Its fate by 300 Å is unknown;
+    # counting it as retained would depress both terminal-event estimates.
+    rows[-1] = replace(rows[-1], depth_ang=200.0)
+    with pytest.raises(ValueError, match="retained.*sampled maximum depth"):
+        add_physical_fate_source_bounds(
+            source(),
+            rows,
+            sampled_max_depth_ang=300.0,
+            caps=caps(),
+            sample_evidence_id="censored-histories",
+        )
 
 
 def test_fails_closed_on_wrong_source_scope_and_confidence_budget():

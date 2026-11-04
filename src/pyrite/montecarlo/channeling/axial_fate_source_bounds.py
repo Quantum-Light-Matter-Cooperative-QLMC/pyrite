@@ -89,6 +89,40 @@ def _total_cap(name: str, values: Sequence[float]) -> float:
     return total
 
 
+def _terminal_fate_depths(
+    records: Sequence[AxialHandoffRecord], sampled_max_depth_ang: float
+) -> tuple[list[float], list[float]]:
+    """Validate a complete incident census before estimating terminal CDFs."""
+    if not records:
+        raise ValueError("no independently sampled incident records")
+    seen: set[int] = set()
+    outgoing, unresolved = [], []
+    for record in records:
+        if not isinstance(record, AxialHandoffRecord):
+            raise TypeError("records must be unweighted AxialHandoffRecord entries")
+        if (
+            isinstance(record.incident_id, bool)
+            or not isinstance(record.incident_id, (int, np.integer))
+            or record.incident_id < 0
+            or record.incident_id in seen
+        ):
+            raise ValueError("sampled incident IDs must be unique nonnegative integers")
+        seen.add(int(record.incident_id))
+        if not isfinite(record.depth_ang) or not 0 <= record.depth_ang <= sampled_max_depth_ang:
+            raise ValueError("record depth is outside the sampled zone")
+        # A retained record is censored at its observation horizon, unlike
+        # an outgoing/unresolved event whose terminal fate is already known.
+        if record.fate == "retained" and record.depth_ang != sampled_max_depth_ang:
+            raise ValueError("retained records must reach the sampled maximum depth")
+        if record.fate == "physical_outgoing":
+            outgoing.append(record.depth_ang)
+        elif record.fate == "unresolved":
+            unresolved.append(record.depth_ang)
+        elif record.fate != "retained":
+            raise ValueError(f"invalid physical outgoing fate: {record.fate!r}")
+    return outgoing, unresolved
+
+
 def physical_fate_source_uppers(
     records: Sequence[AxialHandoffRecord],
     *,
@@ -138,37 +172,17 @@ def physical_fate_source_uppers(
         last_stop = stop
         starts_stops.append((start, stop))
 
-    if not records:
-        raise ValueError("no independently sampled incident records")
-    seen: set[int] = set()
-    outgoing, unresolved = [], []
-    for record in records:
-        if not isinstance(record, AxialHandoffRecord):
-            raise TypeError("records must be unweighted AxialHandoffRecord entries")
-        if (
-            isinstance(record.incident_id, bool)
-            or not isinstance(record.incident_id, (int, np.integer))
-            or record.incident_id < 0
-            or record.incident_id in seen
-        ):
-            raise ValueError("sampled incident IDs must be unique nonnegative integers")
-        seen.add(int(record.incident_id))
-        if not isfinite(record.depth_ang) or not 0 <= record.depth_ang <= sampled_max_depth_ang:
-            raise ValueError("record depth is outside the sampled zone")
-        if record.fate == "physical_outgoing":
-            outgoing.append(record.depth_ang)
-        elif record.fate == "unresolved":
-            unresolved.append(record.depth_ang)
-        elif record.fate != "retained":
-            raise ValueError(f"invalid physical outgoing fate: {record.fate!r}")
+    outgoing, unresolved = _terminal_fate_depths(records, sampled_max_depth_ang)
+    outgoing_depths = np.asarray(outgoing)
+    unresolved_depths = np.asarray(unresolved)
     # Exactly 2*m one-sided Bernoulli CDF bounds, simultaneously. The same
     # incidents may be reused across depths; the union bound needs no
     # independence between these CDF estimates, only between incidents.
     allowance = sqrt(log(2 * len(intervals) / sampling_failure_probability) / (2 * len(records)))
     result = []
     for start, stop in starts_stops:
-        f_out = sum(d <= stop for d in outgoing) / len(records)
-        f_unresolved = sum(d <= stop for d in unresolved) / len(records)
+        f_out = float(np.count_nonzero(outgoing_depths <= stop)) / len(records)
+        f_unresolved = float(np.count_nonzero(unresolved_depths <= stop)) / len(records)
         # Caps are per *missing electron*, not populations. Multiplication
         # is safe only if their uniform response bound holds for EVERY fate.
         return_upper = min(1.0, f_out + allowance) * return_cap
