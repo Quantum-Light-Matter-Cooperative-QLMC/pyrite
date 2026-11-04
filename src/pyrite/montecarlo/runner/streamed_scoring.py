@@ -22,6 +22,9 @@ from typing import Any
 
 import numpy as np
 
+from ..._physics_fallback import FallbackAudit
+from .fallbacks import measure_block_fallbacks
+
 #: Case keys whose spectra need every segment at once.
 STREAM_REFUSED_KEYS = ("coherent_emission", "temporal_profile", "photon_transport")
 
@@ -75,6 +78,9 @@ class BlockSpectrumScorer:
         from .streamed_recovery import EscapeScoringRecovery, RowScoringRecovery
 
         self.case = case
+        self.fallbacks = FallbackAudit(
+            case.get("allow_physics_fallback", False), case.get("physics_fallbacks", ())
+        )
         self.row_recovery = RowScoringRecovery()
         self.escape_recovery = EscapeScoringRecovery()
         self._restage_continuum = False
@@ -88,6 +94,7 @@ class BlockSpectrumScorer:
         self.totals: tuple | None = None
         self.n_segments = 0
 
+    @measure_block_fallbacks
     def add(self, segs: Mapping[str, Any]) -> None:
         """Score one whole-electron block and add it to the running totals."""
         from . import _segments_on_device
@@ -116,6 +123,7 @@ class BlockSpectrumScorer:
             self.emission.characteristic, brem_batch, "spec_characteristic"
         )
         brem = None
+        fallback_snapshot = self.fallbacks.snapshot()
         if not self._restage_continuum:
             from .. import runner
             from .oom import _drop_traceback_locals
@@ -134,6 +142,7 @@ class BlockSpectrumScorer:
                     raise
                 _drop_traceback_locals(error)
                 error.__traceback__ = None
+                self.fallbacks.restore(fallback_snapshot)
                 self._restage_continuum = True
         if self._restage_continuum:
             # Drop line staging before retrying BremsLib's full-background
@@ -224,6 +233,8 @@ class BlockSpectrumScorer:
                     if truncation is None
                     else {**diagnostic_grid, "truncation_audit": truncation}
                 )
+        if events := self.fallbacks.events():
+            out["physics_fallbacks"] = events
         return out
 
 

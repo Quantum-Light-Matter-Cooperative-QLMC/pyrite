@@ -60,3 +60,41 @@ def test_scan_refuses_before_minting_an_uncoupled_identity(monkeypatch):
     monkeypatch.setattr(tables, "resolve_bremsstrahlung_model", lambda *_a, **_k: "eedl")
     with pytest.raises(ValueError, match="--allow-physics-fallback"):
         scan._resolved_run(Namespace(fidelity="full", catalog_profile="standard"), "hopg")
+
+
+def test_run_settings_opt_in_overrides_ambient_warning_errors(monkeypatch):
+    import warnings
+    from dataclasses import replace
+
+    from pyrite.runs import scan
+    from pyrite.xsgen.bremslib import tables
+
+    scan._load_runtime()
+    original = scan.default_settings
+    assert original is not None
+    monkeypatch.setattr(
+        scan, "default_settings", lambda *_a, **_k: replace(original(), allow_fallback=True)
+    )
+    monkeypatch.setattr(tables, "resolve_bremsstrahlung_model", lambda *_a, **_k: "eedl")
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", PhysicsFallbackWarning)
+        with pytest.warns(PhysicsFallbackWarning):
+            settings, _, identity, _ = scan._resolved_run(
+                Namespace(fidelity="full", catalog_profile="standard"), "hopg"
+            )
+    assert settings.allow_fallback
+    assert identity["resolved_parameters"]["transport_numerics"]["allow_physics_fallback"] is True
+
+
+def test_opt_in_and_strict_have_distinct_dataset_cache_admission():
+    from dataclasses import replace
+
+    from pyrite.campaign.config import default_settings, material_sweep
+    from pyrite.campaign.profiles import dataset_identity
+
+    sweep = material_sweep("hopg")
+    settings = default_settings()
+    strict = dataset_identity("hopg", "full", settings, sweep)
+    allowed = dataset_identity("hopg", "full", replace(settings, allow_fallback=True), sweep)
+    assert strict["parameter_sha256"] != allowed["parameter_sha256"]
+    assert "allow_physics_fallback" not in strict["resolved_parameters"]["transport_numerics"]

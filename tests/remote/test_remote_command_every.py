@@ -151,5 +151,5 @@ def test_queue_fallback_policy_is_forwarded(chunked):
     assert "--allow-physics-fallback" not in strict
     assert "PYRITE_STRICT_PHYSICS_FALLBACK=1" not in allowed
     assert "--allow-physics-fallback" in allowed
-    assert "--require bremslib,elsepa" in strict
+    assert "--require elsepa" in strict
     assert "--require elsepa" in allowed

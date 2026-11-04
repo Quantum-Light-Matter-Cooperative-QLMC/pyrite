@@ -40,6 +40,7 @@ import click
 
 from .._catalog_keys import material_keys
 from .._env import GENERATED_INVOCATION_ENV, set_canonical_env
+from .._physics_fallback import PhysicsFallbackWarning, fallback_cases
 from .._progress import (  # noqa: F401  (re-exported: progress helpers' historical scan import path)
     _ProgressTimer,
     _write_progress_record,
@@ -485,7 +486,13 @@ def run(args):
                     from ..xsgen._errors import TableNotFoundError
 
                     if not isinstance(
-                        error, (AxialAdmissionError, TrajectoryArtifactError, TableNotFoundError)
+                        error,
+                        (
+                            AxialAdmissionError,
+                            TrajectoryArtifactError,
+                            TableNotFoundError,
+                            PhysicsFallbackWarning,
+                        ),
                     ):
                         raise
                     raise SystemExit(str(error)) from None
@@ -664,6 +671,12 @@ def _resolved_run(args, material):
     from ..montecarlo.case import refuse_axial_channeling
 
     settings = profile_run_settings(settings, catalog_profile, fidelity, CATALOG)
+    settings = replace(
+        settings,
+        allow_fallback=any(
+            (settings.allow_fallback, getattr(args, "allow_physics_fallback", False))
+        ),
+    )
     refuse_axial_channeling(vars(settings))
     overrides = {}
     if getattr(args, "quick", False):
@@ -752,33 +765,19 @@ def _resolved_run(args, material):
         from ..xsgen.elsepa.catalog import resolve_catalog_tables
 
         tables.extend(table for key in table_keys for table in resolve_catalog_tables(key))
-    from ..xsgen.bremslib.tables import load_bremsstrahlung_tables, resolve_bremsstrahlung_model
+    from ..xsgen.bremslib.tables import load_bremsstrahlung_tables
     from ..xsgen.elsepa.catalog import catalog_composition
 
     elements = [element for key in table_keys for element, _ in catalog_composition(key)]
     # Resolve "auto" once, before any transport or checkpoint I/O. Opting in
     # to fallback selects EEDL for the entire run, not per element.
     requested_brem_model = settings.bremsstrahlung_model
-    resolved_brem_model = resolve_bremsstrahlung_model(
-        requested_brem_model,
-        elements,
-        allow_fallback=getattr(args, "allow_physics_fallback", False),
-    )
-    from ..campaign.bremsstrahlung_cases import resolve_run_radiative_model
+    from ..campaign.bremsstrahlung_cases import resolve_run_models
 
-    resolved_radiative, radiative_cutoff, radiative_fallbacks = resolve_run_radiative_model(
-        settings.radiative_model,
-        resolved_brem_model,
-        cutoff_eV=settings.radiative_cutoff_eV,
-        grooved=getattr(target, "entrance_face", None) is not None,
-        allow_fallback=getattr(args, "allow_physics_fallback", False),
+    settings, radiative_fallbacks = resolve_run_models(
+        settings, elements, grooved=getattr(target, "entrance_face", None) is not None
     )
-    settings = replace(
-        settings,
-        bremsstrahlung_model=resolved_brem_model,
-        radiative_model=resolved_radiative,
-        radiative_cutoff_eV=radiative_cutoff,
-    )
+    resolved_brem_model = settings.bremsstrahlung_model
     xsgen_tables = identity_markers(tables)
     if settings.bremsstrahlung_model == "bremslib":
         xsgen_tables |= {
@@ -871,7 +870,11 @@ def _run_material(args, material, max_seconds=None):
     settings, sweep, identity, stem = _resolved_run(args, material)
     fidelity = identity["fidelity"]
 
-    cases = build_cases(sweep, settings)
+    cases = fallback_cases(
+        build_cases(sweep, settings),
+        allow=settings.allow_fallback,
+        events=identity.get("physics_fallbacks", ()),
+    )
     cases, dropped = gate_cases_by_penetration(cases)
     summary = format_penetration_watchdog_summary(dropped, material=material)
     if summary is not None:

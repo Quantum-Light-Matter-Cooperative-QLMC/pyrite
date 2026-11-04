@@ -170,6 +170,8 @@ def _case_bremslib_tables(case):
         for composition in _case_layer_compositions(case)
         for element in _composition_elements(composition)
     ]
+    if case.get("allow_physics_fallback") and not case.get("radiative_model"):
+        return load_bremsstrahlung_tables(elements, allow_fallback=True)
     return load_bremsstrahlung_tables(elements)
 
 

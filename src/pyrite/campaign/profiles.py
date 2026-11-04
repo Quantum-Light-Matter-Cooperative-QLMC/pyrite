@@ -1011,7 +1011,7 @@ def canonical_settings(settings: Settings, *, resolved_bremsstrahlung: bool = Tr
     bremsstrahlung = ("bremslib",) if resolved_bremsstrahlung else ("bremslib", "auto")
     return (
         settings.emission == "incoherent"
-        and not (settings.temporal_profile or settings.straggling)
+        and not (settings.temporal_profile or settings.straggling or settings.allow_fallback)
         and settings.precision is None
         and settings.energy_model == "midpoint"
         and settings.max_dE_frac == 0.0

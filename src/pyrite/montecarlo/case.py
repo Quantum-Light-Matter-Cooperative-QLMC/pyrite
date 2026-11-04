@@ -139,6 +139,8 @@ _CASE_KEY_ORDER = (
     "sinc_cutoff",
     "brem_step_eV",
     "coherent_flat_omission_limit",
+    "allow_physics_fallback",
+    "physics_fallbacks",
 )
 
 
@@ -216,6 +218,11 @@ class Case(Mapping[str, Any]):
     bremsstrahlung_model
         Opt-in ``"bremslib"`` continuum source with its angular model; absent
         is the fetched EEDL continuum, so existing case keys stay valid.
+    allow_physics_fallback, physics_fallbacks
+        Optional campaign admission (``True``) and preflight substitution
+        records. Absent admission is strict in runner scoring; runtime events
+        record per-element affected row counts and electron-energy spans in
+        keV. These fields travel to workers and remain distinct in cache keys.
     radiative_model, radiative_cutoff_eV
         Opt-in ``"bremslib-soft-hard"`` coupled radiative transport and its
         hard-photon cutoff in eV; both absent is uncoupled post-hoc scoring.
@@ -346,6 +353,9 @@ class Case(Mapping[str, Any]):
     channeling_source: dict[str, object] | _Absent = _ABSENT
 
     photon_transport: dict[str, object] | _Absent = _ABSENT
+    # Admission/provenance, appended to retain historical pickle offsets.
+    allow_physics_fallback: Literal[True] | _Absent = _ABSENT
+    physics_fallbacks: list[dict[str, Any]] | _Absent = _ABSENT
 
     def __setstate__(self, state: list[Any]) -> None:
         """Restore frozen-slot pickles, filling newly appended optional fields."""
@@ -397,12 +407,15 @@ class Case(Mapping[str, Any]):
             value = getattr(self, name)
             if value is not None:
                 _positive_int(name, value)
-        if self.coherent_emission is not _ABSENT and self.coherent_emission is not True:
-            raise ValueError("coherent_emission must be absent or True")
-        if self.temporal_profile is not _ABSENT and self.temporal_profile is not True:
-            raise ValueError("temporal_profile must be absent or True")
-        if self.straggling is not _ABSENT and self.straggling is not True:
-            raise ValueError("straggling must be absent or True")
+        for name in (
+            "coherent_emission",
+            "temporal_profile",
+            "straggling",
+            "allow_physics_fallback",
+        ):
+            value = getattr(self, name)
+            if value is not _ABSENT and value is not True:
+                raise ValueError(f"{name} must be absent or True")
         if self.energy_model is not _ABSENT and self.energy_model != "midpoint":
             raise ValueError("energy_model must be absent or 'midpoint'")
         if self.max_dE_frac is not _ABSENT:

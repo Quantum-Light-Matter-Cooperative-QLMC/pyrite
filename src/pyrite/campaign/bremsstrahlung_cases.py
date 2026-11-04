@@ -18,6 +18,27 @@ from .._radiative_moment_policy import RADIATIVE_MOMENT_MODEL
 from ..montecarlo.case import Case
 
 
+def resolve_run_models(settings, elements, *, grooved):
+    """Apply explicit admission before identity, honoring opt-in over ambient filters."""
+    from .._physics_fallback import collect_physics_fallbacks
+    from ..xsgen.bremslib.tables import resolve_bremsstrahlung_model
+
+    with collect_physics_fallbacks(allow=settings.allow_fallback):
+        source = resolve_bremsstrahlung_model(
+            settings.bremsstrahlung_model, elements, allow_fallback=settings.allow_fallback
+        )
+        model, cutoff, events = resolve_run_radiative_model(
+            settings.radiative_model,
+            source,
+            grooved=grooved,
+            allow_fallback=settings.allow_fallback,
+            cutoff_eV=settings.radiative_cutoff_eV,
+        )
+    return replace(
+        settings, bremsstrahlung_model=source, radiative_model=model, radiative_cutoff_eV=cutoff
+    ), events
+
+
 def resolve_run_radiative_model(
     model, bremsstrahlung_model, *, grooved, allow_fallback=False, cutoff_eV=None
 ):
