@@ -285,6 +285,7 @@ class _StartFlags:
     trajectories: str | None = None
     overwrite_trajectories: bool = False
     trajectory_storage: str | None = None
+    allow_physics_fallback: bool = False
 
 
 @dataclass(frozen=True)
@@ -391,6 +392,8 @@ def _plan_start(flags, catalog_profile):
     Checks run in the order the command has always applied them, so the first
     rule a user violates still decides the ``UsageError`` they see.
     """
+    if flags.allow_physics_fallback and (flags.nsys or flags.py_spy or flags.cpu or flags.cpu_only):
+        raise click.UsageError("--allow-physics-fallback cannot be combined with profiling")
     _reject_exclusive_start_flags(flags)
     performance_profile = _resolve_performance_profile(flags, catalog_profile)
     if flags.nsys and flags.material is None:
@@ -604,6 +607,9 @@ _start_transfer_options = _option_group(
 @_start_allocation_options
 @_start_performance_options
 @_start_cache_options
+@click.option(
+    "--allow-physics-fallback", is_flag=True, help="Allow and record physics-table fallbacks."
+)
 @_start_transfer_options
 @click.option(
     "--trajectories",
@@ -668,6 +674,7 @@ def start_command(**params):
         trajectories=flags.trajectories,
         overwrite_trajectories=flags.overwrite_trajectories,
         trajectory_storage=flags.trajectory_storage,
+        allow_physics_fallback=flags.allow_physics_fallback,
     )
 
 

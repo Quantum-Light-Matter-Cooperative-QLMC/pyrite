@@ -7,10 +7,12 @@ blocks to bound that staging. The runner sizes blocks with
 """
 
 import warnings
+from contextlib import nullcontext
 from functools import cache
 
 import numpy as np
 
+from ..._physics_fallback import repeated_photon_block
 from ...materials.attenuation import _normalize_composition
 from .brem import load_bremsstrahlung_cross_sections
 from .brem_bremslib import resolve_auto_model
@@ -69,7 +71,7 @@ def blocked_brem_spectrum(score, arguments):
     parts = []
     for start in range(0, energy.size, block):
         nodes = slice(start, start + block)
-        with warnings.catch_warnings():
+        with warnings.catch_warnings(), repeated_photon_block() if start else nullcontext():
             if start:
                 warnings.simplefilter("ignore")
             parts.append(

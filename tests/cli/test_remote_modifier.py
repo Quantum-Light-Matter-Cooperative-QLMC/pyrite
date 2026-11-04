@@ -408,3 +408,13 @@ def test_remote_overwrite_capture_requires_root():
     result = invoke(scan.command, ["standard", "--remote", "--overwrite-trajectories"])
     assert result.exit_code == 2
     assert "--overwrite-trajectories requires --trajectories" in result.stderr
+
+
+def test_remote_forwards_physics_fallback(monkeypatch):
+    seen = {}
+    monkeypatch.setattr(remote_cli, "_cli_start", lambda **kwargs: seen.update(kwargs))
+    result = invoke(
+        scan.command, ["standard", "-m", "hopg", "--remote", "--allow-physics-fallback"]
+    )
+    assert_clean_result(result)
+    assert seen["allow_physics_fallback"] is True

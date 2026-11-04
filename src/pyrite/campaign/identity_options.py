@@ -42,10 +42,12 @@ class IdentityOptions:
     pair_production_model: Any
     positron_transport: bool
     atomic_electron_deflection: str
+    allow_fallback: bool = False
 
 
 def pop_identity_options(settings_payload: dict[str, Any]) -> IdentityOptions:
     return IdentityOptions(
+        allow_fallback=bool(settings_payload.pop("allow_fallback", False)),
         emission=str(settings_payload.pop("emission", "incoherent")),
         temporal_profile=bool(settings_payload.pop("temporal_profile", False)),
         straggling=bool(settings_payload.pop("straggling", False)),
@@ -70,6 +72,8 @@ def transport_numerics_payload(
 ) -> dict[str, Any]:
     """Divergence-only transport keys; continuous stopping leaves digests unchanged."""
     numerics: dict[str, Any] = {}
+    if options.allow_fallback:
+        numerics["allow_physics_fallback"] = True
     if options.straggling:
         numerics["straggling"] = True
     if options.energy_model != "frozen":

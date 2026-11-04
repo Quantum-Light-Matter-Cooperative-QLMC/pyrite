@@ -100,6 +100,11 @@ class Settings:
         Convolve read-time spectra with the stored detector FWHM.
     brem_source
         ``"mc"``, ``"external"``, or ``"none"`` background selection.
+    allow_fallback
+        ``False`` (default) refuses missing-data substitutions in campaign
+        preflight and workers. ``True`` permits measured surrogate events;
+        maps to ``pyrite run --allow-physics-fallback`` and separates cache
+        admission from strict runs. It does not affect read-time analysis.
     n_electrons, n_electrons_brem
         Default line and continuum macro-electron counts.
     straggling
@@ -190,8 +195,11 @@ class Settings:
     # Opt-in line I(t) (#292). Divergence-only in dataset_identity, like emission.
     temporal_profile: bool = False
     precision: Precision | None = None
+    allow_fallback: bool = False
 
     def __post_init__(self) -> None:
+        if not isinstance(self.allow_fallback, bool):
+            raise TypeError("allow_fallback must be a bool")
         if self.precision is not None and not isinstance(self.precision, Precision):
             raise TypeError("precision must be a Precision or None")
         if not isinstance(self.temporal_profile, bool):
@@ -359,6 +367,8 @@ def store_result(results, case, out):
         results[name][E0]["line_grid_resolved"] = out["line_grid_resolved"]
     if out.get("line_data_coverage") is not None:
         results[name][E0]["line_data_coverage"] = out["line_data_coverage"]
+    if out.get("physics_fallbacks") is not None:
+        results[name][E0]["physics_fallbacks"] = out["physics_fallbacks"]
     if out.get("adaptive_sampling") is not None:
         results[name][E0]["adaptive_sampling"] = out["adaptive_sampling"]
     # Artifact-scored records name the trajectory file they replayed (#186).

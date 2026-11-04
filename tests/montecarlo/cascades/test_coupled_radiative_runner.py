@@ -457,3 +457,18 @@ def test_resident_coupled_cascade_passes_are_refused():
     assert validate_radiative_args(*args, **shared)
     with pytest.raises(ValueError, match="cascades join photon rows on the host"):
         validate_radiative_args(*args, **shared, cascade=True)
+
+
+def test_auto_without_tables_warns_about_uncoupled_radiation():
+    from pyrite._physics_fallback import PhysicsFallbackWarning
+    from pyrite.montecarlo.transport.hard_radiative import validate_radiative_args
+
+    with pytest.warns(PhysicsFallbackWarning, match="uncoupled radiative scoring"):
+        assert not validate_radiative_args(
+            "auto",
+            None,
+            None,
+            energy_model="midpoint",
+            groove=None,
+            keep_segments_on_device=False,
+        )

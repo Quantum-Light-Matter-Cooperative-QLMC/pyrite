@@ -4,6 +4,9 @@
 # canonical_facades lists active domain imports; other domains retain existing paths.
 # simulate_trajectories adds keyword-only radiative_moments="table"|"exact" (#788);
 # Case.radiative_moment_model persists approximation identity; absence replays exact.
+# Settings.allow_fallback and Case.allow_physics_fallback add explicit campaign
+# admission (#262); Case.physics_fallbacks carries preflight provenance to workers.
+# Existing bindings/statuses and strict/default identity payloads are preserved.
 schema_version = 1
 canonical_facades = ["beams", "geometry", "config", "detectors", "observations", "transport", "radiation"]
 

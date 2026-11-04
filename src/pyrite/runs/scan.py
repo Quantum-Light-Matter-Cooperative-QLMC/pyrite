@@ -40,6 +40,7 @@ import click
 
 from .._catalog_keys import material_keys
 from .._env import GENERATED_INVOCATION_ENV, set_canonical_env
+from .._physics_fallback import PhysicsFallbackWarning, fallback_cases
 from .._progress import (  # noqa: F401  (re-exported: progress helpers' historical scan import path)
     _ProgressTimer,
     _write_progress_record,
@@ -482,8 +483,17 @@ def run(args):
                 except Exception as error:
                     from ..montecarlo.case import AxialAdmissionError
                     from ..montecarlo.trajectories import TrajectoryArtifactError
+                    from ..xsgen._errors import TableNotFoundError
 
-                    if not isinstance(error, (AxialAdmissionError, TrajectoryArtifactError)):
+                    if not isinstance(
+                        error,
+                        (
+                            AxialAdmissionError,
+                            TrajectoryArtifactError,
+                            TableNotFoundError,
+                            PhysicsFallbackWarning,
+                        ),
+                    ):
                         raise
                     raise SystemExit(str(error)) from None
                 if not complete:
@@ -608,6 +618,32 @@ def _select_quick_energies(by_energy, e_grid_cxr, *, nominal=(30, 50), count=2):
     return chosen[:count]
 
 
+def _physics_fallback_identity(requested, resolved, elements, radiative_fallbacks=()):
+    """Descriptive provenance for continuum and radiative model fallbacks.
+
+    Case/dataset physics identity is already keyed by the executed models.
+    Segment energies and their affected fraction are not known during
+    preflight, so they are reported as ``None`` rather than invented.
+    """
+    events = [{**event, "elements": sorted(set(elements))} for event in radiative_fallbacks]
+    if requested not in ("auto", "bremslib") or resolved != "eedl":
+        return {"physics_fallbacks": events} if events else {}
+    return {
+        "physics_fallbacks": [
+            {
+                "model_requested": "auto (BremsLib)" if requested == "auto" else "bremslib",
+                "model_used": "eedl",
+                "elements": sorted(set(elements)),
+                "energy_span_keV": None,
+                "fraction_segments_affected": None,
+                "scope": "entire continuum source",
+                "reason": "BremsLib tables unavailable",
+            },
+            *events,
+        ]
+    }
+
+
 def _resolved_run(args, material):
     """Resolve settings, sweep, identity, and collision-free checkpoint stem."""
     import numpy as np
@@ -635,6 +671,12 @@ def _resolved_run(args, material):
     from ..montecarlo.case import refuse_axial_channeling
 
     settings = profile_run_settings(settings, catalog_profile, fidelity, CATALOG)
+    settings = replace(
+        settings,
+        allow_fallback=any(
+            (settings.allow_fallback, getattr(args, "allow_physics_fallback", False))
+        ),
+    )
     refuse_axial_channeling(vars(settings))
     overrides = {}
     if getattr(args, "quick", False):
@@ -723,16 +765,19 @@ def _resolved_run(args, material):
         from ..xsgen.elsepa.catalog import resolve_catalog_tables
 
         tables.extend(table for key in table_keys for table in resolve_catalog_tables(key))
-    from ..xsgen.bremslib.tables import load_bremsstrahlung_tables, resolve_bremsstrahlung_model
+    from ..xsgen.bremslib.tables import load_bremsstrahlung_tables
     from ..xsgen.elsepa.catalog import catalog_composition
 
     elements = [element for key in table_keys for element, _ in catalog_composition(key)]
-    # Resolve "auto" once, here, so the settings a run executes with, its
-    # dataset identity, and its table markers all name the same source.
-    settings = replace(
-        settings,
-        bremsstrahlung_model=resolve_bremsstrahlung_model(settings.bremsstrahlung_model, elements),
+    # Resolve "auto" once, before any transport or checkpoint I/O. Opting in
+    # to fallback selects EEDL for the entire run, not per element.
+    requested_brem_model = settings.bremsstrahlung_model
+    from ..campaign.bremsstrahlung_cases import resolve_run_models
+
+    settings, radiative_fallbacks = resolve_run_models(
+        settings, elements, grooved=getattr(target, "entrance_face", None) is not None
     )
+    resolved_brem_model = settings.bremsstrahlung_model
     xsgen_tables = identity_markers(tables)
     if settings.bremsstrahlung_model == "bremslib":
         xsgen_tables |= {
@@ -758,6 +803,11 @@ def _resolved_run(args, material):
         identity["detector_id"] = detector_id
     # Unhashed label: names and definition digests of the resolved presets.
     identity.update(identity_labels(CATALOG, catalog_profile))
+    identity.update(
+        _physics_fallback_identity(
+            requested_brem_model, resolved_brem_model, elements, radiative_fallbacks
+        )
+    )
     canonical_full = (
         fidelity == "full"
         and not overrides
@@ -820,7 +870,11 @@ def _run_material(args, material, max_seconds=None):
     settings, sweep, identity, stem = _resolved_run(args, material)
     fidelity = identity["fidelity"]
 
-    cases = build_cases(sweep, settings)
+    cases = fallback_cases(
+        build_cases(sweep, settings),
+        allow=settings.allow_fallback,
+        events=identity.get("physics_fallbacks", ()),
+    )
     cases, dropped = gate_cases_by_penetration(cases)
     summary = format_penetration_watchdog_summary(dropped, material=material)
     if summary is not None:

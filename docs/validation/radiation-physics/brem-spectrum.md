@@ -1,5 +1,65 @@
 # `brem-spectrum`
 
+(physics-fallback-coverage-review)=
+## Coverage-policy verification (issue #262, 2026-11-04)
+
+This fresh-context review concerns model selection, warning classification and
+coverage policy. It does not revalidate unchanged cross-section kernels or
+extend their energy domains. The ledger rows, source bibliography and source
+coverage were read before the policy implementation bodies.
+
+The [BremsLib v2.0.8 primary release](https://data.mendeley.com/datasets/6zfsc9xsz8/9)
+and its [manual](https://web.vu.lt/ff/a.poskus/files/2025/02/BremsLib_v2.0.pdf)
+specify an incident-electron floor of 10 eV. This is electron kinetic energy,
+not photon energy or the hard-photon cutoff. A staged table may cover a narrower
+domain; its actual incident-energy endpoints govern admission. Neither source
+provides a continuation below that floor using EEDL or Koch–Motz/Elwert.
+
+Independently of implementation, substituting EEDL changes the conditional
+angular density from the normalized BremsLib shape to the isotropic density:
+
+$$
+\frac{d^2\sigma_{\rm B}}{dk\,d\Omega}
+=\frac{d\sigma_{\rm B}}{dk}S_{\rm B}(T,k,\theta),
+\qquad \int S_{\rm B}\,d\Omega=1,
+\qquad
+\frac{d^2\sigma_{\rm E}}{dk\,d\Omega}
+=\frac{1}{4\pi}\frac{d\sigma_{\rm E}}{dk}.
+$$
+
+Both have units cm$^2$/(eV sr), but equal units and unit angular integrals do
+not imply equal spectra, angular distributions, or matching at a table boundary.
+If EEDL is itself uncovered, the analytic helper introduces another model
+substitution, with the approximation and endpoint limitations already recorded
+below. No new accuracy tolerance for either substitution is justified here.
+
+The soft/hard identity in `bremslib-radiative-partition` partitions one covered
+SDCS. Its cutoff-independent first-moment closure does not validate an
+out-of-range SDCS, an EEDL replacement, or omission of radiative energy-loss
+feedback in uncoupled transport. A low-energy splice would require a separate
+model definition, overlap/boundary evidence, angular treatment and coupled
+moment checks. Current source and ledger evidence do not supply those.
+
+**Policy verdict:** out-of-range emission remains a surrogate fallback requiring
+explicit opt-in in a strict run; it is not a validated model splice. Explicit
+EEDL, Bethe–Heitler, Mott and uncoupled selections retain their own meanings.
+Covered BremsLib work must not be reported as fallback merely because an unused
+EEDL staging table lacks coverage. Strict coupled scoring must continue to
+reject a substituted source even when uncoupled fallback is otherwise allowed.
+
+- **Claim:** `brem-spectrum`, with coverage constraints from
+  `bremslib-angular-model` and `bremslib-radiative-partition`.
+- **Filters:** units `pass`; limits `pass` within declared coverage;
+  signs/conventions `pass` for the distinction between directional and isotropic
+  density. Below-floor physical accuracy is not established.
+- **Re-derivation:** `matches` for the coverage-policy distinction above; no new
+  derivation or status upgrade is claimed for unchanged kernels.
+- **Verdict:** `filtered` for this policy review; preserve existing equation
+  statuses and pending human sign-off.
+- **Suggested ledger change:** update policy notes to distinguish strict run
+  admission, explicitly opted-in substitutions, and warning-based low-level
+  behavior; do not describe below-floor substitution as a validated splice.
+
 ```{note}
 **2026-09-25 (#174):** The Cartesian incident-panel interpolation derived below has been replaced by unit-base refinement with a $\ln T$ shape weight. See [Bremsstrahlung](../../physics/radiation-physics/bremsstrahlung.md). The ledger status is back to `filtered` until a fresh-context re-derivation covers the new interpolation. The derivation below remains valid for native panels, the MF=23 total and the isotropic estimator.
 ```

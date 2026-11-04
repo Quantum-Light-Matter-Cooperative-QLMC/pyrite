@@ -62,6 +62,22 @@ in human output. The JSON payload retains its existing source spellings.
 | `pair_production_model`, `positron_transport` | `--pair-production-model`, `--positron-transport` | |
 | `atomic_electron_deflection` | `--atomic-electron-deflection` | |
 
+Run preflight resolves `radiative_model="auto"` before checkpoint access.
+It requires the BremsLib continuum source and an ungrooved target. Unsupported
+configurations fail with guidance; `pyrite run --allow-physics-fallback` permits
+automatic uncoupled transport and records that substitution in
+`physics_fallbacks` alongside any continuum-source fallback. The same policy
+applies to remote submission. Explicit `bremslib-soft-hard` requests remain
+strict even with the flag.
+
+To choose uncoupled transport deliberately, set `radiative_model="uncoupled"`
+in the numerical preset. This scores radiation after transport without
+debiting radiative energy loss from the electron trajectory; it is a model
+choice, not a substitute with a guaranteed accuracy bound. Assess its limits
+against the [coupled transport model](../physics/radiation-physics/hard-bremsstrahlung-events.md).
+Existing checkpoint identities retain their historical interpretation;
+resolving a new run does not reinterpret stored `auto` or absent fields.
+
 ## Line-grid policy
 
 `pyrite numerics cxr-grid show|set|reset NAME` owns `[profiles.NAME.cxr_grid_policy]`.

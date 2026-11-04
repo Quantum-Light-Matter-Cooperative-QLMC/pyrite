@@ -11,6 +11,7 @@ import numpy as np
 from endf_parserpy import EndfFile
 
 from ..._backend import BACKEND, CUPY_BACKENDS, REAL, _to_cpu, xp
+from ..._physics_fallback import PhysicsFallbackWarning
 from ...materials.atomic import Z_TABLE
 from ...materials.attenuation import (
     _finite_mu_or_raise,
@@ -32,6 +33,7 @@ from .brem_bremslib import (
     stage_bremslib_elements,
     stage_bremslib_table,
 )
+from .brem_fallbacks import _prepare_mc_eedl_contexts
 from .brem_unit_base import _unit_base_panels
 from .characteristic import CHARACTERISTIC_EEDL_FILENAME as BREMSSTRAHLUNG_EEDL_FILENAME
 from .characteristic import CHARACTERISTIC_EEDL_SHA256 as BREMSSTRAHLUNG_EEDL_SHA256
@@ -774,7 +776,7 @@ def _bremsstrahlung_dsigma_dk(
     except EEDLBremsstrahlungDataUnavailable as exc:
         warnings.warn(
             f"{exc}; falling back to Bethe-Heitler for {element}",
-            RuntimeWarning,
+            PhysicsFallbackWarning,
             stacklevel=2,
         )
         return _brem_dsigma_dk(atomic_number, T_keV, k_eV)
@@ -789,7 +791,7 @@ def _bremsstrahlung_dsigma_dk(
             f"[{prepared.minimum_incident_energy_eV:g}, "
             f"{prepared.maximum_incident_energy_eV:g}] eV; falling back to "
             "Bethe-Heitler for those segments",
-            RuntimeWarning,
+            PhysicsFallbackWarning,
             stacklevel=2,
         )
     eedl = _evaluate_prepared_eedl(prepared, state, k_eV)
@@ -797,45 +799,6 @@ def _bremsstrahlung_dsigma_dk(
         return eedl
     bethe_heitler = _brem_dsigma_dk(atomic_number, T_keV, k_eV)
     return xp.where(state.available[:, None], eedl, bethe_heitler)
-
-
-def _prepare_mc_eedl_contexts(
-    composition,
-    segment_energy_keV,
-    photon_energy_eV,
-) -> dict[str, _ResolvedEEDLContext | None]:
-    """Load/stage each element once and prepare all segment interpolation state."""
-    contexts: dict[str, _ResolvedEEDLContext | None] = {}
-    for element, _density in composition:
-        try:
-            table = load_bremsstrahlung_cross_sections(element)
-        except EEDLBremsstrahlungDataUnavailable as exc:
-            warnings.warn(
-                f"{exc}; falling back to Bethe-Heitler for {element}",
-                RuntimeWarning,
-                stacklevel=3,
-            )
-            contexts[element] = None
-            continue
-        prepared = _prepare_eedl_grid(table, photon_energy_eV)
-        state = _prepare_eedl_segment_state(prepared, segment_energy_keV)
-        available_host = np.asarray(_to_cpu(state.available), dtype=bool)
-        all_available = bool(np.all(available_host))
-        if not all_available:
-            warnings.warn(
-                f"{element} incident energy is outside the EEDL range "
-                f"[{prepared.minimum_incident_energy_eV:g}, "
-                f"{prepared.maximum_incident_energy_eV:g}] eV; falling back to "
-                "Bethe-Heitler for those segments",
-                RuntimeWarning,
-                stacklevel=3,
-            )
-        contexts[element] = _ResolvedEEDLContext(
-            prepared=prepared,
-            state=state,
-            all_available=all_available,
-        )
-    return contexts
 
 
 def mc_brem_spectrum(
@@ -1013,11 +976,6 @@ def mc_brem_spectrum(
     seg_E = seg_E[owner]
     # BremsLib keeps EEDL staged too: it is the isotropic fallback for an
     # element without a table and for segments outside a table's energy range.
-    eedl_contexts = (
-        _prepare_mc_eedl_contexts(comp, seg_E, E_grid)
-        if cross_section_model in {"eedl", "bremslib"}
-        else {}
-    )
     bremslib_staged: dict = {}
     bremslib_covers: dict[str, bool] = {}
     if cross_section_model == "bremslib":
@@ -1026,6 +984,12 @@ def mc_brem_spectrum(
         )
         v_hat = xp.asarray(segments["v_hat"], dtype=REAL)[brem_idx][owner]
         seg_cos_theta = v_hat @ xp.asarray(n_hat, dtype=REAL)
+
+    eedl_contexts = (
+        _prepare_mc_eedl_contexts(comp, seg_E, E_grid, supplied_bremslib)
+        if cross_section_model in {"eedl", "bremslib"}
+        else {}
+    )
 
     spec = xp.zeros(E_grid.size, dtype=REAL)
 

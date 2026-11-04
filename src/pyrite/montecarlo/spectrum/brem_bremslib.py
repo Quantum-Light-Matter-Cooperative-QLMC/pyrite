@@ -44,6 +44,11 @@ from ..._bremslib_table import (
     solid_angle_integral,
     top_reduced_energy,
 )
+from ..._physics_fallback import (
+    PhysicsFallbackWarning,
+    preflight_segment_fallbacks,
+    record_segment_fallback,
+)
 
 #: One millibarn in square centimetres.
 _MB_CM2 = 1.0e-27
@@ -241,23 +246,72 @@ def evaluate_bremslib_rows(staged: _StagedBremsLib, state: _BremsLibSegmentState
 _ELECTRON_REST_EV = 510998.95
 
 
-def _warn_bremslib_element_missing(element: str, stacklevel: int) -> None:
-    warnings.warn(
-        f"no BremsLib table supplied for {element}; its bremsstrahlung falls back to "
-        "isotropic EEDL emission",
-        RuntimeWarning,
-        stacklevel=stacklevel + 1,
+def report_segment_fallback(message, requested, used, element, energies, mask, *, stacklevel=3):
+    """Count scored rows on the active backend; download only scalar metrics."""
+    affected = int(_to_cpu(xp.count_nonzero(mask)))
+    span = None
+    if affected:
+        selected = energies[mask]
+        span = [float(_to_cpu(selected.min())), float(_to_cpu(selected.max()))]
+    record_segment_fallback(
+        requested,
+        used,
+        element,
+        int(energies.size),
+        affected,
+        span,
+        "continuum segment rows",
+        message,
     )
+    if affected:
+        warnings.warn(message, PhysicsFallbackWarning, stacklevel=stacklevel)
 
 
-def _warn_bremslib_out_of_range(table: BremsLibBremsstrahlungTable, stacklevel: int) -> None:
-    warnings.warn(
+def observe_continuum_rows(element, energies):
+    span = (
+        None
+        if not energies.size
+        else [float(_to_cpu(energies.min())), float(_to_cpu(energies.max()))]
+    )
+    preflight_segment_fallbacks(element, int(energies.size), span)
+
+
+def _warn_bremslib_element_missing(element: str, stacklevel: int, energies=None) -> None:
+    message = (
+        f"no BremsLib table supplied for {element}; its bremsstrahlung falls back to "
+        "isotropic EEDL emission"
+    )
+    if energies is None:
+        warnings.warn(message, PhysicsFallbackWarning, stacklevel=stacklevel + 1)
+    else:
+        report_segment_fallback(
+            message,
+            "bremslib",
+            "eedl",
+            element,
+            energies,
+            xp.ones(energies.shape, dtype=bool),
+            stacklevel=stacklevel + 1,
+        )
+
+
+def _warn_bremslib_out_of_range(
+    table: BremsLibBremsstrahlungTable, stacklevel: int, *, element=None, energies=None
+) -> None:
+    message = (
         f"Z={table.atomic_number} incident energy is outside the BremsLib range "
         f"[{table.minimum_incident_energy_keV:g}, {table.maximum_incident_energy_keV:g}] keV; "
-        "falling back to isotropic EEDL emission for those segments",
-        RuntimeWarning,
-        stacklevel=stacklevel + 1,
+        "falling back to isotropic EEDL emission for those segments"
     )
+    if energies is None:
+        warnings.warn(message, PhysicsFallbackWarning, stacklevel=stacklevel + 1)
+    else:
+        mask = (energies < table.minimum_incident_energy_keV) | (
+            energies > table.maximum_incident_energy_keV
+        )
+        report_segment_fallback(
+            message, "bremslib", "eedl", element, energies, mask, stacklevel=stacklevel + 1
+        )
 
 
 def stage_bremslib_elements(comp, tables, seg_E_keV, *, strict=False):
@@ -274,7 +328,7 @@ def stage_bremslib_elements(comp, tables, seg_E_keV, *, strict=False):
         if table is None:
             if strict:
                 raise ValueError("dielectric-coupled scoring requires all BremsLib tables")
-            _warn_bremslib_element_missing(element, stacklevel=3)
+            _warn_bremslib_element_missing(element, stacklevel=3, energies=seg_E_keV)
             continue
         covered = not seg_E_keV.size or bool(
             (float(_to_cpu(seg_E_keV.min())) >= table.minimum_incident_energy_keV)
@@ -283,7 +337,7 @@ def stage_bremslib_elements(comp, tables, seg_E_keV, *, strict=False):
         if not covered:
             if strict:
                 raise ValueError("dielectric-coupled BremsLib scorer cannot fall back to EEDL")
-            _warn_bremslib_out_of_range(table, stacklevel=3)
+        _warn_bremslib_out_of_range(table, stacklevel=3, element=element, energies=seg_E_keV)
         staged[element] = stage_bremslib_table(table)
         covers[element] = covered
     return staged, covers
@@ -329,7 +383,7 @@ def resolve_auto_model(segments, comp, bremslib_tables):
         warnings.warn(
             "bremsstrahlung_model 'auto': the supplied BremsLib tables do not cover "
             f"{', '.join(elements)}; using EEDL with an isotropic photon angle",
-            RuntimeWarning,
+            PhysicsFallbackWarning,
             stacklevel=3,
         )
         return "eedl", None

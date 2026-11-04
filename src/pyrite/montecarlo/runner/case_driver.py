@@ -27,6 +27,7 @@ from typing import Any
 import numpy as np
 
 from ..._backend import BACKEND
+from ..._physics_fallback import collect_physics_fallbacks
 from ..case import Case, refuse_axial_channeling
 from ..spectrum import _segments_in_layer, _segments_on_device, mc_cxr_spectrum
 from ..spectrum.coherent_population import physical_bunch_electrons
@@ -59,6 +60,7 @@ from .electron_blocks import (
     snapshot_audit,
 )
 from .emission import optional_line_components
+from .fallbacks import spectrum_fallbacks
 from .oom import _maybe_free_pool, _SpectrumPhaseOOM
 from .recovery import _spectrum_with_recovery, transport_with_recovery
 from .stage_chunks import _stage_counters
@@ -237,15 +239,18 @@ def _transport_case(
     )
     select_emission(case)
     if case.get("adaptive_precision") is not None:
-        return _adaptive.transport_requested_precision(
-            case,
-            record_timing,
-            transport_core=transport_core,
-            keep_segments_on_device=keep_segments_on_device,
-            trajectory_capture=trajectory_capture,
-            block_electrons=block_electrons,
-            block_monitor=block_monitor,
-        )
+        # Precision probes score intermediate batches before the final spectrum.
+        # Enforce admission there too; final rows are measured independently.
+        with collect_physics_fallbacks(allow=case.get("allow_physics_fallback", False)):
+            return _adaptive.transport_requested_precision(
+                case,
+                record_timing,
+                transport_core=transport_core,
+                keep_segments_on_device=keep_segments_on_device,
+                trajectory_capture=trajectory_capture,
+                block_electrons=block_electrons,
+                block_monitor=block_monitor,
+            )
     timed = _pkg._TIMING or record_timing
     t0 = perf_counter() if timed else 0.0
     E_grid, E_brem, beam, n_hat, groove = _case_geometry(case)
@@ -773,8 +778,13 @@ def _spectrum_case(case, tp, record_timing=False):
     timed = _pkg._TIMING or record_timing
     if timed:
         _cxr_setup.SETUP_STATS.clear()
-    with _pkg._nsys_range(f"pyrite.spectrum_case:{case.get('name', 'case')}"):
+    with (
+        spectrum_fallbacks(case, tp) as fallbacks,
+        _pkg._nsys_range(f"pyrite.spectrum_case:{case.get('name', 'case')}"),
+    ):
         out = _spectrum_case_impl(case, tp, record_timing)
+    if events := fallbacks.events():
+        out["physics_fallbacks"] = events
     if timed:
         out.update(_stage_counters(tp))
     _adaptive.attach_sampling(case, tp, out)

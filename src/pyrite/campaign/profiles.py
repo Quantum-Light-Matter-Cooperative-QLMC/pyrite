@@ -1011,7 +1011,7 @@ def canonical_settings(settings: Settings, *, resolved_bremsstrahlung: bool = Tr
     bremsstrahlung = ("bremslib",) if resolved_bremsstrahlung else ("bremslib", "auto")
     return (
         settings.emission == "incoherent"
-        and not (settings.temporal_profile or settings.straggling)
+        and not (settings.temporal_profile or settings.straggling or settings.allow_fallback)
         and settings.precision is None
         and settings.energy_model == "midpoint"
         and settings.max_dE_frac == 0.0
@@ -1019,7 +1019,7 @@ def canonical_settings(settings: Settings, *, resolved_bremsstrahlung: bool = Tr
         and settings.inelastic_cutoff_eV is None
         and settings.elastic_model == "elsepa"
         and settings.bremsstrahlung_model in bremsstrahlung
-        and settings.radiative_model == "auto"
+        and settings.radiative_model in ("auto", "bremslib-soft-hard")
         and settings.radiative_cutoff_eV is None
     )
 

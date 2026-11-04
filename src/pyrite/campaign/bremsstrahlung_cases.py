@@ -18,6 +18,77 @@ from .._radiative_moment_policy import RADIATIVE_MOMENT_MODEL
 from ..montecarlo.case import Case
 
 
+def resolve_run_models(settings, elements, *, grooved):
+    """Apply explicit admission before identity, honoring opt-in over ambient filters."""
+    from .._physics_fallback import collect_physics_fallbacks
+    from ..xsgen.bremslib.tables import resolve_bremsstrahlung_model
+
+    with collect_physics_fallbacks(allow=settings.allow_fallback):
+        source = resolve_bremsstrahlung_model(
+            settings.bremsstrahlung_model, elements, allow_fallback=settings.allow_fallback
+        )
+        model, cutoff, events = resolve_run_radiative_model(
+            settings.radiative_model,
+            source,
+            grooved=grooved,
+            allow_fallback=settings.allow_fallback,
+            cutoff_eV=settings.radiative_cutoff_eV,
+        )
+    return replace(
+        settings, bremsstrahlung_model=source, radiative_model=model, radiative_cutoff_eV=cutoff
+    ), events
+
+
+def resolve_run_radiative_model(
+    model, bremsstrahlung_model, *, grooved, allow_fallback=False, cutoff_eV=None
+):
+    """Resolve driver-side coupling before identity or checkpoint access.
+
+    Historical identity decoding remains separate: this policy applies only
+    when preparing a new run, not when interpreting an existing checkpoint.
+    Return the executed model, applicable cutoff, and preflight fallback events.
+    """
+    if model == "uncoupled":
+        return model, cutoff_eV, []
+    if not grooved and bremsstrahlung_model == "bremslib":
+        return "bremslib-soft-hard", cutoff_eV, []
+    reason = (
+        "coupled BremsLib transport does not support grooved targets"
+        if grooved
+        else "coupled radiative transport requires the BremsLib continuum source"
+    )
+    guidance = (
+        f"{reason}; install tables with `pyrite tables fetch bremslib` and select "
+        "an ungrooved BremsLib configuration, or explicitly select "
+        "radiative_model='uncoupled'."
+    )
+    if model != "auto":
+        raise ValueError(guidance)
+    if not allow_fallback:
+        raise ValueError(guidance + " Automatic degradation requires --allow-physics-fallback.")
+    import warnings
+
+    from .._physics_fallback import PhysicsFallbackWarning
+
+    warnings.warn(
+        guidance + " Using uncoupled radiative transport.", PhysicsFallbackWarning, stacklevel=2
+    )
+    return (
+        "uncoupled",
+        None,
+        [
+            {
+                "model_requested": "auto (bremslib-soft-hard)",
+                "model_used": "uncoupled",
+                "scope": "entire radiative transport",
+                "reason": reason,
+                "energy_span_keV": None,
+                "fraction_segments_affected": None,
+            }
+        ],
+    )
+
+
 def radiative_case_keys(
     model,
     cutoff_eV,

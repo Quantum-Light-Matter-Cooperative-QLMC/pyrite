@@ -240,6 +240,7 @@ def test_mc_brem_stages_eedl_grid_once_across_reduction_chunks(monkeypatch):
         segments,
         np.array([100.0, 500.0, 1000.0]),
         composition=[("C", 0.1)],
+        cross_section_model="eedl",
         chunk=1,
     )
 

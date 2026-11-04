@@ -132,3 +132,24 @@ def test_every_generated_bash_payload_rejects_remote_uv_program_text(monkeypatch
 
     with pytest.raises(SystemExit, match="PYRITE_REMOTE_UV"):
         build()
+
+
+@pytest.mark.parametrize("chunked", [False, True])
+def test_queue_fallback_policy_is_forwarded(chunked):
+    def build(allow):
+        if chunked:
+            return _queue_scripts._chunked_queue_script(
+                "j", ["hopg"], False, None, 10, allow_physics_fallback=allow
+            )
+        return _queue_scripts._queue_script(
+            "j", ["hopg"], False, None, allow_physics_fallback=allow
+        )
+
+    strict = build(False)
+    allowed = build(True)
+    assert "PYRITE_STRICT_PHYSICS_FALLBACK=1" in strict
+    assert "--allow-physics-fallback" not in strict
+    assert "PYRITE_STRICT_PHYSICS_FALLBACK=1" not in allowed
+    assert "--allow-physics-fallback" in allowed
+    assert "--require elsepa" in strict
+    assert "--require elsepa" in allowed

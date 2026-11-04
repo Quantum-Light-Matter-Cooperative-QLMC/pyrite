@@ -11,6 +11,7 @@ from dataclasses import dataclass, replace
 import numpy as np
 
 from ..._backend import BACKEND
+from ..._physics_fallback import PhysicsFallbackWarning
 from ...materials._transport_data import TRANSPORT_ELEMENTS
 from ..spectrum.brem_bremslib import (
     BremsLibBremsstrahlungTable,
@@ -677,11 +678,18 @@ def validate_radiative_args(
         warnings.warn(
             "coupled BremsLib radiative transport is unavailable for grooves; "
             "using uncoupled scoring",
-            UserWarning,
+            PhysicsFallbackWarning,
             stacklevel=2,
         )
         return False
     if radiative_model == "auto" and bremslib_tables is None:
+        warnings.warn(
+            "BremsLib tables are unavailable; using uncoupled radiative scoring. "
+            "Install tables with `pyrite tables fetch bremslib` or explicitly select "
+            "radiative_model='uncoupled'.",
+            PhysicsFallbackWarning,
+            stacklevel=2,
+        )
         return False
     if bremslib_tables is None:
         raise ValueError("bremslib-soft-hard requires bremslib_tables")

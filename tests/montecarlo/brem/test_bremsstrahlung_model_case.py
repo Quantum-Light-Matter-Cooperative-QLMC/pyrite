@@ -89,16 +89,14 @@ def test_auto_resolves_to_bremslib_only_when_every_table_is_installed(monkeypatc
     )
     assert tables.resolve_bremsstrahlung_model("auto", ["C", "Si"]) == "bremslib"
 
-    monkeypatch.setattr(tables, "load_bremsstrahlung_tables", lambda elements: {"C": object()})
-    with pytest.warns(RuntimeWarning, match="pyrite tables fetch bremslib"):
-        assert tables.resolve_bremsstrahlung_model("auto", ["C", "Si"]) == "eedl"
-
     def missing(elements):
         raise _errors.TableNotFoundError("not fetched")
 
     monkeypatch.setattr(tables, "load_bremsstrahlung_tables", missing)
+    with pytest.raises(_errors.TableNotFoundError, match="not fetched"):
+        tables.resolve_bremsstrahlung_model("auto", ["C"])
     with pytest.warns(RuntimeWarning):
-        assert tables.resolve_bremsstrahlung_model("auto", ["C"]) == "eedl"
+        assert tables.resolve_bremsstrahlung_model("auto", ["C"], allow_fallback=True) == "eedl"
     # Explicit choices pass through untouched, so "bremslib" stays strict.
     assert tables.resolve_bremsstrahlung_model("bremslib", ["C"]) == "bremslib"
     assert tables.resolve_bremsstrahlung_model("eedl", ["C"]) == "eedl"
