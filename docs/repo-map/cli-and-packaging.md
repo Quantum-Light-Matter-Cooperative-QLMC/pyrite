@@ -125,8 +125,7 @@ characteristic, bremsstrahlung, opt-in planar history TR; `directional_sources`)
 owns the typed component and mean-current scaling. The thin standalone
 `apps/angular_heatmap_app.py` uses bounded cache/panel helpers in
 `apps/angular_heatmap.py` (cached polar × azimuth orientations);
-`apps/angular_cherenkov.py` supplies the separate internal bulk cone diagnostic,
-per-bin normalization and export. `apps/angular_maps.py` owns the shared Plotly
+`apps/angular_maps.py` owns the shared Plotly
 angle × energy heatmap/profile figures, catalog material options, backend-aware
 transport cores and form layout used by the heatmap, TR and optical apps.
 `pyrite app angular-heatmap launch|export` uses the shared launcher on tunnel
