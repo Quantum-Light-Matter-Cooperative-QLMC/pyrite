@@ -133,82 +133,78 @@ def _(plt, result):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## Put components on one grid and choose units
+    ## Explicit current and matching acceptance
 
-    `spectral_flux()` returns a wide Polars table: one row per energy, one
-    column per component, plus `total`. It combines all native energy nodes,
-    linearly interpolates each component between its nodes, and uses zero
-    outside that component's range. Columns can now be added at the same energy.
-
-    `units` chooses the normalization of **every component and `total`**:
-
-    | `units=`               | Spectral values                         | Scaling from `"electron"`          |
-    | ---------------------- | --------------------------------------- | ---------------------------------- |
-    | `"electron"`           | photons / (incident electron · eV · sr) | None                               |
-    | `"sr"`                 | photons / (s · eV · sr)                 | Multiply by physical electrons / s |
-    | `"detector"` (default) | photons / (s · eV) into acceptance      | Also multiply by accepted sr       |
-    | `"nA"`                 | photons / (s · nA · eV) into acceptance | Accepted rate per 1 nA of current  |
-
-    The energy columns remain in eV and keV; selecting `photon_energy_keV`
-    does **not** change a density from per eV to per keV (that needs ×1,000).
-    These are expected rates before detector efficiency and exposure, not
-    acquired counts. This scalar-detector conversion assumes intensity is
-    uniform across its accepted solid angle.
+    `.quantify().rate(current=...)` changes per-primary yield into photons
+    per second using $I/|e|$. It keeps the per-sr directional measure.
+    `accepted_spectra(assume_uniform=True)` uses this scalar case's acceptance
+    with explicit acknowledgment that density is uniform over it. Each
+    component keeps its native sampling and energy grid. `to_energy("keV")`
+    converts the energy coordinate and reciprocal density together.
     """)
     return
 
 
 @app.cell
-def _(result):
-    # Each table has a common, interpolated energy grid and explicit units.
-    per_sr = result.spectral_flux(units="sr")
-    into_acceptance = result.spectral_flux(units="detector")
-    into_acceptance  # noqa: B018 - display the common-grid table in marimo
-    return into_acceptance, per_sr
+def _(beam, result):
+    from pyrite.units import Q_
+
+    mean_current = Q_(beam.bunch_charge_pc, "pC") * Q_(beam.rep_rate_hz, "Hz")
+    per_sr = result.cxr.incoherent.quantify().rate(current=mean_current)
+    accepted = result.accepted_spectra(assume_uniform=True)
+    into_acceptance = {
+        name: component.rate(current=mean_current).to_energy("keV")
+        for name, component in accepted.items()
+    }
+    per_current = accepted["cxr"].rate_per_current()
+    # One native table per component; write_csv/write_parquet can export it.
+    into_acceptance["cxr"].to_dataframe().head(5)
+    return accepted, into_acceptance, mean_current, per_current, per_sr
 
 
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    For this beam, **50 nA ≈ 3.12 × 10¹¹ electrons / s**. Thus the `"sr"`
-    table is the electron-normalized table multiplied by that rate; the
-    `"detector"` table also includes the detector's accepted solid angle.
-    Integrating a `"detector"` column over energy in **eV** gives photons / s.
-    The following check applies those conversions to the CXR band alone.
+    For this beam, **50 nA ≈ 3.12 × 10¹¹ electrons / s**. An accepted
+    per-current coefficient is computed directly with $1/|e|$, even at zero
+    beam current. A second current transformation is rejected. The native
+    tables retain semantic columns; `dataframe_units()` supplies physical
+    units for a JSON sidecar. These are expected photon rates, not acquired
+    counts after detector response, exposure and a possible Poisson draw.
+
+    Integrate each original component with its declared sampling, then add
+    its integral. A mixed node/bin-mean `combined_cxr()` may be plotted but
+    refuses integration; `integrated_yield()` integrates its parts honestly.
+    No union-grid interpolation or zero-filled tails are needed for totals.
     """)
     return
 
 
 @app.cell
-def _(beam, cxr, into_acceptance, np, per_sr, result):
+def _(accepted, mean_current, np, per_current, per_sr, result):
     from scipy.constants import elementary_charge
 
     band_eV = (600.0, 2_000.0)
-    lo, hi = band_eV
-    energy = cxr.photon_energy_eV
-    nodes = np.r_[lo, energy[(energy > lo) & (energy < hi)], hi]
-
-    # Integrating photon number flux density per electron per sr
-    cxr_yield_per_electron_sr = float(np.trapezoid(np.interp(nodes, energy, cxr.density), nodes))
-
-    current_nA = beam.bunch_charge_pc * beam.rep_rate_hz / 1_000  # Current
-    electrons_per_second = current_nA * 1e-9 / elementary_charge  # electron number flux density
-
-    flux_sr_grid = per_sr.get_column("photon_energy_eV").to_numpy()
-    flux_sr_cxr = per_sr.get_column("cxr").to_numpy()
-    cxr_rate_sr = float(np.trapezoid(np.interp(nodes, flux_sr_grid, flux_sr_cxr), nodes))
-
-    # For a scalar detector, the accepted rate assumes locally uniform intensity.
-    result.accepted_solid_angle_sr()
-    assert np.isclose(cxr_rate_sr, cxr_yield_per_electron_sr * electrons_per_second, rtol=1e-10)
-    assert np.array_equal(into_acceptance.get_column("photon_energy_eV").to_numpy(), flux_sr_grid)
+    represented = result.integrated_yield(band_eV, mode="incoherent")
+    electron_rate = mean_current.to("A").magnitude / elementary_charge
+    accepted_total_rate = (
+        represented["total"].inside * electron_rate * result.accepted_solid_angle_sr()
+    )
+    # Metadata reports unsupported portions of the requested window separately.
+    print("Represented accepted band rate [photons/s]:", accepted_total_rate)
+    print("CXR uncovered windows [eV]:", represented["cxr"].uncovered_eV)
+    assert np.allclose(
+        (per_current.density * mean_current).to("1/eV/s").magnitude,
+        accepted["cxr"].rate(current=mean_current).density.magnitude,
+    )
+    assert per_sr.measure == "per_energy_per_steradian"
     return
 
 
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ### Plot the complete spectrum summed over all components
+    ### Plot accepted components on their native grids
     """)
     return
 
@@ -216,16 +212,13 @@ def _(mo):
 @app.cell
 def _(into_acceptance, plt):
     fig_rate, ax_rate = plt.subplots(figsize=(7, 3.8), layout="constrained")
-    ax_rate.plot(
-        into_acceptance.get_column("photon_energy_eV").to_numpy() / 1_000,
-        into_acceptance.get_column("total").to_numpy(),
-        label="Total accepted photon rate",
-    )
-    ax_rate.axvspan(0.6, 2.0, alpha=0.12, color="grey", label="CXR integration band")
+    for _name, _view in into_acceptance.items():
+        ax_rate.plot(_view.photon_energy.magnitude, _view.density.magnitude, label=_name)
+    ax_rate.axvspan(0.6, 2.0, alpha=0.12, color="grey", label="Integration band")
     ax_rate.set(
         xlabel="Photon energy (keV)",
-        ylabel="Photons / (s · eV)",
-        title="Source spectrum scaled by current and solid-angle acceptance",
+        ylabel="Photons / (s · keV)",
+        title="Native components scaled by explicit current and matching acceptance",
         xlim=(0.3, 3.7),
         yscale="log",
     )
@@ -240,13 +233,12 @@ def _(mo):
     mo.md(r"""
     ## Interpretation
 
-    `to_dataframe()` preserves each component's native energy grid;
-    `spectral_flux()` interpolates onto a common one. `"electron"` gives
-    the electron-normalized density, `"sr"` scales by the physical electron
-    rate, and `"detector"` also multiplies by accepted solid angle.
-
-    The **600–2,000 eV** band integral uses CXR only; the photon-rate plot
-    includes all computed components. These are _expected source rates_,
+    `to_dataframe()` preserves each component's native energy grid.
+    Quantity tables record paired energy/density units, measure and
+    normalization. `combined_cxr()` combines same-grid line components;
+    incoherent and coherent CXR are alternative choices. The **600–2,000 eV**
+    represented total sums native component integrals and reports uncovered
+    support separately; the photon-rate plot retains separate components. These are _expected source rates_,
     not measured counts: no exposure, efficiency or Poisson noise is applied.
     The scalar acceptance assumes locally uniform angular density.
 

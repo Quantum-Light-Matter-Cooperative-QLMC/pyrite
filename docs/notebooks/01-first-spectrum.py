@@ -168,7 +168,7 @@ def _(mo, tables_ready):
     cxr = result.cxr.incoherent
     brem = result.brem
     characteristic = result.characteristic
-    return brem, characteristic, cxr, result
+    return beam, brem, characteristic, cxr, result
 
 
 @app.cell(hide_code=True)
@@ -228,32 +228,33 @@ def _(mo):
     mo.md(r"""
     ### Now, together, and linear
 
-    To put the spectra together onto the same axes, we must interpolate their grids onto one another's,
-    as they do not generally share native photon grids in order to maximize simulation performance.
-
-    We then convert from the average yield *per electron* into the average yield *per second* based on our
-    average beam current (if you wanted average yield per bunch, just leave off the `beam.repetition_rate` below)
+    Plot components on their own native grids; they need no interpolation to
+    share axes. Convert energy and density together with `to_energy("keV")`.
+    The explicit mean current is bunch charge times repetition rate. Here we
+    also acknowledge uniform directional density over the scalar detector's
+    matching acceptance. The resulting curves are expected accepted photon
+    rates before detector response or exposure.
     """)
     return
 
 
 @app.cell
-def _(plt, result):
-    flux = result.spectral_flux(units="sr")
+def _(beam, plt, result):
+    from pyrite.units import Q_
 
-    energy_eV = flux["photon_energy_eV"].to_numpy()
-    total_flux = flux["total"].to_numpy()
-
-    xmin, xmax = 300, 3700
-    mask = (energy_eV >= 300) & (energy_eV <= 3700)
-
+    mean_current = Q_(beam.bunch_charge_pc, "pC") * Q_(beam.rep_rate_hz, "Hz")
+    accepted_components = result.accepted_spectra(assume_uniform=True)
     _figure, _axis = plt.subplots(figsize=(7, 3.8), layout="constrained")
-    _axis.plot(energy_eV[mask] / 1000, total_flux[mask])
+    for _name, _component in accepted_components.items():
+        _rate = _component.rate(current=mean_current).to_energy("keV")
+        _energy = _rate.photon_energy.magnitude
+        _visible = (_energy >= 0.3) & (_energy <= 3.7)
+        _axis.plot(_energy[_visible], _rate.density.magnitude[_visible], label=_name)
     _axis.set(
         xlabel="Photon energy (keV)",
-        ylabel=r"Photons / (s $\cdot$ eV $\cdot$ sr)",
+        ylabel=r"Photons / (s $\cdot$ keV)",
         title=r"30 keV electrons $\rightarrow$ 400 nm HOPG",
-        xlim=(xmin / 1000, xmax / 1000),
+        xlim=(0.3, 3.7),
         yscale="linear",
     )
     _axis.set_ylim(bottom=0)
@@ -270,11 +271,13 @@ def _(mo):
 
     PXR and CBS are combined here because their amplitudes interfere. The electron bunch duration
     is, however, generally far longer than the wavelength of interest, meaning the interference
-    is generally between many incoherent emitters which averages to the spectrum above. Integrating
-    the spectrum over photon energy gives photons / (s · sr), i.e., a sample of a single $(\theta, \phi)$ direction,
-    with no solid-angular span. So, multiplying by a hypothetical detector's acceptance solid angle
-    gives an expected photon rate in photons / s (assuming the detector is small enough that the
-    spectrum is uniform across it, of course).
+    is generally between many incoherent emitters which averages to the spectrum above.
+    The last plot shows separate accepted components, each on its native grid.
+    For an integrated total, `result.integrated_yield()` integrates each original
+    component according to its node/bin-mean sampling before adding yields.
+    Apply current and matching acceptance to those represented integrals; report
+    uncovered windows rather than assuming missing emission is zero. Never sum
+    alternative coherent and incoherent CXR modes.
 
     Try halving or doubling the history counts; see what happens to the spectrum, especially the CXR spectrum
     in the log plot. Then, change only the target thickness, or just the observation angle -- watch how the lines change.
