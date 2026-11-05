@@ -66,16 +66,16 @@ from ..checkpoints.recompute import (  # noqa: F401 -- compatibility exports
     repair_checkpoint,
     repair_cxr_spec,
 )
-from ..execution.artifacts import (
-    CaseArtifactRef,
-    DirectionalArtifactRef,
-    load_directional_result,
-)
 from ..montecarlo import run_cases, runner
 from ..montecarlo.case import refuse_axial_channeling_cases
 from ..results import store_result
-from ._sweep_execution import SweepCompletion
-from ._sweep_plan import SweepResume, SweepWork, has_record, validate_sweep_request
+from ._sweep_execution import (
+    SweepBudget,
+    SweepCompletion,
+    resolve_worker_output,
+    terminal_activity,
+)
+from ._sweep_plan import SweepResume, SweepWork, validate_sweep_request
 
 
 def __getattr__(name):
@@ -98,6 +98,91 @@ def _default_group_key(case):
         case.get("crystal_width_mm"),
         case.get("crystal_height_mm"),
     )
+
+
+def _runtime_plan(executor, cases, max_workers):
+    """Describe where ``cases`` run; never the local topology for a foreign executor."""
+    if executor is None:
+        return runner.runtime_plan(cases, max_workers)
+    planner = getattr(executor, "runtime_plan", None)
+    if planner is not None:
+        return planner(cases, max_workers)
+    return {
+        "engine": "external",
+        "executor": type(executor).__qualname__,
+        "requested_workers": max_workers,
+        "effective_workers": None,
+    }
+
+
+def _run_options(
+    max_workers, progress, should_stop, transport_only, trajectory_capture, on_timing, on_activity
+):
+    """Options common to ``run_cases`` and ``executor.execute``; optional hooks stay absent."""
+    options = {
+        "max_workers": max_workers,
+        "progress": progress,
+        "should_stop": should_stop,
+        "keep_results": False,  # the case callback owns storage; don't pin spectra in RAM
+        "transport_only": transport_only,
+    }
+    if trajectory_capture is not None:
+        options["trajectory_capture"] = trajectory_capture
+    if on_timing is not None:
+        options["on_timing"] = on_timing
+    if on_activity is not None:
+        options["on_activity"] = on_activity
+    return options
+
+
+def _capture_size_report(trajectory_capture, todo):
+    if trajectory_capture is None or os.environ.get("PYRITE_TRAJECTORY_SIZE_REPORT") != "1":
+        return None
+    from ._trajectory_capture import CaptureSizeReport
+
+    return CaptureSizeReport(trajectory_capture, todo)
+
+
+def _case_callback(
+    results, preparation, checkpoint, work, completion, artifact_store, size_report, on_case
+):
+    """Store one finished case: artifact, observation, scalar, then notifications.
+
+    Durable state precedes each notification that promises it. ``on_case`` and
+    ``on_progress`` report the in-memory record; ``on_chunk`` follows persistence.
+    """
+
+    def callback(_index, case, out):
+        out = resolve_worker_output(
+            case,
+            out,
+            artifact_store=artifact_store,
+            content_key=preparation.content_key,
+            observation_plans=work.observation_plans,
+            material=checkpoint.material,
+        )
+        if size_report is not None:
+            size_report.completed(case)
+
+        if work.transport_only:
+            work.transport_finished(case)
+            completion.case_finished(case)
+            return
+
+        if work.accept_observation(case, out):
+            completion.case_finished(case)
+            return
+
+        store_result(results, case, out)
+
+        preparation.store_transport(case, out)
+        checkpoint.record_finished(case)
+        if on_case is not None:
+            on_case(case)
+        completion.scalar_finished(case, checkpoint)
+        completion.case_finished(case)
+
+    return callback
 
 
 def run_sweep(
@@ -158,7 +243,12 @@ def run_sweep(
         optional object implementing ``execute(cases, callback=..., **options)``.
         When omitted, use ``montecarlo.run_cases`` exactly as before. When
         supplied, callbacks must execute in this coordinator process so the
-        existing sweep remains sole owner of manifests and consolidation.
+        existing sweep remains sole owner of manifests and consolidation. An
+        optional ``validate_run_options`` rejects unsupported options before any
+        checkpoint, cache or file effect, whether or not any case turns out to
+        need execution; an executor without it can only reject inside ``execute``,
+        which a fully cached sweep never calls. See
+        :class:`~pyrite.execution.protocol.Executor`.
     artifact_store
         optional pyrite.execution.CaseArtifactStore.
         A shared-filesystem inbox for independently published worker results.
@@ -204,7 +294,9 @@ def run_sweep(
         fired once after resume filtering and after every newly completed case,
         including observation-only and transport-only cases. A case that raises
         is not reported. ``cached_cases`` excludes observation-only cases, which
-        are still to run.
+        are still to run. Progress does not imply durability: only ``on_chunk`` and
+        the CAS (with ``cache_write``) promise persisted output, and a default-mode
+        config is persisted only once all its energies finish.
     on_case
         optional callback(case) fired when a case newly stores its scalar
         record, before ``on_chunk`` and ``on_progress`` -- the frontier the sweep
@@ -214,9 +306,11 @@ def run_sweep(
         transport-only cases store no new scalar, so they advance ``on_progress``
         without firing it.
     on_runtime
-        optional callback(dict) fired once after resume filtering with
-        resolved engine, effective worker count, memory policy, representative
-        energy-grid widths, and spectrum/brem chunk sizing.
+        optional callback(dict) fired once after resume filtering. Without an
+        executor it holds the local resolved engine, effective worker count,
+        memory policy, representative energy-grid widths, and spectrum/brem chunk
+        sizing. With one it holds that executor's ``runtime_plan``, or
+        ``engine="external"`` and ``effective_workers=None`` if it has none.
     on_timing
         optional callback(dict) receiving rolling per-case transport,
         spectrum, GPU feed-wait, retry, CuPy-pool, and checkpoint timings.
@@ -225,16 +319,25 @@ def run_sweep(
         case index, and in-flight work counts. A multi-batch in-process
         transport also reports ``transport_electrons_done``/
         ``transport_electrons_total`` for the active case (see ``run_cases``).
+        The last event is always ``{"phase": "handoff", "case": None,
+        "in_flight_case_count": 0}``, on success, on a pause and on an exception
+        once the sweep has begun loading. If this callback itself raises during a
+        failure, the original exception propagates with a note.
     max_seconds
-        optional soft wall-clock budget, measured from just before
-        ``run_cases`` starts. None (default) means unbounded. When set, a
-        deadline of ``time_fn() + max_seconds`` is checked (via ``run_cases``'s
-        ``should_stop`` hook) before each new case starts; once it passes, no
-        new case begins but in-flight work still drains and is still stored.
-        Unstarted configs are simply left for the next call to pick up --
-        resume filtering is per ``(name, E0_keV)`` (see checkpoint_path).
+        optional soft wall-clock budget, measured from just before dispatch,
+        after resume, cache replay and cached-group callbacks. None (default) means
+        unbounded. When set, a deadline of ``time_fn() + max_seconds`` is checked
+        (via ``run_cases``'s ``should_stop`` hook) before each new case starts;
+        once it passes, no new case begins but in-flight work still drains and is
+        still stored. Unstarted configs are simply left for the next call to pick
+        up -- resume filtering is per ``(name, E0_keV)`` (see checkpoint_path).
+    deadline
+        optional absolute stop time on the ``time_fn`` clock, for one budget shared
+        across calls; resume and replay spend it. Takes precedence over
+        ``max_seconds``, which is then ignored. Either makes the sweep bounded, so
+        an executor without bounded support rejects it.
     time_fn
-        clock used for the deadline; defaults to ``time.monotonic``.
+        clock used for both budgets; defaults to ``time.monotonic``.
         Override for deterministic tests.
     dataset_identity
         optional JSON-serializable resolved-profile identity,
@@ -262,10 +365,16 @@ def run_sweep(
         the pre-CAS per-stem-only path. Reuse replays through ``store_result`` with
         the REQUESTED case, so the reconstructed record is bit-identical to a fresh
         compute (including the requester's own detector/flux scalars).
+    resume
+        load this checkpoint's records before planning (default True). Independent
+        of ``cache_read``: ``resume=False`` still replays the CAS unless that is
+        also False. The ``run`` CLI deliberately passes one value for both.
+        Recovering worker artifacts from ``artifact_store`` requires both.
     cache_read
-        consult the CAS on resume for cross-profile reuse (default True;
-        ignored when ``content_key_fn`` is None). Set False by ``--no-cache`` /
-        ``--recompute`` / ``-p`` so a run recomputes rather than reuses.
+        replay CAS blobs for cases lacking a record, with or without ``resume``, for
+        cross-profile reuse (default True; ignored when ``content_key_fn`` is None).
+        Set False by ``--no-cache`` / ``--recompute`` / ``-p`` so a run recomputes
+        rather than reuses.
     cache_write
         write each finished case into the CAS (default True; ignored
         when ``content_key_fn`` is None). Set False by ``--no-cache`` / ``-p`` so
@@ -322,13 +431,22 @@ def run_sweep(
     refuse_axial_channeling_cases(cases)
     if artifact_store is not None and content_key_fn is None:
         raise ValueError("artifact_store requires content_key_fn for physics identity validation")
-    if time_fn is None:
-        time_fn = time.monotonic
-    if deadline is None and max_seconds is not None:
-        deadline = time_fn() + max_seconds
     if group_key is None:
         group_key = _default_group_key
     validate_sweep_request(cases, results, group_key)
+    budget = SweepBudget(deadline, max_seconds, time.monotonic if time_fn is None else time_fn)
+    run_options = _run_options(
+        max_workers,
+        progress,
+        budget.should_stop,
+        transport_only,
+        trajectory_capture,
+        on_timing,
+        on_activity,
+    )
+    validate_options = getattr(executor, "validate_run_options", None)
+    if validate_options is not None:
+        validate_options(run_options)
     if dataset_identity is not None:
         from ..campaign.profiles import normalize_dataset_identity
 
@@ -356,184 +474,66 @@ def run_sweep(
         and observation is None
         and on_chunk is None
     )
-    if preparation.load(resume, metadata_eligible):
+    with terminal_activity(on_activity):
+        if preparation.load(resume, metadata_eligible):
+            if on_runtime is not None:
+                on_runtime(_runtime_plan(executor, [], max_workers))
+            SweepCompletion(cases, [], group_key, case_cost_fn, on_cost, on_progress, None).report()
+            print(f"0 of {len(cases)} cases to run ({len(cases)} cached; metadata proof)")
+            return True
+
+        if preparation.loaded:
+            preparation.seed_cache()
+        preparation.replay_cache()
+
+        # Resume / --no-cache semantics control whether existing artifacts may be
+        # replayed. Do not use a scalar-only artifact in place of a missing
+        # directional observation.
+        if (
+            resume
+            and cache_read
+            and artifact_store is not None
+            and not transport_only
+            and observation is None
+        ):
+            preparation.recover_artifacts(artifact_store)
+
+        work = SweepWork(cases, results, observation, transport_only)
+        todo = work.todo
+        print(f"{len(todo)} of {len(cases)} cases to run ({len(cases) - len(todo)} cached)")
+        if trajectory_capture is not None:
+            from ._trajectory_capture import prepare_sweep_capture
+
+            trajectory_capture = prepare_sweep_capture(trajectory_capture, observation, cases, todo)
+            run_options["trajectory_capture"] = trajectory_capture
         if on_runtime is not None:
-            on_runtime(runner.runtime_plan([], max_workers))
-        total_cost = sum(case_cost_fn(case) for case in cases) if case_cost_fn is not None else None
-        if on_cost is not None and total_cost is not None:
-            on_cost(total_cost, total_cost)
-        if on_progress is not None:
-            on_progress(0, len(cases), len(cases))
-        if on_activity is not None:
-            on_activity({"phase": "handoff", "case": None, "in_flight_case_count": 0})
-        print(f"0 of {len(cases)} cases to run ({len(cases)} cached; metadata proof)")
-        return True
-
-    if preparation.loaded:
-        preparation.seed_cache()
-    preparation.replay_cache()
-
-    # A worker may finish publishing its immutable artifact immediately before
-    # the coordinator crashes. Recover those outputs before planning new work,
-    # so successful transports are not recomputed. Resume / --no-cache semantics
-    # still control whether existing artifacts may be replayed. Do not use a
-    # scalar-only artifact in place of a missing directional observation.
-    if (
-        resume
-        and cache_read
-        and artifact_store is not None
-        and not transport_only
-        and observation is None
-    ):
-        recovered = 0
-        for case in cases:
-            if has_record(results, case):
-                continue
-            key = preparation.content_key(case)
-            if key is None:
-                continue
-            found = artifact_store.recover(material, key)
-            if found is None:
-                continue
-            _, output = found
-            store_result(results, case, output)
-            preparation.store_transport(case, output)
-            checkpoint.record_finished(case)
-            recovered += 1
-        if recovered:
-            checkpoint.cache_replayed()
-            print(f"recovered {recovered} {material} case artifacts from distributed inbox")
-
-    work = SweepWork(cases, results, observation, transport_only)
-    todo = work.todo
-    print(f"{len(todo)} of {len(cases)} cases to run ({len(cases) - len(todo)} cached)")
-    if trajectory_capture is not None:
-        if trajectory_capture.scene is None and observation is not None:
-            from dataclasses import replace
-
-            from ..instrument.scene import scene_payload
-
-            trajectory_capture = replace(
-                trajectory_capture,
-                scene=scene_payload(
-                    observation.observation.filters, observation.observation.detector
-                ),
-            )
-        from ..montecarlo.trajectories import preflight_capture
-
-        plan = preflight_capture(trajectory_capture, cases, todo)
-        print(
-            f"trajectories: writing {plan.to_write} case(s) to {trajectory_capture.root}"
-            + (f" (replacing {plan.replaced})" if plan.replaced else "")
-            + (f"; {plan.kept} already captured" if plan.kept else "")
+            on_runtime(_runtime_plan(executor, todo, max_workers))
+        size_report = _capture_size_report(trajectory_capture, todo)
+        completion = SweepCompletion(
+            cases, todo, group_key, case_cost_fn, on_cost, on_progress, on_chunk
         )
-        if plan.missing_cached:
-            print(
-                f"trajectories: {plan.missing_cached} cached case(s) have no artifact "
-                "and are not re-transported; rerun with --recompute to capture them"
-            )
-    if on_runtime is not None:
-        on_runtime(runner.runtime_plan(todo, max_workers))
-    capture_size_report = None
-    if trajectory_capture is not None and os.environ.get("PYRITE_TRAJECTORY_SIZE_REPORT") == "1":
-        from ._trajectory_capture import CaptureSizeReport
-
-        capture_size_report = CaptureSizeReport(trajectory_capture, todo)
-    completion = SweepCompletion(
-        cases, todo, group_key, case_cost_fn, on_cost, on_progress, on_chunk
-    )
-    completion.report()
-    completion.prepare_groups(todo, work.observation_only)
-
-    def _cb(i, case, out):
-        if isinstance(out, DirectionalArtifactRef):
-            if artifact_store is None:
-                raise ValueError("executor returned a directional artifact without artifact_store")
-            key = preparation.content_key(case)
-            if key is None:
-                raise ValueError("cannot resolve key for worker-published observation")
-            plan = work.observation_plans.get((case["name"], case["E0_keV"]))
-            if plan is None:
-                raise ValueError("executor returned unexpected directional artifact")
-            out = load_directional_result(
-                artifact_store,
-                out,
-                material=material,
-                case_key=key,
-                directions=plan.directions_sample,
-            )
-        if isinstance(out, CaseArtifactRef):
-            if artifact_store is None:
-                raise ValueError("executor returned a case artifact without artifact_store")
-            key = preparation.content_key(case)
-            if key is None:
-                raise ValueError("cannot resolve content key for worker-published case")
-            out = artifact_store.load(
-                out,
-                expected_material=material,
-                expected_content_key=key,
-            )
-        if capture_size_report is not None:
-            capture_size_report.completed(case)
-
-        if transport_only:
-            work.transport_finished(case)
-            completion.case_finished(case)
-            return
-
-        if work.accept_observation(case, out):
-            completion.case_finished(case)
-            return
-
-        store_result(results, case, out)
-
-        preparation.store_transport(case, out)
-        checkpoint.record_finished(case)
-        if on_case is not None:
-            on_case(case)
-        completion.scalar_finished(case, checkpoint)
-        completion.case_finished(case)
-
-    # Replay cached groups before launching new work, including observation-only
-    # work whose scalar group is already complete.
-    completion.replay_cached_groups(results)
-
-    should_stop = None if deadline is None else (lambda: time_fn() >= deadline)
-    run_cases_options = {}
-    if trajectory_capture is not None:
-        run_cases_options["trajectory_capture"] = trajectory_capture
-    if work.observation_plans:
-        run_cases_options["observation_directions"] = [
-            (
-                None
-                if (plan := work.observation_plans.get((c["name"], c["E0_keV"]))) is None
-                else plan.directions_sample
-            )
-            for c in todo
-        ]
-    if on_timing is not None:
-        run_cases_options["on_timing"] = on_timing
-    if on_activity is not None:
-        run_cases_options["on_activity"] = on_activity
-
-    t0 = time.perf_counter()
-    # A fully cached sweep has no work for an external executor. Preserve the
-    # historical run_cases([]) call when no executor was explicitly supplied.
-    if todo or executor is None:
-        dispatch = run_cases if executor is None else executor.execute
-        dispatch(
-            todo,
-            max_workers=max_workers,
-            progress=progress,
-            callback=_cb,
-            should_stop=should_stop,
-            keep_results=False,  # _cb owns storage; don't pin every spectrum in RAM
-            transport_only=transport_only,
-            **run_cases_options,
+        completion.report()
+        completion.prepare_groups(todo, work.observation_only)
+        callback = _case_callback(
+            results, preparation, checkpoint, work, completion, artifact_store, size_report, on_case
         )
-    print(f"{len(todo)} cases in {time.perf_counter() - t0:.0f} s")
-    # Publication follows what is stored; transport-only execution stores nothing.
-    checkpoint.finish(work.stored_complete())
-    if on_activity is not None:
-        on_activity({"phase": "handoff", "case": None, "in_flight_case_count": 0})
-    return work.requested_complete()
+
+        # Replay cached groups before launching new work, including observation-only
+        # work whose scalar group is already complete.
+        completion.replay_cached_groups(results)
+
+        directions = work.observation_directions()
+        if directions is not None:
+            run_options["observation_directions"] = directions
+
+        budget.start()
+        t0 = time.perf_counter()
+        # A fully cached sweep has no work for an external executor. Preserve the
+        # historical run_cases([]) call when no executor was explicitly supplied.
+        if todo or executor is None:
+            dispatch = run_cases if executor is None else executor.execute
+            dispatch(todo, callback=callback, **run_options)
+        print(f"{len(todo)} cases in {time.perf_counter() - t0:.0f} s")
+        # Publication follows what is stored; transport-only execution stores nothing.
+        checkpoint.finish(work.stored_complete())
+        return work.requested_complete()

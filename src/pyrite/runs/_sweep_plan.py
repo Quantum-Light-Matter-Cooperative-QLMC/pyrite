@@ -272,6 +272,32 @@ class SweepResume:
                 self.checkpoint_path, self.cases, self.content_key, self.dataset_identity
             )
 
+    def recover_artifacts(self, artifact_store):
+        """Commit outputs a worker published before the coordinator stopped.
+
+        A worker may finish publishing its immutable artifact immediately before
+        the coordinator crashes; recover those outputs before planning new work,
+        so successful transports are not recomputed.
+        """
+        recovered = 0
+        for case in self.cases:
+            if has_record(self.results, case):
+                continue
+            key = self.content_key(case)
+            if key is None:
+                continue
+            found = artifact_store.recover(self.material, key)
+            if found is None:
+                continue
+            _, output = found
+            store_result(self.results, case, output)
+            self.store_transport(case, output)
+            self.checkpoint.record_finished(case)
+            recovered += 1
+        if recovered:
+            self.checkpoint.cache_replayed()
+            print(f"recovered {recovered} {self.material} case artifacts from distributed inbox")
+
     def store_transport(self, case, out):
         if self.cache_write:
             key = self.content_key(case)
@@ -322,6 +348,13 @@ class SweepWork:
         ]
 
         self.transport_pending = {(case["name"], case["E0_keV"]) for case in self.todo}
+
+    def observation_directions(self):
+        """Per-``todo`` directions, or None when nothing needs an observation."""
+        if not self.observation_plans:
+            return None
+        plans = (self.observation_plans.get((c["name"], c["E0_keV"])) for c in self.todo)
+        return [None if plan is None else plan.directions_sample for plan in plans]
 
     def transport_finished(self, case):
         """Count execution only; a transport-only output is never a stored record."""

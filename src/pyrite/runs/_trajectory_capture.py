@@ -37,6 +37,33 @@ def scan_trajectory_capture(args, identity, stem, material, fidelity):
     )
 
 
+def prepare_sweep_capture(capture, observation, cases, todo):
+    """Snapshot the observation's scene and check existing artifacts before transport."""
+    if capture.scene is None and observation is not None:
+        from dataclasses import replace
+
+        from ..instrument.scene import scene_payload
+
+        capture = replace(
+            capture,
+            scene=scene_payload(observation.observation.filters, observation.observation.detector),
+        )
+    from ..montecarlo.trajectories import preflight_capture
+
+    plan = preflight_capture(capture, cases, todo)
+    print(
+        f"trajectories: writing {plan.to_write} case(s) to {capture.root}"
+        + (f" (replacing {plan.replaced})" if plan.replaced else "")
+        + (f"; {plan.kept} already captured" if plan.kept else "")
+    )
+    if plan.missing_cached:
+        print(
+            f"trajectories: {plan.missing_cached} cached case(s) have no artifact "
+            "and are not re-transported; rerun with --recompute to capture them"
+        )
+    return capture
+
+
 class CaptureSizeReport:
     """Warn once using the first completed capture; no segment arrays are read."""
 

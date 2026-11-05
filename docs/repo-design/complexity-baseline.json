@@ -220,7 +220,7 @@
     {
       "path": "src/pyrite/execution/dask.py",
       "name": "DaskExecutor.execute",
-      "cc": 45
+      "cc": 39
     },
     {
       "path": "src/pyrite/execution/dask.py",
@@ -236,11 +236,6 @@
       "path": "src/pyrite/execution/slurm.py",
       "name": "SlurmArrayExecutor._execute_staged",
       "cc": 37
-    },
-    {
-      "path": "src/pyrite/execution/slurm.py",
-      "name": "SlurmArrayExecutor.execute",
-      "cc": 31
     },
     {
       "path": "src/pyrite/execution/slurm_worker.py",
@@ -323,7 +318,7 @@
     {
       "path": "src/pyrite/montecarlo/case.py",
       "name": "Case.__post_init__",
-      "cc": 60,
+      "cc": 57,
       "exception": "#680: accept 59 -> 60 for the optional channeling_source admission guard. Source-specific checks already live in validate_source_case; the dispatcher must also reject source records without planar channeling. Moving this single guard would only hide a constructor invariant."
     },
     {
@@ -441,7 +436,7 @@
     {
       "path": "src/pyrite/montecarlo/spectrum/brem.py",
       "name": "mc_brem_spectrum",
-      "cc": 46
+      "cc": 45
     },
     {
       "path": "src/pyrite/montecarlo/spectrum/brem_events.py",
@@ -774,7 +769,7 @@
     {
       "path": "src/pyrite/runs/run.py",
       "name": "run_sweep",
-      "cc": 55
+      "cc": 27
     },
     {
       "path": "src/pyrite/runs/scan.py",

@@ -11,8 +11,22 @@ class Executor(Protocol):
     process, not in a remote worker. The callback owns persistence, exactly as
     in ``runs.run.run_sweep``. The call must drain already-started tasks if
     ``should_stop`` becomes true, and must leave never-started slots as None.
-    All backend implementations must support the run_cases-compatible options
-    forwarded by ``run_sweep`` (including timing/observation hooks).
+    A backend that cannot honor a run_cases-compatible option forwarded by
+    ``run_sweep`` must raise ``ValueError`` rather than ignore it.
+
+    Two optional methods, discovered by attribute so that an executor defining
+    only ``execute`` keeps working, refine what ``run_sweep`` can do:
+
+    ``validate_run_options(options)``
+        raises ``ValueError`` for unsupported options before any checkpoint,
+        cache or filesystem effect. ``options`` holds what ``execute`` will
+        receive except ``callback`` and the per-case ``observation_directions``.
+        Without it, rejection happens inside ``execute``, after resume.
+    ``runtime_plan(cases, max_workers)``
+        returns the ``on_runtime`` dict describing where the work runs: at least
+        ``engine``, ``requested_workers`` and ``effective_workers``. Without it,
+        ``run_sweep`` reports ``engine="external"`` and no worker count rather
+        than the local runner's topology.
     """
 
     def execute(

@@ -17,7 +17,7 @@ import subprocess
 import sys
 import time
 import uuid
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from threading import Event, Lock
@@ -299,7 +299,8 @@ class SlurmArrayExecutor:
         self._cancel_current_job()
         return True
 
-    def execute(self, cases: Sequence[Any], *, callback=None, **options: Any) -> list[Any]:
+    def validate_run_options(self, options: Mapping[str, Any]) -> None:
+        """Reject options this backend cannot honor; ``execute`` applies the same checks."""
         allowed = {
             "max_workers",
             "progress",
@@ -319,9 +320,6 @@ class SlurmArrayExecutor:
             raise ValueError("SLURM slice does not yet support transport_only")
         if options.get("trajectory_capture") is not None:
             raise ValueError("SLURM slice does not yet support trajectory_capture")
-        directions = options.get("observation_directions")
-        if directions is not None and len(directions) != len(cases):
-            raise ValueError("observation_directions must align with cases")
         if options.get("should_stop") is not None:
             raise ValueError("SLURM array executor does not yet support bounded sweeps")
         engine = options.get("engine", "auto")
@@ -341,6 +339,25 @@ class SlurmArrayExecutor:
             raise ValueError("GPU array tasks must not launch a nested worker pool")
         if self.resources.gpu_count and self.resources.accelerator not in ("cuda", "rocm"):
             raise ValueError("GPU array requires explicit CUDA or ROCm vendor")
+
+    def runtime_plan(self, cases: Sequence[Any], max_workers: int | None = None) -> dict[str, Any]:
+        """Describe the array allocation; coordinator devices play no part in it."""
+        return {
+            "engine": "slurm-array",
+            "requested_workers": max_workers,
+            "effective_workers": self.config.max_concurrent,
+            "cases_per_task": self.config.cases_per_task,
+            "work_units": math.ceil(len(cases) / self.config.cases_per_task),
+            "cpu_cores_per_task": self.resources.cpu_cores,
+            "gpu_count_per_task": self.resources.gpu_count,
+        }
+
+    def execute(self, cases: Sequence[Any], *, callback=None, **options: Any) -> list[Any]:
+        self.validate_run_options(options)
+        requested_workers = options.get("max_workers")
+        directions = options.get("observation_directions")
+        if directions is not None and len(directions) != len(cases):
+            raise ValueError("observation_directions must align with cases")
         n = len(cases)
         results: list[Any] = [None] * n
         if not n:

@@ -11,7 +11,7 @@ from __future__ import annotations
 import os
 import uuid
 from collections import deque
-from collections.abc import Callable, Generator, Sequence
+from collections.abc import Callable, Generator, Mapping, Sequence
 from contextlib import closing
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -313,7 +313,8 @@ class DaskExecutor:
             with self._lock:
                 self._futures.clear()
 
-    def execute(self, cases: Sequence[Any], *, callback=None, **options: Any) -> list[Any]:
+    def validate_run_options(self, options: Mapping[str, Any]) -> None:
+        """Reject options this backend cannot honor; ``execute`` applies the same checks."""
         supported = {
             "max_workers",
             "progress",
@@ -332,13 +333,29 @@ class DaskExecutor:
             raise ValueError("Dask executor does not yet support bounded execution")
         if options.get("transport_only") or options.get("trajectory_capture") is not None:
             raise ValueError("Dask executor does not support transport_only or trajectory_capture")
-        directions = options.get("observation_directions")
-        if directions is not None and len(directions) != len(cases):
-            raise ValueError("observation_directions must align with cases")
         if options.get("engine") not in (None, "auto"):
             raise ValueError("Dask work engine is derived from resource request")
         if options.get("max_workers") not in (None, 0):
             raise ValueError("Dask executor owns parallelism; do not set max_workers")
+
+    def runtime_plan(self, cases: Sequence[Any], max_workers: int | None = None) -> dict[str, Any]:
+        """Describe the configured cluster; coordinator devices play no part in it."""
+        cfg = self.config
+        return {
+            "engine": "dask",
+            "requested_workers": max_workers,
+            "effective_workers": (cfg.max_workers or cfg.workers) if cfg.adaptive else cfg.workers,
+            "cases_per_task": cfg.cases_per_task,
+            "work_units": (len(cases) + cfg.cases_per_task - 1) // cfg.cases_per_task,
+            "cpu_cores_per_task": self.resources.cpu_cores,
+            "gpu_count_per_task": self.resources.gpu_count,
+        }
+
+    def execute(self, cases: Sequence[Any], *, callback=None, **options: Any) -> list[Any]:
+        self.validate_run_options(options)
+        directions = options.get("observation_directions")
+        if directions is not None and len(directions) != len(cases):
+            raise ValueError("observation_directions must align with cases")
         n = len(cases)
         results: list[Any] = [None] * n
         if n == 0:
