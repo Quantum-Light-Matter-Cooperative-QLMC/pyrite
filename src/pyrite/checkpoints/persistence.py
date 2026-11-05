@@ -538,6 +538,10 @@ def cases_from_results(results):
     return [rec["case"] for recs in results.values() for rec in recs.values()]
 
 
+class _CheckpointIdentityError(ValueError):
+    """A checkpoint cannot safely supply records to the requested dataset."""
+
+
 class _SweepCheckpoint:
     """One material's publication lifecycle; incomplete sweeps retain shards."""
 
@@ -557,6 +561,17 @@ class _SweepCheckpoint:
 
     def load(self):
         return _checkpoint_load(self.checkpoint_path)
+
+    def restart(self):
+        """Replace the previous run before publishing any fresh-run shards.
+
+        Otherwise a budget stop leaves old base records or shards underneath
+        the new shards, and the next resume silently accepts stale cases.
+        """
+        self.save()
+        if self.sharded:
+            path = Path(self.checkpoint_path)
+            _checkpoint_store.clear_parts(path.name, path.parent)
 
     def record_for(self, case):
         return self.results.get(case["name"], {}).get(case["E0_keV"])

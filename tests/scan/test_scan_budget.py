@@ -367,3 +367,22 @@ def test_progress_timer_samples_complete_intervals_and_excludes_restart_overhead
     assert sample["sample_compute_seconds"] == 20.0
     assert sample["sample_new_cases"] == 2
     assert sample["sample_new_cost"] == 10.0
+
+
+def test_chunk_resume_keeps_recompute_cache_reads_disabled(monkeypatch, tmp_path):
+    seen = []
+    monkeypatch.setattr(scan, "run_sweep", lambda *a, **kw: seen.append(kw) or False)
+    _stub_cases(monkeypatch)
+    result = _invoke(
+        "hopg",
+        5.0,
+        None,
+        "--checkpoint-dir",
+        str(tmp_path),
+        "--recompute",
+        "--resume-checkpoint",
+    )
+    assert result.exit_code == 75
+    assert seen[0]["resume"] is True
+    assert seen[0]["cache_read"] is False
+    assert seen[0]["cache_write"] is True

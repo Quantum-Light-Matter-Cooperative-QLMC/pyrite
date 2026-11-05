@@ -13,6 +13,12 @@ from ..perf.py_spy import (
 )
 from ..validation._zhai import ZHAI_CACHE_SCHEMA, ZHAI_DETECTOR
 from . import config
+from ._chunked_runtime import (
+    _chunked_recompute_blocks,
+    _chunked_run_wait,
+    _chunked_timeout_result,
+    _chunked_timeout_setup,
+)
 from ._table_preflight import _tables_preflight_block
 
 # Private compatibility classification for legacy queue records that stored a
@@ -561,58 +567,6 @@ while [ "$attempt" -lt {_SBATCH_RETRY_ATTEMPTS} ]; do
 done"""
 
 
-def _chunked_timeout_setup() -> str:
-    """Only SLURM's chunked prelimit USR1 can authorize a resumable 143."""
-    return """timeout_warned=0
-child_pid=
-trap 'timeout_warned=1; [ -z "$child_pid" ] || kill -TERM "$child_pid" 2>/dev/null || true' USR1
-progress_count() {
-  python3 - "$JOBDIR/progress" <<'PY'
-import glob
-import json
-import sys
-
-count = 0
-for path in glob.glob(sys.argv[1] + "/*.json"):
-    try:
-        with open(path, encoding="utf-8") as record_file:
-            record = json.load(record_file)
-        count += int(record.get("cached_cases", 0)) + int(record.get("completed_new_cases", 0))
-    except (OSError, ValueError, TypeError, AttributeError):
-        # Legacy or interrupted records cannot prove checkpoint progress.
-        continue
-print(count)
-PY
-}
-slice_progress_before=$(progress_count) || exit 1
-"""
-
-
-def _chunked_run_wait() -> str:
-    """Read the child result even when USR1 interrupts bash's wait."""
-    return """  child_pid=$!
-  wait "$child_pid" 2>/dev/null || true
-  [ -f "$JOBDIR/.child_rc" ] || wait "$child_pid" 2>/dev/null || true
-  rc=$(cat "$JOBDIR/.child_rc") || exit 1
-  child_pid=
-"""
-
-
-def _chunked_timeout_result() -> str:
-    return """  elif [ "$rc" -eq 143 ] && [ "$timeout_warned" -eq 1 ]; then
-    progress_after=$(progress_count) || exit 1
-    if [ "$progress_after" -gt "$progress_before" ]; then
-      echo "resumable timeout: $m [$n/$total] $(date -Is)" | tee -a "$JOBDIR/timeouts" >> "$JOBDIR/log"
-      echo "resumable timeout at $m [$n/$total] $(date -Is)" > "$JOBDIR/state"
-      break
-    fi
-    echo "WARNING: slice timed out without checkpoint progress for $m; will not retry" >> "$JOBDIR/log"
-    echo "failed: $m" >> "$JOBDIR/log"
-    echo "FAILED (slice timeout without progress) $(date -Is)" > "$JOBDIR/state"
-    exit 1
-"""
-
-
 def _chunked_queue_tail() -> str:
     """Common resubmit-or-finish tail shared by every self-resubmitting chunked
     queue script (scan/rebrem/reline chunked variants).
@@ -724,6 +678,7 @@ def _chunked_queue_script(
     mats = " ".join(materials)  # safe: each token matched _SHELL_TOKEN_RE
     jobdir = config.remote_path(config.JOBS_SUBDIR, jobid)
     chunk_seconds = int(round(chunk_minutes * 60))
+    resume_setup, resume_record = _chunked_recompute_blocks(recompute)
     return f"""JOBDIR={config.shell_word(jobdir)}
 PERFDIR={config.shell_word(config.remote_output_path("performance", jobid))}
 PERFCKPT={config.shell_word(config.remote_output_path("checkpoints", "performance", jobid))}
@@ -754,16 +709,18 @@ for m in "${{mats[@]}}"; do
   printf '\\n===== [%s/%s] %s  %s =====\\n' "$n" "$total" "$m" "$(date -Is)" >> "$JOBDIR/log"
   rc=0
   rm -f "$JOBDIR/.child_rc"
+{resume_setup}
   (
     uv_pid=
     trap '[ -z "$uv_pid" ] || {{ kill -TERM "$uv_pid" 2>/dev/null || true; wait "$uv_pid" 2>/dev/null || true; }}; echo 143 > "$JOBDIR/.child_rc"; exit 143' TERM
-    {config.shell_remote_uv()} run --no-sync python -u -m pyrite._entry.scan {config.shell_word(catalog_profile)} -m "$m"{flags} --max-minutes "$remaining_min" \
+    {config.shell_remote_uv()} run --no-sync python -u -m pyrite._entry.scan {config.shell_word(catalog_profile)} -m "$m"{flags} "${{resume_flags[@]}}" --max-minutes "$remaining_min" \
       --progress-file "$JOBDIR/progress/$m.json" --no-progress >> "$JOBDIR/log" 2>&1 &
     uv_pid=$!
     wait "$uv_pid"
     echo "$?" > "$JOBDIR/.child_rc"
   ) &
 {_chunked_run_wait()}
+{resume_record}\
   if [ "$rc" -eq 0 ]; then
     echo "completed: $m" >> "$JOBDIR/log"
 {_chunked_timeout_result()}

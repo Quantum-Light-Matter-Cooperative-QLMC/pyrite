@@ -379,7 +379,11 @@ def run_sweep(
     resume
         load this checkpoint's records before planning (default True). Independent
         of ``cache_read``: ``resume=False`` still replays the CAS unless that is
-        also False. The ``run`` CLI deliberately passes one value for both.
+        also False. A fresh non-transport run replaces the previous checkpoint
+        before publishing new shards, so an interrupted restart cannot later
+        resume stale records. The ``run`` CLI disables both reads for fresh
+        recomputes; later remote chunks resume their checkpoint with CAS reads
+        still disabled.
         Recovering worker artifacts from ``artifact_store`` requires both.
     cache_read
         replay CAS blobs for cases lacking a record, with or without ``resume``, for
@@ -484,7 +488,7 @@ def run_sweep(
         and on_chunk is None
     )
     with terminal_activity(on_activity):
-        if preparation.load(resume, metadata_eligible):
+        if preparation.load(resume, metadata_eligible, transport_only=transport_only):
             if on_runtime is not None:
                 on_runtime(_runtime_plan(executor, [], max_workers))
             SweepCompletion(cases, [], group_key, case_cost_fn, on_cost, on_progress, None).report()
