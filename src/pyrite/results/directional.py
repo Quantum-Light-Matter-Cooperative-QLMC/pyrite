@@ -94,7 +94,7 @@ class DirectionalSpectrum:
         return beam_current_na(self.case)
 
     def rate(
-        self, current_na: float | None = None, *, current: Quantity | None = None
+        self, current_na: float | None = None, *, current: "Quantity | None" = None
     ) -> np.ndarray:
         """Return ph/s/eV/sr at the resolved or explicit mean current [nA].
 
