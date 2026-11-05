@@ -1,8 +1,7 @@
 """Quantum specifications, configuration, runtime states, and advanced diagnostics.
 
-This import-light module is the canonical quantum facade. Portable specs and
-configuration are advanced-stable; solver and projection diagnostics are
-experimental. Runtime wavefunctions are nonportable. See the quantum API guide.
+This import-light module is the canonical quantum facade. The whole
+surface, including planar channeling, is experimental. Runtime wavefunctions are nonportable. See the quantum API guide.
 
 Only the established planar density-matrix zone can be lowered to production
 cases. Unsupported recipes fail before case construction; FFT-grid escape is

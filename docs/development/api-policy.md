@@ -160,8 +160,8 @@ existing spelling and semantics pending the separate numerics/config issue;
 
 `[package_exports."pyrite.<namespace>"]` registers supported package and
 leaf-module attributes, each with a concrete `module:attribute` target and API
-status. Existing documented scientific helpers remain advanced-stable; the
-axial diagnostic remains experimental. Concrete targets may live in private
+status. Existing documented scientific helpers remain advanced-stable; quantum
+and channeling interfaces, planar included, are experimental. Concrete targets may live in private
 implementation modules without making those modules public. The static gate
 checks that the namespace exists in source, the name appears in a literal
 `__all__` where present (otherwise in its declarations), the target module exists, and

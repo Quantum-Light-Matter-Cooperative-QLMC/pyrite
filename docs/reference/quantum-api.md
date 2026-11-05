@@ -7,8 +7,10 @@ GPU, plotting backend, scheduler, or material dataset. Requesting a runtime
 factory or solver loads its existing scientific dependencies. Star imports
 resolve the entire advanced surface and therefore load those dependencies.
 
-API stability describes compatibility, not physical validation. Quantum
-channeling remains experimental research software. The production adapter
+The entire quantum and channeling API, planar included, has `experimental`
+compatibility status and may change incompatibly in a minor release
+([lifecycle](experimental-api.md)). Quantum channeling is also research
+software, not a validated production model. The production adapter
 admits only the existing planar Bloch density-matrix channeling recipe;
 unitary, MCWF, axial, and other configurations still explicitly refuse in
 `QuantumSetup.lower`. Direct diagnostic solvers do not imply production

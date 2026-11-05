@@ -1,4 +1,4 @@
-"""Manifest-driven coverage for advanced-stable quantum reference objects."""
+"""Manifest-driven coverage for experimental quantum reference objects."""
 
 import re
 import tomllib
@@ -8,22 +8,27 @@ ROOT = Path(__file__).resolve().parents[2]
 QUANTUM_PAGE = ROOT / "docs/reference/python-api/quantum.md"
 
 
-def test_advanced_stable_quantum_exports_are_documented():
+def test_quantum_exports_are_experimental_and_documented():
     manifest = tomllib.loads((ROOT / "api-surface.toml").read_text(encoding="utf-8"))
     exports = manifest["package_exports"]["pyrite.quantum"]
-    stable = {
-        name for name, declaration in exports.items() if declaration["status"] == "advanced-stable"
+    assert {declaration["status"] for declaration in exports.values()} == {"experimental"}
+    portable = {
+        name
+        for name, declaration in exports.items()
+        if declaration["target"].startswith(
+            ("pyrite.quantum:", "pyrite.quantum_state:", "pyrite.montecarlo.channeling.states:")
+        )
     }
     content = QUANTUM_PAGE.read_text(encoding="utf-8")
-    stable_content, experimental_content = content.split(
+    portable_content, experimental_content = content.split(
         "## Experimental solvers and planar projection", maxsplit=1
     )
     pattern = r"^   pyrite\.quantum\.([A-Za-z_]\w*)$"
     all_listed = re.findall(pattern, content, re.M)
     assert len(all_listed) == len(set(all_listed)), "duplicate canonical quantum API page"
-    listed = re.findall(pattern, stable_content, re.M)
-    assert set(listed) == stable, (
-        f"missing: {sorted(stable - set(listed))}; unexpected: {sorted(set(listed) - stable)}"
+    listed = re.findall(pattern, portable_content, re.M)
+    assert set(listed) == portable, (
+        f"missing: {sorted(portable - set(listed))}; unexpected: {sorted(set(listed) - portable)}"
     )
     experimental = set(re.findall(pattern, experimental_content, re.M))
     assert experimental == {"ScatteringKernel", "electronic_kernel", "tds_kernel"}
