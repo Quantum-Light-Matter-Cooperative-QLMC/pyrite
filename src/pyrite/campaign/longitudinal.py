@@ -92,9 +92,7 @@ class LongitudinalDistribution:
     Notes
     -----
     ``gaussian`` draws ``dt = sigma * z`` with ``z ~ N(0, 1)`` (or a flat top
-    for ``shape="uniform"``) and subtracts the realized centroid. It draws the
-    same per-electron offsets, bit for bit, as the deprecated
-    ``BunchLength(rms_fs=sigma, shape=...)`` for the same seed. Setting
+    for ``shape="uniform"``) and subtracts the realized centroid. Setting
     ``modulation_depth=0`` in ``microtrain`` likewise reduces to a plain
     Gaussian of RMS ``envelope_rms_fs``.
 
@@ -205,6 +203,17 @@ class LongitudinalDistribution:
         return self.rms_duration
 
     def __post_init__(self) -> None:
+        if self.envelope_rms_fs is not None:
+            object.__setattr__(
+                self,
+                "envelope_rms_fs",
+                normalize_unit(
+                    self.envelope_rms_fs,
+                    "fs",
+                    field="LongitudinalDistribution.envelope_rms_fs",
+                    expected="time",
+                ),
+            )
         if self.kind not in ("gaussian", "microtrain", "compressed"):
             raise ValueError(f"unknown longitudinal kind {self.kind!r}")
         self._validate_shape()

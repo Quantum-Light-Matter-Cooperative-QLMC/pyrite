@@ -547,7 +547,7 @@ class Result:
         Entries follow :meth:`dataframe_units`; every family column and
         ``total`` share the selected flux unit and count basis.
 
-        Deprecated since 0.26.1; removal in 0.28.0. Use native quantity
+        Deprecated since 0.27.0; removal in 0.29.0. Use native quantity
         spectra and their ``dataframe_units()`` for new exports.
         """
         from .._api_deprecations import warn_api
@@ -590,7 +590,7 @@ class Result:
     ) -> pl.DataFrame:
         """Return a wide spectrum table on a common grid, in physical units.
 
-        Deprecated since 0.26.1; removal in 0.28.0. For new exports use
+        Deprecated since 0.27.0; removal in 0.29.0. For new exports use
         :meth:`accepted_spectra` or component ``quantify()``, then explicit
         current transforms and native ``to_dataframe()``/``dataframe_units()``.
 

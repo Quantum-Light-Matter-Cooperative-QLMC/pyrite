@@ -18,7 +18,7 @@ from ._env import env_value
 from ._jit_cache import apply_managed_cache_env
 from .paths import data_dir
 
-__version__ = "0.26.0"
+__version__ = "0.27.0"
 
 # Default the Numba/CuPy kernel caches to PyRITE's managed user-cache
 # directories (a non-empty NUMBA_CACHE_DIR / CUPY_CACHE_DIR always wins). This
@@ -54,9 +54,6 @@ if TYPE_CHECKING:
     from pyrite.api import simulate as simulate
     from pyrite.beams import (
         BunchFrontTilt as BunchFrontTilt,
-    )
-    from pyrite.beams import (
-        BunchLength as BunchLength,
     )
     from pyrite.beams import (
         GdfSource as GdfSource,

@@ -27,22 +27,14 @@ def _api_entry(spelling: str, replacement: str, *, since: str) -> ApiDeprecation
 ROOT_API_REPLACEMENTS = {}
 
 API_DEPRECATIONS: dict[str, ApiDeprecation] = {}
-API_DEPRECATIONS["BunchLength"] = _api_entry(
-    "BunchLength",
-    "LongitudinalDistribution(kind='gaussian', ...) "
-    "(shape='uniform' for a flat top; rms_duration= for a Pint time)",
-    since="0.25.0",
-)
-
-# #955: approved announcement/removal window. Release PR must re-date if
-# announcement is bundled after 0.26.1; never remove before replacements ship.
+# #955: first announced in 0.27.0; never remove before replacements ship.
 for _spelling in ("Result.spectral_flux", "Result.spectral_flux_units"):
     API_DEPRECATIONS[_spelling] = _api_entry(
         _spelling,
         "Result.accepted_spectra(assume_uniform=True) for scalar sources, "
         "or SpectralDensity.quantify(), followed by explicit rate(current=...), "
         "to_energy(), to_dataframe()/dataframe_units(); integrated_yield() for totals",
-        since="0.26.1",
+        since="0.27.0",
     )
 
 
@@ -51,7 +43,7 @@ for _spelling, _replacement in (
     ("Footprint.height", "Slab.height for slabs or Footprint.height_mm for stacks"),
     ("Slab(footprint=None)", "Slab(width=None, height=None)"),
 ):
-    API_DEPRECATIONS[_spelling] = _api_entry(_spelling, _replacement, since="0.26.1")
+    API_DEPRECATIONS[_spelling] = _api_entry(_spelling, _replacement, since="0.27.0")
 
 
 def warn_api(spelling: str, *, stacklevel: int = 3) -> None:

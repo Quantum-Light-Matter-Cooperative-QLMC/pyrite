@@ -9,7 +9,7 @@ import numpy as np
 import pint
 import pytest
 
-from pyrite.beams import Beam, BunchFrontTilt, BunchLength, PointBunch, Spot
+from pyrite.beams import Beam, BunchFrontTilt, LongitudinalDistribution, PointBunch, Spot
 from pyrite.config import Numerics, Physics
 from pyrite.detectors import AngularAcceptance, Detector, EnergyBins, PixelGrid, PlanarPose
 from pyrite.geometry import RectangularBody, SubstanceRef, Target
@@ -210,11 +210,11 @@ def test_target_beam_timing_physics_and_numerics_normalize_units() -> None:
     beam = Beam(
         energy_keV=60,
         transverse=Spot(fwhm_x_mm=500 * ureg.um),
-        longitudinal=BunchLength(0.2 * ureg.ps),
+        longitudinal=LongitudinalDistribution("gaussian", 0.2 * ureg.ps),
         bunch_front_tilt=BunchFrontTilt(0.1 * ureg.radian),
     )
     assert beam.transverse.fwhm_x_mm == 0.5
-    assert beam.longitudinal.rms_fs == 200.0
+    assert beam.longitudinal.envelope_rms_fs == 200.0
     assert beam.bunch_front_tilt.tilt_deg == pytest.approx(np.rad2deg(0.1))
 
     bins = EnergyBins(cxr=np.array([0.1, 0.2]) * ureg.keV)

@@ -88,9 +88,9 @@ and adaptive consumers use the same selections; see
 
 ### `campaign/beam.py`
 
-Public `Beam`: one sub-object per kind of property (`Spot`/`Point`/`TransverseDistribution`, `PointBunch`/`BunchLength`/`Offsets`/`LongitudinalDistribution`, optional `GdfSource` via `Beam.from_gdf`). `Beam.to_spec()` lowers to the flat `campaign.sweep.BeamSpec`, the internal record behind case payloads and profile files; `Beam.from_spec` is the inverse. `Scene` accepts either and stores a `Beam`.
+Public `Beam`: one sub-object per kind of property (`Spot`/`Point`/`TransverseDistribution`, `PointBunch`/`Offsets`/`LongitudinalDistribution`, optional `GdfSource` via `Beam.from_gdf`). `Beam.to_spec()` lowers to the flat `campaign.sweep.BeamSpec`, the internal record behind case payloads and profile files; `Beam.from_spec` is the inverse. `Scene` accepts either and stores a `Beam`.
 
-- Public: root-lazy `Beam`, `Spot`, `Point`, `PointBunch`, `BunchLength`, `Offsets`, `GdfSource`.
+- Public: root-lazy `Beam`, `Spot`, `Point`, `PointBunch`, `Offsets`, `GdfSource`.
 - Deps: `campaign.sweep.BeamSpec`, `campaign.longitudinal`, `montecarlo.transverse`.
 
 ### `campaign/single_scene.py` and `cli/commands/_simulation.py`

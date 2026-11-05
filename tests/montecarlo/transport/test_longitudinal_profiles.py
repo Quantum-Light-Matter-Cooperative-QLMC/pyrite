@@ -222,13 +222,9 @@ def _resolved_gaussian(policy: LongitudinalDistribution) -> dict:
 
 
 @pytest.mark.parametrize("shape", ["gaussian", "uniform"])
-def test_gaussian_policy_matches_deprecated_bunch_length_bit_for_bit(shape):
+def test_gaussian_policy_matches_flat_sampling_bit_for_bit(shape):
     from pyrite.units import Q_
 
-    with pytest.warns(DeprecationWarning, match="BunchLength"):
-        from pyrite.beams import BunchLength
-
-        legacy = BunchLength(137.0, shape)
     flat = _sample_bunch_offsets(257, 137.0, shape, None, 11)
     for policy in (
         LongitudinalDistribution("gaussian", 137.0, shape=shape),
@@ -241,7 +237,11 @@ def test_gaussian_policy_matches_deprecated_bunch_length_bit_for_bit(shape):
         )
     from pyrite.beams import Beam
 
-    beam = Beam(30.0, transverse=pr_spot(), longitudinal=legacy)
+    beam = Beam(
+        30.0,
+        transverse=pr_spot(),
+        longitudinal=LongitudinalDistribution("gaussian", 137.0, shape=shape),
+    )
     assert beam.to_spec().longitudinal == LongitudinalDistribution("gaussian", 137.0, shape=shape)
     if shape == "uniform":
         assert np.max(np.abs(flat)) <= np.sqrt(3.0) * 137.0 * C_ANG_PER_FS * 2.0
@@ -251,19 +251,6 @@ def pr_spot():
     from pyrite.beams import PointSpot
 
     return PointSpot()
-
-
-def test_bunch_length_construction_warns_once_naming_replacement():
-    import warnings
-
-    from pyrite.beams import BunchLength
-
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always")
-        BunchLength(rms_fs=10.0)
-    messages = [str(w.message) for w in caught if w.category is DeprecationWarning]
-    assert len(messages) == 1
-    assert "LongitudinalDistribution" in messages[0]
 
 
 def test_policy_quantity_inputs_validate_and_read_back():

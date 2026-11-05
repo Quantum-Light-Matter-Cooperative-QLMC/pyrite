@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 import pyrite as pr
-from pyrite.campaign.beam import BunchLength, GdfSource, Offsets, PointBunch, PointSpot, Spot
+from pyrite.campaign.beam import GdfSource, Offsets, PointBunch, PointSpot, Spot
 from pyrite.campaign.longitudinal import LongitudinalDistribution
 from pyrite.campaign.sweep import BeamSpec, build_cases
 from pyrite.campaign.sweep import Sweep as LegacySweep
@@ -36,7 +36,11 @@ def _case(beam):
             BeamSpec(energy_keV=30.0, transverse_fwhm_x_mm=None, transverse_fwhm_y_mm=None),
         ),
         (
-            pr.Beam(energy_keV=30.0, transverse=Spot(), longitudinal=BunchLength(100.0)),
+            pr.Beam(
+                energy_keV=30.0,
+                transverse=Spot(),
+                longitudinal=LongitudinalDistribution("gaussian", 100.0),
+            ),
             BeamSpec(energy_keV=30.0, longitudinal=LongitudinalDistribution("gaussian", 100.0)),
         ),
         (
@@ -67,7 +71,7 @@ def test_lowering_matches_the_flat_record_and_round_trips(beam, spec):
 def test_wrong_types_name_the_allowed_options():
     with pytest.raises(TypeError, match="Spot, PointSpot, or TransverseDistribution"):
         pr.Beam(transverse=1.0, longitudinal=PointBunch())
-    with pytest.raises(TypeError, match="PointBunch, BunchLength"):
+    with pytest.raises(TypeError, match="PointBunch, Offsets"):
         pr.Beam(transverse=Spot(), longitudinal=100.0)
     with pytest.raises(TypeError):
         pr.Beam(
@@ -87,7 +91,7 @@ def test_sub_object_validation():
     with pytest.raises(ValueError, match="fwhm_x_mm"):
         Spot(0.0)
     with pytest.raises(ValueError, match="rms_fs"):
-        BunchLength(-1.0)
+        LongitudinalDistribution("gaussian", -1.0)
     with pytest.raises(ValueError, match="empty"):
         Offsets(())
     with pytest.raises(ValueError, match="normalization"):
@@ -151,7 +155,7 @@ def test_quantity_timing_preserves_cases_and_nested_sweep_replacement():
 
     from pyrite.units import Q_
 
-    duration = BunchLength(rms_duration=Q_(250, "fs"))
+    duration = LongitudinalDistribution("gaussian", rms_duration=Q_(250, "fs"))
     offsets = Offsets(arrival_offsets=Q_([-125, 250], "fs"))
     for timing in (duration, offsets):
         beam = pr.Beam(30, transverse=Spot(), longitudinal=timing)
@@ -162,9 +166,12 @@ def test_quantity_timing_preserves_cases_and_nested_sweep_replacement():
         beam=pr.Beam(30, transverse=Spot(), longitudinal=duration),
         target=pr.geometry.Slab("hopg", footprint=pr.geometry.Footprint(5.0, 5.0)),
     )
-    sweep = pr.Sweep(scene, {"beam.longitudinal.rms_fs": [125.0, 500.0]})
-    assert [s.beam.longitudinal for _, s in sweep.expand()] == [BunchLength(125), BunchLength(500)]
-    timings = [duration, duration.with_rms_duration(Q_(500, "fs"))]
+    sweep = pr.Sweep(scene, {"beam.longitudinal.envelope_rms_fs": [125.0, 500.0]})
+    assert [s.beam.longitudinal for _, s in sweep.expand()] == [
+        LongitudinalDistribution("gaussian", 125),
+        LongitudinalDistribution("gaussian", 500),
+    ]
+    timings = [duration, LongitudinalDistribution("gaussian", rms_duration=Q_(500, "fs"))]
     sweep = pr.Sweep(scene, {"beam.longitudinal": timings})
     assert [s.beam.longitudinal for _, s in sweep.expand()] == timings
     retimed = replace(scene.beam, longitudinal=offsets.with_arrival_offsets(Q_([0, 125], "fs")))

@@ -15,7 +15,6 @@ from pyrite.devtools import api_surface
 _BEAM_OWNERS = {
     "Beam": "pyrite.campaign.beam",
     "BunchFrontTilt": "pyrite.campaign.beam",
-    "BunchLength": "pyrite.campaign.beam",
     "GdfSource": "pyrite.campaign.beam",
     "LongitudinalDistribution": "pyrite.campaign.longitudinal",
     "Offsets": "pyrite.campaign.beam",
