@@ -25,6 +25,9 @@ import json
 import os
 import pickle
 import sys
+from collections.abc import Iterator
+from concurrent.futures import ThreadPoolExecutor
+from itertools import chain
 from pathlib import Path
 from time import perf_counter
 from typing import Any
@@ -33,6 +36,7 @@ import numpy as np
 
 FAMILIES = ("cxr.incoherent", "cxr.coherent", "characteristic", "channeling", "transition", "brem")
 _PROGRESS_INTERVAL_S = 0.25
+_DIGEST_CHUNK_BYTES = 1 << 28
 
 
 def tuning_from_dict(data: dict[str, Any]) -> Any:
@@ -72,18 +76,48 @@ def environment() -> dict[str, Any]:
     return env
 
 
+def _named_arrays(value: Any, name: str = "") -> Iterator[tuple[str, np.ndarray]]:
+    """Every array nested in ``value``, in a stable order, with its path."""
+    if isinstance(value, np.ndarray):
+        yield name, np.ascontiguousarray(value)
+    elif isinstance(value, dict):
+        for key in sorted(value, key=str):
+            yield from _named_arrays(value[key], f"{name}/{key}")
+    elif isinstance(value, list | tuple):
+        for index, item in enumerate(value):
+            yield from _named_arrays(item, f"{name}/{index}")
+
+
+def _byte_chunks(array: np.ndarray) -> list[np.ndarray]:
+    """Zero-copy fixed-size byte views; an empty array still has one chunk."""
+    data = array.reshape(-1).view(np.uint8)
+    return [
+        data[i : i + _DIGEST_CHUNK_BYTES] for i in range(0, max(data.size, 1), _DIGEST_CHUNK_BYTES)
+    ]
+
+
 def transport_digest(transported: Any) -> str:
-    """SHA-256 over every transported array and the resolved line grid."""
+    """SHA-256 tree over every transported array and the resolved line grid.
+
+    ``hashlib`` releases the GIL, so hashing chunks in threads scales with the
+    cores even when one array dominates. Digests are only compared within one
+    ``tune_kernels`` call, so their value carries no compatibility promise.
+    """
     from ..montecarlo.runner.recovery import _host_arrays
 
     tp = transported._transport
-    digest = hashlib.sha256()
-    for key, value in sorted(_host_arrays(tp["segs"]).items()):
-        if isinstance(value, np.ndarray):
-            host = np.ascontiguousarray(value)
-            digest.update(f"{key}:{host.dtype}:{host.shape}".encode())
-            digest.update(host.tobytes())
-    digest.update(np.ascontiguousarray(tp["E_grid"]).tobytes())
+    arrays = list(_named_arrays(_host_arrays(tp["segs"]), "segs"))
+    arrays.extend(_named_arrays(np.asarray(tp["E_grid"]), "E_grid"))
+    chunks = [_byte_chunks(array) for _, array in arrays]
+    with ThreadPoolExecutor(max_workers=os.cpu_count() or 1) as pool:
+        digests = pool.map(
+            lambda chunk: hashlib.sha256(chunk).digest(), chain.from_iterable(chunks)
+        )
+        digest = hashlib.sha256()
+        for (name, array), parts in zip(arrays, chunks, strict=True):
+            digest.update(f"{name}:{array.dtype}:{array.shape}:".encode())
+            for _ in parts:
+                digest.update(next(digests))
     return digest.hexdigest()
 
 
