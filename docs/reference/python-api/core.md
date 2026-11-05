@@ -91,8 +91,11 @@ Radiation families remain separate: `cxr.incoherent`, optional `cxr.coherent`,
 `brem` and optional `characteristic`. Each spectrum carries its energy grid
 and normalization. Scalar-detector densities are response-free photons per
 incident electron per eV per sr; planar-detector densities are filtered,
-solid-angle-weighted observation averages, still per sr. Use `spectral_flux()`
-for current and acceptance scaling, or `acquire()` for registered pixel counts.
+solid-angle-weighted observation averages, still per sr. Use `.quantify().rate(current=...)` for directional rates,
+`accepted_spectra(assume_uniform=True)` for scalar source acceptance, and
+`acquire()` for registered pixel counts. Observation averages use matching
+pixel acceptance without another transmission factor. See the
+[quantity recipe](../../guides/physical-quantities.md#read-results-with-units).
 
 The workflow covers [results](../../reference/python-scene-recipes.md#interpret-the-result),
 [detector response](../../reference/python-scene-recipes.md#apply-detector-response-explicitly),

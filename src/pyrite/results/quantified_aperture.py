@@ -2,14 +2,24 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING, ClassVar, Literal, Self
 
 import numpy as np
 
+from ._spectral_rate import (
+    NormalizationBasis,
+    count_basis,
+    per_current_factor,
+    quantity_columns,
+    rate_factor,
+    rate_units,
+    table_metadata,
+)
 from .quantified import _check_energy_unit
 
 if TYPE_CHECKING:
+    import polars as pl
     from pint import Quantity
 
     from ..photon_event_observation import PhotonEventTally
@@ -27,8 +37,8 @@ class QuantifiedApertureSpectrum:
     displayed energy axis does not change any counts.
 
     Obtained from ``PhotonContinuumTally.quantify()`` or
-    ``PhotonEventTally.quantify()``. No current, response or exposure scaling
-    is performed. Stored tally arrays, event budgets and identity remain numeric.
+    ``PhotonEventTally.quantify()``. Explicit current methods scale the stored photon yield; response and
+    exposure are never replayed. Stored tally arrays, event budgets and identity remain numeric.
     Every returned Pint quantity owns a fresh magnitude; no view exposes its
     private source snapshot or performs resampling or transport.
     """
@@ -46,9 +56,6 @@ class QuantifiedApertureSpectrum:
     sampling: ClassVar[Literal["bin_means"]] = "bin_means"
     measure: ClassVar[Literal["per_energy"]] = "per_energy"
     normalization: ClassVar[Literal["aperture-integrated"]] = "aperture-integrated"
-    count_basis: ClassVar[Literal["photons_per_incident_electron"]] = (
-        "photons_per_incident_electron"
-    )
 
     @classmethod
     def from_tally(cls, tally: PhotonContinuumTally | PhotonEventTally) -> Self:
@@ -63,8 +70,13 @@ class QuantifiedApertureSpectrum:
             getattr(tally, "source_component", "continuum"),
         )
 
+    acceptance_applied: ClassVar[bool] = True
+
+    normalization_basis: NormalizationBasis = field(default="per_incident_electron", kw_only=True)
+
     def __post_init__(self) -> None:
         _check_energy_unit(self._energy_unit)
+        count_basis(self.normalization_basis)
         if self.source_component not in {"continuum", "characteristic", "annihilation"}:
             raise ValueError("unsupported aperture source component")
 
@@ -127,7 +139,9 @@ class QuantifiedApertureSpectrum:
     def _density(self, native: np.ndarray) -> Quantity:
         from ..units import Q_
 
-        return Q_(native.copy(), "1 / eV").to(f"1 / ({self._energy_unit})")
+        return Q_(native.copy(), f"1 / eV{rate_units(self.normalization_basis)}").to(
+            f"1 / ({self._energy_unit}){rate_units(self.normalization_basis)}"
+        )
 
     @property
     def density(self) -> Quantity:
@@ -144,11 +158,10 @@ class QuantifiedApertureSpectrum:
         """Transport-redistributed bin-mean density."""
         return self._density(self._redistributed_per_primary_eV)
 
-    @staticmethod
-    def _counts(density: np.ndarray, edges: np.ndarray) -> Quantity:
+    def _counts(self, density: np.ndarray, edges: np.ndarray) -> Quantity:
         from ..units import Q_
 
-        return Q_(density * np.diff(edges), "dimensionless")
+        return Q_(density * np.diff(edges), f"1{rate_units(self.normalization_basis)}")
 
     @property
     def counts(self) -> Quantity:
@@ -168,24 +181,93 @@ class QuantifiedApertureSpectrum:
         """Detected photon counts outside the reported energy bins."""
         from ..units import Q_
 
-        return Q_(float(self._unbinned_detected_per_primary), "dimensionless")
+        return Q_(
+            float(self._unbinned_detected_per_primary), f"1{rate_units(self.normalization_basis)}"
+        )
 
     @property
     def detected_counts(self) -> Quantity:
         """All detected photons: in-range bins plus unbinned detections."""
         from ..units import Q_
 
-        return Q_(float(self._detected_per_primary), "dimensionless")
+        return Q_(float(self._detected_per_primary), f"1{rate_units(self.normalization_basis)}")
 
     def to_energy(self, unit: str) -> Self:
         """Couple bin-edge/width/density conversion; preserve counts and context."""
-        return type(self)(
-            self._edges_eV,
-            self._total_per_primary_eV,
-            self._direct_per_primary_eV,
-            self._redistributed_per_primary_eV,
-            self._detected_per_primary,
-            self._unbinned_detected_per_primary,
-            self.source_component,
-            unit,
+        return replace(self, _energy_unit=unit)
+
+    @property
+    def count_basis(self) -> str:
+        """Photon normalization, independent of Pint's dimensional algebra."""
+        return count_basis(self.normalization_basis)
+
+    def rate(self, *, current: Quantity) -> Self:
+        """Return photons per second using explicit mean current ``I/|e|``.
+
+        Current must be a finite nonnegative scalar quantity. Rejects repeated
+        current transforms; preserves acceptance, response and native sampling.
+        Validation: spectral-explicit-rate-normalization
+        """
+        factor = rate_factor(self.normalization_basis, current)
+        return replace(
+            self,
+            _total_per_primary_eV=self._total_per_primary_eV * factor,
+            _direct_per_primary_eV=self._direct_per_primary_eV * factor,
+            _redistributed_per_primary_eV=self._redistributed_per_primary_eV * factor,
+            _detected_per_primary=self._detected_per_primary * factor,
+            _unbinned_detected_per_primary=self._unbinned_detected_per_primary * factor,
+            normalization_basis="per_second",
         )
+
+    def rate_per_current(self) -> Self:
+        """Return photons per second per ampere, including at zero beam current.
+
+        Applies ``1/|e|`` directly to per-primary yields, never divides by current.
+        Validation: spectral-explicit-rate-normalization
+        """
+        factor = per_current_factor(self.normalization_basis)
+        return replace(
+            self,
+            _total_per_primary_eV=self._total_per_primary_eV * factor,
+            _direct_per_primary_eV=self._direct_per_primary_eV * factor,
+            _redistributed_per_primary_eV=self._redistributed_per_primary_eV * factor,
+            _detected_per_primary=self._detected_per_primary * factor,
+            _unbinned_detected_per_primary=self._unbinned_detected_per_primary * factor,
+            normalization_basis="per_current",
+        )
+
+    def _table_quantities(self) -> dict[str, Quantity]:
+        edges = self.photon_energy_edges
+        return {
+            "photon_energy_left": edges[:-1],
+            "photon_energy_right": edges[1:],
+            **{
+                name: getattr(self, name)
+                for name in (
+                    "density",
+                    "direct_density",
+                    "redistributed_density",
+                    "counts",
+                    "direct_counts",
+                    "redistributed_counts",
+                )
+            },
+        }
+
+    def to_dataframe(self) -> pl.DataFrame:
+        """Numeric native-grid table with explicit measure and normalization labels.
+
+        Coordinates and densities use the paired display energy unit. No
+        interpolation, total, response replay or acquisition scaling is added.
+        """
+        import polars as pl
+
+        frame = pl.DataFrame({name: q.magnitude for name, q in self._table_quantities().items()})
+        frame = frame.with_columns(pl.lit(self.source_component).alias("source_component"))
+        return frame.with_columns(
+            *[pl.lit(value).alias(name) for name, value in table_metadata(self).items()]
+        )
+
+    def dataframe_units(self) -> dict[str, dict[str, str | None]]:
+        """Physical column units and count bases for :meth:`to_dataframe`."""
+        return quantity_columns(self._table_quantities(), self.count_basis)

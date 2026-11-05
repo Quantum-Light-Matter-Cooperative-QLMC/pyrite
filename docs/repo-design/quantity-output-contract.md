@@ -1,10 +1,11 @@
 # Quantity-output conversion contract (#755)
 
-**Status: node-sampled `SpectralDensity.quantify()`, experimental
+**Status: native-sampled `SpectralDensity.quantify()`, experimental
 `DirectionalSpectrum.quantify()`, experimental binned aperture tallies,
 selected-pixel `SpatialResult.quantify_spectra()`, integrated spatial-image
 and acquisition count views are implemented; other families remain proposed
-for review.** This is the
+for review.** Spectral carriers also expose explicit current transforms and
+native tables; `Result.accepted_spectra()` owns matching acceptance. This is the
 contract for incremental result views. It
 builds on the [physical-quantity migration inventory](quantity-migration-inventory.md)
 and [existing numeric result/storage contracts](result-storage-contracts.md).
@@ -89,7 +90,7 @@ acceptance, so there is no second `sr` multiplier.
   uses named beam-current/acceptance scalings. The `units` argument is **not**
   a Pint energy-unit parameter. Its output currently has both eV and keV
   coordinate columns, while density columns remain per **eV** in all modes.
-  Keep this legacy behavior unchanged; new quantity-view naming is deferred.
+  Keep this legacy behavior unchanged; explicit current and acceptance replacements are described below.
 - `DirectionalSpectrum.rate()` uses electron rate from beam current (nA).
   A per-sr source is not an accepted-detector rate; do not assume an angular
   bin width or acceptance in this method.
@@ -318,3 +319,34 @@ mask/uncertainty models; whether a quantity view may wrap non-CPU arrays (if
 not, refuse explicitly); explicit dimensional model for optical coherency;
 and preservation of normalized finite-domain quantum densities. Resolve these
 *before* adding a generalized output wrapper.
+
+## Explicit spectral current normalization (#955)
+
+The scalar, directional, selected-pixel and aperture spectral carriers expose
+`rate(current=...)`, `rate_per_current()`, `to_dataframe()` and
+`dataframe_units()`. They retain native grids, sampling, masks, response and
+source/observation provenance. `normalization_basis` records per-primary,
+per-second or per-current state; `count_basis` identifies photons with the
+matching denominator. The shared boundary validates scalar nonnegative mean
+current quantities using the shared registry convention. Rates use $I/|e|$;
+per-current coefficients use $1/|e|$ with an ampere denominator, including at
+zero beam current. Repeated current transformations fail.
+
+`Result.accepted_spectra(mode=..., assume_uniform=...)` returns an ordinary
+mapping of native component views with acceptance applied. Scalar source
+results require explicit uniform-directional-density acknowledgment and use
+the case acceptance. Observation averages use matching summed pixel solid
+angle without reapplying transmission or reconstructing intrinsic source
+spectra. Their source/observation provenance remains independent of the
+accepted `per_energy` measure. No detached view accepts arbitrary acceptance.
+Spatial/aperture spectra already include acceptance; measured spatial spectra
+also preserve response. Registered acquisition counts remain separate.
+
+Tables contain numeric magnitudes with explicit semantic columns. Accepted
+scalar tables retain component identity and the selected CXR mode. Bin means
+retain left/right edges; directional tables retain angular coordinates and
+support; selected pixels retain indices and measured status. Aperture
+unbinned/detected totals remain separate properties. No union grid, total,
+scoring replay, device transfer or persistence change occurs in these views.
+See [the migration recipe](../guides/physical-quantities.md#read-results-with-units)
+and [normalization evidence](../validation/radiation-physics/spectral-explicit-rate-normalization.md).

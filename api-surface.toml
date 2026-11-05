@@ -143,6 +143,8 @@ superpose = { target = "pyrite.montecarlo.channeling.states:superpose", status =
 tds_kernel = { target = "pyrite.montecarlo.channeling.operators:tds_kernel", status = "experimental" }
 translate = { target = "pyrite.montecarlo.channeling.states:translate", status = "advanced-stable" }
 
+# #955: existing spectral quantity carriers own explicit rate/current states and native tables;
+# Result.accepted_spectra owns matching acceptance. No new exported carrier or storage fields.
 [package_exports."pyrite.results"]
 AcquisitionBatch = { target = "pyrite.instrument:AcquisitionBatch", status = "advanced-stable" }
 PixelCountResult = { target = "pyrite.results:PixelCountResult", status = "advanced-stable" }

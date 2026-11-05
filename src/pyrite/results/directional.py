@@ -2,7 +2,7 @@
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Literal, cast
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 import numpy as np
 from scipy.constants import elementary_charge
@@ -10,6 +10,9 @@ from scipy.constants import elementary_charge
 from .quantified_directional import QuantifiedDirectionalSpectrum
 from .spectral_support import _checked_bin_edges
 from .store import beam_current_na
+
+if TYPE_CHECKING:
+    from pint import Quantity
 
 #: Result component identity for each public directional component name.
 COMPONENT_IDS = {
@@ -90,7 +93,9 @@ class DirectionalSpectrum:
         """
         return beam_current_na(self.case)
 
-    def rate(self, current_na: float | None = None) -> np.ndarray:
+    def rate(
+        self, current_na: float | None = None, *, current: "Quantity | None" = None
+    ) -> np.ndarray:
         """Return ph/s/eV/sr at the resolved or explicit mean current [nA].
 
         Equation: ``R(E,theta) = Y(E,theta) I[nA] 1e-9 / |e|``, where
@@ -99,10 +104,20 @@ class DirectionalSpectrum:
         PXR–CBS interference remains in Y. No angular-bin/solid-angle factor.
         At zero current all supported bins vanish. Current must be a finite
         nonnegative magnitude; pulse defaults reuse the beam Q*f convention.
+        Alternatively pass ``current=Q_(...)`` using any current unit; do not
+        supply both current spellings. The return type stays a numeric array.
         Source: BIPM SI ampere, https://www.bipm.org/en/si-base-units/ampere
         Validation: directional-source-rate-normalization
         """
-        current = self.current_na if current_na is None else float(current_na)
-        if not np.isfinite(current) or current < 0:
+        if current is not None:
+            from ._spectral_rate import rate_factor
+
+            if current_na is not None:
+                raise TypeError("pass only one of current and current_na")
+            if self.units != "ph/incident-electron/eV/sr":
+                raise ValueError("quantity current requires per-primary directional source density")
+            return self.density * rate_factor("per_incident_electron", current)
+        current_value = self.current_na if current_na is None else float(current_na)
+        if not np.isfinite(current_value) or current_value < 0:
             raise ValueError("current_na must be a finite nonnegative mean current in nA")
-        return self.density * (current * 1e-9 / elementary_charge)
+        return self.density * (current_value * 1e-9 / elementary_charge)

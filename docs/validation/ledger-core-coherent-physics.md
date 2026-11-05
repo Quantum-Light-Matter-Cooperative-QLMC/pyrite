@@ -684,3 +684,13 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 - **Checks:** Units; zero current; linear current scaling; default Q×f normalization; angular-grid and acceptance independence; rejection of negative/nonfinite current
 - **Anchor:** `tests/montecarlo/transport/test_directional_source.py::test_rate_normalization_zero_linear_default_and_no_solid_angle`; `test_invalid_mean_current_rejected`
 - **Notes:** Fresh-context independent derivation and source-to-code check agree ([write-up](radiation-physics/directional-source-rate-normalization.md)); hard-coded BIPM numeric anchors pin regression. The default current reuses the pulse convention of `results/store.py::beam_current_na` (`beam-phase-space-metrics`). No new PXR/CBS or target-escape model claim. Human sign-off remains pending in #277.
+
+## `spectral-explicit-rate-normalization`
+
+- **Claim:** Fixed stored photon yield per incident electron becomes per-second yield with I/|e| or per-ampere coefficient with 1/|e|, preserving native energy sampling and paired axis-density conversion; matching scalar acceptance is applied once, with explicit uniform-source acknowledgment or matching observation-average pixel solid angle
+- **Code:** `results/_spectral_rate.py::{per_current_factor,rate_factor}`; `results/model.py::Result.accepted_spectra`; `results/quantified.py::QuantifiedSpectrum.rate`; `results/quantified_directional.py::QuantifiedDirectionalSpectrum.rate`; `results/quantified_spatial.py::QuantifiedSpatialSpectrum.rate`; `results/quantified_aperture.py::QuantifiedApertureSpectrum.rate`
+- **Source:** [BIPM SI ampere](https://www.bipm.org/en/si-base-units/ampere), exact elementary charge `1.602176634e-19` C; matching solid-angle average definition and energy-coordinate Jacobian
+- **Status:** anchored
+- **Checks:** Units, signs, fixed-yield coherent bunch convention, zero current, per-current coefficient, native integrated yields/bin masses, source acknowledgment, matching observation acceptance, duplicate/invalid transforms, unsupported NaNs, no response/acceptance replay
+- **Anchor:** `tests/results/test_explicit_spectral_rates.py`
+- **Notes:** [Independent derivation and implementation comparison](radiation-physics/spectral-explicit-rate-normalization.md). Current-only scaling keeps stored coherent bunch population/shape fixed; changing it requires radiation evaluation. Fresh-context independent derivation and source-to-code verdict `rederived`; analytic anchors pass. No registered-count or radiation-model change; human sign-off remains #277.

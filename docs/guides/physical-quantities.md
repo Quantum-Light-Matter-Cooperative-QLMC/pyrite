@@ -188,25 +188,65 @@ in_kev = spectrum.to_energy("keV")
 np.trapezoid(in_kev.density, in_kev.photon_energy)
 ```
 
-Do not convert a density by relabelling its unit, and do not treat a density as
-a count. Integrate densities over their native nodes or bins; use the
-count-valued views for detector counts. Unit conversion never adds beam
-current, exposure or solid angle. Those normalizations come from
-`spectral_flux(units=...)` or the acquisition views, which carry the needed
-beam and detector context.
+Integrate each original component with its declared sampling and support:
+`result.integrated_yield(mode="incoherent")` returns native component yields
+and a sum of their integrals, including uncovered-window metadata. Node-only
+trapezoidal calculations are inappropriate for bin means or mixed sampling.
+`combined_cxr()` combines compatible CXR-grid components; bremsstrahlung retains
+its own grid, and coherent/incoherent CXR remain alternatives.
 
-For tables, `result.dataframe_units()` and
-`result.spectral_flux_units(units=...)` return JSON-ready column metadata
-without changing the table. Store it beside CSV or Parquet output:
+Mean current and acceptance are explicit operations:
+
+```python
+from pyrite.units import Q_
+
+intrinsic = result.cxr.incoherent.quantify()
+directional_rate = intrinsic.rate(current=Q_(20, "nA"))
+# A scalar source needs acknowledgment of uniform density over case acceptance:
+accepted = result.accepted_spectra(mode="incoherent", assume_uniform=True)
+accepted_rate = accepted["cxr"].rate(current=Q_(20, "nA")).to_energy("keV")
+per_ampere = accepted["cxr"].rate_per_current()  # valid even for a zero-current beam
+per_nA_density = per_ampere.density.to("1/eV/s/nA")
+```
+
+`rate()` requires a finite nonnegative scalar current quantity and multiplies
+per-primary photon yield by $I/|e|$. `rate_per_current()` uses $1/|e|$ directly;
+its canonical current denominator is ampere. The stored yield is held fixed:
+for coherent CXR, changing the bunch population/shape requires new radiation
+evaluation, rather than a current-only transformation. Either operation refuses an
+already current-normalized view. `normalization_basis` distinguishes
+`per_incident_electron`, `per_second`, and `per_current`; `normalization`
+retains source/observation provenance and `measure` retains the angular measure.
+Pint's dimensionless steradian cannot enforce those semantic distinctions.
+
+Observation-average results use their matching summed pixel solid angle;
+transmission is already included. They cannot recover intrinsic source spectra.
+Spatial and aperture spectra already include acceptance, and measured spatial
+spectra already include response. Their quantity views accept the same current
+operations without applying acceptance, transmission or response again.
+Acquisition counts remain owned by exposure and realization; they have no
+current-normalization methods. Legacy `DirectionalSpectrum.rate(current_na=...)`
+and aperture exports also accept `current=Q_(...)`, keeping numeric return
+types; passing both current spellings raises an error.
+
+Export each native component separately, with paired energy/density units and
+semantic columns, including component and selected CXR mode for accepted
+scalar views. No interpolation or summed spectral density is implied:
 
 ```python
 import json
 
-flux = result.spectral_flux(units="detector")
-flux.write_csv("flux.csv")
-with open("flux.units.json", "w") as stream:
-    json.dump(result.spectral_flux_units(units="detector"), stream, indent=2)
+accepted_rate.to_dataframe().write_csv("cxr-rate.csv")
+with open("cxr-rate.units.json", "w") as stream:
+    json.dump(accepted_rate.dataframe_units(), stream, indent=2)
 ```
+
+Numeric `result.to_dataframe()` and `result.dataframe_units()` remain supported.
+`spectral_flux(units=...)` and `spectral_flux_units(units=...)`, including
+selector-based CSV/Parquet recipes, are deprecated since 0.26.1, with removal
+scheduled for 0.28.0. During that window their values, column schemas and legacy
+union-grid display behavior remain unchanged. Their `total` is not a native
+yield representation; use native integration for physical totals.
 
 Each entry holds a Pint-parsable `unit` and a separate `basis`. The basis
 records counts that Pint cannot express, such as photons per incident

@@ -34,6 +34,17 @@ API_DEPRECATIONS["BunchLength"] = _api_entry(
     since="0.25.0",
 )
 
+# #955: approved announcement/removal window. Release PR must re-date if
+# announcement is bundled after 0.26.1; never remove before replacements ship.
+for _spelling in ("Result.spectral_flux", "Result.spectral_flux_units"):
+    API_DEPRECATIONS[_spelling] = _api_entry(
+        _spelling,
+        "Result.accepted_spectra(assume_uniform=True) for scalar sources, "
+        "or SpectralDensity.quantify(), followed by explicit rate(current=...), "
+        "to_energy(), to_dataframe()/dataframe_units(); integrated_yield() for totals",
+        since="0.26.1",
+    )
+
 
 def warn_api(spelling: str, *, stacklevel: int = 3) -> None:
     """Warn that registered *spelling* is deprecated, naming its replacement."""

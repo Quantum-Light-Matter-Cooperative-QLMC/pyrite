@@ -77,7 +77,11 @@ without detector response or acceptance weighting.
 ```python
 cxr = result.cxr.incoherent
 continuum = result.brem
-flux = result.spectral_flux(units="detector")  # photons/(s eV), accepted solid angle
+from pyrite.units import Q_
+
+accepted = result.accepted_spectra(assume_uniform=True)
+flux = accepted["cxr"].rate(current=Q_(20, "nA")).to_energy("keV")
+flux_table = flux.to_dataframe()  # native CXR grid, photons/(s keV)
 native = result.to_dataframe()  # Polars, one row per native energy node
 combined = result.combined_cxr()  # CXR + applicable line components; no brem
 
@@ -88,11 +92,13 @@ resolved_case = result.case
 ```
 
 `combined_cxr()` adds the applicable line components once; bremsstrahlung
-remains separate because its energy grid can differ. `spectral_flux` combines
-grids with interpolation and scales using beam current and acceptance;
-`to_dataframe` preserves native nodes without interpolation.
-`result.dataframe_units()` and `result.spectral_flux_units(units="detector")`
-return JSON-ready `{column: {"unit": ..., "basis": ...}}` metadata for those
+remains separate because its energy grid can differ. Mixed node/bin-mean sums
+refuse integration: use `result.integrated_yield()` to integrate native parts
+and add their represented yields, preserving uncovered-window metadata.
+`accepted_spectra` requires the uniform-density acknowledgment for scalar
+source results and uses matching pixel acceptance for observation averages.
+`to_dataframe` preserves native samples without interpolation.
+`result.dataframe_units()` and `flux.dataframe_units()` return JSON-ready `{column: {"unit": ..., "basis": ...}}` metadata for those
 tables without changing their columns. Units are Pint-parsable strings;
 `basis` records what Pint cannot, such as photons per incident electron.
 Write it next to a CSV or Parquet export when another program must read the

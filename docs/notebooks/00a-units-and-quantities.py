@@ -320,9 +320,13 @@ def _(mo):
 
     The public `SpectralDensity.quantify().to_energy("keV")` does this
     _coupled conversion_ for you. It does **not** change the spectrum's
-    per-electron normalization, multiply by acceptance, or predict a photon
-    rate. `Result.spectral_flux(units="detector")` uses a different sort of
-    `units` argument: it selects **physical normalization**, not eV vs keV.
+    per-electron normalization or multiply by acceptance. Request a directional
+    rate with `.rate(current=20 * ureg.nA)`, or a coefficient per ampere with
+    `.rate_per_current()`; neither applies detector acceptance. On a full
+    result, `accepted_spectra(assume_uniform=True)` explicitly acknowledges
+    uniform source density over the matching scalar case acceptance.
+    Spatial/aperture spectra already include acceptance. These expected photon
+    rates are separate from acquisition counts after response and exposure.
     """)
     return
 
@@ -345,6 +349,15 @@ def _(np, ureg):
     integral_per_keV = np.trapezoid(in_keV.density.magnitude, in_keV.photon_energy.magnitude)
     assert np.isclose(integral_per_eV, integral_per_keV)
     assert in_keV.photon_energy.units == ureg.keV
+    directional_rate = quantified.rate(current=20 * ureg.nA).to_energy("keV")
+    per_current = quantified.rate_per_current().to_energy("keV")
+    assert np.allclose(
+        directional_rate.density.magnitude,
+        (per_current.density * (20 * ureg.nA)).to("1/keV/s/sr").magnitude,
+    )
+    assert quantified.rate(current=0 * ureg.nA).density.magnitude.max() == 0
+    # Numeric export retains the paired display unit and explicit semantic labels.
+    assert directional_rate.dataframe_units()["density"]["basis"] == "photons_per_second"
     return in_keV, integral_per_eV, integral_per_keV, source
 
 
