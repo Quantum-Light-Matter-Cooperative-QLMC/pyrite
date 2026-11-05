@@ -37,6 +37,7 @@ CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
     "checks/detector_cone_variance_reduction.py": (),
     # #879 fixed-population spectral/timing diagnostics, not a physics claim.
     "checks/line_roulette_spectral_gate_879.py": (),
+    "checks/line_roulette_independent_879.py": (),
     "checks/roulette879_analysis.py": (),
     # #875 launch-shape timing diagnostic: bitwise-identity and timing, no physics claim.
     "checks/launch_retune_875.py": (),
