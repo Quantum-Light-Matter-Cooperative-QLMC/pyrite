@@ -13,12 +13,11 @@ def _transported(**segments):
     return SimpleNamespace(_transport={"segs": base | segments, "E_grid": np.array([1.0, 2.0])})
 
 
-def test_digest_is_deterministic_when_arrays_span_chunks(monkeypatch):
+def test_digest_is_deterministic_across_checksum_chunks(monkeypatch):
     first = worker.transport_digest(_transported())
     assert worker.transport_digest(_transported()) == first
-    monkeypatch.setattr(worker, "_DIGEST_CHUNK_BYTES", 7)  # arrays span many chunks
-    small = worker.transport_digest(_transported())
-    assert worker.transport_digest(_transported()) == small
+    monkeypatch.setattr(worker, "_CHECKSUM_CHUNK_WORDS", 5)
+    assert worker.transport_digest(_transported()) == first
 
 
 @pytest.mark.parametrize(
@@ -42,6 +41,24 @@ def test_digest_sees_a_change_inside_nested_arrays():
     assert worker.transport_digest(one) != worker.transport_digest(two)
 
 
-def test_digest_chunks_do_not_copy():
-    array = np.arange(8.0)
-    assert all(np.shares_memory(chunk, array) for chunk in worker._byte_chunks(array))
+@pytest.mark.parametrize("bit", [0, 31, 52, 63])
+def test_checksum_sees_a_single_bit_flip(bit):
+    values = np.arange(1000.0)
+    flipped = values.copy()
+    flipped.view(np.uint64)[417] ^= np.uint64(1) << np.uint64(bit)
+    first, second = worker._array_checksum(np, values), worker._array_checksum(np, flipped)
+    assert first[0] != second[0] and first[1] != second[1]
+
+
+def test_checksum_sees_swapped_words():
+    values = np.arange(1000.0)
+    swapped = values.copy()
+    swapped[[3, 900]] = swapped[[900, 3]]
+    assert worker._array_checksum(np, values) != worker._array_checksum(np, swapped)
+
+
+@pytest.mark.parametrize("dtype", [bool, np.int8, np.int16, np.float32, np.complex128])
+def test_checksum_handles_each_word_size(dtype):
+    assert worker._array_checksum(np, np.zeros(4, dtype=dtype)) != worker._array_checksum(
+        np, np.ones(4, dtype=dtype)
+    )

@@ -26,8 +26,7 @@ import os
 import pickle
 import sys
 from collections.abc import Iterator
-from concurrent.futures import ThreadPoolExecutor
-from itertools import chain
+from functools import partial
 from pathlib import Path
 from time import perf_counter
 from typing import Any
@@ -36,7 +35,7 @@ import numpy as np
 
 FAMILIES = ("cxr.incoherent", "cxr.coherent", "characteristic", "channeling", "transition", "brem")
 _PROGRESS_INTERVAL_S = 0.25
-_DIGEST_CHUNK_BYTES = 1 << 28
+_CHECKSUM_CHUNK_WORDS = 1 << 24  # bounds checksum scratch on the device
 
 
 def tuning_from_dict(data: dict[str, Any]) -> Any:
@@ -76,10 +75,12 @@ def environment() -> dict[str, Any]:
     return env
 
 
-def _named_arrays(value: Any, name: str = "") -> Iterator[tuple[str, np.ndarray]]:
-    """Every array nested in ``value``, in a stable order, with its path."""
-    if isinstance(value, np.ndarray):
-        yield name, np.ascontiguousarray(value)
+def _named_arrays(value: Any, name: str = "") -> Iterator[tuple[str, Any]]:
+    """Every host or device array nested in ``value``, in a stable order, with its path."""
+    from .._backend import BACKEND
+
+    if isinstance(value, np.ndarray) or BACKEND.is_array(value):
+        yield name, value
     elif isinstance(value, dict):
         for key in sorted(value, key=str):
             yield from _named_arrays(value[key], f"{name}/{key}")
@@ -88,36 +89,48 @@ def _named_arrays(value: Any, name: str = "") -> Iterator[tuple[str, np.ndarray]
             yield from _named_arrays(item, f"{name}/{index}")
 
 
-def _byte_chunks(array: np.ndarray) -> list[np.ndarray]:
-    """Zero-copy fixed-size byte views; an empty array still has one chunk."""
-    data = array.reshape(-1).view(np.uint8)
-    return [
-        data[i : i + _DIGEST_CHUNK_BYTES] for i in range(0, max(data.size, 1), _DIGEST_CHUNK_BYTES)
-    ]
+def _chunk_sums(xp: Any, chunk: Any, start: int) -> tuple[int, int]:
+    """Two wrapping sums of position-keyed words; each term is a bijection of its word."""
+    constant = partial(xp.asarray, dtype=xp.uint64)
+    positions = xp.arange(start, start + chunk.size, dtype=xp.uint64)
+    keyed = chunk.astype(xp.uint64) + positions * constant(0x9E3779B97F4A7C15)
+    first = (keyed ^ (keyed >> constant(30))) * constant(0xBF58476D1CE4E5B9)
+    second = (first ^ (first >> constant(31))) * constant(0x94D049BB133111EB)
+    return int(xp.sum(first, dtype=xp.uint64)), int(xp.sum(second, dtype=xp.uint64))
+
+
+def _array_checksum(xp: Any, array: Any) -> tuple[int, int]:
+    """Two wrapping 64-bit sums over an array's bits, computed with ``xp``.
+
+    Any change to one word changes both sums, and reordered words change them
+    with high probability. Host arrays upload one bounded chunk at a time, and
+    the value does not depend on where the array lives. This detects accidental
+    differences between candidates; it is not cryptographic.
+    """
+    source = np if isinstance(array, np.ndarray) else xp
+    words = source.ravel(array).view(f"u{min(array.dtype.itemsize, 8)}")
+    totals = [0, 0]
+    for start in range(0, int(words.size), _CHECKSUM_CHUNK_WORDS):
+        chunk = xp.asarray(words[start : start + _CHECKSUM_CHUNK_WORDS])
+        for index, value in enumerate(_chunk_sums(xp, chunk, start)):
+            totals[index] = (totals[index] + value) % (1 << 64)
+    return totals[0], totals[1]
 
 
 def transport_digest(transported: Any) -> str:
-    """SHA-256 tree over every transported array and the resolved line grid.
+    """Identity of every transported array and the resolved line grid.
 
-    ``hashlib`` releases the GIL, so hashing chunks in threads scales with the
-    cores even when one array dominates. Digests are only compared within one
+    Checksums run on the device, so a candidate need not download its segments
+    to be compared. Digests are only compared within one
     ``tune_kernels`` call, so their value carries no compatibility promise.
     """
-    from ..montecarlo.runner.recovery import _host_arrays
+    from .._backend import BACKEND
 
     tp = transported._transport
-    arrays = list(_named_arrays(_host_arrays(tp["segs"]), "segs"))
-    arrays.extend(_named_arrays(np.asarray(tp["E_grid"]), "E_grid"))
-    chunks = [_byte_chunks(array) for _, array in arrays]
-    with ThreadPoolExecutor(max_workers=os.cpu_count() or 1) as pool:
-        digests = pool.map(
-            lambda chunk: hashlib.sha256(chunk).digest(), chain.from_iterable(chunks)
-        )
-        digest = hashlib.sha256()
-        for (name, array), parts in zip(arrays, chunks, strict=True):
-            digest.update(f"{name}:{array.dtype}:{array.shape}:".encode())
-            for _ in parts:
-                digest.update(next(digests))
+    digest = hashlib.sha256()
+    for name, value in (*_named_arrays(tp["segs"], "segs"), *_named_arrays(tp["E_grid"], "E_grid")):
+        checksum = _array_checksum(BACKEND.xp, value)
+        digest.update(f"{name}:{value.dtype}:{value.shape}:{checksum}".encode())
     return digest.hexdigest()
 
 
