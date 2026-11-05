@@ -7,7 +7,7 @@
 # [tool.marimo.display]
 # theme = "light"
 # ///
-"""Directional transported-source and internal Cherenkov energy–angle maps."""
+"""Directional transported-source energy–angle maps."""
 
 import marimo
 
@@ -50,13 +50,11 @@ def _():
             page_title(
                 mo,
                 "Directional source heatmap",
-                "PXR/CBS, characteristic, bremsstrahlung, planar TR and bulk Cherenkov"
-                " · no detector or checkpoint",
+                "PXR/CBS, characteristic, bremsstrahlung and planar TR · no detector or checkpoint",
             ),
             mo.md("""
         Select transported radiation in **ph/s/eV/sr** versus signed lab-plane
-        angle (**0° = incoming beam**, ±180° = backward), or the separate internal
-        Cherenkov source in **ph/electron/eV/polar bin**. Each view states its
+        angle (**0° = incoming beam**, ±180° = backward). Each view states its
         geometry and normalization. No aperture, filter or detector response.
         """),
         ]
@@ -82,20 +80,7 @@ def _():
 
 
 @app.cell
-def _(mo):
-    source_view = mo.ui.radio(
-        ["Transported sources", "Cherenkov (internal bulk)"],
-        value="Transported sources",
-        label="Radiation view",
-        inline=True,
-    )
-    source_view
-    return (source_view,)
-
-
-@app.cell
-def _(fetch_tables, mo, source_view):
-    mo.stop(source_view.value != "Transported sources")
+def _(fetch_tables, mo):
     # Fresh hosted sessions (e.g. molab) start without PyRITE's pinned data;
     # a complete install returns without network access.
     try:
@@ -116,10 +101,8 @@ def _(
     form_template,
     material_options,
     mo,
-    source_view,
     transport_cores,
 ):
-    mo.stop(source_view.value != "Transported sources")
     _d = MapConfig()
     _materials = material_options()
     _cores = transport_cores(BACKEND.name)
@@ -463,90 +446,6 @@ def _(maps, mo):
       Use `pyrite.radiation.directional_sources` for scripted or remote studies.
     """)
                 }
-            ),
-        ]
-    )
-    return
-
-
-@app.cell
-def _(mo, source_view):
-    mo.stop(source_view.value != "Cherenkov (internal bulk)")
-    from pyrite.apps.angular_cherenkov import cherenkov_form, submitted_config
-
-    cone_form = cherenkov_form(mo)
-    mo.vstack(
-        [
-            mo.md(
-                "**Internal homogeneous Cherenkov source** · explicit constant index, straight "
-                "fixed-speed passage. No target escape, interfaces, refraction or TIR. "
-                "Target polar/azimuth settings do not affect this bulk model. "
-                "This diagnostic is separate from TR and is never added to it. "
-                "Choose a transparent band where the declared index is nearly constant "
-                "and photon energy is far below the beam kinetic energy."
-            ),
-            cone_form,
-        ]
-    )
-    return cone_form, submitted_config
-
-
-@app.cell
-def _(cone_form, mo, submitted_config):
-    import numpy as _np
-
-    from pyrite.apps.angular_cherenkov import VALUE_LABEL, calculate_cherenkov, cherenkov_npz
-
-    try:
-        cone_config = submitted_config(cone_form.value)
-        cone_panel, _edges, _source = calculate_cherenkov(cone_config)
-    except ValueError as error:
-        mo.stop(True, mo.callout(mo.md(str(error)), kind="danger"))
-    cone_energy = mo.ui.number(
-        cone_config.start_eV,
-        cone_config.stop_eV,
-        value=float(cone_panel.energy_eV[len(cone_panel.energy_eV) // 2]),
-        label="Cherenkov cut energy (eV)",
-    )
-    cone_angle = mo.ui.number(0, 180, value=45, label="Cone cut angle (deg)")
-    mo.vstack(
-        [
-            mo.md(
-                "Yield integrates each full-azimuth polar bin and the declared path; "
-                "**ph/electron/eV/bin**, not a pointwise per-sr density. "
-                + (
-                    "Below threshold: physical zero yield."
-                    if not _source.above_threshold.any()
-                    else f"Cone half-angle: {_np.degrees(_source.theta_rad[0]):.3g}°."
-                )
-            ),
-            mo.hstack([cone_energy, cone_angle]),
-            mo.download(
-                data=lambda: cherenkov_npz(cone_config),
-                filename="cherenkov_bulk_source.npz",
-                mimetype="application/octet-stream",
-                label="Download Cherenkov source (.npz)",
-            ),
-        ]
-    )
-    return VALUE_LABEL, cone_angle, cone_energy, cone_panel
-
-
-@app.cell
-def _(VALUE_LABEL, cone_angle, cone_energy, cone_panel, heatmap_figure, mo, profile_figure):
-    mo.vstack(
-        [
-            heatmap_figure(
-                [cone_panel],
-                value_label=VALUE_LABEL,
-                angle_label="Polar angle about velocity (deg, full-azimuth bins)",
-            ),
-            profile_figure(
-                [cone_panel],
-                value_label=VALUE_LABEL,
-                energy_eV=cone_energy.value,
-                angle_deg=cone_angle.value,
-                angle_label="Polar-bin centre (deg)",
             ),
         ]
     )

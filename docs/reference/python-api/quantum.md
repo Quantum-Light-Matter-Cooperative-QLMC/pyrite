@@ -10,7 +10,7 @@ Learn the interfaces in [Constructing transverse quantum states](../../notebooks
 then continue to the planar and axial diagnostics.
 
 The tables below link to generated signatures, docstrings, and source code.
-The advanced-stable names come from `api-surface.toml`; exposing a factory here
+Every name on this page, planar included, is experimental in `api-surface.toml`; exposing a factory here
 does not make its outputs serializable or production-admitted.
 
 ## Portable sources and configuration
@@ -32,7 +32,7 @@ select physical quantum regions, dynamics, and numerical representation.
 
 ## Runtime state objects
 
-These advanced-stable interfaces describe evaluated wavefunctions or mixtures.
+These experimental interfaces describe evaluated wavefunctions or mixtures.
 They are **not** portable source specifications or persisted simulation
 checkpoints; construct `TransverseStateSpec` when a serializable input is needed.
 
@@ -52,7 +52,7 @@ checkpoints; construct `TransverseStateSpec` when a serializable input is needed
 
 ## Runtime state factories
 
-The following advanced-stable factories construct states without admitting
+The following experimental factories construct states without admitting
 them to production transport. Superpositions combine complex amplitudes;
 mixtures combine populations. Array-based and abTEM-backed sources require the
 caller's data (or installed external dependency). Dimensions and quantity
@@ -100,7 +100,7 @@ existing code owners. The same axial objects can be imported from the
 
 | Entry | Owner / status | Scientific contract and effects |
 | --- | --- | --- |
-| `spatial_density` | Quantum/channeling, advanced-stable | Density matrix, basis eigenfunctions and spatial grid (angstrom); Born-rule probability density (1/angstrom), including retained survival weight, without conditioning or renormalization. Array compatibility errors propagate; no transport or artifact I/O. |
+| `spatial_density` | Quantum/channeling, experimental | Density matrix, basis eigenfunctions and spatial grid (angstrom); Born-rule probability density (1/angstrom), including retained survival weight, without conditioning or renormalization. Array compatibility errors propagate; no transport or artifact I/O. |
 | `AxialDiagnosticConfig`, `AxialDiagnosticResult`, `axial_diagnostic` | Quantum/channeling, experimental | Bounded solver configuration (field-specific units), populations and incident-normalized spatial density on recorded depths; retained solver/configuration diagnostics. Explicit solver/allocation limits and invalid configurations raise. No standard axial transport integration. Ownership consolidation belongs to #704. |
 
 For planar channeling, `DensityMatrixSolver.propagate(spatial_x_ang=...)`

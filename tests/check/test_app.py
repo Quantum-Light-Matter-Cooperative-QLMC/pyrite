@@ -78,13 +78,12 @@ def test_start_remote_zhai_returns_detached_job_id(monkeypatch):
     jobid = check.start_remote_zhai(ne=11, ne_brem=3, ne_supp=5, tmd_azimuth=35.0, refresh=True)
 
     assert jobid == "20260816-084051-40a80198"
-    # The retired `remote check`/`validate` spelling this used to call is no
-    # longer mounted on the CLI tree (commit fa3e0aa1); the canonical launch
-    # path is `run --preset zhai --remote --detach`.
+    # The canonical launch
+    # path is `app validation reproduce --remote --detach`.
     assert captured["command"][3:] == [
-        "run",
-        "--preset",
-        "zhai",
+        "app",
+        "validation",
+        "reproduce",
         "--remote",
         "--detach",
         "--ne",
@@ -259,7 +258,7 @@ def test_export_cache_miss_is_clean_cli_failure(monkeypatch, tmp_path):
         @staticmethod
         def export_all_figures(*_args, **_kwargs):
             raise FileNotFoundError(
-                "Zhai cache missing; populate it with `pyrite run --preset zhai --remote`"
+                "Zhai cache missing; populate it with `pyrite app validation reproduce --remote`"
             )
 
     monkeypatch.setitem(sys.modules, "pyrite.validation.anchor_figures", _FakeAF())
@@ -268,7 +267,7 @@ def test_export_cache_miss_is_clean_cli_failure(monkeypatch, tmp_path):
 
     assert result.exit_code == 1
     assert "Error: Zhai cache missing" in result.output
-    assert "pyrite run --preset zhai --remote" in result.output
+    assert "pyrite app validation reproduce --remote" in result.output
     assert result.exception is not None
 
 
@@ -340,7 +339,7 @@ def test_validation_app_never_falls_back_to_heavy_local_cache_population():
     assert "Heavy cache preparation was not started locally" in source
     # The app still points at the preset rather than populating caches itself;
     # --remote is now optional for that command, so only the command is pinned.
-    assert "pyrite run --preset zhai" in source
+    assert "pyrite app validation reproduce" in source
 
 
 def test_validation_app_declares_evidence_tasks_and_authorities():

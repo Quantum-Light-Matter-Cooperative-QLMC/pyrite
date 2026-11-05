@@ -431,8 +431,6 @@ def test_ephemeral_artifact_and_existing_file_preflight(tmp_path, monkeypatch):
         ["--recompute"],
         ["--trajectories", "tracks"],
         ["--overwrite-trajectories"],
-        ["--preset", "zhai"],
-        ["--ne", "20000"],
         ["--remote"],
         ["--wait"],
         ["--detach"],

@@ -77,7 +77,7 @@ config = AxialDiagnosticConfig(
     depths_ang=(0.0, 50.0, 100.0),
     step_ang=5.0,
     shape=(32, 32),
-    mode="coherent",
+    mode="unitary",
 )
 ensemble = IncidentEnergyEnsemble(5e6, energy_spread_frac=0.001, order=9)
 result = axial_energy_diagnostic(

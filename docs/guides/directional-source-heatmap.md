@@ -100,6 +100,6 @@ pyrite app angular-heatmap launch
 
 The app adds target-orientation comparisons, linked cuts, current scaling and
 separate radiation-component maps. See [app controls, downloads and molab](../reference/directional-sources.md#interactive-app)
-for its contracts, including the distinct internal Cherenkov view. Review
+for its contracts. Review
 [model capabilities](../physics/capabilities.md) and
 [validation status](../validation/status-summary.md) before quantitative use.

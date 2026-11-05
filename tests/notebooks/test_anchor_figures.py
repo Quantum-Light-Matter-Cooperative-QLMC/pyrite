@@ -326,7 +326,7 @@ def test_cached_model_spectra_cache_only_miss_never_computes(anchor, tmp_path, m
         lambda *_args, **_kwargs: pytest.fail("cache-only miss must not compute"),
     )
 
-    with pytest.raises(af.ZhaiCacheMiss, match="pyrite run --preset zhai"):
+    with pytest.raises(af.ZhaiCacheMiss, match="pyrite app validation reproduce"):
         af.cached_model_spectra(
             anchor,
             ne=12,

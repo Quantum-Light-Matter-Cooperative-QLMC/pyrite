@@ -74,17 +74,6 @@ Options:
                                   (uncompressed); requires --trajectories.
   --no-progress                   Disable progress bars/dashboard.
   -v, --verbose                   Increase dashboard detail.
-  --preset [zhai]                 Run a named reproduction workflow; zhai runs here
-                                  unless -R/--remote.
-  --ne NUMBER                     With --preset zhai, Fig. 1c line electrons per energy.
-                                  [default: 20000]
-  --brem-trials NUMBER            With --preset zhai, Monte Carlo electron histories for
-                                  Fig. 1c bremsstrahlung per energy.  [default: 200]
-  --ne-supp NUMBER                With --preset zhai, supplementary electrons per polar-
-                                  tilt spectrum.  [default: 200]
-  --tmd-azimuth DEGREES           With --preset zhai, exploratory TMD azimuth.
-                                  [default: 0.0]
-  --refresh                       With --preset zhai, recompute matching cache.
   --no-sync                       With -R/--remote, skip code upload.
   --dry-run                       With -R/--remote, print submission preview only.
   --target NAME                   Use named remote compute target NAME.

@@ -11,9 +11,10 @@ resolve or persist.
     pyrite app validation             # `marimo run` the validation app
     pyrite app validation --watch     # add marimo's --watch
     pyrite app validation --edit      # `marimo edit` instead of `marimo run`
+    pyrite app validation reproduce   # populate the Zhai reproduction cache
     pyrite app validation export      # skip marimo; render the full Zhai figure
                                     # set from pyrite-output/cache/zhai_reproduction/
-                                    # (see `pyrite run --preset zhai`) to pyrite-output/figures/
+                                    # (see `pyrite app validation reproduce`) to pyrite-output/figures/
 """
 
 import importlib
@@ -66,6 +67,24 @@ def _launch(*, edit=False, watch=False, acp=False, tunnel=False):
         # Ctrl+C is delivered to the marimo child and this parent on Windows.
         # Once marimo has handled its interactive exit, avoid a second traceback.
         return
+
+
+def reproduce(*, ne, ne_brem, ne_supp, tmd_azimuth, refresh):
+    """Populate the Zhai reproduction cache in this process.
+
+    Same workload the box runs as ``python -m pyrite._entry.reproduce_zhai``.
+    Heavy at the default sample counts.
+    """
+    anchor_figures = importlib.import_module("pyrite.validation.anchor_figures")
+    results = anchor_figures.reproduce_all(
+        ne=ne,
+        ne_brem=ne_brem,
+        ne_supp=ne_supp,
+        tmd_exploratory_azimuth_deg=tmd_azimuth,
+        refresh=refresh,
+    )
+    for label, path, cache_hit in results:
+        click.echo(anchor_figures.format_reproduction_row(label, path, cache_hit))
 
 
 def _export(outdir=None, ne=20_000, ne_brem=200, ne_supp=200):

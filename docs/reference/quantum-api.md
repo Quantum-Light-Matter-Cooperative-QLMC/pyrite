@@ -7,10 +7,12 @@ GPU, plotting backend, scheduler, or material dataset. Requesting a runtime
 factory or solver loads its existing scientific dependencies. Star imports
 resolve the entire advanced surface and therefore load those dependencies.
 
-API stability describes compatibility, not physical validation. Quantum
-channeling remains experimental research software. The production adapter
+The entire quantum and channeling API, planar included, has `experimental`
+compatibility status and may change incompatibly in a minor release
+([lifecycle](experimental-api.md)). Quantum channeling is also research
+software, not a validated production model. The production adapter
 admits only the existing planar Bloch density-matrix channeling recipe;
-coherent, MCWF, axial, and other configurations still explicitly refuse in
+unitary, MCWF, axial, and other configurations still explicitly refuse in
 `QuantumSetup.lower`. Direct diagnostic solvers do not imply production
 admission. See the [planar](../guides/experimental-planar-channeling.md) and
 [axial](../guides/experimental-axial-channeling.md) workflow restrictions.
@@ -295,7 +297,7 @@ runs one `AxialDiagnosticConfig`; see
 [the axial guide](../guides/experimental-axial-channeling.md#run-an-mcwf-diagnostic-from-python)
 for a complete call.
 
-`mode="coherent"` performs deterministic split-step propagation; `mode="mcwf"`
+`mode="unitary"` performs deterministic jump-free split-step propagation; `mode="mcwf"`
 uses Monte Carlo wavefunctions with thermal-diffuse and electronic scattering.
 The `seed` controls independent per-electron random streams. Depths must be
 increasing, nonnegative multiples of `step_ang`. Results are normalized **per

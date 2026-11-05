@@ -163,11 +163,6 @@
       "cc": 27
     },
     {
-      "path": "src/pyrite/cli/commands/scan.py",
-      "name": "_command",
-      "cc": 22
-    },
-    {
       "path": "src/pyrite/cli/commands/tables.py",
       "name": "verify_command",
       "cc": 21

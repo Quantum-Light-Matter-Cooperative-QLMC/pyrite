@@ -29,10 +29,10 @@ Physics = { target = "pyrite._numerics:Physics", status = "stable", domain = "co
 PixelMetadata = { target = "pyrite.results.model:PixelMetadata", status = "advanced-stable", domain = "results", root_role = "specialized" }
 PixelRayMap = { target = "pyrite.results.model:PixelRayMap", status = "advanced-stable", domain = "results", root_role = "specialized" }
 Provenance = { target = "pyrite.results.provenance:Provenance", status = "advanced-stable", domain = "results", root_role = "specialized" }
-QuantumDynamics = { target = "pyrite.quantum:QuantumDynamics", status = "advanced-stable", domain = "quantum", root_role = "specialized" }
-QuantumNumerics = { target = "pyrite.quantum:QuantumNumerics", status = "advanced-stable", domain = "quantum", root_role = "specialized" }
-QuantumRegion = { target = "pyrite.quantum:QuantumRegion", status = "advanced-stable", domain = "quantum", root_role = "specialized" }
-QuantumSetup = { target = "pyrite.quantum:QuantumSetup", status = "advanced-stable", domain = "quantum", root_role = "specialized" }
+QuantumDynamics = { target = "pyrite.quantum:QuantumDynamics", status = "experimental", domain = "quantum", root_role = "experimental" }
+QuantumNumerics = { target = "pyrite.quantum:QuantumNumerics", status = "experimental", domain = "quantum", root_role = "experimental" }
+QuantumRegion = { target = "pyrite.quantum:QuantumRegion", status = "experimental", domain = "quantum", root_role = "experimental" }
+QuantumSetup = { target = "pyrite.quantum:QuantumSetup", status = "experimental", domain = "quantum", root_role = "experimental" }
 Result = { target = "pyrite.results.model:Result", status = "stable", domain = "results", root_role = "core" }
 Scene = { target = "pyrite.campaign.model:Scene", status = "stable", domain = "campaign", root_role = "core" }
 SpatialResult = { target = "pyrite.results.model:SpatialResult", status = "advanced-stable", domain = "results", root_role = "specialized" }
@@ -40,7 +40,7 @@ SpectralDensity = { target = "pyrite.results.model:SpectralDensity", status = "a
 SpectralFactors = { target = "pyrite.results.model:SpectralFactors", status = "advanced-stable", domain = "results", root_role = "specialized" }
 Sweep = { target = "pyrite.campaign.model:Sweep", status = "stable", domain = "campaign", root_role = "core" }
 Target = { target = "pyrite.campaign.target:Target", status = "stable", domain = "geometry", root_role = "core" }
-TransverseStateSpec = { target = "pyrite.quantum_state:TransverseStateSpec", status = "advanced-stable", domain = "quantum", root_role = "specialized" }
+TransverseStateSpec = { target = "pyrite.quantum_state:TransverseStateSpec", status = "experimental", domain = "quantum", root_role = "experimental" }
 fetch_tables = { target = "pyrite.xsgen.install:fetch_tables", status = "advanced-stable", domain = "datasets", root_role = "specialized" }
 photon_energies = { target = "pyrite.materials.emission:photon_energies", status = "advanced-stable", domain = "radiation", root_role = "specialized" }
 # simulate composes independent models, observations and executor= scheduling;
@@ -100,10 +100,10 @@ Q_ = { target = "pyrite.units:Q_", status = "advanced-stable" }
 ureg = { target = "pyrite.units:ureg", status = "advanced-stable" }
 
 [package_exports."pyrite.quantum"]
-QuantumSetup = { target = "pyrite.quantum:QuantumSetup", status = "advanced-stable" }
-QuantumRegion = { target = "pyrite.quantum:QuantumRegion", status = "advanced-stable" }
-QuantumDynamics = { target = "pyrite.quantum:QuantumDynamics", status = "advanced-stable" }
-QuantumNumerics = { target = "pyrite.quantum:QuantumNumerics", status = "advanced-stable" }
+QuantumSetup = { target = "pyrite.quantum:QuantumSetup", status = "experimental" }
+QuantumRegion = { target = "pyrite.quantum:QuantumRegion", status = "experimental" }
+QuantumDynamics = { target = "pyrite.quantum:QuantumDynamics", status = "experimental" }
+QuantumNumerics = { target = "pyrite.quantum:QuantumNumerics", status = "experimental" }
 AxialDiagnosticConfig = { target = "pyrite.montecarlo.channeling.axial_diagnostic:AxialDiagnosticConfig", status = "experimental" }
 AxialDiagnosticResult = { target = "pyrite.montecarlo.channeling.axial_diagnostic:AxialDiagnosticResult", status = "experimental" }
 AxialMCWF = { target = "pyrite.montecarlo.channeling.axial_mcwf:AxialMCWF", status = "experimental" }
@@ -112,37 +112,37 @@ DensityMatrixResult = { target = "pyrite.montecarlo.channeling.density:DensityMa
 DensityMatrixSolver = { target = "pyrite.montecarlo.channeling.density:DensityMatrixSolver", status = "experimental" }
 # #816: TransverseState and concrete entry states keep numeric solver fields;
 # opt-in read-back properties construct fresh quantities without new exports.
-EntryState = { target = "pyrite.montecarlo.channeling.states:EntryState", status = "advanced-stable" }
+EntryState = { target = "pyrite.montecarlo.channeling.states:EntryState", status = "experimental" }
 MCWFResult = { target = "pyrite.montecarlo.channeling.mcwf:MCWFResult", status = "experimental" }
 MCWFSolver = { target = "pyrite.montecarlo.channeling.mcwf:MCWFSolver", status = "experimental" }
-MixedState = { target = "pyrite.montecarlo.channeling.states:MixedState", status = "advanced-stable" }
+MixedState = { target = "pyrite.montecarlo.channeling.states:MixedState", status = "experimental" }
 PlanarStateProjection = { target = "pyrite.planar_source:PlanarStateProjection", status = "experimental" }
 RealSpaceGrid = { target = "pyrite.montecarlo.channeling.realspace:RealSpaceGrid", status = "experimental" }
-SampledState = { target = "pyrite.montecarlo.channeling.states:SampledState", status = "advanced-stable" }
+SampledState = { target = "pyrite.montecarlo.channeling.states:SampledState", status = "experimental" }
 ScatteringKernel = { target = "pyrite.montecarlo.channeling.operators:ScatteringKernel", status = "experimental" }
 SplitStepPropagator = { target = "pyrite.montecarlo.channeling.realspace:SplitStepPropagator", status = "experimental" }
-Superposition = { target = "pyrite.montecarlo.channeling.states:Superposition", status = "advanced-stable" }
-Translated = { target = "pyrite.montecarlo.channeling.states:Translated", status = "advanced-stable" }
-TransverseState = { target = "pyrite.montecarlo.channeling.states:TransverseState", status = "advanced-stable" }
-TransverseStateSpec = { target = "pyrite.quantum_state:TransverseStateSpec", status = "advanced-stable" }
-airy = { target = "pyrite.montecarlo.channeling.states:airy", status = "advanced-stable" }
-aperture_probe = { target = "pyrite.montecarlo.channeling.states:aperture_probe", status = "advanced-stable" }
+Superposition = { target = "pyrite.montecarlo.channeling.states:Superposition", status = "experimental" }
+Translated = { target = "pyrite.montecarlo.channeling.states:Translated", status = "experimental" }
+TransverseState = { target = "pyrite.montecarlo.channeling.states:TransverseState", status = "experimental" }
+TransverseStateSpec = { target = "pyrite.quantum_state:TransverseStateSpec", status = "experimental" }
+airy = { target = "pyrite.montecarlo.channeling.states:airy", status = "experimental" }
+aperture_probe = { target = "pyrite.montecarlo.channeling.states:aperture_probe", status = "experimental" }
 axial_diagnostic = { target = "pyrite.montecarlo.channeling.axial_diagnostic:axial_diagnostic", status = "experimental" }
-bessel_gauss = { target = "pyrite.montecarlo.channeling.states:bessel_gauss", status = "advanced-stable" }
-donut = { target = "pyrite.montecarlo.channeling.states:donut", status = "advanced-stable" }
+bessel_gauss = { target = "pyrite.montecarlo.channeling.states:bessel_gauss", status = "experimental" }
+donut = { target = "pyrite.montecarlo.channeling.states:donut", status = "experimental" }
 electronic_kernel = { target = "pyrite.montecarlo.channeling.operators:electronic_kernel", status = "experimental" }
-from_abtem = { target = "pyrite.montecarlo.channeling.states:from_abtem", status = "advanced-stable" }
-from_array = { target = "pyrite.montecarlo.channeling.states:from_array", status = "advanced-stable" }
-gaussian = { target = "pyrite.montecarlo.channeling.states:gaussian", status = "advanced-stable" }
-hermite_gauss = { target = "pyrite.montecarlo.channeling.states:hermite_gauss", status = "advanced-stable" }
-laguerre_gauss = { target = "pyrite.montecarlo.channeling.states:laguerre_gauss", status = "advanced-stable" }
-mixture = { target = "pyrite.montecarlo.channeling.states:mixture", status = "advanced-stable" }
+from_abtem = { target = "pyrite.montecarlo.channeling.states:from_abtem", status = "experimental" }
+from_array = { target = "pyrite.montecarlo.channeling.states:from_array", status = "experimental" }
+gaussian = { target = "pyrite.montecarlo.channeling.states:gaussian", status = "experimental" }
+hermite_gauss = { target = "pyrite.montecarlo.channeling.states:hermite_gauss", status = "experimental" }
+laguerre_gauss = { target = "pyrite.montecarlo.channeling.states:laguerre_gauss", status = "experimental" }
+mixture = { target = "pyrite.montecarlo.channeling.states:mixture", status = "experimental" }
 project_planar_source = { target = "pyrite.planar_source:project_planar_source", status = "experimental" }
 propagate_planar_source = { target = "pyrite.planar_source:propagate_planar_source", status = "experimental" }
 score_planar_source = { target = "pyrite.planar_source:score_planar_source", status = "experimental" }
-superpose = { target = "pyrite.montecarlo.channeling.states:superpose", status = "advanced-stable" }
+superpose = { target = "pyrite.montecarlo.channeling.states:superpose", status = "experimental" }
 tds_kernel = { target = "pyrite.montecarlo.channeling.operators:tds_kernel", status = "experimental" }
-translate = { target = "pyrite.montecarlo.channeling.states:translate", status = "advanced-stable" }
+translate = { target = "pyrite.montecarlo.channeling.states:translate", status = "experimental" }
 
 # #955: existing spectral quantity carriers own explicit rate/current states and native tables;
 # Result.accepted_spectra owns matching acceptance. No new exported carrier or storage fields.
@@ -318,7 +318,7 @@ run_case = { target = "pyrite.montecarlo.runner:run_case", status = "advanced-st
 run_cases = { target = "pyrite.montecarlo.runner:run_cases", status = "advanced-stable" }
 
 [package_exports."pyrite.montecarlo.channeling.spatial"]
-spatial_density = { target = "pyrite.montecarlo.channeling.spatial:spatial_density", status = "advanced-stable" }
+spatial_density = { target = "pyrite.montecarlo.channeling.spatial:spatial_density", status = "experimental" }
 
 [package_exports."pyrite.montecarlo.channeling.axial_diagnostic"]
 AxialDiagnosticConfig = { target = "pyrite.montecarlo.channeling.axial_diagnostic:AxialDiagnosticConfig", status = "experimental" }

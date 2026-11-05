@@ -117,22 +117,6 @@ and JSON metadata (submitted configuration, current, units, ceilings, identity
 digests). Exported static HTML contains the default example and cannot launch
 new transport calculations.
 
-### Internal Cherenkov view
-
-**Cherenkov (internal bulk)** is a separate homogeneous Frank–Tamm source.
-Declare constant refractive index, kinetic energy, straight path length and
-photon band. The band must be transparent with nearly constant index, with
-photon energies far below electron kinetic energy. Target pose, catalog
-material and footprint from the transported view do not enter this source.
-
-Its full-azimuth polar bins about the velocity hold
-**photons/(electron · eV · angular bin)** integrated over the path, rather than
-pointwise per-steradian density. Below threshold the yield is zero. No
-interfaces, refraction, total internal reflection, absorption or finite-target
-escape are included, and the result is never added to TR. Downloads include
-energies, polar centres/edges, per-bin/path and per-metre yields, threshold mask
-and declared source settings. Model: [Cherenkov radiation](../physics/radiation-physics/cherenkov-radiation.md).
-
 ### Backends and molab
 
 The array backend is fixed at import. Select CUDA before launch with

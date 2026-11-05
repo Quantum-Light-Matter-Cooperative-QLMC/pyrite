@@ -538,7 +538,7 @@ def _(mo, mode_ui):
             crystal=mo.ui.dropdown(["silicon", "diamond"], value="silicon", label="Crystal"),
             axis=mo.ui.dropdown(["001", "110"], value="001", label="Axis"),
             energy=mo.ui.slider(1, 10, value=5, label="Energy (MeV)"),
-            mode=mo.ui.dropdown(["coherent", "mcwf"], value="mcwf", label="Evolution"),
+            mode=mo.ui.dropdown(["unitary", "mcwf"], value="mcwf", label="Evolution"),
             backend=mo.ui.dropdown(["cpu", "cuda"], value="cpu", label="MCWF backend"),
             grid=mo.ui.dropdown(
                 [16, 32, 48, 64, 96, 128, 192], value=32, label="Grid samples per axis"
@@ -742,7 +742,7 @@ def _(axial_conditional_ui, axial_demo_figure, axial_result, axial_sample_ui, ax
         f"**{axial_result.config.mode} · depth {axial_result.depths_ang[_index] / 1e4:.4g} µm** · "
         f"surviving weight {axial_result.surviving[_index]:.6f}. "
         "Density integrates to incident-electron survival, or one when conditioned "
-        "(zero if extinct). Coherent norm is not scattering survival. "
+        "(zero if extinct). Unitary norm is not scattering survival. "
         f"Supercell {axial_result.config.cells[0]}×{axial_result.config.cells[1]} cells; "
         f"{axial_result.config.shape[0] // axial_result.config.cells[0]}×"
         f"{axial_result.config.shape[1] // axial_result.config.cells[1]} samples/cell. "

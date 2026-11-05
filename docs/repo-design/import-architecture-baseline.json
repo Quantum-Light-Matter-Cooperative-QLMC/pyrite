@@ -590,14 +590,6 @@
         "importer": "pyrite.apps.analyze"
       },
       {
-        "imported": "pyrite.montecarlo.spectrum.cherenkov",
-        "importer": "pyrite.apps.angular_cherenkov"
-      },
-      {
-        "imported": "pyrite.montecarlo.spectrum.transition_radiation",
-        "importer": "pyrite.apps.angular_cherenkov"
-      },
-      {
         "imported": "pyrite.campaign.beam",
         "importer": "pyrite.apps.angular_heatmap"
       },

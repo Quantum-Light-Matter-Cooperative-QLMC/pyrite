@@ -331,7 +331,7 @@ def axial_demo_figure(
             vmin=-np.pi,
             vmax=np.pi,
         )
-        axes[2].set(title="Coherent envelope phase", xlabel="x (Å)", ylabel="y (Å)")
+        axes[2].set(title="Unitary envelope phase", xlabel="x (Å)", ylabel="y (Å)")
         fig.colorbar(mesh, ax=axes[2], label="rad; carrier tilt factored out")
     elif result.coherence_numerator_per_ang2 is not None:
         from pyrite.montecarlo.channeling.axial_state_diagnostics import coherence_maps
@@ -358,7 +358,7 @@ def axial_demo_figure(
     axes[3].plot(result.depths_ang / 1e4, result.surviving)
     axes[3].axvline(result.depths_ang[sample] / 1e4, ls="--", color="0.5")
     axes[3].set(
-        title="MCWF grid survival" if result.config.mode == "mcwf" else "Coherent norm",
+        title="MCWF grid survival" if result.config.mode == "mcwf" else "Unitary norm",
         xlabel="Depth (µm)",
         ylabel="Incident-electron fraction",
         ylim=(0, 1.05),

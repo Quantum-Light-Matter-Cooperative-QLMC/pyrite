@@ -1,8 +1,7 @@
 """Quantum specifications, configuration, runtime states, and advanced diagnostics.
 
-This import-light module is the canonical quantum facade. Portable specs and
-configuration are advanced-stable; solver and projection diagnostics are
-experimental. Runtime wavefunctions are nonportable. See the quantum API guide.
+This import-light module is the canonical quantum facade. The whole
+surface, including planar channeling, is experimental. Runtime wavefunctions are nonportable. See the quantum API guide.
 
 Only the established planar density-matrix zone can be lowered to production
 cases. Unsupported recipes fail before case construction; FFT-grid escape is
@@ -253,7 +252,7 @@ class QuantumNumerics:
     """
 
     representation: Literal["bloch", "real-space"] = "bloch"
-    method: Literal["coherent", "density-matrix", "mcwf"] = "density-matrix"
+    method: Literal["unitary", "density-matrix", "mcwf"] = "density-matrix"
     basis_size: int = 16
     bloch_cells: int = 16
     step_ang: float = 250.0
@@ -261,7 +260,7 @@ class QuantumNumerics:
     def __init__(
         self,
         representation: Literal["bloch", "real-space"] = "bloch",
-        method: Literal["coherent", "density-matrix", "mcwf"] = "density-matrix",
+        method: Literal["unitary", "density-matrix", "mcwf"] = "density-matrix",
         basis_size: int = 16,
         bloch_cells: int = 16,
         step_ang: float | _Unset = UNSET,
@@ -299,7 +298,7 @@ class QuantumNumerics:
         )
         if self.representation not in ("bloch", "real-space"):
             raise ValueError("unknown quantum representation")
-        if self.method not in ("coherent", "density-matrix", "mcwf"):
+        if self.method not in ("unitary", "density-matrix", "mcwf"):
             raise ValueError("unknown quantum propagation method")
         validate_channeling_numerics(self.basis_size, self.bloch_cells, self.step_ang, None)
 

@@ -12,8 +12,9 @@ Own the issue outcome, not unlimited repository scope.
 1. Read the issue body (Goal, Scope, Plan, Acceptance, Decisions), handoff
    authority, branch/worktree state, and dependencies. Check only
    worktrees/branches relevant to the milestone. No handoff (direct user
-   invocation) means `commits: checkpoint`; `push`, `issue-writer`, `pr`, and
-   `delegate` are `no`.
+   invocation) means `commits: checkpoint`, `issue-writer: yes` (create and edit
+   issues) and `remote: yes` (run compute through `pyrite remote`, following
+   `remote-gpu-jobs`); `push`, `pr`, and `delegate` are `no`.
 2. Resolve goal, non-goals, decisions, owners, dependency order, integration
    points, and risks. Use `repo-orientation` for cross-cutting ownership and
    Serena when symbol-level navigation materially helps; do not perform tool

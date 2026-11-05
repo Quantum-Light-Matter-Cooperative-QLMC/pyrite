@@ -10,7 +10,7 @@ from tests.helpers.cli import assert_clean_result, invoke
 @pytest.mark.parametrize(
     "command",
     [
-        scan.command,
+        app.validation_reproduce_command,
         app.validation_export_command,
         app_validation.command,
         recompute.brem_command,
@@ -58,14 +58,6 @@ def test_profile_help_describes_trials(verb):
     assert "Monte Carlo electron histories" in " ".join(result.stdout.split())
 
 
-@pytest.mark.parametrize("flag", ["--brem-trials"])
-def test_trials_preserve_explicit_preset_validation(flag):
-    result = invoke(root_command, ["run", flag, "17"])
-
-    assert result.exit_code == 2
-    assert "require --preset zhai" in result.stderr
-
-
 @pytest.mark.parametrize("reverse", [False, True])
 @pytest.mark.parametrize(
     ("command_path", "canonical", "retired"),
@@ -80,7 +72,7 @@ def test_trials_preserve_explicit_preset_validation(flag):
         ),
         (["profile", "numerics", "set", "example"], "--cxr-trials", "--line-electrons"),
         (["profile", "numerics", "set", "example"], "--brem-trials", "--bremsstrahlung-electrons"),
-        (["run", "--preset", "zhai"], "--brem-trials", "--ne-brem"),
+        (["app", "validation", "reproduce"], "--brem-trials", "--ne-brem"),
         (["app", "validation", "export"], "--brem-trials", "--ne-brem"),
         (["checkpoint", "recompute", "brem", "hopg"], "--brem-trials", "--ne-brem"),
     ],

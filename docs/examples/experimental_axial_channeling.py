@@ -20,7 +20,7 @@ def calculate(depth_ang=500.0, waist_ang=0.5):
         shape=(64, 64),
         depths_ang=tuple(np.linspace(0.0, depth_ang, 51)),
         step_ang=2.0,
-        mode="coherent",
+        mode="unitary",
         backend="cpu",
     )
     entry = gaussian(waist_ang=waist_ang, dimension=2, center_ang=(1.0, 1.0))

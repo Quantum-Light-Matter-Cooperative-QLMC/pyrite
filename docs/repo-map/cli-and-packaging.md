@@ -125,8 +125,7 @@ characteristic, bremsstrahlung, opt-in planar history TR; `directional_sources`)
 owns the typed component and mean-current scaling. The thin standalone
 `apps/angular_heatmap_app.py` uses bounded cache/panel helpers in
 `apps/angular_heatmap.py` (cached polar × azimuth orientations);
-`apps/angular_cherenkov.py` supplies the separate internal bulk cone diagnostic,
-per-bin normalization and export. `apps/angular_maps.py` owns the shared Plotly
+`apps/angular_maps.py` owns the shared Plotly
 angle × energy heatmap/profile figures, catalog material options, backend-aware
 transport cores and form layout used by the heatmap, TR and optical apps.
 `pyrite app angular-heatmap launch|export` uses the shared launcher on tunnel
@@ -232,7 +231,7 @@ targets `channeling_app.py` with no material argument. Imports no `apps` module.
 - Public: `command`, `main`.
 
 ## `validation/_zhai.py`
-Canonical maintained Zhai detector geometry and cache-schema provenance shared by anchor figures, headless reproduction, validation-app export, and remote SLURM metadata. Heavy calculations remain in `src/pyrite/validation/anchor_figures.py`; app and export consumers are cache-only and direct misses to `pyrite run --preset zhai --remote`.
+Canonical maintained Zhai detector geometry and cache-schema provenance shared by anchor figures, headless reproduction, validation-app export, and remote SLURM metadata. Heavy calculations remain in `src/pyrite/validation/anchor_figures.py`; app and export consumers are cache-only and direct misses to `pyrite app validation reproduce --remote`.
 - Internal: `ZHAI_DETECTOR`, `ZHAI_CACHE_SCHEMA`, `ZHAI_CACHE_FORMAT`, `detector_metadata`.
 - Deps: `detectors.Detector`.
 

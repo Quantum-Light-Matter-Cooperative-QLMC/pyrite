@@ -216,8 +216,8 @@ Do not add separate tutorial provenance manifests or HTML/session exports.
 - Task type stays separate: workers also invoke matching CLI, notebook,
   physics, performance, docs, remote, regression, or scientific skill.
 - Direct user invocation of a worker skill permits task-local checkpoint
-  commits unless user says otherwise; never permits push, issue ownership, or
-  delegation. Supervisors may pass only authority they hold.
+  commits unless user says otherwise; never permits push or delegation, and
+  permits issue writing and remote compute only for `lead-task`. Supervisors may pass only authority they hold.
 - Checkpoint only independently valid slices: focused checks pass, scoped diff
   reviewed, explicit paths staged. Never `git add .`; never mix unrelated WIP.
 

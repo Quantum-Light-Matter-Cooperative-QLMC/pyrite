@@ -109,7 +109,7 @@ class ZhaiCacheMiss(FileNotFoundError):
         self.path = path
         super().__init__(
             f"Zhai cache missing or stale: {path}; populate it with "
-            "`pyrite run --preset zhai` (add --remote to run it on the box)"
+            "`pyrite app validation reproduce` (add --remote to run it on the box)"
         )
 
 
@@ -518,7 +518,7 @@ def reproduce_all(
 
     No figures -- this only leaves correct, hash-addressed .pkl files on disk
     under ``cache_dir`` (default pyrite-output/cache/zhai_reproduction/). This is the
-    unit behind ``pyrite._entry.reproduce_zhai`` / ``pyrite run --preset zhai``,
+    unit behind ``pyrite._entry.reproduce_zhai`` / ``pyrite app validation reproduce``,
     which runs here by default and on the box with ``--remote``.
 
     Returns [(label, path, cache_hit)] for the Fig.1c anchor plus every
@@ -548,7 +548,7 @@ def reproduce_all(
 def format_reproduction_row(label: str, path: Path, cache_hit: bool) -> str:
     """Render one ``reproduce_all`` result line.
 
-    Shared by ``pyrite run --preset zhai`` and ``pyrite._entry.reproduce_zhai``
+    Shared by ``pyrite app validation reproduce`` and ``pyrite._entry.reproduce_zhai``
     so the local and remote paths report the same thing.
     """
     return f"{label:16s} {'cached' if cache_hit else 'computed':9s} {path}"

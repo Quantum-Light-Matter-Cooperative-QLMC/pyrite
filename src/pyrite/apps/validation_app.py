@@ -459,7 +459,7 @@ def _(af, anchor, mo, ne_brem_ui, ne_ui, run_zhai_ui):
     else:
         with mo.status.spinner(
             title="Loading Monte Carlo spectra",
-            subtitle="Cache misses are populated through pyrite run --preset zhai.",
+            subtitle="Cache misses are populated through pyrite app validation reproduce.",
         ):
             try:
                 zhai_model, zhai_cache_hit, zhai_cache_path = af.cached_model_spectra(
@@ -716,7 +716,7 @@ def _(mo):
     currently selected above. It first probes the configured SSH GPU host. When
     available, it starts a detached job that continues after this app closes;
     status is polled below and completed caches are pulled automatically. This
-    launcher never falls back to local WSL on its own; run `pyrite run --preset zhai`
+    launcher never falls back to local WSL on its own; run `pyrite app validation reproduce`
     yourself to populate the caches here, or add `--remote` once remote access is
     restored.
     """)
@@ -795,7 +795,7 @@ def _(
         else:
             set_remote_zhai_message(
                 f"{_reason} Heavy cache preparation was not started locally; "
-                "run `pyrite run --preset zhai` here, or restore remote access "
+                "run `pyrite app validation reproduce` here, or restore remote access "
                 "and add --remote."
             )
     elif _jobid is not None:
@@ -840,7 +840,7 @@ def _(
         try:
             with mo.status.spinner(
                 title="Loading detector-convolved supplementary spectra",
-                subtitle="Cache misses are populated through pyrite run --preset zhai.",
+                subtitle="Cache misses are populated through pyrite app validation reproduce.",
             ):
                 spectra, cache_hit, cache_path = af.cached_coherent_spectra(
                     study,

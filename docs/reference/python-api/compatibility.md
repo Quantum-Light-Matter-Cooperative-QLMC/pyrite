@@ -146,8 +146,8 @@ public API.
 The root inventory is supplemented by reviewed package and leaf-module names in
 `api-surface.toml` under `package_exports`. In addition to material authoring,
 the inventory retains the material, transport, detector-response, and analysis
-contracts documented in these namespace pages as advanced-stable, with the axial diagnostic explicitly
-experimental. It also includes `pyrite.observations.ObservationPlan`,
+contracts documented in these namespace pages as advanced-stable, with quantum and channeling interfaces
+(planar included) explicitly experimental. It also includes `pyrite.observations.ObservationPlan`,
 `pyrite.observations.PixelSampling`, `pyrite.results.Result`, and
 `pyrite.results.Provenance`. A declaration in `__all__` alone is **not** an
 API-support promise; consult the [API policy](../../development/api-policy.md)

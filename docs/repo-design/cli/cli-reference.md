@@ -27,7 +27,7 @@ and `union` spellings were removed at 0.3.0 and now exit as unknown
 commands.
 
 Validation uses `pyrite app validation` and `pyrite material validate`; the
-Zhai reproduction uses `pyrite run --preset zhai`, which runs locally unless
+Zhai reproduction uses `pyrite app validation reproduce`, which runs locally unless
 `--remote` is given. Remote runs use
 `pyrite run --remote`. The `check`, `check-config`, `remote run`,
 `remote validate`, and `remote check` spellings were removed at 0.3.0.
@@ -178,6 +178,7 @@ Existing command fragments remain available below; each link opens the full fami
 - <span id="pyrite-app-validation"></span>[`pyrite app validation`](cli-reference-app.md#pyrite-app-validation)
 - <span id="pyrite-app-validation-export"></span>[`pyrite app validation export`](cli-reference-app.md#pyrite-app-validation-export)
 - <span id="pyrite-app-validation-launch"></span>[`pyrite app validation launch`](cli-reference-app.md#pyrite-app-validation-launch)
+- <span id="pyrite-app-validation-reproduce"></span>[`pyrite app validation reproduce`](cli-reference-app.md#pyrite-app-validation-reproduce)
 - <span id="pyrite-checkpoint"></span>[`pyrite checkpoint`](cli-reference-checkpoint.md#pyrite-checkpoint)
 - <span id="pyrite-checkpoint-slim"></span>[`pyrite checkpoint slim`](cli-reference-checkpoint.md#pyrite-checkpoint-slim)
 - <span id="pyrite-checkpoint-recompute"></span>[`pyrite checkpoint recompute`](cli-reference-checkpoint.md#pyrite-checkpoint-recompute)
