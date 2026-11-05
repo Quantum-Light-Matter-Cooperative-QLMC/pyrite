@@ -2,8 +2,8 @@
  "validation_ids": [
   "optical-stack-fast-solver"
  ],
- "revision": "e3a07bce82b43035ea2508f1f7b2502a9714387b",
- "timestamp_utc": "2026-11-05T04:36:03.529015+00:00",
+ "revision": "d587d2790e377819e4e143719636e554e8052b34",
+ "timestamp_utc": "2026-11-05T05:22:45.623196+00:00",
  "device": "NVIDIA GeForce RTX 3060 Ti",
  "cupy": "14.2.0",
  "pairs": 256,
@@ -11,64 +11,64 @@
  "parity_peak_normalized": [
   {
    "layers": 20,
-   "amplitude": 1.9735611952981335e-13,
+   "amplitude": 1.55519975541396e-13,
    "response": 1.034736908033099e-14
   },
   {
    "layers": 300,
-   "amplitude": 3.0673098613766596e-13,
+   "amplitude": 2.750219691995816e-13,
    "response": 1.217364902532232e-13
   },
   {
    "layers": 2000,
-   "amplitude": 1.3406491573351881e-12,
+   "amplitude": 9.75683881802362e-13,
    "response": 1.3493124555991462e-13
   }
  ],
  "timing": [
   {
    "layers": 10,
-   "fast_gpu_s": 0.0023224549995575217,
-   "peak_pool_bytes": 141824,
-   "fast_cpu_s": 0.0020462379998207325,
-   "dense_cpu_s": 0.009103782999773102,
-   "dense_gpu_s": 0.06078821600021911
+   "fast_gpu_s": 0.0015596940011164406,
+   "peak_pool_bytes": 143872,
+   "fast_cpu_s": 0.0023006549999990966,
+   "dense_cpu_s": 0.009201500999552081,
+   "dense_gpu_s": 0.1459718369987968
   },
   {
    "layers": 50,
-   "fast_gpu_s": 0.001510113999756868,
-   "peak_pool_bytes": 469504,
-   "fast_cpu_s": 0.009166990999801783,
-   "dense_cpu_s": 0.17884842400053458,
-   "dense_gpu_s": 0.5698076670005321
+   "fast_gpu_s": 0.0022108359989942983,
+   "peak_pool_bytes": 471552,
+   "fast_cpu_s": 0.010173741000471637,
+   "dense_cpu_s": 0.13072626199937076,
+   "dense_gpu_s": 0.5505838699991727
   },
   {
    "layers": 100,
-   "fast_gpu_s": 0.0021910659997956827,
-   "peak_pool_bytes": 879616,
-   "fast_cpu_s": 0.017151314000329876
+   "fast_gpu_s": 0.004044367000460625,
+   "peak_pool_bytes": 881664,
+   "fast_cpu_s": 0.019829636001304607
   },
   {
    "layers": 200,
-   "fast_gpu_s": 0.004034006999972917,
-   "peak_pool_bytes": 1699840,
-   "fast_cpu_s": 0.03493800300020666
+   "fast_gpu_s": 0.007135382998967543,
+   "peak_pool_bytes": 1701888,
+   "fast_cpu_s": 0.03842576699935307
   },
   {
    "layers": 1000,
-   "fast_gpu_s": 0.016081595000287052,
-   "peak_pool_bytes": 8259584,
-   "fast_cpu_s": 0.17600576400036516
+   "fast_gpu_s": 0.02931176200036134,
+   "peak_pool_bytes": 8261632,
+   "fast_cpu_s": 0.19350431599923468
   },
   {
    "layers": 5000,
-   "fast_gpu_s": 0.07634057900031621,
-   "peak_pool_bytes": 41059840
+   "fast_gpu_s": 0.0968663359999482,
+   "peak_pool_bytes": 41061888
   },
   {
    "layers": 20000,
-   "fast_gpu_s": 0.3159464509999452,
-   "peak_pool_bytes": 164059648
+   "fast_gpu_s": 0.4026640520005458,
+   "peak_pool_bytes": 164061696
   }
  ]
 }
