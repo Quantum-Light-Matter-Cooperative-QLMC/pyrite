@@ -84,10 +84,39 @@ def test_run_click_dispatches_profile_material_and_zero_workers(monkeypatch, tmp
         "performance_dir": None,
         "cache_read": True,
         "cache_write": True,
+        "resume_checkpoint": True,
         "progress_file": None,
         "no_progress": False,
         "verbose": 0,
     }
+
+
+@pytest.mark.parametrize(
+    ("flags", "resume", "cache_write"),
+    [
+        (["--recompute"], False, True),
+        (["--recompute", "--resume-checkpoint"], True, True),
+        (["--no-cache"], False, False),
+    ],
+    ids=["fresh-recompute", "resumed-recompute", "no-cache"],
+)
+def test_run_dispatches_checkpoint_resume_without_shared_cache_reads(
+    monkeypatch, flags, resume, cache_write
+):
+    seen = _capture(monkeypatch, scan, "run")
+    result = invoke(scan_cli.command, ["standard", "-m", "hopg", *flags])
+    assert_clean_result(result)
+    assert seen["resume_checkpoint"] is resume
+    assert seen["cache_read"] is False
+    assert seen["cache_write"] is cache_write
+
+
+def test_run_rejects_checkpoint_resume_without_recompute(monkeypatch):
+    seen = _capture(monkeypatch, scan, "run")
+    result = invoke(scan_cli.command, ["standard", "-m", "hopg", "--resume-checkpoint"])
+    assert result.exit_code == 2
+    assert "--resume-checkpoint requires --recompute" in result.stderr
+    assert not seen
 
 
 @pytest.mark.parametrize("plan", [False, True])
