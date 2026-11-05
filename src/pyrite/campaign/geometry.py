@@ -54,6 +54,7 @@ from ._geometry_values import (
     _seq,
     _unique_angles,
 )
+from ._slab_dimensions import SlabDimensions, slab_footprint
 
 ScalarOrSeq = float | Sequence[float] | np.ndarray
 
@@ -927,7 +928,7 @@ class _TargetGeometry:
 
 
 @dataclass(frozen=True, init=False)
-class Slab(_TargetGeometry):
+class Slab(SlabDimensions, _TargetGeometry):
     """Describe a single crystal slab, optionally bounded or grooved.
 
     Parameters
@@ -998,26 +999,9 @@ class Slab(_TargetGeometry):
         tilt: object = _UNSET,
         tilt_azimuth: object = _UNSET,
     ) -> None:
-        if width is not _UNSET or height is not _UNSET:
-            if footprint is not _UNSET:
-                raise TypeError("Slab footprint and width/height are mutually exclusive")
-            if width is _UNSET or height is _UNSET:
-                raise TypeError("Slab requires both width and height")
-            if (width is None) != (height is None):
-                raise ValueError("Slab width and height must both be None or both lengths")
-            _infinite_via_dimensions = width is None
-            footprint = (
-                None
-                if width is None
-                else Footprint(
-                    _geometry_length(width, unit="mm", field="Slab.width"),
-                    _geometry_length(height, unit="mm", field="Slab.height"),
-                )
-            )
-        elif footprint is _UNSET:
-            raise TypeError("Slab requires width and height or footprint")
-        elif footprint is None and not _infinite_via_dimensions:
-            warn_api("Slab(footprint=None)", stacklevel=3)
+        footprint, _infinite_via_dimensions = slab_footprint(
+            footprint, width, height, _infinite_via_dimensions
+        )
         if thickness is not _UNSET:
             if thickness_ang is not _UNSET:
                 raise TypeError("Slab.thickness_ang and thickness are mutually exclusive")
@@ -1042,31 +1026,7 @@ class Slab(_TargetGeometry):
         object.__setattr__(
             self, "_infinite_via_dimensions", _infinite_via_dimensions and footprint is None
         )
-        self.__post_init__()
-
-    @property
-    def width(self) -> Quantity | None:
-        """Full transverse width in mm, or None for an infinite slab."""
-        return None if self.footprint is None else _quantity_geometry(self.footprint.width_mm, "mm")
-
-    @property
-    def height(self) -> Quantity | None:
-        """Full transverse height in mm, or None for an infinite slab."""
-        return (
-            None if self.footprint is None else _quantity_geometry(self.footprint.height_mm, "mm")
-        )
-
-    def with_width(self, width: object) -> Self:
-        """Copy a finite slab with a new unit-bearing width."""
-        if self.footprint is None:
-            raise ValueError("Set both dimensions when changing an infinite slab")
-        return replace(self, footprint=self.footprint.with_width(width))
-
-    def with_height(self, height: object) -> Self:
-        """Copy a finite slab with a new unit-bearing height."""
-        if self.footprint is None:
-            raise ValueError("Set both dimensions when changing an infinite slab")
-        return replace(self, footprint=self.footprint.with_height(height))
+        self.__post_init__(_infinite_via_dimensions)
 
     @property
     def thickness(self) -> Quantity:
@@ -1080,7 +1040,7 @@ class Slab(_TargetGeometry):
             thickness_ang=_geometry_length(thickness, unit="angstrom", field="Slab.thickness"),
         )
 
-    def __post_init__(self) -> None:
+    def __post_init__(self, _infinite_via_dimensions: bool, /) -> None:
         if not isinstance(self.material, str) or not self.material.strip():
             raise ValueError("Slab.material must be a non-empty material key")
         for name, unit, expected, kind in (

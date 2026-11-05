@@ -92,7 +92,9 @@ otherwise):
 from pyrite.geometry import Slab
 from pyrite.units import Q_
 
-slab = Slab("hopg", 2000, width=None, height=None, tilt=Q_([0.5, 0.7], "rad"), tilt_azimuth=Q_(180, "deg"))
+slab = Slab(
+    "hopg", 2000, width=None, height=None, tilt=Q_([0.5, 0.7], "rad"), tilt_azimuth=Q_(180, "deg")
+)
 slab.tilt  # fresh degree quantity, shape (2,)
 steeper = slab.with_tilt(Q_(60, "degree"))
 ```

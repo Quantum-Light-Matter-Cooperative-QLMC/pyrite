@@ -102,9 +102,7 @@ from pyrite.geometry import Slab
 
 scene = Scene(
     Beam(kinetic_energy=30 * ureg.keV, transverse=Spot(), longitudinal=PointBunch()),
-    Slab(
-        "hopg", thickness=200 * ureg.nm, width=5 * ureg.mm, height=5 * ureg.mm
-    ),
+    Slab("hopg", thickness=200 * ureg.nm, width=5 * ureg.mm, height=5 * ureg.mm),
 )
 sweep = Sweep(
     scene,
