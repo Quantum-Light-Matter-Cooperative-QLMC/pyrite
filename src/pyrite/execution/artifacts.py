@@ -324,3 +324,13 @@ def load_directional_result(
     if set(directional) != {"directional"} or not isinstance(directional["directional"], dict):
         raise ArtifactIntegrityError("invalid directional artifact payload")
     return {**scalar, **directional}
+
+
+def require_coordinator_store(expected: CaseArtifactStore, given: CaseArtifactStore | None) -> None:
+    """Reject a sweep that could not load what the executor's workers publish."""
+    if given is None:
+        raise ValueError("this executor publishes artifacts; pass its store as artifact_store")
+    if Path(given.root).resolve() != Path(expected.root).resolve():
+        raise ValueError(
+            f"artifact_store root {given.root} differs from the executor's {expected.root}"
+        )

@@ -313,7 +313,9 @@ Run GPU smoke tests only in appropriately isolated allocations.
 
 Current distributed limitations: trajectory capture, transport-only dispatch,
 explicit wall-clock-bounded sweeps and performance-profile wrappers are not
-supported. CPU and GPU resources are homogeneous within a work-unit group.
+supported; `run_sweep` rejects them before touching any checkpoint or cache, even
+when every case is already complete. CPU and GPU resources are homogeneous within
+a work-unit group.
 Check network reachability, shared-directory permissions, worker imports and
 scheduler logs when tasks cannot start; use native SLURM arrays to isolate a
 Dask-specific failure. Real multi-node throughput and reliability remain

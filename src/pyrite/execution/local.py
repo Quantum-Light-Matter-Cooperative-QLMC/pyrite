@@ -15,6 +15,12 @@ class LocalExecutor:
     def __init__(self, runner: Callable[..., list[Any]] | None = None) -> None:
         self._runner = runner
 
+    def runtime_plan(self, cases: Sequence[Any], max_workers: int | None = None) -> dict[str, Any]:
+        """The topology ``run_cases`` resolves for ``cases`` on this host."""
+        from ..montecarlo import runner
+
+        return runner.runtime_plan(cases, max_workers)
+
     def execute(
         self,
         cases: Sequence[Any],

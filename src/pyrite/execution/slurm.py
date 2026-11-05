@@ -17,7 +17,7 @@ import subprocess
 import sys
 import time
 import uuid
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from threading import Event, Lock
@@ -29,6 +29,7 @@ from .artifacts import (
     directional_content_key,
     directional_store,
     load_directional_result,
+    require_coordinator_store,
 )
 from .inspection import run_provenance
 from .model import ResourceRequest, RetryPolicy
@@ -119,10 +120,8 @@ class SlurmArrayConfig:
             raise ValueError("gres must have form gpu:COUNT or gpu:TYPE:COUNT")
 
 
-def _script(run_dir: Path, n_tasks: int, resources: ResourceRequest, cfg: SlurmArrayConfig) -> str:
-    """Render directives as literals: SLURM does not expand shell variables."""
-    if n_tasks < 1:
-        raise ValueError("SLURM array requires at least one task")
+def _validate_allocation(resources: ResourceRequest, cfg: SlurmArrayConfig) -> None:
+    """Reject resource/directive combinations SLURM would misallocate."""
     if resources.gpu_count not in (0, 1):
         raise ValueError("SLURM slice supports at most one GPU per array task")
     if resources.gpu_count and resources.accelerator not in ("cuda", "rocm"):
@@ -135,6 +134,13 @@ def _script(run_dir: Path, n_tasks: int, resources: ResourceRequest, cfg: SlurmA
             raise ValueError("SLURM gres count differs from requested GPU count")
     elif cfg.gres is not None:
         raise ValueError("CPU-only execution must not request SLURM gres")
+
+
+def _script(run_dir: Path, n_tasks: int, resources: ResourceRequest, cfg: SlurmArrayConfig) -> str:
+    """Render directives as literals: SLURM does not expand shell variables."""
+    if n_tasks < 1:
+        raise ValueError("SLURM array requires at least one task")
+    _validate_allocation(resources, cfg)
     directive = [
         "#!/usr/bin/env bash",
         "#SBATCH --job-name=pyrite-cases",
@@ -155,7 +161,7 @@ def _script(run_dir: Path, n_tasks: int, resources: ResourceRequest, cfg: SlurmA
     if cfg.qos:
         directive.append(f"#SBATCH --qos={cfg.qos}")
     if resources.gpu_count:
-        directive.append(f"#SBATCH --gres={gres}")
+        directive.append(f"#SBATCH --gres={cfg.gres or 'gpu:1'}")
     # One task per allocated GPU: the worker never starts an outer GPU pool.
     backend = resources.accelerator if resources.gpu_count else "cpu"
     command = " ".join(
@@ -299,7 +305,25 @@ class SlurmArrayExecutor:
         self._cancel_current_job()
         return True
 
-    def execute(self, cases: Sequence[Any], *, callback=None, **options: Any) -> list[Any]:
+    def validate_artifact_store(self, artifact_store: CaseArtifactStore | None) -> None:
+        """Require the sweep to read the inbox this executor's workers publish to."""
+        require_coordinator_store(self.store, artifact_store)
+
+    def validate_run_options(self, options: Mapping[str, Any]) -> None:
+        """Reject unsupported options or configuration before any sweep effect."""
+        self._validate_options(options)
+        self._validate_configuration()
+
+    def _validate_configuration(self) -> None:
+        if not self.store.root.is_absolute():
+            raise ValueError("artifact store root must be an absolute shared filesystem path")
+        if any(char.isspace() for char in str(self.store.root)):
+            # #SBATCH directives are parsed by SLURM, not by a shell. Quoting
+            # paths with spaces is not portable between SLURM versions.
+            raise ValueError("shared artifact root cannot contain whitespace in this SLURM slice")
+        _validate_allocation(self.resources, self.config)
+
+    def _validate_options(self, options: Mapping[str, Any]) -> None:
         allowed = {
             "max_workers",
             "progress",
@@ -319,9 +343,6 @@ class SlurmArrayExecutor:
             raise ValueError("SLURM slice does not yet support transport_only")
         if options.get("trajectory_capture") is not None:
             raise ValueError("SLURM slice does not yet support trajectory_capture")
-        directions = options.get("observation_directions")
-        if directions is not None and len(directions) != len(cases):
-            raise ValueError("observation_directions must align with cases")
         if options.get("should_stop") is not None:
             raise ValueError("SLURM array executor does not yet support bounded sweeps")
         engine = options.get("engine", "auto")
@@ -341,17 +362,31 @@ class SlurmArrayExecutor:
             raise ValueError("GPU array tasks must not launch a nested worker pool")
         if self.resources.gpu_count and self.resources.accelerator not in ("cuda", "rocm"):
             raise ValueError("GPU array requires explicit CUDA or ROCm vendor")
+
+    def runtime_plan(self, cases: Sequence[Any], max_workers: int | None = None) -> dict[str, Any]:
+        """Describe the array allocation; coordinator devices play no part in it."""
+        return {
+            "engine": "slurm-array",
+            "requested_workers": max_workers,
+            "effective_workers": self.config.max_concurrent,
+            "cases_per_task": self.config.cases_per_task,
+            "work_units": math.ceil(len(cases) / self.config.cases_per_task),
+            "cpu_cores_per_task": self.resources.cpu_cores,
+            "gpu_count_per_task": self.resources.gpu_count,
+        }
+
+    def execute(self, cases: Sequence[Any], *, callback=None, **options: Any) -> list[Any]:
+        self._validate_options(options)
+        requested_workers = options.get("max_workers")
+        directions = options.get("observation_directions")
+        if directions is not None and len(directions) != len(cases):
+            raise ValueError("observation_directions must align with cases")
         n = len(cases)
         results: list[Any] = [None] * n
         if not n:
             return results
         cfg = self.config
-        if not self.store.root.is_absolute():
-            raise ValueError("artifact store root must be an absolute shared filesystem path")
-        if any(char.isspace() for char in str(self.store.root)):
-            # #SBATCH directives are parsed by SLURM, not by a shell. Quoting
-            # paths with spaces is not portable between SLURM versions.
-            raise ValueError("shared artifact root cannot contain whitespace in this SLURM slice")
+        self._validate_configuration()
         work_dir = self.store.root / ".execution-jobs" / uuid.uuid4().hex
         unit_count = math.ceil(n / cfg.cases_per_task)
         # Validate resource/vendor/SLURM directives *before* staging any data.
