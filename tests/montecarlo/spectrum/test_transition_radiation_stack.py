@@ -11,6 +11,7 @@ import numpy as np
 import pytest
 
 from pyrite.materials.crystal import HBARC_EV_ANG
+from pyrite.montecarlo.spectrum import transition_radiation
 from pyrite.montecarlo.spectrum.transition_radiation import (
     FAST_STACK_MIN_LAYERS,
     _interface_heights,
@@ -122,10 +123,11 @@ def test_host_kernel_response_matches_numpy(host_kernel, name):
     response = np.zeros_like(expected)
     lam = np.zeros_like(expected_lam)
     trans = np.zeros((omega.size, len(z_if), 2), dtype=complex)
+    cancellation = np.zeros(omega.size)
     k_perp = np.ascontiguousarray(k_perp)
     host_kernel.pyrite_stack_host_response(
         ctypes.c_int(omega.size), ctypes.c_int(media.shape[0]), _ptr(omega), _ptr(k_perp),
-        _ptr(media), _ptr(z_if), _ptr(response), _ptr(lam), _ptr(trans),
+        _ptr(media), _ptr(z_if), _ptr(response), _ptr(lam), _ptr(trans), _ptr(cancellation),
     )  # fmt: skip
     assert np.max(np.abs(response - expected)) <= 1e-11 * np.max(np.abs(expected))
     np.testing.assert_allclose(lam, expected_lam, rtol=1e-14)
@@ -141,9 +143,10 @@ def test_host_kernel_amplitude_matches_numpy(host_kernel, name):
     expected, _ = straight_charge_amplitude(omega, k_perp, v, media, z_if)
     e_t = np.zeros_like(expected)
     lam = np.zeros(omega.size, dtype=complex)
+    cancellation = np.zeros(omega.size)
     host_kernel.pyrite_stack_host_amplitude(
         ctypes.c_int(omega.size), ctypes.c_int(media.shape[0]), _ptr(omega), _ptr(k_perp), _ptr(v),
-        _ptr(media), _ptr(z_if), ctypes.c_double(_COUPLING), _ptr(e_t), _ptr(lam),
+        _ptr(media), _ptr(z_if), ctypes.c_double(_COUPLING), _ptr(e_t), _ptr(lam), _ptr(cancellation),
     )  # fmt: skip
     assert np.max(np.abs(e_t - expected)) <= 1e-11 * np.max(np.abs(expected))
 
@@ -227,3 +230,70 @@ def test_weak_contrast_periodic_stack_peaks_at_the_resonance_condition():
     # m odd keeps the first-harmonic form factor of a half-filled period nonzero.
     spectrum = planar_transition_radiation(energy, n, np.array([0.0, 0.0, beta]), layers)
     assert abs(energy[np.argmax(spectrum)] / expected - 1.0) < 1e-3
+
+
+# Y_TM = 2i and -2i across the first interface: D_0 = 0 exactly, with a regular dense matrix.
+_POLE_LAYERS = [(0.5 + 0.0j, 900.0)] + [(0.5 + 0.0j, 900.0), (2.0 + 0.0j, 900.0)] * 10
+_POLE_N = np.array([0.75, 0.0, np.sqrt(1 - 0.75**2)])
+
+
+def test_exact_recursion_pole_is_refused_although_the_dense_matrix_is_regular(monkeypatch):
+    v = np.array([0.0, 0.0, 0.9])
+    with pytest.raises(np.linalg.LinAlgError, match="stack solve"):
+        planar_transition_radiation(1.0, _POLE_N, v, _POLE_LAYERS, -4.5 + 0.0j)
+    with pytest.raises(np.linalg.LinAlgError, match="stack solve"):
+        interface_response(1.0, _POLE_N, _POLE_LAYERS, -4.5 + 0.0j)
+    monkeypatch.setattr(transition_radiation, "FAST_STACK_MIN_LAYERS", 10**9)
+    assert np.isfinite(planar_transition_radiation(1.0, _POLE_N, v, _POLE_LAYERS, -4.5 + 0.0j))
+
+
+def test_falling_admittance_chain_is_refused_before_it_loses_accuracy():
+    # A single fall of 1e12 per step: the top interface carries the rounding of 1 + rho.
+    n = np.array([0.0, 0.0, 1.0])
+    layers = [(1e-12 + 0.0j, 50.0)] * 9 + [(1e-24 + 0.0j, 50.0)] * 9
+    with pytest.raises(np.linalg.LinAlgError, match="cancellation error"):
+        interface_response(1.5, n, layers, 1.0)
+
+
+def test_accepted_falling_chain_amplitude_matches_a_high_precision_recursion():
+    # Reference: 400-digit evaluation of the same recursion; the dense LU is 20 % off here.
+    n, v = np.array([0.3, 0.0, np.sqrt(1 - 0.09)]), np.array([0.0, 0.0, 0.9])
+    layers = [(1e-8 + 0.0j, 900.0), (1e-16 + 0.0j, 900.0)] * 10
+    _, amplitude = planar_transition_radiation(2.0, n, v, layers, return_amplitude=True)
+    expected = 0.8301748905284412 - 0.922586820530029j
+    assert abs(amplitude[0] - expected) <= 1e-13 * abs(expected)
+
+
+def test_subnormal_transverse_wavevector_keeps_a_unit_k_hat():
+    n = np.array([3e-160, 4e-160, 1.0])
+    layers = [(2.1 + 0.0j, 800.0), (6.0 + 0.01j, 500.0)] * 8
+    fast = interface_response(1.5, n, layers, 1.0).response
+    expected = interface_response(1.5, np.array([0.0, 0.0, 1.0]), layers, 1.0).response
+    # Both polarizations are degenerate here, so the response is rotation invariant.
+    assert np.max(np.abs(fast - expected)) <= 1e-12 * np.max(np.abs(expected))
+
+
+def test_grazing_metal_stack_is_not_refused():
+    theta = np.linspace(0.0, np.radians(89.9), 400)
+    n = np.stack([np.sin(theta), np.zeros(400), np.cos(theta)], axis=-1)
+    layers = [(-1e5 + 1e4j, 200.0), (2.1 + 0.0j, 800.0)] * 10
+    fast = interface_response(1.5, n, layers, 1.0)
+    assert np.all(np.isfinite(fast.response))
+
+
+def test_lossless_stop_band_is_accepted_and_keeps_peak_accuracy(monkeypatch):
+    # rho -> -1 for real here; deep responses are buried near the roundoff, the peak is not.
+    eps_a, eps_b, energy, sin_t = 2.1, 6.0, 2.0, 0.4
+    k = energy * sin_t
+    d_a, d_b = (np.pi / (2 * np.sqrt(e * energy**2 - k**2)) * HBARC_EV_ANG for e in (eps_a, eps_b))
+    layers = [(eps_a + 0.0j, d_a), (eps_b + 0.0j, d_b)] * 100
+    n, v = np.array([sin_t, 0.0, np.sqrt(1 - sin_t**2)]), np.array([0.0, 0.0, 0.9])
+    grid = np.linspace(1.6, 2.4, 41)
+    _, fast = planar_transition_radiation(grid, n, v, layers, return_amplitude=True)
+    fast_response = interface_response(grid, n, layers, 1.0).response
+    monkeypatch.setattr(transition_radiation, "FAST_STACK_MIN_LAYERS", 10**9)
+    _, dense = planar_transition_radiation(grid, n, v, layers, return_amplitude=True)
+    dense_response = interface_response(grid, n, layers, 1.0).response
+    assert np.max(np.abs(fast - dense)) <= 1e-11 * np.max(np.abs(dense))
+    peak = np.max(np.abs(dense_response))
+    assert np.max(np.abs(fast_response - dense_response)) <= 1e-11 * peak

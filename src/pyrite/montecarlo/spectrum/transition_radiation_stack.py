@@ -26,16 +26,26 @@ continuity equations gives ``a' = Gamma_i b' + u_i`` above interface ``i``, with
 
 and ``rho_{i+1} = p^2 Gamma_i``, ``A_{i+1} = p u_i`` for the layer phase
 ``p = exp(i lambda_{i+1} d_{i+1})``, ``|p| <= 1``. The vacuum above has no
-down-going wave, so its amplitude is ``u`` of the last interface: only decaying
-factors enter and thick absorbing or evanescent layers cannot overflow.
+down-going wave, so its amplitude is ``u`` of the last interface. Thick absorbing
+or evanescent layers cannot overflow, because their phases are bounded; ``rho``,
+``tau`` and ``1 / D`` are not bounded when ``Y`` is not real.
 Unrolling the recursion gives the response to a jump at interface ``i``,
 
     a_top = sum_i C_i (alpha_i s_E,i + beta_i s_H,i),
     C_last = 1,  C_i = C_{i+1} tau_{i+1} p_{i+1},
 
 which is the transposed solve of ``interface_response``, one interface at a
-time. Both forms have the singularities of the dense system: ``lambda = 0`` in
-a layer, and the Cherenkov pole of an own field in a lossless medium.
+time. Both forms share two singularities with the dense system: ``lambda = 0`` in
+a layer, and the Cherenkov pole of an own field in a lossless medium. The
+recursion adds a removable pole at ``D_i = 0``, a bound mode of the lower
+half-stack where the dense matrix is regular. It also rounds ``1 + rho`` where
+``rho -> -1``. That rounding reaches the top through ``C_i / D_i``, so its size
+relative to the largest term of the pair is estimated by propagating it with the
+amplitude: ``u sum_i |C_i / D_i| / max_i |C_i beta_i|``, ``u`` the unit roundoff.
+Non-finite results and estimates above ``_MAX_CANCELLATION_ERROR`` raise
+:class:`numpy.linalg.LinAlgError`, for the whole call. Smaller losses are returned.
+Accuracy is relative to that largest term: a response buried near ``u`` below it,
+as deep in a lossless stop band, has no pointwise accuracy.
 
 Validation: optical-stack-fast-solver
 """
@@ -49,6 +59,8 @@ from .transition_radiation import _outgoing_root, _particular_field
 __all__ = ["stack_amplitude", "stack_response", "straight_charge_amplitude"]
 
 _USE_JIT_STACK = True
+#: Largest accepted rounding of ``1 + rho`` at the top, relative to a pair's largest term (#962).
+_MAX_CANCELLATION_ERROR = 1e-8
 
 
 def _fused_kernel(xp) -> bool:
@@ -61,7 +73,7 @@ def _fused_kernel(xp) -> bool:
 def _modes(omega, k_perp, media, xp):
     """``k_hat`` and ``s_hat`` ``(B, 2)``, ``lambda`` per medium, and ``Y`` with (TE, TM) last."""
     k2 = xp.sum(k_perp**2, axis=-1)
-    k = xp.sqrt(k2)
+    k = xp.hypot(k_perp[:, 0], k_perp[:, 1])
     safe = xp.where(k > 0.0, k, 1.0)
     k_hat = xp.stack([xp.where(k > 0.0, k_perp[:, 0] / safe, 1.0), k_perp[:, 1] / safe], axis=-1)
     s_hat = xp.stack([-k_hat[:, 1], k_hat[:, 0]], axis=-1)
@@ -70,8 +82,22 @@ def _modes(omega, k_perp, media, xp):
     return k_hat, s_hat, lam, admittance
 
 
+def _require_resolved(array, reach, xp):
+    """Refuse a non-finite result, or a pair whose ``1 + rho`` rounding reaches the top."""
+    if not bool(xp.all(xp.isfinite(array))):
+        raise np.linalg.LinAlgError(
+            "stack solve: singular pair (recursion pole D = 0, lambda = 0 or a lossless "
+            "own-field pole); detune the energy or direction"
+        )
+    if bool(xp.any(reach * np.finfo(float).eps / 2 > _MAX_CANCELLATION_ERROR)):
+        raise np.linalg.LinAlgError(
+            f"stack solve: estimated cancellation error exceeds {_MAX_CANCELLATION_ERROR:g}; "
+            "1 + rho is not resolved along this stack"
+        )
+
+
 def _coefficients(lam, admittance, z_if, xp):
-    """Yield ``(alpha, beta, tau, p)`` per interface, bottom up, each ``(B, 2)``.
+    """Yield ``(alpha, beta, tau, p, 1 / |D|)`` per interface, bottom up, each ``(B, 2)``.
 
     ``p`` is the phase of the medium above the interface, 1 for the vacuum.
     """
@@ -89,7 +115,7 @@ def _coefficients(lam, admittance, z_if, xp):
         if i < n_if - 1:
             phase = xp.exp(1j * lam[i + 1] * thickness[i])[:, None]
             rho = phase**2 * (plus * above - minus * below) / denominator
-        yield alpha, beta, tau, phase
+        yield alpha, beta, tau, phase, 1.0 / xp.abs(denominator)
 
 
 def stack_response(omega, k_perp, media, z_if, *, xp=np):
@@ -104,7 +130,9 @@ def stack_response(omega, k_perp, media, z_if, *, xp=np):
     if _fused_kernel(xp):
         from .transition_radiation_stack_kernel import device_stack_response
 
-        return device_stack_response(omega, k_perp, media, z_if)
+        response, lam_top, reach = device_stack_response(omega, k_perp, media, z_if)
+        _require_resolved(response, reach, xp)
+        return response, lam_top
     k_hat, s_hat, lam, admittance = _modes(omega, k_perp, media, xp)
     terms = list(_coefficients(lam, admittance, z_if, xp))
     ss = s_hat[:, None, :] * s_hat[:, :, None]
@@ -113,13 +141,18 @@ def stack_response(omega, k_perp, media, z_if, *, xp=np):
     source_s_out_k = s_hat[:, :, None] * k_hat[:, None, :]
     response = xp.zeros((omega.size, len(terms), 4, 2), dtype=complex)
     weight = xp.ones_like(admittance[0])
+    reach = xp.zeros_like(weight.real)
+    peak = xp.zeros_like(weight.real)
     for i in range(len(terms) - 1, -1, -1):
-        alpha, beta, tau, _ = terms[i]
+        alpha, beta, tau, _, inverse_d = terms[i]
+        reach = reach + xp.abs(weight) * inverse_d
+        peak = xp.maximum(peak, xp.abs(weight * beta))
         g_e, g_h = (weight * alpha)[:, None, None, :], (weight * beta)[:, None, None, :]
         response[:, i, :2] = g_e[..., 0] * ss + g_e[..., 1] * kk
         response[:, i, 2:] = g_h[..., 0] * source_k_out_s + g_h[..., 1] * source_s_out_k
         if i > 0:
             weight = weight * tau * terms[i - 1][3]
+    _require_resolved(response, xp.max(reach / peak, axis=-1), xp)
     return response, lam[-1]
 
 
@@ -133,13 +166,21 @@ def stack_amplitude(omega, k_perp, media, z_if, sources, *, xp=np):
     """
     k_hat, s_hat, lam, admittance = _modes(omega, k_perp, media, xp)
     up = xp.zeros_like(admittance[0])
+    reach = xp.zeros_like(up.real)
+    size = xp.zeros_like(up.real)
     terms = _coefficients(lam, admittance, z_if, xp)
-    for (alpha, beta, tau, phase), source in zip(terms, sources, strict=True):
+    for (alpha, beta, tau, phase, inverse_d), source in zip(terms, sources, strict=True):
         e_t, h_t = source[:, :2], source[:, 2:]
         s_e = xp.stack([xp.sum(s_hat * e_t, axis=-1), xp.sum(k_hat * e_t, axis=-1)], axis=-1)
         s_h = xp.stack([xp.sum(k_hat * h_t, axis=-1), xp.sum(s_hat * h_t, axis=-1)], axis=-1)
         up = phase * (tau * up + alpha * s_e + beta * s_h)
-    return up[:, 0, None] * s_hat + up[:, 1, None] * k_hat, lam[-1]
+        decay = xp.abs(phase)
+        reach = decay * (xp.abs(tau) * reach + inverse_d * xp.abs(s_h))
+        size = decay * (xp.abs(tau) * size + xp.abs(alpha * s_e) + xp.abs(beta * s_h))
+    e_t = up[:, 0, None] * s_hat + up[:, 1, None] * k_hat
+    ratio = xp.where(size > 0.0, reach / xp.where(size > 0.0, size, 1.0), 0.0)
+    _require_resolved(e_t, xp.max(ratio, axis=-1), xp)
+    return e_t, lam[-1]
 
 
 def _straight_charge_sources(omega, k_perp, v, q, media, z_if, xp):
@@ -161,7 +202,9 @@ def straight_charge_amplitude(omega, k_perp, v, media, z_if, *, xp=np):
     if _fused_kernel(xp):
         from .transition_radiation_stack_kernel import device_stack_amplitude
 
-        return device_stack_amplitude(omega, k_perp, v, media, z_if)
+        e_t, lam_top, reach = device_stack_amplitude(omega, k_perp, v, media, z_if)
+        _require_resolved(e_t, reach, xp)
+        return e_t, lam_top
     q = (omega - xp.sum(k_perp * v[:, :2], axis=-1)) / v[:, 2]
     sources = _straight_charge_sources(omega, k_perp, v, q, media, z_if, xp)
     return stack_amplitude(omega, k_perp, media, z_if, sources, xp=xp)

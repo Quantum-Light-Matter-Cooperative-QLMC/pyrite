@@ -210,6 +210,16 @@ matched-medium, vanishing-film, closed single-interface and opaque-exit limits,
 Bloch stop-band decay against the period's transfer trace, and the weak-contrast
 resonance $(q-k_z)\Lambda=2\pi m$.
 
+The recursion has two limits the dense solve does not. $D_i=0$, a bound mode of
+the lower half-stack, is a removable pole where the dense matrix is regular.
+It also rounds $1+\rho$ where $\rho\to-1$. That rounding reaches the vacuum
+through $C_i/D_i$, so its size relative to the pair's largest term is estimated
+as $u\sum_i|C_i/D_i|/\max_i|C_i\beta_i|$ for unit roundoff $u$. Non-finite
+results and estimates above $10^{-8}$ raise `LinAlgError` for the whole call;
+smaller losses are returned. Accuracy is relative to that largest term: a response
+buried near $u$ below it, as deep in a lossless stop band, has no pointwise
+accuracy.
+
 These are interference and Bragg effects along $z$. In-plane momentum is
 conserved, so this is resonant TR and not diffracted TR; laterally patterned
 layers are a separate model (#963).
