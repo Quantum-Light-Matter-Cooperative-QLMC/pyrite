@@ -85,15 +85,20 @@ def _(mo, tables_ready):
     # cache the results of expensive simulate_trajectories calls
     with mo.persistent_cache(name="simulate_trajectories_cache"):
         transport_result = simulate_trajectories(
-            Beam(kinetic_energy=30 * ureg.keV,
-                 transverse=PointSpot(), longitudinal=PointBunch()),
-            Slab("hopg", thickness_nm * 10, tilt_deg=0.0,
-                 footprint=None, allow_normal_incidence=True),
-            physics=Physics(inelastic_model="continuous", elastic_model="elsepa",
-                            bremsstrahlung_model="eedl", radiative_model="uncoupled",
-                            atomic_electron_deflection="none"),
-            numerics=Numerics(sampling=FixedSampling(histories, histories),
-                              seed=seed, transport_core="lockstep"),
+            Beam(kinetic_energy=30 * ureg.keV, transverse=PointSpot(), longitudinal=PointBunch()),
+            Slab(
+                "hopg", thickness_nm * 10, tilt_deg=0.0, footprint=None, allow_normal_incidence=True
+            ),
+            physics=Physics(
+                inelastic_model="continuous",
+                elastic_model="elsepa",
+                bremsstrahlung_model="eedl",
+                radiative_model="uncoupled",
+                atomic_electron_deflection="none",
+            ),
+            numerics=Numerics(
+                sampling=FixedSampling(histories, histories), seed=seed, transport_core="lockstep"
+            ),
             E_cut_keV=(5 * ureg.keV).magnitude,
             max_steps=20_000,
         )
