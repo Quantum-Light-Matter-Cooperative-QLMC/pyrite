@@ -58,6 +58,8 @@ class QuantifiedSpectrum:
 
     acceptance_applied: bool = field(default=False, kw_only=True)
     accepted_solid_angle_sr: float | None = field(default=None, kw_only=True)
+    component: str | None = field(default=None, kw_only=True)
+    mode: Literal["incoherent", "coherent"] | None = field(default=None, kw_only=True)
 
     normalization_basis: NormalizationBasis = field(default="per_incident_electron", kw_only=True)
 
@@ -69,6 +71,11 @@ class QuantifiedSpectrum:
                 raise TypeError("quantity spectra require CPU NumPy arrays or numeric sequences")
         if self.normalization not in {"source", "observation-average"}:
             raise ValueError("normalization must be source or observation-average")
+        if self.mode is not None and (self.component, self.mode) not in {
+            ("cxr", "incoherent"),
+            ("cxr", "coherent"),
+        }:
+            raise ValueError("CXR mode metadata requires a CXR component and one valid mode")
         if self.sampling not in {"nodes", "bin-mean", "mixed"} or self.measure not in {
             "per_energy_per_steradian",
             "per_energy",
@@ -147,7 +154,7 @@ class QuantifiedSpectrum:
         return count_basis(self.normalization_basis)
 
     def rate(self, *, current: Quantity) -> Self:
-        """Return photons per second using explicit mean current I/|e|.
+        """Return photons per second using explicit mean current ``I/|e|``.
 
         Current must be a finite nonnegative scalar quantity. Rejects repeated
         current transforms; preserves acceptance, response and native sampling.
@@ -163,7 +170,7 @@ class QuantifiedSpectrum:
     def rate_per_current(self) -> Self:
         """Return photons per second per ampere, including at zero beam current.
 
-        Applies 1/|e| directly to per-primary yields, never divides by current.
+        Applies ``1/|e|`` directly to per-primary yields, never divides by current.
         Validation: spectral-explicit-rate-normalization
         """
         factor = per_current_factor(self.normalization_basis)
@@ -190,6 +197,10 @@ class QuantifiedSpectrum:
 
         columns = self._table_quantities()
         frame = pl.DataFrame({name: q.magnitude for name, q in columns.items()})
+        if self.component is not None:
+            frame = frame.with_columns(
+                pl.lit(self.component).alias("component"), pl.lit(self.mode).alias("mode")
+            )
         return frame.with_columns(
             *[pl.lit(value).alias(name) for name, value in table_metadata(self).items()]
         )

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from math import isfinite
 from typing import TYPE_CHECKING, Literal
 
 from scipy.constants import elementary_charge
@@ -39,7 +40,7 @@ def current_amperes(current: Quantity) -> float:
 
 
 def per_current_factor(basis: str) -> float:
-    """I/|e| or 1/|e| from per-primary yields; never divide by beam current.
+    """``I/|e|`` or ``1/|e|`` from per-primary yields; never divide by beam current.
 
     Assumes a fixed stored yield and independently repeated realizations or
     bunches, with nonnegative mean current magnitude. Coherent yields retain
@@ -56,13 +57,16 @@ def per_current_factor(basis: str) -> float:
 
 
 def rate_factor(basis: str, current: Quantity) -> float:
-    """I/|e| for the fixed stored yield; zero current gives zero finite rates.
+    """``I/|e|`` for the fixed stored yield; zero current gives zero finite rates.
 
     Source and bunch assumptions follow :func:`per_current_factor`.
     None is not a default-current request.
     Validation: spectral-explicit-rate-normalization
     """
-    return per_current_factor(basis) * current_amperes(current)
+    factor = per_current_factor(basis) * current_amperes(current)
+    if not isfinite(factor):
+        raise ValueError("current rate normalization is not representable")
+    return factor
 
 
 def table_metadata(view: object) -> dict[str, str | bool]:

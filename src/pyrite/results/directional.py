@@ -114,6 +114,8 @@ class DirectionalSpectrum:
 
             if current_na is not None:
                 raise TypeError("pass only one of current and current_na")
+            if self.units != "ph/incident-electron/eV/sr":
+                raise ValueError("quantity current requires per-primary directional source density")
             return self.density * rate_factor("per_incident_electron", current)
         current_value = self.current_na if current_na is None else float(current_na)
         if not np.isfinite(current_value) or current_value < 0:

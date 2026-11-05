@@ -133,7 +133,7 @@ class QuantifiedDirectionalSpectrum:
         return count_basis(self.normalization_basis)
 
     def rate(self, *, current: Quantity) -> Self:
-        """Return photons per second using explicit mean current I/|e|.
+        """Return photons per second using explicit mean current ``I/|e|``.
 
         Current must be a finite nonnegative scalar quantity. Rejects repeated
         current transforms; preserves acceptance, response and native sampling.
@@ -149,7 +149,7 @@ class QuantifiedDirectionalSpectrum:
     def rate_per_current(self) -> Self:
         """Return photons per second per ampere, including at zero beam current.
 
-        Applies 1/|e| directly to per-primary yields, never divides by current.
+        Applies ``1/|e|`` directly to per-primary yields, never divides by current.
         Validation: spectral-explicit-rate-normalization
         """
         factor = per_current_factor(self.normalization_basis)

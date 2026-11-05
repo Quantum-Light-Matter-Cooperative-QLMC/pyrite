@@ -230,7 +230,8 @@ and aperture exports also accept `current=Q_(...)`, keeping numeric return
 types; passing both current spellings raises an error.
 
 Export each native component separately, with paired energy/density units and
-semantic columns. No interpolation or summed spectral density is implied:
+semantic columns, including component and selected CXR mode for accepted
+scalar views. No interpolation or summed spectral density is implied:
 
 ```python
 import json

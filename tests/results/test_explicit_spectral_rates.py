@@ -332,3 +332,50 @@ def test_native_result_serialization_and_identity_are_unchanged():
     reopened.accepted_spectra(assume_uniform=True)["cxr"].rate(current=Q_(20, "nA")).to_dataframe()
     reopened.brem.quantify().rate_per_current().to_energy("keV").dataframe_units()
     assert pickle.dumps(reopened) == before
+
+
+@pytest.mark.parametrize("mode", [None, "both", "other"])
+def test_accepted_spectra_requires_one_explicit_cxr_mode(mode):
+    with pytest.raises(ValueError, match="mode"):
+        scalar_result().accepted_spectra(mode=mode, assume_uniform=True)
+
+
+def test_quantity_directional_current_refuses_nonprimary_units():
+    with pytest.raises(ValueError, match="per-primary"):
+        replace(directional(), units="ph/s/eV/sr").rate(current=Q_(1, "nA"))
+
+
+def test_current_rate_factor_must_be_representable():
+    with pytest.raises(ValueError, match="representable"):
+        scalar_result().brem.quantify().rate(current=Q_(1e300, "A"))
+
+
+def test_steradian_dimensionlessness_cannot_change_semantic_measure():
+    source = scalar_result().brem.quantify()
+    # Pint permits dropping sr; the spectrum must still declare a directional measure.
+    source.density.to("1/eV")
+    assert source.measure == "per_energy_per_steradian" and not source.acceptance_applied
+    with pytest.raises(ValueError, match="acceptance"):
+        replace(source, measure="per_energy")
+    with pytest.raises(ValueError, match="acceptance"):
+        replace(source, acceptance_applied=True)
+
+
+@pytest.mark.parametrize("solid_angle", [0, -1, np.inf, np.nan])
+def test_scalar_acceptance_refuses_nonpositive_or_nonfinite_solid_angle(solid_angle):
+    result = replace(scalar_result(), case={"domega_sr": solid_angle})
+    with pytest.raises(ValueError, match="solid angle"):
+        result.accepted_spectra(assume_uniform=True)
+
+
+def test_accepted_tables_retain_selected_cxr_mode_without_summing_alternatives():
+    result = scalar_result()
+    result = replace(
+        result, cxr=CxrSpectra(result.cxr.incoherent, SpectralDensity([100, 300], [7.0, 7.0]))
+    )
+    view = result.accepted_spectra(mode="coherent", assume_uniform=True)["cxr"]
+    table = view.rate(current=Q_(1, "nA")).to_energy("keV").to_dataframe()
+    assert table["component"].unique().to_list() == ["cxr"]
+    assert table["mode"].unique().to_list() == ["coherent"]
+    np.testing.assert_allclose(view.density.magnitude, [0.7, 0.7])
+    assert view.normalization == "source"

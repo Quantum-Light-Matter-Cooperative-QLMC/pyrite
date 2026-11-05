@@ -1,10 +1,11 @@
 # Quantity-output conversion contract (#755)
 
-**Status: node-sampled `SpectralDensity.quantify()`, experimental
+**Status: native-sampled `SpectralDensity.quantify()`, experimental
 `DirectionalSpectrum.quantify()`, experimental binned aperture tallies,
 selected-pixel `SpatialResult.quantify_spectra()`, integrated spatial-image
 and acquisition count views are implemented; other families remain proposed
-for review.** This is the
+for review.** Spectral carriers also expose explicit current transforms and
+native tables; `Result.accepted_spectra()` owns matching acceptance. This is the
 contract for incremental result views. It
 builds on the [physical-quantity migration inventory](quantity-migration-inventory.md)
 and [existing numeric result/storage contracts](result-storage-contracts.md).
@@ -341,7 +342,8 @@ accepted `per_energy` measure. No detached view accepts arbitrary acceptance.
 Spatial/aperture spectra already include acceptance; measured spatial spectra
 also preserve response. Registered acquisition counts remain separate.
 
-Tables contain numeric magnitudes with explicit semantic columns. Bin means
+Tables contain numeric magnitudes with explicit semantic columns. Accepted
+scalar tables retain component identity and the selected CXR mode. Bin means
 retain left/right edges; directional tables retain angular coordinates and
 support; selected pixels retain indices and measured status. Aperture
 unbinned/detected totals remain separate properties. No union grid, total,

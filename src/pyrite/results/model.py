@@ -374,6 +374,8 @@ class Result:
         """
         if not isinstance(assume_uniform, bool):
             raise TypeError("assume_uniform must be boolean")
+        if mode not in {"incoherent", "coherent"}:
+            raise ValueError("mode must be 'incoherent' or 'coherent'")
         parts = self._components(mode)
         if self.cxr.incoherent.normalization == "source" and not assume_uniform:
             raise ValueError("source acceptance requires assume_uniform=True")
@@ -388,8 +390,10 @@ class Result:
                 _bin_edges_eV=part.bin_edges_eV,
                 acceptance_applied=True,
                 accepted_solid_angle_sr=solid_angle,
+                component=name,
+                mode=cast(Literal["incoherent", "coherent"] | None, component_mode),
             )
-            for name, _, part in parts
+            for name, component_mode, part in parts
         }
 
     def combined_cxr(
@@ -585,6 +589,10 @@ class Result:
         mode: str = "incoherent",
     ) -> pl.DataFrame:
         """Return a wide spectrum table on a common grid, in physical units.
+
+        Deprecated since 0.26.1; removal in 0.28.0. For new exports use
+        :meth:`accepted_spectra` or component ``quantify()``, then explicit
+        current transforms and native ``to_dataframe()``/``dataframe_units()``.
 
         Columns are ``photon_energy_eV``, ``photon_energy_keV``, one column per
         family (``cxr`` in the selected ``mode``, ``characteristic``,
