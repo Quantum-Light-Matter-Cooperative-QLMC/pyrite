@@ -276,7 +276,7 @@ promoting every implementation module to public API.
 | Canonical public input | Current accepted form and read-back | Numeric lowering/record owner | Pilot disposition |
 | --- | --- | --- | --- |
 | `pyrite.beams.Beam.energy_keV` | Scalar/sequence numbers or compatible quantities → keV | `campaign/beam.py::Beam.to_spec`, `campaign/sweep.py::BeamSpec`, `campaign/beam_cases.py` | Quantity keyword/property and explicit replacement method are available |
-| `pyrite.beams.BunchLength.rms_fs`, `Offsets.offsets_fs` | Number(s) or time quantity → fs | `campaign/beam.py::Beam.to_spec` | Numeric fields retained; semantic timing interfaces described below |
+| `pyrite.beams.LongitudinalDistribution.envelope_rms_fs`, `Offsets.offsets_fs` | Number(s) or time quantity → fs | `campaign/beam.py::Beam.to_spec` | Numeric fields retained; semantic timing interfaces described below |
 | `pyrite.geometry.RectangularBody.thickness_mm` | Number or length quantity → mm | `bodies.py`, `campaign/geometry.py` | Keep current body serialization and units |
 | `pyrite.detectors.PlanarPose.center_mm`, `PixelGrid.pitch_mm` | Numeric components or compatible quantities, including array magnitudes → numeric mm components | `_planar_geometry.py`, persisted geometry in `observations/store.py` | Preserve coordinate and pixel representations |
 | `pyrite.observations.Acquisition.exposure_s`, `measured_edges_eV` | Numbers/components or compatible quantities → s/eV | `instrument/observation.py`, persisted acquisition in `observations/store.py` | Preserve exposure and measured-bin meaning |
@@ -337,14 +337,12 @@ independent of this beam pilot.
 
 ## Bunch timing quantity interfaces
 
-`pyrite.beams.LongitudinalDistribution` (Gaussian kind; replaces the deprecated
-`BunchLength`) and `Offsets` extend the beam-energy naming pattern
+`pyrite.beams.LongitudinalDistribution` (Gaussian kind) and `Offsets` extend the beam-energy naming pattern
 at their existing owners in `campaign/beam.py`:
 
 | Descriptor | Quantity constructor/read-back | Quantity replacement | Numeric field retained |
 | --- | --- | --- | --- |
 | `LongitudinalDistribution` (Gaussian) | `rms_duration` / `envelope_rms` | `dataclasses.replace(policy, envelope_rms_fs=...)` | `envelope_rms_fs` |
-| `BunchLength` (deprecated) | `rms_duration` | `with_rms_duration(quantity)` | `rms_fs` |
 | `Offsets` | `arrival_offsets` | `with_arrival_offsets(quantity)` | `offsets_fs` |
 
 The semantic constructor arguments are keyword-only and require explicit Pint

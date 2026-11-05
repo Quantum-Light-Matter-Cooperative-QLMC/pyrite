@@ -8,8 +8,7 @@ invalid mix cannot be constructed and the type hints list what is allowed:
   :class:`~pyrite.montecarlo.transverse.TransverseDistribution`
   (Courant--Snyder);
 * longitudinal -- :class:`PointBunch`, :class:`Offsets`, or a
-  :class:`~pyrite.campaign.longitudinal.LongitudinalDistribution` policy
-  (:class:`BunchLength` is a deprecated spelling of its Gaussian kind);
+  :class:`~pyrite.campaign.longitudinal.LongitudinalDistribution` policy;
 * source -- analytic by default, or :class:`GdfSource` through
   :meth:`Beam.from_gdf`.
 
@@ -23,7 +22,6 @@ from typing import TYPE_CHECKING, Any, Self
 
 import numpy as np
 
-from .._api_deprecations import warn_api
 from .._spec_defaults import UNSET as _UNSET
 from .._spec_defaults import _Unset
 from .._units import _is_pint_quantity, _scalar_quantity, normalize_unit
@@ -196,81 +194,6 @@ class PointBunch:
 
 
 @dataclass(frozen=True, init=False)
-class BunchLength:
-    """Sampled arrival times with an RMS duration.
-
-    .. deprecated:: 0.25.0
-        Use :class:`~pyrite.beams.LongitudinalDistribution` with
-        ``kind="gaussian"`` (``shape="uniform"`` for a flat top). ``Beam`` lowers
-        both spellings to the same canonical form, so case identity and sampled
-        offsets are unchanged.
-
-    Parameters
-    ----------
-    rms_fs
-        RMS bunch duration in fs. Mutually exclusive with ``rms_duration``.
-    rms_duration
-        Keyword-only real scalar Pint time quantity, finite and positive.
-        Read-back is a fresh quantity in fs; numeric storage remains ``rms_fs``.
-    shape
-        Sampling law name, ``"gaussian"`` by default.
-    """
-
-    rms_fs: float
-    shape: str = "gaussian"
-
-    def __init__(
-        self,
-        rms_fs: float | _Unset = _UNSET,
-        shape: str = "gaussian",
-        *,
-        rms_duration: object = _UNSET,
-    ) -> None:
-        warn_api("BunchLength")
-        if rms_duration is not _UNSET:
-            if rms_fs is not _UNSET:
-                raise TypeError("BunchLength.rms_fs and rms_duration are mutually exclusive")
-            rms_fs = _positive(
-                "BunchLength.rms_duration",
-                _timing_quantity_fs(rms_duration, field="BunchLength.rms_duration", ndim=0).item(),
-            )
-        elif rms_fs is _UNSET:
-            raise TypeError("BunchLength requires rms_fs or rms_duration")
-        object.__setattr__(self, "rms_fs", rms_fs)
-        object.__setattr__(self, "shape", shape)
-        self.__post_init__()
-
-    @property
-    def rms_duration(self) -> "Quantity":
-        """RMS duration as a fresh scalar quantity in fs; no sampling occurs."""
-        from ..units import Q_
-
-        return Q_(float(self.rms_fs), "fs")
-
-    def with_rms_duration(self, rms_duration: object) -> Self:
-        """Replace duration using an explicit time quantity, preserving shape.
-
-        ``dataclasses.replace`` continues to use the numeric ``rms_fs`` field;
-        supplying ``rms_duration`` there conflicts with its forwarded field.
-        """
-        rms_fs = _positive(
-            "BunchLength.rms_duration",
-            _timing_quantity_fs(rms_duration, field="BunchLength.rms_duration", ndim=0).item(),
-        )
-        return replace(self, rms_fs=rms_fs)
-
-    def __post_init__(self) -> None:
-        object.__setattr__(
-            self,
-            "rms_fs",
-            normalize_unit(self.rms_fs, "fs", field="BunchLength.rms_fs", expected="time"),
-        )
-        _positive("rms_fs", self.rms_fs)
-        if not isinstance(self.shape, str) or not self.shape:
-            raise ValueError("shape must be a non-empty string")
-
-
-@dataclass(frozen=True, init=False)
 class Offsets:
     """Explicit per-electron arrival offsets, replacing random sampling.
 
@@ -402,7 +325,7 @@ class GdfSource:
 
 
 Transverse = TransverseSpot | PointSpot | TransverseDistribution
-Longitudinal = PointBunch | BunchLength | Offsets | LongitudinalDistribution
+Longitudinal = PointBunch | Offsets | LongitudinalDistribution
 
 
 @dataclass(frozen=True, init=False)
@@ -435,8 +358,6 @@ class Beam:
     longitudinal
         Required: :class:`PointBunch`, :class:`Offsets`, or a
         :class:`~pyrite.campaign.longitudinal.LongitudinalDistribution` policy.
-        A deprecated :class:`BunchLength` is still stored as given but lowers to
-        the equivalent Gaussian ``LongitudinalDistribution`` record.
     energy_spread_frac
         RMS fractional kinetic-energy spread; ``None`` is monoenergetic.
     rep_rate_hz
@@ -605,12 +526,9 @@ class Beam:
             raise TypeError(
                 "Beam.transverse must be a TransverseSpot, PointSpot, or TransverseDistribution"
             )
-        if not isinstance(
-            self.longitudinal, (PointBunch, BunchLength, Offsets, LongitudinalDistribution)
-        ):
+        if not isinstance(self.longitudinal, (PointBunch, Offsets, LongitudinalDistribution)):
             raise TypeError(
-                "Beam.longitudinal must be a PointBunch, BunchLength, Offsets, or "
-                "LongitudinalDistribution"
+                "Beam.longitudinal must be a PointBunch, Offsets, or LongitudinalDistribution"
             )
         if self.bunch_front_tilt is not None and not isinstance(
             self.bunch_front_tilt, BunchFrontTilt
@@ -627,9 +545,6 @@ class Beam:
             if isinstance(self.longitudinal, LongitudinalDistribution)
             else None,
             offsets=self.longitudinal if isinstance(self.longitudinal, Offsets) else None,
-            shape=self.longitudinal.shape
-            if isinstance(self.longitudinal, BunchLength)
-            else "gaussian",
         )
         object.__setattr__(self, "bunch_front_tilt", front)
         if self.gdf is not None:
@@ -711,12 +626,7 @@ class Beam:
         elif isinstance(transverse, TransverseDistribution):
             fields["transverse"] = transverse
         longitudinal = self.longitudinal
-        if isinstance(longitudinal, BunchLength):
-            # Canonical smooth-bunch form: equal beams share case keys.
-            fields["longitudinal"] = LongitudinalDistribution(
-                "gaussian", float(longitudinal.rms_fs), shape=longitudinal.shape
-            )
-        elif isinstance(longitudinal, Offsets):
+        if isinstance(longitudinal, Offsets):
             fields["long_offsets_fs"] = longitudinal.offsets_fs
             fields["long_shape"] = longitudinal.shape
         elif isinstance(longitudinal, LongitudinalDistribution):
@@ -830,7 +740,6 @@ class Beam:
 __all__ = [
     "Beam",
     "BunchFrontTilt",
-    "BunchLength",
     "GdfSource",
     "Offsets",
     "PointBunch",

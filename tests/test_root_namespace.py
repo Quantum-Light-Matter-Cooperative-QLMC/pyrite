@@ -18,7 +18,6 @@ REMOVED_ROOT_NAMES = (
     "AngularAcceptance",
     "BlazedGrooves",
     "BunchFrontTilt",
-    "BunchLength",
     "CrystalCut",
     "CxrReflections",
     "EnergyBins",

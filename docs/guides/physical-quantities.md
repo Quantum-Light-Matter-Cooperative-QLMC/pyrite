@@ -243,8 +243,8 @@ with open("cxr-rate.units.json", "w") as stream:
 
 Numeric `result.to_dataframe()` and `result.dataframe_units()` remain supported.
 `spectral_flux(units=...)` and `spectral_flux_units(units=...)`, including
-selector-based CSV/Parquet recipes, are deprecated since 0.26.1, with removal
-scheduled for 0.28.0. During that window their values, column schemas and legacy
+selector-based CSV/Parquet recipes, are deprecated since 0.27.0, with removal
+scheduled for 0.29.0. During that window their values, column schemas and legacy
 union-grid display behavior remain unchanged. Their `total` is not a native
 yield representation; use native integration for physical totals.
 

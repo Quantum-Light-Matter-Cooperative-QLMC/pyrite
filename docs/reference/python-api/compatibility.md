@@ -82,9 +82,11 @@ the historical lowering. This is not a scheduler profile
 
 ## Deprecated spellings
 
-| Deprecated | Replacement | Notes |
+Removal dates live in `pyrite._api_deprecations`.
+
+| Removed | Replacement | Notes |
 | --- | --- | --- |
-| `pyrite.beams.BunchLength(rms_fs=σ, shape=s)` | `LongitudinalDistribution("gaussian", σ, shape=s)` | `shape="uniform"` is the flat top of the same RMS. `rms_duration=` keeps its meaning. `Beam` lowers both to the same `longitudinal` record, so sampled offsets and case keys agree; existing pickles still load. Removal date: `pyrite._api_deprecations`. |
+| `pyrite.beams.BunchLength(rms_fs=σ, shape=s)` (removed in 0.27.0) | `LongitudinalDistribution("gaussian", σ, shape=s)` | `shape="uniform"` is the flat top of the same RMS. `rms_duration=` keeps its meaning. Sampled offsets and case keys are unchanged; pickled `Beam` objects holding a `BunchLength` no longer load. |
 
 ## Root import compatibility
 

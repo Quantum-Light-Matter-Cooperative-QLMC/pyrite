@@ -56,9 +56,6 @@ if TYPE_CHECKING:
         BunchFrontTilt as BunchFrontTilt,
     )
     from pyrite.beams import (
-        BunchLength as BunchLength,
-    )
-    from pyrite.beams import (
         GdfSource as GdfSource,
     )
     from pyrite.beams import (

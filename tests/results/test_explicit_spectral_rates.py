@@ -294,10 +294,10 @@ def test_legacy_selector_warning_window_preserves_numeric_tables():
     result = scalar_result()
     for name in ("spectral_flux", "spectral_flux_units"):
         entry = API_DEPRECATIONS[f"Result.{name}"]
-        assert (entry.deprecated_in, entry.remove_in) == ("0.26.1", "0.28.0")
-    with pytest.warns(DeprecationWarning, match="0.28.0"):
+        assert (entry.deprecated_in, entry.remove_in) == ("0.27.0", "0.29.0")
+    with pytest.warns(DeprecationWarning, match="0.29.0"):
         frame = result.spectral_flux(units="electron")
-    with pytest.warns(DeprecationWarning, match="0.28.0"):
+    with pytest.warns(DeprecationWarning, match="0.29.0"):
         metadata = result.spectral_flux_units(units="electron")
     assert frame.columns == ["photon_energy_eV", "photon_energy_keV", "cxr", "brem", "total"]
     assert list(metadata) == frame.columns

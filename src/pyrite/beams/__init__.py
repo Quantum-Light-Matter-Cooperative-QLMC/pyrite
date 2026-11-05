@@ -17,9 +17,6 @@ if TYPE_CHECKING:
         BunchFrontTilt as BunchFrontTilt,
     )
     from pyrite.campaign.beam import (
-        BunchLength as BunchLength,
-    )
-    from pyrite.campaign.beam import (
         GdfSource as GdfSource,
     )
     from pyrite.campaign.beam import (
@@ -42,7 +39,6 @@ if TYPE_CHECKING:
 _EXPORTS = {
     "Beam": ("pyrite.campaign.beam", "Beam"),
     "BunchFrontTilt": ("pyrite.campaign.beam", "BunchFrontTilt"),
-    "BunchLength": ("pyrite.campaign.beam", "BunchLength"),
     "GdfSource": ("pyrite.campaign.beam", "GdfSource"),
     "LongitudinalDistribution": ("pyrite.campaign.longitudinal", "LongitudinalDistribution"),
     "Offsets": ("pyrite.campaign.beam", "Offsets"),
@@ -55,7 +51,6 @@ _EXPORTS = {
 __all__ = [
     "Beam",
     "BunchFrontTilt",
-    "BunchLength",
     "GdfSource",
     "LongitudinalDistribution",
     "Offsets",

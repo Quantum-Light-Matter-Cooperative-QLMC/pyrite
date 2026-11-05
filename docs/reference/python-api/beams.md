@@ -34,17 +34,6 @@ This individually governed implementation path is advanced-stable; it does not p
    pyrite.campaign.beam_metrics.capture_beam_metrics
 ```
 
-## Deprecated bunch length spelling
-
-`BunchLength` retains its governed deprecated import. Prefer `LongitudinalDistribution` as described [below](#bunch-timing-with-units).
-
-```{eval-rst}
-.. autosummary::
-   :toctree: ../../_autosummary
-   :nosignatures:
-
-   pyrite.beams.BunchLength
-```
 
 ## Compatibility spellings
 
@@ -95,9 +84,6 @@ returns a front for one explicit reflection and direction on a flat single slab.
 See [front timing, supported sources and examples](../../reference/python-scene-recipes.md#tilt-the-bunch-front-and-crystal-cut).
 
 ## Bunch timing with units
-
-`BunchLength` is deprecated; use `LongitudinalDistribution("gaussian", ...)`
-(see the [migration table](compatibility.md#deprecated-spellings)).
 
 Construct `LongitudinalDistribution("gaussian", rms_duration=quantity)` (or
 `envelope_rms=quantity`) with a finite positive scalar time quantity; add

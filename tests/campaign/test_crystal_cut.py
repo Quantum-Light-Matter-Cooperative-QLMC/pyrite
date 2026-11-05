@@ -32,7 +32,7 @@ def _scene(cut=None, tilt=84.5, azimuth=0.0):
         beam=pr.Beam(
             energy_keV=30.0,
             transverse=pr.beams.TransverseSpot(0.001, 0.002),
-            longitudinal=pr.beams.BunchLength(0.001),
+            longitudinal=pr.beams.LongitudinalDistribution("gaussian", 0.001),
         ),
         target=_slab(cut, tilt, azimuth),
         detector=pr.Detector(observation_angle_deg=145.0),

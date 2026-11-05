@@ -105,8 +105,8 @@ def validate_front_source(
 ):
     """Refuse sources outside the monoenergetic Gaussian parallel-ray model."""
     front = resolve_front_tilt(front)
-    # A Gaussian/flat-top policy is the canonical smooth-bunch spelling (what the
-    # deprecated BunchLength lowers to); targeted kinds stay unsupported.
+    # A Gaussian/flat-top policy is the canonical smooth-bunch spelling; targeted
+    # kinds stay unsupported.
     if isinstance(longitudinal, Mapping):
         kind, policy_shape = longitudinal.get("kind"), longitudinal.get("shape", "gaussian")
     else:
