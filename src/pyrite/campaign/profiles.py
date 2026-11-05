@@ -59,6 +59,7 @@ from ..results import EmissionMode, Settings
 from ..xsgen.bremslib.tables import resolve_bremsstrahlung_model
 from .axial_spec import AXIAL_MODEL_MARKER, resolve_axial_spec
 from .identity_options import (
+    _CONTENT_KEY_DENYLIST,
     pop_identity_options,
     radiative_numerics_payload,
     transport_numerics_payload,
@@ -81,46 +82,6 @@ FIDELITY_NAMES = ("full", "survey")
 DATASET_IDENTITY_SCHEMA = "cxr.dataset-identity.v1"
 CASE_CONTENT_KEY_SCHEMA = "cxr.case-content-key.v1"
 CURRENT_IDENTITY_VERSION = 1
-
-# Case-dict fields excluded from the per-case content key. EVERYTHING else in a
-# resolved ``build_cases`` case dict determines the stored spec/brem arrays and
-# stays in the key (rule when unsure: keep -- over-inclusion only loses reuse,
-# under-inclusion serves wrong numbers). These excluded fields are label / perf /
-# post-processing / flux-scale only:
-#   - ``name`` and profile/variant fields: presentation/provenance labels.
-#   - ``domega_sr``: detector solid angle. ``store_result`` folds it into the
-#     derived ``scale`` scalar (``domega_sr * PER_NA``); the spec/brem arrays are
-#     untouched. Recomputed per requester on reuse, so a reused blob's arrays are
-#     correct for any solid angle.
-#   - ``rep_rate_hz`` / ``bunch_charge_pc``: pulse cadence/charge. ``store_result``
-#     folds them into ``source_current_na``. Coherent content keys also carry
-#     the resolved physical bunch population, since charge changes their arrays.
-#   - ``beam_current_na``: legacy reporting fallback, never a kernel input.
-#   - ``mosaic_fwhm_rad``: analytic post-processing broadening in
-#     ``store_result``. The MC route remains keyed by ``mosaic_mc_fwhm_rad``.
-#   - ``spec_chunk`` / ``brem_chunk``: GPU batch sizes. Chunk-invariant per the
-#     goldens, and only ever set on ``-p/--perf`` runs -- which bypass the cache
-#     entirely (perf implies ``--no-cache``) -- so the cache never mixes chunks.
-# ``catalog_profile`` / ``variant`` / ``fidelity`` are NOT case-dict fields today
-# -- the profile name never reaches a case, which is exactly what lets two
-# differently-named profiles' shared case hash equal and reuse one blob. They are
-# listed anyway as belt-and-suspenders: should any future path stamp a label onto
-# a case dict, it must still never perturb the content key.
-_CONTENT_KEY_DENYLIST = frozenset(
-    {
-        "name",
-        "domega_sr",
-        "beam_current_na",
-        "rep_rate_hz",
-        "bunch_charge_pc",
-        "mosaic_fwhm_rad",
-        "spec_chunk",
-        "brem_chunk",
-        "catalog_profile",
-        "variant",
-        "fidelity",
-    }
-)
 
 
 def _centered_sample(values: Any, limit: int | None) -> Any:

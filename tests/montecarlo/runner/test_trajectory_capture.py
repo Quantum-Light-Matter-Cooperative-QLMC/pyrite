@@ -735,7 +735,12 @@ def _production_case(kind, tmp_path, monkeypatch):
         monkeypatch.setattr(_cxr_grid_policy, "output_dir", lambda _kind: tmp_path / "grid-cache")
         sweep = material_sweep("hopg")
         sweep = replace(sweep, beam=replace(sweep.beam, energy_keV=77.0))
-    case = build_cases(sweep, n_electrons=24, n_electrons_brem=12)[0]
+    options = (
+        {"inelastic_model": "continuous", "radiative_model": "uncoupled"}
+        if kind == "grooved"
+        else {}
+    )
+    case = build_cases(sweep, n_electrons=24, n_electrons_brem=12, **options)[0]
     assert (kind == "auto-line-grid") == ("line_grid_policy" in case)
     return case
 

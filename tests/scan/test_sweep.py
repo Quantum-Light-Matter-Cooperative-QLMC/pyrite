@@ -113,7 +113,7 @@ def test_standard_profile_materials_are_unique_and_buildable():
         sweep = Sweep(
             material=key, thickness_ang=100.0, beam=BeamSpec(energy_keV=30.0), tilt_deg=5.0
         )
-        cases = build_cases(sweep)
+        cases = build_cases(sweep, inelastic_model="continuous", radiative_model="uncoupled")
         assert cases, f"{key} produced no cases"
 
 
@@ -767,7 +767,13 @@ def test_oriented_materials_are_registered_as_symmetric_cuts(
             brem=np.arange(0.0, 1000.0, 100.0),
         ),
     )
-    case = build_cases(sweep, n_electrons=2, n_electrons_brem=1)[0]
+    case = build_cases(
+        sweep,
+        n_electrons=2,
+        n_electrons_brem=1,
+        inelastic_model="continuous",
+        radiative_model="uncoupled",
+    )[0]
     assert case["crystal"] == material
     assert case["surface_hkl"] == surface_hkl
     assert case["hkl_list"] == hkl_list
@@ -864,7 +870,7 @@ def test_named_stack_registered():
     assert stack is not None
     assert [lay.material for lay in stack] == ["sio2", "silicon"]
 
-    case = build_cases(sweep, 10, 5)[0]
+    case = build_cases(sweep, 10, 5, inelastic_model="continuous", radiative_model="uncoupled")[0]
     assert case["crystal"] == "mos2"
     assert len(case["abs_layers"]) == 3
 
@@ -897,7 +903,19 @@ def test_scan_checkpoints_under_registry_name(monkeypatch, tmp_path):
     import argparse
 
     import pyrite.materials as materials_pkg
+    from pyrite.campaign import profiles
     from pyrite.runs import scan
+
+    original_settings = profiles.profile_run_settings
+    monkeypatch.setattr(
+        profiles,
+        "profile_run_settings",
+        lambda *args, **kwargs: replace(
+            original_settings(*args, **kwargs),
+            inelastic_model="continuous",
+            inelastic_cutoff_eV=None,
+        ),
+    )
 
     catalog = materials_pkg.CATALOG
 
@@ -976,7 +994,7 @@ def test_build_cases_carries_groove_spacing():
         crystal_width_mm=None,
         crystal_height_mm=None,
     )
-    cases = build_cases(sweep)
+    cases = build_cases(sweep, inelastic_model="continuous", radiative_model="uncoupled")
     assert all(c["groove_spacing_ang"] == 2.0e4 for c in cases)
 
 
@@ -1040,7 +1058,9 @@ def test_build_cases_groove_allows_default_finite_footprint():
             tilt_deg=45.0,
             tilt_azim_deg=180.0,
             groove_spacing_ang=2.0e4,
-        )
+        ),
+        inelastic_model="continuous",
+        radiative_model="uncoupled",
     )
     assert cases
     for c in cases:

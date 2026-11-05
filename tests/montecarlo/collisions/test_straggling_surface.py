@@ -85,6 +85,7 @@ def test_case_rejects_inconsistent_manual_transport_controls():
         n_electrons=1,
         n_electrons_brem=1,
         energy_model="frozen",
+        inelastic_model="continuous",
         radiative_model="uncoupled",
     )[0]
     with pytest.raises(ValueError, match="requires energy_model='midpoint'"):

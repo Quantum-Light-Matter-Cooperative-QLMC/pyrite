@@ -282,7 +282,9 @@ def _sweep(**kwargs):
     ],
 )
 def test_lower_reproduces_the_build_cases_geometry(sweep_kwargs, target):
-    cases = build_cases(_sweep(**sweep_kwargs))
+    cases = build_cases(
+        _sweep(**sweep_kwargs), inelastic_model="continuous", radiative_model="uncoupled"
+    )
     lowered = _lower(target)
 
     assert len(lowered) == len(cases)  # one beam energy, so the products align 1:1

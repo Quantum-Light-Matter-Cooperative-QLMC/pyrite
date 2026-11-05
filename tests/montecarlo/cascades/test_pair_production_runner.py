@@ -59,8 +59,8 @@ def test_case_key_joins_only_coupled_cases(monkeypatch, resolved):
         bremslib_tables, "resolve_bremsstrahlung_model", lambda _model, _elements: resolved
     )
     sweep = material_sweep("silicon")
-    plain = build_cases(sweep, 4, 4, **SHELL, **COUPLED)[0]
-    paired = build_cases(sweep, 4, 4, **SHELL, **COUPLED, **PAIR)[0]
+    plain = build_cases(sweep, 4, 4, bremsstrahlung_model="auto", **SHELL, **COUPLED)[0]
+    paired = build_cases(sweep, 4, 4, bremsstrahlung_model="auto", **SHELL, **COUPLED, **PAIR)[0]
     assert "pair_production_model" not in plain
     if resolved == "bremslib":
         assert paired["pair_production_model"] == "penelope-2024"

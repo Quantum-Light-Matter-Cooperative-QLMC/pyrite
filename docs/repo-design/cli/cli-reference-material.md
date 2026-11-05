@@ -138,18 +138,21 @@ Usage: pyrite material blaze [OPTIONS] MATERIAL
   Repeat --energy/--spacing/--polar for multiple values.
 
 Options:
-  --energy E                 Beam energies in keV (one or more).  [required]
-  --spacing S                Groove spacing(s) in meters (one, or one per energy).
-                             [required]
-  --polar A                  Polar tilt values in degrees.  [0.0<x<90.0]
-  --workers NUMBER           run_cases max_workers (default auto; 0 = serial).
-  --checkpoint-dir DIR       Read and write blazed component checkpoints in DIR.
-                             [default: (pyrite-output/checkpoints)]
-  --max-minutes MINUTES      Soft wall-clock budget in minutes; exit 75 if resumable
-                             work remains.
-  -o, --output [table|json]  Output format; only json is a stable automation contract.
-                             [default: table]
-  -h, --help                 Show this message and exit.
+  --energy E                      Beam energies in keV (one or more).  [required]
+  --spacing S                     Groove spacing(s) in meters (one, or one per energy).
+                                  [required]
+  --polar A                       Polar tilt values in degrees.  [0.0<x<90.0]
+  --inelastic-model [continuous]  Select continuous stopping for grooved targets.
+  --radiative-model [uncoupled]   Select radiative scoring without transport energy-loss
+                                  feedback.
+  --workers NUMBER                run_cases max_workers (default auto; 0 = serial).
+  --checkpoint-dir DIR            Read and write blazed component checkpoints in DIR.
+                                  [default: (pyrite-output/checkpoints)]
+  --max-minutes MINUTES           Soft wall-clock budget in minutes; exit 75 if
+                                  resumable work remains.
+  -o, --output [table|json]       Output format; only json is a stable automation
+                                  contract.  [default: table]
+  -h, --help                      Show this message and exit.
 ```
 
 ## `pyrite material validate`

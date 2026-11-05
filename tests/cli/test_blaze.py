@@ -34,7 +34,7 @@ def _run_and_capture(monkeypatch, argv):
 
     monkeypatch.setattr(blaze, "gate_cases_by_penetration", fake_gate)
     monkeypatch.setattr(blaze, "run_sweep", fake_run_sweep)
-    result = _invoke(argv)
+    result = _invoke([*argv, "--inelastic-model", "continuous", "--radiative-model", "uncoupled"])
     assert result.exit_code == 0
     assert result.stderr == ""
     return captured

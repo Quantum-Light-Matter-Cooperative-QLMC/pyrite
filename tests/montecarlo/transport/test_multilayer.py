@@ -211,7 +211,11 @@ def test_transport_backscatter_increases_with_substrate_Z():
 
 
 def test_build_cases_attaches_abs_layers_only_with_substrate():
-    plain = build_cases(Sweep(material="mose2", tilt_deg=30.0, beam=BeamSpec(energy_keV=30.0)))
+    plain = build_cases(
+        Sweep(material="mose2", tilt_deg=30.0, beam=BeamSpec(energy_keV=30.0)),
+        inelastic_model="continuous",
+        radiative_model="uncoupled",
+    )
     assert all(c["abs_layers"] is None for c in plain)
 
     stacked = build_cases(
@@ -221,7 +225,9 @@ def test_build_cases_attaches_abs_layers_only_with_substrate():
             target=Stack.on_substrate(
                 "mose2", 2e4, "sio2", 1e6, tilt_deg=30.0, footprint=Footprint(5.0, 5.0)
             ),
-        )
+        ),
+        inelastic_model="continuous",
+        radiative_model="uncoupled",
     )
     for c in stacked:
         assert c["abs_layers"] is not None and len(c["abs_layers"]) == 2
@@ -253,7 +259,11 @@ def test_substrate_radiator_crystalline_vs_amorphous():
 
 def test_build_cases_layer_radiators_match_stack():
     # no substrate -> single slab, no per-layer radiators
-    plain = build_cases(Sweep(material="mose2", tilt_deg=30.0, beam=BeamSpec(energy_keV=30.0)))
+    plain = build_cases(
+        Sweep(material="mose2", tilt_deg=30.0, beam=BeamSpec(energy_keV=30.0)),
+        inelastic_model="continuous",
+        radiative_model="uncoupled",
+    )
     assert all(c["layer_radiators"] is None for c in plain)
 
     # amorphous substrate -> [film radiator, None] (substrate adds no lines)
@@ -264,7 +274,9 @@ def test_build_cases_layer_radiators_match_stack():
             target=Stack.on_substrate(
                 "mose2", 2e4, "sio2", tilt_deg=30.0, footprint=Footprint(5.0, 5.0)
             ),
-        )
+        ),
+        inelastic_model="continuous",
+        radiative_model="uncoupled",
     )[0]
     film, sub = amorph["layer_radiators"]
     assert sub is None
@@ -282,7 +294,9 @@ def test_build_cases_layer_radiators_match_stack():
             target=Stack.on_substrate(
                 "mose2", 2e4, "sapphire", tilt_deg=30.0, footprint=Footprint(5.0, 5.0)
             ),
-        )
+        ),
+        inelastic_model="continuous",
+        radiative_model="uncoupled",
     )[0]
     assert cryst["layer_radiators"][1]["crystal"] == "sapphire"
     assert len(cryst["layer_radiators"]) == len(cryst["abs_layers"]) == 2
@@ -337,7 +351,7 @@ def test_build_cases_stack_three_layers():
             LayerSpec("silicon", 5e6, azimuth_deg=15.0),
         ),
     )
-    case = build_cases(sw)[0]
+    case = build_cases(sw, inelastic_model="continuous", radiative_model="uncoupled")[0]
     assert len(case["abs_layers"]) == len(case["layer_radiators"]) == 3
     film_rad, oxide, si = case["layer_radiators"]
     assert film_rad["crystal"] == "mos2"
@@ -351,8 +365,16 @@ def test_build_cases_stack_three_layers():
 def test_build_cases_substrate_sugar_matches_single_layer_stack():
     kw: dict[str, Any] = dict(material="mose2", tilt_deg=30.0, beam=BeamSpec(energy_keV=30.0))
     with pytest.deprecated_call():
-        sugar = build_cases(Sweep(**kw, substrate="sapphire", substrate_thickness_ang=1e6))[0]
-    general = build_cases(Sweep(**kw, stack=(LayerSpec("sapphire", 1e6),)))[0]
+        sugar = build_cases(
+            Sweep(**kw, substrate="sapphire", substrate_thickness_ang=1e6),
+            inelastic_model="continuous",
+            radiative_model="uncoupled",
+        )[0]
+    general = build_cases(
+        Sweep(**kw, stack=(LayerSpec("sapphire", 1e6),)),
+        inelastic_model="continuous",
+        radiative_model="uncoupled",
+    )[0]
     helper = build_cases(
         Sweep(
             material="mose2",
@@ -360,7 +382,9 @@ def test_build_cases_substrate_sugar_matches_single_layer_stack():
             target=Stack.on_substrate(
                 "mose2", 2e4, "sapphire", 1e6, tilt_deg=30.0, footprint=Footprint(5.0, 5.0)
             ),
-        )
+        ),
+        inelastic_model="continuous",
+        radiative_model="uncoupled",
     )[0]
     for key in ("abs_layers", "layer_radiators", "name"):
         assert sugar[key] == general[key] == helper[key]

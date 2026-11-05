@@ -76,7 +76,7 @@ def test_canonical_physical_inputs_compose_layered_scenes_and_sweeps(gdf):
     """Composition/serialization require neither GDF file I/O nor transport."""
     from dataclasses import asdict
 
-    from pyrite import Scene, Sweep
+    from pyrite import Physics, Scene, Sweep
     from pyrite.beams import Beam, GdfSource, LongitudinalDistribution, PointBunch, PointSpot
     from pyrite.geometry import Footprint, Layer, Stack
 
@@ -93,7 +93,8 @@ def test_canonical_physical_inputs_compose_layered_scenes_and_sweeps(gdf):
         layers=(Layer("hopg", 1e4), Layer("sio2", 2850.0), Layer("silicon", 5e6)),
         footprint=Footprint(5.0, 5.0),
     )
-    scene = Scene(beam=beam, target=target)
+    physics = Physics(inelastic_model="continuous")
+    scene = Scene(beam=beam, target=target, physics=physics)
     expanded = [value for _, value in Sweep(scene, {"beam.energy_keV": [30.0, 50.0]}).expand()]
     assert [value.beam.energy_keV for value in expanded] == [30.0, 50.0]
     assert all(value.target == target for value in expanded)
@@ -111,6 +112,7 @@ def test_canonical_physical_inputs_compose_layered_scenes_and_sweeps(gdf):
         from pyrite.campaign.geometry import Stack as OriginalStack
 
         legacy_scene = Scene(
+            physics=physics,
             beam=OriginalBeam.from_spec(beam.to_spec()),
             target=OriginalStack(
                 layers=tuple(

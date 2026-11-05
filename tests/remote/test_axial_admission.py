@@ -29,6 +29,7 @@ def axial_profile(monkeypatch):
                 "entry": {"version": 1, "kind": "gaussian", "waist_ang": 0.5},
             },
             radiative_model="uncoupled",
+            radiative_cutoff_eV=None,
             precision=None,
         )
 

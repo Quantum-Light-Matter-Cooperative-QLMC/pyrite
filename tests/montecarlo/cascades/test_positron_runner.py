@@ -41,8 +41,10 @@ def test_case_key_joins_only_coupled_pair_cases(monkeypatch, resolved):
         bremslib_tables, "resolve_bremsstrahlung_model", lambda _model, _elements: resolved
     )
     sweep = material_sweep("silicon")
-    paired = build_cases(sweep, 4, 4, **SHELL, **COUPLED, **PAIR)[0]
-    positron = build_cases(sweep, 4, 4, **SHELL, **COUPLED, **PAIR, **POSITRON)[0]
+    paired = build_cases(sweep, 4, 4, bremsstrahlung_model="auto", **SHELL, **COUPLED, **PAIR)[0]
+    positron = build_cases(
+        sweep, 4, 4, bremsstrahlung_model="auto", **SHELL, **COUPLED, **PAIR, **POSITRON
+    )[0]
     assert "positron_transport" not in paired
     if resolved == "bremslib":
         assert positron["positron_transport"] is True

@@ -21,6 +21,8 @@ class _BlazeCommand(click.Command):
             "--spacing",
             "--polar",
             "--angles",
+            "--inelastic-model",
+            "--radiative-model",
             "--workers",
             "--checkpoint-dir",
             "--max-minutes",
@@ -108,6 +110,18 @@ _EMISSION_ANGLE = click.FloatRange(min=0.0, max=90.0, min_open=True, max_open=Tr
     help="Polar tilt values in degrees.",
 )
 @click.option(
+    "--inelastic-model",
+    type=click.Choice(["continuous"]),
+    default=None,
+    help="Select continuous stopping for grooved targets.",
+)
+@click.option(
+    "--radiative-model",
+    type=click.Choice(["uncoupled"]),
+    default=None,
+    help="Select radiative scoring without transport energy-loss feedback.",
+)
+@click.option(
     "--workers",
     type=_cli_core.NONNEGATIVE_INT,
     default=None,
@@ -135,6 +149,8 @@ def command(
     energies,
     spacings,
     angles,
+    inelastic_model,
+    radiative_model,
     workers,
     checkpoint_dir,
     max_minutes,
@@ -149,6 +165,8 @@ def command(
         energy=list(energies),
         spacing=list(spacings),
         angles=list(angles) if angles else None,
+        inelastic_model=inelastic_model,
+        radiative_model=radiative_model,
         workers=workers,
         checkpoint_dir=checkpoint_dir,
         max_minutes=max_minutes,

@@ -8,7 +8,8 @@ automatically by the existing geometry code
 (``montecarlo.groove.blazed_groove_spec``); this driver only supplies groove
 spacing and the scan grid.
 
-    pyrite material blaze hopg --spacing 2e-6 --energy 30 --polar 25 45
+    pyrite material blaze hopg --spacing 2e-6 --energy 30 --polar 25 45 \
+        --inelastic-model continuous --radiative-model uncoupled
 
 adds a HOPG crystal with 2 micron-spaced grooves, scanned over polar angles
 25 deg and 45 deg.
@@ -32,6 +33,7 @@ import io
 import os
 import time
 from contextlib import redirect_stderr, redirect_stdout
+from dataclasses import replace
 
 from ..console import json as cli_json
 from ..console import output as _cli_core
@@ -126,6 +128,16 @@ def _run_json(args):
     _cli_core.emit_json_result(result, failure_exit=75 if resumable else 1)
 
 
+def _physics_settings(settings, args):
+    """Apply explicit model selections for the grooved target."""
+    overrides = {}
+    if getattr(args, "inelastic_model", None) is not None:
+        overrides.update(inelastic_model=args.inelastic_model, inelastic_cutoff_eV=None)
+    if getattr(args, "radiative_model", None) is not None:
+        overrides.update(radiative_model=args.radiative_model, radiative_cutoff_eV=None)
+    return replace(settings, **overrides) if overrides else settings
+
+
 def run(args):
     _load_runtime()
     assert default_settings is not None
@@ -143,7 +155,7 @@ def run(args):
     spacings_ang = [spacing_m * 1e10 for spacing_m in args.spacing]
     pairs = _pair_energies_and_spacings(args.energy, spacings_ang)
 
-    settings = default_settings()
+    settings = _physics_settings(default_settings(), args)
     cases = []
     for energy_keV, spacing_ang in pairs:
         # crystal_width_mm/crystal_height_mm are left at the material_sweep
