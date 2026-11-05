@@ -737,7 +737,7 @@ def radiative_core_args(
         from .radiative_moment_transport import pack_transport_moments
 
         plasma = pack_transport_moments(
-            compositions, tables, min_cutoff_eV, maximum_eV, cutoff_eV, packed[-1]
+            compositions, tables, min_cutoff_eV, maximum_eV, cutoff_eV, packed
         )
         packed = (*packed[:-1], plasma)
     elif moment_mode != "exact":

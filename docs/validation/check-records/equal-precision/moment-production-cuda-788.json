@@ -1,0 +1,1269 @@
+{
+ "schema": "radiative-moment-production-cuda-788-v1",
+ "jobs": {
+  "ensemble": [
+   3913,
+   3930
+  ],
+  "failed_start": {
+   "3913": "HostMemoryResourceError on SiO2 compound at 50000 histories; 7 completed seed-78831 cases resumed by 3930"
+  }
+ },
+ "sources": {
+  "a13539fd41ee4a1d4dfb91005eb9ac086337f9cf": "jobs 3913/3914 (code_digest cd7051a9...)",
+  "14f2cbd4564bee373cb2049555910efe4f7355f9": "resume jobs 3930/3931 (code_digest c8d00ccf...); src/ identical to 9c4b6f45, only checks/ changed; moment_source hashes identical in every record"
+ },
+ "source_dirty": false,
+ "tables_digest": "fa64dadcf63912be948c11f4b30745483bbe14b5df3a81dc6613ae46b7cf5e1e",
+ "sbethe_tables": {
+  "silicon": {
+   "generated": false,
+   "table_key": "86c73cd7a10433ce547de2ae9458e3fd7c09da3c394e8e07e5f7f9415bfaff32",
+   "digest": "cd6144893da65f70656bd7880c6083642862cd6068b34aaeb0d36bf73e7fe20f"
+  },
+  "W": {
+   "generated": false,
+   "table_key": "6a7b4dbfeffcbb8243196a6c1633d5a3373c763e1ab8187d14f8fdc78b040abe",
+   "digest": "aab6a247acaa6303e5db0ad052ad43c6c4b3f35b073ef683bc34b3071bc442c3"
+  }
+ },
+ "node": "DESKTOP-QNIHO3D, gpu partition, NVIDIA GeForce RTX 5080, driver 610.47 / CUDA 13.3, 24 GiB job memory",
+ "sbatch": "checks/equal_precision/moment-production-788.sbatch",
+ "harness": "checks/equal_precision/benchmark_moment_production.py (shipped radiative_moments exact/table; refined = shipped path at rtol 1e-4)",
+ "protocol": "checks/equal_precision/moment-production-788.json",
+ "protocol_sha256": "eedfad7bf01c464b689db7e3fe292555ae88456ca833c9cf94ac31ab86d1eb26",
+ "protocol_amendment": "SiO2 compound 50000 -> 20000 histories after jobs 3913/3914 host-memory refusal (27.14 GiB > 24 GiB); amended before any compound result; completed records resumed, not rerun",
+ "moment_source": {
+  "reference_sha256": "47394195598cf2fae08f76488a01dc1a0221f79fc23b1513091f0168ada90ce8",
+  "lookup_sha256": "38288b16d9c44e2f39da905e024a387342f020859ff7343ddc926b209edc843c",
+  "packer_sha256": "b89866c74e2851874f4f7b9f77116e0260a5d1e3348e62083384f3e8fd20bedb",
+  "wrapper_sha256": "b1ab1e871cb7ed24d00f9ca2b14beb7d2f84a6d0545d21acc7ceb07a6b016cd3",
+  "protocol_sha256": "1b3d0748828ab001b385644208020b50d28eb1f484aa9f5a310458ba437d376f",
+  "exact_sampler_sha256": "83c1464e0244b315bcf3a396766b436b5696d361da55ebde5ed0bc2bdc9a398b",
+  "path": "production"
+ },
+ "hardware_preflight": {
+  "cuda_tests": "tests/montecarlo/cascades/test_radiative_moments_cuda.py + test_hard_radiative_cuda.py: 11 passed (job 3930)",
+  "same_seed_replay": "24/24 case x variant preflights at 256 histories (seed 78830) pass in-process replay with matching persisted moment policy"
+ },
+ "table_identity": "one persisted moment_table_sha256 per case and variant across all three seeds; table SHAs match the benchmark job for shared cases",
+ "ensemble": {
+  "seeds": [
+   78831,
+   78832,
+   78833
+  ],
+  "histories_per_seed": "50000 (SiO2 compound 20000)",
+  "confidence": 0.99,
+  "rule": "entire paired CI inside margin; <30 changed pairs or zero variance unresolved; unresolved is not pass",
+  "status_counts": {
+   "unresolved": 66,
+   "screening_pass": 30
+  },
+  "failures": 0
+ },
+ "interpretation": "CUDA paired screening over 8 cases x {table, refined} x 6 metrics: 30 screening passes, 66 unresolved, 0 failures. Hard count changed in zero pairs in every comparison (unresolved by rule, not passed); photon energy resolves only for W 100 keV 75 deg (37 changed pairs). Transmission/backscatter flags changed in zero pairs (unresolved). Per-comparison 99% intervals, screening only, no family-wise or equal-precision claim. Request ratios are in-job diagnostics, not the benchmark.",
+ "comparisons": [
+  {
+   "scene": "si-100-1um-0deg",
+   "cutoff_eV": 1000,
+   "variant": "table",
+   "paired_seeds": 3,
+   "complete_seed_set": true,
+   "histories": 150000,
+   "checks": {
+    "hard_count": {
+     "status": "unresolved",
+     "nonzero_differences": 0,
+     "mean_difference": 0.0,
+     "confidence_interval": [
+      0.0,
+      0.0
+     ],
+     "margin": 1.1333333333333332e-06
+    },
+    "photon_energy_keV_per_primary": {
+     "status": "unresolved",
+     "nonzero_differences": 0,
+     "mean_difference": 0.0,
+     "confidence_interval": [
+      0.0,
+      0.0
+     ],
+     "margin": 4.208907779947917e-06
+    },
+    "path_length": {
+     "status": "unresolved",
+     "nonzero_differences": 17,
+     "mean_difference": -6.5289861595374535e-09,
+     "confidence_interval": [
+      -1.7493735908297397e-08,
+      4.43576358922249e-09
+     ],
+     "margin": 20.50753034117477
+    },
+    "transmitted_energy_keV_per_primary": {
+     "status": "screening_pass",
+     "nonzero_differences": 149683,
+     "mean_difference": 1.3006849618098689e-11,
+     "confidence_interval": [
+      1.1373277800608692e-11,
+      1.4640421435588685e-11
+     ],
+     "margin": 0.19802424487343182
+    },
+    "transmitted": {
+     "status": "unresolved",
+     "nonzero_differences": 0,
+     "mean_difference": 0.0,
+     "confidence_interval": [
+      0.0,
+      0.0
+     ],
+     "margin": 0.002
+    },
+    "backscattered": {
+     "status": "unresolved",
+     "nonzero_differences": 0,
+     "mean_difference": 0.0,
+     "confidence_interval": [
+      0.0,
+      0.0
+     ],
+     "margin": 0.002
+    }
+   },
+   "diagnostic_request_ratio_exact_over_variant": [
+    1.1082025444268941,
+    1.137071596330071,
+    1.0400988361811108
+   ]
+  },
+  {
+   "scene": "si-100-1um-0deg",
+   "cutoff_eV": 1000,
+   "variant": "refined",
+   "paired_seeds": 3,
+   "complete_seed_set": true,
+   "histories": 150000,
+   "checks": {
+    "hard_count": {
+     "status": "unresolved",
+     "nonzero_differences": 0,
+     "mean_difference": 0.0,
+     "confidence_interval": [
+      0.0,
+      0.0
+     ],
+     "margin": 1.1333333333333332e-06
+    },
+    "photon_energy_keV_per_primary": {
+     "status": "unresolved",
+     "nonzero_differences": 0,
+     "mean_difference": 0.0,
+     "confidence_interval": [
+      0.0,
+      0.0
+     ],
+     "margin": 4.208907779947917e-06
+    },
+    "path_length": {
+     "status": "unresolved",
+     "nonzero_differences": 17,
+     "mean_difference": -6.5289861595374535e-09,
+     "confidence_interval": [
+      -1.7493735908297397e-08,
+      4.43576358922249e-09
+     ],
+     "margin": 20.50753034117477
+    },
+    "transmitted_energy_keV_per_primary": {
+     "status": "screening_pass",
+     "nonzero_differences": 149683,
+     "mean_difference": 1.3006849618098689e-11,
+     "confidence_interval": [
+      1.1373277800608692e-11,
+      1.4640421435588685e-11
+     ],
+     "margin": 0.19802424487343182
+    },
+    "transmitted": {
+     "status": "unresolved",
+     "nonzero_differences": 0,
+     "mean_difference": 0.0,
+     "confidence_interval": [
+      0.0,
+      0.0
+     ],
+     "margin": 0.002
+    },
+    "backscattered": {
+     "status": "unresolved",
+     "nonzero_differences": 0,
+     "mean_difference": 0.0,
+     "confidence_interval": [
+      0.0,
+      0.0
+     ],
+     "margin": 0.002
+    }
+   },
+   "diagnostic_request_ratio_exact_over_variant": [
+    1.1217219887428351,
+    1.134602665566262,
+    1.0823816065962681
+   ]
+  },
+  {
+   "scene": "si-300-100um-0deg",
+   "cutoff_eV": 1000,
+   "variant": "table",
+   "paired_seeds": 3,
+   "complete_seed_set": true,
+   "histories": 150000,
+   "checks": {
+    "hard_count": {
+     "status": "unresolved",
+     "nonzero_differences": 0,
+     "mean_difference": 0.0,
+     "confidence_interval": [
+      0.0,
+      0.0
+     ],
+     "margin": 0.0001506
+    },
+    "photon_energy_keV_per_primary": {
+     "status": "unresolved",
+     "nonzero_differences": 12,
+     "mean_difference": 5.013020833984546e-10,
+     "confidence_interval": [
+      -5.365199739108542e-10,
+      1.5391241407077632e-09
+     ],
+     "margin": 0.003786383135766602
+    },
+    "path_length": {
+     "status": "screening_pass",
+     "nonzero_differences": 8590,
+     "mean_difference": 2.742287096528647e-06,
+     "confidence_interval": [
+      -1.6447735529668937e-05,
+      2.1932309722726232e-05
+     ],
+     "margin": 3277.907467379064
+    },
+    "transmitted_energy_keV_per_primary": {
+     "status": "screening_pass",
+     "nonzero_differences": 126922,
+     "mean_difference": 2.895959222352455e-10,
+     "confidence_interval": [
+      -2.888248792225835e-10,
+      8.680167236930745e-10
+     ],
+     "margin": 0.3974264085997435
+    },
+    "transmitted": {
+     "status": "unresolved",
+     "nonzero_differences": 0,
+     "mean_difference": 0.0,
+     "confidence_interval": [
+      0.0,
+      0.0
+     ],
+     "margin": 0.002
+    },
+    "backscattered": {
+     "status": "unresolved",
+     "nonzero_differences": 0,
+     "mean_difference": 0.0,
+     "confidence_interval": [
+      0.0,
+      0.0
+     ],
+     "margin": 0.002
+    }
+   },
+   "diagnostic_request_ratio_exact_over_variant": [
+    1.0754095796903849,
+    1.116226144943781,
+    1.0513641457507445
+   ]
+  },
+  {
+   "scene": "si-300-100um-0deg",
+   "cutoff_eV": 1000,
+   "variant": "refined",
+   "paired_seeds": 3,
+   "complete_seed_set": true,
+   "histories": 150000,
+   "checks": {
+    "hard_count": {
+     "status": "unresolved",
+     "nonzero_differences": 0,
+     "mean_difference": 0.0,
+     "confidence_interval": [
+      0.0,
+      0.0
+     ],
+     "margin": 0.0001506
+    },
+    "photon_energy_keV_per_primary": {
+     "status": "unresolved",
+     "nonzero_differences": 11,
+     "mean_difference": 4.4921875007819523e-10,
+     "confidence_interval": [
+      -5.798963676489275e-10,
+      1.478333867805318e-09
+     ],
+     "margin": 0.003786383135766602
+    },
+    "path_length": {
+     "status": "screening_pass",
+     "nonzero_differences": 8590,
+     "mean_difference": 2.224382924323436e-06,
+     "confidence_interval": [
+      -1.6958594689563526e-05,
+      2.1407360538210398e-05
+     ],
+     "margin": 3277.907467379064
+    },
+    "transmitted_energy_keV_per_primary": {
+     "status": "screening_pass",
+     "nonzero_differences": 126922,
+     "mean_difference": 2.8904765510873175e-10,
+     "confidence_interval": [
+      -2.8937456512352476e-10,
+      8.674698753409883e-10
+     ],
+     "margin": 0.3974264085997435
+    },
+    "transmitted": {
+     "status": "unresolved",
+     "nonzero_differences": 0,
+     "mean_difference": 0.0,
+     "confidence_interval": [
+      0.0,
+      0.0
+     ],
+     "margin": 0.002
+    },
+    "backscattered": {
+     "status": "unresolved",
+     "nonzero_differences": 0,
+     "mean_difference": 0.0,
+     "confidence_interval": [
+      0.0,
+      0.0
+     ],
+     "margin": 0.002
+    }
+   },
+   "diagnostic_request_ratio_exact_over_variant": [
+    1.0872146916046024,
+    1.0703016162750594,
+    1.109161973935469
+   ]
+  },
+  {
+   "scene": "si-300-100um-0deg",
+   "cutoff_eV": 10000.0,
+   "variant": "table",
+   "paired_seeds": 3,
+   "complete_seed_set": true,
+   "histories": 150000,
+   "checks": {
+    "hard_count": {
+     "status": "unresolved",
+     "nonzero_differences": 0,
+     "mean_difference": 0.0,
+     "confidence_interval": [
+      0.0,
+      0.0
+     ],
+     "margin": 6.893333333333333e-05
+    },
+    "photon_energy_keV_per_primary": {
+     "status": "unresolved",
+     "nonzero_differences": 10,
+     "mean_difference": -3.2552083331793826e-09,
+     "confidence_interval": [
+      -7.632090397207131e-09,
+      1.121673730848367e-09
+     ],
+     "margin": 0.003379128982421875
+    },
+    "path_length": {
+     "status": "screening_pass",
+     "nonzero_differences": 15527,
+     "mean_difference": 0.00013072712788542656,
+     "confidence_interval": [
+      7.103819768352479e-05,
+      0.00019041605808732832
+     ],
+     "margin": 3278.188822108313
+    },
+    "transmitted_energy_keV_per_primary": {
+     "status": "screening_pass",
+     "nonzero_differences": 126929,
+     "mean_difference": 1.7740441757621758e-08,
+     "confidence_interval": [
+      1.4433048246247335e-08,
+      2.1047835268996182e-08
+     ],
+     "margin": 0.39743811333192697
+    },
+    "transmitted": {
+     "status": "unresolved",
+     "nonzero_differences": 0,
+     "mean_difference": 0.0,
+     "confidence_interval": [
+      0.0,
+      0.0
+     ],
+     "margin": 0.002
+    },
+    "backscattered": {
+     "status": "unresolved",
+     "nonzero_differences": 0,
+     "mean_difference": 0.0,
+     "confidence_interval": [
+      0.0,
+      0.0
+     ],
+     "margin": 0.002
+    }
+   },
+   "diagnostic_request_ratio_exact_over_variant": [
+    1.102738735141821,
+    1.135119019318645,
+    1.0812187525967927
+   ]
+  },
+  {
+   "scene": "si-300-100um-0deg",
+   "cutoff_eV": 10000.0,
+   "variant": "refined",
+   "paired_seeds": 3,
+   "complete_seed_set": true,
+   "histories": 150000,
+   "checks": {
+    "hard_count": {
+     "status": "unresolved",
+     "nonzero_differences": 0,
+     "mean_difference": 0.0,
+     "confidence_interval": [
+      0.0,
+      0.0
+     ],
+     "margin": 6.893333333333333e-05
+    },
+    "photon_energy_keV_per_primary": {
+     "status": "unresolved",
+     "nonzero_differences": 8,
+     "mean_difference": -3.203124999835438e-09,
+     "confidence_interval": [
+      -7.553196947596015e-09,
+      1.1469469479251398e-09
+     ],
+     "margin": 0.003379128982421875
+    },
+    "path_length": {
+     "status": "screening_pass",
+     "nonzero_differences": 15177,
+     "mean_difference": 0.00010426840743796978,
+     "confidence_interval": [
+      4.476829839231889e-05,
+      0.00016376851648362066
+     ],
+     "margin": 3278.188822108313
+    },
+    "transmitted_energy_keV_per_primary": {
+     "status": "screening_pass",
+     "nonzero_differences": 126929,
+     "mean_difference": 1.7024571064065222e-08,
+     "confidence_interval": [
+      1.3733548683417324e-08,
+      2.031559344471312e-08
+     ],
+     "margin": 0.39743811333192697
+    },
+    "transmitted": {
+     "status": "unresolved",
+     "nonzero_differences": 0,
+     "mean_difference": 0.0,
+     "confidence_interval": [
+      0.0,
+      0.0
+     ],
+     "margin": 0.002
+    },
+    "backscattered": {
+     "status": "unresolved",
+     "nonzero_differences": 0,
+     "mean_difference": 0.0,
+     "confidence_interval": [
+      0.0,
+      0.0
+     ],
+     "margin": 0.002
+    }
+   },
+   "diagnostic_request_ratio_exact_over_variant": [
+    1.1101310437377394,
+    1.0903024680737092,
+    1.093715525059053
+   ]
+  },
+  {
+   "scene": "si-800-100um-0deg",
+   "cutoff_eV": 1000,
+   "variant": "table",
+   "paired_seeds": 3,
+   "complete_seed_set": true,
+   "histories": 150000,
+   "checks": {
+    "hard_count": {
+     "status": "unresolved",
+     "nonzero_differences": 0,
+     "mean_difference": 0.0,
+     "confidence_interval": [
+      0.0,
+      0.0
+     ],
+     "margin": 8.460000000000001e-05
+    },
+    "photon_energy_keV_per_primary": {
+     "status": "unresolved",
+     "nonzero_differences": 1,
+     "mean_difference": 3.255208332516209e-12,
+     "confidence_interval": [
+      -5.129759377436515e-12,
+      1.1640176042468932e-11
+     ],
+     "margin": 0.004476579458764648
+    },
+    "path_length": {
+     "status": "screening_pass",
+     "nonzero_differences": 1345,
+     "mean_difference": -3.4635642954769235e-06,
+     "confidence_interval": [
+      -7.295345217138947e-06,
+      3.6821662618509966e-07
+     ],
+     "margin": 2176.377319339557
+    },
+    "transmitted_energy_keV_per_primary": {
+     "status": "screening_pass",
+     "nonzero_differences": 149094,
+     "mean_difference": 2.3303234809191053e-09,
+     "confidence_interval": [
+      2.163864887606381e-09,
+      2.4967820742318296e-09
+     ],
+     "margin": 1.512921658520711
+    },
+    "transmitted": {
+     "status": "unresolved",
+     "nonzero_differences": 0,
+     "mean_difference": 0.0,
+     "confidence_interval": [
+      0.0,
+      0.0
+     ],
+     "margin": 0.002
+    },
+    "backscattered": {
+     "status": "unresolved",
+     "nonzero_differences": 0,
+     "mean_difference": 0.0,
+     "confidence_interval": [
+      0.0,
+      0.0
+     ],
+     "margin": 0.002
+    }
+   },
+   "diagnostic_request_ratio_exact_over_variant": [
+    1.2353152036193287,
+    1.4337997002582807,
+    1.217544681034662
+   ]
+  },
+  {
+   "scene": "si-800-100um-0deg",
+   "cutoff_eV": 1000,
+   "variant": "refined",
+   "paired_seeds": 3,
+   "complete_seed_set": true,
+   "histories": 150000,
+   "checks": {
+    "hard_count": {
+     "status": "unresolved",
+     "nonzero_differences": 0,
+     "mean_difference": 0.0,
+     "confidence_interval": [
+      0.0,
+      0.0
+     ],
+     "margin": 8.460000000000001e-05
+    },
+    "photon_energy_keV_per_primary": {
+     "status": "unresolved",
+     "nonzero_differences": 1,
+     "mean_difference": 3.255208332516209e-12,
+     "confidence_interval": [
+      -5.129759377436515e-12,
+      1.1640176042468932e-11
+     ],
+     "margin": 0.004476579458764648
+    },
+    "path_length": {
+     "status": "screening_pass",
+     "nonzero_differences": 1345,
+     "mean_difference": -3.46358961192891e-06,
+     "confidence_interval": [
+      -7.295369854557857e-06,
+      3.681906307000378e-07
+     ],
+     "margin": 2176.377319339557
+    },
+    "transmitted_energy_keV_per_primary": {
+     "status": "screening_pass",
+     "nonzero_differences": 149094,
+     "mean_difference": 2.33032213259321e-09,
+     "confidence_interval": [
+      2.163864996247982e-09,
+      2.496779268938438e-09
+     ],
+     "margin": 1.512921658520711
+    },
+    "transmitted": {
+     "status": "unresolved",
+     "nonzero_differences": 0,
+     "mean_difference": 0.0,
+     "confidence_interval": [
+      0.0,
+      0.0
+     ],
+     "margin": 0.002
+    },
+    "backscattered": {
+     "status": "unresolved",
+     "nonzero_differences": 0,
+     "mean_difference": 0.0,
+     "confidence_interval": [
+      0.0,
+      0.0
+     ],
+     "margin": 0.002
+    }
+   },
+   "diagnostic_request_ratio_exact_over_variant": [
+    1.2592192414558192,
+    1.4225942444484894,
+    1.240315088004817
+   ]
+  },
+  {
+   "scene": "sio2-800kev-tr0.3-0deg-compound",
+   "cutoff_eV": 1000,
+   "variant": "table",
+   "paired_seeds": 3,
+   "complete_seed_set": true,
+   "histories": 60000,
+   "checks": {
+    "hard_count": {
+     "status": "unresolved",
+     "nonzero_differences": 0,
+     "mean_difference": 0.0,
+     "confidence_interval": [
+      0.0,
+      0.0
+     ],
+     "margin": 0.0005515
+    },
+    "photon_energy_keV_per_primary": {
+     "status": "unresolved",
+     "nonzero_differences": 10,
+     "mean_difference": 1.6967773436182832e-09,
+     "confidence_interval": [
+      -2.3490547478890733e-09,
+      5.742609435125639e-09
+     ],
+     "margin": 0.02536762462782797
+    },
+    "path_length": {
+     "status": "screening_pass",
+     "nonzero_differences": 10315,
+     "mean_difference": 9.84267575511088e-05,
+     "confidence_interval": [
+      -1.731662332854348e-05,
+      0.00021417013843076107
+     ],
+     "margin": 17016.324419378594
+    },
+    "transmitted_energy_keV_per_primary": {
+     "status": "screening_pass",
+     "nonzero_differences": 49617,
+     "mean_difference": 4.820443134197679e-09,
+     "confidence_interval": [
+      -1.6956900904578029e-09,
+      1.1336576358853161e-08
+     ],
+     "margin": 0.8950631190929843
+    },
+    "transmitted": {
+     "status": "unresolved",
+     "nonzero_differences": 0,
+     "mean_difference": 0.0,
+     "confidence_interval": [
+      0.0,
+      0.0
+     ],
+     "margin": 0.002
+    },
+    "backscattered": {
+     "status": "unresolved",
+     "nonzero_differences": 0,
+     "mean_difference": 0.0,
+     "confidence_interval": [
+      0.0,
+      0.0
+     ],
+     "margin": 0.002
+    }
+   },
+   "diagnostic_request_ratio_exact_over_variant": [
+    1.2972793907524562,
+    1.381977413677681,
+    1.3160395607457578
+   ]
+  },
+  {
+   "scene": "sio2-800kev-tr0.3-0deg-compound",
+   "cutoff_eV": 1000,
+   "variant": "refined",
+   "paired_seeds": 3,
+   "complete_seed_set": true,
+   "histories": 60000,
+   "checks": {
+    "hard_count": {
+     "status": "unresolved",
+     "nonzero_differences": 0,
+     "mean_difference": 0.0,
+     "confidence_interval": [
+      0.0,
+      0.0
+     ],
+     "margin": 0.0005515
+    },
+    "photon_energy_keV_per_primary": {
+     "status": "unresolved",
+     "nonzero_differences": 9,
+     "mean_difference": 1.7293294269508466e-09,
+     "confidence_interval": [
+      -2.315632108701069e-09,
+      5.774290962602762e-09
+     ],
+     "margin": 0.02536762462782797
+    },
+    "path_length": {
+     "status": "screening_pass",
+     "nonzero_differences": 10315,
+     "mean_difference": 9.816489860143823e-05,
+     "confidence_interval": [
+      -1.7577820167391872e-05,
+      0.00021390761737026835
+     ],
+     "margin": 17016.324419378594
+    },
+    "transmitted_energy_keV_per_primary": {
+     "status": "screening_pass",
+     "nonzero_differences": 49617,
+     "mean_difference": 4.820344606641195e-09,
+     "confidence_interval": [
+      -1.695788438084371e-09,
+      1.1336477651366761e-08
+     ],
+     "margin": 0.8950631190929843
+    },
+    "transmitted": {
+     "status": "unresolved",
+     "nonzero_differences": 0,
+     "mean_difference": 0.0,
+     "confidence_interval": [
+      0.0,
+      0.0
+     ],
+     "margin": 0.002
+    },
+    "backscattered": {
+     "status": "unresolved",
+     "nonzero_differences": 0,
+     "mean_difference": 0.0,
+     "confidence_interval": [
+      0.0,
+      0.0
+     ],
+     "margin": 0.002
+    }
+   },
+   "diagnostic_request_ratio_exact_over_variant": [
+    1.3214337145303399,
+    1.3799719981296845,
+    1.3802645368335067
+   ]
+  },
+  {
+   "scene": "w-100-100um-75deg",
+   "cutoff_eV": 1000,
+   "variant": "table",
+   "paired_seeds": 3,
+   "complete_seed_set": true,
+   "histories": 150000,
+   "checks": {
+    "hard_count": {
+     "status": "unresolved",
+     "nonzero_differences": 0,
+     "mean_difference": 0.0,
+     "confidence_interval": [
+      0.0,
+      0.0
+     ],
+     "margin": 0.0002746
+    },
+    "photon_energy_keV_per_primary": {
+     "status": "screening_pass",
+     "nonzero_differences": 37,
+     "mean_difference": -6.852213540782989e-10,
+     "confidence_interval": [
+      -1.6244327466627714e-09,
+      2.539900385061737e-10
+     ],
+     "margin": 0.003732904374210612
+    },
+    "path_length": {
+     "status": "screening_pass",
+     "nonzero_differences": 38894,
+     "mean_difference": 2.087974564982081e-06,
+     "confidence_interval": [
+      1.3049311197579127e-06,
+      2.8710180102062496e-06
+     ],
+     "margin": 112.05677145790843
+    },
+    "transmitted_energy_keV_per_primary": {
+     "status": "unresolved",
+     "nonzero_differences": 0,
+     "mean_difference": 0.0,
+     "confidence_interval": [
+      0.0,
+      0.0
+     ],
+     "margin": 0.0
+    },
+    "transmitted": {
+     "status": "unresolved",
+     "nonzero_differences": 0,
+     "mean_difference": 0.0,
+     "confidence_interval": [
+      0.0,
+      0.0
+     ],
+     "margin": 0.002
+    },
+    "backscattered": {
+     "status": "unresolved",
+     "nonzero_differences": 0,
+     "mean_difference": 0.0,
+     "confidence_interval": [
+      0.0,
+      0.0
+     ],
+     "margin": 0.002
+    }
+   },
+   "diagnostic_request_ratio_exact_over_variant": [
+    1.0741437797179016,
+    1.0680421217625238,
+    1.0765629871870288
+   ]
+  },
+  {
+   "scene": "w-100-100um-75deg",
+   "cutoff_eV": 1000,
+   "variant": "refined",
+   "paired_seeds": 3,
+   "complete_seed_set": true,
+   "histories": 150000,
+   "checks": {
+    "hard_count": {
+     "status": "unresolved",
+     "nonzero_differences": 0,
+     "mean_difference": 0.0,
+     "confidence_interval": [
+      0.0,
+      0.0
+     ],
+     "margin": 0.0002746
+    },
+    "photon_energy_keV_per_primary": {
+     "status": "screening_pass",
+     "nonzero_differences": 37,
+     "mean_difference": -6.852213540782989e-10,
+     "confidence_interval": [
+      -1.6244327466627714e-09,
+      2.539900385061737e-10
+     ],
+     "margin": 0.003732904374210612
+    },
+    "path_length": {
+     "status": "screening_pass",
+     "nonzero_differences": 38893,
+     "mean_difference": 2.1025885283461323e-06,
+     "confidence_interval": [
+      1.3206189631849534e-06,
+      2.884558093507311e-06
+     ],
+     "margin": 112.05677145790843
+    },
+    "transmitted_energy_keV_per_primary": {
+     "status": "unresolved",
+     "nonzero_differences": 0,
+     "mean_difference": 0.0,
+     "confidence_interval": [
+      0.0,
+      0.0
+     ],
+     "margin": 0.0
+    },
+    "transmitted": {
+     "status": "unresolved",
+     "nonzero_differences": 0,
+     "mean_difference": 0.0,
+     "confidence_interval": [
+      0.0,
+      0.0
+     ],
+     "margin": 0.002
+    },
+    "backscattered": {
+     "status": "unresolved",
+     "nonzero_differences": 0,
+     "mean_difference": 0.0,
+     "confidence_interval": [
+      0.0,
+      0.0
+     ],
+     "margin": 0.002
+    }
+   },
+   "diagnostic_request_ratio_exact_over_variant": [
+    1.0690375690302116,
+    1.0984211683170544,
+    1.0953225123844885
+   ]
+  },
+  {
+   "scene": "w-300-10um-0deg",
+   "cutoff_eV": 1000,
+   "variant": "table",
+   "paired_seeds": 3,
+   "complete_seed_set": true,
+   "histories": 150000,
+   "checks": {
+    "hard_count": {
+     "status": "unresolved",
+     "nonzero_differences": 0,
+     "mean_difference": 0.0,
+     "confidence_interval": [
+      0.0,
+      0.0
+     ],
+     "margin": 0.0007417999999999999
+    },
+    "photon_energy_keV_per_primary": {
+     "status": "unresolved",
+     "nonzero_differences": 22,
+     "mean_difference": -3.364257812386029e-09,
+     "confidence_interval": [
+      -7.943756253304624e-09,
+      1.215240628532566e-09
+     ],
+     "margin": 0.024150018218278
+    },
+    "path_length": {
+     "status": "screening_pass",
+     "nonzero_differences": 14611,
+     "mean_difference": 1.11295843694946e-05,
+     "confidence_interval": [
+      2.7482337673648302e-06,
+      1.9510934971624368e-05
+     ],
+     "margin": 466.76291191025354
+    },
+    "transmitted_energy_keV_per_primary": {
+     "status": "screening_pass",
+     "nonzero_differences": 81664,
+     "mean_difference": 2.263728761100481e-09,
+     "confidence_interval": [
+      -1.0399264381980677e-09,
+      5.5673839603990296e-09
+     ],
+     "margin": 0.2657104101752823
+    },
+    "transmitted": {
+     "status": "unresolved",
+     "nonzero_differences": 0,
+     "mean_difference": 0.0,
+     "confidence_interval": [
+      0.0,
+      0.0
+     ],
+     "margin": 0.002
+    },
+    "backscattered": {
+     "status": "unresolved",
+     "nonzero_differences": 0,
+     "mean_difference": 0.0,
+     "confidence_interval": [
+      0.0,
+      0.0
+     ],
+     "margin": 0.002
+    }
+   },
+   "diagnostic_request_ratio_exact_over_variant": [
+    1.2297841887923646,
+    1.2405883766664663,
+    1.2837321682422485
+   ]
+  },
+  {
+   "scene": "w-300-10um-0deg",
+   "cutoff_eV": 1000,
+   "variant": "refined",
+   "paired_seeds": 3,
+   "complete_seed_set": true,
+   "histories": 150000,
+   "checks": {
+    "hard_count": {
+     "status": "unresolved",
+     "nonzero_differences": 0,
+     "mean_difference": 0.0,
+     "confidence_interval": [
+      0.0,
+      0.0
+     ],
+     "margin": 0.0007417999999999999
+    },
+    "photon_energy_keV_per_primary": {
+     "status": "unresolved",
+     "nonzero_differences": 22,
+     "mean_difference": -3.364257812386029e-09,
+     "confidence_interval": [
+      -7.943756253304624e-09,
+      1.215240628532566e-09
+     ],
+     "margin": 0.024150018218278
+    },
+    "path_length": {
+     "status": "screening_pass",
+     "nonzero_differences": 14611,
+     "mean_difference": 1.1135215339854768e-05,
+     "confidence_interval": [
+      2.7538625120333125e-06,
+      1.9516568167676224e-05
+     ],
+     "margin": 466.76291191025354
+    },
+    "transmitted_energy_keV_per_primary": {
+     "status": "screening_pass",
+     "nonzero_differences": 81664,
+     "mean_difference": 2.2637321771767914e-09,
+     "confidence_interval": [
+      -1.0399230703515022e-09,
+      5.567387424705085e-09
+     ],
+     "margin": 0.2657104101752823
+    },
+    "transmitted": {
+     "status": "unresolved",
+     "nonzero_differences": 0,
+     "mean_difference": 0.0,
+     "confidence_interval": [
+      0.0,
+      0.0
+     ],
+     "margin": 0.002
+    },
+    "backscattered": {
+     "status": "unresolved",
+     "nonzero_differences": 0,
+     "mean_difference": 0.0,
+     "confidence_interval": [
+      0.0,
+      0.0
+     ],
+     "margin": 0.002
+    }
+   },
+   "diagnostic_request_ratio_exact_over_variant": [
+    1.2543561281872528,
+    1.292341081129527,
+    1.270293279657286
+   ]
+  },
+  {
+   "scene": "w-800-10um-0deg",
+   "cutoff_eV": 1000,
+   "variant": "table",
+   "paired_seeds": 3,
+   "complete_seed_set": true,
+   "histories": 150000,
+   "checks": {
+    "hard_count": {
+     "status": "unresolved",
+     "nonzero_differences": 0,
+     "mean_difference": 0.0,
+     "confidence_interval": [
+      0.0,
+      0.0
+     ],
+     "margin": 0.00038626666666666666
+    },
+    "photon_energy_keV_per_primary": {
+     "status": "unresolved",
+     "nonzero_differences": 6,
+     "mean_difference": -1.21093750004538e-09,
+     "confidence_interval": [
+      -3.804804125824511e-09,
+      1.3829291257337514e-09
+     ],
+     "margin": 0.026704733586783855
+    },
+    "path_length": {
+     "status": "screening_pass",
+     "nonzero_differences": 6978,
+     "mean_difference": 4.3494787538293167e-07,
+     "confidence_interval": [
+      -2.2774074110318293e-06,
+      3.1473031617976927e-06
+     ],
+     "margin": 290.7418242537372
+    },
+    "transmitted_energy_keV_per_primary": {
+     "status": "screening_pass",
+     "nonzero_differences": 138058,
+     "mean_difference": 1.2127527809061197e-08,
+     "confidence_interval": [
+      9.415069342061356e-09,
+      1.4839986276061039e-08
+     ],
+     "margin": 1.419936447017742
+    },
+    "transmitted": {
+     "status": "unresolved",
+     "nonzero_differences": 0,
+     "mean_difference": 0.0,
+     "confidence_interval": [
+      0.0,
+      0.0
+     ],
+     "margin": 0.002
+    },
+    "backscattered": {
+     "status": "unresolved",
+     "nonzero_differences": 0,
+     "mean_difference": 0.0,
+     "confidence_interval": [
+      0.0,
+      0.0
+     ],
+     "margin": 0.002
+    }
+   },
+   "diagnostic_request_ratio_exact_over_variant": [
+    1.5039675233457128,
+    1.2998896749288953,
+    1.279567869653631
+   ]
+  },
+  {
+   "scene": "w-800-10um-0deg",
+   "cutoff_eV": 1000,
+   "variant": "refined",
+   "paired_seeds": 3,
+   "complete_seed_set": true,
+   "histories": 150000,
+   "checks": {
+    "hard_count": {
+     "status": "unresolved",
+     "nonzero_differences": 0,
+     "mean_difference": 0.0,
+     "confidence_interval": [
+      0.0,
+      0.0
+     ],
+     "margin": 0.00038626666666666666
+    },
+    "photon_energy_keV_per_primary": {
+     "status": "unresolved",
+     "nonzero_differences": 6,
+     "mean_difference": -1.21093750004538e-09,
+     "confidence_interval": [
+      -3.804804125824511e-09,
+      1.3829291257337514e-09
+     ],
+     "margin": 0.026704733586783855
+    },
+    "path_length": {
+     "status": "screening_pass",
+     "nonzero_differences": 6975,
+     "mean_difference": 3.6212250183477107e-07,
+     "confidence_interval": [
+      -2.345952296678379e-06,
+      3.070197300347921e-06
+     ],
+     "margin": 290.7418242537372
+    },
+    "transmitted_energy_keV_per_primary": {
+     "status": "screening_pass",
+     "nonzero_differences": 138058,
+     "mean_difference": 1.2023206511505198e-08,
+     "confidence_interval": [
+      9.31182629714657e-09,
+      1.4734586725863827e-08
+     ],
+     "margin": 1.419936447017742
+    },
+    "transmitted": {
+     "status": "unresolved",
+     "nonzero_differences": 0,
+     "mean_difference": 0.0,
+     "confidence_interval": [
+      0.0,
+      0.0
+     ],
+     "margin": 0.002
+    },
+    "backscattered": {
+     "status": "unresolved",
+     "nonzero_differences": 0,
+     "mean_difference": 0.0,
+     "confidence_interval": [
+      0.0,
+      0.0
+     ],
+     "margin": 0.002
+    }
+   },
+   "diagnostic_request_ratio_exact_over_variant": [
+    1.4924508137665122,
+    1.2443419871755668,
+    1.2772612213473427
+   ]
+  }
+ ],
+ "precision": "CUDA ran the shipped default transport_precision=auto -> mixed (model cuda-exact-mixed-fp32-tables-v1; PYRITE_MC_TRANSPORT_PRECISION unset); the prepared moment buffer stays float64 with FP32 lookup arithmetic. Confirmed for the same code by job 3934's kernel variant key (moment-cpu-cuda-788.json)."
+}

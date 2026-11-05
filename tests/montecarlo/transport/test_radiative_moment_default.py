@@ -111,3 +111,35 @@ def test_production_endpoint_admission_matches_exact_without_relaxing_query_boun
 
 def test_uncoupled_case_explicitly_disables_automatic_radiative_fallback():
     assert case_tables._case_radiative_kwargs({}) == {"radiative_model": "uncoupled"}
+
+
+def test_identical_passes_reuse_moment_buffer_and_inputs_change_the_key(monkeypatch):
+    from pyrite.montecarlo.transport import radiative_moment_transport as transport
+    from pyrite.montecarlo.transport.hard_radiative import radiative_core_args
+
+    monkeypatch.setattr(transport, "_cache", type(transport._cache)())
+    tables = {"C": _table()}
+    args = ([[("C", 0.1)]], tables, 1000.0, np.array([10.0]), np.array([60.0]), 42, 1)
+    first = radiative_core_args(*args, moment_mode="table")[-1]
+    built = first.copy()
+
+    def unexpected(*args, **kwargs):
+        raise AssertionError("identical inputs must not rebuild moments")
+
+    monkeypatch.setattr(transport, "prepare_radiative_moments", unexpected)
+    # A different seed/block start leaves the numerical tables unchanged.
+    again = radiative_core_args(*args[:5], 7, 4, start=4, moment_mode="table")[-1]
+    assert again is first
+    np.testing.assert_array_equal(again, built)
+    assert not again.flags.writeable
+    # Density, cutoff, range and SDCS bytes each select a distinct table.
+    edited = replace(tables["C"], scaled_sdcs_mb=tables["C"].scaled_sdcs_mb * 1.01)
+    variants = [
+        ([[("C", 0.2)]],) + args[1:],
+        args[:2] + (2000.0,) + args[3:],
+        args[:4] + (np.array([50.0]),) + args[5:],
+        (args[0], {"C": edited}) + args[2:],
+    ]
+    for variant in variants:
+        with pytest.raises(AssertionError, match="must not rebuild"):
+            radiative_core_args(*variant, moment_mode="table")
