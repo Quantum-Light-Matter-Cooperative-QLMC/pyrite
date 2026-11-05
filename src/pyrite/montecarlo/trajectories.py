@@ -1,7 +1,7 @@
 """Opt-in HDF5 artifacts of a case's electron-transport result.
 
 A run that requests trajectory capture hands the exact
-:func:`~pyrite.montecarlo.transport.simulate_trajectories` mapping its case
+:func:`~pyrite.montecarlo.transport._simulate_trajectories` mapping its case
 transported -- before the spectrum phase consumes it -- to
 :meth:`TrajectoryCapture.write`. Nothing is re-transported, no random draw is
 consumed, and the mapping is never mutated, so spectra are identical with and

@@ -72,7 +72,7 @@ and [capture workflow](../trajectory-workflows.md).
 | Canonical import (`pyrite.transport.`) | Previous import | Input/output and effects |
 | --- | --- | --- |
 | `Case` | `pyrite.montecarlo.Case` | Validated lowered simulation/configuration record; field-specific units, frozen mapping serialization. Invalid fields raise validation errors; no transport on construction. |
-| `simulate_trajectories` | `pyrite.montecarlo.transport.simulate_trajectories` | Typed Beam/Target/Physics/Numerics inputs, explicit electron cutoff in keV; segment positions and lengths in angstroms; returns segment arrays and incident `Ne`/fate metadata. Samples transport with the supplied seed; may resolve elastic/stopping tables and backend. Unsupported model combinations/table coverage raise errors; incomplete step-limited histories raise. No detector response or photon tally. |
+| `simulate_trajectories` | `pyrite.montecarlo.transport.simulate_trajectories` (removed, #936) | Typed Beam/Target/Physics/Numerics inputs, explicit electron cutoff in keV; segment positions and lengths in angstroms; returns segment arrays and incident `Ne`/fate metadata. Samples transport with the supplied seed; may resolve elastic/stopping tables and backend. Unsupported model combinations/table coverage raise errors; incomplete step-limited histories raise. No detector response or photon tally. |
 | `summarize_trajectories` | `pyrite.montecarlo.trajectory_summary.summarize_trajectories` | Reads a saved capture and explicit depth/energy/angle edges; returns histogram DataFrames. Fate fractions divide by stored incident `Ne`, including missed entries. Depth loss is keV/bin without primary, mass or volume normalization. Invalid edges/missing row fields raise. |
 | `iter_primary_summaries` | `pyrite.montecarlo.trajectory_summary.iter_primary_summaries` | Streams capture DataFrames: primary fate, depth/range (angstrom), terminal pre-event energy (keV), angle (rad). Descendants do not determine primary fate; missed entries have no material rows. Artifact validation and file errors propagate. |
 | `depth_loss_profile` | `pyrite.montecarlo.trajectory_summary.depth_loss_profile` | Stored segment mapping plus depth edges (angstrom) to continuous-loss keV/bin by layer. Excludes cutoff residuals/hard transfers; no primary normalization or file I/O. Invalid edges raise. |
@@ -115,10 +115,10 @@ from pyrite.transport import simulate_trajectories
 segments = simulate_trajectories(
     Beam(30.0, transverse=PointSpot(), longitudinal=PointBunch()),
     Slab("silicon", 1000.0, tilt_deg=30.0, footprint=None),
-    physics=Physics(inelastic_model="continuous", radiative_model="uncoupled",
-                    bremsstrahlung_model="eedl"),
-    numerics=Numerics(sampling=FixedSampling(100, 100), seed=4,
-                      transport_core="per-electron"),
+    physics=Physics(
+        inelastic_model="continuous", radiative_model="uncoupled", bremsstrahlung_model="eedl"
+    ),
+    numerics=Numerics(sampling=FixedSampling(100, 100), seed=4, transport_core="per-electron"),
     E_cut_keV=5.0,
 )
 ```
@@ -132,7 +132,9 @@ bunch timing; omission uses the canonical detector-free source direction.
 Adaptive sampling, channeling/quantum entry states, streamed scoring and photon
 aperture tallies require `pyrite.simulate`. Spectral policies do not produce any
 spectral output here. Old flat arguments, prepared table injection, and internal
-electron-block/cascade controls are no longer public inputs. Repository engine
+electron-block/cascade controls are no longer public inputs. The function is owned by `pyrite.campaign.trajectories`; the former
+`pyrite.montecarlo.transport.simulate_trajectories` and
+`pyrite.montecarlo.simulate_trajectories` paths are removed. Repository engine
 probes use the private `_simulate_trajectories` boundary; it is not a migration
 API for applications. Analytic `"sr"` elastic reference runs remain private;
 public `Physics` selects ELSEPA or the deprecated Mott model.

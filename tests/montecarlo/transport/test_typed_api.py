@@ -7,6 +7,7 @@ import pytest
 
 from pyrite import Scene
 from pyrite.beams import Beam, PointBunch, PointSpot, Spot
+from pyrite.campaign import trajectories as transport_api
 from pyrite.campaign.lowering import build_case
 from pyrite.config import (
     AdaptiveSampling,
@@ -19,7 +20,6 @@ from pyrite.config import (
 )
 from pyrite.geometry import Slab
 from pyrite.montecarlo.transport import _simulate_trajectories
-from pyrite.montecarlo.transport import api as transport_api
 from pyrite.transport import simulate_trajectories
 
 

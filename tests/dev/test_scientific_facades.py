@@ -63,10 +63,15 @@ assert not blocked.intersection(sys.modules)
 def test_transport_alias_preserves_typed_function_identity():
     import inspect
 
-    from pyrite.montecarlo.transport import simulate_trajectories as original
+    import pyrite.montecarlo
+    import pyrite.montecarlo.transport
+    from pyrite.campaign.trajectories import simulate_trajectories as original
     from pyrite.transport import simulate_trajectories
 
     assert simulate_trajectories is original
+    # The physics core keeps only the private flat engine (#936).
+    assert not hasattr(pyrite.montecarlo.transport, "simulate_trajectories")
+    assert "simulate_trajectories" not in pyrite.montecarlo.__all__
     parameters = inspect.signature(simulate_trajectories).parameters
     assert list(parameters)[:2] == ["beam", "target"]
     assert "physics" in parameters and "numerics" in parameters

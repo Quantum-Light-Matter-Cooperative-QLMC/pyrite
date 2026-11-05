@@ -43,6 +43,10 @@ lowering consume it. Configured sweeps share its model validation while retainin
 their historical expansion. `campaign/lowering.py` projects
 `Numerics.energy_bins` onto the legacy campaign adapter, whose `energy_bins`
 field feeds the existing case builder. Detectors own acceptance and response.
+`campaign/trajectories.py` owns the typed public `simulate_trajectories`
+(#936): it lowers Beam/Target/Physics/Numerics through `build_case` and the
+runner's case adapters, then calls the private flat engine
+`montecarlo.transport._simulate_trajectories`.
 
 `_executor_contract.py` owns import-light executor admission/provenance shared by
 composition and dispatch; `execution._simulation` preserves the legacy aliases.

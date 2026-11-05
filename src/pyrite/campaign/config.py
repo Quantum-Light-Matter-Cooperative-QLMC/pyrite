@@ -479,7 +479,7 @@ def gate_cases_by_penetration(
 
     For each beam energy present in ``cases``, walks that energy's distinct
     ``thickness_ang`` values ascending and runs one direct-CPU transmission
-    check per thickness with :func:`pyrite.montecarlo.simulate_trajectories`
+    check per thickness with :func:`pyrite.montecarlo.transport._simulate_trajectories`
     -- the SAME prebuilt penetration-depth transport behind
     :func:`pyrite.plots.plot_penetration_survival` -- at normal incidence
     (``beam_dir`` left at its ``simulate_trajectories`` default, +z), using

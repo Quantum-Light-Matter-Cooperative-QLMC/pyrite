@@ -129,7 +129,6 @@ _EXPORT_MODULES = {
     "_sigma_browning_cm2": ".transport",
     "beta_from_keV": ".transport",
     "mott_tables_dir": ".transport",
-    "simulate_trajectories": ".transport",
 }
 
 __all__ = [
@@ -162,7 +161,6 @@ __all__ = [
     "_dEds_bs_compound_scalar",
     "_dEds_bs_packed_scalar",
     "_rotate_directions",
-    "simulate_trajectories",
     "X_MIN",
     "X_MAX",
     "Y_MIN",

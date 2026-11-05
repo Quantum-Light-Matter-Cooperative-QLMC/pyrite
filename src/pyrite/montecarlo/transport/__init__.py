@@ -7,7 +7,8 @@ scattering models (Browning free paths + NIST-Mott-calibrated screened-
 Rutherford angles, analytic SR fallback), Joy-Luo/Berger-Seltzer stopping
 power, Urban energy-loss straggling, and Numba-compiled event-driven
 transport cores. CPU-only; the spectrum phase consumes the segment arrays
-:func:`simulate_trajectories` returns.
+:func:`_simulate_trajectories` returns (typed public entry:
+:func:`pyrite.transport.simulate_trajectories`).
 
 Split into submodules by concern (kinematics/RNG streams, elastic
 scattering, stopping power, straggling, energy LUT, transport cores,
@@ -168,7 +169,6 @@ from .batching import (
 
 from .api import (
     _simulate_trajectories,
-    simulate_trajectories,
 )
 
 # Preserve the pre-split owner reported by introspection and frozen export
@@ -186,7 +186,6 @@ for _function in (
     pack_layer_tables,
     PerElectronTransportConfig,
     resolve_transport_core,
-    simulate_trajectories,
 ):
     _function.__module__ = __name__
 
