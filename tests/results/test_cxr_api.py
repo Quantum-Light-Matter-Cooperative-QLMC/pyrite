@@ -65,6 +65,39 @@ def test_component_shape_and_normalization_errors_are_explicit():
         CxrSpectra(SpectralDensity([1], [2]), SpectralDensity([2], [3]))
 
 
+@pytest.mark.parametrize(
+    ("cxr_norm", "brem_norm"),
+    [("source", "observation-average"), ("observation-average", "source")],
+)
+def test_result_rejects_brem_normalization_mismatch(cxr_norm, brem_norm):
+    with pytest.raises(ValueError, match="brem and CXR normalization must match"):
+        Result(
+            cxr=CxrSpectra(SpectralDensity([1, 2], [3, 4], cxr_norm)),
+            brem=SpectralDensity([1, 2, 3], [5, 6, 7], brem_norm),
+            case={},
+            provenance={},
+        )
+
+
+@pytest.mark.parametrize("norm", ["source", "observation-average"])
+def test_result_accepts_matching_brem_normalization_on_independent_grid(norm):
+    provenance = {"identity_digest": "abc123", "observation_identity_digest": "def456"}
+    result = Result(
+        cxr=CxrSpectra(SpectralDensity([1, 2], [3, 4], norm)),
+        brem=SpectralDensity([0.5, 1.5, 2.5, 3.5], [5, 6, 7, 8], norm),
+        case={},
+        provenance=provenance,
+    )
+    assert result.brem.normalization == result.cxr.incoherent.normalization == norm
+    np.testing.assert_array_equal(result.brem.photon_energy_eV, [0.5, 1.5, 2.5, 3.5])
+    np.testing.assert_array_equal(result.brem.density, [5, 6, 7, 8])
+    np.testing.assert_array_equal(result.cxr.incoherent.photon_energy_eV, [1, 2])
+    rebuilt = replace(result)
+    np.testing.assert_array_equal(rebuilt.brem.density, result.brem.density)
+    assert rebuilt.provenance["identity_digest"] == "abc123"
+    assert rebuilt.provenance["observation_identity_digest"] == "def456"
+
+
 def test_numerics_uses_canonical_trial_names_and_rejects_old_keywords():
     new = Numerics(cxr_trials=7, brem_trials=3, cxr_chunk=2)
     assert asdict(new)["cxr_trials"] == 7

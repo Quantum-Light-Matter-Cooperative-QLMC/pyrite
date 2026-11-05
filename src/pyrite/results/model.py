@@ -209,6 +209,12 @@ class Result:
                 raise ValueError(f"{label} must use the CXR photon-energy grid")
             if component.normalization != cxr.incoherent.normalization:
                 raise ValueError(f"{label} and CXR normalization must match")
+        if brem.normalization != cxr.incoherent.normalization:
+            raise ValueError(
+                "brem and CXR normalization must match "
+                f"({brem.normalization!r} != {cxr.incoherent.normalization!r}); "
+                "their photon-energy grids may differ"
+            )
         if spatial is not None and not isinstance(spatial, SpatialResult):
             raise TypeError("spatial must be a SpatialResult or None")
         if temporal is not None and not isinstance(temporal, TemporalIntensity):
