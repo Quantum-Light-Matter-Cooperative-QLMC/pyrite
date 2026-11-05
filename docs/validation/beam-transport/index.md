@@ -60,6 +60,7 @@ cheap-numerical-validation
 equal-precision-protocol
 energy-controlled-propagation
 energy-loss-straggling
+collision-straggling-default-pilot
 energy-step-convergence
 gos-distant-response
 gos-hard-recoil

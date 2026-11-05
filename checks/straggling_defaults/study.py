@@ -123,7 +123,7 @@ def transport_inputs(protocol, material, fraction, core, cap, cutoff):
 
 
 def run(args, protocol):
-    from pyrite.montecarlo.transport import simulate_trajectories
+    from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
     from pyrite.perf.precision import primary_moments
 
     cap = protocol["max_de_frac"] if args.cap is None else args.cap

@@ -120,7 +120,10 @@ Explicit `inelastic_model="auto"` retains the historical selection: shell at
 serialized omissions and `auto` records retain their historical meanings.
 Covered scenes have the same resolved cases, dataset identities and content
 keys as legacy `auto` at 50 eV; stored continuous cases retain omitted shell
-keys. The low-level `simulate_trajectories` default remains continuous.
+keys. The typed `simulate_trajectories` resolves `Physics` through the same
+lowering, so it inherits the shell default; the private flat
+`montecarlo.transport._simulate_trajectories` engine entry keeps its
+continuous default.
 The singleton pixel-profile adapter retains its historical frozen integration;
 `pixelated_detector_demo` explicitly selects continuous stopping to preserve
 its resolved model and identities. Other frozen adapter profiles must explicitly
