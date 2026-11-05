@@ -122,7 +122,7 @@ def _spread(values):
 
 
 def timing(args):
-    from pyrite.montecarlo.transport import simulate_trajectories
+    from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
     from pyrite.montecarlo.transport.batching import DEFAULT_PER_ELECTRON_TRANSPORT_CONFIG
 
     names = args.arms
@@ -200,7 +200,7 @@ def timing(args):
 
 
 def attributes(args):
-    from pyrite.montecarlo.transport import simulate_trajectories
+    from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
 
     kwargs = _scene_kwargs(args.scenes[0])
     arms = Arms(args.arms)

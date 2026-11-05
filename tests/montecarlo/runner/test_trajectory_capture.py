@@ -15,7 +15,7 @@ from click.testing import CliRunner
 
 from pyrite.campaign.geometry import Footprint
 from pyrite.materials import CATALOG
-from pyrite.montecarlo import runner, simulate_trajectories
+from pyrite.montecarlo import runner
 from pyrite.montecarlo import trajectories as traj
 from pyrite.montecarlo.geometry import tilted_geometry
 from pyrite.montecarlo.groove import GrooveSpec
@@ -28,6 +28,7 @@ from pyrite.montecarlo.trajectories import (
     write_trajectory_artifact,
 )
 from pyrite.montecarlo.trajectory_export import export_segments_vtp
+from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
 from tests.helpers.trajectory_schema import SCHEMA2_FIXTURE, downgrade
 
 _SI = dict(element="Si", n_atoms_per_ang3=0.05)

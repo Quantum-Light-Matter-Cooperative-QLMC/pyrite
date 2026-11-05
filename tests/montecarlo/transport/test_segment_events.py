@@ -19,7 +19,9 @@ from pyrite.montecarlo.transport import (
     TransportLUTConfig,
     check_segment_event_contract,
     closes_flight,
-    simulate_trajectories,
+)
+from pyrite.montecarlo.transport import (
+    _simulate_trajectories as simulate_trajectories,
 )
 from pyrite.montecarlo.transport.events import RESERVED_EVENTS
 from tests.helpers import host_backend_only, to_host

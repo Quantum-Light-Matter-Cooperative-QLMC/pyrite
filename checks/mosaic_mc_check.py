@@ -31,13 +31,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 import itertools
 
 from pyrite.campaign.sweep import crystal_params
-from pyrite.montecarlo import (
-    mc_cxr_spectrum,
-    mosaic_fwhm_eV,
-    mosaic_psi_rad,
-    simulate_trajectories,
-    tilted_geometry,
-)
+from pyrite.montecarlo import mc_cxr_spectrum, mosaic_fwhm_eV, mosaic_psi_rad, tilted_geometry
+from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
 
 E0_KEV = 30.0
 THETA_OBS = np.deg2rad(90.0)

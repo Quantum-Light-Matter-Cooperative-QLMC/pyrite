@@ -86,7 +86,11 @@ def test_rendered_links_pin_revision_and_leave_literals_and_history_alone(tmp_pa
 
 def test_viewcode_resolution_preserves_runtime_module_identity(source_refs):
     cases = (
-        ("pyrite.transport", "simulate_trajectories", "pyrite.montecarlo.transport.api"),
+        (
+            "pyrite.montecarlo.transport",
+            "resolve_transport_core",
+            "pyrite.montecarlo.transport.batching",
+        ),
         ("pyrite.radiation", "mc_cxr_spectrum", "pyrite.montecarlo.spectrum.cxr._spectrum"),
         ("pyrite.montecarlo.runner", "run_cases", "pyrite.montecarlo.runner.scheduling"),
     )
@@ -113,7 +117,7 @@ def test_viewcode_resolution_leaves_other_objects_to_sphinx(source_refs, monkeyp
 
 def test_viewcode_follows_compatibility_functions_to_their_definitions(tmp_path):
     functions = {
-        "pyrite.transport.simulate_trajectories": "pyrite/montecarlo/transport/api",
+        "pyrite.transport.simulate_trajectories": "pyrite/campaign/trajectories",
         "pyrite.radiation.mc_cxr_spectrum": "pyrite/montecarlo/spectrum/cxr/_spectrum",
         "pyrite.radiation.mc_cxr_spectrum_solid_angle": "pyrite/montecarlo/spectrum/cxr/_spectrum",
         "pyrite.radiation.mc_brem_spectrum": "pyrite/montecarlo/spectrum/brem",

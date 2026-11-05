@@ -1,4 +1,6 @@
-"""Public transport entry point: :func:`simulate_trajectories`.
+"""Private flat transport engine entry: :func:`_simulate_trajectories`.
+
+The typed public entry is :func:`pyrite.campaign.trajectories.simulate_trajectories`.
 
 Validation: sbethe-corrected-stopping
 """
@@ -14,7 +16,7 @@ from .lut import DEFAULT_TRANSPORT_LUT_CONFIG
 logger = logging.getLogger(__name__)
 
 
-def simulate_trajectories(
+def _simulate_trajectories(
     E0_keV,
     Ne,
     thickness_ang,
@@ -520,9 +522,9 @@ def simulate_trajectories(
     if isinstance(_cone_split, ConeSplit):
         from .cone_split import transport_cone_split
 
-        return transport_cone_split(simulate_trajectories, inputs.as_kwargs())
+        return transport_cone_split(_simulate_trajectories, inputs.as_kwargs())
     if (secondary_threshold_eV, pair_production_model, positron_transport) != (None, None, False):
         from .secondaries import transport_secondary_cascade
 
-        return transport_secondary_cascade(simulate_trajectories, inputs.as_kwargs())
+        return transport_secondary_cascade(_simulate_trajectories, inputs.as_kwargs())
     return run_transport_pass(inputs)

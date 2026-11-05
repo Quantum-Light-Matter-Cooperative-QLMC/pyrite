@@ -458,14 +458,14 @@ def install_precision(variant):
         return wrapped[switches]
 
     _jit_launch.transport_kernel_variant = variant_kernel
-    simulate = transport.simulate_trajectories
+    simulate = transport._simulate_trajectories
 
     def fresh_tables(*a, **kw):
         stats["_f32_cache"].clear()
         stats["_events"].clear()
         return simulate(*a, **kw)
 
-    transport.simulate_trajectories = fresh_tables
+    transport._simulate_trajectories = fresh_tables
 
 
 def main():

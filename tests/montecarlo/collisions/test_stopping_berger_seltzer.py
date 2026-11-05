@@ -448,7 +448,7 @@ def test_cutoff_solve_is_well_posed_across_the_crossover(transport_core):
     single-valued there and the solve stays well posed -- but this is the check
     checklist C asked for rather than assumed.
     """
-    from pyrite.montecarlo.transport import simulate_trajectories
+    from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
 
     tungsten = [("W", 0.0632)]
     result = simulate_trajectories(

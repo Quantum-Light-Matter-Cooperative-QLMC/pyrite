@@ -145,7 +145,7 @@ def _launch_cascade(stage, rows, seed, *, positron=False):
     Validation: photon-secondary-feedback
     """
     from .annihilation import electron_density_per_ang3
-    from .api import simulate_trajectories
+    from .api import _simulate_trajectories as simulate_trajectories
     from .secondaries import (
         LaunchState,
         _annihilate_positrons,

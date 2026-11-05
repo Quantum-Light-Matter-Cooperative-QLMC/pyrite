@@ -18,7 +18,7 @@ import numpy as np
 import pytest
 
 from pyrite.montecarlo.groove import GrooveSpec
-from pyrite.montecarlo.transport import simulate_trajectories
+from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
 from pyrite.montecarlo.transport.batching import (
     PerElectronTransportConfig,
     _alloc_hard_scratch,

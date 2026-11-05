@@ -370,14 +370,14 @@ def main():
         return wrapped[switches]
 
     _jit_launch.transport_kernel_variant = variant_kernel
-    simulate = transport.simulate_trajectories
+    simulate = transport._simulate_trajectories
 
     def tagged_simulate(*a, **kw):
         stats["_seed"] = int(kw["seed"])
         stats["_f32_cache"].clear()
         return simulate(*a, **kw)
 
-    transport.simulate_trajectories = tagged_simulate
+    transport._simulate_trajectories = tagged_simulate
     sys.argv = [str(args.bench), *bench_args, "--kernel", "specialized"]
     runpy.run_path(str(args.bench), run_name="__main__")
     cupy.cuda.Device().synchronize()

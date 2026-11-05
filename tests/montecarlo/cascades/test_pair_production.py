@@ -420,7 +420,8 @@ def _cascade(
     from pyrite.materials import CATALOG
     from pyrite.montecarlo import shell_configuration as config
     from pyrite.montecarlo.spectrum.brem_bremslib import prepare_bremslib_table
-    from pyrite.montecarlo.transport import pair_production, simulate_trajectories
+    from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
+    from pyrite.montecarlo.transport import pair_production
     from pyrite.xsgen.sbethe.catalog import resolve_catalog_table
     from tests.helpers.bremslib import synthetic_bremslib_arrays
 
@@ -540,7 +541,7 @@ def test_cascade_pair_mode_is_reproducible_and_inert_without_pairs(monkeypatch):
 def test_pair_mode_rejects_unsupported_configurations(kw, message):
     from pyrite.materials import CATALOG
     from pyrite.montecarlo import shell_configuration as config
-    from pyrite.montecarlo.transport import simulate_trajectories
+    from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
     from pyrite.xsgen.sbethe.catalog import resolve_catalog_table
 
     if not config._default_path().is_file():
@@ -608,13 +609,13 @@ def test_cascade_receives_exactly_the_public_parameters(monkeypatch):
 
     monkeypatch.setattr(secondaries, "transport_secondary_cascade", capture)
     tables = object()
-    out = api.simulate_trajectories(
+    out = api._simulate_trajectories(
         100.0, 3, 1.0e4, element="Si", stopping_tables=tables, secondary_threshold_eV=1.0e3
     )
     assert out == "cascade"
-    assert seen["simulate"] is api.simulate_trajectories
+    assert seen["simulate"] is api._simulate_trajectories
     kw = seen["kw"]
-    assert list(kw) == list(inspect.signature(api.simulate_trajectories).parameters)
+    assert list(kw) == list(inspect.signature(api._simulate_trajectories).parameters)
     assert kw["stopping_tables"] is tables
     assert (kw["E0_keV"], kw["Ne"], kw["thickness_ang"], kw["element"]) == (100.0, 3, 1.0e4, "Si")
     assert kw["secondary_threshold_eV"] == 1.0e3

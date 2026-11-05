@@ -323,7 +323,8 @@ def main():
     setup = time.perf_counter()
     import numpy as np
 
-    from pyrite.montecarlo.transport import TransportLUTConfig, simulate_trajectories
+    from pyrite.montecarlo.transport import TransportLUTConfig
+    from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
     from pyrite.montecarlo.transport.batching import PerElectronTransportConfig
     from pyrite.perf.precision import primary_moments
     from pyrite.xsgen.bremslib.tables import load_bremsstrahlung_tables

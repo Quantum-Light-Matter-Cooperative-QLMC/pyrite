@@ -61,7 +61,7 @@ def main():
     namespace = runpy.run_path(str(root / "pyrite_adapter.py"))
     original_score = namespace["score_segments"]
     blocks, coverage, resolved = [], {}, {}
-    original_simulate = transport.simulate_trajectories
+    original_simulate = transport._simulate_trajectories
 
     def simulate(**kwargs):
         if not coverage:
@@ -95,7 +95,7 @@ def main():
         return {**original_score(result, count), **extra}
 
     namespace["main"].__globals__["score_segments"] = score
-    transport.simulate_trajectories = simulate
+    transport._simulate_trajectories = simulate
     sys.argv = [
         sys.argv[0],
         *adapter_args,
@@ -108,7 +108,7 @@ def main():
     try:
         namespace["main"]()
     finally:
-        transport.simulate_trajectories = original_simulate
+        transport._simulate_trajectories = original_simulate
     output = Path(adapter_args[adapter_args.index("--output") + 1])
     record = json.loads(output.read_text())
     if sum(b["primaries"] for b in blocks) != 2 * record["histories"]:

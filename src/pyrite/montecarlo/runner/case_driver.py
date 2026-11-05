@@ -35,7 +35,8 @@ from ..spectrum.cxr import _setup as _cxr_setup
 from ..spectrum.cxr._coverage import collect_line_data_coverage
 from ..spectrum.cxr._temporal import case_temporal_profiles, temporal_outputs
 from ..trajectories import TrajectoryCapture
-from ..transport import TransportLUTConfig, simulate_trajectories
+from ..transport import TransportLUTConfig
+from ..transport import _simulate_trajectories as simulate_trajectories
 from . import _SPECTRUM_PROGRESS, _TRANSPORT_PROGRESS, SPECTRUM_STAGES
 from . import adaptive as _adaptive
 from .artifacts import _case_geometry

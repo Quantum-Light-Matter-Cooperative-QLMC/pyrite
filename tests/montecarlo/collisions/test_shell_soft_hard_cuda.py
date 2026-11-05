@@ -18,7 +18,8 @@ import pytest
 
 from pyrite.materials import CATALOG
 from pyrite.montecarlo import shell_configuration as config
-from pyrite.montecarlo.transport import TransportLUTConfig, simulate_trajectories
+from pyrite.montecarlo.transport import TransportLUTConfig
+from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
 from pyrite.montecarlo.transport.events import SegmentEvent, check_segment_event_contract
 from pyrite.montecarlo.transport.shell_transport import hard_event_energy_accounting
 from pyrite.xsgen.sbethe.catalog import resolve_catalog_table

@@ -20,7 +20,7 @@ import sys
 import numpy as np
 from cases import CASES, MM
 
-from pyrite.montecarlo.transport import simulate_trajectories
+from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
 from pyrite.montecarlo.transport.events import EVENT_HARD_RADIATIVE
 
 T_BINS = (0.1, 0.3, 0.6, 1.0)  # fractions of E0

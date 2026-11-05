@@ -160,7 +160,7 @@ def boundary_crossings(
     Parameters
     ----------
     segments
-        :func:`pyrite.montecarlo.transport.simulate_trajectories` result with
+        :func:`pyrite.montecarlo.transport._simulate_trajectories` result with
         ``energy_model="midpoint"``, on host or device.
     layers
         The ``layers`` stack passed to transport, ``[(z_top, z_bot,

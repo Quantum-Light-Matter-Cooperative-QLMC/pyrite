@@ -51,7 +51,7 @@ import time
 
 import numpy as np
 
-from pyrite.montecarlo.transport import simulate_trajectories
+from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
 
 CARBON = [("C", 0.1136)]
 TUNGSTEN = [("W", 0.06305)]

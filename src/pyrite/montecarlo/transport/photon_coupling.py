@@ -363,7 +363,7 @@ class CascadeChargedStage:
 
     def __call__(self, rows: Mapping[str, np.ndarray], seed: int) -> ChargedStageResult:
         """Validation: photon-charged-coupling"""
-        from .api import simulate_trajectories
+        from .api import _simulate_trajectories as simulate_trajectories
         from .secondaries import LaunchState, secondary_energy_balance, transport_secondary_cascade
         from .secondaries import _radiative_keys as radiative_keys
 
@@ -419,7 +419,7 @@ def cascade_charged_stage(layers: Sequence, *, width_ang=None, height_ang=None, 
 
 def _transport_kwargs(transport: Mapping, seed: int, threshold_eV: float) -> dict:
     """Full ``simulate_trajectories`` keyword mapping for one stage call."""
-    from .api import simulate_trajectories
+    from .api import _simulate_trajectories as simulate_trajectories
 
     signature = inspect.signature(simulate_trajectories)
     kw = {

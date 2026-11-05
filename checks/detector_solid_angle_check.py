@@ -31,8 +31,8 @@ from pyrite.montecarlo import (
     detector_directions,
     mc_cxr_spectrum,
     mc_cxr_spectrum_solid_angle,
-    simulate_trajectories,
 )
+from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
 
 THETA = np.deg2rad(119.0)
 E0_KEV = 25.0

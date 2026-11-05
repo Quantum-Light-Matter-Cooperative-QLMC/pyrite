@@ -17,9 +17,10 @@ import numpy as np
 
 from pyrite._backend import REAL, _to_cpu, xp
 from pyrite.materials.crystal import CRYSTALS
-from pyrite.montecarlo import mc_cxr_spectrum, simulate_trajectories
+from pyrite.montecarlo import mc_cxr_spectrum
 from pyrite.montecarlo.spectrum.cxr import _policy
 from pyrite.montecarlo.spectrum.phase_retention import PhaseRetentionCost, PhaseRetentionPolicy
+from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
 
 
 def _benchmark_transport(args, energy, common):

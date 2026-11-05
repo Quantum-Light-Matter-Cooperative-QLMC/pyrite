@@ -10,7 +10,7 @@ from scipy.integrate import quad
 from pyrite import _numerics
 from pyrite.montecarlo.case import Case
 from pyrite.montecarlo.runner.case_tables import _case_elastic_kwargs
-from pyrite.montecarlo.transport import simulate_trajectories
+from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
 from pyrite.montecarlo.transport.atomic_electrons import (
     ATOMIC_ELECTRON_DEFLECTION_MODELS,
     atomic_electron_xi,

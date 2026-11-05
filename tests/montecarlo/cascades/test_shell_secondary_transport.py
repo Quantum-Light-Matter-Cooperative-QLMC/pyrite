@@ -12,7 +12,8 @@ from pyrite.materials import CATALOG
 from pyrite.montecarlo import shell_configuration as config
 from pyrite.montecarlo.spectrum.brem_bremslib import prepare_bremslib_table
 from pyrite.montecarlo.spectrum.characteristic import mc_characteristic_spectrum
-from pyrite.montecarlo.transport import PerElectronTransportConfig, simulate_trajectories
+from pyrite.montecarlo.transport import PerElectronTransportConfig
+from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
 from pyrite.montecarlo.transport.events import (
     EVENT_CUTOFF,
     check_segment_event_contract,

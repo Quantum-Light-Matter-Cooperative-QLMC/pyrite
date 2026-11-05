@@ -33,7 +33,8 @@ import time
 import numpy as np
 
 from pyrite.materials import CATALOG
-from pyrite.montecarlo.transport import TransportLUTConfig, simulate_trajectories
+from pyrite.montecarlo.transport import TransportLUTConfig
+from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
 from pyrite.montecarlo.transport.events import (
     EVENT_CUTOFF,
     EVENT_EXIT_BOTTOM,

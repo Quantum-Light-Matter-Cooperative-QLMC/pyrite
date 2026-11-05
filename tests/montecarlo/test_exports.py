@@ -50,7 +50,6 @@ FROZEN_EXPORTS = frozenset(
         "_dEds_bs_compound_scalar",
         "_dEds_bs_packed_scalar",
         "_rotate_directions",
-        "simulate_trajectories",
         # geometry
         "X_MIN",
         "X_MAX",
@@ -165,7 +164,6 @@ FROZEN_EXPORTS = FROZEN_EXPORTS | frozenset(
         "mc_cxr_spectrum_solid_angle",
         "_stack_tau",
         "_dEds_bs_keV_per_ang",
-        "simulate_trajectories",
         "_alpha_from_first_moment",
         "_transport_case",
         "CHARACTERISTIC_XRAYDB_VERSION",
@@ -216,5 +214,6 @@ def test_public_names_resolve_to_subpackage():
     # top-level montecarlo.py
     assert mc.mc_cxr_spectrum.__module__ == "pyrite.montecarlo.spectrum"
     assert mc.mc_characteristic_spectrum.__module__ == "pyrite.montecarlo.spectrum"
-    assert mc.simulate_trajectories.__module__ == "pyrite.montecarlo.transport"
+    # #936 moved the typed public entry above the physics core (pyrite.transport).
+    assert not hasattr(mc, "simulate_trajectories")
     assert mc.run_cases.__module__ == "pyrite.montecarlo.runner"

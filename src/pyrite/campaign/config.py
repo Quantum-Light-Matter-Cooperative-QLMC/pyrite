@@ -29,9 +29,9 @@ import numpy as np
 from .._numerics import CONVERGENCE_KEYS
 from ..detectors import Detector, EnergyBins
 from ..materials import CATALOG, MaterialSpec, load_material_catalog
-from ..montecarlo import simulate_trajectories
 from ..montecarlo.runner.case_tables import _case_elastic_kwargs
 from ..montecarlo.runner.step_budget import retry_step_budget
+from ..montecarlo.transport import _simulate_trajectories as simulate_trajectories
 from ..montecarlo.transverse import TransverseDistribution
 from ..results import Settings
 from .longitudinal import LongitudinalDistribution
@@ -479,7 +479,7 @@ def gate_cases_by_penetration(
 
     For each beam energy present in ``cases``, walks that energy's distinct
     ``thickness_ang`` values ascending and runs one direct-CPU transmission
-    check per thickness with :func:`pyrite.montecarlo.simulate_trajectories`
+    check per thickness with :func:`pyrite.montecarlo.transport._simulate_trajectories`
     -- the SAME prebuilt penetration-depth transport behind
     :func:`pyrite.plots.plot_penetration_survival` -- at normal incidence
     (``beam_dir`` left at its ``simulate_trajectories`` default, +z), using

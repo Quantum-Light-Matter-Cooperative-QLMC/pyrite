@@ -58,7 +58,7 @@ from ..transport import (
     TransportLUTConfig as TransportLUTConfig,
 )
 from ..transport import (
-    simulate_trajectories as simulate_trajectories,
+    _simulate_trajectories as simulate_trajectories,  # noqa: F401
 )
 
 # Opt-in Gate-0 phase profiling for the sweep-acceleration work (TODO P?/#numba;

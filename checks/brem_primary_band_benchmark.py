@@ -84,7 +84,7 @@ def capture(args):
     spec = importlib.util.spec_from_file_location("benchmark821", filename)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    original = transport.simulate_trajectories
+    original = transport._simulate_trajectories
 
     class Captured(Exception):
         pass
@@ -109,7 +109,7 @@ def capture(args):
         write_json(args.output.with_suffix(".json"), metadata)
         raise Captured
 
-    transport.simulate_trajectories = save
+    transport._simulate_trajectories = save
     sys.argv = [
         str(filename),
         args.scene,
@@ -130,7 +130,7 @@ def capture(args):
     except Captured:
         pass
     finally:
-        transport.simulate_trajectories = original
+        transport._simulate_trajectories = original
 
 
 def moments(scores):

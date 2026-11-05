@@ -2,7 +2,9 @@
 # target is the *current* concrete binding; domain is the intended public owner.
 # root_role records ownership/stability; root_policy separately classifies root compatibility.
 # canonical_facades lists active domain imports; other domains retain existing paths.
-# simulate_trajectories adds keyword-only radiative_moments="table"|"exact" (#788);
+# simulate_trajectories takes Beam/Target/Physics/Numerics (#936) and lives in
+# pyrite.campaign.trajectories (above the physics core); the montecarlo paths and
+# flat engine controls are private.
 # Case.radiative_moment_model persists approximation identity; absence replays exact.
 # Settings.allow_fallback and Case.allow_physics_fallback add explicit campaign
 # admission (#262); Case.physics_fallbacks carries preflight provenance to workers.
@@ -258,9 +260,6 @@ photon_energies_q = { target = "pyrite.materials.quantities:photon_energies_q", 
 [package_exports."pyrite.montecarlo"]
 Case = { target = "pyrite.montecarlo.case:Case", status = "advanced-stable" }
 
-[package_exports."pyrite.montecarlo.transport"]
-simulate_trajectories = { target = "pyrite.montecarlo.transport:simulate_trajectories", status = "advanced-stable" }
-
 [package_exports."pyrite.montecarlo.spectrum"]
 mc_cxr_spectrum = { target = "pyrite.montecarlo.spectrum:mc_cxr_spectrum", status = "advanced-stable" }
 mc_cxr_spectrum_solid_angle = { target = "pyrite.montecarlo.spectrum:mc_cxr_spectrum_solid_angle", status = "advanced-stable" }
@@ -403,7 +402,7 @@ simulate = { classification = "retained", canonical = "pyrite:simulate", reason 
 
 [package_exports."pyrite.transport"]
 Case = { target = "pyrite.montecarlo.case:Case", status = "advanced-stable" }
-simulate_trajectories = { target = "pyrite.montecarlo.transport:simulate_trajectories", status = "advanced-stable" }
+simulate_trajectories = { target = "pyrite.campaign.trajectories:simulate_trajectories", status = "advanced-stable" }
 summarize_trajectories = { target = "pyrite.montecarlo.trajectory_summary:summarize_trajectories", status = "advanced-stable" }
 iter_primary_summaries = { target = "pyrite.montecarlo.trajectory_summary:iter_primary_summaries", status = "advanced-stable" }
 depth_loss_profile = { target = "pyrite.montecarlo.trajectory_summary:depth_loss_profile", status = "advanced-stable" }

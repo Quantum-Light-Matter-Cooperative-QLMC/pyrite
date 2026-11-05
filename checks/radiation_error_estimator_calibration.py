@@ -29,7 +29,7 @@ from pyrite.montecarlo.spectrum import (
     mc_cxr_spectrum,
 )
 from pyrite.montecarlo.spectrum.diagnostics import _flight_E_end_keV
-from pyrite.montecarlo.transport import simulate_trajectories
+from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
 
 CARBON = [("C", 0.1136)]
 TUNGSTEN = [("W", 0.06305)]

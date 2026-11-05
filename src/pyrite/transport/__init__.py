@@ -15,6 +15,7 @@ from importlib import import_module
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from pyrite.campaign.trajectories import simulate_trajectories as simulate_trajectories
     from pyrite.montecarlo.case import Case as Case
     from pyrite.montecarlo.trajectory_balance import (
         capture_secondary_energy_balance as capture_secondary_energy_balance,
@@ -26,11 +27,10 @@ if TYPE_CHECKING:
     from pyrite.montecarlo.trajectory_summary import (
         summarize_trajectories as summarize_trajectories,
     )
-    from pyrite.montecarlo.transport import simulate_trajectories as simulate_trajectories
 
 _EXPORTS = {
     "Case": ("pyrite.montecarlo.case", "Case"),
-    "simulate_trajectories": ("pyrite.montecarlo.transport", "simulate_trajectories"),
+    "simulate_trajectories": ("pyrite.campaign.trajectories", "simulate_trajectories"),
     "summarize_trajectories": ("pyrite.montecarlo.trajectory_summary", "summarize_trajectories"),
     "iter_primary_summaries": ("pyrite.montecarlo.trajectory_summary", "iter_primary_summaries"),
     "depth_loss_profile": ("pyrite.montecarlo.trajectory_summary", "depth_loss_profile"),

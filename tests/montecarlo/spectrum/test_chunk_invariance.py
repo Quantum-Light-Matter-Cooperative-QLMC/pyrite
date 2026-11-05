@@ -21,14 +21,9 @@ import pytest
 
 from pyrite._backend import REAL
 from pyrite.materials.crystal import CRYSTALS
-from pyrite.montecarlo import (
-    _brem_dsigma_dk,
-    mc_brem_spectrum,
-    mc_cxr_spectrum,
-    simulate_trajectories,
-    spectrum,
-)
+from pyrite.montecarlo import _brem_dsigma_dk, mc_brem_spectrum, mc_cxr_spectrum, spectrum
 from pyrite.montecarlo.runner import _env_chunk
+from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
 
 xp = spectrum.xp
 

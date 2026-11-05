@@ -10,7 +10,7 @@ import numpy as np
 import pytest
 from numba import njit
 
-from pyrite.montecarlo.transport import simulate_trajectories
+from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
 from pyrite.montecarlo.transport.scattering import (
     _elsepa_invert_row,
     _elsepa_rate_scalar,
@@ -509,7 +509,7 @@ def test_cuda_guided_inversion_is_bitwise_the_device_bisection(reference):
 
 
 def test_pre_adapter_seeded_elsepa_baseline(reference):
-    from pyrite.montecarlo.transport import simulate_trajectories
+    from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
     from tests.helpers.photon_mode_off import exercise_photon_reference
     from tests.helpers.physics_baseline import assert_output_baseline, transport_signature
 
@@ -536,7 +536,7 @@ def test_cuda_elastic_factory_selection_with_cpu_stubs(reference, monkeypatch, m
     import sys
     from types import SimpleNamespace
 
-    from pyrite.montecarlo.transport import simulate_trajectories
+    from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
 
     class ReachedFactory(Exception):
         pass
@@ -579,7 +579,7 @@ def test_preparation_adapter_preserves_seeded_elsepa_baseline(reference, monkeyp
     from types import SimpleNamespace
 
     from pyrite.montecarlo.runner.case_tables import _case_elastic_kwargs
-    from pyrite.montecarlo.transport import simulate_trajectories
+    from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
     from tests.helpers.physics_baseline import assert_output_baseline, transport_signature
 
     table = _sr_table(14.0, np.geomspace(4.0, 40.0, 41), reference.mu)

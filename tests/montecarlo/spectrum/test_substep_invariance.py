@@ -13,7 +13,7 @@ import numpy as np
 import pytest
 
 from pyrite.montecarlo.spectrum import mc_brem_spectrum, mc_cxr_spectrum, subdivide_flights
-from pyrite.montecarlo.transport import simulate_trajectories
+from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
 from tests.helpers import host_backend_only
 
 # The grouped reduction that makes substeps add as field before they are squared

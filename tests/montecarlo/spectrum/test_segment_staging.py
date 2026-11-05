@@ -267,7 +267,7 @@ def test_device_resident_transport_feeds_the_kernels_the_same_spectra():
     to give the kernels exactly what a downloaded-then-uploaded run gives them.
     Staging is what makes it transparent -- it casts to REAL either way, and on
     segments that are already device arrays it is the only copy in the path."""
-    from pyrite.montecarlo import simulate_trajectories
+    from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
 
     case = dict(
         E0_keV=30.0,

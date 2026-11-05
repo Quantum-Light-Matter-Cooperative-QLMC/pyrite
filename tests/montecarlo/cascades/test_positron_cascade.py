@@ -106,7 +106,7 @@ def test_positron_mode_is_reproducible_and_off_is_unchanged(monkeypatch):
 
 
 def test_positron_transport_requires_pair_mode():
-    from pyrite.montecarlo.transport import simulate_trajectories
+    from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
 
     with pytest.raises(ValueError, match="requires pair_production_model"):
         simulate_trajectories(50.0, 2, 1.0e4, element="Si", positron_transport=True)

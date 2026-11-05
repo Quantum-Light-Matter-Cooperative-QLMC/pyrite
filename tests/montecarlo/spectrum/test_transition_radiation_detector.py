@@ -147,7 +147,7 @@ def test_tilted_sample_and_rejections():
 
 def test_transported_bilayer_on_a_tilted_sample():
     from pyrite.montecarlo.spectrum.transition_radiation_crossings import boundary_crossings
-    from pyrite.montecarlo.transport import simulate_trajectories
+    from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
 
     layers = [(0.0, 1500.0, [("C", 0.1136)]), (1500.0, 3000.0, [("W", 0.0632)])]
     rows = simulate_trajectories(

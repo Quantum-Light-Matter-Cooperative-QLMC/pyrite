@@ -19,8 +19,9 @@ import numpy as np
 import pytest
 
 from pyrite.materials.crystal import CRYSTALS
-from pyrite.montecarlo import mc_cxr_spectrum, simulate_trajectories, tilted_geometry
+from pyrite.montecarlo import mc_cxr_spectrum, tilted_geometry
 from pyrite.montecarlo.geometry import _orientation_R
+from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
 
 THETA_OBS = np.deg2rad(119.0)
 

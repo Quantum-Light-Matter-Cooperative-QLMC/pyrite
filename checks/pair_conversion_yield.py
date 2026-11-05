@@ -31,7 +31,7 @@ import numpy as np
 from pyrite.materials import CATALOG
 from pyrite.materials.attenuation import _normalize_composition
 from pyrite.montecarlo.geometry import first_prism_exit
-from pyrite.montecarlo.transport import simulate_trajectories
+from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
 from pyrite.montecarlo.transport.pair_production import (
     PAIR_THRESHOLD_EV,
     _channel_coefficients,

@@ -15,7 +15,7 @@ The pipeline models an ordered stack of layers. A single-crystal slab is the one
 | Concern | Representation | Code site |
 |---|---|---|
 | Sample definition | catalog material + optional ordered `stack`/`substrate`; the resolved case keeps the film's scalar fields plus `abs_layers`/`layer_radiators` | `materials.catalog`, `sweep.build_cases` |
-| Transport | composition-aware flights truncated at each internal boundary | `montecarlo.simulate_trajectories(layers=...)` |
+| Transport | composition-aware flights truncated at each internal boundary | `transport.simulate_trajectories(beam, Stack(...))` |
 | Line spectrum | one radiator per crystalline layer, summed incoherently | `montecarlo.runner._spectrum_case`, `mc_cxr_spectrum` |
 | Self-absorption | piecewise optical depth through every crossed layer | `materials.attenuation._stack_tau` |
 | Bremsstrahlung | per-layer emitting segments with the same cross-stack escape depth | `mc_brem_spectrum` |
@@ -89,7 +89,7 @@ A crystalline substrate is another material key: `Stack.on_substrate(film, thick
 
 ## Multilayer electron transport
 
-`simulate_trajectories(layers=…)` performs per-layer transport. Free path, stopping power, and scattering element switch with the electron's current layer. Flights truncate at internal boundaries (no collision there; the electron continues into the neighbor layer), so material is constant within a flight. Each segment carries its emitting `layer`. A single layer reproduces single-material transport bit-for-bit.
+`simulate_trajectories(beam, Stack(...))` performs per-layer transport. Free path, stopping power, and scattering element switch with the electron's current layer. Flights truncate at internal boundaries (no collision there; the electron continues into the neighbor layer), so material is constant within a flight. Each segment carries its emitting `layer`. A single layer reproduces single-material transport bit-for-bit.
 
 ## Adding a stack to the catalog
 

@@ -388,7 +388,7 @@ def run_benchmark(args):
 
     from pyrite import _backend
     from pyrite.montecarlo import trajectories as traj
-    from pyrite.montecarlo.transport import simulate_trajectories
+    from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
 
     if _backend.BACKEND.name != "cuda":
         raise SystemExit(f"Requested CUDA backend, got {_backend.BACKEND.name!r}")

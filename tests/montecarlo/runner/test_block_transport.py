@@ -22,7 +22,8 @@ from pyrite.montecarlo.runner.block_transport import (
     electron_blocks,
     transport_electron_blocks,
 )
-from pyrite.montecarlo.transport import _sample_bunch_offsets, simulate_trajectories, stream_keys
+from pyrite.montecarlo.transport import _sample_bunch_offsets, stream_keys
+from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
 from pyrite.montecarlo.transport._jit_radiative import radiative_stream_keys
 from pyrite.montecarlo.transport.beam_entry import initial_beam_positions, initial_energies_keV
 from pyrite.montecarlo.transport.hard_inelastic import hard_stream_keys

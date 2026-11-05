@@ -34,7 +34,8 @@ import pytest
 from pyrite.campaign.config import material_sweep
 from pyrite.campaign.sweep import build_cases
 from pyrite.montecarlo import runner
-from pyrite.montecarlo.transport import TransportLUTConfig, simulate_trajectories
+from pyrite.montecarlo.transport import TransportLUTConfig
+from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
 
 NO_LUT = TransportLUTConfig(enabled=False)
 

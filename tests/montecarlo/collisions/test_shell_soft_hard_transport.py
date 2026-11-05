@@ -10,7 +10,9 @@ from pyrite.materials import CATALOG
 from pyrite.montecarlo import shell_configuration as config
 from pyrite.montecarlo.transport import (
     TransportLUTConfig,
-    simulate_trajectories,
+)
+from pyrite.montecarlo.transport import (
+    _simulate_trajectories as simulate_trajectories,
 )
 from pyrite.montecarlo.transport.events import SegmentEvent, check_segment_event_contract
 from pyrite.montecarlo.transport.hard_inelastic import (

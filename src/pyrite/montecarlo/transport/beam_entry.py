@@ -1,6 +1,6 @@
 """Initial electron positions on the sample entrance face.
 
-Split out of :func:`pyrite.montecarlo.transport.api.simulate_trajectories`.
+Split out of :func:`pyrite.montecarlo.transport.api._simulate_trajectories`.
 Every draw here lives in its own ``SeedSequence(seed)`` child namespace, so the
 main free-path and scattering stream is untouched. Spot and Twiss draws are
 counter-addressed per electron inside that namespace (#361).

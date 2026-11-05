@@ -53,7 +53,7 @@ import numpy as np
 from pyrite.materials import CATALOG
 from pyrite.montecarlo.spectrum.brem import mc_brem_spectrum
 from pyrite.montecarlo.spectrum.characteristic import mc_characteristic_spectrum
-from pyrite.montecarlo.transport import simulate_trajectories
+from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
 from pyrite.montecarlo.transport.events import check_segment_event_contract
 from pyrite.montecarlo.transport.secondaries import secondary_energy_balance
 from pyrite.montecarlo.transport.shell_rates import catalog_shell_oscillators

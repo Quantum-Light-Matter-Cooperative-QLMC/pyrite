@@ -42,7 +42,8 @@ from pathlib import Path
 import numpy as np
 
 from pyrite.materials import CATALOG
-from pyrite.montecarlo.transport import simulate_trajectories, urban_loss_moments_keV
+from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
+from pyrite.montecarlo.transport import urban_loss_moments_keV
 from pyrite.montecarlo.transport.events import SegmentEvent, check_segment_event_contract
 from pyrite.montecarlo.transport.shell_rates import catalog_shell_rate_closure
 from pyrite.xsgen.sbethe.catalog import resolve_catalog_table

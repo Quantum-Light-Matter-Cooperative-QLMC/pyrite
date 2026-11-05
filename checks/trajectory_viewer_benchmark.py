@@ -31,8 +31,8 @@ def _generate_small(root: Path) -> None:
     from pyrite.instrument import FilterPlate, PixelGrid, PlanarDetector, PlanarPose
     from pyrite.instrument.scene import scene_payload
     from pyrite.materials import CATALOG
-    from pyrite.montecarlo import simulate_trajectories
     from pyrite.montecarlo.trajectories import write_trajectory_artifact
+    from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
     from pyrite.xsgen.sbethe.catalog import resolve_catalog_table
 
     composition = CATALOG.crystal("silicon").composition

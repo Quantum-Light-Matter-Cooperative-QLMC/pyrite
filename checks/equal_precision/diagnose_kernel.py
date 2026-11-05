@@ -93,7 +93,7 @@ def main():
     capacity_hint = 512
     request_capacities = []
     if variant == "learned32":
-        original_simulate = transport.simulate_trajectories
+        original_simulate = transport._simulate_trajectories
 
         def with_capacity_hint(**kwargs):
             request_capacities.append(capacity_hint)
@@ -102,9 +102,9 @@ def main():
             )
             return original_simulate(**kwargs)
 
-        transport.simulate_trajectories = with_capacity_hint
+        transport._simulate_trajectories = with_capacity_hint
     if variant == "radiation-off":
-        original_simulate = transport.simulate_trajectories
+        original_simulate = transport._simulate_trajectories
 
         def without_radiation(**kwargs):
             kwargs.update(
@@ -112,7 +112,7 @@ def main():
             )
             return original_simulate(**kwargs)
 
-        transport.simulate_trajectories = without_radiation
+        transport._simulate_trajectories = without_radiation
     original_factory = _jit_launch.make_cuda_transport_core
 
     def factory(*args, **kwargs):

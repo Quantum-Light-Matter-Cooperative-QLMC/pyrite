@@ -1,6 +1,6 @@
 # `energy-controlled-propagation`
 
-Ledger row: [`energy-controlled-propagation`](../ledger-transport-background.md#energy-controlled-propagation). Code: `montecarlo/transport/api.py::simulate_trajectories` (`max_dE_frac`); host cores in `montecarlo/transport/cores.py`; exact CUDA core in `montecarlo/transport/_jit_kernel.py`. Measurement: `checks/collision_statistics_refinement.py`.
+Ledger row: [`energy-controlled-propagation`](../ledger-transport-background.md#energy-controlled-propagation). Code: `montecarlo/transport/api.py::_simulate_trajectories` (`max_dE_frac`); host cores in `montecarlo/transport/cores.py`; exact CUDA core in `montecarlo/transport/_jit_kernel.py`. Measurement: `checks/collision_statistics_refinement.py`.
 
 ## Claim
 

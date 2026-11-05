@@ -2,8 +2,10 @@ import numpy as np
 import pytest
 
 from pyrite.montecarlo.transport import (
+    _simulate_trajectories as simulate_trajectories,
+)
+from pyrite.montecarlo.transport import (
     beta_from_keV_scalar,
-    simulate_trajectories,
     spliced_stopping_keV_per_ang,
 )
 

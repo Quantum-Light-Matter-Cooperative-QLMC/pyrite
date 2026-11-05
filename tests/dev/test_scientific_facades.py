@@ -60,27 +60,22 @@ assert not blocked.intersection(sys.modules)
     assert result.returncode == 0, result.stdout + result.stderr
 
 
-def test_transport_alias_matches_seeded_segments_and_metadata():
-    from pyrite.montecarlo.transport import simulate_trajectories as original
+def test_transport_alias_preserves_typed_function_identity():
+    import inspect
+
+    import pyrite.montecarlo
+    import pyrite.montecarlo.transport
+    from pyrite.campaign.trajectories import simulate_trajectories as original
     from pyrite.transport import simulate_trajectories
 
-    options = dict(
-        composition=[("C", 0.1136)],
-        E_cut_keV=5.0,
-        seed=4,
-        elastic_model="sr",
-        transport_core="lockstep",
-        energy_model="frozen",
-    )
-    canonical = simulate_trajectories(5.01, 1, 1e8, **options)
-    legacy = original(5.01, 1, 1e8, **options)
-    assert canonical.keys() == legacy.keys()
-    for key in canonical:
-        if isinstance(canonical[key], np.ndarray):
-            np.testing.assert_array_equal(canonical[key], legacy[key], err_msg=key)
-        else:
-            assert canonical[key] == legacy[key], key
-    assert canonical["Ne"] == canonical["n_cutoff_stopped"] == 1
+    assert simulate_trajectories is original
+    # The physics core keeps only the private flat engine (#936).
+    assert not hasattr(pyrite.montecarlo.transport, "simulate_trajectories")
+    assert "simulate_trajectories" not in pyrite.montecarlo.__all__
+    parameters = inspect.signature(simulate_trajectories).parameters
+    assert list(parameters)[:2] == ["beam", "target"]
+    assert "physics" in parameters and "numerics" in parameters
+    assert "E0_keV" not in parameters
 
 
 def test_photon_energy_alias_preserves_eV_broadcast_contract():
