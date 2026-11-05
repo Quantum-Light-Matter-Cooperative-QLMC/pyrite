@@ -39,13 +39,19 @@ time. Both forms share two singularities with the dense system: ``lambda = 0`` i
 a layer, and the Cherenkov pole of an own field in a lossless medium. The
 recursion adds a removable pole at ``D_i = 0``, a bound mode of the lower
 half-stack where the dense matrix is regular. It also rounds ``1 + rho`` where
-``rho -> -1``. That rounding reaches the top through ``C_i / D_i``, so its size
-relative to the largest term of the pair is estimated by propagating it with the
-amplitude: ``u sum_i |C_i / D_i| / max_i |C_i beta_i|``, ``u`` the unit roundoff.
-Non-finite results and estimates above ``_MAX_CANCELLATION_ERROR`` raise
-:class:`numpy.linalg.LinAlgError`, for the whole call. Smaller losses are returned.
-Accuracy is relative to that largest term: a response buried near ``u`` below it,
-as deep in a lossless stop band, has no pointwise accuracy.
+``rho -> -1``. That rounding reaches the top through ``C_i / D_i``, so it is
+estimated relative to the pair's terms: ``u sum_i |C_i / D_i| / max_i |C_i beta_i|``
+for the response, with ``u`` the unit roundoff, and the same rounding carried up
+beside the amplitude and divided by the running sum of term sizes. Non-finite
+results and estimates above ``_MAX_CANCELLATION_ERROR`` raise
+:class:`numpy.linalg.LinAlgError`, for the whole call.
+
+The estimate covers only that rounding. Conditioning near lossless resonances and
+phase rounding ``u sum |lambda d|`` are not estimated and can be larger, up to full
+scale at a resonance, where the dense solve is also unreliable. Cancellation
+between terms can leave an amplitude less accurate relative to itself than the
+estimate. Deep responses can lose pointwise accuracy in lossless stacks; absorbing
+stacks keep it.
 
 Validation: optical-stack-fast-solver
 """

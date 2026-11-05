@@ -210,15 +210,22 @@ matched-medium, vanishing-film, closed single-interface and opaque-exit limits,
 Bloch stop-band decay against the period's transfer trace, and the weak-contrast
 resonance $(q-k_z)\Lambda=2\pi m$.
 
-The recursion has two limits the dense solve does not. $D_i=0$, a bound mode of
-the lower half-stack, is a removable pole where the dense matrix is regular.
-It also rounds $1+\rho$ where $\rho\to-1$. That rounding reaches the vacuum
-through $C_i/D_i$, so its size relative to the pair's largest term is estimated
-as $u\sum_i|C_i/D_i|/\max_i|C_i\beta_i|$ for unit roundoff $u$. Non-finite
-results and estimates above $10^{-8}$ raise `LinAlgError` for the whole call;
-smaller losses are returned. Accuracy is relative to that largest term: a response
-buried near $u$ below it, as deep in a lossless stop band, has no pointwise
-accuracy.
+The recursion has a removable pole at $D_i=0$, a bound mode of the lower
+half-stack, where the dense matrix is regular. It also rounds $1+\rho$ where
+$\rho\to-1$. That rounding reaches the vacuum through $C_i/D_i$, so it is estimated
+relative to the pair's terms, as $u\sum_i|C_i/D_i|/\max_i|C_i\beta_i|$ for the
+response with unit roundoff $u$, and likewise beside the amplitude. Non-finite
+results and estimates above $10^{-8}$ raise `LinAlgError` for the whole call, so
+one such pair refuses a batch. A lossless scan across a critical angle can do this;
+a small absorption avoids it.
+
+The estimate covers only that rounding. Conditioning near lossless resonances and
+phase rounding $u\sum|\lambda d|$ are not estimated and can be larger, up to full
+scale at a resonance, where the dense solve is also unreliable. Deep responses can
+lose pointwise accuracy in lossless stacks; absorbing stacks keep it. The dense
+solve has a limit of its own: on oblique falling-permittivity chains it lost up to
+all accuracy in the amplitude where this solve did not, against the dense system
+evaluated at 100–800 digits.
 
 These are interference and Bragg effects along $z$. In-plane momentum is
 conserved, so this is resonant TR and not diffracted TR; laterally patterned

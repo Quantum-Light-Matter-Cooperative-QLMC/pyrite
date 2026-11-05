@@ -457,83 +457,151 @@ claim rests on a transcription from them.
 **Verdict:** `rederived`, for the algebra and kernel, with the three defects recorded
 and the Notes sentence to be corrected. Human sign-off is tracked in #277.
 
-## Addendum, 2026-11-04: refusal guards
+## Addendum, 2026-11-04: propagated rounding estimate
 
-Scope: the uncommitted diff over `dfd72a3b` adding `_require_conditioned`,
-`_require_finite` and `hypot`, with corrected wording. The equations are unchanged.
-The mpmath reference and scan seed are those of Section 7. Guards were bypassed only
-in the verifier's process, to measure what they refuse.
+This replaces an earlier addendum on a span guard, which is no longer in the code.
+Reviewed at `c763ea3e`. The equations of Sections 1 to 4 are unchanged. The estimate and
+the refusal are a numerical guard, not physics. "High precision" below means the dense
+Cartesian system of Section 1 solved in mpmath, or, for large $N$ and the scan, the
+recursion in mpmath, which agreed with that dense system to $2.5\times10^{-16}$ on 30
+random stacks.
 
-**Exact pole.** $D_0=0$ raises `LinAlgError` from `interface_response` and
-`planar_transition_radiation` on NumPy, the fused CUDA kernel and non-fused CuPy. One
-pole in a batch refuses the whole batch.
+**Correction to Section 7.** The double-precision dense solve is not a safe reference for
+falling chains at oblique incidence, and Defect 2 compared only at normal incidence. See
+the dense-solve subsection below.
 
-**Falling chains.** Spans of $10^{12}$ and $10^{16}$ and the 49-layer grade are
-refused. The $10^{8}$ case passes at the boundary, with error $1.0\times10^{-9}$.
+### Estimate against actual error
 
-**Refusal rate.**
+The estimate is $e$. The response uses $u\sum_i\lvert C_i/D_i\rvert/\max_i\lvert C_i\beta_i\rvert$.
+The amplitude uses a forward reach over a forward sum of term magnitudes, $S$.
 
-| Set | Refused pairs |
-|---|---|
-| Periodic films, $\varepsilon$ from $-20+1.3i$ to $-10^5+10^4i$, to $89.9^\circ$ | $0$ of $2001$ each; largest span $1.8\times10^{5}$ |
-| Same, $89.9^\circ$ to $89.9999^\circ$, $\varepsilon=-10^5+10^4i$ | $2$ of $2001$ |
-| Real near-critical layer, $20001$-point scan, $\pm10^{-2}$ rad | $0$ or $1$ per scan |
-| Same, $\pm10^{-12}$ rad | $0$ to $3$; $2221$ at $\varepsilon=1-10^{-6}$ |
-| Near-critical with $\operatorname{Im}\varepsilon=10^{-6}$ | $0$ |
-| Random scan, seed 962001 | $383$ of $48000$ ($0.80\%$); $162$ of $6000$ stacks ($2.70\%$) |
+For the class it models, the $1+\rho$ rounding at normal or near-normal incidence, the
+estimate is usually above the response error and is at most about 1.5 times below it near
+and under the limit (table). Far above the limit it no longer tracks the error (the ENZ
+grade, error $10^{108}$), but those pairs are refused.
 
-Kept pairs differ from dense by at most $2.4\times10^{-9}$. The eight largest
-differences, against mpmath, are fast at most $4.2\times10^{-10}$ and dense at most
-$2.4\times10^{-9}$. Of the refused pairs, $99.2\%$ were within $10^{-9}$ of dense.
+| Case | Response $e$ | Response error | Result | Amplitude $e$ | Error over $S$ | Error over $\lvert a\rvert$ | Result |
+|---|---|---|---|---|---|---|---|
+| $1,10^{-8},10^{-16}$ | $5.4\times10^{-9}$ | $1.0\times10^{-9}$ | accepted | $1.5\times10^{-9}$ | $5.5\times10^{-10}$ | $9.5\times10^{-9}$ | accepted |
+| $1,10^{-10},10^{-20}$ | $5.4\times10^{-7}$ | $4.1\times10^{-8}$ | refused | $1.5\times10^{-7}$ | $2.2\times10^{-8}$ | $3.7\times10^{-7}$ | refused |
+| $1,10^{-16},10^{-32}$ | $0.25$ | $0.37$ | refused | $0.11$ | $0.20$ | $3.4$ | refused |
+| $k_\perp=10^{-6}$ chain | $5.5\times10^{-12}$ | $5.7\times10^{-12}$ | accepted | $1.5\times10^{-12}$ | $3.2\times10^{-13}$ | $5.8\times10^{-12}$ | accepted |
+| ENZ grade, 49 layers | $10^{27}$ | $10^{108}$ | refused | $3\times10^{82}$ | $10^{85}$ | $10^{85}$ | refused |
+| Sawtooth span $3\times10^{7}$, 8 layers | $2.9\times10^{-9}$ | $6.9\times10^{-10}$ | accepted | $3.0\times10^{-10}$ | $8.7\times10^{-12}$ | $1.7\times10^{-10}$ | accepted |
+| Same, 89 layers | $2.3\times10^{-8}$ | $3.9\times10^{-9}$ | refused | $3.2\times10^{-10}$ | $4.5\times10^{-11}$ | $2.2\times10^{-9}$ | accepted |
+| Same, 8999 layers | $2.4\times10^{-6}$ | $2.5\times10^{-7}$ | refused | $3.3\times10^{-10}$ | $3.5\times10^{-11}$ | $1.3\times10^{-7}$ | accepted |
 
-**The span is conservative, not a measure of loss.** These are refused although the
-fast solve is accurate to $5\times10^{-16}$: conductor films with $|\varepsilon|\ge10^{16}$;
-$n_z=10^{-8}$ exit with $\varepsilon=-50+3i$; oblique evanescent chains at span
-$7.5\times10^{35}$, where the dense solve raises `LinAlgError`. The loss needs
-$|p|\approx1$ and propagating waves: at span $10^{8}$, $d=10$ gives $1.3\times10^{-11}$
-while $d=0.1$ gives $4.8\times10^{-9}$.
+All ENZ grades at $k_\perp=0$ are refused. The oblique grade is accepted with error
+$1.1\times10^{-16}$. On the amplitude, error over $S$ stays at or below $e$ for the
+accepted chains in this table, and error over $\lvert a\rvert$ exceeds $e$ by up to about
+400 in this table because terms cancel. A stack can therefore pass `planar_transition_radiation` and be
+refused by `interface_response`.
 
-**Error below the limit grows with layer count.** Thin lossless sawtooth at normal
-incidence, against the recursion in 80-digit arithmetic:
+### Accepted pairs above $10^{-8}$
 
-| Layers | $8$ | $89$ | $899$ | $8999$ |
+The estimate models no other error source. These are accepted, with $e$ below
+$10^{-15}$ unless noted.
+
+| Class | Response error | Amplitude | Dense in double precision |
+|---|---|---|---|
+| Lossless tunnel cavity at resonance, $\kappa L=10$ to $30$ | $8.3\times10^{-8}$ to $1.1$ | same size | $9.3\times10^{-9}$ to $0.31$ |
+| Same, TE $\kappa L=18$, core loss $10^{-12}$ | $4.3\times10^{-5}$ | same size | not run |
+| Large $\lambda d$ phases, random scan | up to $6.7\times10^{-7}$ | up to $5.0\times10^{-7}$ over $S$ | same large error to the printed digits on the worst pairs compared |
+| Thin oblique film, $d=10^{-8}$ | below $e$ | $3\times10^{-8}$ to $7\times10^{-8}$ over $\lvert a\rvert$; over $S$ near $10^{-16}$ | not run |
+| Sawtooth at 899 and 8999 layers | refused | $1.2\times10^{-8}$ to $1.3\times10^{-7}$ over $\lvert a\rvert$ ($e$ near $10^{-9}$) | not run |
+| Spike $\varepsilon=-10^{18}$ to $-10^{22}$, $d\le10^{-19}$, $k_\perp=0.7$ ($1-\rho$ rounding, unphysical) | $1.6\times10^{-8}$ to $5.0\times10^{-8}$ | up to $2.4\times10^{-7}$ over $\lvert a\rvert$ | not run |
+
+The cavity case is the important one: the estimate normalizes the resonant gain away and
+stays near $10^{-16}$ while the result is wrong at full scale. Double-precision dense is
+also wrong there, by a factor 2 to 9 less, so this is conditioning and not a defect
+peculiar to the recursion.
+
+### Refusal rates
+
+Random scan, seed 962001: $0$ of $48000$ pairs refused on response or amplitude. Largest
+$e$ was $1.6\times10^{-9}$. $98$ pairs have response error above $10^{-8}$; $82$ of them
+are within 10 times the phase rounding $u\sum_j\lvert\operatorname{Re}\lambda_jd_j\rvert$.
+$761$ have amplitude error over $S$ above $10^{-8}$, of which $500$ are within 10 times
+that phase rounding. The rest were not classified, except that the worst pairs compared
+match dense to the printed digits.
+
+| Set | Response refused or non-finite | Amplitude |
+|---|---|---|
+| Metal films to $-10^5+10^4i$, to $89.9999^\circ$ | $0$ of $2001$ each | $0$ |
+| Grazing, $n_z$ down to $10^{-8}$ | $0$ | $0$ |
+| Grazing, $n_z=3\times10^{-9}$ | non-finite: rounded vacuum $\lambda=0$ | non-finite |
+| Conductors to $-10^{24}+i$ | $0$ | $0$ |
+| Near-critical, $20001$ points, $\pm10^{-2}$ rad | $0$ or $1$ refused; $0$ or $1$ non-finite | $0$ refused; same non-finite |
+| Same, $\pm10^{-9}$ rad | up to $36$ refused | $0$ refused |
+| Same, $\pm10^{-12}$ rad | $101$ to $113$ refused at most angles; $11236$ at $\varepsilon=1-10^{-5}$; all $20001$ at $1-10^{-6}$ | $0$ refused; up to $351$ non-finite |
+| Near-critical, $\operatorname{Im}\varepsilon=10^{-6}$ | $0$ | $0$ |
+
+The false refusals of the span guard are gone. One pair still refuses a whole call, so a
+lossless scan crossing a critical angle can lose the whole batch on the response path.
+
+### Kernels
+
+Slots 5 and 6 are written in the bottom-up pass and read before the top-down expansion
+overwrites them. Slot 4 of interface $i-1$ is intact when `g[-4]` reads it. No slot-reuse
+defect was found. On $15360$ random pairs to 120 layers, the estimate differs from NumPy
+by at most $2.9\times10^{-8}$ relative on the GPU and $3.3\times10^{-8}$ on the host,
+with $0$ accept or refuse mismatches. The exact pole and the falling chain raise on NumPy
+and on CUDA, and `stack_amplitude` now raises at the pole. CuPy pool at 5000 layers and
+4096 pairs is $656$ MB, so the materialization cost of the span guard is gone.
+
+### Double-precision dense solve on oblique falling chains
+
+Confirmed, with a formulation that does not use the recursion. The dense system in mpmath
+at 100, 400 and 800 digits gives $0.830174890528442-0.922586820530028i$ for
+`test_accepted_falling_chain_amplitude_matches_a_high_precision_recursion`. That agrees
+with the test's expected value to $1.0\times10^{-15}$ and with the fast solve to
+$2.0\times10^{-15}$. Double-precision dense is $20.7\%$ off.
+
+| $\varepsilon$ pair, repeats | $n_x$ | Dense amplitude error | Dense response error | Fast amplitude error | Dense condition number |
+|---|---|---|---|---|---|
+| $10^{-4},10^{-8}$, 10 | $0.3$ | $1.4\times10^{-9}$ | $1.6\times10^{-12}$ | $1.8\times10^{-15}$ | $2\times10^{5}$ |
+| $10^{-6},10^{-12}$, 10 | $0.3$ | $1.0\times10^{-7}$ | $9.5\times10^{-11}$ | $2.4\times10^{-15}$ | $2\times10^{7}$ |
+| $10^{-8},10^{-16}$, 10 | $0.1$ | $1.4\%$ | $2.5\times10^{-7}$ | $9.5\times10^{-16}$ | $10^{11}$ |
+| $10^{-8},10^{-16}$, 10 | $0.3$ | $20.7\%$ | $2.2\times10^{-8}$ | $2.0\times10^{-15}$ | $2\times10^{9}$ |
+| $10^{-8},10^{-16}$, 10 | $0.6$ | $65\%$ | $3.6\times10^{-6}$ | $7.0\times10^{-15}$ | $4\times10^{11}$ |
+| $10^{-10},10^{-20}$, 4 | $0.6$ | $196\%$ | $1.1\times10^{-7}$ | $2.4\times10^{-15}$ | $3\times10^{13}$ |
+| $10^{-8},10^{-16}$, 20 | $0.9$ | $266\%$ | $9.7\times10^{-7}$ | $1.2\times10^{-14}$ | $10^{11}$ |
+
+The measured range is wider than the 20 to 120% first reported. The mechanism was not
+isolated; a response error near $10^{-7}$ multiplying own-field jumps that scale as
+$1/\varepsilon$ would be consistent with it. So the dense solve has its own limit here,
+and the recursion is the more accurate of the two on these stacks.
+
+### Buried responses
+
+The new statement holds only for lossless stacks, and "no pointwise accuracy" overstates
+it. Relative error per response entry against high precision, by depth below the peak:
+
+| Stack | Depth | Fast median | Fast max | Dense max |
 |---|---|---|---|---|
-| Span $3\times10^{7}$ | $7.1\times10^{-10}$ | $3.3\times10^{-9}$ | $2.4\times10^{-8}$ | $2.3\times10^{-7}$ |
-| Span $10^{8}$ | $4.8\times10^{-9}$ | $1.0\times10^{-8}$ | $4.9\times10^{-8}$ | $7.8\times10^{-8}$ |
+| Lossless stop band, 200 layers | $10^{-12}$ to $1$ | at most $6.6\times10^{-16}$ | $3.5\times10^{-15}$ | $1.4\times10^{-14}$ |
+| Same | $10^{-16}$ to $10^{-12}$ | $4.1\times10^{-15}$ | $5.5\times10^{-3}$ | $1.1\times10^{-3}$ |
+| Same | $10^{-20}$ to $10^{-16}$ | $5.8\times10^{-15}$ | $7.9\times10^{-3}$ | $3.0\times10^{-3}$ |
+| Same | $10^{-40}$ to $10^{-20}$ | $1.8\times10^{-3}$ | $0.25$ | $0.16$ |
+| Absorbing metal, 40 layers | $10^{-300}$ to $10^{-80}$ | $2.6\times10^{-14}$ | $3.4\times10^{-14}$ | $3.4\times10^{-14}$ |
 
-So "about $10^{-9}$" at the limit holds for a three-medium chain, not for a many-layer
-stack, which is the case this solver exists for.
+### Remaining defects
 
-**Non-finite spans.** The bypass is real but no wrong result was found through it.
-TM alone goes non-finite (exact $\varepsilon=0$, or $10^{-320}$ overflowing the ratio),
-TE keeps the check. Oblique chains passing this way have error at most $4.2\times10^{-16}$.
-Near-normal chains are refused by the TE span. Exact $\lambda=0$ is non-finite in both
-and raises through `_require_finite`.
+1. "Accuracy is relative to that largest term" and "smaller losses are returned"
+   (`transition_radiation_stack.py:46,47`, physics page lines 219 to 221, ledger line 33)
+   are false as stated. The estimate covers only $1+\rho$ rounding. Accepted pairs exceed
+   it at full scale near lossless resonances, and by up to $6.7\times10^{-7}$ from phases.
+2. The formula quoted in the same three places is the response estimate. The amplitude uses
+   reach over the sum $S$, which is undocumented (`transition_radiation_stack.py:178,179,181`).
+   The response's "largest term" is $\max\lvert C\beta\rvert$, which excludes $C\alpha$.
+3. "Propagating it with the amplitude" (`transition_radiation_stack.py:43`) does not
+   describe the response estimate, which is a top-down sum.
+4. "No pointwise accuracy" (`transition_radiation_stack.py:47,48`, physics page lines 220
+   to 221, ledger line 33) is too broad. See the table above.
+5. "Agreement with the dense solve" (ledger line 31) is too broad, and "two limits the dense
+   solve does not" (physics page line 213) omits the dense solve's own limit above.
+6. $1-\rho$ rounding is neither estimated nor documented. It reached $5\times10^{-8}$ only
+   in the unphysical spikes above.
 
-**`hypot`.** At $\mathbf n_\perp=(3,4)\times10^{-160}$, NumPy against dense is
-$5.9\times10^{-16}$, host against NumPy $2.5\times10^{-16}$ and GPU against NumPy
-$2.3\times10^{-16}$. Defect 3 is closed. The kernel compiles and runs on the device.
-
-**Remaining defects.**
-
-1. `stack_amplitude` is unguarded (`transition_radiation_stack.py:159`). It is exported
-   and in the ledger `Code` field, and it returns NaN at the exact pole and unrefused
-   values for the $10^{24}$ chain. "Both are refused" (lines 42, 43) is too broad.
-2. Lines 42, 43 are also too broad because loss below the limit is returned. The
-   comment above line 58 and the ledger "1e-9 at 1e8" understate many-layer error.
-3. The physics page, line 216, "any span above $10^8$", and the ledger Notes omit that
-   an infinite span skips the test and passes when the output is finite.
-4. The message "the O(N) recursion cannot resolve this stack" (line 89) is false for the
-   accurate refusals above.
-5. `_require_finite`'s docstring, "as the dense solve does" (line 94), is false for the
-   exact recursion pole, where dense is regular, and for the lossless own-field pole,
-   where dense returns NaN without raising.
-6. The guard materializes $\lambda$, $Y$ and $|Y|$ on the device. Peak CuPy pool for
-   amplitude rises from $738$ to $2397$ MB at 5000 layers and 4096 pairs, and from
-   $164$ to $594$ MB at 20000 layers and 256 pairs. Best-of-three time goes from $97$ to
-   $142$ ms and from $13$ to $58$ ms at 1000 layers. The check record
-   (`e3a07bce`) therefore no longer describes the code, and the ledger now cites it right
-   after the refusal sentence, which it does not support.
-
-**Adjudication.** The guards do what was asked for Defects 1 and 2. `rederived` stands
-for the equations and kernel. Items 1 to 6 are for the task owner.
+**Adjudication.** `rederived` stands for the equations and kernels. The estimate does what it
+was built for. Items 1 to 6 are documentation scope for the task owner.
