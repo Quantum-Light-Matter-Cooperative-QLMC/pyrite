@@ -102,7 +102,7 @@ def load_bremsstrahlung_tables(
             message = (
                 f"no BremsLib table for {element} (Z={z}): {exc}. Install it with "
                 "`pyrite tables fetch bremslib`, or explicitly select "
-                "bremsstrahlung_model='eedl'."
+                "bremsstrahlung_model='eedl' with radiative_model='uncoupled'."
             )
             if not allow_fallback:
                 raise TableNotFoundError(message) from exc
@@ -130,7 +130,8 @@ def resolve_bremsstrahlung_model(
 ) -> Literal["eedl", "bremslib"]:
     """Resolve a run's continuum source *before* computing any trajectories.
 
-    ``auto`` requires every BremsLib table by default. Opting into fallback
+    ``bremslib`` (the public default) and legacy ``auto`` require every
+    BremsLib table by default. Opting into fallback
     selects EEDL for the *whole* run, not just the missing elements. An
     explicit ``bremslib`` request also resolves to EEDL when fallback is enabled.
     An explicit ``eedl`` request never probes BremsLib and needs no opt-in.
@@ -143,7 +144,8 @@ def resolve_bremsstrahlung_model(
     except TableNotFoundError as exc:
         if not allow_fallback:
             raise TableNotFoundError(
-                f"BremsLib is required for bremsstrahlung_model='auto' ({', '.join(unique)}): {exc}"
+                f"BremsLib is required for bremsstrahlung_model={model!r} "
+                f"({', '.join(unique)}): {exc}"
             ) from exc
         warnings.warn(
             f"BremsLib tables for {', '.join(unique)} are not all installed: {exc}. "

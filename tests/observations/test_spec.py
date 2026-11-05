@@ -39,7 +39,7 @@ def scene():
             PlanarPose.from_observation(100.0, 60.0),
             pixels=PixelGrid((2, 4), (0.5, 0.5)),
         ),
-        physics=Physics(bremsstrahlung_model="eedl"),
+        physics=Physics(bremsstrahlung_model="eedl", radiative_model="uncoupled"),
     )
 
 

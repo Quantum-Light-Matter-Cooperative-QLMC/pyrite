@@ -25,6 +25,7 @@ from .._continuum_grid import CONTINUUM_GRID_MODEL
 from .._energy_grid_encoding import encode_energy_grid
 from .._numerics import (
     CHANNELING_KEYS,
+    DEFAULT_RADIATIVE_CUTOFF_EV,
     PHYSICS_FIELDS,
     PROFILE_NUMERICS_KEYS,
     SAMPLING_KEYS,
@@ -33,6 +34,7 @@ from .._numerics import (
     Numerics,
     Physics,
     default_inelastic_cutoff,
+    default_radiative_cutoff,
     electron_counts,
     validate_bremsstrahlung_model,
     validate_profile_numerics,
@@ -344,6 +346,9 @@ def resolve_numerics(
     effective["inelastic_cutoff_eV"] = {
         "built-in": default_inelastic_cutoff(effective["inelastic_model"], None)
     }.get(sources["inelastic_cutoff_eV"], effective["inelastic_cutoff_eV"])
+    effective["radiative_cutoff_eV"] = {
+        "built-in": default_radiative_cutoff(effective["radiative_model"], None)
+    }.get(sources["radiative_cutoff_eV"], effective["radiative_cutoff_eV"])
     validate_profile_numerics({**effective, **run_overrides})
     return NumericsResolution(
         fidelity=fidelity,
@@ -1019,8 +1024,12 @@ def canonical_settings(settings: Settings, *, resolved_bremsstrahlung: bool = Tr
         in {("auto", None), ("shell-soft-hard", 50.0)}
         and settings.elastic_model == "elsepa"
         and settings.bremsstrahlung_model in bremsstrahlung
-        and settings.radiative_model in ("auto", "bremslib-soft-hard")
-        and settings.radiative_cutoff_eV is None
+        and (settings.radiative_model, settings.radiative_cutoff_eV)
+        in {
+            ("auto", None),
+            ("bremslib-soft-hard", None),
+            ("bremslib-soft-hard", DEFAULT_RADIATIVE_CUTOFF_EV),
+        }
     )
 
 

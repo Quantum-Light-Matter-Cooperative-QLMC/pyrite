@@ -57,6 +57,7 @@ from .._grid_semantics import resolution_num
 from .._numerics import (
     DEFAULT_INELASTIC_CUTOFF_EV,
     default_inelastic_cutoff,
+    default_radiative_cutoff,
     validate_bremsstrahlung_model,
     validate_elastic_model,
     validate_inelastic_numerics,
@@ -71,6 +72,7 @@ from ..montecarlo.case import Case
 from ..montecarlo.transverse import TransverseDistribution, resolve_transverse_distribution
 from .beam_cases import beam_case_keys, beam_distribution_keys
 from .bremsstrahlung_cases import (
+    grooved_radiative_keys,
     radiative_case_keys,
     require_coupled_radiative,
     resolve_auto_bremsstrahlung,
@@ -1049,9 +1051,9 @@ def build_cases(
     inelastic_model="shell-soft-hard",
     inelastic_cutoff_eV=None,
     elastic_model="elsepa",
-    bremsstrahlung_model="auto",
+    bremsstrahlung_model="bremslib",
     secondary_threshold_eV=None,
-    radiative_model="auto",
+    radiative_model="bremslib-soft-hard",
     radiative_cutoff_eV=None,
     temporal_profile=False,
     pair_production_model=None,
@@ -1092,7 +1094,8 @@ def build_cases(
     )
     validate_elastic_model(elastic_model)
     validate_bremsstrahlung_model(bremsstrahlung_model)
-    # Opt-in coupled radiative keys (#172) and pair conversion (#275); "auto" resolves later.
+    radiative_cutoff_eV = default_radiative_cutoff(radiative_model, radiative_cutoff_eV)
+    # Coupled radiative keys (#172) and pair conversion (#275); "auto" resolves later.
     pair = (pair_production_model, secondary_threshold_eV, positron_transport)
     radiative = radiative_case_keys(
         radiative_model, radiative_cutoff_eV, energy_model, straggling, bremsstrahlung_model, *pair
@@ -1143,14 +1146,7 @@ def build_cases(
         orientation=orientation,
     )
     grooved = any(g.case_keys().get("groove_spacing_ang") is not None for g in geometries)
-    if radiative and grooved:
-        warnings.warn(
-            "coupled BremsLib radiative transport is unavailable for grooves; "
-            "using uncoupled bremsstrahlung scoring",
-            UserWarning,
-            stacklevel=2,
-        )
-        radiative = {}
+    radiative = grooved_radiative_keys(radiative, radiative_model, grooved=grooved)
     if gdf is not None and grooved:
         raise ValueError("gpt_gdf currently requires a flat entrance face")
     model_keys = _model_case_keys(

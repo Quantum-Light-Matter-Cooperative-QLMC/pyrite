@@ -47,7 +47,8 @@ def test_physics_positional_defaults_and_none_readback() -> None:
     assert default.inelastic_cutoff_eV == 50.0
     assert default.inelastic_cutoff.magnitude == 50.0
     assert default.secondary_threshold is None
-    assert default.radiative_cutoff is None
+    assert default.radiative_cutoff.magnitude == 1000.0
+    assert Physics(radiative_model="uncoupled").radiative_cutoff is None
     assert default.transition_lattice_origin is None
     assert Physics(inelastic_model="continuous", inelastic_cutoff=None).inelastic_cutoff is None
 

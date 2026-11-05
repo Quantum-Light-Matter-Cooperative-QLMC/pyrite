@@ -19,12 +19,15 @@ def _any_case(model="eedl"):
     from pyrite.campaign.config import material_sweep
     from pyrite.campaign.sweep import build_cases
 
-    return build_cases(material_sweep("silicon"), 4, 4, bremsstrahlung_model=model)[0]
+    return build_cases(
+        material_sweep("silicon"), 4, 4, bremsstrahlung_model=model, radiative_model="uncoupled"
+    )[0]
 
 
 def test_physics_accepts_only_known_bremsstrahlung_models():
-    assert Physics().bremsstrahlung_model == "auto"
-    assert Physics(bremsstrahlung_model="eedl").bremsstrahlung_model == "eedl"
+    assert Physics().bremsstrahlung_model == "bremslib"
+    eedl = Physics(bremsstrahlung_model="eedl", radiative_model="uncoupled")
+    assert eedl.bremsstrahlung_model == "eedl"
     assert Physics(bremsstrahlung_model="bremslib").bremsstrahlung_model == "bremslib"
     with pytest.raises(ValueError, match="bremsstrahlung_model"):
         Physics(bremsstrahlung_model="bethe-heitler")  # type: ignore[arg-type]
@@ -103,8 +106,13 @@ def test_auto_resolves_to_bremslib_only_when_every_table_is_installed(monkeypatc
 
 
 def test_build_cases_records_the_resolved_continuum(monkeypatch):
+    """Legacy ``auto`` still records only the continuum source it resolved."""
+    from functools import partial
+
     from pyrite.campaign.config import material_sweep
     from pyrite.campaign.sweep import build_cases
+
+    build_cases = partial(build_cases, bremsstrahlung_model="auto", radiative_model="auto")
 
     monkeypatch.setattr(
         "pyrite.xsgen.bremslib.tables.resolve_bremsstrahlung_model",
@@ -130,7 +138,10 @@ def _mev_cases(monkeypatch, energy_keV, resolved, **kwargs):
         lambda model, elements: resolved,
     )
     sweep = replace(material_sweep("silicon"), beam=BeamSpec(energy_keV=energy_keV))
-    return build_cases(sweep, 4, 4, **kwargs)
+    # Legacy "auto" selectors unless a test spells the explicit choice.
+    return build_cases(
+        sweep, 4, 4, **{"bremsstrahlung_model": "auto", "radiative_model": "auto", **kwargs}
+    )
 
 
 def test_mev_cases_refuse_to_drop_radiative_loss_silently(monkeypatch):
@@ -139,6 +150,15 @@ def test_mev_cases_refuse_to_drop_radiative_loss_silently(monkeypatch):
         _mev_cases(monkeypatch, 5.0e4, "eedl")
     with pytest.raises(ValueError, match="drops radiative energy loss"):
         _mev_cases(monkeypatch, 1.0e5, "bremslib", bremsstrahlung_model="eedl")
+    # The explicit EEDL choice must also spell the uncoupled approximation.
+    with pytest.raises(ValueError, match="radiative_model='uncoupled'"):
+        _mev_cases(
+            monkeypatch,
+            5.0e4,
+            "bremslib",
+            bremsstrahlung_model="eedl",
+            radiative_model="bremslib-soft-hard",
+        )
     # Coupled cases, and the historical uncoupled fallback up to 30 MeV, pass.
     assert _mev_cases(monkeypatch, 5.0e4, "bremslib")[0]["radiative_model"] == (
         "bremslib-soft-hard"

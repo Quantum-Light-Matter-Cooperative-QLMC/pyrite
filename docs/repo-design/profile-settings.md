@@ -62,16 +62,19 @@ in human output. The JSON payload retains its existing source spellings.
 | `pair_production_model`, `positron_transport` | `--pair-production-model`, `--positron-transport` | |
 | `atomic_electron_deflection` | `--atomic-electron-deflection` | |
 
-Run preflight resolves `radiative_model="auto"` before checkpoint access.
-It requires the BremsLib continuum source and an ungrooved target. Unsupported
-configurations fail with guidance; `pyrite run --allow-physics-fallback` permits
-automatic uncoupled transport and records that substitution in
-`physics_fallbacks` alongside any continuum-source fallback. The same policy
-applies to remote submission. Explicit `bremslib-soft-hard` requests remain
-strict even with the flag.
+The built-in defaults are `bremsstrahlung_model="bremslib"` and
+`radiative_model="bremslib-soft-hard"` with `radiative_cutoff_eV=1000`. Run
+preflight admits the coupled default before checkpoint access: it requires the
+BremsLib continuum source and an ungrooved target. Unsupported configurations
+fail with guidance; `pyrite run --allow-physics-fallback` permits uncoupled
+transport and records that substitution in `physics_fallbacks` alongside any
+continuum-source fallback. The same policy applies to remote submission and to
+legacy `radiative_model="auto"`. Without the flag every coupled request is
+strict.
 
 To choose uncoupled transport deliberately, set `radiative_model="uncoupled"`
-in the numerical preset. This scores radiation after transport without
+in the numerical preset (`--radiative-model uncoupled`); it takes no
+`radiative_cutoff_eV`. Pair `bremsstrahlung_model="eedl"` with it. This scores radiation after transport without
 debiting radiative energy loss from the electron trajectory; it is a model
 choice, not a substitute with a guaranteed accuracy bound. Assess its limits
 against the [coupled transport model](../physics/radiation-physics/hard-bremsstrahlung-events.md).

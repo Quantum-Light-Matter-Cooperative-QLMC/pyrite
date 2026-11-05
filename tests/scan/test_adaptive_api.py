@@ -101,7 +101,13 @@ def test_fixed_n_identity_matches_the_pre_precision_baseline():
         identity["parameter_sha256"]
         == "f6fa825072e99150f63825cdd1888284e76b9dfca16909e77d01f76f463a1e2d"
     )
-    case = build_cases(sweep, n_electrons=60, n_electrons_brem=60, bremsstrahlung_model="eedl")[0]
+    case = build_cases(
+        sweep,
+        n_electrons=60,
+        n_electrons_brem=60,
+        bremsstrahlung_model="eedl",
+        radiative_model="uncoupled",
+    )[0]
     assert "adaptive_precision" not in case
     assert (
         case_content_key(case) == "dfc310848e992f446987bd6b20100712ce180828c856b5c6ca250053bda5a310"

@@ -421,20 +421,20 @@ def numerics_show_command(name, json_output):
     "--bremsstrahlung-model",
     type=click.Choice(_BREMSSTRAHLUNG_MODEL_VALUES),
     help=(
-        "Continuum bremsstrahlung: auto (default) uses the released BremsLib tables with "
-        "their angular model when installed ('pyrite tables fetch bremslib') and warns and "
-        "falls back to EEDL otherwise; bremslib requires them; eedl is the fetched EEDL "
-        "continuum with an isotropic photon angle."
+        "Continuum bremsstrahlung: bremslib (default) requires the released BremsLib tables "
+        "('pyrite tables fetch bremslib') and uses their angular model; eedl is the fetched "
+        "EEDL continuum with an isotropic photon angle (pair with --radiative-model "
+        "uncoupled); auto is the legacy table-checked BremsLib selection."
     ),
 )
 @click.option(
     "--radiative-model",
     type=click.Choice(_RADIATIVE_MODEL_VALUES),
     help=(
-        "Radiative energy loss: auto (default) couples when BremsLib resolves; "
-        "uncoupled scores after transport; bremslib-soft-hard uses soft loss plus "
-        "sampled hard photons. Coupling requires midpoint energy and BremsLib. "
-        "Missing tables and grooved targets fall back to uncoupled scoring."
+        "Radiative energy loss: bremslib-soft-hard (default) uses soft loss plus sampled "
+        "hard photons and requires midpoint energy, BremsLib and an ungrooved target; "
+        "uncoupled (explicit approximation) scores after collision-only transport; auto "
+        "(legacy) couples where supported. Unsupported scenes must pass uncoupled."
     ),
 )
 @click.option(
@@ -442,8 +442,8 @@ def numerics_show_command(name, json_output):
     type=click.FloatRange(min=0.0, min_open=True),
     metavar="EV",
     help=(
-        "Hard-photon cutoff k_c in eV for coupled transport (default 1000); must not exceed the "
-        "continuum electron cutoff (1000 eV by default)."
+        "Hard-photon cutoff k_c in eV for bremslib-soft-hard or auto (default 1000); must not "
+        "exceed the continuum electron cutoff (1000 eV by default)."
     ),
 )
 @click.option(

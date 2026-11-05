@@ -19,6 +19,7 @@ def _case(beam):
         n_electrons=1,
         n_electrons_brem=1,
         bremsstrahlung_model="eedl",
+        radiative_model="uncoupled",
     )
     return case
 

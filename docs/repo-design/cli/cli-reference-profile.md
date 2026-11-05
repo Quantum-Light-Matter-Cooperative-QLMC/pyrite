@@ -557,22 +557,22 @@ Options:
                                   bypasses the transport LUT), or the historical mott
                                   screened-Rutherford angles.
   --bremsstrahlung-model [auto|eedl|bremslib]
-                                  Continuum bremsstrahlung: auto (default) uses the
-                                  released BremsLib tables with their angular model when
-                                  installed ('pyrite tables fetch bremslib') and warns
-                                  and falls back to EEDL otherwise; bremslib requires
-                                  them; eedl is the fetched EEDL continuum with an
-                                  isotropic photon angle.
+                                  Continuum bremsstrahlung: bremslib (default) requires
+                                  the released BremsLib tables ('pyrite tables fetch
+                                  bremslib') and uses their angular model; eedl is the
+                                  fetched EEDL continuum with an isotropic photon angle
+                                  (pair with --radiative-model uncoupled); auto is the
+                                  legacy table-checked BremsLib selection.
   --radiative-model [auto|uncoupled|bremslib-soft-hard]
-                                  Radiative energy loss: auto (default) couples when
-                                  BremsLib resolves; uncoupled scores after transport;
-                                  bremslib-soft-hard uses soft loss plus sampled hard
-                                  photons. Coupling requires midpoint energy and
-                                  BremsLib. Missing tables and grooved targets fall back
-                                  to uncoupled scoring.
-  --radiative-cutoff-ev EV        Hard-photon cutoff k_c in eV for coupled transport
-                                  (default 1000); must not exceed the continuum electron
-                                  cutoff (1000 eV by default).  [x>0.0]
+                                  Radiative energy loss: bremslib-soft-hard (default)
+                                  uses soft loss plus sampled hard photons and requires
+                                  midpoint energy, BremsLib and an ungrooved target;
+                                  uncoupled (explicit approximation) scores after
+                                  collision-only transport; auto (legacy) couples where
+                                  supported. Unsupported scenes must pass uncoupled.
+  --radiative-cutoff-ev EV        Hard-photon cutoff k_c in eV for bremslib-soft-hard or
+                                  auto (default 1000); must not exceed the continuum
+                                  electron cutoff (1000 eV by default).  [x>0.0]
   --pair-production-model [penelope-2024]
                                   Convert coupled hard photons above 1.022 MeV to e-/e+
                                   pairs (opt-in). Requires --secondary-threshold-ev and

@@ -122,7 +122,11 @@ def test_standard_profile_passes_screen(material):
     with warnings.catch_warnings():
         warnings.simplefilter("error", KinematicValidityWarning)
         build_cases(
-            sweep, inelastic_model="continuous", elastic_model="mott", bremsstrahlung_model="eedl"
+            sweep,
+            inelastic_model="continuous",
+            elastic_model="mott",
+            bremsstrahlung_model="eedl",
+            radiative_model="uncoupled",
         )
 
 

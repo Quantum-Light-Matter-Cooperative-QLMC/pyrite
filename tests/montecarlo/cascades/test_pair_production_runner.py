@@ -45,7 +45,7 @@ def test_physics_and_settings_validate_pair_requirements():
     with pytest.raises(ValueError, match="requires coupled BremsLib"):
         pr.Physics(**shell_physics, radiative_model="uncoupled", **PAIR)
     with pytest.raises(ValueError, match="requires coupled BremsLib"):
-        pr.Physics(**shell_physics, bremsstrahlung_model="eedl", **PAIR)
+        pr.Physics(**shell_physics, bremsstrahlung_model="eedl", radiative_model="auto", **PAIR)
     with pytest.raises(ValueError, match="pair_production_model must be one of"):
         pr.Physics(**shell_physics, pair_production_model="bethe-heitler")
     with pytest.raises(ValueError, match="requires secondary_threshold_eV"):

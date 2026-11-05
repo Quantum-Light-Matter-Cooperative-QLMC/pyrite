@@ -55,6 +55,9 @@ def test_case_round_trips_conditional_divergence_keys_in_legacy_order():
         n_electrons=2,
         n_electrons_brem=1,
         coherent_emission=True,
+        # Grooves admit neither shell nor coupled transport: spell the legacy fallbacks.
+        inelastic_model="continuous",
+        radiative_model="uncoupled",
     )[0]
 
     case = Case(**legacy)

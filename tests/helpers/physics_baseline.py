@@ -29,8 +29,10 @@ def resolved_baseline(kind):
     selections = dict(
         elastic_model="mott",
         inelastic_model="continuous",
+        inelastic_cutoff_eV=None,
         bremsstrahlung_model="eedl",
         radiative_model="uncoupled",
+        radiative_cutoff_eV=None,
     )
     markers = {}
     if kind == "elsepa":

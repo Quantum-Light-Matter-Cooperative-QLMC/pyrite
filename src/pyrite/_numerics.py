@@ -91,9 +91,9 @@ DEFAULT_INELASTIC_CUTOFF_EV = 50.0
 #: samples resolved ELSEPA tables; ``"mott"`` is the historical model.
 ELASTIC_MODELS = ("mott", "elsepa")
 #: Continuum bremsstrahlung sources a run may select (issue #86): the packaged
-#: EEDL evaluation, the released BremsLib tables, or ``"auto"`` (the default),
-#: which is BremsLib when every layer element's table is installed and EEDL,
-#: with a warning, otherwise. A case records only the resolved choice.
+#: EEDL evaluation, the released BremsLib tables (the default), or legacy
+#: ``"auto"``, which requires BremsLib for every layer element unless a run
+#: opts into fallback. A case records only the resolved choice.
 BREMSSTRAHLUNG_MODELS = ("auto", "eedl", "bremslib")
 #: Opt-in pair conversion of coupled hard photons (issue #275); mirrors
 #: ``montecarlo.transport.pair_production.PAIR_PRODUCTION_MODELS`` (a test
@@ -109,9 +109,20 @@ ATOMIC_ELECTRON_DEFLECTION_MODELS = ("kawrakow", "none")
 #: Bote--Salvat K/L/M fit (#92). Kept in step with
 #: ``montecarlo.spectrum.characteristic._IONIZATION_MODELS`` by a test.
 SHELL_IONIZATION_MODELS = ("eedl", "bote-salvat")
-#: The default resolves coupling when BremsLib tables are available.
+#: ``"bremslib-soft-hard"`` (the default) couples radiative loss into transport;
+#: unsupported scenes must select ``"uncoupled"``. Legacy ``"auto"`` couples
+#: only where BremsLib resolves and the target is ungrooved.
 RADIATIVE_MODELS = ("auto", "uncoupled", "bremslib-soft-hard")
 DEFAULT_RADIATIVE_CUTOFF_EV = 1000.0
+#: Selector values an omitted field had before the explicit defaults (#642):
+#: pickles minted before then keep their historical ``auto`` policies.
+HISTORICAL_SELECTOR_OMISSIONS: dict[str, object] = {
+    "inelastic_model": "auto",
+    "inelastic_cutoff_eV": None,
+    "bremsstrahlung_model": "auto",
+    "radiative_model": "auto",
+    "radiative_cutoff_eV": None,
+}
 #: Exact CUDA transport kernel precisions (#838). ``auto`` resolves through
 #: ``montecarlo.transport.precision.resolve_transport_precision``.
 TRANSPORT_PRECISIONS = ("auto", "fp64", "mixed")
@@ -229,19 +240,21 @@ class Physics:
         ``"mott"`` keeps the historical screened-Rutherford angles calibrated
         to NIST Mott transport cross sections.
     bremsstrahlung_model
-        ``"auto"`` (default) uses the released BremsLib tables with their
-        angular model (``pyrite tables fetch bremslib``) when every layer
-        element's table is installed, and otherwise warns and falls back to
-        EEDL. ``"bremslib"`` requires the tables; ``"eedl"`` selects the
-        fetched EEDL continuum with an isotropic photon angle.
+        ``"bremslib"`` (default) uses the released BremsLib tables with their
+        angular model (``pyrite tables fetch bremslib``) and requires them for
+        every layer element. ``"eedl"`` selects the fetched EEDL continuum with
+        an isotropic photon angle (pair it with ``radiative_model="uncoupled"``).
+        Legacy ``"auto"`` resolves to BremsLib and keeps its historical meaning.
     radiative_model, radiative_cutoff_eV
-        ``"auto"`` (default) couples when BremsLib resolves for every layer
-        and otherwise uses uncoupled EEDL scoring. ``"uncoupled"`` always
-        scores the continuum from electron track length. ``"bremslib-soft-hard"`` removes
-        radiative loss during transport: soft BremsLib loss below the photon
-        cutoff ``k_c`` in eV and sampled hard photons above it. The default
-        cutoff is 1000 eV. Coupling requires ``energy_model="midpoint"``;
-        ``k_c`` must not exceed the electron cutoffs.
+        ``"bremslib-soft-hard"`` (default) removes radiative loss during
+        transport: soft BremsLib loss below the photon cutoff ``k_c`` in eV
+        and sampled hard photons above it; an omitted ``k_c`` is 1000 eV.
+        Coupling requires BremsLib, ``energy_model="midpoint"`` and an
+        ungrooved target; ``k_c`` must not exceed the electron cutoffs.
+        Unsupported scenes (EEDL continuum, grooves, frozen integration) must
+        select ``"uncoupled"`` explicitly, which scores the continuum from
+        collision-only electron tracks without radiative energy-loss feedback.
+        Legacy ``"auto"`` keeps its conditional coupling.
     pair_production_model
         Opt-in pair conversion of coupled hard photons above ``2 m_e c^2``
         (``"penelope-2024"``); requires ``secondary_threshold_eV`` and coupled
@@ -313,8 +326,8 @@ class Physics:
     inelastic_cutoff_eV: float | None = None
     secondary_threshold_eV: float | None = None
     elastic_model: Literal["mott", "elsepa"] = "elsepa"
-    bremsstrahlung_model: Literal["auto", "eedl", "bremslib"] = "auto"
-    radiative_model: Literal["auto", "uncoupled", "bremslib-soft-hard"] = "auto"
+    bremsstrahlung_model: Literal["auto", "eedl", "bremslib"] = "bremslib"
+    radiative_model: Literal["auto", "uncoupled", "bremslib-soft-hard"] = "bremslib-soft-hard"
     radiative_cutoff_eV: float | None = None
     pair_production_model: Literal["penelope-2024"] | None = None
     positron_transport: bool = False
@@ -336,8 +349,8 @@ class Physics:
         inelastic_cutoff_eV: float | None | _Unset = UNSET,
         secondary_threshold_eV: float | None | _Unset = UNSET,
         elastic_model: Literal["mott", "elsepa"] = "elsepa",
-        bremsstrahlung_model: Literal["auto", "eedl", "bremslib"] = "auto",
-        radiative_model: Literal["auto", "uncoupled", "bremslib-soft-hard"] = "auto",
+        bremsstrahlung_model: Literal["auto", "eedl", "bremslib"] = "bremslib",
+        radiative_model: Literal["auto", "uncoupled", "bremslib-soft-hard"] = "bremslib-soft-hard",
         radiative_cutoff_eV: float | None | _Unset = UNSET,
         pair_production_model: Literal["penelope-2024"] | None = None,
         positron_transport: bool = False,
@@ -360,7 +373,10 @@ class Physics:
             name: values.pop(name) for name in (*_PHYSICS_ENERGIES, "transition_lattice_origin")
         }
         del values["self"]
-        quantity_defaults = {"inelastic_cutoff_eV": default_inelastic_cutoff(inelastic_model, None)}
+        quantity_defaults = {
+            "inelastic_cutoff_eV": default_inelastic_cutoff(inelastic_model, None),
+            "radiative_cutoff_eV": default_radiative_cutoff(radiative_model, None),
+        }
         for name, numeric in (
             *_PHYSICS_ENERGIES.items(),
             ("transition_lattice_origin", "transition_lattice_origin_ang"),
@@ -380,7 +396,7 @@ class Physics:
 
     def __setstate__(self, state: dict[str, Any]) -> None:
         """Restore historical selector omissions independently of constructor defaults."""
-        restored = {"inelastic_model": "auto", "inelastic_cutoff_eV": None, **state}
+        restored = {**HISTORICAL_SELECTOR_OMISSIONS, **state}
         for name, value in restored.items():
             object.__setattr__(self, name, value)
 
@@ -1052,7 +1068,10 @@ def validate_radiative_numerics(
         raise ValueError(f"radiative_model must be one of {', '.join(RADIATIVE_MODELS)}")
     if model == "uncoupled":
         if cutoff_eV is not None:
-            raise ValueError("radiative_cutoff_eV requires radiative_model='bremslib-soft-hard'")
+            raise ValueError(
+                "radiative_cutoff_eV requires radiative_model='bremslib-soft-hard'; "
+                "pass radiative_cutoff_eV=None with radiative_model='uncoupled'"
+            )
         return
     if cutoff_eV is None:
         cutoff_eV = DEFAULT_RADIATIVE_CUTOFF_EV
@@ -1066,9 +1085,22 @@ def validate_radiative_numerics(
             "radiative_model='bremslib-soft-hard' requires a finite positive radiative_cutoff_eV"
         )
     if energy_model != "midpoint":
-        raise ValueError("radiative_model='bremslib-soft-hard' requires energy_model='midpoint'")
+        raise ValueError(
+            "radiative_model='bremslib-soft-hard' requires energy_model='midpoint'; "
+            "select radiative_model='uncoupled' explicitly for frozen integration"
+        )
     if model == "bremslib-soft-hard" and bremsstrahlung_model == "eedl":
-        raise ValueError("radiative_model='bremslib-soft-hard' requires BremsLib, not 'eedl'")
+        raise ValueError(
+            "radiative_model='bremslib-soft-hard' (the default) requires BremsLib, not 'eedl'; "
+            "select radiative_model='uncoupled' explicitly with bremsstrahlung_model='eedl'"
+        )
+
+
+def default_radiative_cutoff(model: object, cutoff_eV: float | None) -> float | None:
+    """Fill an omitted new-run cutoff only for the explicit coupled model."""
+    if cutoff_eV is None and model == "bremslib-soft-hard":
+        return DEFAULT_RADIATIVE_CUTOFF_EV
+    return cutoff_eV
 
 
 def default_inelastic_cutoff(model: object, cutoff_eV: float | None) -> float | None:

@@ -49,7 +49,11 @@ def _api_digest(monkeypatch) -> tuple[dict, str]:
 
     monkeypatch.setattr(api, "run_case", fake_run_case)
     result = pr.simulate(
-        beam, target, detector, numerics=numerics, physics=pr.Physics(bremsstrahlung_model="eedl")
+        beam,
+        target,
+        detector,
+        numerics=numerics,
+        physics=pr.Physics(bremsstrahlung_model="eedl", radiative_model="uncoupled"),
     )
     return result.case, result.provenance["identity_digest"]
 
@@ -67,6 +71,7 @@ def _sweep_case():
         n_electrons=1,
         n_electrons_brem=1,
         bremsstrahlung_model="eedl",
+        radiative_model="uncoupled",
     )[0]
 
 

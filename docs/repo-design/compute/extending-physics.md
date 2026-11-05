@@ -17,7 +17,7 @@ trial counts, precision and execution controls. Deprecated physics inputs on
 | Choice | Selection and execution |
 | --- | --- |
 | Elastic | `elastic_model="elsepa"` uses per-element tabulated scattering; `"mott"` uses SRD 64. Exact native cores implement ELSEPA; enabling a screening-parameter LUT does not make it an ELSEPA LUT. |
-| Continuum | `bremsstrahlung_model="eedl"` or `"bremslib"` selects one continuum implementation. `"auto"` checks every layer element, choosing BremsLib only with complete data and retaining the documented EEDL warning/fallback. |
+| Continuum | `bremsstrahlung_model="bremslib"` (default, tables required) or `"eedl"` (with explicit uncoupled radiation) selects one continuum implementation. Legacy `"auto"` checks every layer element and requires complete BremsLib data unless the run opts into fallback. |
 | Inelastic | Continuous loss or supported shell soft/hard transport; existing energy integration, shell data and secondary-threshold constraints apply. |
 | Coupled radiation | Supported coupled BremsLib scoring consumes the transported radiative state and its expected-value estimator. It replaces uncoupled continuum scoring; the two are never independent additive sources. |
 | CXR and characteristic | CXR produces incoherent `spec` and optionally the alternative `spec_coherent`. Characteristic emission remains separate and is added once by `_spectral_components`. |

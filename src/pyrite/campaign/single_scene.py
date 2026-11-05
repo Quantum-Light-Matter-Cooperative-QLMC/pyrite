@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any, Literal, cast
 import numpy as np
 
 from .._energy_grid_encoding import encode_energy_grid
-from .._numerics import _emission_selection, default_inelastic_cutoff
+from .._numerics import _emission_selection, default_inelastic_cutoff, default_radiative_cutoff
 from .observation import filter_from_config, physical_detector_from_config
 
 if TYPE_CHECKING:
@@ -179,13 +179,18 @@ def resolve_pixel_scene(
             secondary_threshold_eV=cast(float | None, transport.get("secondary_threshold_eV")),
             elastic_model=cast(Literal["mott", "elsepa"], transport.get("elastic_model", "elsepa")),
             bremsstrahlung_model=cast(
-                Literal["auto", "eedl", "bremslib"], transport.get("bremsstrahlung_model", "auto")
+                Literal["auto", "eedl", "bremslib"],
+                transport.get("bremsstrahlung_model", "bremslib"),
             ),
+            # The singleton adapter's historical default stays uncoupled (frozen-capable).
             radiative_model=cast(
                 Literal["uncoupled", "bremslib-soft-hard"],
                 transport.get("radiative_model", "uncoupled"),
             ),
-            radiative_cutoff_eV=cast(float | None, transport.get("radiative_cutoff_eV")),
+            radiative_cutoff_eV=default_radiative_cutoff(
+                transport.get("radiative_model", "uncoupled"),
+                cast(float | None, transport.get("radiative_cutoff_eV")),
+            ),
             pair_production_model=cast(
                 Literal["penelope-2024"] | None, transport.get("pair_production_model")
             ),

@@ -19,10 +19,12 @@ EmissionMode = Literal["incoherent", "coherent", "both"]
 import numpy as np
 
 from .._numerics import (
+    HISTORICAL_SELECTOR_OMISSIONS,
     PHYSICS_FIELDS,
     Physics,
     _emission_selection,
     default_inelastic_cutoff,
+    default_radiative_cutoff,
     validate_atomic_electron_deflection,
     validate_bremsstrahlung_model,
     validate_channeling_numerics,
@@ -122,12 +124,14 @@ class Settings:
     elastic_model
         ``"elsepa"`` (default) tabulated model, or the historical ``"mott"``.
     bremsstrahlung_model
-        ``"auto"`` (default: BremsLib when installed, else EEDL), ``"eedl"`` or
-        ``"bremslib"`` continuum source.
+        ``"bremslib"`` (default; tables required), ``"eedl"``, or legacy
+        ``"auto"`` continuum source.
     radiative_model, radiative_cutoff_eV
-        ``"auto"`` (default) couples when BremsLib resolves; ``"uncoupled"``
-        selects post-hoc continuum scoring. The hard-photon cutoff defaults
-        to 1000 eV when coupling runs.
+        ``"bremslib-soft-hard"`` (default) with a 1000 eV hard-photon cutoff
+        when omitted; requires BremsLib, midpoint integration and an ungrooved
+        target. Choose ``"uncoupled"`` (collision-only transport, post-hoc
+        continuum scoring) explicitly for unsupported scenes. ``"auto"``
+        retains the legacy conditional coupling.
     pair_production_model
         Opt-in ``"penelope-2024"`` pair conversion of coupled hard photons
         (requires the secondary threshold and coupling).
@@ -170,8 +174,8 @@ class Settings:
     inelastic_cutoff_eV: float | None = None
     secondary_threshold_eV: float | None = None
     elastic_model: Literal["mott", "elsepa"] = "elsepa"
-    bremsstrahlung_model: Literal["auto", "eedl", "bremslib"] = "auto"
-    radiative_model: Literal["auto", "uncoupled", "bremslib-soft-hard"] = "auto"
+    bremsstrahlung_model: Literal["auto", "eedl", "bremslib"] = "bremslib"
+    radiative_model: Literal["auto", "uncoupled", "bremslib-soft-hard"] = "bremslib-soft-hard"
     radiative_cutoff_eV: float | None = None
     pair_production_model: Literal["penelope-2024"] | None = None
     positron_transport: bool = False
@@ -199,12 +203,15 @@ class Settings:
     allow_fallback: bool = False
 
     def __setstate__(self, state: dict[str, Any]) -> None:
-        """Keep omitted historical inelastic selectors on their original auto policy."""
-        self.__dict__.update({"inelastic_model": "auto", "inelastic_cutoff_eV": None, **state})
+        """Keep omitted historical model selectors on their original auto policies."""
+        self.__dict__.update({**HISTORICAL_SELECTOR_OMISSIONS, **state})
 
     def __post_init__(self) -> None:
         self.inelastic_cutoff_eV = default_inelastic_cutoff(
             self.inelastic_model, self.inelastic_cutoff_eV
+        )
+        self.radiative_cutoff_eV = default_radiative_cutoff(
+            self.radiative_model, self.radiative_cutoff_eV
         )
         if not isinstance(self.allow_fallback, bool):
             raise TypeError("allow_fallback must be a bool")

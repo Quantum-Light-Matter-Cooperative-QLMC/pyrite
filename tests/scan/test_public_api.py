@@ -74,7 +74,7 @@ def test_simulate_returns_intrinsic_result_and_provenance_without_store(
 
     monkeypatch.setattr(api, "run_case", fake_run_case)
 
-    physics = pr.Physics(bremsstrahlung_model="eedl")
+    physics = pr.Physics(bremsstrahlung_model="eedl", radiative_model="uncoupled")
     if use_scene:
         result = pr.simulate(pr.Scene(beam, target, detector, numerics=numerics, physics=physics))
     else:
@@ -115,13 +115,22 @@ def test_simulate_is_bit_for_bit_the_existing_single_case_path() -> None:
     beam, target, detector, numerics = _inputs()
     expected = run_case(
         api.build_case(
-            pr.Scene(beam, target, detector, physics=pr.Physics(bremsstrahlung_model="eedl")),
+            pr.Scene(
+                beam,
+                target,
+                detector,
+                physics=pr.Physics(bremsstrahlung_model="eedl", radiative_model="uncoupled"),
+            ),
             numerics,
         )
     )
 
     result = pr.simulate(
-        beam, target, detector, numerics=numerics, physics=pr.Physics(bremsstrahlung_model="eedl")
+        beam,
+        target,
+        detector,
+        numerics=numerics,
+        physics=pr.Physics(bremsstrahlung_model="eedl", radiative_model="uncoupled"),
     )
 
     np.testing.assert_array_equal(result.cxr.incoherent.photon_energy_eV, expected["E_grid"])
@@ -214,7 +223,9 @@ def test_simulate_scene_overrides_preserve_original_and_geometry(monkeypatch):
     scene = pr.Scene(
         beam, replace(target, tilt_deg=30.123456789, tilt_azim_deg=-75.23456789), detector
     )
-    physics = pr.Physics(brem_source="none", bremsstrahlung_model="eedl")
+    physics = pr.Physics(
+        brem_source="none", bremsstrahlung_model="eedl", radiative_model="uncoupled"
+    )
     seen = {}
 
     def run(case, *, transport_core):

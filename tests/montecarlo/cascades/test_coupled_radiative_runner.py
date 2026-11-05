@@ -33,13 +33,14 @@ COUPLED = {"radiative_model": "bremslib-soft-hard", "radiative_cutoff_eV": 1000.
 
 
 def test_physics_validate_coupled_radiative_requirements():
-    assert pr.Physics().radiative_model == "auto"
+    assert pr.Physics().radiative_model == "bremslib-soft-hard"
     assert pr.Numerics().energy_model == "midpoint"
     physics = pr.Physics(**COUPLED)
     assert physics.radiative_model == "bremslib-soft-hard"
     with pytest.raises(ValueError, match="radiative_cutoff_eV requires"):
         pr.Physics(radiative_model="uncoupled", radiative_cutoff_eV=1000.0)
-    assert pr.Physics(radiative_model="bremslib-soft-hard").radiative_cutoff_eV is None
+    assert pr.Physics(radiative_model="bremslib-soft-hard").radiative_cutoff_eV == 1000.0
+    assert pr.Physics(radiative_model="auto").radiative_cutoff_eV is None
     with pytest.raises(ValueError, match="finite positive radiative_cutoff_eV"):
         pr.Physics(radiative_cutoff_eV=0.0)
     with pytest.raises(ValueError, match="energy_model='midpoint'"):
@@ -63,7 +64,14 @@ def test_case_keys_are_divergence_only_and_need_bremslib():
     assert coupled["radiative_model"] == "bremslib-soft-hard"
     assert coupled["radiative_cutoff_eV"] == 1000.0
     assert profiles.case_content_key(coupled) != profiles.case_content_key(plain)
-    eedl = build_cases(sweep, 4, 4, energy_model="midpoint", bremsstrahlung_model="eedl")[0]
+    eedl = build_cases(
+        sweep,
+        4,
+        4,
+        energy_model="midpoint",
+        bremsstrahlung_model="eedl",
+        radiative_model="uncoupled",
+    )[0]
     with pytest.raises(ValueError, match="requires bremsstrahlung_model='bremslib'"):
         replace(eedl, **COUPLED)
     with pytest.raises(ValueError, match="must not exceed the continuum electron cutoff"):
@@ -80,7 +88,14 @@ def test_auto_bremsstrahlung_couples_only_cases_that_resolve_to_bremslib(monkeyp
     monkeypatch.setattr(
         bremslib_tables, "resolve_bremsstrahlung_model", lambda _model, _elements: resolved
     )
-    case = build_cases(material_sweep("silicon"), 4, 4, energy_model="midpoint", **COUPLED)[0]
+    case = build_cases(
+        material_sweep("silicon"),
+        4,
+        4,
+        energy_model="midpoint",
+        bremsstrahlung_model="auto",
+        **COUPLED,
+    )[0]
     assert ("radiative_model" in case) is (resolved == "bremslib")
     assert (case.get("bremsstrahlung_model") == "bremslib") is (resolved == "bremslib")
 
@@ -91,7 +106,7 @@ def test_identity_records_coupling_only_when_bremslib_runs(monkeypatch, resolved
         profiles, "resolve_bremsstrahlung_model", lambda _model, _elements: resolved
     )
     sweep = material_sweep("silicon")
-    settings = replace(default_settings(), radiative_model="uncoupled")
+    settings = replace(default_settings(), radiative_model="uncoupled", radiative_cutoff_eV=None)
     base = dataset_identity("silicon", "full", settings, sweep)
     coupled = dataset_identity("silicon", "full", replace(settings, **COUPLED), sweep)
     other = dataset_identity(
@@ -110,14 +125,16 @@ def test_identity_records_coupling_only_when_bremslib_runs(monkeypatch, resolved
 
 
 @pytest.mark.parametrize("resolved", ["bremslib", "eedl"])
-def test_default_radiative_mode_resolves_with_the_continuum_source(monkeypatch, resolved):
+def test_legacy_auto_radiative_mode_resolves_with_the_continuum_source(monkeypatch, resolved):
     monkeypatch.setattr(
         bremslib_tables, "resolve_bremsstrahlung_model", lambda _model, _elements: resolved
     )
     monkeypatch.setattr(profiles, "resolve_bremsstrahlung_model", lambda *_args: resolved)
     sweep = material_sweep("silicon")
-    case = build_cases(sweep, 4, 4)[0]
-    identity = dataset_identity("silicon", "full", default_settings(), sweep)
+    legacy = {"bremsstrahlung_model": "auto", "radiative_model": "auto"}
+    case = build_cases(sweep, 4, 4, **legacy)[0]
+    settings = replace(default_settings(), **legacy, radiative_cutoff_eV=None)
+    identity = dataset_identity("silicon", "full", settings, sweep)
     assert case["energy_model"] == "midpoint"
     assert ("radiative_model" in case) is (resolved == "bremslib")
     numerics = identity["resolved_parameters"]["transport_numerics"]
@@ -141,14 +158,18 @@ def test_grooves_fall_back_to_uncoupled_without_a_coupling_identity(
         thickness_ang=2.0e5,
         beam=BeamSpec(energy_keV=100.0),
     )
+    # The explicit coupled default refuses grooves; legacy "auto" warns and degrades.
+    with pytest.raises(ValueError, match="radiative_model='uncoupled'"):
+        build_cases(sweep, 4, 4, bremsstrahlung_model=bremsstrahlung_model, **COUPLED)
     with pytest.warns(UserWarning, match="unavailable for grooves"):
         cases = build_cases(
             sweep,
             4,
             4,
             energy_model="midpoint",
+            inelastic_model="continuous",
             bremsstrahlung_model=bremsstrahlung_model,
-            **COUPLED,
+            radiative_model="auto",
         )
     assert cases and all("radiative_model" not in case for case in cases)
     assert all(case["bremsstrahlung_model"] == "bremslib" for case in cases)
@@ -262,7 +283,9 @@ def test_runner_transport_and_scoring_use_the_coupled_mode(synthetic_si_tables, 
 
 
 def test_uncoupled_case_transport_explicitly_selects_uncoupled_radiation(monkeypatch):
-    case = build_cases(material_sweep("silicon"), 4, 4, bremsstrahlung_model="eedl")[0]
+    case = build_cases(
+        material_sweep("silicon"), 4, 4, bremsstrahlung_model="eedl", radiative_model="uncoupled"
+    )[0]
     assert runner._case_radiative_kwargs(case) == {"radiative_model": "uncoupled"}
     seen = {}
 
@@ -285,7 +308,9 @@ def test_layered_stack_scores_each_layer_with_its_own_composition(synthetic_si_t
             layers=(Layer("silicon", 5.0e3), Layer("sio2", 2.0e4)),
             tilt_deg=30.0,
             footprint=Footprint(5.0, 5.0),
-        )
+        ),
+        # Amorphous SiO2 has no shell data: keep the historical continuous stopping.
+        inelastic_model="continuous",
     )
     assert case["abs_layers"] is not None and len(case["abs_layers"]) == 2
     tp = runner._transport_case(case)

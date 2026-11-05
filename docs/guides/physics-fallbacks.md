@@ -1,17 +1,23 @@
 # Physics-table fallback policy
 
-PyRITE's `bremsstrahlung_model="auto"` now requires BremsLib tables for every
-emitting element **before** a campaign starts. If a table is missing, the run
+PyRITE's default `bremsstrahlung_model="bremslib"` (and legacy `"auto"`)
+requires BremsLib tables for every emitting element **before** a campaign
+starts. The default `radiative_model="bremslib-soft-hard"` additionally requires
+an ungrooved target. If a table is missing, the run
 raises `TableNotFoundError`, with the command `pyrite tables fetch bremslib`.
 A missing BremsLib checkout for an element not in the distributed release is
 also an error; provide its table explicitly rather than silently degrading.
 
 To intentionally run the isotropic EEDL continuum without coupled radiative
 transport, set `bremsstrahlung_model="eedl"` and `radiative_model="uncoupled"`
-in the physics configuration. These are explicit model selections. For the previous *auto-if-installed, otherwise
-EEDL* behavior in a CLI sweep, add `--allow-physics-fallback` to
+in the physics configuration (`--bremsstrahlung-model eedl --radiative-model
+uncoupled`). These are explicit model selections; `"eedl"` alone is rejected
+because the coupled default needs BremsLib. For a grooved target keep BremsLib
+and select `radiative_model="uncoupled"`. For the previous *auto-if-installed,
+otherwise EEDL* behavior in a CLI sweep, add `--allow-physics-fallback` to
 `pyrite run PROFILE`. This emits `PhysicsFallbackWarning`, resolves the whole
-continuum to EEDL, and puts a `physics_fallbacks` event in the dataset's
+continuum to EEDL, degrades the coupled default to uncoupled transport, and
+puts a `physics_fallbacks` event in the dataset's
 identity metadata (requested/used model, elements, scope, and unavailable
 preflight metrics). The executed source and opt-in policy participate in
 checkpoint and content-cache keys, so a strict request cannot reuse an opted-in
@@ -21,8 +27,10 @@ Both local and remote campaign workers refuse per-segment substitutions by
 default. With `--allow-physics-fallback`, uncovered BremsLib rows may use EEDL;
 missing EEDL coverage may in turn use Bethe--Heitler. This also applies below
 the supplied table's floor: it is a surrogate, not a source-backed model splice.
-Malformed or corrupted reference data remain errors. An explicit coupled
-`bremslib-soft-hard` request is never downgraded by the flag.
+Malformed or corrupted reference data remain errors. Because
+`bremslib-soft-hard` is now the default, the flag degrades it like legacy
+`auto` (the event records `model_requested="bremslib-soft-hard"`); without the
+flag it is never downgraded.
 
 Completed result rows carry `physics_fallbacks` in both line and bremsstrahlung
 checkpoint components. Each event records requested/used models, element,

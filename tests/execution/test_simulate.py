@@ -74,7 +74,7 @@ def test_scalar_executor_matches_default_and_component_calls(scene, controls, mo
         return [scalar_output()]
 
     executor = LocalExecutor(run)
-    physics = Physics(bremsstrahlung_model="eedl")
+    physics = Physics(bremsstrahlung_model="eedl", radiative_model="uncoupled")
     expected = api.simulate(scene, physics=physics, numerics=controls)
     actual = api.simulate(scene, physics=physics, numerics=controls, executor=executor)
     components = api.simulate(

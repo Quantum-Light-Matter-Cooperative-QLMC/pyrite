@@ -2,8 +2,10 @@
 
 ``build_cases`` records only the resolved continuum source on each case, so
 identity and content keys never depend on what happened to be installed
-unless BremsLib really ran. The opt-in coupled radiative mode (issue #172)
-needs BremsLib, so its divergence-only keys follow the same resolution.
+unless BremsLib really ran. Coupled radiative transport (issue #172) needs
+BremsLib, so its divergence-only keys follow the same resolution. The explicit
+public defaults (``bremslib`` with ``bremslib-soft-hard``, #642) are admitted
+here before transport; unsupported scenes must choose ``uncoupled`` explicitly.
 """
 
 from dataclasses import replace
@@ -57,13 +59,8 @@ def resolve_run_radiative_model(
         if grooved
         else "coupled radiative transport requires the BremsLib continuum source"
     )
-    guidance = (
-        f"{reason}; install tables with `pyrite tables fetch bremslib` and select "
-        "an ungrooved BremsLib configuration, or explicitly select "
-        "radiative_model='uncoupled'."
-    )
-    if model != "auto":
-        raise ValueError(guidance)
+    guidance = coupling_guidance(reason)
+    # The explicit default and legacy "auto" degrade only under the opt-in.
     if not allow_fallback:
         raise ValueError(guidance + " Automatic degradation requires --allow-physics-fallback.")
     import warnings
@@ -78,7 +75,7 @@ def resolve_run_radiative_model(
         None,
         [
             {
-                "model_requested": "auto (bremslib-soft-hard)",
+                "model_requested": ("auto (bremslib-soft-hard)" if model == "auto" else str(model)),
                 "model_used": "uncoupled",
                 "scope": "entire radiative transport",
                 "reason": reason,
@@ -87,6 +84,37 @@ def resolve_run_radiative_model(
             }
         ],
     )
+
+
+def coupling_guidance(reason: str) -> str:
+    """Actionable message for a scene the coupled radiative default cannot run."""
+    return (
+        f"{reason}; install tables with `pyrite tables fetch bremslib` and select "
+        "an ungrooved BremsLib configuration, or explicitly select "
+        "radiative_model='uncoupled' (CLI: --radiative-model uncoupled), which omits "
+        "radiative energy-loss feedback from transport."
+    )
+
+
+def grooved_radiative_keys(
+    radiative: dict[str, Any], radiative_model: object, *, grooved: bool
+) -> dict[str, Any]:
+    """Refuse the explicit coupled model on grooves; legacy ``auto`` warns and uncouples."""
+    if not (radiative and grooved):
+        return radiative
+    if radiative_model == "bremslib-soft-hard":
+        raise ValueError(
+            coupling_guidance("coupled BremsLib transport does not support grooved targets")
+        )
+    import warnings
+
+    warnings.warn(
+        "coupled BremsLib radiative transport is unavailable for grooves; "
+        "using uncoupled bremsstrahlung scoring",
+        UserWarning,
+        stacklevel=3,
+    )
+    return {}
 
 
 def radiative_case_keys(

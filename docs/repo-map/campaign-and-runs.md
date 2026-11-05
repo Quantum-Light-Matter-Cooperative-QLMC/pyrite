@@ -125,7 +125,7 @@ Thick-target screen run by `build_cases` after the kinematic screen: `warn_thick
 - Deps: `materials.radiation_length`.
 
 ### `campaign/bremsstrahlung_cases.py`
-Per-case continuum source resolution for `build_cases`: `resolve_auto_bremsstrahlung` replaces `bremsstrahlung_model="auto"` with the source each case's elements resolve to, and `radiative_case_keys` validates the coupled radiative mode and returns its divergence-only case keys, which join only BremsLib-resolved cases (#172).
+Per-case continuum source resolution for `build_cases`: `resolve_auto_bremsstrahlung` replaces `bremsstrahlung_model="auto"` with the source each case's elements resolve to, and `radiative_case_keys` validates the coupled radiative mode and returns its divergence-only case keys, which join only BremsLib-resolved cases (#172). `coupling_guidance` names the explicit `uncoupled` choice when the `bremslib-soft-hard` default cannot run; `resolve_run_models` applies run preflight and the opt-in fallback (#262, #642).
 - Deps: `_numerics`, `montecarlo.case`, `xsgen.bremslib.tables` (lazy).
 
 ### Experimental planar overflow instrument

@@ -16,7 +16,7 @@ def _scene():
             "hopg", thickness_ang=10_000.0, tilt_deg=30.0, footprint=pr.geometry.Footprint(5.0, 5.0)
         ),
         pr.Detector(),
-        physics=pr.Physics(bremsstrahlung_model="eedl"),
+        physics=pr.Physics(bremsstrahlung_model="eedl", radiative_model="uncoupled"),
     )
 
 

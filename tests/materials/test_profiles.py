@@ -553,7 +553,12 @@ def test_case_content_key_separates_characteristic_models():
 
 
 def test_bremsstrahlung_model_marker_orphans_bethe_heitler_era_digests():
-    settings = replace(default_settings(), bremsstrahlung_model="eedl")
+    settings = replace(
+        default_settings(),
+        bremsstrahlung_model="eedl",
+        radiative_model="uncoupled",
+        radiative_cutoff_eV=None,
+    )
     identity = dataset_identity("hopg", "full", settings, material_sweep("hopg"))
 
     assert identity["resolved_parameters"]["bremsstrahlung_model"] == BREMSSTRAHLUNG_MODEL
@@ -572,7 +577,11 @@ def test_default_continuum_is_bremslib_when_installed_and_eedl_otherwise(monkeyp
 
 def test_case_content_key_separates_bremsstrahlung_models():
     case = build_cases(
-        material_sweep("hopg"), n_electrons=300, n_electrons_brem=150, bremsstrahlung_model="eedl"
+        material_sweep("hopg"),
+        n_electrons=300,
+        n_electrons_brem=150,
+        bremsstrahlung_model="eedl",
+        radiative_model="uncoupled",
     )[0]
     current = case_content_key(case)
     with mock.patch.object(profiles, "BREMSSTRAHLUNG_MODEL", "bethe-heitler-only"):
