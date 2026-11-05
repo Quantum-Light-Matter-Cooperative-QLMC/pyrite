@@ -19,7 +19,7 @@ requires a Pint quantity. Use the shared registry from `pyrite.units`:
 from pyrite import Scene
 from pyrite.beams import Beam, PointBunch, Spot
 from pyrite.config import Physics
-from pyrite.geometry import Footprint, Slab
+from pyrite.geometry import Slab
 from pyrite.units import Q_, ureg
 
 beam = Beam(
@@ -29,12 +29,12 @@ beam = Beam(
     transverse=Spot(),
     longitudinal=PointBunch(),
 )
-footprint = Footprint(width=5 * ureg.mm, height=5 * ureg.mm)  # was Footprint(5, 5)
 target = Slab(
     "hopg",
     thickness=2 * ureg.um,  # was thickness_ang=20_000
     tilt=45 * ureg.degree,  # was tilt_deg=45
-    footprint=footprint,
+    width=5 * ureg.mm,
+    height=5 * ureg.mm,
 )
 physics = Physics(inelastic_model="shell-soft-hard", inelastic_cutoff=Q_(50, "eV"))
 scene = Scene(beam, target)
@@ -286,3 +286,10 @@ script to quantities.
 A future deprecation of a numeric spelling follows the
 [release policy](../repo-design/releasing.md): it is announced in a shipping
 release and supported for two minor versions before removal.
+
+
+For slabs, specify full transverse dimensions directly with `Slab(width=5 *
+ureg.mm, height=5 * ureg.mm)`. Use `width=None, height=None` for a
+laterally infinite slab. `Slab(footprint=None)` and the quantity-valued
+`Footprint.width` and `Footprint.height` spellings are deprecated. For a
+`Stack`, `Footprint(width_mm=5, height_mm=5)` remains supported.

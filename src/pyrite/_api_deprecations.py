@@ -46,6 +46,14 @@ for _spelling in ("Result.spectral_flux", "Result.spectral_flux_units"):
     )
 
 
+for _spelling, _replacement in (
+    ("Footprint.width", "Slab.width for slabs or Footprint.width_mm for stacks"),
+    ("Footprint.height", "Slab.height for slabs or Footprint.height_mm for stacks"),
+    ("Slab(footprint=None)", "Slab(width=None, height=None)"),
+):
+    API_DEPRECATIONS[_spelling] = _api_entry(_spelling, _replacement, since="0.26.1")
+
+
 def warn_api(spelling: str, *, stacklevel: int = 3) -> None:
     """Warn that registered *spelling* is deprecated, naming its replacement."""
     entry = API_DEPRECATIONS[spelling]

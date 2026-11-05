@@ -88,7 +88,7 @@ def __getattr__(name):
 def _default_group_key(case):
     """Everything but azimuth and energy: the sweep at one tilt and footprint.
 
-    Missing footprint fields represent the legacy laterally infinite slab, so
+    Missing footprint fields represent the laterally infinite slab, so
     older case dictionaries continue to group together.
     """
     return (

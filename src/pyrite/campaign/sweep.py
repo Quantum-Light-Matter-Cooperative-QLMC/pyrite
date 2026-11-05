@@ -375,7 +375,7 @@ class Sweep:
     Each of ``target.thickness``, ``beam.energy_keV``, ``target.tilt_deg``, and
     ``target.tilt_azim_deg`` is either a single number (fixed) or a
     sequence/array (swept); build_cases() takes the product. The transverse
-    crystal dimensions must be both ``None`` (the legacy infinite slab) or both
+    crystal dimensions must be both ``None`` (the infinite slab) or both
     strictly positive full dimensions in mm; they default to a finite 5x5 mm
     footprint.
 
@@ -1066,7 +1066,7 @@ def build_cases(
     product over the swept thickness / tilt / azimuth / footprint, each
     crossed with every beam energy). ``crystal_width_mm`` and
     ``crystal_height_mm`` are full dimensions: both ``None`` recovers the
-    legacy infinite slab, otherwise both must be positive (default: a finite
+    infinite slab, otherwise both must be positive (default: a finite
     5x5 mm footprint). Each case also carries the beam phase-space fields from
     ``sweep.beam`` (:class:`BeamSpec`): ``beam_fwhm_mm`` (x-plane FWHM; default a
     1 mm Gaussian spot, ``None`` recovers the legacy point source), the
