@@ -218,6 +218,8 @@ class ObservationPlan:
         own stored energy grids. The match is rescored with this plan's
         response, acquisition, and normalization. Damaged candidates are
         skipped, so the caller's transported ``put`` repairs them.
+        The resolved source quadrature restores the in-memory CXR sampling
+        that the stored arrays do not encode.
         """
         filters = self.observation.filters
         for digest in store.digests(self.source_identity_digest):
@@ -233,6 +235,11 @@ class ObservationPlan:
                 )
             )
             if payload_digest(payload) == stored.identity.true_spatial_digest:
+                sampling, _ = _declared_line_sampling(self.line_quadrature, spatial.cxr.energy_eV)
+                sampling = {"sampling": "nodes", "bin_edges_eV": None, **sampling}
+                stored = replace(
+                    stored, spatial=replace(spatial, cxr=replace(spatial.cxr, **sampling))
+                )
                 return stored.rescore(
                     acquisition=self.observation.acquisition,
                     response=self.observation.detector.response,

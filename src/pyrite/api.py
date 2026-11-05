@@ -524,6 +524,7 @@ def observation_plan(
         bunch_charge_pc=scene.beam.bunch_charge_pc,
         emission=request.physics.emission_policy,
         brem_source=cast(str, request.physics.brem_source),
+        line_quadrature=case.get("line_quadrature"),
     )
 
 

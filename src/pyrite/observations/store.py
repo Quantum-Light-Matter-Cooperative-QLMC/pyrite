@@ -8,7 +8,9 @@ Layout under ``<root>/<stem>/``::
 
 A true object holds only factorized arrays -- pixel tile map, solid angles,
 filter paths, representative tile directions, per-tile intrinsic spectra, and
-attenuation coefficients -- never an ``(ny, nx, energy)`` cube. It is shared by
+attenuation coefficients, plus declared sampling and native bin-edge metadata
+in schema v2 -- never an ``(ny, nx, energy)`` cube. Schema v1 remains readable;
+its CXR sampling is unknown until a resolved source plan restores it. It is shared by
 every response/acquisition choice over the same transport and geometry. An
 observation record holds the three canonical layer payloads that name it, from
 which the detector response, acquisition, and beam normalization are rebuilt.
@@ -62,7 +64,8 @@ from ..results.model import PixelRayMap, Result, SpatialResult, SpectralFactors
 from ..results.spectral_support import _declared_line_sampling
 
 INDEX_SCHEMA = "pyrite.observation-index.v1"
-TRUE_SCHEMA = "pyrite.observation-true.v1"
+TRUE_SCHEMA = "pyrite.observation-true.v2"
+_LEGACY_TRUE_SCHEMA = "pyrite.observation-true.v1"
 RECORD_SCHEMA = "pyrite.observation-record.v1"
 
 #: HDF5 group name -> ``SpatialResult`` attribute for each spectral factor.
@@ -95,13 +98,15 @@ _RESPONSES: dict[str, type] = {
 _DIGEST = re.compile(r"[0-9a-f]{64}")
 
 
-def _stored_factor(arrays: Mapping[str, np.ndarray], group: str) -> SpectralFactors:
-    """Reopen one factor group, declaring the sampling its component fixes.
-
-    The record has no line quadrature, so only characteristic sampling is
-    derivable; every other factor reopens with the default ``nodes`` label.
-    """
+def _stored_factor(
+    arrays: Mapping[str, np.ndarray], group: str, metadata: Mapping[str, Any] | None
+) -> SpectralFactors:
+    """Reopen declared sampling, deriving only unambiguous legacy components."""
     energy, intrinsic, mu = (arrays[f"factors/{group}/{name}"] for name in _FACTOR_ARRAYS)
+    if metadata is not None:
+        return SpectralFactors(energy, intrinsic, mu, **metadata)
+    if group == "line":
+        return SpectralFactors(energy, intrinsic, mu, sampling=None)
     if group != "characteristic_line":
         return SpectralFactors(energy, intrinsic, mu)
     _, sampling = _declared_line_sampling(None, energy)
@@ -461,6 +466,20 @@ class ObservationStore:
                 for group, attribute in _FACTORS.items():
                     factor = getattr(spatial, attribute)
                     if factor is not None:
+                        node = handle.require_group(f"factors/{group}")
+                        node.attrs["sampling"] = factor.sampling or "unknown"
+                        if factor.bin_edges_eV is not None:
+                            arrays[f"factors/{group}/bin_edges_eV"] = factor.bin_edges_eV
+                        node.attrs["sampling_sha256"] = payload_digest(
+                            {
+                                "sampling": factor.sampling,
+                                "bin_edges_eV": (
+                                    None
+                                    if factor.bin_edges_eV is None
+                                    else factor.bin_edges_eV.tolist()
+                                ),
+                            }
+                        )
                         for name in _FACTOR_ARRAYS:
                             arrays[f"factors/{group}/{name}"] = getattr(factor, name)
                 for name, array in arrays.items():
@@ -478,7 +497,8 @@ class ObservationStore:
             raise ObservationStoreError(f"missing true-spatial object {path}")
         try:
             with h5py.File(path, "r") as handle:
-                if handle.attrs.get("schema") != TRUE_SCHEMA:
+                schema = handle.attrs.get("schema")
+                if schema not in {TRUE_SCHEMA, _LEGACY_TRUE_SCHEMA}:
                     raise ObservationStoreError(f"unknown true-spatial schema in {path}")
                 payload = json.loads(handle.attrs["true_payload"])
                 arrays: dict[str, np.ndarray] = {}
@@ -491,6 +511,27 @@ class ObservationStore:
                         arrays[name] = array
 
                 handle.visititems(collect)
+                metadata = {}
+                if schema == TRUE_SCHEMA:
+                    for group in _FACTORS:
+                        if f"factors/{group}" in handle:
+                            attrs = handle[f"factors/{group}"].attrs
+                            sampling = attrs["sampling"]
+                            metadata[group] = {
+                                "sampling": None if sampling == "unknown" else sampling,
+                                "bin_edges_eV": arrays.get(f"factors/{group}/bin_edges_eV"),
+                            }
+                            edges = metadata[group]["bin_edges_eV"]
+                            if (
+                                payload_digest(
+                                    {
+                                        "sampling": metadata[group]["sampling"],
+                                        "bin_edges_eV": None if edges is None else edges.tolist(),
+                                    }
+                                )
+                                != attrs["sampling_sha256"]
+                            ):
+                                raise ObservationStoreError(f"sampling checksum mismatch in {path}")
         except ObservationStoreError:
             raise
         except (OSError, KeyError, ValueError) as exc:
@@ -501,7 +542,7 @@ class ObservationStore:
             directions = arrays["ray_map/tile_directions_lab"]
             ray_map = PixelRayMap(*(arrays[f"ray_map/{name}"] for name in _RAY_ARRAYS))
             factors = {
-                group: _stored_factor(arrays, group)
+                group: _stored_factor(arrays, group, metadata.get(group))
                 for group in _FACTORS
                 if f"factors/{group}/energy_eV" in arrays
             }
@@ -572,7 +613,9 @@ class ObservationStore:
         if observation.spatial.tile_directions_lab is None:
             raise ValueError("observation spatial factors lack tile_directions_lab")
         try:
-            self._read_true(true_digest)
+            _, _, _, factors = self._read_true(true_digest)
+            if factors["line"].sampling is None and observation.spatial.cxr.sampling is not None:
+                self._write_true(observation)
         except ObservationStoreError:
             self._write_true(observation)
         try:

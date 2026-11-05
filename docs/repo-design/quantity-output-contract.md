@@ -200,7 +200,10 @@ response resimulation. Counts are Pint-dimensionless but semantically photons
 per original primary, not electron charge. Event relaxation budgets and
 persistence provenance are left on the numeric tally. Invalid source arrays
 are rejected, CPU arrays are snapshotted and each property returns a fresh
-quantity. Reconstruct after loading; no serialized schema changes.
+quantity. Reconstruct after loading; the observation's numerical datasets and
+scientific identities are unchanged. True-object schema v2 adds persisted
+sampling declarations and native bin edges, with backward reading of v1;
+see [energy-grid semantics](../physics/radiation-physics/energy-grid-semantics.md).
 
 ### Selected-pixel spectral view
 

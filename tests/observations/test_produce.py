@@ -70,6 +70,47 @@ def test_repeat_request_reuses_the_stored_observation(tmp_path, transports) -> N
     assert store.digests(first.observation.source_identity_digest) == (first.observation.digest,)
 
 
+@pytest.mark.parametrize("legacy", [False, True])
+@pytest.mark.parametrize("quadrature", ["nodes", "bin-mean"])
+def test_reuse_restores_sampling_from_resolved_source(
+    tmp_path, transports, monkeypatch, legacy, quadrature
+):
+    source_case = api._source_case
+
+    def bin_mean(request):
+        case, tables = source_case(request)
+        return (
+            replace(case, line_quadrature=quadrature) if quadrature == "bin-mean" else case
+        ), tables
+
+    monkeypatch.setattr(api, "_source_case", bin_mean)
+    store = ObservationStore("hopg", root=tmp_path)
+    first = produce_observation(_scene(), NUMERICS, store)
+    path = store.true_path(first.observation.identity.true_spatial_digest)
+    if legacy:
+        with h5py.File(path, "r+") as handle:
+            handle.attrs["schema"] = "pyrite.observation-true.v1"
+            for group in handle["factors"].values():
+                for name in ("sampling", "bin_edges_eV"):
+                    if name in group.attrs:
+                        del group.attrs[name]
+                if "bin_edges_eV" in group:
+                    del group["bin_edges_eV"]
+    second = produce_observation(_scene(), NUMERICS, store)
+
+    assert first.transported and not second.transported
+    assert len(transports) == 1
+    assert second.observation.digest == first.observation.digest
+    for observation in (first.observation, second.observation):
+        view = observation.spatial.quantify_spectra(pixels=[(0, 0)], component="cxr")
+        assert view.sampling == quadrature
+        if quadrature == "bin-mean":
+            np.testing.assert_array_equal(
+                view.photon_energy_edges.magnitude, first.observation.spatial.cxr.bin_edges_eV
+            )
+    assert store.load(second.observation.digest).spatial.cxr.sampling == quadrature
+
+
 @pytest.mark.parametrize(
     "overrides",
     [

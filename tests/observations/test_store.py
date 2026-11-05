@@ -135,23 +135,97 @@ def test_fresh_factors_declare_sampling_and_stored_identity_ignores_it(
             "energy_eV",
             "intrinsic_by_tile",
             "mu_by_filter_inv_mm",
+            "bin_edges_eV",
         }
 
 
-def test_reopened_factors_keep_only_component_derivable_sampling(tmp_path) -> None:
+def test_legacy_factors_keep_only_component_derivable_sampling(tmp_path) -> None:
     result = _simulate()
     store = ObservationStore("hopg", root=tmp_path)
-    spatial = store.load(store.put(observation_from_result(result))).spatial
+    digest = store.put(observation_from_result(result))
+    (path,) = _true_objects(store)
+    with h5py.File(path, "r+") as handle:
+        handle.attrs["schema"] = "pyrite.observation-true.v1"
+        for group in handle["factors"].values():
+            for name in ("sampling", "bin_edges_eV"):
+                if name in group.attrs:
+                    del group.attrs[name]
+            if "bin_edges_eV" in group:
+                del group["bin_edges_eV"]
+    spatial = store.load(digest).spatial
     assert result.spatial is not None
     assert spatial.characteristic is not None and result.spatial.characteristic is not None
     assert spatial.characteristic.sampling == "bin-mean"
     np.testing.assert_array_equal(
         spatial.characteristic.bin_edges_eV, result.spatial.characteristic.bin_edges_eV
     )
-    # The record stores no line quadrature, so a reopened CXR factor always
-    # reads as nodes; a bin-mean source is a documented limitation (#959).
-    assert spatial.cxr.sampling == "nodes"
+    # Legacy records cannot distinguish node and bin-mean CXR producers.
+    assert spatial.cxr.sampling is None
     assert spatial.brem.sampling == "nodes"
+    for component in ("cxr", "cxr_total"):
+        with pytest.raises(ValueError, match="legacy CXR sampling is unavailable"):
+            spatial.quantify_spectra(pixels=[(0, 0)], component=component)
+    assert (
+        spatial.quantify_spectra(pixels=[(0, 0)], component="characteristic").sampling == "bin-mean"
+    )
+    assert store.verify() == ()
+    # A known producing result upgrades metadata atomically under the same identity.
+    before = spatial.spectra(pixels=[(0, 0)])[1]
+    assert store.put(observation_from_result(result)) == digest
+    with h5py.File(path) as handle:
+        assert handle.attrs["schema"] == "pyrite.observation-true.v2"
+    upgraded = store.load(digest).spatial
+    assert upgraded.cxr.sampling == "nodes"
+    np.testing.assert_array_equal(upgraded.spectra(pixels=[(0, 0)])[1], before)
+
+
+def test_bin_mean_sampling_round_trip_preserves_edges_values_and_identity(tmp_path, monkeypatch):
+    planar = api._simulate_planar
+
+    def bin_mean(request, case, tables):
+        return planar(request, replace(case, line_quadrature="bin-mean"), tables)
+
+    monkeypatch.setattr(api, "_simulate_planar", bin_mean)
+    result = _simulate()
+    store = ObservationStore("hopg", root=tmp_path)
+    digest = store.put(observation_from_result(result))
+    loaded = store.load(digest)
+    assert loaded.digest == result.provenance["observation_identity_digest"]
+    for component in ("cxr", "characteristic"):
+        fresh = result.spatial.quantify_spectra(pixels=[(0, 0)], component=component)
+        reopened = loaded.spatial.quantify_spectra(pixels=[(0, 0)], component=component)
+        assert reopened.sampling == "bin-mean"
+        np.testing.assert_array_equal(
+            reopened.photon_energy_edges.magnitude, fresh.photon_energy_edges.magnitude
+        )
+        np.testing.assert_array_equal(reopened.density.magnitude, fresh.density.magnitude)
+        np.testing.assert_array_equal(
+            reopened.to_energy("keV").photon_energy_edges.magnitude,
+            fresh.to_energy("keV").photon_energy_edges.magnitude,
+        )
+    assert loaded.spatial.quantify_spectra(pixels=[(0, 0)], component="brem").sampling == "nodes"
+    assert store.verify() == ()
+
+
+def test_stored_sampling_metadata_is_checked(tmp_path):
+    store = ObservationStore("hopg", root=tmp_path)
+    digest = store.put(observation_from_result(_simulate()))
+    (path,) = _true_objects(store)
+    with h5py.File(path, "r+") as handle:
+        handle["factors/line"].attrs["sampling"] = "mixed"
+    with pytest.raises(ObservationStoreError, match="sampling checksum mismatch"):
+        store.load(digest)
+
+
+def test_native_edges_larger_than_hdf5_attribute_limit_round_trip(tmp_path, monkeypatch):
+    monkeypatch.setitem(globals(), "ENERGY", np.linspace(500.0, 3_000.0, 10_000))
+    result = _simulate()
+    store = ObservationStore("hopg", root=tmp_path)
+    loaded = store.load(store.put(observation_from_result(result)))
+    edges = loaded.spatial.characteristic.bin_edges_eV
+    assert edges.nbytes > 65_536
+    np.testing.assert_array_equal(edges, result.spatial.characteristic.bin_edges_eV)
+    assert store.verify() == ()
 
 
 def test_poisson_realization_replays_after_reopen(tmp_path) -> None:

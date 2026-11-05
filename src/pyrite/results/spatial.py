@@ -39,8 +39,10 @@ def _readonly_array(value: object, *, dtype=None) -> np.ndarray:
     return array
 
 
-def _combined_sampling(parts: Sequence[SpectralFactors]) -> tuple[str, np.ndarray | None]:
+def _combined_sampling(parts: Sequence[SpectralFactors]) -> tuple[str | None, np.ndarray | None]:
     """Sampling of a sum, matching :meth:`~pyrite.results.Result.combined_cxr`."""
+    if any(part.sampling is None for part in parts):
+        return None, None
     edges = parts[0].bin_edges_eV
     if edges is not None and all(
         part.sampling == "bin-mean"
@@ -121,7 +123,9 @@ class SpectralFactors:
     sampling
         Producer-declared meaning of each energy value, as on
         :class:`~pyrite.results.SpectralDensity`: ``nodes``, ``bin-mean`` or
-        ``mixed``. In-memory metadata, outside stored arrays and identities.
+        ``mixed``. ``None`` means a legacy stored CXR factor has no declaration;
+        numeric scoring remains available, but quantification requires a
+        resolved source plan. Sampling does not affect scientific identities.
     bin_edges_eV
         Native bin edges in eV, required for and only for ``bin-mean``.
     """
@@ -129,7 +133,7 @@ class SpectralFactors:
     energy_eV: np.ndarray
     intrinsic_by_tile: np.ndarray
     mu_by_filter_inv_mm: np.ndarray
-    sampling: str = "nodes"
+    sampling: str | None = "nodes"
     bin_edges_eV: np.ndarray | None = None
 
     def __post_init__(self) -> None:
@@ -153,7 +157,13 @@ class SpectralFactors:
         object.__setattr__(self, "energy_eV", energy)
         object.__setattr__(self, "intrinsic_by_tile", intrinsic)
         object.__setattr__(self, "mu_by_filter_inv_mm", coefficient)
-        edges = _checked_bin_edges(self.sampling, self.bin_edges_eV, energy.size)
+        if self.sampling is None and self.bin_edges_eV is not None:
+            raise ValueError("unknown sampling cannot carry bin edges")
+        edges = (
+            None
+            if self.sampling is None
+            else _checked_bin_edges(self.sampling, self.bin_edges_eV, energy.size)
+        )
         object.__setattr__(self, "bin_edges_eV", edges)
 
 
@@ -517,9 +527,18 @@ class SpatialResult:
 
     def _sampling(self, component: str) -> tuple[str, np.ndarray | None]:
         """Declared unmeasured sampling, without materializing a combined factor."""
-        if component in {"cxr_total", "coherent_total"}:
-            return _combined_sampling(self._total_parts(component))
-        return _combined_sampling((self._factor(component),))
+        parts = (
+            self._total_parts(component)
+            if component in {"cxr_total", "coherent_total"}
+            else (self._factor(component),)
+        )
+        sampling, edges = _combined_sampling(parts)
+        if sampling is None:
+            raise ValueError(
+                "legacy CXR sampling is unavailable; reuse through a resolved ObservationPlan "
+                "or regenerate the observation from its source"
+            )
+        return sampling, edges
 
     def _coordinates(self, *, pixels, region) -> np.ndarray:
         if (pixels is None) == (region is None):
