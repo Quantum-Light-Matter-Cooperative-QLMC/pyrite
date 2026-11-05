@@ -98,13 +98,11 @@ shape and validation rules. Nested and indexed owner paths work as well:
 ```python
 from pyrite import Beam, Scene, Sweep
 from pyrite.beams import PointBunch, Spot
-from pyrite.geometry import Footprint, Slab
+from pyrite.geometry import Slab
 
 scene = Scene(
     Beam(kinetic_energy=30 * ureg.keV, transverse=Spot(), longitudinal=PointBunch()),
-    Slab(
-        "hopg", thickness=200 * ureg.nm, footprint=Footprint(width=5 * ureg.mm, height=5 * ureg.mm)
-    ),
+    Slab("hopg", thickness=200 * ureg.nm, width=5 * ureg.mm, height=5 * ureg.mm),
 )
 sweep = Sweep(
     scene,

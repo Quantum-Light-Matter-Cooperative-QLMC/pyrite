@@ -147,6 +147,7 @@ def target_from_flat(
         tilt_deg=tilt_deg,
         tilt_azim_deg=tilt_azim_deg,
         footprint=footprint,
+        _infinite_via_dimensions=footprint is None,
         entrance_face=(None if groove_spacing_ang is None else BlazedGrooves(groove_spacing_ang)),
         allow_normal_incidence=allow_normal_incidence,
         mosaic=mosaic,

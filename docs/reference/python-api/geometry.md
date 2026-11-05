@@ -92,7 +92,9 @@ otherwise):
 from pyrite.geometry import Slab
 from pyrite.units import Q_
 
-slab = Slab("hopg", 2000, footprint=None, tilt=Q_([0.5, 0.7], "rad"), tilt_azimuth=Q_(180, "deg"))
+slab = Slab(
+    "hopg", 2000, width=None, height=None, tilt=Q_([0.5, 0.7], "rad"), tilt_azimuth=Q_(180, "deg")
+)
 slab.tilt  # fresh degree quantity, shape (2,)
 steeper = slab.with_tilt(Q_(60, "degree"))
 ```
@@ -113,3 +115,9 @@ sweep and optimization paths can target `target.tilt` and `target.tilt_azimuth`.
 `pyrite.units`. Legacy positional `spacing_ang` values, numeric records and
 geometry lowering retain their existing units and behavior. Supplying both
 spellings raises `TypeError`; `dataclasses.replace` uses `spacing_ang`.
+
+Slab transverse dimensions are full widths, supplied as paired Pint lengths:
+`Slab("hopg", width=5 * ureg.mm, height=5 * ureg.mm)`. Set both to
+`None` for an infinite slab. The `Slab(footprint=None)` spelling is deprecated,
+as are the quantity-valued `Footprint.width` and `Footprint.height` keywords
+and properties; numeric `Footprint` dimensions remain available for `Stack`.
