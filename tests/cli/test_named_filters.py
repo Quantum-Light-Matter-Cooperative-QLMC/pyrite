@@ -44,7 +44,7 @@ distance_mm = 80.0
     assert refused.exit_code != 0
     assert "cannot delete referenced" in refused.output
     assert path.read_bytes() == before
-    deleted = invoke(command, ["delete", "copy"])
+    deleted = invoke(command, ["delete", "copy", "--yes"])
     assert deleted.exit_code == 0, deleted.output
     assert "copy" not in tomlkit.parse(path.read_text())["filters"]
 

@@ -26,7 +26,8 @@ catalog/
   detectors/<name>.toml
   physics/<name>.toml     # named physics presets (ADR-0021)
   numerics/<name>.toml    # named numerics presets (ADR-0021)
-  filters/<name>.toml     # named finite downstream plates (issue #665)
+  filters/<name>.toml     # named finite downstream plates or sequences (issue #665)
+  targets/<name>.toml     # named scalar slab/stack targets (issue #665)
   profiles/<name>.toml    # profile fields plus its [overrides.MATERIAL] tables
   energy-grid-artifacts/  # immutable line-grid artifacts, not catalog source
 ```
@@ -45,7 +46,8 @@ schema_version = 1
 [detectors.NAME]     # reusable detector geometry
 [physics.NAME]       # reusable physics models and cutoffs
 [numerics.NAME]      # reusable sampling, integration and grid policy
-[filters.NAME]       # reusable downstream finite plate definition
+[filters.NAME]       # reusable downstream finite plate or plate sequence
+[targets.NAME]       # reusable scalar slab or stack target
 [crystals.NAME]      # CIF-backed crystalline phase
 [media.NAME]         # amorphous composition
 [materials.NAME]     # runnable film or stack
@@ -181,4 +183,14 @@ objects remain read-only. Python uses `pyrite.geometry.load_target(NAME)`
 (or an explicit `catalog=`) to obtain an existing `Slab` or `Stack`. Resolved
 physical values alone affect identities: equivalent inline and named target
 geometry gives the same campaign/checkpoint identity; name-only changes do
-not invalidate it. Target CLI lifecycle commands are not yet provided.
+not invalidate it. `pyrite target` manages the lifecycle.
+
+## Named filters
+
+`[filters.NAME]` is one complete finite plate, or `kind = "sequence"` with a
+nonempty ordered `plates` array of complete plates (no nested references).
+`[[profiles.PROFILE.filters]]` entries use `ref = "NAME"`. A plate reference may
+override plate fields; a sequence reference accepts only `ref` and expands in
+place, keeping each member's absolute pose. Only expanded plate values enter
+observation identity. `pyrite.geometry.load_filter` returns one plate and
+rejects a sequence; `load_filters` returns an ordered tuple for either form.

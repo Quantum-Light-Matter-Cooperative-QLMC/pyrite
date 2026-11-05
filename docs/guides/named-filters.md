@@ -42,3 +42,36 @@ be overwritten through the regular CLI.
 Downstream plates only attenuate photons under the existing model; they are
 not arbitrary electron-interacting bodies. This does not create a mesh/CSG
 navigator or enable fluorescence/secondary generation inside a filter.
+
+## Reuse an ordered set of plates
+
+```bash
+pyrite filter create-sequence window-pair si-window kapton-window
+pyrite filter attach my-profile window-pair
+pyrite profile filter list my-profile
+```
+
+`create-sequence` copies the member plates, so later edits to `si-window` do
+not change `window-pair`. A sequence expands in place in beam order, and each
+plate keeps its own absolute pose; a placement takes no overrides. To change
+one plate for a single profile, run `pyrite filter detach my-profile window-pair`
+(or its index) first. This writes equivalent inline plates and leaves observation
+identity unchanged. In Python, use `pyrite.geometry.load_filters("window-pair")`.
+
+## Reuse a target
+
+```bash
+pyrite target create thin-si --material silicon --thickness-ang 20000 --tilt-deg 30
+pyrite target create si-on-oxide --layer silicon 20000 --layer sio2 30000
+pyrite target attach my-profile thin-si --dry-run
+pyrite target attach my-profile thin-si
+```
+
+The entrance material must already be a member of the profile; `attach` never
+adds members. A target attaches to that material and owns all of its
+geometry; profile sweeps of thickness and angle no longer apply to it. Beam
+energy, physics, numerics and grids stay with the profile. `attach` and `detach`
+print the effective geometry before and after; `target detach my-profile silicon`
+restores the profile geometry. In Python, `pyrite.geometry.load_target("thin-si")`
+returns a `Slab` or `Stack`. See the
+[schema](../repo-design/materials-catalog-schema.md#named-targets).

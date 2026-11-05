@@ -271,5 +271,15 @@ never enter it. Internal draft rename/delete services update references or
 refuse removal while referenced. Catalog saving also rejects dangling
 references and enforces bundled-object immutability.
 
-Target CLI lifecycle commands and filter sequences remain subsequent slices.
-The plural filter loader and sequence examples are not yet implemented.
+## Implemented lifecycle and sequences
+
+`pyrite target` provides list/show/create/set/rename/delete/attach/detach/validate.
+Attach and detach report the effective geometry before and after on stderr;
+`target show` and `profile show` mark inherited profile geometry as unused for
+referenced materials. Definitions containing `kind = "sequence"`, the
+`pyrite filter create-sequence` and `filter detach` commands, and
+`pyrite.geometry.load_filters` implement the sequence design above.
+`create-sequence` copies single-plate presets, so members are complete inline
+plates rather than nested references. No catalog material rename service exists,
+so material references inside presets are protected by catalog validation on
+save rather than rewritten.

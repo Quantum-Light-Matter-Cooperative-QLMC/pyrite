@@ -228,3 +228,53 @@ def test_multiple_profiles_and_directory_layer_readonly(tmp_path, monkeypatch):
     layout.write_text(path, tomlkit.dumps(layered))
     assert (tmp_path / "user" / "targets" / "copy.toml").is_file()
     assert load_material_catalog(path).named_targets["copy"] == first.named_targets["film"]
+
+
+def test_stack_named_and_inline_identity_match(document, tmp_path, monkeypatch):
+    from pyrite.campaign import config
+    from pyrite.campaign.profiles import named_profile_identity
+
+    layers = [{"material": "sio2", "thickness_ang": 30000.0}]
+    row = document["profiles"]["standard"]
+    row.pop("thickness_layers", None)
+    row.update({"thickness_ang": 20000.0, "tilt_deg": 30.0, "tilt_azim_deg": 0.0})
+    document["materials"]["silicon"]["stack"] = layers
+    monkeypatch.setattr(config, "CATALOG", load(document, tmp_path))
+    inline = named_profile_identity("silicon", "survey")
+    inline_target = config.material_sweep("silicon").target
+    document["materials"]["silicon"].pop("stack")
+    document["targets"] = {
+        "supported": {
+            "kind": "stack",
+            "layers": [{"material": "silicon", "thickness_ang": 20000.0}, *layers],
+        }
+    }
+    row["targets"] = {"silicon": "supported"}
+    monkeypatch.setattr(config, "CATALOG", load(document, tmp_path))
+    assert named_profile_identity("silicon", "survey") == inline
+    assert config.material_sweep("silicon").target == inline_target
+
+
+def test_unused_presets_do_not_change_identity(document, tmp_path, monkeypatch):
+    from pyrite.campaign import config
+    from pyrite.campaign.profiles import named_profile_identity
+
+    monkeypatch.setattr(config, "CATALOG", load(document, tmp_path))
+    before = named_profile_identity("silicon", "survey")
+    document["targets"] = {"film": SLAB}
+    document["filters"] = {
+        "window": {
+            "material": "silicon",
+            "thickness_mm": 0.1,
+            "size_mm": [20.0, 10.0],
+            "distance_mm": 50.0,
+        }
+    }
+    monkeypatch.setattr(config, "CATALOG", load(document, tmp_path))
+    assert named_profile_identity("silicon", "survey") == before
+
+
+def test_remote_catalog_layer_transfer_covers_preset_tables():
+    from pyrite._catalog_layout import LAYERED_TABLES
+
+    assert {"filters", "targets"} <= set(LAYERED_TABLES)

@@ -161,3 +161,57 @@ def test_real_catalog_reference_and_inline_resolve_identically(tmp_path):
     assert observation_identity(
         "a" * 64, named_observation, **identity_inputs
     ) == observation_identity("a" * 64, inline_observation, **identity_inputs)
+
+
+SECOND = {**PLATE, "thickness_mm": 0.2, "distance_mm": 60.0}
+
+
+def test_sequence_expands_in_place_like_inline_plates():
+    errors = _Errors()
+    inline_middle = {**PLATE, "name": "middle", "distance_mm": 55.0}
+    definitions, profiles, refs = resolve_named_filters(
+        {"pair": {"kind": "sequence", "description": "x", "plates": [PLATE, SECOND]}},
+        {
+            "named": {"filters": [inline_middle, {"ref": "pair"}, inline_middle]},
+            "inline": {"filters": [inline_middle, PLATE, SECOND, inline_middle]},
+        },
+        errors,
+    )
+    assert not errors.items
+    assert profiles["named"]["filters"] == profiles["inline"]["filters"]
+    assert refs["named"] == (None, "pair", "pair", None)
+    assert definitions["pair"]["kind"] == "sequence"
+
+
+@pytest.mark.parametrize(
+    "definition,placement,message",
+    [
+        ({"kind": "sequence", "plates": []}, {}, "nonempty"),
+        ({"kind": "sequence"}, {}, "nonempty"),
+        ({"kind": "sequence", "plates": [{"ref": "w"}]}, {}, "nested"),
+        ({"kind": "sequence", "plates": [PLATE], "material": "x"}, {}, "pair.material"),
+        ({"kind": "stack", "plates": [PLATE]}, {}, "must be 'sequence'"),
+        ({"kind": "sequence", "plates": [PLATE]}, {"distance_mm": 5.0}, "accept only ref"),
+    ],
+)
+def test_invalid_sequences_rejected(definition, placement, message):
+    errors = _Errors()
+    resolve_named_filters(
+        {"pair": definition}, {"p": {"filters": [{"ref": "pair", **placement}]}}, errors
+    )
+    assert any(message in item for item in errors.items), errors.items
+
+
+def test_plural_loader_and_singular_rejection():
+    from pyrite.geometry import load_filters
+
+    errors = _Errors()
+    definitions, _, _ = resolve_named_filters(
+        {"one": PLATE, "pair": {"kind": "sequence", "plates": [PLATE, SECOND]}}, {}, errors
+    )
+    catalog = cast(Any, SimpleNamespace(named_filters=definitions))
+    assert load_filters("one", catalog=catalog) == (load_filter("one", catalog=catalog),)
+    plates = load_filters("pair", catalog=catalog)
+    assert [plate.thickness_mm for plate in plates] == [0.1, 0.2]
+    with pytest.raises(ValueError, match="load_filters"):
+        load_filter("pair", catalog=catalog)

@@ -22,9 +22,31 @@ if TYPE_CHECKING:
 _NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*\Z")
 
 
+def _parse_sequence(
+    entry: Mapping[str, object], path: str, errors: _Errors
+) -> tuple[Mapping[str, object] | None, list[dict[str, object]]]:
+    """Validate a flat ordered sequence of complete inline plates."""
+    errors.keys(entry, path, {"kind", "description", "plates"})
+    plates = entry.get("plates")
+    if not isinstance(plates, list) or not plates:
+        errors.add(f"{path}.plates", "must be a nonempty array of complete plates")
+        return None, []
+    for index, plate in enumerate(plates):
+        if isinstance(plate, Mapping) and "ref" in plate:
+            errors.add(f"{path}.plates[{index}].ref", "nested filter references are not supported")
+            return None, []
+    decoded = _parse_filter_rows(plates, f"{path}.plates", errors)
+    if decoded is None or len(decoded) != len(plates):
+        return None, []
+    definition = MappingProxyType(
+        {"kind": "sequence", "plates": tuple(MappingProxyType(dict(row)) for row in decoded)}
+    )
+    return definition, [dict(plate) for plate in plates]
+
+
 def _parse_definitions(
     raw: object, errors: _Errors
-) -> tuple[dict[str, Mapping[str, object]], dict[str, dict[str, object]]]:
+) -> tuple[dict[str, Mapping[str, object]], dict[str, Any]]:
     """Validate complete plate definitions independently of scene placements."""
     table: Mapping[str, object]
     if raw is None:
@@ -36,7 +58,7 @@ def _parse_definitions(
         table = {}
 
     definitions: dict[str, Mapping[str, object]] = {}
-    templates: dict[str, dict[str, object]] = {}
+    templates: dict[str, Any] = {}
     folded: dict[str, str] = {}
     for name, entry in table.items():
         path = f"filters.{name}"
@@ -57,6 +79,16 @@ def _parse_definitions(
             not isinstance(description, str) or not description.strip()
         ):
             errors.add(f"{path}.description", "must be a nonempty string")
+        kind = entry.get("kind")
+        if kind == "sequence":
+            definition, plates = _parse_sequence(entry, path, errors)
+            if definition is not None:
+                definitions[name] = definition
+                templates[name] = plates
+            continue
+        if kind is not None:
+            errors.add(f"{path}.kind", "must be 'sequence'; omit it for a single plate")
+            continue
         template = {key: value for key, value in entry.items() if key != "description"}
         # Reuse exactly the existing plate and unit/pose validator. Template
         # values must be complete; no unresolved refs or arbitrary bodies.
@@ -79,7 +111,9 @@ def resolve_named_filters(
 
     A definition is a complete finite plate without a name. Profile entries
     may specify ``ref`` with optional overrides of any plate field (including
-    pose and the instance's ``name``); a bare inline plate remains valid. No
+    pose and the instance's ``name``); a bare inline plate remains valid. A
+    ``kind = "sequence"`` reference expands in place to its complete plates and
+    takes no overrides, so ``reference_labels`` aligns with expanded rows. No
     preset name is copied into the resolved plate, observation, or identity.
     """
     definitions, templates = _parse_definitions(raw, errors)
@@ -107,9 +141,18 @@ def resolve_named_filters(
                 rows.append({key: value for key, value in item.items() if key != "ref"})
                 labels.append(None)
                 continue
+            template = templates[name]
+            if isinstance(template, list):
+                # Absolute member poses: group overrides would be ambiguous.
+                extra = sorted(key for key in item if key != "ref")
+                if extra:
+                    errors.add(path, f"sequence placements accept only ref; got {extra}")
+                rows.extend(dict(plate) for plate in template)
+                labels.extend([name] * len(template))
+                continue
             # Full definition plus per-placement overrides, in original order.
             # Description and reference are never included in resolved rows.
-            rows.append({**templates[name], **{k: v for k, v in item.items() if k != "ref"}})
+            rows.append({**template, **{k: v for k, v in item.items() if k != "ref"}})
             labels.append(name)
         expanded[profile_name] = {**profile, "filters": rows}
         reference_labels[profile_name] = tuple(labels)

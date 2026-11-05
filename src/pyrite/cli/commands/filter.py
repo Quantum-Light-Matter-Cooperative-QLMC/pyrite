@@ -10,7 +10,7 @@ from tomlkit.exceptions import ParseError
 
 from pyrite.cli import _catalog_io
 from pyrite.cli.commands._profile_shared import write
-from pyrite.console.output import CLIError, emit_result
+from pyrite.console.output import CLIError, confirm_destructive, emit_result
 
 _NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*\Z")
 
@@ -36,6 +36,21 @@ def _new(doc, name):
     existing = next((key for key in _rows(doc) if key.casefold() == name.casefold()), None)
     if existing is not None:
         raise ValueError(f"filter preset {name!r} already exists as {existing!r}")
+
+
+def _inline_rows(rows):
+    """Keep nested rows inline so directory-catalog object files stay self-contained."""
+    array = tomlkit.array()
+    array.multiline(True)
+    for row in rows:
+        item = tomlkit.inline_table()
+        item.update(row)
+        array.append(item)
+    return array
+
+
+def _plain(row):
+    return row.unwrap() if hasattr(row, "unwrap") else dict(row)
 
 
 def _reference_sites(doc, name):
@@ -109,7 +124,11 @@ def create_command(name, source, description, dry_run, **values):
 
     def op(doc):
         _new(doc, name)
-        copied = dict(_existing(doc, source)) if source is not None else {}
+        copied = _plain(_existing(doc, source)) if source is not None else {}
+        if copied.get("kind") == "sequence":
+            if any(val is not None for val in values.values()):
+                raise ValueError("a cloned sequence accepts only --description")
+            copied["plates"] = _inline_rows(copied["plates"])
         copied.update(
             {
                 key: list(val) if isinstance(val, tuple) else val
@@ -147,11 +166,65 @@ def set_command(name, description, dry_run, **values):
     def op(doc):
         _catalog_io.require_writable_object("filters", name)
         row = _existing(doc, name)
+        if row.get("kind") == "sequence" and any(v is not None for v in values.values()):
+            raise ValueError(
+                f"filter preset {name!r} is a sequence; only --description is editable here"
+            )
         for key, value in {**values, "description": description}.items():
             if value is not None:
                 row[key] = list(value) if isinstance(value, tuple) else value
 
     return _change(op, dry_run, f"updated filter preset {name}")
+
+
+@command.command("create-sequence")
+@click.argument("name")
+@click.argument("members", nargs=-1, required=True)
+@click.option("--description", help="Optional display description.")
+@click.option("--dry-run", is_flag=True, help="Print proposed TOML diff; write nothing.")
+def create_sequence_command(name, members, description, dry_run):
+    """Create an ordered sequence by copying single-plate presets MEMBERS.
+
+    Members are copied, not referenced: later edits to them do not propagate.
+    Order is beam order and each plate keeps its own absolute pose.
+    """
+
+    def op(doc):
+        _new(doc, name)
+        plates = []
+        for member in members:
+            source = _plain(_existing(doc, member))
+            if source.get("kind") == "sequence":
+                raise ValueError(f"member {member!r} is a sequence; sequences cannot nest")
+            source.pop("description", None)
+            plates.append(source)
+        row = tomlkit.table()
+        row["kind"] = "sequence"
+        if description is not None:
+            row["description"] = description
+        row["plates"] = _inline_rows(plates)
+        _rows(doc, create=True)[name] = row
+
+    return _change(op, dry_run, f"created filter sequence {name}")
+
+
+@command.command("detach")
+@click.argument("profile")
+@click.argument("identifier")
+@click.option("--dry-run", is_flag=True, help="Print proposed TOML diff; write nothing.")
+def detach_command(profile, identifier, dry_run):
+    """Replace a placement (name or one-based index) with equivalent inline plates.
+
+    Resolved plate values and order, hence observation identity, are unchanged;
+    the placement stops following later edits to the preset.
+    """
+
+    def op(doc):
+        from pyrite.campaign.profile_filters import detach_filter
+
+        detach_filter(doc, profile, identifier)
+
+    return _change(op, dry_run, f"detached filter {identifier} on profile {profile} to inline")
 
 
 @command.command("rename")
@@ -175,9 +248,10 @@ def rename_command(old, new, dry_run):
 
 @command.command("delete")
 @click.argument("name")
+@click.option("-y", "--yes", is_flag=True, help="Delete the exact previewed definition.")
 @click.option("--dry-run", is_flag=True)
-def delete_command(name, dry_run):
-    """Delete an unreferenced, user-owned definition only."""
+def delete_command(name, yes, dry_run):
+    """Delete an unreferenced, user-owned definition; irreversible."""
 
     def op(doc):
         _catalog_io.require_writable_object("filters", name)
@@ -192,6 +266,10 @@ def delete_command(name, dry_run):
             )
         del _rows(doc)[name]
 
+    if not dry_run and not yes:
+        _change(op, True, "")
+        if not confirm_destructive(False, f"delete filter preset {name!r}? this cannot be undone"):
+            return 0
     return _change(op, dry_run, f"deleted filter preset {name}")
 
 
@@ -208,7 +286,11 @@ def attach_command(profile, name, instance_name, distance_mm, dry_run):
         from pyrite.campaign._profile_document import existing_profile
         from pyrite.campaign.profile_filters import add_filter
 
-        _existing(doc, name)
+        definition = _existing(doc, name)
+        if definition.get("kind") == "sequence" and (
+            instance_name is not None or distance_mm is not None
+        ):
+            raise ValueError("a sequence placement accepts no --instance-name or --distance-mm")
         existing_profile(doc, profile)
         row = tomlkit.table()
         row["ref"] = name
@@ -225,12 +307,12 @@ def attach_command(profile, name, instance_name, distance_mm, dry_run):
 @click.argument("name")
 def validate_command(name):
     """Validate a named plate through the selected catalog without writing."""
-    from pyrite.geometry import load_filter
+    from pyrite.geometry import load_filters
     from pyrite.materials.catalog import load_material_catalog
 
     try:
         catalog = load_material_catalog(_catalog_io.active_catalog_path())
-        load_filter(name, catalog=catalog)
+        load_filters(name, catalog=catalog)
     except (OSError, ValueError, KeyError) as exc:
         raise CLIError(str(exc)) from None
     emit_result(f"filter preset {name} is valid")

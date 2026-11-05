@@ -67,17 +67,38 @@ def _filter_payload(document, profile_name):
         profile=profile_name,
     )
     resolved = catalog.profile_filters.get(profile_name, ())
-    return {
-        "profile": profile_name,
-        "filters": [
+    filters = []
+    position = 0
+    for index, row in enumerate(raw, start=1):
+        definition = catalog.named_filters.get(row.get("ref"), {})
+        if definition.get("kind") == "sequence":
+            plates = definition["plates"]
+            filters.append(
+                {
+                    "index": index,
+                    "ref": row["ref"],
+                    "kind": "sequence",
+                    "plates": [
+                        {
+                            "expanded_index": position + offset,
+                            **dict(resolved[position + offset - 1]),
+                        }
+                        for offset in range(1, len(plates) + 1)
+                    ],
+                }
+            )
+            position += len(plates)
+            continue
+        position += 1
+        plate = dict(resolved[position - 1]) if "ref" in row else row
+        filters.append(
             {
                 "index": index,
-                **(dict(plate) if "ref" in row else row),
-                **({"ref": row["ref"]} if "ref" in row else {}),
+                **plate,
+                **({"ref": row["ref"], "expanded_index": position} if "ref" in row else {}),
             }
-            for index, (row, plate) in enumerate(zip(raw, resolved, strict=True), start=1)
-        ],
-    }
+        )
+    return {"profile": profile_name, "filters": filters}
 
 
 @command.command("list")
@@ -99,6 +120,10 @@ def filter_list_command(profile_name, json_output):
     if not payload["filters"]:
         emit_result(f"{profile_name}: no filters")
     for row in payload["filters"]:
+        if row.get("kind") == "sequence":
+            members = ", ".join(str(plate["expanded_index"]) for plate in row["plates"])
+            emit_result(f"{row['index']}: sequence {row['ref']} (expanded plates {members})")
+            continue
         label = row.get("name") or f"#{row['index']}"
         emit_result(f"{row['index']}: {label} ({row['material']}, {row['thickness_mm']:g} mm)")
     return 0

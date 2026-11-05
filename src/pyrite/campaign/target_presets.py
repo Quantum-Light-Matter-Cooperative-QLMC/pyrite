@@ -100,3 +100,59 @@ def delete_target(document, name):
     if users:
         raise ValueError(f"cannot delete referenced target preset {name!r}: {', '.join(users)}")
     del rows[name]
+
+
+def target_entrance(row):
+    """Return the entrance material recipe key of a raw target definition."""
+    if row.get("kind") == "stack":
+        layers = row.get("layers") or [{}]
+        return layers[0].get("material")
+    return row.get("material")
+
+
+def target_reference_sites(document, name):
+    """Return ``(profile, material)`` pairs referencing a target preset."""
+    return [
+        (profile, material)
+        for profile, row in document.get("profiles", {}).items()
+        for material, target in row.get("targets", {}).items()
+        if target == name
+    ]
+
+
+def attach_target(document, profile_name, name):
+    """Point a profile material at a target; returns the entrance material key."""
+    import tomlkit
+
+    from ._profile_document import existing_profile
+
+    rows = document.get("targets", {})
+    if name not in rows:
+        raise ValueError(f"unknown target preset {name!r}; have {list(rows)}")
+    profile = existing_profile(document, profile_name)
+    material = target_entrance(rows[name])
+    refs = profile.get("targets", {})
+    if material in refs:
+        raise ValueError(
+            f"profile {profile_name!r} already maps {material!r} to target {refs[material]!r}; "
+            "detach it first"
+        )
+    if "targets" not in profile:
+        profile["targets"] = tomlkit.table()
+    profile["targets"][material] = name
+    return material
+
+
+def detach_target(document, profile_name, material):
+    """Remove a material's reference, restoring legacy profile/material geometry."""
+    from ._profile_document import existing_profile
+
+    profile = existing_profile(document, profile_name)
+    refs = profile.get("targets", {})
+    if material not in refs:
+        raise ValueError(f"profile {profile_name!r} has no target for material {material!r}")
+    name = str(refs[material])
+    del refs[material]
+    if not refs:
+        del profile["targets"]
+    return name

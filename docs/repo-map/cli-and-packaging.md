@@ -54,6 +54,9 @@ Canonical `pyrite beam list|show|create|set|rename|delete` Click layer over top-
 ## `cli/commands/detector.py`
 Canonical `pyrite detector list|show|create|set|reset|rename|delete` Click layer over top-level `[detectors.NAME]` scalar/pixel objects. Profiles attach references through `detector = "NAME"` or ID collections; rename updates every reference and delete refuses while any survives. Named objects own reusable geometry and optional scorer/response/acquisition sections; `_profile_detectors.py` owns profile membership and inline edits. `_detector_shared.py` and `_pixel_detector_shared.py` share scalar/pixel options and updates. Names and display-only labels are removed during catalog resolution, so identity depends on resolved settings.
 
+## `cli/commands/filter.py`, `cli/commands/target.py`
+Click layers for reusable `[filters.NAME]` plates/sequences and scalar `[targets.NAME]` slabs/stacks (ADR-0022). Resolution lives in `materials/_named_filters.py` and `_named_targets.py`, typed loaders and target edits in `campaign/filter_presets.py` and `target_presets.py`, and filter detach in `campaign/profile_filters.py`. Names stay out of identity; only resolved values count.
+
 ## Configuration editor services
 
 `campaign/configuration_editor.py` adapts catalog drafts for the configuration

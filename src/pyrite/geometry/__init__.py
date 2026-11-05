@@ -17,6 +17,7 @@ if TYPE_CHECKING:
         SubstanceRef as SubstanceRef,
     )
     from pyrite.campaign.filter_presets import load_filter as load_filter
+    from pyrite.campaign.filter_presets import load_filters as load_filters
     from pyrite.campaign.geometry import (
         BlazedGrooves as BlazedGrooves,
     )
@@ -49,6 +50,7 @@ _EXPORTS = {
     "Layer": ("pyrite.campaign.geometry", "Layer"),
     "load_target": ("pyrite.campaign.target_presets", "load_target"),
     "load_filter": ("pyrite.campaign.filter_presets", "load_filter"),
+    "load_filters": ("pyrite.campaign.filter_presets", "load_filters"),
     "RectangularBody": ("pyrite.bodies", "RectangularBody"),
     "Slab": ("pyrite.campaign.geometry", "Slab"),
     "Stack": ("pyrite.campaign.geometry", "Stack"),
@@ -64,6 +66,7 @@ __all__ = [
     "Footprint",
     "Layer",
     "load_filter",
+    "load_filters",
     "load_target",
     "RectangularBody",
     "Slab",

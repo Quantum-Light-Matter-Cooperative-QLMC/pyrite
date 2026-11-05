@@ -67,3 +67,40 @@ def remove_filter(document, profile_name, identifier):
     if not filters:
         profile.pop("filters", None)
     return dict(removed.unwrap() if hasattr(removed, "unwrap") else removed)
+
+
+def _plain(row):
+    return dict(row.unwrap() if hasattr(row, "unwrap") else row)
+
+
+def detach_filter(document, profile_name, identifier):
+    """Replace one preset reference with equivalent inline plates, in place.
+
+    Returns the number of inline plates. Resolved values and order are
+    unchanged, so observation identity is too.
+    """
+    profile = existing_profile(document, profile_name)
+    rows = [_plain(row) for row in filter_rows(profile)]
+    index = _filter_index(rows, profile_name, identifier)
+    placement = rows[index]
+    name = placement.get("ref")
+    if name is None:
+        raise ValueError(f"filter {identifier!r} on profile {profile_name!r} is already inline")
+    definitions = document.get("filters", {})
+    if name not in definitions:
+        raise ValueError(f"unknown filter preset {name!r}")
+    definition = _plain(definitions[name])
+    definition.pop("description", None)
+    overrides = {key: value for key, value in placement.items() if key != "ref"}
+    inline = (
+        [_plain(plate) for plate in definition["plates"]]
+        if definition.get("kind") == "sequence"
+        else [{**definition, **overrides}]
+    )
+    replacement = tomlkit.aot()
+    for row in (*rows[:index], *inline, *rows[index + 1 :]):
+        table = tomlkit.table()
+        table.update(row)
+        replacement.append(table)
+    profile["filters"] = replacement
+    return len(inline)

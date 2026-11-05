@@ -17,14 +17,16 @@ Options:
   -h, --help  Show this message and exit.
 
 Commands:
-  attach    Append a named plate reference to PROFILE's ordered filter sequence.
-  create    Create or clone a validated named plate without placing it in a scene.
-  delete    Delete an unreferenced, user-owned definition only.
-  list      List named filter definitions in the selected catalog.
-  rename    Rename a filter, updating all placements by reference.
-  set       Update a user definition; future resolutions receive its new values.
-  show      Inspect one filter definition and its referencing profile placements.
-  validate  Validate a named plate through the selected catalog without writing.
+  attach           Append a named plate reference to PROFILE's ordered filter...
+  create           Create or clone a validated named plate without placing it in a...
+  create-sequence  Create an ordered sequence by copying single-plate presets MEMBERS.
+  delete           Delete an unreferenced, user-owned definition; irreversible.
+  detach           Replace a placement (name or one-based index) with equivalent...
+  list             List named filter definitions in the selected catalog.
+  rename           Rename a filter, updating all placements by reference.
+  set              Update a user definition; future resolutions receive its new...
+  show             Inspect one filter definition and its referencing profile...
+  validate         Validate a named plate through the selected catalog without...
 ```
 
 ## `pyrite filter attach`
@@ -63,15 +65,47 @@ Options:
   -h, --help                    Show this message and exit.
 ```
 
+## `pyrite filter create-sequence`
+
+```text
+Usage: pyrite filter create-sequence [OPTIONS] NAME MEMBERS...
+
+  Create an ordered sequence by copying single-plate presets MEMBERS.
+
+  Members are copied, not referenced: later edits to them do not propagate. Order is
+  beam order and each plate keeps its own absolute pose.
+
+Options:
+  --description TEXT  Optional display description.
+  --dry-run           Print proposed TOML diff; write nothing.
+  -h, --help          Show this message and exit.
+```
+
 ## `pyrite filter delete`
 
 ```text
 Usage: pyrite filter delete [OPTIONS] NAME
 
-  Delete an unreferenced, user-owned definition only.
+  Delete an unreferenced, user-owned definition; irreversible.
 
 Options:
+  -y, --yes   Delete the exact previewed definition.
   --dry-run
+  -h, --help  Show this message and exit.
+```
+
+## `pyrite filter detach`
+
+```text
+Usage: pyrite filter detach [OPTIONS] PROFILE IDENTIFIER
+
+  Replace a placement (name or one-based index) with equivalent inline plates.
+
+  Resolved plate values and order, hence observation identity, are unchanged; the
+  placement stops following later edits to the preset.
+
+Options:
+  --dry-run   Print proposed TOML diff; write nothing.
   -h, --help  Show this message and exit.
 ```
 

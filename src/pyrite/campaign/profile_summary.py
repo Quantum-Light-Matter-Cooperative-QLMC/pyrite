@@ -114,7 +114,9 @@ def profile_payload(document, name):
     )
     if precision["source"] == "profile" and "precision" not in profile:
         precision["source"] = f"preset {presets['numerics']}"
+    targets = profile.get("targets")
     return {
+        **({"targets": dict(targets)} if targets else {}),
         "name": name,
         "ranges": [
             {"name": label, "catalog_key": key, "values": range_values(profile, key)}
