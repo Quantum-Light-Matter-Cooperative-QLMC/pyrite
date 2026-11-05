@@ -23,6 +23,7 @@ CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
     "checks/continuum_backend_parity.py": (),
     "checks/continuum_benchmark_report.py": (),
     "checks/continuum_geant4_precision.py": (),
+    "checks/continuum_primary_tail.py": (),
     "checks/continuum_pyrite_precision.py": (),
     "checks/continuum_spectral_statistics.py": (),
     "checks/continuum_grid_convergence.py": (),

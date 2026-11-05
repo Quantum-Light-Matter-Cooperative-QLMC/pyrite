@@ -159,6 +159,7 @@ independent physics-validation verdicts.
 | `continuum_backend_parity.py` | Compare CPU, CUDA and chunked scores on saved trajectories. |
 | `continuum_benchmark_report.py` | Render benchmark JSON and spectral comparisons. |
 | `continuum_geant4_precision.py` | Drive Geant4 precision measurements. |
+| `continuum_primary_tail.py` | Report per-primary continuum moments and tail shares (#278); study diagnostic, no independent physics-validation verdict. |
 | `continuum_pyrite_precision.py` | Drive PyRITE precision measurements. |
 | `continuum_spectral_statistics.py` | Reduce per-primary Geant4 spectral sidecars. |
 | `continuum_benchmark_matrix.sbatch` | Submit the grid benchmark matrix. |
