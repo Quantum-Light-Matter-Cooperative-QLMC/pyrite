@@ -21,6 +21,8 @@ Use `pyrite.results` for computed values. Historical root object pages remain li
    pyrite.Provenance
    pyrite.CxrSpectra
    pyrite.SpectralDensity
+   pyrite.results.SpectralYield
+   pyrite.results.BinnedSpectrum
    pyrite.results.TemporalIntensity
    pyrite.results.directional.DirectionalSpectrum
 ```
