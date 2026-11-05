@@ -10,7 +10,7 @@ resolve the entire advanced surface and therefore load those dependencies.
 API stability describes compatibility, not physical validation. Quantum
 channeling remains experimental research software. The production adapter
 admits only the existing planar Bloch density-matrix channeling recipe;
-coherent, MCWF, axial, and other configurations still explicitly refuse in
+unitary, MCWF, axial, and other configurations still explicitly refuse in
 `QuantumSetup.lower`. Direct diagnostic solvers do not imply production
 admission. See the [planar](../guides/experimental-planar-channeling.md) and
 [axial](../guides/experimental-axial-channeling.md) workflow restrictions.
