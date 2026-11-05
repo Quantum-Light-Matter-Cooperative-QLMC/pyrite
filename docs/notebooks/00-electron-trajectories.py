@@ -77,7 +77,7 @@ def _(mo, tables_ready):
     from pyrite.transport import simulate_trajectories
     from pyrite.units import ureg
 
-    histories = 65_536  # 16_384
+    histories = 65_536
     seed = 1
     thickness_nm = (4 * ureg.um).to("nm").magnitude
     assert tables_ready  # Finish reference-table setup before transport.
@@ -97,7 +97,9 @@ def _(mo, tables_ready):
                 atomic_electron_deflection="none",
             ),
             numerics=Numerics(
-                sampling=FixedSampling(histories, histories), seed=seed, transport_core="lockstep"
+                sampling=FixedSampling(histories, histories),
+                seed=seed,
+                transport_core="per-electron",
             ),
             E_cut_keV=(5 * ureg.keV).magnitude,
             max_steps=20_000,
@@ -120,7 +122,7 @@ def _(mo):
 
     `E_start_keV` and `E_end_keV` describe the continuously slowing electron.
     We color each segment by its mean kinetic energy, not by photon energy.
-    The plot shows **32 of the 16,384 histories** so individual turns remain visible.
+    The plot shows **32 of the 65,536 histories** so individual turns remain visible.
     The entrance is at depth 0; the exit face is at 4,000 nm.
     """)
     return
@@ -392,7 +394,7 @@ def _(mo):
     Change `thickness_nm` to 100, rerun, and compare the outcomes. More
     histories are needed for precise backscatter probabilities.
 
-    Finally, **16,384 numerical histories are not 16,384 electrons in a bunch**.
+    Finally, **65,536 numerical histories are not 65,536 electrons in a bunch**.
     A physical beam usually contains many more electrons; radiation yields per
     incident electron are subsequently scaled using the physical beam
     current.
