@@ -37,8 +37,9 @@ energy, no recoil); a straight, constant-velocity trajectory through the whole
 stack (no scattering or energy loss across the formation zones); infinite,
 sharp, flat interfaces; local isotropic ``eps(omega)``, here
 :func:`medium_dielectric`, which is the independent-atom Chantler forward
-scattering factor and therefore crude near and below the plasma energy. No
-diffracted transition radiation: the layers have no lattice periodicity.
+scattering factor and therefore crude near and below the plasma energy. No atomic
+lattice diffraction: each layer is homogeneous. A periodic stack does Bragg-reflect
+TR through its layer period, and that is contained in the solve.
 
 Limits (checked in ``tests/montecarlo/spectrum/test_transition_radiation.py``): a matched
 medium or a vanishing film radiates nothing; a single interface at normal
