@@ -366,6 +366,22 @@ def simulate(
     return _scalar_result(request, case, xsgen_tables, output)
 
 
+def _line_sampling(case: Case, energy_eV: object) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Declared sampling of the incoherent CXR and characteristic producers.
+
+    The characteristic kernel always writes bin means, and incoherent PXR/CBS
+    does under ``line_quadrature="bin-mean"``, both on the 0 eV-clamped
+    midpoint edges of ``characteristic._energy_bin_edges_and_widths``. Other
+    families are node samples. Producers declare this; it is never inferred.
+    """
+    from .montecarlo.spectrum.characteristic import _energy_bin_edges_and_widths
+
+    edges, _ = _energy_bin_edges_and_widths(energy_eV)
+    bin_mean = {"sampling": "bin-mean", "bin_edges_eV": edges}
+    cxr = bin_mean if case.get("line_quadrature") == "bin-mean" else {}
+    return cxr, bin_mean
+
+
 def _scalar_result(
     request: ResolvedSimulation,
     case: Case,
@@ -384,14 +400,17 @@ def _scalar_result(
     characteristic = output.get("spec_characteristic")
     channeling = output.get("spec_channeling")
     transition = output.get("spec_transition")
+    cxr_sampling, line_sampling = _line_sampling(case, output["E_grid"])
     return Result(
         cxr=CxrSpectra(
-            SpectralDensity(output["E_grid"], output["spec"]),
+            SpectralDensity(output["E_grid"], output["spec"], **cxr_sampling),
             None if coherent is None else SpectralDensity(output["E_grid"], coherent),
         ),
         brem=SpectralDensity(background_energy, background),
         characteristic=(
-            None if characteristic is None else SpectralDensity(output["E_grid"], characteristic)
+            None
+            if characteristic is None
+            else SpectralDensity(output["E_grid"], characteristic, **line_sampling)
         ),
         channeling=(None if channeling is None else SpectralDensity(output["E_grid"], channeling)),
         transition=(None if transition is None else SpectralDensity(output["E_grid"], transition)),
@@ -606,9 +625,12 @@ def _simulate_planar(
     transition_average = (
         None if spatial.transition is None else spatial.average_density("transition")
     )
+    cxr_sampling, line_sampling = _line_sampling(case, energy)
     return Result(
         cxr=CxrSpectra(
-            SpectralDensity(energy, spatial.average_density("cxr"), "observation-average"),
+            SpectralDensity(
+                energy, spatial.average_density("cxr"), "observation-average", **cxr_sampling
+            ),
             None
             if coherent_average is None
             else SpectralDensity(energy, coherent_average, "observation-average"),
@@ -616,7 +638,9 @@ def _simulate_planar(
         brem=SpectralDensity(
             background_energy, spatial.average_density("brem"), "observation-average"
         ),
-        characteristic=SpectralDensity(energy, characteristic_average, "observation-average"),
+        characteristic=SpectralDensity(
+            energy, characteristic_average, "observation-average", **line_sampling
+        ),
         channeling=(
             None
             if channeling_average is None

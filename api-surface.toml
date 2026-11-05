@@ -164,6 +164,9 @@ QuantifiedDirectionalSpectrum = { target = "pyrite.results.quantified_directiona
 QuantifiedSpatialSpectrum = { target = "pyrite.results.quantified_spatial:QuantifiedSpatialSpectrum", status = "experimental" }
 QuantifiedSpatialImage = { target = "pyrite.results.quantified_spatial:QuantifiedSpatialImage", status = "experimental" }
 QuantifiedSpectrum = { target = "pyrite.results.quantified:QuantifiedSpectrum", status = "advanced-stable" }
+# #954: support-aware yields and explicit conservative rebinning; no storage or identity change.
+SpectralYield = { target = "pyrite.results.spectral_support:SpectralYield", status = "experimental" }
+BinnedSpectrum = { target = "pyrite.results.spectral_support:BinnedSpectrum", status = "experimental" }
 CxrSpectra = { target = "pyrite.results.model:CxrSpectra", status = "advanced-stable" }
 SpatialResult = { target = "pyrite.results.model:SpatialResult", status = "advanced-stable" }
 SpectralFactors = { target = "pyrite.results.model:SpectralFactors", status = "advanced-stable" }

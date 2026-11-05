@@ -135,6 +135,93 @@ The line-grid policy's `quadrature` field accepts `node` or `bin-mean`. It resol
 
 A `bin-mean` policy uses payload schema 3 and participates in case, checkpoint, and cache identity. Selecting it does not change the automatic `sinc-nyquist` resolution policy, which still targets node-sampled shape observables.
 
+(spectral-support-integration)=
+
+## Support-aware yields and explicit resampling
+
+A stored component represents yield only over its **declared support**: $[E_0, E_{N-1}]$ for node samples, $[\epsilon_0, \epsilon_N]$ for bin means. A computational domain does not establish that emission is zero beyond it. `pyrite.results.spectral_support` and the `SpectralDensity.integrate`, `SpectralDensity.rebin` and `Result.integrated_yield` methods follow this contract; the legacy `Result.spectral_flux` table does not (see [below](#legacy-union-table)).
+
+### Declared sampling
+
+Producers declare each component's convention in `SpectralDensity.sampling`; consumers never infer it from the array shape. Results built by `pyrite.simulate` declare:
+
+```{list-table} Declared sampling of `Result` families.
+:name: tbl-result-sampling
+:header-rows: 1
+
+* - Family
+  - Sampling
+  - Native edges
+* - `cxr.incoherent`
+  - `bin-mean` with `line_quadrature="bin-mean"`, else `nodes`
+  - `characteristic.py::_energy_bin_edges_and_widths` (midpoints, low edge clamped at 0 eV)
+* - `characteristic`
+  - always `bin-mean`
+  - same edges
+* - `cxr.coherent`, `channeling`, `transition`, `brem`
+  - `nodes`
+  - none
+```
+
+An observation-average density keeps its family's convention: it is a per-node, solid-angle-weighted average whose filter transmission is evaluated at the node, which for a bin mean approximates the transmission's mean over the bin. A `SpectralDensity` constructed without `sampling` keeps its historical meaning, node samples. `Result.combined_cxr` returns `sampling="mixed"` when it adds node and bin-mean parts; values are unchanged, but no single quadrature integrates such a sum. The planar per-pixel and directional quantity views (`QuantifiedSpatialSpectrum`, `QuantifiedDirectionalSpectrum`) still label every component `nodes`, including characteristic bin means; use the `Result` family for yields.
+
+### Coordinate and value requirements
+
+Integration and resampling require finite, strictly increasing coordinates: duplicates and reordered nodes are refused rather than sorted or merged. A single node declares no interval and is refused; one bin with two edges is valid. Empty arrays, `NaN` or infinite densities and masked entries are refused, never zero-filled.
+
+### Integrating node samples
+
+Node samples integrate as the piecewise-linear interpolant over their support. For a window $[a, b]$, let $a' = \min(\max(a, E_0), E_{N-1})$ and $b'$ likewise. With $h_k = E_{k+1} - E_k$, the cumulative yield at $x \in [E_k, E_{k+1}]$ is
+
+```{math}
+:label: eq-grid-linear-cumulative
+
+C(x) = \sum_{j<k} \tfrac{1}{2} h_j (f_j + f_{j+1})
++ f_k (x - E_k) + \frac{f_{k+1} - f_k}{2 h_k} (x - E_k)^2 ,
+```
+
+the exact integral of the interpolant from $E_0$. The window yields are
+
+```{math}
+:label: eq-grid-support-split
+
+N_\mathrm{in} = C(b') - C(a'), \qquad
+N_\mathrm{below} = C(a'), \qquad
+N_\mathrm{above} = C(E_{N-1}) - C(b'),
+```
+
+so $N_\mathrm{in} + N_\mathrm{below} + N_\mathrm{above} = C(E_{N-1})$, the trapezoid of {eq}`eq-grid-physical-integral` over the whole grid. Parts of $[a, b]$ outside the support are reported as `uncovered_eV`, not as zero yield. Bin means use the same split with the piecewise-constant cumulative $C(x) = \sum_{j<k} \bar S_j (\epsilon_{j+1} - \epsilon_j) + \bar S_k (x - \epsilon_k)$, which is exact under the assumption of uniform density within each bin.
+
+Families combine by **summing native integrals**, $N = \sum_c N_c$. Each family is integrated on its own support; none is interpolated onto another's grid. The combined support is the union of family supports, and a window part that no family supports is uncovered.
+
+*Limiting cases.* A window equal to the support returns the full integral with zero cropped mass. A window disjoint from the support returns zero inside mass, the full integral as cropped mass, and the whole window as uncovered. For a linear density, {eq}`eq-grid-linear-cumulative` is exact for any node placement, including nonuniform nodes and nonzero endpoint values.
+
+### Three separate operations
+
+Resampling is never implicit. Native samples, including narrow lines, remain unchanged unless one of these operations is requested. Each takes explicit target coordinates or edges and a boundary policy:
+
+* **Target-node interpolation** (`SpectralDensity.interpolate`, `outside="raise"` or `"nan"`) evaluates the linear interpolant at target nodes. It is pointwise only: a coarse target grid preserves neither integrated yield nor line shape. Bin means refuse it.
+* **Node-to-bin integration** (`SpectralDensity.rebin` of node samples) applies {eq}`eq-grid-linear-cumulative` at every target edge, $M_i = C(e_{i+1}) - C(e_i)$.
+* **Bin-mean overlap rebinning** (`SpectralDensity.rebin` of bin means) reuses `_grid_semantics.py::rebin_piecewise_constant_density`, the detector-input overlap integral. Finer target bins inherit their parent's mean and do not recover unresolved structure.
+
+Both rebinning operations conserve represented mass: $\sum_i M_i + N_\mathrm{below} + N_\mathrm{above}$ equals the source integral. `boundary="raise"` refuses target edges beyond the support. `boundary="clip"` bins only the supported part, reports each bin's `supported_width_eV`, and makes `mean_density` `NaN` wherever a bin is only partly supported.
+
+A change of energy unit (`QuantifiedSpectrum.to_energy`) scales coordinates, native edges and density together and preserves every integral; it is not resampling.
+
+Acquisition reporting bins (`instrument/acquisition.py`) partition detected event mass, a different measure with its own underflow and overflow channels; they are not reused here.
+
+(legacy-union-table)=
+
+### Legacy union table
+
+`Result.spectral_flux` interpolates every family onto the union of all native nodes and fills zero outside each family's grid. Its values are unchanged and remain a display table, but they are not a yield representation:
+
+* Between a family's own nodes, union nodes preserve its piecewise-linear integral.
+* Beyond its support, the zero fill adds a bridging triangle from each nonzero endpoint to the next union node. For CXR $(100, 300)\,\mathrm{eV} \mapsto (2, 4)$, characteristic $(100, 300) \mapsto (0.5, 0.5)$ and brem $(100, 200, 400) \mapsto (1, 1, 1)$, the native integrals are 600, 100 and 300 (1000 in total); the trapezoid of the union `total` column is 1225, including triangles of 200 and 25 between 300 and 400 eV.
+* Bin-mean families are read as node samples.
+
+[Validation: `spectral-support-yield-conservation`](../../validation/physics-validation-ledger.md).
+
 ## A logarithmic grid cannot contain zero
 
 $\ln 0$ is undefined, so a log grid has a strictly positive lower bound. That bound is a physical choice, not a numerical one: it is the low-energy edge of the modelled band, set by the data support of the attenuation and form-factor tables and by where the model stops being meaningful. The [bremsstrahlung](bremsstrahlung.md) infrared rise makes the choice observable — the integrated background depends on it.
