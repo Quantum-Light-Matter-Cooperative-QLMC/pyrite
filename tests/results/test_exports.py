@@ -36,6 +36,8 @@ FROZEN_EXPORTS = frozenset(
         "AcquisitionBatch",
         "PixelCountResult",
         "QuantifiedSpectrum",
+        "SpectralYield",
+        "BinnedSpectrum",
         "QuantifiedAcquisitionBatch",
         "QuantifiedApertureSpectrum",
         "QuantifiedDirectionalSpectrum",

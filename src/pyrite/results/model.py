@@ -21,6 +21,17 @@ from .spatial import (
     SpatialResult,
     SpectralFactors,
 )
+from .spectral_support import (
+    BinnedSpectrum,
+    BoundaryPolicy,
+    SpectralYield,
+    bin_mean_yield,
+    combine_yields,
+    interpolate_nodes,
+    node_yield,
+    nodes_to_bins,
+    rebin_bin_means,
+)
 from .temporal import TemporalIntensity
 
 FluxUnits = Literal["detector", "nA", "sr", "electron"]
@@ -66,6 +77,15 @@ class SpectralDensity:
         ``source`` means response-free source density without acceptance or
         current scaling. ``observation-average`` means filter-attenuated,
         solid-angle-weighted physical-detector average, still per sr.
+    sampling
+        What each value means. ``nodes`` (default): the density sampled at
+        ``photon_energy_eV``. ``bin-mean``: the mean density over bin
+        ``[bin_edges_eV[i], bin_edges_eV[i + 1])``, as written by the
+        characteristic kernel and ``line_quadrature="bin-mean"`` PXR/CBS.
+        ``mixed``: a sum of components with different conventions, which no
+        single quadrature integrates; integrate its parts separately.
+    bin_edges_eV
+        Native bin edges in eV, required for and only for ``bin-mean``.
     """
 
     photon_energy_eV: np.ndarray
@@ -74,30 +94,104 @@ class SpectralDensity:
     """Photons / incident electron / eV / sr on :attr:`photon_energy_eV`."""
     normalization: str = "source"
     """``"source"`` (scalar detector) or ``"observation-average"`` (planar detector)."""
+    sampling: str = "nodes"
+    """``"nodes"``, ``"bin-mean"`` (with :attr:`bin_edges_eV`) or ``"mixed"``."""
+    bin_edges_eV: np.ndarray | None = None
+    """Native bin edges in eV for ``bin-mean`` sampling, else ``None``."""
 
     def __post_init__(self) -> None:
+        if np.ma.isMaskedArray(self.density) and np.ma.getmaskarray(self.density).any():
+            raise ValueError("density has masked entries; masks are never filled with zero")
         energy = np.asarray(self.photon_energy_eV)
         density = np.asarray(self.density)
         if energy.ndim != 1 or density.shape != energy.shape:
             raise ValueError("density must match its one-dimensional photon_energy_eV grid")
         if self.normalization not in {"source", "observation-average"}:
             raise ValueError("normalization must be 'source' or 'observation-average'")
+        if self.sampling not in {"nodes", "bin-mean", "mixed"}:
+            raise ValueError("sampling must be 'nodes', 'bin-mean' or 'mixed'")
+        edges = None
+        if self.sampling == "bin-mean":
+            if self.bin_edges_eV is None:
+                raise ValueError("bin-mean sampling requires its native bin_edges_eV")
+            edges = np.asarray(self.bin_edges_eV, dtype=float)
+            if edges.shape != (energy.size + 1,):
+                raise ValueError("bin_edges_eV must have one more entry than photon_energy_eV")
+        elif self.bin_edges_eV is not None:
+            raise ValueError("bin_edges_eV is only meaningful for bin-mean sampling")
         object.__setattr__(self, "photon_energy_eV", energy)
         object.__setattr__(self, "density", density)
+        object.__setattr__(self, "bin_edges_eV", edges)
+
+    def integrate(self, energy_range_eV: tuple[float, float] | None = None) -> SpectralYield:
+        """Represented yield over the declared support, optionally windowed.
+
+        Node samples integrate as a piecewise-linear function over
+        ``[E_0, E_{N-1}]``; bin means as piecewise-constant over their native
+        edges. Mass the window crops is returned as ``below``/``above``;
+        window parts outside the support are ``uncovered_eV`` (unknown, not
+        zero). Units: photons / incident electron / sr. ``mixed`` refuses.
+
+        Validation: spectral-support-yield-conservation
+        """
+        if self.sampling == "bin-mean":
+            return bin_mean_yield(self.bin_edges_eV, self.density, energy_range_eV)
+        self._require_nodes("integrate")
+        return node_yield(self.photon_energy_eV, self.density, energy_range_eV)
+
+    def rebin(self, edges_eV: object, *, boundary: BoundaryPolicy) -> BinnedSpectrum:
+        """Explicitly requested conservative resampling onto target bin edges.
+
+        Node samples: exact integrals of their linear interpolant per bin.
+        Bin means: exact overlap of their native bins. ``boundary`` is
+        ``"raise"`` (refuse edges beyond the support) or ``"clip"`` (bin the
+        supported part only). This density is unchanged.
+
+        Validation: spectral-support-yield-conservation
+        """
+        if self.sampling == "bin-mean":
+            return rebin_bin_means(self.bin_edges_eV, self.density, edges_eV, boundary=boundary)
+        self._require_nodes("rebin")
+        return nodes_to_bins(self.photon_energy_eV, self.density, edges_eV, boundary=boundary)
+
+    def interpolate(self, energy_eV: object, *, outside: Literal["raise", "nan"]) -> np.ndarray:
+        """Pointwise linear interpolation of node samples; not conservative.
+
+        Coarse targets preserve neither yield nor line shape. Bin means are
+        not node values and refuse; use :meth:`rebin`.
+        """
+        if self.sampling == "bin-mean":
+            raise ValueError("bin-mean density is not node-sampled; use rebin() with edges")
+        self._require_nodes("interpolate")
+        return interpolate_nodes(self.photon_energy_eV, self.density, energy_eV, outside=outside)
+
+    def _require_nodes(self, action: str) -> None:
+        if self.sampling == "mixed":
+            raise ValueError(
+                f"cannot {action} a mixed node/bin-mean sum; use its components or "
+                "Result.integrated_yield"
+            )
 
     def quantify(self) -> QuantifiedSpectrum:
-        """Return an independent, unit-aware node-sampled spectrum.
+        """Return an independent, unit-aware spectrum with this sampling.
 
         ``photon_energy`` is a Pint quantity in eV and ``density`` is a Pint
         quantity per eV and sr, both per incident electron. Use
         ``.to_energy("keV")`` on the returned spectrum to change the energy
-        coordinate and density together. Native nodes, source/observation
-        normalization, numeric fields and scientific identities are unchanged.
-        Pint is loaded only when this method is called.
+        coordinate and density together. Native nodes, sampling, bin edges,
+        source/observation normalization, numeric fields and scientific
+        identities are unchanged. Pint is loaded only when this method is called.
         """
         # __post_init__ validates this legacy string field's two supported values.
         normalization = cast(Literal["source", "observation-average"], self.normalization)
-        return QuantifiedSpectrum(self.photon_energy_eV, self.density, normalization)
+        sampling = cast(Literal["nodes", "bin-mean", "mixed"], self.sampling)
+        return QuantifiedSpectrum(
+            self.photon_energy_eV,
+            self.density,
+            normalization,
+            sampling=sampling,
+            _bin_edges_eV=self.bin_edges_eV,
+        )
 
 
 @dataclass(frozen=True)
@@ -209,6 +303,12 @@ class Result:
                 raise ValueError(f"{label} must use the CXR photon-energy grid")
             if component.normalization != cxr.incoherent.normalization:
                 raise ValueError(f"{label} and CXR normalization must match")
+        if brem.normalization != cxr.incoherent.normalization:
+            raise ValueError(
+                "brem and CXR normalization must match "
+                f"({brem.normalization!r} != {cxr.incoherent.normalization!r}); "
+                "their photon-energy grids may differ"
+            )
         if spatial is not None and not isinstance(spatial, SpatialResult):
             raise TypeError("spatial must be a SpatialResult or None")
         if temporal is not None and not isinstance(temporal, TemporalIntensity):
@@ -262,21 +362,47 @@ class Result:
         the selected mode's source/observation normalization. Brem is excluded
         because it may use another photon-energy grid. Transition radiation
         adds as an intensity (``tr-line-cross-term``): its interference with a
-        reflection ``g`` along the surface normal is not included.
+        reflection ``g`` along the surface normal is not included. Summing
+        node-sampled and bin-mean parts returns ``sampling="mixed"``, which
+        values are unchanged by but refuses integration; use
+        :meth:`integrated_yield` for yields.
         """
         if mode not in {"incoherent", "coherent"}:
             raise ValueError("mode must be 'incoherent' or 'coherent'")
         component = getattr(self.cxr, mode)
         if component is None:
             raise ValueError("coherent spectrum is not available")
-        density = component.density
+        parts = [component]
         if include_characteristic and self.characteristic is not None:
-            density = density + self.characteristic.density
+            parts.append(self.characteristic)
         if include_channeling and self.channeling is not None:
-            density = density + self.channeling.density
+            parts.append(self.channeling)
         if include_transition and self.transition is not None:
-            density = density + self.transition.density
-        return SpectralDensity(component.photon_energy_eV, density, component.normalization)
+            parts.append(self.transition)
+        density = parts[0].density
+        for part in parts[1:]:
+            density = density + part.density
+        samplings = {part.sampling for part in parts}
+        edges = component.bin_edges_eV
+        if (
+            samplings == {"bin-mean"}
+            and edges is not None
+            and all(
+                part.bin_edges_eV is not None and np.array_equal(part.bin_edges_eV, edges)
+                for part in parts
+            )
+        ):
+            return SpectralDensity(
+                component.photon_energy_eV,
+                density,
+                component.normalization,
+                "bin-mean",
+                edges,
+            )
+        sampling = "nodes" if samplings == {"nodes"} else "mixed"
+        return SpectralDensity(
+            component.photon_energy_eV, density, component.normalization, sampling
+        )
 
     @property
     def scene(self) -> Scene | None:
@@ -416,6 +542,14 @@ class Result:
         and linearly interpolated between them. Outside its own grid a family
         is zero; the total therefore omits brem below the brem grid start.
 
+        This is a legacy display table, not a yield representation. Its zero
+        fill asserts no emission beyond a family's computational domain, so
+        integrating ``total`` over the union grid adds exterior bridging
+        triangles from nonzero endpoints, and bin-mean families (characteristic,
+        ``line_quadrature="bin-mean"`` PXR/CBS) are read as node samples. Use
+        :meth:`integrated_yield` for represented yields; values here are
+        unchanged.
+
         Parameters
         ----------
         units
@@ -472,6 +606,28 @@ class Result:
         return pl.DataFrame(
             {"photon_energy_eV": energy_eV, "photon_energy_keV": energy_eV / 1e3, **columns}
         ).with_columns(total=pl.sum_horizontal(list(columns)))
+
+    def integrated_yield(
+        self,
+        energy_range_eV: tuple[float, float] | None = None,
+        *,
+        mode: str = "incoherent",
+    ) -> dict[str, SpectralYield]:
+        """Represented yield per family plus ``total``, in photons / electron / sr.
+
+        Each family integrates on its own native support with its declared
+        sampling (:meth:`SpectralDensity.integrate`); ``total`` sums those
+        native integrals (:func:`~pyrite.results.spectral_support.combine_yields`).
+        No family is interpolated onto another's grid or zero-filled beyond
+        its support. ``energy_range_eV`` clips every family to one window;
+        cropped mass is reported as ``below``/``above`` and window parts a
+        family does not support as its ``uncovered_eV``.
+
+        Validation: spectral-support-yield-conservation
+        """
+        # Result.__init__ already guarantees one normalization across families.
+        yields = {name: part.integrate(energy_range_eV) for name, _, part in self._components(mode)}
+        return {**yields, "total": combine_yields(yields.values())}
 
     def _summary_rows(self) -> list[tuple[str, str, str]]:
         def grid(part: SpectralDensity | None) -> str:

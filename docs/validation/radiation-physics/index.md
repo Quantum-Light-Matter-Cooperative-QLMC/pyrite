@@ -77,6 +77,7 @@ segment-escape-average
 sinc-bin-far-envelope
 sinc-bin-integration
 sinc-bin-near-far
+spectral-support-yield-conservation
 transverse-bunch-form-factor
 xray-chi-zero
 xray-in-medium-propagation-phase

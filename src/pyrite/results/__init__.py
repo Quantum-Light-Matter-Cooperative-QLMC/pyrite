@@ -83,6 +83,7 @@ from .selection import (
     sweep_values,
     thicknesses_by_energy,
 )
+from .spectral_support import BinnedSpectrum, SpectralYield
 from .store import (
     DEFAULT_BEAM_CURRENT_NA,
     PER_NA,
@@ -119,6 +120,8 @@ __all__ = [
     "SpectralDensity",
     "TemporalIntensity",
     "QuantifiedSpectrum",
+    "SpectralYield",
+    "BinnedSpectrum",
     "QuantifiedAcquisitionBatch",
     "QuantifiedApertureSpectrum",
     "QuantifiedDirectionalSpectrum",
