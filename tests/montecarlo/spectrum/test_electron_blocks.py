@@ -212,3 +212,62 @@ def test_line_attribution_accounts_for_the_whole_line_mass(small_transport):
             rtol=scaled_rtol(1e-12, eps_multiple=4),
         )
         assert np.all(lines["A2"] > 0) and np.all(lines["T_abs"] <= 1.0)
+
+
+def _force_gpu_blocks(monkeypatch, count):
+    monkeypatch.setattr(runner._RESOURCE_POLICY, "gpu", True)
+    monkeypatch.setattr(blocks, "device_headroom_bytes", lambda: 1)
+    monkeypatch.setattr(blocks, "electron_block_count", lambda n, headroom: count)
+
+
+def test_score_blocks_double_on_oom_and_restart_the_sum(monkeypatch):
+    class FakeOOM(MemoryError):
+        pass
+
+    segments = {"L_ang": np.ones(8), "elec_id": np.repeat(np.arange(4), 2), "Ne": 4}
+    sizes = []
+
+    def score(block):
+        sizes.append(block["L_ang"].size)
+        if len(sizes) == 1:
+            raise FakeOOM
+        return block["L_ang"].sum()
+
+    _force_gpu_blocks(monkeypatch, 2)
+    monkeypatch.setattr(runner, "_is_gpu_oom", lambda error: isinstance(error, FakeOOM))
+    assert blocks.score_in_electron_blocks(score, segments) == 8.0
+    assert sizes == [4, 2, 2, 2, 2]
+
+
+def test_score_blocks_reraise_unrelated_errors(monkeypatch):
+    segments = {"L_ang": np.ones(2), "elec_id": np.arange(2), "Ne": 2}
+
+    def score(block):
+        raise ValueError("not an allocation failure")
+
+    _force_gpu_blocks(monkeypatch, 2)
+    with pytest.raises(ValueError, match="not an allocation"):
+        blocks.score_in_electron_blocks(score, segments)
+
+
+@pytest.mark.parametrize(
+    "scorer, energy_key",
+    [
+        (runner._characteristic_from_segments, "E_grid"),
+        (runner._brem_wide_from_segments, "E_brem"),
+    ],
+)
+def test_background_blocks_add_to_the_whole_spectrum(
+    monkeypatch, small_transport, scorer, energy_key
+):
+    """Blocks keep ``Ne`` normalization, so their spectra sum to the whole."""
+    case, tp = small_transport
+    args = (tp["segs"], tp[energy_key], case, tp["n_hat"], case.get("abs_layers"))
+    kwargs = {"groove": tp.get("groove"), "Ne": tp["Ne_brem"]}
+    whole = np.asarray(scorer(*args, **kwargs))
+    assert whole.sum() > 0.0
+    _force_gpu_blocks(monkeypatch, 3)
+    split = np.asarray(scorer(*args, **kwargs))
+    np.testing.assert_allclose(
+        split, whole, rtol=scaled_rtol(1e-10, eps_multiple=16), atol=1e-12 * whole.max()
+    )
