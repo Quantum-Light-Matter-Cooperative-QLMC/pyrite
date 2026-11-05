@@ -6,6 +6,10 @@ the automatic refined continuum grid (``--grid automatic``) or the earlier
 uniform 25 eV axis (``--grid uniform25``). Lines use the same explicit uniform
 grid in both arms (the automatic line policy refuses 29,999 keV), so the
 difference isolates the continuum. One arm per process, one JSON out.
+
+Timed scopes: case build, transport, each spectrum stage from the runner's stage
+progress (attempts accumulate on an allocation retry), and detector scoring of
+the returned continuum.
 """
 
 import argparse
@@ -15,8 +19,22 @@ import time
 import numpy as np
 from electron_count_accuracy import explicit_line_grid
 
+from pyrite.detectors.spec import EagleXO, Timepix3
 from pyrite.energy_grid import convergence_case as cc
+from pyrite.energy_grid.convergence import spectrum_observables
 from pyrite.montecarlo import runner
+
+DETECTOR_MAX_EV = 100e3
+
+
+def score_detectors(energy_eV, density):
+    """Continuum counts at or below the band the detector responses support."""
+    keep = energy_eV <= DETECTOR_MAX_EV
+    detectors = {"timepix3_counts": Timepix3(n_mc=32, seed=7), "eaglexo_counts": EagleXO()}
+    found = spectrum_observables(
+        energy_eV[keep], np.zeros(int(keep.sum())), density[keep], detectors=detectors
+    )
+    return {key: float(value) for key, value in found.items() if key.endswith("counts")}
 
 
 def main():
@@ -31,6 +49,7 @@ def main():
     ap.add_argument("--warmup", action="store_true")
     a = ap.parse_args()
 
+    t_build = time.perf_counter()
     case = cc.build_ladder_case(
         "hopg",
         a.energy_kev,
@@ -48,12 +67,27 @@ def main():
         warm = dict(case, Ne=1, Ne_brem=1)
         warm_tp = runner._transport_case(warm, True)
         runner._spectrum_with_recovery(warm, warm_tp, True)
+    case_build = time.perf_counter() - t_build
     t0 = time.perf_counter()
     tp = runner._transport_case(case, True)
     t1 = time.perf_counter()
-    out = runner._spectrum_with_recovery(case, tp, True)
+    stages = []
+    previous = [t1]
+
+    def stage_done(stage, _index, _total):
+        now = time.perf_counter()
+        stages.append({"stage": stage, "seconds": now - previous[0]})
+        previous[0] = now
+
+    token = runner._SPECTRUM_PROGRESS.set(stage_done)
+    try:
+        out = runner._spectrum_with_recovery(case, tp, True)
+    finally:
+        runner._SPECTRUM_PROGRESS.reset(token)
     t2 = time.perf_counter()
     Eb = np.asarray(out.get("E_brem", tp["E_brem"]), float)
+    detector_counts = score_detectors(Eb, np.asarray(out["brem_wide"], float))
+    t3 = time.perf_counter()
     np.savez_compressed(a.output + ".npz", energy_eV=Eb, density=np.asarray(out["brem_wide"]))
     rec = dict(
         grid=a.grid,
@@ -65,7 +99,16 @@ def main():
         brem_nodes=int(Eb.size),
         line_nodes=int(np.asarray(tp["E_grid"]).size),
         segments=int(tp["segs"]["L_ang"].shape[0]),
-        seconds=dict(transport=t1 - t0, spectrum=t2 - t1, total=t2 - t0),
+        seconds=dict(
+            case_build=case_build,
+            transport=t1 - t0,
+            spectrum=t2 - t1,
+            detector=t3 - t2,
+            total=case_build + t3 - t0,
+        ),
+        spectrum_stages=stages,
+        detector_counts=detector_counts,
+        recovery_events=out.get("_recovery_events", []),
         output_keys=sorted(out),
         timing={
             k: v
