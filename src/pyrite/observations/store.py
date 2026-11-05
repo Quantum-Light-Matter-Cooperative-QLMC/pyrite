@@ -59,6 +59,7 @@ from ..instrument.observation import (
     response_payload,
 )
 from ..results.model import PixelRayMap, Result, SpatialResult, SpectralFactors
+from ..results.spectral_support import _declared_line_sampling
 
 INDEX_SCHEMA = "pyrite.observation-index.v1"
 TRUE_SCHEMA = "pyrite.observation-true.v1"
@@ -92,6 +93,19 @@ _RESPONSES: dict[str, type] = {
     f"{kind.__module__}.{kind.__qualname__}": kind for kind in (IdealPhotonCounter, Timepix3)
 }
 _DIGEST = re.compile(r"[0-9a-f]{64}")
+
+
+def _stored_factor(arrays: Mapping[str, np.ndarray], group: str) -> SpectralFactors:
+    """Reopen one factor group, declaring the sampling its component fixes.
+
+    The record has no line quadrature, so only characteristic sampling is
+    derivable; every other factor reopens with the default ``nodes`` label.
+    """
+    energy, intrinsic, mu = (arrays[f"factors/{group}/{name}"] for name in _FACTOR_ARRAYS)
+    if group != "characteristic_line":
+        return SpectralFactors(energy, intrinsic, mu)
+    _, sampling = _declared_line_sampling(None, energy)
+    return SpectralFactors(energy, intrinsic, mu, **sampling)
 
 
 class ObservationStoreError(RuntimeError):
@@ -487,9 +501,7 @@ class ObservationStore:
             directions = arrays["ray_map/tile_directions_lab"]
             ray_map = PixelRayMap(*(arrays[f"ray_map/{name}"] for name in _RAY_ARRAYS))
             factors = {
-                group: SpectralFactors(
-                    *(arrays[f"factors/{group}/{name}"] for name in _FACTOR_ARRAYS)
-                )
+                group: _stored_factor(arrays, group)
                 for group in _FACTORS
                 if f"factors/{group}/energy_eV" in arrays
             }

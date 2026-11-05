@@ -43,6 +43,49 @@ def test_rate_normalization_zero_linear_default_and_no_solid_angle():
     np.testing.assert_array_equal(fine.rate(1)[0], result.rate(1)[0])
 
 
+@pytest.mark.parametrize(
+    ("line_quadrature", "pxr_sampling"), [(None, "nodes"), ("bin-mean", "bin-mean")]
+)
+def test_producer_declares_component_sampling(monkeypatch, line_quadrature, pxr_sampling):
+    import pyrite.directional as owner
+
+    lowered = owner._lowered_source
+
+    def lower(*args, **kwargs):
+        case, controls = lowered(*args, **kwargs)
+        return (
+            replace(case, line_quadrature=line_quadrature) if line_quadrature else case
+        ), controls
+
+    def score(case, directions, *, components, **kwargs):
+        values = {name: np.ones((len(directions), 3)) for name in components}
+        return values, np.ones(len(directions), dtype=bool)
+
+    monkeypatch.setattr(owner, "_lowered_source", lower)
+    monkeypatch.setattr(owner, "source_outputs", score)
+    monkeypatch.setattr(owner, "case_table_markers", lambda case: {})
+    monkeypatch.setattr(owner, "run_provenance", lambda *args: {})
+    beam = Beam(30.0, transverse=PointSpot(), longitudinal=PointBunch())
+    target = Slab("hopg", 1_000.0, footprint=Footprint(5.0, 5.0))
+    results = owner.directional_sources(
+        beam,
+        target,
+        energy_eV=[100.0, 200.0, 400.0],
+        angle_deg=[0.0],
+        numerics=Numerics(cxr_trials=1, brem_trials=1),
+        seed=1,
+        components=("pxr-cbs", "characteristic", "bremsstrahlung"),
+    )
+    edges = [50.0, 150.0, 300.0, 500.0]
+    assert results["characteristic"].quantify().sampling == "bin-mean"
+    np.testing.assert_array_equal(results["characteristic"].bin_edges_eV, edges)
+    assert results["bremsstrahlung"].quantify().sampling == "nodes"
+    view = results["pxr-cbs"].quantify()
+    assert view.sampling == pxr_sampling
+    if line_quadrature:
+        np.testing.assert_array_equal(view.photon_energy_edges.magnitude, edges)
+
+
 @pytest.mark.parametrize("current", [-1, np.nan, np.inf, -np.inf])
 def test_invalid_mean_current_rejected(current):
     with pytest.raises(ValueError, match="finite nonnegative"):

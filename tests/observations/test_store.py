@@ -103,6 +103,57 @@ def test_round_trip_reopens_factors_and_counts_without_transport(tmp_path, monke
     assert store.verify() == ()
 
 
+def test_fresh_factors_declare_sampling_and_stored_identity_ignores_it(
+    tmp_path, monkeypatch
+) -> None:
+    result = _simulate()
+    planar = api._simulate_planar
+
+    def bin_mean(request, case, tables):
+        return planar(request, replace(case, line_quadrature="bin-mean"), tables)
+
+    monkeypatch.setattr(api, "_simulate_planar", bin_mean)
+    labeled = _simulate()
+    pixel = [(0, 0)]
+    assert result.spatial.cxr.sampling == "nodes"
+    assert result.spatial.characteristic.sampling == "bin-mean"
+    assert result.spatial.quantify_spectra(pixels=pixel, component="cxr_total").sampling == "mixed"
+    view = labeled.spatial.quantify_spectra(pixels=pixel, component="cxr")
+    assert view.sampling == "bin-mean"
+    np.testing.assert_array_equal(
+        view.photon_energy_edges.magnitude, labeled.cxr.incoherent.bin_edges_eV
+    )
+    # The label is metadata: values and the observation's stored bytes agree.
+    np.testing.assert_array_equal(
+        labeled.spatial.cxr.intrinsic_by_tile, result.spatial.cxr.intrinsic_by_tile
+    )
+    store = ObservationStore("hopg", root=tmp_path)
+    store.put(observation_from_result(result))
+    (path,) = _true_objects(store)
+    with h5py.File(path) as handle:
+        assert set(handle["factors/characteristic_line"]) == {
+            "energy_eV",
+            "intrinsic_by_tile",
+            "mu_by_filter_inv_mm",
+        }
+
+
+def test_reopened_factors_keep_only_component_derivable_sampling(tmp_path) -> None:
+    result = _simulate()
+    store = ObservationStore("hopg", root=tmp_path)
+    spatial = store.load(store.put(observation_from_result(result))).spatial
+    assert result.spatial is not None
+    assert spatial.characteristic is not None and result.spatial.characteristic is not None
+    assert spatial.characteristic.sampling == "bin-mean"
+    np.testing.assert_array_equal(
+        spatial.characteristic.bin_edges_eV, result.spatial.characteristic.bin_edges_eV
+    )
+    # The record stores no line quadrature, so a reopened CXR factor always
+    # reads as nodes; a bin-mean source is a documented limitation (#959).
+    assert spatial.cxr.sampling == "nodes"
+    assert spatial.brem.sampling == "nodes"
+
+
 def test_poisson_realization_replays_after_reopen(tmp_path) -> None:
     result = _simulate(acquisition=_acquisition(exposure_s=1.0e-3, mode="poisson", seed=7))
     store = ObservationStore("hopg", root=tmp_path)

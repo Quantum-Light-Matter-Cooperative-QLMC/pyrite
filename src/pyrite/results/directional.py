@@ -2,12 +2,13 @@
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal, cast
 
 import numpy as np
 from scipy.constants import elementary_charge
 
 from .quantified_directional import QuantifiedDirectionalSpectrum
+from .spectral_support import _checked_bin_edges
 from .store import beam_current_na
 
 #: Result component identity for each public directional component name.
@@ -34,6 +35,10 @@ class DirectionalSpectrum:
     case retain resolved sampling, geometry, grids, seed and beam pulse data.
     Future components retain independent energy coordinates and identities;
     this object does not imply that arbitrary components can be added.
+
+    ``sampling`` is the producer-declared meaning of each energy value:
+    ``nodes``, or ``bin-mean`` with native ``bin_edges_eV`` in eV (the
+    characteristic kernel and ``line_quadrature="bin-mean"`` PXR/CBS).
     """
 
     angle_deg: np.ndarray
@@ -46,6 +51,12 @@ class DirectionalSpectrum:
     provenance: Mapping[str, Any]
     component: str = "incoherent-pxr-cbs"
     units: str = "ph/incident-electron/eV/sr"
+    sampling: str = "nodes"
+    bin_edges_eV: np.ndarray | None = None
+
+    def __post_init__(self) -> None:
+        edges = _checked_bin_edges(self.sampling, self.bin_edges_eV, np.size(self.energy_eV))
+        object.__setattr__(self, "bin_edges_eV", edges)
 
     def quantify(self) -> QuantifiedDirectionalSpectrum:
         """Copy native angle/energy nodes, density and support into a unit view.
@@ -54,14 +65,21 @@ class DirectionalSpectrum:
         in eV, and ``density`` per incident electron, eV and steradian.
         ``to_energy("keV")`` converts energy and density together. Angles
         remain point samples; no angular Jacobian or acceptance is applied.
-        Component identity and unsupported NaNs are preserved. Case and
+        Component identity, sampling, native bin edges and unsupported NaNs
+        are preserved. Case and
         provenance remain on this numeric source; no current scaling occurs.
         Pint loads only when this method is called.
         """
         if self.units != "ph/incident-electron/eV/sr":
             raise ValueError("quantify requires ph/incident-electron/eV/sr source density")
         return QuantifiedDirectionalSpectrum(
-            self.angle_deg, self.energy_eV, self.density, self.supported, self.component
+            self.angle_deg,
+            self.energy_eV,
+            self.density,
+            self.supported,
+            self.component,
+            sampling=cast(Literal["nodes", "bin-mean", "mixed"], self.sampling),
+            _bin_edges_eV=self.bin_edges_eV,
         )
 
     @property

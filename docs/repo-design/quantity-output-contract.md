@@ -124,7 +124,7 @@ error, not a guessed conversion.
 `SpectralDensity.quantify()` returns an independent
 `pyrite.results.QuantifiedSpectrum` on native energy nodes. It has Pint
 `photon_energy` and `density` properties, an immutable conversion operation
-`to_energy(unit)`, and explicit `sampling="nodes"`,
+`to_energy(unit)`, and explicit producer-declared `sampling`,
 `measure="per_energy_per_steradian"`,
 `count_basis="photons_per_incident_electron"`, and unchanged
 `normalization` (`"source"` or `"observation-average"`).
@@ -165,8 +165,9 @@ unit-suffixed numeric names unless a versioned format is approved.
 `photon_energy` returns eV quantities, and `density` returns per-eV/sr
 quantities. `to_energy(unit)` couples energy and reciprocal density conversion
 on each angular row. `supported` returns the original boolean angular mask;
-NaNs remain unchanged. Component identity, node sampling, source normalization,
-per-sr measure and photon/incident-electron count basis are explicit metadata.
+NaNs remain unchanged. Component identity, producer-declared `sampling`, source
+normalization, per-sr measure and photon/incident-electron count basis are
+explicit metadata; `bin-mean` views add `photon_energy_edges`.
 
 Converting `view.angle.to("radian")` changes only the returned coordinate.
 No angular Jacobian, sr-bin width, current, exposure or acceptance is inferred.
@@ -206,7 +207,9 @@ quantity. Reconstruct after loading; no serialized schema changes.
 `SpatialResult.quantify_spectra(pixels=... | region=..., component=...,
 measured=...)` returns an experimental, detached
 `pyrite.results.QuantifiedSpatialSpectrum`, carrying ordered integer
-`pixel_coordinates` and node-sampled `(pixel, photon_energy)` values. The
+`pixel_coordinates` and `(pixel, photon_energy)` values with the component's
+declared `sampling` (`measured=True` is always `nodes`; see
+[energy-grid semantics](../physics/radiation-physics/energy-grid-semantics.md)). The
 underlying bounded `spectra()` call applies per-pixel solid-angle acceptance
 and primary filter transmission. Its spectral density has Pint units of
 `1/energy`, **not** `1/energy/sr`, and retains the semantic measure

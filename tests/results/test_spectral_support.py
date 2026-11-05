@@ -10,13 +10,19 @@ import numpy as np
 import pytest
 
 from pyrite.api import _line_sampling
+from pyrite.instrument import PixelGrid, PlanarDetector, PlanarPose
+from pyrite.observations.plan import PixelSampling
 from pyrite.results import (
     BinnedSpectrum,
     CxrSpectra,
+    QuantifiedDirectionalSpectrum,
+    QuantifiedSpatialSpectrum,
     Result,
     SpectralDensity,
     SpectralYield,
 )
+from pyrite.results.directional import DirectionalSpectrum
+from pyrite.results.model import PixelRayMap, SpatialResult, SpectralFactors
 from pyrite.results.spectral_support import (
     bin_mean_yield,
     combine_yields,
@@ -25,6 +31,7 @@ from pyrite.results.spectral_support import (
     nodes_to_bins,
     rebin_bin_means,
 )
+from pyrite.units import ureg
 
 CASE = {"domega_sr": 0.01, "bunch_charge_pc": 2.0, "rep_rate_hz": 1.0e4}
 
@@ -271,3 +278,209 @@ def test_yield_types_are_frozen_values():
     binned = nodes_to_bins([0.0, 1.0], [1.0, 1.0], [0.0, 1.0], boundary="raise")
     with pytest.raises(ValueError):
         binned.mass[0] = 3.0
+
+
+# -- planar and directional quantified views (#959) ----------------------------
+
+
+ENERGY = np.array([10.0, 40.0, 50.0])
+EDGES = np.array([0.0, 25.0, 45.0, 55.0])
+
+
+def _factor(**sampling) -> SpectralFactors:
+    return SpectralFactors(ENERGY, np.ones((1, 3)), np.zeros((0, 3)), **sampling)
+
+
+def _spatial(**factors) -> SpatialResult:
+    ray_map = PixelRayMap(
+        tile_index=np.array([[0]]),
+        solid_angle_sr=np.array([[0.5]]),
+        path_length_mm=np.zeros((1, 1, 0)),
+    )
+    detector = PlanarDetector(
+        pose=PlanarPose((0.0, 0.0, 10.0)),
+        pixels=PixelGrid((1, 1), (1.0, 1.0)),
+        response=_ScaleResponse(),
+    )
+    return SpatialResult(ray_map, factors.pop("cxr", _factor()), _factor(), detector, **factors)
+
+
+class _ScaleResponse:
+    def score(self, energy_eV, intrinsic_density, *, fwhm_eV, scale):
+        return np.asarray(intrinsic_density) * (0.5 * scale)
+
+
+BIN_MEAN = {"sampling": "bin-mean", "bin_edges_eV": EDGES}
+
+
+def test_pixel_views_report_declared_sampling_and_convert_edges():
+    spatial = _spatial(characteristic=_factor(**BIN_MEAN), channeling=_factor())
+    characteristic = spatial.quantify_spectra(pixels=[(0, 0)], component="characteristic")
+    assert characteristic.sampling == "bin-mean"
+    assert characteristic.photon_energy_edges.units == ureg.eV
+    np.testing.assert_array_equal(characteristic.photon_energy_edges.magnitude, EDGES)
+    kev = characteristic.to_energy("keV")
+    assert kev.sampling == "bin-mean"
+    np.testing.assert_allclose(kev.photon_energy_edges.magnitude, EDGES / 1e3)
+    np.testing.assert_allclose(
+        np.sum(kev.density.magnitude * np.diff(kev.photon_energy_edges.magnitude), axis=1),
+        np.sum(characteristic.density.magnitude * np.diff(EDGES), axis=1),
+    )
+    for component in ("cxr", "brem", "channeling"):
+        view = spatial.quantify_spectra(pixels=[(0, 0)], component=component)
+        assert view.sampling == "nodes"
+        with pytest.raises(ValueError, match="only bin-mean"):
+            _ = view.photon_energy_edges
+
+
+def test_combined_pixel_view_matches_result_combination_rule():
+    mixed = _spatial(characteristic=_factor(**BIN_MEAN))
+    view = mixed.quantify_spectra(pixels=[(0, 0)], component="cxr_total")
+    assert view.sampling == "mixed"
+    with pytest.raises(ValueError, match="only bin-mean"):
+        _ = view.photon_energy_edges
+    # Equal native edges still integrate as one bin-mean family, as in combined_cxr.
+    uniform = _spatial(cxr=_factor(**BIN_MEAN), characteristic=_factor(**BIN_MEAN))
+    assert uniform.quantify_spectra(pixels=[(0, 0)], component="cxr").sampling == "bin-mean"
+    total = uniform.quantify_spectra(pixels=[(0, 0)], component="cxr_total")
+    assert total.sampling == "bin-mean"
+    np.testing.assert_array_equal(total.photon_energy_edges.magnitude, EDGES)
+    other = _factor(sampling="bin-mean", bin_edges_eV=EDGES + np.array([0.0, 1.0, 1.0, 0.0]))
+    disagree = _spatial(cxr=_factor(**BIN_MEAN), characteristic=other)
+    assert disagree.quantify_spectra(pixels=[(0, 0)], component="cxr_total").sampling == "mixed"
+    # No extras: a total is its base component.
+    assert _spatial().quantify_spectra(pixels=[(0, 0)], component="cxr_total").sampling == "nodes"
+
+
+def test_sampling_labels_do_not_change_pixel_values():
+    plain = _spatial(characteristic=_factor())
+    labeled = _spatial(characteristic=_factor(**BIN_MEAN))
+    for component in ("characteristic", "cxr_total"):
+        for measured in (False, True):
+            for left, right in zip(
+                plain.spectra(pixels=[(0, 0)], component=component, measured=measured),
+                labeled.spectra(pixels=[(0, 0)], component=component, measured=measured),
+                strict=True,
+            ):
+                np.testing.assert_array_equal(left, right)
+
+
+def test_measured_pixel_view_is_node_sampled_without_native_edges():
+    spatial = _spatial(characteristic=_factor(**BIN_MEAN))
+    view = spatial.quantify_spectra(pixels=[(0, 0)], component="characteristic", measured=True)
+    assert view.measured is True
+    assert view.sampling == "nodes"
+    with pytest.raises(ValueError, match="only bin-mean"):
+        _ = view.photon_energy_edges
+    assert view.to_energy("keV").sampling == "nodes"
+    with pytest.raises(ValueError, match="node-sampled"):
+        QuantifiedSpatialSpectrum(
+            ENERGY,
+            np.ones((1, 3)),
+            np.zeros((1, 2), dtype=int),
+            "characteristic",
+            True,
+            sampling="bin-mean",
+            _bin_edges_eV=EDGES,
+        )
+
+
+@pytest.mark.parametrize(
+    ("sampling", "edges", "message"),
+    [
+        ("bin-mean", None, "requires"),
+        ("nodes", EDGES, "requires"),
+        ("mixed", EDGES, "requires"),
+        ("bin-mean", EDGES[:-1], "one more entry"),
+        ("bin_means", None, "sampling must be"),
+    ],
+)
+def test_sampling_carriers_refuse_inconsistent_declarations(sampling, edges, message):
+    with pytest.raises(ValueError, match=message):
+        _factor(sampling=sampling, bin_edges_eV=edges)
+    with pytest.raises(ValueError, match=message):
+        _directional(sampling=sampling, bin_edges_eV=edges)
+    with pytest.raises(ValueError, match=message):
+        QuantifiedSpatialSpectrum(
+            ENERGY,
+            np.ones((1, 3)),
+            np.zeros((1, 2), dtype=int),
+            "cxr",
+            False,
+            sampling=sampling,
+            _bin_edges_eV=edges,
+        )
+    with pytest.raises(ValueError, match=message):
+        QuantifiedDirectionalSpectrum(
+            np.zeros(1),
+            ENERGY,
+            np.ones((1, 3)),
+            np.ones(1, dtype=bool),
+            "characteristic",
+            sampling=sampling,
+            _bin_edges_eV=edges,
+        )
+
+
+def _directional(**sampling) -> DirectionalSpectrum:
+    return DirectionalSpectrum(
+        np.zeros(1),
+        ENERGY,
+        np.array([[0.0, 0.0, 1.0]]),
+        np.array([[0.0, 0.0, 1.0]]),
+        np.ones((1, 3)),
+        np.ones(1, dtype=bool),
+        {},
+        {},
+        **sampling,
+    )
+
+
+def test_directional_view_keeps_declared_sampling_and_converts_edges():
+    view = _directional(component="characteristic", **BIN_MEAN).quantify()
+    assert view.sampling == "bin-mean"
+    kev = view.to_energy("keV")
+    assert kev.sampling == "bin-mean"
+    np.testing.assert_allclose(kev.photon_energy_edges.magnitude, EDGES / 1e3)
+    np.testing.assert_allclose(
+        np.sum(kev.density.magnitude * np.diff(kev.photon_energy_edges.magnitude), axis=1),
+        np.sum(view.density.magnitude * np.diff(EDGES), axis=1),
+    )
+    node = _directional(component="bremsstrahlung").quantify()
+    assert node.sampling == "nodes"
+    with pytest.raises(ValueError, match="only bin-mean"):
+        _ = node.photon_energy_edges
+
+
+@pytest.mark.parametrize(
+    ("line_quadrature", "cxr_sampling"), [(None, "nodes"), ("bin-mean", "bin-mean")]
+)
+def test_planar_producer_declares_factor_sampling(line_quadrature, cxr_sampling):
+    detector = PlanarDetector(
+        pose=PlanarPose((0.0, 0.0, 10.0)), size_mm=(1.0, 1.0), pixels=PixelGrid((1, 1), (1.0, 1.0))
+    )
+    sampling = PixelSampling.of(detector, (1, 1))
+    output = {
+        "E_grid": ENERGY,
+        "E_grid_brem": ENERGY,
+        "spec_by_direction": np.ones((1, 3)),
+        "brem_wide_by_direction": np.ones((1, 3)),
+        "spec_characteristic_by_direction": np.ones((1, 3)),
+        "spec_channeling_by_direction": np.ones((1, 3)),
+        "spec_transition_by_direction": np.ones((1, 3)),
+        "spec_coherent_by_direction": np.ones((1, 3)),
+    }
+    spatial = sampling.spatial(
+        output, detector=detector, filters=(), line_quadrature=line_quadrature
+    )
+    assert spatial.cxr.sampling == cxr_sampling
+    assert spatial.characteristic.sampling == "bin-mean"
+    np.testing.assert_array_equal(spatial.characteristic.bin_edges_eV, EDGES)
+    for name in ("brem", "coherent_cxr", "channeling", "transition"):
+        assert getattr(spatial, name).sampling == "nodes"
+    if line_quadrature:
+        np.testing.assert_array_equal(spatial.cxr.bin_edges_eV, EDGES)
+    assert spatial.quantify_spectra(pixels=[(0, 0)], component="cxr").sampling == cxr_sampling
+    # Channeling and transition are node-sampled, so this total is always mixed.
+    total = spatial.quantify_spectra(pixels=[(0, 0)], component="cxr_total")
+    assert total.sampling == "mixed"
