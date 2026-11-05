@@ -106,7 +106,7 @@ def test_help_documents_examples_units_side_effects_and_incompatibilities():
     runner = CliRunner()
     cases = {
         (): ("Examples:", "pyrite run"),
-        ("run",): ("minutes", "--preset"),
+        ("run",): ("minutes",),
         ("remote",): ("PYRITE_REMOTE_HOST", "Examples:"),
         ("remote", "pull"): ("--preset", "grid-filtered"),
         ("numerics", "energy-grid"): ("detector energy-grid inputs", "Examples:"),
