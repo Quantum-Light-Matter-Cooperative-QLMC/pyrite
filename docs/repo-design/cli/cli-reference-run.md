@@ -56,6 +56,8 @@ Options:
                                   checkpoint or observation-store I/O.
   --recompute                     Ignore cached cases and recompute fresh, but
                                   repopulate the shared per-case cache with the results.
+                                  Remote chunks resume this fresh run after its first
+                                  slice.
   --trajectories [DIR]            Opt in to saving each transported case's full
                                   electron-transport result as HDF5 under DIR/<stem>/
                                   (bare flag: pyrite-output/trajectories). With

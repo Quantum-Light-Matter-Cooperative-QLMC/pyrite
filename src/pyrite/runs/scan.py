@@ -481,6 +481,7 @@ def run(args):
                 try:
                     complete = _run_material(args, material, max_seconds=remaining)
                 except Exception as error:
+                    from ..checkpoints.persistence import _CheckpointIdentityError
                     from ..montecarlo.case import AxialAdmissionError
                     from ..montecarlo.trajectories import TrajectoryArtifactError
                     from ..xsgen._errors import TableNotFoundError
@@ -488,6 +489,7 @@ def run(args):
                     if not isinstance(
                         error,
                         (
+                            _CheckpointIdentityError,
                             AxialAdmissionError,
                             TrajectoryArtifactError,
                             TableNotFoundError,
@@ -908,10 +910,9 @@ def _run_material(args, material, max_seconds=None):
         sweep=sweep,
         context=progress.performance_context,
     )
-    # Shared per-case cache gates. Default reads + writes; --recompute / --no-cache
-    # / a -p perf run narrow this (see the `run` command). cache_read also drives
-    # the per-stem resume, so a --no-cache/--recompute/perf run recomputes rather
-    # than resume-skipping (the perf-run "measures near-nothing" bug).
+    # Fresh recompute/no-cache/perf invocations skip checkpoint and CAS reads.
+    # A later remote recompute slice resumes only this chain's checkpoint;
+    # shared-cache reads remain disabled for every slice.
     cache_read = getattr(args, "cache_read", True)
     cache_write = getattr(args, "cache_write", True)
     # Opt-in transport artifacts (issue #159): absent unless --trajectories.
@@ -960,7 +961,7 @@ def _run_material(args, material, max_seconds=None):
             checkpoint_dir=args.checkpoint_dir,
             checkpoint_path=ckpt,
             max_workers=args.workers,
-            resume=cache_read,
+            resume=getattr(args, "resume_checkpoint", cache_read),
             content_key_fn=content_key_fn,
             cache_read=cache_read,
             cache_write=cache_write,

@@ -12,6 +12,7 @@ from ..checkpoints.persistence import (
     _case_set_proof_from_cases,
     _checkpoint_exists,
     _checkpoint_signature,
+    _CheckpointIdentityError,
     _manifest_path_for,
     _valid_cas_payload,
     _write_case_manifest,
@@ -111,7 +112,9 @@ class SweepResume:
         except (TypeError, ValueError):
             return None
 
-    def load(self, resume, metadata_only_complete):
+    def load(self, resume, metadata_only_complete, *, transport_only=False):
+        if not resume and not transport_only and _checkpoint_exists(self.checkpoint_path):
+            self.checkpoint.restart()
         if resume and _checkpoint_exists(self.checkpoint_path):
             if self.on_activity is not None:
                 self.on_activity({"phase": "loading", "case": None, "in_flight_case_count": 0})
@@ -165,26 +168,34 @@ class SweepResume:
         if os.path.isfile(manifest_path):
             try:
                 with open(manifest_path) as handle:
-                    existing_identity = json.load(handle).get("dataset_identity")
+                    manifest = json.load(handle)
+                if isinstance(manifest, dict):
+                    existing_identity = manifest.get("dataset_identity")
             except (OSError, ValueError, TypeError):
                 pass
         if isinstance(existing_identity, dict):
             from ..campaign.profiles import normalize_dataset_identity
 
             existing_identity = normalize_dataset_identity(existing_identity)
+        if self.dataset_identity is not None and not isinstance(existing_identity, dict):
+            raise _CheckpointIdentityError(
+                f"checkpoint {self.checkpoint_path} dataset identity cannot be verified; "
+                "rerun with --recompute or archive the checkpoint before resuming"
+            )
         if (
             self.dataset_identity is not None
             and existing_identity is not None
             and self.dataset_identity.get("parameter_sha256")
             != existing_identity.get("parameter_sha256")
         ):
-            raise ValueError(
+            raise _CheckpointIdentityError(
                 "checkpoint dataset identity mismatch: "
                 f"requested {self.dataset_identity.get('profile')}:"
                 f"{self.dataset_identity.get('parameter_sha256', '')[:12]}, existing "
                 f"{existing_identity.get('profile')}:"
                 f"{existing_identity.get('parameter_sha256', '')[:12]}; "
-                "archive or select a different variant before resuming"
+                "rerun with --recompute, archive the checkpoint, or select a different variant "
+                "before resuming"
             )
         return existing_identity
 

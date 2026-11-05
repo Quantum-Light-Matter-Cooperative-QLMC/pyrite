@@ -278,7 +278,8 @@ def _reproduce_zhai(ne, ne_brem, ne_supp, tmd_azimuth, refresh):
     is_flag=True,
     help=(
         "Ignore cached cases and recompute fresh, but repopulate the shared "
-        "per-case cache with the results."
+        "per-case cache with the results. Remote chunks resume this fresh run "
+        "after its first slice."
     ),
 )
 @click.option(
@@ -311,6 +312,7 @@ def _reproduce_zhai(ne, ne_brem, ne_supp, tmd_azimuth, refresh):
     help="Capture storage: compact (default, LZF) or throughput (uncompressed); requires --trajectories.",
 )
 @click.option("--progress-file", type=click.Path(path_type=Path), default=None, hidden=True)
+@click.option("--resume-checkpoint", is_flag=True, hidden=True)
 @click.option(
     "--progress-phase",
     type=click.Choice(("primary", "cpu"), case_sensitive=True),
@@ -563,6 +565,8 @@ def _check_mode_combinations(ctx, options):
     _check_remote_only_flags(options)
     if options["no_cache"] and options["recompute"]:
         raise click.UsageError("--no-cache and --recompute are mutually exclusive")
+    if options["resume_checkpoint"] and not options["recompute"]:
+        raise click.UsageError("--resume-checkpoint requires --recompute")
     if options["py_spy"] and options["nsys"]:
         raise click.UsageError("--py-spy and --nsys are mutually exclusive")
     if options["overwrite_trajectories"] and options["trajectories"] is None:
@@ -793,6 +797,7 @@ def _run_local(options):
         "performance_profile": performance_profile,
         "cache_read": cache_read,
         "cache_write": cache_write,
+        "resume_checkpoint": any((options["resume_checkpoint"], cache_read)),
         **({"progress_phase": progress_phase} if progress_phase is not None else {}),
         **capture,
         **execution,
