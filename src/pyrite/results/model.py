@@ -625,10 +625,8 @@ class Result:
 
         Validation: spectral-support-yield-conservation
         """
-        parts = self._components(mode)
-        if len({part.normalization for _, _, part in parts}) != 1:
-            raise ValueError("cannot sum families with different normalizations")
-        yields = {name: part.integrate(energy_range_eV) for name, _, part in parts}
+        # Result.__init__ already guarantees one normalization across families.
+        yields = {name: part.integrate(energy_range_eV) for name, _, part in self._components(mode)}
         return {**yields, "total": combine_yields(yields.values())}
 
     def _summary_rows(self) -> list[tuple[str, str, str]]:

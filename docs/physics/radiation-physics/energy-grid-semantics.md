@@ -145,7 +145,7 @@ A stored component represents yield only over its **declared support**: $[E_0, E
 
 Producers declare each component's convention in `SpectralDensity.sampling`; consumers never infer it from the array shape. Results built by `pyrite.simulate` declare:
 
-```{list-table} Declared sampling of `Result` families.
+```{list-table} Declared sampling of Result families.
 :name: tbl-result-sampling
 :header-rows: 1
 
@@ -176,8 +176,7 @@ Node samples integrate as the piecewise-linear interpolant over their support. F
 ```{math}
 :label: eq-grid-linear-cumulative
 
-C(x) = \sum_{j<k} \tfrac{1}{2} h_j (f_j + f_{j+1})
-+ f_k (x - E_k) + \frac{f_{k+1} - f_k}{2 h_k} (x - E_k)^2 ,
+C(x) = \sum_{j<k} \tfrac{1}{2} h_j \left(f_j + f_{j+1}\right) + f_k \left(x - E_k\right) + \frac{f_{k+1} - f_k}{2 h_k} \left(x - E_k\right)^2 ,
 ```
 
 the exact integral of the interpolant from $E_0$. The window yields are
@@ -217,7 +216,7 @@ Acquisition reporting bins (`instrument/acquisition.py`) partition detected even
 `Result.spectral_flux` interpolates every family onto the union of all native nodes and fills zero outside each family's grid. Its values are unchanged and remain a display table, but they are not a yield representation:
 
 * Between a family's own nodes, union nodes preserve its piecewise-linear integral.
-* Beyond its support, the zero fill adds a bridging triangle from each nonzero endpoint to the next union node. For CXR $(100, 300)\,\mathrm{eV} \mapsto (2, 4)$, characteristic $(100, 300) \mapsto (0.5, 0.5)$ and brem $(100, 200, 400) \mapsto (1, 1, 1)$, the native integrals are 600, 100 and 300 (1000 in total); the trapezoid of the union `total` column is 1225, including triangles of 200 and 25 between 300 and 400 eV.
+* Beyond its support, the zero fill adds a bridging triangle from each nonzero endpoint to the next union node. For CXR $(100, 300)\,\mathrm{eV} \mapsto (2, 4)$, characteristic $(100, 300) \mapsto (0.5, 0.5)$ and brem, all declared as node samples, $(100, 200, 400) \mapsto (1, 1, 1)$, the native integrals are 600, 100 and 300 (1000 in total); the trapezoid of the union `total` column is 1225, including triangles of 200 and 25 between 300 and 400 eV. A producer-built characteristic is a bin mean on edges $(0, 200, 400)$ and represents 200, not 100.
 * Bin-mean families are read as node samples.
 
 [Validation: `spectral-support-yield-conservation`](../../validation/physics-validation-ledger.md).
