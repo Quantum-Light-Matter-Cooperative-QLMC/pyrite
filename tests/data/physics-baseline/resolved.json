@@ -1245,8 +1245,8 @@
       "dtheta_obs_rad": 0.0351963661580141,
       "domega_sr": 0.0012390399999999998
     },
-    "case_content_key": "d856b0f82f23b56462a2b05c77ec5c3758ee6ea7ea3fd5ac426fe93c57d8ca9c",
-    "parameter_sha256": "6bc04e54c7a5227c5b8c480ec0f85c8bd3c8c7c0324b3e497bdd07b5655b8d58"
+    "case_content_key": "e12dc01e073eec6dab65443a5c1b8d05fd531616375031def56a287c0a29af71",
+    "parameter_sha256": "a76cad2640e90032bc410903e9956794b4e3762a6faf7d12a9170198b656752b"
   },
   "multilayer": {
     "case": {
@@ -2479,7 +2479,7 @@
       "dtheta_obs_rad": 0.0351963661580141,
       "domega_sr": 0.0012390399999999998
     },
-    "case_content_key": "59ad89befd722d2b03fcae273443541501511cbf63bbf4ee9292789ad9e00d6f",
-    "parameter_sha256": "b1b8e31b440dce84aa7bd68320d8cb847ae08878cd63da3e0a8a715578d8d872"
+    "case_content_key": "9cc324b574768c9db80b105d7c55f48ea2d1f067bb376d8c5179f35a301d0108",
+    "parameter_sha256": "d384b3a55cf2c5fef278fdfc318fa2ae3c264c71b7292ee2c13149250b515c96"
   }
 }

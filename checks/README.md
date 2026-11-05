@@ -148,3 +148,21 @@ record. Current tables must match the original digest. It records hashes of both
 source files, preserves their contents, and evaluates the saved trajectories
 without generating a new transport. Use a distinct output and retain the source
 argument on every resumed slice. Run through the remote GPU workflow.
+
+## Continuum benchmark support
+
+These diagnostics record engineering and statistical evidence; they do not emit
+independent physics-validation verdicts.
+
+| Entry | Purpose |
+| --- | --- |
+| `continuum_backend_parity.py` | Compare CPU, CUDA and chunked scores on saved trajectories. |
+| `continuum_benchmark_report.py` | Render benchmark JSON and spectral comparisons. |
+| `continuum_geant4_precision.py` | Drive Geant4 precision measurements. |
+| `continuum_pyrite_precision.py` | Drive PyRITE precision measurements. |
+| `continuum_spectral_statistics.py` | Reduce per-primary Geant4 spectral sidecars. |
+| `continuum_benchmark_matrix.sbatch` | Submit the grid benchmark matrix. |
+| `continuum_cpu_reservation.sbatch` | Reserve CPU resources during GPU measurements. |
+| `continuum_geant4_isolated.sbatch`, `continuum_geant4_queen.sbatch`, `continuum_geant4_spectra.sbatch` | Submit Geant4 benchmark workloads. |
+| `continuum_precision.sbatch`, `continuum_pyrite_isolated.sbatch` | Submit precision workloads. |
+| `escaped278` | Escaped-photon comparison and prepared-scorer benchmark harnesses; follow-up ownership in #821/#825. |
