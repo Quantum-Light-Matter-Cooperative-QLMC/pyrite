@@ -16,8 +16,12 @@ New coupled cases serialize `radiative_moment_model` with the versioned marker
 `radiative-moments-v1/positive-linear-log-energy-v1/rtol2e-4`. Result row metadata
 also retain the actual packed moment-buffer SHA-256. A legacy case lacking the
 marker replays exact quadrature; it is not silently reinterpreted as a table
-case. Prepared buffers belong to one transport pass and are uploaded once by
-its batching owner; no process-global host/device table cache is introduced.
+case. Each transport pass uploads its read-only buffer once through its
+batching owner. A bounded process-local host cache (eight entries) reuses
+the buffer across passes with identical inputs, such as runner blocks sharing
+one table range. Its key hashes the moment policy, coverage, cutoff, source
+labels and endpoints, and the exact packer's SDCS, density and plasma bytes,
+so a hit is bit-identical to a rebuild. There is no device-side cache.
 Preparation and out-of-coverage failures remain explicit. Production table
 construction retains the exact reference packer's existing relative
 $10^{-12}$ source-endpoint allowance, needed when incident-grid refinement
@@ -27,17 +31,67 @@ range is admitted. The standalone component preparation API remains strict
 by default. All interpolation queries, including production queries, still
 reject energies outside their explicitly prepared interval.
 
-Held-out CPU job **2669**, frozen at `8db53f2d` before the #795/#799 rebase,
-was cancelled at the user's request to release its 24 GiB reservation for
-other GPU tests. The [interruption record](../check-records/equal-precision/moment-heldout-interrupted-788.json)
-lists completed requests. Partial records remain in its isolated evidence directory;
-missing fixed-seed groups remain unresolved. This run did not include #795.
-Issue #788 stays open for complete held-out ensemble qualification, remaining
-hard-count/continuous-observable limits, wider CPU/CUDA transport comparisons
-and matched timing of the combined production source. No unfinished check is
-counted as passing. The job's six Si preflights passed within-process replay
-and matched score/trajectory hashes across the two independent processes for
-exact, table and refined policies.
+### Production-path reruns
+
+The production harness `checks/equal_precision/benchmark_moment_production.py`
+selects the shipped `radiative_moments` policies; `refined` differs only in
+its $10^{-4}$ preparation budget. Every record pins one moment-source hash set.
+Held-out CPU job 2669 was cancelled before completion; its
+[interruption record](../check-records/equal-precision/moment-heldout-interrupted-788.json)
+is superseded and none of its partial records are reused.
+
+- **CPU held-out rerun** (jobs 3926–3929,
+  [record](../check-records/equal-precision/moment-heldout-production-788.json)):
+  table and refined policies pass all 32 predeclared transmission/backscatter
+  comparisons at 99% joint confidence, with zero discordant pairs in 6144
+  paired histories each. Post-hoc continuous screening with the
+  `moment-policy-788` margins gives 44 screening passes, 52 unresolved and
+  0 failures. Cross-process replay passes for all three policies.
+- **CUDA ensemble** (jobs 3913/3930, RTX 5080,
+  [record](../check-records/equal-precision/moment-production-cuda-788.json)):
+  11 CUDA moment/hard-radiative tests pass. All 24 case/policy 256-history
+  preflights pass same-seed replay with the matching persisted policy. Three
+  fresh seeds at 50000 histories (SiO2 compound 20000, by a host-memory
+  amendment made before any compound result) give 30 per-comparison
+  screening passes, 66 unresolved and 0 failures.
+- **CUDA benchmark** (jobs 3914/3931,
+  [record](../check-records/equal-precision/moment-production-benchmark-788.json)):
+  5 fresh-process repeats at matched histories. Median exact/table ratios:
+  CUDA transport-core wall 2.43 (Si 300 keV), 3.22 (W 300 keV) and 4.83
+  (SiO2 compound); transport and emission 1.20/1.68/2.01; complete request
+  with reductions 1.07/1.28/1.39. Each process built its table once
+  (0.05–0.09 s) and reused it through the host cache. Peak host RSS does not
+  change between policies.
+- **Same-table CPU/CUDA** (job 3934 paired with CPU jobs 3926–3928,
+  [record](../check-records/equal-precision/moment-cpu-cuda-788.json)): CUDA
+  reran the CPU held-out seeds with identical arguments. Every pair shares
+  primary coupling and persisted `moment_table_sha256`. CPU is FP64; CUDA uses
+  the shipped `mixed` default (`cuda-exact-mixed-fp32-tables-v1`): it reads
+  the same float64 moment bytes, with FP32 lookup arithmetic. No comparison
+  failed. Per policy, the CUDA−CPU screen gives 57 passes and 87 unresolved,
+  with the same result for exact, table and refined. Its dense unresolved
+  cases (W 300 keV exit energy, W 800 keV path length, SiO2 exit
+  energy/transmission) are core-level divergences, underpowered at 6144
+  histories. The table×core difference-in-differences gives 44 passes,
+  52 unresolved and 0 failures. Wherever that test resolves, the same table
+  does not change CPU and CUDA results differently.
+- **Launch work** (job 3934, one diagnostic repeat): the 512-row capacity
+  guess with no probe overflows for every primary. Each primary is therefore
+  replayed once at the measured capacity, so 2× the primaries are launched.
+  The first full-width launch takes 12–48% of CUDA core wall. Returned rows
+  fill 15–29% of the allocated slots. The one specialized kernel variant uses
+  140 registers and 32 local bytes per thread at 32 threads per block (25%
+  theoretical occupancy), under the full-history schedule.
+
+The hard count changed in no pair in any CPU or CUDA policy comparison, so it
+stays `unresolved`; so do the CUDA binary outcomes and sparse photon-energy
+screens. [#978](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/978)
+owns their resolution. None of these is counted as passing. The CUDA
+intervals are per-comparison screening, not family-wise qualification. The
+timings are measured ratios on one GPU at matched histories, not
+equal-achieved-precision or Geant4 comparisons. Table upload is not timed
+separately; the KB-scale buffer is inside the per-call wall. No profiler was
+run.
 
 ## Independent derivation
 

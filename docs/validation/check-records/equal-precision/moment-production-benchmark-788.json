@@ -1,0 +1,689 @@
+{
+ "schema": "radiative-moment-production-benchmark-788-v1",
+ "jobs": {
+  "benchmark": [
+   3914,
+   3931
+  ],
+  "failed_start": {
+   "3914": "HostMemoryResourceError on SiO2 compound at 50000 histories; completed Si/W repeat-0 records resumed by 3931"
+  }
+ },
+ "sources": {
+  "a13539fd41ee4a1d4dfb91005eb9ac086337f9cf": "jobs 3913/3914 (code_digest cd7051a9...)",
+  "14f2cbd4564bee373cb2049555910efe4f7355f9": "resume jobs 3930/3931 (code_digest c8d00ccf...); src/ identical to 9c4b6f45, only checks/ changed; moment_source hashes identical in every record"
+ },
+ "source_dirty": false,
+ "tables_digest": "fa64dadcf63912be948c11f4b30745483bbe14b5df3a81dc6613ae46b7cf5e1e",
+ "sbethe_tables": {
+  "silicon": {
+   "generated": false,
+   "table_key": "86c73cd7a10433ce547de2ae9458e3fd7c09da3c394e8e07e5f7f9415bfaff32",
+   "digest": "cd6144893da65f70656bd7880c6083642862cd6068b34aaeb0d36bf73e7fe20f"
+  },
+  "W": {
+   "generated": false,
+   "table_key": "6a7b4dbfeffcbb8243196a6c1633d5a3373c763e1ab8187d14f8fdc78b040abe",
+   "digest": "aab6a247acaa6303e5db0ad052ad43c6c4b3f35b073ef683bc34b3071bc442c3"
+  }
+ },
+ "node": "DESKTOP-QNIHO3D, gpu partition, NVIDIA GeForce RTX 5080, driver 610.47 / CUDA 13.3, 24 GiB job memory",
+ "sbatch": "checks/equal_precision/moment-production-788.sbatch",
+ "harness": "checks/equal_precision/benchmark_moment_production.py (shipped radiative_moments exact/table; refined = shipped path at rtol 1e-4)",
+ "protocol": "checks/equal_precision/moment-production-788.json",
+ "protocol_sha256": "eedfad7bf01c464b689db7e3fe292555ae88456ca833c9cf94ac31ab86d1eb26",
+ "protocol_amendment": "SiO2 compound 50000 -> 20000 histories after jobs 3913/3914 host-memory refusal (27.14 GiB > 24 GiB); amended before any compound result; completed records resumed, not rerun",
+ "moment_source": {
+  "reference_sha256": "47394195598cf2fae08f76488a01dc1a0221f79fc23b1513091f0168ada90ce8",
+  "lookup_sha256": "38288b16d9c44e2f39da905e024a387342f020859ff7343ddc926b209edc843c",
+  "packer_sha256": "b89866c74e2851874f4f7b9f77116e0260a5d1e3348e62083384f3e8fd20bedb",
+  "wrapper_sha256": "b1ab1e871cb7ed24d00f9ca2b14beb7d2f84a6d0545d21acc7ceb07a6b016cd3",
+  "protocol_sha256": "1b3d0748828ab001b385644208020b50d28eb1f484aa9f5a310458ba437d376f",
+  "exact_sampler_sha256": "83c1464e0244b315bcf3a396766b436b5696d361da55ebde5ed0bc2bdc9a398b",
+  "path": "production"
+ },
+ "design": "5 repeats per case and variant, seeds 78841-78845, fresh process each, one in-process warmup at the measured history count, exact/table order alternates by repeat parity; matched histories (Si/W 50000, SiO2 20000)",
+ "measurement_notes": [
+  "cuda_core_wall_s sums synchronized wall time of the measured request's CUDA transport-core calls (after the warmup block boundary)",
+  "transport_s is transport_and_emission (compound layout: transport)",
+  "table_build_s is moment preparation inside the process; preparations_per_process=1 shows the warmup preparation is reused by the measured request through the host cache",
+  "kernel registers/local memory were not exposed by the harness introspection (resources list empty): reported limitation"
+ ],
+ "cases": {
+  "si-300-100um-0deg": {
+   "exact": {
+    "repeats": {
+     "seed": [
+      78841,
+      78842,
+      78843,
+      78844,
+      78845
+     ],
+     "histories": [
+      50000,
+      50000,
+      50000,
+      50000,
+      50000
+     ],
+     "transport_s": [
+      8.646277944964822,
+      8.844737231964245,
+      8.17940855002962,
+      8.985941975028254,
+      8.2423393370118
+     ],
+     "request_with_reductions_s": [
+      19.929493624018505,
+      19.786834580998402,
+      19.249067033990286,
+      19.885333849990275,
+      19.286016555968672
+     ],
+     "cuda_core_wall_s": [
+      2.4474665660527535,
+      2.433994187042117,
+      2.529297323897481,
+      2.443636345968116,
+      2.5404646819806658
+     ],
+     "cuda_core_calls": [
+      9,
+      9,
+      9,
+      9,
+      9
+     ],
+     "peak_rss_gib": [
+      10.703880310058594,
+      10.761909484863281,
+      10.665817260742188,
+      10.748176574707031,
+      10.822380065917969
+     ],
+     "table_build_s": [
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "preparations_per_process": [
+      0,
+      0,
+      0,
+      0,
+      0
+     ]
+    },
+    "transport_s_summary": {
+     "median": 8.646277944964822,
+     "min": 8.17940855002962,
+     "max": 8.985941975028254
+    },
+    "request_with_reductions_s_summary": {
+     "median": 19.786834580998402,
+     "min": 19.249067033990286,
+     "max": 19.929493624018505
+    },
+    "cuda_core_wall_s_summary": {
+     "median": 2.4474665660527535,
+     "min": 2.433994187042117,
+     "max": 2.5404646819806658
+    },
+    "peak_rss_gib_summary": {
+     "median": 10.748176574707031,
+     "min": 10.665817260742188,
+     "max": 10.822380065917969
+    },
+    "table_build_s_summary": {
+     "median": 0,
+     "min": 0,
+     "max": 0
+    },
+    "moment_result": [
+     "exact",
+     null
+    ]
+   },
+   "table": {
+    "repeats": {
+     "seed": [
+      78841,
+      78842,
+      78843,
+      78844,
+      78845
+     ],
+     "histories": [
+      50000,
+      50000,
+      50000,
+      50000,
+      50000
+     ],
+     "transport_s": [
+      7.200391200953163,
+      7.339781777991448,
+      7.685620477015618,
+      7.321260457974859,
+      7.598550851049367
+     ],
+     "request_with_reductions_s": [
+      18.666207875008695,
+      18.287095030013006,
+      18.763249269977678,
+      18.32053054496646,
+      18.60660421999637
+     ],
+     "cuda_core_wall_s": [
+      0.9795701410039328,
+      1.0302213281393051,
+      1.056776652985718,
+      1.0061408308683895,
+      0.992722614959348
+     ],
+     "cuda_core_calls": [
+      9,
+      9,
+      9,
+      9,
+      9
+     ],
+     "peak_rss_gib": [
+      10.70382308959961,
+      10.764747619628906,
+      10.671234130859375,
+      10.765777587890625,
+      10.83023452758789
+     ],
+     "table_build_s": [
+      0.05159791302867234,
+      0.04966990201501176,
+      0.050932969024870545,
+      0.05153714900370687,
+      0.050713848031591624
+     ],
+     "preparations_per_process": [
+      1,
+      1,
+      1,
+      1,
+      1
+     ]
+    },
+    "transport_s_summary": {
+     "median": 7.339781777991448,
+     "min": 7.200391200953163,
+     "max": 7.685620477015618
+    },
+    "request_with_reductions_s_summary": {
+     "median": 18.60660421999637,
+     "min": 18.287095030013006,
+     "max": 18.763249269977678
+    },
+    "cuda_core_wall_s_summary": {
+     "median": 1.0061408308683895,
+     "min": 0.9795701410039328,
+     "max": 1.056776652985718
+    },
+    "peak_rss_gib_summary": {
+     "median": 10.764747619628906,
+     "min": 10.671234130859375,
+     "max": 10.83023452758789
+    },
+    "table_build_s_summary": {
+     "median": 0.050932969024870545,
+     "min": 0.04966990201501176,
+     "max": 0.05159791302867234
+    },
+    "moment_result": [
+     "radiative-moments-v1/positive-linear-log-energy-v1/rtol2e-4",
+     "89daa95ef6358bda28245b6a049d3eb7e19f78795e9a3b4d288663824b650806"
+    ]
+   },
+   "ratio_exact_over_table": {
+    "transport_s": {
+     "median": 1.200806692811393,
+     "min": 1.0642483029822654,
+     "max": 1.2273763550154948
+    },
+    "request_with_reductions_s": {
+     "median": 1.067677685658969,
+     "min": 1.0258919847528725,
+     "max": 1.0854125540296509
+    },
+    "cuda_core_wall_s": {
+     "median": 2.428721975092731,
+     "min": 2.362593474392714,
+     "max": 2.5590881518143895
+    }
+   }
+  },
+  "sio2-800kev-tr0.3-0deg-compound": {
+   "exact": {
+    "repeats": {
+     "seed": [
+      78841,
+      78842,
+      78843,
+      78844,
+      78845
+     ],
+     "histories": [
+      20000,
+      20000,
+      20000,
+      20000,
+      20000
+     ],
+     "transport_s": [
+      19.694254275993444,
+      19.68451242498122,
+      20.86038936796831,
+      19.58877518196823,
+      19.722397272009403
+     ],
+     "request_with_reductions_s": [
+      37.7497852340457,
+      37.551917120988946,
+      38.47098000202095,
+      37.473152288992424,
+      37.34665558103006
+     ],
+     "cuda_core_wall_s": [
+      9.033524183847476,
+      8.95973030908499,
+      8.968260362918954,
+      9.015148449048866,
+      9.047831453033723
+     ],
+     "cuda_core_calls": [
+      9,
+      9,
+      9,
+      9,
+      9
+     ],
+     "peak_rss_gib": [
+      15.951713562011719,
+      15.711246490478516,
+      15.90908432006836,
+      15.917865753173828,
+      15.839954376220703
+     ],
+     "table_build_s": [
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "preparations_per_process": [
+      0,
+      0,
+      0,
+      0,
+      0
+     ]
+    },
+    "transport_s_summary": {
+     "median": 19.694254275993444,
+     "min": 19.58877518196823,
+     "max": 20.86038936796831
+    },
+    "request_with_reductions_s_summary": {
+     "median": 37.551917120988946,
+     "min": 37.34665558103006,
+     "max": 38.47098000202095
+    },
+    "cuda_core_wall_s_summary": {
+     "median": 9.015148449048866,
+     "min": 8.95973030908499,
+     "max": 9.047831453033723
+    },
+    "peak_rss_gib_summary": {
+     "median": 15.90908432006836,
+     "min": 15.711246490478516,
+     "max": 15.951713562011719
+    },
+    "table_build_s_summary": {
+     "median": 0,
+     "min": 0,
+     "max": 0
+    },
+    "moment_result": [
+     "exact",
+     null
+    ]
+   },
+   "table": {
+    "repeats": {
+     "seed": [
+      78841,
+      78842,
+      78843,
+      78844,
+      78845
+     ],
+     "histories": [
+      20000,
+      20000,
+      20000,
+      20000,
+      20000
+     ],
+     "transport_s": [
+      10.379233649000525,
+      9.631955344986636,
+      10.24026790598873,
+      9.76113219698891,
+      11.182600946980529
+     ],
+     "request_with_reductions_s": [
+      28.06499495904427,
+      26.985409410030115,
+      27.681617156020366,
+      26.78696289897198,
+      28.80319258099189
+     ],
+     "cuda_core_wall_s": [
+      1.8825421840301715,
+      1.8553837210056372,
+      1.811852055019699,
+      1.7863267529173754,
+      1.9166967328637838
+     ],
+     "cuda_core_calls": [
+      9,
+      9,
+      9,
+      9,
+      9
+     ],
+     "peak_rss_gib": [
+      15.951759338378906,
+      15.714252471923828,
+      15.914192199707031,
+      15.969017028808594,
+      15.888675689697266
+     ],
+     "table_build_s": [
+      0.09153084503486753,
+      0.08861992502352223,
+      0.08960041496902704,
+      0.08917515497887507,
+      0.08862858702195808
+     ],
+     "preparations_per_process": [
+      1,
+      1,
+      1,
+      1,
+      1
+     ]
+    },
+    "transport_s_summary": {
+     "median": 10.24026790598873,
+     "min": 9.631955344986636,
+     "max": 11.182600946980529
+    },
+    "request_with_reductions_s_summary": {
+     "median": 27.681617156020366,
+     "min": 26.78696289897198,
+     "max": 28.80319258099189
+    },
+    "cuda_core_wall_s_summary": {
+     "median": 1.8553837210056372,
+     "min": 1.7863267529173754,
+     "max": 1.9166967328637838
+    },
+    "peak_rss_gib_summary": {
+     "median": 15.914192199707031,
+     "min": 15.714252471923828,
+     "max": 15.969017028808594
+    },
+    "table_build_s_summary": {
+     "median": 0.08917515497887507,
+     "min": 0.08861992502352223,
+     "max": 0.09153084503486753
+    },
+    "moment_result": [
+     "radiative-moments-v1/positive-linear-log-energy-v1/rtol2e-4",
+     "1eba8eb929e0296be0422e38d06fa4c286a57f92aa186fdeede23cc78c71e279"
+    ]
+   },
+   "ratio_exact_over_table": {
+    "transport_s": {
+     "median": 2.0068138394858464,
+     "min": 1.763668163204442,
+     "max": 2.043667326097693
+    },
+    "request_with_reductions_s": {
+     "median": 1.3897663487356644,
+     "min": 1.2966151400062598,
+     "max": 1.398932474365377
+    },
+    "cuda_core_wall_s": {
+     "median": 4.829044368368567,
+     "min": 4.720533664976376,
+     "max": 5.046752188156839
+    }
+   }
+  },
+  "w-300-10um-0deg": {
+   "exact": {
+    "repeats": {
+     "seed": [
+      78841,
+      78842,
+      78843,
+      78844,
+      78845
+     ],
+     "histories": [
+      50000,
+      50000,
+      50000,
+      50000,
+      50000
+     ],
+     "transport_s": [
+      24.841262260975782,
+      25.149715104023926,
+      25.862029209034517,
+      25.211579761002213,
+      25.202913903980516
+     ],
+     "request_with_reductions_s": [
+      46.890239604981616,
+      47.39049639296718,
+      47.83476688002702,
+      46.80606384202838,
+      46.6522088359925
+     ],
+     "cuda_core_wall_s": [
+      11.175605371012352,
+      11.242992608866189,
+      11.097157892072573,
+      10.667907500930596,
+      11.22357988805743
+     ],
+     "cuda_core_calls": [
+      20,
+      20,
+      20,
+      19,
+      20
+     ],
+     "peak_rss_gib": [
+      20.161624908447266,
+      20.18124008178711,
+      20.17618179321289,
+      20.210521697998047,
+      20.045143127441406
+     ],
+     "table_build_s": [
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "preparations_per_process": [
+      0,
+      0,
+      0,
+      0,
+      0
+     ]
+    },
+    "transport_s_summary": {
+     "median": 25.202913903980516,
+     "min": 24.841262260975782,
+     "max": 25.862029209034517
+    },
+    "request_with_reductions_s_summary": {
+     "median": 46.890239604981616,
+     "min": 46.6522088359925,
+     "max": 47.83476688002702
+    },
+    "cuda_core_wall_s_summary": {
+     "median": 11.175605371012352,
+     "min": 10.667907500930596,
+     "max": 11.242992608866189
+    },
+    "peak_rss_gib_summary": {
+     "median": 20.17618179321289,
+     "min": 20.045143127441406,
+     "max": 20.210521697998047
+    },
+    "table_build_s_summary": {
+     "median": 0,
+     "min": 0,
+     "max": 0
+    },
+    "moment_result": [
+     "exact",
+     null
+    ]
+   },
+   "table": {
+    "repeats": {
+     "seed": [
+      78841,
+      78842,
+      78843,
+      78844,
+      78845
+     ],
+     "histories": [
+      50000,
+      50000,
+      50000,
+      50000,
+      50000
+     ],
+     "transport_s": [
+      15.47243654198246,
+      14.791031404980458,
+      15.43139327102108,
+      14.702554235002026,
+      15.474741693993565
+     ],
+     "request_with_reductions_s": [
+      37.18873390898807,
+      36.473311776004266,
+      37.182655215030536,
+      36.51227678998839,
+      37.20558894000715
+     ],
+     "cuda_core_wall_s": [
+      3.4988314167712815,
+      3.4203052750672214,
+      3.3692695277859457,
+      3.314571892900858,
+      3.525899237021804
+     ],
+     "cuda_core_calls": [
+      20,
+      20,
+      20,
+      19,
+      20
+     ],
+     "peak_rss_gib": [
+      20.161949157714844,
+      20.18596649169922,
+      20.18041229248047,
+      20.215984344482422,
+      20.047466278076172
+     ],
+     "table_build_s": [
+      0.0497964289970696,
+      0.0499415920348838,
+      0.049756175954826176,
+      0.04916084301657975,
+      0.04918182798428461
+     ],
+     "preparations_per_process": [
+      1,
+      1,
+      1,
+      1,
+      1
+     ]
+    },
+    "transport_s_summary": {
+     "median": 15.43139327102108,
+     "min": 14.702554235002026,
+     "max": 15.474741693993565
+    },
+    "request_with_reductions_s_summary": {
+     "median": 37.182655215030536,
+     "min": 36.473311776004266,
+     "max": 37.20558894000715
+    },
+    "cuda_core_wall_s_summary": {
+     "median": 3.4203052750672214,
+     "min": 3.314571892900858,
+     "max": 3.525899237021804
+    },
+    "peak_rss_gib_summary": {
+     "median": 20.18041229248047,
+     "min": 20.047466278076172,
+     "max": 20.215984344482422
+    },
+    "table_build_s_summary": {
+     "median": 0.049756175954826176,
+     "min": 0.04916084301657975,
+     "max": 0.0499415920348838
+    },
+    "moment_result": [
+     "radiative-moments-v1/positive-linear-log-energy-v1/rtol2e-4",
+     "ad08783f31069825123e0a9efeb7e39bcfa27779070a62e1acf78515f3c3c5ec"
+    ]
+   },
+   "ratio_exact_over_table": {
+    "transport_s": {
+     "median": 1.6759361099040446,
+     "min": 1.6055171526199006,
+     "max": 1.7147754980547254
+    },
+    "request_with_reductions_s": {
+     "median": 1.2819267368958631,
+     "min": 1.253903248547355,
+     "max": 1.299319806328783
+    },
+    "cuda_core_wall_s": {
+     "median": 3.2184872875375232,
+     "min": 3.1831822560923695,
+     "max": 3.2936391109573444
+    }
+   }
+  }
+ },
+ "interpretation": "Measured exact/table median ratios of the shipped policies at matched histories on one RTX 5080 (5 repeats, ranges in cases): CUDA transport-core wall 2.43x (Si 300 keV), 3.22x (W 300 keV), 4.83x (SiO2 800 keV compound); transport_and_emission 1.20x/1.68x/2.01x; complete request with reductions 1.07x/1.28x/1.39x, where host reductions dominate. Table build 0.05-0.09 s once per process; peak host RSS unchanged between policies. Not an equal-achieved-precision or Geant4 comparison; one GPU, one node; kernel resource counts unavailable.",
+ "precision": "CUDA ran the shipped default transport_precision=auto -> mixed (model cuda-exact-mixed-fp32-tables-v1; PYRITE_MC_TRANSPORT_PRECISION unset); the prepared moment buffer stays float64 with FP32 lookup arithmetic. Confirmed for the same code by job 3934's kernel variant key (moment-cpu-cuda-788.json)."
+}

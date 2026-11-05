@@ -53,8 +53,12 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("root", type=Path)
     parser.add_argument("output", type=Path)
+    # Frozen protocols carry an ``ensemble`` block (seeds, margins, confidence).
+    parser.add_argument(
+        "--policy", type=Path, default=Path(__file__).with_name("moment-policy-788.json")
+    )
     args = parser.parse_args()
-    policy_path = Path(__file__).with_name("moment-policy-788.json")
+    policy_path = args.policy
     policy = json.loads(policy_path.read_text())["ensemble"]
     records = {}
     for path in args.root.glob("*.json"):
@@ -70,7 +74,8 @@ def main():
         raw = path.with_suffix(".npz")
         if hashlib.sha256(raw.read_bytes()).hexdigest() != r["raw_scores_sha256"]:
             raise ValueError(f"score digest mismatch: {path.name}")
-        key = (r["scene"]["id"], r["seed"], r["moment_variant"])
+        # A cutoff-override case shares its scene id with the default case.
+        key = ((r["scene"]["id"], r["cutoff_eV"]), r["seed"], r["moment_variant"])
         if key in records:
             raise ValueError("duplicate scene/seed/variant")
         with np.load(raw) as data:
@@ -127,7 +132,8 @@ def main():
                 checks[metric] = paired(base, candidate, margin, policy["confidence"])
             result["comparisons"].append(
                 {
-                    "scene": scene,
+                    "scene": scene[0],
+                    "cutoff_eV": scene[1],
                     "variant": variant,
                     "paired_seeds": len(samples),
                     "complete_seed_set": len(samples) == len(policy["seeds"]),

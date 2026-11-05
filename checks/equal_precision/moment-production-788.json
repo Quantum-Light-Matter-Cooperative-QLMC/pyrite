@@ -1,0 +1,97 @@
+{
+  "schema": "radiative-moment-production-788-v1",
+  "purpose": "Frozen before any run: fresh-seed CUDA ensemble screening and repeated timing of the shipped exact/table radiative-moment policies after #805, using one committed source for every variant.",
+  "harness": "checks/equal_precision/benchmark_moment_production.py",
+  "hardware_preflight": [
+    "tests/montecarlo/cascades/test_radiative_moments_cuda.py",
+    "tests/montecarlo/cascades/test_hard_radiative_cuda.py",
+    "same-seed in-process replay for every case and variant at 256 histories"
+  ],
+  "cases": [
+    "si-300-100um-0deg",
+    "w-300-10um-0deg",
+    "si-800-100um-0deg",
+    "w-800-10um-0deg",
+    "si-100-1um-0deg",
+    "w-100-100um-75deg",
+    "si-300-100um-0deg:10000",
+    "sio2-800kev-tr0.3-0deg-compound"
+  ],
+  "variants": [
+    "exact",
+    "table",
+    "refined"
+  ],
+  "ensemble": {
+    "seeds": [
+      78831,
+      78832,
+      78833
+    ],
+    "histories_per_seed": 50000,
+    "core": "cuda",
+    "confidence": 0.99,
+    "rule": "entire paired difference confidence interval inside equivalence margins; fewer than 30 changed pairs or zero variance is unresolved; unresolved is not pass",
+    "relative_margins": {
+      "hard_count": 0.01,
+      "hard_energy": 0.01,
+      "path_length": 0.002,
+      "exit_energy": 0.002
+    },
+    "absolute_margins": {
+      "transmission_fraction": 0.002,
+      "backscatter_fraction": 0.002
+    },
+    "analysis": "analyze_moment_transport.py --policy moment-production-788.json",
+    "multiplicity": "per-comparison 99% intervals over 8 cases x 2 variants x 6 metrics; reported as screening, no family-wise qualification claim",
+    "histories_override": {
+      "sio2-800kev-tr0.3-0deg-compound": 20000
+    }
+  },
+  "benchmark": {
+    "cases": [
+      "si-300-100um-0deg",
+      "w-300-10um-0deg",
+      "sio2-800kev-tr0.3-0deg-compound"
+    ],
+    "variants": [
+      "exact",
+      "table"
+    ],
+    "repeats": 5,
+    "seeds": [
+      78841,
+      78842,
+      78843,
+      78844,
+      78845
+    ],
+    "histories": 50000,
+    "order": "alternate exact/table first by repeat parity; each run is a fresh process with one in-process warmup",
+    "report": [
+      "table build_s per process",
+      "warm transport_and_emission",
+      "complete request_with_reductions",
+      "peak host RSS",
+      "per-call synchronized CUDA wall time",
+      "kernel registers/local memory when exposed",
+      "all repeats, median, range"
+    ],
+    "claim_limit": "measured ratio of shipped policies at matched histories on one RTX 5080; not an equal-achieved-precision or Geant4 comparison",
+    "histories_override": {
+      "sio2-800kev-tr0.3-0deg-compound": 20000
+    }
+  },
+  "cpu_heldout": "moment-heldout-788.json rerun in full from the beginning on the production harness (job 2669 incomplete records are not reused).",
+  "amendments": [
+    {
+      "date": "2026-11-05",
+      "jobs": [
+        3913,
+        3914
+      ],
+      "change": "SiO2 compound histories 50000 -> 20000 in ensemble and benchmark",
+      "reason": "host memory admission refused 27.14 GiB retained output at 50000 under the 24 GiB allocation; no compound result existed when amended. Other cases, seeds, margins and rules unchanged; completed records are resumed, not rerun."
+    }
+  ]
+}

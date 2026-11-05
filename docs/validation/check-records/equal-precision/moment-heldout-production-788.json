@@ -1,0 +1,3668 @@
+{
+ "schema": "radiative-moment-heldout-production-788-v1",
+ "jobs": {
+  "seeds": {
+   "78821": 3926,
+   "78822": 3927,
+   "78823": 3928
+  },
+  "analysis": 3929
+ },
+ "failed_starts_not_used": {
+  "3915,3916": "NFS cp EEXIST race on shared policy.json",
+  "3917,3919,3920": "fresh checkout lacked W SBETHE table",
+  "3922,3923,3924": "no Fortran compiler on qlmc-ace for table generation"
+ },
+ "node": "qlmc-ace (cpu partition, 1 CPU, 8 GiB per job)",
+ "source_revision": "a13539fd41ee4a1d4dfb91005eb9ac086337f9cf",
+ "source_dirty": false,
+ "src_identical_to": "9c4b6f45 (only checks/ sbatch changed)",
+ "code_digest": "cd7051a957d4e431eea10c82ff133b5828d41425044f99ec4a0ad147534157fa",
+ "tables_digest": "fa64dadcf63912be948c11f4b30745483bbe14b5df3a81dc6613ae46b7cf5e1e",
+ "sbethe_tables": {
+  "silicon": {
+   "generated": false,
+   "table_key": "86c73cd7a10433ce547de2ae9458e3fd7c09da3c394e8e07e5f7f9415bfaff32",
+   "digest": "cd6144893da65f70656bd7880c6083642862cd6068b34aaeb0d36bf73e7fe20f"
+  },
+  "W": {
+   "generated": false,
+   "table_key": "6a7b4dbfeffcbb8243196a6c1633d5a3373c763e1ab8187d14f8fdc78b040abe",
+   "digest": "aab6a247acaa6303e5db0ad052ad43c6c4b3f35b073ef683bc34b3071bc442c3"
+  }
+ },
+ "sbatch": "checks/equal_precision/moment-heldout-production-788.sbatch",
+ "harness": "checks/equal_precision/benchmark_moment_production.py (shipped radiative_moments exact/table; refined = shipped path at rtol 1e-4)",
+ "protocol": "checks/equal_precision/moment-heldout-788.json",
+ "protocol_sha256": "7a5ead2d264aca8734474ff07b9afc2520ae32a3bc07d30d2cc9db22321f4409",
+ "moment_source": {
+  "reference_sha256": "dcaff1196f7864b2123d43529dd0d0a8b66121d59782dcd4a1533003109eef33",
+  "lookup_sha256": "d454737c44a21afade7ee6eeeefec0e5d4d4f90caac81fb0b0a2481f18315fbc",
+  "packer_sha256": "b89866c74e2851874f4f7b9f77116e0260a5d1e3348e62083384f3e8fd20bedb",
+  "wrapper_sha256": "b1ab1e871cb7ed24d00f9ca2b14beb7d2f84a6d0545d21acc7ceb07a6b016cd3",
+  "protocol_sha256": "1b3d0748828ab001b385644208020b50d28eb1f484aa9f5a310458ba437d376f",
+  "exact_sampler_sha256": "94cf1515e58a1c3436077c5d58ec895309e2a33c235caf7fa35352ffbd69360b",
+  "path": "production"
+ },
+ "replay_preflight": {
+  "scene": "si-300-100um-0deg",
+  "seed": 78820,
+  "histories": 256,
+  "result": "exact/table/refined each pass in-process same-seed replay and match raw score and trajectory hashes across two separate processes"
+ },
+ "binary_fraction_qualification": {
+  "comparisons": 32,
+  "joint_confidence": 0.99,
+  "passed": 32,
+  "changed_pairs_total": 0,
+  "results": [
+   {
+    "case": "si-300-100um-0deg",
+    "variant": "table",
+    "complete": true,
+    "checks": {
+     "transmitted": {
+      "status": "passed",
+      "histories": 6144,
+      "changed_pairs": 0,
+      "difference": 0.0,
+      "difference_ci": [
+       -0.001312761611508193,
+       0.001312761611508193
+      ],
+      "margin": 0.002,
+      "discordance_probability_upper": 0.001312761611508193
+     },
+     "backscattered": {
+      "status": "passed",
+      "histories": 6144,
+      "changed_pairs": 0,
+      "difference": 0.0,
+      "difference_ci": [
+       -0.001312761611508193,
+       0.001312761611508193
+      ],
+      "margin": 0.002,
+      "discordance_probability_upper": 0.001312761611508193
+     }
+    }
+   },
+   {
+    "case": "si-300-100um-0deg",
+    "variant": "refined",
+    "complete": true,
+    "checks": {
+     "transmitted": {
+      "status": "passed",
+      "histories": 6144,
+      "changed_pairs": 0,
+      "difference": 0.0,
+      "difference_ci": [
+       -0.001312761611508193,
+       0.001312761611508193
+      ],
+      "margin": 0.002,
+      "discordance_probability_upper": 0.001312761611508193
+     },
+     "backscattered": {
+      "status": "passed",
+      "histories": 6144,
+      "changed_pairs": 0,
+      "difference": 0.0,
+      "difference_ci": [
+       -0.001312761611508193,
+       0.001312761611508193
+      ],
+      "margin": 0.002,
+      "discordance_probability_upper": 0.001312761611508193
+     }
+    }
+   },
+   {
+    "case": "w-300-10um-0deg",
+    "variant": "table",
+    "complete": true,
+    "checks": {
+     "transmitted": {
+      "status": "passed",
+      "histories": 6144,
+      "changed_pairs": 0,
+      "difference": 0.0,
+      "difference_ci": [
+       -0.001312761611508193,
+       0.001312761611508193
+      ],
+      "margin": 0.002,
+      "discordance_probability_upper": 0.001312761611508193
+     },
+     "backscattered": {
+      "status": "passed",
+      "histories": 6144,
+      "changed_pairs": 0,
+      "difference": 0.0,
+      "difference_ci": [
+       -0.001312761611508193,
+       0.001312761611508193
+      ],
+      "margin": 0.002,
+      "discordance_probability_upper": 0.001312761611508193
+     }
+    }
+   },
+   {
+    "case": "w-300-10um-0deg",
+    "variant": "refined",
+    "complete": true,
+    "checks": {
+     "transmitted": {
+      "status": "passed",
+      "histories": 6144,
+      "changed_pairs": 0,
+      "difference": 0.0,
+      "difference_ci": [
+       -0.001312761611508193,
+       0.001312761611508193
+      ],
+      "margin": 0.002,
+      "discordance_probability_upper": 0.001312761611508193
+     },
+     "backscattered": {
+      "status": "passed",
+      "histories": 6144,
+      "changed_pairs": 0,
+      "difference": 0.0,
+      "difference_ci": [
+       -0.001312761611508193,
+       0.001312761611508193
+      ],
+      "margin": 0.002,
+      "discordance_probability_upper": 0.001312761611508193
+     }
+    }
+   },
+   {
+    "case": "si-800-100um-0deg",
+    "variant": "table",
+    "complete": true,
+    "checks": {
+     "transmitted": {
+      "status": "passed",
+      "histories": 6144,
+      "changed_pairs": 0,
+      "difference": 0.0,
+      "difference_ci": [
+       -0.001312761611508193,
+       0.001312761611508193
+      ],
+      "margin": 0.002,
+      "discordance_probability_upper": 0.001312761611508193
+     },
+     "backscattered": {
+      "status": "passed",
+      "histories": 6144,
+      "changed_pairs": 0,
+      "difference": 0.0,
+      "difference_ci": [
+       -0.001312761611508193,
+       0.001312761611508193
+      ],
+      "margin": 0.002,
+      "discordance_probability_upper": 0.001312761611508193
+     }
+    }
+   },
+   {
+    "case": "si-800-100um-0deg",
+    "variant": "refined",
+    "complete": true,
+    "checks": {
+     "transmitted": {
+      "status": "passed",
+      "histories": 6144,
+      "changed_pairs": 0,
+      "difference": 0.0,
+      "difference_ci": [
+       -0.001312761611508193,
+       0.001312761611508193
+      ],
+      "margin": 0.002,
+      "discordance_probability_upper": 0.001312761611508193
+     },
+     "backscattered": {
+      "status": "passed",
+      "histories": 6144,
+      "changed_pairs": 0,
+      "difference": 0.0,
+      "difference_ci": [
+       -0.001312761611508193,
+       0.001312761611508193
+      ],
+      "margin": 0.002,
+      "discordance_probability_upper": 0.001312761611508193
+     }
+    }
+   },
+   {
+    "case": "w-800-10um-0deg",
+    "variant": "table",
+    "complete": true,
+    "checks": {
+     "transmitted": {
+      "status": "passed",
+      "histories": 6144,
+      "changed_pairs": 0,
+      "difference": 0.0,
+      "difference_ci": [
+       -0.001312761611508193,
+       0.001312761611508193
+      ],
+      "margin": 0.002,
+      "discordance_probability_upper": 0.001312761611508193
+     },
+     "backscattered": {
+      "status": "passed",
+      "histories": 6144,
+      "changed_pairs": 0,
+      "difference": 0.0,
+      "difference_ci": [
+       -0.001312761611508193,
+       0.001312761611508193
+      ],
+      "margin": 0.002,
+      "discordance_probability_upper": 0.001312761611508193
+     }
+    }
+   },
+   {
+    "case": "w-800-10um-0deg",
+    "variant": "refined",
+    "complete": true,
+    "checks": {
+     "transmitted": {
+      "status": "passed",
+      "histories": 6144,
+      "changed_pairs": 0,
+      "difference": 0.0,
+      "difference_ci": [
+       -0.001312761611508193,
+       0.001312761611508193
+      ],
+      "margin": 0.002,
+      "discordance_probability_upper": 0.001312761611508193
+     },
+     "backscattered": {
+      "status": "passed",
+      "histories": 6144,
+      "changed_pairs": 0,
+      "difference": 0.0,
+      "difference_ci": [
+       -0.001312761611508193,
+       0.001312761611508193
+      ],
+      "margin": 0.002,
+      "discordance_probability_upper": 0.001312761611508193
+     }
+    }
+   },
+   {
+    "case": "si-100-1um-0deg",
+    "variant": "table",
+    "complete": true,
+    "checks": {
+     "transmitted": {
+      "status": "passed",
+      "histories": 6144,
+      "changed_pairs": 0,
+      "difference": 0.0,
+      "difference_ci": [
+       -0.001312761611508193,
+       0.001312761611508193
+      ],
+      "margin": 0.002,
+      "discordance_probability_upper": 0.001312761611508193
+     },
+     "backscattered": {
+      "status": "passed",
+      "histories": 6144,
+      "changed_pairs": 0,
+      "difference": 0.0,
+      "difference_ci": [
+       -0.001312761611508193,
+       0.001312761611508193
+      ],
+      "margin": 0.002,
+      "discordance_probability_upper": 0.001312761611508193
+     }
+    }
+   },
+   {
+    "case": "si-100-1um-0deg",
+    "variant": "refined",
+    "complete": true,
+    "checks": {
+     "transmitted": {
+      "status": "passed",
+      "histories": 6144,
+      "changed_pairs": 0,
+      "difference": 0.0,
+      "difference_ci": [
+       -0.001312761611508193,
+       0.001312761611508193
+      ],
+      "margin": 0.002,
+      "discordance_probability_upper": 0.001312761611508193
+     },
+     "backscattered": {
+      "status": "passed",
+      "histories": 6144,
+      "changed_pairs": 0,
+      "difference": 0.0,
+      "difference_ci": [
+       -0.001312761611508193,
+       0.001312761611508193
+      ],
+      "margin": 0.002,
+      "discordance_probability_upper": 0.001312761611508193
+     }
+    }
+   },
+   {
+    "case": "w-100-100um-75deg",
+    "variant": "table",
+    "complete": true,
+    "checks": {
+     "transmitted": {
+      "status": "passed",
+      "histories": 6144,
+      "changed_pairs": 0,
+      "difference": 0.0,
+      "difference_ci": [
+       -0.001312761611508193,
+       0.001312761611508193
+      ],
+      "margin": 0.002,
+      "discordance_probability_upper": 0.001312761611508193
+     },
+     "backscattered": {
+      "status": "passed",
+      "histories": 6144,
+      "changed_pairs": 0,
+      "difference": 0.0,
+      "difference_ci": [
+       -0.001312761611508193,
+       0.001312761611508193
+      ],
+      "margin": 0.002,
+      "discordance_probability_upper": 0.001312761611508193
+     }
+    }
+   },
+   {
+    "case": "w-100-100um-75deg",
+    "variant": "refined",
+    "complete": true,
+    "checks": {
+     "transmitted": {
+      "status": "passed",
+      "histories": 6144,
+      "changed_pairs": 0,
+      "difference": 0.0,
+      "difference_ci": [
+       -0.001312761611508193,
+       0.001312761611508193
+      ],
+      "margin": 0.002,
+      "discordance_probability_upper": 0.001312761611508193
+     },
+     "backscattered": {
+      "status": "passed",
+      "histories": 6144,
+      "changed_pairs": 0,
+      "difference": 0.0,
+      "difference_ci": [
+       -0.001312761611508193,
+       0.001312761611508193
+      ],
+      "margin": 0.002,
+      "discordance_probability_upper": 0.001312761611508193
+     }
+    }
+   },
+   {
+    "case": "si-300-100um-0deg:10000",
+    "variant": "table",
+    "complete": true,
+    "checks": {
+     "transmitted": {
+      "status": "passed",
+      "histories": 6144,
+      "changed_pairs": 0,
+      "difference": 0.0,
+      "difference_ci": [
+       -0.001312761611508193,
+       0.001312761611508193
+      ],
+      "margin": 0.002,
+      "discordance_probability_upper": 0.001312761611508193
+     },
+     "backscattered": {
+      "status": "passed",
+      "histories": 6144,
+      "changed_pairs": 0,
+      "difference": 0.0,
+      "difference_ci": [
+       -0.001312761611508193,
+       0.001312761611508193
+      ],
+      "margin": 0.002,
+      "discordance_probability_upper": 0.001312761611508193
+     }
+    }
+   },
+   {
+    "case": "si-300-100um-0deg:10000",
+    "variant": "refined",
+    "complete": true,
+    "checks": {
+     "transmitted": {
+      "status": "passed",
+      "histories": 6144,
+      "changed_pairs": 0,
+      "difference": 0.0,
+      "difference_ci": [
+       -0.001312761611508193,
+       0.001312761611508193
+      ],
+      "margin": 0.002,
+      "discordance_probability_upper": 0.001312761611508193
+     },
+     "backscattered": {
+      "status": "passed",
+      "histories": 6144,
+      "changed_pairs": 0,
+      "difference": 0.0,
+      "difference_ci": [
+       -0.001312761611508193,
+       0.001312761611508193
+      ],
+      "margin": 0.002,
+      "discordance_probability_upper": 0.001312761611508193
+     }
+    }
+   },
+   {
+    "case": "sio2-800kev-tr0.3-0deg-compound",
+    "variant": "table",
+    "complete": true,
+    "checks": {
+     "transmitted": {
+      "status": "passed",
+      "histories": 6144,
+      "changed_pairs": 0,
+      "difference": 0.0,
+      "difference_ci": [
+       -0.001312761611508193,
+       0.001312761611508193
+      ],
+      "margin": 0.002,
+      "discordance_probability_upper": 0.001312761611508193
+     },
+     "backscattered": {
+      "status": "passed",
+      "histories": 6144,
+      "changed_pairs": 0,
+      "difference": 0.0,
+      "difference_ci": [
+       -0.001312761611508193,
+       0.001312761611508193
+      ],
+      "margin": 0.002,
+      "discordance_probability_upper": 0.001312761611508193
+     }
+    }
+   },
+   {
+    "case": "sio2-800kev-tr0.3-0deg-compound",
+    "variant": "refined",
+    "complete": true,
+    "checks": {
+     "transmitted": {
+      "status": "passed",
+      "histories": 6144,
+      "changed_pairs": 0,
+      "difference": 0.0,
+      "difference_ci": [
+       -0.001312761611508193,
+       0.001312761611508193
+      ],
+      "margin": 0.002,
+      "discordance_probability_upper": 0.001312761611508193
+     },
+     "backscattered": {
+      "status": "passed",
+      "histories": 6144,
+      "changed_pairs": 0,
+      "difference": 0.0,
+      "difference_ci": [
+       -0.001312761611508193,
+       0.001312761611508193
+      ],
+      "margin": 0.002,
+      "discordance_probability_upper": 0.001312761611508193
+     }
+    }
+   }
+  ]
+ },
+ "continuous_screening": {
+  "note": "Post-run screening with the frozen moment-policy-788.json margins and rule on the held-out seeds; outside the held-out protocol's qualification scope. Fewer than 30 changed pairs is unresolved by the predeclared rule.",
+  "status_counts": {
+   "screening_pass": 44,
+   "unresolved": 52,
+   "fail": 0
+  },
+  "comparisons": [
+   {
+    "scene": "si-100-1um-0deg",
+    "cutoff_eV": 1000,
+    "variant": "table",
+    "paired_seeds": 3,
+    "complete_seed_set": true,
+    "histories": 6144,
+    "checks": {
+     "hard_count": {
+      "mean_difference": 0.0,
+      "confidence_interval": [
+       0.0,
+       0.0
+      ],
+      "margin": 3.255208333333333e-06,
+      "nonzero_differences": 0,
+      "status": "unresolved",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "photon_energy_keV_per_primary": {
+      "mean_difference": -6.506618883730016e-12,
+      "confidence_interval": [
+       -2.0613453909534307e-11,
+       7.600216142074277e-12
+      ],
+      "margin": 4.3776777419262174e-05,
+      "nonzero_differences": 2,
+      "status": "unresolved",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "path_length": {
+      "mean_difference": -7.569774436907059e-10,
+      "confidence_interval": [
+       -2.7362494918917537e-09,
+       1.2222946045103418e-09
+      ],
+      "margin": 20.56468136896282,
+      "nonzero_differences": 4307,
+      "status": "screening_pass",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "transmitted_energy_keV_per_primary": {
+      "mean_difference": 2.151456790500106e-11,
+      "confidence_interval": [
+       -1.5406953642014824e-11,
+       5.843608945201695e-11
+      ],
+      "margin": 0.19795149307772325,
+      "nonzero_differences": 6129,
+      "status": "screening_pass",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "transmitted": {
+      "mean_difference": 0.0,
+      "confidence_interval": [
+       0.0,
+       0.0
+      ],
+      "margin": 0.002,
+      "nonzero_differences": 0,
+      "status": "unresolved",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "backscattered": {
+      "mean_difference": 0.0,
+      "confidence_interval": [
+       0.0,
+       0.0
+      ],
+      "margin": 0.002,
+      "nonzero_differences": 0,
+      "status": "unresolved",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     }
+    },
+    "complete_warm_request_s": [
+     0.020041609182953835,
+     0.024835689924657345,
+     0.02528492221608758
+    ],
+    "exact_complete_warm_request_s": [
+     0.159529531840235,
+     0.1644551670178771,
+     0.1700470568612218
+    ],
+    "timing_limit": "three-seed pilot only; include all reductions; no production or equal-precision speedup"
+   },
+   {
+    "scene": "si-100-1um-0deg",
+    "cutoff_eV": 1000,
+    "variant": "refined",
+    "paired_seeds": 3,
+    "complete_seed_set": true,
+    "histories": 6144,
+    "checks": {
+     "hard_count": {
+      "mean_difference": 0.0,
+      "confidence_interval": [
+       0.0,
+       0.0
+      ],
+      "margin": 3.255208333333333e-06,
+      "nonzero_differences": 0,
+      "status": "unresolved",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "photon_energy_keV_per_primary": {
+      "mean_difference": -6.506618883730016e-12,
+      "confidence_interval": [
+       -2.0613453909534307e-11,
+       7.600216142074277e-12
+      ],
+      "margin": 4.3776777419262174e-05,
+      "nonzero_differences": 2,
+      "status": "unresolved",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "path_length": {
+      "mean_difference": -7.569774436907059e-10,
+      "confidence_interval": [
+       -2.7362494918917537e-09,
+       1.2222946045103418e-09
+      ],
+      "margin": 20.56468136896282,
+      "nonzero_differences": 4307,
+      "status": "screening_pass",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "transmitted_energy_keV_per_primary": {
+      "mean_difference": 2.1514475386415672e-11,
+      "confidence_interval": [
+       -1.540682167454828e-11,
+       5.843577244737962e-11
+      ],
+      "margin": 0.19795149307772325,
+      "nonzero_differences": 6129,
+      "status": "screening_pass",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "transmitted": {
+      "mean_difference": 0.0,
+      "confidence_interval": [
+       0.0,
+       0.0
+      ],
+      "margin": 0.002,
+      "nonzero_differences": 0,
+      "status": "unresolved",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "backscattered": {
+      "mean_difference": 0.0,
+      "confidence_interval": [
+       0.0,
+       0.0
+      ],
+      "margin": 0.002,
+      "nonzero_differences": 0,
+      "status": "unresolved",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     }
+    },
+    "complete_warm_request_s": [
+     0.01995953219011426,
+     0.024372757878154516,
+     0.025193156208842993
+    ],
+    "exact_complete_warm_request_s": [
+     0.159529531840235,
+     0.1644551670178771,
+     0.1700470568612218
+    ],
+    "timing_limit": "three-seed pilot only; include all reductions; no production or equal-precision speedup"
+   },
+   {
+    "scene": "si-300-100um-0deg",
+    "cutoff_eV": 1000,
+    "variant": "table",
+    "paired_seeds": 3,
+    "complete_seed_set": true,
+    "histories": 6144,
+    "checks": {
+     "hard_count": {
+      "mean_difference": 0.0,
+      "confidence_interval": [
+       0.0,
+       0.0
+      ],
+      "margin": 0.00015787760416666668,
+      "nonzero_differences": 0,
+      "status": "unresolved",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "photon_energy_keV_per_primary": {
+      "mean_difference": -4.541760559581438e-10,
+      "confidence_interval": [
+       -8.421748840523151e-10,
+       -6.617722786397248e-11
+      ],
+      "margin": 0.004826063940305822,
+      "nonzero_differences": 96,
+      "status": "screening_pass",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "path_length": {
+      "mean_difference": -1.586086331902455e-05,
+      "confidence_interval": [
+       -9.179539296101698e-05,
+       6.007366632296789e-05
+      ],
+      "margin": 3314.871581162037,
+      "nonzero_differences": 6139,
+      "status": "screening_pass",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "transmitted_energy_keV_per_primary": {
+      "mean_difference": 2.134889494354031e-09,
+      "confidence_interval": [
+       -1.8154949426017254e-09,
+       6.085273931309787e-09
+      ],
+      "margin": 0.3956111576876984,
+      "nonzero_differences": 5192,
+      "status": "screening_pass",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "transmitted": {
+      "mean_difference": 0.0,
+      "confidence_interval": [
+       0.0,
+       0.0
+      ],
+      "margin": 0.002,
+      "nonzero_differences": 0,
+      "status": "unresolved",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "backscattered": {
+      "mean_difference": 0.0,
+      "confidence_interval": [
+       0.0,
+       0.0
+      ],
+      "margin": 0.002,
+      "nonzero_differences": 0,
+      "status": "unresolved",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     }
+    },
+    "complete_warm_request_s": [
+     1.8232463020831347,
+     1.7664457033388317,
+     1.8469157270155847
+    ],
+    "exact_complete_warm_request_s": [
+     27.005009138025343,
+     26.13576027425006,
+     27.157037125900388
+    ],
+    "timing_limit": "three-seed pilot only; include all reductions; no production or equal-precision speedup"
+   },
+   {
+    "scene": "si-300-100um-0deg",
+    "cutoff_eV": 1000,
+    "variant": "refined",
+    "paired_seeds": 3,
+    "complete_seed_set": true,
+    "histories": 6144,
+    "checks": {
+     "hard_count": {
+      "mean_difference": 0.0,
+      "confidence_interval": [
+       0.0,
+       0.0
+      ],
+      "margin": 0.00015787760416666668,
+      "nonzero_differences": 0,
+      "status": "unresolved",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "photon_energy_keV_per_primary": {
+      "mean_difference": -3.5925916448195416e-10,
+      "confidence_interval": [
+       -6.276433899967222e-10,
+       -9.087493896718606e-11
+      ],
+      "margin": 0.004826063940305822,
+      "nonzero_differences": 96,
+      "status": "screening_pass",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "path_length": {
+      "mean_difference": -1.6744165103924995e-05,
+      "confidence_interval": [
+       -9.26424077451488e-05,
+       5.91540775372988e-05
+      ],
+      "margin": 3314.871581162037,
+      "nonzero_differences": 6139,
+      "status": "screening_pass",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "transmitted_energy_keV_per_primary": {
+      "mean_difference": 2.1342803664438823e-09,
+      "confidence_interval": [
+       -1.816100510899872e-09,
+       6.084661243787637e-09
+      ],
+      "margin": 0.3956111576876984,
+      "nonzero_differences": 5192,
+      "status": "screening_pass",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "transmitted": {
+      "mean_difference": 0.0,
+      "confidence_interval": [
+       0.0,
+       0.0
+      ],
+      "margin": 0.002,
+      "nonzero_differences": 0,
+      "status": "unresolved",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "backscattered": {
+      "mean_difference": 0.0,
+      "confidence_interval": [
+       0.0,
+       0.0
+      ],
+      "margin": 0.002,
+      "nonzero_differences": 0,
+      "status": "unresolved",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     }
+    },
+    "complete_warm_request_s": [
+     1.8138984702527523,
+     1.7708717589266598,
+     1.8487299559637904
+    ],
+    "exact_complete_warm_request_s": [
+     27.005009138025343,
+     26.13576027425006,
+     27.157037125900388
+    ],
+    "timing_limit": "three-seed pilot only; include all reductions; no production or equal-precision speedup"
+   },
+   {
+    "scene": "si-300-100um-0deg",
+    "cutoff_eV": 10000.0,
+    "variant": "table",
+    "paired_seeds": 3,
+    "complete_seed_set": true,
+    "histories": 6144,
+    "checks": {
+     "hard_count": {
+      "mean_difference": 0.0,
+      "confidence_interval": [
+       0.0,
+       0.0
+      ],
+      "margin": 6.510416666666667e-05,
+      "nonzero_differences": 0,
+      "status": "unresolved",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "photon_energy_keV_per_primary": {
+      "mean_difference": -2.565041298576339e-10,
+      "confidence_interval": [
+       -4.3950173493209727e-10,
+       -7.350652478317049e-11
+      ],
+      "margin": 0.0034916468836094145,
+      "nonzero_differences": 40,
+      "status": "screening_pass",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "path_length": {
+      "mean_difference": 0.00010404857525732798,
+      "confidence_interval": [
+       8.271291366911608e-05,
+       0.00012538423684553988
+      ],
+      "margin": 3314.097062581733,
+      "nonzero_differences": 6144,
+      "status": "screening_pass",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "transmitted_energy_keV_per_primary": {
+      "mean_difference": 1.6359122705205304e-08,
+      "confidence_interval": [
+       1.5178741524574764e-08,
+       1.7539503885835845e-08
+      ],
+      "margin": 0.396278329446421,
+      "nonzero_differences": 5202,
+      "status": "screening_pass",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "transmitted": {
+      "mean_difference": 0.0,
+      "confidence_interval": [
+       0.0,
+       0.0
+      ],
+      "margin": 0.002,
+      "nonzero_differences": 0,
+      "status": "unresolved",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "backscattered": {
+      "mean_difference": 0.0,
+      "confidence_interval": [
+       0.0,
+       0.0
+      ],
+      "margin": 0.002,
+      "nonzero_differences": 0,
+      "status": "unresolved",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     }
+    },
+    "complete_warm_request_s": [
+     1.8427057899534702,
+     1.8060202258639038,
+     1.8420474948361516
+    ],
+    "exact_complete_warm_request_s": [
+     26.89962171576917,
+     26.154828832950443,
+     27.413175916299224
+    ],
+    "timing_limit": "three-seed pilot only; include all reductions; no production or equal-precision speedup"
+   },
+   {
+    "scene": "si-300-100um-0deg",
+    "cutoff_eV": 10000.0,
+    "variant": "refined",
+    "paired_seeds": 3,
+    "complete_seed_set": true,
+    "histories": 6144,
+    "checks": {
+     "hard_count": {
+      "mean_difference": 0.0,
+      "confidence_interval": [
+       0.0,
+       0.0
+      ],
+      "margin": 6.510416666666667e-05,
+      "nonzero_differences": 0,
+      "status": "unresolved",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "photon_energy_keV_per_primary": {
+      "mean_difference": -2.572536344826644e-10,
+      "confidence_interval": [
+       -4.4061852977467553e-10,
+       -7.388873919065331e-11
+      ],
+      "margin": 0.0034916468836094145,
+      "nonzero_differences": 40,
+      "status": "screening_pass",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "path_length": {
+      "mean_difference": 7.798218720248921e-05,
+      "confidence_interval": [
+       5.924379576195036e-05,
+       9.672057864302806e-05
+      ],
+      "margin": 3314.097062581733,
+      "nonzero_differences": 6144,
+      "status": "screening_pass",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "transmitted_energy_keV_per_primary": {
+      "mean_difference": 1.565730478198431e-08,
+      "confidence_interval": [
+       1.454276044771498e-08,
+       1.6771849116253642e-08
+      ],
+      "margin": 0.396278329446421,
+      "nonzero_differences": 5202,
+      "status": "screening_pass",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "transmitted": {
+      "mean_difference": 0.0,
+      "confidence_interval": [
+       0.0,
+       0.0
+      ],
+      "margin": 0.002,
+      "nonzero_differences": 0,
+      "status": "unresolved",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "backscattered": {
+      "mean_difference": 0.0,
+      "confidence_interval": [
+       0.0,
+       0.0
+      ],
+      "margin": 0.002,
+      "nonzero_differences": 0,
+      "status": "unresolved",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     }
+    },
+    "complete_warm_request_s": [
+     1.8382113771513104,
+     1.7929917401634157,
+     1.84117233986035
+    ],
+    "exact_complete_warm_request_s": [
+     26.89962171576917,
+     26.154828832950443,
+     27.413175916299224
+    ],
+    "timing_limit": "three-seed pilot only; include all reductions; no production or equal-precision speedup"
+   },
+   {
+    "scene": "si-800-100um-0deg",
+    "cutoff_eV": 1000,
+    "variant": "table",
+    "paired_seeds": 3,
+    "complete_seed_set": true,
+    "histories": 6144,
+    "checks": {
+     "hard_count": {
+      "mean_difference": 0.0,
+      "confidence_interval": [
+       0.0,
+       0.0
+      ],
+      "margin": 0.00010579427083333334,
+      "nonzero_differences": 0,
+      "status": "unresolved",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "photon_energy_keV_per_primary": {
+      "mean_difference": -1.510425293229737e-10,
+      "confidence_interval": [
+       -3.017578186973624e-10,
+       -3.272399485850091e-13
+      ],
+      "margin": 0.006684356062855563,
+      "nonzero_differences": 65,
+      "status": "screening_pass",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "path_length": {
+      "mean_difference": -2.6242360794033934e-06,
+      "confidence_interval": [
+       -6.537032034149542e-06,
+       1.2885598753427558e-06
+      ],
+      "margin": 2168.8247592777216,
+      "nonzero_differences": 6143,
+      "status": "screening_pass",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "transmitted_energy_keV_per_primary": {
+      "mean_difference": 2.4650677749038508e-09,
+      "confidence_interval": [
+       2.2159327711525996e-09,
+       2.714202778655102e-09
+      ],
+      "margin": 1.5146590463317517,
+      "nonzero_differences": 6116,
+      "status": "screening_pass",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "transmitted": {
+      "mean_difference": 0.0,
+      "confidence_interval": [
+       0.0,
+       0.0
+      ],
+      "margin": 0.002,
+      "nonzero_differences": 0,
+      "status": "unresolved",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "backscattered": {
+      "mean_difference": 0.0,
+      "confidence_interval": [
+       0.0,
+       0.0
+      ],
+      "margin": 0.002,
+      "nonzero_differences": 0,
+      "status": "unresolved",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     }
+    },
+    "complete_warm_request_s": [
+     0.7861299449577928,
+     0.8088858257979155,
+     0.7605840330943465
+    ],
+    "exact_complete_warm_request_s": [
+     10.536184979137033,
+     10.55340704927221,
+     10.462794056162238
+    ],
+    "timing_limit": "three-seed pilot only; include all reductions; no production or equal-precision speedup"
+   },
+   {
+    "scene": "si-800-100um-0deg",
+    "cutoff_eV": 1000,
+    "variant": "refined",
+    "paired_seeds": 3,
+    "complete_seed_set": true,
+    "histories": 6144,
+    "checks": {
+     "hard_count": {
+      "mean_difference": 0.0,
+      "confidence_interval": [
+       0.0,
+       0.0
+      ],
+      "margin": 0.00010579427083333334,
+      "nonzero_differences": 0,
+      "status": "unresolved",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "photon_energy_keV_per_primary": {
+      "mean_difference": -1.510425293229737e-10,
+      "confidence_interval": [
+       -3.017578186973624e-10,
+       -3.272399485850091e-13
+      ],
+      "margin": 0.006684356062855563,
+      "nonzero_differences": 65,
+      "status": "screening_pass",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "path_length": {
+      "mean_difference": -2.6242360794033934e-06,
+      "confidence_interval": [
+       -6.537032034149542e-06,
+       1.2885598753427558e-06
+      ],
+      "margin": 2168.8247592777216,
+      "nonzero_differences": 6143,
+      "status": "screening_pass",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "transmitted_energy_keV_per_primary": {
+      "mean_difference": 2.4650677749038508e-09,
+      "confidence_interval": [
+       2.2159327711525996e-09,
+       2.714202778655102e-09
+      ],
+      "margin": 1.5146590463317517,
+      "nonzero_differences": 6116,
+      "status": "screening_pass",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "transmitted": {
+      "mean_difference": 0.0,
+      "confidence_interval": [
+       0.0,
+       0.0
+      ],
+      "margin": 0.002,
+      "nonzero_differences": 0,
+      "status": "unresolved",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "backscattered": {
+      "mean_difference": 0.0,
+      "confidence_interval": [
+       0.0,
+       0.0
+      ],
+      "margin": 0.002,
+      "nonzero_differences": 0,
+      "status": "unresolved",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     }
+    },
+    "complete_warm_request_s": [
+     0.7835359373129904,
+     0.7969176787883043,
+     0.762960908934474
+    ],
+    "exact_complete_warm_request_s": [
+     10.536184979137033,
+     10.55340704927221,
+     10.462794056162238
+    ],
+    "timing_limit": "three-seed pilot only; include all reductions; no production or equal-precision speedup"
+   },
+   {
+    "scene": "sio2-800kev-tr0.3-0deg-compound",
+    "cutoff_eV": 1000,
+    "variant": "table",
+    "paired_seeds": 3,
+    "complete_seed_set": true,
+    "histories": 6144,
+    "checks": {
+     "hard_count": {
+      "mean_difference": 0.0,
+      "confidence_interval": [
+       0.0,
+       0.0
+      ],
+      "margin": 0.0005289713541666666,
+      "nonzero_differences": 0,
+      "status": "unresolved",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "photon_energy_keV_per_primary": {
+      "mean_difference": -4.2091941181097065e-10,
+      "confidence_interval": [
+       -6.136518088091509e-10,
+       -2.2818701481279032e-10
+      ],
+      "margin": 0.026381314305896048,
+      "nonzero_differences": 320,
+      "status": "screening_pass",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "path_length": {
+      "mean_difference": 1.5835520969176287e-05,
+      "confidence_interval": [
+       -2.6708204329307295e-05,
+       5.837924626765987e-05
+      ],
+      "margin": 17090.249537427517,
+      "nonzero_differences": 6144,
+      "status": "screening_pass",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "transmitted_energy_keV_per_primary": {
+      "mean_difference": 9.609080643448639e-09,
+      "confidence_interval": [
+       8.119441013369995e-09,
+       1.1098720273527283e-08
+      ],
+      "margin": 0.8933109544891489,
+      "nonzero_differences": 5086,
+      "status": "screening_pass",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "transmitted": {
+      "mean_difference": 0.0,
+      "confidence_interval": [
+       0.0,
+       0.0
+      ],
+      "margin": 0.002,
+      "nonzero_differences": 0,
+      "status": "unresolved",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "backscattered": {
+      "mean_difference": 0.0,
+      "confidence_interval": [
+       0.0,
+       0.0
+      ],
+      "margin": 0.002,
+      "nonzero_differences": 0,
+      "status": "unresolved",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     }
+    },
+    "complete_warm_request_s": [
+     8.12373880064115,
+     7.891438371036202,
+     8.210725880693644
+    ],
+    "exact_complete_warm_request_s": [
+     182.78351754695177,
+     183.39932979410514,
+     185.21773736318573
+    ],
+    "timing_limit": "three-seed pilot only; include all reductions; no production or equal-precision speedup"
+   },
+   {
+    "scene": "sio2-800kev-tr0.3-0deg-compound",
+    "cutoff_eV": 1000,
+    "variant": "refined",
+    "paired_seeds": 3,
+    "complete_seed_set": true,
+    "histories": 6144,
+    "checks": {
+     "hard_count": {
+      "mean_difference": 0.0,
+      "confidence_interval": [
+       0.0,
+       0.0
+      ],
+      "margin": 0.0005289713541666666,
+      "nonzero_differences": 0,
+      "status": "unresolved",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "photon_energy_keV_per_primary": {
+      "mean_difference": -4.2093966015390355e-10,
+      "confidence_interval": [
+       -6.136798785617466e-10,
+       -2.2819944174606046e-10
+      ],
+      "margin": 0.026381314305896048,
+      "nonzero_differences": 320,
+      "status": "screening_pass",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "path_length": {
+      "mean_difference": 1.5629582113281987e-05,
+      "confidence_interval": [
+       -2.691202351851356e-05,
+       5.817118774507754e-05
+      ],
+      "margin": 17090.249537427517,
+      "nonzero_differences": 6144,
+      "status": "screening_pass",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "transmitted_energy_keV_per_primary": {
+      "mean_difference": 9.60872509799445e-09,
+      "confidence_interval": [
+       8.119119659816825e-09,
+       1.1098330536172074e-08
+      ],
+      "margin": 0.8933109544891489,
+      "nonzero_differences": 5086,
+      "status": "screening_pass",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "transmitted": {
+      "mean_difference": 0.0,
+      "confidence_interval": [
+       0.0,
+       0.0
+      ],
+      "margin": 0.002,
+      "nonzero_differences": 0,
+      "status": "unresolved",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "backscattered": {
+      "mean_difference": 0.0,
+      "confidence_interval": [
+       0.0,
+       0.0
+      ],
+      "margin": 0.002,
+      "nonzero_differences": 0,
+      "status": "unresolved",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     }
+    },
+    "complete_warm_request_s": [
+     8.057088028639555,
+     8.026036463677883,
+     8.167115500662476
+    ],
+    "exact_complete_warm_request_s": [
+     182.78351754695177,
+     183.39932979410514,
+     185.21773736318573
+    ],
+    "timing_limit": "three-seed pilot only; include all reductions; no production or equal-precision speedup"
+   },
+   {
+    "scene": "w-100-100um-75deg",
+    "cutoff_eV": 1000,
+    "variant": "table",
+    "paired_seeds": 3,
+    "complete_seed_set": true,
+    "histories": 6144,
+    "checks": {
+     "hard_count": {
+      "mean_difference": 0.0,
+      "confidence_interval": [
+       0.0,
+       0.0
+      ],
+      "margin": 0.0002945963541666667,
+      "nonzero_differences": 0,
+      "status": "unresolved",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "photon_energy_keV_per_primary": {
+      "mean_difference": -6.157036786157722e-10,
+      "confidence_interval": [
+       -9.398158572615968e-10,
+       -2.9159149996994763e-10
+      ],
+      "margin": 0.004096753199410721,
+      "nonzero_differences": 175,
+      "status": "screening_pass",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "path_length": {
+      "mean_difference": 2.1390254256227945e-06,
+      "confidence_interval": [
+       7.75919964903424e-07,
+       3.5021308863421652e-06
+      ],
+      "margin": 111.26394962673402,
+      "nonzero_differences": 6053,
+      "status": "screening_pass",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "transmitted_energy_keV_per_primary": {
+      "mean_difference": 0.0,
+      "confidence_interval": [
+       0.0,
+       0.0
+      ],
+      "margin": 0.0,
+      "nonzero_differences": 0,
+      "status": "unresolved",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "transmitted": {
+      "mean_difference": 0.0,
+      "confidence_interval": [
+       0.0,
+       0.0
+      ],
+      "margin": 0.002,
+      "nonzero_differences": 0,
+      "status": "unresolved",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "backscattered": {
+      "mean_difference": 0.0,
+      "confidence_interval": [
+       0.0,
+       0.0
+      ],
+      "margin": 0.002,
+      "nonzero_differences": 0,
+      "status": "unresolved",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     }
+    },
+    "complete_warm_request_s": [
+     1.6972121666185558,
+     1.802704802248627,
+     1.76387825794518
+    ],
+    "exact_complete_warm_request_s": [
+     25.27584596304223,
+     26.374901779927313,
+     26.2127770697698
+    ],
+    "timing_limit": "three-seed pilot only; include all reductions; no production or equal-precision speedup"
+   },
+   {
+    "scene": "w-100-100um-75deg",
+    "cutoff_eV": 1000,
+    "variant": "refined",
+    "paired_seeds": 3,
+    "complete_seed_set": true,
+    "histories": 6144,
+    "checks": {
+     "hard_count": {
+      "mean_difference": 0.0,
+      "confidence_interval": [
+       0.0,
+       0.0
+      ],
+      "margin": 0.0002945963541666667,
+      "nonzero_differences": 0,
+      "status": "unresolved",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "photon_energy_keV_per_primary": {
+      "mean_difference": -6.156545625226351e-10,
+      "confidence_interval": [
+       -9.397521203626435e-10,
+       -2.9155700468262674e-10
+      ],
+      "margin": 0.004096753199410721,
+      "nonzero_differences": 175,
+      "status": "screening_pass",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "path_length": {
+      "mean_difference": 2.1795255166073835e-06,
+      "confidence_interval": [
+       8.165119189362265e-07,
+       3.5425391142785406e-06
+      ],
+      "margin": 111.26394962673402,
+      "nonzero_differences": 6053,
+      "status": "screening_pass",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "transmitted_energy_keV_per_primary": {
+      "mean_difference": 0.0,
+      "confidence_interval": [
+       0.0,
+       0.0
+      ],
+      "margin": 0.0,
+      "nonzero_differences": 0,
+      "status": "unresolved",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "transmitted": {
+      "mean_difference": 0.0,
+      "confidence_interval": [
+       0.0,
+       0.0
+      ],
+      "margin": 0.002,
+      "nonzero_differences": 0,
+      "status": "unresolved",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "backscattered": {
+      "mean_difference": 0.0,
+      "confidence_interval": [
+       0.0,
+       0.0
+      ],
+      "margin": 0.002,
+      "nonzero_differences": 0,
+      "status": "unresolved",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     }
+    },
+    "complete_warm_request_s": [
+     1.697301883250475,
+     1.8077291739173234,
+     1.764095630031079
+    ],
+    "exact_complete_warm_request_s": [
+     25.27584596304223,
+     26.374901779927313,
+     26.2127770697698
+    ],
+    "timing_limit": "three-seed pilot only; include all reductions; no production or equal-precision speedup"
+   },
+   {
+    "scene": "w-300-10um-0deg",
+    "cutoff_eV": 1000,
+    "variant": "table",
+    "paired_seeds": 3,
+    "complete_seed_set": true,
+    "histories": 6144,
+    "checks": {
+     "hard_count": {
+      "mean_difference": 0.0,
+      "confidence_interval": [
+       0.0,
+       0.0
+      ],
+      "margin": 0.0007942708333333334,
+      "nonzero_differences": 0,
+      "status": "unresolved",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "photon_energy_keV_per_primary": {
+      "mean_difference": -5.011451812703358e-10,
+      "confidence_interval": [
+       -7.102928106154521e-10,
+       -2.9199755192521957e-10
+      ],
+      "margin": 0.02659676726665154,
+      "nonzero_differences": 460,
+      "status": "screening_pass",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "path_length": {
+      "mean_difference": 1.0325759208636617e-05,
+      "confidence_interval": [
+       6.250249771201918e-06,
+       1.4401268646071316e-05
+      ],
+      "margin": 463.5632406370249,
+      "nonzero_differences": 6143,
+      "status": "screening_pass",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "transmitted_energy_keV_per_primary": {
+      "mean_difference": 1.174519038161607e-09,
+      "confidence_interval": [
+       2.973879086206016e-10,
+       2.0516501677026123e-09
+      ],
+      "margin": 0.26460653725907574,
+      "nonzero_differences": 3329,
+      "status": "screening_pass",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "transmitted": {
+      "mean_difference": 0.0,
+      "confidence_interval": [
+       0.0,
+       0.0
+      ],
+      "margin": 0.002,
+      "nonzero_differences": 0,
+      "status": "unresolved",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "backscattered": {
+      "mean_difference": 0.0,
+      "confidence_interval": [
+       0.0,
+       0.0
+      ],
+      "margin": 0.002,
+      "nonzero_differences": 0,
+      "status": "unresolved",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     }
+    },
+    "complete_warm_request_s": [
+     3.3863962409086525,
+     3.4565487122163177,
+     3.37214542273432
+    ],
+    "exact_complete_warm_request_s": [
+     49.49784287670627,
+     50.44274127390236,
+     49.45155410422012
+    ],
+    "timing_limit": "three-seed pilot only; include all reductions; no production or equal-precision speedup"
+   },
+   {
+    "scene": "w-300-10um-0deg",
+    "cutoff_eV": 1000,
+    "variant": "refined",
+    "paired_seeds": 3,
+    "complete_seed_set": true,
+    "histories": 6144,
+    "checks": {
+     "hard_count": {
+      "mean_difference": 0.0,
+      "confidence_interval": [
+       0.0,
+       0.0
+      ],
+      "margin": 0.0007942708333333334,
+      "nonzero_differences": 0,
+      "status": "unresolved",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "photon_energy_keV_per_primary": {
+      "mean_difference": -5.011451812703358e-10,
+      "confidence_interval": [
+       -7.102928106154521e-10,
+       -2.9199755192521957e-10
+      ],
+      "margin": 0.02659676726665154,
+      "nonzero_differences": 460,
+      "status": "screening_pass",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "path_length": {
+      "mean_difference": 1.0330440535370281e-05,
+      "confidence_interval": [
+       6.25487074741676e-06,
+       1.4406010323323802e-05
+      ],
+      "margin": 463.5632406370249,
+      "nonzero_differences": 6143,
+      "status": "screening_pass",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "transmitted_energy_keV_per_primary": {
+      "mean_difference": 1.1745396131385144e-09,
+      "confidence_interval": [
+       2.9740132851993365e-10,
+       2.051677897757095e-09
+      ],
+      "margin": 0.26460653725907574,
+      "nonzero_differences": 3329,
+      "status": "screening_pass",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "transmitted": {
+      "mean_difference": 0.0,
+      "confidence_interval": [
+       0.0,
+       0.0
+      ],
+      "margin": 0.002,
+      "nonzero_differences": 0,
+      "status": "unresolved",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "backscattered": {
+      "mean_difference": 0.0,
+      "confidence_interval": [
+       0.0,
+       0.0
+      ],
+      "margin": 0.002,
+      "nonzero_differences": 0,
+      "status": "unresolved",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     }
+    },
+    "complete_warm_request_s": [
+     3.4022393147461116,
+     3.7352369190193713,
+     3.390550686046481
+    ],
+    "exact_complete_warm_request_s": [
+     49.49784287670627,
+     50.44274127390236,
+     49.45155410422012
+    ],
+    "timing_limit": "three-seed pilot only; include all reductions; no production or equal-precision speedup"
+   },
+   {
+    "scene": "w-800-10um-0deg",
+    "cutoff_eV": 1000,
+    "variant": "table",
+    "paired_seeds": 3,
+    "complete_seed_set": true,
+    "histories": 6144,
+    "checks": {
+     "hard_count": {
+      "mean_difference": 0.0,
+      "confidence_interval": [
+       0.0,
+       0.0
+      ],
+      "margin": 0.00041178385416666663,
+      "nonzero_differences": 0,
+      "status": "unresolved",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "photon_energy_keV_per_primary": {
+      "mean_difference": -2.0250694585486942e-10,
+      "confidence_interval": [
+       -3.0894999948105863e-10,
+       -9.606389222868021e-11
+      ],
+      "margin": 0.03330991588957061,
+      "nonzero_differences": 245,
+      "status": "screening_pass",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "path_length": {
+      "mean_difference": 4.7106355038906145e-07,
+      "confidence_interval": [
+       -1.5741259678838405e-06,
+       2.5162530686619634e-06
+      ],
+      "margin": 293.506002534894,
+      "nonzero_differences": 6144,
+      "status": "screening_pass",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "transmitted_energy_keV_per_primary": {
+      "mean_difference": 1.0702163414736768e-08,
+      "confidence_interval": [
+       1.0268812400770587e-08,
+       1.113551442870295e-08
+      ],
+      "margin": 1.4129108947167832,
+      "nonzero_differences": 5634,
+      "status": "screening_pass",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "transmitted": {
+      "mean_difference": 0.0,
+      "confidence_interval": [
+       0.0,
+       0.0
+      ],
+      "margin": 0.002,
+      "nonzero_differences": 0,
+      "status": "unresolved",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "backscattered": {
+      "mean_difference": 0.0,
+      "confidence_interval": [
+       0.0,
+       0.0
+      ],
+      "margin": 0.002,
+      "nonzero_differences": 0,
+      "status": "unresolved",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     }
+    },
+    "complete_warm_request_s": [
+     1.4792725211009383,
+     1.4868569620884955,
+     1.4851428386755288
+    ],
+    "exact_complete_warm_request_s": [
+     20.770980936009437,
+     21.005109323188663,
+     20.886869010981172
+    ],
+    "timing_limit": "three-seed pilot only; include all reductions; no production or equal-precision speedup"
+   },
+   {
+    "scene": "w-800-10um-0deg",
+    "cutoff_eV": 1000,
+    "variant": "refined",
+    "paired_seeds": 3,
+    "complete_seed_set": true,
+    "histories": 6144,
+    "checks": {
+     "hard_count": {
+      "mean_difference": 0.0,
+      "confidence_interval": [
+       0.0,
+       0.0
+      ],
+      "margin": 0.00041178385416666663,
+      "nonzero_differences": 0,
+      "status": "unresolved",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "photon_energy_keV_per_primary": {
+      "mean_difference": -2.0250694585486942e-10,
+      "confidence_interval": [
+       -3.0894999948105863e-10,
+       -9.606389222868021e-11
+      ],
+      "margin": 0.03330991588957061,
+      "nonzero_differences": 245,
+      "status": "screening_pass",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "path_length": {
+      "mean_difference": 4.632527151512041e-07,
+      "confidence_interval": [
+       -1.5778505421650528e-06,
+       2.504355972467461e-06
+      ],
+      "margin": 293.506002534894,
+      "nonzero_differences": 6144,
+      "status": "screening_pass",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "transmitted_energy_keV_per_primary": {
+      "mean_difference": 1.0530679023235123e-08,
+      "confidence_interval": [
+       1.0119541218017441e-08,
+       1.0941816828452805e-08
+      ],
+      "margin": 1.4129108947167832,
+      "nonzero_differences": 5634,
+      "status": "screening_pass",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "transmitted": {
+      "mean_difference": 0.0,
+      "confidence_interval": [
+       0.0,
+       0.0
+      ],
+      "margin": 0.002,
+      "nonzero_differences": 0,
+      "status": "unresolved",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     },
+     "backscattered": {
+      "mean_difference": 0.0,
+      "confidence_interval": [
+       0.0,
+       0.0
+      ],
+      "margin": 0.002,
+      "nonzero_differences": 0,
+      "status": "unresolved",
+      "limitation": "Student-t paired pilot interval; sparse changes/zero variance unresolved; no production qualification"
+     }
+    },
+    "complete_warm_request_s": [
+     1.4853751100599766,
+     1.4880864932201803,
+     1.4666660479269922
+    ],
+    "exact_complete_warm_request_s": [
+     20.770980936009437,
+     21.005109323188663,
+     20.886869010981172
+    ],
+    "timing_limit": "three-seed pilot only; include all reductions; no production or equal-precision speedup"
+   }
+  ]
+ },
+ "diagnostic_request_ratio_exact_over_variant": {
+  "si-300-100um-0deg": {
+   "table": [
+    14.811,
+    14.796,
+    14.704
+   ],
+   "refined": [
+    14.888,
+    14.759,
+    14.69
+   ]
+  },
+  "w-300-10um-0deg": {
+   "table": [
+    14.617,
+    14.593,
+    14.665
+   ],
+   "refined": [
+    14.549,
+    13.505,
+    14.585
+   ]
+  },
+  "si-800-100um-0deg": {
+   "table": [
+    13.403,
+    13.047,
+    13.756
+   ],
+   "refined": [
+    13.447,
+    13.243,
+    13.713
+   ]
+  },
+  "w-800-10um-0deg": {
+   "table": [
+    14.041,
+    14.127,
+    14.064
+   ],
+   "refined": [
+    13.984,
+    14.116,
+    14.241
+   ]
+  },
+  "si-100-1um-0deg": {
+   "table": [
+    7.96,
+    6.622,
+    6.725
+   ],
+   "refined": [
+    7.993,
+    6.747,
+    6.75
+   ]
+  },
+  "w-100-100um-75deg": {
+   "table": [
+    14.893,
+    14.631,
+    14.861
+   ],
+   "refined": [
+    14.892,
+    14.59,
+    14.859
+   ]
+  },
+  "si-300-100um-0deg:10000": {
+   "table": [
+    14.598,
+    14.482,
+    14.882
+   ],
+   "refined": [
+    14.634,
+    14.587,
+    14.889
+   ]
+  },
+  "sio2-800kev-tr0.3-0deg-compound": {
+   "table": [
+    22.5,
+    23.24,
+    22.558
+   ],
+   "refined": [
+    22.686,
+    22.851,
+    22.678
+   ]
+  }
+ },
+ "interpretation": "Shipped CPU table and refined policies qualify both predeclared binary endpoints in every held-out case (32/32, zero discordant pairs in 6144 paired histories each). Path length and exit energy screen inside margins wherever particles exit. Hard count changes in zero pairs everywhere, so it stays unresolved by the frozen rule, not failed. Per-track exit-energy differences from exact are at most ~3e-7 keV. CPU request ratios are single-process diagnostics on qlmc-ace, not production or equal-precision speedups.",
+ "runs": [
+  {
+   "file": "si-100-1um-0deg-78821-exact.json",
+   "variant": "exact",
+   "seed": 78821,
+   "cutoff_eV": 1000,
+   "request_s": 0.159529531840235,
+   "raw_scores_sha256": "242412d31f4bb89d515b1bc903c245a8e8da772c632c2f314df319e15fc2a171",
+   "moment_results": [
+    [
+     "exact",
+     null
+    ]
+   ],
+   "preparations": []
+  },
+  {
+   "file": "si-100-1um-0deg-78821-refined.json",
+   "variant": "refined",
+   "seed": 78821,
+   "cutoff_eV": 1000,
+   "request_s": 0.01995953219011426,
+   "raw_scores_sha256": "18861cdf903aa47ce8b39e0ea9eb3f695187869a55ba12d5483ffb918baeec92",
+   "moment_results": [
+    [
+     "radiative-moments-v1/positive-linear-log-energy-v1/rtol2e-4",
+     "8c28bcf7eac70af14790778a71bd1371c4b8ee92b22619555d8574a835874d07"
+    ]
+   ],
+   "preparations": [
+    {
+     "digest": "19c09fcecc3069a9aa16297e05b07aa048b8c1f1626befef721910e2309fff9e",
+     "held_out_max_error_fraction": [
+      0.2440747054427261
+     ],
+     "build_s": 0.03788598394021392,
+     "nodes": [
+      298
+     ]
+    }
+   ]
+  },
+  {
+   "file": "si-100-1um-0deg-78821-table.json",
+   "variant": "table",
+   "seed": 78821,
+   "cutoff_eV": 1000,
+   "request_s": 0.020041609182953835,
+   "raw_scores_sha256": "18861cdf903aa47ce8b39e0ea9eb3f695187869a55ba12d5483ffb918baeec92",
+   "moment_results": [
+    [
+     "radiative-moments-v1/positive-linear-log-energy-v1/rtol2e-4",
+     "5a0bea8574063d37c63f28bc245d71cd19442f6f8ccb10a836bb13c3d8fa489f"
+    ]
+   ],
+   "preparations": [
+    {
+     "digest": "8201c2a81375500c9066e5581e76f122c2e830d0a83cc2318328233596b8c8e3",
+     "held_out_max_error_fraction": [
+      0.20596583838238644
+     ],
+     "build_s": 0.035980630200356245,
+     "nodes": [
+      166
+     ]
+    }
+   ]
+  },
+  {
+   "file": "si-100-1um-0deg-78822-exact.json",
+   "variant": "exact",
+   "seed": 78822,
+   "cutoff_eV": 1000,
+   "request_s": 0.1644551670178771,
+   "raw_scores_sha256": "975d2b89dfafd64236910130cd7ef6b3b18598405ba852d50c698fbd4773b013",
+   "moment_results": [
+    [
+     "exact",
+     null
+    ]
+   ],
+   "preparations": []
+  },
+  {
+   "file": "si-100-1um-0deg-78822-refined.json",
+   "variant": "refined",
+   "seed": 78822,
+   "cutoff_eV": 1000,
+   "request_s": 0.024372757878154516,
+   "raw_scores_sha256": "f78de57d1ad3a9540daba00a86b2657cecdfcc2b7d970c7ec6b5d6a5b2f8bc3d",
+   "moment_results": [
+    [
+     "radiative-moments-v1/positive-linear-log-energy-v1/rtol2e-4",
+     "8c28bcf7eac70af14790778a71bd1371c4b8ee92b22619555d8574a835874d07"
+    ]
+   ],
+   "preparations": [
+    {
+     "digest": "19c09fcecc3069a9aa16297e05b07aa048b8c1f1626befef721910e2309fff9e",
+     "held_out_max_error_fraction": [
+      0.2440747054427261
+     ],
+     "build_s": 0.037773529067635536,
+     "nodes": [
+      298
+     ]
+    }
+   ]
+  },
+  {
+   "file": "si-100-1um-0deg-78822-table.json",
+   "variant": "table",
+   "seed": 78822,
+   "cutoff_eV": 1000,
+   "request_s": 0.024835689924657345,
+   "raw_scores_sha256": "f78de57d1ad3a9540daba00a86b2657cecdfcc2b7d970c7ec6b5d6a5b2f8bc3d",
+   "moment_results": [
+    [
+     "radiative-moments-v1/positive-linear-log-energy-v1/rtol2e-4",
+     "5a0bea8574063d37c63f28bc245d71cd19442f6f8ccb10a836bb13c3d8fa489f"
+    ]
+   ],
+   "preparations": [
+    {
+     "digest": "8201c2a81375500c9066e5581e76f122c2e830d0a83cc2318328233596b8c8e3",
+     "held_out_max_error_fraction": [
+      0.20596583838238644
+     ],
+     "build_s": 0.03561542369425297,
+     "nodes": [
+      166
+     ]
+    }
+   ]
+  },
+  {
+   "file": "si-100-1um-0deg-78823-exact.json",
+   "variant": "exact",
+   "seed": 78823,
+   "cutoff_eV": 1000,
+   "request_s": 0.1700470568612218,
+   "raw_scores_sha256": "26e8be32400d2ea1d98a05c17aef3686ec84f8c29d9aadbd7528762c23774f00",
+   "moment_results": [
+    [
+     "exact",
+     null
+    ]
+   ],
+   "preparations": []
+  },
+  {
+   "file": "si-100-1um-0deg-78823-refined.json",
+   "variant": "refined",
+   "seed": 78823,
+   "cutoff_eV": 1000,
+   "request_s": 0.025193156208842993,
+   "raw_scores_sha256": "7bbd5ff62b833081a6fc5a97e3bc50332e7f715d6a81bd1002314b5b4a15d67d",
+   "moment_results": [
+    [
+     "radiative-moments-v1/positive-linear-log-energy-v1/rtol2e-4",
+     "8c28bcf7eac70af14790778a71bd1371c4b8ee92b22619555d8574a835874d07"
+    ]
+   ],
+   "preparations": [
+    {
+     "digest": "19c09fcecc3069a9aa16297e05b07aa048b8c1f1626befef721910e2309fff9e",
+     "held_out_max_error_fraction": [
+      0.2440747054427261
+     ],
+     "build_s": 0.038212550804018974,
+     "nodes": [
+      298
+     ]
+    }
+   ]
+  },
+  {
+   "file": "si-100-1um-0deg-78823-table.json",
+   "variant": "table",
+   "seed": 78823,
+   "cutoff_eV": 1000,
+   "request_s": 0.02528492221608758,
+   "raw_scores_sha256": "860a541aaddc8f667ac429a553a4353b2e685882e6dd4cec9c701b78c2ef8f82",
+   "moment_results": [
+    [
+     "radiative-moments-v1/positive-linear-log-energy-v1/rtol2e-4",
+     "5a0bea8574063d37c63f28bc245d71cd19442f6f8ccb10a836bb13c3d8fa489f"
+    ]
+   ],
+   "preparations": [
+    {
+     "digest": "8201c2a81375500c9066e5581e76f122c2e830d0a83cc2318328233596b8c8e3",
+     "held_out_max_error_fraction": [
+      0.20596583838238644
+     ],
+     "build_s": 0.03647411009296775,
+     "nodes": [
+      166
+     ]
+    }
+   ]
+  },
+  {
+   "file": "si-300-100um-0deg-78821-exact.json",
+   "variant": "exact",
+   "seed": 78821,
+   "cutoff_eV": 1000,
+   "request_s": 27.005009138025343,
+   "raw_scores_sha256": "e13d657eb0c24bdaec3170756d206200bc60d6d831beb816f04ed3b7c22490d9",
+   "moment_results": [
+    [
+     "exact",
+     null
+    ]
+   ],
+   "preparations": []
+  },
+  {
+   "file": "si-300-100um-0deg-78821-refined.json",
+   "variant": "refined",
+   "seed": 78821,
+   "cutoff_eV": 1000,
+   "request_s": 1.8138984702527523,
+   "raw_scores_sha256": "e541cf308c68aaca1e34d3b24434418e4db10703fdc6070d13ae60833bcaae15",
+   "moment_results": [
+    [
+     "radiative-moments-v1/positive-linear-log-energy-v1/rtol2e-4",
+     "0bf5690e24848bab71a53d608c6208252471498ad143154c8fd37725f1fb03d2"
+    ]
+   ],
+   "preparations": [
+    {
+     "digest": "1fa564c48cb28b9740039e4970fc48de2d479dc7c84d49de37bad2ebd94f932f",
+     "held_out_max_error_fraction": [
+      0.2438659817428869
+     ],
+     "build_s": 0.040114395786076784,
+     "nodes": [
+      378
+     ]
+    }
+   ]
+  },
+  {
+   "file": "si-300-100um-0deg-78821-table.json",
+   "variant": "table",
+   "seed": 78821,
+   "cutoff_eV": 1000,
+   "request_s": 1.8232463020831347,
+   "raw_scores_sha256": "d834599a18107aa54e9004f19d79e99a7fe379153fa146ee0e9ff42d51235b7d",
+   "moment_results": [
+    [
+     "radiative-moments-v1/positive-linear-log-energy-v1/rtol2e-4",
+     "89daa95ef6358bda28245b6a049d3eb7e19f78795e9a3b4d288663824b650806"
+    ]
+   ],
+   "preparations": [
+    {
+     "digest": "089290d5db3fdb83c85086865d8ba9ed8282f564865e7009430a697fdd8ef6ba",
+     "held_out_max_error_fraction": [
+      0.20598760999820137
+     ],
+     "build_s": 0.03642729204148054,
+     "nodes": [
+      246
+     ]
+    }
+   ]
+  },
+  {
+   "file": "si-300-100um-0deg-78822-exact.json",
+   "variant": "exact",
+   "seed": 78822,
+   "cutoff_eV": 1000,
+   "request_s": 26.13576027425006,
+   "raw_scores_sha256": "bd31e760f9f54932f754516f20865d1ae31b5b9e0f8a0df5ec5d51db339b1786",
+   "moment_results": [
+    [
+     "exact",
+     null
+    ]
+   ],
+   "preparations": []
+  },
+  {
+   "file": "si-300-100um-0deg-78822-refined.json",
+   "variant": "refined",
+   "seed": 78822,
+   "cutoff_eV": 1000,
+   "request_s": 1.7708717589266598,
+   "raw_scores_sha256": "b2e5cf051a7a052fadbe639dd52d6367d4ea70d247c3a4960f29e9a5fb31a04f",
+   "moment_results": [
+    [
+     "radiative-moments-v1/positive-linear-log-energy-v1/rtol2e-4",
+     "0bf5690e24848bab71a53d608c6208252471498ad143154c8fd37725f1fb03d2"
+    ]
+   ],
+   "preparations": [
+    {
+     "digest": "1fa564c48cb28b9740039e4970fc48de2d479dc7c84d49de37bad2ebd94f932f",
+     "held_out_max_error_fraction": [
+      0.2438659817428869
+     ],
+     "build_s": 0.06351193320006132,
+     "nodes": [
+      378
+     ]
+    }
+   ]
+  },
+  {
+   "file": "si-300-100um-0deg-78822-table.json",
+   "variant": "table",
+   "seed": 78822,
+   "cutoff_eV": 1000,
+   "request_s": 1.7664457033388317,
+   "raw_scores_sha256": "7c2c6b836275ce717c025c6f8edb1feed07ae1a4f1a2cf4192ac21055112584c",
+   "moment_results": [
+    [
+     "radiative-moments-v1/positive-linear-log-energy-v1/rtol2e-4",
+     "89daa95ef6358bda28245b6a049d3eb7e19f78795e9a3b4d288663824b650806"
+    ]
+   ],
+   "preparations": [
+    {
+     "digest": "089290d5db3fdb83c85086865d8ba9ed8282f564865e7009430a697fdd8ef6ba",
+     "held_out_max_error_fraction": [
+      0.20598760999820137
+     ],
+     "build_s": 0.036646673921495676,
+     "nodes": [
+      246
+     ]
+    }
+   ]
+  },
+  {
+   "file": "si-300-100um-0deg-78823-exact.json",
+   "variant": "exact",
+   "seed": 78823,
+   "cutoff_eV": 1000,
+   "request_s": 27.157037125900388,
+   "raw_scores_sha256": "c8a5eb2cc792e288b05bf2cc741e3454586fb50183ea88597e25b84f9f1d1c1e",
+   "moment_results": [
+    [
+     "exact",
+     null
+    ]
+   ],
+   "preparations": []
+  },
+  {
+   "file": "si-300-100um-0deg-78823-refined.json",
+   "variant": "refined",
+   "seed": 78823,
+   "cutoff_eV": 1000,
+   "request_s": 1.8487299559637904,
+   "raw_scores_sha256": "d53d5d182077e3d813e422a5d2c6506f295d30002f43812ac68b092a70019d37",
+   "moment_results": [
+    [
+     "radiative-moments-v1/positive-linear-log-energy-v1/rtol2e-4",
+     "0bf5690e24848bab71a53d608c6208252471498ad143154c8fd37725f1fb03d2"
+    ]
+   ],
+   "preparations": [
+    {
+     "digest": "1fa564c48cb28b9740039e4970fc48de2d479dc7c84d49de37bad2ebd94f932f",
+     "held_out_max_error_fraction": [
+      0.2438659817428869
+     ],
+     "build_s": 0.040213971864432096,
+     "nodes": [
+      378
+     ]
+    }
+   ]
+  },
+  {
+   "file": "si-300-100um-0deg-78823-table.json",
+   "variant": "table",
+   "seed": 78823,
+   "cutoff_eV": 1000,
+   "request_s": 1.8469157270155847,
+   "raw_scores_sha256": "8710b50110275062bbe175d3f76db810877ea8400d4f632cc9b89e3122e15de2",
+   "moment_results": [
+    [
+     "radiative-moments-v1/positive-linear-log-energy-v1/rtol2e-4",
+     "89daa95ef6358bda28245b6a049d3eb7e19f78795e9a3b4d288663824b650806"
+    ]
+   ],
+   "preparations": [
+    {
+     "digest": "089290d5db3fdb83c85086865d8ba9ed8282f564865e7009430a697fdd8ef6ba",
+     "held_out_max_error_fraction": [
+      0.20598760999820137
+     ],
+     "build_s": 0.039668263867497444,
+     "nodes": [
+      246
+     ]
+    }
+   ]
+  },
+  {
+   "file": "si-300-100um-0deg-cut10000-78821-exact.json",
+   "variant": "exact",
+   "seed": 78821,
+   "cutoff_eV": 10000.0,
+   "request_s": 26.89962171576917,
+   "raw_scores_sha256": "46b1ef4d1a1f0e79dc6e8c9fe974dda17991dba2ff97c1e1a65870f2cc08aaae",
+   "moment_results": [
+    [
+     "exact",
+     null
+    ]
+   ],
+   "preparations": []
+  },
+  {
+   "file": "si-300-100um-0deg-cut10000-78821-refined.json",
+   "variant": "refined",
+   "seed": 78821,
+   "cutoff_eV": 10000.0,
+   "request_s": 1.8382113771513104,
+   "raw_scores_sha256": "c004693552554988e1ce33c8240288321e22603c38112b467dbff1c4cb771713",
+   "moment_results": [
+    [
+     "radiative-moments-v1/positive-linear-log-energy-v1/rtol2e-4",
+     "a3e2f6b4fc6910915d3cee58d40abeff4e4df97fdb16b158c774eb3fd0775daa"
+    ]
+   ],
+   "preparations": [
+    {
+     "digest": "24b9869024808c39f5239fdd9931306f6487fd4c945f918ccbeb929c294f4849",
+     "held_out_max_error_fraction": [
+      0.2489245339773966
+     ],
+     "build_s": 0.04331062315031886,
+     "nodes": [
+      772
+     ]
+    }
+   ]
+  },
+  {
+   "file": "si-300-100um-0deg-cut10000-78821-table.json",
+   "variant": "table",
+   "seed": 78821,
+   "cutoff_eV": 10000.0,
+   "request_s": 1.8427057899534702,
+   "raw_scores_sha256": "4d20827331bb9bbfc55fd61c0d0904d8dae347ceae036f6253a9a1d0d543bac4",
+   "moment_results": [
+    [
+     "radiative-moments-v1/positive-linear-log-energy-v1/rtol2e-4",
+     "c5e73a4c2ce5f0e4f437de8695de069226177b03ccc299e750f89e2f75b286f5"
+    ]
+   ],
+   "preparations": [
+    {
+     "digest": "dbb4adab71d2c48e006802fa2d97f55b8ca9d6e877f6697b3cb898c3eff64b5f",
+     "held_out_max_error_fraction": [
+      0.23344285235653675
+     ],
+     "build_s": 0.042946675792336464,
+     "nodes": [
+      580
+     ]
+    }
+   ]
+  },
+  {
+   "file": "si-300-100um-0deg-cut10000-78822-exact.json",
+   "variant": "exact",
+   "seed": 78822,
+   "cutoff_eV": 10000.0,
+   "request_s": 26.154828832950443,
+   "raw_scores_sha256": "f0e9c635f6b24c0f79f40fa4b6ca02c36884b618c5c98d6851ee1cd0a3dd0e11",
+   "moment_results": [
+    [
+     "exact",
+     null
+    ]
+   ],
+   "preparations": []
+  },
+  {
+   "file": "si-300-100um-0deg-cut10000-78822-refined.json",
+   "variant": "refined",
+   "seed": 78822,
+   "cutoff_eV": 10000.0,
+   "request_s": 1.7929917401634157,
+   "raw_scores_sha256": "19d99ef88f31df629b89e3ebe2d331c3adf68e4bfc4b26560612ca9da85dbf6d",
+   "moment_results": [
+    [
+     "radiative-moments-v1/positive-linear-log-energy-v1/rtol2e-4",
+     "a3e2f6b4fc6910915d3cee58d40abeff4e4df97fdb16b158c774eb3fd0775daa"
+    ]
+   ],
+   "preparations": [
+    {
+     "digest": "24b9869024808c39f5239fdd9931306f6487fd4c945f918ccbeb929c294f4849",
+     "held_out_max_error_fraction": [
+      0.2489245339773966
+     ],
+     "build_s": 0.738657174166292,
+     "nodes": [
+      772
+     ]
+    }
+   ]
+  },
+  {
+   "file": "si-300-100um-0deg-cut10000-78822-table.json",
+   "variant": "table",
+   "seed": 78822,
+   "cutoff_eV": 10000.0,
+   "request_s": 1.8060202258639038,
+   "raw_scores_sha256": "8e432773433f78a2866c5244bc9b22872a297e44197628548d682770d4c8a3ba",
+   "moment_results": [
+    [
+     "radiative-moments-v1/positive-linear-log-energy-v1/rtol2e-4",
+     "c5e73a4c2ce5f0e4f437de8695de069226177b03ccc299e750f89e2f75b286f5"
+    ]
+   ],
+   "preparations": [
+    {
+     "digest": "dbb4adab71d2c48e006802fa2d97f55b8ca9d6e877f6697b3cb898c3eff64b5f",
+     "held_out_max_error_fraction": [
+      0.23344285235653675
+     ],
+     "build_s": 0.04715660074725747,
+     "nodes": [
+      580
+     ]
+    }
+   ]
+  },
+  {
+   "file": "si-300-100um-0deg-cut10000-78823-exact.json",
+   "variant": "exact",
+   "seed": 78823,
+   "cutoff_eV": 10000.0,
+   "request_s": 27.413175916299224,
+   "raw_scores_sha256": "ce3e7ee2c2ad5eabff9f72c9302776a75000e608c4241379d3f21b42ad37187d",
+   "moment_results": [
+    [
+     "exact",
+     null
+    ]
+   ],
+   "preparations": []
+  },
+  {
+   "file": "si-300-100um-0deg-cut10000-78823-refined.json",
+   "variant": "refined",
+   "seed": 78823,
+   "cutoff_eV": 10000.0,
+   "request_s": 1.84117233986035,
+   "raw_scores_sha256": "7b94852fc22addc0a7fd7145181532cecbe4572b18dd32ed69753d0ed8b94702",
+   "moment_results": [
+    [
+     "radiative-moments-v1/positive-linear-log-energy-v1/rtol2e-4",
+     "a3e2f6b4fc6910915d3cee58d40abeff4e4df97fdb16b158c774eb3fd0775daa"
+    ]
+   ],
+   "preparations": [
+    {
+     "digest": "24b9869024808c39f5239fdd9931306f6487fd4c945f918ccbeb929c294f4849",
+     "held_out_max_error_fraction": [
+      0.2489245339773966
+     ],
+     "build_s": 0.044064623303711414,
+     "nodes": [
+      772
+     ]
+    }
+   ]
+  },
+  {
+   "file": "si-300-100um-0deg-cut10000-78823-table.json",
+   "variant": "table",
+   "seed": 78823,
+   "cutoff_eV": 10000.0,
+   "request_s": 1.8420474948361516,
+   "raw_scores_sha256": "42425ec1199cc31d279f1aba585b7cebee53fc0e7251e297cc3e36b5c3243b40",
+   "moment_results": [
+    [
+     "radiative-moments-v1/positive-linear-log-energy-v1/rtol2e-4",
+     "c5e73a4c2ce5f0e4f437de8695de069226177b03ccc299e750f89e2f75b286f5"
+    ]
+   ],
+   "preparations": [
+    {
+     "digest": "dbb4adab71d2c48e006802fa2d97f55b8ca9d6e877f6697b3cb898c3eff64b5f",
+     "held_out_max_error_fraction": [
+      0.23344285235653675
+     ],
+     "build_s": 0.04670919897034764,
+     "nodes": [
+      580
+     ]
+    }
+   ]
+  },
+  {
+   "file": "si-800-100um-0deg-78821-exact.json",
+   "variant": "exact",
+   "seed": 78821,
+   "cutoff_eV": 1000,
+   "request_s": 10.536184979137033,
+   "raw_scores_sha256": "98d1979fc27ae07903c5dcf60fc9d2620bcd3b7805c663b00c26feb4aa10882d",
+   "moment_results": [
+    [
+     "exact",
+     null
+    ]
+   ],
+   "preparations": []
+  },
+  {
+   "file": "si-800-100um-0deg-78821-refined.json",
+   "variant": "refined",
+   "seed": 78821,
+   "cutoff_eV": 1000,
+   "request_s": 0.7835359373129904,
+   "raw_scores_sha256": "fdf296d9290a5145c5a4572d1747591a2cbf146674da8e51413efbd06ddbac59",
+   "moment_results": [
+    [
+     "radiative-moments-v1/positive-linear-log-energy-v1/rtol2e-4",
+     "a8806fa1b78690aab72c5870acc93fe8b65084fb99937ec96f6744fae4aaf28a"
+    ]
+   ],
+   "preparations": [
+    {
+     "digest": "b27fb59b7b41ace434f39045d1eb80300c198dba874580e7ac02b069f6daa960",
+     "held_out_max_error_fraction": [
+      0.24376635281453404
+     ],
+     "build_s": 0.039998930878937244,
+     "nodes": [
+      442
+     ]
+    }
+   ]
+  },
+  {
+   "file": "si-800-100um-0deg-78821-table.json",
+   "variant": "table",
+   "seed": 78821,
+   "cutoff_eV": 1000,
+   "request_s": 0.7861299449577928,
+   "raw_scores_sha256": "fdf296d9290a5145c5a4572d1747591a2cbf146674da8e51413efbd06ddbac59",
+   "moment_results": [
+    [
+     "radiative-moments-v1/positive-linear-log-energy-v1/rtol2e-4",
+     "1628733825f7f42dc873d01fd3f4193ce45b5ae3dea1c46d0140364072e46cc1"
+    ]
+   ],
+   "preparations": [
+    {
+     "digest": "50d3f43bf508c5526b603704134b6689db2fc1cca57c97e0b587e2634ed15900",
+     "held_out_max_error_fraction": [
+      0.20597159407534346
+     ],
+     "build_s": 0.03690591314807534,
+     "nodes": [
+      310
+     ]
+    }
+   ]
+  },
+  {
+   "file": "si-800-100um-0deg-78822-exact.json",
+   "variant": "exact",
+   "seed": 78822,
+   "cutoff_eV": 1000,
+   "request_s": 10.55340704927221,
+   "raw_scores_sha256": "b68e1830c83b6761a8608a259d576c4903f2c99e6e0b1314e57d0b9d45a079d1",
+   "moment_results": [
+    [
+     "exact",
+     null
+    ]
+   ],
+   "preparations": []
+  },
+  {
+   "file": "si-800-100um-0deg-78822-refined.json",
+   "variant": "refined",
+   "seed": 78822,
+   "cutoff_eV": 1000,
+   "request_s": 0.7969176787883043,
+   "raw_scores_sha256": "e9db5022380a5b0cf541bcd9e9a95d0478c30391a073e8a5032ead7136cfd8e3",
+   "moment_results": [
+    [
+     "radiative-moments-v1/positive-linear-log-energy-v1/rtol2e-4",
+     "a8806fa1b78690aab72c5870acc93fe8b65084fb99937ec96f6744fae4aaf28a"
+    ]
+   ],
+   "preparations": [
+    {
+     "digest": "b27fb59b7b41ace434f39045d1eb80300c198dba874580e7ac02b069f6daa960",
+     "held_out_max_error_fraction": [
+      0.24376635281453404
+     ],
+     "build_s": 0.04224381223320961,
+     "nodes": [
+      442
+     ]
+    }
+   ]
+  },
+  {
+   "file": "si-800-100um-0deg-78822-table.json",
+   "variant": "table",
+   "seed": 78822,
+   "cutoff_eV": 1000,
+   "request_s": 0.8088858257979155,
+   "raw_scores_sha256": "e9db5022380a5b0cf541bcd9e9a95d0478c30391a073e8a5032ead7136cfd8e3",
+   "moment_results": [
+    [
+     "radiative-moments-v1/positive-linear-log-energy-v1/rtol2e-4",
+     "1628733825f7f42dc873d01fd3f4193ce45b5ae3dea1c46d0140364072e46cc1"
+    ]
+   ],
+   "preparations": [
+    {
+     "digest": "50d3f43bf508c5526b603704134b6689db2fc1cca57c97e0b587e2634ed15900",
+     "held_out_max_error_fraction": [
+      0.20597159407534346
+     ],
+     "build_s": 0.03738364391028881,
+     "nodes": [
+      310
+     ]
+    }
+   ]
+  },
+  {
+   "file": "si-800-100um-0deg-78823-exact.json",
+   "variant": "exact",
+   "seed": 78823,
+   "cutoff_eV": 1000,
+   "request_s": 10.462794056162238,
+   "raw_scores_sha256": "cb0d3131689cc6bc586fc4a6b1a3c745ccae8475d0f9a9256e15880827991339",
+   "moment_results": [
+    [
+     "exact",
+     null
+    ]
+   ],
+   "preparations": []
+  },
+  {
+   "file": "si-800-100um-0deg-78823-refined.json",
+   "variant": "refined",
+   "seed": 78823,
+   "cutoff_eV": 1000,
+   "request_s": 0.762960908934474,
+   "raw_scores_sha256": "0fb58c8291011e131e0c54910c6ebca5b5f4e3f82835fe02242bc59e3543a024",
+   "moment_results": [
+    [
+     "radiative-moments-v1/positive-linear-log-energy-v1/rtol2e-4",
+     "a8806fa1b78690aab72c5870acc93fe8b65084fb99937ec96f6744fae4aaf28a"
+    ]
+   ],
+   "preparations": [
+    {
+     "digest": "b27fb59b7b41ace434f39045d1eb80300c198dba874580e7ac02b069f6daa960",
+     "held_out_max_error_fraction": [
+      0.24376635281453404
+     ],
+     "build_s": 0.03995128162205219,
+     "nodes": [
+      442
+     ]
+    }
+   ]
+  },
+  {
+   "file": "si-800-100um-0deg-78823-table.json",
+   "variant": "table",
+   "seed": 78823,
+   "cutoff_eV": 1000,
+   "request_s": 0.7605840330943465,
+   "raw_scores_sha256": "0fb58c8291011e131e0c54910c6ebca5b5f4e3f82835fe02242bc59e3543a024",
+   "moment_results": [
+    [
+     "radiative-moments-v1/positive-linear-log-energy-v1/rtol2e-4",
+     "1628733825f7f42dc873d01fd3f4193ce45b5ae3dea1c46d0140364072e46cc1"
+    ]
+   ],
+   "preparations": [
+    {
+     "digest": "50d3f43bf508c5526b603704134b6689db2fc1cca57c97e0b587e2634ed15900",
+     "held_out_max_error_fraction": [
+      0.20597159407534346
+     ],
+     "build_s": 0.03711569495499134,
+     "nodes": [
+      310
+     ]
+    }
+   ]
+  },
+  {
+   "file": "sio2-800kev-tr0.3-0deg-compound-78821-exact.json",
+   "variant": "exact",
+   "seed": 78821,
+   "cutoff_eV": 1000,
+   "request_s": 182.78351754695177,
+   "raw_scores_sha256": "7d83195aaf18cce3207b5e14f929839fd0ffacbfae36d691a9fe9ac97f1a4587",
+   "moment_results": [
+    [
+     "exact",
+     null
+    ]
+   ],
+   "preparations": []
+  },
+  {
+   "file": "sio2-800kev-tr0.3-0deg-compound-78821-refined.json",
+   "variant": "refined",
+   "seed": 78821,
+   "cutoff_eV": 1000,
+   "request_s": 8.057088028639555,
+   "raw_scores_sha256": "5fc18fa5bfd2311a682db79f5dc44d6cef993e0b70317deede5e325e2e601ec2",
+   "moment_results": [
+    [
+     "radiative-moments-v1/positive-linear-log-energy-v1/rtol2e-4",
+     "8dba81c43609cba9f193a9488b09cdfee678d418a845329b7f1e9972881fabe3"
+    ]
+   ],
+   "preparations": [
+    {
+     "digest": "89b401ec1c0089159660a4b8e26d1166f680aad3293dd98859b00e15d03947f4",
+     "held_out_max_error_fraction": [
+      0.24954246161071694
+     ],
+     "build_s": 0.07206708798184991,
+     "nodes": [
+      445
+     ]
+    }
+   ]
+  },
+  {
+   "file": "sio2-800kev-tr0.3-0deg-compound-78821-table.json",
+   "variant": "table",
+   "seed": 78821,
+   "cutoff_eV": 1000,
+   "request_s": 8.12373880064115,
+   "raw_scores_sha256": "c03e19d301d14ad93e0209702c0a4879ae357f9e56295d84ba5eadb2d660f277",
+   "moment_results": [
+    [
+     "radiative-moments-v1/positive-linear-log-energy-v1/rtol2e-4",
+     "1eba8eb929e0296be0422e38d06fa4c286a57f92aa186fdeede23cc78c71e279"
+    ]
+   ],
+   "preparations": [
+    {
+     "digest": "781e933c9d7938252067f123c130e79414f7378478aa3b8e26bdc1311fd3e55d",
+     "held_out_max_error_fraction": [
+      0.2127275490837799
+     ],
+     "build_s": 0.06661023292690516,
+     "nodes": [
+      310
+     ]
+    }
+   ]
+  },
+  {
+   "file": "sio2-800kev-tr0.3-0deg-compound-78822-exact.json",
+   "variant": "exact",
+   "seed": 78822,
+   "cutoff_eV": 1000,
+   "request_s": 183.39932979410514,
+   "raw_scores_sha256": "c689a6d35ccbc79bdf6abf097cacd19fcc35d2722725a86d73622ee03db0d883",
+   "moment_results": [
+    [
+     "exact",
+     null
+    ]
+   ],
+   "preparations": []
+  },
+  {
+   "file": "sio2-800kev-tr0.3-0deg-compound-78822-refined.json",
+   "variant": "refined",
+   "seed": 78822,
+   "cutoff_eV": 1000,
+   "request_s": 8.026036463677883,
+   "raw_scores_sha256": "f6fec8eca98cdc9fcb5081e932cb4100146e6b636f5550517c9cdc3907fe33a8",
+   "moment_results": [
+    [
+     "radiative-moments-v1/positive-linear-log-energy-v1/rtol2e-4",
+     "8dba81c43609cba9f193a9488b09cdfee678d418a845329b7f1e9972881fabe3"
+    ]
+   ],
+   "preparations": [
+    {
+     "digest": "89b401ec1c0089159660a4b8e26d1166f680aad3293dd98859b00e15d03947f4",
+     "held_out_max_error_fraction": [
+      0.24954246161071694
+     ],
+     "build_s": 0.07160508679226041,
+     "nodes": [
+      445
+     ]
+    }
+   ]
+  },
+  {
+   "file": "sio2-800kev-tr0.3-0deg-compound-78822-table.json",
+   "variant": "table",
+   "seed": 78822,
+   "cutoff_eV": 1000,
+   "request_s": 7.891438371036202,
+   "raw_scores_sha256": "dbcc38871154cdc38fda7f8c0e645b842a0b03ddb2b198eccd5d1abdd5fe0287",
+   "moment_results": [
+    [
+     "radiative-moments-v1/positive-linear-log-energy-v1/rtol2e-4",
+     "1eba8eb929e0296be0422e38d06fa4c286a57f92aa186fdeede23cc78c71e279"
+    ]
+   ],
+   "preparations": [
+    {
+     "digest": "781e933c9d7938252067f123c130e79414f7378478aa3b8e26bdc1311fd3e55d",
+     "held_out_max_error_fraction": [
+      0.2127275490837799
+     ],
+     "build_s": 0.06599452812224627,
+     "nodes": [
+      310
+     ]
+    }
+   ]
+  },
+  {
+   "file": "sio2-800kev-tr0.3-0deg-compound-78823-exact.json",
+   "variant": "exact",
+   "seed": 78823,
+   "cutoff_eV": 1000,
+   "request_s": 185.21773736318573,
+   "raw_scores_sha256": "ac2836f20bea6ba2c4d72429810d755439f40d941dece3b5ae49fa3a7b9e7b04",
+   "moment_results": [
+    [
+     "exact",
+     null
+    ]
+   ],
+   "preparations": []
+  },
+  {
+   "file": "sio2-800kev-tr0.3-0deg-compound-78823-refined.json",
+   "variant": "refined",
+   "seed": 78823,
+   "cutoff_eV": 1000,
+   "request_s": 8.167115500662476,
+   "raw_scores_sha256": "40bd940601cef646f0122a9061573b3b838fd81ec3f2f239dc66dae59e641ecd",
+   "moment_results": [
+    [
+     "radiative-moments-v1/positive-linear-log-energy-v1/rtol2e-4",
+     "8dba81c43609cba9f193a9488b09cdfee678d418a845329b7f1e9972881fabe3"
+    ]
+   ],
+   "preparations": [
+    {
+     "digest": "89b401ec1c0089159660a4b8e26d1166f680aad3293dd98859b00e15d03947f4",
+     "held_out_max_error_fraction": [
+      0.24954246161071694
+     ],
+     "build_s": 0.09974561678245664,
+     "nodes": [
+      445
+     ]
+    }
+   ]
+  },
+  {
+   "file": "sio2-800kev-tr0.3-0deg-compound-78823-table.json",
+   "variant": "table",
+   "seed": 78823,
+   "cutoff_eV": 1000,
+   "request_s": 8.210725880693644,
+   "raw_scores_sha256": "4df4cf1da1fd5da304b2d2de94f6b70d35b7b449655d9fe3da739b5d08c5b703",
+   "moment_results": [
+    [
+     "radiative-moments-v1/positive-linear-log-energy-v1/rtol2e-4",
+     "1eba8eb929e0296be0422e38d06fa4c286a57f92aa186fdeede23cc78c71e279"
+    ]
+   ],
+   "preparations": [
+    {
+     "digest": "781e933c9d7938252067f123c130e79414f7378478aa3b8e26bdc1311fd3e55d",
+     "held_out_max_error_fraction": [
+      0.2127275490837799
+     ],
+     "build_s": 0.07166568422690034,
+     "nodes": [
+      310
+     ]
+    }
+   ]
+  },
+  {
+   "file": "w-100-100um-75deg-78821-exact.json",
+   "variant": "exact",
+   "seed": 78821,
+   "cutoff_eV": 1000,
+   "request_s": 25.27584596304223,
+   "raw_scores_sha256": "510e3b47a305c4daea4d597e1ae1c6be9fdee37c44a43095a2c22f5ee0c7ae61",
+   "moment_results": [
+    [
+     "exact",
+     null
+    ]
+   ],
+   "preparations": []
+  },
+  {
+   "file": "w-100-100um-75deg-78821-refined.json",
+   "variant": "refined",
+   "seed": 78821,
+   "cutoff_eV": 1000,
+   "request_s": 1.697301883250475,
+   "raw_scores_sha256": "9fd6b031f64c45b8fab892d2570c7633edcf805fcf55bccf19b86d979acdd245",
+   "moment_results": [
+    [
+     "radiative-moments-v1/positive-linear-log-energy-v1/rtol2e-4",
+     "110c0e3210184f223415a53c780bd916e31633e31e99f3661bd88ea4eb2ac9e4"
+    ]
+   ],
+   "preparations": [
+    {
+     "digest": "5c742ad1c4d19831487b9d25097038aafd1fd5f80c8be0c2dcdff2f50b4cb314",
+     "held_out_max_error_fraction": [
+      0.19541283753311314
+     ],
+     "build_s": 0.03584609692916274,
+     "nodes": [
+      166
+     ]
+    }
+   ]
+  },
+  {
+   "file": "w-100-100um-75deg-78821-table.json",
+   "variant": "table",
+   "seed": 78821,
+   "cutoff_eV": 1000,
+   "request_s": 1.6972121666185558,
+   "raw_scores_sha256": "45a64bb24bfa421c6ad012901d37eaf14909556822bbd2c991a1aee5cc18cdf0",
+   "moment_results": [
+    [
+     "radiative-moments-v1/positive-linear-log-energy-v1/rtol2e-4",
+     "d3e5cbf4911ab425a27678b141f90e563a7f8640aa19d882fa61b52fcc36bacb"
+    ]
+   ],
+   "preparations": [
+    {
+     "digest": "8827300a163bed83c59b866173f00604e38611df8ffd37cc5f15fa67e9fffbe4",
+     "held_out_max_error_fraction": [
+      0.23848131761264582
+     ],
+     "build_s": 0.03672127099707723,
+     "nodes": [
+      163
+     ]
+    }
+   ]
+  },
+  {
+   "file": "w-100-100um-75deg-78822-exact.json",
+   "variant": "exact",
+   "seed": 78822,
+   "cutoff_eV": 1000,
+   "request_s": 26.374901779927313,
+   "raw_scores_sha256": "1a122910a37e879e59dce56c0154632ac8def99ff5581fc5d46cccd0e93c028c",
+   "moment_results": [
+    [
+     "exact",
+     null
+    ]
+   ],
+   "preparations": []
+  },
+  {
+   "file": "w-100-100um-75deg-78822-refined.json",
+   "variant": "refined",
+   "seed": 78822,
+   "cutoff_eV": 1000,
+   "request_s": 1.8077291739173234,
+   "raw_scores_sha256": "6b6db4f65d62b911640e38359f40f85c25c56c82a6413ea87601b4b075e70bc7",
+   "moment_results": [
+    [
+     "radiative-moments-v1/positive-linear-log-energy-v1/rtol2e-4",
+     "110c0e3210184f223415a53c780bd916e31633e31e99f3661bd88ea4eb2ac9e4"
+    ]
+   ],
+   "preparations": [
+    {
+     "digest": "5c742ad1c4d19831487b9d25097038aafd1fd5f80c8be0c2dcdff2f50b4cb314",
+     "held_out_max_error_fraction": [
+      0.19541283753311314
+     ],
+     "build_s": 0.04333509923890233,
+     "nodes": [
+      166
+     ]
+    }
+   ]
+  },
+  {
+   "file": "w-100-100um-75deg-78822-table.json",
+   "variant": "table",
+   "seed": 78822,
+   "cutoff_eV": 1000,
+   "request_s": 1.802704802248627,
+   "raw_scores_sha256": "23048d4d5c5e584555846f6dd67bd5162ed2974e1212a5bb1e978b724f97ca15",
+   "moment_results": [
+    [
+     "radiative-moments-v1/positive-linear-log-energy-v1/rtol2e-4",
+     "d3e5cbf4911ab425a27678b141f90e563a7f8640aa19d882fa61b52fcc36bacb"
+    ]
+   ],
+   "preparations": [
+    {
+     "digest": "8827300a163bed83c59b866173f00604e38611df8ffd37cc5f15fa67e9fffbe4",
+     "held_out_max_error_fraction": [
+      0.23848131761264582
+     ],
+     "build_s": 0.03733421582728624,
+     "nodes": [
+      163
+     ]
+    }
+   ]
+  },
+  {
+   "file": "w-100-100um-75deg-78823-exact.json",
+   "variant": "exact",
+   "seed": 78823,
+   "cutoff_eV": 1000,
+   "request_s": 26.2127770697698,
+   "raw_scores_sha256": "b4b2850edd100bc50a6b30d306b991493eca55bd173444fd44ce239dd0231b6c",
+   "moment_results": [
+    [
+     "exact",
+     null
+    ]
+   ],
+   "preparations": []
+  },
+  {
+   "file": "w-100-100um-75deg-78823-refined.json",
+   "variant": "refined",
+   "seed": 78823,
+   "cutoff_eV": 1000,
+   "request_s": 1.764095630031079,
+   "raw_scores_sha256": "68228d14cf017d9ddbcce85ec043d4df6beb62114f0bf9c3c9f6dd08b8840a97",
+   "moment_results": [
+    [
+     "radiative-moments-v1/positive-linear-log-energy-v1/rtol2e-4",
+     "110c0e3210184f223415a53c780bd916e31633e31e99f3661bd88ea4eb2ac9e4"
+    ]
+   ],
+   "preparations": [
+    {
+     "digest": "5c742ad1c4d19831487b9d25097038aafd1fd5f80c8be0c2dcdff2f50b4cb314",
+     "held_out_max_error_fraction": [
+      0.19541283753311314
+     ],
+     "build_s": 0.03670595306903124,
+     "nodes": [
+      166
+     ]
+    }
+   ]
+  },
+  {
+   "file": "w-100-100um-75deg-78823-table.json",
+   "variant": "table",
+   "seed": 78823,
+   "cutoff_eV": 1000,
+   "request_s": 1.76387825794518,
+   "raw_scores_sha256": "1da890710f0f9be0b67b0f6b316ca9d50e9bb8dd42021d096a6f4c0db749ed67",
+   "moment_results": [
+    [
+     "radiative-moments-v1/positive-linear-log-energy-v1/rtol2e-4",
+     "d3e5cbf4911ab425a27678b141f90e563a7f8640aa19d882fa61b52fcc36bacb"
+    ]
+   ],
+   "preparations": [
+    {
+     "digest": "8827300a163bed83c59b866173f00604e38611df8ffd37cc5f15fa67e9fffbe4",
+     "held_out_max_error_fraction": [
+      0.23848131761264582
+     ],
+     "build_s": 0.04192901682108641,
+     "nodes": [
+      163
+     ]
+    }
+   ]
+  },
+  {
+   "file": "w-300-10um-0deg-78821-exact.json",
+   "variant": "exact",
+   "seed": 78821,
+   "cutoff_eV": 1000,
+   "request_s": 49.49784287670627,
+   "raw_scores_sha256": "0b15972f4af4a0fbd3368bbc549ac5306a4a4d51af6c880c9eec1150329ecfda",
+   "moment_results": [
+    [
+     "exact",
+     null
+    ]
+   ],
+   "preparations": []
+  },
+  {
+   "file": "w-300-10um-0deg-78821-refined.json",
+   "variant": "refined",
+   "seed": 78821,
+   "cutoff_eV": 1000,
+   "request_s": 3.4022393147461116,
+   "raw_scores_sha256": "e9d83549358a679f0563b9a4750d9157e1acfe763cbcf5f8995a15aca539bc70",
+   "moment_results": [
+    [
+     "radiative-moments-v1/positive-linear-log-energy-v1/rtol2e-4",
+     "0e42682156d71a37b8e35aa21a7125385c366b4d8198c2fdc29914ec9bd503dc"
+    ]
+   ],
+   "preparations": [
+    {
+     "digest": "722e757788877fe031846091e7ae5c343821102e457a9d30b4210cf99582aace",
+     "held_out_max_error_fraction": [
+      0.1954137132889644
+     ],
+     "build_s": 0.036532227881252766,
+     "nodes": [
+      246
+     ]
+    }
+   ]
+  },
+  {
+   "file": "w-300-10um-0deg-78821-table.json",
+   "variant": "table",
+   "seed": 78821,
+   "cutoff_eV": 1000,
+   "request_s": 3.3863962409086525,
+   "raw_scores_sha256": "2757bc4909e0c0ca3a724d430b39ab4ce6f9a6bd4603ec5e2a46611571015ba4",
+   "moment_results": [
+    [
+     "radiative-moments-v1/positive-linear-log-energy-v1/rtol2e-4",
+     "ad08783f31069825123e0a9efeb7e39bcfa27779070a62e1acf78515f3c3c5ec"
+    ]
+   ],
+   "preparations": [
+    {
+     "digest": "9c0ecdb981747cad4f587b36fc624dcbb194dd5575f09660a10175e85efafda2",
+     "held_out_max_error_fraction": [
+      0.23847308900715566
+     ],
+     "build_s": 0.03643108205869794,
+     "nodes": [
+      243
+     ]
+    }
+   ]
+  },
+  {
+   "file": "w-300-10um-0deg-78822-exact.json",
+   "variant": "exact",
+   "seed": 78822,
+   "cutoff_eV": 1000,
+   "request_s": 50.44274127390236,
+   "raw_scores_sha256": "3d6c7d4976cf0b7076292efeb42c65090fca2a2ffd31e80da8038240cf1dcb1d",
+   "moment_results": [
+    [
+     "exact",
+     null
+    ]
+   ],
+   "preparations": []
+  },
+  {
+   "file": "w-300-10um-0deg-78822-refined.json",
+   "variant": "refined",
+   "seed": 78822,
+   "cutoff_eV": 1000,
+   "request_s": 3.7352369190193713,
+   "raw_scores_sha256": "a8517ab70397feb77ced149741772def4fd2b385208c67c5b77dfadd92312144",
+   "moment_results": [
+    [
+     "radiative-moments-v1/positive-linear-log-energy-v1/rtol2e-4",
+     "0e42682156d71a37b8e35aa21a7125385c366b4d8198c2fdc29914ec9bd503dc"
+    ]
+   ],
+   "preparations": [
+    {
+     "digest": "722e757788877fe031846091e7ae5c343821102e457a9d30b4210cf99582aace",
+     "held_out_max_error_fraction": [
+      0.1954137132889644
+     ],
+     "build_s": 0.03645103983581066,
+     "nodes": [
+      246
+     ]
+    }
+   ]
+  },
+  {
+   "file": "w-300-10um-0deg-78822-table.json",
+   "variant": "table",
+   "seed": 78822,
+   "cutoff_eV": 1000,
+   "request_s": 3.4565487122163177,
+   "raw_scores_sha256": "585aee2af2d9cf0226349dac3f56536d00c01cd4a7398ff61f47e8f116cb3e38",
+   "moment_results": [
+    [
+     "radiative-moments-v1/positive-linear-log-energy-v1/rtol2e-4",
+     "ad08783f31069825123e0a9efeb7e39bcfa27779070a62e1acf78515f3c3c5ec"
+    ]
+   ],
+   "preparations": [
+    {
+     "digest": "9c0ecdb981747cad4f587b36fc624dcbb194dd5575f09660a10175e85efafda2",
+     "held_out_max_error_fraction": [
+      0.23847308900715566
+     ],
+     "build_s": 0.036473849788308144,
+     "nodes": [
+      243
+     ]
+    }
+   ]
+  },
+  {
+   "file": "w-300-10um-0deg-78823-exact.json",
+   "variant": "exact",
+   "seed": 78823,
+   "cutoff_eV": 1000,
+   "request_s": 49.45155410422012,
+   "raw_scores_sha256": "522e2ef608881be610d50552fce67e8040b859724bbd317d9e8d7b5f60945e38",
+   "moment_results": [
+    [
+     "exact",
+     null
+    ]
+   ],
+   "preparations": []
+  },
+  {
+   "file": "w-300-10um-0deg-78823-refined.json",
+   "variant": "refined",
+   "seed": 78823,
+   "cutoff_eV": 1000,
+   "request_s": 3.390550686046481,
+   "raw_scores_sha256": "99508a40d95fb2ec62ff512d3417540a210434910d7bc6766ba42f3339494f52",
+   "moment_results": [
+    [
+     "radiative-moments-v1/positive-linear-log-energy-v1/rtol2e-4",
+     "0e42682156d71a37b8e35aa21a7125385c366b4d8198c2fdc29914ec9bd503dc"
+    ]
+   ],
+   "preparations": [
+    {
+     "digest": "722e757788877fe031846091e7ae5c343821102e457a9d30b4210cf99582aace",
+     "held_out_max_error_fraction": [
+      0.1954137132889644
+     ],
+     "build_s": 0.03747883019968867,
+     "nodes": [
+      246
+     ]
+    }
+   ]
+  },
+  {
+   "file": "w-300-10um-0deg-78823-table.json",
+   "variant": "table",
+   "seed": 78823,
+   "cutoff_eV": 1000,
+   "request_s": 3.37214542273432,
+   "raw_scores_sha256": "d39ffd03c5e2f124b1a9c009384fa744e9166108d84870446a939e72b0cbb11c",
+   "moment_results": [
+    [
+     "radiative-moments-v1/positive-linear-log-energy-v1/rtol2e-4",
+     "ad08783f31069825123e0a9efeb7e39bcfa27779070a62e1acf78515f3c3c5ec"
+    ]
+   ],
+   "preparations": [
+    {
+     "digest": "9c0ecdb981747cad4f587b36fc624dcbb194dd5575f09660a10175e85efafda2",
+     "held_out_max_error_fraction": [
+      0.23847308900715566
+     ],
+     "build_s": 0.03721035085618496,
+     "nodes": [
+      243
+     ]
+    }
+   ]
+  },
+  {
+   "file": "w-800-10um-0deg-78821-exact.json",
+   "variant": "exact",
+   "seed": 78821,
+   "cutoff_eV": 1000,
+   "request_s": 20.770980936009437,
+   "raw_scores_sha256": "4b7fb102ff603675dc7da43f46b8f6b2e63a24490ad13522647988d120d52296",
+   "moment_results": [
+    [
+     "exact",
+     null
+    ]
+   ],
+   "preparations": []
+  },
+  {
+   "file": "w-800-10um-0deg-78821-refined.json",
+   "variant": "refined",
+   "seed": 78821,
+   "cutoff_eV": 1000,
+   "request_s": 1.4853751100599766,
+   "raw_scores_sha256": "cd1f77bc39b20161187453242f78d0a8365e6a70df310e1adbb69ad881ea879d",
+   "moment_results": [
+    [
+     "radiative-moments-v1/positive-linear-log-energy-v1/rtol2e-4",
+     "1390c9ed5f6bbaa58bfe6c7b67bd44c1b0b11ca8f4bdc8731dd550df1eaf2f2d"
+    ]
+   ],
+   "preparations": [
+    {
+     "digest": "f17f4050756a2d887f1f63c5a622c247589ba5525c293c5c912e12f1694b4048",
+     "held_out_max_error_fraction": [
+      0.19527268471417691
+     ],
+     "build_s": 0.037278068251907825,
+     "nodes": [
+      310
+     ]
+    }
+   ]
+  },
+  {
+   "file": "w-800-10um-0deg-78821-table.json",
+   "variant": "table",
+   "seed": 78821,
+   "cutoff_eV": 1000,
+   "request_s": 1.4792725211009383,
+   "raw_scores_sha256": "7bdec3157393d4b24bdef0670d64b151f912db3d3af67d2d0a776a1c98be23c1",
+   "moment_results": [
+    [
+     "radiative-moments-v1/positive-linear-log-energy-v1/rtol2e-4",
+     "c52725a8a7ca263b8327992c19b838bc408ed650a3baf63384084b6d2ad50c32"
+    ]
+   ],
+   "preparations": [
+    {
+     "digest": "8be9963951c6efd25c0f8a53fca441a74762bcec6cfb1babbb876eea2edeb385",
+     "held_out_max_error_fraction": [
+      0.23847484751026693
+     ],
+     "build_s": 0.05246128886938095,
+     "nodes": [
+      283
+     ]
+    }
+   ]
+  },
+  {
+   "file": "w-800-10um-0deg-78822-exact.json",
+   "variant": "exact",
+   "seed": 78822,
+   "cutoff_eV": 1000,
+   "request_s": 21.005109323188663,
+   "raw_scores_sha256": "3f0af10fe368dea6ba7086b4988f7927d02bbfa7958a79d31b06c0be7cfbcb98",
+   "moment_results": [
+    [
+     "exact",
+     null
+    ]
+   ],
+   "preparations": []
+  },
+  {
+   "file": "w-800-10um-0deg-78822-refined.json",
+   "variant": "refined",
+   "seed": 78822,
+   "cutoff_eV": 1000,
+   "request_s": 1.4880864932201803,
+   "raw_scores_sha256": "31275de88a52ef8430dacdd2cac5829b6e9dee972dee239cccb72d30ac5a736b",
+   "moment_results": [
+    [
+     "radiative-moments-v1/positive-linear-log-energy-v1/rtol2e-4",
+     "1390c9ed5f6bbaa58bfe6c7b67bd44c1b0b11ca8f4bdc8731dd550df1eaf2f2d"
+    ]
+   ],
+   "preparations": [
+    {
+     "digest": "f17f4050756a2d887f1f63c5a622c247589ba5525c293c5c912e12f1694b4048",
+     "held_out_max_error_fraction": [
+      0.19527268471417691
+     ],
+     "build_s": 0.03697090968489647,
+     "nodes": [
+      310
+     ]
+    }
+   ]
+  },
+  {
+   "file": "w-800-10um-0deg-78822-table.json",
+   "variant": "table",
+   "seed": 78822,
+   "cutoff_eV": 1000,
+   "request_s": 1.4868569620884955,
+   "raw_scores_sha256": "25b4b24ae2b9ecfe43384d06d4014372acacd4e92d5d0a577750eb3fbbe41636",
+   "moment_results": [
+    [
+     "radiative-moments-v1/positive-linear-log-energy-v1/rtol2e-4",
+     "c52725a8a7ca263b8327992c19b838bc408ed650a3baf63384084b6d2ad50c32"
+    ]
+   ],
+   "preparations": [
+    {
+     "digest": "8be9963951c6efd25c0f8a53fca441a74762bcec6cfb1babbb876eea2edeb385",
+     "held_out_max_error_fraction": [
+      0.23847484751026693
+     ],
+     "build_s": 0.03675407916307449,
+     "nodes": [
+      283
+     ]
+    }
+   ]
+  },
+  {
+   "file": "w-800-10um-0deg-78823-exact.json",
+   "variant": "exact",
+   "seed": 78823,
+   "cutoff_eV": 1000,
+   "request_s": 20.886869010981172,
+   "raw_scores_sha256": "6ddc4480a47028489ebb6f95e6c05ad97bb9e6cb24c76aeba85e26414ff1d3d9",
+   "moment_results": [
+    [
+     "exact",
+     null
+    ]
+   ],
+   "preparations": []
+  },
+  {
+   "file": "w-800-10um-0deg-78823-refined.json",
+   "variant": "refined",
+   "seed": 78823,
+   "cutoff_eV": 1000,
+   "request_s": 1.4666660479269922,
+   "raw_scores_sha256": "a441b9f4c367990a4e447a2239b930df09e12f759602f4c8a03691c0fd5d07db",
+   "moment_results": [
+    [
+     "radiative-moments-v1/positive-linear-log-energy-v1/rtol2e-4",
+     "1390c9ed5f6bbaa58bfe6c7b67bd44c1b0b11ca8f4bdc8731dd550df1eaf2f2d"
+    ]
+   ],
+   "preparations": [
+    {
+     "digest": "f17f4050756a2d887f1f63c5a622c247589ba5525c293c5c912e12f1694b4048",
+     "held_out_max_error_fraction": [
+      0.19527268471417691
+     ],
+     "build_s": 0.039047569036483765,
+     "nodes": [
+      310
+     ]
+    }
+   ]
+  },
+  {
+   "file": "w-800-10um-0deg-78823-table.json",
+   "variant": "table",
+   "seed": 78823,
+   "cutoff_eV": 1000,
+   "request_s": 1.4851428386755288,
+   "raw_scores_sha256": "86f71955daecb7e3c65037d1a106b0e5710eb082407a0d5223e75b38268425ac",
+   "moment_results": [
+    [
+     "radiative-moments-v1/positive-linear-log-energy-v1/rtol2e-4",
+     "c52725a8a7ca263b8327992c19b838bc408ed650a3baf63384084b6d2ad50c32"
+    ]
+   ],
+   "preparations": [
+    {
+     "digest": "8be9963951c6efd25c0f8a53fca441a74762bcec6cfb1babbb876eea2edeb385",
+     "held_out_max_error_fraction": [
+      0.23847484751026693
+     ],
+     "build_s": 0.0369101632386446,
+     "nodes": [
+      283
+     ]
+    }
+   ]
+  }
+ ]
+}

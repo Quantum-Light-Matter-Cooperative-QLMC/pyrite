@@ -1,0 +1,79 @@
+{
+  "schema": "radiative-moment-cpu-cuda-788-v1",
+  "purpose": "Frozen before any CUDA run: same-table CPU/CUDA transport comparison of the shipped exact/table/refined radiative-moment policies on the held-out cases, plus a launch-work and kernel-resource audit at benchmark scale.",
+  "harness": "checks/equal_precision/benchmark_moment_production.py",
+  "reference": {
+    "core": "per-electron",
+    "records": "CPU held-out jobs 3926-3928 (evidence/moment-heldprod788/a13539fd-r2/), committed summary docs/validation/check-records/equal-precision/moment-heldout-production-788.json",
+    "note": "CPU records predate this protocol; no CUDA result for these seeds existed when it was frozen."
+  },
+  "candidate": {
+    "core": "cuda",
+    "arguments": "identical scene, cutoff, seed, histories, --batch-histories, --scratch-mib 4096, --probe-electrons 0"
+  },
+  "cases": [
+    "si-300-100um-0deg",
+    "w-300-10um-0deg",
+    "si-800-100um-0deg",
+    "w-800-10um-0deg",
+    "si-100-1um-0deg",
+    "w-100-100um-75deg",
+    "si-300-100um-0deg:10000",
+    "sio2-800kev-tr0.3-0deg-compound"
+  ],
+  "variants": [
+    "exact",
+    "table",
+    "refined"
+  ],
+  "ensemble": {
+    "seeds": [
+      78821,
+      78822,
+      78823
+    ],
+    "histories_per_seed": 2048,
+    "confidence": 0.99,
+    "relative_margins": {
+      "hard_count": 0.01,
+      "hard_energy": 0.01,
+      "path_length": 0.002,
+      "exit_energy": 0.002
+    },
+    "absolute_margins": {
+      "transmission_fraction": 0.002,
+      "backscatter_fraction": 0.002
+    }
+  },
+  "identity": "Each CPU/CUDA pair must share primary coupling, packer source, table digests and the persisted moment model and moment_table_sha256; any mismatch aborts.",
+  "rules": {
+    "core_difference": "Per policy, paired CUDA-CPU differences per metric with the analyze_moment_transport Student-t rule: entire 99% interval inside margin is screening_pass, entirely outside is fail, fewer than 30 changed pairs or zero variance is unresolved, otherwise unresolved.",
+    "table_core_interaction": "For table and refined, the paired difference-in-differences (CUDA_policy - CUDA_exact) - (CPU_policy - CPU_exact) per metric under the same rule and margins: tests whether the same prepared table changes CUDA and CPU results differently.",
+    "binary_discordance": "For transmitted/backscattered, also report the one-sided exact-binomial CPU/CUDA discordance bound with Bonferroni alpha 0.01 over 8 cases x 3 policies x 2 metrics.",
+    "unresolved": "Unresolved is never counted as passing. Hard-count resolution belongs to #978."
+  },
+  "multiplicity": "Per-comparison 99% Student-t screening; no family-wise claim beyond the stated binary Bonferroni bound.",
+  "work_audit": {
+    "cases": [
+      "si-300-100um-0deg",
+      "w-300-10um-0deg",
+      "sio2-800kev-tr0.3-0deg-compound"
+    ],
+    "variants": [
+      "exact",
+      "table"
+    ],
+    "seed": 78841,
+    "histories": 50000,
+    "histories_override": {
+      "sio2-800kev-tr0.3-0deg-compound": 20000
+    },
+    "report": [
+      "per-launch electrons, row capacity, threads per block and continuation flag",
+      "launched electrons beyond the primaries (capacity replays)",
+      "returned segments versus allocated row slots",
+      "registers, local bytes and theoretical occupancy of each launched kernel variant"
+    ],
+    "claim_limit": "Instrumented diagnostic; its timings do not replace the moment-production-788 benchmark."
+  }
+}
