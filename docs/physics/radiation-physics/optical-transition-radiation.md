@@ -227,9 +227,12 @@ solve has a limit of its own: on oblique falling-permittivity chains it lost up 
 all accuracy in the amplitude where this solve did not, against the dense system
 evaluated at 100–800 digits.
 
-These are interference and Bragg effects along $z$. In-plane momentum is
-conserved, so this is resonant TR and not diffracted TR; laterally patterned
-layers are a separate model (#963).
+Results from flat stacks include interference between interfaces, TR Bragg-reflected
+by a layer period (macroscopic diffracted TR, DTR) and diffraction of the charge's
+own field (a PXR analogue), all in one field. In-plane momentum is conserved, so
+only a reciprocal vector along $z$ takes part; laterally patterned layers are a
+separate model (#963). Plain interference without Bragg reflection is not DTR, and
+atomic-lattice DTR has no propagating Bragg order at optical wavelengths.
 
 ## Backend
 
