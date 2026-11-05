@@ -219,3 +219,18 @@ def attach_command(profile, name, instance_name, distance_mm, dry_run):
         add_filter(doc, profile, row)
 
     return _change(op, dry_run, f"attached filter {name} to profile {profile}")
+
+
+@command.command("validate")
+@click.argument("name")
+def validate_command(name):
+    """Validate a named plate through the selected catalog without writing."""
+    from pyrite.geometry import load_filter
+    from pyrite.materials.catalog import load_material_catalog
+
+    try:
+        catalog = load_material_catalog(_catalog_io.active_catalog_path())
+        load_filter(name, catalog=catalog)
+    except (OSError, ValueError, KeyError) as exc:
+        raise CLIError(str(exc)) from None
+    emit_result(f"filter preset {name} is valid")

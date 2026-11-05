@@ -17,13 +17,14 @@ Options:
   -h, --help  Show this message and exit.
 
 Commands:
-  attach  Append a named plate reference to PROFILE's ordered filter sequence.
-  create  Create or clone a validated named plate without placing it in a scene.
-  delete  Delete an unreferenced, user-owned definition only.
-  list    List named filter definitions in the selected catalog.
-  rename  Rename a filter, updating all placements by reference.
-  set     Update a user definition; future resolutions receive its new values.
-  show    Inspect one filter definition and its referencing profile placements.
+  attach    Append a named plate reference to PROFILE's ordered filter sequence.
+  create    Create or clone a validated named plate without placing it in a scene.
+  delete    Delete an unreferenced, user-owned definition only.
+  list      List named filter definitions in the selected catalog.
+  rename    Rename a filter, updating all placements by reference.
+  set       Update a user definition; future resolutions receive its new values.
+  show      Inspect one filter definition and its referencing profile placements.
+  validate  Validate a named plate through the selected catalog without writing.
 ```
 
 ## `pyrite filter attach`
@@ -124,6 +125,17 @@ Options:
 Usage: pyrite filter show [OPTIONS] NAME
 
   Inspect one filter definition and its referencing profile placements.
+
+Options:
+  -h, --help  Show this message and exit.
+```
+
+## `pyrite filter validate`
+
+```text
+Usage: pyrite filter validate [OPTIONS] NAME
+
+  Validate a named plate through the selected catalog without writing.
 
 Options:
   -h, --help  Show this message and exit.

@@ -356,6 +356,7 @@ Existing command fragments remain available below; each link opens the full fami
 - <span id="pyrite-filter-rename"></span>[`pyrite filter rename`](cli-reference-filter.md#pyrite-filter-rename)
 - <span id="pyrite-filter-set"></span>[`pyrite filter set`](cli-reference-filter.md#pyrite-filter-set)
 - <span id="pyrite-filter-show"></span>[`pyrite filter show`](cli-reference-filter.md#pyrite-filter-show)
+- <span id="pyrite-filter-validate"></span>[`pyrite filter validate`](cli-reference-filter.md#pyrite-filter-validate)
 - <span id="pyrite-tables"></span>[`pyrite tables`](cli-reference-tables.md#pyrite-tables)
 - <span id="pyrite-tables-fetch"></span>[`pyrite tables fetch`](cli-reference-tables.md#pyrite-tables-fetch)
 - <span id="pyrite-tables-generate"></span>[`pyrite tables generate`](cli-reference-tables.md#pyrite-tables-generate)

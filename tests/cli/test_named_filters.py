@@ -63,3 +63,35 @@ def test_invalid_draft_does_not_write(tmp_path, monkeypatch):
     assert result.exit_code != 0
     assert "invalid plate thickness" in result.output
     assert path.read_bytes() == before
+
+
+def test_validate_uses_real_catalog_without_writing(tmp_path, monkeypatch):
+    from pyrite._catalog_layout import bundled_catalog, read_text
+
+    document = tomlkit.parse(read_text(bundled_catalog()))
+    document["filters"] = {
+        "window": {
+            "material": "silicon",
+            "thickness_mm": 0.1,
+            "size_mm": [20.0, 10.0],
+            "distance_mm": 50.0,
+        }
+    }
+    path = tmp_path / "catalog.toml"
+    path.write_text(tomlkit.dumps(document))
+    monkeypatch.setattr(_catalog_io, "active_catalog_path", lambda: path)
+    before = path.read_bytes()
+    valid = invoke(command, ["validate", "window"])
+    assert valid.exit_code == 0, valid.output
+    assert "filter preset window is valid" in valid.output
+    missing = invoke(command, ["validate", "missing"])
+    assert missing.exit_code != 0
+    assert "unknown filter preset" in missing.output
+    assert path.read_bytes() == before
+    document["filters"]["window"]["thickness_mm"] = -1
+    path.write_text(tomlkit.dumps(document))
+    before = path.read_bytes()
+    invalid = invoke(command, ["validate", "window"])
+    assert invalid.exit_code != 0
+    assert "thickness_mm" in invalid.output
+    assert path.read_bytes() == before
