@@ -93,19 +93,23 @@ def simulate_trajectories(
 
     Validation: electron-transport
     """
+    from ..runner.adaptive import case_transport_core
     from ..runner.transport_options import per_electron_config
     from .typed_inputs import case_transport_kwargs, trajectory_case
 
     case, numerics = trajectory_case(beam, target, physics, numerics, detector)
     tuning = numerics.resolved_execution.transport
     kwargs = case_transport_kwargs(case)
-    if kwargs.get("inelastic_model") == "shell-soft-hard":
+    core = case_transport_core(case, numerics.transport_core)
+    # Mirror the case driver: the CUDA LUT kernel lacks explicit inelastic
+    # modes, so those runs select the exact CUDA kernel.
+    if core == "cuda" and case.get("inelastic_model") is not None:
         kwargs["transport_lut_config"] = TransportLUTConfig(enabled=False)
     return _simulate_trajectories(
         **kwargs,
         E_cut_keV=E_cut_keV,
         max_steps=max_steps,
-        transport_core=numerics.transport_core,
+        transport_core=core,
         per_electron_config=per_electron_config(tuning),
         transport_precision=tuning.precision or "auto",
         keep_segments_on_device=keep_segments_on_device,

@@ -18,11 +18,9 @@ import numpy as np
 import pandas as pd
 
 from .._formatting import fmt_thickness
-from ..montecarlo import (
-    simulate_trajectories,
-    tilted_geometry,
-)
+from ..montecarlo import tilted_geometry
 from ..montecarlo.runner.case_tables import _case_inelastic_kwargs, _case_stopping_tables
+from ..montecarlo.transport import _simulate_trajectories as simulate_trajectories
 from ..results import records, records_for_cases, selection_score
 from ._common import (
     _beam_detector_basis,

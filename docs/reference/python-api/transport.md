@@ -38,8 +38,8 @@ Use `pyrite.transport` for trajectory simulation and saved-capture reductions;
 use `pyrite.radiation` for source-level spectra. These lazy facades resolve to
 the same implementation objects. The trajectory function now takes typed
 inputs; equivalent resolved engine inputs preserve numerical outputs, RNG
-streams, provenance, serialization and scientific identities. Importing either namespace loads no engines or material datasets;
-resolving a function loads its implementation, and calling it may read tables,
+streams, provenance, serialization and scientific identities. Importing
+either namespace loads no engines or material datasets; resolving a function loads its implementation, and calling it may read tables,
 select an accelerator or perform the documented artifact I/O.
 
 ```python
