@@ -12,6 +12,7 @@ optimization-fixed-window-yield
 absorption-length
 optical-material-response
 optical-planar-tr
+optical-stack-fast-solver
 optical-finite-boundary-field
 optical-wavefront-propagation
 optical-ctr-population

@@ -181,6 +181,56 @@ Both are recorded in the result's `metadata["validity"]`; passing `None`
 skips a check and records it as not evaluated. Space charge, wakefields and
 collective bunch evolution are outside this passive-source model.
 
+## Many-layer stacks
+
+`Validation: optical-stack-fast-solver`
+
+From `FAST_STACK_MIN_LAYERS` layers up, `planar_transition_radiation` and
+`interface_response` use an O(N) solve of the same boundary problem (#962). In a
+flat isotropic stack $\mathbf k_\parallel$ is conserved and TE and TM decouple.
+With up- and down-going amplitudes $a,b$, the tangential fields are $E=a+b$ and
+$H=Y(a-b)$, where $Y_{\rm TE}=-\lambda/\omega$ and
+$Y_{\rm TM}=\varepsilon\omega/\lambda$. Eliminating the down-going wave below
+interface $i$ from the continuity equations with jump $(s_E,s_H)$ gives
+
+$$
+D_i=(1+\rho_i)Y_{i+1}+(1-\rho_i)Y_i,\qquad
+u_i=\frac{2Y_iA_i+(1-\rho_i)Y_is_{E,i}+(1+\rho_i)s_{H,i}}{D_i},
+$$
+
+$$
+\rho_{i+1}=p_{i+1}^2\,\frac{(1+\rho_i)Y_{i+1}-(1-\rho_i)Y_i}{D_i},\qquad
+A_{i+1}=p_{i+1}u_i,\qquad p_j=e^{i\lambda_jd_j},
+$$
+
+with $\rho_0=A_0=0$. The vacuum amplitude is $u$ of the last interface. Because
+$|p|\le1$, thick absorbing or evanescent layers cannot overflow, unlike a
+transfer-matrix product. Tests compare against the dense solve and pin the
+matched-medium, vanishing-film, closed single-interface and opaque-exit limits,
+Bloch stop-band decay against the period's transfer trace, and the weak-contrast
+resonance $(q-k_z)\Lambda=2\pi m$.
+
+The recursion has a removable pole at $D_i=0$, a bound mode of the lower
+half-stack, where the dense matrix is regular. It also rounds $1+\rho$ where
+$\rho\to-1$. That rounding reaches the vacuum through $C_i/D_i$, so it is estimated
+relative to the pair's terms, as $u\sum_i|C_i/D_i|/\max_i|C_i\beta_i|$ for the
+response with unit roundoff $u$, and likewise beside the amplitude. Non-finite
+results and estimates above $10^{-8}$ raise `LinAlgError` for the whole call, so
+one such pair refuses a batch. A lossless scan across a critical angle can do this;
+a small absorption avoids it.
+
+The estimate covers only that rounding. Conditioning near lossless resonances and
+phase rounding $u\sum|\lambda d|$ are not estimated and can be larger, up to full
+scale at a resonance, where the dense solve is also unreliable. Deep responses can
+lose pointwise accuracy in lossless stacks; absorbing stacks keep it. The dense
+solve has a limit of its own: on oblique falling-permittivity chains it lost up to
+all accuracy in the amplitude where this solve did not, against the dense system
+evaluated at 100–800 digits.
+
+These are interference and Bragg effects along $z$. In-plane momentum is
+conserved, so this is resonant TR and not diffracted TR; laterally patterned
+layers are a separate model (#963).
+
 ## Backend
 
 The history sums run on the active backend: CUDA CuPy uses the fused TR kernel

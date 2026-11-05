@@ -80,6 +80,11 @@ __all__ = [
 ]
 
 
+#: Layer count at which the stack solves switch from dense to O(N) (#962). The O(N) solve
+#: was already faster at two layers; thinner stacks stay dense to keep their bits unchanged.
+FAST_STACK_MIN_LAYERS = 16
+
+
 def beta_from_kinetic_eV(kinetic_energy_eV: float) -> float:
     """Electron speed ``v/c`` for kinetic energy ``T`` in eV."""
     gamma = 1.0 + float(kinetic_energy_eV) / M_E_EV
@@ -250,9 +255,28 @@ def planar_transition_radiation(
     omega = xp.asarray(np.broadcast_to(energy, shape).ravel())
     n = xp.asarray(np.broadcast_to(n, (*shape, 3)).reshape(-1, 3))
     v = xp.asarray(np.broadcast_to(v, (*shape, 3)).reshape(-1, 3))
-    media = _stack_media(substrate_eps, layers, shape, xp)
     z_if = _interface_heights(layers)
     k_perp = omega[:, None] * n[:, :2]
+    if len(layers) >= FAST_STACK_MIN_LAYERS:
+        from .transition_radiation_stack import straight_charge_amplitude
+
+        media = _media_array(substrate_eps, layers, shape, xp)
+        e_t, lam_top = straight_charge_amplitude(omega, k_perp, v, media, z_if, xp=xp)
+    else:
+        e_t, lam_top = _dense_amplitude(omega, k_perp, v, substrate_eps, layers, shape, z_if, xp)
+    e_z = -xp.sum(k_perp * e_t, axis=-1) / lam_top
+    power = xp.sum(xp.abs(e_t) ** 2, axis=-1) + xp.abs(e_z) ** 2
+    yield_ = omega * n[:, 2] ** 2 * power / (16.0 * np.pi**4)
+    yield_ = yield_.reshape(shape)
+    if return_amplitude:
+        amplitude = xp.concatenate([e_t, e_z[:, None]], axis=-1)
+        return yield_, amplitude.reshape((*shape, 3))
+    return yield_
+
+
+def _dense_amplitude(omega, k_perp, v, substrate_eps, layers, shape, z_if, xp):
+    """Top-wave tangential ``E`` and vacuum ``lambda`` from one dense solve per pair."""
+    media = _stack_media(substrate_eps, layers, shape, xp)
     q = (omega - xp.sum(k_perp * v[:, :2], axis=-1)) / v[:, 2]
     matrix, top, lam = _free_system(omega, k_perp, media, z_if, xp)
     particular = [_particular_field(eps, omega, k_perp, q, v, xp) for eps in media]
@@ -266,15 +290,18 @@ def planar_transition_radiation(
             rhs[:, row + 2 : row + 4] -= side * h_vec[:, :2] * phase
 
     solution = xp.linalg.solve(matrix, rhs[..., None])[..., 0]
-    e_t = solution[:, top : top + 2]
-    e_z = -xp.sum(k_perp * e_t, axis=-1) / lam[-1]
-    power = xp.sum(xp.abs(e_t) ** 2, axis=-1) + xp.abs(e_z) ** 2
-    yield_ = omega * n[:, 2] ** 2 * power / (16.0 * np.pi**4)
-    yield_ = yield_.reshape(shape)
-    if return_amplitude:
-        amplitude = xp.concatenate([e_t, e_z[:, None]], axis=-1)
-        return yield_, amplitude.reshape((*shape, 3))
-    return yield_
+    return solution[:, top : top + 2], lam[-1]
+
+
+def _media_array(substrate_eps, layers, shape, xp):
+    """Permittivities ``(n_media, B)`` assembled on the host and moved once."""
+    size = int(np.prod(shape, dtype=int))
+    media = np.empty((len(layers) + 2, size), dtype=complex)
+    media[-1] = 1.0
+    for j, eps in enumerate([substrate_eps, *(e for e, _ in layers)]):
+        host = eps.get() if hasattr(eps, "get") else eps  # CuPy -> host for broadcasting
+        media[j] = np.broadcast_to(np.asarray(host, dtype=complex), shape).ravel()
+    return xp.asarray(media)
 
 
 def _stack_media(substrate_eps, layers, shape, xp):
@@ -485,8 +512,15 @@ def interface_response(
     shape = np.broadcast_shapes(energy.shape, n.shape[:-1])
     omega = xp.asarray(np.broadcast_to(energy, shape).ravel())
     n = xp.asarray(np.broadcast_to(n, (*shape, 3)).reshape(-1, 3))
-    media = _stack_media(substrate_eps, layers, shape, xp)
     k_perp = omega[:, None] * n[:, :2]
+    if len(layers) >= FAST_STACK_MIN_LAYERS:
+        from .transition_radiation_stack import stack_response
+
+        eps = _media_array(substrate_eps, layers, shape, xp)
+        z_if = _interface_heights(layers)
+        response, lam_top = stack_response(omega, k_perp, eps, z_if, xp=xp)
+        return InterfaceResponse(shape, omega, k_perp, eps, response, lam_top)
+    media = _stack_media(substrate_eps, layers, shape, xp)
     matrix, top, lam = _free_system(omega, k_perp, media, _interface_heights(layers), xp)
     # Top-wave rows of the inverse: solve the transposed system once.
     select = xp.zeros((omega.size, matrix.shape[1], 2), dtype=complex)
