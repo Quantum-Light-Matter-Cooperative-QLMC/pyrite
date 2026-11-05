@@ -45,6 +45,8 @@ def _bremslib_band_template(
     nominal_ratio,
     row_sum,
     band_weights,
+    band_offsets,
+    n_bands,
     atomic_number,
     plasma_eV,
     n_segments,
@@ -56,11 +58,12 @@ def _bremslib_band_template(
     Validation: bremslib-angular-model
     """
     line_id = jit.blockIdx.x
+    band = jit.blockIdx.y
     thread_idx = jit.threadIdx.x
     n_threads = jit.blockDim.x
     spectrum_sum = _ACCUM_REAL(0.0)
-    energy_index = thread_idx
-    while energy_index < n_energies:
+    energy_index = band_offsets[band] + thread_idx
+    while energy_index < band_offsets[band + 1]:
         photon_eV = energies_eV[energy_index]
         weighted_cross_section = _bremslib_or_fallback_weighted_scalar(
             kinetic_energies_keV[line_id],
@@ -104,7 +107,7 @@ def _bremslib_band_template(
         jit.syncthreads()
         stride //= U32_TWO
     if thread_idx == U32_ZERO:
-        row_sum[line_id] = shared[U32_ZERO]
+        row_sum[line_id * n_bands + band] = shared[U32_ZERO]
 
 
 @cache
@@ -121,10 +124,12 @@ def _band_kernel(dtype):
 
 
 @jit.rawkernel()
-def _group_rows(row_sum, row_electron, out, n_rows):
-    row = jit.blockIdx.x * jit.blockDim.x + jit.threadIdx.x
-    if row < n_rows:
-        jit.atomic_add(out, row_electron[row], row_sum[row])
+def _group_rows(row_sum, row_electron, out, n_rows, n_bands):
+    cell = jit.blockIdx.x * jit.blockDim.x + jit.threadIdx.x
+    if cell < n_rows * n_bands:
+        row = cell // n_bands
+        band = cell % n_bands
+        jit.atomic_add(out, row_electron[row] * n_bands + band, row_sum[cell])
 
 
 def run_bremslib_band_kernel(arguments, band_weights, row_electron, out, n_threads):
@@ -136,15 +141,25 @@ def run_bremslib_band_kernel(arguments, band_weights, row_electron, out, n_threa
     fields and CXR never change.
     """
     n_rows = int(row_electron.size)
-    row_sum = xp.empty(n_rows, dtype=ROW_ACCUMULATION_DTYPE)
-    args = (*arguments[:19], row_sum, band_weights, *arguments[20:])
+    if isinstance(band_weights, tuple):
+        band_weights, offsets = band_weights
+    else:
+        offsets = xp.asarray([0, band_weights.size], dtype=np.uint32)
+    n_bands = int(offsets.size) - 1
+    row_sum = xp.empty(n_rows * n_bands, dtype=ROW_ACCUMULATION_DTYPE)
+    args = (*arguments[:19], row_sum, band_weights, offsets, np.uint32(n_bands), *arguments[20:])
     _band_kernel(ROW_ACCUMULATION_DTYPE)(
-        (n_rows,),
+        (n_rows, n_bands),
         (n_threads,),
         args,
         shared_mem=n_threads * np.dtype(ROW_ACCUMULATION_DTYPE).itemsize,
     )
     # Match the atomic value type to the output (CUDA atomicAdd overload).
     values = row_sum.astype(out.dtype, copy=False)
-    _group_rows(((n_rows + 255) // 256,), (256,), (values, row_electron, out, np.uint32(n_rows)))
+    cells = n_rows * n_bands
+    _group_rows(
+        ((cells + 255) // 256,),
+        (256,),
+        (values, row_electron, out.reshape(-1), np.uint32(n_rows), np.uint32(n_bands)),
+    )
     return out

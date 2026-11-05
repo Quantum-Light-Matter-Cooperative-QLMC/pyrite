@@ -26,7 +26,7 @@ from ._bremslib_extension import extend_above_complete
 #: Identity of the BremsLib model and of this module's interpolation scheme.
 #: Bump the suffix whenever the interpolation changes the numbers it serves.
 BREMSSTRAHLUNG_BREMSLIB_MODEL = (
-    "bremslib-v2.0-sdcs-ddcs/lin-x18-geo4-ln-t-lin-theta-v2/tm-coupled-v2/ee-sb85-v1"
+    "bremslib-v2.0-sdcs-ddcs/lin-x18-geo4-ln-t-lin-theta-v2/tm-coupled-v2/ee-sb85-v1/angle-f64-v1"
 )
 
 #: Number of library ``k/T1`` grid values per incident energy.

@@ -26,6 +26,7 @@ bremslib-radiative-partition
 radiative-moment-interpolation
 cbs-amplitude
 characteristic-radiation
+continuum-node-refinement
 eedl-shell-ionization-comparison
 bote-salvat-ionization-backend
 bremslib-angular-schiff

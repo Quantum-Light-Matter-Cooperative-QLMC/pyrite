@@ -799,6 +799,84 @@ def _spectrum_case(case, tp, record_timing=False):
     return out
 
 
+def _finished_or_run(phase_cache, phase, run):
+    """Return a phase kept from an earlier allocation attempt, else run and keep it."""
+    if phase_cache is None:
+        return run()
+    if phase not in phase_cache:
+        phase_cache[phase] = run()
+    return phase_cache[phase]
+
+
+def _line_phase(
+    case,
+    emission,
+    batch,
+    E_grid,
+    Ne_lines,
+    want_coherent,
+    temporal_profiles,
+    truncation_audit,
+    coherent_audit,
+):
+    """Score the line spectra and run their audits; tag an allocator OOM by phase."""
+    from dataclasses import replace as batch_replace
+
+    temporal, temporal_coherent = temporal_profiles
+    spec_coherent = None
+    with _pkg._nsys_range("pyrite.lines"), collect_line_data_coverage() as line_coverage:
+        try:
+            spec = emission.cxr.evaluate(batch, "spec").values
+
+            if want_coherent:
+                spec_coherent = emission.cxr.evaluate(
+                    batch_replace(
+                        batch,
+                        coherent=True,
+                        temporal=temporal_coherent,
+                        coefficient_capture=None
+                        if coherent_audit is None
+                        else coherent_audit.capture,
+                    ),
+                    "spec_coherent",
+                ).values
+        except Exception as error:
+            if not _pkg._is_gpu_oom(error):
+                raise
+            raise _SpectrumPhaseOOM("line", error) from error
+    # Refuse a truncating measured bandwidth before the other components run.
+    truncation_record = (
+        None if truncation_audit is None else check_cxr_truncation(case, truncation_audit)
+    )
+    coherent_yield_record = (
+        None if coherent_audit is None else coherent_audit.check(E_grid, spec_coherent, Ne_lines)
+    )
+    return (
+        spec,
+        spec_coherent,
+        line_coverage,
+        truncation_record,
+        coherent_yield_record,
+        temporal,
+        temporal_coherent,
+    )
+
+
+def _characteristic_phase(emission, batch, Ne_brem):
+    """Score the characteristic component; tag an allocator OOM by phase."""
+    from dataclasses import replace as batch_replace
+
+    with _pkg._nsys_range("pyrite.characteristic"):
+        try:
+            return emission.characteristic.evaluate(
+                batch_replace(batch, electron_limit=Ne_brem), "spec_characteristic"
+            ).values
+        except Exception as error:
+            if not _pkg._is_gpu_oom(error):
+                raise
+            raise _SpectrumPhaseOOM("characteristic", error) from error
+
+
 def _spectrum_case_impl(case, tp, record_timing=False):
     """Implement :func:`_spectrum_case` inside its optional Nsight range.
 
@@ -840,7 +918,6 @@ def _spectrum_case_impl(case, tp, record_timing=False):
     # so the OOM retry (_SpectrumPhaseOOM -> _halve_case_spec_chunk) covers the 2x
     # complex coherent grid too.
     want_coherent = bool(case.get("coherent_emission", False))
-    spec_coherent = None
     coherent_audit = None
     if case.get("_coherent_yield_audit") is not None:
         from .coherent_audit import CoherentGridAudit
@@ -862,49 +939,42 @@ def _spectrum_case_impl(case, tp, record_timing=False):
         truncation_audit=truncation_audit,
         temporal=temporal,
     )
-    with _pkg._nsys_range("pyrite.lines"), collect_line_data_coverage() as line_coverage:
-        try:
-            spec = emission.cxr.evaluate(batch, "spec").values
-
-            if want_coherent:
-                spec_coherent = emission.cxr.evaluate(
-                    batch_replace(
-                        batch,
-                        coherent=True,
-                        temporal=temporal_coherent,
-                        coefficient_capture=None
-                        if coherent_audit is None
-                        else coherent_audit.capture,
-                    ),
-                    "spec_coherent",
-                ).values
-        except Exception as error:
-            if not _pkg._is_gpu_oom(error):
-                raise
-            raise _SpectrumPhaseOOM("line", error) from error
+    # An allocation retry keeps phases that already finished (#278): repeating a
+    # 600k-node line sum cost about ten minutes per characteristic retry.
+    phase_cache = case.get("_spectrum_phase_cache")
+    (
+        spec,
+        spec_coherent,
+        line_coverage,
+        truncation_record,
+        coherent_yield_record,
+        temporal,
+        temporal_coherent,
+    ) = _finished_or_run(
+        phase_cache,
+        "lines",
+        lambda: _line_phase(
+            case,
+            emission,
+            batch,
+            E_grid,
+            Ne_lines,
+            want_coherent,
+            (temporal, temporal_coherent),
+            truncation_audit,
+            coherent_audit,
+        ),
+    )
     _spectrum_stage_done("lines")
-    # Refuse a truncating measured bandwidth before the other components run.
-    truncation_record = (
-        None if truncation_audit is None else check_cxr_truncation(case, truncation_audit)
-    )
-    coherent_yield_record = (
-        None if coherent_audit is None else coherent_audit.check(E_grid, spec_coherent, Ne_lines)
-    )
 
     # CHARACTERISTIC: EEDL shell-ionization track-length estimator on the
     # lower-cutoff bremsstrahlung electron population. Atomic relaxation is
     # incoherent, so one component serves both the PXR/CBS spectrum and its
     # coherent companion. It stays a separate array; consumers combine
     # components through pyrite._spectral_components (issue #123).
-    with _pkg._nsys_range("pyrite.characteristic"):
-        try:
-            spec_characteristic = emission.characteristic.evaluate(
-                batch_replace(batch, electron_limit=Ne_brem), "spec_characteristic"
-            ).values
-        except Exception as error:
-            if not _pkg._is_gpu_oom(error):
-                raise
-            raise _SpectrumPhaseOOM("characteristic", error) from error
+    spec_characteristic = _finished_or_run(
+        phase_cache, "characteristic", lambda: _characteristic_phase(emission, batch, Ne_brem)
+    )
     _spectrum_stage_done("characteristic")
 
     # BREM: EVERY layer radiates with its OWN composition (each Z^2 cross

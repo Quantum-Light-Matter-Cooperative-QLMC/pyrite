@@ -256,6 +256,37 @@ def test_refined_continuum_observables_stay_within_budget(ladder):
             assert relative < allowed, f"{name} moved {relative:.3e} at num={count}"
 
 
+def test_automatic_policy_matches_a_resolved_reference_on_fixed_tracks(ladder):
+    """Anchor (#278): the adopted ``dlnE=0.0025`` policy against a 4x finer reference.
+
+    Same trajectories, two automatic meshes, so any difference is the grid
+    alone. The ledger claims every continuum observable within ``1e-3`` -- ten
+    times inside the ``detected_counts`` budget, at the ``intrinsic_source`` one.
+    """
+    from pyrite._continuum_grid import CONTINUUM_LOG_STEP, automatic_continuum_grid
+
+    detectors = {"timepix3_counts": Timepix3(n_mc=32, seed=7), "eaglexo_counts": EagleXO()}
+    endpoint = case_endpoint_eV(ladder.case)
+
+    def observe(grid):
+        continuum = ladder.continuum(grid)
+        return spectrum_observables(grid, np.zeros_like(continuum), continuum, detectors=detectors)
+
+    adopted = automatic_continuum_grid("hopg", endpoint)
+    resolved = automatic_continuum_grid("hopg", endpoint, log_step=CONTINUUM_LOG_STEP / 4)
+    assert resolved.size > 3 * adopted.size
+    production, reference = observe(adopted), observe(resolved)
+    for name in (
+        "continuum_yield",
+        "continuum_centroid_eV",
+        "timepix3_continuum_counts",
+        "eaglexo_continuum_counts",
+    ):
+        assert reference[name] > 0.0
+        relative = abs(production[name] - reference[name]) / reference[name]
+        assert relative < 1.0e-3, f"{name} differs by {relative:.3e} from the resolved mesh"
+
+
 @pytest.mark.parametrize(
     ("medium", "endpoint_eV", "size", "digest"),
     [

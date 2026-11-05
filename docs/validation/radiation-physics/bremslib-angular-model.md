@@ -75,6 +75,19 @@ The implementation's directional path temporarily multiplies the DDCS by $4\pi$ 
 
 `prepare_bremslib_table` applies the exact piecewise-linear solid-angle integral, normalizes each shape, refines incident energy, and rebuilds DDCS from the interpolated SDCS and normalized shape. `bremslib_segment_state` uses $\arccos(\operatorname{clip}(\hat{\mathbf v}\cdot\hat{\mathbf n},-1,1))$ and linear angular interpolation. `evaluate_bremslib` applies the common $x$ and incident-energy interpolation, the $10^{-27}Z^2/k$ conversion, and the physical support $0<k\le T$.
 
+The `angle-f64-v1` numerical policy retains binary64 direction components,
+their dot product and inverse cosine before converting the recovered angle
+to table precision. Binary32 cosine rounding otherwise maps angles below
+approximately $\sqrt{2^{-24}}=0.244$ mrad to zero; the derivative of inverse
+cosine diverges at one. The regression
+`test_forward_angle_survives_float32_table_staging` checks a 0.1 mrad ray
+against the angular interpolant, using binary32 tables without requiring a
+GPU. The exactly forward and backward limits remain zero and $\pi$;
+interpolation, solid-angle normalization and physical units are unchanged.
+The BremsLib model identity advances because directional scores can change.
+This is a numerical correction within the existing derivation, not new
+independent physics validation.
+
 `mc_brem_spectrum` evaluates the angle per segment, preserves EEDL as the warned isotropic fallback for a missing element table or uncovered incident energy, applies attenuation, and divides by the incident-electron count. The portable path and the fused CUDA mirror use the same staged rows, interpolation fractions, tip rule, unit conversion, fallback state, and $4\pi$ cancellation. This derivation is a static source-to-code comparison. Separately, the hardware-gated CUDA comparison passed on an RTX 5080 on 2026-09-22; the full neighboring CUDA spectrum regression file passed (7 tests, SLURM job 1796).
 
 No divergent factor, sign, exponent, unit, interpolation order, angle convention, limiting case, or fallback scope was found.

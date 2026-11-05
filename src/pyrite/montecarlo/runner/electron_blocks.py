@@ -94,6 +94,40 @@ def iter_electron_blocks(segments, n_blocks):
         yield block
 
 
+def score_in_electron_blocks(score, segments):
+    """Sum an additive per-row ``score(segments)`` over electron-aligned blocks.
+
+    Characteristic and continuum scoring clip and expand every row they receive,
+    so chunk-halving alone cannot bound their device peak (#278). A population
+    that fits the pool headroom runs as one unchanged call; otherwise a block OOM
+    doubles the block count up to ``MAX_ELECTRON_BLOCKS``, then re-raises to the
+    spectrum phase's retry. Non-GPU policies never split.
+    """
+    from .. import runner
+
+    if not runner._RESOURCE_POLICY.gpu:
+        return score(segments)
+    n_segments = int(segments["L_ang"].shape[0])
+    n_blocks = electron_block_count(n_segments, device_headroom_bytes())
+    while True:
+        try:
+            if n_blocks == 1:
+                return score(segments)
+            total = None
+            for block in iter_electron_blocks(segments, n_blocks):
+                part = score(block)
+                total = part if total is None else total + part
+            return total
+        except Exception as error:
+            if not runner._is_gpu_oom(error) or n_blocks >= MAX_ELECTRON_BLOCKS:
+                raise
+            # A retained traceback would pin the failed block's device scratch.
+            error.__traceback__ = None
+        total = part = block = None
+        BACKEND.release_memory()
+        n_blocks = min(MAX_ELECTRON_BLOCKS, 2 * n_blocks)
+
+
 #: Audit entries that blocks append to rather than sum into.
 _APPENDED = ("collect", "attribution")
 

@@ -654,3 +654,46 @@ def test_keep_oom_frames_flag_preserves_traceback_locals(monkeypatch):
         tb = tb.tb_next
     assert isinstance(tb.tb_frame.f_locals["held"], _Pinned)
     assert sink[0]() is not None
+
+
+@pytest.mark.parametrize(
+    "failing, repeated, reused",
+    [
+        ("_characteristic_from_segments", 2, ("_cxr_for_segments",)),
+        ("_brem_wide_from_segments", 2, ("_cxr_for_segments", "_characteristic_from_segments")),
+    ],
+)
+def test_allocation_retry_keeps_finished_spectrum_phases(monkeypatch, failing, repeated, reused):
+    from tests.helpers.segments import runner_transport_payload
+
+    calls = dict.fromkeys(
+        ("_cxr_for_segments", "_characteristic_from_segments", "_brem_wide_from_segments"), 0
+    )
+
+    def scorer(name):
+        def score(*_args, **_kwargs):
+            calls[name] += 1
+            if name == failing and calls[name] == 1:
+                raise DummyOOM
+            return np.ones(2)
+
+        return score
+
+    for name in calls:
+        monkeypatch.setattr(runner, name, scorer(name))
+    monkeypatch.setattr(runner._RESOURCE_POLICY, "gpu_oom", (DummyOOM,))
+    tp = runner_transport_payload(
+        segs={"n_backscattered": 0, "n_missed": 0, "Ne": 1, "L_ang": np.array([1.0])},
+        E_grid=np.array([100.0, 200.0]),
+        E_brem=np.array([100.0, 200.0]),
+        n_hat=np.array([0.0, 0.0, 1.0]),
+        groove=None,
+    )
+    case = {"name": "retry", "crystal": "hopg", "E0_keV": 30.0, "brem_chunk": 100}
+
+    out = recovery._spectrum_case_retry(case, tp)
+
+    assert calls[failing] == repeated
+    assert all(calls[name] == 1 for name in reused)
+    assert "_spectrum_phase_cache" not in case
+    np.testing.assert_array_equal(out["spec"], np.ones(2))

@@ -117,3 +117,22 @@ def test_resume_replaces_legacy_rows_without_duplicate_replicas(tmp_path, monkey
     calls.clear()
     diagnostic.main()
     assert calls == []
+
+
+def test_markdown_distinguishes_measured_uncertainty_and_projection():
+    from checks.electron_count_accuracy import markdown_report
+
+    state = {
+        "reference_count": 1600,
+        "runs": [run(1600, 9, 10), run(1600, 8, 10)],
+    }
+    for n, delta in [(100, 2), (400, 1)]:
+        state["runs"] += [run(n, 1, 10 - delta), run(n, 2, 10 + delta)]
+    report = markdown_report(state)
+    assert "single-run RSE | mean RSE" in report
+    assert "not established systematic bias" in report
+    # Independent analytic result C=sqrt(8), N=(C/0.001)^2.
+    assert "Conditional N for budget 0.001: 8000000" in report
+    assert "Fitted exponent: -0.5" in report
+    assert "Ne_brem: continuum_yield" in report
+    assert "Ne: yield" in report

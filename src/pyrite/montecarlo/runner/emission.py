@@ -3,9 +3,12 @@
 Resolve runner dependencies at call time to preserve the facade test seams.
 """
 
+from dataclasses import replace
 from typing import Any
 
 import numpy as np
+
+from .electron_blocks import score_in_electron_blocks
 
 
 def _brem_wide_from_segments(
@@ -55,7 +58,16 @@ def _brem_wide_from_segments(
         chunk=brem_chunk,
         electron_band_weights=electron_band_weights,
     )
-    return select_continuum(case).evaluate(batch, "brem_wide", native=True).values
+    continuum = select_continuum(case)
+
+    def score(segments):
+        block = replace(batch, segments=segments)
+        return continuum.evaluate(block, "brem_wide", native=True).values
+
+    # Band weights are per-electron outputs, not an additive spectrum.
+    if electron_band_weights is not None:
+        return score(segs_b)
+    return score_in_electron_blocks(score, segs_b)
 
 
 def _uncoupled_brem_from_segments(
@@ -215,37 +227,41 @@ def _characteristic_from_segments(
     )
     ionization_model = case.get("shell_ionization_model", "eedl")
     n_lay = int(segs.get("n_layers", 1))
-    if n_lay == 1:
-        return runner.mc_characteristic_spectrum(
-            segs,
-            E_grid,
-            composition=case["composition"],
-            n_hat=n_hat,
-            chunk=characteristic_chunk,
-            layers=abs_layers,
-            groove=groove,
-            electron_limit=Ne,
-            E_cut_keV=case.get("E_cut_brem_keV", 1.0),
-            ionization_model=ionization_model,
-        )
-    characteristic = np.zeros(E_grid.shape, dtype=float)
-    for layer_index in range(n_lay):
-        layer_segments = runner._segments_in_layer(segs, layer_index)
-        if layer_segments["L_ang"].size == 0:
-            continue
-        characteristic = characteristic + runner.mc_characteristic_spectrum(
-            layer_segments,
-            E_grid,
-            composition=abs_layers[layer_index][2],
-            n_hat=n_hat,
-            chunk=characteristic_chunk,
-            layers=abs_layers,
-            groove=groove,
-            electron_limit=Ne,
-            E_cut_keV=case.get("E_cut_brem_keV", 1.0),
-            ionization_model=ionization_model,
-        )
-    return characteristic
+
+    def score(segments):
+        if n_lay == 1:
+            return runner.mc_characteristic_spectrum(
+                segments,
+                E_grid,
+                composition=case["composition"],
+                n_hat=n_hat,
+                chunk=characteristic_chunk,
+                layers=abs_layers,
+                groove=groove,
+                electron_limit=Ne,
+                E_cut_keV=case.get("E_cut_brem_keV", 1.0),
+                ionization_model=ionization_model,
+            )
+        characteristic = np.zeros(E_grid.shape, dtype=float)
+        for layer_index in range(n_lay):
+            layer_segments = runner._segments_in_layer(segments, layer_index)
+            if layer_segments["L_ang"].size == 0:
+                continue
+            characteristic = characteristic + runner.mc_characteristic_spectrum(
+                layer_segments,
+                E_grid,
+                composition=abs_layers[layer_index][2],
+                n_hat=n_hat,
+                chunk=characteristic_chunk,
+                layers=abs_layers,
+                groove=groove,
+                electron_limit=Ne,
+                E_cut_keV=case.get("E_cut_brem_keV", 1.0),
+                ionization_model=ionization_model,
+            )
+        return characteristic
+
+    return score_in_electron_blocks(score, segs)
 
 
 def _brem_for_case(case, E_brem):

@@ -19,6 +19,13 @@ CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
     "checks/pyrite_issue610_overlap_benchmark.py": (),
     # #278 / #286 measurement diagnostics: they record grid error, accuracy vs electron
     # count and per-flush cost as study evidence, not as an independent physics claim.
+    # Continuum benchmark diagnostics: engineering evidence, no physics verdict.
+    "checks/continuum_backend_parity.py": (),
+    "checks/continuum_benchmark_report.py": (),
+    "checks/continuum_geant4_precision.py": (),
+    "checks/continuum_primary_tail.py": (),
+    "checks/continuum_pyrite_precision.py": (),
+    "checks/continuum_spectral_statistics.py": (),
     "checks/continuum_grid_convergence.py": (),
     "checks/electron_count_accuracy.py": (),
     "checks/line_cost_286.py": (),

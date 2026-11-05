@@ -260,3 +260,31 @@ def test_cuda_source_uses_cpu_reference_cutoff_and_termination_rules():
     assert "I8_CUTOFF_STOPPED = np.int8(0)" in cuda_source
     assert "I8_STEP_LIMITED = np.int8(4)" in cuda_source
     assert "I8_NOT_ENTERED = np.int8(5)" in cuda_source
+
+
+def test_population_cutoff_uploads_only_surviving_host_rows(monkeypatch):
+    """Discarded histories must not consume device staging capacity."""
+    from pyrite.montecarlo.spectrum.cxr import _kernels
+
+    segments = {
+        "E_keV": np.array([10.0, 4.0, 12.0]),
+        "L_ang": np.ones(3),
+        "r_mid": np.array([[0.0, 0.0, 0.5]] * 3),
+        "v_hat": np.array([[0.0, 0.0, 1.0]] * 3),
+        "layer": np.zeros(3, dtype=int),
+        "elec_id": np.arange(3),
+        "Ne": 3,
+    }
+    staged_sizes = []
+    original = _kernels._RowStager.__call__
+
+    def record_upload(self, row):
+        staged_sizes.append(len(row))
+        return original(self, row)
+
+    monkeypatch.setattr(_kernels._RowStager, "__call__", record_upload)
+    clipped = _clip_segments_to_cutoff(segments, 5.0, CARBON)
+    np.testing.assert_array_equal(to_host(clipped["elec_id"]), [0, 2])
+    np.testing.assert_array_equal(to_host(clipped["E_keV"]), [10.0, 12.0])
+    np.testing.assert_array_equal(to_host(clipped["L_ang"]), [1.0, 1.0])
+    assert staged_sizes and max(staged_sizes) == 2
