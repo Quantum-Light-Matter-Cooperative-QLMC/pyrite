@@ -2,15 +2,25 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING, ClassVar, Literal, Self
 
 import numpy as np
 
+from ._spectral_rate import (
+    NormalizationBasis,
+    count_basis,
+    per_current_factor,
+    quantity_columns,
+    rate_factor,
+    rate_units,
+    table_metadata,
+)
 from .quantified import _check_energy_unit
 from .spectral_support import _checked_bin_edges
 
 if TYPE_CHECKING:
+    import polars as pl
     from pint import Quantity
 
 
@@ -24,7 +34,7 @@ class QuantifiedDirectionalSpectrum:
     ``supported`` flags valid directions, retaining unsupported density NaNs.
     Each array property returns a fresh copy. The view snapshots native NumPy
     arrays, retains component identity, and does no scoring, resampling, device
-    transfer or current/acceptance scaling. Case/provenance stay on the source.
+    transfer. Explicit rate methods change only current normalization. Case/provenance stay on the source.
     Numeric arrays and private constructor fields use degrees, eV and per-eV/sr.
     ``sampling`` keeps the producer's convention: ``nodes`` (pointwise) or
     ``bin-mean`` (means over :attr:`photon_energy_edges`).
@@ -40,13 +50,16 @@ class QuantifiedDirectionalSpectrum:
     _bin_edges_eV: np.ndarray | None = field(default=None, repr=False)
     axis_names: ClassVar[tuple[str, str]] = ("angle", "photon_energy")
     measure: ClassVar[Literal["per_energy_per_steradian"]] = "per_energy_per_steradian"
-    count_basis: ClassVar[Literal["photons_per_incident_electron"]] = (
-        "photons_per_incident_electron"
-    )
+
     normalization: ClassVar[Literal["source"]] = "source"
+
+    acceptance_applied: ClassVar[bool] = False
+
+    normalization_basis: NormalizationBasis = field(default="per_incident_electron", kw_only=True)
 
     def __post_init__(self) -> None:
         _check_energy_unit(self._energy_unit)
+        count_basis(self.normalization_basis)
         for name in ("_angle_deg", "_energy_eV", "_density_per_eV_sr", "_supported"):
             value = getattr(self, name)
             if not isinstance(value, np.ndarray):
@@ -95,9 +108,10 @@ class QuantifiedDirectionalSpectrum:
         """Fresh density per display energy and sr; count basis stays semantic."""
         from ..units import Q_
 
-        return Q_(self._density_per_eV_sr.copy(), "1 / eV / steradian").to(
-            f"1 / ({self._energy_unit}) / steradian"
-        )
+        return Q_(
+            self._density_per_eV_sr.copy(),
+            f"1 / eV / steradian{rate_units(self.normalization_basis)}",
+        ).to(f"1 / ({self._energy_unit}) / steradian{rate_units(self.normalization_basis)}")
 
     @property
     def supported(self) -> np.ndarray:
@@ -107,17 +121,67 @@ class QuantifiedDirectionalSpectrum:
     def to_energy(self, unit: str) -> Self:
         """Return a new view with coupled energy/density conversion.
 
-        Native nodes, bin edges, support, sampling and per-primary/per-sr
-        normalization are retained.
+        Native nodes, bin edges, support, sampling, angular measure and current count
+        basis are retained.
         Non-energy unit strings raise ValueError; other inputs raise TypeError.
         """
-        return type(self)(
-            self._angle_deg,
-            self._energy_eV,
-            self._density_per_eV_sr,
-            self._supported,
-            self.component,
-            unit,
-            self.sampling,
-            self._bin_edges_eV,
+        return replace(self, _energy_unit=unit)
+
+    @property
+    def count_basis(self) -> str:
+        """Photon normalization, independent of Pint's dimensional algebra."""
+        return count_basis(self.normalization_basis)
+
+    def rate(self, *, current: Quantity) -> Self:
+        """Return photons per second using explicit mean current I/|e|.
+
+        Current must be a finite nonnegative scalar quantity. Rejects repeated
+        current transforms; preserves acceptance, response and native sampling.
+        Validation: spectral-explicit-rate-normalization
+        """
+        factor = rate_factor(self.normalization_basis, current)
+        return replace(
+            self,
+            _density_per_eV_sr=self._density_per_eV_sr * factor,
+            normalization_basis="per_second",
         )
+
+    def rate_per_current(self) -> Self:
+        """Return photons per second per ampere, including at zero beam current.
+
+        Applies 1/|e| directly to per-primary yields, never divides by current.
+        Validation: spectral-explicit-rate-normalization
+        """
+        factor = per_current_factor(self.normalization_basis)
+        return replace(
+            self,
+            _density_per_eV_sr=self._density_per_eV_sr * factor,
+            normalization_basis="per_current",
+        )
+
+    def _table_quantities(self) -> dict[str, Quantity]:
+        return {"photon_energy": self.photon_energy, "angle": self.angle, "density": self.density}
+
+    def to_dataframe(self) -> pl.DataFrame:
+        """Numeric native-grid table with explicit measure and normalization labels.
+
+        Coordinates and densities use the paired display energy unit. No
+        interpolation, total, response replay or acquisition scaling is added.
+        """
+        import polars as pl
+
+        frame = pl.DataFrame(
+            {
+                "angle": np.repeat(self.angle.magnitude, self._energy_eV.size),
+                "photon_energy": np.tile(self.photon_energy.magnitude, self._angle_deg.size),
+                "density": self.density.magnitude.reshape(-1),
+                "supported": np.repeat(self.supported, self._energy_eV.size),
+            }
+        ).with_columns(pl.lit(self.component).alias("component"))
+        return frame.with_columns(
+            *[pl.lit(value).alias(name) for name, value in table_metadata(self).items()]
+        )
+
+    def dataframe_units(self) -> dict[str, dict[str, str | None]]:
+        """Physical column units and count bases for :meth:`to_dataframe`."""
+        return quantity_columns(self._table_quantities(), self.count_basis)

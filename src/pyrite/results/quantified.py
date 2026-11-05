@@ -2,14 +2,24 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING, Literal, Self
 
 import numpy as np
 
 from .._units import _check_energy_unit
+from ._spectral_rate import (
+    NormalizationBasis,
+    count_basis,
+    per_current_factor,
+    quantity_columns,
+    rate_factor,
+    rate_units,
+    table_metadata,
+)
 
 if TYPE_CHECKING:
+    import polars as pl
     from pint import Quantity
 
 
@@ -26,10 +36,12 @@ class QuantifiedSpectrum:
     spectrum.
 
     ``normalization`` is either response-free ``"source"`` or filtered,
-    solid-angle-weighted ``"observation-average"`` (still per steradian).
+    solid-angle-weighted ``"observation-average"``. Initial views are per
+    steradian; Result.accepted_spectra() supplies accepted per-energy views.
     ``measure`` and ``count_basis`` preserve the physical interpretation that
-    cannot be enforced by Pint's dimensional algebra alone. No acceptance,
-    beam-current, or response scaling takes place here.
+    cannot be enforced by Pint's dimensional algebra alone. The initial
+    quantify() view has no acceptance or current scaling; explicit rate/current
+    methods change its count basis without response replay.
 
     Internal arrays are isolated from the source and private. Each property
     access returns a fresh quantity: caller mutation cannot desynchronize the
@@ -41,20 +53,39 @@ class QuantifiedSpectrum:
     normalization: Literal["source", "observation-average"]
     _energy_unit: str = field(default="eV", repr=False)
     sampling: Literal["nodes", "bin-mean", "mixed"] = "nodes"
-    measure: Literal["per_energy_per_steradian"] = "per_energy_per_steradian"
-    count_basis: Literal["photons_per_incident_electron"] = "photons_per_incident_electron"
+    measure: Literal["per_energy_per_steradian", "per_energy"] = "per_energy_per_steradian"
     _bin_edges_eV: np.ndarray | None = field(default=None, repr=False)
+
+    acceptance_applied: bool = field(default=False, kw_only=True)
+    accepted_solid_angle_sr: float | None = field(default=None, kw_only=True)
+
+    normalization_basis: NormalizationBasis = field(default="per_incident_electron", kw_only=True)
 
     def __post_init__(self) -> None:
         _check_energy_unit(self._energy_unit)
+        count_basis(self.normalization_basis)
+        for value in (self._energy_eV, self._density_per_eV_sr, self._bin_edges_eV):
+            if value is not None and not isinstance(value, (np.ndarray, list, tuple)):
+                raise TypeError("quantity spectra require CPU NumPy arrays or numeric sequences")
         if self.normalization not in {"source", "observation-average"}:
             raise ValueError("normalization must be source or observation-average")
-        if (
-            self.sampling not in {"nodes", "bin-mean", "mixed"}
-            or self.measure != "per_energy_per_steradian"
-            or self.count_basis != "photons_per_incident_electron"
-        ):
+        if self.sampling not in {"nodes", "bin-mean", "mixed"} or self.measure not in {
+            "per_energy_per_steradian",
+            "per_energy",
+        }:
             raise ValueError("unsupported spectrum measure or normalization metadata")
+
+        if self.acceptance_applied != (self.measure == "per_energy"):
+            raise ValueError("acceptance and spectral measure must agree")
+        if self.acceptance_applied:
+            if (
+                self.accepted_solid_angle_sr is None
+                or not np.isfinite(self.accepted_solid_angle_sr)
+                or self.accepted_solid_angle_sr <= 0
+            ):
+                raise ValueError("accepted spectra require a finite positive matching solid angle")
+        elif self.accepted_solid_angle_sr is not None:
+            raise ValueError("unaccepted spectra cannot carry applied solid angle")
 
         energy = np.array(self._energy_eV, copy=True)
         density = np.array(self._density_per_eV_sr, copy=True)
@@ -92,11 +123,13 @@ class QuantifiedSpectrum:
 
     @property
     def density(self) -> Quantity:
-        """A fresh Pint density per displayed energy and steradian."""
+        """Fresh density in the displayed energy unit and declared angular/current measure."""
         from ..units import Q_
 
-        return Q_(self._density_per_eV_sr.copy(), "1 / eV / steradian").to(
-            f"1 / ({self._energy_unit}) / steradian"
+        angular = " / steradian" if self.measure == "per_energy_per_steradian" else ""
+        temporal = rate_units(self.normalization_basis)
+        return Q_(self._density_per_eV_sr.copy(), f"1 / eV{angular}{temporal}").to(
+            f"1 / ({self._energy_unit}){angular}{temporal}"
         )
 
     def to_energy(self, unit: str) -> Self:
@@ -106,11 +139,61 @@ class QuantifiedSpectrum:
         solid-angle normalization change. It retains every native sample and
         its physical meaning, and never modifies this spectrum.
         """
-        return type(self)(
-            self._energy_eV,
-            self._density_per_eV_sr,
-            self.normalization,
-            unit,
-            self.sampling,
-            _bin_edges_eV=self._bin_edges_eV,
+        return replace(self, _energy_unit=unit)
+
+    @property
+    def count_basis(self) -> str:
+        """Photon normalization, independent of Pint's dimensional algebra."""
+        return count_basis(self.normalization_basis)
+
+    def rate(self, *, current: Quantity) -> Self:
+        """Return photons per second using explicit mean current I/|e|.
+
+        Current must be a finite nonnegative scalar quantity. Rejects repeated
+        current transforms; preserves acceptance, response and native sampling.
+        Validation: spectral-explicit-rate-normalization
+        """
+        factor = rate_factor(self.normalization_basis, current)
+        return replace(
+            self,
+            _density_per_eV_sr=self._density_per_eV_sr * factor,
+            normalization_basis="per_second",
         )
+
+    def rate_per_current(self) -> Self:
+        """Return photons per second per ampere, including at zero beam current.
+
+        Applies 1/|e| directly to per-primary yields, never divides by current.
+        Validation: spectral-explicit-rate-normalization
+        """
+        factor = per_current_factor(self.normalization_basis)
+        return replace(
+            self,
+            _density_per_eV_sr=self._density_per_eV_sr * factor,
+            normalization_basis="per_current",
+        )
+
+    def _table_quantities(self) -> dict[str, Quantity]:
+        columns = {"photon_energy": self.photon_energy, "density": self.density}
+        if self._bin_edges_eV is not None:
+            edges = self.photon_energy_edges
+            columns.update(photon_energy_left=edges[:-1], photon_energy_right=edges[1:])
+        return columns
+
+    def to_dataframe(self) -> pl.DataFrame:
+        """Numeric native-grid table with explicit measure and normalization labels.
+
+        Coordinates and densities use the paired display energy unit. No
+        interpolation, total, response replay or acquisition scaling is added.
+        """
+        import polars as pl
+
+        columns = self._table_quantities()
+        frame = pl.DataFrame({name: q.magnitude for name, q in columns.items()})
+        return frame.with_columns(
+            *[pl.lit(value).alias(name) for name, value in table_metadata(self).items()]
+        )
+
+    def dataframe_units(self) -> dict[str, dict[str, str | None]]:
+        """Physical column units and count bases for :meth:`to_dataframe`."""
+        return quantity_columns(self._table_quantities(), self.count_basis)

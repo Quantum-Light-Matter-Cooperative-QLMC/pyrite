@@ -52,6 +52,7 @@ coherent-line-spectrum
 coherent-segment-midpoint-time
 temporal-intensity-profile
 directional-source-rate-normalization
+spectral-explicit-rate-normalization
 tr-coherent-bunch
 tr-crossing-superposition
 tr-cuda-parity

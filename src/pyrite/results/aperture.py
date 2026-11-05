@@ -15,6 +15,7 @@ from ..photon_observation import SCHEMA as CONTINUUM_SCHEMA
 
 if TYPE_CHECKING:
     import polars as pl
+    from pint import Quantity
 
 ApertureResult = PhotonContinuumTally | PhotonEventTally
 
@@ -84,12 +85,15 @@ def aperture_from_payload(payload: dict | None) -> ApertureResult | None:
     raise ValueError("unsupported photon aperture schema")
 
 
-def aperture_dataframe(tally: ApertureResult, *, current_nA: float | None = None) -> pl.DataFrame:
+def aperture_dataframe(
+    tally: ApertureResult, *, current_nA: float | None = None, current: Quantity | None = None
+) -> pl.DataFrame:
     """Histogram densities/counts over the physical aperture, with explicit units.
 
     Without ``current_nA`` densities are photons/(incident electron eV), and
     counts are photons/incident electron. Supplying a finite nonnegative mean
-    beam current scales to photons/(s eV) and photons/s. No solid angle or
+    beam current scales to photons/(s eV) and photons/s. Alternatively supply
+    ``current=Q_(...)``; both spellings together are an error. No solid angle or
     proposal-count factor is applied. Unbinned detections remain on ``tally``;
     they are not assigned to displayed energy bins or interpolated onto nodes.
     """
@@ -98,7 +102,14 @@ def aperture_dataframe(tally: ApertureResult, *, current_nA: float | None = None
 
     scale = 1.0
     density_units, count_units = "photons / (electron eV)", "photons / electron"
-    if current_nA is not None:
+    if current is not None:
+        from ._spectral_rate import rate_factor
+
+        if current_nA is not None:
+            raise TypeError("pass only one of current and current_nA")
+        scale = rate_factor("per_incident_electron", current)
+        density_units, count_units = "photons / (s eV)", "photons / s"
+    elif current_nA is not None:
         if isinstance(current_nA, bool) or not np.isfinite(current_nA) or current_nA < 0:
             raise ValueError("current_nA must be finite and nonnegative")
         scale = float(current_nA) * 1e-9 / elementary_charge

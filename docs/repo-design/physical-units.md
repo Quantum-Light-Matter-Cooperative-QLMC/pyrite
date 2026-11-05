@@ -120,7 +120,9 @@ incident electron, eV, and sr; pixel/acquisition counts represent integrated
 accepted events; rate and flux helpers apply their stated beam and geometry
 normalizations. Angles and solid angles remain available through the existing
 public degree/sr fields. No optional Pint wrapper is added to result arrays in
-this slice. `Result.spectral_flux(units=...)` already provides named flux
+this slice. `Result.accepted_spectra()` and explicit spectral `.rate(current=...)`
+provide acceptance and current transformations; the legacy
+`Result.spectral_flux(units=...)` selector retains named flux
 normalizations (`detector`, `nA`, `sr`, and `electron`); the underlying source
 components use distinct grids and spectral-density semantics, while pixel and
 aperture results are integrated quantities. A generic quantity wrapper would

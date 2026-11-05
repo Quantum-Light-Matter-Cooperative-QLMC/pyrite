@@ -59,6 +59,7 @@ _ENERGY_COLUMN = {"unit": "eV", "basis": None}
 
 if TYPE_CHECKING:
     import polars as pl
+    from pint import Quantity
 
     from .._numerics import Numerics
     from ..campaign.model import Scene
@@ -338,15 +339,58 @@ class Result:
         ):
             object.__setattr__(self, name, value)
 
-    def aperture_dataframe(self, *, current_nA: float | None = None) -> pl.DataFrame:
+    def aperture_dataframe(
+        self, *, current_nA: float | None = None, current: Quantity | None = None
+    ) -> pl.DataFrame:
         """Aperture histogram; per electron by default, or per second at ``current_nA``.
 
         Densities/counts and their units remain separate from :meth:`spectral_flux`.
-        Uses exact histogram edges and widths; no acceptance factor is reapplied.
+        ``current=Q_(...)`` accepts an explicit mean current quantity instead
+        of ``current_nA``; supplying both is an error. Uses exact histogram
+        edges and widths; no acceptance factor is reapplied.
         """
         if self.aperture is None:
             raise ValueError("this Result has no photon aperture observation")
-        return aperture_dataframe(self.aperture, current_nA=current_nA)
+        return aperture_dataframe(self.aperture, current_nA=current_nA, current=current)
+
+    def accepted_spectra(
+        self,
+        *,
+        mode: Literal["incoherent", "coherent"] = "incoherent",
+        assume_uniform: bool = False,
+    ) -> dict[str, QuantifiedSpectrum]:
+        """Native component photon yields integrated over matching acceptance.
+
+        Source densities require ``assume_uniform=True`` to acknowledge the
+        central directional density is uniform over the case's solid angle.
+        Observation averages use the matching summed pixel solid angle, with
+        transmission already included. They remain observation averages and
+        cannot recover intrinsic source densities. No response, current or
+        exposure is applied. Select one CXR mode; no union grid or total.
+        Coherent rates retain the stored bunch population/shape; an explicit
+        mean current does not recompute charge-dependent radiation.
+
+        Validation: spectral-explicit-rate-normalization
+        """
+        if not isinstance(assume_uniform, bool):
+            raise TypeError("assume_uniform must be boolean")
+        parts = self._components(mode)
+        if self.cxr.incoherent.normalization == "source" and not assume_uniform:
+            raise ValueError("source acceptance requires assume_uniform=True")
+        solid_angle = self.accepted_solid_angle_sr()
+        return {
+            name: QuantifiedSpectrum(
+                part.photon_energy_eV,
+                part.density * solid_angle,
+                cast(Literal["source", "observation-average"], part.normalization),
+                sampling=cast(Literal["nodes", "bin-mean", "mixed"], part.sampling),
+                measure="per_energy",
+                _bin_edges_eV=part.bin_edges_eV,
+                acceptance_applied=True,
+                accepted_solid_angle_sr=solid_angle,
+            )
+            for name, _, part in parts
+        }
 
     def combined_cxr(
         self,
@@ -444,8 +488,9 @@ class Result:
         ``photon_energy_eV`` (eV), ``density`` (photons / incident electron /
         eV / sr), and ``normalization`` (``source`` or ``observation-average``).
         Each array keeps its own grid; nothing is interpolated or padded, and
-        no totals are added. Use :meth:`spectral_flux` for a common-grid table
-        with physical units and a ``total`` column. Case and provenance stay on
+        no totals are added. Use :meth:`accepted_spectra` and explicit quantity
+        current transforms for native tables with physical units; use
+        :meth:`integrated_yield` for represented totals. Case and provenance stay on
         this result; spatial pixel data stays on :attr:`spatial`.
         """
         import polars as pl
@@ -497,7 +542,13 @@ class Result:
 
         Entries follow :meth:`dataframe_units`; every family column and
         ``total`` share the selected flux unit and count basis.
+
+        Deprecated since 0.26.1; removal in 0.28.0. Use native quantity
+        spectra and their ``dataframe_units()`` for new exports.
         """
+        from .._api_deprecations import warn_api
+
+        warn_api("Result.spectral_flux_units")
         if units not in FLUX_UNITS:
             raise ValueError(f"units must be one of {', '.join(map(repr, FLUX_UNITS))}")
         unit, basis = _FLUX_COLUMN_UNITS[units]
@@ -573,8 +624,10 @@ class Result:
         import polars as pl
         from scipy.constants import elementary_charge
 
+        from .._api_deprecations import warn_api
         from .store import beam_current_na
 
+        warn_api("Result.spectral_flux")
         if units not in FLUX_UNITS:
             raise ValueError(f"units must be one of {', '.join(map(repr, FLUX_UNITS))}")
         electrons_per_s_per_na = 1e-9 / elementary_charge

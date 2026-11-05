@@ -424,3 +424,13 @@ loading; they must not enter a checkpoint, CAS payload, worker record or hash.
 
 Any newly discovered ambiguity in units, probability measure or normalization
 is a **blocking review item**, not an invitation to guess a Pint dimension.
+
+## Explicit spectral-rate follow-up (#955)
+
+Scalar, directional, selected-pixel and aperture quantity spectra support
+explicit `rate(current=...)`, zero-safe `rate_per_current()`, and native tables.
+`Result.accepted_spectra()` owns matching acceptance and uniform-density
+acknowledgment. Numeric tables and legacy directional/aperture return types
+remain compatible. The `spectral_flux` selector and its metadata accessor are
+scheduled for deprecation in 0.26.1 and removal in 0.28.0; no default numerical
+output or identity changes. Use the [quantity migration recipe](../guides/physical-quantities.md#read-results-with-units).

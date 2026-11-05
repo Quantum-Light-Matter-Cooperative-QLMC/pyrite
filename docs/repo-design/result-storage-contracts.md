@@ -74,10 +74,11 @@ manifests, cache keys and normalization conventions do not change.
 
 Keep `Analysis` as the existing presentation-time compatibility value. It is
 not consumed by `simulate()` and must not acquire persistence or physics
-responsibilities. For scalar results, use `Result.spectral_flux(units="electron")`
-for intrinsic density, `units="sr"` for rates per steradian at the beam's mean
-current, or `units="detector"` for the scalar acceptance approximation. These
-return derived tables without changing the stored spectra or source identity.
+responsibilities. For scalar results, use `Result.to_dataframe()`
+for native intrinsic density tables, `.quantify().rate(current=...)` for
+explicit per-steradian rates, and `Result.accepted_spectra(assume_uniform=True)`
+for matching scalar acceptance. The quantity carriers export native tables
+without changing stored spectra or source identity.
 For physical pixel detectors, use an explicit response and acquisition request
 with `Result.acquire()` or `Result.acquisition_image()`; a stored observation
 can be rescored with `StoredObservation.rescore()` while retaining its source
