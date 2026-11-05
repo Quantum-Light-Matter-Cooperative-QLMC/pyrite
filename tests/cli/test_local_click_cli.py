@@ -71,7 +71,6 @@ def test_run_click_dispatches_profile_material_and_zero_workers(monkeypatch, tmp
         "allow_physics_fallback": False,
         "material": "hopg",
         "all": False,
-        "actually_all": False,
         "workers": 0,
         "catalog_profile": "standard",
         "quick": False,

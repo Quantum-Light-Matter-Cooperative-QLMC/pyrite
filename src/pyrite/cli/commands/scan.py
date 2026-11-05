@@ -792,7 +792,6 @@ def _run_local(options):
     run_kwargs = {
         **{name: options[name] for name in _LOCAL_RUN_PARAMETER_NAMES},
         "all": False,
-        "actually_all": False,
         "beam_uvw": None,
         "performance_profile": performance_profile,
         "cache_read": cache_read,
