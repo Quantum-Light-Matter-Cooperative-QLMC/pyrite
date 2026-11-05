@@ -850,23 +850,24 @@ def _clip_segments_to_cutoff(segments, E_cut_keV, composition, layers=None):
     # blocking device->host syncs 46 -> 19 per case and kernel launches 471 ->
     # 366. Keep it an index; reverting to `out[key][keep]` restores the stall.
     keep_idx = xp.nonzero(keep)[0]
-    # ``keep_idx`` lives on the selected backend, so the rows it gathers have to
-    # as well. This runs BEFORE ``_segments_on_device``, i.e. on whatever the
-    # transport handed us -- host arrays on every accelerator run -- and
-    # ``host_rows[device_idx]`` is not an upload: NumPy asks the index for
-    # ``__array__`` and CuPy refuses to sync implicitly. Stage the row here (a
-    # no-op once the caller already staged, and no copy at all on NumPy) rather
-    # than fetch the index back to the host, which would undo the readback this
-    # very index exists to pay only once. Staging with ``_stage_row`` rather
-    # than a bare ``asarray`` keeps the clip's own outputs at the same dtype
-    # ``_segments_on_device`` would give them a moment later, so the fields it
-    # derives below (E_end/E_repr/t_end) are consistent with the rows it emits
-    # instead of mixing transport fp64 with a REAL solve.
+    # Transport normally supplies host rows. Select those BEFORE uploading:
+    # staging the entire row and then gathering allocates both full and selected
+    # device arrays (over 1 GB per vector field in the 20k-primary #278 run).
+    # Reuse one host index for every host field; device-resident rows keep the
+    # existing device gather. Stage after selection to retain the same REAL
+    # conversion and non-flushing FP64-to-FP32 cast.
+    host_idx = None
     out = dict(segments)
     with _RowStager() as stage:
         for key in _SEG_ARRAYS:
             if key in out:
-                out[key] = stage(out[key])[keep_idx]
+                row = out[key]
+                if isinstance(row, np.ndarray):
+                    if host_idx is None:
+                        host_idx = _to_cpu(keep_idx)
+                    out[key] = stage(row[host_idx])
+                else:
+                    out[key] = stage(row)[keep_idx]
 
     E = xp.asarray(out["E_keV"], dtype=REAL)
     old_L = xp.asarray(out["L_ang"], dtype=REAL)
