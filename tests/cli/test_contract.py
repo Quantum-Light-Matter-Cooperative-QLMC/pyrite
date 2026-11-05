@@ -94,6 +94,13 @@ _REMOVED_OPTIONS.update(
             for flag in ("--ne-line", "--ne-brem")
         ),
         ("run", "--ne-brem"),
+        # Issue #739: the Zhai workflow moved to `app validation reproduce`.
+        ("run", "--preset"),
+        ("run", "--ne"),
+        ("run", "--brem-trials"),
+        ("run", "--ne-supp"),
+        ("run", "--tmd-azimuth"),
+        ("run", "--refresh"),
         ("app validation export", "--ne-brem"),
         ("checkpoint recompute brem", "--ne-brem"),
         ("profile numerics set", "--line-electrons"),

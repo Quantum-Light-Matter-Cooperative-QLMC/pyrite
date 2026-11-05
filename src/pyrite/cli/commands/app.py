@@ -7,6 +7,7 @@ import click
 
 from .._deprecations import canonical_option
 from .._groups import LazyGroup
+from .._options import remote_option
 
 _LEAVES = {
     "configuration": "pyrite.cli.commands.app.configuration_command",
@@ -30,7 +31,7 @@ _HELP = {
     "transition-radiation": "Launch or export the TR/CTR demo.",
     "optical-diagnostics": "Launch or export optical source and instrument diagnostics.",
     "viewer": "Launch or export the 3D trajectory viewer.",
-    "validation": "Launch or export cached validation figures.",
+    "validation": "Launch, reproduce or export validation figures.",
 }
 
 
@@ -132,10 +133,10 @@ def transition_radiation_command() -> click.Group:
 @click.group(
     "validation",
     no_args_is_help=True,
-    help="Launch the interactive validation application, or export cached figures.",
+    help="Launch the validation application, reproduce its cache, or export cached figures.",
 )
 def validation_command() -> None:
-    """Launch or export cached validation figures."""
+    """Launch, reproduce or export validation figures."""
 
 
 @click.command("launch", help="Launch the interactive validation application.")
@@ -205,7 +206,77 @@ def validation_export_command(
     )
 
 
+@click.command(
+    "reproduce",
+    help="Populate the Zhai reproduction cache; runs here unless -R/--remote.",
+)
+@click.option(
+    "--ne",
+    type=click.IntRange(min=1),
+    default=20_000,
+    show_default=True,
+    help="Fig. 1c line electrons per energy.",
+)
+@canonical_option(
+    "--brem-trials",
+    "ne_brem",
+    type=click.IntRange(min=1),
+    default=200,
+    show_default=True,
+    help="Monte Carlo electron histories for Fig. 1c bremsstrahlung per energy.",
+)
+@click.option(
+    "--ne-supp",
+    type=click.IntRange(min=1),
+    default=200,
+    show_default=True,
+    help="Supplementary electrons per polar-tilt spectrum.",
+)
+@click.option(
+    "--tmd-azimuth",
+    type=click.FloatRange(),
+    default=0.0,
+    show_default=True,
+    metavar="DEGREES",
+    help="Exploratory TMD azimuth.",
+)
+@click.option("--refresh", is_flag=True, help="Recompute matching cache.")
+@click.option("--no-sync", is_flag=True, help="With -R/--remote, skip code upload.")
+@click.option("--dry-run", is_flag=True, help="With -R/--remote, print submission preview only.")
+@click.option("--detach", is_flag=True, help="With -R/--remote, return after submission.")
+@remote_option
+def validation_reproduce_command(
+    ne: int,
+    ne_brem: int,
+    ne_supp: int,
+    tmd_azimuth: float,
+    refresh: bool,
+    no_sync: bool,
+    dry_run: bool,
+    detach: bool,
+    remote_target: str | None,
+) -> None:
+    workload = {
+        "ne": ne,
+        "ne_brem": ne_brem,
+        "ne_supp": ne_supp,
+        "tmd_azimuth": tmd_azimuth,
+        "refresh": refresh,
+    }
+    if remote_target is None:
+        if no_sync or dry_run or detach:
+            raise click.UsageError("--no-sync/--dry-run/--detach require -R/--remote")
+        _load("pyrite.cli.commands.app_validation.reproduce")(**workload)
+        return
+    remote_config = import_module("pyrite.remote.config")
+    remote_check = _load("pyrite.cli.commands.remote.remote_check")
+    host = None if remote_target == "__configured__" else remote_target
+    with remote_config.override_remote_host(host):
+        remote_check(**workload, no_sync=no_sync, detach=detach, dry_run=dry_run)
+
+
 validation_command.add_command(validation_launch_command)
+validation_command.add_command(validation_reproduce_command)
 validation_command.add_command(validation_export_command)
 
 

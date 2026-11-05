@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pytest
 
+from pyrite.cli import command as root_command
 from pyrite.cli.commands import recompute as recompute_cli
 from pyrite.cli.commands import remote as remote_cli
 from pyrite.cli.commands import scan
@@ -164,8 +165,10 @@ def test_invalid_remote_target_is_usage_error_and_restores_host(monkeypatch):
     assert remote_config.remote_host() == "configured-box"
 
 
-@pytest.mark.parametrize("brem_flag", ["--brem-trials"])
-def test_zhai_preset_waits_pulls_and_restores_explicit_target(monkeypatch, brem_flag):
+REPRODUCE = ["app", "validation", "reproduce"]
+
+
+def test_zhai_reproduce_remote_restores_explicit_target(monkeypatch):
     seen = {}
     monkeypatch.setattr(remote_config, "HOST", "configured-box")
 
@@ -173,17 +176,14 @@ def test_zhai_preset_waits_pulls_and_restores_explicit_target(monkeypatch, brem_
         seen.update(kwargs, host=remote_config.remote_host())
 
     monkeypatch.setattr(remote_cli, "remote_check", check)
-
     result = invoke(
-        scan.command,
+        root_command,
         [
-            "--preset",
-            "zhai",
+            *REPRODUCE,
             "--remote=box-a",
-            "--wait",
             "--ne",
             "11",
-            brem_flag,
+            "--brem-trials",
             "3",
             "--ne-supp",
             "5",
@@ -209,44 +209,20 @@ def test_zhai_preset_waits_pulls_and_restores_explicit_target(monkeypatch, brem_
     assert remote_config.remote_host() == "configured-box"
 
 
-def test_zhai_preset_detach_and_dry_run_flow_to_remote_workflow(monkeypatch):
+def test_zhai_reproduce_detach_and_dry_run_flow_to_remote_workflow(monkeypatch):
     calls = []
     monkeypatch.setattr(remote_cli, "remote_check", lambda **kwargs: calls.append(kwargs))
 
-    detached = invoke(scan.command, ["--preset", "zhai", "--remote", "--detach"])
-    preview = invoke(scan.command, ["--preset", "zhai", "--remote", "--dry-run"])
+    detached = invoke(root_command, [*REPRODUCE, "--remote", "--detach"])
+    preview = invoke(root_command, [*REPRODUCE, "--remote", "--dry-run"])
 
     assert_clean_result(detached)
     assert_clean_result(preview)
-    assert calls[0]["detach"] is True
-    assert calls[0]["dry_run"] is False
-    assert calls[1]["detach"] is False
-    assert calls[1]["dry_run"] is True
+    assert (calls[0]["detach"], calls[0]["dry_run"]) == (True, False)
+    assert (calls[1]["detach"], calls[1]["dry_run"]) == (False, True)
 
 
-def test_zhai_preset_rejects_normal_run_inputs_in_both_localities():
-    positional = invoke(scan.command, ["standard", "--preset", "zhai", "--remote"])
-    positional_local = invoke(scan.command, ["standard", "--preset", "zhai"])
-    normal_option = invoke(
-        scan.command,
-        ["--preset", "zhai", "--remote", "--material", "hopg"],
-    )
-    normal_option_local = invoke(scan.command, ["--preset", "zhai", "--material", "hopg"])
-    missing_preset = invoke(scan.command, ["--remote", "--ne", "11"])
-
-    assert positional.exit_code == 2
-    assert "normal-run option(s): PROFILE" in positional.stderr
-    assert positional_local.exit_code == 2
-    assert "normal-run option(s): PROFILE" in positional_local.stderr
-    assert normal_option.exit_code == 2
-    assert "normal-run option(s): --material" in normal_option.stderr
-    assert normal_option_local.exit_code == 2
-    assert "normal-run option(s): --material" in normal_option_local.stderr
-    assert missing_preset.exit_code == 2
-    assert "require --preset zhai: --ne" in missing_preset.stderr
-
-
-def test_zhai_preset_runs_locally_without_remote(monkeypatch):
+def test_zhai_reproduce_runs_locally_without_remote(monkeypatch):
     seen = {}
 
     def reproduce_all(**kwargs):
@@ -254,10 +230,9 @@ def test_zhai_preset_runs_locally_without_remote(monkeypatch):
         return [("zhai-fig1c", Path("/cache/zhai-fig1c.pkl"), False)]
 
     monkeypatch.setattr(anchor_figures, "reproduce_all", reproduce_all)
-
     result = invoke(
-        scan.command,
-        ["--preset", "zhai", "--ne", "11", "--brem-trials", "3", "--ne-supp", "5", "--refresh"],
+        root_command,
+        [*REPRODUCE, "--ne", "11", "--brem-trials", "3", "--ne-supp", "5", "--refresh"],
     )
 
     assert_clean_result(result)
@@ -268,16 +243,31 @@ def test_zhai_preset_runs_locally_without_remote(monkeypatch):
         "tmd_exploratory_azimuth_deg": 0.0,
         "refresh": True,
     }
-    assert "zhai-fig1c" in result.stdout
-    assert "computed" in result.stdout
     assert "/cache/zhai-fig1c.pkl" in result.stdout
 
 
-def test_zhai_preset_remote_only_options_still_require_remote():
-    for flag in ("--no-sync", "--dry-run"):
-        result = invoke(scan.command, ["--preset", "zhai", flag])
-        assert result.exit_code == 2
-        assert "require -R/--remote" in result.stderr
+@pytest.mark.parametrize("flag", ["--no-sync", "--dry-run", "--detach"])
+def test_zhai_reproduce_remote_only_options_require_remote(flag):
+    result = invoke(root_command, [*REPRODUCE, flag])
+    assert result.exit_code == 2
+    assert "require -R/--remote" in result.stderr
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        ["--preset", "zhai"],
+        ["--ne", "11"],
+        ["--brem-trials", "3"],
+        ["--ne-supp", "5"],
+        ["--tmd-azimuth", "35"],
+        ["--refresh"],
+    ],
+)
+def test_run_refuses_removed_zhai_options(args):
+    result = invoke(root_command, ["run", *args])
+    assert result.exit_code == 2
+    assert "No such option" in result.stderr
 
 
 def test_remote_optional_value_parses_around_profile(monkeypatch):

@@ -231,7 +231,7 @@ targets `channeling_app.py` with no material argument. Imports no `apps` module.
 - Public: `command`, `main`.
 
 ## `validation/_zhai.py`
-Canonical maintained Zhai detector geometry and cache-schema provenance shared by anchor figures, headless reproduction, validation-app export, and remote SLURM metadata. Heavy calculations remain in `src/pyrite/validation/anchor_figures.py`; app and export consumers are cache-only and direct misses to `pyrite run --preset zhai --remote`.
+Canonical maintained Zhai detector geometry and cache-schema provenance shared by anchor figures, headless reproduction, validation-app export, and remote SLURM metadata. Heavy calculations remain in `src/pyrite/validation/anchor_figures.py`; app and export consumers are cache-only and direct misses to `pyrite app validation reproduce --remote`.
 - Internal: `ZHAI_DETECTOR`, `ZHAI_CACHE_SCHEMA`, `ZHAI_CACHE_FORMAT`, `detector_metadata`.
 - Deps: `detectors.Detector`.
 

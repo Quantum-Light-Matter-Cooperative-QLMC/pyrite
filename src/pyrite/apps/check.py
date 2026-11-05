@@ -94,15 +94,14 @@ _JOB_ID_RE = re.compile(r"JOB (\d{8}-\d{6}-[0-9a-f]{8}) · SUBMITTED")
 
 def start_remote_zhai(*, ne, ne_brem, ne_supp, tmd_azimuth, refresh=False):
     """Launch the existing detached remote Zhai job and return its job id."""
-    # `pyrite run --preset zhai --remote --detach` is the canonical launch path
-    # (the retired `remote check`/`validate` spelling this used to call is no
-    # longer mounted on the CLI tree, see commit fa3e0aa1). It prints a
+    # `pyrite app validation reproduce --remote --detach` is the canonical
+    # launch path. It prints a
     # `JOB <jobid> · SUBMITTED` banner (`remote/queue.py::start_zhai_queue`) on
     # success, not the "started zhai job <id>" text this used to look for.
     command = _cli(
-        "run",
-        "--preset",
-        "zhai",
+        "app",
+        "validation",
+        "reproduce",
         "--remote",
         "--detach",
         "--ne",

@@ -471,7 +471,7 @@ Regenerate the data and the README preview image after populating the Zhai
 cache:
 
 ```bash
-pyrite run --preset zhai          # or --remote, then pull the cache back
+pyrite app validation reproduce          # or --remote, then pull the cache back
 uv run python scripts/export_docs_demo.py
 ```
 

@@ -435,7 +435,9 @@ def pull_zhai_cache():
     )
     names = [Path(p).name for p in transport._ssh_capture(listing).split()]
     if not names:
-        print("(no zhai cache files on the box -- run `pyrite run --preset zhai --remote` first)")
+        print(
+            "(no zhai cache files on the box -- run `pyrite app validation reproduce --remote` first)"
+        )
         return
     dest = output_dir("cache") / "zhai_reproduction"
     dest.mkdir(parents=True, exist_ok=True)

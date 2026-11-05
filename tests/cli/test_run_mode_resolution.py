@@ -23,7 +23,6 @@ def dispatched(monkeypatch):
     monkeypatch.setattr(runs_scan, "_reexec_under_py_spy", sink("py_spy"))
     monkeypatch.setattr(remote_cli, "_cli_start", sink("remote_start"))
     monkeypatch.setattr(remote_cli, "remote_check", sink("remote_check"))
-    monkeypatch.setattr(scan, "_reproduce_zhai", sink("zhai"))
     monkeypatch.setattr(scan, "set_canonical_env", sink("env"))
     monkeypatch.setattr(_simulation, "execute_simulation", sink("simulate"))
     return calls
@@ -37,15 +36,6 @@ def dispatched(monkeypatch):
         (
             ["standard", "-m", "hopg", "--remote", "--wait", "--detach"],
             "--wait and --detach are mutually exclusive",
-        ),
-        (["standard", "--ne", "10"], "Zhai option(s) require --preset zhai: --ne"),
-        (
-            ["standard", "--preset", "zhai"],
-            "--preset zhai does not support normal-run option(s): PROFILE",
-        ),
-        (
-            ["--preset", "zhai", "--workers", "2", "--quick"],
-            "--preset zhai does not support normal-run option(s): --workers, --quick",
         ),
     ],
 )
@@ -67,21 +57,6 @@ def test_ephemeral_counts_default_map_options_as_explicit(dispatched):
     assert result.exit_code == 2
     assert "--ephemeral does not support option(s): --workers" in result.stderr
     assert dispatched == []
-
-
-def test_preset_ignores_default_map_normal_run_options(dispatched):
-    result = CliRunner().invoke(
-        scan.command, ["--preset", "zhai", "--ne", "10"], default_map={"workers": 2}
-    )
-
-    assert_clean_result(result)
-    assert dispatched == [
-        (
-            "zhai",
-            (),
-            {"ne": 10, "ne_brem": 200, "ne_supp": 200, "tmd_azimuth": 0.0, "refresh": False},
-        )
-    ]
 
 
 def test_environment_profile_reaches_local_run(dispatched, monkeypatch):

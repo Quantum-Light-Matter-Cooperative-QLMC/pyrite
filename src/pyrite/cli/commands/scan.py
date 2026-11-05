@@ -51,26 +51,6 @@ def _trajectories_dir(ctx, param, value):
     return value
 
 
-def _reproduce_zhai(ne, ne_brem, ne_supp, tmd_azimuth, refresh):
-    """Populate the Zhai reproduction cache in this process.
-
-    Same workload the box runs as ``python -m pyrite._entry.reproduce_zhai``;
-    ``--remote`` queues it there instead. Heavy at the default sample counts.
-    """
-    import importlib
-
-    anchor_figures = importlib.import_module("pyrite.validation.anchor_figures")
-    results = anchor_figures.reproduce_all(
-        ne=ne,
-        ne_brem=ne_brem,
-        ne_supp=ne_supp,
-        tmd_exploratory_azimuth_deg=tmd_azimuth,
-        refresh=refresh,
-    )
-    for label, path, cache_hit in results:
-        click.echo(anchor_figures.format_reproduction_row(label, path, cache_hit))
-
-
 @click.command(
     "run",
     help=(
@@ -321,43 +301,6 @@ def _reproduce_zhai(ne, ne_brem, ne_supp, tmd_azimuth, refresh):
 )
 @click.option("--no-progress", is_flag=True, help="Disable progress bars/dashboard.")
 @click.option("-v", "--verbose", count=True, help="Increase dashboard detail.")
-@click.option(
-    "--preset",
-    type=click.Choice(("zhai",), case_sensitive=True),
-    default=None,
-    help="Run a named reproduction workflow; zhai runs here unless -R/--remote.",
-)
-@click.option(
-    "--ne",
-    type=_cli_core.POSITIVE_INT,
-    default=20_000,
-    show_default=True,
-    help="With --preset zhai, Fig. 1c line electrons per energy.",
-)
-@canonical_option(
-    "--brem-trials",
-    "ne_brem",
-    type=_cli_core.POSITIVE_INT,
-    default=200,
-    show_default=True,
-    help="With --preset zhai, Monte Carlo electron histories for Fig. 1c bremsstrahlung per energy.",
-)
-@click.option(
-    "--ne-supp",
-    type=_cli_core.POSITIVE_INT,
-    default=200,
-    show_default=True,
-    help="With --preset zhai, supplementary electrons per polar-tilt spectrum.",
-)
-@click.option(
-    "--tmd-azimuth",
-    type=_cli_core.FINITE_FLOAT,
-    default=0.0,
-    show_default=True,
-    metavar="DEGREES",
-    help="With --preset zhai, exploratory TMD azimuth.",
-)
-@click.option("--refresh", is_flag=True, help="With --preset zhai, recompute matching cache.")
 @click.option("--no-sync", is_flag=True, help="With -R/--remote, skip code upload.")
 @click.option("--dry-run", is_flag=True, help="With -R/--remote, print submission preview only.")
 @remote_option
@@ -388,26 +331,18 @@ def _command(ctx, **options):
     if options["execution_plan"] and options["json_output"]:
         raise click.UsageError("--execution-plan has its own JSON output; omit --json")
     if options["execution"] is not None and (
-        options["ephemeral"]
-        or options["remote_target"] is not None
-        or options["preset"] is not None
+        options["ephemeral"] or options["remote_target"] is not None
     ):
         raise click.UsageError(
             "--execution is for ordinary sweeps; it cannot be combined with "
-            "--ephemeral, -R/--remote, or --preset"
+            "--ephemeral or -R/--remote"
         )
     if options["ephemeral"]:
         return _run_ephemeral(ctx, options)
-    raw_catalog_profile = options["catalog_profile"]
-    resolved_profile = None
-    if options["preset"] is None:
-        resolved_profile = _resolve_current_profile(options["catalog_profile"])
-        options["catalog_profile"] = resolved_profile.value
+    resolved_profile = _resolve_current_profile(options["catalog_profile"])
+    options["catalog_profile"] = resolved_profile.value
     _check_mode_combinations(ctx, options)
-    if options["preset"] == "zhai":
-        return _run_zhai_preset(ctx, options, raw_catalog_profile)
-    if resolved_profile is not None:
-        _implicit_defaults.require_explicit_profile(resolved_profile)
+    _implicit_defaults.require_explicit_profile(resolved_profile)
     if options["remote_target"] is not None or options["nsys"]:
         _refuse_unstaged_gdf_beam(options["catalog_profile"])
     if options["remote_target"] is not None:
@@ -438,44 +373,6 @@ _EPHEMERAL_PARAMETER_NAMES = frozenset(
         "verbose",
     }
 )
-_ZHAI_PARAMETER_FLAGS = {
-    "ne": "--ne",
-    "ne_brem": "--brem-trials",
-    "ne_supp": "--ne-supp",
-    "tmd_azimuth": "--tmd-azimuth",
-    "refresh": "--refresh",
-}
-_NORMAL_RUN_PARAMETER_FLAGS = {
-    "catalog_profile": "PROFILE",
-    "material": "--material",
-    "workers": "--workers",
-    "quick": "--quick",
-    "n_families": "--n-families",
-    "checkpoint_dir": "--checkpoint-dir",
-    "max_minutes": "--max-minutes",
-    "perf": "--perf",
-    "performance_profile": "--performance-profile",
-    "performance_dir": "--performance-dir",
-    "performance_interval": "--perf-interval",
-    "spec_chunk": "--cxr-chunk",
-    "brem_chunk": "--brem-chunk",
-    "nsys": "--nsys",
-    "py_spy": "--py-spy",
-    "cpu": "--cpu",
-    "cpu_only": "--cpu-only",
-    "chunk_minutes": "--chunk-minutes",
-    "no_cache": "--no-cache",
-    "allow_physics_fallback": "--allow-physics-fallback",
-    "recompute": "--recompute",
-    "trajectories": "--trajectories",
-    "overwrite_trajectories": "--overwrite-trajectories",
-    "trajectory_storage": "--trajectory-storage",
-    "progress_file": "--progress-file",
-    "progress_phase": "--progress-phase",
-    "no_progress": "--no-progress",
-    "json_output": "--output",
-    "verbose": "--verbose",
-}
 _LOCAL_ONLY_PARAMETER_FLAGS = {
     "n_families": "--n-families",
     "checkpoint_dir": "--checkpoint-dir",
@@ -573,33 +470,6 @@ def _check_mode_combinations(ctx, options):
         raise click.UsageError("--overwrite-trajectories requires --trajectories")
     if options["trajectory_storage"] is not None and options["trajectories"] is None:
         raise click.UsageError("--trajectory-storage requires --trajectories")
-    explicit_zhai = _explicit_flags(ctx, _ZHAI_PARAMETER_FLAGS)
-    if options["preset"] is None and explicit_zhai:
-        raise click.UsageError(f"Zhai option(s) require --preset zhai: {', '.join(explicit_zhai)}")
-
-
-def _run_zhai_preset(ctx, options, raw_catalog_profile):
-    """``--preset zhai``: reproduce locally, or queue it with -R/--remote."""
-    explicit_normal = _explicit_flags(ctx, _NORMAL_RUN_PARAMETER_FLAGS)
-    if raw_catalog_profile is not None and "PROFILE" not in explicit_normal:
-        explicit_normal.insert(0, "PROFILE")
-    if explicit_normal:
-        raise click.UsageError(
-            "--preset zhai does not support normal-run option(s): " + ", ".join(explicit_normal)
-        )
-    zhai = {name: options[name] for name in _ZHAI_PARAMETER_FLAGS}
-    if options["remote_target"] is None:
-        return _reproduce_zhai(**zhai)
-    from ...remote import config as remote_config
-    from . import remote as remote_cli
-
-    with remote_config.override_remote_host(_remote_host(options["remote_target"])):
-        return remote_cli.remote_check(
-            **zhai,
-            no_sync=options["no_sync"],
-            detach=options["detach"],
-            dry_run=options["dry_run"],
-        )
 
 
 def _remote_host(remote_target):
@@ -820,9 +690,6 @@ _PERF_PARAMETER_NAMES = frozenset(
         "cpu_only",
     }
 )
-_PRESET_PARAMETER_NAMES = frozenset(
-    {"preset", "ne", "ne_brem", "ne_supp", "tmd_azimuth", "refresh"}
-)
 
 
 def _derived_command(name, *, excluded, implied, help):
@@ -911,7 +778,6 @@ performance_command = _derived_command(
         "ephemeral",
         "detector_id",
         "output_file",
-        *_PRESET_PARAMETER_NAMES,
     },
     implied={
         "perf": True,
@@ -922,12 +788,6 @@ performance_command = _derived_command(
         "overwrite_trajectories": False,
         "trajectory_storage": None,
         "performance_profile": None,
-        "preset": None,
-        "ne": 20_000,
-        "ne_brem": 200,
-        "ne_supp": 200,
-        "tmd_azimuth": 0.0,
-        "refresh": False,
     },
     help=(
         "Measure a catalog profile's MC sweeps and write performance telemetry.\n\n"

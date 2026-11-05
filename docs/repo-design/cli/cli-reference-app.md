@@ -26,7 +26,7 @@ Commands:
   transition-radiation  Launch or export the TR/CTR demo.
   optical-diagnostics   Launch or export optical source and instrument diagnostics.
   viewer                Launch or export the 3D trajectory viewer.
-  validation            Launch or export cached validation figures.
+  validation            Launch, reproduce or export validation figures.
 ```
 
 ## `pyrite app configuration`
@@ -515,14 +515,15 @@ Options:
 ```text
 Usage: pyrite app validation [OPTIONS] COMMAND [ARGS]...
 
-  Launch the interactive validation application, or export cached figures.
+  Launch the validation application, reproduce its cache, or export cached figures.
 
 Options:
   -h, --help  Show this message and exit.
 
 Commands:
-  export  Write cached validation figures; never starts marimo.
-  launch  Launch the interactive validation application.
+  export     Write cached validation figures; never starts marimo.
+  launch     Launch the interactive validation application.
+  reproduce  Populate the Zhai reproduction cache; runs here unless -R/--remote.
 ```
 
 ## `pyrite app validation export`
@@ -554,4 +555,29 @@ Options:
   --acp       Start local Claude and Codex ACP bridges.
   --tunnel    Use fixed port for SSH tunneling.
   -h, --help  Show this message and exit.
+```
+
+## `pyrite app validation reproduce`
+
+```text
+Usage: pyrite app validation reproduce [OPTIONS]
+
+  Populate the Zhai reproduction cache; runs here unless -R/--remote.
+
+Options:
+  --ne INTEGER RANGE           Fig. 1c line electrons per energy.  [default: 20000;
+                               x>=1]
+  --brem-trials INTEGER RANGE  Monte Carlo electron histories for Fig. 1c bremsstrahlung
+                               per energy.  [default: 200; x>=1]
+  --ne-supp INTEGER RANGE      Supplementary electrons per polar-tilt spectrum.
+                               [default: 200; x>=1]
+  --tmd-azimuth DEGREES        Exploratory TMD azimuth.  [default: 0.0; x<=None]
+  --refresh                    Recompute matching cache.
+  --no-sync                    With -R/--remote, skip code upload.
+  --dry-run                    With -R/--remote, print submission preview only.
+  --detach                     With -R/--remote, return after submission.
+  --target NAME                Use named remote compute target NAME.
+  -R, --remote [TARGET]        Run remotely; bare uses the configured target, =TARGET
+                               overrides it.
+  -h, --help                   Show this message and exit.
 ```
