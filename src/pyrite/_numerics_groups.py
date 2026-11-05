@@ -149,6 +149,12 @@ class ExecutionConfig:
     enters case identity. Only scalar-detector, in-process runs of additive
     spectra are supported; other cases and entry points raise ``ValueError``
     before transport. Where the joined run fits in memory it is faster.
+    ``stream_memory_mib`` (experimental, #868; ``None``: off; MiB) opts into
+    the same streaming by device-memory target instead of an electron count:
+    it caps the CuPy pool at the target for the run, sizes blocks from rows per
+    electron measured on a small first block, and scales any unset
+    ``scratch_mib`` and ``electron_batch`` with the block. It excludes
+    ``stream_block_electrons`` and never enters case identity.
     """
 
     transport_core: str = "auto"
@@ -158,14 +164,17 @@ class ExecutionConfig:
     cxr_threads: int | None = None
     cxr_energies_per_block: int | None = None
     stream_block_electrons: int | None = None
+    stream_memory_mib: int | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.transport_core, str) or not self.transport_core:
             raise ValueError("transport_core must be a nonempty string")
-        for name in ("cxr_chunk", "brem_chunk", "stream_block_electrons"):
+        for name in ("cxr_chunk", "brem_chunk", "stream_block_electrons", "stream_memory_mib"):
             value = getattr(self, name)
             if value is not None and (type(value) is not int or value <= 0):
                 raise ValueError(f"{name} must be a positive integer or None")
+        if self.stream_block_electrons is not None and self.stream_memory_mib is not None:
+            raise ValueError("stream_block_electrons and stream_memory_mib are exclusive")
         if not isinstance(self.transport, TransportKernelTuning):
             raise TypeError("transport must be a TransportKernelTuning")
         for name, allowed in (
@@ -182,11 +191,12 @@ class ExecutionConfig:
 
     def __setstate__(self, state: dict[str, object]) -> None:
         # Pickles from before #776 carry no ``transport`` entry, before #825 no
-        # CXR launch controls, before #865 no streaming block.
+        # CXR launch controls, before #865/#868 no streaming controls.
         state.setdefault("transport", TransportKernelTuning())
         state.setdefault("cxr_threads", None)
         state.setdefault("cxr_energies_per_block", None)
         state.setdefault("stream_block_electrons", None)
+        state.setdefault("stream_memory_mib", None)
         self.__dict__.update(state)
 
 

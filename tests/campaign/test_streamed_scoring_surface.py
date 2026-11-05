@@ -102,3 +102,60 @@ def test_other_entry_points_fail_before_transport(monkeypatch):
             pass
     with pytest.raises(ValueError, match="executor does not support"):
         pr.simulate(_scene(), numerics=_numerics(5, core="auto"), executor=LocalExecutor())
+
+
+def _memory_numerics(target):
+    return pr.Numerics(
+        cxr_trials=12,
+        brem_trials=16,
+        energy_bins=BINS,
+        execution=cfg.KernelTuning(transport_core="per-electron", stream_memory_mib=target),
+    )
+
+
+@pytest.mark.parametrize("value", [0, -3, 2.0, True])
+def test_invalid_memory_target_is_rejected(value):
+    with pytest.raises(ValueError, match="stream_memory_mib must be a positive integer"):
+        cfg.KernelTuning(stream_memory_mib=value)
+
+
+def test_memory_target_excludes_block_electrons():
+    with pytest.raises(ValueError, match="exclusive"):
+        cfg.KernelTuning(stream_block_electrons=5, stream_memory_mib=5)
+
+
+def test_memory_target_stays_out_of_case_identity_and_old_pickles_restore():
+    plain = pr.api.build_case(_scene(), _numerics())
+    target = pr.api.build_case(_scene(), _memory_numerics(64))
+    assert case_content_key(plain) == case_content_key(target)
+    state = dict(cfg.KernelTuning().__dict__)
+    del state["stream_memory_mib"]
+    restored = cfg.KernelTuning.__new__(cfg.KernelTuning)
+    restored.__setstate__(state)
+    assert restored == cfg.KernelTuning()
+
+
+def test_memory_target_refused_outside_simulate():
+    with pytest.raises(ValueError, match="streamed scoring"):
+        phases.simulate_transport(_scene(), numerics=_memory_numerics(64))
+    with pytest.raises(ValueError, match="streamed scoring"):
+        pr.simulate(
+            _scene(),
+            numerics=pr.Numerics(
+                cxr_trials=12,
+                brem_trials=16,
+                energy_bins=BINS,
+                execution=cfg.KernelTuning(stream_memory_mib=64),
+            ),
+            executor=LocalExecutor(),
+        )
+
+
+def test_memory_target_matches_the_default():
+    reference = pr.simulate(_scene(), numerics=_numerics())
+    streamed = pr.simulate(_scene(), numerics=_memory_numerics(64))
+    assert streamed.case == reference.case
+    np.testing.assert_allclose(
+        streamed.cxr.incoherent.density, reference.cxr.incoherent.density, rtol=1e-12
+    )
+    np.testing.assert_allclose(streamed.brem.density, reference.brem.density, rtol=1e-12)

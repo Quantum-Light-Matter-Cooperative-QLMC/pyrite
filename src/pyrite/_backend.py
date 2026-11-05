@@ -69,6 +69,13 @@ class ArrayBackend:
     def to_cpu(self, value: Any) -> np.ndarray:
         return np.asarray(value)
 
+    def memory_limit_bytes(self) -> int | None:
+        """The device pool's byte cap (0: none), or None without a device pool."""
+        return None
+
+    def set_memory_limit_bytes(self, size: int) -> None:
+        return None
+
     def is_array(self, value: Any) -> bool:
         return isinstance(value, self.array_type)
 
@@ -198,6 +205,12 @@ class CuPyBackend(ArrayBackend):
 
     def release_memory(self) -> None:
         self.cp.get_default_memory_pool().free_all_blocks()
+
+    def memory_limit_bytes(self) -> int | None:
+        return int(self.cp.get_default_memory_pool().get_limit())
+
+    def set_memory_limit_bytes(self, size: int) -> None:
+        self.cp.get_default_memory_pool().set_limit(size=int(size))
 
     def allocator_stats(self) -> dict[str, float | None]:
         pool = self.cp.get_default_memory_pool()

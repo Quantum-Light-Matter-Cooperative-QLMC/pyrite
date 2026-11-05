@@ -23,6 +23,7 @@ electron count build on it.
 """
 
 from collections.abc import Callable, Mapping
+from contextlib import nullcontext
 from functools import partial
 from typing import Any
 
@@ -177,11 +178,20 @@ def _stream_electron_blocks(
 
     counts: dict[str, Any] = dict.fromkeys(_ADDITIVE_COUNTS, 0)
     retries, events = 0, []
-    for start, stop in electron_blocks(n_electrons, block_electrons):
+    sizer = None if isinstance(block_electrons, int) else block_electrons
+    spans = (
+        electron_blocks(n_electrons, block_electrons)
+        if sizer is None
+        else sizer.blocks(n_electrons)
+    )
+    for start, stop in spans:
 
         def score_block(resident, start=start, stop=stop):
             simulate = simulate_block if resident or replay_block is None else replay_block
-            block = simulate(start, stop)
+            with nullcontext() if sizer is None else sizer.block_tuning(stop - start):
+                block = simulate(start, stop)
+            if sizer is not None:
+                sizer.observe(start, stop, block)
             if on_block is not None:
                 on_block(start, stop, block)
             block = _globalize(block, start)
@@ -235,6 +245,9 @@ def transport_electron_blocks(
 
     Returns the result a single ``[0, n)`` call returns, bit for bit, where
     ``n`` is ``n_electrons`` or the earlier stop.
+
+    With ``consume``, ``block_electrons`` may be a
+    :class:`.stream_sizing.MemoryBlockSizer` instead of a count (#868).
 
     ``consume`` (optional, #611) takes each globalized block instead of the
     join: no block is retained, the population-wide host steps are skipped,

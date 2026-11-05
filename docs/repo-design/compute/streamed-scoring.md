@@ -266,6 +266,39 @@ and within 1.8e-7 on the 5080; continuum bitwise identical. Streamed arms at 262
 bound across block sizes, threads and row quanta, and are bitwise identical
 across the three measured code versions.
 
+## Memory-target block sizing (#868)
+
+`KernelTuning.stream_memory_mib` (how-to: [the guide](../../guides/streamed-scoring.md))
+caps the CuPy pool at 95% of the target for the run. The cap is what bounds
+device memory, because scoring adapts to the pool and its peak does not follow
+row count. A 1,024-electron first block measures retained bytes per electron;
+later blocks give retained rows a quarter of the target and follow the largest
+rate seen. Unset `scratch_mib` and `electron_batch` scale with each block.
+
+Re-measured on the RTX PRO 6000 (2026-11-05, `f316e1921` with #868's modules
+overlaid), single runs, W 1 MeV / 10 um and Si 1 MeV / 10 um, 262,144 electrons:
+
+| Scene, target | Wall | Driver peak | Blocks after the first |
+|---|---|---|---|
+| W, 16 GiB | 37.3 s | 15.65 GiB | 21,729 |
+| W, 64 GiB | 29.9 s | 61.73 GiB | 86,918 |
+| Si, 16 GiB | 5.0 s | 12.57 GiB | 261,120 |
+
+Fixed blocks at the same commit, W, measured with the #907 harness:
+
+| Block | Wall | Scoring | Kernel | Host peak | VRAM peak |
+|---|---|---|---|---|---|
+| 16,384 | 28.3 s | 8.2 s | 16.8 s | 1.4 GiB | 27.7 GiB |
+| 32,768 | 20.0 s | 8.0 s | 9.9 s | 1.3 GiB | 38.6 GiB |
+| 65,536 | 21.7 s | 14.1 s | 6.1 s | 2.0 GiB | 57.6 GiB |
+| 131,072 | 20.0 s | 14.6 s | 4.5 s | 2.7 GiB | 65.8 GiB |
+| 262,144 | 23.2 s | 18.6 s | 3.5 s | 4.0 GiB | 65.8 GiB |
+| joined | 34.1 s | n/a | 3.5 s | 58.3 GiB | 65.6 GiB |
+
+Since #907, device-resident blocks cut the 131k host peak from 23.4 to 2.7 GiB
+and its wall from 30.7 to 20.0 s, and the joined 262,144 W run now completes.
+Wall is flat from 32k to 131k blocks, so a larger block is not faster here.
+
 ## Resident live CUDA blocks (#914)
 
 Lab RTX 5080, implementation `16db8150c`, job 3686; the #907 W scene above
@@ -369,3 +402,9 @@ and 1.9e-5 across the Si block sizes. For W across block sizes, lines and
 characteristic agree to 4e-7 and the continuum to 2.9e-5. With
 `PYRITE_FP64=1` an earlier Si comparison agreed to 1.75e-15 (job 2937), which
 confirms that the float32 differences come from summation order only.
+
+Memory-target blocks split the continuum population differently from joined
+runs, so W's float32 continuum differs by up to 3.6e-5 of its peak at 262,144
+electrons. With `PYRITE_FP64=1` at 32,768 W electrons, memory-target blocks agree
+with the joined run to 5.4e-15 of the peak and a whole-run block is bitwise
+identical (2026-11-05).

@@ -141,8 +141,9 @@ def trajectory_case(
         raise ValueError(
             "simulate_trajectories requires fixed sampling; adaptive sampling scores spectra"
         )
-    if numerics.resolved_execution.stream_block_electrons is not None:
-        raise ValueError("stream_block_electrons requires pyrite.simulate")
+    execution = numerics.resolved_execution
+    if execution.stream_block_electrons is not None or execution.stream_memory_mib is not None:
+        raise ValueError("stream_block_electrons and stream_memory_mib require pyrite.simulate")
     scene = Scene(beam, target, detector=detector)
     if physics.channeling_model != "off" or scene.beam.state is not None:
         raise ValueError("channeling and Beam.state require pyrite.simulate")

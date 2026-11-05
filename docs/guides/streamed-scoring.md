@@ -46,6 +46,27 @@ memory on different scenes. For reference, the #611 measurements streamed a
 the largest electron count the default path fits, then raise it while memory
 allows: larger blocks amortize per-block launch and staging costs.
 
+## Set a memory target instead
+
+Use `KernelTuning.stream_memory_mib` to give a device-memory budget in MiB
+rather than an electron count. It excludes `stream_block_electrons`:
+
+<!-- verify: skip (illustrative; runs a full simulation) -->
+```python
+numerics = numerics.with_kernel_tuning(KernelTuning(stream_memory_mib=32_768))
+```
+
+The run caps the CuPy memory pool at 95% of the target, leaving room for memory
+the driver holds outside the pool, and restores the previous cap afterwards. A first block of 1,024 electrons measures this scene's memory per
+electron, and later blocks are sized so retained rows take a quarter of the
+target, shrinking if a later block proves denser. Any `scratch_mib` and
+`electron_batch` you leave unset scale with the block.
+
+Spectra and counts follow the same guarantees as electron blocks. An
+allocation over the cap goes through the normal block recovery and can raise
+an out-of-memory error if the target is too small for the scene. Other
+processes on the card are not counted.
+
 ## What it supports
 
 Streaming runs on the per-electron or CUDA transport core, in-process, through

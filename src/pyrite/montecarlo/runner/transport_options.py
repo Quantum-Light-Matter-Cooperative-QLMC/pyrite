@@ -77,8 +77,14 @@ def stream_block_electrons(numerics) -> int | None:
     return None if execution is None else execution.stream_block_electrons
 
 
+def stream_memory_mib(numerics) -> int | None:
+    """``numerics``' ``KernelTuning.stream_memory_mib`` (#868), or None."""
+    execution = getattr(numerics, "resolved_execution", None)
+    return None if execution is None else execution.stream_memory_mib
+
+
 STREAMING_ENTRY_ERROR = (
-    "KernelTuning.stream_block_electrons is supported only by pyrite.simulate "
+    "KernelTuning streamed scoring is supported only by pyrite.simulate "
     "with a scalar detector and no executor"
 )
 
@@ -91,9 +97,11 @@ def transport_tuning(numerics, *, streaming=False):
     ``transport_core``, and unset fields, keep the process defaults
     (``PYRITE_MC_TRANSPORT_SCHEDULE``, ``PYRITE_MC_ELECTRON_BATCH_MAX``).
     Callers that do not run live streamed scoring leave ``streaming`` False,
-    so a requested ``stream_block_electrons`` fails before transport (#865).
+    so a requested streaming control fails before transport (#865).
     """
-    if not streaming and stream_block_electrons(numerics) is not None:
+    if not streaming and (
+        stream_block_electrons(numerics) is not None or stream_memory_mib(numerics) is not None
+    ):
         raise ValueError(STREAMING_ENTRY_ERROR)
     tuning = transport_kernel_tuning(numerics)
     launch = _spectrum_launch(getattr(numerics, "resolved_execution", None))
@@ -116,6 +124,16 @@ def transport_tuning(numerics, *, streaming=False):
     finally:
         for var, token in reversed(tokens):
             var.reset(token)
+
+
+@contextmanager
+def override_transport_tuning(tuning):
+    """Run the enclosed transport under ``tuning`` (a ``TransportKernelTuning``)."""
+    token = _TRANSPORT_TUNING.set(per_electron_config(replace(tuning, precision=None)))
+    try:
+        yield
+    finally:
+        _TRANSPORT_TUNING.reset(token)
 
 
 @contextmanager

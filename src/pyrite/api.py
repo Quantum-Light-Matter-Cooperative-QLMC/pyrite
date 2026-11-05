@@ -46,6 +46,7 @@ from .montecarlo.runner import cached_case_table_markers, case_table_markers, ru
 from .montecarlo.runner.transport_options import (
     run_progress,
     stream_block_electrons,
+    stream_memory_mib,
     transport_tuning,
 )
 from .montecarlo.spectrum import (
@@ -350,14 +351,21 @@ def simulate(
             return _simulate_planar(request, case, xsgen_tables)
     if request.executor is None:
         block = stream_block_electrons(resolved_numerics)
+        memory = stream_memory_mib(resolved_numerics)
         with transport_tuning(resolved_numerics, streaming=True), run_progress(progress):
-            if block is None:
+            if block is None and memory is None:
                 output = run_case(case, transport_core=resolved_numerics.transport_core)
             else:
+                from .montecarlo.runner.stream_sizing import MemoryBlockSizer
                 from .montecarlo.runner.streamed_scoring import run_case_streamed
 
+                sizing = (
+                    block
+                    if memory is None
+                    else MemoryBlockSizer(memory, resolved_numerics.resolved_execution.transport)
+                )
                 output = run_case_streamed(
-                    case, block, transport_core=resolved_numerics.transport_core
+                    case, sizing, transport_core=resolved_numerics.transport_core
                 )
     else:
         from .execution._simulation import execute_simulation
