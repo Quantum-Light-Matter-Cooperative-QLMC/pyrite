@@ -200,3 +200,30 @@ def conditional_errors(contributions, probabilities, widths, bands, *, repeats=2
         "deployment_recommendation": False,
     }
     return summary, variance
+
+
+def yield_variance_summary(mass, probabilities):
+    """Analog sampling variance vs variance added by roulette, per-primary mass.
+
+    Additive decomposition: Var[sum c_i m_i] = Var_pop[sum m_i] + sum (1/p_i - 1) m_i^2.
+    The analog term is a sample estimate and is unreliable while ESS is small.
+    """
+    m = np.asarray(mass, dtype=float)
+    p = np.asarray(probabilities, dtype=float)
+    if m.ndim != 1 or m.size < 2 or p.shape != m.shape or not np.all((p > 0) & (p <= 1)):
+        raise ValueError("one mass and one positive probability per primary required")
+    analog = float(m.size * m.var(ddof=1))
+    added = float((1 / p - 1) @ m**2)
+    culled = p < 1
+    total = float(m.sum())
+    top = int(np.argmax(m))
+    return {
+        **tail_statistics(m),
+        "primaries": int(m.size),
+        "expected_kept_fraction": float(p.mean()),
+        "top_primary_probability": float(p[top]),
+        "floor_stratum_mass_share": float(m[culled].sum() / total) if total > 0 else None,
+        "analog_variance": analog,
+        "added_variance": added,
+        "added_over_analog": added / analog if analog > 0 else None,
+    }

@@ -152,3 +152,17 @@ def test_per_primary_reference_adds_to_production_bin_mean_spectrum():
         rtol=scaled_rtol(1e-10, eps_multiple=32),
         atol=whole.max() * 1e-12,
     )
+
+
+def test_yield_variance_summary_flags_rare_history_missed_by_predictor():
+    mass = np.array([100.0, 1.0, 1.0, 1.0])
+    kept = analysis.yield_variance_summary(mass, np.array([1.0, 0.5, 0.5, 0.5]))
+    missed = analysis.yield_variance_summary(mass, np.array([0.5, 1.0, 1.0, 1.0]))
+    assert kept["added_variance"] == pytest.approx(3.0)
+    assert kept["top_primary_probability"] == 1.0
+    assert missed["added_variance"] == pytest.approx(1e4)
+    assert missed["top_primary_probability"] == 0.5
+    assert missed["floor_stratum_mass_share"] == pytest.approx(100 / 103)
+    analog = analysis.yield_variance_summary(mass, np.ones(4))
+    assert analog["added_variance"] == 0.0
+    assert analog["added_over_analog"] == 0.0
