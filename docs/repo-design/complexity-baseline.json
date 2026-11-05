@@ -220,7 +220,7 @@
     {
       "path": "src/pyrite/execution/dask.py",
       "name": "DaskExecutor.execute",
-      "cc": 39
+      "cc": 33
     },
     {
       "path": "src/pyrite/execution/dask.py",
@@ -769,7 +769,7 @@
     {
       "path": "src/pyrite/runs/run.py",
       "name": "run_sweep",
-      "cc": 27
+      "cc": 26
     },
     {
       "path": "src/pyrite/runs/scan.py",

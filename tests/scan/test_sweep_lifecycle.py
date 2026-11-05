@@ -28,6 +28,7 @@ from pyrite.checkpoints.persistence import (
 from pyrite.execution import LocalExecutor
 from pyrite.execution.artifacts import CaseArtifactStore
 from pyrite.execution.dask import DaskExecutor
+from pyrite.execution.model import ResourceRequest
 from pyrite.execution.slurm import SlurmArrayExecutor
 from pyrite.montecarlo.trajectories import TrajectoryCapture
 from pyrite.runs import run as run_mod
@@ -473,6 +474,59 @@ def test_distributed_backends_reject_before_any_effect(tmp_path, backend, mode):
         )
     assert results == {}
     assert not root.exists()
+
+
+@pytest.mark.parametrize("backend", ["slurm", "dask"])
+@pytest.mark.parametrize(
+    ("store", "match"),
+    [(None, "pass its store"), ("elsewhere", "differs")],
+    ids=["missing", "foreign"],
+)
+def test_unusable_artifact_store_is_rejected_before_any_effect(tmp_path, backend, store, match):
+    root = tmp_path / "checkpoints"
+    if store is not None:
+        store = CaseArtifactStore(tmp_path / store)
+    with pytest.raises(ValueError, match=match):
+        run_sweep(
+            [_fake_case("a", 20.0)],
+            {},
+            checkpoint_path=str(root / "hopg"),
+            content_key_fn=_key,
+            artifact_store=store,
+            executor=_backends(tmp_path)[backend],
+        )
+    assert not root.exists()
+
+
+@pytest.mark.parametrize(
+    ("executor_type", "resources", "match"),
+    [
+        (SlurmArrayExecutor, ResourceRequest(gpu_count=2, accelerator="cuda"), "at most one GPU"),
+        (DaskExecutor, ResourceRequest(gpu_count=1, accelerator="cuda"), "no GPU isolation"),
+    ],
+    ids=["slurm", "dask"],
+)
+def test_unusable_backend_configuration_is_rejected_before_any_effect(
+    tmp_path, executor_type, resources, match
+):
+    root = tmp_path / "checkpoints"
+    store = CaseArtifactStore(tmp_path / "shared")
+    with pytest.raises(ValueError, match=match):
+        run_sweep(
+            [_fake_case("a", 20.0)],
+            {},
+            checkpoint_path=str(root / "hopg"),
+            content_key_fn=_key,
+            artifact_store=store,
+            executor=executor_type(store, _key, resources=resources),
+        )
+    assert not root.exists()
+
+
+def test_empty_backend_execute_still_ignores_configuration(tmp_path):
+    store = CaseArtifactStore(tmp_path / "shared")
+    resources = ResourceRequest(gpu_count=1, accelerator="cuda")
+    assert DaskExecutor(store, _key, resources=resources).execute([]) == []
 
 
 def test_rejection_precedes_resume_even_when_every_case_is_cached(tmp_path):

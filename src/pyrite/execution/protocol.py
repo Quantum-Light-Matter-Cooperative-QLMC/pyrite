@@ -14,7 +14,7 @@ class Executor(Protocol):
     A backend that cannot honor a run_cases-compatible option forwarded by
     ``run_sweep`` must raise ``ValueError`` rather than ignore it.
 
-    Two optional methods, discovered by attribute so that an executor defining
+    Three optional methods, discovered by attribute so that an executor defining
     only ``execute`` keeps working, refine what ``run_sweep`` can do:
 
     ``validate_run_options(options)``
@@ -22,6 +22,9 @@ class Executor(Protocol):
         cache or filesystem effect. ``options`` holds what ``execute`` will
         receive except ``callback`` and the per-case ``observation_directions``.
         Without it, rejection happens inside ``execute``, after resume.
+    ``validate_artifact_store(artifact_store)``
+        raises ``ValueError``, equally early, if the sweep's store (possibly None)
+        cannot load what this executor's workers publish.
     ``runtime_plan(cases, max_workers)``
         returns the ``on_runtime`` dict describing where the work runs: at least
         ``engine``, ``requested_workers`` and ``effective_workers``. Without it,

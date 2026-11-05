@@ -100,6 +100,16 @@ def _default_group_key(case):
     )
 
 
+def _validate_executor(executor, run_options, artifact_store):
+    """Apply whichever optional capability checks ``executor`` defines."""
+    validate_options = getattr(executor, "validate_run_options", None)
+    if validate_options is not None:
+        validate_options(run_options)
+    validate_store = getattr(executor, "validate_artifact_store", None)
+    if validate_store is not None:
+        validate_store(artifact_store)
+
+
 def _runtime_plan(executor, cases, max_workers):
     """Describe where ``cases`` run; never the local topology for a foreign executor."""
     if executor is None:
@@ -244,9 +254,10 @@ def run_sweep(
         When omitted, use ``montecarlo.run_cases`` exactly as before. When
         supplied, callbacks must execute in this coordinator process so the
         existing sweep remains sole owner of manifests and consolidation. An
-        optional ``validate_run_options`` rejects unsupported options before any
+        optional ``validate_run_options`` or ``validate_artifact_store`` rejects
+        unsupported options, configuration or a missing or foreign store before any
         checkpoint, cache or file effect, whether or not any case turns out to
-        need execution; an executor without it can only reject inside ``execute``,
+        need execution; an executor without them can only reject inside ``execute``,
         which a fully cached sweep never calls. See
         :class:`~pyrite.execution.protocol.Executor`.
     artifact_store
@@ -444,9 +455,7 @@ def run_sweep(
         on_timing,
         on_activity,
     )
-    validate_options = getattr(executor, "validate_run_options", None)
-    if validate_options is not None:
-        validate_options(run_options)
+    _validate_executor(executor, run_options, artifact_store)
     if dataset_identity is not None:
         from ..campaign.profiles import normalize_dataset_identity
 

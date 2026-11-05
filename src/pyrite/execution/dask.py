@@ -24,6 +24,7 @@ from .artifacts import (
     directional_content_key,
     directional_store,
     load_directional_result,
+    require_coordinator_store,
 )
 from .inspection import run_provenance
 from .model import ResourceRequest, RetryPolicy
@@ -313,8 +314,26 @@ class DaskExecutor:
             with self._lock:
                 self._futures.clear()
 
+    def validate_artifact_store(self, artifact_store: CaseArtifactStore | None) -> None:
+        """Require the sweep to read the inbox this executor's workers publish to."""
+        require_coordinator_store(self.store, artifact_store)
+
     def validate_run_options(self, options: Mapping[str, Any]) -> None:
-        """Reject options this backend cannot honor; ``execute`` applies the same checks."""
+        """Reject unsupported options or configuration before any sweep effect."""
+        self._validate_options(options)
+        self._validate_configuration()
+
+    def _validate_configuration(self) -> None:
+        if not self.store.root.is_absolute():
+            raise ValueError("artifact_root must be an absolute shared filesystem path")
+        if self.resources.gpu_count > 1:
+            raise ValueError("Dask supports at most one GPU per worker")
+        if self.resources.gpu_count and self.resources.accelerator not in ("cuda", "rocm"):
+            raise ValueError("Dask GPU requires explicit cuda or rocm accelerator")
+        if self.resources.gpu_count and self.config.cluster == "local":
+            raise ValueError("local Dask cluster has no GPU isolation; use existing scheduler")
+
+    def _validate_options(self, options: Mapping[str, Any]) -> None:
         supported = {
             "max_workers",
             "progress",
@@ -352,7 +371,7 @@ class DaskExecutor:
         }
 
     def execute(self, cases: Sequence[Any], *, callback=None, **options: Any) -> list[Any]:
-        self.validate_run_options(options)
+        self._validate_options(options)
         directions = options.get("observation_directions")
         if directions is not None and len(directions) != len(cases):
             raise ValueError("observation_directions must align with cases")
@@ -362,14 +381,7 @@ class DaskExecutor:
             return results
         if self._running.is_set():
             raise RuntimeError("Dask executor already running")
-        if not self.store.root.is_absolute():
-            raise ValueError("artifact_root must be an absolute shared filesystem path")
-        if self.resources.gpu_count > 1:
-            raise ValueError("Dask supports at most one GPU per worker")
-        if self.resources.gpu_count and self.resources.accelerator not in ("cuda", "rocm"):
-            raise ValueError("Dask GPU requires explicit cuda or rocm accelerator")
-        if self.resources.gpu_count and self.config.cluster == "local":
-            raise ValueError("local Dask cluster has no GPU isolation; use existing scheduler")
+        self._validate_configuration()
         cfg = self.config
         units = iter_work_units(
             cases,
