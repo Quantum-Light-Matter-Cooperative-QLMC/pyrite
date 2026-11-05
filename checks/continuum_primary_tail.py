@@ -13,6 +13,7 @@ import argparse
 import json
 
 import numpy as np
+from electron_count_accuracy import explicit_line_grid
 
 from pyrite._backend import _to_cpu
 from pyrite.energy_grid import convergence_case as cc
@@ -82,7 +83,9 @@ def main():
         n_electrons=a.electrons,
         seed=a.seed,
     )
+    # Lines are unused here; the automatic line policy refuses high-energy cases.
     case["E_grid"] = np.array([100.0, 100000.0])
+    case = explicit_line_grid(case, 2000)
     tp = runner._transport_case(case, True)
     segments = tp["segs"]
     energy = np.asarray(tp["E_brem"], float)
