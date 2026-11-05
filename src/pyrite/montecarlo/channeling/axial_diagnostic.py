@@ -41,7 +41,7 @@ class AxialDiagnosticConfig:
     depths_ang: tuple[float, ...] = (0.0, 50.0, 100.0)
     step_ang: float = 5.0
     tilt_rad: tuple[float, float] = (0.0, 0.0)
-    mode: Literal["coherent", "mcwf"] = "coherent"
+    mode: Literal["unitary", "mcwf"] = "unitary"
     n_electrons: int = 16
     seed: int = 0
     mechanisms: tuple[str, ...] = ("tds", "electronic")
@@ -112,8 +112,8 @@ def _validate(config: AxialDiagnosticConfig) -> None:
         depths / config.step_ang, np.rint(depths / config.step_ang), rtol=0, atol=1e-9
     ):
         raise ValueError("depths_ang must be multiples of step_ang")
-    if config.mode not in ("coherent", "mcwf"):
-        raise ValueError("mode must be coherent or mcwf")
+    if config.mode not in ("unitary", "mcwf"):
+        raise ValueError("mode must be 'unitary' or 'mcwf' ('coherent' is now 'unitary')")
     if not isinstance(config.n_electrons, Integral) or config.n_electrons < 1:
         raise ValueError("n_electrons must be a positive integer")
     if not isinstance(config.seed, Integral) or config.seed < 0:
@@ -213,7 +213,7 @@ class AxialDiagnosticResult:
         )
 
 
-def _coherent(config, grid, potential, components, norms, observe):
+def _unitary(config, grid, potential, components, norms, observe):
     """Weighted sum of ``observe`` over coherent component histories, and the last history."""
     solver = SplitStepPropagator(
         grid, config.kinetic_energy_eV, potential_eV=potential, tilt_rad=config.tilt_rad
@@ -459,8 +459,8 @@ def axial_diagnostic(
     numerical_sink = np.zeros(len(config.depths_ang))
     jump_history = None
 
-    if config.mode == "coherent":
-        stacked, waves = _coherent(config, grid, potential, components, norms, observe)
+    if config.mode == "unitary":
+        stacked, waves = _unitary(config, grid, potential, components, norms, observe)
         waves = None if isinstance(entry, MixedState) else waves
         jumps = {}
     else:
@@ -518,7 +518,7 @@ def axial_diagnostic(
         current_maps, current_divergence, current_sides = current.unpack(
             stacked[:, extra_stop : extra_stop + observe.current_width]
         )
-    if config.mode == "coherent":
+    if config.mode == "unitary":
         surviving = density.sum(axis=(1, 2)) * grid.cell_area_ang2
     else:
         surviving = mcwf.surviving

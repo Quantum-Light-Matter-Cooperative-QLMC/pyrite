@@ -1,9 +1,9 @@
 {
   "schema": "pyrite.tutorial.v1",
-  "source_sha256": "afa63dadd19e519cdd5da0b376d9bbca980803fce8793bf406b5e7f6da7a1785",
-  "pyrite_version": "0.21.0",
+  "source_sha256": "24367839d48f2fd3f8a0a6151318e9220b10b6ef96cdd236eab49f83777620fa",
+  "pyrite_version": "0.26.0",
   "python_version": "3.14.4",
-  "git_revision": "18394cf8b191573312f4feb464c3d4d326a4b5db",
+  "git_revision": "e8634e722b3049669ed9fde1d6660c5770043933",
   "output": {
     "config": {
       "crystal": "silicon",
@@ -80,7 +80,7 @@
         0.0,
         0.0
       ],
-      "mode": "coherent",
+      "mode": "unitary",
       "n_electrons": 16,
       "seed": 0,
       "mechanisms": [

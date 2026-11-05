@@ -175,7 +175,7 @@ def test_axial_diagnostic_renders_cached_density_and_overlap_without_solving(
     np.testing.assert_allclose(norm, 1, atol=1e-12)
     assert overlap[0] == pytest.approx(1)
     assert np.all(overlap >= 0) and np.all(overlap <= norm + 1e-12)
-    assert data["config"]["mode"] == "coherent" and data["config"]["backend"] == "cpu"
+    assert data["config"]["mode"] == "unitary" and data["config"]["backend"] == "cpu"
     assert data["units"]["density"] == "per incident electron / angstrom^2"
     try:
         tutorials.experimental_axial_channeling(view="density")

@@ -55,7 +55,7 @@ def _(AxialDiagnosticConfig, gaussian, np, ureg):
         shape=(64, 64),
         depths_ang=tuple((np.linspace(0.0, 50.0, 51) * ureg.nm).to("angstrom").magnitude),
         step_ang=(2 * ureg.angstrom).magnitude,
-        mode="coherent",
+        mode="unitary",
         backend="cpu",
     )
     entry = gaussian(

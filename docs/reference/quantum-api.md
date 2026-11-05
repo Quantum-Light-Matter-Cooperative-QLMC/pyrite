@@ -295,7 +295,7 @@ runs one `AxialDiagnosticConfig`; see
 [the axial guide](../guides/experimental-axial-channeling.md#run-an-mcwf-diagnostic-from-python)
 for a complete call.
 
-`mode="coherent"` performs deterministic split-step propagation; `mode="mcwf"`
+`mode="unitary"` performs deterministic jump-free split-step propagation; `mode="mcwf"`
 uses Monte Carlo wavefunctions with thermal-diffuse and electronic scattering.
 The `seed` controls independent per-electron random streams. Depths must be
 increasing, nonnegative multiples of `step_ang`. Results are normalized **per

@@ -24,7 +24,7 @@ def config():
     )
 
 
-def test_coherent_matches_direct_propagator_and_projection(config):
+def test_unitary_matches_direct_propagator_and_projection(config):
     config = replace(config, oam_string=0)
     entry = laguerre_gauss(1, waist_ang=0.5, center_ang=(0.2, 0.3))
     result = axial_diagnostic(config, entry=entry)
@@ -55,7 +55,7 @@ def test_coherent_matches_direct_propagator_and_projection(config):
     assert "experimental" in result.experimental_model
 
 
-def test_coherent_mixture_adds_densities_not_amplitudes(config):
+def test_unitary_mixture_adds_densities_not_amplitudes(config):
     a = gaussian(waist_ang=0.5)
     b = laguerre_gauss(-1, waist_ang=0.7)
     result = axial_diagnostic(config, entry=mixture([(1, a), (3, b)]))
@@ -135,6 +135,11 @@ def test_invalid_inputs(config, updates):
         axial_diagnostic(replace(config, **updates))
 
 
+def test_retired_coherent_mode_names_replacement(config):
+    with pytest.raises(ValueError, match="'coherent' is now 'unitary'"):
+        axial_diagnostic(replace(config, mode="coherent"))
+
+
 def test_refuses_planar_entry(config):
     with pytest.raises(ValueError, match="2D"):
         axial_diagnostic(config, entry=gaussian(waist_ang=0.5, dimension=1))
@@ -170,7 +175,7 @@ def test_diamond110_and_empty_sample(config, monkeypatch):
         axial_diagnostic(config)
 
 
-@pytest.mark.parametrize("mode", ["coherent", "mcwf"])
+@pytest.mark.parametrize("mode", ["unitary", "mcwf"])
 def test_caller_observable_is_weighted_like_the_density(mode):
     config = AxialDiagnosticConfig(
         shape=(16, 16), depths_ang=(0.0, 50.0), mode=mode, n_electrons=4, mechanisms=("tds",)

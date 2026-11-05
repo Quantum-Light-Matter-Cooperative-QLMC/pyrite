@@ -137,7 +137,7 @@ def test_axial_display_controls_do_not_feed_solve():
     assert {arg.arg for arg in solve_cells[0].args.args} == {"axial_form", "mo"}
 
 
-@pytest.mark.parametrize("mode", ["coherent", "mcwf"])
+@pytest.mark.parametrize("mode", ["unitary", "mcwf"])
 def test_axial_app_executes_same_api_and_reuses_solve(mode):
     from types import SimpleNamespace
 
