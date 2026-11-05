@@ -124,7 +124,7 @@ def _spectrum_case_retry(
     timed = runner._TIMING or record_timing
     t0 = perf_counter() if timed else 0.0
     max_retries = runner._RESOURCE_POLICY.gpu_oom_retries if max_retries is None else max_retries
-    work = dict(case)
+    work = dict(case, _spectrum_phase_cache={})
     initial_spec = runner._effective_spec_chunk(work, tp)
     if spec_chunk_cap is not None and initial_spec > spec_chunk_cap:
         work["spec_chunk"] = initial_spec = spec_chunk_cap
