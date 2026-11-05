@@ -466,6 +466,8 @@ class MaterialSpec:
     substrate: str | None = None
     stack: tuple[LayerSpec, ...] = ()
     validation: MaterialValidationSpec = MaterialValidationSpec()
+    #: Value-only scalar target geometry, when selected through a profile reference.
+    target_fields: Mapping[str, object] | None = None
 
     @property
     def crystal(self) -> str:
@@ -595,6 +597,9 @@ class MaterialCatalog:
     #: Reusable downstream plate definitions; no catalog name or display metadata
     #: is carried into resolved ``profile_filters`` (issue #665).
     named_filters: Mapping[str, Mapping[str, object]] = MappingProxyType({})
+    #: Validated scalar target definitions and profile references (inspection only).
+    named_targets: Mapping[str, Mapping[str, object]] = MappingProxyType({})
+    profile_target_refs: Mapping[str, Mapping[str, str]] = MappingProxyType({})
     #: Optional filter preset references by position, for inspection only.
     profile_filter_refs: Mapping[str, tuple[str | None, ...]] = MappingProxyType({})
     #: Declarative planar-pixel detector geometry for ``run --ephemeral``.

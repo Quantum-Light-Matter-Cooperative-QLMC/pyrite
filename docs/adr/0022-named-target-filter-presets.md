@@ -1,6 +1,7 @@
 # 0022 — Named target and downstream filter presets (first implementation slice)
 
-- **Status:** Proposed
+- **Status:** Accepted (reference design); implementation staged
+- **Accepted:** 2026-11-05 (human approval to continue with the proposed design)
 - **Date:** 2026-10-31
 - **Context:** [#665](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/665), [#401](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/401), ADR-0008, ADR-0016, ADR-0021
 
@@ -40,10 +41,11 @@ ADR-0016 favor specialized role wrappers over a general geometry class.
 
 ## Proposed extension: target catalogs
 
-The remainder of this ADR is a **design proposal**, not implemented schema or
-an accepted amendment to ADR-0016/ADR-0021. Human review must settle the
-reference shape and geometry precedence before dependent implementation.
-The existing single-plate implementation above remains the first slice.
+The reference shape, complete geometry ownership, scalar target definitions,
+flat filter sequences and scorer-catalog deferral below were approved for
+implementation on 2026-11-05. Sections distinguish implemented foundation
+from subsequent runtime work; approval does not imply that all interfaces
+below are available. ADR-0016/ADR-0021 boundaries remain unchanged.
 
 ### Evidence and alternatives
 
@@ -215,13 +217,11 @@ typed scorer/response/acquisition APIs.
 
 ## Review and implementation gates
 
-Human review is requested on the proposed per-material target mapping,
-complete-geometry ownership, initial scalar-only definitions, and flat filter
-sequence variant. These are recommendations, not runtime contracts or an
-assertion that human acceptance has occurred. Review may choose a smaller
-slice without changing accepted ADR-0016 boundaries.
+Human review approved the per-material target mapping, complete-geometry
+ownership, initial scalar-only definitions and flat filter sequence variant.
+Implementation remains staged; approval changes no ADR-0016 solver boundary.
 
-After review, implementation should cover these compatibility gates in owning
+Implementation should cover these compatibility gates in owning
 source and tests (the issue remains the progress record):
 
 - Add target codecs/resolution adjacent to catalog parsing, lower through
@@ -243,3 +243,33 @@ source and tests (the issue remains the progress record):
   implemented; generate CLI references from actual commands. Run focused tests,
   API checks/imports, complexity and the documentation build. No physics kernel,
   default numerical output or general geometry/navigation change is implied.
+
+## Implemented target foundation
+
+The target catalog, per-material profile references and
+`pyrite.geometry.load_target` are implemented. Definitions use the schema
+examples above; scalar `tilt_deg` and `tilt_azim_deg` default to 30 and 0.
+Paired `crystal_width_mm` / `crystal_height_mm` default to 5 mm each.
+`allow_normal_incidence` and `mosaic` are optional booleans. Slabs additionally
+accept positive `groove_spacing_ang` under the existing 180-degree azimuth
+and positive-tilt restrictions. Stack members below the entrance film accept
+the existing scalar `beam_uvw` and `azimuth_deg` layer fields.
+
+This first codec rejects crystal-cut tables and infinite footprints, as well
+as sweep arrays and unsupported keys; direct typed constructors remain
+available for those supported geometry features. Entrance recipes must have
+no pre-existing substrate/stack to avoid competing layer ownership. Stack
+entrance keys resolve through runnable recipes; underlying layers refer to
+crystals/media. The loader translates the entrance recipe to its crystal key,
+as the existing material-sweep adapter does.
+
+Catalog parsing validates unused definitions and references in every profile.
+Reference-free profiles retain their exact resolution. Referenced targets
+replace the material's resolved thickness/angle grids and preserve the
+historical array representation in campaign identity; names and descriptions
+never enter it. Internal draft rename/delete services update references or
+refuse removal while referenced. Catalog saving also rejects dangling
+references and enforces bundled-object immutability.
+
+Target CLI lifecycle commands and filter sequences remain subsequent slices.
+The plural filter loader and sequence examples are not yet implemented.

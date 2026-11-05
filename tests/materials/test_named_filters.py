@@ -6,8 +6,9 @@ from typing import Any, cast
 import pytest
 
 from pyrite.campaign.observation import filter_from_config
+from pyrite.geometry import load_filter
 from pyrite.materials._catalog_decode import _Errors
-from pyrite.materials._named_filters import load_filter, resolve_named_filters
+from pyrite.materials._named_filters import resolve_named_filters
 
 PLATE = {
     "material": "silicon",
