@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from functools import cached_property
 from numbers import Integral
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal, cast
 
 import numpy as np
 
 from ..instrument import PlanarDetector
+from .spectral_support import _checked_bin_edges
 
 if TYPE_CHECKING:
     from pint import Quantity
@@ -35,6 +37,21 @@ def _readonly_array(value: object, *, dtype=None) -> np.ndarray:
     array = np.asarray(value, dtype=dtype)
     array.setflags(write=False)
     return array
+
+
+def _combined_sampling(parts: Sequence[SpectralFactors]) -> tuple[str | None, np.ndarray | None]:
+    """Sampling of a sum, matching :meth:`~pyrite.results.Result.combined_cxr`."""
+    if any(part.sampling is None for part in parts):
+        return None, None
+    edges = parts[0].bin_edges_eV
+    if edges is not None and all(
+        part.sampling == "bin-mean"
+        and part.bin_edges_eV is not None
+        and np.array_equal(part.bin_edges_eV, edges)
+        for part in parts
+    ):
+        return "bin-mean", edges
+    return ("nodes" if all(part.sampling == "nodes" for part in parts) else "mixed"), None
 
 
 def _positive_integer(name: str, value: object) -> int:
@@ -103,11 +120,21 @@ class SpectralFactors:
     mu_by_filter_inv_mm
         Linear attenuation coefficients with shape ``(n_filter, n_energy)`` in
         inverse mm; ``+inf`` marks an energy at which the filter is opaque.
+    sampling
+        Producer-declared meaning of each energy value, as on
+        :class:`~pyrite.results.SpectralDensity`: ``nodes``, ``bin-mean`` or
+        ``mixed``. ``None`` means a legacy stored CXR factor has no declaration;
+        numeric scoring remains available, but quantification requires a
+        resolved source plan. Sampling does not affect scientific identities.
+    bin_edges_eV
+        Native bin edges in eV, required for and only for ``bin-mean``.
     """
 
     energy_eV: np.ndarray
     intrinsic_by_tile: np.ndarray
     mu_by_filter_inv_mm: np.ndarray
+    sampling: str | None = "nodes"
+    bin_edges_eV: np.ndarray | None = None
 
     def __post_init__(self) -> None:
         energy = _readonly_array(self.energy_eV, dtype=float)
@@ -130,6 +157,14 @@ class SpectralFactors:
         object.__setattr__(self, "energy_eV", energy)
         object.__setattr__(self, "intrinsic_by_tile", intrinsic)
         object.__setattr__(self, "mu_by_filter_inv_mm", coefficient)
+        if self.sampling is None and self.bin_edges_eV is not None:
+            raise ValueError("unknown sampling cannot carry bin edges")
+        edges = (
+            None
+            if self.sampling is None
+            else _checked_bin_edges(self.sampling, self.bin_edges_eV, energy.size)
+        )
+        object.__setattr__(self, "bin_edges_eV", edges)
 
 
 @dataclass(frozen=True)
@@ -471,21 +506,39 @@ class SpatialResult:
                 raise ValueError("transition radiation spectrum is not available")
             return self.transition
         if component in {"cxr_total", "coherent_total"}:
-            base = self._factor(component.removesuffix("_total"))
-            extras = [
-                extra
-                for extra in (self.characteristic, self.channeling, self.transition)
-                if extra is not None
-            ]
-            if not extras:
+            parts = self._total_parts(component)
+            base = parts[0]
+            if len(parts) == 1:
                 return base
             # Every factor shares the line grid and attenuation, so the
             # pre-filter densities add tile by tile.
             intrinsic = base.intrinsic_by_tile
-            for extra in extras:
+            for extra in parts[1:]:
                 intrinsic = intrinsic + extra.intrinsic_by_tile
-            return SpectralFactors(base.energy_eV, intrinsic, base.mu_by_filter_inv_mm)
+            return SpectralFactors(
+                base.energy_eV, intrinsic, base.mu_by_filter_inv_mm, *_combined_sampling(parts)
+            )
         raise ValueError(f"component must be one of {', '.join(map(repr, COMPONENTS))}")
+
+    def _total_parts(self, component: str) -> tuple[SpectralFactors, ...]:
+        extras = (self.characteristic, self.channeling, self.transition)
+        base = self._factor(component.removesuffix("_total"))
+        return (base, *(extra for extra in extras if extra is not None))
+
+    def _sampling(self, component: str) -> tuple[str, np.ndarray | None]:
+        """Declared unmeasured sampling, without materializing a combined factor."""
+        parts = (
+            self._total_parts(component)
+            if component in {"cxr_total", "coherent_total"}
+            else (self._factor(component),)
+        )
+        sampling, edges = _combined_sampling(parts)
+        if sampling is None:
+            raise ValueError(
+                "legacy CXR sampling is unavailable; reuse through a resolved ObservationPlan "
+                "or regenerate the observation from its source"
+            )
+        return sampling, edges
 
     def _coordinates(self, *, pixels, region) -> np.ndarray:
         if (pixels is None) == (region is None):
@@ -608,11 +661,17 @@ class SpatialResult:
     ) -> QuantifiedSpatialSpectrum:
         """Return detached physical quantities for explicitly selected pixels.
 
-        The ``(pixel, photon_energy)`` result contains the same node-sampled,
+        The ``(pixel, photon_energy)`` result contains the same
         solid-angle-accepted per-primary spectra as :meth:`spectra`. The Pint
         density is per energy, **not** per steradian. Use ``to_energy()`` to
-        convert nodes and density together, without rerunning detector response.
-        Pixel selections are required; no full-detector cube is materialized.
+        convert nodes, native bin edges and density together, without rerunning
+        detector response. Pixel selections are required; no full-detector cube
+        is materialized.
+
+        ``sampling`` is the component's declared convention; a sum of
+        conventions is ``mixed``. ``measured=True`` always reports ``nodes``:
+        the response contract reads and returns density at the energy
+        coordinates, so native bin edges do not describe its output.
         """
         from .quantified_spatial import QuantifiedSpatialSpectrum
 
@@ -620,7 +679,17 @@ class SpatialResult:
         energy, density = self.spectra(
             pixels=coordinates, component=component, measured=measured, fwhm_eV=fwhm_eV
         )
-        return QuantifiedSpatialSpectrum(energy, density, coordinates, component, measured, fwhm_eV)
+        sampling, edges = ("nodes", None) if measured else self._sampling(component)
+        return QuantifiedSpatialSpectrum(
+            energy,
+            density,
+            coordinates,
+            component,
+            measured,
+            fwhm_eV,
+            sampling=cast(Literal["nodes", "bin-mean", "mixed"], sampling),
+            _bin_edges_eV=edges,
+        )
 
     def image(
         self,

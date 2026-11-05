@@ -22,6 +22,7 @@ from .montecarlo.runner import case_table_markers
 from .montecarlo.runner.directional_source import SOURCE_COMPONENTS, source_outputs
 from .montecarlo.runner.transport_options import transport_tuning
 from .results.directional import COMPONENT_IDS, DirectionalSpectrum
+from .results.spectral_support import _declared_line_sampling
 
 #: Public component names accepted by :func:`directional_sources`.
 DIRECTIONAL_COMPONENTS = tuple(SOURCE_COMPONENTS)
@@ -246,6 +247,10 @@ def directional_sources(
         "line_window_ceiling_eV": line_window_ceiling_eV(case),
         **run_provenance(case, tables, controls),
     }
+    cxr_sampling, characteristic_sampling = _declared_line_sampling(
+        case.get("line_quadrature"), grid
+    )
+    samplings = {"pxr-cbs": cxr_sampling, "characteristic": characteristic_sampling}
     return {
         name: DirectionalSpectrum(
             angles,
@@ -257,6 +262,7 @@ def directional_sources(
             case,
             provenance,
             component=COMPONENT_IDS[name],
+            **samplings.get(name, {}),
         )
         for name in components
     }

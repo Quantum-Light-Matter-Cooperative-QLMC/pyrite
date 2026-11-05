@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, ClassVar, Literal, Self
 import numpy as np
 
 from .quantified import _check_energy_unit
+from .spectral_support import _checked_bin_edges
 
 if TYPE_CHECKING:
     from pint import Quantity
@@ -25,6 +26,8 @@ class QuantifiedDirectionalSpectrum:
     arrays, retains component identity, and does no scoring, resampling, device
     transfer or current/acceptance scaling. Case/provenance stay on the source.
     Numeric arrays and private constructor fields use degrees, eV and per-eV/sr.
+    ``sampling`` keeps the producer's convention: ``nodes`` (pointwise) or
+    ``bin-mean`` (means over :attr:`photon_energy_edges`).
     """
 
     _angle_deg: np.ndarray = field(repr=False)
@@ -33,8 +36,9 @@ class QuantifiedDirectionalSpectrum:
     _supported: np.ndarray = field(repr=False)
     component: str
     _energy_unit: str = field(default="eV", repr=False)
+    sampling: Literal["nodes", "bin-mean", "mixed"] = "nodes"
+    _bin_edges_eV: np.ndarray | None = field(default=None, repr=False)
     axis_names: ClassVar[tuple[str, str]] = ("angle", "photon_energy")
-    sampling: ClassVar[Literal["nodes"]] = "nodes"
     measure: ClassVar[Literal["per_energy_per_steradian"]] = "per_energy_per_steradian"
     count_basis: ClassVar[Literal["photons_per_incident_electron"]] = (
         "photons_per_incident_electron"
@@ -60,6 +64,8 @@ class QuantifiedDirectionalSpectrum:
             raise ValueError("density must have shape (angle, photon_energy)")
         if self._supported.shape != self._angle_deg.shape or self._supported.dtype.kind != "b":
             raise ValueError("supported must be a boolean mask on the angle axis")
+        edges = _checked_bin_edges(self.sampling, self._bin_edges_eV, self._energy_eV.size)
+        object.__setattr__(self, "_bin_edges_eV", edges)
 
     @property
     def angle(self) -> Quantity:
@@ -74,6 +80,15 @@ class QuantifiedDirectionalSpectrum:
         from ..units import Q_
 
         return Q_(self._energy_eV.copy(), "eV").to(self._energy_unit)
+
+    @property
+    def photon_energy_edges(self) -> Quantity:
+        """Fresh Pint native bin edges of a ``bin-mean`` spectrum."""
+        from ..units import Q_
+
+        if self._bin_edges_eV is None:
+            raise ValueError("only bin-mean spectra carry native bin edges")
+        return Q_(self._bin_edges_eV.copy(), "eV").to(self._energy_unit)
 
     @property
     def density(self) -> Quantity:
@@ -92,7 +107,8 @@ class QuantifiedDirectionalSpectrum:
     def to_energy(self, unit: str) -> Self:
         """Return a new view with coupled energy/density conversion.
 
-        Native nodes, support and per-primary/per-sr normalization are retained.
+        Native nodes, bin edges, support, sampling and per-primary/per-sr
+        normalization are retained.
         Non-energy unit strings raise ValueError; other inputs raise TypeError.
         """
         return type(self)(
@@ -102,4 +118,6 @@ class QuantifiedDirectionalSpectrum:
             self._supported,
             self.component,
             unit,
+            self.sampling,
+            self._bin_edges_eV,
         )

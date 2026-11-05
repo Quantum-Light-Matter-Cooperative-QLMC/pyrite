@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, ClassVar, Literal, Self
 import numpy as np
 
 from .quantified import _check_energy_unit
+from .spectral_support import _checked_bin_edges
 
 if TYPE_CHECKING:
     from pint import Quantity
@@ -24,6 +25,11 @@ class QuantifiedSpatialSpectrum:
     ``measured`` reports whether detector response was applied during the
     original, bounded scoring operation. Unit conversion never scores again.
 
+    ``sampling`` keeps the producer's convention: ``nodes`` (pointwise),
+    ``bin-mean`` (means over :attr:`photon_energy_edges`) or ``mixed`` (a sum
+    of conventions). A measured spectrum is always ``nodes``: the response
+    reads and returns density at the energy coordinates.
+
     The private numerical snapshot is CPU-only. All public array read-backs
     are fresh copies; source spatial factors, saved observations and numeric
     APIs remain unchanged. No beam-current or exposure normalization occurs.
@@ -36,9 +42,10 @@ class QuantifiedSpatialSpectrum:
     measured: bool
     fwhm_eV: float | None = None
     _energy_unit: str = field(default="eV", repr=False)
+    sampling: Literal["nodes", "bin-mean", "mixed"] = "nodes"
+    _bin_edges_eV: np.ndarray | None = field(default=None, repr=False)
 
     axis_names: ClassVar[tuple[str, str]] = ("pixel", "photon_energy")
-    sampling: ClassVar[Literal["nodes"]] = "nodes"
     measure: ClassVar[Literal["per_energy"]] = "per_energy"
     normalization: ClassVar[Literal["pixel-accepted"]] = "pixel-accepted"
     count_basis: ClassVar[Literal["photons_per_incident_electron"]] = (
@@ -75,6 +82,10 @@ class QuantifiedSpatialSpectrum:
             raise ValueError("pixel coordinates must have nonnegative shape (n_pixel, 2)")
         if density.shape != (pixels.shape[0], energy.size):
             raise ValueError("density must have shape (n_pixel, n_energy)")
+        if self.measured and self.sampling != "nodes":
+            raise ValueError("measured spectra are node-sampled")
+        edges = _checked_bin_edges(self.sampling, self._bin_edges_eV, energy.size)
+        object.__setattr__(self, "_bin_edges_eV", edges)
 
     @property
     def pixel_coordinates(self) -> np.ndarray:
@@ -89,6 +100,15 @@ class QuantifiedSpatialSpectrum:
         return Q_(self._energy_eV.copy(), "eV").to(self._energy_unit)
 
     @property
+    def photon_energy_edges(self) -> Quantity:
+        """Fresh Pint native bin edges of a ``bin-mean`` spectrum."""
+        from ..units import Q_
+
+        if self._bin_edges_eV is None:
+            raise ValueError("only bin-mean spectra carry native bin edges")
+        return Q_(self._bin_edges_eV.copy(), "eV").to(self._energy_unit)
+
+    @property
     def density(self) -> Quantity:
         """Fresh accepted per-pixel spectrum per displayed photon energy."""
         from ..units import Q_
@@ -96,7 +116,7 @@ class QuantifiedSpatialSpectrum:
         return Q_(self._density_per_eV.copy(), "1 / eV").to(f"1 / ({self._energy_unit})")
 
     def to_energy(self, unit: str) -> Self:
-        """Convert node energy and reciprocal density without rescoring pixels."""
+        """Convert energy, bin edges and reciprocal density without rescoring pixels."""
         return type(self)(
             self._energy_eV,
             self._density_per_eV,
@@ -105,6 +125,8 @@ class QuantifiedSpatialSpectrum:
             self.measured,
             self.fwhm_eV,
             unit,
+            self.sampling,
+            self._bin_edges_eV,
         )
 
 

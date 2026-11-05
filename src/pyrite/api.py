@@ -374,12 +374,9 @@ def _line_sampling(case: Case, energy_eV: object) -> tuple[dict[str, Any], dict[
     midpoint edges of ``characteristic._energy_bin_edges_and_widths``. Other
     families are node samples. Producers declare this; it is never inferred.
     """
-    from .montecarlo.spectrum.characteristic import _energy_bin_edges_and_widths
+    from .results.spectral_support import _declared_line_sampling
 
-    edges, _ = _energy_bin_edges_and_widths(energy_eV)
-    bin_mean = {"sampling": "bin-mean", "bin_edges_eV": edges}
-    cxr = bin_mean if case.get("line_quadrature") == "bin-mean" else {}
-    return cxr, bin_mean
+    return _declared_line_sampling(case.get("line_quadrature"), energy_eV)
 
 
 def _scalar_result(
@@ -527,6 +524,7 @@ def observation_plan(
         bunch_charge_pc=scene.beam.bunch_charge_pc,
         emission=request.physics.emission_policy,
         brem_source=cast(str, request.physics.brem_source),
+        line_quadrature=case.get("line_quadrature"),
     )
 
 
@@ -580,6 +578,7 @@ def _simulate_planar(
             filters=scene.filter_plates,
             brem_source=cast(str, scene.physics.brem_source),
             reconstruction=scorer.reconstruction,
+            line_quadrature=case.get("line_quadrature"),
         )
         observation_digest, observation = _observation_provenance(
             source_digest,
@@ -602,6 +601,7 @@ def _simulate_planar(
             bunch_charge_pc=scene.beam.bunch_charge_pc,
             emission=scene.physics.emission_policy,
             brem_source=cast(str, scene.physics.brem_source),
+            line_quadrature=case.get("line_quadrature"),
         )
         output = _execute_planar(request, case, xsgen_tables, plan.directions_sample)
         stored = plan.assemble(output, provenance={})

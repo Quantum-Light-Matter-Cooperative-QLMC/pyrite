@@ -75,7 +75,7 @@ from ..montecarlo import run_cases, runner
 from ..montecarlo.case import refuse_axial_channeling_cases
 from ..results import store_result
 from ._sweep_execution import SweepCompletion
-from ._sweep_plan import SweepResume, SweepWork, has_record
+from ._sweep_plan import SweepResume, SweepWork, has_record, validate_sweep_request
 
 
 def __getattr__(name):
@@ -138,9 +138,15 @@ def run_sweep(
     Parameters
     ----------
     cases
-        list of typed cases from sweep.build_cases.
+        list of typed cases from sweep.build_cases. All cases must name one
+        ``crystal`` and have unique ``(name, E0_keV)`` pairs; a violation raises
+        ``ValueError`` before any checkpoint, cache, file or ``results`` effect.
     results
-        the dict to fill ({name: {E0: record}}).
+        the dict to fill ({name: {E0: record}}). It may hold other materials
+        under other config names, but a requested config already holding another
+        material's records, or a config mixing this material with another, raises
+        ``ValueError``. So does a restored checkpoint holding another material's
+        records, before ``results`` changes and leaving the file untouched.
     retain_results
         defaults to True, preserving in-memory spectra. False
         requires an empty results mapping and a component checkpoint path;
@@ -183,19 +189,30 @@ def run_sweep(
         on_chunk fires once the WHOLE group has finished. Default groups by
         (material, thickness, polar tilt, finite footprint), so the azimuth
         sweep at one tilt and footprint is one group -- on_chunk gets every
-        azimuth at once.
+        azimuth at once. Every energy of a config must map to the same key
+        (``ValueError`` otherwise); an unhashable key raises ``TypeError``. Keys
+        need no ordering: fully cached groups replay in request order.
     on_chunk
         optional callback(list_of_config_names) fired once per completed
-        group, with all of that group's config names (cached + freshly run).
+        group, with all of that group's config names (cached + freshly run). It
+        runs after the group's configs are persisted and before ``on_progress``
+        reports the finishing case. Only scalar records complete a group, so
+        observation-only and transport-only execution never fire it; groups
+        whose scalars were already cached replay once before new work starts.
     on_progress
         optional callback(completed_new_cases, total_cases, cached_cases)
-        fired once after resume filtering and after every newly completed case.
+        fired once after resume filtering and after every newly completed case,
+        including observation-only and transport-only cases. A case that raises
+        is not reported. ``cached_cases`` excludes observation-only cases, which
+        are still to run.
     on_case
-        optional callback(case) fired with each case as it finishes,
-        just before ``on_progress`` -- the frontier the sweep is working through.
-        Lets a live viewer surface which crystal case (energy, tilts, thickness)
-        is currently under test without threading it through ``on_progress``'s
-        fixed count signature.
+        optional callback(case) fired when a case newly stores its scalar
+        record, before ``on_chunk`` and ``on_progress`` -- the frontier the sweep
+        is working through. Lets a live viewer surface which crystal case
+        (energy, tilts, thickness) is currently under test without threading it
+        through ``on_progress``'s fixed count signature. Observation-only and
+        transport-only cases store no new scalar, so they advance ``on_progress``
+        without firing it.
     on_runtime
         optional callback(dict) fired once after resume filtering with
         resolved engine, effective worker count, memory policy, representative
@@ -269,17 +286,38 @@ def run_sweep(
         evaluated on the same transport as its scalar record. A case whose
         scalar record is already cached but whose observation is missing runs
         again for the observation only; its cached record is kept. Directional
-        arrays never enter the scalar record or the CAS blob. Ignored with
-        ``transport_only``.
+        arrays never enter the scalar record or the CAS blob. Output lacking a
+        required ``directional`` payload raises ``ValueError`` before that case
+        stores or reports anything; previously completed configs stay resumable,
+        and a cached scalar record is kept. Ignored with ``transport_only``.
+    transport_only
+        run transport without spectra or observations. Cases that already have
+        a scalar record are not re-transported. Outputs are not scalar records,
+        so execution adds nothing to ``results``, checkpoints or the CAS; only
+        ``trajectory_capture`` retains transport data. Execution advances
+        ``on_progress`` and ``on_cost`` but not ``on_case`` or ``on_chunk``.
+    metadata_only_complete
+        allow a fresh manifest whose case-set proof and ``dataset_identity``
+        match this request to complete without loading any record. Skipped with
+        ``trajectory_capture``, ``observation``, ``on_chunk`` or
+        ``retain_results=False``.
 
     Returns
     -------
     bool
-        True iff every requested ``(name, E0_keV)`` pair ended up in
-        ``results`` (i.e. the sweep ran to completion, budget or not); False if
-        ``max_seconds`` cut it short. Incomplete component checkpoints retain their
-        completed-config shards for resume. Legacy ``.pkl`` paths receive a final
-        whole-store save on an incomplete return, including partial configs.
+        True iff the requested work finished, budget or not; False if
+        ``max_seconds`` or an executor left work undone. By default that means
+        every requested ``(name, E0_keV)`` pair is in ``results`` and every
+        required observation is stored. Exceptions: on a metadata-proof completion
+        (``metadata_only_complete``) ``results`` is left unloaded, so True rests on
+        the persisted proof; with ``retain_results=False`` records are
+        ``{"case", "checkpoint_path"}`` references; with ``transport_only`` True
+        means only that every case lacking a scalar record was executed in this
+        call, says nothing about persistence, and ``results`` may stay empty.
+        Incomplete component checkpoints retain their completed-config shards
+        for resume. Legacy ``.pkl`` paths receive a final whole-store save on an
+        incomplete return, including partial configs. An exception skips that
+        final save; configs published before it remain resumable.
     """
     refuse_axial_channeling_cases(cases)
     if artifact_store is not None and content_key_fn is None:
@@ -290,6 +328,7 @@ def run_sweep(
         deadline = time_fn() + max_seconds
     if group_key is None:
         group_key = _default_group_key
+    validate_sweep_request(cases, results, group_key)
     if dataset_identity is not None:
         from ..campaign.profiles import normalize_dataset_identity
 
@@ -300,7 +339,6 @@ def run_sweep(
     material = cases[0]["crystal"] if cases else "mixed"
     if checkpoint_path is None:
         checkpoint_path = checkpoint_path_for(material, checkpoint_dir)
-    os.makedirs(os.path.dirname(checkpoint_path) or ".", exist_ok=True)
     checkpoint = sweep_checkpoint(
         checkpoint_path,
         results,
@@ -310,6 +348,7 @@ def run_sweep(
         on_activity,
         retain_results=retain_results,
     )
+    os.makedirs(os.path.dirname(checkpoint_path) or ".", exist_ok=True)
     preparation = SweepResume(cases, results, checkpoint, content_key_fn, cache_read, cache_write)
     metadata_eligible = (
         metadata_only_complete
@@ -438,6 +477,7 @@ def run_sweep(
             capture_size_report.completed(case)
 
         if transport_only:
+            work.transport_finished(case)
             completion.case_finished(case)
             return
 
@@ -492,8 +532,8 @@ def run_sweep(
             **run_cases_options,
         )
     print(f"{len(todo)} cases in {time.perf_counter() - t0:.0f} s")
-    complete = all(has_record(results, c) for c in cases) and not work.observation_plans
-    checkpoint.finish(complete)
+    # Publication follows what is stored; transport-only execution stores nothing.
+    checkpoint.finish(work.stored_complete())
     if on_activity is not None:
         on_activity({"phase": "handoff", "case": None, "in_flight_case_count": 0})
-    return complete
+    return work.requested_complete()

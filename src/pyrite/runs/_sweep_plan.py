@@ -19,6 +19,67 @@ from ..checkpoints.persistence import (
 from ..results import store_result
 
 
+def validate_sweep_request(cases, results, group_key):
+    """Reject an ambiguous request before any checkpoint, cache or file effect.
+
+    A sweep is single-material, ``(name, E0_keV)`` identifies one record and one
+    observation, and every energy of a config belongs to one ``group_key`` group
+    because configs complete and publish by name. An empty request has no
+    material or identity to contradict and passes.
+    """
+    if not cases:
+        return
+    material = cases[0]["crystal"]
+    identities = set()
+    group_by_name = {}
+    for case in cases:
+        if case["crystal"] != material:
+            raise ValueError(
+                f"run_sweep is single-material: case {case['name']!r} is "
+                f"{case['crystal']!r} but the sweep is {material!r}; "
+                "run one sweep per material"
+            )
+        identity = (case["name"], case["E0_keV"])
+        if identity in identities:
+            raise ValueError(
+                f"duplicate sweep case (name={identity[0]!r}, E0_keV={identity[1]!r}); "
+                "records and observations are keyed by this pair"
+            )
+        identities.add(identity)
+        group = _hashable_group(group_key, case)
+        if group_by_name.setdefault(case["name"], group) != group:
+            raise ValueError(
+                f"config {case['name']!r} spans group_key groups {group_by_name[case['name']]!r} "
+                f"and {group!r}; all energies of a config must share one group"
+            )
+    for name, values in results.items():
+        crystals = _record_crystals(values)
+        ambiguous = material in crystals and len(crystals) > 1
+        if ambiguous or (name in group_by_name and crystals - {material}):
+            raise ValueError(
+                f"results config {name!r} holds {sorted(crystals)} records, which conflicts "
+                f"with this {material!r} sweep; use a distinct results mapping or config name"
+            )
+
+
+def _hashable_group(group_key, case):
+    group = group_key(case)
+    try:
+        hash(group)
+    except TypeError as error:
+        raise TypeError(
+            f"group_key must return a hashable value; got {type(group).__name__} "
+            f"for case {case['name']!r}"
+        ) from error
+    return group
+
+
+def _record_crystals(values):
+    """Crystals named by one config's records; legacy case-less records name none."""
+    cases = (record.get("case") for record in values.values())
+    return {case.get("crystal") for case in cases if case is not None} - {None}
+
+
 class SweepResume:
     """Prepare scalar records before deciding which cases need execution."""
 
@@ -71,6 +132,7 @@ class SweepResume:
             print(f"checkpoint: loaded in {time.perf_counter() - resume_started:.3f} s")
             if self.on_timing is not None:
                 self.on_timing({"resume_seconds": time.perf_counter() - resume_started})
+            self.validate_restored(loaded)
             self.results.update(loaded)
             self.loaded = True
             print(
@@ -78,6 +140,25 @@ class SweepResume:
             )
 
         return False
+
+    def validate_restored(self, loaded):
+        """Refuse before merging: a later save keeps only this material's records.
+
+        Merging a foreign or same-name mixed store would therefore drop or
+        misfile the others. The file stays untouched for the user to inspect.
+        """
+        if not self.cases:
+            return
+        for name, values in loaded.items():
+            restored = _record_crystals(values)
+            live = _record_crystals(self.results.get(name, {}))
+            foreign = (restored | live) - {self.material}
+            if foreign:
+                raise ValueError(
+                    f"checkpoint {self.checkpoint_path} config {name!r} conflicts with this "
+                    f"{self.material!r} sweep: found {sorted(foreign)} records; "
+                    "archive it or select that material's checkpoint before resuming"
+                )
 
     def validate_identity(self, manifest_path):
         existing_identity = None
@@ -210,6 +291,9 @@ class SweepWork:
     """
 
     def __init__(self, cases, results, observation, transport_only):
+        self.cases = cases
+        self.results = results
+        self.transport_only = transport_only
         self.observation = observation
         self.observation_plans = {}
         self.observation_only = set()
@@ -237,12 +321,38 @@ class SweepWork:
             or (case["name"], case["E0_keV"]) in self.observation_plans
         ]
 
+        self.transport_pending = {(case["name"], case["E0_keV"]) for case in self.todo}
+
+    def transport_finished(self, case):
+        """Count execution only; a transport-only output is never a stored record."""
+        self.transport_pending.discard((case["name"], case["E0_keV"]))
+
+    def stored_complete(self):
+        """Every scalar record and required observation is available."""
+        return not self.observation_plans and all(has_record(self.results, c) for c in self.cases)
+
+    def requested_complete(self):
+        """Mode-specific meaning of the ``run_sweep`` return value."""
+        return not self.transport_pending if self.transport_only else self.stored_complete()
+
     def accept_observation(self, case, out):
-        """Store directional work; return whether the scalar must be preserved."""
-        directional = out.pop("directional", None)
+        """Store directional work; return whether the scalar must be preserved.
+
+        A required directional payload that is absent raises before ``out`` or
+        any sweep state changes, so the case stays unreported and reruns on
+        resume. Otherwise ``directional`` is removed from ``out`` because it
+        never enters the scalar record or the CAS blob.
+        """
         key = (case["name"], case["E0_keV"])
         plan = self.observation_plans.get(key)
-        if plan is not None and directional is not None:
+        if plan is not None and out.get("directional") is None:
+            raise ValueError(
+                f"executor output for case (name={key[0]!r}, E0_keV={key[1]!r}) lacks the "
+                "'directional' payload its observation requires; completed configs remain "
+                "resumable, so fix the executor and rerun"
+            )
+        directional = out.pop("directional", None)
+        if plan is not None:
             assert self.observation is not None
             self.observation.store.put(
                 plan.assemble(directional, self.observation.provenance(case))

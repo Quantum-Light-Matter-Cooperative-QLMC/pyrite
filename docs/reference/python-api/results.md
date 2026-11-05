@@ -21,6 +21,8 @@ Use `pyrite.results` for computed values. Historical root object pages remain li
    pyrite.Provenance
    pyrite.CxrSpectra
    pyrite.SpectralDensity
+   pyrite.results.SpectralYield
+   pyrite.results.BinnedSpectrum
    pyrite.results.TemporalIntensity
    pyrite.results.directional.DirectionalSpectrum
 ```
@@ -144,7 +146,8 @@ identities and optional event relaxation-energy budgets.
 
 `SpatialResult.quantify_spectra(pixels=[(row, column), ...])` (or `region=...`)
 returns an experimental `QuantifiedSpatialSpectrum` with native energy nodes,
-`(pixel, photon_energy)` density and an ordered `pixel_coordinates` array.
+`(pixel, photon_energy)` density, an ordered `pixel_coordinates` array and the
+component's declared `sampling`; `bin-mean` views add `photon_energy_edges`.
 Unlike source and directional spectra, each pixel spectrum has **already been
 multiplied by pixel solid angle** and filter transmission. Its dimensional
 measure is therefore `1/energy`, **not** `1/energy/sr`; the semantic metadata

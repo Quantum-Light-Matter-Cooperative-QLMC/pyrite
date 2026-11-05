@@ -28,11 +28,48 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Literal
+from typing import Any, Literal
 
 import numpy as np
 
 from .._grid_semantics import rebin_piecewise_constant_density
+
+
+def _declared_line_sampling(
+    line_quadrature: object, energy_eV: object
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Declared sampling of the incoherent CXR and characteristic producers.
+
+    The characteristic kernel always writes bin means, and incoherent PXR/CBS
+    does under ``line_quadrature="bin-mean"``, both on the 0 eV-clamped
+    midpoint edges of ``characteristic._energy_bin_edges_and_widths``. Other
+    families are node samples. Producers declare this; it is never inferred.
+    Returns ``(cxr, characteristic)`` keyword mappings for a spectrum carrier.
+    """
+    from ..montecarlo.spectrum.characteristic import _energy_bin_edges_and_widths
+
+    edges, _ = _energy_bin_edges_and_widths(energy_eV)
+    bin_mean = {"sampling": "bin-mean", "bin_edges_eV": edges}
+    return (bin_mean if line_quadrature == "bin-mean" else {}), bin_mean
+
+
+def _checked_bin_edges(sampling: str, bin_edges_eV: object, n_energy: int) -> np.ndarray | None:
+    """Validate a sampling label; return a read-only copy of its native edges.
+
+    ``bin-mean`` requires, and only it accepts, ``n_energy + 1`` edges in eV.
+    """
+    if sampling not in {"nodes", "bin-mean", "mixed"}:
+        raise ValueError("sampling must be 'nodes', 'bin-mean' or 'mixed'")
+    if (sampling == "bin-mean") != (bin_edges_eV is not None):
+        raise ValueError("bin-mean sampling requires, and only it accepts, bin edges")
+    if bin_edges_eV is None:
+        return None
+    edges = np.array(bin_edges_eV, dtype=float, copy=True)
+    if edges.shape != (n_energy + 1,):
+        raise ValueError("bin edges must have one more entry than the energy grid")
+    edges.setflags(write=False)
+    return edges
+
 
 __all__ = [
     "BinnedSpectrum",

@@ -38,6 +38,7 @@ from ..instrument.geometry import (
 from ..instrument.observation import payload_digest, true_spatial_payload
 from ..montecarlo.geometry import directions_to_sample_frame
 from ..results.model import PixelRayMap, SpatialResult, SpectralFactors
+from ..results.spectral_support import _declared_line_sampling
 from ..results.store import DEFAULT_BUNCH_CHARGE_PC, DEFAULT_REP_RATE_HZ
 from .store import ObservationStore, ObservationStoreError, StoredObservation
 
@@ -81,6 +82,7 @@ class PixelSampling:
         filters: tuple[FilterPlate, ...],
         brem_source: str = "mc",
         reconstruction: str = "nearest_tile",
+        line_quadrature: str | None = None,
     ) -> SpatialResult:
         """Assemble factorized spatial data from runner directional output.
 
@@ -88,6 +90,8 @@ class PixelSampling:
         output or a scalar run's ``out["directional"]``. A non-``"mc"``
         ``brem_source`` zeroes the continuum, as the scalar path does.
         ``reconstruction`` is the scorer's pixel reconstruction mode.
+        ``line_quadrature`` is the source case's value; with the producer's
+        always-bin-mean characteristic it declares each factor's sampling.
         """
         energy = np.asarray(output["E_grid"])
         background_energy = np.asarray(output["E_grid_brem"])
@@ -96,13 +100,16 @@ class PixelSampling:
         background = np.asarray(output["brem_wide_by_direction"])
         if brem_source != "mc":
             background = np.zeros_like(background)
+        cxr_sampling, characteristic_sampling = _declared_line_sampling(line_quadrature, energy)
         return SpatialResult(
             ray_map=PixelRayMap(
                 tile_index=self.tile_index,
                 solid_angle_sr=self.rays.solid_angle_sr,
                 path_length_mm=filter_path_lengths(self.rays, filters),
             ),
-            cxr=SpectralFactors(energy, np.asarray(output["spec_by_direction"]), line_mu),
+            cxr=SpectralFactors(
+                energy, np.asarray(output["spec_by_direction"]), line_mu, **cxr_sampling
+            ),
             brem=SpectralFactors(background_energy, background, background_mu),
             detector=detector,
             coherent_cxr=(
@@ -113,7 +120,10 @@ class PixelSampling:
                 )
             ),
             characteristic=SpectralFactors(
-                energy, np.asarray(output["spec_characteristic_by_direction"]), line_mu
+                energy,
+                np.asarray(output["spec_characteristic_by_direction"]),
+                line_mu,
+                **characteristic_sampling,
             ),
             channeling=(
                 None
@@ -152,6 +162,9 @@ class ObservationPlan:
         Source emission policy; selects the default line component.
     brem_source
         ``"mc"`` keeps the Monte Carlo continuum; anything else zeroes it.
+    line_quadrature
+        The source case's line quadrature. It declares in-memory factor
+        sampling only and is covered by ``source_identity_digest``.
     """
 
     observation: ResolvedObservation
@@ -166,6 +179,7 @@ class ObservationPlan:
     #: sweep passes one shared instance because it depends only on the
     #: detector and scorer, never on the case.
     sampling: PixelSampling | None = field(default=None, repr=False, compare=False)
+    line_quadrature: str | None = None
 
     def __post_init__(self) -> None:
         if self.sampling is None:
@@ -204,6 +218,8 @@ class ObservationPlan:
         own stored energy grids. The match is rescored with this plan's
         response, acquisition, and normalization. Damaged candidates are
         skipped, so the caller's transported ``put`` repairs them.
+        The resolved source quadrature restores the in-memory CXR sampling
+        that the stored arrays do not encode.
         """
         filters = self.observation.filters
         for digest in store.digests(self.source_identity_digest):
@@ -219,6 +235,11 @@ class ObservationPlan:
                 )
             )
             if payload_digest(payload) == stored.identity.true_spatial_digest:
+                sampling, _ = _declared_line_sampling(self.line_quadrature, spatial.cxr.energy_eV)
+                sampling = {"sampling": "nodes", "bin_edges_eV": None, **sampling}
+                stored = replace(
+                    stored, spatial=replace(spatial, cxr=replace(spatial.cxr, **sampling))
+                )
                 return stored.rescore(
                     acquisition=self.observation.acquisition,
                     response=self.observation.detector.response,
@@ -242,6 +263,7 @@ class ObservationPlan:
             filters=observation.filters,
             brem_source=self.brem_source,
             reconstruction=observation.scorer.reconstruction,
+            line_quadrature=self.line_quadrature,
         )
         axes = [spatial.cxr.energy_eV, spatial.brem.energy_eV]
         for extra in (spatial.characteristic, spatial.channeling, spatial.transition):
@@ -330,6 +352,7 @@ class SweepObservation:
             bunch_charge_pc=float(case.get("bunch_charge_pc", DEFAULT_BUNCH_CHARGE_PC)),
             emission=self.emission,
             sampling=self.sampling,
+            line_quadrature=case.get("line_quadrature"),
         )
 
 

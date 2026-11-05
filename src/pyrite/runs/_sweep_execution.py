@@ -78,7 +78,10 @@ class SweepCompletion:
     def replay_cached_groups(self, results):
         if self.on_chunk is None:
             return
-        for group in sorted(g for g in self.group_names if self.group_remaining.get(g, 0) == 0):
+        # Group keys promise hashability, not ordering: replay in request order.
+        for group in self.group_names:
+            if self.group_remaining.get(group, 0) != 0:
+                continue
             rep = next(iter(results[self.group_names[group][0]].values()))["case"]
             print(
                 f"\n=== cached: {rep['thickness_ang'] / 1e4:g} um, "

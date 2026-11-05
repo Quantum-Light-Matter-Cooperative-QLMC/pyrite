@@ -160,6 +160,9 @@ SpectralDensity = { target = "pyrite.results.model:SpectralDensity", status = "a
 TemporalIntensity = { target = "pyrite.results.temporal:TemporalIntensity", status = "experimental" }
 QuantifiedApertureSpectrum = { target = "pyrite.results.quantified_aperture:QuantifiedApertureSpectrum", status = "experimental" }
 QuantifiedAcquisitionBatch = { target = "pyrite.instrument.quantified_acquisition:QuantifiedAcquisitionBatch", status = "experimental" }
+# #959: producer-declared sampling and native photon_energy_edges on both views.
+# SpectralFactors.sampling=None marks unavailable legacy CXR metadata; numeric
+# scoring stays readable and resolved source reuse restores the declaration.
 QuantifiedDirectionalSpectrum = { target = "pyrite.results.quantified_directional:QuantifiedDirectionalSpectrum", status = "experimental" }
 QuantifiedSpatialSpectrum = { target = "pyrite.results.quantified_spatial:QuantifiedSpatialSpectrum", status = "experimental" }
 QuantifiedSpatialImage = { target = "pyrite.results.quantified_spatial:QuantifiedSpatialImage", status = "experimental" }
