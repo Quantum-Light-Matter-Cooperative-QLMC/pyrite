@@ -17,6 +17,7 @@ re-completion of hard-photon directions, which no eligible estimator reads.
 """
 
 from collections.abc import Mapping
+from contextlib import nullcontext
 from dataclasses import replace
 from typing import Any
 
@@ -240,14 +241,15 @@ class BlockSpectrumScorer:
 
 def run_case_streamed(
     case,
-    block_electrons: int,
+    block_electrons: Any,
     *,
     transport_core: str = "auto",
 ) -> dict[str, Any]:
     """Opt-in live streamed form of :func:`.run_case` for additive spectra (#611).
 
     Transports ``[0, max(Ne, Ne_brem))`` in electron blocks of
-    ``block_electrons`` on the per-electron/CUDA core, scores each block as soon
+    ``block_electrons`` (a count, or a :class:`.stream_sizing.MemoryBlockSizer`)
+    on the per-electron/CUDA core, scores each block as soon
     as it finishes and releases it. The spectra equal :func:`.run_case`'s up to
     floating-point summation order; transport counts are exact. Cases outside
     :func:`streaming_refusal` (``live=True``) raise ``ValueError`` before any
@@ -274,14 +276,16 @@ def run_case_streamed(
     # Same allocator cap as the joined spectrum phase.
     _ensure_pool_limit()
 
-    with collect_line_data_coverage() as line_coverage:
-        tp = _transport_case(
-            case,
-            transport_core=transport_core,
-            block_electrons=block_electrons,
-            block_consumer=scorer.add,
-            keep_segments_on_device=True,
-        )
+    sized = not isinstance(block_electrons, int)
+    with block_electrons.pool_limit() if sized else nullcontext():
+        with collect_line_data_coverage() as line_coverage:
+            tp = _transport_case(
+                case,
+                transport_core=transport_core,
+                block_electrons=block_electrons,
+                block_consumer=scorer.add,
+                keep_segments_on_device=True,
+            )
     counts = tp["segs"]
     out = scorer.result(
         Ne=int(counts["Ne"]),
