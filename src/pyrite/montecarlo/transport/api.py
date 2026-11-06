@@ -24,7 +24,7 @@ def _simulate_trajectories(
     n_atoms_per_ang3=None,
     E_cut_keV=5.0,
     seed=0,
-    max_steps=20000,
+    max_steps=400_000,
     elastic_model="elsepa",
     beam_dir=None,
     composition=None,

@@ -121,7 +121,7 @@ Segment $s$ of local electron $i$ is written to slot $i \times \mathrm{cap} + s$
 
 The counter records the **true** count even when it exceeds the capacity: the thread keeps transporting but stops writing. The driver then grows the capacity and replays the batch. Replay is exact because the streams are counter-addressed, so an overflow costs time and nothing else.
 
-Replay permits a default capacity of 512 slots instead of reserving the `max_steps` worst case of 20 000 for every electron on the device.
+Replay permits a default capacity of 512 slots instead of reserving the `max_steps` worst case of 400,000 for every electron on the device.
 
 Because the true count is always reported, every batch — including one that overflowed — states exactly what the material needs. Two policies use that:
 

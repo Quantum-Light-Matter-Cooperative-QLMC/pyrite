@@ -1,0 +1,2679 @@
+{
+ "schema": "pyrite.mixed-elastic.protocol.v1",
+ "issue": 894,
+ "sha": "248d684a66983745a124452c0f70bdfc3db74523",
+ "epsilon": 0.02,
+ "alpha": 0.05,
+ "comparisons": 446,
+ "seeds": [
+  92001,
+  92002,
+  92003,
+  92004
+ ],
+ "families": {
+  "matched": {
+   "reference": "det",
+   "extra": [],
+   "arms": {
+    "c05": [
+     0.05,
+     0.05
+    ],
+    "c20": [
+     0.2,
+     0.2
+    ]
+   },
+   "diagnostic_arms": {
+    "c10c05": [
+     0.1,
+     0.05
+    ],
+    "c20c05": [
+     0.2,
+     0.05
+    ],
+    "c10": [
+     0.1,
+     0.1
+    ]
+   },
+   "diagnostic_fraction": 0.25,
+   "scenes": {
+    "si-300keV-100um": {
+     "histories_per_seed": 2854101,
+     "predicted_hours": 0.5000000834034009,
+     "pilot_rows_per_history": [
+      1039.5559,
+      91.7095
+     ],
+     "observables": {
+      "backscattered": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.1051,
+       "headline": true,
+       "margin": 0.002102,
+       "required_histories": 1021715
+      },
+      "transmitted": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.8474,
+       "headline": true,
+       "margin": 0.016948,
+       "required_histories": 26226
+      },
+      "stopped": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0475,
+       "headline": true,
+       "margin": 0.00095,
+       "required_histories": 2358684
+      },
+      "transmitted_mu_bin_0": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.1156,
+       "headline": true,
+       "margin": 0.002312,
+       "required_histories": 901868
+      },
+      "transmitted_mu_bin_1": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.4932,
+       "headline": true,
+       "margin": 0.009864000000000001,
+       "required_histories": 125162
+      },
+      "transmitted_mu_bin_2": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.2116,
+       "headline": true,
+       "margin": 0.0042320000000000005,
+       "required_histories": 440660
+      },
+      "transmitted_mu_bin_3": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.027,
+       "headline": true,
+       "margin": 0.00054,
+       "required_histories": 4312857
+      },
+      "backscattered_mu_bin_0": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0206,
+       "headline": true,
+       "margin": 0.00041200000000000004,
+       "required_histories": 6017115
+      },
+      "backscattered_mu_bin_1": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0619,
+       "headline": true,
+       "margin": 0.001238,
+       "required_histories": 1810225
+      },
+      "backscattered_mu_bin_2": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0204,
+       "headline": true,
+       "margin": 0.00040800000000000005,
+       "required_histories": 5439021
+      },
+      "backscattered_mu_bin_3": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0022,
+       "headline": false,
+       "margin": 4.4000000000000006e-05
+      },
+      "transmitted_energy_bin_0": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0054,
+       "headline": false,
+       "margin": 0.00010800000000000001
+      },
+      "transmitted_energy_bin_1": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0232,
+       "headline": true,
+       "margin": 0.000464,
+       "required_histories": 4878414
+      },
+      "transmitted_energy_bin_2": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.1141,
+       "headline": true,
+       "margin": 0.0022819999999999997,
+       "required_histories": 922163
+      },
+      "transmitted_energy_bin_3": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.7047,
+       "headline": true,
+       "margin": 0.014094,
+       "required_histories": 54314
+      },
+      "transmitted_energy_bin_4": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0,
+       "headline": false,
+       "margin": 0.0
+      },
+      "backscattered_energy_bin_0": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0041,
+       "headline": false,
+       "margin": 8.200000000000001e-05
+      },
+      "backscattered_energy_bin_1": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.027,
+       "headline": true,
+       "margin": 0.00054,
+       "required_histories": 4428427
+      },
+      "backscattered_energy_bin_2": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0558,
+       "headline": true,
+       "margin": 0.001116,
+       "required_histories": 1956400
+      },
+      "backscattered_energy_bin_3": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0136,
+       "headline": false,
+       "margin": 0.000272
+      },
+      "backscattered_energy_bin_4": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0046,
+       "headline": false,
+       "margin": 9.2e-05
+      },
+      "photons_10_50keV": {
+       "bound": 30.0,
+       "kind": "count",
+       "mean": 0.0052,
+       "headline": true,
+       "margin": 0.000104,
+       "required_histories": 46614435
+      },
+      "photons_50_100keV": {
+       "bound": 6.0,
+       "kind": "count",
+       "mean": 0.0006,
+       "headline": false,
+       "margin": 1.1999999999999999e-05
+      },
+      "photons_ge100keV": {
+       "bound": 3.0,
+       "kind": "count",
+       "mean": 0.0013,
+       "headline": true,
+       "margin": 2.6e-05,
+       "required_histories": 87586622
+      },
+      "cone_source_photons_ge10kev": {
+       "bound": 30.0,
+       "kind": "count",
+       "mean": 0.0001,
+       "headline": true,
+       "margin": 2.0000000000000003e-06,
+       "required_histories": 1779430832
+      },
+      "transmitted_energy_keV": {
+       "bound": 300.0003,
+       "kind": "energy",
+       "mean": 199.11275726229567,
+       "headline": true,
+       "margin": 3.9822551452459134,
+       "required_histories": 29924
+      },
+      "photon_keV_ge10keV": {
+       "bound": 300.0003,
+       "kind": "energy",
+       "mean": 0.368371824609375,
+       "headline": true,
+       "margin": 0.007367436492187501,
+       "required_histories": 35981689
+      }
+     }
+    },
+    "w-300keV-10um": {
+     "histories_per_seed": 1179188,
+     "predicted_hours": 0.5000001636381689,
+     "pilot_rows_per_history": [
+      1985.8458,
+      305.2869
+     ],
+     "observables": {
+      "backscattered": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.425,
+       "headline": true,
+       "margin": 0.0085,
+       "required_histories": 163373
+      },
+      "transmitted": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.5438,
+       "headline": true,
+       "margin": 0.010875999999999999,
+       "required_histories": 103165
+      },
+      "stopped": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0312,
+       "headline": true,
+       "margin": 0.000624,
+       "required_histories": 3614164
+      },
+      "transmitted_mu_bin_0": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0929,
+       "headline": true,
+       "margin": 0.001858,
+       "required_histories": 1145710
+      },
+      "transmitted_mu_bin_1": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.3199,
+       "headline": true,
+       "margin": 0.006398000000000001,
+       "required_histories": 253594
+      },
+      "transmitted_mu_bin_2": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.1164,
+       "headline": true,
+       "margin": 0.002328,
+       "required_histories": 890131
+      },
+      "transmitted_mu_bin_3": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0146,
+       "headline": false,
+       "margin": 0.000292
+      },
+      "backscattered_mu_bin_0": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0874,
+       "headline": true,
+       "margin": 0.0017480000000000002,
+       "required_histories": 1227175
+      },
+      "backscattered_mu_bin_1": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.2506,
+       "headline": true,
+       "margin": 0.005012,
+       "required_histories": 357324
+      },
+      "backscattered_mu_bin_2": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.078,
+       "headline": true,
+       "margin": 0.00156,
+       "required_histories": 1356797
+      },
+      "backscattered_mu_bin_3": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.009,
+       "headline": false,
+       "margin": 0.00017999999999999998
+      },
+      "transmitted_energy_bin_0": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0024,
+       "headline": false,
+       "margin": 4.7999999999999994e-05
+      },
+      "transmitted_energy_bin_1": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0167,
+       "headline": false,
+       "margin": 0.000334
+      },
+      "transmitted_energy_bin_2": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0889,
+       "headline": true,
+       "margin": 0.001778,
+       "required_histories": 1218472
+      },
+      "transmitted_energy_bin_3": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.3395,
+       "headline": true,
+       "margin": 0.006790000000000001,
+       "required_histories": 232142
+      },
+      "transmitted_energy_bin_4": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0963,
+       "headline": true,
+       "margin": 0.001926,
+       "required_histories": 1099406
+      },
+      "backscattered_energy_bin_0": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0017,
+       "headline": false,
+       "margin": 3.4e-05
+      },
+      "backscattered_energy_bin_1": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.016,
+       "headline": false,
+       "margin": 0.00032
+      },
+      "backscattered_energy_bin_2": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0927,
+       "headline": true,
+       "margin": 0.0018540000000000002,
+       "required_histories": 1130849
+      },
+      "backscattered_energy_bin_3": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.1921,
+       "headline": true,
+       "margin": 0.003842,
+       "required_histories": 496170
+      },
+      "backscattered_energy_bin_4": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.1225,
+       "headline": true,
+       "margin": 0.00245,
+       "required_histories": 865740
+      },
+      "photons_10_50keV": {
+       "bound": 30.0,
+       "kind": "count",
+       "mean": 0.024,
+       "headline": true,
+       "margin": 0.00048,
+       "required_histories": 9943723
+      },
+      "photons_50_100keV": {
+       "bound": 6.0,
+       "kind": "count",
+       "mean": 0.0081,
+       "headline": true,
+       "margin": 0.000162,
+       "required_histories": 19295936
+      },
+      "photons_ge100keV": {
+       "bound": 3.0,
+       "kind": "count",
+       "mean": 0.0061,
+       "headline": true,
+       "margin": 0.00012200000000000001,
+       "required_histories": 23963228
+      },
+      "cone_source_photons_ge10kev": {
+       "bound": 30.0,
+       "kind": "count",
+       "mean": 0.0004,
+       "headline": true,
+       "margin": 8.000000000000001e-06,
+       "required_histories": 568232720
+      },
+      "transmitted_energy_keV": {
+       "bound": 300.0003,
+       "kind": "energy",
+       "mean": 132.78220822268435,
+       "headline": true,
+       "margin": 2.655644164453687,
+       "required_histories": 109821
+      },
+      "photon_keV_ge10keV": {
+       "bound": 300.0003,
+       "kind": "energy",
+       "mean": 2.2087116212890625,
+       "headline": true,
+       "margin": 0.04417423242578125,
+       "required_histories": 7057660
+      }
+     }
+    },
+    "si-1MeV-1mm": {
+     "histories_per_seed": 438433,
+     "predicted_hours": 0.5000002204739838,
+     "pilot_rows_per_history": [
+      7807.8572,
+      370.1332
+     ],
+     "observables": {
+      "backscattered": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0991,
+       "headline": true,
+       "margin": 0.001982,
+       "required_histories": 1069849
+      },
+      "transmitted": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.5344,
+       "headline": true,
+       "margin": 0.010688,
+       "required_histories": 106998
+      },
+      "stopped": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.3665,
+       "headline": true,
+       "margin": 0.00733,
+       "required_histories": 207880
+      },
+      "transmitted_mu_bin_0": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0742,
+       "headline": true,
+       "margin": 0.001484,
+       "required_histories": 1445751
+      },
+      "transmitted_mu_bin_1": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.3213,
+       "headline": true,
+       "margin": 0.006425999999999999,
+       "required_histories": 251119
+      },
+      "transmitted_mu_bin_2": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.1251,
+       "headline": true,
+       "margin": 0.002502,
+       "required_histories": 820126
+      },
+      "transmitted_mu_bin_3": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0138,
+       "headline": false,
+       "margin": 0.000276
+      },
+      "backscattered_mu_bin_0": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0176,
+       "headline": false,
+       "margin": 0.00035200000000000005
+      },
+      "backscattered_mu_bin_1": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0598,
+       "headline": true,
+       "margin": 0.001196,
+       "required_histories": 1801974
+      },
+      "backscattered_mu_bin_2": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0186,
+       "headline": false,
+       "margin": 0.000372
+      },
+      "backscattered_mu_bin_3": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0031,
+       "headline": false,
+       "margin": 6.2e-05
+      },
+      "transmitted_energy_bin_0": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.031,
+       "headline": true,
+       "margin": 0.00062,
+       "required_histories": 3779673
+      },
+      "transmitted_energy_bin_1": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.1766,
+       "headline": true,
+       "margin": 0.0035320000000000004,
+       "required_histories": 543931
+      },
+      "transmitted_energy_bin_2": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.3268,
+       "headline": true,
+       "margin": 0.006536,
+       "required_histories": 245257
+      },
+      "transmitted_energy_bin_3": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0,
+       "headline": false,
+       "margin": 0.0
+      },
+      "transmitted_energy_bin_4": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0,
+       "headline": false,
+       "margin": 0.0
+      },
+      "backscattered_energy_bin_0": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0157,
+       "headline": false,
+       "margin": 0.000314
+      },
+      "backscattered_energy_bin_1": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0426,
+       "headline": true,
+       "margin": 0.000852,
+       "required_histories": 2725526
+      },
+      "backscattered_energy_bin_2": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0339,
+       "headline": true,
+       "margin": 0.000678,
+       "required_histories": 3237221
+      },
+      "backscattered_energy_bin_3": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0061,
+       "headline": false,
+       "margin": 0.00012200000000000001
+      },
+      "backscattered_energy_bin_4": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0008,
+       "headline": false,
+       "margin": 1.6000000000000003e-05
+      },
+      "photons_10_50keV": {
+       "bound": 100.0,
+       "kind": "count",
+       "mean": 0.0415,
+       "headline": true,
+       "margin": 0.00083,
+       "required_histories": 11969518
+      },
+      "photons_50_100keV": {
+       "bound": 20.0,
+       "kind": "count",
+       "mean": 0.0147,
+       "headline": true,
+       "margin": 0.000294,
+       "required_histories": 14100172
+      },
+      "photons_ge100keV": {
+       "bound": 10.0,
+       "kind": "count",
+       "mean": 0.0177,
+       "headline": true,
+       "margin": 0.00035400000000000004,
+       "required_histories": 9614894
+      },
+      "cone_source_photons_ge10kev": {
+       "bound": 100.0,
+       "kind": "count",
+       "mean": 0.0007,
+       "headline": true,
+       "margin": 1.4e-05,
+       "required_histories": 708810335
+      },
+      "transmitted_energy_keV": {
+       "bound": 1000.0009999999999,
+       "kind": "energy",
+       "mean": 263.9253166706704,
+       "headline": true,
+       "margin": 5.278506333413408,
+       "required_histories": 128332
+      },
+      "photon_keV_ge10keV": {
+       "bound": 1000.0009999999999,
+       "kind": "energy",
+       "mean": 6.077743096289062,
+       "headline": true,
+       "margin": 0.12155486192578124,
+       "required_histories": 5389701
+      }
+     }
+    },
+    "w-1MeV-100um": {
+     "histories_per_seed": 170001,
+     "predicted_hours": 0.5000005117952147,
+     "pilot_rows_per_history": [
+      15407.7181,
+      1601.6287
+     ],
+     "observables": {
+      "backscattered": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.4285,
+       "headline": true,
+       "margin": 0.00857,
+       "required_histories": 161378
+      },
+      "transmitted": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.2329,
+       "headline": true,
+       "margin": 0.004658,
+       "required_histories": 390029
+      },
+      "stopped": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.3386,
+       "headline": true,
+       "margin": 0.006772,
+       "required_histories": 232042
+      },
+      "transmitted_mu_bin_0": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0358,
+       "headline": true,
+       "margin": 0.000716,
+       "required_histories": 3295408
+      },
+      "transmitted_mu_bin_1": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.1409,
+       "headline": true,
+       "margin": 0.002818,
+       "required_histories": 712722
+      },
+      "transmitted_mu_bin_2": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0502,
+       "headline": true,
+       "margin": 0.0010040000000000001,
+       "required_histories": 2183327
+      },
+      "transmitted_mu_bin_3": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.006,
+       "headline": false,
+       "margin": 0.00012
+      },
+      "backscattered_mu_bin_0": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0824,
+       "headline": true,
+       "margin": 0.0016480000000000002,
+       "required_histories": 1314015
+      },
+      "backscattered_mu_bin_1": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.2586,
+       "headline": true,
+       "margin": 0.005172,
+       "required_histories": 341264
+      },
+      "backscattered_mu_bin_2": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0792,
+       "headline": true,
+       "margin": 0.0015840000000000001,
+       "required_histories": 1399540
+      },
+      "backscattered_mu_bin_3": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0083,
+       "headline": false,
+       "margin": 0.000166
+      },
+      "transmitted_energy_bin_0": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.011,
+       "headline": false,
+       "margin": 0.00021999999999999998
+      },
+      "transmitted_energy_bin_1": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0581,
+       "headline": true,
+       "margin": 0.001162,
+       "required_histories": 1862448
+      },
+      "transmitted_energy_bin_2": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.1487,
+       "headline": true,
+       "margin": 0.002974,
+       "required_histories": 678016
+      },
+      "transmitted_energy_bin_3": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0151,
+       "headline": false,
+       "margin": 0.000302
+      },
+      "transmitted_energy_bin_4": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0,
+       "headline": false,
+       "margin": 0.0
+      },
+      "backscattered_energy_bin_0": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0111,
+       "headline": false,
+       "margin": 0.000222
+      },
+      "backscattered_energy_bin_1": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0564,
+       "headline": true,
+       "margin": 0.001128,
+       "required_histories": 1970632
+      },
+      "backscattered_energy_bin_2": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.1397,
+       "headline": true,
+       "margin": 0.002794,
+       "required_histories": 748694
+      },
+      "backscattered_energy_bin_3": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.1613,
+       "headline": true,
+       "margin": 0.003226,
+       "required_histories": 603197
+      },
+      "backscattered_energy_bin_4": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.06,
+       "headline": true,
+       "margin": 0.0012,
+       "required_histories": 1891317
+      },
+      "photons_10_50keV": {
+       "bound": 100.0,
+       "kind": "count",
+       "mean": 0.1989,
+       "headline": true,
+       "margin": 0.003978,
+       "required_histories": 2534011
+      },
+      "photons_50_100keV": {
+       "bound": 20.0,
+       "kind": "count",
+       "mean": 0.0689,
+       "headline": true,
+       "margin": 0.001378,
+       "required_histories": 3014531
+      },
+      "photons_ge100keV": {
+       "bound": 10.0,
+       "kind": "count",
+       "mean": 0.1103,
+       "headline": true,
+       "margin": 0.002206,
+       "required_histories": 1436526
+      },
+      "cone_source_photons_ge10kev": {
+       "bound": 100.0,
+       "kind": "count",
+       "mean": 0.0015,
+       "headline": true,
+       "margin": 3e-05,
+       "required_histories": 370105909
+      },
+      "transmitted_energy_keV": {
+       "bound": 1000.0009999999999,
+       "kind": "energy",
+       "mean": 132.29431799360208,
+       "headline": true,
+       "margin": 2.6458863598720415,
+       "required_histories": 445888
+      },
+      "photon_keV_ge10keV": {
+       "bound": 1000.0009999999999,
+       "kind": "energy",
+       "mean": 37.17876040585937,
+       "headline": true,
+       "margin": 0.7435752081171875,
+       "required_histories": 959473
+      }
+     }
+    },
+    "si-3MeV-1mm": {
+     "histories_per_seed": 610048,
+     "predicted_hours": 0.5000005861012257,
+     "pilot_rows_per_history": [
+      5484.3082,
+      28.3886
+     ],
+     "observables": {
+      "backscattered": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0079,
+       "headline": false,
+       "margin": 0.00015800000000000002
+      },
+      "transmitted": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.9912,
+       "headline": true,
+       "margin": 0.019824,
+       "required_histories": 4857
+      },
+      "stopped": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0007,
+       "headline": false,
+       "margin": 1.4e-05
+      },
+      "transmitted_mu_bin_0": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0319,
+       "headline": true,
+       "margin": 0.000638,
+       "required_histories": 3398664
+      },
+      "transmitted_mu_bin_1": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.395,
+       "headline": true,
+       "margin": 0.0079,
+       "required_histories": 184250
+      },
+      "transmitted_mu_bin_2": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.4808,
+       "headline": true,
+       "margin": 0.009616,
+       "required_histories": 131344
+      },
+      "transmitted_mu_bin_3": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0835,
+       "headline": true,
+       "margin": 0.00167,
+       "required_histories": 1274387
+      },
+      "backscattered_mu_bin_0": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0025,
+       "headline": false,
+       "margin": 5e-05
+      },
+      "backscattered_mu_bin_1": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0047,
+       "headline": false,
+       "margin": 9.400000000000001e-05
+      },
+      "backscattered_mu_bin_2": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0007,
+       "headline": false,
+       "margin": 1.4e-05
+      },
+      "backscattered_mu_bin_3": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0,
+       "headline": false,
+       "margin": 0.0
+      },
+      "transmitted_energy_bin_0": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0008,
+       "headline": false,
+       "margin": 1.6000000000000003e-05
+      },
+      "transmitted_energy_bin_1": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0048,
+       "headline": false,
+       "margin": 9.599999999999999e-05
+      },
+      "transmitted_energy_bin_2": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0165,
+       "headline": false,
+       "margin": 0.00033
+      },
+      "transmitted_energy_bin_3": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.9691,
+       "headline": true,
+       "margin": 0.019382,
+       "required_histories": 8140
+      },
+      "transmitted_energy_bin_4": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0,
+       "headline": false,
+       "margin": 0.0
+      },
+      "backscattered_energy_bin_0": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0005,
+       "headline": false,
+       "margin": 1e-05
+      },
+      "backscattered_energy_bin_1": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0015,
+       "headline": false,
+       "margin": 3e-05
+      },
+      "backscattered_energy_bin_2": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0046,
+       "headline": false,
+       "margin": 9.2e-05
+      },
+      "backscattered_energy_bin_3": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.001,
+       "headline": false,
+       "margin": 2e-05
+      },
+      "backscattered_energy_bin_4": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0003,
+       "headline": false,
+       "margin": 5.999999999999999e-06
+      },
+      "photons_10_50keV": {
+       "bound": 300.0,
+       "kind": "count",
+       "mean": 0.0274,
+       "headline": true,
+       "margin": 0.000548,
+       "required_histories": 42149529
+      },
+      "photons_50_100keV": {
+       "bound": 60.0,
+       "kind": "count",
+       "mean": 0.0108,
+       "headline": true,
+       "margin": 0.00021600000000000002,
+       "required_histories": 33105376
+      },
+      "photons_ge100keV": {
+       "bound": 30.0,
+       "kind": "count",
+       "mean": 0.0329,
+       "headline": true,
+       "margin": 0.000658,
+       "required_histories": 7521113
+      },
+      "cone_source_photons_ge10kev": {
+       "bound": 300.0,
+       "kind": "count",
+       "mean": 0.0,
+       "headline": false,
+       "margin": 0.0
+      },
+      "transmitted_energy_keV": {
+       "bound": 3000.0029999999997,
+       "kind": "energy",
+       "mean": 2561.354474468474,
+       "headline": true,
+       "margin": 51.22708948936948,
+       "required_histories": 5965
+      },
+      "photon_keV_ge10keV": {
+       "bound": 3000.0029999999997,
+       "kind": "energy",
+       "mean": 16.84226936816406,
+       "headline": true,
+       "margin": 0.33684538736328123,
+       "required_histories": 7104566
+      }
+     }
+    },
+    "w-3MeV-100um": {
+     "histories_per_seed": 321378,
+     "predicted_hours": 0.5000006266578685,
+     "pilot_rows_per_history": [
+      8084.2546,
+      91.439
+     ],
+     "observables": {
+      "backscattered": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.1191,
+       "headline": true,
+       "margin": 0.002382,
+       "required_histories": 888066
+      },
+      "transmitted": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.8741,
+       "headline": true,
+       "margin": 0.017482,
+       "required_histories": 22019
+      },
+      "stopped": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0068,
+       "headline": false,
+       "margin": 0.000136
+      },
+      "transmitted_mu_bin_0": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.1158,
+       "headline": true,
+       "margin": 0.002316,
+       "required_histories": 898512
+      },
+      "transmitted_mu_bin_1": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.4967,
+       "headline": true,
+       "margin": 0.009934,
+       "required_histories": 123523
+      },
+      "transmitted_mu_bin_2": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.231,
+       "headline": true,
+       "margin": 0.00462,
+       "required_histories": 392908
+      },
+      "transmitted_mu_bin_3": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0306,
+       "headline": true,
+       "margin": 0.000612,
+       "required_histories": 3613723
+      },
+      "backscattered_mu_bin_0": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0266,
+       "headline": true,
+       "margin": 0.000532,
+       "required_histories": 4410745
+      },
+      "backscattered_mu_bin_1": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0745,
+       "headline": true,
+       "margin": 0.00149,
+       "required_histories": 1454182
+      },
+      "backscattered_mu_bin_2": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0161,
+       "headline": false,
+       "margin": 0.000322
+      },
+      "backscattered_mu_bin_3": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0019,
+       "headline": false,
+       "margin": 3.8e-05
+      },
+      "transmitted_energy_bin_0": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0015,
+       "headline": false,
+       "margin": 3e-05
+      },
+      "transmitted_energy_bin_1": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0135,
+       "headline": false,
+       "margin": 0.00027
+      },
+      "transmitted_energy_bin_2": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0487,
+       "headline": true,
+       "margin": 0.000974,
+       "required_histories": 2382233
+      },
+      "transmitted_energy_bin_3": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.2175,
+       "headline": true,
+       "margin": 0.00435,
+       "required_histories": 429183
+      },
+      "transmitted_energy_bin_4": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.5929,
+       "headline": true,
+       "margin": 0.011858,
+       "required_histories": 85754
+      },
+      "backscattered_energy_bin_0": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0027,
+       "headline": false,
+       "margin": 5.4000000000000005e-05
+      },
+      "backscattered_energy_bin_1": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0077,
+       "headline": false,
+       "margin": 0.000154
+      },
+      "backscattered_energy_bin_2": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.032,
+       "headline": true,
+       "margin": 0.00064,
+       "required_histories": 3881981
+      },
+      "backscattered_energy_bin_3": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0621,
+       "headline": true,
+       "margin": 0.001242,
+       "required_histories": 1750642
+      },
+      "backscattered_energy_bin_4": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0146,
+       "headline": false,
+       "margin": 0.000292
+      },
+      "photons_10_50keV": {
+       "bound": 300.0,
+       "kind": "count",
+       "mean": 0.1123,
+       "headline": true,
+       "margin": 0.002246,
+       "required_histories": 10299758
+      },
+      "photons_50_100keV": {
+       "bound": 60.0,
+       "kind": "count",
+       "mean": 0.0463,
+       "headline": true,
+       "margin": 0.0009260000000000001,
+       "required_histories": 7739163
+      },
+      "photons_ge100keV": {
+       "bound": 30.0,
+       "kind": "count",
+       "mean": 0.1481,
+       "headline": true,
+       "margin": 0.0029620000000000002,
+       "required_histories": 1716694
+      },
+      "cone_source_photons_ge10kev": {
+       "bound": 300.0,
+       "kind": "count",
+       "mean": 0.0014,
+       "headline": true,
+       "margin": 2.8e-05,
+       "required_histories": 834477427
+      },
+      "transmitted_energy_keV": {
+       "bound": 3000.0029999999997,
+       "kind": "energy",
+       "mean": 2307.030411724336,
+       "headline": true,
+       "margin": 46.14060823448672,
+       "required_histories": 24295
+      },
+      "photon_keV_ge10keV": {
+       "bound": 3000.0029999999997,
+       "kind": "energy",
+       "mean": 85.24402961640625,
+       "headline": true,
+       "margin": 1.7048805923281252,
+       "required_histories": 1546124
+      }
+     }
+    }
+   }
+  },
+  "default": {
+   "reference": "shdet",
+   "extra": [
+    "--inelastic-cutoff-ev",
+    "50"
+   ],
+   "arms": {
+    "shc05": [
+     0.05,
+     0.05
+    ],
+    "shc20": [
+     0.2,
+     0.2
+    ]
+   },
+   "diagnostic_arms": {},
+   "diagnostic_fraction": 0.25,
+   "scenes": {
+    "si-300keV-100um": {
+     "histories_per_seed": 1040740,
+     "predicted_hours": 0.5000002160391025,
+     "pilot_rows_per_history": [
+      1123.8902,
+      420.4302
+     ],
+     "observables": {
+      "backscattered": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0952,
+       "headline": true,
+       "margin": 0.001904,
+       "required_histories": 1179394
+      },
+      "transmitted": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.8534,
+       "headline": true,
+       "margin": 0.017068,
+       "required_histories": 25631
+      },
+      "stopped": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0514,
+       "headline": true,
+       "margin": 0.001028,
+       "required_histories": 2163152
+      },
+      "transmitted_mu_bin_0": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.1102,
+       "headline": true,
+       "margin": 0.0022040000000000002,
+       "required_histories": 949271
+      },
+      "transmitted_mu_bin_1": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.486,
+       "headline": true,
+       "margin": 0.00972,
+       "required_histories": 128722
+      },
+      "transmitted_mu_bin_2": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.2278,
+       "headline": true,
+       "margin": 0.004556,
+       "required_histories": 394887
+      },
+      "transmitted_mu_bin_3": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0294,
+       "headline": true,
+       "margin": 0.000588,
+       "required_histories": 3780153
+      },
+      "backscattered_mu_bin_0": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0208,
+       "headline": true,
+       "margin": 0.000416,
+       "required_histories": 5460442
+      },
+      "backscattered_mu_bin_1": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0566,
+       "headline": true,
+       "margin": 0.001132,
+       "required_histories": 2064687
+      },
+      "backscattered_mu_bin_2": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0158,
+       "headline": false,
+       "margin": 0.00031600000000000004
+      },
+      "backscattered_mu_bin_3": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.002,
+       "headline": false,
+       "margin": 4e-05
+      },
+      "transmitted_energy_bin_0": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0052,
+       "headline": false,
+       "margin": 0.000104
+      },
+      "transmitted_energy_bin_1": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0288,
+       "headline": true,
+       "margin": 0.000576,
+       "required_histories": 3795515
+      },
+      "transmitted_energy_bin_2": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.149,
+       "headline": true,
+       "margin": 0.00298,
+       "required_histories": 657558
+      },
+      "transmitted_energy_bin_3": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.6608,
+       "headline": true,
+       "margin": 0.013216000000000002,
+       "required_histories": 65064
+      },
+      "transmitted_energy_bin_4": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0096,
+       "headline": false,
+       "margin": 0.00019199999999999998
+      },
+      "backscattered_energy_bin_0": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0046,
+       "headline": false,
+       "margin": 9.2e-05
+      },
+      "backscattered_energy_bin_1": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0278,
+       "headline": true,
+       "margin": 0.000556,
+       "required_histories": 4080769
+      },
+      "backscattered_energy_bin_2": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.043,
+       "headline": true,
+       "margin": 0.00086,
+       "required_histories": 2853885
+      },
+      "backscattered_energy_bin_3": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0166,
+       "headline": false,
+       "margin": 0.000332
+      },
+      "backscattered_energy_bin_4": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0032,
+       "headline": false,
+       "margin": 6.400000000000001e-05
+      },
+      "photons_10_50keV": {
+       "bound": 30.0,
+       "kind": "count",
+       "mean": 0.007,
+       "headline": true,
+       "margin": 0.00014000000000000001,
+       "required_histories": 30502463
+      },
+      "photons_50_100keV": {
+       "bound": 6.0,
+       "kind": "count",
+       "mean": 0.0006,
+       "headline": false,
+       "margin": 1.1999999999999999e-05
+      },
+      "photons_ge100keV": {
+       "bound": 3.0,
+       "kind": "count",
+       "mean": 0.0016,
+       "headline": true,
+       "margin": 3.2000000000000005e-05,
+       "required_histories": 70480259
+      },
+      "cone_source_photons_ge10kev": {
+       "bound": 30.0,
+       "kind": "count",
+       "mean": 0.0,
+       "headline": false,
+       "margin": 0.0
+      },
+      "transmitted_energy_keV": {
+       "bound": 300.0003,
+       "kind": "energy",
+       "mean": 202.31274707628498,
+       "headline": true,
+       "margin": 4.046254941525699,
+       "required_histories": 29939
+      },
+      "photon_keV_ge10keV": {
+       "bound": 300.0003,
+       "kind": "energy",
+       "mean": 0.4478062171875001,
+       "headline": true,
+       "margin": 0.008956124343750002,
+       "required_histories": 28011368
+      }
+     }
+    },
+    "w-300keV-10um": {
+     "histories_per_seed": 502216,
+     "predicted_hours": 0.5000002410724472,
+     "pilot_rows_per_history": [
+      2179.2258,
+      833.8612
+     ],
+     "observables": {
+      "backscattered": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.4212,
+       "headline": true,
+       "margin": 0.008424000000000001,
+       "required_histories": 165993
+      },
+      "transmitted": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.5386,
+       "headline": true,
+       "margin": 0.010772,
+       "required_histories": 105306
+      },
+      "stopped": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0402,
+       "headline": true,
+       "margin": 0.000804,
+       "required_histories": 2847804
+      },
+      "transmitted_mu_bin_0": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0912,
+       "headline": true,
+       "margin": 0.001824,
+       "required_histories": 1178020
+      },
+      "transmitted_mu_bin_1": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.3158,
+       "headline": true,
+       "margin": 0.006316,
+       "required_histories": 255907
+      },
+      "transmitted_mu_bin_2": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.1154,
+       "headline": true,
+       "margin": 0.002308,
+       "required_histories": 911750
+      },
+      "transmitted_mu_bin_3": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0162,
+       "headline": false,
+       "margin": 0.000324
+      },
+      "backscattered_mu_bin_0": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.089,
+       "headline": true,
+       "margin": 0.00178,
+       "required_histories": 1155152
+      },
+      "backscattered_mu_bin_1": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.2442,
+       "headline": true,
+       "margin": 0.004884,
+       "required_histories": 369749
+      },
+      "backscattered_mu_bin_2": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.078,
+       "headline": true,
+       "margin": 0.00156,
+       "required_histories": 1428944
+      },
+      "backscattered_mu_bin_3": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.01,
+       "headline": false,
+       "margin": 0.0002
+      },
+      "transmitted_energy_bin_0": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0028,
+       "headline": false,
+       "margin": 5.6e-05
+      },
+      "transmitted_energy_bin_1": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0154,
+       "headline": false,
+       "margin": 0.000308
+      },
+      "transmitted_energy_bin_2": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0824,
+       "headline": true,
+       "margin": 0.0016480000000000002,
+       "required_histories": 1349601
+      },
+      "transmitted_energy_bin_3": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.2612,
+       "headline": true,
+       "margin": 0.0052239999999999995,
+       "required_histories": 328179
+      },
+      "transmitted_energy_bin_4": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.1768,
+       "headline": true,
+       "margin": 0.0035360000000000005,
+       "required_histories": 548159
+      },
+      "backscattered_energy_bin_0": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0026,
+       "headline": false,
+       "margin": 5.2e-05
+      },
+      "backscattered_energy_bin_1": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0216,
+       "headline": true,
+       "margin": 0.00043200000000000004,
+       "required_histories": 5025880
+      },
+      "backscattered_energy_bin_2": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0842,
+       "headline": true,
+       "margin": 0.001684,
+       "required_histories": 1291324
+      },
+      "backscattered_energy_bin_3": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.1656,
+       "headline": true,
+       "margin": 0.003312,
+       "required_histories": 595100
+      },
+      "backscattered_energy_bin_4": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.1472,
+       "headline": true,
+       "margin": 0.002944,
+       "required_histories": 691591
+      },
+      "photons_10_50keV": {
+       "bound": 30.0,
+       "kind": "count",
+       "mean": 0.0212,
+       "headline": true,
+       "margin": 0.000424,
+       "required_histories": 11564402
+      },
+      "photons_50_100keV": {
+       "bound": 6.0,
+       "kind": "count",
+       "mean": 0.009,
+       "headline": true,
+       "margin": 0.00017999999999999998,
+       "required_histories": 13105983
+      },
+      "photons_ge100keV": {
+       "bound": 3.0,
+       "kind": "count",
+       "mean": 0.0074,
+       "headline": true,
+       "margin": 0.00014800000000000002,
+       "required_histories": 17243796
+      },
+      "cone_source_photons_ge10kev": {
+       "bound": 30.0,
+       "kind": "count",
+       "mean": 0.0004,
+       "headline": true,
+       "margin": 8.000000000000001e-06,
+       "required_histories": 444823069
+      },
+      "transmitted_energy_keV": {
+       "bound": 300.0003,
+       "kind": "energy",
+       "mean": 133.36716880260872,
+       "headline": true,
+       "margin": 2.6673433760521745,
+       "required_histories": 111784
+      },
+      "photon_keV_ge10keV": {
+       "bound": 300.0003,
+       "kind": "energy",
+       "mean": 2.3288742859375002,
+       "headline": true,
+       "margin": 0.046577485718750006,
+       "required_histories": 6101810
+      }
+     }
+    },
+    "si-1MeV-1mm": {
+     "histories_per_seed": 180252,
+     "predicted_hours": 0.5000010998378824,
+     "pilot_rows_per_history": [
+      8576.6948,
+      3114.2182
+     ],
+     "observables": {
+      "backscattered": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0958,
+       "headline": true,
+       "margin": 0.001916,
+       "required_histories": 1117618
+      },
+      "transmitted": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.5226,
+       "headline": true,
+       "margin": 0.010452,
+       "required_histories": 111802
+      },
+      "stopped": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.3816,
+       "headline": true,
+       "margin": 0.007632,
+       "required_histories": 193815
+      },
+      "transmitted_mu_bin_0": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0788,
+       "headline": true,
+       "margin": 0.001576,
+       "required_histories": 1321637
+      },
+      "transmitted_mu_bin_1": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.303,
+       "headline": true,
+       "margin": 0.00606,
+       "required_histories": 277309
+      },
+      "transmitted_mu_bin_2": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.128,
+       "headline": true,
+       "margin": 0.00256,
+       "required_histories": 795084
+      },
+      "transmitted_mu_bin_3": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0128,
+       "headline": false,
+       "margin": 0.00025600000000000004
+      },
+      "backscattered_mu_bin_0": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0174,
+       "headline": false,
+       "margin": 0.000348
+      },
+      "backscattered_mu_bin_1": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0578,
+       "headline": true,
+       "margin": 0.001156,
+       "required_histories": 1881576
+      },
+      "backscattered_mu_bin_2": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0192,
+       "headline": false,
+       "margin": 0.00038399999999999996
+      },
+      "backscattered_mu_bin_3": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0014,
+       "headline": false,
+       "margin": 2.8e-05
+      },
+      "transmitted_energy_bin_0": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0294,
+       "headline": true,
+       "margin": 0.000588,
+       "required_histories": 4180387
+      },
+      "transmitted_energy_bin_1": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.1658,
+       "headline": true,
+       "margin": 0.003316,
+       "required_histories": 576537
+      },
+      "transmitted_energy_bin_2": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.3274,
+       "headline": true,
+       "margin": 0.006548000000000001,
+       "required_histories": 247590
+      },
+      "transmitted_energy_bin_3": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0,
+       "headline": false,
+       "margin": 0.0
+      },
+      "transmitted_energy_bin_4": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0,
+       "headline": false,
+       "margin": 0.0
+      },
+      "backscattered_energy_bin_0": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0142,
+       "headline": false,
+       "margin": 0.000284
+      },
+      "backscattered_energy_bin_1": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0416,
+       "headline": true,
+       "margin": 0.000832,
+       "required_histories": 2728679
+      },
+      "backscattered_energy_bin_2": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0324,
+       "headline": true,
+       "margin": 0.000648,
+       "required_histories": 3407409
+      },
+      "backscattered_energy_bin_3": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0062,
+       "headline": false,
+       "margin": 0.000124
+      },
+      "backscattered_energy_bin_4": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0014,
+       "headline": false,
+       "margin": 2.8e-05
+      },
+      "photons_10_50keV": {
+       "bound": 100.0,
+       "kind": "count",
+       "mean": 0.0442,
+       "headline": true,
+       "margin": 0.0008840000000000001,
+       "required_histories": 11189980
+      },
+      "photons_50_100keV": {
+       "bound": 20.0,
+       "kind": "count",
+       "mean": 0.0142,
+       "headline": true,
+       "margin": 0.000284,
+       "required_histories": 14338415
+      },
+      "photons_ge100keV": {
+       "bound": 10.0,
+       "kind": "count",
+       "mean": 0.02,
+       "headline": true,
+       "margin": 0.0004,
+       "required_histories": 7677278
+      },
+      "cone_source_photons_ge10kev": {
+       "bound": 100.0,
+       "kind": "count",
+       "mean": 0.0008,
+       "headline": true,
+       "margin": 1.6000000000000003e-05,
+       "required_histories": 570343160
+      },
+      "transmitted_energy_keV": {
+       "bound": 1000.0009999999999,
+       "kind": "energy",
+       "mean": 269.4485774606987,
+       "headline": true,
+       "margin": 5.388971549213974,
+       "required_histories": 136602
+      },
+      "photon_keV_ge10keV": {
+       "bound": 1000.0009999999999,
+       "kind": "energy",
+       "mean": 6.919076201953125,
+       "headline": true,
+       "margin": 0.1383815240390625,
+       "required_histories": 4392865
+      }
+     }
+    },
+    "w-1MeV-100um": {
+     "histories_per_seed": 70861,
+     "predicted_hours": 0.5000023220821102,
+     "pilot_rows_per_history": [
+      16874.7016,
+      5519.035
+     ],
+     "observables": {
+      "backscattered": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.4428,
+       "headline": true,
+       "margin": 0.008856000000000001,
+       "required_histories": 152014
+      },
+      "transmitted": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.2138,
+       "headline": true,
+       "margin": 0.004276,
+       "required_histories": 438558
+      },
+      "stopped": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.3434,
+       "headline": true,
+       "margin": 0.006868,
+       "required_histories": 228749
+      },
+      "transmitted_mu_bin_0": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0342,
+       "headline": true,
+       "margin": 0.000684,
+       "required_histories": 3387312
+      },
+      "transmitted_mu_bin_1": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.125,
+       "headline": true,
+       "margin": 0.0025,
+       "required_histories": 819870
+      },
+      "transmitted_mu_bin_2": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0472,
+       "headline": true,
+       "margin": 0.000944,
+       "required_histories": 2536885
+      },
+      "transmitted_mu_bin_3": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0074,
+       "headline": false,
+       "margin": 0.00014800000000000002
+      },
+      "backscattered_mu_bin_0": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0858,
+       "headline": true,
+       "margin": 0.001716,
+       "required_histories": 1210448
+      },
+      "backscattered_mu_bin_1": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.266,
+       "headline": true,
+       "margin": 0.00532,
+       "required_histories": 324127
+      },
+      "backscattered_mu_bin_2": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.081,
+       "headline": true,
+       "margin": 0.0016200000000000001,
+       "required_histories": 1400973
+      },
+      "backscattered_mu_bin_3": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.01,
+       "headline": false,
+       "margin": 0.0002
+      },
+      "transmitted_energy_bin_0": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0118,
+       "headline": false,
+       "margin": 0.000236
+      },
+      "transmitted_energy_bin_1": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0496,
+       "headline": true,
+       "margin": 0.000992,
+       "required_histories": 2286571
+      },
+      "transmitted_energy_bin_2": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.1126,
+       "headline": true,
+       "margin": 0.002252,
+       "required_histories": 957054
+      },
+      "transmitted_energy_bin_3": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0398,
+       "headline": true,
+       "margin": 0.000796,
+       "required_histories": 2702235
+      },
+      "transmitted_energy_bin_4": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0,
+       "headline": false,
+       "margin": 0.0
+      },
+      "backscattered_energy_bin_0": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0126,
+       "headline": false,
+       "margin": 0.000252
+      },
+      "backscattered_energy_bin_1": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0618,
+       "headline": true,
+       "margin": 0.0012360000000000001,
+       "required_histories": 1676710
+      },
+      "backscattered_energy_bin_2": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.1398,
+       "headline": true,
+       "margin": 0.0027960000000000003,
+       "required_histories": 736459
+      },
+      "backscattered_energy_bin_3": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.1444,
+       "headline": true,
+       "margin": 0.002888,
+       "required_histories": 708927
+      },
+      "backscattered_energy_bin_4": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0842,
+       "headline": true,
+       "margin": 0.001684,
+       "required_histories": 1206513
+      },
+      "photons_10_50keV": {
+       "bound": 100.0,
+       "kind": "count",
+       "mean": 0.1884,
+       "headline": true,
+       "margin": 0.0037680000000000005,
+       "required_histories": 2668362
+      },
+      "photons_50_100keV": {
+       "bound": 20.0,
+       "kind": "count",
+       "mean": 0.0724,
+       "headline": true,
+       "margin": 0.001448,
+       "required_histories": 2787734
+      },
+      "photons_ge100keV": {
+       "bound": 10.0,
+       "kind": "count",
+       "mean": 0.1194,
+       "headline": true,
+       "margin": 0.0023880000000000004,
+       "required_histories": 1265020
+      },
+      "cone_source_photons_ge10kev": {
+       "bound": 100.0,
+       "kind": "count",
+       "mean": 0.0048,
+       "headline": true,
+       "margin": 9.599999999999999e-05,
+       "required_histories": 97099596
+      },
+      "transmitted_energy_keV": {
+       "bound": 1000.0009999999999,
+       "kind": "energy",
+       "mean": 125.22658842211652,
+       "headline": true,
+       "margin": 2.5045317684423303,
+       "required_histories": 500850
+      },
+      "photon_keV_ge10keV": {
+       "bound": 1000.0009999999999,
+       "kind": "energy",
+       "mean": 38.89198405546875,
+       "headline": true,
+       "margin": 0.777839681109375,
+       "required_histories": 856331
+      }
+     }
+    },
+    "si-3MeV-1mm": {
+     "histories_per_seed": 201893,
+     "predicted_hours": 0.5000010489748293,
+     "pilot_rows_per_history": [
+      5844.6198,
+      1504.6188
+     ],
+     "observables": {
+      "backscattered": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0074,
+       "headline": false,
+       "margin": 0.00014800000000000002
+      },
+      "transmitted": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.9912,
+       "headline": true,
+       "margin": 0.019824,
+       "required_histories": 4990
+      },
+      "stopped": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.001,
+       "headline": false,
+       "margin": 2e-05
+      },
+      "transmitted_mu_bin_0": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0286,
+       "headline": true,
+       "margin": 0.000572,
+       "required_histories": 4118242
+      },
+      "transmitted_mu_bin_1": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.402,
+       "headline": true,
+       "margin": 0.00804,
+       "required_histories": 179931
+      },
+      "transmitted_mu_bin_2": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.4772,
+       "headline": true,
+       "margin": 0.009544,
+       "required_histories": 132921
+      },
+      "transmitted_mu_bin_3": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0834,
+       "headline": true,
+       "margin": 0.001668,
+       "required_histories": 1270085
+      },
+      "backscattered_mu_bin_0": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.002,
+       "headline": false,
+       "margin": 4e-05
+      },
+      "backscattered_mu_bin_1": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0044,
+       "headline": false,
+       "margin": 8.800000000000001e-05
+      },
+      "backscattered_mu_bin_2": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.001,
+       "headline": false,
+       "margin": 2e-05
+      },
+      "backscattered_mu_bin_3": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0,
+       "headline": false,
+       "margin": 0.0
+      },
+      "transmitted_energy_bin_0": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0012,
+       "headline": false,
+       "margin": 2.3999999999999997e-05
+      },
+      "transmitted_energy_bin_1": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0108,
+       "headline": false,
+       "margin": 0.00021600000000000002
+      },
+      "transmitted_energy_bin_2": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.047,
+       "headline": true,
+       "margin": 0.00094,
+       "required_histories": 2307097
+      },
+      "transmitted_energy_bin_3": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.7116,
+       "headline": true,
+       "margin": 0.014232,
+       "required_histories": 51864
+      },
+      "transmitted_energy_bin_4": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.2206,
+       "headline": true,
+       "margin": 0.004412,
+       "required_histories": 414332
+      },
+      "backscattered_energy_bin_0": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0008,
+       "headline": false,
+       "margin": 1.6000000000000003e-05
+      },
+      "backscattered_energy_bin_1": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0014,
+       "headline": false,
+       "margin": 2.8e-05
+      },
+      "backscattered_energy_bin_2": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.003,
+       "headline": false,
+       "margin": 6e-05
+      },
+      "backscattered_energy_bin_3": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.002,
+       "headline": false,
+       "margin": 4e-05
+      },
+      "backscattered_energy_bin_4": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0002,
+       "headline": false,
+       "margin": 4.000000000000001e-06
+      },
+      "photons_10_50keV": {
+       "bound": 300.0,
+       "kind": "count",
+       "mean": 0.0308,
+       "headline": true,
+       "margin": 0.000616,
+       "required_histories": 36455812
+      },
+      "photons_50_100keV": {
+       "bound": 60.0,
+       "kind": "count",
+       "mean": 0.0098,
+       "headline": true,
+       "margin": 0.000196,
+       "required_histories": 37580507
+      },
+      "photons_ge100keV": {
+       "bound": 30.0,
+       "kind": "count",
+       "mean": 0.035,
+       "headline": true,
+       "margin": 0.0007000000000000001,
+       "required_histories": 6740242
+      },
+      "cone_source_photons_ge10kev": {
+       "bound": 300.0,
+       "kind": "count",
+       "mean": 0.0,
+       "headline": false,
+       "margin": 0.0
+      },
+      "transmitted_energy_keV": {
+       "bound": 3000.0029999999997,
+       "kind": "energy",
+       "mean": 2563.0590908014156,
+       "headline": true,
+       "margin": 51.26118181602831,
+       "required_histories": 6692
+      },
+      "photon_keV_ge10keV": {
+       "bound": 3000.0029999999997,
+       "kind": "energy",
+       "mean": 17.659230852734375,
+       "headline": true,
+       "margin": 0.3531846170546875,
+       "required_histories": 5740522
+      }
+     }
+    },
+    "w-3MeV-100um": {
+     "histories_per_seed": 115301,
+     "predicted_hours": 0.5000022786379986,
+     "pilot_rows_per_history": [
+      9203.7654,
+      2422.074
+     ],
+     "observables": {
+      "backscattered": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.1204,
+       "headline": true,
+       "margin": 0.002408,
+       "required_histories": 860547
+      },
+      "transmitted": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.8704,
+       "headline": true,
+       "margin": 0.017408,
+       "required_histories": 22075
+      },
+      "stopped": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0092,
+       "headline": false,
+       "margin": 0.000184
+      },
+      "transmitted_mu_bin_0": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.118,
+       "headline": true,
+       "margin": 0.00236,
+       "required_histories": 880356
+      },
+      "transmitted_mu_bin_1": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.4944,
+       "headline": true,
+       "margin": 0.009888000000000001,
+       "required_histories": 124642
+      },
+      "transmitted_mu_bin_2": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.2264,
+       "headline": true,
+       "margin": 0.004528,
+       "required_histories": 403087
+      },
+      "transmitted_mu_bin_3": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0316,
+       "headline": true,
+       "margin": 0.0006320000000000001,
+       "required_histories": 3462392
+      },
+      "backscattered_mu_bin_0": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0252,
+       "headline": true,
+       "margin": 0.000504,
+       "required_histories": 4377622
+      },
+      "backscattered_mu_bin_1": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0696,
+       "headline": true,
+       "margin": 0.001392,
+       "required_histories": 1615686
+      },
+      "backscattered_mu_bin_2": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0224,
+       "headline": true,
+       "margin": 0.000448,
+       "required_histories": 5044540
+      },
+      "backscattered_mu_bin_3": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0032,
+       "headline": false,
+       "margin": 6.400000000000001e-05
+      },
+      "transmitted_energy_bin_0": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0034,
+       "headline": false,
+       "margin": 6.8e-05
+      },
+      "transmitted_energy_bin_1": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.016,
+       "headline": false,
+       "margin": 0.00032
+      },
+      "transmitted_energy_bin_2": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0578,
+       "headline": true,
+       "margin": 0.001156,
+       "required_histories": 2019875
+      },
+      "transmitted_energy_bin_3": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.2184,
+       "headline": true,
+       "margin": 0.004368,
+       "required_histories": 422905
+      },
+      "transmitted_energy_bin_4": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.5748,
+       "headline": true,
+       "margin": 0.011496,
+       "required_histories": 91638
+      },
+      "backscattered_energy_bin_0": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0032,
+       "headline": false,
+       "margin": 6.400000000000001e-05
+      },
+      "backscattered_energy_bin_1": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0102,
+       "headline": false,
+       "margin": 0.00020400000000000003
+      },
+      "backscattered_energy_bin_2": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0334,
+       "headline": true,
+       "margin": 0.000668,
+       "required_histories": 3501170
+      },
+      "backscattered_energy_bin_3": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0558,
+       "headline": true,
+       "margin": 0.001116,
+       "required_histories": 1945366
+      },
+      "backscattered_energy_bin_4": {
+       "bound": 1.0,
+       "kind": "indicator",
+       "mean": 0.0178,
+       "headline": false,
+       "margin": 0.000356
+      },
+      "photons_10_50keV": {
+       "bound": 300.0,
+       "kind": "count",
+       "mean": 0.1162,
+       "headline": true,
+       "margin": 0.002324,
+       "required_histories": 9911296
+      },
+      "photons_50_100keV": {
+       "bound": 60.0,
+       "kind": "count",
+       "mean": 0.0442,
+       "headline": true,
+       "margin": 0.0008840000000000001,
+       "required_histories": 8461280
+      },
+      "photons_ge100keV": {
+       "bound": 30.0,
+       "kind": "count",
+       "mean": 0.1518,
+       "headline": true,
+       "margin": 0.003036,
+       "required_histories": 1615996
+      },
+      "cone_source_photons_ge10kev": {
+       "bound": 300.0,
+       "kind": "count",
+       "mean": 0.0014,
+       "headline": true,
+       "margin": 2.8e-05,
+       "required_histories": 813440989
+      },
+      "transmitted_energy_keV": {
+       "bound": 3000.0029999999997,
+       "kind": "energy",
+       "mean": 2297.12918859743,
+       "headline": true,
+       "margin": 45.942583771948605,
+       "required_histories": 24948
+      },
+      "photon_keV_ge10keV": {
+       "bound": 3000.0029999999997,
+       "kind": "energy",
+       "mean": 88.05901929179687,
+       "headline": true,
+       "margin": 1.7611803858359374,
+       "required_histories": 1342182
+      }
+     }
+    }
+   }
+  }
+ }
+}

@@ -30,6 +30,7 @@ import os
 import resource
 import sys
 import time
+from itertools import pairwise
 from pathlib import Path
 
 START = time.perf_counter()
@@ -43,6 +44,11 @@ BANDS = (
 
 
 CONE_BANDS = ("10_50kev", "50_100kev", "ge100kev")
+# Catalog keys that carry shell oscillator data (the scenes key W by its SBETHE table).
+SHELL_MATERIALS = {"Si": "silicon", "W": "tungsten"}
+# Exit-distribution bins (#894). The top edges sit above 1 so a value at 1 is kept.
+COSINE_EDGES = (0.0, 0.5, 0.9, 0.99, 1.0000000001)
+ENERGY_FRACTION_EDGES = (0.0, 0.25, 0.5, 0.75, 0.9, 1.0000000001)
 # Only these CXR-package helpers may run: segment clipping/orientation geometry
 # the bremsstrahlung estimator imports. They compute no PXR/CBS amplitude or line.
 SHARED_GEOMETRY = {
@@ -310,7 +316,7 @@ def electron_groups(r, n, max_rows):
         first = last
 
 
-def block_scores(r, n):
+def block_scores(r, n, e0_keV):
     """Per-primary observables and work counts for one block."""
     import numpy as np
 
@@ -346,9 +352,42 @@ def block_scores(r, n):
         ("rows_elastic", EventKind.ELASTIC),
         ("rows_substep", EventKind.SUBSTEP),
         ("rows_hard_radiative", EventKind.HARD_RADIATIVE),
+        ("rows_hard_inelastic", EventKind.HARD_INELASTIC),
+        ("rows_soft_hinge", EventKind.SOFT_HINGE),
+        ("rows_delta", EventKind.DELTA),
     ]:
         m = ev == code
         out[name] = grouped_scores(ids[m], ones[m], n)
+    out |= exit_distribution_scores(r, ids, ev, n, e0_keV)
+    return out
+
+
+def exit_distribution_scores(r, ids, ev, n, e0_keV):
+    """Per-primary exit-distribution indicators (#894): cosine and energy-fraction bins.
+
+    Exit energy is binned as a fraction of the beam energy, so every scene shares
+    the bin definitions. Cosine edges follow the #838 equivalence study; a
+    backscattered electron's cosine is taken against the outward normal.
+    """
+    import numpy as np
+
+    from pyrite.montecarlo.transport.events import SegmentEvent as EventKind
+    from pyrite.perf.precision import grouped_scores
+
+    mu = np.asarray(r["v_hat"], dtype=np.float64)[:, 2]
+    energy = np.asarray(r["E_end_keV"], dtype=np.float64) / float(e0_keV)
+    out = {}
+    for prefix, code, sign in [
+        ("transmitted", EventKind.EXIT_BOTTOM, 1.0),
+        ("backscattered", EventKind.EXIT_TOP, -1.0),
+    ]:
+        exiting = ev == code
+        for index, (low, high) in enumerate(pairwise(COSINE_EDGES)):
+            sel = exiting & (sign * mu >= low) & (sign * mu < high)
+            out[f"{prefix}_mu_bin_{index}"] = grouped_scores(ids[sel], np.ones(sel.sum()), n)
+        for index, (low, high) in enumerate(pairwise(ENERGY_FRACTION_EDGES)):
+            sel = exiting & (energy >= low) & (energy < high)
+            out[f"{prefix}_energy_bin_{index}"] = grouped_scores(ids[sel], np.ones(sel.sum()), n)
     return out
 
 
@@ -422,6 +461,21 @@ def main():
         default="mixed",
         help="exact CUDA kernel precision (#838); mixed (the library default since #873) is "
         "FP32 tables/sampling",
+    )
+    parser.add_argument(
+        "--mixed-c1",
+        type=float,
+        default=None,
+        help="run transport_mode='mixed' at this C1 (#894); needs --mixed-c2",
+    )
+    parser.add_argument("--mixed-c2", type=float, default=None)
+    parser.add_argument("--mixed-max-step-um", type=float, default=None)
+    parser.add_argument(
+        "--inelastic-cutoff-ev",
+        type=float,
+        default=None,
+        help="use shell-soft-hard inelastic transport at this cutoff instead of the "
+        "matched-bounds continuous stopping (#894 default-physics family)",
     )
     parser.add_argument(
         "--pool-fraction", type=float, default=0.85, help="CuPy pool limit, fraction of VRAM"
@@ -547,6 +601,20 @@ def main():
         # ELSEPA bypasses the LUT anyway; explicit so `auto` cannot fall back on it.
         transport_lut_config=TransportLUTConfig(enabled=False),
     )
+    if (args.mixed_c1 is None) != (args.mixed_c2 is None):
+        parser.error("--mixed-c1 and --mixed-c2 go together")
+    if args.mixed_c1 is not None:
+        from pyrite._mixed_elastic_policy import MixedElasticParameters
+
+        kwargs["mixed_elastic"] = MixedElasticParameters(
+            args.mixed_c1, args.mixed_c2, args.mixed_max_step_um
+        )
+    if args.inelastic_cutoff_ev is not None:
+        kwargs |= dict(
+            inelastic_model="shell-soft-hard",
+            inelastic_cutoff_eV=args.inelastic_cutoff_ev,
+            inelastic_materials=[SHELL_MATERIALS[scene["material"]]],
+        )
     from pyrite.perf.detector_scoring import absorption_edges_keV
 
     cone = spec["cone"]
@@ -585,7 +653,7 @@ def main():
             retained += int(np.asarray(r["event_kind"]).size)
             t2 = time.perf_counter()
             pool.free_all_blocks()
-            block = block_scores(r, n)
+            block = block_scores(r, n, kwargs["E0_keV"])
             if args.estimator == "continuous":
                 parts = [
                     (first, continuous_cone_scores(sub, count, cone, ctx))
@@ -719,6 +787,10 @@ def main():
             score_rows=args.score_rows,
             kernel=args.kernel,
             transport_precision=args.transport_precision,
+            mixed_c1=args.mixed_c1,
+            mixed_c2=args.mixed_c2,
+            mixed_max_step_um=args.mixed_max_step_um,
+            inelastic_cutoff_eV=args.inelastic_cutoff_ev,
             kernel_threads=config.kernel_threads,
             spectrum_step_eV=args.spectrum_step_ev,
             spectrum_geometric_nodes=args.spectrum_geometric_nodes,

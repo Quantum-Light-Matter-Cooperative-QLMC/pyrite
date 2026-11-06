@@ -3,18 +3,18 @@
 from ..._env import env_value
 from ..transport import TransportStepLimitError
 
-#: First per-electron transport step budget, and the largest the runner doubles
-#: it to after a :class:`TransportStepLimitError` (#192).
-TRANSPORT_MAX_STEPS = 20_000
-TRANSPORT_MAX_STEPS_CEILING = 8 * TRANSPORT_MAX_STEPS
+#: Default per-electron transport step limit. A smaller initial budget from
+#: ``PYRITE_MC_TRANSPORT_INITIAL_MAX_STEPS`` doubles up to the ceiling after a
+#: :class:`TransportStepLimitError` (#192).
+TRANSPORT_MAX_STEPS = 400_000
+TRANSPORT_MAX_STEPS_CEILING = TRANSPORT_MAX_STEPS
 
 
 def initial_step_budget() -> int:
-    """Initial transport capacity, not a cutoff on electron trajectories.
+    """Initial step budget, not a cutoff below the transport step limit.
 
-    The standard allocation remains 20,000 rows per electron. A smaller
-    starting value is useful for thin-target tutorials: an exhausted step
-    budget triggers a deterministic retry with more capacity.
+    A smaller starting value reduces fixed lockstep buffers: an exhausted step
+    budget triggers a deterministic retry with a larger one.
     """
     name = "PYRITE_MC_TRANSPORT_INITIAL_MAX_STEPS"
     raw = env_value(name, str(TRANSPORT_MAX_STEPS))
@@ -32,15 +32,13 @@ def initial_step_budget() -> int:
 def retry_step_budget(simulate, *args, **kwargs):
     """Run transport with a retrying step-storage capacity.
 
-    Start at :data:`TRANSPORT_MAX_STEPS` by default, double the allocation
-    on :class:`TransportStepLimitError` and stop at
-    :data:`TRANSPORT_MAX_STEPS_CEILING`, where the error propagates.
-    The initial capacity can be reduced using
-    ``PYRITE_MC_TRANSPORT_INITIAL_MAX_STEPS`` without truncating tracks.
+    Start at :data:`TRANSPORT_MAX_STEPS` by default, where the error propagates.
+    ``PYRITE_MC_TRANSPORT_INITIAL_MAX_STEPS`` starts lower without truncating
+    tracks: the budget doubles on :class:`TransportStepLimitError` and stops at
+    :data:`TRANSPORT_MAX_STEPS_CEILING`.
 
-    Thick MeV cases outlive the default step budget (5 MeV h-BN, 10 mm:
-    ~23-32k steps). The trajectories depend on the seed alone, so a rerun at a
-    doubled budget is exactly the run that budget gives from the start.
+    The trajectories depend on the seed alone, so a rerun at a doubled budget
+    is exactly the run that budget gives from the start.
     """
     max_steps = initial_step_budget()
     while True:

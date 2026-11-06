@@ -55,6 +55,7 @@ mixed-elastic-split
 mixed-elastic-soft-moments
 mixed-elastic-hinge
 mixed-elastic-reverification
+mixed-elastic-cuda-verification
 sbethe-atomic-shell-inputs
 sbethe-atomic-shell-inputs-verification
 gos-core-edge

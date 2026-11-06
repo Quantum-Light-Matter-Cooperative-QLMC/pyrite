@@ -49,6 +49,11 @@
 #include "G4CoulombScattering.hh"
 #include "G4eBremsstrahlung.hh"
 #include "G4eDPWACoulombScatteringModel.hh"
+#include "G4eCoulombScatteringModel.hh"
+#include "G4eMultipleScattering.hh"
+#include "G4GoudsmitSaundersonMscModel.hh"
+#include "G4MscStepLimitType.hh"
+#include "G4WentzelVIModel.hh"
 #include "G4eIonisation.hh"
 #include "Randomize.hh"
 
@@ -81,6 +86,7 @@ struct Config
   // eIoni step function; <= 0 keeps the Geant4 default (0.2, 1 mm).
   double step_dr = 0.;
   double step_final_um = 0.;
+  std::string elastic = "ss";  // ss | wvi | gs
   // Detector cone (polar centre from +z in the x-z plane, half-angle).
   double cone_center_deg = 90.;
   double cone_half_deg = 10.;
@@ -169,8 +175,26 @@ class ElectronOnlyPhysics : public G4VPhysicsConstructor
     ph->RegisterProcess(new G4eBremsstrahlung(), e);
     // As G4EmStandardPhysicsSS with Mott correction: DPWA over all angles,
     // scattering-power correction on (constructor defaults).
-    auto* ss = new G4CoulombScattering(false);
-    ss->SetEmModel(new G4eDPWACoulombScatteringModel());
+    if (gConfig.elastic == "ss") {
+      auto* ss = new G4CoulombScattering(false);
+      ss->SetEmModel(new G4eDPWACoulombScatteringModel());
+      ph->RegisterProcess(ss, e);
+      return;
+    }
+    // Mixed-scheme counterparts of PyRITE transport_mode="mixed" (#894).
+    auto* msc = new G4eMultipleScattering();
+    if (gConfig.elastic == "gs") {
+      // As G4EmStandardPhysicsGS: condensed history, no explicit hard events.
+      msc->SetEmModel(new G4GoudsmitSaundersonMscModel());
+      ph->RegisterProcess(msc, e);
+      return;
+    }
+    // As G4EmStandardPhysicsWVI, with WentzelVI at every energy: multiple
+    // scattering below the limit angle, single Coulomb scattering above it.
+    msc->SetEmModel(new G4WentzelVIModel());
+    ph->RegisterProcess(msc, e);
+    auto* ss = new G4CoulombScattering();
+    ss->SetEmModel(new G4eCoulombScatteringModel());
     ph->RegisterProcess(ss, e);
   }
 };
@@ -187,7 +211,13 @@ class PhysicsList : public G4VModularPhysicsList
     p->SetAuger(false);
     p->SetPixe(false);
     p->SetLowestElectronEnergy(10. * keV);
-    p->SetMscThetaLimit(0.0);
+    p->SetMscThetaLimit(gConfig.elastic == "wvi" ? 0.15 : 0.0);
+    if (gConfig.elastic == "gs") {
+      p->SetMscEnergyLimit(1. * GeV);
+      p->SetMscStepLimitType(fUseSafetyPlus);
+      p->SetMscSkin(3);
+      p->SetMscRangeFactor(0.08);
+    }
     p->SetUseMottCorrection(true);
     if (gConfig.step_dr > 0.) p->SetStepFunction(gConfig.step_dr, gConfig.step_final_um * um);
     RegisterPhysics(new ElectronOnlyPhysics());
@@ -395,12 +425,14 @@ int main(int argc, char** argv)
     else if (k == "--cone-half-deg") gConfig.cone_half_deg = std::stod(v);
     else if (k == "--step-dr") gConfig.step_dr = std::stod(v);
     else if (k == "--step-final-um") gConfig.step_final_um = std::stod(v);
+    else if (k == "--elastic") gConfig.elastic = v;
     else {
       std::fprintf(stderr, "unknown option %s\n", k.c_str());
       return 2;
     }
   }
   if (gConfig.material != "Si" && gConfig.material != "W" && gConfig.material != "C") return 2;
+  if (gConfig.elastic != "ss" && gConfig.elastic != "wvi" && gConfig.elastic != "gs") return 2;
   const auto t0 = std::chrono::steady_clock::now();
   auto type = gConfig.threads > 1 ? G4RunManagerType::MTOnly : G4RunManagerType::SerialOnly;
   auto* rm = G4RunManagerFactory::CreateRunManager(type, gConfig.threads);
