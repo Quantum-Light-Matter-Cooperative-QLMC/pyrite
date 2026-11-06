@@ -30,12 +30,17 @@ def near_intervals(e, a, edges, exact_widths, xp=np):
     return first.astype(xp.int64), xp.maximum(first, stop).astype(xp.int64)
 
 
-def pair_keys(first, offsets, start, stop, xp=np):
-    """Map a bounded line-major ordinal tile to sorted (bin, line) keys."""
+def pair_keys(first, offsets, start, stop, xp=np, *, sort=True):
+    """Map a bounded line-major ordinal tile to (bin, line) keys.
+
+    ``sort=False`` keeps line-major order: each warp then holds one line across
+    consecutive bins, so its lanes stay on the same ``Si`` branch (#1003).
+    """
     ordinal = xp.arange(start, stop, dtype=xp.int64)
     line = xp.searchsorted(offsets, ordinal, side="right") - 1
     bins = first[line] + ordinal - offsets[line]
-    return xp.sort(bins * len(first) + line)
+    keys = bins * len(first) + line
+    return xp.sort(keys) if sort else keys
 
 
 def far_source():
@@ -82,7 +87,7 @@ def kernels(cp):
     )
 
 
-def sparse_reduce(cp, inputs, *, exact_widths, tile_pairs):
+def sparse_reduce(cp, inputs, *, exact_widths, tile_pairs, line_major=False):
     """Return a complete per-flush candidate, construction and work metrics."""
     sync = cp.cuda.Device().synchronize
     stages = {}
@@ -109,7 +114,9 @@ def sparse_reduce(cp, inputs, *, exact_widths, tile_pairs):
     peak_used = cp.get_default_memory_pool().used_bytes()
     for start in range(0, count, tile_pairs):
         started = time.perf_counter()
-        keys = pair_keys(first, offsets, start, min(start + tile_pairs, count), cp)
+        keys = pair_keys(
+            first, offsets, start, min(start + tile_pairs, count), cp, sort=not line_major
+        )
         sync()
         mapping += time.perf_counter() - started
         started = time.perf_counter()
@@ -133,6 +140,10 @@ def sparse_reduce(cp, inputs, *, exact_widths, tile_pairs):
         sync()
         evaluate += time.perf_counter() - started
         started = time.perf_counter()
+        if line_major:
+            # Same (bin, line) sum order as the bin-major route; keys are unique.
+            order = cp.argsort(keys)
+            keys, values = keys[order], values[order]
         bins = keys // n_lines
         begins = cp.concatenate(
             (cp.zeros(1, dtype=cp.int64), cp.flatnonzero(bins[1:] != bins[:-1]) + 1)

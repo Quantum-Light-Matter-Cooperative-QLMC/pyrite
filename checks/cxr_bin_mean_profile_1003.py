@@ -181,7 +181,7 @@ def _sparse_module():
     return sys.modules[name]
 
 
-def _arm(name, inputs, tile_pairs):
+def _arm(name, inputs, tile_pairs, nodes=None):
     """``run(out)`` adding the arm's reduction of ``inputs`` into ``out``."""
     import cupy as cp
 
@@ -192,18 +192,39 @@ def _arm(name, inputs, tile_pairs):
     from pyrite.montecarlo.spectrum.cxr._bin_tree import run_tree_reduction
 
     kind = name.removesuffix("+series")
+    if kind == "node":
+        # Point sampling, a different quadrature: reported for #944, not a
+        # same-accuracy candidate for #1003.
+        from pyrite.montecarlo.spectrum.cxr_jit_kernel import (
+            DEFAULT_SPECTRUM_KERNEL_CONFIG,
+            run_reduction_kernel,
+        )
+
+        def run_node(out):
+            sampled = cp.zeros(out.size, dtype=cp.float32)
+            run_reduction_kernel(
+                *inputs[:3], nodes, out=sampled, config=DEFAULT_SPECTRUM_KERNEL_CONFIG
+            )
+            out += sampled
+
+        return run_node
     if kind in ("auto", "pairs"):
         return lambda out: run_bin_mean_reduction_kernel(*inputs, out=out, method=kind)
     if kind in ("tree", "warp"):
         return lambda out: run_tree_reduction(*inputs, out=out, warp=kind == "warp")
-    if kind == "sparse":
+    if kind in ("sparse", "sparse-line"):
         sparse = _sparse_module()
 
         def run(out):
-            result, _ = sparse.sparse_reduce(
-                cp, inputs, exact_widths=BIN_MEAN_EXACT_WIDTHS, tile_pairs=tile_pairs
+            result, stages = sparse.sparse_reduce(
+                cp,
+                inputs,
+                exact_widths=BIN_MEAN_EXACT_WIDTHS,
+                tile_pairs=tile_pairs,
+                line_major=kind == "sparse-line",
             )
             out += result
+            print(name, json.dumps(stages), flush=True)
 
         return run
     raise ValueError(f"unknown arm {name!r}")
@@ -217,6 +238,8 @@ def _accuracy(candidate, ref, widths):
         "max_dev_over_peak": float(diff.max() / peak),
         "max_rel_dev_floor1e-6peak": float(np.max(diff / floor)),
         "integral_rel_dev": float(np.dot(candidate - ref, widths) / np.dot(ref, widths)),
+        "l1_rel_dev": float(np.dot(diff, widths) / np.dot(np.abs(ref), widths)),
+        "bin_rel_dev_q50_q95_q99": [float(v) for v in np.quantile(diff / floor, [0.5, 0.95, 0.99])],
         "finite": bool(np.isfinite(candidate).all()),
     }
 
@@ -236,8 +259,17 @@ def replay(args):
     inv_width = cp.asarray(data["inv_width"])
     widths = 1.0 / data["inv_width"]
     e, a, w = (cp.asarray(data[k]) for k in ("E_r", "aw", "w"))
+    # Captures without the grid (the #286 flushes) sample at bin centres.
+    has_grid = "grid" in data.files
+    nodes = data["grid"] if has_grid else 0.5 * (data["edges"][:-1] + data["edges"][1:])
+    nodes = cp.asarray(nodes, dtype=cp.float32)
     arms = args.arms.split(",")
-    report = {"fixture": str(args.fixture), "arms": arms, "flushes": []}
+    report = {
+        "fixture": str(args.fixture),
+        "arms": arms,
+        "node_coordinates": "grid" if has_grid else "bin centres",
+        "flushes": [],
+    }
     for index, sl in enumerate(_flushes(int(e.size), _JIT_CXR_BATCH_TARGET)):
         if args.max_flushes and index >= args.max_flushes:
             break
@@ -250,7 +282,7 @@ def replay(args):
             order = arms if repeat % 2 == 0 else arms[::-1]
             for name in order:
                 _set_series(name.endswith("+series"))
-                run = _arm(name, inputs, args.tile_pairs)
+                run = _arm(name, inputs, args.tile_pairs, nodes)
                 out = cp.zeros(edges.size - 1, dtype=cp.float64)
                 elapsed = _sync_time(lambda run=run, out=out: run(out))
                 host = cp.asnumpy(out)
