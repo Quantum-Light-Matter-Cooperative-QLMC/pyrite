@@ -178,6 +178,10 @@ class ElsepaDeck:
         # Electron records retain their exact historical keys.
         if self.projectile != "electron":
             record["projectile"] = self.projectile
+        # These decks reach ``NPH=2``, so one shared ``elscata`` process and one
+        # process per energy give different numbers (#656). Other keys stay put.
+        if not self.is_muffin_tin and (self.z == 1 or self.nuclear_model == 1):
+            record["process_per_energy"] = True
         # Free-atom records keep their historical spelling, and so their keys.
         if self.is_muffin_tin:
             record["muffin_tin_radius_cm"] = self.muffin_tin_radius_cm

@@ -205,3 +205,11 @@ def test_generate_runs_each_energy_in_its_own_process(monkeypatch, tmp_path):
 
     assert len(decks) == 2
     assert result.table.arrays()["dcs_cm2_sr"].shape == (2, 606)
+
+
+def test_only_decks_that_inherit_state_record_process_per_energy():
+    flag = "process_per_energy"
+    assert ElsepaDeck.free_atom(1, [1.0e3]).model_record()[flag] is True
+    assert ElsepaDeck.free_atom(74, [1.0e3], nuclear_model=1).model_record()[flag] is True
+    assert flag not in ElsepaDeck.free_atom(2, [1.0e3]).model_record()
+    assert flag not in ElsepaDeck.free_atom(74, [1.0e3]).model_record()
