@@ -215,6 +215,7 @@ def _characteristic(batch: EmissionBatch) -> EmissionOutput:
         batch.abs_layers,
         groove=batch.groove,
         Ne=batch.electron_limit,
+        table_cache=batch.table_cache,
     )
     return EmissionOutput("spec_characteristic", values)
 

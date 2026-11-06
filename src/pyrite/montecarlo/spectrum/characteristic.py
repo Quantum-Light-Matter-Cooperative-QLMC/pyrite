@@ -8,6 +8,7 @@ Validation: eedl-shell-ionization-comparison
 Validation: bote-salvat-ionization-backend
 """
 
+import hashlib
 import re
 import warnings
 from collections.abc import Mapping
@@ -51,6 +52,7 @@ from ..eedl_ionization import (
 )
 from ..eedl_ionization import EEDLSubshellTable as EEDLSubshellTable
 from ..eedl_ionization import load_eedl_shell_ionization as load_eedl_shell_ionization
+from . import _characteristic_fused
 from .cxr import (
     _clip_segments_to_cutoff,
     _observation_direction,
@@ -741,20 +743,37 @@ def _characteristic_transport_cutoff_keV(E_cut_keV: object) -> float:
     return cutoff
 
 
+def _device_shell_tables(table: CharacteristicCrossSectionTable):
+    """Per-shell ``(energy_eV, sigma_cm2)`` tables on the scoring device."""
+    return tuple(
+        (xp.asarray(energy, dtype=REAL), xp.asarray(values, dtype=REAL))
+        for energy, values in zip(
+            table.projectile_energy_eV_by_shell,
+            table.ionization_cross_sections_cm2_by_shell,
+            strict=True,
+        )
+    )
+
+
 def _interpolate_shell_cross_sections(
     table: CharacteristicCrossSectionTable,
     segment_energy_keV: object,
+    shell_tables=None,
+    packed_shells=None,
 ):
-    """Linearly interpolate the table's partial electroionization cross sections."""
+    """Linearly interpolate the table's partial electroionization cross sections.
+
+    ``shell_tables`` is the table's :func:`_device_shell_tables`, prepared once
+    instead of copied to the device on every chunk; ``packed_shells`` its
+    concatenated CuPy form, which evaluates every shell in one bit-identical
+    launch (#1005).
+    """
     query_eV = xp.asarray(segment_energy_keV, dtype=REAL) * 1.0e3
+    fused = _characteristic_fused.shell_sigma(query_eV, packed_shells)
+    if fused is not None:
+        return fused
     columns = []
-    for energy_cpu, values_cpu in zip(
-        table.projectile_energy_eV_by_shell,
-        table.ionization_cross_sections_cm2_by_shell,
-        strict=True,
-    ):
-        energy = xp.asarray(energy_cpu, dtype=REAL)
-        values = xp.asarray(values_cpu, dtype=REAL)
+    for energy, values in shell_tables or _device_shell_tables(table):
         interpolated = xp.interp(query_eV, energy, values)
         inside = (query_eV >= energy[0]) & (query_eV <= energy[-1])
         columns.append(xp.where(inside, interpolated, REAL(0.0)))
@@ -767,45 +786,160 @@ _LINE_BATCH_ELEMENTS = 1 << 22
 
 def _accumulate_line_yields(
     table,
-    cxr_work,
+    response,
+    mu_by_line,
     seg_E,
     seg_L,
     path_start,
     path_end,
     *,
     chunk,
-    layered,
     number_density_ang3,
+    shell_tables=None,
+    packed_shells=None,
 ):
     """Segment-summed yield of every characteristic line (#872).
 
     Lines are scored in groups against each chunk, so one set of array kernels
     serves many lines instead of one launch set per (chunk, line). Per-element
     arithmetic is that of the former per-line loop; only the matmul and
-    segment-sum reduction orders regroup (float rounding).
+    segment-sum reduction orders regroup (float rounding). ``response`` is
+    ``(n_shell, n_line)`` and ``mu_by_line`` ``(n_layer, n_line)``, one row
+    for a single slab, matching the ``(n_segment, n_layer)`` escape paths.
     """
-    n_lines = len(cxr_work)
+    n_lines = int(response.shape[1])
     line_yields = xp.zeros(n_lines, dtype=REAL)
-    response = xp.stack([work[1] for work in cxr_work], axis=1)
-    if layered:
-        mu_by_line = xp.stack([xp.asarray(work[3], dtype=REAL) for work in cxr_work], axis=1)
-    else:
-        mu_by_line = xp.stack([xp.asarray(work[2], dtype=REAL) for work in cxr_work])[None, :]
     for start in range(0, int(seg_E.size), chunk):
         sl = slice(start, min(start + chunk, int(seg_E.size)))
         rows = int(sl.stop - sl.start)
-        shell_sigma_cm2 = _interpolate_shell_cross_sections(table, seg_E[sl])
+        shell_sigma_cm2 = _interpolate_shell_cross_sections(
+            table, seg_E[sl], shell_tables, packed_shells
+        )
         path_cm = number_density_ang3 * 1.0e24 * (seg_L[sl] * 1.0e-8)
         group = max(1, _LINE_BATCH_ELEMENTS // max(rows, 1))
         for first in range(0, n_lines, group):
             lines = slice(first, min(first + group, n_lines))
             mu = mu_by_line[:, lines]
-            transmission = mean_transmission(path_start[sl] @ mu, path_end[sl] @ mu, xp=xp)
+            tau_start, tau_end = path_start[sl] @ mu, path_end[sl] @ mu
             effective_line_sigma_cm2 = shell_sigma_cm2 @ response[:, lines]
-            line_yields[lines] += xp.sum(
-                path_cm[:, None] * effective_line_sigma_cm2 * transmission, axis=0
+            weighted = _characteristic_fused.weighted_transmission(
+                tau_start, tau_end, path_cm, effective_line_sigma_cm2
             )
+            if weighted is None:
+                transmission = mean_transmission(tau_start, tau_end, xp=xp)
+                weighted = path_cm[:, None] * effective_line_sigma_cm2 * transmission
+            summed = _characteristic_fused.segment_sum(weighted)
+            line_yields[lines] += xp.sum(weighted, axis=0) if summed is None else summed
     return line_yields
+
+
+@dataclass(frozen=True, slots=True)
+class _PreparedLines:
+    """Trajectory-independent scoring data of one element's emitted lines.
+
+    Depends only on the energy grid, the element's table and relaxation
+    cutoff, and the absorber compositions -- never on segments or the
+    observation direction -- so one instance serves every streamed block,
+    emitting layer and direction of a case (#1005). Arrays are on the scoring
+    device: ``profiles`` ``(n_line, n_bin)`` bin-integrated Lorentzian
+    densities, ``response`` ``(n_shell, n_line)`` photons per primary vacancy,
+    ``mu_by_line`` ``(n_layer, n_line)`` total attenuation at each line energy
+    (one row for a single slab), and ``shell_tables`` the per-shell
+    ionization tables (:func:`_device_shell_tables`, plus their packed CuPy
+    form or ``None``). ``severe_truncation`` lists ``(label,
+    captured)`` for in-window lines below
+    :data:`CHARACTERISTIC_SEVERE_TRUNCATION_FRACTION`.
+    """
+
+    profiles: Any
+    response: Any
+    mu_by_line: Any
+    shell_tables: tuple
+    packed_shells: Any
+    severe_truncation: tuple[tuple[str, float], ...]
+
+
+def _prepare_lines(table, comp, layers, edges, bin_widths, relaxation_cutoff):
+    """Select, profile and attenuate one element's scored lines, or ``None``.
+
+    Line selection and per-line arithmetic are those of the former per-call
+    loop. The attenuation is one :func:`_mu_total_inv_ang` evaluation over all
+    kept line energies per absorber (the EPDL lookup is elementwise), instead
+    of one per line.
+
+    Validation: characteristic-radiation
+    """
+    _transfer, line_yield_per_vacancy = _cascade_line_yields(table, relaxation_cutoff)
+    kept, profiles, severe = [], [], []
+    for cxr_index, (line_energy, line_fwhm) in enumerate(
+        zip(table.line_energy_eV, table.cxr_fwhm_eV, strict=True)
+    ):
+        if line_energy <= relaxation_cutoff:
+            continue
+        if not np.any(line_yield_per_vacancy[:, cxr_index] > 0.0):
+            continue
+        weights_cpu = _lorentzian_bin_weights(edges, line_energy, line_fwhm)
+        if not np.any(weights_cpu > 0.0):
+            continue
+        captured = float(weights_cpu.sum())
+        peak_in_window = edges[0] <= line_energy <= edges[-1]
+        if peak_in_window and captured < CHARACTERISTIC_SEVERE_TRUNCATION_FRACTION:
+            # The line centre is inside the requested window but the window
+            # itself is too narrow around it -- distinct from a line whose
+            # centre sits entirely outside E_grid_eV and only contributes a
+            # deliberately small physical tail (see
+            # `characteristic_line_window_mass` for that case's breakdown).
+            severe.append((str(table.line_labels[cxr_index]), captured))
+        kept.append(cxr_index)
+        profiles.append(weights_cpu / bin_widths)
+    if not kept:
+        return None
+    # Cast to the scoring dtype first, as the per-line grids were, so the EPDL
+    # lookup sees the same energies.
+    cxr_grid = xp.asarray(table.line_energy_eV[kept], dtype=REAL)
+    absorbers = [comp] if layers is None else [c for _z_top, _z_bot, c in layers]
+    mu_by_line = xp.stack(
+        [
+            _finite_mu_or_raise(
+                _mu_total_inv_ang(absorber, cxr_grid), cxr_grid, "characteristic line energy"
+            )
+            for absorber in absorbers
+        ]
+    )
+    shell_tables = _device_shell_tables(table)
+    return _PreparedLines(
+        profiles=xp.asarray(np.stack(profiles), dtype=REAL),
+        response=xp.asarray(line_yield_per_vacancy[:, kept], dtype=REAL),
+        mu_by_line=mu_by_line,
+        shell_tables=shell_tables,
+        packed_shells=_characteristic_fused.pack_shell_tables(shell_tables),
+        severe_truncation=tuple(severe),
+    )
+
+
+def _prepared_lines_cached(cache, key_parts, table, comp, layers, edges, widths, cutoff):
+    """:func:`_prepare_lines` through an optional caller-owned, case-local cache.
+
+    The key carries every input of the preparation: element, data source,
+    yield and ionization models, relaxation cutoff, absorber compositions, the
+    exact bin edges (by digest) and the active array namespace and dtype.
+    """
+    if cache is None:
+        return _prepare_lines(table, comp, layers, edges, widths, cutoff)
+    key = (
+        "characteristic-lines",
+        *key_parts,
+        float(cutoff),
+        tuple(comp),
+        None if layers is None else tuple(tuple(c) for _z_top, _z_bot, c in layers),
+        edges.shape,
+        hashlib.blake2b(edges.tobytes(), digest_size=16).hexdigest(),
+        getattr(xp, "__name__", str(xp)),
+        np.dtype(REAL).name,
+    )
+    if key not in cache:
+        cache[key] = _prepare_lines(table, comp, layers, edges, widths, cutoff)
+    return cache[key]
 
 
 def mc_characteristic_spectrum(
@@ -825,6 +959,7 @@ def mc_characteristic_spectrum(
     relaxation_cutoff_eV=None,
     fluorescence_yields: FluorescenceYieldSource = "eadl",
     ionization_model: IonizationModel = "eedl",
+    _table_cache: dict | None = None,
 ):
     """Return the characteristic X-ray density from transport segments.
 
@@ -872,6 +1007,11 @@ def mc_characteristic_spectrum(
     ionization_model
         ``"eedl"`` (default) or the opt-in ``"bote-salvat"``; see
         :func:`load_characteristic_cross_sections`.
+    _table_cache
+        Private, caller-owned case-local dict. When given, each element's
+        trajectory-independent line data (profiles, responses, line-energy
+        attenuation) is prepared once and reused across calls with the same
+        grid, tables, cutoff and absorbers (#1005); results are unchanged.
 
     Returns
     -------
@@ -946,65 +1086,40 @@ def mc_characteristic_spectrum(
 
     for el, number_density_ang3 in comp:
         table = all_tables[el]
-        _transfer, line_yield_per_vacancy = _cascade_line_yields(table, relaxation_cutoff)
-        cxr_work = []
-        for cxr_index, (line_energy, line_fwhm) in enumerate(
-            zip(table.line_energy_eV, table.cxr_fwhm_eV, strict=True)
-        ):
-            if line_energy <= relaxation_cutoff:
-                continue
-            if not np.any(line_yield_per_vacancy[:, cxr_index] > 0.0):
-                continue
-            weights_cpu = _lorentzian_bin_weights(edges, line_energy, line_fwhm)
-            if not np.any(weights_cpu > 0.0):
-                continue
-            captured = float(weights_cpu.sum())
-            peak_in_window = edges[0] <= line_energy <= edges[-1]
-            if peak_in_window and captured < CHARACTERISTIC_SEVERE_TRUNCATION_FRACTION:
-                # The line centre is inside the requested window but the window
-                # itself is too narrow around it -- distinct from a line whose
-                # centre sits entirely outside E_grid_eV and only contributes a
-                # deliberately small physical tail (see
-                # `characteristic_line_window_mass` for that case's breakdown).
-                severe_truncation.append((el, str(table.line_labels[cxr_index]), captured))
-            profile_cpu = weights_cpu / bin_widths
-            profile = xp.asarray(profile_cpu, dtype=REAL)
-            if layers is None:
-                cxr_grid = xp.asarray([line_energy], dtype=REAL)
-                mu = _finite_mu_or_raise(
-                    _mu_total_inv_ang(comp, cxr_grid), cxr_grid, "characteristic line energy"
-                )[0]
-                layer_mu = ()
-            else:
-                mu = None
-                cxr_grid = xp.asarray([line_energy], dtype=REAL)
-                layer_mu = [
-                    _finite_mu_or_raise(
-                        _mu_total_inv_ang(c, cxr_grid), cxr_grid, "characteristic line energy"
-                    )[0]
-                    for _z_top, _z_bot, c in layers
-                ]
-            response = xp.asarray(line_yield_per_vacancy[:, cxr_index], dtype=REAL)
-            cxr_work.append((profile, response, mu, layer_mu))
-
-        if not cxr_work:
+        prepared = _prepared_lines_cached(
+            _table_cache,
+            (
+                el,
+                None if data_dir is None else str(data_dir),
+                fluorescence_yields,
+                ionization_model,
+            ),
+            table,
+            comp,
+            layers,
+            edges,
+            bin_widths,
+            relaxation_cutoff,
+        )
+        if prepared is None:
             continue
+        severe_truncation.extend(
+            (el, label, captured) for label, captured in prepared.severe_truncation
+        )
         line_yields = _accumulate_line_yields(
             table,
-            cxr_work,
+            prepared.response,
+            prepared.mu_by_line,
             seg_E,
             seg_L,
             path_start,
             path_end,
             chunk=chunk,
-            layered=layers is not None,
             number_density_ang3=number_density_ang3,
+            shell_tables=prepared.shell_tables,
+            packed_shells=prepared.packed_shells,
         )
-        for (profile, _response, _mu, _layer_mu), line_yield in zip(
-            cxr_work,
-            line_yields,
-            strict=True,
-        ):
+        for profile, line_yield in zip(prepared.profiles, line_yields, strict=True):
             spec += line_yield * profile
 
     if severe_truncation:

@@ -580,3 +580,200 @@ def test_light_elements_without_subshells_above_the_cutoff_load_empty_tables():
         assert table.ionization_shell_labels == ()
         assert table.line_labels == ()
         assert table.line_yield_per_vacancy.shape == (0, 0)
+
+
+_W_ON_SI = [(0.0, 100.0, [("W", 0.063)]), (100.0, 1000.0, [("Si", 0.05)])]
+
+
+def _w_film_segments(seed: int) -> dict[str, object]:
+    rng = np.random.default_rng(seed)
+    n = 64
+    z = rng.uniform(1.0, 99.0, n)
+    v = rng.normal(size=(n, 3))
+    return {
+        "r_mid": np.column_stack((np.zeros(n), np.zeros(n), z)),
+        "v_hat": v / np.linalg.norm(v, axis=1, keepdims=True),
+        "L_ang": rng.uniform(0.5, 1.0, n),
+        "E_keV": rng.uniform(12.0, 30.0, n),
+        "elec_id": rng.integers(0, 4, n),
+        "layer": np.zeros(n, dtype=int),
+        "Ne": 4,
+        "thickness_ang": 1000.0,
+    }
+
+
+def test_prepared_lines_batch_attenuation_matches_per_line_lookup():
+    """One EPDL lookup over every kept line equals the per-line lookups (#1005)."""
+    table = characteristic.load_characteristic_cross_sections("W")
+    edges, widths = characteristic._energy_bin_edges_and_widths(np.linspace(1.0e3, 1.2e4, 200))
+    prepared = characteristic._prepare_lines(
+        table, [("W", 0.063)], _W_ON_SI, edges, widths, table.recommended_cutoff_eV
+    )
+    mu = np.asarray(characteristic._to_cpu(prepared.mu_by_line))
+    kept = [
+        index
+        for index, energy in enumerate(table.line_energy_eV)
+        if energy > table.recommended_cutoff_eV
+        and np.any(table.line_yield_per_vacancy[:, index] > 0.0)
+        and np.any(
+            characteristic._lorentzian_bin_weights(edges, energy, table.cxr_fwhm_eV[index]) > 0.0
+        )
+    ]
+    assert mu.shape == (len(_W_ON_SI), len(kept))
+    for layer, (_z_top, _z_bot, composition) in enumerate(_W_ON_SI):
+        for column, index in enumerate(kept):
+            grid = xp.asarray([table.line_energy_eV[index]], dtype=REAL)
+            single = characteristic._to_cpu(characteristic._mu_total_inv_ang(composition, grid))
+            assert mu[layer, column] == single[0]
+
+
+def test_prepared_line_cache_is_reused_across_blocks_and_directions(monkeypatch):
+    """A case-local cache prepares each element once and changes no output (#1005)."""
+    calls = []
+    real_prepare = characteristic._prepare_lines
+
+    def counted(*args):
+        calls.append(args[0].element)
+        return real_prepare(*args)
+
+    monkeypatch.setattr(characteristic, "_prepare_lines", counted)
+    energy = np.linspace(1.0e3, 1.2e4, 200)
+    common = dict(composition=[("W", 0.063)], layers=_W_ON_SI)
+    cache: dict = {}
+    for seed in (1, 2):
+        for theta in (np.deg2rad(119.0), np.deg2rad(150.0)):
+            segments = _w_film_segments(seed)
+            fresh = characteristic.mc_characteristic_spectrum(
+                segments, energy, theta_obs_rad=theta, **common
+            )
+            reused = characteristic.mc_characteristic_spectrum(
+                segments, energy, theta_obs_rad=theta, _table_cache=cache, **common
+            )
+            assert np.any(fresh > 0.0)
+            np.testing.assert_array_equal(reused, fresh)
+
+    assert calls.count("W") == 5  # four uncached calls plus one cached preparation
+    assert len(cache) == 1
+
+
+def _is_cupy() -> bool:
+    return getattr(xp, "__name__", "") == "cupy"
+
+
+def test_fused_shell_interpolation_is_bitwise_the_per_shell_chain():
+    """One-launch shell interpolation replays the per-shell chain exactly (#1005).
+
+    Queries cover table nodes, both ends, out-of-range energies and random
+    interior points. Off CuPy float32 the fused entry declines and the scorer
+    keeps its per-shell chain.
+    """
+    from pyrite.montecarlo.spectrum import _characteristic_fused as fused
+
+    table = characteristic.load_characteristic_cross_sections("W")
+    shells = characteristic._device_shell_tables(table)
+    packed = fused.pack_shell_tables(shells)
+    if not (_is_cupy() and np.dtype(REAL) == np.float32):
+        assert packed is None
+        return
+    nodes = np.concatenate([np.asarray(e) for e in table.projectile_energy_eV_by_shell])
+    rng = np.random.default_rng(5)
+    query_keV = np.concatenate(
+        [nodes / 1.0e3, rng.uniform(0.01, 400.0, 20000), [0.0, 1.0e-3, 1.0e5]]
+    )
+    chain = characteristic._interpolate_shell_cross_sections(table, query_keV, shells)
+    one = characteristic._interpolate_shell_cross_sections(table, query_keV, shells, packed)
+    assert one.dtype == chain.dtype
+    np.testing.assert_array_equal(characteristic._to_cpu(one), characteristic._to_cpu(chain))
+
+
+def test_fused_weighted_transmission_is_bitwise_the_mean_transmission_chain():
+    """Fused segment-mean transmission times path and sigma equals the chain (#1005)."""
+    from pyrite.montecarlo.spectrum import _characteristic_fused as fused
+    from pyrite.montecarlo.spectrum.segment_escape import mean_transmission
+
+    rng = np.random.default_rng(7)
+    rows, lines = 4096, 37
+    tau0 = rng.exponential(0.5, (rows, lines))
+    # Mix in the series branch (|t1 - t0| <= 1e-4) and exact ties.
+    step = np.where(rng.random((rows, lines)) < 0.3, rng.uniform(-1e-4, 1e-4, (rows, lines)), 1.0)
+    tau1 = np.abs(tau0 + step * rng.normal(0.0, 2.0, (rows, lines)))
+    tau1[:, 0] = tau0[:, 0]
+    t0, t1 = xp.asarray(tau0), xp.asarray(tau1)
+    path = xp.asarray(rng.uniform(0.0, 3.0, rows), dtype=REAL)
+    sigma = xp.asarray(rng.uniform(0.0, 1e-20, (rows, lines)))
+    one = fused.weighted_transmission(t0, t1, path, sigma)
+    if not _is_cupy():
+        assert one is None
+        return
+    chain = path[:, None] * sigma * mean_transmission(t0, t1, xp=xp)
+    np.testing.assert_array_equal(characteristic._to_cpu(one), characteristic._to_cpu(chain))
+
+
+def test_segment_sum_matches_column_sum_to_float64_reordering():
+    """The cuBLAS column sum only reorders the float64 segment sum (#1005)."""
+    from pyrite.montecarlo.spectrum import _characteristic_fused as fused
+
+    rng = np.random.default_rng(11)
+    weighted = xp.asarray(rng.uniform(0.0, 1e-20, (50000, 41)))
+    summed = fused.segment_sum(weighted)
+    if not _is_cupy():
+        assert summed is None
+        return
+    reference = characteristic._to_cpu(xp.sum(weighted, axis=0))
+    np.testing.assert_allclose(characteristic._to_cpu(summed), reference, rtol=1e-12, atol=0.0)
+    np.testing.assert_array_equal(
+        characteristic._to_cpu(fused.segment_sum(weighted)), characteristic._to_cpu(summed)
+    )
+
+
+@pytest.mark.parametrize(
+    ("element", "density", "layer", "z_range"),
+    [("W", 0.063, 0, (1.0, 99.0)), ("Si", 0.05, 1, (101.0, 999.0))],
+)
+def test_layered_w_si_spectrum_matches_a_per_line_reference(element, density, layer, z_range):
+    """Grouped, prepared and fused scoring equals the plain per-line sum (#1005)."""
+    from pyrite.montecarlo.spectrum.segment_escape import mean_transmission
+
+    rng = np.random.default_rng(13)
+    segments = _w_film_segments(21)
+    n = segments["L_ang"].size
+    segments["r_mid"][:, 2] = rng.uniform(*z_range, n)
+    segments["layer"] = np.full(n, layer)
+    energy = np.linspace(1.0e3, 1.2e4, 200)
+    composition = [(element, density)]
+    spectrum = characteristic.mc_characteristic_spectrum(
+        segments, energy, composition=composition, layers=_W_ON_SI, E_cut_keV=1.0, _table_cache={}
+    )
+
+    table = characteristic.load_characteristic_cross_sections(element)
+    clipped = characteristic._clip_segments_to_cutoff(segments, 1.0, composition, _W_ON_SI)
+    index = xp.flatnonzero(xp.asarray(clipped["elec_id"]) < 4)
+    n_hat = characteristic._observation_direction(np.deg2rad(119.0), None)
+    owner, fraction, start, end = characteristic.segment_escape_paths(
+        clipped, index, n_hat, layers=_W_ON_SI, xp=xp
+    )
+    seg_L = xp.asarray(clipped["L_ang"], dtype=REAL)[index][owner] * fraction
+    seg_E = xp.asarray(clipped["E_keV"], dtype=REAL)[index][owner]
+    sigma = characteristic._interpolate_shell_cross_sections(table, seg_E)
+    path_cm = density * 1.0e24 * (seg_L * 1.0e-8)
+    edges, widths = characteristic._energy_bin_edges_and_widths(energy)
+    _transfer, per_vacancy = characteristic._cascade_line_yields(table, table.recommended_cutoff_eV)
+    expected = np.zeros(energy.size)
+    for line, line_energy in enumerate(table.line_energy_eV):
+        if line_energy <= table.recommended_cutoff_eV:
+            continue
+        grid = xp.asarray([line_energy], dtype=REAL)
+        mu = xp.stack([characteristic._mu_total_inv_ang(c, grid)[0] for *_z, c in _W_ON_SI])
+        transmission = mean_transmission(start @ mu, end @ mu, xp=xp)
+        line_sigma = sigma @ xp.asarray(per_vacancy[:, line], dtype=REAL)
+        line_yield = float(characteristic._to_cpu(xp.sum(path_cm * line_sigma * transmission)))
+        weights = characteristic._lorentzian_bin_weights(
+            edges, line_energy, table.cxr_fwhm_eV[line]
+        )
+        expected += line_yield * weights / widths
+    expected /= 4.0 * np.pi * 4
+
+    assert np.any(expected > 0.0)
+    np.testing.assert_allclose(
+        spectrum, expected, rtol=scaled_rtol(1.0e-13, eps_multiple=energy.size), atol=0.0
+    )
