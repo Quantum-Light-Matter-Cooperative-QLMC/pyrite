@@ -53,7 +53,8 @@ def _lowered_source(beam, target, grid, numerics, seed, *, transition=False):
         raise TypeError("numerics must be a Numerics")
     if controls.precision is not None:
         raise ValueError("directional_source requires fixed counts; precision is unsupported")
-    controls = replace(controls, brem_trials=controls.cxr_trials, energy_bins=EnergyBins(cxr=grid))
+    # Only the grid is overridden: both requested populations are kept (#1004).
+    controls = replace(controls, energy_bins=EnergyBins(cxr=grid))
     physics = Physics(transition_radiation="history" if transition else "off")
     scene = Scene(beam, target, detector=None)
     slab = scene.target_spec
@@ -157,13 +158,18 @@ def directional_sources(
     interference), ``"characteristic"`` (isotropic atomic relaxation lines)
     and ``"bremsstrahlung"`` (continuum; BremsLib angular model when the
     tables resolve under the default ``Physics``, otherwise isotropic EEDL).
-    Characteristic and continuum use the live runner's lower-cutoff
-    population, which equals the line population here because
-    ``brem_trials`` is replaced by ``cxr_trials``.
-    ``"transition"`` adds history-coherent planar-stack TR, using that same
-    population. It requires an infinite planar target and the existing X-ray
-    dielectric band; finite lateral interfaces and optical response are not
-    inferred. Components remain separate; no TR–line cross term is added.
+    Populations follow the live runner: transport follows
+    ``max(cxr, brem)`` histories; PXR/CBS scores the first ``cxr`` histories
+    (``Ne_lines``); characteristic and continuum score the first ``brem``
+    histories (``Ne_brem``). Histories in both populations stop at the lower
+    of the two cutoffs; line-only histories stop at the line cutoff.
+    Each component is normalized per incident electron of its own
+    population. ``"transition"`` adds history-coherent planar-stack TR on the
+    bremsstrahlung population (``Ne_brem``), because boundary crossings by
+    slowed electrons need the lower-cutoff transport. It requires an infinite
+    planar target and the existing X-ray dielectric band; finite lateral
+    interfaces and optical response are not inferred. Components remain
+    separate; no TR–line cross term is added.
 
     Parameters
     ----------
@@ -180,9 +186,12 @@ def directional_sources(
     plane_azimuth_deg
         Lab transverse plane basis azimuth, degrees; zero gives the x–z plane.
     numerics
-        Fixed electron count, reflection/mosaic and transport controls. Adaptive
-        precision and automatic energy grids are unsupported. brem_trials is
-        replaced by cxr_trials; no extra population or excluded channel is scored.
+        Fixed electron counts, reflection/mosaic and transport controls. The
+        line count (``cxr_trials`` or ``FixedSampling.cxr_electrons``) drives
+        PXR/CBS; the bremsstrahlung count (``brem_trials`` or
+        ``brem_electrons``) drives characteristic, continuum and TR. Both are
+        used as requested. Adaptive precision and automatic energy grids are
+        unsupported; no excluded channel is scored.
     seed, direction_batch
         Nonnegative integer RNG seed and positive bounded scoring batch size.
     components

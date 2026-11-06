@@ -7,6 +7,7 @@ import pytest
 
 from pyrite import Beam, Numerics
 from pyrite.beams import PointBunch, PointSpot
+from pyrite.config import FixedSampling
 from pyrite.directional import observation_directions
 from pyrite.geometry import Footprint, Slab
 from pyrite.radiation import directional_source
@@ -124,7 +125,7 @@ def test_source_lowering_rotation_and_no_detector(inputs, monkeypatch):
         from pyrite._energy_grid_encoding import decode_energy_grid
 
         np.testing.assert_array_equal(decode_energy_grid(case["E_grid"]), [100.0, 200.0])
-        assert case["Ne"] == case["Ne_brem"] == 3
+        assert (case["Ne"], case["Ne_brem"]) == (3, 50)  # legacy brem_trials honored (#1004)
         assert kwargs["components"] == ("pxr-cbs",)
         values = {"pxr-cbs": np.ones((len(directions), 2))}
         return values, np.ones(len(directions), dtype=bool)
@@ -156,7 +157,7 @@ def test_tr_lowering_sets_history_model_and_preserves_oriented_frame(inputs, mon
 
     def score(case, directions, **kwargs):
         assert case["transition_radiation"] == {"model": "planar-stack", "coherence": "history"}
-        assert case["Ne"] == case["Ne_brem"] == 3
+        assert (case["Ne"], case["Ne_brem"]) == (3, 100)  # default brem_trials kept
         return {"transition": np.ones((len(directions), 2))}, np.ones(len(directions), dtype=bool)
 
     monkeypatch.setattr(owner, "source_outputs", score)
@@ -290,6 +291,80 @@ def test_shared_transport_components_match_fixed_direction_scorers(inputs, monke
             runner._brem_wide_from_segments(*args, layers, Ne=transport["Ne_brem"]),
             rtol=1e-13,
         )
+
+
+@pytest.mark.parametrize("single", [True, False])
+@pytest.mark.parametrize(
+    ("numerics", "counts"),
+    [
+        (Numerics(sampling=FixedSampling(cxr_electrons=1024, brem_electrons=256)), (1024, 256)),
+        (Numerics(sampling=FixedSampling(cxr_electrons=64, brem_electrons=512)), (64, 512)),
+        (Numerics(cxr_trials=7, brem_trials=3), (7, 3)),
+        (Numerics(), (450, 100)),
+        (None, (450, 100)),
+    ],
+)
+def test_requested_populations_are_lowered_unchanged(inputs, monkeypatch, numerics, counts, single):
+    """Typed and legacy fixed counts reach the case as requested (#1004)."""
+    import pyrite.directional as owner
+
+    def score(case, directions, *, components, **kwargs):
+        assert (case["Ne"], case["Ne_brem"]) == counts
+        values = {name: np.ones((len(directions), 2)) for name in components}
+        return values, np.ones(len(directions), dtype=bool)
+
+    monkeypatch.setattr(owner, "source_outputs", score)
+    monkeypatch.setattr(owner, "case_table_markers", lambda case: {})
+    monkeypatch.setattr(owner, "run_provenance", lambda *args: {})
+    options = dict(energy_eV=[100.0, 200.0], angle_deg=[0.0], numerics=numerics)
+    if single:
+        results = {"pxr-cbs": owner.directional_source(*inputs, **options)}
+    else:
+        results = owner.directional_sources(
+            *inputs, components=("pxr-cbs", "characteristic", "bremsstrahlung"), **options
+        )
+    for result in results.values():
+        assert (result.case["Ne"], result.case["Ne_brem"]) == counts
+        assert result.provenance["numerics"].resolved_sampling == FixedSampling(*counts)
+
+
+def test_unequal_populations_score_own_prefix_and_normalization(inputs):
+    """Each component equals the equal-count run of its own population (#1004).
+
+    The per-electron core draws counter-addressed histories, so the first ``n``
+    histories do not depend on the transported total. PXR/CBS of
+    ``FixedSampling(a, b)`` must equal ``FixedSampling(a, a)``; characteristic,
+    continuum and TR (the ``Ne_brem`` population) must equal ``FixedSampling(b, b)``.
+    Exact agreement also fixes each per-electron normalization to its own count.
+    Combined histories use the lower cutoff in both runs (``case_driver``).
+    """
+    from pyrite.directional import directional_sources
+
+    components = ("pxr-cbs", "characteristic", "bremsstrahlung", "transition")
+    target = replace(inputs[1], thickness_ang=2000.0)
+
+    def run(cxr, brem):
+        controls = Numerics(sampling=FixedSampling(cxr, brem), transport_core="per-electron")
+        results = directional_sources(
+            inputs[0],
+            target,
+            energy_eV=np.linspace(500.0, 3000.0, 6),
+            angle_deg=[-120.0, 60.0],
+            numerics=controls,
+            seed=7,
+            components=components,
+        )
+        assert {(r.case["Ne"], r.case["Ne_brem"]) for r in results.values()} == {(cxr, brem)}
+        return {name: result.density for name, result in results.items()}
+
+    equal = {n: run(n, n) for n in (2, 4)}
+    assert not np.array_equal(equal[2]["pxr-cbs"], equal[4]["pxr-cbs"])  # discriminating
+    assert not np.array_equal(equal[2]["transition"], equal[4]["transition"])
+    for cxr, brem in ((4, 2), (2, 4)):
+        unequal = run(cxr, brem)
+        np.testing.assert_array_equal(unequal["pxr-cbs"], equal[cxr]["pxr-cbs"])
+        for name in components[1:]:
+            np.testing.assert_array_equal(unequal[name], equal[brem][name])
 
 
 def test_grazing_explicitly_masked_without_scoring(monkeypatch):
