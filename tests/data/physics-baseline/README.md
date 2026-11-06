@@ -239,3 +239,17 @@ The exact CUDA kernel's default arithmetic became mixed FP32/FP64 after the
 content key. Only the generation-dependent identity hash in `resolved.json`
 was re-pinned. These fixtures are CPU/NumPy fp64, which always runs FP64, so
 every recorded output keeps its expectation.
+
+## Order-16 TDS radial panels (#887)
+
+`_tds_transform` and `_tds_diagonal` moved from order-8 to order-16 radial
+panels, which changed `CHANNELING_MODEL` to
+`planar-density-matrix-emission-v5`. #887 landed without re-pinning, so
+`transport-runner` failed on `main` from `1a5c8f78d`; #1000 re-pinned it.
+Restoring only `channeling/operators.py` and `channeling/handoff.py` from the
+parent of `1a5c8f78d` makes both channeling checks pass against the old
+expectations. Re-pinned: the `case_content_key` in `channeling.json`, and in
+the `channeling` output of `outputs.json` the `path_ang` sum (5.96e-12
+relative), `spec_characteristic` (2.2e-12) and `brem` (3.4e-12). Row counts,
+fates, the leading flight samples, the line spectrum and the resolved case
+payload are unchanged, and so are the tolerances.
