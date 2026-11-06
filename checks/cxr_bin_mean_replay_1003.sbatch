@@ -26,7 +26,7 @@ nvidia-smi --query-gpu=name,driver_version --format=csv
 uv sync -q --locked --no-default-groups --extra nvidia --group dev
 uv run --no-sync pyrite-dev test tests/montecarlo/spectrum/test_sinc_bin_integration_cuda.py \
   tests/montecarlo/spectrum/test_sinc_bin_near_far.py || echo "FAILED cuda tests rc=$?"
-arms="${ARMS:-auto,pairs,tree,sparse,sparse-line,auto+series,pairs+series,tree+series,sparse-line+series}"
+arms="${ARMS:-auto,node,pairs,tree,sparse,sparse-line,auto+series,pairs+series,tree+series,sparse-line+series}"
 for fixture in "$@"; do
   name="$(basename "$fixture" .npz)"
   uv run --no-sync python checks/cxr_bin_mean_profile_1003.py replay "$fixture" \
