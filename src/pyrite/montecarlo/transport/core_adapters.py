@@ -7,7 +7,7 @@ operations remain in ``cores.make_cpu_transport_core``'s compiled body.
 from numba import njit
 
 
-def adapt_cpu_transport_core(body, *, per_electron, lut, grooved, cone_split):
+def adapt_cpu_transport_core(body, *, per_electron, lut, grooved, cone_split, mixed=False):
     """Expose the existing lockstep/per-electron/LUT/split kernel signatures."""
     if per_electron and lut:
 
@@ -38,6 +38,41 @@ def adapt_cpu_transport_core(body, *, per_electron, lut, grooved, cone_split):
                 pe_out,
                 straggling,
                 inelastic_args,
+            )
+    elif per_electron and mixed:
+
+        @njit(cache=True)
+        def core(
+            run,
+            control,
+            geometry,
+            materials,
+            mott,
+            state,
+            segments,
+            pe_out,
+            straggling,
+            inelastic_args,
+            radiative_args,
+            mixed_args,
+        ):
+            return body(
+                run,
+                0,
+                control,
+                geometry,
+                (),
+                materials,
+                mott,
+                (),
+                state,
+                segments,
+                pe_out,
+                straggling,
+                inelastic_args,
+                radiative_args,
+                None,
+                mixed_args,
             )
     elif per_electron and cone_split:
 

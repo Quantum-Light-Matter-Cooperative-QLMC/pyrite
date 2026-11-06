@@ -33,7 +33,7 @@ from .beam_entry import (
     table_energy_range,
 )
 from .continuation import effective_schedule, resolve_schedule
-from .cores import (
+from .core_specializations import (
     _transport_core_grooved,
     _transport_core_ungrooved_lut,
     _transport_core_ungrooved_lut_inelastic,
@@ -41,6 +41,7 @@ from .cores import (
     _transport_core_ungrooved_perelectron_lut_inelastic,
     cone_split_core,
     exact_ungrooved_core,
+    mixed_elastic_core,
 )
 from .events import TransportStepLimitError
 from .hard_inelastic import hard_keys_from_stream_keys, validate_inelastic_args
@@ -49,6 +50,7 @@ from .host_memory import GrowingHostRows, admit_host_allocation, reserve_or_rais
 from .kinematics import _sample_bunch_offsets, stream_keys
 from .layer_tables import build_layer_tables
 from .lut import build_transport_energy_lut
+from .mixed_elastic import mixed_core_args
 from .precision import resolve_transport_precision, validate_transport_precision
 from .scattering import check_elsepa_coverage, check_mott_coverage
 from .stopping import (
@@ -346,11 +348,30 @@ def _validated_controls(p, launch, electron_start):
     )
 
 
+def _refuse_ineligible_mixed(p, transport_core):
+    """Mixed elastic transport has one specialization (#894)."""
+    if p.mixed_elastic is not None and (
+        transport_core != "per-electron"
+        or p.groove is not None
+        or p.elastic_model != "elsepa"
+        or p.energy_model != "midpoint"
+        or p._cone_split is not None
+    ):
+        raise ValueError(
+            "transport_mode='mixed' runs only on the ungrooved per-electron core with "
+            "elastic_model='elsepa', energy_model='midpoint' and no detector-cone splitting"
+        )
+
+
 def _checked_core(p, launch, electron_start):
     """Resolved transport core, checked against groove, blocks and device rows."""
     transport_core = p.transport_core
     if launch is None:  # a launched generation names its per-electron core
-        transport_core = resolve_transport_core(transport_core, p.Ne, p.groove)
+        transport_core = (
+            "per-electron"
+            if p.mixed_elastic is not None and transport_core == "auto"
+            else resolve_transport_core(transport_core, p.Ne, p.groove)
+        )
     if transport_core != "lockstep" and p.groove is not None:
         raise ValueError("grooved transport is only implemented for the lockstep core")
     if p._cone_split is not None and (
@@ -360,6 +381,7 @@ def _checked_core(p, launch, electron_start):
             "detector-cone splitting runs only on the ungrooved per-electron CPU core "
             "with elastic_model='elsepa'"
         )
+    _refuse_ineligible_mixed(p, transport_core)
     if electron_start and transport_core == "lockstep":
         raise ValueError("electron blocks need counter-addressed streams, not the lockstep core")
     if effective_schedule(p.per_electron_config) == "continuation" and transport_core != "cuda":
@@ -688,6 +710,8 @@ def _per_electron_core(t, lut):
     )
     if t.inputs._cone_split is not None:
         return cone_split_core(inelastic=shell_mode, radiative=t.controls.radiative_mode), np
+    if t.inputs.mixed_elastic is not None:
+        return mixed_elastic_core(inelastic=shell_mode, radiative=t.controls.radiative_mode), np
     if lut and cuda:
         if shell_mode:
             raise NotImplementedError(
@@ -768,9 +792,17 @@ def _run_per_electron(t, *, lut):
         packed_per_layer_tables += t.sbethe_group
         tables = (packed_per_layer_tables, s.L_top, s.L_bot, s.mott_group, e.E_keV)
         radiative = (t.radiative_args, b["seg_rad_k"], b["seg_rad_Z"])
+        # Cone splitting and mixed elastic transport exclude each other and
+        # share the core's third optional argument.
+        mixed_args = (
+            None
+            if p.mixed_elastic is None
+            else mixed_core_args(s.mott_group[5:], p.mixed_elastic, s.L_top, s.L_bot)
+        )
         counts = _run_per_electron_transport(
             *common, *tables, *rows, t.straggle_on, t.stragg_dE, **options,
-            radiative=radiative if c.radiative_mode else None, split_args=split_args,
+            radiative=radiative if c.radiative_mode else None,
+            split_args=split_args if p.mixed_elastic is None else mixed_args,
         )  # fmt: skip
     seg_xp = core_xp if p.keep_segments_on_device else np
     split_record = (

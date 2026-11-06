@@ -7,8 +7,6 @@ Validation: transport-midpoint-stopping
 Validation: sbethe-corrected-stopping
 """
 
-from functools import cache
-
 import numpy as np
 from numba import njit
 
@@ -30,6 +28,7 @@ from .core_geometry import (
 )
 from .events import (
     EVENT_CUTOFF,
+    EVENT_DELTA,
     EVENT_ELASTIC,
     EVENT_EXIT_BOTTOM,
     EVENT_EXIT_SIDE,
@@ -38,6 +37,7 @@ from .events import (
     EVENT_HARD_INELASTIC,
     EVENT_HARD_RADIATIVE,
     EVENT_LAYER_BOUNDARY,
+    EVENT_SOFT_HINGE,
     EVENT_SUBSTEP,
 )
 from .hard_inelastic import (
@@ -55,6 +55,13 @@ from .kinematics import (
     beta_from_keV_scalar,
 )
 from .lut import _lut_index_frac_scalar, _lut_lerp_1d, _lut_lerp_2d, _lut_lerp_3d
+from .mixed_elastic import (
+    MIXED_MAX_STEP_HARD_MFP,
+    _hinge_direction,
+    _layer_soft_rates,
+    _mixed_hard_quantile_scalar,
+    _mixed_hard_rate_scalar,
+)
 from .scattering import (
     _alpha_sr_joy_scalar,
     _elsepa_rate_scalar,
@@ -92,6 +99,7 @@ def make_cpu_transport_core(
     radiative=False,
     lazy_cutoff=True,
     cone_split=False,
+    mixed=False,
 ):
     """Generate one CPU specialization with compile-time-frozen axis flags.
 
@@ -124,9 +132,15 @@ def make_cpu_transport_core(
     elastic event may record one weighted in-cone copy, from draws on a
     separate split-key domain, and a primary whose analog outgoing direction
     enters the cone ends after that event. Without it the cores are the
-    unchanged historical ones.
+    unchanged historical ones. ``mixed=True`` compiles the opt-in mixed elastic
+    scheme (#894, :mod:`.mixed_elastic`) into the exact per-electron ELSEPA core:
+    rows also end at a random hinge or a step limit, which deflect or do nothing
+    and leave every optical depth running. With ``C1 = 0`` it consumes no extra
+    draws and is bit-for-bit the detailed core.
 
     Validation: gpu-transport-core
+    Validation: mixed-elastic-split
+    Validation: mixed-elastic-hinge
     Validation: shell-secondary-transport
     Validation: shell-soft-hard-transport
     Validation: detector-cone-variance-reduction
@@ -139,6 +153,8 @@ def make_cpu_transport_core(
         raise ValueError("coupled radiative transport has only exact ungrooved specializations")
     if cone_split and (grooved or lut or not per_electron):
         raise ValueError("detector-cone splitting has only exact per-electron specializations")
+    if mixed and (grooved or lut or cone_split or not per_electron):
+        raise ValueError("mixed elastic transport has only exact per-electron specializations")
 
     @njit(cache=True)
     def body(
@@ -157,6 +173,7 @@ def make_cpu_transport_core(
         inelastic_args,
         radiative_args=None,
         split_args=None,
+        mixed_args=None,
     ):
         (max_steps, max_segments, elastic_model_code, energy_model_code, max_dE_frac) = control
         (
@@ -309,6 +326,14 @@ def make_cpu_transport_core(
             rad_scratch_rates = np.empty(rad_Z.shape[1], dtype=np.float64)
             # Table lookups stay inline; exact quadrature stays out of line (#841).
             rad_table = rad_plasma.size != n_layers
+        if mixed:
+            assert mixed_args is not None
+            mix_c2, mix_limit, mix_tables = mixed_args
+            mix_hf = mix_tables[0]
+            # Remaining step, distance to hinge, full length; negative is none.
+            mix_left = np.full(Ne, -1.0)
+            mix_hinge = np.full(Ne, -1.0)
+            mix_length = np.zeros(Ne)
         # Lazy midpoint cutoff (#841); the skip proof is in _jit_cutoff_bound.
         cut_lazy, cut_bound = False, np.zeros(n_layers)
         if lazy_cutoff and energy_model_code == 1 and not straggle_on:
@@ -399,7 +424,11 @@ def make_cpu_transport_core(
                 sr_joy_numer = L_sr_joy_numer[L]
                 total_rate = 0.0
                 for i_el in range(n_el):
-                    if elastic_model_code == 2:
+                    if mixed:
+                        rate = _mixed_hard_rate_scalar(
+                            E_j, el_logE, el_log_rate, mix_hf, el_start[L, i_el], el_len[L, i_el]
+                        )
+                    elif elastic_model_code == 2:
                         rate = _elsepa_rate_scalar(
                             E_j, el_logE, el_log_rate, el_start[L, i_el], el_len[L, i_el]
                         )
@@ -446,6 +475,44 @@ def make_cpu_transport_core(
                     rad_draws[e] += _SM64_ONE
                 if mu_rad > 0.0 and tau_rad[e] / mu_rad < step_j:
                     step_j, rad_j, hard_j = tau_rad[e] / mu_rad, True, False
+            hinge_j = delta_j = False
+            if mixed:
+                if (
+                    mix_left[e] < 0.0
+                    and _layer_soft_rates(
+                        E_j, L, n_el, el_logE, el_log_rate, el_start, el_len, mix_tables
+                    )[0]
+                    > 0.0
+                ):
+                    hard_total = total_rate
+                    if inelastic:
+                        hard_total += mu_hard * 1e8
+                    if radiative:
+                        hard_total += mu_rad * 1e8
+                    if sbethe_on:
+                        mix_stopping = _dEds_sbethe_packed_scalar(
+                            L_sbethe_logE, L_sbethe_logS, L, L_sbethe_n[L], E_j
+                        )
+                    else:
+                        mix_stopping = _dEds_spliced_packed_scalar(
+                            L_Js, L_ks, L_coeffs, L_E_cross, 0.0, L, n_el, E_j
+                        )
+                    if radiative:
+                        mix_stopping -= rad_soft * 1e-3
+                    mix_length[e] = min(
+                        step_j,
+                        mix_limit[L],
+                        MIXED_MAX_STEP_HARD_MFP * 1e8 / hard_total,
+                        mix_c2 * E_j / (-mix_stopping),
+                    )
+                    mix_left[e] = mix_length[e]
+                    mix_hinge[e] = mix_length[e] * _stream_uniform_scalar(stream_key[e], draws[e])
+                    draws[e] += _SM64_ONE
+                if mix_left[e] >= 0.0:
+                    if 0.0 <= mix_hinge[e] < step_j:
+                        step_j, hinge_j, hard_j, rad_j = mix_hinge[e], True, False, False
+                    elif mix_left[e] < step_j:
+                        step_j, delta_j, hard_j, rad_j = mix_left[e], True, False, False
 
             dx, dy, dz = dirs[e, 0], dirs[e, 1], dirs[e, 2]
             px, py, pz = pos[e, 0], pos[e, 1], pos[e, 2]
@@ -728,6 +795,10 @@ def make_cpu_transport_core(
                 event_j = EVENT_GROOVE_SURFACE
             elif cross_up_j or cross_dn_j:
                 event_j = EVENT_LAYER_BOUNDARY
+            elif hinge_j:
+                event_j = EVENT_SOFT_HINGE
+            elif delta_j:
+                event_j = EVENT_DELTA
             elif inelastic and hard_j:
                 event_j = EVENT_HARD_INELASTIC
             elif radiative and rad_j:
@@ -879,6 +950,10 @@ def make_cpu_transport_core(
                 tau_rad[e] -= step_j * mu_rad
                 if tau_rad[e] < 0.0:
                     tau_rad[e] = 0.0
+            if mixed and mix_left[e] >= 0.0:
+                mix_left[e] = max(mix_left[e] - step_j, 0.0)
+                if mix_hinge[e] >= 0.0:
+                    mix_hinge[e] = max(mix_hinge[e] - step_j, 0.0)
 
             if grooved:
                 if limited_j:
@@ -969,6 +1044,26 @@ def make_cpu_transport_core(
                         alive[e] = False
                         n_alive -= 1
                     continue
+                if mixed:
+                    if event_j == EVENT_SOFT_HINGE or event_j == EVENT_DELTA:
+                        # Fictitious for the hard processes: their optical
+                        # depths keep running, and a new flight starts.
+                        if event_j == EVENT_SOFT_HINGE:
+                            dirs[e, 0], dirs[e, 1], dirs[e, 2] = _hinge_direction(
+                                dirs[e, 0], dirs[e, 1], dirs[e, 2], mix_length[e], E_keV[e], L,
+                                n_el, el_logE, el_log_rate, el_start, el_len, mix_tables,
+                                stream_key[e], draws[e],
+                            )  # fmt: skip
+                            draws[e] += np.uint64(2)
+                            mix_hinge[e] = -1.0
+                        else:
+                            mix_left[e] = -1.0
+                        flight_id[e] += 1
+                        substep_id[e] = 0
+                        material_steps[e] += 1
+                        continue
+                    # A hard event or surface ends the step (Sec. 4.4, (vi)).
+                    mix_left[e] = mix_hinge[e] = -1.0
                 flight_id[e] += 1
                 substep_id[e], tau_left[e] = 0, -1.0
                 if inelastic:
@@ -1018,7 +1113,16 @@ def make_cpu_transport_core(
                     cumulative, i_el = 0.0, n_el - 1
                     for k_el in range(n_el):
                         if per_electron:
-                            if elastic_model_code == 2:
+                            if mixed:
+                                rate = _mixed_hard_rate_scalar(
+                                    E_j,
+                                    el_logE,
+                                    el_log_rate,
+                                    mix_hf,
+                                    el_start[L, k_el],
+                                    el_len[L, k_el],
+                                )
+                            elif elastic_model_code == 2:
                                 rate = _elsepa_rate_scalar(
                                     E_j, el_logE, el_log_rate, el_start[L, k_el], el_len[L, k_el]
                                 )
@@ -1062,6 +1166,10 @@ def make_cpu_transport_core(
                     draws[e] += _SM64_ONE
                 else:
                     cos_u, phi_u = rng.random(), rng.random()
+                if mixed:
+                    cos_u = _mixed_hard_quantile_scalar(
+                        cos_u, E_keV[e], el_logE, mix_hf, el_start[L, i_el], el_len[L, i_el]
+                    )
                 if lut:
                     cos_t = _sample_cos_theta_from_alpha(alpha, cos_u)
                 elif elastic_model_code == 2:
@@ -1130,61 +1238,13 @@ def make_cpu_transport_core(
         return nseg, n_back, n_trans, n_side, n_cutoff, int(alive.sum())
 
     core = adapt_cpu_transport_core(
-        body, per_electron=per_electron, lut=lut, grooved=grooved, cone_split=cone_split
+        body,
+        per_electron=per_electron,
+        lut=lut,
+        grooved=grooved,
+        cone_split=cone_split,
+        mixed=mixed,
     )
-    flags = (grooved, per_electron, lut, inelastic, radiative, lazy_cutoff, cone_split)
+    flags = (grooved, per_electron, lut, inelastic, radiative, lazy_cutoff, cone_split, mixed)
     stabilize_closure_cache(core, body, f"{__name__}.make_cpu_transport_core{flags}")
     return core
-
-
-_transport_core_ungrooved = make_cpu_transport_core()
-_transport_core_ungrooved_lut = make_cpu_transport_core(lut=True)
-_transport_core_grooved = make_cpu_transport_core(grooved=True)
-_transport_core_ungrooved_perelectron = make_cpu_transport_core(per_electron=True)
-_transport_core_ungrooved_perelectron_lut = make_cpu_transport_core(per_electron=True, lut=True)
-# Opt-in shell soft/hard inelastic specializations (never selected by default).
-_transport_core_ungrooved_inelastic = make_cpu_transport_core(inelastic=True)
-_transport_core_ungrooved_lut_inelastic = make_cpu_transport_core(lut=True, inelastic=True)
-_transport_core_ungrooved_perelectron_inelastic = make_cpu_transport_core(
-    per_electron=True, inelastic=True
-)
-_transport_core_ungrooved_perelectron_lut_inelastic = make_cpu_transport_core(
-    per_electron=True, lut=True, inelastic=True
-)
-# Opt-in coupled-radiative specializations: exact lockstep, and the exact
-# per-electron reference of the CUDA kernel, each with either collision mode.
-_transport_core_ungrooved_radiative = make_cpu_transport_core(radiative=True)
-_transport_core_ungrooved_inelastic_radiative = make_cpu_transport_core(
-    inelastic=True, radiative=True
-)
-_transport_core_ungrooved_perelectron_radiative = make_cpu_transport_core(
-    per_electron=True, radiative=True
-)
-_transport_core_ungrooved_perelectron_inelastic_radiative = make_cpu_transport_core(
-    per_electron=True, inelastic=True, radiative=True
-)
-
-
-@cache
-def cone_split_core(*, inelastic, radiative):
-    """The exact per-electron CPU core with detector-cone splitting (#203 prototype).
-
-    Validation: detector-cone-variance-reduction
-    """
-    return make_cpu_transport_core(
-        per_electron=True, inelastic=inelastic, radiative=radiative, cone_split=True
-    )
-
-
-def exact_ungrooved_core(*, per_electron, inelastic, radiative):
-    """The exact (non-LUT) ungrooved CPU core for a collision/radiative mode."""
-    return {
-        (False, False, False): _transport_core_ungrooved,
-        (False, True, False): _transport_core_ungrooved_inelastic,
-        (False, False, True): _transport_core_ungrooved_radiative,
-        (False, True, True): _transport_core_ungrooved_inelastic_radiative,
-        (True, False, False): _transport_core_ungrooved_perelectron,
-        (True, True, False): _transport_core_ungrooved_perelectron_inelastic,
-        (True, False, True): _transport_core_ungrooved_perelectron_radiative,
-        (True, True, True): _transport_core_ungrooved_perelectron_inelastic_radiative,
-    }[(bool(per_electron), bool(inelastic), bool(radiative))]
