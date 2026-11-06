@@ -298,3 +298,63 @@ def test_mixed_exits_agree_with_detailed_transport_within_statistics():
 def test_ineligible_transport_is_refused(overrides):
     with pytest.raises(ValueError, match="transport_mode='mixed'"):
         _transport(MixedElasticParameters(), **overrides)
+
+
+def _shell_kwargs():
+    from pyrite.montecarlo import shell_configuration
+    from pyrite.xsgen.sbethe.catalog import resolve_catalog_table
+
+    if not shell_configuration._default_path().is_file():
+        pytest.skip("pinned SBETHE reference data have not been fetched")
+    return {
+        "stopping_tables": [resolve_catalog_table("silicon").arrays()],
+        "inelastic_model": "shell-soft-hard",
+        "inelastic_cutoff_eV": 50.0,
+        "inelastic_materials": ["silicon"],
+    }
+
+
+def _radiative_kwargs():
+    from pyrite.montecarlo.spectrum.brem_bremslib import prepare_bremslib_table
+    from tests.helpers.bremslib import synthetic_bremslib_arrays
+
+    table = prepare_bremslib_table(synthetic_bremslib_arrays(), atomic_number=14)
+    return {
+        "radiative_model": "bremslib-soft-hard",
+        "radiative_cutoff_eV": 1000.0,
+        "bremslib_tables": {"Si": table},
+    }
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [
+        pytest.param(_shell_kwargs, id="shell"),
+        pytest.param(_radiative_kwargs, id="radiative"),
+        pytest.param(lambda: {**_shell_kwargs(), **_radiative_kwargs()}, id="shell-radiative"),
+    ],
+)
+def test_collision_specializations_keep_the_detailed_limit_and_run_mixed(extra):
+    kwargs = extra()
+    detailed = _transport(None, **kwargs)
+    limit = _transport(MixedElasticParameters(c1=0.0, c2=0.0), **kwargs)
+    mixed = _transport(MixedElasticParameters(), **kwargs)
+
+    for key, value in detailed.items():
+        if isinstance(value, np.ndarray):
+            np.testing.assert_array_equal(limit[key], value, err_msg=key)
+    assert np.any(mixed["event_kind"] == EVENT_SOFT_HINGE)
+    assert np.all(np.isfinite(mixed["E_end_keV"]))
+
+
+def test_compound_rates_add_over_elements():
+    composition = [("Mo", 0.0186), ("Se", 0.0372)]
+    tables = {"elastic_tables": [[_sr_table(42), _sr_table(34)]], "composition": composition}
+    detailed = _transport(None, element=None, n_atoms_per_ang3=None, **tables)
+    limit = _transport(
+        MixedElasticParameters(c1=0.0, c2=0.0), element=None, n_atoms_per_ang3=None, **tables
+    )
+    mixed = _transport(MixedElasticParameters(), element=None, n_atoms_per_ang3=None, **tables)
+
+    np.testing.assert_array_equal(limit["L_ang"], detailed["L_ang"])
+    assert np.any(mixed["event_kind"] == EVENT_SOFT_HINGE)
