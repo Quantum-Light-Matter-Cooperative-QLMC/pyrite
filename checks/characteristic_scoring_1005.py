@@ -14,13 +14,17 @@ per-segment scoring) and its ``interp`` share
 response and attenuation preparation. Each timed callable also opens an NVTX
 range (``char.<name>``) so an Nsight trace attributes kernel launches and
 copies to it. ``MATERIAL`` ``A/B`` builds a layered target: a 1 um film of A
-on a THICKNESS_ANG substrate of B.
+on a THICKNESS_ANG substrate of B. ``C1005_NO_CACHE=1`` withholds the
+case-local preparation cache from ``mc_characteristic_spectrum`` (every call
+prepares its line data afresh), isolating the per-call batching from the
+cross-call reuse.
 
 ``compare`` checks the three spectra against a reference run at ``--rtol``
 (default 0: bitwise), relative to each spectrum's peak.
 """
 
 import json
+import os
 import sys
 import time
 from contextlib import nullcontext
@@ -113,7 +117,15 @@ def _instrument(timers):
     char._interpolate_shell_cross_sections = timers.wrap(
         "interp", char._interpolate_shell_cross_sections
     )
-    runner.mc_characteristic_spectrum = timers.wrap("total", runner.mc_characteristic_spectrum)
+    score = runner.mc_characteristic_spectrum
+    if os.environ.get("C1005_NO_CACHE") == "1":
+        real = score
+
+        def score(*args, **kwargs):
+            kwargs.pop("_table_cache", None)
+            return real(*args, **kwargs)
+
+    runner.mc_characteristic_spectrum = timers.wrap("total", score)
 
 
 def run(mode, ne, block, out_path, material, *rest):

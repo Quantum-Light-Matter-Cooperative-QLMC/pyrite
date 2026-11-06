@@ -580,3 +580,77 @@ def test_light_elements_without_subshells_above_the_cutoff_load_empty_tables():
         assert table.ionization_shell_labels == ()
         assert table.line_labels == ()
         assert table.line_yield_per_vacancy.shape == (0, 0)
+
+
+_W_ON_SI = [(0.0, 100.0, [("W", 0.063)]), (100.0, 1000.0, [("Si", 0.05)])]
+
+
+def _w_film_segments(seed: int) -> dict[str, object]:
+    rng = np.random.default_rng(seed)
+    n = 64
+    z = rng.uniform(1.0, 99.0, n)
+    v = rng.normal(size=(n, 3))
+    return {
+        "r_mid": np.column_stack((np.zeros(n), np.zeros(n), z)),
+        "v_hat": v / np.linalg.norm(v, axis=1, keepdims=True),
+        "L_ang": rng.uniform(0.5, 1.0, n),
+        "E_keV": rng.uniform(12.0, 30.0, n),
+        "elec_id": rng.integers(0, 4, n),
+        "layer": np.zeros(n, dtype=int),
+        "Ne": 4,
+        "thickness_ang": 1000.0,
+    }
+
+
+def test_prepared_lines_batch_attenuation_matches_per_line_lookup():
+    """One EPDL lookup over every kept line equals the per-line lookups (#1005)."""
+    table = characteristic.load_characteristic_cross_sections("W")
+    edges, widths = characteristic._energy_bin_edges_and_widths(np.linspace(1.0e3, 1.2e4, 200))
+    prepared = characteristic._prepare_lines(
+        table, [("W", 0.063)], _W_ON_SI, edges, widths, table.recommended_cutoff_eV
+    )
+    mu = np.asarray(characteristic._to_cpu(prepared.mu_by_line))
+    kept = [
+        index
+        for index, energy in enumerate(table.line_energy_eV)
+        if energy > table.recommended_cutoff_eV
+        and np.any(table.line_yield_per_vacancy[:, index] > 0.0)
+        and np.any(
+            characteristic._lorentzian_bin_weights(edges, energy, table.cxr_fwhm_eV[index]) > 0.0
+        )
+    ]
+    assert mu.shape == (len(_W_ON_SI), len(kept))
+    for layer, (_z_top, _z_bot, composition) in enumerate(_W_ON_SI):
+        for column, index in enumerate(kept):
+            grid = xp.asarray([table.line_energy_eV[index]], dtype=REAL)
+            single = characteristic._to_cpu(characteristic._mu_total_inv_ang(composition, grid))
+            assert mu[layer, column] == single[0]
+
+
+def test_prepared_line_cache_is_reused_across_blocks_and_directions(monkeypatch):
+    """A case-local cache prepares each element once and changes no output (#1005)."""
+    calls = []
+    real_prepare = characteristic._prepare_lines
+
+    def counted(*args):
+        calls.append(args[0].element)
+        return real_prepare(*args)
+
+    monkeypatch.setattr(characteristic, "_prepare_lines", counted)
+    energy = np.linspace(1.0e3, 1.2e4, 200)
+    common = dict(composition=[("W", 0.063)], layers=_W_ON_SI)
+    cache: dict = {}
+    for seed in (1, 2):
+        for theta in (np.deg2rad(119.0), np.deg2rad(150.0)):
+            segments = _w_film_segments(seed)
+            fresh = characteristic.mc_characteristic_spectrum(
+                segments, energy, theta_obs_rad=theta, **common
+            )
+            reused = characteristic.mc_characteristic_spectrum(
+                segments, energy, theta_obs_rad=theta, _table_cache=cache, **common
+            )
+            assert np.any(fresh > 0.0)
+            np.testing.assert_array_equal(reused, fresh)
+
+    assert calls.count("W") == 5  # four uncached calls plus one cached preparation
+    assert len(cache) == 1

@@ -202,6 +202,7 @@ def _characteristic_from_segments(
     abs_layers,
     groove=None,
     Ne=None,
+    table_cache=None,
 ):
     """Characteristic lines on the requested fine line-energy grid.
 
@@ -212,6 +213,8 @@ def _characteristic_from_segments(
     low-energy ionization path that a line-only 5 keV cutoff would discard.
     Characteristic scoring itself enforces its documented 1 keV transport-
     validity floor even if a case requests a lower background cutoff.
+    ``table_cache`` is the caller's case-local preparation cache, reused
+    across streamed blocks, layers and directions (#1005).
 
     Validation: characteristic-radiation
 
@@ -241,6 +244,7 @@ def _characteristic_from_segments(
                 electron_limit=Ne,
                 E_cut_keV=case.get("E_cut_brem_keV", 1.0),
                 ionization_model=ionization_model,
+                _table_cache=table_cache,
             )
         characteristic = np.zeros(E_grid.shape, dtype=float)
         for layer_index in range(n_lay):
@@ -258,6 +262,7 @@ def _characteristic_from_segments(
                 electron_limit=Ne,
                 E_cut_keV=case.get("E_cut_brem_keV", 1.0),
                 ionization_model=ionization_model,
+                _table_cache=table_cache,
             )
         return characteristic
 
