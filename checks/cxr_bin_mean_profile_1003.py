@@ -196,14 +196,19 @@ def _arm(name, inputs, tile_pairs):
         return lambda out: run_bin_mean_reduction_kernel(*inputs, out=out, method=kind)
     if kind in ("tree", "warp"):
         return lambda out: run_tree_reduction(*inputs, out=out, warp=kind == "warp")
-    if kind == "sparse":
+    if kind in ("sparse", "sparse-line"):
         sparse = _sparse_module()
 
         def run(out):
-            result, _ = sparse.sparse_reduce(
-                cp, inputs, exact_widths=BIN_MEAN_EXACT_WIDTHS, tile_pairs=tile_pairs
+            result, stages = sparse.sparse_reduce(
+                cp,
+                inputs,
+                exact_widths=BIN_MEAN_EXACT_WIDTHS,
+                tile_pairs=tile_pairs,
+                line_major=kind == "sparse-line",
             )
             out += result
+            print(name, json.dumps(stages), flush=True)
 
         return run
     raise ValueError(f"unknown arm {name!r}")
