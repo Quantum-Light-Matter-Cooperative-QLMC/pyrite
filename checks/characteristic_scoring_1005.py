@@ -17,7 +17,8 @@ copies to it. ``MATERIAL`` ``A/B`` builds a layered target: a 1 um film of A
 on a THICKNESS_ANG substrate of B. ``C1005_NO_CACHE=1`` withholds the
 case-local preparation cache from ``mc_characteristic_spectrum`` (every call
 prepares its line data afresh), isolating the per-call batching from the
-cross-call reuse.
+cross-call reuse. ``C1005_LINE_BINS`` overrides the 400 line bins on 1-20 keV,
+to measure preparation on a production-like fine grid.
 
 ``compare`` checks the three spectra against a reference run at ``--rtol``
 (default 0: bitwise), relative to each spectrum's peak.
@@ -39,18 +40,19 @@ import streamed_scoring_memory as harness  # noqa: E402
 CHAR_TIMERS = ("total", "clip", "escape", "accumulate", "interp")
 
 
-def _layered_case(material, ne, e0_kev, thickness_ang=1.0e4, seed=None):
+def _case(material, ne, e0_kev, thickness_ang=1.0e4, seed=None):
+    """The harness case, optionally layered and on ``C1005_LINE_BINS`` line bins."""
     import pyrite as pr
     from pyrite import api
     from pyrite.detectors import EnergyBins
 
-    film, substrate = material.split("/")
     numerics = pr.Numerics(
         cxr_trials=ne,
         brem_trials=ne,
         energy_model="midpoint",
         energy_bins=EnergyBins(
-            cxr=np.linspace(1000.0, 20000.0, 400), brem=np.arange(1000.0, e0_kev * 1e3, 1000.0)
+            cxr=np.linspace(1000.0, 20000.0, int(os.environ.get("C1005_LINE_BINS", "400"))),
+            brem=np.arange(1000.0, e0_kev * 1e3, 1000.0),
         ),
     )
     physics = pr.Physics(
@@ -58,14 +60,16 @@ def _layered_case(material, ne, e0_kev, thickness_ang=1.0e4, seed=None):
         radiative_model="bremslib-soft-hard",
         radiative_cutoff_eV=1000.0,
     )
-    target = pr.geometry.Stack.on_substrate(
-        film,
-        1.0e4,
-        substrate,
-        thickness_ang,
-        tilt_deg=30.0,
-        footprint=pr.geometry.Footprint(5.0, 5.0),
-    )
+    footprint = pr.geometry.Footprint(5.0, 5.0)
+    if "/" in material:
+        film, substrate = material.split("/")
+        target = pr.geometry.Stack.on_substrate(
+            film, 1.0e4, substrate, thickness_ang, tilt_deg=30.0, footprint=footprint
+        )
+    else:
+        target = pr.geometry.Slab(
+            material, thickness_ang=thickness_ang, tilt_deg=30.0, footprint=footprint
+        )
     scene = pr.Scene(
         pr.Beam(energy_keV=e0_kev, transverse=pr.beams.Spot(), longitudinal=pr.beams.PointBunch()),
         target,
@@ -131,8 +135,7 @@ def _instrument(timers):
 def run(mode, ne, block, out_path, material, *rest):
     timers = _CharTimers()
     _instrument(timers)
-    if "/" in material:
-        harness._case = _layered_case
+    harness._case = _case
     harness.run(mode, ne, block, out_path, material, *rest)
     s = timers.seconds
     split = {
