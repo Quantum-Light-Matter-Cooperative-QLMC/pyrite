@@ -169,7 +169,7 @@ def _(band_eV, cases, mo, np, tables_ready, thicknesses, tilts):
 
 
 @app.cell
-def _(plt, sweep_yield, thicknesses, tilts):
+def _(band_eV, plt, sweep_yield, thicknesses, tilts):
     fig_sweep, _ax = plt.subplots(figsize=(7, 4.3), layout="constrained")
     _image = _ax.pcolormesh(
         thicknesses.to("nm").magnitude,
@@ -180,7 +180,7 @@ def _(plt, sweep_yield, thicknesses, tilts):
     _ax.set(
         xlabel="HOPG thickness (nm)",
         ylabel="Target tilt (°)",
-        title="PXR/CBS yield in the 600–2,000 eV band at 135° observation",
+        title=f"PXR/CBS yield in the {band_eV[0]:g}–{band_eV[1]:,.0f} eV band at 135° observation",
         xticks=thicknesses.to("nm").magnitude,
         yticks=tilts.to("degree").magnitude,
     )
@@ -192,11 +192,11 @@ def _(plt, sweep_yield, thicknesses, tilts):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    Yield grows with thickness at every tilt except 45°, where it is essentially
-    zero. That is geometry: with this target's tilt convention, a 45° tilt puts
-    the 135° observation direction parallel to the slab face, so photons leave
-    along a long, strongly absorbing path. All 20 runs use 1,024 sampled histories
-    per population and distinct seeds.
+    Yield generally grows with thickness, and the 85° tilt is brightest. The 45°
+    row stays near zero: for that tilt, 135° falls in a broad minimum of the
+    angular distribution, which the next section maps. All 30 runs use 256
+    sampled histories per population and distinct seeds, so neighbouring cells
+    differ partly by noise.
     """)
     return
 
@@ -212,6 +212,14 @@ def _(mo):
     line, because no automatic per-angle window is applied. Angles within one
     tilt share electron histories, so their noise is correlated along the angle
     axis. A different seed per tilt keeps the rows independent.
+
+    The line energy moves with angle, so a fixed band mixes the line with a
+    varying amount of continuum. Instead, `photon_energies` gives the line
+    energy at every tilt and angle, and each component is integrated over that
+    line energy ±5%. Requesting `"characteristic"` and `"bremsstrahlung"` on the
+    same transport gives the background under each window. `mo.persistent_cache`
+    stores the scored windows on disk, so rerunning with unchanged inputs
+    skips the scoring; change any input and it recomputes.
     """)
     return
 
@@ -234,18 +242,20 @@ def _(
     from pyrite.radiation import directional_sources, photon_energies
 
     assert tables_ready
-    observation_angles = np.linspace(0.0, 180.0, 181) * ureg.degree
+    observation_angles = np.linspace(4, 180.0, 181) * ureg.degree
     energy_grid = np.arange(band_eV[0], band_eV[1] + 0.5, 1.0) * ureg.eV
     line_window = 0.05  # integrate over line energy * (1 ± 5%)
     components = ("pxr-cbs", "characteristic", "bremsstrahlung")
 
-    # The analytic and experimental helpers take numeric eV and degree values.
+    # The analytic and experimental helpers take numeric eV and degree values;
+    # plain arrays also hash cleanly into the cache key below.
+    _tilts_deg = tilts.to("degree").magnitude
     _angles_deg = observation_angles.to("degree").magnitude
     _energy_eV = energy_grid.to("eV").magnitude
     line_energy_eV = photon_energies(
         "hopg",
         beam_energy.to("eV").magnitude,
-        tilt_deg=tilts.to("degree").magnitude[:, None],
+        tilt_deg=_tilts_deg[:, None],
         tilt_azim_deg=tilt_azimuth.to("degree").magnitude,
         theta_obs_deg=_angles_deg[None, :],
     )[0]
@@ -268,19 +278,17 @@ def _(
         _covered = (_low >= _energy_eV[0]) & (_high <= _energy_eV[-1])
         return np.where(_covered, _yield, np.nan)
 
-    # Only the return value persists (under __marimo__/cache), keyed on the
-    # inputs this function closes over; a rerun with equal inputs skips scoring.
     @mo.persistent_cache
     def _score_line_windows():
         _yields = {_name: np.full(line_energy_eV.shape, np.nan) for _name in components}
-        with mo.status.progress_bar(total=len(tilts), title="Scoring angles per tilt") as _bar:
-            for _row, _tilt in enumerate(tilts):
+        with mo.status.progress_bar(total=len(_tilts_deg), title="Scoring angles per tilt") as _bar:
+            for _row, _tilt_deg in enumerate(_tilts_deg):
                 _sources = directional_sources(
                     beam,
                     Slab(
                         "hopg",
                         thickness=100 * ureg.nm,
-                        tilt=_tilt,
+                        tilt=_tilt_deg * ureg.degree,
                         tilt_azimuth=tilt_azimuth,
                         **size,
                     ),
@@ -297,7 +305,7 @@ def _(
         return _yields
 
     line_yield = _score_line_windows()
-    return line_energy_eV, line_window, line_yield, observation_angles
+    return line_window, line_yield, observation_angles
 
 
 @app.cell
@@ -325,8 +333,11 @@ def _(line_window, line_yield, observation_angles, plt, tilts):
 def _(line_window, line_yield, np, observation_angles, plt, tilts):
     # Background under each line: continuum plus characteristic (carbon K).
     _background = line_yield["bremsstrahlung"] + line_yield["characteristic"]
+    # Exits along the slab face absorb line and background alike, by hundreds
+    # of decades; their ratio is meaningless, so drop them.
+    _kept = _background > 1e-6 * np.nanmax(_background, axis=1, keepdims=True)
     with np.errstate(divide="ignore", invalid="ignore"):
-        line_to_background = np.where(_background > 0, line_yield["pxr-cbs"] / _background, np.nan)
+        line_to_background = np.where(_kept, line_yield["pxr-cbs"] / _background, np.nan)
 
     fig_line_to_background, _ax = plt.subplots(figsize=(7, 4.3), layout="constrained")
     for _tilt, _ratio in zip(tilts, line_to_background, strict=True):
@@ -351,13 +362,24 @@ def _(line_window, line_yield, np, observation_angles, plt, tilts):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    Each curve drops sharply where the observation direction runs parallel to the
-    slab face, at 90° plus the tilt: the same null as the 45° row above, now seen
-    at every tilt. One run per point would need 108 transports for this figure;
-    here four suffice. Scoring still costs time, so the saving is largest when
-    transport dominates. Spectra stay on one explicit 1 eV grid, so refine it
-    and the sampling before quantitative use, and compare against a few
-    independent `simulate` runs.
+    In the first figure, each curve has a narrow null where the exit runs along
+    the slab face, at 90° minus the tilt (the slab normal leans toward −x here),
+    and a broader minimum at larger angles. The 45° minimum near 130° is why the
+    45° row of the sweep stays dark at 135°.
+
+    The second figure divides the PXR/CBS window yield by the bremsstrahlung plus
+    characteristic yield in the same window. Away from the minima the line
+    carries roughly two to four times the background; near them the ratio falls
+    by orders of magnitude, so a detector placed there would see mostly
+    background. Directions where the background is absorbed by more than six
+    decades are left blank. No detector response is applied: a detector whose
+    resolution is broader than ±5% of the line collects more continuum.
+
+    One run per point would need 905 transports for these figures; here five
+    suffice. Scoring still costs time, so the saving is largest when transport
+    dominates. Spectra stay on one explicit 1 eV grid, so refine it and the
+    sampling before quantitative use, and compare against a few independent
+    `simulate` runs.
 
     Use [notebook 07](07-sampling-convergence-performance.ipynb)
     to choose a larger sampling budget for a selected region.
