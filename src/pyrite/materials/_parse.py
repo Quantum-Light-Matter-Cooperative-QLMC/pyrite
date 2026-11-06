@@ -575,6 +575,7 @@ def _parse_profiles(raw: object, errors: _Errors) -> dict[str, Mapping[str, obje
                 "detector",
                 "detectors",
                 "filters",
+                "targets",
                 "physical_detector",
                 "emission",
                 "temporal_profile",

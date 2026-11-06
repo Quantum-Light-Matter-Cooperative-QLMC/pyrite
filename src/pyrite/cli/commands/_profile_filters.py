@@ -54,13 +54,51 @@ def filter_add_command(profile_name, dry_run, **values):
 def _filter_payload(document, profile_name):
     profile = existing_profile(document, profile_name)
     rows = _profile_edit.filter_rows(profile)
-    return {
-        "profile": profile_name,
-        "filters": [
-            {"index": index, **dict(row.unwrap() if hasattr(row, "unwrap") else row)}
-            for index, row in enumerate(rows, start=1)
-        ],
-    }
+    raw = [dict(row.unwrap() if hasattr(row, "unwrap") else row) for row in rows]
+    if not any("ref" in row for row in raw):
+        # Preserve the exact legacy list/show payload for existing profiles.
+        return {
+            "profile": profile_name,
+            "filters": [{"index": index, **row} for index, row in enumerate(raw, start=1)],
+        }
+    catalog = _catalog_io.validated_catalog(
+        _catalog_io.active_catalog_path(),
+        _catalog_io.render_catalog(document),
+        profile=profile_name,
+    )
+    resolved = catalog.profile_filters.get(profile_name, ())
+    filters = []
+    position = 0
+    for index, row in enumerate(raw, start=1):
+        definition = catalog.named_filters.get(row.get("ref"), {})
+        if definition.get("kind") == "sequence":
+            plates = definition["plates"]
+            filters.append(
+                {
+                    "index": index,
+                    "ref": row["ref"],
+                    "kind": "sequence",
+                    "plates": [
+                        {
+                            "expanded_index": position + offset,
+                            **dict(resolved[position + offset - 1]),
+                        }
+                        for offset in range(1, len(plates) + 1)
+                    ],
+                }
+            )
+            position += len(plates)
+            continue
+        position += 1
+        plate = dict(resolved[position - 1]) if "ref" in row else row
+        filters.append(
+            {
+                "index": index,
+                **plate,
+                **({"ref": row["ref"], "expanded_index": position} if "ref" in row else {}),
+            }
+        )
+    return {"profile": profile_name, "filters": filters}
 
 
 @command.command("list")
@@ -82,6 +120,10 @@ def filter_list_command(profile_name, json_output):
     if not payload["filters"]:
         emit_result(f"{profile_name}: no filters")
     for row in payload["filters"]:
+        if row.get("kind") == "sequence":
+            members = ", ".join(str(plate["expanded_index"]) for plate in row["plates"])
+            emit_result(f"{row['index']}: sequence {row['ref']} (expanded plates {members})")
+            continue
         label = row.get("name") or f"#{row['index']}"
         emit_result(f"{row['index']}: {label} ({row['material']}, {row['thickness_mm']:g} mm)")
     return 0
@@ -175,7 +217,8 @@ def filter_set_command(profile_name, identifier, dry_run, **values):
         raise CLIError(str(exc)) from None
     try:
         updated = _profile_edit.update_filter(document, profile_name, identifier, changes)
-        filter_from_row(updated)
+        if "ref" not in updated:
+            filter_from_row(updated)
         _catalog_io.validate(_catalog_io.active_catalog_path(), tomlkit.dumps(document))
     except (ValueError, TypeError) as exc:
         raise click.UsageError(str(exc)) from None

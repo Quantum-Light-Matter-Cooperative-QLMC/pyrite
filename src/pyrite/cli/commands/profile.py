@@ -756,6 +756,7 @@ def create_command(
                     ("detectors", "detector collection"),
                     ("physical_detector", "physical detector"),
                     ("filters", "filters"),
+                    ("targets", "targets"),
                     ("emission", "emission"),
                     ("temporal_profile", "temporal profile"),
                 )

@@ -150,6 +150,22 @@ def _preset_rows(payload):
     return [(table, name or "none") for table, name in payload["presets"].items()]
 
 
+def _filter_summary(row):
+    if "ref" in row:
+        return f"preset {row['ref']}"
+    return (
+        f"{row.get('material')}, {row['thickness_mm']:g} mm, {_display(row.get('size_mm', []))} mm"
+    )
+
+
+def _emit_targets(payload):
+    if payload.get("targets"):
+        _table(
+            "Targets; profile geometry above is unused for these materials (pyrite target)",
+            [(material, str(name)) for material, name in payload["targets"].items()],
+        )
+
+
 def emit_show(payload, target, resolution, numerics_names, grid_rows):
     emit_result(f"[{payload['name']}]")
     ranges = [
@@ -182,6 +198,8 @@ def emit_show(payload, target, resolution, numerics_names, grid_rows):
             ("temporal-profile", "on" if payload["temporal_profile"] else "off (default)"),
         ],
     )
+
+    _emit_targets(payload)
 
     _table(
         "Named presets (profile set --physics/--numerics; pyrite physics|numerics preset)",
@@ -224,7 +242,7 @@ def emit_show(payload, target, resolution, numerics_names, grid_rows):
         [
             (
                 f"{index}. {row.get('name') or '(unnamed)'}",
-                f"{row.get('material')}, {row['thickness_mm']:g} mm, {_display(row.get('size_mm', []))} mm",
+                _filter_summary(row),
             )
             for index, row in enumerate(filters, start=1)
         ]

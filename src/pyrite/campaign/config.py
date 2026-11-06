@@ -326,6 +326,8 @@ def material_sweep(
             else declared_brem(scan)
         ),
     )
+    from .target_presets import material_target
+
     sweep = Sweep(
         material=spec.crystal_key,
         detector=resolved_detector,
@@ -335,14 +337,7 @@ def material_sweep(
         # The catalog speaks the flat geometry vocabulary, so the scan grid is
         # projected onto the target here rather than handed to Sweep's retired
         # flat aliases.
-        target=target_from_flat(
-            spec.crystal_key,
-            thickness_ang=scan.thickness_ang,
-            tilt_deg=scan.tilt_deg,
-            tilt_azim_deg=scan.tilt_azim_deg,
-            substrate=spec.substrate,
-            stack=spec.stack or None,
-        ),
+        target=material_target(spec),
         n_electrons=scan.n_electrons,
         n_electrons_brem=scan.n_electrons_brem,
         cxr_grid_policy=_profile_cxr_grid_policy(catalog_profile),

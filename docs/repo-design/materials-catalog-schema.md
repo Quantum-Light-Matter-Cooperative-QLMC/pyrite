@@ -26,6 +26,8 @@ catalog/
   detectors/<name>.toml
   physics/<name>.toml     # named physics presets (ADR-0021)
   numerics/<name>.toml    # named numerics presets (ADR-0021)
+  filters/<name>.toml     # named finite downstream plates or sequences (issue #665)
+  targets/<name>.toml     # named scalar slab/stack targets (issue #665)
   profiles/<name>.toml    # profile fields plus its [overrides.MATERIAL] tables
   energy-grid-artifacts/  # immutable line-grid artifacts, not catalog source
 ```
@@ -44,6 +46,8 @@ schema_version = 1
 [detectors.NAME]     # reusable detector geometry
 [physics.NAME]       # reusable physics models and cutoffs
 [numerics.NAME]      # reusable sampling, integration and grid policy
+[filters.NAME]       # reusable downstream finite plate or plate sequence
+[targets.NAME]       # reusable scalar slab or stack target
 [crystals.NAME]      # CIF-backed crystalline phase
 [media.NAME]         # amorphous composition
 [materials.NAME]     # runnable film or stack
@@ -136,3 +140,57 @@ pyrite material validate path/to/materials.toml  # single file
 ```
 
 New crystal phases require a packaged CIF, explicit provenance, a validation record and ledger row, and transport support for every constituent element.
+
+## Named targets
+
+Scalar `[targets.NAME]` objects (or `targets/NAME.toml` in directory catalogs)
+are reusable target definitions. Attach one through
+`[profiles.PROFILE.targets]` with `MATERIAL = "NAME"`. This mapping does not
+add profile members; the key must match the target's entrance recipe.
+Target geometry replaces inherited profile geometry for that material, and
+per-material geometry overrides alongside the reference are rejected.
+Beam energies, photon grids and numerical/physical policies remain profile-owned.
+
+```toml
+[targets.film]
+kind = "slab"
+material = "silicon"
+thickness_ang = 20000.0
+tilt_deg = 30.0
+tilt_azim_deg = 0.0
+
+[profiles.example.targets]
+silicon = "film"
+```
+
+Use a runnable entrance recipe without an existing substrate/stack.
+`kind = "stack"` instead accepts `layers`, an ordered array of at least two
+inline tables with `material` and positive scalar `thickness_ang`. The first
+material is a runnable entrance recipe; remaining materials are crystal or
+medium keys, with optional existing `beam_uvw` and finite `azimuth_deg` fields.
+All layers use angstroms; tilt angles use degrees.
+
+Both variants accept scalar tilts (defaults 30 and 0 degrees), paired positive
+`crystal_width_mm` / `crystal_height_mm` (defaults 5 mm each), and optional
+boolean `mosaic` / `allow_normal_incidence` (both false). Slabs optionally
+accept positive `groove_spacing_ang` with the existing groove restrictions.
+Optional `description` is nonempty display metadata. Crystal-cut tables,
+infinite footprints, array sweeps, arbitrary variants and unknown fields
+are rejected by this initial codec.
+
+Names are reserved case-insensitively across bundled/user layers. Bundled
+objects remain read-only. Python uses `pyrite.geometry.load_target(NAME)`
+(or an explicit `catalog=`) to obtain an existing `Slab` or `Stack`. Resolved
+physical values alone affect identities: equivalent inline and named target
+geometry gives the same campaign/checkpoint identity; name-only changes do
+not invalidate it. `pyrite target` manages the lifecycle.
+
+## Named filters
+
+`[filters.NAME]` is one complete finite plate, or `kind = "sequence"` with a
+nonempty ordered `plates` array of complete plates (no nested references).
+`[[profiles.PROFILE.filters]]` entries use `ref = "NAME"`. A plate reference may
+override plate fields; a sequence reference accepts only `ref` and expands in
+place, keeping each member's absolute pose. Only expanded plate values enter
+observation identity. `pyrite.geometry.load_filter` returns one plate and
+rejects a sequence; `load_filters` returns an ordered tuple for either form.

@@ -11,6 +11,9 @@ The entries below use generated docstrings, signatures, and source links. API su
 
    pyrite.geometry.Slab
    pyrite.geometry.Stack
+   pyrite.geometry.load_target
+   pyrite.geometry.load_filter
+   pyrite.geometry.load_filters
    pyrite.geometry.SubstanceRef
    pyrite.geometry.RectangularBody
    pyrite.geometry.Filter
@@ -121,3 +124,12 @@ Slab transverse dimensions are full widths, supplied as paired Pint lengths:
 `None` for an infinite slab. The `Slab(footprint=None)` spelling is deprecated,
 as are the quantity-valued `Footprint.width` and `Footprint.height` keywords
 and properties; numeric `Footprint` dimensions remain available for `Stack`.
+
+## Named target definitions
+
+`load_target(name, catalog=catalog)` returns an existing scalar `Slab` or
+`Stack` from the selected catalog's `targets` table. Omitting `catalog` uses
+the selected default catalog. Definitions resolve runnable entrance-material
+recipes to their crystal key and validate underlying stack layers in the
+crystal/medium namespace. `load_filter(name)` returns one named `FilterPlate`;
+`load_filters(name)` returns an ordered tuple for a plate or sequence. See the [target preset schema](../../repo-design/materials-catalog-schema.md#named-targets).

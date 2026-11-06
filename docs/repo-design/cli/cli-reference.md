@@ -71,6 +71,8 @@ Choose a family for its complete help, options, defaults, and examples.
 - [`pyrite material`](cli-reference-material.md) — Add, inspect, validate, and blaze individual materials.
 - [`pyrite beam`](cli-reference-beam.md) — Manage named beams (``[beams.*]``), attachable to profiles by name.
 - [`pyrite detector`](cli-reference-detector.md) — Manage named detector geometries, attachable to profiles by name.
+- [`pyrite filter`](cli-reference-filter.md) — Manage reusable downstream filter presets, separate from placements.
+- [`pyrite target`](cli-reference-target.md) — Manage reusable slab and stack targets, attached per profile material.
 - [`pyrite tables`](cli-reference-tables.md) — Inspect generated cross-section tables and external code trees.
 - [`pyrite cache`](cli-reference-cache.md) — Inspect, warm, and clear compiled CPU (Numba) and GPU (CuPy) kernel caches.
 
@@ -89,6 +91,8 @@ cli-reference-numerics
 cli-reference-material
 cli-reference-beam
 cli-reference-detector
+cli-reference-filter
+cli-reference-target
 cli-reference-tables
 cli-reference-cache
 ```
@@ -137,6 +141,8 @@ Commands:
   material      Inspect, validate, edit, and blaze individual materials.
   beam          Manage named beams, attachable to profiles by name.
   detector      Manage named detector geometries.
+  filter        Manage named reusable downstream filter plates and sequences.
+  target        Manage named reusable slab and stack targets.
   tables        Inspect generated cross-section tables and external code trees.
   cache         Inspect and clear compiled CPU/GPU kernel caches.
 ```
@@ -345,6 +351,27 @@ Existing command fragments remain available below; each link opens the full fami
 - <span id="pyrite-detector-reset"></span>[`pyrite detector reset`](cli-reference-detector.md#pyrite-detector-reset)
 - <span id="pyrite-detector-set"></span>[`pyrite detector set`](cli-reference-detector.md#pyrite-detector-set)
 - <span id="pyrite-detector-show"></span>[`pyrite detector show`](cli-reference-detector.md#pyrite-detector-show)
+- <span id="pyrite-filter"></span>[`pyrite filter`](cli-reference-filter.md#pyrite-filter)
+- <span id="pyrite-filter-attach"></span>[`pyrite filter attach`](cli-reference-filter.md#pyrite-filter-attach)
+- <span id="pyrite-filter-create"></span>[`pyrite filter create`](cli-reference-filter.md#pyrite-filter-create)
+- <span id="pyrite-filter-create-sequence"></span>[`pyrite filter create-sequence`](cli-reference-filter.md#pyrite-filter-create-sequence)
+- <span id="pyrite-filter-delete"></span>[`pyrite filter delete`](cli-reference-filter.md#pyrite-filter-delete)
+- <span id="pyrite-filter-detach"></span>[`pyrite filter detach`](cli-reference-filter.md#pyrite-filter-detach)
+- <span id="pyrite-filter-list"></span>[`pyrite filter list`](cli-reference-filter.md#pyrite-filter-list)
+- <span id="pyrite-filter-rename"></span>[`pyrite filter rename`](cli-reference-filter.md#pyrite-filter-rename)
+- <span id="pyrite-filter-set"></span>[`pyrite filter set`](cli-reference-filter.md#pyrite-filter-set)
+- <span id="pyrite-filter-show"></span>[`pyrite filter show`](cli-reference-filter.md#pyrite-filter-show)
+- <span id="pyrite-filter-validate"></span>[`pyrite filter validate`](cli-reference-filter.md#pyrite-filter-validate)
+- <span id="pyrite-target"></span>[`pyrite target`](cli-reference-target.md#pyrite-target)
+- <span id="pyrite-target-attach"></span>[`pyrite target attach`](cli-reference-target.md#pyrite-target-attach)
+- <span id="pyrite-target-create"></span>[`pyrite target create`](cli-reference-target.md#pyrite-target-create)
+- <span id="pyrite-target-delete"></span>[`pyrite target delete`](cli-reference-target.md#pyrite-target-delete)
+- <span id="pyrite-target-detach"></span>[`pyrite target detach`](cli-reference-target.md#pyrite-target-detach)
+- <span id="pyrite-target-list"></span>[`pyrite target list`](cli-reference-target.md#pyrite-target-list)
+- <span id="pyrite-target-rename"></span>[`pyrite target rename`](cli-reference-target.md#pyrite-target-rename)
+- <span id="pyrite-target-set"></span>[`pyrite target set`](cli-reference-target.md#pyrite-target-set)
+- <span id="pyrite-target-show"></span>[`pyrite target show`](cli-reference-target.md#pyrite-target-show)
+- <span id="pyrite-target-validate"></span>[`pyrite target validate`](cli-reference-target.md#pyrite-target-validate)
 - <span id="pyrite-tables"></span>[`pyrite tables`](cli-reference-tables.md#pyrite-tables)
 - <span id="pyrite-tables-fetch"></span>[`pyrite tables fetch`](cli-reference-tables.md#pyrite-tables-fetch)
 - <span id="pyrite-tables-generate"></span>[`pyrite tables generate`](cli-reference-tables.md#pyrite-tables-generate)

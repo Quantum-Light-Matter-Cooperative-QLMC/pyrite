@@ -35,6 +35,9 @@ _GEOMETRY_OWNERS = {
     "Stack": "pyrite.campaign.geometry",
     "SubstanceRef": "pyrite.bodies",
     "Target": "pyrite.campaign.target",
+    "load_filter": "pyrite.campaign.filter_presets",
+    "load_filters": "pyrite.campaign.filter_presets",
+    "load_target": "pyrite.campaign.target_presets",
 }
 
 
