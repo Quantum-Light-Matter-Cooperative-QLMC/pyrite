@@ -71,6 +71,9 @@ CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
     "checks/characteristic_budget_1006.py": (),
     # Streamed-block sizing sweep (#907): engineering evidence.
     "checks/streamed_block_sizing.py": (),
+    # Characteristic scoring setup/accumulate split (#1005): engineering evidence.
+    "checks/characteristic_scoring_1005.py": (),
+    "checks/characteristic_nsys_1005.py": (),
     "checks/axial_mcwf_precision_cuda.py": (),
     "checks/axial_recording_performance.py": (),
     "checks/axial_split_step_precision_cuda.py": (),
