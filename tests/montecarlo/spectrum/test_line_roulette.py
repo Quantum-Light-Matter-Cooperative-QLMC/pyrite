@@ -6,6 +6,7 @@ Validation: line-scoring-roulette
 import numpy as np
 import pytest
 
+from pyrite._backend import _to_cpu
 from pyrite._line_roulette import LINE_ROULETTE_MODEL, LineRoulette
 from pyrite._precision import Precision
 from pyrite.campaign.sweep import BeamSpec, Sweep, build_cases
@@ -160,9 +161,8 @@ def test_mass_pass_skips_the_reduction_and_matches_the_full_audit(case, transpor
             truncation_audit=audit,
         )
     assert not np.any(np.asarray(spectrum))
-    np.testing.assert_allclose(only["electron_mass"], full["electron_mass"], rtol=1e-12)
-    for key in ("line_mass", "mass_above", "mass_below"):
-        np.testing.assert_allclose(only[key], full[key], rtol=1e-12, err_msg=key)
+    for key in ("electron_mass", "line_mass", "mass_above", "mass_below"):
+        np.testing.assert_allclose(_to_cpu(only[key]), _to_cpu(full[key]), rtol=1e-12, err_msg=key)
 
 
 def test_estimate_is_the_inverse_probability_sum_of_the_analog_primaries(case, transport):
@@ -325,5 +325,7 @@ def test_truncation_audit_stays_analog(case, transport):
     )
     screen.score(batch)
     for key in ("line_mass", "mass_above", "mass_below", "electron_mass"):
-        np.testing.assert_allclose(roulette_audit[key], analog_audit[key], rtol=1e-12, err_msg=key)
+        np.testing.assert_allclose(
+            _to_cpu(roulette_audit[key]), _to_cpu(analog_audit[key]), rtol=1e-12, err_msg=key
+        )
     assert "mass_only" not in roulette_audit
