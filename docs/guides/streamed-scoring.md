@@ -56,8 +56,11 @@ rather than an electron count. It excludes `stream_block_electrons`:
 numerics = numerics.with_kernel_tuning(KernelTuning(stream_memory_mib=32_768))
 ```
 
-The run caps the CuPy memory pool at 95% of the target, leaving room for memory
-the driver holds outside the pool, and restores the previous cap afterwards. A first block of 1,024 electrons measures this scene's memory per
+The target covers this process's whole device footprint. The run caps the CuPy
+memory pool below it, keeping at least 1.25 GiB and 5% of the target for the
+CUDA context and driver allocations, and restores the previous cap afterwards.
+Targets under about 2.5 GiB are best effort, because the pool keeps half of the
+target and that reserve may not fit. A first block of 1,024 electrons measures this scene's memory per
 electron, and later blocks are sized so retained rows take a quarter of the
 target, shrinking if a later block proves denser. Any `scratch_mib` and
 `electron_batch` you leave unset scale with the block.

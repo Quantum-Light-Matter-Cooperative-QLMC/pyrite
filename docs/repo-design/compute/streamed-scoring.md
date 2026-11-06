@@ -269,7 +269,9 @@ across the three measured code versions.
 ## Memory-target block sizing (#868)
 
 `KernelTuning.stream_memory_mib` (how-to: [the guide](../../guides/streamed-scoring.md))
-caps the CuPy pool at 95% of the target for the run. The cap is what bounds
+caps the CuPy pool below the target for the run: the smaller of 95% of the
+target and the target minus 1.25 GiB, with half the target as a floor for small
+targets. The cap is what bounds
 device memory, because scoring adapts to the pool and its peak does not follow
 row count. A 1,024-electron first block measures retained bytes per electron;
 later blocks give retained rows a quarter of the target and follow the largest
@@ -283,6 +285,21 @@ overlaid), single runs, W 1 MeV / 10 um and Si 1 MeV / 10 um, 262,144 electrons:
 | W, 16 GiB | 37.3 s | 15.65 GiB | 21,729 |
 | W, 64 GiB | 29.9 s | 61.73 GiB | 86,918 |
 | Si, 16 GiB | 5.0 s | 12.57 GiB | 261,120 |
+
+That table's driver peak excludes the process's own CUDA context (about
+0.54 GiB), so W at 16 GiB actually used about 16.19 GiB. At `ff09acd68` with the
+reserve overlaid, on the same card with nothing else on it, whole-card peaks
+include the context (262,144 electrons; pyrite was installed from git, not a
+remote job):
+
+| Scene, target | Wall | Whole-card peak |
+|---|---|---|
+| W, 16 GiB | 38.5, 38.8, 72.9 s | 15.68, 15.73, 15.73 GiB |
+| W, 64 GiB | 31.7 s | 62.27 GiB |
+| Si, 16 GiB | 6.1 s | 13.06 GiB |
+
+The 72.9 s run was the first after a kernel restart; its cause was not
+isolated. Peaks are sampled every 5 ms. Not measured on a 16 GB card.
 
 Fixed blocks at the same commit, W, measured with the #907 harness:
 
