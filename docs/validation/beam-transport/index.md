@@ -51,6 +51,9 @@ penelope-shell-secondary-direction
 shell-soft-hard-transport
 shell-secondary-transport
 mixed-elastic-transport
+mixed-elastic-split
+mixed-elastic-soft-moments
+mixed-elastic-hinge
 sbethe-atomic-shell-inputs
 sbethe-atomic-shell-inputs-verification
 gos-core-edge

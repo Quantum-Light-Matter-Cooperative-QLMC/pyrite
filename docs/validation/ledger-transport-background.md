@@ -47,10 +47,10 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 - **Equation:** `lambda_h = max(lambda_el, C1 lambda_1)`, `lambda_1 = lambda_el/(2<mu>)`, `xi_c = 1 - lambda_el/lambda_h`, `mu = P^-1(xi_c + (1-xi_c) u)`
 - **Assumptions:** per-element split of an additive compound rate; the frozen panel cutoff trades a jump in the hard rate at nodes for an exact partition between them; the C2 energy limit truncates the step and leaves the hard rate alone, unlike Eq. 4.85
 - **Limiting cases:** `C1 = 0` gives no soft part and reproduces detailed rows bit for bit; panels with `2<mu> >= C1` stay detailed; first-moment closure of soft plus hard on the detailed law between nodes
-- **Status:** unverified
+- **Status:** discrepancy
 - **Checks:** hard fraction equals `2<mu>/C1` where active; rate and quantile share the panel fraction; out-of-range parameters refused
 - **Anchor:** `tests/montecarlo/collisions/test_mixed_elastic.py`
-- **Notes:** Issue #894. CPU per-electron core only so far. Target `rederived`, with the limit and moments `anchored`, after fresh-context verification.
+- **Notes:** Issue #894. CPU per-electron core only so far. [Fresh-context verification](beam-transport/mixed-elastic-split.md) at 861642bbf: the table equations hold, but the core keeps the row-start hazard across an ELSEPA node, so a crossing row uses a stale hard rate and the mean deflection falls 1-2% below the Lewis integral at default parameters. Fix not applied. Target `rederived`, with the limit `anchored`.
 
 ## `mixed-elastic-soft-moments`
 
@@ -60,10 +60,10 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 - **Equation:** `T1 = (1-f) Q_k + f Q_k+1`, `T2 = (1-f)^2 Q2_k + 2f(1-f) Qx_k + f^2 Q2_k+1`, `Q = integral_0^xi_c mu(xi) dxi` by Gauss-Legendre on the union of both rows' CDF knots
 - **Assumptions:** element rates add, so soft rates of a compound add; the rate carries any atomic-electron scaling
 - **Limiting cases:** `xi_c = 0` gives zero rates; the moments match a dense quantile integral at `f = 0`, `0.3` and `1`
-- **Status:** unverified
+- **Status:** rederived
 - **Checks:** moments against a 2e6-point quantile integral; closure with the hard part
 - **Anchor:** `tests/montecarlo/collisions/test_mixed_elastic.py`
-- **Notes:** Issue #894. Target `anchored` for the per-node moments after fresh-context verification.
+- **Notes:** Issue #894. [Fresh-context verification](beam-transport/mixed-elastic-soft-moments.md) at 861642bbf. Target `anchored` for the per-node moments.
 
 ## `mixed-elastic-hinge`
 
@@ -73,10 +73,10 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 - **Equation:** `<mu> = (1 - exp(-s/lambda_s1))/2`, `<mu^2> = <mu> - (1 - exp(-s/lambda_s2))/6`, `mu_0 = (2<mu> - 3<mu^2>)/(1 - 2<mu>)`, `a = 1 - 2<mu> + mu_0`, `tau = xi s`
 - **Assumptions:** at least about ten hinges per track, the reason for the layer limit; moments at the hinge's energy capture their linear variation along a step; a hinge overtaken by a hard event is dropped, a second-order effect
 - **Limiting cases:** no soft part means no draws and no rows; the law reproduces both moments over small and large steps; position, energy and clock stay continuous across hinges, and direction changes only at hinges and hard events
-- **Status:** unverified
+- **Status:** discrepancy
 - **Checks:** both moments by deviate quadrature; row continuity; step limit; reproducibility; exit fractions against detailed within 4 sigma; [pilot](beam-transport/mixed-elastic-transport.md#pilot-not-the-equivalence-study)
 - **Anchor:** `tests/montecarlo/collisions/test_mixed_elastic.py`
-- **Notes:** Issue #894. The equivalence study on the #821 anchors and the CUDA kernel are pending. Incoherent CXR and standard brem are studied in #990.
+- **Notes:** Issue #894. CPU per-electron core only so far. [Fresh-context verification](beam-transport/mixed-elastic-hinge.md) at 861642bbf: the hinge law holds, but its moments use the planned step length when a hard event ends the step early, which overstates the soft first moment by about 1% at `C1 = 0.05` and 3% at `C1 = 0.2`. Shares its root cause with `mixed-elastic-split`. Fix not applied. Target `rederived`.
 
 ## `detector-cone-variance-reduction`
 

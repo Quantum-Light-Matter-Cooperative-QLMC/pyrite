@@ -1,5 +1,13 @@
 # Mixed elastic transport with a random hinge
 
+```{warning}
+Fresh-context verification found two open biases in the CPU core: a stale hard
+rate across ELSEPA nodes and an overstated hinge moment after an overtaking hard
+event. See [`mixed-elastic-split`](mixed-elastic-split.md) and
+[`mixed-elastic-hinge`](mixed-elastic-hinge.md). This note's statement that the
+node jump "changes speed, not physics" does not hold for the current core.
+```
+
 Design and derivation of the opt-in `transport_mode="mixed"` scheme (#894).
 Detailed single scattering stays the default and the reference. Claims:
 `mixed-elastic-split`, `mixed-elastic-soft-moments`, `mixed-elastic-hinge`.
