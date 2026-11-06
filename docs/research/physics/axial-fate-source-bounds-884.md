@@ -5,7 +5,7 @@ orphan: true
 # Physical outgoing fates → photon-source error — #884 (research only)
 
 **Status:** numerical envelope composition only, **not calibrated**;
-`cr-axial-depth-budget` is **unverified**. This does not admit native axial
+`cr-axial-depth-budget` covers this arithmetic only. This does not admit native axial
 runs, identify a radiation partition, or certify a return calculation.
 
 ## What is measured, and what must be supplied
@@ -42,6 +42,9 @@ outgoing/unresolved electron). The response caps must include later return
 and omitted radiation into the entrance zone; no return probability smaller
 than one is assumed. They may exceed one photon/electron, and must not be
 inferred from #883 electron balance or a finite subset of trajectories.
+An exit beyond an interval's stop is not counted at that stop, so the bound assumes no
+error at depth $z$ for a history without an event by $z$. That holds for yield at crystal
+thickness $z$, but not for depth-resolved use where a later exit returns above $z$.
 The caps have an external joint failure-probability allowance $\delta_c$,
 with zero reserved for **rigorous deterministic** external bounds.
 

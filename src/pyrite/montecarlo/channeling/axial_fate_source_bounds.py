@@ -11,7 +11,7 @@ The terminal-event CDF is monotone in depth. A one-sided Hoeffding bound at
 an interval's STOP therefore bounds the corresponding omitted-fate probability
 at *every* depth in (start, stop], without interpolating checkpoint errors.
 
-Validation: cr-axial-depth-budget (unverified research arithmetic, not calibration).
+Validation: cr-axial-depth-budget
 """
 
 from __future__ import annotations
@@ -92,7 +92,7 @@ def _total_cap(name: str, values: Sequence[float]) -> float:
 def _terminal_fate_depths(
     records: Sequence[AxialHandoffRecord], sampled_max_depth_ang: float
 ) -> tuple[list[float], list[float]]:
-    """Validate a complete incident census before estimating terminal CDFs."""
+    """Validate unit-weight records before estimating CDFs; omitted incidents are undetectable."""
     if not records:
         raise ValueError("no independently sampled incident records")
     seen: set[int] = set()
@@ -143,7 +143,12 @@ def physical_fate_source_uppers(
     stop with joint failure probability at most ``sampling_failure_probability``.
     For each interval the CDF upper bound at its stop is uniform over the
     whole interval by monotonicity. This does not give a physical return-flux
-    calculation: the cap supplies the worst-case response of outgoing fates.
+    calculation: the cap supplies the worst-case response of outgoing fates. The multiplier
+    also assumes no error at depth z for a history without a class event by z.
+    This holds for yield at crystal thickness z, not for depth-resolved use
+    where a later exit returns above z.
+
+    Validation: cr-axial-depth-budget
     """
     if not isinstance(caps, AxialFatePhotonResponseCaps):
         raise TypeError("explicit AxialFatePhotonResponseCaps are required")
@@ -215,8 +220,10 @@ def add_physical_fate_source_bounds(
 
     All provided source intervals must match the sampled region. Joint
     confidence is reduced by both the Hoeffding risk and any supplied response
-    cap risk. The resulting envelope remains **unverified** and can only be
-    used with the research preflight, never as a production admission token.
+    cap risk. The resulting envelope is uncalibrated and can only be used with
+    the research preflight, never as a production admission token.
+
+    Validation: cr-axial-depth-budget
     """
     if not isinstance(source_evidence, AxialPhotonDepthEvidence):
         raise TypeError("source_evidence must be AxialPhotonDepthEvidence")

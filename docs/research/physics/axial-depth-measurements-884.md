@@ -4,18 +4,18 @@ orphan: true
 
 # Axial photon-source depth measurements — #884 (research producer)
 
-**Status:** numerical contract only; `cr-axial-depth-budget` remains
-**unverified**. This module does not establish a physical radiation source,
+**Status:** numerical contract only, ledgered as `cr-axial-depth-budget`; that claim
+covers arithmetic, not calibration. This module does not establish a physical radiation source,
 matching-surface convergence or a calibrated operating depth. It cannot turn
 existing electron population / return-deficit records into photon-source
-bounds without an independently validated radiation response (#885).
+bounds without an independently validated radiation response (#992).
 
 `axial_depth_measurements.compile_axial_photon_depth_evidence` supplies the
 source-normalized interval contract in `axial_depth_budget.py` from paired
 photon-yield comparisons. The output is accepted by the existing research
 `require_axial_photon_depth_budget` preflight and
 `sample_budgeted_physical_handoff` adapter; it grants **no** native run
-admission (#886).
+admission (#994).
 
 ## Required evidence for each interval
 
@@ -67,7 +67,6 @@ depths), or independently justify a nonzero surface contribution. Never
 extrapolate from a measured endpoint into this region.
 
 A finite error envelope on several intervals does not imply all intermediate
-or later depths are admissible. The underlying guard refuses gaps, zero-depth
+or later depths are admissible. The underlying guard refuses a requested depth inside a gap, zero-depth
 relative error, inadequate joint confidence and any interval exceeding the
-caller-selected source tolerance. Standard axial runs remain refused until
-#885/#886 and independent fresh-context `rederived` validation are complete.
+caller-selected source tolerance. Standard axial runs remain refused until #992, #993 and #994 are complete.

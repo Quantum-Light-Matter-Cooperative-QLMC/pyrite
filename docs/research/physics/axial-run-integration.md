@@ -275,7 +275,7 @@ Reserve `cr-axial-zone-handoff-physical` for the new physical escape map,
 joint launch distribution, flux balance and continuity. Reserve
 `cr-axial-persisted-channel` for the new source estimator, line shape,
 normalization, frame/absorption mapping and exactly-once persistence.
-The handoff accounting row `cr-axial-zone-handoff-accounting` is `rederived`
+The handoff accounting row `cr-axial-zone-handoff-accounting` is `anchored`
 with a diagnostic counterexample. The physical row is `anchored` only for the
 research outgoing instrument (#883); it has no production implementation, and
 the depth budget (#884) is not claimed.

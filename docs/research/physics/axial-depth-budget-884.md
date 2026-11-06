@@ -4,9 +4,10 @@ orphan: true
 
 # Axial entrance-zone photon-source depth budget — #884 (research contract)
 
-**Status:** numerical contract and preflight only; **not calibrated**. No physical
-axial depth is admitted by this work. Standard Scene/Sweep/CLI axial runs remain
-refused under #624/#886. The outgoing instrument in #883 is anchored for its
+**Status:** numerical contract and preflight only; **not calibrated**. Its arithmetic
+is the ledgered [`cr-axial-depth-budget`](../../validation/ledger-channeling.md#cr-axial-depth-budget)
+claim. No physical axial depth is admitted by this work. Standard Scene/Sweep/CLI
+axial runs remain refused under #624/#994. The outgoing instrument in #883 is anchored for its
 own scope, but that status does not establish source accuracy or a depth budget.
 
 ## Observable and error definition
@@ -31,8 +32,8 @@ $$
 \leq \frac{R+U+G+S}{L} \leq \epsilon_\mathrm{max}.
 $$
 
-The first inequality requires independently justified **disjoint error
-coverage** (or valid triangle-bound overlap treatment): the code verifies
+The first inequality requires independently justified **exhaustive error
+coverage**, including interaction between channels; overlap only loosens the bound: the code verifies
 arithmetic, not the premise. ``unresolved`` is not itself a photon yield;
 it must first be mapped through a defensible photon-yield envelope. The old
 `AxialDepthEvidence` sums three supplied dimensionless fractions; it is not
@@ -57,7 +58,7 @@ confidence. `require_axial_photon_depth_budget` selects **only** an interval
 covering the requested depth, refuses zero-depth relative normalization,
 missing/mismatched data, inadequate joint confidence and a bound exceeding the
 requested error tolerance. No interpolation or extrapolation is performed;
-a depth gap is a refusal, even when its endpoints passed. Adjacent intervals
+a requested depth inside a gap refuses, even when both neighbouring intervals passed; a gap elsewhere does not block a covered depth. Adjacent intervals
 may have different bounds, and a failing later interval does not invalidate
 an independently certified earlier one.
 
@@ -67,19 +68,13 @@ sampler and before any sampling work. It does not persist results, change the
 unbudgeted #883 instrument, or enable production axial admission. Creating a
 Python evidence object does **not** constitute independent validation.
 
-## Required next measurements (still open)
+## Required next measurements
 
-1. Establish a photon-source reference and a non-overlapping radiation
-   ownership contract (#885). Without a finite lower reference yield and an
-   upper bound on omitted source channels the source-relative budget is
-   undefined; refusal is required.
-2. Obtain depth-uniform return-flux bounds from the #883 outgoing instrument,
-   including return from escaped trajectories, and source-weight the unresolved
-   tail. Separately quantify grid/supercell/Bloch and matching-cut effects.
-3. Retain raw independent histories, exact resolved case and observable keys,
-   per-component uncertainty attribution, versioned model identity and joint
-   coverage evidence. Register and independently rederive
-   `cr-axial-depth-budget` before marking any calibrated envelope anchored.
-4. Only then integrate a trusted calibration lookup and early refusal across
-   the production API, CLI, remote and persistence paths (#886). A caller-made
-   research object must not be accepted as a production eligibility token.
+Calibration moved to [#993](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/993),
+which depends on the validated material source in
+[#992](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/992).
+Without a finite lower reference yield and an upper bound on omitted source
+channels, the source-relative budget is undefined and refusal is required.
+Production lookup and early refusal across API, CLI, remote and persistence
+paths belong to [#994](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/994).
+A caller-made research object must not be accepted as a production eligibility token.

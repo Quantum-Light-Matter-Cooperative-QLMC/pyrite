@@ -156,7 +156,7 @@ class GridProjector:
         The full represented spectrum sets the sector separation. Their ratio
         is a diagnostic scale, NOT a finite-depth or photon-error bound.
         Empty/full sectors have zero cross norm and no separation or ratio.
-        Validation: cr-axial-zone-handoff-accounting (unverified).
+        Validation: cr-axial-zone-handoff-accounting
         """
         if not self.loss_blocks or not np.isfinite(cut_eV):
             raise ValueError("finite cut and absorptive_eV are required")
@@ -191,7 +191,7 @@ class MatchingDiagnostics:
 
     Counts have len(edges)+1 bins: below first edge, half-open interior bins,
     and at/above last edge. No histories or wavefunctions are retained.
-    Validation: cr-axial-zone-handoff-accounting (unverified).
+    Validation: cr-axial-zone-handoff-accounting
     """
 
     def __init__(self, target_eV, window_eV):

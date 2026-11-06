@@ -1,8 +1,10 @@
 """Source-normalized, fail-closed research depth-budget contracts (#884).
 
-Validation: cr-axial-depth-budget (unverified; numerical contract only).
+Validation: cr-axial-depth-budget
 """
 
+import subprocess
+import sys
 from dataclasses import replace
 
 import pytest
@@ -173,3 +175,32 @@ def test_budgeted_handoff_refuses_before_loading_solver_or_writing(monkeypatch):
     assert sample_budgeted_physical_handoff(**args) == ["sampled"]
     assert len(called) == 1
     assert called[0][1]["max_depth_ang"] == 1000.0
+
+
+def test_error_exactly_at_tolerance_is_accepted_and_just_above_is_refused():
+    part = interval(reference_lower=1.0, return_upper=0.25, unresolved_upper=0.0)
+    part = replace(part, grid_supercell_upper=0.0, source_model_upper=0.0)
+    exact = evidence(part)
+    assert require(exact, max_relative_error=0.25) is part
+    with pytest.raises(ValueError, match="photon-source error"):
+        require(exact, max_relative_error=0.2499999)
+
+
+def test_guard_refuses_in_a_fresh_process_before_solver_modules_load():
+    program = """
+import sys
+from pyrite.montecarlo.channeling.axial_depth_budget import sample_budgeted_physical_handoff
+try:
+    sample_budgeted_physical_handoff(
+        None, None, evidence=None, case_key="c", observable_key="o", model_id="m",
+        hbar_v_eV_ang=1.0, window=None, max_depth_ang=10.0, incidents=(), zone=None, matching=None,
+    )
+except ValueError as error:
+    assert "no matching" in str(error)
+else:
+    raise SystemExit("guard did not refuse")
+base = "pyrite.montecarlo.channeling."
+for name in ("axial_outgoing_launch", "axial_fiber_unraveling"):
+    assert base + name not in sys.modules, name
+"""
+    subprocess.run([sys.executable, "-c", program], check=True)

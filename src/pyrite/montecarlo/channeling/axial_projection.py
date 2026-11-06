@@ -7,7 +7,7 @@ per-incident RNG streams are reused; jump times remain resolved to one step.
 
 Source: Castin, Dalibard & Molmer, arXiv:0805.4002, Eqs. (2), (4), (8),
 compressed onto an orthogonal spectral subspace of H. Units: eV and angstrom.
-Validation: cr-axial-zone-handoff-accounting (unverified).
+Validation: cr-axial-zone-handoff-accounting
 """
 
 from __future__ import annotations
@@ -76,7 +76,7 @@ class SpectralNoJump:
     positive W [eV]. The cache holds at most ``cache_size`` tilt entries; it
     does not bound the provider's own spectrum cache or caller-held arrays.
     Energies are eV, lengths are angstroms, and hbar_v is eV angstrom.
-    Validation: cr-axial-zone-handoff-accounting (unverified).
+    Validation: cr-axial-zone-handoff-accounting
     """
 
     def __init__(
@@ -111,7 +111,7 @@ class SpectralNoJump:
         """Compress the Eq. (4) generator before exponentiating [eV / eV Å].
 
         Full-space cuts recover the finite-grid no-jump semigroup.
-        Validation: cr-axial-zone-handoff-accounting (unverified).
+        Validation: cr-axial-zone-handoff-accounting
         """
         key = (float(tilt[0]), float(tilt[1]))
         if not np.all(np.isfinite(key)):
@@ -141,7 +141,7 @@ class SpectralNoJump:
         """Project physical phi [Å^-1] into orthonormal coefficients.
 
         Parseval gives ||c||²=integral |P phi|² dA; a full cut preserves norm.
-        Validation: cr-axial-zone-handoff-accounting (unverified).
+        Validation: cr-axial-zone-handoff-accounting
         """
         if phi.shape != self.projector.n or not np.all(np.isfinite(phi)):
             raise ValueError("state must be finite and match the projector grid")
@@ -151,7 +151,7 @@ class SpectralNoJump:
     def decode(self, coefficients: Coefficients, tilt: tuple[float, float]) -> np.ndarray:
         """Reconstruct physical phi [Å^-1]; zero coefficients give zero state.
 
-        Validation: cr-axial-zone-handoff-accounting (unverified).
+        Validation: cr-axial-zone-handoff-accounting
         """
         a = np.zeros(self.projector.n, dtype=complex)
         for b, c in zip(self._blocks(tilt), coefficients, strict=True):
@@ -162,7 +162,7 @@ class SpectralNoJump:
         """Advance one step without jumps or extra projections; W=0 is unitary.
 
         Source: compressed Castin et al. Eq. (4), eV/Å conventions above.
-        Validation: cr-axial-zone-handoff-accounting (unverified).
+        Validation: cr-axial-zone-handoff-accounting
         """
         return tuple(
             b.propagator @ c for b, c in zip(self._blocks(tilt), coefficients, strict=True)
@@ -172,7 +172,7 @@ class SpectralNoJump:
     def norm2(coefficients: Coefficients) -> float:
         """Dimensionless no-jump norm squared (Parseval); zero state gives zero.
 
-        Validation: cr-axial-zone-handoff-accounting (unverified).
+        Validation: cr-axial-zone-handoff-accounting
         """
         return sum(float(np.vdot(c, c).real) for c in coefficients)
 
@@ -192,7 +192,7 @@ def _trajectory(
 
     Castin et al. Eqs. (4), (8): no-jump norm is the waiting-time survival law.
     W=0 triggers no jump; sink/hook removals contribute zero at later depths.
-    Validation: cr-axial-zone-handoff-accounting (unverified).
+    Validation: cr-axial-zone-handoff-accounting
     """
     rng = _rng(seed, electron)
     area = solver.grid.cell_area_ang2
@@ -268,7 +268,7 @@ def run_spectral_mcwf(
     is interpreted as physical escape. Full cut plus W=0 gives unitary motion.
     Removed electrons contribute zero, never survivor-renormalized output.
     This streams one trajectory at a time; no individual histories are saved.
-    Validation: cr-axial-zone-handoff-accounting (unverified).
+    Validation: cr-axial-zone-handoff-accounting
     """
     if solver.backend != "cpu":
         raise ValueError("spectral MCWF research reference supports only CPU")

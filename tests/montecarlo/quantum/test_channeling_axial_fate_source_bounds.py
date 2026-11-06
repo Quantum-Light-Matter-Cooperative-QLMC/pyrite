@@ -3,6 +3,7 @@
 from dataclasses import replace
 from math import log, sqrt
 
+import numpy as np
 import pytest
 
 from pyrite.montecarlo.channeling.axial_depth_budget import (
@@ -263,4 +264,62 @@ def test_fails_closed_on_wrong_source_scope_and_confidence_budget():
             sampled_max_depth_ang=300,
             caps=caps(),
             sample_evidence_id="physical-fate-response-proof",
+        )
+
+
+def test_production_bound_covers_true_cdfs_simultaneously_at_declared_rate():
+    """Coverage of the code's own bound against a known exponential fate law."""
+    rng = np.random.default_rng(884)
+    delta, count, trials = 0.2, 100, 300
+    stops = (100.0, 200.0, 300.0)
+    intervals = ((50.0, 100.0), (100.0, 200.0), (200.0, 300.0))
+    scale, outgoing_share = 400.0, 0.7
+    event_cdf = 1 - np.exp(-np.asarray(stops) / scale)
+    failures = 0
+    for _ in range(trials):
+        depths = rng.exponential(scale, count)
+        labels = rng.random(count) < outgoing_share
+        rows = [
+            AxialHandoffRecord(i, "retained", 300.0)
+            if z > 300.0
+            else AxialHandoffRecord(i, "physical_outgoing" if out else "unresolved", float(z))
+            for i, (z, out) in enumerate(zip(depths, labels, strict=True))
+        ]
+        bounds = run_bounds(rows, intervals=intervals, sampling_failure_probability=delta)
+        failures += any(
+            outgoing_share * cdf > b.observed_outgoing_fraction + b.fate_fraction_allowance
+            or (1 - outgoing_share) * cdf
+            > b.observed_unresolved_fraction + b.fate_fraction_allowance
+            for b, cdf in zip(bounds, event_cdf, strict=True)
+        )
+    assert failures / trials <= delta
+
+
+def test_exit_exactly_at_a_stop_counts_in_that_interval_and_later_ones_do_not():
+    rows = [AxialHandoffRecord(i, "retained", 300.0) for i in range(100)]
+    rows[0] = AxialHandoffRecord(0, "physical_outgoing", 200.0)
+    rows[1] = AxialHandoffRecord(1, "unresolved", 200.0)
+    rows[2] = AxialHandoffRecord(2, "physical_outgoing", 200.0 + 1e-9)
+    first, second = run_bounds(rows)
+    assert first.observed_outgoing_fraction == pytest.approx(1 / 100)
+    assert first.observed_unresolved_fraction == pytest.approx(1 / 100)
+    assert second.observed_outgoing_fraction == pytest.approx(2 / 100)
+
+
+def test_fate_terms_add_to_the_supplied_source_terms_exactly():
+    base = source()
+    rows = records()
+    enriched = add_physical_fate_source_bounds(
+        base,
+        rows,
+        sampled_max_depth_ang=300.0,
+        caps=caps(),
+        sample_evidence_id="independent-incident-histories",
+        sampling_failure_probability=0.01,
+    )
+    extra = run_bounds(rows)
+    for old, new, term in zip(base.intervals, enriched.intervals, extra, strict=True):
+        assert new.return_upper == pytest.approx(old.return_upper + term.return_source_error_upper)
+        assert new.unresolved_upper == pytest.approx(
+            old.unresolved_upper + term.unresolved_source_error_upper
         )
