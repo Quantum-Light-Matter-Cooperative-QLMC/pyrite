@@ -40,126 +40,135 @@ def _(mo):
     mo.md(r"""
     # Parameter sweeps
 
-    Map the PXR/CBS yield as beam energy and HOPG thickness vary,
-    at a fixed 30° target tilt and 135° observation angle.
+    Map PXR/CBS yield from an HOPG slab two ways. First, `Sweep` and `run_sweep`
+    run one independent transport per grid point, here over target tilt and
+    thickness. Second, an observation-angle scan shares one transport per tilt,
+    because the electrons do not depend on where the detector sits. Both use a
+    30 keV beam and report a source yield per incident electron and steradian,
+    before detector response.
     """)
     return
 
 
 @app.cell
 def _(np):
-    from pyrite import simulate
+    from pyrite import Scene, Sweep
     from pyrite.beams import Beam, PointBunch, PointSpot
     from pyrite.config import CxrReflections, FixedSampling, Numerics, Physics
     from pyrite.detectors import Detector
-    from pyrite.geometry import Footprint, Slab
+    from pyrite.geometry import Slab
     from pyrite.units import ureg
 
-    energies_keV = np.array([20.0, 25.0, 30.0, 35.0, 40.0])
-    thicknesses_nm = np.array([25.0, 50.0, 75.0, 100.0, 125.0])
+    tilts = np.array([15.0, 30.0, 45.0, 60.0]) * ureg.degree
+    thicknesses = np.array([25.0, 50.0, 75.0, 100.0, 125.0]) * ureg.nm
     band_eV = (600.0, 2_000.0)
-    detector = Detector(observation_angle=135 * ureg.degree)
-    physics = Physics(brem_source="none")
+    beam = Beam(
+        kinetic_energy=30 * ureg.keV,
+        transverse=PointSpot(),
+        longitudinal=PointBunch(),
+    )
+    size = {"width": 5 * ureg.mm, "height": 5 * ureg.mm}
     numerics = Numerics(
-        sampling=FixedSampling(cxr_electrons=2_048, brem_electrons=2_048),
-        cxr_reflections=CxrReflections(n_families=2),
+        sampling=FixedSampling(cxr_electrons=1_024, brem_electrons=1_024),
+        cxr_reflections=CxrReflections(n_families=1),
     )
     return (
-        Beam,
-        Footprint,
-        PointBunch,
-        PointSpot,
+        Detector,
+        Physics,
+        Scene,
         Slab,
+        Sweep,
         band_eV,
-        detector,
-        energies_keV,
+        beam,
+        size,
         numerics,
-        physics,
-        simulate,
-        thicknesses_nm,
+        thicknesses,
+        tilts,
         ureg,
     )
 
 
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Independent transports: `Sweep` and `run_sweep`
+
+    `Sweep` expands a base scene over dotted paths into a Cartesian product of
+    cases; each case gets its own seed. `run_sweep` executes them. It needs a
+    checkpoint location, and here a temporary one keeps the example from mixing
+    with other studies. See
+    [Persisted parameter studies](18-persisted-parameter-studies.ipynb)
+    for saving and resuming.
+    """)
+    return
+
+
 @app.cell
 def _(
-    Beam,
-    Footprint,
-    PointBunch,
-    PointSpot,
+    Detector,
+    Physics,
+    Scene,
     Slab,
-    band_eV,
-    detector,
-    energies_keV,
-    mo,
-    np,
+    Sweep,
+    beam,
+    size,
     numerics,
-    physics,
-    simulate,
-    tables_ready,
-    thicknesses_nm,
+    thicknesses,
+    tilts,
     ureg,
 ):
+    sweep = Sweep(
+        base=Scene(
+            beam,
+            Slab("hopg", thickness=thicknesses[0], tilt=tilts[0], **size),
+            Detector(observation_angle=135 * ureg.degree),
+        ),
+        axes={"target.tilt": tuple(tilts), "target.thickness": tuple(thicknesses)},
+    )
+    cases = sweep.cases(numerics=numerics, physics=Physics(brem_source="none"))
+    assert len(cases) == len(tilts) * len(thicknesses)
+    return (cases,)
+
+
+@app.cell
+def _(band_eV, cases, mo, np, tables_ready, thicknesses, tilts):
+    from tempfile import TemporaryDirectory
+
+    from pyrite.execution import run_sweep
+
     assert tables_ready
-    # Rows are thicknesses; columns are beam energies.
-    band_yield = np.zeros((len(thicknesses_nm), len(energies_keV)))
-    runs = []
-    with mo.status.progress_bar(
-        total=len(thicknesses_nm) * len(energies_keV),
-        title="Computing the parameter sweep",
-        show_eta=True,
-    ) as _progress:
-        for _row, _thickness_nm in enumerate(thicknesses_nm):
-            for _col, _energy_keV in enumerate(energies_keV):
-                _result = simulate(
-                    Beam(
-                        kinetic_energy=float(_energy_keV) * ureg.keV,
-                        transverse=PointSpot(),
-                        longitudinal=PointBunch(),
-                    ),
-                    Slab(
-                        "hopg",
-                        thickness=float(_thickness_nm) * ureg.nm,
-                        tilt=30 * ureg.degree,
-                        footprint=Footprint(width=5 * ureg.mm, height=5 * ureg.mm),
-                    ),
-                    detector,
-                    physics=physics,
-                    numerics=numerics,
-                )
-                _spectrum = _result.cxr.incoherent
-                _grid = _spectrum.photon_energy_eV
-                _lo, _hi = band_eV
-                assert _grid[0] <= _lo < _hi <= _grid[-1]
-                # Include interpolated band edges on each result's native grid.
-                _nodes = np.r_[_lo, _grid[(_grid > _lo) & (_grid < _hi)], _hi]
-                band_yield[_row, _col] = np.trapezoid(
-                    np.interp(_nodes, _grid, _spectrum.density), _nodes
-                )
-                runs.append(
-                    {
-                        "energy_keV": float(_energy_keV),
-                        "thickness_nm": float(_thickness_nm),
-                        "seed": int(_result.case["seed"]),
-                        "source_identity": _result.provenance["identity_digest"],
-                    }
-                )
-                _progress.update(subtitle=f"{_energy_keV:g} keV / {_thickness_nm:g} nm")
-    assert np.isfinite(band_yield).all() and np.all(band_yield >= 0)
-    sweep_yield = band_yield.copy()
+    store = {}
+    with mo.status.spinner(title="Running the tilt–thickness sweep"):
+        with TemporaryDirectory(prefix="pyrite-sweep-") as _checkpoints:
+            assert run_sweep(cases, store, checkpoint_dir=_checkpoints, progress=False)
+
+    # Cases follow axis order, so the first axis (tilt) gives the rows.
+    _yields = []
+    for _case in cases:
+        _record = store[_case["name"]][_case["E0_keV"]]
+        _energy, _density = _record["E_grid"], _record["spec"]
+        _inside = (_energy >= band_eV[0]) & (_energy <= band_eV[1])
+        _yields.append(np.trapezoid(_density[_inside], _energy[_inside]))
+    sweep_yield = np.reshape(_yields, (len(tilts), len(thicknesses)))
+    assert np.isfinite(sweep_yield).all() and np.all(sweep_yield >= 0)
     return (sweep_yield,)
 
 
 @app.cell
-def _(energies_keV, plt, sweep_yield, thicknesses_nm):
+def _(plt, sweep_yield, thicknesses, tilts):
     fig_sweep, _ax = plt.subplots(figsize=(7, 4.3), layout="constrained")
-    _image = _ax.pcolormesh(energies_keV, thicknesses_nm, sweep_yield, shading="nearest")
+    _image = _ax.pcolormesh(
+        thicknesses.to("nm").magnitude,
+        tilts.to("degree").magnitude,
+        sweep_yield,
+        shading="nearest",
+    )
     _ax.set(
-        xlabel="Beam energy (keV)",
-        ylabel="HOPG thickness (nm)",
-        title="PXR/CBS yield in the 600–2,000 eV band",
-        xticks=energies_keV,
-        yticks=thicknesses_nm,
+        xlabel="HOPG thickness (nm)",
+        ylabel="Target tilt (°)",
+        title="PXR/CBS yield in the 600–2,000 eV band at 135° observation",
+        xticks=thicknesses.to("nm").magnitude,
+        yticks=tilts.to("degree").magnitude,
     )
     fig_sweep.colorbar(_image, ax=_ax, label="Photons / (incident electron · sr)")
     fig_sweep  # noqa: B018 - captured by marimo
@@ -169,13 +178,92 @@ def _(energies_keV, plt, sweep_yield, thicknesses_nm):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    Each tile integrates a source spectrum over the same photon-energy band;
-    it is a yield per incident electron and steradian, before detector response.
-    Here, yield grows with thickness and falls with beam energy.
-    All 25 runs use 2,048 sampled histories per population and seed 1.
+    Yield grows with thickness at every tilt except 45°, where it is essentially
+    zero. That is geometry: with this target's tilt convention, a 45° tilt puts
+    the 135° observation direction parallel to the slab face, so photons leave
+    along a long, strongly absorbing path. All 20 runs use 1,024 sampled histories
+    per population and distinct seeds.
+    """)
+    return
 
-    Try shifting the energy band or replacing the thickness axis with target tilt.
-    Use [notebook 07](https://pyrite.readthedocs.io/en/latest/notebooks/designing/07-sampling-convergence-performance.html)
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## One transport per tilt: `directional_sources`
+
+    Changing the observation angle changes only the scoring. The **experimental**
+    `directional_sources` runs one transport and scores every requested direction
+    on it. You supply one energy grid shared by all angles; it must resolve every
+    line, because no automatic per-angle window is applied. Angles within one
+    tilt share electron histories, so their noise is correlated along the angle
+    axis. A different seed per tilt keeps the rows independent.
+    """)
+    return
+
+
+@app.cell
+def _(Slab, band_eV, beam, size, mo, np, numerics, tables_ready, tilts, ureg):
+    from pyrite.radiation import directional_sources
+
+    assert tables_ready
+    observation_angles = np.linspace(45.0, 175.0, 27) * ureg.degree
+    energy_grid = np.arange(band_eV[0], band_eV[1] + 0.5, 1.0) * ureg.eV
+
+    angle_yield = np.zeros((len(tilts), len(observation_angles)))
+    with mo.status.progress_bar(total=len(tilts), title="Scoring angles per tilt") as _progress:
+        _seed = 1
+        for _row, _tilt in enumerate(tilts):
+            _source = directional_sources(
+                beam,
+                Slab("hopg", thickness=100 * ureg.nm, tilt=_tilt, **size),
+                # This experimental helper still takes numeric eV and degree grids.
+                energy_eV=energy_grid.to("eV").magnitude,
+                angle_deg=observation_angles.to("degree").magnitude,
+                numerics=numerics,
+                seed=_seed,
+            )["pxr-cbs"]
+            assert _source.supported.all()
+            angle_yield[_row] = np.trapezoid(
+                _source.density, energy_grid.to("eV").magnitude, axis=1
+            )
+            _seed += 1
+            _progress.update()
+    return angle_yield, observation_angles
+
+
+@app.cell
+def _(angle_yield, observation_angles, plt, tilts):
+    fig_angles, _ax = plt.subplots(figsize=(7, 4.3), layout="constrained")
+    for _tilt, _yield in zip(tilts, angle_yield, strict=True):
+        _ax.plot(
+            observation_angles.to("degree").magnitude,
+            _yield,
+            label=f"{_tilt.to('degree').magnitude:g}° tilt",
+        )
+    _ax.set(
+        xlabel="Observation angle (°)",
+        ylabel="Photons / (incident electron · sr)",
+        title="PXR/CBS yield in the 600–2,000 eV band, 100 nm HOPG",
+    )
+    _ax.legend()
+    fig_angles  # noqa: B018 - captured by marimo
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    Each curve drops sharply where the observation direction runs parallel to the
+    slab face, at 90° plus the tilt: the same null as the 45° row above, now seen
+    at every tilt. One run per point would need 108 transports for this figure;
+    here four suffice. Scoring still costs time, so the saving is largest when
+    transport dominates. Spectra stay on one explicit 1 eV grid, so refine it
+    and the sampling before quantitative use, and compare against a few
+    independent `simulate` runs.
+
+    Try another band, or add `"bremsstrahlung"` to `components`. Use
+    [notebook 07](07-sampling-convergence-performance.ipynb)
     to choose a larger sampling budget for a selected region.
     """)
     return
