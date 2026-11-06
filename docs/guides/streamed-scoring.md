@@ -17,12 +17,11 @@ Set `KernelTuning.stream_block_electrons` on the scene's `Numerics`:
 import numpy as np
 
 import pyrite as pr
-from pyrite.config import KernelTuning
+from pyrite.config import FixedSampling, KernelTuning
 from pyrite.detectors import EnergyBins
 
 numerics = pr.Numerics(
-    cxr_trials=64_000,
-    brem_trials=64_000,
+    sampling=FixedSampling(cxr_electrons=64_000, brem_electrons=64_000),
     # Streaming needs a final line grid: give explicit energy bins.
     energy_bins=EnergyBins(
         cxr=np.linspace(8000.0, 9000.0, 400), brem=np.arange(1000.0, 300001.0, 1000.0)

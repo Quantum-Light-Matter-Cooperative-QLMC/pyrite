@@ -18,7 +18,7 @@ command: sweep/membership/emission, beam, detectors, filters, numerics
 overrides. Energy grids name the profile or built-in defaults, grid overrides
 and stored artifacts together; the last section lists non-grid material
 overrides. Numerics name their value source; adaptive
-sampling delegates `line-trials` and `brem-trials` to the precision policy.
+sampling delegates `cxr-electrons` and `brem-electrons` to the precision policy.
 Long values wrap in the default table output; `--output wide` keeps each value
 on one line. `--output json` retains the stable machine payload.
 
@@ -35,11 +35,13 @@ on one line. `--output json` retains the stable machine payload.
 | `energy_grid_refs` | material -> artifact digest | `pyrite numerics energy-grid derive`, `pyrite-dev energy-grid add` | line rows ignored while a line-grid policy is set; brem still applies |
 | `overrides.MATERIAL.*` | any range/grid key above, plus counts | TOML; prefer a single-material profile | Remove existing override keys by editing the TOML. Bundled stack rows (`thickness_layers`, sapphire thickness) stay until materials and physical objects are separated |
 
-Catalog writes use `cxr_trials`, `brem_trials`, `E_grid_cxr` and
-`cxr_grid_policy`. The compatibility spellings `n_electrons`,
-`n_electrons_brem`, `E_grid_line` and `line_grid_policy` still decode to the
-same fields; declaring both spellings of one field is an error. Resolved run
-metadata retains its identity vocabulary.
+Catalog writes use `cxr_electrons`, `brem_electrons`, `E_grid_cxr` and
+`cxr_grid_policy`. The compatibility spellings `E_grid_line` and
+`line_grid_policy` still decode to the same fields; declaring both spellings of
+one field is an error. The removed budget keys `cxr_trials`, `brem_trials`,
+`n_electrons` and `n_electrons_brem` are load errors naming the replacement.
+Resolved run metadata retains its identity vocabulary (`Ne`, `Ne_brem`), so
+existing checkpoints and results still load.
 
 ## Calculation numerics
 
@@ -52,7 +54,7 @@ in human output. The JSON payload retains its existing source spellings.
 
 | TOML key | Setter flag | Notes |
 |---|---|---|
-| `cxr_trials`, `brem_trials` | `--cxr-trials`, `--brem-trials` | single-value grids; `profile set\|add -l/-b` edit them as sweepable grids |
+| `cxr_electrons`, `brem_electrons` | `--cxr-electrons`, `--brem-electrons` | single-value grids; `profile set\|add -l/-b` edit them as sweepable grids |
 | `n_families`, `max_reflections` | `--reflection-families`, `--maximum-reflections` | |
 | `mosaic_nodes`, `mosaic_route` | `--mosaic-nodes`, `--mosaic-route` | |
 | `straggling`, `energy_model`, `max_dE_frac` | `--straggling`, `--energy-model`, `--maximum-fractional-energy-loss` | also accepted by `profile create\|set` for compatibility |

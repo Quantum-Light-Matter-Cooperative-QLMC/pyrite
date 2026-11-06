@@ -88,6 +88,29 @@ Removal dates live in `pyrite._api_deprecations`.
 | --- | --- | --- |
 | `pyrite.beams.BunchLength(rms_fs=σ, shape=s)` (removed in 0.27.0) | `LongitudinalDistribution("gaussian", σ, shape=s)` | `shape="uniform"` is the flat top of the same RMS. `rms_duration=` keeps its meaning. Sampled offsets and case keys are unchanged; pickled `Beam` objects holding a `BunchLength` no longer load. |
 
+## Electron-budget migration
+
+`Numerics` stores its electron budget only as `sampling`. The legacy arguments
+were removed with no deprecation window (#1007, a deliberate exception to the
+API policy's deprecation schedule): using one raises an error naming its
+replacement. Change a budget with `dataclasses.replace(numerics, sampling=...)`.
+Equal budgets give identical case identities and results, and existing
+checkpoints and results still load; persisted run records keep `Ne`, `Ne_brem`
+and `adaptive_precision`.
+
+| Removed | Replacement |
+| --- | --- |
+| `Numerics(cxr_trials=N)`, `Numerics(brem_trials=M)` | `Numerics(sampling=FixedSampling(cxr_electrons=N, brem_electrons=M))` |
+| `Numerics(N, M, ...)` (positional) | `sampling=FixedSampling(N, M)`; every `Numerics` argument is keyword-only |
+| `Numerics(precision=Precision(...))` | `Numerics(sampling=AdaptiveSampling(...))` |
+| `numerics.cxr_trials`, `numerics.brem_trials` | `numerics.sampling.cxr_electrons`, `numerics.sampling.brem_electrons` |
+| `numerics.precision` | `numerics.sampling`, when it is an `AdaptiveSampling` |
+| Sweep axis `numerics.cxr_trials`, `numerics.brem_trials` | `numerics.sampling.cxr_electrons`, `numerics.sampling.brem_electrons` |
+| Catalog keys `cxr_trials`, `n_electrons` | `cxr_electrons` |
+| Catalog keys `brem_trials`, `n_electrons_brem` | `brem_electrons` |
+| `--cxr-trials`, `--brem-trials` on `pyrite profile create\|set\|add`, `pyrite numerics set` and `pyrite numerics precision disable` | `--cxr-electrons`, `--brem-electrons` |
+| `fixed_counts.line_trials`, `fixed_counts.brem_trials` in `pyrite numerics precision show --output json` | `fixed_counts.cxr_electrons`, `fixed_counts.brem_electrons` |
+
 ## Root import compatibility
 
 The forward-looking root API is `Beam`, `Target`, `Detector`, `Scene`,

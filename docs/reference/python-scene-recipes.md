@@ -225,7 +225,8 @@ adaptive = pr.Numerics(
 Adaptive limits are budgets, not promised sample counts; check
 `statistics_limited` and the realized counts in provenance. Coherent emission,
 pixel detectors, and several advanced transport modes are not eligible.
-`pyrite.config.Precision(...)` remains an equivalent adaptive policy. See
+`pyrite.config.Precision(...)` is the same stopping rule for `Settings`; `Numerics`
+takes only `AdaptiveSampling`. See
 [Adaptive electron counts](../computation/statistical-methods.md#adaptive-electron-counts)
 for estimator limitations.
 

@@ -125,7 +125,12 @@ beam = pr.Beam(energy_keV=45.0)
 target = pr.geometry.Slab("hopg", thickness_ang=20_000.0, tilt_deg=30.0)
 detector = pr.Detector(observation_angle_deg=90.0)
 
-result = pr.simulate(beam, target, detector, numerics=pr.Numerics(cxr_trials=450))
+result = pr.simulate(
+    beam,
+    target,
+    detector,
+    numerics=pr.Numerics(sampling=pr.config.FixedSampling(cxr_electrons=450)),
+)
 result.cxr.incoherent.density  # response-free source photons per electron per eV per sr
 result.provenance  # resolved scene, identity digest, backend, versions
 ```
