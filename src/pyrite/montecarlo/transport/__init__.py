@@ -128,15 +128,17 @@ from .core_geometry import (
     _searchsorted_right_scalar,
 )
 from .cores import (
-    _transport_core_ungrooved,
-    _transport_core_ungrooved_lut,
-    _transport_core_grooved,
     EXIT_CUTOFF_STOPPED,
     EXIT_BACKSCATTERED,
     EXIT_TRANSMITTED,
     EXIT_SIDE,
     EXIT_STEP_LIMITED,
     EXIT_NOT_ENTERED,
+)
+from .core_specializations import (
+    _transport_core_ungrooved,
+    _transport_core_ungrooved_lut,
+    _transport_core_grooved,
     _transport_core_ungrooved_perelectron,
     _transport_core_ungrooved_perelectron_lut,
 )

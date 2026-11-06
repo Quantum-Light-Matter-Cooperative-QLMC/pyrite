@@ -40,8 +40,8 @@ EVENT_EXIT_TOP = np.int8(4)
 EVENT_EXIT_BOTTOM = np.int8(5)
 EVENT_EXIT_SIDE = np.int8(6)
 EVENT_CUTOFF = np.int8(7)
-# Hard radiative and fictitious events are reserved for future cores. The
-# shell soft/hard mode emits HARD_INELASTIC.
+# The shell soft/hard mode emits HARD_INELASTIC. Mixed transport (#894) emits
+# DELTA when a step ends at its limit, with no hard event and no state change.
 EVENT_HARD_INELASTIC = np.int8(8)
 EVENT_HARD_RADIATIVE = np.int8(9)
 EVENT_DELTA = np.int8(10)
@@ -52,6 +52,9 @@ EVENT_ANNIHILATION = np.int8(11)
 # state. Position, clock and energy are continuous across it; direction is not.
 # Native cores never emit it.
 EVENT_DECHANNEL = np.int8(12)
+# A mixed-transport random hinge (#894): the row ends at the artificial soft
+# deflection. Position, clock and energy are continuous; direction is not.
+EVENT_SOFT_HINGE = np.int8(13)
 
 
 class SegmentEvent(IntEnum):
@@ -70,6 +73,7 @@ class SegmentEvent(IntEnum):
     DELTA = int(EVENT_DELTA)
     ANNIHILATION = int(EVENT_ANNIHILATION)
     DECHANNEL = int(EVENT_DECHANNEL)
+    SOFT_HINGE = int(EVENT_SOFT_HINGE)
 
 
 RESERVED_EVENTS = frozenset(
