@@ -50,7 +50,7 @@ result = pr.simulate(
     detector,
     physics=pr.Physics(),
     numerics=pr.Numerics(
-        sampling=FixedSampling(cxr_electrons=450, brem_electrons=100),
+        sampling=FixedSampling(cxr_histories=450, brem_histories=100),
         cxr_reflections=CxrReflections(n_families=4),
     ),
 )
@@ -186,7 +186,7 @@ from pyrite.config import (
 )
 
 numerics = pr.Numerics(
-    sampling=FixedSampling(cxr_electrons=400, brem_electrons=200),
+    sampling=FixedSampling(cxr_histories=400, brem_histories=200),
     transport=TransportNumerics(energy_model="midpoint", max_dE_frac=0.01),
     radiation=RadiationNumerics(cxr_reflections=CxrReflections(n_families=6)),
     execution=ExecutionConfig(transport_core="per-electron", cxr_chunk=256, brem_chunk=256),
@@ -204,7 +204,7 @@ update a section of an existing immutable configuration.
 
 ## Choose adaptive sampling
 
-Use fixed electron budgets for reproducible fixed-count runs, or request
+Use fixed history budgets for reproducible fixed-count runs, or request
 adaptive stopping on supported incoherent scalar-detector cases:
 
 ```python
@@ -213,9 +213,9 @@ from pyrite.config import AdaptiveSampling
 adaptive = pr.Numerics(
     sampling=AdaptiveSampling(
         target_rse=0.05,
-        min_electrons=200,
-        max_electrons=20_000,
-        block_electrons=100,
+        min_histories=200,
+        max_histories=20_000,
+        block_histories=100,
         observables=("cxr", "brem"),
     ),
 )
@@ -225,8 +225,8 @@ adaptive = pr.Numerics(
 Adaptive limits are budgets, not promised sample counts; check
 `statistics_limited` and the realized counts in provenance. Coherent emission,
 pixel detectors, and several advanced transport modes are not eligible.
-`pyrite.config.Precision(...)` is the same stopping rule for `Settings`; `Numerics`
-takes only `AdaptiveSampling`. See
+`AdaptiveSampling` is the only public adaptive policy; budgets count Monte
+Carlo histories (transported primary electrons). See
 [Adaptive electron counts](../computation/statistical-methods.md#adaptive-electron-counts)
 for estimator limitations.
 

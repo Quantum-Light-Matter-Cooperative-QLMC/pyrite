@@ -14,11 +14,11 @@ new checkpoint stems and earlier results stay under their old identity.
 
 `pyrite profile show NAME` presents Setting / Value tables grouped by editing
 command: sweep/membership/emission, beam, detectors, filters, numerics
-(sampling/reflection-and-mosaic/transport), precision, line-grid, energy grids and material
+(sampling/reflection-and-mosaic/transport), adaptive sampling, line-grid, energy grids and material
 overrides. Energy grids name the profile or built-in defaults, grid overrides
 and stored artifacts together; the last section lists non-grid material
 overrides. Numerics name their value source; adaptive
-sampling delegates `cxr-electrons` and `brem-electrons` to the precision policy.
+sampling delegates `cxr-histories` and `brem-histories` to the adaptive-sampling policy.
 Long values wrap in the default table output; `--output wide` keeps each value
 on one line. `--output json` retains the stable machine payload.
 
@@ -35,7 +35,7 @@ on one line. `--output json` retains the stable machine payload.
 | `energy_grid_refs` | material -> artifact digest | `pyrite numerics energy-grid derive`, `pyrite-dev energy-grid add` | line rows ignored while a line-grid policy is set; brem still applies |
 | `overrides.MATERIAL.*` | any range/grid key above, plus counts | TOML; prefer a single-material profile | Remove existing override keys by editing the TOML. Bundled stack rows (`thickness_layers`, sapphire thickness) stay until materials and physical objects are separated |
 
-Catalog writes use `cxr_electrons`, `brem_electrons`, `E_grid_cxr` and
+Catalog writes use `cxr_histories`, `brem_histories`, `E_grid_cxr` and
 `cxr_grid_policy`. The compatibility spellings `E_grid_line` and
 `line_grid_policy` still decode to the same fields; declaring both spellings of
 one field is an error. The removed budget keys `cxr_trials`, `brem_trials`,
@@ -54,7 +54,7 @@ in human output. The JSON payload retains its existing source spellings.
 
 | TOML key | Setter flag | Notes |
 |---|---|---|
-| `cxr_electrons`, `brem_electrons` | `--cxr-electrons`, `--brem-electrons` | single-value grids; `profile set\|add -l/-b` edit them as sweepable grids |
+| `cxr_histories`, `brem_histories` | `--cxr-histories`, `--brem-histories` | single-value grids; `profile set\|add -l/-b` edit them as sweepable grids |
 | `n_families`, `max_reflections` | `--reflection-families`, `--maximum-reflections` | |
 | `mosaic_nodes`, `mosaic_route` | `--mosaic-nodes`, `--mosaic-route` | |
 | `straggling`, `energy_model`, `max_dE_frac` | `--straggling`, `--energy-model`, `--maximum-fractional-energy-loss` | also accepted by `profile create\|set` for compatibility |

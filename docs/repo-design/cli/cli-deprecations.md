@@ -8,11 +8,11 @@ Per [ADR-0002](../../adr/0002-cli-surface-redesign.md), every renamed or retired
 
 ## Commands
 
-No command spelling is currently deprecated. Every spelling the CLI accepts is canonical; anything else exits as an unknown command.
+No command spelling is currently deprecated. Every spelling the CLI accepts is canonical; anything else exits as an unknown command, except hard-break removals without a support window (`numerics precision`, #1007), which exit as usage errors naming their replacement.
 
 ## Options
 
-No option spelling is currently deprecated. Every option the CLI accepts is canonical; anything else exits as a usage error.
+No option spelling is currently deprecated. Every option the CLI accepts is canonical; anything else exits as a usage error. Hard-break removals without a support window (the `*-trials` and `*-electrons` Monte Carlo budget flags, #1007) name their `*-histories` replacement.
 
 ## Implicit defaults
 

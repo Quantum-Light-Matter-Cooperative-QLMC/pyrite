@@ -373,7 +373,7 @@ physics = pr.Physics(
     bremsstrahlung_model="eedl",
 )
 numerics = pr.Numerics(
-    sampling=pr.config.FixedSampling(cxr_electrons=3, brem_electrons=3),
+    sampling=pr.config.FixedSampling(cxr_histories=3, brem_histories=3),
     cxr_reflections=pr.config.CxrReflections(max_reflections=1),
     energy_bins=pr.detectors.EnergyBins(
         cxr=np.linspace(500.0, 1500.0, 9),

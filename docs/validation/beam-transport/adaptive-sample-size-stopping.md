@@ -197,7 +197,7 @@ verification above is preserved and concerns the shared-count policy.
 ### Source-first derivation and filters
 
 The intended signature extends `Precision` by `brem_target_rse`,
-`brem_min_electrons`, and `brem_max_electrons`. Sources remain Welford and
+`brem_min_histories`, and `brem_max_histories`. Sources remain Welford and
 Chan–Golub–LeVeque for moments, Kish for concentration, and
 [Glynn and Whitt (1992)](https://web.stanford.edu/~glynn/papers/1992/GW92a.html)
 for sequential simulation precision. This extension changes population ownership,

@@ -129,7 +129,7 @@ result = pr.simulate(
     beam,
     target,
     detector,
-    numerics=pr.Numerics(sampling=pr.config.FixedSampling(cxr_electrons=450)),
+    numerics=pr.Numerics(sampling=pr.config.FixedSampling(cxr_histories=450)),
 )
 result.cxr.incoherent.density  # response-free source photons per electron per eV per sr
 result.provenance  # resolved scene, identity digest, backend, versions

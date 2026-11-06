@@ -18,7 +18,7 @@ Optional local ACP bridge lifecycle (Claude and Codex stdio-to-WebSocket adapter
 - Deps: `paths`.
 
 ## `_precision.py`
-Import-light `Precision` policy for adaptive sampling: validates the requested budget, observables, guards and bands; serializes the policy separately from realized statistics. Shared by `Numerics`, `Settings`, `Case`, and the adaptive runner, without importing a backend.
+Import-light private `Precision` base of the public `AdaptiveSampling` (`_sampling.py`): validates the requested `*_histories` budget, observables, guards and bands; `to_dict`/`from_dict` keep the stored `*_electrons` keys (`STORED_KEYS`) and serialize the policy separately from realized statistics. Shared by `Numerics`, `Settings`, `Case`, and the adaptive runner, without importing a backend.
 
 `montecarlo/runner/independent.py` owns opt-in brem-prefix stopping: separate scalar monitors, a frozen brem population, and live CXR rechecks. `Precision.brem_target_rse` selects it; `block_transport.py` redecides the prefix during realized-range replay, and the runner applies line-only cutoffs after the brem stop.
 

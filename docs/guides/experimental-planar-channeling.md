@@ -130,7 +130,7 @@ result = pr.simulate(
         radiative_model="uncoupled",
     ),
     numerics=pr.Numerics(
-        sampling=pr.config.FixedSampling(cxr_electrons=200, brem_electrons=200),
+        sampling=pr.config.FixedSampling(cxr_histories=200, brem_histories=200),
         energy_bins=pr.EnergyBins(
             cxr=np.arange(1_000, 24_000, 50),
             brem=np.arange(1_000, 17_000_000, 500),

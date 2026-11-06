@@ -198,8 +198,8 @@ Use [Configuration cookbook](../guides/configuration-cookbook.md) for common edi
 The canonical Python import home is `pyrite.config`. It is a lazy, identity-
 preserving facade over the existing dataclasses and validators, not a second
 configuration schema. `Physics`, `Numerics`, `CxrReflections`,
-`TransportNumerics`, `RadiationNumerics`, `Precision`, `FixedSampling`,
-`AdaptiveSampling`, and the experimental `PhotonTransport` retain their
+`TransportNumerics`, `RadiationNumerics`, `FixedSampling`,
+`AdaptiveSampling` (which replaced the public `Precision`, #1007), and the experimental `PhotonTransport` retain their
 original storage and validation. Preset names resolve to immutable typed values
 via `load_physics` / `load_numerics`.
 

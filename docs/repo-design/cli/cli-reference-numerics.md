@@ -21,15 +21,15 @@ Options:
   -h, --help  Show this message and exit.
 
 Commands:
-  list         List the campaigns whose configuration can...
-  reset        Reset selected fields, or all fields owned...
-  set          Set PROFILE fields; validate and...
-  show         Show explicit/effective settings and their...
-  validate     Validate the selected campaign without...
-  preset       Manage named numerics presets that profiles attach by name.
-  precision    Configure adaptive precision or fixed electron counts on PROFILE.
-  cxr-grid     Configure PROFILE's automatic CXR photon-grid policy.
-  energy-grid  Derive and inspect specialist photon-grid artifacts.
+  list               List the campaigns whose configuration can...
+  reset              Reset selected fields, or all fields owned...
+  set                Set PROFILE fields; validate and...
+  show               Show explicit/effective settings and their...
+  validate           Validate the selected campaign without...
+  preset             Manage named numerics presets that profiles attach by name.
+  adaptive-sampling  Configure adaptive sampling or fixed history counts on PROFILE.
+  cxr-grid           Configure PROFILE's automatic CXR photon-grid policy.
+  energy-grid        Derive and inspect specialist photon-grid artifacts.
 ```
 
 ## `pyrite numerics list`
@@ -48,8 +48,7 @@ Options:
 ## `pyrite numerics reset`
 
 ```text
-Usage: pyrite numerics reset [OPTIONS] PROFILE [cxr-electrons|brem-electrons|line-
-                             electrons|bremsstrahlung-electrons|reflection-
+Usage: pyrite numerics reset [OPTIONS] PROFILE [cxr-histories|brem-histories|reflection-
                              families|maximum-reflections|mosaic-nodes|mosaic-
                              route|energy-model|maximum-fractional-energy-
                              loss|channeling-basis-size|channeling-bloch-
@@ -71,9 +70,9 @@ Usage: pyrite numerics set [OPTIONS] NAME
   Set PROFILE fields; validate and atomically save, or preview with --dry-run.
 
 Options:
-  --cxr-electrons N               Monte Carlo electron histories used to estimate the
+  --cxr-histories N               Monte Carlo electron histories used to estimate the
                                   CXR spectrum.  [x>=1]
-  --brem-electrons N              Monte Carlo electron histories used to estimate
+  --brem-histories N              Monte Carlo electron histories used to estimate
                                   bremsstrahlung.  [x>=1]
   --reflection-families N         Ranked reflection families to resolve.  [x>=1]
   --maximum-reflections N         Cap resolved reflections after family expansion.
@@ -134,8 +133,8 @@ Usage: pyrite numerics preset [OPTIONS] COMMAND [ARGS]...
   Bundled reference presets are read-only; clone one with create NAME --from SOURCE.
   Attach with 'pyrite profile set PROFILE --numerics NAME'. Profile fields override the
   preset; a preset never changes a result's identity unless its effective values change.
-  Precision and line_grid_policy tables are edited in the preset toml or captured by
-  adopt.
+  Adaptive_sampling and cxr_grid_policy tables are edited in the preset toml or captured
+  by adopt.
 
 Options:
   -h, --help  Show this message and exit.
@@ -180,9 +179,9 @@ Usage: pyrite numerics preset create [OPTIONS] NAME
 
 Options:
   --from SOURCE                   Clone SOURCE's fields; options then override them.
-  --cxr-electrons N               Monte Carlo electron histories used to estimate the
+  --cxr-histories N               Monte Carlo electron histories used to estimate the
                                   CXR spectrum.  [x>=1]
-  --brem-electrons N              Monte Carlo electron histories used to estimate
+  --brem-histories N              Monte Carlo electron histories used to estimate
                                   bremsstrahlung.  [x>=1]
   --reflection-families N         Ranked reflection families to resolve.  [x>=1]
   --maximum-reflections N         Cap resolved reflections after family expansion.
@@ -268,9 +267,9 @@ Usage: pyrite numerics preset set [OPTIONS] NAME
   referencing profiles before saving.
 
 Options:
-  --cxr-electrons N               Monte Carlo electron histories used to estimate the
+  --cxr-histories N               Monte Carlo electron histories used to estimate the
                                   CXR spectrum.  [x>=1]
-  --brem-electrons N              Monte Carlo electron histories used to estimate
+  --brem-histories N              Monte Carlo electron histories used to estimate
                                   bremsstrahlung.  [x>=1]
   --reflection-families N         Ranked reflection families to resolve.  [x>=1]
   --maximum-reflections N         Cap resolved reflections after family expansion.
@@ -321,68 +320,69 @@ Options:
   -h, --help  Show this message and exit.
 ```
 
-## `pyrite numerics precision`
+## `pyrite numerics adaptive-sampling`
 
 ```text
-Usage: pyrite numerics precision [OPTIONS] COMMAND [ARGS]...
+Usage: pyrite numerics adaptive-sampling [OPTIONS] COMMAND [ARGS]...
 
-  Inspect and edit PROFILE's electron-count mode: adaptive policy or fixed counts.
+  Inspect and edit PROFILE's history-count mode: adaptive policy or fixed counts.
 
-  Profiles without fixed electron counts or a policy run adaptive by default (target RSE
-  0.05, 200-20000 electrons, blocks of 100, line and bremsstrahlung). Each incoherent
+  Profiles without fixed history counts or a policy run adaptive by default (target RSE
+  0.05, 200-20000 histories, blocks of 100, line and bremsstrahlung). Each incoherent
   case stops when the relative standard error of its line (and optionally
   bremsstrahlung) yield meets the target and its heavy-tail guards pass, or at the
   maximum count flagged statistics-limited. By default one count serves both
   populations. --brem-target-rse enables independent brem-prefix stopping; line
   transport continues until brem finishes. Coherent emission, cascades, physical
-  detectors, GDF beams, grooves and fixed electron counts keep fixed counts.
+  detectors, GDF beams, grooves and fixed history counts keep fixed counts. A history is
+  one transported primary electron.
 
     enable   switch to adaptive: drop fixed counts, optionally customize
     set      customize fields of an adaptive policy
     reset    drop customized fields, or the whole table (back to the default)
     disable  opt out: drop any policy and select fixed counts
 
-  Electron sampling is independent of the line grid; see 'pyrite numerics cxr-grid'.
+  History sampling is independent of the line grid; see 'pyrite numerics cxr-grid'.
 
 Options:
   -h, --help  Show this message and exit.
 
 Commands:
   disable  Opt PROFILE out of adaptive sampling: remove any policy, set fixed counts.
-  enable   Switch PROFILE to adaptive electron counts in one atomic edit.
+  enable   Switch PROFILE to adaptive history counts in one atomic edit.
   reset    Reset optional FIELDs to defaults, or remove the policy when none are...
   set      Create or update PROFILE's adaptive policy.
-  show     Show PROFILE's electron-count mode, its source, blockers and next steps.
+  show     Show PROFILE's history-count mode, its source, blockers and next steps.
 ```
 
-## `pyrite numerics precision disable`
+## `pyrite numerics adaptive-sampling disable`
 
 ```text
-Usage: pyrite numerics precision disable [OPTIONS] NAME
+Usage: pyrite numerics adaptive-sampling disable [OPTIONS] NAME
 
   Opt PROFILE out of adaptive sampling: remove any policy, set fixed counts.
 
-  --cxr-electrons/--brem-electrons replace that count. A count the profile already sets
+  --cxr-histories/--brem-histories replace that count. A count the profile already sets
   is otherwise kept, including a sweep grid. A count it lacks is prompted for on a
   terminal; without a terminal, or with --yes or --dry-run, it takes the full-fidelity
   default (300 line, 150 brem).
 
 Options:
-  --cxr-electrons N   Fixed Monte Carlo electron histories for the CXR spectrum.  [x>=1]
-  --brem-electrons N  Fixed Monte Carlo electron histories for bremsstrahlung.  [x>=1]
+  --cxr-histories N   Fixed Monte Carlo electron histories for the CXR spectrum.  [x>=1]
+  --brem-histories N  Fixed Monte Carlo electron histories for bremsstrahlung.  [x>=1]
   -y, --yes           Use defaults for missing counts; skip confirmations.
   --dry-run           Print proposed TOML diff; write nothing.
   -h, --help          Show this message and exit.
 ```
 
-## `pyrite numerics precision enable`
+## `pyrite numerics adaptive-sampling enable`
 
 ```text
-Usage: pyrite numerics precision enable [OPTIONS] NAME
+Usage: pyrite numerics adaptive-sampling enable [OPTIONS] NAME
 
-  Switch PROFILE to adaptive electron counts in one atomic edit.
+  Switch PROFILE to adaptive history counts in one atomic edit.
 
-  Removes the profile's fixed cxr-electrons/brem-electrons. Without options the default
+  Removes the profile's fixed cxr-histories/brem-histories. Without options the default
   policy applies (no table is written); options write a policy whose unspecified fields
   come from the existing policy, else the default. Refuses, writing nothing, when the
   profile cannot run adaptive (coherent emission, cascades, positrons, a physical
@@ -392,29 +392,29 @@ Usage: pyrite numerics precision enable [OPTIONS] NAME
 Options:
   --brem-target-rse FRACTION      Stop brem independently at this RSE; requires both cxr
                                   and brem observables.  [x>0.0]
-  --brem-min-electrons N          Brem minimum; defaults to --min-electrons. Requires
+  --brem-min-histories N          Brem minimum; defaults to --min-histories. Requires
                                   --brem-target-rse.  [x>=2]
-  --brem-max-electrons N          Brem maximum, at most --max-electrons; defaults to it.
+  --brem-max-histories N          Brem maximum, at most --max-histories; defaults to it.
                                   Requires --brem-target-rse.  [x>=2]
   --target-rse FRACTION           Target relative standard error of each watched yield
                                   (0.05 = 5%).  [x>0.0]
-  --min-electrons N               Smallest count at which the run may stop; a multiple
-                                  of --block-electrons.  [x>=2]
-  --max-electrons N               Count at which the run stops regardless, flagged
+  --min-histories N               Smallest count at which the run may stop; a multiple
+                                  of --block-histories.  [x>=2]
+  --max-histories N               Count at which the run stops regardless, flagged
                                   statistics-limited.  [x>=2]
-  --block-electrons N             Electrons per transport block; the rule is checked at
+  --block-histories N             Histories per transport block; the rule is checked at
                                   block ends.  [x>=1]
   --observable [cxr|brem|line]    Yield that must converge; repeat for both. Replaces
                                   the watched set (a new policy watches line and brem).
-  --max-electron-share FRACTION   Guard: largest share of a yield one electron may hold
+  --max-history-share FRACTION    Guard: largest share of a yield one history may hold
                                   (default 0.05).  [0.0<x<=1.0]
-  --min-effective-electrons N     Guard: effective sample size floor (sum m)^2 / sum m^2
+  --min-effective-histories N     Guard: effective sample size floor (sum m)^2 / sum m^2
                                   (default 100).  [x>=0.0]
   --stability-blocks K            Guard: block ends whose running mean must agree; 0
                                   disables (default 3).  [x>=0]
   --stability-fraction FRACTION   Guard: allowed relative mean drift as a fraction of
                                   the target (default 0.5).  [x>=0.0]
-  --pilot-electrons N             Pilot count that projects the stopping count and skips
+  --pilot-histories N             Pilot count that projects the stopping count and skips
                                   checks until it.  [x>=1]
   --band-ev START,STOP            Monitor band in eV (default: the case's line band).
   --batch-means-band-ev START,STOP
@@ -425,22 +425,23 @@ Options:
   -h, --help                      Show this message and exit.
 ```
 
-## `pyrite numerics precision reset`
+## `pyrite numerics adaptive-sampling reset`
 
 ```text
-Usage: pyrite numerics precision reset [OPTIONS] NAME [target-rse|brem-target-rse|brem-
-                                       min-electrons|brem-max-electrons|min-
-                                       electrons|max-electrons|block-
-                                       electrons|observable|max-electron-share|min-
-                                       effective-electrons|stability-blocks|stability-
-                                       fraction|pilot-electrons|band-ev|batch-means-
-                                       band-ev]...
+Usage: pyrite numerics adaptive-sampling reset [OPTIONS] NAME [target-rse|brem-target-
+                                               rse|brem-min-histories|brem-max-
+                                               histories|min-histories|max-
+                                               histories|block-histories|observable|max-
+                                               history-share|min-effective-
+                                               histories|stability-blocks|stability-
+                                               fraction|pilot-histories|band-ev|batch-
+                                               means-band-ev]...
 
   Reset optional FIELDs to defaults, or remove the policy when none are named.
 
   Removing the policy returns PROFILE to the default adaptive policy unless it cannot
-  run adaptive. Fixed counts are untouched; select them with 'pyrite numerics precision
-  disable'.
+  run adaptive. Fixed counts are untouched; select them with 'pyrite numerics adaptive-
+  sampling disable'.
 
 Options:
   -y, --yes   Skip the 'standard' confirmation prompt.
@@ -448,44 +449,44 @@ Options:
   -h, --help  Show this message and exit.
 ```
 
-## `pyrite numerics precision set`
+## `pyrite numerics adaptive-sampling set`
 
 ```text
-Usage: pyrite numerics precision set [OPTIONS] NAME
+Usage: pyrite numerics adaptive-sampling set [OPTIONS] NAME
 
   Create or update PROFILE's adaptive policy.
 
   Fields left unspecified keep the existing policy's values; a new policy takes them
-  from the default (target RSE 0.05, 200-20000 electrons, blocks of 100, line and brem).
-  A profile with fixed counts is refused; switch it with 'pyrite numerics precision
-  enable'.
+  from the default (target RSE 0.05, 200-20000 histories, blocks of 100, line and brem).
+  A profile with fixed counts is refused; switch it with 'pyrite numerics adaptive-
+  sampling enable'.
 
 Options:
   --brem-target-rse FRACTION      Stop brem independently at this RSE; requires both cxr
                                   and brem observables.  [x>0.0]
-  --brem-min-electrons N          Brem minimum; defaults to --min-electrons. Requires
+  --brem-min-histories N          Brem minimum; defaults to --min-histories. Requires
                                   --brem-target-rse.  [x>=2]
-  --brem-max-electrons N          Brem maximum, at most --max-electrons; defaults to it.
+  --brem-max-histories N          Brem maximum, at most --max-histories; defaults to it.
                                   Requires --brem-target-rse.  [x>=2]
   --target-rse FRACTION           Target relative standard error of each watched yield
                                   (0.05 = 5%).  [x>0.0]
-  --min-electrons N               Smallest count at which the run may stop; a multiple
-                                  of --block-electrons.  [x>=2]
-  --max-electrons N               Count at which the run stops regardless, flagged
+  --min-histories N               Smallest count at which the run may stop; a multiple
+                                  of --block-histories.  [x>=2]
+  --max-histories N               Count at which the run stops regardless, flagged
                                   statistics-limited.  [x>=2]
-  --block-electrons N             Electrons per transport block; the rule is checked at
+  --block-histories N             Histories per transport block; the rule is checked at
                                   block ends.  [x>=1]
   --observable [cxr|brem|line]    Yield that must converge; repeat for both. Replaces
                                   the watched set (a new policy watches line and brem).
-  --max-electron-share FRACTION   Guard: largest share of a yield one electron may hold
+  --max-history-share FRACTION    Guard: largest share of a yield one history may hold
                                   (default 0.05).  [0.0<x<=1.0]
-  --min-effective-electrons N     Guard: effective sample size floor (sum m)^2 / sum m^2
+  --min-effective-histories N     Guard: effective sample size floor (sum m)^2 / sum m^2
                                   (default 100).  [x>=0.0]
   --stability-blocks K            Guard: block ends whose running mean must agree; 0
                                   disables (default 3).  [x>=0]
   --stability-fraction FRACTION   Guard: allowed relative mean drift as a fraction of
                                   the target (default 0.5).  [x>=0.0]
-  --pilot-electrons N             Pilot count that projects the stopping count and skips
+  --pilot-histories N             Pilot count that projects the stopping count and skips
                                   checks until it.  [x>=1]
   --band-ev START,STOP            Monitor band in eV (default: the case's line band).
   --batch-means-band-ev START,STOP
@@ -496,12 +497,12 @@ Options:
   -h, --help                      Show this message and exit.
 ```
 
-## `pyrite numerics precision show`
+## `pyrite numerics adaptive-sampling show`
 
 ```text
-Usage: pyrite numerics precision show [OPTIONS] NAME
+Usage: pyrite numerics adaptive-sampling show [OPTIONS] NAME
 
-  Show PROFILE's electron-count mode, its source, blockers and next steps.
+  Show PROFILE's history-count mode, its source, blockers and next steps.
 
 Options:
   -o, --output [table|json]  Output format; only json is a stable automation contract.

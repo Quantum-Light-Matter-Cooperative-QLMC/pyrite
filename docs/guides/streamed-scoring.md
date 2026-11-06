@@ -21,7 +21,7 @@ from pyrite.config import FixedSampling, KernelTuning
 from pyrite.detectors import EnergyBins
 
 numerics = pr.Numerics(
-    sampling=FixedSampling(cxr_electrons=64_000, brem_electrons=64_000),
+    sampling=FixedSampling(cxr_histories=64_000, brem_histories=64_000),
     # Streaming needs a final line grid: give explicit energy bins.
     energy_bins=EnergyBins(
         cxr=np.linspace(8000.0, 9000.0, 400), brem=np.arange(1000.0, 300001.0, 1000.0)
