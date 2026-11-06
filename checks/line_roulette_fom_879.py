@@ -71,7 +71,7 @@ def _run(args, seed, floor):
         patch.object(LineScreen, "__init__", init),
         patch("pyrite.montecarlo.runner.case_driver.check_cxr_truncation", check),
     ):
-        out = runner.run_case(case, transport_core=args.core)
+        out = runner.run_case(case, record_timing=True, transport_core=args.core)
     wall = time.perf_counter() - start
     energy = np.asarray(out["E_grid"], dtype=float)
     spec = np.asarray(out["spec"], dtype=float)
@@ -83,6 +83,8 @@ def _run(args, seed, floor):
         sample, record = masses[-1], None
     return {
         "wall_s": wall,
+        "transport_s": out.get("_t_transport"),
+        "spectrum_s": out.get("_t_spectrum"),
         "sample": sample,
         "spec_yield": float(np.trapezoid(spec, energy)),
         "spec": spec,
@@ -135,6 +137,8 @@ def main():
                     "seed": seed,
                     "floor": arm,
                     "wall_s": run["wall_s"],
+                    "transport_s": run["transport_s"],
+                    "spectrum_s": run["spectrum_s"],
                     "rse": _rse(run["sample"]),
                     "spec_yield": run["spec_yield"],
                     "spec_yield_ratio_to_analog": run["spec_yield"] / results[None]["spec_yield"],
