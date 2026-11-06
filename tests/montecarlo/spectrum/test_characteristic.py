@@ -707,3 +707,20 @@ def test_fused_weighted_transmission_is_bitwise_the_mean_transmission_chain():
         return
     chain = path[:, None] * sigma * mean_transmission(t0, t1, xp=xp)
     np.testing.assert_array_equal(characteristic._to_cpu(one), characteristic._to_cpu(chain))
+
+
+def test_segment_sum_matches_column_sum_to_float64_reordering():
+    """The cuBLAS column sum only reorders the float64 segment sum (#1005)."""
+    from pyrite.montecarlo.spectrum import _characteristic_fused as fused
+
+    rng = np.random.default_rng(11)
+    weighted = xp.asarray(rng.uniform(0.0, 1e-20, (50000, 41)))
+    summed = fused.segment_sum(weighted)
+    if not _is_cupy():
+        assert summed is None
+        return
+    reference = characteristic._to_cpu(xp.sum(weighted, axis=0))
+    np.testing.assert_allclose(characteristic._to_cpu(summed), reference, rtol=1e-12, atol=0.0)
+    np.testing.assert_array_equal(
+        characteristic._to_cpu(fused.segment_sum(weighted)), characteristic._to_cpu(summed)
+    )

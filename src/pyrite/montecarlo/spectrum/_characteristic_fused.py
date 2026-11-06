@@ -10,7 +10,8 @@ Each kernel replays its chain in the original order. Float64 operations that
 ran as separate CuPy kernels are explicit round-to-nearest intrinsics, so the
 compiler cannot contract a multiply-add across what used to be two launches;
 the interpolation body is CuPy 14's ``cupy_interp`` body verbatim. The results
-are therefore bit-for-bit those of the chains they replace. Every entry point
+are therefore bit-for-bit those of the chains they replace; only
+:func:`segment_sum` reorders a float64 sum. Every entry point
 returns ``None`` off the CuPy path or for unexpected dtypes, and the caller
 then runs its original chain.
 """
@@ -174,3 +175,16 @@ def weighted_transmission(tau_start, tau_end, path_cm, effective_sigma):
     if kernel is None:
         return None
     return kernel(tau_start, tau_end, path_cm[:, None], effective_sigma)
+
+
+def segment_sum(weighted):
+    """Column sums of a ``(n_segment, n_line)`` CuPy float64 array, or ``None``.
+
+    CuPy's ``sum(axis=0)`` over a few dozen long columns is a poorly parallel
+    reduction; a ones-vector matrix product reads the array once through
+    cuBLAS. Only the float64 summation order differs (deterministic per
+    shape), far below the float32 line yields it accumulates into.
+    """
+    if not _cupy_arrays(weighted) or weighted.dtype != np.float64 or weighted.ndim != 2:
+        return None
+    return xp.ones(int(weighted.shape[0]), dtype=np.float64) @ weighted

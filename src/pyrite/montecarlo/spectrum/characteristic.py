@@ -828,7 +828,8 @@ def _accumulate_line_yields(
             if weighted is None:
                 transmission = mean_transmission(tau_start, tau_end, xp=xp)
                 weighted = path_cm[:, None] * effective_line_sigma_cm2 * transmission
-            line_yields[lines] += xp.sum(weighted, axis=0)
+            summed = _characteristic_fused.segment_sum(weighted)
+            line_yields[lines] += xp.sum(weighted, axis=0) if summed is None else summed
     return line_yields
 
 
