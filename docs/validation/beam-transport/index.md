@@ -36,6 +36,7 @@ positron-brems-scaling
 heitler-annihilation
 positron-annihilation-at-rest
 elsepa-muffin-tin-inputs
+elsepa-vendor-reference
 inelastic-angular-deflection
 penelope-shell-oscillators
 penelope-shell-oscillators-verification
