@@ -114,8 +114,9 @@ def mixed_elastic_tables(elsepa_group, c1):
     Returns ``(hard_fraction, t1_lo, t1_hi, t2_lo, t2_cross, t2_hi)``, indexed
     like the group's flat node rows; row ``k`` describes the panel from node
     ``k`` to ``k + 1`` of its element. The hard fraction comes from the lower
-    node, whose first moment is the larger one, so the mean deflection per hard
-    step stays near or below ``c1`` across the panel:
+    node, whose first moment is usually the larger one (heavy elements below
+    about 1 keV are the exception), so the mean deflection per hard step stays
+    near or below ``c1`` across the panel:
     ``hard_fraction_k = min(1, 2 <mu>_k / c1)``.
 
     Validation: mixed-elastic-split

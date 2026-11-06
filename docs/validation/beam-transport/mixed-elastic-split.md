@@ -1,7 +1,7 @@
 # `mixed-elastic-split`
 
 ```{note}
-This page records verification of the row-start hazard at 861642bbf. The core has since moved to thinning, which has not had fresh-context verification.
+This page records verification of the row-start hazard at 861642bbf. The core has since moved to thinning; see the [re-verification at e25dede8b](mixed-elastic-reverification.md).
 ```
 
 ## Scope and independence
@@ -97,7 +97,7 @@ Each run used the real per-electron core and released tables, with a monkeypatch
 
 The first three rows isolate the cause: the bias is absent without a crossing. A beam energy on a table node, such as 30, 100, 200 or 300 keV, always crosses at its first row.
 
-Hard-event counts against the exact $\int\Sigma f_h\,ds$ agree with $\Delta N$ (Si, 30 to 24 keV, $C_1=C_2=0.05$, two crossings, about 15.4 events):
+Hard-event counts against the exact $\int\Sigma f_h\,ds$ agree with $\Delta N$ (Si, 30 to 24 keV, $C_1=C_2=0.05$, two crossings, about 18.7 events):
 
 | Run | Hard events / exact integral |
 |---|---|

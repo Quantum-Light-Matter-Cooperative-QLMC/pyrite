@@ -1,7 +1,7 @@
 # `mixed-elastic-hinge`
 
 ```{note}
-This page records verification of the row-start hazard at 861642bbf. The core has since moved to thinning, which has not had fresh-context verification.
+This page records verification of the row-start hazard at 861642bbf. The core has since moved to thinning; see the [re-verification at e25dede8b](mixed-elastic-reverification.md).
 ```
 
 ## Scope and independence

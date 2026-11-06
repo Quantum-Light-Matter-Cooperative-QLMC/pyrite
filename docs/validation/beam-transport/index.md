@@ -54,6 +54,7 @@ mixed-elastic-transport
 mixed-elastic-split
 mixed-elastic-soft-moments
 mixed-elastic-hinge
+mixed-elastic-reverification
 sbethe-atomic-shell-inputs
 sbethe-atomic-shell-inputs-verification
 gos-core-edge
