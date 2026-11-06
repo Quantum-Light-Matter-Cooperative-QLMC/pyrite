@@ -327,7 +327,7 @@ def _brem_for_case(case, E_brem):
                 **runner._case_radiative_kwargs(case),
             )
             if case.get("inelastic_model") is not None or case.get("radiative_model") is not None
-            else {}
+            else {"radiative_model": "uncoupled"}
         ),
     )
     return runner._brem_wide_from_segments(

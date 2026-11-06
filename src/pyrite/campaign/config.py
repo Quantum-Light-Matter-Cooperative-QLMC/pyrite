@@ -534,6 +534,8 @@ def gate_cases_by_penetration(
                 composition=ref["composition"],
                 layers=abs_layers,
                 seed=seed,
+                # An explicit screening proxy, not a fallback from coupled physics.
+                radiative_model="uncoupled",
                 **_case_elastic_kwargs(ref),
             )
             fraction = float(segs["n_transmitted"]) / Ne
