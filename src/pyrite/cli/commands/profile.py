@@ -24,6 +24,7 @@ from pyrite.cli.commands import (
     _profile_detectors,
     _profile_filters,
     _profile_presets,
+    _profile_shared,
     _profile_show,
 )
 from pyrite.cli.commands._profile_members import (
@@ -84,6 +85,10 @@ _NUMERICS_FIELD_NAMES = {
     "inelastic-cutoff-ev": "inelastic_cutoff_eV",
     "secondary-threshold-ev": "secondary_threshold_eV",
     "elastic-model": "elastic_model",
+    "transport-mode": "transport_mode",
+    "mixed-c1": "mixed_c1",
+    "mixed-c2": "mixed_c2",
+    "mixed-maximum-step-um": "mixed_max_step_um",
     "bremsstrahlung-model": "bremsstrahlung_model",
     "radiative-model": "radiative_model",
     "radiative-cutoff-ev": "radiative_cutoff_eV",
@@ -474,6 +479,7 @@ def numerics_show_command(name, json_output):
         "elastic-only deflection."
     ),
 )
+@_profile_shared.mixed_transport_options
 @click.option(
     "--shell-ionization-model",
     type=click.Choice(_SHELL_IONIZATION_MODEL_VALUES),

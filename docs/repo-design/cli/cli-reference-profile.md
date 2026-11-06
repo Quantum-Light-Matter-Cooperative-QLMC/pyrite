@@ -496,13 +496,13 @@ Usage: pyrite profile numerics reset [OPTIONS] NAME [cxr-trials|brem-trials|line
                                      families|maximum-reflections|mosaic-nodes|mosaic-
                                      route|straggling|energy-model|maximum-fractional-
                                      energy-loss|inelastic-model|inelastic-cutoff-
-                                     ev|secondary-threshold-ev|elastic-
-                                     model|bremsstrahlung-model|radiative-
-                                     model|radiative-cutoff-ev|pair-production-
-                                     model|positron-transport|atomic-electron-
-                                     deflection|channeling-model|channeling-
-                                     axial|transition-radiation|shell-ionization-
-                                     model|channeling-plane|channeling-basis-
+                                     ev|secondary-threshold-ev|elastic-model|transport-
+                                     mode|mixed-c1|mixed-c2|mixed-maximum-step-
+                                     um|bremsstrahlung-model|radiative-model|radiative-
+                                     cutoff-ev|pair-production-model|positron-
+                                     transport|atomic-electron-deflection|channeling-
+                                     model|channeling-axial|transition-radiation|shell-
+                                     ionization-model|channeling-plane|channeling-basis-
                                      size|channeling-bloch-cells|channeling-dz-
                                      ang|channeling-zone-max-ang]...
 
@@ -592,6 +592,19 @@ Options:
                                   share above W_c is removed under shell-soft-hard,
                                   which needs elsepa); none keeps elastic-only
                                   deflection.
+  --transport-mode [single-scattering|mixed]
+                                  Elastic transport: single-scattering (default)
+                                  simulates every event; mixed aggregates small-angle
+                                  events into a random hinge (requires elsepa and
+                                  midpoint; refused for coherent emission, temporal
+                                  profiles, transition radiation, channeling, photon
+                                  transport and grooved targets).
+  --mixed-c1 FRACTION             Mean soft deflection per hard step under mixed
+                                  transport (default 0.05).  [0.0<=x<=0.2]
+  --mixed-c2 FRACTION             Mean fractional soft energy loss per step under mixed
+                                  transport (default 0.05).  [0.0<=x<=0.2]
+  --mixed-maximum-step-um UM      Absolute step limit under mixed transport (default: a
+                                  tenth of the layer thickness).  [x>0.0]
   --shell-ionization-model [eedl|bote-salvat]
                                   Characteristic-line primary vacancies: eedl (default)
                                   subshell cross sections, or the opt-in bote-salvat

@@ -61,6 +61,7 @@ in human output. The JSON payload retains its existing source spellings.
 | `radiative_model`, `radiative_cutoff_eV` | `--radiative-model`, `--radiative-cutoff-ev` | |
 | `pair_production_model`, `positron_transport` | `--pair-production-model`, `--positron-transport` | |
 | `atomic_electron_deflection` | `--atomic-electron-deflection` | |
+| `transport_mode`, `mixed_c1`, `mixed_c2`, `mixed_max_step_um` | `--transport-mode`, `--mixed-c1`, `--mixed-c2`, `--mixed-maximum-step-um` | parameters apply only under `mixed` |
 
 The built-in defaults are `bremsstrahlung_model="bremslib"` and
 `radiative_model="bremslib-soft-hard"` with `radiative_cutoff_eV=1000`. Run

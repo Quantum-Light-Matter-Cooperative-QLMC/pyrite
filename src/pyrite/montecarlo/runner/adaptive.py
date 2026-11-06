@@ -572,6 +572,10 @@ def case_transport_core(case, requested="auto"):
 
     from ..transport import resolve_transport_core
 
+    if case.get("transport_mode") == "mixed":
+        if requested == "cuda":
+            raise ValueError("transport_mode='mixed' is not implemented on the CUDA core yet")
+        return "per-electron"
     if case.get("adaptive_precision") is not None:
         return adaptive_transport_core(
             case, Precision.from_dict(case["adaptive_precision"]), requested

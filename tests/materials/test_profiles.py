@@ -1077,6 +1077,22 @@ def test_default_elsepa_model_forks_identity_and_case_payload_from_mott():
         build_cases(sweep, 4, 4, elastic_model="nope")
 
 
+def test_mixed_transport_forks_identity_by_parameter():
+    """#894: the default adds no identity key; mode and parameters each fork it."""
+    settings = default_settings()
+    sweep = material_sweep("hopg")
+    digests = {
+        dataset_identity("hopg", "full", variant, sweep)["parameter_sha256"]
+        for variant in (
+            settings,
+            replace(settings, transport_mode="mixed"),
+            replace(settings, transport_mode="mixed", mixed_c1=0.1),
+            replace(settings, transport_mode="mixed", mixed_max_step_um=5.0),
+        )
+    }
+    assert len(digests) == 4
+
+
 def test_atomic_electron_deflection_forks_identity_and_none_restores_it():
     """#317 is on by default; "none" omits its key; pins include #187’s Snell line marker."""
     settings = default_settings()

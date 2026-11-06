@@ -18,6 +18,7 @@ EmissionMode = Literal["incoherent", "coherent", "both"]
 
 import numpy as np
 
+from .._mixed_elastic_policy import validate_transport_mode
 from .._numerics import (
     HISTORICAL_SELECTOR_OMISSIONS,
     PHYSICS_FIELDS,
@@ -140,6 +141,9 @@ class Settings:
     atomic_electron_deflection
         ``"kawrakow"`` (default) atomic-electron angular deflection as a
         ``Z(Z + xi)`` elastic-rate correction, or ``"none"``.
+    transport_mode, mixed_c1, mixed_c2, mixed_max_step_um
+        Opt-in mixed elastic transport and its parameters (#894); see
+        :class:`~pyrite.Physics`.
     channeling_model, channeling_plane
         Opt-in planar entrance zone and its Miller indices; defaults to off.
     transition_radiation
@@ -180,6 +184,10 @@ class Settings:
     pair_production_model: Literal["penelope-2024"] | None = None
     positron_transport: bool = False
     atomic_electron_deflection: Literal["kawrakow", "none"] = "kawrakow"
+    transport_mode: Literal["single-scattering", "mixed"] = "single-scattering"
+    mixed_c1: float | None = None
+    mixed_c2: float | None = None
+    mixed_max_step_um: float | None = None
     channeling_model: Literal["off", "planar", "axial"] = "off"
     channeling_plane: tuple[int, int, int] | None = None
     channeling_axial: dict[str, object] | None = None
@@ -250,6 +258,9 @@ class Settings:
             self.positron_transport,
         )
         validate_atomic_electron_deflection(self.atomic_electron_deflection)
+        validate_transport_mode(
+            self.transport_mode, self.mixed_c1, self.mixed_c2, self.mixed_max_step_um
+        )
         validate_shell_ionization_model(self.shell_ionization_model)
         if (
             self.channeling_model != "off"

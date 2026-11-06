@@ -358,3 +358,144 @@ def test_compound_rates_add_over_elements():
 
     np.testing.assert_array_equal(limit["L_ang"], detailed["L_ang"])
     assert np.any(mixed["event_kind"] == EVENT_SOFT_HINGE)
+
+
+def _mixed_physics(**kwargs):
+    from pyrite import Physics
+
+    return Physics(transport_mode="mixed", **kwargs)
+
+
+def test_physics_default_adds_no_case_keys():
+    from pyrite import Physics
+    from pyrite._mixed_elastic_policy import mixed_case_keys
+
+    physics = Physics()
+    assert physics.transport_mode == "single-scattering"
+    assert (
+        mixed_case_keys(
+            physics.transport_mode, physics.mixed_c1, physics.mixed_c2, physics.mixed_max_step_um
+        )
+        == {}
+    )
+
+
+def test_physics_mixed_resolves_default_parameters():
+    from pyrite._mixed_elastic_policy import mixed_case_keys
+
+    physics = _mixed_physics(mixed_max_step_um=2.0)
+    assert mixed_case_keys(
+        physics.transport_mode, physics.mixed_c1, physics.mixed_c2, physics.mixed_max_step_um
+    ) == {
+        "transport_mode": "mixed",
+        "mixed_c1": 0.05,
+        "mixed_c2": 0.05,
+        "mixed_max_step_um": 2.0,
+    }
+
+
+@pytest.mark.parametrize(
+    "kwargs, message",
+    [
+        ({"mixed_c1": 0.1}, "transport_mode='mixed'"),
+        ({"transport_mode": "condensed"}, "transport_mode must be"),
+        ({"transport_mode": "mixed", "mixed_c1": 0.3}, "mixed_c1"),
+        ({"transport_mode": "mixed", "mixed_c2": -0.1}, "mixed_c2"),
+        ({"transport_mode": "mixed", "mixed_max_step_um": 0.0}, "mixed_max_step_um"),
+        ({"transport_mode": "mixed", "elastic_model": "mott"}, "elastic_model='elsepa'"),
+    ],
+)
+def test_physics_refuses_invalid_mixed_settings(kwargs, message):
+    from pyrite import Physics
+
+    with pytest.raises(ValueError, match=message):
+        Physics(**kwargs)
+
+
+def _mixed_scene():
+    import pyrite as pr
+
+    # Thick: on a target thin against the hard mean free path, the layer step
+    # limit makes mixed transport cost more rows than detailed scattering.
+    beam = pr.Beam(
+        energy_keV=1000.0, transverse=pr.beams.Spot(), longitudinal=pr.beams.PointBunch()
+    )
+    target = pr.geometry.Slab(
+        "silicon", thickness_ang=1_000_000.0, footprint=pr.geometry.Footprint(5.0, 5.0)
+    )
+    return pr.Scene(beam, target, pr.Detector())
+
+
+def _lowered(physics=None):
+    import numpy as np
+
+    import pyrite as pr
+    from pyrite import api
+    from pyrite.detectors import EnergyBins
+
+    grid = np.array([1000.0, 1050.0])
+    numerics = pr.Numerics(cxr_trials=1, brem_trials=1, energy_bins=EnergyBins(cxr=grid, brem=grid))
+    return api.build_case(_mixed_scene(), numerics, physics=physics)
+
+
+def test_default_case_carries_no_mixed_keys():
+    case = _lowered()
+    assert "transport_mode" not in case
+    assert not any(key.startswith("mixed_") for key in case)
+
+
+def test_mixed_case_records_identity_and_routes_to_per_electron():
+    from pyrite.montecarlo.runner.adaptive import case_transport_core
+    from pyrite.montecarlo.runner.case_tables import _case_elastic_kwargs
+
+    case = _lowered(_mixed_physics(mixed_c1=0.1))
+    assert case["transport_mode"] == "mixed"
+    assert (case["mixed_c1"], case["mixed_c2"]) == (0.1, 0.05)
+    assert "mixed_max_step_um" not in case
+    assert _case_elastic_kwargs(case)["mixed_elastic"] == (0.1, 0.05, None)
+    assert case_transport_core(case, "auto") == "per-electron"
+
+
+@pytest.mark.parametrize(
+    "overrides, message",
+    [
+        ({"mixed_c1": 0.5}, "mixed_c1"),
+        ({"transport_mode": "condensed"}, "transport_mode must be"),
+        ({"coherent_emission": True}, "coherent emission"),
+        ({"temporal_profile": True}, "temporal profiles"),
+        ({"groove_spacing_ang": 100.0}, "grooved"),
+    ],
+)
+def test_case_refuses_ineligible_mixed_combinations(overrides, message):
+    from dataclasses import replace
+
+    case = _lowered(_mixed_physics())
+    with pytest.raises(ValueError, match=message):
+        replace(case, **overrides)
+
+
+def test_public_mixed_physics_cuts_rows():
+    import pyrite as pr
+    from pyrite.campaign.trajectories import simulate_trajectories
+
+    scene = _mixed_scene()
+    numerics = pr.Numerics(cxr_trials=40, brem_trials=40, seed=7)
+    rows = [
+        simulate_trajectories(scene.beam, scene.target, physics=physics, numerics=numerics)[
+            "E_end_keV"
+        ].size
+        for physics in (pr.Physics(), _mixed_physics())
+    ]
+    assert rows[1] < rows[0]
+
+
+def test_mixed_case_records_model_marker_and_default_does_not():
+    from pyrite._physics_provenance import resolved_physics_view
+
+    markers = dict(
+        resolved_physics_view(_lowered(_mixed_physics()), table_markers={}).model_markers
+    )
+    assert markers["mixed_elastic_model"] == "penelope-random-hinge.v1"
+    assert "mixed_elastic_model" not in dict(
+        resolved_physics_view(_lowered(), table_markers={}).model_markers
+    )

@@ -12,62 +12,25 @@ With ``C1 = 0`` nothing is soft, no hinge draws are consumed, and the core
 reproduces detailed transport bit for bit.
 """
 
-from typing import NamedTuple
-
 import numpy as np
 from numba import njit
 
+from ..._mixed_elastic_policy import (
+    MixedElasticParameters as MixedElasticParameters,
+)
+from ..._mixed_elastic_policy import (
+    validate_mixed_parameters as validate_mixed_parameters,
+)
 from .core_geometry import _rotate_direction_scalar
 from .kinematics import _SM64_ONE, _stream_uniform_scalar
 from .scattering import _elsepa_bracket
 
-#: PENELOPE's accepted range of C1 and C2 (PENELOPE-2024, Sec. 4.4).
-MIXED_PARAMETER_MAX = 0.2
-MIXED_DEFAULT_C1 = 0.05
-MIXED_DEFAULT_C2 = 0.05
 #: PENELOPE's limit on a step, in hard mean free paths (Sec. 4.4).
 MIXED_MAX_STEP_HARD_MFP = 4.0
 #: Default step limit as a fraction of the layer thickness, from PENELOPE's
 #: recipe of one tenth of the expected track length (Sec. 4.4.1).
 MIXED_MAX_STEP_LAYER_FRACTION = 0.1
 _GAUSS_NODES, _GAUSS_WEIGHTS = np.polynomial.legendre.leggauss(6)
-
-
-class MixedElasticParameters(NamedTuple):
-    """Resolved parameters of ``transport_mode="mixed"``.
-
-    ``c1`` bounds the mean deflection ``1 - <cos chi>`` per hard step, ``c2``
-    the mean fractional soft energy loss per step, and ``max_step_um`` is an
-    optional absolute step limit [um].
-    """
-
-    c1: float = MIXED_DEFAULT_C1
-    c2: float = MIXED_DEFAULT_C2
-    max_step_um: float | None = None
-
-
-def validate_mixed_parameters(c1, c2, max_step_um=None):
-    """Refuse parameters outside the accepted scheme; ``c1 = 0`` is detailed.
-
-    Validation: mixed-elastic-split
-    """
-    for name, value in (("mixed_c1", c1), ("mixed_c2", c2)):
-        if (
-            isinstance(value, bool)
-            or not isinstance(value, (int, float))
-            or not np.isfinite(value)
-            or not 0.0 <= value <= MIXED_PARAMETER_MAX
-        ):
-            raise ValueError(f"{name} must be a number in [0, {MIXED_PARAMETER_MAX}]")
-    if c1 > 0.0 and c2 <= 0.0:
-        raise ValueError("mixed_c2 must be positive when mixed_c1 is positive")
-    if max_step_um is not None and (
-        isinstance(max_step_um, bool)
-        or not isinstance(max_step_um, (int, float))
-        or not np.isfinite(max_step_um)
-        or max_step_um <= 0.0
-    ):
-        raise ValueError("mixed_max_step_um must be finite and positive")
 
 
 def layer_step_limits_ang(L_top, L_bot, max_step_um=None):

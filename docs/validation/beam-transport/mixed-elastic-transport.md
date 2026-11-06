@@ -121,3 +121,12 @@ empirical-Bernstein intervals is still to be run.
 
 All differences are within 1.6 standard errors. Row reductions are 12.6×, 22×
 and 8×.
+
+## Thin targets
+
+The layer step limit bounds every step by a tenth of the layer thickness. A
+target thin against the hard mean free path therefore takes more rows under
+mixed transport than under detailed scattering: Si at 100 keV and 1 um took
+about 27 rows per history against 15 (40 histories, local, no job ID). Mixed
+transport pays off only when detailed scattering would take many more than the
+roughly twenty rows that the limit forces per layer.

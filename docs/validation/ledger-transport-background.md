@@ -42,7 +42,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `mixed-elastic-split`
 
 - **Claim:** `transport_mode="mixed"` splits each element's ELSEPA angular law at a quantile cutoff frozen per energy panel, with hard fraction `f_h = min(1, 2<mu>_k/C1)` from the panel's lower node; hard events run at `Sigma(E) f_h` and draw from the quantile interval `(1-f_h, 1)` of the detailed sampler, and `C1 = 0` is detailed transport bit for bit
-- **Code:** `montecarlo/transport/mixed_elastic.py::{validate_mixed_parameters,mixed_elastic_tables,_mixed_hard_rate_scalar,_mixed_hard_quantile_scalar}`; `montecarlo/transport/cores.py::make_cpu_transport_core`
+- **Code:** `_mixed_elastic_policy.py::validate_mixed_parameters`; `montecarlo/transport/mixed_elastic.py::{mixed_elastic_tables,_mixed_hard_rate_scalar,_mixed_hard_quantile_scalar}`; `montecarlo/transport/cores.py::make_cpu_transport_core`
 - **Source:** PENELOPE-2024, NEA/MBDAV/R(2024)1, Eqs. 4.9–4.10 and 4.33–4.37; [derivation](beam-transport/mixed-elastic-transport.md)
 - **Equation:** `lambda_h = max(lambda_el, C1 lambda_1)`, `lambda_1 = lambda_el/(2<mu>)`, `xi_c = 1 - lambda_el/lambda_h`, `mu = P^-1(xi_c + (1-xi_c) u)`
 - **Assumptions:** per-element split of an additive compound rate; the frozen panel cutoff trades a jump in the hard rate at nodes for an exact partition between them; the C2 energy limit truncates the step and leaves the hard rate alone, unlike Eq. 4.85
