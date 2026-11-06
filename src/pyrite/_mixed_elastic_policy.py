@@ -15,6 +15,12 @@ MIXED_ELASTIC_MODEL = "penelope-random-hinge.v1"
 MIXED_PARAMETER_MAX = 0.2
 MIXED_DEFAULT_C1 = 0.05
 MIXED_DEFAULT_C2 = 0.05
+#: Urban losses have no upper bound, so they leave a step's hazard window; the
+#: re-verification at e25dede8b measured the resulting bias and did not isolate it.
+MIXED_URBAN_REFUSAL = (
+    "transport_mode='mixed' does not support Urban straggling yet; "
+    "use inelastic_model='shell-soft-hard' or turn straggling off"
+)
 
 
 class MixedElasticParameters(NamedTuple):

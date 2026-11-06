@@ -570,7 +570,7 @@ class Case(Mapping[str, Any]):
             raise ValueError("transport_mode must be absent or 'mixed'")
         if self.mixed_c1 is _ABSENT or self.mixed_c2 is _ABSENT:
             raise ValueError("transport_mode='mixed' needs mixed_c1 and mixed_c2")
-        from .._mixed_elastic_policy import validate_mixed_parameters
+        from .._mixed_elastic_policy import MIXED_URBAN_REFUSAL, validate_mixed_parameters
 
         validate_mixed_parameters(
             self.mixed_c1,
@@ -581,6 +581,8 @@ class Case(Mapping[str, Any]):
             raise ValueError(
                 "transport_mode='mixed' requires elastic_model='elsepa' and energy_model='midpoint'"
             )
+        if self.straggling is not _ABSENT and self.inelastic_model is _ABSENT:
+            raise ValueError(MIXED_URBAN_REFUSAL)
         refused = {
             "coherent_emission": "coherent emission",
             "temporal_profile": "temporal profiles",

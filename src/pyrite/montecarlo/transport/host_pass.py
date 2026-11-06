@@ -50,7 +50,7 @@ from .host_memory import GrowingHostRows, admit_host_allocation, reserve_or_rais
 from .kinematics import _sample_bunch_offsets, stream_keys
 from .layer_tables import build_layer_tables
 from .lut import build_transport_energy_lut
-from .mixed_elastic import mixed_core_args
+from .mixed_elastic import MIXED_URBAN_REFUSAL, mixed_core_args
 from .precision import resolve_transport_precision, validate_transport_precision
 from .scattering import check_elsepa_coverage, check_mott_coverage
 from .stopping import (
@@ -361,6 +361,8 @@ def _refuse_ineligible_mixed(p, transport_core):
             "transport_mode='mixed' runs only on the ungrooved per-electron core with "
             "elastic_model='elsepa', energy_model='midpoint' and no detector-cone splitting"
         )
+    if p.mixed_elastic is not None and p.straggling and p.inelastic_model != "shell-soft-hard":
+        raise ValueError(MIXED_URBAN_REFUSAL)
 
 
 def _checked_core(p, launch, electron_start):
