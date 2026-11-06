@@ -41,6 +41,7 @@ SWITCHES = (
     "sec_on",
     "rad_on",
     "cont_on",
+    "mixed_on",
 )
 # Secondary directions stay runtime-switched: see `TransportKernelSwitches`.
 SPECIALIZED = tuple(name for name in SWITCHES if name != "sec_on")

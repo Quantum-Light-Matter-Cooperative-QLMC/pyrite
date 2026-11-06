@@ -50,7 +50,7 @@ from .host_memory import GrowingHostRows, admit_host_allocation, reserve_or_rais
 from .kinematics import _sample_bunch_offsets, stream_keys
 from .layer_tables import build_layer_tables
 from .lut import build_transport_energy_lut
-from .mixed_elastic import MIXED_URBAN_REFUSAL, mixed_core_args
+from .mixed_elastic import MIXED_URBAN_REFUSAL, mixed_core_args, mixed_device_args
 from .precision import resolve_transport_precision, validate_transport_precision
 from .scattering import check_elsepa_coverage, check_mott_coverage
 from .stopping import (
@@ -351,29 +351,33 @@ def _validated_controls(p, launch, electron_start):
 def _refuse_ineligible_mixed(p, transport_core):
     """Mixed elastic transport has one specialization (#894)."""
     if p.mixed_elastic is not None and (
-        transport_core != "per-electron"
+        transport_core not in ("per-electron", "cuda")
         or p.groove is not None
         or p.elastic_model != "elsepa"
         or p.energy_model != "midpoint"
         or p._cone_split is not None
     ):
         raise ValueError(
-            "transport_mode='mixed' runs only on the ungrooved per-electron core with "
+            "transport_mode='mixed' runs only on the ungrooved per-electron and CUDA cores with "
             "elastic_model='elsepa', energy_model='midpoint' and no detector-cone splitting"
         )
     if p.mixed_elastic is not None and p.straggling and p.inelastic_model != "shell-soft-hard":
         raise ValueError(MIXED_URBAN_REFUSAL)
 
 
+def _resolved_core(p):
+    """``transport_core`` for this pass; mixed elastic has no lockstep specialization."""
+    resolved = resolve_transport_core(p.transport_core, p.Ne, p.groove)
+    if p.mixed_elastic is not None and p.transport_core == "auto" and resolved != "cuda":
+        return "per-electron"
+    return resolved
+
+
 def _checked_core(p, launch, electron_start):
     """Resolved transport core, checked against groove, blocks and device rows."""
     transport_core = p.transport_core
     if launch is None:  # a launched generation names its per-electron core
-        transport_core = (
-            "per-electron"
-            if p.mixed_elastic is not None and transport_core == "auto"
-            else resolve_transport_core(transport_core, p.Ne, p.groove)
-        )
+        transport_core = _resolved_core(p)
     if transport_core != "lockstep" and p.groove is not None:
         raise ValueError("grooved transport is only implemented for the lockstep core")
     if p._cone_split is not None and (
@@ -712,7 +716,7 @@ def _per_electron_core(t, lut):
     )
     if t.inputs._cone_split is not None:
         return cone_split_core(inelastic=shell_mode, radiative=t.controls.radiative_mode), np
-    if t.inputs.mixed_elastic is not None:
+    if t.inputs.mixed_elastic is not None and not cuda:
         return mixed_elastic_core(inelastic=shell_mode, radiative=t.controls.radiative_mode), np
     if lut and cuda:
         if shell_mode:
@@ -801,6 +805,8 @@ def _run_per_electron(t, *, lut):
             if p.mixed_elastic is None
             else mixed_core_args(s.mott_group[5:], p.mixed_elastic, s.L_top, s.L_bot)
         )
+        if mixed_args is not None and c.transport_core == "cuda":
+            mixed_args = mixed_device_args(mixed_args, core_xp, p.Ne)
         counts = _run_per_electron_transport(
             *common, *tables, *rows, t.straggle_on, t.stragg_dE, **options,
             radiative=radiative if c.radiative_mode else None,

@@ -106,6 +106,20 @@ geometry code is unchanged.
 **Row contract.** A hinge row ends in `EVENT_SOFT_HINGE`; a capped step in
 `EVENT_DELTA`. Both start a new flight, so straggling keys stay unique.
 
+**CUDA kernel.** The exact kernel runs the scheme under its `mixed_on` switch,
+in the CPU core's draw order and row contract. `transport_core="auto"` takes the
+kernel when the case would otherwise run on it, and the per-electron core when
+it would otherwise run on lockstep. A step's fields live in a per-history device
+array, so a continuation yield stores nothing for them and a capacity replay
+resets them. In `transport_precision="mixed"`, hard-rate lookups and their layer
+sums are FP32 like `_rad_layer_moment`, and an elastic proposal's target narrows
+to FP32 before element selection. The soft moment tables and the hinge law stay
+FP64: the second moment is a difference of two exponentials that cancels to
+$s\,\Sigma\,T_2$, and FP32 rounding of $T_1$ would reach it when $T_2/T_1$ is
+small. The kernel tests the soft part through the hard fraction, which is one
+exactly where the soft moments vanish, and with no soft part at the row's energy
+it reads the detailed rates, which then equal the hard rates.
+
 ## Limiting cases
 
 - $C_1=0$: nothing is soft, no hinge or delta draws happen, and transport is bit

@@ -504,13 +504,7 @@ def _drive_per_electron_batches(
     midpoint = energy_model_code == 1
     inelastic = inelastic_args is not None
     radiative = radiative_args is not None
-    extra_args = (inelastic_args,) if inelastic else ()
-    if radiative:
-        extra_args = (inelastic_args if inelastic else (), radiative_args)
-    if split_args is not None:
-        # Detector-cone splitting (#203): its buffers are indexed by global
-        # electron and reset per electron, so a capacity replay rewrites them.
-        extra_args = (inelastic_args if inelastic else (), radiative_args, split_args)
+    extra_args = _optional_core_args(inelastic_args, radiative_args, split_args)
     batches = []
     row_bytes = _scratch_row_bytes(midpoint, inelastic, radiative, secondaries)
     warned = False
@@ -929,9 +923,7 @@ def _run_per_electron_transport(
                 secondaries,
             )
 
-        extra = (inelastic_args,) if inelastic_args is not None else ()
-        if radiative_args is not None:
-            extra = (inelastic_args if inelastic_args is not None else (), radiative_args)
+        extra = _optional_core_args(inelastic_args, radiative_args, split_args)
         return _drive_continuation_rounds(
             core,
             core_args,
@@ -973,6 +965,21 @@ def _run_per_electron_transport(
         on_batch=on_batch,
         split_args=split_args,
     )
+
+
+def _optional_core_args(inelastic_args, radiative_args, split_args):
+    """Trailing core arguments, with ``()`` for a shell mode absent before another.
+
+    ``split_args`` is the third: detector-cone splitting (#203), whose buffers are
+    indexed by global electron and reset per electron, so a capacity replay
+    rewrites them, or mixed elastic transport (#894).
+    """
+    inelastic = () if inelastic_args is None else inelastic_args
+    if split_args is not None:
+        return (inelastic, radiative_args, split_args)
+    if radiative_args is not None:
+        return (inelastic, radiative_args)
+    return () if inelastic_args is None else (inelastic_args,)
 
 
 def _alloc_batch_scratch(xp, m, cap, midpoint, inelastic, radiative, secondaries=None):

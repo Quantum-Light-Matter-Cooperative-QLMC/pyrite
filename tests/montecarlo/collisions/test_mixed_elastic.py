@@ -609,6 +609,7 @@ def test_mixed_case_records_identity_and_routes_to_per_electron():
     assert "mixed_max_step_um" not in case
     assert _case_elastic_kwargs(case)["mixed_elastic"] == (0.1, 0.05, None)
     assert case_transport_core(case, "auto") == "per-electron"
+    assert case_transport_core(case, "cuda") == "cuda"
 
 
 @pytest.mark.parametrize(

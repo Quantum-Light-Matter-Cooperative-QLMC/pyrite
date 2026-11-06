@@ -255,6 +255,7 @@ include = [
     "src/pyrite/montecarlo/transport/_jit_kernel_variants.py",
     "src/pyrite/montecarlo/transport/_jit_launch.py",
     "src/pyrite/montecarlo/transport/_jit_lut_kernel.py",
+    "src/pyrite/montecarlo/transport/_jit_mixed_device.py",
     "src/pyrite/montecarlo/transport/_jit_shell_device.py",
     "src/pyrite/montecarlo/runner/__init__.py",
     "src/pyrite/montecarlo/spectrum/*_jit_kernel.py",

@@ -234,6 +234,7 @@ def run_transport_kernel(
     straggling,
     inelastic_args=None,
     radiative_args=None,
+    mixed_args=None,
     config=DEFAULT_TRANSPORT_KERNEL_CONFIG,
     *,
     continuation=None,
@@ -288,6 +289,10 @@ def run_transport_kernel(
     arithmetic, draws and rows are those of one uninterrupted run. Rows land
     at ``i * cap`` plus their index within the launch, and ``seg_count``
     counts this launch's rows only.
+
+    ``mixed_args`` (#894) is :func:`.mixed_elastic.mixed_device_args`, which
+    selects mixed elastic transport. Its per-history state is written by the
+    kernel and persists across launches, so continuation adds nothing for it.
 
     ``precision`` (#838) is ``"fp64"`` or ``"mixed"``; see
     :mod:`._jit_precision`. ``"mixed"`` needs the specialized kernel and passes
@@ -373,6 +378,7 @@ def run_transport_kernel(
                 inelastic_on=inelastic_on,
                 rad_on=radiative_arguments[0],
                 cont_on=continuation is not None,
+                mixed_on=mixed_args is not None,
             ),
             precision,
         )
@@ -455,10 +461,20 @@ def run_transport_kernel(
                 *shell_arguments,
                 *radiative_arguments,
                 *_continuation_kernel_args(continuation),
+                *_mixed_kernel_args(mixed_args),
             ),
             precision,
         ),
     )
+
+
+def _mixed_kernel_args(mixed_args):
+    """Mixed elastic kernel arguments, or inert placeholders."""
+    if mixed_args is None:
+        dummy = xp.zeros(1, dtype=xp.float64)
+        return (np.int32(0), np.float64(0.0), *([dummy] * 8))
+    c2, limits, tables, state = mixed_args
+    return (np.int32(1), np.float64(c2), limits, *tables, state.reshape(-1))
 
 
 def _continuation_kernel_args(continuation):

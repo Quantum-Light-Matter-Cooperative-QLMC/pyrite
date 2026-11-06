@@ -10,6 +10,8 @@ bounded sample:
   Mott screening, BremsLib moments and photon sampling) and ELSEPA polar-angle
   inversion, as the :data:`MIXED_HELPERS` device functions, and the tables
   they read (:data:`MIXED_TABLES`, passed as float32 copies);
+* mixed elastic hard-rate lookups (#894); its soft moment tables stay FP64, see
+  :mod:`._jit_mixed_device`;
 * the kernel body's query logarithms (``ln E``, ``log10 E``), the inline
   ELSEPA rate ``exp``, the Mott ``10**log_alpha``, ``sqrt(1 - cos^2)`` and the
   azimuth ``cos``/``sin``.
@@ -44,7 +46,13 @@ import numpy as np
 
 from ..._numerics import TRANSPORT_PRECISIONS
 from .._cupy_jit import jit
-from . import _jit_device, _jit_moment_lookup_device, _jit_radiative_device, _jit_shell_device
+from . import (
+    _jit_device,
+    _jit_mixed_device,
+    _jit_moment_lookup_device,
+    _jit_radiative_device,
+    _jit_shell_device,
+)
 
 # Device functions whose FP32 twin the mixed build calls. A helper not listed
 # keeps its FP64 constants even when it receives float32 arguments; in
@@ -56,6 +64,12 @@ MIXED_HELPERS = {
         "_interp_mott_log_alpha",
         "_elsepa_invert_row",
         "_elsepa_quantile_mu",
+    ),
+    _jit_mixed_device: (
+        "_mixed_hard_rate",
+        "_mixed_layer_hard_bound",
+        "_mixed_hard_element",
+        "_mixed_has_soft_part",
     ),
     _jit_moment_lookup_device: ("_rad_transport_moment",),
     _jit_radiative_device: (
@@ -92,6 +106,7 @@ MIXED_TABLES = (
     "rad_top",
     "rad_chi",
     "rad_plasma",
+    "mix_hf",
 )
 
 

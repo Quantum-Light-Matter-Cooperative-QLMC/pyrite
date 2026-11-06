@@ -357,7 +357,8 @@ def test_launcher_signature_tracks_the_reference_core():
     launcher = [
         name
         for name, p in inspect.signature(run_transport_kernel).parameters.items()
-        if p.kind is not p.KEYWORD_ONLY and name != "config"
+        # Mixed elastic transport (#894) has its own CPU specialization.
+        if p.kind is not p.KEYWORD_ONLY and name not in ("config", "mixed_args")
     ]
     assert launcher == reference
 
