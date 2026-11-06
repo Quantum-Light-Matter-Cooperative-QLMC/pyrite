@@ -210,3 +210,80 @@ def test_hybrid_reduction_matches_the_host_hybrid_and_keeps_the_mass():
     total = float(np.sum(cp.asnumpy(out) / inv_width))
     bound = 3.0 / (2.0 * np.pi**3 * bq.BIN_MEAN_EXACT_WIDTHS**2)
     assert abs(total / float(captured.sum()) - 1.0) <= bound
+
+
+def test_warp_tree_matches_the_thread_tree_and_repeats_bitwise():
+    """#1003 candidate: one warp per bin changes only the summation order."""
+    from pyrite.montecarlo.spectrum.cxr._bin_tree import run_tree_reduction
+
+    rng = np.random.default_rng(1003)
+    edges = np.r_[np.linspace(900.0, 1000.0, 301), np.linspace(1000.2, 1300.0, 320)]
+    inv_width = 1.0 / np.diff(edges)
+    e = np.r_[rng.uniform(850, 1350, 3000), np.full(200, 1000.2)].astype(np.float32)
+    a = (np.pi / rng.uniform(0.02, 5.0, len(e))).astype(np.float32)
+    w = rng.uniform(0.01, 1.0, len(e)).astype(np.float32)
+    args = (cp.asarray(e), cp.asarray(a), cp.asarray(w), cp.asarray(edges), cp.asarray(inv_width))
+    thread = cp.zeros(len(inv_width), dtype=cp.float64)
+    run_tree_reduction(*args, out=thread)
+    warps = []
+    for _ in range(2):
+        out = cp.zeros_like(thread)
+        run_tree_reduction(*args, out=out, warp=True)
+        warps.append(cp.asnumpy(out))
+    np.testing.assert_array_equal(warps[0], warps[1])
+    np.testing.assert_allclose(warps[0], cp.asnumpy(thread), rtol=1e-12, atol=0)
+
+
+def test_device_midpoint_series_matches_the_host_mirror():
+    """Validation: sinc-bin-midpoint-series -- device and host series agree."""
+    rng = np.random.default_rng(1004)
+    xc = rng.uniform(bq._SERIES_MIN_X, 64.0, 4096) * rng.choice([-1.0, 1.0], 4096)
+    dx = 10.0 ** rng.uniform(-6.0, np.log10(bq._SERIES_MAX_DX), xc.size)
+    kernel = cp.ElementwiseKernel(
+        "float64 xc, float64 dx",
+        "float64 out",
+        "out = pyrite_sincsq_midpoint_mean(xc, dx);",
+        "pyrite_test_midpoint_series",
+        preamble=bq.SINCSQ_BIN_PREAMBLE,
+    )
+    device = cp.asnumpy(kernel(cp.asarray(xc), cp.asarray(dx)))
+    envelope = 1.0 / (2.0 * np.pi**2 * xc**2)
+    np.testing.assert_array_less(np.abs(device - bq.sincsq_midpoint_mean(xc, dx)), 1e-13 * envelope)
+
+
+def test_series_dispatch_takes_only_window_bins():
+    """Validation: sinc-bin-midpoint-series -- with the series compiled in, bins
+    inside the window equal the host series and all others are bitwise the
+    series-free exact mean."""
+
+    def kernel(on):
+        return cp.ElementwiseKernel(
+            "float64 a, float64 e_r, float64 lo, float64 hi",
+            "float64 out",
+            "out = pyrite_sincsq_bin_mean(a, e_r, lo, hi, 1.0 / (hi - lo));",
+            f"pyrite_test_series_dispatch_{int(on)}",
+            preamble=f"#define PYRITE_BIN_MEAN_SERIES {int(on)}\n" + bq.SINCSQ_BIN_PREAMBLE,
+        )
+
+    a_width, E_res = _lines(count=200)
+    edges, _ = _axis()
+    shape = (len(a_width), len(edges) - 1)
+    a_b = np.broadcast_to(a_width[:, None], shape)
+    e_b = np.broadcast_to(E_res[:, None], shape)
+    lo = np.broadcast_to(edges[:-1], shape)
+    hi = np.broadcast_to(edges[1:], shape)
+    inputs = [cp.asarray(np.ascontiguousarray(v)) for v in (a_b, e_b, lo, hi)]
+    series = cp.asnumpy(kernel(True)(*inputs))
+    exact = cp.asnumpy(kernel(False)(*inputs))
+    x_lo = a_b * (lo - e_b) / np.pi
+    x_hi = a_b * (hi - e_b) / np.pi
+    xc, dx = 0.5 * (x_lo + x_hi), x_hi - x_lo
+    window = (dx <= bq._SERIES_MAX_DX) & (np.abs(xc) >= bq._SERIES_MIN_X)
+    assert window.any() and (~window).any()
+    np.testing.assert_array_equal(series[~window], exact[~window])
+    host = bq.sincsq_midpoint_mean(xc[window], dx[window])
+    envelope = 1.0 / (2.0 * np.pi**2 * xc[window] ** 2)
+    # The host mirror forms pi * x before sin/cos, a phase error ~|x| eps that
+    # device sincospi does not have; scale the tolerance with |x|.
+    tol = 1e-13 * envelope * np.maximum(1.0, np.abs(xc[window]))
+    np.testing.assert_array_less(np.abs(series[window] - host), tol)
