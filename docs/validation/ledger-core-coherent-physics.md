@@ -433,6 +433,16 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 - **Anchor:** `tests/montecarlo/spectrum/test_sinc_bin_integration.py`, `tests/montecarlo/spectrum/test_sinc_bin_integration_cuda.py`
 - **Notes:** Introduced for #192: the FP64 sine integral at every (line, bin) pair made 5 MeV `high_energy` h-BN cases ~40x slower than node sampling on the consumer lab GPU. Bin-mean case identity is unchanged (the change is within the stated tolerance); checkpoints written with the all-exact mean remain valid to $1.2\times10^{-5}$ in yield. Fresh-context verification (2026-09-28) returned `discrepancy`: the FP64 resonance was rounded to float32 before the offset was formed, which broke the bound for $E_{\rm res}/w \gtrsim 2^{23}$ on the FP64 host/matrix routes. Fixed by the resonance head/remainder split, pinned by two MeV regressions; the re-check (same day) rederived it. Human sign-off pending. [derivation](radiation-physics/sinc-bin-far-envelope.md)
 
+## `sinc-bin-midpoint-series`
+
+- **Claim:** for a bin of width $\Delta \le 0.05$ first-zero widths centred at $|x_c| \ge 2$, the `sinc-bin-integration` bin mean equals its midpoint series $f + \Delta^2 f''/24 + \Delta^4 f^{(4)}/1920$ at $x_c$ to within $2\times10^{-8}$ of the envelope $1/(2\pi^2x_c^2)$; other bins keep the two-tail evaluation.
+- **Code:** `montecarlo/spectrum/cxr/_bin_quadrature.py::sincsq_midpoint_mean`, `SINCSQ_BIN_PREAMBLE::pyrite_sincsq_midpoint_mean`; `_SERIES_MAX_DX`, `_SERIES_MIN_X`
+- **Source:** Taylor expansion of the bin average; Leibniz bound on $f^{(6)}$ for $f=(1-\cos 2\pi x)/(2\pi^2x^2)$ ([derivation](radiation-physics/sinc-bin-midpoint-series.md))
+- **Status:** unverified
+- **Checks:** Required: series coefficients; remainder bound at the window edge; cancellation-free trig forms; host/device agreement; dispatch leaves out-of-window bins bitwise unchanged; production spectra within float32 rounding of the series-free route.
+- **Anchor:** `tests/montecarlo/spectrum/test_sinc_bin_integration.py`, `tests/montecarlo/spectrum/test_sinc_bin_integration_cuda.py`
+- **Notes:** Issue #1003. Off in production (`PYRITE_BIN_MEAN_SERIES` defaults to 0) pending measurement. Host check against 40-digit `mpmath`: $3.0\times10^{-9}$ of the envelope, versus $1.3\times10^{-7}$ for the FP64 two-tail route on the same narrow bins.
+
 ## `sinc-bin-near-far`
 
 - **Claim:** the large CUDA bin-mean reduction groups strictly far line intervals into a sorted tree. For $c_l=w_l/(2a_l^2)$, a far pair contributes $c_l/[(L-E_l)(H-E_l)]$ to bin $[L,H]$. A ten-moment expansion with node opening ratio at most $0.2$ has relative far-sum truncation below $4.6\times10^{-7}$ and per-line integrated-yield allowance below $7.3\times10^{-10}$ at $K=64$, in addition to the `sinc-bin-far-envelope` allowance. Leaves preserve the #192 near/far classification and exact near mean.

@@ -79,6 +79,7 @@ self-absorption
 segment-escape-average
 sinc-bin-far-envelope
 sinc-bin-integration
+sinc-bin-midpoint-series
 sinc-bin-near-far
 spectral-support-yield-conservation
 transverse-bunch-form-factor

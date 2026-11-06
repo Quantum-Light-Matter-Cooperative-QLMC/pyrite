@@ -80,9 +80,21 @@ BIN_MEAN_EXACT_WIDTHS = 64.0
 #: Host evaluator block size in (line, bin) elements, bounding its temporaries.
 _HOST_BLOCK_ELEMENTS = 1 << 22
 
+#: Midpoint-series window: bins narrower than this many lobe widths and centred
+#: at least ``_SERIES_MIN_X`` lobes from the resonance take the series mean
+#: when the kernels are built with ``PYRITE_BIN_MEAN_SERIES=1`` (off by default).
+#: Validation: sinc-bin-midpoint-series
+_SERIES_MAX_DX = 0.05
+_SERIES_MIN_X = 2.0
+
 #: C source shared by both CUDA/ROCm routes. ``__device__`` is CuPy's
 #: host/device qualifier for kernel preambles.
-SINCSQ_BIN_PREAMBLE = r"""
+SINCSQ_BIN_PREAMBLE = (
+    f"""
+#define PYRITE_SERIES_MAX_DX {_SERIES_MAX_DX!r}
+#define PYRITE_SERIES_MIN_X {_SERIES_MIN_X!r}
+"""
+    + r"""
 static const double PYRITE_PI = 3.14159265358979323846264338327950288;
 
 /* Si(t) - pi/2 for t >= 0. */
@@ -182,12 +194,48 @@ static __device__ double pyrite_sincsq_tail(double x) {
     return (x >= 0.0) ? r : -r;
 }
 
+#ifndef PYRITE_BIN_MEAN_SERIES
+#define PYRITE_BIN_MEAN_SERIES 0
+#endif
+
+/* Mean of f = sinc^2 over a bin much narrower than a lobe, by its midpoint
+   series mean = f + f'' dx^2/24 + f'''' dx^4/1920 (Validation:
+   sinc-bin-midpoint-series). f = A(x) H(x) with A = 1 - cos(2 pi x) and
+   H = 1/(2 pi^2 x^2), so every derivative comes from one sincospi. */
+static __device__ double pyrite_sincsq_midpoint_mean(double xc, double dx) {
+    double sp, cp;
+    sincospi(xc, &sp, &cp);
+    const double om = 2.0 * PYRITE_PI;
+    const double a0 = 2.0 * sp * sp;          /* 1 - cos(2 pi x) */
+    const double s2 = 2.0 * sp * cp;          /* sin(2 pi x) */
+    const double c2 = (cp - sp) * (cp + sp);  /* cos(2 pi x) */
+    const double a1 = om * s2, a2 = om * om * c2;
+    const double a3 = -om * om * om * s2, a4 = -om * om * om * om * c2;
+    const double q = 1.0 / xc;
+    const double h0 = q * q, h1 = -2.0 * h0 * q, h2 = -3.0 * h1 * q;
+    const double h3 = -4.0 * h2 * q, h4 = -5.0 * h3 * q;
+    const double f0 = a0 * h0;
+    const double f2 = a2 * h0 + 2.0 * a1 * h1 + a0 * h2;
+    const double f4 = a4 * h0 + 4.0 * a3 * h1 + 6.0 * a2 * h2 + 4.0 * a1 * h3 + a0 * h4;
+    const double d2 = dx * dx;
+    return (f0 + d2 * (f2 / 24.0 + d2 * (f4 / 1920.0))) / (2.0 * PYRITE_PI * PYRITE_PI);
+}
+
 /* Mean of sinc^2(a (E - e_r) / pi) over [e_lo, e_hi]; inv_width = 1/(e_hi - e_lo). */
 static __device__ double pyrite_sincsq_bin_mean(
     double a, double e_r, double e_lo, double e_hi, double inv_width
 ) {
     const double x_lo = a * (e_lo - e_r) / PYRITE_PI;
     const double x_hi = a * (e_hi - e_r) / PYRITE_PI;
+#if PYRITE_BIN_MEAN_SERIES
+    {
+        const double dx = x_hi - x_lo;
+        const double xc = 0.5 * (x_lo + x_hi);
+        if (dx <= PYRITE_SERIES_MAX_DX && fabs(xc) >= PYRITE_SERIES_MIN_X) {
+            return pyrite_sincsq_midpoint_mean(xc, dx);
+        }
+    }
+#endif
     double mass = pyrite_sincsq_tail(x_hi) - pyrite_sincsq_tail(x_lo);
     if (x_lo < 0.0 && x_hi >= 0.0) {
         mass += 1.0;
@@ -232,6 +280,7 @@ static __device__ double pyrite_sincsq_bin_mean_hybrid(
     return pyrite_sincsq_bin_mean(a, e_r, e_lo, e_hi, inv_width);
 }
 """
+)
 
 
 def validate_cxr_quadrature(value: object) -> str:
@@ -300,6 +349,39 @@ def sincsq_tail(x: object) -> np.ndarray:
     pi2u = np.pi * np.pi * uf
     r[~near] = -(1.0 + d) / (2.0 * pi2u) + d * s1 * s1 / pi2u - 2.0 * g * y * s1 * c1 / np.pi
     return np.where(x >= 0.0, r, -r)
+
+
+def sincsq_midpoint_mean(xc: object, dx: object) -> np.ndarray:
+    """Midpoint series of the ``sinc^2`` mean over ``[xc - dx/2, xc + dx/2]``.
+
+    ``f + f2 dx^2/24 + f4 dx^4/1920`` (``f2``, ``f4`` the second and fourth
+    derivatives) with ``f = (1 - cos 2 pi x)/(2 pi^2 x^2)``: the host mirror of
+    the device ``pyrite_sincsq_midpoint_mean``. Valid only in the window
+    ``dx <= _SERIES_MAX_DX``, ``|xc| >= _SERIES_MIN_X``, where the omitted
+    sixth-derivative term is below ``2e-8`` of the envelope ``1/(2 pi^2 xc^2)``.
+
+    Validation: sinc-bin-midpoint-series
+    """
+    xc = np.asarray(xc, dtype=np.float64)
+    dx = np.asarray(dx, dtype=np.float64)
+    om = 2.0 * np.pi
+    sp, cp = np.sin(np.pi * xc), np.cos(np.pi * xc)
+    a0 = 2.0 * sp * sp
+    s2 = 2.0 * sp * cp
+    c2 = (cp - sp) * (cp + sp)
+    a1, a2 = om * s2, om * om * c2
+    a3, a4 = -(om**3) * s2, -(om**4) * c2
+    q = 1.0 / xc
+    h0 = q * q
+    h1 = -2.0 * h0 * q
+    h2 = -3.0 * h1 * q
+    h3 = -4.0 * h2 * q
+    h4 = -5.0 * h3 * q
+    f0 = a0 * h0
+    f2 = a2 * h0 + 2.0 * a1 * h1 + a0 * h2
+    f4 = a4 * h0 + 4.0 * a3 * h1 + 6.0 * a2 * h2 + 4.0 * a1 * h3 + a0 * h4
+    d2 = dx * dx
+    return (f0 + d2 * (f2 / 24.0 + d2 * (f4 / 1920.0))) / (2.0 * np.pi * np.pi)
 
 
 def sincsq_antiderivative(x: object) -> np.ndarray:
