@@ -245,6 +245,29 @@ def _device_rows_share_flight(flight, owner):
     return bool(_to_cpu(xp.any((flight[1:] == flight[:-1]) & (owner[1:] == owner[:-1]))))
 
 
+def _refuse_grooved_offset_factorization(request, xy0_pop, analytic_offsets, xp):
+    """Refuse coherent reductions that assume a groove-independent ``|S_e|``.
+
+    A groove's escape path depends on the lateral emission point, so a
+    transverse offset moves ``|S_e|`` as well as its phase. That breaks the
+    phase-only factorization of the empirical blend and the translation
+    invariance of the analytic average. Pairing complete sampled fields needs
+    neither, so that route stays available.
+    Validation: coherent-inter-electron-decoherence
+    """
+    if (
+        request.groove is not None
+        and bool(xp.any(xy0_pop != 0.0))
+        and (request.physical_electrons is None or analytic_offsets)
+    ):
+        raise ValueError(
+            "coherent emission from a grooved target with transverse beam offsets "
+            "is only supported by the physical-bunch pair estimator on an infinite "
+            "slab: pass physical_electrons, without a finite footprint or imposed "
+            "bunch front, or use transverse=PointSpot()"
+        )
+
+
 def _prepare_spectrum(request):
     """Phase 1: validate the request and build every quantity that depends on
     neither the reflection nor the crystallite orientation.
@@ -637,6 +660,7 @@ def _prepare_spectrum(request):
                 finite_footprint_now
                 or (segments.get("beam_entry") or {}).get("bunch_front_gradient")
             )
+            _refuse_grooved_offset_factorization(request, xy0_pop, analytic_offsets, xp)
             if analytic_offsets:
                 if longitudinal_rms_fs is None:
                     raise ValueError(

@@ -278,6 +278,95 @@ def test_coherent_decoherence_blend_holds_on_the_per_hkl_route(sinc_cutoff):
     np.testing.assert_allclose(actual, expected, rtol=_blend_rtol(sensitivity), atol=peak * 1e-12)
 
 
+def _grooved_offset_case(x_ang, **segment_overrides):
+    """Identical single-row electrons displaced laterally across a groove."""
+    from pyrite.montecarlo.geometry import tilted_geometry
+    from pyrite.montecarlo.groove import blazed_groove_spec
+
+    tilt = np.deg2rad(45.0)
+    _, n_hat = tilted_geometry(np.pi / 2, tilt, np.pi)
+    kwargs = {
+        "crystal": "hopg",
+        "hkl_list": [(0, 0, 2)],
+        "B_ang2": 0.8,
+        "n_hat": n_hat,
+        "theta_obs_rad": np.pi / 2,
+        "groove": blazed_groove_spec(
+            spacing_ang=2.0e4,
+            theta_obs_rad=np.pi / 2,
+            tilt_polar_rad=tilt,
+            tilt_azim_rad=np.pi,
+        ),
+    }
+    count = x_ang.size
+    initial_r = np.zeros((count, 3))
+    initial_r[:, 0] = x_ang
+    segments = _segments(count)
+    segments.update(
+        r_mid=np.column_stack([x_ang + 4.0, np.zeros(count), np.full(count, 5.0)]),
+        t_ang=np.zeros(count),
+        t0_ang=np.zeros(count),
+        initial_t0_ang=np.zeros(count),
+        initial_r_ang=initial_r,
+        crystal_width_ang=None,
+        crystal_height_ang=None,
+    )
+    segments.update(segment_overrides)
+    return segments, kwargs
+
+
+def test_grooved_transverse_offsets_refuse_the_empirical_blend():
+    """The blend's phase-only factorization fails when escape moves |S_e|.
+
+    Validation: coherent-inter-electron-decoherence
+    """
+    segments, kwargs = _grooved_offset_case(np.linspace(-10.0, 10.0, 5))
+    with pytest.raises(ValueError, match="grooved target with transverse beam offsets"):
+        mc_cxr_spectrum(segments, E_GRID, coherent=True, **kwargs)
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"beam_entry": {"bunch_front_gradient": (1.0e-3, 0.0)}},
+        {"crystal_width_ang": 1.0e6, "crystal_height_ang": 1.0e6},
+    ],
+    ids=["bunch-front", "footprint"],
+)
+def test_grooved_transverse_offsets_refuse_the_analytic_average(overrides):
+    """The analytic average needs translation invariance a groove breaks.
+
+    Validation: coherent-inter-electron-decoherence
+    """
+    segments, kwargs = _grooved_offset_case(np.linspace(-10.0, 10.0, 5), **overrides)
+    with pytest.raises(ValueError, match="grooved target with transverse beam offsets"):
+        mc_cxr_spectrum(
+            segments,
+            E_GRID,
+            coherent=True,
+            physical_electrons=5.0,
+            longitudinal_rms_fs=1.0,
+            **kwargs,
+        )
+
+
+def test_grooved_transverse_offsets_keep_complete_field_pairs():
+    """N = M pairs complete fields, so the estimate is the raw sampled sum.
+
+    Validation: coherent-physical-bunch-population
+    """
+    x_ang = np.linspace(-10.0, 10.0, 5)
+    segments, kwargs = _grooved_offset_case(x_ang)
+    actual = mc_cxr_spectrum(
+        segments, E_GRID, coherent=True, physical_electrons=float(x_ang.size), **kwargs
+    )
+    # No recorded offsets: the direct sum of the same displaced rows.
+    raw, _ = _grooved_offset_case(x_ang, initial_r_ang=np.zeros((x_ang.size, 3)))
+    expected = mc_cxr_spectrum(raw, E_GRID, coherent=True, **kwargs)
+    assert np.max(np.abs(expected)) > 0.0
+    np.testing.assert_allclose(actual, expected, rtol=1e-9, atol=1e-9 * np.max(np.abs(expected)))
+
+
 def test_coherent_decoherence_inactive_by_default():
     """No initial_t0_ang/initial_r_ang keys (every pre-existing fixture) ->
     decoherence_active is False and the result is bit-for-bit the old,
