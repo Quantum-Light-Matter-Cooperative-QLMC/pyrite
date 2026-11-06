@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from pyrite._config_presets import (
         load_physics as load_physics,
     )
+    from pyrite._line_roulette import LineRoulette as LineRoulette
     from pyrite._numerics import (
         CxrReflections as CxrReflections,
     )
@@ -65,6 +66,7 @@ _EXPORTS = {
     "Numerics": ("pyrite.campaign.model", "Numerics"),
     "PhotonTransport": ("pyrite._photon_config", "PhotonTransport"),
     "PixelScorer": ("pyrite.instrument", "PixelScorer"),
+    "LineRoulette": ("pyrite._line_roulette", "LineRoulette"),
     "Physics": ("pyrite._numerics", "Physics"),
     "Precision": ("pyrite._precision", "Precision"),
     "RadiationNumerics": ("pyrite._numerics_groups", "RadiationNumerics"),
@@ -82,6 +84,7 @@ __all__ = [
     "ExecutionConfig",
     "KernelTuning",
     "FixedSampling",
+    "LineRoulette",
     "Numerics",
     "PhotonTransport",
     "Physics",

@@ -103,11 +103,23 @@ def lower_simulation(request: ResolvedSimulation) -> Case:
         from ..montecarlo.channeling.planar_injection import source_record
 
         case = replace(case, channeling_source=source_record(scene.beam.state))
-    if numerics.seed is not None:
-        case = replace(case, seed=numerics.seed)
+    case = _with_run_options([case], numerics)[0]
     from .photon_cases import resolve_photon_transport
 
     return resolve_photon_transport(scene, case, numerics)
+
+
+def _with_run_options(cases: list[Case], numerics: Numerics) -> list[Case]:
+    """Apply the explicit seed stream and opt-in line roulette to lowered cases.
+
+    Replacing re-runs case validation, which refuses non-additive line routes.
+    """
+    if numerics.seed is not None:
+        cases = [replace(case, seed=numerics.seed + index) for index, case in enumerate(cases)]
+    if numerics.line_roulette is not None:
+        record = numerics.line_roulette.to_dict()
+        cases = [replace(case, line_roulette=record) for case in cases]
+    return cases
 
 
 def _kept_brem_band(old_sweep: LegacySweep, energy_bins: EnergyBins) -> bool:
@@ -199,12 +211,7 @@ def build_sweep_cases(
         )
         cases = resolve_shell_ionization(resolve_transition_radiation(cases, physics), physics)
         cases = resolve_channeling(cases, physics, resolved_numerics)
-        if resolved_numerics.seed is not None:
-            cases = [
-                replace(case, seed=resolved_numerics.seed + index)
-                for index, case in enumerate(cases)
-            ]
-        return cases
+        return _with_run_options(cases, resolved_numerics)
     if not check_kinematic_validity:
         raise ValueError("check_kinematic_validity=False requires a configured legacy sweep")
     overrides = {}

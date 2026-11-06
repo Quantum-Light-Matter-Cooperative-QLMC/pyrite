@@ -6,10 +6,15 @@ Validation: line-scoring-roulette
 import numpy as np
 import pytest
 
+import pyrite as pr
 from pyrite._backend import _to_cpu
+from pyrite._energy_bins import EnergyBins
 from pyrite._line_roulette import LINE_ROULETTE_MODEL, LineRoulette
 from pyrite._precision import Precision
+from pyrite.campaign.lowering import build_case
+from pyrite.campaign.profiles import case_content_key
 from pyrite.campaign.sweep import BeamSpec, Sweep, build_cases
+from pyrite.detectors import PlanarDetector, PlanarPose
 from pyrite.montecarlo import runner
 from pyrite.montecarlo.case import Case
 from pyrite.montecarlo.runner.emission_adapters import EmissionBatch
@@ -360,3 +365,72 @@ def test_truncation_audit_stays_analog(case, transport):
             _to_cpu(roulette_audit[key]), _to_cpu(analog_audit[key]), rtol=1e-12, err_msg=key
         )
     assert "mass_only" not in roulette_audit
+
+
+def _public_scene(detector=None):
+    return pr.Scene(
+        pr.Beam(energy_keV=30.0, transverse=pr.beams.Spot(), longitudinal=pr.beams.PointBunch()),
+        pr.geometry.Slab(
+            "hopg", thickness_ang=10_000.0, tilt_deg=30.0, footprint=pr.geometry.Footprint(5.0, 5.0)
+        ),
+        pr.Detector() if detector is None else detector,
+    )
+
+
+def _public_numerics(**kwargs):
+    return pr.Numerics(
+        cxr_trials=12,
+        brem_trials=16,
+        seed=7,
+        energy_bins=EnergyBins(
+            cxr=np.linspace(250.0, 320.0, 15), brem=np.arange(1000.0, 30001.0, 1000.0)
+        ),
+        transport_core="per-electron",
+        **kwargs,
+    )
+
+
+def test_numerics_off_adds_no_case_key_and_keeps_identity():
+    plain = build_case(_public_scene(), _public_numerics())
+    explicit = build_case(_public_scene(), _public_numerics(line_roulette=None))
+    assert "line_roulette" not in plain
+    assert case_content_key(plain) == case_content_key(explicit)
+
+
+def test_numerics_on_lowers_the_record_and_changes_identity():
+    policy = LineRoulette(floor=0.25, pilot_electrons=4)
+    case = build_case(_public_scene(), _public_numerics(line_roulette=policy))
+    assert case["line_roulette"] == policy.to_dict()
+    assert case_content_key(case) != case_content_key(
+        build_case(_public_scene(), _public_numerics())
+    )
+    described = _public_numerics(line_roulette=policy).describe_numerics()
+    assert described["radiation"]["effective"]["line_roulette"] == policy.to_dict()
+
+
+def test_numerics_rejects_a_raw_mapping():
+    with pytest.raises(TypeError, match="LineRoulette"):
+        _public_numerics(line_roulette={"floor": 0.25})
+
+
+def test_numerics_refuses_coherent_emission_when_lowering():
+    numerics = _public_numerics(line_roulette=LineRoulette(floor=0.25))
+    with pytest.raises(ValueError, match="coherent"):
+        build_case(_public_scene(), numerics, physics=pr.Physics(emission="coherent"))
+
+
+def test_numerics_refuses_a_planar_detector():
+    detector = PlanarDetector(PlanarPose.from_observation(100.0, 60.0), size_mm=(2.0, 2.0))
+    numerics = _public_numerics(line_roulette=LineRoulette(floor=0.25))
+    with pytest.raises(ValueError, match="scalar Detector"):
+        build_case(_public_scene(detector), numerics)
+
+
+def test_simulate_reports_the_selection_in_provenance():
+    numerics = _public_numerics(line_roulette=LineRoulette(floor=0.25, pilot_electrons=4))
+    record = pr.simulate(_public_scene(), numerics=numerics).provenance.line_roulette
+    assert record["primaries"] == 12
+    assert record["floor"] == 0.25
+    analog = pr.simulate(_public_scene(), numerics=_public_numerics()).provenance
+    assert analog.line_roulette is None
+    assert "line_roulette" not in analog

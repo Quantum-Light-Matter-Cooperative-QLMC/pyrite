@@ -92,6 +92,9 @@ class Provenance(Mapping[str, Any]):
     adaptive_sampling: Mapping[str, Any] | None = None
     """Adaptive runs only: requested precision, realized electron counts,
     achieved errors, guards, ``stop_reason``, and ``statistics_limited``."""
+    line_roulette: Mapping[str, Any] | None = None
+    """Line-scoring roulette runs only: the policy, threshold, selected
+    primaries and rows, analog and weighted line mass, and added variance."""
     line_grid_policy: Mapping[str, Any] | None = None
     """Automatic CXR-grid runs only: the grid policy and tolerances."""
     line_grid_resolved: Mapping[str, Any] | None = None

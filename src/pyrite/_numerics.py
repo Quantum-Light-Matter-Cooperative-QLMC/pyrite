@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any, Literal, Self, cast
 import numpy as np
 
 from ._energy_bins import EnergyBins
+from ._line_roulette import LineRoulette
 from ._photon_config import PhotonTransport
 from ._precision import Precision
 from ._sampling import AdaptiveSampling, FixedSampling, SamplingPolicy
@@ -559,6 +560,9 @@ class Numerics:
     ``channeling_zone_max_ang`` an optional zone-length cap [angstrom] beyond
     which still-channeled electrons are handed off (``None``: the first
     layer's thickness).
+    ``line_roulette`` opts an incoherent scalar-detector run into
+    inverse-probability scoring of its CXR lines; ``None`` is analog scoring
+    and adds nothing to case identity.
     Select ``PYRITE_MC_BACKEND`` before import; models belong to :class:`Physics`.
     """
 
@@ -576,6 +580,8 @@ class Numerics:
     energy_bins: EnergyBins | None = field(default=None, kw_only=True)
     # Opt-in output diagnostic; False must not add a key to a Case identity.
     temporal_profile: bool = field(default=False, kw_only=True)
+    # Opt-in estimator; None must not add a key to a Case identity.
+    line_roulette: LineRoulette | None = field(default=None, kw_only=True)
     transport: "TransportNumerics | None" = field(default=None, kw_only=True)
     radiation: "RadiationNumerics | None" = field(default=None, kw_only=True)
     execution: "ExecutionConfig | None" = field(default=None, kw_only=True)
@@ -629,12 +635,7 @@ class Numerics:
                 raise ValueError(f"{name} must be a positive integer or None")
         if self.seed is not None and type(self.seed) is not int:
             raise ValueError("seed must be an integer or None")
-        if type(self.temporal_profile) is not bool:
-            raise TypeError("temporal_profile must be a bool")
-        if not isinstance(self.cxr_reflections, CxrReflections):
-            raise TypeError("cxr_reflections must be a CxrReflections")
-        if self.energy_bins is not None and not isinstance(self.energy_bins, EnergyBins):
-            raise TypeError("energy_bins must be an EnergyBins or None")
+        self._validate_typed_options()
         if self.energy_model not in {"frozen", "midpoint"}:
             raise ValueError("energy_model must be 'frozen' or 'midpoint'")
         if (
@@ -646,6 +647,16 @@ class Numerics:
             raise ValueError("max_dE_frac must be finite and non-negative")
         if self.max_dE_frac > 0.0 and self.energy_model != "midpoint":
             raise ValueError("max_dE_frac > 0 requires energy_model='midpoint'")
+
+    def _validate_typed_options(self) -> None:
+        if type(self.temporal_profile) is not bool:
+            raise TypeError("temporal_profile must be a bool")
+        if self.line_roulette is not None and not isinstance(self.line_roulette, LineRoulette):
+            raise TypeError("line_roulette must be a LineRoulette or None")
+        if not isinstance(self.cxr_reflections, CxrReflections):
+            raise TypeError("cxr_reflections must be a CxrReflections")
+        if self.energy_bins is not None and not isinstance(self.energy_bins, EnergyBins):
+            raise TypeError("energy_bins must be an EnergyBins or None")
 
     def _resolve_typed_groups(self) -> None:
         """Lower opt-in grouped sections through the existing flat API.
@@ -780,6 +791,11 @@ class Numerics:
                 "effective": {
                     "cxr_reflections": asdict(self.cxr_reflections),
                     "energy_bins": "custom" if self.energy_bins is not None else "catalog-default",
+                    **(
+                        {"line_roulette": self.line_roulette.to_dict()}
+                        if self.line_roulette is not None
+                        else {}
+                    ),
                 },
             },
             "execution": {
