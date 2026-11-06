@@ -40,7 +40,9 @@ from pyrite.xsgen.bremslib import (
 from pyrite.xsgen.bremslib import generate_element as generate_bremslib
 from pyrite.xsgen.bremslib.read import ddcs_integral_path
 from pyrite.xsgen.bremslib.release import build_release, load_release_index, release_arrays
-from pyrite.xsgen.elsepa import generate_element
+from pyrite.xsgen.elsepa import ElsepaDeck, generate_element, parse_dcs, table_arrays
+from pyrite.xsgen.elsepa.generate import run_panels
+from pyrite.xsgen.elsepa.parse import check_transport_scaling
 from pyrite.xsgen.sbethe import (
     SbetheDeck,
     generate_material,
@@ -393,6 +395,55 @@ def test_the_generate_path_runs_elsepa_from_its_own_rendered_deck(isolated_dirs,
     assert float(arrays["total_elastic_cm2"][0]) > 0.0
     # MABS 0 is the deck default, so there is no absorption.
     assert float(arrays["absorption_cm2"][0]) == 0.0
+
+
+def test_elsepa_point_nucleus_panels_do_not_inherit_a_previous_energy():
+    """Pin the #656 vendor trigger and show per-energy generation avoids it.
+
+    In one process, the 1 MeV panel leaves ``CGL(3)`` behind and the bare
+    point-nucleus panels (``NPH=2``) read it. Fresh processes do not.
+    """
+    source = _elsepa()
+    binary = build(source, "elscata", toolchain=find_toolchain())
+    energies = (1.0e6, 3.0e6, 6.0e6, 1.0e7, 2.5e7, 5.0e7, 1.0e8)
+    deck = ElsepaDeck.free_atom(74, energies, nuclear_model=1)
+
+    shared = run_program(
+        binary,
+        data_dirs=source.data_dirs,
+        stdin_text=deck.render(),
+        outputs=deck.output_names,
+    )
+    contaminated = table_arrays(
+        [parse_dcs(shared.outputs[name]) for name in deck.output_names],
+        energies_ev=deck.energies_ev,
+    )
+    separate = table_arrays(run_panels(binary, source, deck), energies_ev=deck.energies_ev)
+
+    ratio = contaminated["transport1_cm2"] / separate["transport1_cm2"]
+    assert ratio[0] == pytest.approx(1.0, rel=1.0e-5)
+    assert ratio[-1] > 50.0
+    with pytest.raises(ValueError, match="stops falling"):
+        check_transport_scaling(energies, contaminated["transport1_cm2"], z=74)
+    check_transport_scaling(energies, separate["transport1_cm2"], z=74)
+
+
+def test_elsepa_hydrogen_production_deck_inherits_at_the_factorization_threshold():
+    """The Fermi H deck also reaches ``NPH=2``, at 25 and 30 keV (#656)."""
+    source = _elsepa()
+    binary = build(source, "elscata", toolchain=find_toolchain())
+    deck = ElsepaDeck.free_atom(1, (2.0e4, 2.5e4))
+
+    shared = run_program(
+        binary,
+        data_dirs=source.data_dirs,
+        stdin_text=deck.render(),
+        outputs=deck.output_names,
+    )
+    inherited = parse_dcs(shared.outputs[deck.output_names[1]])
+    fresh = run_panels(binary, source, deck)[1]
+
+    assert inherited.transport1_cm2 / fresh.transport1_cm2 == pytest.approx(1.00012, abs=2.0e-5)
 
 
 def test_the_generate_path_runs_sbethe_from_its_own_rendered_deck(monkeypatch, tmp_path):

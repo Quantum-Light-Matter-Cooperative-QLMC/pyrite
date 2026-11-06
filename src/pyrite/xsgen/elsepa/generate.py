@@ -1,14 +1,19 @@
 """Generate and cache free-atom and muffin-tin ELSEPA tables.
 
+Each energy runs in its own ``elscata`` process. One process keeps its common
+blocks between energies, and ``DPWA`` reads ``CGL(3)`` even when ``DPWA0`` set
+only ``NPH=2`` coefficients, so a later panel can inherit a spin-flip amplitude
+from an earlier energy (issue #656).
+
 Validation: elsepa-vendor-reference
 """
 
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from .._run import run_program
-from ..sources import code_version, resolve_source
+from ..sources import ResolvedSource, code_version, resolve_source
 from ..store import (
     ElementTarget,
     MaterialTarget,
@@ -20,7 +25,7 @@ from ..store import (
 )
 from ..toolchain import build, find_toolchain
 from .deck import DEFAULT_ABSORPTION_STRENGTH, ElsepaDeck
-from .parse import parse_dcs, table_arrays
+from .parse import ElsepaResult, check_transport_scaling, parse_dcs, table_arrays
 
 
 @dataclass(frozen=True)
@@ -92,6 +97,28 @@ def muffin_tin_request(
     return request, deck
 
 
+def run_panels(
+    binary: Path,
+    source: ResolvedSource,
+    deck: ElsepaDeck,
+    *,
+    keep_on_failure: bool = False,
+) -> list[ElsepaResult]:
+    """Run each deck energy in a fresh ``elscata`` process and parse its panel."""
+    panels = []
+    for energy in deck.energies_ev:
+        single = replace(deck, energies_ev=(energy,))
+        run = run_program(
+            binary,
+            data_dirs=source.data_dirs,
+            stdin_text=single.render(),
+            outputs=single.output_names,
+            keep_on_failure=keep_on_failure,
+        )
+        panels.append(parse_dcs(run.outputs[single.output_names[0]]))
+    return panels
+
+
 def _generate(
     request: TableRequest,
     deck: ElsepaDeck,
@@ -107,17 +134,13 @@ def _generate(
     source = resolve_source("elsepa", source_path)
     toolchain = find_toolchain()
     binary = build(source, "elscata", toolchain=toolchain)
-    run = run_program(
-        binary,
-        data_dirs=source.data_dirs,
-        stdin_text=deck.render(),
-        outputs=deck.output_names,
-        keep_on_failure=keep_on_failure,
-    )
-    panels = [parse_dcs(run.outputs[name]) for name in deck.output_names]
+    panels = run_panels(binary, source, deck, keep_on_failure=keep_on_failure)
+    arrays = table_arrays(panels, energies_ev=deck.energies_ev)
+    if deck.high_energy_factorization > 0 and not deck.is_muffin_tin:
+        check_transport_scaling(arrays["energy_eV"], arrays["transport1_cm2"], z=deck.z)
     table = store(
         request,
-        table_arrays(panels, energies_ev=deck.energies_ev),
+        arrays,
         compiler=toolchain.version,
         source_origin=source.origin,
         upstream=source.spec.upstream,

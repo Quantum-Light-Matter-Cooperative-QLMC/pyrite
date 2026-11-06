@@ -8,6 +8,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 
 import numpy as np
+from scipy.constants import physical_constants
 
 _SCALARS = {
     "energy_ev": r"Kinetic energy\s*=\s*([0-9.E+-]+)\s*eV",
@@ -86,6 +87,47 @@ def parse_dcs(data: str | bytes) -> ElsepaResult:
         # zero rather than missing.
         absorption_cm2=_scalar(text, "absorption_cm2", default=0.0),
     )
+
+
+#: ``elscata`` factorizes neutral-atom panels above this energy per unit Z (eV).
+_FACTORIZATION_EV_PER_Z = 20.1e3
+#: ``ELSEPA`` replaces the partial-wave panel with a Born result above this (eV).
+_BORN_ABOVE_EV = 100.0e6
+_ELECTRON_REST_ENERGY_EV = physical_constants["electron mass energy equivalent in MeV"][0] * 1.0e6
+#: Largest accepted ``d ln(sigma_1 p^2 beta^2) / d ln E``.
+_MAX_TRANSPORT_SCALING_SLOPE = 1.0
+
+
+def check_transport_scaling(
+    energy_ev: Iterable[float], transport1_cm2: Iterable[float], *, z: int
+) -> None:
+    """Reject a factorized panel whose first transport cross section stops falling.
+
+    Screened Rutherford scattering has ``sigma_1 ~ L / (p^2 beta^2)`` with a
+    slowly varying logarithm ``L``, so ``sigma_1 p^2 beta^2`` is nearly flat in
+    energy. The largest slope on the released tables is 0.20. A stale spin-flip
+    amplitude holds ``sigma_1`` nearly constant, which gives a slope of 1.9-2.0
+    at high energy. Small contamination stays below this bound; per-energy
+    generation, not this guard, is what prevents it.
+
+    Validation: elsepa-vendor-reference
+    """
+    energy = np.asarray(tuple(energy_ev), dtype=np.float64)
+    sigma = np.asarray(tuple(transport1_cm2), dtype=np.float64)
+    selected = (energy > _FACTORIZATION_EV_PER_Z * z) & (energy <= _BORN_ABOVE_EV)
+    energy, sigma = energy[selected], sigma[selected]
+    if energy.size < 2:
+        return
+    gamma = 1.0 + energy / _ELECTRON_REST_ENERGY_EV
+    scaled = sigma * (gamma**2 - 1.0) * (1.0 - gamma**-2)
+    slope = np.diff(np.log(scaled)) / np.diff(np.log(energy))
+    worst = int(np.argmax(slope))
+    if slope[worst] > _MAX_TRANSPORT_SCALING_SLOPE:
+        raise ValueError(
+            "ELSEPA first transport cross section stops falling with energy: "
+            f"d ln(sigma_1 p^2 beta^2)/d ln E = {slope[worst]:.3g} between "
+            f"{energy[worst]:.5g} and {energy[worst + 1]:.5g} eV for Z={z}"
+        )
 
 
 def _normalized_cdf(panel: ElsepaResult) -> np.ndarray:
