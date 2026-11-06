@@ -14,7 +14,11 @@ from ..observations.spec import Observation
 from ..quantum import QuantumSetup
 from .channeling_cases import resolve_channeling
 from .resolution import UNSET, ResolvedSimulation, _Unset, resolve_models, resolve_simulation
-from .transition_cases import resolve_shell_ionization, resolve_transition_radiation
+from .transition_cases import (
+    resolve_shell_ionization,
+    resolve_transition_radiation,
+    resolve_transport_mode,
+)
 
 if TYPE_CHECKING:
     from .model import Scene, Sweep
@@ -100,6 +104,7 @@ def lower_simulation(request: ResolvedSimulation) -> Case:
         raise RuntimeError(f"one Scene lowered to {len(cases)} cases")
     # Opt-in channeling zone (#506) and TR component (#103): "off" is unchanged.
     cases = resolve_shell_ionization(resolve_transition_radiation(cases, physics), physics)
+    cases = resolve_transport_mode(cases, physics)
     case = resolve_channeling(cases, physics, numerics)[0]
     if scene.beam.state is not None:
         from ..montecarlo.channeling.planar_injection import source_record
@@ -201,6 +206,7 @@ def build_sweep_cases(
             check_kinematic_validity=check_kinematic_validity,
         )
         cases = resolve_shell_ionization(resolve_transition_radiation(cases, physics), physics)
+        cases = resolve_transport_mode(cases, physics)
         cases = resolve_channeling(cases, physics, resolved_numerics)
         if resolved_numerics.seed is not None:
             cases = [

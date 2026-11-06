@@ -15,12 +15,9 @@ from ..geometry import X_MIN, Y_MAX, Z_MAX, Z_MIN
 from ..groove import _first_surface_event_scalar_numba
 from . import _jit_cutoff_bound as _cutoff
 from . import _jit_moment_lookup as _moments
-from ._jit_radiative import (
-    radiative_layer_moments_scalar,
-    sample_hard_photon_energy_scalar,
-)
+from ._jit_radiative import _sample_hard_photon, radiative_layer_moments_scalar
 from .cone_split import EXIT_CONE_SPLIT, _event_key, cone_split_event
-from .core_adapters import adapt_cpu_transport_core
+from .core_adapters import adapt_cpu_transport_core, validate_core_axes
 from .core_geometry import (
     _first_prism_exit_scalar,
     _rotate_direction_scalar,
@@ -41,11 +38,8 @@ from .events import (
     EVENT_SUBSTEP,
 )
 from .hard_inelastic import (
-    POSITRON_BRANCH_OFFSET,
-    _hard_primary_cosine,
-    _hard_secondary_direction,
     _log_grid_frac,
-    _sample_hard_transfer_eV,
+    _sample_hard_collision,
     _soft_loss_sample_keV,
 )
 from .kinematics import (
@@ -56,11 +50,19 @@ from .kinematics import (
 )
 from .lut import _lut_index_frac_scalar, _lut_lerp_1d, _lut_lerp_2d, _lut_lerp_3d
 from .mixed_elastic import (
-    MIXED_MAX_STEP_HARD_MFP,
+    MIXED_STEP_LOSS_MARGIN,
+    STEP_END_ELASTIC,
+    STEP_END_INELASTIC,
+    STEP_END_LIMIT,
+    STEP_END_RADIATIVE,
+    _grid_rate_bound,
     _hinge_direction,
+    _layer_hard_rate_bound,
     _layer_soft_rates,
+    _mixed_hard_element,
     _mixed_hard_quantile_scalar,
     _mixed_hard_rate_scalar,
+    _plan_mixed_step,
 )
 from .scattering import (
     _alpha_sr_joy_scalar,
@@ -134,9 +136,8 @@ def make_cpu_transport_core(
     enters the cone ends after that event. Without it the cores are the
     unchanged historical ones. ``mixed=True`` compiles the opt-in mixed elastic
     scheme (#894, :mod:`.mixed_elastic`) into the exact per-electron ELSEPA core:
-    rows also end at a random hinge or a step limit, which deflect or do nothing
-    and leave every optical depth running. With ``C1 = 0`` it consumes no extra
-    draws and is bit-for-bit the detailed core.
+    steps run at thinned hard-rate bounds and hold one random hinge. With
+    ``C1 = 0`` it consumes no extra draws and is bit-for-bit the detailed core.
 
     Validation: gpu-transport-core
     Validation: mixed-elastic-split
@@ -145,16 +146,7 @@ def make_cpu_transport_core(
     Validation: shell-soft-hard-transport
     Validation: detector-cone-variance-reduction
     """
-    if grooved and (per_electron or lut):
-        raise ValueError("grooved transport has only an exact lockstep specialization")
-    if grooved and inelastic:
-        raise ValueError("shell soft/hard inelastic transport has no grooved specialization")
-    if radiative and (grooved or lut):
-        raise ValueError("coupled radiative transport has only exact ungrooved specializations")
-    if cone_split and (grooved or lut or not per_electron):
-        raise ValueError("detector-cone splitting has only exact per-electron specializations")
-    if mixed and (grooved or lut or cone_split or not per_electron):
-        raise ValueError("mixed elastic transport has only exact per-electron specializations")
+    validate_core_axes(grooved, per_electron, lut, inelastic, radiative, cone_split, mixed)
 
     @njit(cache=True)
     def body(
@@ -334,6 +326,10 @@ def make_cpu_transport_core(
             mix_left = np.full(Ne, -1.0)
             mix_hinge = np.full(Ne, -1.0)
             mix_length = np.zeros(Ne)
+            # Hazard bounds of the current step (elastic [1/cm], inelastic and
+            # radiative [1/Ang]) and the process proposing at its end.
+            mix_bound = np.zeros((Ne, 3))
+            mix_end = np.zeros(Ne, dtype=np.int64)
         # Lazy midpoint cutoff (#841); the skip proof is in _jit_cutoff_bound.
         cut_lazy, cut_bound = False, np.zeros(n_layers)
         if lazy_cutoff and energy_model_code == 1 and not straggle_on:
@@ -476,6 +472,7 @@ def make_cpu_transport_core(
                 if mu_rad > 0.0 and tau_rad[e] / mu_rad < step_j:
                     step_j, rad_j, hard_j = tau_rad[e] / mu_rad, True, False
             hinge_j = delta_j = False
+            mix_element = -1
             if mixed:
                 if (
                     mix_left[e] < 0.0
@@ -484,11 +481,30 @@ def make_cpu_transport_core(
                     )[0]
                     > 0.0
                 ):
-                    hard_total = total_rate
+                    # Hard processes run at upper bounds over the step's energies;
+                    # a proposal at its end is thinned to the true rate, so only a
+                    # surface or cutoff shortens the step (PENELOPE Eqs. 4.96-4.98).
+                    E_low = max(E_j * (1.0 - MIXED_STEP_LOSS_MARGIN * mix_c2), E_cut_e)
+                    mix_bound[e, 0] = _layer_hard_rate_bound(
+                        E_low, E_j, L, n_el, el_logE, el_log_rate, mix_hf, el_start, el_len
+                    )
+                    mix_inelastic = mix_radiative = np.inf
                     if inelastic:
-                        hard_total += mu_hard * 1e8
+                        mix_bound[e, 1] = _grid_rate_bound(
+                            il_rate[L], il_logE[L], il_n[L], np.log(E_low), np.log(E_j)
+                        )
+                        if mix_bound[e, 1] > 0.0:
+                            mix_inelastic = tau_h[e] / mix_bound[e, 1]
                     if radiative:
-                        hard_total += mu_rad * 1e8
+                        if rad_table:
+                            _, mu_low = _moments.table_moments(rad_plasma, n_layers, L, E_low * 1e3)
+                        else:
+                            _, mu_low = _moments.exact_moments(
+                                radiative_args, L, E_low * 1e3, rad_scratch_rates
+                            )
+                        mix_bound[e, 2] = max(mu_rad, mu_low)
+                        if mix_bound[e, 2] > 0.0:
+                            mix_radiative = tau_rad[e] / mix_bound[e, 2]
                     if sbethe_on:
                         mix_stopping = _dEds_sbethe_packed_scalar(
                             L_sbethe_logE, L_sbethe_logS, L, L_sbethe_n[L], E_j
@@ -499,20 +515,28 @@ def make_cpu_transport_core(
                         )
                     if radiative:
                         mix_stopping -= rad_soft * 1e-3
-                    mix_length[e] = min(
-                        step_j,
-                        mix_limit[L],
-                        MIXED_MAX_STEP_HARD_MFP * 1e8 / hard_total,
-                        mix_c2 * E_j / (-mix_stopping),
-                    )
+                    mix_length[e], mix_end[e] = _plan_mixed_step(
+                        tau_left[e] * 1e8 / mix_bound[e, 0], mix_inelastic, mix_radiative,
+                        mix_bound[e], min(mix_limit[L], mix_c2 * E_j / (-mix_stopping)),
+                    )  # fmt: skip
                     mix_left[e] = mix_length[e]
                     mix_hinge[e] = mix_length[e] * _stream_uniform_scalar(stream_key[e], draws[e])
                     draws[e] += _SM64_ONE
                 if mix_left[e] >= 0.0:
-                    if 0.0 <= mix_hinge[e] < step_j:
-                        step_j, hinge_j, hard_j, rad_j = mix_hinge[e], True, False, False
-                    elif mix_left[e] < step_j:
-                        step_j, delta_j, hard_j, rad_j = mix_left[e], True, False, False
+                    # The row consumes optical depth at the step's bounds.
+                    lam_ang = 1e8 / mix_bound[e, 0]
+                    if inelastic:
+                        mu_hard = mix_bound[e, 1]
+                    if radiative:
+                        mu_rad = mix_bound[e, 2]
+                    hard_j = rad_j = False
+                    if mix_hinge[e] >= 0.0:
+                        step_j, hinge_j = mix_hinge[e], True
+                    else:
+                        step_j = mix_left[e]
+                        delta_j = mix_end[e] == STEP_END_LIMIT
+                        hard_j = mix_end[e] == STEP_END_INELASTIC
+                        rad_j = mix_end[e] == STEP_END_RADIATIVE
 
             dx, dy, dz = dirs[e, 0], dirs[e, 1], dirs[e, 2]
             px, py, pz = pos[e, 0], pos[e, 1], pos[e, 2]
@@ -805,6 +829,19 @@ def make_cpu_transport_core(
                 event_j = EVENT_HARD_RADIATIVE
             else:
                 event_j = EVENT_ELASTIC
+            thinned_j = False
+            if mixed and mix_left[e] >= 0.0:
+                thinned_j = True
+                if event_j == EVENT_ELASTIC:
+                    # One uniform accepts the proposal and picks the element,
+                    # both at the energy the event happens.
+                    mix_element = _mixed_hard_element(
+                        _stream_uniform_scalar(stream_key[e], draws[e]) * mix_bound[e, 0],
+                        E_end_j, L, n_el, el_logE, el_log_rate, mix_hf, el_start, el_len,
+                    )  # fmt: skip
+                    draws[e] += _SM64_ONE
+                    if mix_element < 0:
+                        event_j = EVENT_DELTA
             if inelastic:
                 hard_W_keV, hard_code = 0.0, -1
                 hard_cos, hard_phi = 1.0, 0.0
@@ -812,55 +849,34 @@ def make_cpu_transport_core(
                 if event_j == EVENT_HARD_INELASTIC:
                     # Channel, transfer, recoil, azimuth: four hard-stream
                     # draws, all evaluated at the row's start energy, where
-                    # its hazard was.
+                    # its hazard was; a thinned proposal uses the row's end.
                     u_ch = _stream_uniform_scalar(il_keys[e], hard_draws[e])
                     u_w = _stream_uniform_scalar(il_keys[e], hard_draws[e] + _SM64_ONE)
                     u_q = _stream_uniform_scalar(il_keys[e], hard_draws[e] + np.uint64(2))
                     u_phi = _stream_uniform_scalar(il_keys[e], hard_draws[e] + np.uint64(3))
                     hard_draws[e] += np.uint64(4)
                     target = u_ch * mu_hard
-                    ch = il_nch[L] - 1
-                    cumulative = 0.0
-                    for k_ch in range(il_nch[L]):
-                        cumulative += il_ch_rate[L, k_ch, il_lo] + il_f * (
-                            il_ch_rate[L, k_ch, il_lo + 1] - il_ch_rate[L, k_ch, il_lo]
+                    mu_event = mu_hard
+                    if thinned_j:
+                        il_lo, il_f = _log_grid_frac(il_logE[L], il_n[L], np.log(E_end_j))
+                        mu_event = il_rate[L, il_lo] + il_f * (
+                            il_rate[L, il_lo + 1] - il_rate[L, il_lo]
                         )
-                        if cumulative > target:
-                            ch = k_ch
-                            break
-                    E_eV = E_j * 1.0e3
-                    W_eV = _sample_hard_transfer_eV(
-                        E_eV,
-                        il_ch_U[L, ch],
-                        il_ch_W[L, ch],
-                        il_ch_branch[L, ch],
-                        il_cutoff_eV,
-                        u_w,
-                    )
-                    if il_ch_branch[L, ch] >= POSITRON_BRANCH_OFFSET:
-                        # W_max = E at the row start can exceed the soft-debited
-                        # row-end energy only for positrons; absorb, never overdraw.
-                        W_eV = min(W_eV, E_end_j * 1.0e3)
-                    hard_W_keV, hard_code = W_eV * 1.0e-3, il_ch_code[L, ch]
-                    if sec_on:
-                        sec_x, sec_y, sec_z = _hard_secondary_direction(
-                            dx, dy, dz, E_eV, il_ch_U[L, ch], il_ch_W[L, ch],
-                            il_ch_branch[L, ch], W_eV, u_q, u_phi,
-                        )  # fmt: skip
-                    if E_end_j - hard_W_keV <= E_cut_e:
-                        # The collision leaves the primary below its cutoff:
-                        # absorbed at the collision point, a terminal row.
-                        event_j, cutoff_j = EVENT_CUTOFF, True
+                    if target >= mu_event and thinned_j:
+                        event_j = EVENT_DELTA
                     else:
-                        hard_cos = _hard_primary_cosine(
-                            E_eV,
-                            il_ch_U[L, ch],
-                            il_ch_W[L, ch],
-                            il_ch_branch[L, ch],
-                            W_eV,
-                            u_q,
-                        )
-                        hard_phi = 2.0 * np.pi * u_phi
+                        (
+                            hard_W_keV, hard_code, hard_cos, hard_phi, sec_x, sec_y, sec_z, absorbed,
+                        ) = _sample_hard_collision(
+                            target, (E_end_j if thinned_j else E_j) * 1.0e3, E_end_j, E_cut_e,
+                            u_w, u_q, u_phi, dx, dy, dz, il_ch_rate[L], il_nch[L], il_lo, il_f,
+                            il_ch_U[L], il_ch_W[L], il_ch_branch[L], il_ch_code[L],
+                            il_cutoff_eV, sec_on,
+                        )  # fmt: skip
+                        if absorbed:
+                            # The collision leaves the primary below its cutoff:
+                            # absorbed at the collision point, a terminal row.
+                            event_j, cutoff_j = EVENT_CUTOFF, True
             if radiative:
                 rad_k_eV, rad_event_Z = 0.0, 0
                 if event_j == EVENT_HARD_RADIATIVE:
@@ -868,46 +884,25 @@ def make_cpu_transport_core(
                     # scattering. The photon and its element are conditional on
                     # the electron's actual pre-event energy at this row end.
                     _, mu_event = radiative_layer_moments_scalar(
-                        rad_nel,
-                        rad_nT,
-                        rad_Z,
-                        rad_ncm3,
-                        rad_incident,
-                        rad_nominal,
-                        rad_top,
-                        rad_chi,
-                        L,
-                        E_end_j * 1e3,
-                        rad_cutoff_eV,
-                        rad_scratch_rates,
-                        rad_plasma,
-                    )
+                        rad_nel, rad_nT, rad_Z, rad_ncm3, rad_incident, rad_nominal, rad_top,
+                        rad_chi, L, E_end_j * 1e3, rad_cutoff_eV, rad_scratch_rates, rad_plasma,
+                    )  # fmt: skip
                     u_el = _stream_uniform_scalar(rad_keys[e], rad_draws[e])
                     u_k = _stream_uniform_scalar(rad_keys[e], rad_draws[e] + _SM64_ONE)
                     rad_draws[e] += np.uint64(2)
                     target = u_el * mu_event
-                    element_index = rad_nel[L] - 1
-                    cumulative = 0.0
-                    for k_el in range(rad_nel[L]):
-                        cumulative += rad_scratch_rates[k_el]
-                        if cumulative > target:
-                            element_index = k_el
-                            break
-                    nT = rad_nT[L, element_index]
-                    rad_k_eV = sample_hard_photon_energy_scalar(
-                        rad_incident[L, element_index, :nT],
-                        rad_nominal[L, element_index],
-                        rad_top[L, element_index, :nT],
-                        rad_chi[L, element_index, :nT],
-                        rad_Z[L, element_index],
-                        E_end_j * 1e3,
-                        rad_cutoff_eV,
-                        u_k,
-                        rad_plasma[L],
-                    )
-                    rad_event_Z = rad_Z[L, element_index]
-                    if E_end_j - rad_k_eV * 1e-3 <= E_cut_e:
-                        event_j, cutoff_j = EVENT_CUTOFF, True
+                    if mixed and thinned_j:
+                        target = u_el * mix_bound[e, 2]
+                    if target >= mu_event and thinned_j:
+                        event_j = EVENT_DELTA
+                    else:
+                        rad_k_eV, rad_event_Z = _sample_hard_photon(
+                            target, u_k, L, rad_nel, rad_nT, rad_Z, rad_incident, rad_nominal,
+                            rad_top, rad_chi, E_end_j * 1e3, rad_cutoff_eV, rad_scratch_rates,
+                            rad_plasma,
+                        )  # fmt: skip
+                        if E_end_j - rad_k_eV * 1e-3 <= E_cut_e:
+                            event_j, cutoff_j = EVENT_CUTOFF, True
             if per_electron:
                 i = e - e_start
                 slot, record = i * cap + local_nseg[e], local_nseg[e] < cap
@@ -1057,6 +1052,14 @@ def make_cpu_transport_core(
                             draws[e] += np.uint64(2)
                             mix_hinge[e] = -1.0
                         else:
+                            # A rejected proposal has used up its clock; the
+                            # other optical depths keep running.
+                            if mix_end[e] == STEP_END_ELASTIC:
+                                tau_left[e] = -1.0
+                            elif inelastic and mix_end[e] == STEP_END_INELASTIC:
+                                tau_h[e] = -1.0
+                            elif radiative and mix_end[e] == STEP_END_RADIATIVE:
+                                tau_rad[e] = -1.0
                             mix_left[e] = -1.0
                         flight_id[e] += 1
                         substep_id[e] = 0
@@ -1087,7 +1090,9 @@ def make_cpu_transport_core(
                     E_keV[e] -= rad_k_eV * 1e-3
 
             if full_j:
-                if n_el == 1:
+                if mixed and mix_element >= 0:
+                    i_el = mix_element
+                elif n_el == 1:
                     i_el = 0
                 elif lut:
                     u = (
@@ -1115,13 +1120,8 @@ def make_cpu_transport_core(
                         if per_electron:
                             if mixed:
                                 rate = _mixed_hard_rate_scalar(
-                                    E_j,
-                                    el_logE,
-                                    el_log_rate,
-                                    mix_hf,
-                                    el_start[L, k_el],
-                                    el_len[L, k_el],
-                                )
+                                    E_j, el_logE, el_log_rate, mix_hf, el_start[L, k_el], el_len[L, k_el]
+                                )  # fmt: skip
                             elif elastic_model_code == 2:
                                 rate = _elsepa_rate_scalar(
                                     E_j, el_logE, el_log_rate, el_start[L, k_el], el_len[L, k_el]

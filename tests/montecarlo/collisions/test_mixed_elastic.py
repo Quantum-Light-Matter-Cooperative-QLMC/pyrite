@@ -5,13 +5,19 @@ Validation: mixed-elastic-soft-moments
 Validation: mixed-elastic-hinge
 """
 
+from functools import partial
+
 import numpy as np
 import pytest
 
 from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
+from pyrite.montecarlo.transport import host_pass
 from pyrite.montecarlo.transport.events import (
+    EVENT_CUTOFF,
     EVENT_DELTA,
     EVENT_ELASTIC,
+    EVENT_HARD_INELASTIC,
+    EVENT_HARD_RADIATIVE,
     EVENT_SOFT_HINGE,
     EVENT_SUBSTEP,
 )
@@ -20,16 +26,23 @@ from pyrite.montecarlo.transport.mixed_elastic import (
     MixedElasticParameters,
     _hinge_moments,
     _invert_cdf_row,
+    _layer_hard_rate_bound,
+    _mixed_hard_element,
     _mixed_hard_quantile_scalar,
     _mixed_hard_rate_scalar,
     _mixed_soft_rates_scalar,
+    _panel_moments,
     _sample_hinge_mu,
     layer_step_limits_ang,
     mean_angular_deflection,
     mixed_elastic_tables,
     validate_mixed_parameters,
 )
-from pyrite.montecarlo.transport.scattering import _elsepa_rate_scalar, pack_elsepa_tables
+from pyrite.montecarlo.transport.scattering import (
+    _elsepa_bracket,
+    _elsepa_rate_scalar,
+    pack_elsepa_tables,
+)
 
 MU = np.concatenate([[0.0], np.geomspace(1e-9, 1.0, 400)])
 ENERGIES_KEV = np.geomspace(20.0, 2000.0, 12)
@@ -266,6 +279,80 @@ def test_mixed_transport_is_much_cheaper_and_reproducible():
     np.testing.assert_array_equal(mixed["v_hat"], again["v_hat"])
 
 
+def _lewis_rates(group, E_keV):
+    """Detailed ``(Sigma, 1/lam_1, 1/lam_2)`` [1/cm] at ``E_keV``, on the sampler's own law."""
+    _, start, length, log_e, log_rate, cdf, pdf, mu, _ = group
+    row, f = _elsepa_bracket(np.log(E_keV * 1e3), log_e, int(start[0, 0]), int(length[0, 0]))
+    rate = np.exp(log_rate[row] + f * (log_rate[row + 1] - log_rate[row]))
+    q1_lo, q1_hi, q2_lo, q_cross, q2_hi = _panel_moments(
+        cdf[row], pdf[row], cdf[row + 1], pdf[row + 1], mu, 1.0
+    )
+    first = (1.0 - f) * q1_lo + f * q1_hi
+    second = (1.0 - f) ** 2 * q2_lo + 2.0 * f * (1.0 - f) * q_cross + f**2 * q2_hi
+    return rate, 2.0 * rate * first, 6.0 * rate * (first - second)
+
+
+def _mid_slab_transport(monkeypatch, parameters, *, Ne, thickness=1e7):
+    """Tracks that start mid-slab and end at the cutoff, so the medium looks infinite."""
+    sample = host_pass.initial_beam_positions
+
+    def from_mid_slab(*args, **kwargs):
+        positions, slopes, entry = sample(*args, **kwargs)
+        positions = positions.copy()
+        positions[:, 2] += 0.5 * thickness
+        return positions, slopes, entry
+
+    monkeypatch.setattr(host_pass, "initial_beam_positions", from_mid_slab)
+    return _transport(
+        parameters, Ne=Ne, E0=170.0, E_cut_keV=100.0, thickness=thickness, max_steps=1_000_000
+    )
+
+
+@pytest.mark.parametrize(("c1", "c2"), [(0.05, 0.05), (0.2, 0.2)])
+def test_mixed_tracks_follow_the_lewis_integrals_across_nodes(monkeypatch, group, c1, c2):
+    """Hard events and both angular moments against noise-free integrals.
+
+    The track crosses two table nodes, where the frozen panel cutoff makes the
+    hard rate jump. Stopping is continuous, so ``E(s)`` is the same for every
+    track and the references are deterministic.
+    """
+    Ne = 20_000
+    result = _mid_slab_transport(monkeypatch, MixedElasticParameters(c1=c1, c2=c2), Ne=Ne)
+    electron, kind = result["electron_id"], result["event_kind"]
+    last = np.r_[np.nonzero(np.diff(electron))[0], electron.size - 1]
+    assert last.size == Ne
+    assert np.all(kind[last] == EVENT_CUTOFF)
+
+    # The energy along one track, piecewise linear in its rows.
+    track = electron == electron[0]
+    length = result["L_ang"][track]
+    start, end = result["E_start_keV"][track], result["E_end_keV"][track]
+    nodes, weights = np.polynomial.legendre.leggauss(4)
+    tables = mixed_elastic_tables(group, c1)
+    hard_integral = first_integral = second_integral = 0.0
+    for row_length, row_start, row_end in zip(length, start, end, strict=True):
+        for node, weight in zip(nodes, weights, strict=True):
+            E_keV = row_start + 0.5 * (node + 1.0) * (row_end - row_start)
+            hard = _mixed_hard_rate_scalar(
+                E_keV, group[3], group[4], tables[0], int(group[1][0, 0]), int(group[2][0, 0])
+            )
+            _, inverse_1, inverse_2 = _lewis_rates(group, E_keV)
+            ds_cm = 0.5 * weight * row_length * 1e-8
+            hard_integral += hard * ds_cm
+            first_integral += inverse_1 * ds_cm
+            second_integral += inverse_2 * ds_cm
+
+    counts = np.count_nonzero(kind == EVENT_ELASTIC) / Ne
+    assert counts == pytest.approx(hard_integral, abs=4.0 * np.sqrt(hard_integral / Ne))
+
+    cosine = result["v_hat"][last, 2]
+    p2 = 1.5 * cosine**2 - 0.5
+    for measured, integral in ((cosine, first_integral), (p2, second_integral)):
+        expected = np.exp(-integral)
+        error = np.std(measured) / np.sqrt(Ne)
+        assert abs(np.mean(measured) - expected) < 4.0 * error
+
+
 def _exit_summary(result):
     electron = result["electron_id"]
     last = np.r_[np.nonzero(np.diff(electron))[0], electron.size - 1]
@@ -347,6 +434,53 @@ def test_collision_specializations_keep_the_detailed_limit_and_run_mixed(extra):
     assert np.all(np.isfinite(mixed["E_end_keV"]))
 
 
+@pytest.mark.parametrize("c1", [0.05, 0.2])
+def test_hazard_bound_covers_the_hard_rate_and_its_elements(group, c1):
+    tables = mixed_elastic_tables(group, c1)
+    start, length = group[1], group[2]
+    # The window straddles table nodes, where the frozen cutoff makes the rate jump.
+    E_low, E_high = 25.0, 170.0
+    bound = _layer_hard_rate_bound(
+        E_low, E_high, 0, 1, group[3], group[4], tables[0], start, length
+    )
+    energies = np.geomspace(E_low, E_high, 4001)
+    rates = [
+        _mixed_hard_rate_scalar(E, group[3], group[4], tables[0], start[0, 0], length[0, 0])
+        for E in energies
+    ]
+    assert bound >= max(rates)
+    # Tight: the supremum sits at a panel's edge, which the fine grid approaches.
+    assert bound == pytest.approx(max(rates), rel=2e-3)
+
+    E_keV = 100.0
+    rate = _mixed_hard_rate_scalar(E_keV, group[3], group[4], tables[0], start[0, 0], length[0, 0])
+    element = partial(
+        _mixed_hard_element, E_keV=E_keV, L=0, n_el=1, logE_flat=group[3],
+        log_rate_flat=group[4], hard_fraction=tables[0], start=start, length=length,
+    )  # fmt: skip
+    assert element(target=0.999 * rate) == 0
+    assert element(target=1.001 * rate) == -1
+
+
+@pytest.mark.parametrize(
+    ("extra", "event", "Ne", "minimum"),
+    [
+        (_shell_kwargs, EVENT_HARD_INELASTIC, 400, 100),
+        (_radiative_kwargs, EVENT_HARD_RADIATIVE, 4000, 20),
+    ],
+    ids=["inelastic", "radiative"],
+)
+def test_thinned_hard_processes_keep_the_detailed_event_count(extra, event, Ne, minimum):
+    """Rejected proposals restart their own clock and leave the others running."""
+    arguments = {"Ne": Ne, "thickness": 1e6, **extra()}
+    detailed = np.count_nonzero(_transport(None, **arguments)["event_kind"] == event)
+    mixed = _transport(MixedElasticParameters(), seed=23, **arguments)
+    count = np.count_nonzero(mixed["event_kind"] == event)
+    assert detailed >= minimum
+    assert abs(count - detailed) < 4.0 * np.sqrt(count + detailed)
+    assert np.any(mixed["event_kind"] == EVENT_DELTA)
+
+
 def test_compound_rates_add_over_elements():
     composition = [("Mo", 0.0186), ("Se", 0.0372)]
     tables = {"elastic_tables": [[_sr_table(42), _sr_table(34)]], "composition": composition}
@@ -358,3 +492,144 @@ def test_compound_rates_add_over_elements():
 
     np.testing.assert_array_equal(limit["L_ang"], detailed["L_ang"])
     assert np.any(mixed["event_kind"] == EVENT_SOFT_HINGE)
+
+
+def _mixed_physics(**kwargs):
+    from pyrite import Physics
+
+    return Physics(transport_mode="mixed", **kwargs)
+
+
+def test_physics_default_adds_no_case_keys():
+    from pyrite import Physics
+    from pyrite._mixed_elastic_policy import mixed_case_keys
+
+    physics = Physics()
+    assert physics.transport_mode == "single-scattering"
+    assert (
+        mixed_case_keys(
+            physics.transport_mode, physics.mixed_c1, physics.mixed_c2, physics.mixed_max_step_um
+        )
+        == {}
+    )
+
+
+def test_physics_mixed_resolves_default_parameters():
+    from pyrite._mixed_elastic_policy import mixed_case_keys
+
+    physics = _mixed_physics(mixed_max_step_um=2.0)
+    assert mixed_case_keys(
+        physics.transport_mode, physics.mixed_c1, physics.mixed_c2, physics.mixed_max_step_um
+    ) == {
+        "transport_mode": "mixed",
+        "mixed_c1": 0.05,
+        "mixed_c2": 0.05,
+        "mixed_max_step_um": 2.0,
+    }
+
+
+@pytest.mark.parametrize(
+    "kwargs, message",
+    [
+        ({"mixed_c1": 0.1}, "transport_mode='mixed'"),
+        ({"transport_mode": "condensed"}, "transport_mode must be"),
+        ({"transport_mode": "mixed", "mixed_c1": 0.3}, "mixed_c1"),
+        ({"transport_mode": "mixed", "mixed_c2": -0.1}, "mixed_c2"),
+        ({"transport_mode": "mixed", "mixed_max_step_um": 0.0}, "mixed_max_step_um"),
+        ({"transport_mode": "mixed", "elastic_model": "mott"}, "elastic_model='elsepa'"),
+    ],
+)
+def test_physics_refuses_invalid_mixed_settings(kwargs, message):
+    from pyrite import Physics
+
+    with pytest.raises(ValueError, match=message):
+        Physics(**kwargs)
+
+
+def _mixed_scene():
+    import pyrite as pr
+
+    # Thick: on a target thin against the hard mean free path, the layer step
+    # limit makes mixed transport cost more rows than detailed scattering.
+    beam = pr.Beam(
+        energy_keV=1000.0, transverse=pr.beams.Spot(), longitudinal=pr.beams.PointBunch()
+    )
+    target = pr.geometry.Slab(
+        "silicon", thickness_ang=1_000_000.0, footprint=pr.geometry.Footprint(5.0, 5.0)
+    )
+    return pr.Scene(beam, target, pr.Detector())
+
+
+def _lowered(physics=None):
+    import numpy as np
+
+    import pyrite as pr
+    from pyrite import api
+    from pyrite.detectors import EnergyBins
+
+    grid = np.array([1000.0, 1050.0])
+    numerics = pr.Numerics(cxr_trials=1, brem_trials=1, energy_bins=EnergyBins(cxr=grid, brem=grid))
+    return api.build_case(_mixed_scene(), numerics, physics=physics)
+
+
+def test_default_case_carries_no_mixed_keys():
+    case = _lowered()
+    assert "transport_mode" not in case
+    assert not any(key.startswith("mixed_") for key in case)
+
+
+def test_mixed_case_records_identity_and_routes_to_per_electron():
+    from pyrite.montecarlo.runner.adaptive import case_transport_core
+    from pyrite.montecarlo.runner.case_tables import _case_elastic_kwargs
+
+    case = _lowered(_mixed_physics(mixed_c1=0.1))
+    assert case["transport_mode"] == "mixed"
+    assert (case["mixed_c1"], case["mixed_c2"]) == (0.1, 0.05)
+    assert "mixed_max_step_um" not in case
+    assert _case_elastic_kwargs(case)["mixed_elastic"] == (0.1, 0.05, None)
+    assert case_transport_core(case, "auto") == "per-electron"
+
+
+@pytest.mark.parametrize(
+    "overrides, message",
+    [
+        ({"mixed_c1": 0.5}, "mixed_c1"),
+        ({"transport_mode": "condensed"}, "transport_mode must be"),
+        ({"coherent_emission": True}, "coherent emission"),
+        ({"temporal_profile": True}, "temporal profiles"),
+        ({"groove_spacing_ang": 100.0}, "grooved"),
+    ],
+)
+def test_case_refuses_ineligible_mixed_combinations(overrides, message):
+    from dataclasses import replace
+
+    case = _lowered(_mixed_physics())
+    with pytest.raises(ValueError, match=message):
+        replace(case, **overrides)
+
+
+def test_public_mixed_physics_cuts_rows():
+    import pyrite as pr
+    from pyrite.campaign.trajectories import simulate_trajectories
+
+    scene = _mixed_scene()
+    numerics = pr.Numerics(cxr_trials=40, brem_trials=40, seed=7)
+    rows = [
+        simulate_trajectories(scene.beam, scene.target, physics=physics, numerics=numerics)[
+            "E_end_keV"
+        ].size
+        for physics in (pr.Physics(), _mixed_physics())
+    ]
+    assert rows[1] < rows[0]
+
+
+def test_mixed_case_records_model_marker_and_default_does_not():
+    from pyrite._physics_provenance import resolved_physics_view
+
+    markers = dict(
+        resolved_physics_view(_lowered(_mixed_physics()), table_markers={}).model_markers
+    )
+    assert markers["mixed_elastic_model"] == "penelope-random-hinge.v1"
+    assert "mixed_elastic_model" not in dict(
+        resolved_physics_view(_lowered(), table_markers={}).model_markers
+    )

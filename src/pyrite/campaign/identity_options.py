@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, cast
 
+from .._mixed_elastic_policy import mixed_case_keys
 from .._numerics import DEFAULT_INELASTIC_CUTOFF_EV, DEFAULT_RADIATIVE_CUTOFF_EV
 from .._radiative_moment_policy import RADIATIVE_MOMENT_MODEL
 from .inelastic_cases import covered_shell_materials, shell_fallback_reason, target_shell_materials
@@ -84,6 +85,10 @@ class IdentityOptions:
     positron_transport: bool
     atomic_electron_deflection: str
     allow_fallback: bool = False
+    transport_mode: str = "single-scattering"
+    mixed_c1: Any = None
+    mixed_c2: Any = None
+    mixed_max_step_um: Any = None
 
 
 def pop_identity_options(settings_payload: dict[str, Any]) -> IdentityOptions:
@@ -105,6 +110,10 @@ def pop_identity_options(settings_payload: dict[str, Any]) -> IdentityOptions:
         positron_transport=bool(settings_payload.pop("positron_transport", False)),
         # Absent in a record minted before #317: elastic-only, as it ran.
         atomic_electron_deflection=str(settings_payload.pop("atomic_electron_deflection", "none")),
+        transport_mode=str(settings_payload.pop("transport_mode", "single-scattering")),
+        mixed_c1=settings_payload.pop("mixed_c1", None),
+        mixed_c2=settings_payload.pop("mixed_c2", None),
+        mixed_max_step_um=settings_payload.pop("mixed_max_step_um", None),
     )
 
 
@@ -151,6 +160,11 @@ def transport_numerics_payload(
         options.elastic_model != "mott" or inelastic_model != "shell-soft-hard"
     ):
         numerics["atomic_electron_deflection"] = options.atomic_electron_deflection
+    numerics.update(
+        mixed_case_keys(
+            options.transport_mode, options.mixed_c1, options.mixed_c2, options.mixed_max_step_um
+        )
+    )
     return numerics
 
 

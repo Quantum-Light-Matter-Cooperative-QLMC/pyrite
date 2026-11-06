@@ -11,6 +11,7 @@ from collections.abc import Mapping
 from pathlib import PurePath
 from typing import TYPE_CHECKING
 
+from ._mixed_elastic_policy import mixed_provenance_markers
 from ._physics_contract import (
     BUILTIN_DESCRIPTORS,
     ApplicabilityEvidence,
@@ -130,6 +131,7 @@ def resolved_physics_view(
             resolved.get("adaptive_precision"), selections["emission.continuum"]
         )
     )
+    markers.update(mixed_provenance_markers(resolved))
     if resolved.get("photon_transport") is not None:
         markers["photon_transport_model"] = resolved["photon_transport"]["model"]
     if resolved.get("coherent_emission", False):
