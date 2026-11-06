@@ -59,17 +59,19 @@ def _(np):
     from pyrite.geometry import Slab
     from pyrite.units import ureg
 
-    tilts = np.array([15.0, 30.0, 45.0, 60.0]) * ureg.degree
-    thicknesses = np.array([25.0, 50.0, 75.0, 100.0, 125.0]) * ureg.nm
-    band_eV = (600.0, 2_000.0)
+    tilts = np.array([5.0, 25.0, 45.0, 65.0, 85.0]) * ureg.degree
+    thicknesses = np.array([100.0, 200.0, 300.0, 400.0, 500.0, 600.0]) * ureg.nm
+    band_eV = (50.0, 2_000.0)
+    tilt_azimuth = 180.0 * ureg.degree
+    beam_energy = 30 * ureg.keV
     beam = Beam(
-        kinetic_energy=30 * ureg.keV,
+        kinetic_energy=beam_energy,
         transverse=PointSpot(),
         longitudinal=PointBunch(),
     )
     size = {"width": 5 * ureg.mm, "height": 5 * ureg.mm}
     numerics = Numerics(
-        sampling=FixedSampling(cxr_electrons=1_024, brem_electrons=1_024),
+        sampling=FixedSampling(cxr_electrons=256, brem_electrons=256),
         cxr_reflections=CxrReflections(n_families=1),
     )
     return (
@@ -80,9 +82,11 @@ def _(np):
         Sweep,
         band_eV,
         beam,
-        size,
+        beam_energy,
         numerics,
+        size,
         thicknesses,
+        tilt_azimuth,
         tilts,
         ureg,
     )
@@ -111,36 +115,46 @@ def _(
     Slab,
     Sweep,
     beam,
-    size,
     numerics,
+    size,
     thicknesses,
+    tilt_azimuth,
     tilts,
     ureg,
 ):
     sweep = Sweep(
         base=Scene(
             beam,
-            Slab("hopg", thickness=thicknesses[0], tilt=tilts[0], **size),
+            Slab(
+                "hopg",
+                thickness=thicknesses[0],
+                tilt=tilts[0],
+                tilt_azimuth=tilt_azimuth,
+                **size,
+            ),
             Detector(observation_angle=135 * ureg.degree),
         ),
         axes={"target.tilt": tuple(tilts), "target.thickness": tuple(thicknesses)},
     )
-    cases = sweep.cases(numerics=numerics, physics=Physics(brem_source="none"))
+    cases = sweep.cases(numerics=numerics, physics=Physics(brem_source="mc"))
     assert len(cases) == len(tilts) * len(thicknesses)
     return (cases,)
 
 
 @app.cell
 def _(band_eV, cases, mo, np, tables_ready, thicknesses, tilts):
-    from tempfile import TemporaryDirectory
+    from pathlib import Path
 
     from pyrite.execution import run_sweep
+
+    # Completed cases persist here, so a rerun resumes instead of recomputing.
+    _checkpoints = Path.home() / ".cache" / "pyrite-sweep"
+    _checkpoints.mkdir(parents=True, exist_ok=True)
 
     assert tables_ready
     store = {}
     with mo.status.spinner(title="Running the tilt–thickness sweep"):
-        with TemporaryDirectory(prefix="pyrite-sweep-") as _checkpoints:
-            assert run_sweep(cases, store, checkpoint_dir=_checkpoints, progress=False)
+        assert run_sweep(cases, store, checkpoint_dir=_checkpoints, progress=False)
 
     # Cases follow axis order, so the first axis (tilt) gives the rows.
     _yields = []
@@ -203,39 +217,93 @@ def _(mo):
 
 
 @app.cell
-def _(Slab, band_eV, beam, size, mo, np, numerics, tables_ready, tilts, ureg):
-    from pyrite.radiation import directional_sources
+def _(
+    Slab,
+    band_eV,
+    beam,
+    beam_energy,
+    mo,
+    np,
+    numerics,
+    size,
+    tables_ready,
+    tilt_azimuth,
+    tilts,
+    ureg,
+):
+    from pyrite.radiation import directional_sources, photon_energies
 
     assert tables_ready
-    observation_angles = np.linspace(45.0, 175.0, 27) * ureg.degree
+    observation_angles = np.linspace(0.0, 180.0, 181) * ureg.degree
     energy_grid = np.arange(band_eV[0], band_eV[1] + 0.5, 1.0) * ureg.eV
+    line_window = 0.05  # integrate over line energy * (1 ± 5%)
+    components = ("pxr-cbs", "characteristic", "bremsstrahlung")
 
-    angle_yield = np.zeros((len(tilts), len(observation_angles)))
-    with mo.status.progress_bar(total=len(tilts), title="Scoring angles per tilt") as _progress:
-        _seed = 1
-        for _row, _tilt in enumerate(tilts):
-            _source = directional_sources(
-                beam,
-                Slab("hopg", thickness=100 * ureg.nm, tilt=_tilt, **size),
-                # This experimental helper still takes numeric eV and degree grids.
-                energy_eV=energy_grid.to("eV").magnitude,
-                angle_deg=observation_angles.to("degree").magnitude,
-                numerics=numerics,
-                seed=_seed,
-            )["pxr-cbs"]
-            assert _source.supported.all()
-            angle_yield[_row] = np.trapezoid(
-                _source.density, energy_grid.to("eV").magnitude, axis=1
+    # The analytic and experimental helpers take numeric eV and degree values.
+    _angles_deg = observation_angles.to("degree").magnitude
+    _energy_eV = energy_grid.to("eV").magnitude
+    line_energy_eV = photon_energies(
+        "hopg",
+        beam_energy.to("eV").magnitude,
+        tilt_deg=tilts.to("degree").magnitude[:, None],
+        tilt_azim_deg=tilt_azimuth.to("degree").magnitude,
+        theta_obs_deg=_angles_deg[None, :],
+    )[0]
+
+    def _window_yield(source, centers_eV, fraction):
+        # Integrate each angle's density over its own line window. Windows
+        # leaving the energy grid, or angles with no line (NaN), give NaN.
+        _low, _high = centers_eV * (1 - fraction), centers_eV * (1 + fraction)
+        _inside = (_energy_eV >= _low[:, None]) & (_energy_eV <= _high[:, None])
+        if source.sampling == "bin-mean":  # characteristic: per-bin means
+            _counts = np.where(_inside, source.density * np.diff(source.bin_edges_eV), 0.0)
+            _yield = _counts.sum(axis=1)
+        else:  # point samples
+            _yield = np.array(
+                [
+                    np.trapezoid(_d[_m], _energy_eV[_m])
+                    for _d, _m in zip(source.density, _inside, strict=True)
+                ]
             )
-            _seed += 1
-            _progress.update()
-    return angle_yield, observation_angles
+        _covered = (_low >= _energy_eV[0]) & (_high <= _energy_eV[-1])
+        return np.where(_covered, _yield, np.nan)
+
+    # Only the return value persists (under __marimo__/cache), keyed on the
+    # inputs this function closes over; a rerun with equal inputs skips scoring.
+    @mo.persistent_cache
+    def _score_line_windows():
+        _yields = {_name: np.full(line_energy_eV.shape, np.nan) for _name in components}
+        with mo.status.progress_bar(total=len(tilts), title="Scoring angles per tilt") as _bar:
+            for _row, _tilt in enumerate(tilts):
+                _sources = directional_sources(
+                    beam,
+                    Slab(
+                        "hopg",
+                        thickness=100 * ureg.nm,
+                        tilt=_tilt,
+                        tilt_azimuth=tilt_azimuth,
+                        **size,
+                    ),
+                    energy_eV=_energy_eV,
+                    angle_deg=_angles_deg,
+                    numerics=numerics,
+                    seed=_row + 1,  # independent rows
+                    components=components,
+                )
+                assert all(_source.supported.all() for _source in _sources.values())
+                for _name, _source in _sources.items():
+                    _yields[_name][_row] = _window_yield(_source, line_energy_eV[_row], line_window)
+                _bar.update()
+        return _yields
+
+    line_yield = _score_line_windows()
+    return line_energy_eV, line_window, line_yield, observation_angles
 
 
 @app.cell
-def _(angle_yield, observation_angles, plt, tilts):
-    fig_angles, _ax = plt.subplots(figsize=(7, 4.3), layout="constrained")
-    for _tilt, _yield in zip(tilts, angle_yield, strict=True):
+def _(line_window, line_yield, observation_angles, plt, tilts):
+    fig_cxr_angles, _ax = plt.subplots(figsize=(7, 4.3), layout="constrained")
+    for _tilt, _yield in zip(tilts, line_yield["pxr-cbs"], strict=True):
         _ax.plot(
             observation_angles.to("degree").magnitude,
             _yield,
@@ -244,10 +312,39 @@ def _(angle_yield, observation_angles, plt, tilts):
     _ax.set(
         xlabel="Observation angle (°)",
         ylabel="Photons / (incident electron · sr)",
-        title="PXR/CBS yield in the 600–2,000 eV band, 100 nm HOPG",
+        title=f"PXR/CBS yield within ±{line_window:.0%} of the line, 100 nm HOPG",
+        xlim=(0, 180),
     )
+    _ax.grid(alpha=0.5)
     _ax.legend()
-    fig_angles  # noqa: B018 - captured by marimo
+    fig_cxr_angles  # noqa: B018 - captured by marimo
+    return
+
+
+@app.cell
+def _(line_window, line_yield, np, observation_angles, plt, tilts):
+    # Background under each line: continuum plus characteristic (carbon K).
+    _background = line_yield["bremsstrahlung"] + line_yield["characteristic"]
+    with np.errstate(divide="ignore", invalid="ignore"):
+        line_to_background = np.where(_background > 0, line_yield["pxr-cbs"] / _background, np.nan)
+
+    fig_line_to_background, _ax = plt.subplots(figsize=(7, 4.3), layout="constrained")
+    for _tilt, _ratio in zip(tilts, line_to_background, strict=True):
+        _ax.plot(
+            observation_angles.to("degree").magnitude,
+            _ratio,
+            label=f"{_tilt.to('degree').magnitude:g}° tilt",
+        )
+    _ax.set(
+        xlabel="Observation angle (°)",
+        ylabel="PXR/CBS ÷ (bremsstrahlung + characteristic)",
+        title=f"Line-to-background within ±{line_window:.0%} of the line, 100 nm HOPG",
+        xlim=(0, 180),
+        yscale="log",
+    )
+    _ax.grid(which="both", alpha=0.5)
+    _ax.legend()
+    fig_line_to_background  # noqa: B018 - captured by marimo
     return
 
 
@@ -262,8 +359,7 @@ def _(mo):
     and the sampling before quantitative use, and compare against a few
     independent `simulate` runs.
 
-    Try another band, or add `"bremsstrahlung"` to `components`. Use
-    [notebook 07](07-sampling-convergence-performance.ipynb)
+    Use [notebook 07](07-sampling-convergence-performance.ipynb)
     to choose a larger sampling budget for a selected region.
     """)
     return
