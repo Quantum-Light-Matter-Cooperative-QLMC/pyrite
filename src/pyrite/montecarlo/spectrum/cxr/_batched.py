@@ -26,6 +26,7 @@ from ._kernels import (
     _PREF_C1,
     _RESONANCE_ROOT_RTOL,
     _accumulate_edge_truncation,
+    _audit_skips_reduction,
     _cxr_amp_sq_core,
     _cxr_kin_core,
     _cxr_weight_core,
@@ -735,7 +736,7 @@ def _queue_unit_lines(audit, cxr_batch, bt, blk, gm_idx, lines, electron):
         unit = slice(lo, hi)
         E_r, aw, w = (a[unit] for a in lines)
         _accumulate_edge_truncation(audit, E_r, aw, w, None if electron is None else electron[unit])
-        if audit is None or "collect" not in audit:
+        if not _audit_skips_reduction(audit):
             cxr_batch.append(E_r, aw, w)
 
 
@@ -835,7 +836,7 @@ def _batched_incoherent_block(st, bt, blk, cxr_batch):
         _queue_unit_lines(audit, cxr_batch, bt, blk, gm_idx, (E_r_f, aw_f, w_f), electron)
         return
     _accumulate_edge_truncation(audit, E_r_f, aw_f, w_f, electron)
-    if audit is not None and "collect" in audit:
+    if _audit_skips_reduction(audit):
         return
 
     _nsys_push("pyrite.lines.accum")

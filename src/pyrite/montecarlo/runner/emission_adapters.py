@@ -35,6 +35,7 @@ class EmissionBatch:
     coefficient_capture: Any = None
     chunk: int | None = None
     electron_band_weights: Any = None
+    line_screen: Any = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -180,6 +181,8 @@ class EmissionSelection:
 def _cxr(batch: EmissionBatch) -> EmissionOutput:
     from .. import runner
 
+    if batch.line_screen is not None and not batch.coherent:
+        return EmissionOutput("spec", batch.line_screen.score(batch))
     kwargs = dict(
         coherent=batch.coherent,
         Ne=batch.electron_limit,

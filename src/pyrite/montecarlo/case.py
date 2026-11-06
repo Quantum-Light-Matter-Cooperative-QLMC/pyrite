@@ -139,6 +139,7 @@ _CASE_KEY_ORDER = (
     "sinc_cutoff",
     "brem_step_eV",
     "coherent_flat_omission_limit",
+    "line_roulette",
     "allow_physics_fallback",
     "physics_fallbacks",
 )
@@ -258,6 +259,10 @@ class Case(Mapping[str, Any]):
         Manual coherent-reducer control: the share of a row's per-electron
         floor the inter-electron blend may omit; absent is the policy default
         and ``0`` the full blend. Validation: coherent-flat-term-omission
+    line_roulette
+        Opt-in incoherent line-scoring roulette as a
+        :class:`pyrite._line_roulette.LineRoulette` record; absent is analog
+        scoring. Validation: line-scoring-roulette
     """
 
     # Producer-required fields. Their declaration order need not match the
@@ -356,6 +361,8 @@ class Case(Mapping[str, Any]):
     # Admission/provenance, appended to retain historical pickle offsets.
     allow_physics_fallback: Literal[True] | _Absent = _ABSENT
     physics_fallbacks: list[dict[str, Any]] | _Absent = _ABSENT
+    # Opt-in line-scoring roulette, appended to retain historical pickle offsets.
+    line_roulette: dict[str, object] | _Absent = _ABSENT
 
     def __setstate__(self, state: list[Any]) -> None:
         """Restore frozen-slot pickles, filling newly appended optional fields."""
@@ -481,6 +488,7 @@ class Case(Mapping[str, Any]):
             validate_source_case(self)
         self._validate_transition_radiation()
         self._validate_photon_transport()
+        self._validate_line_roulette()
         if self.coherent_flat_omission_limit is not _ABSENT:
             _positive(
                 "coherent_flat_omission_limit", self.coherent_flat_omission_limit, allow_zero=True
@@ -546,6 +554,13 @@ class Case(Mapping[str, Any]):
             raise ValueError("channeling supports a single-layer slab only")
         if self.mosaic_fwhm_rad or self.mosaic_mc_fwhm_rad:
             raise ValueError("channeling does not support mosaic crystals")
+
+    def _validate_line_roulette(self) -> None:
+        if isinstance(self.line_roulette, _Absent):
+            return
+        from .._line_roulette import LineRoulette
+
+        LineRoulette.from_dict(self.line_roulette).validate_case(self)
 
     def _validate_transition_radiation(self) -> None:
         record = self.transition_radiation

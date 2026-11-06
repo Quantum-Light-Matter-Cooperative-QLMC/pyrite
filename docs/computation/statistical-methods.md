@@ -8,7 +8,7 @@ Every observable is a **per-incident-electron expectation**. The estimator is th
 
 That includes exit fractions (transmitted, backscattered, side-exited, stopped), path-length and energy moments, and spectra per unit energy and solid angle. Details of the normalization conventions live in [transport outputs](../physics/beam-transport/transport-outputs.md#tallies-and-normalization) and [spectral observables](../physics/radiation-physics/spectral-observables.md#units-and-normalization).
 
-Electrons carry no statistical weights. The implementation uses no variance reduction, splitting, or Russian roulette: each electron contributes once to the sample mean. For ordinary sample means, variance falls as $1/N$.
+By default electrons carry no statistical weights and no variance reduction, splitting, or Russian roulette is applied: each electron contributes once to the sample mean. [Line-scoring roulette](#line-scoring-roulette) is the one opt-in exception, and it reweights only the incoherent line tally. For ordinary sample means, variance falls as $1/N$.
 
 **No absolute flux.** A spectrum is per incident electron until a caller supplies a multiplier. No photons-per-second normalization is applied anywhere.
 
@@ -202,6 +202,15 @@ So $r_n \le \varepsilon$ already implies $\mathrm{ESS}_n \gtrsim 1/\varepsilon^2
 * The light real case is hopg at 30 keV, 1 µm thick, with the line mass watched. Its per-electron distribution has skewness about 8 and CV about 1. At $\varepsilon = 10\,\%$ with $n_{\min} = 200$, 20 seeds stop at 200–440 electrons. All 20 lie within $1.96\varepsilon$ of the pooled 16 000-electron mean. The paired stopping bias is $+0.06\,\% \pm 1.5\,\%$, below every reported error.
 * The sample-based interval $\pm 1.96\, r_N$ covers only 17 of the 20 light-case seeds. At a fixed $N = 400$, two 80-seed sets cover 86–88 %; that undercoverage belongs to the skewed per-electron distribution at a few hundred electrons. The stop adds to it at small $n_{\min}$: pooled over 160 seeds at $\varepsilon = 5\,\%$, coverage is 82 %, 84 % and 88 % at $n_{\min} = 100$, 200 and 400. At $n_{\min} \lesssim 200$ the stopping bias is also $-0.3$ to $-0.4\varepsilon$, reduced to about $-0.14\varepsilon$ at $n_{\min} = 400$. A skewed population whose sample mean and variance are low together stops early on that pair. Choose $n_{\min}$ near the count the target implies.
 * On a constructed heavy-tailed population, the bare rule stops at 200 electrons, 37 % low (44 % is the deficit expected from never meeting the heavy class), with a reported error of 6.5 %. Exp(1) electrons plus a +400 contribution every 500th electron make that population. With an ESS floor of 1000, the run meets the heavy electrons, the share cap holds, and it ends `statistics_limited` at $n_{\max}$. Over 40 random heavy-tailed seeds at rate $2\times10^{-3}$, false stops beyond 3 reported errors fall from 24 to 1 with that floor, but only to 12 with the default guards ($E_{\min} = 100$). The remaining case is one whose tail is still unsampled at the floor.
+
+## Line-scoring roulette
+
+The `line_roulette` case record (`LineRoulette(floor, keep_fraction, pilot_electrons)`) scores the incoherent CXR lines of only some primaries, with inverse-probability weights, so that the same scoring time covers more histories. It is off by default and enters case identity when on. The record is a case key and has no profile or `Numerics` option yet. The [derivation](../validation/beam-transport/line-scoring-roulette.md) gives the estimator and its variance.
+
+* **What stays exact.** A screen pass computes every primary's line mass without a grid reduction, so line mass, truncation bounds and per-primary line-yield statistics stay analog. The result record `line_roulette` gives `line_mass_exact` beside the weighted `line_mass_estimate`.
+* **What gets noisier.** Resolved spectra carry extra noise away from dominant lines, because each bin adds {eq}`eq-roulette-variance`. A spectrum with smooth contributions from many low-mass histories can lose more than it gains. The figure of merit this option targets is integrated line yield.
+* **What is refused.** Coherent emission, temporal profiles, channeling and two-beam line scoring.
+* **Unchanged scorers.** Characteristic lines and the continuum are not rouletted. Batch-means standard errors stay analog and repeat the line scoring, so they spend the time roulette saves.
 
 ## Convergence protocol
 

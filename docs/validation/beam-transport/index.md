@@ -10,6 +10,7 @@ for sources, criteria and limitations, follow each record or the
 
 adaptive-sample-size-stopping
 detector-cone-variance-reduction
+line-scoring-roulette
 mev-full-track-transport
 beam-energy-spread-injection
 beam-phase-space-injection
