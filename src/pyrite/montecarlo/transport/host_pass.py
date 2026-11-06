@@ -9,7 +9,7 @@ Accelerator modules stay lazily imported.
 Validation: sbethe-corrected-stopping
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
 import numpy as np
@@ -193,6 +193,9 @@ _NO_VACUUM = (
     np.empty(0, dtype=float),
     np.empty(0, dtype=np.int64),
 )
+#: First fixed lockstep/grooved row budget per electron; see ``_replay_fixed_buffers``.
+FIXED_BUFFER_INITIAL_STEPS = 20_000
+
 # Segment buffer names in the lockstep ``segments`` tuple order.
 _ROW_FIELDS = (
     "seg_dir",
@@ -210,15 +213,38 @@ _ROW_FIELDS = (
 )
 
 
+def _replay_fixed_buffers(p, launch, electron_start, c):
+    """Grow lockstep's fixed row buffers by replay up to ``p.max_steps``.
+
+    Lockstep and grooved kernels need arrays of ``Ne * max_steps`` rows, so the
+    limit must not be the first reservation. Trajectories depend on the seed
+    alone, so a completed replay is exactly the run at the full limit.
+    """
+    budget = FIXED_BUFFER_INITIAL_STEPS
+    while budget < p.max_steps:
+        try:
+            return _run_validated_pass(replace(p, max_steps=budget), launch, electron_start, c)
+        except TransportStepLimitError:
+            budget *= 2
+    return _run_validated_pass(p, launch, electron_start, c)
+
+
 def run_transport_pass(p: TransportInputs):
     """Transport one population (primaries, a block, or one cascade generation)."""
     electron_start = int(p._electron_start)
-    # ``_secondary`` is the cascade's per-generation pass (secondaries.py).
     launch = None if p._secondary is None else p._secondary.launch
+    c = _validated_controls(p, launch, electron_start)
+    if c.transport_core == "lockstep" and p.max_steps > FIXED_BUFFER_INITIAL_STEPS:
+        return _replay_fixed_buffers(p, launch, electron_start, c)
+    return _run_validated_pass(p, launch, electron_start, c)
+
+
+def _run_validated_pass(p, launch, electron_start, c):
+    """One transport attempt at ``p.max_steps``, after input validation."""
+    # ``launch``: the cascade's per-generation pass (secondaries.py).
     block_keys = stream_keys(p.seed, p.Ne, start=electron_start)
     # Per-electron/CUDA keys: a block or cascade generation supplies its own.
     transport_keys = launch.stream_keys if launch is not None else block_keys
-    c = _validated_controls(p, launch, electron_start)
 
     _nsys_push("pyrite.transport.tables")
     stack = _layer_stack(p, c)

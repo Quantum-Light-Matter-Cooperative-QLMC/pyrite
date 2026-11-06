@@ -125,7 +125,7 @@ An electron's history ends in exactly one of:
   - `n_step_limited`
 ```
 
-`n_step_limited` is a failure mode, not a physical channel: an incomplete history raises rather than returning truncated arrays, so a run never silently reports partially transported electrons. The default budget is 20000 steps per electron.
+`n_step_limited` is a failure mode, not a physical channel: an incomplete history raises rather than returning truncated arrays, so a run never silently reports partially transported electrons. The default budget is 400,000 steps per electron.
 
 ## Assumptions
 

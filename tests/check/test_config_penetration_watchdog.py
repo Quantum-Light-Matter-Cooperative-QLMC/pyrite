@@ -167,7 +167,8 @@ def _step_limited(monkeypatch, fail_below):
 def test_gate_cases_by_penetration_retries_the_step_budget(monkeypatch):
     # Thick MeV cases outlive the default budget (#315); the gate doubles it
     # like the runner does instead of aborting the sweep.
-    base = runner.TRANSPORT_MAX_STEPS
+    base = 1000
+    monkeypatch.setenv("PYRITE_MC_TRANSPORT_INITIAL_MAX_STEPS", str(base))
     budgets = _step_limited(monkeypatch, fail_below=2 * base)
     cases = [_case(5000.0, t) for t in (100.0, 200.0, 400.0)]
     kept, dropped = config.gate_cases_by_penetration(cases, floor=0.05, Ne=10, seed=0)
