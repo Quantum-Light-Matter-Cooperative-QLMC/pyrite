@@ -6,7 +6,7 @@ Every uncertainty and between-depth allowance supplied by the caller must be
 a defensible simultaneous bound. This module validates and combines numbers;
 it cannot independently certify measurements or permit production admission.
 
-Validation: cr-axial-depth-budget (unverified; numerical research contract).
+Validation: cr-axial-depth-budget
 """
 
 from __future__ import annotations
@@ -126,6 +126,8 @@ def source_interval_bounds(
     by the caller. It does not certify each fine bin's relative accuracy; to
     guard a fine bin use a separate observable key and a one-bin measurement.
     No cancellation across spectral/angle bins or perturbed channels is used.
+
+    Validation: cr-axial-depth-budget
     """
     if not isinstance(measurement, AxialPhotonSourceIntervalMeasurement):
         raise TypeError("expected AxialPhotonSourceIntervalMeasurement")
@@ -187,6 +189,8 @@ def compile_axial_photon_depth_evidence(
     ordered and individually uniform; gaps remain gaps. The output is suited
     to :func:`require_axial_photon_depth_budget` and the guarded research
     sampler, but constructing it is NOT validation or native admission.
+
+    Validation: cr-axial-depth-budget
     """
     if not measurements:
         raise ValueError("no source-depth measurements; axial zone refused")

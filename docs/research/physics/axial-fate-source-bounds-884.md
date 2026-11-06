@@ -5,7 +5,7 @@ orphan: true
 # Physical outgoing fates → photon-source error — #884 (research only)
 
 **Status:** numerical envelope composition only, **not calibrated**;
-`cr-axial-depth-budget` is **unverified**. This does not admit native axial
+`cr-axial-depth-budget` covers this arithmetic only. This does not admit native axial
 runs, identify a radiation partition, or certify a return calculation.
 
 ## What is measured, and what must be supplied

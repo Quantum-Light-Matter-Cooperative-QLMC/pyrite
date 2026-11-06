@@ -8,7 +8,7 @@ Photon yields and absolute error bounds are photons / incident electron in one
 fully specified spectral, angular and polarization observable. Depth is Å.
 The bounds must hold simultaneously over each declared depth interval.
 
-Validation: cr-axial-depth-budget (unverified; contract tests only).
+Validation: cr-axial-depth-budget
 """
 
 from __future__ import annotations
@@ -48,6 +48,8 @@ class AxialPhotonBoundInterval:
 
     Every bound must be valid at **every depth** in this interval (not only
     at sampled endpoints). An observed mean or SEM is not a confidence bound.
+
+    Validation: cr-axial-depth-budget
     """
 
     start_depth_ang: float
@@ -110,6 +112,8 @@ class AxialPhotonDepthEvidence:
     not a per-measurement confidence level. The producer is responsible for
     independent source-model closure and for retaining the underlying data.
     A constructed instance is never an independent physics sign-off.
+
+    Validation: cr-axial-depth-budget
     """
 
     case_key: str
@@ -154,7 +158,7 @@ def require_axial_photon_depth_budget(
     zero-depth photon yield has no useful relative normalization. Returns the
     matched interval for audit, without granting production eligibility.
 
-    Validation: cr-axial-depth-budget (unverified).
+    Validation: cr-axial-depth-budget
     """
     if not isfinite(requested_depth_ang) or requested_depth_ang <= 0:
         raise ValueError("requested_depth_ang must be finite and positive")
@@ -203,7 +207,9 @@ def sample_budgeted_physical_handoff(
 
     This opt-in adapter does not modify or admit the unbudgeted research
     instrument and must not be called a production transport handoff. Native
-    Scene/Sweep/CLI runs remain refused under #624/#886.
+    Scene/Sweep/CLI runs remain refused under #624/#994.
+
+    Validation: cr-axial-depth-budget
     """
     require_axial_photon_depth_budget(
         case_key=case_key,

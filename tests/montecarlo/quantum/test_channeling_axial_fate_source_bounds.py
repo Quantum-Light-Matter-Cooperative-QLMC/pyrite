@@ -3,6 +3,7 @@
 from dataclasses import replace
 from math import log, sqrt
 
+import numpy as np
 import pytest
 
 from pyrite.montecarlo.channeling.axial_depth_budget import (
@@ -264,3 +265,48 @@ def test_fails_closed_on_wrong_source_scope_and_confidence_budget():
             caps=caps(),
             sample_evidence_id="physical-fate-response-proof",
         )
+
+
+def test_hoeffding_allowance_covers_true_cdfs_simultaneously_at_declared_rate():
+    """Independent coverage check: the true CDFs stay under the bound in >= 1 - delta of samples."""
+    rng = np.random.default_rng(884)
+    delta, count, trials = 0.2, 200, 2000
+    stops = np.array([100.0, 200.0, 300.0])
+    # Exponential terminal depth, with independent outgoing or unresolved labels.
+    scale, outgoing_share = 400.0, 0.7
+    event_cdf = 1 - np.exp(-stops / scale)
+    truth = np.stack((outgoing_share * event_cdf, (1 - outgoing_share) * event_cdf))
+    allowance = sqrt(log(2 * stops.size / delta) / (2 * count))
+    failures = 0
+    for _ in range(trials):
+        depths = rng.exponential(scale, count)
+        labels = rng.random(count) < outgoing_share
+        estimate = np.stack(
+            (
+                [(labels & (depths <= stop)).mean() for stop in stops],
+                [(~labels & (depths <= stop)).mean() for stop in stops],
+            )
+        )
+        failures += np.any(truth > estimate + allowance)
+    assert failures / trials <= delta
+
+
+def test_code_allowance_matches_the_coverage_oracle_on_a_sampled_census():
+    rng = np.random.default_rng(885)
+    count = 300
+    depths = rng.exponential(400.0, count)
+    rows = [
+        AxialHandoffRecord(i, "physical_outgoing", float(z))
+        if z <= 300.0
+        else AxialHandoffRecord(i, "retained", 300.0)
+        for i, z in enumerate(depths)
+    ]
+    bounds = run_bounds(
+        rows,
+        intervals=((50.0, 100.0), (100.0, 200.0), (200.0, 300.0)),
+        sampling_failure_probability=0.2,
+    )
+    allowance = sqrt(log(6 / 0.2) / (2 * count))
+    for bound, stop in zip(bounds, (100.0, 200.0, 300.0), strict=True):
+        assert bound.fate_fraction_allowance == pytest.approx(allowance)
+        assert bound.observed_outgoing_fraction == pytest.approx(np.mean(depths <= stop))
