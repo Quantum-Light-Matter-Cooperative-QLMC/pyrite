@@ -37,9 +37,11 @@ _SCALARS = {
         "e_start e_count cap max_steps n_layers elastic_model_code_arg energy_model_code_arg "
         "finite_footprint_arg sbethe_on_arg sbethe_width max_el el_n_mu el_guide_cells "
         "straggle_on_arg inelastic_on_arg il_width il_max_ch sec_on_arg rad_on_arg rad_max_el "
-        "rad_max_t rad_n_red cont_on_arg"
+        "rad_max_t rad_n_red cont_on_arg mixed_on_arg"
     ).split(),
-    np.float64: "max_dE_frac z_total width_ang height_ang il_cutoff_eV rad_cutoff_eV".split(),
+    np.float64: (
+        "max_dE_frac z_total width_ang height_ang il_cutoff_eV rad_cutoff_eV mix_c2"
+    ).split(),
 }
 _ARRAYS = {
     np.uint64: "stream_key il_keys rad_keys cont_u64".split(),
@@ -52,8 +54,12 @@ _ARRAYS = {
     np.int8: "seg_event exit_code".split(),
 }
 # ELSEPA, midpoint, SBETHE, straggling, shell, coupled radiative, continuation;
-# and Mott, midpoint, straggling.
-_SWITCHES = [(2, 1, 0, 1, 1, 1, 1, 1), (1, 1, 0, 0, 1, 0, 0, 0)]
+# the same with mixed elastic transport; and Mott, midpoint, straggling.
+_SWITCHES = [
+    (2, 1, 0, 1, 1, 1, 1, 1),
+    (2, 1, 0, 1, 1, 1, 1, 1, 1),
+    (1, 1, 0, 0, 1, 0, 0, 0),
+]
 
 
 def _transpile(switches, precision):
@@ -115,6 +121,13 @@ def test_mixed_helpers_compute_in_fp32_and_fp64_build_never_narrows(switches):
     body = mixed.split("__global__")[1]
     assert "log((float)" in body
     assert "log(_stream_uniform" in body  # free-path draws stay FP64
+
+
+@requires_cupy
+@pytest.mark.parametrize("precision", ["fp64", "mixed"])
+def test_mixed_elastic_folds_out_of_the_other_variants(precision):
+    assert "_mixed_" not in _transpile(_SWITCHES[0], precision)
+    assert "_mixed_hinge_mu" in _transpile(_SWITCHES[1], precision)
 
 
 @requires_cupy

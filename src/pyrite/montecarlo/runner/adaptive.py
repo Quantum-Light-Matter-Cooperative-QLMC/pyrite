@@ -573,9 +573,9 @@ def case_transport_core(case, requested="auto"):
     from ..transport import resolve_transport_core
 
     if case.get("transport_mode") == "mixed":
-        if requested == "cuda":
-            raise ValueError("transport_mode='mixed' is not implemented on the CUDA core yet")
-        return "per-electron"
+        # No lockstep specialization: every CPU route is the per-electron core.
+        core = resolve_transport_core(requested, max(case.get("Ne") or 0, case.get("Ne_brem") or 0))
+        return core if core == "cuda" or requested != "auto" else "per-electron"
     if case.get("adaptive_precision") is not None:
         return adaptive_transport_core(
             case, Precision.from_dict(case["adaptive_precision"]), requested

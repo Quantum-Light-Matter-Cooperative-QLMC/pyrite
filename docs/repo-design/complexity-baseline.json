@@ -50,7 +50,7 @@
     {
       "path": "src/pyrite/campaign/beam.py",
       "name": "Beam.__post_init__",
-      "cc": 22
+      "cc": 21
     },
     {
       "path": "src/pyrite/campaign/beam.py",
@@ -60,7 +60,7 @@
     {
       "path": "src/pyrite/campaign/config.py",
       "name": "material_sweep",
-      "cc": 38
+      "cc": 37
     },
     {
       "path": "src/pyrite/campaign/front_matching.py",
@@ -394,11 +394,6 @@
     },
     {
       "path": "src/pyrite/montecarlo/runner/case_driver.py",
-      "name": "_spectrum_case_impl",
-      "cc": 23
-    },
-    {
-      "path": "src/pyrite/montecarlo/runner/case_driver.py",
       "name": "_transport_case",
       "cc": 24
     },
@@ -576,7 +571,7 @@
     {
       "path": "src/pyrite/montecarlo/transport/_jit_kernel.py",
       "name": "_transport_kernel",
-      "cc": 147,
+      "cc": 195,
       "exception": "Numerical transport kernel: a split or rewrite needs RNG-stream, event-order, CPU/GPU parity and performance evidence (#567, #344); never refactor for the metric alone."
     },
     {
@@ -584,11 +579,6 @@
       "name": "_transport_lut_kernel",
       "cc": 88,
       "exception": "Numerical transport kernel: a split or rewrite needs RNG-stream, event-order, CPU/GPU parity and performance evidence (#567, #344); never refactor for the metric alone."
-    },
-    {
-      "path": "src/pyrite/montecarlo/transport/batching.py",
-      "name": "_drive_per_electron_batches",
-      "cc": 25
     },
     {
       "path": "src/pyrite/montecarlo/transport/cores.py",

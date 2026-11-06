@@ -43,6 +43,9 @@ STEP_END_LIMIT = 0
 STEP_END_ELASTIC = 1
 STEP_END_INELASTIC = 2
 STEP_END_RADIATIVE = 3
+#: Doubles per history in the CUDA kernel's ``mix_state``: remaining step, distance
+#: to the hinge, full length, three hazard bounds and what ends the step.
+MIX_STATE_WORDS = 7
 _GAUSS_NODES, _GAUSS_WEIGHTS = np.polynomial.legendre.leggauss(6)
 
 
@@ -147,6 +150,13 @@ def mixed_core_args(elsepa_group, parameters, L_top, L_bot):
         layer_step_limits_ang(L_top, L_bot, parameters.max_step_um),
         mixed_elastic_tables(elsepa_group, float(parameters.c1)),
     )
+
+
+def mixed_device_args(core_args, xp, Ne):
+    """``core_args`` as the CUDA kernel's device tables plus per-history state."""
+    c2, limits, tables = core_args
+    state = xp.full((int(Ne), MIX_STATE_WORDS), -1.0, dtype=xp.float64)
+    return c2, xp.asarray(limits), tuple(xp.asarray(table) for table in tables), state
 
 
 @njit(cache=True)
