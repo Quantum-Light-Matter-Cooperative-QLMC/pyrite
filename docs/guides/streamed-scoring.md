@@ -65,7 +65,11 @@ electron, and later blocks are sized so retained rows take a quarter of the
 target, shrinking if a later block proves denser. Any `scratch_mib` and
 `electron_batch` you leave unset scale with the block.
 
-Spectra and counts follow the same guarantees as electron blocks. An
+Transport counts are exact. CUDA scoring runs in float32 by default, and these
+blocks split the continuum population differently from a joined run, so
+continuum bins can differ more than the lines: in W at 1 MeV, up to about 7e-5
+per bin against about 5e-7 for the lines, and about 7e-7 for the Si continuum.
+With `PYRITE_FP64=1` the difference falls to rounding. An
 allocation over the cap goes through the normal block recovery and can raise
 an out-of-memory error if the target is too small for the scene. Other
 processes on the card are not counted.
