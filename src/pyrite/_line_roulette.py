@@ -69,6 +69,5 @@ class LineRoulette:
         for key, reason in _REFUSED_KEYS.items():
             if case.get(key):
                 raise ValueError(f"line roulette does not support {key}: {reason}")
-        transition = case.get("transition_radiation")
-        if isinstance(transition, Mapping) and transition.get("model") == "two-beam":
+        if (case.get("transition_radiation") or {}).get("model") == "two-beam":
             raise ValueError("line roulette does not support two-beam line scoring")

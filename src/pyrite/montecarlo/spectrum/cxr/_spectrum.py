@@ -321,7 +321,10 @@ def _needs_per_hkl_route(st):
 
 
 def _mc_spectrum(request):
-    """Run the three spectrum phases for a bound request."""
+    """Run the three spectrum phases for a bound request.
+
+    Validation: line-scoring-roulette
+    """
     st = _prepare_spectrum(request)
     if st.grouped and (request.truncation_audit or {}).get("mass_only"):
         # The grouped reduction fills no row audit, so masses would read as zero.
