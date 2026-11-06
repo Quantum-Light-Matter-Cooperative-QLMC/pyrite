@@ -1,10 +1,11 @@
 # Mixed elastic transport with a random hinge
 
 ```{warning}
-Urban straggling with `transport_mode="mixed"` is not validated. The
+`transport_mode="mixed"` refuses Urban straggling. The
 [re-verification at e25dede8b](mixed-elastic-reverification.md) found the hard
-count 0.07-0.32% low from the rate-bound clamp and the path 0.3-1.3% long. Thinning
-is verified for continuous stopping and the shell soft sampler at $C_2\ge0.05$.
+count 0.07-0.32% low from the rate-bound clamp and the path 0.3-1.3% long, with
+the path growth's cause not isolated. Thinning is verified for continuous
+stopping and the shell soft sampler at $C_2\ge0.05$.
 ```
 
 Design and derivation of the opt-in `transport_mode="mixed"` scheme (#894).
@@ -91,7 +92,7 @@ peaks inside it, makes the true rate exceed the bound, and the proposal is then
 accepted with probability 1, and element or channel selection then truncates
 instead of rescaling. The radiative excess is negligible, at most 1.02%. Under
 Urban straggling 0.1-2.4% of steps leave the window, which lowers the hard count
-measurably; see the warning above.
+measurably, so that combination is refused; see the warning above.
 
 Thinning adds rows: about 15% on the table-free Si anchor (170 to 100 keV,
 $C_1=C_2=0.05$), where rejected proposals add 6.6 delta rows to the 95 rows per
@@ -129,7 +130,7 @@ read it cannot use it.
 | Coherent emission, temporal profiles | Refused | Depend on flight-level phase and small-angle structure |
 | Channeling | Refused | Needs real transverse dynamics |
 | Grooved geometry, cone splitting, LUT, Mott | Refused | No specialization |
-| Any observable with Urban straggling | Not validated, not refused | See the warning above |
+| Any observable with Urban straggling | Refused | See the warning above |
 
 ## Pilot (not the equivalence study)
 

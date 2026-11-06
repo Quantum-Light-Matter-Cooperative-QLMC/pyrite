@@ -9,7 +9,7 @@ import numpy as np
 
 from ._cxr_vocabulary import catalog_key
 from ._energy_bins import EnergyBins
-from ._mixed_elastic_policy import validate_transport_mode
+from ._mixed_elastic_policy import MIXED_URBAN_REFUSAL, validate_transport_mode
 from ._photon_config import PhotonTransport
 from ._sampling import AdaptiveSampling, FixedSampling, SamplingPolicy
 from ._spec_defaults import UNSET, _Unset
@@ -250,7 +250,8 @@ class Physics:
         ``"mixed"`` aggregates small-angle events into a random hinge, which
         requires ``elastic_model="elsepa"`` and ``energy_model="midpoint"`` and
         is refused for coherent emission, temporal profiles, transition
-        radiation, channeling, photon transport and grooved targets. ``mixed_c1``
+        radiation, channeling, photon transport, grooved targets and Urban
+        straggling (``straggling=True`` with continuous stopping). ``mixed_c1``
         (default 0.05) bounds the mean soft deflection per hard step,
         ``mixed_c2`` (default 0.05) the mean fractional soft loss per step, and
         ``mixed_max_step_um`` adds an absolute step limit; the parameters apply
@@ -537,6 +538,12 @@ class Physics:
             raise ValueError(
                 "transport_mode='mixed' requires elastic_model='elsepa' and energy_model='midpoint'"
             )
+        if (
+            self.transport_mode == "mixed"
+            and self.straggling
+            and self.inelastic_model == "continuous"
+        ):
+            raise ValueError(MIXED_URBAN_REFUSAL)
         validate_bremsstrahlung_model(self.bremsstrahlung_model)
         validate_radiative_numerics(
             self.radiative_model,

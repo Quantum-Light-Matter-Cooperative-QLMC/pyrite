@@ -10,6 +10,7 @@ from functools import partial
 import numpy as np
 import pytest
 
+from pyrite.montecarlo.case import _ABSENT
 from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
 from pyrite.montecarlo.transport import host_pass
 from pyrite.montecarlo.transport.events import (
@@ -387,6 +388,18 @@ def test_ineligible_transport_is_refused(overrides):
         _transport(MixedElasticParameters(), **overrides)
 
 
+@pytest.mark.parametrize("parameters", [MixedElasticParameters(), MixedElasticParameters(0.0, 0.0)])
+def test_urban_straggling_is_refused(parameters):
+    """Urban losses leave the hazard window, including in the detailed limit's core."""
+    with pytest.raises(ValueError, match="Urban straggling"):
+        _transport(parameters, straggling=True)
+
+
+def test_shell_soft_sampler_still_runs_with_straggling():
+    rows = _transport(MixedElasticParameters(), straggling=True, **_shell_kwargs())
+    assert np.any(rows["event_kind"] == EVENT_SOFT_HINGE)
+
+
 def _shell_kwargs():
     from pyrite.montecarlo import shell_configuration
     from pyrite.xsgen.sbethe.catalog import resolve_catalog_table
@@ -514,6 +527,10 @@ def test_physics_default_adds_no_case_keys():
     )
 
 
+def test_physics_allows_straggling_with_the_shell_soft_sampler():
+    assert _mixed_physics(straggling=True, inelastic_model="shell-soft-hard").straggling
+
+
 def test_physics_mixed_resolves_default_parameters():
     from pyrite._mixed_elastic_policy import mixed_case_keys
 
@@ -537,6 +554,10 @@ def test_physics_mixed_resolves_default_parameters():
         ({"transport_mode": "mixed", "mixed_c2": -0.1}, "mixed_c2"),
         ({"transport_mode": "mixed", "mixed_max_step_um": 0.0}, "mixed_max_step_um"),
         ({"transport_mode": "mixed", "elastic_model": "mott"}, "elastic_model='elsepa'"),
+        (
+            {"transport_mode": "mixed", "straggling": True, "inelastic_model": "continuous"},
+            "Urban straggling",
+        ),
     ],
 )
 def test_physics_refuses_invalid_mixed_settings(kwargs, message):
@@ -596,6 +617,7 @@ def test_mixed_case_records_identity_and_routes_to_per_electron():
         ({"mixed_c1": 0.5}, "mixed_c1"),
         ({"transport_mode": "condensed"}, "transport_mode must be"),
         ({"coherent_emission": True}, "coherent emission"),
+        ({"straggling": True, "inelastic_model": _ABSENT, "inelastic_cutoff_eV": _ABSENT}, "Urban"),
         ({"temporal_profile": True}, "temporal profiles"),
         ({"groove_spacing_ang": 100.0}, "grooved"),
     ],

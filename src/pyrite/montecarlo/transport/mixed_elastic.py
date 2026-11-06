@@ -16,6 +16,9 @@ import numpy as np
 from numba import njit
 
 from ..._mixed_elastic_policy import (
+    MIXED_URBAN_REFUSAL as MIXED_URBAN_REFUSAL,
+)
+from ..._mixed_elastic_policy import (
     MixedElasticParameters as MixedElasticParameters,
 )
 from ..._mixed_elastic_policy import (
