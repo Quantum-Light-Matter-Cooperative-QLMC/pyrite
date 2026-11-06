@@ -89,7 +89,7 @@ def test_unit_bearing_numerics_preset_rejects_wrong_dimensions(_isolate_user_cat
 
 def test_numerics_preset_resolves_into_profiles_with_provenance(_isolate_user_catalog):
     ok("profile", "create", "campaign", "--from", "quickstart")
-    ok("numerics", "preset", "create", "fast", "--cxr-trials", "200", "--mosaic-nodes", "7")
+    ok("numerics", "preset", "create", "fast", "--cxr-electrons", "200", "--mosaic-nodes", "7")
     ok("profile", "set", "campaign", "--numerics", "fast")
 
     catalog = load_material_catalog(profile="campaign")
@@ -107,7 +107,7 @@ def test_numerics_preset_resolves_into_profiles_with_provenance(_isolate_user_ca
     numerics = pyrite.config.load_numerics("fast", catalog=load_material_catalog())
     expected = replace(
         pyrite.Numerics(),
-        cxr_trials=200,
+        sampling=pyrite.config.FixedSampling(cxr_electrons=200),
         cxr_reflections=pyrite.config.CxrReflections(mosaic_nodes=7),
     )
     assert numerics == expected
@@ -126,7 +126,7 @@ def test_profile_sampling_policy_replaces_the_presets_whole_group(_isolate_user_
     summary = payload("profile", "show", "campaign")
     assert summary["precision"]["source"] == "preset adaptive"
 
-    ok("numerics", "set", "campaign", "--cxr-trials", "300")
+    ok("numerics", "set", "campaign", "--cxr-electrons", "300")
     catalog = load_material_catalog(profile="campaign")
     assert catalog.profile_precision("campaign") is None
     assert catalog.profile_numerics("campaign")["mosaic_nodes"] == 7
@@ -188,15 +188,15 @@ def test_adopt_keeps_multi_value_trial_grids_on_the_profile(_isolate_user_catalo
     profile = _isolate_user_catalog / "profiles" / "campaign.toml"
     # Root keys must precede the profile's sub-tables.
     profile.write_text(
-        "n_electrons = {values = [100, 200]}\nmosaic_nodes = 7\n" + profile.read_text()
+        "cxr_electrons = {values = [100, 200]}\nmosaic_nodes = 7\n" + profile.read_text()
     )
     ok("numerics", "preset", "adopt", "campaign", "mine")
-    # On disk, trial counts use the canonical ``cxr_trials`` spelling.
+    # On disk, electron counts use the canonical ``cxr_electrons`` spelling.
     row = profile_row("campaign")
-    assert row["cxr_trials"] == {"values": [100, 200]}
+    assert row["cxr_electrons"] == {"values": [100, 200]}
     assert "mosaic_nodes" not in row
     preset = read_raw(bundled_catalog())["numerics"]["mine"]
-    assert "cxr_trials" not in preset and preset["mosaic_nodes"] == 7
+    assert "cxr_electrons" not in preset and preset["mosaic_nodes"] == 7
 
 
 def test_user_presets_ship_to_remote_jobs(_isolate_user_catalog):

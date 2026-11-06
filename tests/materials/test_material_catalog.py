@@ -2454,11 +2454,11 @@ def test_profile_precision_parses_and_rejects_incompatible_profiles(tmp_path):
         ("precision = { target_rse = 0.1 }\n", "requires min_electrons"),
         (policy.replace("block_electrons = 20", "block_electrons = 30"), "multiples"),
         (policy.replace("target_rse = 0.1,", "target_rse = 0.1, spare = 1,"), "unknown"),
-        (policy + "n_electrons = { values = [450] }\n", "n_electrons"),
+        (policy + "cxr_electrons = { values = [450] }\n", "cxr_electrons"),
         (policy + 'emission = "both"\n', "coherent emission"),
         (
-            policy + "overrides = { hopg = { n_electrons_brem = { values = [90] } } }\n",
-            r"overrides\.hopg\.n_electrons_brem",
+            policy + "overrides = { hopg = { brem_electrons = { values = [90] } } }\n",
+            r"overrides\.hopg\.brem_electrons",
         ),
     ):
         with pytest.raises(MaterialConfigError, match=match):

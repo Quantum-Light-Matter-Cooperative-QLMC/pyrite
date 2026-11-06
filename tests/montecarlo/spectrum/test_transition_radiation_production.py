@@ -15,6 +15,7 @@ from pyrite._spectral_components import cxr_spectrum
 from pyrite.campaign.config import default_settings, material_sweep
 from pyrite.campaign.profiles import case_content_key, dataset_identity
 from pyrite.checkpoints import _checkpoint_store, recompute
+from pyrite.config import FixedSampling
 from pyrite.detectors import EnergyBins
 from pyrite.montecarlo import runner
 from pyrite.montecarlo.spectrum.transition_radiation_crossings import TRANSITION_MODEL
@@ -26,8 +27,7 @@ from pyrite.montecarlo.trajectories import (
 from pyrite.results.store import Settings, store_result
 
 _NUMERICS = pr.Numerics(
-    cxr_trials=12,
-    brem_trials=8,
+    sampling=FixedSampling(cxr_electrons=12, brem_electrons=8),
     energy_bins=EnergyBins(cxr=np.linspace(150.0, 1500.0, 28), brem=np.array([500.0, 5000.0])),
 )
 

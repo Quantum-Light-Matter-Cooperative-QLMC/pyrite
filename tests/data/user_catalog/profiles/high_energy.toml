@@ -9,8 +9,8 @@ tilt_azim_deg = {values = [180.0]}
 # yield exact across local-spacing joins, which point sampling does not. Cases
 # whose line yield is carried by a few electrons run with a
 # LineYieldStatisticsWarning (#201).
-n_electrons = {values = [5000]}
-n_electrons_brem = {values = [1000]}
+cxr_electrons = {values = [5000]}
+brem_electrons = {values = [1000]}
 straggling = true
 
 [line_grid_policy]

@@ -15,6 +15,7 @@ import pytest
 
 import pyrite as pr
 from pyrite import api
+from pyrite.config import FixedSampling
 from pyrite.montecarlo import runner
 from pyrite.montecarlo.case import _ABSENT
 from pyrite.montecarlo.channeling.handoff import (
@@ -52,8 +53,7 @@ def _case(plane=(1, -1, 0), *, n=N, numerics=SMALL, thickness_ang=10000.0):
     return api.build_case(
         scene,
         pr.Numerics(
-            cxr_trials=n,
-            brem_trials=n,
+            sampling=FixedSampling(cxr_electrons=n, brem_electrons=n),
             energy_bins=pr.detectors.EnergyBins(cxr=np.linspace(1e3, 2e3, 9)),
             **numerics,
         ),

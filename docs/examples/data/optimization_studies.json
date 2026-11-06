@@ -7,7 +7,7 @@
   "output": {
     "repository_input_sha256": {
       "docs/validation/check-records/pxr-optimization.json": "e77d7cb86376bdc06d2f8aee25d5b73a7aaf16d43a0689daef19d4b698ee4aba",
-      "checks/pxr_optimization.py": "a231ab5c8e159d7a8d51650cde1f307979eb0112381ddca50ecba9f5fa93f7b5"
+      "checks/pxr_optimization.py": "08206ddb5daca8bdf5435f06d8007b5f7cb8c7bd4a1354fbfa113df865149cfb"
     },
     "simulation_source": {
       "code_digest": "4d751daec85b740d866b3261eefa443bafd691edfb06c85d78774e9618937eaf",

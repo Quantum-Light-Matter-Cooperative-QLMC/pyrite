@@ -137,6 +137,7 @@ Edges (importer -> imported):
   p1 -> p27
   p1 -> p3
   p1 -> p4
+  p1 -> p6
   p1 -> p7
   p1 -> p8
   p10 -> p15

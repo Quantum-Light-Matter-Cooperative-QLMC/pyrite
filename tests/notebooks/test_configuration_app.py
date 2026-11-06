@@ -91,7 +91,7 @@ def test_geometry_physics_and_numerics_use_existing_catalog_validation(editor):
     assert catalog.profile_numerics("notebook")["straggling"] is True
     assert catalog.profile_emission("notebook") == "both"
     assert catalog.profile_numerics("notebook")["n_electrons"] == (10,)
-    assert "cxr_trials" in updated.draft.serialize()
+    assert "cxr_electrons" in updated.draft.serialize()
 
 
 def test_scalar_and_pixel_slots_preserve_shared_definitions(editor):
@@ -143,7 +143,7 @@ def test_clearing_scalar_geometry_cannot_silently_restore_defaults(editor, value
         ({"materials": ["missing"]}, "missing"),
         ({"beam": "missing"}, "beam"),
         ({"elastic_model": "invented"}, "elastic_model"),
-        ({"n_electrons": {"values": [0]}}, "n_electrons"),
+        ({"n_electrons": {"values": [0]}}, "cxr_electrons"),
         ({"detector": "missing"}, "detector"),
     ],
 )
@@ -188,7 +188,7 @@ def test_explicit_adaptive_precision_rejects_pixel_and_coherent_modes(editor):
     )
     assert not adaptive.errors()
     pixel = adaptive.detector("default", values="pixelated_reference")
-    assert any("fixed trial counts" in error for error in pixel.errors())
+    assert any("fixed electron counts" in error for error in pixel.errors())
     assert adaptive.patch({"emission": "coherent"}).errors()
     assert adaptive.patch({"n_electrons": {"values": [20]}}).errors()
 

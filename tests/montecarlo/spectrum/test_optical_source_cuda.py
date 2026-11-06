@@ -10,6 +10,7 @@ import numpy as np
 import pytest
 
 from pyrite._backend import BACKEND, CUPY_BACKENDS
+from pyrite.config import FixedSampling
 from pyrite.detectors.optical_energy import CalibratedPulseEnergyDetector
 from pyrite.montecarlo.spectrum.optical_finite_bunch import (
     finite_screen_bunch_angular,
@@ -184,8 +185,7 @@ def test_real_case_transport_to_native_device_source():
         ),
     )
     numerics = pr.Numerics(
-        cxr_trials=4,
-        brem_trials=2,
+        sampling=FixedSampling(cxr_electrons=4, brem_electrons=2),
         energy_bins=EnergyBins(cxr=np.array([150.0, 1500.0]), brem=np.array([500.0, 5000.0])),
     )
     case = replace(api.build_case(scene, numerics), seed=11)

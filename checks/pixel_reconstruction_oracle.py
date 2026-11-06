@@ -72,6 +72,7 @@ from scipy.signal import find_peaks, peak_widths
 
 import pyrite as pr
 from pyrite import api
+from pyrite.config import FixedSampling
 from pyrite.detectors import Timepix3
 from pyrite.instrument import FilterPlate, PixelGrid, PlanarDetector, PlanarPose
 from pyrite.instrument.attenuation import attenuation_matrix, primary_transmission
@@ -329,8 +330,7 @@ def run(
         timepix_n_mc=timepix_n_mc,
     )
     numerics = pr.Numerics(
-        cxr_trials=n_electrons,
-        brem_trials=n_electrons_brem,
+        sampling=FixedSampling(cxr_electrons=n_electrons, brem_electrons=n_electrons_brem),
     )
     scene = pr.Scene(beam=beam, target=target, detector=detector, filters=filters)
     base_case = api.build_case(scene, numerics)

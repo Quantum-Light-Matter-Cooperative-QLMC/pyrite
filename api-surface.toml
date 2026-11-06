@@ -9,6 +9,8 @@
 # Settings.allow_fallback and Case.allow_physics_fallback add explicit campaign
 # admission (#262); Case.physics_fallbacks carries preflight provenance to workers.
 # Existing bindings/statuses and strict/default identity payloads are preserved.
+# #1007: Numerics takes electron budgets only as sampling=FixedSampling|AdaptiveSampling;
+# cxr_trials, brem_trials, precision and positional arguments were removed (hard break).
 schema_version = 1
 canonical_facades = ["beams", "geometry", "config", "detectors", "observations", "transport", "radiation"]
 

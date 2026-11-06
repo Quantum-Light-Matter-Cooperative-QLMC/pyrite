@@ -13,6 +13,7 @@ import numpy as np
 from .. import DATA_DIR, _config_presets
 from .._catalog_layout import ARTIFACT_DIR, catalog_root
 from .._cxr_grid_policy import PROFILE_CXR_GRID_SELECTORS
+from .._cxr_vocabulary import catalog_key
 from .._energy_grid_artifacts import ArtifactError, load_artifact
 from .._numerics import validate_profile_numerics
 from .._precision import Precision
@@ -396,9 +397,10 @@ def _scan(
     for key in ("n_electrons", "n_electrons_brem"):
         grid = None
         if key in values:
-            grid = _grid(values[key], f"{path}.{key}", errors)
+            label = f"{path}.{catalog_key(key)}"
+            grid = _grid(values[key], label, errors)
             if grid is not None and (np.any(grid <= 0) or np.any(grid != np.floor(grid))):
-                errors.add(f"{path}.{key}", "values must be positive integers")
+                errors.add(label, "values must be positive integers")
                 grid = None
         electron_grids[key] = grid
     ordinary_required = ("energy_keV", "tilt_deg", "tilt_azim_deg", "E_grid_brem")
@@ -463,7 +465,7 @@ def _parse_profile_precision(row, path, errors) -> None:
     for key in ("n_electrons", "n_electrons_brem"):
         if key in row:
             errors.add(
-                f"{path}.{key}",
+                f"{path}.{catalog_key(key)}",
                 "cannot be combined with precision; the adaptive policy owns the count",
             )
     overrides = row.get("overrides")
@@ -471,7 +473,7 @@ def _parse_profile_precision(row, path, errors) -> None:
         for key in ("n_electrons", "n_electrons_brem"):
             if isinstance(override, dict) and key in override:
                 errors.add(
-                    f"{path}.overrides.{material}.{key}",
+                    f"{path}.overrides.{material}.{catalog_key(key)}",
                     "cannot be combined with precision; the adaptive policy owns the count",
                 )
     if row.get("emission") in ("coherent", "both"):

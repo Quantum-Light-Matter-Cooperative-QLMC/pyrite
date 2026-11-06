@@ -27,7 +27,7 @@ Commands:
   show         Show explicit/effective settings and their...
   validate     Validate the selected campaign without...
   preset       Manage named numerics presets that profiles attach by name.
-  precision    Configure adaptive precision or fixed trials on PROFILE.
+  precision    Configure adaptive precision or fixed electron counts on PROFILE.
   cxr-grid     Configure PROFILE's automatic CXR photon-grid policy.
   energy-grid  Derive and inspect specialist photon-grid artifacts.
 ```
@@ -48,7 +48,7 @@ Options:
 ## `pyrite numerics reset`
 
 ```text
-Usage: pyrite numerics reset [OPTIONS] PROFILE [cxr-trials|brem-trials|line-
+Usage: pyrite numerics reset [OPTIONS] PROFILE [cxr-electrons|brem-electrons|line-
                              electrons|bremsstrahlung-electrons|reflection-
                              families|maximum-reflections|mosaic-nodes|mosaic-
                              route|energy-model|maximum-fractional-energy-
@@ -71,9 +71,9 @@ Usage: pyrite numerics set [OPTIONS] NAME
   Set PROFILE fields; validate and atomically save, or preview with --dry-run.
 
 Options:
-  --cxr-trials N                  Monte Carlo electron histories used to estimate the
+  --cxr-electrons N               Monte Carlo electron histories used to estimate the
                                   CXR spectrum.  [x>=1]
-  --brem-trials N                 Monte Carlo electron histories used to estimate
+  --brem-electrons N              Monte Carlo electron histories used to estimate
                                   bremsstrahlung.  [x>=1]
   --reflection-families N         Ranked reflection families to resolve.  [x>=1]
   --maximum-reflections N         Cap resolved reflections after family expansion.
@@ -180,9 +180,9 @@ Usage: pyrite numerics preset create [OPTIONS] NAME
 
 Options:
   --from SOURCE                   Clone SOURCE's fields; options then override them.
-  --cxr-trials N                  Monte Carlo electron histories used to estimate the
+  --cxr-electrons N               Monte Carlo electron histories used to estimate the
                                   CXR spectrum.  [x>=1]
-  --brem-trials N                 Monte Carlo electron histories used to estimate
+  --brem-electrons N              Monte Carlo electron histories used to estimate
                                   bremsstrahlung.  [x>=1]
   --reflection-families N         Ranked reflection families to resolve.  [x>=1]
   --maximum-reflections N         Cap resolved reflections after family expansion.
@@ -268,9 +268,9 @@ Usage: pyrite numerics preset set [OPTIONS] NAME
   referencing profiles before saving.
 
 Options:
-  --cxr-trials N                  Monte Carlo electron histories used to estimate the
+  --cxr-electrons N               Monte Carlo electron histories used to estimate the
                                   CXR spectrum.  [x>=1]
-  --brem-trials N                 Monte Carlo electron histories used to estimate
+  --brem-electrons N              Monte Carlo electron histories used to estimate
                                   bremsstrahlung.  [x>=1]
   --reflection-families N         Ranked reflection families to resolve.  [x>=1]
   --maximum-reflections N         Cap resolved reflections after family expansion.
@@ -362,17 +362,17 @@ Usage: pyrite numerics precision disable [OPTIONS] NAME
 
   Opt PROFILE out of adaptive sampling: remove any policy, set fixed counts.
 
-  --cxr-trials/--brem-trials replace that count. A count the profile already sets is
-  otherwise kept, including a sweep grid. A count it lacks is prompted for on a
+  --cxr-electrons/--brem-electrons replace that count. A count the profile already sets
+  is otherwise kept, including a sweep grid. A count it lacks is prompted for on a
   terminal; without a terminal, or with --yes or --dry-run, it takes the full-fidelity
   default (300 line, 150 brem).
 
 Options:
-  --cxr-trials N   Fixed Monte Carlo electron histories for the CXR spectrum.  [x>=1]
-  --brem-trials N  Fixed Monte Carlo electron histories for bremsstrahlung.  [x>=1]
-  -y, --yes        Use defaults for missing counts; skip confirmations.
-  --dry-run        Print proposed TOML diff; write nothing.
-  -h, --help       Show this message and exit.
+  --cxr-electrons N   Fixed Monte Carlo electron histories for the CXR spectrum.  [x>=1]
+  --brem-electrons N  Fixed Monte Carlo electron histories for bremsstrahlung.  [x>=1]
+  -y, --yes           Use defaults for missing counts; skip confirmations.
+  --dry-run           Print proposed TOML diff; write nothing.
+  -h, --help          Show this message and exit.
 ```
 
 ## `pyrite numerics precision enable`
@@ -382,7 +382,7 @@ Usage: pyrite numerics precision enable [OPTIONS] NAME
 
   Switch PROFILE to adaptive electron counts in one atomic edit.
 
-  Removes the profile's fixed line-trials/brem-trials. Without options the default
+  Removes the profile's fixed cxr-electrons/brem-electrons. Without options the default
   policy applies (no table is written); options write a policy whose unspecified fields
   come from the existing policy, else the default. Refuses, writing nothing, when the
   profile cannot run adaptive (coherent emission, cascades, positrons, a physical

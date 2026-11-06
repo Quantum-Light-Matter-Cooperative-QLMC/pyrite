@@ -1,6 +1,6 @@
 """Adaptive electron counts: sequential block-wise stopping on a target error (#361).
 
-``Numerics.precision`` selects this path through the public runner.
+``Numerics(sampling=AdaptiveSampling(...))`` selects this path through the public runner.
 :func:`run_case_adaptive` retains the internal compatibility interface. Both
 transport electron blocks
 ``[kB, (k+1)B)`` through :mod:`.block_transport` and, after each block, folds
@@ -546,7 +546,7 @@ def run_case_adaptive(
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Compatibility helper returning the realized fixed-N result and statistics.
 
-    Public callers select a :class:`~pyrite.config.Precision` on ``Numerics`` and use
+    Public callers select :class:`~pyrite.config.AdaptiveSampling` on ``Numerics`` and use
     ``simulate`` or ``run_case``; their output carries ``adaptive_sampling``.
     This helper retains the internal two-value return convention.
 

@@ -9,6 +9,7 @@ import pyrite as pr
 from pyrite.api import build_case
 from pyrite.campaign.beam import Spot, TransverseSpot
 from pyrite.campaign.sweep import BeamSpec
+from pyrite.config import FixedSampling
 
 
 def _beam(front=None, **kwargs):
@@ -91,7 +92,7 @@ def test_case_records_nonzero_tilt_and_keeps_zero_identity():
             pr.Scene(
                 beam=_beam(front),
                 target=pr.geometry.Slab("hopg", thickness_ang=100.0, tilt_deg=45.0, footprint=None),
-                numerics=pr.Numerics(cxr_trials=10, brem_trials=2),
+                numerics=pr.Numerics(sampling=FixedSampling(cxr_electrons=10, brem_electrons=2)),
             )
         )
 

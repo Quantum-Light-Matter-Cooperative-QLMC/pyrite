@@ -8,6 +8,7 @@ from pyrite.campaign.config import default_settings
 from pyrite.campaign.geometry import Footprint, Stack
 from pyrite.campaign.profiles import case_content_key, dataset_identity
 from pyrite.campaign.sweep import BeamSpec, Sweep, build_cases
+from pyrite.config import FixedSampling
 from pyrite.detectors import EnergyBins
 
 
@@ -205,8 +206,7 @@ def channeling_output_baseline():
     from pyrite.montecarlo import runner
 
     numerics = pr.Numerics(
-        cxr_trials=16,
-        brem_trials=16,
+        sampling=FixedSampling(cxr_electrons=16, brem_electrons=16),
         energy_bins=EnergyBins(**_CHANNELING_BINS),
         channeling_basis_size=12,
         channeling_bloch_cells=4,
@@ -246,8 +246,7 @@ def resolved_channeling_baseline():
 
     scene = _channeling_scene()
     numerics = pr.Numerics(
-        cxr_trials=4,
-        brem_trials=4,
+        sampling=FixedSampling(cxr_electrons=4, brem_electrons=4),
         energy_bins=EnergyBins(**_CHANNELING_BINS),
     )
     case = build_case(scene, numerics)

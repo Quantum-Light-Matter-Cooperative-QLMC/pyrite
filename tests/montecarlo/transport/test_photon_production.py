@@ -9,6 +9,7 @@ import pytest
 from scipy.constants import elementary_charge
 
 import pyrite as pr
+from pyrite.config import FixedSampling
 from pyrite.montecarlo import runner
 from pyrite.montecarlo.runner import photon_aperture as photon
 from pyrite.montecarlo.transport.photon_histories import PhotonAperture
@@ -153,8 +154,7 @@ def test_public_simulate_returns_separate_aperture_after_one_primary_pass(
             photon_transport=pr.PhotonTransport((1000.0, 3000.0, 10000.0), n_samples=32),
         ),
         numerics=pr.Numerics(
-            cxr_trials=4,
-            brem_trials=3,
+            sampling=FixedSampling(cxr_electrons=4, brem_electrons=3),
             energy_bins=pr.detectors.EnergyBins(
                 cxr=np.array([1500.0, 2000.0]),
                 brem=np.array([5000.0, 10000.0]),

@@ -7,7 +7,7 @@ import pytest
 
 from pyrite import Beam, Numerics
 from pyrite.beams import PointBunch, PointSpot
-from pyrite.config import FixedSampling
+from pyrite.config import CxrReflections, FixedSampling, RadiationNumerics
 from pyrite.directional import observation_directions
 from pyrite.geometry import Footprint, Slab
 from pyrite.radiation import directional_source
@@ -73,7 +73,7 @@ def test_producer_declares_component_sampling(monkeypatch, line_quadrature, pxr_
         target,
         energy_eV=[100.0, 200.0, 400.0],
         angle_deg=[0.0],
-        numerics=Numerics(cxr_trials=1, brem_trials=1),
+        numerics=Numerics(sampling=FixedSampling(cxr_electrons=1, brem_electrons=1)),
         seed=1,
         components=("pxr-cbs", "characteristic", "bremsstrahlung"),
     )
@@ -125,7 +125,7 @@ def test_source_lowering_rotation_and_no_detector(inputs, monkeypatch):
         from pyrite._energy_grid_encoding import decode_energy_grid
 
         np.testing.assert_array_equal(decode_energy_grid(case["E_grid"]), [100.0, 200.0])
-        assert (case["Ne"], case["Ne_brem"]) == (3, 50)  # legacy brem_trials honored (#1004)
+        assert (case["Ne"], case["Ne_brem"]) == (3, 50)  # brem_electrons honored (#1004)
         assert kwargs["components"] == ("pxr-cbs",)
         values = {"pxr-cbs": np.ones((len(directions), 2))}
         return values, np.ones(len(directions), dtype=bool)
@@ -138,7 +138,7 @@ def test_source_lowering_rotation_and_no_detector(inputs, monkeypatch):
         *inputs,
         energy_eV=[100.0, 200.0],
         angle_deg=[-180.0, -90.0, 0.0, 90.0],
-        numerics=Numerics(cxr_trials=3, brem_trials=50),
+        numerics=Numerics(sampling=FixedSampling(cxr_electrons=3, brem_electrons=50)),
         seed=42,
     )
     rotation = sample_to_lab_R(np.deg2rad(30), np.deg2rad(45))
@@ -157,7 +157,7 @@ def test_tr_lowering_sets_history_model_and_preserves_oriented_frame(inputs, mon
 
     def score(case, directions, **kwargs):
         assert case["transition_radiation"] == {"model": "planar-stack", "coherence": "history"}
-        assert (case["Ne"], case["Ne_brem"]) == (3, 100)  # default brem_trials kept
+        assert (case["Ne"], case["Ne_brem"]) == (3, 100)  # default brem_electrons kept
         return {"transition": np.ones((len(directions), 2))}, np.ones(len(directions), dtype=bool)
 
     monkeypatch.setattr(owner, "source_outputs", score)
@@ -167,7 +167,7 @@ def test_tr_lowering_sets_history_model_and_preserves_oriented_frame(inputs, mon
         *inputs,
         energy_eV=[100, 200],
         angle_deg=[-120, 60],
-        numerics=Numerics(cxr_trials=3),
+        numerics=Numerics(sampling=FixedSampling(cxr_electrons=3)),
         components=("transition",),
     )["transition"]
     assert result.component == "transition-radiation-history"
@@ -205,7 +205,8 @@ def test_shared_transport_matches_fixed_direction_cxr_only(inputs, monkeypatch):
     from pyrite.montecarlo import runner
 
     controls = Numerics(
-        cxr_trials=2, brem_trials=2, energy_bins=EnergyBins(cxr=np.linspace(100, 3000, 33))
+        sampling=FixedSampling(cxr_electrons=2, brem_electrons=2),
+        energy_bins=EnergyBins(cxr=np.linspace(100, 3000, 33)),
     )
     case = build_case(Scene(*inputs, detector=None, numerics=controls))
     transport = runner._transport_case(case)
@@ -259,7 +260,8 @@ def test_shared_transport_components_match_fixed_direction_scorers(inputs, monke
     from pyrite.montecarlo import runner
 
     controls = Numerics(
-        cxr_trials=2, brem_trials=2, energy_bins=EnergyBins(cxr=np.linspace(500, 3000, 26))
+        sampling=FixedSampling(cxr_electrons=2, brem_electrons=2),
+        energy_bins=EnergyBins(cxr=np.linspace(500, 3000, 26)),
     )
     case = build_case(Scene(*inputs, detector=None, numerics=controls))
     transport = runner._transport_case(case)
@@ -299,7 +301,7 @@ def test_shared_transport_components_match_fixed_direction_scorers(inputs, monke
     [
         (Numerics(sampling=FixedSampling(cxr_electrons=1024, brem_electrons=256)), (1024, 256)),
         (Numerics(sampling=FixedSampling(cxr_electrons=64, brem_electrons=512)), (64, 512)),
-        (Numerics(cxr_trials=7, brem_trials=3), (7, 3)),
+        (Numerics(sampling=FixedSampling(cxr_electrons=7, brem_electrons=3)), (7, 3)),
         (Numerics(), (450, 100)),
         (None, (450, 100)),
     ],
@@ -514,7 +516,10 @@ def _escape_scan(footprint, keV, energy, angles):
         ),
         energy_eV=energy,
         angle_deg=angles,
-        numerics=Numerics(cxr_trials=2, cxr_reflections=CxrReflections(max_reflections=4)),
+        numerics=Numerics(
+            sampling=FixedSampling(cxr_electrons=2),
+            cxr_reflections=CxrReflections(max_reflections=4),
+        ),
     )
 
 
@@ -547,3 +552,15 @@ def test_relativistic_forward_band_is_window_truncation():
     below = np.trapezoid(density[:, energy <= 5000], energy[energy <= 5000], axis=1)
     assert total[0] > 0.5 * total[1]  # forward emission is not suppressed
     assert below[0] < 0.05 * total[0] and below[1] > 0.5 * total[1]
+
+
+def test_explicit_grid_overrides_a_grouped_radiation_policy(inputs):
+    from pyrite.directional import _lowered_source
+
+    reflections = CxrReflections(max_reflections=4)
+    numerics = Numerics(radiation=RadiationNumerics(cxr_reflections=reflections))
+    grid = np.array([100.0, 200.0])
+    _, controls = _lowered_source(*inputs, grid, numerics, 1)
+    assert controls.radiation.cxr_reflections == reflections
+    np.testing.assert_array_equal(controls.energy_bins.cxr, grid)
+    assert controls.resolved_radiation.energy_bins is controls.energy_bins

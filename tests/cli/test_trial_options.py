@@ -51,8 +51,8 @@ def test_profile_help_describes_trials(verb):
     result = invoke(profile.command, [verb, "--help"])
 
     assert_clean_result(result)
-    assert "--cxr-trials" in result.stdout
-    assert "--brem-trials" in result.stdout
+    assert "--cxr-electrons" in result.stdout
+    assert "--brem-electrons" in result.stdout
     assert "--ne-line" not in result.stdout
     assert "--ne-brem" not in result.stdout
     assert "Monte Carlo electron histories" in " ".join(result.stdout.split())
@@ -66,12 +66,16 @@ def test_profile_help_describes_trials(verb):
             (["profile", verb, "example"], canonical, retired)
             for verb in ("create", "set", "add")
             for canonical, retired in (
-                ("--cxr-trials", "--ne-line"),
-                ("--brem-trials", "--ne-brem"),
+                ("--cxr-electrons", "--ne-line"),
+                ("--brem-electrons", "--ne-brem"),
             )
         ),
-        (["profile", "numerics", "set", "example"], "--cxr-trials", "--line-electrons"),
-        (["profile", "numerics", "set", "example"], "--brem-trials", "--bremsstrahlung-electrons"),
+        (["profile", "numerics", "set", "example"], "--cxr-electrons", "--line-electrons"),
+        (
+            ["profile", "numerics", "set", "example"],
+            "--brem-electrons",
+            "--bremsstrahlung-electrons",
+        ),
         (["app", "validation", "reproduce"], "--brem-trials", "--ne-brem"),
         (["app", "validation", "export"], "--brem-trials", "--ne-brem"),
         (["checkpoint", "recompute", "brem", "hopg"], "--brem-trials", "--ne-brem"),

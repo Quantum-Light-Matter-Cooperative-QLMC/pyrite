@@ -8,6 +8,7 @@ from numpy.typing import ArrayLike
 from ._cxr_grid_policy import kinematic_cxr_stop_eV
 from ._energy_bins import EnergyBins
 from ._numerics import Numerics, Physics
+from ._sampling import AdaptiveSampling
 from ._scene_geometry import case_rotation
 from .api import run_provenance
 from .campaign.beam import Beam
@@ -51,10 +52,14 @@ def _lowered_source(beam, target, grid, numerics, seed, *, transition=False):
     controls = Numerics() if numerics is None else numerics
     if not isinstance(controls, Numerics):
         raise TypeError("numerics must be a Numerics")
-    if controls.precision is not None:
-        raise ValueError("directional_source requires fixed counts; precision is unsupported")
+    if isinstance(controls.sampling, AdaptiveSampling):
+        raise ValueError(
+            "directional_source requires fixed counts; adaptive sampling is unsupported"
+        )
     # Only the grid is overridden: both requested populations are kept (#1004).
-    controls = replace(controls, energy_bins=EnergyBins(cxr=grid))
+    bins = EnergyBins(cxr=grid)
+    radiation = controls.radiation and replace(controls.radiation, energy_bins=bins)
+    controls = replace(controls, energy_bins=bins, radiation=radiation)
     physics = Physics(transition_radiation="history" if transition else "off")
     scene = Scene(beam, target, detector=None)
     slab = scene.target_spec
@@ -187,11 +192,10 @@ def directional_sources(
         Lab transverse plane basis azimuth, degrees; zero gives the x–z plane.
     numerics
         Fixed electron counts, reflection/mosaic and transport controls. The
-        line count (``cxr_trials`` or ``FixedSampling.cxr_electrons``) drives
-        PXR/CBS; the bremsstrahlung count (``brem_trials`` or
-        ``brem_electrons``) drives characteristic, continuum and TR. Both are
-        used as requested. Adaptive precision and automatic energy grids are
-        unsupported; no excluded channel is scored.
+        line count (``FixedSampling.cxr_electrons``) drives PXR/CBS; the
+        bremsstrahlung count (``brem_electrons``) drives characteristic,
+        continuum and TR. Both are used as requested. Adaptive sampling and
+        automatic energy grids are unsupported; no excluded channel is scored.
     seed, direction_batch
         Nonnegative integer RNG seed and positive bounded scoring batch size.
     components

@@ -451,7 +451,7 @@ def test_resolved_population_warning_keeps_generic_trial_remedy():
     from pyrite._backend import xp
     from pyrite.montecarlo.spectrum.coherent_population import require_resolved_power
 
-    with pytest.warns(CoherentSamplingWarning, match="increase --cxr-trials") as caught:
+    with pytest.warns(CoherentSamplingWarning, match="increase cxr_electrons") as caught:
         require_resolved_power(xp.asarray([-1.0]), incident_samples=100, physical_electrons=50.0)
     assert "PointSpot" not in str(caught[0].message)
     assert caught[0].message.diagnostics["pair_weight"] < 1.0

@@ -11,6 +11,7 @@ import pytest
 
 import pyrite as pr
 from pyrite import api
+from pyrite.config import FixedSampling
 from pyrite.detectors import EnergyBins
 from pyrite.montecarlo import runner
 from pyrite.montecarlo.case import _ABSENT
@@ -49,8 +50,7 @@ def _case(*, elastic="elsepa", plane=(1, -1, 0), unit_bearing=False):
         ),
     )
     numerics = pr.Numerics(
-        cxr_trials=32,
-        brem_trials=48,
+        sampling=FixedSampling(cxr_electrons=32, brem_electrons=48),
         channeling_basis_size=8,
         channeling_bloch_cells=4,
         channeling_dz_ang=500.0,

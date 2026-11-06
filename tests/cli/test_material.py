@@ -10,6 +10,7 @@ from pyrite import cli
 from pyrite._catalog_layout import read_text
 from pyrite.cli import _catalog_io
 from pyrite.cli.commands import _simulation, material, profile
+from pyrite.config import FixedSampling
 from tests.helpers.cli import assert_clean_result, invoke
 
 _CATALOG = """[profiles.standard]
@@ -151,8 +152,8 @@ tilt_deg = {{ values = [5.0] }}
 tilt_azim_deg = {{ values = [95.0] }}
 E_grid_line = {{ values = [100.0, 200.0] }}
 E_grid_brem = {{ values = [10.0, 20.0] }}
-n_electrons = {{ values = [7] }}
-n_electrons_brem = {{ values = [3] }}
+cxr_electrons = {{ values = [7] }}
+brem_electrons = {{ values = [3] }}
 straggling = true
 energy_model = "midpoint"
 max_dE_frac = 0.1
@@ -198,8 +199,7 @@ def test_simulation_scene_resolves_real_profile_objects(tmp_path, monkeypatch):
     assert isinstance(filters[0], FilterPlate)
     assert filters[0].name == "half"
     assert isinstance(numerics, Numerics)
-    assert numerics.cxr_trials == 7
-    assert numerics.brem_trials == 3
+    assert numerics.sampling == FixedSampling(7, 3)
     assert physics.straggling is True
     assert numerics.energy_model == "midpoint"
     assert physics.emission == ("incoherent",)
@@ -594,7 +594,7 @@ def test_single_scene_and_checkpoint_lowering_share_seed_counts_and_explicit_gri
     path = _catalog_io.active_catalog_path()
     path.write_text(
         path.read_text().replace(
-            "n_electrons = { values = [7] }", "n_electrons = { values = [200] }"
+            "cxr_electrons = { values = [7] }", "cxr_electrons = { values = [200] }"
         )
     )
     catalog = load_material_catalog(path, profile="single")

@@ -19,6 +19,7 @@ from pyrite.campaign.config import default_settings, material_sweep
 from pyrite.campaign.geometry import Footprint
 from pyrite.campaign.profiles import dataset_identity
 from pyrite.campaign.sweep import BeamSpec, Sweep, build_cases
+from pyrite.config import FixedSampling
 from pyrite.detectors import EnergyBins
 from pyrite.montecarlo import runner
 from pyrite.montecarlo.runner import case_driver
@@ -213,8 +214,7 @@ def synthetic_si_tables(monkeypatch):
 def _coupled_case(target=None, **numerics_overrides):
     detector = pr.Detector()
     numerics = pr.Numerics(
-        cxr_trials=12,
-        brem_trials=12,
+        sampling=FixedSampling(cxr_electrons=12, brem_electrons=12),
         energy_model="midpoint",
         energy_bins=EnergyBins(
             cxr=np.linspace(1500.0, 2000.0, 20), brem=np.arange(5000.0, 40001.0, 500.0)

@@ -1,5 +1,6 @@
 import json
 
+import pytest
 import tomlkit
 
 from pyrite.cli import command as root_command
@@ -105,7 +106,7 @@ def test_precision_show_reports_the_default_policy_without_a_table(tmp_path, mon
 
 def test_precision_show_names_why_a_profile_keeps_fixed_counts(tmp_path, monkeypatch):
     for extra, reason in (
-        ("cxr_trials = { values = [450] }\n", "the profile sets fixed electron counts"),
+        ("cxr_electrons = { values = [450] }\n", "the profile sets fixed electron counts"),
         ('emission = "both"\n', "emission is 'both'"),
     ):
         text = _CATALOG.replace("[profiles.sub_100keV]\n", f"[profiles.sub_100keV]\n{extra}")
@@ -225,12 +226,12 @@ def test_precision_set_validates_at_the_boundary(tmp_path, monkeypatch):
 
 def test_precision_set_refuses_fixed_counts_and_coherent_profiles(tmp_path, monkeypatch):
     fixed = _CATALOG.replace(
-        "[profiles.sub_100keV]\n", "[profiles.sub_100keV]\ncxr_trials = { values = [450] }\n"
+        "[profiles.sub_100keV]\n", "[profiles.sub_100keV]\ncxr_electrons = { values = [450] }\n"
     )
     _catalog(tmp_path, monkeypatch, fixed)
     refused = invoke(numerics_command, ["precision", "set", "sub_100keV", *_POLICY])
     assert refused.exit_code == 1
-    assert "cxr-trials 450" in refused.stderr
+    assert "cxr-electrons 450" in refused.stderr
     assert "pyrite numerics precision enable sub_100keV" in refused.stderr
     assert "line-electrons" not in refused.stderr
 
@@ -253,7 +254,7 @@ def test_precision_standard_mutation_requires_confirmation(tmp_path, monkeypatch
     assert_clean_result(accepted)
 
 
-def _fixed(counts="cxr_trials = { values = [500] }\nbrem_trials = { values = [100] }\n"):
+def _fixed(counts="cxr_electrons = { values = [500] }\nbrem_electrons = { values = [100] }\n"):
     return _CATALOG.replace("[profiles.sub_100keV]\n", f"[profiles.sub_100keV]\n{counts}")
 
 
@@ -285,7 +286,7 @@ def test_enable_replaces_fixed_counts_atomically(tmp_path, monkeypatch):
 
     preview = invoke(numerics_command, ["precision", "enable", "sub_100keV", "--dry-run"])
     assert_clean_result(preview)
-    assert "-cxr_trials = { values = [500] }" in preview.stdout
+    assert "-cxr_electrons = { values = [500] }" in preview.stdout
     assert catalog.read_text() == _fixed()
 
     enabled = invoke(numerics_command, ["precision", "enable", "sub_100keV", "--observable", "cxr"])
@@ -293,12 +294,12 @@ def test_enable_replaces_fixed_counts_atomically(tmp_path, monkeypatch):
         enabled,
         stdout=(
             "enabled adaptive precision for profile sub_100keV\n"
-            "  removed fixed counts: cxr-trials 500, brem-trials 100\n"
+            "  removed fixed counts: cxr-electrons 500, brem-electrons 100\n"
             "profile sub_100keV: adaptive (profile policy)\n"
         ),
     )
     row = _profile(catalog)
-    assert "cxr_trials" not in row and "brem_trials" not in row
+    assert "cxr_electrons" not in row and "brem_electrons" not in row
     assert row["precision"].unwrap()["observables"] == ["cxr"]
     assert row["precision"].unwrap()["max_electrons"] == 20000
 
@@ -321,7 +322,7 @@ def test_enable_refuses_unsupported_profiles_without_writing(tmp_path, monkeypat
         ("secondary_threshold_eV = 1000.0\n", "particle cascades"),
         ("positron_transport = true\n", "positron transport"),
     ):
-        text = _fixed(f"cxr_trials = {{ values = [500] }}\n{extra}")
+        text = _fixed(f"cxr_electrons = {{ values = [500] }}\n{extra}")
         catalog = _catalog(tmp_path, monkeypatch, text)
         refused = invoke(numerics_command, ["precision", "enable", "sub_100keV"])
         assert refused.exit_code == 1
@@ -340,16 +341,16 @@ def test_enable_refuses_unsupported_profiles_without_writing(tmp_path, monkeypat
 
     override = _CATALOG.replace(
         "\n[materials.hopg]",
-        "\n[profiles.sub_100keV.overrides.hopg]\ncxr_trials = { values = [900] }\n"
+        "\n[profiles.sub_100keV.overrides.hopg]\ncxr_electrons = { values = [900] }\n"
         "\n[materials.hopg]",
     )
     catalog = _catalog(tmp_path, monkeypatch, override)
     refused = invoke(numerics_command, ["precision", "enable", "sub_100keV"])
     assert refused.exit_code == 1
-    assert "[overrides.hopg] sets cxr-trials" in refused.stderr
+    assert "[overrides.hopg] sets cxr-electrons" in refused.stderr
     assert catalog.read_text() == override
     shown = invoke(numerics_command, ["precision", "show", "sub_100keV"])
-    assert "adaptive unsupported: [overrides.hopg] sets cxr-trials" in shown.stdout
+    assert "adaptive unsupported: [overrides.hopg] sets cxr-electrons" in shown.stdout
 
 
 def test_disable_selects_fixed_counts_with_defaults_or_flags(tmp_path, monkeypatch):
@@ -358,7 +359,7 @@ def test_disable_selects_fixed_counts_with_defaults_or_flags(tmp_path, monkeypat
 
     preview = invoke(numerics_command, ["precision", "disable", "sub_100keV", "--dry-run"])
     assert_clean_result(preview)
-    assert "+cxr_trials = {values = [300]}" in preview.stdout
+    assert "+cxr_electrons = {values = [300]}" in preview.stdout
     assert "precision" in _profile(catalog)
 
     disabled = invoke(numerics_command, ["precision", "disable", "sub_100keV"])
@@ -367,22 +368,22 @@ def test_disable_selects_fixed_counts_with_defaults_or_flags(tmp_path, monkeypat
         stdout=(
             "selected fixed electron counts for profile sub_100keV\n"
             "  removed precision policy\n"
-            "  counts: cxr-trials 300, brem-trials 150\n"
+            "  counts: cxr-electrons 300, brem-electrons 150\n"
         ),
     )
     row = _profile(catalog)
     assert "precision" not in row
-    assert (row["cxr_trials"]["values"], row["brem_trials"]["values"]) == ([300], [150])
+    assert (row["cxr_electrons"]["values"], row["brem_electrons"]["values"]) == ([300], [150])
     shown = invoke(numerics_command, ["precision", "show", "sub_100keV"])
-    assert "  counts: cxr-trials 300, brem-trials 150\n" in shown.stdout
+    assert "  counts: cxr-electrons 300, brem-electrons 150\n" in shown.stdout
     assert "to switch to adaptive: pyrite numerics precision enable sub_100keV" in shown.stdout
 
     changed = invoke(
-        numerics_command, ["precision", "disable", "sub_100keV", "--cxr-trials", "800"]
+        numerics_command, ["precision", "disable", "sub_100keV", "--cxr-electrons", "800"]
     )
     assert_clean_result(changed)
-    assert _profile(catalog)["cxr_trials"]["values"] == [800]
-    assert _profile(catalog)["brem_trials"]["values"] == [150]
+    assert _profile(catalog)["cxr_electrons"]["values"] == [800]
+    assert _profile(catalog)["brem_electrons"]["values"] == [150]
 
     same = invoke(numerics_command, ["precision", "disable", "sub_100keV"])
     assert_clean_result(
@@ -393,22 +394,22 @@ def test_disable_selects_fixed_counts_with_defaults_or_flags(tmp_path, monkeypat
 def test_disable_keeps_count_sweeps_and_prompts_only_on_a_terminal(tmp_path, monkeypatch):
     from pyrite.cli.commands import _profile_precision
 
-    grid = "cxr_trials = { values = [100, 200] }\n"
+    grid = "cxr_electrons = { values = [100, 200] }\n"
     catalog = _catalog(tmp_path, monkeypatch, _fixed(grid))
     monkeypatch.setattr(_profile_precision, "_interactive", lambda: True)
 
     prompted = invoke(numerics_command, ["precision", "disable", "sub_100keV"], input="75\n")
     assert prompted.exit_code == 0
-    assert "brem-trials [150]" in prompted.stderr
-    assert "cxr-trials" not in prompted.stderr
+    assert "brem-electrons [150]" in prompted.stderr
+    assert "cxr-electrons" not in prompted.stderr
     row = _profile(catalog)
-    assert row["cxr_trials"]["values"] == [100, 200]
-    assert row["brem_trials"]["values"] == [75]
+    assert row["cxr_electrons"]["values"] == [100, 200]
+    assert row["brem_electrons"]["values"] == [75]
 
     _catalog(tmp_path, monkeypatch)
     bypassed = invoke(
         numerics_command,
-        ["precision", "disable", "sub_100keV", "--cxr-trials", "40", "--brem-trials", "20"],
+        ["precision", "disable", "sub_100keV", "--cxr-electrons", "40", "--brem-electrons", "20"],
     )
     assert bypassed.exit_code == 0
     assert "[" not in bypassed.stderr
@@ -419,7 +420,7 @@ def test_numerics_counts_on_an_adaptive_profile_point_at_disable(tmp_path, monke
     invoke(numerics_command, ["precision", "set", "sub_100keV", *_POLICY])
     before = catalog.read_text()
 
-    refused = invoke(profile.command, ["numerics", "set", "sub_100keV", "--cxr-trials", "500"])
+    refused = invoke(profile.command, ["numerics", "set", "sub_100keV", "--cxr-electrons", "500"])
     assert refused.exit_code == 1
     assert "pyrite numerics precision disable sub_100keV" in refused.stderr
     assert catalog.read_text() == before
@@ -449,9 +450,38 @@ def test_show_reports_line_grid_independently_and_next_steps(tmp_path, monkeypat
     machine = json.loads(
         invoke(numerics_command, ["precision", "show", "sub_100keV", "-o", "json"]).stdout
     )["payload"]
-    assert machine["fixed_counts"] == {"line_trials": [500], "brem_trials": [100]}
+    assert machine["fixed_counts"] == {"cxr_electrons": [500], "brem_electrons": [100]}
     assert machine["line_grid_automatic_for_every_case"] is True
     enabled = invoke(numerics_command, ["precision", "enable", "sub_100keV"])
     assert_clean_result(enabled)
     shown = invoke(numerics_command, ["precision", "show", "sub_100keV"])
     assert "CXR grid: automatic for every case (cxr-grid policy)" in shown.stdout
+
+
+@pytest.mark.parametrize(
+    ("argv", "old", "new"),
+    [
+        (["numerics", "precision", "disable", "p"], "--cxr-trials", "--cxr-electrons"),
+        (["numerics", "precision", "disable", "p"], "--brem-trials", "--brem-electrons"),
+        (["numerics", "set", "p"], "--cxr-trials", "--cxr-electrons"),
+        (["numerics", "set", "p"], "--brem-trials", "--brem-electrons"),
+        (["profile", "set", "p"], "--cxr-trials", "--cxr-electrons"),
+        (["profile", "add", "p"], "--brem-trials", "--brem-electrons"),
+    ],
+)
+def test_removed_budget_flags_are_usage_errors_naming_the_replacement(argv, old, new):
+    result = invoke(root_command, [*argv, old, "5"])
+    assert result.exit_code == 2
+    assert f"{old} was removed; use {new}" in result.stderr
+    assert "Traceback" not in result.stderr
+
+
+def test_removed_budget_catalog_key_is_a_clear_runtime_error(tmp_path, monkeypatch):
+    stale = _CATALOG.replace(
+        "[profiles.sub_100keV]\n", "[profiles.sub_100keV]\ncxr_trials = { values = [450] }\n"
+    )
+    _catalog(tmp_path, monkeypatch, stale)
+    result = invoke(numerics_command, ["precision", "show", "sub_100keV"])
+    assert result.exit_code == 1
+    assert "cxr_trials: catalog key was removed; rename it to 'cxr_electrons'" in result.stderr
+    assert "Traceback" not in result.stderr

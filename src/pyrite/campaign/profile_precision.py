@@ -14,7 +14,7 @@ from pyrite.detectors.editing import _toml_value
 from ._profile_document import existing_profile, profile_overrides, values_item
 from .profile_numerics import profile_numerics_values
 
-SAMPLING_FLAGS = {"n_electrons": "cxr-trials", "n_electrons_brem": "brem-trials"}
+SAMPLING_FLAGS = {"n_electrons": "cxr-electrons", "n_electrons_brem": "brem-electrons"}
 
 
 _INITIAL_FIELDS = (*REQUIRED_FIELDS, "observables")
@@ -70,7 +70,7 @@ def fixed_counts(profile):
 
 
 def describe_counts(counts):
-    """Render fixed counts with their CLI spellings: ``line-trials 500, brem-trials 100``."""
+    """Render fixed counts with their CLI spellings: ``cxr-electrons 500, brem-electrons 100``."""
     return ", ".join(
         f"{SAMPLING_FLAGS[key]} {','.join(str(value) for value in counts[key])}"
         for key in SAMPLING_KEYS

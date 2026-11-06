@@ -6,6 +6,7 @@ import pytest
 
 import pyrite as pr
 from pyrite import api
+from pyrite.config import FixedSampling
 from pyrite.detectors import Timepix3
 from pyrite.observations import ObservationStore
 from pyrite.runs.observe import produce_observation
@@ -32,7 +33,7 @@ def transports(monkeypatch) -> list[int]:
     return calls
 
 
-NUMERICS = pr.Numerics(cxr_trials=1, brem_trials=1)
+NUMERICS = pr.Numerics(sampling=FixedSampling(cxr_electrons=1, brem_electrons=1))
 PLATE = pr.geometry.FilterPlate(
     "silicon", 0.05, (1.5, 10.0), pr.detectors.PlanarPose.from_observation(50.0, 60.0)
 )

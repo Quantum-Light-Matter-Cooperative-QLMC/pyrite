@@ -51,7 +51,7 @@ def simulate_trajectories(
     physics, numerics
         Existing :class:`pyrite.Physics` and :class:`pyrite.Numerics` policies;
         omitted values use their constructor defaults. The population is
-        ``max(numerics.cxr_trials, numerics.brem_trials)``. ``Numerics.seed``
+        ``max(cxr_electrons, brem_electrons)`` of ``numerics.sampling``. ``Numerics.seed``
         uses the canonical case seed when omitted. Integration, transport core,
         precision and kernel tuning come from Numerics. Models and source
         policies resolve through the same scene lowering as ``pyrite.simulate``.
@@ -128,6 +128,7 @@ def trajectory_case(
 ):
     """Resolve supported fixed-count transport through the canonical scene owner."""
     from .._numerics import Numerics, Physics
+    from .._sampling import AdaptiveSampling
     from .lowering import build_case
     from .model import Scene
 
@@ -137,7 +138,7 @@ def trajectory_case(
         raise TypeError("numerics must be a Numerics")
     if not isinstance(physics, Physics):
         raise TypeError("physics must be a Physics")
-    if numerics.precision is not None:
+    if isinstance(numerics.sampling, AdaptiveSampling):
         raise ValueError(
             "simulate_trajectories requires fixed sampling; adaptive sampling scores spectra"
         )

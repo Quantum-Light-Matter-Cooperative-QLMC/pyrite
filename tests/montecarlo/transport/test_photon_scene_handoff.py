@@ -10,6 +10,7 @@ import numpy as np
 import pytest
 
 import pyrite.photon_transport as photon
+from pyrite.config import FixedSampling
 
 
 def _physical_scene():
@@ -261,7 +262,7 @@ def test_independent_photon_configuration_matches_legacy_case(monkeypatch, entry
     scene = _physical_scene()
     original = asdict(scene)
     physics = Physics(bremsstrahlung_model="eedl", radiative_model="uncoupled")
-    controls = Numerics(cxr_trials=7, brem_trials=7)
+    controls = Numerics(sampling=FixedSampling(cxr_electrons=7, brem_electrons=7))
     expected = lowering.build_case(replace(scene, physics=physics, numerics=controls))
     lower = lowering.lower_simulation
     captured = []

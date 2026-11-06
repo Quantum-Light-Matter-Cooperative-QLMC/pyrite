@@ -7,7 +7,7 @@ import pytest
 
 from pyrite import Scene, Sweep, api
 from pyrite.beams import Beam, PointBunch, Spot
-from pyrite.config import Numerics, Physics
+from pyrite.config import FixedSampling, Numerics, Physics
 from pyrite.detectors import Detector, EnergyBins
 from pyrite.geometry import Footprint, Slab
 from pyrite.quantum import QuantumDynamics, QuantumNumerics, QuantumRegion, QuantumSetup
@@ -27,8 +27,7 @@ def scene():
 @pytest.fixture
 def numerics():
     return Numerics(
-        cxr_trials=1,
-        brem_trials=1,
+        sampling=FixedSampling(cxr_electrons=1, brem_electrons=1),
         energy_bins=EnergyBins(cxr=(1_000.0, 1_500.0), brem=(1_000.0, 1_500.0)),
     )
 
@@ -64,7 +63,11 @@ def test_one_scene_runs_under_independent_configurations(scene, numerics, transp
     second = api.simulate(
         scene,
         physics=replace(scene.physics, brem_source="none"),
-        numerics=replace(numerics, cxr_trials=2, transport_core="per-electron"),
+        numerics=replace(
+            numerics,
+            sampling=replace(numerics.sampling, cxr_electrons=2),
+            transport_core="per-electron",
+        ),
     )
 
     np.testing.assert_array_equal(first.brem.density, [4.0, 5.0])

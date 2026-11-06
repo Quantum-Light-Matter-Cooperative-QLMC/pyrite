@@ -1,13 +1,12 @@
-"""Explicit Monte Carlo sampling modes for the Python API (issue #680).
+"""Electron-budget policies: the single sampling input of ``Numerics`` (#680, #1007).
 
-Legacy ``Numerics(precision=...)`` and positional trial-count construction remain
-valid. These types *select* the same existing fixed/adaptive runner contracts;
-they do not change stochastic estimators, RNG streams, or checkpoint payloads.
+These types *select* the existing fixed/adaptive runner contracts; they do not
+change stochastic estimators, RNG streams, or checkpoint payloads.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 
 from ._precision import Precision
 
@@ -42,3 +41,21 @@ class AdaptiveSampling(Precision):
 
 
 SamplingPolicy = FixedSampling | AdaptiveSampling
+
+
+def adaptive_sampling(policy: Precision) -> AdaptiveSampling:
+    """Return the typed policy for a catalog or ``Settings`` stopping rule."""
+    if isinstance(policy, AdaptiveSampling):
+        return policy
+    return AdaptiveSampling(**{f.name: getattr(policy, f.name) for f in fields(Precision)})
+
+
+def case_budget(policy: SamplingPolicy) -> tuple[int, int, Precision | None]:
+    """Lower a policy to the case builder's ``(line, brem, adaptive)`` inputs.
+
+    Adaptive cases request their maximum for both estimators; resolved case
+    identity vocabulary (``Ne``, ``Ne_brem``, ``adaptive_precision``) is unchanged.
+    """
+    if isinstance(policy, FixedSampling):
+        return policy.cxr_electrons, policy.brem_electrons, None
+    return policy.max_electrons, policy.max_electrons, policy

@@ -264,12 +264,12 @@ def transported_demo(
     the fused CUDA kernel.
     """
     import pyrite as pr
+    from pyrite.config import FixedSampling
     from pyrite.detectors import EnergyBins
 
     stop = config.energy_keV * 1e3
     numerics = pr.Numerics(
-        cxr_trials=trials,
-        brem_trials=2 * trials,
+        sampling=FixedSampling(trials, 2 * trials),
         energy_model="midpoint",
         transport_core=transport_core,
         energy_bins=EnergyBins(

@@ -5,7 +5,7 @@ from __future__ import annotations
 import math
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass, replace
-from typing import Any
+from typing import Any, Self
 
 OBSERVABLES = ("cxr", "brem")
 REQUIRED_FIELDS = ("target_rse", "min_electrons", "max_electrons", "block_electrons")
@@ -193,7 +193,7 @@ class Precision:
         return values
 
     @classmethod
-    def from_dict(cls, payload: Mapping[str, Any]) -> Precision:
+    def from_dict(cls, payload: Mapping[str, Any]) -> Self:
         """Validate a serialized policy and restore tuple-valued fields."""
         if not isinstance(payload, Mapping):
             raise TypeError("adaptive_precision must be a mapping")

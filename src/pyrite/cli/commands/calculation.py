@@ -141,6 +141,7 @@ def _register(group, *, physics):
         copy(param)
         for param in profile.numerics_set_command.params
         if param.name in ("name", "yes", "dry_run")
+        or not param.expose_value  # removed flags keep naming their replacement
         or names.get((param.name or "").replace("_", "-")) is not None
     ]
     if physics:
@@ -216,7 +217,7 @@ def physics_command():
     },
     lazy_help={
         "preset": "Manage named numerics presets that profiles attach by name.",
-        "precision": "Configure adaptive precision or fixed trials on PROFILE.",
+        "precision": "Configure adaptive precision or fixed electron counts on PROFILE.",
         "cxr-grid": "Configure PROFILE's automatic CXR photon-grid policy.",
         "energy-grid": "Derive and inspect specialist photon-grid artifacts.",
     },

@@ -7,8 +7,8 @@ tilt_azim_deg = {values = [0.0]}
 materials = ["silicon"]
 beam = "tr_demo"
 detector = "tr_backward"
-cxr_trials = {values = [2048]}
-brem_trials = {values = [4096]}
+cxr_electrons = {values = [2048]}
+brem_electrons = {values = [4096]}
 energy_model = "midpoint"
 inelastic_model = "continuous"
 radiative_model = "uncoupled"

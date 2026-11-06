@@ -218,10 +218,10 @@ class ConfigurationEditor:
             return
         blockers = precision_blockers(row)
         if any("distance_mm" in entry for entry in catalog.profile_detector_set(name).values()):
-            blockers.append("pixel observation directions require fixed trial counts")
+            blockers.append("pixel observation directions require fixed electron counts")
         beam = catalog.profile_beam(name)
         if beam is not None and beam.get("source") == "gpt_gdf":
-            blockers.append("GDF sources require fixed trial counts")
+            blockers.append("GDF sources require fixed electron counts")
         if blockers:
             raise ValueError(f"profiles.{name}.precision: {'; '.join(blockers)}")
 

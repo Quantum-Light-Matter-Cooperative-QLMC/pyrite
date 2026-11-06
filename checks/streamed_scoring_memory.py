@@ -41,6 +41,8 @@ from dataclasses import replace
 
 import numpy as np
 
+from pyrite.config import FixedSampling
+
 SPECTRA = ("spec", "spec_characteristic", "brem_wide")
 
 
@@ -50,8 +52,7 @@ def _case(material, ne, e0_kev, thickness_ang=1.0e4, seed=None):
     from pyrite.detectors import EnergyBins
 
     numerics = pr.Numerics(
-        cxr_trials=ne,
-        brem_trials=ne,
+        sampling=FixedSampling(cxr_electrons=ne, brem_electrons=ne),
         energy_model="midpoint",
         energy_bins=EnergyBins(
             cxr=np.linspace(1000.0, 20000.0, 400), brem=np.arange(1000.0, e0_kev * 1e3, 1000.0)

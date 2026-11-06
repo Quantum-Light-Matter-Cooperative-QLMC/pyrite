@@ -8,6 +8,7 @@ import numpy as np
 
 from .._energy_grid_encoding import encode_energy_grid
 from .._numerics import _emission_selection, default_inelastic_cutoff, default_radiative_cutoff
+from .._sampling import FixedSampling, SamplingPolicy, adaptive_sampling
 from .observation import filter_from_config, physical_detector_from_config
 
 if TYPE_CHECKING:
@@ -37,6 +38,24 @@ def _band_at_energy(grid, energy_keV):
         return grid
     start, _, step = encoded
     return np.arange(start, float(energy_keV) * 1e3 + step, step)
+
+
+def _profile_sampling(
+    catalog: Any, scan: Any, profile_name: str, command_name: str
+) -> SamplingPolicy:
+    """Return one scene's policy: the profile's adaptive rule or its single counts."""
+    precision = catalog.profile_precision(profile_name)
+    if precision is not None:
+        return adaptive_sampling(precision)
+    default = FixedSampling()
+    return FixedSampling(
+        default.cxr_electrons
+        if scan.n_electrons is None
+        else int(_one(scan.n_electrons, profile_name, command_name)),
+        default.brem_electrons
+        if scan.n_electrons_brem is None
+        else int(_one(scan.n_electrons_brem, profile_name, command_name)),
+    )
 
 
 def resolve_pixel_scene(
@@ -134,14 +153,6 @@ def resolve_pixel_scene(
     max_dE_frac = transport.get("max_dE_frac", 0.0)
     if isinstance(max_dE_frac, bool) or not isinstance(max_dE_frac, (int, float)):
         raise TypeError("profile max_dE_frac must be a number")
-    n_electrons = (
-        450 if scan.n_electrons is None else int(_one(scan.n_electrons, profile_name, command_name))
-    )
-    n_electrons_brem = (
-        100
-        if scan.n_electrons_brem is None
-        else int(_one(scan.n_electrons_brem, profile_name, command_name))
-    )
     return (
         beam,
         target,
@@ -155,15 +166,13 @@ def resolve_pixel_scene(
                 cxr_by_energy=scan.E_grid_line_by_energy,
                 brem=_declared_brem_band(scan, energy),
             ),
-            cxr_trials=n_electrons,
-            brem_trials=n_electrons_brem,
+            sampling=_profile_sampling(catalog, scan, profile_name, command_name),
             energy_model=cast(Literal["frozen", "midpoint"], energy_model),
             max_dE_frac=float(max_dE_frac),
             channeling_basis_size=int(transport.get("channeling_basis_size", 16)),
             channeling_bloch_cells=int(transport.get("channeling_bloch_cells", 16)),
             channeling_dz_ang=float(transport.get("channeling_dz_ang", 250.0)),
             channeling_zone_max_ang=cast(float | None, transport.get("channeling_zone_max_ang")),
-            precision=catalog.profile_precision(profile_name),
         ),
         Physics(
             emission=_emission_selection(catalog.profile_emission(profile_name) or "incoherent"),

@@ -5,4 +5,4 @@ tilt_azim_deg = {values = [95.0, 105.0, 115.0, 125.0, 135.0, 145.0, 155.0, 165.0
 beam = "1_atto"
 materials = ["hopg"]
 emission = "both"
-n_electrons = {values = [20000]}
+cxr_electrons = {values = [20000]}

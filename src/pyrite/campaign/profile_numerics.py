@@ -29,7 +29,7 @@ def set_numerics(document, name, updates):
     if "precision" in target and any(key in updates for key in SAMPLING_KEYS):
         raise ValueError(
             f"profile {name!r} has an adaptive precision policy; select fixed counts with: "
-            f"pyrite numerics precision disable {name} --cxr-trials N --brem-trials N"
+            f"pyrite numerics precision disable {name} --cxr-electrons N --brem-electrons N"
         )
     merged = {**profile_numerics_values(target), **updates}
     validate_profile_numerics(merged)

@@ -363,6 +363,20 @@ def canonical_option(*param_decls: str, retired: Sequence[str] = (), **kwargs):
     return decorator
 
 
+def removed_option(flag: str, replacement: str):
+    """Hidden option for a flag removed without an alias: name its replacement.
+
+    Giving ``flag`` is a usage error (exit 2) rather than Click's bare
+    "No such option", so a stale script learns the new spelling.
+    """
+
+    def reject(ctx: click.Context, param: click.Parameter, value):
+        if value is not None:
+            raise click.UsageError(f"{flag} was removed; use {replacement}", ctx=ctx)
+
+    return click.option(flag, hidden=True, expose_value=False, callback=reject, metavar="N")
+
+
 def _implied_dest(param_decls: Sequence[str]) -> str:
     """The variable name Click will infer for *param_decls*."""
     for decl in param_decls:

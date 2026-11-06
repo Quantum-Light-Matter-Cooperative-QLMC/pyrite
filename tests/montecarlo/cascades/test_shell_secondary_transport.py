@@ -8,6 +8,7 @@ from dataclasses import replace
 import numpy as np
 import pytest
 
+from pyrite.config import FixedSampling
 from pyrite.materials import CATALOG
 from pyrite.montecarlo import shell_configuration as config
 from pyrite.montecarlo.spectrum.brem_bremslib import prepare_bremslib_table
@@ -429,8 +430,7 @@ def test_case_threshold_reaches_runner_transport():
 
     detector = pr.Detector()
     numerics = pr.Numerics(
-        cxr_trials=8,
-        brem_trials=8,
+        sampling=FixedSampling(cxr_electrons=8, brem_electrons=8),
         energy_model="midpoint",
         energy_bins=EnergyBins(cxr=np.linspace(1500, 2000, 20), brem=np.linspace(1500, 9000, 20)),
     )

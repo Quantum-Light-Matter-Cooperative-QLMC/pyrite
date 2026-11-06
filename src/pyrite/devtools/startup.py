@@ -32,7 +32,7 @@ start = time.perf_counter()
 beam = pr.Beam(energy_keV=30.0, transverse=pr.beams.TransverseSpot(), longitudinal=pr.beams.PointBunch())
 target = pr.geometry.Slab("hopg", thickness_ang=10_000.0, tilt_deg=30.0, footprint=pr.geometry.Footprint(5.0, 5.0))
 detector = pr.Detector()
-numerics = pr.Numerics(cxr_trials=450, brem_trials=100)
+numerics = pr.Numerics(sampling=pr.config.FixedSampling(450, 100))
 setup_s = time.perf_counter() - start
 start = time.perf_counter()
 from contextlib import nullcontext

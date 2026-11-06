@@ -11,6 +11,7 @@ import pytest
 
 import pyrite as pr
 from pyrite import api
+from pyrite.config import FixedSampling
 from pyrite.detectors import EnergyBins
 from pyrite.detectors.optical_energy import CalibratedPulseEnergyDetector
 from pyrite.montecarlo import runner
@@ -63,8 +64,7 @@ def transported():
         ),
     )
     numerics = pr.Numerics(
-        cxr_trials=12,
-        brem_trials=8,
+        sampling=FixedSampling(cxr_electrons=12, brem_electrons=8),
         energy_bins=EnergyBins(cxr=np.linspace(150.0, 1500.0, 28), brem=np.array([500.0, 5000.0])),
     )
     case = replace(api.build_case(scene, numerics), seed=11)

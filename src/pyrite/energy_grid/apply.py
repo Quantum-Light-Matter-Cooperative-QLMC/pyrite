@@ -289,7 +289,7 @@ def apply_bounds(toml_text, combined, *, force=False):
         # from E0 (``campaign/sweep.py::build_cases``), so a stored per-material
         # uniform override would change nothing but bookkeeping (issue #256).
     _insert_energies(document, all_energies)
-    return tomlkit.dumps(document), skipped
+    return _render_catalog(document), skipped
 
 
 def resolved_grid_band(descriptor, field: str):
@@ -532,7 +532,7 @@ def add_file(
         material: artifacts.artifact_digest(identity) for material, identity in identities.items()
     }
     _set_profile_refs(document, profile, refs)
-    new_text = tomlkit.dumps(document)
+    new_text = _render_catalog(document)
 
     if dry_run:
         _print_diff(original, new_text)
@@ -610,7 +610,7 @@ def remove_cxr_rows(
     )
     digest = artifacts.artifact_digest(identity)
     _set_profile_refs(document, profile, {material: digest})
-    new_text = tomlkit.dumps(document)
+    new_text = _render_catalog(document)
     if dry_run:
         _print_diff(original, new_text)
         return sorted(wanted), digest
@@ -648,7 +648,7 @@ def _repoint_identity(
 ) -> str:
     stored = artifacts.write_artifact(_artifact_store_root(path), identity)
     _set_profile_refs(document, profile, {material: stored.digest})
-    new_text = tomlkit.dumps(document)
+    new_text = _render_catalog(document)
     _validate_catalog_text(path, new_text)
     if _read_catalog(path) != original:
         raise ValueError("material catalog changed while repointing artifact; rerun command")
@@ -765,6 +765,11 @@ def set_brem_artifact(
         raise
     _warn_stale_golden()
     return digest
+
+
+def _render_catalog(document) -> str:
+    """Serialize an edited document with canonical catalog keys."""
+    return translate_catalog_text(tomlkit.dumps(document), canonical=True)
 
 
 def _atomic_write(path, text):
@@ -903,7 +908,7 @@ def set_brem_geometric(
     item["values"] = values
     _material_override_table(document, material, profile)["E_grid_brem"] = item
 
-    new_text = tomlkit.dumps(document)
+    new_text = _render_catalog(document)
     _validate_catalog_text(path, new_text, profile=profile)
     provenance_original = _snapshot(_provenance.PROVENANCE_PATH)
     _write_catalog(path, new_text)

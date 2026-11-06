@@ -13,8 +13,8 @@ energy_keV = {values = [17000.0]}
 tilt_deg = {values = [3.0]}
 tilt_azim_deg = {values = [45.0]}
 materials = ["silicon"]
-cxr_trials = {values = [200]}
-brem_trials = {values = [200]}
+cxr_electrons = {values = [200]}
+brem_electrons = {values = [200]}
 beam = "example"
 detector = "forward"
 emission = "incoherent"

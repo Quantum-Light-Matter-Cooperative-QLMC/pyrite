@@ -88,7 +88,7 @@ def test_removed_policy_aliases_and_paths_are_rejected():
         with pytest.raises(ValueError, match="has no field"):
             pr.Sweep(scene(), {path: [1]})
     sweep = pr.Sweep(
-        scene(), {"physics.straggling": [False, True], "numerics.cxr_trials": [10, 20]}
+        scene(), {"physics.straggling": [False, True], "numerics.sampling.cxr_electrons": [10, 20]}
     )
     cases = sweep.cases()
     assert [c["Ne"] for c in cases] == [10, 20, 10, 20]

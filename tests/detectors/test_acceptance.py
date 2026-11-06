@@ -11,6 +11,7 @@ import pyrite as pr
 from pyrite.api import build_case, case_content_key
 from pyrite.campaign.profiles import dataset_identity
 from pyrite.campaign.sweep import Sweep as LegacySweep
+from pyrite.config import FixedSampling
 from pyrite.results import Settings
 
 
@@ -192,7 +193,7 @@ def test_equal_acceptance_preserves_lowered_case_and_both_identities():
         energy_keV=30, transverse=pr.beams.PointSpot(), longitudinal=pr.beams.PointBunch()
     )
     target = pr.geometry.Slab("hopg", thickness_ang=1000, footprint=None)
-    numerics = pr.Numerics(cxr_trials=1, brem_trials=1)
+    numerics = pr.Numerics(sampling=FixedSampling(cxr_electrons=1, brem_electrons=1))
     cases = [
         build_case(pr.Scene(beam, target, detector), numerics) for detector in (legacy, modern)
     ]

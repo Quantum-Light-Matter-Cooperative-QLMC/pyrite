@@ -8,6 +8,7 @@ import pytest
 import pyrite as pr
 from pyrite.campaign.lowering import build_case
 from pyrite.campaign.profiles import case_content_key
+from pyrite.config import FixedSampling
 from pyrite.execution import LocalExecutor, ResourceRequest
 
 
@@ -38,8 +39,7 @@ def test_defaults_and_legacy_read_views():
     assert n.resolved_radiation == pr.config.RadiationNumerics()
     assert n.resolved_execution == pr.ExecutionConfig()
     old = pr.Numerics(
-        31,
-        17,
+        sampling=pr.config.FixedSampling(31, 17),
         cxr_chunk=4,
         brem_chunk=8,
         energy_model="midpoint",
@@ -63,8 +63,7 @@ def test_defaults_and_legacy_read_views():
 
 def test_typed_sections_lower_to_identical_case_payload_and_hash():
     old = pr.Numerics(
-        cxr_trials=31,
-        brem_trials=17,
+        sampling=FixedSampling(cxr_electrons=31, brem_electrons=17),
         energy_model="midpoint",
         max_dE_frac=0.01,
         cxr_reflections=pr.config.CxrReflections(n_families=2, mosaic_nodes=3),
@@ -91,7 +90,7 @@ def test_typed_sections_lower_to_identical_case_payload_and_hash():
 def test_adaptive_and_grouped_execution_remain_compatible():
     p = pr.config.AdaptiveSampling(0.1, 40, 80, 20)
     old = pr.Numerics(
-        precision=pr.config.Precision.from_dict(p.to_dict()),
+        sampling=pr.config.AdaptiveSampling.from_dict(p.to_dict()),
         transport_core="per-electron",
         cxr_chunk=2,
     )
@@ -157,7 +156,10 @@ def test_explicit_group_replace_helpers():
     assert changed.describe_numerics()["execution"]["source"] == "typed"
     assert changed.describe_numerics()["transport"]["classification"] == "scientific"
     assert changed.describe_numerics()["execution"]["classification"] == "kernel-tuning"
-    assert replace(n, brem_trials=99).brem_trials == 99
+    assert (
+        replace(n, sampling=pr.config.FixedSampling(brem_electrons=99)).sampling.brem_electrons
+        == 99
+    )
 
 
 def test_681_executor_and_resource_contract_not_shadowed():

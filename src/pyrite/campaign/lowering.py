@@ -7,6 +7,7 @@ import numpy as np
 
 from .._energy_bins import EnergyBins
 from .._numerics import Numerics, Physics
+from .._sampling import case_budget
 from ..instrument import PlanarDetector
 from ..montecarlo import Case
 from ..observations.spec import Observation
@@ -73,10 +74,11 @@ def lower_simulation(request: ResolvedSimulation) -> Case:
         mosaic_route=convergence.mosaic_route,
         mosaic_nodes=convergence.mosaic_nodes,
     )
+    n_electrons, n_electrons_brem, precision = case_budget(numerics.sampling)
     cases = build_cases(
         legacy,
-        n_electrons=numerics.cxr_trials,
-        n_electrons_brem=numerics.brem_trials,
+        n_electrons=n_electrons,
+        n_electrons_brem=n_electrons_brem,
         coherent_emission=physics.coherent_emission,
         temporal_profile=numerics.temporal_profile,
         straggling=physics.straggling,
@@ -92,7 +94,7 @@ def lower_simulation(request: ResolvedSimulation) -> Case:
         pair_production_model=physics.pair_production_model,
         positron_transport=physics.positron_transport,
         atomic_electron_deflection=physics.atomic_electron_deflection,
-        precision=numerics.precision,
+        precision=precision,
     )
     if len(cases) != 1:  # Scene rejects every implicit multi-value field.
         raise RuntimeError(f"one Scene lowered to {len(cases)} cases")
@@ -175,10 +177,11 @@ def build_sweep_cases(
                 spec_chunk=resolved_numerics.cxr_chunk,
                 brem_chunk=resolved_numerics.brem_chunk,
             )
+        n_electrons, n_electrons_brem, precision = case_budget(resolved_numerics.sampling)
         cases = build_cases(
             old_sweep,
-            n_electrons=resolved_numerics.cxr_trials,
-            n_electrons_brem=resolved_numerics.brem_trials,
+            n_electrons=n_electrons,
+            n_electrons_brem=n_electrons_brem,
             coherent_emission=physics.coherent_emission,
             straggling=physics.straggling,
             energy_model=resolved_numerics.energy_model,
@@ -194,7 +197,7 @@ def build_sweep_cases(
             pair_production_model=physics.pair_production_model,
             positron_transport=physics.positron_transport,
             atomic_electron_deflection=physics.atomic_electron_deflection,
-            precision=resolved_numerics.precision,
+            precision=precision,
             check_kinematic_validity=check_kinematic_validity,
         )
         cases = resolve_shell_ionization(resolve_transition_radiation(cases, physics), physics)

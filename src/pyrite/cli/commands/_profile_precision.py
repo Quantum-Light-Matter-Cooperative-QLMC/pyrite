@@ -15,7 +15,7 @@ from pyrite.console import json as cli_json
 from pyrite.console import output as _output
 from pyrite.console.output import CLIError, emit_json_result, emit_result, output_option
 
-from .._deprecations import canonical_option
+from .._deprecations import canonical_option, removed_option
 
 _PRECISION_FIELD_NAMES = {
     "target-rse": "target_rse",
@@ -251,7 +251,7 @@ def precision_show_command(name, json_output):
             "explicit": explicit,
             "effective": effective,
             "fixed_counts": {
-                {"n_electrons": "line_trials", "n_electrons_brem": "brem_trials"}[key]: value
+                {"n_electrons": "cxr_electrons", "n_electrons_brem": "brem_electrons"}[key]: value
                 for key, value in counts.items()
             },
             "blockers": blockers,
@@ -297,7 +297,7 @@ def precision_show_command(name, json_output):
 def precision_enable_command(name, yes, dry_run, **values):
     """Switch PROFILE to adaptive electron counts in one atomic edit.
 
-    Removes the profile's fixed line-trials/brem-trials. Without options the
+    Removes the profile's fixed cxr-electrons/brem-electrons. Without options the
     default policy applies (no table is written); options write a policy whose
     unspecified fields come from the existing policy, else the default.
     Refuses, writing nothing, when the profile cannot run adaptive (coherent
@@ -381,15 +381,16 @@ def precision_reset_command(name, fields, yes, dry_run):
 
 @command.command("disable")
 @click.argument("name", shell_complete=_cli_completion.complete_profile)
+@removed_option("--cxr-trials", "--cxr-electrons")
+@removed_option("--brem-trials", "--brem-electrons")
 @canonical_option(
-    "--cxr-trials",
-    "line_trials",
+    "--cxr-electrons",
     type=click.IntRange(min=1),
     metavar="N",
     help="Fixed Monte Carlo electron histories for the CXR spectrum.",
 )
 @click.option(
-    "--brem-trials",
+    "--brem-electrons",
     type=click.IntRange(min=1),
     metavar="N",
     help="Fixed Monte Carlo electron histories for bremsstrahlung.",
@@ -398,10 +399,10 @@ def precision_reset_command(name, fields, yes, dry_run):
     "-y", "--yes", is_flag=True, help="Use defaults for missing counts; skip confirmations."
 )
 @click.option("--dry-run", is_flag=True, help="Print proposed TOML diff; write nothing.")
-def precision_disable_command(name, line_trials, brem_trials, yes, dry_run):
+def precision_disable_command(name, cxr_electrons, brem_electrons, yes, dry_run):
     """Opt PROFILE out of adaptive sampling: remove any policy, set fixed counts.
 
-    --cxr-trials/--brem-trials replace that count. A count the profile already
+    --cxr-electrons/--brem-electrons replace that count. A count the profile already
     sets is otherwise kept, including a sweep grid. A count it lacks is prompted
     for on a terminal; without a terminal, or with --yes or --dry-run, it takes
     the full-fidelity default (300 line, 150 brem).
@@ -415,7 +416,7 @@ def precision_disable_command(name, line_trials, brem_trials, yes, dry_run):
     defaults = {"n_electrons": preset.n_electrons, "n_electrons_brem": preset.n_electrons_brem}
     prompt = _interactive() and not (yes or dry_run)
     counts = {}
-    for key, value in (("n_electrons", line_trials), ("n_electrons_brem", brem_trials)):
+    for key, value in (("n_electrons", cxr_electrons), ("n_electrons_brem", brem_electrons)):
         if value is None and key in current:
             continue
         if value is None and prompt:

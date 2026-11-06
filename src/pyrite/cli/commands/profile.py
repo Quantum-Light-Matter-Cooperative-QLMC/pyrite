@@ -18,7 +18,7 @@ from pyrite.campaign import (
 )
 from pyrite.cli import _catalog_io
 from pyrite.cli import _completion as _cli_completion
-from pyrite.cli._deprecations import canonical_option
+from pyrite.cli._deprecations import canonical_option, removed_option
 from pyrite.cli._groups import LazyGroup
 from pyrite.cli.commands import (
     _profile_detectors,
@@ -69,8 +69,8 @@ _ATOMIC_ELECTRON_DEFLECTION_VALUES = ("kawrakow", "none")
 _SHELL_IONIZATION_MODEL_VALUES = ("eedl", "bote-salvat")
 _MOSAIC_ROUTE_VALUES = ("analytic", "mc")
 _NUMERICS_FIELD_NAMES = {
-    "cxr-trials": "n_electrons",
-    "brem-trials": "n_electrons_brem",
+    "cxr-electrons": "n_electrons",
+    "brem-electrons": "n_electrons_brem",
     "line-electrons": "n_electrons",
     "bremsstrahlung-electrons": "n_electrons_brem",
     "reflection-families": "n_families",
@@ -120,9 +120,11 @@ def _catalog_key(label):
 
 
 def _ne_cli_options(function):
+    function = removed_option("--cxr-trials", "--cxr-electrons")(function)
+    function = removed_option("--brem-trials", "--brem-electrons")(function)
     function = canonical_option(
         "-b",
-        "--brem-trials",
+        "--brem-electrons",
         "ne_brem",
         type=COUNT_CSV,
         metavar="N,...",
@@ -130,7 +132,7 @@ def _ne_cli_options(function):
     )(function)
     function = canonical_option(
         "-l",
-        "--cxr-trials",
+        "--cxr-electrons",
         "ne_line",
         type=COUNT_CSV,
         metavar="N,...",
@@ -268,7 +270,7 @@ def command():
       pyrite profile show sub_100keV        (or: pyrite profile sub_100keV)
       pyrite profile create sub_100keV --energy 30:100:10
       pyrite profile set sub_100keV --detector eds
-      pyrite numerics set sub_100keV --cxr-trials 2000
+      pyrite numerics set sub_100keV --cxr-electrons 2000
       pyrite numerics cxr-grid show sub_100keV
       pyrite profile add sub_100keV --energy 75
       pyrite profile set sub_100keV --material hopg,mose2
@@ -330,15 +332,17 @@ def numerics_show_command(name, json_output):
 
 @numerics_command.command("set")
 @click.argument("name", shell_complete=_cli_completion.complete_profile)
+@removed_option("--cxr-trials", "--cxr-electrons")
+@removed_option("--brem-trials", "--brem-electrons")
 @canonical_option(
-    "--cxr-trials",
+    "--cxr-electrons",
     "line_electrons",
     type=click.IntRange(min=1),
     metavar="N",
     help="Monte Carlo electron histories used to estimate the CXR spectrum.",
 )
 @canonical_option(
-    "--brem-trials",
+    "--brem-electrons",
     "bremsstrahlung_electrons",
     type=click.IntRange(min=1),
     metavar="N",
