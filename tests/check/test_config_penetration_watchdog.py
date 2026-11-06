@@ -7,9 +7,11 @@ drops_with_real_transport at the bottom of this file covers real physics.
 """
 
 import math
+import warnings
 
 import pytest
 
+from pyrite._physics_fallback import PhysicsFallbackWarning
 from pyrite.campaign import config
 from pyrite.montecarlo import runner
 from pyrite.montecarlo.transport import TransportStepLimitError
@@ -180,3 +182,37 @@ def test_gate_cases_by_penetration_step_budget_stops_at_the_ceiling(monkeypatch)
     with pytest.raises(TransportStepLimitError):
         config.gate_cases_by_penetration([_case(5000.0, 100.0)], Ne=10)
     assert budgets[-1] == runner.TRANSPORT_MAX_STEPS_CEILING
+
+
+def _gate_case(thickness_ang):
+    return {
+        "E0_keV": 30.0,
+        "thickness_ang": thickness_ang,
+        "tilt_deg": 0.0,
+        "composition": [("Si", 1.0)],
+    }
+
+
+def test_gate_requests_uncoupled_transport_without_a_fallback_warning():
+    """Strict remote jobs turn PhysicsFallbackWarning into an error (#984)."""
+    cases = [_gate_case(1000.0), _gate_case(5.0e7)]
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", PhysicsFallbackWarning)
+        kept, dropped = config.gate_cases_by_penetration(cases, Ne=20, seed=3)
+
+    with pytest.warns(PhysicsFallbackWarning, match="BremsLib tables are unavailable"):
+        legacy_kept, legacy_dropped = _gate_with_auto_radiative(cases)
+    assert (kept, dropped) == (legacy_kept, legacy_dropped)
+
+
+def _gate_with_auto_radiative(cases):
+    """Replay the gate's former implicit mode, pinning its kept/dropped decisions."""
+    real = config.simulate_trajectories
+
+    def auto(*args, radiative_model, **kwargs):
+        assert radiative_model == "uncoupled"
+        return real(*args, **kwargs)
+
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(config, "simulate_trajectories", auto)
+        return config.gate_cases_by_penetration(cases, Ne=20, seed=3)
