@@ -230,6 +230,27 @@ Carlo histories (transported primary electrons). See
 [Adaptive electron counts](../computation/statistical-methods.md#adaptive-electron-counts)
 for estimator limitations.
 
+## Reduce line-scoring cost (experimental)
+
+When a few primaries carry nearly all the line yield, roulette spends scoring
+time on them and scores the rest with a probability floor:
+
+```python
+from pyrite.config import FixedSampling, LineRoulette
+
+screened = pr.Numerics(
+    sampling=FixedSampling(cxr_histories=4096),
+    line_roulette=LineRoulette(floor=0.05, keep_fraction=0.1, pilot_histories=128),
+)
+# After simulating with `screened`, inspect result.provenance.line_roulette.
+```
+
+The estimate stays unbiased for incoherent lines, but the option enters case
+identity and its cost gain depends on the case, so measure it before relying on
+it. Coherent emission, temporal profiles, channeling, `max_dE_frac > 0`, two-beam
+transition radiation and pixel detectors are refused. See
+[Line-scoring roulette](../computation/statistical-methods.md#line-scoring-roulette).
+
 ## Scalar detector acceptance
 
 Use angular spans for a central-direction detector, or physical size and

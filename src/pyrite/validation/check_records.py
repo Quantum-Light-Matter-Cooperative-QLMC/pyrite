@@ -40,6 +40,7 @@ CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
     "checks/line_roulette_independent_879.py": (),
     "checks/roulette879_analysis.py": (),
     "checks/line_roulette_fom_879.py": (),
+    "checks/line_roulette_core_bench_879.py": (),
     "checks/line_roulette_mass_jitter_879.py": (),
     "checks/line_roulette_off_hashes_879.py": (),
     "checks/line_roulette_tail_879.py": (),

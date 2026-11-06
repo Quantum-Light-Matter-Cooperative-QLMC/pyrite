@@ -104,13 +104,13 @@ class LineScreen:
         return audit
 
     def _resolve_threshold(self) -> None:
-        pilot = self.mass[: self.policy.pilot_electrons]
+        pilot = self.mass[: self.policy.pilot_histories]
         self.threshold = float(np.quantile(pilot, 1.0 - self.policy.keep_fraction))
 
     def _select(self, primaries: np.ndarray) -> None:
         """Set each primary's probability and draw, given its exact mass."""
         policy = self.policy
-        later = primaries[primaries >= policy.pilot_electrons]
+        later = primaries[primaries >= policy.pilot_histories]
         if later.size and self.threshold is None:
             self._resolve_threshold()
         self.probability[primaries] = 1.0

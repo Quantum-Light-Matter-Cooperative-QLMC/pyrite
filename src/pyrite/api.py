@@ -445,6 +445,7 @@ def _scalar_result(
                 if "adaptive_sampling" in output
                 else {}
             ),
+            **({"line_roulette": output["line_roulette"]} if "line_roulette" in output else {}),
             # Allocation retries ran smaller chunks than requested; absent when none.
             **(
                 {"spectrum_recovery": {k: output[k] for k in _RECOVERY_KEYS if k in output}}

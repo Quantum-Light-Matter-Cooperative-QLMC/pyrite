@@ -29,7 +29,7 @@ _REFUSED_KEYS = {
 class LineRoulette:
     """Keep low-mass histories with probability ``floor`` and weight ``1/floor``.
 
-    ``pilot_electrons`` leading primaries are always scored, and the
+    ``pilot_histories`` leading primaries are always scored, and the
     ``1 - keep_fraction`` quantile of their exact line masses is the threshold
     at or above which later primaries are scored surely.
 
@@ -38,7 +38,7 @@ class LineRoulette:
 
     floor: float
     keep_fraction: float = 0.1
-    pilot_electrons: int = 128
+    pilot_histories: int = 128
     model: str = LINE_ROULETTE_MODEL
 
     def __post_init__(self) -> None:
@@ -48,9 +48,9 @@ class LineRoulette:
             value = getattr(self, name)
             if isinstance(value, bool) or not isinstance(value, int | float) or not 0 < value <= 1:
                 raise ValueError(f"line roulette {name} must lie in (0, 1]")
-        pilot = self.pilot_electrons
+        pilot = self.pilot_histories
         if isinstance(pilot, bool) or not isinstance(pilot, int) or pilot < 1:
-            raise ValueError("line roulette pilot_electrons must be a positive integer")
+            raise ValueError("line roulette pilot_histories must be a positive integer")
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

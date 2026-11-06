@@ -16,13 +16,19 @@ export PYRITE_USER_CATALOG="$PWD/scratch/roulette879/empty-user-catalog"
 export UV_CACHE_DIR=/tmp/pyrite-uv-cache
 export PYRITE_MC_BACKEND=cuda
 export PYRITE_TEST_BACKEND=cuda
-export PYRITE_FP64=1
+export PYRITE_FP64="${PYRITE_FP64:-0}"  # production float32 scoring; 1 forces float64
+# fp64 transport: mixed saved 4-10% in job 4017, and its MeV tail effect is unresolved.
+export PYRITE_MC_TRANSPORT_PRECISION="${PYRITE_MC_TRANSPORT_PRECISION:-fp64}"
 export OPENBLAS_NUM_THREADS=1
 mkdir -p "$PYRITE_USER_CATALOG"
 git check-ignore scratch/roulette879/probe
 sha="$(git rev-parse HEAD)"
 nvidia-smi
 uv sync -q --locked --no-default-groups --extra nvidia --group dev
-uv run --no-sync pyrite-dev test tests/montecarlo/spectrum/test_line_roulette.py --durations=5
+# Recorded, not fatal: the float32 results are themselves what these two steps measure.
+uv run --no-sync python checks/line_roulette_mass_jitter_879.py || echo "FAILED jitter rc=$?"
+uv run --no-sync pyrite-dev test tests/montecarlo/spectrum/test_line_roulette.py --durations=5 \
+  || echo "FAILED roulette tests rc=$?"
 output_root="$1"; shift
-uv run --no-sync python checks/line_roulette_fom_879.py --out "$output_root" --code-sha "$sha" "$@"
+check="${CHECK:-checks/line_roulette_fom_879.py}"  # or checks/line_roulette_blocks_879.py
+uv run --no-sync python "$check" --out "$output_root" --code-sha "$sha" "$@"

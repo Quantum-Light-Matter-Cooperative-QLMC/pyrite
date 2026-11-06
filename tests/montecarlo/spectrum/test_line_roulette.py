@@ -6,10 +6,15 @@ Validation: line-scoring-roulette
 import numpy as np
 import pytest
 
-from pyrite._backend import _to_cpu
+import pyrite as pr
+from pyrite._backend import REAL, _to_cpu, xp
+from pyrite._energy_bins import EnergyBins
 from pyrite._line_roulette import LINE_ROULETTE_MODEL, LineRoulette
 from pyrite._precision import Precision
+from pyrite.campaign.lowering import build_case
+from pyrite.campaign.profiles import case_content_key
 from pyrite.campaign.sweep import BeamSpec, Sweep, build_cases
+from pyrite.detectors import PlanarDetector, PlanarPose
 from pyrite.montecarlo import runner
 from pyrite.montecarlo.case import Case
 from pyrite.montecarlo.runner.emission_adapters import EmissionBatch
@@ -17,7 +22,9 @@ from pyrite.montecarlo.runner.line_roulette import LineScreen, line_screen_for, 
 from pyrite.montecarlo.runner.streamed_scoring import run_case_streamed
 from pyrite.montecarlo.spectrum.cxr._kernels import _SEG_ARRAYS
 
-POLICY = LineRoulette(floor=0.5, keep_fraction=0.25, pilot_electrons=8).to_dict()
+POLICY = LineRoulette(floor=0.5, keep_fraction=0.25, pilot_histories=8).to_dict()
+#: Regrouping a sum in the working type: job 4018 measured up to 4.2e-7 in float32.
+SUM_RTOL = 1e-12 if REAL == xp.float64 else 2e-6
 PINNED_DRAWS = [0.47716136674061527, 0.6692201585934083, 0.42749804493215904]
 
 
@@ -52,11 +59,11 @@ def weighted(case, transport):
 
 
 def _assert_same_selection(actual, expected):
-    """Exact selection; device mass sums repeat only to about 6e-16 (see the derivation)."""
+    """Exact selection; mass sums repeat only to summation rounding (see the derivation)."""
     for key in ("primaries_scored", "primaries_at_floor", "primaries_zero_mass", "rows_scored"):
         assert actual[key] == expected[key], key
     for key in ("threshold", "line_mass_analog", "line_mass_estimate", "added_mass_variance"):
-        np.testing.assert_allclose(actual[key], expected[key], rtol=1e-12, err_msg=key)
+        np.testing.assert_allclose(actual[key], expected[key], rtol=SUM_RTOL, err_msg=key)
 
 
 def _score(case, transport, screen, segments=None):
@@ -100,7 +107,7 @@ def test_off_takes_the_analog_path_and_leaves_the_case_payload_unchanged(case, a
 
 def test_policy_enters_the_case_payload_with_its_model():
     assert POLICY["model"] == LINE_ROULETTE_MODEL
-    assert set(POLICY) == {"floor", "keep_fraction", "pilot_electrons", "model"}
+    assert set(POLICY) == {"floor", "keep_fraction", "pilot_histories", "model"}
     assert LineRoulette.from_dict(POLICY).to_dict() == POLICY
 
 
@@ -111,7 +118,7 @@ def test_policy_enters_the_case_payload_with_its_model():
         {"floor": 1.5},
         {"floor": True},
         {"floor": 0.5, "keep_fraction": 0.0},
-        {"floor": 0.5, "pilot_electrons": 0},
+        {"floor": 0.5, "pilot_histories": 0},
         {"floor": 0.5, "model": "other"},
         {"floor": 0.5, "unknown": 1},
     ],
@@ -210,7 +217,7 @@ def test_estimate_is_the_inverse_probability_sum_of_the_analog_primaries(case, t
     expected = np.zeros_like(spectrum)
     for primary in np.flatnonzero(screen.kept):
         expected += _primary(case, transport, [primary]) / screen.probability[primary]
-    np.testing.assert_allclose(spectrum, expected, rtol=1e-10, atol=1e-30)
+    np.testing.assert_allclose(spectrum, expected, rtol=max(SUM_RTOL, 1e-10), atol=1e-30)
     assert screen.threshold is not None
     assert np.any(screen.probability < 1.0), "fixture must exercise the floor stratum"
     assert not screen.kept[screen.probability < 1.0].all(), "fixture must cull a primary"
@@ -249,7 +256,7 @@ def test_expectation_over_seeds_recovers_the_analog_spectrum(case, transport, an
 
 
 def test_floor_one_equals_analog_scoring(case, transport, analog):
-    policy = LineRoulette(floor=1.0, keep_fraction=0.25, pilot_electrons=8).to_dict()
+    policy = LineRoulette(floor=1.0, keep_fraction=0.25, pilot_histories=8).to_dict()
     output = runner._spectrum_case({**case, "line_roulette": policy}, transport)
     np.testing.assert_allclose(output["spec"], analog["spec"], rtol=1e-12, atol=0)
     assert output["line_roulette"]["added_mass_variance"] == 0.0
@@ -275,12 +282,12 @@ def test_record_reports_the_exact_mass_and_conditional_variance(weighted):
 def test_selection_is_block_invariant_and_streaming_matches_joined(case, weighted, block):
     roulette = {**case, "line_roulette": POLICY}
     streamed = run_case_streamed(roulette, block, transport_core="per-electron")
-    np.testing.assert_allclose(streamed["spec"], weighted["spec"], rtol=1e-12, atol=0)
+    np.testing.assert_allclose(streamed["spec"], weighted["spec"], rtol=SUM_RTOL, atol=0)
     _assert_same_selection(streamed["line_roulette"], weighted["line_roulette"])
 
 
 def test_adaptive_at_n_equals_fixed_at_n_bit_for_bit(case):
-    settings = Precision(target_rse=1e-9, min_electrons=16, max_electrons=32, block_electrons=8)
+    settings = Precision(target_rse=1e-9, min_histories=16, max_histories=32, block_histories=8)
     roulette = {
         **case,
         "Ne": 32,
@@ -311,7 +318,7 @@ def test_rescoring_a_block_leaves_the_selection_unchanged(case, transport):
 
 
 def test_population_within_the_pilot_is_analog(case, transport):
-    policy = LineRoulette(floor=0.5, pilot_electrons=500).to_dict()
+    policy = LineRoulette(floor=0.5, pilot_histories=500).to_dict()
     output = runner._spectrum_case({**case, "line_roulette": policy}, transport)
     assert output["line_roulette"]["threshold"] is None
     assert output["line_roulette"]["primaries_at_floor"] == 0
@@ -360,3 +367,71 @@ def test_truncation_audit_stays_analog(case, transport):
             _to_cpu(roulette_audit[key]), _to_cpu(analog_audit[key]), rtol=1e-12, err_msg=key
         )
     assert "mass_only" not in roulette_audit
+
+
+def _public_scene(detector=None):
+    return pr.Scene(
+        pr.Beam(energy_keV=30.0, transverse=pr.beams.Spot(), longitudinal=pr.beams.PointBunch()),
+        pr.geometry.Slab(
+            "hopg", thickness_ang=10_000.0, tilt_deg=30.0, footprint=pr.geometry.Footprint(5.0, 5.0)
+        ),
+        pr.Detector() if detector is None else detector,
+    )
+
+
+def _public_numerics(**kwargs):
+    return pr.Numerics(
+        sampling=pr.config.FixedSampling(cxr_histories=12, brem_histories=16),
+        seed=7,
+        energy_bins=EnergyBins(
+            cxr=np.linspace(250.0, 320.0, 15), brem=np.arange(1000.0, 30001.0, 1000.0)
+        ),
+        transport_core="per-electron",
+        **kwargs,
+    )
+
+
+def test_numerics_off_adds_no_case_key_and_keeps_identity():
+    plain = build_case(_public_scene(), _public_numerics())
+    explicit = build_case(_public_scene(), _public_numerics(line_roulette=None))
+    assert "line_roulette" not in plain
+    assert case_content_key(plain) == case_content_key(explicit)
+
+
+def test_numerics_on_lowers_the_record_and_changes_identity():
+    policy = LineRoulette(floor=0.25, pilot_histories=4)
+    case = build_case(_public_scene(), _public_numerics(line_roulette=policy))
+    assert case["line_roulette"] == policy.to_dict()
+    assert case_content_key(case) != case_content_key(
+        build_case(_public_scene(), _public_numerics())
+    )
+    described = _public_numerics(line_roulette=policy).describe_numerics()
+    assert described["radiation"]["effective"]["line_roulette"] == policy.to_dict()
+
+
+def test_numerics_rejects_a_raw_mapping():
+    with pytest.raises(TypeError, match="LineRoulette"):
+        _public_numerics(line_roulette={"floor": 0.25})
+
+
+def test_numerics_refuses_coherent_emission_when_lowering():
+    numerics = _public_numerics(line_roulette=LineRoulette(floor=0.25))
+    with pytest.raises(ValueError, match="coherent"):
+        build_case(_public_scene(), numerics, physics=pr.Physics(emission="coherent"))
+
+
+def test_numerics_refuses_a_planar_detector():
+    detector = PlanarDetector(PlanarPose.from_observation(100.0, 60.0), size_mm=(2.0, 2.0))
+    numerics = _public_numerics(line_roulette=LineRoulette(floor=0.25))
+    with pytest.raises(ValueError, match="scalar Detector"):
+        build_case(_public_scene(detector), numerics)
+
+
+def test_simulate_reports_the_selection_in_provenance():
+    numerics = _public_numerics(line_roulette=LineRoulette(floor=0.25, pilot_histories=4))
+    record = pr.simulate(_public_scene(), numerics=numerics).provenance.line_roulette
+    assert record["primaries"] == 12
+    assert record["floor"] == 0.25
+    analog = pr.simulate(_public_scene(), numerics=_public_numerics()).provenance
+    assert analog.line_roulette is None
+    assert "line_roulette" not in analog
