@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 
 import pyrite as pr
-from pyrite._backend import _to_cpu
+from pyrite._backend import REAL, _to_cpu, xp
 from pyrite._energy_bins import EnergyBins
 from pyrite._line_roulette import LINE_ROULETTE_MODEL, LineRoulette
 from pyrite._precision import Precision
@@ -23,6 +23,8 @@ from pyrite.montecarlo.runner.streamed_scoring import run_case_streamed
 from pyrite.montecarlo.spectrum.cxr._kernels import _SEG_ARRAYS
 
 POLICY = LineRoulette(floor=0.5, keep_fraction=0.25, pilot_electrons=8).to_dict()
+#: Regrouping a sum in the working type: job 4018 measured up to 4.2e-7 in float32.
+SUM_RTOL = 1e-12 if REAL == xp.float64 else 2e-6
 PINNED_DRAWS = [0.47716136674061527, 0.6692201585934083, 0.42749804493215904]
 
 
@@ -57,11 +59,11 @@ def weighted(case, transport):
 
 
 def _assert_same_selection(actual, expected):
-    """Exact selection; device mass sums repeat only to about 6e-16 (see the derivation)."""
+    """Exact selection; mass sums repeat only to summation rounding (see the derivation)."""
     for key in ("primaries_scored", "primaries_at_floor", "primaries_zero_mass", "rows_scored"):
         assert actual[key] == expected[key], key
     for key in ("threshold", "line_mass_analog", "line_mass_estimate", "added_mass_variance"):
-        np.testing.assert_allclose(actual[key], expected[key], rtol=1e-12, err_msg=key)
+        np.testing.assert_allclose(actual[key], expected[key], rtol=SUM_RTOL, err_msg=key)
 
 
 def _score(case, transport, screen, segments=None):
@@ -215,7 +217,7 @@ def test_estimate_is_the_inverse_probability_sum_of_the_analog_primaries(case, t
     expected = np.zeros_like(spectrum)
     for primary in np.flatnonzero(screen.kept):
         expected += _primary(case, transport, [primary]) / screen.probability[primary]
-    np.testing.assert_allclose(spectrum, expected, rtol=1e-10, atol=1e-30)
+    np.testing.assert_allclose(spectrum, expected, rtol=max(SUM_RTOL, 1e-10), atol=1e-30)
     assert screen.threshold is not None
     assert np.any(screen.probability < 1.0), "fixture must exercise the floor stratum"
     assert not screen.kept[screen.probability < 1.0].all(), "fixture must cull a primary"
@@ -280,7 +282,7 @@ def test_record_reports_the_exact_mass_and_conditional_variance(weighted):
 def test_selection_is_block_invariant_and_streaming_matches_joined(case, weighted, block):
     roulette = {**case, "line_roulette": POLICY}
     streamed = run_case_streamed(roulette, block, transport_core="per-electron")
-    np.testing.assert_allclose(streamed["spec"], weighted["spec"], rtol=1e-12, atol=0)
+    np.testing.assert_allclose(streamed["spec"], weighted["spec"], rtol=SUM_RTOL, atol=0)
     _assert_same_selection(streamed["line_roulette"], weighted["line_roulette"])
 
 
