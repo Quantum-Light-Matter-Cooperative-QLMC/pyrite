@@ -59,7 +59,7 @@ conversion for tilted incidence. Entrance phase, transverse drift and the
 physical exit plane must use the same transform. A first tier can refuse
 non-normal incidence; it cannot silently call solver depth a lab path length.
 
-Proposed first eligibility envelope: electrons in a single, flat, nonmosaic
+Proposed first eligibility envelope ([currently empty](axial-first-envelope-886.md)): electrons in a single, flat, nonmosaic
 silicon or diamond slab, isotropic sourced displacement data, rectangular
 projected cells, 1–30 MeV, fixed counts and CPU execution. This is an engineering
 restriction, not a validated axial energy range. Require a nonempty usable
