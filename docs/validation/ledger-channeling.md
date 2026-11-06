@@ -543,6 +543,18 @@ change the eigenproblem or introduce a new physical selection rule.
 - **Anchor:** `tests/montecarlo/quantum/test_axial_qrt_source.py`
 - **Notes:** registered before implementation for #620; fresh-context verdict `rederived`, followed by independent focused anchors. Research reference only, not standard-run source admission. Human sign-off remains in #277.
 
+## `cr-axial-source-partition`
+
+- **Claim:** for a supplied finite global eigensystem and on-axis observation, the lowering current splits exactly into an axial block (final state at or below a declared boundary: bound→bound and free→bound) and a free→free block, with no bound→free block. The cross term between blocks vanishes identically under Hamiltonian evolution, because their final subspaces are orthogonal, and is reported as a signed defect when jumps carry final-state coherence between them. Beer–Lambert attenuation acts as `exp(-μL/2)` at amplitude level at both depths, with `L = T/cos α − z` along the axis. The secular on-axis rate of a retained subspace gives the omitted yield within the represented grid. Not claimed: a material source, a physical axial dissipator, off-axis recoil, grid or Bloch-sector convergence, or standard-run admission.
+- **Code:** `montecarlo/channeling/axial_source_partition.py::{partition_axial_currents,partition_on_axis_spectra,emitting_subspace_closure,on_axis_exit_path,AxialCurrentPartition,AxialPartitionSpectra,AxialSubspaceClosure}`; `montecarlo/channeling/axial_qrt_source.py::{on_axis_photon_spectrum,_attenuation_amplitude}`
+- **Source:** ADR-0018 ownership (bound→bound and capture to channeling radiation, free→free to CBS); finite-current normalization `cr-axial-qrt-source-normalization`; GKSL and quantum regression `cr-quantum-regression-correlation`; Beer–Lambert geometry of `cr-persisted-channel`. [Derivation](channeling/cr-axial-source-partition.md).
+- **Assumptions:** caller-declared boundary on the eigenenergy scale; time-independent GKSL model in the supplied eigenbasis; constant longitudinal velocity; scalar real absorption with a laterally infinite slab; photon refraction is neglected in the Doppler phase. At exact axial alignment the free→free block has no native resonance (`v·g = 0`), so it is an explicit omission, not a native contribution.
+- **Limiting cases:** all-bound and all-free boundaries give one empty block; zero absorption reproduces the unattenuated source exactly; decay and dephasing rates reduce to the finite-path sinc form; a retained set equal to the full grid omits nothing.
+- **Status:** unverified
+- **Checks:** complementary blocks; zero cross term on a real eigensystem with a coherent incident state; nonzero defect only under a coherence-transferring jump; closed-form excited-state decay and direct-quadrature dephasing line shapes; closed-form on-resonance attenuation, distinct from the intensity-level form; mixed-state linearity and sub-unit trace; transverse-rotation invariance; closure against the independent rest-dipole and aberration oracle; multiplet refusals.
+- **Anchor:** `tests/montecarlo/quantum/test_channeling_axial_source_partition.py`
+- **Notes:** #885. Task-owner derivation awaiting fresh-context verification. Does not advance `cr-axial-persisted-channel`. Target `anchored`; human sign-off remains in #277.
+
 ## `cr-mcwf-regression-estimator`
 
 - **Claim:** the right-inserted regression operator `|psi><psi| B†` equals `(R_1-R_-1+i R_i-i R_-i)/4`, where `R_s=|psi+s Bpsi><psi+s Bpsi|`. Evolving normalized auxiliary states with their original norms and incident-normalized expectations estimates the supplied common linear map's complex correlation. Errors are computed from independent combined replicas, not independently combined branch errors.

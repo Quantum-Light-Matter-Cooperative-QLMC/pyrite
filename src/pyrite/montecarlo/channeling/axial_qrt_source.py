@@ -158,12 +158,32 @@ def global_axial_source(
     )
 
 
+def _attenuation_amplitude(absorption_inv_ang, exit_path_ang, energies, depths):
+    """Return amplitude transmission of shape (energy, depth, 1), or None if unattenuated.
+
+    Validation: cr-axial-source-partition
+    """
+    if (absorption_inv_ang is None) != (exit_path_ang is None):
+        raise ValueError("absorption_inv_ang and exit_path_ang must be supplied together")
+    if absorption_inv_ang is None:
+        return None
+    mu = np.asarray(absorption_inv_ang, dtype=float)
+    path = np.asarray(exit_path_ang, dtype=float)
+    if mu.shape != energies.shape or path.shape != depths.shape:
+        raise ValueError("absorption and exit path must match the energy and depth grids")
+    if any(not np.all(np.isfinite(x)) or np.any(x < 0) for x in (mu, path)):
+        raise ValueError("absorption and exit path must be finite and nonnegative")
+    return np.exp(-0.5 * mu[:, None] * path[None, :])[..., None]
+
+
 def on_axis_photon_spectrum(
     correlation: RegressionCorrelation,
     photon_energy_eV: np.ndarray,
     kinetic_energy_eV: float,
     *,
     observation_angle_rad: float = 0.0,
+    absorption_inv_ang=None,
+    exit_path_ang=None,
     max_working_bytes: int = 64 * 1024**2,
 ) -> np.ndarray:
     r"""Return on-axis photons/(eV sr incident electron) from velocity/c currents.
@@ -184,7 +204,11 @@ def on_axis_photon_spectrum(
     Abrupt finite windows have ultraviolet tails; this quadrature requires
     depth/energy-window convergence and is not an all-frequency sum rule.
 
-    Validation: cr-axial-qrt-source-normalization
+    Optional ``absorption_inv_ang[E]`` and ``exit_path_ang[depth]`` apply
+    Beer-Lambert intensity attenuation as $e^{-\mu L/2}$ at amplitude level at
+    both depths of the correlation. Supply both or neither.
+
+    Validation: cr-axial-qrt-source-normalization, cr-axial-source-partition
     """
     if not np.isfinite(observation_angle_rad) or observation_angle_rad != 0:
         raise ValueError("only on-axis observation is supported; off-axis changes Bloch sector")
@@ -208,6 +232,9 @@ def on_axis_photon_spectrum(
         or max_working_bytes < 1
     ):
         raise ValueError("max_working_bytes must be a positive integer")
+    amplitude = _attenuation_amplitude(
+        absorption_inv_ang, exit_path_ang, energies, correlation.depths_ang
+    )
     overhead = 8 * energies.nbytes
     if overhead >= max_working_bytes:
         raise ValueError("photon normalization exceeds working-memory budget")
@@ -228,6 +255,6 @@ def on_axis_photon_spectrum(
             correlation.working_bytes,
         )
         output += spectral_quadratic_form(
-            single, phase, max_working_bytes=max_working_bytes - overhead
+            single, phase, amplitudes=amplitude, max_working_bytes=max_working_bytes - overhead
         )
     return ALPHA_FS * energies * output / (4 * np.pi**2 * hbar_v**2)
