@@ -283,4 +283,7 @@ def test_series_dispatch_takes_only_window_bins():
     np.testing.assert_array_equal(series[~window], exact[~window])
     host = bq.sincsq_midpoint_mean(xc[window], dx[window])
     envelope = 1.0 / (2.0 * np.pi**2 * xc[window] ** 2)
-    np.testing.assert_array_less(np.abs(series[window] - host), 1e-13 * envelope)
+    # The host mirror forms pi * x before sin/cos, a phase error ~|x| eps that
+    # device sincospi does not have; scale the tolerance with |x|.
+    tol = 1e-13 * envelope * np.maximum(1.0, np.abs(xc[window]))
+    np.testing.assert_array_less(np.abs(series[window] - host), tol)

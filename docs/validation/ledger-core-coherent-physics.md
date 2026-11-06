@@ -435,13 +435,13 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 
 ## `sinc-bin-midpoint-series`
 
-- **Claim:** for a bin of width $\Delta \le 0.05$ first-zero widths centred at $|x_c| \ge 2$, the `sinc-bin-integration` bin mean equals its midpoint series $f + \Delta^2 f''/24 + \Delta^4 f^{(4)}/1920$ at $x_c$ to within $2\times10^{-8}$ of the envelope $1/(2\pi^2x_c^2)$; other bins keep the two-tail evaluation.
+- **Claim:** for a bin of width $\Delta \le 0.1$ first-zero widths centred at $|x_c| \ge 2$, the `sinc-bin-integration` bin mean equals its midpoint series $f + \Delta^2 f''/24 + \Delta^4 f^{(4)}/1920 + \Delta^6 f^{(6)}/322560$ at $x_c$ to within $2.5\times10^{-9}$ of the envelope $1/(2\pi^2x_c^2)$; other bins keep the two-tail evaluation.
 - **Code:** `montecarlo/spectrum/cxr/_bin_quadrature.py::sincsq_midpoint_mean`, `SINCSQ_BIN_PREAMBLE::pyrite_sincsq_midpoint_mean`; `_SERIES_MAX_DX`, `_SERIES_MIN_X`
-- **Source:** Taylor expansion of the bin average; Leibniz bound on $f^{(6)}$ for $f=(1-\cos 2\pi x)/(2\pi^2x^2)$ ([derivation](radiation-physics/sinc-bin-midpoint-series.md))
+- **Source:** Taylor expansion of the bin average; Leibniz bound on $f^{(8)}$ for $f=(1-\cos 2\pi x)/(2\pi^2x^2)$ ([derivation](radiation-physics/sinc-bin-midpoint-series.md))
 - **Status:** unverified
 - **Checks:** Required: series coefficients; remainder bound at the window edge; cancellation-free trig forms; host/device agreement; dispatch leaves out-of-window bins bitwise unchanged; production spectra within float32 rounding of the series-free route.
 - **Anchor:** `tests/montecarlo/spectrum/test_sinc_bin_integration.py`, `tests/montecarlo/spectrum/test_sinc_bin_integration_cuda.py`
-- **Notes:** Issue #1003. Off in production (`PYRITE_BIN_MEAN_SERIES` defaults to 0) pending measurement. Host check against 40-digit `mpmath`: $3.0\times10^{-9}$ of the envelope, versus $1.3\times10^{-7}$ for the FP64 two-tail route on the same narrow bins.
+- **Notes:** Issue #1003. Off in production (`PYRITE_BIN_MEAN_SERIES` defaults to 0) pending measurement. Host check against 40-digit `mpmath`: $2.6\times10^{-10}$ of the envelope, versus $2.6\times10^{-7}$ for the FP64 two-tail route on the same narrow bins.
 
 ## `sinc-bin-near-far`
 

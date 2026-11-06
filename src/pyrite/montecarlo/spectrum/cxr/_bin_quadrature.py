@@ -84,7 +84,7 @@ _HOST_BLOCK_ELEMENTS = 1 << 22
 #: at least ``_SERIES_MIN_X`` lobes from the resonance take the series mean
 #: when the kernels are built with ``PYRITE_BIN_MEAN_SERIES=1`` (off by default).
 #: Validation: sinc-bin-midpoint-series
-_SERIES_MAX_DX = 0.05
+_SERIES_MAX_DX = 0.1
 _SERIES_MIN_X = 2.0
 
 #: C source shared by both CUDA/ROCm routes. ``__device__`` is CuPy's
@@ -199,43 +199,51 @@ static __device__ double pyrite_sincsq_tail(double x) {
 #endif
 
 /* Mean of f = sinc^2 over a bin much narrower than a lobe, by its midpoint
-   series mean = f + f'' dx^2/24 + f'''' dx^4/1920 (Validation:
-   sinc-bin-midpoint-series). f = A(x) H(x) with A = 1 - cos(2 pi x) and
-   H = 1/(2 pi^2 x^2), so every derivative comes from one sincospi. */
+   series mean = f + f2 dx^2/24 + f4 dx^4/1920 + f6 dx^6/322560 (fk the k-th
+   derivative; Validation: sinc-bin-midpoint-series). f = A(x) H(x) / (2 pi^2)
+   with A = 1 - cos(2 pi x) and H = x^-2, so every derivative comes from one
+   sincospi. Constant divisions are reciprocal products: FP64 division is
+   costly on consumer GPUs. */
 static __device__ double pyrite_sincsq_midpoint_mean(double xc, double dx) {
     double sp, cp;
     sincospi(xc, &sp, &cp);
-    const double om = 2.0 * PYRITE_PI;
+    const double om = 2.0 * PYRITE_PI, om2 = om * om;
     const double a0 = 2.0 * sp * sp;          /* 1 - cos(2 pi x) */
     const double s2 = 2.0 * sp * cp;          /* sin(2 pi x) */
     const double c2 = (cp - sp) * (cp + sp);  /* cos(2 pi x) */
-    const double a1 = om * s2, a2 = om * om * c2;
-    const double a3 = -om * om * om * s2, a4 = -om * om * om * om * c2;
+    const double a1 = om * s2, a2 = om2 * c2;
+    const double a3 = -om2 * a1, a4 = -om2 * a2, a5 = -om2 * a3, a6 = -om2 * a4;
     const double q = 1.0 / xc;
     const double h0 = q * q, h1 = -2.0 * h0 * q, h2 = -3.0 * h1 * q;
-    const double h3 = -4.0 * h2 * q, h4 = -5.0 * h3 * q;
+    const double h3 = -4.0 * h2 * q, h4 = -5.0 * h3 * q, h5 = -6.0 * h4 * q;
+    const double h6 = -7.0 * h5 * q;
     const double f0 = a0 * h0;
     const double f2 = a2 * h0 + 2.0 * a1 * h1 + a0 * h2;
     const double f4 = a4 * h0 + 4.0 * a3 * h1 + 6.0 * a2 * h2 + 4.0 * a1 * h3 + a0 * h4;
+    const double f6 = a6 * h0 + 6.0 * a5 * h1 + 15.0 * a4 * h2 + 20.0 * a3 * h3
+        + 15.0 * a2 * h4 + 6.0 * a1 * h5 + a0 * h6;
     const double d2 = dx * dx;
-    return (f0 + d2 * (f2 / 24.0 + d2 * (f4 / 1920.0))) / (2.0 * PYRITE_PI * PYRITE_PI);
+    const double series = f0 + d2 * (f2 * (1.0 / 24.0)
+        + d2 * (f4 * (1.0 / 1920.0) + d2 * (f6 * (1.0 / 322560.0))));
+    return series * (1.0 / (2.0 * PYRITE_PI * PYRITE_PI));
 }
 
 /* Mean of sinc^2(a (E - e_r) / pi) over [e_lo, e_hi]; inv_width = 1/(e_hi - e_lo). */
 static __device__ double pyrite_sincsq_bin_mean(
     double a, double e_r, double e_lo, double e_hi, double inv_width
 ) {
-    const double x_lo = a * (e_lo - e_r) / PYRITE_PI;
-    const double x_hi = a * (e_hi - e_r) / PYRITE_PI;
 #if PYRITE_BIN_MEAN_SERIES
     {
-        const double dx = x_hi - x_lo;
-        const double xc = 0.5 * (x_lo + x_hi);
+        const double scale = a * (1.0 / PYRITE_PI);
+        const double dx = scale * (e_hi - e_lo);
+        const double xc = scale * ((0.5 * (e_lo + e_hi)) - e_r);
         if (dx <= PYRITE_SERIES_MAX_DX && fabs(xc) >= PYRITE_SERIES_MIN_X) {
             return pyrite_sincsq_midpoint_mean(xc, dx);
         }
     }
 #endif
+    const double x_lo = a * (e_lo - e_r) / PYRITE_PI;
+    const double x_hi = a * (e_hi - e_r) / PYRITE_PI;
     double mass = pyrite_sincsq_tail(x_hi) - pyrite_sincsq_tail(x_lo);
     if (x_lo < 0.0 && x_hi >= 0.0) {
         mass += 1.0;
@@ -354,11 +362,11 @@ def sincsq_tail(x: object) -> np.ndarray:
 def sincsq_midpoint_mean(xc: object, dx: object) -> np.ndarray:
     """Midpoint series of the ``sinc^2`` mean over ``[xc - dx/2, xc + dx/2]``.
 
-    ``f + f2 dx^2/24 + f4 dx^4/1920`` (``f2``, ``f4`` the second and fourth
-    derivatives) with ``f = (1 - cos 2 pi x)/(2 pi^2 x^2)``: the host mirror of
+    ``f + f2 dx^2/24 + f4 dx^4/1920 + f6 dx^6/322560`` (``fk`` the k-th
+    derivative) with ``f = (1 - cos 2 pi x)/(2 pi^2 x^2)``: the host mirror of
     the device ``pyrite_sincsq_midpoint_mean``. Valid only in the window
     ``dx <= _SERIES_MAX_DX``, ``|xc| >= _SERIES_MIN_X``, where the omitted
-    sixth-derivative term is below ``2e-8`` of the envelope ``1/(2 pi^2 xc^2)``.
+    eighth-derivative term is below ``3e-9`` of the envelope ``1/(2 pi^2 xc^2)``.
 
     Validation: sinc-bin-midpoint-series
     """
@@ -371,17 +379,30 @@ def sincsq_midpoint_mean(xc: object, dx: object) -> np.ndarray:
     c2 = (cp - sp) * (cp + sp)
     a1, a2 = om * s2, om * om * c2
     a3, a4 = -(om**3) * s2, -(om**4) * c2
+    a5, a6 = (om**5) * s2, (om**6) * c2
     q = 1.0 / xc
     h0 = q * q
     h1 = -2.0 * h0 * q
     h2 = -3.0 * h1 * q
     h3 = -4.0 * h2 * q
     h4 = -5.0 * h3 * q
+    h5 = -6.0 * h4 * q
+    h6 = -7.0 * h5 * q
     f0 = a0 * h0
     f2 = a2 * h0 + 2.0 * a1 * h1 + a0 * h2
     f4 = a4 * h0 + 4.0 * a3 * h1 + 6.0 * a2 * h2 + 4.0 * a1 * h3 + a0 * h4
+    f6 = (
+        a6 * h0
+        + 6.0 * a5 * h1
+        + 15.0 * a4 * h2
+        + 20.0 * a3 * h3
+        + 15.0 * a2 * h4
+        + 6.0 * a1 * h5
+        + a0 * h6
+    )
     d2 = dx * dx
-    return (f0 + d2 * (f2 / 24.0 + d2 * (f4 / 1920.0))) / (2.0 * np.pi * np.pi)
+    series = f0 + d2 * (f2 / 24.0 + d2 * (f4 / 1920.0 + d2 * (f6 / 322560.0)))
+    return series / (2.0 * np.pi * np.pi)
 
 
 def sincsq_antiderivative(x: object) -> np.ndarray:

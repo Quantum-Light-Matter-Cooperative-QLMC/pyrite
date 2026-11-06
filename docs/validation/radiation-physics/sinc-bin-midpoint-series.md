@@ -11,27 +11,27 @@ With $x = a(E-E_{\mathrm{res}})/\pi$ and $f(x) = \operatorname{sinc}^2 x$, a bin
 ```{math}
 :label: eq-sbms-series
 
-\bar f = f(x_c) + \frac{\Delta^2}{24} f''(x_c) + \frac{\Delta^4}{1920} f^{(4)}(x_c) + R_6,
+\bar f = f(x_c) + \frac{\Delta^2}{24} f''(x_c) + \frac{\Delta^4}{1920} f^{(4)}(x_c) + \frac{\Delta^6}{322560} f^{(6)}(x_c) + R_8,
 ```
 
-and inside the window $\Delta \le 0.05$, $|x_c| \ge 2$ (`_SERIES_MAX_DX`, `_SERIES_MIN_X`) the remainder satisfies $|R_6| \le 2\times10^{-8}\, e(x_c)$, with $e(x) = 1/(2\pi^2x^2)$ the $\sin^2$-averaged envelope. That is below float32 rounding of the local envelope. Bins outside the window keep the two-tail evaluation `R(x_1) - R(x_0)` unchanged.
+and inside the window $\Delta \le 0.1$, $|x_c| \ge 2$ (`_SERIES_MAX_DX`, `_SERIES_MIN_X`) the remainder satisfies $|R_8| \le 2.5\times10^{-9}\, e(x_c)$, with $e(x) = 1/(2\pi^2x^2)$ the $\sin^2$-averaged envelope. That is below float32 rounding of the local envelope. Bins outside the window keep the two-tail evaluation `R(x_1) - R(x_0)` unchanged.
 
 ## Derivation
 
-Taylor-expand $f$ about $x_c$ and average over $[x_c - \Delta/2, x_c + \Delta/2]$: odd terms vanish, and the $2n$-th term is $f^{(2n)}(x_c)\,(\Delta/2)^{2n}/(2n+1)!$, giving the coefficients $1/24$, $1/1920$ and $1/322560$ for $n = 1, 2, 3$. The remainder after the $n=2$ term is bounded by $\sup|f^{(6)}|\,\Delta^6/322560$ over the bin.
+Taylor-expand $f$ about $x_c$ and average over $[x_c - \Delta/2, x_c + \Delta/2]$: odd terms vanish, and the $2n$-th term is $f^{(2n)}(x_c)\,(\Delta/2)^{2n}/(2n+1)!$, giving the coefficients $1/24$, $1/1920$, $1/322560$ and $1/92897280$ for $n = 1, \dots, 4$. The remainder after the $n=3$ term is bounded by $\sup|f^{(8)}|\,\Delta^8/92897280$ over the bin.
 
 Write $f = A\,H/(2\pi^2)$ with $A = 1-\cos 2\pi x$ and $H = x^{-2}$. Then $|A^{(k)}| \le 2(2\pi)^k$ for $k \ge 0$ and $|H^{(j)}| = (j+1)!\,|x|^{-(j+2)}$. By Leibniz,
 
 ```{math}
-\frac{|f^{(6)}|}{e(x)} \le 2\sum_{j=0}^{6}\binom{6}{j}(2\pi)^{6-j}(j+1)!\,|x|^{-j}.
+\frac{|f^{(8)}|}{e(x)} \le 2\sum_{j=0}^{8}\binom{8}{j}(2\pi)^{8-j}(j+1)!\,|x|^{-j}.
 ```
 
-At $|x| \ge 1.975$ (the smallest $|x|$ in a window bin) the sum is below $3.6\times10^{5}$, so $|R_6|/e \le 3.6\times10^5 \cdot (0.05)^6/322560 \approx 1.7\times10^{-8}$; $e$ itself varies by under 6% across the bin. Every derivative comes from one $\sin\pi x_c$, $\cos\pi x_c$ pair: $A = 2\sin^2\pi x$, $\sin 2\pi x = 2\sin\pi x\cos\pi x$, $\cos 2\pi x = (\cos\pi x - \sin\pi x)(\cos\pi x + \sin\pi x)$, which avoids the $1-\cos$ cancellation near zeros of $f$.
+At $|x| \ge 1.95$ (the smallest $|x|$ in a window bin) this gives $|R_8|/e \le 2.5\times10^{-9}$ at $\Delta = 0.1$; $e$ itself varies by under 11% across the bin. (Stopping after $f^{(4)}$ would need $\Delta \le 0.05$ for $1.7\times10^{-8}$.) Every derivative comes from one $\sin\pi x_c$, $\cos\pi x_c$ pair: $A = 2\sin^2\pi x$, $\sin 2\pi x = 2\sin\pi x\cos\pi x$, $\cos 2\pi x = (\cos\pi x - \sin\pi x)(\cos\pi x + \sin\pi x)$, which avoids the $1-\cos$ cancellation near zeros of $f$.
 
 ## Assumptions
 
-- The `sinc-bin-integration` profile and bin convention; $x_0$, $x_1$ are formed in FP64 exactly as for the two-tail route.
-- FP64 evaluation (`sincospi` on device, `sin`/`cos` of $\pi x$ on host).
+- The `sinc-bin-integration` profile and bin convention. The device forms $x_c = (a/\pi)(\tfrac12(\epsilon_i+\epsilon_{i+1}) - E_{\rm res})$ and $\Delta = (a/\pi)(\epsilon_{i+1}-\epsilon_i)$ directly in FP64, so the window test and series need no division by $\pi$; out-of-window bins form $x_0$, $x_1$ exactly as before.
+- FP64 evaluation (`sincospi` on device, `sin`/`cos` of $\pi x$ on host, whose phase error grows like $|x|\epsilon$). Device constant divisions are written as reciprocal products.
 
 ## Limiting cases
 
@@ -41,7 +41,7 @@ At $|x| \ge 1.975$ (the smallest $|x|$ in a window bin) the sum is below $3.6\ti
 
 ## Numeric checks
 
-Host mirror against `mpmath` adaptive quadrature (40 digits), 400 random window bins including $\Delta = 0.05$ and bins centred on zeros: maximum $|\bar f_{\rm series} - \bar f|/e = 3.0\times10^{-9}$. The existing FP64 two-tail evaluation on the same bins reaches $1.3\times10^{-7}$, because $R(x_1) - R(x_0)$ cancels when $\Delta \ll 1$; the series is the more accurate of the two inside the window. Regressions: `test_midpoint_series_matches_the_bin_integral_inside_its_window` (host, `scipy` quadrature), `test_device_midpoint_series_matches_the_host_mirror` and `test_series_dispatch_takes_only_window_bins` (CUDA).
+Host mirror against `mpmath` adaptive quadrature (40 digits), 400 random window bins with $\Delta$ from $10^{-7}$ to $0.1$, including $\Delta = 0.1$ and bins centred on zeros: maximum $|\bar f_{\rm series} - \bar f|/e = 2.6\times10^{-10}$. The existing FP64 two-tail evaluation on the same bins reaches $2.6\times10^{-7}$, because $R(x_1) - R(x_0)$ cancels when $\Delta \ll 1$; the series is the more accurate of the two inside the window. Regressions: `test_midpoint_series_matches_the_bin_integral_inside_its_window` (host, `scipy` quadrature), `test_device_midpoint_series_matches_the_host_mirror` and `test_series_dispatch_takes_only_window_bins` (CUDA).
 
 ## Status
 
