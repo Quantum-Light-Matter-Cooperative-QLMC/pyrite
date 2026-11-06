@@ -23,6 +23,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import warnings
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
@@ -34,6 +35,7 @@ from .._simulation_progress import SimulationProgress
 from ._kernel_worker import tuning_from_dict
 
 _SCHEMA = "pyrite-kernel-tuning-v2"
+_CALLER_MEMORY_WARNING_MIB = 1024.0
 _PHASE_DIMENSIONS = {
     "transport": (
         "electron_batch",
@@ -226,6 +228,22 @@ def _median(trial: KernelTrial) -> float:
     return float(trial.median_s)
 
 
+def _release_caller_device_memory() -> None:
+    """Return this process's cached CuPy blocks so the worker can use the card."""
+    from .._backend import BACKEND
+
+    if BACKEND.name != "cuda":
+        return
+    BACKEND.release_memory()
+    reserved_mib = BACKEND.allocator_stats()["reserved_mib"] or 0.0
+    if reserved_mib > _CALLER_MEMORY_WARNING_MIB:
+        warnings.warn(
+            f"this process still holds {reserved_mib / 1024:.1f} GiB of GPU memory in live "
+            "arrays; tuning workers get less memory and may time differently",
+            stacklevel=3,
+        )
+
+
 class _WorkerError(RuntimeError):
     pass
 
@@ -266,14 +284,21 @@ class _Worker:
         try:
             line = self._lines.get(timeout=self._timeout)
         except queue.Empty:
-            self.close()
-            raise _WorkerError(f"no worker reply within {self._timeout:g} s") from None
+            raise _WorkerError(
+                f"no worker reply within {self._timeout:g} s: {self._stop_and_read_stderr()}"
+            ) from None
+        except KeyboardInterrupt as exc:
+            exc.add_note(f"Kernel tuning worker stderr: {self._stop_and_read_stderr()}")
+            raise
         if line is None:
-            self._stderr.seek(0)
-            detail = self._stderr.read().strip()[-2500:]
-            self.close()
-            raise _WorkerError(f"worker exited: {detail}")
+            raise _WorkerError(f"worker exited: {self._stop_and_read_stderr()}")
         return json.loads(line)
+
+    def _stop_and_read_stderr(self) -> str:
+        """End the worker first: it shares this file's offset while it runs."""
+        self.close()
+        self._stderr.seek(0)
+        return self._stderr.read().strip()[-2500:]
 
     def measure(self, request: dict[str, Any]) -> tuple[list[float], dict[str, Any]]:
         if self._process is None:
@@ -463,6 +488,7 @@ def tune_kernels(
         else tuple(p for p in ("transport", "spectrum") if space.dimensions(p))
     )
     protocol = [warmups, repeats, rtol, atol, min_speedup, isolate]
+    _release_caller_device_memory()
     with tempfile.TemporaryDirectory(prefix="pyrite-kernel-tuning-") as tmp:
         workdir = Path(tmp)
         payload = workdir / "payload.pkl"

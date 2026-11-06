@@ -25,6 +25,8 @@ import json
 import os
 import pickle
 import sys
+from collections.abc import Iterator
+from functools import partial
 from pathlib import Path
 from time import perf_counter
 from typing import Any
@@ -33,6 +35,7 @@ import numpy as np
 
 FAMILIES = ("cxr.incoherent", "cxr.coherent", "characteristic", "channeling", "transition", "brem")
 _PROGRESS_INTERVAL_S = 0.25
+_CHECKSUM_CHUNK_WORDS = 1 << 24  # bounds checksum scratch on the device
 
 
 def tuning_from_dict(data: dict[str, Any]) -> Any:
@@ -72,18 +75,62 @@ def environment() -> dict[str, Any]:
     return env
 
 
+def _named_arrays(value: Any, name: str = "") -> Iterator[tuple[str, Any]]:
+    """Every host or device array nested in ``value``, in a stable order, with its path."""
+    from .._backend import BACKEND
+
+    if isinstance(value, np.ndarray) or BACKEND.is_array(value):
+        yield name, value
+    elif isinstance(value, dict):
+        for key in sorted(value, key=str):
+            yield from _named_arrays(value[key], f"{name}/{key}")
+    elif isinstance(value, list | tuple):
+        for index, item in enumerate(value):
+            yield from _named_arrays(item, f"{name}/{index}")
+
+
+def _chunk_sums(xp: Any, chunk: Any, start: int) -> tuple[int, int]:
+    """Two wrapping sums of position-keyed words; each term is a bijection of its word."""
+    constant = partial(xp.asarray, dtype=xp.uint64)
+    positions = xp.arange(start, start + chunk.size, dtype=xp.uint64)
+    keyed = chunk.astype(xp.uint64) + positions * constant(0x9E3779B97F4A7C15)
+    first = (keyed ^ (keyed >> constant(30))) * constant(0xBF58476D1CE4E5B9)
+    second = (first ^ (first >> constant(31))) * constant(0x94D049BB133111EB)
+    return int(xp.sum(first, dtype=xp.uint64)), int(xp.sum(second, dtype=xp.uint64))
+
+
+def _array_checksum(xp: Any, array: Any) -> tuple[int, int]:
+    """Two wrapping 64-bit sums over an array's bits, computed with ``xp``.
+
+    Any change to one word changes both sums, and reordered words change them
+    with high probability. Host arrays upload one bounded chunk at a time, and
+    the value does not depend on where the array lives. This detects accidental
+    differences between candidates; it is not cryptographic.
+    """
+    source = np if isinstance(array, np.ndarray) else xp
+    words = source.ravel(array).view(f"u{min(array.dtype.itemsize, 8)}")
+    totals = [0, 0]
+    for start in range(0, int(words.size), _CHECKSUM_CHUNK_WORDS):
+        chunk = xp.asarray(words[start : start + _CHECKSUM_CHUNK_WORDS])
+        for index, value in enumerate(_chunk_sums(xp, chunk, start)):
+            totals[index] = (totals[index] + value) % (1 << 64)
+    return totals[0], totals[1]
+
+
 def transport_digest(transported: Any) -> str:
-    """SHA-256 over every transported array and the resolved line grid."""
-    from ..montecarlo.runner.recovery import _host_arrays
+    """Identity of every transported array and the resolved line grid.
+
+    Checksums run on the device, so a candidate need not download its segments
+    to be compared. Digests are only compared within one
+    ``tune_kernels`` call, so their value carries no compatibility promise.
+    """
+    from .._backend import BACKEND
 
     tp = transported._transport
     digest = hashlib.sha256()
-    for key, value in sorted(_host_arrays(tp["segs"]).items()):
-        if isinstance(value, np.ndarray):
-            host = np.ascontiguousarray(value)
-            digest.update(f"{key}:{host.dtype}:{host.shape}".encode())
-            digest.update(host.tobytes())
-    digest.update(np.ascontiguousarray(tp["E_grid"]).tobytes())
+    for name, value in (*_named_arrays(tp["segs"], "segs"), *_named_arrays(tp["E_grid"], "E_grid")):
+        checksum = _array_checksum(BACKEND.xp, value)
+        digest.update(f"{name}:{value.dtype}:{value.shape}:{checksum}".encode())
     return digest.hexdigest()
 
 

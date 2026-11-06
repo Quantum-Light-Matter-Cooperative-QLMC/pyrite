@@ -1,6 +1,10 @@
 """CPU tests of the public CUDA execution tuner with a fake worker (#776)."""
 
+import queue
+import warnings
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import Mock
 
 import numpy as np
 import pytest
@@ -252,3 +256,39 @@ def test_kernel_lattice_is_a_deprecated_alias():
 
     with pytest.warns(DeprecationWarning, match="KernelSearchSpace"):
         assert opt.KernelLattice is KernelSearchSpace
+
+
+def _silent_worker(tmp_path, stderr="worker said this"):
+    worker = kt._Worker(tmp_path / "payload", tmp_path, 0.001, lambda _message: None)
+    worker._stderr = (tmp_path / "stderr").open("w+")
+    worker._stderr.write(stderr)
+    worker._lines = queue.Queue()
+    return worker
+
+
+def test_worker_timeout_reports_stderr(tmp_path):
+    with pytest.raises(kt._WorkerError, match="no worker reply.*worker said this"):
+        _silent_worker(tmp_path)._next()
+
+
+def test_worker_interrupt_keeps_stderr_as_a_note(tmp_path):
+    worker = _silent_worker(tmp_path)
+    worker._lines = SimpleNamespace(get=Mock(side_effect=KeyboardInterrupt))
+    with pytest.raises(KeyboardInterrupt) as caught:
+        worker._next()
+    assert any("worker said this" in note for note in caught.value.__notes__)
+
+
+@pytest.mark.parametrize(("reserved", "warns"), [(10.0, False), (4096.0, True)])
+def test_caller_pool_is_released_and_live_memory_warned(monkeypatch, reserved, warns):
+    backend = SimpleNamespace(
+        name="cuda",
+        release_memory=Mock(),
+        allocator_stats=lambda: {"reserved_mib": reserved},
+    )
+    monkeypatch.setattr("pyrite._backend.BACKEND", backend)
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        kt._release_caller_device_memory()
+    backend.release_memory.assert_called_once_with()
+    assert bool(caught) is warns

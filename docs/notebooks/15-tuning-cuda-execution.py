@@ -95,7 +95,7 @@ def _(mo):
         f"{resident_threads:,} resident threads at full occupancy, "
         f"{gpu['free_GiB']:.1f} of {gpu['total_GiB']:.1f} GiB free."
     )
-    return free_bytes, gpu
+    return gpu, total_bytes
 
 
 @app.cell(hide_code=True)
@@ -270,7 +270,7 @@ def _(mo, scene, tables_ready):
         _ = score_spectra(transported, progress=show)
         _bar.update(increment=50)
         spectrum_s = perf_counter() - _started
-    del transported  # releases the kept segments on the device
+    del transported  # back to CuPy's pool; tune_kernels returns it to the card
     mo.md(
         f"Transport **{transport_s:.2f} s**, spectrum **{spectrum_s:.2f} s** "
         f"({spectrum_s / (transport_s + spectrum_s):.0%} of the run)."
@@ -307,7 +307,7 @@ def _(mo):
 
 
 @app.cell(hide_code=True)
-def _(card, card_presets, free_bytes, mo, scene, trial_budget):
+def _(card, card_presets, mo, scene, total_bytes, trial_budget):
     from pyrite.optimization import KernelSearchSpace
 
     # Built-ins for this PyRITE release. None means inherit the scene's value;
@@ -324,7 +324,9 @@ def _(card, card_presets, free_bytes, mo, scene, trial_budget):
         "cxr_energies_per_block": 3,
     }
     _preset = {k: v for k, v in card_presets[card.value].items() if k != "electrons"}
-    _scratch_cap = max(1_024, int(0.5 * free_bytes / 2**20))
+    # From the card's total, not current free memory: a stored study must see
+    # the same space whatever this kernel happens to hold.
+    _scratch_cap = max(1_024, int(0.5 * total_bytes / 2**20))
     _preset["scratch_mib"] = tuple(
         v for v in _preset["scratch_mib"] if v is None or v <= _scratch_cap
     )
