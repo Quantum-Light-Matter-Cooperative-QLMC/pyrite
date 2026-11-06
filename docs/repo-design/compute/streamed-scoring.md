@@ -434,6 +434,25 @@ The fused kernels are bit-for-bit by construction; the column sum reorders only
 a float64 sum that accumulates into float32 line yields, so a rounding-level
 difference is possible on other inputs. There is no model marker change.
 
+The case-local preparation cache (`EmissionBatch.table_cache`) gains nothing
+at 400 bins, because setup there is milliseconds per call. Job 4035 repeats the
+measurement on 190,000 line bins (1-20 keV), 8,192 electrons in 2,048-electron
+blocks, four calls, one rep each, with the cache on and with it withheld
+(`C1005_NO_CACHE=1`). Seconds:
+
+| Case | Characteristic, cache / none | Setup, cache / none | Accumulate, cache / none |
+|---|---|---|---|
+| W 10 um | 4.82 / 6.04 | 0.48 / 1.23 | 4.23 / 4.70 |
+| Si 10 um | 0.72 / 0.43 | 0.23 / 0.20 | 0.47 / 0.22 |
+
+On W the cache removes 0.75 s of setup, 12% of the uncached characteristic
+time. The Si arm is confounded: the cached arm ran first in a cold job with no
+warm-up, and its whole `add` took 22.9 s against 6.4 s for the uncached arm
+that followed. It therefore says nothing either way about Si. Spectra with and
+without the cache are bitwise identical on both. The cache stays: it clears
+the 5% bar on W. At this grid size incoherent line scoring dominates the W wall
+(126 s of 132 s), so the cache saves about 1% of W wall.
+
 Spectral-window pruning is not implemented: on W at a 1e-6 in-window mass
 tolerance it would keep 79 of 95 lines, and only the about 1 s of per-line
 kernels scales with that count, about 1% of wall for an opt-in approximation.
