@@ -20,7 +20,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from hashlib import sha256
 from math import prod
-from typing import Any, Literal
+from typing import Any, Literal, NamedTuple
 
 import numpy as np
 from scipy.special import ndtr, ndtri
@@ -315,6 +315,223 @@ def _radiation_bins(
     return counts / np.diff(edges)[None, :]
 
 
+class _ObservableParts(NamedTuple):
+    density: np.ndarray
+    oam: np.ndarray
+    coherence: np.ndarray
+    custom: np.ndarray
+    level: np.ndarray
+
+
+@dataclass(frozen=True)
+class _ObservableLayout:
+    """Column layout of one electron's packed observable history.
+
+    Columns run density (``npix``), OAM populations (``n_ell``), pixel-pair
+    coherences (``n_pairs``), the custom observable, then the level history
+    (``level_size``). The custom block takes whatever lies between the fixed
+    leading blocks and the trailing level block.
+    """
+
+    npix: int
+    n_ell: int
+    n_pairs: int
+    level_size: int
+
+    @staticmethod
+    def pack(density, oam, coherence, custom, level):
+        """Concatenate one depth's observables in layout order; ``None`` blocks are absent."""
+        output = [density.astype(complex)]
+        for block in (oam, coherence, custom, level):
+            if block is not None:
+                output.append(np.asarray(block).ravel())
+        return np.concatenate(output)
+
+    def split(self, data, *, has_custom):
+        """Per-block column views of a ``(depth, column)`` history."""
+        oam_start = self.npix
+        pairs_start = oam_start + self.n_ell
+        custom_start = pairs_start + self.n_pairs
+        level_start = data.shape[1] - self.level_size
+        if not has_custom and level_start != custom_start:
+            raise ValueError("unexpected observable shape")
+        return _ObservableParts(
+            data[:, :oam_start],
+            data[:, oam_start:pairs_start],
+            data[:, pairs_start:custom_start],
+            data[:, custom_start:level_start],
+            data[:, level_start:],
+        )
+
+
+def _restart_signature(
+    energies, ids, bounds, depths, config, options, detector_sigma_eV, pairs, photon_edges
+):
+    """One metadata signature for restart checking.
+
+    Callback identity cannot be hashed and is explicitly the caller's
+    responsibility.
+    """
+    signature = sha256()
+    for values in (
+        energies,
+        ids,
+        bounds,
+        depths,
+        np.asarray(config.shape),
+        np.asarray(config.cells),
+        np.asarray(config.axis),
+        np.asarray([options.seed, options.n_electrons]),
+        np.asarray(
+            [
+                config.step_ang,
+                config.temperature_K,
+                config.kinetic_energy_eV,
+                config.oam_radius_ang,
+                detector_sigma_eV,
+                *config.tilt_rad,
+            ]
+        ),
+        np.asarray([config.oam_string if config.oam_string is not None else -1]),
+        np.asarray(pairs, dtype=int).reshape(-1, 2),
+        np.asarray([] if photon_edges is None else photon_edges),
+        np.asarray([options.sampling, config.mode, config.crystal, *config.mechanisms]),
+    ):
+        array = np.asarray(values)
+        signature.update(str(array.shape).encode())
+        signature.update(
+            array.tobytes() if array.dtype.kind not in "USO" else repr(array.tolist()).encode()
+        )
+    return signature.hexdigest()
+
+
+def _restore_checkpoint(cp, fingerprint, options, ids, nb, density_bins, survival_bins, optional):
+    """Load a checkpoint's raw sums into the fresh reductions, after validating it.
+
+    ``optional`` pairs each optional reduction (``None`` when disabled) with its
+    checkpoint field. Returns the custom-observable sums, jump counts per bin
+    and the first unprocessed electron ID.
+    """
+    if (
+        not isinstance(cp, AxialEnergyMCWFCheckpoint)
+        or cp.signature != fingerprint
+        or not 0 <= cp.processed_electrons <= options.n_electrons
+    ):
+        raise ValueError("checkpoint has incompatible assignment/configuration signature")
+    if not np.array_equal(
+        cp.bin_counts_processed, np.bincount(ids[: cp.processed_electrons], minlength=nb)
+    ):
+        raise ValueError("checkpoint contains inconsistent processed bin counts")
+    if cp.density_sums.shape != density_bins.shape or cp.survival_sums.shape != survival_bins.shape:
+        raise ValueError("checkpoint reduction shapes differ")
+    density_bins[:] = cp.density_sums
+    survival_bins[:] = cp.survival_sums
+    for target, name in optional:
+        source = getattr(cp, name)
+        if (target is None) != (source is None):
+            raise ValueError("checkpoint optional reduction layout differs")
+        if target is not None:
+            assert source is not None
+            if target.shape != source.shape:
+                raise ValueError("checkpoint reduction shape differs")
+            target[:] = source
+    additional_bins = None
+    if cp.observable_sums is not None:
+        additional_bins = np.array(cp.observable_sums, copy=True)
+    if len(cp.jumps_by_bin) != nb:
+        raise ValueError("checkpoint jump bins differ")
+    return additional_bins, [dict(b) for b in cp.jumps_by_bin], cp.processed_electrons
+
+
+class _EnergySolvers:
+    """Energy-matched MCWF solvers and level observers, least-recently-used first out."""
+
+    def __init__(
+        self,
+        profile,
+        potential,
+        grid,
+        config,
+        options,
+        *,
+        history_columns,
+        solver_factory,
+        radiation_factory,
+        radiation,
+    ):
+        self._profile = profile
+        self._potential = potential
+        self._grid = grid
+        self._config = config
+        self._options = options
+        self._history_columns = history_columns
+        self._solver_factory = solver_factory
+        self._radiation_factory = radiation_factory
+        self._radiation = radiation
+        self._cached: OrderedDict[float, tuple[Any, Any, int]] = OrderedDict()
+
+    def get(self, energy):
+        """``(solver, level_observer or None, level history size)`` at ``energy``."""
+        cached = self._cached
+        if energy in cached:
+            cached.move_to_end(energy)
+            return cached[energy]
+        solver = self._solver(energy)
+        level_observer = self._level_observer(energy)
+        level_size = 0
+        if level_observer is not None:
+            level_size = self._level_size(level_observer)
+        cached[energy] = (solver, level_observer, level_size)
+        if len(cached) > self._options.max_cached_solvers:
+            cached.popitem(last=False)
+        return cached[energy]
+
+    def _solver(self, energy):
+        from .axial_dissipator import axial_dissipator
+        from .axial_mcwf import AxialMCWF
+
+        config, grid = self._config, self._grid
+        solver = (
+            AxialMCWF(
+                axial_dissipator(
+                    self._profile, energy, config.cells, config.shape, mechanisms=config.mechanisms
+                ),
+                energy,
+                self._potential,
+            )
+            if self._solver_factory is None
+            else self._solver_factory(energy, grid, self._potential)
+        )
+        if not np.isclose(float(solver.kinetic_energy_eV), energy, rtol=1e-12, atol=0):
+            raise ValueError("solver_factory must construct the requested energy")
+        if solver.grid.shape != grid.shape or solver.grid.extent_ang != grid.extent_ang:
+            raise ValueError("all energy-specific solvers must use the same physical grid")
+        return solver
+
+    def _level_observer(self, energy):
+        if not self._radiation:
+            return None
+        if self._radiation_factory is not None:
+            return self._radiation_factory(energy, self._grid)
+        from dataclasses import replace
+        from importlib import import_module
+
+        return import_module("pyrite.apps.axial_channeling")._level_observable(
+            replace(self._config, kinetic_energy_eV=energy)
+        )
+
+    def _level_size(self, level_observer):
+        if not hasattr(level_observer, "levels") or not hasattr(level_observer.levels, "unpack"):
+            raise ValueError("radiation_factory must return a compatible level observable")
+        grid = self._grid
+        sample_state = np.full(grid.shape, 1 / np.sqrt(grid.area_ang2), dtype=complex)
+        level_size = int(np.asarray(level_observer(sample_state, (0.0, 0.0))).size)
+        nd = len(self._config.depths_ang)
+        if nd * (self._history_columns + level_size + 17) * 16 > self._options.storage_limit_bytes:
+            raise ValueError("energy-dependent level history exceeds storage_limit_bytes")
+        return level_size
+
+
 def axial_energy_mcwf(
     distribution: IncidentEnergyEnsemble,
     config: Any,
@@ -354,8 +571,6 @@ def axial_energy_mcwf(
     """
     from pyrite.materials.channeling.axial import axial_profile
 
-    from .axial_dissipator import axial_dissipator
-    from .axial_mcwf import AxialMCWF
     from .realspace import RealSpaceGrid
     from .states import gaussian
 
@@ -450,80 +665,23 @@ def axial_energy_mcwf(
     additional_bins = None
     photons_bins = np.zeros((nb, 3, len(photon_edges) - 1)) if photon_edges is not None else None
     jumps_bins = [dict.fromkeys(("tds", "sink", "electronic", "absorbed"), 0) for _ in range(nb)]
-    cached: OrderedDict[float, tuple[Any, Any, int]] = OrderedDict()
     sampled_entry = gaussian(waist_ang=0.5) if entry is None else entry
     depths = np.asarray(config.depths_ang, dtype=float)
-    # One metadata signature for restart checking; callback identity cannot be
-    # hashed and is explicitly the caller's responsibility.
-    signature = sha256()
-    for values in (
-        energies,
-        ids,
-        bounds,
-        depths,
-        np.asarray(config.shape),
-        np.asarray(config.cells),
-        np.asarray(config.axis),
-        np.asarray([options.seed, options.n_electrons]),
-        np.asarray(
-            [
-                config.step_ang,
-                config.temperature_K,
-                config.kinetic_energy_eV,
-                config.oam_radius_ang,
-                detector_sigma_eV,
-                *config.tilt_rad,
-            ]
-        ),
-        np.asarray([config.oam_string if config.oam_string is not None else -1]),
-        np.asarray(pairs, dtype=int).reshape(-1, 2),
-        np.asarray([] if photon_edges is None else photon_edges),
-        np.asarray([options.sampling, config.mode, config.crystal, *config.mechanisms]),
-    ):
-        array = np.asarray(values)
-        signature.update(str(array.shape).encode())
-        signature.update(
-            array.tobytes() if array.dtype.kind not in "USO" else repr(array.tolist()).encode()
-        )
-    fingerprint = signature.hexdigest()
+    fingerprint = _restart_signature(
+        energies, ids, bounds, depths, config, options, detector_sigma_eV, pairs, photon_edges
+    )
     next_id = 0
     if resume_from is not None:
-        cp = resume_from
-        if (
-            not isinstance(cp, AxialEnergyMCWFCheckpoint)
-            or cp.signature != fingerprint
-            or not 0 <= cp.processed_electrons <= options.n_electrons
-        ):
-            raise ValueError("checkpoint has incompatible assignment/configuration signature")
-        if not np.array_equal(
-            cp.bin_counts_processed, np.bincount(ids[: cp.processed_electrons], minlength=nb)
-        ):
-            raise ValueError("checkpoint contains inconsistent processed bin counts")
-        if (
-            cp.density_sums.shape != density_bins.shape
-            or cp.survival_sums.shape != survival_bins.shape
-        ):
-            raise ValueError("checkpoint reduction shapes differ")
-        density_bins[:] = cp.density_sums
-        survival_bins[:] = cp.survival_sums
-        for target, source in (
-            (coh_bins, cp.coherence_sums),
-            (oam_bins, cp.oam_sums),
-            (photons_bins, cp.photon_sums),
-        ):
-            if (target is None) != (source is None):
-                raise ValueError("checkpoint optional reduction layout differs")
-            if target is not None:
-                assert source is not None
-                if target.shape != source.shape:
-                    raise ValueError("checkpoint reduction shape differs")
-                target[:] = source
-        if cp.observable_sums is not None:
-            additional_bins = np.array(cp.observable_sums, copy=True)
-        if len(cp.jumps_by_bin) != nb:
-            raise ValueError("checkpoint jump bins differ")
-        jumps_bins = [dict(b) for b in cp.jumps_by_bin]
-        next_id = cp.processed_electrons
+        additional_bins, jumps_bins, next_id = _restore_checkpoint(
+            resume_from,
+            fingerprint,
+            options,
+            ids,
+            nb,
+            density_bins,
+            survival_bins,
+            ((coh_bins, "coherence_sums"), (oam_bins, "oam_sums"), (photons_bins, "photon_sums")),
+        )
 
     def emit_checkpoint(processed: int) -> None:
         def freeze(value):
@@ -548,56 +706,23 @@ def axial_energy_mcwf(
         if checkpoint_callback is not None:
             checkpoint_callback(snapshot)
 
-    def get_solver(energy):
-        if energy in cached:
-            cached.move_to_end(energy)
-            return cached[energy]
-        solver = (
-            AxialMCWF(
-                axial_dissipator(
-                    profile, energy, config.cells, config.shape, mechanisms=config.mechanisms
-                ),
-                energy,
-                potential,
-            )
-            if solver_factory is None
-            else solver_factory(energy, grid, potential)
-        )
-        if not np.isclose(float(solver.kinetic_energy_eV), energy, rtol=1e-12, atol=0):
-            raise ValueError("solver_factory must construct the requested energy")
-        if solver.grid.shape != grid.shape or solver.grid.extent_ang != grid.extent_ang:
-            raise ValueError("all energy-specific solvers must use the same physical grid")
-        level_observer = None
-        if photon_edges is not None:
-            if radiation_factory is None:
-                from dataclasses import replace
-                from importlib import import_module
-
-                level_observer = import_module("pyrite.apps.axial_channeling")._level_observable(
-                    replace(config, kinetic_energy_eV=energy)
-                )
-            else:
-                level_observer = radiation_factory(energy, grid)
-        level_size = 0
-        if level_observer is not None:
-            if not hasattr(level_observer, "levels") or not hasattr(
-                level_observer.levels, "unpack"
-            ):
-                raise ValueError("radiation_factory must return a compatible level observable")
-            sample_state = np.full(grid.shape, 1 / np.sqrt(grid.area_ang2), dtype=complex)
-            level_size = int(np.asarray(level_observer(sample_state, (0.0, 0.0))).size)
-            if nd * (npix + len(pairs) + level_size + 17) * 16 > options.storage_limit_bytes:
-                raise ValueError("energy-dependent level history exceeds storage_limit_bytes")
-        cached[energy] = (solver, level_observer, level_size)
-        if len(cached) > options.max_cached_solvers:
-            cached.popitem(last=False)
-        return cached[energy]
+    solvers = _EnergySolvers(
+        profile,
+        potential,
+        grid,
+        config,
+        options,
+        history_columns=npix + len(pairs),
+        solver_factory=solver_factory,
+        radiation_factory=radiation_factory,
+        radiation=photon_edges is not None,
+    )
 
     for start in range(next_id, options.n_electrons, options.chunk_size):
         for eid in range(start, min(options.n_electrons, start + options.chunk_size)):
             energy = float(energies[eid])
             bin_id = int(ids[eid])
-            solver, level_observer, level_size = get_solver(energy)
+            solver, level_observer, level_size = solvers.get(energy)
             rng = _rng(options.seed, eid, _ENTRY_TAG)
             if entry_factory is None:
                 current_entry, tilt_rad = sampled_entry, config.tilt_rad
@@ -614,20 +739,23 @@ def axial_energy_mcwf(
                 if single_history_bytes > options.storage_limit_bytes:
                     raise ValueError("custom observable history exceeds storage_limit_bytes")
 
+            layout = _ObservableLayout(
+                npix, 0 if projection is None else len(projection.ells), len(pairs), level_size
+            )
+
             def observe(phi, tilt, *, custom=custom, level_observer=level_observer):
-                base = np.asarray(np.abs(phi).reshape(-1) ** 2, float)
-                output = [base.astype(complex)]
-                if projection is not None:
-                    output.append(np.asarray(projection(phi, tilt)).ravel())
+                coherence = None
                 if pairs:
                     flat = phi.ravel()
                     coherence = np.array([flat[a] * flat[b].conjugate() for a, b in pairs])
-                    output.append(coherence * np.exp(1j * (tilt[0] * dx + tilt[1] * dy)))
-                if custom is not None:
-                    output.append(np.asarray(custom(phi, tilt)).ravel())
-                if level_observer is not None:
-                    output.append(np.asarray(level_observer(phi, tilt)).ravel())
-                return np.concatenate(output)
+                    coherence = coherence * np.exp(1j * (tilt[0] * dx + tilt[1] * dy))
+                return _ObservableLayout.pack(
+                    np.asarray(np.abs(phi).reshape(-1) ** 2, float),
+                    None if projection is None else projection(phi, tilt),
+                    coherence,
+                    None if custom is None else custom(phi, tilt),
+                    None if level_observer is None else level_observer(phi, tilt),
+                )
 
             # Unique seed for (global_id, stochastic trajectory) even when all
             # runs pass n_electrons=1 to the existing MCWF backend.
@@ -644,21 +772,15 @@ def axial_energy_mcwf(
             data = np.asarray(electron.observables)
             if data.ndim != 2 or data.shape[0] != nd or not np.all(np.isfinite(data)):
                 raise ValueError("solver returned nonfinite or malformed observables")
-            density_bins[bin_id] += data[:, :npix].real.reshape(nd, *config.shape)
-            off = npix
+            parts = layout.split(data, has_custom=custom is not None)
+            density_bins[bin_id] += parts.density.real.reshape(nd, *config.shape)
             if oam_bins is not None:
-                assert projection is not None
-                n_ell = len(projection.ells)
-                oam_bins[bin_id] += data[:, off : off + n_ell].real
-                off += n_ell
+                oam_bins[bin_id] += parts.oam.real
             if pairs:
                 assert coh_bins is not None
-                coh_bins[bin_id] += data[:, off : off + len(pairs)]
-                off += len(pairs)
-            nlevel = level_size
-            extra_stop = data.shape[1] - nlevel
+                coh_bins[bin_id] += parts.coherence
             if custom is not None:
-                extra = data[:, off:extra_stop]
+                extra = parts.custom
                 if additional_bins is None:
                     extra_bytes = (nb + 1) * extra.size * 16
                     if (nbytes + extra_bytes) * capacity_factor > options.storage_limit_bytes:
@@ -668,12 +790,10 @@ def axial_energy_mcwf(
                 if extra.shape != additional_bins.shape[1:]:
                     raise ValueError("observable_factory outputs must have a fixed common shape")
                 additional_bins[bin_id] += extra
-            elif extra_stop != off:
-                raise ValueError("unexpected observable shape")
             if photon_edges is not None and level_observer is not None:
                 assert photons_bins is not None
                 photons_bins[bin_id] += _radiation_bins(
-                    data[:, extra_stop:],
+                    parts.level,
                     level_observer.levels,
                     level_observer.levels.catalog,
                     np.asarray(electron.depths_ang),
