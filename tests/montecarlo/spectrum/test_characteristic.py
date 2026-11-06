@@ -654,3 +654,56 @@ def test_prepared_line_cache_is_reused_across_blocks_and_directions(monkeypatch)
 
     assert calls.count("W") == 5  # four uncached calls plus one cached preparation
     assert len(cache) == 1
+
+
+def _is_cupy() -> bool:
+    return getattr(xp, "__name__", "") == "cupy"
+
+
+def test_fused_shell_interpolation_is_bitwise_the_per_shell_chain():
+    """One-launch shell interpolation replays the per-shell chain exactly (#1005).
+
+    Queries cover table nodes, both ends, out-of-range energies and random
+    interior points. Off CuPy float32 the fused entry declines and the scorer
+    keeps its per-shell chain.
+    """
+    from pyrite.montecarlo.spectrum import _characteristic_fused as fused
+
+    table = characteristic.load_characteristic_cross_sections("W")
+    shells = characteristic._device_shell_tables(table)
+    packed = fused.pack_shell_tables(shells)
+    if not (_is_cupy() and np.dtype(REAL) == np.float32):
+        assert packed is None
+        return
+    nodes = np.concatenate([np.asarray(e) for e in table.projectile_energy_eV_by_shell])
+    rng = np.random.default_rng(5)
+    query_keV = np.concatenate(
+        [nodes / 1.0e3, rng.uniform(0.01, 400.0, 20000), [0.0, 1.0e-3, 1.0e5]]
+    )
+    chain = characteristic._interpolate_shell_cross_sections(table, query_keV, shells)
+    one = characteristic._interpolate_shell_cross_sections(table, query_keV, shells, packed)
+    assert one.dtype == chain.dtype
+    np.testing.assert_array_equal(characteristic._to_cpu(one), characteristic._to_cpu(chain))
+
+
+def test_fused_weighted_transmission_is_bitwise_the_mean_transmission_chain():
+    """Fused segment-mean transmission times path and sigma equals the chain (#1005)."""
+    from pyrite.montecarlo.spectrum import _characteristic_fused as fused
+    from pyrite.montecarlo.spectrum.segment_escape import mean_transmission
+
+    rng = np.random.default_rng(7)
+    rows, lines = 4096, 37
+    tau0 = rng.exponential(0.5, (rows, lines))
+    # Mix in the series branch (|t1 - t0| <= 1e-4) and exact ties.
+    step = np.where(rng.random((rows, lines)) < 0.3, rng.uniform(-1e-4, 1e-4, (rows, lines)), 1.0)
+    tau1 = np.abs(tau0 + step * rng.normal(0.0, 2.0, (rows, lines)))
+    tau1[:, 0] = tau0[:, 0]
+    t0, t1 = xp.asarray(tau0), xp.asarray(tau1)
+    path = xp.asarray(rng.uniform(0.0, 3.0, rows), dtype=REAL)
+    sigma = xp.asarray(rng.uniform(0.0, 1e-20, (rows, lines)))
+    one = fused.weighted_transmission(t0, t1, path, sigma)
+    if not _is_cupy():
+        assert one is None
+        return
+    chain = path[:, None] * sigma * mean_transmission(t0, t1, xp=xp)
+    np.testing.assert_array_equal(characteristic._to_cpu(one), characteristic._to_cpu(chain))

@@ -52,6 +52,7 @@ from ..eedl_ionization import (
 )
 from ..eedl_ionization import EEDLSubshellTable as EEDLSubshellTable
 from ..eedl_ionization import load_eedl_shell_ionization as load_eedl_shell_ionization
+from . import _characteristic_fused
 from .cxr import (
     _clip_segments_to_cutoff,
     _observation_direction,
@@ -758,13 +759,19 @@ def _interpolate_shell_cross_sections(
     table: CharacteristicCrossSectionTable,
     segment_energy_keV: object,
     shell_tables=None,
+    packed_shells=None,
 ):
     """Linearly interpolate the table's partial electroionization cross sections.
 
     ``shell_tables`` is the table's :func:`_device_shell_tables`, prepared once
-    instead of copied to the device on every chunk.
+    instead of copied to the device on every chunk; ``packed_shells`` its
+    concatenated CuPy form, which evaluates every shell in one bit-identical
+    launch (#1005).
     """
     query_eV = xp.asarray(segment_energy_keV, dtype=REAL) * 1.0e3
+    fused = _characteristic_fused.shell_sigma(query_eV, packed_shells)
+    if fused is not None:
+        return fused
     columns = []
     for energy, values in shell_tables or _device_shell_tables(table):
         interpolated = xp.interp(query_eV, energy, values)
@@ -789,6 +796,7 @@ def _accumulate_line_yields(
     chunk,
     number_density_ang3,
     shell_tables=None,
+    packed_shells=None,
 ):
     """Segment-summed yield of every characteristic line (#872).
 
@@ -804,17 +812,23 @@ def _accumulate_line_yields(
     for start in range(0, int(seg_E.size), chunk):
         sl = slice(start, min(start + chunk, int(seg_E.size)))
         rows = int(sl.stop - sl.start)
-        shell_sigma_cm2 = _interpolate_shell_cross_sections(table, seg_E[sl], shell_tables)
+        shell_sigma_cm2 = _interpolate_shell_cross_sections(
+            table, seg_E[sl], shell_tables, packed_shells
+        )
         path_cm = number_density_ang3 * 1.0e24 * (seg_L[sl] * 1.0e-8)
         group = max(1, _LINE_BATCH_ELEMENTS // max(rows, 1))
         for first in range(0, n_lines, group):
             lines = slice(first, min(first + group, n_lines))
             mu = mu_by_line[:, lines]
-            transmission = mean_transmission(path_start[sl] @ mu, path_end[sl] @ mu, xp=xp)
+            tau_start, tau_end = path_start[sl] @ mu, path_end[sl] @ mu
             effective_line_sigma_cm2 = shell_sigma_cm2 @ response[:, lines]
-            line_yields[lines] += xp.sum(
-                path_cm[:, None] * effective_line_sigma_cm2 * transmission, axis=0
+            weighted = _characteristic_fused.weighted_transmission(
+                tau_start, tau_end, path_cm, effective_line_sigma_cm2
             )
+            if weighted is None:
+                transmission = mean_transmission(tau_start, tau_end, xp=xp)
+                weighted = path_cm[:, None] * effective_line_sigma_cm2 * transmission
+            line_yields[lines] += xp.sum(weighted, axis=0)
     return line_yields
 
 
@@ -830,7 +844,8 @@ class _PreparedLines:
     densities, ``response`` ``(n_shell, n_line)`` photons per primary vacancy,
     ``mu_by_line`` ``(n_layer, n_line)`` total attenuation at each line energy
     (one row for a single slab), and ``shell_tables`` the per-shell
-    ionization tables (:func:`_device_shell_tables`). ``severe_truncation`` lists ``(label,
+    ionization tables (:func:`_device_shell_tables`, plus their packed CuPy
+    form or ``None``). ``severe_truncation`` lists ``(label,
     captured)`` for in-window lines below
     :data:`CHARACTERISTIC_SEVERE_TRUNCATION_FRACTION`.
     """
@@ -839,6 +854,7 @@ class _PreparedLines:
     response: Any
     mu_by_line: Any
     shell_tables: tuple
+    packed_shells: Any
     severe_truncation: tuple[tuple[str, float], ...]
 
 
@@ -889,11 +905,13 @@ def _prepare_lines(table, comp, layers, edges, bin_widths, relaxation_cutoff):
             for absorber in absorbers
         ]
     )
+    shell_tables = _device_shell_tables(table)
     return _PreparedLines(
         profiles=xp.asarray(np.stack(profiles), dtype=REAL),
         response=xp.asarray(line_yield_per_vacancy[:, kept], dtype=REAL),
         mu_by_line=mu_by_line,
-        shell_tables=_device_shell_tables(table),
+        shell_tables=shell_tables,
+        packed_shells=_characteristic_fused.pack_shell_tables(shell_tables),
         severe_truncation=tuple(severe),
     )
 
@@ -1098,6 +1116,7 @@ def mc_characteristic_spectrum(
             chunk=chunk,
             number_density_ang3=number_density_ang3,
             shell_tables=prepared.shell_tables,
+            packed_shells=prepared.packed_shells,
         )
         for profile, line_yield in zip(prepared.profiles, line_yields, strict=True):
             spec += line_yield * profile
