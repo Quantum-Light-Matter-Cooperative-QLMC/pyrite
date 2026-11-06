@@ -10,6 +10,7 @@ import numpy as np
 
 from .._numerics import CONVERGENCE_KEYS, TRANSPORT_KEYS
 from .._precision import Precision
+from .._sampling import AdaptiveSampling
 from .._units import reject_quantity
 from ._catalog_decode import CxrGridByEnergy, _number
 from ._identity import CutFrame, MaterialIdentity, hexagonal_setting, reduce_indices
@@ -580,8 +581,8 @@ class MaterialCatalog:
     profile_emissions: Mapping[str, str] = MappingProxyType({})
     #: ``profiles.NAME.temporal_profile = true`` opt-ins (#292); absent is off.
     profile_temporal_profiles: Mapping[str, bool] = MappingProxyType({})
-    #: Validated ``[profiles.NAME.precision]`` adaptive-sampling policies, as
-    #: plain field mappings; absent means fixed electron counts.
+    #: Validated ``[profiles.NAME.adaptive_sampling]`` policies, as stored-vocabulary
+    #: mappings (``Precision.to_dict`` keys); absent means fixed history counts.
     profile_precisions: Mapping[str, Mapping[str, object]] = MappingProxyType({})
     #: Explicit scalar result-affecting numerics, keyed by profile. Electron
     #: count grids remain on each resolved :class:`ScanSpec`.
@@ -659,9 +660,9 @@ class MaterialCatalog:
         return bool(self.profile_temporal_profiles.get(name, False))
 
     def profile_precision(self, name: str) -> Precision | None:
-        """Adaptive electron-count policy for ``name``, or ``None`` for fixed counts."""
+        """Adaptive history-count policy for ``name``, or ``None`` for fixed counts."""
         payload = self.profile_precisions.get(name)
-        return None if payload is None else Precision.from_dict(payload)
+        return None if payload is None else AdaptiveSampling.from_dict(payload)
 
     def profile_numerics(self, name: str) -> Mapping[str, object] | None:
         """Explicit result-affecting transport numerics for ``name``."""

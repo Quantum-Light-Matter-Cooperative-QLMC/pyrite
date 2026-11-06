@@ -44,7 +44,7 @@ SCHEDULES = (
 def _numerics(transport):
     tuning = cfg.KernelTuning(transport_core="cuda", transport=transport)
     return pr.Numerics(
-        sampling=FixedSampling(cxr_electrons=256, brem_electrons=128), seed=7, execution=tuning
+        sampling=FixedSampling(cxr_histories=256, brem_histories=128), seed=7, execution=tuning
     )
 
 

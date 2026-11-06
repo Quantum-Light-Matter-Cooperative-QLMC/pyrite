@@ -2,8 +2,9 @@
 
 A ``[physics.NAME]`` object holds ``emission`` plus every profile key that is
 a :class:`~pyrite._numerics.Physics` field. A ``[numerics.NAME]`` object holds
-scalar electron counts, the remaining profile numerics keys, and optional
-``precision`` and ``line_grid_policy`` tables. Both may carry a display
+scalar history counts, the remaining profile numerics keys, and optional
+``adaptive_sampling`` and ``cxr_grid_policy`` tables (held internally as
+``precision`` and ``line_grid_policy``). Both may carry a display
 ``description``. A profile attaches them with ``physics = "NAME"`` and
 ``numerics = "NAME"``; its own keys stay explicit overrides. The catalog folds
 presets into each referencing profile row before any consumer reads it, so
@@ -33,7 +34,7 @@ from ._units import normalize_unit_input
 EMISSION_VALUES = ("incoherent", "coherent", "both")
 METADATA_KEYS = ("description",)
 #: Keys of one sampling policy: a profile setting any of them takes none of
-#: them from its numerics preset, so fixed counts and adaptive precision never mix.
+#: them from its numerics preset, so fixed counts and adaptive sampling never mix.
 SAMPLING_POLICY_KEYS = (*SAMPLING_KEYS, "precision")
 
 
@@ -135,7 +136,9 @@ def validate_values(kind: PresetKind, values: Mapping[str, Any]) -> None:
             )
     if "precision" in values:
         if any(key in values for key in SAMPLING_KEYS):
-            raise ValueError("precision cannot be combined with fixed electron counts")
+            raise ValueError(
+                "adaptive_sampling cannot be combined with cxr_histories/brem_histories"
+            )
         from ._precision import Precision
 
         Precision.from_dict(values["precision"])
@@ -224,8 +227,8 @@ def numerics_from_values(values: Mapping[str, Any]) -> Numerics:
     else:
         default = FixedSampling()
         sampling = FixedSampling(
-            values.get("n_electrons", default.cxr_electrons),
-            values.get("n_electrons_brem", default.brem_electrons),
+            values.get("n_electrons", default.cxr_histories),
+            values.get("n_electrons_brem", default.brem_histories),
         )
     return Numerics(**fields, cxr_reflections=reflections, sampling=sampling)
 
@@ -281,8 +284,8 @@ def load_numerics(name: str, *, catalog: Any = None) -> Numerics:
     Returns
     -------
     Numerics
-        The preset's ``sampling`` policy (``cxr_electrons``/``brem_electrons``
-        counts or an adaptive ``precision`` table), integration,
+        The preset's ``sampling`` policy (``cxr_histories``/``brem_histories``
+        counts or an ``adaptive_sampling`` table), integration,
         reflection/mosaic and channeling-zone numerics over the built-in
         defaults.
         Energy bins and execution-only fields keep their defaults; a

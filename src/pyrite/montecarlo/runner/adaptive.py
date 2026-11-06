@@ -161,8 +161,8 @@ class StoppingMonitor:
         stability = self._stability(name)
         passes = {
             "relative_se": rse is not None and rse <= s.target_rse,
-            "max_electron_share": share is not None and share <= s.max_electron_share,
-            "effective_sample_size": ess >= s.min_effective_electrons,
+            "max_electron_share": share is not None and share <= s.max_history_share,
+            "effective_sample_size": ess >= s.min_effective_histories,
             "stability": stability is not None and stability <= s.stability_fraction * s.target_rse,
         }
         return {
@@ -183,18 +183,18 @@ class StoppingMonitor:
             rse = moments.relative_se()
             worst = max(worst, math.inf if rse is None else (rse / s.target_rse) ** 2)
         if not math.isfinite(worst):
-            return s.max_electrons
-        block = s.block_electrons
+            return s.max_histories
+        block = s.block_histories
         projected = math.ceil(n * worst / block) * block
-        return min(max(projected, n), s.max_electrons)
+        return min(max(projected, n), s.max_histories)
 
     def should_stop(self, n: int) -> bool:
         s = self.settings
-        at_max = n >= s.max_electrons
-        if n < s.min_electrons and not at_max:
+        at_max = n >= s.max_histories
+        if n < s.min_histories and not at_max:
             return False
-        if s.pilot_electrons is not None and not at_max:
-            if n < s.pilot_electrons:
+        if s.pilot_histories is not None and not at_max:
+            if n < s.pilot_histories:
                 return False
             if self.pilot is None:
                 self.projected = self._project(n)
@@ -221,13 +221,13 @@ class StoppingMonitor:
             "mode": "adaptive",
             "precision": s.to_dict(),
             "target_rse": s.target_rse,
-            "min_electrons": s.min_electrons,
-            "max_electrons": s.max_electrons,
-            "block_electrons": s.block_electrons,
+            "min_electrons": s.min_histories,
+            "max_electrons": s.max_histories,
+            "block_electrons": s.block_histories,
             "observables": list(s.observables),
             "guards": {
-                "max_electron_share": s.max_electron_share,
-                "min_effective_electrons": s.min_effective_electrons,
+                "max_electron_share": s.max_history_share,
+                "min_effective_electrons": s.min_effective_histories,
                 "stability_blocks": s.stability_blocks,
                 "stability_fraction": s.stability_fraction,
             },
@@ -257,7 +257,7 @@ def run_stopping_rule(settings: AdaptiveSettings, measure: Measure) -> dict[str,
         if settings.brem_target_rse is None
         else IndependentStoppingMonitor(settings, measure)
     )
-    for start, stop in electron_blocks(settings.max_electrons, settings.block_electrons):
+    for start, stop in electron_blocks(settings.max_histories, settings.block_histories):
         monitor.on_block(start, stop, None)
         if monitor.should_stop(stop):
             break
@@ -395,7 +395,7 @@ def batch_means(case, transport, settings: AdaptiveSettings) -> dict[str, Any]:
     segs = transport["segs"]
     n = int(segs["Ne"])
     n_brem = int(transport["Ne_brem"])
-    blocks = electron_blocks(n, settings.block_electrons)
+    blocks = electron_blocks(n, settings.block_histories)
     E_grid, E_brem = np.asarray(transport["E_grid"]), np.asarray(transport["E_brem"])
     cxr_bins = (E_grid >= start_eV) & (E_grid <= stop_eV)
     brem_bins = (E_brem >= start_eV) & (E_brem <= stop_eV)
@@ -443,7 +443,7 @@ def batch_means(case, transport, settings: AdaptiveSettings) -> dict[str, Any]:
         "band_eV": [float(start_eV), float(stop_eV)],
         "n_batches": k,
         **({"n_batches_brem": len(brem_batches)} if settings.brem_target_rse is not None else {}),
-        "batch_electrons": settings.block_electrons,
+        "batch_electrons": settings.block_histories,
         "spec": summary(E_grid[cxr_bins], cxr_batches),
         "brem_wide": summary(E_brem[brem_bins], brem_batches),
     }
@@ -459,7 +459,7 @@ def adaptive_transport_core(case, settings: AdaptiveSettings, requested: str = "
     from .. import runner
 
     loop_case = {key: value for key, value in case.items() if key != "adaptive_precision"}
-    loop_case.update(Ne=settings.max_electrons, Ne_brem=settings.max_electrons)
+    loop_case.update(Ne=settings.max_histories, Ne_brem=settings.max_histories)
     core = runner._case_transport_core(loop_case, requested)
     if core == "lockstep" and requested == "auto":
         core = runner._case_transport_core(loop_case, "per-electron")
@@ -499,7 +499,7 @@ def transport_case_adaptive(
         select_emission(case).preflight(case, streaming=True)
     core = adaptive_transport_core(case, settings, transport_core)
     loop_case = {key: value for key, value in case.items() if key != "adaptive_precision"}
-    loop_case.update(Ne=settings.max_electrons, Ne_brem=settings.max_electrons)
+    loop_case.update(Ne=settings.max_histories, Ne_brem=settings.max_histories)
     from .independent import case_stopping_monitor
 
     monitor = case_stopping_monitor(loop_case, settings)
@@ -508,7 +508,7 @@ def transport_case_adaptive(
         record_timing,
         transport_core=core,
         keep_segments_on_device=keep_segments_on_device,
-        block_electrons=settings.block_electrons,
+        block_electrons=settings.block_histories,
         block_monitor=monitor,
     )
     statistics = monitor.record()
@@ -518,7 +518,7 @@ def transport_case_adaptive(
     if statistics["statistics_limited"]:
         worst = {name: status["relative_se"] for name, status in statistics["statistics"].items()}
         limit = (
-            f"reached max_electrons={settings.max_electrons} without meeting "
+            f"reached max_histories={settings.max_histories} without meeting "
             f"target_rse={settings.target_rse:g} and its guards"
         )
         if settings.brem_target_rse is not None:

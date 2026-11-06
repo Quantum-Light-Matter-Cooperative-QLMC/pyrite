@@ -1,5 +1,5 @@
 # Demo: a small parameter sweep -- two materials x two beam energies x three
-# polar tilts -- for the scan and analysis apps. Adaptive electron counts
+# polar tilts -- for the scan and analysis apps. Adaptive history counts
 # (default policy). ~6 min on CPU.
 #   pyrite run sweep_demo && pyrite app analysis launch hopg
 

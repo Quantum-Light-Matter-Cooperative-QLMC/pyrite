@@ -66,8 +66,8 @@ def case_runtime_plan(case):
         "brem_chunk": brem_chunk,
         "line_grid_bins": int(cxr_grid.size),
         "brem_grid_bins": int(brem_grid.size),
-        "line_electrons": case.get("Ne"),
-        "brem_electrons": case.get("Ne_brem"),
+        "cxr_histories": case.get("Ne"),
+        "brem_histories": case.get("Ne_brem"),
     }
 
 
@@ -209,7 +209,7 @@ class _TransportProgress:
         if self._show_bar:
             if self._bar is None and done < total:
                 self._bar = _progress_bar(
-                    total=total, desc="electrons", unit="e", unit_scale=True, leave=False
+                    total=total, desc="histories", unit="h", unit_scale=True, leave=False
                 )
                 if self._bar is None:
                     self._show_bar = False

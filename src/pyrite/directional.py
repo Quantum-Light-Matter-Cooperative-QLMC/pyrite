@@ -192,8 +192,8 @@ def directional_sources(
         Lab transverse plane basis azimuth, degrees; zero gives the x–z plane.
     numerics
         Fixed electron counts, reflection/mosaic and transport controls. The
-        line count (``FixedSampling.cxr_electrons``) drives PXR/CBS; the
-        bremsstrahlung count (``brem_electrons``) drives characteristic,
+        line count (``FixedSampling.cxr_histories``) drives PXR/CBS; the
+        bremsstrahlung count (``brem_histories``) drives characteristic,
         continuum and TR. Both are used as requested. Adaptive sampling and
         automatic energy grids are unsupported; no excluded channel is scored.
     seed, direction_batch

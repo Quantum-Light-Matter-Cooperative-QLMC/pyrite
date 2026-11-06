@@ -92,7 +92,7 @@ def test_case_records_nonzero_tilt_and_keeps_zero_identity():
             pr.Scene(
                 beam=_beam(front),
                 target=pr.geometry.Slab("hopg", thickness_ang=100.0, tilt_deg=45.0, footprint=None),
-                numerics=pr.Numerics(sampling=FixedSampling(cxr_electrons=10, brem_electrons=2)),
+                numerics=pr.Numerics(sampling=FixedSampling(cxr_histories=10, brem_histories=2)),
             )
         )
 

@@ -37,7 +37,7 @@ def scene():
 
 @pytest.fixture
 def controls():
-    return Numerics(sampling=FixedSampling(cxr_electrons=1, brem_electrons=1))
+    return Numerics(sampling=FixedSampling(cxr_histories=1, brem_histories=1))
 
 
 def scalar_output():

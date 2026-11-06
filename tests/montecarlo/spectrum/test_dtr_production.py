@@ -29,7 +29,7 @@ def _scene(mode="two-beam"):
 
 def _numerics():
     return pr.Numerics(
-        sampling=FixedSampling(cxr_electrons=3, brem_electrons=3),
+        sampling=FixedSampling(cxr_histories=3, brem_histories=3),
         cxr_reflections=pr.config.CxrReflections(max_reflections=1),
         energy_bins=pr.detectors.EnergyBins(
             cxr=np.linspace(500.0, 1500.0, 9), brem=np.array([500.0, 5000.0])
@@ -195,7 +195,7 @@ def test_unsupported_configs_refuse_before_transport():
         api.build_case(_scene(), replace(_numerics(), cxr_reflections=pr.config.CxrReflections()))
     with pytest.raises(ValueError, match="equal line and continuum"):
         api.build_case(
-            _scene(), replace(_numerics(), sampling=replace(_numerics().sampling, brem_electrons=2))
+            _scene(), replace(_numerics(), sampling=replace(_numerics().sampling, brem_histories=2))
         )
     with pytest.raises(ValueError, match="three finite"):
         pr.Physics(

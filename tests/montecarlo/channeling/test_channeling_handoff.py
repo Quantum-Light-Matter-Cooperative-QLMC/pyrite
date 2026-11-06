@@ -53,7 +53,7 @@ def _case(plane=(1, -1, 0), *, n=N, numerics=SMALL, thickness_ang=10000.0):
     return api.build_case(
         scene,
         pr.Numerics(
-            sampling=FixedSampling(cxr_electrons=n, brem_electrons=n),
+            sampling=FixedSampling(cxr_histories=n, brem_histories=n),
             energy_bins=pr.detectors.EnergyBins(cxr=np.linspace(1e3, 2e3, 9)),
             **numerics,
         ),

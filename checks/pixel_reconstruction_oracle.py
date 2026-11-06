@@ -330,7 +330,7 @@ def run(
         timepix_n_mc=timepix_n_mc,
     )
     numerics = pr.Numerics(
-        sampling=FixedSampling(cxr_electrons=n_electrons, brem_electrons=n_electrons_brem),
+        sampling=FixedSampling(cxr_histories=n_electrons, brem_histories=n_electrons_brem),
     )
     scene = pr.Scene(beam=beam, target=target, detector=detector, filters=filters)
     base_case = api.build_case(scene, numerics)

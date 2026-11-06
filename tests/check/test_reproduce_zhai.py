@@ -39,7 +39,7 @@ def test_cli_forwards_overrides(monkeypatch, capsys):
         [
             "--ne",
             "11",
-            "--ne-brem",
+            "--brem-histories",
             "3",
             "--ne-supp",
             "5",

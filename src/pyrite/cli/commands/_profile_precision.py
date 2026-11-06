@@ -1,8 +1,9 @@
-"""``pyrite numerics precision``: a profile's adaptive electron-count policy."""
+"""``pyrite numerics adaptive-sampling``: a profile's adaptive history-count policy."""
 
 import click
 from tomlkit.exceptions import ParseError
 
+from pyrite._cxr_vocabulary import CATALOG_FIELDS
 from pyrite._precision import OBSERVABLES
 from pyrite.campaign import profile_precision as _profile_edit
 from pyrite.campaign._profile_document import existing_profile
@@ -17,23 +18,41 @@ from pyrite.console.output import CLIError, emit_json_result, emit_result, outpu
 
 from .._deprecations import canonical_option, removed_option
 
+#: Option/FIELD spelling -> catalog ``adaptive_sampling`` field name.
 _PRECISION_FIELD_NAMES = {
     "target-rse": "target_rse",
     "brem-target-rse": "brem_target_rse",
-    "brem-min-electrons": "brem_min_electrons",
-    "brem-max-electrons": "brem_max_electrons",
-    "min-electrons": "min_electrons",
-    "max-electrons": "max_electrons",
-    "block-electrons": "block_electrons",
+    "brem-min-histories": "brem_min_histories",
+    "brem-max-histories": "brem_max_histories",
+    "min-histories": "min_histories",
+    "max-histories": "max_histories",
+    "block-histories": "block_histories",
     "observable": "observables",
-    "max-electron-share": "max_electron_share",
-    "min-effective-electrons": "min_effective_electrons",
+    "max-history-share": "max_history_share",
+    "min-effective-histories": "min_effective_histories",
     "stability-blocks": "stability_blocks",
     "stability-fraction": "stability_fraction",
-    "pilot-electrons": "pilot_electrons",
+    "pilot-histories": "pilot_histories",
     "band-ev": "band_eV",
     "batch-means-band-ev": "batch_means_band_eV",
 }
+
+#: Policy options removed in #1007 without an alias, and their replacement.
+_REMOVED_POLICY_OPTIONS = {
+    "--brem-min-electrons": "--brem-min-histories",
+    "--brem-max-electrons": "--brem-max-histories",
+    "--min-electrons": "--min-histories",
+    "--max-electrons": "--max-histories",
+    "--block-electrons": "--block-histories",
+    "--max-electron-share": "--max-history-share",
+    "--min-effective-electrons": "--min-effective-histories",
+    "--pilot-electrons": "--pilot-histories",
+}
+
+
+def _stored(field):
+    """Internal stored-vocabulary key of a catalog ``adaptive_sampling`` field."""
+    return CATALOG_FIELDS.get(field, field)
 
 
 def _energy_band(_ctx, param, value):
@@ -61,16 +80,16 @@ def _policy_options(function):
             help="Stop brem independently at this RSE; requires both cxr and brem observables.",
         ),
         click.option(
-            "--brem-min-electrons",
+            "--brem-min-histories",
             type=click.IntRange(min=2),
             metavar="N",
-            help="Brem minimum; defaults to --min-electrons. Requires --brem-target-rse.",
+            help="Brem minimum; defaults to --min-histories. Requires --brem-target-rse.",
         ),
         click.option(
-            "--brem-max-electrons",
+            "--brem-max-histories",
             type=click.IntRange(min=2),
             metavar="N",
-            help="Brem maximum, at most --max-electrons; defaults to it. Requires --brem-target-rse.",
+            help="Brem maximum, at most --max-histories; defaults to it. Requires --brem-target-rse.",
         ),
         click.option(
             "--target-rse",
@@ -79,22 +98,22 @@ def _policy_options(function):
             help="Target relative standard error of each watched yield (0.05 = 5%).",
         ),
         click.option(
-            "--min-electrons",
+            "--min-histories",
             type=click.IntRange(min=2),
             metavar="N",
-            help="Smallest count at which the run may stop; a multiple of --block-electrons.",
+            help="Smallest count at which the run may stop; a multiple of --block-histories.",
         ),
         click.option(
-            "--max-electrons",
+            "--max-histories",
             type=click.IntRange(min=2),
             metavar="N",
             help="Count at which the run stops regardless, flagged statistics-limited.",
         ),
         click.option(
-            "--block-electrons",
+            "--block-histories",
             type=click.IntRange(min=1),
             metavar="N",
-            help="Electrons per transport block; the rule is checked at block ends.",
+            help="Histories per transport block; the rule is checked at block ends.",
         ),
         click.option(
             "--observable",
@@ -106,13 +125,13 @@ def _policy_options(function):
             ),
         ),
         click.option(
-            "--max-electron-share",
+            "--max-history-share",
             type=click.FloatRange(min=0.0, max=1.0, min_open=True),
             metavar="FRACTION",
-            help="Guard: largest share of a yield one electron may hold (default 0.05).",
+            help="Guard: largest share of a yield one history may hold (default 0.05).",
         ),
         click.option(
-            "--min-effective-electrons",
+            "--min-effective-histories",
             type=click.FloatRange(min=0.0),
             metavar="N",
             help="Guard: effective sample size floor (sum m)^2 / sum m^2 (default 100).",
@@ -130,7 +149,7 @@ def _policy_options(function):
             help="Guard: allowed relative mean drift as a fraction of the target (default 0.5).",
         ),
         click.option(
-            "--pilot-electrons",
+            "--pilot-histories",
             type=click.IntRange(min=1),
             metavar="N",
             help="Pilot count that projects the stopping count and skips checks until it.",
@@ -148,14 +167,17 @@ def _policy_options(function):
             help="Band in eV for reported per-bin batch-means errors; costs one extra reduction.",
         ),
     )
-    for option in reversed(options):
+    removed = tuple(
+        removed_option(old, new) for old, new in reversed(_REMOVED_POLICY_OPTIONS.items())
+    )
+    for option in (*reversed(options), *removed):
         function = option(function)
     return function
 
 
 def _updates(values):
     updates = {
-        _PRECISION_FIELD_NAMES[key.replace("_", "-")]: value
+        _stored(_PRECISION_FIELD_NAMES[key.replace("_", "-")]): value
         for key, value in values.items()
         if value is not None and value != ()
     }
@@ -180,38 +202,38 @@ def show_cxr(precision):
     """Return the `profile show` summary line for a resolved precision payload."""
     effective = precision["effective"]
     if effective is None:
-        return f"  electron counts: fixed ({precision['fixed_reason']})"
+        return f"  history counts: fixed ({precision['fixed_reason']})"
     default = " (default)" if precision["source"] == "default" else ""
     return (
-        f"  electron counts: adaptive{default}, target RSE {effective['target_rse']:g}, "
-        f"{effective['min_electrons']}-{effective['max_electrons']} electrons"
+        f"  history counts: adaptive{default}, target RSE {effective['target_rse']:g}, "
+        f"{effective['min_histories']}-{effective['max_histories']} histories"
     )
 
 
 def _mode_cxr(document, name):
-    """One-line resulting electron-count mode after an edit."""
+    """One-line resulting history-count mode after an edit."""
     _explicit, effective, source, reason = _profile_edit.precision_resolution(
         existing_profile(document, name)
     )
     if effective is None:
-        return f"profile {name}: fixed electron counts ({reason})"
+        return f"profile {name}: fixed history counts ({reason})"
     return f"profile {name}: adaptive ({source} policy)"
 
 
-@click.group("precision")
+@click.group("adaptive-sampling")
 def command():
-    """Inspect and edit PROFILE's electron-count mode: adaptive policy or fixed counts.
+    """Inspect and edit PROFILE's history-count mode: adaptive policy or fixed counts.
 
-    Profiles without fixed electron counts or a policy run adaptive by default
-    (target RSE 0.05, 200-20000 electrons, blocks of 100, line and
+    Profiles without fixed history counts or a policy run adaptive by default
+    (target RSE 0.05, 200-20000 histories, blocks of 100, line and
     bremsstrahlung). Each incoherent case stops when the relative standard error
     of its line (and optionally bremsstrahlung) yield meets the target and its
     heavy-tail guards pass, or at the maximum count flagged statistics-limited.
     By default one count serves both populations. --brem-target-rse enables
     independent brem-prefix stopping; line transport continues until brem finishes.
     Coherent emission,
-    cascades, physical detectors, GDF beams, grooves and fixed electron counts
-    keep fixed counts.
+    cascades, physical detectors, GDF beams, grooves and fixed history counts
+    keep fixed counts. A history is one transported primary electron.
 
     \b
       enable   switch to adaptive: drop fixed counts, optionally customize
@@ -219,7 +241,7 @@ def command():
       reset    drop customized fields, or the whole table (back to the default)
       disable  opt out: drop any policy and select fixed counts
 
-    Electron sampling is independent of the line grid; see
+    History sampling is independent of the line grid; see
     'pyrite numerics cxr-grid'.
     """
 
@@ -228,7 +250,7 @@ def command():
 @click.argument("name", shell_complete=_cli_completion.complete_profile)
 @output_option
 def precision_show_command(name, json_output):
-    """Show PROFILE's electron-count mode, its source, blockers and next steps."""
+    """Show PROFILE's history-count mode, its source, blockers and next steps."""
     try:
         _text, document = _catalog_io.catalog_text()
         profile = existing_profile(document, name)
@@ -238,7 +260,7 @@ def precision_show_command(name, json_output):
         grid = cxr_grid_sources(document, profile)
     except (OSError, TypeError, ValueError, ParseError) as exc:
         if json_output:
-            emit_json_result(cli_json.failure("cxr.profile.precision.show", {}, str(exc)))
+            emit_json_result(cli_json.failure("cxr.profile.adaptive_sampling.show", {}, str(exc)))
             return 1
         raise CLIError(str(exc)) from None
     automatic_grid = grid["automatic_for_every_case"]
@@ -251,25 +273,25 @@ def precision_show_command(name, json_output):
             "explicit": explicit,
             "effective": effective,
             "fixed_counts": {
-                {"n_electrons": "cxr_electrons", "n_electrons_brem": "brem_electrons"}[key]: value
+                {"n_electrons": "cxr_histories", "n_electrons_brem": "brem_histories"}[key]: value
                 for key, value in counts.items()
             },
             "blockers": blockers,
             "line_grid_automatic_for_every_case": automatic_grid,
         }
-        emit_json_result(cli_json.JsonResult("cxr.profile.precision.show", payload))
+        emit_json_result(cli_json.JsonResult("cxr.profile.adaptive_sampling.show", payload))
         return 0
     if effective is None:
-        emit_result(f"[{name} precision] fixed electron counts: {fixed_reason}")
+        emit_result(f"[{name} adaptive-sampling] fixed history counts: {fixed_reason}")
         if counts:
             emit_result(f"  counts: {_profile_edit.describe_counts(counts)}")
     else:
-        emit_result(f"[{name} precision] adaptive ({source} policy)")
+        emit_result(f"[{name} adaptive-sampling] adaptive ({source} policy)")
         for flag, key in _PRECISION_FIELD_NAMES.items():
             marker = "" if explicit is not None and key in explicit else " (default)"
             emit_result(f"  {flag}: {_display(effective.get(key))}{marker}")
         emit_result(
-            "  per material, fixed counts, GDF beams and grooved faces keep fixed electron counts"
+            "  per material, fixed counts, GDF beams and grooved faces keep fixed history counts"
         )
     for blocker in blockers:
         emit_result(f"  adaptive unsupported: {blocker}")
@@ -280,12 +302,12 @@ def precision_show_command(name, json_output):
             if automatic_grid
             else "explicit or stored grids first, automatic for the rest"
         )
-        + f"; independent of electron sampling, see 'pyrite numerics cxr-grid show {name}'"
+        + f"; independent of history sampling, see 'pyrite numerics cxr-grid show {name}'"
     )
     if effective is not None:
-        emit_result(f"  to select fixed counts: pyrite numerics precision disable {name}")
+        emit_result(f"  to select fixed counts: pyrite numerics adaptive-sampling disable {name}")
     elif counts and not blockers:
-        emit_result(f"  to switch to adaptive: pyrite numerics precision enable {name}")
+        emit_result(f"  to switch to adaptive: pyrite numerics adaptive-sampling enable {name}")
     return 0
 
 
@@ -295,9 +317,9 @@ def precision_show_command(name, json_output):
 @click.option("-y", "--yes", is_flag=True, help="Skip the 'standard' confirmation prompt.")
 @click.option("--dry-run", is_flag=True, help="Print proposed TOML diff; write nothing.")
 def precision_enable_command(name, yes, dry_run, **values):
-    """Switch PROFILE to adaptive electron counts in one atomic edit.
+    """Switch PROFILE to adaptive history counts in one atomic edit.
 
-    Removes the profile's fixed cxr-electrons/brem-electrons. Without options the
+    Removes the profile's fixed cxr-histories/brem-histories. Without options the
     default policy applies (no table is written); options write a policy whose
     unspecified fields come from the existing policy, else the default.
     Refuses, writing nothing, when the profile cannot run adaptive (coherent
@@ -313,8 +335,8 @@ def precision_enable_command(name, yes, dry_run, **values):
     if _catalog_io.is_unchanged(document, original):
         emit_result(f"profile {name}: already adaptive; nothing to change")
         return 0
-    confirm_standard(name, "enable adaptive precision on", yes, dry_run)
-    status = write(document, original, dry_run, f"enabled adaptive precision for profile {name}")
+    confirm_standard(name, "enable adaptive sampling on", yes, dry_run)
+    status = write(document, original, dry_run, f"enabled adaptive sampling for profile {name}")
     if not dry_run:
         if removed:
             emit_result(f"  removed fixed counts: {_profile_edit.describe_counts(removed)}")
@@ -331,23 +353,23 @@ def precision_set_command(name, yes, dry_run, **values):
     """Create or update PROFILE's adaptive policy.
 
     Fields left unspecified keep the existing policy's values; a new policy takes
-    them from the default (target RSE 0.05, 200-20000 electrons, blocks of 100,
+    them from the default (target RSE 0.05, 200-20000 histories, blocks of 100,
     line and brem). A profile with fixed counts is refused; switch it with
-    'pyrite numerics precision enable'.
+    'pyrite numerics adaptive-sampling enable'.
     """
     updates = _updates(values)
     if not updates:
         raise click.UsageError(
-            "provide at least one precision option; "
-            f"'pyrite numerics precision enable {name}' selects the default policy"
+            "provide at least one policy option; "
+            f"'pyrite numerics adaptive-sampling enable {name}' selects the default policy"
         )
     try:
         original, document = _catalog_io.catalog_text()
         _profile_edit.set_precision(document, name, updates)
     except (OSError, TypeError, ValueError, ParseError) as exc:
         raise CLIError(str(exc)) from None
-    confirm_standard(name, "set adaptive precision on", yes, dry_run)
-    return write(document, original, dry_run, f"updated precision for profile {name}")
+    confirm_standard(name, "set adaptive sampling on", yes, dry_run)
+    return write(document, original, dry_run, f"updated adaptive sampling for profile {name}")
 
 
 @command.command("reset")
@@ -360,9 +382,9 @@ def precision_reset_command(name, fields, yes, dry_run):
 
     Removing the policy returns PROFILE to the default adaptive policy unless it
     cannot run adaptive. Fixed counts are untouched; select them with
-    'pyrite numerics precision disable'.
+    'pyrite numerics adaptive-sampling disable'.
     """
-    keys = tuple(_PRECISION_FIELD_NAMES[field] for field in fields)
+    keys = tuple(_stored(_PRECISION_FIELD_NAMES[field]) for field in fields)
     try:
         original, document = _catalog_io.catalog_text()
         removed = _profile_edit.reset_precision(document, name, keys)
@@ -371,8 +393,8 @@ def precision_reset_command(name, fields, yes, dry_run):
     if not removed:
         emit_result(f"profile {name}: nothing to reset")
         return 0
-    confirm_standard(name, "reset adaptive precision on", yes, dry_run)
-    done = "removed precision policy" if not keys else "reset precision fields"
+    confirm_standard(name, "reset adaptive sampling on", yes, dry_run)
+    done = "removed adaptive-sampling policy" if not keys else "reset adaptive-sampling fields"
     status = write(document, original, dry_run, f"{done} for profile {name}")
     if not dry_run:
         emit_result(_mode_cxr(document, name))
@@ -381,16 +403,18 @@ def precision_reset_command(name, fields, yes, dry_run):
 
 @command.command("disable")
 @click.argument("name", shell_complete=_cli_completion.complete_profile)
-@removed_option("--cxr-trials", "--cxr-electrons")
-@removed_option("--brem-trials", "--brem-electrons")
+@removed_option("--cxr-trials", "--cxr-histories")
+@removed_option("--cxr-electrons", "--cxr-histories")
+@removed_option("--brem-trials", "--brem-histories")
+@removed_option("--brem-electrons", "--brem-histories")
 @canonical_option(
-    "--cxr-electrons",
+    "--cxr-histories",
     type=click.IntRange(min=1),
     metavar="N",
     help="Fixed Monte Carlo electron histories for the CXR spectrum.",
 )
 @click.option(
-    "--brem-electrons",
+    "--brem-histories",
     type=click.IntRange(min=1),
     metavar="N",
     help="Fixed Monte Carlo electron histories for bremsstrahlung.",
@@ -399,10 +423,10 @@ def precision_reset_command(name, fields, yes, dry_run):
     "-y", "--yes", is_flag=True, help="Use defaults for missing counts; skip confirmations."
 )
 @click.option("--dry-run", is_flag=True, help="Print proposed TOML diff; write nothing.")
-def precision_disable_command(name, cxr_electrons, brem_electrons, yes, dry_run):
+def precision_disable_command(name, cxr_histories, brem_histories, yes, dry_run):
     """Opt PROFILE out of adaptive sampling: remove any policy, set fixed counts.
 
-    --cxr-electrons/--brem-electrons replace that count. A count the profile already
+    --cxr-histories/--brem-histories replace that count. A count the profile already
     sets is otherwise kept, including a sweep grid. A count it lacks is prompted
     for on a terminal; without a terminal, or with --yes or --dry-run, it takes
     the full-fidelity default (300 line, 150 brem).
@@ -416,7 +440,7 @@ def precision_disable_command(name, cxr_electrons, brem_electrons, yes, dry_run)
     defaults = {"n_electrons": preset.n_electrons, "n_electrons_brem": preset.n_electrons_brem}
     prompt = _interactive() and not (yes or dry_run)
     counts = {}
-    for key, value in (("n_electrons", cxr_electrons), ("n_electrons_brem", brem_electrons)):
+    for key, value in (("n_electrons", cxr_histories), ("n_electrons_brem", brem_histories)):
         if value is None and key in current:
             continue
         if value is None and prompt:
@@ -435,12 +459,10 @@ def precision_disable_command(name, cxr_electrons, brem_electrons, yes, dry_run)
     if _catalog_io.is_unchanged(document, original):
         emit_result(f"profile {name}: already uses fixed counts; nothing to change")
         return 0
-    confirm_standard(name, "select fixed electron counts on", yes, dry_run)
-    status = write(
-        document, original, dry_run, f"selected fixed electron counts for profile {name}"
-    )
+    confirm_standard(name, "select fixed history counts on", yes, dry_run)
+    status = write(document, original, dry_run, f"selected fixed history counts for profile {name}")
     if not dry_run:
         if removed is not None:
-            emit_result("  removed precision policy")
+            emit_result("  removed adaptive-sampling policy")
         emit_result(f"  counts: {_profile_edit.describe_counts(result)}")
     return status

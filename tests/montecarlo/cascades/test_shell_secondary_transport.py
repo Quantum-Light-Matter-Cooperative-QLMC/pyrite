@@ -430,7 +430,7 @@ def test_case_threshold_reaches_runner_transport():
 
     detector = pr.Detector()
     numerics = pr.Numerics(
-        sampling=FixedSampling(cxr_electrons=8, brem_electrons=8),
+        sampling=FixedSampling(cxr_histories=8, brem_histories=8),
         energy_model="midpoint",
         energy_bins=EnergyBins(cxr=np.linspace(1500, 2000, 20), brem=np.linspace(1500, 9000, 20)),
     )

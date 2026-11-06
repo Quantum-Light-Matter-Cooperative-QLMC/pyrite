@@ -183,7 +183,7 @@ def test_zhai_reproduce_remote_restores_explicit_target(monkeypatch):
             "--remote=box-a",
             "--ne",
             "11",
-            "--brem-trials",
+            "--brem-histories",
             "3",
             "--ne-supp",
             "5",
@@ -232,7 +232,7 @@ def test_zhai_reproduce_runs_locally_without_remote(monkeypatch):
     monkeypatch.setattr(anchor_figures, "reproduce_all", reproduce_all)
     result = invoke(
         root_command,
-        [*REPRODUCE, "--ne", "11", "--brem-trials", "3", "--ne-supp", "5", "--refresh"],
+        [*REPRODUCE, "--ne", "11", "--brem-histories", "3", "--ne-supp", "5", "--refresh"],
     )
 
     assert_clean_result(result)
@@ -258,7 +258,7 @@ def test_zhai_reproduce_remote_only_options_require_remote(flag):
     [
         ["--preset", "zhai"],
         ["--ne", "11"],
-        ["--brem-trials", "3"],
+        ["--brem-histories", "3"],
         ["--ne-supp", "5"],
         ["--tmd-azimuth", "35"],
         ["--refresh"],
@@ -286,7 +286,7 @@ def test_remote_optional_value_parses_around_profile(monkeypatch):
     assert seen == [("standard", "box-a"), ("standard", "box-b")]
 
 
-@pytest.mark.parametrize("brem_flag", ["--brem-trials"])
+@pytest.mark.parametrize("brem_flag", ["--brem-histories"])
 def test_recompute_remote_modifier_delegates_and_restores_target(monkeypatch, brem_flag):
     seen = {}
     monkeypatch.setattr(remote_config, "HOST", "configured-box")

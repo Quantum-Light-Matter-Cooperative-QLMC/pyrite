@@ -112,7 +112,7 @@ def _simulate(scene: Scene, grid: np.ndarray, trials: int):
         pr.Detector(scene.theta_obs_deg),
         physics=pr.Physics(),
         numerics=pr.Numerics(
-            sampling=FixedSampling(cxr_electrons=trials, brem_electrons=trials),
+            sampling=FixedSampling(cxr_histories=trials, brem_histories=trials),
             energy_bins=pr.detectors.EnergyBins(cxr=cxr, brem=grid),
         ),
     )

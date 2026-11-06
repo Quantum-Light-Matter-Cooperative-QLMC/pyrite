@@ -50,7 +50,7 @@ def _case(*, elastic="elsepa", plane=(1, -1, 0), unit_bearing=False):
         ),
     )
     numerics = pr.Numerics(
-        sampling=FixedSampling(cxr_electrons=32, brem_electrons=48),
+        sampling=FixedSampling(cxr_histories=32, brem_histories=48),
         channeling_basis_size=8,
         channeling_bloch_cells=4,
         channeling_dz_ang=500.0,

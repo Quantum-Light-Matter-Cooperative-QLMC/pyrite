@@ -12,7 +12,7 @@ Run (defaults match the app's own UI defaults, so the pulled cache is guaranteed
 to hit locally):
 
     python -m pyrite._entry.reproduce_zhai
-    python -m pyrite._entry.reproduce_zhai --ne 20000 --ne-brem 200 --ne-supp 200 --refresh
+    python -m pyrite._entry.reproduce_zhai --ne 20000 --brem-histories 200 --ne-supp 200 --refresh
 """
 
 import argparse
@@ -26,10 +26,11 @@ def main(argv=None):
         "--ne", type=int, default=20_000, help="Fig.1c anchor line electrons per energy"
     )
     ap.add_argument(
-        "--ne-brem",
+        "--brem-histories",
+        dest="ne_brem",
         type=int,
         default=200,
-        help="Fig.1c anchor bremsstrahlung electrons per energy",
+        help="Fig.1c anchor bremsstrahlung Monte Carlo histories per energy",
     )
     ap.add_argument(
         "--ne-supp",

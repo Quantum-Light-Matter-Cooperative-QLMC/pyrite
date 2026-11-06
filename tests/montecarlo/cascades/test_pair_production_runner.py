@@ -114,7 +114,7 @@ def test_case_pair_model_reaches_runner_transport(monkeypatch):
     table = replace(table, incident_energy_keV=np.r_[1.0, table.incident_energy_keV[1:-1], 100.0])
     monkeypatch.setattr(case_tables, "_case_bremslib_tables", lambda _case: {"Si": table})
     numerics = pr.Numerics(
-        sampling=FixedSampling(cxr_electrons=4, brem_electrons=4),
+        sampling=FixedSampling(cxr_histories=4, brem_histories=4),
         energy_model=SHELL["energy_model"],
         energy_bins=EnergyBins(cxr=np.linspace(1500, 2000, 20), brem=np.linspace(1500, 9000, 20)),
     )

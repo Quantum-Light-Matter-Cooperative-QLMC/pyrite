@@ -21,7 +21,7 @@ def scene():
         Beam(30.0, transverse=Spot(), longitudinal=PointBunch()),
         Slab("hopg", 1000.0, tilt_deg=30.0, footprint=Footprint(5.0, 5.0)),
         Detector(),
-        numerics=Numerics(sampling=FixedSampling(cxr_electrons=8, brem_electrons=4), seed=3),
+        numerics=Numerics(sampling=FixedSampling(cxr_histories=8, brem_histories=4), seed=3),
     )
 
 

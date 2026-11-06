@@ -49,10 +49,10 @@ def _profile_sampling(
         return adaptive_sampling(precision)
     default = FixedSampling()
     return FixedSampling(
-        default.cxr_electrons
+        default.cxr_histories
         if scan.n_electrons is None
         else int(_one(scan.n_electrons, profile_name, command_name)),
-        default.brem_electrons
+        default.brem_histories
         if scan.n_electrons_brem is None
         else int(_one(scan.n_electrons_brem, profile_name, command_name)),
     )

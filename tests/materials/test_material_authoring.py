@@ -305,7 +305,7 @@ def test_registered_medium_lowers_into_real_layered_case():
     case = api.build_case(
         scene,
         pr.Numerics(
-            sampling=FixedSampling(cxr_electrons=1, brem_electrons=1),
+            sampling=FixedSampling(cxr_histories=1, brem_histories=1),
             energy_bins=pr.detectors.EnergyBins(cxr=[1000, 1050], brem=[1000, 1050]),
         ),
     )

@@ -185,7 +185,7 @@ def test_real_case_transport_to_native_device_source():
         ),
     )
     numerics = pr.Numerics(
-        sampling=FixedSampling(cxr_electrons=4, brem_electrons=2),
+        sampling=FixedSampling(cxr_histories=4, brem_histories=2),
         energy_bins=EnergyBins(cxr=np.array([150.0, 1500.0]), brem=np.array([500.0, 5000.0])),
     )
     case = replace(api.build_case(scene, numerics), seed=11)

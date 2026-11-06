@@ -67,7 +67,7 @@ def _scene(component="brem", feedback=False):
         detectors.PlanarDetector(detectors.PlanarPose((0, 0, 1)), size_mm=(2, 2)),
         physics=physics,
         numerics=pr.Numerics(
-            sampling=FixedSampling(cxr_electrons=4, brem_electrons=4),
+            sampling=FixedSampling(cxr_histories=4, brem_histories=4),
             transport_core="cuda",
             energy_bins=detectors.EnergyBins(
                 cxr=np.linspace(1500, 2000, 8), brem=np.arange(1000, 40001, 1000)

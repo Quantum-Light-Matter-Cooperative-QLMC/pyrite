@@ -33,7 +33,7 @@ def transports(monkeypatch) -> list[int]:
     return calls
 
 
-NUMERICS = pr.Numerics(sampling=FixedSampling(cxr_electrons=1, brem_electrons=1))
+NUMERICS = pr.Numerics(sampling=FixedSampling(cxr_histories=1, brem_histories=1))
 PLATE = pr.geometry.FilterPlate(
     "silicon", 0.05, (1.5, 10.0), pr.detectors.PlanarPose.from_observation(50.0, 60.0)
 )

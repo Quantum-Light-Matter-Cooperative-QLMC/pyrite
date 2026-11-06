@@ -154,7 +154,7 @@ def test_public_simulate_returns_separate_aperture_after_one_primary_pass(
             photon_transport=pr.PhotonTransport((1000.0, 3000.0, 10000.0), n_samples=32),
         ),
         numerics=pr.Numerics(
-            sampling=FixedSampling(cxr_electrons=4, brem_electrons=3),
+            sampling=FixedSampling(cxr_histories=4, brem_histories=3),
             energy_bins=pr.detectors.EnergyBins(
                 cxr=np.array([1500.0, 2000.0]),
                 brem=np.array([5000.0, 10000.0]),

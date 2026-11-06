@@ -42,7 +42,7 @@ def benchmark(repeats: int, electrons: int) -> dict:
             pr.Detector(),
         ),
         pr.Numerics(
-            sampling=FixedSampling(cxr_electrons=electrons, brem_electrons=electrons),
+            sampling=FixedSampling(cxr_histories=electrons, brem_histories=electrons),
             energy_bins=pr.detectors.EnergyBins(
                 cxr=np.linspace(1500.0, 4500.0, 31), brem=np.linspace(1000.0, 10000.0, 31)
             ),

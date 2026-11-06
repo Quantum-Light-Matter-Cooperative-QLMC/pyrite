@@ -63,7 +63,7 @@ def test_defaults_and_legacy_read_views():
 
 def test_typed_sections_lower_to_identical_case_payload_and_hash():
     old = pr.Numerics(
-        sampling=FixedSampling(cxr_electrons=31, brem_electrons=17),
+        sampling=FixedSampling(cxr_histories=31, brem_histories=17),
         energy_model="midpoint",
         max_dE_frac=0.01,
         cxr_reflections=pr.config.CxrReflections(n_families=2, mosaic_nodes=3),
@@ -157,7 +157,7 @@ def test_explicit_group_replace_helpers():
     assert changed.describe_numerics()["transport"]["classification"] == "scientific"
     assert changed.describe_numerics()["execution"]["classification"] == "kernel-tuning"
     assert (
-        replace(n, sampling=pr.config.FixedSampling(brem_electrons=99)).sampling.brem_electrons
+        replace(n, sampling=pr.config.FixedSampling(brem_histories=99)).sampling.brem_histories
         == 99
     )
 

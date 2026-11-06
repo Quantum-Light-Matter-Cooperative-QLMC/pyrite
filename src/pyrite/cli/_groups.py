@@ -25,12 +25,23 @@ class LazyGroup(DeprecatingGroup):
         lazy_commands: Mapping[str, str] | None = None,
         lazy_help: Mapping[str, str] | None = None,
         lazy_hidden: Sequence[str] = (),
+        removed_commands: Mapping[str, str] | None = None,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
         self.lazy_commands = dict(lazy_commands or {})
         self.lazy_help = dict(lazy_help or {})
         self.lazy_hidden = frozenset(lazy_hidden)
+        #: Subcommands removed without an alias -> replacement name; invoking
+        #: one is a usage error naming the replacement, never "No such command".
+        self.removed_commands = dict(removed_commands or {})
+
+    def resolve_command(self, ctx: click.Context, args: list[str]):
+        if args and args[0] in self.removed_commands:
+            old = f"{ctx.command_path} {args[0]}"
+            new = f"{ctx.command_path} {self.removed_commands[args[0]]}"
+            raise click.UsageError(f"'{old}' was removed; use '{new}'", ctx=ctx)
+        return super().resolve_command(ctx, args)
 
     def list_commands(self, ctx: click.Context) -> list[str]:
         eager = super().list_commands(ctx)

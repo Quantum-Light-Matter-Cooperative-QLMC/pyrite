@@ -215,8 +215,8 @@ def test_catalog_rejects_unknown_reference_and_preset_keys(tmp_path):
 
     catalog = tmp_path / "catalog"
     copytree(bundled_catalog(), catalog)
-    (catalog / "physics" / "odd.toml").write_text("cxr_electrons = {values = [10]}\n")
-    with pytest.raises(MaterialConfigError, match=r"physics\.odd\.cxr_electrons: unknown key"):
+    (catalog / "physics" / "odd.toml").write_text("cxr_histories = {values = [10]}\n")
+    with pytest.raises(MaterialConfigError, match=r"physics\.odd\.cxr_histories: unknown key"):
         load_material_catalog(catalog)
     (catalog / "physics" / "odd.toml").unlink()
     quickstart = catalog / "profiles" / "quickstart.toml"

@@ -154,7 +154,7 @@ def calculation(
             mo.md(
                 "**Override previous** writes an override. Unchecked restores preset/default "
                 "resolution; displayed suggestions are not new defaults. Coupled settings are "
-                "validated together. Fixed electron counts and adaptive precision cannot mix. "
+                "validated together. Fixed history counts and adaptive sampling cannot mix. "
                 "PXR/CBS are a joint line scorer; emission selects incoherent/coherent scoring. "
                 "These controls affect computation, not export filtering."
             ),

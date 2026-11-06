@@ -1,6 +1,7 @@
 """Read-only profile summary assembly for catalog consumers."""
 
 from pyrite._config_presets import KINDS
+from pyrite._cxr_vocabulary import catalog_key
 from pyrite._numerics import TRANSPORT_KEYS
 
 from ._profile_document import (
@@ -105,21 +106,21 @@ def profile_payload(document, name):
     physical = physical_detector_row(profile)
     presets = {kind.table: profile.get(kind.reference_key) for kind in KINDS}
     effective = effective_profile(document, profile)
-    precision = dict(
+    adaptive = dict(
         zip(
             ("explicit", "effective", "source", "fixed_reason"),
             precision_resolution(effective),
             strict=True,
         )
     )
-    if precision["source"] == "profile" and "precision" not in profile:
-        precision["source"] = f"preset {presets['numerics']}"
+    if adaptive["source"] == "profile" and "precision" not in profile:
+        adaptive["source"] = f"preset {presets['numerics']}"
     targets = profile.get("targets")
     return {
         **({"targets": dict(targets)} if targets else {}),
         "name": name,
         "ranges": [
-            {"name": label, "catalog_key": key, "values": range_values(profile, key)}
+            {"name": label, "catalog_key": catalog_key(key), "values": range_values(profile, key)}
             for label, key in range_keys
             if key in profile
         ],
@@ -139,7 +140,7 @@ def profile_payload(document, name):
         "presets": presets,
         "temporal_profile": profile.get("temporal_profile") is True,
         "line_grid_policy": profile_cxr_grid_values(profile),
-        "precision": precision,
+        "adaptive_sampling": adaptive,
         "transport_numerics": {key: profile[key] for key in TRANSPORT_KEYS if key in profile},
         "overrides": {
             material: sorted(row)

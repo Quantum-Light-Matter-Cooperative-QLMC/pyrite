@@ -3,9 +3,24 @@
 import re
 from collections.abc import MutableMapping
 
+#: Adaptive-sampling table fields: canonical TOML name -> stored vocabulary
+#: (``pyrite._precision.STORED_KEYS``), the keys ``Precision.from_dict`` reads.
+ADAPTIVE_SAMPLING_FIELDS = {
+    "min_histories": "min_electrons",
+    "max_histories": "max_electrons",
+    "block_histories": "block_electrons",
+    "max_history_share": "max_electron_share",
+    "min_effective_histories": "min_effective_electrons",
+    "pilot_histories": "pilot_electrons",
+    "brem_min_histories": "brem_min_electrons",
+    "brem_max_histories": "brem_max_electrons",
+}
+
 CATALOG_FIELDS = {
-    "cxr_electrons": "n_electrons",
-    "brem_electrons": "n_electrons_brem",
+    "cxr_histories": "n_electrons",
+    "brem_histories": "n_electrons_brem",
+    "adaptive_sampling": "precision",
+    **ADAPTIVE_SAMPLING_FIELDS,
     "cxr_grid_policy": "line_grid_policy",
     "E_grid_cxr": "E_grid_line",
     "E_grid_cxr_by_energy": "E_grid_line_by_energy",
@@ -13,13 +28,17 @@ CATALOG_FIELDS = {
 
 _CANONICAL_KEYS = {internal: key for key, internal in CATALOG_FIELDS.items()}
 
-#: Removed electron-budget spellings (#1007) and the canonical key replacing each.
+#: Removed history-budget spellings (#1007) and the canonical key replacing each.
 #: They error on read: an alias would keep two names for one sampling budget.
 REMOVED_CATALOG_KEYS = {
-    "cxr_trials": "cxr_electrons",
-    "brem_trials": "brem_electrons",
-    "n_electrons": "cxr_electrons",
-    "n_electrons_brem": "brem_electrons",
+    "cxr_trials": "cxr_histories",
+    "brem_trials": "brem_histories",
+    "cxr_electrons": "cxr_histories",
+    "brem_electrons": "brem_histories",
+    "n_electrons": "cxr_histories",
+    "n_electrons_brem": "brem_histories",
+    "precision": "adaptive_sampling",
+    **{internal: key for key, internal in ADAPTIVE_SAMPLING_FIELDS.items()},
 }
 
 
@@ -49,7 +68,7 @@ def translate_catalog_text(text: str, *, canonical: bool = False) -> str:
         parts = [part for part in prefix.split(".") if part]
         return (
             not parts
-            or (len(parts) == 2 and parts[0] in {"profiles", "energy_grids"})
+            or (len(parts) == 2 and parts[0] in {"profiles", "energy_grids", "numerics"})
             or (len(parts) == 4 and parts[0] == "profiles" and parts[2] == "overrides")
             or (len(parts) == 3 and parts[0] == "materials" and parts[2] == "scan")
         )

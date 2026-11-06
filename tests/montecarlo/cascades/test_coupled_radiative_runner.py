@@ -214,7 +214,7 @@ def synthetic_si_tables(monkeypatch):
 def _coupled_case(target=None, **numerics_overrides):
     detector = pr.Detector()
     numerics = pr.Numerics(
-        sampling=FixedSampling(cxr_electrons=12, brem_electrons=12),
+        sampling=FixedSampling(cxr_histories=12, brem_histories=12),
         energy_model="midpoint",
         energy_bins=EnergyBins(
             cxr=np.linspace(1500.0, 2000.0, 20), brem=np.arange(5000.0, 40001.0, 500.0)

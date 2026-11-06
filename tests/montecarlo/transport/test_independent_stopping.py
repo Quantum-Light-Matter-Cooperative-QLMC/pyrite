@@ -19,9 +19,9 @@ def _policy(**kw):
     return Precision(
         **dict(
             target_rse=0.1,
-            min_electrons=40,
-            max_electrons=200,
-            block_electrons=20,
+            min_histories=40,
+            max_histories=200,
+            block_histories=20,
             observables=("cxr", "brem"),
             brem_target_rse=0.2,
             **_RULE_ONLY,
@@ -31,7 +31,7 @@ def _policy(**kw):
 
 
 def test_brem_freezes_and_line_is_rechecked_until_brem_finishes():
-    settings = _policy(brem_min_electrons=60)
+    settings = _policy(brem_min_histories=60)
     measured = []
 
     def measure(start, stop, _):
@@ -47,7 +47,7 @@ def test_brem_freezes_and_line_is_rechecked_until_brem_finishes():
 
 
 def test_frozen_brem_does_not_observe_later_blocks_and_resets_on_retry():
-    settings = _policy(min_electrons=80, brem_min_electrons=40)
+    settings = _policy(min_histories=80, brem_min_histories=40)
     cxr_calls, brem_calls = [], []
 
     def measure(calls, name):
@@ -74,7 +74,7 @@ def test_frozen_brem_does_not_observe_later_blocks_and_resets_on_retry():
 
 
 def test_brem_maximum_records_its_own_failure_while_line_continues():
-    settings = _policy(min_electrons=80, brem_min_electrons=20, brem_max_electrons=40)
+    settings = _policy(min_histories=80, brem_min_histories=20, brem_max_histories=40)
     record = run_stopping_rule(
         settings,
         lambda a, b, _: {
@@ -90,7 +90,7 @@ def test_brem_maximum_records_its_own_failure_while_line_continues():
 
 
 def test_cxr_early_convergence_is_not_frozen_while_waiting_for_brem():
-    settings = _policy(brem_min_electrons=60)
+    settings = _policy(brem_min_histories=60)
     values = np.ones(200)
     values[40] = 1000
     record = run_stopping_rule(
@@ -107,7 +107,7 @@ def test_cxr_early_convergence_is_not_frozen_while_waiting_for_brem():
 
 
 def test_independent_pilot_is_clipped_to_brem_bounds():
-    settings = _policy(pilot_electrons=80, brem_min_electrons=20, brem_max_electrons=60)
+    settings = _policy(pilot_histories=80, brem_min_histories=20, brem_max_histories=60)
     record = run_stopping_rule(
         settings,
         lambda a, b, _: {
@@ -118,7 +118,7 @@ def test_independent_pilot_is_clipped_to_brem_bounds():
     assert record["realized_electrons"] == 80
     assert record["realized_electrons_brem"] == 60
     assert record["statistics"]["cxr"]["pilot"]["n_electrons"] == 80
-    assert settings.brem_policy().pilot_electrons == 60
+    assert settings.brem_policy().pilot_histories == 60
     # The cap always checks directly, so no pilot projection is needed there.
     assert record["statistics"]["brem"]["pilot"] is None
 
@@ -141,12 +141,12 @@ def test_light_case_brem_converges_first_with_equal_minima():
         {"brem_target_rse": True},
         {"brem_target_rse": float("nan")},
         {"brem_target_rse": 0},
-        {"brem_max_electrons": 220},
-        {"brem_min_electrons": 30},
-        {"brem_min_electrons": True},
-        {"brem_min_electrons": 80, "brem_max_electrons": 60},
+        {"brem_max_histories": 220},
+        {"brem_min_histories": 30},
+        {"brem_min_histories": True},
+        {"brem_min_histories": 80, "brem_max_histories": 60},
         {"observables": ("cxr",)},
-        {"brem_target_rse": None, "brem_min_electrons": 40},
+        {"brem_target_rse": None, "brem_min_histories": 40},
     ],
 )
 def test_invalid_independent_policies(kw):
@@ -174,16 +174,16 @@ def test_realized_pair_matches_fixed_transport_and_spectra(spread, core):
     }
     settings = _policy(
         target_rse=1.0,
-        min_electrons=80,
-        max_electrons=120,
+        min_histories=80,
+        max_histories=120,
         brem_target_rse=1.0,
-        brem_min_electrons=40,
+        brem_min_histories=40,
         batch_means_band_eV=(1000.0, 10000.0),
     )
     requested = {
         **case,
-        "Ne": settings.max_electrons,
-        "Ne_brem": settings.max_electrons,
+        "Ne": settings.max_histories,
+        "Ne_brem": settings.max_histories,
         "adaptive_precision": settings.to_dict(),
     }
     transport = runner._transport_case(requested, transport_core=core)
@@ -206,7 +206,7 @@ def test_realized_pair_matches_fixed_transport_and_spectra(spread, core):
     for key in ("spec", "spec_characteristic", "brem", "brem_wide", "E_grid"):
         np.testing.assert_array_equal(output[key], reference[key], err_msg=key)
     batches = record["batch_means"]
-    assert batches["n_batches_brem"] == nb // settings.block_electrons
+    assert batches["n_batches_brem"] == nb // settings.block_histories
     for key, axis in (("spec", "E_grid"), ("brem_wide", "E_grid_brem")):
         energies = np.asarray(output[axis])
         mask = (energies >= 1000) & (energies <= 10000)

@@ -52,13 +52,13 @@ def test_kernel_tuning_alias_and_mirrored_case_identity():
     assert type(kernel).__name__ == "ExecutionConfig"
     assert pickle.loads(pickle.dumps(kernel)) == kernel
     old = cfg.Numerics(
-        sampling=FixedSampling(cxr_electrons=31, brem_electrons=17),
+        sampling=FixedSampling(cxr_histories=31, brem_histories=17),
         transport_core="per-electron",
         cxr_chunk=7,
         brem_chunk=3,
     )
     new = cfg.Numerics(
-        sampling=FixedSampling(cxr_electrons=31, brem_electrons=17), execution=kernel
+        sampling=FixedSampling(cxr_histories=31, brem_histories=17), execution=kernel
     )
     assert new.kernel_tuning is kernel
     assert new.resolved_execution is kernel

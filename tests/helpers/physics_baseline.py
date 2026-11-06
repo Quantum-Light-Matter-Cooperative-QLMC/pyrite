@@ -206,7 +206,7 @@ def channeling_output_baseline():
     from pyrite.montecarlo import runner
 
     numerics = pr.Numerics(
-        sampling=FixedSampling(cxr_electrons=16, brem_electrons=16),
+        sampling=FixedSampling(cxr_histories=16, brem_histories=16),
         energy_bins=EnergyBins(**_CHANNELING_BINS),
         channeling_basis_size=12,
         channeling_bloch_cells=4,
@@ -246,7 +246,7 @@ def resolved_channeling_baseline():
 
     scene = _channeling_scene()
     numerics = pr.Numerics(
-        sampling=FixedSampling(cxr_electrons=4, brem_electrons=4),
+        sampling=FixedSampling(cxr_histories=4, brem_histories=4),
         energy_bins=EnergyBins(**_CHANNELING_BINS),
     )
     case = build_case(scene, numerics)

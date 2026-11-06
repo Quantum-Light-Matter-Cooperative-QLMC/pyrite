@@ -51,7 +51,7 @@ def simulate_trajectories(
     physics, numerics
         Existing :class:`pyrite.Physics` and :class:`pyrite.Numerics` policies;
         omitted values use their constructor defaults. The population is
-        ``max(cxr_electrons, brem_electrons)`` of ``numerics.sampling``. ``Numerics.seed``
+        ``max(cxr_histories, brem_histories)`` of ``numerics.sampling``. ``Numerics.seed``
         uses the canonical case seed when omitted. Integration, transport core,
         precision and kernel tuning come from Numerics. Models and source
         policies resolve through the same scene lowering as ``pyrite.simulate``.

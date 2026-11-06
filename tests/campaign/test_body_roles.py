@@ -37,7 +37,7 @@ def _scene(target=None, *, filters=()):
         filters=filters,
         acquisition=pr.observations.Acquisition(1.0, (0.0, 1000.0, 2000.0)),
         physics=pr.Physics(brem_source="none"),
-        numerics=pr.Numerics(sampling=FixedSampling(cxr_electrons=1, brem_electrons=1)),
+        numerics=pr.Numerics(sampling=FixedSampling(cxr_histories=1, brem_histories=1)),
     )
 
 

@@ -29,7 +29,7 @@ def case():
     return api.build_case(
         scene,
         pr.Numerics(
-            sampling=FixedSampling(cxr_electrons=4, brem_electrons=4),
+            sampling=FixedSampling(cxr_histories=4, brem_histories=4),
             channeling_basis_size=8,
             channeling_bloch_cells=4,
             channeling_dz_ang=500.0,

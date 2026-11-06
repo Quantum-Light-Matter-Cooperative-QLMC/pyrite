@@ -26,7 +26,7 @@ def _inputs():
     )
     detector = pr.Detector()
     numerics = pr.Numerics(
-        sampling=FixedSampling(cxr_electrons=1, brem_electrons=1),
+        sampling=FixedSampling(cxr_histories=1, brem_histories=1),
         energy_bins=EnergyBins(cxr=np.array([1000.0, 1050.0]), brem=np.array([1000.0, 1050.0])),
     )
     return beam, target, detector, numerics
@@ -236,7 +236,7 @@ def test_simulate_scene_overrides_preserve_original_and_geometry(monkeypatch):
     result = pr.simulate(scene, physics=physics, numerics=numerics)
     assert result.case["tilt_deg"] == 30.123456789
     assert result.case["tilt_azim_deg"] == -75.23456789
-    assert result.case["Ne"] == numerics.sampling.cxr_electrons
+    assert result.case["Ne"] == numerics.sampling.cxr_histories
     assert result.provenance["scene"].physics == physics
     assert result.provenance["scene"].numerics is numerics
     assert scene.physics != physics and scene.numerics is not numerics

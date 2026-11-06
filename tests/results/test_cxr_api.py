@@ -9,7 +9,7 @@ import pytest
 from pyrite import CxrSpectra, Numerics, Result, SpectralDensity
 from pyrite.campaign.beam import PointBunch, Spot
 from pyrite.campaign.geometry import Footprint
-from pyrite.config import FixedSampling, Precision
+from pyrite.config import AdaptiveSampling, FixedSampling
 from pyrite.detectors import EnergyBins
 
 
@@ -99,10 +99,10 @@ def test_result_accepts_matching_brem_normalization_on_independent_grid(norm):
 
 
 def test_numerics_uses_sampling_budget_and_rejects_old_keywords():
-    new = Numerics(sampling=FixedSampling(cxr_electrons=7, brem_electrons=3), cxr_chunk=2)
-    assert asdict(new)["sampling"] == {"cxr_electrons": 7, "brem_electrons": 3}
+    new = Numerics(sampling=FixedSampling(cxr_histories=7, brem_histories=3), cxr_chunk=2)
+    assert asdict(new)["sampling"] == {"cxr_histories": 7, "brem_histories": 3}
     assert "n_electrons" not in asdict(new)
-    assert replace(new, sampling=FixedSampling(9, 3)).sampling.cxr_electrons == 9
+    assert replace(new, sampling=FixedSampling(9, 3)).sampling.cxr_histories == 9
     for old in ("n_electrons", "n_electrons_brem", "spec_chunk"):
         with pytest.raises(TypeError, match="unexpected keyword"):
             Numerics(**{old: 7})
@@ -113,11 +113,11 @@ def test_canonical_energy_bins_and_precision_keep_legacy_serialization():
     with pytest.raises(TypeError, match="unexpected keyword"):
         EnergyBins(line=np.array([1, 2]))
     assert not hasattr(EnergyBins(cxr=np.array([1, 2])), "line")
-    canonical = Precision(0.1, 20, 40, 10, observables=("cxr", "brem"))
+    canonical = AdaptiveSampling(0.1, 20, 40, 10, observables=("cxr", "brem"))
     with pytest.raises(ValueError, match="observables"):
-        Precision(0.1, 20, 40, 10, observables=("line", "brem"))
+        AdaptiveSampling(0.1, 20, 40, 10, observables=("line", "brem"))
     assert canonical.to_dict()["observables"] == ("line", "brem")
-    assert Precision.from_dict(canonical.to_dict()) == canonical
+    assert AdaptiveSampling.from_dict(canonical.to_dict()) == canonical
 
 
 def test_dataframe_preserves_modes_unequal_grids_and_normalization():
@@ -164,8 +164,8 @@ def test_catalog_key_translation_preserves_literals_order_and_profile_names():
     original = """# n_electrons = 99
 [profiles.n_electrons]
 label = "n_electrons = 99"
-cxr_electrons = {values = [7]} # n_electrons = 99
-brem_electrons = {values = [3]}
+cxr_histories = {values = [7]} # n_electrons = 99
+brem_histories = {values = [3]}
 [profiles."my.profile".cxr_grid_policy]
 quadrature = "bin-mean"
 """
@@ -187,10 +187,10 @@ def test_catalog_aliases_reject_duplicate_spellings():
 @pytest.mark.parametrize(
     ("old", "new"),
     [
-        ("cxr_trials", "cxr_electrons"),
-        ("brem_trials", "brem_electrons"),
-        ("n_electrons", "cxr_electrons"),
-        ("n_electrons_brem", "brem_electrons"),
+        ("cxr_trials", "cxr_histories"),
+        ("brem_trials", "brem_histories"),
+        ("n_electrons", "cxr_histories"),
+        ("n_electrons_brem", "brem_histories"),
     ],
 )
 def test_removed_budget_keys_error_naming_the_new_key(old, new):

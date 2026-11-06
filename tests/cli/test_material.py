@@ -152,8 +152,8 @@ tilt_deg = {{ values = [5.0] }}
 tilt_azim_deg = {{ values = [95.0] }}
 E_grid_line = {{ values = [100.0, 200.0] }}
 E_grid_brem = {{ values = [10.0, 20.0] }}
-cxr_electrons = {{ values = [7] }}
-brem_electrons = {{ values = [3] }}
+cxr_histories = {{ values = [7] }}
+brem_histories = {{ values = [3] }}
 straggling = true
 energy_model = "midpoint"
 max_dE_frac = 0.1
@@ -594,7 +594,7 @@ def test_single_scene_and_checkpoint_lowering_share_seed_counts_and_explicit_gri
     path = _catalog_io.active_catalog_path()
     path.write_text(
         path.read_text().replace(
-            "cxr_electrons = { values = [7] }", "cxr_electrons = { values = [200] }"
+            "cxr_histories = { values = [7] }", "cxr_histories = { values = [200] }"
         )
     )
     catalog = load_material_catalog(path, profile="single")

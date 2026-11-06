@@ -59,8 +59,8 @@ def calculation_defaults(kind: str) -> dict[str, Any]:
     values = {**plain(Physics()), **plain(Numerics()), **plain(CxrReflections())}
     values["emission"] = Physics().emission_policy
     values.update(
-        n_electrons={"values": [FixedSampling().cxr_electrons]},
-        n_electrons_brem={"values": [FixedSampling().brem_electrons]},
+        n_electrons={"values": [FixedSampling().cxr_histories]},
+        n_electrons_brem={"values": [FixedSampling().brem_histories]},
     )
     values.update(
         inelastic_cutoff_eV=50.0,

@@ -1,12 +1,13 @@
 """Low-level typed calculation-numerics policy and profile validation."""
 
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field, fields, replace
+from dataclasses import asdict, dataclass, field, fields, replace
 from functools import wraps
 from typing import TYPE_CHECKING, Any, Literal, Self, cast
 
 import numpy as np
 
+from ._cxr_vocabulary import catalog_key
 from ._energy_bins import EnergyBins
 from ._photon_config import PhotonTransport
 from ._sampling import AdaptiveSampling, FixedSampling, SamplingPolicy
@@ -535,8 +536,8 @@ PHYSICS_FIELDS = tuple(f.name for f in fields(Physics))
 
 #: Removed ``Numerics`` arguments and the ``sampling=`` spelling replacing each.
 _REMOVED_NUMERICS_ARGUMENTS = {
-    "cxr_trials": "sampling=FixedSampling(cxr_electrons=...)",
-    "brem_trials": "sampling=FixedSampling(brem_electrons=...)",
+    "cxr_trials": "sampling=FixedSampling(cxr_histories=...)",
+    "brem_trials": "sampling=FixedSampling(brem_histories=...)",
     "precision": "sampling=AdaptiveSampling(...)",
 }
 
@@ -549,8 +550,8 @@ def _reject_removed_numerics_arguments[T: type](cls: T) -> T:
     def __init__(self, *args, **kwargs):
         if args:
             raise TypeError(
-                "Numerics takes keyword arguments only; set electron budgets with "
-                "sampling=FixedSampling(cxr_electrons=..., brem_electrons=...)"
+                "Numerics takes keyword arguments only; set history budgets with "
+                "sampling=FixedSampling(cxr_histories=..., brem_histories=...)"
             )
         for name, replacement in _REMOVED_NUMERICS_ARGUMENTS.items():
             if name in kwargs:
@@ -566,9 +567,9 @@ def _reject_removed_numerics_arguments[T: type](cls: T) -> T:
 class Numerics:
     """Control sampling, integration, CXR truncation, and local kernel tuning.
 
-    ``sampling`` is the only electron budget: a :class:`FixedSampling` or
-    :class:`AdaptiveSampling` policy, defaulting to
-    ``FixedSampling(cxr_electrons=450, brem_electrons=100)``. Change it with
+    ``sampling`` is the only Monte Carlo history budget: a :class:`FixedSampling`
+    or :class:`AdaptiveSampling` policy, defaulting to
+    ``FixedSampling(cxr_histories=450, brem_histories=100)``. Change it with
     ``dataclasses.replace(numerics, sampling=...)``. All arguments are
     keyword-only. Optional ``cxr_chunk`` and ``brem_chunk`` bound
     spectrum-kernel batches.
@@ -811,11 +812,11 @@ class Numerics:
 
     @property
     def resolved_sampling(self) -> SamplingPolicy:
-        """The electron-budget policy; the same object as :attr:`sampling`."""
+        """The history-budget policy; the same object as :attr:`sampling`."""
         return self.sampling
 
     def describe_sampling(self) -> dict[str, object]:
-        """Explain the chosen mode and its effective electron budgets.
+        """Explain the chosen mode and its effective history budgets.
 
         No material lookup, estimation, or execution is performed. This is a
         Python API diagnostic, not the profile CLI's resolution provenance.
@@ -823,19 +824,19 @@ class Numerics:
         policy = self.sampling
         if isinstance(policy, FixedSampling):
             budget = {
-                "cxr_electrons": policy.cxr_electrons,
-                "brem_electrons": policy.brem_electrons,
+                "cxr_histories": policy.cxr_histories,
+                "brem_histories": policy.brem_histories,
             }
             return {"mode": "fixed", "requested": budget, "effective": dict(budget)}
         return {
             "mode": "adaptive",
-            "requested": policy.to_dict(),
+            "requested": asdict(policy),
             "effective": {
-                "maximum_cxr_electrons": policy.max_electrons,
-                "maximum_brem_electrons": (
-                    policy.max_electrons
+                "maximum_cxr_histories": policy.max_histories,
+                "maximum_brem_histories": (
+                    policy.max_histories
                     if policy.brem_target_rse is None
-                    else policy.brem_policy().max_electrons
+                    else policy.brem_policy().max_histories
                 ),
             },
         }
@@ -1115,8 +1116,8 @@ def validate_inelastic_numerics(
         raise ValueError("inelastic_model='shell-soft-hard' requires energy_model='midpoint'")
 
 
-def electron_counts(value: object) -> tuple[int, ...]:
-    """Decode one profile electron-count grid to validated integer values."""
+def history_counts(value: object) -> tuple[int, ...]:
+    """Decode one profile history-count grid to validated integer values."""
     if isinstance(value, Mapping):
         value = cast(Mapping[str, object], value).get("values")
     if isinstance(value, np.ndarray):
@@ -1125,11 +1126,11 @@ def electron_counts(value: object) -> tuple[int, ...]:
         value = (value,)
     raw_counts = tuple(value)
     if not raw_counts:
-        raise ValueError("electron counts must be nonempty positive integers")
+        raise ValueError("history counts must be nonempty positive integers")
     counts = []
     for item in raw_counts:
         if isinstance(item, bool) or not isinstance(item, (int, np.integer)) or item <= 0:
-            raise ValueError("electron counts must be nonempty positive integers")
+            raise ValueError("history counts must be nonempty positive integers")
         counts.append(int(item))
     return tuple(counts)
 
@@ -1142,9 +1143,9 @@ def validate_profile_numerics(values: Mapping[str, object]) -> None:
     for key in SAMPLING_KEYS:
         if key in values:
             try:
-                electron_counts(values[key])
+                history_counts(values[key])
             except ValueError as exc:
-                raise ValueError(f"{key} {exc}") from None
+                raise ValueError(f"{catalog_key(key)} {exc}") from None
     convergence_values: dict[str, Any] = {
         key: values[key] for key in CONVERGENCE_KEYS if key in values
     }

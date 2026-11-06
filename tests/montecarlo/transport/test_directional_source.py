@@ -73,7 +73,7 @@ def test_producer_declares_component_sampling(monkeypatch, line_quadrature, pxr_
         target,
         energy_eV=[100.0, 200.0, 400.0],
         angle_deg=[0.0],
-        numerics=Numerics(sampling=FixedSampling(cxr_electrons=1, brem_electrons=1)),
+        numerics=Numerics(sampling=FixedSampling(cxr_histories=1, brem_histories=1)),
         seed=1,
         components=("pxr-cbs", "characteristic", "bremsstrahlung"),
     )
@@ -125,7 +125,7 @@ def test_source_lowering_rotation_and_no_detector(inputs, monkeypatch):
         from pyrite._energy_grid_encoding import decode_energy_grid
 
         np.testing.assert_array_equal(decode_energy_grid(case["E_grid"]), [100.0, 200.0])
-        assert (case["Ne"], case["Ne_brem"]) == (3, 50)  # brem_electrons honored (#1004)
+        assert (case["Ne"], case["Ne_brem"]) == (3, 50)  # brem_histories honored (#1004)
         assert kwargs["components"] == ("pxr-cbs",)
         values = {"pxr-cbs": np.ones((len(directions), 2))}
         return values, np.ones(len(directions), dtype=bool)
@@ -138,7 +138,7 @@ def test_source_lowering_rotation_and_no_detector(inputs, monkeypatch):
         *inputs,
         energy_eV=[100.0, 200.0],
         angle_deg=[-180.0, -90.0, 0.0, 90.0],
-        numerics=Numerics(sampling=FixedSampling(cxr_electrons=3, brem_electrons=50)),
+        numerics=Numerics(sampling=FixedSampling(cxr_histories=3, brem_histories=50)),
         seed=42,
     )
     rotation = sample_to_lab_R(np.deg2rad(30), np.deg2rad(45))
@@ -157,7 +157,7 @@ def test_tr_lowering_sets_history_model_and_preserves_oriented_frame(inputs, mon
 
     def score(case, directions, **kwargs):
         assert case["transition_radiation"] == {"model": "planar-stack", "coherence": "history"}
-        assert (case["Ne"], case["Ne_brem"]) == (3, 100)  # default brem_electrons kept
+        assert (case["Ne"], case["Ne_brem"]) == (3, 100)  # default brem_histories kept
         return {"transition": np.ones((len(directions), 2))}, np.ones(len(directions), dtype=bool)
 
     monkeypatch.setattr(owner, "source_outputs", score)
@@ -167,7 +167,7 @@ def test_tr_lowering_sets_history_model_and_preserves_oriented_frame(inputs, mon
         *inputs,
         energy_eV=[100, 200],
         angle_deg=[-120, 60],
-        numerics=Numerics(sampling=FixedSampling(cxr_electrons=3)),
+        numerics=Numerics(sampling=FixedSampling(cxr_histories=3)),
         components=("transition",),
     )["transition"]
     assert result.component == "transition-radiation-history"
@@ -205,7 +205,7 @@ def test_shared_transport_matches_fixed_direction_cxr_only(inputs, monkeypatch):
     from pyrite.montecarlo import runner
 
     controls = Numerics(
-        sampling=FixedSampling(cxr_electrons=2, brem_electrons=2),
+        sampling=FixedSampling(cxr_histories=2, brem_histories=2),
         energy_bins=EnergyBins(cxr=np.linspace(100, 3000, 33)),
     )
     case = build_case(Scene(*inputs, detector=None, numerics=controls))
@@ -260,7 +260,7 @@ def test_shared_transport_components_match_fixed_direction_scorers(inputs, monke
     from pyrite.montecarlo import runner
 
     controls = Numerics(
-        sampling=FixedSampling(cxr_electrons=2, brem_electrons=2),
+        sampling=FixedSampling(cxr_histories=2, brem_histories=2),
         energy_bins=EnergyBins(cxr=np.linspace(500, 3000, 26)),
     )
     case = build_case(Scene(*inputs, detector=None, numerics=controls))
@@ -299,9 +299,9 @@ def test_shared_transport_components_match_fixed_direction_scorers(inputs, monke
 @pytest.mark.parametrize(
     ("numerics", "counts"),
     [
-        (Numerics(sampling=FixedSampling(cxr_electrons=1024, brem_electrons=256)), (1024, 256)),
-        (Numerics(sampling=FixedSampling(cxr_electrons=64, brem_electrons=512)), (64, 512)),
-        (Numerics(sampling=FixedSampling(cxr_electrons=7, brem_electrons=3)), (7, 3)),
+        (Numerics(sampling=FixedSampling(cxr_histories=1024, brem_histories=256)), (1024, 256)),
+        (Numerics(sampling=FixedSampling(cxr_histories=64, brem_histories=512)), (64, 512)),
+        (Numerics(sampling=FixedSampling(cxr_histories=7, brem_histories=3)), (7, 3)),
         (Numerics(), (450, 100)),
         (None, (450, 100)),
     ],
@@ -517,7 +517,7 @@ def _escape_scan(footprint, keV, energy, angles):
         energy_eV=energy,
         angle_deg=angles,
         numerics=Numerics(
-            sampling=FixedSampling(cxr_electrons=2),
+            sampling=FixedSampling(cxr_histories=2),
             cxr_reflections=CxrReflections(max_reflections=4),
         ),
     )

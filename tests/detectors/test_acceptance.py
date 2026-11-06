@@ -193,7 +193,7 @@ def test_equal_acceptance_preserves_lowered_case_and_both_identities():
         energy_keV=30, transverse=pr.beams.PointSpot(), longitudinal=pr.beams.PointBunch()
     )
     target = pr.geometry.Slab("hopg", thickness_ang=1000, footprint=None)
-    numerics = pr.Numerics(sampling=FixedSampling(cxr_electrons=1, brem_electrons=1))
+    numerics = pr.Numerics(sampling=FixedSampling(cxr_histories=1, brem_histories=1))
     cases = [
         build_case(pr.Scene(beam, target, detector), numerics) for detector in (legacy, modern)
     ]

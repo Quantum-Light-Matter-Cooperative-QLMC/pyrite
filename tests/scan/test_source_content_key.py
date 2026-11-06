@@ -28,7 +28,7 @@ def _inputs():
     )
     detector = pr.Detector()
     numerics = pr.Numerics(
-        sampling=FixedSampling(cxr_electrons=1, brem_electrons=1),
+        sampling=FixedSampling(cxr_histories=1, brem_histories=1),
         energy_bins=EnergyBins(cxr=np.array([1000.0, 1050.0]), brem=np.array([1000.0, 1050.0])),
     )
     return beam, target, detector, numerics

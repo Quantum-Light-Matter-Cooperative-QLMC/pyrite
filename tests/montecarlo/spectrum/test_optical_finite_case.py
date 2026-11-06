@@ -64,7 +64,7 @@ def transported():
         ),
     )
     numerics = pr.Numerics(
-        sampling=FixedSampling(cxr_electrons=12, brem_electrons=8),
+        sampling=FixedSampling(cxr_histories=12, brem_histories=8),
         energy_bins=EnergyBins(cxr=np.linspace(150.0, 1500.0, 28), brem=np.array([500.0, 5000.0])),
     )
     case = replace(api.build_case(scene, numerics), seed=11)

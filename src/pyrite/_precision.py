@@ -5,43 +5,79 @@ from __future__ import annotations
 import math
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass, replace
+from functools import wraps
 from typing import Any, Self
 
 OBSERVABLES = ("cxr", "brem")
+
+#: Field name -> serialized key. Stored ``adaptive_precision`` payloads, case and
+#: dataset identities, and internal catalog tables keep the historical
+#: ``*_electrons`` vocabulary (#1007), so renaming a field never re-keys a result.
+STORED_KEYS = {
+    "min_histories": "min_electrons",
+    "max_histories": "max_electrons",
+    "block_histories": "block_electrons",
+    "max_history_share": "max_electron_share",
+    "min_effective_histories": "min_effective_electrons",
+    "pilot_histories": "pilot_electrons",
+    "brem_min_histories": "brem_min_electrons",
+    "brem_max_histories": "brem_max_electrons",
+}
+_FIELD_NAMES = {stored: name for name, stored in STORED_KEYS.items()}
+
+#: Required keys of a serialized policy (stored vocabulary).
 REQUIRED_FIELDS = ("target_rse", "min_electrons", "max_electrons", "block_electrons")
 
-#: Default for the counts that follow the now-optional ``min_electrons``; keeps
+#: Default for the counts that follow the now-optional ``min_histories``; keeps
 #: the positional field order while still refusing an omitted count.
 _REQUIRED: Any = object()
-#: Omitted ``min_electrons``: resolves to one block in ``__post_init__``.
+#: Omitted ``min_histories``: resolves to one block in ``__post_init__``.
 _ONE_BLOCK: Any = None
 
 
+def reject_renamed_arguments[T: type](cls: T) -> T:
+    """Make ``cls(<old>_electrons=...)`` name its ``*_histories`` field (#1007)."""
+    init = cls.__init__
+
+    @wraps(init)
+    def __init__(self, *args, **kwargs):
+        for name in kwargs:
+            if name in _FIELD_NAMES:
+                raise TypeError(
+                    f"{type(self).__name__}({name}=...) was removed; use {_FIELD_NAMES[name]}="
+                )
+        init(self, *args, **kwargs)
+
+    cls.__init__ = __init__  # ty: ignore[invalid-assignment]
+    return cls
+
+
+@reject_renamed_arguments
 @dataclass(frozen=True)
 class Precision:
     """Stopping-rule settings for one adaptive case.
 
-    ``min_electrons``, ``max_electrons`` and ``pilot_electrons`` are multiples
-    of ``block_electrons``, so every realized count is a whole number of equal
+    ``min_histories``, ``max_histories`` and ``pilot_histories`` are multiples
+    of ``block_histories``, so every realized count is a whole number of equal
     blocks (the batch-means estimator needs equal batches).
 
     Parameters
     ----------
     target_rse
         Target relative standard error of each observable's mean.
-    min_electrons, max_electrons
+    min_histories, max_histories
         Smallest count at which the rule may stop (default: one block,
-        ``block_electrons``), and the count at which it stops regardless,
+        ``block_histories``), and the count at which it stops regardless,
         flagged ``statistics_limited``.
-    block_electrons
+    block_histories
         Electrons per transport block; the rule is checked at block ends.
     observables
         Non-empty subset of ``('cxr', 'brem')`` that must all converge; a single
         name such as ``"cxr"`` is accepted.
-    max_electron_share
+    max_history_share
         Guard: the largest single-electron value may hold at most this share
         of the observable's sum.
-    min_effective_electrons
+    min_effective_histories
         Guard: the effective sample size ``(sum m)**2 / sum m**2`` must reach
         this floor.
     stability_blocks, stability_fraction
@@ -49,7 +85,7 @@ class Precision:
         within ``stability_fraction * target_rse`` (relative) of the current
         mean, so a run does not stop on the block a rare heavy electron just
         moved; ``k = 0`` disables.
-    pilot_electrons
+    pilot_histories
         Optional pilot count. At the pilot the run projects
         ``N = N_pilot * max(rse / target)**2`` (rounded up to a block) and
         skips the checks until it gets there.
@@ -64,34 +100,34 @@ class Precision:
         Enable independent brem-prefix stopping at this target. Requires both
         observables. ``target_rse`` then governs CXR; line transport continues
         until brem finishes, so ``Ne_brem <= Ne``. Omit for the shared rule.
-    brem_min_electrons, brem_max_electrons
+    brem_min_histories, brem_max_histories
         Optional brem bounds, defaulting to the shared bounds; block multiples.
-        The brem maximum cannot exceed ``max_electrons``. Guards and block size
+        The brem maximum cannot exceed ``max_histories``. Guards and block size
         are shared; the brem pilot is clipped to its own bounds.
     """
 
     target_rse: float
-    min_electrons: int = _ONE_BLOCK
-    max_electrons: int = _REQUIRED
-    block_electrons: int = _REQUIRED
+    min_histories: int = _ONE_BLOCK
+    max_histories: int = _REQUIRED
+    block_histories: int = _REQUIRED
     observables: tuple[str, ...] = ("cxr",)
-    max_electron_share: float = 0.05
-    min_effective_electrons: float = 100.0
+    max_history_share: float = 0.05
+    min_effective_histories: float = 100.0
     stability_blocks: int = 3
     stability_fraction: float = 0.5
-    pilot_electrons: int | None = None
+    pilot_histories: int | None = None
     band_eV: tuple[float, float] | None = None
     batch_means_band_eV: tuple[float, float] | None = None
     brem_target_rse: float | None = None
-    brem_min_electrons: int | None = None
-    brem_max_electrons: int | None = None
+    brem_min_histories: int | None = None
+    brem_max_histories: int | None = None
 
     def __post_init__(self) -> None:
-        for name in ("max_electrons", "block_electrons"):
+        for name in ("max_histories", "block_histories"):
             if getattr(self, name) is _REQUIRED:
-                raise TypeError(f"Precision requires {name}")
-        if self.min_electrons is None:
-            object.__setattr__(self, "min_electrons", self.block_electrons)
+                raise TypeError(f"{type(self).__name__} requires {name}")
+        if self.min_histories is None:
+            object.__setattr__(self, "min_histories", self.block_histories)
         # Freeze caller-owned sequences as well as the dataclass itself. A bare
         # name is one observable, not its characters.
         raw = self.observables
@@ -105,22 +141,22 @@ class Precision:
             math.isfinite(self.target_rse) and self.target_rse > 0.0
         ):
             raise ValueError("target_rse must be a positive finite number")
-        for name in ("block_electrons", "min_electrons", "max_electrons", "pilot_electrons"):
+        for name in ("block_histories", "min_histories", "max_histories", "pilot_histories"):
             value = getattr(self, name)
-            if name == "pilot_electrons" and value is None:
+            if name == "pilot_histories" and value is None:
                 continue
             if type(value) is not int or value < 1:
                 raise ValueError(f"{name} must be a positive integer")
-        block = self.block_electrons
-        if not 2 <= self.min_electrons <= self.max_electrons:
-            raise ValueError("need 2 <= min_electrons <= max_electrons")
-        counts = [self.min_electrons, self.max_electrons]
-        if self.pilot_electrons is not None:
-            counts.append(self.pilot_electrons)
+        block = self.block_histories
+        if not 2 <= self.min_histories <= self.max_histories:
+            raise ValueError("need 2 <= min_histories <= max_histories")
+        counts = [self.min_histories, self.max_histories]
+        if self.pilot_histories is not None:
+            counts.append(self.pilot_histories)
         if any(count % block for count in counts):
             raise ValueError(
-                "min_electrons, max_electrons and pilot_electrons must be multiples "
-                "of block_electrons"
+                "min_histories, max_histories and pilot_histories must be multiples "
+                "of block_histories"
             )
         if (
             not self.observables
@@ -128,18 +164,18 @@ class Precision:
             or len(set(self.observables)) != len(self.observables)
         ):
             raise ValueError(f"observables must be a non-empty subset of {OBSERVABLES}")
-        if isinstance(self.max_electron_share, bool) or not 0.0 < self.max_electron_share <= 1.0:
-            raise ValueError("max_electron_share must lie in (0, 1]")
-        for name in ("min_effective_electrons", "stability_fraction"):
+        if isinstance(self.max_history_share, bool) or not 0.0 < self.max_history_share <= 1.0:
+            raise ValueError("max_history_share must lie in (0, 1]")
+        for name in ("min_effective_histories", "stability_fraction"):
             value = getattr(self, name)
             if isinstance(value, bool) or not math.isfinite(value) or value < 0.0:
                 raise ValueError(f"{name} must be finite and non-negative")
         if type(self.stability_blocks) is not int or self.stability_blocks < 0:
             raise ValueError("stability_blocks must be a non-negative integer")
-        if self.pilot_electrons is not None and not (
-            self.min_electrons <= self.pilot_electrons <= self.max_electrons
+        if self.pilot_histories is not None and not (
+            self.min_histories <= self.pilot_histories <= self.max_histories
         ):
-            raise ValueError("pilot_electrons must lie between min_electrons and max_electrons")
+            raise ValueError("pilot_histories must lie between min_histories and max_histories")
         for name in ("band_eV", "batch_means_band_eV"):
             band = getattr(self, name)
             if band is not None and (
@@ -152,37 +188,40 @@ class Precision:
 
     def _validate_brem_policy(self) -> None:
         if self.brem_target_rse is None:
-            if self.brem_min_electrons is not None or self.brem_max_electrons is not None:
+            if self.brem_min_histories is not None or self.brem_max_histories is not None:
                 raise ValueError("brem count bounds require brem_target_rse")
             return
         if set(self.observables) != set(OBSERVABLES):
             raise ValueError("brem_target_rse requires both cxr and brem observables")
         policy = self.brem_policy()
-        if policy.max_electrons > self.max_electrons:
-            raise ValueError("brem_max_electrons must not exceed max_electrons (brem is a prefix)")
+        if policy.max_histories > self.max_histories:
+            raise ValueError("brem_max_histories must not exceed max_histories (brem is a prefix)")
 
     def brem_policy(self) -> Precision:
         """Scalar brem rule for independent stopping; shares block size and guards."""
-        minimum = self.min_electrons if self.brem_min_electrons is None else self.brem_min_electrons
-        maximum = self.max_electrons if self.brem_max_electrons is None else self.brem_max_electrons
-        pilot = self.pilot_electrons
+        minimum = self.min_histories if self.brem_min_histories is None else self.brem_min_histories
+        maximum = self.max_histories if self.brem_max_histories is None else self.brem_max_histories
+        pilot = self.pilot_histories
         return replace(
             self,
             target_rse=self.target_rse if self.brem_target_rse is None else self.brem_target_rse,
-            min_electrons=minimum,
-            max_electrons=maximum,
+            min_histories=minimum,
+            max_histories=maximum,
             observables=("brem",),
-            pilot_electrons=None if pilot is None else min(max(pilot, minimum), maximum),
+            pilot_histories=None if pilot is None else min(max(pilot, minimum), maximum),
             brem_target_rse=None,
-            brem_min_electrons=None,
-            brem_max_electrons=None,
+            brem_min_histories=None,
+            brem_max_histories=None,
         )
 
     def to_dict(self) -> dict[str, Any]:
-        """Return the requested policy, without realized counts or statistics."""
+        """Return the requested policy, without realized counts or statistics.
+
+        Keys use the stored vocabulary (:data:`STORED_KEYS`), not field names.
+        """
         # Persisted requested-policy and identity payloads retain their historical
         # vocabulary. Public in-memory observables are canonical CXR names.
-        values = asdict(self)
+        values = {STORED_KEYS.get(name, name): value for name, value in asdict(self).items()}
         # Absent independent settings must not change existing policy identities.
         for key in ("brem_target_rse", "brem_min_electrons", "brem_max_electrons"):
             if values[key] is None:
@@ -194,17 +233,18 @@ class Precision:
 
     @classmethod
     def from_dict(cls, payload: Mapping[str, Any]) -> Self:
-        """Validate a serialized policy and restore tuple-valued fields."""
+        """Validate a serialized (stored-vocabulary) policy and restore its fields."""
         if not isinstance(payload, Mapping):
             raise TypeError("adaptive_precision must be a mapping")
         values = dict(payload)
-        fields = cls.__dataclass_fields__
-        unknown = sorted(set(values) - set(fields))
+        stored = [STORED_KEYS.get(name, name) for name in cls.__dataclass_fields__]
+        names = list(cls.__dataclass_fields__)
+        unknown = sorted(_FIELD_NAMES.get(key, key) for key in set(values) - set(stored))
         if unknown:
-            raise ValueError(f"unknown precision field(s) {unknown}; valid fields: {list(fields)}")
-        missing = [name for name in REQUIRED_FIELDS if name not in values]
+            raise ValueError(f"unknown adaptive-sampling field(s) {unknown}; valid fields: {names}")
+        missing = [_FIELD_NAMES.get(key, key) for key in REQUIRED_FIELDS if key not in values]
         if missing:
-            raise ValueError(f"precision requires {', '.join(missing)}")
+            raise ValueError(f"adaptive sampling requires {', '.join(missing)}")
         for name in ("observables", "band_eV", "batch_means_band_eV"):
             if name in values and values[name] is not None:
                 values[name] = tuple(values[name])
@@ -212,7 +252,7 @@ class Precision:
             values["observables"] = tuple(
                 "cxr" if value == "line" else value for value in values["observables"]
             )
-        return cls(**values)
+        return cls(**{_FIELD_NAMES.get(key, key): value for key, value in values.items()})
 
     def validate_case(self, case: Mapping[str, Any]) -> None:
         """Reject routes whose samples do not satisfy the block-driver contract."""
@@ -250,13 +290,13 @@ def _brem_band_reduction_markers(policy, model) -> dict[str, str]:
     return {}
 
 
-#: Policy for a profile that sets neither fixed electron counts nor a
+#: Policy for a profile that sets neither fixed history counts nor a
 #: ``precision`` table (#361 user decision, 2026-10-08).
 DEFAULT_PRECISION = Precision(
     target_rse=0.05,
-    min_electrons=200,
-    max_electrons=20_000,
-    block_electrons=100,
+    min_histories=200,
+    max_histories=20_000,
+    block_histories=100,
     observables=("cxr", "brem"),
 )
 
@@ -277,7 +317,7 @@ def default_precision_fallback(
     routes :meth:`Precision.validate_case` refuses, plus an explicit count.
     """
     if fixed_counts:
-        return "the profile sets fixed electron counts"
+        return "the profile sets fixed history counts"
     if emission in ("coherent", "both"):
         return f"emission is {emission!r} (adaptive is incoherent-only)"
     if secondary_threshold_eV is not None or pair_production_model is not None:

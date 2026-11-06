@@ -280,7 +280,7 @@ def test_blaze_unknown_option_after_variadic_value_is_not_swallowed():
             recompute_cli,
             recompute_cli.brem_command,
             "_brem_cli",
-            ["hopg", "w", "--brem-trials", "1000"],
+            ["hopg", "w", "--brem-histories", "1000"],
             {"material": ["hopg", "w"], "all": False, "ne_brem": 1000},
         ),
         (

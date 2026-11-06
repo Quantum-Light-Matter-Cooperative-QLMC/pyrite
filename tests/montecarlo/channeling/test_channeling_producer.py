@@ -106,7 +106,7 @@ def produced():
         footprint=pr.geometry.Footprint(5.0, 5.0),
     )
     numerics = pr.Numerics(
-        sampling=FixedSampling(cxr_electrons=4, brem_electrons=4),
+        sampling=FixedSampling(cxr_histories=4, brem_histories=4),
         energy_bins=EnergyBins(
             cxr=np.linspace(1500.0, 3000.0, 31), brem=np.array([5000.0, 10000.0])
         ),

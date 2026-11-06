@@ -211,16 +211,17 @@ def physics_command():
     cls=LazyGroup,
     lazy_commands={
         "preset": "pyrite.cli.commands.config_preset.numerics_command",
-        "precision": "pyrite.cli.commands._profile_precision.command",
+        "adaptive-sampling": "pyrite.cli.commands._profile_precision.command",
         "cxr-grid": "pyrite.cli.commands._profile_cxr_grid.command",
         "energy-grid": "pyrite.cli.commands.energy_grid_surface.material_command",
     },
     lazy_help={
         "preset": "Manage named numerics presets that profiles attach by name.",
-        "precision": "Configure adaptive precision or fixed electron counts on PROFILE.",
+        "adaptive-sampling": "Configure adaptive sampling or fixed history counts on PROFILE.",
         "cxr-grid": "Configure PROFILE's automatic CXR photon-grid policy.",
         "energy-grid": "Derive and inspect specialist photon-grid artifacts.",
     },
+    removed_commands={"precision": "adaptive-sampling"},
     context_settings={"help_option_names": ["-h", "--help"]},
 )
 def numerics_command():

@@ -20,7 +20,7 @@ from ...console import json as cli_json
 from ...console import output as _cli_core
 from ...console.outputs import output_default, output_label
 from .. import _completion as _cli_completion
-from .._deprecations import canonical_option
+from .._deprecations import canonical_option, removed_option
 from .._options import remote_option
 
 
@@ -211,8 +211,10 @@ def _reject_remote_local_options(ctx: click.Context, json_output: bool) -> None:
     shell_complete=_cli_completion.complete_profile,
     help="Catalog profile for legacy data; otherwise must match checkpoint metadata.",
 )
+@removed_option("--brem-trials", "--brem-histories")
+@removed_option("--brem-electrons", "--brem-histories")
 @canonical_option(
-    "--brem-trials",
+    "--brem-histories",
     "ne_brem",
     type=_cli_core.POSITIVE_INT,
     default=None,
@@ -441,13 +443,15 @@ def _cxr_cli_json(args):
     shell_complete=_cli_completion.complete_profile,
     help="Catalog profile for legacy data; otherwise must match checkpoint metadata.",
 )
+@removed_option("--cxr-trials", "--cxr-histories")
+@removed_option("--cxr-electrons", "--cxr-histories")
 @canonical_option(
-    "--cxr-trials",
+    "--cxr-histories",
     "cxr_ne",
     type=_cli_core.POSITIVE_INT,
     default=None,
     metavar="N",
-    help="CXR trial count; overrides profile default.",
+    help="Monte Carlo electron histories for the CXR spectrum; overrides profile default.",
 )
 @click.option(
     "--start",

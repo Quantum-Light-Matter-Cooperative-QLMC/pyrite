@@ -253,8 +253,11 @@ def emit_show(payload, target, resolution, numerics_names, grid_rows):
         rows = []
         for row in group["fields"]:
             label = numerics_names[row["key"]]
-            if group["name"] == "sampling" and payload["precision"]["effective"] is not None:
-                value = "adaptive (numerics precision)"
+            if (
+                group["name"] == "sampling"
+                and payload["adaptive_sampling"]["effective"] is not None
+            ):
+                value = "adaptive (numerics adaptive-sampling)"
             else:
                 source = "default" if row["source"] == "fidelity" else row["source"]
                 value = f"{_display(row['effective'])} ({source})"
@@ -262,15 +265,15 @@ def emit_show(payload, target, resolution, numerics_names, grid_rows):
         label = "reflections and mosaic" if group["name"] == "convergence" else group["name"]
         _table(f"Numerics / {label} (profile numerics)", rows)
 
-    precision = payload["precision"]
-    if precision["effective"] is None:
-        precision_rows = [("mode", f"fixed ({precision['fixed_reason']})")]
+    adaptive = payload["adaptive_sampling"]
+    if adaptive["effective"] is None:
+        adaptive_rows = [("mode", f"fixed ({adaptive['fixed_reason']})")]
     else:
-        precision_rows = [
-            ("mode", f"adaptive ({precision['source']} policy)"),
-            *list(_rows(precision["effective"])),
+        adaptive_rows = [
+            ("mode", f"adaptive ({adaptive['source']} policy)"),
+            *list(_rows(adaptive["effective"])),
         ]
-    _table("Precision (numerics precision)", precision_rows)
+    _table("Adaptive sampling (numerics adaptive-sampling)", adaptive_rows)
 
     policy = payload["line_grid_policy"]
     _table(

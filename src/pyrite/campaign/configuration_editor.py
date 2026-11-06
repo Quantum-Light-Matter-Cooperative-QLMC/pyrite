@@ -218,12 +218,12 @@ class ConfigurationEditor:
             return
         blockers = precision_blockers(row)
         if any("distance_mm" in entry for entry in catalog.profile_detector_set(name).values()):
-            blockers.append("pixel observation directions require fixed electron counts")
+            blockers.append("pixel observation directions require fixed history counts")
         beam = catalog.profile_beam(name)
         if beam is not None and beam.get("source") == "gpt_gdf":
-            blockers.append("GDF sources require fixed electron counts")
+            blockers.append("GDF sources require fixed history counts")
         if blockers:
-            raise ValueError(f"profiles.{name}.precision: {'; '.join(blockers)}")
+            raise ValueError(f"profiles.{name}.adaptive_sampling: {'; '.join(blockers)}")
 
     def errors(self) -> tuple[str, ...]:
         try:

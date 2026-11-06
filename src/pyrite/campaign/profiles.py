@@ -35,7 +35,7 @@ from .._numerics import (
     Physics,
     default_inelastic_cutoff,
     default_radiative_cutoff,
-    electron_counts,
+    history_counts,
     validate_bremsstrahlung_model,
     validate_profile_numerics,
 )
@@ -294,7 +294,7 @@ def resolve_numerics(
         if key not in PROFILE_NUMERICS_KEYS:
             continue
         if key in SAMPLING_KEYS:
-            counts = electron_counts(value)
+            counts = history_counts(value)
             value = counts[0] if len(counts) == 1 else list(counts)
         normalized[key] = value
         effective[key] = value

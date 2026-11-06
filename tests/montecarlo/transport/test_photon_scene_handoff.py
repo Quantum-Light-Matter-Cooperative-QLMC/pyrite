@@ -262,7 +262,7 @@ def test_independent_photon_configuration_matches_legacy_case(monkeypatch, entry
     scene = _physical_scene()
     original = asdict(scene)
     physics = Physics(bremsstrahlung_model="eedl", radiative_model="uncoupled")
-    controls = Numerics(sampling=FixedSampling(cxr_electrons=7, brem_electrons=7))
+    controls = Numerics(sampling=FixedSampling(cxr_histories=7, brem_histories=7))
     expected = lowering.build_case(replace(scene, physics=physics, numerics=controls))
     lower = lowering.lower_simulation
     captured = []

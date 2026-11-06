@@ -55,7 +55,7 @@ def _simulate(
         pr.Beam(30.0, transverse=pr.beams.Spot(), longitudinal=pr.beams.PointBunch()),
         pr.geometry.Slab("hopg", 1_000.0, tilt_deg=30.0, footprint=pr.geometry.Footprint(5.0, 5.0)),
         detector,
-        numerics=pr.Numerics(sampling=FixedSampling(cxr_electrons=1, brem_electrons=1)),
+        numerics=pr.Numerics(sampling=FixedSampling(cxr_histories=1, brem_histories=1)),
         filters=(plate,),
         acquisition=_acquisition() if acquisition is None else acquisition,
     )
@@ -352,7 +352,7 @@ def test_acquisition_free_simulation_keeps_the_reconstruction_mode() -> None:
         pr.Beam(30.0, transverse=pr.beams.Spot(), longitudinal=pr.beams.PointBunch()),
         pr.geometry.Slab("hopg", 1_000.0, tilt_deg=30.0, footprint=pr.geometry.Footprint(5.0, 5.0)),
         detector,
-        numerics=pr.Numerics(sampling=FixedSampling(cxr_electrons=1, brem_electrons=1)),
+        numerics=pr.Numerics(sampling=FixedSampling(cxr_histories=1, brem_histories=1)),
     )
 
     assert result.spatial is not None

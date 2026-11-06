@@ -16,7 +16,7 @@ from pyrite.runs.observe import produce_observation
 from tests.helpers.case_compare import assert_same_case
 
 ENERGY = np.linspace(500.0, 3000.0, 6)
-CONTROLS = Numerics(sampling=FixedSampling(cxr_electrons=1, brem_electrons=1))
+CONTROLS = Numerics(sampling=FixedSampling(cxr_histories=1, brem_histories=1))
 
 
 @dataclass(frozen=True)
@@ -319,12 +319,12 @@ def test_sweep_binds_each_geometry_and_applies_run_overrides_before_axes(scene, 
                 PlanarPose.from_observation(100.0, 60.0),
                 PlanarPose.from_observation(100.0, 75.0),
             ),
-            "numerics.sampling.cxr_electrons": (1, 2),
+            "numerics.sampling.cxr_histories": (1, 2),
         },
     )
     physics = replace(scene.physics, straggling=True)
     cases = sweep.cases(
-        replace(CONTROLS, sampling=replace(CONTROLS.sampling, cxr_electrons=3)),
+        replace(CONTROLS, sampling=replace(CONTROLS.sampling, cxr_histories=3)),
         physics=physics,
         observation=observation,
     )
@@ -337,7 +337,7 @@ def test_sweep_binds_each_geometry_and_applies_run_overrides_before_axes(scene, 
             replace(
                 CONTROLS,
                 sampling=replace(
-                    CONTROLS.sampling, cxr_electrons=point.numerics.sampling.cxr_electrons
+                    CONTROLS.sampling, cxr_histories=point.numerics.sampling.cxr_histories
                 ),
             ),
             physics=physics,

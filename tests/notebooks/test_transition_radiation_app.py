@@ -40,7 +40,7 @@ def test_reference_profiles_match_notebook_scene(profile, mode):
         reference_scene(DemoConfig(), mode),
         pr.Numerics(
             sampling=FixedSampling(
-                cxr_electrons=DEFAULT_LINE_HISTORIES, brem_electrons=2 * DEFAULT_LINE_HISTORIES
+                cxr_histories=DEFAULT_LINE_HISTORIES, brem_histories=2 * DEFAULT_LINE_HISTORIES
             ),
             energy_bins=EnergyBins(cxr=photon_grid(), brem=np.arange(200.0, 30000.0, 100.0)),
         ),

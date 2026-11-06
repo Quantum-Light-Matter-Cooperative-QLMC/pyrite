@@ -50,7 +50,7 @@ def _gaussian(waist=10.0):
 
 def _numerics():
     return pr.Numerics(
-        sampling=FixedSampling(cxr_electrons=8, brem_electrons=12),
+        sampling=FixedSampling(cxr_histories=8, brem_histories=12),
         # Replay equality needs only a few photon nodes; the automatic grid
         # would score >300,000 nodes at every detector quadrature direction.
         energy_bins=pr.detectors.EnergyBins(

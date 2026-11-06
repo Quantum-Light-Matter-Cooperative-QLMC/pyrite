@@ -27,7 +27,7 @@ def scene():
 @pytest.fixture
 def numerics():
     return Numerics(
-        sampling=FixedSampling(cxr_electrons=1, brem_electrons=1),
+        sampling=FixedSampling(cxr_histories=1, brem_histories=1),
         energy_bins=EnergyBins(cxr=(1_000.0, 1_500.0), brem=(1_000.0, 1_500.0)),
     )
 
@@ -65,7 +65,7 @@ def test_one_scene_runs_under_independent_configurations(scene, numerics, transp
         physics=replace(scene.physics, brem_source="none"),
         numerics=replace(
             numerics,
-            sampling=replace(numerics.sampling, cxr_electrons=2),
+            sampling=replace(numerics.sampling, cxr_histories=2),
             transport_core="per-electron",
         ),
     )

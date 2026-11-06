@@ -374,7 +374,10 @@ def removed_option(flag: str, replacement: str):
         if value is not None:
             raise click.UsageError(f"{flag} was removed; use {replacement}", ctx=ctx)
 
-    return click.option(flag, hidden=True, expose_value=False, callback=reject, metavar="N")
+    # A private name keeps the hidden option from shadowing a live parameter
+    # whose destination the removed spelling once shared (e.g. ``--ne-brem``).
+    name = "removed_" + flag.lstrip("-").replace("-", "_")
+    return click.option(flag, name, hidden=True, expose_value=False, callback=reject, metavar="N")
 
 
 def _implied_dest(param_decls: Sequence[str]) -> str:

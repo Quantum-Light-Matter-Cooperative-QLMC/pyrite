@@ -42,7 +42,7 @@ pytestmark = [
 def _scene(electrons=1024):
     """The #905 benchmark scene (W 1 MeV / 10 um) at a test electron count."""
     numerics = Numerics(
-        sampling=FixedSampling(cxr_electrons=electrons, brem_electrons=electrons // 4),
+        sampling=FixedSampling(cxr_histories=electrons, brem_histories=electrons // 4),
         seed=7,
         energy_bins=EnergyBins().with_cxr_energies(np.linspace(750, 1_000, 51) * ureg.eV),
         cxr_reflections=CxrReflections(n_families=1),

@@ -77,7 +77,7 @@ def scene(histories: int = 32, step_eV: float = 2.0) -> pr.Scene:
             bremsstrahlung_model="eedl",
         ),
         numerics=pr.Numerics(
-            sampling=FixedSampling(cxr_electrons=histories, brem_electrons=histories),
+            sampling=FixedSampling(cxr_histories=histories, brem_histories=histories),
             transport_core="per-electron",
             energy_bins=EnergyBins(
                 cxr=np.linspace(750, 1000, round(250 / step_eV) + 1),
