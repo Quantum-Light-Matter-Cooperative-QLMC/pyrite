@@ -113,7 +113,7 @@ def _jump_defect(*elements):
     source = _ladder([0.0, 7.0, 5.0, 5.0 + gap], {(0, 1): 3e-3, (2, 3): 4e-3})
     split = partition_axial_currents(source, 3.0)
     rho = np.zeros((4, 4), dtype=complex)
-    rho[1, 1] = rho[3, 3] = rho[1, 3] = rho[3, 1] = 0.5
+    rho[1, 1] = rho[3, 3] = rho[1, 3] = rho[3, 1] = rho[2, 2] = 1 / 3
     jump = np.zeros((1, 4, 4), dtype=complex)
     for final, initial in elements:
         jump[0, final, initial] = np.sqrt(0.05)
@@ -138,7 +138,7 @@ def test_block_coupling_jumps_create_a_measured_cross_term(elements):
 
 @pytest.mark.parametrize(
     "elements",
-    [(), ((0, 0), (1, 1), (2, 2), (3, 3)), ((0, 2),), ((0, 1), (2, 1))],
+    [(), ((1, 1), (3, 3)), ((0, 2),), ((0, 1), (2, 1))],
     ids=["hamiltonian", "dephasing", "rank-one", "fan-out"],
 )
 def test_jumps_that_do_not_couple_final_coherence_leave_no_cross_term(elements):
@@ -379,22 +379,47 @@ def test_closure_refuses_invalid_density_and_unresolved_coherence():
         emitting_subspace_closure(source, populations, keep, path_ang=0.0)
 
 
-def test_full_retained_set_omits_nothing_and_vanishing_damping_recovers_sinc():
+def test_closure_guards_are_scale_free_and_refuse_broken_contracts():
+    source = _ladder([0.0, 2.0, 2.0 + 1e-4], {(0, 1): 3e-3, (0, 2): 3e-3})
+    keep = np.ones(3, dtype=bool)
+    pair = np.array([[0, 0, 0], [0, 0.5, 0.5], [0, 0.5, 0.5]], dtype=complex)
+    with pytest.raises(ValueError, match="unresolved"):
+        emitting_subspace_closure(source, 1e-13 * pair, keep, path_ang=1e4)
+    for phase in (float("nan"), -1.0, 0.0):
+        with pytest.raises(ValueError, match="min_coherence_phase"):
+            emitting_subspace_closure(source, pair, keep, path_ang=1e4, min_coherence_phase=phase)
+    with pytest.raises(ValueError, match="trace"):
+        emitting_subspace_closure(source, 2 * pair, keep, path_ang=1e10)
+    raising = _ladder([0.0, 2.0], {(0, 1): 3e-3})
+    raising.currents[0, 1, 0] = 1e-3
+    with pytest.raises(ValueError, match="lowering"):
+        emitting_subspace_closure(
+            raising, np.diag([1.0, 0.0]), np.ones(2, dtype=bool), path_ang=1e6
+        )
+
+
+@pytest.mark.parametrize(
+    "element", [(0, 1), (1, 1)], ids=["vanishing-decay", "vanishing-dephasing"]
+)
+def test_vanishing_damping_recovers_sinc(element):
+    gap, length = 2.0, 300.0
+    two, excited, _ = _two_level()
+    depths = np.linspace(0.0, length, 101)
+    energies = (gap + np.linspace(-1.5, 1.5, 5)) / DOPPLER
+    weak = np.zeros((1, 2, 2), dtype=complex)
+    weak[(0, *element)] = np.sqrt(1e-12)
+    detuning = (energies * DOPPLER - gap) / HV
+    sinc = length**2 * np.sinc(detuning * length / (2 * np.pi)) ** 2
+    expected = ALPHA_FS * energies * (3e-3) ** 2 * sinc / (4 * np.pi**2 * HV**2)
+    np.testing.assert_allclose(_spectrum(two, excited, weak, depths, energies), expected, rtol=1e-4)
+
+
+def test_full_retained_set_omits_nothing():
     source = _three_level()
     rho = np.diag([0.0, 0.25, 0.25, 0.5]).astype(complex)
     closure = emitting_subspace_closure(source, rho, np.ones(4, dtype=bool), path_ang=1e6)
     assert closure.omitted_rate == 0
     assert closure.retained_rate == closure.full_rate > 0
-
-    gap, length = 2.0, 300.0
-    two, excited, _ = _two_level()
-    depths = np.linspace(0.0, length, 101)
-    energies = (gap + np.linspace(-1.5, 1.5, 5)) / DOPPLER
-    weak = np.array([[[0, np.sqrt(1e-12)], [0, 0]]], dtype=complex)
-    detuning = (energies * DOPPLER - gap) / HV
-    sinc = length**2 * np.sinc(detuning * length / (2 * np.pi)) ** 2
-    expected = ALPHA_FS * energies * (3e-3) ** 2 * sinc / (4 * np.pi**2 * HV**2)
-    np.testing.assert_allclose(_spectrum(two, excited, weak, depths, energies), expected, rtol=1e-4)
 
 
 def test_partition_refuses_non_lowering_currents_and_uses_a_strict_barrier():

@@ -13,7 +13,7 @@ recoil, Hilbert-space convergence or standard-run admission; those stay under
 
 Let $H=\sum_n E_n|n\rangle\langle n|$ and let the positive-frequency current be
 $A_\lambda=\sum_{E_i-E_f>\tau}a^\lambda_{fi}|f\rangle\langle i|$. For a declared
-boundary $E_b$, let $Q_b$ project on states with $E_n\le E_b$ and
+boundary $E_b$, let $Q_b$ project on states with $E_n<E_b$ and
 $Q_u=1-Q_b$. Define
 
 $$
@@ -46,7 +46,7 @@ $$
 =\mathrm{Tr}[A\,(\cdots)\,Q_uQ_b]=0
 $$
 
-by cyclicity. The term $G^{\mathrm{ff,ax}}$ vanishes by the same argument with the left index, and the
+by cyclicity. The term $G^{\mathrm{ff,ax}}$ vanishes by the same right-index argument with the blocks swapped, and the
 two are related by $G^{ab}(z,z')^*=G^{ba}(z',z)$. So the cross term vanishes under unitary
 evolution, for any incident density and at every photon energy.
 
@@ -133,14 +133,14 @@ Free→free stays owned by CBS under ADR-0018 and is never scored by the axial s
 A straight mean zone row exactly along the axis has $\mathbf v\cdot\mathbf g=0$ for
 zero-order $\mathbf g$, so its native resonance energy vanishes and it emits no such
 line. That is a property of the straight row, which discards transverse momentum. It
-is not a property of the block: each represented free→free transition carries
-$E_i-E_f=\hbar\bar{\mathbf v}\cdot\mathbf g>0$, and matches the native Born amplitude
-in the weak-potential limit.
+is not a property of the block: each represented free→free transition has $E_i-E_f>0$.
+In the plane-wave limit that gap equals $\hbar\bar{\mathbf v}\cdot\mathbf g$ and the element matches the
+native Born amplitude; dressed states depart from both.
 
 Native output therefore depends on the row direction. It vanishes for zero-order
 $\mathbf g$ on the exact axis and reappears at tilted handoff directions, above a
 numerical resonance-root threshold. A production adapter must reconcile the two
-before combining them: treating the block as absent can double count after handoff,
+before combining them: treating the block as absent from native scoring can double count after handoff,
 and treating it as native-scored can omit it on the zone row. Nonzero axial-order
 $\mathbf g$ and incoherent bremsstrahlung stay native, following the ADR-0018 convention
 of passing straight mean segments to native scorers.
@@ -416,3 +416,72 @@ For the Assumptions field and "What native scoring owns":
 
 Status remains the owner's decision and is unchanged by this section. Re-verification
 after the text correction can be limited to this statement and the cross-term text.
+
+## Re-verification
+
+Commit `6878645fb`, 2026-11-05, same verifier as the section above. Scope: native-ownership
+text, cross-term text and its tests, closure guards, strict barrier and lowering
+check. Refraction, the capture split and per-population native reconciliation moved
+to #992 and were not re-checked.
+
+**Verdict: `discrepancy`, in text and test evidence only.** Every code path in scope
+behaves as derived and no number changes. First divergent term: line 16 above still
+defines $Q_b$ by $E_n\le E_b$, while the code and the ledger row use the strict
+`energies < boundary_eV`.
+
+**Confirmed.**
+
+- *Cross term.* $G^{ab}(z,z')^*=G^{ba}(z',z)$ and the gain and no-jump conditions match
+  the derivation above. A separate dense GKSL and quadrature agrees with
+  `partition_on_axis_spectra` on the anchor's fixture, with defect/total $+0.1556$,
+  $+0.1440$, $-0.3600$ for the three `test_block_coupling_jumps_*` cases. In the third
+  case the sandwich term vanishes on the incident support, so the id "no-jump-coupling"
+  is accurate.
+- *Native text.* The row and zone-row distinction, the ownership and the numerical
+  threshold are correct.
+- *Closure.* Unresolved coherent pairs are refused, and refusal was exercised. At the
+  default threshold each pair's frequency-integrated residual is at most $1/\theta=1\%$,
+  for equal weights and by $2\lvert\rho_{ii'}\rvert\le\rho_{ii}+\rho_{i'i'}$ otherwise.
+- *Partition.* The strict barrier matches `emission.py`, and a level exactly at the
+  barrier is free. The lowering check indexes $E_i-E_f$ correctly and passes the
+  production builder, with exact zeros in $Q_uAQ_b$.
+
+**Required for `rederived`.**
+
+1. Write-up line 16: replace $E_n\le E_b$ with $E_n<E_b$.
+2. Ledger Assumptions and "What native scoring owns": $E_i-E_f=\hbar\bar{\mathbf v}\cdot\mathbf g$
+   holds only in the plane-wave limit, and the qualifier must cover it. Only
+   $E_i-E_f>0$ is general. Dressed gap over $\hbar\bar{\mathbf v}\cdot\mathbf g$ at Si
+   $(2\,2\,0)$, $U=4.32$ eV: 0.987, 1.18, 1.88 for $n=3\to2$, $2\to1$, $1\to0$. My
+   earlier suggested text also lacked the qualifier.
+3. `test_jumps_that_do_not_couple_*`, id `dephasing`: elements
+   `((0, 0), (1, 1), (2, 2), (3, 3))` give $L=\sqrt{0.05}\,\mathbb 1$, whose generator
+   is zero, so the case repeats `hamiltonian` and the total is unchanged. The ledger
+   check "zero under dephasing" is therefore not exercised. The physics holds:
+   `((1, 1), (3, 3))` changes the total by $-26\%$ with defect $0$ to roundoff, in both
+   codes.
+
+**Should fix.**
+
+4. `min_coherence_phase` is unvalidated: NaN, $-1$ and $0$ each accept the unresolved
+   pair and return the secular rate, which is wrong by up to a factor of 2. Refuse
+   non-finite or nonpositive values.
+5. The coherence test has an absolute floor, `max(..., 1.0)`. Scaling the same pair by
+   $10^{-13}$ passes the guard, so the relative `omitted_fraction` is unguarded for a
+   very small density. The trace is also unbounded, unlike `regression_correlation`,
+   which refuses a trace above one.
+6. The closure has no lowering check. A raising element inside $S$ returns a negative
+   `full_rate` of $-5.1\times10^{-7}$ with no error. The negative-omission refusal fires
+   only when the element lies outside $S$, is reachable only through that broken
+   contract, and has no test.
+
+**Minor wording and fixtures.**
+
+- "with the left index" should say the same right-index argument with the blocks
+  swapped.
+- "treating the block as absent" should say absent from native scoring.
+- `AxialPartitionSpectra`: "The block is CBS-owned" should name the free→free block.
+- The `rank-one` case never populates $|2\rangle$, so its jump acts only through
+  no-jump decay. Adding $|2\rangle$ to the fixture density would exercise the
+  diagonal-gain argument.
+- The ledger limiting case for sinc is anchored for decay only, not dephasing.

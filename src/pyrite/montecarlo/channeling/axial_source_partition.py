@@ -52,7 +52,7 @@ class AxialPartitionSpectra:
     blocks have orthogonal final subspaces, so Hamiltonian evolution gives zero.
     A jump model can make it nonzero only if it couples the blocks through a
     gain ``Q L Q'`` or a no-jump ``Q (sum L† L) Q'`` term; that is necessary, not
-    sufficient. The block is CBS-owned; combining ``axial`` with any free→free
+    sufficient. The free→free block is CBS-owned; combining ``axial`` with any free→free
     score omits ``interference``.
 
     Validation: cr-axial-source-partition
@@ -83,6 +83,13 @@ class AxialSubspaceClosure:
     retained_population: float
 
 
+def _check_lowering(source: GlobalAxialSource) -> None:
+    energies = source.energies_eV
+    lowering = energies[None, :] - energies[:, None] > source.bohr_tolerance_eV
+    if np.any(source.currents[:, ~lowering]):
+        raise ValueError("currents must contain lowering transitions only")
+
+
 def partition_axial_currents(
     source: GlobalAxialSource, boundary_eV: float
 ) -> AxialCurrentPartition:
@@ -102,9 +109,7 @@ def partition_axial_currents(
         raise ValueError("boundary_eV must be finite")
     energies = source.energies_eV
     bound = energies < boundary_eV
-    lowering = energies[None, :] - energies[:, None] > source.bohr_tolerance_eV
-    if np.any(source.currents[:, ~lowering]):
-        raise ValueError("currents must contain lowering transitions only")
+    _check_lowering(source)
     if bound.any() and (~bound).any():
         gap = float(energies[~bound].min() - energies[bound].max())
         if gap <= source.bohr_tolerance_eV:
@@ -175,11 +180,13 @@ def _secular_rate(source: GlobalAxialSource, density: np.ndarray, currents: np.n
 def _check_density(rho: np.ndarray, size: int) -> None:
     if rho.shape != (size, size) or not np.all(np.isfinite(rho)):
         raise ValueError("density must be a finite eigenbasis matrix of the source dimension")
-    scale = max(float(np.abs(rho).max()), 1.0)
+    scale = float(np.abs(rho).max())
     if np.abs(rho - rho.conj().T).max() > 1e-12 * scale:
         raise ValueError("density must be Hermitian")
     if np.linalg.eigvalsh(rho).min() < -1e-12 * scale:
         raise ValueError("density must be positive")
+    if np.trace(rho).real > 1 + 1e-12:
+        raise ValueError("density trace must not exceed one incident electron")
 
 
 def emitting_subspace_closure(
@@ -198,7 +205,9 @@ def emitting_subspace_closure(
     independent. Coherence between other levels is dropped, which needs
     $\theta=|E_i-E_{i'}|\ell/\hbar v\gg1$ over ``path_ang``: for equal weights
     the true rate is $1\pm\sin\theta/\theta$ times the secular one. A coherent pair
-    below ``min_coherence_phase`` is refused. Scattering linewidth is not checked.
+    below ``min_coherence_phase`` is refused; the default limits each pair's
+    frequency-integrated residual to 1%, not the accumulated residual of many
+    pairs. Scattering linewidth is not checked.
 
     Validation: cr-axial-source-partition
     """
@@ -208,6 +217,9 @@ def emitting_subspace_closure(
     _check_density(rho, size)
     if not isfinite(path_ang) or path_ang <= 0:
         raise ValueError("path_ang must be finite and positive")
+    if not isfinite(min_coherence_phase) or min_coherence_phase <= 0:
+        raise ValueError("min_coherence_phase must be finite and positive")
+    _check_lowering(source)
     if keep.shape != (size,) or keep.dtype != bool:
         raise ValueError("retained must be a boolean mask over global eigenstates")
     energies = source.energies_eV
@@ -215,7 +227,7 @@ def emitting_subspace_closure(
     if np.any(same_level & (keep[:, None] != keep[None, :])):
         raise ValueError("retained subspace splits a degenerate multiplet")
     phase = np.abs(energies[:, None] - energies[None, :]) * path_ang / source.hbar_v_eV_ang
-    coherent = np.abs(rho) > 1e-12 * max(float(np.abs(rho).max()), 1.0)
+    coherent = np.abs(rho) > 1e-12 * float(np.abs(rho).max())
     if np.any(coherent & ~same_level & (phase < min_coherence_phase)):
         raise ValueError("coherent levels are unresolved over path_ang; secular rate is invalid")
     full = _secular_rate(source, rho, source.currents)
