@@ -5,7 +5,9 @@ analog peak of the per-bin RSE, across independent seeds, against analog at equa
 wall time. Every arm scores one frozen grid, so bins align across seeds and no
 arm pays a grid pass. Every arm scores the same continuum population, so roulette
 arms gain only from line scoring. Each roulette arm's primaries are fitted from two
-timed calibration runs to match the analog batch wall time.
+timed calibration runs to match the analog batch wall time. Requests stream in
+electron blocks by default, and `spectrum_s` is then the time inside block scoring,
+including any roulette screen, with `transport_s` the rest of the wall time.
 
 Each seed's rare histories dominate its batch, so K batches give only a coarse RSE.
 Measurements stay in ignored scratch; no physics-validation claim.
@@ -44,20 +46,47 @@ def _case(args, grid, seed, electrons, arm):
     return case
 
 
+def _run_streamed(case, block, core):
+    from pyrite.montecarlo.runner import streamed_scoring
+
+    scorer = streamed_scoring.BlockSpectrumScorer
+    add, scoring = scorer.add, [0.0]
+
+    def timed_add(self, *args, **kwargs):
+        started = time.perf_counter()
+        try:
+            return add(self, *args, **kwargs)
+        finally:
+            scoring[0] += time.perf_counter() - started
+
+    scorer.add = timed_add
+    try:
+        start = time.perf_counter()
+        out = streamed_scoring.run_case_streamed(case, block, transport_core=core)
+        return out, time.perf_counter() - start, scoring[0]
+    finally:
+        scorer.add = add
+
+
 def _run(args, grid, seed, electrons, arm):
     from pyrite.montecarlo import runner
 
     case = _case(args, grid, seed, electrons, arm)
     runner.BACKEND.release_memory()
-    start = time.perf_counter()
-    out = runner.run_case(case, record_timing=True, transport_core=args.core)
-    wall = time.perf_counter() - start
+    if args.block is None:
+        start = time.perf_counter()
+        out = runner.run_case(case, record_timing=True, transport_core=args.core)
+        wall = time.perf_counter() - start
+        transport, spectrum = out.get("_t_transport"), out.get("_t_spectrum")
+    else:
+        out, wall, spectrum = _run_streamed(case, args.block, args.core)
+        transport = wall - spectrum
     return {
         "seed": seed,
         "electrons": electrons,
         "wall_s": wall,
-        "transport_s": out.get("_t_transport"),
-        "spectrum_s": out.get("_t_spectrum"),
+        "transport_s": transport,
+        "spectrum_s": spectrum,
         "record": out.get("line_roulette"),
         "spec": np.asarray(out["spec"], dtype=float),
     }
@@ -117,6 +146,7 @@ def main():
     parser.add_argument("--tilt", type=float, default=10.0)
     parser.add_argument("--azimuth", type=float, default=100.0)
     parser.add_argument("--core", default="cuda")
+    parser.add_argument("--block", type=int, default=4096)
     args = parser.parse_args()
     subprocess.run(["git", "check-ignore", "-q", str(args.out)], check=True)
     args.out.mkdir(parents=True, exist_ok=True)

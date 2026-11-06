@@ -41,7 +41,7 @@ def main():
     parser.add_argument("--core", required=True)
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--electrons", type=int, default=512)
-    parser.add_argument("--block", type=int, default=128)
+    parser.add_argument("--stream-block", type=int, default=128)
     parser.add_argument("--arm", default="0.1:0.1", help="keep:floor")
     parser.add_argument("--pilot", type=int, default=128)
     parser.add_argument("--material", default="hbn")
@@ -51,6 +51,7 @@ def main():
     parser.add_argument("--azimuth", type=float, default=100.0)
     args = parser.parse_args()
     args.brem_electrons = args.electrons
+    args.block = None  # timed requests are joined; the streamed one is compared below
 
     from pyrite._backend import REAL
     from pyrite.montecarlo.runner.streamed_scoring import run_case_streamed
@@ -78,7 +79,9 @@ def main():
     report["repeat"] = _compare(_run(args, grid, args.seed, args.electrons, arm), roulette)
     save()
     streamed = run_case_streamed(
-        _case(args, grid, args.seed, args.electrons, arm), args.block, transport_core=args.core
+        _case(args, grid, args.seed, args.electrons, arm),
+        args.stream_block,
+        transport_core=args.core,
     )
     report["streamed"] = _compare(
         {"spec": np.asarray(streamed["spec"], dtype=float), "record": streamed["line_roulette"]},
