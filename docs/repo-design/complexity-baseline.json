@@ -414,11 +414,6 @@
       "cc": 27
     },
     {
-      "path": "src/pyrite/montecarlo/runner/scheduling.py",
-      "name": "run_cases",
-      "cc": 72
-    },
-    {
       "path": "src/pyrite/montecarlo/shell_configuration.py",
       "name": "_parse_atomic_shells",
       "cc": 27
