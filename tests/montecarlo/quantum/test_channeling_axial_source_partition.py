@@ -112,8 +112,9 @@ def _jump_defect(*elements):
     gap = 2.0
     source = _ladder([0.0, 7.0, 5.0, 5.0 + gap], {(0, 1): 3e-3, (2, 3): 4e-3})
     split = partition_axial_currents(source, 3.0)
-    rho = np.zeros((4, 4), dtype=complex)
-    rho[1, 1] = rho[3, 3] = rho[1, 3] = rho[3, 1] = rho[2, 2] = 1 / 3
+    # Pure (|1> + |2> + |3>)/sqrt(3): rho_23 feeds the free-final diagonal gain.
+    state = np.array([0, 1, 1, 1], dtype=complex) / np.sqrt(3)
+    rho = np.outer(state, state.conj())
     jump = np.zeros((1, 4, 4), dtype=complex)
     for final, initial in elements:
         jump[0, final, initial] = np.sqrt(0.05)

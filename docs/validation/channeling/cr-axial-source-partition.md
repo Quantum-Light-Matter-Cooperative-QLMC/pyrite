@@ -1,6 +1,6 @@
 # `cr-axial-source-partition`: finite-grid transition ownership and on-axis mapping
 
-**Status:** task-owner derivation (2026-11-05), awaiting fresh-context verification.
+**Status:** see the [ledger row](../ledger-channeling.md#cr-axial-source-partition). Task-owner derivation (2026-11-05), followed by the fresh-context verification below.
 Code: `src/pyrite/montecarlo/channeling/axial_source_partition.py` and the attenuation
 branch of `axial_qrt_source.on_axis_photon_spectrum`.
 
@@ -485,3 +485,20 @@ defines $Q_b$ by $E_n\le E_b$, while the code and the ledger row use the strict
   no-jump decay. Adding $|2\rangle$ to the fixture density would exercise the
   diagonal-gain argument.
 - The ledger limiting case for sinc is anchored for decay only, not dephasing.
+
+**Follow-up at commit `0a539020b`: `rederived`.** Items 1–6 and the listed minors are
+applied correctly, with one fixture exception below. This was a check of those fixes,
+with no new derivation. The anchor module passes (31 tests).
+
+- `dephasing` is no longer vacuous: $L=\sqrt{0.05}(|1\rangle\langle1|+|3\rangle\langle3|)$
+  changes the total by $-26\%$ with defect at roundoff.
+- `rank-one` is unchanged by the fix, and my suggestion was wrong. Its generator is
+  nontrivial (total $-17\%$, defect at roundoff), but the population added on $|2\rangle$ only
+  rescales the case: the total scales by exactly $2/3$ and the relative numbers do not
+  move. The gain needs $X_{22}=\rho_{23}a^*\ne0$, and $\rho_{23}=0$ here. With
+  $(|1\rangle+|2\rangle+|3\rangle)/\sqrt3$, $\lvert X_{22}\rvert=1.3\times10^{-3}$, the
+  defect stays at roundoff, and the block-coupling cases still give $+0.156$, $+0.144$,
+  $-0.311$. Not blocking, because the claim holds there and in the random-density oracle.
+- The negative-omission refusal is now unreachable for valid input, since lowering,
+  positivity and whole multiplets force a nonnegative omission. It stays as an untested
+  roundoff guard, which is not blocking.
