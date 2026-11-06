@@ -269,9 +269,9 @@ across the three measured code versions.
 ## Memory-target block sizing (#868)
 
 `KernelTuning.stream_memory_mib` (how-to: [the guide](../../guides/streamed-scoring.md))
-caps the CuPy pool below the target for the run: the smaller of 95% of the
-target and the target minus 1.25 GiB, with half the target as a floor for small
-targets. The cap is what bounds
+caps the CuPy pool below the target for the run: the target minus the device
+memory in use outside the pool at the start and a 0.5 GiB allowance, at most 95%
+of the target, with half the target as a floor for small targets. The cap is what bounds
 device memory, because scoring adapts to the pool and its peak does not follow
 row count. A 1,024-electron first block measures retained bytes per electron;
 later blocks give retained rows a quarter of the target and follow the largest
@@ -286,20 +286,26 @@ overlaid), single runs, W 1 MeV / 10 um and Si 1 MeV / 10 um, 262,144 electrons:
 | W, 64 GiB | 29.9 s | 61.73 GiB | 86,918 |
 | Si, 16 GiB | 5.0 s | 12.57 GiB | 261,120 |
 
-That table's driver peak excludes the process's own CUDA context (about
-0.54 GiB), so W at 16 GiB actually used about 16.19 GiB. At `ff09acd68` with the
-reserve overlaid, on the same card with nothing else on it, whole-card peaks
-include the context (262,144 electrons; pyrite was installed from git, not a
-remote job):
+That table's driver peak excludes the process's own CUDA context, so W at 16
+GiB actually used about 16.19 GiB. A fixed 1.25 GiB reserve then fixed the RTX
+PRO 6000 but left the RTX 5080 0.30-0.43 GiB over (job 3997), because the baseline
+after importing CuPy is 1.32 GiB there against 0.55 GiB. Hence the per-run
+reading. Whole-card peaks at `5a8c02ca7`, 262,144 electrons, single runs, 5 ms
+sampling (RTX 5080: job 3999; RTX PRO 6000: Molab):
 
-| Scene, target | Wall | Whole-card peak |
-|---|---|---|
-| W, 16 GiB | 38.5, 38.8, 72.9 s | 15.68, 15.73, 15.73 GiB |
-| W, 64 GiB | 31.7 s | 62.27 GiB |
-| Si, 16 GiB | 6.1 s | 13.06 GiB |
+| Card | Scene, target | Wall | Whole-card peak |
+|---|---|---|---|
+| RTX 5080 | W, 4 GiB | 137.8 s | 3.73 GiB |
+| RTX 5080 | W, 8 GiB | 43.8 s | 7.78 GiB |
+| RTX 5080 | W, 12 GiB | 38.2 s | 11.85 GiB |
+| RTX 5080 | Si, 4 GiB | 7.4 s | 3.72 GiB |
+| RTX 5080 | Si, 8 GiB | 3.8 s | 7.88 GiB |
+| RTX PRO 6000 | W, 16 GiB | 38.5 s | 15.91 GiB |
+| RTX PRO 6000 | W, 64 GiB | 30.4 s | 62.27 GiB |
+| RTX PRO 6000 | Si, 16 GiB | 5.4 s | 13.06 GiB |
 
-The 72.9 s run was the first after a kernel restart; its cause was not
-isolated. Peaks are sampled every 5 ms. Not measured on a 16 GB card.
+W at 4 GiB took 61.6 s with the larger pool of job 3997, so a target close to the
+overhead is much slower.
 
 Fixed blocks at the same commit, W, measured with the #907 harness:
 
