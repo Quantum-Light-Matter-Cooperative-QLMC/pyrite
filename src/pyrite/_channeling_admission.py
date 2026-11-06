@@ -13,7 +13,8 @@ def refuse_unverified_axial_run() -> NoReturn:
     raise AxialAdmissionError(
         "channeling_model='axial' cannot run yet: physical matching surface, "
         "incident-normalized photon source and case-specific depth budget "
-        "are unvalidated (#623); #624 only provides preliminary configuration"
+        "are unvalidated (#623, see #992, #993, #994); #624 only provides "
+        "preliminary configuration"
     )
 
 
