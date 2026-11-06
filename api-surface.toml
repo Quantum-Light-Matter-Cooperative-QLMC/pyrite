@@ -332,6 +332,7 @@ axial_diagnostic = { target = "pyrite.montecarlo.channeling.axial_diagnostic:axi
 AdaptiveSampling = { target = "pyrite._sampling:AdaptiveSampling", status = "advanced-stable" }
 CxrReflections = { target = "pyrite._numerics:CxrReflections", status = "advanced-stable" }
 FixedSampling = { target = "pyrite._sampling:FixedSampling", status = "advanced-stable" }
+LineRoulette = { target = "pyrite._line_roulette:LineRoulette", status = "experimental" }
 PixelScorer = { target = "pyrite.instrument:PixelScorer", status = "advanced-stable" }
 Precision = { target = "pyrite._precision:Precision", status = "advanced-stable" }
 RadiationNumerics = { target = "pyrite._numerics_groups:RadiationNumerics", status = "advanced-stable" }

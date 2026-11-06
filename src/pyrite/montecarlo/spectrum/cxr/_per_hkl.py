@@ -28,6 +28,7 @@ from ._formation import (
 )
 from ._kernels import (
     _accumulate_edge_truncation,
+    _audit_skips_reduction,
     _cxr_amp_sq_core,
     _energy_slices,
     _flight_blocks,
@@ -1081,7 +1082,7 @@ def _accumulate_reflection(
         weight[good],
         st.seg_elec_id[idx][good],
     )
-    if st.request.truncation_audit is not None and "collect" in st.request.truncation_audit:
+    if _audit_skips_reduction(st.request.truncation_audit):
         _nsys_pop()
         return
     if st.temporal_buf is not None:

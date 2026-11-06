@@ -74,6 +74,8 @@ def resolve_models(scene: Scene, numerics: Numerics) -> tuple[Physics, Numerics]
         source_record(scene.beam.state)
     if numerics.precision is not None and isinstance(scene.detector, PlanarDetector):
         raise ValueError("adaptive precision does not support physical detectors; use fixed counts")
+    if numerics.line_roulette is not None and isinstance(scene.detector, PlanarDetector):
+        raise ValueError("line_roulette currently requires a scalar Detector")
     return physics, numerics
 
 

@@ -1,7 +1,7 @@
 """Peak memory and wall time of joined vs live streamed scoring (#611).
 
 Usage:
-  streamed_scoring_memory.py run MODE NE BLOCK OUT_JSON [MATERIAL [E0_KEV [CORE [THICKNESS_ANG [SEED]]]]]
+  streamed_scoring_memory.py run MODE NE BLOCK OUT_JSON [MATERIAL [E0_KEV [CORE [THICKNESS_ANG [SEED [TILT_DEG [AZIM_DEG]]]]]]]
   streamed_scoring_memory.py compare REF_JSON OTHER_JSON...
 
 MODE: ``joined`` (``run_case``: full trajectory downloaded, then spectra;
@@ -44,7 +44,7 @@ import numpy as np
 SPECTRA = ("spec", "spec_characteristic", "brem_wide")
 
 
-def _case(material, ne, e0_kev, thickness_ang=1.0e4, seed=None):
+def _case(material, ne, e0_kev, thickness_ang=1.0e4, seed=None, tilt_deg=30.0, azim_deg=0.0):
     import pyrite as pr
     from pyrite import api
     from pyrite.detectors import EnergyBins
@@ -65,7 +65,8 @@ def _case(material, ne, e0_kev, thickness_ang=1.0e4, seed=None):
     target = pr.geometry.Slab(
         material,
         thickness_ang=thickness_ang,
-        tilt_deg=30.0,
+        tilt_deg=tilt_deg,
+        tilt_azim_deg=azim_deg,
         footprint=pr.geometry.Footprint(5.0, 5.0),
     )
     scene = pr.Scene(
@@ -162,10 +163,19 @@ def _instrument(mode, phases):
         from pyrite.montecarlo.runner.emission_adapters import EmissionAdapter
 
         real_evaluate = EmissionAdapter.evaluate
+        active_slots = set()
 
         def evaluate(self, batch, slot, **kwargs):
-            timed = phases.wrap(f"score.{slot}", real_evaluate)
-            return timed(self, batch, slot, **kwargs)
+            # The continuum adapter delegates to a native adapter through the
+            # same method. Its inclusive outer timer already counts that work.
+            if slot in active_slots:
+                return real_evaluate(self, batch, slot, **kwargs)
+            active_slots.add(slot)
+            try:
+                timed = phases.wrap(f"score.{slot}", real_evaluate)
+                return timed(self, batch, slot, **kwargs)
+            finally:
+                active_slots.remove(slot)
 
         EmissionAdapter.evaluate = evaluate
         backend = _backend.BACKEND
@@ -219,11 +229,21 @@ def run(
     core="per-electron",
     thickness_ang=1.0e4,
     seed=None,
+    tilt_deg=30.0,
+    azim_deg=0.0,
 ):
     from pyrite.montecarlo import runner
     from pyrite.montecarlo.runner.streamed_scoring import run_case_streamed
 
-    case = _case(material, int(ne), float(e0_kev), float(thickness_ang), seed)
+    case = _case(
+        material,
+        int(ne),
+        float(e0_kev),
+        float(thickness_ang),
+        seed,
+        float(tilt_deg),
+        float(azim_deg),
+    )
     phases = _Phases()
     _instrument(mode, phases)
     rss_before = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
@@ -259,6 +279,8 @@ def run(
         "E0_keV": float(e0_kev),
         "core": core,
         "thickness_ang": float(thickness_ang),
+        "tilt_deg": float(tilt_deg),
+        "azim_deg": float(azim_deg),
         "wall_s": wall,
         "host_peak_MiB": rss_peak / 1024,
         "host_peak_before_run_MiB": rss_before / 1024,

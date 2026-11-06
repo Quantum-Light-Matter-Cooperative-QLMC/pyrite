@@ -52,6 +52,19 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 - **Anchor:** `tests/montecarlo/test_cone_split.py`; remote-only `checks/detector_cone_variance_reduction.py`
 - **Notes:** Issue #203 prototype checkpoint. Independent source-to-code validation, competing-method comparison, analog cost baseline and radiation-yield/FOM measurements remain pending. No production weight support, GPU parity, validated unbiasedness or human sign-off is claimed.
 
+## `line-scoring-roulette`
+
+- **Claim:** opt-in two-stratum roulette over primary histories, keyed on seed and primary ID and screened by exact per-primary line mass, is an unbiased estimator of the incoherent CXR line spectrum and any linear functional of it, conditional on transport, with added variance `sum (1/p_i - 1) f_i^2 / N^2`; off, it leaves the case payload and scoring path unchanged
+- **Code:** `_line_roulette.py::LineRoulette`; `montecarlo/runner/line_roulette.py::{LineScreen,roulette_uniforms}`; `montecarlo/spectrum/cxr/_kernels.py::_audit_skips_reduction`; `montecarlo/spectrum/cxr/_spectrum.py::_mc_spectrum`
+- **Source:** elementary inverse-probability weighting (Horvitz-Thompson) of independent Bernoulli selection; [derivation](beam-transport/line-scoring-roulette.md)
+- **Equation:** [Line-scoring roulette](beam-transport/line-scoring-roulette.md) Eqs. `eq-roulette-mass` to `eq-roulette-coherent-bias`
+- **Assumptions:** independent primary histories; `p_i` fixed by the primary's own mass and a threshold from always-scored pilot histories; additive per-history incoherent line tally on the audited per-row route (flight-grouped substeps refused); uniforms independent of the histories; `p_min > 0`; blocks of whole primaries in ascending ID order
+- **Limiting cases:** `p_min = 1` is analog up to summation order; `N <= n_p` is analog; all-zero pilot keeps every positive-mass primary; zero-mass primaries contribute nothing; the coherent square is biased by `sum (1/p_i - 1)|a_i|^2` and refused
+- **Status:** rederived
+- **Checks:** per-primary inverse-probability reconstruction of the scored spectrum; draw rate and seed-averaged coefficient means; mass-only pass equal to the full audit; streamed block sizes equal to joined scoring; adaptive at N bitwise equal to fixed at N; analog audit preserved; policy and route refusals
+- **Anchor:** `tests/montecarlo/spectrum/test_line_roulette.py`; remote-only `checks/line_roulette_fom_879.py`
+- **Notes:** Issue #879. Fresh-context validation returned `rederived` at `0ce844613`, after a first `discrepancy` on the flight-grouped route was fixed; CUDA execution was outside that validation. FOM and analog-agreement evidence on MeV cases is pending for `anchored`. The per-history spectra are the unchanged production scorers, so this claim covers only the selection and weighting.
+
 ## `inelastic-angular-deflection`
 
 - **Claim:** `atomic_electron_deflection="kawrakow"`, the default of every run built from `Numerics`, folds angular deflection by atomic electrons into each element's elastic rate as `sigma_i -> sigma_i (1 + xi/Z_i)` with the elastic angular law unchanged, where `xi = 1 - min(g_M(tau, tau_c)/g_R(eta), 1)`: `xi = 1` under continuous stopping (`T_c = inf`) and the Moller share above `T_c = W_c` removed under shell soft/hard transport; `None`/`"none"` leaves every rate coefficient bit for bit
