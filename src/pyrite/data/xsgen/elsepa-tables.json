@@ -2,17 +2,17 @@
   "schema": "pyrite.xsgen.elsepa-release.v1",
   "upstream": "ELSEPA 2020, Mendeley Data doi:10.17632/w4hm5vymym.1",
   "archive": {
-    "sha256": "2155aaedb20797fcafe712386a24d37d5a40021c9d3481d62e27ae697d66b861",
-    "bytes": 48282047,
+    "sha256": "2daf47014ccf88910f01604f2871789658eb4ade520bd21a3f3e8d0d379b7573",
+    "bytes": 48282076,
     "urls": [
-      "https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/releases/download/tables-elsepa-4/elsepa-tables.zip"
+      "https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/releases/download/tables-elsepa-5/elsepa-tables.zip"
     ]
   },
   "tables": [
     {
       "label": "Z=1",
-      "key": "1640cc578d8377dd3a13e94530128fdecce5b6f99a404c386b045ced1565bdf2",
-      "manifest_sha256": "083df9f5be79d9cd97726bfed3f27bdf500855e3a258eb02f6d8dd634d57968d"
+      "key": "d5eafa3d1baec72863d788140773e770be2d84ce57d48a70bbb9affd9f5faa11",
+      "manifest_sha256": "1656aa29af8d89974ad5d02bb7e6869892bf7e9c4a6a0aa305d15bf00577d6d1"
     },
     {
       "label": "Z=3",
