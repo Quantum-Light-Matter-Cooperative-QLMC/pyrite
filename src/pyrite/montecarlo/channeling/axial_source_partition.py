@@ -7,8 +7,8 @@ not establish a material source, a physical dissipator, off-axis recoil or
 standard-run admission (``cr-axial-persisted-channel`` stays unverified).
 
 Ownership follows ADR-0018: a transition belongs to the axial source when its
-final state is at or below the declared boundary (bound→bound and free→bound
-capture). Free→free transitions are coherent-bremsstrahlung-like and are never
+final state is below the declared emission barrier (bound→bound and free→bound
+capture, which this block does not separate). Free→free transitions are coherent-bremsstrahlung-like and are never
 scored by the axial source. Lowering currents have no bound→free block.
 
 Units: energies in eV, lengths in Å, spectra in photons/(eV sr incident electron).
@@ -49,9 +49,11 @@ class AxialPartitionSpectra:
 
     ``total`` uses the unsplit current, so ``interference = total - axial -
     free_free`` is a measured signed quantity rather than an assumed zero. The
-    blocks have orthogonal final subspaces, so Hamiltonian evolution gives zero;
-    only jumps carrying final-state coherence between the blocks make it nonzero.
-    Adding ``axial`` to a native free→free score omits ``interference``.
+    blocks have orthogonal final subspaces, so Hamiltonian evolution gives zero.
+    A jump model can make it nonzero only if it couples the blocks through a
+    gain ``Q L Q'`` or a no-jump ``Q (sum L† L) Q'`` term; that is necessary, not
+    sufficient. The block is CBS-owned; combining ``axial`` with any free→free
+    score omits ``interference``.
 
     Validation: cr-axial-source-partition
     """
@@ -66,8 +68,9 @@ class AxialPartitionSpectra:
 class AxialSubspaceClosure:
     """Secular on-axis yield per depth of a retained subspace and of the full grid.
 
-    Rates are photons/(sr Å incident electron). ``omitted_rate`` is the exact
-    represented remainder, including transitions from unretained initial states.
+    Rates are photons/(sr Å incident electron) at one density and depth.
+    ``omitted_rate`` is the secular represented remainder, including transitions
+    from unretained initial states.
     The bound covers the represented grid only, not grid or sector refinement.
 
     Validation: cr-axial-source-partition
@@ -85,8 +88,10 @@ def partition_axial_currents(
 ) -> AxialCurrentPartition:
     """Split lowering currents by whether their final state is bound.
 
-    ``boundary_eV`` is a caller-declared energy on the same scale as
-    ``source.energies_eV``; choosing a physical barrier is outside this function.
+    ``boundary_eV`` is the emission barrier on the same scale as
+    ``source.energies_eV``, with bound meaning strictly below it as in the planar
+    emitter. Passing barrier plus a margin would assign free→margin transitions to
+    channeling radiation. Choosing a physical barrier is outside this function.
     A boundary inside a degenerate multiplet has no basis-independent meaning
     and is refused, since a rotation within the multiplet would move weight
     between owners.
@@ -96,7 +101,10 @@ def partition_axial_currents(
     if not isfinite(boundary_eV):
         raise ValueError("boundary_eV must be finite")
     energies = source.energies_eV
-    bound = energies <= boundary_eV
+    bound = energies < boundary_eV
+    lowering = energies[None, :] - energies[:, None] > source.bohr_tolerance_eV
+    if np.any(source.currents[:, ~lowering]):
+        raise ValueError("currents must contain lowering transitions only")
     if bound.any() and (~bound).any():
         gap = float(energies[~bound].min() - energies[bound].max())
         if gap <= source.bohr_tolerance_eV:
@@ -164,34 +172,59 @@ def _secular_rate(source: GlobalAxialSource, density: np.ndarray, currents: np.n
     return float(weighted.real) * ALPHA_FS / (2 * np.pi * source.hbar_v_eV_ang * doppler**2)
 
 
+def _check_density(rho: np.ndarray, size: int) -> None:
+    if rho.shape != (size, size) or not np.all(np.isfinite(rho)):
+        raise ValueError("density must be a finite eigenbasis matrix of the source dimension")
+    scale = max(float(np.abs(rho).max()), 1.0)
+    if np.abs(rho - rho.conj().T).max() > 1e-12 * scale:
+        raise ValueError("density must be Hermitian")
+    if np.linalg.eigvalsh(rho).min() < -1e-12 * scale:
+        raise ValueError("density must be positive")
+
+
 def emitting_subspace_closure(
-    source: GlobalAxialSource, density: np.ndarray, retained: np.ndarray
+    source: GlobalAxialSource,
+    density: np.ndarray,
+    retained: np.ndarray,
+    *,
+    path_ang: float,
+    min_coherence_phase: float = 100.0,
 ) -> AxialSubspaceClosure:
-    """Quantify the secular on-axis yield omitted by a truncated emitting subspace.
+    r"""Quantify the secular on-axis yield omitted by a truncated emitting subspace.
 
     ``density`` is the incident-normalized eigenbasis density at one depth and
-    ``retained`` is a boolean mask over global eigenstates. Coherence between
-    nondegenerate levels averages out of the long-path secular rate and is
-    dropped; coherence inside a multiplet is kept, so a retained set must hold
-    whole multiplets to stay basis independent.
+    ``retained`` is a boolean mask over global eigenstates. Coherence inside a
+    multiplet is kept, so a retained set must hold whole multiplets to stay basis
+    independent. Coherence between other levels is dropped, which needs
+    $\theta=|E_i-E_{i'}|\ell/\hbar v\gg1$ over ``path_ang``: for equal weights
+    the true rate is $1\pm\sin\theta/\theta$ times the secular one. A coherent pair
+    below ``min_coherence_phase`` is refused. Scattering linewidth is not checked.
 
     Validation: cr-axial-source-partition
     """
     rho = np.asarray(density, dtype=complex)
     keep = np.asarray(retained)
     size = source.energies_eV.size
-    if rho.shape != (size, size) or not np.all(np.isfinite(rho)):
-        raise ValueError("density must be a finite eigenbasis matrix of the source dimension")
+    _check_density(rho, size)
+    if not isfinite(path_ang) or path_ang <= 0:
+        raise ValueError("path_ang must be finite and positive")
     if keep.shape != (size,) or keep.dtype != bool:
         raise ValueError("retained must be a boolean mask over global eigenstates")
     energies = source.energies_eV
     same_level = np.abs(energies[:, None] - energies[None, :]) <= source.bohr_tolerance_eV
     if np.any(same_level & (keep[:, None] != keep[None, :])):
         raise ValueError("retained subspace splits a degenerate multiplet")
+    phase = np.abs(energies[:, None] - energies[None, :]) * path_ang / source.hbar_v_eV_ang
+    coherent = np.abs(rho) > 1e-12 * max(float(np.abs(rho).max()), 1.0)
+    if np.any(coherent & ~same_level & (phase < min_coherence_phase)):
+        raise ValueError("coherent levels are unresolved over path_ang; secular rate is invalid")
     full = _secular_rate(source, rho, source.currents)
     pair = keep[:, None] & keep[None, :]
     retained_rate = _secular_rate(source, rho * pair, source.currents * pair[None])
-    omitted = max(full - retained_rate, 0.0)
+    omitted = full - retained_rate
+    if omitted < -1e-12 * max(full, 1e-300):
+        raise FloatingPointError("retained rate exceeds the full-grid rate beyond roundoff")
+    omitted = max(omitted, 0.0)
     return AxialSubspaceClosure(
         full,
         retained_rate,

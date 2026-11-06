@@ -81,7 +81,7 @@ def test_all_free_or_all_bound_limits(boundary):
 def test_boundary_inside_multiplet_is_refused():
     source = _ladder([0.0, 2.0, 2.0 + 1e-12], {(0, 1): 1e-3, (0, 2): 1e-3})
     with pytest.raises(ValueError, match="multiplet"):
-        partition_axial_currents(source, 2.0)
+        partition_axial_currents(source, 2.0 + 5e-13)
     with pytest.raises(ValueError, match="finite"):
         partition_axial_currents(source, float("nan"))
 
@@ -107,26 +107,42 @@ def test_real_grid_blocks_do_not_interfere_under_hamiltonian_evolution():
     np.testing.assert_allclose(spectra.interference, 0.0, atol=1e-10 * spectra.total.max())
 
 
-def test_only_a_jump_transferring_final_state_coherence_creates_interference():
+def _jump_defect(*elements):
+    """Relative cross term for a single jump built from ``(final, initial)`` elements."""
     gap = 2.0
     source = _ladder([0.0, 7.0, 5.0, 5.0 + gap], {(0, 1): 3e-3, (2, 3): 4e-3})
     split = partition_axial_currents(source, 3.0)
-    depths = np.linspace(0.0, 40.0, 41)
-    energy = np.array([3.0 / DOPPLER])
     rho = np.zeros((4, 4), dtype=complex)
     rho[1, 1] = rho[3, 3] = rho[1, 3] = rho[3, 1] = 0.5
-
-    unjumped = partition_on_axis_spectra(source, split, rho, (), depths, energy)
-    np.testing.assert_allclose(unjumped.interference, 0.0, atol=1e-12 * unjumped.total[0])
-
-    # L|1> ~ |1> and L|2> ~ |0| map the free-final coherence |1><2| onto |1><0|.
     jump = np.zeros((1, 4, 4), dtype=complex)
-    jump[0, 1, 1] = jump[0, 0, 2] = np.sqrt(0.05)
-    coupled = partition_on_axis_spectra(source, split, rho, jump, depths, energy)
-    assert abs(coupled.interference[0]) > 1e-4 * coupled.total[0]
-    np.testing.assert_allclose(
-        coupled.axial + coupled.free_free + coupled.interference, coupled.total, rtol=1e-13
+    for final, initial in elements:
+        jump[0, final, initial] = np.sqrt(0.05)
+    jumps = jump if elements else ()
+    spectra = partition_on_axis_spectra(
+        source, split, rho, jumps, np.linspace(0.0, 40.0, 41), np.array([3.0 / DOPPLER])
     )
+    np.testing.assert_allclose(
+        spectra.axial + spectra.free_free + spectra.interference, spectra.total, rtol=1e-13
+    )
+    return abs(spectra.interference[0]) / spectra.total[0]
+
+
+@pytest.mark.parametrize(
+    "elements",
+    [((0, 2), (1, 3)), ((2, 0), (3, 3)), ((1, 0), (1, 2))],
+    ids=["free-to-bound-gain", "bound-to-free-gain", "no-jump-coupling"],
+)
+def test_block_coupling_jumps_create_a_measured_cross_term(elements):
+    assert _jump_defect(*elements) > 1e-4
+
+
+@pytest.mark.parametrize(
+    "elements",
+    [(), ((0, 0), (1, 1), (2, 2), (3, 3)), ((0, 2),), ((0, 1), (2, 1))],
+    ids=["hamiltonian", "dephasing", "rank-one", "fan-out"],
+)
+def test_jumps_that_do_not_couple_final_coherence_leave_no_cross_term(elements):
+    assert _jump_defect(*elements) < 1e-12
 
 
 def _two_level(jump=(), *, population=1.0):
@@ -277,7 +293,7 @@ def test_closure_matches_golden_rule_and_counts_all_omitted_transitions():
     source = _ladder([0.0, 2.0, 5.0], {(0, 1): 3e-3, (1, 2): 2e-3, (0, 2): 1e-3})
     rho = np.diag([0.0, 0.25, 0.75]).astype(complex)
     keep = np.array([True, True, False])
-    closure = emitting_subspace_closure(source, rho, keep)
+    closure = emitting_subspace_closure(source, rho, keep, path_ang=1e6)
     prefactor = ALPHA_FS / (2 * np.pi * HV * DOPPLER**2)
     full = prefactor * (0.25 * 2 * 9e-6 + 0.75 * (3 * 4e-6 + 5 * 1e-6))
     retained = prefactor * 0.25 * 2 * 9e-6
@@ -305,7 +321,9 @@ def test_closure_rate_matches_independent_rest_dipole_and_aberration():
         0,
         1e-10,
     )
-    closure = emitting_subspace_closure(source, np.diag([0.0, 1.0]), np.ones(2, dtype=bool))
+    closure = emitting_subspace_closure(
+        source, np.diag([0.0, 1.0]), np.ones(2, dtype=bool), path_ang=1e6
+    )
     # A'/(gamma beta c), transverse rest dipole density on axis, aberration Jacobian.
     rest_rate_over_c = 4 / 3 * ALPHA_FS * (gamma * gap / HBARC_EV_ANG) ** 3 * dipole**2
     oracle = rest_rate_over_c / (gamma * beta) * 3 / (8 * np.pi) * gamma**2 * (1 + beta) ** 2
@@ -322,20 +340,69 @@ def test_closure_is_basis_invariant_in_a_multiplet_and_refuses_splitting_it():
     rho = np.diag([0.0, 0.8, 0.2]).astype(complex)
     keep = np.ones(3, dtype=bool)
     assert emitting_subspace_closure(
-        turned, unitary @ rho @ unitary.conj().T, keep
-    ).full_rate == pytest.approx(emitting_subspace_closure(plain, rho, keep).full_rate, rel=1e-12)
+        turned, unitary @ rho @ unitary.conj().T, keep, path_ang=1e6
+    ).full_rate == pytest.approx(
+        emitting_subspace_closure(plain, rho, keep, path_ang=1e6).full_rate, rel=1e-12
+    )
     with pytest.raises(ValueError, match="multiplet"):
-        emitting_subspace_closure(plain, rho, np.array([True, True, False]))
+        emitting_subspace_closure(plain, rho, np.array([True, True, False]), path_ang=1e6)
 
 
 def test_closure_input_validation_and_zero_density():
     source = _three_level()
     keep = np.ones(4, dtype=bool)
-    assert emitting_subspace_closure(source, np.zeros((4, 4)), keep).omitted_fraction == 0
+    assert (
+        emitting_subspace_closure(source, np.zeros((4, 4)), keep, path_ang=1e6).omitted_fraction
+        == 0
+    )
     with pytest.raises(ValueError, match="density"):
-        emitting_subspace_closure(source, np.zeros((3, 3)), keep)
+        emitting_subspace_closure(source, np.zeros((3, 3)), keep, path_ang=1e6)
     with pytest.raises(ValueError, match="boolean"):
-        emitting_subspace_closure(source, np.zeros((4, 4)), np.ones(4))
+        emitting_subspace_closure(source, np.zeros((4, 4)), np.ones(4), path_ang=1e6)
+
+
+def test_closure_refuses_invalid_density_and_unresolved_coherence():
+    source = _ladder([0.0, 2.0, 2.0 + 1e-4], {(0, 1): 3e-3, (0, 2): 3e-3})
+    keep = np.ones(3, dtype=bool)
+    rho = np.array([[0, 0, 0], [0, 0.5, 0.5], [0, 0.5, 0.5]], dtype=complex)
+    with pytest.raises(ValueError, match="unresolved"):
+        emitting_subspace_closure(source, rho, keep, path_ang=1e4)
+    # True rate for this pair is 1 + sin(theta)/theta times secular, so it needs a long path.
+    assert emitting_subspace_closure(source, rho, keep, path_ang=1e10).full_rate > 0
+    populations = np.diag([0.0, 0.5, 0.5]).astype(complex)
+    assert emitting_subspace_closure(source, populations, keep, path_ang=1e4).full_rate > 0
+    with pytest.raises(ValueError, match="Hermitian"):
+        emitting_subspace_closure(source, np.triu(rho), keep, path_ang=1e9)
+    with pytest.raises(ValueError, match="positive"):
+        emitting_subspace_closure(source, np.diag([0.0, 1.0, -0.5]), keep, path_ang=1e9)
+    with pytest.raises(ValueError, match="path_ang"):
+        emitting_subspace_closure(source, populations, keep, path_ang=0.0)
+
+
+def test_full_retained_set_omits_nothing_and_vanishing_damping_recovers_sinc():
+    source = _three_level()
+    rho = np.diag([0.0, 0.25, 0.25, 0.5]).astype(complex)
+    closure = emitting_subspace_closure(source, rho, np.ones(4, dtype=bool), path_ang=1e6)
+    assert closure.omitted_rate == 0
+    assert closure.retained_rate == closure.full_rate > 0
+
+    gap, length = 2.0, 300.0
+    two, excited, _ = _two_level()
+    depths = np.linspace(0.0, length, 101)
+    energies = (gap + np.linspace(-1.5, 1.5, 5)) / DOPPLER
+    weak = np.array([[[0, np.sqrt(1e-12)], [0, 0]]], dtype=complex)
+    detuning = (energies * DOPPLER - gap) / HV
+    sinc = length**2 * np.sinc(detuning * length / (2 * np.pi)) ** 2
+    expected = ALPHA_FS * energies * (3e-3) ** 2 * sinc / (4 * np.pi**2 * HV**2)
+    np.testing.assert_allclose(_spectrum(two, excited, weak, depths, energies), expected, rtol=1e-4)
+
+
+def test_partition_refuses_non_lowering_currents_and_uses_a_strict_barrier():
+    source = _three_level()
+    assert not partition_axial_currents(source, 2.0).bound[1]
+    source.currents[0, 1, 0] = 1e-3
+    with pytest.raises(ValueError, match="lowering"):
+        partition_axial_currents(source, 3.0)
 
 
 def test_exit_path_normal_and_tilted_slab_and_refusals():
