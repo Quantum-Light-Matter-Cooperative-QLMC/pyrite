@@ -3,7 +3,7 @@
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=32G
-#SBATCH -t 02:30:00
+#SBATCH -t 04:00:00
 #SBATCH -o scratch/roulette879/fom-%j.log
 # Run from a clean isolated checkout at the pushed SHA. First argument is the
 # output root; the rest pass verbatim to checks/line_roulette_fom_879.py.

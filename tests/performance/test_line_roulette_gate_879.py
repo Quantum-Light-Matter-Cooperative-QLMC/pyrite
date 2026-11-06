@@ -166,3 +166,25 @@ def test_yield_variance_summary_flags_rare_history_missed_by_predictor():
     analog = analysis.yield_variance_summary(mass, np.ones(4))
     assert analog["added_variance"] == 0.0
     assert analog["added_over_analog"] == 0.0
+
+
+def test_equal_wall_electrons_solves_the_fitted_line_within_bounds():
+    points = [(512, 20.0), (2048, 50.0)]
+    assert analysis.equal_wall_electrons(points, 70.0, minimum=512, maximum=8192) == 3072
+    assert analysis.equal_wall_electrons(points, 5.0, minimum=512, maximum=8192) == 512
+    assert analysis.equal_wall_electrons(points, 900.0, minimum=512, maximum=8192) == 8192
+    with pytest.raises(ValueError, match="grow"):
+        analysis.equal_wall_electrons([(512, 9.0), (2048, 3.0)], 5.0, minimum=1, maximum=9)
+
+
+def test_bin_rse_uses_the_analog_bins_and_rescales_to_equal_wall():
+    reference = np.array([100.0, 1.0, 0.01])
+    batches = np.array([[90.0, 0.5, 5.0], [110.0, 1.5, 5.0]])
+    summary, scaled = analysis.bin_rse_summary(batches, reference, 40.0, 10.0)
+    assert summary["bins"] == 2  # the 1e-4-of-peak bin leaves, whatever the arm scores there
+    expected = np.array([10.0 / 100.0, 0.5 / 1.0])
+    np.testing.assert_allclose(scaled, expected * 2.0)
+    assert summary["rse_q50"] == pytest.approx(np.quantile(expected, 0.5))
+    assert summary["equal_wall_rse_q95"] == pytest.approx(2.0 * np.quantile(expected, 0.95))
+    with pytest.raises(ValueError, match="two batches"):
+        analysis.bin_rse_summary(batches[:1], reference, 1.0, 1.0)
