@@ -43,7 +43,7 @@ Histories are independent, and $s_0$ depends only on pilot histories, which are 
 E[\hat S(E) \mid \text{transport}] = S(E),
 ```
 
-for every bin and any linear functional of the spectrum. A skipped primary loses nothing: every surviving line has $w_\ell > 0$ and finite $a_\ell$, so $m_i = 0$ means it has no surviving line and $f_i \equiv 0$. The screen only sets $p_i$, so a poor screen costs variance and never bias, as long as $p_{\min} > 0$.
+for every bin and any linear functional of the spectrum. A skipped primary loses nothing: every surviving line has $w_\ell > 0$ and finite $a_\ell$, so $m_i = 0$ means it has no surviving line and $f_i \equiv 0$. This needs the audited per-row route, so flight-grouped substeps are refused: that route reduces whole flights and fills no per-row audit. Among primaries with $m_i > 0$ the screen only sets $p_i$, so a poor screen costs variance and never bias, as long as $p_{\min} > 0$. The proof also needs each $U_i$ independent of the histories. The draw hashes only the seed, a fixed salt and the primary ID, and consumes nothing from the transport streams.
 
 The roulette draws add, conditional on transport,
 
@@ -69,7 +69,7 @@ For amplitudes $a_i$ the coherent spectrum squares a sum, and $E[(B_i/p_i)^2] = 
 E\left|\sum_i \frac{B_i}{p_i} a_i\right|^2 = \left|\sum_i a_i\right|^2 + \sum_i \left(\frac{1}{p_i} - 1\right) |a_i|^2 ,
 ```
 
-which is biased high. Cases with coherent emission, temporal profiles, channeling or two-beam line scoring are refused.
+which is biased high. Cases with coherent emission, temporal profiles, channeling, two-beam line scoring or flight-grouped substeps (`max_dE_frac`) are refused when the case is built and again when scoring starts.
 
 ## Limiting cases
 
@@ -86,7 +86,9 @@ The selection is reproducible only up to floating-point rounding of the masses. 
 
 ## Statistics and audits
 
-The screen pass fills the truncation audit, so line mass, out-of-axis bounds and per-primary line-yield statistics stay analog and exact, and need no weights. The adaptive monitor and bandwidth attribution call the scorer without a screen. Run provenance records the policy, threshold, retained counts, exact mass, weighted estimate and added mass variance.
+The screen pass fills the truncation audit, so line mass, out-of-axis bounds and per-primary line-yield statistics stay analog, with no roulette noise and no weights. The adaptive monitor and bandwidth attribution call the scorer without a screen. So the reported yield standard error and the adaptive `target_rse` describe the analog yield and exclude Eq. {eq}`eq-roulette-variance`: they understate the uncertainty of the reweighted spectrum.
+
+Run provenance records the policy, threshold, retained counts, `line_mass_analog`, `line_mass_estimate` and `added_mass_variance`. These masses are unnormalized sums over the population. They count the full profile of each kept line, including any part beyond the grid ends, so they are not the integral of the spectrum over the axis; the two differed by $5\times10^{-4}$ on a 6759-node grid.
 
 ## Independent verification
 
@@ -125,3 +127,55 @@ $$
 which gives Eq. {eq}`eq-roulette-coherent-bias`.
 
 Block invariance requires three things of the code: $s_0$ read only from the $n_p$ lowest primary IDs, $U_i$ a pure function of seed and ID, and a block's $B_i$ evaluated on masses that do not depend on the screen grid or on which other primaries share the block. A retried block must recompute the same $B_i$ and must not add its screen audit twice.
+
+### Comparison with the implementation
+
+The estimator, draw and threshold in `runner/line_roulette.py` match the rederivation on every route except the flight-grouped one. Probes used a 30 keV HOPG film of 1 µm on the CPU backend, with per-primary spectra from the production scorer as the reference.
+
+| Check | Result |
+| --- | --- |
+| Threshold and $p_i$ recomputed outside the code, $N = 300$, $p_{\min} = 0.25$ | Identical |
+| Integrated mean over 600 seeds, fixed transport, divided by $S$ | $1.00025$, $z = 0.08$ |
+| Observed variance over Eq. {eq}`eq-roulette-variance`, integrated | $1.04$ |
+| Same ratio per bin, 20 largest bins (min, median, max) | $0.86$, $0.998$, $1.06$ |
+| $\mathrm{corr}(U_i, \ln m_i)$, $n = 300$ | $0.09$, below the $0.11$ two-sided 5% level |
+| Screen mass over full-grid audit mass, multilayer stack | Relative difference 0 |
+| Inverse-probability reconstruction, multilayer stack | Relative difference $4 \times 10^{-16}$ |
+| $p_{\min} = 1$ against analog: default, narrow and off-centre axes, non-uniform axis, `E_cut_lines_keV` of 29.8 and 29.95, bin-mean, `sinc_cutoff`, mosaic, secondary cascade | Relative difference 0 |
+| Same, on a narrow axis with 39 of 40 primaries at zero mass | Relative difference 0 |
+| Line-phase OOM injected after the audit merge, rerun on the same phase cache | Spectrum, record and audit line mass unchanged |
+
+The screen window equals the scoring window on these routes. The keep-window pad and the tabulation grid read only the first and last grid nodes, so the 2-node grid reproduces them, and no surviving-line mask reads an interior node.
+
+The `id(E_grid)` table key is safe for the screen. `LineScreen` keeps its grid array alive, so the identity cannot be reused, and it holds its own cache separate from the real grid's.
+
+The audit merge does not double count. The joined path builds a new audit on each attempt, the electron-block retry restores a snapshot whose arrays are replaced rather than mutated, live streaming has no audit because it refuses `line_grid_policy`, and artifact replay has no retry.
+
+### Discrepancy
+
+**The zero-mass premise fails on the flight-grouped route.** With `max_dE_frac > 0`, flights split into substeps and `_setup` selects the grouped reduction. That branch of `_accumulate_reflection` reduces and returns before it reaches `_accumulate_edge_truncation`, so the audit stays empty. `LineScreen.score` then sets $m_i = 0$ for every primary, and every primary is skipped. The first divergent statement is the implication $m_i = 0 \implies f_i \equiv 0$ above; here $m_i = 0$ while $f_i \ne 0$.
+
+| Quantity, $N = 40$, `max_dE_frac` $= 0.002$, $p_{\min} = 1$ | Analog | Roulette |
+| --- | --- | --- |
+| Peak of `spec` | $3.5976 \times 10^{-9}$ | $0$ |
+| Primaries scored | | 0 |
+| Primaries at zero mass | | 40 |
+| `line_mass_exact` | | 0 |
+
+`Case(...)` accepts this combination, and `run_case` runs it without a warning. On a device backend the grouped route raises, so the failure is silent only on the host.
+
+The sentence "a poor screen costs variance and never bias" needs the same exception: it holds for $p_i > 0$, and the skip is $p_i = 0$.
+
+### Other findings
+
+- **Refusals are enforced only by `Case`.** `line_screen_for` does not call `validate_case`, and `checks/line_roulette_fom_879.py` sets the policy on a raw dict. A raw dict with `temporal_profile` reached temporal setup without the roulette refusal. By reading, a raw two-beam dict would return from `case_dtr_spectrum` with an empty audit and give the same zero spectrum.
+- **`line_mass_exact` is a conditional, unnormalized, whole-profile sum.** It is exact in having no roulette noise. It is not the yield on the axis: it is $N$ times the integral of the untruncated profiles of the lines inside the padded window. On the 6759-node resonance grid, $N \int \hat S \, dE$ over `line_mass_estimate` was $0.9995$. `added_mass_variance` has the same normalization, so it carries no $N^{-2}$, unlike Eq. {eq}`eq-roulette-variance`.
+- **Block invariance is exact for draws and holds to rounding for masses.** The test helper cites this page for a $6 \times 10^{-16}$ repeatability that the page does not state. A primary within that distance of $s_0$ could change stratum, which leaves the estimator unbiased.
+- **Reported statistics describe the analog yield.** The yield standard error and the adaptive `target_rse` exclude Eq. {eq}`eq-roulette-variance`, so they understate the uncertainty of the reweighted spectrum.
+
+### Not verified
+
+- CUDA execution, including `_fused.line_bracket` and `_queue_unit_lines`, because no device was used.
+- The grooved route by execution. It shares the audited per-reflection branch with the multilayer route, which was run.
+- MeV behavior and analog agreement, which remain pending for `anchored`.
+- Replay of artifacts that hold a subset of histories.

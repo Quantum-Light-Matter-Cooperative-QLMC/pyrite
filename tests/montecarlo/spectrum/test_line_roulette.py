@@ -55,7 +55,7 @@ def _assert_same_selection(actual, expected):
     """Exact selection; device mass sums repeat only to about 6e-16 (see the derivation)."""
     for key in ("primaries_scored", "primaries_at_floor", "primaries_zero_mass", "rows_scored"):
         assert actual[key] == expected[key], key
-    for key in ("threshold", "line_mass_exact", "line_mass_estimate", "added_mass_variance"):
+    for key in ("threshold", "line_mass_analog", "line_mass_estimate", "added_mass_variance"):
         np.testing.assert_allclose(actual[key], expected[key], rtol=1e-12, err_msg=key)
 
 
@@ -123,11 +123,41 @@ def test_invalid_policy_is_refused(payload):
 
 @pytest.mark.parametrize(
     "key, value",
-    [("coherent_emission", True), ("temporal_profile", True), ("channeling", {"planes": 1})],
+    [
+        ("coherent_emission", True),
+        ("temporal_profile", True),
+        ("channeling", {"planes": 1}),
+        ("max_dE_frac", 0.002),
+    ],
 )
 def test_non_additive_line_routes_are_refused(key, value):
     with pytest.raises(ValueError, match=key):
         LineRoulette(floor=0.5).validate_case({key: value})
+
+
+def test_scoring_refuses_a_raw_mapping_on_a_non_additive_route(case):
+    with pytest.raises(ValueError, match="max_dE_frac"):
+        line_screen_for({**case, "line_roulette": POLICY, "max_dE_frac": 0.002}, case["Ne"])
+
+
+def test_mass_pass_refuses_flight_grouped_substeps_instead_of_reading_zero(case):
+    """Validation: line-scoring-roulette. Grouped rows fill no audit, so zero would be wrong."""
+    substepped = {**case, "max_dE_frac": 0.002}
+    transport = runner._transport_case(substepped, transport_core="per-electron")
+    grid = transport["E_grid"]
+    audit = {"start_eV": float(grid[0]), "stop_eV": float(grid[-1]), "mass_only": True}
+    with pytest.raises(ValueError, match="flight-grouped"):
+        runner._cxr_for_segments(
+            transport["segs"],
+            np.array([grid[0], grid[-1]]),
+            substepped,
+            transport["n_hat"],
+            None,
+            None,
+            coherent=False,
+            Ne=case["Ne"],
+            truncation_audit=audit,
+        )
 
 
 def test_two_beam_line_scoring_is_refused():
@@ -236,7 +266,7 @@ def test_record_reports_the_exact_mass_and_conditional_variance(weighted):
     assert record["model"] == LINE_ROULETTE_MODEL
     assert record["primaries"] == 40
     assert 0 < record["rows_scored"] < record["rows"]
-    assert record["line_mass_exact"] > 0.0
+    assert record["line_mass_analog"] > 0.0
     assert record["line_mass_estimate"] > 0.0
     assert record["added_mass_variance"] > 0.0
 

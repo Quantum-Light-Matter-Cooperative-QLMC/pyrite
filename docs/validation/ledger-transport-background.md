@@ -58,7 +58,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 - **Code:** `_line_roulette.py::LineRoulette`; `montecarlo/runner/line_roulette.py::{LineScreen,roulette_uniforms}`; `montecarlo/spectrum/cxr/_kernels.py::_audit_skips_reduction`
 - **Source:** elementary inverse-probability weighting (Horvitz-Thompson) of independent Bernoulli selection; [derivation](beam-transport/line-scoring-roulette.md)
 - **Equation:** [Line-scoring roulette](beam-transport/line-scoring-roulette.md) Eqs. `eq-roulette-mass` to `eq-roulette-coherent-bias`
-- **Assumptions:** independent primary histories; `p_i` fixed by the primary's own mass and a threshold from always-scored pilot histories; additive per-history incoherent line tally; `p_min > 0`; blocks of whole primaries in ascending ID order
+- **Assumptions:** independent primary histories; `p_i` fixed by the primary's own mass and a threshold from always-scored pilot histories; additive per-history incoherent line tally on the audited per-row route (flight-grouped substeps refused); uniforms independent of the histories; `p_min > 0`; blocks of whole primaries in ascending ID order
 - **Limiting cases:** `p_min = 1` is analog up to summation order; `N <= n_p` is analog; all-zero pilot keeps every positive-mass primary; zero-mass primaries contribute nothing; the coherent square is biased by `sum (1/p_i - 1)|a_i|^2` and refused
 - **Status:** unverified
 - **Checks:** per-primary inverse-probability reconstruction of the scored spectrum; draw rate and seed-averaged coefficient means; mass-only pass equal to the full audit; streamed block sizes equal to joined scoring; adaptive at N bitwise equal to fixed at N; analog audit preserved; policy and route refusals

@@ -21,6 +21,7 @@ _REFUSED_KEYS = {
     "coherent_emission": "coherent emission squares a sum of amplitudes",
     "temporal_profile": "temporal profiles accumulate unweighted line boxes",
     "channeling": "channeling joins zones across a history",
+    "max_dE_frac": "substeps of a flight add coherently, so a row has no separate line mass",
 }
 
 

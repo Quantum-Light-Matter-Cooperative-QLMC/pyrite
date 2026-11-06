@@ -65,6 +65,7 @@ class LineScreen:
 
     def __init__(self, case: Mapping[str, Any], n_electrons: int):
         self.policy = LineRoulette.from_dict(case["line_roulette"])
+        self.policy.validate_case(case)
         self.seed = int(case["seed"])
         self.n = int(n_electrons)
         self.mass = np.zeros(self.n)
@@ -170,7 +171,13 @@ class LineScreen:
         return np.zeros(grid.shape) if spectrum is None else spectrum
 
     def record(self) -> dict[str, Any]:
-        """Provenance and the estimator's exact, conditional yield variance."""
+        """Provenance and the conditional variance of the summed line mass.
+
+        Masses are unnormalized whole-profile sums over the population, so
+        ``added_mass_variance`` carries no ``1/N**2``. ``line_mass_analog`` has
+        no roulette noise; it counts the full profile of each kept line, also
+        beyond the grid ends.
+        """
         culled = self.probability < 1.0
         estimate = float(self.mass[self.kept] @ (1.0 / self.probability[self.kept]))
         return {
@@ -182,7 +189,7 @@ class LineScreen:
             "primaries_zero_mass": int(np.count_nonzero(self.mass == 0.0)),
             "rows": int(self.rows.sum()),
             "rows_scored": int(self.rows[self.kept].sum()),
-            "line_mass_exact": float(self.mass.sum()),
+            "line_mass_analog": float(self.mass.sum()),
             "line_mass_estimate": estimate,
             "added_mass_variance": float(
                 (1.0 / self.probability[culled] - 1.0) @ self.mass[culled] ** 2
