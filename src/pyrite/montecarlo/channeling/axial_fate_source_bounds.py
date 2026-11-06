@@ -92,7 +92,7 @@ def _total_cap(name: str, values: Sequence[float]) -> float:
 def _terminal_fate_depths(
     records: Sequence[AxialHandoffRecord], sampled_max_depth_ang: float
 ) -> tuple[list[float], list[float]]:
-    """Validate a complete incident census before estimating terminal CDFs."""
+    """Validate unit-weight records before estimating CDFs; omitted incidents are undetectable."""
     if not records:
         raise ValueError("no independently sampled incident records")
     seen: set[int] = set()
@@ -143,7 +143,10 @@ def physical_fate_source_uppers(
     stop with joint failure probability at most ``sampling_failure_probability``.
     For each interval the CDF upper bound at its stop is uniform over the
     whole interval by monotonicity. This does not give a physical return-flux
-    calculation: the cap supplies the worst-case response of outgoing fates.
+    calculation: the cap supplies the worst-case response of outgoing fates. The multiplier
+    also assumes no error at depth z for a history without a class event by z.
+    This holds for yield at crystal thickness z, not for depth-resolved use
+    where a later exit returns above z.
 
     Validation: cr-axial-depth-budget
     """

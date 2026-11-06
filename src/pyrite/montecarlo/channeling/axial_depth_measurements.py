@@ -126,6 +126,9 @@ def source_interval_bounds(
     by the caller. It does not certify each fine bin's relative accuracy; to
     guard a fine bin use a separate observable key and a one-bin measurement.
     No cancellation across spectral/angle bins or perturbed channels is used.
+    Probes are one-at-a-time, so the supplier must cover channel interaction
+    (the ``e1*e2`` term) with chained probes, an all-on closure probe or an
+    allowance inside one of the probe bounds.
 
     Validation: cr-axial-depth-budget
     """

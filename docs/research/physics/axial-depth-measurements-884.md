@@ -67,6 +67,6 @@ depths), or independently justify a nonzero surface contribution. Never
 extrapolate from a measured endpoint into this region.
 
 A finite error envelope on several intervals does not imply all intermediate
-or later depths are admissible. The underlying guard refuses gaps, zero-depth
+or later depths are admissible. The underlying guard refuses a requested depth inside a gap, zero-depth
 relative error, inadequate joint confidence and any interval exceeding the
 caller-selected source tolerance. Standard axial runs remain refused until #992, #993 and #994 are complete.

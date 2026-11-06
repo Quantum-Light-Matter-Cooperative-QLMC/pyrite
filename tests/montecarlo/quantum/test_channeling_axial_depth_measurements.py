@@ -198,41 +198,34 @@ def test_preflight_consumes_compiled_evidence_before_any_sampling(monkeypatch):
     assert calls[0][1]["max_depth_ang"] == 200.0
 
 
-def test_compiled_bound_contains_randomized_true_relative_error():
-    """The triangle bound holds for true errors drawn inside each supplied allowance."""
+def test_sign_aligned_errors_attain_the_compiled_bound_exactly():
+    """Each allowance must count: aligned true errors reach the bound with equality."""
     rng = np.random.default_rng(884)
     bins = 6
-    for _ in range(200):
-        reference = rng.uniform(1.0, 2.0, bins)
-        stat = rng.uniform(0.0, 0.01, bins)
-
-        probes = {
-            name: AxialPhotonPairedProbe(
-                reference + rng.uniform(-0.02, 0.02, bins), stat, stat, name
-            )
-            for name in ("return", "unresolved", "matching", "grid", "model")
-        }
-        interval = source_interval_bounds(
-            AxialPhotonSourceIntervalMeasurement(
-                start_depth_ang=10.0,
-                stop_depth_ang=20.0,
-                reference_yield_bins=reference,
-                reference_stat_error_upper_bins=stat,
-                reference_depth_drift_upper_bins=stat,
-                return_flux=probes["return"],
-                unresolved=probes["unresolved"],
-                matching_surface=probes["matching"],
-                grid_supercell=probes["grid"],
-                source_model=probes["model"],
-                evidence_id="interval",
-                simultaneous_confidence=0.99,
-            )
+    reference = rng.uniform(1.0, 2.0, bins)
+    ref_stat, ref_drift = rng.uniform(0.0, 0.01, (2, bins))
+    names = ("return", "unresolved", "matching", "grid", "model")
+    worst = np.zeros(bins)
+    probes = {}
+    for name in names:
+        shift, stat, drift = rng.uniform(-0.02, 0.02, bins), *rng.uniform(0.0, 0.01, (2, bins))
+        probes[name] = AxialPhotonPairedProbe(reference + shift, stat, drift, name)
+        worst += abs(shift) + stat + drift
+    interval = source_interval_bounds(
+        AxialPhotonSourceIntervalMeasurement(
+            start_depth_ang=10.0,
+            stop_depth_ang=20.0,
+            reference_yield_bins=reference,
+            reference_stat_error_upper_bins=ref_stat,
+            reference_depth_drift_upper_bins=ref_drift,
+            return_flux=probes["return"],
+            unresolved=probes["unresolved"],
+            matching_surface=probes["matching"],
+            grid_supercell=probes["grid"],
+            source_model=probes["model"],
+            evidence_id="interval",
+            simultaneous_confidence=0.99,
         )
-        # True reference sits anywhere within its allowance; true errors are signed draws.
-        true_reference = reference - rng.uniform(0, 1, bins) * 2 * stat
-        true_error = np.zeros(bins)
-        for item in probes.values():
-            shift = np.asarray(item.candidate_yield_bins) - reference
-            true_error += shift + rng.uniform(-1, 1, bins) * 2 * stat
-        relative = abs(true_error.sum()) / true_reference.sum()
-        assert relative <= interval.relative_error_upper
+    )
+    attained = worst.sum() / (reference - ref_stat - ref_drift).sum()
+    assert interval.relative_error_upper == pytest.approx(attained, rel=1e-13)

@@ -1691,3 +1691,87 @@ Suggested ledger change (the task owner applies it; never `signed-off`):
 - Notes: record sub-verdict (a) `rederived` for the loss-coupling
   instrumentation, and the clamp magnitude on the $2\times2$-cell $32^2$ grid
   (1.33% mean, up to 98% pointwise). Human sign-off remains in #277.
+
+## Fresh-context verification (2026-11-05)
+
+Scope: the row's research accounting claim. This derivation was written from the ledger row before opening any implementation body or test body under this review.
+
+### Independent derivation
+
+Let $P,F,O$ be orthogonal projectors with $P+F+O=I$ on the represented space. For Lindblad operators $J_m$ (Castin, Dalibard and Mølmer) the total jump rate is $\Gamma[\rho]={\rm Tr}\,\rho\sum_mJ_m^\dagger J_m$. For $Q\in\{P,F,O\}$ define $E_Q=\sum_mJ_m^\dagger QJ_m$.
+
+**Positivity.** $Q=Q^\dagger Q$ gives $\langle\psi\rvert E_Q\lvert\psi\rangle=\sum_m\lVert QJ_m\psi\rVert^2\ge0$.
+
+**Closure.** Linearity and completeness give $\sum_QE_Q=\sum_mJ_m^\dagger(P+F+O)J_m=\sum_mJ_m^\dagger J_m$, so $\sum_Q{\rm Tr}\,\rho E_Q=\Gamma[\rho]$. The $Q=P$ term is the recapture, and the identity requires it. Closure fails by exactly $\Gamma_P$ if it is omitted.
+
+**Relation to retained-weight loss.** From $\dot\rho=-\tfrac{i}{\hbar}[H,\rho]+\sum_mJ_m\rho J_m^\dagger-\tfrac12\{\sum_mJ_m^\dagger J_m,\rho\}$,
+
+$$
+\frac{d}{dt}{\rm Tr}\,P\rho=-\frac{i}{\hbar}{\rm Tr}\,[P,H]\rho+{\rm Tr}\,\rho E_P-\tfrac12{\rm Tr}\,\{P,\textstyle\sum_mJ_m^\dagger J_m\}\rho.
+$$
+
+Only for $\rho=P\rho P$, $[H,P]=0$ and fixed $P$ does this reduce to $-{\rm Tr}\,\rho(E_F+E_O)$. So closure is a statement about the jump rate, not by itself about retained-weight loss.
+
+**Non-identifiability.** For an isometry $V$ on the jump target, $J'_m=VJ_m$ leaves $\sum_mJ_m^\dagger J_m$ fixed while $E_Q'=\sum_mJ_m^\dagger V^\dagger QVJ_m$ changes whenever $V$ does not commute with $Q$. So a loss effect alone does not identify an outgoing direction law.
+
+**Limits.** $J_m\to0$ gives all effects zero. A window enclosing the full jump image gives $E_O\to0$ and $E_P+E_F=\sum_mJ_m^\dagger J_m$.
+
+**Scope consequence.** All of the above is algebra on supplied projectors. It holds for any choice of $P,F,O$, so it cannot establish that a given choice is a physical matching surface. An anchored status can only cover the accounting identities and their numerical realization.
+
+### Implementation and anchor comparison
+
+Everything below was added after opening the implementation, at commit `1c1e001cd`.
+
+**Source.** Castin, Dalibard and Mølmer, arXiv:0805.4002, was read for this review. Eq. (2) is the relaxation operator, Eq. (4) the no-jump Hamiltonian and Eq. (8) the jump probability $\delta p_m=\delta t\langle\phi\rvert C_m^\dagger C_m\lvert\phi\rangle$, as the row cites.
+
+**Independent dense oracle.** The operators were random, with no repository code.
+
+| Check | Result |
+| --- | --- |
+| Closure of $E_P+E_F+E_O$ against $\sum_mJ_m^\dagger J_m$, 500 random draws | maximum relative error $5.4\times10^{-16}$ |
+| Smallest eigenvalue over all effects | $-2.1\times10^{-14}$, roundoff |
+| Smallest recapture rate over the draws | $5.11$, so closure fails without $Q=P$ |
+| $J\to VJ$ with unitary $V$ | loss changes by $2.3\times10^{-16}$; $E_F$ changes by $0.69$ relative |
+| ${\rm Tr}\,P\dot\rho$ for $\rho=P\rho P$, $[H,P]=0$ | $-82.499685694571$ on both sides |
+| Same with generic $H$ and $\rho$ | $4.71$ against $-75.12$, so closure is not retained-weight loss |
+
+**Check code against a separate route.** A Gauss-Hermite displacement average over explicit plane-wave jumps, without the Kraus factorization, reproduces `periodic_tds_rates`. `W` agrees to $4.2\times10^{-15}$ and `total` to $2.1\times10^{-15}$ (maximum relative). The three-way split of four retained states closes exactly and every $\Gamma_O$ is positive, the smallest being $0.0180$.
+
+`checks/axial_escape_accounting.py` runs and reproduces the row's counterexample. For Si [001] at 5 MeV the total is $6.0783\times10^{-5}$ Å$^{-1}$ at all four incident orders, while the window escape ranges from $5.13\times10^{-6}$ to $4.15\times10^{-5}$ Å$^{-1}$.
+
+### Anchor evaluation
+
+`test_channeling_axial_escape_accounting.py` and `test_channeling_axial_matching_study.py` give 25 passed locally. CI status was not observed in this review. All the behaviours the Anchor field describes exist, and their references are independent of the routine under test: exact hand rates, direct Gaussian quadrature, closed-form Gaussian integrals, a direct lattice sum, an analytic two-state solution and an explicit $2\times2$ supercell.
+
+Ten mutated versions of the check code all failed:
+
+| Mutant | Killed by |
+| --- | --- |
+| recapture dropped from the retained generator | `test_retained_flux_balance_and_two_state_solution` |
+| $\Gamma_O$ without subtracting gain | same |
+| recapture dropped from the plane-wave total | `test_equal_density_plane_waves_have_different_window_escape` and one other |
+| modulo wrap of outgoing order | `test_negative_nyquist_is_a_state_and_no_modulo_wrap_occurs` and one other |
+| gain without interference | three tests |
+| gain without the mean subtraction | five tests |
+| continuum total without coherence | `test_continuum_gain_closes_on_the_full_diagonal` |
+| continuum gain without coherence | two tests |
+| loss harmonic without damping | `test_total_loss_matches_direct_variance_harmonics` |
+| wrong area normalization | three tests |
+
+### Findings
+
+**High and Medium:** none for the stated scope.
+
+**Low.**
+
+- No Code or Anchor entry is missing. All 20 listed symbols and both listed test modules resolve.
+- `report`, `continuum_report` and `bloch_report` in the Code field are not called by any test, so `anchored` cannot extend to the Si [001] numbers, depth budgets or SLURM results in Notes. I ran only the escape-accounting report here.
+- `test_channeling_axial_mcwf_return_flux.py`, `test_channeling_axial_projection.py` and `test_channeling_axial_outgoing_maps.py` test listed owners but are absent from the Anchor field. They give 33 passed. Those diagnostics were not re-derived or mutated in this review and rest on their earlier scoped reviews.
+- `Validation: cr-axial-zone-handoff-accounting (unverified)` is stale in `src/pyrite/montecarlo/channeling/axial_projection.py` and `checks/axial_mcwf_return_flux.py`.
+- The inside/outside trace check in `test_coherent_gain_matches_direct_gaussian_jump_average` is an index-partition identity. The evidence there is the quadrature agreement, not that assertion.
+
+**Scope.** The row does not claim a physical matching surface: the Claim and Anchor fields exclude it, both test docstrings disclaim escape or dechanneling physics, and `cr-axial-zone-handoff-physical` owns the instrument.
+
+### Verdict
+
+`rederived`. Advancing to `anchored` is justified for the stated research accounting scope, once the listed anchors are green in CI. This covers the identities and their check-code realization only. Status is left for the task owner; human sign-off stays in #277.

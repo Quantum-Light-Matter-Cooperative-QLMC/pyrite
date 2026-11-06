@@ -267,46 +267,59 @@ def test_fails_closed_on_wrong_source_scope_and_confidence_budget():
         )
 
 
-def test_hoeffding_allowance_covers_true_cdfs_simultaneously_at_declared_rate():
-    """Independent coverage check: the true CDFs stay under the bound in >= 1 - delta of samples."""
+def test_production_bound_covers_true_cdfs_simultaneously_at_declared_rate():
+    """Coverage of the code's own bound against a known exponential fate law."""
     rng = np.random.default_rng(884)
-    delta, count, trials = 0.2, 200, 2000
-    stops = np.array([100.0, 200.0, 300.0])
-    # Exponential terminal depth, with independent outgoing or unresolved labels.
+    delta, count, trials = 0.2, 100, 300
+    stops = (100.0, 200.0, 300.0)
+    intervals = ((50.0, 100.0), (100.0, 200.0), (200.0, 300.0))
     scale, outgoing_share = 400.0, 0.7
-    event_cdf = 1 - np.exp(-stops / scale)
-    truth = np.stack((outgoing_share * event_cdf, (1 - outgoing_share) * event_cdf))
-    allowance = sqrt(log(2 * stops.size / delta) / (2 * count))
+    event_cdf = 1 - np.exp(-np.asarray(stops) / scale)
     failures = 0
     for _ in range(trials):
         depths = rng.exponential(scale, count)
         labels = rng.random(count) < outgoing_share
-        estimate = np.stack(
-            (
-                [(labels & (depths <= stop)).mean() for stop in stops],
-                [(~labels & (depths <= stop)).mean() for stop in stops],
-            )
+        rows = [
+            AxialHandoffRecord(i, "retained", 300.0)
+            if z > 300.0
+            else AxialHandoffRecord(i, "physical_outgoing" if out else "unresolved", float(z))
+            for i, (z, out) in enumerate(zip(depths, labels, strict=True))
+        ]
+        bounds = run_bounds(rows, intervals=intervals, sampling_failure_probability=delta)
+        failures += any(
+            outgoing_share * cdf > b.observed_outgoing_fraction + b.fate_fraction_allowance
+            or (1 - outgoing_share) * cdf
+            > b.observed_unresolved_fraction + b.fate_fraction_allowance
+            for b, cdf in zip(bounds, event_cdf, strict=True)
         )
-        failures += np.any(truth > estimate + allowance)
     assert failures / trials <= delta
 
 
-def test_code_allowance_matches_the_coverage_oracle_on_a_sampled_census():
-    rng = np.random.default_rng(885)
-    count = 300
-    depths = rng.exponential(400.0, count)
-    rows = [
-        AxialHandoffRecord(i, "physical_outgoing", float(z))
-        if z <= 300.0
-        else AxialHandoffRecord(i, "retained", 300.0)
-        for i, z in enumerate(depths)
-    ]
-    bounds = run_bounds(
+def test_exit_exactly_at_a_stop_counts_in_that_interval_and_later_ones_do_not():
+    rows = [AxialHandoffRecord(i, "retained", 300.0) for i in range(100)]
+    rows[0] = AxialHandoffRecord(0, "physical_outgoing", 200.0)
+    rows[1] = AxialHandoffRecord(1, "unresolved", 200.0)
+    rows[2] = AxialHandoffRecord(2, "physical_outgoing", 200.0 + 1e-9)
+    first, second = run_bounds(rows)
+    assert first.observed_outgoing_fraction == pytest.approx(1 / 100)
+    assert first.observed_unresolved_fraction == pytest.approx(1 / 100)
+    assert second.observed_outgoing_fraction == pytest.approx(2 / 100)
+
+
+def test_fate_terms_add_to_the_supplied_source_terms_exactly():
+    base = source()
+    rows = records()
+    enriched = add_physical_fate_source_bounds(
+        base,
         rows,
-        intervals=((50.0, 100.0), (100.0, 200.0), (200.0, 300.0)),
-        sampling_failure_probability=0.2,
+        sampled_max_depth_ang=300.0,
+        caps=caps(),
+        sample_evidence_id="independent-incident-histories",
+        sampling_failure_probability=0.01,
     )
-    allowance = sqrt(log(6 / 0.2) / (2 * count))
-    for bound, stop in zip(bounds, (100.0, 200.0, 300.0), strict=True):
-        assert bound.fate_fraction_allowance == pytest.approx(allowance)
-        assert bound.observed_outgoing_fraction == pytest.approx(np.mean(depths <= stop))
+    extra = run_bounds(rows)
+    for old, new, term in zip(base.intervals, enriched.intervals, extra, strict=True):
+        assert new.return_upper == pytest.approx(old.return_upper + term.return_source_error_upper)
+        assert new.unresolved_upper == pytest.approx(
+            old.unresolved_upper + term.unresolved_source_error_upper
+        )

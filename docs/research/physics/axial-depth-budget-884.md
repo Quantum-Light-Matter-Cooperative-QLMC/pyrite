@@ -32,8 +32,8 @@ $$
 \leq \frac{R+U+G+S}{L} \leq \epsilon_\mathrm{max}.
 $$
 
-The first inequality requires independently justified **disjoint error
-coverage** (or valid triangle-bound overlap treatment): the code verifies
+The first inequality requires independently justified **exhaustive error
+coverage**, including interaction between channels; overlap only loosens the bound: the code verifies
 arithmetic, not the premise. ``unresolved`` is not itself a photon yield;
 it must first be mapped through a defensible photon-yield envelope. The old
 `AxialDepthEvidence` sums three supplied dimensionless fractions; it is not
@@ -58,7 +58,7 @@ confidence. `require_axial_photon_depth_budget` selects **only** an interval
 covering the requested depth, refuses zero-depth relative normalization,
 missing/mismatched data, inadequate joint confidence and a bound exceeding the
 requested error tolerance. No interpolation or extrapolation is performed;
-a depth gap is a refusal, even when its endpoints passed. Adjacent intervals
+a requested depth inside a gap refuses, even when both neighbouring intervals passed; a gap elsewhere does not block a covered depth. Adjacent intervals
 may have different bounds, and a failing later interval does not invalidate
 an independently certified earlier one.
 
