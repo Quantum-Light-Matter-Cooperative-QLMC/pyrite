@@ -76,6 +76,7 @@ class BlockSpectrumScorer:
     def __init__(self, case: Mapping[str, Any], inputs: Mapping[str, Any]):
         from .cxr_grid import cxr_truncation_audit
         from .emission_adapters import select_emission
+        from .line_roulette import line_screen_for
         from .streamed_recovery import EscapeScoringRecovery, RowScoringRecovery
 
         self.case = case
@@ -91,6 +92,7 @@ class BlockSpectrumScorer:
         self.n_hat, self.groove = inputs["n_hat"], inputs["groove"]
         self.Ne_lines, self.Ne_brem = inputs["Ne_lines"], inputs["Ne_brem"]
         self.audit = cxr_truncation_audit(case, self.E_grid, n_electrons=self.Ne_lines)
+        self.line_screen = line_screen_for(case, self.Ne_lines)
         self.table_cache: dict = {}
         self.totals: tuple | None = None
         self.n_segments = 0
@@ -117,6 +119,7 @@ class BlockSpectrumScorer:
             electron_limit=self.Ne_lines,
             table_cache=self.table_cache,
             truncation_audit=self.audit,
+            line_screen=self.line_screen,
         )
         brem_batch = replace(batch, electron_limit=self.Ne_brem)
         spec = self.emission.cxr.evaluate(batch, "spec").values
@@ -234,6 +237,8 @@ class BlockSpectrumScorer:
                     if truncation is None
                     else {**diagnostic_grid, "truncation_audit": truncation}
                 )
+        if self.line_screen is not None:
+            out["line_roulette"] = self.line_screen.record()
         if events := self.fallbacks.events():
             out["physics_fallbacks"] = events
         return out

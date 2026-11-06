@@ -37,7 +37,9 @@ _LINE_COMPONENT_KEY = {
     "transition": "spec_transition",
     "photon": "photon_aperture",
 }
-_SHARED_KEYS = frozenset({"case", "E_grid", "scale", "adaptive_sampling", "physics_fallbacks"})
+_SHARED_KEYS = frozenset(
+    {"case", "E_grid", "scale", "adaptive_sampling", "physics_fallbacks", "line_roulette"}
+)
 
 
 def checkpoint_dir(stem: str, root: str | os.PathLike[str]) -> Path:

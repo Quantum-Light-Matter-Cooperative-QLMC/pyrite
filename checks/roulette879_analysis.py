@@ -227,3 +227,45 @@ def yield_variance_summary(mass, probabilities):
         "added_variance": added,
         "added_over_analog": added / analog if analog > 0 else None,
     }
+
+
+def equal_wall_electrons(points, target_s, *, minimum, maximum):
+    """Primaries whose fitted wall time ``a + b N`` meets ``target_s``, within bounds.
+
+    ``points`` holds two measured ``(N, seconds)`` pairs at different N.
+    """
+    (n0, t0), (n1, t1) = points
+    if n0 == n1:
+        raise ValueError("calibration needs two different electron counts")
+    slope = (t1 - t0) / (n1 - n0)
+    if slope <= 0:
+        raise ValueError("calibration wall time must grow with electrons")
+    return int(np.clip(round(n0 + (target_s - t0) / slope), minimum, maximum))
+
+
+def bin_rse_summary(batches, reference, wall_s, reference_wall_s, *, support=1e-3):
+    """Per-bin RSE over independent batches, on the analog reference's bins.
+
+    ``batches`` is ``(K, bins)``; ``reference`` the analog mean spectrum, which
+    fixes the bins kept (at or above ``support`` of its peak) and the denominator
+    for every arm, so arm RSE ratios are standard-error ratios. ``equal_wall`` rescales RSE
+    by ``sqrt(wall / reference_wall)``, the 1/sqrt(T) scaling at equal wall time.
+    """
+    values = np.asarray(batches, dtype=float)
+    reference = np.asarray(reference, dtype=float)
+    if values.ndim != 2 or values.shape[0] < 2 or values.shape[1] != reference.size:
+        raise ValueError("need at least two batches on the reference grid")
+    keep = reference >= support * reference.max()
+    error = values.std(axis=0, ddof=1) / np.sqrt(values.shape[0])
+    rse = error[keep] / reference[keep]
+    scaled = rse * np.sqrt(wall_s / reference_wall_s)
+    return {
+        "batches": int(values.shape[0]),
+        "bins": int(keep.sum()),
+        "support_peak_fraction": support,
+        "rse_q50": float(np.quantile(rse, 0.5)),
+        "rse_q95": float(np.quantile(rse, 0.95)),
+        "equal_wall_rse_q50": float(np.quantile(scaled, 0.5)),
+        "equal_wall_rse_q95": float(np.quantile(scaled, 0.95)),
+        "wall_s": float(wall_s),
+    }, scaled
