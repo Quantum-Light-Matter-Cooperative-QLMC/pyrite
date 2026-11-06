@@ -71,14 +71,39 @@ def test_scratch_is_bounded_by_the_target(monkeypatch):
 
 @pytest.mark.parametrize(
     ("previous", "applied"),
-    [(0, int(0.95 * (1024 << 20))), (1 << 40, int(0.95 * (1024 << 20))), (1 << 20, 1 << 20)],
+    [(0, 1024 << 19), (1 << 40, 1024 << 19), (1 << 20, 1 << 20)],
 )
 def test_pool_limit_never_raises_a_cap_and_restores_it(monkeypatch, previous, applied):
     calls = []
     backend = SimpleNamespace(
-        memory_limit_bytes=lambda: previous, set_memory_limit_bytes=calls.append
+        memory_limit_bytes=lambda: previous,
+        set_memory_limit_bytes=calls.append,
+        device_bytes_outside_pool=lambda: 0,
     )
     monkeypatch.setattr(stream_sizing, "BACKEND", backend)
     with MemoryBlockSizer(1024, TransportKernelTuning()).pool_limit():
         assert calls == [applied]
     assert calls == [applied, previous]
+
+
+@pytest.mark.parametrize(
+    ("target_mib", "outside_mib", "pool_mib"),
+    [
+        (1024, 512, 512),  # small target: half, best effort
+        (8192, 1352, 8192 - 1352 - 512),  # the outside memory binds
+        (16_384, 563, 16_384 - 563 - 512),
+        (65_536, 563, 0.95 * 65_536),  # fraction binds
+    ],
+)
+def test_pool_cap_leaves_room_for_memory_outside_the_pool(
+    monkeypatch, target_mib, outside_mib, pool_mib
+):
+    calls = []
+    backend = SimpleNamespace(
+        memory_limit_bytes=lambda: 0,
+        set_memory_limit_bytes=calls.append,
+        device_bytes_outside_pool=lambda: outside_mib << 20,
+    )
+    monkeypatch.setattr(stream_sizing, "BACKEND", backend)
+    with MemoryBlockSizer(target_mib, TransportKernelTuning()).pool_limit():
+        assert calls == [int(pool_mib * (1 << 20))]

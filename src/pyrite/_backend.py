@@ -76,6 +76,10 @@ class ArrayBackend:
     def set_memory_limit_bytes(self, size: int) -> None:
         return None
 
+    def device_bytes_outside_pool(self) -> int | None:
+        """Device memory in use beyond the pool's reservation, or None without a device pool."""
+        return None
+
     def is_array(self, value: Any) -> bool:
         return isinstance(value, self.array_type)
 
@@ -211,6 +215,10 @@ class CuPyBackend(ArrayBackend):
 
     def set_memory_limit_bytes(self, size: int) -> None:
         self.cp.get_default_memory_pool().set_limit(size=int(size))
+
+    def device_bytes_outside_pool(self) -> int | None:
+        free, total = self.cp.cuda.runtime.memGetInfo()
+        return max(0, int(total - free) - int(self.cp.get_default_memory_pool().total_bytes()))
 
     def allocator_stats(self) -> dict[str, float | None]:
         pool = self.cp.get_default_memory_pool()

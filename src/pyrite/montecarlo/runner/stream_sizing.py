@@ -1,6 +1,6 @@
 """Size live streamed blocks from a device-memory target (#868).
 
-``KernelTuning.stream_memory_mib`` caps the CuPy pool at the target, which is
+``KernelTuning.stream_memory_mib`` caps the CuPy pool under the target, which is
 what bounds peak device memory: scoring adapts its chunks to the pool, so its
 peak does not follow row count (#907). The block size only decides how much of
 that budget retained rows may take. A small first block measures rows per
@@ -26,9 +26,15 @@ RETAINED_FRACTION = 0.25
 SCRATCH_BYTES_PER_ELECTRON = 8 * 1024**3 / 65_536
 #: Share of the target continuation scratch may take.
 SCRATCH_FRACTION = 0.125
-#: Share of the target the pool may reserve: the driver held 0.4-0.6 GiB beyond
-#: the pool at 16-64 GiB targets on the RTX PRO 6000 (#868).
+#: Share of the target the pool may reserve at most.
 POOL_FRACTION = 0.95
+#: Target kept for allocations made outside the pool after the run starts: 0.10
+#: to 0.43 GiB on the RTX 5080 and RTX PRO 6000 (#868). Memory already in use
+#: outside the pool at the start (CUDA context, other processes) is read per run.
+POOL_HEADROOM_BYTES = 1024**3 // 2
+#: Smallest share of the target left to the pool, so small targets still run.
+#: Those targets are best effort: the reserve may not fit under them.
+MIN_POOL_FRACTION = 0.5
 _MIB = 1024**2
 
 
@@ -84,12 +90,21 @@ class MemoryBlockSizer:
 
     @contextmanager
     def pool_limit(self) -> Iterator[None]:
-        """Cap the device pool at the target for this run, never above an existing cap."""
+        """Cap the device pool under the target for this run, never above an existing cap."""
         previous = BACKEND.memory_limit_bytes()
-        if previous is None:  # no device pool
+        outside = BACKEND.device_bytes_outside_pool()
+        if previous is None or outside is None:  # no device pool
             yield
             return
-        pool_bytes = int(POOL_FRACTION * self.target_bytes)
+        pool_bytes = int(
+            max(
+                min(
+                    POOL_FRACTION * self.target_bytes,
+                    self.target_bytes - outside - POOL_HEADROOM_BYTES,
+                ),
+                MIN_POOL_FRACTION * self.target_bytes,
+            )
+        )
         limit = pool_bytes if previous == 0 else min(previous, pool_bytes)
         BACKEND.set_memory_limit_bytes(limit)
         try:
