@@ -334,7 +334,7 @@
     {
       "path": "src/pyrite/montecarlo/channeling/axial_energy_mcwf.py",
       "name": "axial_energy_mcwf",
-      "cc": 101
+      "cc": 82
     },
     {
       "path": "src/pyrite/montecarlo/channeling/axial_source_assembly.py",
@@ -412,11 +412,6 @@
       "path": "src/pyrite/montecarlo/runner/cxr_grid.py",
       "name": "_resolve_policy_grid",
       "cc": 27
-    },
-    {
-      "path": "src/pyrite/montecarlo/runner/scheduling.py",
-      "name": "run_cases",
-      "cc": 72
     },
     {
       "path": "src/pyrite/montecarlo/shell_configuration.py",
@@ -546,7 +541,7 @@
     {
       "path": "src/pyrite/montecarlo/spectrum/cxr/_setup.py",
       "name": "_prepare_spectrum",
-      "cc": 75
+      "cc": 36
     },
     {
       "path": "src/pyrite/montecarlo/spectrum/cxr_seeds.py",

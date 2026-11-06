@@ -382,23 +382,77 @@ def run_cases(
         )
 
     progress_label = _case_progress_label(cases)
-    # Passed only when requested so capture-free calls keep their exact shape.
-    capture_kw = {} if trajectory_capture is None else {"trajectory_capture": trajectory_capture}
-
-    show_bars = progress and env_value("PYRITE_LOCAL_DASHBOARD") != "1"
-
-    def _maybe_bar(iterable):
-        if not show_bars:
-            return iterable
-        bar = _progress_bar(iterable=iterable, total=len(cases), desc=progress_label)
-        return iterable if bar is None else bar
-
     n = len(cases)
-    results: list[Any] = [None] * n
     if n == 0:
-        return results
+        return [None] * n
     if observation_directions is not None and len(observation_directions) != n:
         raise ValueError("observation_directions must align with cases")
+    _refuse_adaptive_conflicts(cases, trajectory_capture, transport_only, observation_directions)
+
+    fallback_reason = None
+    if use_gpu:
+        fallback_reason = _device_budget_fallback(cases, engine)
+        use_gpu = fallback_reason is None
+
+    run = _CaseRun(
+        cases,
+        progress_label=progress_label,
+        show_bars=progress and env_value("PYRITE_LOCAL_DASHBOARD") != "1",
+        callback=callback,
+        should_stop=should_stop,
+        engine=engine,
+        use_gpu=use_gpu,
+        keep_results=keep_results,
+        on_timing=on_timing,
+        on_activity=on_activity,
+        transport_only=transport_only,
+        trajectory_capture=trajectory_capture,
+        observation_directions=observation_directions,
+        fallback_reason=fallback_reason,
+    )
+
+    # ---- GPU: pipeline CPU transport (worker pool) behind the serial GPU ------
+    if use_gpu:
+        if _cuda_transport_run(cases):
+            # Transport is on the same device as the spectrum, so the pipeline's
+            # premise -- CPU transport hidden behind GPU work -- is gone, and a
+            # worker pool would put N CUDA contexts on the one card. Run in this
+            # process instead, and let the segments stay where the kernel made
+            # them: the spectrum kernels read them in place.
+            return run.serial(keep_segments_on_device=not transport_only)
+        if max_workers == 0:
+            return run.serial()
+        # RAM-capped (_mem_worker_cap): an uncapped ncpu//2 transport pool OOM'd
+        # a worker at pool startup on the box -> BrokenProcessPool lost the run.
+        nw = _gpu_pipeline_workers(max_workers, n)
+        if nw < 2:
+            return run.serial()
+        return run.gpu_pipeline(nw)
+
+    # ---- no GPU: serial in-process, or a full-case worker pool ---------------
+    if max_workers == 0:
+        return run.serial()
+    return run.cpu_pool(_cpu_pool_workers(max_workers, n))
+
+
+# Private timing/recovery keys stripped from an output when no one aggregates them.
+_UNTIMED_OUTPUT_KEYS = (
+    *RECOVERY_KEYS,
+    "_gpu_oom_retries",
+    "_line_gpu_oom_retries",
+    "_brem_gpu_oom_retries",
+    "_generic_gpu_oom_retries",
+    "_attempted_spec_chunk",
+    "_effective_spec_chunk",
+    "_attempted_brem_chunk",
+    "_effective_brem_chunk",
+    "_learned_spec_chunk",
+    "_backend_fallback_reason",
+)
+
+
+def _refuse_adaptive_conflicts(cases, trajectory_capture, transport_only, observation_directions):
+    """Reject adaptive-precision cases combined with per-case outputs it cannot drive."""
     for index, case in enumerate(cases):
         if case.get("adaptive_precision") is None:
             continue
@@ -411,77 +465,166 @@ def run_cases(
                 "adaptive precision does not support observation directions; use fixed counts"
             )
 
-    def _directions(index):
-        return None if observation_directions is None else observation_directions[index]
 
-    def _direction_kwargs(index):
+def _device_budget_fallback(cases, engine):
+    """``None`` when the device admits the run, else the reason it falls back to CPU.
+
+    Only an ``auto`` run with an ``auto`` backend may fall back; otherwise the
+    admission error propagates.
+    """
+    try:
+        for demanding in _most_demanding_cases(cases):
+            case_runtime_plan(demanding)
+    except BackendResourceError as error:
+        if engine != "auto" or env_value("PYRITE_MC_BACKEND", "auto").lower() != "auto":
+            raise
+        _admit_cpu_fallback()
+        reason = f"device_budget_infeasible: {error}"
+        # stacklevel 3: attribute the warning to run_cases's caller.
+        warnings.warn(f"{reason}; falling back to CPU NumPy", RuntimeWarning, stacklevel=3)
+        return reason
+    return None
+
+
+def _single_thread_blas():
+    for var in (
+        "OMP_NUM_THREADS",
+        "OPENBLAS_NUM_THREADS",
+        "MKL_NUM_THREADS",
+        "NUMEXPR_NUM_THREADS",
+    ):
+        os.environ[var] = "1"
+
+
+def _pool_worker(case, *, transport):
+    """The pool entry point for one case: adaptive or fixed, transport or full case.
+
+    Resolved per call, so the plain workers are read from this module's globals.
+    """
+    if case.get("adaptive_precision") is not None:
+        return _transport_adaptive_case_worker if transport else _run_adaptive_case_worker
+    return _transport_case if transport else run_case
+
+
+def _learned_spec_chunk(learned, out):
+    """Tighten the pipeline's line-chunk cap after a GPU line-OOM retry."""
+    effective = out.get("_effective_spec_chunk")
+    if (
+        out.get("_line_gpu_oom_retries", 0)
+        and effective is not None
+        and out.get("_recovery_path") != "cpu_spectrum"
+    ):
+        return effective if learned is None else min(learned, effective)
+    return learned
+
+
+class _CaseRun:
+    """One ``run_cases`` call: its inputs, retained results and driver-side hooks.
+
+    Each scheduling branch is a method; all of them report through the same
+    activity, timing and per-case delivery helpers.
+    """
+
+    def __init__(
+        self,
+        cases,
+        *,
+        progress_label,
+        show_bars,
+        callback,
+        should_stop,
+        engine,
+        use_gpu,
+        keep_results,
+        on_timing,
+        on_activity,
+        transport_only,
+        trajectory_capture,
+        observation_directions,
+        fallback_reason,
+    ):
+        self.cases = cases
+        self.n = len(cases)
+        self.results: list[Any] = [None] * self.n
+        self.progress_label = progress_label
+        self.show_bars = show_bars
+        self.callback = callback
+        self.should_stop = should_stop
+        self.engine = engine
+        self.use_gpu = use_gpu
+        self.keep_results = keep_results
+        self.on_timing = on_timing
+        self.on_activity = on_activity
+        self.transport_only = transport_only
+        self.observation_directions = observation_directions
+        self.fallback_reason = fallback_reason
+        # Passed only when requested so capture-free calls keep their exact shape.
+        self.capture_kw = (
+            {} if trajectory_capture is None else {"trajectory_capture": trajectory_capture}
+        )
+        # Likewise the positional record_timing flag: present only when timed.
+        self.timing_args = (True,) if on_timing is not None else ()
+        self.timing = _TimingAgg() if _TIMING or on_timing is not None else None
+
+    # ---- shared driver-side helpers -----------------------------------------
+
+    def maybe_bar(self, iterable):
+        if not self.show_bars:
+            return iterable
+        bar = _progress_bar(iterable=iterable, total=self.n, desc=self.progress_label)
+        return iterable if bar is None else bar
+
+    def directions(self, index):
+        if self.observation_directions is None:
+            return None
+        return self.observation_directions[index]
+
+    def direction_kwargs(self, index):
         # Forwarded only when a case has directions, so every scalar-only run
         # calls run_case exactly as before.
-        directions = _directions(index)
+        directions = self.directions(index)
         return {} if directions is None else {"observation_directions": directions}
 
-    fallback_reason = None
-    if use_gpu:
-        try:
-            for demanding in _most_demanding_cases(cases):
-                case_runtime_plan(demanding)
-        except BackendResourceError as error:
-            if engine != "auto" or env_value("PYRITE_MC_BACKEND", "auto").lower() != "auto":
-                raise
-            _admit_cpu_fallback()
-            fallback_reason = f"device_budget_infeasible: {error}"
-            warnings.warn(
-                f"{fallback_reason}; falling back to CPU NumPy",
-                RuntimeWarning,
-                stacklevel=2,
-            )
-            use_gpu = False
+    def activity(self, phase, case_index=None, **metrics):
+        if self.on_activity is None:
+            return
+        case = self.cases[case_index] if case_index is not None else None
+        self.on_activity({"phase": phase, "case_index": case_index, "case": case, **metrics})
 
-    timing = _TimingAgg() if _TIMING or on_timing is not None else None
-
-    def _collect_timing(i, out, wait_seconds=None):
-        if timing is None:
-            for key in (
-                *RECOVERY_KEYS,
-                "_gpu_oom_retries",
-                "_line_gpu_oom_retries",
-                "_brem_gpu_oom_retries",
-                "_generic_gpu_oom_retries",
-                "_attempted_spec_chunk",
-                "_effective_spec_chunk",
-                "_attempted_brem_chunk",
-                "_effective_brem_chunk",
-                "_learned_spec_chunk",
-                "_backend_fallback_reason",
-            ):
+    def collect_timing(self, i, out, wait_seconds=None):
+        if self.timing is None:
+            for key in _UNTIMED_OUTPUT_KEYS:
                 out.pop(key, None)
             return
-        metrics = timing.collect(out, wait_seconds=wait_seconds)
-        if on_timing is not None:
-            on_timing({"case_index": i, **metrics})
+        metrics = self.timing.collect(out, wait_seconds=wait_seconds)
+        if self.on_timing is not None:
+            self.on_timing({"case_index": i, **metrics})
 
-    def _activity(phase, case_index=None, **metrics):
-        if on_activity is not None:
-            case = cases[case_index] if case_index is not None else None
-            on_activity(
-                {
-                    "phase": phase,
-                    "case_index": case_index,
-                    "case": case,
-                    **metrics,
-                }
-            )
+    def deliver(self, i, out):
+        """Retain, hand to the callback, then release one finished case."""
+        self.results[i] = out
+        if self.callback is not None:
+            self.callback(i, self.cases[i], out)
+        if not self.keep_results:
+            self.results[i] = None
+
+    def stop_requested(self):
+        return self.should_stop is not None and self.should_stop()
+
+    def report_timing(self, label, nw):
+        if _TIMING and self.timing is not None:
+            self.timing.report(label, nw=nw)
 
     @contextmanager
-    def _transport_progress(i):
+    def transport_progress(self, i):
         # In-process transports only: the sink is a context variable, so pool
         # workers never see it. Nothing is installed when nobody would listen.
-        if not show_bars and on_activity is None:
+        if not self.show_bars and self.on_activity is None:
             yield
             return
 
         def _report(done, total):
-            _activity(
+            self.activity(
                 "serial_case",
                 i,
                 in_flight_case_count=1,
@@ -489,7 +632,7 @@ def run_cases(
                 transport_electrons_total=total,
             )
 
-        sink = _TransportProgress(show_bars, _report if on_activity is not None else None)
+        sink = _TransportProgress(self.show_bars, _report if self.on_activity is not None else None)
         token = _TRANSPORT_PROGRESS.set(sink)
         try:
             yield
@@ -497,269 +640,178 @@ def run_cases(
             _TRANSPORT_PROGRESS.reset(token)
             sink.close()
 
-    def _serial(keep_segments_on_device=False):
-        force_cpu = not use_gpu and _RESOURCE_POLICY.gpu
-        with recovery_engine(engine), _cpu_spectrum_backend() if force_cpu else nullcontext():
-            for i in _maybe_bar(range(n)):
-                if should_stop is not None and should_stop():
+    # ---- serial, in this process --------------------------------------------
+
+    def serial(self, keep_segments_on_device=False):
+        force_cpu = not self.use_gpu and _RESOURCE_POLICY.gpu
+        with (
+            recovery_engine(self.engine),
+            _cpu_spectrum_backend() if force_cpu else nullcontext(),
+        ):
+            for i in self.maybe_bar(range(self.n)):
+                if self.stop_requested():
                     break
 
-                _activity("serial_case", i, in_flight_case_count=1)
+                self.activity("serial_case", i, in_flight_case_count=1)
 
-                with _transport_progress(i):
-                    out = _serial_case(i, keep_segments_on_device)
+                with self.transport_progress(i):
+                    out = self.serial_case(i, keep_segments_on_device)
 
                 # Both run_case routes report timing; the device-resident one
                 # (CUDA transport) used to skip this and emitted none.
                 if out is not None:
-                    if fallback_reason is not None:
-                        out["_backend_fallback_reason"] = fallback_reason
-                    _collect_timing(i, out)
+                    if self.fallback_reason is not None:
+                        out["_backend_fallback_reason"] = self.fallback_reason
+                    self.collect_timing(i, out)
 
-                results[i] = out
+                self.deliver(i, out)
 
-                if callback is not None:
-                    callback(i, cases[i], out)
+        self.activity("idle", in_flight_case_count=0)
+        self.report_timing("serial", nw=1)
+        return self.results
 
-                if not keep_results:
-                    results[i] = None
-
-        _activity("idle", in_flight_case_count=0)
-
-        if _TIMING and timing is not None:
-            timing.report("serial", nw=1)
-
-        return results
-
-    def _serial_case(i, keep_segments_on_device):
-        if transport_only:
-            _transport_case(
-                cases[i],
-                record_timing=on_timing is not None,
-                **capture_kw,
-            )
+    def serial_case(self, i, keep_segments_on_device):
+        case = self.cases[i]
+        if self.transport_only:
+            _transport_case(case, record_timing=self.on_timing is not None, **self.capture_kw)
             return None
         if keep_segments_on_device:
             return run_case(
-                cases[i],
-                on_timing is not None,
+                case,
+                self.on_timing is not None,
                 keep_segments_on_device=True,
-                **capture_kw,
-                **_direction_kwargs(i),
+                **self.capture_kw,
+                **self.direction_kwargs(i),
             )
-        return (
-            run_case(cases[i], True, **capture_kw, **_direction_kwargs(i))
-            if on_timing is not None
-            else run_case(cases[i], **capture_kw, **_direction_kwargs(i))
-        )
+        return run_case(case, *self.timing_args, **self.capture_kw, **self.direction_kwargs(i))
 
-    def _single_thread_blas():
-        for var in (
-            "OMP_NUM_THREADS",
-            "OPENBLAS_NUM_THREADS",
-            "MKL_NUM_THREADS",
-            "NUMEXPR_NUM_THREADS",
-        ):
-            os.environ[var] = "1"
+    # ---- GPU pipeline: pooled CPU transport behind the serial GPU spectrum ---
 
-    # ---- GPU: pipeline CPU transport (worker pool) behind the serial GPU ------
-    if use_gpu:
-        if _cuda_transport_run(cases):
-            # Transport is on the same device as the spectrum, so the pipeline's
-            # premise -- CPU transport hidden behind GPU work -- is gone, and a
-            # worker pool would put N CUDA contexts on the one card. Run in this
-            # process instead, and let the segments stay where the kernel made
-            # them: the spectrum kernels read them in place.
-            return _serial(keep_segments_on_device=not transport_only)
-        if max_workers == 0:
-            return _serial()
-        # RAM-capped (_mem_worker_cap): an uncapped ncpu//2 transport pool OOM'd
-        # a worker at pool startup on the box -> BrokenProcessPool lost the run.
-        nw = _gpu_pipeline_workers(max_workers, n)
-        if nw < 2:
-            return _serial()
+    def gpu_pipeline(self, nw):
+        """Transport in a worker pool while this process scores spectra in order.
+
+        An unbounded run keeps ``prefetch`` transports in flight and refills the
+        window before each spectrum. A bounded run (``should_stop`` given) must
+        not leave speculative transports running when its deadline passes, so it
+        keeps exactly one case in flight and submits the next only after the
+        stop check that follows each finished spectrum.
+        """
+        n = self.n
+        bounded = self.should_stop is not None
         _ensure_pool_limit()
         _single_thread_blas()
         from concurrent.futures import ProcessPoolExecutor
 
-        # A bounded scan must not leave speculative transports running when its
-        # deadline passes. Keep one case in flight and checkpoint it before exit.
-        prefetch = 1 if should_stop is not None else _gpu_pipeline_prefetch(nw, n)
-        if should_stop is not None and should_stop():
-            return results
+        prefetch = 1 if bounded else _gpu_pipeline_prefetch(nw, n)
+        if self.stop_requested():
+            return self.results
         with ProcessPoolExecutor(
             max_workers=nw,
             initializer=_worker_init,
             **_process_pool_kwargs(),
         ) as ex:
+            submit = partial(self._submit_transport, ex)
             learned_spec_chunk = None
-
-            from threading import Event
-
-            transport_ready_times = {}
-            transport_ready_events = {}
-
-            def _submit_transport(i):
-                # Worker processes are pinned to the CPU core by _worker_init;
-                # none of them may open a CUDA context on the device this
-                # process is driving.
-                transport_worker = (
-                    _transport_adaptive_case_worker
-                    if cases[i].get("adaptive_precision") is not None
-                    else _transport_case
-                )
-                fut = (
-                    ex.submit(transport_worker, cases[i], True, **capture_kw)
-                    if on_timing is not None
-                    else ex.submit(transport_worker, cases[i], **capture_kw)
-                )
-
-                if timing is not None:
-                    ready = Event()
-                    transport_ready_events[i] = ready
-
-                    def _mark_ready(_fut, i=i, ready=ready):
-                        transport_ready_times[i] = perf_counter()
-                        ready.set()
-
-                    fut.add_done_callback(_mark_ready)
-
-                return fut
-
-            inflight = {i: _submit_transport(i) for i in range(min(prefetch, n))}
+            inflight = {i: submit(i) for i in range(min(prefetch, n))}
             stopped = False
-            for i in _maybe_bar(range(n)):
-                if not stopped and should_stop is not None and should_stop():
+            for i in self.maybe_bar(range(n)):
+                if not stopped and self.stop_requested():
                     stopped = True
                 if stopped and i not in inflight:
                     break
-                _activity(
+                self.activity(
                     "transport_wait",
                     i,
                     in_flight_case_count=len(inflight),
                     transport_prefetch_count=prefetch,
                 )
-                tw0 = perf_counter() if timing is not None else 0.0
-
-                fut = inflight.pop(i)
-                tp = fut.result()
-
-                wait_seconds = perf_counter() - tw0 if timing is not None else None
-
-                if timing is not None:
-                    # Future becomes "done" immediately before callbacks execute, so .result()
-                    # can theoretically wake a few microseconds before _mark_ready has run.
-                    # Wait for our callback stamp to exist.
-                    ready = transport_ready_events.pop(i)
-                    ready.wait()
+                tw0 = perf_counter() if self.timing is not None else 0.0
+                tp = inflight.pop(i).result()
+                wait_seconds = perf_counter() - tw0 if self.timing is not None else None
 
                 j = i + prefetch
-                if j < n and not stopped and should_stop is None:
-                    inflight[j] = _submit_transport(j)
-                _activity(
+                if not bounded and j < n:
+                    inflight[j] = submit(j)
+                self.activity(
                     "spectrum",
                     i,
                     in_flight_case_count=len(inflight),
                     transport_prefetch_count=prefetch,
                 )
-                spectrum = partial(
-                    _spectrum_with_recovery, spec_chunk_cap=learned_spec_chunk, engine=engine
-                )
-                out = spectrum(cases[i], tp, record_timing=on_timing is not None)
-                directions = _directions(i)
-                if directions is not None:
-                    out["directional"] = _directional_outputs(
-                        cases[i], tp, directions, spectrum=spectrum
-                    )
+                out = self._pipeline_spectrum(i, tp, learned_spec_chunk)
                 # The payload is dead here; holding it until the next iteration
                 # rebinds tp would put prefetch + 1 of them in the driver.
                 del tp
-                line_retries = out.get("_line_gpu_oom_retries", 0)
-                effective_spec_chunk = out.get("_effective_spec_chunk")
-                if (
-                    line_retries
-                    and effective_spec_chunk is not None
-                    and out.get("_recovery_path") != "cpu_spectrum"
-                ):
-                    learned_spec_chunk = (
-                        effective_spec_chunk
-                        if learned_spec_chunk is None
-                        else min(learned_spec_chunk, effective_spec_chunk)
-                    )
+                learned_spec_chunk = _learned_spec_chunk(learned_spec_chunk, out)
                 if learned_spec_chunk is not None:
                     out["_learned_spec_chunk"] = learned_spec_chunk
-                _collect_timing(i, out, wait_seconds)
-                results[i] = out
-                if callback is not None:
-                    callback(i, cases[i], out)
-                if not keep_results:
-                    results[i] = None
-                if should_stop is not None:
-                    stopped = should_stop()
+                self.collect_timing(i, out, wait_seconds)
+                self.deliver(i, out)
+                if bounded:
+                    stopped = self.should_stop()
                     if not stopped and j < n:
-                        inflight[j] = _submit_transport(j)
-        _activity("idle", in_flight_case_count=0, transport_prefetch_count=prefetch)
-        if _TIMING and timing is not None:
-            timing.report("GPU-pipeline", nw=nw)
-        return results
+                        inflight[j] = submit(j)
+        self.activity("idle", in_flight_case_count=0, transport_prefetch_count=prefetch)
+        self.report_timing("GPU-pipeline", nw=nw)
+        return self.results
 
-    # ---- no GPU: serial in-process, or a full-case worker pool ---------------
-    if max_workers == 0:
-        return _serial()
-    max_workers = _cpu_pool_workers(max_workers, n)
-    _single_thread_blas()
-    from concurrent.futures import ProcessPoolExecutor, as_completed
+    def _submit_transport(self, ex, i):
+        # Worker processes are pinned to the CPU core by _worker_init; none of
+        # them may open a CUDA context on the device this process is driving.
+        case = self.cases[i]
+        return ex.submit(
+            _pool_worker(case, transport=True), case, *self.timing_args, **self.capture_kw
+        )
 
-    with ProcessPoolExecutor(
-        max_workers=max_workers,
-        initializer=_worker_init,
-        initargs=(not use_gpu and _RESOURCE_POLICY.gpu,),
-        **_process_pool_kwargs(),
-    ) as ex:
-        futures = {
-            # Workers run the spectrum on NumPy and the transport on the CPU
-            # core (_worker_init) -- a pool of CUDA contexts is what this pool
-            # exists to avoid.
-            (
+    def _pipeline_spectrum(self, i, tp, learned_spec_chunk):
+        case = self.cases[i]
+        spectrum = partial(
+            _spectrum_with_recovery, spec_chunk_cap=learned_spec_chunk, engine=self.engine
+        )
+        out = spectrum(case, tp, record_timing=self.on_timing is not None)
+        directions = self.directions(i)
+        if directions is not None:
+            out["directional"] = _directional_outputs(case, tp, directions, spectrum=spectrum)
+        return out
+
+    # ---- CPU pool: full cases, completion order ------------------------------
+
+    def cpu_pool(self, max_workers):
+        _single_thread_blas()
+        from concurrent.futures import ProcessPoolExecutor, as_completed
+
+        with ProcessPoolExecutor(
+            max_workers=max_workers,
+            initializer=_worker_init,
+            initargs=(not self.use_gpu and _RESOURCE_POLICY.gpu,),
+            **_process_pool_kwargs(),
+        ) as ex:
+            futures = {
+                # Workers run the spectrum on NumPy and the transport on the CPU
+                # core (_worker_init) -- a pool of CUDA contexts is what this pool
+                # exists to avoid.
                 ex.submit(
-                    _run_adaptive_case_worker
-                    if c.get("adaptive_precision") is not None
-                    else run_case,
+                    _pool_worker(c, transport=False),
                     c,
-                    True,
-                    **capture_kw,
-                    **_direction_kwargs(i),
-                )
-                if on_timing is not None
-                else ex.submit(
-                    _run_adaptive_case_worker
-                    if c.get("adaptive_precision") is not None
-                    else run_case,
-                    c,
-                    **capture_kw,
-                    **_direction_kwargs(i),
-                )
-            ): i
-            for i, c in enumerate(cases)
-        }
-        _activity("cpu_pool", in_flight_case_count=len(futures))
-        stopped = False
-        for fut in _maybe_bar(as_completed(futures)):
-            if fut.cancelled():
-                continue
-            i = futures[fut]
-            out = fut.result()
-            _collect_timing(i, out)
-            results[i] = out
-            if callback is not None:
-                callback(i, cases[i], out)
-            if not keep_results:
-                results[i] = None
-            if not stopped and should_stop is not None and should_stop():
-                stopped = True
-                for f in futures:
-                    f.cancel()
-    _activity("idle", in_flight_case_count=0)
-    if _TIMING and timing is not None:
-        timing.report("CPU-pool", nw=max_workers)
-    return results
+                    *self.timing_args,
+                    **self.capture_kw,
+                    **self.direction_kwargs(i),
+                ): i
+                for i, c in enumerate(self.cases)
+            }
+            self.activity("cpu_pool", in_flight_case_count=len(futures))
+            stopped = False
+            for fut in self.maybe_bar(as_completed(futures)):
+                if fut.cancelled():
+                    continue
+                i = futures[fut]
+                out = fut.result()
+                self.collect_timing(i, out)
+                self.deliver(i, out)
+                if not stopped and self.stop_requested():
+                    stopped = True
+                    for f in futures:
+                        f.cancel()
+        self.activity("idle", in_flight_case_count=0)
+        self.report_timing("CPU-pool", nw=max_workers)
+        return self.results
