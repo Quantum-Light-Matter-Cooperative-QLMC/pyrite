@@ -1,6 +1,6 @@
 # `cr-axial-depth-budget`: source-relative budget arithmetic
 
-**Status:** task-owner derivation (2026-11-05), awaiting fresh-context verification.
+**Status:** see the [ledger row](../ledger-channeling.md#cr-axial-depth-budget). Task-owner derivation (2026-11-05), followed by the fresh-context verification below.
 This claim covers how supplied bounds combine and when the guard refuses. It
 contains no measured bound and no calibrated depth; those belong to
 [#993](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/993).
@@ -224,3 +224,33 @@ Suggested tests: an exit at exactly a stop; `return_upper` equal to the base plu
 ### Verdict
 
 `discrepancy`, limited to the gap clause; the arithmetic re-derives. Correcting the row needs no source change for the arithmetic, and the row then matches this derivation at `rederived`. I do not recommend `anchored` until the Medium 4 survivors are closed. Status is left for the task owner; human sign-off stays in #277.
+
+## Re-verification
+
+Scoped fresh-context check, 2026-11-05, at commit `21fc34eab`. It covers only the corrected wording and the replaced and added tests. The derivation above was not repeated.
+
+**Wording.**
+
+- **Gaps:** the row, the task-owner derivation and both research notes now say that only the interval holding the requested depth is checked, and that a requested depth inside a gap refuses. This matches the guard.
+- **Exhaustiveness and interaction:** the row, the derivation, the budget note and the `source_interval_bounds` docstring now require exhaustive coverage and name the omitted $e_1e_2$ term.
+- **Causal premise:** the row, the derivation and the `physical_fate_source_uppers` docstring now state it, with the crystal-thickness case and the failing depth-resolved case.
+
+**Mutants.** The mutations were applied at import through a scratch `sitecustomize`, which also reaches the fresh-process test's subprocess. No file under `src/` or `tests/` was edited, and `git diff` confirmed both identical to `HEAD` afterwards. The baseline is 60 passed.
+
+| Former survivor | Now killed by |
+| --- | --- |
+| `outgoing_depths <= stop` to `<` | `test_exit_exactly_at_a_stop_counts_in_that_interval_and_later_ones_do_not` |
+| `unresolved_depths <= stop` to `<` | same |
+| `return_upper` replaced rather than added | `test_fate_terms_add_to_the_supplied_source_terms_exactly` |
+| solver import ahead of the guard | `test_guard_refuses_in_a_fresh_process_before_solver_modules_load` |
+| guard `>` to `>=` | `test_error_exactly_at_tolerance_is_accepted_and_just_above_is_refused` |
+
+The other 18 mutants from the first review were rerun to check that removing tests lost no kills, and all are still killed. Three added mutants are also killed: `unresolved_upper` replaced, and the allowance scaled by $1/2$ and by $0$. `test_production_bound_covers_true_cdfs_simultaneously_at_declared_rate` now calls production code and kills the $1/2$ case. `test_sign_aligned_errors_attain_the_compiled_bound_exactly` kills all five probe and lower-bound mutants. The slowest anchor takes 1.90 s, so no new `slow` marker is needed.
+
+**Remaining findings, all Low.**
+
+- The `AxialPhotonBoundInterval` docstring (`axial_depth_budget.py`, line 46) still says the budgets "must cover disjoint error sources", which contradicts the corrected row.
+- None of the three research notes states the causal premise. `axial-fate-source-bounds-884.md` says caps include later return with no return probability below one, without saying that an exit beyond the stop is not counted at that stop.
+- `test_sign_aligned_errors_attain_the_compiled_bound_exactly` pins a hand formula on random inputs and builds no signed errors, so the row's Checks entry "sign-aligned adversarial errors" overstates it slightly. The test is still effective.
+
+**Verdict:** `rederived`. The gap discrepancy is resolved and the Medium findings are closed. The row's Notes still say the derivation is awaiting verification, so the task owner updates them when applying the status. Anchors are green locally; CI was not observed. Human sign-off stays in #277.

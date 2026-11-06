@@ -43,8 +43,8 @@ class AxialPhotonBoundInterval:
     ``reference_lower`` lower-bounds the incident-normalized reference photon
     yield. Each ``*_upper`` upper-bounds the *absolute* error in that same
     observable in photons per incident, not a probability of a lost electron.
-    The four budgets must cover disjoint error sources; overlapping effects
-    cannot be made independent merely by assigning separate labels.
+    The four budgets must exhaustively cover the error, including interaction
+    between channels; overlapping effects only loosen the bound.
 
     Every bound must be valid at **every depth** in this interval (not only
     at sampled endpoints). An observed mean or SEM is not a confidence bound.
